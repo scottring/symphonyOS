@@ -50,6 +50,11 @@ export interface DayPlanPanelActions {
   placeRoutine?: (entry: DayPlanEntry, when: Date) => void
   /** The separate, explicit action: change the routine's repeating schedule. */
   changeRoutineRule?: (entry: DayPlanEntry) => void
+  /** Opens the row's detail pane (Scott, 2026-09-22: "clicking on the task
+   *  should open its detail pane"). The title is the door. */
+  open?: (entry: DayPlanEntry) => void
+  /** Deletes a task row, behind ⋯ — the host holds it for an Undo window. */
+  remove?: (entry: DayPlanEntry) => void
 }
 
 /** The day a routine's "Plan for today…" picker opens on: today when today is
@@ -121,6 +126,20 @@ function RowMenu({ entry, day, actions }: { entry: DayPlanEntry; day: Date; acti
         </button>,
       )
     }
+    if (entry.kind === 'task' && actions.remove) {
+      items.push(
+        <button
+          key="delete"
+          type="button"
+          role="menuitem"
+          aria-label={`Delete ${entry.title}`}
+          onClick={() => { setOpen(false); actions.remove?.(entry) }}
+          className="w-full px-3 py-1.5 text-left text-[13px] text-red-600 hover:bg-red-50"
+        >
+          Delete
+        </button>,
+      )
+    }
   }
   if (items.length === 0) return null
   return (
@@ -148,6 +167,19 @@ function RowMenu({ entry, day, actions }: { entry: DayPlanEntry; day: Date; acti
         </>
       )}
     </div>
+  )
+}
+
+/** The row's title wraps in full — a chooser is not a place for "…" (Scott,
+ *  2026-09-22: "titles are truncated because of the space squeeze") — and,
+ *  when the host can open a detail pane, it is the door to it. */
+function RowTitle({ entry, open }: { entry: DayPlanEntry; open?: (entry: DayPlanEntry) => void }) {
+  const cls = `block break-words text-left leading-snug ${entry.completed ? 'text-neutral-400 line-through' : 'text-neutral-800'}`
+  if (!open) return <span className={cls}>{entry.title}</span>
+  return (
+    <button type="button" onClick={() => open(entry)} aria-label={`Open ${entry.title}`} className={`${cls} hover:text-primary-800 hover:underline`}>
+      {entry.title}
+    </button>
   )
 }
 
@@ -223,9 +255,7 @@ function PlanRow({ entry, day, actions, draggable, weekPage = null }: {
       </button>
       )}
       <div className="min-w-0 flex-1">
-        <span className={`line-clamp-2 break-words leading-snug ${entry.completed ? 'text-neutral-400 line-through' : 'text-neutral-800'}`}>
-          {entry.title}
-        </span>
+        <RowTitle entry={entry} open={actions.open} />
         {entry.planned && !entry.completed && <span className="block text-[11.5px] text-primary-700">Planned today</span>}
         {entry.context && <span className="block text-[11.5px] text-neutral-500">{entry.context}</span>}
       </div>
@@ -299,9 +329,7 @@ function ChooserRow({ entry, day, actions, draggable }: {
         <Repeat aria-hidden="true" className="mt-[4px] h-3.5 w-3.5 shrink-0 text-neutral-400" />
       )}
       <div className="min-w-0 flex-1">
-        <span className={`line-clamp-2 break-words leading-snug ${entry.completed ? 'text-neutral-400 line-through' : 'text-neutral-800'}`}>
-          {entry.title}
-        </span>
+        <RowTitle entry={entry} open={actions.open} />
         {entry.context && <span className="chooser-cadence">{entry.context}</span>}
         {entry.onToday && !entry.completed && <span className="chooser-status">On today's schedule</span>}
         {entry.completed && <span className="chooser-status">Completed</span>}
@@ -728,7 +756,11 @@ export function panelActionsFor(
     toggleTask: (id: string) => void
     completeRoutine: (routineId: string, day: Date, done: boolean) => Promise<boolean>
   },
-  opts: { changeRoutineRule?: (routineId: string) => void } = {},
+  opts: {
+    changeRoutineRule?: (routineId: string) => void
+    open?: (kind: 'task' | 'routine', id: string) => void
+    remove?: (taskId: string, title: string) => void
+  } = {},
 ): DayPlanPanelActions {
   const payload = (e: DayPlanEntry) => ({ kind: e.kind, id: e.id, date: localYmd(day), title: e.title })
   return {
@@ -743,5 +775,7 @@ export function panelActionsFor(
     addTask: () => requestQuickAdd(),
     placeRoutine: (e, when) => { void a.placeRoutineOnce(e.id, when, e.title) },
     changeRoutineRule: opts.changeRoutineRule ? (e) => opts.changeRoutineRule?.(e.id) : undefined,
+    open: opts.open ? (e) => opts.open?.(e.kind, e.id) : undefined,
+    remove: opts.remove ? (e) => { if (e.kind === 'task') opts.remove?.(e.id, e.title) } : undefined,
   }
 }

@@ -1,13 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter, Link, useLocation } from 'react-router-dom'
 import { ReferenceListsProvider } from './ReferenceListsContext'
 import { ReferenceListControls, ReferenceListsDock } from './ReferenceLists'
 import type { Task } from '@/types/task'
 import { weekStartAnchor, readCadenceConfig } from '@/lib/cadence/config'
 
-const data = vi.hoisted(() => ({ tasks: [] as Task[], allow: true, push: vi.fn(), update: vi.fn(), complete: vi.fn() }))
-vi.mock('@/hooks/useSupabaseTasks', () => ({ useSupabaseTasks: () => ({ tasks: data.tasks, loading: false, updateTask: data.update, updateTasksBulk: vi.fn(), pushTask: data.push, toggleTask: data.complete }) }))
+const data = vi.hoisted(() => ({ tasks: [] as Task[], allow: true, push: vi.fn(), update: vi.fn(), complete: vi.fn(), remove: vi.fn(async () => {}) }))
+vi.mock('@/hooks/useSupabaseTasks', () => ({ useSupabaseTasks: () => ({ tasks: data.tasks, loading: false, updateTask: data.update, updateTasksBulk: vi.fn(), pushTask: data.push, toggleTask: data.complete, deleteTask: data.remove }) }))
 vi.mock('@/hooks/useFamilyMembers', () => ({ useFamilyMembers: () => ({ getCurrentUserMember: () => ({ id: 'me' }) }) }))
 vi.mock('@/hooks/useDomain', () => ({ useDomain: () => ({ layers: new Set(['personal']) }) }))
 vi.mock('@/hooks/useGatedTaskActions', async (importOriginal) => ({ ...await importOriginal<typeof import('@/hooks/useGatedTaskActions')>(), useGatedTaskActions: () => ({ updateTask: data.update, pushTask: async (...args: unknown[]) => { if (!data.allow) return false; await data.push(...args); return true } }) }))
@@ -192,6 +192,27 @@ describe('The Planning panel', () => {
     expect(screen.getByRole('menuitem', { name: 'Schedule Book the plumber' })).toBeInTheDocument()
     // A task dated today is on Today's page, not waiting here.
     expect(screen.queryByText('Pick up foot meds')).not.toBeInTheDocument()
+  })
+
+  // Scott, 2026-09-22: "also need to be able to delete items from the chooser".
+  it('Delete behind ⋯ hides the row behind an Undo line; Undo brings it back, the window closing deletes it', () => {
+    vi.useFakeTimers()
+    try {
+      mount(); fireEvent.click(screen.getByRole('button', { name: 'Pin Planning' }))
+      fireEvent.click(screen.getByRole('button', { name: 'More for Book the plumber' }))
+      fireEvent.click(screen.getByRole('menuitem', { name: 'Delete Book the plumber' }))
+      expect(screen.queryByText('Book the plumber')).not.toBeInTheDocument()
+      expect(screen.getByRole('status')).toHaveTextContent(/Deleted “Book the plumber”/)
+      expect(data.remove).not.toHaveBeenCalled()
+      fireEvent.click(screen.getByRole('button', { name: 'Undo' }))
+      expect(screen.getByText('Book the plumber')).toBeInTheDocument()
+      expect(data.remove).not.toHaveBeenCalled()
+      fireEvent.click(screen.getByRole('button', { name: 'More for Book the plumber' }))
+      fireEvent.click(screen.getByRole('menuitem', { name: 'Delete Book the plumber' }))
+      act(() => { vi.advanceTimersByTime(8500) })
+      expect(data.remove).toHaveBeenCalledWith('w')
+      expect(screen.queryByRole('status')).not.toBeInTheDocument()
+    } finally { vi.useRealTimers() }
   })
 
   it('two sections, each row with its context; no month browser beside Today', () => {
