@@ -62,7 +62,7 @@ vi.mock('./useShellChrome', () => ({
   }),
 }))
 const selectionState = vi.hoisted(() => ({ selection: null as unknown }))
-vi.mock('./providers/SelectionProvider', () => ({ useSelection: () => ({ selection: selectionState.selection }) }))
+vi.mock('./providers/SelectionProvider', () => ({ useSelection: () => ({ selection: selectionState.selection }), useSelectionOptional: () => null }))
 
 vi.mock('@/contexts/NotesContext', () => ({ NotesProvider: ({ children }: { children: ReactNode }) => <>{children}</> }))
 vi.mock('@/contexts/ListsContext', () => ({ ListsProvider: ({ children }: { children: ReactNode }) => <>{children}</> }))

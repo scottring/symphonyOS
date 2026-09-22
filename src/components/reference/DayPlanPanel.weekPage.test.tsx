@@ -287,6 +287,51 @@ describe('DayPlanPanel — the Planning panel', () => {
     expect(screen.queryByTitle('Schedule…')).toBeNull()
   })
 
+  // Scott, 2026-09-22, on the chooser beside the Week page: "clicking on the
+  // task should open its detail pane; titles are truncated because of the
+  // space squeeze from the 'plan for today' button"; "also need to be able to
+  // delete items from the chooser".
+  it('the title opens the row when the host can, wraps in full, and never clamps', () => {
+    const open = vi.fn()
+    const p = plan(0)
+    p.toPlan = [entry(1, 'from October')]
+    p.toPlan[0].title = 'A long title that would have been cut short by the verb beside it in a narrow dock'
+    render(<DayPlanPanel plan={p} day={day} actions={{ ...actions, open }} weekPage={thisWeek} />)
+    const title = screen.getByRole('button', { name: /^Open A long title/ })
+    expect(title.className).not.toMatch(/line-clamp/)
+    fireEvent.click(title)
+    expect(open).toHaveBeenCalledWith(expect.objectContaining({ id: 'w1' }))
+  })
+
+  it('without a host that can open, the title is plain text', () => {
+    render(<DayPlanPanel plan={plan(1)} day={day} actions={actions} weekPage={thisWeek} />)
+    expect(screen.queryByRole('button', { name: /^Open Item 1/ })).toBeNull()
+    expect(screen.getByText('Item 1')).toBeInTheDocument()
+  })
+
+  it('a task row offers Delete behind ⋯ when the host can remove; a routine does not', () => {
+    const remove = vi.fn()
+    const p = plan(1)
+    p.toPlan.push({ key: 'routine:r', kind: 'routine', id: 'r', title: 'Vacuum', completed: false, planned: false, group: 'plan', context: 'Weekly routine' })
+    render(<DayPlanPanel plan={p} day={day} actions={{ ...actions, remove }} weekPage={thisWeek} />)
+    fireEvent.click(screen.getByRole('button', { name: 'More for Item 1' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Delete Item 1' }))
+    expect(remove).toHaveBeenCalledWith(expect.objectContaining({ id: 'w1' }))
+    fireEvent.click(screen.getByRole('button', { name: 'More for Vacuum' }))
+    expect(screen.queryByRole('menuitem', { name: 'Delete Vacuum' })).toBeNull()
+  })
+
+  it('beside a day the chooser rows open and delete the same way', () => {
+    const open = vi.fn(); const remove = vi.fn()
+    const p = plan(1)
+    render(<DayPlanPanel plan={p} day={day} actions={{ ...actions, open, remove }} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Open Item 1' }))
+    expect(open).toHaveBeenCalledWith(expect.objectContaining({ id: 'w1' }))
+    fireEvent.click(screen.getByRole('button', { name: 'More for Item 1' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Delete Item 1' }))
+    expect(remove).toHaveBeenCalledWith(expect.objectContaining({ id: 'w1' }))
+  })
+
   it('says what it is planning: the week on screen, or the day', () => {
     expect(planningSubtitle(new Date(2026, 8, 21), new Date(2026, 8, 20))).toBe('Sep 20 – Sep 26')
     expect(planningSubtitle(new Date(2026, 8, 21), null)).toBe('Monday, September 21')

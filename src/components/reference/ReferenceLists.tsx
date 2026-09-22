@@ -1,8 +1,10 @@
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { Pin, X } from 'lucide-react'
 import { useReferenceLists, REFERENCE_KINDS, type ReferenceKind, type ReferencePin } from './ReferenceListsContext'
 import { DayPlanPanel, panelActionsFor, planningSubtitle } from './DayPlanPanel'
+import type { DayPlan, DayPlanEntry } from '@/lib/today/dayPlan'
+import { useSelectionOptional } from '@/shell/providers/SelectionProvider'
 import { useDayPlan } from '@/hooks/useDayPlan'
 import { readViewedWeek, onViewedWeekChange } from '@/lib/viewedWeekSignal'
 import { usePlanActions } from '@/hooks/usePlanActions'
@@ -165,13 +167,82 @@ export function PlanningPanelHost({ draggable = true, header }: {
   const { plan, loading, error } = useDayPlan(day, viewedWeek)
   const planActions = usePlanActions()
   const navigate = useNavigate()
+  // A row's title opens its detail pane when a shell selection exists to
+  // open it in (Scott, 2026-09-22).
+  const selection = useSelectionOptional()
+  // Delete from the chooser, held for an Undo window (Scott, 2026-09-22).
+  // The row hides at once; the DELETE fires when the window closes, on a
+  // second delete, or on unmount — never immediately, so Undo is a promise
+  // this panel can keep (deleteTask cascades to subtasks).
+  const { deleteTask } = useSupabaseTasks()
+  const deleteRef = useRef(deleteTask)
+  useEffect(() => { deleteRef.current = deleteTask }, [deleteTask])
+  const [pending, setPending] = useState<{ id: string; title: string } | null>(null)
+  const pendingRef = useRef<{ id: string; title: string } | null>(null)
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const commitDelete = useCallback(() => {
+    if (timer.current) { clearTimeout(timer.current); timer.current = null }
+    const p = pendingRef.current
+    pendingRef.current = null
+    setPending(null)
+    if (p) void deleteRef.current(p.id)
+  }, [])
+  const remove = useCallback((id: string, title: string) => {
+    if (pendingRef.current && pendingRef.current.id !== id) commitDelete()
+    if (timer.current) clearTimeout(timer.current)
+    pendingRef.current = { id, title }
+    setPending({ id, title })
+    timer.current = setTimeout(commitDelete, DELETE_UNDO_MS)
+  }, [commitDelete])
+  const undoDelete = useCallback(() => {
+    if (timer.current) { clearTimeout(timer.current); timer.current = null }
+    pendingRef.current = null
+    setPending(null)
+  }, [])
+  useEffect(() => () => {
+    if (timer.current) clearTimeout(timer.current)
+    const p = pendingRef.current
+    pendingRef.current = null
+    if (p) void deleteRef.current(p.id)
+  }, [])
   // Changing a routine's repeating schedule is its own explicit action, on
   // the routine's page — never a side effect of placing it.
-  const actions = useMemo(() => panelActionsFor(day, planActions, { changeRoutineRule: () => navigate('/routines') }), [day, planActions, navigate])
+  const actions = useMemo(() => panelActionsFor(day, planActions, {
+    changeRoutineRule: () => navigate('/routines'),
+    open: selection ? (kind, id) => selection.setSelection({ kind, id }) : undefined,
+    remove,
+  }), [day, planActions, navigate, selection, remove])
+  const visible = useMemo(() => (plan && pending ? withoutTask(plan, pending.id) : plan), [plan, pending])
   const body = error ? <p role="alert" className="py-5 text-[15px] text-danger-600">Could not load the plan.</p>
-    : loading || !plan ? <p className="py-5 text-[15px] text-neutral-500">Loading…</p>
-    : <DayPlanPanel plan={plan} day={day} actions={actions} weekPage={viewedWeek} draggable={draggable} />
-  return <>{header?.(day, viewedWeek)}{body}</>
+    : loading || !visible ? <p className="py-5 text-[15px] text-neutral-500">Loading…</p>
+    : <DayPlanPanel plan={visible} day={day} actions={actions} weekPage={viewedWeek} draggable={draggable} />
+  return <>
+    {header?.(day, viewedWeek)}
+    {pending && (
+      <p role="status" className="mt-2 flex items-center gap-3 rounded-md bg-neutral-50 px-3 py-2 text-[13px] text-neutral-600">
+        <span className="min-w-0 flex-1 truncate">Deleted “{pending.title}”</span>
+        <button type="button" onClick={undoDelete} className="shrink-0 font-semibold text-primary-700 hover:text-primary-900">Undo</button>
+      </p>
+    )}
+    {body}
+  </>
+}
+
+const DELETE_UNDO_MS = 8000
+
+/** The plan without one task's rows — while its delete waits on Undo. */
+function withoutTask(plan: DayPlan, id: string): DayPlan {
+  const drop = (rows: DayPlanEntry[] | undefined) => rows?.filter((e) => !(e.kind === 'task' && e.id === id))
+  return {
+    ...plan,
+    toPlan: drop(plan.toPlan) ?? [],
+    chooserTasks: drop(plan.chooserTasks) ?? [],
+    unfinished: drop(plan.unfinished) ?? [],
+    week: drop(plan.week) ?? [],
+    month: drop(plan.month) ?? [],
+    carried: drop(plan.carried) ?? [],
+    scheduled: drop(plan.scheduled) ?? [],
+  }
 }
 
 /** The Planning pin: one panel, named for what it does, for whichever day or

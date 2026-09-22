@@ -375,7 +375,11 @@ export function TodayView({
     ...planActions,
     toggleTask: onToggleTask,
     completeRoutine: async (id, _day, done) => { onCompleteRoutine?.(id, done); return true },
-  }, { changeRoutineRule: () => navigate('/routines') }), [viewedDate, planActions, onToggleTask, onCompleteRoutine, navigate])
+  }, {
+    changeRoutineRule: () => navigate('/routines'),
+    // The sheet's row titles open the same detail pane the page's rows do.
+    open: (kind, id) => onSelectItem(`${kind}-${id}`),
+  }), [viewedDate, planActions, onToggleTask, onCompleteRoutine, navigate, onSelectItem])
   const [planOpenDay, setPlanOpenDay] = useState<string | null>(null)
   const planOpenInline = planOpenDay === localYmd(viewedDate)
   // The desktop pin is always TODAY's plan; another day, or a phone (which
