@@ -24,6 +24,13 @@ describe('FirstWeekCard', () => {
     expect(screen.getByRole('button', { name: /use our sample page/i })).toBeInTheDocument()
   })
 
+  it('shows the hint only under the year step', () => {
+    render(<FirstWeekCard steps={firstWeekSteps(none)} onHide={vi.fn()} onSamplePage={vi.fn()} />)
+
+    expect(screen.getByText('One thing you want to be true by December.')).toBeInTheDocument()
+    expect(screen.getByText('Name your people').closest('li')).not.toHaveTextContent('One thing you want')
+  })
+
   it('a done step collapses to its done line', () => {
     render(
       <FirstWeekCard

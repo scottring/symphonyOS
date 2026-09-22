@@ -69,6 +69,10 @@ export function FirstWeekCard({ steps, onHide, onSamplePage, onClearSample }: Fi
                 </Link>
               )}
 
+              {!step.done && step.hint && (
+                <div className="text-[13px] text-neutral-500 mt-0.5">{step.hint}</div>
+              )}
+
               {step.id === 'page' && !step.done && (
                 <div className="text-[13px] text-neutral-500 mt-0.5">
                   No paper handy?{' '}

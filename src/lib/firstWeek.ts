@@ -33,6 +33,9 @@ export interface FirstWeekStep {
   done: boolean
   doneLine: string | null
   to: string
+  /** A short muted line under an undone step's label — currently only the
+   *  year step carries one. */
+  hint?: string
 }
 
 export function firstWeekSteps(s: FirstWeekSignals): FirstWeekStep[] {
@@ -43,6 +46,7 @@ export function firstWeekSteps(s: FirstWeekSignals): FirstWeekStep[] {
       done: s.yearPlanned,
       doneLine: s.yearPlanned ? 'see Year' : null,
       to: '/year',
+      hint: 'One thing you want to be true by December.',
     },
     {
       id: 'people',

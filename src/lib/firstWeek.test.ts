@@ -47,6 +47,12 @@ describe('firstWeekSteps', () => {
     expect(s[2].to).toBe('/today?plan=paper')
   })
 
+  it('only the year step carries a hint', () => {
+    const s = firstWeekSteps(none)
+    expect(s[0].hint).toBe('One thing you want to be true by December.')
+    expect(s.slice(1).every((x) => x.hint === undefined)).toBe(true)
+  })
+
   it('done lines point at where the result lives', () => {
     const s = firstWeekSteps({
       yearPlanned: true,
