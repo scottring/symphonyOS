@@ -794,23 +794,25 @@ export function HomeViewContainer({ fixedView }: { fixedView?: 'today' | 'week' 
 
   return (
     <ScheduleActionsProvider value={scheduleActionsValue}>
-      {fixedView !== 'week' && firstWeekUid && (
+      {fixedView !== 'week' && firstWeekUid && showFirstWeek && (
         // The SAME column the Today masthead draws in (TodayView's
         // max-w-[1152px] + md:px-10 lg:px-14), so the card sits directly above
         // the day card on the same left and right edges. Without it the card
         // spanned the full content width and hung out past the page.
         <div className="w-full max-w-[1152px] mr-auto px-0 pt-2 md:px-10 md:pt-8 lg:px-14">
-          {showFirstWeek && (
-            <FirstWeekCard
-              steps={firstWeekStepsList}
-              onHide={handleHideFirstWeek}
-              onSamplePage={handleSamplePage}
-              onClearSample={hasSample ? handleClearSample : undefined}
-            />
-          )}
-          <PlanningNudge uid={firstWeekUid} />
+          <FirstWeekCard
+            steps={firstWeekStepsList}
+            onHide={handleHideFirstWeek}
+            onSamplePage={handleSamplePage}
+            onClearSample={hasSample ? handleClearSample : undefined}
+          />
         </div>
       )}
+
+      {/* PlanningNudge owns its own wrapper and renders null when there's
+          nothing to say, so this never leaves an empty padded band above
+          Today. */}
+      {fixedView !== 'week' && firstWeekUid && <PlanningNudge uid={firstWeekUid} />}
 
       <HomeView
         tasks={tasks}

@@ -33,7 +33,7 @@ interface PlanningNudgeProps {
 
 export function PlanningNudge({ uid }: PlanningNudgeProps) {
   const { seasons } = useHouseholdSeasons()
-  const { completed, neverPlanned, loading } = usePlanningSessionsIndex()
+  const { completed, neverPlanned, loading, error } = usePlanningSessionsIndex()
 
   const [dismissedToken, setDismissedToken] = useState<string | null>(null)
   useEffect(() => {
@@ -56,7 +56,7 @@ export function PlanningNudge({ uid }: PlanningNudgeProps) {
   }, [])
 
   const nudge = useMemo(() => {
-    if (loading) return null
+    if (loading || error) return null
     return planningNudge({
       now: new Date(),
       seasons,
@@ -66,7 +66,7 @@ export function PlanningNudge({ uid }: PlanningNudgeProps) {
       dismissedToken,
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps -- `today` stands in for `new Date()`; the Date itself is deliberately not a dep.
-  }, [loading, seasons, completed, neverPlanned, dismissedToken, today])
+  }, [loading, error, seasons, completed, neverPlanned, dismissedToken, today])
 
   const handleDismiss = useCallback(() => {
     if (!nudge) return
@@ -74,22 +74,28 @@ export function PlanningNudge({ uid }: PlanningNudgeProps) {
     setDismissedToken(nudge.token)
   }, [nudge, uid])
 
-  if (loading || !nudge) return null
+  if (loading || error || !nudge) return null
 
   return (
-    <p role="status" className="mx-3 mb-4 text-[13px] text-neutral-600 md:mx-0">
-      {nudge.text}{' '}
-      <Link to={nudge.to} className="font-semibold text-primary-700">
-        {nudge.cta}
-      </Link>{' '}
-      <span className="text-neutral-400">optional</span>{' '}
-      <button
-        type="button"
-        onClick={handleDismiss}
-        className="text-neutral-400 hover:text-neutral-600 transition-colors"
-      >
-        Not now
-      </button>
-    </p>
+    // Own wrapper (mirrors the first-week card's column) so this renders
+    // ONLY when there's a nudge to show — HomeViewContainer no longer owns
+    // a shared wrapper that would otherwise leave an empty padded band above
+    // Today when both the card and this are null.
+    <div className="w-full max-w-[1152px] mr-auto px-0 pt-2 md:px-10 md:pt-8 lg:px-14">
+      <p role="status" className="mx-3 mb-4 text-[13px] text-neutral-600 md:mx-0">
+        {nudge.text}{' '}
+        <Link to={nudge.to} className="font-semibold text-primary-700">
+          {nudge.cta}
+        </Link>{' '}
+        <span className="text-neutral-400">optional</span>{' '}
+        <button
+          type="button"
+          onClick={handleDismiss}
+          className="text-neutral-400 hover:text-neutral-600 transition-colors"
+        >
+          Not now
+        </button>
+      </p>
+    </div>
   )
 }

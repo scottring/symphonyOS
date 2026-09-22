@@ -559,7 +559,7 @@ export function PageReviewSheet({
           </div>
         )}
 
-        <div className="flex items-center justify-end gap-2 px-5 py-4 border-t border-neutral-200/60">
+        <div className="flex flex-wrap items-center justify-end gap-2 px-5 py-4 border-t border-neutral-200/60 min-w-0">
           <button type="button" onClick={onClose} className="px-4 py-2 rounded-lg text-[14px] text-neutral-600 hover:bg-neutral-100 transition-colors">
             Cancel
           </button>
@@ -568,9 +568,9 @@ export function PageReviewSheet({
               type="button"
               onClick={addToDraft}
               disabled={committing || includedCount === 0}
-              className="btn-primary px-4 py-2 rounded-lg text-[14px] disabled:opacity-50"
+              className="btn-primary px-4 py-2 rounded-lg text-[14px] disabled:opacity-50 max-w-full"
             >
-              {`Add to the plan I’m writing (${draftLabel})`}
+              <span className="break-words">{`Add to the plan I’m writing (${draftLabel})`}</span>
             </button>
           )}
           {!isEmpty && (

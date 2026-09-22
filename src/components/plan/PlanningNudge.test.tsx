@@ -7,7 +7,8 @@ vi.mock('@/hooks/useHouseholdSeasons', () => ({
   useHouseholdSeasons: () => ({ seasons: DEFAULT_SEASONS, loading: false }),
 }))
 
-const index = { completed: new Set<string>(), neverPlanned: true, loading: false, error: null, reload: vi.fn() }
+const index: { completed: Set<string>; neverPlanned: boolean; loading: boolean; error: string | null; reload: () => void } =
+  { completed: new Set<string>(), neverPlanned: true, loading: false, error: null, reload: vi.fn() }
 vi.mock('@/hooks/usePlanningSessionsIndex', () => ({ usePlanningSessionsIndex: () => index }))
 
 import { PlanningNudge, PLAN_NUDGE_DISMISSED_KEY } from './PlanningNudge'
@@ -42,6 +43,14 @@ describe('PlanningNudge', () => {
     index.loading = true
     mount()
     expect(screen.queryByRole('status')).not.toBeInTheDocument()
+  })
+
+  it('renders nothing on a read error — no nudge, no empty wrapper', () => {
+    index.error = 'network error'
+    const { container } = mount()
+    expect(screen.queryByRole('status')).not.toBeInTheDocument()
+    expect(container.querySelector('.pt-2')).not.toBeInTheDocument()
+    index.error = null
   })
 
   it('renders nothing once every period is planned', () => {

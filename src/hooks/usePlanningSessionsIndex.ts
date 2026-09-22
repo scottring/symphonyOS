@@ -14,16 +14,19 @@ import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { completedCadenceTokens } from '@/lib/assistant/cadenceDue'
 
-function hasSavedAt(notes: unknown): boolean {
-  if (!notes || typeof notes !== 'object') return false
-  const savedAt = (notes as { savedAt?: unknown }).savedAt
+function hasSavedAt(savedAt: unknown): boolean {
   return typeof savedAt === 'string' && savedAt.trim().length > 0
 }
 
+// Only the notes keys isSessionSubstantive / hasSavedAt actually inspect —
+// not the full jsonb blob, which can carry sizeable free-text reflections we
+// never render here. `stepIndex` (bookkeeping) is deliberately left out.
 interface PlanningSessionRow {
   horizon: string
   period_token: string
-  notes: unknown
+  savedAt: string | null
+  wentWell: string | null
+  didnt: string | null
 }
 
 export interface PlanningSessionsIndex {
@@ -43,15 +46,23 @@ export function usePlanningSessionsIndex(): PlanningSessionsIndex {
   const load = useCallback(async () => {
     const { data, error: err } = await supabase
       .from('planning_sessions')
-      .select('horizon, period_token, notes')
+      .select('horizon, period_token, savedAt:notes->>savedAt, wentWell:notes->>wentWell, didnt:notes->>didnt')
     if (err) {
       setError(err.message)
+      // Unknown is not "never planned" — don't flash the first-use nudge on
+      // a transient read error.
+      setNeverPlanned(false)
       setLoading(false)
       return
     }
     const rows = (data ?? []) as PlanningSessionRow[]
-    setCompleted(completedCadenceTokens(rows))
-    setNeverPlanned(!rows.some((row) => hasSavedAt(row.notes)))
+    const asNotesRows = rows.map((row) => ({
+      horizon: row.horizon,
+      period_token: row.period_token,
+      notes: { savedAt: row.savedAt ?? undefined, wentWell: row.wentWell ?? undefined, didnt: row.didnt ?? undefined },
+    }))
+    setCompleted(completedCadenceTokens(asNotesRows))
+    setNeverPlanned(!rows.some((row) => hasSavedAt(row.savedAt)))
     setError(null)
     setLoading(false)
   }, [])

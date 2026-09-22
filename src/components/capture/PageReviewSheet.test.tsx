@@ -112,6 +112,16 @@ describe('PageReviewSheet', () => {
     expect(screen.getByText(/couldn.t read anything/i)).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /add/i })).not.toBeInTheDocument()
   })
+
+  // At 390px the footer holds Cancel, the long "Add to the plan I'm
+  // writing (…)" button, and the Add-N button — it must wrap instead of
+  // clipping, and the long button must not force the footer wider than the sheet.
+  it('the footer wraps instead of clipping at narrow widths', () => {
+    renderSheet({ draftLabelFor: () => 'Week of Aug 17', onAddToDraft: vi.fn() })
+    const draftButton = screen.getByRole('button', { name: /Add to the plan I.m writing/i })
+    expect(draftButton.closest('div')).toHaveClass('flex-wrap')
+    expect(draftButton).toHaveClass('max-w-full')
+  })
 })
 
 // Altitudes (2026-09-05): every page may place on the month, the season, or

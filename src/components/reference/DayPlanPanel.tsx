@@ -432,7 +432,9 @@ export function DayPlanPanel({ plan, day, actions, draggable = true, weekPage = 
   const { user } = useAuth()
   return (
     <div data-testid="day-plan-panel">
-      <Hint name="day-pick" uid={user?.id ?? null}>The week list stays whole. Picking only marks what you mean to do today.</Hint>
+      {weekPage === null && (
+        <Hint name="day-pick" uid={user?.id ?? null}>The week list stays whole. Picking only marks what you mean to do today.</Hint>
+      )}
       <Group
         title="To plan"
         entries={plan.toPlan ?? []}
