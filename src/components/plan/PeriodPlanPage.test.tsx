@@ -881,7 +881,11 @@ describe('PeriodPlanPage — Plan <Month>', () => {
     const prevOpen = task({ id: 'p', title: 'Bike rack', bucket: 'quarter', seasonStart: summer,
       commitments: [{ level: 'season', periodStart: summer, status: 'open' }] })
     state.tasks = [prevOpen]
-    state.goals = [goal({ id: 'yg', name: 'Get strong again' })]
+    state.goals = [
+      goal({ id: 'yg', name: 'Get strong again' }),
+      // Dropped at the year: archived, not deleted — and so no longer beside the season.
+      goal({ id: 'yd', name: 'Learn the cello', status: 'archived' }),
+    ]
     renderPage('season')
     fireEvent.click(await screen.findByRole('button', { name: /^Plan Fall 2026$/ }))
     fireEvent.click(screen.getByRole('button', { name: 'Keep' }))
@@ -889,6 +893,10 @@ describe('PeriodPlanPage — Plan <Month>', () => {
     // The year's goals sit beside the season's plan (and can be written toward).
     expect(screen.getAllByText('Get strong again').length).toBeGreaterThan(0)
     expect(within(screen.getByRole('complementary')).getByText('Get strong again')).toBeInTheDocument()
+    // A year goal that was Dropped is archived, not deleted — and it must not
+    // keep standing beside the season for ever (fix round 1).
+    expect(within(screen.getByRole('complementary')).queryByText('Learn the cello')).toBeNull()
+    expect(screen.queryByText('Learn the cello')).toBeNull()
     fireEvent.change(screen.getByLabelText(/new task for fall 2026/i), { target: { value: 'Book a PT evaluation' } })
     fireEvent.click(screen.getByRole('button', { name: /add task/i }))
     fireEvent.click(screen.getByRole('button', { name: /next: save/i }))

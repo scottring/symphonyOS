@@ -206,7 +206,7 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
       return selectPeriodTasks(layered, 'season', aboveStart, aboveIsCurrent, meId, seasons).map((t) => taskRow(t, 'season', aboveStart))
     }
     if (above === 'year') {
-      return goals.filter((g) => g.year === aboveStart.getFullYear() && matchesLayers(g.context, layers)).map(goalRow)
+      return goals.filter((g) => g.year === aboveStart.getFullYear() && g.status !== 'archived' && matchesLayers(g.context, layers)).map(goalRow)
     }
     return []
   }, [above, layered, aboveStart, seasons, today, meId, tasks, goals, layers])
@@ -505,7 +505,7 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
   // A season's rail is the YEAR: goals to write beside, never tasks to take
   // down (the year plans in goals alone).
   const aboveGoalItems = useMemo(() => (above === 'year'
-    ? goals.filter((g) => g.year === aboveStart.getFullYear() && matchesLayers(g.context, layers)).map(goalAsRow)
+    ? goals.filter((g) => g.year === aboveStart.getFullYear() && g.status !== 'archived' && matchesLayers(g.context, layers)).map(goalAsRow)
     : aboveTasks.filter((t) => t.isGoal)), [above, goals, aboveStart, layers, aboveTasks])
   // The year has nothing above it: no rail, and no label for one.
   const aboveLabel = isYearSession ? '' : isSeasonSession ? String(aboveStart.getFullYear()) : 'the season'
