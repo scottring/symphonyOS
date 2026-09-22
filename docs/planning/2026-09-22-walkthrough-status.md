@@ -144,3 +144,24 @@ the fixture combines components and does not represent a complete phone-app walk
 The onboarding invitation is implemented, but new-user research is not thereby complete.
 Cross-account database privacy, external calendar sync and invitation delivery remain separate
 integration checks requiring their own real accounts/providers; none are claimed as passed.
+
+### Release verification: 8cf7b2bc
+
+- Production release is Ready on app.symphony-os.com (Vercel deployment
+  dpl_HJnxdFdu5Hrm4p6AzYbWKJRZx2aF).
+- Required pre-push typecheck and full suite passed: 632 files, 6,571 tests passed,
+  3 skipped. Production build passed; changed-file lint has zero errors.
+- Quit and reopened the signed-in test app. The new Planner/Routines/Inbox and
+  five horizon tabs appeared; Today retained Carry forward test, Test weekly task,
+  Read for 10 Minutes, and completed items. Shelves appears in the date header.
+- Opened Test weekly task to verify the former day-removal bug. macOS locked
+  before the action could be exercised. The user was asked to unlock; remaining
+  production mutation checks are pending, not passed.
+
+### Additional navigation closure
+
+The final historical-log audit found the Week → Today date inheritance issue.
+Today and Week now have distinct React route identities, so entering Today starts
+on the actual current day while browsing within a horizon retains its date.
+Explicit date deep links still apply. A route-level regression exercises Week
+browsing followed by Today navigation. This is included in the follow-up release.

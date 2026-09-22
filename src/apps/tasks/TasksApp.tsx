@@ -46,13 +46,13 @@ export function TasksApp() {
             <Routes>
             {/* Cutover paths (active when feature flag enabled) */}
             <Route path="/" element={<Navigate to="/today" replace />} />
-            <Route path="today" element={<HomeViewContainer />} />
+            <Route path="today" element={<HomeViewContainer key="today" />} />
             <Route path="inbox" element={<InboxViewContainer />} />
             <Route path="task/:taskId" element={<TaskViewRoute />} />
             {/* The Week BENCH (streamlined vision Phase 1): the provisioning
                 surface — HomeView pinned to its week grid at its own route.
                 Not a horizon rung; paper owns planning. */}
-            <Route path="week" element={<HomeViewContainer fixedView="week" />} />
+            <Route path="week" element={<HomeViewContainer key="week" fixedView="week" />} />
             {/* Remaining horizon pages stay de-navved (2026-08 pivot): old
                 links and muscle memory land on Today instead of 404ing. The
                 page components under horizons/ are parked, not deleted. */}
@@ -63,7 +63,7 @@ export function TasksApp() {
             <Route path="someday" element={<SomedayPage />} />
             {/* Legacy parallel paths (always available; planned to remove in P5) */}
             <Route path="tasks-new" element={<Navigate to="/tasks-new/today" replace />} />
-            <Route path="tasks-new/today" element={<HomeViewContainer />} />
+            <Route path="tasks-new/today" element={<HomeViewContainer key="today" />} />
             <Route path="tasks-new/inbox" element={<InboxViewContainer />} />
             <Route path="tasks-new/task/:taskId" element={<TaskViewRoute />} />
             </Routes>

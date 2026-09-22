@@ -1,7 +1,9 @@
 # Onboarding assessment from the planning walkthrough
 
-Status: design proposal informed by the September 22 walkthrough. Not implemented
-or validated with new users. Product reference: Symphony — agreed item flow &
+Status: the optional first-arrival invitation, persistent dismissal, help reentry,
+navigation, and task/goal entry paths are implemented in 8cf7b2bc. The contextual
+teaching sequence below remains a design proposal, not a validated guided tour.
+Not yet tested with fresh users. Product reference: Symphony — agreed item flow &
 design reference, codex://threads/01a0c5c4-27c9-7f50-b8db-f2615f2fe92f.
 
 ## First arrival
