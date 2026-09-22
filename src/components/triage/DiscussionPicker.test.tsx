@@ -30,6 +30,9 @@ describe('DiscussionPicker', () => {
     fireEvent.click(screen.getByRole('button', { name: /needs discussion/i }))
     const textarea = screen.getByPlaceholderText(/what's the question/i)
     fireEvent.change(textarea, { target: { value: 'Push delivery?' } })
+    // The note is a draft; it saves on blur (or after a pause), not per keystroke.
+    expect(onChange).not.toHaveBeenCalled()
+    fireEvent.blur(textarea)
     expect(onChange).toHaveBeenCalledWith({ flagged: true, note: 'Push delivery?' })
   })
 
@@ -39,6 +42,7 @@ describe('DiscussionPicker', () => {
     fireEvent.click(screen.getByRole('button', { name: /needs discussion/i }))
     const textarea = screen.getByPlaceholderText(/what's the question/i)
     fireEvent.change(textarea, { target: { value: 'Hi' } })
+    fireEvent.blur(textarea)
     expect(onChange).toHaveBeenCalledWith({ flagged: true, note: 'Hi' })
   })
 

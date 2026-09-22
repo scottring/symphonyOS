@@ -8,6 +8,7 @@ import { SchedulePopover, type ScheduleContextItem } from '@/components/triage'
 import { useScheduleActionsContext } from '@/contexts/ScheduleActionsContext'
 import { AssigneeDropdown, MultiAssigneeDropdown } from '@/components/family'
 import { Video, Check, Pencil, Hourglass, ListChecks, ChevronUp, ChevronDown, MessageCircle, AlertCircle, Mail, Car, Target } from 'lucide-react'
+import { requestDiscussionOpen } from '@/lib/discussions/openIntent'
 import { ScheduleItemItems } from './ScheduleItemItems'
 import { RowActionRail } from './RowActionRail'
 import { useMobile } from '@/hooks/useMobile'
@@ -697,15 +698,23 @@ export const ScheduleItem = memo(function ScheduleItem({
             )}
             {/* Flagged for discussion — STATE, so it belongs with the title
                 chips, not in the action rail. The control that sets it lives in
-                the row's '...' menu. */}
+                the row's '...' menu. The bubble itself is the door to the
+                conversation (Scott, 2026-09-22): it opens the item's panel
+                with its Discussion already showing. */}
             {item.needsDiscussion && (
-              <span
-                className="hidden md:inline shrink-0 text-primary-500"
-                aria-label={item.discussionNote ? `Needs discussion: ${item.discussionNote}` : 'Needs discussion'}
-                title={item.discussionNote || 'Needs discussion'}
+              <button
+                type="button"
+                className="hidden md:inline-flex shrink-0 items-center text-primary-500 hover:text-primary-700"
+                aria-label={item.discussionNote ? `Open discussion: ${item.discussionNote}` : 'Open discussion'}
+                title={item.discussionNote ? `Discussion: ${item.discussionNote}` : 'Open discussion'}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  requestDiscussionOpen(item.type, item.id.replace(/^(task|routine|event)-/, ''))
+                  onSelect()
+                }}
               >
                 <MessageCircle className="w-3.5 h-3.5" />
-              </span>
+              </button>
             )}
             {/* Needed today mark — STATE, so it belongs with the title chips,
                 not the action rail. The '...' menu sets/clears it; clicking the
