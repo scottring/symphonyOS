@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen, fireEvent, within } from '@testing-library/react'
 import type { Task } from '@/types/task'
 import { emptyDraft, type SessionDraft } from '@/lib/planning/session'
 import { PlanSession } from './PlanSession'
@@ -97,5 +97,50 @@ describe('PlanSession — week', () => {
     fireEvent.click(screen.getByRole('button', { name: /next: save/i }))
     expect(screen.getByText(/stays on October/)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /save this week/i })).toBeInTheDocument()
+  })
+})
+
+describe('PlanSession — season', () => {
+  it('plans goals and tasks with the year\'s goals beside it, and offers nothing to take from the year', () => {
+    setup({ level: 'season', periodLabel: 'Winter 2026', prevLabel: 'Fall 2026', aboveLabel: '2026',
+      open: [t({ id: 'g', title: 'Strength 2x/week', isGoal: true, bucket: 'quarter' })], above: [],
+      aboveGoals: [t({ id: 'yg', title: 'Get strong again', isGoal: true })] })
+    expect(screen.getByRole('button', { name: 'Keep, and add a next action' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /next: plan winter 2026/i }))
+    expect(screen.getByLabelText(/for a 2026 goal/i)).toBeInTheDocument()
+    expect(within(screen.getByRole('complementary')).getByText('Get strong again')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /add to winter 2026/i })).toBeNull()
+  })
+})
+
+describe('PlanSession — year', () => {
+  it('offers Keep · Done · Drop, plans goals only, and has no rail', () => {
+    const s = setup({ level: 'year', periodLabel: '2027', prevLabel: '2026', aboveLabel: '',
+      finished: [t({ id: 'f', title: 'Kitchen', isGoal: true, completed: true })], open: [t({ id: 'o', title: 'Get strong', isGoal: true })], above: [], aboveGoals: [] })
+    expect(screen.getByRole('heading', { name: /how did 2026 go/i })).toBeInTheDocument()
+    expect(screen.getAllByRole('button', { name: /^(Keep|Done|Drop)$/ })).toHaveLength(3)
+    expect(screen.queryByRole('button', { name: /next action/i })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Someday' })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Keep' }))
+    fireEvent.click(screen.getByRole('button', { name: /next: plan 2027/i }))
+    expect(screen.queryByLabelText(/new task for/i)).toBeNull()
+    expect(screen.queryByRole('complementary')).toBeNull()
+    fireEvent.change(screen.getByLabelText(/new goal for 2027/i), { target: { value: 'Run a 10k' } })
+    fireEvent.click(screen.getByRole('button', { name: /add goal/i }))
+    fireEvent.click(screen.getByRole('button', { name: /next: save/i }))
+    expect(screen.getByText(/2027 goals · kept from 2026/)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /save 2027/i })).toBeInTheDocument()
+    expect(s.onSave).not.toHaveBeenCalled()
+  })
+
+  it('fills keptIds[id] on Keep, once, and leaves it after toggling off', () => {
+    const s = setup({ level: 'year', periodLabel: '2027', prevLabel: '2026', aboveLabel: '',
+      finished: [], open: [t({ id: 'o', title: 'Get strong', isGoal: true })], above: [], aboveGoals: [] })
+    fireEvent.click(screen.getByRole('button', { name: 'Keep' }))
+    const id = s.draft.keptIds?.o
+    expect(typeof id).toBe('string')
+    expect(id).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Keep' }))
+    expect(s.draft.keptIds?.o).toBe(id)
   })
 })
