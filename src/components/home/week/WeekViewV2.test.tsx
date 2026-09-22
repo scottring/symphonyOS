@@ -6,6 +6,7 @@ import type { Task } from '@/types/task'
 import type { RecurrencePattern } from '@/types/actionable'
 import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
 import { ALL_LAYERS } from '@/lib/domains'
+import { weekStartAnchor, readCadenceConfig } from '@/lib/cadence/config'
 
 // The Planning sheet (narrow screens) computes its own plan from the shared
 // sources; these tests are about the week's viewport, so the sources are
@@ -66,10 +67,18 @@ describe('WeekViewV2 layout', () => {
   // second column of lists to understand first.
   it('gives the desktop viewport to the days; the shell owns the task chooser', () => {
     render(<WeekViewV2 {...defaultProps} routines={[]} />)
-    expect(screen.queryByLabelText("This week's list")).toBeNull()
+    expect(screen.getByRole('region', { name: "This week's list" })).toBeInTheDocument()
     expect(screen.queryByText(/Didn.t happen/)).toBeNull()
     expect(screen.queryByRole('button', { name: /This month/ })).toBeNull()
     expect(screen.queryByRole('button', { name: 'Choose tasks' })).not.toBeInTheDocument()
+  })
+
+  it('shows a week task on "This week\'s list" above the days and lets it be ticked', () => {
+    const anchor = weekStartAnchor(monday, readCadenceConfig().weekStartsOn)
+    const t = createMockTask({ id: 'w', title: 'Call the plumber', bucket: 'week', weekStart: anchor, commitments: [{ level: 'week', periodStart: anchor, status: 'open' }] })
+    render(<WeekViewV2 {...defaultProps} tasks={[t]} routines={[]} />)
+    const list = within(screen.getByRole('region', { name: "This week's list" }))
+    expect(list.getByText('Call the plumber')).toBeInTheDocument()
   })
 })
 
@@ -282,7 +291,7 @@ describe('WeekViewV2 journal spread', () => {
       expect(screen.queryByRole('radio', { name: 'Schedule' })).toBeNull()
       expect(within(screen.getByTestId('journal-day-2026-09-14')).getByText('Return library books')).toBeInTheDocument()
       // No side column here either: Planning is a sheet behind its button.
-      expect(screen.queryByLabelText("This week's list")).toBeNull()
+      expect(screen.getByRole('region', { name: "This week's list" })).toBeInTheDocument()
       expect(screen.queryByRole('dialog', { name: 'Choose tasks' })).toBeNull()
       fireEvent.click(screen.getByRole('button', { name: 'Choose tasks' }))
       expect(screen.getByRole('dialog', { name: 'Choose tasks' })).toHaveAttribute('aria-hidden', 'false')

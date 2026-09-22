@@ -40,7 +40,7 @@ export function periodStartFor(level: PlacementLevel, date: Date, seasons: Seaso
   return seasonStartFor(date, seasons)
 }
 
-function sameDay(a: Date, b: Date): boolean { return localYmd(a) === localYmd(b) }
+export function sameDay(a: Date, b: Date): boolean { return localYmd(a) === localYmd(b) }
 
 /** Every commitment that is still on a list (open or done — the record). */
 export function liveCommitments(task: Pick<Task, 'commitments'>): TaskCommitment[] {

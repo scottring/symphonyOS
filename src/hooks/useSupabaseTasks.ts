@@ -858,7 +858,11 @@ export function useSupabaseTasks() {
       focus: options?.plannedOn ? [{ userId: user.id, date: options.plannedOn }] : [],
       commitments: [],
     }
-    setTasks((prev) => [optimisticTask, ...prev])
+    // Synchronously into tasksRef too: a caller that writes to the new row in
+    // the same tick (the week session's create-then-give-it-a-day) must find it
+    // — a plain setTasks leaves the ref blind until the next render, and the
+    // follow-up write is dropped as "task not found" (the addTask-then-setBucket race).
+    setTasksNow(tasksRef, setTasks, (prev) => [optimisticTask, ...prev])
 
     const { data, error: insertError } = await supabase
       .from('tasks')
@@ -922,7 +926,7 @@ export function useSupabaseTasks() {
         if (existing) {
           const stored = dbTaskToTask(existing as DbTask)
           const had = tasksRef.current.find((t) => t.id === options.id && t !== optimisticTask)
-          setTasks((prev) => {
+          setTasksNow(tasksRef, setTasks, (prev) => {
             const rest = prev.filter((t) => t.id !== options.id)
             const held = prev.find((t) => t.id === options.id && t !== optimisticTask) ?? had
             return [{ ...stored, commitments: held?.commitments ?? stored.commitments, focus: held?.focus ?? stored.focus }, ...rest]
@@ -934,7 +938,7 @@ export function useSupabaseTasks() {
       }
       // Rollback on error. By identity: with a caller-given id the placeholder
       // shares its id with any real copy already in the list.
-      setTasks((prev) => prev.filter((t) => t !== optimisticTask))
+      setTasksNow(tasksRef, setTasks, (prev) => prev.filter((t) => t !== optimisticTask))
       setError(insertError.message)
       showToast('Failed to add task', 'error', 4000)
       return undefined
@@ -958,7 +962,7 @@ export function useSupabaseTasks() {
     // the swap leaves the task in the list twice.
     // By identity, not id: with a caller-given id the placeholder and the
     // real row share one.
-    setTasks((prev) =>
+    setTasksNow(tasksRef, setTasks, (prev) =>
       prev
         .filter((t) => t.id !== createdTask.id || t === optimisticTask)
         .map((t) => (t === optimisticTask ? createdTask : t))
@@ -1498,7 +1502,9 @@ export function useSupabaseTasks() {
    * goal of the work that defines it, and re-deciding four steps one at a time
    * is deliberation the cadence already spent on the goal itself. Finished
    * steps stay behind: they are September's record. So does a step already
-   * placed lower, which is carrying on on its own.
+   * placed lower, which is carrying on on its own. A week Keep of a goal is
+   * not a case — goals are not on weeks — so this branch is gated on
+   * `task.isGoal` and simply is not reached for a week.
    *
    * `from` names the period being carried FROM. Without it planKeep carries
    * the LATEST open commitment — after a half-failed Keep that is the
@@ -1508,11 +1514,11 @@ export function useSupabaseTasks() {
    * Returns the task's own id (callers used to receive the copy's), or
    * undefined unless the task AND every step it carries were written.
    */
-  const keepForward = useCallback(async (id: string, period: { monthStart?: Date; seasonStart?: Date }, from?: Date): Promise<string | undefined> => {
+  const keepForward = useCallback(async (id: string, period: { weekStart?: Date; monthStart?: Date; seasonStart?: Date }, from?: Date): Promise<string | undefined> => {
     const task = findTaskById(id)
     if (!task) return undefined
-    const level: PlacementLevel | null = period.monthStart ? 'month' : period.seasonStart ? 'season' : null
-    const to = period.monthStart ?? period.seasonStart
+    const level: PlacementLevel | null = period.weekStart ? 'week' : period.monthStart ? 'month' : period.seasonStart ? 'season' : null
+    const to = period.weekStart ?? period.monthStart ?? period.seasonStart
     if (!level || !to) return undefined
 
     const keepOne = async (taskId: string) => {

@@ -10,14 +10,20 @@ import { useMemo, useState } from 'react'
 import { Target, Check } from 'lucide-react'
 import type { Task } from '@/types/task'
 import type { DomainId } from '@/lib/domains'
-import { verdictOptions, summarize, type SessionDraft, type Verdict } from '@/lib/planning/session'
+import { verdictOptions, summarize, weekTaskListLabel, type SessionDraft, type SessionLevel, type Verdict } from '@/lib/planning/session'
 import { stepsThatCarryForward } from '@/lib/planning/goalSteps'
 
 type Step = 'back' | 'plan' | 'save'
 /** The row's REAL id, fixed when it is written into the draft: creating it twice finds the first (idempotent insert, Task 0). */
 const newId = () => crypto.randomUUID()
 
-export function PlanSession({ periodLabel: P, prevLabel: Q, finished, open, current, above, aboveGoals, hiddenStepGoals, domainInView = null, draft, onChange, onClose, onSave, saving, saveError }: {
+export function PlanSession({ level, aboveLabel, dayOptions = [], periodLabel: P, prevLabel: Q, finished, open, current, above, aboveGoals, hiddenStepGoals, domainInView = null, draft, onChange, onClose, onSave, saving, saveError }: {
+  /** The level being planned. The week plans tasks only, and may name a day. */
+  level: SessionLevel
+  /** The level above, as this session names it: 'the season' for a month, 'October' for a week. */
+  aboveLabel: string
+  /** Week only: the seven days this week offers a task. */
+  dayOptions?: Array<{ ymd: string; label: string }>
   periodLabel: string; prevLabel: string
   finished: Task[]; open: Task[]; current: Task[]; above: Task[]; aboveGoals: Task[]
   /** Goals whose open steps this view hides — a Keep carries them too, and the summary says so. */
@@ -33,10 +39,25 @@ export function PlanSession({ periodLabel: P, prevLabel: Q, finished, open, curr
   const [goalFor, setGoalFor] = useState('')
   const [taskText, setTaskText] = useState('')
   const [taskToward, setTaskToward] = useState('')
+  const [taskDay, setTaskDay] = useState('')
+  const week = level === 'week'
+  const copy = {
+    backSub: week
+      ? `This is ${Q}'s actual list. Keep what still matters; a ticked row is already done.`
+      : `This is ${Q}'s actual list. A next action is a new task toward the goal; the goal itself stays.`,
+    finished: week ? `Finished ${Q}` : `Finished in ${Q}`,
+    planHead: week ? `What will you get done ${P}?` : `What will ${P} add up to, and what will you do?`,
+    planSub: week
+      ? `Look at ${aboveLabel} beside you. Add what ${P} can take; most things don't need a day.`
+      : `Write ${P}'s goals with the season beside you, then the tasks that move them. Goals are never scheduled.`,
+    saveHead: week ? 'Here\'s the week' : `Here's ${P}'s plan`,
+    taskHead: week ? weekTaskListLabel(P) : `${P} tasks`,
+    marker: week ? `· on ${P}` : `· in ${P}`,
+  }
   // "Keep, and add a next action" with no action named would save as a plain
   // Keep and silently lose the action — so the session will not move on
   // until the row is named or switched to Keep.
-  const unnamedActions = open.filter((t) => draft.verdicts[t.id] === 'keep-action' && !draft.actionTitles[t.id]?.trim()).map((t) => t.id)
+  const unnamedActions = week ? [] : open.filter((t) => draft.verdicts[t.id] === 'keep-action' && !draft.actionTitles[t.id]?.trim()).map((t) => t.id)
   const [askForActions, setAskForActions] = useState(false)
   const goTo = (next: Step) => {
     if (next !== 'back' && unnamedActions.length > 0) { setAskForActions(true); setStep('back'); return }
@@ -55,8 +76,8 @@ export function PlanSession({ periodLabel: P, prevLabel: Q, finished, open, curr
   const isKept = (id: string) => draft.verdicts[id] === 'keep' || draft.verdicts[id] === 'keep-action'
   const kept = open.filter((t) => isKept(t.id))
   // A kept goal's open steps travel with it (keepForward) unless they have a verdict of their own.
-  const carried = kept.filter((g) => g.isGoal).flatMap((g) => stepsThatCarryForward(g.id, open, 'month')).filter((st) => !draft.verdicts[st.id])
-  const monthGoals = [...current.filter((t) => t.isGoal), ...kept.filter((t) => t.isGoal)]
+  const carried = kept.filter((g) => g.isGoal).flatMap((g) => stepsThatCarryForward(g.id, open, level)).filter((st) => !draft.verdicts[st.id])
+  const monthGoals = week ? [] : [...current.filter((t) => t.isGoal), ...kept.filter((t) => t.isGoal)]
   const monthTasks = [...current.filter((t) => !t.isGoal), ...kept.filter((t) => !t.isGoal), ...carried]
     .filter((t, i, all) => all.findIndex((x) => x.id === t.id) === i)
   // A task toward a goal belongs to the goal's domain; a loose one to the domain in view.
@@ -64,7 +85,7 @@ export function PlanSession({ periodLabel: P, prevLabel: Q, finished, open, curr
     ...monthGoals.map((g) => ({ id: g.id, title: g.title, context: g.context ?? null })),
     ...draft.newGoals.map((g) => ({ id: g.id, title: g.title, context: g.context ?? null })),
   ]
-  const lines = useMemo(() => summarize(draft, { open, above, aboveGoals, current, hiddenStepGoals, periodLabel: P, prevLabel: Q }), [draft, open, above, aboveGoals, current, hiddenStepGoals, P, Q])
+  const lines = useMemo(() => summarize(draft, { open, above, aboveGoals, current, hiddenStepGoals, periodLabel: P, prevLabel: Q, aboveLabel }), [draft, open, above, aboveGoals, current, hiddenStepGoals, P, Q, aboveLabel])
 
   const steps: Array<[Step, string]> = [['back', `Look back at ${Q}`], ['plan', `Plan ${P}`], ['save', 'Save']]
   const idx = steps.findIndex(([s]) => s === step)
@@ -84,7 +105,7 @@ export function PlanSession({ periodLabel: P, prevLabel: Q, finished, open, curr
         {step === 'back' && (
           <section>
             <h2 className="font-display text-xl text-neutral-800">How did {Q} go?</h2>
-            <p className="mt-1 text-sm text-neutral-500">This is {Q}'s actual list. A next action is a new task toward the goal; the goal itself stays.</p>
+            <p className="mt-1 text-sm text-neutral-500">{copy.backSub}</p>
             <div className="mt-3 grid gap-3 sm:grid-cols-2">
               <label className="text-[13px] font-semibold text-neutral-700">What went well?
                 <textarea className="input-base mt-1 min-h-[56px]" value={draft.wentWell} onChange={(e) => set({ wentWell: e.target.value })} />
@@ -96,7 +117,7 @@ export function PlanSession({ periodLabel: P, prevLabel: Q, finished, open, curr
             <p className="mt-1 text-[12px] text-neutral-400">Visible to your household.</p>
             {finished.length > 0 && (
               <>
-                <h3 className="mt-5 border-b border-neutral-200 pb-1 font-display text-lg text-neutral-800">Finished in {Q}</h3>
+                <h3 className="mt-5 border-b border-neutral-200 pb-1 font-display text-lg text-neutral-800">{copy.finished}</h3>
                 <ul>{finished.map((t) => (
                   <li key={t.id} className="flex items-center gap-2 border-b border-neutral-100 py-2 text-sm text-neutral-600">
                     {t.isGoal ? <Target className="h-4 w-4 text-accent-600" /> : <Check className="h-4 w-4 text-sage-600" />}{t.title}
@@ -112,7 +133,7 @@ export function PlanSession({ periodLabel: P, prevLabel: Q, finished, open, curr
                       {t.isGoal && <Target className="h-4 w-4 text-accent-600" />}
                       <span className="min-w-[180px] flex-1 text-sm text-neutral-800">{t.title}</span>
                       <div className="flex flex-wrap gap-1">
-                        {verdictOptions(!!t.isGoal).map((o) => (
+                        {verdictOptions(!!t.isGoal, level).map((o) => (
                           <button key={o.verdict} type="button" aria-pressed={draft.verdicts[t.id] === o.verdict}
                             onClick={() => setVerdict(t.id, o.verdict)}
                             className={`rounded-md border px-2 py-1 text-[12.5px] font-semibold ${draft.verdicts[t.id] === o.verdict ? 'border-neutral-900 bg-neutral-900 text-white' : 'border-neutral-200 bg-white text-neutral-700'}`}>
@@ -142,8 +163,9 @@ export function PlanSession({ periodLabel: P, prevLabel: Q, finished, open, curr
 
         {step === 'plan' && (
           <section>
-            <h2 className="font-display text-xl text-neutral-800">What will {P} add up to, and what will you do?</h2>
-            <p className="mt-1 text-sm text-neutral-500">Write {P}'s goals with the season beside you, then the tasks that move them. Goals are never scheduled.</p>
+            <h2 className="font-display text-xl text-neutral-800">{copy.planHead}</h2>
+            <p className="mt-1 text-sm text-neutral-500">{copy.planSub}</p>
+            {!week && (<>
             <h3 className="mt-4 border-b-2 border-primary-700 pb-1 font-display text-lg text-neutral-800">{P} goals</h3>
             <ul>
               {monthGoals.map((g) => <li key={g.id} className="flex items-center gap-2 border-b border-neutral-100 py-2 text-sm"><Target className="h-4 w-4 text-accent-600" />{g.title}</li>)}
@@ -169,20 +191,21 @@ export function PlanSession({ periodLabel: P, prevLabel: Q, finished, open, curr
               )}
               <button type="submit" className="rounded-md border border-neutral-200 px-3 text-sm font-semibold">Add goal</button>
             </form>
+            </>)}
 
-            <h3 className="mt-5 border-b border-neutral-300 pb-1 font-display text-lg text-neutral-800">{P} tasks</h3>
+            <h3 className="mt-5 border-b border-neutral-300 pb-1 font-display text-lg text-neutral-800">{copy.taskHead}</h3>
             <ul>
               {monthTasks.map((x) => <li key={x.id} className="border-b border-neutral-100 py-2 text-sm">{x.title}</li>)}
               {open.filter((t) => draft.verdicts[t.id] === 'keep-action' && draft.actionTitles[t.id]?.trim()).map((g) => (
                 <li key={`a-${g.id}`} className="border-b border-neutral-100 py-2 text-sm">{draft.actionTitles[g.id]}<span className="block text-[12px] text-neutral-400">new next action toward {g.title}</span></li>))}
               {draft.newTasks.map((x) => (
                 <li key={x.id} className="flex items-center gap-2 border-b border-neutral-100 py-2 text-sm">
-                  <span className="flex-1">{x.title}{x.linkId && <span className="block text-[12px] text-neutral-400">toward {towardOptions.find((o) => o.id === x.linkId)?.title}</span>}</span>
+                  <span className="flex-1">{x.title}{x.linkId && <span className="block text-[12px] text-neutral-400">toward {towardOptions.find((o) => o.id === x.linkId)?.title}</span>}{x.day && <span className="block text-[12px] text-neutral-400">on {dayOptions.find((o) => o.ymd === x.day)?.label ?? x.day}</span>}</span>
                   <button type="button" className="text-[12px] text-primary-700" onClick={() => set({ newTasks: draft.newTasks.filter((y) => y.id !== x.id) })}>Remove</button>
                 </li>))}
               {above.filter((a) => draft.takenFromAbove.includes(a.id)).map((a) => (
                 <li key={`t-${a.id}`} className="flex items-center gap-2 border-b border-neutral-100 py-2 text-sm">
-                  <span className="flex-1">{a.title}<span className="block text-[12px] text-neutral-400">from the season</span></span>
+                  <span className="flex-1">{a.title}<span className="block text-[12px] text-neutral-400">from {aboveLabel}</span></span>
                   <button type="button" className="text-[12px] text-primary-700" onClick={() => set({ takenFromAbove: draft.takenFromAbove.filter((id) => id !== a.id) })}>Remove</button>
                 </li>))}
             </ul>
@@ -191,10 +214,16 @@ export function PlanSession({ periodLabel: P, prevLabel: Q, finished, open, curr
               const title = taskText.trim()
               if (!title) return
               const toward = towardOptions.find((o) => o.id === taskToward)
-              set({ newTasks: [...draft.newTasks, { id: newId(), title, linkId: toward?.id, context: toward ? toward.context : domainInView }] }); setTaskText(''); setTaskToward('')
+              set({ newTasks: [...draft.newTasks, { id: newId(), title, linkId: toward?.id, day: taskDay || undefined, context: toward ? toward.context : domainInView }] }); setTaskText(''); setTaskToward(''); setTaskDay('')
             }}>
               <div className="min-w-[200px] flex-1"><input aria-label={`New task for ${P}`} className="input-base" value={taskText} onChange={(e) => setTaskText(e.target.value)} placeholder={`A task for ${P}`} /></div>
-              {towardOptions.length > 0 && (
+              {week && (
+                <select aria-label="Day for this task" className="rounded-md border border-neutral-200 px-2 text-sm" value={taskDay} onChange={(e) => setTaskDay(e.target.value)}>
+                  <option value="">Any day</option>
+                  {dayOptions.map((o) => <option key={o.ymd} value={o.ymd}>{o.label}</option>)}
+                </select>
+              )}
+              {!week && towardOptions.length > 0 && (
                 <select aria-label={`Toward a ${P} goal`} className="rounded-md border border-neutral-200 px-2 text-sm" value={taskToward} onChange={(e) => setTaskToward(e.target.value)}>
                   <option value="">Toward a {P} goal? (optional)</option>
                   {towardOptions.map((o) => <option key={o.id} value={o.id}>{o.title}</option>)}
@@ -207,7 +236,7 @@ export function PlanSession({ periodLabel: P, prevLabel: Q, finished, open, curr
 
         {step === 'save' && (
           <section>
-            <h2 className="font-display text-xl text-neutral-800">Here's {P}'s plan</h2>
+            <h2 className="font-display text-xl text-neutral-800">{copy.saveHead}</h2>
             {saveError
               ? <p role="alert" className="mt-1 text-sm text-accent-700">Some of this didn't save. It's still here and in your draft; Save again retries only these.</p>
               : <p className="mt-1 text-sm text-neutral-500">Nothing is saved yet.</p>}
@@ -233,18 +262,18 @@ export function PlanSession({ periodLabel: P, prevLabel: Q, finished, open, curr
       </div>
 
       <aside className="min-w-0 rounded-xl bg-neutral-50 p-3 lg:sticky lg:top-3">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-neutral-400">The season</p>
+        <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-neutral-400">{aboveLabel}</p>
         <ul className="mt-1">
           {aboveGoals.map((g) => <li key={g.id} className="flex items-center gap-1.5 border-t border-neutral-200 py-1.5 text-[13px] text-neutral-700"><Target className="h-3.5 w-3.5 text-accent-600" />{g.title}</li>)}
           {above.map((a) => (
             <li key={a.id} className="border-t border-neutral-200 py-1.5 text-[13px] text-neutral-700">
               {a.title}
               {step === 'plan' && (draft.takenFromAbove.includes(a.id)
-                ? <span className="ml-1 text-[12px] font-semibold text-sage-600">· in {P}</span>
+                ? <span className="ml-1 text-[12px] font-semibold text-sage-600">{copy.marker}</span>
                 : <button type="button" aria-label={`Add to ${P}: ${a.title}`} className="block text-[12px] font-semibold text-primary-700"
                     onClick={() => set({ takenFromAbove: [...draft.takenFromAbove, a.id] })}>+ Add to {P}</button>)}
             </li>))}
-          {aboveGoals.length === 0 && above.length === 0 && <li className="py-1.5 text-[13px] text-neutral-400">The season has no list yet.</li>}
+          {aboveGoals.length === 0 && above.length === 0 && <li className="py-1.5 text-[13px] text-neutral-400">{aboveLabel} has no list yet.</li>}
         </ul>
       </aside>
     </div>

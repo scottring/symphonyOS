@@ -41,14 +41,15 @@ describe("toPlanEntries — the week's list", () => {
     const r = routine({ name: 'Take out recycling' })
     const out = toPlanEntries(args({ tasks: [sat(), week, fri(), leftBehind()], unhomed: [r] }))
     expect(out.map((e) => e.title)).toEqual(['Talk to HEMS', 'Take out recycling'])
-    expect(out.map((e) => e.context)).toEqual(['September plan', 'Weekly routine · no set day'])
+    expect(out.map((e) => e.context)).toEqual(['from September', 'Weekly routine · no set day'])
     expect(out.every((e) => e.group === 'plan')).toBe(true)
   })
 
-  it('a row with a day is on that day, not here; a chosen row is on the main list, not here', () => {
+  it('a row with no week commitment is not here; a chosen week-list row stays, marked planned', () => {
     const dated = task({ bucket: 'timed', scheduledFor: new Date(2026, 8, 23) })
     const chosen = task({ title: 'Chosen', bucket: 'week', weekStart: WEEK, focus: [{ userId: 'me', date: new Date(2026, 8, 21) }] })
-    expect(toPlanEntries(args({ tasks: [dated, chosen] }))).toEqual([])
+    const out = toPlanEntries(args({ tasks: [dated, chosen] }))
+    expect(out.map((e) => [e.id, e.planned])).toEqual([[chosen.id, true]])
   })
 
   // Review, 2026-09-21: the list is the week ON SCREEN. This week's placement
@@ -63,7 +64,7 @@ describe("toPlanEntries — the week's list", () => {
     const plain = task({ bucket: 'week', weekStart: WEEK })
     const onMonth = task({ bucket: 'week', weekStart: WEEK, commitments: [c('month', SEP), c('week', WEEK)] })
     const out = toPlanEntries(args({ tasks: [plain, onMonth] }))
-    expect(out.map((e) => e.context)).toEqual([undefined, 'September plan'])
+    expect(out.map((e) => e.context)).toEqual([undefined, 'from September'])
   })
 
   it("the day's flexible occurrences ride along with their cadence; a chosen one is on the main list, not here", () => {

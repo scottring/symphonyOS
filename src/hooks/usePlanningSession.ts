@@ -9,10 +9,14 @@ import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/hooks/useAuth'
 
 export function monthToken(start: Date): string { return `${start.getFullYear()}-${start.getMonth() + 1}` }
+/** The week's first day, unpadded like monthToken: 2026-10-4. */
+export function weekToken(weekStart: Date): string { return `${weekStart.getFullYear()}-${weekStart.getMonth() + 1}-${weekStart.getDate()}` }
 
 type Saved = { at: Date; authorId: string; notes: { wentWell?: string; didnt?: string } }
 
-export function usePlanningSession(horizon: 'monthly', token: string) {
+export type SessionHorizon = 'weekly' | 'monthly'
+
+export function usePlanningSession(horizon: SessionHorizon, token: string) {
   const { user } = useAuth()
   const [saved, setSaved] = useState<Saved | null>(null)
   const [mine, setMine] = useState<{ wentWell: string; didnt: string } | null>(null)

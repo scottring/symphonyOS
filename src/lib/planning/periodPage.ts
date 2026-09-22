@@ -192,3 +192,25 @@ export function railLevel(level: PlanLevel): 'season' | 'year' | null {
   if (level === 'season') return 'year'
   return null
 }
+
+/**
+ * The rail's OFFER list: which of the level above a session may still take
+ * down. A row whose commitment to that period is already answered — carried
+ * into the next one, dropped, done — is reference, not an offer; offering it
+ * would write a second placement over a decision that has moved on. Only an
+ * OPEN commitment (or a legacy row, which has no record to read) may be
+ * taken. Goals are never offerable: they stay on their own level.
+ */
+export function offerableFromAbove(
+  tasks: readonly Task[],
+  level: 'month' | 'season',
+  periodStart: Date,
+  isCurrent: boolean,
+  seasons: Seasons = readSeasons(),
+): Task[] {
+  return tasks.filter((t) => {
+    if (t.isGoal) return false
+    const c = committedTo(t, level, periodStart, { isCurrent, seasons })
+    return c === 'legacy' || (c !== undefined && c.status === 'open')
+  })
+}

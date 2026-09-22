@@ -14,13 +14,13 @@ const writers = (over: Partial<SessionWriters> = {}) => {
     complete: vi.fn(async (id) => { calls.push(`done:${id}`); return true }),
     someday: vi.fn(async (id) => { calls.push(`someday:${id}`); return true }),
     drop: vi.fn(async (id) => { calls.push(`drop:${id}`); return true }),
-    takeIntoMonth: vi.fn(async (id, m) => { calls.push(`take:${id}:${m.getMonth()}`); return true }),
+    takeInto: vi.fn(async (id, m) => { calls.push(`take:${id}:${m.getMonth()}`); return true }),
     saveSession: vi.fn(async () => { calls.push('session'); return true }),
     ...over,
   }
   return { w, calls, rows }
 }
-const full = (): SessionDraft => ({ ...emptyDraft(oct, sep),
+const full = (): SessionDraft => ({ ...emptyDraft('month', oct, sep),
   verdicts: { g: 'keep-action', l: 'keep', p: 'drop', s: 'someday', x: 'done' },
   actionTitles: { g: 'Book a PT evaluation' }, actionIds: { g: 'A1' },
   newGoals: [{ id: 'G1', title: 'Three bids' }],
@@ -85,7 +85,7 @@ describe('applySession', () => {
 
   it('a kept goal whose next action failed retries only the action', async () => {
     const first = writers({ addTask: vi.fn(async () => undefined) })
-    const r1 = await applySession({ ...emptyDraft(oct, sep), verdicts: { g: 'keep-action' }, actionTitles: { g: 'Book PT' }, actionIds: { g: 'A1' } }, first.w, () => false)
+    const r1 = await applySession({ ...emptyDraft('month', oct, sep), verdicts: { g: 'keep-action' }, actionTitles: { g: 'Book PT' }, actionIds: { g: 'A1' } }, first.w, () => false)
     expect(r1.remaining.keptAlready).toEqual(['g'])
     const second = writers()
     await applySession(r1.remaining, second.w, () => false)
@@ -94,7 +94,7 @@ describe('applySession', () => {
 
   it('never re-completes a finished task (counts as done)', async () => {
     const { w } = writers()
-    const r = await applySession({ ...emptyDraft(oct, sep), verdicts: { b: 'done' } }, w, () => true)
+    const r = await applySession({ ...emptyDraft('month', oct, sep), verdicts: { b: 'done' } }, w, () => true)
     expect(w.complete).not.toHaveBeenCalled()
     expect(r.ok).toBe(true)
   })
@@ -102,17 +102,29 @@ describe('applySession', () => {
   it('ends a step before its goal carries, whichever verdict was clicked first', async () => {
     for (const verdicts of [{ g: 'keep', s1: 'drop' }, { s1: 'drop', g: 'keep' }] as const) {
       const { w, calls } = writers()
-      await applySession({ ...emptyDraft(oct, sep), verdicts: { ...verdicts } }, w, () => false)
+      await applySession({ ...emptyDraft('month', oct, sep), verdicts: { ...verdicts } }, w, () => false)
       expect(calls).toEqual(['drop:s1', 'keep:g', 'session'])
     }
     const { w, calls } = writers()
-    await applySession({ ...emptyDraft(oct, sep), verdicts: { g: 'keep-action', s1: 'someday', s2: 'done' }, actionTitles: { g: 'A' }, actionIds: { g: 'A1' } }, w, () => false)
+    await applySession({ ...emptyDraft('month', oct, sep), verdicts: { g: 'keep-action', s1: 'someday', s2: 'done' }, actionTitles: { g: 'A' }, actionIds: { g: 'A1' } }, w, () => false)
     expect(calls).toEqual(['someday:s1', 'done:s2', 'keep:g', 'add:A:task:g', 'session'])
+  })
+
+  it('a week draft: keep carries into the week, a new task with a day is created on that day, a month task is taken into the week', async () => {
+    const LAST = new Date(2026, 8, 27), WEEK = new Date(2026, 9, 4)
+    const d: SessionDraft = { ...emptyDraft('week', WEEK, LAST), verdicts: { o: 'keep' },
+      newTasks: [{ id: 'n1', title: 'Call the plumber', day: '2026-10-08', context: null }], takenFromAbove: ['m1'] }
+    const { w } = writers()
+    const r = await applySession(d, w, () => false)
+    expect(r.ok).toBe(true)
+    expect(w.keep).toHaveBeenCalledWith('o', WEEK, LAST)
+    expect(w.addTask).toHaveBeenCalledWith('Call the plumber', expect.objectContaining({ id: 'n1', periodStart: WEEK, day: new Date(2026, 9, 8) }))
+    expect(w.takeInto).toHaveBeenCalledWith('m1', WEEK)
   })
 
   it('creates each new item in the domain it was planned in; a next action takes its goal\'s', async () => {
     const { w } = writers({ contextOf: vi.fn((id: string) => (id === 'g' ? 'family' as const : null)) })
-    await applySession({ ...emptyDraft(oct, sep),
+    await applySession({ ...emptyDraft('month', oct, sep),
       verdicts: { g: 'keep-action' }, actionTitles: { g: 'Book PT' }, actionIds: { g: 'A1' },
       newGoals: [{ id: 'G1', title: 'Three bids', context: 'work' }],
       newTasks: [{ id: 'T1', title: 'Call Hughes', linkId: 'G1', context: 'work' }, { id: 'T2', title: 'Loose', context: null }],

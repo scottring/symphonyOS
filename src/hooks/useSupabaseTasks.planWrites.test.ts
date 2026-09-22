@@ -261,6 +261,27 @@ beforeEach(() => {
 
 afterEach(() => { vi.restoreAllMocks() })
 
+/** The week session's writers, as WeekPlanHost wires them: a new task is
+ *  created ON the week, then given its day. A failed day-write reports the
+ *  step unwritten so Save retries it. */
+function weekWriters(h: () => ReturnType<typeof useSupabaseTasks>): SessionWriters {
+  return {
+    keep: async () => true,
+    addTask: async (title, o) => {
+      const made = await h().addTask(title, undefined, undefined, undefined, { id: o.id, bucket: 'week', weekStart: o.periodStart, context: o.context })
+      if (!made) return undefined
+      if (o.day && !(await h().updateTask(made, { scheduledFor: o.day, isAllDay: true }))) return undefined
+      return made
+    },
+    contextOf: () => null,
+    complete: async () => true,
+    someday: async () => true,
+    drop: async () => true,
+    takeInto: async () => true,
+    saveSession: async () => true,
+  }
+}
+
 describe('planning writes report real outcomes', () => {
   it('updateTask returns false when the row wrote but its commitment write errored', async () => {
     db.failOn('task_commitments', { message: 'boom', code: 'XX000' })
@@ -294,6 +315,83 @@ describe('planning writes report real outcomes', () => {
     let kept: string | undefined = 'x'
     await act(async () => { kept = await result.current.keepForward('t1', { monthStart: oct }) })
     expect(kept).toBeUndefined()
+  })
+
+  it('keepForward carries a task from last week into this week: last week carried, this week open, month untouched', async () => {
+    const last = new Date(2026, 8, 27), week = new Date(2026, 9, 4), month = new Date(2026, 9, 1)
+    db.seed('tasks', dbTaskRow({ id: 't1', title: 'Plumber', bucket: 'week', week_start: localYmd(last), month_start: localYmd(month), completed: false }))
+    db.seed('task_commitments', { id: 'c1', task_id: 't1', level: 'week', period_start: localYmd(last), status: 'open', carried_to: null, ended_at: null })
+    db.seed('task_commitments', { id: 'c2', task_id: 't1', level: 'month', period_start: localYmd(month), status: 'open', carried_to: null, ended_at: null })
+    const { result } = renderHook(() => useSupabaseTasks())
+    await waitFor(() => expect(result.current.loading).toBe(false))
+    let id: string | undefined
+    await act(async () => { id = await result.current.keepForward('t1', { weekStart: week }, last) })
+    expect(id).toBe('t1')
+    const cs = db.rows('task_commitments').filter((c) => c.task_id === 't1')
+    expect(cs.find((c) => c.level === 'week' && c.period_start === localYmd(last))).toMatchObject({ status: 'carried', carried_to: localYmd(week) })
+    expect(cs.find((c) => c.level === 'week' && c.period_start === localYmd(week))).toMatchObject({ status: 'open' })
+    expect(cs.find((c) => c.level === 'month')).toMatchObject({ status: 'open' })
+    expect(db.rows('tasks').find((r) => r.id === 't1')).toMatchObject({ bucket: 'week', week_start: localYmd(week) })
+  })
+
+  it('a new week task with a day is on the week AND on its day', async () => {
+    // addTask writes `week_start` only for a bucket='week' insert — a
+    // `scheduledFor` insert lands as 'timed' with no week. So the session
+    // creates the row ON the week first, then gives it its day.
+    const week = new Date(2026, 9, 4), day = new Date(2026, 9, 6)
+    const { result } = await mountWith([])
+    const id = '22222222-2222-4222-8222-222222222222'
+    await act(async () => { await result.current.addTask('Call the plumber', undefined, undefined, undefined, { id, bucket: 'week', weekStart: week }) })
+    await act(async () => { await result.current.updateTask(id, { scheduledFor: day, isAllDay: true }) })
+    const row = db.rows('tasks').find((r) => r.id === id)!
+    expect(row.scheduled_for).toBe(day.toISOString())
+    const wk = db.rows('task_commitments').find((c) => c.task_id === id && c.level === 'week')
+    expect(wk).toMatchObject({ period_start: localYmd(week), status: 'open' })
+  })
+
+  it('a new week task with a day lands on the FIRST Save', async () => {
+    // addTask puts the new row into tasksRef synchronously, so the day-write
+    // that follows in the same tick finds it (the addTask-then-setBucket race).
+    const week = new Date(2026, 9, 4), day = new Date(2026, 9, 6)
+    const { result } = await mountWith([])
+    const id = '44444444-4444-4444-8444-444444444444'
+    const draft: SessionDraft = { ...emptyDraft('week', week, new Date(2026, 8, 27)),
+      newTasks: [{ id, title: 'Book the sitter', day: localYmd(day), context: null }] }
+    let r: Awaited<ReturnType<typeof applySession>> | undefined
+    await act(async () => { r = await applySession(draft, weekWriters(() => result.current), () => false) })
+    expect(r!.ok).toBe(true)
+    expect(db.rows('tasks').find((x) => x.id === id)!.scheduled_for).toBe(day.toISOString())
+    expect(db.rows('task_commitments').find((c) => c.task_id === id && c.level === 'week')).toMatchObject({ period_start: localYmd(week), status: 'open' })
+  })
+
+  it('when the day write fails the new week task stays in the draft, and the NEXT Save applies the day to the same row', async () => {
+    // The week's addTask writer is two steps (create on the week, then the
+    // day). A lost day is a lost decision, so the step must report itself
+    // unwritten — and the retry must not create a second row.
+    const week = new Date(2026, 9, 4), day = new Date(2026, 9, 6)
+    const { result } = await mountWith([])
+    const w = weekWriters(() => result.current)
+    const id = '33333333-3333-4333-8333-333333333333'
+    const draft: SessionDraft = { ...emptyDraft('week', week, new Date(2026, 8, 27)),
+      newTasks: [{ id, title: 'Call the plumber', day: localYmd(day), context: null }] }
+
+    db.failOnce('tasks', 'update', { message: 'boom', code: 'XX000' })
+    let first: Awaited<ReturnType<typeof applySession>> | undefined
+    await act(async () => { first = await applySession(draft, w, () => false) })
+    expect(first!.ok).toBe(false)
+    expect(first!.remaining.newTasks.map((t) => t.id)).toEqual([id])   // still to do: Save retries exactly this
+    expect(db.rows('tasks').find((x) => x.id === id)!.scheduled_for).toBeNull()
+
+    // Save again: the create is idempotent (the id rides the INSERT), so the
+    // day lands on the row that is already there — on the SECOND round, not a third.
+    db.failInsertWith('tasks', { message: 'duplicate key value violates unique constraint "tasks_pkey"', code: '23505' }, { existing: { id } })
+    let second: Awaited<ReturnType<typeof applySession>> | undefined
+    await act(async () => { second = await applySession(first!.remaining, w, () => false) })
+    expect(second!.ok).toBe(true)
+    expect(db.rows('tasks').filter((x) => x.id === id)).toHaveLength(1)          // never a second row
+    expect(db.insertedIds('tasks').filter((x) => x === id)).toHaveLength(1)
+    expect(db.rows('tasks').find((x) => x.id === id)!.scheduled_for).toBe(day.toISOString())
+    expect(db.rows('task_commitments').find((c) => c.task_id === id && c.level === 'week')).toMatchObject({ period_start: localYmd(week), status: 'open' })
   })
 
   it('addTask with a given id creates exactly one row, and a retry returns the same id without a second insert', async () => {
@@ -508,13 +606,13 @@ describe('a planning session against the real writers', () => {
   async function run(hook: { current: ReturnType<typeof useSupabaseTasks> }, d: SessionDraft) {
     const h = () => hook.current
     const w: SessionWriters = {
-      keep: async (id, monthStart, prevStart) => !!(await h().keepForward(id, { monthStart }, prevStart)),
-      addTask: (title, o) => h().addTask(title, undefined, undefined, undefined, { id: o.id, bucket: 'month', monthStart: o.monthStart, isGoal: o.isGoal, goalTaskId: o.goalTaskId, context: o.context }),
+      keep: async (id, periodStart, prevStart) => !!(await h().keepForward(id, { monthStart: periodStart }, prevStart)),
+      addTask: (title, o) => h().addTask(title, undefined, undefined, undefined, { id: o.id, bucket: 'month', monthStart: o.periodStart, isGoal: o.isGoal, goalTaskId: o.goalTaskId, context: o.context }),
       contextOf: () => null,
       complete: (id) => h().completeTask(id),
       someday: (id) => h().updateTask(id, { bucket: 'someday' }),
       drop: (id, prevStart) => h().dropCommitment(id, 'month', prevStart),
-      takeIntoMonth: (id, monthStart) => h().updateTask(id, { bucket: 'month', monthStart }),
+      takeInto: (id, periodStart) => h().updateTask(id, { bucket: 'month', monthStart: periodStart }),
       saveSession: async () => true,
     }
     let ok = false
@@ -527,8 +625,8 @@ describe('a planning session against the real writers', () => {
     it(`goal Keep + step Drop (${order}): the step stays dropped, its sibling is carried, and the summary said so`, async () => {
       const { result } = await mountWith([goal(), step('s1', 'Buy chairs'), step('s2', 'Paint')])
       const verdicts: SessionDraft['verdicts'] = order === 'goal first' ? { g1: 'keep', s1: 'drop' } : { s1: 'drop', g1: 'keep' }
-      const d: SessionDraft = { ...emptyDraft(oct, sep), verdicts }
-      const lines = summarize(d, { open: lookBackRows(result.current.tasks, sep, null).open, above: [], aboveGoals: [], periodLabel: 'October', prevLabel: 'September' })
+      const d: SessionDraft = { ...emptyDraft('month', oct, sep), verdicts }
+      const lines = summarize(d, { open: lookBackRows(result.current.tasks, sep, null).open, above: [], aboveGoals: [], periodLabel: 'October', prevLabel: 'September', aboveLabel: 'the season' })
       expect(await run(result, d)).toBe(true)
       expect(lines.find((l) => l.title === 'Buy chairs')!.destination).toBe('Dropped from September · the task is kept')
       expect(status('s1', '2026-09-01')).toBe('removed')
@@ -541,7 +639,7 @@ describe('a planning session against the real writers', () => {
 
   it('a step marked Done or Someday under a kept goal is not carried', async () => {
     const { result } = await mountWith([goal(), step('s1', 'Buy chairs'), step('s2', 'Paint')])
-    expect(await run(result, { ...emptyDraft(oct, sep), verdicts: { g1: 'keep', s1: 'done', s2: 'someday' } })).toBe(true)
+    expect(await run(result, { ...emptyDraft('month', oct, sep), verdicts: { g1: 'keep', s1: 'done', s2: 'someday' } })).toBe(true)
     expect(status('s1', '2026-10-01')).toBeUndefined()
     expect(status('s2', '2026-10-01')).toBeUndefined()
     expect(db.rows('tasks').find((r) => r.id === 's1')!.completed).toBe(true)

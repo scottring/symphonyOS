@@ -101,12 +101,21 @@ marked *verify* must be confirmed before the phase that uses them.)
    - A `planning_sessions` row is written on Save; the page shows "Planned
      <date>".
    - The draft is kept on Close.
-2. **Week list and daily picking.**
+2. **Week list and daily picking.** *Shipped 2026-09-21 (plan:
+   `docs/superpowers/plans/2026-09-21-guided-planning-phase-2-week.md`).*
    - The week session: look back at last week, with Keep extended to the
      week level.
    - "This week's list" on the Journal, keeping ticked items visible.
    - The week session's rail shows the month with "+ Add to this week".
    - Choose tasks on Today reads the week list, and picked rows stay marked.
+   - As built: one selector, `weekListTasks` (`src/lib/planning/weekList.ts`),
+     defines "on this week's list" for the Week page, Choose tasks and the
+     session (records-aware; tasks only; a row picked for today or given a
+     day stays). The month beside a week is the month containing the week's
+     fourth day. A saved week session is a `planning_sessions` row with
+     horizon `weekly` and token `YYYY-M-D` of the week's first day. Month and
+     week share one session host (`usePlanSessionHost`). A new week task may
+     take a day; it is created on the week and then dated, so it is on both.
 3. **Season and Year sessions.** The same shape, with the Year Keep fix.
    Year's look-back is skipped when last year has no goals.
 4. **Guidance and reference.**

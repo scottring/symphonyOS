@@ -7,7 +7,7 @@
 import type { Task } from '@/types/task'
 import type { DomainId } from '@/lib/domains'
 import { committedTo } from '@/lib/placement/model'
-import { localYmd } from '@/lib/cadence/config'
+import { localYmd, parseLocalYmd } from '@/lib/cadence/config'
 import { doableBy } from './poolViews'
 import { stepsThatCarryForward } from './goalSteps'
 
@@ -15,9 +15,12 @@ export type Verdict = 'keep' | 'keep-action' | 'done' | 'someday' | 'drop'
 /** `context` is the domain the item was planned in (null = none in view), or,
  *  for a task toward a goal, the goal's — fixed when it is added, never the
  *  domain in view at Save (final review I4). Absent on a draft from before. */
-export interface NewItem { id: string; title: string; linkId?: string; context?: DomainId | null }
+export interface NewItem { id: string; title: string; linkId?: string; context?: DomainId | null
+  /** Week only: an optional day (local YYYY-MM-DD) for a time-sensitive task. */
+  day?: string }
+export type SessionLevel = 'month' | 'week'
 export interface SessionDraft {
-  level: 'month'; periodStart: string; prevStart: string
+  level: SessionLevel; periodStart: string; prevStart: string
   verdicts: Record<string, Verdict>
   actionTitles: Record<string, string>
   wentWell: string; didnt: string
@@ -29,8 +32,8 @@ export interface SessionDraft {
 }
 export interface SummaryLine { title: string; destination: string }
 
-export function emptyDraft(periodStart: Date, prevStart: Date): SessionDraft {
-  return { level: 'month', periodStart: localYmd(periodStart), prevStart: localYmd(prevStart),
+export function emptyDraft(level: SessionLevel, periodStart: Date, prevStart: Date): SessionDraft {
+  return { level, periodStart: localYmd(periodStart), prevStart: localYmd(prevStart),
     verdicts: {}, actionTitles: {}, wentWell: '', didnt: '', newGoals: [], newTasks: [], takenFromAbove: [], keptAlready: [], actionIds: {}, created: [] }
 }
 
@@ -43,12 +46,14 @@ export function isEmptyDraft(d: SessionDraft): boolean {
  *  A row carried or dropped already has its answer and is not asked again.
  *  Scoped to `meId` exactly as the month page is (selectPeriodTasks): a row
  *  assigned only to someone else is not on my September, so it is not asked. */
-export function lookBackRows(tasks: readonly Task[], prevStart: Date, meId: string | null): { finished: Task[]; open: Task[] } {
+export function lookBackRows(tasks: readonly Task[], prevStart: Date, meId: string | null, level: SessionLevel = 'month'): { finished: Task[]; open: Task[] } {
   const finished: Task[] = []
   const open: Task[] = []
   for (const t of tasks) {
     if (meId && !doableBy(t, meId)) continue
-    const c = committedTo(t, 'month', prevStart, { isCurrent: false })
+    // The week plans tasks only; goals live a level up.
+    if (level === 'week' && t.isGoal) continue
+    const c = committedTo(t, level, prevStart, { isCurrent: false })
     if (!c) continue
     if (c !== 'legacy' && c.status === 'carried') continue
     if (t.completed || (c !== 'legacy' && c.status === 'done')) finished.push(t)
@@ -58,7 +63,12 @@ export function lookBackRows(tasks: readonly Task[], prevStart: Date, meId: stri
   return { finished: finished.sort(byCreated), open: open.sort(byCreated) }
 }
 
-export function verdictOptions(isGoal: boolean): Array<{ verdict: Verdict; label: string }> {
+export function verdictOptions(isGoal: boolean, level: SessionLevel = 'month'): Array<{ verdict: Verdict; label: string }> {
+  // A week row is a task: there is no goal to add a next action to.
+  if (level === 'week') {
+    return [{ verdict: 'keep', label: 'Keep' }, { verdict: 'done', label: 'Done' },
+      { verdict: 'someday', label: 'Someday' }, { verdict: 'drop', label: 'Drop' }]
+  }
   return isGoal
     ? [{ verdict: 'keep', label: 'Keep' }, { verdict: 'keep-action', label: 'Keep, and add a next action' },
        { verdict: 'someday', label: 'Someday' }, { verdict: 'drop', label: 'Drop' }]
@@ -87,7 +97,8 @@ function verdictRows(d: SessionDraft, ctx: { open: readonly Task[]; current?: re
  * work — so the summary must say it carries more than it lists. `all` is the
  * unfiltered task list; the step rule is keepForward's own.
  */
-export function goalsWithHiddenSteps(all: readonly Task[], shown: readonly Task[], prevStart: Date): Set<string> {
+export function goalsWithHiddenSteps(all: readonly Task[], shown: readonly Task[], prevStart: Date, level: SessionLevel = 'month'): Set<string> {
+  if (level === 'week') return new Set()
   const shownIds = new Set(shown.map((t) => t.id))
   const goalIds = new Set(all.filter((t) => t.goalTaskId).map((t) => t.goalTaskId!))
   const out = new Set<string>()
@@ -125,6 +136,13 @@ export function pruneDraft(d: SessionDraft, ctx: { open: readonly Task[]; above:
     keptAlready: keptAlready.filter((k) => rows.has(k)), takenFromAbove: d.takenFromAbove.filter((k) => aboveIds.has(k)) }
 }
 
+/** The week session's task-list heading, in the words of the week being
+ *  planned. A week page pages backwards, and "This week's tasks" beside a rail
+ *  marker reading "on the week of Oct 4" is a screen arguing with itself. */
+export function weekTaskListLabel(periodLabel: string): string {
+  return periodLabel === 'this week' ? "This week's tasks" : `Tasks for ${periodLabel}`
+}
+
 export function summarize(
   d: SessionDraft,
   ctx: {
@@ -132,9 +150,21 @@ export function summarize(
     /** Goals with open steps this view hides (goalsWithHiddenSteps). */
     hiddenStepGoals?: ReadonlySet<string>
     periodLabel: string; prevLabel: string
+    /** The level above, as the session names it: 'the season' for a month, 'October' for a week. */
+    aboveLabel: string
   },
 ): SummaryLine[] {
   const P = ctx.periodLabel, Q = ctx.prevLabel
+  const week = d.level === 'week'
+  const L = {
+    list: week ? weekTaskListLabel(P) : `${P} tasks`,
+    goals: `${P} goals`,
+    kept: `kept from ${Q}`,
+    done: week ? `Done ${Q}` : `Done in ${Q}`,
+    dropped: `Dropped from ${Q} · the task is kept`,
+    left: week ? `Left open ${Q}` : `Left open in ${Q}`,
+    stays: `stays on ${ctx.aboveLabel}, marked "${week ? `on ${P}` : `in ${P}`}"`,
+  }
   const lines: SummaryLine[] = []
   // A kept goal carries its steps still open in the previous month (keepForward).
   // A step with its own verdict is written first (applySession) and answers
@@ -144,43 +174,45 @@ export function summarize(
   for (const g of rows) {
     const v = d.verdicts[g.id]
     if (!g.isGoal || (v !== 'keep' && v !== 'keep-action')) continue
-    for (const s of stepsThatCarryForward(g.id, ctx.open, 'month')) carriedWith.set(s.id, g.title)
+    for (const s of stepsThatCarryForward(g.id, ctx.open, d.level)) carriedWith.set(s.id, g.title)
   }
   // No count: one line says there is more, never how much (no scoreboards).
   const alsoCarries = (g: Task) => {
     if (g.isGoal && ctx.hiddenStepGoals?.has(g.id)) {
-      lines.push({ title: `${g.title} also carries steps not shown in this view`, destination: `${P} tasks · carried with ${g.title}` })
+      lines.push({ title: `${g.title} also carries steps not shown in this view`, destination: `${L.list} · carried with ${g.title}` })
     }
   }
   for (const t of rows) {
     const v = d.verdicts[t.id]
-    const list = t.isGoal ? `${P} goals` : `${P} tasks`
-    if (v === 'keep') { lines.push({ title: t.title, destination: `${list} · kept from ${Q}` }); alsoCarries(t) }
+    const list = t.isGoal ? L.goals : L.list
+    if (v === 'keep') { lines.push({ title: t.title, destination: `${list} · ${L.kept}` }); alsoCarries(t) }
     else if (v === 'keep-action') {
-      lines.push({ title: t.title, destination: `${list} · kept from ${Q}` })
+      lines.push({ title: t.title, destination: `${list} · ${L.kept}` })
       alsoCarries(t)
       const a = d.actionTitles[t.id]?.trim()
-      if (a) lines.push({ title: a, destination: `${P} tasks · new next action toward ${t.title}` })
+      if (a) lines.push({ title: a, destination: `${L.list} · new next action toward ${t.title}` })
     }
-    else if (v === 'done') lines.push({ title: t.title, destination: `Done in ${Q}` })
+    else if (v === 'done') lines.push({ title: t.title, destination: L.done })
     else if (v === 'someday') lines.push({ title: t.title, destination: 'Someday page' })
-    else if (v === 'drop') lines.push({ title: t.title, destination: `Dropped from ${Q} · the task is kept` })
-    else if (carriedWith.has(t.id)) lines.push({ title: t.title, destination: `${P} tasks · carried with ${carriedWith.get(t.id)}` })
-    else lines.push({ title: t.title, destination: `Left open in ${Q}` })
+    else if (v === 'drop') lines.push({ title: t.title, destination: L.dropped })
+    else if (carriedWith.has(t.id)) lines.push({ title: t.title, destination: `${L.list} · carried with ${carriedWith.get(t.id)}` })
+    else lines.push({ title: t.title, destination: L.left })
   }
   const goalTitle = new Map(d.newGoals.map((g) => [g.id, g.title]))
   for (const g of d.newGoals) {
     // "for <season goal>" is shown, not stored (Phase 1): levels are separate lists.
     const forTitle = g.linkId ? ctx.aboveGoals.find((x) => x.id === g.linkId)?.title : undefined
-    lines.push({ title: g.title, destination: `${P} goals${forTitle ? ` · for ${forTitle}` : ''}` })
+    lines.push({ title: g.title, destination: `${L.goals}${forTitle ? ` · for ${forTitle}` : ''}` })
   }
   for (const n of d.newTasks) {
     const toward = n.linkId ? goalTitle.get(n.linkId) ?? ctx.open.find((t) => t.id === n.linkId)?.title : undefined
-    lines.push({ title: n.title, destination: `${P} tasks${toward ? ` · toward ${toward}` : ''}` })
+    // A week task may name a day; the weekday is the whole of what it adds.
+    const onDay = n.day ? `, on ${parseLocalYmd(n.day).toLocaleDateString('en-US', { weekday: 'short' })}` : ''
+    lines.push({ title: n.title, destination: `${L.list}${toward ? ` · toward ${toward}` : ''}${onDay}` })
   }
   for (const id of d.takenFromAbove) {
     const t = ctx.above.find((x) => x.id === id)
-    if (t) lines.push({ title: t.title, destination: `${P} tasks · stays on the season, marked "in ${P}"` })
+    if (t) lines.push({ title: t.title, destination: `${L.list} · ${L.stays}` })
   }
   return lines
 }
