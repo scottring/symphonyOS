@@ -54,6 +54,7 @@ import { HomeView } from '@/components/home';
 import { useSelection } from '@/shell/providers/SelectionProvider';
 import { useMealEventsForDate } from '@/shell/providers/MealEventsProvider';
 import { FirstWeekCard } from '@/components/schedule/FirstWeekCard';
+import { PlanningNudge } from '@/components/plan/PlanningNudge';
 import { useFirstWeekSignals } from '@/hooks/useFirstWeekSignals';
 import { firstWeekSteps, shouldShowFirstWeek, FIRST_WEEK_HIDE_KEY, hasSampleIds, readSampleIds, clearSampleIdsRecord, deleteSampleRows } from '@/lib/firstWeek';
 import { getAuthUser } from '@/lib/supabase';
@@ -793,18 +794,21 @@ export function HomeViewContainer({ fixedView }: { fixedView?: 'today' | 'week' 
 
   return (
     <ScheduleActionsProvider value={scheduleActionsValue}>
-      {showFirstWeek && (
+      {fixedView !== 'week' && firstWeekUid && (
         // The SAME column the Today masthead draws in (TodayView's
         // max-w-[1152px] + md:px-10 lg:px-14), so the card sits directly above
         // the day card on the same left and right edges. Without it the card
         // spanned the full content width and hung out past the page.
         <div className="w-full max-w-[1152px] mr-auto px-0 pt-2 md:px-10 md:pt-8 lg:px-14">
-          <FirstWeekCard
-            steps={firstWeekStepsList}
-            onHide={handleHideFirstWeek}
-            onSamplePage={handleSamplePage}
-            onClearSample={hasSample ? handleClearSample : undefined}
-          />
+          {showFirstWeek && (
+            <FirstWeekCard
+              steps={firstWeekStepsList}
+              onHide={handleHideFirstWeek}
+              onSamplePage={handleSamplePage}
+              onClearSample={hasSample ? handleClearSample : undefined}
+            />
+          )}
+          <PlanningNudge uid={firstWeekUid} />
         </div>
       )}
 

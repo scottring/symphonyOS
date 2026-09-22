@@ -8,7 +8,7 @@
  * 2026-09-05).
  */
 
-import { weekStartAnchor, type WeekStart } from '@/lib/cadence/config'
+import { weekStartAnchor, parseLocalYmd, type WeekStart } from '@/lib/cadence/config'
 
 /** Seven columns is what the grid can read at desk width. Past that the days
  *  are stripes. */
@@ -77,6 +77,17 @@ export function presetRange(preset: RangePreset, today: Date): Date[] {
 export function weekRange(today: Date, weekStartsOn: WeekStart): Date[] {
   const start = weekStartAnchor(today, weekStartsOn)
   return buildRange(start, addDays(start, 6))
+}
+
+/** `/week?start=YYYY-MM-DD` — a nudge naming a week that isn't the current
+ *  one (a `PlanningNudge` cta, or `nudges.ts`'s own week candidate) opens the
+ *  week CONTAINING that date, not a bare 7-day run from it. `null` for a
+ *  missing or malformed `start`, so the caller falls back to its own default. */
+export function weekRangeFromStartParam(start: string | null | undefined, weekStartsOn: WeekStart): Date[] | null {
+  if (!start || !/^\d{4}-\d{2}-\d{2}$/.test(start)) return null
+  const parsed = parseLocalYmd(start)
+  if (Number.isNaN(parsed.getTime())) return null
+  return weekRange(parsed, weekStartsOn)
 }
 
 /** The weeks a range touches OTHER than the current one, as week-start dates.

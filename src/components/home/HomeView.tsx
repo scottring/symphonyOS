@@ -1,5 +1,5 @@
 import { useLocation } from 'react-router-dom'
-import { presetRange, weekRange } from '@/lib/planning/dateRange'
+import { presetRange, weekRange, weekRangeFromStartParam } from '@/lib/planning/dateRange'
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react'
 import { useCadenceConfig, readCadenceConfig, weekStartAnchor } from '@/lib/cadence/config'
 import { HomeChromeControls } from './HomeChromeControls'
@@ -204,6 +204,7 @@ export function HomeView({
   // time-block overlay's range picker moved here and the overlay went).
   const location = useLocation()
   const rangePreset = new URLSearchParams(location.search).get('range')
+  const startParam = new URLSearchParams(location.search).get('start')
   const [rangeDays, setRangeDays] = useState(7)
   // Journal (the paper week) or Schedule (the hourly grid). Always opens as
   // the journal; switching is presentation only — same dates, same data.
@@ -216,8 +217,10 @@ export function HomeView({
 
   // Arriving at /week — from the navigation's Week menu or anywhere else —
   // opens the seven-day week unless the link names a shorter run
-  // (?range=weekend | three). Keyed on the navigation itself, so choosing
-  // "Weekend" twice, or "Open week page" after a weekend, re-applies.
+  // (?range=weekend | three) or a specific week (?start=YYYY-MM-DD, from a
+  // planning nudge naming a week that isn't the current one). Keyed on the
+  // navigation itself, so choosing "Weekend" twice, or "Open week page"
+  // after a weekend, re-applies.
   const onDateChangeRef = useRef(onDateChange)
   const viewedDateRef = useRef(viewedDate)
   useEffect(() => {
@@ -226,9 +229,10 @@ export function HomeView({
   })
   useEffect(() => {
     if (fixedView !== 'week') return
-    const range = rangePreset === 'weekend' || rangePreset === 'three'
-      ? presetRange(rangePreset, new Date())
-      : weekRange(new Date(), readCadenceConfig().weekStartsOn)
+    const range = weekRangeFromStartParam(startParam, readCadenceConfig().weekStartsOn)
+      ?? (rangePreset === 'weekend' || rangePreset === 'three'
+        ? presetRange(rangePreset, new Date())
+        : weekRange(new Date(), readCadenceConfig().weekStartsOn))
     setWeekStart(range[0])
     setRangeDays(range.length)
     setWeekMode('journal')
@@ -237,7 +241,7 @@ export function HomeView({
     if (sundayOfWeek(viewedDateRef.current).getTime() !== sundayOfWeek(range[0]).getTime()) {
       onDateChangeRef.current(range[0])
     }
-  }, [fixedView, rangePreset, location.key])
+  }, [fixedView, rangePreset, startParam, location.key])
 
   // Changing the setting re-anchors the week on screen. Without this the view
   // keeps whatever the initial state captured until a remount, so the setting
