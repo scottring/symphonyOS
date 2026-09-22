@@ -225,9 +225,10 @@ describe('ScheduleItemActionsMenu', () => {
       renderMenu(taskItem, {}, vi.fn(), { onUpdateDiscussion })
 
       fireEvent.click(screen.getByText('Flag for discussion…'))
-      fireEvent.change(screen.getByPlaceholderText("What's the question?"), {
-        target: { value: 'ask Iris' },
-      })
+      const box = screen.getByPlaceholderText("What's the question?")
+      fireEvent.change(box, { target: { value: 'ask Iris' } })
+      // The note is a draft: it saves on blur (or after a pause), not per keystroke.
+      fireEvent.blur(box)
 
       expect(onUpdateDiscussion).toHaveBeenCalledWith({
         needsDiscussion: true,
