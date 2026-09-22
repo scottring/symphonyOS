@@ -1,3 +1,4 @@
+import { publishViewedDay } from '@/lib/viewedDaySignal'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter, Link, useLocation } from 'react-router-dom'
@@ -120,13 +121,14 @@ describe('Pinned reference lists', () => {
 // ── The Today pin (2026-09-19) ─────────────────────────────────────────────
 // Same pin system as Week and Month: a third pin, not a permanent sidebar.
 const planMock = vi.hoisted(() => ({
+  readDay: vi.fn(),
   chooseTaskDay: vi.fn(), unchooseTask: vi.fn(), timeTask: vi.fn(), commitTask: vi.fn(),
   chooseRoutine: vi.fn(), drop: vi.fn(), toggleTask: vi.fn(), completeRoutine: vi.fn(async () => true),
   deleteTask: vi.fn(async () => {}), deleteRoutine: vi.fn(async () => true),
 }))
 vi.mock('@/hooks/usePlanActions', () => ({ usePlanActions: () => planMock }))
 vi.mock('@/hooks/useDayPlan', () => ({
-  useDayPlan: () => ({
+  useDayPlan: (day: Date) => { planMock.readDay(day); return ({
     loading: false, error: false,
     plan: {
       carried: [],
@@ -154,10 +156,28 @@ vi.mock('@/hooks/useDayPlan', () => ({
         { key: 'routine:r2', kind: 'routine', id: 'r2', title: 'Family reading time', completed: false, planned: true, group: 'available', context: 'Daily routine' },
       ],
     },
-  }),
+  }) },
 }))
 
 describe('The Planning panel', () => {
+  it('follows the displayed day for both routine data and occurrence actions', () => {
+    const first = new Date(2026, 8, 22)
+    const next = new Date(2026, 8, 23)
+    publishViewedDay(first)
+    const view = mount()
+    fireEvent.click(screen.getByRole('button', { name: 'Pin Planning' }))
+    expect(screen.getByText('Tuesday, September 22')).toBeInTheDocument()
+    act(() => publishViewedDay(next))
+    expect(screen.queryByText('Tuesday, September 22')).toBeNull()
+    expect(screen.getByText('Wednesday, September 23')).toBeInTheDocument()
+    expect(planMock.readDay).toHaveBeenLastCalledWith(next)
+    fireEvent.click(screen.getByRole('navigation', { name: 'Shelf source' }).querySelector('button:last-child')!)
+    fireEvent.click(screen.getByRole('button', { name: 'Choose Kids clean rooms for today' }))
+    expect(planMock.chooseRoutine).toHaveBeenLastCalledWith('r1', next, true, 'Kids clean rooms')
+    view.unmount()
+    publishViewedDay(null)
+  })
+
   it('pins beside any page, next to the Week and Month pins, and writes nothing on pin', () => {
     mount()
     fireEvent.click(screen.getByRole('button', { name: 'Pin Planning' }))

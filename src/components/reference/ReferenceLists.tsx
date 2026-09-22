@@ -6,6 +6,7 @@ import { DayPlanPanel, panelActionsFor, planningSubtitle } from './DayPlanPanel'
 import type { DayPlan, DayPlanEntry } from '@/lib/today/dayPlan'
 import { useSelectionOptional } from '@/shell/providers/SelectionProvider'
 import { useDayPlan } from '@/hooks/useDayPlan'
+import { readViewedDay, onViewedDayChange } from '@/lib/viewedDaySignal'
 import { readViewedWeek, onViewedWeekChange } from '@/lib/viewedWeekSignal'
 import { usePlanActions } from '@/hooks/usePlanActions'
 import { planDropHandlers } from '@/lib/planning/planDrag'
@@ -147,18 +148,29 @@ function ReferenceList({ pin, onClose }: { pin: ReferencePin; onClose: () => voi
  * page, or the sheet on a phone): the day's plan for the actual current day,
  * planning into whichever week a week page is showing.
  */
-export function PlanningPanelHost({ draggable = true, header, wide = false }: {
+interface PlanningPanelHostProps {
   draggable?: boolean
-  /** The wide triage chooser: every row, every move visible. */
   wide?: boolean
-  /** Drawn above the panel with the same day and week the panel plans —
-   *  ONE subscription to the viewed-week signal, not one per header. */
   header?: (day: Date, viewedWeek: Date | null) => ReactNode
-}) {
-  // Always the real current day — the pin's stored date is only when it was
-  // pinned. Keyed on the calendar day so it rolls over at midnight.
-  const todayKey = localYmd(new Date())
-  const day = useMemo(() => { const [y, m, d] = todayKey.split('-').map(Number); return new Date(y, m - 1, d) }, [todayKey])
+}
+
+export function PlanningPanelHost(props: PlanningPanelHostProps) {
+  const [viewedDay, setViewedDay] = useState<Date | null>(() => readViewedDay())
+  useEffect(() => {
+    setViewedDay(readViewedDay())
+    return onViewedDayChange(setViewedDay)
+  }, [])
+  const dayKey = localYmd(viewedDay ?? new Date())
+  const day = useMemo(() => {
+    const [y, m, d] = dayKey.split('-').map(Number)
+    return new Date(y, m - 1, d)
+  }, [dayKey])
+  // Remount on date change: do not show or act on yesterday's occurrence
+  // while the next day's instances are loading.
+  return <PlanningPanelContents key={dayKey} {...props} day={day} />
+}
+
+function PlanningPanelContents({ draggable = true, header, wide = false, day }: PlanningPanelHostProps & { day: Date }) {
   // A week page beside the panel announces the week it is showing, so the
   // list is the same list that page is planning into.
   const [viewedWeek, setViewedWeek] = useState<Date | null>(() => readViewedWeek())

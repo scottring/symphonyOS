@@ -1,3 +1,4 @@
+import { publishViewedDay } from '@/lib/viewedDaySignal'
 import { DesktopPageControls, DesktopControlsContext } from '@/components/layout/DesktopNavigation'
 import { DesktopFooterAction, DesktopFooterActionContext } from '@/components/layout/DesktopFooter'
 /**
@@ -9,7 +10,7 @@ import { DesktopFooterAction, DesktopFooterActionContext } from '@/components/la
  *
  * NOT wired to the route yet — that happens in R4.
  */
-import { useContext, createElement, useMemo, useCallback, useRef, useState, useEffect } from 'react'
+import { useContext, createElement, useMemo, useCallback, useRef, useState, useEffect, useLayoutEffect } from 'react'
 import type { Task, GroupMemberRef } from '@/types/task'
 import type { Project } from '@/types/project'
 import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
@@ -193,6 +194,8 @@ export function TodayView({
   onLinkNote: onLinkNoteProp,
   timelineNotes: timelineNotesProp,
 }: TodayViewProps) {
+  useLayoutEffect(() => { publishViewedDay(viewedDate) }, [viewedDate])
+  useLayoutEffect(() => () => publishViewedDay(null), [])
   // ── Context ──────────────────────────────────────────────────────────────────
   const isMobile = useMobile()
   const navigate = useNavigate()
