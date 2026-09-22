@@ -22,7 +22,7 @@ const task = (over: Partial<Task>): Task => ({
 vi.mock('@/hooks/useSupabaseTasks', () => ({
   useSupabaseTasks: () => ({ tasks: [task({ id: 't1', title: 'Replace kitchen light bulbs' })] }),
 }))
-vi.mock('@/hooks/useProjects', () => ({ useProjects: () => ({ projects: [] }) }))
+vi.mock('@/hooks/useProjects', () => ({ useProjects: () => ({ projects: [{ id: 'p1', name: 'Light fixtures project' }] }) }))
 vi.mock('@/hooks/useContacts', () => ({ useContacts: () => ({ contacts: [] }) }))
 vi.mock('@/hooks/useRoutines', () => ({ useRoutines: () => ({ routines: [] }) }))
 vi.mock('@/contexts/ListsContext', () => ({ useListsContext: () => ({ lists: [] }) }))
@@ -37,6 +37,12 @@ describe('OmniboxResults', () => {
     const row = await screen.findByText('Replace kitchen light bulbs')
     fireEvent.click(row)
     expect(navigateSpy).toHaveBeenCalledWith(expect.stringContaining('detail=task:t1'))
+  })
+
+  it('never offers hidden projects — /projects redirects away, so the result would be a dead end', async () => {
+    render(<OmniboxResults query="light" onNavigate={vi.fn()} />)
+    await screen.findByText('Replace kitchen light bulbs')
+    expect(screen.queryByText('Light fixtures project')).not.toBeInTheDocument()
   })
 
   it('closes the host after navigating', async () => {

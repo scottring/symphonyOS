@@ -5,6 +5,7 @@ import { ChevronDown, Inbox, Plus, Search, UserRound } from 'lucide-react'
 import { usePlanDestination, planPeriodForPath } from './PlanNavigation'
 import { requestPlanFromPaper } from '@/lib/planFromPaperSignal'
 import { appRegistry } from '@/shell/appRegistry'
+import { MORE_GROUPS, isDestinationActive } from './moreDestinations'
 
 export const DesktopControlsContext = createContext<HTMLElement | null>(null)
 export function DesktopPageControls({ children }: { children: ReactNode }) {
@@ -42,14 +43,11 @@ export function DesktopNavigation({ inboxCount, discussionsUnread, onSearch, onQ
   }
   const go = (path: string) => { setOpen(null); navigate(path) }
   // Short labelled columns rather than one tall list. Registry apps join Reference.
-  const groups: [string, [string, string][]][] = [
-    ['Organize', [['Someday', '/someday']]],
-    ['Home', [['Meals', '/meals/plan'], ['Meal shelf', '/meals/shelf'], ['Lists', '/lists'], ['House', '/home']]],
-    ['Reference', [['Discussions', '/discussions'], ['Contacts', '/contacts'], ['Documents', '/documents'],
-      ['Notes', '/notes'], ['History', '/history'], ['Getting started', '/today?welcome=1'],
-      ...appRegistry.filter(a => a.sidebar).sort((a, b) => a.sidebar!.order - b.sidebar!.order)
-        .map((a): [string, string] => [a.sidebar!.label, a.route])]],
-  ]
+  const groups: [string, [string, string][]][] = MORE_GROUPS.map(([group, items]): [string, [string, string][]] => [group, [
+    ...items.map(({ label, route }): [string, string] => [label, route]),
+    ...(group === 'Reference' ? appRegistry.filter(a => a.sidebar).sort((a, b) => a.sidebar!.order - b.sidebar!.order)
+      .map((a): [string, string] => [a.sidebar!.label, a.route]) : []),
+  ]])
   const destinations = groups.flatMap(([, items]) => items)
   return <nav ref={root} className="page-navigation" aria-label="Main navigation">
     <NavLink to={planDestination} aria-current={planPeriodForPath(pathname) ? 'page' : undefined} className={planPeriodForPath(pathname) ? 'is-current' : ''}>Planner</NavLink>
@@ -59,7 +57,7 @@ export function DesktopNavigation({ inboxCount, discussionsUnread, onSearch, onQ
       <div className="page-navigation-groups">
         {groups.map(([group, items]) => <div key={group} role="group" aria-labelledby={`navigation-group-${group}`} className="page-navigation-group">
           <h3 id={`navigation-group-${group}`}>{group}</h3>
-          {items.map(([label, route]) => <button key={route} onClick={() => go(route)}
+          {items.map(([label, route]) => <button key={route} onClick={() => go(route)} aria-current={isDestinationActive(route, pathname) ? 'page' : undefined}
             aria-label={label === 'Discussions' && discussionsUnread > 0 ? `Discussions, ${discussionsUnread} unread` : undefined}>
             {label}{label === 'Discussions' && discussionsUnread > 0 && <span className="navigation-count">{discussionsUnread}</span>}
           </button>)}
@@ -69,7 +67,7 @@ export function DesktopNavigation({ inboxCount, discussionsUnread, onSearch, onQ
         <button onClick={() => { setOpen(null); if (!requestPlanFromPaper()) navigate('/today') }}>Plan from paper</button>
         <span>Photograph a paper page into your plan</span>
       </div>
-    </div>, destinations.some(([, route]) => pathname.startsWith(route)))}
+    </div>, destinations.some(([, route]) => isDestinationActive(route, pathname)))}
     <div className="page-navigation-utilities">
       {auxiliaryControls}
       <div ref={controlsRef} className="page-navigation-page-controls" />

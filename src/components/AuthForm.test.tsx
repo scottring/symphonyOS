@@ -102,12 +102,11 @@ describe('AuthForm', () => {
       expect(emailInput).toHaveAttribute('placeholder', 'you@example.com')
     })
 
-    it('password field has correct type and placeholder', () => {
+    it('password field is a password input', () => {
       render(<AuthForm />)
 
       const passwordInput = screen.getByLabelText('Password')
       expect(passwordInput).toHaveAttribute('type', 'password')
-      expect(passwordInput).toHaveAttribute('placeholder', 'At least 6 characters')
     })
 
     it('password field has minLength of 6', () => {
@@ -372,6 +371,41 @@ describe('AuthForm', () => {
         expect(screen.getByText('Check your email for a confirmation link!')).toBeInTheDocument()
       })
       expect(screen.queryByRole('link', { name: 'Request an invite' })).not.toBeInTheDocument()
+    })
+  })
+  describe('assistive and password-manager hints', () => {
+    it('marks the password as current on sign in and new on sign up', () => {
+      render(<AuthForm />)
+      expect(screen.getByLabelText('Email')).toHaveAttribute('autocomplete', 'email')
+      expect(screen.getByLabelText('Password')).toHaveAttribute('autocomplete', 'current-password')
+      expect(screen.getByLabelText('Password')).not.toHaveAttribute('placeholder')
+
+      fireEvent.click(screen.getByRole('button', { name: 'Sign Up' }))
+      expect(screen.getByLabelText('Password')).toHaveAttribute('autocomplete', 'new-password')
+      expect(screen.getByLabelText('Password')).toHaveAttribute('placeholder', 'At least 6 characters')
+    })
+
+    it('announces a failed sign in as an alert', async () => {
+      mockSignInWithEmail.mockResolvedValueOnce({ error: { message: 'Invalid login credentials' } })
+      render(<AuthForm />)
+      fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'a@b.co' } })
+      fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'secret12' } })
+      fireEvent.click(screen.getByRole('button', { name: 'Sign In' }))
+      expect(await screen.findByRole('alert')).toHaveTextContent('Invalid login credentials')
+    })
+
+    it('says it is creating an account, not signing in, while sign up is pending', async () => {
+      let resolve!: (v: { error: null }) => void
+      mockSignUpWithEmail.mockImplementationOnce(() => new Promise((r) => { resolve = r }))
+      render(<AuthForm />)
+      fireEvent.click(screen.getByRole('button', { name: 'Sign Up' }))
+      fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'a@b.co' } })
+      fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'secret12' } })
+      fireEvent.click(screen.getByRole('button', { name: 'Create Account' }))
+      expect(await screen.findByText('Creating account...')).toBeInTheDocument()
+      expect(screen.queryByText('Signing in...')).not.toBeInTheDocument()
+      await act(async () => { resolve({ error: null }) })
+      expect(await screen.findByRole('status')).toHaveTextContent('Check your email')
     })
   })
 })

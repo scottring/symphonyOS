@@ -93,6 +93,19 @@ export function deriveActiveView(pathname: string): ViewType {
   return 'today';
 }
 
+/**
+ * Pages that render their own domain/person filters and assistant entry in
+ * their masthead. Every other page gets them in the desktop nav — previously
+ * any path deriveActiveView didn't know (Someday, Notes, Lists, History…)
+ * fell through to 'today' and silently lost the domain switcher, even though
+ * Someday filters by it.
+ */
+const OWN_CHROME_PATHS = ['/', '/today', '/week', '/month', '/season', '/year', '/inbox', '/discussions', '/tasks-new'];
+export function pageOwnsFilterChrome(pathname: string): boolean {
+  return OWN_CHROME_PATHS.some((p) => pathname === p || (p !== '/' && pathname.startsWith(`${p}/`)))
+    || pathname.startsWith('/task/');
+}
+
 interface Props {
   children: ReactNode;
 }
@@ -178,53 +191,12 @@ function ShellLayoutInner({ children }: Props) {
     if (seed && seed.autoSend !== false) void assistant.sendMessage(seed.message);
   }, [launchNonce, isToday, isMobile, consumeSeed, assistant]);
 
-  const handleViewChange = useCallback(
-    (view: ViewType) => {
-      switch (view) {
-        case 'home':
-        case 'today':
-          navigate('/');
-          return;
-        case 'home-app':
-          navigate('/home');
-          return;
-        case 'inbox':
-          navigate('/inbox');
-          return;
-        case 'discussions':
-          navigate('/discussions');
-          return;
-        case 'goals':
-          navigate('/goals');
-          return;
-        case 'agent':
-          navigate('/agent');
-          return;
-        case 'routines':
-          navigate('/routines');
-          return;
-        case 'contacts':
-        case 'contact-detail':
-          navigate('/contacts');
-          return;
-        case 'meals':
-          navigate('/meals/plan');
-          return;
-        case 'lists':
-          navigate('/lists');
-          return;
-        case 'history':
-          navigate('/history');
-          return;
-        case 'settings':
-          navigate('/settings');
-          return;
-        default:
-          navigate('/');
-      }
-    },
-    [navigate],
-  );
+  // Closing the More sheet returns focus to its tab, not to <body>.
+  const moreTabRef = useRef<HTMLButtonElement>(null);
+  const closeMoreSheet = useCallback(() => {
+    setMoreSheetOpen(false);
+    moreTabRef.current?.focus();
+  }, []);
 
   // The AI rail is shared with main content margin so content isn't covered.
   const rightRailVisible = showAiRail;
@@ -310,7 +282,7 @@ function ShellLayoutInner({ children }: Props) {
           onSearch={() => setQuickAddOpen(true)} onQuickAdd={() => setQuickAddOpen(true)} onSignOut={signOut}
           userName={user?.user_metadata?.name ?? user?.email}
           paused={referencesPaused} controlsRef={setDesktopControls}
-          auxiliaryControls={activeView !== 'today' && activeView !== 'inbox' && (
+          auxiliaryControls={!pageOwnsFilterChrome(location.pathname) && (
           <div className="flex items-center gap-2">
             <DomainSwitcher />
             <button
@@ -435,6 +407,8 @@ function ShellLayoutInner({ children }: Props) {
             {/* Inbox — capture catch-all, with unread badge. */}
             <button
               onClick={() => navigate('/inbox')}
+              aria-current={location.pathname.startsWith('/inbox') ? 'page' : undefined}
+              aria-label={`Inbox${inboxCount ? `, ${inboxCount} items` : ''}`}
               className={`relative flex-1 min-w-0 flex flex-col items-center gap-0.5 px-1 py-1.5 rounded-lg transition-all ${
                 location.pathname.startsWith('/inbox') ? 'text-accent-600' : 'text-neutral-400 hover:text-neutral-600'
               }`}
@@ -450,7 +424,10 @@ function ShellLayoutInner({ children }: Props) {
 
             {/* More → opens MoreSheet (the mobile library). */}
             <button
+              ref={moreTabRef}
               onClick={() => setMoreSheetOpen(true)}
+              aria-haspopup="dialog"
+              aria-expanded={moreSheetOpen}
               className={`flex-1 min-w-0 flex flex-col items-center gap-0.5 px-1 py-1.5 rounded-lg transition-all ${
                 moreSheetOpen ? 'text-neutral-700' : 'text-neutral-400 hover:text-neutral-600'
               }`}
@@ -466,9 +443,7 @@ function ShellLayoutInner({ children }: Props) {
       {isMobile && (
         <MoreSheet
           isOpen={moreSheetOpen}
-          onClose={() => setMoreSheetOpen(false)}
-          onNavigate={handleViewChange}
-          activeView={activeView}
+          onClose={closeMoreSheet}
           discussionsUnread={discussionsUnread}
         />
       )}
