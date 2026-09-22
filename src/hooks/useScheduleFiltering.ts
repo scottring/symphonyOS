@@ -1,9 +1,9 @@
-import { useState, useMemo, useEffect, useCallback } from 'react'
+import { useMemo, useEffect } from 'react'
 import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
 import type { ActionableInstance, Routine } from '@/types/actionable'
 import type { Task, LinkedActivityType } from '@/types/task'
 import type { FamilyMember } from '@/types/family'
-import { onInstancesChanged } from '@/lib/instancesChangedSignal'
+import { useDateInstances } from '@/hooks/useDateInstances'
 import { routinesForViewedDate } from '@/lib/today/routinesForDate'
 
 interface UseScheduleFilteringParams {
@@ -50,23 +50,12 @@ export function useScheduleFiltering({
   addTask,
   getCurrentUserMember,
 }: UseScheduleFilteringParams): UseScheduleFilteringReturn {
-  const [dateInstances, setDateInstances] = useState<ActionableInstance[]>([])
-
-  const refreshDateInstances = useCallback(async () => {
-    const instances = await getInstancesForDate(viewedDate)
-    setDateInstances(instances)
-  }, [viewedDate, getInstancesForDate])
-
-  useEffect(() => {
-    refreshDateInstances()
-    // Instance writes from outside the schedule's own handlers (e.g. checking a
-    // routine step in the detail panel) announce themselves via this signal —
-    // there is no realtime subscription on actionable_instances.
-    return onInstancesChanged(() => void refreshDateInstances())
-  }, [refreshDateInstances])
+  const { instances, refresh: refreshDateInstances } = useDateInstances(viewedDate, getInstancesForDate)
+  const dateInstances = useMemo(() => instances ?? [], [instances])
 
   // Filter events to exclude skipped/completed items
   const filteredEvents = useMemo(() => {
+    if (!instances) return []
     // Build a map of entity_id -> status for quick lookup
     const statusMap = new Map<string, string>()
     for (const instance of dateInstances) {
@@ -84,15 +73,15 @@ export function useScheduleFiltering({
       // Remove if skipped or deferred
       return status !== 'skipped' && status !== 'deferred'
     })
-  }, [events, dateInstances, isEventHidden])
+  }, [events, dateInstances, instances, isEventHidden])
 
   // Get routines for the viewed date:
   // 1. Routines that normally occur on this date (by recurrence pattern)
   // 2. Routines that were deferred TO this date (even if not normally scheduled)
   // 3. Filter out routines that are skipped or deferred away from this date
   const filteredRoutines = useMemo(
-    () => routinesForViewedDate(getRoutinesForDate(viewedDate), allRoutines, dateInstances, viewedDate),
-    [getRoutinesForDate, viewedDate, dateInstances, allRoutines],
+    () => instances ? routinesForViewedDate(getRoutinesForDate(viewedDate), allRoutines, instances, viewedDate) : [],
+    [getRoutinesForDate, viewedDate, instances, allRoutines],
   )
 
   // Generate prep tasks from routine templates when routines surface for the day

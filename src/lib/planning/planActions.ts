@@ -17,8 +17,8 @@ import { weekendPlacement } from './weekend'
  *  - A PERIOD commits a task to the week's or month's list; no day or time is
  *    invented. Personal focus is kept (S13: moving work never silently
  *    changes focus — un-choosing is its own gesture).
- *  - Un-choosing clears this person's focus for ONE day. It never deletes,
- *    never un-dates, never touches recurrence.
+ *  - Removing a day clears its date and this person's focus for that day,
+ *    preserving broader commitments and choices for other days.
  *  - Undo restores the focus rows themselves (focusSnapshot), not the legacy
  *    shared planned_on.
  */
@@ -58,6 +58,17 @@ function midnight(d: Date): Date {
   return out
 }
 
+/** Reverse a day commitment without sending the task out of its period lists. */
+export function taskDayRemoval(task: Task, day: Date): Partial<Task> {
+  const ymd = localYmd(day)
+  return {
+    focus: focusSnapshot(task).filter((f) => localYmd(f.date) !== ymd),
+    ...(task.scheduledFor && localYmd(task.scheduledFor) === ymd
+      ? { scheduledFor: undefined, isAllDay: undefined }
+      : {}),
+  }
+}
+
 export function makePlanActions(deps: PlanActionDeps) {
   const snapshot = (t: Task): Partial<Task> => ({
     bucket: t.bucket, scheduledFor: t.scheduledFor, isAllDay: t.isAllDay,
@@ -83,14 +94,16 @@ export function makePlanActions(deps: PlanActionDeps) {
     return true
   }
 
-  /** Un-choose for ONE day: only this person's focus on `day` goes. */
+  /** Remove this day's date and focus; keep the same task and period lists. */
   async function unchooseTask(taskId: string, day: Date) {
     const t = deps.findTask(taskId)
     if (!t) return
-    const prev = focusSnapshot(t)
-    const ymd = localYmd(day)
-    await deps.updateTask(taskId, { focus: prev.filter((f) => localYmd(f.date) !== ymd) })
-    deps.pushAction?.(`Moved "${t.title}" back`, () => { void deps.updateTask(taskId, { focus: prev }) })
+    const updates = taskDayRemoval(t, day)
+    const prev = { focus: focusSnapshot(t), ...('scheduledFor' in updates
+      ? { scheduledFor: t.scheduledFor, isAllDay: t.isAllDay } : {}) }
+    const saved = await deps.updateTask(taskId, updates)
+    if (saved === false) return
+    deps.pushAction?.(`Removed "${t.title}" from this day`, () => { void deps.updateTask(taskId, prev) })
   }
 
   async function timeTask(taskId: string, when: Date) {

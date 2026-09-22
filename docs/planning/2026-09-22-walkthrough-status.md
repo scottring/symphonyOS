@@ -1,0 +1,113 @@
+# Walkthrough verification status
+
+Updated September 22, 2026, after the resumed live pass. Scope: the agreed horizon, task, routine, review,
+family-filter, design, and onboarding journeys. This is not a whole-product audit.
+User-confirmed results and agent-observed results are distinguished below.
+
+| Journey | Live result | Evidence / remaining work |
+| --- | --- | --- |
+| Direct Today task entry | Pass — Scott | Buy groceries saved and appeared |
+| Direct Week entry, no day | Pass — Scott | Any day and Today shelf; no automatic Today commitment |
+| Month → Week → Today | Pass — Scott | Check furnace filter retained month commitment |
+| Task completion across horizons | Pass — Scott | Completed in Today, Week, Month; goal remained open |
+| Year → Season reference | Pass — Scott | Separate goal identities and reference visibility |
+| Season → Month reference | Pass — Scott | Season goal visible beside existing month goal |
+| Task-to-goal linking | Failed discoverability — Scott | No exposed link option in tested flow |
+| Today → Tomorrow task move | Pass — Scott | Moves out of Today and into tomorrow |
+| Flexible weekend | Pass with design finding — Scott | Flexible Saturday–Sunday; group ordering finding logged |
+| Remove Today commitment | Fail — Scott; cause inspected | Focus removed, date retained; no complete reversal action |
+| Shelves date follows Today | Pass — Scott after deployed fix | Correct date and occurrence completion |
+| Routine occurrence completion | Pass — Scott | Day-specific state; repeating pattern remains |
+| Routine occurrence time | Mixed | Untimed path failed for Scott; its shelf menu remains automation-blocked. Timed QA routine retimed successfully through its timeline time control |
+| Routine time leaves next day unchanged | Pass — agent, timed routine | Today retimed 8 PM → 9 PM; tomorrow remained 8 PM; rule summary remained 20:00 |
+| Skip one routine occurrence | Pass — agent | Today's QA occurrence disappeared; tomorrow remained at 8 PM |
+| Routine date navigation while loading | Fail — agent | Tomorrow briefly showed today's 9 PM override before resolving to 8 PM |
+| Hide-daily vs routine shelf | Fail — agent | Timeline preference hides eligible routine choices silently |
+| Family assignment/filtering | Pass — agent | Edith includes, Liam excludes, All restores; Alex assignment restored |
+| Filtered empty-state wording | Fail design — agent | Says week empty rather than no matching person |
+| Weekly review entry | Fail discoverability, review exists — agent | Under Plan the week; not a visible previous-week review entry |
+| Next-week Earlier shelf | Fail expectation — agent | Empty while review offers current-week work; uses wall-clock current week |
+| Review Keep and untouched work | Pass — agent | Kept test task next week; Big test left in original week |
+| Review Done | Pass — agent | QA Review Done appeared completed in original week's shelf, absent from new week's list |
+| Review Someday | Pass with interruption — agent | QA Review Someday appeared on Someday; Save prompted for its domain partway through |
+| Review Drop | Pass — agent | QA Review Drop left week and appeared in Inbox, still an incomplete task |
+| Review draft close/reopen | Pass — agent | All three choices retained; prior-week tasks unchanged before Save; next week showed no duplicate kept task |
+| Full application reload persistence | Automation limitation | Cmd-R produced no observable reload; native View menu has navigation but no Reload. Navigation/reopen and automated persistence checked; full reload not claimed |
+| Month review | Pass with presentation finding — agent | Keep + next action saved QA goal and separate child task in October; Month tasks misleadingly said empty |
+| Season review | Pass — agent | QA Season task carried from Fall to Winter; existing goal left open |
+| Year review | Pass — agent | QA Year outcome carried into 2027; existing yearly goal left open |
+| First-time onboarding design | Assessment drafted | Separate proposal; not implemented or validated with new users |
+| Keyboard/narrow-screen walkthrough | Mixed — agent | Enter saved goal/task inputs; Tab moved within daily review; Escape did not dismiss review. Inspected Today + detail, time picker, and daily review at 830px window width; no observed edge overflow in these views. Phone widths not tested |
+
+## Automated pass completed
+
+- 838 tests across 74 files: planning and Today logic, planning-session hooks,
+  plan actions, routine editor, daily review.
+- 132 tests across six additional files: planning session UI, period page, Week
+  review host, commitment persistence, legacy onboarding signals and card.
+- Total for this pass: 970 passed across 80 files. Some component tests emit
+  React act warnings; no failing tests. These checks do not prove production
+  persistence or close the pending live checks above.
+
+## Session recovery
+
+Both native Symphony app installations initially displayed “Your session ended.”
+Scott restored sign-in in the development-build app, and live testing resumed.
+No credentials were obtained or changed by the agent. The authenticated window
+was returned to Today with the daily review closed after testing.
+
+## Completed live sequence
+
+1. Created QA Review Done, QA Review Someday, QA Review Drop in Sep 20–26. Selected
+   respective verdicts from the Sep 27–Oct 3 review, closed/reopened the draft,
+   confirmed no early mutations, saved, and inspected resulting destinations.
+2. Created QA Month outcome in September; kept it with QA Month next action into
+   October. Expanded the goal to verify the saved supporting task.
+3. Created QA Season task in Fall and kept it into Winter. Created QA Year outcome
+   in 2026 and kept it into 2027. Left Scott's original goals untouched.
+4. Created QA Routine Timing daily at 8 PM, verified Today schedule, changed only
+   today's occurrence to 9 PM via the timeline time control, verified tomorrow at
+   8 PM, skipped today, and verified tomorrow still present. Deactivated the QA
+   routine afterward to avoid ongoing clutter. Scott's routine was not changed.
+5. Inspected the narrower window and keyboard behavior; recorded concrete failures
+   and limitations above. The audit pass is complete with failed and limited
+   checks explicitly recorded; it is not an all-green release sign-off.
+
+## New product findings
+
+- Month/season goal review offers Keep, Keep + next action, Someday, Drop, but no
+  Done action. Year review does offer Done. This conflicts with the agreed review
+  choices and needs consistent goal-completion handling.
+- Goal rows expose Make it a task. Reconcile this conversion control with the
+  agreed separate identities rather than teaching conversion in onboarding.
+- Goal linking is not wholly absent: the guided month planner has a Toward a goal
+  selector, and a direct Season task exposes Put it under a goal. The original
+  finding is a discoverability/consistency issue, not proof no linking exists.
+- Supporting actions hidden inside collapsed goal steps are not reflected in the
+  apparent Month tasks empty state. Make the presence of this work clear.
+- Next-day navigation briefly renders prior-day occurrence time while loading;
+  ensure stale occurrences cannot be acted on as though they belong to the new day.
+- Review Save can pause for domain classification after other verdicts have
+  applied. Surface required decisions before Save and explain partial progress.
+
+## QA records retained
+
+QA Review Done (complete), QA Review Someday (Someday, Family domain), QA Review
+Drop (Inbox), QA Month outcome + QA Month next action (October), QA Season task
+(Winter), QA Year outcome (2027), and QA Routine Timing (inactive). Plans for
+Sep 27–Oct 3, October, Winter, and 2027 were saved. No test or user data deleted.
+
+Cross-account privacy, calendar-provider sync, invitation delivery, and fresh-user
+research are outside this single authenticated household walkthrough. Do not
+claim those passed based on same-account filters or mocked tests.
+
+
+## Follow-up fixes — September 22
+
+Implemented after the walkthrough (production verification pending):
+
+- Removing a task from a day clears that day's date and the signed-in user's focus together. Week/month commitments and other users' focus remain. The action also appears for dated tasks without focus, including the previously stranded test task. Undo restores the original date and focus.
+- Today and its shelf use date-keyed occurrence loading. They hide stale occurrence state during navigation and ignore late requests; a pending time override is additionally checked against the displayed date.
+- Today's routine shelf offers **Set time** for available and already-chosen occurrences. This opens an occurrence-only time picker, without an All Day shortcut or modifying the repeating schedule. It provides a direct route for the originally reported untimed routine flow; this is not a claim that the original routine-editor failure has been reproduced and resolved.
+
+Focused regressions cover day removal through the placement writer, preserved broader commitments and other-user focus, failed writes, request races, and both routine shelf time actions. Build passed; changed-file lint has no errors (existing warnings remain). Fixture inspection at 1440px and 390px showed the picker within the viewport and allowed selecting 8 PM. Authenticated live verification remains separate.

@@ -104,8 +104,8 @@ function RowMenu({ entry, day, actions, inline = false, weekPage, planning = fal
         onClick={() => { setOpen(false); actions.commit(entry, 'week') }}>
         This week{!inline && weekPage && <span className="block text-[11px] text-neutral-500">{formatWeekRangeShort(weekPage)}</span>}
       </button>)
-      if (entry.planned) items.push(<button key="unchoose" type="button" role={inline ? undefined : "menuitem"} className={itemClass}
-        onClick={() => { setOpen(false); actions.unchoose(entry) }}>Remove from today</button>)
+      if (entry.planned || (entry.task?.scheduledFor && localYmd(entry.task.scheduledFor) === localYmd(day))) items.push(<button key="unchoose" type="button" role={inline ? undefined : "menuitem"} className={itemClass}
+        onClick={() => { setOpen(false); actions.unchoose(entry) }}>{localYmd(day) === localYmd(new Date()) ? 'Remove from today' : 'Remove from this day'}</button>)
     }
     if (planning || entry.kind === 'routine') items.push(
       <SchedulePopover
@@ -382,6 +382,17 @@ function PlanRow({ entry, day, actions, draggable, weekPage = null, wide = false
  * is the Today list's checkbox, not a control here. The ⋯ menu keeps the
  * row's other moves (a day or time, Someday).
  */
+function OccurrenceTimeAction({ entry, day, actions }: { entry: DayPlanEntry; day: Date; actions: DayPlanPanelActions }) {
+  return <SchedulePopover
+    itemTitle={`${entry.title} · this occurrence`}
+    skipToTime
+    allowAllDay={false}
+    value={day}
+    onSchedule={(when) => actions.schedule(entry, when, false)}
+    trigger={<button type="button" aria-label={`Set time for ${entry.title} occurrence`} className="chooser-pill">Set time</button>}
+  />
+}
+
 function ChooserRow({ entry, day, actions, draggable, wide = false }: {
   entry: DayPlanEntry
   day: Date
@@ -420,7 +431,10 @@ function ChooserRow({ entry, day, actions, draggable, wide = false }: {
           <RowMenu entry={entry} day={day} actions={actions} />
         </div>
       ) : entry.completed || entry.onToday ? (
-        <RowMenu entry={entry} day={day} actions={actions} inline={false} />
+        <div className="chooser-action-group flex shrink-0 items-center gap-0.5">
+          {!entry.completed && entry.kind === 'routine' && <OccurrenceTimeAction entry={entry} day={day} actions={actions} />}
+          <RowMenu entry={entry} day={day} actions={actions} inline={false} />
+        </div>
       ) : (
         <div className={wide ? 'chooser-action-group chooser-row-actions' : 'chooser-action-group flex shrink-0 items-center gap-0.5'}>
           {unhomed ? (
@@ -445,6 +459,7 @@ function ChooserRow({ entry, day, actions, draggable, wide = false }: {
               {picked ? 'Today ✓' : 'Choose'}
             </button>
           )}
+          {!unhomed && entry.kind === 'routine' && <OccurrenceTimeAction entry={entry} day={day} actions={actions} />}
           <RowMenu entry={entry} day={day} actions={actions} inline={false} />
         </div>
       )}

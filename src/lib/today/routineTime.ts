@@ -56,7 +56,7 @@ function resolveOverride(
   if (!instance?.deferred_to) return null
   const deferred = new Date(instance.deferred_to)
 
-  if (instance.status === 'pending') return deferred
+  if (instance.status === 'pending' && isSameLocalDay(deferred, viewedDate)) return deferred
   if (instance.status === 'deferred' && isSameLocalDay(deferred, viewedDate)) return deferred
   return null
 }

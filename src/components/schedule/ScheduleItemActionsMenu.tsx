@@ -3,7 +3,7 @@ import { MoreHorizontal, Redo2, Undo2, Clock, Trash2, CalendarCog, Hourglass, Me
 import type { TimelineItem } from '@/types/timeline'
 import { useScheduleActionsContext } from '@/contexts/ScheduleActionsContext'
 import { isSameDay } from '@/lib/dateUtils'
-import { focusSnapshot } from '@/lib/placement/model'
+import { taskDayRemoval } from '@/lib/planning/planActions'
 import { DiscussionPopover } from '@/components/triage'
 import { WaitingForPopover } from './WaitingForPopover'
 
@@ -226,24 +226,19 @@ export function ScheduleItemActionsMenu({ item, onOpenDetail, onUpdateDiscussion
               </button>
             )}
 
-            {/* Unfocus — a chosen task goes back to the planning candidates
-                (an unscheduled one) or simply loses its lead (a dated one).
-                Nothing else about it changes. */}
-            {isTask && item.focused && ctx.onUpdateTask && item.originalTask && (
+            {/* Remove the day's commitment while retaining the period lists. */}
+            {isTask && (item.focused || (item.originalTask?.scheduledFor && isSameDay(item.originalTask.scheduledFor, ctx.viewedDate ?? new Date()))) && ctx.onUpdateTask && item.originalTask && (
               <button
                 type="button"
                 role="menuitem"
                 onClick={run(() => {
-                  // Only the viewed day's focus goes (a choice for another
-                  // day is kept); focus rows, not the legacy column.
                   const day = ctx.viewedDate ?? new Date()
-                  const kept = focusSnapshot(item.originalTask!).filter((f) => !isSameDay(f.date, day))
-                  void ctx.onUpdateTask?.(item.originalTask!.id, { focus: kept })
+                  void ctx.onUpdateTask?.(item.originalTask!.id, taskDayRemoval(item.originalTask!, day))
                 })}
                 className="flex w-full text-left items-center gap-2.5 px-3 py-2.5 text-sm text-neutral-700 hover:bg-neutral-50"
               >
                 <Undo2 className="w-4 h-4 text-neutral-400" />
-                Unfocus
+                Remove from this day
               </button>
             )}
 

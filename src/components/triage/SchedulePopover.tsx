@@ -39,6 +39,8 @@ interface SchedulePopoverProps {
   getItemsForDate?: (date: Date) => ScheduleContextItem[]
   // Skip straight to time selection when editing existing scheduled item
   skipToTime?: boolean
+  /** Occurrence time controls require an actual time. */
+  allowAllDay?: boolean
   // Title of task/event being scheduled (for context)
   itemTitle?: string
   // When provided, the picker also offers no-specific-date "horizon" buckets
@@ -161,6 +163,7 @@ export function SchedulePopover({
   scheduleItems,
   getItemsForDate,
   skipToTime = false,
+  allowAllDay = true,
   itemTitle,
   onDefer,
   showDuration = false,
@@ -753,7 +756,7 @@ export function SchedulePopover({
               )}
 
               {/* All day option */}
-              {!customTimeSearch && (
+              {!customTimeSearch && allowAllDay && (
                 <button
                   onClick={() => handleTimeSelect('all-day')}
                   className="

@@ -15,6 +15,12 @@ function instance(over: Partial<ActionableInstance> = {}): ActionableInstance {
 }
 
 describe('resolveRoutineTime', () => {
+  it('does not apply a pending override from another day', () => {
+    const stale = instance({ deferred_to: at(21).toISOString() })
+    const next = new Date(2026, 7, 2)
+    expect(resolveRoutineTime({ time_of_day: '20:00' }, stale, next)).toEqual(new Date(2026, 7, 2, 20))
+    expect(resolveRoutineTime({ time_of_day: null }, stale, next)).toBeNull()
+  })
   it('uses the rule time when there is no override', () => {
     expect(resolveRoutineTime({ time_of_day: '09:00' }, undefined, viewedDate))
       .toEqual(at(9, 0))

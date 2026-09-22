@@ -409,3 +409,19 @@ it('supports keyboard navigation and Escape back to the More trigger', () => {
    fireEvent.change(screen.getByRole('searchbox'), { target: { value: 'no match' } })
    expect(screen.queryByText('Item 7')).toBeNull()
  })
+
+
+describe('routine occurrence time action', () => {
+  it.each([false, true])('sets a time on the displayed day, already on Today: %s', (onToday) => {
+    const occurrence: DayPlanEntry = { key: 'routine:read', kind: 'routine', id: 'read', title: 'Read', completed: false, planned: false, onToday, group: 'available' }
+    const p = plan(0)
+    p.chooserRoutines = [occurrence]
+    const schedule = vi.fn()
+    render(<DayPlanPanel plan={p} day={day} actions={{ ...actions, schedule }} />)
+    fireEvent.click(screen.getByRole('navigation', { name: 'Shelf source' }).querySelector('button:last-child')!)
+    fireEvent.click(screen.getByRole('button', { name: 'Set time for Read occurrence' }))
+    expect(screen.queryByRole('button', { name: 'All Day' })).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: '8pm', exact: true }))
+    expect(schedule).toHaveBeenCalledWith(occurrence, new Date(2026, 8, 19, 20), false)
+  })
+})

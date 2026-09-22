@@ -1,7 +1,9 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { makePlanActions, type PlanActionDeps } from './planActions'
+import { makePlanActions, taskDayRemoval, type PlanActionDeps } from './planActions'
 import { createMockTask } from '@/test/mocks/factories'
 import type { Task } from '@/types/task'
+import { planPlacement } from '@/lib/placement/intentions'
+import { committedTo, isFocused } from '@/lib/placement/model'
 
 const SAT = new Date(2026, 8, 19)
 
@@ -65,15 +67,15 @@ describe('plan actions — tasks', () => {
     expect(deps.updateTask).toHaveBeenLastCalledWith('i', { bucket: 'inbox', scheduledFor: undefined, isAllDay: undefined, focus: [earlier] })
   })
 
-  it('un-choosing clears only the viewed day\'s focus — other days kept, nothing un-dated', async () => {
+  it('removing a day clears its date and focus, retaining other days', async () => {
     const other = { userId: 'scott', date: new Date(2026, 8, 17) }
     const t = createMockTask({ id: 'd', bucket: 'timed', scheduledFor: SAT, isAllDay: true, focus: [other, { userId: 'scott', date: SAT }] })
     const { deps, actions, undo } = setup([t])
     await actions.unchooseTask('d', SAT)
-    expect(deps.updateTask).toHaveBeenCalledWith('d', { focus: [other] })
+    expect(deps.updateTask).toHaveBeenCalledWith('d', { focus: [other], scheduledFor: undefined, isAllDay: undefined })
     expect(deps.pushTask).not.toHaveBeenCalled()
     undo[0]()
-    expect(deps.updateTask).toHaveBeenLastCalledWith('d', { focus: t.focus })
+    expect(deps.updateTask).toHaveBeenLastCalledWith('d', { focus: t.focus, scheduledFor: SAT, isAllDay: true })
   })
 
   it('a time is the existing scheduling write, with a default half hour', async () => {
@@ -161,4 +163,40 @@ it('a cancelled time placement does not offer undo for an unwritten change', asy
   deps.updateTask.mockResolvedValueOnce(false)
   await actions.timeTask('task', new Date(2026, 8, 28, 10))
   expect(undo).toHaveLength(0)
+})
+
+
+describe('removing a day preserves the enduring task', () => {
+  beforeEach(() => { vi.useFakeTimers(); vi.setSystemTime(SAT) })
+  afterEach(() => vi.useRealTimers())
+  it('chooses and removes a task through placement, preserving week/month and other people', async () => {
+    const week = new Date(2026, 8, 13), month = new Date(2026, 8, 1)
+    let task = createMockTask({ id: 'one', bucket: 'week', scheduledFor: undefined,
+      commitments: [{ level: 'week', periodStart: week, status: 'open' }, { level: 'month', periodStart: month, status: 'open' }],
+      focus: [{ userId: 'other', date: SAT }],
+    })
+    const { deps } = setup([])
+    const actions = makePlanActions({ ...deps, findTask: () => task,
+      updateTask: async (_id, updates) => { task = planPlacement(task, updates, { now: SAT, userId: 'scott' }).local; return true },
+    })
+    await actions.chooseTaskDay(task.id, SAT)
+    expect(isFocused(task, 'scott', '2026-09-19')).toBe(true)
+    await actions.unchooseTask(task.id, SAT)
+    expect(task.id).toBe('one')
+    expect(task.scheduledFor).toBeUndefined()
+    expect(isFocused(task, 'scott', '2026-09-19')).toBe(false)
+    expect(isFocused(task, 'other', '2026-09-19')).toBe(true)
+    expect(committedTo(task, 'week', week)).toBeTruthy()
+    expect(committedTo(task, 'month', month)).toBeTruthy()
+  })
+  it('does not clear a date on another day', () => {
+    const tomorrow = new Date(2026, 8, 20)
+    expect(taskDayRemoval(createMockTask({ scheduledFor: tomorrow, focus: [] }), SAT)).toEqual({ focus: [] })
+  })
+  it('does not register success or undo after a failed removal', async () => {
+    const { deps, actions } = setup([createMockTask({ id: 'x', scheduledFor: SAT })])
+    deps.updateTask.mockResolvedValueOnce(false)
+    await actions.unchooseTask('x', SAT)
+    expect(deps.pushAction).not.toHaveBeenCalled()
+  })
 })

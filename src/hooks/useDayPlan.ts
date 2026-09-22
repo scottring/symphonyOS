@@ -1,12 +1,11 @@
 import { weekRoutineChoices } from '@/lib/planning/weekRoutineChoices'
-import { useCallback, useEffect, useMemo, useState } from 'react'
-import type { ActionableInstance } from '@/types/actionable'
+import { useEffect, useMemo, useState } from 'react'
 import { useSupabaseTasks } from '@/hooks/useSupabaseTasks'
 import { useRoutines } from '@/hooks/useRoutines'
 import { useActionableInstances } from '@/hooks/useActionableInstances'
 import { useDomain } from '@/hooks/useDomain'
 import { useAssigneeFilter } from '@/hooks/useAssigneeFilter'
-import { onInstancesChanged } from '@/lib/instancesChangedSignal'
+import { useDateInstances } from '@/hooks/useDateInstances'
 import { readHideRoutines, onHideRoutinesChange } from '@/lib/hideRoutinesSignal'
 import { filterTasksForLayers } from '@/lib/today/domainFilter'
 import { routinesForViewedDate } from '@/lib/today/routinesForDate'
@@ -47,15 +46,7 @@ export function useDayPlan(
   // Every instance touching the planned week: a flexible routine already
   // placed on one of its days has a home for that week and leaves To plan.
   const weekInstances = useWeekInstances(weekStart, 7)
-  const [instances, setInstances] = useState<ActionableInstance[] | null>(null)
-  const refresh = useCallback(async () => {
-    const [y, m, d] = dayKey.split('-').map(Number)
-    setInstances(await getInstancesForDate(new Date(y, m - 1, d)))
-  }, [dayKey, getInstancesForDate])
-  useEffect(() => {
-    void refresh()
-    return onInstancesChanged(() => void refresh())
-  }, [refresh])
+  const { instances } = useDateInstances(day, getInstancesForDate)
 
   const plan = useMemo(() => {
     if (!instances) return null
