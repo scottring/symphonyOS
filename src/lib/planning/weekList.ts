@@ -18,6 +18,11 @@ export function weekListTasks(tasks: readonly Task[], weekStart: Date, meId: str
     const c = committedTo(t, 'week', weekStart, { isCurrent: opts.isCurrent ?? true })
     if (!c) continue
     if (c !== 'legacy' && (c.status === 'carried' || c.status === 'removed')) continue
+    // A legacy week row with no week of its own reads as the CURRENT week's
+    // while it is open (it is this week's until placed). Once completed it
+    // is history, not this week's record: Scott's chooser opened on
+    // seventeen struck-through rows from January–June (2026-09-22).
+    if (c === 'legacy' && t.completed && !t.weekStart) continue
     out.push(t)
   }
   return out.sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime())

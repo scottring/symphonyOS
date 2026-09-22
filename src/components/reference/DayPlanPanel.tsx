@@ -337,9 +337,23 @@ function ChooserRow({ entry, day, actions, draggable }: {
   )
 }
 
+/** Remembered per browser: which chooser sections are folded, and whether
+ *  completed rows are hidden (Scott, 2026-09-22: fold "This week's tasks"
+ *  without closing the chooser; hide what is done). */
+const CHOOSER_FOLDS_KEY = 'symphony.chooser.folded'
+const CHOOSER_HIDE_DONE_KEY = 'symphony.chooser.hideCompleted'
+function readFolded(): Record<string, boolean> {
+  try { return JSON.parse(localStorage.getItem(CHOOSER_FOLDS_KEY) ?? '{}') as Record<string, boolean> } catch { return {} }
+}
+function readHideCompleted(): boolean {
+  try { return localStorage.getItem(CHOOSER_HIDE_DONE_KEY) === '1' } catch { return false }
+}
+
 /** One section of Today's chooser: a small ruled heading with a note at its
- *  right, then the rows, outstanding first. */
-function ChooserSection({ title, note, icon, entries, day, actions, draggable, empty }: {
+ *  right — the heading folds the section, leaving the chooser open — then the
+ *  rows, outstanding first. */
+function ChooserSection({ id, title, note, icon, entries, day, actions, draggable, empty, open, onToggle, hideCompleted, allDone }: {
+  id: string
   title: string
   note?: string
   icon?: ReactNode
@@ -347,32 +361,49 @@ function ChooserSection({ title, note, icon, entries, day, actions, draggable, e
   day: Date
   actions: DayPlanPanelActions
   draggable: boolean
+  /** Drawn when the section has no rows at all. */
   empty?: ReactNode
+  open: boolean
+  onToggle: () => void
+  hideCompleted: boolean
+  /** Drawn when every row is completed and completed rows are hidden. */
+  allDone?: ReactNode
 }) {
   const [all, setAll] = useState(false)
-  const ordered = [...entries].sort((a, b) => rank(a) - rank(b))
+  const kept = hideCompleted ? entries.filter((e) => !e.completed) : entries
+  const ordered = [...kept].sort((a, b) => rank(a) - rank(b))
   const shown = all ? ordered : ordered.slice(0, PLAN_GROUP_CAP)
-  const id = `chooser-${title.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`
+  const headingId = `chooser-${id}-heading`
+  const bodyId = `chooser-${id}`
   return (
-    <section aria-labelledby={id} className="chooser-section">
-      <h3 id={id} className="chooser-section-heading">
-        {icon}
-        {title}
+    <section aria-labelledby={headingId} className="chooser-section">
+      <h3 className="chooser-section-heading">
+        <button type="button" id={headingId} aria-expanded={open} aria-controls={bodyId} onClick={onToggle} className="chooser-section-toggle">
+          {open ? <ChevronDown aria-hidden="true" className="h-3.5 w-3.5" /> : <ChevronRight aria-hidden="true" className="h-3.5 w-3.5" />}
+          {icon}
+          {title}
+        </button>
         {note && <span>{note}</span>}
       </h3>
-      {entries.length === 0 ? (
-        <div className="chooser-empty">{empty}</div>
-      ) : (
-        <>
-          <ul className="chooser-rows">
-            {shown.map((e) => <ChooserRow key={e.key} entry={e} day={day} actions={actions} draggable={draggable} />)}
-          </ul>
-          {!all && ordered.length > PLAN_GROUP_CAP && (
-            <button type="button" onClick={() => setAll(true)} className="py-1.5 text-[13px] text-neutral-500 hover:text-neutral-800">
-              Show {ordered.length - PLAN_GROUP_CAP} more
-            </button>
+      {open && (
+        <div id={bodyId}>
+          {entries.length === 0 ? (
+            <div className="chooser-empty">{empty}</div>
+          ) : kept.length === 0 ? (
+            <div className="chooser-empty">{allDone}</div>
+          ) : (
+            <>
+              <ul className="chooser-rows">
+                {shown.map((e) => <ChooserRow key={e.key} entry={e} day={day} actions={actions} draggable={draggable} />)}
+              </ul>
+              {!all && ordered.length > PLAN_GROUP_CAP && (
+                <button type="button" onClick={() => setAll(true)} className="py-1.5 text-[13px] text-neutral-500 hover:text-neutral-800">
+                  Show {ordered.length - PLAN_GROUP_CAP} more
+                </button>
+              )}
+            </>
           )}
-        </>
+        </div>
       )}
     </section>
   )
@@ -529,6 +560,93 @@ export function planningSubtitle(day: Date, weekPage: Date | null): string {
   return day.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
 }
 
+/**
+ * Today's chooser (Scott via Codex, 2026-09-22): two sections, told apart by
+ * eye. "This week's tasks" is the week's list, whole; a chosen row stays,
+ * marked, and choosing again removes only today's choice. "Routines" is the
+ * day's occurrences — choosing one selects an occurrence for today, never a
+ * new task and never the repeating rule; one already on the day by its own
+ * time says so instead of being offered twice; and the section stays even
+ * when the week's list is empty. Month-to-week selection belongs on the
+ * Week page, so there is no month browser here. An empty week offers "Plan
+ * your week"; urgent work still goes straight to Today through Add task.
+ * Each section folds on its heading without closing the chooser, and
+ * completed rows can be hidden; both are remembered per browser.
+ */
+function TodayChooser({ plan, day, actions, draggable, cap }: {
+  plan: DayPlan
+  day: Date
+  actions: DayPlanPanelActions
+  draggable: boolean
+  cap: number | null
+}) {
+  const tasks = plan.chooserTasks ?? (plan.toPlan ?? []).filter((e) => e.kind === 'task')
+  const routines = plan.chooserRoutines ?? []
+  const weekStart = weekStartAnchor(day, readCadenceConfig().weekStartsOn)
+  const [folded, setFolded] = useState<Record<string, boolean>>(() => readFolded())
+  const [hideCompleted, setHideCompleted] = useState<boolean>(() => readHideCompleted())
+  const toggle = (id: string) => setFolded((f) => {
+    const next = { ...f, [id]: !f[id] }
+    try { localStorage.setItem(CHOOSER_FOLDS_KEY, JSON.stringify(next)) } catch { /* remembered only while mounted */ }
+    return next
+  })
+  const toggleHide = () => setHideCompleted((h) => {
+    try { localStorage.setItem(CHOOSER_HIDE_DONE_KEY, h ? '0' : '1') } catch { /* remembered only while mounted */ }
+    return !h
+  })
+  const anyDone = tasks.some((e) => e.completed) || routines.some((e) => e.completed)
+  return (
+    <div data-testid="day-plan-panel">
+      {(anyDone || hideCompleted) && (
+        <div className="chooser-toolbar">
+          <button type="button" aria-pressed={hideCompleted} onClick={toggleHide} className="chooser-toggle">
+            {hideCompleted ? 'Show completed' : 'Hide completed'}
+          </button>
+        </div>
+      )}
+      <ChooserSection
+        id="week"
+        title="This week's tasks"
+        note={formatWeekRangeShort(weekStart)}
+        entries={tasks}
+        day={day}
+        actions={actions}
+        draggable={draggable}
+        open={!folded.week}
+        onToggle={() => toggle('week')}
+        hideCompleted={hideCompleted}
+        empty={
+          <>
+            <span>No tasks on this week's list yet.</span>
+            {/* A plain anchor, like the fold's Inbox link: this panel is
+                drawn inside and outside the router. */}
+            <a href="/week">Plan your week →</a>
+          </>
+        }
+        allDone={<span>Everything on this week's list is done.</span>}
+      />
+      {routines.length > 0 && (
+        <ChooserSection
+          id="routines"
+          title="Routines"
+          note="For today"
+          icon={<Repeat aria-hidden="true" className="h-3.5 w-3.5" />}
+          entries={routines}
+          day={day}
+          actions={actions}
+          draggable={draggable}
+          open={!folded.routines}
+          onToggle={() => toggle('routines')}
+          hideCompleted={hideCompleted}
+          allDone={<span>Every routine for today is done.</span>}
+        />
+      )}
+      <UnfinishedFold entries={plan.unfinished ?? []} older={plan.olderUnfinished ?? 0} day={day} actions={actions} draggable={draggable} weekPage={null} cap={cap} />
+      <p className="chooser-foot">Choices stay on your week's list.<br />Routine choices apply to this occurrence only.</p>
+    </div>
+  )
+}
+
 export function DayPlanPanel({ plan, day, actions, draggable = true, weekPage = null }: {
   plan: DayPlan
   day: Date
@@ -543,52 +661,7 @@ export function DayPlanPanel({ plan, day, actions, draggable = true, weekPage = 
   const [monthOpen, setMonthOpen] = useState(false)
   const cap = weekPage !== null ? null : PLAN_GROUP_CAP
   if (weekPage === null) {
-    // Today's chooser (Scott via Codex, 2026-09-22): two sections, told
-    // apart by eye. "This week's tasks" is the week's list, whole; a chosen
-    // row stays, marked, and choosing again removes only today's choice.
-    // "Routines" is the day's occurrences — choosing one selects an
-    // occurrence for today, never a new task and never the repeating rule;
-    // one already on the day by its own time says so instead of being
-    // offered twice; and the section stays even when the week's list is
-    // empty. Month-to-week selection belongs on the Week page, so there is
-    // no month browser here. An empty week offers "Plan your week"; urgent
-    // work still goes straight to Today through Add task.
-    const tasks = plan.chooserTasks ?? (plan.toPlan ?? []).filter((e) => e.kind === 'task')
-    const routines = plan.chooserRoutines ?? []
-    const weekStart = weekStartAnchor(day, readCadenceConfig().weekStartsOn)
-    return (
-      <div data-testid="day-plan-panel">
-        <ChooserSection
-          title="This week's tasks"
-          note={formatWeekRangeShort(weekStart)}
-          entries={tasks}
-          day={day}
-          actions={actions}
-          draggable={draggable}
-          empty={
-            <>
-              <span>No tasks on this week's list yet.</span>
-              {/* A plain anchor, like the fold's Inbox link: this panel is
-                  drawn inside and outside the router. */}
-              <a href="/week">Plan your week →</a>
-            </>
-          }
-        />
-        {routines.length > 0 && (
-          <ChooserSection
-            title="Routines"
-            note="For today"
-            icon={<Repeat aria-hidden="true" className="h-3.5 w-3.5" />}
-            entries={routines}
-            day={day}
-            actions={actions}
-            draggable={draggable}
-          />
-        )}
-        <UnfinishedFold entries={plan.unfinished ?? []} older={plan.olderUnfinished ?? 0} day={day} actions={actions} draggable={draggable} weekPage={null} cap={cap} />
-        <p className="chooser-foot">Choices stay on your week's list.<br />Routine choices apply to this occurrence only.</p>
-      </div>
-    )
+    return <TodayChooser plan={plan} day={day} actions={actions} draggable={draggable} cap={cap} />
   }
   return (
     <div data-testid="day-plan-panel">
