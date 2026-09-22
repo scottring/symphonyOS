@@ -906,8 +906,8 @@ describe('PeriodPlanPage — Plan <Month>', () => {
     expect(hook.addTask).toHaveBeenCalledWith('Book a PT evaluation', undefined, undefined, undefined,
       expect.objectContaining({ bucket: 'quarter', seasonStart: fall }))
     expect(screen.getByRole('button', { name: /plan the month/i })).toBeInTheDocument()
-    // A season takes nothing down from the year: nothing was ever offered.
-    expect(hook.pushTask).not.toHaveBeenCalled()
+    // A season takes nothing down from the year: the rail never offers a row.
+    expect(screen.queryByRole('button', { name: /^Add to Fall 2026/ })).toBeNull()
   })
 
   it("the year page plans the year from last year's goals: Keep copies notes, strategy, area, context and links the goal; Done and Drop change status; nothing is deleted", async () => {
@@ -936,6 +936,43 @@ describe('PeriodPlanPage — Plan <Month>', () => {
     expect(goalsApi.updateGoal).toHaveBeenCalledWith('dr', { status: 'archived' })
     expect(goalsApi.deleteGoal).not.toHaveBeenCalled()
     expect(screen.getByRole('button', { name: /plan the season/i })).toBeInTheDocument()
+  })
+
+  it("the DEFAULT year page looks back at last year — the goals context holds every year (regression)", async () => {
+    // No ?start=: the page plans 2026 (the suite's clock) and looks back at
+    // 2025. Both years are in the context, as the unfiltered fetch now gives.
+    state.goals = [
+      goal({ id: 'g25', name: 'Learn to sail', year: 2025 }),
+      goal({ id: 'g26', name: 'Get strong again', year: 2026 }),
+    ]
+    renderPage('year')
+    fireEvent.click(await screen.findByRole('button', { name: /^Plan 2026$/ }))
+    expect(screen.getByText(/Look back at 2025/)).toBeInTheDocument()
+    expect(screen.queryByText(/nothing to look back at/i)).toBeNull()
+    const rows = screen.getAllByRole('listitem').filter((li) => within(li).queryByRole('button', { name: 'Keep' }))
+    expect(rows.some((li) => li.textContent?.includes('Learn to sail'))).toBe(true)
+  })
+
+  it('a Keep with no id in the draft is given one BEFORE the save, and a retry re-uses it', async () => {
+    vi.setSystemTime(new Date(2026, 11, 20))
+    state.goals = [goal({ id: 'k', name: 'Get strong again', year: 2026 })]
+    goalsApi.addGoal.mockImplementationOnce(async () => null)          // first Save half-fails
+    renderPageAt('year', '/year?start=2027-01-01')
+    fireEvent.click(await screen.findByRole('button', { name: /^Plan 2027$/ }))
+    fireEvent.click(screen.getByRole('button', { name: 'Keep' }))
+    fireEvent.click(screen.getByRole('button', { name: /next: plan 2027/i }))
+    fireEvent.click(screen.getByRole('button', { name: /next: save/i }))
+    fireEvent.click(screen.getByRole('button', { name: /save 2027/i }))
+    await vi.waitFor(() => expect(goalsApi.addGoal).toHaveBeenCalledTimes(1))
+    const firstId = (goalsApi.addGoal.mock.calls[0][3] as { id: string }).id
+    expect(firstId).toEqual(expect.any(String))
+
+    // Save again once the failed attempt has settled: the SAME id, so the
+    // retry lands on one row, not two.
+    await vi.waitFor(() => expect(screen.getByRole('button', { name: /save 2027/i })).toBeEnabled())
+    fireEvent.click(screen.getByRole('button', { name: /save 2027/i }))
+    await vi.waitFor(() => expect(goalsApi.addGoal).toHaveBeenCalledTimes(2))
+    expect((goalsApi.addGoal.mock.calls[1][3] as { id: string }).id).toBe(firstId)
   })
 
   it('the year look-back is skipped when last year has no goals', async () => {

@@ -1,3 +1,5 @@
+import type { Scope } from '@/lib/scope'
+
 export type GoalStatus = 'active' | 'completed' | 'archived'
 export type Quarter = 'Q1' | 'Q2' | 'Q3' | 'Q4'
 export type MilestoneStatus = 'pending' | 'in_progress' | 'achieved'
@@ -50,6 +52,9 @@ export interface Goal {
   year: number
   notes?: string
   strategy?: string
+  /** goals RLS shares on scope, never on context — a copy that drops it turns
+   *  a shared goal private (Phase 3 final review). Derived, never chosen. */
+  scope?: Scope
   domainSlug?: string
   layerId?: string
   context?: 'work' | 'family' | 'personal' | null
@@ -83,6 +88,7 @@ export interface DbGoal {
   year: number
   notes: string | null
   strategy: string | null
+  scope: Scope | null
   domain_slug: string | null
   layer_id: string | null
   context: string | null

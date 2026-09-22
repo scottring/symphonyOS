@@ -34,6 +34,10 @@ const insertMock = vi.fn()
 // Tracks the row returned by goals.select(...).eq('id', ...).single() — used
 // for the duplicate-id readback path.
 const selectSingleMock = vi.fn()
+// Every .eq(...) the goals query makes — the fetch must not filter by year.
+const goalsEqMock = vi.fn()
+// What the initial goals fetch returns.
+let goalRows: DbGoal[] = []
 
 vi.mock('@/lib/supabase', () => ({
   supabase: {
@@ -43,15 +47,15 @@ vi.mock('@/lib/supabase', () => ({
           select: (_cols?: string) => {
             const chain: Record<string, unknown> = {}
             chain.eq = (field: string, value: unknown) => {
+              goalsEqMock(field, value)
               if (field === 'id') {
                 chain.single = () => selectSingleMock(value)
                 return chain
               }
-              // .eq('year', currentYear).order('sort_order') on initial fetch
               chain.order = () => Promise.resolve({ data: [], error: null })
               return chain
             }
-            chain.order = () => Promise.resolve({ data: [], error: null })
+            chain.order = () => Promise.resolve({ data: goalRows, error: null })
             return chain
           },
           insert: (row: Record<string, unknown>) => {
@@ -83,6 +87,8 @@ describe('useGoals addGoal', () => {
   beforeEach(() => {
     insertMock.mockReset()
     selectSingleMock.mockReset()
+    goalsEqMock.mockReset()
+    goalRows = []
     ;(insertMock as unknown as { __nextResult?: () => unknown }).__nextResult = undefined
   })
 
@@ -132,5 +138,20 @@ describe('useGoals addGoal', () => {
 
     expect(g?.id).toBe('g-next')
     expect(result.current.goals.filter((x) => x.id === 'g-next')).toHaveLength(1)
+  })
+
+  it('fetches EVERY year of goals — the year page plans next year and looks back at last (regression)', async () => {
+    goalRows = [
+      dbGoal({ id: 'g-2025', name: 'Last year', year: 2025 }),
+      dbGoal({ id: 'g-2026', name: 'This year', year: 2026 }),
+      dbGoal({ id: 'g-2027', name: 'Next year', year: 2027 }),
+    ]
+
+    const { result } = renderHook(() => useGoals())
+    await waitFor(() => expect(result.current.loading).toBe(false))
+
+    // No `.eq('year', …)` anywhere in the goals query.
+    expect(goalsEqMock.mock.calls.filter(([field]) => field === 'year')).toHaveLength(0)
+    expect(result.current.goals.map((g) => g.year).sort()).toEqual([2025, 2026, 2027])
   })
 })

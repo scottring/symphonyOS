@@ -515,23 +515,17 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
   //    Done and Drop change its status. Nothing is ever deleted — the year
   //    just gone stays readable.
   //
-  //    The id a Keep will create with is fixed in the draft (PlanSession's
-  //    setVerdict), so a half-failed Save retried lands on the SAME row
-  //    rather than a second copy; `addGoal` has no other idempotent path.
-  //    The draft is read through a ref because the host that owns it is
-  //    constructed below, from these very writers.
+  //    The id a Keep will create with is fixed in the draft BEFORE the save
+  //    starts (prepareDraft, below), so a half-failed Save retried lands on
+  //    the SAME row rather than a second copy; `addGoal` has no other
+  //    idempotent path. The writers only read that id, through a ref, because
+  //    the host that owns the draft is constructed below, from these writers.
   const draftRef = useRef<SessionDraft | null>(null)
-  const changeDraftRef = useRef<((d: SessionDraft) => void) | null>(null)
   const yearWriters = useMemo(() => {
-    const keptIdFor = (sourceId: string): string => {
-      const d = draftRef.current
-      const existing = d?.keptIds?.[sourceId]
-      if (existing) return existing
-      const id = crypto.randomUUID()
-      // Persist BEFORE the write, so a retry finds the same id.
-      if (d) changeDraftRef.current?.({ ...d, keptIds: { ...(d.keptIds ?? {}), [sourceId]: id } })
-      return id
-    }
+    // prepareDraft has already filled every `keep` verdict's id; the fallback
+    // is only for a draft that somehow reached a writer unprepared.
+    const keptIdFor = (sourceId: string): string =>
+      draftRef.current?.keptIds?.[sourceId] ?? crypto.randomUUID()
     const setStatus = async (id: string, status: 'completed' | 'archived') => {
       try { await updateGoal(id, { status }); return true } catch { return false }
     }
@@ -542,8 +536,12 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
         const year = periodStart.getFullYear()
         // A retry finds the goal the first attempt already carried.
         if (goals.find((g) => g.carriedFrom === id && g.year === year)) return true
-        const kept = await addGoal(src.areaId ?? null, src.name, src.context ?? undefined, {
-          id: keptIdFor(id), year, notes: src.notes ?? null, strategy: src.strategy ?? null, carriedFrom: id,
+        // goals RLS shares on scope: a copy that dropped it would turn a shared
+        // goal private. An area from a year whose areas are gone is no area.
+        const areaId = areas.some((a) => a.id === src.areaId) ? src.areaId : null
+        const kept = await addGoal(areaId ?? null, src.name, src.context ?? undefined, {
+          id: keptIdFor(id), year, notes: src.notes ?? null, strategy: src.strategy ?? null,
+          scope: src.scope, carriedFrom: id,
         })
         return !!kept
       },
@@ -556,7 +554,7 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
       drop: (id: string) => setStatus(id, 'archived'),
       takeInto: async () => true,                                   // nothing sits above the year
     }
-  }, [goals, addGoal, updateGoal])
+  }, [goals, areas, addGoal, updateGoal])
 
   const monthOrSeasonWriters = useMemo(() => ({
     keep: async (id: string, periodStart: Date, prevStart: Date) =>
@@ -580,12 +578,26 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
   }), [keepForward, addTask, tasks, completeTask, gated, dropCommitment, isSeasonSession, placeLevel])
   const sessionWriters = isYearSession ? yearWriters : monthOrSeasonWriters
 
+  // Fix the ids every Keep will create with, once, before the first write: the
+  // host persists the result, so a retry after a half-failed Save re-uses them.
+  const prepareYearDraft = useCallback((d: SessionDraft): SessionDraft => {
+    const kept = { ...(d.keptIds ?? {}) }
+    let added = false
+    for (const [id, verdict] of Object.entries(d.verdicts)) {
+      if (verdict !== 'keep' || kept[id]) continue
+      kept[id] = crypto.randomUUID()
+      added = true
+    }
+    return added ? { ...d, keptIds: kept } : d
+  }, [])
+
   const host = usePlanSessionHost({
     enabled: true, level, horizon, token,
     periodStart: bounds.start, prevStart: bounds.prev,
     listsLoading: loading || seasonsLoading,
     back, current: currentPeriodTasks, above: aboveItems,
     writers: sessionWriters,
+    prepareDraft: isYearSession ? prepareYearDraft : undefined,
     isCompleted: (id) => (isYearSession
       ? goals.find((g) => g.id === id)?.status === 'completed'
       : !!tasks.find((t) => t.id === id)?.completed),
@@ -593,10 +605,9 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
   const { saved: savedSession, loading: sessionLoading, error: sessionReadError, reload: reloadSession } = host.session
   const { sessionReady, draft, shownDraft, sessionOpen, savingSession, justSaved, saveError,
     startSession, changeDraft, closeSession, saveDraft } = host
-  // The year's Keep reads the draft it is saving (for the id it must re-use)
-  // and writes back into it; the host owns both, so they arrive here.
+  // The year's Keep reads the draft being saved for the id it must re-use;
+  // the host owns it, so it arrives here.
   draftRef.current = shownDraft
-  changeDraftRef.current = changeDraft
 
   return (
     <div {...monthDrop} className={`${PAGE_COLUMN_WIDE} py-6${planDropOver ? ' reference-list-drop' : ''}`}>

@@ -160,7 +160,8 @@ marked *verify* must be confirmed before the phase that uses them.)
 ## Open items
 
 - **Drop semantics** (Phase 1 *verify*).
-- **The Year Keep schema** (Phase 3 *verify*).
+- ~~The Year Keep schema~~ **Settled (Phase 3):** `goals.carried_from`
+  (nullable, migration 2026-09-22).
 - ~~Household sessions~~ **Settled (Scott, 2026-09-21: "yes agreed"):** a
   period is planned once per household for Family items. Each person's
   private (Work/Personal) items are visible only to them, in the same

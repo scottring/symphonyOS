@@ -46,6 +46,7 @@ function dbGoalToGoal(db: DbGoal, actions: GoalAction[], milestones: GoalMilesto
     year: db.year,
     notes: db.notes ?? undefined,
     strategy: db.strategy ?? undefined,
+    scope: db.scope ?? undefined,
     domainSlug: db.domain_slug ?? undefined,
     layerId: db.layer_id ?? undefined,
     context: db.context as Goal['context'] ?? undefined,
@@ -77,9 +78,14 @@ function dbActionToAction(db: DbGoalAction): GoalAction {
 // Hook
 // ============================================================================
 
-export function useGoals(year?: number) {
+// Every year's goals, not just this one. The year page plans NEXT year and
+// looks back at the one before it, so a fetch pinned to the calendar year left
+// both of those empty (final review, Phase 3). Consumers all filter by
+// `g.year` themselves.
+export function useGoals() {
   const { user } = useAuth()
-  const currentYear = year ?? new Date().getFullYear()
+  /** Only the default for a goal created without an explicit year. */
+  const currentYear = new Date().getFullYear()
 
   const [areas, setAreas] = useState<GoalArea[]>([])
   const [goals, setGoals] = useState<Goal[]>([])
@@ -108,7 +114,7 @@ export function useGoals(year?: number) {
         // Fetch areas, goals, actions, and milestones in parallel
         const [areasRes, goalsRes, actionsRes, milestonesRes] = await Promise.all([
           supabase.from('goal_areas').select('*').order('sort_order'),
-          supabase.from('goals').select('*').eq('year', currentYear).order('sort_order'),
+          supabase.from('goals').select('*').order('sort_order'),
           supabase.from('goal_actions').select('*').order('sort_order'),
           supabase.from('goal_milestones').select('*').order('sort_order'),
         ])
@@ -143,7 +149,7 @@ export function useGoals(year?: number) {
     }
 
     fetchAll()
-  }, [user, currentYear])
+  }, [user])
 
   // Rebuild goals when allActions/allMilestones changes (to keep in sync)
   const goalsWithData = useMemo(() => {
