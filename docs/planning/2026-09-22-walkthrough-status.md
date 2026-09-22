@@ -165,3 +165,52 @@ Today and Week now have distinct React route identities, so entering Today start
 on the actual current day while browsing within a horizon retains its date.
 Explicit date deep links still apply. A route-level regression exercises Week
 browsing followed by Today navigation. This is included in the follow-up release.
+
+## Resumed production verification — after unlock
+
+Verified in the authenticated test household on production **ed2efe40**, after using
+the new-version Reload button. These results supersede the lock-related pending
+checks above. The release passed 6,572 tests across 633 files (3 skipped) and build.
+
+- **Day removal: pass.** Removed Test weekly task from Sep 22 through its inline
+  Remove from this day action. It disappeared from Today, remained under Any day
+  in Sep 27–Oct 3, and remained absent from Today after quitting/reopening the app.
+- **Today navigation: pass.** Entering Today from the future Week returned to
+  Tuesday Sep 22, rather than retaining the browsed week's Sunday.
+- **Earlier shelf/review entry: pass.** Next Week visibly offers Review the week
+  of Sep 20–Sep 26. Earlier offers Buy groceries from Sep 23 without adding it to
+  the next week's list.
+- **Shelf completion: pass.** Completed Big test directly in Today's Week tasks
+  shelf. It appeared in Week's Completed group. Reopened it there; the shelf again
+  offered Complete and retained Weekend Sep 26–27. It was never chosen for Today.
+- **Repeating routine time: pass.** On QA Routine Timing, saved an untimed daily
+  rule, then entered 8:30 PM and used Save & close. Sep 23 showed it in Schedule
+  at 8:30 PM. Explicit Save repeating schedule successfully cleared the time.
+- **Untimed occurrence time: pass.** With that rule untimed, selected Set time
+  in Sep 23's routine shelf and chose 9 PM. It appeared in Schedule at 9 PM; Sep 24
+  had no timed occurrence. After quitting/reopening, Sep 23 still showed 9 PM.
+  Rule detail remained Daily without a time, confirming occurrence-only scope.
+- **QA cleanup: pass.** Restored QA Routine Timing's original 8 PM rule through
+  Save & close, reopened detail to confirm Daily · 20:00 while Sep 23 retained its
+  own 9 PM override, then returned the routine to Resting. Scott's Read for
+  10 Minutes routine was unchanged. The QA occurrence override is retained.
+- **Goal linking: pass.** Created QA Goal link verification in October. Its visible
+  Link to goal control linked it to QA Month outcome and expanded the goal.
+  Supporting-task count and Month tasks guidance updated. Completed only the QA
+  task; the goal and existing QA Month next action remained open. The completed
+  QA task is retained for traceability.
+- **Goal review: pass, UI.** October's previous-month review visibly offered Keep,
+  Keep + next action, Done, Someday, Drop for the open September goal. Closed
+  without changing that goal. Domain preflight/failure paths remain covered by
+  automated regression tests, not newly exercised production writes in this pass.
+- **Daily review keyboard: pass.** Escape dismissed the review with its reflection
+  input focused.
+- **Optional onboarding: pass, mechanics.** More → Getting started reopened the
+  invitation. Add something for today opened the real Today input; Start with a
+  goal exposed Month, Season, Year. Explore on my own dismissed it without
+  creating sample work. Restarted the app to verify persisted dismissal.
+
+The test app was returned to Today. No user tasks or routines were deleted.
+The documented planning walkthrough blockers are resolved and the targeted live
+rechecks pass. This does not extend the sign-off to cross-account security,
+external provider integrations, or fresh-user comprehension research.
