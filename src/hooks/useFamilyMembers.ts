@@ -139,24 +139,37 @@ export function useFamilyMembers() {
 
   const deleteMember = useCallback(async (id: string) => {
     try {
-      // First, unassign all tasks assigned to this member
-      const { error: unassignError } = await supabase
+      // tasks.assigned_to references family_members without ON DELETE, so the
+      // member's tasks must be unassigned before the row can go. Remember
+      // which, so a failed delete can hand them back instead of leaving them
+      // silently unassigned.
+      const { data: assigned, error: readError } = await supabase
         .from('tasks')
-        .update({ assigned_to: null })
+        .select('id')
         .eq('assigned_to', id)
+      if (readError) throw readError
+      const taskIds = (assigned ?? []).map((t: { id: string }) => t.id)
 
-      if (unassignError) {
-        console.error('Error unassigning tasks:', unassignError)
-        // Continue with deletion even if unassign fails
+      if (taskIds.length > 0) {
+        const { error: unassignError } = await supabase
+          .from('tasks')
+          .update({ assigned_to: null })
+          .in('id', taskIds)
+        // Stop here: deleting would fail on the reference anyway.
+        if (unassignError) throw unassignError
       }
 
-      // Then delete the family member
       const { error } = await supabase
         .from('family_members')
         .delete()
         .eq('id', id)
 
-      if (error) throw error
+      if (error) {
+        if (taskIds.length > 0) {
+          await supabase.from('tasks').update({ assigned_to: id }).in('id', taskIds)
+        }
+        throw error
+      }
       setMembers(prev => prev.filter(m => m.id !== id))
     } catch (err) {
       console.error('Error deleting family member:', err)

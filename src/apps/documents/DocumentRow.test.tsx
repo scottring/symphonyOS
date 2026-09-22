@@ -105,3 +105,17 @@ describe('DocumentRow editing', () => {
     expect(screen.getByLabelText(/expires/i)).toHaveValue('')
   })
 })
+
+describe('DocumentRow delete', () => {
+  it('asks before deleting — a scan cannot be recovered', () => {
+    const onDelete = vi.fn()
+    render(<DocumentRow document={doc()} onToggleScope={noop} onDelete={onDelete} onSave={onSave} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Delete document' }))
+    expect(onDelete).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: 'Keep' }))
+    expect(onDelete).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: 'Delete document' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Delete' }))
+    expect(onDelete).toHaveBeenCalledOnce()
+  })
+})

@@ -84,8 +84,9 @@ export function ListView({
     e.preventDefault()
     const trimmed = newItemText.trim()
     if (trimmed && onAddItem) {
-      await onAddItem({ text: trimmed })
-      setNewItemText('')
+      // Clear only once it saved — a failed add keeps the typed text for retry.
+      const added = await onAddItem({ text: trimmed })
+      if (added) setNewItemText('')
     }
   }
 

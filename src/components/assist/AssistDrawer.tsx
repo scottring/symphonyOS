@@ -135,8 +135,8 @@ export function AssistDrawer({ item, onClose, onMutate, discuss, onShare }: Assi
             currentUserId={thread.selfAuthId}
             familyMembers={members}
             suggestions={suggestions}
-            onPost={(text) => { void thread.post(text) }}
-            onAsk={(text) => { void thread.ask(text) }}
+            onPost={(text) => thread.post(text)}
+            onAsk={(text) => thread.ask(text)}
             onClose={onClose}
             onShare={shareEligible ? onShare : undefined}
           />

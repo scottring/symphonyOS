@@ -10,6 +10,8 @@ const db = vi.hoisted(() => ({
   /** What ensure_discuss_thread returns. */
   threadId: 'thr-1' as string | null,
   ensureError: null as { message: string } | null,
+  /** When set, append_chat_message fails the way supabase-js does: `{ error }`, no throw. */
+  appendError: null as { message: string } | null,
   /** The stored chat_sessions row, keyed by id. */
   rows: {} as Record<string, { id: string; messages: unknown[]; scope: string; user_id: string }>,
   rpcCalls: [] as Array<{ fn: string; args: Record<string, unknown> }>,
@@ -41,6 +43,7 @@ vi.mock('@/lib/supabase', () => {
           return Promise.resolve({ data: db.ensureError ? null : db.threadId, error: db.ensureError })
         }
         if (fn === 'append_chat_message') {
+          if (db.appendError) return Promise.resolve({ data: null, error: db.appendError })
           const row = db.rows[args.p_session as string]
           if (row) row.messages = [...row.messages, args.p_message]
           return Promise.resolve({ data: null, error: null })
@@ -104,6 +107,7 @@ describe('useDiscussThread', () => {
     vi.clearAllMocks()
     db.threadId = 'thr-1'
     db.ensureError = null
+    db.appendError = null
     db.rpcCalls = []
     db.upserts = []
     db.realtime = { filter: null, cb: null }
@@ -173,6 +177,31 @@ describe('useDiscussThread', () => {
       timestamp: expect.any(String),
       author: { id: 'u1', name: 'Scott', kind: 'member' },
     })
+    expect(streamSymphonyAgent).not.toHaveBeenCalled()
+  })
+
+  it('a failed post says so, removes the optimistic line and resolves false', async () => {
+    const { result } = renderHook(() => useDiscussThread(familyTask))
+    await waitFor(() => expect(result.current.threadId).toBe('thr-1'))
+    db.appendError = { message: 'permission denied' }
+
+    let ok: boolean | undefined
+    await act(async () => { ok = await result.current.post('When can we go?') })
+
+    expect(ok).toBe(false)
+    expect(result.current.messages.some((m) => m.content === 'When can we go?')).toBe(false)
+    expect(result.current.error).toMatch(/wasn't sent/)
+  })
+
+  it('a failed question never starts a Symphony turn', async () => {
+    const { result } = renderHook(() => useDiscussThread(familyTask))
+    await waitFor(() => expect(result.current.threadId).toBe('thr-1'))
+    db.appendError = { message: 'permission denied' }
+
+    let ok: boolean | undefined
+    await act(async () => { ok = await result.current.ask('What first?') })
+
+    expect(ok).toBe(false)
     expect(streamSymphonyAgent).not.toHaveBeenCalled()
   })
 

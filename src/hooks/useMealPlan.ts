@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback, useRef } from 'react'
 import { supabase, getAuthUser } from '@/lib/supabase'
 import { toIsoDate } from '@/lib/weekHelpers'
 import { useAuth } from '@/hooks/useAuth'
+import { showToast } from '@/hooks/useToast'
 import {
   dbMealPlanToMealPlan, type MealPlan, type DbMealPlan, type DbMealPlanEntry,
   type MealSlot,
@@ -90,7 +91,9 @@ export function useMealPlan(weekStart: Date): UseMealPlanResult {
         for_member_id: input.forMemberId ?? null,
       }).select().single()
     if (insertErr) {
-      setError(insertErr.message)
+      // A write failure is a toast, not the page-wide `error`: that one is
+      // for a failed load and hides the whole grid until the week changes.
+      showToast("Couldn't add that meal. Please try again.", 'error')
       // Surface the DB error to callers so try/catch in handlers (e.g.
       // Ask-Symphony's onApplySuggestion) can show feedback.
       throw new Error(`addMeal failed: ${insertErr.message}`)
@@ -116,7 +119,7 @@ export function useMealPlan(weekStart: Date): UseMealPlanResult {
     const { error: delErr } = await supabase.from('meal_plan_entries').delete().eq('id', entryId)
     if (delErr) {
       setPlan(prev => prev ? { ...prev, entries: previous } : prev)
-      setError(delErr.message)
+      showToast("Couldn't remove that meal.", 'error')
     }
   }, [plan])
 
@@ -152,7 +155,7 @@ export function useMealPlan(weekStart: Date): UseMealPlanResult {
     const failed = results.find(r => r.error)
     if (failed?.error) {
       setPlan(prev => prev ? { ...prev, entries: previous } : prev)
-      setError(failed.error.message)
+      showToast("Couldn't move that meal.", 'error')
     }
   }, [plan])
 
@@ -165,7 +168,7 @@ export function useMealPlan(weekStart: Date): UseMealPlanResult {
       .eq('id', plan.id)
     if (updErr) {
       setPlan(p => p ? { ...p, ...prev } : p)
-      setError(updErr.message)
+      showToast("Couldn't change the week's range.", 'error')
     }
   }, [plan])
 

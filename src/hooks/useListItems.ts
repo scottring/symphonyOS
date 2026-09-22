@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
+import { showToast } from '@/hooks/useToast'
 import { useAuth } from '@/hooks/useAuth'
 import { localYmd, parseLocalYmd } from '@/lib/cadence/config'
 import type { ListItem, DbListItem } from '@/types/list'
@@ -105,6 +106,7 @@ export function useListItems(listId: string | null) {
       // Rollback on error
       setItems((prev) => prev.filter((i) => i.id !== tempId))
       setError(insertError.message)
+      showToast("Couldn't add that item. Please try again.", 'error')
       return null
     }
 
@@ -150,6 +152,7 @@ export function useListItems(listId: string | null) {
       // Rollback on error
       setItems((prev) => prev.map((i) => (i.id === id ? item : i)))
       setError(updateError.message)
+      showToast("Couldn't save that change to the list.", 'error')
     }
   }, [items])
 
@@ -170,6 +173,7 @@ export function useListItems(listId: string | null) {
       // Rollback on error
       setItems((prev) => [...prev, itemToDelete].sort((a, b) => a.sortOrder - b.sortOrder))
       setError(deleteError.message)
+      showToast("Couldn't delete that item.", 'error')
     }
   }, [items])
 
@@ -193,6 +197,7 @@ export function useListItems(listId: string | null) {
       // Rollback on error
       setItems((prev) => [...prev, ...completed].sort((a, b) => a.sortOrder - b.sortOrder))
       setError(deleteError.message)
+      showToast("Couldn't delete that item.", 'error')
     }
   }, [listId, items])
 
@@ -228,6 +233,7 @@ export function useListItems(listId: string | null) {
         // Rollback on error
         setItems(originalItems)
         setError(updateError.message)
+        showToast("Couldn't save that change to the list.", 'error')
         return
       }
     }

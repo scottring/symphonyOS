@@ -8,6 +8,8 @@
 // the same handlers, so a verdict here cannot diverge from one given
 // anywhere else. Nothing here is counted or nagged.
 import { useMemo } from 'react'
+import { usePendingDelete } from '@/hooks/usePendingDelete'
+import { UndoToast } from '@/components/undo/UndoToast'
 import { useSupabaseTasks } from '@/hooks/useSupabaseTasks'
 import { useGatedTaskActions } from '@/hooks/useGatedTaskActions'
 import { useDomain } from '@/hooks/useDomain'
@@ -22,7 +24,13 @@ export function SomedayPage() {
   const { layers, all: showAllDomains } = useDomain()
   const gated = useGatedTaskActions({ updateTask, pushTask, updateTasksBulk }, (id) => tasks.find((t) => t.id === id))
 
-  const setAside = useMemo(() => tasks.filter((t) => t.bucket === 'someday' && !t.completed), [tasks])
+  // Delete is one tap from the row, so it waits out an Undo window first.
+  const pendingDelete = usePendingDelete((id) => { void deleteTask(id) })
+  const pendingIds = pendingDelete.pendingIds
+  const setAside = useMemo(
+    () => tasks.filter((t) => t.bucket === 'someday' && !t.completed && !pendingIds.includes(t.id)),
+    [tasks, pendingIds],
+  )
   const rows = useMemo(
     () => filterTasksForLayers(setAside, layers)
       .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime()),
@@ -37,7 +45,7 @@ export function SomedayPage() {
       viewedDate,
       onUpdateTask: (id, u) => gated.updateTask(id, u),
       onPushTask: (id, target) => gated.pushTask(id, target),
-      onDeleteTask: (id) => { void deleteTask(id) },
+      onDeleteTask: (id) => pendingDelete.schedule([id], 'Deleted'),
     })
   }
 
@@ -80,6 +88,7 @@ export function SomedayPage() {
           )}
         </section>
       </div>
+      <UndoToast action={pendingDelete.action} onUndo={pendingDelete.undo} onDismiss={pendingDelete.dismiss} />
     </div>
   )
 }

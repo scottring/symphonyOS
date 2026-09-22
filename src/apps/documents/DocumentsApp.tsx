@@ -4,6 +4,7 @@ import { PAGE_COLUMN_WIDE } from '@/components/layout/pageLayout'
 import { Plus } from 'lucide-react'
 import { useDocuments, type SymphonyDocument } from '@/hooks/useDocuments'
 import { useAuth } from '@/hooks/useAuth'
+import { showToast } from '@/hooks/useToast'
 import { attachFile, analyzeAttachment, ATTACHMENT_ACCEPT } from '@/lib/taskAttachments'
 import { DocumentRow } from './DocumentRow'
 import { DocumentProposalRow } from '@/components/surface/sections/DocumentProposal'
@@ -40,10 +41,15 @@ export function DocumentsApp() {
       // A shelf document has no parent entity, so it hangs off the user
       // themselves — entity_type 'document', entity_id = the user's id.
       const result = await attachFile('document', user.id, file, file.name)
+      if (!result) showToast(`Couldn't upload "${file.name}". Please try again.`, 'error')
       if (result && (result.contentType.startsWith('image/') || result.contentType === 'application/pdf')) {
         // Classify it so it arrives already proposed rather than unlabeled.
         await analyzeAttachment(result.id, 'A document filed directly in the Documents shelf')
       }
+      await reload()
+    } catch {
+      // A failed classification leaves the file stored, just unlabeled.
+      showToast(`"${file.name}" had a problem while filing. Check the shelf and try again if it's missing.`, 'error')
       await reload()
     } finally {
       setUploading(false)

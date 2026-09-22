@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
+import { showToast } from '@/hooks/useToast'
 import { useAuth } from '@/hooks/useAuth'
 import type { List, DbList, ListCategory, ListVisibility } from '@/types/list'
 
@@ -118,6 +119,7 @@ export function useLists() {
       // Rollback on error
       setLists((prev) => prev.filter((l) => l.id !== tempId))
       setError(insertError.message)
+      showToast("Couldn't create the list. Please try again.", 'error')
       return null
     }
 
@@ -155,6 +157,7 @@ export function useLists() {
       // Rollback on error
       setLists((prev) => prev.map((l) => (l.id === id ? list : l)))
       setError(updateError.message)
+      showToast("Couldn't save that change to the list.", 'error')
     }
   }, [lists])
 
@@ -175,6 +178,7 @@ export function useLists() {
       // Rollback on error
       setLists((prev) => [...prev, listToDelete])
       setError(deleteError.message)
+      showToast("Couldn't delete the list.", 'error')
     }
   }, [lists])
 
@@ -210,6 +214,7 @@ export function useLists() {
         // Rollback on error
         setLists(originalLists)
         setError(updateError.message)
+        showToast("Couldn't save that change to the list.", 'error')
         return
       }
     }

@@ -1,6 +1,7 @@
 import { useState, useMemo, useCallback } from 'react'
 import { ShoppingBasket, MessageCircle, SlidersHorizontal } from 'lucide-react'
 import { useMealPlan } from '@/hooks/useMealPlan'
+import { showToast } from '@/hooks/useToast'
 import { useRecipes, type ManualRecipeInput } from '@/hooks/useRecipes'
 import { useFamilyMembers } from '@/hooks/useFamilyMembers'
 import { useMealPlannerChat } from '@/hooks/useMealPlannerChat'
@@ -94,10 +95,15 @@ export function PlanPage() {
     setPicker({ dayOfWeek, slot, forMemberId: defaultMemberId })
   }, [defaultMemberId])
 
+  // Replacing a meal adds the new one BEFORE removing the old: if the add
+  // fails, the slot keeps what it had (the hook has toasted) instead of
+  // ending up empty. A failed add leaves the picker open for another try.
   const handlePick = async (recipeId: string, familyMemberId: string | null) => {
     if (!picker) return
+    try {
+      await addMeal({ dayOfWeek: picker.dayOfWeek, slot: picker.slot, recipeId, forMemberId: familyMemberId })
+    } catch { return }
     if (picker.replaceEntryId) await removeMeal(picker.replaceEntryId)
-    await addMeal({ dayOfWeek: picker.dayOfWeek, slot: picker.slot, recipeId, forMemberId: familyMemberId })
     // The picker has its own useRecipes instance and can add recipes this
     // page's instance never fetched — refresh so recipesById resolves titles.
     await refreshRecipes()
@@ -106,8 +112,10 @@ export function PlanPage() {
 
   const handlePickLeftover = async (parentEntryId: string, familyMemberId: string | null) => {
     if (!picker) return
+    try {
+      await addMeal({ dayOfWeek: picker.dayOfWeek, slot: picker.slot, leftoverFromId: parentEntryId, forMemberId: familyMemberId })
+    } catch { return }
     if (picker.replaceEntryId) await removeMeal(picker.replaceEntryId)
-    await addMeal({ dayOfWeek: picker.dayOfWeek, slot: picker.slot, leftoverFromId: parentEntryId, forMemberId: familyMemberId })
     setPicker(null)
   }
 
@@ -115,27 +123,32 @@ export function PlanPage() {
   // the new-recipe analogue of handlePick (respects "change recipe" replace).
   const handleApplyAiNew = async (input: ManualRecipeInput) => {
     if (!picker) return
+    try {
+      const recipe = await addManual(input)
+      await addMeal({ dayOfWeek: picker.dayOfWeek, slot: picker.slot, recipeId: recipe.id, forMemberId: picker.forMemberId })
+    } catch {
+      showToast("Couldn't save that recipe to the plan. Please try again.", 'error')
+      return
+    }
     if (picker.replaceEntryId) await removeMeal(picker.replaceEntryId)
-    const recipe = await addManual(input)
-    await addMeal({ dayOfWeek: picker.dayOfWeek, slot: picker.slot, recipeId: recipe.id, forMemberId: picker.forMemberId })
     await refreshRecipes()
     setPicker(null)
   }
 
   const handleTypeName = useCallback((dayOfWeek: number, slot: MealSlot, title: string) => {
-    void addMeal({ dayOfWeek, slot, adHocTitle: title })
+    addMeal({ dayOfWeek, slot, adHocTitle: title }).catch(() => { /* toasted in useMealPlan */ })
   }, [addMeal])
 
   const handleLeftoverFromLastNight = useCallback(
     (dayOfWeek: number, slot: MealSlot, sourceEntry: MealPlanEntry) => {
-      void addMeal({ dayOfWeek, slot, leftoverFromId: sourceEntry.id })
+      addMeal({ dayOfWeek, slot, leftoverFromId: sourceEntry.id }).catch(() => { /* toasted in useMealPlan */ })
     },
     [addMeal],
   )
 
   const handleLeftoverTomorrow = useCallback((dayOfWeek: number, entry: MealPlanEntry) => {
     if (dayOfWeek >= activeRange.lastDay) return // no "tomorrow" inside the active range
-    void addMeal({ dayOfWeek: dayOfWeek + 1, slot: 'lunch', leftoverFromId: entry.id })
+    addMeal({ dayOfWeek: dayOfWeek + 1, slot: 'lunch', leftoverFromId: entry.id }).catch(() => { /* toasted in useMealPlan */ })
   }, [addMeal, activeRange.lastDay])
 
   const handleClear = useCallback((entryId: string) => {

@@ -1,4 +1,5 @@
 import { useState, type KeyboardEvent } from 'react'
+import { showToast } from '@/hooks/useToast'
 import { FileText, Lock, Users, Trash2, ExternalLink, Pencil } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { documentKindLabel } from '@/types/document'
@@ -34,6 +35,8 @@ const fieldLabel = 'block text-[11px] uppercase tracking-wide text-neutral-400 m
 
 export function DocumentRow({ document, onToggleScope, onDelete, onSave }: Props) {
   const [opening, setOpening] = useState(false)
+  // Scanned licences and insurance cards can't be recovered — ask first.
+  const [confirmingDelete, setConfirmingDelete] = useState(false)
   const [editing, setEditing] = useState(false)
   const [label, setLabel] = useState(document.label)
   const [owner, setOwner] = useState(document.owner ?? '')
@@ -69,11 +72,12 @@ export function DocumentRow({ document, onToggleScope, onDelete, onSave }: Props
 
   async function open() {
     setOpening(true)
-    const { data } = await supabase.storage
+    const { data, error } = await supabase.storage
       .from('attachments')
       .createSignedUrl(document.storagePath, 3600)
     setOpening(false)
     if (data?.signedUrl) window.open(data.signedUrl, '_blank', 'noopener,noreferrer')
+    else if (error) showToast("Couldn't open that document. Please try again.", 'error')
   }
 
   if (editing) {
@@ -167,13 +171,30 @@ export function DocumentRow({ document, onToggleScope, onDelete, onSave }: Props
       <button onClick={() => void open()} disabled={opening} aria-label="Open document" className={iconBtn}>
         <ExternalLink className="w-4 h-4" />
       </button>
-      <button
-        onClick={onDelete}
-        aria-label="Delete document"
-        className="p-1.5 rounded-lg text-neutral-400 hover:text-red-600 hover:bg-red-50"
-      >
-        <Trash2 className="w-4 h-4" />
-      </button>
+      {confirmingDelete ? (
+        <span role="group" aria-label="Confirm delete" className="flex items-center gap-1">
+          <button
+            onClick={() => { setConfirmingDelete(false); onDelete() }}
+            className="px-2 py-1 rounded-lg text-xs font-medium text-white bg-red-600 hover:bg-red-700"
+          >
+            Delete
+          </button>
+          <button
+            onClick={() => setConfirmingDelete(false)}
+            className="px-2 py-1 rounded-lg text-xs font-medium text-neutral-600 hover:bg-neutral-100"
+          >
+            Keep
+          </button>
+        </span>
+      ) : (
+        <button
+          onClick={() => setConfirmingDelete(true)}
+          aria-label="Delete document"
+          className="p-1.5 rounded-lg text-neutral-400 hover:text-red-600 hover:bg-red-50"
+        >
+          <Trash2 className="w-4 h-4" />
+        </button>
+      )}
     </div>
   )
 }

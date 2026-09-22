@@ -111,7 +111,10 @@ export function ExpiredSection({
               task={row.task}
               meta={ageLabel(row.ageDays)}
               offer={['today', 'tomorrow', 'week', 'someday', 'deleted']}
-              verdict={verdicts.get(row.task.id)}
+              // The Inbox hides a deleted row until its Undo window closes; a
+              // row that is live again was undone — don't leave it wearing
+              // "✓ deleted".
+              verdict={verdicts.get(row.task.id) === 'deleted' && live.has(row.task.id) ? undefined : verdicts.get(row.task.id)}
               canDelete={canDelete}
               onVerdict={(_t, v) => apply(row, v)}
               onComplete={complete && (() => complete(row))}

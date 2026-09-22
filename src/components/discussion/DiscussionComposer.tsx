@@ -10,8 +10,9 @@ import { ConceptIcon } from '@/lib/conceptIcons'
 import { mentionsSymphony, parseComposer } from '@/lib/discussions/composer'
 
 interface DiscussionComposerProps {
-  onPost: (text: string) => void
-  onAsk: (text: string) => void
+  /** Resolving `false` means the message wasn't stored: the draft comes back. */
+  onPost: (text: string) => void | Promise<boolean | void>
+  onAsk: (text: string) => void | Promise<boolean | void>
   disabled?: boolean
   placeholder?: string
 }
@@ -39,9 +40,13 @@ export function DiscussionComposer({ onPost, onAsk, disabled = false, placeholde
     if (disabled) return
     const intent = parseComposer(value)
     if (!intent.text) return
-    if (forceAsk || intent.kind === 'ask') onAsk(intent.text)
-    else onPost(intent.text)
+    const draft = value
+    const result = forceAsk || intent.kind === 'ask' ? onAsk(intent.text) : onPost(intent.text)
     setValue('')
+    // A failed send puts the draft back, unless something new was typed.
+    void Promise.resolve(result).then((ok) => {
+      if (ok === false) setValue((current) => (current === '' ? draft : current))
+    })
   }, [value, disabled, onAsk, onPost])
 
   const onKeyDown = useCallback((e: React.KeyboardEvent<HTMLTextAreaElement>) => {
