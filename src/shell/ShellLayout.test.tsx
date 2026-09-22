@@ -6,13 +6,26 @@ import { DomainProvider } from '@/hooks/useDomain'
 import { DomainGateProvider } from '@/components/domain/DomainGate'
 import { DesktopPageControls } from '@/components/layout/DesktopNavigation'
 import { DesktopFooterAction } from '@/components/layout/DesktopFooter'
-import { deriveActiveView, ShellLayout } from './ShellLayout'
+import { deriveActiveView, pageOwnsFilterChrome, ShellLayout } from './ShellLayout'
 
 // Regression test for the House sidebar link: it navigated to '/home' but
 // deriveActiveView had no case for that prefix, so it fell through to the
 // 'today' default — House never highlighted and its inline room list never
 // auto-expanded (Sidebar.tsx's `libraryActive`/`homeAppActive` both read
 // off `activeView`).
+describe('pageOwnsFilterChrome', () => {
+  it('leaves filters to pages whose masthead renders them', () => {
+    for (const p of ['/', '/today', '/week', '/month', '/season', '/year', '/inbox', '/discussions', '/task/abc']) {
+      expect(pageOwnsFilterChrome(p)).toBe(true)
+    }
+  })
+  it('gives every other page the nav domain switcher — Someday filters by domain', () => {
+    for (const p of ['/someday', '/notes', '/lists', '/history', '/documents', '/routines', '/contacts', '/weekly']) {
+      expect(pageOwnsFilterChrome(p)).toBe(false)
+    }
+  })
+})
+
 describe('deriveActiveView', () => {
   it('derives home-app for /home and its sub-routes', () => {
     expect(deriveActiveView('/home')).toBe('home-app')

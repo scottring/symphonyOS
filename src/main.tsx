@@ -170,7 +170,10 @@ createRoot(document.getElementById('root')!).render(
               <Route path="/contacts/*" element={cutoverShell} />
               <Route path="/family/*" element={cutoverShell} />
               <Route path="/agent/*" element={cutoverShell} />
-              <Route path="/wall/*" element={<Shell />} /> {/* wall kiosk: own auth, stays ungated */}
+              {/* The legacy /wall app is deleted; with no app registered the
+                  shell rendered chrome around an empty body. Send stale kiosk
+                  bookmarks to the current board instead. */}
+              <Route path="/wall/*" element={<Navigate to="/wall-v2" replace />} />
               <Route path="/wall-v2/*" element={<Shell />} />
               <Route path="/wall-lanes" element={<Suspense fallback={null}><WallV2LanePreview /></Suspense>} />
               {/* /jobs and /us retired (pare-down 2026-09-01): the job pipeline

@@ -12,7 +12,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { useSupabaseTasks } from '@/hooks/useSupabaseTasks'
-import { useProjects } from '@/hooks/useProjects'
+import type { Project } from '@/types/project'
 import { useContacts } from '@/hooks/useContacts'
 import { useRoutines } from '@/hooks/useRoutines'
 import { useListsContext } from '@/contexts/ListsContext'
@@ -21,6 +21,7 @@ import { SearchResultItem } from '@/components/search'
 import { useSearchNavigation } from '@/shell/useSearchNavigation'
 
 const MAX_ROWS = 6
+const NO_PROJECTS: Project[] = []
 
 interface OmniboxResultsProps {
   query: string
@@ -30,15 +31,16 @@ interface OmniboxResultsProps {
 
 export function OmniboxResults({ query, onNavigate }: OmniboxResultsProps) {
   const { tasks } = useSupabaseTasks()
-  const { projects } = useProjects()
   const { contacts } = useContacts()
   const { routines } = useRoutines()
   const { lists } = useListsContext()
   const openResult = useSearchNavigation()
   const [selectedIndex, setSelectedIndex] = useState(-1)
 
+  // Projects are hidden (2026-09-02): /projects redirects to Today, so a
+  // project result would be a dead end. Keep the data, drop the result.
   const { results, totalResults, setQuery, intent } = useSearch({
-    tasks, projects, contacts, routines, lists,
+    tasks, projects: NO_PROJECTS, contacts, routines, lists,
   })
   // useSearch holds its own (debounced) query state; mirror the input into it.
   useEffect(() => { setQuery(query) }, [query, setQuery])
@@ -48,7 +50,6 @@ export function OmniboxResults({ query, onNavigate }: OmniboxResultsProps) {
   const flat = useMemo<SearchResult[]>(
     () => [
       ...results.tasks,
-      ...results.projects,
       ...results.contacts,
       ...results.routines,
       ...results.lists,
