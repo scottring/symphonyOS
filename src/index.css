@@ -1752,7 +1752,10 @@ html.desktop-shell a {
 }
 .chooser-section-heading > span:last-child { margin-left: auto; letter-spacing: 0; font-weight: 400; font-size: 11px; color: var(--color-neutral-500); }
 .chooser-section-heading svg { color: var(--color-neutral-500); }
-.reference-list .chooser-rows li { padding-block: 12px; border-bottom: 1px solid var(--color-neutral-100); }
+.chooser-rows { margin-top: 2px; }
+/* Unscoped on purpose: the same rows draw in the dock (.reference-list) and in
+   the phone sheet, which has no list wrapper of its own. */
+.chooser-rows li { padding-block: 12px; border-bottom: 1px solid var(--color-neutral-100); }
 .chooser-cadence, .chooser-status { display: block; margin-top: 3px; font-size: 11px; color: var(--color-neutral-500); }
 .chooser-pill {
   flex-shrink: 0; padding: 4px 8px; border: 1px solid var(--color-neutral-200); border-radius: 4px;
