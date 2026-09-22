@@ -130,3 +130,12 @@ describe('filterEventsForLayers', () => {
       .toEqual(['w', 'f', 'u'])
   })
 })
+
+describe('filterInboxTasksForLayers (Inbox page and nav badge share it)', () => {
+  it('always keeps untagged captures, and filters tagged ones by layer', async () => {
+    const { filterInboxTasksForLayers } = await import('./domainFilter')
+    const t = (id: string, context: 'work' | 'family' | null) => ({ id, context }) as unknown as import('@/types/task').Task
+    const out = filterInboxTasksForLayers([t('u', null), t('w', 'work'), t('f', 'family')], new Set(['work']) as never)
+    expect(out.map((x) => x.id)).toEqual(['u', 'w'])
+  })
+})
