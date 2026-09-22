@@ -35,9 +35,10 @@ import { filterTasksForLayers, matchesLayers } from '@/lib/today/domainFilter'
 import { placementFateOf, lowerPlacement } from '@/lib/placement/model'
 import { splitGoalRows } from '@/lib/planning/goalSteps'
 import { parseLocalYmd } from '@/lib/cadence/config'
-import { monthToken } from '@/hooks/usePlanningSession'
+import { monthToken, type SessionHorizon } from '@/hooks/usePlanningSession'
+import { seasonToken } from '@/lib/cadence/seasons'
 import { usePlanSessionHost } from '@/hooks/usePlanSessionHost'
-import { lookBackRows, isEmptyDraft, goalsWithHiddenSteps } from '@/lib/planning/session'
+import { lookBackRows, isEmptyDraft, goalsWithHiddenSteps, goalAsRow } from '@/lib/planning/session'
 import type { DomainId } from '@/lib/domains'
 import { formatShortDate } from '@/lib/dateHelpers'
 import {
@@ -460,22 +461,27 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
     : periodBounds(level, bounds.prev, seasons).label
   const daysUntilStart = useMemo(() => Math.round((bounds.start.getTime() - today.getTime()) / 86_400_000), [bounds.start, today])
 
-  // ── Guided planning (Phase 1: month) ────────────────────────────────────
-  // Season and year pages carry no session yet; everything below is inert
-  // there (sessionEnabled false).
-  const sessionEnabled = level === 'month'
-  const token = monthToken(bounds.start)
+  // ── Guided planning (Phase 1: month; Phase 3: the season) ───────────────
+  // ONE session block, parameterised by the level. The year page carries no
+  // session yet; everything below is inert there (sessionEnabled false).
+  const sessionEnabled = level === 'month' || level === 'season'
+  const isSeasonSession = level === 'season'
+  const placeLevel: 'month' | 'season' = isSeasonSession ? 'season' : 'month'
+  const token = isSeasonSession ? seasonToken(bounds.start, seasons) : monthToken(bounds.start)
+  const horizon: SessionHorizon = isSeasonSession ? 'seasonal' : 'monthly'
+  // Where a finished plan sends you next: the rung below, one page down.
+  const nextRung = isSeasonSession ? 'month' : 'week'
 
-  const back = useMemo(() => (sessionEnabled ? lookBackRows(layered, bounds.prev, meId) : { finished: [], open: [] }), [sessionEnabled, layered, bounds.prev, meId])
+  const back = useMemo(() => (sessionEnabled ? lookBackRows(layered, bounds.prev, meId, placeLevel, seasons) : { finished: [], open: [] }), [sessionEnabled, layered, bounds.prev, meId, placeLevel, seasons])
   // Keep carries a goal's steps from the UNFILTERED list (keepForward); the
   // summary says when some of them are not in this view.
   const hiddenStepGoals = useMemo(
-    () => (sessionEnabled ? goalsWithHiddenSteps(tasks, back.open, bounds.prev) : new Set<string>()),
-    [sessionEnabled, tasks, back.open, bounds.prev],
+    () => (sessionEnabled ? goalsWithHiddenSteps(tasks, back.open, bounds.prev, placeLevel, seasons) : new Set<string>()),
+    [sessionEnabled, tasks, back.open, bounds.prev, placeLevel, seasons],
   )
-  const currentMonth = useMemo(
-    () => (sessionEnabled ? selectPeriodTasks(layered, 'month', bounds.start, isCurrent, meId, seasons).filter((t) => !t.completed) : []),
-    [sessionEnabled, layered, bounds.start, isCurrent, meId, seasons],
+  const currentPeriodTasks = useMemo(
+    () => (sessionEnabled ? selectPeriodTasks(layered, placeLevel, bounds.start, isCurrent, meId, seasons).filter((t) => !t.completed) : []),
+    [sessionEnabled, layered, placeLevel, bounds.start, isCurrent, meId, seasons],
   )
   const aboveIsCurrent = useMemo(() => isCurrentPeriod(periodBounds('season', aboveStart, seasons), today), [aboveStart, seasons, today])
   const aboveTasks = useMemo(() => (sessionEnabled && above === 'season'
@@ -487,30 +493,39 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
     () => offerableFromAbove(aboveTasks, 'season', aboveStart, aboveIsCurrent, seasons),
     [aboveTasks, aboveStart, aboveIsCurrent, seasons],
   )
-  const aboveGoalItems = useMemo(() => aboveTasks.filter((t) => t.isGoal), [aboveTasks])
+  // A season's rail is the YEAR: goals to write beside, never tasks to take
+  // down (the year plans in goals alone).
+  const aboveGoalItems = useMemo(() => (above === 'year'
+    ? goals.filter((g) => g.year === aboveStart.getFullYear() && matchesLayers(g.context, layers)).map(goalAsRow)
+    : aboveTasks.filter((t) => t.isGoal)), [above, goals, aboveStart, layers, aboveTasks])
+  const aboveLabel = isSeasonSession ? String(aboveStart.getFullYear()) : 'the season'
 
   const sessionWriters = useMemo(() => ({
-    keep: async (id: string, periodStart: Date, prevStart: Date) => !!(await keepForward(id, { monthStart: periodStart }, prevStart)),
+    keep: async (id: string, periodStart: Date, prevStart: Date) =>
+      !!(await keepForward(id, isSeasonSession ? { seasonStart: periodStart } : { monthStart: periodStart }, prevStart)),
     // Each item's OWN domain, recorded when it was planned — never the one in view now (I4).
     addTask: (title: string, o: { id: string; periodStart: Date; day?: Date; isGoal?: boolean; goalTaskId?: string; context: DomainId | null }) =>
-      addTask(title, undefined, undefined, undefined, {
-        id: o.id, bucket: 'month' as const, monthStart: o.periodStart, isGoal: o.isGoal, goalTaskId: o.goalTaskId, context: o.context,
-      }),
+      addTask(title, undefined, undefined, undefined, isSeasonSession
+        ? { id: o.id, bucket: 'quarter' as const, seasonStart: o.periodStart, isGoal: o.isGoal, goalTaskId: o.goalTaskId, context: o.context }
+        : { id: o.id, bucket: 'month' as const, monthStart: o.periodStart, isGoal: o.isGoal, goalTaskId: o.goalTaskId, context: o.context }),
     contextOf: (id: string) => tasks.find((t) => t.id === id)?.context ?? null,
     // Everything a tick does (subtasks, waiting/discussion, a linked list item), and reports whether it wrote.
     complete: (id: string) => completeTask(id),
     someday: (id: string) => gated.updateTask(id, { bucket: 'someday', scheduledFor: undefined, isAllDay: undefined }),
-    drop: (id: string, prevStart: Date) => dropCommitment(id, 'month', prevStart),
+    drop: (id: string, prevStart: Date) => dropCommitment(id, placeLevel, prevStart),
     // The SESSION's month — pushTask(id, 'month') would target the month
-    // containing today, i.e. September while planning October.
-    takeInto: (id: string, periodStart: Date) => gated.updateTask(id, { bucket: 'month', monthStart: periodStart }),
-  }), [keepForward, addTask, tasks, completeTask, gated, dropCommitment])
+    // containing today, i.e. September while planning October. A season takes
+    // nothing down from the year (its rail is goals), so nothing calls this.
+    takeInto: (id: string, periodStart: Date) => (isSeasonSession
+      ? Promise.resolve(true)
+      : gated.updateTask(id, { bucket: 'month', monthStart: periodStart })),
+  }), [keepForward, addTask, tasks, completeTask, gated, dropCommitment, isSeasonSession, placeLevel])
 
   const host = usePlanSessionHost({
-    enabled: sessionEnabled, level: 'month', horizon: 'monthly', token,
+    enabled: sessionEnabled, level, horizon, token,
     periodStart: bounds.start, prevStart: bounds.prev,
     listsLoading: loading || seasonsLoading,
-    back, current: currentMonth, above: aboveItems,
+    back, current: currentPeriodTasks, above: aboveItems,
     writers: sessionWriters,
     isCompleted: (id) => !!tasks.find((t) => t.id === id)?.completed,
   })
@@ -568,7 +583,7 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
       </div>
 
       {/* Guided planning: whether this month is planned, and the door into
-          the session. Month only; a past month is a look-back, not a plan. */}
+          the session. Month and season; a past period is a look-back. */}
       {sessionEnabled && !isPast && (
         <div className="mb-3 flex flex-wrap items-center gap-3">
           <p className="text-[13px] text-neutral-500">
@@ -591,14 +606,14 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
       )}
       {sessionEnabled && justSaved && !sessionOpen && (
         <div className="mb-3 flex flex-wrap items-center gap-3 rounded-lg bg-sage-50 px-3 py-2 text-sm text-neutral-700">
-          <span className="min-w-0 flex-1"><Check className="mb-0.5 mr-1 inline h-4 w-4 text-sage-600" />{shortLabel} is planned. When you&rsquo;re ready, plan the week with {shortLabel} beside you.</span>
-          <button type="button" onClick={() => navigate('/week')} className="rounded-md bg-primary-600 px-3 py-1 text-[13px] font-semibold text-white">Plan the week →</button>
+          <span className="min-w-0 flex-1"><Check className="mb-0.5 mr-1 inline h-4 w-4 text-sage-600" />{shortLabel} is planned. When you&rsquo;re ready, plan the {nextRung} with {shortLabel} beside you.</span>
+          <button type="button" onClick={() => navigate(`/${nextRung}`)} className="rounded-md bg-primary-600 px-3 py-1 text-[13px] font-semibold text-white">Plan the {nextRung} →</button>
         </div>
       )}
 
       {sessionEnabled && sessionOpen && shownDraft ? (
-        <PlanSession level="month" aboveLabel="the season" periodLabel={shortLabel} prevLabel={prevPeriodLabel}
-          finished={back.finished} open={back.open} current={currentMonth}
+        <PlanSession level={level} aboveLabel={aboveLabel} periodLabel={shortLabel} prevLabel={prevPeriodLabel}
+          finished={back.finished} open={back.open} current={currentPeriodTasks}
           above={aboveItems} aboveGoals={aboveGoalItems} hiddenStepGoals={hiddenStepGoals} domainInView={soleDomain ?? null}
           draft={shownDraft} onChange={changeDraft} onClose={closeSession} onSave={saveDraft} saving={savingSession} saveError={saveError} />
       ) : (

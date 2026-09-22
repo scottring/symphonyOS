@@ -860,10 +860,43 @@ describe('PeriodPlanPage — Plan <Month>', () => {
     expect(screen.getByRole('button', { name: `Continue planning ${label}` })).toBeInTheDocument()
   })
 
-  it('season and year pages carry no planning bar', () => {
-    renderPage('season')
+  it('the season page carries a planning bar; the year page does not yet', () => {
+    const view = renderPage('season')
+    expect(screen.getByRole('button', { name: 'Plan Fall 2026' })).toBeInTheDocument()
+    expect(screen.getByText(/not planned yet/i)).toBeInTheDocument()
+    view.unmount()
+    renderPage('year')
     expect(screen.queryByRole('button', { name: /^Plan / })).toBeNull()
     expect(screen.queryByText(/not planned yet/i)).toBeNull()
+  })
+
+  it('the season page plans the season: look back at the previous season, keep into this one, add a task toward a season goal, save once', async () => {
+    // Previous season = Summer 2026 (Jun 1, DEFAULT_SEASONS); this season =
+    // Fall 2026, starting Sep 1. The suite's clock is Sat Oct 10 2026.
+    const summer = new Date(2026, 5, 1)
+    const fall = new Date(2026, 8, 1)
+    const prevOpen = task({ id: 'p', title: 'Bike rack', bucket: 'quarter', seasonStart: summer,
+      commitments: [{ level: 'season', periodStart: summer, status: 'open' }] })
+    state.tasks = [prevOpen]
+    state.goals = [goal({ id: 'yg', name: 'Get strong again' })]
+    renderPage('season')
+    fireEvent.click(await screen.findByRole('button', { name: /^Plan Fall 2026$/ }))
+    fireEvent.click(screen.getByRole('button', { name: 'Keep' }))
+    fireEvent.click(screen.getByRole('button', { name: /next: plan fall 2026/i }))
+    // The year's goals sit beside the season's plan (and can be written toward).
+    expect(screen.getAllByText('Get strong again').length).toBeGreaterThan(0)
+    expect(within(screen.getByRole('complementary')).getByText('Get strong again')).toBeInTheDocument()
+    fireEvent.change(screen.getByLabelText(/new task for fall 2026/i), { target: { value: 'Book a PT evaluation' } })
+    fireEvent.click(screen.getByRole('button', { name: /add task/i }))
+    fireEvent.click(screen.getByRole('button', { name: /next: save/i }))
+    fireEvent.click(screen.getByRole('button', { name: /save fall 2026/i }))
+    await vi.waitFor(() => expect(saveSession).toHaveBeenCalledTimes(1))
+    expect(hook.keepForward).toHaveBeenCalledWith('p', { seasonStart: fall }, summer)
+    expect(hook.addTask).toHaveBeenCalledWith('Book a PT evaluation', undefined, undefined, undefined,
+      expect.objectContaining({ bucket: 'quarter', seasonStart: fall }))
+    expect(screen.getByRole('button', { name: /plan the month/i })).toBeInTheDocument()
+    // A season takes nothing down from the year: nothing was ever offered.
+    expect(hook.pushTask).not.toHaveBeenCalled()
   })
 
   // ── Final review fixes ─────────────────────────────────────────────────────
