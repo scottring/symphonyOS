@@ -178,8 +178,7 @@ describe('The Planning panel', () => {
 
   it('every drag has a button: choose for today, unchoose, set a day or time', () => {
     mount(); fireEvent.click(screen.getByRole('button', { name: 'Pin Planning' }))
-    fireEvent.click(screen.getByRole('button', { name: 'Plan Book the plumber' }))
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Today', exact: true }))
+    fireEvent.click(screen.getByRole('button', { name: 'Plan Book the plumber for today' }))
     expect(planMock.chooseTaskDay).toHaveBeenCalledWith('w', expect.any(Date))
     // Choosing a routine selects this occurrence, never a new task and never
     // the repeating rule.
@@ -192,8 +191,7 @@ describe('The Planning panel', () => {
     fireEvent.click(chosen)
     expect(planMock.chooseRoutine).toHaveBeenCalledWith('r2', expect.any(Date), false, 'Family reading time')
     fireEvent.click(screen.getByRole('button', { name: 'Week tasks', exact: true }))
-    fireEvent.click(screen.getByRole('button', { name: 'Plan Book the plumber' }))
-    expect(screen.getByRole('menuitem', { name: 'Choose date for Book the plumber' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Choose date for Book the plumber' })).toBeInTheDocument()
     // A task dated today is on Today's page, not waiting here.
     expect(screen.queryByText('Pick up foot meds')).not.toBeInTheDocument()
   })

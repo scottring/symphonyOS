@@ -287,13 +287,13 @@ export function SchedulePopover({
       if (shouldPositionAbove) {
         // Position above: use bottom to anchor to viewport bottom
         setDropdownPosition({
-          bottom: window.innerHeight - rect.top + 8,
+          bottom: Math.max(8, Math.min(window.innerHeight - 48, window.innerHeight - rect.top + 8)),
           left: Math.max(8, Math.min(rect.left, window.innerWidth - 320 - 16)),
         })
       } else {
         // Position below: use top
         setDropdownPosition({
-          top: rect.bottom + 8,
+          top: Math.max(8, Math.min(window.innerHeight - 48, rect.bottom + 8)),
           left: Math.max(8, Math.min(rect.left, window.innerWidth - 320 - 16)),
         })
       }
@@ -484,6 +484,7 @@ export function SchedulePopover({
       style={{
         ...(dropdownPosition.top !== undefined ? { top: dropdownPosition.top } : { bottom: dropdownPosition.bottom }),
         left: dropdownPosition.left,
+        maxHeight: `calc(100dvh - ${(dropdownPosition.top ?? dropdownPosition.bottom ?? 0) + 8}px)`,
         background: 'linear-gradient(180deg, hsl(0 0% 100%) 0%, hsl(44 50% 99%) 100%)',
         borderRadius: 'var(--radius-xl)',
         border: '1px solid hsl(38 25% 88%)',

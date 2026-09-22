@@ -1,7 +1,8 @@
 // Period-specific planning references: Today chooses from the week's tasks
 // and relevant routine occurrences. Week consults month goals and tasks,
 // with unfinished work available on request. Secondary moves stay in menus.
-import { useRef, useState, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
+import { useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { Check, ChevronDown, ChevronRight, GripVertical, MoreHorizontal, Repeat } from 'lucide-react'
 import { WeekRoutineChoices } from './WeekRoutineChoices'
 import { SchedulePopover } from '@/components/triage'
@@ -55,6 +56,16 @@ export function routinePlaceDay(day: Date, weekPage: Date | null): Date {
 function RowMenu({ entry, day, actions, inline = false, weekPage, planning = false }: { entry: DayPlanEntry; day: Date; actions: DayPlanPanelActions; inline?: boolean; weekPage?: Date | null; planning?: boolean }) {
   const [open, setOpen] = useState(false)
   const triggerRef = useRef<HTMLButtonElement>(null)
+  const panelRef = useRef<HTMLDivElement>(null)
+  useLayoutEffect(() => {
+    if (!open || !panelRef.current || !triggerRef.current) return
+    const panel = panelRef.current
+    const rect = triggerRef.current.getBoundingClientRect()
+    const margin = 8
+    panel.style.left = `${Math.max(margin, Math.min(rect.left, window.innerWidth - panel.offsetWidth - margin))}px`
+    panel.style.top = `${Math.max(margin, Math.min(rect.bottom + 4, window.innerHeight - panel.offsetHeight - margin))}px`
+    panel.style.visibility = 'visible'
+  })
   const [savingWeekend, setSavingWeekend] = useState(false)
   const [weekendError, setWeekendError] = useState(false)
   const saturday = weekendStartFor(day, weekPage)
@@ -87,13 +98,13 @@ function RowMenu({ entry, day, actions, inline = false, weekPage, planning = fal
     }
   } else {
     if (planning) {
-      items.push(<button key="today" type="button" role="menuitem" className={itemClass} disabled={entry.planned || entry.onToday || (!!entry.task?.scheduledFor && localYmd(entry.task.scheduledFor) === localYmd(day))}
+      if (!inline || !weekPage) items.push(<button key="today" type="button" role={inline ? undefined : "menuitem"} aria-label={`Plan ${entry.title} for today`} className={itemClass} disabled={entry.planned || entry.onToday || (!!entry.task?.scheduledFor && localYmd(entry.task.scheduledFor) === localYmd(day))}
         onClick={() => { setOpen(false); actions.choose(entry) }}>Today</button>)
-      items.push(<button key="week" type="button" role="menuitem" className={itemClass} disabled={!!(entry.task && !entry.task.weekendStart && !entry.task.scheduledFor && committedTo(entry.task, 'week', weekPage ?? weekStartAnchor(day, readCadenceConfig().weekStartsOn)))}
+      if (!inline || weekPage) items.push(<button key="week" type="button" role={inline ? undefined : "menuitem"} aria-label={`Plan ${entry.title} for this week`} className={itemClass} disabled={!!(entry.task && !entry.task.weekendStart && !entry.task.scheduledFor && committedTo(entry.task, 'week', weekPage ?? weekStartAnchor(day, readCadenceConfig().weekStartsOn)))}
         onClick={() => { setOpen(false); actions.commit(entry, 'week') }}>
-        This week{weekPage && <span className="block text-[11px] text-neutral-500">{formatWeekRangeShort(weekPage)}</span>}
+        This week{!inline && weekPage && <span className="block text-[11px] text-neutral-500">{formatWeekRangeShort(weekPage)}</span>}
       </button>)
-      if (entry.planned) items.push(<button key="unchoose" type="button" role="menuitem" className={itemClass}
+      if (entry.planned) items.push(<button key="unchoose" type="button" role={inline ? undefined : "menuitem"} className={itemClass}
         onClick={() => { setOpen(false); actions.unchoose(entry) }}>Remove from today</button>)
     }
     if (planning || entry.kind === 'routine') items.push(
@@ -117,7 +128,7 @@ function RowMenu({ entry, day, actions, inline = false, weekPage, planning = fal
         }
       />,
     )
-    if (planning && entry.kind === 'task' && !entry.task?.isGoal && actions.weekend) {
+    if (planning && (!inline || weekPage) && entry.kind === 'task' && !entry.task?.isGoal && actions.weekend) {
       items.push(<button key="weekend" type="button" role={inline ? undefined : 'menuitem'}
         aria-label={`Plan ${entry.title} for this weekend`} disabled={savingWeekend}
         className={itemClass}
@@ -131,8 +142,8 @@ function RowMenu({ entry, day, actions, inline = false, weekPage, planning = fal
           } catch { setWeekendError(true) }
           finally { setSavingWeekend(false) }
         }}>
-        {savingWeekend ? 'Planning…' : 'This weekend'}
-        <span className="block text-[11px] text-neutral-500">{weekendLabel(saturday).replace('Weekend · ', '')} · either day</span>
+        {savingWeekend ? 'Planning…' : inline ? 'Weekend' : 'This weekend'}
+        {!inline && <span className="block text-[11px] text-neutral-500">{weekendLabel(saturday).replace('Weekend · ', '')} · either day</span>}
       </button>)
       if (weekendError) items.push(<p key="weekend-error" role="alert" className="px-3 py-2 text-xs text-red-600">Could not save the weekend plan. Try again.</p>)
     }
@@ -180,7 +191,7 @@ function RowMenu({ entry, day, actions, inline = false, weekPage, planning = fal
     <div className="relative shrink-0" onKeyDown={(event) => {
       if (event.key === 'Escape') { setOpen(false); triggerRef.current?.focus(); event.stopPropagation() }
       if (open && ['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) {
-        const buttons = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>('[role="menuitem"]:not(:disabled)'))
+        const buttons = Array.from((panelRef.current ?? event.currentTarget).querySelectorAll<HTMLButtonElement>('[role="menuitem"]:not(:disabled)'))
         if (!buttons.length) return
         event.preventDefault()
         const index = buttons.indexOf(document.activeElement as HTMLButtonElement)
@@ -199,17 +210,19 @@ function RowMenu({ entry, day, actions, inline = false, weekPage, planning = fal
       >
         {planning ? <>Plan <ChevronDown aria-hidden className="h-3 w-3" /></> : <MoreHorizontal className="h-3.5 w-3.5" />}
       </button>
-      {open && (
+      {open && createPortal(
         <>
-          <div className="fixed inset-0 z-10" aria-hidden onClick={() => setOpen(false)} />
+          <div className="fixed inset-0 z-[99]" aria-hidden onClick={() => setOpen(false)} />
           <div
+            ref={panelRef}
+            style={{ visibility: 'hidden', maxWidth: 'calc(100vw - 16px)', maxHeight: 'calc(100dvh - 16px)', overflowY: 'auto' }}
             role="menu"
             aria-label={planning ? `Plan ${entry.title}` : `Moves for ${entry.title}`}
-            className={`absolute ${planning && weekPage ? 'left-0' : 'right-0'} top-full z-20 mt-1 w-52 rounded-xl border border-neutral-200 bg-white py-1 shadow-lg`}
+            className="fixed z-[100] w-52 rounded-xl border border-neutral-200 bg-white py-1 shadow-lg"
           >
             {items}
           </div>
-        </>
+        </>, document.body
       )}
     </div>
   )
@@ -317,7 +330,7 @@ function PlanRow({ entry, day, actions, draggable, weekPage = null, wide = false
         <RowMenu weekPage={weekPage} entry={entry} day={day} actions={actions} inline={false} />
       ) : entry.kind === 'task' ? (
         <div className="chooser-action-group flex shrink-0 items-center gap-1">
-          <RowMenu planning weekPage={weekPage} entry={entry} day={day} actions={actions} />
+          <RowMenu planning inline weekPage={weekPage} entry={entry} day={day} actions={actions} />
           <RowMenu weekPage={weekPage} entry={entry} day={day} actions={actions} />
         </div>
       ) : onWeek ? (
@@ -403,7 +416,7 @@ function ChooserRow({ entry, day, actions, draggable, wide = false }: {
       </div>
       {entry.kind === 'task' && !entry.completed ? (
         <div className="chooser-action-group flex shrink-0 items-center gap-1">
-          <RowMenu planning entry={entry} day={day} actions={actions} />
+          <RowMenu planning inline entry={entry} day={day} actions={actions} />
           <RowMenu entry={entry} day={day} actions={actions} />
         </div>
       ) : entry.completed || entry.onToday ? (

@@ -160,8 +160,7 @@ describe('DayPlanPanel — the Planning panel', () => {
   it('Month reference is immediately available on Week', () => {
     const commit = vi.fn(); const choose = vi.fn()
     render(<DayPlanPanel plan={plan(1)} day={day} actions={{ ...actions, commit, choose }} weekPage={thisWeek} />)
-    fireEvent.click(screen.getByRole('button', { name: 'Plan Item 1' }))
-    fireEvent.click(screen.getByRole('menuitem', { name: /^This week/ }))
+    fireEvent.click(screen.getByRole('button', { name: /Plan Item .* for this week$/ }))
     expect(commit).toHaveBeenCalledWith(expect.objectContaining({ id: 'w1' }), 'week')
     expect(choose).not.toHaveBeenCalled()
     expect(screen.getByRole('link', { name: /View month goals/ })).toHaveAttribute('href', '/month')
@@ -242,8 +241,7 @@ describe('DayPlanPanel — the Planning panel', () => {
     p.unfinished = [{ ...entry(5, 'Originally Saturday'), group: 'unfinished' }]
     render(<DayPlanPanel plan={p} day={day} actions={{ ...actions, commit, someday }} weekPage={thisWeek} />)
     fireEvent.click(screen.getByRole('button', { name: 'Earlier' }))
-    fireEvent.click(screen.getByRole('button', { name: 'Plan Item 5' }))
-    fireEvent.click(screen.getByRole('menuitem', { name: /^This week/ }))
+    fireEvent.click(screen.getByRole('button', { name: /Plan Item .* for this week$/ }))
     expect(commit).toHaveBeenCalledWith(expect.objectContaining({ id: 'w5' }), 'week')
     fireEvent.click(screen.getByRole('button', { name: 'More for Item 5' }))
     expect(screen.queryByRole('menuitem', { name: /Choose date/ })).toBeNull()
@@ -266,8 +264,7 @@ describe('DayPlanPanel — the Planning panel', () => {
   it('month task secondary actions stay behind the menu', () => {
     render(<DayPlanPanel plan={plan(1)} day={day} actions={actions} weekPage={thisWeek} />)
     expect(screen.queryByRole('menuitem')).toBeNull()
-    fireEvent.click(screen.getByRole('button', { name: 'Plan Item 1' }))
-    expect(screen.getByRole('menuitem', { name: 'Choose date for Item 1' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Choose date for Item 1' })).toBeInTheDocument()
   })
 
   // Scott, 2026-09-22, on the chooser beside the Week page: "clicking on the
@@ -348,8 +345,7 @@ describe('DayPlanPanel — the Planning panel', () => {
     p.month[0].task = { bucket: 'week', weekStart: thisWeek } as DayPlanEntry['task']
     render(<DayPlanPanel plan={p} day={day} actions={actions} weekPage={thisWeek} />)
     expect(screen.getByText("On this week's list")).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: 'Plan Item 1' }))
-    expect(screen.getByRole('menuitem', { name: /^This week/ })).toBeDisabled()
+    expect(screen.getByRole('button', { name: /Plan Item .* for this week$/ })).toBeDisabled()
   })
 
   it('a ticked row stays, struck, with no verb', () => {
@@ -365,43 +361,38 @@ it('offers a flexible weekend in the task menu for the displayed week', async ()
   const weekend = vi.fn().mockResolvedValue(true)
   const schedule = vi.fn()
   render(<DayPlanPanel plan={plan(1)} day={day} actions={{ ...actions, weekend, schedule }} weekPage={new Date(2026, 9, 4)} />)
-  fireEvent.click(screen.getByRole('button', { name: 'Plan Item 1' }))
-  const button = screen.getByRole('menuitem', { name: 'Plan Item 1 for this weekend' })
-  expect(button).toHaveTextContent('Oct 10–Oct 11 · either day')
+  const button = screen.getByRole('button', { name: 'Plan Item 1 for this weekend' })
+  expect(button).toHaveTextContent('Weekend')
   fireEvent.click(button)
   expect(weekend).toHaveBeenCalledWith(expect.objectContaining({ id: 'w1' }), new Date(2026, 9, 10))
   expect(schedule).not.toHaveBeenCalled()
 })
 
 it('keeps a failed weekend plan retryable instead of closing the menu', async () => {
-  render(<DayPlanPanel plan={plan(1)} day={day} actions={{ ...actions, weekend: vi.fn().mockResolvedValue(false) }} />)
-  fireEvent.click(screen.getByRole('button', { name: 'Plan Item 1' }))
-  fireEvent.click(screen.getByRole('menuitem', { name: 'Plan Item 1 for this weekend' }))
+  render(<DayPlanPanel plan={plan(1)} day={day} actions={{ ...actions, weekend: vi.fn().mockResolvedValue(false) }} weekPage={thisWeek} />)
+  fireEvent.click(screen.getByRole('button', { name: 'Plan Item 1 for this weekend' }))
   expect(await screen.findByRole('alert')).toHaveTextContent('Could not save')
-  expect(screen.getByRole('menuitem', { name: 'Plan Item 1 for this weekend' })).toBeEnabled()
+  expect(screen.getByRole('button', { name: 'Plan Item 1 for this weekend' })).toBeEnabled()
 })
 
-it('groups planning destinations in Plan and leaves Someday/Delete under More', () => {
-  const choose = vi.fn()
-  render(<DayPlanPanel plan={plan(1)} day={day} actions={{ ...actions, choose, weekend: vi.fn(), someday: vi.fn(), remove: vi.fn() }} weekPage={thisWeek} />)
-  const trigger = screen.getByRole('button', { name: 'Plan Item 1' })
-  fireEvent.click(trigger)
-  expect(screen.getAllByRole('menuitem').map(button => button.textContent)).toEqual([
-    'Today', expect.stringMatching(/^This week/), expect.stringMatching(/^This weekend/), 'Choose date…',
-  ])
-  fireEvent.click(screen.getByRole('menuitem', { name: 'Today', exact: true }))
-  expect(choose).toHaveBeenCalledWith(expect.objectContaining({ id: 'w1' }))
+it('exposes week destinations directly and keeps maintenance under More', () => {
+  const commit = vi.fn()
+  render(<DayPlanPanel plan={plan(1)} day={day} actions={{ ...actions, commit, weekend: vi.fn(), someday: vi.fn(), remove: vi.fn() }} weekPage={thisWeek} />)
+  expect(screen.queryByRole('button', { name: 'Plan Item 1' })).toBeNull()
+  expect(screen.getByRole('button', { name: 'Plan Item 1 for this weekend' })).toBeVisible()
+  fireEvent.click(screen.getByRole('button', { name: 'Plan Item 1 for this week' }))
+  expect(commit).toHaveBeenCalledWith(expect.objectContaining({ id: 'w1' }), 'week')
   fireEvent.click(screen.getByRole('button', { name: 'More for Item 1' }))
   expect(screen.getAllByRole('menuitem').map(button => button.textContent)).toEqual(['Someday', 'Delete'])
 })
 
-it('supports keyboard navigation and Escape back to the Plan trigger', () => {
-  render(<DayPlanPanel plan={plan(1)} day={day} actions={actions} weekPage={thisWeek} />)
-  const trigger = screen.getByRole('button', { name: 'Plan Item 1' })
+it('supports keyboard navigation and Escape back to the More trigger', () => {
+  render(<DayPlanPanel plan={plan(1)} day={day} actions={{ ...actions, someday: vi.fn() }} weekPage={thisWeek} />)
+  const trigger = screen.getByRole('button', { name: 'More for Item 1' })
   trigger.focus()
   fireEvent.click(trigger)
   fireEvent.keyDown(trigger, { key: 'ArrowDown' })
-  expect(screen.getByRole('menuitem', { name: 'Today', exact: true })).toHaveFocus()
+  expect(screen.getByRole('menuitem', { name: 'Move Item 1 to Someday' })).toHaveFocus()
   fireEvent.keyDown(document.activeElement!, { key: 'Escape' })
   expect(screen.queryByRole('menu')).toBeNull()
   expect(trigger).toHaveFocus()
