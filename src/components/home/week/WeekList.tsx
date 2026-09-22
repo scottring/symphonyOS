@@ -5,6 +5,7 @@
 import { Check } from 'lucide-react'
 import type { Task } from '@/types/task'
 import { weekListTasks, weekRowNote, weekRowNoteText } from '@/lib/planning/weekList'
+import { weekListTitle } from '@/components/reference/DayPlanPanel'
 import { localYmd } from '@/lib/cadence/config'
 
 export function WeekList({ tasks, weekStart, meId, userId, isCurrent, onToggle, onSelect, onPlan }: {
@@ -23,11 +24,17 @@ export function WeekList({ tasks, weekStart, meId, userId, isCurrent, onToggle, 
   const open = rows.filter((t) => !t.completed)
   const done = rows.filter((t) => t.completed)
   const ordered = [...open, ...done]
+  // Don't call another week "this week": the page pages backwards. The region's
+  // name stays stable — the panel and its tests find the list by it.
+  const title = weekListTitle(weekStart)
+  const heading = title === 'This week'
+    ? "This week's list"
+    : `List for the ${title.charAt(0).toLowerCase()}${title.slice(1)}`
 
   return (
     <section aria-label="This week's list" className="mb-4">
       <h2 className="font-display text-lg text-neutral-800">
-        This week's list <span className="text-[12px] font-normal text-neutral-400">tick things off any day</span>
+        {heading} <span className="text-[12px] font-normal text-neutral-400">tick things off any day</span>
       </h2>
       {ordered.length === 0 ? (
         <p className="text-sm text-neutral-500">
@@ -59,16 +66,21 @@ export function WeekList({ tasks, weekStart, meId, userId, isCurrent, onToggle, 
                 >
                   <Check className="h-2.5 w-2.5" strokeWidth={3} />
                 </button>
-                <button
-                  type="button"
-                  onClick={() => onSelect(task.id)}
-                  className="min-w-0 flex-1 text-left leading-snug hover:text-neutral-950"
-                >
-                  <span className={`break-words ${task.completed ? 'text-neutral-400 line-through' : 'text-neutral-800'}`}>
-                    {task.title}
-                  </span>
+                <div className="min-w-0 flex-1">
+                  {/* The note sits BESIDE the button, not inside it: inside, it
+                      joins the button's accessible name ("Call the plumber from
+                      October picked for today"). */}
+                  <button
+                    type="button"
+                    onClick={() => onSelect(task.id)}
+                    className="block w-full min-w-0 text-left leading-snug hover:text-neutral-950"
+                  >
+                    <span className={`break-words ${task.completed ? 'text-neutral-400 line-through' : 'text-neutral-800'}`}>
+                      {task.title}
+                    </span>
+                  </button>
                   {note && <span className="block text-[11.5px] text-neutral-500">{note}</span>}
-                </button>
+                </div>
               </li>
             )
           })}

@@ -10,7 +10,7 @@ import { useMemo, useState } from 'react'
 import { Target, Check } from 'lucide-react'
 import type { Task } from '@/types/task'
 import type { DomainId } from '@/lib/domains'
-import { verdictOptions, summarize, type SessionDraft, type SessionLevel, type Verdict } from '@/lib/planning/session'
+import { verdictOptions, summarize, weekTaskListLabel, type SessionDraft, type SessionLevel, type Verdict } from '@/lib/planning/session'
 import { stepsThatCarryForward } from '@/lib/planning/goalSteps'
 
 type Step = 'back' | 'plan' | 'save'
@@ -51,7 +51,7 @@ export function PlanSession({ level, aboveLabel, dayOptions = [], periodLabel: P
       ? `Look at ${aboveLabel} beside you. Add what ${P} can take; most things don't need a day.`
       : `Write ${P}'s goals with the season beside you, then the tasks that move them. Goals are never scheduled.`,
     saveHead: week ? 'Here\'s the week' : `Here's ${P}'s plan`,
-    taskHead: week ? "This week's tasks" : `${P} tasks`,
+    taskHead: week ? weekTaskListLabel(P) : `${P} tasks`,
     marker: week ? `· on ${P}` : `· in ${P}`,
   }
   // "Keep, and add a next action" with no action named would save as a plain

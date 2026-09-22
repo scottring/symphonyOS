@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest'
-import { periodBounds, isCurrentPeriod, selectPeriodTasks, selectDatedInPeriod, actionsFor, railLevel, planningPeriod } from './periodPage'
+import { periodBounds, isCurrentPeriod, selectPeriodTasks, selectDatedInPeriod, actionsFor, railLevel, planningPeriod, offerableFromAbove } from './periodPage'
 import { DEFAULT_SEASONS } from '@/lib/cadence/seasons'
 import type { Task } from '@/types/task'
 
@@ -168,5 +168,20 @@ describe('railLevel', () => {
     expect(railLevel('month')).toBe('season')
     expect(railLevel('season')).toBe('year')
     expect(railLevel('year')).toBeNull()
+  })
+})
+
+describe('offerableFromAbove', () => {
+  beforeEach(() => localStorage.clear())
+  const OCT = d(2026, 9, 1), NOV = d(2026, 10, 1)
+  it('offers open and legacy rows, never one already carried on, dropped or a goal', () => {
+    const open = task({ id: 'open', bucket: 'month', monthStart: OCT, commitments: [{ level: 'month', periodStart: OCT, status: 'open' }] } as Partial<Task>)
+    const carried = task({ id: 'carried', bucket: 'month', monthStart: NOV,
+      commitments: [{ level: 'month', periodStart: OCT, status: 'carried', carriedTo: NOV }, { level: 'month', periodStart: NOV, status: 'open' }] } as Partial<Task>)
+    const dropped = task({ id: 'dropped', bucket: 'month', monthStart: OCT, commitments: [{ level: 'month', periodStart: OCT, status: 'removed' }] } as Partial<Task>)
+    const legacy = task({ id: 'legacy', bucket: 'month', monthStart: OCT } as Partial<Task>)
+    const goal = task({ id: 'goal', isGoal: true, bucket: 'month', monthStart: OCT, commitments: [{ level: 'month', periodStart: OCT, status: 'open' }] } as Partial<Task>)
+    const out = offerableFromAbove([open, carried, dropped, legacy, goal], 'month', OCT, false, DEFAULT_SEASONS)
+    expect(out.map((t) => t.id)).toEqual(['open', 'legacy'])
   })
 })

@@ -41,7 +41,7 @@ import { lookBackRows, isEmptyDraft, goalsWithHiddenSteps } from '@/lib/planning
 import type { DomainId } from '@/lib/domains'
 import { formatShortDate } from '@/lib/dateHelpers'
 import {
-  periodBounds, isCurrentPeriod, selectPeriodTasks, selectDatedInPeriod, actionsFor, railLevel, lowerLevel, planningPeriod,
+  periodBounds, isCurrentPeriod, selectPeriodTasks, selectDatedInPeriod, actionsFor, railLevel, lowerLevel, planningPeriod, offerableFromAbove,
   type PlanLevel, type RowAction,
 } from '@/lib/planning/periodPage'
 import type { Task } from '@/types/task'
@@ -477,10 +477,16 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
     () => (sessionEnabled ? selectPeriodTasks(layered, 'month', bounds.start, isCurrent, meId, seasons).filter((t) => !t.completed) : []),
     [sessionEnabled, layered, bounds.start, isCurrent, meId, seasons],
   )
+  const aboveIsCurrent = useMemo(() => isCurrentPeriod(periodBounds('season', aboveStart, seasons), today), [aboveStart, seasons, today])
   const aboveTasks = useMemo(() => (sessionEnabled && above === 'season'
-    ? selectPeriodTasks(layered, 'season', aboveStart, isCurrentPeriod(periodBounds('season', aboveStart, seasons), today), meId, seasons).filter((t) => !t.completed)
-    : []), [sessionEnabled, above, layered, aboveStart, seasons, today, meId])
-  const aboveItems = useMemo(() => aboveTasks.filter((t) => !t.isGoal), [aboveTasks])
+    ? selectPeriodTasks(layered, 'season', aboveStart, aboveIsCurrent, meId, seasons).filter((t) => !t.completed)
+    : []), [sessionEnabled, above, layered, aboveStart, seasons, aboveIsCurrent, meId])
+  // Only season work still OPEN on that season is offered down; a row already
+  // carried on (or dropped) is reference, as the goals beside it are.
+  const aboveItems = useMemo(
+    () => offerableFromAbove(aboveTasks, 'season', aboveStart, aboveIsCurrent, seasons),
+    [aboveTasks, aboveStart, aboveIsCurrent, seasons],
+  )
   const aboveGoalItems = useMemo(() => aboveTasks.filter((t) => t.isGoal), [aboveTasks])
 
   const sessionWriters = useMemo(() => ({

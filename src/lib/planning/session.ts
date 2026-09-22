@@ -136,6 +136,13 @@ export function pruneDraft(d: SessionDraft, ctx: { open: readonly Task[]; above:
     keptAlready: keptAlready.filter((k) => rows.has(k)), takenFromAbove: d.takenFromAbove.filter((k) => aboveIds.has(k)) }
 }
 
+/** The week session's task-list heading, in the words of the week being
+ *  planned. A week page pages backwards, and "This week's tasks" beside a rail
+ *  marker reading "on the week of Oct 4" is a screen arguing with itself. */
+export function weekTaskListLabel(periodLabel: string): string {
+  return periodLabel === 'this week' ? "This week's tasks" : `Tasks for ${periodLabel}`
+}
+
 export function summarize(
   d: SessionDraft,
   ctx: {
@@ -150,13 +157,13 @@ export function summarize(
   const P = ctx.periodLabel, Q = ctx.prevLabel
   const week = d.level === 'week'
   const L = {
-    list: week ? "This week's tasks" : `${P} tasks`,
+    list: week ? weekTaskListLabel(P) : `${P} tasks`,
     goals: `${P} goals`,
     kept: `kept from ${Q}`,
     done: week ? `Done ${Q}` : `Done in ${Q}`,
     dropped: `Dropped from ${Q} · the task is kept`,
     left: week ? `Left open ${Q}` : `Left open in ${Q}`,
-    stays: `stays on ${ctx.aboveLabel}, marked "${week ? 'on this week' : `in ${P}`}"`,
+    stays: `stays on ${ctx.aboveLabel}, marked "${week ? `on ${P}` : `in ${P}`}"`,
   }
   const lines: SummaryLine[] = []
   // A kept goal carries its steps still open in the previous month (keepForward).

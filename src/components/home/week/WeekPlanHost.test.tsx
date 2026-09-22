@@ -65,6 +65,34 @@ describe('WeekPlanHost', () => {
     expect(screen.getByText('Call the plumber')).toBeInTheDocument()
   })
 
+  it('the month rail offers only month work still open on that month', () => {
+    // Already carried into November: October has answered for it, so offering
+    // it down would write a second placement over a decision that moved on.
+    const carried = createMockTask({ id: 'c', title: 'Old bids', bucket: 'month', monthStart: new Date(2026, 10, 1),
+      commitments: [{ level: 'month', periodStart: new Date(2026, 9, 1), status: 'carried', carriedTo: new Date(2026, 10, 1) },
+        { level: 'month', periodStart: new Date(2026, 10, 1), status: 'open' }] })
+    render(<MemoryRouter><WeekPlanHost tasks={[open, monthTask, carried]} weekStart={WEEK} meId={null} isPast={false}>{() => <div>the days</div>}</WeekPlanHost></MemoryRouter>)
+    fireEvent.click(screen.getByRole('button', { name: 'Plan this week' }))
+    fireEvent.click(screen.getByRole('button', { name: /next: plan this week/i }))
+    expect(screen.getByRole('button', { name: /add to this week: three bids/i })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /add to this week: old bids/i })).toBeNull()
+  })
+
+  it('the session list is the week being planned, not the week containing today', () => {
+    // A legacy bucket='week' row with no week stamp and no records belongs to
+    // "this week" only; planning a future week must not sweep it in.
+    const legacy = createMockTask({ id: 'l', title: 'Legacy row', bucket: 'week', weekStart: undefined, commitments: [] })
+    const NEXT = new Date(2026, 9, 11)
+    const { unmount } = render(<MemoryRouter><WeekPlanHost tasks={[legacy]} weekStart={NEXT} meId={null} isPast={false}>{() => <div>the days</div>}</WeekPlanHost></MemoryRouter>)
+    fireEvent.click(screen.getByRole('button', { name: /plan the week of/i }))
+    expect(screen.queryByText('Legacy row')).toBeNull()
+    unmount()
+    render(<MemoryRouter><WeekPlanHost tasks={[legacy]} weekStart={WEEK} meId={null} isPast={false}>{() => <div>the days</div>}</WeekPlanHost></MemoryRouter>)
+    // Nothing to look back at, so the session opens straight on the Plan step.
+    fireEvent.click(screen.getByRole('button', { name: 'Plan this week' }))
+    expect(screen.getByText('Legacy row')).toBeInTheDocument()
+  })
+
   it('shows Planned <date> and "Review the plan" once a session is saved', () => {
     session.saved = { at: new Date(2026, 9, 4), authorId: 'u2', notes: {} }
     mount()

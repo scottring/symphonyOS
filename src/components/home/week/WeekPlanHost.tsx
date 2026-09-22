@@ -17,7 +17,7 @@ import { weekToken } from '@/hooks/usePlanningSession'
 import { usePlanSessionHost } from '@/hooks/usePlanSessionHost'
 import { lookBackRows, isEmptyDraft } from '@/lib/planning/session'
 import { weekListTasks } from '@/lib/planning/weekList'
-import { periodBounds, isCurrentPeriod, selectPeriodTasks } from '@/lib/planning/periodPage'
+import { periodBounds, isCurrentPeriod, selectPeriodTasks, offerableFromAbove } from '@/lib/planning/periodPage'
 import { monthStartOf } from '@/lib/planning/periodPlacement'
 import { localYmd } from '@/lib/cadence/config'
 import { formatWeekRangeShort } from '@/lib/dateHelpers'
@@ -49,18 +49,29 @@ export function WeekPlanHost({ tasks, weekStart, meId, isPast, children }: {
   const monthStart = useMemo(() => monthStartOf(new Date(weekStart.getTime() + 3 * DAY)), [weekStart])
   const today = useMemo(() => new Date(), [])
 
+  const isCurrentWeek = weekStart <= today && today.getTime() < weekStart.getTime() + 7 * DAY
+
   const back = useMemo(() => lookBackRows(tasks, prevStart, meId, 'week'), [tasks, prevStart, meId])
-  const current = useMemo(() => weekListTasks(tasks, weekStart, meId).filter((t) => !t.completed), [tasks, weekStart, meId])
-  const aboveTasks = useMemo(
-    () => selectPeriodTasks(tasks, 'month', monthStart, isCurrentPeriod(periodBounds('month', monthStart, seasons), today), meId, seasons)
-      .filter((t) => !t.completed),
-    [tasks, monthStart, seasons, today, meId],
+  // The SESSION's week, not "the week containing today": planning a future week
+  // must not sweep in every legacy bucket='week' row (which belongs to no week).
+  const current = useMemo(
+    () => weekListTasks(tasks, weekStart, meId, { isCurrent: isCurrentWeek }).filter((t) => !t.completed),
+    [tasks, weekStart, meId, isCurrentWeek],
   )
-  const above = useMemo(() => aboveTasks.filter((t) => !t.isGoal), [aboveTasks])
+  const monthIsCurrent = isCurrentPeriod(periodBounds('month', monthStart, seasons), today)
+  const aboveTasks = useMemo(
+    () => selectPeriodTasks(tasks, 'month', monthStart, monthIsCurrent, meId, seasons)
+      .filter((t) => !t.completed),
+    [tasks, monthStart, seasons, monthIsCurrent, meId],
+  )
+  // Only month work still OPEN on that month is offered down; a row already
+  // carried on is reference (the goals beside it are, too).
+  const above = useMemo(
+    () => offerableFromAbove(aboveTasks, 'month', monthStart, monthIsCurrent, seasons),
+    [aboveTasks, monthStart, monthIsCurrent, seasons],
+  )
   const aboveGoals = useMemo(() => aboveTasks.filter((t) => t.isGoal), [aboveTasks])
   const aboveLabel = monthStart.toLocaleDateString('en-US', { month: 'long' })
-
-  const isCurrentWeek = weekStart <= today && today.getTime() < weekStart.getTime() + 7 * DAY
   const periodLabel = isCurrentWeek ? 'this week' : `the week of ${formatWeekRangeShort(weekStart)}`
   const prevLabel = isCurrentWeek ? 'last week' : `the week of ${formatWeekRangeShort(prevStart)}`
   const dayOptions = useMemo(() => Array.from({ length: 7 }, (_, i) => {

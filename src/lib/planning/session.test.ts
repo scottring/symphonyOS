@@ -224,6 +224,16 @@ describe('week sessions', () => {
     ])
   })
 
+  it('a week that is not "this week" is named in the list heading and the rail marker', () => {
+    const d: SessionDraft = { ...emptyDraft('week', WEEK, LAST), newTasks: [{ id: 'n1', title: 'Sort the garage' }], takenFromAbove: ['m1'] }
+    const lines = summarize(d, { open: [], above: [t({ id: 'm1', title: 'Three bids', bucket: 'month' })], aboveGoals: [],
+      periodLabel: 'the week of Oct 4 – Oct 10', prevLabel: 'the week of Sep 27 – Oct 3', aboveLabel: 'October' })
+    expect(lines).toEqual([
+      { title: 'Sort the garage', destination: 'Tasks for the week of Oct 4 – Oct 10' },
+      { title: 'Three bids', destination: 'Tasks for the week of Oct 4 – Oct 10 · stays on October, marked "on the week of Oct 4 – Oct 10"' },
+    ])
+  })
+
   it('goalsWithHiddenSteps is empty at the week level', () => {
     expect(goalsWithHiddenSteps([onLast({ id: 'g', isGoal: true })], [], LAST, 'week').size).toBe(0)
   })
