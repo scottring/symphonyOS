@@ -3,17 +3,29 @@
 // "Which period should I plan next" — the one quiet line on Today, decided by
 // `planningNudge` (src/lib/planning/nudges.ts) from the household's saved
 // planning_sessions. Guidance only: the cta navigates, it never writes, and
-// "Not now" dismisses this period's token for good — the dismissal key
-// mirrors `FIRST_WEEK_HIDE_KEY`'s try/catch pattern.
+// "Not now" dismisses THIS PERIOD'S TOKEN — the dismissal key mirrors
+// `FIRST_WEEK_HIDE_KEY`'s try/catch pattern.
+//
+// No separate "hidden" flag: the memo (dismissedToken in, plus everything
+// else planningNudge reads) is the only thing that decides whether a line
+// shows. A dismissed year nudge must not hide next week's week nudge, so
+// dismissing writes the dismissed token and lets the memo recompute — it can
+// come back with a DIFFERENT candidate, not just null.
+//
+// `now` is refreshed periodically (not just on a data refetch) so a tab left
+// open across a period boundary — Saturday to Wednesday, say — advances the
+// nudge instead of freezing on whatever was true when the tab last fetched.
 
 import { Link } from 'react-router-dom'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useHouseholdSeasons } from '@/hooks/useHouseholdSeasons'
 import { usePlanningSessionsIndex } from '@/hooks/usePlanningSessionsIndex'
-import { readCadenceConfig } from '@/lib/cadence/config'
+import { readCadenceConfig, localYmd } from '@/lib/cadence/config'
 import { planningNudge } from '@/lib/planning/nudges'
 
 export const PLAN_NUDGE_DISMISSED_KEY = (uid: string) => `symphony.planNudge.dismissed.${uid}`
+
+const REFRESH_MS = 60_000
 
 interface PlanningNudgeProps {
   uid: string
@@ -28,6 +40,21 @@ export function PlanningNudge({ uid }: PlanningNudgeProps) {
     try { setDismissedToken(localStorage.getItem(PLAN_NUDGE_DISMISSED_KEY(uid))) } catch { setDismissedToken(null) }
   }, [uid])
 
+  // A ymd string, not the Date itself, so the memo deps are a plain value
+  // comparison — ticking every 60s without this would recompute `now` every
+  // render regardless of whether the day actually changed.
+  const [today, setToday] = useState(() => localYmd(new Date()))
+  useEffect(() => {
+    const tick = () => setToday(localYmd(new Date()))
+    const id = setInterval(tick, REFRESH_MS)
+    const onVisible = () => { if (document.visibilityState === 'visible') tick() }
+    document.addEventListener('visibilitychange', onVisible)
+    return () => {
+      clearInterval(id)
+      document.removeEventListener('visibilitychange', onVisible)
+    }
+  }, [])
+
   const nudge = useMemo(() => {
     if (loading) return null
     return planningNudge({
@@ -38,17 +65,16 @@ export function PlanningNudge({ uid }: PlanningNudgeProps) {
       neverPlanned,
       dismissedToken,
     })
-  }, [loading, seasons, completed, neverPlanned, dismissedToken])
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `today` stands in for `new Date()`; the Date itself is deliberately not a dep.
+  }, [loading, seasons, completed, neverPlanned, dismissedToken, today])
 
-  const [hidden, setHidden] = useState(false)
   const handleDismiss = useCallback(() => {
     if (!nudge) return
     try { localStorage.setItem(PLAN_NUDGE_DISMISSED_KEY(uid), nudge.token) } catch { /* ignore */ }
     setDismissedToken(nudge.token)
-    setHidden(true)
   }, [nudge, uid])
 
-  if (loading || !nudge || hidden) return null
+  if (loading || !nudge) return null
 
   return (
     <p role="status" className="mx-3 mb-4 text-[13px] text-neutral-600 md:mx-0">

@@ -93,7 +93,10 @@ function isPlanned(
 export function planningNudge(input: PlanningNudgeInput): PlanningNudgeResult | null {
   const { now, seasons, weekStartsOn, completed, neverPlanned, dismissedToken } = input
 
-  if (neverPlanned) {
+  // A dismissed first-use nudge falls through to the ordinary candidates
+  // below rather than reappearing forever — "Not now" has to stay dismissed
+  // here too, the same as any other token.
+  if (neverPlanned && dismissedToken !== 'first-use') {
     const year = now.getFullYear()
     return {
       kind: 'first-use',
