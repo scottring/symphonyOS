@@ -16,14 +16,14 @@ import { DOMAINS, UNSORTED, UNSORTED_ICON, LAYER_LABELS, type Layer } from '@/li
 // layout footprint on open will bring that back; the menu is portalled for
 // exactly that reason.
 
-const ROWS: { id: Layer; label: string; icon: LucideIcon; color: string }[] = [
+export const LAYER_ROWS: { id: Layer; label: string; icon: LucideIcon; color: string }[] = [
   ...DOMAINS.map((d) => ({ id: d.id as Layer, label: d.label, icon: d.icon, color: d.color })),
   { id: UNSORTED, label: LAYER_LABELS.unsorted, icon: UNSORTED_ICON, color: 'rgb(115 115 115)' },
 ]
 
 function triggerLabel(layers: ReadonlySet<Layer>): string {
-  if (ROWS.every((r) => layers.has(r.id))) return 'All'
-  return ROWS.filter((r) => layers.has(r.id)).map((r) => r.label).join(', ')
+  if (LAYER_ROWS.every((r) => layers.has(r.id))) return 'All'
+  return LAYER_ROWS.filter((r) => layers.has(r.id)).map((r) => r.label).join(', ')
 }
 
 export function DomainSwitcher() {
@@ -64,7 +64,7 @@ export function DomainSwitcher() {
   usePopoverFocus(isOpen, triggerRef, menuRef, () => setIsOpen(false))
 
   const label = triggerLabel(layers)
-  const checked = ROWS.filter((r) => layers.has(r.id))
+  const checked = LAYER_ROWS.filter((r) => layers.has(r.id))
   const isAll = label === 'All'
 
   const menu = isOpen ? (
@@ -76,7 +76,7 @@ export function DomainSwitcher() {
       style={{ top: menuPosition.top, bottom: menuPosition.bottom, right: menuPosition.right }}
     >
       <div className="space-y-0.5">
-        {ROWS.map(({ id, label, icon: Icon, color }) => {
+        {LAYER_ROWS.map(({ id, label, icon: Icon, color }) => {
           const on = layers.has(id)
           const last = on && layers.size === 1
           return (

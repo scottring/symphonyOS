@@ -486,51 +486,27 @@ describe('TodayView', () => {
 })
 
 
-// ── Plan from paper on mobile web ──
-// The desktop controls strip is `hidden md:flex`, so for a long time the only
-// "Plan from paper" entry point was invisible on a phone — the one place a
-// camera is always at hand. The overflow menu is ONE instance: on mobile it
-// mounts beside the date masthead; on desktop it stays in the controls strip.
-describe('TodayView plan from paper — mobile entry point', () => {
+// ── Phone header (2026-09-22): the date and the day's work come first. One
+// Filters control and the ⋯ overflow join the horizon-tab row (inline here,
+// with no tab row mounted); Plan from paper moved into Add. ──
+describe('TodayView phone header', () => {
   afterEach(() => { mockUseMobile.mockReturnValue(true) })
 
-  it('mobile: the overflow lives beside the date masthead, not in the hidden controls strip', () => {
-    renderView({ onOpenPlanFromPaper: vi.fn() })
-    const strip = screen.getByTestId('today-controls')
-    expect(within(strip).queryByRole('button', { name: /more controls/i })).not.toBeInTheDocument()
-    const masthead = screen.getByTestId('today-mobile-masthead')
-    expect(within(masthead).getByRole('button', { name: /more controls/i })).toBeInTheDocument()
+  it('mobile: one Filters control and one overflow, and no Plan from paper button on the page', () => {
+    renderView()
+    expect(screen.getAllByRole('button', { name: /^Filters/ })).toHaveLength(1)
     expect(screen.getAllByRole('button', { name: /more controls/i })).toHaveLength(1)
-  })
-
-  it('mobile: "Plan from paper" is its own visible button beside the masthead — no overflow to open', async () => {
-    const onOpenPlanFromPaper = vi.fn()
-    const { user } = renderView({ onOpenPlanFromPaper })
-    const masthead = screen.getByTestId('today-mobile-masthead')
-    await user.click(within(masthead).getByRole('button', { name: /plan from paper/i }))
-    expect(onOpenPlanFromPaper).toHaveBeenCalledTimes(1)
-    await openOverflow(user)
-    expect(screen.getAllByRole('button', { name: /plan from paper/i })).toHaveLength(1)
-  })
-
-  it('mobile: no "Plan from paper" button when the handler is absent', async () => {
-    const { user } = renderView()
-    await openOverflow(user)
     expect(screen.queryByRole('button', { name: /plan from paper/i })).not.toBeInTheDocument()
+    expect(screen.queryByTestId('today-mobile-masthead')).not.toBeInTheDocument()
   })
 
-  it('desktop: the overflow stays in the controls strip, still one instance', async () => {
+  it('desktop: the overflow stays in the controls strip and there is no phone Filters control', () => {
     mockUseMobile.mockReturnValue(false)
-    const onOpenPlanFromPaper = vi.fn()
-    const { user } = renderView({ onOpenPlanFromPaper })
+    renderView()
     const strip = screen.getByTestId('today-controls')
     expect(within(strip).getByRole('button', { name: /more controls/i })).toBeInTheDocument()
     expect(screen.getAllByRole('button', { name: /more controls/i })).toHaveLength(1)
-    // On desktop the sidenav carries Plan from paper; Today's strip and
-    // overflow do not repeat it.
-    await openOverflow(user)
-    expect(screen.queryByRole('button', { name: /plan from paper/i })).not.toBeInTheDocument()
-    expect(onOpenPlanFromPaper).not.toHaveBeenCalled()
+    expect(screen.queryByRole('button', { name: /^Filters/ })).not.toBeInTheDocument()
   })
 })
 

@@ -1,4 +1,5 @@
-import { PlanNavigation, usePlanDestination, planPeriodForPath } from '@/components/layout/PlanNavigation';
+import { PlanNavigation, usePlanDestination, planPeriodForPath, MobilePlanControlsContext } from '@/components/layout/PlanNavigation';
+import { requestPlanFromPaper } from '@/lib/planFromPaperSignal';
 import { DesktopNavigation, DesktopControlsContext } from '@/components/layout/DesktopNavigation';
 import { ReferenceListsProvider, useReferenceLists } from '@/components/reference/ReferenceListsContext';
 import { ReferenceListsDock } from '@/components/reference/ReferenceLists';
@@ -122,6 +123,7 @@ function ShellLayoutInner({ children }: Props) {
   const { user, signOut } = useAuth();
 
   const [desktopControls, setDesktopControls] = useState<HTMLDivElement | null>(null);
+  const [mobilePlanControls, setMobilePlanControls] = useState<HTMLDivElement | null>(null);
   const [desktopFooterAction, setDesktopFooterAction] = useState<HTMLDivElement | null>(null);
 
   const references = useReferenceLists();
@@ -224,6 +226,7 @@ function ShellLayoutInner({ children }: Props) {
 
   return (
     <DesktopControlsContext.Provider value={desktopControls}>
+    <MobilePlanControlsContext.Provider value={mobilePlanControls}>
     <DesktopFooterActionContext.Provider value={desktopFooterAction}>
     <div className="h-screen flex overflow-hidden overflow-x-hidden bg-bg-base w-full max-w-[100vw]">
       {/* "New version available — reload" banner: shows when a newer build
@@ -255,7 +258,9 @@ function ShellLayoutInner({ children }: Props) {
             NOT here: an unlabelled one-tap door on the page people live in
             (walkthrough 2026-09-21, C-P1) — it lives in Settings, with a
             confirm. */}
-        {isMobile && (
+        {/* Phone Today folds the domain lens into its one Filters control in
+            the tab row, so this header row would only repeat it. */}
+        {isMobile && planPeriodForPath(location.pathname) !== 'today' && (
           <header
             className="sticky top-0 z-10 bg-transparent px-3 py-1"
             style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}
@@ -271,7 +276,7 @@ function ShellLayoutInner({ children }: Props) {
 
         {isMobile ? (
           <div>
-            <PlanNavigation mobile />
+            <PlanNavigation mobile mobileControlsRef={setMobilePlanControls} />
             <div className="min-w-0">{children}</div>
           </div>
         ) : (
@@ -317,6 +322,7 @@ function ShellLayoutInner({ children }: Props) {
           onAddRich={chrome.onQuickAddRich}
           onAddNote={chrome.onQuickAddNote}
           eventCalendarName={chrome.eventCalendarName}
+          onPlanFromPaper={() => { if (!requestPlanFromPaper()) navigate('/today') }}
           projects={chrome.quickAddProjects}
           contacts={chrome.quickAddContacts}
           familyMembers={chrome.quickAddFamilyMembers}
@@ -471,6 +477,7 @@ function ShellLayoutInner({ children }: Props) {
       )}
     </div>
     </DesktopFooterActionContext.Provider>
+    </MobilePlanControlsContext.Provider>
     </DesktopControlsContext.Provider>
   );
 }

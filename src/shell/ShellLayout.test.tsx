@@ -112,17 +112,17 @@ function renderAt(path: string, children: ReactNode = <div data-testid="app-cont
 describe('ShellLayout domain switcher', () => {
   beforeEach(() => localStorage.clear())
 
-  it.each(['/today', '/week', '/inbox'])('renders the domain switcher in the mobile header on %s', (path) => {
+  it.each(['/week', '/inbox'])('renders the domain switcher in the mobile header on %s', (path) => {
     mobileState.isMobile = true
     renderAt(path)
     expect(screen.getByRole('button', { name: 'Layers: All' })).toBeInTheDocument()
     expect(screen.getByTestId('app-content')).toBeInTheDocument()
   })
 
-  it('renders exactly one switcher on mobile Today', () => {
+  it('leaves mobile Today to its own Filters control, so the header row is gone', () => {
     mobileState.isMobile = true
     renderAt('/today')
-    expect(screen.getAllByRole('button', { name: /^Layers:/ })).toHaveLength(1)
+    expect(screen.queryByRole('button', { name: /^Layers:/ })).not.toBeInTheDocument()
   })
 
   it('on desktop keeps the switcher off Today and Inbox (their masthead cards own it) and on for other views', () => {

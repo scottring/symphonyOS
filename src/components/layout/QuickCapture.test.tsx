@@ -24,6 +24,22 @@ describe('QuickCapture', () => {
     })
   })
 
+  describe('Plan from paper (moved into Add, 2026-09-22)', () => {
+    it('offers it on an empty sheet and closes Add when chosen', async () => {
+      const onPlanFromPaper = vi.fn()
+      const onClose = vi.fn()
+      const { user } = render(<QuickCapture onAdd={vi.fn()} isOpen showFab={false} onClose={onClose} onPlanFromPaper={onPlanFromPaper} />)
+      await user.click(screen.getByRole('button', { name: /plan from paper/i }))
+      expect(onPlanFromPaper).toHaveBeenCalledOnce()
+      await waitFor(() => expect(onClose).toHaveBeenCalled())
+    })
+
+    it('is absent without a handler', () => {
+      render(<QuickCapture onAdd={vi.fn()} isOpen showFab={false} />)
+      expect(screen.queryByRole('button', { name: /plan from paper/i })).toBeNull()
+    })
+  })
+
   describe('Modal', () => {
     it('renders modal when isOpen=true', () => {
       render(<QuickCapture onAdd={vi.fn()} isOpen={true} showFab={false} />)

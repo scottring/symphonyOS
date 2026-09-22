@@ -37,8 +37,10 @@ import { resolveSuggestionAction, revealItemId } from '@/lib/assistant/suggestio
 import { useSystemHealth, getHealthTextClasses } from '@/hooks/useSystemHealth'
 import { useTimelineInsert } from '@/hooks/useTimelineInsert'
 import { useDomain } from '@/hooks/useDomain'
+import { MobilePlanControls } from '@/components/layout/PlanNavigation'
+import { PhoneFilterControl } from '@/components/layout/PhoneFilterControl'
 
-import { Eye, EyeOff, Binoculars, Printer, GripVertical, Moon, Sparkles, NotebookPen, ArrowRight, PanelLeft, ChevronDown, ChevronRight, Plus, History } from 'lucide-react'
+import { Eye, EyeOff, Binoculars, Printer, GripVertical, Moon, Sparkles, ArrowRight, PanelLeft, ChevronDown, ChevronRight, Plus, History } from 'lucide-react'
 import { splitTodayJournal, splitCompletedFocus } from '@/lib/today/journalSplit'
 import { panelActionsFor } from '@/components/reference/DayPlanPanel'
 import { PlanningSheet } from '@/components/reference/PlanningSheet'
@@ -133,7 +135,6 @@ interface TodayViewProps {
   bothPanelsOpen?: boolean
   onClosePanel?: () => void
   /** Opens plan-from-paper (photo of the written plan → placed tasks). */
-  onOpenPlanFromPaper?: () => void
   /** Page chrome (domain chooser, assistant toggle) rendered in the day card's
    *  top-right corner. Passed in rather than read from context so TodayView
    *  stays renderable without an AppShell around it. */
@@ -186,7 +187,6 @@ export function TodayView({
   hasUnassignedTasks,
   panelOpen,
   onClosePanel,
-  onOpenPlanFromPaper,
   headerControls,
   afterSchedule,
   onCreateNoteAt: onCreateNoteAtProp,
@@ -1048,17 +1048,6 @@ export function TodayView({
      (Sidebar.tsx, from any page); on a phone the sidenav is hidden, so this
      button sits beside the date masthead. Never back in the overflow —
      Scott: "too important to be hidden" (2026-09-03). */
-  const planFromPaperButton = onOpenPlanFromPaper && (
-    <button
-      type="button"
-      onClick={onOpenPlanFromPaper}
-      title="Plan from paper — photograph your written plan and place its items"
-      className="flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg border border-primary-500/40 bg-primary-50 px-2.5 py-1.5 text-[13px] font-semibold text-primary-700 transition-colors hover:bg-primary-100"
-    >
-      <NotebookPen className="w-4 h-4" />
-      <span>Plan from paper</span>
-    </button>
-  )
   const overflowMenu = (
     <TodayOverflowMenu>
       <button
@@ -1300,20 +1289,20 @@ export function TodayView({
           overdue={data.overdueTasks}
         />
       )}
-      {/* Mobile-only action row. The date nav that used to live here moved into
-          the day card below, which now carries it on every breakpoint. */}
-      <div data-testid="today-mobile-masthead" className="md:hidden px-3 mb-2 flex flex-wrap items-center justify-end gap-2">
-        {isMobile && planFromPaperButton}
-        {isMobile && onSelectAssignees && ((assigneesWithTasks?.length ?? 0) > 0 || hasUnassignedTasks) && (
-          <AssigneeFilter
+      {/* Phone: one Filters control (life areas + people) and ⋯ join the
+          horizon-tab row, so the date and the day's work come first. Plan from
+          paper lives in Add (2026-09-22). */}
+      {isMobile && (
+        <MobilePlanControls>
+          <PhoneFilterControl
             selectedAssignees={selectedAssignees ?? []}
             onSelectAssignees={onSelectAssignees}
             assigneesWithTasks={assigneesWithTasks ?? []}
             hasUnassignedTasks={!!hasUnassignedTasks}
           />
-        )}
-        {isMobile && overflowMenu}
-      </div>
+          {overflowMenu}
+        </MobilePlanControls>
+      )}
 
       {/* Needs your OK — COS-proposed actions awaiting approval. Top of Today
           so the assistant's proposals are the first thing you can clear in a

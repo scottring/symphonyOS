@@ -1,9 +1,18 @@
-import { useEffect, useState } from 'react'
+import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import { NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { PanelLeft, Target } from 'lucide-react'
 import { useReferenceLists } from '@/components/reference/ReferenceListsContext'
 import { PlanningSheet } from '@/components/reference/PlanningSheet'
 import { GoalsSheet } from '@/components/plan/GoalsSheet'
+
+/** Phone: a page's own header controls (filters, ⋯) join the horizon-tab row
+ *  instead of adding rows above the date. Falls back to inline rendering. */
+export const MobilePlanControlsContext = createContext<HTMLElement | null>(null)
+export function MobilePlanControls({ children }: { children: ReactNode }) {
+  const host = useContext(MobilePlanControlsContext)
+  return host ? createPortal(children, host) : <>{children}</>
+}
 
 const PERIODS = ['today', 'week', 'month', 'season', 'year'] as const
 const STORAGE_KEY = 'symphony-plan-period'
@@ -27,7 +36,11 @@ export function usePlanDestination() {
 }
 
 /** Page tools are deliberately outside primary destination navigation. */
-export function PlanNavigation({ mobile = false, paused = false }: { mobile?: boolean; paused?: boolean }) {
+export function PlanNavigation({ mobile = false, paused = false, mobileControlsRef }: {
+  mobile?: boolean; paused?: boolean
+  /** Phone only: the slot MobilePlanControls portals into. */
+  mobileControlsRef?: (node: HTMLDivElement | null) => void
+}) {
   const { pathname, search } = useLocation()
   const navigate = useNavigate()
   const period = planPeriodForPath(pathname)
@@ -71,9 +84,10 @@ export function PlanNavigation({ mobile = false, paused = false }: { mobile?: bo
     </div>}
     {period && <div className="goals-reference-control">
       <button type="button" aria-label="Goals" aria-expanded={goalsOpen} onClick={() => setGoalsOpen(open => !open)}>
-        <Target size={15} aria-hidden="true" />Goals
+        <Target size={15} aria-hidden="true" /><span className="goals-reference-label">Goals</span>
       </button>
     </div>}
+    {period && mobile && <div ref={mobileControlsRef} className="plan-mobile-controls" />}
     {period && <GoalsSheet open={goalsOpen} onClose={() => setGoalsOpen(false)} />}
     {mobile && showChooser && <PlanningSheet open={sheetOpen} onClose={() => setSheetPath(null)} periodShelves={broaderPeriod} />}
   </div>
