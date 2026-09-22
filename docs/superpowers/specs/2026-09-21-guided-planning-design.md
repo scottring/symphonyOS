@@ -157,6 +157,16 @@ marked *verify* must be confirmed before the phase that uses them.)
      (the attachment insert needs a created entity).
 5. **Onboarding.** `docs/onboarding.md` gains the planning chain as its
    guided path. Walk it with `/walkthrough` on the wiped demo account.
+   *Shipped 2026-09-21 (plan:
+   `docs/superpowers/plans/2026-09-21-guided-planning-phase-5-onboarding.md`),
+   except the walkthrough, which is Scott's to run.*
+   - As built: "Your first week" on Today starts with **Plan your year**
+     (done when an `annual` session for this year is saved); an empty
+     current or future period invites its session ("Nothing on this month's
+     list yet. Plan October →"); `docs/onboarding.md` Steps 4–8a walk Year →
+     Season → Month → Week → Today (plus the nudge) in the shipped strings,
+     with Status lines that say which steps read cleanly and which carry a
+     known gap.
 
 ## Testing
 
