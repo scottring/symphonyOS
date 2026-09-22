@@ -2,7 +2,7 @@
 
 A first pass through the app, one step at a time. Each step tells you where you are, why the page exists, one thing to do, and what you should see when it worked.
 
-This draft is being written during a guided walkthrough. `Status` on each step records whether it read cleanly on the first pass, or points at the finding that says it did not (numbers refer to the walkthrough brief for that date).
+The planning chain — Steps 4 to 8, year to today — is the guided path; everything else here is optional. `Status` on each step records whether it read cleanly, or points at the finding that says it did not (numbers refer to the walkthrough brief for that date).
 
 ---
 
@@ -18,8 +18,8 @@ This draft is being written during a guided walkthrough. `Status` on each step r
 
 **Where you are:** `/today`. The day is the page.
 **Why it exists:** Everything else in Symphony exists to make this page right: what matters today, with what you need to do it.
-**Do this:** Read the page as it is, before adding anything.
-**You'll see:** Your name, the date, today's calendar if one is connected, and clear offers for what to do next when the day is empty.
+**Do this:** Read the page as it is, before adding anything. The "Your first week" card lists what to do first, starting with "Plan your year" — "One thing you want to be true by December."
+**You'll see:** Your name, the date, today's calendar if one is connected, and "Your first week" with its steps as links into the flows that do them.
 **Status:** needs #6 (with #1, #4, #5)
 
 ## Step 2 · Capture something fast
@@ -44,45 +44,62 @@ This draft is being written during a guided walkthrough. `Status` on each step r
 
 **Where you are:** `/year`.
 **Why it exists:** A goal is an outcome you want by the end of the year, not a task. The year page holds those outcomes so the shorter periods can draw from them.
-**Do this:** Add one goal you want to be true by the end of the year.
-**You'll see:** The goal on the year page, with room under it for the steps that get you there.
-**Status:** pending
-**Agent notes:** B1–B4, C5 (the composer in the row reads cleanly; "Review 2025" does nothing; the goal page treats a goal like a task).
+**Do this:** Press **Plan 2026** in the status row (from late November it offers next year). Write one goal you want true by December, then **Save 2026**. An empty goals list offers the same session: "Nothing yet. Plan 2026 →".
+**You'll see:** "Planned Sep 21" where "Not planned yet" was, the goal on the year page, and the line "2026 is planned. When you're ready, plan the season with 2026 beside you. Plan the season → optional". "Not now" puts that line away.
+**Status:** reads cleanly (Phase 3)
+**Agent notes:** B1–B4, C5 (the composer in the row reads cleanly; the goal page treats a goal like a task). Once the year is saved, the button reads "Review the plan".
 
 ## Step 5 · Season
 
 **Where you are:** `/season`.
-**Why it exists:** A year is too far away to act on. A season is the stretch where you commit to a few steps under a goal.
-**Do this:** Add a step under your goal for this season.
-**You'll see:** The step in the season list, still showing which goal it belongs to.
-**Status:** pending
-**Agent notes:** B5–B10 (the year goal is visible in the rail without a link; a rail goal cannot take a step and the screen does not say so; row verbs are hover-only).
+**Why it exists:** A year is too far away to act on. A season is the stretch where you commit to a few goals under the year's, and the tasks that move them.
+**Do this:** Press **Plan Fall 2026**. The session runs "Look back at Summer 2026 · Plan Fall 2026 · Save". If last season had a list, give each open row a verdict — **Keep**, **Keep, and add a next action**, **Someday** or **Drop**. Then add a season goal, choosing the year goal it is "for", and a task "toward" it. **Save Fall 2026**.
+**You'll see:** The goal and the task on the season page, and the year's goals in the column beside the session while you write. A hint says once: "Goals are what this period should add up to. They stay on this list; you look at them when you plan a week or a day."
+**Status:** reads cleanly (Phase 3)
+**Agent notes:** B5–B10 (the year's goals now sit beside the session rather than in a rail that cannot take a step). "Close · keep my draft" leaves the session without losing what you wrote.
 
 ## Step 6 · Month
 
 **Where you are:** `/month`.
 **Why it exists:** The month pulls from the season. Choosing what to carry into this month is a deliberate decision, not an automatic cascade.
-**Do this:** Pull your season step into this month.
-**You'll see:** The step on the month page, and the season row showing it has been placed.
-**Status:** pending
-**Agent notes:** B9, B11, B12, B25 ("Take it into this month" keeps one row marked "↗ September"; empty sentence draws before the data).
+**Do this:** Press **Plan October**. Look back at September and give its rows their verdicts; then, in the column beside you, press **+ Add to October** on a season task, or type a task of your own. **Save October**.
+**You'll see:** "Planned Sep 21" in the status row; the save summary saying the season task "stays on Fall 2026, marked "in October""; and afterwards "October is planned. When you're ready, plan the week with October beside you. Plan the week → optional".
+**Status:** reads cleanly (Phase 1)
+**Agent notes:** B9, B11, B12, B25 (the pull is now "+ Add to October" inside the session; the empty list points at the session rather than drawing before the data).
 
-## Step 7 · Week, the journal
+## Step 7 · Week
 
-**Where you are:** `/week`, journal view.
-**Why it exists:** The week is where the plan meets real days. The journal shows the week's own work and what is still unplaced.
-**Do this:** Open the Planning panel and use "Plan for this week" to bring in what belongs here.
-**You'll see:** The chosen work in the week, and the panel's unfinished list shrinking as you place things.
-**Status:** pending
-**Agent notes:** B13, B14, C6 (the week has no list of its own; the panel beside it says "Plan for today"; an empty week is seven bare rows).
+**Where you are:** `/week`.
+**Why it exists:** The week is where the plan meets real days. The week has a list of its own, and the days pick from it.
+**Do this:** Press **Plan this week**. Look back at last week's list, then press **+ Add to this week** on an October task. Give a time-sensitive task a day with the day menu ("Any day" until you choose one). **Save this week**.
+**You'll see:** "This week's list" above the days, each row saying where it came from ("from October", "kept from last week"), and "The week is planned. Each day, pick from this list. Go to Today → optional". A hint says once: "Adding a month task here puts it on this week's list too. The month keeps it and shows "on this week"."
+**Status:** reads cleanly (Phase 2)
+**Agent notes:** B13, B14, C6 (B13 closed: the week now has its own list. An empty list reads "Nothing on this week's list yet. Plan this week →").
 
-## Step 8 · Week, the schedule
+## Step 8 · Today
+
+**Where you are:** `/today`.
+**Why it exists:** The week list stays whole all week. Today is where you say which of it you mean to do now.
+**Do this:** Open **Choose tasks** and press **Plan for today** on one row.
+**You'll see:** The row on today's list, and still on the week's list marked "Planned today"; ticking it in either place strikes it in both. A hint says once: "The week list stays whole. Picking only marks what you mean to do today."
+**Status:** reads cleanly (Phase 2)
+**Agent notes:** Beside "Choose tasks" is **◎ Goals** — the year's, the season's and the month's goals, "For reference. Edit them on their pages.", each with "Open →". It never writes.
+
+## Step 8a · The nudge
+
+**Where you are:** Today, on a Saturday or Sunday, or in the last days of a month.
+**Why it exists:** The chain is a habit, not a chore. One quiet line offers the next rung when its moment comes, and never more than one at a time.
+**Do this:** Read it, and either follow it or press **Not now**.
+**You'll see:** One line — "The week of Sep 22–28 isn't planned yet. Plan the week → optional · Not now" — and nothing at all once that period is planned or dismissed. Before you have ever planned, it reads "Start with the year: plan 2026, then the season, the month and the week."
+**Status:** reads cleanly (Phase 4)
+
+## Step 8b · Week, the schedule
 
 **Where you are:** `/week`, schedule view.
 **Why it exists:** Some work needs a time, not just a day. The schedule is where a task becomes a block on the calendar.
 **Do this:** Drag a task onto a day and time, or open its time picker and choose one.
 **You'll see:** The task drawn as a block at that time, beside your calendar events.
-**Status:** pending
+**Status:** needs B15–B18
 **Agent notes:** B15–B18 (a drag to a time works; the focus row stays on the old day; the panel never says when the task is).
 
 ## Step 9 · Routines
