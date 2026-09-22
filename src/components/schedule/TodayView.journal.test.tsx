@@ -125,7 +125,7 @@ describe('Today as a daily journal', () => {
 
   it('Tasks holds what was chosen; Schedule holds the rest of the timed day', () => {
     renderView()
-    const focus = screen.getByRole('region', { name: 'Tasks' })
+    const focus = screen.getByRole('region', { name: 'For today' })
     const ahead = screen.getByRole('region', { name: 'Schedule' })
     expect(within(focus).getByText('Check dryer duct')).toBeInTheDocument()
     expect(within(ahead).getByText('Food planning')).toBeInTheDocument()
@@ -142,10 +142,13 @@ describe('Today as a daily journal', () => {
     expect(screen.getByText('Do kids laundry')).toBeInTheDocument()
   })
 
-  it('an empty focus offers the plan — on desktop that opens the Today pin', () => {
+  it('an empty focus says what the two heading controls are for; Choose opens the Today pin', () => {
     renderView({ tasks: tasks.filter((t) => t.id !== 'dryer') })
     expect(screen.getByText('Nothing chosen yet.')).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: 'Choose something for today →' }))
+    expect(screen.getByText(/Choose from this week's tasks, or add something for today/)).toBeInTheDocument()
+    // One door, on the heading — no second prompt in the empty state.
+    expect(screen.queryByRole('button', { name: /Choose something for today/ })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Choose tasks' }))
     expect(screen.getByTestId('pins')).toHaveTextContent('today')
   })
 

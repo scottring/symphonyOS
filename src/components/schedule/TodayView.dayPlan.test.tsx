@@ -86,28 +86,37 @@ describe('Today — the way to Planning', () => {
     expect(screen.queryByText(/\d scheduled for today/)).toBeNull()
   })
 
-  it('on a phone the Tasks heading\'s Planning button opens the sheet with the same plan, and a tick there is the same completion', () => {
+  it('on a phone the "For today" heading\'s Choose button opens the sheet with the same plan, titled "Choose for today"', () => {
     const { onToggleTask } = renderView()
     const line = screen.getByRole('button', { name: 'Choose tasks' })
     expect(line).toHaveAttribute('aria-expanded', 'false')
     fireEvent.click(line)
     const sheet = screen.getByRole('dialog', { name: 'Choose tasks' })
+    expect(within(sheet).getByRole('heading', { name: 'Choose for today' })).toBeInTheDocument()
     const panel = within(sheet).getByTestId('day-plan-panel')
     // The dated task is on the page, not in the sheet; the chore waits here.
     expect(within(panel).queryByText('Pick up foot meds')).not.toBeInTheDocument()
     expect(within(panel).getByText('Kids clean rooms')).toBeInTheDocument()
     // Touch layout: no drag handles, every action is a button.
     expect(panel.querySelector('[draggable="true"]')).toBeNull()
-    expect(within(panel).getByRole('button', { name: 'Plan Kids clean rooms for today' })).toBeInTheDocument()
+    expect(within(panel).getByRole('button', { name: 'Choose Kids clean rooms for today' })).toBeInTheDocument()
     expect(onToggleTask).not.toHaveBeenCalled()
+    // The same button closes it.
+    fireEvent.click(screen.getByRole('button', { name: 'Close chooser' }))
+    expect(screen.getByRole('button', { name: 'Choose tasks' })).toHaveAttribute('aria-expanded', 'false')
   })
 
-  it('on desktop the page draws no Planning line of its own — the navigation\'s toggle is the door', () => {
+  it('on desktop the "For today" heading\'s Choose button pins the chooser beside the page and unpins it again; no second prompt', () => {
     mobile.value = false
     renderView()
     expect(screen.getByTestId('pins')).toHaveTextContent('')
-    expect(screen.queryByRole('button', { name: 'Choose tasks' })).toBeNull()
     expect(screen.queryByRole('button', { name: /Choose something for today/ })).toBeNull()
+    const choose = screen.getByRole('button', { name: 'Choose tasks' })
+    expect(choose).toHaveAttribute('aria-expanded', 'false')
+    fireEvent.click(choose)
+    expect(screen.getByTestId('pins')).toHaveTextContent('today')
+    fireEvent.click(screen.getByRole('button', { name: 'Close chooser' }))
+    expect(screen.getByTestId('pins')).toHaveTextContent('')
     expect(ctxValue.onUpdateTask).not.toHaveBeenCalled()
   })
 })

@@ -809,12 +809,11 @@ export function HomeViewContainer({ fixedView }: { fixedView?: 'today' | 'week' 
         </div>
       )}
 
-      {/* PlanningNudge owns its own wrapper and renders null when there's
-          nothing to say, so this never leaves an empty padded band above
-          Today. */}
-      {fixedView !== 'week' && firstWeekUid && <PlanningNudge uid={firstWeekUid} />}
-
       <HomeView
+        // The week reminder is Today's, below its schedule (2026-09-22): a
+        // quiet line, never a banner above the date. Renders null when there
+        // is nothing to say.
+        todayAfterSchedule={fixedView !== 'week' && firstWeekUid ? <PlanningNudge uid={firstWeekUid} only="week" /> : undefined}
         tasks={tasks}
         userId={userId}
         events={filteredEvents}

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterAll } from 'vitest'
-import { render, screen, fireEvent, act } from '@testing-library/react'
+import { render, screen, fireEvent, act, cleanup } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { DEFAULT_SEASONS } from '@/lib/cadence/seasons'
 
@@ -32,11 +32,31 @@ describe('PlanningNudge', () => {
     mount()
     expect(screen.getByRole('status')).toHaveTextContent(/Start with the year/)
     expect(screen.getByText('Plan 2026 →')).toBeInTheDocument()
-    expect(screen.getByText('optional')).toBeInTheDocument()
+    // No "optional" beside the controls (Scott via Codex, 2026-09-22).
+    expect(screen.queryByText('optional')).toBeNull()
 
     fireEvent.click(screen.getByText('Not now'))
     expect(screen.queryByRole('status')).not.toBeInTheDocument()
     expect(localStorage.getItem(PLAN_NUDGE_DISMISSED_KEY('u1'))).toBe('first-use')
+  })
+
+  // Today's reminder speaks only for the week (Scott via Codex, 2026-09-22):
+  // a quiet line below the schedule with "Plan the week →" and "Not now".
+  it('with only="week", stays silent for the first-use nudge and shows the week one even when the year would win', () => {
+    // Oct 14 2026: no week window open, never planned — nothing to say for the week.
+    render(<MemoryRouter><PlanningNudge uid="u1" only="week" /></MemoryRouter>)
+    expect(screen.queryByRole('status')).not.toBeInTheDocument()
+    // Monday Dec 21 2026 — the week window is open; the year nudge would win
+    // on precedence without the filter.
+    vi.setSystemTime(new Date(2026, 11, 21, 9))
+    index.neverPlanned = false
+    index.completed = new Set()
+    cleanup()
+    render(<MemoryRouter><PlanningNudge uid="u1" only="week" /></MemoryRouter>)
+    expect(screen.getByRole('status')).toHaveTextContent(/isn't planned yet/)
+    expect(screen.getByText('Plan the week →')).toHaveAttribute('href', '/week')
+    expect(screen.getByText('Not now')).toBeInTheDocument()
+    expect(screen.queryByText('optional')).toBeNull()
   })
 
   it('renders nothing while loading', () => {
@@ -49,7 +69,7 @@ describe('PlanningNudge', () => {
     index.error = 'network error'
     const { container } = mount()
     expect(screen.queryByRole('status')).not.toBeInTheDocument()
-    expect(container.querySelector('.pt-2')).not.toBeInTheDocument()
+    expect(container.firstChild).toBeNull()
     index.error = null
   })
 

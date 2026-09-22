@@ -1,6 +1,6 @@
 import { useLocation } from 'react-router-dom'
 import { presetRange, weekRange, weekRangeFromStartParam } from '@/lib/planning/dateRange'
-import { useState, useMemo, useCallback, useEffect, useRef } from 'react'
+import { useState, useMemo, useCallback, useEffect, useRef, type ReactNode } from 'react'
 import { useCadenceConfig, readCadenceConfig, weekStartAnchor } from '@/lib/cadence/config'
 import { HomeChromeControls } from './HomeChromeControls'
 import type { HomeViewType } from '@/types/homeView'
@@ -61,6 +61,8 @@ interface HomeViewProps {
    *  (`/week`) mounts HomeView with fixedView="week" — its own route, not a
    *  switcher state (the D/W/M switcher died with the analog-planning pivot). */
   fixedView?: HomeViewType
+  /** Today's planning reminder, drawn below its schedule (2026-09-22). */
+  todayAfterSchedule?: ReactNode
 }
 
 export function HomeView({
@@ -79,6 +81,7 @@ export function HomeView({
   bothPanelsOpen,
   onOpenPlanFromPaper,
   fixedView,
+  todayAfterSchedule,
 }: HomeViewProps) {
   const ctx = useScheduleActionsContext()
   const { currentView: hookView, setCurrentView } = useHomeView()
@@ -455,6 +458,7 @@ export function HomeView({
     return (
       <TodayView
         headerControls={<HomeChromeControls className="flex" />}
+        afterSchedule={todayAfterSchedule}
         tasks={filteredTasks}
         userId={userId}
         allRoutines={allActiveRoutines}
@@ -526,20 +530,9 @@ export function HomeView({
       )}
 
       <div className="flex-1 overflow-y-auto">
-        {!isMobile && currentView === 'today' && (
-          <div className={`max-w-[940px] w-full mr-auto px-0 ${PAGE_GUTTER_X} pt-4`}>
-            <HomeHeader
-              currentView={currentView}
-              onViewChange={handleViewChange}
-              viewedDate={viewedDate}
-              onDateChange={onDateChange}
-              weekStart={weekStart}
-              onWeekChange={setWeekStart}
-              monthStart={monthStart}
-              onMonthChange={setMonthStart}
-              />
-          </div>
-        )}
+        {/* Today draws its own masthead inside the day card, and HomeHeader
+            returns null for it — the padded wrapper that used to mount it
+            here was an empty band above the date (2026-09-22). */}
         {/* Surfaces an expired/revoked calendar connection so the empty event
             state isn't silent. Wrapper collapses (empty:hidden) when the banner
             renders null, so it adds no padding while connected. */}

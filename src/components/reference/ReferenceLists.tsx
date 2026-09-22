@@ -181,7 +181,9 @@ function TodayPlanList({ onClose }: { onClose: () => void }) {
     <PlanningPanelHost header={(day, viewedWeek) => (
       <header className="flex items-start justify-between gap-3 border-b border-neutral-300 pb-4">
         <div>
-          <h2 className="font-display text-[22px] leading-tight text-neutral-900">Choose tasks</h2>
+          {/* Beside a day the panel picks for today (Scott via Codex,
+              2026-09-22); beside a week page it plans that week. */}
+          <h2 className="font-display text-[22px] leading-tight text-neutral-900">{viewedWeek ? 'Choose tasks' : 'Choose for today'}</h2>
           <p className="mt-1 text-[13px] text-neutral-500">{planningSubtitle(day, viewedWeek)}</p>
         </div>
         <button type="button" onClick={onClose} aria-label="Close task chooser" className="p-2 text-neutral-500 hover:bg-neutral-100 rounded"><X className="w-4 h-4" /></button>
