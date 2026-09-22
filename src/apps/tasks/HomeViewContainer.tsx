@@ -835,7 +835,6 @@ export function HomeViewContainer({ fixedView }: { fixedView?: 'today' | 'week' 
         loading={tasksLoading || routinesLoading}
         viewedDate={viewedDate}
         onDateChange={setViewedDate}
-        onOpenPlanFromPaper={() => setPlanFromPaperOpen(true)}
         fixedView={fixedView}
       />
 

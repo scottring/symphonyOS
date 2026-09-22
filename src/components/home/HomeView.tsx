@@ -57,7 +57,6 @@ interface HomeViewProps {
   onDateChange: (date: Date) => void
   bothPanelsOpen?: boolean
   /** Opens the plan-from-paper flow (photo of a written plan → placed tasks). */
-  onOpenPlanFromPaper?: () => void
   /** Pin this mount to one sub-view, ignoring useHomeView. The Week bench
    *  (`/week`) mounts HomeView with fixedView="week" — its own route, not a
    *  switcher state (the D/W/M switcher died with the analog-planning pivot). */
@@ -80,7 +79,6 @@ export function HomeView({
   viewedDate,
   onDateChange,
   bothPanelsOpen,
-  onOpenPlanFromPaper,
   fixedView,
   todayAfterSchedule,
 }: HomeViewProps) {
@@ -491,7 +489,6 @@ export function HomeView({
         panelOpen={selectedItemId !== null}
         bothPanelsOpen={bothPanelsOpen}
         onClosePanel={() => onSelectItem(null)}
-        onOpenPlanFromPaper={onOpenPlanFromPaper}
         onUpdateTasksBulk={handleUpdateTasksBulk}
         currentHomeView={currentView}
         onHomeViewChange={handleViewChange}

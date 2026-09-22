@@ -2047,10 +2047,16 @@ div.chooser-action-group { overflow: visible !important; }
   .plan-page-tools[data-period="week"] .task-chooser-control > button { display: none; }
 }
 @media (max-width: 767px) {
+  /* One compact row on phones: horizon tabs, Goals, then the page's own
+     controls (Today: Filters, ⋯) — so the date sits right under it. */
+  .plan-page-tools { flex-wrap: nowrap; gap: 4px; padding: 4px 12px; }
   .plan-page-tools .plan-period-controls { display: contents; }
-  .plan-page-tools .plan-period-navigation { flex-basis: 100%; }
-  .plan-page-tools .plan-period-navigation a { flex: 1; justify-content: center; }
-  .plan-page-tools .goals-reference-control { margin-left: auto; }
+  .plan-page-tools .plan-period-navigation { flex: 1 1 auto; min-width: 0; }
+  .plan-page-tools .plan-period-navigation a { flex: 1; justify-content: center; min-width: 0 !important; padding: 0 2px !important; font-size: 12px; }
+  .plan-page-tools .goals-reference-control button { min-width: 40px !important; min-height: 40px; justify-content: center; padding: 0 !important; }
+  .plan-page-tools .goals-reference-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  div.plan-mobile-controls { display: flex; align-items: center; gap: 2px; overflow: visible !important; }
+  div.plan-mobile-controls:empty { display: none; }
 }
 
 /* Today uses the same quiet hierarchy as Week, with the day's work first. */

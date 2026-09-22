@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useMemo, type ReactNode } from 'react'
-import { Sparkles, Camera } from 'lucide-react'
+import { Sparkles, Camera, NotebookPen } from 'lucide-react'
 import { usePhotoCapture } from '@/hooks/usePhotoCapture'
 import { CameraCaptureModal } from '@/components/capture/CameraCaptureModal'
 import { hasParsedFields, allDayFromParse } from '@/lib/quickInputParser'
@@ -54,6 +54,9 @@ interface QuickCaptureProps {
   /** The calendar an EVENT would be written to for a life area (null = the
    *  primary calendar). Lets the destination line name it before Enter. */
   eventCalendarName?: (context: TaskContext | null) => string | null
+  /** Photograph a written plan and place its items. Lives in Add so the phone
+   *  Today header stays light (Scott, 2026-09-22). */
+  onPlanFromPaper?: () => void
 }
 
 export function QuickCapture({
@@ -70,6 +73,7 @@ export function QuickCapture({
   resultsSlot,
   onAskSymphony,
   eventCalendarName,
+  onPlanFromPaper,
 }: QuickCaptureProps) {
   // Support both controlled and uncontrolled modes
   const [internalIsOpen, setInternalIsOpen] = useState(false)
@@ -475,6 +479,16 @@ export function QuickCapture({
                         : 'Snap a photo of a thing — AI identifies it and files it'}
                     </span>
                   </button>
+                  {onPlanFromPaper && (
+                    <button
+                      type="button"
+                      onClick={() => { handleClose(); onPlanFromPaper() }}
+                      className="mt-2 w-full flex items-center gap-2 rounded-xl border border-neutral-200 bg-neutral-50 px-4 py-3 text-sm text-neutral-600 hover:bg-neutral-100 transition-colors"
+                    >
+                      <NotebookPen className="w-4 h-4 shrink-0 text-primary-600" />
+                      <span className="flex-1 text-left">Plan from paper — photograph your written plan</span>
+                    </button>
+                  )}
                 </div>
               )}
 
