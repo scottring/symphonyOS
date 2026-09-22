@@ -3,18 +3,32 @@ import { render, screen } from '@/test/test-utils'
 import { firstWeekSteps, type FirstWeekSignals } from '@/lib/firstWeek'
 import { FirstWeekCard } from './FirstWeekCard'
 
-const none: FirstWeekSignals = { memberCount: 1, pageCommitted: false, partnerInvited: false, routineCount: 0 }
+const none: FirstWeekSignals = {
+  yearPlanned: false,
+  memberCount: 1,
+  pageCommitted: false,
+  partnerInvited: false,
+  routineCount: 0,
+}
 
 describe('FirstWeekCard', () => {
-  it('lists four steps, each a link into the real flow', () => {
+  it('lists five steps, each a link into the real flow', () => {
     render(<FirstWeekCard steps={firstWeekSteps(none)} onHide={vi.fn()} onSamplePage={vi.fn()} />)
 
     expect(screen.getByRole('heading', { name: 'Your first week' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /Plan your year/ })).toHaveAttribute('href', '/year')
     expect(screen.getByRole('link', { name: /Snap this week's page/ })).toHaveAttribute('href', '/today?plan=paper')
     expect(screen.getByRole('link', { name: /Name your people/ })).toHaveAttribute('href', '/settings#household')
     expect(screen.getByRole('link', { name: /Invite your partner/ })).toHaveAttribute('href', '/settings#invite')
     expect(screen.getByRole('link', { name: /Add one routine/ })).toHaveAttribute('href', '/routines')
     expect(screen.getByRole('button', { name: /use our sample page/i })).toBeInTheDocument()
+  })
+
+  it('shows the hint only under the year step', () => {
+    render(<FirstWeekCard steps={firstWeekSteps(none)} onHide={vi.fn()} onSamplePage={vi.fn()} />)
+
+    expect(screen.getByText('One thing you want to be true by December.')).toBeInTheDocument()
+    expect(screen.getByText('Name your people').closest('li')).not.toHaveTextContent('One thing you want')
   })
 
   it('a done step collapses to its done line', () => {

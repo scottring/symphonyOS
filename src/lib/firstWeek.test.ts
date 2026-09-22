@@ -30,30 +30,50 @@ import {
   type FirstWeekSignals,
 } from './firstWeek'
 
-const none: FirstWeekSignals = { memberCount: 1, pageCommitted: false, partnerInvited: false, routineCount: 0 }
+const none: FirstWeekSignals = {
+  yearPlanned: false,
+  memberCount: 1,
+  pageCommitted: false,
+  partnerInvited: false,
+  routineCount: 0,
+}
 
 describe('firstWeekSteps', () => {
-  it('four steps, all undone for a fresh account', () => {
+  it('five steps, all undone for a fresh account, year first', () => {
     const s = firstWeekSteps(none)
-    expect(s.map((x) => x.id)).toEqual(['people', 'page', 'partner', 'routine'])
+    expect(s.map((x) => x.id)).toEqual(['plan-year', 'people', 'page', 'partner', 'routine'])
     expect(s.every((x) => !x.done)).toBe(true)
-    expect(s[1].to).toBe('/today?plan=paper')
+    expect(s[0].to).toBe('/year')
+    expect(s[2].to).toBe('/today?plan=paper')
+  })
+
+  it('only the year step carries a hint', () => {
+    const s = firstWeekSteps(none)
+    expect(s[0].hint).toBe('One thing you want to be true by December.')
+    expect(s.slice(1).every((x) => x.hint === undefined)).toBe(true)
   })
 
   it('done lines point at where the result lives', () => {
-    const s = firstWeekSteps({ memberCount: 4, pageCommitted: true, partnerInvited: true, routineCount: 2 })
-    expect(s[0]).toMatchObject({ done: true, doneLine: '4 people' })
-    expect(s[1]).toMatchObject({ done: true, doneLine: 'see This Week' })
-    expect(s[3]).toMatchObject({ done: true, doneLine: 'see Routines' })
+    const s = firstWeekSteps({
+      yearPlanned: true,
+      memberCount: 4,
+      pageCommitted: true,
+      partnerInvited: true,
+      routineCount: 2,
+    })
+    expect(s[0]).toMatchObject({ id: 'plan-year', done: true })
+    expect(s[1]).toMatchObject({ done: true, doneLine: '4 people' })
+    expect(s[2]).toMatchObject({ done: true, doneLine: 'see This Week' })
+    expect(s[4]).toMatchObject({ done: true, doneLine: 'see Routines' })
   })
 })
 
 describe('shouldShowFirstWeek', () => {
   it('shows only while ≥2 steps remain, and hides for 7 days after Hide for now', () => {
-    const two = firstWeekSteps({ ...none, memberCount: 4, pageCommitted: true })
+    const two = firstWeekSteps({ ...none, yearPlanned: true, memberCount: 4, pageCommitted: true })
     expect(shouldShowFirstWeek(two, null, new Date())).toBe(true)
 
-    const one = firstWeekSteps({ ...none, memberCount: 4, pageCommitted: true, partnerInvited: true })
+    const one = firstWeekSteps({ ...none, yearPlanned: true, memberCount: 4, pageCommitted: true, partnerInvited: true })
     expect(shouldShowFirstWeek(one, null, new Date())).toBe(false)
 
     expect(shouldShowFirstWeek(two, new Date(Date.now() - 2 * 86_400_000).toISOString(), new Date())).toBe(false)
