@@ -77,24 +77,26 @@ describe('ScheduleItem — the action rail', () => {
   // visible, so it moved to the title cluster — state belongs with the title,
   // actions belong in the rail.
   describe('discussion flag', () => {
-    it('shows an indicator in the title cluster when flagged, carrying the note', () => {
+    // The bubble is the door to the conversation (2026-09-22), so it is a
+    // button named for what it opens.
+    it('shows the bubble in the title cluster when flagged, carrying the note', () => {
       renderRow({ needsDiscussion: true, discussionNote: 'ask Iris first' })
-      expect(screen.getByLabelText('Needs discussion: ask Iris first')).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Open discussion: ask Iris first' })).toBeInTheDocument()
     })
 
     it('falls back to a bare label when flagged with no note', () => {
       renderRow({ needsDiscussion: true, discussionNote: '' })
-      expect(screen.getByLabelText('Needs discussion')).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Open discussion' })).toBeInTheDocument()
     })
 
     it('shows nothing when the task is not flagged', () => {
       renderRow({ needsDiscussion: false })
-      expect(screen.queryByLabelText(/Needs discussion/)).not.toBeInTheDocument()
+      expect(screen.queryByLabelText(/Open discussion/)).not.toBeInTheDocument()
     })
 
-    it('keeps the indicator out of the rail — it is state, not an action', () => {
+    it('keeps the bubble out of the rail — it is state, not an action', () => {
       const { container } = renderRow({ needsDiscussion: true, discussionNote: 'ask Iris' })
-      const indicator = screen.getByLabelText('Needs discussion: ask Iris')
+      const indicator = screen.getByRole('button', { name: 'Open discussion: ask Iris' })
       const slots = Array.from(container.querySelectorAll('[data-rail-slot]'))
       expect(slots.some((slot) => slot.contains(indicator))).toBe(false)
     })

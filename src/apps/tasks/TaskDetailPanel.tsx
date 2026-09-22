@@ -52,6 +52,7 @@ import { TapEventPanel } from '@/components/surface/TapEventPanel';
 import { TapMealPanel } from '@/components/surface/TapMealPanel';
 import { applyTriageWhen, describeTriageWhen } from '@/lib/triage/applyWhen';
 import { formatDateLabel } from '@/lib/dateHelpers';
+import { consumeDiscussionOpen } from '@/lib/discussions/openIntent';
 import type { Task, TaskLink } from '@/types/task';
 import { enrichLink } from '@/lib/enrichLink';
 
@@ -149,7 +150,7 @@ export function shouldCloseStaleEventPanel(opts: {
 
 // ── Task ──────────────────────────────────────────────────────────────────
 function TaskPanelBody({ id }: { id: string }) {
-  const autoOpenDiscussion = useAutoOpenDiscussion();
+  const autoOpenDiscussion = useAutoOpenDiscussion('task', id);
   const { clearSelection } = useSelection();
   const navigate = useNavigate();
 
@@ -321,7 +322,7 @@ function TaskPanelBody({ id }: { id: string }) {
 
 // ── Routine ─────────────────────────────────────────────────────────────────
 function RoutinePanelBody({ id }: { id: string }) {
-  const autoOpenDiscussion = useAutoOpenDiscussion();
+  const autoOpenDiscussion = useAutoOpenDiscussion('routine', id);
   const { clearSelection, setSelection } = useSelection();
   // Search ALL routines (not just active): flipping a routine to "reference"
   // visibility removes it from the active set/timeline but the panel must stay
@@ -431,7 +432,7 @@ function eventUpdateErrorMessage(err: unknown): string {
 
 // ── Event ─────────────────────────────────────────────────────────────────
 function EventPanelBody({ id }: { id: string }) {
-  const autoOpenDiscussion = useAutoOpenDiscussion();
+  const autoOpenDiscussion = useAutoOpenDiscussion('event', id);
   const { clearSelection } = useSelection();
   const navigate = useNavigate();
   const { events, updateEvent, moveEvent, fetchEvents, fetchCalendarList, isFetching, isLoading } = useGoogleCalendar();
@@ -663,11 +664,13 @@ function MealPanelBody({ id }: { id: string }) {
 /**
  * `?discuss=1` (the Discussions inbox deep link) opens the item's Discussion
  * as the panel mounts, then leaves the URL — a reload shouldn't reopen it.
+ * A row's discussion bubble asks the same thing without the URL
+ * (`requestDiscussionOpen`, consumed here once for this item).
  */
-function useAutoOpenDiscussion(): boolean {
+function useAutoOpenDiscussion(kind: 'task' | 'routine' | 'event', id: string): boolean {
   const [searchParams, setSearchParams] = useSearchParams();
   const wanted = searchParams.get('discuss') === '1';
-  const [auto] = useState(wanted);
+  const [auto] = useState(() => wanted || consumeDiscussionOpen(kind, id));
   useEffect(() => {
     if (!wanted) return;
     setSearchParams((prev) => {
