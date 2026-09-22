@@ -1,5 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { renderHook, waitFor, act } from '@testing-library/react'
+import { isFocused } from '@/lib/placement/model'
+import { localYmd } from '@/lib/cadence/config'
 import { useSupabaseTasks, __resetTasksCache } from './useSupabaseTasks'
 // The mocked client (see vi.mock below) — used by the test that pins down what
 // the database does to a partial-row upsert.
@@ -589,6 +591,26 @@ describe('useSupabaseTasks', () => {
       expect(mockUpdate).toHaveBeenCalledWith(expect.objectContaining({ bucket: 'week', month_start: '2026-09-01', season_start: null }))
       expect(result.current.tasks).toHaveLength(1)
       expect(result.current.tasks[0].commitments?.map((c) => [c.level, c.status])).toEqual([['month', 'open'], ['week', 'open']])
+    })
+
+    it('deferring to tomorrow removes today’s choice while keeping history and month commitments', async () => {
+      const today = new Date(); today.setHours(0, 0, 0, 0)
+      const yesterday = new Date(today); yesterday.setDate(today.getDate() - 1)
+      const tomorrow = new Date(today); tomorrow.setDate(today.getDate() + 1)
+      const month = new Date(today.getFullYear(), today.getMonth(), 1)
+      mockSupabaseData.push(createMockDbTask({ id: 'task-1', bucket: 'month', month_start: localYmd(month) }))
+      const { result } = renderHook(() => useSupabaseTasks())
+      await waitFor(() => expect(result.current.tasks).toHaveLength(1))
+      await act(async () => { await result.current.updateTask('task-1', { plannedOn: yesterday }) })
+      await act(async () => { await result.current.updateTask('task-1', { plannedOn: today }) })
+      expect(isFocused(result.current.tasks[0], mockUser.id, localYmd(today))).toBe(true)
+      await act(async () => { await result.current.pushTask('task-1', tomorrow) })
+      const task = result.current.tasks[0]
+      expect(localYmd(task.scheduledFor!)).toBe(localYmd(tomorrow))
+      expect(isFocused(task, mockUser.id, localYmd(today))).toBe(false)
+      expect(isFocused(task, mockUser.id, localYmd(yesterday))).toBe(true)
+      expect(task.commitments).toContainEqual(expect.objectContaining({ level: 'month', status: 'open' }))
+      expect(mockRecordWrites).toContainEqual(expect.objectContaining({ table: 'task_focus', op: 'delete' }))
     })
 
     it('pushTask to a date keeps the commitments and aligns the week with the day', async () => {

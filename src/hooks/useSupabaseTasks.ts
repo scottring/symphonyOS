@@ -14,7 +14,7 @@ import { stepsThatCarryForward } from '@/lib/planning/goalSteps'
 import { readSeasons, seasonStartFor } from '@/lib/cadence/seasons'
 import { planPlacement, planKeep, planDropCommitment, commitmentRow, isPlacementWrite, type PlacementPlan } from '@/lib/placement/intentions'
 import type { TaskCommitment, TaskFocusEntry, PlacementLevel } from '@/types/task'
-import { committedTo, deriveCache } from '@/lib/placement/model'
+import { committedTo, deriveCache, focusSnapshot } from '@/lib/placement/model'
 import { onRealtimeResumed } from '@/lib/realtime/keepAlive'
 import { announceToBuyChanged } from '@/lib/lists/toBuy'
 // `import type` on purpose: erased at compile time, so it does NOT drag
@@ -2204,6 +2204,11 @@ export function useSupabaseTasks() {
         bucket: 'timed',
         scheduledFor: newScheduledFor,
         isAllDay: !hasSpecificTime,
+        // Deferring away from today must also release today's personal choice.
+        // Keep historical choices and let planPlacement scope the write to me.
+        ...(task && localYmd(newScheduledFor) !== localYmd(today)
+          ? { focus: focusSnapshot(task).filter((f) => localYmd(f.date) !== localYmd(today)) }
+          : {}),
         deferCount,
       })
     }
