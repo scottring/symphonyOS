@@ -56,4 +56,23 @@ describe('SomedayPage', () => {
       localStorage.removeItem('symphony-layers')
     }
   })
+
+  it('a one-tap delete waits out an Undo window, and Undo keeps the task', async () => {
+    render(<SomedayPage />)
+    fireEvent.click(screen.getByRole('button', { name: /More/ }))
+    fireEvent.click(screen.getByRole('button', { name: 'Delete "Learn the cello"' }))
+    expect(screen.queryByText('Learn the cello')).not.toBeInTheDocument()
+    expect(hook.deleteTask).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: /Undo/ }))
+    expect(screen.getByText('Learn the cello')).toBeInTheDocument()
+    expect(hook.deleteTask).not.toHaveBeenCalled()
+  })
+
+  it('deletes for real once the Undo toast is dismissed', () => {
+    render(<SomedayPage />)
+    fireEvent.click(screen.getByRole('button', { name: /More/ }))
+    fireEvent.click(screen.getByRole('button', { name: 'Delete "Learn the cello"' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Dismiss' }))
+    expect(hook.deleteTask).toHaveBeenCalledWith('s1')
+  })
 })

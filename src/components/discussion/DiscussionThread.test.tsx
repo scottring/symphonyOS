@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { DiscussionThread, type DiscussionThreadProps } from './DiscussionThread'
 
 function renderThread(over: Partial<DiscussionThreadProps> = {}) {
@@ -59,6 +59,14 @@ describe('DiscussionThread', () => {
     expect(p.onPost).toHaveBeenCalledWith('Can you take this one?')
     expect(p.onAsk).not.toHaveBeenCalled()
     expect(box).toHaveValue('')
+  })
+
+  it('a send that was not stored puts the draft back', async () => {
+    renderThread({ onPost: vi.fn(async () => false) })
+    const box = screen.getByRole('textbox', { name: 'Message' })
+    fireEvent.change(box, { target: { value: 'Can you take this one?' } })
+    fireEvent.keyDown(box, { key: 'Enter' })
+    await waitFor(() => expect(box).toHaveValue('Can you take this one?'))
   })
 
   it('Ask Symphony sends the draft as a question', () => {

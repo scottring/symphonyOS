@@ -30,8 +30,8 @@ export interface DiscussionThreadProps {
   familyMembers: FamilyMember[]
   /** Rendered as Symphony asks in the empty state. */
   suggestions: string[]
-  onPost: (text: string) => void
-  onAsk: (text: string) => void
+  onPost: (text: string) => void | Promise<boolean | void>
+  onAsk: (text: string) => void | Promise<boolean | void>
   onClose: () => void
   /** Move the item into Family, which is what makes the house able to read
    *  the thread. Present only when the host has decided it's eligible (see

@@ -5,6 +5,7 @@ import { useAuth } from '@/hooks/useAuth'
 import { logger } from '@/lib/logger'
 import { scopeForDomain } from '@/lib/scope'
 import { captureToVault } from '@/lib/openBrain'
+import { showToast } from '@/hooks/useToast'
 import type {
   Note,
   DisplayNote,
@@ -239,6 +240,7 @@ export function useNotes() {
         // Rollback on error
         setNotes((prev) => prev.filter((n) => n.id !== tempId))
         setError(insertError.message)
+        showToast("Couldn't save the note. Please try again.", 'error')
         return null
       }
 
@@ -257,9 +259,9 @@ export function useNotes() {
   )
 
   const updateNote = useCallback(
-    async (id: string, updates: UpdateNoteInput): Promise<void> => {
+    async (id: string, updates: UpdateNoteInput): Promise<boolean> => {
       const note = notes.find((n) => n.id === id)
-      if (!note) return
+      if (!note) return false
 
       // Optimistic update
       setNotes((prev) =>
@@ -288,7 +290,10 @@ export function useNotes() {
         // Rollback on error
         setNotes((prev) => prev.map((n) => (n.id === id ? note : n)))
         setError(updateError.message)
+        showToast("Couldn't save your note changes.", 'error')
+        return false
       }
+      return true
     },
     [notes]
   )
@@ -312,6 +317,7 @@ export function useNotes() {
           return [...prev.slice(0, index), noteToDelete, ...prev.slice(index)]
         })
         setError(deleteError.message)
+        showToast("Couldn't delete the note.", 'error')
       }
     },
     [notes]
@@ -345,6 +351,7 @@ export function useNotes() {
       if (deleteError) {
         setNotes((prev) => [...prev, ...doomed])
         setError(deleteError.message)
+        showToast("Couldn't delete those notes.", 'error')
         return null
       }
 
@@ -365,6 +372,7 @@ export function useNotes() {
       const ids = deleted.rows.map((r) => r.id)
       setNotes((prev) => prev.filter((n) => !ids.includes(n.id)))
       setError(insertError.message)
+      showToast("Couldn't restore the deleted notes.", 'error')
       return
     }
 

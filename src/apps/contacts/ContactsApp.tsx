@@ -43,7 +43,7 @@ function ContactsIndex() {
 function ContactDetail() {
   const navigate = useNavigate()
   const { contactId } = useParams<{ contactId: string }>()
-  const { contacts, updateContact, deleteContact } = useContacts()
+  const { contacts, loading: contactsLoading, updateContact, deleteContact } = useContacts()
   const { tasks } = useSupabaseTasks()
   const pinnedItems = usePinnedItems()
   const { addNote, addEntityLink, getNotesForEntity } = useNotesContext()
@@ -73,9 +73,24 @@ function ContactDetail() {
     [addNote, addEntityLink, getNotesForEntity],
   )
 
-  // Contacts not yet loaded — wait. If loaded and missing, bounce to the list.
+  // Contacts not yet loaded — wait. If loaded and missing, say so: with an
+  // empty (or failed) contact list the old check spun forever.
   if (!contact) {
-    return contacts.length > 0 ? <Navigate to="/contacts" replace /> : <LoadingFallback />
+    if (contactsLoading) return <LoadingFallback />
+    if (contacts.length > 0) return <Navigate to="/contacts" replace />
+    return (
+      <div className="p-8 text-center">
+        <p className="font-display text-xl text-neutral-800">Contact not found</p>
+        <p className="mt-2 text-sm text-neutral-500">It may have been deleted, or it isn't shared with you.</p>
+        <button
+          type="button"
+          onClick={() => navigate('/contacts')}
+          className="mt-4 rounded-lg border border-neutral-200 px-3 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-50"
+        >
+          Back to contacts
+        </button>
+      </div>
+    )
   }
 
   return (

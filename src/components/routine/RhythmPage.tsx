@@ -22,6 +22,9 @@ interface RhythmPageProps {
   routines: Routine[]
   /** Hold the empty state until the first load settles. */
   loading?: boolean
+  /** Routines exist but the domain filter hides all of them — not "No routines yet". */
+  hiddenByFilter?: boolean
+  onShowAllDomains?: () => void
   contacts?: Contact[]
   familyMembers?: FamilyMember[]
   onCreateRoutine: () => void
@@ -58,7 +61,7 @@ interface RhythmPageProps {
 
 export function RhythmPage(props: RhythmPageProps) {
   const {
-    routines, loading = false, familyMembers = [],
+    routines, loading = false, familyMembers = [], hiddenByFilter = false, onShowAllDomains,
     onUpdateRoutine, onDelete, onBuildWithAI, onCreateCollection,
     onAddToCollection, onCreateRoutineInSlot,
   } = props
@@ -175,8 +178,12 @@ export function RhythmPage(props: RhythmPageProps) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const t = e.target
-      if (t instanceof HTMLElement && t.closest('input,textarea,[contenteditable="true"]')) return
+      if (t instanceof HTMLElement && t.closest('input,textarea,select,[contenteditable="true"]')) return
       if (open || tendOpen) return
+      // A focused control keeps its own keys: Space/Enter activate a button,
+      // letters jump in a menu. Search only claims keys from the page itself.
+      if (t instanceof HTMLElement && t.closest('button,a,[role]')) return
+      if (e.key === ' ') return
       if (e.key === 'Escape') { setQuery(''); return }
       if (e.key === 'Backspace') { e.preventDefault(); setQuery(q => q.slice(0, -1)); return }
       if (e.key.length === 1 && !e.metaKey && !e.ctrlKey && !e.altKey) { e.preventDefault(); setQuery(q => q + e.key) }
@@ -213,7 +220,12 @@ export function RhythmPage(props: RhythmPageProps) {
   const handleWakeAll = () => {
     for (const r of sleepers) handleWake(r.id)
   }
+  // Merging deletes the look-alikes outright (their data does not move to the
+  // survivor), so it asks first rather than acting on one tap.
   const handleMerge = (_survivorId: string, loserIds: string[]) => {
+    const names = loserIds.map(id => routines.find(r => r.id === id)?.name).filter(Boolean)
+    const what = names.length === 1 ? `"${names[0]}"` : `${loserIds.length} look-alike routines`
+    if (!window.confirm(`Merge by deleting ${what}? Their history and notes are not moved.`)) return
     for (const id of loserIds) onDelete?.(id)
   }
 
@@ -264,6 +276,7 @@ export function RhythmPage(props: RhythmPageProps) {
                 type="search"
                 value={query}
                 onChange={e => setQuery(e.target.value)}
+                aria-label="Find a routine"
                 placeholder="Type anywhere to find"
                 className="w-40 bg-transparent text-[14px] focus:outline-none placeholder:text-neutral-400"
               />
@@ -325,7 +338,23 @@ export function RhythmPage(props: RhythmPageProps) {
           <p className="py-16 text-center text-[15px] text-neutral-400">Loading your week…</p>
         )}
 
-        {!loading && routines.length === 0 && (
+        {!loading && routines.length === 0 && hiddenByFilter && (
+          <div className="py-16 text-center">
+            <h2 className="mb-2 font-display text-[24px] text-neutral-800">No routines in the domains you're viewing</h2>
+            <p className="mx-auto mb-6 max-w-sm text-[15px] text-neutral-500">
+              Your other routines are hidden by the domain filter.
+            </p>
+            {onShowAllDomains && (
+              <button
+                onClick={onShowAllDomains}
+                className="inline-flex items-center gap-2 rounded-md border border-primary-200 bg-primary-50 px-5 py-2.5 text-[15px] font-medium text-primary-800 hover:bg-primary-100">
+                Show all domains
+              </button>
+            )}
+          </div>
+        )}
+
+        {!loading && routines.length === 0 && !hiddenByFilter && (
           <div className="py-16 text-center">
             <RefreshCw aria-hidden="true" className="mx-auto mb-5 h-8 w-8 text-primary-400" />
             <h2 className="mb-2 font-display text-[24px] text-neutral-800">No routines yet</h2>

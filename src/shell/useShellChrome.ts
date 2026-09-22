@@ -201,6 +201,7 @@ export function useShellChrome() {
           assigned_to_all: data.assignedMemberIds?.length ? data.assignedMemberIds : undefined,
         });
         if (routine) showToast('Routine created', 'success');
+        else showToast(`Routine not created: "${data.title}". Please try again.`, 'error', 10000);
         return;
       }
 
@@ -245,8 +246,15 @@ export function useShellChrome() {
           topicId = newTopic?.id;
         }
       }
-      await addNote({ content: data.content, topicId });
-      showToast('Note saved', 'success');
+      const note = await addNote({ content: data.content, topicId });
+      if (note) {
+        showToast('Note saved', 'success');
+      } else {
+        // QuickCapture has already cleared its input — echo the text back so
+        // a failed save doesn't silently lose what was typed.
+        const text = data.content.length > 80 ? `${data.content.slice(0, 80)}…` : data.content;
+        showToast(`Note not saved: "${text}". Please try again.`, 'error', 10000);
+      }
     },
     [activeTopics, addTopic, addNote, showToast],
   );

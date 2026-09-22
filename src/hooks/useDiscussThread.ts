@@ -255,7 +255,7 @@ export function useDiscussThread(
    * realtime + the reload after the append reconcile it with the stored array.
    * Returns the thread as it stands after the append (for the agent's view).
    */
-  const appendMember = useCallback(async (text: string, askedSymphony: boolean): Promise<DiscussMessage[]> => {
+  const appendMember = useCallback(async (text: string, askedSymphony: boolean): Promise<DiscussMessage[] | null> => {
     const id = threadIdRef.current!
     const author = await resolveAuthor()
     const timestamp = new Date()
@@ -269,8 +269,11 @@ export function useDiscussThread(
     }
     const thread = [...messagesRef.current, userMsg]
     setMessages(thread)
+    // supabase-js reports failure as `{ error }` rather than throwing, so a
+    // try/catch alone let a failed send look sent until the reload dropped it.
+    let failed = false
     try {
-      await supabase.rpc('append_chat_message', {
+      const { error: rpcError } = await supabase.rpc('append_chat_message', {
         p_session: id,
         p_message: {
           role: 'user',
@@ -280,30 +283,38 @@ export function useDiscussThread(
           ...(askedSymphony ? { askedSymphony: true } : {}),
         },
       })
+      failed = !!rpcError
     } catch {
-      // Fall through: the reload will show what stuck.
+      failed = true
+    }
+    if (failed) {
+      setMessages((prev) => prev.filter((m) => m.id !== userMsg.id))
+      setError("Your message wasn't sent. It's back in the box — try again.")
+      return null
     }
     return thread
   }, [resolveAuthor])
 
   /** Say something to the people in the thread. Symphony stays quiet. */
-  const post = useCallback(async (content: string) => {
+  /** Resolves false when the message was not stored — the caller keeps the draft. */
+  const post = useCallback(async (content: string): Promise<boolean> => {
     const text = content.trim()
-    if (!text || !threadIdRef.current || sendingRef.current) return
+    if (!text || !threadIdRef.current || sendingRef.current) return false
     sendingRef.current = true
     setSending(true)
     setError(null)
-    await appendMember(text, false)
+    const thread = await appendMember(text, false)
     sendingRef.current = false
     setSending(false)
-    void reload()
+    if (thread) void reload()
+    return !!thread
   }, [appendMember, reload])
 
   /** Invite Symphony: post the question, then one agent turn with the whole thread. */
-  const ask = useCallback(async (content: string) => {
+  const ask = useCallback(async (content: string): Promise<boolean> => {
     const text = content.trim()
     const id = threadIdRef.current
-    if (!text || !id || sendingRef.current) return
+    if (!text || !id || sendingRef.current) return false
 
     sendingRef.current = true
     setSending(true)
@@ -311,6 +322,12 @@ export function useDiscussThread(
     setToolActivity([])
 
     const thread = await appendMember(text, true)
+    if (!thread) {
+      // The question never reached the thread — don't run a turn on it.
+      sendingRef.current = false
+      setSending(false)
+      return false
+    }
 
     const assistantId = crypto.randomUUID()
     setMessages((prev) => [
@@ -340,8 +357,9 @@ export function useDiscussThread(
       taskContext,
     })
 
+    let replySaved = true
     try {
-      await supabase.rpc('append_chat_message', {
+      const { error: rpcError } = await supabase.rpc('append_chat_message', {
         p_session: id,
         p_message: {
           role: 'assistant',
@@ -351,16 +369,23 @@ export function useDiscussThread(
           ...(turn.sources && turn.sources.length > 0 ? { sources: turn.sources } : {}),
         },
       })
+      replySaved = !rpcError
     } catch {
-      // best-effort
+      replySaved = false
     }
 
     if (turn.didWrite) onMutate?.()
     sendingRef.current = false
     setSending(false)
+    if (!replySaved) {
+      // Keep the reply on screen (a reload would drop it) and say it wasn't kept.
+      setError("Symphony's reply couldn't be saved to the thread; it will be gone after you leave.")
+      return true
+    }
     // Re-read so the optimistic ids give way to the stored array (and so the
     // partner's messages that landed mid-turn are folded in).
     void reload()
+    return true
   }, [appendMember, getCurrentUserMember, taskContext, onMutate, reload])
 
   // ── Mark read ─────────────────────────────────────────────────────────────

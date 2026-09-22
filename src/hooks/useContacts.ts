@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
+import { showToast } from '@/hooks/useToast'
 import { useAuth } from '@/hooks/useAuth'
 import type { Contact, ContactCategory } from '@/types/contact'
 
@@ -178,6 +179,7 @@ export function useContacts() {
         prev.map((c) => (c.id === id ? contact : c))
       )
       setError(updateError.message)
+      showToast("Couldn't save that change to the contact. It was undone.", 'error')
     }
   }, [contacts])
 
@@ -198,6 +200,7 @@ export function useContacts() {
       // Rollback on error
       setContacts((prev) => [...prev, contactToDelete].sort((a, b) => a.name.localeCompare(b.name)))
       setError(deleteError.message)
+      showToast(`Couldn't delete ${contactToDelete.name}.`, 'error')
     }
   }, [contacts])
 

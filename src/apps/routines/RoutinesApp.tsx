@@ -13,6 +13,7 @@ import { useContacts } from '@/hooks/useContacts'
 import { useFamilyMembers } from '@/hooks/useFamilyMembers'
 import { usePinnedItems } from '@/hooks/usePinnedItems'
 import { useDomain } from '@/hooks/useDomain'
+import { showToast } from '@/hooks/useToast'
 import type { SlotRoutineDraft } from '@/components/routine/rhythm/SlotAdd'
 import { resolveSlotRoutineFields } from '@/components/routine/rhythm/SlotAdd'
 import { matchesLayers } from '@/lib/today/domainFilter'
@@ -38,8 +39,21 @@ const RoutineBuilderModal = lazy(() =>
  */
 function RoutinesIndex() {
   const navigate = useNavigate()
-  const { soleDomain, layers } = useDomain()
-  const { routines, addRoutine, updateRoutine, deleteRoutine, loading } = useRoutines()
+  const { soleDomain, layers, all: showAllDomains } = useDomain()
+  const { routines, addRoutine, updateRoutine: saveRoutine, deleteRoutine: removeRoutine, loading } = useRoutines()
+  // useRoutines reports a failed write by returning false (and setting an
+  // `error` this page never rendered), so renames, schedules and deletes
+  // could revert silently. Say so.
+  const updateRoutine = useCallback(async (...args: Parameters<typeof saveRoutine>) => {
+    const ok = await saveRoutine(...args)
+    if (!ok) showToast("Couldn't save that routine change. It was undone.", 'error')
+    return ok
+  }, [saveRoutine])
+  const deleteRoutine = useCallback(async (id: string) => {
+    const ok = await removeRoutine(id)
+    if (!ok) showToast("Couldn't delete that routine.", 'error')
+    return ok
+  }, [removeRoutine])
   const { contacts } = useContacts()
   const { members: familyMembers } = useFamilyMembers()
   const [builderOpen, setBuilderOpen] = useState(false)
@@ -140,6 +154,8 @@ function RoutinesIndex() {
       <RoutinesList
         routines={filtered}
         loading={loading}
+        hiddenByFilter={routines.length > 0 && filtered.length === 0}
+        onShowAllDomains={showAllDomains}
         contacts={contacts}
         familyMembers={familyMembers}
         onCreateRoutine={() => navigate('/routines/new')}
@@ -187,6 +203,7 @@ function RoutineCreate() {
         <div className="flex items-center gap-3 p-6 pb-0">
           <button
             onClick={() => navigate('/routines')}
+            aria-label="Back to routines"
             className="p-2 -ml-2 rounded-lg text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100 transition-colors"
           >
             <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">

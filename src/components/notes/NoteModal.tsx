@@ -21,7 +21,8 @@ interface NoteModalProps {
   projects?: Project[]
   contacts?: Contact[]
   onClose: () => void
-  onUpdate: (id: string, updates: UpdateNoteInput) => Promise<void>
+  /** Resolving `false` means the save failed (the hook has already said so). */
+  onUpdate: (id: string, updates: UpdateNoteInput) => Promise<boolean | void>
   onDelete: (id: string) => Promise<void>
   onAddTopic?: (name: string) => Promise<NoteTopic | null>
   onAddEntityLink?: (noteId: string, entityType: NoteEntityType, entityId: string) => Promise<void>
@@ -101,12 +102,18 @@ export function NoteModal({
     setHasUnsavedChanges(true)
   }, [])
 
-  const handleSave = useCallback(async () => {
-    if (!note || !editContent.trim() || isSaving) return
+  /** Resolves whether the edit is safely stored. */
+  const handleSave = useCallback(async (): Promise<boolean> => {
+    // Nothing savable (an emptied note is never written) — as before, closing is fine.
+    if (!note || !editContent.trim()) return true
+    if (isSaving) return false
     setIsSaving(true)
     try {
-      await onUpdate(note.id, { content: editContent.trim() })
-      setHasUnsavedChanges(false)
+      const ok = (await onUpdate(note.id, { content: editContent.trim() })) !== false
+      // A failed save keeps the edit marked unsaved, so it isn't mistaken
+      // for stored and the modal doesn't close over it.
+      if (ok) setHasUnsavedChanges(false)
+      return ok
     } finally {
       setIsSaving(false)
     }
@@ -114,8 +121,8 @@ export function NoteModal({
 
   const handleClose = useCallback(() => {
     if (hasUnsavedChanges) {
-      // Auto-save on close
-      handleSave().then(() => onClose())
+      // Auto-save on close — stay open if it didn't land.
+      void handleSave().then((ok) => { if (ok) onClose() })
     } else {
       onClose()
     }

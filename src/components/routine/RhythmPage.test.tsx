@@ -97,6 +97,34 @@ describe('RhythmPage', () => {
     expect(jax.className).not.toContain('opacity-40')
   })
 
+  it('type-anywhere search leaves a focused button its own Space and letters', () => {
+    render(
+      <RhythmPage {...noop} onUpdateRoutine={vi.fn()} routines={[mk('Walk Jax', { id: 'jax' })]} />
+    )
+    const button = screen.getAllByRole('button')[0]
+    const space = new KeyboardEvent('keydown', { key: ' ', bubbles: true, cancelable: true })
+    button.dispatchEvent(space)
+    expect(space.defaultPrevented).toBe(false)
+    fireEvent.keyDown(button, { key: 'j' })
+    expect(screen.getByRole('searchbox', { name: 'Find a routine' })).toHaveValue('')
+  })
+
+  it('says the domain filter hides routines rather than "No routines yet"', () => {
+    const onShowAllDomains = vi.fn()
+    render(
+      <RhythmPage {...noop} onUpdateRoutine={vi.fn()} routines={[]} hiddenByFilter onShowAllDomains={onShowAllDomains} />
+    )
+    expect(screen.queryByText('No routines yet')).not.toBeInTheDocument()
+    expect(screen.getByText("No routines in the domains you're viewing")).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Show all domains' }))
+    expect(onShowAllDomains).toHaveBeenCalled()
+  })
+
+  it('still invites the first routine when there truly are none', () => {
+    render(<RhythmPage {...noop} onUpdateRoutine={vi.fn()} routines={[]} />)
+    expect(screen.getByText('No routines yet')).toBeInTheDocument()
+  })
+
   it('wake-all updates every seasonal routine', async () => {
     const onUpdateRoutine = vi.fn()
     render(

@@ -60,13 +60,16 @@ export function CalendarSetupWizard({ onComplete }: CalendarSetupWizardProps) {
       const { data: { user } } = await getAuthUser()
       if (!user) throw new Error('Not authenticated')
 
-      // Delete existing mappings
-      await supabase
+      // Keep the current mappings so a failed save can put them back —
+      // replacing them is delete-then-insert, and a failed insert used to
+      // leave the user with no mappings at all (breaking event filtering).
+      const { data: previous, error: readError } = await supabase
         .from('calendar_domain_mappings')
-        .delete()
+        .select('*')
         .eq('user_id', user.id)
+      if (readError) throw readError
 
-      // Insert new mappings
+      // Build new mappings
       const mappings: any[] = []
       assignments.forEach((domains, calendarId) => {
         const calendar = calendars.find(c => c.id === calendarId)
@@ -80,32 +83,36 @@ export function CalendarSetupWizard({ onComplete }: CalendarSetupWizardProps) {
             calendar_name: calendar.summary,
             domain,
             access_role: calendar.accessRole,
-            is_default: false, // Will set defaults later
+            is_default: false,
           })
         })
       })
+
+      // First writable calendar is the default for each domain — decided
+      // here and written with the insert, rather than as follow-up updates
+      // whose failures went unchecked.
+      for (const domain of ['work', 'family', 'personal'] as TaskContext[]) {
+        const writable = mappings.find(
+          m => m.domain === domain && (m.access_role === 'owner' || m.access_role === 'writer')
+        )
+        if (writable) writable.is_default = true
+      }
+
+      const { error: deleteError } = await supabase
+        .from('calendar_domain_mappings')
+        .delete()
+        .eq('user_id', user.id)
+      if (deleteError) throw deleteError
 
       const { error: insertError } = await supabase
         .from('calendar_domain_mappings')
         .insert(mappings)
 
-      if (insertError) throw insertError
-
-      // Set first writable calendar as default for each domain
-      for (const domain of ['work', 'family', 'personal'] as TaskContext[]) {
-        const writableMapping = mappings.find(
-          m => m.domain === domain && (m.access_role === 'owner' || m.access_role === 'writer')
-        )
-
-        if (writableMapping) {
-          await supabase
-            .from('calendar_domain_mappings')
-            .update({ is_default: true })
-            .eq('user_id', user.id)
-            .eq('domain', domain)
-            .eq('calendar_id', writableMapping.calendar_id)
-            .single()
+      if (insertError) {
+        if (previous && previous.length > 0) {
+          await supabase.from('calendar_domain_mappings').insert(previous)
         }
+        throw insertError
       }
 
       setSavedAssignments(assignments)

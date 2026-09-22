@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/hooks/useAuth'
+import { showToast } from '@/hooks/useToast'
+import { logger } from '@/lib/logger'
 import type { DocumentKind, DocumentScope, DocumentStatus } from '@/types/document'
 
 /** How far ahead an expiry starts mattering — used by the shelf's warning
@@ -148,20 +150,22 @@ export function useDocuments() {
   const deleteDocument = useCallback(
     async (doc: SymphonyDocument): Promise<boolean> => {
       setRows((prev) => prev.filter((d) => d.id !== doc.id))
-      const { error: storageErr } = await supabase.storage
-        .from('attachments')
-        .remove([doc.storagePath])
-      if (storageErr) {
-        setError(storageErr.message)
-        await reload()
-        return false
-      }
+      // Row first, file second: a failed row delete must leave the document
+      // whole. The old order removed the file first, so a failed row delete
+      // left a document pointing at nothing — an unrecoverable scan.
       const { error: delErr } = await supabase.from('attachments').delete().eq('id', doc.id)
       if (delErr) {
         setError(delErr.message)
+        showToast(`Couldn't delete "${doc.label || doc.fileName}".`, 'error')
         await reload()
         return false
       }
+      const { error: storageErr } = await supabase.storage
+        .from('attachments')
+        .remove([doc.storagePath])
+      // The document is already gone for the user; an orphaned file is only
+      // storage housekeeping, not something to alarm them about.
+      if (storageErr) logger.warn('[useDocuments] file left after delete', storageErr.message)
       return true
     },
     [reload]

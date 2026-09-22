@@ -12,6 +12,9 @@ const mockUpdate = vi.fn()
 const mockDelete = vi.fn()
 const mockInsert = vi.fn()
 
+const { mockShowToast } = vi.hoisted(() => ({ mockShowToast: vi.fn() }))
+vi.mock('@/hooks/useToast', () => ({ showToast: mockShowToast }))
+
 // Mock useAuth
 vi.mock('@/hooks/useAuth', () => ({
   useAuth: () => ({ user: mockUserState }),
@@ -239,6 +242,40 @@ describe('useNotes', () => {
 
     expect(mockUpdate).toHaveBeenCalledWith({ content: 'Updated content' })
     expect(result.current.notes[0].content).toBe('Updated content')
+  })
+
+  it('a failed update rolls back, says so, and resolves false', async () => {
+    mockSupabaseData = [{
+      id: 'note-1', user_id: mockUser.id, title: null, content: 'Original content',
+      type: 'quick_capture', source: 'manual', topic_id: null, audio_url: null,
+      external_id: null, external_url: null,
+      created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
+    } as DbNote]
+    const { result } = renderHook(() => useNotes())
+    await waitFor(() => expect(result.current.notes).toHaveLength(1))
+    mockError = { message: 'permission denied' }
+    mockShowToast.mockClear()
+
+    let ok: boolean | undefined
+    await act(async () => { ok = await result.current.updateNote('note-1', { content: 'Edited' }) })
+
+    expect(ok).toBe(false)
+    expect(result.current.notes[0].content).toBe('Original content')
+    expect(mockShowToast).toHaveBeenCalledWith(expect.stringMatching(/Couldn't save/), 'error')
+  })
+
+  it('a failed add says so and returns null', async () => {
+    const { result } = renderHook(() => useNotes())
+    await waitFor(() => expect(result.current.loading).toBe(false))
+    mockError = { message: 'timeout' }
+    mockShowToast.mockClear()
+
+    let note: unknown = 'unset'
+    await act(async () => { note = await result.current.addNote({ content: 'Remember the milk' }) })
+
+    expect(note).toBeNull()
+    expect(result.current.notes).toHaveLength(0)
+    expect(mockShowToast).toHaveBeenCalledWith(expect.stringMatching(/Couldn't save the note/), 'error')
   })
 
   it('deletes a note with optimistic update', async () => {

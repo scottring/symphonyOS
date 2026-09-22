@@ -94,7 +94,7 @@ export function InboxView({
   const { addTask } = useSupabaseTasks()
   const { user } = useAuth()
 
-  const { soleDomain, layers } = useDomain()
+  const { soleDomain, layers, all: showAllDomains } = useDomain()
 
   // Rows deleted from the Inbox but still inside their Undo window. They are
   // hidden everywhere on this page; the real delete waits for the toast to go
@@ -118,6 +118,26 @@ export function InboxView({
   }, [])
   const dismissUndo = useCallback(() => pushUndo(null), [pushUndo])
   useEffect(() => () => { undoRef.current?.onExpire?.(); undoRef.current = null }, [])
+
+  // Every Inbox delete — a row, the Expired section, a bulk selection — hides
+  // at once and deletes only when the Undo window closes, so Undo brings back
+  // the SAME rows rather than re-inserted copies.
+  const deleteWithUndo = useCallback((ids: string[], message: string) => {
+    if (ids.length === 0) return
+    const forget = () => setPendingDeleteIds((s) => { const next = new Set(s); ids.forEach((id) => next.delete(id)); return next })
+    setPendingDeleteIds((s) => { const next = new Set(s); ids.forEach((id) => next.add(id)); return next })
+    pushUndo({
+      taskId: ids[0],
+      message,
+      previous: {},
+      undoable: true,
+      onUndoExtra: async () => { forget() },
+      onExpire: () => {
+        ids.forEach((id) => onDeleteTask?.(id))
+        forget()
+      },
+    })
+  }, [onDeleteTask, pushUndo])
 
   // Page chrome for the card's corner — only inside an AppShell (tests mount bare).
 
@@ -161,9 +181,9 @@ export function InboxView({
 
   const handleBulkDelete = useCallback(() => {
     const ids = Array.from(selectedTaskIds)
-    ids.forEach(id => onDeleteTask?.(id))
+    deleteWithUndo(ids, ids.length === 1 ? 'Deleted' : `Deleted ${ids.length} items`)
     exitSelection()
-  }, [selectedTaskIds, onDeleteTask, exitSelection])
+  }, [selectedTaskIds, deleteWithUndo, exitSelection])
 
   // makeOnCreateProject (create a project from an inbox row and file the task
   // into it) lived here until Projects was hidden — 2026-09-02, see the note in
@@ -271,10 +291,12 @@ export function InboxView({
       }
       const previousContent = target.content
 
+      // updateNote reports failure by its return value (it rolls back and
+      // toasts rather than throwing) — the capture is deleted only once the
+      // append really landed, or a failed write would lose it.
       let appendOk = false
       try {
-        await updateNote(target.id, { content: previousContent + '\n' + bullet })
-        appendOk = true
+        appendOk = await updateNote(target.id, { content: previousContent + '\n' + bullet })
       } catch (err) {
         console.error('Failed to append to note:', err)
       }
@@ -391,6 +413,9 @@ export function InboxView({
   // show planning outputs — and their per-horizon copies — as "items to triage",
   // which is exactly the confusing duplication the inbox should never show.
   const totalCount = inboxTasks.length
+  // Empty because the domain or person filter hides captures — not Inbox zero.
+  const hiddenByFilter = totalCount === 0
+    && tasks.some((t) => !t.completed && t.bucket === 'inbox')
 
   // ...with ONE exception, added 2026-09-03: work whose date has passed.
   //
@@ -448,21 +473,8 @@ export function InboxView({
         } else if (action.kind === 'delete') {
           // Hide now, delete when the Undo window closes (onExpire).
           const id = task.id
-          setPendingDeleteIds((s) => new Set(s).add(id))
           setLeavingIds((s) => { const next = new Set(s); next.delete(id); return next })
-          pushUndo({
-            taskId: id,
-            message: 'Deleted',
-            previous: {},
-            undoable: true,
-            onUndoExtra: async () => {
-              setPendingDeleteIds((s) => { const next = new Set(s); next.delete(id); return next })
-            },
-            onExpire: () => {
-              onDeleteTask?.(id)
-              setPendingDeleteIds((s) => { const next = new Set(s); next.delete(id); return next })
-            },
-          })
+          deleteWithUndo([id], 'Deleted')
           return
         }
 
@@ -470,7 +482,7 @@ export function InboxView({
         if (ok) pushUndo({ taskId: task.id, message, previous, undoable: true })
       })()
     }, 220)
-  }, [onPushTask, onDeleteTask, onUpdateTask, pushUndo])
+  }, [onPushTask, onUpdateTask, pushUndo, deleteWithUndo])
 
   // Fan-out triage: route an inbox item to a specific WHEN. Mirrors applyTriage's
   // leaving-animation + undo, but covers the richer temporal vocabulary. Dated
@@ -708,7 +720,7 @@ export function InboxView({
         title="Inbox"
         subline={
           totalCount === 0
-            ? (loading ? 'Loading your inbox…' : 'All clear — nothing to triage')
+            ? (loading ? 'Loading your inbox…' : hiddenByFilter ? 'Filtered — nothing in this view' : 'All clear — nothing to triage')
             : `${totalCount} item${totalCount !== 1 ? 's' : ''} to triage`
         }
         controls={chrome ? <HomeChromeControls className="flex" /> : undefined}
@@ -745,6 +757,18 @@ export function InboxView({
       {totalCount === 0 && loading ? (
         <div className="text-center py-16">
           <p className="font-display text-xl text-neutral-700">Loading your inbox…</p>
+        </div>
+      ) : hiddenByFilter ? (
+        <div className="mx-auto max-w-xl py-16 text-center">
+          <p className="mb-2 font-display text-[24px] text-neutral-800">Nothing matches these filters</p>
+          <p className="text-[15px] text-neutral-500">Captures in other domains or for other people are hidden right now.</p>
+          <button
+            type="button"
+            onClick={() => { showAllDomains(); setSelectedAssignees([]) }}
+            className="mt-5 inline-flex items-center gap-2 rounded-lg border border-primary-200 bg-primary-50 px-3 py-2 text-sm font-medium text-primary-800 hover:bg-primary-100 transition-colors"
+          >
+            Show everything
+          </button>
         </div>
       ) : totalCount === 0 ? (
         <div className="mx-auto max-w-xl py-16 text-center">
@@ -800,7 +824,7 @@ export function InboxView({
         canDelete={!!onDeleteTask}
         onUpdateTask={(id, updates) => onUpdateTask?.(id, updates)}
         onPushTask={onPushTask}
-        onDeleteTask={onDeleteTask}
+        onDeleteTask={onDeleteTask ? (id) => deleteWithUndo([id], 'Deleted') : undefined}
         onCompleteTask={onToggleTask}
       />
 

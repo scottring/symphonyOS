@@ -3,6 +3,7 @@ import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/hooks/useAuth'
 import { detectRecipeUrl } from '@/lib/recipeDetection'
 import { logger } from '@/lib/logger'
+import { showToast } from '@/hooks/useToast'
 import type { TaskContext, TaskLink } from '@/types/task'
 
 export interface EventNote {
@@ -174,6 +175,7 @@ export function useEventNotes(eventIds?: string[]) {
         })
       }
       setError(upsertError.message)
+      showToast("Couldn't save that change to the event. It was undone.", 'error')
       return
     }
 
@@ -233,6 +235,7 @@ export function useEventNotes(eventIds?: string[]) {
         })
       }
       setError(upsertError.message)
+      showToast("Couldn't save that change to the event. It was undone.", 'error')
       return
     }
 
@@ -266,6 +269,7 @@ export function useEventNotes(eventIds?: string[]) {
       // Rollback on error
       setNotes((prev) => new Map(prev).set(googleEventId, existingNote))
       setError(deleteError.message)
+      showToast("Couldn't save that change to the event. It was undone.", 'error')
     }
   }, [user, notes])
 
@@ -412,6 +416,7 @@ export function useEventNotes(eventIds?: string[]) {
         })
       }
       setError(upsertError.message)
+      showToast("Couldn't save that change to the event. It was undone.", 'error')
       return
     }
 
@@ -470,6 +475,7 @@ export function useEventNotes(eventIds?: string[]) {
         })
       }
       setError(upsertError.message)
+      showToast("Couldn't save that change to the event. It was undone.", 'error')
       return
     }
 
@@ -554,6 +560,7 @@ export function useEventNotes(eventIds?: string[]) {
         })
       }
       setError(upsertError.message)
+      showToast("Couldn't save that change to the event. It was undone.", 'error')
       return
     }
 
@@ -625,6 +632,7 @@ export function useEventNotes(eventIds?: string[]) {
         })
       }
       setError(upsertError.message)
+      showToast("Couldn't save that change to the event. It was undone.", 'error')
       return
     }
 
@@ -673,6 +681,7 @@ export function useEventNotes(eventIds?: string[]) {
         setNotes((prev) => new Map(prev).set(googleEventId, existingNote))
       }
       setError(upsertError.message)
+      showToast("Couldn't save that change to the event. It was undone.", 'error')
       return
     }
 
@@ -706,6 +715,7 @@ export function useEventNotes(eventIds?: string[]) {
     if (upsertError) {
       if (existingNote) setNotes((prev) => new Map(prev).set(googleEventId, existingNote))
       setError(upsertError.message)
+      showToast("Couldn't save that change to the event. It was undone.", 'error')
       return
     }
     if (data) {
@@ -739,6 +749,7 @@ export function useEventNotes(eventIds?: string[]) {
     if (upsertError) {
       if (existingNote) setNotes((prev) => new Map(prev).set(key, existingNote))
       setError(upsertError.message)
+      showToast("Couldn't save that change to the event. It was undone.", 'error')
       return
     }
     if (data) {
@@ -771,6 +782,7 @@ export function useEventNotes(eventIds?: string[]) {
     if (upsertError) {
       if (existingNote) setNotes((prev) => new Map(prev).set(googleEventId, existingNote))
       setError(upsertError.message)
+      showToast("Couldn't save that change to the event. It was undone.", 'error')
       return
     }
     if (data) {

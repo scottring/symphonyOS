@@ -25,7 +25,7 @@ export interface NotesContextValue {
   addNote: (input: CreateNoteInput) => Promise<Note | null>
   appendToNote: (id: string, block: string, anchor: Date | null) => Promise<string | null>
 
-  updateNote: (id: string, updates: UpdateNoteInput) => Promise<void>
+  updateNote: (id: string, updates: UpdateNoteInput) => Promise<boolean>
   deleteNote: (id: string) => Promise<void>
   // Entity links
   addEntityLink: (noteId: string, input: CreateEntityLinkInput) => Promise<NoteEntityLink | null>
