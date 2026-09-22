@@ -68,7 +68,8 @@ function findTask(tasks: Task[], id: string): Task | null {
 }
 
 const panelClassName =
-  'fixed right-0 top-0 z-30 h-screen w-full md:w-[480px] border-l border-neutral-200 bg-bg-elevated overflow-y-auto shadow-xl';
+  // Phone: a full-screen modal, so it sits above the bottom tab bar (z-40).
+  'fixed right-0 top-0 z-30 max-md:z-[45] h-screen w-full md:w-[480px] border-l border-neutral-200 bg-bg-elevated overflow-y-auto shadow-xl';
 
 // Selectors for elements whose mousedown must NOT dismiss the open detail panel:
 // interactive controls, selectable cards, and popovers that render outside the

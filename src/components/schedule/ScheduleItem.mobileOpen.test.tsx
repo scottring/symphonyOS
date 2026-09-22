@@ -37,6 +37,8 @@ describe('ScheduleItem — phone row opens without a swipe', () => {
     const title = screen.getByRole('button', { name: 'Call plumber' })
     expect(title.tagName).toBe('BUTTON')
     expect(title.closest('[aria-pressed]:not(button)')).toBeNull()
+    // Opening a row is not a toggle; aria-pressed would announce one.
+    expect(title).not.toHaveAttribute('aria-pressed')
   })
 
   it('completing does not also open the detail', () => {

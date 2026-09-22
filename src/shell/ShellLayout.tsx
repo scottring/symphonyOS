@@ -311,7 +311,8 @@ function ShellLayoutInner({ children }: Props) {
       {activeView !== 'agent' && (
         <QuickCapture
           // Desktop captures through ⌘K and the navigation's search button.
-          showFab={isMobile}
+          // …and not over a full-screen detail panel on phones.
+          showFab={isMobile && !selection}
           onAdd={chrome.onQuickAdd}
           onAddRich={chrome.onQuickAddRich}
           onAddNote={chrome.onQuickAddNote}

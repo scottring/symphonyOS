@@ -399,7 +399,6 @@ export const ScheduleItem = memo(function ScheduleItem({
         <div className="flex-1 min-w-0">
           <button
             type="button"
-            aria-pressed={selected}
             className={`block w-full text-left text-[16px] font-medium leading-snug line-clamp-2 break-words ${item.completed || item.skipped ? 'line-through text-neutral-400' : 'text-neutral-800'}`}
           >
             {item.title}

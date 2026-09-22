@@ -303,6 +303,13 @@ describe('Grouped More menu and desktop capture', () => {
     renderAt('/today')
     expect(screen.getByTestId('quick-capture')).toHaveAttribute('data-fab', 'true')
   })
+
+  it('hides the floating capture button over a full-screen detail panel on phones', () => {
+    mobileState.isMobile = true
+    selectionState.selection = { kind: 'task', id: 't1' }
+    renderAt('/today')
+    expect(screen.getByTestId('quick-capture')).toHaveAttribute('data-fab', 'false')
+  })
 })
 
 describe('Pinned lists on the left', () => {
