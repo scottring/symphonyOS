@@ -1694,17 +1694,21 @@ html.desktop-shell a {
 .desktop-workspace-dock { grid-area: dock; align-self: stretch; min-width: 0; }
 /* References stay in the desktop workspace across route changes. */
 .desktop-workspace.has-references {
-  grid-template-columns: minmax(290px, 340px) minmax(0, 1fr);
+  grid-template-columns: auto minmax(0, 1fr);
   grid-template-areas: "dock nav" "dock page" "dock footer";
 }
 .reference-dock {
   position: sticky;
   top: 0;
+  width: 340px;
   max-height: 100dvh;
   overflow-y: auto;
   padding: 36px 20px 80px;
   border-right: 1px solid var(--color-neutral-200);
 }
+/* The wide "triage" chooser: half the screen, every row and every move
+   visible (Scott, 2026-09-22). */
+.reference-dock.is-wide { width: min(50vw, 760px); padding-inline: 28px; }
 .reference-list + .reference-list { margin-top: 32px; }
 /* Today as a daily journal: My focus, Still ahead — a serif heading on a
    fine rule, the rows beneath it unchanged. */
@@ -1730,7 +1734,7 @@ html.desktop-shell a {
     grid-template-rows: auto 1fr auto auto;
     grid-template-areas: "nav" "page" "dock" "footer";
   }
-  .reference-dock { position: static; max-height: none; border-right: 0; border-top: 1px solid var(--color-neutral-200); }
+  .reference-dock, .reference-dock.is-wide { position: static; width: auto; max-height: none; border-right: 0; border-top: 1px solid var(--color-neutral-200); }
 }
 .reference-list li {
   border-width: 0 0 1px;
@@ -1762,12 +1766,22 @@ html.desktop-shell a {
    the phone sheet, which has no list wrapper of its own. */
 .chooser-rows li { padding-block: 12px; border-bottom: 1px solid var(--color-neutral-100); }
 .chooser-cadence, .chooser-status { display: block; margin-top: 3px; font-size: 11px; color: var(--color-neutral-500); }
+.chooser-cadence-routine { color: var(--color-sage-600); }
+/* A routine row: a faint sage rule at its left edge, the repeat mark and its
+   cadence in sage — different at a glance from an ordinary task. */
+.chooser-row-routine { box-shadow: inset 2px 0 0 var(--color-sage-200); padding-left: 8px; }
 .chooser-pill {
   flex-shrink: 0; padding: 4px 8px; border: 1px solid var(--color-neutral-200); border-radius: 4px;
   font-size: 12px; color: var(--color-neutral-800); background: white;
 }
 .chooser-pill:hover { background: var(--color-neutral-50); }
 .chooser-pill[aria-pressed="true"] { background: var(--color-sage-50); border-color: var(--color-sage-200); color: var(--color-sage-600); }
+.chooser-row-actions { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 4px 6px; max-width: 55%; }
+.chooser-inline-actions { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; }
+.chooser-inline-action { padding: 3px 7px; border: 1px solid var(--color-neutral-200); border-radius: 4px; background: white; font-size: 11.5px; color: var(--color-neutral-600); }
+.chooser-inline-action:hover { color: var(--color-neutral-950); background: var(--color-neutral-50); }
+.chooser-inline-action-danger { color: var(--color-danger-600, #b42318); border-color: transparent; }
+.chooser-inline-action-danger:hover { color: var(--color-danger-600, #b42318); background: #fef2f2; }
 .chooser-empty { padding: 17px 0; font-size: 13px; color: var(--color-neutral-500); }
 .chooser-empty a { display: block; margin-top: 9px; font-size: 12px; color: var(--color-sage-600); }
 .chooser-empty a:hover { color: var(--color-sage-600); }

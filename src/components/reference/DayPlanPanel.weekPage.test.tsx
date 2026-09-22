@@ -309,16 +309,21 @@ describe('DayPlanPanel — the Planning panel', () => {
     expect(screen.getByText('Item 1')).toBeInTheDocument()
   })
 
-  it('a task row offers Delete behind ⋯ when the host can remove; a routine does not', () => {
+  it('every row offers Delete behind ⋯ when the host can remove — a routine row says "Delete routine"; a done row keeps only Delete', () => {
     const remove = vi.fn()
     const p = plan(1)
     p.toPlan.push({ key: 'routine:r', kind: 'routine', id: 'r', title: 'Vacuum', completed: false, planned: false, group: 'plan', context: 'Weekly routine' })
+    p.toPlan.push({ key: 'task:d', kind: 'task', id: 'd', title: 'Done thing', completed: true, planned: false, group: 'plan' })
     render(<DayPlanPanel plan={p} day={day} actions={{ ...actions, remove }} weekPage={thisWeek} />)
     fireEvent.click(screen.getByRole('button', { name: 'More for Item 1' }))
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Delete Item 1' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Delete: Item 1' }))
     expect(remove).toHaveBeenCalledWith(expect.objectContaining({ id: 'w1' }))
     fireEvent.click(screen.getByRole('button', { name: 'More for Vacuum' }))
-    expect(screen.queryByRole('menuitem', { name: 'Delete Vacuum' })).toBeNull()
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Delete routine: Vacuum' }))
+    expect(remove).toHaveBeenCalledWith(expect.objectContaining({ id: 'r', kind: 'routine' }))
+    fireEvent.click(screen.getByRole('button', { name: 'More for Done thing' }))
+    expect(screen.getByRole('menuitem', { name: 'Delete: Done thing' })).toBeInTheDocument()
+    expect(screen.queryByRole('menuitem', { name: 'Schedule Done thing' })).toBeNull()
   })
 
   it('beside a day the chooser rows open and delete the same way', () => {
@@ -328,8 +333,38 @@ describe('DayPlanPanel — the Planning panel', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Open Item 1' }))
     expect(open).toHaveBeenCalledWith(expect.objectContaining({ id: 'w1' }))
     fireEvent.click(screen.getByRole('button', { name: 'More for Item 1' }))
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Delete Item 1' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Delete: Item 1' }))
     expect(remove).toHaveBeenCalledWith(expect.objectContaining({ id: 'w1' }))
+  })
+
+  // Scott, 2026-09-22: "a triage view for the Choose Tasks column so that we
+  // can have full control and visibility … widening it to half screen".
+  it('wide: every row shows (no cap) and every move is a visible pill, no ⋯ menu', () => {
+    const remove = vi.fn(); const someday = vi.fn()
+    const n = PLAN_GROUP_CAP + 3
+    const p = plan(n)
+    render(<DayPlanPanel plan={p} day={day} actions={{ ...actions, remove, someday }} weekPage={thisWeek} wide />)
+    expect(screen.getByText(`Item ${n}`)).toBeInTheDocument()
+    expect(screen.queryByText(/Show \d+ more/)).toBeNull()
+    expect(screen.queryByRole('button', { name: 'More for Item 1' })).toBeNull()
+    expect(screen.getByRole('button', { name: 'Plan Item 1 for today' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Schedule Item 1' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Move Item 1 to Someday' }))
+    expect(someday).toHaveBeenCalledWith(expect.objectContaining({ id: 'w1' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Delete: Item 1' }))
+    expect(remove).toHaveBeenCalledWith(expect.objectContaining({ id: 'w1' }))
+  })
+
+  it('wide, beside a day: the chooser sections show every row with inline moves too', () => {
+    const remove = vi.fn()
+    const n = PLAN_GROUP_CAP + 2
+    const p = plan(n)
+    render(<DayPlanPanel plan={p} day={day} actions={{ ...actions, remove }} wide />)
+    expect(screen.getByText(`Item ${n}`)).toBeInTheDocument()
+    expect(screen.queryByText(/Show \d+ more/)).toBeNull()
+    expect(screen.getByRole('button', { name: 'Choose Item 1 for today' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'More for Item 1' })).toBeNull()
+    expect(screen.getByRole('button', { name: 'Delete: Item 1' })).toBeInTheDocument()
   })
 
   it('says what it is planning: the week on screen, or the day', () => {

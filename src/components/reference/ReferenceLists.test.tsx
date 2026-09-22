@@ -6,7 +6,7 @@ import { ReferenceListControls, ReferenceListsDock } from './ReferenceLists'
 import type { Task } from '@/types/task'
 import { weekStartAnchor, readCadenceConfig } from '@/lib/cadence/config'
 
-const data = vi.hoisted(() => ({ tasks: [] as Task[], allow: true, push: vi.fn(), update: vi.fn(), complete: vi.fn(), remove: vi.fn(async () => {}) }))
+const data = vi.hoisted(() => ({ tasks: [] as Task[], allow: true, push: vi.fn(), update: vi.fn(), complete: vi.fn(), remove: vi.fn(async () => {}), removeRoutine: vi.fn(async () => true) }))
 vi.mock('@/hooks/useSupabaseTasks', () => ({ useSupabaseTasks: () => ({ tasks: data.tasks, loading: false, updateTask: data.update, updateTasksBulk: vi.fn(), pushTask: data.push, toggleTask: data.complete, deleteTask: data.remove }) }))
 vi.mock('@/hooks/useFamilyMembers', () => ({ useFamilyMembers: () => ({ getCurrentUserMember: () => ({ id: 'me' }) }) }))
 vi.mock('@/hooks/useDomain', () => ({ useDomain: () => ({ layers: new Set(['personal']) }) }))
@@ -122,6 +122,7 @@ describe('Pinned reference lists', () => {
 const planMock = vi.hoisted(() => ({
   chooseTaskDay: vi.fn(), unchooseTask: vi.fn(), timeTask: vi.fn(), commitTask: vi.fn(),
   chooseRoutine: vi.fn(), drop: vi.fn(), toggleTask: vi.fn(), completeRoutine: vi.fn(async () => true),
+  deleteTask: vi.fn(async () => {}), deleteRoutine: vi.fn(async () => true),
 }))
 vi.mock('@/hooks/usePlanActions', () => ({ usePlanActions: () => planMock }))
 vi.mock('@/hooks/useDayPlan', () => ({
@@ -200,19 +201,44 @@ describe('The Planning panel', () => {
     try {
       mount(); fireEvent.click(screen.getByRole('button', { name: 'Pin Planning' }))
       fireEvent.click(screen.getByRole('button', { name: 'More for Book the plumber' }))
-      fireEvent.click(screen.getByRole('menuitem', { name: 'Delete Book the plumber' }))
+      fireEvent.click(screen.getByRole('menuitem', { name: 'Delete: Book the plumber' }))
       expect(screen.queryByText('Book the plumber')).not.toBeInTheDocument()
       expect(screen.getByRole('status')).toHaveTextContent(/Deleted “Book the plumber”/)
-      expect(data.remove).not.toHaveBeenCalled()
+      expect(planMock.deleteTask).not.toHaveBeenCalled()
       fireEvent.click(screen.getByRole('button', { name: 'Undo' }))
       expect(screen.getByText('Book the plumber')).toBeInTheDocument()
-      expect(data.remove).not.toHaveBeenCalled()
+      expect(planMock.deleteTask).not.toHaveBeenCalled()
       fireEvent.click(screen.getByRole('button', { name: 'More for Book the plumber' }))
-      fireEvent.click(screen.getByRole('menuitem', { name: 'Delete Book the plumber' }))
+      fireEvent.click(screen.getByRole('menuitem', { name: 'Delete: Book the plumber' }))
       act(() => { vi.advanceTimersByTime(8500) })
-      expect(data.remove).toHaveBeenCalledWith('w')
+      expect(planMock.deleteTask).toHaveBeenCalledWith('w')
       expect(screen.queryByRole('status')).not.toBeInTheDocument()
+      // A routine row deletes the routine the same way.
+      fireEvent.click(screen.getByRole('button', { name: 'More for Kids clean rooms' }))
+      fireEvent.click(screen.getByRole('menuitem', { name: 'Delete routine: Kids clean rooms' }))
+      expect(screen.queryByText('Kids clean rooms')).not.toBeInTheDocument()
+      act(() => { vi.advanceTimersByTime(8500) })
+      expect(planMock.deleteRoutine).toHaveBeenCalledWith('r1')
     } finally { vi.useRealTimers() }
+  })
+
+  it('the header widens the chooser to half the screen for triage, and remembers it', () => {
+    localStorage.removeItem('symphony.chooser.wide')
+    const view = mount(); fireEvent.click(screen.getByRole('button', { name: 'Pin Planning' }))
+    const dock = screen.getByRole('complementary', { name: 'Pinned reference lists' })
+    expect(dock).not.toHaveClass('is-wide')
+    const widen = screen.getByRole('button', { name: 'Widen the chooser for triage' })
+    expect(widen).toHaveAttribute('aria-pressed', 'false')
+    fireEvent.click(widen)
+    expect(dock).toHaveClass('is-wide')
+    // Wide: the row's moves are visible pills, not a ⋯ menu.
+    expect(screen.queryByRole('button', { name: 'More for Book the plumber' })).toBeNull()
+    expect(screen.getByRole('button', { name: 'Delete: Book the plumber' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Narrow the chooser' })).toHaveAttribute('aria-pressed', 'true')
+    view.unmount()
+    mount()
+    expect(screen.getByRole('complementary', { name: 'Pinned reference lists' })).toHaveClass('is-wide')
+    localStorage.removeItem('symphony.chooser.wide')
   })
 
   it('two sections, each row with its context; no month browser beside Today', () => {

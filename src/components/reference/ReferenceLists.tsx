@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { Pin, X } from 'lucide-react'
+import { Maximize2, Minimize2, Pin, X } from 'lucide-react'
 import { useReferenceLists, REFERENCE_KINDS, type ReferenceKind, type ReferencePin } from './ReferenceListsContext'
 import { DayPlanPanel, panelActionsFor, planningSubtitle } from './DayPlanPanel'
 import type { DayPlan, DayPlanEntry } from '@/lib/today/dayPlan'
@@ -49,9 +49,21 @@ export function ReferenceListControls({ paused = false }: { paused?: boolean }) 
   </div>
 }
 
+/** The wide "triage" chooser (Scott, 2026-09-22: "full control and visibility
+ *  into the tasks at hand … widening it to half screen"): remembered per browser. */
+const CHOOSER_WIDE_KEY = 'symphony.chooser.wide'
+function readChooserWide(): boolean {
+  try { return localStorage.getItem(CHOOSER_WIDE_KEY) === '1' } catch { return false }
+}
+
 export function ReferenceListsDock() {
   const ref = useReferenceLists()
   const { pathname } = useLocation()
+  const [wide, setWide] = useState<boolean>(() => readChooserWide())
+  const toggleWide = useCallback(() => setWide((w) => {
+    try { localStorage.setItem(CHOOSER_WIDE_KEY, w ? '0' : '1') } catch { /* remembered only while mounted */ }
+    return !w
+  }), [])
   // A pin whose period this page already shows is skipped, not unpinned: the
   // page holds the period's whole record (completed and placed rows and all),
   // and a pooled copy beside it would be both redundant and less complete.
@@ -62,9 +74,10 @@ export function ReferenceListsDock() {
       .sort((a, b) => REFERENCE_KINDS.indexOf(a.kind) - REFERENCE_KINDS.indexOf(b.kind)),
     [ref?.pins, pathname])
   if (!showing.length) return null
-  return <aside aria-label="Pinned reference lists" className="reference-dock">
+  const hasChooser = showing.some(pin => pin.kind === 'today')
+  return <aside aria-label="Pinned reference lists" className={`reference-dock${wide && hasChooser ? ' is-wide' : ''}`}>
     {showing.map(pin => pin.kind === 'today'
-      ? <TodayPlanList key="today" onClose={() => ref!.unpin('today')} />
+      ? <TodayPlanList key="today" onClose={() => ref!.unpin('today')} wide={wide} onToggleWide={toggleWide} />
       : <ReferenceList key={`${pin.kind}:${pin.date}`} pin={pin} onClose={() => ref!.unpin(pin.kind)} />)}
   </aside>
 }
@@ -145,8 +158,10 @@ function ReferenceList({ pin, onClose }: { pin: ReferencePin; onClose: () => voi
  * page, or the sheet on a phone): the day's plan for the actual current day,
  * planning into whichever week a week page is showing.
  */
-export function PlanningPanelHost({ draggable = true, header }: {
+export function PlanningPanelHost({ draggable = true, header, wide = false }: {
   draggable?: boolean
+  /** The wide triage chooser: every row, every move visible. */
+  wide?: boolean
   /** Drawn above the panel with the same day and week the panel plans —
    *  ONE subscription to the viewed-week signal, not one per header. */
   header?: (day: Date, viewedWeek: Date | null) => ReactNode
@@ -174,24 +189,23 @@ export function PlanningPanelHost({ draggable = true, header }: {
   // The row hides at once; the DELETE fires when the window closes, on a
   // second delete, or on unmount — never immediately, so Undo is a promise
   // this panel can keep (deleteTask cascades to subtasks).
-  const { deleteTask } = useSupabaseTasks()
-  const deleteRef = useRef(deleteTask)
-  useEffect(() => { deleteRef.current = deleteTask }, [deleteTask])
-  const [pending, setPending] = useState<{ id: string; title: string } | null>(null)
-  const pendingRef = useRef<{ id: string; title: string } | null>(null)
+  const deleteRef = useRef({ deleteTask: planActions.deleteTask, deleteRoutine: planActions.deleteRoutine })
+  useEffect(() => { deleteRef.current = { deleteTask: planActions.deleteTask, deleteRoutine: planActions.deleteRoutine } }, [planActions.deleteTask, planActions.deleteRoutine])
+  const [pending, setPending] = useState<PendingDelete | null>(null)
+  const pendingRef = useRef<PendingDelete | null>(null)
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const commitDelete = useCallback(() => {
     if (timer.current) { clearTimeout(timer.current); timer.current = null }
     const p = pendingRef.current
     pendingRef.current = null
     setPending(null)
-    if (p) void deleteRef.current(p.id)
+    if (p) void (p.kind === 'task' ? deleteRef.current.deleteTask(p.id) : deleteRef.current.deleteRoutine(p.id))
   }, [])
-  const remove = useCallback((id: string, title: string) => {
+  const remove = useCallback((kind: 'task' | 'routine', id: string, title: string) => {
     if (pendingRef.current && pendingRef.current.id !== id) commitDelete()
     if (timer.current) clearTimeout(timer.current)
-    pendingRef.current = { id, title }
-    setPending({ id, title })
+    pendingRef.current = { kind, id, title }
+    setPending({ kind, id, title })
     timer.current = setTimeout(commitDelete, DELETE_UNDO_MS)
   }, [commitDelete])
   const undoDelete = useCallback(() => {
@@ -203,7 +217,7 @@ export function PlanningPanelHost({ draggable = true, header }: {
     if (timer.current) clearTimeout(timer.current)
     const p = pendingRef.current
     pendingRef.current = null
-    if (p) void deleteRef.current(p.id)
+    if (p) void (p.kind === 'task' ? deleteRef.current.deleteTask(p.id) : deleteRef.current.deleteRoutine(p.id))
   }, [])
   // Changing a routine's repeating schedule is its own explicit action, on
   // the routine's page — never a side effect of placing it.
@@ -212,10 +226,10 @@ export function PlanningPanelHost({ draggable = true, header }: {
     open: selection ? (kind, id) => selection.setSelection({ kind, id }) : undefined,
     remove,
   }), [day, planActions, navigate, selection, remove])
-  const visible = useMemo(() => (plan && pending ? withoutTask(plan, pending.id) : plan), [plan, pending])
+  const visible = useMemo(() => (plan && pending ? withoutEntry(plan, pending.kind, pending.id) : plan), [plan, pending])
   const body = error ? <p role="alert" className="py-5 text-[15px] text-danger-600">Could not load the plan.</p>
     : loading || !visible ? <p className="py-5 text-[15px] text-neutral-500">Loading…</p>
-    : <DayPlanPanel plan={visible} day={day} actions={actions} weekPage={viewedWeek} draggable={draggable} />
+    : <DayPlanPanel plan={visible} day={day} actions={actions} weekPage={viewedWeek} draggable={draggable} wide={wide} />
   return <>
     {header?.(day, viewedWeek)}
     {pending && (
@@ -230,13 +244,17 @@ export function PlanningPanelHost({ draggable = true, header }: {
 
 const DELETE_UNDO_MS = 8000
 
-/** The plan without one task's rows — while its delete waits on Undo. */
-function withoutTask(plan: DayPlan, id: string): DayPlan {
-  const drop = (rows: DayPlanEntry[] | undefined) => rows?.filter((e) => !(e.kind === 'task' && e.id === id))
+interface PendingDelete { kind: 'task' | 'routine'; id: string; title: string }
+
+/** The plan without one row's entries — while its delete waits on Undo. */
+function withoutEntry(plan: DayPlan, kind: 'task' | 'routine', id: string): DayPlan {
+  const drop = (rows: DayPlanEntry[] | undefined) => rows?.filter((e) => !(e.kind === kind && e.id === id))
   return {
     ...plan,
     toPlan: drop(plan.toPlan) ?? [],
     chooserTasks: drop(plan.chooserTasks) ?? [],
+    chooserRoutines: drop(plan.chooserRoutines) ?? [],
+    available: drop(plan.available) ?? [],
     unfinished: drop(plan.unfinished) ?? [],
     week: drop(plan.week) ?? [],
     month: drop(plan.month) ?? [],
@@ -247,9 +265,9 @@ function withoutTask(plan: DayPlan, id: string): DayPlan {
 
 /** The Planning pin: one panel, named for what it does, for whichever day or
  *  week is on screen. */
-function TodayPlanList({ onClose }: { onClose: () => void }) {
+function TodayPlanList({ onClose, wide = false, onToggleWide }: { onClose: () => void; wide?: boolean; onToggleWide?: () => void }) {
   return <section aria-label="Choose tasks" className="reference-list">
-    <PlanningPanelHost header={(day, viewedWeek) => (
+    <PlanningPanelHost wide={wide} header={(day, viewedWeek) => (
       <header className="flex items-start justify-between gap-3 border-b border-neutral-300 pb-4">
         <div>
           {/* Beside a day the panel picks for today (Scott via Codex,
@@ -257,7 +275,17 @@ function TodayPlanList({ onClose }: { onClose: () => void }) {
           <h2 className="font-display text-[22px] leading-tight text-neutral-900">{viewedWeek ? 'Choose tasks' : 'Choose for today'}</h2>
           <p className="mt-1 text-[13px] text-neutral-500">{planningSubtitle(day, viewedWeek)}</p>
         </div>
-        <button type="button" onClick={onClose} aria-label="Close task chooser" className="p-2 text-neutral-500 hover:bg-neutral-100 rounded"><X className="w-4 h-4" /></button>
+        <div className="flex shrink-0 items-center gap-1">
+          {/* Triage: the chooser opens to half the screen, every row and
+              every move visible (Scott, 2026-09-22). */}
+          {onToggleWide && (
+            <button type="button" onClick={onToggleWide} aria-pressed={wide} aria-label={wide ? 'Narrow the chooser' : 'Widen the chooser for triage'}
+              title={wide ? 'Narrow' : 'Triage — widen to half the screen'} className="p-2 text-neutral-500 hover:bg-neutral-100 rounded">
+              {wide ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+            </button>
+          )}
+          <button type="button" onClick={onClose} aria-label="Close task chooser" className="p-2 text-neutral-500 hover:bg-neutral-100 rounded"><X className="w-4 h-4" /></button>
+        </div>
       </header>
     )} />
   </section>
