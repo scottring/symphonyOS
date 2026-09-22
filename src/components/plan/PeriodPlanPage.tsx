@@ -13,7 +13,7 @@
 
 import { useMemo, useState, useCallback, useEffect, useRef } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { Plus, Target, ChevronDown, ChevronRight, Repeat, ArrowUpRight, Check } from 'lucide-react'
+import { Plus, Target, ChevronDown, ChevronRight, Repeat, ArrowUpRight } from 'lucide-react'
 import { MastheadCard, PeriodNavEyebrow } from '@/components/layout/MastheadCard'
 import { HomeChromeControls } from '@/components/home/HomeChromeControls'
 import { DomainSwitcher } from '@/components/domain/DomainSwitcher'
@@ -38,6 +38,7 @@ import { parseLocalYmd } from '@/lib/cadence/config'
 import { monthToken, yearToken, type SessionHorizon } from '@/hooks/usePlanningSession'
 import { seasonToken } from '@/lib/cadence/seasons'
 import { usePlanSessionHost } from '@/hooks/usePlanSessionHost'
+import { useAuth } from '@/hooks/useAuth'
 import { lookBackRows, isEmptyDraft, goalsWithHiddenSteps, goalAsRow, yearLookBack, type SessionDraft } from '@/lib/planning/session'
 import type { DomainId } from '@/lib/domains'
 import { formatShortDate } from '@/lib/dateHelpers'
@@ -45,12 +46,14 @@ import {
   periodBounds, isCurrentPeriod, selectPeriodTasks, selectDatedInPeriod, actionsFor, railLevel, lowerLevel, planningPeriod, offerableFromAbove,
   type PlanLevel, type RowAction,
 } from '@/lib/planning/periodPage'
+import { firstNoteLine } from '@/lib/planning/goalsReference'
 import type { Task } from '@/types/task'
 import type { Goal } from '@/types/goal'
 import { PlanRow, rowIsDone, type PlanRowModel } from './PlanRow'
 import { PlanRail } from './PlanRail'
 import { readOpen, readFoldPref, writeOpen } from './foldState'
 import { PlanSession } from './PlanSession'
+import { PlanNextLine } from './PlanNextLine'
 
 /** How many tasks a period's list shows before it asks. A long plan is still
  *  a plan, but a page that opens with twenty rows is a page you scroll rather
@@ -68,22 +71,6 @@ function periodTitle(level: PlanLevel, label: string) {
   return <>{parts[1]} <span className="text-neutral-400">{parts[2]}</span></>
 }
 
-/** The first line of a note, as one quiet line of intent. Notes render
- *  markdown: a HEADING is structure rather than intent ("## Why" is a label
- *  for the sentence under it), so headings are skipped and the first real
- *  line wins. Bullet and number markers come off the line they lead.
- *  Anything long is left for the row's own page. */
-function firstLine(notes: string | undefined): string | undefined {
-  if (!notes) return undefined
-  for (const raw of notes.split(/\r?\n/)) {
-    const bare = raw.replace(/<[^>]*>/g, '').trim()
-    if (!bare || /^#{1,6}\s/.test(bare)) continue
-    const line = bare.replace(/^\s*([-*+]|\d+\.)\s*/, '').trim()
-    if (line) return line.length > 120 ? `${line.slice(0, 119)}…` : line
-  }
-  return undefined
-}
-
 /** A row as THIS period's list sees it: its fate and "→ where it went" are
  *  read off the row itself, relative to the level and period being shown
  *  (a September row kept into October says "carried to October" on
@@ -98,13 +85,13 @@ function taskRow(t: Task, level: PlanLevel, periodStart: Date): PlanRowModel {
       : lower
         ? { label: lower.label, id: t.id, kind: lower.kind === 'date' ? 'date' : lower.kind === 'week' ? 'week' : 'placed' }
         : null,
-    subtitle: t.isGoal ? firstLine(t.notes) : undefined,
+    subtitle: t.isGoal ? firstNoteLine(t.notes) : undefined,
   }
 }
 function goalRow(g: Goal): PlanRowModel {
   return {
     id: g.id, title: g.name, isGoal: true, fate: g.status === 'completed' ? 'done' : 'open', kind: 'goal',
-    subtitle: g.strategy?.trim() || firstLine(g.notes),
+    subtitle: g.strategy?.trim() || firstNoteLine(g.notes),
   }
 }
 
@@ -191,11 +178,16 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
   const above = railLevel(level)
   const aboveStart = useMemo(() => {
     if (!above) return today
+    // The season page's year rail anchors on the year containing the SEASON
+    // on screen, not whichever year `planningPeriod` would currently offer —
+    // a season starting next January (Fall/Winter crossing the boundary)
+    // reads next year's goals, never this year's (Phase 3 final review).
+    if (above === 'year') return new Date(bounds.start.getFullYear(), 0, 1)
     return planningPeriod({
       level: above, today, seasons,
       countFor: (s) => (above === 'season' ? selectPeriodTasks(layered, 'season', s, isCurrentPeriod(periodBounds('season', s, seasons), today), meId, seasons).length : 0),
     }).start
-  }, [above, today, seasons, layered, meId])
+  }, [above, today, seasons, layered, meId, bounds.start])
   const railRows = useMemo<PlanRowModel[]>(() => {
     if (above === 'season') {
       // The fold can look ahead to a season that ISN'T actually current
@@ -604,7 +596,8 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
   })
   const { saved: savedSession, loading: sessionLoading, error: sessionReadError, reload: reloadSession } = host.session
   const { sessionReady, draft, shownDraft, sessionOpen, savingSession, justSaved, saveError,
-    startSession, changeDraft, closeSession, saveDraft } = host
+    startSession, changeDraft, closeSession, saveDraft, dismissJustSaved } = host
+  const { user } = useAuth()
   // The year's Keep reads the draft being saved for the id it must re-use;
   // the host owns it, so it arrives here.
   draftRef.current = shownDraft
@@ -681,16 +674,19 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
         </div>
       )}
       {justSaved && !sessionOpen && (
-        <div className="mb-3 flex flex-wrap items-center gap-3 rounded-lg bg-sage-50 px-3 py-2 text-sm text-neutral-700">
-          <span className="min-w-0 flex-1"><Check className="mb-0.5 mr-1 inline h-4 w-4 text-sage-600" />{shortLabel} is planned. When you&rsquo;re ready, plan the {nextRung} with {shortLabel} beside you.</span>
-          <button type="button" onClick={() => navigate(`/${nextRung}`)} className="rounded-md bg-primary-600 px-3 py-1 text-[13px] font-semibold text-white">Plan the {nextRung} →</button>
-        </div>
+        <PlanNextLine
+          planned={shortLabel}
+          message={`When you’re ready, plan the ${nextRung} with ${shortLabel} beside you.`}
+          nextLabel={`the ${nextRung}`}
+          to={`/${nextRung}`}
+          onDismiss={dismissJustSaved}
+        />
       )}
 
       {sessionOpen && shownDraft ? (
         <PlanSession level={level} aboveLabel={aboveLabel} periodLabel={shortLabel} prevLabel={prevPeriodLabel}
           finished={back.finished} open={back.open} current={currentPeriodTasks}
-          above={aboveItems} aboveGoals={aboveGoalItems} hiddenStepGoals={hiddenStepGoals} domainInView={soleDomain ?? null}
+          above={aboveItems} aboveGoals={aboveGoalItems} hiddenStepGoals={hiddenStepGoals} domainInView={soleDomain ?? null} uid={user?.id ?? null}
           draft={shownDraft} onChange={changeDraft} onClose={closeSession} onSave={saveDraft} saving={savingSession} saveError={saveError} />
       ) : (
       /* The plan on the left, what you consult while writing it on the

@@ -138,6 +138,23 @@ marked *verify* must be confirmed before the phase that uses them.)
    - Dismissible first-time hints.
    - The ◎ Goals drawer.
    - Paper import into the draft, with matching.
+   *Shipped 2026-09-21 (plan:
+   `docs/superpowers/plans/2026-09-21-guided-planning-phase-4-guidance.md`).*
+   - As built: one pure module (`src/lib/planning/nudges.ts`) decides the
+     single nudge (first use → "Start with the year"; then year from Nov 20
+     for next year / Jan 1–14, season ±14 days around a boundary, month last
+     6 / first 7 days, week Sat–Tue), reading the household's saved sessions
+     and a per-user dismissal (`symphony.planNudge.dismissed.<uid>`). Every
+     post-save banner is one `PlanNextLine` (a text link plus "optional").
+     Three first-time hints (`symphony.hint.<name>.<uid>`). ◎ Goals is one
+     sheet from the Plan navigation at every width (year, current season,
+     current month goals; a desktop pinned panel is a follow-up). A paper
+     page can join the draft of the period its altitude plans ("Add to the
+     plan I'm writing"), matched with `findLikelyDuplicate` against the
+     draft, the level above, the previous period and the current list; the
+     open session re-reads the draft on `symphony:plan-draft-changed`. Known
+     gap: a page whose every line joins the draft files no attachment row
+     (the attachment insert needs a created entity).
 5. **Onboarding.** `docs/onboarding.md` gains the planning chain as its
    guided path. Walk it with `/walkthrough` on the wiped demo account.
 

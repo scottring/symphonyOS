@@ -45,6 +45,18 @@ describe('DayPlanPanel — the Planning panel', () => {
     expect(list.textContent).toBe('To plan')
   })
 
+  it('shows the day-pick hint above "To plan"', () => {
+    render(<DayPlanPanel plan={plan(1)} day={day} actions={actions} />)
+    expect(screen.getByRole('note')).toHaveTextContent(/The week list stays whole/)
+  })
+
+  // The hint explains picking a day's work from the week's list — meaningless
+  // beside /week, where the list already IS the work being planned.
+  it('omits the day-pick hint beside a week page', () => {
+    render(<DayPlanPanel plan={plan(1)} day={day} actions={actions} weekPage={thisWeek} />)
+    expect(screen.queryByRole('note')).not.toBeInTheDocument()
+  })
+
   it('beside a day, stays a capped reference', () => {
     const n = PLAN_GROUP_CAP + 4
     render(<DayPlanPanel plan={plan(n)} day={day} actions={actions} />)

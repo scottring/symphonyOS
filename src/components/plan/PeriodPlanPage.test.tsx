@@ -735,7 +735,7 @@ describe('PeriodPlanPage — Plan <Month>', () => {
     expect(hook.keepForward).toHaveBeenCalledWith('g1', { monthStart: expect.any(Date) }, expect.any(Date))
     expect((hook.keepForward.mock.calls[0][2] as Date).getMonth()).toBe(lastMonth.getMonth())   // carried FROM last month
     expect(hook.addTask).toHaveBeenCalledWith('Book PT', undefined, undefined, undefined, expect.objectContaining({ bucket: 'month', goalTaskId: 'g1' }))
-    expect(await screen.findByRole('button', { name: /plan the week/i })).toBeInTheDocument()
+    expect(await screen.findByRole('link', { name: /plan the week/i })).toBeInTheDocument()
   })
 
   it('a kept goal with a blank next action cannot move on — its row asks for one', () => {
@@ -767,7 +767,7 @@ describe('PeriodPlanPage — Plan <Month>', () => {
     fireEvent.click(screen.getByRole('button', { name: new RegExp(`save ${label}`, 'i') }))
     expect(await screen.findByRole('alert')).toHaveTextContent(/didn't save/i)
     expect(saveSession).not.toHaveBeenCalled()
-    expect(screen.queryByRole('button', { name: /plan the week/i })).toBeNull()
+    expect(screen.queryByRole('link', { name: /plan the week/i })).toBeNull()
     const stored = Object.keys(localStorage).find((k) => k.startsWith('symphony.planSession.u1.month.'))
     expect(JSON.parse(localStorage.getItem(stored!)!).verdicts).toEqual({ p1: 'drop' })
   })
@@ -905,7 +905,7 @@ describe('PeriodPlanPage — Plan <Month>', () => {
     expect(hook.keepForward).toHaveBeenCalledWith('p', { seasonStart: fall }, summer)
     expect(hook.addTask).toHaveBeenCalledWith('Book a PT evaluation', undefined, undefined, undefined,
       expect.objectContaining({ bucket: 'quarter', seasonStart: fall }))
-    expect(screen.getByRole('button', { name: /plan the month/i })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /plan the month/i })).toBeInTheDocument()
     // A season takes nothing down from the year: the rail never offers a row.
     expect(screen.queryByRole('button', { name: /^Add to Fall 2026/ })).toBeNull()
   })
@@ -935,7 +935,25 @@ describe('PeriodPlanPage — Plan <Month>', () => {
     expect(goalsApi.updateGoal).toHaveBeenCalledWith('dn', { status: 'completed' })
     expect(goalsApi.updateGoal).toHaveBeenCalledWith('dr', { status: 'archived' })
     expect(goalsApi.deleteGoal).not.toHaveBeenCalled()
-    expect(screen.getByRole('button', { name: /plan the season/i })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /plan the season/i })).toBeInTheDocument()
+  })
+
+  it("a season starting in January anchors its year rail on the season's own year, not the current one (carried fix)", () => {
+    // A household whose seasons cross the new year — Spring starts Jan 1 —
+    // needs the season page's "bigger picture" rail to show THAT year's
+    // goals, not the year `planningPeriod` would otherwise land on.
+    seasonsState.seasons = [
+      { name: 'Spring', month: 1, day: 1 },
+      { name: 'Summer', month: 4, day: 1 },
+      { name: 'Fall', month: 7, day: 1 },
+      { name: 'Winter', month: 10, day: 1 },
+    ] as Seasons
+    state.goals = [goal({ id: 'g27', name: 'Run a marathon', year: 2027 })]
+    renderPageAt('season', '/season?start=2027-01-01')
+    expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('Spring 2027')
+    expect(screen.getByText('2027')).toBeInTheDocument()               // the rail's subtitle: the year
+    fireEvent.click(screen.getByRole('button', { name: /this year/i }))
+    expect(screen.getByText('Run a marathon')).toBeInTheDocument()
   })
 
   it("the DEFAULT year page looks back at last year — the goals context holds every year (regression)", async () => {
@@ -1099,7 +1117,7 @@ describe('PeriodPlanPage — Plan <Month>', () => {
     expect(localStorage.getItem(draftKey(next))).toBeNull()
     expect(screen.getByRole('button', { name: `Plan ${nextLabel}` })).toBeInTheDocument()   // not "Continue planning"
     expect(screen.queryByRole('alert')).toBeNull()
-    expect(screen.queryByRole('button', { name: /plan the week/i })).toBeNull()
+    expect(screen.queryByRole('link', { name: /plan the week/i })).toBeNull()
   })
 
   it('the blocked-Next message is announced and marks its input invalid (M9)', () => {

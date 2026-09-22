@@ -4,13 +4,14 @@ import { MemoryRouter, Link, useLocation } from 'react-router-dom'
 import { ReferenceListsProvider } from './ReferenceListsContext'
 import { ReferenceListControls, ReferenceListsDock } from './ReferenceLists'
 import type { Task } from '@/types/task'
+import { weekStartAnchor, readCadenceConfig } from '@/lib/cadence/config'
 
 const data = vi.hoisted(() => ({ tasks: [] as Task[], allow: true, push: vi.fn(), update: vi.fn(), complete: vi.fn() }))
 vi.mock('@/hooks/useSupabaseTasks', () => ({ useSupabaseTasks: () => ({ tasks: data.tasks, loading: false, updateTask: data.update, updateTasksBulk: vi.fn(), pushTask: data.push, toggleTask: data.complete }) }))
 vi.mock('@/hooks/useFamilyMembers', () => ({ useFamilyMembers: () => ({ getCurrentUserMember: () => ({ id: 'me' }) }) }))
 vi.mock('@/hooks/useDomain', () => ({ useDomain: () => ({ layers: new Set(['personal']) }) }))
 vi.mock('@/hooks/useGatedTaskActions', async (importOriginal) => ({ ...await importOriginal<typeof import('@/hooks/useGatedTaskActions')>(), useGatedTaskActions: () => ({ updateTask: data.update, pushTask: async (...args: unknown[]) => { if (!data.allow) return false; await data.push(...args); return true } }) }))
-function task(id: string, bucket: 'week' | 'month', extra = {}): Task {
+function task(id: string, bucket: 'week' | 'month' | 'timed', extra = {}): Task {
   return { id, title: id, bucket, context: 'personal', completed: false, createdAt: new Date(), updatedAt: new Date(), ...extra } as Task
 }
 function Page() {
@@ -73,6 +74,18 @@ describe('Pinned reference lists', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Do today' }))
     await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('Could not save'))
     expect(screen.getByRole('button', { name: 'Do today' })).toBeEnabled()
+  })
+  // Carried fix (Phase 2 follow-up): the pinned Week list reads the same
+  // `weekListTasks` definition the week page does, so a row picked for
+  // today (bucket flips to 'timed', the week commitment record stays open)
+  // is still on the pin — the old `selectHorizonPool` pool question was
+  // `bucket === 'week'` only, and dropped it the moment it was picked.
+  it('keeps a row picked for today (bucket: timed, week commitment record) on the pinned week list', () => {
+    const week = weekStartAnchor(new Date(), readCadenceConfig().weekStartsOn)
+    data.tasks.push(task('Pick up dry cleaning', 'timed', { commitments: [{ level: 'week', periodStart: week, status: 'open' }] }))
+    mount()
+    fireEvent.click(screen.getByRole('button', { name: 'Pin week list' }))
+    expect(screen.getByText('Pick up dry cleaning')).toBeInTheDocument()
   })
   it('does not draw a second copy of a list the page is already showing', () => {
     mount()

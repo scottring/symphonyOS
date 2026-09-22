@@ -8,6 +8,14 @@ import { useCommitPage } from '@/hooks/useCommitPage'
 import { isSessionExpired } from '@/lib/authErrors'
 import { getAuthUser } from '@/lib/supabase'
 import { readSampleIds, writeSampleIds } from '@/lib/firstWeek'
+import { draftTargetFor, matchSourcesFor, mergePaperIntoDraft } from '@/lib/planning/paperIntoDraft'
+import { readDraft, writeDraftAndAnnounce } from '@/lib/planning/sessionDraft'
+import { useSupabaseTasks } from '@/hooks/useSupabaseTasks'
+import { useDomain } from '@/hooks/useDomain'
+import { useFamilyMembers } from '@/hooks/useFamilyMembers'
+import { useHouseholdSeasons } from '@/hooks/useHouseholdSeasons'
+import { useGoalsContext } from '@/contexts/GoalsContext'
+import { showToast } from '@/hooks/useToast'
 import type { ExistingTask } from '@/lib/planDuplicates'
 import type { DomainId } from '@/lib/domains'
 import type { FamilyMember } from '@/types/family'
@@ -39,6 +47,8 @@ interface PageFromPaperFlowProps {
    *  rows it creates are tracked (client-side) so "Clear sample" can remove
    *  them once a real page replaces the need for it. */
   sample?: boolean
+  /** When the page was snapped. Defaults to now; a seam for tests. */
+  today?: Date
 }
 
 /**
@@ -53,10 +63,20 @@ interface PageFromPaperFlowProps {
  * that is open for a few seconds a week. This component mounts only while the
  * flow is open, so those hooks instantiate only then.
  */
-export function PageFromPaperFlow({ members, onClose, existingTasks, calendarTitlesByDay, initialBlob, initialAltitude, sample }: PageFromPaperFlowProps) {
+export function PageFromPaperFlow({ members, onClose, existingTasks, calendarTitlesByDay, initialBlob, initialAltitude, sample, today }: PageFromPaperFlowProps) {
   const { status, result, error, parseFromBlob, parseFromStoragePath, retry, reset } = usePageFromPaper(members)
   const { commitPage } = useCommitPage()
   const navigate = useNavigate()
+  const [userId, setUserId] = useState<string | null>(null)
+  useEffect(() => { void getAuthUser().then(({ data: { user } }) => setUserId(user?.id ?? null)) }, [])
+  // The lists a page's lines are matched against, exactly as the session
+  // pages build them — so an import cannot add what the plan already holds.
+  const { tasks } = useSupabaseTasks()
+  const { layers } = useDomain()
+  const { getCurrentUserMember } = useFamilyMembers()
+  const { seasons } = useHouseholdSeasons()
+  const { goals } = useGoalsContext()
+  const meId = getCurrentUserMember()?.id ?? null
   const [camera, setCamera] = useState(!initialBlob)
   // Which page is being snapped. Chosen in the camera modal; the client owns
   // the window, so it must own the altitude too. Week = the old behaviour.
@@ -115,6 +135,39 @@ export function PageFromPaperFlow({ members, onClose, existingTasks, calendarTit
       setCommitting(false)
     }
   }, [commitPage, reset, onClose, navigate, result.storagePath, result.altitude, sample])
+
+  // The plan being written right now that this page would join. The sheet's
+  // month/season chip is the user saying which period the page is FOR, so it
+  // decides the target; a chip moved to a period with no session in progress
+  // has no offer at all.
+  const targetFor = useCallback(
+    (chosenStart?: Date | null) => draftTargetFor(result.altitude, today ?? new Date(), seasons, userId, chosenStart),
+    [result.altitude, seasons, userId, today],
+  )
+  // "Add to the plan I'm writing": the page's goal and task lines join the
+  // open draft — matched first, so nothing it already holds is added twice —
+  // and everything else (day-facts, routines, notes) commits as usual.
+  const handleAddToDraft = useCallback(async (payload: PageReviewPayload) => {
+    const target = targetFor(payload.monthStart ?? payload.seasonStart ?? null)
+    if (!target) return
+    const draft = readDraft(userId, target.level, target.periodStart)
+    if (!draft) return
+    setCommitting(true)
+    try {
+      const merged = mergePaperIntoDraft(draft, payload, matchSourcesFor(target, { tasks, goals, layers, meId, seasons }))
+      // Announced, so a session open on this draft in this tab re-reads it
+      // instead of saving its older copy back over the import.
+      writeDraftAndAnnounce(userId, merged.draft)
+      // Always committed, even with nothing left over: that call is what pins
+      // the page image to the period as an attachment.
+      await commitPage({ ...merged.rest, storagePath: result.storagePath, altitude: result.altitude })
+      showToast(`Added to the ${target.label} draft. Open it to review.`, 'success', 4000)
+      reset()
+      onClose()
+    } finally {
+      setCommitting(false)
+    }
+  }, [targetFor, userId, tasks, goals, layers, meId, seasons, commitPage, result.storagePath, result.altitude, reset, onClose])
 
   return (
     <>
@@ -191,9 +244,12 @@ export function PageFromPaperFlow({ members, onClose, existingTasks, calendarTit
           existingTasks={existingTasks}
           calendarTitlesByDay={calendarTitlesByDay}
           initialDomain={rememberedDomain(result.altitude)}
+          {...(today ? { today } : {})}
           members={members}
           committing={committing}
           onCommit={(payload) => void handleCommit(payload)}
+          draftLabelFor={(chosenStart) => targetFor(chosenStart)?.label}
+          onAddToDraft={(payload) => void handleAddToDraft(payload)}
           onClose={close}
         />
       )}

@@ -12,12 +12,13 @@ import type { Task } from '@/types/task'
 import type { DomainId } from '@/lib/domains'
 import { verdictOptions, summarize, weekTaskListLabel, placementLevelOf, type SessionDraft, type SessionLevel, type Verdict } from '@/lib/planning/session'
 import { stepsThatCarryForward } from '@/lib/planning/goalSteps'
+import { Hint } from './Hint'
 
 type Step = 'back' | 'plan' | 'save'
 /** The row's REAL id, fixed when it is written into the draft: creating it twice finds the first (idempotent insert, Task 0). */
 const newId = () => crypto.randomUUID()
 
-export function PlanSession({ level, aboveLabel, dayOptions = [], periodLabel: P, prevLabel: Q, finished, open, current, above, aboveGoals, hiddenStepGoals, domainInView = null, draft, onChange, onClose, onSave, saving, saveError }: {
+export function PlanSession({ level, aboveLabel, dayOptions = [], periodLabel: P, prevLabel: Q, finished, open, current, above, aboveGoals, hiddenStepGoals, domainInView = null, uid = null, draft, onChange, onClose, onSave, saving, saveError }: {
   /** The level being planned. The week plans tasks only, and may name a day. */
   level: SessionLevel
   /** The level above, as this session names it: 'the season' for a month, 'October' for a week. */
@@ -30,6 +31,8 @@ export function PlanSession({ level, aboveLabel, dayOptions = [], periodLabel: P
   hiddenStepGoals?: ReadonlySet<string>
   /** The domain in view — a new item is created in it (recorded as it is added, not at Save). */
   domainInView?: DomainId | null
+  /** The signed-in person, for the first-time hints' per-user storage key. */
+  uid?: string | null
   draft: SessionDraft; onChange: (d: SessionDraft) => void
   onClose: () => void; onSave: () => Promise<void>; saving: boolean; saveError?: boolean
 }) {
@@ -184,6 +187,11 @@ export function PlanSession({ level, aboveLabel, dayOptions = [], periodLabel: P
             <p className="mt-1 text-sm text-neutral-500">{copy.planSub}</p>
             {!week && (<>
             <h3 className="mt-4 border-b-2 border-primary-700 pb-1 font-display text-lg text-neutral-800">{P} goals</h3>
+            {(level === 'month' || level === 'season') && (
+              <div className="mt-2">
+                <Hint name="month-goals" uid={uid}>Goals are what this period should add up to. They stay on this list; you look at them when you plan a week or a day.</Hint>
+              </div>
+            )}
             <ul>
               {monthGoals.map((g) => <li key={g.id} className="flex items-center gap-2 border-b border-neutral-100 py-2 text-sm"><Target className="h-4 w-4 text-accent-600" />{g.title}</li>)}
               {draft.newGoals.map((g) => (
@@ -212,6 +220,11 @@ export function PlanSession({ level, aboveLabel, dayOptions = [], periodLabel: P
 
             {!year && (<>
             <h3 className="mt-5 border-b border-neutral-300 pb-1 font-display text-lg text-neutral-800">{copy.taskHead}</h3>
+            {week && (
+              <div className="mt-2">
+                <Hint name="week-list" uid={uid}>Adding a month task here puts it on this week's list too. The month keeps it and shows "on this week".</Hint>
+              </div>
+            )}
             <ul>
               {monthTasks.map((x) => <li key={x.id} className="border-b border-neutral-100 py-2 text-sm">{x.title}</li>)}
               {open.filter((t) => draft.verdicts[t.id] === 'keep-action' && draft.actionTitles[t.id]?.trim()).map((g) => (

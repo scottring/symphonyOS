@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { buildRange, presetRange, weekRange, foldWeeksFor, MAX_RANGE_DAYS } from './dateRange'
+import { buildRange, presetRange, weekRange, weekRangeFromStartParam, foldWeeksFor, MAX_RANGE_DAYS } from './dateRange'
 
 const d = (y: number, m: number, day: number) => new Date(y, m, day)
 const ymd = (x: Date) => `${x.getFullYear()}-${x.getMonth() + 1}-${x.getDate()}`
@@ -90,6 +90,22 @@ describe('weekRange', () => {
   })
   it('honours a Monday week start', () => {
     expect(weekRange(d(2026, 8, 9), 1).map(ymd)[0]).toBe('2026-9-7')
+  })
+})
+
+describe('weekRangeFromStartParam', () => {
+  it('returns the week containing a valid ?start date', () => {
+    const days = weekRangeFromStartParam('2026-10-04', 0)
+    expect(days?.map(ymd)[0]).toBe('2026-10-4')
+    expect(days).toHaveLength(7)
+  })
+  it('returns null for a missing start', () => {
+    expect(weekRangeFromStartParam(null, 0)).toBeNull()
+    expect(weekRangeFromStartParam(undefined, 0)).toBeNull()
+  })
+  it('returns null for a malformed start', () => {
+    expect(weekRangeFromStartParam('not-a-date', 0)).toBeNull()
+    expect(weekRangeFromStartParam('', 0)).toBeNull()
   })
 })
 

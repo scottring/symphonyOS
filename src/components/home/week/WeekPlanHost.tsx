@@ -7,10 +7,9 @@
 // do in the margin of the week.
 
 import { useCallback, useMemo, type ReactNode } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { Check } from 'lucide-react'
 import { useSupabaseTasks } from '@/hooks/useSupabaseTasks'
 import { useGatedTaskActions } from '@/hooks/useGatedTaskActions'
+import { useAuth } from '@/hooks/useAuth'
 import { useDomain } from '@/hooks/useDomain'
 import { useHouseholdSeasons } from '@/hooks/useHouseholdSeasons'
 import { weekToken } from '@/hooks/usePlanningSession'
@@ -22,6 +21,7 @@ import { monthStartOf } from '@/lib/planning/periodPlacement'
 import { localYmd } from '@/lib/cadence/config'
 import { formatWeekRangeShort } from '@/lib/dateHelpers'
 import { PlanSession } from '@/components/plan/PlanSession'
+import { PlanNextLine } from '@/components/plan/PlanNextLine'
 import type { DomainId } from '@/lib/domains'
 import type { Task } from '@/types/task'
 
@@ -36,7 +36,6 @@ export function WeekPlanHost({ tasks, weekStart, meId, isPast, children }: {
   /** The page's normal content (list + journal), shown when the session is closed. */
   children: (host: { openSession: () => void }) => ReactNode
 }) {
-  const navigate = useNavigate()
   const { loading, addTask, updateTask, updateTasksBulk, pushTask, keepForward, dropCommitment, completeTask } = useSupabaseTasks()
   const gated = useGatedTaskActions({ updateTask, pushTask, updateTasksBulk }, (id) => tasks.find((t) => t.id === id))
   const { soleDomain } = useDomain()
@@ -115,8 +114,9 @@ export function WeekPlanHost({ tasks, weekStart, meId, isPast, children }: {
     isCompleted,
   })
   const { saved: savedSession, loading: sessionLoading, error: sessionReadError, reload: reloadSession } = host.session
-  const { sessionReady, draft, shownDraft, sessionOpen, savingSession, justSaved, saveError,
+  const { sessionReady, draft, shownDraft, sessionOpen, savingSession, justSaved, saveError, dismissJustSaved,
     startSession, changeDraft, closeSession, saveDraft } = host
+  const { user } = useAuth()
 
   return (
     <>
@@ -141,10 +141,14 @@ export function WeekPlanHost({ tasks, weekStart, meId, isPast, children }: {
         </div>
       )}
       {justSaved && !sessionOpen && (
-        <div className="mb-3 flex flex-wrap items-center gap-3 rounded-lg bg-sage-50 px-3 py-2 text-sm text-neutral-700">
-          <span className="min-w-0 flex-1"><Check className="mb-0.5 mr-1 inline h-4 w-4 text-sage-600" />The week is planned. Each day, pick from this list.</span>
-          <button type="button" onClick={() => navigate('/today')} className="rounded-md bg-primary-600 px-3 py-1 text-[13px] font-semibold text-white">Go to Today →</button>
-        </div>
+        <PlanNextLine
+          planned="The week"
+          message="Each day, pick from this list."
+          nextLabel="today"
+          cta="Go to Today →"
+          to="/today"
+          onDismiss={dismissJustSaved}
+        />
       )}
 
       {sessionOpen && shownDraft
@@ -152,7 +156,7 @@ export function WeekPlanHost({ tasks, weekStart, meId, isPast, children }: {
           <PlanSession level="week" aboveLabel={aboveLabel} dayOptions={dayOptions}
             periodLabel={periodLabel} prevLabel={prevLabel}
             finished={back.finished} open={back.open} current={current}
-            above={above} aboveGoals={aboveGoals} hiddenStepGoals={undefined} domainInView={soleDomain ?? null}
+            above={above} aboveGoals={aboveGoals} hiddenStepGoals={undefined} domainInView={soleDomain ?? null} uid={user?.id ?? null}
             draft={shownDraft} onChange={changeDraft} onClose={closeSession} onSave={saveDraft} saving={savingSession} saveError={saveError} />
         )
         : children({ openSession: startSession })}

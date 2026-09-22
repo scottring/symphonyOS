@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { X, NotebookPen, HelpCircle, Target, ChevronLeft, ChevronRight, CalendarCheck2 } from 'lucide-react'
 import { parseLocalYmd } from '@/lib/cadence/config'
-import { pageMonthStart, pageSeasonStart, planWindowDates, rewindowPlanItems, type PlanDay, type PlanItem, type PlanPlacement, type PageAltitude } from '@/lib/planParse'
+import { pageMonthStart, pageSeasonStart, planWindowDates, rewindowPlanItems, type PlanDay, type PlanItem, type PlanPlacement, type PageAltitude, type PageReviewPayload } from '@/lib/planParse'
 import { normalizeSeasons, readSeasons, seasonLabel, nextSeasonStart, seasonStartFor, type Seasons } from '@/lib/cadence/seasons'
 import { findLikelyDuplicate, type ExistingTask } from '@/lib/planDuplicates'
 import { DOMAINS, type DomainId } from '@/lib/domains'
@@ -10,17 +10,8 @@ import type { PageNote } from '@/lib/pageParse'
 import type { FamilyMember } from '@/types/family'
 import { TaskKindBadge } from '@/components/task/TaskKindBadge'
 
-export interface PageReviewPayload {
-  items: PlanItem[]
-  notes: PageNote[]
-  /** Which layer the whole page belongs to — asked once, here, and stamped on
-   *  everything the page writes. Family is the sharing switch. */
-  domain: DomainId
-  /** The month a MONTH page is for (its 1st) — the chip's choice. */
-  monthStart?: Date
-  /** The season a SEASON page is for (its start) — the chip's choice. */
-  seasonStart?: Date
-}
+// The payload's shape lives with the rest of the page-from-paper model.
+export type { PageReviewPayload } from '@/lib/planParse'
 
 export interface PageReviewSheetProps {
   /** Parsed actions, in page order. */
@@ -51,6 +42,13 @@ export interface PageReviewSheetProps {
   committing: boolean
   /** Called with only the checked rows, as edited. */
   onCommit: (payload: PageReviewPayload) => void
+  /** What to call the plan being written that this page would join, for the
+   *  period the chip is on ("this week", "October"). Undefined = no session
+   *  in progress for that period; the offer is not made. Asked per chip, so
+   *  moving the chip to an unplanned month withdraws the offer. */
+  draftLabelFor?: (chosenStart: Date | null) => string | undefined
+  /** Same payload as onCommit, taken into that draft instead of committed. */
+  onAddToDraft?: (payload: PageReviewPayload) => void
   onClose: () => void
 }
 
@@ -151,7 +149,7 @@ function rememberedDomain(altitude: PageAltitude): DomainId | null {
 export function PageReviewSheet({
   items, notes, unclear, windowDates, altitude = 'week', seasons = readSeasons(), today = new Date(),
   titlePeriod = null, pageTitle = null, existingTasks = [], calendarTitlesByDay,
-  initialDomain, members, committing, onCommit, onClose,
+  initialDomain, members, committing, onCommit, onClose, draftLabelFor, onAddToDraft,
 }: PageReviewSheetProps) {
   // A caller's boundaries may be hand-written and out of calendar order; the
   // season maths below assume ordered ones.
@@ -242,10 +240,10 @@ export function PageReviewSheet({
     setUnread((prev) => prev.filter((l) => l !== line))
   }
 
-  const commit = () => {
+  const buildPayload = (): PageReviewPayload => {
     // The house remembers what kind of page this altitude usually is.
     try { localStorage.setItem(DOMAIN_KEY(altitude), domain) } catch { /* private mode */ }
-    onCommit({
+    return {
       domain,
       items: itemRows
         .filter((r) => r.included && r.title.trim())
@@ -255,8 +253,15 @@ export function PageReviewSheet({
         .map(({ included: _included, ...note }) => ({ title: note.title.trim(), content: note.content.trim() })),
       ...(altitude === 'month' ? { monthStart } : {}),
       ...(altitude === 'season' ? { seasonStart } : {}),
-    })
+    }
   }
+
+  const commit = () => onCommit(buildPayload())
+  const chosenStart = altitude === 'month' ? monthStart : altitude === 'season' ? seasonStart : null
+  const draftLabel = draftLabelFor?.(chosenStart)
+  // The page joins the plan being written instead of landing on the list
+  // directly — the same rows, one destination up the flow.
+  const addToDraft = () => onAddToDraft?.(buildPayload())
 
   // The period chip: ‹ September › / ‹ Fall 2026 › — which list this page fills.
   const periodChip = (altitude === 'month' || altitude === 'season') && (
@@ -554,10 +559,20 @@ export function PageReviewSheet({
           </div>
         )}
 
-        <div className="flex items-center justify-end gap-2 px-5 py-4 border-t border-neutral-200/60">
+        <div className="flex flex-wrap items-center justify-end gap-2 px-5 py-4 border-t border-neutral-200/60 min-w-0">
           <button type="button" onClick={onClose} className="px-4 py-2 rounded-lg text-[14px] text-neutral-600 hover:bg-neutral-100 transition-colors">
             Cancel
           </button>
+          {!isEmpty && draftLabel && onAddToDraft && (
+            <button
+              type="button"
+              onClick={addToDraft}
+              disabled={committing || includedCount === 0}
+              className="btn-primary px-4 py-2 rounded-lg text-[14px] disabled:opacity-50 max-w-full"
+            >
+              <span className="break-words">{`Add to the plan I’m writing (${draftLabel})`}</span>
+            </button>
+          )}
           {!isEmpty && (
             <button
               type="button"

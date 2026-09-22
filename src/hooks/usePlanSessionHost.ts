@@ -11,7 +11,7 @@ import { useAuth } from '@/hooks/useAuth'
 import { usePlanningSession, type SessionHorizon } from '@/hooks/usePlanningSession'
 import { localYmd } from '@/lib/cadence/config'
 import { emptyDraft, lookBackRows, pruneDraft, type SessionDraft, type SessionLevel } from '@/lib/planning/session'
-import { readDraft, writeDraft, clearDraft } from '@/lib/planning/sessionDraft'
+import { readDraft, writeDraft, clearDraft, DRAFT_CHANGED_EVENT, type DraftChangedDetail } from '@/lib/planning/sessionDraft'
 import { applySession, type SessionWriters } from '@/lib/planning/applySession'
 import type { Task } from '@/types/task'
 
@@ -76,6 +76,23 @@ export function usePlanSessionHost(input: PlanSessionHostInput): PlanSessionHost
     setDraft(enabled ? readDraft(userId, level, periodYmd) : null)
   }, [periodYmd, enabled, userId, level])
 
+  // Something else in this tab wrote THIS draft — a page from paper joining
+  // the plan. Storage wins: the in-memory copy predates it, and saving it
+  // back would drop what the page just added. Never mid-save, which is
+  // already writing from a decided draft.
+  const savingRef = useRef(false)
+  useEffect(() => {
+    const onChanged = (e: Event) => {
+      const d = (e as CustomEvent<DraftChangedDetail>).detail
+      if (!enabled || savingRef.current) return
+      if (!d || d.level !== level || d.periodStart !== periodYmdRef.current) return
+      const fresh = readDraft(userId, level, periodYmdRef.current)
+      if (fresh) setDraft(fresh)
+    }
+    window.addEventListener(DRAFT_CHANGED_EVENT, onChanged)
+    return () => window.removeEventListener(DRAFT_CHANGED_EVENT, onChanged)
+  }, [enabled, level, userId])
+
   // The draft as the session can show it — the ONE draft both the summary and
   // Save read, so a stale entry (a deleted task, a row the domain in view
   // hides) is neither written nor an invisible blocker (final review I2).
@@ -106,27 +123,60 @@ export function usePlanSessionHost(input: PlanSessionHostInput): PlanSessionHost
     const draftForSave = prepareDraft ? prepareDraft(shownDraft) : shownDraft
     if (draftForSave !== shownDraft) { setDraft(draftForSave); writeDraft(userId, draftForSave) }
     setSavingSession(true)
+    savingRef.current = true
+    // What WE last put in storage — the draft we're about to save, then each
+    // progress write applySession makes. Compared below against what's
+    // actually in storage once the save finishes, to notice anything else
+    // wrote there in between.
+    const lastWritten = { current: draftForSave as SessionDraft | null }
     const result = await applySession(draftForSave, { ...writers, saveSession: (notes) => saveSession(notes) },
       isCompleted,
       // Persist after EVERY write, so a reload mid-save resumes from here.
-      (remaining) => writeDraft(userId, remaining))
+      (remaining) => { lastWritten.current = remaining; writeDraft(userId, remaining) })
     setSavingSession(false)
+    savingRef.current = false
+
+    // An import event that landed mid-save was ignored (the listener bails
+    // out while savingRef.current is true) and never re-read. If storage now
+    // differs from what OUR save last wrote, something else wrote it after —
+    // prefer storage over what the save computed, so that import isn't
+    // silently clobbered by the clear/write we're about to do.
+    function reconcile<T extends SessionDraft | null>(computed: T): T | SessionDraft {
+      const fresh = readDraft(userId, level, savingYmd)
+      if (fresh && JSON.stringify(fresh) !== JSON.stringify(lastWritten.current)) return fresh
+      return computed
+    }
+
     if (periodYmdRef.current !== savingYmd) {
       // The page moved to another period mid-save: the result belongs to the
       // period it was saving, in storage only — never on the page now shown.
-      if (result.ok) clearDraft(userId, level, savingYmd)
-      else writeDraft(userId, result.remaining)
+      if (result.ok) {
+        const remaining = reconcile(null)
+        if (remaining) writeDraft(userId, remaining)
+        else clearDraft(userId, level, savingYmd)
+      } else {
+        writeDraft(userId, reconcile(result.remaining))
+      }
       return
     }
     if (!result.ok) {
       // Keep only what did not write — Save again retries exactly that.
-      setDraft(result.remaining)
-      writeDraft(userId, result.remaining)
+      const remaining = reconcile(result.remaining)
+      setDraft(remaining)
+      writeDraft(userId, remaining)
       setSaveError(true)
       return
     }
-    clearDraft(userId, level, periodYmd)
-    setDraft(null)
+    const remaining = reconcile(null)
+    if (remaining) {
+      // Storage moved on during the save (an import landed) — keep it
+      // instead of clearing; the save itself still succeeded.
+      setDraft(remaining)
+      writeDraft(userId, remaining)
+    } else {
+      clearDraft(userId, level, periodYmd)
+      setDraft(null)
+    }
     setSaveError(false)
     setSessionOpen(false)
     setJustSaved(true)
