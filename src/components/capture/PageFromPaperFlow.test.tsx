@@ -56,9 +56,18 @@ vi.mock('@/lib/planning/sessionDraft', () => ({
   readDraft: mocks.readDraft, writeDraft: mocks.writeDraft, writeDraftAndAnnounce: mocks.writeDraft, clearDraft: vi.fn(),
   DRAFT_CHANGED_EVENT: 'symphony:plan-draft-changed',
 }))
-vi.mock('@/lib/supabase', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('@/lib/supabase')>()
-  return { ...actual, getAuthUser: () => Promise.resolve({ data: { user: { id: 'u1' } } }) }
+vi.mock('@/lib/supabase', () => {
+  const chain = {
+    select: vi.fn(() => chain),
+    eq: vi.fn(() => chain),
+    maybeSingle: vi.fn(() => Promise.resolve({ data: null, error: null })),
+    upsert: vi.fn(() => Promise.resolve({ data: null, error: null })),
+    insert: vi.fn(() => Promise.resolve({ data: null, error: null })),
+  }
+  return {
+    supabase: { from: vi.fn(() => chain) },
+    getAuthUser: () => Promise.resolve({ data: { user: { id: 'u1' } }, error: null }),
+  }
 })
 vi.mock('react-router-dom', async (importOriginal) => {
   const actual = await importOriginal<typeof import('react-router-dom')>()
