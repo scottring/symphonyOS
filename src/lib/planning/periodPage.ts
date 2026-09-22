@@ -164,8 +164,8 @@ export function actionsFor(
   { fate: PlacementFate; isGoal: boolean; isPast: boolean; level?: PlanLevel; hasGoals?: boolean },
 ): RowAction[] {
   if (fate === 'done' || fate === 'placed-done') return []
-  if (fate === 'placed-open') return isPast ? ['keep', 'drop'] : []
-  const kind: RowAction = isGoal ? 'make-task' : 'make-goal'
+  if (fate === 'placed-open') return isPast ? ['keep', 'drop'] : ['complete', ...(!isGoal && hasGoals ? ['under-goal' as const] : [])]
+  const kind: RowAction[] = [] // Goals guide actions; planning never converts their identity.
   // A year row is a goal entity and has no rung below it on this page.
   const canDescend = !isGoal && level !== 'year'
   // Only a loose row, and only where there is a goal to file it under. A goal
@@ -173,10 +173,10 @@ export function actionsFor(
   const underGoal: RowAction[] = !isGoal && hasGoals ? ['under-goal'] : []
   if (!isPast) {
     return canDescend
-      ? ['complete', 'to-lower', 'today', ...underGoal, kind, 'drop']
-      : ['complete', ...underGoal, kind, 'drop']
+      ? ['complete', 'to-lower', 'today', ...underGoal, ...kind, 'drop']
+      : ['complete', ...underGoal, ...kind, 'drop']
   }
-  return isGoal ? ['complete', 'keep', kind, 'drop'] : ['complete', 'keep', 'someday', kind, 'drop']
+  return isGoal ? ['complete', 'keep', ...kind, 'drop'] : ['complete', 'keep', 'someday', ...kind, 'drop']
 }
 
 /** The rung a row drops into from this page. */

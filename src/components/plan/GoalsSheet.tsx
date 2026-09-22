@@ -72,6 +72,7 @@ export function GoalsSheet({ open, onClose }: { open: boolean; onClose: () => vo
     return () => document.removeEventListener('keydown', onKey)
   }, [open, onClose])
 
+  if (!open) return null
   return createPortal(
     <>
       {open && (

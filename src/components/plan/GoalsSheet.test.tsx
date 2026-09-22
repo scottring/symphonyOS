@@ -82,11 +82,10 @@ describe('GoalsSheet', () => {
     expect(onClose).toHaveBeenCalled()
   })
 
-  it('is inert when closed', () => {
+  it('is absent when closed', () => {
     render(<MemoryRouter><GoalsSheet open={false} onClose={vi.fn()} /></MemoryRouter>)
     const sheet = document.querySelector('[role="dialog"][aria-label="Goals"]')
-    expect(sheet).toHaveAttribute('aria-hidden', 'true')
-    expect(sheet).toHaveAttribute('inert')
+    expect(sheet).toBeNull()
     expect(screen.queryByText('Nothing yet.')).not.toBeInTheDocument()
   })
 })

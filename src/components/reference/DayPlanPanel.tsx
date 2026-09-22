@@ -416,6 +416,7 @@ function ChooserRow({ entry, day, actions, draggable, wide = false }: {
       {canDrag
         ? <GripVertical aria-hidden="true" className="mt-[3px] h-3.5 w-3.5 shrink-0 cursor-grab text-neutral-300 opacity-0 transition-opacity group-hover:opacity-100" />
         : <span aria-hidden="true" className="w-3.5 shrink-0" />}
+      {entry.kind === 'task' && <button type="button" aria-label={`${entry.completed ? 'Mark not done' : 'Complete'} ${entry.title}`} onClick={() => actions.complete(entry)} className="chooser-task-check mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center text-primary-700"><span className="grid h-3.5 w-3.5 shrink-0 place-items-center rounded-full border border-neutral-400">{entry.completed && <Check className="h-3 w-3" />}</span></button>}
       {entry.kind === 'routine' && (
         <Repeat aria-hidden="true" className="mt-[4px] h-3.5 w-3.5 shrink-0 text-sage-600" />
       )}
@@ -714,7 +715,7 @@ function TodayChooser({ plan, day, actions, draggable, wide }: {
         wide={wide}
         empty={
           <>
-            <span>{query ? "No matching week tasks." : "No tasks on this week's list yet."}</span>
+            <span>{query ? "No matching week tasks." : "No week tasks in this view. Add work on Week, or check your people and domain filters."}</span>
             {/* A plain anchor, like the fold's Inbox link: this panel is
                 drawn inside and outside the router. */}
             <a href="/week">Plan your week →</a>
@@ -727,7 +728,7 @@ function TodayChooser({ plan, day, actions, draggable, wide }: {
           id="routines"
           title="Routines"
           note={day.toDateString() === new Date().toDateString() ? "For today" : "For this day"}
-          empty={<span>{query ? "No matching routines." : "No routine occurrences for this day."}</span>}
+          empty={<><span>{query ? "No matching routines." : "No routine occurrences in this view for this day. Check your filters or add a repeating routine."}</span><a href="/routines">Manage routines →</a></>}
           icon={<Repeat aria-hidden="true" className="h-3.5 w-3.5" />}
           entries={routines.filter(matches)}
           day={day}

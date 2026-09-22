@@ -73,7 +73,7 @@ describe('DayPlanPanel — the Planning panel', () => {
     const p = plan(0)
     p.chooserRoutines = [{ key: 'routine:r1', kind: 'routine', id: 'r1', title: 'Take a walk', completed: false, planned: false, group: 'available', context: 'Daily routine' }]
     render(<DayPlanPanel plan={p} day={day} actions={actions} />)
-    expect(screen.getByText(/No tasks on this week's list yet/)).toBeInTheDocument()
+    expect(screen.getByText(/No week tasks in this view/)).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Plan your week →' })).toHaveAttribute('href', '/week')
     fireEvent.click(screen.getByRole('navigation', { name: 'Shelf source' }).querySelector('button:last-child')!)
     expect(screen.getByRole('heading', { name: /Routines/ })).toBeInTheDocument()
@@ -424,4 +424,13 @@ describe('routine occurrence time action', () => {
     fireEvent.click(screen.getByRole('button', { name: '8pm', exact: true }))
     expect(schedule).toHaveBeenCalledWith(occurrence, new Date(2026, 8, 19, 20), false)
   })
+})
+
+it('completes a week task from Today’s shelf without choosing a day', () => {
+  const p = plan(1)
+  const complete = vi.fn(), choose = vi.fn()
+  render(<DayPlanPanel plan={p} day={day} actions={{ ...actions, complete, choose }} />)
+  fireEvent.click(screen.getByRole('button', { name: 'Complete Item 1' }))
+  expect(complete).toHaveBeenCalledWith(expect.objectContaining({ id: 'w1' }))
+  expect(choose).not.toHaveBeenCalled()
 })

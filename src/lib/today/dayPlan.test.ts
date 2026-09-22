@@ -359,3 +359,19 @@ it('offers the same weekend task on Sunday across the week boundary, without dat
   const monday = selectDayPlan(input({ tasks: [task], viewedDate: new Date(2026, 8, 28), weekStart: new Date(2026, 8, 27) }))
   expect(monday.chooserTasks.map(entry => entry.id)).not.toContain('weekend')
 })
+
+it('keeps daily routines discoverable in Shelves when the schedule hides daily routines', () => {
+  const daily = createMockRoutine({ id: 'daily', time_of_day: null, recurrence_pattern: { type: 'daily' } })
+  const data = computeTodayData({ ...input({ routines: [daily], hideRoutines: true }), events: [] })
+  expect(data.dayPlan.chooserRoutines.map(row => row.id)).toContain('daily')
+})
+
+it('offers this week’s unfinished work when planning next week without committing it', () => {
+  const task = createMockTask({ id: 'left', scheduledFor: undefined, bucket: 'week', weekStart: WEEK,
+    commitments: [{ level: 'week', periodStart: WEEK, status: 'open' }] })
+  const next = new Date(2026, 8, 20)
+  const p = selectDayPlan(input({ tasks: [task], now: SAT, viewedDate: next, weekStart: next }))
+  expect(p.unfinished.map(row => row.id)).toContain('left')
+  expect(p.chooserTasks.map(row => row.id)).not.toContain('left')
+  expect(task.commitments).toHaveLength(1)
+})

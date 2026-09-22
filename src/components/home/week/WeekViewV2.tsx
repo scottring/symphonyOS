@@ -35,9 +35,6 @@ import { useGatedTaskActions } from '@/hooks/useGatedTaskActions'
 import { weekStartAnchor, readCadenceConfig } from '@/lib/cadence/config'
 import { partitionWeekExtras } from '@/lib/week/weekExtras'
 import { buildWeekRoutineItems } from './weekRoutineItems'
-import { PanelLeft } from 'lucide-react'
-import { useReferenceLists } from '@/components/reference/ReferenceListsContext'
-import { PlanningSheet } from '@/components/reference/PlanningSheet'
 import { useWeekInstances } from './useWeekInstances'
 import { edgeForPointer } from './edgeAdvance'
 import { WeekJournal, type JournalDay, type JournalEntry } from './WeekJournal'
@@ -171,7 +168,6 @@ export function WeekViewV2(props: WeekViewV2Props) {
   // The rail plans MY week — scope it to the current member, as the strip does.
   const { getCurrentUserMember } = useFamilyMembers()
   const meId = getCurrentUserMember()?.id ?? null
-  const references = useReferenceLists()
   const { createEvent, deleteEvent } = useGoogleCalendar()
   const gridCreate = useGridCreate()
 
@@ -825,13 +821,6 @@ export function WeekViewV2(props: WeekViewV2Props) {
   // the dock beside the page on desktop, a sheet on a phone. The viewport is
   // the days. When the panel is closed the page offers it in one line, so a
   // week is never a wall of days with no way to fill them.
-  const planningPinned = !!references?.pins.some((p) => p.kind === 'today')
-  const [sheetOpen, setSheetOpen] = useState(false)
-  const openPlanning = () => {
-    if (narrow || !references) setSheetOpen(true)
-    else references.pin('today')
-  }
-
   const weekIsCurrent = sameDay(weekAnchor, weekStartAnchor(new Date(), readCadenceConfig().weekStartsOn))
   const weekListFor = (onPlan: () => void) => (
     <WeekList
@@ -862,22 +851,10 @@ export function WeekViewV2(props: WeekViewV2Props) {
         {!narrow && props.mode === undefined && (
           <div className="mr-auto"><WeekModeSwitch mode={mode} onChange={setOwnMode} /></div>
         )}
-        {narrow && (
-          <button
-            type="button"
-            onClick={openPlanning}
-            aria-expanded={narrow ? sheetOpen : planningPinned}
-            className="inline-flex items-center gap-1.5 rounded-full border border-neutral-300 px-3 py-1 text-[13px] text-neutral-700 hover:bg-neutral-100"
-          >
-            <PanelLeft className="h-3.5 w-3.5" aria-hidden="true" />
-            <span>Shelves</span>
-          </button>
-        )}
         <RoutinesToggle hidden={hideRoutines} onToggle={() => writeHideRoutines(!hideRoutines)} />
       </>}>
       {({ openSession }) => (
     <div className="relative week-content">
-      {narrow && <PlanningSheet open={sheetOpen} onClose={() => setSheetOpen(false)} weekPage={weekAnchor} />}
 
       <DndContext
         sensors={sensors}

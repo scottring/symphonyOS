@@ -294,8 +294,7 @@ describe('WeekViewV2 journal spread', () => {
       // No side column here either: Planning is a sheet behind its button.
       expect(screen.getByRole('region', { name: "This week's list" })).toBeInTheDocument()
       expect(screen.queryByRole('dialog', { name: 'Shelves' })).toBeNull()
-      fireEvent.click(screen.getByRole('button', { name: 'Shelves' }))
-      expect(screen.getByRole('dialog', { name: 'Shelves' })).toHaveAttribute('aria-hidden', 'false')
+      expect(screen.queryByRole('button', { name: 'Shelves' })).toBeNull() // Date header owns the launcher.
     })
   })
 })

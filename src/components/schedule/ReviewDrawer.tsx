@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Sparkles, Check, ArrowRight, Moon, Sun, X } from 'lucide-react'
 import type { Task } from '@/types/task'
 import type { AttentionItem } from '@/lib/today/attention'
@@ -113,6 +113,14 @@ export function ReviewDrawer({
     return [...byId.values()].sort((x, y) => x.ageDays - y.ageDays)
   }, [overdueTasks, attentionItems, viewedDate])
 
+  const close = useCallback(async () => { if (mode === 'evening') await save(); onClose() }, [mode, save, onClose])
+  useEffect(() => {
+    if (!isOpen) return
+    const escape = (event: KeyboardEvent) => { if (event.key === 'Escape') { event.preventDefault(); void close() } }
+    document.addEventListener('keydown', escape)
+    return () => document.removeEventListener('keydown', escape)
+  }, [isOpen, close])
+
   if (!isOpen) return null
 
   const apply = (t: Task, v: Verdict) => {
@@ -141,7 +149,7 @@ export function ReviewDrawer({
     setMovedIds((s) => new Set(s).add(t.id))
   }
 
-  const close = async () => { if (mode === 'evening') await save(); onClose() }
+
 
   // A ticked-off loose end is no longer loose — it must leave this count or
   // the heading keeps asking you to sweep work you just closed.

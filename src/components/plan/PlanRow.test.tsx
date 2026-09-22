@@ -94,10 +94,10 @@ describe('a goal holds the steps that serve it', () => {
   })
 
   // Three steps done is not a transformed porch. No scoreboard on the goal.
-  it('shows no count and no progress on the goal row', () => {
+  it('makes supporting tasks discoverable without claiming goal progress', () => {
     render(<ul><PlanRow row={goalWithSteps} actions={[]} onAction={vi.fn()} onOpen={vi.fn()} /></ul>)
     const goal = screen.getByText('Transform the porch').closest('li')!
-    expect(within(goal).queryByText(/\b2\b/)).not.toBeInTheDocument()
+    expect(within(goal).getByRole('button', { name: '2 supporting tasks · show' })).toBeInTheDocument()
     expect(within(goal).queryByText(/0\s*\/\s*2/)).not.toBeInTheDocument()
   })
 

@@ -97,28 +97,28 @@ describe('actionsFor', () => {
     // Referencing this list to choose the week's work is the motion the whole
     // cadence rests on, and the page had no way to do it (Scott, 2026-09-13).
     expect(actionsFor({ fate: 'open', isGoal: false, isPast: false, level: 'month' }))
-      .toEqual(['complete', 'to-lower', 'today', 'make-goal', 'drop'])
+      .toEqual(['complete', 'to-lower', 'today', 'drop'])
     expect(actionsFor({ fate: 'open', isGoal: false, isPast: false, level: 'season' }))
-      .toEqual(['complete', 'to-lower', 'today', 'make-goal', 'drop'])
+      .toEqual(['complete', 'to-lower', 'today', 'drop'])
     // A year row has no rung below it on this page.
     expect(actionsFor({ fate: 'open', isGoal: false, isPast: false, level: 'year' }))
-      .toEqual(['complete', 'make-goal', 'drop'])
+      .toEqual(['complete', 'drop'])
   })
   it('a GOAL is never offered a rung — every placement writer refuses it', () => {
     expect(actionsFor({ fate: 'open', isGoal: true, isPast: false, level: 'month' }))
-      .toEqual(['complete', 'make-task', 'drop'])
+      .toEqual(['complete', 'drop'])
   })
   it('an open task in a PAST period: the look-back verbs', () => {
-    expect(actionsFor({ fate: 'open', isGoal: false, isPast: true })).toEqual(['complete', 'keep', 'someday', 'make-goal', 'drop'])
+    expect(actionsFor({ fate: 'open', isGoal: false, isPast: true })).toEqual(['complete', 'keep', 'someday', 'drop'])
   })
   // A goal is an outcome, not a thing you postpone: no Someday.
   it('an open goal in a PAST period: keep, make it a task, drop — never someday', () => {
-    expect(actionsFor({ fate: 'open', isGoal: true, isPast: true })).toEqual(['complete', 'keep', 'make-task', 'drop'])
+    expect(actionsFor({ fate: 'open', isGoal: true, isPast: true })).toEqual(['complete', 'keep', 'drop'])
   })
   // You write "call the roofer" and only then realise it is porch work.
   it('offers "under a goal" to a loose task only when the period has goals', () => {
     expect(actionsFor({ fate: 'open', isGoal: false, isPast: false, level: 'month', hasGoals: true }))
-      .toEqual(['complete', 'to-lower', 'today', 'under-goal', 'make-goal', 'drop'])
+      .toEqual(['complete', 'to-lower', 'today', 'under-goal', 'drop'])
     expect(actionsFor({ fate: 'open', isGoal: false, isPast: false, level: 'month', hasGoals: false }))
       .not.toContain('under-goal')
   })
@@ -137,7 +137,7 @@ describe('actionsFor', () => {
   })
   it('a placed-open row can still be kept or dropped in a look-back, not re-placed', () => {
     expect(actionsFor({ fate: 'placed-open', isGoal: false, isPast: true })).toEqual(['keep', 'drop'])
-    expect(actionsFor({ fate: 'placed-open', isGoal: false, isPast: false })).toEqual([])
+    expect(actionsFor({ fate: 'placed-open', isGoal: false, isPast: false })).toEqual(['complete'])
   })
 })
 

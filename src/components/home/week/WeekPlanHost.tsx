@@ -98,10 +98,10 @@ export function WeekPlanHost({ tasks, weekStart, meId, isPast, children, tools }
     },
     contextOf: (id: string) => tasks.find((t) => t.id === id)?.context ?? null,
     complete: (id: string) => completeTask(id),
-    someday: (id: string) => gated.updateTask(id, { bucket: 'someday', scheduledFor: undefined, isAllDay: undefined }),
+    someday: (id: string, context?: DomainId) => gated.updateTask(id, { bucket: 'someday', scheduledFor: undefined, isAllDay: undefined, ...(context ? { context } : {}) }),
     drop: (id: string, prev: Date) => dropCommitment(id, 'week', prev),
     // The SESSION's week, never "the week containing today".
-    takeInto: (id: string, periodStart: Date) => gated.updateTask(id, { bucket: 'week', weekStart: periodStart }),
+    takeInto: (id: string, periodStart: Date, context?: DomainId) => gated.updateTask(id, { bucket: 'week', weekStart: periodStart, ...(context ? { context } : {}) }),
   }), [keepForward, addTask, tasks, completeTask, gated, dropCommitment])
 
   const isCompleted = useCallback((id: string) => !!tasks.find((t) => t.id === id)?.completed, [tasks])
@@ -131,6 +131,7 @@ export function WeekPlanHost({ tasks, weekStart, meId, isPast, children, tools }
                 : current.length ? `${current.length} tasks on this week’s list` : 'Start with a few commitments'}
           </p>
 
+          {!sessionOpen && <button type="button" onClick={startSession} disabled={!sessionReady} className="text-sm text-primary-700 hover:underline">Review {prevLabel} →</button>}
           {!sessionOpen && (
             <button type="button" onClick={startSession} disabled={!sessionReady} aria-busy={sessionLoading || undefined}
               className={`${savedSession

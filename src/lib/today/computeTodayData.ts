@@ -34,7 +34,7 @@ export function computeTodayData(input: TodayDataInput): TodayData {
   // The day's plan decides what the main list draws; everything it moves off
   // the list waits in the Today pin (dayPlan.ts). Computed first so every
   // pool and count below describes the same rows.
-  const dayPlan = selectDayPlan(input)
+  const dayPlan = selectDayPlan({ ...input, hideRoutines: false })
   const viewedYmd = localYmd(input.viewedDate)
   const chosenToday = (t: { plannedOn?: Date; focus?: Task['focus'] }) => isFocused(t, input.userId, viewedYmd)
 

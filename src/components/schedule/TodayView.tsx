@@ -1223,6 +1223,11 @@ export function TodayView({
   // "Add task" beside the date opens the add box at the head of Tasks; the
   // box unmounts when it closes itself. Keyed by day so a day change closes it.
   const [addOpenDay, setAddOpenDay] = useState<string | null>(null)
+  useEffect(() => {
+    const open = () => setAddOpenDay(localYmd(viewedDate))
+    window.addEventListener('symphony:add-today', open)
+    return () => window.removeEventListener('symphony:add-today', open)
+  }, [viewedDate])
   const addOpen = addOpenDay === localYmd(viewedDate)
   const canAdd = data.isToday && !!(ctx.onCreateTaskParsed ?? ctx.onCreateTask)
   // The page's two controls sit on the "For today" heading (approved white
@@ -1336,7 +1341,17 @@ export function TodayView({
         aside={data.isToday ? <WeatherChip now={nowForDisplay} /> : undefined}
         // Shell desktop controls live in the page navigation; standalone
         // mounts retain the footer controls as a fallback.
-        footer={desktopControls ? undefined : desktopToolbar}
+        footer={<>{!desktopControls && desktopToolbar}<div className="ml-auto">                <button
+                  type="button"
+                  onClick={openPlan}
+                  aria-expanded={chooserOpen}
+                  aria-label={chooserOpen ? 'Close shelves' : 'Shelves'}
+                  className={`daybook-choose${chooserOpen ? ' is-open' : ''}`}
+                >
+                  <PanelLeft className="h-3.5 w-3.5" aria-hidden="true" />
+                  <span>Shelves</span>
+                </button>
+</div></>}
 
       />
 
@@ -1428,16 +1443,6 @@ export function TodayView({
                   task opens the add box at the head of this list. */}
               <h2 id="today-focus-heading">{data.isToday ? 'For today' : 'For this day'}</h2>
               <div className="daybook-heading-actions">
-                <button
-                  type="button"
-                  onClick={openPlan}
-                  aria-expanded={chooserOpen}
-                  aria-label={chooserOpen ? 'Close shelves' : 'Shelves'}
-                  className={`daybook-choose${chooserOpen ? ' is-open' : ''}`}
-                >
-                  <PanelLeft className="h-3.5 w-3.5" aria-hidden="true" />
-                  <span>Shelves</span>
-                </button>
                 {addTaskButton}
               </div>
             </div>

@@ -153,6 +153,8 @@ describe('TapRoutinePanel', () => {
     fireEvent.click(screen.getByRole('button', { name: /Edit schedule/i }))
     // Routine repeats Tue; toggling Mon on should report days including 'mon'.
     fireEvent.click(screen.getByRole('button', { name: 'Mon' }))
+    expect(onScheduleChange).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: 'Save repeating schedule' }))
     expect(onScheduleChange).toHaveBeenCalledTimes(1)
     const [pattern, time] = onScheduleChange.mock.calls[0]
     expect(pattern.type).toBe('weekly')
@@ -176,6 +178,7 @@ describe('TapRoutinePanel', () => {
     fireEvent.click(screen.getByRole('button', { name: /Edit schedule/i }))
     const timeInput = screen.getByDisplayValue('20:00')
     fireEvent.change(timeInput, { target: { value: '07:30' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Save repeating schedule' }))
     expect(onScheduleChange).toHaveBeenCalled()
     const lastCall = onScheduleChange.mock.calls[onScheduleChange.mock.calls.length - 1]
     expect(lastCall[1]).toBe('07:30')
@@ -255,4 +258,21 @@ describe('TapRoutinePanel Discuss action', () => {
       discuss: { type: 'routine', id: 'r1', title: 'Trash night', scope: 'compound' },
     }))
   })
+})
+
+it('keeps a failed schedule edit open and retries the same time before closing', async () => {
+  const close = vi.fn(), save = vi.fn().mockResolvedValueOnce(false).mockResolvedValueOnce(true)
+  const { waitFor } = await import('@testing-library/react')
+  render(<TapRoutinePanel routine={{ ...routine, time_of_day: null }} onClose={close} onScheduleChange={save}
+    onNotesChange={vi.fn()} onContextChange={vi.fn()} onVisibilityChange={vi.fn()} />)
+  fireEvent.click(screen.getByRole('button', { name: /Edit schedule/i }))
+  const input = document.querySelector('input[type="time"]')!
+  fireEvent.change(input, { target: { value: '20:30' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Save & close' }))
+  await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('Could not save'))
+  expect(close).not.toHaveBeenCalled()
+  expect(input).toHaveValue('20:30')
+  fireEvent.click(screen.getByRole('button', { name: 'Save & close' }))
+  await waitFor(() => expect(close).toHaveBeenCalledOnce())
+  expect(save).toHaveBeenLastCalledWith(routine.recurrence_pattern, '20:30')
 })

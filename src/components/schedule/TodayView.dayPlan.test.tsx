@@ -103,7 +103,7 @@ describe('Today — the way to Planning', () => {
     expect(within(panel).getByRole('button', { name: 'Choose Kids clean rooms for today' })).toBeInTheDocument()
     expect(onToggleTask).not.toHaveBeenCalled()
     // The same button closes it.
-    fireEvent.click(within(screen.getByRole('region', { name: 'For today' })).getByRole('button', { name: 'Close shelves' }))
+    fireEvent.click(within(screen.getByTestId('masthead-card')).getByRole('button', { name: 'Close shelves' }))
     expect(screen.getByRole('button', { name: 'Shelves' })).toHaveAttribute('aria-expanded', 'false')
   })
 
@@ -116,7 +116,7 @@ describe('Today — the way to Planning', () => {
     expect(choose).toHaveAttribute('aria-expanded', 'false')
     fireEvent.click(choose)
     expect(screen.getByTestId('pins')).toHaveTextContent('today')
-    fireEvent.click(within(screen.getByRole('region', { name: 'For today' })).getByRole('button', { name: 'Close shelves' }))
+    fireEvent.click(within(screen.getByTestId('masthead-card')).getByRole('button', { name: 'Close shelves' }))
     expect(screen.getByTestId('pins')).toHaveTextContent('')
     expect(ctxValue.onUpdateTask).not.toHaveBeenCalled()
   })

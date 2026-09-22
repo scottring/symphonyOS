@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen, fireEvent, within } from '@testing-library/react'
 import { HomeHeader } from './HomeHeader'
+import { ReferenceListsProvider } from '@/components/reference/ReferenceListsContext'
 
 vi.mock('./HomeChromeControls', () => ({ HomeChromeControls: () => null }))
 
@@ -29,7 +30,7 @@ function renderWeek(over: Partial<React.ComponentProps<typeof HomeHeader>> = {})
     onMonthChange: () => {},
     ...over,
   }
-  const view = render(<HomeHeader {...baseProps} />)
+  const view = render(<ReferenceListsProvider userId="test"><HomeHeader {...baseProps} /></ReferenceListsProvider>)
   // Simulates what the real parent does: feed a picked/changed range's shape
   // back in as props, as if HomeView had stored it and re-rendered.
   const rerenderWith = (nextOver: Partial<React.ComponentProps<typeof HomeHeader>>) =>
@@ -186,4 +187,10 @@ describe('HomeHeader — Journal | Schedule sits by the dates', () => {
     fireEvent.click(within(aside).getByRole('radio', { name: 'Schedule' }))
     expect(onWeekModeChange).toHaveBeenCalledWith('schedule')
   })
+})
+
+
+it('puts the week Shelves launcher inside the date header', () => {
+  renderWeek()
+  expect(screen.getByTestId('masthead-card')).toContainElement(screen.getByRole('button', { name: /Shelves/i }))
 })

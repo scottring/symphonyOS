@@ -241,9 +241,9 @@ export function toPlanEntries(args: {
  * (Inbox › Expired holds them). A row chosen for the viewed day is on the
  * main list, not here.
  *
- * "Left behind" is judged against the REAL current week, never the week on
- * screen: paging /week forward must not relabel this week's open placements
- * as unfinished (the old shelf anchored on today for the same reason).
+ * Future planning offers work from before the displayed week as reference.
+ * It remains on its original list until the user explicitly keeps it.
+ * Today uses the current clock so yesterday stays available.
  */
 export function unfinishedEntries(args: {
   tasks: Task[]
@@ -251,8 +251,10 @@ export function unfinishedEntries(args: {
   ymd: string
   userId?: string | null
   now: Date
+  referenceWeek?: Date
 }): DayPlanEntry[] {
-  const { tasks, match, ymd, userId, now } = args
+  const { tasks, match, ymd, userId } = args
+  const now = args.referenceWeek ?? args.now
   const chosen = (t: Task) => isFocused(t, userId, ymd)
   const currentWeek = weekStartAnchor(now, readCadenceConfig().weekStartsOn)
   const missed = flatten(tasks)
@@ -387,7 +389,7 @@ export function selectDayPlan(input: DayPlanInput): DayPlan {
     tasks: input.tasks, match, weekStart: input.weekStart, ymd, userId: input.userId,
     available, unhomed: input.unhomedRoutines ?? [], routineById: byId,
   })
-  const unfinished = unfinishedEntries({ tasks: input.tasks, match, ymd, userId: input.userId, now })
+  const unfinished = unfinishedEntries({ tasks: input.tasks, match, ymd, userId: input.userId, now, referenceWeek: input.weekStart > now ? input.weekStart : undefined })
   const olderUnfinished = flatten(input.tasks).filter((t) =>
     !t.completed && match(t.assignedTo, t.assignedToAll) && !chosen(t)
     && isMissedPlacement(t.scheduledFor, t.completed, now) && !isRecentMiss(t.scheduledFor, t.completed, now)).length

@@ -168,3 +168,12 @@ describe('ReviewDrawer — morning goes straight to triage', () => {
     expect(screen.getByRole('button', { name: /Delete "Old thing"/ })).toBeInTheDocument()
   })
 })
+
+it('Escape closes a review with an input focused', async () => {
+  const close = vi.fn()
+  const { user } = render(<ReviewDrawer {...base} mode="evening" onClose={close} />)
+  const fields = screen.getAllByRole('textbox')
+  fields[0].focus()
+  await user.keyboard('{Escape}')
+  expect(close).toHaveBeenCalledOnce()
+})

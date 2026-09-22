@@ -9,7 +9,7 @@
 import { useMemo, useState } from 'react'
 import { Target, Check } from 'lucide-react'
 import type { Task } from '@/types/task'
-import type { DomainId } from '@/lib/domains'
+import { DOMAINS, type DomainId } from '@/lib/domains'
 import { verdictOptions, summarize, weekTaskListLabel, placementLevelOf, type SessionDraft, type SessionLevel, type Verdict } from '@/lib/planning/session'
 import { stepsThatCarryForward } from '@/lib/planning/goalSteps'
 import { Hint } from './Hint'
@@ -36,6 +36,8 @@ export function PlanSession({ level, aboveLabel, dayOptions = [], periodLabel: P
   draft: SessionDraft; onChange: (d: SessionDraft) => void
   onClose: () => void; onSave: () => Promise<void>; saving: boolean; saveError?: boolean
 }) {
+  const needsDomain = [...open.filter(task => draft.verdicts[task.id] === 'someday'), ...above.filter(task => draft.takenFromAbove.includes(task.id))].filter(task => !task.context && !task.parentTaskId)
+  const missingDomains = needsDomain.filter(task => !draft.domains?.[task.id])
   const nothingBack = finished.length === 0 && open.length === 0
   const [step, setStep] = useState<Step>(nothingBack ? 'plan' : 'back')
   const [goalText, setGoalText] = useState('')
@@ -272,6 +274,8 @@ export function PlanSession({ level, aboveLabel, dayOptions = [], periodLabel: P
             {saveError
               ? <p role="alert" className="mt-1 text-sm text-accent-700">Some of this didn't save. It's still here and in your draft; Save again retries only these.</p>
               : <p className="mt-1 text-sm text-neutral-500">Nothing is saved yet.</p>}
+            {needsDomain.length > 0 && <fieldset className="my-3 rounded border border-neutral-200 p-3"><legend className="text-sm">Choose where these items belong before saving</legend><p className="mb-2 text-xs text-neutral-500">Family is shared with your household. Personal and Work stay private.</p>{needsDomain.map(task => <label key={task.id} className="mb-2 flex flex-wrap items-center justify-between gap-2 text-sm">{task.title}<select aria-label={`Domain for ${task.title}`} value={draft.domains?.[task.id] ?? ''} onChange={event => { const domains = { ...draft.domains }; if (event.target.value) domains[task.id] = event.target.value as DomainId; else delete domains[task.id]; set({ domains }) }} className="rounded border border-neutral-200 p-2"><option value="">Choose a domain</option>{DOMAINS.map(domain => <option key={domain.id} value={domain.id}>{domain.label}</option>)}</select></label>)}</fieldset>}
+
             <ul className="mt-3 rounded-lg bg-sage-50 px-4 py-2">
               {lines.length === 0 && <li className="py-1.5 text-sm text-neutral-500">Nothing chosen.</li>}
               {lines.map((l, i) => (
@@ -289,7 +293,7 @@ export function PlanSession({ level, aboveLabel, dayOptions = [], periodLabel: P
           <button type="button" disabled={saving} className="rounded-md border border-neutral-200 px-3 py-1.5 text-sm disabled:opacity-60" onClick={onClose}>Close · keep my draft</button>
           {step === 'back' && <button type="button" className="rounded-md bg-primary-600 px-3 py-1.5 text-sm font-semibold text-white" onClick={() => goTo('plan')}>Next: plan {P} →</button>}
           {step === 'plan' && <button type="button" className="rounded-md bg-primary-600 px-3 py-1.5 text-sm font-semibold text-white" onClick={() => goTo('save')}>Next: save →</button>}
-          {step === 'save' && <button type="button" disabled={saving} className="rounded-md bg-primary-600 px-3 py-1.5 text-sm font-semibold text-white disabled:opacity-60" onClick={() => { void onSave() }}>{saving ? 'Saving…' : `Save ${P}`}</button>}
+          {step === 'save' && <button type="button" disabled={saving || missingDomains.length > 0} className="rounded-md bg-primary-600 px-3 py-1.5 text-sm font-semibold text-white disabled:opacity-60" onClick={() => { void onSave() }}>{saving ? 'Saving…' : `Save ${P}`}</button>}
         </div>
       </div>
 

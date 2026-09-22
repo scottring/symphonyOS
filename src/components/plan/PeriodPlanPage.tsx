@@ -16,6 +16,7 @@ import { useReferenceLists } from '@/components/reference/ReferenceListsContext'
 import { useMemo, useState, useCallback, useEffect, useRef } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Plus, Target, ChevronDown, ChevronRight, Repeat, ArrowUpRight, X } from 'lucide-react'
+import { ShelvesButton } from '@/components/reference/ShelvesButton'
 import { MastheadCard, PeriodNavEyebrow } from '@/components/layout/MastheadCard'
 import { HomeChromeControls } from '@/components/home/HomeChromeControls'
 import { DomainSwitcher } from '@/components/domain/DomainSwitcher'
@@ -392,9 +393,11 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
   }, [level, bounds.start, soleDomain, addTask])
 
   const [pickingGoalFor, setPickingGoalFor] = useState<string | null>(null)
+  const [linkError, setLinkError] = useState(false)
   const fileUnderGoal = useCallback(async (taskId: string, goalId: string) => {
+    setLinkError(false)
+    if (!(await gated.updateTask(taskId, { goalTaskId: goalId }))) { setLinkError(true); return }
     setPickingGoalFor(null)
-    await gated.updateTask(taskId, { goalTaskId: goalId })
     // Open the goal it went into, or the row appears to vanish from the task
     // list with nowhere visible to have gone.
     setExpandedGoals((prev) => new Set(prev).add(goalId))
@@ -423,6 +426,7 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
   // walkthrough (Scott, 2026-09-20) stalled on a blank /year: a grey "No goals
   // for this year yet." and a 13px "+ Add a goal" off to the right read as
   // "nothing to do here". The composer IS the empty state.
+  const supportingTaskCount = goalRows.reduce((sum, row) => sum + (row.steps?.filter(step => !rowIsDone(step.fate)).length ?? 0), 0)
   const goalComposerOpen = !isPast && (addingGoal || goalRows.length === 0)
 
   const looseRows = useMemo(
@@ -560,14 +564,14 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
     contextOf: (id: string) => tasks.find((t) => t.id === id)?.context ?? null,
     // Everything a tick does (subtasks, waiting/discussion, a linked list item), and reports whether it wrote.
     complete: (id: string) => completeTask(id),
-    someday: (id: string) => gated.updateTask(id, { bucket: 'someday', scheduledFor: undefined, isAllDay: undefined }),
+    someday: (id: string, context?: DomainId) => gated.updateTask(id, { bucket: 'someday', scheduledFor: undefined, isAllDay: undefined, ...(context ? { context } : {}) }),
     drop: (id: string, prevStart: Date) => dropCommitment(id, placeLevel, prevStart),
     // The SESSION's month — pushTask(id, 'month') would target the month
     // containing today, i.e. September while planning October. A season takes
     // nothing down from the year (its rail is goals), so nothing calls this.
-    takeInto: (id: string, periodStart: Date) => (isSeasonSession
+    takeInto: (id: string, periodStart: Date, context?: DomainId) => (isSeasonSession
       ? Promise.resolve(true)
-      : gated.updateTask(id, { bucket: 'month', monthStart: periodStart })),
+      : gated.updateTask(id, { bucket: 'month', monthStart: periodStart, ...(context ? { context } : {}) })),
   }), [keepForward, addTask, tasks, completeTask, gated, dropCommitment, isSeasonSession, placeLevel])
   const sessionWriters = isYearSession ? yearWriters : monthOrSeasonWriters
 
@@ -726,6 +730,7 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
           />
         )}
         title={periodTitle(level, bounds.label)}
+        footer={<div className="ml-auto"><ShelvesButton periodShelves /></div>}
         subline={isPast
           ? 'Look back: what got done, what didn\'t. Keep what still matters, drop the rest.'
           : lookingAhead
@@ -761,7 +766,7 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
               ? <>Couldn&rsquo;t check whether {shortLabel} is planned. <button type="button" onClick={reloadSession} className="font-semibold text-primary-700 hover:underline">Try again</button></>
               : savedSession
                 ? <span className="font-semibold text-sage-600">Planned {savedSession.at.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
-                : `${goalRows.filter((r) => !rowIsDone(r.fate)).length} goals${level === 'year' ? '' : ` · ${openTaskRows.length} tasks`}`}
+                : `${goalRows.filter((r) => !rowIsDone(r.fate)).length} goals${level === 'year' ? '' : ` · ${openTaskRows.length + supportingTaskCount} tasks`}`}
           </p>
           <span className="flex-1" />
           {!sessionOpen && (
@@ -869,7 +874,7 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
               <div className="mt-3">
                 {openTaskRows.length === 0 ? (
                   <p className="px-2 py-2 text-sm text-neutral-400">
-                    {doneTaskRows.length > 0
+                    {supportingTaskCount > 0 ? `${supportingTaskCount} supporting ${supportingTaskCount === 1 ? 'task is' : 'tasks are'} listed under the goals above.` : doneTaskRows.length > 0
                       ? `Everything on this ${noun}'s list is done.`
                       : isPast
                         ? `Nothing was on this ${noun}'s list.`
@@ -905,10 +910,11 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
                 {pickingGoalFor && (
                   <div
                     role="dialog"
-                    aria-label="Put it under a goal"
+                    aria-label="Link to goal"
                     className="mt-2 rounded-lg border border-neutral-200 bg-bg-elevated p-2 shadow-md"
                   >
-                    <p className="px-2 py-1 text-[12px] text-neutral-500">Put it under…</p>
+                    <p className="px-2 py-1 text-[12px] text-neutral-500">Which goal does this task support?</p>
+                    {linkError && <p role="alert" className="p-2 text-sm text-red-600">Could not link this task. Try again.</p>}
                     <ul>
                       {goalRows.map((g) => (
                         <li key={g.id}>

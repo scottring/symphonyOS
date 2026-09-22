@@ -32,6 +32,7 @@ export function placementLevelOf(level: SessionLevel): PlacementLevel {
 }
 export interface SessionDraft {
   level: SessionLevel; periodStart: string; prevStart: string
+  domains?: Record<string, DomainId>
   verdicts: Record<string, Verdict>
   actionTitles: Record<string, string>
   wentWell: string; didnt: string
@@ -92,7 +93,7 @@ export function verdictOptions(isGoal: boolean, level: SessionLevel = 'month'): 
       { verdict: 'someday', label: 'Someday' }, { verdict: 'drop', label: 'Drop' }]
   }
   return isGoal
-    ? [{ verdict: 'keep', label: 'Keep' }, { verdict: 'keep-action', label: 'Keep, and add a next action' },
+    ? [{ verdict: 'keep', label: 'Keep' }, { verdict: 'keep-action', label: 'Keep, and add a next action' }, { verdict: 'done', label: 'Done' },
        { verdict: 'someday', label: 'Someday' }, { verdict: 'drop', label: 'Drop' }]
     : [{ verdict: 'keep', label: 'Keep' }, { verdict: 'done', label: 'Done' },
        { verdict: 'someday', label: 'Someday' }, { verdict: 'drop', label: 'Drop' }]

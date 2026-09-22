@@ -22,9 +22,9 @@ export interface SessionWriters {
   /** An existing row's domain — a next action takes its goal's. */
   contextOf: (id: string) => DomainId | null
   complete: (id: string) => Promise<boolean>
-  someday: (id: string) => Promise<boolean>
+  someday: (id: string, context?: DomainId) => Promise<boolean>
   drop: (id: string, prevStart: Date) => Promise<boolean>
-  takeInto: (id: string, periodStart: Date) => Promise<boolean>
+  takeInto: (id: string, periodStart: Date, context?: DomainId) => Promise<boolean>
   saveSession: (notes: { wentWell: string; didnt: string }) => Promise<boolean>
 }
 export interface ApplyResult { ok: boolean; remaining: SessionDraft }
@@ -67,7 +67,7 @@ export async function applySession(
     const ok =
       v === 'keep' ? await wrote(() => w.keep(id, periodStart, prevStart))
       : v === 'drop' ? await wrote(() => w.drop(id, prevStart))
-      : v === 'someday' ? await wrote(() => w.someday(id))
+      : v === 'someday' ? await wrote(() => w.someday(id, d.domains?.[id]))
       : v === 'done' ? (isCompleted(id) || await wrote(() => w.complete(id)))
       : false
     if (ok) progress({ ...cur, verdicts: without(cur.verdicts, id) })
@@ -87,7 +87,7 @@ export async function applySession(
     }
   }
   for (const id of d.takenFromAbove) {
-    if (await wrote(() => w.takeInto(id, periodStart))) progress({ ...cur, takenFromAbove: cur.takenFromAbove.filter((x) => x !== id) })
+    if (await wrote(() => w.takeInto(id, periodStart, d.domains?.[id]))) progress({ ...cur, takenFromAbove: cur.takenFromAbove.filter((x) => x !== id) })
   }
 
   const left = Object.keys(cur.verdicts).length + cur.newGoals.length + cur.newTasks.length + cur.takenFromAbove.length

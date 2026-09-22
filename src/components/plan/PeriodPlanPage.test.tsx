@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, fireEvent, within, cleanup } from '@testing-library/react'
+import { render, screen, fireEvent, within, cleanup, waitFor } from '@testing-library/react'
 import { ReferenceListsProvider, useReferenceLists } from '@/components/reference/ReferenceListsContext'
 import { MemoryRouter } from 'react-router-dom'
 import type { Task } from '@/types/task'
@@ -452,14 +452,13 @@ describe('PeriodPlanPage', () => {
     expect(hook.pushTask).toHaveBeenCalledWith(expect.any(String), 'month')
   })
 
-  it('the current period offers tick and change-of-kind; no look-back verbs', () => {
+  it('the current period offers completion without converting task identity', () => {
     state.tasks = [task({ title: 'Repaint', monthStart: thisMonth })]
     renderPage('month')
     expect(screen.getByRole('button', { name: 'Complete Repaint' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Make it a goal Repaint' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Make it a goal Repaint' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Keep Repaint' })).not.toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: 'Make it a goal Repaint' }))
-    expect(hook.setGoal).toHaveBeenCalledWith(expect.any(String), true)
+    expect(hook.setGoal).not.toHaveBeenCalled()
   })
 
   // The look-back: page to last month → every row shows its fate and offers
@@ -698,16 +697,29 @@ describe('steps under a goal', () => {
   it('files a loose row under a goal you pick', () => {
     porchPlan()
     renderPage('month')
-    fireEvent.click(screen.getByRole('button', { name: /Put it under a goal Renew car registration/i }))
-    const picker = screen.getByRole('dialog', { name: /Put it under a goal/i })
+    fireEvent.click(screen.getByRole('button', { name: /Link Renew car registration to a goal/i }))
+    const picker = screen.getByRole('dialog', { name: /Link to goal/i })
     fireEvent.click(within(picker).getByRole('button', { name: /Transform the porch/i }))
     expect(hook.updateTask).toHaveBeenCalledWith('l1', { goalTaskId: 'g1' })
+  })
+
+  it('retains the goal picker and allows retry after a failed link', async () => {
+    porchPlan()
+    hook.updateTask.mockResolvedValueOnce(false)
+    renderPage('month')
+    fireEvent.click(screen.getByRole('button', { name: /Link Renew car registration to a goal/i }))
+    const picker = screen.getByRole('dialog', { name: /Link to goal/i })
+    fireEvent.click(within(picker).getByRole('button', { name: /Transform the porch/i }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('Could not link this task')
+    expect(picker).toBeInTheDocument()
+    fireEvent.click(within(picker).getByRole('button', { name: /Transform the porch/i }))
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: /Link to goal/i })).toBeNull())
   })
 
   it('offers no "under a goal" verb when the period has no goals', () => {
     state.tasks = [task({ id: 'l1', title: 'Renew car registration', monthStart: thisMonth })]
     renderPage('month')
-    expect(screen.queryByRole('button', { name: /Put it under a goal/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Link to goal/i })).not.toBeInTheDocument()
   })
 
   it('the season page holds steps the same way', () => {
@@ -858,6 +870,7 @@ describe('PeriodPlanPage — Plan <Month>', () => {
     fireEvent.click(screen.getByRole('button', { name: `Plan ${label}` }))
     fireEvent.click(screen.getByRole('button', { name: new RegExp(`add to ${label}: get three bids`, 'i') }))
     fireEvent.click(screen.getByRole('button', { name: /next: save/i }))
+    fireEvent.change(screen.getByLabelText('Domain for Get three bids'), { target: { value: 'family' } })
     fireEvent.click(screen.getByRole('button', { name: new RegExp(`save ${label}`, 'i') }))
     await vi.waitFor(() => expect(hook.updateTask).toHaveBeenCalledWith('b1', expect.objectContaining({ bucket: 'month', monthStart: expect.any(Date) })))
     const monthStart = (hook.updateTask.mock.calls.find((c) => c[0] === 'b1')![1] as { monthStart: Date }).monthStart

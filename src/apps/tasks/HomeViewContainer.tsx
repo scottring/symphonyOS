@@ -148,14 +148,15 @@ export function HomeViewContainer({ fixedView }: { fixedView?: 'today' | 'week' 
   // /week mounts this same container (fixedView="week") — the card is a
   // Today-only onboarding nudge, never shown on the bench.
   const showFirstWeek = fixedView !== 'week' && firstWeekUid !== null && firstWeekSignals !== null &&
-    shouldShowFirstWeek(firstWeekStepsList, firstWeekHiddenAt, new Date());
+    (searchParams.get('welcome') === '1' || (tasks.length === 0 && shouldShowFirstWeek(firstWeekStepsList, firstWeekHiddenAt, new Date())));
 
   const handleHideFirstWeek = useCallback(() => {
     if (!firstWeekUid) return;
     const now = new Date().toISOString();
     try { localStorage.setItem(FIRST_WEEK_HIDE_KEY(firstWeekUid), now); } catch { /* ignore */ }
     setFirstWeekHiddenAt(now);
-  }, [firstWeekUid]);
+    if (searchParams.has('welcome')) { const next = new URLSearchParams(searchParams); next.delete('welcome'); setSearchParams(next, { replace: true }); }
+  }, [firstWeekUid, searchParams, setSearchParams]);
 
   // "Use our sample page" hands the bundled week-page image straight to the
   // paper flow on the week altitude, skipping the camera — the same path a

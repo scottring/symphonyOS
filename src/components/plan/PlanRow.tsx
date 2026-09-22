@@ -51,7 +51,7 @@ const ACTION_LABEL: Record<Exclude<RowAction, 'complete'>, string> = {
   'make-goal': 'Make it a goal',
   'make-task': 'Make it a task',
   'to-lower': 'Take it into',
-  'under-goal': 'Put it under a goal',
+  'under-goal': 'Link to goal',
   today: 'Do it today',
 }
 
@@ -126,7 +126,7 @@ export function PlanRow({
   // 2026-09-13). Only `placed-done` stays locked — that completion belongs to
   // the copy that did the work, and is reopened there.
   const canTick = actions.includes('complete') || rowOwnsCompletion(row.fate)
-  const verbs = actions.filter((a): a is Exclude<RowAction, 'complete'> => a !== 'complete')
+  const verbs = actions.filter((a): a is Exclude<RowAction, 'complete'> => a !== 'complete' && a !== 'under-goal')
   // Only a month/season goal holds steps. A year row is a goals-table entity,
   // and a step never nests further, so neither offers a disclosure. A goal
   // with no steps still gets one when it can TAKE them — that is the way in.
@@ -175,6 +175,8 @@ export function PlanRow({
         {row.subtitle && (
           <span className="mt-1 block text-[13px] leading-snug text-neutral-500">{row.subtitle}</span>
         )}
+        {!row.isGoal && actions.includes('under-goal') && <button type="button" onClick={() => onAction('under-goal', row)} className="mt-1 block text-xs text-primary-700 hover:underline" aria-label={`Link ${row.title} to a goal`}>Link to goal</button>}
+        {canHoldSteps && !!row.steps?.length && <button type="button" onClick={() => onToggleExpand?.(row)} className="mt-1 block text-xs text-primary-700 hover:underline">{row.steps.length} supporting {row.steps.length === 1 ? 'task' : 'tasks'}{expanded ? ' · hide' : ' · show'}</button>}
         {/* Where this row is committed, on its own line beneath the title —
             the chip a reader scans down, not a whisper in the right margin. */}
         {row.placed && (

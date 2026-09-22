@@ -157,16 +157,16 @@ describe('Phone execution chrome', () => {
     mobileState.isMobile = true
     localStorage.removeItem('symphony-plan-period')
     renderAt('/today')
-    fireEvent.click(screen.getByRole('button', { name: 'Plan' }))
-    expect(screen.getByRole('button', { name: 'Plan' })).toHaveAttribute('aria-current', 'page')
+    fireEvent.click(screen.getByRole('button', { name: 'Planner' }))
+    expect(screen.getByRole('button', { name: 'Planner' })).toHaveAttribute('aria-current', 'page')
     for (const label of ['Week', 'Month', 'Season', 'Year']) {
       fireEvent.click(screen.getByRole('link', { name: label }))
       expect(screen.getByRole('link', { name: label })).toHaveAttribute('aria-current', 'page')
     }
-    fireEvent.click(screen.getByRole('button', { name: 'Today' }))
-    expect(screen.queryByRole('navigation', { name: 'Planning period' })).not.toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: 'Plan' }))
-    expect(screen.getByRole('link', { name: 'Year' })).toHaveAttribute('aria-current', 'page')
+    fireEvent.click(screen.getByRole('link', { name: 'Today' }))
+    expect(screen.getByRole('navigation', { name: 'Planning period' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Planner' }))
+    expect(screen.getByRole('link', { name: 'Today' })).toHaveAttribute('aria-current', 'page')
   })
 
   it('keeps references off the phone even when desktop lists were pinned', () => {
@@ -175,7 +175,7 @@ describe('Phone execution chrome', () => {
     renderAt('/today')
     expect(screen.queryByRole('complementary', { name: 'Pinned reference lists' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Pin month list' })).not.toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Today' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Today' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Inbox' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'More' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Week' })).not.toBeInTheDocument()
@@ -195,13 +195,13 @@ describe('Consolidated desktop navigation', () => {
     const chooser = screen.getByRole('button', { name: 'Shelves' })
     expect(nav).not.toContainElement(chooser)
     expect(screen.queryByRole('navigation', { name: 'Planning period' })).not.toBeInTheDocument()
-    fireEvent.click(screen.getByRole('link', { name: 'Plan' }))
+    fireEvent.click(screen.getByRole('link', { name: 'Planner' }))
     expect(screen.getByRole('navigation', { name: 'Planning period' })).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: 'Week' })).toHaveAttribute('aria-current', 'page')
+    expect(screen.getByRole('link', { name: 'Today' })).toHaveAttribute('aria-current', 'page')
     fireEvent.click(screen.getByRole('link', { name: 'Month' }))
     expect(screen.getByRole('link', { name: 'Month' })).toHaveAttribute('aria-current', 'page')
-    fireEvent.click(screen.getByRole('link', { name: 'Today' }))
-    fireEvent.click(screen.getByRole('link', { name: 'Plan' }))
+    fireEvent.click(screen.getByRole('link', { name: 'Routines' }))
+    fireEvent.click(screen.getByRole('link', { name: 'Planner' }))
     expect(screen.getByRole('link', { name: 'Month' })).toHaveAttribute('aria-current', 'page')
   })
   it('places page-specific controls in the consolidated navigation', () => {
@@ -344,6 +344,6 @@ describe('Capture and the Today pin from every desktop page', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Close shelves', pressed: true }))
     expect(screen.queryByRole('region', { name: 'Shelves' })).not.toBeInTheDocument()
     // Today is still one destination.
-    expect(screen.getAllByRole('link', { name: 'Today' })).toHaveLength(1)
+    expect(screen.getAllByRole('link', { name: 'Planner' })).toHaveLength(1)
   })
 })

@@ -52,7 +52,7 @@ export function WeekList({ tasks, weekStart, meId, userId, isCurrent, onToggle, 
       </h2>
       {ordered.length === 0 ? (
         <p className="text-sm text-neutral-500">
-          {isCurrent ? "Nothing on this week's list yet." : "Nothing on this week’s list."}
+          {meId ? "No week tasks match this person. Change the people filter to see other work." : isCurrent ? "Nothing on this week's list in this view yet." : "Nothing on this week’s list in this view."}
           {onPlan && (
             <>
               {' '}

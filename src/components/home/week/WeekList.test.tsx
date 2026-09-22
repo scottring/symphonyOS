@@ -53,7 +53,7 @@ describe('WeekList', () => {
   it('empty: says so and offers to plan the week', () => {
     const onPlan = vi.fn()
     render(<WeekList tasks={[]} weekStart={WEEK} meId={null} userId="me" isCurrent onToggle={vi.fn()} onSelect={vi.fn()} onPlan={onPlan} />)
-    expect(screen.getByText(/nothing on this week's list yet/i)).toBeInTheDocument()
+    expect(screen.getByText(/nothing on this week's list in this view yet/i)).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: /plan this week/i }))
     expect(onPlan).toHaveBeenCalled()
   })

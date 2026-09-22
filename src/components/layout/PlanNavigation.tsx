@@ -5,9 +5,10 @@ import { useReferenceLists } from '@/components/reference/ReferenceListsContext'
 import { PlanningSheet } from '@/components/reference/PlanningSheet'
 import { GoalsSheet } from '@/components/plan/GoalsSheet'
 
-const PERIODS = ['week', 'month', 'season', 'year'] as const
+const PERIODS = ['today', 'week', 'month', 'season', 'year'] as const
 const STORAGE_KEY = 'symphony-plan-period'
 export function planPeriodForPath(path: string) {
+  if (path === '/' || path.startsWith('/tasks-new')) return 'today'
   return PERIODS.find(period => path === `/${period}` || path.startsWith(`/${period}/`))
 }
 
@@ -21,8 +22,8 @@ export function usePlanDestination() {
     }
   }, [period])
   let saved: string | null = null
-  try { saved = localStorage.getItem(STORAGE_KEY) } catch { /* Default to week. */ }
-  return `/${period ?? (PERIODS.find(value => value === saved) ?? 'week')}`
+  try { saved = localStorage.getItem(STORAGE_KEY) } catch { /* Default to Today. */ }
+  return `/${period ?? (PERIODS.find(value => value === saved) ?? 'today')}`
 }
 
 /** Page tools are deliberately outside primary destination navigation. */
@@ -37,17 +38,15 @@ export function PlanNavigation({ mobile = false, paused = false }: { mobile?: bo
   // component; a desktop pinned panel is a follow-up).
   const [goalsOpen, setGoalsOpen] = useState(false)
   const sheetOpen = sheetPath === pathname
-  // Today draws its ONE chooser control on its "For today" heading (Scott via
-  // Codex, 2026-09-22), at every width; Week owns a mobile chooser with its
-  // actual viewed date. Elsewhere this row is the door.
+  // Horizon pages own their Shelves launcher in the date masthead.
   const onToday = pathname === '/' || pathname === '/today' || pathname.startsWith('/tasks-new')
   const broaderPeriod = ['month', 'season', 'year'].includes(period ?? '')
-  const showChooser = !onToday && (broaderPeriod || !mobile)
+  const showChooser = !period && !onToday && !mobile
   // The kept-pins note ("Lists return when you close the side panel") is
   // still said on Today, even though its chooser button lives on the page.
   const pausedNote = !mobile && paused && !!references && references.pins.length > 0
   if (!period && !showChooser && !pausedNote) return null
-  const range = new URLSearchParams(search).get('range') ?? 'week'
+  const range = new URLSearchParams(search).get('range') ?? 'today'
   return <div className="plan-page-tools" data-period={period}>
     {period && <div className="plan-period-controls">
       <nav aria-label="Planning period" className="plan-period-navigation">

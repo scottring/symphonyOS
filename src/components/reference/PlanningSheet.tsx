@@ -34,6 +34,7 @@ export function PlanningSheet({ open, onClose, weekPage = null, plan, day: dayPr
   // Portalled to <body>: a `position: fixed` sheet inside a transformed
   // ancestor (the phone shell) would be fixed to that ancestor, not the
   // viewport, and sit below the fold (found in the 390px check, 2026-09-21).
+  if (!open) return null
   return createPortal(
     <>
       {open && (

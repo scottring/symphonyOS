@@ -69,7 +69,7 @@ describe('firstWeekSteps', () => {
 })
 
 describe('shouldShowFirstWeek', () => {
-  it('shows only while ≥2 steps remain, and hides for 7 days after Hide for now', () => {
+  it('shows only while ≥2 steps remain, and stays dismissed after choosing to explore independently', () => {
     const two = firstWeekSteps({ ...none, yearPlanned: true, memberCount: 4, pageCommitted: true })
     expect(shouldShowFirstWeek(two, null, new Date())).toBe(true)
 
@@ -77,7 +77,7 @@ describe('shouldShowFirstWeek', () => {
     expect(shouldShowFirstWeek(one, null, new Date())).toBe(false)
 
     expect(shouldShowFirstWeek(two, new Date(Date.now() - 2 * 86_400_000).toISOString(), new Date())).toBe(false)
-    expect(shouldShowFirstWeek(two, new Date(Date.now() - 8 * 86_400_000).toISOString(), new Date())).toBe(true)
+    expect(shouldShowFirstWeek(two, new Date(Date.now() - 8 * 86_400_000).toISOString(), new Date())).toBe(false)
   })
 })
 

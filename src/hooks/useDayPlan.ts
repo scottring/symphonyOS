@@ -1,12 +1,11 @@
 import { weekRoutineChoices } from '@/lib/planning/weekRoutineChoices'
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo } from 'react'
 import { useSupabaseTasks } from '@/hooks/useSupabaseTasks'
 import { useRoutines } from '@/hooks/useRoutines'
 import { useActionableInstances } from '@/hooks/useActionableInstances'
 import { useDomain } from '@/hooks/useDomain'
 import { useAssigneeFilter } from '@/hooks/useAssigneeFilter'
 import { useDateInstances } from '@/hooks/useDateInstances'
-import { readHideRoutines, onHideRoutinesChange } from '@/lib/hideRoutinesSignal'
 import { filterTasksForLayers } from '@/lib/today/domainFilter'
 import { routinesForViewedDate } from '@/lib/today/routinesForDate'
 import { selectDayPlan, type DayPlan } from '@/lib/today/dayPlan'
@@ -33,8 +32,6 @@ export function useDayPlan(
   const { getInstancesForDate } = useActionableInstances()
   const { layers } = useDomain()
   const [selectedAssignees] = useAssigneeFilter()
-  const [hideRoutines, setHideRoutines] = useState(() => readHideRoutines())
-  useEffect(() => onHideRoutinesChange(setHideRoutines), [])
 
   const dayKey = localYmd(day)
   const weekKey = weekStartOverride ? localYmd(weekStartOverride) : null
@@ -59,7 +56,7 @@ export function useDayPlan(
       viewedDate,
       referenceMonth: weekStartOverride ?? viewedDate,
       selectedAssignee: selectedAssignees,
-      hideRoutines,
+      hideRoutines: false,
       layers,
       weekStart,
       userId,
@@ -70,9 +67,9 @@ export function useDayPlan(
     })
     return weekStartOverride ? {
       ...dayPlan,
-      weekRoutineDays: weekRoutineChoices({ weekStart, selectedAssignee: selectedAssignees, hideRoutines, layers }, allRoutines, getRoutinesForDate, weekInstances),
+      weekRoutineDays: weekRoutineChoices({ weekStart, selectedAssignee: selectedAssignees, hideRoutines: false, layers }, allRoutines, getRoutinesForDate, weekInstances),
     } : dayPlan
-  }, [instances, dayKey, weekStartOverride, weekStart, weekInstances, tasks, layers, getRoutinesForDate, allRoutines, selectedAssignees, hideRoutines, userId])
+  }, [instances, dayKey, weekStartOverride, weekStart, weekInstances, tasks, layers, getRoutinesForDate, allRoutines, selectedAssignees, userId])
 
   return { plan, loading: tasksLoading || routinesLoading || !instances, error: !!tasksError }
 }

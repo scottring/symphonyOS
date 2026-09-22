@@ -79,21 +79,9 @@ export function firstWeekSteps(s: FirstWeekSignals): FirstWeekStep[] {
   ]
 }
 
-const HIDE_DURATION_MS = 7 * 86_400_000
-
-/**
- * The card shows only while genuine onboarding work remains (≥2 undone
- * steps — an account with real data never sees it) and outside a 7-day
- * "Hide for now" window.
- */
-export function shouldShowFirstWeek(steps: FirstWeekStep[], hiddenAt: string | null, now: Date): boolean {
-  const remaining = steps.filter((s) => !s.done).length
-  if (remaining < 2) return false
-  if (hiddenAt) {
-    const t = Date.parse(hiddenAt)
-    if (Number.isFinite(t) && now.getTime() - t < HIDE_DURATION_MS) return false
-  }
-  return true
+/** Dismissal persists. Help may explicitly reopen the invitation. */
+export function shouldShowFirstWeek(steps: FirstWeekStep[], hiddenAt: string | null, _now: Date): boolean {
+  return !hiddenAt && steps.filter(step => !step.done).length >= 2
 }
 
 export const FIRST_WEEK_HIDE_KEY = (uid: string) => `symphony.firstWeek.hidden.${uid}`

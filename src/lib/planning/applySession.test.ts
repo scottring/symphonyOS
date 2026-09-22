@@ -119,7 +119,7 @@ describe('applySession', () => {
     expect(r.ok).toBe(true)
     expect(w.keep).toHaveBeenCalledWith('o', WEEK, LAST)
     expect(w.addTask).toHaveBeenCalledWith('Call the plumber', expect.objectContaining({ id: 'n1', periodStart: WEEK, day: new Date(2026, 9, 8) }))
-    expect(w.takeInto).toHaveBeenCalledWith('m1', WEEK)
+    expect(w.takeInto).toHaveBeenCalledWith('m1', WEEK, undefined)
   })
 
   it('creates each new item in the domain it was planned in; a next action takes its goal\'s', async () => {

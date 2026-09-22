@@ -39,7 +39,7 @@ describe('lookBackRows', () => {
 
 describe('verdictOptions', () => {
   it('offers "Keep, and add a next action" to goals only', () => {
-    expect(verdictOptions(true).map((o) => o.verdict)).toEqual(['keep', 'keep-action', 'someday', 'drop'])
+    expect(verdictOptions(true).map((o) => o.verdict)).toEqual(['keep', 'keep-action', 'done', 'someday', 'drop'])
     expect(verdictOptions(false).map((o) => o.verdict)).toEqual(['keep', 'done', 'someday', 'drop'])
   })
 })

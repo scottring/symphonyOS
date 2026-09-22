@@ -111,3 +111,36 @@ Implemented after the walkthrough (production verification pending):
 - Today's routine shelf offers **Set time** for available and already-chosen occurrences. This opens an occurrence-only time picker, without an All Day shortcut or modifying the repeating schedule. It provides a direct route for the originally reported untimed routine flow; this is not a claim that the original routine-editor failure has been reproduced and resolved.
 
 Focused regressions cover day removal through the placement writer, preserved broader commitments and other-user focus, failed writes, request races, and both routine shelf time actions. Build passed; changed-file lint has no errors (existing warnings remain). Fixture inspection at 1440px and 390px showed the picker within the viewport and allowed selecting 8 PM. Authenticated live verification remains separate.
+
+## Closure implementation — September 22
+
+The historical matrix above records the original findings, not the current release state.
+The following changes close the implementation gaps; live verification is recorded separately.
+
+| Finding | Implemented behavior / regression evidence |
+| --- | --- |
+| Complete from week shelf | Direct task checkbox; completion and choosing remain independent |
+| Shelves placement and empty states | Launcher inside every horizon's date masthead; empty messages acknowledge filters and link to routine management |
+| Primary navigation | Planner, Routines, Inbox; Today is the first horizon alongside Week, Month, Season, Year |
+| Weekend ordering | Any day, Weekend, Assigned a day, Completed in a single reading order |
+| Hidden routine choices | Hiding daily routines in the schedule no longer removes eligible shelf occurrences |
+| Link task to goal | Visible Link to goal on loose and already-assigned tasks; failed links retain picker for retry |
+| Goals versus tasks | Removed conversion controls from period rows; goals remain separate from supporting tasks |
+| Hidden supporting tasks | Goal rows show supporting-task count; month totals and empty-state text acknowledge them |
+| Previous-week review | Visible Review date-range entry beside Plan; same deliberate review flow |
+| Next-week Earlier | Offers open work from the preceding period without creating a new commitment |
+| Review Done for goals | Month and season now offer Done, consistent with Year |
+| Review domain interruption | Required domains selected before Save; Save is disabled until complete |
+| Daily review keyboard | Escape closes even from its reflection input, preserving reflection |
+| Routine editor save | Repeating schedule is a local draft with explicit awaited Save, error/retry, and scope guidance; Save & close waits for success |
+| Legacy first-week checklist | Optional start-with-a-task or start-with-a-goal invitation; dismissal persists and Getting started reopens it from More |
+| Closed-sheet overflow | Closed goal/planning sheets do not render outside the page |
+
+Automated regressions cover these branches, including failures/retries. Production live
+verification is still required for the new release, especially routine timing and day removal.
+Component fixture visual inspection at 1440, 830, and 390 pixels found no horizontal overflow;
+the fixture combines components and does not represent a complete phone-app walkthrough.
+
+The onboarding invitation is implemented, but new-user research is not thereby complete.
+Cross-account database privacy, external calendar sync and invitation delivery remain separate
+integration checks requiring their own real accounts/providers; none are claimed as passed.

@@ -7,6 +7,7 @@ import { mondayOfWeek } from '@/lib/workweekHelpers'
 import { buildRange, presetRange, weekRange, type RangePreset } from '@/lib/planning/dateRange'
 import { readCadenceConfig } from '@/lib/cadence/config'
 import { MastheadCard, PeriodNavEyebrow } from '@/components/layout/MastheadCard'
+import { ShelvesButton } from '@/components/reference/ShelvesButton'
 import { WeekModeSwitch, type WeekMode } from './week/WeekViewV2'
 
 interface HomeHeaderProps {
@@ -241,6 +242,7 @@ export function HomeHeader(props: HomeHeaderProps) {
         variant="page"
         eyebrow={<PeriodNavEyebrow label={menuButton} onPrev={onPrev} onNext={onNext} prevLabel={prevLabel} nextLabel={nextLabel} trailing={menu} />}
         title={label.long}
+        footer={<div className="ml-auto"><ShelvesButton weekPage={weekStart} /></div>}
         subline={customInputs}
         // The hourly grid needs desk width; below lg the journal is the week.
         aside={props.weekMode && props.onWeekModeChange

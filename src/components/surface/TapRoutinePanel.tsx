@@ -52,7 +52,7 @@ interface TapRoutinePanelProps {
   onShowOnTodayChange?: (next: boolean) => void
   onAssignChange?: (memberIds: string[]) => void
   /** Persist a recurrence/time-of-day change. time is '' (clear) or 'HH:MM'. */
-  onScheduleChange?: (pattern: RecurrencePattern, timeOfDay: string) => void
+  onScheduleChange?: (pattern: RecurrencePattern, timeOfDay: string) => void | boolean | Promise<void | boolean>
   /** Set/change the routine's location (enables directions). When omitted, the Location section is hidden. */
   onUpdateLocation?: (location: string, placeId?: string) => void
   onClearLocation?: () => void
@@ -83,6 +83,21 @@ export function TapRoutinePanel(props: TapRoutinePanelProps) {
     ? routine.assigned_to_all
     : (routine.assigned_to ? [routine.assigned_to] : [])
   const [editingSchedule, setEditingSchedule] = useState(false)
+  const [scheduleDraft, setScheduleDraft] = useState({ recurrencePattern: routine.recurrence_pattern, timeOfDay: (routine.time_of_day ?? '').slice(0, 5) })
+  const [savingSchedule, setSavingSchedule] = useState(false)
+  const [scheduleError, setScheduleError] = useState(false)
+  const saveSchedule = async () => {
+    if (savingSchedule) return false
+    setSavingSchedule(true); setScheduleError(false)
+    try {
+      const result = await props.onScheduleChange?.(scheduleDraft.recurrencePattern, scheduleDraft.timeOfDay)
+      if (result === false) { setScheduleError(true); return false }
+      setEditingSchedule(false)
+      return true
+    } catch { setScheduleError(true); return false }
+    finally { setSavingSchedule(false) }
+  }
+
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [showDirections, setShowDirections] = useState(false)
   const [assistOpen, setAssistOpen] = useState(props.autoOpenDiscussion === true)
@@ -225,24 +240,25 @@ export function TapRoutinePanel(props: TapRoutinePanelProps) {
           <div>
             {editingSchedule ? (
               <div className="rounded-xl border border-neutral-200 p-3">
+                <p className="mb-3 text-xs text-neutral-500">Repeating schedule. To change just one day, use Set time in that day’s Shelves.</p>
                 <RoutineScheduleEditor
                   size="sm"
-                  recurrencePattern={routine.recurrence_pattern}
-                  timeOfDay={(routine.time_of_day ?? '').slice(0, 5)}
-                  onChange={({ recurrencePattern, timeOfDay }) =>
-                    props.onScheduleChange?.(recurrencePattern, timeOfDay)
-                  }
+                  recurrencePattern={scheduleDraft.recurrencePattern}
+                  timeOfDay={scheduleDraft.timeOfDay}
+                  onChange={next => { setScheduleDraft(next); if (props.unsaved) void props.onScheduleChange?.(next.recurrencePattern, next.timeOfDay) }}
                 />
                 <button
-                  onClick={() => setEditingSchedule(false)}
+                  disabled={savingSchedule}
+                  onClick={() => { void saveSchedule() }}
                   className="mt-3 text-xs font-medium text-neutral-500 hover:text-neutral-700"
                 >
-                  Done
+                  {savingSchedule ? 'Saving…' : 'Save repeating schedule'}
                 </button>
+                {scheduleError && <p role="alert" className="mt-2 text-sm text-red-600">Could not save the schedule. Your changes are still here; try again.</p>}
               </div>
             ) : (
               <button
-                onClick={() => setEditingSchedule(true)}
+                onClick={() => { setScheduleDraft({ recurrencePattern: routine.recurrence_pattern, timeOfDay: (routine.time_of_day ?? '').slice(0, 5) }); setScheduleError(false); setEditingSchedule(true) }}
                 className="flex items-center justify-between w-full px-3 py-2 rounded-lg bg-neutral-100 text-[15px] text-neutral-700 hover:bg-neutral-200 transition-colors"
               >
                 <span>{recurrenceSummary(routine)}</span>
@@ -378,11 +394,12 @@ export function TapRoutinePanel(props: TapRoutinePanelProps) {
           panel with no button reads as "did that stick?" */}
       <div className="mt-4 flex items-center justify-between gap-3">
         <span className="text-xs text-neutral-400">
-          {props.unsaved ? 'Not saved yet — closing discards it' : 'Changes save as you edit'}
+          {props.unsaved ? 'Not saved yet — closing discards it' : editingSchedule ? 'Save to apply the repeating schedule' : 'Other changes save as you edit'}
         </span>
         <button
           type="button"
-          onClick={props.unsaved && props.onSave ? props.onSave : props.onClose}
+          disabled={savingSchedule}
+          onClick={async () => { if (props.unsaved && props.onSave) { props.onSave(); return }; if (editingSchedule && !(await saveSchedule())) return; props.onClose() }}
           className="rounded-xl bg-[var(--color-primary-500,#3d5a44)] px-4 py-2 text-[15px] font-medium text-white
                      hover:opacity-90 transition-opacity"
         >

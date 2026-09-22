@@ -7,7 +7,7 @@ import { DesktopFooter, DesktopFooterActionContext } from '@/components/layout/D
 // src/shell/ShellLayout.tsx
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Sparkles, Sun, CalendarRange, Inbox as InboxIcon, MoreHorizontal } from 'lucide-react';
+import { Sparkles, Repeat, CalendarRange, Inbox as InboxIcon, MoreHorizontal } from 'lucide-react';
 import { type ViewType } from '@/components/layout/Sidebar';
 import { MoreSheet } from '@/components/layout/MoreSheet';
 import { QuickCapture } from '@/components/layout/QuickCapture';
@@ -416,8 +416,8 @@ function ShellLayoutInner({ children }: Props) {
         >
           <div className="flex items-stretch px-1 py-0.5">
             {[
-              { label: 'Today', Icon: Sun, route: '/today', active: location.pathname === '/' || location.pathname === '/today' },
-              { label: 'Plan', Icon: CalendarRange, route: planDestination, active: !!planPeriodForPath(location.pathname) },
+              { label: 'Planner', Icon: CalendarRange, route: planDestination, active: !!planPeriodForPath(location.pathname) },
+              { label: 'Routines', Icon: Repeat, route: '/routines', active: location.pathname.startsWith('/routines') },
             ].map((tab) => (
               <button
                 key={tab.route}

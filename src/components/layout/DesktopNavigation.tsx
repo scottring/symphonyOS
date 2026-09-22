@@ -43,17 +43,17 @@ export function DesktopNavigation({ inboxCount, discussionsUnread, onSearch, onQ
   const go = (path: string) => { setOpen(null); navigate(path) }
   // Short labelled columns rather than one tall list. Registry apps join Reference.
   const groups: [string, [string, string][]][] = [
-    ['Organize', [['Someday', '/someday'], ['Routines', '/routines']]],
+    ['Organize', [['Someday', '/someday']]],
     ['Home', [['Meals', '/meals/plan'], ['Meal shelf', '/meals/shelf'], ['Lists', '/lists'], ['House', '/home']]],
     ['Reference', [['Discussions', '/discussions'], ['Contacts', '/contacts'], ['Documents', '/documents'],
-      ['Notes', '/notes'], ['History', '/history'],
+      ['Notes', '/notes'], ['History', '/history'], ['Getting started', '/today?welcome=1'],
       ...appRegistry.filter(a => a.sidebar).sort((a, b) => a.sidebar!.order - b.sidebar!.order)
         .map((a): [string, string] => [a.sidebar!.label, a.route])]],
   ]
   const destinations = groups.flatMap(([, items]) => items)
   return <nav ref={root} className="page-navigation" aria-label="Main navigation">
-    <NavLink to="/today" className={pathname === '/' || pathname === '/today' || pathname.startsWith('/tasks-new') ? 'is-current' : ''}>Today</NavLink>
-    <NavLink to={planDestination} aria-current={planPeriodForPath(pathname) ? 'page' : undefined} className={planPeriodForPath(pathname) ? 'is-current' : ''}>Plan</NavLink>
+    <NavLink to={planDestination} aria-current={planPeriodForPath(pathname) ? 'page' : undefined} className={planPeriodForPath(pathname) ? 'is-current' : ''}>Planner</NavLink>
+    <NavLink to="/routines">Routines</NavLink>
     <NavLink to="/inbox" aria-label={`Inbox${inboxCount ? `, ${inboxCount} items` : ''}`}><Inbox size={16} aria-hidden="true" /><span>Inbox</span>{inboxCount > 0 && <span className="navigation-count">{inboxCount}</span>}</NavLink>
     {menu('more', <>More{discussionsUnread > 0 && <span className="navigation-count">{discussionsUnread}</span>}</>, <div className="page-navigation-more">
       <div className="page-navigation-groups">
