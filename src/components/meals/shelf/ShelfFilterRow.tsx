@@ -15,13 +15,17 @@ const FILTERS: Array<{ id: RecipeFilter; label: string }> = [
 
 export function ShelfFilterRow({ active, onChange }: Props) {
   return (
-    <div className="flex items-center gap-3 pb-5 border-b-2 border-neutral-800">
+    // Wraps on phones: in one row at 390px the chips squeezed into narrow
+    // columns and the last one was pushed off-screen.
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-2 pb-5 border-b-2 border-neutral-800">
       <span className="text-[12px] font-bold uppercase tracking-widest text-neutral-500">Show:</span>
       {FILTERS.map((f) => (
         <button
           key={f.id}
+          type="button"
           onClick={() => onChange(f.id)}
-          className={`px-4 py-1.5 rounded-full text-[13px] font-medium transition ${
+          aria-pressed={active === f.id}
+          className={`whitespace-nowrap px-4 py-1.5 rounded-full text-[13px] font-medium transition ${
             active === f.id
               ? 'bg-neutral-800 text-white'
               : 'text-neutral-600 hover:bg-neutral-100'

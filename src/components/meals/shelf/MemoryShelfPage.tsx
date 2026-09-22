@@ -54,7 +54,9 @@ export function MemoryShelfPage() {
         title={<>What we cook <span className="italic text-primary-600">together.</span></>}
         motif="meals"
         eyebrow={
-          <span className="text-[12px] font-semibold uppercase tracking-[0.14em] text-neutral-500">
+          // pl-1.5 undoes the eyebrow slot's -ml-1.5 (meant for caret navs);
+          // without it the phone overflow rule clipped the first letter.
+          <span className="inline-block pl-1.5 text-[12px] font-semibold uppercase tracking-[0.14em] text-neutral-500">
             Memory shelf · {recipes.length} {recipes.length === 1 ? 'recipe' : 'recipes'}
           </span>
         }

@@ -41,13 +41,14 @@ export function SeasonsSettings() {
         Your household's own groupings for seasonal planning. Each season runs from its start date to the next one's.
       </p>
 
+      {/* Rows wrap on phones: at 390px the month/day pickers were clipped. */}
       <div className="space-y-3">
         {seasons.map((s, i) => (
-          <div key={i} className="flex items-center justify-between gap-3 p-4 bg-white rounded-lg border border-neutral-100">
+          <div key={i} className="flex flex-wrap items-center justify-between gap-3 p-4 bg-white rounded-lg border border-neutral-100">
             {canEdit ? (
               <>
                 <NameInput index={i} value={s.name} onCommit={(name) => update(i, { name })} />
-                <div className="flex items-center gap-2 text-sm text-neutral-600">
+                <div className="flex shrink-0 items-center gap-2 text-sm text-neutral-600">
                   <span>starts</span>
                   <select
                     aria-label={`Season ${i + 1} starts in`}

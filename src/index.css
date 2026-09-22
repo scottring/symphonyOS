@@ -422,6 +422,17 @@ body {
     overflow-x: hidden !important;
   }
 
+  /* The rule above turns flex mastheads into scroll containers (hidden-x
+     forces auto-y), so a few px of touch-target overflow drew a stray
+     scrollbar beside the date. clip contains x without that side effect.
+     div.-qualified to outrank div[class*="flex"]. */
+  div.daybook-masthead-row,
+  div.daybook-masthead-text {
+    overflow-x: clip !important;
+    overflow-y: visible !important;
+    overflow-clip-margin: 6px;
+  }
+
   /* Prevent any margin/padding from pushing content */
   * {
     box-sizing: border-box;
