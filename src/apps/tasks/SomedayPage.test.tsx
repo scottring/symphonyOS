@@ -43,4 +43,17 @@ describe('SomedayPage', () => {
     render(<SomedayPage />)
     expect(screen.getByText('Nothing set aside.')).toBeInTheDocument()
   })
+
+  it('distinguishes a filtered-empty view from an empty shelf and offers the way out', () => {
+    localStorage.setItem('symphony-layers', JSON.stringify(['work']))
+    try {
+      render(<SomedayPage />)
+      expect(screen.queryByText('Nothing set aside.')).not.toBeInTheDocument()
+      expect(screen.getByText(/Nothing set aside in the domains you're viewing/)).toBeInTheDocument()
+      fireEvent.click(screen.getByRole('button', { name: 'Show all domains' }))
+      expect(screen.getByText('Learn the cello')).toBeInTheDocument()
+    } finally {
+      localStorage.removeItem('symphony-layers')
+    }
+  })
 })
