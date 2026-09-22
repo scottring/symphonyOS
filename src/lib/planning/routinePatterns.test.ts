@@ -59,3 +59,37 @@ describe('routinePatterns', () => {
     expect(rows).toEqual([{ id: rows[0].id, name: 'Dishes', cadence: 'Every day' }])
   })
 })
+
+describe('horizon shelves', () => {
+  const routines = [
+    routine({ name: 'Daily', recurrence_pattern: { type: 'daily' } }),
+    routine({ name: 'Weekly', recurrence_pattern: { type: 'weekly' } }),
+    routine({ name: 'Monthly', recurrence_pattern: { type: 'monthly', day_of_month: 3 } }),
+    routine({ name: 'Quarterly', recurrence_pattern: { type: 'quarterly', day_of_month: 3 } }),
+    routine({ name: 'Annual September', recurrence_pattern: { type: 'yearly', month_of_year: 9, day_of_month: 3 } }),
+    routine({ name: 'Annual December', recurrence_pattern: { type: 'yearly', month_of_year: 12, day_of_month: 3 } }),
+  ]
+  it('month excludes fast routines and yearly routines outside the displayed month', () => {
+    const names = routinePatterns(routines, ALL, { level: 'month', start: new Date(2026, 8, 1), end: new Date(2026, 9, 1) }).map(r => r.name)
+    expect(names).toContain('Monthly')
+    expect(names).toContain('Annual September')
+    expect(names).not.toContain('Annual December')
+    expect(names).not.toContain('Daily')
+    expect(names).not.toContain('Weekly')
+  })
+  it('season excludes monthly routines and includes annual routines due in its bounds', () => {
+    const names = routinePatterns(routines, ALL, { level: 'season', start: new Date(2026, 6, 1), end: new Date(2026, 9, 1) }).map(r => r.name)
+    expect(names).toContain('Quarterly')
+    expect(names).toContain('Annual September')
+    expect(names).not.toContain('Monthly')
+    expect(names).not.toContain('Annual December')
+  })
+  it('year shows annual routines', () => {
+    expect(routinePatterns(routines, ALL, { level: 'year', start: new Date(2026, 0, 1), end: new Date(2027, 0, 1) }).map(r => r.name)).toEqual(['Annual September', 'Annual December'])
+  })
+  it('explicit dates use the displayed period, with an exclusive end', () => {
+    const rows = [routine({ recurrence_pattern: { type: 'specific_days', dates: ['2026-10-01'] } })]
+    expect(routinePatterns(rows, ALL, { level: 'month', start: new Date(2026, 8, 1), end: new Date(2026, 9, 1) })).toHaveLength(0)
+    expect(routinePatterns(rows, ALL, { level: 'month', start: new Date(2026, 9, 1), end: new Date(2026, 10, 1) })).toHaveLength(1)
+  })
+})

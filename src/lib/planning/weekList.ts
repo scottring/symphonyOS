@@ -6,6 +6,7 @@
 // the list stays whole all week (Scott, 2026-09-21). Tasks only; a goal lives
 // on its month, season or year and is never on a week.
 
+import { weekendLabel } from './weekend'
 import type { Task } from '@/types/task'
 import { committedTo, isFocused, openCommitment, sameDay } from '@/lib/placement/model'
 import { doableBy } from './poolViews'
@@ -28,7 +29,7 @@ export function weekListTasks(tasks: readonly Task[], weekStart: Date, meId: str
   return out.sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime())
 }
 
-export interface WeekRowNote { origin?: 'month' | 'kept'; monthLabel?: string; dayLabel?: string; pickedToday: boolean }
+export interface WeekRowNote { origin?: 'month' | 'kept'; monthLabel?: string; dayLabel?: string; pickedToday: boolean; weekend?: string }
 
 export function weekRowNote(t: Task, weekStart: Date, userId: string | null | undefined, todayYmd: string): WeekRowNote {
   const prev = new Date(weekStart); prev.setDate(prev.getDate() - 7)
@@ -38,11 +39,12 @@ export function weekRowNote(t: Task, weekStart: Date, userId: string | null | un
   const end = new Date(weekStart); end.setDate(end.getDate() + 7)
   const dayLabel = t.scheduledFor && t.scheduledFor >= weekStart && t.scheduledFor < end
     ? t.scheduledFor.toLocaleDateString('en-US', { weekday: 'short' }) : undefined
-  return { origin: keptFromLast ? 'kept' : monthLabel ? 'month' : undefined, monthLabel, dayLabel, pickedToday: isFocused(t, userId, todayYmd) }
+  return { weekend: t.weekendStart ? weekendLabel(t.weekendStart) : undefined, origin: keptFromLast ? 'kept' : monthLabel ? 'month' : undefined, monthLabel, dayLabel, pickedToday: isFocused(t, userId, todayYmd) }
 }
 
 export function weekRowNoteText(n: WeekRowNote): string | undefined {
   const parts: string[] = []
+  if (n.weekend) parts.push(n.weekend)
   if (n.origin === 'kept') parts.push('kept from last week')
   else if (n.origin === 'month' && n.monthLabel) parts.push(`from ${n.monthLabel}`)
   if (n.dayLabel) parts.push(n.dayLabel)

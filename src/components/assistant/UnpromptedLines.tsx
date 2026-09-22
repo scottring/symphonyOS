@@ -9,6 +9,7 @@
 // cost a row. When this renders at all, the user asked for it — so the full
 // reasoning gets room to wrap; a truncated reason can't be judged.
 
+import { useState } from 'react'
 import { Sparkles, X } from 'lucide-react'
 import type { UnpromptedItem, UnpromptedDecisionLog } from '@/hooks/useUnpromptedSuggestions'
 import { resolveSuggestionAction, actionLabel } from '@/lib/assistant/suggestionAction'
@@ -17,12 +18,14 @@ interface Props {
   items: UnpromptedItem[]
   onAct: (item: UnpromptedItem) => void
   onSnooze: (id: string, scope: 'now' | 'today') => void
+  todayState?: (item: UnpromptedItem) => 'available' | 'added' | null
+  onAddToToday?: (item: UnpromptedItem) => Promise<boolean>
   /** Populated only under ?why=1. */
   decisions?: UnpromptedDecisionLog[]
   showWhy?: boolean
 }
 
-export function UnpromptedLines({ items, onAct, onSnooze, decisions, showWhy }: Props) {
+export function UnpromptedLines({ items, onAct, onSnooze, decisions, showWhy, todayState, onAddToToday }: Props) {
   if (items.length === 0 && !showWhy) return null
 
   return (
@@ -42,7 +45,7 @@ export function UnpromptedLines({ items, onAct, onSnooze, decisions, showWhy }: 
               {s.detail && (
                 <p className="mt-0.5 text-[13px] leading-relaxed text-neutral-500">{s.detail}</p>
               )}
-              <div className="mt-1.5 flex items-center gap-3">
+              <div className="mt-1.5 flex flex-wrap items-center gap-3">
                 <button
                   type="button"
                   onClick={() => onAct(item)}
@@ -50,6 +53,8 @@ export function UnpromptedLines({ items, onAct, onSnooze, decisions, showWhy }: 
                 >
                   {actionLabel(action)}
                 </button>
+                {todayState?.(item) === 'added' ? <span className="text-[13px] text-neutral-500">On today's tasks</span>
+                  : todayState?.(item) === 'available' && onAddToToday ? <AddToToday onAdd={() => onAddToToday(item)} /> : null}
                 <button
                   type="button"
                   onClick={() => onSnooze(s.id, 'now')}
@@ -84,4 +89,21 @@ export function UnpromptedLines({ items, onAct, onSnooze, decisions, showWhy }: 
       )}
     </div>
   )
+}
+
+function AddToToday({ onAdd }: { onAdd: () => Promise<boolean> }) {
+  const [pending, setPending] = useState(false)
+  const [added, setAdded] = useState(false)
+  const [failed, setFailed] = useState(false)
+  if (added) return <span className="text-[13px] text-neutral-500">On today's tasks</span>
+  return <>
+    <button type="button" disabled={pending} className="text-[13px] font-medium text-primary-700 hover:underline disabled:opacity-50" onClick={async () => {
+      if (pending) return
+      setPending(true); setFailed(false)
+      try { const saved = await onAdd(); setAdded(saved); setFailed(!saved) }
+      catch { setFailed(true) }
+      finally { setPending(false) }
+    }}>{pending ? 'Adding…' : 'Add to today'}</button>
+    {failed && <span role="alert" className="text-[13px] text-red-600">Could not add to today. Try again.</span>}
+  </>
 }

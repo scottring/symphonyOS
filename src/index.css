@@ -1965,21 +1965,144 @@ html.desktop-shell a {
 }
 
 
-/* Destination navigation and page-local planning tools are separate levels. */
-.plan-page-tools { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; padding: 0 0 16px; }
-.plan-period-controls { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
-.plan-period-navigation { display: flex; flex-wrap: wrap; gap: 4px; }
-.plan-period-navigation a { padding: 8px 10px; color: var(--color-neutral-500); font-size: 14px; border-bottom: 2px solid transparent; }
-.plan-period-navigation a.is-current { color: var(--color-neutral-900); border-bottom-color: currentColor; font-weight: 600; }
-.plan-range-control { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--color-neutral-500); }
-.plan-range-control select { background: transparent; padding: 6px; max-width: 150px; }
-.task-chooser-control { margin-left: auto; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-.task-chooser-control button { display: inline-flex; align-items: center; gap: 6px; padding: 8px 10px; border: 1px solid var(--color-neutral-300); border-radius: 6px; font-size: 13px; color: var(--color-neutral-700); }
-.task-chooser-control button[aria-pressed="true"] { background: var(--color-neutral-100); }
+/* Planning toolbar shares the page's content gutter and groups related tools. */
+.plan-page-tools { display: flex; align-items: center; justify-content: flex-start; flex-wrap: wrap; gap: 8px; max-width: 1152px; padding: 0 56px 12px; }
+.plan-period-controls { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.plan-period-navigation { display: flex; gap: 2px; padding: 3px; border-radius: 7px; background: var(--color-neutral-100); }
+.plan-period-navigation a { padding: 6px 11px; color: var(--color-neutral-500); font-size: 13px; border-radius: 5px; white-space: nowrap; }
+.plan-period-navigation a.is-current { color: var(--color-neutral-900); background: white; box-shadow: 0 1px 3px #233b5815; font-weight: 600; }
+.plan-range-control { display: flex; align-items: center; font-size: 12px; color: var(--color-neutral-500); }
+.plan-range-control select { background: transparent; padding: 6px 4px; max-width: 130px; }
+.task-chooser-control { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.task-chooser-control button, .goals-reference-control button { display: inline-flex; align-items: center; gap: 5px; padding: 7px 8px; border: 0; border-radius: 5px; font-size: 12px; color: var(--color-neutral-600); }
+.task-chooser-control button:hover, .goals-reference-control button:hover { background: var(--color-neutral-100); }
+.task-chooser-control button[aria-pressed="true"], .goals-reference-control button[aria-expanded="true"] { background: var(--color-neutral-100); color: var(--color-neutral-900); }
 .task-chooser-control span { font-size: 12px; color: var(--color-neutral-500); }
-/* The ◎ Goals reference sits beside "Choose tasks", in the same row and the
-   same shape — it opens a reference sheet, it never changes the page. */
 .goals-reference-control { display: flex; align-items: center; }
-.goals-reference-control button { display: inline-flex; align-items: center; gap: 6px; padding: 8px 10px; border: 1px solid var(--color-neutral-300); border-radius: 6px; font-size: 13px; color: var(--color-neutral-700); }
-.goals-reference-control button[aria-expanded="true"] { background: var(--color-neutral-100); }
-@media (max-width: 767px) { .plan-page-tools { padding: 8px 16px; } .plan-period-navigation a { min-height: 44px; display: flex; align-items: center; } }
+@media (min-width: 768px) {
+  .desktop-workspace-nav .page-navigation { padding-top: 14px; padding-bottom: 10px; }
+}
+@media (min-width: 768px) and (max-width: 1023px) { .plan-page-tools { padding-inline: 40px; } }
+@media (max-width: 767px) {
+  .plan-page-tools { padding: 8px 16px; }
+  .plan-period-navigation a { min-height: 44px; display: flex; align-items: center; }
+}
+
+/* Keep task titles readable in the compact week reference. */
+.plan-reference-row { display: grid; grid-template-columns: 14px 16px minmax(0, 1fr); }
+.plan-reference-row > :last-child { grid-column: 3; justify-self: start; }
+
+@media (max-width: 640px) {
+  .plan-reference-row { grid-template-columns: 0 40px minmax(0, 1fr); }
+}
+
+/* Row menus must escape the action group, including the mobile overflow reset. */
+div.chooser-action-group { overflow: visible !important; }
+
+/* Week planning: one source shelf, commitments, then the days. */
+.shelf-sources { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 3px; padding: 4px; margin-top: 18px; background: #f2f4f6; border-radius: 8px; }
+.shelf-sources button { padding: 8px 2px; font-size: 12px; color: #68788e; border-radius: 5px; }
+.shelf-sources button[aria-pressed="true"] { background: white; color: #233b5a; box-shadow: 0 1px 3px #18304915; font-weight: 600; }
+.shelf-search { width: 100%; margin-top: 16px; padding: 9px 10px; border: 1px solid #dfe5ec; border-radius: 6px; font-size: 13px; background: white; }
+.shelf-intro { margin: 14px 0; font-size: 12px; line-height: 1.6; color: #697a91; }
+.shelf-intro a { display: block; margin-top: 4px; color: #314f76; }
+.shelf-goals { padding: 10px 0; border-bottom: 1px solid #e4e9ef; font-size: 13px; }
+.shelf-goals summary { cursor: pointer; color: #425b79; }
+.shelf-goals ul { display: grid; gap: 10px; padding: 12px 0; }
+.week-plan-status { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; margin: 0 0 16px; padding: 8px 0; }
+.week-display-tools { display: flex; align-items: center; justify-content: flex-end; gap: 8px; margin-bottom: 12px; }
+.week-commitments { padding: 18px 20px; margin-bottom: 26px; background: #f7f8fa; border: 1px solid #e5e9ef; border-radius: 8px; }
+.week-task-groups { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr)); gap: 22px 28px; margin-top: 18px; }
+.week-task-group h3, .journal-day-groups h3 { font-size: 10px; font-weight: 600; letter-spacing: .09em; text-transform: uppercase; color: #76859a; margin-bottom: 10px; }
+.week-task-group ul { display: grid; gap: 12px; }
+.week-task-group li { font-size: 14px; }
+.week-completed-toggle { display: block; font-size: 12px; color: #728197; margin-top: 16px; }
+.week-days-heading { font-family: var(--font-display, Georgia, serif); font-size: 20px; color: #253b58; margin-bottom: 12px; }
+.journal-day-groups { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr)); gap: 18px 28px; }
+@media (max-width: 767px) {
+  .week-commitments { padding: 14px; }
+  .shelf-sources button { min-width: 0 !important; }
+  .week-task-groups, .journal-day-groups { grid-template-columns: minmax(0, 1fr); }
+}
+.week-plan-tools { display: flex; align-items: center; gap: 8px; margin-left: auto; }
+.plan-reference-static { grid-template-columns: 16px minmax(0, 1fr); column-gap: 10px; }
+.plan-reference-static > :first-child { display: none; }
+.plan-reference-static > :last-child { grid-column: 2; }
+@media (max-width: 767px) { .plan-reference-static { grid-template-columns: 40px minmax(0, 1fr); } }
+.journal-check { display: grid; place-items: center; width: 20px; height: 20px; }
+@media (max-width: 767px) { .journal-check { min-width: 40px !important; } }
+
+@media (min-width: 768px) and (max-width: 1023px) {
+  .plan-page-tools[data-period="week"] .task-chooser-control > button { display: none; }
+}
+@media (max-width: 767px) {
+  .plan-page-tools .plan-period-controls { display: contents; }
+  .plan-page-tools .plan-period-navigation { flex-basis: 100%; }
+  .plan-page-tools .plan-period-navigation a { flex: 1; justify-content: center; }
+  .plan-page-tools .goals-reference-control { margin-left: auto; }
+}
+
+/* Today uses the same quiet hierarchy as Week, with the day's work first. */
+.today-focus-card { background: #f7f8fa; border: 1px solid #e5e9ef; border-radius: 8px; padding: 18px 20px 12px; }
+.today-focus-card .daybook-journal-heading { border-bottom: 0; padding-bottom: 10px; }
+.today-focus-card .schedule-empty-time { display: none; }
+.today-completed { border-top: 1px solid #e1e6ed; margin-top: 12px; padding-top: 12px; }
+.today-completed > button { display: inline-flex; align-items: center; gap: 5px; color: #728197; font-size: 12px; }
+.today-shelves .shelf-sources { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.today-shelves .chooser-section { margin-top: 18px; }
+.today-shelves .chooser-rows > li { display: grid; grid-template-columns: 16px minmax(0, 1fr); column-gap: 8px; }
+.today-shelves .chooser-rows > li:not(.chooser-row-routine) > div:first-of-type { grid-column: 2; }
+.today-shelves .chooser-rows > li.chooser-row-routine > svg { grid-column: 1; grid-row: 1; }
+.today-shelves .chooser-rows > li.chooser-row-routine > :first-child { display: none; }
+.today-shelves .chooser-rows > li > :last-child { grid-column: 2; justify-self: start; }
+@media (max-width: 767px) { .today-focus-card { padding: 14px 12px 12px; } .today-focus-card .daybook-journal-heading { flex-wrap: wrap; gap: 10px; } }
+.today-focus-card .schedule-time-column { display: none; }
+
+/* Broader horizons: goals lead; tasks and reference material have distinct homes. */
+.period-plan-context { display:flex; align-items:baseline; justify-content:space-between; gap:16px; margin:20px 0 8px; }
+.period-plan-status { display:flex; align-items:center; flex-wrap:wrap; gap:12px; margin-bottom:24px; }
+.period-plan-layout { display:grid; gap:28px; align-items:start; }
+.period-plan-main { min-width:0; display:flex; flex-direction:column; gap:28px; }
+.period-goals-card { min-width:0; padding:22px; border:1px solid #e3e8e5; border-radius:12px; background:#f7f9f7; }
+.period-tasks-card { min-width:0; padding:0 4px; }
+.period-section-note { margin:6px 4px 0; font-size:12px; line-height:1.6; color:#788596; }
+.period-group-label { margin:18px 8px 6px; font-size:11px; font-weight:600; letter-spacing:.055em; text-transform:uppercase; color:#758293; }
+.period-group-label span { margin-left:6px; font-weight:400; }
+.period-assigned-fold { margin-top:18px; padding-top:12px; border-top:1px solid #e0e5e9; }
+.period-assigned-fold > summary { cursor:pointer; color:#66778c; font-size:13px; padding:4px; }
+.period-shelves { min-width:0; padding:20px; border:1px solid #e6e9ed; border-radius:12px; display:flex; flex-direction:column; gap:18px; }
+.period-plan-page .period-plan-row { position:relative; gap:10px; padding:14px 6px; }
+.period-plan-page .period-row-actions { position:absolute; right:4px; top:4px; background:var(--color-bg-elevated, #fff); border-radius:6px; box-shadow:0 1px 5px #263a5012; }
+.period-plan-page .period-row-check { min-width:18px; min-height:18px; }
+@media (min-width:1024px) {
+
+}
+@media (max-width:639px) {
+  .period-goals-card, .period-shelves { padding:16px 12px; }
+  .period-plan-layout, .period-plan-main { gap:24px; }
+  .period-plan-page .period-row-check { width:18px !important; height:18px !important; min-width:18px !important; min-height:18px !important; margin-top:5px; position:relative; }
+  .period-plan-page .period-row-check::after { content:''; position:absolute; inset:-12px; }
+  .period-plan-context { gap:8px; flex-wrap:wrap; }
+}
+.period-plan-page .period-row-actions { pointer-events:none; }
+.period-plan-page .period-plan-row:hover > .period-row-actions,
+.period-plan-page .period-row-actions:focus-within { pointer-events:auto; }
+@media (max-width:639px) {
+  .period-plan-page .period-row-check { padding:0 !important; }
+  .period-plan-page .period-row-title { padding:0; min-height:32px; font-size:16px; }
+  .period-plan-page .period-plan-row { padding:12px 4px; }
+  .period-plan-page .period-goals-card h2,
+  .period-plan-page .period-tasks-card h2 { font-size:22px; }
+  .period-goals-card > div:first-child > button { padding:4px 6px; font-size:13px; min-height:32px; }
+  .period-plan-context button { padding:6px 0; font-size:13px; min-height:36px; }
+  .period-plan-status button { padding:6px 10px; font-size:13px; min-height:36px; }
+  .period-plan-page .period-plan-status { margin-bottom:18px; }
+}
+@media (max-width:639px) {
+  .period-plan-page .period-return { padding:4px 8px; min-height:32px; font-size:11px; }
+  .period-plan-page input { font-size:16px; }
+}
+/* Period shelves use the shared collapsible dock, not a second page column. */
+.reference-dock .period-shelves,
+[role="dialog"] .period-shelves { padding:0; border:0; border-radius:0; }
+.period-shelves > header { padding-bottom:16px; border-bottom:1px solid var(--color-neutral-300); }

@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, within, cleanup } from '@testing-library/react'
+import { ReferenceListsProvider, useReferenceLists } from '@/components/reference/ReferenceListsContext'
 import { MemoryRouter } from 'react-router-dom'
 import type { Task } from '@/types/task'
 import type { Goal } from '@/types/goal'
@@ -96,6 +97,27 @@ describe('PeriodPlanPage', () => {
     mockNavigate.mockClear()
   })
 
+  it('renders contextual shelves into the shared dock only while opened', () => {
+    function DockHarness() {
+      const refs = useReferenceLists()!
+      const opened = refs.pins.some((p) => p.kind === 'today')
+      return <>
+        <button onClick={() => refs.pin('today')}>Open test shelves</button>
+        {opened && <div data-testid="shelves-slot" ref={refs.setShelvesTarget} />}
+        <PeriodPlanPage level="month" />
+      </>
+    }
+    render(<MemoryRouter><ReferenceListsProvider userId="period-dock-test"><DockHarness /></ReferenceListsProvider></MemoryRouter>)
+    expect(screen.queryByRole('complementary', { name: 'Shelves' })).toBeNull()
+    fireEvent.click(screen.getByText('Open test shelves'))
+    const slot = screen.getByTestId('shelves-slot')
+    expect(within(slot).getByRole('complementary', { name: 'Shelves' })).toBeInTheDocument()
+    expect(within(slot).getByRole('complementary', { name: 'This Season' })).toBeInTheDocument()
+    fireEvent.click(within(slot).getByRole('button', { name: 'Close shelves' }))
+    expect(screen.queryByTestId('shelves-slot')).toBeNull()
+    expect(screen.getByRole('heading', { name: 'Month goals' })).toBeInTheDocument()
+  })
+
   it("This Month: goals first, then tasks, each under its own heading; Iris's rows stay out", () => {
     const placed = task({ title: 'Repaint the porch', monthStart: thisMonth })
     state.tasks = [
@@ -113,8 +135,8 @@ describe('PeriodPlanPage', () => {
     // only tell. Goals come first, and the goal is in the GOALS list.
     const goals = screen.getByRole('region', { name: /goals$/ })
     const list = screen.getByRole('region', { name: /list$/ })
-    expect(within(goals).getByRole('heading', { name: `${monthName} goals` })).toBeInTheDocument()
-    expect(within(list).getByRole('heading', { name: `${monthName} tasks` })).toBeInTheDocument()
+    expect(within(goals).getByRole('heading', { name: 'Month goals' })).toBeInTheDocument()
+    expect(within(list).getByRole('heading', { name: 'Month tasks' })).toBeInTheDocument()
     expect(goals.compareDocumentPosition(list) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
     expect(within(goals).getByText('Read more')).toBeInTheDocument()
     expect(within(list).queryByText('Read more')).not.toBeInTheDocument()
@@ -141,6 +163,26 @@ describe('PeriodPlanPage', () => {
   // One enduring action (2026-09-21): a month row taken into a week is the
   // SAME row carrying a week commitment. It stays on the month list, says
   // where the work went, and the status opens the row itself.
+  it('keeps assigned tasks in a separate fold without using the available-task preview', () => {
+    const wk = new Date(now.getFullYear(), now.getMonth(), 13)
+    state.tasks = [
+      task({ title: 'Already in a week', bucket: 'week', weekStart: wk, monthStart: thisMonth, commitments: [
+        { level: 'month', periodStart: thisMonth, status: 'open' },
+        { level: 'week', periodStart: wk, status: 'open' },
+      ] }),
+      ...Array.from({ length: 6 }, (_, i) => task({ title: `Available ${i}`, monthStart: thisMonth })),
+    ]
+    renderPage('month')
+    const assigned = screen.getByText('Already in a week').closest('details')
+    expect(assigned).not.toHaveAttribute('open')
+    expect(assigned).toHaveTextContent('Already assigned · 1')
+    expect(screen.getByText('Available 4')).toBeInTheDocument()
+    expect(screen.queryByText('Available 5')).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Show all 6 — 1 more' }))
+    expect(screen.getByText('Available 5')).toBeInTheDocument()
+    expect(hook.pushTask).not.toHaveBeenCalled()
+  })
+
   it('a placed row says ONE thing — where the work went — and follows to it', () => {
     const wk = new Date(now.getFullYear(), now.getMonth(), 13)
     const row = task({ title: 'Repaint the porch', bucket: 'week', weekStart: wk, monthStart: thisMonth, commitments: [
@@ -184,6 +226,7 @@ describe('PeriodPlanPage', () => {
   it('a goal you completed can be reopened from its own tick', () => {
     state.goals = [goal({ name: 'Read more', status: 'completed' })]
     renderPage('year')
+    expect(screen.getByText('Read more').closest('details')).not.toHaveAttribute('open')
     const tick = screen.getByRole('button', { name: 'Reopen Read more' })
     expect(tick).not.toBeDisabled()
     fireEvent.click(tick)
@@ -206,8 +249,8 @@ describe('PeriodPlanPage', () => {
 
   it('lists the month\'s routine PATTERNS in the reference column — no checkboxes', () => {
     routinesState.routines = [
-      routine({ name: 'Kitchen laundry', recurrence_pattern: { type: 'weekly' } }),
-      routine({ name: 'Family planning', recurrence_pattern: { type: 'weekly', days: ['sun'] } }),
+      routine({ name: 'Kitchen laundry', recurrence_pattern: { type: 'monthly' } }),
+      routine({ name: 'Family planning', recurrence_pattern: { type: 'monthly', day_of_month: 3 } }),
     ]
     renderPage('month')
     const panel = screen.getByRole('region', { name: 'Recurring commitments' })
@@ -215,10 +258,10 @@ describe('PeriodPlanPage', () => {
     expect(within(panel).queryByText('Kitchen laundry')).not.toBeInTheDocument()
     fireEvent.click(within(panel).getByRole('button', { name: /Recurring commitments/ }))
     expect(within(panel).getByText('Kitchen laundry')).toBeInTheDocument()
-    expect(within(panel).getByText(/Every week/)).toBeInTheDocument()
+    expect(within(panel).getByText(/Every month/)).toBeInTheDocument()
     // describeRecurrence is the app's one cadence vocabulary — the page does
     // not invent a second one.
-    expect(within(panel).getByText(/Every Sun$/)).toBeInTheDocument()
+    expect(within(panel).getByText(/Monthly on the 3rd/)).toBeInTheDocument()
     // A pattern is reference: nothing here can be ticked off.
     expect(within(panel).queryByRole('button', { name: /^Complete/ })).not.toBeInTheDocument()
     expect(within(panel).queryByRole('checkbox')).not.toBeInTheDocument()
@@ -228,7 +271,7 @@ describe('PeriodPlanPage', () => {
   })
 
   it('only the CURRENT period claims the routines are its own — there is no routine history', () => {
-    routinesState.routines = [routine({ name: 'Kitchen laundry' })]
+    routinesState.routines = [routine({ name: 'Kitchen laundry', recurrence_pattern: { type: 'monthly' } })]
     renderPage('month')
     expect(screen.getByRole('region', { name: 'Recurring commitments' })).toBeInTheDocument()
     // Page back: the same patterns are all we know, so the heading stops
@@ -238,8 +281,8 @@ describe('PeriodPlanPage', () => {
     expect(screen.getByRole('region', { name: 'Current recurring commitments' })).toBeInTheDocument()
   })
 
-  it('the year plans in goals alone — no routine patterns, no calendar', () => {
-    routinesState.routines = [routine({ name: 'Kitchen laundry' })]
+  it('year shelves exclude faster routine patterns', () => {
+    routinesState.routines = [routine({ name: 'Kitchen laundry', recurrence_pattern: { type: 'monthly' } })]
     renderPage('year')
     expect(screen.queryByRole('region', { name: /recurring commitments$/i })).not.toBeInTheDocument()
   })
@@ -478,7 +521,7 @@ describe('PeriodPlanPage', () => {
     renderPage('year')
     expect(screen.getByRole('heading', { name: String(now.getFullYear()) })).toBeInTheDocument()
     expect(screen.getByText('Run a half marathon')).toBeInTheDocument()
-    expect(screen.queryByRole('complementary')).not.toBeInTheDocument()
+    expect(screen.queryByRole('complementary', { name: 'This Year' })).not.toBeInTheDocument()
     // no Someday for a goal, ever
     fireEvent.click(screen.getByRole('button', { name: `Review ${now.getFullYear() - 1}` }))
     expect(screen.getByText('Old goal')).toHaveClass('line-through')
@@ -886,21 +929,21 @@ describe('PeriodPlanPage — Plan <Month>', () => {
     expect(screen.getByRole('button', { name: `Continue planning ${label}` })).toBeInTheDocument()
   })
 
-  it('an empty, unplanned year invites the session from its empty goals list', () => {
+  it('an empty year offers direct goal entry and one planning action', () => {
     vi.setSystemTime(new Date(2026, 11, 20))
     renderPageAt('year', '/year?start=2027-01-01')
-    expect(screen.getByText(/Nothing yet\./)).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Plan 2027 →' })).toBeInTheDocument()
+    expect(screen.getByRole('textbox', { name: 'New goal for 2027' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Plan 2027' })).toBeInTheDocument()
   })
 
   it('the season page and the year page each carry a planning bar', () => {
     const view = renderPage('season')
     expect(screen.getByRole('button', { name: 'Plan Fall 2026' })).toBeInTheDocument()
-    expect(screen.getByText(/not planned yet/i)).toBeInTheDocument()
+    expect(screen.getByText(/^0 goals/)).toBeInTheDocument()
     view.unmount()
     renderPage('year')
     expect(screen.getByRole('button', { name: 'Plan 2026' })).toBeInTheDocument()
-    expect(screen.getByText(/not planned yet/i)).toBeInTheDocument()
+    expect(screen.getByText(/^0 goals/)).toBeInTheDocument()
   })
 
   it('the season page plans the season: look back at the previous season, keep into this one, add a task toward a season goal, save once', async () => {

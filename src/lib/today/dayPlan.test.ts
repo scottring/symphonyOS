@@ -336,3 +336,26 @@ describe('chooser — this week\'s tasks and today\'s routines', () => {
     expect(plan.chooserRoutines[1]).toMatchObject({ routine: unhomed, context: 'Weekly routine · no set day' })
   })
 })
+
+it('month reference follows the displayed period and retains goals and tasks already placed in a week', () => {
+  const october = new Date(2026, 9, 1)
+  const task = createMockTask({ id: 'oct', bucket: 'week', weekStart: new Date(2026, 9, 4), commitments: [
+    { level: 'month', periodStart: october, status: 'open' },
+    { level: 'week', periodStart: new Date(2026, 9, 4), status: 'open' },
+  ] })
+  const goal = createMockTask({ id: 'goal', isGoal: true, bucket: 'month', monthStart: october })
+  const september = createMockTask({ id: 'sep', bucket: 'month', monthStart: new Date(2026, 8, 1) })
+  const plan = selectDayPlan(input({ tasks: [task, goal, september], referenceMonth: october }))
+  expect(plan.month.map(entry => entry.id)).toEqual(['oct', 'goal'])
+})
+
+it('offers the same weekend task on Sunday across the week boundary, without dating it or carrying it into Monday', () => {
+  const saturday = new Date(2026, 8, 26)
+  const task = createMockTask({ id: 'weekend', weekendStart: saturday, bucket: 'week', weekStart: new Date(2026, 8, 20), commitments: [{ level: 'week', periodStart: new Date(2026, 8, 20), status: 'open' }] })
+  const sunday = selectDayPlan(input({ tasks: [task], viewedDate: new Date(2026, 8, 27), weekStart: new Date(2026, 8, 27) }))
+  expect(sunday.chooserTasks.map(entry => entry.id)).toContain('weekend')
+  expect(sunday.chooserTasks[0].context).toContain('Weekend · Sep 26–Sep 27')
+  expect(task.scheduledFor).toBeUndefined()
+  const monday = selectDayPlan(input({ tasks: [task], viewedDate: new Date(2026, 8, 28), weekStart: new Date(2026, 8, 27) }))
+  expect(monday.chooserTasks.map(entry => entry.id)).not.toContain('weekend')
+})

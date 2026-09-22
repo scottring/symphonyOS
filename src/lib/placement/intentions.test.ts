@@ -269,3 +269,24 @@ describe('season Keep and Drop match the season by range', () => {
     expect(planDropCommitment(t, 'month', fall).commitmentOps).toEqual([])
   })
 })
+
+
+describe('flexible weekend placement', () => {
+  const saturday = new Date(2026, 8, 26)
+  it('keeps month and week commitments without creating a scheduled day', () => {
+    const p = planPlacement(task({ bucket: 'month', commitments: [c('month', SEP)] }), { bucket: 'week', weekStart: WK20, weekendStart: saturday, scheduledFor: undefined, plannedOn: undefined }, ctx)
+    expect(p.local.weekendStart).toEqual(saturday)
+    expect(p.local.scheduledFor).toBeUndefined()
+    expect(p.local.commitments).toEqual([c('month', SEP), c('week', WK20)])
+  })
+  it('keeps weekend context when choosing Sunday, and clears it when explicitly planning another day', () => {
+    const t = task({ weekendStart: saturday, bucket: 'week', commitments: [c('week', WK20)] })
+    expect(planPlacement(t, { scheduledFor: WK27 }, ctx).local.weekendStart).toEqual(saturday)
+    expect(planPlacement(t, { scheduledFor: new Date(2026, 8, 28) }, ctx).local.weekendStart).toBeUndefined()
+  })
+  it('keeping a week does not silently carry its weekend window forward', () => {
+    const t = task({ weekendStart: saturday, bucket: 'week', commitments: [c('week', WK20)] })
+    expect(planKeep(t, 'week', WK27, WK20).local.weekendStart).toBeUndefined()
+    expect(planDropCommitment(t, 'week', WK20).local.weekendStart).toBeUndefined()
+  })
+})

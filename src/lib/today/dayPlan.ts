@@ -35,7 +35,8 @@ import { buildRoutineStatusMap, selectVisibleRoutines } from './statusMaps'
 import { buildRoutineDayItems } from './grouping'
 import { deferredInRoutineIds } from './deferredRoutines'
 import { groupRoutineSteps } from './routineCollections'
-import { selectHorizonPool } from './horizons'
+import { inTaskWeekend } from '@/lib/planning/weekend'
+import { committedTo } from '@/lib/placement/model'
 import { selectCarriedOver } from './taskPools'
 import { localYmd } from '@/lib/cadence/config'
 import { monthStartOf } from '@/lib/planning/periodPlacement'
@@ -77,6 +78,7 @@ export interface DayPlanEntry {
 }
 
 export interface DayPlan {
+  weekRoutineDays?: import('@/lib/planning/weekRoutineChoices').WeekRoutineDay[]
   /** Yesterday's (and the day before's) unfinished commitments, inside
    *  Today's grace window and not yet chosen for today. Computed for years
    *  (selectCarriedOver) but drawn nowhere since 2026-09-03; the walkthrough
@@ -125,6 +127,7 @@ export interface DayPlanInput {
   /** Instances touching the viewed day (getInstancesForDate). */
   dateInstances: ActionableInstance[]
   viewedDate: Date
+  referenceMonth?: Date
   selectedAssignee: AssigneeFilter
   hideRoutines: boolean
   layers: ReadonlySet<Layer>
@@ -254,7 +257,7 @@ export function unfinishedEntries(args: {
   const currentWeek = weekStartAnchor(now, readCadenceConfig().weekStartsOn)
   const missed = flatten(tasks)
     .filter((t) => !t.completed && match(t.assignedTo, t.assignedToAll) && !chosen(t) && isRecentMiss(t.scheduledFor, t.completed, now))
-  const leftBehind = selectStaleWeekPlacements(tasks, currentWeek, match).filter((t) => !t.scheduledFor && !chosen(t))
+  const leftBehind = selectStaleWeekPlacements(tasks, currentWeek, match).filter((t) => !t.scheduledFor && !chosen(t) && !inTaskWeekend(t, now))
   const seen = new Set<string>()
   const when = (t: Task) => (t.scheduledFor ?? t.weekStart ?? t.createdAt).getTime()
   return [...missed, ...leftBehind]
@@ -371,7 +374,13 @@ export function selectDayPlan(input: DayPlanInput): DayPlan {
   const week = weekListEntries(input.tasks, match, input.weekStart, ymd, input.userId)
   const isToday = ymd === localYmd(new Date())
   const carried = selectCarriedOver(input.tasks, isToday, match).filter((t) => !chosen(t)).map(listEntry('carried'))
-  const month = selectHorizonPool(input.tasks, 'month', match, undefined, monthStartOf(input.viewedDate)).map(listEntry('month'))
+  const monthStart = monthStartOf(input.referenceMonth ?? input.viewedDate)
+  const currentMonth = monthStartOf(input.now ?? new Date())
+  const month = input.tasks.filter((task) => {
+    if (!match(task.assignedTo, task.assignedToAll)) return false
+    const commitment = committedTo(task, 'month', monthStart, { isCurrent: localYmd(monthStart) === localYmd(currentMonth) })
+    return commitment && (commitment === 'legacy' || !['removed', 'carried'].includes(commitment.status))
+  }).map(listEntry('month'))
 
   const now = input.now ?? new Date()
   const toPlan = toPlanEntries({
@@ -387,6 +396,14 @@ export function selectDayPlan(input: DayPlanInput): DayPlan {
   // day — choosable ones (chosen ones stay, marked), the ones already on the
   // day by rule, and weekly routines with no day yet.
   const chooserTasks = toPlan.filter((e) => e.kind === 'task')
+  // Sunday may be in a different calendar week; the explicit weekend window
+  // still offers the same task, without making another week commitment.
+  const chooserIds = new Set(chooserTasks.map((entry) => entry.id))
+  for (const task of input.tasks) {
+    if (task.completed || task.isGoal || chooserIds.has(task.id) || !inTaskWeekend(task, input.viewedDate)) continue
+    if (!match(task.assignedTo, task.assignedToAll)) continue
+    chooserTasks.push({ ...listEntry('week')(task), context: weekRowNoteText(weekRowNote(task, input.weekStart, input.userId, ymd)) })
+  }
   const chooserRoutines: DayPlanEntry[] = [
     ...available.map((e) => {
       const r = byId.get(e.id)

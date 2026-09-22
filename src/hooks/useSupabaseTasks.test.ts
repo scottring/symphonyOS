@@ -900,6 +900,20 @@ describe('useSupabaseTasks', () => {
   })
 
   describe('updateTask', () => {
+    it('persists a flexible weekend as a local DATE and clears it when replanned', async () => {
+      mockSupabaseData.push(createMockDbTask({ id: 'task-1', title: 'Task', bucket: 'month', month_start: '2026-09-01' }))
+      const { result } = renderHook(() => useSupabaseTasks())
+      await waitFor(() => expect(result.current.tasks).toHaveLength(1))
+      await act(async () => {
+        await result.current.updateTask('task-1', { bucket: 'week', weekStart: new Date(2026, 8, 20), weekendStart: new Date(2026, 8, 26), scheduledFor: undefined })
+      })
+      expect(mockUpdate).toHaveBeenCalledWith(expect.objectContaining({ weekend_start: '2026-09-26', scheduled_for: null }))
+      expect(result.current.tasks[0].weekendStart).toEqual(new Date(2026, 8, 26))
+      await act(async () => { await result.current.updateTask('task-1', { bucket: 'someday' }) })
+      expect(mockUpdate).toHaveBeenCalledWith(expect.objectContaining({ weekend_start: null }))
+      expect(result.current.tasks[0].weekendStart).toBeUndefined()
+    })
+
     it('maps monthStart/seasonStart to DATE strings and isGoal to is_goal', async () => {
       mockSupabaseData.push(createMockDbTask({ id: 'task-1', title: 'Task', bucket: 'month' }))
       const { result } = renderHook(() => useSupabaseTasks())

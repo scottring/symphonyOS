@@ -1,3 +1,4 @@
+import { keepsWeekView } from '@/lib/week/keepsWeekView'
 import { useLocation } from 'react-router-dom'
 import { presetRange, weekRange, weekRangeFromStartParam } from '@/lib/planning/dateRange'
 import { useState, useMemo, useCallback, useEffect, useRef, type ReactNode } from 'react'
@@ -230,8 +231,11 @@ export function HomeView({
     onDateChangeRef.current = onDateChange
     viewedDateRef.current = viewedDate
   })
+  const previousWeekLocation = useRef<{ pathname: string; search: string } | null>(null)
   useEffect(() => {
-    if (fixedView !== 'week') return
+    const keepView = keepsWeekView(previousWeekLocation.current, location)
+    previousWeekLocation.current = { pathname: location.pathname, search: location.search }
+    if (fixedView !== 'week' || keepView) return
     const range = weekRangeFromStartParam(startParam, readCadenceConfig().weekStartsOn)
       ?? (rangePreset === 'weekend' || rangePreset === 'three'
         ? presetRange(rangePreset, new Date())
@@ -244,7 +248,7 @@ export function HomeView({
     if (sundayOfWeek(viewedDateRef.current).getTime() !== sundayOfWeek(range[0]).getTime()) {
       onDateChangeRef.current(range[0])
     }
-  }, [fixedView, rangePreset, startParam, location.key])
+  }, [fixedView, rangePreset, startParam, location.key, location.pathname, location.search])
 
   // Changing the setting re-anchors the week on screen. Without this the view
   // keeps whatever the initial state captured until a remount, so the setting

@@ -1,3 +1,4 @@
+import { weekendPlacement } from './weekend'
 /**
  * The writes behind every plan gesture — pin buttons, pin drags, the Today
  * reopen line, Week day drops — so each surface places work the same way.
@@ -60,6 +61,7 @@ function midnight(d: Date): Date {
 export function makePlanActions(deps: PlanActionDeps) {
   const snapshot = (t: Task): Partial<Task> => ({
     bucket: t.bucket, scheduledFor: t.scheduledFor, isAllDay: t.isAllDay,
+    weekendStart: t.weekendStart,
   })
   const snapshotWithFocus = (t: Task): Partial<Task> => ({ ...snapshot(t), focus: focusSnapshot(t) })
 
@@ -69,14 +71,16 @@ export function makePlanActions(deps: PlanActionDeps) {
    */
   async function chooseTaskDay(taskId: string, day: Date, opts: { focus?: boolean } = {}) {
     const t = deps.findTask(taskId)
-    if (!t) return
+    if (!t) return false
     const d = midnight(day)
     const focus = (opts.focus ?? true) && localYmd(d) === localYmd(new Date())
     const prev = focus ? snapshotWithFocus(t) : snapshot(t)
-    await deps.updateTask(taskId, focus
+    const result = await deps.updateTask(taskId, focus
       ? { bucket: 'timed', scheduledFor: d, isAllDay: true, plannedOn: d }
       : { bucket: 'timed', scheduledFor: d, isAllDay: true })
+    if (result === false) return false
     deps.pushAction?.(focus ? `Planned "${t.title}" for today` : `Moved "${t.title}"`, () => { void deps.updateTask(taskId, prev) })
+    return true
   }
 
   /** Un-choose for ONE day: only this person's focus on `day` goes. */
@@ -93,11 +97,19 @@ export function makePlanActions(deps: PlanActionDeps) {
     const t = deps.findTask(taskId)
     if (!t) return
     const prev = snapshot(t)
-    await deps.updateTask(taskId, {
+    const result = await deps.updateTask(taskId, {
       bucket: 'timed', scheduledFor: when, isAllDay: false,
       endTime: new Date(when.getTime() + DEFAULT_DURATION_MS),
     })
+    if (result === false) return
     deps.pushAction?.(`Scheduled "${t.title}"`, () => { void deps.updateTask(taskId, prev) })
+  }
+
+  async function planTaskWeekend(taskId: string, saturday: Date) {
+    const task = deps.findTask(taskId)
+    if (!task || task.completed || task.isGoal) return false
+    const result = await deps.updateTask(taskId, weekendPlacement(saturday))
+    return result !== false
   }
 
   async function commitTask(taskId: string, period: 'week' | 'month') {
@@ -123,6 +135,7 @@ export function makePlanActions(deps: PlanActionDeps) {
         void deps.setRoutinePlanned(routineId, occurrence, !planned)
       })
     }
+    return ok
   }
 
   /** Apply a drop from the pin. A drop on a day is a date only; a drop onto
@@ -183,7 +196,7 @@ export function makePlanActions(deps: PlanActionDeps) {
     deps.pushAction?.(`Placed "${routine?.name ?? title}"`, () => { if (prev) void deps.updateRoutine?.(routineId, prev) })
   }
 
-  return { chooseTaskDay, unchooseTask, timeTask, commitTask, somedayTask, chooseRoutine, placeRoutineOnce, placeRoutineRule, drop }
+  return { planTaskWeekend, chooseTaskDay, unchooseTask, timeTask, commitTask, somedayTask, chooseRoutine, placeRoutineOnce, placeRoutineRule, drop }
 }
 
 export type PlanActions = ReturnType<typeof makePlanActions>

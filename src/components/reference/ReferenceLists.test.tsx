@@ -162,7 +162,7 @@ describe('The Planning panel', () => {
     mount()
     fireEvent.click(screen.getByRole('button', { name: 'Pin Planning' }))
     fireEvent.click(screen.getByRole('button', { name: 'Pin week list' }))
-    const plan = screen.getByRole('region', { name: 'Choose tasks' })
+    const plan = screen.getByRole('region', { name: 'Shelves' })
     expect(plan).toHaveTextContent("This week's tasks")
     expect(plan).toHaveTextContent('Routines')
     expect(screen.getByText('Book a service visit')).toBeInTheDocument()
@@ -173,15 +173,17 @@ describe('The Planning panel', () => {
   it('restores with the other pins for the same user', () => {
     const view = mount(); fireEvent.click(screen.getByRole('button', { name: 'Pin Planning' })); view.unmount()
     mount()
-    expect(screen.getByRole('region', { name: 'Choose tasks' })).toBeInTheDocument()
+    expect(screen.getByRole('region', { name: 'Shelves' })).toBeInTheDocument()
   })
 
   it('every drag has a button: choose for today, unchoose, set a day or time', () => {
     mount(); fireEvent.click(screen.getByRole('button', { name: 'Pin Planning' }))
-    fireEvent.click(screen.getByRole('button', { name: 'Choose Book the plumber for today' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Plan Book the plumber' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Today', exact: true }))
     expect(planMock.chooseTaskDay).toHaveBeenCalledWith('w', expect.any(Date))
     // Choosing a routine selects this occurrence, never a new task and never
     // the repeating rule.
+    fireEvent.click(screen.getByRole('navigation', { name: 'Shelf source' }).querySelector('button:last-child')!)
     fireEvent.click(screen.getByRole('button', { name: 'Choose Kids clean rooms for today' }))
     expect(planMock.chooseRoutine).toHaveBeenCalledWith('r1', expect.any(Date), true, 'Kids clean rooms')
     // A chosen occurrence reads "Today ✓"; pressing it again removes only today's choice.
@@ -189,8 +191,9 @@ describe('The Planning panel', () => {
     expect(chosen).toHaveAttribute('aria-pressed', 'true')
     fireEvent.click(chosen)
     expect(planMock.chooseRoutine).toHaveBeenCalledWith('r2', expect.any(Date), false, 'Family reading time')
-    fireEvent.click(screen.getByRole('button', { name: 'More for Book the plumber' }))
-    expect(screen.getByRole('menuitem', { name: 'Schedule Book the plumber' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Week tasks', exact: true }))
+    fireEvent.click(screen.getByRole('button', { name: 'Plan Book the plumber' }))
+    expect(screen.getByRole('menuitem', { name: 'Choose date for Book the plumber' })).toBeInTheDocument()
     // A task dated today is on Today's page, not waiting here.
     expect(screen.queryByText('Pick up foot meds')).not.toBeInTheDocument()
   })
@@ -214,6 +217,7 @@ describe('The Planning panel', () => {
       expect(planMock.deleteTask).toHaveBeenCalledWith('w')
       expect(screen.queryByRole('status')).not.toBeInTheDocument()
       // A routine row deletes the routine the same way.
+      fireEvent.click(screen.getByRole('navigation', { name: 'Shelf source' }).querySelector('button:last-child')!)
       fireEvent.click(screen.getByRole('button', { name: 'More for Kids clean rooms' }))
       fireEvent.click(screen.getByRole('menuitem', { name: 'Delete routine: Kids clean rooms' }))
       expect(screen.queryByText('Kids clean rooms')).not.toBeInTheDocument()
@@ -222,22 +226,11 @@ describe('The Planning panel', () => {
     } finally { vi.useRealTimers() }
   })
 
-  it('the header widens the chooser to half the screen for triage, and remembers it', () => {
-    localStorage.removeItem('symphony.chooser.wide')
-    const view = mount(); fireEvent.click(screen.getByRole('button', { name: 'Pin Planning' }))
-    const dock = screen.getByRole('complementary', { name: 'Pinned reference lists' })
-    expect(dock).not.toHaveClass('is-wide')
-    const widen = screen.getByRole('button', { name: 'Widen the chooser for triage' })
-    expect(widen).toHaveAttribute('aria-pressed', 'false')
-    fireEvent.click(widen)
-    expect(dock).toHaveClass('is-wide')
-    // Wide: the row's moves are visible pills, not a ⋯ menu.
-    expect(screen.queryByRole('button', { name: 'More for Book the plumber' })).toBeNull()
-    expect(screen.getByRole('button', { name: 'Delete: Book the plumber' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Narrow the chooser' })).toHaveAttribute('aria-pressed', 'true')
-    view.unmount()
-    mount()
-    expect(screen.getByRole('complementary', { name: 'Pinned reference lists' })).toHaveClass('is-wide')
+  it('keeps the chooser compact despite a stored wide preference', () => {
+    localStorage.setItem('symphony.chooser.wide', '1')
+    mount(); fireEvent.click(screen.getByRole('button', { name: 'Pin Planning' }))
+    expect(screen.getByRole('complementary', { name: 'Pinned reference lists' })).not.toHaveClass('is-wide')
+    expect(screen.queryByRole('button', { name: /Widen the chooser/ })).toBeNull()
     localStorage.removeItem('symphony.chooser.wide')
   })
 
@@ -245,6 +238,7 @@ describe('The Planning panel', () => {
     mount(); fireEvent.click(screen.getByRole('button', { name: 'Pin Planning' }))
     expect(screen.getByText('Book the plumber')).toBeInTheDocument()
     expect(screen.getByText('September plan')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('navigation', { name: 'Shelf source' }).querySelector('button:last-child')!)
     expect(screen.getByText('Weekly routine')).toBeInTheDocument()
     expect(screen.queryByText(/Available today|Carried over/)).toBeNull()
     // Month-to-week selection belongs on the Week page (2026-09-22).

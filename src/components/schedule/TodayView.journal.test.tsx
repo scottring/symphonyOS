@@ -148,7 +148,7 @@ describe('Today as a daily journal', () => {
     expect(screen.getByText(/Choose from this week's tasks, or add something for today/)).toBeInTheDocument()
     // One door, on the heading — no second prompt in the empty state.
     expect(screen.queryByRole('button', { name: /Choose something for today/ })).toBeNull()
-    fireEvent.click(screen.getByRole('button', { name: 'Choose tasks' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Shelves' }))
     expect(screen.getByTestId('pins')).toHaveTextContent('today')
   })
 
@@ -189,4 +189,13 @@ describe('the calendar-clear claim', () => {
     renderView({ tasks: [] })
     expect(screen.queryByText(/Your calendar is clear/)).toBeNull()
   })
+})
+
+it('folds completed untimed work without hiding the ability to reopen and undo it', () => {
+  const done = createMockTask({ id: 'done-focus', title: 'Finished today task', bucket: 'timed', isAllDay: true, scheduledFor: MIDNIGHT, completed: true })
+  renderView({ tasks: [...tasks, done] })
+  expect(screen.queryByText('Finished today task')).toBeNull()
+  fireEvent.click(screen.getByRole('button', { name: 'Completed · 1' }))
+  expect(screen.getByText('Finished today task')).toBeInTheDocument()
+  expect(screen.getByRole('button', { name: 'Completed · 1' })).toHaveAttribute('aria-expanded', 'true')
 })

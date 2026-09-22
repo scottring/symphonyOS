@@ -646,7 +646,7 @@ export function WeekViewV2(props: WeekViewV2Props) {
         id: r.id, kind: 'routine', time: r.startTime ?? undefined, title: r.title, completed, routineId,
       }
       if (r.startTime) timed.get(day.key)!.push(entry)
-      else if (planned || pinned) untimed.get(day.key)!.push(entry)
+      else if (planned || pinned || completed) untimed.get(day.key)!.push(entry)
       else day.available.push({ ...r, completed })
     }
 
@@ -835,6 +835,7 @@ export function WeekViewV2(props: WeekViewV2Props) {
   const weekIsCurrent = sameDay(weekAnchor, weekStartAnchor(new Date(), readCadenceConfig().weekStartsOn))
   const weekListFor = (onPlan: () => void) => (
     <WeekList
+      key={localYmd(weekAnchor)}
       tasks={tasks}
       weekStart={weekAnchor}
       meId={meId}
@@ -842,6 +843,13 @@ export function WeekViewV2(props: WeekViewV2Props) {
       isCurrent={weekIsCurrent}
       onToggle={(task) => handleJournalToggle({ id: `task-${task.id}`, kind: 'task', title: task.title, completed: task.completed, task }, journalDays[0])}
       onSelect={(id) => onSelectItem(`task-${id}`)}
+      onAdd={async (title) => {
+        const id = await addTask(title, undefined, undefined, undefined, { bucket: 'week', weekStart: weekAnchor, assignedTo: meId ?? undefined })
+        if (!id) throw new Error('Task creation failed')
+        const hidden = !layers.has('unsorted')
+        showToast(`Added to the week · Unsorted · only you${hidden ? ' · hidden by your current view' : ''}`, hidden ? 'warning' : 'success', hidden ? 8000 : undefined)
+        pushAction?.(`Added "${title}"`, () => { void deleteTask(id) })
+      }}
       onPlan={onPlan}
     />
   )
@@ -850,10 +858,7 @@ export function WeekViewV2(props: WeekViewV2Props) {
   const weekIsPast = weekAnchor.getTime() + 7 * 86_400_000 <= Date.now()
 
   return (
-    <WeekPlanHost tasks={tasks} weekStart={weekAnchor} meId={meId} isPast={weekIsPast}>
-      {({ openSession }) => (
-    <div className="relative">
-      <div className="flex items-center justify-end gap-2 mb-2">
+    <WeekPlanHost tasks={tasks} weekStart={weekAnchor} meId={meId} isPast={weekIsPast} tools={<>
         {!narrow && props.mode === undefined && (
           <div className="mr-auto"><WeekModeSwitch mode={mode} onChange={setOwnMode} /></div>
         )}
@@ -865,11 +870,13 @@ export function WeekViewV2(props: WeekViewV2Props) {
             className="inline-flex items-center gap-1.5 rounded-full border border-neutral-300 px-3 py-1 text-[13px] text-neutral-700 hover:bg-neutral-100"
           >
             <PanelLeft className="h-3.5 w-3.5" aria-hidden="true" />
-            <span>Choose tasks</span>
+            <span>Shelves</span>
           </button>
         )}
         <RoutinesToggle hidden={hideRoutines} onToggle={() => writeHideRoutines(!hideRoutines)} />
-      </div>
+      </>}>
+      {({ openSession }) => (
+    <div className="relative week-content">
       {narrow && <PlanningSheet open={sheetOpen} onClose={() => setSheetOpen(false)} weekPage={weekAnchor} />}
 
       <DndContext
@@ -890,6 +897,7 @@ export function WeekViewV2(props: WeekViewV2Props) {
         {narrow ? (
           <div className="flex flex-col gap-4">
             {weekListFor(openSession)}
+            <h2 className="week-days-heading">The days</h2>
             <WeekJournal days={journalDays} spans={journalSpans} onSelectItem={onSelectItem} onToggleEntry={handleJournalToggle} onPlanDrop={handlePlanDropOnDay} onAddToDay={handleAddToDay} narrow dragEnabled={false} />
           </div>
         ) : (
@@ -899,9 +907,12 @@ export function WeekViewV2(props: WeekViewV2Props) {
         {!showSchedule ? (
           <>
             {weekListFor(openSession)}
+            <h2 className="week-days-heading">The days</h2>
             <WeekJournal days={journalDays} spans={journalSpans} onSelectItem={onSelectItem} onToggleEntry={handleJournalToggle} onPlanDrop={handlePlanDropOnDay} onAddToDay={handleAddToDay} />
           </>
         ) : (
+        <>
+        {weekListFor(openSession)}
         <WeekGrid
           weekStart={weekStart}
           dayCount={dayCount}
@@ -984,6 +995,7 @@ export function WeekViewV2(props: WeekViewV2Props) {
             />
           ))}
         </WeekGrid>
+        </>
         )}
         </div>
         </div>

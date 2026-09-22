@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest'
 import { ALL_LAYERS } from '@/lib/domains'
-import { screen, within } from '@testing-library/react'
+import { screen, within, fireEvent } from '@testing-library/react'
 import { render } from '@/test/test-utils'
 import { ScheduleActionsProvider } from '@/contexts/ScheduleActionsContext'
 import { TodayView } from './TodayView'
@@ -99,6 +99,8 @@ describe('My focus — chosen untimed routines', () => {
     const { routines, dateInstances } = untimedRoutineSet(3, 1)
     renderView({ routines, dateInstances })
     const focus = screen.getByRole('region', { name: 'For today' })
+    expect(within(focus).queryByText('Routine r0')).toBeNull()
+    fireEvent.click(within(focus).getByRole('button', { name: 'Completed · 1' }))
     expect(within(focus).getByText('Routine r0')).toBeInTheDocument()
     expect(within(focus).getByText('Routine r2')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /anytime/i })).toBeNull()

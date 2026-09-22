@@ -86,24 +86,25 @@ describe('Today — the way to Planning', () => {
     expect(screen.queryByText(/\d scheduled for today/)).toBeNull()
   })
 
-  it('on a phone the "For today" heading\'s Choose button opens the sheet with the same plan, titled "Choose for today"', () => {
+  it('on a phone the "For today" heading\'s Choose button opens the sheet with the same plan, titled "Reference"', () => {
     const { onToggleTask } = renderView()
-    const line = screen.getByRole('button', { name: 'Choose tasks' })
+    const line = screen.getByRole('button', { name: 'Shelves' })
     expect(line).toHaveAttribute('aria-expanded', 'false')
     fireEvent.click(line)
-    const sheet = screen.getByRole('dialog', { name: 'Choose tasks' })
-    expect(within(sheet).getByRole('heading', { name: 'Choose for today' })).toBeInTheDocument()
+    const sheet = screen.getByRole('dialog', { name: 'Shelves' })
+    expect(within(sheet).getByRole('heading', { name: 'Shelves' })).toBeInTheDocument()
     const panel = within(sheet).getByTestId('day-plan-panel')
     // The dated task is on the page, not in the sheet; the chore waits here.
     expect(within(panel).queryByText('Pick up foot meds')).not.toBeInTheDocument()
+    fireEvent.click(within(panel).getByRole('navigation', { name: 'Shelf source' }).querySelector('button:last-child')!)
     expect(within(panel).getByText('Kids clean rooms')).toBeInTheDocument()
     // Touch layout: no drag handles, every action is a button.
     expect(panel.querySelector('[draggable="true"]')).toBeNull()
     expect(within(panel).getByRole('button', { name: 'Choose Kids clean rooms for today' })).toBeInTheDocument()
     expect(onToggleTask).not.toHaveBeenCalled()
     // The same button closes it.
-    fireEvent.click(screen.getByRole('button', { name: 'Close chooser' }))
-    expect(screen.getByRole('button', { name: 'Choose tasks' })).toHaveAttribute('aria-expanded', 'false')
+    fireEvent.click(within(screen.getByRole('region', { name: 'For today' })).getByRole('button', { name: 'Close shelves' }))
+    expect(screen.getByRole('button', { name: 'Shelves' })).toHaveAttribute('aria-expanded', 'false')
   })
 
   it('on desktop the "For today" heading\'s Choose button pins the chooser beside the page and unpins it again; no second prompt', () => {
@@ -111,11 +112,11 @@ describe('Today — the way to Planning', () => {
     renderView()
     expect(screen.getByTestId('pins')).toHaveTextContent('')
     expect(screen.queryByRole('button', { name: /Choose something for today/ })).toBeNull()
-    const choose = screen.getByRole('button', { name: 'Choose tasks' })
+    const choose = screen.getByRole('button', { name: 'Shelves' })
     expect(choose).toHaveAttribute('aria-expanded', 'false')
     fireEvent.click(choose)
     expect(screen.getByTestId('pins')).toHaveTextContent('today')
-    fireEvent.click(screen.getByRole('button', { name: 'Close chooser' }))
+    fireEvent.click(within(screen.getByRole('region', { name: 'For today' })).getByRole('button', { name: 'Close shelves' }))
     expect(screen.getByTestId('pins')).toHaveTextContent('')
     expect(ctxValue.onUpdateTask).not.toHaveBeenCalled()
   })

@@ -546,10 +546,10 @@ export const ScheduleItem = memo(function ScheduleItem({
 
         {/* Time column - fixed width for alignment */}
         {hideTime ? (
-          <div className="w-16 shrink-0" />
+          <div className="schedule-empty-time w-16 shrink-0" />
         ) : (isTask && onSchedule) || ((isRoutine || item.type === 'event') && onPush) ? (
           <div
-            className="w-16 shrink-0 relative"
+            className="schedule-time-column w-16 shrink-0 relative"
             onClick={(e) => e.stopPropagation()}
           >
             <SchedulePopover
@@ -599,7 +599,7 @@ export const ScheduleItem = memo(function ScheduleItem({
             />
           </div>
         ) : (
-          <div className="w-16 shrink-0 text-xs font-medium tabular-nums">
+          <div className="schedule-time-column w-16 shrink-0 text-xs font-medium tabular-nums">
             {isOverdue && overdueLabel ? (
               <span style={{ color: overdueColors.warning600 }}>
                 {overdueLabel}

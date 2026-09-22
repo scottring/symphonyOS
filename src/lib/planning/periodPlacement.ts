@@ -76,6 +76,6 @@ export function seasonStartForBucket(bucket: TaskBucket, now: Date): Date | unde
 
 /** Does this write move the task in time? The question the is_goal refusal asks. */
 export function isPlacement(updates: Partial<Task>): boolean {
-  return 'bucket' in updates || 'scheduledFor' in updates || 'weekStart' in updates
+  return 'weekendStart' in updates || 'bucket' in updates || 'scheduledFor' in updates || 'weekStart' in updates
     || 'monthStart' in updates || 'seasonStart' in updates
 }

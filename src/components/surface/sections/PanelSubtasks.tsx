@@ -57,7 +57,7 @@ function SubtaskReschedule({
       {open && (
         <div className="absolute right-0 z-50 mt-1 w-80 p-2 bg-white rounded-xl border border-neutral-200 shadow-lg">
           <div className="px-1 pb-2 text-[11px] uppercase tracking-wider text-neutral-400">Reschedule to</div>
-          <RescheduleGrid
+          <RescheduleGrid flexibleWeekend
             onPick={(when) => { setOpen(false); onReschedule(subtask.id, when) }}
             onPickDate={onSchedule ? (date, isAllDay) => { setOpen(false); onSchedule(subtask.id, date, isAllDay) } : undefined}
           />

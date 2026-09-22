@@ -38,7 +38,7 @@ import { useTimelineInsert } from '@/hooks/useTimelineInsert'
 import { useDomain } from '@/hooks/useDomain'
 
 import { Eye, EyeOff, Binoculars, Printer, GripVertical, Moon, Sparkles, NotebookPen, ArrowRight, PanelLeft, ChevronDown, ChevronRight, Plus, History } from 'lucide-react'
-import { splitTodayJournal } from '@/lib/today/journalSplit'
+import { splitTodayJournal, splitCompletedFocus } from '@/lib/today/journalSplit'
 import { panelActionsFor } from '@/components/reference/DayPlanPanel'
 import { PlanningSheet } from '@/components/reference/PlanningSheet'
 import { unhomedRoutines } from '@/lib/week/unhomedRoutines'
@@ -1212,6 +1212,9 @@ export function TodayView({
   )
   // Earlier today folds by default, per day: unfolding it is about this
   // reading of this day, not a standing preference.
+  const focusWork = useMemo(() => splitCompletedFocus(journal.focus), [journal.focus])
+  const [completedOpenDay, setCompletedOpenDay] = useState<string | null>(null)
+  const completedOpen = completedOpenDay === localYmd(viewedDate)
   const [earlierOpenDay, setEarlierOpenDay] = useState<string | null>(null)
   const earlierOpen = earlierOpenDay === localYmd(viewedDate)
   // "Add task" beside the date opens the add box at the head of Tasks; the
@@ -1375,6 +1378,17 @@ export function TodayView({
           <UnpromptedLines
             items={visibleUnpromptedItems}
             onAct={handleUnpromptedAct}
+            todayState={(item) => {
+              if (item.suggestion.entityType !== 'task' || !ctx.onUpdateTask) return null
+              const task = findTaskById(tasks, item.suggestion.entityId)
+              if (!task || task.completed || task.isGoal) return null
+              return task.scheduledFor && localYmd(task.scheduledFor) === localYmd(new Date()) ? 'added' : 'available'
+            }}
+            onAddToToday={async (item) => {
+              // Accepting a suggestion plans the existing task; it does not
+              // perform its Call action or mark that action as completed.
+              return planActions.chooseTaskDay(item.suggestion.entityId, new Date())
+            }}
             onSnooze={unprompted.snooze}
             decisions={unprompted.decisions}
             showWhy={showWhyDebug}
@@ -1403,23 +1417,23 @@ export function TodayView({
               commitments; Today is where you settle into a few of them. The
               same rows, the same actions — read as what you chose, what is
               still ahead, and what is already behind you. */}
-          <section aria-labelledby="today-focus-heading" className="daybook-journal-section">
+          <section aria-labelledby="today-focus-heading" className="daybook-journal-section today-focus-card">
             <div className="daybook-journal-heading">
               {/* "For today" holds the page's two verbs (approved white
                   journal, 2026-09-22): Choose opens and closes the chooser —
                   the dock beside the page, or the sheet on a phone — and Add
                   task opens the add box at the head of this list. */}
-              <h2 id="today-focus-heading">For today</h2>
+              <h2 id="today-focus-heading">{data.isToday ? 'For today' : 'For this day'}</h2>
               <div className="daybook-heading-actions">
                 <button
                   type="button"
                   onClick={openPlan}
                   aria-expanded={chooserOpen}
-                  aria-label={chooserOpen ? 'Close chooser' : 'Choose tasks'}
+                  aria-label={chooserOpen ? 'Close shelves' : 'Shelves'}
                   className={`daybook-choose${chooserOpen ? ' is-open' : ''}`}
                 >
                   <PanelLeft className="h-3.5 w-3.5" aria-hidden="true" />
-                  <span>Choose</span>
+                  <span>Shelves</span>
                 </button>
                 {addTaskButton}
               </div>
@@ -1443,25 +1457,34 @@ export function TodayView({
             {!usePin && (
               <PlanningSheet open={planOpenInline} onClose={() => setPlanOpenDay(null)} plan={data.dayPlan} day={viewedDate} actions={planPanelActions} />
             )}
-            {journal.focusCount > 0 ? (
+            {focusWork.activeCount > 0 ? (
               <TodaySectionList
                 {...listProps}
                 sectionsOrder={FOCUS_SECTIONS}
-                grouped={journal.focus}
+                grouped={focusWork.active}
+                // A filtered list cannot use full-day gap indices. Direct
+                // entry stays on Add task; timed scheduling keeps its gaps.
+                dropTargets={false}
                 anytimeHeader={false}
               />
             ) : (
-              // One door to the chooser (the labelled Choose tasks button),
+              // One door to the chooser (the labelled Shelves button),
               // one to adding (Add task by the date) — the empty list says
               // what those are for and offers no third prompt (Scott via
               // Codex, 2026-09-22).
               <div className="py-4">
-                <p className="font-display text-lg text-neutral-600">Nothing chosen yet.</p>
+                <p className="font-display text-lg text-neutral-600">{focusWork.completedCount ? 'Everything on your list is done.' : 'Nothing chosen yet.'}</p>
                 <p className="mt-1 text-[14px] text-neutral-500">
                   Choose from this week's tasks, or add something for {data.isToday ? 'today' : 'this day'}.
                 </p>
               </div>
             )}
+            {focusWork.completedCount > 0 && <div className="today-completed">
+              <button type="button" aria-expanded={completedOpen} onClick={() => setCompletedOpenDay(completedOpen ? null : localYmd(viewedDate))}>
+                {completedOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}Completed · {focusWork.completedCount}
+              </button>
+              {completedOpen && <TodaySectionList {...listProps} sectionsOrder={FOCUS_SECTIONS} grouped={focusWork.completed} anytimeHeader={false} dropTargets={false} />}
+            </div>}
           </section>
 
           {/* Unfinished work from earlier has ONE entrance: the Planning

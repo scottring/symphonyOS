@@ -27,7 +27,7 @@ describe('WeekPlanHost', () => {
 
   it('says the week is not planned, opens the session in place of the days, and saves every decision once', async () => {
     mount()
-    expect(screen.getByText('Not planned yet')).toBeInTheDocument()
+    expect(screen.queryByText('Not planned yet')).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: 'Plan this week' }))
     expect(screen.queryByText('the days')).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: 'Keep' }))

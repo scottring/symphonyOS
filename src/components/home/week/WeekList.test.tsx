@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
-import { render, screen, fireEvent, within } from '@testing-library/react'
+import { render, screen, fireEvent, within, waitFor } from '@testing-library/react'
 import { createMockTask } from '@/test/mocks/factories'
 import { WeekList } from './WeekList'
 
@@ -15,6 +15,7 @@ describe('WeekList', () => {
     ]
     render(<WeekList tasks={tasks} weekStart={WEEK} meId={null} userId="me" isCurrent onToggle={vi.fn()} onSelect={vi.fn()} />)
     const list = within(screen.getByRole('region', { name: "This week's list" }))
+    fireEvent.click(list.getByRole('button', { name: 'Completed · 1' }))
     const items = list.getAllByRole('listitem')
     expect(items[0]).toHaveTextContent('Call the plumber')
     expect(items[0]).toHaveTextContent('from October')
@@ -45,7 +46,7 @@ describe('WeekList', () => {
     vi.setSystemTime(new Date(2026, 8, 30, 9)) // the week of Sep 27 — WEEK is a FUTURE week
     render(<WeekList tasks={[row({ id: 'b', title: 'Call the plumber' })]} weekStart={WEEK} meId={null} userId="me" isCurrent={false} onToggle={vi.fn()} onSelect={vi.fn()} />)
     const list = within(screen.getByRole('region', { name: "This week's list" }))
-    expect(list.getByRole('heading')).toHaveTextContent('List for the week of Oct 4')
+    expect(list.getByRole('heading', { level: 2 })).toHaveTextContent('List for the week of Oct 4')
     expect(screen.queryByText(/This week's list/)).toBeNull()
   })
 
@@ -56,4 +57,17 @@ describe('WeekList', () => {
     fireEvent.click(screen.getByRole('button', { name: /plan this week/i }))
     expect(onPlan).toHaveBeenCalled()
   })
+})
+
+it('adds a task directly and keeps the entry available after a failed save', async () => {
+  const onAdd = vi.fn().mockRejectedValueOnce(new Error('offline')).mockResolvedValue(undefined)
+  render(<WeekList tasks={[]} weekStart={WEEK} meId={null} userId="me" isCurrent onToggle={vi.fn()} onSelect={vi.fn()} onAdd={onAdd} />)
+  fireEvent.click(screen.getByRole('button', { name: /Add task to this week/ }))
+  fireEvent.change(screen.getByRole('textbox', { name: 'New week task' }), { target: { value: '  Book car service  ' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Add', exact: true }))
+  expect(await screen.findByRole('alert')).toHaveTextContent('Could not add')
+  expect(screen.getByRole('textbox')).toHaveValue('  Book car service  ')
+  fireEvent.click(screen.getByRole('button', { name: 'Add', exact: true }))
+  await waitFor(() => expect(screen.queryByRole('textbox')).toBeNull())
+  expect(onAdd).toHaveBeenLastCalledWith('Book car service')
 })

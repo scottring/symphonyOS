@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { splitTodayJournal } from './journalSplit'
+import { splitTodayJournal, splitCompletedFocus } from './journalSplit'
 import { emptySections } from './types'
 import type { TimelineItem } from '@/types/timeline'
 
@@ -69,4 +69,14 @@ describe('splitTodayJournal', () => {
     expect(j.earlierSummary.rows).toBe(0)
     expect(Object.values(j.ahead).flat()).toHaveLength(5)
   })
+})
+
+it('folds completed parents with their children and keeps completed steps under active parents', () => {
+  const focus = emptySections<TimelineItem>()
+  focus.allday = [item('task-open'), item('task-done', { completed: true }), item('task-step', { isSubtask: true, parentTaskId: 'open', completed: true }), item('task-done-step', { isSubtask: true, parentTaskId: 'done' })]
+  const split = splitCompletedFocus(focus)
+  expect(split.active.allday.map(row => row.id)).toEqual(['task-open', 'task-step'])
+  expect(split.completed.allday.map(row => row.id)).toEqual(['task-done', 'task-done-step'])
+  expect(split.activeCount).toBe(1)
+  expect(split.completedCount).toBe(1)
 })

@@ -11,7 +11,7 @@ import { makePlanActions, type PlanActions } from '@/lib/planning/planActions'
  * Today pin in the shell). Scheduling writes go through the DomainGate like
  * every other placement; choosing a day does not schedule, so it doesn't ask.
  */
-export function usePlanActions(pushAction?: (message: string, undo: () => void) => void): PlanActions & {
+export function usePlanActions(pushAction?: (message: string, undo: () => void) => void, viewedWeek?: Date | null): PlanActions & {
   toggleTask: (id: string) => void
   completeRoutine: (routineId: string, day: Date, done: boolean) => Promise<boolean>
   /** Deletes, for the chooser's Delete (held behind an Undo window by the host). */
@@ -30,7 +30,9 @@ export function usePlanActions(pushAction?: (message: string, undo: () => void) 
     // Choosing / un-choosing a day is not a scheduling decision; placing a
     // time or a date is, and asks "where does this belong?" when needed.
     updateTask: (id, u) => ('scheduledFor' in u || 'bucket' in u) ? gated.updateTask(id, u) : updateTask(id, u),
-    pushTask: gated.pushTask,
+    pushTask: (id, target) => target === 'week' && viewedWeek
+      ? gated.updateTask(id, { bucket: 'week', weekStart: viewedWeek })
+      : gated.pushTask(id, target),
     setRoutinePlanned: (id, day, planned) => setPlanned('routine', id, day, planned),
     rescheduleRoutine: (id, from, when) => reschedule('routine', id, from, when),
     // A routine with no day yet is given one by writing its RULE.
@@ -38,7 +40,7 @@ export function usePlanActions(pushAction?: (message: string, undo: () => void) 
     findRoutine: (id) => routines.find((r) => r.id === id),
     pushAction,
     notify: (m) => showToast(m, 'warning'),
-  }), [findTask, gated, updateTask, setPlanned, reschedule, updateRoutine, routines, pushAction])
+  }), [findTask, gated, updateTask, setPlanned, reschedule, updateRoutine, routines, pushAction, viewedWeek])
 
   return {
     ...actions,

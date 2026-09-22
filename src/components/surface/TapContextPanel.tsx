@@ -1,3 +1,4 @@
+import { weekendLabel } from '@/lib/planning/weekend'
 import { useCallback, useRef, useState, type ReactNode, useEffect } from 'react'
 import type { Task, TaskContext } from '@/types/task'
 import type { Contact } from '@/types/contact'
@@ -207,6 +208,8 @@ export function TapContextPanel(props: TapContextPanelProps) {
       label: 'Schedule',
       render: () => (
         <SchedulePicker
+          flexibleWeekend
+          label={task.weekendStart && !task.scheduledFor ? weekendLabel(task.weekendStart) : undefined}
           scheduledFor={task.scheduledFor || undefined}
           onSchedule={props.onSchedule}
           onReschedule={props.onReschedule}

@@ -14,3 +14,10 @@ describe('needed_on mapping', () => {
     expect(task.neededOn).toBeUndefined()
   })
 })
+
+
+it('hydrates a flexible weekend as a local date without scheduling a day', () => {
+  const task = dbTaskToTask({ id: 'weekend', title: 'x', completed: false, weekend_start: '2026-09-26' } as never)
+  expect(task.weekendStart).toEqual(new Date(2026, 8, 26))
+  expect(task.scheduledFor).toBeUndefined()
+})

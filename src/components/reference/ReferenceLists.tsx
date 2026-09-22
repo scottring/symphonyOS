@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { Maximize2, Minimize2, Pin, X } from 'lucide-react'
+import { Pin, X } from 'lucide-react'
 import { useReferenceLists, REFERENCE_KINDS, type ReferenceKind, type ReferencePin } from './ReferenceListsContext'
 import { DayPlanPanel, panelActionsFor, planningSubtitle } from './DayPlanPanel'
 import type { DayPlan, DayPlanEntry } from '@/lib/today/dayPlan'
@@ -49,21 +49,9 @@ export function ReferenceListControls({ paused = false }: { paused?: boolean }) 
   </div>
 }
 
-/** The wide "triage" chooser (Scott, 2026-09-22: "full control and visibility
- *  into the tasks at hand … widening it to half screen"): remembered per browser. */
-const CHOOSER_WIDE_KEY = 'symphony.chooser.wide'
-function readChooserWide(): boolean {
-  try { return localStorage.getItem(CHOOSER_WIDE_KEY) === '1' } catch { return false }
-}
-
 export function ReferenceListsDock() {
   const ref = useReferenceLists()
   const { pathname } = useLocation()
-  const [wide, setWide] = useState<boolean>(() => readChooserWide())
-  const toggleWide = useCallback(() => setWide((w) => {
-    try { localStorage.setItem(CHOOSER_WIDE_KEY, w ? '0' : '1') } catch { /* remembered only while mounted */ }
-    return !w
-  }), [])
   // A pin whose period this page already shows is skipped, not unpinned: the
   // page holds the period's whole record (completed and placed rows and all),
   // and a pooled copy beside it would be both redundant and less complete.
@@ -74,10 +62,11 @@ export function ReferenceListsDock() {
       .sort((a, b) => REFERENCE_KINDS.indexOf(a.kind) - REFERENCE_KINDS.indexOf(b.kind)),
     [ref?.pins, pathname])
   if (!showing.length) return null
-  const hasChooser = showing.some(pin => pin.kind === 'today')
-  return <aside aria-label="Pinned reference lists" className={`reference-dock${wide && hasChooser ? ' is-wide' : ''}`}>
+  return <aside aria-label="Pinned reference lists" className="reference-dock">
     {showing.map(pin => pin.kind === 'today'
-      ? <TodayPlanList key="today" onClose={() => ref!.unpin('today')} wide={wide} onToggleWide={toggleWide} />
+      ? /^\/(month|season|year)(?:\/|$)/.test(pathname)
+        ? <div key="period-shelves" ref={ref!.setShelvesTarget} />
+        : <TodayPlanList key="today" onClose={() => ref!.unpin('today')} />
       : <ReferenceList key={`${pin.kind}:${pin.date}`} pin={pin} onClose={() => ref!.unpin(pin.kind)} />)}
   </aside>
 }
@@ -128,7 +117,7 @@ function ReferenceList({ pin, onClose }: { pin: ReferencePin; onClose: () => voi
   }
   // A task dragged out of the Today pin commits to this period's list — no
   // day or time invented.
-  const planActions = usePlanActions()
+  const planActions = usePlanActions(undefined, week)
   const [dropOver, setDropOver] = useState(false)
   const kind = pin.kind as 'week' | 'month'
   const dropProps = planDropHandlers((payload) => {
@@ -180,7 +169,7 @@ export function PlanningPanelHost({ draggable = true, header, wide = false }: {
     return onViewedWeekChange(setViewedWeek)
   }, [])
   const { plan, loading, error } = useDayPlan(day, viewedWeek)
-  const planActions = usePlanActions()
+  const planActions = usePlanActions(undefined, viewedWeek)
   const navigate = useNavigate()
   // A row's title opens its detail pane when a shell selection exists to
   // open it in (Scott, 2026-09-22).
@@ -265,26 +254,18 @@ function withoutEntry(plan: DayPlan, kind: 'task' | 'routine', id: string): DayP
 
 /** The Planning pin: one panel, named for what it does, for whichever day or
  *  week is on screen. */
-function TodayPlanList({ onClose, wide = false, onToggleWide }: { onClose: () => void; wide?: boolean; onToggleWide?: () => void }) {
-  return <section aria-label="Choose tasks" className="reference-list">
-    <PlanningPanelHost wide={wide} header={(day, viewedWeek) => (
+function TodayPlanList({ onClose }: { onClose: () => void }) {
+  return <section aria-label="Shelves" className="reference-list">
+    <PlanningPanelHost header={(day, viewedWeek) => (
       <header className="flex items-start justify-between gap-3 border-b border-neutral-300 pb-4">
         <div>
           {/* Beside a day the panel picks for today (Scott via Codex,
               2026-09-22); beside a week page it plans that week. */}
-          <h2 className="font-display text-[22px] leading-tight text-neutral-900">{viewedWeek ? 'Choose tasks' : 'Choose for today'}</h2>
+          <h2 className="font-display text-[22px] leading-tight text-neutral-900">Shelves</h2>
           <p className="mt-1 text-[13px] text-neutral-500">{planningSubtitle(day, viewedWeek)}</p>
         </div>
         <div className="flex shrink-0 items-center gap-1">
-          {/* Triage: the chooser opens to half the screen, every row and
-              every move visible (Scott, 2026-09-22). */}
-          {onToggleWide && (
-            <button type="button" onClick={onToggleWide} aria-pressed={wide} aria-label={wide ? 'Narrow the chooser' : 'Widen the chooser for triage'}
-              title={wide ? 'Narrow' : 'Triage — widen to half the screen'} className="p-2 text-neutral-500 hover:bg-neutral-100 rounded">
-              {wide ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
-            </button>
-          )}
-          <button type="button" onClick={onClose} aria-label="Close task chooser" className="p-2 text-neutral-500 hover:bg-neutral-100 rounded"><X className="w-4 h-4" /></button>
+          <button type="button" onClick={onClose} aria-label="Close shelves" className="p-2 text-neutral-500 hover:bg-neutral-100 rounded"><X className="w-4 h-4" /></button>
         </div>
       </header>
     )} />

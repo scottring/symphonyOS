@@ -5,6 +5,8 @@ export type ReferenceKind = 'today' | 'week' | 'month'
 export const REFERENCE_KINDS: ReferenceKind[] = ['today', 'week', 'month']
 export interface ReferencePin { kind: ReferenceKind; date: string }
 interface ReferenceListsState {
+  shelvesTarget: HTMLElement | null
+  setShelvesTarget: (target: HTMLElement | null) => void
   pins: ReferencePin[]
   pin: (kind: ReferenceKind, date?: Date) => void
   unpin: (kind: ReferenceKind) => void
@@ -14,6 +16,7 @@ export const useReferenceLists = () => useContext(Context)
 
 /** Only period identifiers are stored; task content never enters browser storage. */
 export function ReferenceListsProvider({ userId, children }: { userId: string; children: ReactNode }) {
+  const [shelvesTarget, setShelvesTarget] = useState<HTMLElement | null>(null)
   const key = `symphony-reference-lists:${userId}`
   const [pins, setPins] = useState<ReferencePin[]>(() => {
     try {
@@ -29,7 +32,7 @@ export function ReferenceListsProvider({ userId, children }: { userId: string; c
     try { sessionStorage.setItem(key, JSON.stringify(next)) } catch { /* In-memory pinning still works. */ }
   }
   return <Context.Provider value={{
-    pins,
+    pins, shelvesTarget, setShelvesTarget,
     pin: (kind, date = new Date()) => save([...pins.filter(p => p.kind !== kind), { kind, date: date.toISOString() }]),
     unpin: kind => save(pins.filter(p => p.kind !== kind)),
   }}>{children}</Context.Provider>

@@ -19,8 +19,9 @@ export function periodsShownOnPage(pathname: string): ReferenceKind[] {
   // /week draws the week itself and folds This month beneath it
   // (WeekMonthRail), so both lists are already here.
   if (pathname.startsWith('/week') || pathname.startsWith('/workweek')) return ['week', 'month']
-  // /month is the month's own list. Its fold shows the SEASON, not the week.
+  // Broader pages supply their contextual content to the shared shelves dock.
   if (pathname.startsWith('/month')) return ['month']
+  if (pathname.startsWith('/season') || pathname.startsWith('/year')) return []
   // /season and /year fold the level above them; neither is a week or month.
   return []
 }

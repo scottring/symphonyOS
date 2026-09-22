@@ -27,12 +27,13 @@ import type { Task } from '@/types/task'
 
 const DAY = 86_400_000
 
-export function WeekPlanHost({ tasks, weekStart, meId, isPast, children }: {
+export function WeekPlanHost({ tasks, weekStart, meId, isPast, children, tools }: {
   /** Layer-filtered tasks, as the page receives them. */
   tasks: Task[]
   weekStart: Date
   meId: string | null
   isPast: boolean
+  tools?: ReactNode
   /** The page's normal content (list + journal), shown when the session is closed. */
   children: (host: { openSession: () => void }) => ReactNode
 }) {
@@ -121,25 +122,27 @@ export function WeekPlanHost({ tasks, weekStart, meId, isPast, children }: {
   return (
     <>
       {!isPast && (
-        <div className="mb-3 flex flex-wrap items-center gap-3">
+        <div className="week-plan-status">
           <p className="text-[13px] text-neutral-500">
             {sessionReadError
               ? <>Couldn&rsquo;t check whether {periodLabel} is planned. <button type="button" onClick={reloadSession} className="font-semibold text-primary-700 hover:underline">Try again</button></>
               : savedSession
                 ? <span className="font-semibold text-sage-600">Planned {savedSession.at.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
-                : 'Not planned yet'}
+                : current.length ? `${current.length} tasks on this week’s list` : 'Start with a few commitments'}
           </p>
-          <span className="flex-1" />
+
           {!sessionOpen && (
             <button type="button" onClick={startSession} disabled={!sessionReady} aria-busy={sessionLoading || undefined}
               className={`${savedSession
                 ? 'rounded-md border border-neutral-200 px-3 py-1.5 text-sm text-neutral-700'
-                : 'rounded-md bg-primary-600 px-3 py-1.5 text-sm font-semibold text-white'} disabled:opacity-50`}>
+                : 'rounded-md border border-neutral-200 px-3 py-1.5 text-sm font-medium text-primary-700'} disabled:opacity-50`}>
               {savedSession ? 'Review the plan' : draft && !isEmptyDraft(draft) ? `Continue planning ${periodLabel}` : `Plan ${periodLabel}`}
             </button>
           )}
+          <div className="week-plan-tools">{tools}</div>
         </div>
       )}
+      {isPast && <div className="week-display-tools">{tools}</div>}
       {justSaved && !sessionOpen && (
         <PlanNextLine
           planned="The week"

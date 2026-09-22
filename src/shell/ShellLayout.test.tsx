@@ -192,7 +192,7 @@ describe('Consolidated desktop navigation', () => {
     // (2026-09-22); the page-tools chooser is every other page's door.
     renderAt('/notes')
     const nav = screen.getByRole('navigation', { name: 'Main navigation' })
-    const chooser = screen.getByRole('button', { name: 'Choose tasks' })
+    const chooser = screen.getByRole('button', { name: 'Shelves' })
     expect(nav).not.toContainElement(chooser)
     expect(screen.queryByRole('navigation', { name: 'Planning period' })).not.toBeInTheDocument()
     fireEvent.click(screen.getByRole('link', { name: 'Plan' }))
@@ -336,13 +336,13 @@ describe('Capture and the Today pin from every desktop page', () => {
 
   it('the Planning panel opens beside any page from its labelled button, and closes the same way', () => {
     renderAt('/notes')
-    const toggle = screen.getByRole('button', { name: 'Choose tasks' })
+    const toggle = screen.getByRole('button', { name: 'Shelves' })
     expect(toggle).toHaveAttribute('aria-pressed', 'false')
-    expect(toggle).toHaveTextContent('Choose tasks')
+    expect(toggle).toHaveTextContent('Shelves')
     fireEvent.click(toggle)
-    expect(screen.getByRole('region', { name: 'Choose tasks' })).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: 'Close task chooser', pressed: true }))
-    expect(screen.queryByRole('region', { name: 'Choose tasks' })).not.toBeInTheDocument()
+    expect(screen.getByRole('region', { name: 'Shelves' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Close shelves', pressed: true }))
+    expect(screen.queryByRole('region', { name: 'Shelves' })).not.toBeInTheDocument()
     // Today is still one destination.
     expect(screen.getAllByRole('link', { name: 'Today' })).toHaveLength(1)
   })

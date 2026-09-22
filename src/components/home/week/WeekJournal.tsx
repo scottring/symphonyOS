@@ -10,8 +10,7 @@
 //   all-day notes    a holiday, "no school" — italic, no checkbox
 //   entries          timed events, tasks and routines, then the untimed work
 //                    given to the day (dated or chosen), each with a checkbox
-//   available        untimed routine occurrences nobody chose yet — one quiet
-//                    line, the way the Today pin holds them
+// Unchosen routine occurrences are offered in the planning sidebar.
 //   dinner           the day's meal, quietly
 // Multi-day context (on call, a trip, a break) is listed once above the days.
 //
@@ -96,13 +95,10 @@ function Box({ entry, onToggle }: { entry: JournalEntry; onToggle: () => void })
       aria-label={entry.completed ? `Mark ${entry.title} not done` : `Complete ${entry.title}`}
       onPointerDown={(e) => e.stopPropagation()}
       onClick={(e) => { e.stopPropagation(); onToggle() }}
-      className={`mt-[3px] grid h-3.5 w-3.5 shrink-0 place-items-center rounded-[3px] border transition-colors ${
-        entry.completed
-          ? 'border-neutral-500 bg-neutral-500 text-white'
-          : 'border-neutral-400 text-transparent hover:border-primary-500 hover:bg-primary-500 hover:text-white'
-      }`}
+      className="journal-check shrink-0"
     >
-      <Check className="h-2.5 w-2.5" strokeWidth={3} />
+      <span aria-hidden="true" className={`grid h-3.5 w-3.5 place-items-center rounded-[3px] border ${entry.completed ? 'border-neutral-500 bg-neutral-500 text-white' : 'border-neutral-400 text-transparent'}`}>
+      <Check className="h-2.5 w-2.5" strokeWidth={3} /></span>
     </button>
   )
 }
@@ -206,7 +202,7 @@ function DayRow({ day, onSelectItem, onToggleEntry, onPlanDrop, onAddToDay, drag
   const [planOver, setPlanOver] = useState(false)
   const planProps = onPlanDrop ? planDropHandlers((p) => onPlanDrop(day, p), setPlanOver) : {}
   const today = isToday(day.date)
-  const empty = day.notes.length + day.entries.length + day.available.length + day.dinners.length === 0
+  const empty = day.notes.length + day.entries.length + day.dinners.length === 0
 
   return (
     <section
@@ -242,29 +238,16 @@ function DayRow({ day, onSelectItem, onToggleEntry, onPlanDrop, onAddToDay, drag
           </ul>
         )}
 
-        {day.entries.length > 0 && (
-          <ul className="flex flex-col gap-1" aria-label="Entries">
-            {day.entries.map((entry) => (
-              <Entry key={entry.id} entry={entry} day={day} onSelect={onSelectItem} onToggle={onToggleEntry} dragEnabled={dragEnabled} />
-            ))}
-          </ul>
-        )}
-
-        {day.available.length > 0 && (
-          // The week's weather, not its news: what the day could hold, one line.
-          <p className="text-[12.5px] leading-snug text-neutral-400" aria-label="Available">
-            <span className="text-neutral-400">Available · </span>
-            {day.available.map((r, i) => (
-              <span key={r.id}>
-                {i > 0 && ' · '}
-                <button type="button" onClick={() => onSelectItem(r.id.replace(/-day\d+$/, ''))}
-                  className={`text-left hover:text-neutral-700 ${r.completed ? 'line-through' : ''}`}>
-                  {r.title}
-                </button>
-              </span>
-            ))}
-          </p>
-        )}
+        {day.entries.length > 0 && <div className="journal-day-groups">
+          {[{ label: 'Schedule', entries: day.entries.filter(entry => entry.time) },
+            { label: 'Any time', entries: day.entries.filter(entry => !entry.time) }].filter(group => group.entries.length).map(group =>
+            <section key={group.label} aria-label={group.label}>
+              <h3>{group.label}</h3>
+              <ul className="flex flex-col gap-2" aria-label={group.label + ' entries'}>
+                {group.entries.map(entry => <Entry key={entry.id} entry={entry} day={day} onSelect={onSelectItem} onToggle={onToggleEntry} dragEnabled={dragEnabled} />)}
+              </ul>
+            </section>)}
+        </div>}
 
         {day.dinners.length > 0 && (
           <p className="text-[12.5px] leading-snug text-neutral-500">

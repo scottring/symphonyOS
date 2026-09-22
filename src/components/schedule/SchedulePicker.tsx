@@ -31,6 +31,7 @@ export function dayLoadKey(d: Date): string {
 }
 
 export interface SchedulePickerProps {
+  flexibleWeekend?: boolean
   /** Current schedule, if any — enables "Clear schedule". */
   scheduledFor?: Date
   onSchedule: (date: Date, isAllDay: boolean) => void
@@ -62,6 +63,7 @@ const POPOVER_MAX_HEIGHT = 360
  */
 export function SchedulePicker({
   scheduledFor,
+  flexibleWeekend = false,
   onSchedule,
   onReschedule,
   onClearSchedule,
@@ -157,7 +159,7 @@ export function SchedulePicker({
               <div className="px-1 pb-2 text-[11px] uppercase tracking-wider text-neutral-400">
                 {label} for
               </div>
-              <RescheduleGrid
+              <RescheduleGrid flexibleWeekend={flexibleWeekend}
                 loads={loads}
                 onPeek={(_date, when) => {
                   const load = loads.get(loadKeyFor(when))

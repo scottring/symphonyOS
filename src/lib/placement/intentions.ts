@@ -16,6 +16,7 @@
 // translation. The result is a plan: what to write to `tasks`, which
 // commitment and focus rows to write, and the optimistic local task.
 
+import { inTaskWeekend } from '@/lib/planning/weekend'
 import type { Task, TaskBucket, PlacementLevel, TaskCommitment, TaskFocusEntry } from '@/types/task'
 import { readSeasons, seasonEndFor, type Seasons } from '@/lib/cadence/seasons'
 import { localYmd } from '@/lib/cadence/config'
@@ -48,7 +49,7 @@ export interface PlacementPlan {
   local: Task
 }
 
-const PLACEMENT_KEYS = ['bucket', 'scheduledFor', 'weekStart', 'monthStart', 'seasonStart', 'plannedOn'] as const
+const PLACEMENT_KEYS = ['bucket', 'scheduledFor', 'weekStart', 'monthStart', 'seasonStart', 'plannedOn', 'weekendStart'] as const
 
 /** Does this write move the task in time or choose it? */
 export function isPlacementWrite(updates: Partial<Task>): boolean {
@@ -142,6 +143,13 @@ export function planPlacement(input: Task, updates: Partial<Task>, ctx: Placemen
   for (const [k, v] of Object.entries(updates)) {
     if ((PLACEMENT_KEYS as readonly string[]).includes(k) || k === 'commitments' || k === 'focus') continue
     ;(row as Record<string, unknown>)[k] = v
+  }
+
+  if ('weekendStart' in updates) row.weekendStart = updates.weekendStart
+  else if (task.weekendStart) {
+    const changesPeriod = ('bucket' in updates && updates.bucket !== 'timed') || 'weekStart' in updates || 'monthStart' in updates || 'seasonStart' in updates
+    const outsideWindow = updates.scheduledFor && !inTaskWeekend(task, updates.scheduledFor)
+    if (changesPeriod || outsideWindow) row.weekendStart = undefined
   }
 
   const bucket = 'bucket' in updates ? updates.bucket : undefined
@@ -281,7 +289,8 @@ export function planKeep(input: Task, level: PlacementLevel, to: Date, from?: Da
   const commitments = applyCommitmentOps(task.commitments, commitmentOps)
   const merged: Task = { ...task, commitments }
   const cache = deriveCache(merged)
-  return { row: { ...cache }, commitmentOps, focusOps: [], local: { ...merged, ...cache } }
+  const weekendReset = level === 'week' && task.weekendStart ? { weekendStart: undefined } : {}
+  return { row: { ...cache, ...weekendReset }, commitmentOps, focusOps: [], local: { ...merged, ...cache, ...weekendReset } }
 }
 
 /**
@@ -298,7 +307,8 @@ export function planDropCommitment(input: Task, level: PlacementLevel, periodSta
   const commitments = applyCommitmentOps(task.commitments, commitmentOps)
   const merged: Task = { ...task, commitments }
   const cache = deriveCache(merged)
-  return { row: { ...cache }, commitmentOps, focusOps: [], local: { ...merged, ...cache } }
+  const weekendReset = level === 'week' && task.weekendStart ? { weekendStart: undefined } : {}
+  return { row: { ...cache, ...weekendReset }, commitmentOps, focusOps: [], local: { ...merged, ...cache, ...weekendReset } }
 }
 
 /** The DB row shape for a commitment op (task_commitments). */

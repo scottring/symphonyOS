@@ -78,6 +78,8 @@ export interface Task {
    *  DO it) and contactId (who it's about). */
   userId?: string
   bucket?: TaskBucket // inbox, week, month, quarter, or timed
+  /** Flexible Saturday–Sunday commitment; never an appointment or automatic carry-forward. */
+  weekendStart?: Date
   scheduledFor?: Date // When this task is scheduled (only set when bucket='timed')
   deferredUntil?: Date // Legacy — kept for backwards compat, prefer bucket
   deferCount?: number // Times this task has been deferred

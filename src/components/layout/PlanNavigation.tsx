@@ -41,19 +41,20 @@ export function PlanNavigation({ mobile = false, paused = false }: { mobile?: bo
   // Codex, 2026-09-22), at every width; Week owns a mobile chooser with its
   // actual viewed date. Elsewhere this row is the door.
   const onToday = pathname === '/' || pathname === '/today' || pathname.startsWith('/tasks-new')
-  const showChooser = !onToday && (!mobile || (period && period !== 'week'))
+  const broaderPeriod = ['month', 'season', 'year'].includes(period ?? '')
+  const showChooser = !onToday && (broaderPeriod || !mobile)
   // The kept-pins note ("Lists return when you close the side panel") is
   // still said on Today, even though its chooser button lives on the page.
   const pausedNote = !mobile && paused && !!references && references.pins.length > 0
   if (!period && !showChooser && !pausedNote) return null
   const range = new URLSearchParams(search).get('range') ?? 'week'
-  return <div className="plan-page-tools">
+  return <div className="plan-page-tools" data-period={period}>
     {period && <div className="plan-period-controls">
       <nav aria-label="Planning period" className="plan-period-navigation">
         {PERIODS.map(value => <NavLink key={value} to={`/${value}`} aria-current={period === value ? 'page' : undefined}
           className={period === value ? 'is-current' : ''}>{value[0].toUpperCase() + value.slice(1)}</NavLink>)}
       </nav>
-      {period === 'week' && <label className="plan-range-control">Range
+      {period === 'week' && <label className="plan-range-control"><span className="sr-only">Range</span>
         <select aria-label="Week range" value={['week', 'weekend', 'three', 'custom'].includes(range) ? range : 'week'}
           onChange={event => navigate(event.target.value === 'week' ? '/week' : `/week?range=${event.target.value}`)}>
           <option value="week">Full week</option><option value="weekend">Weekend</option>
@@ -62,10 +63,10 @@ export function PlanNavigation({ mobile = false, paused = false }: { mobile?: bo
       </label>}
     </div>}
     {(showChooser || pausedNote) && references && <div className="task-chooser-control">
-      {showChooser && <button type="button" aria-label={pinned && !mobile ? 'Close task chooser' : 'Choose tasks'}
+      {showChooser && <button type="button" aria-label={pinned && !mobile ? 'Close shelves' : 'Shelves'}
         aria-pressed={mobile ? sheetOpen : pinned}
         onClick={() => mobile ? setSheetPath(sheetOpen ? null : pathname) : pinned ? references.unpin('today') : references.pin('today')}>
-        <PanelLeft size={15} aria-hidden="true" />Choose tasks
+        <PanelLeft size={15} aria-hidden="true" />Shelves
       </button>}
       {pausedNote && <span>Lists return when you close the side panel.</span>}
     </div>}
@@ -75,6 +76,6 @@ export function PlanNavigation({ mobile = false, paused = false }: { mobile?: bo
       </button>
     </div>}
     {period && <GoalsSheet open={goalsOpen} onClose={() => setGoalsOpen(false)} />}
-    {mobile && showChooser && <PlanningSheet open={sheetOpen} onClose={() => setSheetPath(null)} />}
+    {mobile && showChooser && <PlanningSheet open={sheetOpen} onClose={() => setSheetPath(null)} periodShelves={broaderPeriod} />}
   </div>
 }

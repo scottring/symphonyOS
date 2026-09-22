@@ -2,13 +2,16 @@
 // bottom sheet (the MoreSheet recipe — scrim, rounded top, slide-up, safe-area
 // padding, grab handle). Opened by the "Planning" button on Today and Week;
 // no drags here, every row has its buttons.
+import { useEffect } from 'react'
 import { createPortal } from 'react-dom'
+import { useReferenceLists } from './ReferenceListsContext'
 import { X } from 'lucide-react'
 import { PlanningPanelHost } from './ReferenceLists'
 import { DayPlanPanel, planningSubtitle, type DayPlanPanelActions } from './DayPlanPanel'
 import type { DayPlan } from '@/lib/today/dayPlan'
 
-export function PlanningSheet({ open, onClose, weekPage = null, plan, day: dayProp, actions }: {
+export function PlanningSheet({ open, onClose, weekPage = null, plan, day: dayProp, actions, periodShelves = false }: {
+  periodShelves?: boolean
   open: boolean
   onClose: () => void
   /** The week the page is showing, for the subtitle. */
@@ -20,6 +23,13 @@ export function PlanningSheet({ open, onClose, weekPage = null, plan, day: dayPr
   day?: Date
   actions?: DayPlanPanelActions
 }) {
+  const references = useReferenceLists()
+  useEffect(() => {
+    const target = references?.shelvesTarget
+    if (!periodShelves || !open || !target) return
+    target.addEventListener('close-period-shelves', onClose)
+    return () => target.removeEventListener('close-period-shelves', onClose)
+  }, [references?.shelvesTarget, periodShelves, open, onClose])
   const day = dayProp ?? new Date()
   // Portalled to <body>: a `position: fixed` sheet inside a transformed
   // ancestor (the phone shell) would be fixed to that ancestor, not the
@@ -32,7 +42,7 @@ export function PlanningSheet({ open, onClose, weekPage = null, plan, day: dayPr
       <div
         role="dialog"
         aria-modal="true"
-        aria-label="Choose tasks"
+        aria-label="Shelves"
         aria-hidden={!open}
         inert={!open}
         className={`fixed bottom-0 left-0 right-0 z-50 max-h-[85vh] overflow-y-auto rounded-t-2xl bg-bg-elevated px-5 transform transition-transform duration-300 ease-out ${open ? 'translate-y-0' : 'translate-y-full pointer-events-none'}`}
@@ -41,14 +51,16 @@ export function PlanningSheet({ open, onClose, weekPage = null, plan, day: dayPr
         <div className="flex justify-center pt-3 pb-2">
           <div className="h-1 w-10 rounded-full bg-neutral-300" />
         </div>
-        <header className="flex items-start justify-between gap-3 border-b border-neutral-300 pb-3">
+        {!periodShelves && <header className="flex items-start justify-between gap-3 border-b border-neutral-300 pb-3">
           <div>
-            <h2 className="font-display text-[22px] leading-tight text-neutral-900">{weekPage ? 'Choose tasks' : 'Choose for today'}</h2>
+            <h2 className="font-display text-[22px] leading-tight text-neutral-900">Shelves</h2>
             <p className="mt-1 text-[13px] text-neutral-500">{planningSubtitle(day, weekPage)}</p>
           </div>
-          <button type="button" onClick={onClose} aria-label="Close task chooser" className="rounded p-2 text-neutral-500 hover:bg-neutral-100"><X className="h-4 w-4" /></button>
-        </header>
-        {open && (plan && actions
+          <button type="button" onClick={onClose} aria-label="Close shelves" className="rounded p-2 text-neutral-500 hover:bg-neutral-100"><X className="h-4 w-4" /></button>
+        </header>}
+        {open && (periodShelves
+          ? <div ref={references?.setShelvesTarget} />
+          : plan && actions
           ? <DayPlanPanel plan={plan} day={day} actions={actions} draggable={false} weekPage={weekPage} />
           : <PlanningPanelHost draggable={false} />)}
       </div>

@@ -1,3 +1,4 @@
+import { relativeWeekend, weekendLabel } from '@/lib/planning/weekend'
 // src/components/schedule/RescheduleGrid.tsx
 //
 // The shared 2-column icon grid for picking a relative reschedule target — the
@@ -46,6 +47,7 @@ const tileClass =
   'text-neutral-700 bg-neutral-50 hover:bg-primary-50 hover:text-primary-700 transition-all duration-150'
 
 interface Props {
+  flexibleWeekend?: boolean
   onPick: (when: TriageWhen) => void
   /** When provided, adds a "Pick date…" tile for a specific date/time. */
   onPickDate?: (date: Date, isAllDay: boolean) => void
@@ -70,7 +72,7 @@ export function loadKeyFor(when: TriageWhen): string {
   return when === 'tonight' ? `${ymd}|evening` : ymd
 }
 
-export function RescheduleGrid({ onPick, onPickDate, loads, onPeek }: Props) {
+export function RescheduleGrid({ onPick, onPickDate, loads, onPeek, flexibleWeekend = false }: Props) {
   const [picking, setPicking] = useState(false)
   const [pickingToday, setPickingToday] = useState(false)
 
@@ -139,10 +141,11 @@ export function RescheduleGrid({ onPick, onPickDate, loads, onPeek }: Props) {
     <div className="grid grid-cols-2 gap-2">
       {WHENS.map(({ when, label, Icon }) => {
         const dateFn = WHEN_DATE[when]
-        const sub = dateFn ? tileDate(dateFn()) : null
+        const weekend = flexibleWeekend && (when === 'this-weekend' || when === 'next-weekend')
+        const sub = weekend ? weekendLabel(relativeWeekend(when === 'next-weekend')).replace('Weekend · ', '') + ' · either day' : dateFn ? tileDate(dateFn()) : null
         // Pool whens (this-week / this-month / someday) have no day to measure,
         // so they carry no bar. `loads` is keyed by the caller.
-        const load = loads?.get(loadKeyFor(when))
+        const load = weekend ? undefined : loads?.get(loadKeyFor(when))
         return (
           <div key={when} data-tile className="flex flex-col">
             <button

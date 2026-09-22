@@ -11,9 +11,11 @@
 // the rail into this page, or from this page onward in a look-back); a goal
 // is only ever ticked, kept or dropped.
 
+import { createPortal } from 'react-dom'
+import { useReferenceLists } from '@/components/reference/ReferenceListsContext'
 import { useMemo, useState, useCallback, useEffect, useRef } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { Plus, Target, ChevronDown, ChevronRight, Repeat, ArrowUpRight } from 'lucide-react'
+import { Plus, Target, ChevronDown, ChevronRight, Repeat, ArrowUpRight, X } from 'lucide-react'
 import { MastheadCard, PeriodNavEyebrow } from '@/components/layout/MastheadCard'
 import { HomeChromeControls } from '@/components/home/HomeChromeControls'
 import { DomainSwitcher } from '@/components/domain/DomainSwitcher'
@@ -96,6 +98,7 @@ function goalRow(g: Goal): PlanRowModel {
 }
 
 function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
+  const references = useReferenceLists()
   const navigate = useNavigate()
   const { tasks, loading, toggleTask, deleteTask, updateTask, updateTasksBulk, addTask, setGoal, pushTask, keepForward, dropCommitment, completeTask } = useSupabaseTasks()
   const gated = useGatedTaskActions({ updateTask, pushTask, updateTasksBulk }, (id) => tasks.find((t) => t.id === id))
@@ -287,14 +290,10 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
   }, [calendarKey])
 
   // ── Routines this period ─────────────────────────────────────────────────
-  // PATTERNS, not occurrences: what already takes up time, so the plan is
-  // written against real capacity. No checkboxes — an occurrence is ticked on
-  // Week or Today, and the pattern itself is edited in Routines (Scott,
-  // 2026-09-13). Eligibility runs the one resolver, date-agnostically: a
-  // month is not a day, so rung 2 must not filter by one date's recurrence.
+  // Broader shelves show relevant slower patterns; Week/Today own occurrences.
   const patterns = useMemo(
-    () => (level === 'year' ? [] : routinePatterns(activeRoutines, layers)),
-    [activeRoutines, layers, level],
+    () => routinePatterns(activeRoutines, layers, { level, start: bounds.start, end: bounds.end }),
+    [activeRoutines, layers, level, bounds.start, bounds.end],
   )
 
   // "Recurring commitments" rather than "Routines this month": what the
@@ -436,11 +435,13 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
   const openTaskRows = useMemo(() => looseRows.filter((r) => !rowIsDone(r.fate)), [looseRows])
   const doneTaskRows = useMemo(() => looseRows.filter((r) => rowIsDone(r.fate)), [looseRows])
   const lowerLabelText = lowerLevel(level) === 'week' ? 'this week' : 'this month'
-  const visibleTaskRows = showAll ? openTaskRows : openTaskRows.slice(0, TASK_PREVIEW_CAP)
+  const availableTaskRows = openTaskRows.filter((r) => !r.placed)
+  const assignedTaskRows = openTaskRows.filter((r) => !!r.placed)
+  const visibleTaskRows = showAll ? availableTaskRows : availableTaskRows.slice(0, TASK_PREVIEW_CAP)
   // Gated on the LIST being long, not on rows being hidden right now —
   // otherwise expanding removes the only way back to five.
-  const overCap = openTaskRows.length > TASK_PREVIEW_CAP
-  const hiddenTaskCount = openTaskRows.length - visibleTaskRows.length
+  const overCap = availableTaskRows.length > TASK_PREVIEW_CAP
+  const hiddenTaskCount = availableTaskRows.length - visibleTaskRows.length
 
   const openPlaced = useCallback((taskId: string) => { navigate(`/task/${taskId}`) }, [navigate])
 
@@ -602,287 +603,12 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
   // the host owns it, so it arrives here.
   draftRef.current = shownDraft
 
-  return (
-    <div {...monthDrop} className={`${PAGE_COLUMN_WIDE} py-6${planDropOver ? ' reference-list-drop' : ''}`}>
-      {/* The same open masthead Today wears: the period in the eyebrow, the
-          page name as the title, the look-back cue on the quiet line when the
-          period has ended. No date numeral — a month is not a day. */}
-      <MastheadCard
-        variant="page"
-        eyebrow={(
-          <PeriodNavEyebrow
-            label={noun}
-            onPrev={() => goTo(bounds.prev)}
-            onNext={() => goTo(bounds.next)}
-            prevLabel={`Previous ${noun}`}
-            nextLabel={`Next ${noun}`}
-            trailing={isCurrent ? undefined : (
-              <button type="button" onClick={() => goTo(today)}
-                className="ml-1 inline-flex shrink-0 items-center gap-1 rounded-full border border-primary-100 bg-primary-50 px-2 py-0.5 text-[11px] font-semibold text-primary-600 transition-colors hover:bg-primary-100">
-                Back to this {noun}
-              </button>
-            )}
-          />
-        )}
-        title={periodTitle(level, bounds.label)}
-        subline={isPast
-          ? 'Look back: what got done, what didn\'t. Keep what still matters, drop the rest.'
-          : lookingAhead
-            ? <p className="text-[12px] text-neutral-500">{bounds.label} starts in {daysUntilStart} days · you&rsquo;re looking ahead</p>
-            : <p className="text-[12px] text-neutral-500">What matters this {noun}.</p>}
-        // The plan pages mount outside TasksApp's chrome context, so the
-        // assistant toggle isn't reachable here; the domain lens still is,
-        // and this page scopes by it (soleDomain).
-        controls={chrome ? <HomeChromeControls className="flex" /> : <DomainSwitcher />}
-      />
-
-      {/* Who this page is showing, and the door to the period just ended —
-          a quiet line rather than chrome crowded into the eyebrow. */}
-      <div className="mb-3 flex items-baseline justify-between gap-3 border-b border-neutral-200/70 pb-2">
-        <p className="text-[12px] text-neutral-500">{lensLabel}</p>
-        {isCurrent && (
-          <button
-            type="button"
-            onClick={() => goTo(bounds.prev)}
-            className="shrink-0 text-[13px] font-medium text-primary-700 transition-colors hover:underline"
-          >
-            Review {prevPeriodLabel} <ArrowUpRight className="mb-0.5 inline h-3 w-3" />
-          </button>
-        )}
-      </div>
-
-      {/* Guided planning: whether this month is planned, and the door into
-          the session. Month and season; a past period is a look-back. */}
-      {!isPast && (
-        <div className="mb-3 flex flex-wrap items-center gap-3">
-          <p className="text-[13px] text-neutral-500">
-            {sessionReadError
-              ? <>Couldn&rsquo;t check whether {shortLabel} is planned. <button type="button" onClick={reloadSession} className="font-semibold text-primary-700 hover:underline">Try again</button></>
-              : savedSession
-                ? <span className="font-semibold text-sage-600">Planned {savedSession.at.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
-                : 'Not planned yet'}
-          </p>
-          <span className="flex-1" />
-          {!sessionOpen && (
-            <button type="button" onClick={startSession} disabled={!sessionReady} aria-busy={sessionLoading || undefined}
-              className={`${savedSession
-                ? 'rounded-md border border-neutral-200 px-3 py-1.5 text-sm text-neutral-700'
-                : 'rounded-md bg-primary-600 px-3 py-1.5 text-sm font-semibold text-white'} disabled:opacity-50`}>
-              {savedSession ? 'Review the plan' : draft && !isEmptyDraft(draft) ? `Continue planning ${shortLabel}` : `Plan ${shortLabel}`}
-            </button>
-          )}
-        </div>
-      )}
-      {justSaved && !sessionOpen && (
-        <PlanNextLine
-          planned={shortLabel}
-          message={`When you’re ready, plan the ${nextRung} with ${shortLabel} beside you.`}
-          nextLabel={`the ${nextRung}`}
-          to={`/${nextRung}`}
-          onDismiss={dismissJustSaved}
-        />
-      )}
-
-      {sessionOpen && shownDraft ? (
-        <PlanSession level={level} aboveLabel={aboveLabel} periodLabel={shortLabel} prevLabel={prevPeriodLabel}
-          finished={back.finished} open={back.open} current={currentPeriodTasks}
-          above={aboveItems} aboveGoals={aboveGoalItems} hiddenStepGoals={hiddenStepGoals} domainInView={soleDomain ?? null} uid={user?.id ?? null}
-          draft={shownDraft} onChange={changeDraft} onClose={closeSession} onSave={saveDraft} saving={savingSession} saveError={saveError} />
-      ) : (
-      /* The plan on the left, what you consult while writing it on the
-          right — the calendar included. Reference sits WITH reference instead
-          of interrupting the list (Scott, 2026-09-13). One column on a phone. */
-      <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-[minmax(0,1fr)_320px]">
-        <div className="min-w-0 flex flex-col gap-4">
-          {/* Goals — what you want from the period. */}
-          <section aria-label={`${bounds.label} goals`} className="min-w-0">
-            <div className="flex items-start gap-2 px-1">
-              <h2 className="min-w-0 flex-1 font-display text-2xl text-neutral-800">{shortLabel} goals</h2>
-              {!isPast && (
-                <button
-                  type="button"
-                  aria-label={`Add a goal for ${shortLabel}`}
-                  onClick={() => { if (goalRows.length === 0) goalInputRef.current?.focus(); else setAddingGoal((v) => !v) }}
-                  className="mt-1.5 shrink-0 text-[13px] text-neutral-500 transition-colors hover:text-primary-700"
-                >
-                  + Add a goal
-                </button>
-              )}
-            </div>
-            <div className="mt-2 border-t-2 border-primary-700 pt-1">
-              {goalRows.length === 0 ? (
-                isPast ? (
-                  <p className="px-2 py-2 text-sm text-neutral-400">Nothing was on this {noun}'s goals.</p>
-                ) : !savedSession ? (
-                  <p className="px-2 py-2 text-sm text-neutral-400">
-                    Nothing yet.{' '}
-                    <button type="button" onClick={startSession} disabled={!sessionReady}
-                      className="font-semibold text-primary-700 hover:underline disabled:opacity-50">
-                      Plan {shortLabel} →
-                    </button>
-                  </p>
-                ) : null
-              ) : (
-                <ul>
-                  {goalRows.map((row) => (
-                    <PlanRow key={row.id} row={row} onOpen={open} onOpenPlaced={openPlaced} onAction={(a, r) => { void act(a, r) }}
-                      lowerLabel={lowerLabelText}
-                      expanded={expandedGoals.has(row.id)}
-                      onToggleExpand={toggleGoal}
-                      onAddStep={isPast ? undefined : (g, t) => { void addStep(g, t) }}
-                      stepActionsFor={(st) => actionsFor({ fate: st.fate, isGoal: false, isPast, level })}
-                        actions={actionsFor({ fate: row.fate, isGoal: row.isGoal, isPast, level })} />
-                  ))}
-                </ul>
-              )}
-              {goalComposerOpen && (
-                <form
-                  className="mt-1 flex items-center gap-2 px-2"
-                  onSubmit={(e) => { e.preventDefault(); const t = goalDraft; setGoalDraft(''); void addRow(t, true) }}
-                >
-                  <Target className="h-4 w-4 shrink-0 text-accent-600" />
-                  <input
-                    ref={goalInputRef}
-                    autoFocus={addingGoal}
-                    aria-label={`New goal for ${shortLabel}`}
-                    value={goalDraft}
-                    onChange={(e) => setGoalDraft(e.target.value)}
-                    placeholder={`What do you want from this ${noun}?`}
-                    className="min-w-0 flex-1 bg-transparent py-1.5 text-sm text-neutral-800 placeholder:text-neutral-400 focus:outline-none"
-                  />
-                </form>
-              )}
-            </div>
-          </section>
-
-          {/* Tasks — the concrete things. The year plans in goals alone. */}
-          {level !== 'year' && (
-            <section aria-label={`${bounds.label} list`} className="min-w-0">
-              <h2 className="px-1 font-display text-2xl text-neutral-800">{shortLabel} tasks</h2>
-              <div className="mt-2 border-t border-neutral-300 pt-1">
-                {openTaskRows.length === 0 ? (
-                  <p className="px-2 py-2 text-sm text-neutral-400">
-                    {doneTaskRows.length > 0
-                      ? `Everything on this ${noun}'s list is done.`
-                      : isPast
-                        ? `Nothing was on this ${noun}'s list.`
-                        : (
-                          <>
-                            Nothing on this {noun}'s list yet.{!savedSession && (
-                              <>
-                                {' '}
-                                <button type="button" onClick={startSession} disabled={!sessionReady}
-                                  className="font-semibold text-primary-700 hover:underline disabled:opacity-50">
-                                  Plan {shortLabel} →
-                                </button>
-                              </>
-                            )}
-                          </>
-                        )}
-                  </p>
-                ) : (
-                  <ul>
-                    {visibleTaskRows.map((row) => (
-                      <PlanRow key={row.id} row={row} onOpen={open} onOpenPlaced={openPlaced} onAction={(a, r) => { void act(a, r) }}
-                        lowerLabel={lowerLabelText}
-                        actions={actionsFor({ fate: row.fate, isGoal: row.isGoal, isPast, level, hasGoals: goalRows.length > 0 })} />
-                    ))}
-                  </ul>
-                )}
-                {/* One picker, not one per row. Rendered where the row you are
-                    filing lives, so the answer appears next to the question. */}
-                {pickingGoalFor && (
-                  <div
-                    role="dialog"
-                    aria-label="Put it under a goal"
-                    className="mt-2 rounded-lg border border-neutral-200 bg-bg-elevated p-2 shadow-md"
-                  >
-                    <p className="px-2 py-1 text-[12px] text-neutral-500">Put it under…</p>
-                    <ul>
-                      {goalRows.map((g) => (
-                        <li key={g.id}>
-                          <button
-                            type="button"
-                            onClick={() => { void fileUnderGoal(pickingGoalFor, g.id) }}
-                            className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm text-neutral-800 transition-colors hover:bg-white"
-                          >
-                            <Target className="h-3.5 w-3.5 shrink-0 text-accent-600" />
-                            <span className="truncate">{g.title}</span>
-                          </button>
-                        </li>
-                      ))}
-                    </ul>
-                    <button
-                      type="button"
-                      onClick={() => setPickingGoalFor(null)}
-                      className="mt-1 px-2 py-1 text-[12px] text-neutral-500 transition-colors hover:text-neutral-800"
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                )}
-                {overCap && (
-                  <button
-                    type="button"
-                    onClick={toggleShowAll}
-                    className="mt-1 w-full px-2 py-1 text-left text-[13px] text-neutral-500 transition-colors hover:text-primary-700"
-                  >
-                    {showAll
-                      ? `Show the first ${TASK_PREVIEW_CAP}`
-                      : `Show all ${openTaskRows.length} — ${hiddenTaskCount} more`}
-                  </button>
-                )}
-
-                {!isPast && (
-                  <form
-                    className="mt-1 flex items-center gap-2 px-2"
-                    onSubmit={(e) => { e.preventDefault(); const t = taskDraft; setTaskDraft(''); void addRow(t, false) }}
-                  >
-                    <Plus className="h-4 w-4 shrink-0 text-neutral-400" />
-                    <input
-                      aria-label={`Add to this ${noun}`}
-                      value={taskDraft}
-                      onChange={(e) => setTaskDraft(e.target.value)}
-                      placeholder={`Add a task for ${shortLabel}`}
-                      className="min-w-0 flex-1 bg-transparent py-1.5 text-sm text-neutral-800 placeholder:text-neutral-400 focus:outline-none"
-                    />
-                  </form>
-                )}
-              </div>
-
-              {doneTaskRows.length > 0 && (
-                <div className="mt-2">
-                  <button
-                    type="button"
-                    aria-expanded={doneOpen}
-                    onClick={toggleDone}
-                    className="flex items-center gap-1.5 px-1 text-[13px] text-neutral-500 transition-colors hover:text-neutral-700"
-                  >
-                    {doneOpen
-                      ? <ChevronDown className="h-3.5 w-3.5" />
-                      : <ChevronRight className="h-3.5 w-3.5" />}
-                    Completed this {noun}
-                    <span className="tabular-nums text-neutral-400">{doneTaskRows.length}</span>
-                  </button>
-                  {doneOpen && (
-                    <ul className="mt-1 border-t border-neutral-200">
-                      {doneTaskRows.map((row) => (
-                        <PlanRow key={row.id} row={row} onOpen={open} onOpenPlaced={openPlaced} onAction={(a, r) => { void act(a, r) }}
-                          lowerLabel={lowerLabelText}
-                        actions={actionsFor({ fate: row.fate, isGoal: row.isGoal, isPast, level })} />
-                      ))}
-                    </ul>
-                  )}
-                </div>
-              )}
-            </section>
-          )}
-        </div>
-
-        {/* The bigger picture — the rung above, and the dates, both look-only. */}
-        {(above || dated.length > 0 || patterns.length > 0) && (
-          <aside className="min-w-0 flex flex-col gap-3 lg:pt-1">
-            <p className="px-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-neutral-400">The bigger picture</p>
+  const periodShelves = (
+<aside aria-label="Shelves" className="period-shelves">
+            <header><div className="flex items-start justify-between gap-3"><h2 className="font-display text-xl text-neutral-800">Shelves</h2><button type="button" data-close-period-shelves aria-label="Close shelves" onClick={() => { references?.shelvesTarget?.dispatchEvent(new Event('close-period-shelves')); references?.unpin('today') }} className="p-2 text-neutral-500"><X className="h-4 w-4" /></button></div>
+              <p className="mt-1 text-[13px] text-neutral-500">{bounds.label}</p>
+              <p className="period-section-note">{above ? `Keep the ${NOUN[above]} in view as you plan this ${noun}.` : 'Recurring commitments to consider alongside your goals.'}</p></header>
+            {!above && patterns.length === 0 && <p className="period-section-note">No recurring commitments to reference for this year.</p>}
             {above && railBounds && (
               <PlanRail
                 title={TITLE[above]}
@@ -936,7 +662,7 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
                     <p className="mt-1.5 px-1.5 text-[11px] leading-snug text-neutral-400">
                       {/* No promise that an occurrence can be ticked: an
                           untimed routine has no occurrence anywhere yet. */}
-                      Time already committed. Patterns are changed in Routines.
+                      Slower routines relevant to this period, based on current patterns. Manage all routines in Routines.
                     </p>
                   </>
                 )}
@@ -975,7 +701,309 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
               </section>
             )}
           </aside>
+  )
+
+  return (
+    <div {...monthDrop} className={`${PAGE_COLUMN_WIDE} period-plan-page py-6${planDropOver ? ' reference-list-drop' : ''}`}>
+      {/* The same open masthead Today wears: the period in the eyebrow, the
+          page name as the title, the look-back cue on the quiet line when the
+          period has ended. No date numeral — a month is not a day. */}
+      <MastheadCard
+        variant="page"
+        eyebrow={(
+          <PeriodNavEyebrow
+            label={noun}
+            onPrev={() => goTo(bounds.prev)}
+            onNext={() => goTo(bounds.next)}
+            prevLabel={`Previous ${noun}`}
+            nextLabel={`Next ${noun}`}
+            trailing={isCurrent ? undefined : (
+              <button type="button" onClick={() => goTo(today)}
+                className="period-return ml-1 inline-flex shrink-0 items-center gap-1 rounded-full border border-primary-100 bg-primary-50 px-2 py-0.5 text-[11px] font-semibold text-primary-600 transition-colors hover:bg-primary-100">
+                Back to this {noun}
+              </button>
+            )}
+          />
         )}
+        title={periodTitle(level, bounds.label)}
+        subline={isPast
+          ? 'Look back: what got done, what didn\'t. Keep what still matters, drop the rest.'
+          : lookingAhead
+            ? <p className="text-[12px] text-neutral-500">{bounds.label} starts in {daysUntilStart} days · you&rsquo;re looking ahead</p>
+            : <p className="text-[12px] text-neutral-500">What matters this {noun}.</p>}
+        // The plan pages mount outside TasksApp's chrome context, so the
+        // assistant toggle isn't reachable here; the domain lens still is,
+        // and this page scopes by it (soleDomain).
+        controls={chrome ? <HomeChromeControls className="flex" /> : <DomainSwitcher />}
+      />
+
+      {/* Who this page is showing, and the door to the period just ended —
+          a quiet line rather than chrome crowded into the eyebrow. */}
+      <div className="period-plan-context">
+        <p className="text-[12px] text-neutral-500">{lensLabel}</p>
+        {isCurrent && (
+          <button
+            type="button"
+            onClick={() => goTo(bounds.prev)}
+            className="shrink-0 text-[13px] font-medium text-primary-700 transition-colors hover:underline"
+          >
+            Review {prevPeriodLabel} <ArrowUpRight className="mb-0.5 inline h-3 w-3" />
+          </button>
+        )}
+      </div>
+
+      {/* Guided planning: whether this month is planned, and the door into
+          the session. Month and season; a past period is a look-back. */}
+      {!isPast && (
+        <div className="period-plan-status">
+          <p className="text-[13px] text-neutral-500">
+            {sessionReadError
+              ? <>Couldn&rsquo;t check whether {shortLabel} is planned. <button type="button" onClick={reloadSession} className="font-semibold text-primary-700 hover:underline">Try again</button></>
+              : savedSession
+                ? <span className="font-semibold text-sage-600">Planned {savedSession.at.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
+                : `${goalRows.filter((r) => !rowIsDone(r.fate)).length} goals${level === 'year' ? '' : ` · ${openTaskRows.length} tasks`}`}
+          </p>
+          <span className="flex-1" />
+          {!sessionOpen && (
+            <button type="button" onClick={startSession} disabled={!sessionReady} aria-busy={sessionLoading || undefined}
+              className={`${savedSession
+                ? 'rounded-md border border-neutral-200 px-3 py-1.5 text-sm text-neutral-700'
+                : 'rounded-md border border-neutral-200 px-3 py-1.5 text-sm font-semibold text-primary-700'} disabled:opacity-50`}>
+              {savedSession ? 'Review the plan' : draft && !isEmptyDraft(draft) ? `Continue planning ${shortLabel}` : `Plan ${shortLabel}`}
+            </button>
+          )}
+        </div>
+      )}
+      {justSaved && !sessionOpen && (
+        <PlanNextLine
+          planned={shortLabel}
+          message={`When you’re ready, plan the ${nextRung} with ${shortLabel} beside you.`}
+          nextLabel={`the ${nextRung}`}
+          to={`/${nextRung}`}
+          onDismiss={dismissJustSaved}
+        />
+      )}
+
+      {sessionOpen && shownDraft ? (
+        <PlanSession level={level} aboveLabel={aboveLabel} periodLabel={shortLabel} prevLabel={prevPeriodLabel}
+          finished={back.finished} open={back.open} current={currentPeriodTasks}
+          above={aboveItems} aboveGoals={aboveGoalItems} hiddenStepGoals={hiddenStepGoals} domainInView={soleDomain ?? null} uid={user?.id ?? null}
+          draft={shownDraft} onChange={changeDraft} onClose={closeSession} onSave={saveDraft} saving={savingSession} saveError={saveError} />
+      ) : (
+      /* The plan on the left, what you consult while writing it on the
+          right — the calendar included. Reference sits WITH reference instead
+          of interrupting the list (Scott, 2026-09-13). One column on a phone. */
+      <div className="period-plan-layout">
+        <div className="period-plan-main">
+          {/* Goals — what you want from the period. */}
+          <section aria-label={`${bounds.label} goals`} className="period-goals-card">
+            <div className="flex items-start gap-2 px-1">
+              <h2 className="min-w-0 flex-1 font-display text-2xl text-neutral-800">{noun[0].toUpperCase() + noun.slice(1)} goals</h2>
+              {!isPast && (
+                <button
+                  type="button"
+                  aria-label={`Add a goal for ${shortLabel}`}
+                  onClick={() => { if (goalRows.length === 0) goalInputRef.current?.focus(); else setAddingGoal((v) => !v) }}
+                  className="mt-1.5 shrink-0 text-[13px] text-neutral-500 transition-colors hover:text-primary-700"
+                >
+                  + Add a goal
+                </button>
+              )}
+            </div>
+            <p className="period-section-note">{level === 'year' ? 'What do you want this year to add up to?' : level === 'season' ? 'What deserves attention this season?' : 'What progress do you want to make this month?'}</p>
+            <div className="mt-3">
+              {goalRows.length === 0 ? (
+                isPast ? (
+                  <p className="px-2 py-2 text-sm text-neutral-400">Nothing was on this {noun}'s goals.</p>
+                ) : null
+              ) : (
+                <ul>
+                  {goalRows.filter((r) => !rowIsDone(r.fate)).map((row) => (
+                    <PlanRow key={row.id} row={row} onOpen={open} onOpenPlaced={openPlaced} onAction={(a, r) => { void act(a, r) }}
+                      lowerLabel={lowerLabelText}
+                      expanded={expandedGoals.has(row.id)}
+                      onToggleExpand={toggleGoal}
+                      onAddStep={isPast ? undefined : (g, t) => { void addStep(g, t) }}
+                      stepActionsFor={(st) => actionsFor({ fate: st.fate, isGoal: false, isPast, level })}
+                        actions={actionsFor({ fate: row.fate, isGoal: row.isGoal, isPast, level })} />
+                  ))}
+                </ul>
+              )}
+              {goalRows.some((r) => rowIsDone(r.fate)) && (
+                <details className="period-assigned-fold" key={`goals-${level}-${bounds.start.toISOString()}`} open={isPast || undefined}>
+                  <summary>Completed goals · {goalRows.filter((r) => rowIsDone(r.fate)).length}</summary>
+                  <ul>{goalRows.filter((r) => rowIsDone(r.fate)).map((row) => (
+                    <PlanRow key={row.id} row={row} onOpen={open} onOpenPlaced={openPlaced}
+                      onAction={(a, r) => { void act(a, r) }} lowerLabel={lowerLabelText}
+                      expanded={expandedGoals.has(row.id)} onToggleExpand={toggleGoal}
+                      stepActionsFor={(st) => actionsFor({ fate: st.fate, isGoal: false, isPast, level })}
+                      actions={actionsFor({ fate: row.fate, isGoal: true, isPast, level })} />
+                  ))}</ul>
+                </details>
+              )}
+              {goalComposerOpen && (
+                <form
+                  className="mt-1 flex items-center gap-2 px-2"
+                  onSubmit={(e) => { e.preventDefault(); const t = goalDraft; setGoalDraft(''); void addRow(t, true) }}
+                >
+                  <Target className="h-4 w-4 shrink-0 text-accent-600" />
+                  <input
+                    ref={goalInputRef}
+                    autoFocus={addingGoal}
+                    aria-label={`New goal for ${shortLabel}`}
+                    value={goalDraft}
+                    onChange={(e) => setGoalDraft(e.target.value)}
+                    placeholder={`What do you want from this ${noun}?`}
+                    className="min-w-0 flex-1 bg-transparent py-1.5 text-sm text-neutral-800 placeholder:text-neutral-400 focus:outline-none"
+                  />
+                </form>
+              )}
+            </div>
+          </section>
+
+          {/* Tasks — the concrete things. The year plans in goals alone. */}
+          {level !== 'year' && (
+            <section aria-label={`${bounds.label} list`} className="period-tasks-card">
+              <h2 className="px-1 font-display text-2xl text-neutral-800">{noun[0].toUpperCase() + noun.slice(1)} tasks</h2>
+              <p className="period-section-note">{level === 'month' ? 'Actions for the month. Choose a week when you’re ready.' : 'Work worth committing to this season.'}</p>
+              <div className="mt-3">
+                {openTaskRows.length === 0 ? (
+                  <p className="px-2 py-2 text-sm text-neutral-400">
+                    {doneTaskRows.length > 0
+                      ? `Everything on this ${noun}'s list is done.`
+                      : isPast
+                        ? `Nothing was on this ${noun}'s list.`
+                        : (
+                          <>
+                            Nothing on this {noun}'s list yet.{!savedSession && (
+                              <>
+                                {' '}
+                                <button type="button" onClick={startSession} disabled={!sessionReady}
+                                  className="font-semibold text-primary-700 hover:underline disabled:opacity-50">
+                                  Plan {shortLabel} →
+                                </button>
+                              </>
+                            )}
+                          </>
+                        )}
+                  </p>
+                ) : (
+                  <>
+                  <h3 className="period-group-label">{level === 'month' ? 'To plan into a week' : 'To plan into a month'} <span>{availableTaskRows.length}</span></h3>
+                  {availableTaskRows.length === 0 && <p className="period-section-note">Every open task has a more specific commitment.</p>}
+                  <ul>
+                    {visibleTaskRows.map((row) => (
+                      <PlanRow key={row.id} row={row} onOpen={open} onOpenPlaced={openPlaced} onAction={(a, r) => { void act(a, r) }}
+                        lowerLabel={lowerLabelText}
+                        actions={actionsFor({ fate: row.fate, isGoal: row.isGoal, isPast, level, hasGoals: goalRows.length > 0 })} />
+                    ))}
+                  </ul>
+                  </>
+                )}
+                {/* One picker, not one per row. Rendered where the row you are
+                    filing lives, so the answer appears next to the question. */}
+                {pickingGoalFor && (
+                  <div
+                    role="dialog"
+                    aria-label="Put it under a goal"
+                    className="mt-2 rounded-lg border border-neutral-200 bg-bg-elevated p-2 shadow-md"
+                  >
+                    <p className="px-2 py-1 text-[12px] text-neutral-500">Put it under…</p>
+                    <ul>
+                      {goalRows.map((g) => (
+                        <li key={g.id}>
+                          <button
+                            type="button"
+                            onClick={() => { void fileUnderGoal(pickingGoalFor, g.id) }}
+                            className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm text-neutral-800 transition-colors hover:bg-white"
+                          >
+                            <Target className="h-3.5 w-3.5 shrink-0 text-accent-600" />
+                            <span className="truncate">{g.title}</span>
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                    <button
+                      type="button"
+                      onClick={() => setPickingGoalFor(null)}
+                      className="mt-1 px-2 py-1 text-[12px] text-neutral-500 transition-colors hover:text-neutral-800"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                )}
+                {overCap && (
+                  <button
+                    type="button"
+                    onClick={toggleShowAll}
+                    className="mt-1 w-full px-2 py-1 text-left text-[13px] text-neutral-500 transition-colors hover:text-primary-700"
+                  >
+                    {showAll
+                      ? `Show the first ${TASK_PREVIEW_CAP}`
+                      : `Show all ${availableTaskRows.length} — ${hiddenTaskCount} more`}
+                  </button>
+                )}
+
+                {!isPast && (
+                  <form
+                    className="mt-1 flex items-center gap-2 px-2"
+                    onSubmit={(e) => { e.preventDefault(); const t = taskDraft; setTaskDraft(''); void addRow(t, false) }}
+                  >
+                    <Plus className="h-4 w-4 shrink-0 text-neutral-400" />
+                    <input
+                      aria-label={`Add to this ${noun}`}
+                      value={taskDraft}
+                      onChange={(e) => setTaskDraft(e.target.value)}
+                      placeholder={`Add a task for ${shortLabel}`}
+                      className="min-w-0 flex-1 bg-transparent py-1.5 text-sm text-neutral-800 placeholder:text-neutral-400 focus:outline-none"
+                    />
+                  </form>
+                )}
+              </div>
+
+              {assignedTaskRows.length > 0 && (
+                <details className="period-assigned-fold" key={`${level}-${bounds.start.toISOString()}`}>
+                  <summary>Already assigned · {assignedTaskRows.length}</summary>
+                  <p className="period-section-note">Still part of this {noun}’s plan.</p>
+                  <ul>{assignedTaskRows.map((row) => (
+                    <PlanRow key={row.id} row={row} onOpen={open} onOpenPlaced={openPlaced}
+                      onAction={(a, r) => { void act(a, r) }} lowerLabel={lowerLabelText}
+                      actions={actionsFor({ fate: row.fate, isGoal: false, isPast, level, hasGoals: goalRows.length > 0 })} />
+                  ))}</ul>
+                </details>
+              )}
+
+              {doneTaskRows.length > 0 && (
+                <div className="mt-2">
+                  <button
+                    type="button"
+                    aria-expanded={doneOpen}
+                    onClick={toggleDone}
+                    className="flex items-center gap-1.5 px-1 text-[13px] text-neutral-500 transition-colors hover:text-neutral-700"
+                  >
+                    {doneOpen
+                      ? <ChevronDown className="h-3.5 w-3.5" />
+                      : <ChevronRight className="h-3.5 w-3.5" />}
+                    Completed this {noun}
+                    <span className="tabular-nums text-neutral-400">{doneTaskRows.length}</span>
+                  </button>
+                  {doneOpen && (
+                    <ul className="mt-1 border-t border-neutral-200">
+                      {doneTaskRows.map((row) => (
+                        <PlanRow key={row.id} row={row} onOpen={open} onOpenPlaced={openPlaced} onAction={(a, r) => { void act(a, r) }}
+                          lowerLabel={lowerLabelText}
+                        actions={actionsFor({ fate: row.fate, isGoal: row.isGoal, isPast, level })} />
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              )}
+            </section>
+          )}
+        </div>
+
+        {references?.shelvesTarget ? createPortal(periodShelves, references.shelvesTarget) : !references ? periodShelves : null}
+
       </div>
       )}
     </div>

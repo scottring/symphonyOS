@@ -70,7 +70,7 @@ describe('WeekViewV2 layout', () => {
     expect(screen.getByRole('region', { name: "This week's list" })).toBeInTheDocument()
     expect(screen.queryByText(/Didn.t happen/)).toBeNull()
     expect(screen.queryByRole('button', { name: /This month/ })).toBeNull()
-    expect(screen.queryByRole('button', { name: 'Choose tasks' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Shelves' })).not.toBeInTheDocument()
   })
 
   it('shows a week task on "This week\'s list" above the days and lets it be ticked', () => {
@@ -152,6 +152,7 @@ describe('WeekViewV2 all-day lane', () => {
     ]
     render(<WeekViewV2 {...defaultProps} routines={[]} weekStart={labourDayWeek} events={events} />)
     fireEvent.click(screen.getByRole('radio', { name: 'Schedule' }))
+    expect(screen.getByRole('region', { name: "This week's list" })).toBeInTheDocument()
     expect(within(screen.getByTestId('allday-2026-09-07')).getByText('Labor Day')).toBeInTheDocument()
   })
 
@@ -204,8 +205,8 @@ describe('WeekViewV2 journal spread', () => {
     ]
     render(<WeekViewV2 {...defaultProps} routines={[]} weekStart={sunday} tasks={tasks} events={events} />)
     const monday = within(screen.getByTestId('journal-day-2026-09-14'))
-    const entries = monday.getByRole('list', { name: 'Entries' })
-    expect(within(entries).getAllByRole('listitem').map((li) => li.textContent)).toEqual([
+    const entries = [...within(monday.getByRole('list', { name: 'Schedule entries' })).getAllByRole('listitem'), ...within(monday.getByRole('list', { name: 'Any time entries' })).getAllByRole('listitem')]
+    expect(entries.map((li) => li.textContent)).toEqual([
       '6:50aGutter quotes',
       '10aPT appointment',
       '2:30pCall the bank',
@@ -265,7 +266,7 @@ describe('WeekViewV2 journal spread', () => {
   it('the Routines switch also hides an untimed weekly routine from the Available line', () => {
     const routines = [createMockRoutine({ name: 'Take out garbage', time_of_day: null, recurrence_pattern: { type: 'weekly', days: ['sun'] } as RecurrencePattern })]
     render(<WeekViewV2 {...defaultProps} routines={routines} weekStart={sunday} />)
-    expect(screen.getByText('Take out garbage')).toBeInTheDocument()
+    expect(screen.queryByText('Take out garbage')).toBeNull()
     fireEvent.click(screen.getByRole('switch', { name: 'Routines' }))
     expect(screen.queryByText('Take out garbage')).toBeNull()
     fireEvent.click(screen.getByRole('switch', { name: 'Routines' }))
@@ -292,9 +293,9 @@ describe('WeekViewV2 journal spread', () => {
       expect(within(screen.getByTestId('journal-day-2026-09-14')).getByText('Return library books')).toBeInTheDocument()
       // No side column here either: Planning is a sheet behind its button.
       expect(screen.getByRole('region', { name: "This week's list" })).toBeInTheDocument()
-      expect(screen.queryByRole('dialog', { name: 'Choose tasks' })).toBeNull()
-      fireEvent.click(screen.getByRole('button', { name: 'Choose tasks' }))
-      expect(screen.getByRole('dialog', { name: 'Choose tasks' })).toHaveAttribute('aria-hidden', 'false')
+      expect(screen.queryByRole('dialog', { name: 'Shelves' })).toBeNull()
+      fireEvent.click(screen.getByRole('button', { name: 'Shelves' }))
+      expect(screen.getByRole('dialog', { name: 'Shelves' })).toHaveAttribute('aria-hidden', 'false')
     })
   })
 })
@@ -312,6 +313,15 @@ describe('WeekViewV2 — Journal and Schedule agree', () => {
     expect(within(screen.getByTestId('allday-2026-09-19')).getByText('Organize kids clothes')).toBeInTheDocument()
   })
 
+  it('keeps completed untimed routine occurrences in the day record', async () => {
+    instancesMock.rows = [{
+      id: 'done', user_id: 'u', entity_type: 'routine', entity_id: 'read', date: '2026-09-19', status: 'completed',
+      assignee: null, assigned_to_override: null, deferred_to: null, completed_at: '2026-09-19T12:00:00Z', skipped_at: null, progress: null, created_at: '', updated_at: '',
+    }]
+    render(<WeekViewV2 {...defaultProps} routines={[createMockRoutine({ id: 'read', name: 'Read', time_of_day: null, recurrence_pattern: { type: 'weekly', days: ['sat'] } })]} weekStart={sunday} />)
+    expect(await within(screen.getByTestId('journal-day-2026-09-19')).findByText('Read')).toBeInTheDocument()
+  })
+
   it('a routine occurrence chosen for Saturday (no time) is an entry in both; one nobody chose is only "available"', async () => {
     instancesMock.rows = [{
       id: 'i1', user_id: 'u', entity_type: 'routine', entity_id: 'chosen', date: '2026-09-19', status: 'pending',
@@ -324,10 +334,11 @@ describe('WeekViewV2 — Journal and Schedule agree', () => {
     ]
     render(<WeekViewV2 {...defaultProps} routines={routines} weekStart={sunday} />)
     const saturday = within(screen.getByTestId('journal-day-2026-09-19'))
-    const entries = await saturday.findByRole('list', { name: 'Entries' })
+    const entries = await saturday.findByRole('list', { name: 'Any time entries' })
     expect(within(entries).getByText('Family reading time')).toBeInTheDocument()
     expect(within(entries).queryByText('Kids clean rooms')).toBeNull()
-    expect(saturday.getByLabelText('Available')).toHaveTextContent('Kids clean rooms')
+    expect(saturday.queryByLabelText('Available')).toBeNull()
+    expect(saturday.queryByText('Kids clean rooms')).toBeNull()
 
     // Ticking the entry completes THAT occurrence — Saturday's instance.
     fireEvent.click(saturday.getByRole('button', { name: 'Complete Family reading time' }))

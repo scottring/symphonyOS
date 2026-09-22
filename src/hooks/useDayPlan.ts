@@ -1,3 +1,4 @@
+import { weekRoutineChoices } from '@/lib/planning/weekRoutineChoices'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { ActionableInstance } from '@/types/actionable'
 import { useSupabaseTasks } from '@/hooks/useSupabaseTasks'
@@ -60,11 +61,12 @@ export function useDayPlan(
     if (!instances) return null
     const [y, m, d] = dayKey.split('-').map(Number)
     const viewedDate = new Date(y, m - 1, d)
-    return selectDayPlan({
+    const dayPlan = selectDayPlan({
       tasks: filterTasksForLayers(tasks, layers),
       routines: routinesForViewedDate(getRoutinesForDate(viewedDate), allRoutines, instances, viewedDate),
       dateInstances: instances,
       viewedDate,
+      referenceMonth: weekStartOverride ?? viewedDate,
       selectedAssignee: selectedAssignees,
       hideRoutines,
       layers,
@@ -75,7 +77,11 @@ export function useDayPlan(
       unhomedRoutines: unhomedRoutines(allRoutines, { member: selectedAssignees, prefs: { hideRoutines: false, layers } },
         { weekStart, instances: weekInstances }),
     })
-  }, [instances, dayKey, weekStart, weekInstances, tasks, layers, getRoutinesForDate, allRoutines, selectedAssignees, hideRoutines, userId])
+    return weekStartOverride ? {
+      ...dayPlan,
+      weekRoutineDays: weekRoutineChoices({ weekStart, selectedAssignee: selectedAssignees, hideRoutines, layers }, allRoutines, getRoutinesForDate, weekInstances),
+    } : dayPlan
+  }, [instances, dayKey, weekStartOverride, weekStart, weekInstances, tasks, layers, getRoutinesForDate, allRoutines, selectedAssignees, hideRoutines, userId])
 
   return { plan, loading: tasksLoading || routinesLoading || !instances, error: !!tasksError }
 }

@@ -109,3 +109,22 @@ export function splitTodayJournal(
     aheadCount: allDayEvents.length + timed.length - cut,
   }
 }
+
+/** Keep a task group together when folding completed work. */
+export function splitCompletedFocus(focus: Record<DaySection, TimelineItem[]>) {
+  const active = emptySections<TimelineItem>()
+  const completed = emptySections<TimelineItem>()
+  const rows = Object.values(focus).flat()
+  const parents = new Map(rows.filter(row => !row.isSubtask).map(row => [row.originalTask?.id ?? row.id.replace(/^task-/, ''), row]))
+  let completedCount = 0
+  let activeCount = 0
+  for (const section of Object.keys(focus) as DaySection[]) {
+    for (const row of focus[section]) {
+      const parent = row.parentTaskId ? parents.get(row.parentTaskId) : undefined
+      const done = parent ? parent.completed : row.completed
+      ;(done ? completed : active)[section].push(row)
+      if (!row.isSubtask) { if (done) completedCount++; else activeCount++ }
+    }
+  }
+  return { active, completed, completedCount, activeCount }
+}

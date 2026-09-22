@@ -172,3 +172,14 @@ describe('SchedulePicker', () => {
     expect(onClearSchedule).toHaveBeenCalledOnce()
   })
 })
+
+it('task weekend choices promise either day and do not show Saturday-only capacity', async () => {
+  const user = userEvent.setup()
+  const onReschedule = vi.fn()
+  render(<SchedulePicker flexibleWeekend onSchedule={vi.fn()} onReschedule={onReschedule} loads={new Map([[loadKeyFor('this-weekend'), load()]])} />)
+  await openPicker(user)
+  const button = screen.getByRole('menuitem', { name: /This weekend.*either day/ })
+  expect(within(button.closest('[data-tile]') as HTMLElement).queryByRole('progressbar')).toBeNull()
+  await user.click(button)
+  expect(onReschedule).toHaveBeenCalledWith('this-weekend')
+})

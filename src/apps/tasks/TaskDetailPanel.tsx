@@ -1,3 +1,4 @@
+import { relativeWeekend, weekendPlacement, weekendLabel } from '@/lib/planning/weekend';
 // src/apps/tasks/TaskDetailPanel.tsx
 //
 // The Shell's global detail panel for the Tasks app. Driven by the URL
@@ -244,6 +245,12 @@ function TaskPanelBody({ id }: { id: string }) {
         // the real hook logic (defer_count, weekStart, overdue time
         // preservation), and an Unsorted task reschedule here asks first.
         void (async () => {
+          if (when === 'this-weekend' || when === 'next-weekend') {
+            const saturday = relativeWeekend(when === 'next-weekend');
+            const result = await gated.updateTask(task.id, weekendPlacement(saturday));
+            if (result !== false) showToast(`${weekendLabel(saturday)} · either day`, 'success');
+            return;
+          }
           const ok = await applyTriageWhen(when, task.id, { onPushTask: gated.pushTask, onSetBucket: gated.setBucket!, onFocus: (id, day) => gated.updateTask(id, { plannedOn: day }) });
           if (ok) showToast(describeTriageWhen(when), 'success');
         })();
@@ -279,6 +286,12 @@ function TaskPanelBody({ id }: { id: string }) {
       }}
       onRescheduleSubtask={(sid, when) => {
         void (async () => {
+          if (when === 'this-weekend' || when === 'next-weekend') {
+            const saturday = relativeWeekend(when === 'next-weekend');
+            const result = await gated.updateTask(sid, weekendPlacement(saturday));
+            if (result !== false) showToast(`${weekendLabel(saturday)} · either day`, 'success');
+            return;
+          }
           const ok = await applyTriageWhen(when, sid, { onPushTask: gated.pushTask, onSetBucket: gated.setBucket!, onFocus: (id, day) => gated.updateTask(id, { plannedOn: day }) });
           if (ok) showToast(describeTriageWhen(when), 'success');
         })();

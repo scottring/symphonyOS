@@ -107,6 +107,7 @@ export interface DbTask {
   // Optional: absent until the 2026-09-19 migration is applied.
   planned_on?: string | null
   week_deferred_at: string | null
+  weekend_start?: string | null
   week_start: string | null
   month_start: string | null
   season_start: string | null
@@ -194,6 +195,7 @@ export function dbTaskToTask(dbTask: DbTask): Task {
     plannedOn: dbTask.planned_on ? parseLocalYmd(dbTask.planned_on) : undefined,
     weekDeferredAt: dbTask.week_deferred_at ? new Date(dbTask.week_deferred_at) : undefined,
     // A `date` column — parse to LOCAL midnight, never `new Date(str)` (that's UTC).
+    weekendStart: dbTask.weekend_start ? parseLocalYmd(dbTask.weekend_start) : undefined,
     weekStart: dbTask.week_start ? parseLocalYmd(dbTask.week_start) : undefined,
     monthStart: dbTask.month_start ? parseLocalYmd(dbTask.month_start) : undefined,
     seasonStart: dbTask.season_start ? parseLocalYmd(dbTask.season_start) : undefined,
@@ -1430,6 +1432,7 @@ export function useSupabaseTasks() {
       let error: { message: string } | null | undefined
       try {
         ;({ error } = await supabase.from('tasks').update({
+          ...('weekendStart' in plan.row ? { weekend_start: plan.row.weekendStart ? localYmd(plan.row.weekendStart) : null } : {}),
           bucket: plan.row.bucket,
           week_start: plan.row.weekStart ? localYmd(plan.row.weekStart) : null,
           month_start: plan.row.monthStart ? localYmd(plan.row.monthStart) : null,
@@ -1528,6 +1531,7 @@ export function useSupabaseTasks() {
       const before = t
       setTasksNow(tasksRef, setTasks, (prev) => prev.map((x) => (x.id === t.id ? plan.local : x)))
       const dbRow: Record<string, unknown> = {
+        ...('weekendStart' in plan.row ? { weekend_start: plan.row.weekendStart ? localYmd(plan.row.weekendStart) : null } : {}),
         bucket: plan.row.bucket,
         week_start: plan.row.weekStart ? localYmd(plan.row.weekStart) : null,
         month_start: plan.row.monthStart ? localYmd(plan.row.monthStart) : null,
@@ -1574,6 +1578,7 @@ export function useSupabaseTasks() {
     const before = task
     setTasksNow(tasksRef, setTasks, (prev) => prev.map((x) => (x.id === id ? plan.local : x)))
     const { error } = await supabase.from('tasks').update({
+      ...('weekendStart' in plan.row ? { weekend_start: plan.row.weekendStart ? localYmd(plan.row.weekendStart) : null } : {}),
       bucket: plan.row.bucket,
       week_start: plan.row.weekStart ? localYmd(plan.row.weekStart) : null,
       month_start: plan.row.monthStart ? localYmd(plan.row.monthStart) : null,
@@ -1678,6 +1683,7 @@ export function useSupabaseTasks() {
     const childrenToMove = movesSchedule ? (task.subtasks ?? []) : []
     const childMove: Partial<Task> = {}
     if ('scheduledFor' in updates) childMove.scheduledFor = updates.scheduledFor
+    if ('weekendStart' in updates) childMove.weekendStart = updates.weekendStart
     if ('isAllDay' in updates) childMove.isAllDay = updates.isAllDay
     if ('bucket' in updates) childMove.bucket = updates.bucket
 
@@ -1768,6 +1774,7 @@ export function useSupabaseTasks() {
     if ('isFun' in updates) dbUpdates.is_fun = updates.isFun ?? false
     if ('weekDeferredAt' in updates) dbUpdates.week_deferred_at = updates.weekDeferredAt?.toISOString() ?? null
     // `week_start` is a DATE column — localYmd, not toISOString (which shifts the day west of Greenwich).
+    if ('weekendStart' in updates) dbUpdates.weekend_start = updates.weekendStart ? localYmd(updates.weekendStart) : null
     if ('weekStart' in updates) dbUpdates.week_start = updates.weekStart ? localYmd(updates.weekStart) : null
     if ('monthStart' in updates) dbUpdates.month_start = updates.monthStart ? localYmd(updates.monthStart) : null
     if ('seasonStart' in updates) dbUpdates.season_start = updates.seasonStart ? localYmd(updates.seasonStart) : null
@@ -1977,6 +1984,7 @@ export function useSupabaseTasks() {
     if ('isFun' in updates) dbUpdates.is_fun = updates.isFun ?? false
     if ('weekDeferredAt' in updates) dbUpdates.week_deferred_at = updates.weekDeferredAt?.toISOString() ?? null
     // `week_start` is a DATE column — localYmd, not toISOString (which shifts the day west of Greenwich).
+    if ('weekendStart' in updates) dbUpdates.weekend_start = updates.weekendStart ? localYmd(updates.weekendStart) : null
     if ('weekStart' in updates) dbUpdates.week_start = updates.weekStart ? localYmd(updates.weekStart) : null
     if ('monthStart' in updates) dbUpdates.month_start = updates.monthStart ? localYmd(updates.monthStart) : null
     if ('seasonStart' in updates) dbUpdates.season_start = updates.seasonStart ? localYmd(updates.seasonStart) : null

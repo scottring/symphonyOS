@@ -138,13 +138,13 @@ export function PlanRow({
   // own edge is the one you see.
   return (
     <>
-    <li className="group flex items-start gap-2.5 border-b border-neutral-200 px-2 py-3 transition-colors last:border-0 hover:bg-neutral-50">
+    <li className="period-plan-row group flex items-start gap-2.5 border-b border-neutral-200 px-2 py-3 transition-colors last:border-0 hover:bg-neutral-50">
       <button
         type="button"
         aria-label={`${done ? 'Reopen' : 'Complete'} ${row.title}`}
         disabled={!canTick}
         onClick={() => onAction('complete', row)}
-        className={`mt-1 shrink-0 w-[18px] h-[18px] rounded-full border-2 grid place-items-center transition-colors ${
+        className={`period-row-check mt-1 shrink-0 w-[18px] h-[18px] rounded-full border-2 grid place-items-center transition-colors ${
           done ? 'border-primary-500 bg-primary-500 text-white' : canTick ? 'border-neutral-300 hover:border-primary-500 text-transparent' : 'border-neutral-200 text-transparent'
         }`}
       >
@@ -168,7 +168,7 @@ export function PlanRow({
         <button
           type="button"
           onClick={() => onOpen(row)}
-          className={`block w-full min-w-0 text-left leading-snug ${row.isGoal ? 'font-display text-[17px]' : 'text-[16px]'} ${done ? 'line-through text-neutral-400' : 'text-neutral-800'}`}
+          className={`period-row-title block w-full min-w-0 text-left leading-snug ${row.isGoal ? 'font-display text-[17px]' : 'text-[16px]'} ${done ? 'line-through text-neutral-400' : 'text-neutral-800'}`}
         >
           {row.title}
         </button>
@@ -186,7 +186,7 @@ export function PlanRow({
           19px title down to one word a line — and an unseen "Drop" was still
           tappable. A phone opens the row instead. */}
       {verbs.length > 0 && (
-        <span className="hidden shrink-0 sm:flex items-center gap-0.5 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
+        <span className="period-row-actions hidden shrink-0 sm:flex items-center gap-0.5 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
           {verbs.map((a) => (
             <button
               key={a}
