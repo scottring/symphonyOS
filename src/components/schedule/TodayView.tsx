@@ -60,6 +60,7 @@ import { AssigneeFilter } from '@/components/home/AssigneeFilter'
 
 import { NeededTodayNote } from './NeededTodayNote'
 import { TodayAddInput } from './TodayAddInput'
+import { PhoneCaptureBar } from '@/components/layout/PhoneCaptureBar'
 import { TodaySectionList, findTimelineItem } from './TodaySectionList'
 import { TodayDragProvider } from './TodayDragProvider'
 import { resolveDrop, writeMoveAndRegisterUndo, type DropIntent } from '@/lib/today/todayDrop'
@@ -1226,7 +1227,8 @@ export function TodayView({
   const canAdd = data.isToday && !!(ctx.onCreateTaskParsed ?? ctx.onCreateTask)
   // The page's two controls sit on the "For today" heading (approved white
   // journal, 2026-09-22): one Choose, one Add task. Nothing by the date.
-  const addTaskButton = canAdd ? (
+  // Phones add through the floating capture bar instead (native layout).
+  const addTaskButton = canAdd && !isMobile ? (
     <button
       type="button"
       onClick={() => setAddOpenDay(addOpen ? null : localYmd(viewedDate))}
@@ -1726,6 +1728,19 @@ export function TodayView({
           onKeepOne={sweep.keepOne}
           onSkipRoutineToday={(routineId) => ctx.onSkipRoutine?.(routineId)}
         />
+      )}
+
+      {/* Phone: the floating capture bar above the dock (native TodayView). */}
+      {isMobile && canAdd && (
+        <PhoneCaptureBar>
+          <TodayAddInput
+            variant="bar"
+            onAdd={ctx.onCreateTaskParsed!}
+            parserContext={ctx.parserContext!}
+            resolver={ctx.resolverContext!}
+            getRecentTaskForContact={ctx.getRecentTaskForContact}
+          />
+        </PhoneCaptureBar>
       )}
 
       {/* Timeline note composer (radial wheel → "Note" pick) */}

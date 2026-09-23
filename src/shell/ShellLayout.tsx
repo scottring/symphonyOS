@@ -8,7 +8,8 @@ import { DesktopFooter, DesktopFooterActionContext } from '@/components/layout/D
 // src/shell/ShellLayout.tsx
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Sparkles, Repeat, CalendarRange, Inbox as InboxIcon, MoreHorizontal } from 'lucide-react';
+import { Sparkles, Repeat, CalendarRange, Inbox as InboxIcon, MoreHorizontal, Plus } from 'lucide-react';
+import { useTextEntryActive } from '@/hooks/useKeyboardInset';
 import { type ViewType } from '@/components/layout/Sidebar';
 import { MoreSheet } from '@/components/layout/MoreSheet';
 import { QuickCapture } from '@/components/layout/QuickCapture';
@@ -119,6 +120,7 @@ function ShellLayoutInner({ children }: Props) {
   const navigate = useNavigate();
   const location = useLocation();
   const isMobile = useMobile();
+  const typing = useTextEntryActive();
   const planDestination = usePlanDestination();
   const { user, signOut } = useAuth();
 
@@ -259,7 +261,7 @@ function ShellLayoutInner({ children }: Props) {
             confirm. */}
         {/* Phone Today folds the domain lens into its one Filters control in
             the tab row, so this header row would only repeat it. */}
-        {isMobile && planPeriodForPath(location.pathname) !== 'today' && (
+        {isMobile && !planPeriodForPath(location.pathname) && (
           <header
             className="sticky top-0 z-10 bg-transparent px-3 py-1"
             style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}
@@ -349,9 +351,9 @@ function ShellLayoutInner({ children }: Props) {
       {/* QuickCapture FAB — all routes except the agent view (which has its own input) */}
       {activeView !== 'agent' && (
         <QuickCapture
-          // Desktop captures through ⌘K and the navigation's search button.
-          // …and not over a full-screen detail panel on phones.
-          showFab={isMobile && !selection}
+          // Phones add through the dock's + (and the capture bar); desktop
+          // through ⌘K and the navigation's search button.
+          showFab={false}
           onAdd={chrome.onQuickAdd}
           onAddRich={chrome.onQuickAddRich}
           onAddNote={chrome.onQuickAddNote}
@@ -397,60 +399,58 @@ function ShellLayoutInner({ children }: Props) {
         </div>
       )}
 
-      {/* The same four destinations on desktop and phone: Today, Plan, Inbox, More. */}
-      {isMobile && (
-        <nav
-          className="fixed bottom-0 left-0 right-0 z-40 bg-bg-elevated/95 backdrop-blur-lg border-t border-neutral-200/50"
-          style={{ paddingBottom: 'max(0px, calc(env(safe-area-inset-bottom, 0px) - 8px))' }}
-        >
-          <div className="flex items-stretch px-1 py-0.5">
-            {[
-              { label: 'Planner', Icon: CalendarRange, route: planDestination, active: !!planPeriodForPath(location.pathname) },
-              { label: 'Routines', Icon: Repeat, route: '/routines', active: location.pathname.startsWith('/routines') },
-            ].map((tab) => (
-              <button
-                key={tab.route}
-                onClick={() => navigate(tab.route)}
-                aria-current={tab.active ? 'page' : undefined}
-                className={`flex-1 min-w-0 flex flex-col items-center gap-0.5 px-1 py-1.5 rounded-lg transition-all ${
-                  tab.active ? 'text-accent-600' : 'text-neutral-400 hover:text-neutral-600'
-                }`}
-              >
-                <tab.Icon className="w-5 h-5" />
-                <span className={`text-[0.625rem] font-medium ${tab.active ? 'font-semibold' : ''}`}>{tab.label}</span>
-              </button>
-            ))}
-
-            {/* Inbox — capture catch-all, with unread badge. */}
+      {/* The native dock: Planner · Inbox · + · Routines · More. While a text
+          field has focus the keyboard owns the bottom edge, so the dock steps
+          aside and the capture bar sits on the keyboard (as on iOS). */}
+      {isMobile && !typing && (
+        <nav className="phone-dock" aria-label="Main">
+          <div className="phone-dock-row">
             <button
+              type="button"
+              className="phone-dock-tab"
+              onClick={() => navigate(planDestination)}
+              aria-current={planPeriodForPath(location.pathname) ? 'page' : undefined}
+            >
+              <CalendarRange aria-hidden="true" />
+              <span>Planner</span>
+            </button>
+            <button
+              type="button"
+              className="phone-dock-tab"
               onClick={() => navigate('/inbox')}
               aria-current={location.pathname.startsWith('/inbox') ? 'page' : undefined}
               aria-label={`Inbox${inboxCount ? `, ${inboxCount} ${inboxCount === 1 ? 'item' : 'items'}` : ''}`}
-              className={`relative flex-1 min-w-0 flex flex-col items-center gap-0.5 px-1 py-1.5 rounded-lg transition-all ${
-                location.pathname.startsWith('/inbox') ? 'text-accent-600' : 'text-neutral-400 hover:text-neutral-600'
-              }`}
             >
-              <InboxIcon className="w-5 h-5" />
-              <span className={`text-[0.625rem] font-medium ${location.pathname.startsWith('/inbox') ? 'font-semibold' : ''}`}>Inbox</span>
+              <InboxIcon aria-hidden="true" />
+              <span>Inbox</span>
               {inboxCount > 0 && (
-                <span className="absolute top-0.5 right-[18%] min-w-[16px] h-[16px] px-1 flex items-center justify-center rounded-full bg-primary-500 text-white text-[9px] font-semibold leading-none">
-                  {inboxCount > 99 ? '99+' : inboxCount}
-                </span>
+                <span className="phone-dock-badge" aria-hidden="true">{inboxCount > 99 ? '99+' : inboxCount}</span>
               )}
             </button>
-
-            {/* More → opens MoreSheet (the mobile library). */}
+            <div className="phone-dock-add-slot">
+              <button type="button" className="phone-dock-add" onClick={() => setQuickAddOpen(true)} aria-label="Add">
+                <Plus aria-hidden="true" />
+              </button>
+            </div>
             <button
+              type="button"
+              className="phone-dock-tab"
+              onClick={() => navigate('/routines')}
+              aria-current={location.pathname.startsWith('/routines') ? 'page' : undefined}
+            >
+              <Repeat aria-hidden="true" />
+              <span>Routines</span>
+            </button>
+            <button
+              type="button"
               ref={moreTabRef}
+              className="phone-dock-tab"
               onClick={() => setMoreSheetOpen(true)}
               aria-haspopup="dialog"
               aria-expanded={moreSheetOpen}
-              className={`flex-1 min-w-0 flex flex-col items-center gap-0.5 px-1 py-1.5 rounded-lg transition-all ${
-                moreSheetOpen ? 'text-neutral-700' : 'text-neutral-400 hover:text-neutral-600'
-              }`}
             >
-              <MoreHorizontal className="w-5 h-5" />
-              <span className="text-[0.625rem] font-medium">More</span>
+              <MoreHorizontal aria-hidden="true" />
+              <span>More</span>
             </button>
           </div>
         </nav>

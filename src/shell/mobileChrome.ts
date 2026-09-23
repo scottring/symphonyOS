@@ -16,4 +16,6 @@
  * (which is exactly what happened before: the content frame's padding and
  * the bar's actual height disagreed, clipping AttentionLine).
  */
-export const MOBILE_TAB_BAR_HEIGHT = '4.75rem'
+// The native dock (.phone-dock in index.css): 6px top pad + 60px row + 1px
+// rule, in px so it does not grow with the phone's larger root font size.
+export const MOBILE_TAB_BAR_HEIGHT = '67px'

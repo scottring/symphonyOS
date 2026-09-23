@@ -1,10 +1,13 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { NavLink, useLocation, useNavigate } from 'react-router-dom'
-import { PanelLeft, Target } from 'lucide-react'
+import { PanelLeft, Target, ChevronDown, Check } from 'lucide-react'
+import { periodBounds } from '@/lib/planning/periodPage'
+import { readSeasons } from '@/lib/cadence/seasons'
 import { useReferenceLists } from '@/components/reference/ReferenceListsContext'
 import { PlanningSheet } from '@/components/reference/PlanningSheet'
 import { GoalsSheet } from '@/components/plan/GoalsSheet'
+import { DomainSwitcher } from '@/components/domain/DomainSwitcher'
 
 /** Phone: a page's own header controls (filters, ⋯) join the horizon-tab row
  *  instead of adding rows above the date. Falls back to inline rendering. */
@@ -35,6 +38,47 @@ export function usePlanDestination() {
   return `/${period ?? (PERIODS.find(value => value === saved) ?? 'today')}`
 }
 
+const HORIZON_NAMES: Record<typeof PERIODS[number], string> = {
+  today: 'Today', week: 'Week', month: 'Month', season: 'Season', year: 'Year',
+}
+
+function horizonSubtitle(period: typeof PERIODS[number], now: Date): string {
+  if (period === 'today') return now.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
+  if (period === 'week') return "This week's list and days"
+  if (period === 'year') return 'Goals for the year'
+  try { return periodBounds(period, now, readSeasons()).label } catch { return '' }
+}
+
+/** Phone: one horizon at a time, switched from a compact title menu rather
+ *  than a row of five tabs (native PlannerView; mockup review 2026-09-23). */
+function HorizonSwitcher({ period }: { period: typeof PERIODS[number] }) {
+  const [open, setOpen] = useState(false)
+  const navigate = useNavigate()
+  const now = new Date()
+  useEffect(() => {
+    if (!open) return
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false) }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [open])
+  return <div className="horizon-switcher">
+    <button type="button" className="horizon-switcher-title" aria-haspopup="menu" aria-expanded={open}
+      aria-label={`${HORIZON_NAMES[period]}. Switch horizon`} onClick={() => setOpen(o => !o)}>
+      {HORIZON_NAMES[period]}<ChevronDown aria-hidden="true" />
+    </button>
+    {open && <>
+      <button type="button" className="horizon-switcher-scrim" aria-label="Close" onClick={() => setOpen(false)} />
+      <div role="menu" aria-label="Planning horizon" className="horizon-switcher-menu">
+        {PERIODS.map(value => <button key={value} type="button" role="menuitemradio" aria-checked={period === value}
+          onClick={() => { setOpen(false); navigate(`/${value}`) }}>
+          <span><strong>{HORIZON_NAMES[value]}</strong><small>{horizonSubtitle(value, now)}</small></span>
+          {period === value && <Check aria-hidden="true" />}
+        </button>)}
+      </div>
+    </>}
+  </div>
+}
+
 /** Page tools are deliberately outside primary destination navigation. */
 export function PlanNavigation({ mobile = false, paused = false, mobileControlsRef }: {
   mobile?: boolean; paused?: boolean
@@ -62,10 +106,10 @@ export function PlanNavigation({ mobile = false, paused = false, mobileControlsR
   const range = new URLSearchParams(search).get('range') ?? 'today'
   return <div className="plan-page-tools" data-period={period}>
     {period && <div className="plan-period-controls">
-      <nav aria-label="Planning period" className="plan-period-navigation">
+      {mobile ? <HorizonSwitcher period={period} /> : <nav aria-label="Planning period" className="plan-period-navigation">
         {PERIODS.map(value => <NavLink key={value} to={`/${value}`} aria-current={period === value ? 'page' : undefined}
           className={period === value ? 'is-current' : ''}>{value[0].toUpperCase() + value.slice(1)}</NavLink>)}
-      </nav>
+      </nav>}
       {period === 'week' && <label className="plan-range-control"><span className="sr-only">Range</span>
         <select aria-label="Week range" value={['week', 'weekend', 'three', 'custom'].includes(range) ? range : 'week'}
           onChange={event => navigate(event.target.value === 'week' ? '/week' : `/week?range=${event.target.value}`)}>
@@ -87,6 +131,9 @@ export function PlanNavigation({ mobile = false, paused = false, mobileControlsR
         <Target size={15} aria-hidden="true" /><span className="goals-reference-label">Goals</span>
       </button>
     </div>}
+    {/* Phone: the life-area lens rides on this row (Today folds it into
+        its Filters control instead). */}
+    {period && mobile && period !== 'today' && <DomainSwitcher />}
     {period && mobile && <div ref={mobileControlsRef} className="plan-mobile-controls" />}
     {period && <GoalsSheet open={goalsOpen} onClose={() => setGoalsOpen(false)} />}
     {mobile && showChooser && <PlanningSheet open={sheetOpen} onClose={() => setSheetPath(null)} periodShelves={broaderPeriod} />}
