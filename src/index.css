@@ -92,7 +92,11 @@
   --color-review-600: hsl(30 45% 38%);
 
   /* Background Tiers */
-  --color-bg-base: #fbfbfa;
+  /* The page wears a light tint of the place's colour — visible at a glance,
+     never a wash of saturated colour (Woodsy Cabin by default; each place
+     overrides it below). Panels, menus and cards stay white so the layers
+     read clearly on it. */
+  --color-bg-base: hsl(150 20% 94.5%);
   --color-bg-elevated: #ffffff;
   --color-bg-overlay: hsl(0 0% 100%);
 
@@ -188,6 +192,7 @@
 
 /* slate blue */
 :root[data-place='urban'] {
+  --color-bg-base: hsl(215 24% 94.5%);
   --color-primary-50: hsl(215 16% 97%);
   --color-primary-100: hsl(215 16% 93%);
   --color-primary-200: hsl(215 18% 85%);
@@ -213,6 +218,7 @@
 
 /* plum */
 :root[data-place='small-city'] {
+  --color-bg-base: hsl(315 16% 95%);
   --color-primary-50: hsl(315 15% 97%);
   --color-primary-100: hsl(315 15% 93%);
   --color-primary-200: hsl(315 17% 85%);
@@ -238,6 +244,7 @@
 
 /* alpine blue */
 :root[data-place='mountain-town'] {
+  --color-bg-base: hsl(203 32% 94.5%);
   --color-primary-50: hsl(203 29% 97%);
   --color-primary-100: hsl(203 29% 93%);
   --color-primary-200: hsl(203 31% 85%);
@@ -263,6 +270,7 @@
 
 /* barn red */
 :root[data-place='farm'] {
+  --color-bg-base: hsl(8 22% 95%);
   --color-primary-50: hsl(6 29% 97%);
   --color-primary-100: hsl(6 29% 93%);
   --color-primary-200: hsl(6 31% 85%);
@@ -2196,4 +2204,23 @@ div.chooser-action-group { overflow: visible !important; }
   .daybook-masthead-row { position: relative; }
   .daybook-masthead-row .daybook-title-row { padding-right: 120px; }
   .daybook-masthead-row .daybook-title-action { position: absolute; right: 0; bottom: 6px; padding-bottom: 0; }
+}
+/* On the place-tinted page, open panels are white surfaces so the layers
+   read clearly: the Shelves dock like the Details/AI column. */
+.reference-dock { background: var(--color-bg-elevated); box-shadow: 8px 0 24px rgb(35 35 34 / 0.04); }
+/* Your place across the top of the app (PlaceBand.tsx): a shallow window onto
+   the scene's horizon behind the navigation, fading at both ends and into the
+   page so labels stay readable. Same height as the navigation band. */
+.place-band {
+  position: absolute; left: 0; right: 0; top: 0; height: 88px;
+  overflow: hidden; pointer-events: none;
+  -webkit-mask-image: linear-gradient(to bottom, black 70%, transparent);
+  mask-image: linear-gradient(to bottom, black 70%, transparent);
+}
+.place-band-scene {
+  position: absolute; left: 50%; top: -230px; width: 560px; height: 560px;
+  transform: translateX(-50%);
+  opacity: 0.45;
+  -webkit-mask-image: linear-gradient(to right, transparent, black 32%, black 68%, transparent);
+  mask-image: linear-gradient(to right, transparent, black 32%, black 68%, transparent);
 }

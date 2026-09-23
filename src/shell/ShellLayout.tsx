@@ -34,6 +34,7 @@ import { useSelection } from './providers/SelectionProvider';
 import { MOBILE_TAB_BAR_HEIGHT } from './mobileChrome';
 import { SideColumn, SIDE_COLUMN_WIDTH, type SidePane } from './SideColumn';
 import { NoteViewer } from '@/components/chat/NoteViewer';
+import { PlaceBand } from '@/components/place/PlaceBand';
 import { onQuickAddRequest } from '@/lib/quickAddSignal';
 
 /**
@@ -281,7 +282,10 @@ function ShellLayoutInner({ children }: Props) {
           // Desktop: navigation, page, and footer share one centred column —
           // centred in the window, or in the space left beside a side pane or
           // the pinned reference lists.
-          <div className={`desktop-workspace${referencesVisible ? ' has-references' : ''}`}>
+          <>
+          {/* Your place, as a shallow landscape behind the navigation band. */}
+          <PlaceBand />
+          <div className={`desktop-workspace relative${referencesVisible ? ' has-references' : ''}`}>
             <div className="desktop-workspace-nav">
         <DesktopNavigation inboxCount={inboxCount} discussionsUnread={discussionsUnread}
           onSearch={() => setQuickAddOpen(true)} onQuickAdd={() => setQuickAddOpen(true)} onSignOut={signOut}
@@ -338,6 +342,7 @@ function ShellLayoutInner({ children }: Props) {
             {referencesVisible && <div className="desktop-workspace-dock"><ReferenceListsDock /></div>}
             <DesktopFooter actionRef={setDesktopFooterAction} />
           </div>
+          </>
         )}
       </div>
 
