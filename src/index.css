@@ -2382,6 +2382,14 @@ div.chooser-action-group { overflow: visible !important; }
   min-height: 32px; padding: 0 12px; border-radius: 999px; font-size: 13px; font-weight: 500;
   color: var(--color-neutral-600); background: var(--color-neutral-100); border: 1px solid transparent;
 }
+/* Phone Details | AI switch (PhonePaneSwitch.tsx), atop each full-screen pane. */
+.phone-pane-switch {
+  display: flex; justify-content: center; padding: 10px 16px;
+  border-bottom: 1px solid var(--color-neutral-200); background: var(--color-bg-elevated);
+  position: sticky; top: 0; z-index: 2;
+}
+.phone-pane-switch .side-column-switch > button { min-height: 36px; padding: 0 20px; }
+
 /* Phone Today (native TodayView): soft white cards on the tinted page, and
    tracked uppercase eyebrows over each group instead of serif rules. Desktop
    keeps the ruled journal. */

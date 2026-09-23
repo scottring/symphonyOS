@@ -34,6 +34,7 @@ import { useShellChrome } from './useShellChrome';
 import { useSelection } from './providers/SelectionProvider';
 import { MOBILE_TAB_BAR_HEIGHT } from './mobileChrome';
 import { SideColumn, SIDE_COLUMN_WIDTH, type SidePane } from './SideColumn';
+import { PhonePaneSwitch } from './PhonePaneSwitch';
 import { NoteViewer } from '@/components/chat/NoteViewer';
 import { PlaceBand } from '@/components/place/PlaceBand';
 import { onQuickAddRequest } from '@/lib/quickAddSignal';
@@ -370,12 +371,18 @@ function ShellLayoutInner({ children }: Props) {
       {/* Mobile AI rail — full-screen overlay */}
       {phoneChatOpen && isMobile && (
         <div
-          className="fixed inset-0 z-50 bg-bg-elevated"
+          className="fixed inset-0 z-50 flex flex-col bg-bg-elevated"
+          // Taps in here are not a tap "outside" the Details panel beneath.
+          data-panel-keepalive
           style={{
             paddingTop: 'env(safe-area-inset-top, 0px)',
             paddingBottom: 'env(safe-area-inset-bottom, 0px)',
           }}
         >
+          {/* With an item open, the same Details | AI switch as desktop:
+              Details is still mounted underneath, edits and all. */}
+          {selection && <PhonePaneSwitch active="ai" onChange={(p) => { if (p === 'details') setPhoneChatOpen(false); }} />}
+          <div className="min-h-0 flex-1">
           <ChatPanel
             messages={assistant.messages}
             loading={assistant.loading}
@@ -393,6 +400,7 @@ function ShellLayoutInner({ children }: Props) {
             onDeleteSession={assistant.deleteSession}
             activeSessionId={assistant.activeSessionId}
           />
+          </div>
         </div>
       )}
 
@@ -459,6 +467,8 @@ function ShellLayoutInner({ children }: Props) {
           isOpen={moreSheetOpen}
           onClose={closeMoreSheet}
           discussionsUnread={discussionsUnread}
+          // Opens the conversation without sending anything.
+          onAskSymphony={() => { setMoreSheetOpen(false); setPhoneChatOpen(true); }}
         />
       )}
 

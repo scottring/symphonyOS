@@ -6,7 +6,7 @@ import { useLocation, useNavigate } from 'react-router-dom'
 // in its account menu.
 import {
   Archive, BookOpen, Compass, FileText, History, Home, ListChecks, MessageCircle,
-  Settings, StickyNote, UtensilsCrossed, Users,
+  Settings, Sparkles, StickyNote, UtensilsCrossed, Users,
 } from 'lucide-react'
 import { MORE_GROUPS, isDestinationActive } from './moreDestinations'
 
@@ -15,6 +15,8 @@ interface MoreSheetProps {
   onClose: () => void
   /** Unread Discussions — shown as the badge on that row. */
   discussionsUnread?: number
+  /** Open the assistant (phones have no AI pane beside the page). */
+  onAskSymphony?: () => void
 }
 
 const ICONS: Record<string, ComponentType<{ className?: string }>> = {
@@ -37,7 +39,7 @@ const GROUPS = MORE_GROUPS.map(([group, items]) => [
   group === 'Reference' ? [...items, { label: 'Settings', route: '/settings' }] : items,
 ] as const)
 
-export function MoreSheet({ isOpen, onClose, discussionsUnread }: MoreSheetProps) {
+export function MoreSheet({ isOpen, onClose, discussionsUnread, onAskSymphony }: MoreSheetProps) {
   const navigate = useNavigate()
   const { pathname } = useLocation()
   const sheet = useRef<HTMLDivElement>(null)
@@ -84,6 +86,19 @@ export function MoreSheet({ isOpen, onClose, discussionsUnread }: MoreSheetProps
         <div className="flex justify-center pt-3 pb-2">
           <div className="w-10 h-1 rounded-full bg-neutral-300" />
         </div>
+
+        {onAskSymphony && (
+          <div className="px-4 pb-2">
+            <button
+              type="button"
+              onClick={onAskSymphony}
+              className="flex w-full items-center gap-3 rounded-xl border border-neutral-200 px-4 py-3 text-left text-neutral-800 hover:bg-neutral-50"
+            >
+              <Sparkles className="h-5 w-5 text-primary-600" aria-hidden="true" />
+              <span className="text-[15px] font-medium">Ask Symphony</span>
+            </button>
+          </div>
+        )}
 
         {GROUPS.map(([group, items]) => (
           <section key={group} aria-labelledby={`more-sheet-${group}`} className="px-4 pb-2">

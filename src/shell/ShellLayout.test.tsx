@@ -82,7 +82,7 @@ vi.mock('@/contexts/ListsContext', () => ({ ListsProvider: ({ children }: { chil
 vi.mock('@/contexts/PinsContext', () => ({ PinsProvider: ({ children }: { children: ReactNode }) => <>{children}</> }))
 
 vi.mock('@/components/layout/Sidebar', () => ({ Sidebar: () => <div data-testid="sidebar" /> }))
-vi.mock('@/components/layout/MoreSheet', () => ({ MoreSheet: () => null }))
+vi.mock('@/components/layout/MoreSheet', () => ({ MoreSheet: ({ isOpen, onAskSymphony }: { isOpen: boolean; onAskSymphony?: () => void }) => (isOpen && onAskSymphony ? <button type="button" onClick={onAskSymphony}>Ask Symphony</button> : null) }))
 vi.mock('@/components/layout/QuickCapture', () => ({ QuickCapture: ({ showFab, isOpen }: { showFab?: boolean; isOpen?: boolean }) => <div data-testid="quick-capture" data-fab={String(showFab)} data-open={String(!!isOpen)} /> }))
 vi.mock('@/hooks/useDayPlan', () => ({ useDayPlan: () => ({ loading: false, error: false, plan: {
   carried: [], scheduled: [], available: [], week: [], month: [], counts: { scheduled: 0, available: 0 },
@@ -199,6 +199,30 @@ describe('Phone execution chrome', () => {
   })
 })
 
+
+describe('Phone AI beside Details', () => {
+  afterEach(() => { selectionState.selection = null; mobileState.isMobile = false })
+
+  it('opens from More without an item, with no Details switch to show', () => {
+    mobileState.isMobile = true
+    renderAt('/today')
+    fireEvent.click(screen.getByRole('button', { name: 'More' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Ask Symphony' }))
+    expect(screen.queryByRole('tablist', { name: 'Side panel' })).not.toBeInTheDocument()
+  })
+
+  it('switches back to the item, which stays open underneath', () => {
+    mobileState.isMobile = true
+    selectionState.selection = { kind: 'task', id: 't1' }
+    renderAt('/today')
+    fireEvent.click(screen.getByRole('button', { name: 'More' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Ask Symphony' }))
+    expect(screen.getByRole('tab', { name: 'AI' })).toHaveAttribute('aria-selected', 'true')
+    fireEvent.click(screen.getByRole('tab', { name: 'Details' }))
+    expect(screen.queryByRole('tablist', { name: 'Side panel' })).not.toBeInTheDocument()
+    expect(selectionState.selection).toEqual({ kind: 'task', id: 't1' })
+  })
+})
 
 describe('Consolidated desktop navigation', () => {
   beforeEach(() => { mobileState.isMobile = false; selectionState.selection = null; sessionStorage.clear(); localStorage.removeItem('symphony-plan-period') })

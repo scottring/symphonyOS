@@ -1,4 +1,6 @@
 import { relativeWeekend, weekendPlacement, weekendLabel } from '@/lib/planning/weekend';
+import { PhonePaneSwitch } from '@/shell/PhonePaneSwitch';
+import { useAssistantLauncher } from '@/contexts/AssistantLaunchContext';
 // src/apps/tasks/TaskDetailPanel.tsx
 //
 // The Shell's global detail panel for the Tasks app. Driven by the URL
@@ -105,6 +107,7 @@ export function shouldDismissPanel(target: HTMLElement | null, panelEl: HTMLElem
  */
 function PanelChrome({ children }: { children: React.ReactNode }) {
   const { clearSelection } = useSelection();
+  const { openAssistant } = useAssistantLauncher();
   const panelRef = useRef<HTMLElement>(null);
   // Desktop draws inside the shared Details/AI column; while the AI pane is
   // in front the panel stays mounted (edits kept) but must not take Escape.
@@ -153,6 +156,8 @@ function PanelChrome({ children }: { children: React.ReactNode }) {
       role={fullScreen ? 'dialog' : undefined}
       aria-modal={fullScreen ? true : undefined}
     >
+      {/* Phone: the same Details | AI switch as the desktop column. */}
+      {fullScreen && <PhonePaneSwitch active="details" onChange={(pane) => { if (pane === 'ai') openAssistant(); }} />}
       {children}
     </aside>
   );

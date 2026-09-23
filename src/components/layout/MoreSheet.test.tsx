@@ -53,4 +53,12 @@ describe('isDestinationActive', () => {
     expect(isDestinationActive('/meals/plan', '/meals')).toBe(true)
     expect(isDestinationActive('/today?welcome=1', '/today')).toBe(false)
   })
+
+  it('opens the assistant from its own row, without navigating', () => {
+    const ask = vi.fn()
+    render(<MemoryRouter initialEntries={['/today']}><MoreSheet isOpen onClose={vi.fn()} onAskSymphony={ask} /><Location /></MemoryRouter>)
+    fireEvent.click(screen.getByRole('button', { name: 'Ask Symphony' }))
+    expect(ask).toHaveBeenCalledOnce()
+    expect(screen.getByTestId('path')).toHaveTextContent('/today')
+  })
 })
