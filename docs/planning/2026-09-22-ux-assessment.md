@@ -135,6 +135,7 @@ Commits on `codex/claude-ux-assessment` since ed2efe40:
 8. `d7b77065` Phone layout: Seasons (R6), Meal shelf (R7), masthead scrollbars (R8).
 9. `bec7686b` Phone Today header (D1).
 10. `3dc4334d` Inbox triage simplification (D2).
+11. Bulk triage correction (Scott's review): life areas for every unclassified item collected in one dialog before anything moves; `pushTask`/`setBucket` return their write result and the domain gate stops reporting failed writes as success; partial and total failures are reported; one Undo restores exactly the moved items. Tests: `InboxTriageActions.test.tsx` (cancel, mixed selection, partial failure + Undo, all-fail, Undo to Unsorted), `useGatedTaskActions.test.ts`, `useSupabaseTasks.test.ts`.
 
 Verification: typecheck clean; full suite 638 files passed (connectors
 dependencies had to be installed locally for the WhatsApp adapter test); lint 0
@@ -144,7 +145,7 @@ household, desktop 1316px window plus same-origin 390px / 830px frames.
 
 ## Remaining gaps
 
-- D1 and D2 are implemented to Scott's direction and await his review. Week/Month phone headers keep the separate domain row; only Today was changed. Bulk Today/This week on Unsorted items may raise the domain question once per item.
+- D1 and D2 are implemented to Scott's direction and await his review. Week/Month phone headers keep the separate domain row; only Today was changed.
 - Open items: F12 `assigned_to_all`, F13 optimistic contact navigation, L1–L7,
   ~60 placeholder-only inputs on lower-traffic screens, desktop row semantics (L4).
 - Failed-save paths other than ⌘K note were verified by unit tests only.
