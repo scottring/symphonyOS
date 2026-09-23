@@ -178,9 +178,12 @@ export function SettingsPage({
       onFamilyMembersChanged?.()
     } catch (err) {
       console.error('Failed to delete member:', err)
-      showToast((err as { restored?: boolean })?.restored === false
-        ? `Couldn't remove ${deletingMember.name}, and some of their task assignments may not have been restored — check their tasks.`
-        : `Couldn't remove ${deletingMember.name}. Nothing was changed.`, 'error')
+      const failure = err as { restored?: boolean; unrestoredTaskIds?: string[]; userFacing?: boolean; message?: string }
+      const n = failure?.unrestoredTaskIds?.length ?? 0
+      const why = failure?.userFacing && failure.message ? ` ${failure.message}.` : ''
+      showToast(failure?.restored === false
+        ? `Couldn't remove ${deletingMember.name}, and ${n === 1 ? '1 task' : `${n} tasks`} may no longer list them — check their tasks.${why}`
+        : `Couldn't remove ${deletingMember.name}.${why} Nothing was changed.`, 'error', 10000)
     } finally {
       setIsDeleting(false)
       setDeletingMember(null)

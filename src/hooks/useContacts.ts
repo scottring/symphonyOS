@@ -190,14 +190,19 @@ export function useContacts() {
     const contactToDelete = contacts.find((c) => c.id === id)
     if (!contactToDelete) return false
 
-    const { error: deleteError } = await supabase
+    // Confirm the row went: RLS turns a forbidden DELETE into zero rows with
+    // no error, so "no error" alone is not "deleted".
+    const { data: gone, error: deleteError } = await supabase
       .from('contacts')
       .delete()
       .eq('id', id)
+      .select('id')
 
-    if (deleteError) {
-      setError(deleteError.message)
-      showToast(`Couldn't delete ${contactToDelete.name}.`, 'error')
+    if (deleteError || !((gone ?? []) as { id: string }[]).some((c) => c.id === id)) {
+      if (deleteError) setError(deleteError.message)
+      showToast(deleteError
+        ? `Couldn't delete ${contactToDelete.name}.`
+        : `Couldn't delete ${contactToDelete.name} — you may not have permission.`, 'error')
       return false
     }
     setContacts((prev) => prev.filter((c) => c.id !== id))
