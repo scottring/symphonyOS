@@ -35,7 +35,8 @@ async function callVision(fileUrl: string, isPdf: boolean, prompt: string, apiKe
     headers: { 'content-type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
     body: JSON.stringify({
       model: MODEL,
-      max_tokens: 4000,
+      // 4000 cut a full two-page spread short; a page of 60+ lines needs room.
+      max_tokens: 12000,
       messages: [{ role: 'user', content: [fileBlock, { type: 'text', text: prompt }] }],
     }),
   })
@@ -137,6 +138,12 @@ Deno.serve(async (req) => {
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e)
     console.error('parse-page failed:', message)
-    return json({ error: message }, 500)
+    // A stable code alongside the message: the client says something a person
+    // can act on instead of echoing a parser error (2026-09-23).
+    const code = /Anthropic returned (429|5\d\d)/.test(message) ? 'model_busy'
+      : /Could not sign file URL/.test(message) ? 'image_unavailable'
+      : /JSON|No text in Anthropic response/.test(message) ? 'reply_unreadable'
+      : 'unknown'
+    return json({ error: message, code }, 500)
   }
 })

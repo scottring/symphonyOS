@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { windowCalendar, buildPagePrompt, parsePageResponse } from './parse'
+import { windowCalendar, buildPagePrompt, parsePageResponse, extractJsonObject } from './parse'
 
 describe('windowCalendar', () => {
   it('walks the window inclusively with weekday names', () => {
@@ -225,5 +225,19 @@ describe('parsePageResponse — date_hint, kind, recurring, phone, page_title', 
   it('defaults kind to task and recurring/phone/date_hint to null when absent', () => {
     const out = parsePageResponse('{"items":[{"title":"Mow","day":"week"}]}', new Set(), new Set(), 'week')
     expect(out.items[0]).toMatchObject({ kind: 'task', recurring: null, phone: null, date_hint: null })
+  })
+})
+
+// 2026-09-23: a two-page spread failed twice with `Unexpected token 'I', "I need to "...
+// is not valid JSON` — the model opened with prose before the JSON object.
+describe('extractJsonObject', () => {
+  it('reads the JSON object out of a reply that opens with prose', () => {
+    const raw = 'I need to look at both pages carefully.\n\n{"items":[],"notes":[],"unclear":[],"page_title":"Fall"}\nThat is the page.'
+    expect(extractJsonObject(raw)).toEqual({ items: [], notes: [], unclear: [], page_title: 'Fall' })
+    expect(parsePageResponse(raw, new Set(), new Set(), 'season').page_title).toBe('Fall')
+  })
+
+  it('still throws when there is no object at all, so the caller retries', () => {
+    expect(() => extractJsonObject('I need to think about this.')).toThrow()
   })
 })
