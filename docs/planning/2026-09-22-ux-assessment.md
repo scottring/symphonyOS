@@ -136,6 +136,7 @@ Commits on `codex/claude-ux-assessment` since ed2efe40:
 9. `bec7686b` Phone Today header (D1).
 10. `3dc4334d` Inbox triage simplification (D2).
 11. Bulk triage correction (Scott's review): life areas for every unclassified item collected in one dialog before anything moves; `pushTask`/`setBucket` return their write result and the domain gate stops reporting failed writes as success; partial and total failures are reported; one Undo restores exactly the moved items. Tests: `InboxTriageActions.test.tsx` (cancel, mixed selection, partial failure + Undo, all-fail, Undo to Unsorted), `useGatedTaskActions.test.ts`, `useSupabaseTasks.test.ts`.
+12. Second review correction: one `updateTask` is not one transaction — the row saves before its commitment/focus records, so `false` can follow a real change. Bulk triage now reports such rows as "may not have saved" (never "Nothing moved") and includes them in Undo; Undo awaits and checks every restore and leaves a persistent Retry for exactly the rows that failed. Tests cover a row write that lands before its records fail (data layer), unconfirmed rows in Undo, a failed chosen-for-today write, and failed batch/single-row restores with Retry. Not exercised live (it would require leaving test data half-moved); unit-tested only. A single-row Inbox move that returns false still shows no Undo, because there a false can also mean the domain question was cancelled.
 
 Verification: typecheck clean; full suite 638 files passed (connectors
 dependencies had to be installed locally for the WhatsApp adapter test); lint 0
