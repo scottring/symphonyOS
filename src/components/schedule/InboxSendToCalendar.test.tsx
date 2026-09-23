@@ -5,6 +5,13 @@ import { InboxView } from './InboxView'
 import { ScheduleActionsProvider, type ScheduleActionsValue } from '@/contexts/ScheduleActionsContext'
 import type { Task } from '@/types/task'
 
+/** Row actions beyond Today / This week / Someday live in the row's More menu. */
+function fromMore(item: string | RegExp, index = 0) {
+  fireEvent.click(screen.getAllByRole('button', { name: /^More actions for/ })[index])
+  fireEvent.click(screen.getByRole('menuitem', { name: item }))
+}
+
+
 // The undo path is what makes destroying a task acceptable, so the whole feature
 // is covered against the real composed handler: a full InboxView render, the real
 // SchedulePopover, the real useSendToCalendar, and only the Google/Supabase edges
@@ -143,7 +150,7 @@ function renderInbox(overrides: Partial<ScheduleActionsValue> = {}, task: Task =
 
 /** Chip -> day -> duration -> time. Leaves the popover closed and the send in flight. */
 function sendToTomorrowAt2pm(duration: string) {
-  fireEvent.click(screen.getByRole('button', { name: /send to calendar/i }))
+  fromMore('To calendar…')
   fireEvent.click(screen.getByRole('button', { name: /tomorrow/i }))
   fireEvent.click(screen.getByRole('button', { name: duration }))
   fireEvent.click(screen.getByRole('button', { name: '2pm' }))
@@ -175,13 +182,10 @@ describe('InboxView send to calendar', () => {
     vi.restoreAllMocks()
   })
 
-  it('puts a Calendar chip on the row that opens a picker instead of firing', () => {
+  it('offers To calendar in the row menu, which opens a picker instead of firing', () => {
     const { onDeleteTask } = renderInbox()
 
-    const chip = screen.getByRole('button', { name: /send to calendar/i })
-    expect(chip).toHaveTextContent('Calendar')
-
-    fireEvent.click(chip)
+    fromMore('To calendar…')
 
     // Opening the picker must not convert anything on its own.
     expect(createEvent).not.toHaveBeenCalled()
@@ -192,7 +196,7 @@ describe('InboxView send to calendar', () => {
     renderInbox()
 
     expect(screen.queryByText('Schedule')).not.toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: /send to calendar/i }))
+    fromMore('To calendar…')
 
     expect(screen.getByText('Schedule')).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: /tomorrow/i }))
@@ -298,9 +302,8 @@ describe('InboxView send to calendar', () => {
 
     sendToTomorrowAt2pm('1h')
 
-    const chip = screen.getByRole('button', { name: /send to calendar/i })
-    await waitFor(() => expect(chip).toBeDisabled())
-    expect(chip).toHaveAttribute('aria-busy', 'true')
+    fireEvent.click(screen.getByRole('button', { name: /^More actions for/ }))
+    await waitFor(() => expect(screen.getByRole('menuitem', { name: 'To calendar…' })).toBeDisabled())
 
     await act(async () => { release({ id: 'evt-1' }) })
   })

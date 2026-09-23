@@ -65,6 +65,9 @@ interface DenseInboxRowProps {
    *  only the horizons pool renderer (a grid with day/rail drop targets)
    *  opts in. */
   draggable?: boolean
+  /** 'readonly': show the life area as a small dot (only when set) instead of
+   *  the tag picker — the Inbox edits it from its More menu. Default 'picker'. */
+  contextControl?: 'picker' | 'readonly'
 }
 
 const CONTEXT_OPTIONS: Array<{ value: TaskContext | null; label: string }> = [
@@ -92,6 +95,7 @@ export const DenseInboxRow = memo(function DenseInboxRow({
   focusToggle,
   lineage,
   draggable = false,
+  contextControl = 'picker',
 }: DenseInboxRowProps) {
   const [contextOpen, setContextOpen] = useState(false)
 
@@ -202,6 +206,17 @@ export const DenseInboxRow = memo(function DenseInboxRow({
       {/* Context dot — moved to the trailing controls so it sits with the rest
           of the triage affordances (assignee, when, delete) instead of crowding
           the title. Popover opens right-aligned to stay on-screen. */}
+      {contextControl === 'readonly' ? (
+        contextColor && (
+          <span
+            role="img"
+            aria-label={`Life area: ${CONTEXT_OPTIONS.find((o) => o.value === task.context)?.label ?? ''}`}
+            title={CONTEXT_OPTIONS.find((o) => o.value === task.context)?.label}
+            className="mt-2 h-2 w-2 shrink-0 rounded-full"
+            style={{ background: contextColor }}
+          />
+        )
+      ) : (
       <div
         className={`relative shrink-0 mt-0.5 ${
           hoverOnlyChrome ? 'hidden group-hover:block group-focus-within:block' : ''
@@ -239,6 +254,7 @@ export const DenseInboxRow = memo(function DenseInboxRow({
           </div>
         )}
       </div>
+      )}
 
       {/* Assignee avatar */}
       {familyMembers.length > 0 && onAssign && (
@@ -253,8 +269,9 @@ export const DenseInboxRow = memo(function DenseInboxRow({
       )}
 
       {/* Quick action buttons. In hover-chrome mode, hidden until row is
-          hovered/focused so the default view stays calm. */}
-      <div
+          hovered/focused so the default view stays calm. While selecting, the
+          shared bulk toolbar is the one place to act (2026-09-22). */}
+      {!selectionMode && <div
         className={`items-center gap-1 shrink-0 mt-0.5 ${
           hoverOnlyChrome ? 'hidden group-hover:flex group-focus-within:flex' : 'flex'
         }`}
@@ -305,7 +322,7 @@ export const DenseInboxRow = memo(function DenseInboxRow({
             </button>
           )
         })}
-      </div>
+      </div>}
       </div>
     </div>
   )

@@ -4,6 +4,13 @@ import { InboxView } from './InboxView'
 import { ScheduleActionsProvider, type ScheduleActionsValue } from '@/contexts/ScheduleActionsContext'
 import type { Task } from '@/types/task'
 
+/** Row actions beyond Today / This week / Someday live in the row's More menu. */
+function fromMore(item: string | RegExp, index = 0) {
+  fireEvent.click(screen.getAllByRole('button', { name: /^More actions for/ })[index])
+  fireEvent.click(screen.getByRole('menuitem', { name: item }))
+}
+
+
 // Walkthrough 2026-09-21, A10: Delete was the only Inbox verdict without Undo.
 // It now hides the row at once and deletes only when the Undo window closes,
 // so Undo brings back the SAME row rather than a re-inserted copy.
@@ -52,7 +59,7 @@ function renderInbox() {
 }
 
 async function deleteRow() {
-  fireEvent.click(screen.getAllByRole('button', { name: 'Delete' })[0])
+  fromMore('Delete')
   await waitFor(() => expect(screen.getByText('Deleted')).toBeInTheDocument())
 }
 
