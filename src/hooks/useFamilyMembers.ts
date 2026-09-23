@@ -140,81 +140,24 @@ export function useFamilyMembers() {
   const deleteMember = useCallback(async (id: string) => {
     /** A reason written for people (Settings shows it); raw DB errors are not. */
     const explain = (message: string) => Object.assign(new Error(message), { userFacing: true })
-    // A member appears on tasks two ways: `assigned_to` (a foreign key with no
-    // ON DELETE, so it must be cleared before the row can go) and the
-    // `assigned_to_all` list (no key at all, so a delete used to leave the
-    // removed person's id behind). Clear both, confirm every row actually
-    // changed (RLS can silently skip a row), and hand everything back if any
-    // step fails. Scope is deliberately NOT re-derived here: narrowing who can
-    // see a task is an access change, not part of removing a person.
-    const cleared: string[] = []
-    const listsChanged: { id: string; list: string[] }[] = []
-    /** Put back what changed. Returns the task ids that could NOT be
-     *  confirmed restored: an error, or an UPDATE that RLS silently turned into
-     *  zero rows, both count — "no error" is not "restored". */
-    const restore = async (): Promise<string[]> => {
-      const unrestored: string[] = []
-      for (const row of listsChanged) {
-        const { data, error } = await supabase.from('tasks').update({ assigned_to_all: row.list }).eq('id', row.id).select('id')
-        if (error || !((data ?? []) as { id: string }[]).some((t) => t.id === row.id)) unrestored.push(row.id)
-      }
-      if (cleared.length > 0) {
-        const { data, error } = await supabase.from('tasks').update({ assigned_to: id }).in('id', cleared).select('id')
-        const back = new Set(((data ?? []) as { id: string }[]).map((t) => t.id))
-        for (const taskId of cleared) if (error || !back.has(taskId)) unrestored.push(taskId)
-      }
-      return [...new Set(unrestored)]
-    }
+    // One DELETE. The database clears the member from every assignment —
+    // single and multiple assignees on tasks, routines, event notes and
+    // instances, INCLUDING other people's private tasks this user cannot see —
+    // in the same statement (trigger family_members_clear_assignments,
+    // migration 2026-09-23). If the delete fails, that cleanup rolls back with
+    // it, so a failure always means nothing changed.
     try {
-      const { data: assigned, error: readError } = await supabase
-        .from('tasks')
-        .select('id')
-        .eq('assigned_to', id)
-      if (readError) throw readError
-      const taskIds = (assigned ?? []).map((t: { id: string }) => t.id)
-
-      const { data: shared, error: sharedError } = await supabase
-        .from('tasks')
-        .select('id, assigned_to_all')
-        .contains('assigned_to_all', [id])
-      if (sharedError) throw sharedError
-
-      if (taskIds.length > 0) {
-        const { data: done, error: unassignError } = await supabase
-          .from('tasks')
-          .update({ assigned_to: null })
-          .in('id', taskIds)
-          .select('id')
-        cleared.push(...((done ?? []) as { id: string }[]).map((t) => t.id))
-        if (unassignError) throw unassignError
-        if (cleared.length !== taskIds.length) {
-          throw explain(`${taskIds.length - cleared.length} of their tasks couldn't be unassigned`)
-        }
-      }
-
-      for (const row of (shared ?? []) as { id: string; assigned_to_all: string[] | null }[]) {
-        const list = row.assigned_to_all ?? []
-        const { data: done, error: listError } = await supabase
-          .from('tasks')
-          .update({ assigned_to_all: list.filter((m) => m !== id) })
-          .eq('id', row.id)
-          .select('id')
-        if (listError) throw listError
-        if (!done || done.length === 0) throw explain("A shared task still lists them and couldn't be updated")
-        listsChanged.push({ id: row.id, list })
-      }
-
-      // Confirm the member row itself went: RLS turns a forbidden DELETE into
-      // zero rows with no error, which used to read as success.
+      // Confirm the row went: RLS turns a forbidden DELETE into zero rows with
+      // no error, which used to read as success.
       const { data: gone, error } = await supabase
         .from('family_members')
         .delete()
         .eq('id', id)
         .select('id')
-      // 23503: a task this user cannot see (someone's private task) still has
-      // them as its assignee — verified with two accounts, 2026-09-23.
+      // 23503: something the cleanup deliberately leaves (screen-time history)
+      // still refers to them.
       if (error?.code === '23503') {
-        throw explain("They're still the assignee on a task you can't see — someone's private task. Ask its owner to reassign it first")
+        throw explain("They still have screen-time history, which isn't removed automatically")
       }
       if (error) throw error
       if (!((gone ?? []) as { id: string }[]).some((m) => m.id === id)) {
@@ -222,14 +165,8 @@ export function useFamilyMembers() {
       }
       setMembers(prev => prev.filter(m => m.id !== id))
     } catch (err) {
-      const unrestored = await restore()
       console.error('Error deleting family member:', err)
-      // The caller says "nothing was changed" only when every change was
-      // confirmed undone; otherwise it says how many tasks to check.
-      throw Object.assign(err instanceof Error ? err : new Error(String((err as { message?: string })?.message ?? err)), {
-        restored: unrestored.length === 0,
-        unrestoredTaskIds: unrestored,
-      })
+      throw err
     }
   }, [])
 
