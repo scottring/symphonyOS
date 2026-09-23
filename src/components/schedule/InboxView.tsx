@@ -27,7 +27,9 @@ import { focusSnapshot } from '@/lib/placement/model'
 import { InboxTriageActions } from './InboxTriageActions'
 import type { TriageWhen } from './TriageWhenMenu'
 import { getBaseDate, getThisEvening, getNextWeekend, getWeekendAfterNext, getNextMonday } from '@/lib/dateHelpers'
-import { wasWritten } from '@/hooks/useGatedTaskActions'
+import { wasWritten, isStep } from '@/hooks/useGatedTaskActions'
+import type { DomainId } from '@/lib/domains'
+import { BulkAreaDialog } from './BulkAreaDialog'
 import { FocusInboxCard } from './FocusInboxCard'
 import { InboxModeToggle } from './InboxModeToggle'
 import { InboxUndoToast } from './InboxUndoToast'
@@ -43,6 +45,8 @@ import { ExpiredSection } from './ExpiredSection'
 const INBOX_ACTIONS: QuickAction[] = [
   { kind: 'today' }, { kind: 'week' }, { kind: 'month' }, { kind: 'someday' }, { kind: 'note' }, { kind: 'delete' }
 ]
+
+type BulkWhen = 'today' | 'this-week' | 'someday'
 
 type UndoEntry = {
   taskId: string
@@ -548,38 +552,67 @@ export function InboxView({
     }, 220)
   }, [onPushTask, pushUndo])
 
-  // Bulk triage to the three row destinations. One Undo restores the batch:
-  // the first row through the entry itself, the rest through onUndoExtra.
-  const handleBulkWhen = useCallback(async (when: 'today' | 'this-week' | 'someday') => {
-    const rows = tasks.filter((t) => selectedTaskIds.has(t.id))
-    if (rows.length === 0) return
+  // Bulk triage to the three row destinations (2026-09-22). Every
+  // unclassified item's life area is collected in ONE dialog before anything
+  // moves; classified items keep theirs. Each write's result is checked, so a
+  // failed placement is reported, never counted as sent, and one Undo restores
+  // exactly the items that moved.
+  const [bulkAsk, setBulkAsk] = useState<{ when: BulkWhen; rows: Task[]; unclassified: Task[] } | null>(null)
+
+  const runBulkWhen = useCallback(async (when: BulkWhen, rows: Task[], areas: Map<string, DomainId>) => {
     exitSelection()
     const day = getBaseDate(0)
     const moved: { id: string; previous: Partial<Task> }[] = []
+    let failed = 0
     for (const t of rows) {
-      const previous: Partial<Task> = { bucket: t.bucket, scheduledFor: t.scheduledFor, isAllDay: t.isAllDay, focus: focusSnapshot(t) }
+      const area = areas.get(t.id)
+      const previous: Partial<Task> = {
+        bucket: t.bucket, scheduledFor: t.scheduledFor, isAllDay: t.isAllDay, focus: focusSnapshot(t),
+        // Undo also returns a newly classified item to Unsorted.
+        ...(area ? { context: t.context ?? null } : {}),
+      }
       let ok = true
-      if (when === 'today') {
-        if (onPushTask) ok = await wasWritten(onPushTask(t.id, day))
+      if (area) {
+        // The area rides in the same write as the placement: no second ask,
+        // and no half-state where it is classified but not moved.
+        const placement: Partial<Task> = when === 'today'
+          ? { bucket: 'timed', scheduledFor: day, isAllDay: true, plannedOn: day }
+          : { bucket: when === 'this-week' ? 'week' : 'someday', scheduledFor: undefined }
+        ok = onUpdateTask ? await wasWritten(onUpdateTask(t.id, { context: area, ...placement })) : false
+      } else if (when === 'today') {
+        ok = onPushTask ? await wasWritten(onPushTask(t.id, day)) : false
         if (ok && onUpdateTask) await onUpdateTask(t.id, { plannedOn: day })
       } else if (when === 'this-week') {
-        if (onPushTask) ok = await wasWritten(onPushTask(t.id, 'week'))
-      } else if (onUpdateTask) {
-        ok = await wasWritten(onUpdateTask(t.id, { bucket: 'someday', scheduledFor: undefined }))
+        ok = onPushTask ? await wasWritten(onPushTask(t.id, 'week')) : false
+      } else {
+        ok = onUpdateTask ? await wasWritten(onUpdateTask(t.id, { bucket: 'someday', scheduledFor: undefined })) : false
       }
       if (ok) moved.push({ id: t.id, previous })
+      else failed++
     }
-    if (moved.length === 0) return
     const label = when === 'today' ? 'Today' : when === 'this-week' ? 'This Week' : 'Someday'
+    if (moved.length === 0) {
+      showToast(`Couldn't send ${failed === 1 ? 'the item' : `${failed} items`} to ${label}. Nothing moved.`, 'error')
+      return
+    }
+    const sent = moved.length === 1 ? `Sent to ${label}` : `Sent ${moved.length} to ${label}`
     const [first, ...rest] = moved
     pushUndo({
       taskId: first.id,
-      message: moved.length === 1 ? `Sent to ${label}` : `Sent ${moved.length} to ${label}`,
+      message: failed ? `${sent} · ${failed} couldn't be moved` : sent,
       previous: first.previous,
       undoable: true,
       onUndoExtra: rest.length ? async () => { for (const r of rest) await onUpdateTask?.(r.id, r.previous) } : undefined,
     })
-  }, [tasks, selectedTaskIds, exitSelection, onPushTask, onUpdateTask, pushUndo])
+  }, [exitSelection, onPushTask, onUpdateTask, pushUndo])
+
+  const handleBulkWhen = useCallback((when: BulkWhen) => {
+    const rows = tasks.filter((t) => selectedTaskIds.has(t.id))
+    if (rows.length === 0) return
+    const unclassified = rows.filter((t) => t.context == null && !isStep(t))
+    if (unclassified.length > 0) { setBulkAsk({ when, rows, unclassified }); return }
+    void runBulkWhen(when, rows, new Map())
+  }, [tasks, selectedTaskIds, runBulkWhen])
 
   const handleUndo = useCallback(async () => {
     if (!undo) { setUndo(null); return }
@@ -852,6 +885,16 @@ export function InboxView({
       )}
       </div>
 
+      {bulkAsk && (
+        <BulkAreaDialog
+          destination={bulkAsk.when === 'today' ? 'Today' : bulkAsk.when === 'this-week' ? 'This week' : 'Someday'}
+          items={bulkAsk.unclassified.map((t) => ({ id: t.id, title: t.title }))}
+          classifiedCount={bulkAsk.rows.length - bulkAsk.unclassified.length}
+          onCancel={() => setBulkAsk(null)}
+          onConfirm={(areas) => { const ask = bulkAsk; setBulkAsk(null); void runBulkWhen(ask.when, ask.rows, areas) }}
+        />
+      )}
+
       {selectedTaskIds.size > 0 && (
         // The shared toolbar for a selection: the same three destinations as
         // a row, then life area and delete — instead of every row repeating
@@ -863,9 +906,9 @@ export function InboxView({
         >
           <span className="text-sm font-medium pr-1">{selectedTaskIds.size} selected</span>
           <span className="text-neutral-500" aria-hidden="true">·</span>
-          <button type="button" onClick={() => void handleBulkWhen('today')} className="text-sm px-2 py-1 rounded-lg bg-white/10 hover:bg-white/20 font-medium">Today</button>
-          <button type="button" onClick={() => void handleBulkWhen('this-week')} className="text-sm px-2 py-1 rounded-lg hover:bg-white/10">This week</button>
-          <button type="button" onClick={() => void handleBulkWhen('someday')} className="text-sm px-2 py-1 rounded-lg hover:bg-white/10">Someday</button>
+          <button type="button" onClick={() => handleBulkWhen('today')} className="text-sm px-2 py-1 rounded-lg bg-white/10 hover:bg-white/20 font-medium">Today</button>
+          <button type="button" onClick={() => handleBulkWhen('this-week')} className="text-sm px-2 py-1 rounded-lg hover:bg-white/10">This week</button>
+          <button type="button" onClick={() => handleBulkWhen('someday')} className="text-sm px-2 py-1 rounded-lg hover:bg-white/10">Someday</button>
           <span className="text-neutral-600 mx-1" aria-hidden="true">|</span>
           <label className="flex items-center gap-1 text-xs text-neutral-400">
             Area

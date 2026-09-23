@@ -2164,7 +2164,9 @@ export function useSupabaseTasks() {
   }, [updateTask])
 
   // Move a task to a bucket (week, month, quarter) or reschedule to a date
-  const pushTask = useCallback(async (id: string, target: Date | 'week' | 'month' | 'quarter') => {
+  // Resolves the write's result (false = not written) so callers never report
+  // a failed placement as done.
+  const pushTask = useCallback(async (id: string, target: Date | 'week' | 'month' | 'quarter'): Promise<boolean> => {
     // A push is a deliberate act of deferral, so it is what defer_count counts.
     // Passive slippage is covered by age instead (expiry is read-side and
     // preserves scheduled_for, so "245 days" stays knowable without a write).
@@ -2178,7 +2180,7 @@ export function useSupabaseTasks() {
       // Commit to the period that contains now (planPlacement stamps it) and
       // take it off its day. Descending keeps the higher commitments;
       // ascending releases the lower ones.
-      await updateTask(id, { bucket: target, scheduledFor: undefined, deferCount })
+      return updateTask(id, { bucket: target, scheduledFor: undefined, deferCount })
     } else {
       // Reschedule to a specific date
       const newScheduledFor = new Date(target)
@@ -2200,7 +2202,7 @@ export function useSupabaseTasks() {
       // instead of "All day", and the Week grid drops it at the 00:00 row
       // (top-left) instead of the all-day strip. Always write a real boolean.
       const hasSpecificTime = newScheduledFor.getHours() !== 0 || newScheduledFor.getMinutes() !== 0
-      await updateTask(id, {
+      return updateTask(id, {
         bucket: 'timed',
         scheduledFor: newScheduledFor,
         isAllDay: !hasSpecificTime,
@@ -2222,7 +2224,7 @@ export function useSupabaseTasks() {
   // was already bucket='week', so the update changed nothing and the item came
   // back marked stale, forever. Every other bucket has no week, so clear it
   // (otherwise something sent to the month keeps a secret week).
-  const setBucket = useCallback(async (id: string, bucket: TaskBucket, scheduledFor?: Date, isAllDay?: boolean) => {
+  const setBucket = useCallback(async (id: string, bucket: TaskBucket, scheduledFor?: Date, isAllDay?: boolean): Promise<boolean> => {
     const updates: Partial<Task> = { bucket }
     if (bucket === 'timed' && scheduledFor) {
       updates.scheduledFor = scheduledFor
@@ -2232,7 +2234,7 @@ export function useSupabaseTasks() {
     }
     // The period is the one containing now; planPlacement stamps it and keeps
     // or releases the other commitments by direction (see lib/placement).
-    await updateTask(id, updates)
+    return updateTask(id, updates)
   }, [updateTask])
 
   /**

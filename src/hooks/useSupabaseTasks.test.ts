@@ -1271,6 +1271,22 @@ describe('useSupabaseTasks', () => {
     })
   })
 
+  describe('pushTask reports its write', () => {
+    it('resolves true when the placement saves and false when it fails', async () => {
+      mockSupabaseData.push(createMockDbTask({ id: 'task-1', title: 'Original' }))
+      const { result } = renderHook(() => useSupabaseTasks())
+      await waitFor(() => expect(result.current.tasks).toHaveLength(1))
+
+      let ok: boolean | undefined
+      await act(async () => { ok = await result.current.pushTask('task-1', 'week') })
+      expect(ok).toBe(true)
+
+      mockError = { message: 'Update failed' }
+      await act(async () => { ok = await result.current.pushTask('task-1', new Date(2026, 8, 30)) })
+      expect(ok).toBe(false)
+    })
+  })
+
   describe('updateTasksBulk', () => {
     it('writes sortOrder: 0 as sort_order: 0, not null', async () => {
       mockSupabaseData.push(

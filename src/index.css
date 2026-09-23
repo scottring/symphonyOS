@@ -2135,4 +2135,5 @@ div.chooser-action-group { overflow: visible !important; }
   .inbox-triage-menu button { min-height: 40px; padding: 0 12px; font-size: 15px; }
   .inbox-bulk button { min-height: 40px; min-width: 0; padding: 0 10px; font-size: 14px; }
   .inbox-bulk button[aria-label] { min-width: 40px; padding: 0; }
+  .bulk-area-dialog [role="group"] button { min-height: 40px; min-width: 0; padding: 0 12px; font-size: 14px; }
 }

@@ -85,15 +85,18 @@ async function gateThenCall(
   task: Gatable | undefined,
   ask: Ask,
   writeContext: (id: string, context: DomainId) => Promise<unknown> | unknown,
-  call: () => Promise<void> | void,
+  call: () => Promise<void | boolean> | void | boolean,
 ): Promise<boolean> {
   if (task && task.context == null && !isStep(task)) {
     const context = await ask(task)
     if (!context) return false
-    await writeContext(task.id, context)
+    // A failed domain write stops here: placing an item whose answer didn't
+    // save would leave it placed but still Unsorted.
+    if ((await writeContext(task.id, context)) === false) return false
   }
-  await call()
-  return true
+  // A writer that reports `false` did not write; that is a failure, not a
+  // success (pushTask used to be trusted blindly).
+  return (await call()) !== false
 }
 
 /** The six processes Iris's rule gates, re-typed to say what they actually
@@ -112,9 +115,9 @@ export interface GatedTaskActions {
 
 export function useGatedTaskActions<R extends {
   updateTask: (id: string, u: Partial<Task>) => Promise<boolean | void> | boolean | void
-  pushTask: (id: string, target: Date | 'week' | 'month' | 'quarter') => Promise<void> | void
+  pushTask: (id: string, target: Date | 'week' | 'month' | 'quarter') => Promise<void | boolean> | void
   updateTasksBulk: (ids: string[], u: Partial<Task>) => Promise<void>
-  setBucket?: (id: string, bucket: TaskBucket, scheduledFor?: Date, isAllDay?: boolean) => Promise<void> | void
+  setBucket?: (id: string, bucket: TaskBucket, scheduledFor?: Date, isAllDay?: boolean) => Promise<void | boolean> | void
   onAssignTask?: (id: string, memberId: string | null) => void
   onAssignTaskAll?: (id: string, ids: string[]) => void
 }>(raw: R, findTask: (id: string) => Task | undefined): Omit<R, keyof GatedTaskActions> & GatedTaskActions {
