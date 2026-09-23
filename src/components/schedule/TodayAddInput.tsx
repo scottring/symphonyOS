@@ -39,7 +39,8 @@ export interface TodayCaptureResult {
 }
 
 interface TodayAddInputProps {
-  onAdd: (r: TodayCaptureResult) => void
+  /** May resolve false when the save failed; the typed text then comes back. */
+  onAdd: (r: TodayCaptureResult) => void | Promise<void | boolean>
   parserContext: ParserContext
   resolver: ResolverContext
   getRecentTaskForContact?: (contactId: string) => { title: string; date: Date } | null
@@ -139,7 +140,7 @@ export function TodayAddInput({ onAdd, parserContext, resolver, getRecentTaskFor
       : suggestionApplied
         ? (suggestionState === 'accepted' ? 'accepted' : 'auto_applied')
         : suggestionState === 'dismissed' ? 'dismissed' : 'ignored'
-    onAdd({
+    const saved = onAdd({
       title: p.title?.trim() || trimmed,
       scheduledFor: p.dueDate ?? null,
       isAllDay: allDayFromParse(p),
@@ -153,6 +154,11 @@ export function TodayAddInput({ onAdd, parserContext, resolver, getRecentTaskFor
       resolution: suggestion && action ? { inputText: trimmed, suggestion, action } : undefined,
     })
     reset()
+    // A failed save gives the words back (unless something new was typed
+    // meanwhile), so a retry is one tap rather than retyping.
+    void Promise.resolve(saved).then((ok) => {
+      if (ok === false) setValue((v) => (v ? v : trimmed))
+    })
   }, [value, qp, suggestion, suggestionState, suggestionApplied, destination, onAdd, reset])
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {

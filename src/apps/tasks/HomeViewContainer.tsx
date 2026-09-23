@@ -433,7 +433,7 @@ export function HomeViewContainer({ fixedView }: { fixedView?: 'today' | 'week' 
           context: r.context,
         });
         showToast(note ? 'Note saved' : 'Could not save the note', note ? 'success' : 'error');
-        return;
+        return !!note;
       }
 
       const today = new Date();
@@ -469,6 +469,8 @@ export function HomeViewContainer({ fixedView }: { fixedView?: 'today' | 'week' 
           taskId,
         });
       }
+      // False tells the capture box to give the words back for a retry.
+      return !!taskId;
     },
     [addTask, addNote, getCurrentUserMember, recordOutcome],
   );

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, within, fireEvent } from '@/test/test-utils'
+import { render, screen, within, fireEvent, waitFor } from '@/test/test-utils'
 import { WeekViewV2 } from './WeekViewV2'
 import { createMockRoutine, createMockTask } from '@/test/mocks/factories'
 import type { Task } from '@/types/task'
@@ -11,6 +11,14 @@ import { weekStartAnchor, readCadenceConfig } from '@/lib/cadence/config'
 // The Planning sheet (narrow screens) computes its own plan from the shared
 // sources; these tests are about the week's viewport, so the sources are
 // stubbed rather than mounted.
+// The real tasks hook, with the tick's result under the test's control — the
+// Undo toast is only pushed once the write says it succeeded.
+const toggleResult = { ok: true }
+vi.mock('@/hooks/useSupabaseTasks', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/hooks/useSupabaseTasks')>()
+  return { ...actual, useSupabaseTasks: () => ({ ...actual.useSupabaseTasks(), toggleTask: async () => toggleResult.ok }) }
+})
+
 vi.mock('@/hooks/useDayPlan', () => ({
   useDayPlan: () => ({
     loading: false, error: false,
@@ -240,15 +248,27 @@ describe('WeekViewV2 journal spread', () => {
     }
   })
 
-  it('ticking a day task completes it with an undo that restores the exact prior state', () => {
+  it('ticking a day task completes it with an undo that restores the exact prior state', async () => {
+    toggleResult.ok = true
     const pushAction = vi.fn()
     const onUpdateTask = vi.fn()
     const tasks = [createMockTask({ id: 'day', title: 'Return library books', scheduledFor: new Date(2026, 8, 14), isAllDay: true })]
     render(<WeekViewV2 {...defaultProps} onUpdateTask={onUpdateTask} pushAction={pushAction} routines={[]} weekStart={sunday} tasks={tasks} />)
     fireEvent.click(within(screen.getByTestId('journal-day-2026-09-14')).getByRole('button', { name: 'Complete Return library books' }))
-    expect(pushAction).toHaveBeenCalledWith('Task completed', expect.any(Function))
+    await waitFor(() => expect(pushAction).toHaveBeenCalledWith('Task completed', expect.any(Function)))
     pushAction.mock.calls[0][1]()
     expect(onUpdateTask).toHaveBeenCalledWith('day', { completed: false })
+  })
+
+  it('offers no "Task completed" undo when the tick failed to save', async () => {
+    toggleResult.ok = false
+    const pushAction = vi.fn()
+    const tasks = [createMockTask({ id: 'day', title: 'Return library books', scheduledFor: new Date(2026, 8, 14), isAllDay: true })]
+    render(<WeekViewV2 {...defaultProps} pushAction={pushAction} routines={[]} weekStart={sunday} tasks={tasks} />)
+    fireEvent.click(within(screen.getByTestId('journal-day-2026-09-14')).getByRole('button', { name: 'Complete Return library books' }))
+    await new Promise((r) => setTimeout(r, 0))
+    expect(pushAction).not.toHaveBeenCalled()
+    toggleResult.ok = true
   })
 
   it('keeps routines quiet and honours the Routines switch', () => {

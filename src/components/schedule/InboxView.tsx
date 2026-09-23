@@ -905,7 +905,7 @@ export function InboxView({
           swaps it for the bulk bar. */}
       {isMobile && selectedTaskIds.size === 0 && (
         <PhoneCaptureBar>
-          <PhoneCaptureField placeholder="Add a task…" onSubmit={(text) => { void addTask(text) }} />
+          <PhoneCaptureField placeholder="Add a task…" onSubmit={(text) => addTask(text)} />
         </PhoneCaptureBar>
       )}
       </div>

@@ -38,14 +38,22 @@ export function PhoneCaptureField({
   onSubmit,
 }: {
   placeholder: string
-  onSubmit: (text: string) => void
+  /** Return the save's promise: resolving to nothing (or false) means it
+   *  failed, and the text comes back for a retry. A plain void return is
+   *  treated as fire-and-forget. */
+  onSubmit: (text: string) => void | Promise<unknown>
 }) {
   const [value, setValue] = useState('')
   const submit = () => {
     const text = value.trim()
     if (!text) return
-    onSubmit(text)
+    const saved = onSubmit(text)
     setValue('')
+    if (saved instanceof Promise) {
+      void saved.then((result) => {
+        if (!result) setValue((v) => (v ? v : text))
+      })
+    }
   }
   return (
     <form

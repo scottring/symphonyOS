@@ -15,7 +15,8 @@ import type { ResolverContext } from '@/lib/entityResolver'
 
 export interface ScheduleActionsValue {
   // Task actions
-  onToggleTask: (taskId: string) => void
+  /** May resolve false when the write failed. */
+  onToggleTask: (taskId: string) => void | Promise<boolean | void>
   onToggleWaiting?: (taskId: string) => void
   /** `false` means a domain gate was cancelled — nothing was written. A
    *  raw (non-gated) handler still type-checks here since it returns void,
@@ -166,7 +167,8 @@ export interface ScheduleActionsValue {
   onUpdateEvent?: (eventId: string, updates: { startTime: Date; endTime: Date }) => Promise<void> | void
 
   /** Structured create from the smart Add-to-Today input. */
-  onCreateTaskParsed?: (r: TodayCaptureResult) => void | Promise<void>
+  /** Resolves false when the save failed, so the capture box can keep the text. */
+  onCreateTaskParsed?: (r: TodayCaptureResult) => void | Promise<void | boolean>
   /** Stable parser context for parse-aware inputs. */
   parserContext?: ParserContext
   /** Resolver inputs for implicit entity resolution. */

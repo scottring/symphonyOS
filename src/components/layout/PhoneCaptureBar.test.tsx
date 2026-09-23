@@ -20,4 +20,20 @@ describe('PhoneCaptureBar', () => {
     expect(onSubmit).toHaveBeenCalledWith('Buy stamps')
     expect(input).toHaveValue('')
   })
+
+  it('gives the words back when the save fails, so a retry is one tap', async () => {
+    const onSubmit = vi.fn(async () => undefined)
+    render(<PhoneCaptureField placeholder="Add a task…" onSubmit={onSubmit} />)
+    const input = screen.getByRole('textbox', { name: 'Add a task' })
+    await userEvent.type(input, 'Renew the permit{Enter}')
+    expect(input).toHaveValue('Renew the permit')
+  })
+
+  it('stays clear once the save succeeds', async () => {
+    const onSubmit = vi.fn(async () => 'new-id')
+    render(<PhoneCaptureField placeholder="Add a task…" onSubmit={onSubmit} />)
+    const input = screen.getByRole('textbox', { name: 'Add a task' })
+    await userEvent.type(input, 'Renew the permit{Enter}')
+    expect(input).toHaveValue('')
+  })
 })

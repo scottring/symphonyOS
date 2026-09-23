@@ -1264,11 +1264,13 @@ export function useSupabaseTasks() {
     return writeCompletion(task, true)
   }, [findTaskById, writeCompletion])
 
-  const toggleTask = useCallback(async (id: string) => {
+  /** Resolves false when the write failed (the row is already rolled back
+   *  and a toast shown), so callers do not announce a change that didn't happen. */
+  const toggleTask = useCallback(async (id: string): Promise<boolean> => {
     const task = findTaskById(id)
-    if (!task) return
-    if (!task.completed) { await completeTask(id); return }
-    await writeCompletion(task, false)
+    if (!task) return false
+    if (!task.completed) return completeTask(id)
+    return writeCompletion(task, false)
   }, [findTaskById, completeTask, writeCompletion])
 
   const toggleWaiting = useCallback(async (id: string) => {

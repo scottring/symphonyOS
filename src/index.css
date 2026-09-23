@@ -2444,6 +2444,11 @@ div.chooser-action-group { overflow: visible !important; }
   .phone-lift { bottom: calc(139px + env(safe-area-inset-bottom, 0px)) !important; }
   /* A centred toast sizes to its words, not to half the screen. */
   .phone-lift:not(.inbox-bulk) { width: max-content; max-width: calc(100vw - 24px); }
+  /* Two lanes, so a status message and an Undo never sit on each other: Undo
+     toasts in the lower lane, status messages ("Failed to …") above. */
+  .phone-lift-status { bottom: calc(243px + env(safe-area-inset-bottom, 0px)) !important; }
+  /* The Inbox's toast carries Retry and Undo: full width so both fit. */
+  .phone-lift.phone-lift-wide { left: 12px !important; right: 12px; width: auto; max-width: none; }
   .inbox-bulk.phone-lift { bottom: calc(79px + env(safe-area-inset-bottom, 0px)) !important; }
 }
 

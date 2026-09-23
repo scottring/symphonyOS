@@ -668,9 +668,11 @@ export function WeekViewV2(props: WeekViewV2Props) {
     if (entry.task) {
       const task = entry.task
       const was = task.completed
-      void toggleTask(task.id)
-      pushAction?.(was ? 'Task marked incomplete' : 'Task completed', () => {
-        void onUpdateTask(task.id, { completed: was })
+      void toggleTask(task.id).then((ok) => {
+        if (!ok) return // rolled back and reported by the write itself
+        pushAction?.(was ? 'Task marked incomplete' : 'Task completed', () => {
+          void onUpdateTask(task.id, { completed: was })
+        })
       })
       return
     }

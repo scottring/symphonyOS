@@ -26,7 +26,7 @@ export function InboxUndoToast({ message, onUndo, onDismiss, durationMs = 10000,
   return (
     <div
       role="status"
-      className="phone-lift fixed bottom-6 left-6 z-50 flex items-center gap-3 bg-neutral-800 text-white text-sm rounded-xl px-4 py-2.5 shadow-lg animate-fade-in"
+      className="phone-lift phone-lift-wide fixed bottom-6 left-6 z-50 flex items-center gap-3 bg-neutral-800 text-white text-sm rounded-xl px-4 py-2.5 shadow-lg animate-fade-in"
     >
       <span>{message}</span>
       {onRetry && (
