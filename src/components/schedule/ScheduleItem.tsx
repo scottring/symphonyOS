@@ -352,7 +352,7 @@ export const ScheduleItem = memo(function ScheduleItem({
         // card, away from the title they label. Same rule the desktop branch
         // applies to its leading column via hasBelowTitleContent/self-start.
         cardClassName={`
-          schedule-mobile-row relative flex ${hasPerPersonItems || fromEmail ? 'items-start' : 'items-center'} gap-3 bg-bg-elevated rounded-2xl border border-neutral-200/70
+          schedule-mobile-row relative flex ${hasPerPersonItems || fromEmail || stepsOpen ? 'items-start' : 'items-center'} gap-3 bg-bg-elevated rounded-2xl border border-neutral-200/70
           px-3 py-3 shadow-card
           ${selected ? 'ring-2 ring-primary-300 shadow-md' : ''}
           ${item.completed || item.skipped || isFree ? 'opacity-60' : ''}
@@ -443,6 +443,41 @@ export const ScheduleItem = memo(function ScheduleItem({
             onToggle={onToggleSubtask}
             viewedDate={viewedDate}
           />
+          {/* Steps inside the card, as the native app shows them: a quiet
+              count that opens the list, each step ticked in place. */}
+          {hasSubtasks && (
+            <div onClick={(e) => e.stopPropagation()}>
+              <button
+                type="button"
+                aria-expanded={stepsOpen}
+                onClick={() => setStepsOpen((v) => !v)}
+                className="phone-steps-toggle"
+              >
+                <ListChecks className="w-3.5 h-3.5" aria-hidden="true" />
+                {stepsDone} of {stepsTotal} steps
+                {stepsOpen ? <ChevronUp className="w-3.5 h-3.5" aria-hidden="true" /> : <ChevronDown className="w-3.5 h-3.5" aria-hidden="true" />}
+              </button>
+              {stepsOpen && plainSubtasks.length > 0 && (
+                <ul className="phone-steps">
+                  {plainSubtasks.map((s) => (
+                    <li key={s.id}>
+                      <button
+                        type="button"
+                        aria-pressed={!!s.completed}
+                        aria-label={`${s.completed ? 'Reopen' : 'Complete'} ${s.title}`}
+                        disabled={!onToggleSubtask}
+                        onClick={() => onToggleSubtask?.(s.id)}
+                        className={`phone-step-check${s.completed ? ' is-done' : ''}`}
+                      >
+                        {s.completed && <Check className="w-3 h-3" strokeWidth={3} aria-hidden="true" />}
+                      </button>
+                      <span className={s.completed ? 'line-through text-neutral-400' : 'text-neutral-700'}>{s.title}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Right cluster — assignee. Three-dot removed; swipe

@@ -2410,6 +2410,8 @@ div.chooser-action-group { overflow: visible !important; }
    neither covers them (dock 67px + bar 52px + gaps). */
 @media (max-width: 767px) {
   .phone-lift { bottom: calc(139px + env(safe-area-inset-bottom, 0px)) !important; }
+  /* A centred toast sizes to its words, not to half the screen. */
+  .phone-lift:not(.inbox-bulk) { width: max-content; max-width: calc(100vw - 24px); }
   .inbox-bulk.phone-lift { bottom: calc(79px + env(safe-area-inset-bottom, 0px)) !important; }
 }
 
@@ -2434,11 +2436,33 @@ div.chooser-action-group { overflow: visible !important; }
 .daily-edition-body dd { margin: 2px 0 0; font-family: var(--font-family-display); font-size: 18px; line-height: 1.45; color: var(--color-neutral-800); }
 @media (min-width: 900px) { .daily-edition-body { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 24px; } }
 
+/* Steps inside a phone Today card (ScheduleItem mobile). */
+.phone-steps-toggle {
+  display: inline-flex; align-items: center; gap: 5px; margin-top: 4px;
+  min-height: 32px; padding: 0; background: none;
+  font-size: 13px; color: var(--color-neutral-500);
+}
+.phone-steps { display: grid; gap: 2px; margin: 2px 0 2px; }
+.phone-steps li { display: flex; align-items: flex-start; gap: 8px; font-size: 15px; line-height: 1.35; }
+.phone-steps li > span { padding-top: 10px; }
+.phone-step-check {
+  flex-shrink: 0; width: 40px; height: 40px; min-width: 40px; min-height: 40px; margin-left: -10px; padding: 0;
+  display: grid; place-items: center; background: none; color: #fff; position: relative;
+}
+.phone-step-check::before {
+  content: ""; position: absolute; width: 18px; height: 18px; border-radius: 999px;
+  border: 1.5px solid var(--color-neutral-400);
+}
+.phone-step-check.is-done::before { background: var(--color-primary-600); border-color: var(--color-primary-600); }
+.phone-step-check svg { position: relative; }
+
 /* The visible Move control on a phone row (native MoveMenuButton): a pill
    with the platform's own picker laid invisibly over it. */
+.period-row-move { display: none; }
+@media (max-width: 639px) { .period-row-move { display: inline-flex; } }
 .period-row-move {
   position: relative; flex-shrink: 0; align-self: center;
-  display: inline-flex; align-items: center; gap: 3px;
+  align-items: center; gap: 3px;
   min-height: 32px; padding: 0 10px; border-radius: 999px;
   border: 1px solid var(--color-neutral-200); background: var(--color-neutral-50);
   font-size: 13px; font-weight: 600; color: var(--color-neutral-800);

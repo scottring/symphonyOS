@@ -785,7 +785,7 @@ export function InboxView({
         }
         controls={chrome ? <HomeChromeControls className="flex" /> : undefined}
         footer={(totalCount > 0 || familyMembers.length > 0) ? (
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
             {totalCount > 0 && (
               <button
                 type="button"
