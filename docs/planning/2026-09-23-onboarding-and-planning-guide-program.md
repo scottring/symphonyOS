@@ -154,4 +154,18 @@ onboarding and guide surfaces.
   went, with a link there), S1-09 (Inbox triage now uses the shared `RescheduleGrid`
   with day-load bars). 12 new tests; full suite 6690 passed, 1 pre-existing collection
   failure in `connectors/` (its own node_modules, unrelated).
-- **Resume at:** show Scott fix batch 1 on the rebuilt preview, then storyline 2.
+- **Storyline 2 walked through the cascade.** 13 entries (S2-01 … S2-13), including
+  one blocker: a goal's own page could not create a step, so the creator of the app
+  could not move work from a goal into a week.
+- **Fixed on the branch:** goal-aware detail page (Steps, goal_task_id, Period, status
+  Active/Completed/Archived, dated steps with a push control); the silent month jump
+  removed in favour of an explicit neighbour link; "Back to tasks" → "Back"; the week's
+  list now names the goal each row serves.
+- **Verified in data, not just on screen:** a step pushed to This Week keeps
+  `month_start`, `goal_task_id`, and BOTH `task_commitments` rows (month + week).
+- **Open and notable:** S2-08 false empty states on load (raised to high — likely the
+  real cause of the month-page wandering) · S2-10 planning pages open a full page while
+  Today/Week open the pane · S2-01 a review should expand commitments · S2-05a the
+  ladder breaking between Week and Month · S1-15 parked, treatment rejected.
+- **Resume at:** storyline 2's remaining steps — choosing today's work from the week —
+  then storyline 3.

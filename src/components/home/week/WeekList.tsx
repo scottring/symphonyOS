@@ -2,10 +2,11 @@
 // stays whole all week — done rows stay, struck, sorted last. Renders beside
 // (desktop) or above (narrow) the journal on the Week page.
 
-import { useState } from 'react'
-import { Check } from 'lucide-react'
+import { useMemo, useState } from 'react'
+import { Check, Target } from 'lucide-react'
 import type { Task } from '@/types/task'
 import { weekListTasks, weekRowNote, weekRowNoteText } from '@/lib/planning/weekList'
+import { goalTitleMap } from '@/lib/planning/goalSteps'
 import { weekListTitle } from '@/components/reference/DayPlanPanel'
 import { localYmd } from '@/lib/cadence/config'
 
@@ -26,6 +27,12 @@ export function WeekList({ tasks, weekStart, meId, userId, isCurrent, onToggle, 
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(false)
   const todayYmd = localYmd(new Date())
+  // Which broader commitment a row is serving. The grid and the journal have
+  // shown this on DATED rows for a while, but the week's list — where work
+  // with no day lives — never did, so a week could not be read as "this
+  // serves October, that is just this week" (Scott, 2026-09-23: "none of the
+  // three weeks coming up say antying about the october goal").
+  const goalTitles = useMemo(() => goalTitleMap(tasks), [tasks])
   const rows = weekListTasks(tasks, weekStart, meId, { isCurrent })
   const open = rows.filter((t) => !t.completed)
   const done = rows.filter((t) => t.completed)
@@ -93,6 +100,12 @@ export function WeekList({ tasks, weekStart, meId, userId, isCurrent, onToggle, 
                       {task.title}
                     </span>
                   </button>
+                  {task.goalTaskId && goalTitles.get(task.goalTaskId) && (
+                    <span className="block text-[11.5px] text-neutral-500">
+                      <Target className="mr-1 inline h-3 w-3 align-[-1px]" aria-hidden="true" />
+                      {goalTitles.get(task.goalTaskId)}
+                    </span>
+                  )}
                   {note && <span className="block text-[11.5px] text-neutral-500">{note}</span>}
                 </div>
               </li>

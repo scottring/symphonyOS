@@ -71,3 +71,26 @@ it('adds a task directly and keeps the entry available after a failed save', asy
   await waitFor(() => expect(screen.queryByRole('textbox')).toBeNull())
   expect(onAdd).toHaveBeenLastCalledWith('Book car service')
 })
+
+describe('the goal a week row serves', () => {
+  it('names the goal under a step, so a week reads as commitments not noise', () => {
+    // Scott, 2026-09-23: "none of the three weeks coming up say antying about
+    // the october goal". goalTitleMap reached dated grid rows only; the week's
+    // list, where work with no day lives, showed nothing. The existing "from
+    // October" note says which PERIOD a row came from; it never said which
+    // outcome the row serves.
+    const goal = createMockTask({ id: 'g1', title: 'Take Kaleb to an Islanders game in DC', isGoal: true, bucket: 'month' })
+    const step = row({ id: 's1', title: 'research tickets', goalTaskId: 'g1' })
+    render(<WeekList tasks={[goal, step]} weekStart={WEEK} meId={null} userId="me" isCurrent onToggle={vi.fn()} onSelect={vi.fn()} />)
+    const list = within(screen.getByRole('region', { name: "This week's list" }))
+    expect(list.getByText('research tickets')).toBeInTheDocument()
+    expect(list.getByText('Take Kaleb to an Islanders game in DC')).toBeInTheDocument()
+  })
+
+  it('says nothing for a row that serves no goal', () => {
+    render(<WeekList tasks={[row({ id: 's2', title: 'book the car in' })]} weekStart={WEEK} meId={null} userId="me" isCurrent onToggle={vi.fn()} onSelect={vi.fn()} />)
+    const list = within(screen.getByRole('region', { name: "This week's list" }))
+    expect(list.getByText('book the car in')).toBeInTheDocument()
+    expect(list.queryByText(/Islanders/)).not.toBeInTheDocument()
+  })
+})
