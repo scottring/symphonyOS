@@ -6,13 +6,20 @@ interface InboxUndoToastProps {
   onUndo?: () => void
   onDismiss: () => void
   durationMs?: number
+  /** Button text; "Retry" after a failed undo. */
+  actionLabel?: string
+  /** Stays until dismissed — a failure must not vanish on a timer. */
+  persistent?: boolean
+  /** Disables the action while it runs, so a slow undo can't be sent twice. */
+  busy?: boolean
 }
 
-export function InboxUndoToast({ message, onUndo, onDismiss, durationMs = 10000 }: InboxUndoToastProps) {
+export function InboxUndoToast({ message, onUndo, onDismiss, durationMs = 10000, actionLabel = 'Undo', persistent = false, busy = false }: InboxUndoToastProps) {
   useEffect(() => {
+    if (persistent || busy) return
     const id = setTimeout(onDismiss, durationMs)
     return () => clearTimeout(id)
-  }, [onDismiss, durationMs])
+  }, [onDismiss, durationMs, persistent, busy])
 
   return (
     <div
@@ -24,9 +31,10 @@ export function InboxUndoToast({ message, onUndo, onDismiss, durationMs = 10000 
         <button
           type="button"
           onClick={onUndo}
-          className="px-2 py-0.5 rounded-md text-primary-200 hover:text-white hover:bg-white/10 transition-colors font-medium"
+          disabled={busy}
+          className="disabled:opacity-50 px-2 py-0.5 rounded-md text-primary-200 hover:text-white hover:bg-white/10 transition-colors font-medium"
         >
-          Undo
+          {busy ? 'Undoing…' : actionLabel}
         </button>
       )}
       <button

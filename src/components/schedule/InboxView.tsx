@@ -55,6 +55,12 @@ type UndoEntry = {
   undoable: boolean
   /** Optional extra async side-effect to run alongside the task update on undo */
   onUndoExtra?: () => Promise<void>
+  /** A batch: every row to restore, each checked. Replaces taskId/previous. */
+  restores?: { id: string; previous: Partial<Task> }[]
+  /** "Retry" for an entry left behind by a failed undo. */
+  actionLabel?: string
+  /** A failure report: stays until dismissed. */
+  persistent?: boolean
   /**
    * Runs when the entry goes away WITHOUT an undo — the toast timed out or was
    * dismissed, another action replaced it, or the page unmounted. Delete uses
@@ -563,7 +569,7 @@ export function InboxView({
     exitSelection()
     const day = getBaseDate(0)
     const moved: { id: string; previous: Partial<Task> }[] = []
-    let failed = 0
+    const unconfirmed: { id: string; previous: Partial<Task> }[] = []
     for (const t of rows) {
       const area = areas.get(t.id)
       const previous: Partial<Task> = {
@@ -581,28 +587,35 @@ export function InboxView({
         ok = onUpdateTask ? await wasWritten(onUpdateTask(t.id, { context: area, ...placement })) : false
       } else if (when === 'today') {
         ok = onPushTask ? await wasWritten(onPushTask(t.id, day)) : false
-        if (ok && onUpdateTask) await onUpdateTask(t.id, { plannedOn: day })
+        // Choosing it for today is part of "Today"; a failure there is unconfirmed too.
+        if (ok && onUpdateTask) ok = await wasWritten(onUpdateTask(t.id, { plannedOn: day }))
       } else if (when === 'this-week') {
         ok = onPushTask ? await wasWritten(onPushTask(t.id, 'week')) : false
       } else {
         ok = onUpdateTask ? await wasWritten(onUpdateTask(t.id, { bucket: 'someday', scheduledFor: undefined })) : false
       }
+      // A false result means "not confirmed", not "nothing changed": the row
+      // can save before its commitment/focus records fail. So an unconfirmed
+      // row is reported as such and still goes into Undo — restoring its
+      // snapshot is safe whether or not it moved.
       if (ok) moved.push({ id: t.id, previous })
-      else failed++
+      else unconfirmed.push({ id: t.id, previous })
     }
     const label = when === 'today' ? 'Today' : when === 'this-week' ? 'This Week' : 'Someday'
-    if (moved.length === 0) {
-      showToast(`Couldn't send ${failed === 1 ? 'the item' : `${failed} items`} to ${label}. Nothing moved.`, 'error')
-      return
-    }
-    const sent = moved.length === 1 ? `Sent to ${label}` : `Sent ${moved.length} to ${label}`
-    const [first, ...rest] = moved
+    const all = [...moved, ...unconfirmed]
+    const message = unconfirmed.length === 0
+      ? (moved.length === 1 ? `Sent to ${label}` : `Sent ${moved.length} to ${label}`)
+      : moved.length === 0
+        ? `Couldn't confirm ${unconfirmed.length === 1 ? 'the move' : `${unconfirmed.length} moves`} to ${label} — check the Inbox, or Undo`
+        : `Sent ${moved.length} to ${label} · ${unconfirmed.length} may not have saved`
     pushUndo({
-      taskId: first.id,
-      message: failed ? `${sent} · ${failed} couldn't be moved` : sent,
-      previous: first.previous,
+      taskId: all[0].id,
+      message,
+      previous: {},
+      restores: all,
       undoable: true,
-      onUndoExtra: rest.length ? async () => { for (const r of rest) await onUpdateTask?.(r.id, r.previous) } : undefined,
+      // A report of a possible failure stays until it is read.
+      persistent: unconfirmed.length > 0,
     })
   }, [exitSelection, onPushTask, onUpdateTask, pushUndo])
 
@@ -614,17 +627,42 @@ export function InboxView({
     void runBulkWhen(when, rows, new Map())
   }, [tasks, selectedTaskIds, runBulkWhen])
 
+  // Undo awaits and checks every restore. Rows that fail to restore stay on
+  // screen as a persistent "Retry" entry for just those rows — an Undo that
+  // failed must never simply disappear (review 2026-09-22).
+  const [undoBusy, setUndoBusy] = useState(false)
   const handleUndo = useCallback(async () => {
     if (!undo) { setUndo(null); return }
+    if (undoBusy) return
     // Undone, not expired: clear the ref first so onExpire never runs.
     undoRef.current = null
-    // Only call onUpdateTask if there are actual fields to restore
-    if (onUpdateTask && Object.keys(undo.previous).length > 0) {
-      onUpdateTask(undo.taskId, undo.previous)
+    const restores = undo.restores
+      ?? (Object.keys(undo.previous).length > 0 ? [{ id: undo.taskId, previous: undo.previous }] : [])
+    setUndoBusy(true)
+    const failed: typeof restores = []
+    try {
+      for (const r of restores) {
+        const ok = onUpdateTask ? await wasWritten(onUpdateTask(r.id, r.previous)) : false
+        if (!ok) failed.push(r)
+      }
+      if (undo.onUndoExtra) await undo.onUndoExtra()
+    } finally {
+      setUndoBusy(false)
     }
-    if (undo.onUndoExtra) await undo.onUndoExtra()
-    setUndo(null)
-  }, [undo, onUpdateTask])
+    if (failed.length === 0) { setUndo(null); return }
+    const whole = restores.length
+    const next: UndoEntry = {
+      taskId: failed[0].id,
+      message: whole === 1 ? "Couldn't undo that move" : `Couldn't undo ${failed.length} of ${whole} moves`,
+      previous: {},
+      restores: failed,
+      undoable: true,
+      actionLabel: 'Retry',
+      persistent: true,
+    }
+    undoRef.current = next
+    setUndo(next)
+  }, [undo, undoBusy, onUpdateTask])
 
   const handleFocusTriage = useCallback((taskId: string, bucket: 'today' | 'week' | 'month' | 'quarter') => {
     const task = filteredTasks.find((t) => t.id === taskId)
@@ -878,9 +916,13 @@ export function InboxView({
 
       {undo && (
         <InboxUndoToast
+          key={undo.message + (undo.actionLabel ?? '')}
           message={undo.message}
           onUndo={undo.undoable ? handleUndo : undefined}
           onDismiss={dismissUndo}
+          actionLabel={undo.actionLabel}
+          persistent={undo.persistent}
+          busy={undoBusy}
         />
       )}
       </div>
