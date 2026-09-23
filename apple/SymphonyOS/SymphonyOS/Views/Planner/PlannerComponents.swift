@@ -210,7 +210,7 @@ struct PlanTaskRow<Trailing: View>: View {
                         .font(.bodyMedium)
                         .foregroundStyle(task.completed ? Color.textTertiary : Color.textPrimary)
                         .strikethrough(task.completed)
-                        .lineLimit(3)
+                        .fixedSize(horizontal: false, vertical: true)
                         .multilineTextAlignment(.leading)
                     if let meta {
                         Text(meta).font(.bodySmall).foregroundStyle(Color.textTertiary)
@@ -277,6 +277,47 @@ struct MoveMenuButton: View {
             .contentShape(Rectangle())
         }
         .accessibilityLabel("Move \(title)")
+    }
+}
+
+// MARK: - Loading + top edge
+
+/// "Loading calendar…" — shown only for a day whose events never loaded.
+struct CalendarLoadingRow: View {
+    var body: some View {
+        HStack(spacing: 8) {
+            ProgressView().controlSize(.small)
+            Text("Loading calendar…").font(.bodySmall).foregroundStyle(Color.textTertiary)
+        }
+        .accessibilityElement(children: .combine)
+    }
+}
+
+extension View {
+    /// Pages scroll under the status bar; this lays the page's own ivory over
+    /// the clock / Dynamic Island strip (with a soft fade below it) so
+    /// scrolled text never shows through behind them.
+    func statusBarScrim() -> some View {
+        // A zero-height top inset whose background reaches up into the
+        // status-bar area: it draws above the scrolling content, exactly as
+        // tall as the clock / Dynamic Island strip on any device.
+        safeAreaInset(edge: .top, spacing: 0) {
+            Color.clear
+                .frame(height: 0)
+                .background(alignment: .top) {
+                    Color.bgBase
+                        .ignoresSafeArea(edges: .top)
+                        // A short fade so content slides under, not against, it.
+                        .overlay(alignment: .bottom) {
+                            LinearGradient(colors: [Color.bgBase, Color.bgBase.opacity(0)],
+                                           startPoint: .top, endPoint: .bottom)
+                                .frame(height: 10)
+                                .offset(y: 10)
+                        }
+                }
+                .allowsHitTesting(false)
+                .accessibilityHidden(true)
+        }
     }
 }
 

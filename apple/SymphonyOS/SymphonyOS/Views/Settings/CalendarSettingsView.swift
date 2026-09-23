@@ -4,7 +4,7 @@ import SwiftUI
 /// user connect (via the web flow in an in-app browser) or disconnect. Once linked,
 /// events appear on the Today timeline.
 struct CalendarSettingsView: View {
-    @State private var service = GoogleCalendarService()
+    @State private var service = GoogleCalendarService.shared
     @State private var showConnect = false
 
     var body: some View {

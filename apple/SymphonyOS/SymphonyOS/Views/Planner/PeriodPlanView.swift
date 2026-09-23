@@ -21,6 +21,18 @@ struct PeriodPlanView: View {
 
     @State private var toast: TriageController.Toast?
 
+    enum GoalEdit: Identifiable {
+        case new
+        case existing(Goal)
+        var id: String {
+            switch self {
+            case .new: "new"
+            case .existing(let g): g.id.uuidString
+            }
+        }
+    }
+    @State private var editing: GoalEdit?
+
     private var userId: UUID { auth.currentUser?.id ?? UUID() }
     private var date: Date { appState.selectedDate }
     private var seasons: [SeasonBoundary]? { households.first?.seasons }
@@ -79,6 +91,7 @@ struct PeriodPlanView: View {
             .padding(.bottom, 16)
         }
         .background(Color.bgBase.ignoresSafeArea())
+        .statusBarScrim()
         .safeAreaInset(edge: .bottom, spacing: 0) {
             VStack(spacing: 0) {
                 if let toast {
@@ -94,6 +107,12 @@ struct PeriodPlanView: View {
         #if os(iOS)
         .toolbar(.hidden, for: .navigationBar)
         #endif
+        .sheet(item: $editing) { edit in
+            switch edit {
+            case .new: GoalEditorSheet(goal: nil, year: PlanCalendar.year(of: date))
+            case .existing(let g): GoalEditorSheet(goal: g, year: g.year)
+            }
+        }
     }
 
     // MARK: Month / season
@@ -153,23 +172,47 @@ struct PeriodPlanView: View {
     private func yearContent(_ plan: PlanSnapshot) -> some View {
         let list = plan.yearGoals(PlanCalendar.year(of: date))
         Eyebrow(text: "Goals", count: list.count)
-        if list.isEmpty { quiet("No goals for \(title) yet. Set them on the web planner.") }
+        if list.isEmpty { quiet("No goals for \(title) yet.") }
         ForEach(list, id: \.id) { goal in
-            goalRow(goal.name, note: goal.notes.flatMap(NotesHTML.firstLine), context: goal.context)
+            Button { editing = .existing(goal) } label: {
+                goalRow(goal.name, note: goal.notes.flatMap(NotesHTML.firstLine), context: goal.context,
+                        done: goal.status == "completed")
+            }
+            .buttonStyle(.plain)
+            .accessibilityHint("Edit goal")
         }
+        Button { editing = .new } label: {
+            HStack(spacing: 8) {
+                Image(systemName: "plus").font(.system(size: 13, weight: .bold))
+                Text("Add a goal for \(title)")
+            }
+            .font(.bodyMediumBold)
+            .foregroundStyle(Color.ink)
+            .padding(.horizontal, 16)
+            .frame(maxWidth: .infinity, minHeight: 48, alignment: .leading)
+            .background(Color.bgWarm, in: RoundedRectangle(cornerRadius: 14))
+            .overlay(RoundedRectangle(cornerRadius: 14).strokeBorder(Color.cardBorder, style: StrokeStyle(lineWidth: 1, dash: [4, 3])))
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .padding(.horizontal, 16)
+        .padding(.top, 8)
     }
 
     // MARK: Pieces
 
-    private func goalRow(_ name: String, note: String?, context: String?) -> some View {
+    private func goalRow(_ name: String, note: String?, context: String?, done: Bool = false) -> some View {
         HStack(alignment: .top, spacing: 10) {
-            Image(systemName: "scope")
+            Image(systemName: done ? "checkmark.circle.fill" : "scope")
                 .font(.system(size: 15, weight: .medium))
-                .foregroundStyle(Color.textSecondary)
+                .foregroundStyle(done ? Color.successGreen : Color.textSecondary)
                 .padding(.top, 3)
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 2) {
-                Text(name).font(.displaySmall).foregroundStyle(Color.textPrimary)
+                Text(name).font(.displaySmall)
+                    .foregroundStyle(done ? Color.textTertiary : Color.textPrimary)
+                    .strikethrough(done)
+                    .fixedSize(horizontal: false, vertical: true)
                 if let note {
                     Text(note).font(.displayItalic).foregroundStyle(Color.textSecondary).lineLimit(2)
                 }
@@ -184,7 +227,7 @@ struct PeriodPlanView: View {
         .padding(.horizontal, 16)
         .padding(.vertical, 3)
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("Goal: \(name)")
+        .accessibilityLabel("Goal: \(name)\(done ? ", completed" : "")")
     }
 
     private func quiet(_ text: String) -> some View {

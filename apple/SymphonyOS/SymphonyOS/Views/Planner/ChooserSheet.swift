@@ -151,7 +151,7 @@ struct ChooserSheet: View {
             .foregroundStyle(Color.textSecondary)
             .accessibilityLabel("Routine")
         let text = VStack(alignment: .leading, spacing: 2) {
-            Text(r.name).font(.bodyMedium).foregroundStyle(Color.textPrimary).lineLimit(4)
+            Text(r.name).font(.bodyMedium).foregroundStyle(Color.textPrimary).fixedSize(horizontal: false, vertical: true)
             Text(offer.flexible ? "Any day this week" : "Due \(dayWord)")
                 .font(.bodySmall).foregroundStyle(Color.textTertiary)
         }

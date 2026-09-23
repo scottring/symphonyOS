@@ -13,10 +13,49 @@ import Supabase
 @Observable
 @MainActor
 final class GoogleCalendarService {
+    /// One instance for the app, so a day's events survive leaving and
+    /// returning to a screen: Today and Week read the same per-day cache and
+    /// keep showing what they had while a refresh is in flight.
+    static let shared = GoogleCalendarService()
+
     var isConnected = false
     var isLoading = false
     /// Google events for the last-fetched day, already mapped to timeline items.
     var eventItems: [TimelineItem] = []
+
+    /// Events per local day (YYYY-MM-DD). A missing key means "never loaded"
+    /// — distinct from an empty, loaded day.
+    private(set) var byDay: [String: [TimelineItem]] = [:]
+    private(set) var loadingDays: Set<String> = []
+    private var fetchedAt: [String: Date] = [:]
+
+    /// Cached events for `date`, or nil if that day was never loaded.
+    func items(for date: Date) -> [TimelineItem]? { byDay[PlanCalendar.ymd(date)] }
+
+    func isLoading(_ date: Date) -> Bool { loadingDays.contains(PlanCalendar.ymd(date)) }
+
+    /// Load `date` unless it was fetched in the last `maxAge` seconds.
+    func refresh(_ date: Date, maxAge: TimeInterval = 120) async {
+        let key = PlanCalendar.ymd(date)
+        #if DEBUG
+        if DemoMode.isOn {   // sample events; never a network call in demo mode
+            byDay[key] = DemoMode.events(on: date)
+            fetchedAt[key] = Date()
+            return
+        }
+        #endif
+        if let at = fetchedAt[key], Date().timeIntervalSince(at) < maxAge { return }
+        await fetchEvents(for: date)
+    }
+
+    /// Load every day of a week (in parallel), each into the per-day cache.
+    func refreshWeek(_ weekStart: Date) async {
+        await withTaskGroup(of: Void.self) { group in
+            for day in PlanCalendar.weekDays(weekStart) {
+                group.addTask { await self.refresh(day) }
+            }
+        }
+    }
 
     /// The web app's settings page (hosts the Google Calendar connect card).
     /// Opened in an in-app Safari view so the connection lands in `calendar_connections`.
@@ -48,6 +87,8 @@ final class GoogleCalendarService {
                 .execute()
             isConnected = false
             eventItems = []
+            byDay = [:]
+            fetchedAt = [:]
         } catch {
             // Best-effort; leave state as-is on failure.
         }
@@ -74,18 +115,28 @@ final class GoogleCalendarService {
             domain: "all"
         )
 
+        let key = PlanCalendar.ymd(start)
         isLoading = true
-        defer { isLoading = false }
+        loadingDays.insert(key)
+        defer {
+            loadingDays.remove(key)
+            isLoading = !loadingDays.isEmpty
+        }
         do {
             let resp: EventsResponse = try await supabase.functions.invoke(
                 "google-calendar-events",
                 options: FunctionInvokeOptions(body: body)
             )
             isConnected = true   // a successful call means a connection exists
-            eventItems = (resp.events ?? []).map { $0.toTimelineItem() }
+            let items = (resp.events ?? []).map { $0.toTimelineItem() }
+            byDay[key] = items
+            fetchedAt[key] = Date()
+            eventItems = items
         } catch {
-            // No connection or transient error → no events for this day.
-            eventItems = []
+            // Keep what was cached — a transient failure must not blank a day
+            // that already showed its events. A day never loaded stays empty.
+            if byDay[key] == nil { byDay[key] = [] }
+            eventItems = byDay[key] ?? []
         }
     }
 }

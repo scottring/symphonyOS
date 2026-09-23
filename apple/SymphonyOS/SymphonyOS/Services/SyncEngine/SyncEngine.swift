@@ -443,6 +443,9 @@ actor SyncEngine {
         case "task_focus":
             guard let f = find(TaskFocus.self) else { return nil }
             return focusRow(f)
+        case "goals":
+            guard let g = find(Goal.self) else { return nil }
+            return goalRow(g, forInsert: forInsert)
         default:
             return nil   // other tables aren't edited from iOS
         }
@@ -679,6 +682,26 @@ actor SyncEngine {
             "created_by": u(c.createdBy),
             "ended_at": d(c.endedAt),
         ]
+    }
+
+    /// The fields the phone edits — the web's addGoal / updateGoal columns.
+    /// area/strategy/domain/layer/carried_from are web-owned and omitted, so an
+    /// UPDATE leaves them untouched. `scope` rides on INSERT only (derived from
+    /// the life area, as the web does); an update never re-derives sharing.
+    private static func goalRow(_ g: Goal, forInsert: Bool) -> [String: AnyJSON] {
+        var row: [String: AnyJSON] = [
+            "id": .string(g.id.uuidString),
+            "user_id": .string(g.userId.uuidString),
+            "name": .string(g.name),
+            "year": .integer(g.year),
+            "status": .string(g.status),
+            "notes": s(g.notes),
+            "context": s(g.context),
+            "sort_order": .integer(g.sortOrder),
+            "updated_at": .string(isoOut.string(from: Date())),
+        ]
+        if forInsert { row["scope"] = .string(g.scope ?? "individual") }
+        return row
     }
 
     private static func focusRow(_ f: TaskFocus) -> [String: AnyJSON] {

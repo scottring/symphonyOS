@@ -247,6 +247,38 @@ struct PlanWriter {
         save()
     }
 
+    /// Complete / skip / reopen one occurrence (routine or event) on `date` —
+    /// the same write Today's cards make: find the (entity, day) instance,
+    /// household-shared ones included, else create one. Routine keys compare
+    /// case-insensitively (the web writes lowercase ids).
+    func setOccurrence(entityType: String, entityId: String, on date: Date, status: String) {
+        let day = PlanCalendar.day(date)
+        let key = entityType == "routine" ? entityId.lowercased() : entityId
+        let all = (try? context.fetch(FetchDescriptor<ActionableInstance>())) ?? []
+        let existing = all.first {
+            $0.entityType == entityType
+                && (entityType == "routine" ? $0.entityId.lowercased() == key : $0.entityId == key)
+                && PlanCalendar.sameDay($0.date, day)
+        }
+        let now = Date()
+        if let i = existing {
+            i.status = status
+            i.completedAt = status == "completed" ? now : nil
+            i.skippedAt = status == "skipped" ? now : nil
+            i.updatedAt = now
+            i.syncStatus = .pending
+            queueInstance(i)
+        } else if status != "pending" {
+            let i = ActionableInstance(userId: userId, entityType: entityType, entityId: key, date: day)
+            i.status = status
+            i.completedAt = status == "completed" ? now : nil
+            i.skippedAt = status == "skipped" ? now : nil
+            context.insert(i)
+            context.queueSync(table: "actionable_instances", recordId: i.id, type: "insert")
+        }
+        save()
+    }
+
     private func instance(for routine: Routine, on day: Date) -> ActionableInstance {
         let key = routine.id.uuidString
         let all = (try? context.fetch(FetchDescriptor<ActionableInstance>())) ?? []
@@ -309,6 +341,43 @@ struct PlanWriter {
 
     func complete(_ task: SymphonyTask) {
         TaskViewModel(modelContext: context).toggleComplete(task)
+    }
+
+    // MARK: Year goals (web useGoals addGoal / updateGoal)
+
+    @discardableResult
+    func createGoal(name: String, notes: String?, context: String?, year: Int) -> Goal {
+        let all = (try? context_fetchGoals()) ?? []
+        let g = Goal(id: UUID(), userId: userId, name: name, year: year, syncStatus: .pending)
+        g.notes = notes
+        g.context = context
+        g.sortOrder = all.filter { $0.year == year }.count
+        // RLS shares goals on scope; derive it from the life area like the web.
+        g.scope = ScopeRule.scopeForDomain(context: context, assignees: [], selfMemberId: nil)
+        g.lastSyncedAt = nil
+        self.context.insert(g)
+        self.context.queueSync(table: "goals", recordId: g.id, type: "insert")
+        save()
+        return g
+    }
+
+    func updateGoal(_ g: Goal, name: String, notes: String?, context: String?, status: String) {
+        g.name = name
+        g.notes = notes
+        g.context = context
+        g.status = status
+        g.updatedAt = Date()
+        g.syncStatus = .pending
+        let queued = (try? self.context.fetch(FetchDescriptor<PendingChange>())) ?? []
+        // A goal made on the phone that hasn't pushed yet: its insert carries the edit.
+        if !queued.contains(where: { $0.tableName == "goals" && $0.recordId == g.id && $0.changeType == "insert" }) {
+            self.context.queueSync(table: "goals", recordId: g.id, type: "update")
+        }
+        save()
+    }
+
+    private func context_fetchGoals() throws -> [Goal] {
+        try context.fetch(FetchDescriptor<Goal>())
     }
 
     // MARK: Commitments + focus

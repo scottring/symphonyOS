@@ -31,6 +31,25 @@ enum DemoMode {
 
     @MainActor static let sharedContainer: ModelContainer = container(for: types)
 
+    /// Sample calendar events: school drop-off on weekdays, a Monday dentist
+    /// visit, Saturday soccer.
+    static func events(on date: Date) -> [TimelineItem] {
+        let cal = PlanCalendar.calendar
+        let day = PlanCalendar.day(date)
+        let weekday = cal.component(.weekday, from: day)   // 1 Sun … 7 Sat
+        func event(_ title: String, _ h: Int, _ m: Int) -> TimelineItem {
+            TimelineItem(id: "demo-\(title)-\(PlanCalendar.ymd(day))", type: .event, title: title,
+                         startTime: cal.date(bySettingHour: h, minute: m, second: 0, of: day),
+                         isAllDay: false, completed: false, context: nil, entityId: UUID(),
+                         eventKey: "demo-\(title)-\(PlanCalendar.ymd(day))")
+        }
+        var out: [TimelineItem] = []
+        if (2...6).contains(weekday) { out.append(event("School drop-off", 8, 0)) }
+        if weekday == 2 { out.append(event("Dentist — Mia", 15, 30)) }
+        if weekday == 7 { out.append(event("Soccer — Liam", 9, 0)) }
+        return out
+    }
+
     // MARK: Seed
 
     static func seed(_ ctx: ModelContext) {
@@ -92,7 +111,9 @@ enum DemoMode {
             t.weekStart = ws
             commit(t, "week", ws)
         }
-        let garage = task("Clean out the garage", "family", alex, bucket: "week", created: 110)
+        // Deliberately long: titles must stay fully readable on every surface.
+        let garage = task("Clean out the garage and take the old paint cans, broken chairs and bike parts to the county drop-off",
+                          "family", alex, bucket: "week", created: 110)
         garage.weekStart = ws
         garage.weekendStart = PlanCalendar.weekendSaturday(ofWeek: ws)
         commit(garage, "week", ws)

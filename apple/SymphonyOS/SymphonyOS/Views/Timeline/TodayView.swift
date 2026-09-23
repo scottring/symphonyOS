@@ -14,7 +14,7 @@ struct TodayView: View {
     @Environment(AuthService.self) private var auth
     @Environment(\.modelContext) private var modelContext
     @State private var viewModel = TimelineViewModel()
-    @State private var calendar = GoogleCalendarService()
+    @State private var calendar = GoogleCalendarService.shared
     @State private var showSearch = false
     @State private var searchText = ""
     @State private var showChooser = false
@@ -87,7 +87,17 @@ struct TodayView: View {
                         }
                     }
 
-                    if viewModel.timelineItems.isEmpty && viewModel.carriedOverTasks.isEmpty && offerTasks + offerRoutines == 0 {
+                    // First visit to a day: say the calendar is coming instead
+                    // of showing an empty schedule that then fills in.
+                    let eventsPending = calendar.items(for: date) == nil && calendar.isLoading(date)
+                    if eventsPending {
+                        CalendarLoadingRow()
+                            .padding(.horizontal, 20)
+                            .padding(.top, 18)
+                    }
+
+                    if viewModel.timelineItems.isEmpty && viewModel.carriedOverTasks.isEmpty
+                        && offerTasks + offerRoutines == 0 && !eventsPending {
                         emptyState.padding(.top, 60).frame(maxWidth: .infinity)
                     }
                 }
@@ -96,6 +106,7 @@ struct TodayView: View {
         }
         .scrollDismissesKeyboard(.interactively)
         .background(Color.bgBase.ignoresSafeArea())
+        .statusBarScrim()
         // The capture bar is an inset, not an overlay: the list's scroll
         // extent ends above it, so the last card (and every subtask) can
         // always scroll fully into view — with the keyboard up too.
@@ -121,18 +132,20 @@ struct TodayView: View {
                 .presentationDetents(typeSize.isAccessibilitySize ? [.large] : [.medium, .large])
                 .presentationDragIndicator(.visible)
         }
+        // Rebuild from the shared cache first (no blank schedule on return),
+        // then refresh the day in the background.
         .onAppear { rebuildTimeline() }
-        .task { await calendar.fetchEvents(for: date) }
+        .task { await calendar.refresh(date, maxAge: 60) }
         .onChange(of: appState.selectedDate) { _, _ in
             rebuildTimeline()
-            Task { await calendar.fetchEvents(for: appState.selectedDate) }
+            Task { await calendar.refresh(appState.selectedDate, maxAge: 60) }
         }
         .onChange(of: appState.domainFilter) { _, _ in rebuildTimeline() }
         .onChange(of: tasksRevision) { _, _ in rebuildTimeline() }
         .onChange(of: instancesRevision) { _, _ in rebuildTimeline() }
         .onChange(of: focusRows.count) { _, _ in rebuildTimeline() }
         .onChange(of: eventNotesRevision) { _, _ in rebuildTimeline() }
-        .onChange(of: calendar.eventItems.count) { _, _ in rebuildTimeline() }
+        .onChange(of: eventsRevision) { _, _ in rebuildTimeline() }
     }
 
     private func card(_ item: TimelineItem) -> some View {
@@ -302,6 +315,19 @@ struct TodayView: View {
         return hasher.finalize()
     }
 
+    /// Changes when the displayed day's cached events arrive or change.
+    private var eventsRevision: Int {
+        var hasher = Hasher()
+        let items = calendar.items(for: appState.selectedDate)
+        hasher.combine(items == nil)
+        for item in items ?? [] {
+            hasher.combine(item.id)
+            hasher.combine(item.startTime)
+            hasher.combine(item.title)
+        }
+        return hasher.finalize()
+    }
+
     private var eventNotesRevision: Int {
         var hasher = Hasher()
         hasher.combine(eventNotes.count)
@@ -334,7 +360,7 @@ struct TodayView: View {
             instances: instances,
             date: appState.selectedDate,
             domainFilter: appState.domainFilter,
-            eventItems: calendar.eventItems,
+            eventItems: calendar.items(for: appState.selectedDate) ?? [],
             eventNotes: eventNotes,
             focus: focusRows,
             userId: auth.currentUser?.id

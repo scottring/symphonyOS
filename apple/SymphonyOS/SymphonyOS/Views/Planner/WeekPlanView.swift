@@ -16,10 +16,30 @@ struct WeekPlanView: View {
     @Query private var commitments: [TaskCommitment]
     @Query private var focusRows: [TaskFocus]
     @Query private var households: [Household]
+    @Query private var routines: [Routine]
+    @Query private var instances: [ActionableInstance]
+    @Query private var eventNotes: [EventNote]
 
     @State private var showReview = false
     @State private var toast: TriageController.Toast?
+    @State private var calendar = GoogleCalendarService.shared
     @Environment(\.dynamicTypeSize) private var typeSize
+
+    /// With routines and instances — for each day's routine occurrences.
+    private var fullPlan: PlanSnapshot {
+        PlanSnapshot(tasks: tasks, commitments: commitments, focus: focusRows, routines: routines,
+                     instances: instances, userId: auth.currentUser?.id, domain: appState.domainFilter.contextValue)
+    }
+
+    /// Everything Today would show for `day` — tasks, routine occurrences,
+    /// calendar events — built by the same view model, untimed first.
+    private func dayItems(_ day: Date) -> [TimelineItem] {
+        let vm = TimelineViewModel()
+        vm.buildTimeline(tasks: tasks, routines: routines, instances: instances, date: day,
+                         domainFilter: appState.domainFilter, eventItems: calendar.items(for: day) ?? [],
+                         eventNotes: eventNotes, focus: focusRows, userId: auth.currentUser?.id)
+        return vm.forToday + vm.schedule
+    }
 
     private var userId: UUID { auth.currentUser?.id ?? UUID() }
     private var weekStart: Date { PlanCalendar.weekStart(appState.selectedDate) }
@@ -90,9 +110,12 @@ struct WeekPlanView: View {
                 }
 
                 Eyebrow(text: "By day")
-                ForEach(week.byDay, id: \.day) { entry in
-                    DayCard(day: entry.day, tasks: entry.tasks) {
-                        appState.selectedDate = entry.day
+                ForEach(PlanCalendar.weekDays(weekStart), id: \.self) { day in
+                    DayCard(day: day, items: dayItems(day),
+                            alsoDue: fullPlan.chooserRoutines(on: day)
+                                .filter { !$0.flexible && !$0.chosen }.map(\.routine.name),
+                            eventsLoading: calendar.items(for: day) == nil && calendar.isLoading(day)) {
+                        appState.selectedDate = day
                         appState.horizon = .today
                     }
                     .padding(.horizontal, 16)
@@ -102,6 +125,7 @@ struct WeekPlanView: View {
             .padding(.bottom, 16)
         }
         .background(Color.bgBase.ignoresSafeArea())
+        .statusBarScrim()
         .safeAreaInset(edge: .bottom, spacing: 0) {
             VStack(spacing: 0) {
                 if let toast {
@@ -117,6 +141,8 @@ struct WeekPlanView: View {
         #if os(iOS)
         .toolbar(.hidden, for: .navigationBar)
         #endif
+        // Each day's events, from the same cache Today reads.
+        .task(id: weekStart) { await calendar.refreshWeek(weekStart) }
         .sheet(isPresented: $showReview) {
             WeekReviewSheet(previousWeek: previous, intoWeek: weekStart)
                 .presentationDetents(typeSize.isAccessibilitySize ? [.large] : [.medium, .large])
@@ -172,12 +198,20 @@ struct WeekPlanView: View {
 
 // MARK: - Day card
 
+/// One day of the week: the same items Today would show for it — tasks,
+/// routine occurrences and calendar events — plus a quiet line naming the
+/// untimed routines due that day. "Nothing planned" only when that's true
+/// and the day's calendar has loaded.
 private struct DayCard: View {
     let day: Date
-    let tasks: [SymphonyTask]
+    let items: [TimelineItem]
+    /// Untimed routines due this day but not chosen (they wait in the chooser).
+    let alsoDue: [String]
+    let eventsLoading: Bool
     let open: () -> Void
 
     @Environment(\.modelContext) private var modelContext
+    @Environment(AuthService.self) private var auth
     @Environment(\.dynamicTypeSize) private var typeSize
 
     private var isToday: Bool { PlanCalendar.calendar.isDateInToday(day) }
@@ -207,47 +241,96 @@ private struct DayCard: View {
             .buttonStyle(.plain)
             .accessibilityLabel("\(day.formatted(.dateTime.weekday(.wide).month(.wide).day()))\(isToday ? ", today" : ""). Open day")
 
-            if tasks.isEmpty {
-                Text("Nothing planned")
-                    .font(.bodySmall)
-                    .foregroundStyle(Color.textTertiary)
-                    .padding(.bottom, 10)
-            }
-            ForEach(tasks, id: \.id) { task in
-                HStack(spacing: 10) {
-                    CheckCircle(checked: task.completed, size: 20, label: task.title) {
-                        TaskViewModel(modelContext: modelContext).toggleComplete(task)
-                    }
-                    // Time sits beside the title, or above it at large text.
-                    let layout = typeSize.isAccessibilitySize
-                        ? AnyLayout(VStackLayout(alignment: .leading, spacing: 2))
-                        : AnyLayout(HStackLayout(spacing: 10))
-                    layout {
-                        if !task.isAllDay, let t = task.scheduledFor {
-                            Text(t.formatted(.dateTime.hour().minute()))
-                                .font(.bodySmall)
-                                .foregroundStyle(Color.textTertiary)
-                                .fixedSize()
-                        }
-                        Text(task.title)
-                            .font(.bodyMedium)
-                            .foregroundStyle(task.completed ? Color.textTertiary : Color.textPrimary)
-                            .strikethrough(task.completed)
-                            .lineLimit(4)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                    }
-                    if task.context != nil { ContextDot(context: task.context) }
+            ForEach(items) { item in row(item) }
+
+            if !alsoDue.isEmpty {
+                HStack(alignment: .firstTextBaseline, spacing: 6) {
+                    Image(systemName: "repeat").font(.system(size: 11, weight: .semibold))
+                    Text("Also due: \(alsoDue.joined(separator: ", "))")
                 }
-                .padding(.vertical, 2)
+                .font(.bodySmall)
+                .foregroundStyle(Color.textTertiary)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(.vertical, 8)
                 .overlay(alignment: .top) { Rectangle().fill(Color.cardBorder).frame(height: 1) }
+            }
+
+            if items.isEmpty && alsoDue.isEmpty {
+                if eventsLoading {
+                    CalendarLoadingRow().padding(.bottom, 10)
+                } else {
+                    Text("Nothing planned")
+                        .font(.bodySmall)
+                        .foregroundStyle(Color.textTertiary)
+                        .padding(.bottom, 10)
+                }
+            } else if eventsLoading {
+                CalendarLoadingRow().padding(.vertical, 6)
             }
         }
         .padding(.horizontal, 14)
         .padding(.top, 4)
-        .padding(.bottom, tasks.isEmpty ? 0 : 6)
+        .padding(.bottom, items.isEmpty && alsoDue.isEmpty ? 0 : 6)
         .background(Color.bgElevated, in: RoundedRectangle(cornerRadius: 14))
         .overlay(RoundedRectangle(cornerRadius: 14).strokeBorder(Color.cardBorder, lineWidth: 1))
         .shadow(color: Color.cardShadow, radius: 8, x: 0, y: 2)
+    }
+
+    @ViewBuilder
+    private func row(_ item: TimelineItem) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 10) {
+            mark(item)
+            // Time sits beside the title, or above it at large text.
+            let layout = typeSize.isAccessibilitySize
+                ? AnyLayout(VStackLayout(alignment: .leading, spacing: 2))
+                : AnyLayout(HStackLayout(alignment: .firstTextBaseline, spacing: 10))
+            layout {
+                if let time = item.timeString {
+                    Text(time)
+                        .font(.bodySmall)
+                        .foregroundStyle(Color.textTertiary)
+                        .fixedSize()
+                }
+                Text(item.title)
+                    .font(.bodyMedium)
+                    .foregroundStyle(item.completed ? Color.textTertiary
+                                     : (item.type == .event ? Color.textSecondary : Color.textPrimary))
+                    .strikethrough(item.completed)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            if item.type == .routine {
+                Image(systemName: "repeat")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(Color.textSecondary)
+                    .accessibilityLabel("Routine")
+            }
+            if item.context != nil { ContextDot(context: item.context) }
+        }
+        .padding(.vertical, 2)
+        .overlay(alignment: .top) { Rectangle().fill(Color.cardBorder).frame(height: 1) }
+        .opacity(item.isFree ? 0.6 : 1)
+    }
+
+    @ViewBuilder
+    private func mark(_ item: TimelineItem) -> some View {
+        switch item.type {
+        case .event:
+            EventMark()
+        case .task:
+            CheckCircle(checked: item.completed, size: 20, label: item.title) {
+                let tasks = (try? modelContext.fetch(FetchDescriptor<SymphonyTask>())) ?? []
+                if let t = tasks.first(where: { $0.id == item.entityId }) {
+                    TaskViewModel(modelContext: modelContext).toggleComplete(t)
+                }
+            }
+        case .routine:
+            CheckCircle(checked: item.completed, size: 20, label: item.title) {
+                PlanWriter(context: modelContext, userId: auth.currentUser?.id ?? UUID())
+                    .setOccurrence(entityType: "routine", entityId: item.entityId.uuidString,
+                                   on: day, status: item.completed ? "pending" : "completed")
+            }
+        }
     }
 }
 

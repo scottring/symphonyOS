@@ -331,6 +331,44 @@ struct PlanWriterTests {
         #expect(PlanCalendar.sameDay(t.weekStart, now))
     }
 
+    @Test func newGoalPushesWebColumnsWithDerivedScope() throws {
+        let ctx = try makeContext()
+        let g = PlanWriter(context: ctx, userId: me).createGoal(name: "Family dinner four nights a week",
+                                                                 notes: nil, context: "family", year: 2026)
+        #expect(g.scope == "compound")   // family goals share with the household (RLS keys on scope)
+        let insert = try #require(SyncEngine.serializeRow(table: "goals", id: g.id, context: ctx, forInsert: true))
+        // Live goals columns (verified 2026-09-23).
+        let prod: Set<String> = ["id", "user_id", "area_id", "name", "year", "notes", "status", "sort_order",
+                                 "created_at", "updated_at", "strategy", "domain_slug", "layer_id", "context",
+                                 "scope", "carried_from"]
+        #expect(Set(insert.keys).isSubset(of: prod))
+        #expect(insert["scope"]?.stringValue == "compound")
+        #expect(pending(ctx).contains { $0.tableName == "goals" && $0.changeType == "insert" })
+
+        // Editing never re-derives sharing, and an unpushed goal's insert carries the edit.
+        PlanWriter(context: ctx, userId: me).updateGoal(g, name: "Family dinner five nights", notes: "Phones away",
+                                                        context: "personal", status: "active")
+        let update = try #require(SyncEngine.serializeRow(table: "goals", id: g.id, context: ctx))
+        #expect(update["scope"] == nil)
+        #expect(update["name"]?.stringValue == "Family dinner five nights")
+        #expect(pending(ctx).filter { $0.tableName == "goals" }.map(\.changeType) == ["insert"])
+    }
+
+    @Test func checkingOffARoutineFromWeekWritesThatDay() throws {
+        let ctx = try makeContext()
+        let r = routine("Water the tomatoes", RecurrencePattern(type: "weekly", days: ["thu"]))
+        ctx.insert(r)
+        let thu = day(2026, 9, 24)
+        let writer = PlanWriter(context: ctx, userId: me)
+        writer.setOccurrence(entityType: "routine", entityId: r.id.uuidString, on: thu, status: "completed")
+        let i = try #require(try ctx.fetch(FetchDescriptor<ActionableInstance>()).first)
+        #expect(i.status == "completed" && PlanCalendar.sameDay(i.date, thu))
+        #expect(i.entityId == r.id.uuidString.lowercased())
+        writer.setOccurrence(entityType: "routine", entityId: r.id.uuidString, on: thu, status: "pending")
+        #expect(try ctx.fetch(FetchDescriptor<ActionableInstance>()).count == 1)
+        #expect(i.status == "pending")
+    }
+
     @Test func choosingARoutineNeverTouchesItsRule() throws {
         let ctx = try makeContext()
         let r = routine("Mow the lawn", RecurrencePattern(type: "weekly", days: []))

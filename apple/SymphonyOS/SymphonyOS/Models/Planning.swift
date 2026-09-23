@@ -91,7 +91,7 @@ final class TaskFocus {
     }
 }
 
-// MARK: - Goal (a year's intention; read-only on the phone)
+// MARK: - Goal (a year's intention)
 
 @Model
 final class Goal {
@@ -99,10 +99,14 @@ final class Goal {
     var userId: UUID
     var name: String
     var year: Int
+    /// "active" | "completed" | "archived"
     var status: String
     var notes: String?
     var context: String?
     var sortOrder: Int
+    /// Who can see it — RLS shares goals on scope. Derived from the life area
+    /// at creation (like the web's addGoal); sent on insert only.
+    var scope: String? = nil
 
     var syncStatus: SyncStatus
     var lastSyncedAt: Date?

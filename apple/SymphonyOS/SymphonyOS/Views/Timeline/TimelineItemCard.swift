@@ -165,7 +165,7 @@ struct TimelineItemCard: View {
             .font(.bodyMedium)
             .foregroundStyle(isCompleted ? Color.textTertiary : (item.type == .event ? Color.textSecondary : Color.textPrimary))
             .strikethrough(isCompleted)
-            .lineLimit(typeSize.isAccessibilitySize ? 5 : 3)
+            .fixedSize(horizontal: false, vertical: true)
             .frame(maxWidth: .infinity, alignment: .leading)
     }
 
@@ -256,7 +256,7 @@ struct TimelineItemCard: View {
                         .font(.displaySmall)
                         .foregroundStyle(isCompleted ? Color.textTertiary : Color.textPrimary)
                         .strikethrough(isCompleted)
-                        .lineLimit(3)
+                        .fixedSize(horizontal: false, vertical: true)
                         .frame(maxWidth: .infinity, alignment: .leading)
                     typeIcon
                     if item.context != nil { ContextDot(context: item.context).padding(.top, 6) }
@@ -558,7 +558,7 @@ struct ChildRow: View {
                 .font(.bodySmall)
                 .foregroundStyle(child.completed ? Color.textTertiary : Color.textPrimary)
                 .strikethrough(child.completed)
-                .lineLimit(3)
+                .fixedSize(horizontal: false, vertical: true)
         }
     }
 }

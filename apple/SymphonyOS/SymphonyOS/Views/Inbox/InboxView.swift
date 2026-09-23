@@ -84,6 +84,7 @@ struct InboxView: View {
         }
         .scrollDismissesKeyboard(.interactively)
         .background(Color.bgBase.ignoresSafeArea())
+        .statusBarScrim()
         .safeAreaInset(edge: .bottom, spacing: 0) {
             VStack(spacing: 8) {
                 if let toast = triage.toast {
@@ -242,7 +243,7 @@ private struct SelectableRow: View {
                 Text(task.title)
                     .font(.bodyMedium)
                     .foregroundStyle(Color.textPrimary)
-                    .lineLimit(3)
+                    .fixedSize(horizontal: false, vertical: true)
                     .multilineTextAlignment(.leading)
                     .frame(maxWidth: .infinity, alignment: .leading)
                 if task.context != nil { ContextDot(context: task.context) }

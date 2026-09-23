@@ -322,6 +322,7 @@ enum RowMapper {
         g.notes = row.string("notes")
         g.context = row.string("context")
         g.sortOrder = row.int("sort_order") ?? 0
+        g.scope = row.string("scope")
         g.lastSyncedAt = Date()
         g.createdAt = row.date("created_at") ?? Date()
         g.updatedAt = row.date("updated_at") ?? Date()

@@ -72,6 +72,14 @@ final class PlannerScreensUITests: XCTestCase {
         shot("12-season")
         horizon(yearName())
         shot("13-year")
+        tap(app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Add a goal'")).firstMatch)
+        let goalField = app.textFields["Goal"]
+        if goalField.waitForExistence(timeout: 4) {
+            goalField.typeText("Read twenty books together")
+            shot("13b-goal-editor")
+            tap(app.buttons["Save"], scroll: false)
+            shot("13c-year-goal-added")
+        }
         horizon("Today")
 
         // Inbox
