@@ -46,7 +46,7 @@ import { lookBackRows, isEmptyDraft, goalsWithHiddenSteps, goalAsRow, yearLookBa
 import type { DomainId } from '@/lib/domains'
 import { formatShortDate } from '@/lib/dateHelpers'
 import {
-  periodBounds, isCurrentPeriod, selectPeriodTasks, selectDatedInPeriod, actionsFor, railLevel, lowerLevel, planningPeriod, offerableFromAbove,
+  periodBounds, isCurrentPeriod, selectPeriodTasks, actionsFor, railLevel, lowerLevel, planningPeriod, offerableFromAbove,
   type PlanLevel, type RowAction,
 } from '@/lib/planning/periodPage'
 import { firstNoteLine } from '@/lib/planning/goalsReference'
@@ -57,6 +57,8 @@ import { PlanRail } from './PlanRail'
 import { readOpen, readFoldPref, writeOpen } from './foldState'
 import { PlanSession } from './PlanSession'
 import { PlanNextLine } from './PlanNextLine'
+import { periodCalendarEntries } from '@/lib/planning/periodCalendar'
+import { useDayLoadEvents, DAY_LOAD_RANGE_DAYS } from '@/hooks/useDayLoadEvents'
 
 /** How many tasks a period's list shows before it asks. A long plan is still
  *  a plan, but a page that opens with twenty rows is a page you scroll rather
@@ -171,7 +173,22 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
   //    question, so a dated item never goes missing just because it lives on
   //    a different bucket (demo run 2026-09-06). Month and season only — a
   //    year list is goals, with no dates to show. ─────────────────────────
-  const dated = useMemo(() => (level === 'year' ? [] : selectDatedInPeriod(layered, bounds)), [level, layered, bounds])
+  //    Until 2026-09-23 this read `tasks` only, so a section headed "On the
+  //    calendar" contained no calendar: Scott opened Month to see what he was
+  //    already committed to and his dentist appointment was simply absent
+  //    (S2-14). Events now come in beside the dated tasks.
+  const { events: periodEvents, available: eventsAvailable } = useDayLoadEvents(level !== 'year')
+  const dated = useMemo(
+    () => (level === 'year' ? [] : periodCalendarEntries(layered, periodEvents, bounds.start, bounds.end)),
+    [level, layered, periodEvents, bounds.start, bounds.end],
+  )
+  // The event fetch reaches a fixed window forward from today. Past that, the
+  // list is tasks only — say so rather than show a confidently short list.
+  const eventsCoverPeriod = useMemo(() => {
+    const horizon = new Date(today)
+    horizon.setDate(horizon.getDate() + DAY_LOAD_RANGE_DAYS)
+    return bounds.end <= horizon && bounds.start >= new Date(today.getFullYear(), today.getMonth(), today.getDate())
+  }, [today, bounds.start, bounds.end])
 
   // ── The fold: the level above, read-only. It follows the same "plan for
   //    the period ahead" rule as the page itself — near a season/year
@@ -711,19 +728,33 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
                 </button>
                 {calendarOpen && (
                   <ul className="mt-1.5 divide-y divide-neutral-100">
-                    {dated.map((t) => (
-                      <li key={t.id}>
-                        <button
-                          type="button"
-                          onClick={() => navigate(`/task/${t.id}`)}
-                          className="w-full rounded-md px-1.5 py-1 text-left text-[13px] text-neutral-700 transition-colors hover:bg-neutral-50"
-                        >
-                          {formatShortDate(t.scheduledFor!)} · {t.title}
-                          {!t.isAllDay && ` · ${t.scheduledFor!.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`}
-                        </button>
+                    {dated.map((entry) => (
+                      <li key={entry.id}>
+                        {entry.taskId ? (
+                          <button
+                            type="button"
+                            onClick={() => navigate(`/task/${entry.taskId}`)}
+                            className="w-full rounded-md px-1.5 py-1 text-left text-[13px] text-neutral-700 transition-colors hover:bg-neutral-50"
+                          >
+                            {formatShortDate(entry.at)} · {entry.title}
+                            {!entry.allDay && ` · ${entry.at.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`}
+                          </button>
+                        ) : (
+                          <div className="px-1.5 py-1 text-[13px] text-neutral-700">
+                            {formatShortDate(entry.at)} · {entry.title}
+                            {!entry.allDay && ` · ${entry.at.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`}
+                          </div>
+                        )}
                       </li>
                     ))}
                   </ul>
+                )}
+                {calendarOpen && (!eventsAvailable || !eventsCoverPeriod) && (
+                  <p className="mt-1.5 px-1.5 text-[12px] text-neutral-500">
+                    {eventsAvailable
+                      ? 'Calendar events are shown for the next few weeks only; further out, this is dated tasks alone.'
+                      : "Couldn't reach the calendar, so this is dated tasks alone."}
+                  </p>
                 )}
               </section>
             )}
