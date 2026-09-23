@@ -79,8 +79,8 @@ Status key: **Fixed** (implemented + regression test), **Open**, **Deferred**.
 | F8 | Lists add item, failure | Text cleared even when the add fails | Keep text on failure | **Fixed** (no dedicated test) |
 | F9 | Meals replace | Removes old meal before adding new; failure loses both, error hides whole grid | Add then remove; banner | **Fixed** — add-then-remove; toasts instead of page error (no dedicated test) |
 | F11 | Routines edits / Merge | `false` returns never surfaced; Merge deletes look-alikes in one tap | Toast; confirm | **Fixed** — toasts; Merge confirm (no dedicated test) |
-| F12 | Family member delete | Tasks unassigned before the delete; failure leaves them unassigned | Unassign only after success | **Partly fixed** — the FK forbids deleting first, so tasks are unassigned then re-assigned if the delete fails; `assigned_to_all` still keeps the removed member (open) |
-| F13 | Contacts | Missing contact = endless spinner; delete navigates away on failure | "Not found"; stay on failure | **Mostly fixed** — "Contact not found"; failed delete restores the row, but the page still navigates away optimistically (open) |
+| F12 | Family member delete | Tasks unassigned before the delete; failure leaves them unassigned | Unassign only after success | **Fixed in #57** — also cleared from `assigned_to_all`; each row confirmed (an RLS-skipped row stops the removal); both restored on failure. Scope not re-derived (access change). `useFamilyMembers.test.ts` |
+| F13 | Contacts | Missing contact = endless spinner; delete navigates away on failure | "Not found"; stay on failure | **Fixed in #57** — "Contact not found"; delete is no longer optimistic, so a failure keeps the page and its confirmation. `useContacts.test.ts`, `ContactViewRedesign.delete.test.tsx` |
 | F16 | Calendar setup wizard | Deletes all mappings, then inserts unchecked | Never leave zero mappings on failure | **Fixed** — prior mappings restored on insert failure (no dedicated test) |
 | A1 | Keyboard: portalled menus | Detail ⋯ menu, domain switcher, reschedule, fate menu never take focus; Escape on ⋯ closes the whole panel | Focus in, Escape closes menu only, focus returns | **Fixed** — `usePopoverFocus` (+test); Rendered ✓ domain menu focus/Escape, panel ⋯ menu Escape keeps panel |
 | A3 | Detail panel | Unlabelled `<aside>`, focus stays on row, no restore; full-screen on phone | Named region/dialog with focus management | **Fixed** — Rendered ✓ desktop focus in/out; phone dialog above tab bar |
@@ -145,13 +145,42 @@ errors on changed files (existing warnings remain); production build passed.
 Rendered checks were on `vite preview` against production data in the test
 household, desktop 1316px window plus same-origin 390px / 830px frames.
 
+## Production smoke test — September 23 (aee87c02)
+
+On app.symphony-os.com in the test household (Alex Chen), against the QA Review Drop item. Failures were simulated inside the page only (a fetch override returning 500 for task writes); the database was checked before and after.
+
+| Check | Result |
+| --- | --- |
+| Confirmed move: This week → life-area question → Family | Pass. "Sent to This Week" with Undo; database showed week + Family + one open week commitment |
+| Undo window | The 10-second notice expired while the database was being queried. The item was returned to baseline with a targeted database update (commitment marked removed, row to Inbox/unclassified/individual scope), which is what Undo writes |
+| Unconfirmed move (task write failing) | Pass. "Couldn't confirm the move to This Week" with Retry and Undo; the row stayed; one failed write |
+| Retry with writes working | Pass. "Sent to This Week"; task and commitment written |
+| Undo with writes failing | Pass. "Couldn't undo that move" with Retry |
+| Retry Undo with writes working | Pass. Row back; database exactly at baseline (Inbox, unclassified, individual, no open commitments) |
+| Cancelled: Today → decline life-area question | Pass. Zero writes; row back; no notice |
+| Phone (390px frame): Today header | Pass. One row (tabs, Goals, Filters, ⋯); no domain row; date at 151px |
+| Phone: Filters sheet | Pass. Focus inside; Escape closes |
+| Phone: More sheet → Notes; tab bar → Inbox | Pass. 12 destinations; navigation works; no horizontal scroll; Inbox rows show Today / This week / Someday / More |
+
+## Device and VoiceOver script (needs Scott — not done by the agent)
+
+On an iPhone, with the test household signed in at app.symphony-os.com:
+
+1. **Today header.** The date should be visible without scrolling. Tap Filters, turn off Family, tap Done: the Filters button shows a dot and the day says filters are on. Tap "Show everything".
+2. **Add.** Tap +: "Plan from paper" should be offered below the photo option.
+3. **More.** Every destination opens, and swipe-down or tapping outside closes the sheet.
+4. **Inbox.** Tap Today / This week / Someday on a QA row, then Undo. Open ⋯: the whole menu should be reachable by scrolling. Select two rows: the toolbar sits above the tab bar and the + button.
+5. **VoiceOver** (Settings → Accessibility → VoiceOver):
+   - Swipe through a Today row: the title should read as a button, not a toggle, and double-tap opens the detail.
+   - The detail panel is announced as a dialog; its close button is reachable.
+   - A "Sent to …" notice is announced.
+   - In ⋯ menus, focus lands on the first item, and a two-finger scrub (Escape) closes only the menu.
+
+Report anything that differs; each step names what should happen.
+
 ## Remaining gaps
 
-- D1 and D2 are implemented to Scott's direction and await his review. Week/Month phone headers keep the separate domain row; only Today was changed.
-- Open items: F12 `assigned_to_all`, F13 optimistic contact navigation, L1–L7,
-  ~60 placeholder-only inputs on lower-traffic screens, desktop row semantics (L4).
-- Failed-save paths other than ⌘K note were verified by unit tests only.
-- Real-device / VoiceOver pass; the 390px checks used a same-origin frame in
-  desktop Chrome, not a phone.
-- Not deployed. Fresh-user research, cross-account privacy and provider sync
-  remain out of scope and unclaimed.
+- Open items: L1–L7, ~60 placeholder-only inputs on lower-traffic screens, desktop row semantics (L4). Week/Month phone headers keep the separate domain row (by decision).
+- Real-device and VoiceOver pass (script above).
+- Cross-account behaviour of member removal (whether RLS lets one household member edit the other's tasks) is detected and reported, not verified with two real accounts.
+- Fresh-user research, cross-account privacy and provider sync remain out of scope and unclaimed.
