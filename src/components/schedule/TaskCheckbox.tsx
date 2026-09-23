@@ -41,6 +41,15 @@ export const TaskCheckbox = memo(function TaskCheckbox({
   return (
     <button
       {...handlers}
+      type="button"
+      // Completing is not opening: the click must not reach the row, whose
+      // own click opens Details. Mouse and touch complete through the
+      // press handlers above; a keyboard click (Enter/Space, detail 0) has no
+      // press, so it completes here.
+      onClick={(e) => {
+        e.stopPropagation()
+        if (e.detail === 0) onToggleComplete()
+      }}
       className={`touch-target flex items-center justify-center -m-2 p-2 ${className}`}
       aria-label={label}
     >

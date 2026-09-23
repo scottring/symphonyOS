@@ -5,6 +5,7 @@ import type { Routine, RecurrencePattern, RoutineVisibility, PrepFollowupTemplat
 import { matchesRecurrenceForDate, type LastCompletionMap } from '@/lib/routineUtils'
 import { scopeForDomain, memberForAuthUser } from '@/lib/scope'
 import { onRealtimeResumed } from '@/lib/realtime/keepAlive'
+import { onInstancesChanged } from '@/lib/instancesChangedSignal'
 
 // ── Same-tab sync ────────────────────────────────────────────────────────────
 //
@@ -295,6 +296,11 @@ export function useRoutines() {
     fetchRoutines()
     fetchLastCompletions()
   }, [fetchRoutines, fetchLastCompletions])
+
+  // A completion elsewhere in the tab changes when each routine was last
+  // done, which decides whether a weekend-window routine still shows. The
+  // map used to load once, so a tick was only reflected after a reload.
+  useEffect(() => onInstancesChanged(() => { void fetchLastCompletions() }), [fetchLastCompletions])
 
   // Writes from OTHER instances in this tab, and from other tabs/devices.
   useEffect(() => {

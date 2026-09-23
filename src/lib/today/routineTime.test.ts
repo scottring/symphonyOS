@@ -68,6 +68,17 @@ describe('resolveRoutineTime', () => {
     }
   })
 
+  // An untimed routine has no rule slot to return to, so its placed time is
+  // the only home it has once it is done — without it the ticked occurrence
+  // dropped off Today entirely.
+  it('keeps an untimed routine at its placed time once completed or skipped', () => {
+    for (const status of ['completed', 'skipped'] as const) {
+      const i = instance({ status, deferred_to: at(14, 30).toISOString() })
+      expect(resolveRoutineTime({ time_of_day: null }, i, viewedDate)).toEqual(at(14, 30))
+      expect(resolveRoutineTime({ time_of_day: null }, i, new Date(2026, 7, 2))).toBeNull()
+    }
+  })
+
   it('parses a rule time carrying seconds', () => {
     // Postgres `time` columns come back as "19:30:00", not "19:30".
     expect(resolveRoutineTime({ time_of_day: '19:30:00' }, undefined, viewedDate))
