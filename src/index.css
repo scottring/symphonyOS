@@ -21,20 +21,20 @@
      Ink blue, paper white, vermilion accent
      --------------------------------------------------------------------------- */
 
-  /* Near-neutral paper and brown-black ink (the phone's text colours). The
-     light steps carry no cream: fills and rules stay neutral on the #FBFBFA
-     page (Scott, 2026-09-23). Colour belongs to actions and people. */
-  --color-neutral-50: #f6f6f4;
-  --color-neutral-100: #efeeeb;
-  --color-neutral-200: #e4e2de;
-  --color-neutral-300: #cbc7c1;
-  --color-neutral-400: #958879;
-  --color-neutral-500: #7d7066;
-  --color-neutral-600: #6b5e54;
-  --color-neutral-700: #4e433b;
-  --color-neutral-800: #372e28;
-  --color-neutral-900: #2c2520;
-  --color-neutral-950: #1e1915;
+  /* Neutral grays on the #FBFBFA page — no cream, no brown or red cast in
+     text, fills or rules (Scott, 2026-09-23). Colour belongs to the place
+     accent, the life areas and people. */
+  --color-neutral-50: #f6f6f5;
+  --color-neutral-100: #efefee;
+  --color-neutral-200: #e4e4e2;
+  --color-neutral-300: #cacac7;
+  --color-neutral-400: #93938f;
+  --color-neutral-500: #737370;
+  --color-neutral-600: #5c5c59;
+  --color-neutral-700: #454542;
+  --color-neutral-800: #30302e;
+  --color-neutral-900: #232322;
+  --color-neutral-950: #171716;
 
   /* Primary + accent — the place's colour (Woodsy Cabin by default: forest
      green). Selected tabs, primary actions, links and small highlights draw
@@ -160,13 +160,13 @@
      SHADOWS - More dramatic, layered
      --------------------------------------------------------------------------- */
 
-  /* Warm-tinted, matching the phone's card shadow (#2C2520 at 6%). */
-  --shadow-sm: 0 1px 2px 0 rgb(44 37 32 / 0.05);
-  --shadow-md: 0 4px 8px -2px rgb(44 37 32 / 0.07), 0 2px 4px -1px rgb(44 37 32 / 0.05);
-  --shadow-lg: 0 12px 24px -4px rgb(44 37 32 / 0.09), 0 4px 8px -2px rgb(44 37 32 / 0.05);
-  --shadow-xl: 0 24px 48px -8px rgb(44 37 32 / 0.13), 0 8px 16px -4px rgb(44 37 32 / 0.07);
-  --shadow-card: 0 0 0 1px rgb(228 226 222), 0 2px 8px rgb(44 37 32 / 0.06);
-  --shadow-elevated: 0 0 0 1px rgb(228 226 222 / 0.9), 0 8px 24px -4px rgb(44 37 32 / 0.1);
+  /* Neutral shadows to match the neutral page. */
+  --shadow-sm: 0 1px 2px 0 rgb(35 35 34 / 0.05);
+  --shadow-md: 0 4px 8px -2px rgb(35 35 34 / 0.07), 0 2px 4px -1px rgb(35 35 34 / 0.05);
+  --shadow-lg: 0 12px 24px -4px rgb(35 35 34 / 0.09), 0 4px 8px -2px rgb(35 35 34 / 0.05);
+  --shadow-xl: 0 24px 48px -8px rgb(35 35 34 / 0.13), 0 8px 16px -4px rgb(35 35 34 / 0.07);
+  --shadow-card: 0 0 0 1px rgb(228 226 222), 0 2px 8px rgb(35 35 34 / 0.06);
+  --shadow-elevated: 0 0 0 1px rgb(228 226 222 / 0.9), 0 8px 24px -4px rgb(35 35 34 / 0.1);
 
 
   /* ---------------------------------------------------------------------------
@@ -1852,7 +1852,7 @@ html.desktop-shell a {
   position: absolute; top: 100%; left: 0; z-index: 40;
   min-width: 210px; max-height: 65vh; overflow-y: auto;
   background: var(--color-bg-elevated); border: 1px solid var(--color-neutral-200);
-  box-shadow: 0 8px 24px #2c25200f; padding: 8px;
+  box-shadow: 0 8px 24px #2323220f; padding: 8px;
 }
 .page-navigation-utilities .page-navigation-popover { left: auto; right: 0; }
 .page-navigation-popover button { display: flex; width: 100%; padding: 9px 12px; text-align: left; }
@@ -1883,12 +1883,12 @@ html.desktop-shell a {
 }
 .desktop-footer-backdrop {
   position: fixed; inset: 0; z-index: 60; display: grid; place-items: center;
-  background: #2c252022; padding: 16px;
+  background: #23232222; padding: 16px;
 }
 .desktop-footer-dialog {
   width: min(440px, 100%); max-height: 80vh; overflow-y: auto;
   background: var(--color-bg-elevated); border: 1px solid var(--color-neutral-200);
-  box-shadow: 0 12px 32px #2c252018; padding: 20px 24px; font-size: 14px; color: var(--color-neutral-700);
+  box-shadow: 0 12px 32px #23232218; padding: 20px 24px; font-size: 14px; color: var(--color-neutral-700);
 }
 .desktop-footer-dialog:focus { outline: none; }
 .desktop-footer-dialog h2 { font-size: 17px; font-weight: 600; color: var(--color-neutral-950); }
@@ -1921,10 +1921,10 @@ html.desktop-shell a {
 
 /* Review drawer on desktop: a paper sheet in ink. Phones keep their sheet. */
 @media (min-width: 768px) {
-  .review-backdrop { background: #2c252022; backdrop-filter: none; }
+  .review-backdrop { background: #23232222; backdrop-filter: none; }
   .review-sheet {
     border-radius: 0; border: 1px solid var(--color-neutral-200);
-    box-shadow: 0 12px 32px #2c252018; background: #fff;
+    box-shadow: 0 12px 32px #23232218; background: #fff;
   }
   .review-sheet .review-icon { width: auto; height: auto; background: none; color: var(--color-neutral-950); }
   .review-sheet h2 { color: var(--color-neutral-950); }
@@ -1991,7 +1991,7 @@ html.desktop-shell a {
 .plan-period-controls { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .plan-period-navigation { display: flex; gap: 2px; padding: 3px; border-radius: 7px; background: var(--color-neutral-100); }
 .plan-period-navigation a { padding: 6px 11px; color: var(--color-neutral-500); font-size: 13px; border-radius: 5px; white-space: nowrap; }
-.plan-period-navigation a.is-current { color: var(--color-primary-700); background: white; box-shadow: 0 1px 3px rgb(44 37 32 / 0.08); font-weight: 600; }
+.plan-period-navigation a.is-current { color: var(--color-primary-700); background: white; box-shadow: 0 1px 3px rgb(35 35 34 / 0.08); font-weight: 600; }
 .plan-range-control { display: flex; align-items: center; font-size: 12px; color: var(--color-neutral-500); }
 .plan-range-control select { background: transparent; padding: 6px 4px; max-width: 130px; }
 .task-chooser-control { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
@@ -2023,7 +2023,7 @@ div.chooser-action-group { overflow: visible !important; }
 /* Week planning: one source shelf, commitments, then the days. */
 .shelf-sources { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 3px; padding: 4px; margin-top: 18px; background: var(--color-neutral-100); border-radius: 8px; }
 .shelf-sources button { padding: 8px 2px; font-size: 12px; color: var(--color-neutral-500); border-radius: 5px; }
-.shelf-sources button[aria-pressed="true"] { background: white; color: var(--color-primary-700); box-shadow: 0 1px 3px rgb(44 37 32 / 0.08); font-weight: 600; }
+.shelf-sources button[aria-pressed="true"] { background: white; color: var(--color-primary-700); box-shadow: 0 1px 3px rgb(35 35 34 / 0.08); font-weight: 600; }
 .shelf-search { width: 100%; margin-top: 16px; padding: 9px 10px; border: 1px solid var(--color-neutral-200); border-radius: 6px; font-size: 13px; background: white; }
 .shelf-intro { margin: 14px 0; font-size: 12px; line-height: 1.6; color: var(--color-neutral-500); }
 .shelf-intro a { display: block; margin-top: 4px; color: var(--color-neutral-900); }
@@ -2158,7 +2158,7 @@ div.chooser-action-group { overflow: visible !important; }
   display: flex; flex-direction: column;
   background: var(--color-bg-elevated);
   border-left: 1px solid var(--color-neutral-200);
-  box-shadow: -8px 0 24px rgb(44 37 32 / 0.05);
+  box-shadow: -8px 0 24px rgb(35 35 34 / 0.05);
 }
 .side-column-bar {
   display: flex; align-items: center; justify-content: space-between; gap: 12px;
@@ -2175,7 +2175,7 @@ div.chooser-action-group { overflow: visible !important; }
 }
 .native-segmented > button[aria-pressed="true"], .side-column-switch > button[aria-selected="true"] {
   background: #fff; border-color: var(--color-neutral-200); font-weight: 600; color: var(--color-primary-700);
-  box-shadow: 0 1px 2px rgb(44 37 32 / 0.06);
+  box-shadow: 0 1px 2px rgb(35 35 34 / 0.06);
 }
 .side-column-switch > button:disabled { color: var(--color-neutral-300); cursor: default; }
 .side-column-close {
