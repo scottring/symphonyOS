@@ -100,18 +100,30 @@ describe('useContacts', () => {
       mockSupabaseData.push(alice)
       const { result } = renderHook(() => useContacts())
       await waitFor(() => expect(result.current.contacts).toHaveLength(1))
-      mockEq.mockReturnValueOnce(Promise.resolve({ error: { message: 'permission denied' } }))
+      mockEq.mockReturnValueOnce({ select: () => Promise.resolve({ data: null, error: { message: 'permission denied' } }) })
       let deleted: boolean | undefined
       await act(async () => { deleted = await result.current.deleteContact('1') })
       expect(deleted).toBe(false)
       expect(result.current.contacts.map((c) => c.name)).toEqual(['Alice'])
     })
 
-    it('removes the contact only after the delete succeeds', async () => {
+    // RLS answers a forbidden DELETE with zero rows and NO error.
+    it('treats a delete that removed zero rows as a failure', async () => {
       mockSupabaseData.push(alice)
       const { result } = renderHook(() => useContacts())
       await waitFor(() => expect(result.current.contacts).toHaveLength(1))
-      mockEq.mockReturnValueOnce(Promise.resolve({ error: null }))
+      mockEq.mockReturnValueOnce({ select: () => Promise.resolve({ data: [], error: null }) })
+      let deleted: boolean | undefined
+      await act(async () => { deleted = await result.current.deleteContact('1') })
+      expect(deleted).toBe(false)
+      expect(result.current.contacts.map((c) => c.name)).toEqual(['Alice'])
+    })
+
+    it('removes the contact only after the delete is confirmed', async () => {
+      mockSupabaseData.push(alice)
+      const { result } = renderHook(() => useContacts())
+      await waitFor(() => expect(result.current.contacts).toHaveLength(1))
+      mockEq.mockReturnValueOnce({ select: () => Promise.resolve({ data: [{ id: '1' }], error: null }) })
       let deleted: boolean | undefined
       await act(async () => { deleted = await result.current.deleteContact('1') })
       expect(deleted).toBe(true)

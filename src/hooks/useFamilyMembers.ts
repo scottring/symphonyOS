@@ -138,6 +138,8 @@ export function useFamilyMembers() {
   }, [])
 
   const deleteMember = useCallback(async (id: string) => {
+    /** A reason written for people (Settings shows it); raw DB errors are not. */
+    const explain = (message: string) => Object.assign(new Error(message), { userFacing: true })
     // A member appears on tasks two ways: `assigned_to` (a foreign key with no
     // ON DELETE, so it must be cleared before the row can go) and the
     // `assigned_to_all` list (no key at all, so a delete used to leave the
@@ -147,18 +149,21 @@ export function useFamilyMembers() {
     // see a task is an access change, not part of removing a person.
     const cleared: string[] = []
     const listsChanged: { id: string; list: string[] }[] = []
-    /** Put back what changed; false if any piece couldn't be restored. */
-    const restore = async (): Promise<boolean> => {
-      let ok = true
+    /** Put back what changed. Returns the task ids that could NOT be
+     *  confirmed restored: an error, or an UPDATE that RLS silently turned into
+     *  zero rows, both count — "no error" is not "restored". */
+    const restore = async (): Promise<string[]> => {
+      const unrestored: string[] = []
       for (const row of listsChanged) {
-        const { error } = await supabase.from('tasks').update({ assigned_to_all: row.list }).eq('id', row.id)
-        if (error) ok = false
+        const { data, error } = await supabase.from('tasks').update({ assigned_to_all: row.list }).eq('id', row.id).select('id')
+        if (error || !((data ?? []) as { id: string }[]).some((t) => t.id === row.id)) unrestored.push(row.id)
       }
       if (cleared.length > 0) {
-        const { error } = await supabase.from('tasks').update({ assigned_to: id }).in('id', cleared)
-        if (error) ok = false
+        const { data, error } = await supabase.from('tasks').update({ assigned_to: id }).in('id', cleared).select('id')
+        const back = new Set(((data ?? []) as { id: string }[]).map((t) => t.id))
+        for (const taskId of cleared) if (error || !back.has(taskId)) unrestored.push(taskId)
       }
-      return ok
+      return [...new Set(unrestored)]
     }
     try {
       const { data: assigned, error: readError } = await supabase
@@ -183,7 +188,7 @@ export function useFamilyMembers() {
         cleared.push(...((done ?? []) as { id: string }[]).map((t) => t.id))
         if (unassignError) throw unassignError
         if (cleared.length !== taskIds.length) {
-          throw new Error(`${taskIds.length - cleared.length} of their tasks couldn't be unassigned`)
+          throw explain(`${taskIds.length - cleared.length} of their tasks couldn't be unassigned`)
         }
       }
 
@@ -195,21 +200,36 @@ export function useFamilyMembers() {
           .eq('id', row.id)
           .select('id')
         if (listError) throw listError
-        if (!done || done.length === 0) throw new Error("A shared task still lists them and couldn't be updated")
+        if (!done || done.length === 0) throw explain("A shared task still lists them and couldn't be updated")
         listsChanged.push({ id: row.id, list })
       }
 
-      const { error } = await supabase
+      // Confirm the member row itself went: RLS turns a forbidden DELETE into
+      // zero rows with no error, which used to read as success.
+      const { data: gone, error } = await supabase
         .from('family_members')
         .delete()
         .eq('id', id)
+        .select('id')
+      // 23503: a task this user cannot see (someone's private task) still has
+      // them as its assignee — verified with two accounts, 2026-09-23.
+      if (error?.code === '23503') {
+        throw explain("They're still the assignee on a task you can't see — someone's private task. Ask its owner to reassign it first")
+      }
       if (error) throw error
+      if (!((gone ?? []) as { id: string }[]).some((m) => m.id === id)) {
+        throw explain("They couldn't be removed — you may not have permission")
+      }
       setMembers(prev => prev.filter(m => m.id !== id))
     } catch (err) {
-      const restored = await restore()
+      const unrestored = await restore()
       console.error('Error deleting family member:', err)
-      // The caller says "nothing was changed" only when that is true.
-      throw Object.assign(err instanceof Error ? err : new Error(String((err as { message?: string })?.message ?? err)), { restored })
+      // The caller says "nothing was changed" only when every change was
+      // confirmed undone; otherwise it says how many tasks to check.
+      throw Object.assign(err instanceof Error ? err : new Error(String((err as { message?: string })?.message ?? err)), {
+        restored: unrestored.length === 0,
+        unrestoredTaskIds: unrestored,
+      })
     }
   }, [])
 
