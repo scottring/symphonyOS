@@ -1231,7 +1231,7 @@ export function TodayView({
       type="button"
       onClick={() => setAddOpenDay(addOpen ? null : localYmd(viewedDate))}
       aria-expanded={addOpen}
-      className="daybook-add-task inline-flex items-center gap-1 py-1.5 text-[13px] font-medium text-sage-600 transition-colors hover:text-sage-700"
+      className="daybook-add-task inline-flex items-center gap-1 py-1.5 text-[13px] font-medium text-primary-600 transition-colors hover:text-primary-700"
     >
       <Plus className="h-3.5 w-3.5" aria-hidden="true" />
       Add task

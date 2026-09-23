@@ -21,12 +21,13 @@
      Ink blue, paper white, vermilion accent
      --------------------------------------------------------------------------- */
 
-  /* Warm ivory paper and brown-black ink — the native iPhone palette
-     (NordicColors.swift). Color belongs to actions and people. */
-  --color-neutral-50: #faf7f2;
-  --color-neutral-100: #f5efe7;
-  --color-neutral-200: #e8e0d8;
-  --color-neutral-300: #cfc4b9;
+  /* Near-neutral paper and brown-black ink (the phone's text colours). The
+     light steps carry no cream: fills and rules stay neutral on the #FBFBFA
+     page (Scott, 2026-09-23). Colour belongs to actions and people. */
+  --color-neutral-50: #f6f6f4;
+  --color-neutral-100: #efeeeb;
+  --color-neutral-200: #e4e2de;
+  --color-neutral-300: #cbc7c1;
   --color-neutral-400: #958879;
   --color-neutral-500: #7d7066;
   --color-neutral-600: #6b5e54;
@@ -35,28 +36,31 @@
   --color-neutral-900: #2c2520;
   --color-neutral-950: #1e1915;
 
-  /* Primary — ink. Buttons are ink, as on the phone. */
-  --color-primary-50: #f5efe7;
-  --color-primary-100: #f0ebe3;
-  --color-primary-200: #e0d6cb;
-  --color-primary-300: #c4b6a8;
-  --color-primary-400: #8f8074;
-  --color-primary-500: #4e433b;
-  --color-primary-600: #2c2520;
-  --color-primary-700: #241e1a;
-  --color-primary-800: #1e1915;
-  --color-primary-900: #17130f;
-  --color-primary-950: #0f0c0a;
-
-  /* Accent — amber, reserved for small directional marks (Today, badges). */
-  --color-accent-50: #fffbeb;
-  --color-accent-100: #fef3c7;
-  --color-accent-200: #fde68a;
-  --color-accent-300: #fcd34d;
-  --color-accent-400: #f59e0b;
-  --color-accent-500: #d97706;
-  --color-accent-600: #b45309;
-  --color-accent-700: #92400e;
+  /* Primary + accent — the place's colour (Woodsy Cabin by default: forest
+     green). Selected tabs, primary actions, links and small highlights draw
+     from it; the page itself stays neutral. Other places override these under
+     :root[data-place] below. */
+  --color-primary-50: hsl(150 19% 97%);
+  --color-primary-100: hsl(150 19% 93%);
+  --color-primary-200: hsl(150 20% 85%);
+  --color-primary-300: hsl(150 24% 72%);
+  --color-primary-400: hsl(150 29% 55%);
+  --color-primary-500: hsl(150 34% 30%);
+  --color-primary-600: hsl(150 34% 24%);
+  --color-primary-700: hsl(150 34% 19%);
+  --color-primary-800: hsl(150 34% 14%);
+  --color-primary-900: hsl(150 34% 9%);
+  --color-primary-950: hsl(150 34% 3%);
+  --color-accent-50: hsl(150 25% 97%);
+  --color-accent-100: hsl(150 25% 93%);
+  --color-accent-200: hsl(150 28% 85%);
+  --color-accent-300: hsl(150 32% 72%);
+  --color-accent-400: hsl(150 39% 55%);
+  --color-accent-500: hsl(150 46% 36%);
+  --color-accent-600: hsl(150 46% 30%);
+  --color-accent-700: hsl(150 46% 25%);
+  --shadow-primary: 0 8px 24px -6px hsl(150 34% 30% / 0.25);
+  --shadow-accent: 0 8px 24px -6px hsl(150 34% 30% / 0.2);
 
   /* Sage - Secondary muted green */
   --color-sage-50: hsl(145 20% 96%);
@@ -161,12 +165,9 @@
   --shadow-md: 0 4px 8px -2px rgb(44 37 32 / 0.07), 0 2px 4px -1px rgb(44 37 32 / 0.05);
   --shadow-lg: 0 12px 24px -4px rgb(44 37 32 / 0.09), 0 4px 8px -2px rgb(44 37 32 / 0.05);
   --shadow-xl: 0 24px 48px -8px rgb(44 37 32 / 0.13), 0 8px 16px -4px rgb(44 37 32 / 0.07);
-  --shadow-card: 0 0 0 1px rgb(232 224 216), 0 2px 8px rgb(44 37 32 / 0.06);
-  --shadow-elevated: 0 0 0 1px rgb(232 224 216 / 0.9), 0 8px 24px -4px rgb(44 37 32 / 0.1);
+  --shadow-card: 0 0 0 1px rgb(228 226 222), 0 2px 8px rgb(44 37 32 / 0.06);
+  --shadow-elevated: 0 0 0 1px rgb(228 226 222 / 0.9), 0 8px 24px -4px rgb(44 37 32 / 0.1);
 
-  /* Colored shadows */
-  --shadow-primary: 0 8px 24px -6px rgb(44 37 32 / 0.2);
-  --shadow-accent: 0 8px 24px -6px rgb(217 119 6 / 0.2);
 
   /* ---------------------------------------------------------------------------
      TRANSITIONS
@@ -179,103 +180,110 @@
 }
 
 /* =============================================================================
-   PLACE THEMES — accent-deep re-tints keyed by html[data-place]
-   Five illustrated "places" (see src/config/places.ts). Each shifts the
-   primary + accent hue families; the paper-white and ink neutrals stay
-   consistent. The default cabin illustration uses the base ink/vermilion
-   palette; explicit alternate place selections retain their accent hues.
+   PLACE THEMES — "Your place" is the theme (Settings → Your place). Each place
+   draws its accent from its illustration; the neutral page, the ink text and
+   the life-area colours never change, so their meaning stays put.
+   Woodsy Cabin (forest green) is the default above.
    ============================================================================= */
 
-/* Densely Urban — steel blue + streetlight amber */
+/* slate blue */
 :root[data-place='urban'] {
-  --color-primary-50: hsl(218 25% 96%);
-  --color-primary-100: hsl(218 24% 90%);
-  --color-primary-200: hsl(218 22% 78%);
-  --color-primary-300: hsl(218 24% 62%);
-  --color-primary-400: hsl(218 30% 45%);
-  --color-primary-500: hsl(218 38% 30%);
-  --color-primary-600: hsl(218 42% 24%);
-  --color-primary-700: hsl(218 44% 20%);
-  --color-primary-800: hsl(218 42% 16%);
-  --color-primary-900: hsl(218 40% 12%);
-  --color-primary-950: hsl(218 42% 7%);
-  --color-accent-50: hsl(38 60% 97%);
-  --color-accent-100: hsl(38 55% 92%);
-  --color-accent-200: hsl(38 50% 82%);
-  --color-accent-300: hsl(38 48% 68%);
-  --color-accent-400: hsl(38 55% 55%);
-  --color-accent-500: hsl(38 60% 44%);
-  --shadow-primary: 0 8px 24px -6px hsl(218 38% 30% / 0.3);
-  --shadow-accent: 0 8px 24px -6px hsl(38 60% 44% / 0.25);
+  --color-primary-50: hsl(215 16% 97%);
+  --color-primary-100: hsl(215 16% 93%);
+  --color-primary-200: hsl(215 18% 85%);
+  --color-primary-300: hsl(215 21% 72%);
+  --color-primary-400: hsl(215 26% 55%);
+  --color-primary-500: hsl(215 30% 36%);
+  --color-primary-600: hsl(215 30% 30%);
+  --color-primary-700: hsl(215 30% 25%);
+  --color-primary-800: hsl(215 30% 20%);
+  --color-primary-900: hsl(215 30% 15%);
+  --color-primary-950: hsl(215 30% 9%);
+  --color-accent-50: hsl(215 23% 97%);
+  --color-accent-100: hsl(215 23% 93%);
+  --color-accent-200: hsl(215 25% 85%);
+  --color-accent-300: hsl(215 29% 72%);
+  --color-accent-400: hsl(215 36% 55%);
+  --color-accent-500: hsl(215 42% 42%);
+  --color-accent-600: hsl(215 42% 36%);
+  --color-accent-700: hsl(215 42% 31%);
+  --shadow-primary: 0 8px 24px -6px hsl(215 30% 36% / 0.25);
+  --shadow-accent: 0 8px 24px -6px hsl(215 30% 36% / 0.2);
 }
 
-/* Small City — dusk violet + sunset rose */
+/* plum */
 :root[data-place='small-city'] {
-  --color-primary-50: hsl(262 25% 96%);
-  --color-primary-100: hsl(262 24% 90%);
-  --color-primary-200: hsl(262 22% 78%);
-  --color-primary-300: hsl(262 24% 62%);
-  --color-primary-400: hsl(262 28% 45%);
-  --color-primary-500: hsl(262 36% 30%);
-  --color-primary-600: hsl(262 40% 24%);
-  --color-primary-700: hsl(262 42% 20%);
-  --color-primary-800: hsl(262 40% 16%);
-  --color-primary-900: hsl(262 38% 12%);
-  --color-primary-950: hsl(262 40% 7%);
-  --color-accent-50: hsl(345 55% 97%);
-  --color-accent-100: hsl(345 50% 92%);
-  --color-accent-200: hsl(345 46% 82%);
-  --color-accent-300: hsl(345 44% 68%);
-  --color-accent-400: hsl(345 45% 55%);
-  --color-accent-500: hsl(345 50% 45%);
-  --shadow-primary: 0 8px 24px -6px hsl(262 36% 30% / 0.3);
-  --shadow-accent: 0 8px 24px -6px hsl(345 50% 45% / 0.25);
+  --color-primary-50: hsl(315 15% 97%);
+  --color-primary-100: hsl(315 15% 93%);
+  --color-primary-200: hsl(315 17% 85%);
+  --color-primary-300: hsl(315 20% 72%);
+  --color-primary-400: hsl(315 24% 55%);
+  --color-primary-500: hsl(315 28% 34%);
+  --color-primary-600: hsl(315 28% 28%);
+  --color-primary-700: hsl(315 28% 23%);
+  --color-primary-800: hsl(315 28% 18%);
+  --color-primary-900: hsl(315 28% 13%);
+  --color-primary-950: hsl(315 28% 7%);
+  --color-accent-50: hsl(315 22% 97%);
+  --color-accent-100: hsl(315 22% 93%);
+  --color-accent-200: hsl(315 24% 85%);
+  --color-accent-300: hsl(315 28% 72%);
+  --color-accent-400: hsl(315 34% 55%);
+  --color-accent-500: hsl(315 40% 40%);
+  --color-accent-600: hsl(315 40% 34%);
+  --color-accent-700: hsl(315 40% 29%);
+  --shadow-primary: 0 8px 24px -6px hsl(315 28% 34% / 0.25);
+  --shadow-accent: 0 8px 24px -6px hsl(315 28% 34% / 0.2);
 }
 
-/* Small Mountain Town — alpine blue + autumn orange */
+/* alpine blue */
 :root[data-place='mountain-town'] {
-  --color-primary-50: hsl(210 30% 96%);
-  --color-primary-100: hsl(210 28% 90%);
-  --color-primary-200: hsl(210 26% 78%);
-  --color-primary-300: hsl(210 28% 62%);
-  --color-primary-400: hsl(210 35% 45%);
-  --color-primary-500: hsl(210 45% 30%);
-  --color-primary-600: hsl(210 50% 24%);
-  --color-primary-700: hsl(210 52% 20%);
-  --color-primary-800: hsl(210 50% 16%);
-  --color-primary-900: hsl(210 48% 12%);
-  --color-primary-950: hsl(210 50% 7%);
-  --color-accent-50: hsl(28 60% 97%);
-  --color-accent-100: hsl(28 55% 92%);
-  --color-accent-200: hsl(28 50% 82%);
-  --color-accent-300: hsl(28 48% 68%);
-  --color-accent-400: hsl(28 55% 55%);
-  --color-accent-500: hsl(28 60% 45%);
-  --shadow-primary: 0 8px 24px -6px hsl(210 45% 30% / 0.3);
-  --shadow-accent: 0 8px 24px -6px hsl(28 60% 45% / 0.25);
+  --color-primary-50: hsl(203 29% 97%);
+  --color-primary-100: hsl(203 29% 93%);
+  --color-primary-200: hsl(203 31% 85%);
+  --color-primary-300: hsl(203 36% 72%);
+  --color-primary-400: hsl(203 44% 55%);
+  --color-primary-500: hsl(203 52% 34%);
+  --color-primary-600: hsl(203 52% 28%);
+  --color-primary-700: hsl(203 52% 23%);
+  --color-primary-800: hsl(203 52% 18%);
+  --color-primary-900: hsl(203 52% 13%);
+  --color-primary-950: hsl(203 52% 7%);
+  --color-accent-50: hsl(203 35% 97%);
+  --color-accent-100: hsl(203 35% 93%);
+  --color-accent-200: hsl(203 38% 85%);
+  --color-accent-300: hsl(203 45% 72%);
+  --color-accent-400: hsl(203 54% 55%);
+  --color-accent-500: hsl(203 64% 40%);
+  --color-accent-600: hsl(203 64% 34%);
+  --color-accent-700: hsl(203 64% 29%);
+  --shadow-primary: 0 8px 24px -6px hsl(203 52% 34% / 0.25);
+  --shadow-accent: 0 8px 24px -6px hsl(203 52% 34% / 0.2);
 }
 
-/* Farm — barn red + wheat gold */
+/* barn red */
 :root[data-place='farm'] {
-  --color-primary-50: hsl(10 35% 96%);
-  --color-primary-100: hsl(10 33% 90%);
-  --color-primary-200: hsl(10 30% 78%);
-  --color-primary-300: hsl(10 32% 62%);
-  --color-primary-400: hsl(10 40% 46%);
-  --color-primary-500: hsl(10 48% 32%);
-  --color-primary-600: hsl(10 52% 26%);
-  --color-primary-700: hsl(10 54% 21%);
-  --color-primary-800: hsl(10 52% 17%);
-  --color-primary-900: hsl(10 50% 13%);
-  --color-primary-950: hsl(10 52% 8%);
-  --color-accent-50: hsl(44 60% 97%);
-  --color-accent-100: hsl(44 55% 92%);
-  --color-accent-200: hsl(44 50% 82%);
-  --color-accent-300: hsl(44 48% 68%);
-  --color-accent-400: hsl(44 55% 52%);
-  --color-accent-500: hsl(44 60% 42%);
-  --shadow-primary: 0 8px 24px -6px hsl(10 48% 32% / 0.3);
-  --shadow-accent: 0 8px 24px -6px hsl(44 60% 42% / 0.25);
+  --color-primary-50: hsl(6 29% 97%);
+  --color-primary-100: hsl(6 29% 93%);
+  --color-primary-200: hsl(6 31% 85%);
+  --color-primary-300: hsl(6 36% 72%);
+  --color-primary-400: hsl(6 44% 55%);
+  --color-primary-500: hsl(6 52% 38%);
+  --color-primary-600: hsl(6 52% 32%);
+  --color-primary-700: hsl(6 52% 27%);
+  --color-primary-800: hsl(6 52% 22%);
+  --color-primary-900: hsl(6 52% 17%);
+  --color-primary-950: hsl(6 52% 11%);
+  --color-accent-50: hsl(6 35% 97%);
+  --color-accent-100: hsl(6 35% 93%);
+  --color-accent-200: hsl(6 38% 85%);
+  --color-accent-300: hsl(6 45% 72%);
+  --color-accent-400: hsl(6 54% 55%);
+  --color-accent-500: hsl(6 64% 44%);
+  --color-accent-600: hsl(6 64% 38%);
+  --color-accent-700: hsl(6 64% 33%);
+  --shadow-primary: 0 8px 24px -6px hsl(6 52% 38% / 0.25);
+  --shadow-accent: 0 8px 24px -6px hsl(6 52% 38% / 0.2);
 }
 
 /* =============================================================================
@@ -1830,7 +1838,7 @@ html.desktop-shell a {
   text-decoration: none;
 }
 .page-navigation a:hover, .page-navigation button:hover, .page-navigation .is-current { color: var(--color-neutral-950); }
-.page-navigation .is-current { font-weight: 600; }
+.page-navigation .is-current, .page-navigation [aria-current="page"] { font-weight: 600; color: var(--color-primary-700); }
 .page-navigation-menu { position: relative; }
 /* Today + its plan pin: one destination, with the pin toggle tucked beside it. */
 .page-navigation-today { display: inline-flex; align-items: center; gap: 4px; }
@@ -1983,7 +1991,7 @@ html.desktop-shell a {
 .plan-period-controls { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .plan-period-navigation { display: flex; gap: 2px; padding: 3px; border-radius: 7px; background: var(--color-neutral-100); }
 .plan-period-navigation a { padding: 6px 11px; color: var(--color-neutral-500); font-size: 13px; border-radius: 5px; white-space: nowrap; }
-.plan-period-navigation a.is-current { color: var(--color-neutral-900); background: white; box-shadow: 0 1px 3px #233b5815; font-weight: 600; }
+.plan-period-navigation a.is-current { color: var(--color-primary-700); background: white; box-shadow: 0 1px 3px rgb(44 37 32 / 0.08); font-weight: 600; }
 .plan-range-control { display: flex; align-items: center; font-size: 12px; color: var(--color-neutral-500); }
 .plan-range-control select { background: transparent; padding: 6px 4px; max-width: 130px; }
 .task-chooser-control { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
@@ -2015,7 +2023,7 @@ div.chooser-action-group { overflow: visible !important; }
 /* Week planning: one source shelf, commitments, then the days. */
 .shelf-sources { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 3px; padding: 4px; margin-top: 18px; background: var(--color-neutral-100); border-radius: 8px; }
 .shelf-sources button { padding: 8px 2px; font-size: 12px; color: var(--color-neutral-500); border-radius: 5px; }
-.shelf-sources button[aria-pressed="true"] { background: white; color: var(--color-neutral-900); box-shadow: 0 1px 3px #18304915; font-weight: 600; }
+.shelf-sources button[aria-pressed="true"] { background: white; color: var(--color-primary-700); box-shadow: 0 1px 3px rgb(44 37 32 / 0.08); font-weight: 600; }
 .shelf-search { width: 100%; margin-top: 16px; padding: 9px 10px; border: 1px solid var(--color-neutral-200); border-radius: 6px; font-size: 13px; background: white; }
 .shelf-intro { margin: 14px 0; font-size: 12px; line-height: 1.6; color: var(--color-neutral-500); }
 .shelf-intro a { display: block; margin-top: 4px; color: var(--color-neutral-900); }
@@ -2159,14 +2167,14 @@ div.chooser-action-group { overflow: visible !important; }
 }
 .native-segmented, .side-column-switch {
   display: inline-flex; gap: 4px; padding: 3px; border-radius: 999px;
-  background: rgb(240 235 227 / 0.6);
+  background: var(--color-neutral-100);
 }
 .native-segmented > button, .side-column-switch > button {
   padding: 6px 16px; border-radius: 999px; border: 1px solid transparent;
   font-size: 13px; color: var(--color-neutral-600); background: none;
 }
 .native-segmented > button[aria-pressed="true"], .side-column-switch > button[aria-selected="true"] {
-  background: #fff; border-color: var(--color-neutral-200); font-weight: 600; color: var(--color-neutral-900);
+  background: #fff; border-color: var(--color-neutral-200); font-weight: 600; color: var(--color-primary-700);
   box-shadow: 0 1px 2px rgb(44 37 32 / 0.06);
 }
 .side-column-switch > button:disabled { color: var(--color-neutral-300); cursor: default; }
@@ -2178,3 +2186,7 @@ div.chooser-action-group { overflow: visible !important; }
 .side-column-body { position: relative; flex: 1; min-height: 0; }
 .side-column-pane { position: absolute; inset: 0; overflow: auto; }
 .side-column-pane[hidden] { display: none; }
+/* Inside the column the column's own bar closes the pane, and the pane is
+   the frame: no second × and no card-in-a-card. */
+.side-column .panel-close { display: none; }
+.side-column .panel-shell { max-width: none; border: 0; border-radius: 0; box-shadow: none; }

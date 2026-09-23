@@ -127,7 +127,7 @@ export function WeekPlanHost({ tasks, weekStart, meId, isPast, children, tools }
             {sessionReadError
               ? <>Couldn&rsquo;t check whether {periodLabel} is planned. <button type="button" onClick={reloadSession} className="font-semibold text-primary-700 hover:underline">Try again</button></>
               : savedSession
-                ? <span className="font-semibold text-sage-600">Planned {savedSession.at.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
+                ? <span className="font-semibold text-primary-600">Planned {savedSession.at.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
                 : current.length ? `${current.length} tasks on this week’s list` : 'Start with a few commitments'}
           </p>
 

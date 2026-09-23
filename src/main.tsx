@@ -64,17 +64,10 @@ window.addEventListener('vite:preloadError', (e) => {
   e.preventDefault()
 })
 
-// Load theme from localStorage, default to Nordic Journal
-const THEME_STORAGE_KEY = 'symphony-theme'
-const savedTheme = localStorage.getItem(THEME_STORAGE_KEY)
-const ACTIVE_THEME = (savedTheme === 'kinetic' || savedTheme === 'nordic') ? savedTheme : 'nordic'
-
-// Conditionally import CSS based on active theme
-if (ACTIVE_THEME === 'kinetic') {
-  await import('./kinetic-clarity.css')
-} else {
-  await import('./index.css')
-}
+// One design system. "Your place" (Settings) is the only theme choice; the
+// old Appearance switch (Kinetic Clarity) was retired 2026-09-23, so a saved
+// 'kinetic' preference no longer strands anyone on a look they can't leave.
+await import('./index.css')
 
 // Apply the cached place theme before first paint so there's no color flash;
 // PlaceProvider owns it (and syncs with the DB) once React mounts.

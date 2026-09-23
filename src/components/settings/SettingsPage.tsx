@@ -8,7 +8,6 @@ import { useFamilyMembers } from '@/hooks/useFamilyMembers'
 import { useHouseholdInvitations } from '@/hooks/useHouseholdInvitations'
 import { CalendarSettings } from './CalendarSettings'
 import { WaitlistAdmin } from './WaitlistAdmin'
-import { ThemeSelector } from './ThemeSelector'
 import { PlacePicker } from './PlacePicker'
 import { useTextSize } from '@/hooks/useTextSize'
 import { HomeAddressSettings } from './HomeAddressSettings'
@@ -332,11 +331,9 @@ export function SettingsPage({
         {/* Tab Content */}
         {activeTab === 'general' && (
           <div className="space-y-8">
-            {/* Place theme — artwork + accent colors */}
+            {/* Your place IS the theme: artwork + accent colours (the separate
+                Appearance chooser was retired, 2026-09-23). */}
             <PlacePicker />
-
-            {/* Theme Selector */}
-            <ThemeSelector />
 
             {/* Text Size */}
             <section>

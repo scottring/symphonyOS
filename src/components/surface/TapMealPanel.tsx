@@ -77,7 +77,7 @@ export function TapMealPanel({ event, onClose }: TapMealPanelProps) {
         <button
           onClick={onClose}
           aria-label="Close"
-          className="text-neutral-400 hover:text-neutral-700 text-xl leading-none mt-1 shrink-0"
+          className="panel-close text-neutral-400 hover:text-neutral-700 text-xl leading-none mt-1 shrink-0"
         >
           ×
         </button>

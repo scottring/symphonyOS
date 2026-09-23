@@ -42,7 +42,7 @@ export function PanelHeader({ title, onTitleChange, onClose }: PanelHeaderProps)
       <button
         onClick={onClose}
         aria-label="Close"
-        className="-mt-1 -mx-2 -mb-2 p-2 text-xl leading-none text-neutral-400 hover:text-neutral-700"
+        className="panel-close -mt-1 -mx-2 -mb-2 p-2 text-xl leading-none text-neutral-400 hover:text-neutral-700"
       >
         ×
       </button>

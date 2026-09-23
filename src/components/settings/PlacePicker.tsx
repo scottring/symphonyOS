@@ -12,8 +12,9 @@ export function PlacePicker() {
     <section>
       <h2 className="text-lg font-semibold text-neutral-700 mb-2">Your place</h2>
       <p className="text-sm text-neutral-500 mb-6">
-        Where does your world live? Your place sets the artwork and the app's accent
-        colors — it applies instantly and follows you across devices.
+        Your place is Symphony's theme: its artwork, and the accent colour on
+        selected tabs, buttons and links. It applies instantly and follows you
+        across devices.
       </p>
 
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
@@ -34,10 +35,9 @@ export function PlacePicker() {
             >
               <PlaceMedallion place={p.id} className="w-full aspect-square mb-2" />
               <div className="flex items-center gap-1.5">
+                {/* The colour this place gives the app. */}
+                <span className="shrink-0 w-3 h-3 rounded-full" style={{ background: p.swatch }} aria-hidden="true" />
                 <span className="text-sm font-semibold text-neutral-800 leading-tight">{p.name}</span>
-                {active && (
-                  <span className="shrink-0 w-2 h-2 rounded-full bg-primary-500" aria-hidden="true" />
-                )}
               </div>
               <p className="text-xs text-neutral-500 mt-0.5 leading-snug">{p.tagline}</p>
             </button>
