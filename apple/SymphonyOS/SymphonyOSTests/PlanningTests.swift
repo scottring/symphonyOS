@@ -204,6 +204,12 @@ struct PlanSelectorTests {
         #expect(plan.reviewRows(previousWeek: prev).map(\.task.title) == ["Still open"])
     }
 
+    @Test func alsoDueStaysOneCompactLine() {
+        #expect(WeekPlanView.alsoDueLine(["Piano practice"]) == "Also due: Piano practice")
+        #expect(WeekPlanView.alsoDueLine(["A", "B"]) == "Also due: A, B")
+        #expect(WeekPlanView.alsoDueLine(["A", "B", "C", "D", "E"]) == "Also due: A, B +3 more")
+    }
+
     @Test func focusKeyMatchesPulledRows() {
         let taskId = UUID(), userId = UUID(), d = day(2026, 9, 23)
         let local = TaskFocus(taskId: taskId, userId: userId, date: d)

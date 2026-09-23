@@ -150,6 +150,14 @@ struct WeekPlanView: View {
         }
     }
 
+    /// The day card's single "Also due" line: "Also due: Piano practice",
+    /// "…: A, B", or "…: A, B +3 more" — never a list.
+    static func alsoDueLine(_ names: [String]) -> String {
+        let shown = names.prefix(2).joined(separator: ", ")
+        let rest = names.count - 2
+        return rest > 0 ? "Also due: \(shown) +\(rest) more" : "Also due: \(shown)"
+    }
+
     static func shortRange(_ ws: Date) -> String {
         let we = PlanCalendar.addDays(ws, 6)
         return "\(ws.formatted(.dateTime.month(.abbreviated).day())) – \(we.formatted(.dateTime.month(.abbreviated).day()))"
@@ -243,16 +251,22 @@ private struct DayCard: View {
 
             ForEach(items) { item in row(item) }
 
+            // Secondary by design: ONE muted line, never a list (the desktop
+            // Week's "Available" lists were removed as clutter). Up to two
+            // names, then a count; choosing happens on the day's chooser.
             if !alsoDue.isEmpty {
                 HStack(alignment: .firstTextBaseline, spacing: 6) {
                     Image(systemName: "repeat").font(.system(size: 11, weight: .semibold))
-                    Text("Also due: \(alsoDue.joined(separator: ", "))")
+                    Text(WeekPlanView.alsoDueLine(alsoDue))
+                        .lineLimit(1)
+                        .truncationMode(.tail)
                 }
                 .font(.bodySmall)
                 .foregroundStyle(Color.textTertiary)
-                .fixedSize(horizontal: false, vertical: true)
-                .padding(.vertical, 8)
+                .padding(.vertical, 6)
                 .overlay(alignment: .top) { Rectangle().fill(Color.cardBorder).frame(height: 1) }
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel("Also due: \(alsoDue.joined(separator: ", "))")
             }
 
             if items.isEmpty && alsoDue.isEmpty {
