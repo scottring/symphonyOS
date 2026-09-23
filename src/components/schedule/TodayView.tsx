@@ -61,6 +61,7 @@ import { AssigneeFilter } from '@/components/home/AssigneeFilter'
 import { NeededTodayNote } from './NeededTodayNote'
 import { TodayAddInput } from './TodayAddInput'
 import { PhoneCaptureBar } from '@/components/layout/PhoneCaptureBar'
+import { DailyEditionPreview, useEditionPreview } from './DailyEditionPreview'
 import { TodaySectionList, findTimelineItem } from './TodaySectionList'
 import { TodayDragProvider } from './TodayDragProvider'
 import { resolveDrop, writeMoveAndRegisterUndo, type DropIntent } from '@/lib/today/todayDrop'
@@ -199,6 +200,7 @@ export function TodayView({
   useLayoutEffect(() => () => publishViewedDay(null), [])
   // ── Context ──────────────────────────────────────────────────────────────────
   const isMobile = useMobile()
+  const [editionPreview, hideEditionPreview] = useEditionPreview()
   const navigate = useNavigate()
   const { isConnected: calendarConnected, error: calendarError } = useGoogleCalendar()
   const ctx = useScheduleActionsContext()
@@ -1310,7 +1312,7 @@ export function TodayView({
           so the assistant's proposals are the first thing you can clear in a
           tap. Renders nothing when the queue is empty. */}
       {data.isToday && (
-        <div className="px-3 md:px-0">
+        <div className="px-4 md:px-0">
           <NeedsYourOK />
         </div>
       )}
@@ -1359,7 +1361,7 @@ export function TodayView({
 
       {/* The rail column only exists when the rail does; otherwise the day gets
           the full width instead of a 320px empty gutter. */}
-      <div className={`px-3 md:px-0 ${decisionCount > 0 ? '@[62rem]:grid @[62rem]:grid-cols-[minmax(0,1fr)_320px] @[62rem]:items-start @[62rem]:gap-8' : ''}`}>
+      <div className={`px-4 md:px-0 ${decisionCount > 0 ? '@[62rem]:grid @[62rem]:grid-cols-[minmax(0,1fr)_320px] @[62rem]:items-start @[62rem]:gap-8' : ''}`}>
         <main className="min-w-0">
           {/* The "N need a decision" banner that stood here at narrow widths
               is gone (Scott, 2026-09-21): a count on Today is a scoreboard,
@@ -1574,6 +1576,9 @@ export function TodayView({
           {/* Below the schedule, not above the date: the one planning
               reminder Today carries (2026-09-22). */}
           {data.isToday && afterSchedule}
+          {/* Review preview only (?edition=sample): labelled sample text,
+              after the work and the schedule, never before them. */}
+          {data.isToday && editionPreview && <DailyEditionPreview onHide={hideEditionPreview} />}
           </TodayDragProvider>
         )}
 

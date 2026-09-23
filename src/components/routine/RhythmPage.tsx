@@ -261,7 +261,7 @@ export function RhythmPage(props: RhythmPageProps) {
     <div className="h-full overflow-auto bg-[var(--color-bg-base)]">
       {/* Full-width canvas (keeps the shared gutter, drops the 940px cap) —
           the staggered timeline needs the room; approved deviation from PAGE_COLUMN. */}
-      <div className="relative w-full px-6 md:px-10 lg:px-14 py-8">
+      <div className="relative w-full px-4 md:px-10 lg:px-14 pt-3 pb-8 md:py-8">
         {/* The shared masthead card — the same anchor every other page wears. */}
         <MastheadCard
           variant="page"
@@ -269,8 +269,8 @@ export function RhythmPage(props: RhythmPageProps) {
           motif="routines"
           subline={`How your family runs — ${subtitle}`}
           footer={
-          <div className="flex items-center gap-2">
-            <div className="flex items-center gap-2 rounded-md border border-neutral-300 bg-bg-elevated px-3 py-2 focus-within:border-primary-500">
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="flex min-w-[12rem] flex-1 items-center gap-2 rounded-md border border-neutral-300 bg-bg-elevated px-3 py-2 focus-within:border-primary-500 md:flex-none">
               <Search className="w-4 h-4 text-neutral-400" />
               <input
                 type="search"
@@ -278,7 +278,7 @@ export function RhythmPage(props: RhythmPageProps) {
                 onChange={e => setQuery(e.target.value)}
                 aria-label="Find a routine"
                 placeholder="Type anywhere to find"
-                className="w-40 bg-transparent text-[14px] focus:outline-none placeholder:text-neutral-400"
+                className="w-full min-w-0 bg-transparent text-[16px] md:w-40 md:text-[14px] focus:outline-none placeholder:text-neutral-400"
               />
             </div>
             {onBuildWithAI && (

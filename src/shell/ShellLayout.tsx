@@ -262,16 +262,13 @@ function ShellLayoutInner({ children }: Props) {
         {/* Phone Today folds the domain lens into its one Filters control in
             the tab row, so this header row would only repeat it. */}
         {isMobile && !planPeriodForPath(location.pathname) && (
+          // Rides in the top-right corner, level with the page title, rather
+          // than spending a row of its own above it.
           <header
-            className="sticky top-0 z-10 bg-transparent px-3 py-1"
-            style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}
+            className="phone-page-lens absolute right-0 top-0 z-10 px-4 pt-2"
+            style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 8px)' }}
           >
-            <div className="flex items-center gap-2">
-              <div className="flex-1" />
-              <div className="flex items-center gap-1 shrink-0">
-                <DomainSwitcher />
-              </div>
-            </div>
+            <DomainSwitcher />
           </header>
         )}
 

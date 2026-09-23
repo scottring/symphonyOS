@@ -2381,9 +2381,24 @@ div.chooser-action-group { overflow: visible !important; }
 
   /* The page heading under the horizon switcher: no newspaper rules on a
      phone, one serif size, the same side margin on every page. */
-  .daybook-masthead { margin: 0 4px 14px; border-top: 0; border-bottom: 0; }
+  .daybook-masthead { margin: 0 0 14px; border-top: 0; border-bottom: 0; }
+  .daybook-stamp { display: none; }
+  .daybook-masthead:not(.daybook-masthead-page) { margin-inline: 16px; }
   .daybook-masthead-inner { padding-top: 2px; }
   .daybook-title, .daybook-masthead-page .daybook-title { font-size: 26px; letter-spacing: -0.02em; }
+
+  /* A goal's steps disclosure is a small caret, not a 44px-wide gap. */
+  .period-plan-row > button[aria-expanded] { min-width: 24px; }
+  /* The page's Shelves launcher sits on the period navigator's row. */
+  .daybook-masthead-page .daybook-masthead-inner { position: relative; }
+  .daybook-masthead-page .daybook-title-action { position: absolute; right: 0; top: 0; padding: 0; }
+
+  /* Library pages carry the life-area lens in their top-right corner. */
+  .daybook-masthead-page .daybook-masthead-text { padding-right: 48px; }
+
+  /* iOS Safari zooms the page into any field under 16px; keep every text
+     field at 16px on a phone. */
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]), textarea, select { font-size: 16px; }
 
   /* Round header buttons, as the native CircleIconButton. */
   button.domain-switcher-trigger {
@@ -2391,4 +2406,36 @@ div.chooser-action-group { overflow: visible !important; }
     border-radius: 999px; box-shadow: none !important;
   }
 }
+/* The daily edition, as a review preview (DailyEditionPreview.tsx): a short
+   editorial read after the day's work, visibly marked as sample text. */
+.daily-edition {
+  margin-top: 32px; padding: 18px 20px 20px;
+  background: var(--color-bg-panel, #fff); border: 1px dashed var(--color-primary-300); border-radius: 14px;
+}
+.daily-edition-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.daily-edition-flag {
+  display: inline-block; margin-bottom: 4px; padding: 2px 8px; border-radius: 999px;
+  background: var(--color-primary-50); color: var(--color-primary-700);
+  font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase;
+}
+.daily-edition h2 { font-family: var(--font-family-display); font-size: 22px; font-weight: 500; color: var(--color-neutral-900); }
+.daily-edition-hide { display: grid; place-items: center; width: 32px; height: 32px; min-height: 32px; min-width: 32px; padding: 0; border-radius: 999px; color: var(--color-neutral-500); }
+.daily-edition-hide:hover { background: var(--color-neutral-100); color: var(--color-neutral-800); }
+.daily-edition-note { margin-top: 4px; font-size: 13px; color: var(--color-neutral-500); }
+.daily-edition-body { display: grid; gap: 12px; margin-top: 14px; }
+.daily-edition-body dt { font-size: 11px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--color-neutral-500); }
+.daily-edition-body dd { margin: 2px 0 0; font-family: var(--font-family-display); font-size: 18px; line-height: 1.45; color: var(--color-neutral-800); }
+@media (min-width: 900px) { .daily-edition-body { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 24px; } }
+
+/* The visible Move control on a phone row (native MoveMenuButton): a pill
+   with the platform's own picker laid invisibly over it. */
+.period-row-move {
+  position: relative; flex-shrink: 0; align-self: center;
+  display: inline-flex; align-items: center; gap: 3px;
+  min-height: 32px; padding: 0 10px; border-radius: 999px;
+  border: 1px solid var(--color-neutral-200); background: var(--color-neutral-50);
+  font-size: 13px; font-weight: 600; color: var(--color-neutral-800);
+}
+.period-row-move select { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; min-height: 44px; }
+.period-row-move:focus-within { outline: 2px solid var(--color-primary-500); outline-offset: 2px; }
 .phone-capture-chip.is-on { background: var(--color-primary-50); border-color: var(--color-primary-300); color: var(--color-primary-700); }

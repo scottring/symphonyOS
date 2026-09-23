@@ -20,9 +20,9 @@
  */
 /** The horizontal half on its own — for pages that own their vertical rhythm
  *  (the week grid's header + grid) but must share the app's left edge. */
-export const PAGE_GUTTER_X = 'px-6 md:px-10 lg:px-14'
+export const PAGE_GUTTER_X = 'px-4 md:px-10 lg:px-14'
 
-const PAGE_GUTTER = `${PAGE_GUTTER_X} py-8`
+const PAGE_GUTTER = `${PAGE_GUTTER_X} pt-3 pb-8 md:py-8`
 
 /** Default column — rhythm views + library lists. */
 export const PAGE_COLUMN = `w-full max-w-[940px] mr-auto ${PAGE_GUTTER}`

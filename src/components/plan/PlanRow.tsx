@@ -187,6 +187,26 @@ export function PlanRow({
           yet still took the width of four 48px touch buttons, which squeezed a
           19px title down to one word a line — and an unseen "Drop" was still
           tappable. A phone opens the row instead. */}
+      {/* Phone: the same verbs behind one visible Move control (native
+          MoveMenuButton) — a native picker, so it is reachable by touch,
+          keyboard and screen reader alike, and never swipe-only. */}
+      {verbs.length > 0 && (
+        <label className="period-row-move sm:hidden">
+          <span aria-hidden="true">Move</span>
+          <ChevronDown className="h-3 w-3" aria-hidden="true" />
+          <select
+            aria-label={`Move ${row.title}`}
+            value=""
+            onChange={(e) => {
+              const a = e.target.value as Exclude<RowAction, 'complete'>
+              if (a) onAction(a, row)
+            }}
+          >
+            <option value="" disabled>Move to…</option>
+            {verbs.map((a) => <option key={a} value={a}>{label(a, lowerLabel)}</option>)}
+          </select>
+        </label>
+      )}
       {verbs.length > 0 && (
         <span className="period-row-actions hidden shrink-0 sm:flex items-center gap-0.5 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
           {verbs.map((a) => (
