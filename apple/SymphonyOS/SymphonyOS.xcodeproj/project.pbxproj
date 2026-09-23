@@ -36,6 +36,7 @@
 		4AE3289D3236007A5F98C6C0 /* MainView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0E4D95EEAD58A126302E8231 /* MainView.swift */; };
 		4BCF33CAF546B310C3757000 /* TimelineViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 39EA5F28070C6203DFC10DC7 /* TimelineViewModel.swift */; };
 		4D32ABFDA54603F52835573C /* PlannerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 762879785174DAA48771110A /* PlannerView.swift */; };
+		4DE34ED9DDD20F324D83BFBB /* PlannerScreensUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3DAE563BB5ACD767A6B02809 /* PlannerScreensUITests.swift */; };
 		509F025ABD79CD27B878E1EC /* PeriodPlanView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 187DEF77B7597EB968E30562 /* PeriodPlanView.swift */; };
 		53CDAD91081EB2442A2A0010 /* DateNavigator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7F3522449230AFDDBFBBAA95 /* DateNavigator.swift */; };
 		5480BD7E5D83BED5704A2D87 /* SymphonyTask.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4990741A74AC21CB7B92A74A /* SymphonyTask.swift */; };
@@ -50,6 +51,7 @@
 		6D4E94613C5930EBF5EFD66C /* PlanWriter.swift in Sources */ = {isa = PBXBuildFile; fileRef = 681A9DD4788EEF1FCA8A3D32 /* PlanWriter.swift */; };
 		6E913AE06A0DF4E1FE99AFB7 /* CrimsonPro-Italic.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 3E40DA63B5495F9F9971B614 /* CrimsonPro-Italic.ttf */; };
 		6FA7A8C0F8DCA3F3F9D2293F /* DesignSystemTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = FDA21FA32A236A44EDB99EE6 /* DesignSystemTests.swift */; };
+		708959FDE7111867F169E963 /* DemoMode.swift in Sources */ = {isa = PBXBuildFile; fileRef = E588D645EF487302339B0C5F /* DemoMode.swift */; };
 		70AA89C1F21478AC1E5842E1 /* PlanningTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CB914E1C7496FD41FBD275B4 /* PlanningTests.swift */; };
 		71F02D60795DFA30FE1D8E16 /* ContactListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9BB546AEA1DD397A0999083E /* ContactListView.swift */; };
 		75911C7EFF2EDFEED273E4B5 /* Planning.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9AAB2B6E9FC48131AEE8F13F /* Planning.swift */; };
@@ -148,6 +150,7 @@
 		37846053B387BAA8FC10D3E6 /* UserProfile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserProfile.swift; sourceTree = "<group>"; };
 		39946BD93A7DD6FB74C15D93 /* TriageController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TriageController.swift; sourceTree = "<group>"; };
 		39EA5F28070C6203DFC10DC7 /* TimelineViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimelineViewModel.swift; sourceTree = "<group>"; };
+		3DAE563BB5ACD767A6B02809 /* PlannerScreensUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlannerScreensUITests.swift; sourceTree = "<group>"; };
 		3DD1BE1E7E379CBBA6DD1A49 /* AuthView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthView.swift; sourceTree = "<group>"; };
 		3E40DA63B5495F9F9971B614 /* CrimsonPro-Italic.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "CrimsonPro-Italic.ttf"; sourceTree = "<group>"; };
 		4639DAB84CA71AE3E1BF1431 /* ChooserSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChooserSheet.swift; sourceTree = "<group>"; };
@@ -214,6 +217,7 @@
 		DC2535BB1638E97B5DED27A2 /* KeyboardShortcuts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyboardShortcuts.swift; sourceTree = "<group>"; };
 		E4053D1678E9C1DF45E6BA6C /* EventDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EventDetailView.swift; sourceTree = "<group>"; };
 		E5472D887E316ADEF911E0AF /* PageReviewSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PageReviewSheet.swift; sourceTree = "<group>"; };
+		E588D645EF487302339B0C5F /* DemoMode.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DemoMode.swift; sourceTree = "<group>"; };
 		E66A3BA0E2CBF7FCE61EA47F /* TaskDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskDetailView.swift; sourceTree = "<group>"; };
 		E835A0EB2F2BE8C29B990F52 /* PageIngestTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PageIngestTests.swift; sourceTree = "<group>"; };
 		F78B0DC6BEC5E61D5289ABA6 /* ProjectDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectDetailView.swift; sourceTree = "<group>"; };
@@ -464,6 +468,7 @@
 				F9595773CA7713C5157B3B01 /* AppState.swift */,
 				6E12BCB3F98A56A73FBB104A /* Assets.xcassets */,
 				A99D77B01B73C4E9753A3494 /* ContentView.swift */,
+				E588D645EF487302339B0C5F /* DemoMode.swift */,
 				2D0143577802D4C6E5B36D3C /* Info.plist */,
 				0E4D95EEAD58A126302E8231 /* MainView.swift */,
 				976CC1C0AE86C75E25C45F45 /* SymphonyApp.swift */,
@@ -582,6 +587,7 @@
 			isa = PBXGroup;
 			children = (
 				0190D691EF214A5E96258AF1 /* CarriedOverUITests.swift */,
+				3DAE563BB5ACD767A6B02809 /* PlannerScreensUITests.swift */,
 				6F4404B5A49F9ACA4F69DEFA /* SkinScreenshotsUITests.swift */,
 				718E56D8B02093D599728E35 /* SymphonyOSUITests.swift */,
 			);
@@ -740,6 +746,7 @@
 				E8B5EA11D41BBF3272A9E57F /* ContentView.swift in Sources */,
 				1A4329534E810EBF6BF16103 /* Date+Extensions.swift in Sources */,
 				53CDAD91081EB2442A2A0010 /* DateNavigator.swift in Sources */,
+				708959FDE7111867F169E963 /* DemoMode.swift in Sources */,
 				D649033FC497E5CAE0F323F8 /* DocumentIngest.swift in Sources */,
 				296C67879E486F3CBE93D3ED /* DocumentScanner.swift in Sources */,
 				A5D8A8346B621F57B8565CF3 /* DomainFilter.swift in Sources */,
@@ -809,6 +816,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				386379CF5A08540EE1B036D4 /* CarriedOverUITests.swift in Sources */,
+				4DE34ED9DDD20F324D83BFBB /* PlannerScreensUITests.swift in Sources */,
 				6AFA1C9974CFBC759404624E /* SkinScreenshotsUITests.swift in Sources */,
 				B243747A711245915530C319 /* SymphonyOSUITests.swift in Sources */,
 			);

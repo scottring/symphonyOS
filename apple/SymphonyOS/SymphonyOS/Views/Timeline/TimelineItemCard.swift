@@ -158,29 +158,62 @@ struct TimelineItemCard: View {
         }
     }
 
-    private var plainRow: some View {
-        HStack(spacing: 10) {
-            leadingControl
+    @Environment(\.dynamicTypeSize) private var typeSize
 
-            if let time = item.timeString {
-                Text(time)
-                    .font(.bodySmall)
-                    .foregroundStyle(Color.textTertiary)
-                    .fixedSize()
-            }
+    private var titleText: some View {
+        Text(item.title)
+            .font(.bodyMedium)
+            .foregroundStyle(isCompleted ? Color.textTertiary : (item.type == .event ? Color.textSecondary : Color.textPrimary))
+            .strikethrough(isCompleted)
+            .lineLimit(typeSize.isAccessibilitySize ? 5 : 3)
+            .frame(maxWidth: .infinity, alignment: .leading)
+    }
 
-            Text(item.title)
-                .font(.bodyMedium)
-                .foregroundStyle(isCompleted ? Color.textTertiary : (item.type == .event ? Color.textSecondary : Color.textPrimary))
-                .strikethrough(isCompleted)
-                .lineLimit(3)
-                .frame(maxWidth: .infinity, alignment: .leading)
-
-            if item.isFree { FreePill() }
-            typeIcon
-            if item.context != nil { ContextDot(context: item.context) }
-            AssigneeAvatars(memberIds: item.assignedTo, members: familyMembers, size: 20)
+    @ViewBuilder
+    private var timeText: some View {
+        if let time = item.timeString {
+            Text(time)
+                .font(.bodySmall)
+                .foregroundStyle(Color.textTertiary)
+                .fixedSize()
         }
+    }
+
+    @ViewBuilder
+    private var trailingMarks: some View {
+        if item.isFree { FreePill() }
+        typeIcon
+        if item.context != nil { ContextDot(context: item.context) }
+        AssigneeAvatars(memberIds: item.assignedTo, members: familyMembers, size: 20)
+    }
+
+    @ViewBuilder
+    private var plainRowContent: some View {
+        if typeSize.isAccessibilitySize {
+            // Large text: the title gets the full width on its own line.
+            HStack(alignment: .top, spacing: 10) {
+                leadingControl
+                VStack(alignment: .leading, spacing: 4) {
+                    timeText
+                    titleText
+                    HStack(spacing: 8) {
+                        Spacer(minLength: 0)
+                        trailingMarks
+                    }
+                }
+            }
+        } else {
+            HStack(spacing: 10) {
+                leadingControl
+                timeText
+                titleText
+                trailingMarks
+            }
+        }
+    }
+
+    private var plainRow: some View {
+        plainRowContent
         .padding(.horizontal, 14)
         .padding(.vertical, 11)
         .background(Color.bgElevated, in: RoundedRectangle(cornerRadius: 14))
@@ -444,24 +477,27 @@ struct CheckCircle: View {
 
     var body: some View {
         let side = size * min(scale, 1.6)
-        Button(action: action) {
-            ZStack {
-                // Muted, not light: the ring must read as a control (3:1).
-                Circle().strokeBorder(checked ? Color.successGreen : Color.textTertiary, lineWidth: 1.5)
-                if checked {
-                    Circle().fill(Color.successGreen)
-                    Image(systemName: "checkmark").font(.system(size: side * 0.45, weight: .bold)).foregroundStyle(.white)
-                }
+        ZStack {
+            // Muted, not light: the ring must read as a control (3:1).
+            Circle().strokeBorder(checked ? Color.successGreen : Color.textTertiary, lineWidth: 1.5)
+            if checked {
+                Circle().fill(Color.successGreen)
+                Image(systemName: "checkmark").font(.system(size: side * 0.45, weight: .bold)).foregroundStyle(.white)
             }
-            .frame(width: side, height: side)
-            // 44pt hit target around a smaller ring.
-            .frame(minWidth: 44, minHeight: 44)
-            .padding(-((44 - side) / 2))
-            .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
+        .frame(width: side, height: side)
+        // 44pt hit target around a smaller ring.
+        .frame(minWidth: 44, minHeight: 44)
+        .padding(-((44 - side) / 2))
+        .contentShape(Rectangle())
+        // A tap gesture, not a Button: inside a swipeable row a Button fires
+        // when a swipe ends on it, completing the task by accident. A tap
+        // gesture fails as soon as the finger moves.
+        .onTapGesture(perform: action)
+        .accessibilityElement()
+        .accessibilityAddTraits(checked ? [.isButton, .isSelected] : .isButton)
         .accessibilityLabel(label.map { checked ? "Completed: \($0)" : "Complete \($0)" } ?? (checked ? "Completed" : "Mark complete"))
-        .accessibilityAddTraits(checked ? .isSelected : [])
+        .accessibilityAction { action() }
     }
 }
 

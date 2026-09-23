@@ -20,6 +20,7 @@ struct SymphonyApp: App {
                 .environment(authService)
                 .environment(appState)
                 .background(Color.bgBase)
+                .demoContainerIfRequested()
         }
         .modelContainer(for: [
             SymphonyTask.self,

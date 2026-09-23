@@ -88,6 +88,7 @@ struct LifeAreaSheet: View {
     let onCancel: () -> Void
 
     @State private var choices: [UUID: String] = [:]
+    @Environment(\.dynamicTypeSize) private var typeSize
     private static let areas = [("Work", "work"), ("Family", "family"), ("Personal", "personal")]
 
     private var allChosen: Bool { request.unclassified.allSatisfy { choices[$0.id] != nil } }
@@ -135,19 +136,30 @@ struct LifeAreaSheet: View {
             }
             .background(Color.bgBase)
             .safeAreaInset(edge: .bottom) {
-                HStack(spacing: 10) {
-                    Button("Cancel", action: onCancel)
-                        .buttonStyle(.symphonySecondary)
-                    Button("Send to \(destination)") { onConfirm(choices) }
-                        .buttonStyle(.symphony)
-                        .disabled(!allChosen)
-                        .opacity(allChosen ? 1 : 0.45)
+                // Side by side, or stacked (primary first) at large text.
+                let layout = typeSize.isAccessibilitySize
+                    ? AnyLayout(VStackLayout(spacing: 10))
+                    : AnyLayout(HStackLayout(spacing: 10))
+                layout {
+                    if typeSize.isAccessibilitySize { sendButton; cancelButton } else { cancelButton; sendButton }
                 }
                 .padding(.horizontal, 20)
                 .padding(.vertical, 12)
                 .background(Color.bgBase)
             }
         }
+    }
+
+    private var cancelButton: some View {
+        Button("Cancel", action: onCancel)
+            .buttonStyle(.symphonySecondary)
+    }
+
+    private var sendButton: some View {
+        Button("Send to \(destination)") { onConfirm(choices) }
+            .buttonStyle(.symphony)
+            .disabled(!allChosen)
+            .opacity(allChosen ? 1 : 0.45)
     }
 
     private var explainer: String {

@@ -89,7 +89,7 @@ struct PeriodPlanView: View {
                     .padding(.bottom, 8)
                 }
             }
-            .padding(.bottom, DockMetrics.height)
+            .padding(.bottom, appState.bottomInset)
         }
         #if os(iOS)
         .toolbar(.hidden, for: .navigationBar)

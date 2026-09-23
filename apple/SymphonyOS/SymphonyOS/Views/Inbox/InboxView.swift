@@ -22,6 +22,7 @@ struct InboxView: View {
     @State private var selecting = false
     @State private var selected: Set<UUID> = []
     @State private var datePickFor: [SymphonyTask] = []
+    @Environment(\.dynamicTypeSize) private var typeSize
 
     private var userId: UUID { auth.currentUser?.id ?? UUID() }
 
@@ -98,7 +99,7 @@ struct InboxView: View {
                 }
             }
             .padding(.top, 4)
-            .padding(.bottom, DockMetrics.height)
+            .padding(.bottom, appState.bottomInset)
             .animation(.easeInOut(duration: 0.2), value: triage.toast?.id)
         }
         #if os(iOS)
@@ -114,7 +115,7 @@ struct InboxView: View {
                 // Cancel moves nothing and offers no Undo.
                 triage.areaRequest = nil
             })
-            .presentationDetents([.medium, .large])
+            .presentationDetents(typeSize.isAccessibilitySize ? [.large] : [.medium, .large])
             .presentationDragIndicator(.visible)
         }
         .sheet(isPresented: Binding(get: { !datePickFor.isEmpty }, set: { if !$0 { datePickFor = [] } })) {
@@ -172,6 +173,9 @@ struct InboxView: View {
             .accessibilityLabel("More actions for \(selected.count) selected")
         }
         .padding(6)
+        // A toolbar: labels stop growing at a readable size (like the dock),
+        // with the large-content viewer for bigger text.
+        .dynamicTypeSize(...DynamicTypeSize.xLarge)
         .background(Color.ink, in: Capsule())
         .shadow(color: Color.ink.opacity(0.25), radius: 12, y: 6)
         .padding(.horizontal, 16)
@@ -193,6 +197,7 @@ struct InboxView: View {
                 .background(strong ? Color.white.opacity(0.14) : Color.clear, in: Capsule())
         }
         .buttonStyle(.plain)
+        .accessibilityShowsLargeContentViewer { Text(title) }
     }
 
     private var emptyState: some View {

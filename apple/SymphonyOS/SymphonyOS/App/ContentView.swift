@@ -40,7 +40,11 @@ struct ContentView: View {
             Task { await engine.resync() }
         }
         .task {
+            #if DEBUG
+            if !DemoMode.isOn { NotificationManager.requestAuthorization() }
+            #else
             NotificationManager.requestAuthorization()
+            #endif
             // Handle initial session restore
             if auth.isAuthenticated, let user = auth.currentUser {
                 startSync(userId: user.id)
@@ -49,6 +53,9 @@ struct ContentView: View {
     }
 
     private func startSync(userId: UUID) {
+        #if DEBUG
+        if DemoMode.isOn { return }   // demo data is local-only; never sync it
+        #endif
         // Both call sites run on the main actor, so claiming the id synchronously
         // here is what makes the second call a no-op.
         guard syncedUserId != userId else { return }

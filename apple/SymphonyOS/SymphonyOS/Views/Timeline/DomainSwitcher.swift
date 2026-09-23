@@ -5,9 +5,17 @@ struct DomainSwitcher: View {
     @Namespace private var pillAnimation
 
     var body: some View {
+        // Large text: scroll sideways rather than breaking words mid-pill.
+        ViewThatFits(in: .horizontal) {
+            pills
+            ScrollView(.horizontal, showsIndicators: false) { pills }
+        }
+    }
+
+    private var pills: some View {
         @Bindable var state = appState
 
-        HStack(spacing: 4) {
+        return HStack(spacing: 4) {
             ForEach(DomainFilter.allCases) { filter in
                 let isSelected = state.domainFilter == filter
 
@@ -19,6 +27,7 @@ struct DomainSwitcher: View {
                     Text(filter.rawValue)
                         .font(isSelected ? .bodySmallBold : .bodySmall)
                         .foregroundStyle(isSelected ? Color.ink : Color.textSecondary)
+                        .fixedSize()
                         .padding(.horizontal, 14)
                         .padding(.vertical, 7)
                         .background {
@@ -33,6 +42,7 @@ struct DomainSwitcher: View {
                         }
                 }
                 .buttonStyle(.plain)
+                .accessibilityAddTraits(isSelected ? .isSelected : [])
             }
         }
         .padding(3)

@@ -20,6 +20,7 @@ struct TodayView: View {
     @State private var showChooser = false
     @State private var showUnfinished = false
     @FocusState private var searchFocused: Bool
+    @Environment(\.dynamicTypeSize) private var typeSize
 
     @Query private var allTasks: [SymphonyTask]
     @Query private var routines: [Routine]
@@ -105,7 +106,7 @@ struct TodayView: View {
                     LinearGradient(colors: [Color.bgBase.opacity(0), Color.bgBase], startPoint: .top, endPoint: .center)
                         .ignoresSafeArea()
                 }
-                .padding(.bottom, DockMetrics.height)
+                .padding(.bottom, appState.bottomInset)
         }
         #if os(iOS)
         .toolbar(.hidden, for: .navigationBar)
@@ -117,7 +118,7 @@ struct TodayView: View {
         }
         .sheet(isPresented: $showUnfinished) {
             UnfinishedSheet(tasks: viewModel.carriedOverTasks)
-                .presentationDetents([.medium, .large])
+                .presentationDetents(typeSize.isAccessibilitySize ? [.large] : [.medium, .large])
                 .presentationDragIndicator(.visible)
         }
         .onAppear { rebuildTimeline() }

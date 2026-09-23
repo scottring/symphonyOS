@@ -21,6 +21,7 @@ struct ChooserSheet: View {
     @Query private var instances: [ActionableInstance]
     @Query private var familyMembers: [FamilyMember]
 
+    @Environment(\.dynamicTypeSize) private var typeSize
     @State private var needsArea: SymphonyTask?
     @State private var toast: TriageController.Toast?
 
@@ -145,29 +146,30 @@ struct ChooserSheet: View {
 
     private func routineRow(_ offer: PlanSnapshot.RoutineOffer) -> some View {
         let r = offer.routine
-        return HStack(spacing: 10) {
-            Image(systemName: "repeat")
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(Color.textSecondary)
-                .accessibilityLabel("Routine")
-            VStack(alignment: .leading, spacing: 2) {
-                Text(r.name).font(.bodyMedium).foregroundStyle(Color.textPrimary).lineLimit(3)
-                Text(offer.flexible ? "Any day this week" : "Due \(dayWord)")
-                    .font(.bodySmall).foregroundStyle(Color.textTertiary)
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
+        let icon = Image(systemName: "repeat")
+            .font(.system(size: 13, weight: .semibold))
+            .foregroundStyle(Color.textSecondary)
+            .accessibilityLabel("Routine")
+        let text = VStack(alignment: .leading, spacing: 2) {
+            Text(r.name).font(.bodyMedium).foregroundStyle(Color.textPrimary).lineLimit(4)
+            Text(offer.flexible ? "Any day this week" : "Due \(dayWord)")
+                .font(.bodySmall).foregroundStyle(Color.textTertiary)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        let marks = HStack(spacing: 10) {
             if r.context != nil { ContextDot(context: r.context) }
             AssigneeAvatars(memberIds: r.assignedTo.map { [$0] } ?? [], members: familyMembers, size: 20)
-            AddButton(title: r.name, added: offer.chosen) {
-                let writer = PlanWriter(context: modelContext, userId: userId)
-                if offer.chosen {
-                    writer.unchooseRoutine(r, on: date, flexible: offer.flexible)
-                } else {
-                    writer.chooseRoutine(r, on: date, flexible: offer.flexible)
-                    #if os(iOS)
-                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                    #endif
+            routineAdd(offer)
+        }
+        return Group {
+            if typeSize.isAccessibilitySize {
+                // Large text: the name gets the full width; controls below.
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack(alignment: .top, spacing: 10) { icon; text }
+                    HStack { Spacer(minLength: 0); marks }
                 }
+            } else {
+                HStack(spacing: 10) { icon; text; marks }
             }
         }
         .padding(.leading, 14)
@@ -179,6 +181,21 @@ struct ChooserSheet: View {
         .padding(.horizontal, 16)
         .padding(.vertical, 3)
         .accessibilityElement(children: .contain)
+    }
+
+    private func routineAdd(_ offer: PlanSnapshot.RoutineOffer) -> some View {
+        let r = offer.routine
+        return AddButton(title: r.name, added: offer.chosen) {
+                let writer = PlanWriter(context: modelContext, userId: userId)
+                if offer.chosen {
+                    writer.unchooseRoutine(r, on: date, flexible: offer.flexible)
+                } else {
+                    writer.chooseRoutine(r, on: date, flexible: offer.flexible)
+                    #if os(iOS)
+                    UIImpactFeedbackGenerator(style: .light).impactOccurred()
+                    #endif
+                }
+            }
     }
 }
 
@@ -194,6 +211,7 @@ struct AddButton: View {
                 if added { Image(systemName: "checkmark").font(.system(size: 11, weight: .bold)) }
                 Text(added ? "Added" : "Add")
             }
+            .fixedSize()
             .font(.bodySmallBold)
             .foregroundStyle(added ? Color.white : Color.ink)
             .padding(.horizontal, 14)

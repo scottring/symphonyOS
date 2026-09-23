@@ -147,34 +147,28 @@ struct PlanTaskRow<Trailing: View>: View {
 
     private var assigned: [UUID] { task.assignedToAll ?? (task.assignedTo.map { [$0] } ?? []) }
 
+    @Environment(\.dynamicTypeSize) private var typeSize
+
     var body: some View {
-        HStack(spacing: 10) {
-            CheckCircle(checked: task.completed, size: 24, label: task.title) {
-                #if os(iOS)
-                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
-                #endif
-                TaskViewModel(modelContext: modelContext).toggleComplete(task)
-            }
-            Button { showDetail = true } label: {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(task.title)
-                        .font(.bodyMedium)
-                        .foregroundStyle(task.completed ? Color.textTertiary : Color.textPrimary)
-                        .strikethrough(task.completed)
-                        .lineLimit(3)
-                        .multilineTextAlignment(.leading)
-                    if let meta {
-                        Text(meta).font(.bodySmall).foregroundStyle(Color.textTertiary)
+        Group {
+            if typeSize.isAccessibilitySize {
+                // Large text: title on its own full-width line, controls below.
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack(alignment: .top, spacing: 10) { circle; titleButton }
+                    HStack(spacing: 10) {
+                        Spacer(minLength: 0)
+                        marks
+                        trailing()
                     }
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .contentShape(Rectangle())
+            } else {
+                HStack(spacing: 10) {
+                    circle
+                    titleButton
+                    marks
+                    trailing()
+                }
             }
-            .buttonStyle(.plain)
-            if task.captureStatus == "pending" { ProgressView().controlSize(.small) }
-            if task.context != nil { ContextDot(context: task.context) }
-            AssigneeAvatars(memberIds: assigned, members: familyMembers, size: 20)
-            trailing()
         }
         .padding(.leading, 14)
         .padding(.trailing, 10)
@@ -192,6 +186,45 @@ struct PlanTaskRow<Trailing: View>: View {
             }
             .presentationDetents([.large, .medium])
         }
+    }
+
+    private var circle: some View {
+        CheckCircle(checked: task.completed, size: 24, label: task.title) {
+            #if os(iOS)
+            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+            #endif
+            TaskViewModel(modelContext: modelContext).toggleComplete(task)
+        }
+    }
+
+    @ViewBuilder
+    private var marks: some View {
+        if task.captureStatus == "pending" { ProgressView().controlSize(.small) }
+        if task.context != nil { ContextDot(context: task.context) }
+        AssigneeAvatars(memberIds: assigned, members: familyMembers, size: 20)
+    }
+
+    private var titleButton: some View {
+            VStack(alignment: .leading, spacing: 2) {
+                    Text(task.title)
+                        .font(.bodyMedium)
+                        .foregroundStyle(task.completed ? Color.textTertiary : Color.textPrimary)
+                        .strikethrough(task.completed)
+                        .lineLimit(3)
+                        .multilineTextAlignment(.leading)
+                    if let meta {
+                        Text(meta).font(.bodySmall).foregroundStyle(Color.textTertiary)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .contentShape(Rectangle())
+                // Tap gesture (not a Button) so a swipe across the row never
+                // opens the task; still a button to VoiceOver.
+                .onTapGesture { showDetail = true }
+                .accessibilityElement(children: .combine)
+                .accessibilityAddTraits(.isButton)
+                .accessibilityHint("Opens the task")
+                .accessibilityAction { showDetail = true }
     }
 }
 
@@ -253,20 +286,13 @@ struct PlannerToast: View {
     let message: String
     var actionTitle: String? = nil
     var action: (() -> Void)? = nil
-    var secondaryTitle: String? = nil
-    var secondary: (() -> Void)? = nil
 
     var body: some View {
         HStack(spacing: 12) {
             Text(message)
                 .font(.bodySmall)
                 .foregroundStyle(.white)
-                .frame(maxWidth: .infinity, alignment: .leading)
-            if let secondaryTitle, let secondary {
-                Button(secondaryTitle, action: secondary)
-                    .font(.bodySmallBold).foregroundStyle(.white)
-                    .frame(minHeight: 44)
-            }
+                .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
             if let actionTitle, let action {
                 Button(actionTitle, action: action)
                     .font(.bodySmallBold).foregroundStyle(Color.primaryLight)

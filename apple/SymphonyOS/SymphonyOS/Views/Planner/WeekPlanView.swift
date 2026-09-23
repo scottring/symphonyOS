@@ -19,6 +19,7 @@ struct WeekPlanView: View {
 
     @State private var showReview = false
     @State private var toast: TriageController.Toast?
+    @Environment(\.dynamicTypeSize) private var typeSize
 
     private var userId: UUID { auth.currentUser?.id ?? UUID() }
     private var weekStart: Date { PlanCalendar.weekStart(appState.selectedDate) }
@@ -111,14 +112,14 @@ struct WeekPlanView: View {
                     .padding(.bottom, 8)
                 }
             }
-            .padding(.bottom, DockMetrics.height)
+            .padding(.bottom, appState.bottomInset)
         }
         #if os(iOS)
         .toolbar(.hidden, for: .navigationBar)
         #endif
         .sheet(isPresented: $showReview) {
             WeekReviewSheet(previousWeek: previous, intoWeek: weekStart)
-                .presentationDetents([.medium, .large])
+                .presentationDetents(typeSize.isAccessibilitySize ? [.large] : [.medium, .large])
                 .presentationDragIndicator(.visible)
         }
     }
@@ -177,6 +178,7 @@ private struct DayCard: View {
     let open: () -> Void
 
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.dynamicTypeSize) private var typeSize
 
     private var isToday: Bool { PlanCalendar.calendar.isDateInToday(day) }
 
@@ -189,7 +191,11 @@ private struct DayCard: View {
                         .foregroundStyle(Color.textPrimary)
                     Spacer()
                     if isToday {
-                        Text("Today").eyebrowStyle().foregroundStyle(Color.amberStrong)
+                        Text("Today")
+                            .font(.eyebrow)
+                            .textCase(.uppercase)
+                            .kerning(1.2)
+                            .foregroundStyle(Color.amberStrong)
                     }
                     Image(systemName: "chevron.right")
                         .font(.system(size: 12, weight: .semibold))
@@ -212,18 +218,24 @@ private struct DayCard: View {
                     CheckCircle(checked: task.completed, size: 20, label: task.title) {
                         TaskViewModel(modelContext: modelContext).toggleComplete(task)
                     }
-                    if !task.isAllDay, let t = task.scheduledFor {
-                        Text(t.formatted(.dateTime.hour().minute()))
-                            .font(.bodySmall)
-                            .foregroundStyle(Color.textTertiary)
-                            .fixedSize()
+                    // Time sits beside the title, or above it at large text.
+                    let layout = typeSize.isAccessibilitySize
+                        ? AnyLayout(VStackLayout(alignment: .leading, spacing: 2))
+                        : AnyLayout(HStackLayout(spacing: 10))
+                    layout {
+                        if !task.isAllDay, let t = task.scheduledFor {
+                            Text(t.formatted(.dateTime.hour().minute()))
+                                .font(.bodySmall)
+                                .foregroundStyle(Color.textTertiary)
+                                .fixedSize()
+                        }
+                        Text(task.title)
+                            .font(.bodyMedium)
+                            .foregroundStyle(task.completed ? Color.textTertiary : Color.textPrimary)
+                            .strikethrough(task.completed)
+                            .lineLimit(4)
+                            .frame(maxWidth: .infinity, alignment: .leading)
                     }
-                    Text(task.title)
-                        .font(.bodyMedium)
-                        .foregroundStyle(task.completed ? Color.textTertiary : Color.textPrimary)
-                        .strikethrough(task.completed)
-                        .lineLimit(3)
-                        .frame(maxWidth: .infinity, alignment: .leading)
                     if task.context != nil { ContextDot(context: task.context) }
                 }
                 .padding(.vertical, 2)

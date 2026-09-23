@@ -103,8 +103,11 @@ struct SlideRow<Content: View>: View {
                             .frame(width: buttonWidth)
                             .frame(maxHeight: .infinity)
                             .background(action.tint)
+                            // Fixed 64pt buttons: cap the label like a toolbar.
+                            .dynamicTypeSize(...DynamicTypeSize.large)
                         }
                         .buttonStyle(.plain)
+                        .accessibilityLabel(action.label)
                     }
                     Spacer(minLength: 0)
                 }

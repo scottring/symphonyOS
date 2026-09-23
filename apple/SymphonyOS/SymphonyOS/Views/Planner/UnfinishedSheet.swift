@@ -18,6 +18,7 @@ struct UnfinishedSheet: View {
 
     @State private var triage = TriageController()
     @State private var datePickFor: [SymphonyTask] = []
+    @Environment(\.dynamicTypeSize) private var typeSize
 
     private var userId: UUID { auth.currentUser?.id ?? UUID() }
 
@@ -79,7 +80,7 @@ struct UnfinishedSheet: View {
                     triage.perform(request.tasks, to: request.destination, areas: areas,
                                    context: modelContext, userId: userId, members: familyMembers)
                 }, onCancel: { triage.areaRequest = nil })
-                .presentationDetents([.medium, .large])
+                .presentationDetents(typeSize.isAccessibilitySize ? [.large] : [.medium, .large])
             }
             .sheet(isPresented: Binding(get: { !datePickFor.isEmpty }, set: { if !$0 { datePickFor = [] } })) {
                 SchedulePickerSheet { date, isAllDay in

@@ -84,6 +84,13 @@ final class AppState {
     /// the week, month, season and year shown are the ones containing it.
     var horizon: Horizon = .today
 
+    /// The dock's measured height (it grows with larger text), and whether
+    /// the keyboard is up (the dock hides while typing). Screens pad their
+    /// floating bars by `bottomInset` so nothing sits behind the dock.
+    var dockHeight: CGFloat = DockMetrics.height
+    var keyboardVisible = false
+    var bottomInset: CGFloat { keyboardVisible ? 0 : dockHeight }
+
     // Domain filter
     var domainFilter: DomainFilter = .all
 

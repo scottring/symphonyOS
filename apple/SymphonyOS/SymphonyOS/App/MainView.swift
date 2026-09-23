@@ -27,6 +27,13 @@ struct iOSMainView: View {
     private var dock: some View {
         @Bindable var state = appState
         return SymphonyDock(activeTab: $state.activeTab) { showCapture = true }
+            // Report the dock's real height (it grows with text size) so the
+            // floating capture bar and toolbars sit exactly above it.
+            .background(GeometryReader { proxy in
+                Color.clear
+                    .onAppear { appState.dockHeight = proxy.size.height }
+                    .onChange(of: proxy.size.height) { _, h in appState.dockHeight = h }
+            })
     }
 
     var body: some View {
@@ -57,7 +64,17 @@ struct iOSMainView: View {
                 NavigationStack { MoreView() }
             }
         }
-        .safeAreaInset(edge: .bottom, spacing: 0) { dock }
+        // While typing, the keyboard owns the bottom edge: hide the dock so
+        // the capture bar sits right on the keyboard instead of above a dock.
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            if !appState.keyboardVisible { dock }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)) { _ in
+            appState.keyboardVisible = true
+        }
+        .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)) { _ in
+            appState.keyboardVisible = false
+        }
         .sheet(isPresented: $showCapture) {
             if let userId = auth.currentUser?.id {
                 CaptureSheet(userId: userId)
@@ -106,6 +123,9 @@ private struct SymphonyDock: View {
             tab(.routines, icon: AppTab.routines.icon, label: "Routines")
             tab(.more, icon: AppTab.more.icon, label: "More")
         }
+        // Like the system tab bar: labels stop growing at a readable size and
+        // the large-content viewer (long-press) shows them bigger.
+        .dynamicTypeSize(...DynamicTypeSize.xLarge)
         .padding(.top, 10)
         .padding(.horizontal, 6)
         .background(
@@ -131,6 +151,10 @@ private struct SymphonyDock: View {
         }
         .buttonStyle(.plain)
         .accessibilityAddTraits(activeTab == t ? .isSelected : [])
+        .accessibilityShowsLargeContentViewer {
+            Image(systemName: icon)
+            Text(label)
+        }
     }
 
     // The center "+" is its own equal-width slot (so it sits between Inbox and

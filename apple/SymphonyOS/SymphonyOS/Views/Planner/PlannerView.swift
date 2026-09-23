@@ -37,7 +37,8 @@ struct PlannerView: View {
                 switcher
                     .padding(.leading, 16)
                     .padding(.trailing, 56)
-                    .padding(.top, 60)
+                    // Below the title, so it stays visible above the menu.
+                    .padding(.top, 104)
                     .transition(.opacity.combined(with: .scale(scale: 0.96, anchor: .topLeading)))
             }
         }
