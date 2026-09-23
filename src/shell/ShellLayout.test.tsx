@@ -239,9 +239,12 @@ describe('Consolidated desktop navigation', () => {
     expect(screen.getByRole('link', { name: 'Today' })).toHaveAttribute('aria-current', 'page')
     fireEvent.click(screen.getByRole('link', { name: 'Month' }))
     expect(screen.getByRole('link', { name: 'Month' })).toHaveAttribute('aria-current', 'page')
+    // Leaving the planner and coming back lands on Today, not on the horizon
+    // you happened to open last. Remembering it put Today two clicks away for
+    // the rest of the session (walk finding S1-11).
     fireEvent.click(screen.getByRole('link', { name: 'Routines' }))
     fireEvent.click(screen.getByRole('link', { name: 'Planner' }))
-    expect(screen.getByRole('link', { name: 'Month' })).toHaveAttribute('aria-current', 'page')
+    expect(screen.getByRole('link', { name: 'Today' })).toHaveAttribute('aria-current', 'page')
   })
   it('places page-specific controls in the consolidated navigation', () => {
     renderAt('/today', <DesktopPageControls><button>Page options</button></DesktopPageControls>)

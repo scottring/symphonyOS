@@ -25,6 +25,7 @@ import { formatInboxBullet } from '@/lib/inboxBullet'
 import { DenseInboxRow, type QuickAction } from './DenseInboxRow'
 import { focusSnapshot } from '@/lib/placement/model'
 import { InboxTriageActions } from './InboxTriageActions'
+import { useDayLoads } from '@/components/surface/hooks/useDayLoads'
 import type { TriageWhen } from './TriageWhenMenu'
 import { getBaseDate, getThisEvening, getNextWeekend, getWeekendAfterNext, getNextMonday } from '@/lib/dateHelpers'
 import { wasWritten, isStep } from '@/hooks/useGatedTaskActions'
@@ -161,6 +162,11 @@ export function InboxView({
   // Page chrome for the card's corner — only inside an AppShell (tests mount bare).
 
   const chrome = useAppShellChromeOptional()
+
+  // How full each candidate day already is, so a triage tile can show what it
+  // is about to add to (S1-09). Computed once for the list; the grid keys into
+  // it by tile.
+  const dayLoads = useDayLoads({ tasks: allTasks, enabled: true })
 
   // Needs-re-filing strip: the UNFILTERED tasks prop, not filteredByDomain —
   // a stranded row must show regardless of which layers are checked.
@@ -726,6 +732,7 @@ export function InboxView({
               calendarBusy={sendingTaskId !== null}
               onSetArea={(context) => onUpdateTask?.(task.id, { context })}
               onDelete={() => applyTriage(task, { kind: 'delete' })}
+              loads={dayLoads}
             />
           }
           onToggleComplete={() => onToggleTask?.(task.id)}

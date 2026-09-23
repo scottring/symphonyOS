@@ -8,6 +8,9 @@ export interface ToastMessage {
   message: string
   type: ToastType
   duration?: number // ms, default 3000
+  /** One link out of the toast — "Go to inbox" after a capture (S1-07).
+   *  Clicking it dismisses the toast. */
+  action?: { label: string; onClick: () => void }
 }
 
 interface ToastProps {
@@ -79,6 +82,20 @@ export function Toast({ toast, onDismiss }: ToastProps) {
       >
         {getIcon()}
         <span className="text-sm font-medium">{toast?.message}</span>
+
+        {toast?.action && (
+          <button
+            onClick={() => {
+              toast.action?.onClick()
+              setIsLeaving(true)
+              setTimeout(onDismiss, 200)
+            }}
+            className="text-sm font-medium text-primary-200 underline underline-offset-2
+                       hover:text-white transition-colors"
+          >
+            {toast.action.label}
+          </button>
+        )}
 
         <button
           onClick={() => {

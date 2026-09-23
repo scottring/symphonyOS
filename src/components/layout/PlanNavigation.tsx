@@ -18,24 +18,28 @@ export function MobilePlanControls({ children }: { children: ReactNode }) {
 }
 
 const PERIODS = ['today', 'week', 'month', 'season', 'year'] as const
-const STORAGE_KEY = 'symphony-plan-period'
 export function planPeriodForPath(path: string) {
   if (path === '/' || path.startsWith('/tasks-new')) return 'today'
   return PERIODS.find(period => path === `/${period}` || path.startsWith(`/${period}/`))
 }
 
-/** Persist only the period view, never task content or a stale dated URL. */
+/**
+ * Where the `Planner` entry in the primary navigation points.
+ *
+ * On a planner page it points at the page you are on, so the entry reads as
+ * "you are here" rather than sending you somewhere else. From anywhere else —
+ * Routines, Inbox, a detail route — it points at Today.
+ *
+ * It used to fall back to the last horizon you visited, remembered in
+ * localStorage. That made Today cost two clicks for the rest of the session
+ * once you had opened Month or Season (walk finding S1-11: "it should be VERY
+ * easy to get back tro the today page"). Today is the page the whole app exists
+ * to make right; it is never more than one click away now, and the horizon tabs
+ * sit on the page for everything else.
+ */
 export function usePlanDestination() {
   const { pathname } = useLocation()
-  const period = planPeriodForPath(pathname)
-  useEffect(() => {
-    if (period) {
-      try { localStorage.setItem(STORAGE_KEY, period) } catch { /* Navigation still works without storage. */ }
-    }
-  }, [period])
-  let saved: string | null = null
-  try { saved = localStorage.getItem(STORAGE_KEY) } catch { /* Default to Today. */ }
-  return `/${period ?? (PERIODS.find(value => value === saved) ?? 'today')}`
+  return `/${planPeriodForPath(pathname) ?? 'today'}`
 }
 
 const HORIZON_NAMES: Record<typeof PERIODS[number], string> = {

@@ -7,7 +7,9 @@ import type { TaskCategory, TaskContext } from '@/types/task'
 import { DomainChooser } from '@/components/domain/DomainChooser'
 import { domainForHotkey } from '@/lib/domainHotkey'
 import { useQuickParse } from '@/hooks/useQuickParse'
-import { destinationLine } from '@/lib/capture/destination'
+import { destinationLine, captureConfirmation } from '@/lib/capture/destination'
+import { showToast } from '@/hooks/useToast'
+import { useNavigate } from 'react-router-dom'
 import { ParsedFieldChips } from '@/components/capture/ParsedFieldChips'
 import { ConceptIcon } from '@/lib/conceptIcons'
 import { DictationMicButton } from '@/components/common/DictationMicButton'
@@ -87,6 +89,7 @@ export function QuickCapture({
   // position and the slide is invisible. Desktop ignores it (no transform).
   const [isEntering, setIsEntering] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
+  const navigate = useNavigate()
 
   // Photo-first capture: live camera → AI-enriched inbox task. On macOS,
   // Continuity Camera lists the iPhone as a camera device, making the phone
@@ -265,6 +268,24 @@ export function QuickCapture({
     } else {
       // Fallback if onAddRich not provided
       onAdd(trimmed)
+    }
+
+    // Say where it went, with one link there. The fly-away animation below has
+    // no destination unless you happen to be on Today, so before this a capture
+    // made from anywhere else confirmed nothing at all (walk finding S1-07).
+    {
+      const when = useRaw ? null : effectiveParsed.dueDate ?? null
+      const today = new Date()
+      const confirmation = captureConfirmation({
+        kind: isInboxAdd ? 'inbox' : 'dated',
+        context: effectiveParsed.context,
+        when,
+        isToday: !!when && when.toDateString() === today.toDateString(),
+      })
+      showToast(confirmation.message, 'success', 5000, {
+        label: confirmation.linkLabel,
+        onClick: () => { navigate(confirmation.route) },
+      })
     }
 
     // Dispatch animation event for inbox items

@@ -9,7 +9,7 @@ vi.mock('@/components/plan/GoalsSheet', () => ({
 
 vi.mock('@/components/domain/DomainSwitcher', () => ({ DomainSwitcher: () => <button type="button">Layers</button> }))
 
-const { PlanNavigation } = await import('./PlanNavigation')
+const { PlanNavigation, usePlanDestination } = await import('./PlanNavigation')
 
 afterEach(cleanup)
 
@@ -43,5 +43,31 @@ describe('PlanNavigation — the ◎ Goals control', () => {
     expect(screen.getByRole('menuitemradio', { name: /^Season/ })).toHaveAttribute('aria-checked', 'true')
     fireEvent.keyDown(window, { key: 'Escape' })
     expect(screen.queryByRole('menu')).not.toBeInTheDocument()
+  })
+})
+
+describe('usePlanDestination — Today is one click away', () => {
+  function Probe() {
+    return <span data-testid="destination">{usePlanDestination()}</span>
+  }
+
+  it('points at Today from a page outside the planner', () => {
+    render(<MemoryRouter initialEntries={['/routines']}><Probe /></MemoryRouter>)
+    expect(screen.getByTestId('destination')).toHaveTextContent('/today')
+  })
+
+  it('still points at Today after a visit to a further-out horizon (S1-11)', () => {
+    // The old behaviour remembered the last horizon in localStorage, so once
+    // you had opened Month, "Planner" took you back to Month and Today cost a
+    // second click for the rest of the session.
+    render(<MemoryRouter initialEntries={['/month']}><Probe /></MemoryRouter>)
+    cleanup()
+    render(<MemoryRouter initialEntries={['/inbox']}><Probe /></MemoryRouter>)
+    expect(screen.getByTestId('destination')).toHaveTextContent('/today')
+  })
+
+  it('reads as "you are here" while you are on a planner page', () => {
+    render(<MemoryRouter initialEntries={['/season']}><Probe /></MemoryRouter>)
+    expect(screen.getByTestId('destination')).toHaveTextContent('/season')
   })
 })

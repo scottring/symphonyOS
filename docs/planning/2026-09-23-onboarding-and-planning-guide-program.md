@@ -99,7 +99,19 @@ Each prompt is followed by how an answer becomes a goal, task, routine, event, o
 reference note, with concrete examples. The guide never claims every task must serve a
 goal, or that a seasonal goal needs a monthly twin.
 
-**C. Regression tests** for every behaviour a walk proves wrong, plus tests for the new
+**C. Optional AI-guided sessions** over the same storylines, on the user's own data
+(direction set 2026-09-23). The deterministic guide stays available and equal — not a
+fallback. First to prove: "plan my week with my own tasks", with contextual questions,
+verified saves, error recovery and resume-later. The other storylines stay in the
+design but wait for that one. What the assistant can and cannot do today, and the tool
+gaps that block this, are recorded in
+[`2026-09-23-guided-sessions-assistant-gaps.md`](./2026-09-23-guided-sessions-assistant-gaps.md);
+the short version is that the agent has no `week_start`, `planned_on`, `is_goal` or
+planning-session access, so nothing goal-aware, horizon-aware or resumable can be
+promised yet. Walks 2–4 supply the questions the session must ask; the agent is not
+built until after review.
+
+**D. Regression tests** for every behaviour a walk proves wrong, plus tests for the new
 onboarding and guide surfaces.
 
 ## Sequence
@@ -112,6 +124,8 @@ onboarding and guide surfaces.
 6. Walk storyline 3 (including Plan from paper on the Fall brainstorm) → fix → entry path 3.
 7. Walk storyline 4 → fix → contextual review teaching.
 8. Write and wire the Planning Guide; print stylesheet; link from onboarding, Help, horizons.
+8b. Specify the deterministic "plan my week" session from the walk findings; close the
+   agent's tool gaps; prototype the AI session over it; review before extending.
 9. Full test pass, visual check including narrow screens, then ask Scott about deployment.
 
 ## Session log
@@ -131,4 +145,13 @@ onboarding and guide surfaces.
   S1-09 Inbox triage → existing `RescheduleGrid` with day loads · S1-12 focus the detail
   pane on open · S1-13 the pane must state the item's own date · S1-05a the nav ladder
   breaks between Week and Month · S1-01 the entry paths themselves.
-- **Resume at:** fix batch 1 (above), then storyline 2.
+- **Direction update (mid-session):** onboarding gains optional AI-guided sessions on
+  the user's own data; deterministic guide stays equal; don't build the agent yet.
+  Inspected the assistant and recorded the blocking tool gaps.
+- **Fix batch 1 shipped on the branch:** S1-11 (Planner reaches Today in one click),
+  S1-13 (`taskWhen` — the pane states day *and* the commitments around it),
+  S1-12 (pane takes focus and names itself on open), S1-07 (capture confirms where it
+  went, with a link there), S1-09 (Inbox triage now uses the shared `RescheduleGrid`
+  with day-load bars). 12 new tests; full suite 6690 passed, 1 pre-existing collection
+  failure in `connectors/` (its own node_modules, unrelated).
+- **Resume at:** show Scott fix batch 1 on the rebuilt preview, then storyline 2.

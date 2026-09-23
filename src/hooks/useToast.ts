@@ -26,12 +26,18 @@ function getSnapshot() {
   return currentToast
 }
 
-export function showToast(message: string, type: ToastType = 'info', duration?: number) {
+export function showToast(
+  message: string,
+  type: ToastType = 'info',
+  duration?: number,
+  action?: ToastMessage['action'],
+) {
   currentToast = {
     id: Math.random().toString(36).substring(7),
     message,
     type,
     duration,
+    action,
   }
   emit()
 }

@@ -7,17 +7,17 @@ import { createPortal } from 'react-dom'
 import { MoreHorizontal } from 'lucide-react'
 import { usePopoverFocus } from '@/hooks/usePopoverFocus'
 import { SchedulePopover } from '@/components/triage/SchedulePopover'
-import { SpecificDatePicker } from './SpecificDatePicker'
+import { RescheduleGrid } from './RescheduleGrid'
 import type { TriageWhen } from './TriageWhenMenu'
 import type { TaskContext } from '@/types/task'
+import type { DayLoad } from '@/lib/today/dayLoad'
 
-const INBOX_MORE_WHEN: { when: TriageWhen; label: string }[] = [
-  { when: 'tonight', label: 'Tonight' },
-  { when: 'tomorrow', label: 'Tomorrow' },
-  { when: 'this-weekend', label: 'This weekend' },
-  { when: 'next-week', label: 'Next week' },
-  { when: 'next-weekend', label: 'Next weekend' },
-  { when: 'this-month', label: 'This month' },
+// The horizons the shared grid has no tile for. Everything the grid does cover
+// — today, tonight, tomorrow, both weekends, next week, this month, someday,
+// and a specific date — now comes from `RescheduleGrid`, the same icon grid the
+// reschedule button and the detail panel use, so the Inbox stops being the one
+// place that triages from a plain text list (walk finding S1-09).
+const INBOX_EXTRA_WHEN: { when: TriageWhen; label: string }[] = [
   { when: 'next-month', label: 'Next month' },
   { when: 'this-season', label: 'This season' },
 ]
@@ -33,6 +33,9 @@ interface InboxTriageActionsProps {
   title: string
   onPick: (when: TriageWhen) => void
   onPickDate: (date: Date) => void
+  /** How full each dated tile's day already is, keyed by `loadKeyFor(when)`.
+   *  Omit for a plain grid. */
+  loads?: Map<string, DayLoad>
   onNote: () => void
   onSendToCalendar: (date: Date, isAllDay: boolean, durationMinutes?: number) => void
   calendarBusy?: boolean
@@ -44,9 +47,9 @@ const itemClass = 'block w-full rounded-md px-3 py-1.5 text-left text-sm text-ne
 const headingClass = 'px-3 pb-0.5 pt-2 text-[10px] font-semibold uppercase tracking-wider text-neutral-400'
 
 export function InboxTriageActions({
-  title, onPick, onPickDate, onNote, onSendToCalendar, calendarBusy, onSetArea, onDelete,
+  title, onPick, onPickDate, onNote, onSendToCalendar, calendarBusy, onSetArea, onDelete, loads,
 }: InboxTriageActionsProps) {
-  const [menu, setMenu] = useState<null | 'menu' | 'date'>(null)
+  const [menu, setMenu] = useState<null | 'menu'>(null)
   const [calendarOpen, setCalendarOpen] = useState(false)
   const wrapRef = useRef<HTMLDivElement>(null)
   const triggerRef = useRef<HTMLButtonElement>(null)
@@ -109,12 +112,18 @@ export function InboxTriageActions({
 
       {menu === 'menu' && createPortal(
         <div ref={menuRef} role="menu" aria-label={`More actions for ${title}`} style={position}
-          className="inbox-triage-menu fixed z-[60] w-52 overflow-y-auto rounded-lg border border-neutral-200 bg-white py-1 shadow-lg">
+          className="inbox-triage-menu fixed z-[60] w-80 overflow-y-auto rounded-lg border border-neutral-200 bg-white py-1 shadow-lg">
           <p className={headingClass} aria-hidden="true">When</p>
-          {INBOX_MORE_WHEN.map(({ when, label }) => (
+          <div className="px-2 pb-1">
+            <RescheduleGrid
+              onPick={(when) => { close(); onPick(when) }}
+              onPickDate={(date) => { close(); onPickDate(date) }}
+              loads={loads}
+            />
+          </div>
+          {INBOX_EXTRA_WHEN.map(({ when, label }) => (
             <button key={when} type="button" role="menuitem" className={itemClass} onClick={choose(() => onPick(when))}>{label}</button>
           ))}
-          <button type="button" role="menuitem" className={itemClass} onClick={() => setMenu('date')}>Pick a date…</button>
           <p className={headingClass} aria-hidden="true">Send</p>
           <button type="button" role="menuitem" className={itemClass} onClick={choose(onNote)}>To a note…</button>
           <button type="button" role="menuitem" className={itemClass} disabled={calendarBusy}
@@ -125,14 +134,6 @@ export function InboxTriageActions({
           ))}
           <div className="my-1 border-t border-neutral-100" />
           <button type="button" role="menuitem" className={`${itemClass} text-rose-600 hover:bg-rose-50 hover:text-rose-700`} onClick={choose(onDelete)}>Delete</button>
-        </div>,
-        document.body,
-      )}
-
-      {menu === 'date' && createPortal(
-        <div ref={menuRef} role="dialog" aria-label="Pick a date" style={position}
-          className="fixed z-[60] w-56 overflow-y-auto rounded-lg border border-neutral-200 bg-white p-2 shadow-lg">
-          <SpecificDatePicker onSubmit={(date) => { close(); onPickDate(date) }} />
         </div>,
         document.body,
       )}
