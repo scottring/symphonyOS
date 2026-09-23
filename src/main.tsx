@@ -77,6 +77,13 @@ if (savedPlace && savedPlace !== 'cabin' &&
   document.documentElement.dataset.place = savedPlace
 }
 
+// Large text, likewise, before first paint and on every page. It used to be
+// applied only by the Settings page's hook, so a reload anywhere else quietly
+// dropped it (2026-09-23).
+try {
+  if (localStorage.getItem('symphony-large-text') === 'true') document.documentElement.classList.add('large-text')
+} catch { /* storage unavailable: default size */ }
+
 import { Suspense, lazy } from 'react'
 import { CalendarCallback } from './pages/CalendarCallback'
 import { isDesktopShell } from './lib/desktop'

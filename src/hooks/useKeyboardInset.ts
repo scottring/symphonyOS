@@ -16,7 +16,9 @@ export function useKeyboardInset(): number {
     if (!vv) return
     const update = () => {
       const covered = Math.max(0, window.innerHeight - vv.height - vv.offsetTop)
-      setInset(covered < 120 ? 0 : Math.round(covered))
+      // Large text zooms the page; a `bottom` set inside it is in zoomed px.
+      const zoom = parseFloat(getComputedStyle(document.documentElement).zoom) || 1
+      setInset(covered < 120 ? 0 : Math.round(covered / zoom))
     }
     update()
     vv.addEventListener('resize', update)
