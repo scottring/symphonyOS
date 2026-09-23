@@ -284,10 +284,8 @@ function ShellLayoutInner({ children }: Props) {
           // the pinned reference lists.
           <>
           {/* Your place, as a shallow landscape behind the navigation band. */}
-          <PlaceBand edge="top" />
+          <PlaceBand />
           <div className={`desktop-workspace relative${referencesVisible ? ' has-references' : ''}`}>
-            {/* …and its ground behind the footer, to balance the top. */}
-            <PlaceBand edge="bottom" />
             <div className="desktop-workspace-nav">
         <DesktopNavigation inboxCount={inboxCount} discussionsUnread={discussionsUnread}
           onSearch={() => setQuickAddOpen(true)} onQuickAdd={() => setQuickAddOpen(true)} onSignOut={signOut}
