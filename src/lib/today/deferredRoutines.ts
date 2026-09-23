@@ -1,4 +1,17 @@
 import type { ActionableInstance } from '@/types/actionable'
+import { localYmd } from '@/lib/cadence/config'
+
+/**
+ * Chosen for this day WITHOUT a time: "Choose" (or a picker's All Day) writes
+ * `planned_on` on the occurrence and no `deferred_to`. For a routine whose
+ * rule names no day — a flexible weekly one — that choice is the only thing
+ * putting it on the day, so it must count as placed here exactly as a time
+ * override does. A skipped occurrence is not on the day (2026-09-23).
+ */
+export function chosenUntimedOn(instance: ActionableInstance, day: Date): boolean {
+  return instance.entity_type === 'routine' && instance.status !== 'skipped'
+    && !instance.deferred_to && instance.planned_on === localYmd(day)
+}
 
 /**
  * Routine ids that were placed onto `viewedDate` by a cross-day deferral.
@@ -26,6 +39,7 @@ export function deferredInRoutineIds(
   const viewedDateStr = viewedDate.toISOString().split('T')[0]
   const ids = new Set<string>()
   for (const instance of dateInstances) {
+    if (chosenUntimedOn(instance, viewedDate)) { ids.add(instance.entity_id); continue }
     if (instance.entity_type !== 'routine' || !instance.deferred_to) continue
     const deferredToDateStr = new Date(instance.deferred_to).toISOString().split('T')[0]
     if (deferredToDateStr === viewedDateStr) ids.add(instance.entity_id)

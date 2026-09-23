@@ -30,6 +30,9 @@ export function placedInWeek(routineId: string, week: UnhomedWeek): boolean {
   return week.instances.some((i) => {
     if (i.entity_type !== 'routine' || i.entity_id !== routineId || i.status === 'skipped') return false
     if (i.deferred_to && inWeek(new Date(i.deferred_to))) return true
+    // Chosen for a day of this week without a time (All Day): placed for the
+    // week, though its rule still names no day — next week it is back.
+    if (i.planned_on && !i.deferred_to) { const [y, m, d] = i.planned_on.split('-').map(Number); if (inWeek(new Date(y, m - 1, d))) return true }
     if (i.status === 'completed') { const [y, m, d] = i.date.split('-').map(Number); return inWeek(new Date(y, m - 1, d)) }
     return false
   })

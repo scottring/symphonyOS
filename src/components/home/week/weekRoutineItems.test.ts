@@ -183,4 +183,27 @@ describe('buildWeekRoutineItems — the weekend is one window', () => {
     expect(ids).toContain('routine-w1-day0') // the day it was done still shows it, ticked
     expect(ids).not.toContain('routine-w1-day1') // Sunday goes quiet
   })
+
+  // "All Day" on a flexible weekly routine is a choice of DAY: planned_on,
+  // no deferred_to. It must land in that day's untimed section — never at
+  // 12:00 AM — and nowhere else in the week (2026-09-23).
+  it('draws a flexible routine chosen All Day on that one day, untimed', () => {
+    const flexible = createMockRoutine({ id: 'f1', name: 'Water the plants', time_of_day: null, recurrence_pattern: { type: 'weekly' } as never })
+    const chosen = createMockActionableInstance({
+      entity_type: 'routine', entity_id: 'f1', date: '2026-05-20', status: 'pending', deferred_to: null, planned_on: '2026-05-20',
+    })
+    const items = build([flexible], [chosen])
+    const ids = items.map((i) => i.id)
+    expect(ids).toEqual(['routine-f1-day2'])
+    expect(startOn(items, 'f1', 2)).toBeUndefined()
+  })
+
+  it('keeps an intentionally timed midnight placement timed', () => {
+    const flexible = createMockRoutine({ id: 'f2', name: 'Night meds', time_of_day: null, recurrence_pattern: { type: 'weekly' } as never })
+    const midnight = createMockActionableInstance({
+      entity_type: 'routine', entity_id: 'f2', date: '2026-05-20', status: 'pending', deferred_to: new Date(2026, 4, 20, 0, 0).toISOString(),
+    })
+    const items = build([flexible], [midnight])
+    expect(startOn(items, 'f2', 2)?.getHours()).toBe(0)
+  })
 })

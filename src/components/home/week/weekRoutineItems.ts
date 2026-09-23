@@ -4,6 +4,7 @@ import { routineToTimelineItem } from '@/types/timeline'
 import { resolveRoutine } from '@/lib/routineUtils'
 import { resolveRoutineTime } from '@/lib/today/routineTime'
 import { addDays, isSameDay, toDateString } from '@/lib/dateUtils'
+import { chosenUntimedOn } from '@/lib/today/deferredRoutines'
 import type { AssigneeFilter } from '@/lib/today/types'
 import type { Layer } from '@/lib/domains'
 import { parseLocalDate } from '@/lib/dateUtils'
@@ -73,8 +74,10 @@ export function buildWeekRoutineItems({
     // same-day placement: "Give it a day" puts a routine with no day of its
     // own on ONE day of a week as a pending instance dated that day, and the
     // pattern (which names no day) must not veto the day the user chose.
+    // Chosen for this day without a time counts too (All Day on a flexible
+    // routine): it belongs in the day's untimed section.
     const landedHere = (i: ActionableInstance) =>
-      !!i.deferred_to && isSameDay(new Date(i.deferred_to), day)
+      (!!i.deferred_to && isSameDay(new Date(i.deferred_to), day)) || chosenUntimedOn(i, day)
 
     const deferredInto = new Set(routineInstances.filter(landedHere).map((i) => i.entity_id))
 

@@ -67,4 +67,11 @@ describe('unhomedRoutines', () => {
       expect(unhomedRoutines([r], ctx, { weekStart: sun, instances: [done] })).toEqual([])
     })
   })
+
+  it('a flexible routine chosen All Day on a day this week has a home for the week, and only this week', () => {
+    const r = createMockRoutine({ id: 'f1', name: 'Water the plants', time_of_day: null, recurrence_pattern: { type: 'weekly' } as RecurrencePattern })
+    const chosen = createMockActionableInstance({ entity_type: 'routine', entity_id: 'f1', date: '2026-05-20', status: 'pending', deferred_to: null, planned_on: '2026-05-20' })
+    expect(unhomedRoutines([r], ctx, { weekStart: new Date(2026, 4, 17), instances: [chosen] })).toEqual([])
+    expect(unhomedRoutines([r], ctx, { weekStart: new Date(2026, 4, 24), instances: [chosen] })).toEqual([r])
+  })
 })
