@@ -118,8 +118,8 @@ Status key: **Fixed** (implemented + regression test), **Open**, **Deferred**.
 | R6 | Settings → Seasons, 390px | Month/day pickers clipped ("h" for March; day picker gone) | **Fixed** — rows wrap; Rendered ✓ |
 | R7 | Meal shelf, 390px | Filter chips squeezed into 4-line columns; "Prep-friendly" off-screen; eyebrow lost its first letter | **Fixed** — chips wrap (+`aria-pressed`); eyebrow inset; Rendered ✓ |
 | R8 | Mastheads on phone (Today, Week, Meals, Settings) | Stray scrollbar beside the date: the phone-wide `overflow-x: hidden !important` made the masthead a 3–5px scroll box | **Fixed** — `overflow-x: clip` exception in `index.css`; Rendered ✓ 0 scrollers |
-| D1 | Phone Today, top of page | ~260px of controls (tabs, Goals, a prominent "Plan from paper" button, filters) above the date | **Open — design call for Scott**; not changed |
-| D2 | Inbox row actions | Nine inline actions per row (tag, person, Today, Week, Month, Someday, date, Note, Calendar, delete); Note/Calendar use accent colours the others don't | **Open — design call**: conflicts with "no laundry lists" vs "no hidden two-click triage" |
+| D1 | Phone Today, top of page | ~260px of controls (domain row, tabs, Goals, a prominent "Plan from paper" button, person filter, ⋯) above the date | **Implemented per Scott, awaiting review** — one row: compact tabs, icon Goals, one Filters control (areas + people, dot when on), ⋯; Plan from paper moved into Add. Date top ~345px → 151px at 390px; no overflow at 360/390. `PhoneFilterControl.test.tsx`, `TodayView.test.tsx`, `QuickCapture.test.tsx` |
+| D2 | Inbox row actions | Nine inline actions per row | **Implemented per Scott, awaiting review** — Today / This week / Someday + More (other days, date, note, calendar, life area, delete); selecting hides row actions and the toolbar offers the same three with one Undo. Also fixed: "This season" wrote nothing. `InboxTriageActions.test.tsx` |
 
 ## Change log
 
@@ -133,6 +133,8 @@ Commits on `codex/claude-ux-assessment` since ed2efe40:
 6. `92611304` Today filtered-empty note (R2); singular Inbox label (R5).
 7. `be09d28d` Phone panel layering (R3); row title semantics (R4).
 8. `d7b77065` Phone layout: Seasons (R6), Meal shelf (R7), masthead scrollbars (R8).
+9. `bec7686b` Phone Today header (D1).
+10. `3dc4334d` Inbox triage simplification (D2).
 
 Verification: typecheck clean; full suite 638 files passed (connectors
 dependencies had to be installed locally for the WhatsApp adapter test); lint 0
@@ -142,7 +144,7 @@ household, desktop 1316px window plus same-origin 390px / 830px frames.
 
 ## Remaining gaps
 
-- Design calls for Scott: D1 (phone Today header weight), D2 (Inbox row actions).
+- D1 and D2 are implemented to Scott's direction and await his review. Week/Month phone headers keep the separate domain row; only Today was changed. Bulk Today/This week on Unsorted items may raise the domain question once per item.
 - Open items: F12 `assigned_to_all`, F13 optimistic contact navigation, L1–L7,
   ~60 placeholder-only inputs on lower-traffic screens, desktop row semantics (L4).
 - Failed-save paths other than ⌘K note were verified by unit tests only.
