@@ -126,4 +126,14 @@ describe('the row renders no source comments', () => {
     const { container } = render(<ul><PlanRow row={goal} actions={[]} onAction={vi.fn()} onOpen={vi.fn()} expanded onAddStep={vi.fn()} /></ul>)
     expect(container.textContent).not.toContain('//')
   })
+
+  it('phone: every verb is reachable from one visible Move picker, never only by hover or swipe', async () => {
+    const onAction = vi.fn()
+    render(<ul><PlanRow row={row()} actions={['complete', 'to-lower', 'someday', 'drop']} onAction={onAction} onOpen={vi.fn()} lowerLabel="this week" /></ul>)
+    const move = screen.getByRole('combobox', { name: 'Move Fix the back door' })
+    const options = within(move).getAllByRole('option').map((o) => o.textContent)
+    expect(options).toEqual(['Move to…', 'Take it into this week', 'Someday', 'Drop'])
+    await userEvent.selectOptions(move, 'someday')
+    expect(onAction).toHaveBeenCalledWith('someday', expect.objectContaining({ id: 'r1' }))
+  })
 })

@@ -16,6 +16,7 @@ import { MealChatRail } from '../chat/MealChatRail'
 import { MealChatSheet } from '../chat/MealChatSheet'
 import { MastheadCard, PeriodNavEyebrow } from '@/components/layout/MastheadCard'
 import { MealsTabs } from '../MealsTabs'
+import { MOBILE_TAB_BAR_HEIGHT } from '@/shell/mobileChrome'
 import { SendToGroceriesModalV2 } from '../groceries-v2/SendToGroceriesModalV2'
 import type { MealPlanEntry, MealSlot } from '@/types/meal-planner'
 
@@ -192,7 +193,7 @@ export function PlanPage() {
         }
         subline={<MealsTabs className="-mb-1" />}
         footer={
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <button
             onClick={() => setPrefsOpen(true)}
             className="flex items-center gap-2 rounded-md px-3 py-2 text-[14px] text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900"
@@ -254,7 +255,9 @@ export function PlanPage() {
           <button
             onClick={() => setChatSheetOpen(true)}
             aria-label="Open chat"
-            className="fixed bottom-6 right-6 z-30 w-14 h-14 rounded-full bg-primary-500 text-white shadow-elevated flex items-center justify-center"
+            // Above the dock, and quieter than its + so the two never compete.
+            className="fixed right-4 z-30 w-12 h-12 rounded-full border border-neutral-200 bg-bg-elevated text-primary-600 shadow-elevated flex items-center justify-center"
+            style={{ bottom: `calc(${MOBILE_TAB_BAR_HEIGHT} + env(safe-area-inset-bottom, 0px) + 12px)` }}
           >
             <MessageCircle className="w-6 h-6" />
           </button>

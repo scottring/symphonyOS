@@ -2406,6 +2406,13 @@ div.chooser-action-group { overflow: visible !important; }
     border-radius: 999px; box-shadow: none !important;
   }
 }
+/* Toasts and bulk bars on a phone sit above the dock AND the capture bar, so
+   neither covers them (dock 67px + bar 52px + gaps). */
+@media (max-width: 767px) {
+  .phone-lift { bottom: calc(139px + env(safe-area-inset-bottom, 0px)) !important; }
+  .inbox-bulk.phone-lift { bottom: calc(79px + env(safe-area-inset-bottom, 0px)) !important; }
+}
+
 /* The daily edition, as a review preview (DailyEditionPreview.tsx): a short
    editorial read after the day's work, visibly marked as sample text. */
 .daily-edition {

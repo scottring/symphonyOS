@@ -17,7 +17,8 @@ export function PageMasthead({ title, description, actions }: {
   return (
     <div className="daybook-masthead daybook-masthead-page">
       <div className="daybook-masthead-inner">
-        <div className="flex items-start justify-between gap-3">
+        {/* pr-12 on a phone: the life-area lens rides in the top-right corner. */}
+        <div className="flex items-start justify-between gap-3 pr-12 md:pr-0">
           <h1 className="daybook-title min-w-0 flex-1">{title}</h1>
           {actions && <div className="flex shrink-0 items-center gap-2">{actions}</div>}
         </div>

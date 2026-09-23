@@ -766,7 +766,7 @@ export function SettingsPage({
 
       {/* Success toast */}
       {deleteSuccess && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 animate-fade-in-up">
+        <div className="phone-lift fixed bottom-6 left-1/2 -translate-x-1/2 z-50 animate-fade-in-up">
           <div className="flex items-center gap-2 px-4 py-3 bg-neutral-800 text-white rounded-lg shadow-lg">
             <svg className="w-5 h-5 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />

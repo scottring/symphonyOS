@@ -10,14 +10,14 @@ export function PlacePicker() {
 
   return (
     <section>
-      <h2 className="text-lg font-semibold text-neutral-700 mb-2">Your place</h2>
+      <h2 className="mb-2 font-display text-[22px] text-neutral-900">Your place</h2>
       <p className="text-sm text-neutral-500 mb-6">
         Your place is Symphony's theme: its artwork, and the accent colour on
         selected tabs, buttons and links. It applies instantly and follows you
         across devices.
       </p>
 
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
         {PLACES.map((p) => {
           const active = p.id === place
           return (

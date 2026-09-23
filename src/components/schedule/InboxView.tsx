@@ -927,7 +927,7 @@ export function InboxView({
         <div
           role="toolbar"
           aria-label="Bulk actions"
-          className="inbox-bulk fixed bottom-24 md:bottom-6 left-1/2 -translate-x-1/2 z-[55] flex w-[calc(100%-24px)] max-w-2xl flex-wrap items-center justify-center gap-x-2 gap-y-1 px-4 py-2.5 rounded-2xl bg-neutral-900 text-white shadow-xl md:w-auto"
+          className="inbox-bulk phone-lift fixed bottom-24 md:bottom-6 left-1/2 -translate-x-1/2 z-[55] flex w-[calc(100%-24px)] max-w-2xl flex-wrap items-center justify-center gap-x-2 gap-y-1 px-4 py-2.5 rounded-2xl bg-neutral-900 text-white shadow-xl md:w-auto"
         >
           <span className="text-sm font-medium pr-1">{selectedTaskIds.size} selected</span>
           <span className="text-neutral-500" aria-hidden="true">·</span>
