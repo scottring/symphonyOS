@@ -108,7 +108,7 @@ struct TimelineItemCard: View {
         case .routine:
             return [
                 SlideAction(label: "Skip", systemImage: "arrow.uturn.forward", tint: Color.textSecondary) {
-                    setInstanceStatus(entityType: "routine", entityId: item.entityId.uuidString, status: "skipped")
+                    setInstanceStatus(entityType: "routine", entityId: item.entityId.uuidString.lowercased(), status: "skipped")
                 },
             ]
         case .event:
@@ -141,75 +141,96 @@ struct TimelineItemCard: View {
 
     // MARK: Plain row — time · dot · title · check circle (landing "Just a list" row)
 
-    private var plainRow: some View {
-        HStack(spacing: 12) {
-            Text(item.timeString ?? "")
-                .font(.captionText)
-                .foregroundStyle(Color.textTertiary)
-                .frame(width: 52, alignment: .leading)
-
-            Circle()
-                .fill(isCompleted ? Color.textLight : accentColor)
-                .frame(width: 6, height: 6)
-
-            HStack(spacing: 6) {
-                typeIcon
-                Text(item.title)
-                    .font(.bodyMedium)
-                    .foregroundStyle(isCompleted ? Color.textTertiary : Color.textPrimary)
-                    .strikethrough(isCompleted)
-                    .lineLimit(2)
-            }
-
-            if item.isFree { FreePill() }
-
-            Spacer(minLength: 0)
-
-            AssigneeAvatars(memberIds: item.assignedTo, members: familyMembers, size: 20)
-
-            // A free event is informational only — nothing for a parent to
-            // check off.
-            if !item.isFree {
-                CheckCircle(checked: isCompleted) {
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) { isCompleted.toggle() }
-                    toggleCompletion()
-                }
+    /// Leading completion control: one tap completes (swipe-left is only a
+    /// shortcut). A free event carries no expectation, so it gets a quiet bar
+    /// in the circle's place instead — titles still align.
+    @ViewBuilder
+    private var leadingControl: some View {
+        if item.isFree || item.type == .event {
+            // Events are the calendar's, not commitments to tick off here;
+            // a non-free event can still be checked off with swipe-left.
+            EventMark()
+        } else {
+            CheckCircle(checked: isCompleted, size: 24, label: item.title) {
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) { isCompleted.toggle() }
+                toggleCompletion()
             }
         }
+    }
+
+    private var plainRow: some View {
+        HStack(spacing: 10) {
+            leadingControl
+
+            if let time = item.timeString {
+                Text(time)
+                    .font(.bodySmall)
+                    .foregroundStyle(Color.textTertiary)
+                    .fixedSize()
+            }
+
+            Text(item.title)
+                .font(.bodyMedium)
+                .foregroundStyle(isCompleted ? Color.textTertiary : (item.type == .event ? Color.textSecondary : Color.textPrimary))
+                .strikethrough(isCompleted)
+                .lineLimit(3)
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+            if item.isFree { FreePill() }
+            typeIcon
+            if item.context != nil { ContextDot(context: item.context) }
+            AssigneeAvatars(memberIds: item.assignedTo, members: familyMembers, size: 20)
+        }
         .padding(.horizontal, 14)
-        .padding(.vertical, 12)
-        .background(Color.bgSurface, in: RoundedRectangle(cornerRadius: 10))
+        .padding(.vertical, 11)
+        .background(Color.bgElevated, in: RoundedRectangle(cornerRadius: 14))
+        .overlay(RoundedRectangle(cornerRadius: 14).strokeBorder(Color.cardBorder, lineWidth: 1))
+        .shadow(color: Color.cardShadow, radius: 8, x: 0, y: 2)
         .opacity(item.isFree ? 0.6 : (isCompleted ? 0.7 : 1.0))
+        .onTapGesture { openDetail() }
+    }
+
+    private func openDetail() {
+        switch item.type {
+        case .task: showDetail = true
+        case .event: if item.eventKey != nil { showEventDetail = true }
+        case .routine: break
+        }
     }
 
     // MARK: Block — rail · time + pill · serif title · note line · children · context row
 
     private var blockContent: some View {
-        HStack(spacing: 0) {
-            RoundedRectangle(cornerRadius: 2)
-                .fill(isCompleted ? Color.textLight : Color.primaryTint)
-                .frame(width: 3)
+        HStack(alignment: .top, spacing: 10) {
+            leadingControl
 
             VStack(alignment: .leading, spacing: 6) {
-                HStack {
-                    Text(item.timeString ?? (item.isAllDay ? "All day" : ""))
-                        .font(.captionText)
-                        .foregroundStyle(Color.textTertiary)
-                    Spacer()
-                    if item.isFree { FreePill() }
-                    if let source = item.source { SourcePill(source: source) }
+                if item.timeString != nil || item.isFree || item.source != nil {
+                    HStack {
+                        if let time = item.timeString {
+                            Text(time)
+                                .font(.bodySmall)
+                                .foregroundStyle(Color.textTertiary)
+                        }
+                        Spacer()
+                        if item.isFree { FreePill() }
+                        if let source = item.source { SourcePill(source: source) }
+                    }
                 }
 
                 HStack(alignment: .top, spacing: 6) {
-                    typeIcon
                     Text(item.title)
                         .font(.displaySmall)
                         .foregroundStyle(isCompleted ? Color.textTertiary : Color.textPrimary)
                         .strikethrough(isCompleted)
-                        .lineLimit(2)
-                    Spacer(minLength: 0)
+                        .lineLimit(3)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    typeIcon
+                    if item.context != nil { ContextDot(context: item.context).padding(.top, 6) }
                     AssigneeAvatars(memberIds: item.assignedTo, members: familyMembers, size: 20)
                 }
+                .contentShape(Rectangle())
+                .onTapGesture { openDetail() }
 
                 if let line = item.noteLine {
                     Text(line)
@@ -218,21 +239,23 @@ struct TimelineItemCard: View {
                         .lineLimit(2)
                 }
 
+                // Subtasks stay inside their card, each with its own circle.
                 if !item.children.isEmpty {
-                    VStack(alignment: .leading, spacing: 4) {
+                    VStack(alignment: .leading, spacing: 8) {
                         ForEach(item.children) { child in
                             ChildRow(child: child, members: familyMembers) { toggleChild(child) }
                         }
                     }
+                    .padding(.top, 8)
+                    .overlay(alignment: .top) { Rectangle().fill(Color.cardBorder).frame(height: 1) }
                     .padding(.top, 2)
                 }
 
                 if hasContextRow { contextRow.padding(.top, 2) }
             }
-            .padding(.leading, 12)
-            .padding(.trailing, 14)
-            .padding(.vertical, 12)
         }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 12)
         .background(Color.bgElevated)
         .clipShape(RoundedRectangle(cornerRadius: 16))
         .overlay(RoundedRectangle(cornerRadius: 16).strokeBorder(Color.cardBorder, lineWidth: 1))
@@ -321,7 +344,7 @@ struct TimelineItemCard: View {
                 vm.toggleComplete(task)
             }
         case .routine:
-            setInstanceStatus(entityType: "routine", entityId: item.entityId.uuidString,
+            setInstanceStatus(entityType: "routine", entityId: item.entityId.uuidString.lowercased(),
                               status: isCompleted ? "completed" : "pending")
         case .event:
             // Web parity: events check off via actionable_instances keyed by the
@@ -346,7 +369,7 @@ struct TimelineItemCard: View {
         let cal = Calendar.current
         let allInstances = (try? modelContext.fetch(FetchDescriptor<ActionableInstance>())) ?? []
         let instance = allInstances.first {
-            $0.entityType == entityType && $0.entityId == entityIdString &&
+            $0.entityType == entityType && (entityType == "routine" ? $0.entityId.lowercased() == entityIdString : $0.entityId == entityIdString) &&
             cal.isDate($0.date, inSameDayAs: date)
         }
 
@@ -412,22 +435,68 @@ struct FreePill: View {
 
 struct CheckCircle: View {
     let checked: Bool
+    var size: CGFloat = 20
+    /// What it completes, for VoiceOver ("Complete Renew the passport").
+    var label: String? = nil
     let action: () -> Void
 
+    @ScaledMetric(relativeTo: .body) private var scale: CGFloat = 1
+
     var body: some View {
+        let side = size * min(scale, 1.6)
         Button(action: action) {
             ZStack {
-                Circle().strokeBorder(checked ? Color.successGreen : Color.textLight, lineWidth: 1.5)
+                // Muted, not light: the ring must read as a control (3:1).
+                Circle().strokeBorder(checked ? Color.successGreen : Color.textTertiary, lineWidth: 1.5)
                 if checked {
                     Circle().fill(Color.successGreen)
-                    Image(systemName: "checkmark").font(.system(size: 10, weight: .bold)).foregroundStyle(.white)
+                    Image(systemName: "checkmark").font(.system(size: side * 0.45, weight: .bold)).foregroundStyle(.white)
                 }
             }
-            .frame(width: 20, height: 20)
+            .frame(width: side, height: side)
+            // 44pt hit target around a smaller ring.
+            .frame(minWidth: 44, minHeight: 44)
+            .padding(-((44 - side) / 2))
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .accessibilityLabel(checked ? "Completed" : "Mark complete")
+        .accessibilityLabel(label.map { checked ? "Completed: \($0)" : "Complete \($0)" } ?? (checked ? "Completed" : "Mark complete"))
+        .accessibilityAddTraits(checked ? .isSelected : [])
+    }
+}
+
+/// Holds the completion circle's place on an event row: events aren't
+/// ticked off from the circle.
+struct EventMark: View {
+    @ScaledMetric(relativeTo: .body) private var side: CGFloat = 24
+    var body: some View {
+        RoundedRectangle(cornerRadius: 2)
+            .fill(Color.textLight)
+            .frame(width: 3, height: min(side, 38) * 0.8)
+            .frame(width: min(side, 38))
+            .accessibilityHidden(true)
+    }
+}
+
+/// The small life-area dot.
+struct ContextDot: View {
+    let context: String?
+    var body: some View {
+        Circle()
+            .fill(Color.forContext(context))
+            .frame(width: 9, height: 9)
+            .accessibilityLabel(context?.capitalized ?? "No life area")
+    }
+}
+
+extension Color {
+    static func forContext(_ context: String?) -> Color {
+        switch context {
+        case "work": .contextWork
+        case "family": .contextFamily
+        case "personal": .contextPersonal
+        default: .textTertiary
+        }
     }
 }
 
@@ -439,8 +508,8 @@ struct ChildRow: View {
     let onToggle: () -> Void
 
     var body: some View {
-        HStack(spacing: 8) {
-            CheckCircle(checked: child.completed, action: onToggle)
+        HStack(spacing: 10) {
+            CheckCircle(checked: child.completed, size: 20, label: child.title, action: onToggle)
             if let m = members.first(where: { child.assignedTo.contains($0.id) }) {
                 Text(m.name.split(separator: " ").first.map(String.init) ?? m.name)
                     .font(.captionBold)
@@ -453,7 +522,7 @@ struct ChildRow: View {
                 .font(.bodySmall)
                 .foregroundStyle(child.completed ? Color.textTertiary : Color.textPrimary)
                 .strikethrough(child.completed)
-                .lineLimit(1)
+                .lineLimit(3)
         }
     }
 }

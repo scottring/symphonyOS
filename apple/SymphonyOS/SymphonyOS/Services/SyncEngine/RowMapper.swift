@@ -33,6 +33,12 @@ enum RowMapper {
             return householdFromRow(row) as? T
         case is UserProfile.Type:
             return userProfileFromRow(row) as? T
+        case is TaskCommitment.Type:
+            return commitmentFromRow(row) as? T
+        case is TaskFocus.Type:
+            return focusFromRow(row) as? T
+        case is Goal.Type:
+            return goalFromRow(row) as? T
         default:
             return nil
         }
@@ -69,6 +75,13 @@ enum RowMapper {
         task.scope = row.string("scope")
         task.captureId = row.uuid("capture_id")
         task.weekStart = row.date("week_start")
+        task.monthStart = row.date("month_start")
+        task.seasonStart = row.date("season_start")
+        task.weekendStart = row.date("weekend_start")
+        task.isGoal = row.bool("is_goal") ?? false
+        task.goalTaskId = row.uuid("goal_task_id")
+        task.goalId = row.uuid("goal_id")
+        task.plannedOn = row.date("planned_on")
         task.linkedTo = row.codable("linked_to")
         task.linkType = row.string("link_type")
         let captureMeta: CaptureMeta? = row.codable("capture_meta")
@@ -112,6 +125,10 @@ enum RowMapper {
         routine.timeOfDay = row.string("time_of_day")
         routine.context = row.string("context")
         routine.assignedTo = row.uuid("assigned_to")
+        routine.showOnTimeline = row.bool("show_on_timeline") ?? true
+        routine.pinToTimeline = row.bool("pin_to_timeline") ?? false
+        routine.parentRoutineId = row.uuid("parent_routine_id")
+        routine.pausedUntil = row.date("paused_until")
         routine.lastSyncedAt = Date()
         routine.createdAt = row.date("created_at") ?? Date()
         routine.updatedAt = row.date("updated_at") ?? Date()
@@ -212,6 +229,7 @@ enum RowMapper {
         instance.deferredTo = row.date("deferred_to")
         instance.completedAt = row.date("completed_at")
         instance.skippedAt = row.date("skipped_at")
+        instance.plannedOn = row.date("planned_on")
         instance.lastSyncedAt = Date()
         instance.createdAt = row.date("created_at") ?? Date()
         instance.updatedAt = row.date("updated_at") ?? Date()
@@ -262,10 +280,52 @@ enum RowMapper {
 
         let model = Household(id: id, name: row.string("name") ?? "My Household", ownerId: ownerId, syncStatus: .synced)
         model.address = row.string("address")
+        model.seasons = row.codable("seasons")
         model.lastSyncedAt = Date()
         model.createdAt = row.date("created_at") ?? Date()
         model.updatedAt = row.date("updated_at") ?? Date()
         return model
+    }
+
+    static func commitmentFromRow(_ row: [String: AnyJSON]) -> TaskCommitment? {
+        guard let id = row.uuid("id"),
+              let taskId = row.uuid("task_id"),
+              let level = row.string("level"),
+              let periodStart = row.date("period_start") else { return nil }
+        let c = TaskCommitment(id: id, taskId: taskId, level: level, periodStart: periodStart,
+                               status: row.string("status") ?? "open",
+                               createdBy: row.uuid("created_by"), syncStatus: .synced)
+        c.carriedTo = row.date("carried_to")
+        c.endedAt = row.date("ended_at")
+        c.createdAt = row.date("created_at") ?? Date()
+        c.lastSyncedAt = Date()
+        return c
+    }
+
+    static func focusFromRow(_ row: [String: AnyJSON]) -> TaskFocus? {
+        guard let taskId = row.uuid("task_id"),
+              let userId = row.uuid("user_id"),
+              let date = row.date("date") else { return nil }
+        let f = TaskFocus(taskId: taskId, userId: userId, date: date, syncStatus: .synced)
+        f.createdAt = row.date("created_at") ?? Date()
+        f.lastSyncedAt = Date()
+        return f
+    }
+
+    private static func goalFromRow(_ row: [String: AnyJSON]) -> Goal? {
+        guard let id = row.uuid("id"),
+              let userId = row.uuid("user_id"),
+              let name = row.string("name"),
+              let year = row.int("year") else { return nil }
+        let g = Goal(id: id, userId: userId, name: name, year: year)
+        g.status = row.string("status") ?? "active"
+        g.notes = row.string("notes")
+        g.context = row.string("context")
+        g.sortOrder = row.int("sort_order") ?? 0
+        g.lastSyncedAt = Date()
+        g.createdAt = row.date("created_at") ?? Date()
+        g.updatedAt = row.date("updated_at") ?? Date()
+        return g
     }
 
     private static func userProfileFromRow(_ row: [String: AnyJSON]) -> UserProfile? {

@@ -7,6 +7,9 @@ final class Household {
     var name: String
     var ownerId: UUID
     var address: String?
+    /// The household's four season boundaries (`households.seasons` jsonb).
+    /// Nil → the web's defaults (see PlanCalendar.defaultSeasons).
+    var seasons: [SeasonBoundary]? = nil
 
     // Sync
     var syncStatus: SyncStatus
@@ -29,6 +32,13 @@ final class Household {
         self.createdAt = Date()
         self.updatedAt = Date()
     }
+}
+
+/// One season's first day, e.g. {name: "Fall", month: 9, day: 1}.
+struct SeasonBoundary: Codable, Hashable {
+    var name: String
+    var month: Int
+    var day: Int
 }
 
 extension Household {

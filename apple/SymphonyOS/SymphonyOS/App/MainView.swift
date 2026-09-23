@@ -47,12 +47,12 @@ struct iOSMainView: View {
             // capture bar instead gets an explicit `.padding(.bottom:
             // SymphonyDock.height)` sized to match.
             switch state.activeTab {
-            case .today:
-                NavigationStack { TodayView() }
+            case .planner:
+                NavigationStack { PlannerView() }
             case .inbox:
                 NavigationStack { InboxView() }
-            case .projects:
-                NavigationStack { ProjectListView() }
+            case .routines:
+                NavigationStack { RoutineListView() }
             case .more:
                 NavigationStack { MoreView() }
             }
@@ -82,11 +82,17 @@ struct iOSMainView: View {
 /// above the (already-safe-area-respecting) bottom edge. TodayView/InboxView's
 /// `VStack { Spacer(); QuickCaptureBar() }` pads its bottom by this amount so
 /// the floating capture bar clears the dock (see F4 in MainView's iOSMainView).
+#endif
 enum DockMetrics {
+    #if os(iOS)
     static let height: CGFloat = 43
+    #else
+    static let height: CGFloat = 0   // no dock on the Mac sidebar layout
+    #endif
 }
+#if os(iOS)
 
-// MARK: - Custom Dock (5 slots: Today · Inbox · ＋ · Projects · More)
+// MARK: - Custom Dock (5 slots: Planner · Inbox · ＋ · Routines · More)
 
 private struct SymphonyDock: View {
     @Binding var activeTab: AppTab
@@ -94,11 +100,11 @@ private struct SymphonyDock: View {
 
     var body: some View {
         HStack(alignment: .center, spacing: 0) {
-            tab(.today, icon: "sun.max", label: "Today")
-            tab(.inbox, icon: "tray", label: "Inbox")
+            tab(.planner, icon: AppTab.planner.icon, label: "Planner")
+            tab(.inbox, icon: AppTab.inbox.icon, label: "Inbox")
             addSlot
-            tab(.projects, icon: "folder", label: "Projects")
-            tab(.more, icon: "ellipsis", label: "More")
+            tab(.routines, icon: AppTab.routines.icon, label: "Routines")
+            tab(.more, icon: AppTab.more.icon, label: "More")
         }
         .padding(.top, 10)
         .padding(.horizontal, 6)
@@ -120,10 +126,11 @@ private struct SymphonyDock: View {
                 Text(label).font(.captionBold)
             }
             .foregroundStyle(activeTab == t ? Color.ink : Color.textTertiary)
-            .frame(maxWidth: .infinity)
+            .frame(maxWidth: .infinity, minHeight: 44)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .accessibilityAddTraits(activeTab == t ? .isSelected : [])
     }
 
     // The center "+" is its own equal-width slot (so it sits between Inbox and
@@ -403,10 +410,11 @@ struct MoreView: View {
     var body: some View {
         List {
             Section {
+                // Routines moved to the dock; Projects moved here from it.
                 NavigationLink {
-                    RoutineListView()
+                    ProjectListView()
                 } label: {
-                    Label("Routines", systemImage: "repeat")
+                    Label("Projects", systemImage: "folder")
                 }
 
                 NavigationLink {

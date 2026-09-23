@@ -3,22 +3,31 @@ import SwiftUI
 
 // MARK: - View Navigation
 
+/// The phone dock: Planner · Inbox · ＋ · Routines · More.
 enum AppTab: String, CaseIterable, Identifiable {
-    case today = "Today"
+    case planner = "Planner"
     case inbox = "Inbox"
-    case projects = "Projects"
+    case routines = "Routines"
     case more = "More"
 
     var id: String { rawValue }
 
     var icon: String {
         switch self {
-        case .today: "sun.max"
+        case .planner: "calendar"
         case .inbox: "tray"
-        case .projects: "folder"
+        case .routines: "repeat"
         case .more: "ellipsis"
         }
     }
+}
+
+/// The Planner's horizons, switched from its serif title. Each is a real,
+/// dated period — never an open-ended list.
+enum Horizon: String, CaseIterable, Identifiable {
+    case today, week, month, season, year
+
+    var id: String { rawValue }
 }
 
 enum SidebarItem: String, CaseIterable, Identifiable {
@@ -68,9 +77,12 @@ enum DomainFilter: String, CaseIterable, Identifiable {
 @Observable
 final class AppState {
     // Navigation
-    var activeTab: AppTab = .today
+    var activeTab: AppTab = .planner
     var activeSidebarItem: SidebarItem = .today
     var selectedDate: Date = .now
+    /// Which horizon the Planner shows. `selectedDate` anchors every horizon:
+    /// the week, month, season and year shown are the ones containing it.
+    var horizon: Horizon = .today
 
     // Domain filter
     var domainFilter: DomainFilter = .all
@@ -96,4 +108,27 @@ final class AppState {
     var isToday: Bool {
         Calendar.current.isDateInToday(selectedDate)
     }
+
+    /// Step the displayed period back or forward by one of the current
+    /// horizon's units (a week, a month, a season, a year).
+    func step(_ direction: Int, seasons: [SeasonBoundary]? = nil) {
+        let cal = PlanCalendar.calendar
+        switch horizon {
+        case .today:
+            selectedDate = PlanCalendar.addDays(selectedDate, direction)
+        case .week:
+            selectedDate = PlanCalendar.addDays(PlanCalendar.weekStart(selectedDate), 7 * direction)
+        case .month:
+            selectedDate = cal.date(byAdding: .month, value: direction, to: PlanCalendar.monthStart(selectedDate)) ?? selectedDate
+        case .season:
+            let season = PlanCalendar.season(containing: selectedDate, boundaries: seasons)
+            selectedDate = direction > 0 ? season.end : PlanCalendar.addDays(season.start, -1)
+        case .year:
+            let y = PlanCalendar.year(of: selectedDate) + direction
+            selectedDate = cal.date(from: DateComponents(year: y, month: 1, day: 1)) ?? selectedDate
+        }
+    }
+
+    /// Back to the period containing today.
+    func goToCurrentPeriod() { selectedDate = .now }
 }

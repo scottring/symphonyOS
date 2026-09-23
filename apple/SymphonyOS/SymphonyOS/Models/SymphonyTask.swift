@@ -80,6 +80,28 @@ final class SymphonyTask {
     /// Which week a bucket=="week" row belongs to (placement cascade). Local
     /// midnight. Sent as a DATE column — see `SyncEngine.taskRow`.
     var weekStart: Date?
+    /// Placement cache for month/season (bucket "month"/"quarter") and the
+    /// weekend (a Saturday) — kept current by database triggers from
+    /// `task_commitments`. Inline defaults so SwiftData's lightweight
+    /// migration can add them to an existing on-device store.
+    var monthStart: Date? = nil
+    var seasonStart: Date? = nil
+    var weekendStart: Date? = nil
+    /// A month/season goal row (an outcome), not an action.
+    var isGoal: Bool = false
+    /// A step under a goal row.
+    var goalTaskId: UUID? = nil
+    /// The year goal (`goals` row) this serves.
+    var goalId: UUID? = nil
+    /// Legacy shared "chosen for this day" date. Read-only: the web now keeps
+    /// focus per person in `task_focus` and only reads this when a task has no
+    /// focus rows at all.
+    var plannedOn: Date? = nil
+    /// True when a local placement change set the period stamps
+    /// (week/month/season/weekend) and they haven't pushed yet. Like
+    /// `scopeDirty`: an UPDATE otherwise leaves those columns alone, so an
+    /// ordinary edit here never nulls a placement made on the web.
+    var placementDirty: Bool = false
 
     // Linked activity
     var linkedTo: LinkedActivity?

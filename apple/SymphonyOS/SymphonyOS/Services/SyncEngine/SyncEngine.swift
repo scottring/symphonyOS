@@ -33,6 +33,9 @@ actor SyncEngine {
         ("actionable_instances", ActionableInstance.self),
         ("event_notes", EventNote.self),
         ("weekly_templates", WeeklyTemplate.self),
+        ("task_commitments", TaskCommitment.self),
+        ("task_focus", TaskFocus.self),
+        ("goals", Goal.self),
     ]
 
     init(modelContainer: ModelContainer) {
@@ -151,6 +154,7 @@ actor SyncEngine {
                     if change.tableName == "tasks",
                        let task = (try? context.fetch(FetchDescriptor<SymphonyTask>()))?.first(where: { $0.id == change.recordId }) {
                         task.scopeDirty = false
+                        task.placementDirty = false
                     }
                 } catch {
                     change.attempts += 1
@@ -207,6 +211,11 @@ actor SyncEngine {
         await pullTable("actionable_instances", as: ActionableInstance.self, userId: userId)
         await pullTable("event_notes", as: EventNote.self, userId: userId)
         await pullTable("weekly_templates", as: WeeklyTemplate.self, userId: userId)
+        // Planning: which week/month/season each task is committed to, who
+        // chose what for which day, and the year's goals.
+        await pullTable("task_commitments", as: TaskCommitment.self, userId: userId)
+        await pullTable("task_focus", as: TaskFocus.self, userId: userId)
+        await pullTable("goals", as: Goal.self, userId: userId)
     }
 
     // MARK: - Pull
@@ -233,7 +242,11 @@ actor SyncEngine {
                 offset += pageSize
             }
 
-            let serverIds = Set(rows.compactMap { $0["id"]?.stringValue?.lowercased() })
+            // Ids come from the mapped models, not the raw `id` column:
+            // task_focus has no id column (its key is task/user/date) and
+            // derives a stable local id from that key.
+            let models = rows.compactMap { RowMapper.toModel(type, from: $0) }
+            let serverIds = Set(models.map { $0.id.uuidString.lowercased() })
 
             // Rows with a queued (not-yet-pushed) local change are off-limits in
             // BOTH phases: deleting one as "gone from server" destroys a local
@@ -272,8 +285,7 @@ actor SyncEngine {
 
             // Phase 2: insert the fresh server rows (skipping ones we kept above).
             var inserted = 0
-            for row in rows {
-                guard let model = RowMapper.toModel(type, from: row) else { continue }
+            for model in models {
                 if pendingIds.contains(model.id) { continue }
                 context.insert(model)
                 inserted += 1
@@ -299,7 +311,16 @@ actor SyncEngine {
             // that natural key and update it instead of failing the push forever.
             guard let row = Self.serializeRow(table: change.tableName, id: change.recordId, context: context, forInsert: true) else { return }
             let conflictKey = Self.naturalKey(for: change.tableName)?.joined(separator: ",")
-            if let conflictKey {
+            if change.tableName == "task_focus" {
+                // Focus rows are insert-or-nothing: the table has no UPDATE
+                // policy, so an upsert that hit an existing row would fail RLS.
+                var focusRow = row
+                focusRow.removeValue(forKey: "id")
+                try await supabase
+                    .from(change.tableName)
+                    .upsert(AnyJSON.object(focusRow), onConflict: "task_id,user_id,date", ignoreDuplicates: true)
+                    .execute()
+            } else if let conflictKey {
                 var naturalRow = row
                 naturalRow.removeValue(forKey: "id")   // let the existing row keep its id
                 try await supabase
@@ -346,11 +367,22 @@ actor SyncEngine {
             Self.syncLog.info("pushed update \(change.tableName, privacy: .public)")
 
         case "delete":
-            try await supabase
-                .from(change.tableName)
-                .delete()
-                .eq("id", value: change.recordId.uuidString)
-                .execute()
+            if let payload = change.payload,
+               let match = try? JSONDecoder().decode([String: String].self, from: payload) {
+                // Keyed delete (task_focus has no id): the row is already gone
+                // locally, so its key rode along in the payload.
+                var query = supabase.from(change.tableName).delete()
+                for (column, value) in match.sorted(by: { $0.key < $1.key }) {
+                    query = query.eq(column, value: value)
+                }
+                try await query.execute()
+            } else {
+                try await supabase
+                    .from(change.tableName)
+                    .delete()
+                    .eq("id", value: change.recordId.uuidString)
+                    .execute()
+            }
             Self.syncLog.info("pushed delete \(change.tableName, privacy: .public)")
 
         default:
@@ -365,6 +397,9 @@ actor SyncEngine {
         switch table {
         case "actionable_instances": ["user_id", "entity_type", "entity_id", "date"]
         case "event_notes": ["user_id", "google_event_id"]
+        // One commitment per (task, level, period): a web-made row for the same
+        // key has a different id, so match on the key, never the local id.
+        case "task_commitments": ["task_id", "level", "period_start"]
         default: nil
         }
     }
@@ -402,6 +437,12 @@ actor SyncEngine {
         case "list_items":
             guard let i = find(SymphonyListItem.self) else { return nil }
             return listItemRow(i)
+        case "task_commitments":
+            guard let c = find(TaskCommitment.self) else { return nil }
+            return commitmentRow(c)
+        case "task_focus":
+            guard let f = find(TaskFocus.self) else { return nil }
+            return focusRow(f)
         default:
             return nil   // other tables aren't edited from iOS
         }
@@ -470,7 +511,16 @@ actor SyncEngine {
         }
         // Only when set: a blanket null would wipe a week placement made on the
         // web. DATE column → local yyyy-MM-dd (dateOnly), never ISO.
-        if let ws = t.weekStart {
+        // A placement made on the phone (placementDirty) sends every period
+        // stamp — nulls included, so moving a weekend task to a weekday clears
+        // `weekend_start`. Otherwise only a set week_start rides along, so an
+        // ordinary edit never nulls a placement made on the web.
+        if t.placementDirty {
+            row["week_start"] = dateOnly(t.weekStart)
+            row["month_start"] = dateOnly(t.monthStart)
+            row["season_start"] = dateOnly(t.seasonStart)
+            row["weekend_start"] = dateOnly(t.weekendStart)
+        } else if let ws = t.weekStart {
             row["week_start"] = dateOnly(ws)
         }
         // scope is derived on the phone at creation (PageParse.taskFields) and
@@ -586,6 +636,7 @@ actor SyncEngine {
             "deferred_to": d(i.deferredTo),
             "completed_at": d(i.completedAt),
             "skipped_at": d(i.skippedAt),
+            "planned_on": dateOnly(i.plannedOn),
             "created_at": .string(isoOut.string(from: i.createdAt)),
             "updated_at": .string(isoOut.string(from: Date())),
         ]
@@ -614,6 +665,28 @@ actor SyncEngine {
             "is_free": .bool(n.isFree),
             "created_at": .string(isoOut.string(from: n.createdAt)),
             "updated_at": .string(isoOut.string(from: Date())),
+        ]
+    }
+
+    private static func commitmentRow(_ c: TaskCommitment) -> [String: AnyJSON] {
+        [
+            "id": .string(c.id.uuidString),
+            "task_id": .string(c.taskId.uuidString),
+            "level": .string(c.level),
+            "period_start": dateOnly(c.periodStart),
+            "status": .string(c.status),
+            "carried_to": dateOnly(c.carriedTo),
+            "created_by": u(c.createdBy),
+            "ended_at": d(c.endedAt),
+        ]
+    }
+
+    private static func focusRow(_ f: TaskFocus) -> [String: AnyJSON] {
+        [
+            "id": .string(f.id.uuidString),   // dropped before the push
+            "task_id": .string(f.taskId.uuidString),
+            "user_id": .string(f.userId.uuidString),
+            "date": dateOnly(f.date),
         ]
     }
 
@@ -808,6 +881,9 @@ extension Project: HasUUID {}
 extension Routine: HasUUID {}
 extension Contact: HasUUID {}
 extension FamilyMember: HasUUID {}
+extension TaskCommitment: HasUUID {}
+extension TaskFocus: HasUUID {}
+extension Goal: HasUUID {}
 extension ActionableInstance: HasUUID {}
 extension EventNote: HasUUID {}
 extension WeeklyTemplate: HasUUID {}

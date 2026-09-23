@@ -2,7 +2,14 @@ import SwiftUI
 import SwiftData
 import UserNotifications
 
+/// The Planner's Today: the displayed date's untimed work ("For today"), the
+/// way into this week's shelf ("Choose from this week"), then the timed
+/// schedule. Unfinished work is one calm line to review deliberately —
+/// nothing carries forward on its own.
 struct TodayView: View {
+    /// Opens the horizon switcher (the title is its button).
+    var onTitle: () -> Void = {}
+
     @Environment(AppState.self) private var appState
     @Environment(AuthService.self) private var auth
     @Environment(\.modelContext) private var modelContext
@@ -10,203 +17,169 @@ struct TodayView: View {
     @State private var calendar = GoogleCalendarService()
     @State private var showSearch = false
     @State private var searchText = ""
+    @State private var showChooser = false
+    @State private var showUnfinished = false
     @FocusState private var searchFocused: Bool
 
-    // SwiftData queries
     @Query private var allTasks: [SymphonyTask]
-    @Query(filter: #Predicate<Routine> { $0.visibility == "active" })
-    private var routines: [Routine]
+    @Query private var routines: [Routine]
     @Query private var instances: [ActionableInstance]
     @Query private var eventNotes: [EventNote]
+    @Query private var focusRows: [TaskFocus]
+    @Query private var commitments: [TaskCommitment]
+
+    private var userId: UUID { auth.currentUser?.id ?? UUID() }
+    private var date: Date { appState.selectedDate }
+
+    private var plan: PlanSnapshot {
+        PlanSnapshot(tasks: allTasks, commitments: commitments, focus: focusRows, routines: routines,
+                     instances: instances, userId: auth.currentUser?.id, domain: appState.domainFilter.contextValue)
+    }
 
     var body: some View {
-        ZStack {
-            Color.bgBase.ignoresSafeArea()
+        let plan = plan
+        let offerTasks = plan.chooserTasks(on: date).count
+        let offerRoutines = plan.chooserRoutines(on: date).filter { !$0.chosen }.count
 
-            VStack(spacing: 0) {
-                // Editorial header
-                editorialHeader
+        ScrollView {
+            LazyVStack(alignment: .leading, spacing: 0) {
+                header
                     .padding(.horizontal, 20)
                     .padding(.top, 8)
-                    .padding(.bottom, 4)
 
-                // Search field — drops down from the search icon in the header
                 if showSearch {
                     searchField
                         .padding(.horizontal, 20)
-                        .padding(.bottom, 8)
+                        .padding(.top, 10)
                         .transition(.move(edge: .top).combined(with: .opacity))
                 }
 
-                // Domain switcher
                 DomainSwitcher()
                     .padding(.horizontal, 20)
-                    .padding(.bottom, 12)
+                    .padding(.top, 10)
 
-                // Timeline
-                ScrollView {
-                    LazyVStack(spacing: 0) {
-                        if isSearching {
-                            searchResultsContent
-                        } else {
-                        // Carried over (overdue) — mirrors the web's OverdueSection,
-                        // at the top and COLLAPSED by default.
-                        if !viewModel.carriedOverTasks.isEmpty {
-                            CarriedOverSection(
-                                tasks: viewModel.carriedOverTasks,
-                                modelContext: modelContext,
-                                userId: auth.currentUser?.id ?? UUID()
-                            )
-                        }
-
-                        // Time-of-day sections (All Day, Morning, Afternoon, Evening)
-                        ForEach(TimelineViewModel.TimeSection.allCases, id: \.self) { section in
-                            let sectionItems = viewModel.timelineItems.filter { viewModel.section(for: $0) == section }
-                            if !sectionItems.isEmpty {
-                                TimelineSectionView(
-                                    title: section.rawValue,
-                                    items: sectionItems,
-                                    modelContext: modelContext,
-                                    userId: auth.currentUser?.id ?? UUID(),
-                                    date: appState.selectedDate
-                                )
-                            }
-                        }
-
-                        // NOTE: no inbox/"Unscheduled" section here — the web Today
-                        // page doesn't show the inbox; it lives in the Inbox tab.
-
-                        // Empty state
-                        if viewModel.timelineItems.isEmpty && viewModel.carriedOverTasks.isEmpty {
-                            emptyState
-                                .padding(.top, 60)
-                        }
-                        } // end: not searching
+                if isSearching {
+                    searchResultsContent
+                } else {
+                    if !viewModel.carriedOverTasks.isEmpty {
+                        let n = viewModel.carriedOverTasks.count
+                        CalmRow(text: "Review \(n) unfinished \(n == 1 ? "item" : "items")") { showUnfinished = true }
+                            .accessibilityHint("Decide what happens to each. Nothing moves on its own.")
                     }
-                    .padding(.bottom, 80) // Space for quick capture bar
-                }
-            }
 
-            // Quick capture bar
-            if let userId = auth.currentUser?.id {
-                VStack {
-                    Spacer()
-                    QuickCaptureBar(userId: userId, defaultDate: appState.selectedDate)
+                    let forToday = viewModel.forToday
+                    if !forToday.isEmpty || offerTasks + offerRoutines > 0 {
+                        Eyebrow(text: "For today")
+                        ForEach(forToday) { item in card(item) }
+                    }
+                    if offerTasks + offerRoutines > 0 {
+                        CalmRow(text: "Choose from this week", detail: offerDetail(offerTasks, offerRoutines)) {
+                            showChooser = true
+                        }
+                    }
+
+                    ForEach(TimelineViewModel.TimeSection.allCases, id: \.self) { section in
+                        let items = viewModel.schedule.filter { viewModel.section(for: $0) == section }
+                        if !items.isEmpty {
+                            Eyebrow(text: section.rawValue)
+                            ForEach(items) { item in card(item) }
+                        }
+                    }
+
+                    if viewModel.timelineItems.isEmpty && viewModel.carriedOverTasks.isEmpty && offerTasks + offerRoutines == 0 {
+                        emptyState.padding(.top, 60).frame(maxWidth: .infinity)
+                    }
                 }
-                // The dock's `.safeAreaInset` is attached outside this
-                // NavigationStack (see iOSMainView, F4) so it doesn't propagate
-                // down here — pad explicitly by the dock's own content height
-                // so the bar floats clear of it instead of sitting behind it.
-                .padding(.bottom, DockMetrics.height)
             }
+            .padding(.bottom, 12)
+        }
+        .scrollDismissesKeyboard(.interactively)
+        .background(Color.bgBase.ignoresSafeArea())
+        // The capture bar is an inset, not an overlay: the list's scroll
+        // extent ends above it, so the last card (and every subtask) can
+        // always scroll fully into view — with the keyboard up too.
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            QuickCaptureBar(userId: userId, defaultDate: date)
+                .padding(.top, 4)
+                .background(alignment: .bottom) {
+                    LinearGradient(colors: [Color.bgBase.opacity(0), Color.bgBase], startPoint: .top, endPoint: .center)
+                        .ignoresSafeArea()
+                }
+                .padding(.bottom, DockMetrics.height)
         }
         #if os(iOS)
         .toolbar(.hidden, for: .navigationBar)
         #endif
+        .sheet(isPresented: $showChooser) {
+            ChooserSheet(date: date)
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
+        }
+        .sheet(isPresented: $showUnfinished) {
+            UnfinishedSheet(tasks: viewModel.carriedOverTasks)
+                .presentationDetents([.medium, .large])
+                .presentationDragIndicator(.visible)
+        }
         .onAppear { rebuildTimeline() }
-        .task { await calendar.fetchEvents(for: appState.selectedDate) }
+        .task { await calendar.fetchEvents(for: date) }
         .onChange(of: appState.selectedDate) { _, _ in
             rebuildTimeline()
             Task { await calendar.fetchEvents(for: appState.selectedDate) }
         }
         .onChange(of: appState.domainFilter) { _, _ in rebuildTimeline() }
-        // Rebuild on task CONTENT changes, not just count: completing or
-        // rescheduling a task leaves the count unchanged, so keying on
-        // `allTasks.count` never fired — the row mutated in SwiftData but the
-        // carried-over/timeline snapshot stayed stale (visible completion bug).
         .onChange(of: tasksRevision) { _, _ in rebuildTimeline() }
         .onChange(of: instancesRevision) { _, _ in rebuildTimeline() }
-        // A note/link edit on an EventNote (via the event detail sheet) must
-        // flip its timeline row from plain to block without leaving Today.
+        .onChange(of: focusRows.count) { _, _ in rebuildTimeline() }
         .onChange(of: eventNotesRevision) { _, _ in rebuildTimeline() }
-        // Google events arrived (or changed) → fold them into the timeline.
         .onChange(of: calendar.eventItems.count) { _, _ in rebuildTimeline() }
     }
 
-    // MARK: - Editorial Header
+    private func card(_ item: TimelineItem) -> some View {
+        TimelineItemCard(item: item, modelContext: modelContext, userId: userId, date: date)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 3)
+    }
 
-    private var editorialHeader: some View {
-        HStack(alignment: .bottom) {
-            // Left: Title + date
-            VStack(alignment: .leading, spacing: 2) {
-                Text(appState.isToday ? "Today" : appState.selectedDate.formatted(.dateTime.weekday(.wide)))
-                    .font(.displayLarge)
-                    .foregroundStyle(Color.textPrimary)
+    private func offerDetail(_ tasks: Int, _ routines: Int) -> String {
+        var parts: [String] = []
+        if tasks > 0 { parts.append("\(tasks) \(tasks == 1 ? "task" : "tasks")") }
+        if routines > 0 { parts.append("\(routines) \(routines == 1 ? "routine" : "routines")") }
+        return parts.joined(separator: " · ")
+    }
 
-                Text(appState.selectedDate.formatted(.dateTime.weekday(.wide).month(.wide).day()))
-                    .font(.bodySmall)
-                    .foregroundStyle(Color.textTertiary)
-            }
+    // MARK: - Header
 
-            Spacer()
-
-            // Right: Day navigation arrows
-            HStack(spacing: 12) {
-                // Search — drops down a search field below the header
-                Button {
+    private var header: some View {
+        PlannerHeader(
+            title: appState.isToday ? "Today" : date.formatted(.dateTime.weekday(.wide)),
+            subtitle: date.formatted(.dateTime.weekday(.wide).month(.wide).day()),
+            onTitle: onTitle
+        ) {
+            HStack(spacing: 0) {
+                CircleIconButton(systemImage: "magnifyingglass", label: showSearch ? "Close search" : "Search", active: showSearch) {
                     withAnimation(.easeInOut(duration: 0.2)) {
                         showSearch.toggle()
                         if !showSearch { searchText = "" }
                     }
                     searchFocused = showSearch
-                } label: {
-                    Image(systemName: "magnifyingglass")
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(showSearch ? Color.primaryTint : Color.textTertiary)
-                        .frame(width: 32, height: 32)
-                        .background(Color.bgSurface)
-                        .clipShape(Circle())
-                        .overlay(Circle().strokeBorder(Color.cardBorder, lineWidth: 1))
                 }
-                .buttonStyle(.plain)
-
-                Button {
-                    withAnimation(.easeInOut(duration: 0.2)) {
-                        appState.goToPreviousDay()
-                    }
-                } label: {
-                    Image(systemName: "chevron.left")
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(Color.textTertiary)
-                        .frame(width: 32, height: 32)
-                        .background(Color.bgSurface)
-                        .clipShape(Circle())
-                        .overlay(Circle().strokeBorder(Color.cardBorder, lineWidth: 1))
+                CircleIconButton(systemImage: "chevron.left", label: "Previous day") {
+                    withAnimation(.easeInOut(duration: 0.2)) { appState.goToPreviousDay() }
                 }
-                .buttonStyle(.plain)
-
                 if !appState.isToday {
-                    Button {
-                        withAnimation(.easeInOut(duration: 0.2)) {
-                            appState.goToToday()
-                        }
-                    } label: {
-                        Text("Today")
-                            .font(.captionBold)
-                            .foregroundStyle(Color.ink)
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 6)
-                            .background(Color.bgWarm)
-                            .clipShape(Capsule())
-                            .overlay(Capsule().strokeBorder(Color.cardBorder, lineWidth: 1))
-                    }
-                    .buttonStyle(.plain)
+                    Button("Today") { withAnimation(.easeInOut(duration: 0.2)) { appState.goToToday() } }
+                        .font(.captionBold)
+                        .foregroundStyle(Color.ink)
+                        .padding(.horizontal, 10)
+                        .frame(minHeight: 32)
+                        .background(Color.bgWarm, in: Capsule())
+                        .overlay(Capsule().strokeBorder(Color.cardBorder, lineWidth: 1))
+                        .frame(minHeight: 44)
+                        .buttonStyle(.plain)
                 }
-
-                Button {
-                    withAnimation(.easeInOut(duration: 0.2)) {
-                        appState.goToNextDay()
-                    }
-                } label: {
-                    Image(systemName: "chevron.right")
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(Color.textTertiary)
-                        .frame(width: 32, height: 32)
-                        .background(Color.bgSurface)
-                        .clipShape(Circle())
-                        .overlay(Circle().strokeBorder(Color.cardBorder, lineWidth: 1))
+                CircleIconButton(systemImage: "chevron.right", label: "Next day") {
+                    withAnimation(.easeInOut(duration: 0.2)) { appState.goToNextDay() }
                 }
-                .buttonStyle(.plain)
             }
         }
     }
@@ -221,6 +194,7 @@ struct TodayView: View {
         let q = searchText.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         guard !q.isEmpty else { return [] }
         return allTasks
+            .filter { $0.parentTaskId == nil }
             .filter { $0.title.lowercased().contains(q) || ($0.notes?.lowercased().contains(q) ?? false) }
             .sorted { $0.title.lowercased() < $1.title.lowercased() }
     }
@@ -241,12 +215,14 @@ struct TodayView: View {
                     Image(systemName: "xmark.circle.fill")
                         .font(.system(size: 16))
                         .foregroundStyle(Color.textTertiary)
+                        .frame(minWidth: 44, minHeight: 44)
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel("Clear search")
             }
         }
         .padding(.horizontal, 14)
-        .padding(.vertical, 10)
+        .padding(.vertical, 4)
         .background(Color.bgElevated, in: RoundedRectangle(cornerRadius: 12))
         .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(Color.cardBorder, lineWidth: 1))
     }
@@ -265,12 +241,12 @@ struct TodayView: View {
             .frame(maxWidth: .infinity)
             .padding(.top, 60)
         } else {
-            InboxSectionView(
-                title: "Results",
-                tasks: searchResults,
-                modelContext: modelContext,
-                userId: auth.currentUser?.id ?? UUID()
-            )
+            Eyebrow(text: "Results", count: searchResults.count)
+            ForEach(searchResults, id: \.id) { task in
+                PlanTaskRow(task: task)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 3)
+            }
         }
     }
 
@@ -286,6 +262,7 @@ struct TodayView: View {
                         .font(.system(size: 28))
                         .foregroundStyle(Color.textTertiary)
                 )
+                .accessibilityHidden(true)
 
             Text("Your day is clear")
                 .font(.displayMedium)
@@ -297,13 +274,10 @@ struct TodayView: View {
         }
     }
 
-    /// A content fingerprint of the task list. Changes whenever a task is added,
-    /// removed, completed, rescheduled, or edited in any field the block card
-    /// (TimelineItemCard) renders — the signals that affect what the timeline
-    /// shows. Keying `.onChange` on this (instead of `allTasks.count`) makes
-    /// completion/reschedule/edit actually re-derive the Today view. Without
-    /// title/notes/phoneNumber/links/etc here, editing a task's notes on the
-    /// phone left its row plain until Today was re-entered.
+    // MARK: - Rebuild triggers
+
+    /// A content fingerprint of the task list — completion/reschedule/edits
+    /// leave the count unchanged, so keying on count alone went stale.
     private var tasksRevision: Int {
         var hasher = Hasher()
         hasher.combine(allTasks.count)
@@ -320,16 +294,13 @@ struct TodayView: View {
             hasher.combine(task.parentTaskId)
             hasher.combine(task.captureId)
             hasher.combine(task.scope)
+            hasher.combine(task.context)
             hasher.combine(task.assignedTo)
             hasher.combine(task.assignedToAll?.count)
         }
         return hasher.finalize()
     }
 
-    /// Same idea for EventNote content — notes/links typed in the event detail
-    /// sheet must flip a plain event row into a block card without leaving Today,
-    /// and toggling Free (which may write a SERIES note, not the instance note
-    /// any particular event row already held) must redim/undim it the same way.
     private var eventNotesRevision: Int {
         var hasher = Hasher()
         hasher.combine(eventNotes.count)
@@ -342,14 +313,15 @@ struct TodayView: View {
         return hasher.finalize()
     }
 
-    /// Same idea for routine completions, which write `ActionableInstance.status`
-    /// in place — the count never changes, so a count-only trigger would miss it.
+    /// Routine completions and choices write `ActionableInstance` in place.
     private var instancesRevision: Int {
         var hasher = Hasher()
         hasher.combine(instances.count)
         for instance in instances {
             hasher.combine(instance.id)
             hasher.combine(instance.status)
+            hasher.combine(instance.plannedOn)
+            hasher.combine(instance.deferredTo)
         }
         return hasher.finalize()
     }
@@ -362,7 +334,9 @@ struct TodayView: View {
             date: appState.selectedDate,
             domainFilter: appState.domainFilter,
             eventItems: calendar.eventItems,
-            eventNotes: eventNotes
+            eventNotes: eventNotes,
+            focus: focusRows,
+            userId: auth.currentUser?.id
         )
         NotificationManager.reconcile(allTasks)
     }
@@ -395,152 +369,6 @@ enum NotificationManager {
             let comps = Calendar.current.dateComponents([.year, .month, .day, .hour, .minute], from: when)
             let trigger = UNCalendarNotificationTrigger(dateMatching: comps, repeats: false)
             center.add(UNNotificationRequest(identifier: task.id.uuidString, content: content, trigger: trigger))
-        }
-    }
-}
-
-// MARK: - Timeline Section
-
-struct TimelineSectionView: View {
-    let title: String
-    let items: [TimelineItem]
-    let modelContext: ModelContext
-    let userId: UUID
-    /// The day this section renders — routine completions attach to this date.
-    var date: Date = Date()
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text(title)
-                .eyebrowStyle()
-                .padding(.horizontal, 20)
-                .padding(.top, 24)
-                .padding(.bottom, 2)
-
-            ForEach(items) { item in
-                TimelineItemCard(item: item, modelContext: modelContext, userId: userId, date: date)
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 3)
-            }
-        }
-    }
-}
-
-// MARK: - Carried Over Section
-
-/// Carried-over work, collapsed to one line by default — the same stance the
-/// web's `OverdueSection` takes.
-///
-/// These are obligations to review, not the day's headline. Rendered expanded
-/// they ate the entire first screen (nine rows on an iPhone 17 Pro) and the
-/// actual day never appeared above the fold. One calm line keeps the timeline
-/// visible on load; tap to open the full list.
-struct CarriedOverSection: View {
-    let tasks: [SymphonyTask]
-    let modelContext: ModelContext
-    let userId: UUID
-
-    @State private var expanded = false
-
-    var body: some View {
-        if expanded {
-            VStack(alignment: .leading, spacing: 0) {
-                InboxSectionView(
-                    title: "Carried over",
-                    tasks: tasks,
-                    modelContext: modelContext,
-                    userId: userId
-                )
-                Button { withAnimation(.easeInOut(duration: 0.2)) { expanded = false } } label: {
-                    HStack(spacing: 4) {
-                        Image(systemName: "chevron.up")
-                            .font(.captionBold)
-                        Text("Collapse")
-                            .font(.captionText)
-                    }
-                    .foregroundStyle(Color.textTertiary)
-                    .padding(.horizontal, 20)
-                    .padding(.top, 8)
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Collapse carried over")
-            }
-        } else {
-            Button { withAnimation(.easeInOut(duration: 0.2)) { expanded = true } } label: {
-                HStack(spacing: 6) {
-                    Image(systemName: "arrow.uturn.left")
-                        .font(.captionBold)
-                        .foregroundStyle(Color.feedbackAmber)
-
-                    Text("\(tasks.count) carried over")
-                        .font(.bodySmallBold)
-                        .foregroundStyle(Color.feedbackAmber)
-                        .fixedSize()
-
-                    if let first = tasks.first {
-                        Text(summary(after: first))
-                            .font(.bodySmall)
-                            .foregroundStyle(Color.textTertiary)
-                            .lineLimit(1)
-                            .truncationMode(.tail)
-                    }
-
-                    Spacer(minLength: 4)
-
-                    Image(systemName: "chevron.down")
-                        .font(.captionBold)
-                        .foregroundStyle(Color.textTertiary)
-                }
-                .padding(.horizontal, 20)
-                .padding(.top, 20)
-                .padding(.bottom, 4)
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Show \(tasks.count) carried over tasks")
-        }
-    }
-
-    private func summary(after first: SymphonyTask) -> String {
-        tasks.count > 1
-            ? "— \(first.title) +\(tasks.count - 1) more"
-            : "— \(first.title)"
-    }
-}
-
-// MARK: - Inbox Section
-
-struct InboxSectionView: View {
-    var title: String = "Unscheduled"
-    let tasks: [SymphonyTask]
-    let modelContext: ModelContext
-    let userId: UUID
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack(alignment: .center) {
-                Text(title)
-                    .eyebrowStyle()
-
-                Spacer()
-
-                Text("\(tasks.count)")
-                    .font(.captionBold)
-                    .foregroundStyle(Color.textSecondary)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 3)
-                    .background(Color.bgSurface)
-                    .clipShape(Capsule())
-            }
-            .padding(.horizontal, 20)
-            .padding(.top, 28)
-            .padding(.bottom, 2)
-
-            ForEach(tasks, id: \.id) { task in
-                InboxTaskRow(task: task, modelContext: modelContext, userId: userId)
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 3)
-            }
         }
     }
 }

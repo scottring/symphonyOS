@@ -60,6 +60,7 @@ struct SyncSerializationTests {
             "id", "user_id", "entity_type", "entity_id", "date", "status",
             "assignee", "deferred_to", "completed_at", "skipped_at",
             "created_at", "updated_at", "assigned_to_override",
+            "planned_on",   // verified against prod 2026-09-23
         ]
         #expect(Set(row.keys).isSubset(of: prodColumns))
     }
@@ -123,6 +124,8 @@ struct SyncSerializationTests {
             "assigned_to_all", "is_waiting", "waiting_since", "bucket", "needs_discussion",
             "discussion_note", "week_deferred_at", "group_members", "scope", "directions",
             "capture_meta", "week_start", "capture_id",
+            // Planning stamps (verified against prod 2026-09-23).
+            "month_start", "season_start", "weekend_start",
         ]
         #expect(Set(row.keys).isSubset(of: prodColumns))
         // Non-capture tasks must NOT send capture_meta — a null would wipe the

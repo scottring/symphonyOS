@@ -34,6 +34,9 @@ struct SymphonyApp: App {
             UserProfile.self,
             SymphonyList.self,
             SymphonyListItem.self,
+            TaskCommitment.self,
+            TaskFocus.self,
+            Goal.self,
             PendingChange.self,
         ])
     }

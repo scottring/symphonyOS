@@ -25,6 +25,19 @@ final class TimelineViewModel {
         case evening = "Evening"
     }
 
+    /// Untimed work for the day: all-day/untimed tasks, tasks I chose for it,
+    /// and chosen or pinned untimed routine occurrences. Chosen first.
+    var forToday: [TimelineItem] {
+        timelineItems
+            .filter { $0.type != .event && $0.startTime == nil }
+            .sorted { ($0.isFocused ? 0 : 1) < ($1.isFocused ? 0 : 1) }
+    }
+
+    /// Timed work and events, including all-day events (the web's Schedule).
+    var schedule: [TimelineItem] {
+        timelineItems.filter { $0.type == .event || $0.startTime != nil }
+    }
+
     func buildTimeline(
         tasks: [SymphonyTask],
         routines: [Routine],
@@ -32,15 +45,19 @@ final class TimelineViewModel {
         date: Date,
         domainFilter: DomainFilter,
         eventItems: [TimelineItem] = [],
-        eventNotes: [EventNote] = []
+        eventNotes: [EventNote] = [],
+        focus: [TaskFocus] = [],
+        userId: UUID? = nil
     ) {
         var items: [TimelineItem] = []
         var inbox: [SymphonyTask] = []
-        var carried: [SymphonyTask] = []
 
         let cal = Calendar.current
         let startOfDay = cal.startOfDay(for: date)
-        let isToday = cal.isDateInToday(date)
+        let plan = PlanSnapshot(tasks: tasks, commitments: [], focus: focus, routines: routines,
+                                instances: instances, userId: userId, domain: domainFilter.contextValue)
+        let focusedExtras = plan.focusedExtras(on: date)
+        let focusedIds = Set(focusedExtras.map(\.id))
 
         // Subtasks attach to their parent's card. Not filtered by domain — they
         // inherit the parent's placement. Orphans (parent not on this day) are
@@ -58,24 +75,12 @@ final class TimelineViewModel {
             // Skip subtasks (they show under parent)
             if task.parentTaskId != nil { continue }
 
-            guard let scheduled = task.scheduledFor,
-                  cal.isDate(scheduled, inSameDayAs: date) else {
-                // Not scheduled for this day (domain filter already applied above):
-                //   • no date           → Unscheduled (inbox)
-                //   • past date + today → Carried over (overdue), mirrors web OverdueSection
-                if !task.completed {
-                    if let s = task.scheduledFor {
-                        // A date is a commitment to a day, and it EXPIRES. Only work
-                        // inside the grace window keeps a Today slot; older items
-                        // belong to the review queue on /week. Without this bound the
-                        // phone rendered every past-dated task ever created — a July
-                        // 25 item was still sitting on Today on August 8, and nine
-                        // carried-over rows pushed the actual day off the screen.
-                        let age = cal.dateComponents([.day], from: cal.startOfDay(for: s), to: startOfDay).day ?? 0
-                        if isToday && age > 0 && age <= Self.graceDays { carried.append(task) }
-                    } else if task.bucket == "inbox" {
-                        inbox.append(task)   // true inbox only; week/month/someday excluded
-                    }
+            let chosen = focusedIds.contains(task.id)
+            guard chosen || (task.scheduledFor.map { cal.isDate($0, inSameDayAs: date) } ?? false) else {
+                // Not on this day. Undated inbox work is collected for the
+                // Inbox; past-dated work is reviewed via `plan.unfinished`.
+                if !task.completed && task.scheduledFor == nil && task.bucket == "inbox" {
+                    inbox.append(task)   // true inbox only; week/month/someday excluded
                 }
                 continue
             }
@@ -88,8 +93,10 @@ final class TimelineViewModel {
                 id: "task-\(task.id.uuidString)",
                 type: .task,
                 title: task.title,
-                startTime: task.isAllDay ? nil : task.scheduledFor,
-                isAllDay: task.isAllDay,
+                // A task chosen for this day but dated elsewhere lists untimed.
+                startTime: (task.isAllDay || chosen && !(task.scheduledFor.map { cal.isDate($0, inSameDayAs: date) } ?? false))
+                    ? nil : task.scheduledFor,
+                isAllDay: task.isAllDay || chosen,
                 completed: task.completed,
                 context: task.context,
                 entityId: task.id,
@@ -100,20 +107,18 @@ final class TimelineViewModel {
                 phoneNumber: task.phoneNumber,
                 locationPlaceId: task.locationPlaceId,
                 source: Self.source(type: .task, captureId: task.captureId, scope: task.scope),
-                children: kids
+                children: kids,
+                isFocused: chosen || plan.isFocused(task, on: date)
             ))
         }
 
-        // Routines that should appear today
-        for routine in routines {
-            if let contextValue = domainFilter.contextValue, routine.context != contextValue { continue }
-            guard shouldShowRoutine(routine, on: date) else { continue }
-
-            // Check if there's an instance for this routine+date
-            let instanceStatus = instances.first {
-                $0.entityType == "routine" && $0.entityId == routine.id.uuidString &&
-                cal.isDate($0.date, inSameDayAs: date)
-            }?.status
+        // Routines on the day: timed or pinned ones that are due, plus untimed
+        // occurrences chosen for it. Other untimed occurrences wait in the
+        // chooser (web dayPlan: they stay off the main list until chosen).
+        for routine in plan.dayRoutines(on: date) {
+            // The day's instance. entity_id is text: the web writes lowercase
+            // uuids, so compare case-insensitively.
+            let instanceStatus = plan.instance(for: routine, on: date)?.status
 
             let startTime: Date? = {
                 guard let timeStr = routine.timeOfDay else { return nil }
@@ -133,7 +138,8 @@ final class TimelineViewModel {
                 completed: instanceStatus == "completed" || instanceStatus == "skipped",
                 context: routine.context,
                 entityId: routine.id,
-                assignedTo: routine.assignedTo.map { [$0] } ?? []
+                assignedTo: routine.assignedTo.map { [$0] } ?? [],
+                isFocused: plan.isChosen(routine, on: date)
             ))
         }
 
@@ -171,9 +177,7 @@ final class TimelineViewModel {
 
         self.timelineItems = items
         self.inboxTasks = inbox
-        self.carriedOverTasks = carried.sorted {
-            ($0.scheduledFor ?? .distantPast) < ($1.scheduledFor ?? .distantPast)
-        }
+        self.carriedOverTasks = plan.unfinished(on: date)
     }
 
     /// "Free" resolution — mirrors the web's `isEventFree` in
@@ -202,32 +206,6 @@ final class TimelineViewModel {
         if hour < 12 { return .morning }
         if hour < 18 { return .afternoon }   // web uses an 18:00 afternoon/evening cutoff
         return .evening
-    }
-
-    private func shouldShowRoutine(_ routine: Routine, on date: Date) -> Bool {
-        guard routine.visibility == "active" else { return false }
-
-        // Mirror the web app: hide high-frequency routines (daily, or weekly/
-        // specific-days covering all of Mon–Fri = >4×/week). Daily-rhythm chores
-        // are noise on the timeline, not glanceable commitments. Lower-frequency
-        // routines (weekend-only, ordinary weekly, monthly…) still show.
-        if Self.isEverydayRoutine(routine.recurrencePattern) { return false }
-
-        let pattern = routine.recurrencePattern
-        switch pattern.type {
-        case "daily":
-            return true
-        case "weekly":
-            guard let days = pattern.days else { return false }
-            return days.contains(date.dayOfWeek)
-        case "monthly":
-            if let dom = pattern.dayOfMonth {
-                return Calendar.current.component(.day, from: date) == dom
-            }
-            return false
-        default:
-            return false
-        }
     }
 
     /// True when a routine effectively recurs every weekday (>=5×/week):
@@ -280,6 +258,8 @@ struct TimelineItem: Identifiable {
     /// Resolved by `TimelineViewModel.isEventFree` (instance note OR series
     /// note). Free events render dimmed, unactionable, no check circle.
     var isFree: Bool = false
+    /// Chosen for this day (my task_focus row, or a chosen routine occurrence).
+    var isFocused: Bool = false
 
     enum ItemType: String {
         case task

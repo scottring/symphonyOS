@@ -25,13 +25,19 @@ extension Color {
     // MARK: Text
     static let textPrimary   = Color(hex: 0x2C2520) // --text
     static let textSecondary = Color(hex: 0x6B5E54) // --text-secondary
-    static let textTertiary  = Color(hex: 0x9B8E84) // --text-muted
+    /// Darker than the landing's --text-muted (#9B8E84, ~3:1 on ivory) so
+    /// muted labels, times and eyebrows reach 4.5:1 — as reviewed in the
+    /// approved phone mockups (2026-09-23).
+    static let textTertiary  = Color(hex: 0x7D7066)
     static let textLight     = Color(hex: 0xBEB3A9) // --text-light
 
     // MARK: Accent (amber) + ink
     static let primaryTint  = Color(hex: 0xD97706)  // --amber
     static let primaryLight = Color(hex: 0xF59E0B)  // --amber-soft
     static let accentBg     = Color(hex: 0xFEF3C7)  // --amber-bg
+    /// Amber for text and for fills behind white text (swipe actions, the
+    /// Today tag) — #D97706 is under 3:1 there.
+    static let amberStrong  = Color(hex: 0xB45309)
     /// Primary buttons and the active dock tab — the landing's `.btn-primary`.
     static let ink          = Color(hex: 0x2C2520)
 
