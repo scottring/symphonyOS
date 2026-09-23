@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen, fireEvent, act } from '@testing-library/react'
 import { InboxUndoToast } from './InboxUndoToast'
 
 describe('InboxUndoToast', () => {
@@ -38,5 +38,28 @@ describe('InboxUndoToast', () => {
     render(<InboxUndoToast message="Deleted" onDismiss={() => {}} />)
     expect(screen.queryByRole('button', { name: /undo/i })).not.toBeInTheDocument()
     expect(screen.getByText('Deleted')).toBeInTheDocument()
+  })
+})
+
+describe('InboxUndoToast failure reporting', () => {
+  afterEach(() => vi.useRealTimers())
+
+  it('a persistent entry (failed undo) does not time out; an ordinary one does', () => {
+    vi.useFakeTimers()
+    const stay = vi.fn()
+    const { unmount } = render(<InboxUndoToast message="Couldn't undo that move" onUndo={vi.fn()} onDismiss={stay} actionLabel="Retry" persistent />)
+    act(() => { vi.advanceTimersByTime(60_000) })
+    expect(stay).not.toHaveBeenCalled()
+    expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument()
+    unmount()
+    const go = vi.fn()
+    render(<InboxUndoToast message="Sent" onUndo={vi.fn()} onDismiss={go} />)
+    act(() => { vi.advanceTimersByTime(10_000) })
+    expect(go).toHaveBeenCalledOnce()
+  })
+
+  it('disables the action while an undo is running', () => {
+    render(<InboxUndoToast message="Sent" onUndo={vi.fn()} onDismiss={vi.fn()} busy />)
+    expect(screen.getByRole('button', { name: 'Undoing…' })).toBeDisabled()
   })
 })

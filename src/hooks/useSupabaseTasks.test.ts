@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { renderHook, waitFor, act } from '@testing-library/react'
 import { isFocused } from '@/lib/placement/model'
 import { localYmd } from '@/lib/cadence/config'
@@ -133,16 +133,26 @@ function createMockDbTask(overrides: Partial<MockDbTask> = {}): MockDbTask {
 /** The supporting-record tables (task_commitments, task_focus). Their writes
  *  are recorded on mockUpsert / mockRecordWrites so the tasks spies stay clean. */
 const mockRecordWrites: Array<{ table: string; op: string; data: Record<string, unknown> }> = []
+/** Set to fail ONLY the commitment/focus writes (the row write still lands). */
+let mockRecordsError: { message: string } | null = null
 function recordsApi(table: string) {
   const chain = (op: string, data: Record<string, unknown>) => {
     mockRecordWrites.push({ table, op, data })
     const c: Record<string, unknown> = {}
     c.eq = () => c
-    c.then = (resolve: (v: { error: null }) => unknown) => resolve({ error: null })
+    c.then = (resolve: (v: { error: { message: string } | null }) => unknown) => resolve({ error: mockRecordsError })
     return c
   }
   return {
-    select: () => Promise.resolve({ data: [], error: null }),
+    select: () => {
+      // Chainable like the real client (the reconcile after a failed record
+      // write filters by task).
+      const q: Record<string, unknown> = {}
+      q.eq = () => q
+      q.in = () => q
+      q.then = (resolve: (v: { data: unknown[]; error: null }) => unknown) => resolve({ data: [], error: null })
+      return q
+    },
     upsert: (data: Record<string, unknown>) => { mockUpsert(table, data); return chain('upsert', data) },
     update: (data: Record<string, unknown>) => chain('update', data),
     delete: () => chain('delete', {}),
@@ -1268,6 +1278,25 @@ describe('useSupabaseTasks', () => {
 
       // Should roll back to original
       expect(result.current.tasks[0].title).toBe('Original')
+    })
+  })
+
+  // One updateTask is not one transaction: the row saves first, then its
+  // commitment/focus records. A failure in the second step still reports
+  // false — but the row HAS changed, so callers must not read false as
+  // "nothing happened" (review 2026-09-22).
+  describe('a row write that lands before its records fail', () => {
+    afterEach(() => { mockRecordsError = null })
+    it('reports false although the tasks row was updated', async () => {
+      mockSupabaseData.push(createMockDbTask({ id: 'task-1', title: 'Original', bucket: 'inbox' }))
+      const { result } = renderHook(() => useSupabaseTasks())
+      await waitFor(() => expect(result.current.tasks).toHaveLength(1))
+      mockRecordsError = { message: 'commitment write failed' }
+      let ok: boolean | undefined
+      await act(async () => { ok = await result.current.pushTask('task-1', 'week') })
+      expect(ok).toBe(false)
+      expect(mockUpdate).toHaveBeenCalledWith(expect.objectContaining({ bucket: 'week' }))
+      expect(mockUpsert).toHaveBeenCalledWith('task_commitments', expect.objectContaining({ level: 'week' }))
     })
   })
 
