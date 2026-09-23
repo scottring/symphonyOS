@@ -26,7 +26,7 @@ interface Props {
 }
 
 export function TaskViewContainer({ taskId, onBack }: Props) {
-  const { tasks, addSubtask, deleteTask, toggleTask, updateTask, pushTask } = useSupabaseTasks();
+  const { tasks, addTask, addSubtask, deleteTask, toggleTask, updateTask, pushTask } = useSupabaseTasks();
   const { contacts, contactsMap, addContact, searchContacts } = useContacts();
   const { projects, projectsMap, addProject, searchProjects } = useProjects();
   const { addNote, addEntityLink, getNotesForEntity } = useNotesContext();
@@ -34,6 +34,26 @@ export function TaskViewContainer({ taskId, onBack }: Props) {
   const navigate = useNavigate();
 
   const task = useMemo(() => tasks.find(t => t.id === taskId) ?? null, [tasks, taskId]);
+
+  // A goal's children are its STEPS, joined by goal_task_id and carrying the
+  // goal's own period — not subtasks. Adding a subtask under a goal wrote
+  // parent_task_id with bucket 'inbox', which no horizon page renders, so the
+  // work vanished (walk finding S2-06).
+  const isGoal = task?.isGoal === true;
+  const steps = useMemo(
+    () => (isGoal && task ? tasks.filter(t => t.goalTaskId === task.id) : []),
+    [isGoal, task, tasks],
+  );
+  const addStep = useCallback(async (goalId: string, title: string) => {
+    if (!task) return undefined;
+    return addTask(title, undefined, undefined, undefined, {
+      bucket: task.bucket === 'quarter' ? 'quarter' : 'month',
+      monthStart: task.monthStart,
+      seasonStart: task.seasonStart,
+      goalTaskId: goalId,
+      context: task.context ?? undefined,
+    });
+  }, [addTask, task]);
   const contact = task?.contactId ? contactsMap.get(task.contactId) ?? null : null;
   const project = task?.projectId ? projectsMap.get(task.projectId) ?? null : null;
 
@@ -128,7 +148,8 @@ export function TaskViewContainer({ taskId, onBack }: Props) {
         onSearchProjects={searchProjects}
         onOpenProject={(projectId) => navigate(`/projects/${projectId}`)}
         onAddProject={addProject}
-        onAddSubtask={addSubtask}
+        onAddSubtask={isGoal ? addStep : addSubtask}
+        steps={steps}
         entityNotes={entityNotes}
         entityNotesLoading={entityNotesLoading}
         onAddEntityNote={handleAddEntityNote}

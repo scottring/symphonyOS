@@ -453,6 +453,35 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
   const shortLabel = level === 'month'
     ? bounds.start.toLocaleDateString('en-US', { month: 'long' })
     : bounds.label
+  /**
+   * When this period is empty, whether an adjacent one holds the plan.
+   *
+   * `/month` opens the month you are IN. With October planned and September
+   * empty, that greeted Scott with "0 goals · 0 tasks" and no hint his work
+   * was one step away, and he wandered (walk finding S2-07). `planningPeriod`
+   * has a silent jump for this case that did not fire here; rather than change
+   * tested navigation behaviour, the page now SAYS what is next door and lets
+   * the reader choose. If the jump does fire, this line simply never shows.
+   */
+  const neighbourWithWork = useMemo(() => {
+    if (level === 'year' || rows.length > 0) return null
+    for (const start of [bounds.next, bounds.prev]) {
+      const found = selectPeriodTasks(layered, level as 'month' | 'season', start, false, meId, seasons)
+        .filter((t) => !t.completed)
+      if (!found.length) continue
+      const goalCount = found.filter((t) => t.isGoal).length
+      const parts = [
+        goalCount ? `${goalCount} goal${goalCount === 1 ? '' : 's'}` : null,
+        found.length - goalCount ? `${found.length - goalCount} task${found.length - goalCount === 1 ? '' : 's'}` : null,
+      ].filter(Boolean)
+      const label = level === 'month'
+        ? start.toLocaleDateString('en-US', { month: 'long' })
+        : periodBounds(level, start, seasons).label
+      return { start, label, summary: parts.join(' and ') }
+    }
+    return null
+  }, [level, rows.length, bounds.next, bounds.prev, layered, meId, seasons])
+
   // "Review August" says which period the look-back is of; "Last month" made
   // the reader work it out.
   const prevPeriodLabel = level === 'month'
@@ -768,6 +797,14 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
                 ? <span className="font-semibold text-sage-600">Planned {savedSession.at.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
                 : `${goalRows.filter((r) => !rowIsDone(r.fate)).length} goals${level === 'year' ? '' : ` · ${openTaskRows.length + supportingTaskCount} tasks`}`}
           </p>
+          {/* Never while a session is open: the reader is mid-draft, and this
+              link would navigate them out of it. */}
+          {neighbourWithWork && !sessionOpen && (
+            <button type="button" onClick={() => goTo(neighbourWithWork.start)}
+              className="ml-2 text-[13px] text-primary-700 hover:underline">
+              {neighbourWithWork.label} has {neighbourWithWork.summary} &rarr;
+            </button>
+          )}
           <span className="flex-1" />
           {!sessionOpen && (
             <button type="button" onClick={startSession} disabled={!sessionReady} aria-busy={sessionLoading || undefined}

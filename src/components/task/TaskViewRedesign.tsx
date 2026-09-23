@@ -28,6 +28,14 @@ interface TaskViewProps {
   onOpenProject?: (projectId: string) => void
   onAddProject?: (project: { name: string }) => Promise<Project | null>
   onAddSubtask?: (parentId: string, title: string) => Promise<string | undefined>
+  /**
+   * The goal's steps, when `task.isGoal`. A goal's children are joined by
+   * `goal_task_id` and carry the goal's own period, so they land on that
+   * period's list and can be chosen for a week. Subtasks (`parent_task_id`,
+   * bucket inbox) cannot — adding one under a goal put the work where no
+   * horizon could see it (walk finding S2-06).
+   */
+  steps?: Task[]
   // Notes support (linked entity notes)
   entityNotes?: Note[]
   entityNotesLoading?: boolean
@@ -50,6 +58,7 @@ export function TaskViewRedesign({
   onAddContact,
   onOpenContact,
   onAddSubtask,
+  steps,
   entityNotes = [],
   entityNotesLoading = false,
   onAddEntityNote,
@@ -217,8 +226,20 @@ export function TaskViewRedesign({
   }
 
   const phoneNumber = contact?.phone
-  const completedSubtasks = task.subtasks?.filter(s => s.completed).length || 0
-  const totalSubtasks = task.subtasks?.length || 0
+  // A goal is the same row as a task, distinguished only by `is_goal`. Until
+  // this page read that flag it offered a goal subtasks, a date and a
+  // completion box — the model says goals stay goals (walk finding S2-06).
+  const isGoal = task.isGoal === true
+  const children = isGoal ? (steps ?? []) : (task.subtasks ?? [])
+  const childNoun = isGoal ? 'step' : 'subtask'
+  const goalPeriodLabel = (() => {
+    if (task.monthStart) return task.monthStart.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+    if (task.seasonStart) return `Season from ${task.seasonStart.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}`
+    if (task.weekStart) return `Week of ${task.weekStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
+    return 'This year'
+  })()
+  const completedSubtasks = children.filter(s => s.completed).length
+  const totalSubtasks = children.length
 
   return (
     <div className="h-full overflow-auto bg-[var(--color-bg-base)]">
@@ -240,7 +261,7 @@ export function TaskViewRedesign({
           >
             <path fillRule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clipRule="evenodd" />
           </svg>
-          Back to tasks
+          Back
         </button>
 
         {/* Two-column layout */}
@@ -250,7 +271,9 @@ export function TaskViewRedesign({
             {/* Task Header */}
             <div className="mb-10">
               <div className="flex items-start gap-5">
-                {/* Completion checkbox - prominent */}
+                {/* Completion checkbox — a goal is not a thing you tick off
+                    here; it closes when its period is reviewed (S2-06). */}
+                {!isGoal && (
                 <button
                   onClick={() => onToggleComplete(task.id)}
                   className="mt-2 flex-shrink-0 group"
@@ -273,6 +296,7 @@ export function TaskViewRedesign({
                     )}
                   </span>
                 </button>
+                )}
 
                 {/* Title - Large editorial typography */}
                 <div className="flex-1 min-w-0">
@@ -349,7 +373,7 @@ export function TaskViewRedesign({
             <div className="mb-10">
               <div className="flex items-center justify-between mb-5">
                 <h2 className="font-display text-lg font-medium text-neutral-800 flex items-center gap-3">
-                  Subtasks
+                  {isGoal ? 'Steps' : 'Subtasks'}
                   {totalSubtasks > 0 && (
                     <span className="text-sm font-normal text-neutral-400">
                       {completedSubtasks} of {totalSubtasks}
@@ -373,8 +397,8 @@ export function TaskViewRedesign({
 
               {/* Subtask list - spacious, no card */}
               <div className="space-y-1">
-                {task.subtasks && task.subtasks.length > 0 && (
-                  task.subtasks.map((subtask, index) => (
+                {children.length > 0 && (
+                  children.map((subtask, index) => (
                     <div
                       key={subtask.id}
                       className="flex items-center gap-4 py-3.5 px-4 -mx-4 rounded-xl
@@ -471,21 +495,23 @@ export function TaskViewRedesign({
                           <path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" />
                         </svg>
                       </span>
-                      <span className="text-base">Add a subtask</span>
+                      <span className="text-base">Add a {childNoun}</span>
                     </button>
                   )
                 )}
               </div>
 
               {/* Empty state for subtasks */}
-              {(!task.subtasks || task.subtasks.length === 0) && !isAddingSubtask && (
+              {children.length === 0 && !isAddingSubtask && (
                 <div className="py-8 text-center">
                   <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-neutral-100 mb-3">
                     <svg xmlns="http://www.w3.org/2000/svg" className="w-6 h-6 text-neutral-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
                     </svg>
                   </div>
-                  <p className="text-sm text-neutral-400">Break this task into smaller steps</p>
+                  <p className="text-sm text-neutral-400">{isGoal
+                    ? 'Add the steps that move this goal. Each one lands on this period\u2019s list, ready to choose for a week.'
+                    : 'Break this task into smaller steps'}</p>
                 </div>
               )}
             </div>
@@ -540,7 +566,20 @@ export function TaskViewRedesign({
           {/* ========== SIDEBAR - Metadata ========== */}
           <aside className="w-72 lg:w-80 flex-shrink-0 hidden md:block">
             <div className="sticky top-8 space-y-6">
-              {/* When */}
+              {/* When — a goal is an outcome for a period, not something with a
+                  day. Offering it a date is the conversion the model forbids,
+                  so a goal gets its period stated instead (S2-06). */}
+              {isGoal ? (
+                <div className="pb-6 border-b border-neutral-200/60">
+                  <h3 className="text-xs font-semibold text-neutral-400 uppercase tracking-wider mb-3">
+                    Period
+                  </h3>
+                  <p className="text-neutral-800 font-medium">{goalPeriodLabel}</p>
+                  <p className="mt-1 text-sm text-neutral-500">
+                    A goal is what this period should add up to. Its steps carry the dates.
+                  </p>
+                </div>
+              ) : (
               <div className="pb-6 border-b border-neutral-200/60">
                 <h3 className="text-xs font-semibold text-neutral-400 uppercase tracking-wider mb-3">
                   When
@@ -621,6 +660,7 @@ export function TaskViewRedesign({
                   </div>
                 )}
               </div>
+              )}
 
               {/* Context */}
               <div className="pb-6 border-b border-neutral-200/60">
