@@ -143,10 +143,7 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
     if (seasonsLoading) return
     anchorSettledRef.current = true
     if (level === 'year') return
-    const result = planningPeriod({
-      level, today, seasons,
-      countFor: (s) => selectPeriodTasks(layered, level as 'month' | 'season', s, isCurrentPeriod(periodBounds(level, s, seasons), today), meId, seasons).length,
-    })
+    const result = planningPeriod({ level, today, seasons })
     setAnchor(result.start)
     setLookingAhead(result.lookingAhead)
   }, [tasks.length, loading, seasonsLoading, level, today, seasons, layered, meId])
@@ -187,11 +184,8 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
     // a season starting next January (Fall/Winter crossing the boundary)
     // reads next year's goals, never this year's (Phase 3 final review).
     if (above === 'year') return new Date(bounds.start.getFullYear(), 0, 1)
-    return planningPeriod({
-      level: above, today, seasons,
-      countFor: (s) => (above === 'season' ? selectPeriodTasks(layered, 'season', s, isCurrentPeriod(periodBounds('season', s, seasons), today), meId, seasons).length : 0),
-    }).start
-  }, [above, today, seasons, layered, meId, bounds.start])
+    return planningPeriod({ level: above, today, seasons }).start
+  }, [above, today, seasons, bounds.start])
   const railRows = useMemo<PlanRowModel[]>(() => {
     if (above === 'season') {
       // The fold can look ahead to a season that ISN'T actually current

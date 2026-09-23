@@ -144,22 +144,25 @@ describe('actionsFor', () => {
 describe('planningPeriod', () => {
   const seasons = DEFAULT_SEASONS
   it('an explicit start wins', () => {
-    expect(planningPeriod({ level: 'season', today: new Date(2026, 8, 6), seasons, explicitStart: new Date(2026, 11, 1), countFor: () => 0 }).start).toEqual(new Date(2026, 11, 1))
+    expect(planningPeriod({ level: 'season', today: new Date(2026, 8, 6), seasons, explicitStart: new Date(2026, 11, 1) }).start).toEqual(new Date(2026, 11, 1))
   })
   it('looks ahead when the current season has ≤14 days left', () => {
-    const r = planningPeriod({ level: 'season', today: new Date(2026, 10, 20), seasons, countFor: () => 0 })
+    const r = planningPeriod({ level: 'season', today: new Date(2026, 10, 20), seasons })
     expect(r).toEqual({ start: new Date(2026, 11, 1), lookingAhead: true })
   })
-  it('looks ahead when this period is empty and the next has a list', () => {
-    const next = new Date(2026, 9, 1)
-    const r = planningPeriod({ level: 'month', today: new Date(2026, 8, 6), seasons, countFor: (s) => (s.getTime() === next.getTime() ? 9 : 0) })
-    expect(r).toEqual({ start: next, lookingAhead: true })
+  it('stays put when this period is empty and the next has a list (S2-09)', () => {
+    // This used to jump silently to the next period. Removed 2026-09-23: it
+    // made the page you arrive at depend on data, and it did not fire when it
+    // was needed. PeriodPlanPage now NAMES the neighbour that holds the plan
+    // and leaves the move to the reader.
+    expect(planningPeriod({ level: 'month', today: new Date(2026, 8, 6), seasons }))
+      .toEqual({ start: new Date(2026, 8, 1), lookingAhead: false })
   })
   it('otherwise the current period', () => {
-    expect(planningPeriod({ level: 'month', today: new Date(2026, 8, 6), seasons, countFor: () => 3 })).toEqual({ start: new Date(2026, 8, 1), lookingAhead: false })
+    expect(planningPeriod({ level: 'month', today: new Date(2026, 8, 6), seasons })).toEqual({ start: new Date(2026, 8, 1), lookingAhead: false })
   })
   it('the year level never looks ahead', () => {
-    expect(planningPeriod({ level: 'year', today: new Date(2026, 11, 28), seasons, countFor: () => 0 })).toEqual({ start: new Date(2026, 0, 1), lookingAhead: false })
+    expect(planningPeriod({ level: 'year', today: new Date(2026, 11, 28), seasons })).toEqual({ start: new Date(2026, 0, 1), lookingAhead: false })
   })
 })
 

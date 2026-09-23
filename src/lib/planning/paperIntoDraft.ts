@@ -82,8 +82,8 @@ function candidates(altitude: PageAltitude, now: Date, seasons: Seasons, chosenS
   }
   const cur = periodBounds(level, now, seasons)
   // The period the page for this level opens on — the same question
-  // PeriodPlanPage asks. No list to count from here: the calendar decides.
-  const { start } = planningPeriod({ level, today: now, seasons, countFor: () => 0 })
+  // PeriodPlanPage asks.
+  const { start } = planningPeriod({ level, today: now, seasons })
   const other = start.getTime() === cur.start.getTime() ? cur.next : cur.start
   return [start, other].map((d) => ({ level, start: d, label: label(d) }))
 }

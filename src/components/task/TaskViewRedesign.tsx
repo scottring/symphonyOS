@@ -8,6 +8,8 @@ import { DOMAIN_COLORS } from '@/lib/domainColors'
 import { EntityNotesSection } from '@/components/notes/EntityNotesSection'
 import { UnifiedNotesEditor } from '@/components/notes/UnifiedNotesEditor'
 import { CloudUpload, Check } from 'lucide-react'
+import { taskWhenLabel } from '@/lib/planning/taskWhen'
+import { GOAL_STATUSES, GOAL_STATUS_HINT, GOAL_STATUS_LABEL, goalStatusOf, goalStatusUpdate } from '@/lib/planning/goalStatus'
 
 interface TaskViewProps {
   task: Task
@@ -232,6 +234,7 @@ export function TaskViewRedesign({
   const isGoal = task.isGoal === true
   const children = isGoal ? (steps ?? []) : (task.subtasks ?? [])
   const childNoun = isGoal ? 'step' : 'subtask'
+  const goalStatus = goalStatusOf(task)
   const goalPeriodLabel = (() => {
     if (task.monthStart) return task.monthStart.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
     if (task.seasonStart) return `Season from ${task.seasonStart.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}`
@@ -430,6 +433,24 @@ export function TaskViewRedesign({
                       <span className={`flex-1 text-base ${subtask.completed ? 'text-neutral-400 line-through' : 'text-neutral-700'}`}>
                         {subtask.title}
                       </span>
+
+                      {/* "Its steps carry the dates" was a promise the row did
+                          not keep — a step showed a checkbox and a title and
+                          nothing else (Scott, 2026-09-23). A step states its
+                          own when, and can be given a week or a day here
+                          rather than only from the month page. */}
+                      {isGoal && (
+                        <>
+                          <span className="flex-shrink-0 text-sm text-neutral-400">
+                            {taskWhenLabel(subtask)}
+                          </span>
+                          {onPush && (
+                            <span className="flex-shrink-0 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
+                              <PushDropdown size="sm" showTodayOption onPush={(date) => onPush(subtask.id, date)} />
+                            </span>
+                          )}
+                        </>
+                      )}
                     </div>
                   ))
                 )}
@@ -578,6 +599,36 @@ export function TaskViewRedesign({
                   <p className="mt-1 text-sm text-neutral-500">
                     A goal is what this period should add up to. Its steps carry the dates.
                   </p>
+
+                  {/* A goal still has to be closeable. Taking away the
+                      task-style checkbox left no way to finish one, so the
+                      three states year goals already use live here instead
+                      (Scott, 2026-09-23). Archiving keeps the goal and its
+                      steps; it is not a delete. */}
+                  <fieldset className="mt-5">
+                    <legend className="text-xs font-semibold text-neutral-400 uppercase tracking-wider mb-2">
+                      Status
+                    </legend>
+                    <div className="flex flex-wrap gap-1.5">
+                      {GOAL_STATUSES.map((value) => (
+                        <button
+                          key={value}
+                          type="button"
+                          aria-pressed={goalStatus === value}
+                          onClick={() => {
+                            const update = goalStatusUpdate(task, value, task.bucket === 'quarter' ? 'quarter' : 'month')
+                            if (update) onUpdate(task.id, update)
+                          }}
+                          className={`rounded-md px-2.5 py-1 text-sm transition-colors ${goalStatus === value
+                            ? 'bg-primary-50 font-semibold text-primary-700'
+                            : 'text-neutral-500 hover:bg-neutral-100 hover:text-neutral-700'}`}
+                        >
+                          {GOAL_STATUS_LABEL[value]}
+                        </button>
+                      ))}
+                    </div>
+                    <p className="mt-2 text-sm text-neutral-500">{GOAL_STATUS_HINT[goalStatus]}</p>
+                  </fieldset>
                 </div>
               ) : (
               <div className="pb-6 border-b border-neutral-200/60">
