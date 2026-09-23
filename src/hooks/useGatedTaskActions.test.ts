@@ -186,6 +186,27 @@ describe('useGatedTaskActions setBucket', () => {
     expect(rawTagged.pushTask).toHaveBeenCalled()
   })
 
+  // pushTask used to be trusted blindly: a write that failed (and rolled
+  // back) still came out of the gate as true, so callers toasted "Sent".
+  it('pushTask resolves false when the placement write fails', async () => {
+    const raw = makeRaw()
+    raw.pushTask.mockResolvedValue(false)
+    const findTagged = (id: string) => (id === 't' ? (tagged as Task) : undefined)
+    const { result } = renderHook(() => useGatedTaskActions(raw, findTagged))
+    await expect(result.current.pushTask('t', 'week')).resolves.toBe(false)
+  })
+
+  it('an answered gate whose domain write fails places nothing and resolves false', async () => {
+    mockRequireDomain.mockResolvedValue('family')
+    const raw = makeRaw()
+    raw.updateTask.mockResolvedValue(false)
+    const findUnsorted = (id: string) => (id === 't' ? (unsorted as Task) : undefined)
+    const { result } = renderHook(() => useGatedTaskActions(raw, findUnsorted))
+    await expect(result.current.pushTask('t', 'week')).resolves.toBe(false)
+    expect(raw.updateTask).toHaveBeenCalledWith('t', { context: 'family' })
+    expect(raw.pushTask).not.toHaveBeenCalled()
+  })
+
   it('updateTask resolves false when the gate is cancelled, true for a tagged pass-through', async () => {
     mockRequireDomain.mockResolvedValue(null)
     const rawCancelled = makeRaw()
