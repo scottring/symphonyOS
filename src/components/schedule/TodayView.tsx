@@ -60,6 +60,8 @@ import { AssigneeFilter } from '@/components/home/AssigneeFilter'
 
 import { NeededTodayNote } from './NeededTodayNote'
 import { TodayAddInput } from './TodayAddInput'
+import { PhoneCaptureBar } from '@/components/layout/PhoneCaptureBar'
+import { DailyEditionPreview, useEditionPreview } from './DailyEditionPreview'
 import { TodaySectionList, findTimelineItem } from './TodaySectionList'
 import { TodayDragProvider } from './TodayDragProvider'
 import { resolveDrop, writeMoveAndRegisterUndo, type DropIntent } from '@/lib/today/todayDrop'
@@ -198,6 +200,7 @@ export function TodayView({
   useLayoutEffect(() => () => publishViewedDay(null), [])
   // ── Context ──────────────────────────────────────────────────────────────────
   const isMobile = useMobile()
+  const [editionPreview, hideEditionPreview] = useEditionPreview()
   const navigate = useNavigate()
   const { isConnected: calendarConnected, error: calendarError } = useGoogleCalendar()
   const ctx = useScheduleActionsContext()
@@ -1226,12 +1229,13 @@ export function TodayView({
   const canAdd = data.isToday && !!(ctx.onCreateTaskParsed ?? ctx.onCreateTask)
   // The page's two controls sit on the "For today" heading (approved white
   // journal, 2026-09-22): one Choose, one Add task. Nothing by the date.
-  const addTaskButton = canAdd ? (
+  // Phones add through the floating capture bar instead (native layout).
+  const addTaskButton = canAdd && !isMobile ? (
     <button
       type="button"
       onClick={() => setAddOpenDay(addOpen ? null : localYmd(viewedDate))}
       aria-expanded={addOpen}
-      className="daybook-add-task inline-flex items-center gap-1 py-1.5 text-[13px] font-medium text-sage-600 transition-colors hover:text-sage-700"
+      className="daybook-add-task inline-flex items-center gap-1 py-1.5 text-[13px] font-medium text-primary-600 transition-colors hover:text-primary-700"
     >
       <Plus className="h-3.5 w-3.5" aria-hidden="true" />
       Add task
@@ -1308,7 +1312,7 @@ export function TodayView({
           so the assistant's proposals are the first thing you can clear in a
           tap. Renders nothing when the queue is empty. */}
       {data.isToday && (
-        <div className="px-3 md:px-0">
+        <div className="px-4 md:px-0">
           <NeedsYourOK />
         </div>
       )}
@@ -1335,24 +1339,29 @@ export function TodayView({
         aside={data.isToday ? <WeatherChip now={nowForDisplay} /> : undefined}
         // Shell desktop controls live in the page navigation; standalone
         // mounts retain the footer controls as a fallback.
-        footer={<>{!desktopControls && desktopToolbar}<div className="ml-auto">                <button
-                  type="button"
-                  onClick={openPlan}
-                  aria-expanded={chooserOpen}
-                  aria-label={chooserOpen ? 'Close shelves' : 'Shelves'}
-                  className={`daybook-choose${chooserOpen ? ' is-open' : ''}`}
-                >
-                  <PanelLeft className="h-3.5 w-3.5" aria-hidden="true" />
-                  <span>Shelves</span>
-                </button>
-</div></>}
+        // Standalone mounts keep their controls along the foot; in the Shell
+        // there is no foot row at all (it was an empty ruled row, 2026-09-23).
+        footer={!desktopControls ? desktopToolbar : undefined}
+        // Shelves sits beside the date, at the header's bottom right.
+        action={
+          <button
+            type="button"
+            onClick={openPlan}
+            aria-expanded={chooserOpen}
+            aria-label={chooserOpen ? 'Close shelves' : 'Shelves'}
+            className={`daybook-choose${chooserOpen ? ' is-open' : ''}`}
+          >
+            <PanelLeft className="h-3.5 w-3.5" aria-hidden="true" />
+            <span>Shelves</span>
+          </button>
+        }
 
       />
 
 
       {/* The rail column only exists when the rail does; otherwise the day gets
           the full width instead of a 320px empty gutter. */}
-      <div className={`px-3 md:px-0 ${decisionCount > 0 ? '@[62rem]:grid @[62rem]:grid-cols-[minmax(0,1fr)_320px] @[62rem]:items-start @[62rem]:gap-8' : ''}`}>
+      <div className={`px-4 md:px-0 ${decisionCount > 0 ? '@[62rem]:grid @[62rem]:grid-cols-[minmax(0,1fr)_320px] @[62rem]:items-start @[62rem]:gap-8' : ''}`}>
         <main className="min-w-0">
           {/* The "N need a decision" banner that stood here at narrow widths
               is gone (Scott, 2026-09-21): a count on Today is a scoreboard,
@@ -1567,6 +1576,9 @@ export function TodayView({
           {/* Below the schedule, not above the date: the one planning
               reminder Today carries (2026-09-22). */}
           {data.isToday && afterSchedule}
+          {/* Review preview only (?edition=sample): labelled sample text,
+              after the work and the schedule, never before them. */}
+          {data.isToday && editionPreview && <DailyEditionPreview onHide={hideEditionPreview} />}
           </TodayDragProvider>
         )}
 
@@ -1721,6 +1733,19 @@ export function TodayView({
           onKeepOne={sweep.keepOne}
           onSkipRoutineToday={(routineId) => ctx.onSkipRoutine?.(routineId)}
         />
+      )}
+
+      {/* Phone: the floating capture bar above the dock (native TodayView). */}
+      {isMobile && canAdd && (
+        <PhoneCaptureBar>
+          <TodayAddInput
+            variant="bar"
+            onAdd={ctx.onCreateTaskParsed!}
+            parserContext={ctx.parserContext!}
+            resolver={ctx.resolverContext!}
+            getRecentTaskForContact={ctx.getRecentTaskForContact}
+          />
+        </PhoneCaptureBar>
       )}
 
       {/* Timeline note composer (radial wheel → "Note" pick) */}

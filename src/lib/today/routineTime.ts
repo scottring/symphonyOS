@@ -30,6 +30,15 @@ export function resolveRoutineTime(
   const override = resolveOverride(instance, viewedDate)
   if (override) return override
 
+  // An untimed routine placed at a time on this day has no rule slot to fall
+  // back to: once it is done (or skipped), the placed time is still the only
+  // place it has. Dropping it made a ticked occurrence vanish from Today —
+  // untimed and unchosen, it left the main list (2026-09-23).
+  if (!routine.time_of_day && instance?.deferred_to && (instance.status === 'completed' || instance.status === 'skipped')) {
+    const placed = new Date(instance.deferred_to)
+    if (isSameLocalDay(placed, viewedDate)) return placed
+  }
+
   if (routine.time_of_day) {
     // Postgres `time` columns arrive as "19:30:00"; extra parts are ignored.
     const [hours, minutes] = routine.time_of_day.split(':').map(Number)

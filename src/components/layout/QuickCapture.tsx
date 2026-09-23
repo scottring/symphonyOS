@@ -396,8 +396,9 @@ export function QuickCapture({
             />
             {/* Header with keyboard hint and close button */}
             <div className="flex items-center justify-between mb-4">
-              <h2 id="quick-capture-title" className="text-lg font-semibold text-neutral-800">
-                Quick Add
+              <h2 id="quick-capture-title" aria-label="Quick Add" className="font-display text-[24px] text-neutral-900 md:font-sans md:text-lg md:font-semibold md:text-neutral-800">
+                {/* The phone's dock + opens this as "Add", as the native sheet. */}
+                <span className="md:hidden">Add</span><span className="hidden md:inline">Quick Add</span>
               </h2>
               <div className="flex items-center gap-2">
                 {/* Keyboard hint - hidden on mobile */}

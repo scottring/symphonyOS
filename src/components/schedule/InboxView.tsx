@@ -32,6 +32,8 @@ import type { DomainId } from '@/lib/domains'
 import { BulkAreaDialog } from './BulkAreaDialog'
 import { useDomainGate } from '@/components/domain/DomainGate'
 import { FocusInboxCard } from './FocusInboxCard'
+import { useMobile } from '@/hooks/useMobile'
+import { PhoneCaptureBar, PhoneCaptureField } from '@/components/layout/PhoneCaptureBar'
 import { InboxModeToggle } from './InboxModeToggle'
 import { InboxUndoToast } from './InboxUndoToast'
 import { filterInboxTasksForLayers } from '@/lib/today/domainFilter'
@@ -108,6 +110,7 @@ export function InboxView({
   } = useScheduleActionsContext()
   const { notes, addNote, updateNote, deleteNote } = useNotes()
   const { addTask } = useSupabaseTasks()
+  const isMobile = useMobile()
   const { user } = useAuth()
 
   const { soleDomain, layers, all: showAllDomains } = useDomain()
@@ -782,7 +785,7 @@ export function InboxView({
         }
         controls={chrome ? <HomeChromeControls className="flex" /> : undefined}
         footer={(totalCount > 0 || familyMembers.length > 0) ? (
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
             {totalCount > 0 && (
               <button
                 type="button"
@@ -897,6 +900,14 @@ export function InboxView({
           onRetry={undo.retry ? () => { const r = undo.retry!; undoRef.current = null; setUndo(null); r() } : undefined}
         />
       )}
+
+      {/* Phone: the floating capture bar (native InboxView). Selecting rows
+          swaps it for the bulk bar. */}
+      {isMobile && selectedTaskIds.size === 0 && (
+        <PhoneCaptureBar>
+          <PhoneCaptureField placeholder="Add a task…" onSubmit={(text) => addTask(text)} />
+        </PhoneCaptureBar>
+      )}
       </div>
 
       {bulkAsk && (
@@ -916,7 +927,7 @@ export function InboxView({
         <div
           role="toolbar"
           aria-label="Bulk actions"
-          className="inbox-bulk fixed bottom-24 md:bottom-6 left-1/2 -translate-x-1/2 z-[55] flex w-[calc(100%-24px)] max-w-2xl flex-wrap items-center justify-center gap-x-2 gap-y-1 px-4 py-2.5 rounded-2xl bg-neutral-900 text-white shadow-xl md:w-auto"
+          className="inbox-bulk phone-lift fixed bottom-24 md:bottom-6 left-1/2 -translate-x-1/2 z-[55] flex w-[calc(100%-24px)] max-w-2xl flex-wrap items-center justify-center gap-x-2 gap-y-1 px-4 py-2.5 rounded-2xl bg-neutral-900 text-white shadow-xl md:w-auto"
         >
           <span className="text-sm font-medium pr-1">{selectedTaskIds.size} selected</span>
           <span className="text-neutral-500" aria-hidden="true">·</span>

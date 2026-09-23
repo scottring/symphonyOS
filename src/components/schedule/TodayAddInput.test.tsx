@@ -241,4 +241,31 @@ describe('TodayAddInput smart capture', () => {
     expect(onAdd.mock.calls[0][0].context).toBeUndefined()
     vi.useRealTimers()
   })
+
+  describe('phone capture bar', () => {
+    const renderBar = (onAdd: (r: TodayCaptureResult) => Promise<boolean | void>) => {
+      render(<TodayAddInput variant="bar" onAdd={onAdd} parserContext={parserContext} resolver={resolver} />)
+      return screen.getByPlaceholderText('Add to today…')
+    }
+
+    it('is an open field from the start: a tap focuses it and raises the keyboard', () => {
+      const input = renderBar(vi.fn(async () => true))
+      expect(input.tagName).toBe('INPUT')
+      expect(screen.queryByRole('radiogroup', { name: 'Capture destination' })).toBeNull()
+    })
+
+    it('gives the words back when the save fails', async () => {
+      const input = renderBar(vi.fn(async () => false))
+      fireEvent.change(input, { target: { value: 'Book the vet' } })
+      await act(async () => { fireEvent.keyDown(input, { key: 'Enter' }) })
+      expect(input).toHaveValue('Book the vet')
+    })
+
+    it('clears once the save succeeds', async () => {
+      const input = renderBar(vi.fn(async () => true))
+      fireEvent.change(input, { target: { value: 'Book the vet' } })
+      await act(async () => { fireEvent.keyDown(input, { key: 'Enter' }) })
+      expect(input).toHaveValue('')
+    })
+  })
 })

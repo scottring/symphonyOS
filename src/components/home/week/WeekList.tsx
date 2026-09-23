@@ -76,7 +76,7 @@ export function WeekList({ tasks, weekStart, meId, userId, isCurrent, onToggle, 
                   onClick={() => onToggle(task)}
                   className="mt-0 flex h-6 w-6 shrink-0 items-center justify-center"
                 >
-                  <span aria-hidden="true" className={`grid h-3.5 w-3.5 place-items-center rounded-[3px] border transition-colors ${task.completed ? 'border-neutral-500 bg-neutral-500 text-white' : 'border-neutral-400 text-transparent hover:border-primary-500 hover:bg-primary-500 hover:text-white'}`}>
+                  <span aria-hidden="true" className={`grid h-4 w-4 place-items-center rounded-full border-[1.5px] transition-colors ${task.completed ? 'border-primary-600 bg-primary-600 text-white' : 'border-neutral-400 text-transparent hover:border-primary-500 hover:bg-primary-500 hover:text-white'}`}>
                     <Check className="h-2.5 w-2.5" strokeWidth={3} />
                   </span>
                 </button>

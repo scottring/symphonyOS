@@ -1,4 +1,6 @@
 import { relativeWeekend, weekendPlacement, weekendLabel } from '@/lib/planning/weekend';
+import { PhonePaneSwitch } from '@/shell/PhonePaneSwitch';
+import { useAssistantLauncher } from '@/contexts/AssistantLaunchContext';
 // src/apps/tasks/TaskDetailPanel.tsx
 //
 // The Shell's global detail panel for the Tasks app. Driven by the URL
@@ -27,6 +29,8 @@ import { showToast } from '@/hooks/useToast';
 import { useEscapeKey } from '@/hooks/useEscapeKey';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { useSelection } from '@/shell/providers/SelectionProvider';
+import { useSideColumnSlot } from '@/shell/SideColumn';
+import { createPortal } from 'react-dom';
 import type { SelectionRef } from '@/shell/types';
 import { useSupabaseTasks } from '@/hooks/useSupabaseTasks';
 import { useGatedTaskActions } from '@/hooks/useGatedTaskActions';
@@ -103,8 +107,17 @@ export function shouldDismissPanel(target: HTMLElement | null, panelEl: HTMLElem
  */
 function PanelChrome({ children }: { children: React.ReactNode }) {
   const { clearSelection } = useSelection();
+  const { openAssistant } = useAssistantLauncher();
   const panelRef = useRef<HTMLElement>(null);
-  useEscapeKey(true, clearSelection);
+  // Desktop draws inside the shared Details/AI column; while the AI pane is
+  // in front the panel stays mounted (edits kept) but must not take Escape.
+  const { hosted, detailsSlot, detailsVisible } = useSideColumnSlot();
+  const fullScreen = useMediaQuery('(max-width: 767px)');
+  const inColumn = !fullScreen && !!detailsSlot;
+  // The column opens with the selection; draw once its slot exists rather
+  // than flashing the old fixed panel for a frame.
+  const waiting = hosted && !fullScreen && !detailsSlot;
+  useEscapeKey(detailsVisible, clearSelection);
   useEffect(() => {
     function onDown(e: MouseEvent) {
       if (shouldDismissPanel(e.target as HTMLElement | null, panelRef.current)) {
@@ -123,29 +136,33 @@ function PanelChrome({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     const panel = panelRef.current;
-    if (panel && !panel.contains(document.activeElement)) panel.focus({ preventScroll: true });
+    if (!panel) return;
+    if (!panel.contains(document.activeElement)) panel.focus({ preventScroll: true });
     return () => {
       const active = document.activeElement;
       const focusWasInPanel = !active || active === document.body || !!panel?.contains(active) || !active.isConnected;
       if (focusWasInPanel && opener?.isConnected && opener !== document.body) opener.focus({ preventScroll: true });
     };
-  }, []);
+  }, [waiting]);
   // Full-screen on phones, so it is a modal dialog there; a side panel beside
   // the page on wider screens.
-  const fullScreen = useMediaQuery('(max-width: 767px)');
-  return (
+  const aside = (
     <aside
       ref={panelRef}
       data-testid="task-detail-panel"
-      className={panelClassName}
+      className={inColumn ? 'h-full overflow-y-auto bg-bg-elevated' : panelClassName}
       tabIndex={-1}
       aria-label="Details"
       role={fullScreen ? 'dialog' : undefined}
       aria-modal={fullScreen ? true : undefined}
     >
+      {/* Phone: the same Details | AI switch as the desktop column. */}
+      {fullScreen && <PhonePaneSwitch active="details" onChange={(pane) => { if (pane === 'ai') openAssistant(); }} />}
       {children}
     </aside>
   );
+  if (waiting) return null;
+  return inColumn ? createPortal(aside, detailsSlot) : aside;
 }
 
 function PanelLoading() {

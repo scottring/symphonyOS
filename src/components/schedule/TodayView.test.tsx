@@ -190,7 +190,25 @@ describe('TodayView', () => {
     expect(screen.getByRole('button', { name: /show daily/i })).toBeInTheDocument()
   })
 
+  it('phone: the floating capture bar adds to today; there is no second "Add task" door', async () => {
+    const onCreateTaskParsed = vi.fn()
+    const { user } = renderView({}, { onCreateTaskParsed })
+    expect(screen.queryByRole('button', { name: 'Add task' })).toBeNull()
+    const input = screen.getByPlaceholderText('Add to today…')
+    await user.type(input, 'Bar thing{Enter}')
+    expect(onCreateTaskParsed).toHaveBeenCalledWith(expect.objectContaining({ title: 'Bar thing', destination: 'today' }))
+  })
+
+  it('phone: no capture bar without a create handler, or on another day', () => {
+    renderView()
+    expect(screen.queryByPlaceholderText('Add to today…')).toBeNull()
+    const tomorrow = new Date(TODAY); tomorrow.setDate(tomorrow.getDate() + 1)
+    renderView({ viewedDate: tomorrow }, { onCreateTaskParsed: vi.fn() })
+    expect(screen.queryByPlaceholderText('Add to today…')).toBeNull()
+  })
+
   it('"Add task" beside the date opens the add box at the head of Tasks; submitting fires onCreateTaskParsed', async () => {
+    mockUseMobile.mockReturnValue(false)
     const onCreateTaskParsed = vi.fn()
     const { user } = renderView({}, { onCreateTaskParsed })
     // Nothing to add with until you ask: no pill below the schedule, no box.
@@ -204,6 +222,7 @@ describe('TodayView', () => {
     expect(onCreateTaskParsed).toHaveBeenCalledWith(
       expect.objectContaining({ title: 'New thing' }),
     )
+    mockUseMobile.mockReturnValue(true)
   })
 
   it('offers no "Add task" without a create handler, and none on another day', () => {

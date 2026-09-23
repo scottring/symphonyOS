@@ -82,7 +82,7 @@ vi.mock('@/contexts/ListsContext', () => ({ ListsProvider: ({ children }: { chil
 vi.mock('@/contexts/PinsContext', () => ({ PinsProvider: ({ children }: { children: ReactNode }) => <>{children}</> }))
 
 vi.mock('@/components/layout/Sidebar', () => ({ Sidebar: () => <div data-testid="sidebar" /> }))
-vi.mock('@/components/layout/MoreSheet', () => ({ MoreSheet: () => null }))
+vi.mock('@/components/layout/MoreSheet', () => ({ MoreSheet: ({ isOpen, onAskSymphony }: { isOpen: boolean; onAskSymphony?: () => void }) => (isOpen && onAskSymphony ? <button type="button" onClick={onAskSymphony}>Ask Symphony</button> : null) }))
 vi.mock('@/components/layout/QuickCapture', () => ({ QuickCapture: ({ showFab, isOpen }: { showFab?: boolean; isOpen?: boolean }) => <div data-testid="quick-capture" data-fab={String(showFab)} data-open={String(!!isOpen)} /> }))
 vi.mock('@/hooks/useDayPlan', () => ({ useDayPlan: () => ({ loading: false, error: false, plan: {
   carried: [], scheduled: [], available: [], week: [], month: [], counts: { scheduled: 0, available: 0 },
@@ -172,14 +172,16 @@ describe('Phone execution chrome', () => {
     renderAt('/today')
     fireEvent.click(screen.getByRole('button', { name: 'Planner' }))
     expect(screen.getByRole('button', { name: 'Planner' })).toHaveAttribute('aria-current', 'page')
+    // One horizon at a time, switched from the title menu (native PlannerView).
     for (const label of ['Week', 'Month', 'Season', 'Year']) {
-      fireEvent.click(screen.getByRole('link', { name: label }))
-      expect(screen.getByRole('link', { name: label })).toHaveAttribute('aria-current', 'page')
+      fireEvent.click(screen.getByRole('button', { name: /Switch horizon/ }))
+      fireEvent.click(screen.getByRole('menuitemradio', { name: new RegExp(`^${label}`) }))
+      expect(screen.getByRole('button', { name: `${label}. Switch horizon` })).toBeInTheDocument()
     }
-    fireEvent.click(screen.getByRole('link', { name: 'Today' }))
-    expect(screen.getByRole('navigation', { name: 'Planning period' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /Switch horizon/ }))
+    fireEvent.click(screen.getByRole('menuitemradio', { name: /^Today/ }))
     fireEvent.click(screen.getByRole('button', { name: 'Planner' }))
-    expect(screen.getByRole('link', { name: 'Today' })).toHaveAttribute('aria-current', 'page')
+    expect(screen.getByRole('button', { name: 'Today. Switch horizon' })).toBeInTheDocument()
   })
 
   it('keeps references off the phone even when desktop lists were pinned', () => {
@@ -188,8 +190,8 @@ describe('Phone execution chrome', () => {
     renderAt('/today')
     expect(screen.queryByRole('complementary', { name: 'Pinned reference lists' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Pin month list' })).not.toBeInTheDocument()
-    expect(screen.getByRole('link', { name: 'Today' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Inbox' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Today. Switch horizon' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^Inbox/ })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'More' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Week' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Month' })).not.toBeInTheDocument()
@@ -197,6 +199,30 @@ describe('Phone execution chrome', () => {
   })
 })
 
+
+describe('Phone AI beside Details', () => {
+  afterEach(() => { selectionState.selection = null; mobileState.isMobile = false })
+
+  it('opens from More without an item, with no Details switch to show', () => {
+    mobileState.isMobile = true
+    renderAt('/today')
+    fireEvent.click(screen.getByRole('button', { name: 'More' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Ask Symphony' }))
+    expect(screen.queryByRole('tablist', { name: 'Side panel' })).not.toBeInTheDocument()
+  })
+
+  it('switches back to the item, which stays open underneath', () => {
+    mobileState.isMobile = true
+    selectionState.selection = { kind: 'task', id: 't1' }
+    renderAt('/today')
+    fireEvent.click(screen.getByRole('button', { name: 'More' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Ask Symphony' }))
+    expect(screen.getByRole('tab', { name: 'AI' })).toHaveAttribute('aria-selected', 'true')
+    fireEvent.click(screen.getByRole('tab', { name: 'Details' }))
+    expect(screen.queryByRole('tablist', { name: 'Side panel' })).not.toBeInTheDocument()
+    expect(selectionState.selection).toEqual({ kind: 'task', id: 't1' })
+  })
+})
 
 describe('Consolidated desktop navigation', () => {
   beforeEach(() => { mobileState.isMobile = false; selectionState.selection = null; sessionStorage.clear(); localStorage.removeItem('symphony-plan-period') })
@@ -295,20 +321,19 @@ describe('Grouped More menu and desktop capture', () => {
     expect(plan).not.toContainElement(screen.getByRole('button', { name: 'Plan from paper' }))
   })
 
-  it('shows the floating capture button on phones only', () => {
+  it('adds from the dock + on phones, with no floating button anywhere', () => {
     const desktop = renderAt('/today')
     expect(screen.getByTestId('quick-capture')).toHaveAttribute('data-fab', 'false')
+    expect(screen.queryByRole('button', { name: 'Add' })).not.toBeInTheDocument()
     desktop.unmount()
     mobileState.isMobile = true
     renderAt('/today')
-    expect(screen.getByTestId('quick-capture')).toHaveAttribute('data-fab', 'true')
-  })
-
-  it('hides the floating capture button over a full-screen detail panel on phones', () => {
-    mobileState.isMobile = true
-    selectionState.selection = { kind: 'task', id: 't1' }
-    renderAt('/today')
     expect(screen.getByTestId('quick-capture')).toHaveAttribute('data-fab', 'false')
+    const nav = screen.getByRole('navigation', { name: 'Main' })
+    expect([...nav.querySelectorAll('button')].map((b) => b.textContent || b.getAttribute('aria-label')))
+      .toEqual(['Planner', 'Inbox', 'Add', 'Routines', 'More'])
+    fireEvent.click(screen.getByRole('button', { name: 'Add' }))
+    expect(screen.getByTestId('quick-capture')).toHaveAttribute('data-open', 'true')
   })
 })
 

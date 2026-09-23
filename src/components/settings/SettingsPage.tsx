@@ -8,7 +8,6 @@ import { useFamilyMembers } from '@/hooks/useFamilyMembers'
 import { useHouseholdInvitations } from '@/hooks/useHouseholdInvitations'
 import { CalendarSettings } from './CalendarSettings'
 import { WaitlistAdmin } from './WaitlistAdmin'
-import { ThemeSelector } from './ThemeSelector'
 import { PlacePicker } from './PlacePicker'
 import { useTextSize } from '@/hooks/useTextSize'
 import { HomeAddressSettings } from './HomeAddressSettings'
@@ -332,11 +331,9 @@ export function SettingsPage({
         {/* Tab Content */}
         {activeTab === 'general' && (
           <div className="space-y-8">
-            {/* Place theme — artwork + accent colors */}
+            {/* Your place IS the theme: artwork + accent colours (the separate
+                Appearance chooser was retired, 2026-09-23). */}
             <PlacePicker />
-
-            {/* Theme Selector */}
-            <ThemeSelector />
 
             {/* Text Size */}
             <section>
@@ -769,7 +766,7 @@ export function SettingsPage({
 
       {/* Success toast */}
       {deleteSuccess && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 animate-fade-in-up">
+        <div className="phone-lift fixed bottom-6 left-1/2 -translate-x-1/2 z-50 animate-fade-in-up">
           <div className="flex items-center gap-2 px-4 py-3 bg-neutral-800 text-white rounded-lg shadow-lg">
             <svg className="w-5 h-5 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />

@@ -64,17 +64,10 @@ window.addEventListener('vite:preloadError', (e) => {
   e.preventDefault()
 })
 
-// Load theme from localStorage, default to Nordic Journal
-const THEME_STORAGE_KEY = 'symphony-theme'
-const savedTheme = localStorage.getItem(THEME_STORAGE_KEY)
-const ACTIVE_THEME = (savedTheme === 'kinetic' || savedTheme === 'nordic') ? savedTheme : 'nordic'
-
-// Conditionally import CSS based on active theme
-if (ACTIVE_THEME === 'kinetic') {
-  await import('./kinetic-clarity.css')
-} else {
-  await import('./index.css')
-}
+// One design system. "Your place" (Settings) is the only theme choice; the
+// old Appearance switch (Kinetic Clarity) was retired 2026-09-23, so a saved
+// 'kinetic' preference no longer strands anyone on a look they can't leave.
+await import('./index.css')
 
 // Apply the cached place theme before first paint so there's no color flash;
 // PlaceProvider owns it (and syncs with the DB) once React mounts.
@@ -83,6 +76,13 @@ if (savedPlace && savedPlace !== 'cabin' &&
     ['urban', 'small-city', 'mountain-town', 'farm'].includes(savedPlace)) {
   document.documentElement.dataset.place = savedPlace
 }
+
+// Large text, likewise, before first paint and on every page. It used to be
+// applied only by the Settings page's hook, so a reload anywhere else quietly
+// dropped it (2026-09-23).
+try {
+  if (localStorage.getItem('symphony-large-text') === 'true') document.documentElement.classList.add('large-text')
+} catch { /* storage unavailable: default size */ }
 
 import { Suspense, lazy } from 'react'
 import { CalendarCallback } from './pages/CalendarCallback'

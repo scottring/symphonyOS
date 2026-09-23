@@ -730,7 +730,7 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
           />
         )}
         title={periodTitle(level, bounds.label)}
-        footer={<div className="ml-auto"><ShelvesButton periodShelves /></div>}
+        action={<ShelvesButton periodShelves />}
         subline={isPast
           ? 'Look back: what got done, what didn\'t. Keep what still matters, drop the rest.'
           : lookingAhead

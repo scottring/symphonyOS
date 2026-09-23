@@ -133,7 +133,7 @@ export function DomainSwitcher() {
         aria-expanded={isOpen}
         aria-label={`Layers: ${label}`}
         title={`Layers: ${label}`}
-        className={`inline-flex items-center gap-1.5 px-3 py-2.5 rounded-lg bg-bg-elevated/90 backdrop-blur-sm border transition-colors ${isOpen ? 'border-primary-300 bg-neutral-50' : 'border-neutral-200 hover:bg-neutral-50/50'}`}
+        className={`domain-switcher-trigger inline-flex items-center gap-1.5 px-3 py-2.5 rounded-lg bg-bg-elevated/90 backdrop-blur-sm border transition-colors ${isOpen ? 'border-primary-300 bg-neutral-50' : 'border-neutral-200 hover:bg-neutral-50/50'}`}
         style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04), inset 0 1px 0 rgba(255,255,255,0.4)' }}
       >
         {isAll ? (

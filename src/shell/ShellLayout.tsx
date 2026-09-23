@@ -8,7 +8,8 @@ import { DesktopFooter, DesktopFooterActionContext } from '@/components/layout/D
 // src/shell/ShellLayout.tsx
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Sparkles, Repeat, CalendarRange, Inbox as InboxIcon, MoreHorizontal } from 'lucide-react';
+import { Sparkles, Repeat, CalendarRange, Inbox as InboxIcon, MoreHorizontal, Plus } from 'lucide-react';
+import { useTextEntryActive } from '@/hooks/useKeyboardInset';
 import { type ViewType } from '@/components/layout/Sidebar';
 import { MoreSheet } from '@/components/layout/MoreSheet';
 import { QuickCapture } from '@/components/layout/QuickCapture';
@@ -32,6 +33,10 @@ import { useAssistantLaunchRequests, useAssistantLauncher } from '@/contexts/Ass
 import { useShellChrome } from './useShellChrome';
 import { useSelection } from './providers/SelectionProvider';
 import { MOBILE_TAB_BAR_HEIGHT } from './mobileChrome';
+import { SideColumn, SIDE_COLUMN_WIDTH, type SidePane } from './SideColumn';
+import { PhonePaneSwitch } from './PhonePaneSwitch';
+import { NoteViewer } from '@/components/chat/NoteViewer';
+import { PlaceBand } from '@/components/place/PlaceBand';
 import { onQuickAddRequest } from '@/lib/quickAddSignal';
 
 /**
@@ -51,10 +56,10 @@ import { onQuickAddRequest } from '@/lib/quickAddSignal';
  * setting `chromeless: true` on their AppDef — Shell.tsx skips this wrapper for
  * those apps, so the chrome here only ever wraps non-chromeless apps.
  *
- * NOTE on the AI rail: on Today (desktop) the assistant rail is owned by
- * Shell.tsx's <ShellAssistantHost>. For non-Today views ShellLayout renders its
- * own assistant rail toggled by the top-bar AI button — kept self-contained so
- * Shell.tsx's global DetailPanel model is untouched.
+ * NOTE on the right column: on desktop, Details and AI share ONE column
+ * (SideColumn) on every page — one assistant, one conversation, and switching
+ * panes keeps both mounted. Phones keep the full-screen detail panel and a
+ * full-screen assistant overlay.
  */
 
 // Left reference dock at its widest, and the narrowest page worth keeping
@@ -71,9 +76,6 @@ function useViewportWidth() {
   }, []);
   return width;
 }
-
-// Mirrors Shell.tsx — the AI rail is owned by ShellAssistantHost on these paths.
-const TODAY_PATHS = new Set(['/', '/today', '/tasks-new/today', '/tasks-new']);
 
 /**
  * Derive ViewType from pathname so the Sidebar's active-item highlight
@@ -119,6 +121,7 @@ function ShellLayoutInner({ children }: Props) {
   const navigate = useNavigate();
   const location = useLocation();
   const isMobile = useMobile();
+  const typing = useTextEntryActive();
   const planDestination = usePlanDestination();
   const { user, signOut } = useAuth();
 
@@ -128,7 +131,6 @@ function ShellLayoutInner({ children }: Props) {
 
   const references = useReferenceLists();
   const activeView = useMemo(() => deriveActiveView(location.pathname), [location.pathname]);
-  const isToday = TODAY_PATHS.has(location.pathname);
 
   const { tasks } = useSupabaseTasks();
   const { unreadCount: discussionsUnread } = useDiscussionInbox();
@@ -147,9 +149,8 @@ function ShellLayoutInner({ children }: Props) {
   // Chrome data + handlers, sourced from shared hooks (not props).
   const chrome = useShellChrome();
 
-  // When a detail panel (480px fixed-right) is open, reflow content left so the
-  // panel doesn't obscure it.
-  const { selection } = useSelection();
+  // The selected item opens Details in the right column.
+  const { selection, clearSelection } = useSelection();
 
   // Mobile/UI chrome state
   const [moreSheetOpen, setMoreSheetOpen] = useState(false);
@@ -174,26 +175,36 @@ function ShellLayoutInner({ children }: Props) {
     return () => window.removeEventListener('keydown', onKeyDown);
   }, []);
 
-  // Non-Today AI rail (desktop Today's rail is owned by Shell.tsx's
-  // ShellAssistantHost; mobile Today has no other surface, so this rail's
-  // full-screen mobile overlay covers it too).
-  const [chatOpen, setChatOpen] = useState(false);
+  // One assistant for the whole shell: the desktop column's AI pane and the
+  // phone overlay show the same conversation. On desktop its visibility is
+  // the persisted rail preference (useScratchpadHidden — the masthead's AI
+  // button toggles the same state); phones open it per launch.
   const assistant = useSymphonyAssistant({ persistKey: 'symphony_rail' });
-  const showAiRail = chatOpen && (!isToday || isMobile);
+  const { hidden: aiHidden, setHidden: setAiHidden } = useScratchpadHidden();
+  const [phoneChatOpen, setPhoneChatOpen] = useState(false);
+  const [pane, setPane] = useState<SidePane>('details');
+  const [activeNoteId, setActiveNoteId] = useState<string | null>(null);
+  const aiOpen = !isMobile && !aiHidden;
+  // A new selection brings Details to the front.
+  const selectionKey = selection ? `${selection.kind}:${selection.id}` : null;
+  useEffect(() => { if (selectionKey) setPane('details'); }, [selectionKey]);
+  const showPane = useCallback((next: SidePane) => {
+    if (next === 'ai') setAiHidden(false);
+    setPane(next);
+  }, [setAiHidden]);
 
-  // Programmatic launches (unibox "Ask Symphony", Add-to-today…): this host
-  // owns every surface except desktop-Today (Shell's ShellAssistantHost).
+  // Programmatic launches (unibox "Ask Symphony", Add-to-today…).
   const { openAssistant } = useAssistantLauncher();
   const { nonce: launchNonce, consumeSeed } = useAssistantLaunchRequests();
   const seenLaunchNonce = useRef(0);
   useEffect(() => {
     if (launchNonce === 0 || launchNonce === seenLaunchNonce.current) return;
-    if (isToday && !isMobile) return;
     seenLaunchNonce.current = launchNonce;
-    setChatOpen(true);
+    if (isMobile) setPhoneChatOpen(true);
+    else showPane('ai');
     const seed = consumeSeed();
     if (seed && seed.autoSend !== false) void assistant.sendMessage(seed.message);
-  }, [launchNonce, isToday, isMobile, consumeSeed, assistant]);
+  }, [launchNonce, isMobile, consumeSeed, assistant, showPane]);
 
   // Closing the More sheet returns focus to its tab, not to <body>.
   const moreTabRef = useRef<HTMLButtonElement>(null);
@@ -202,23 +213,14 @@ function ShellLayoutInner({ children }: Props) {
     moreTabRef.current?.focus();
   }, []);
 
-  // The AI rail is shared with main content margin so content isn't covered.
-  const rightRailVisible = showAiRail;
-
-  // Today's assistant rail is owned by Shell.tsx (ShellAssistantHost, 420px wide)
-  // and its visibility is the shared scratchpad-hidden state. When it's open on
-  // Today, reflow the main column left by the rail width instead of letting the
-  // fixed overlay cover it. (Detail-pane `selection` takes precedence below,
-  // matching ShellAssistantHost which hides the rail while a detail pane is open.)
-  const { hidden: scratchpadHidden } = useScratchpadHidden();
-  const todayRailVisible = isToday && !scratchpadHidden && !isMobile;
-  // Pinned lists sit on the LEFT, so they no longer compete with the detail
-  // and AI panes on the right: both stay open while the page keeps a readable
-  // width between them. Only when it would not do the panes still win, and
-  // the lists return when the pane closes. The dock column is reserved only
-  // when a pin actually draws here, so the page centres in the width left.
+  // Pinned lists sit on the LEFT, so they no longer compete with the right
+  // column: both stay open while the page keeps a readable width between
+  // them. Only when it would not do the column still wins, and the lists
+  // return when it closes. The dock column is reserved only when a pin
+  // actually draws here, so the page centres in the width left.
   const viewportWidth = useViewportWidth();
-  const paneWidth = selection ? 480 : rightRailVisible ? 380 : todayRailVisible ? 420 : 0;
+  const columnOpen = !isMobile && (!!selection || aiOpen);
+  const paneWidth = columnOpen ? SIDE_COLUMN_WIDTH : 0;
   const referencesFit = paneWidth === 0 || viewportWidth - paneWidth - REFERENCE_DOCK_WIDTH >= MIN_PAGE_WITH_REFERENCES;
   const referencesPaused = paneWidth > 0 && !referencesFit;
   const referencesVisible = !isMobile && referencesFit
@@ -247,7 +249,7 @@ function ShellLayoutInner({ children }: Props) {
                 // the bar's actual height and clipped AttentionLine.
                 paddingBottom: `calc(${MOBILE_TAB_BAR_HEIGHT} + 0.5rem + env(safe-area-inset-bottom, 0px))`,
               }
-            : { marginRight: selection ? '480px' : rightRailVisible ? '380px' : todayRailVisible ? '420px' : '0' }
+            : { marginRight: `${paneWidth}px` }
         }
       >
         {/* Mobile header — domain switcher (date nav lives in
@@ -260,17 +262,14 @@ function ShellLayoutInner({ children }: Props) {
             confirm. */}
         {/* Phone Today folds the domain lens into its one Filters control in
             the tab row, so this header row would only repeat it. */}
-        {isMobile && planPeriodForPath(location.pathname) !== 'today' && (
+        {isMobile && !planPeriodForPath(location.pathname) && (
+          // Rides in the top-right corner, level with the page title, rather
+          // than spending a row of its own above it.
           <header
-            className="sticky top-0 z-10 bg-transparent px-3 py-1"
-            style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}
+            className="phone-page-lens absolute right-0 top-0 z-10 px-4 pt-2"
+            style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 8px)' }}
           >
-            <div className="flex items-center gap-2">
-              <div className="flex-1" />
-              <div className="flex items-center gap-1 shrink-0">
-                <DomainSwitcher />
-              </div>
-            </div>
+            <DomainSwitcher />
           </header>
         )}
 
@@ -283,7 +282,10 @@ function ShellLayoutInner({ children }: Props) {
           // Desktop: navigation, page, and footer share one centred column —
           // centred in the window, or in the space left beside a side pane or
           // the pinned reference lists.
-          <div className={`desktop-workspace${referencesVisible ? ' has-references' : ''}`}>
+          <>
+          {/* Your place, as a shallow landscape behind the navigation band. */}
+          <PlaceBand />
+          <div className={`desktop-workspace relative${referencesVisible ? ' has-references' : ''}`}>
             <div className="desktop-workspace-nav">
         <DesktopNavigation inboxCount={inboxCount} discussionsUnread={discussionsUnread}
           onSearch={() => setQuickAddOpen(true)} onQuickAdd={() => setQuickAddOpen(true)} onSignOut={signOut}
@@ -293,9 +295,9 @@ function ShellLayoutInner({ children }: Props) {
           <div className="flex items-center gap-2">
             <DomainSwitcher />
             <button
-              onClick={() => setChatOpen((o) => !o)}
+              onClick={() => setAiHidden(aiOpen)}
               className={`w-9 h-9 rounded-full bg-bg-elevated border border-neutral-200 text-neutral-500 hover:text-primary-500 hover:border-primary-300 transition-all grid place-items-center shadow-card ${
-                chatOpen ? 'ring-2 ring-primary-500/30 text-primary-500 border-primary-500' : ''
+                aiOpen ? 'ring-2 ring-primary-500/30 text-primary-500 border-primary-500' : ''
               }`}
               aria-label="AI chat"
               title="AI chat"
@@ -305,19 +307,51 @@ function ShellLayoutInner({ children }: Props) {
           </div>
         )} />
             </div>
-            <div className="desktop-workspace-page min-w-0"><PlanNavigation paused={referencesPaused} />{children}</div>
+            <div className="desktop-workspace-page min-w-0"><PlanNavigation paused={referencesPaused} />
+              <SideColumn
+                hasSelection={!!selection}
+                aiOpen={aiOpen}
+                pane={pane}
+                onPaneChange={showPane}
+                onCloseDetails={clearSelection}
+                onCloseAi={() => setAiHidden(true)}
+                ai={
+                  <ChatPanel
+                    messages={assistant.messages}
+                    loading={assistant.loading}
+                    error={assistant.error}
+                    entityContext={null}
+                    mode="chat"
+                    onSend={assistant.sendMessage}
+                    onClear={assistant.resetSession}
+                    onClose={() => setAiHidden(true)}
+                    onNewChat={assistant.resetSession}
+                    onSourceClick={setActiveNoteId}
+                    toolActivity={assistant.toolActivity}
+                    sessions={assistant.sessions}
+                    sessionsLoading={assistant.sessionsLoading}
+                    onLoadSession={assistant.loadSession}
+                    onDeleteSession={assistant.deleteSession}
+                    activeSessionId={assistant.activeSessionId}
+                  />
+                }
+              >
+                {children}
+              </SideColumn>
+            </div>
             {referencesVisible && <div className="desktop-workspace-dock"><ReferenceListsDock /></div>}
             <DesktopFooter actionRef={setDesktopFooterAction} />
           </div>
+          </>
         )}
       </div>
 
       {/* QuickCapture FAB — all routes except the agent view (which has its own input) */}
       {activeView !== 'agent' && (
         <QuickCapture
-          // Desktop captures through ⌘K and the navigation's search button.
-          // …and not over a full-screen detail panel on phones.
-          showFab={isMobile && !selection}
+          // Phones add through the dock's + (and the capture bar); desktop
+          // through ⌘K and the navigation's search button.
+          showFab={false}
           onAdd={chrome.onQuickAdd}
           onAddRich={chrome.onQuickAddRich}
           onAddNote={chrome.onQuickAddNote}
@@ -334,41 +368,21 @@ function ShellLayoutInner({ children }: Props) {
         />
       )}
 
-      {/* Non-Today AI rail (desktop). Today's rail is in Shell.tsx. */}
-      {showAiRail && !isMobile && (
-        <aside
-          className="fixed top-0 bottom-0 right-0 w-[380px] bg-bg-elevated border-l border-neutral-200/80 shadow-xl z-20"
-          aria-label="Symphony AI"
-        >
-          <ChatPanel
-            messages={assistant.messages}
-            loading={assistant.loading}
-            error={assistant.error}
-            entityContext={null}
-            mode="chat"
-            onSend={assistant.sendMessage}
-            onClear={assistant.resetSession}
-            onClose={() => setChatOpen(false)}
-            onNewChat={assistant.resetSession}
-            toolActivity={assistant.toolActivity}
-            sessions={assistant.sessions}
-            sessionsLoading={assistant.sessionsLoading}
-            onLoadSession={assistant.loadSession}
-            onDeleteSession={assistant.deleteSession}
-            activeSessionId={assistant.activeSessionId}
-          />
-        </aside>
-      )}
-
       {/* Mobile AI rail — full-screen overlay */}
-      {showAiRail && isMobile && (
+      {phoneChatOpen && isMobile && (
         <div
-          className="fixed inset-0 z-50 bg-bg-elevated"
+          className="fixed inset-0 z-50 flex flex-col bg-bg-elevated"
+          // Taps in here are not a tap "outside" the Details panel beneath.
+          data-panel-keepalive
           style={{
             paddingTop: 'env(safe-area-inset-top, 0px)',
             paddingBottom: 'env(safe-area-inset-bottom, 0px)',
           }}
         >
+          {/* With an item open, the same Details | AI switch as desktop:
+              Details is still mounted underneath, edits and all. */}
+          {selection && <PhonePaneSwitch active="ai" onChange={(p) => { if (p === 'details') setPhoneChatOpen(false); }} />}
+          <div className="min-h-0 flex-1">
           <ChatPanel
             messages={assistant.messages}
             loading={assistant.loading}
@@ -377,7 +391,7 @@ function ShellLayoutInner({ children }: Props) {
             mode="chat"
             onSend={assistant.sendMessage}
             onClear={assistant.resetSession}
-            onClose={() => setChatOpen(false)}
+            onClose={() => setPhoneChatOpen(false)}
             onNewChat={assistant.resetSession}
             toolActivity={assistant.toolActivity}
             sessions={assistant.sessions}
@@ -386,63 +400,62 @@ function ShellLayoutInner({ children }: Props) {
             onDeleteSession={assistant.deleteSession}
             activeSessionId={assistant.activeSessionId}
           />
+          </div>
         </div>
       )}
 
-      {/* The same four destinations on desktop and phone: Today, Plan, Inbox, More. */}
-      {isMobile && (
-        <nav
-          className="fixed bottom-0 left-0 right-0 z-40 bg-bg-elevated/95 backdrop-blur-lg border-t border-neutral-200/50"
-          style={{ paddingBottom: 'max(0px, calc(env(safe-area-inset-bottom, 0px) - 8px))' }}
-        >
-          <div className="flex items-stretch px-1 py-0.5">
-            {[
-              { label: 'Planner', Icon: CalendarRange, route: planDestination, active: !!planPeriodForPath(location.pathname) },
-              { label: 'Routines', Icon: Repeat, route: '/routines', active: location.pathname.startsWith('/routines') },
-            ].map((tab) => (
-              <button
-                key={tab.route}
-                onClick={() => navigate(tab.route)}
-                aria-current={tab.active ? 'page' : undefined}
-                className={`flex-1 min-w-0 flex flex-col items-center gap-0.5 px-1 py-1.5 rounded-lg transition-all ${
-                  tab.active ? 'text-accent-600' : 'text-neutral-400 hover:text-neutral-600'
-                }`}
-              >
-                <tab.Icon className="w-5 h-5" />
-                <span className={`text-[0.625rem] font-medium ${tab.active ? 'font-semibold' : ''}`}>{tab.label}</span>
-              </button>
-            ))}
-
-            {/* Inbox — capture catch-all, with unread badge. */}
+      {/* The native dock: Planner · Inbox · + · Routines · More. While a text
+          field has focus the keyboard owns the bottom edge, so the dock steps
+          aside and the capture bar sits on the keyboard (as on iOS). */}
+      {isMobile && !typing && (
+        <nav className="phone-dock" aria-label="Main">
+          <div className="phone-dock-row">
             <button
+              type="button"
+              className="phone-dock-tab"
+              onClick={() => navigate(planDestination)}
+              aria-current={planPeriodForPath(location.pathname) ? 'page' : undefined}
+            >
+              <CalendarRange aria-hidden="true" />
+              <span>Planner</span>
+            </button>
+            <button
+              type="button"
+              className="phone-dock-tab"
               onClick={() => navigate('/inbox')}
               aria-current={location.pathname.startsWith('/inbox') ? 'page' : undefined}
               aria-label={`Inbox${inboxCount ? `, ${inboxCount} ${inboxCount === 1 ? 'item' : 'items'}` : ''}`}
-              className={`relative flex-1 min-w-0 flex flex-col items-center gap-0.5 px-1 py-1.5 rounded-lg transition-all ${
-                location.pathname.startsWith('/inbox') ? 'text-accent-600' : 'text-neutral-400 hover:text-neutral-600'
-              }`}
             >
-              <InboxIcon className="w-5 h-5" />
-              <span className={`text-[0.625rem] font-medium ${location.pathname.startsWith('/inbox') ? 'font-semibold' : ''}`}>Inbox</span>
+              <InboxIcon aria-hidden="true" />
+              <span>Inbox</span>
               {inboxCount > 0 && (
-                <span className="absolute top-0.5 right-[18%] min-w-[16px] h-[16px] px-1 flex items-center justify-center rounded-full bg-primary-500 text-white text-[9px] font-semibold leading-none">
-                  {inboxCount > 99 ? '99+' : inboxCount}
-                </span>
+                <span className="phone-dock-badge" aria-hidden="true">{inboxCount > 99 ? '99+' : inboxCount}</span>
               )}
             </button>
-
-            {/* More → opens MoreSheet (the mobile library). */}
+            <div className="phone-dock-add-slot">
+              <button type="button" className="phone-dock-add" onClick={() => setQuickAddOpen(true)} aria-label="Add">
+                <Plus aria-hidden="true" />
+              </button>
+            </div>
             <button
+              type="button"
+              className="phone-dock-tab"
+              onClick={() => navigate('/routines')}
+              aria-current={location.pathname.startsWith('/routines') ? 'page' : undefined}
+            >
+              <Repeat aria-hidden="true" />
+              <span>Routines</span>
+            </button>
+            <button
+              type="button"
               ref={moreTabRef}
+              className="phone-dock-tab"
               onClick={() => setMoreSheetOpen(true)}
               aria-haspopup="dialog"
               aria-expanded={moreSheetOpen}
-              className={`flex-1 min-w-0 flex flex-col items-center gap-0.5 px-1 py-1.5 rounded-lg transition-all ${
-                moreSheetOpen ? 'text-neutral-700' : 'text-neutral-400 hover:text-neutral-600'
-              }`}
             >
-              <MoreHorizontal className="w-5 h-5" />
-              <span className="text-[0.625rem] font-medium">More</span>
+              <MoreHorizontal aria-hidden="true" />
+              <span>More</span>
             </button>
           </div>
         </nav>
@@ -454,7 +467,13 @@ function ShellLayoutInner({ children }: Props) {
           isOpen={moreSheetOpen}
           onClose={closeMoreSheet}
           discussionsUnread={discussionsUnread}
+          // Opens the conversation without sending anything.
+          onAskSymphony={() => { setMoreSheetOpen(false); setPhoneChatOpen(true); }}
         />
+      )}
+
+      {activeNoteId && (
+        <NoteViewer key={activeNoteId} noteId={activeNoteId} onClose={() => setActiveNoteId(null)} />
       )}
 
       {/* Always mounted, so toast text is announced to screen readers. */}

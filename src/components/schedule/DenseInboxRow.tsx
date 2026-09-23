@@ -184,7 +184,7 @@ export const DenseInboxRow = memo(function DenseInboxRow({
       <button
         type="button"
         onClick={onSelect}
-        className={`flex-1 min-w-[16rem] text-left text-[16px] leading-snug break-words py-0.5 ${
+        className={`flex-1 min-w-[11rem] md:min-w-[16rem] text-left text-[16px] leading-snug break-words py-0.5 ${
           task.completed
             ? 'text-neutral-400 line-through'
             : task.isWaiting

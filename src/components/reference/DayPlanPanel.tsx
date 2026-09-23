@@ -359,7 +359,12 @@ function PlanRow({ entry, day, actions, draggable, weekPage = null, wide = false
               itemTitle={entry.title}
               skipToTime
               value={routinePlaceDay(day, weekPage)}
-              onSchedule={(when) => actions.placeRoutine?.(entry, when)}
+              onSchedule={(when, allDay) => {
+                // All Day is a choice of DAY, never a midnight time: the
+                // occurrence is chosen untimed and the rule keeps no day.
+                if (allDay) void actions.chooseOccurrence?.(entry, when)
+                else actions.placeRoutine?.(entry, when)
+              }}
               trigger={<button type="button" aria-label={verbAria} className={verbClass}>{verbLabel}</button>}
             />
           ) : (
@@ -446,7 +451,12 @@ function ChooserRow({ entry, day, actions, draggable, wide = false }: {
               itemTitle={entry.title}
               skipToTime
               value={day}
-              onSchedule={(when) => actions.placeRoutine?.(entry, when)}
+              onSchedule={(when, allDay) => {
+                // All Day is a choice of DAY, never a midnight time: the
+                // occurrence is chosen untimed and the rule keeps no day.
+                if (allDay) void actions.chooseOccurrence?.(entry, when)
+                else actions.placeRoutine?.(entry, when)
+              }}
               trigger={<button type="button" aria-label={pillAria} className="chooser-pill">Choose…</button>}
             />
           ) : (

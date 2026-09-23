@@ -1,4 +1,5 @@
 import type { ActionableInstance, Routine } from '@/types/actionable'
+import { chosenUntimedOn } from './deferredRoutines'
 
 /**
  * The routines a day holds before any visibility rule runs: those whose
@@ -29,6 +30,8 @@ export function routinesForViewedDate(
   const deferredToThisDate = new Set<string>()
   const viewedDateStr = viewedDate.toISOString().split('T')[0]
   for (const instance of dateInstances) {
+    // Chosen for the day with no time (a flexible routine's All Day).
+    if (chosenUntimedOn(instance, viewedDate)) deferredToThisDate.add(instance.entity_id)
     if (instance.entity_type === 'routine' && instance.deferred_to) {
       const deferredToDateStr = new Date(instance.deferred_to).toISOString().split('T')[0]
       if (deferredToDateStr === viewedDateStr) {

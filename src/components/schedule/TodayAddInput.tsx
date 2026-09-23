@@ -1,6 +1,6 @@
 // src/components/schedule/TodayAddInput.tsx
 import { useState, useCallback, useRef, useMemo, useEffect } from 'react'
-import { Plus, Check, X, Phone, Sparkles } from 'lucide-react'
+import { Plus, Check, X, Phone, Sparkles, ArrowUp } from 'lucide-react'
 import { allDayFromParse } from '@/lib/quickInputParser'
 import type { ParserContext } from '@/lib/quickInputParser'
 import type { ResolverContext, ContactSuggestion } from '@/lib/entityResolver'
@@ -39,7 +39,8 @@ export interface TodayCaptureResult {
 }
 
 interface TodayAddInputProps {
-  onAdd: (r: TodayCaptureResult) => void
+  /** May resolve false when the save failed; the typed text then comes back. */
+  onAdd: (r: TodayCaptureResult) => void | Promise<void | boolean>
   parserContext: ParserContext
   resolver: ResolverContext
   getRecentTaskForContact?: (contactId: string) => { title: string; date: Date } | null
@@ -49,6 +50,10 @@ interface TodayAddInputProps {
   /** The box closed itself (Escape, or blurred empty). Lets a host that
    *  mounts it on demand unmount it again. */
   onCollapse?: () => void
+  /** 'bar' is the phone's floating capture bar: always an open field (so a
+   *  tap focuses it and raises the keyboard in the same gesture), with the
+   *  destination and domain choices appearing only once there is text. */
+  variant?: 'inline' | 'bar'
 }
 
 /** Debounce a value — used to keep the suggestion line from flickering per keystroke. */
@@ -67,8 +72,10 @@ const DESTINATIONS: { key: CaptureDestination; label: string; placeholder: strin
   { key: 'note', label: 'Note', placeholder: 'Jot a note...' },
 ]
 
-export function TodayAddInput({ onAdd, parserContext, resolver, getRecentTaskForContact, defaultExpanded = false, onCollapse }: TodayAddInputProps) {
-  const [expanded, setExpanded] = useState(defaultExpanded)
+export function TodayAddInput({ onAdd, parserContext, resolver, getRecentTaskForContact, defaultExpanded = false, onCollapse, variant = 'inline' }: TodayAddInputProps) {
+  const bar = variant === 'bar'
+  const [expandedState, setExpanded] = useState(defaultExpanded)
+  const expanded = bar || expandedState
   const [value, setValue] = useState('')
   const [destination, setDestination] = useState<CaptureDestination>('today')
   const inputRef = useRef<HTMLInputElement>(null)
@@ -133,7 +140,7 @@ export function TodayAddInput({ onAdd, parserContext, resolver, getRecentTaskFor
       : suggestionApplied
         ? (suggestionState === 'accepted' ? 'accepted' : 'auto_applied')
         : suggestionState === 'dismissed' ? 'dismissed' : 'ignored'
-    onAdd({
+    const saved = onAdd({
       title: p.title?.trim() || trimmed,
       scheduledFor: p.dueDate ?? null,
       isAllDay: allDayFromParse(p),
@@ -147,6 +154,11 @@ export function TodayAddInput({ onAdd, parserContext, resolver, getRecentTaskFor
       resolution: suggestion && action ? { inputText: trimmed, suggestion, action } : undefined,
     })
     reset()
+    // A failed save gives the words back (unless something new was typed
+    // meanwhile), so a retry is one tap rather than retyping.
+    void Promise.resolve(saved).then((ok) => {
+      if (ok === false) setValue((v) => (v ? v : trimmed))
+    })
   }, [value, qp, suggestion, suggestionState, suggestionApplied, destination, onAdd, reset])
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
@@ -192,11 +204,14 @@ export function TodayAddInput({ onAdd, parserContext, resolver, getRecentTaskFor
   }
 
   const showSuggestion = !!suggestion && suggestionState !== 'dismissed'
+  const hasText = !!value.trim()
 
   return (
-    <div className="rounded-lg border border-primary-300 bg-white shadow-sm transition-all duration-200">
-      <div className="flex items-center gap-2 px-3 py-1.5 md:px-4 md:py-2">
-        <span className="text-lg leading-none text-primary-500">+</span>
+    <div className={bar ? 'phone-capture-card' : 'rounded-lg border border-primary-300 bg-white shadow-sm transition-all duration-200'}>
+      <div className={bar ? 'phone-capture-field' : 'flex items-center gap-2 px-3 py-1.5 md:px-4 md:py-2'}>
+        {bar
+          ? <Plus className="h-5 w-5 shrink-0 text-neutral-400" aria-hidden="true" />
+          : <span className="text-lg leading-none text-primary-500">+</span>}
         <input
           ref={inputRef}
           type="text"
@@ -205,12 +220,26 @@ export function TodayAddInput({ onAdd, parserContext, resolver, getRecentTaskFor
           onKeyDown={handleKeyDown}
           onBlur={handleBlur}
           aria-label={DESTINATIONS.find((d) => d.key === destination)!.placeholder.split(' — ')[0].replace(/\.{3}$/, '')}
-          placeholder={DESTINATIONS.find((d) => d.key === destination)!.placeholder}
-          className="flex-1 bg-transparent text-sm text-neutral-800 placeholder:text-neutral-400 outline-none"
+          placeholder={bar && destination === 'today' ? 'Add to today…' : DESTINATIONS.find((d) => d.key === destination)!.placeholder}
+          enterKeyHint={bar ? 'done' : undefined}
+          className={bar
+            ? 'min-w-0 flex-1 bg-transparent text-[16px] text-neutral-900 outline-none placeholder:text-neutral-500'
+            : 'flex-1 bg-transparent text-sm text-neutral-800 placeholder:text-neutral-400 outline-none'}
         />
         {/* Destination chips — one input, every capture. Mousedown-preventDefault
             keeps the input focused while switching. */}
-        <div role="radiogroup" aria-label="Capture destination" className="flex items-center gap-0.5">
+        {bar && hasText && (
+          <button
+            type="button"
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={handleSubmit}
+            aria-label="Add"
+            className="phone-capture-send"
+          >
+            <ArrowUp className="h-4 w-4" aria-hidden="true" />
+          </button>
+        )}
+        {!bar && <div role="radiogroup" aria-label="Capture destination" className="flex items-center gap-0.5">
           {DESTINATIONS.map((d) => (
             <button
               key={d.key}
@@ -228,8 +257,8 @@ export function TodayAddInput({ onAdd, parserContext, resolver, getRecentTaskFor
               {d.label}
             </button>
           ))}
-        </div>
-        {value.trim() && (
+        </div>}
+        {value.trim() && !bar && (
           <button
             type="button"
             onMouseDown={(e) => e.preventDefault()}
@@ -247,6 +276,22 @@ export function TodayAddInput({ onAdd, parserContext, resolver, getRecentTaskFor
           chooser for the applied chip. Mousedown-preventDefault everywhere:
           losing the caret mid-capture would break the type → tag → Enter run.
           Hidden for a typed "note:" — that path has its own shape. */}
+      {bar && hasText && (
+        <div role="radiogroup" aria-label="Capture destination" className="flex items-center gap-1 px-3 pb-1" onMouseDown={(e) => e.preventDefault()}>
+          {DESTINATIONS.map((d) => (
+            <button
+              key={d.key}
+              type="button"
+              role="radio"
+              aria-checked={destination === d.key}
+              onClick={() => setDestination(d.key)}
+              className={`phone-capture-chip${destination === d.key ? ' is-on' : ''}`}
+            >
+              {d.label}
+            </button>
+          ))}
+        </div>
+      )}
       {value.trim() && !p.isNote && (
         <div
           className="flex items-center gap-2 px-3 pb-2 md:px-4"

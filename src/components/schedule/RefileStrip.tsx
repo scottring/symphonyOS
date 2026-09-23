@@ -1,10 +1,16 @@
+import { useState } from 'react'
 import type { Task } from '@/types/task'
 import type { DomainId } from '@/lib/domains'
 import { DomainChooser } from '@/components/domain/DomainChooser'
 import type { RefileRow } from '@/lib/today/refile'
 
 export function RefileStrip({ rows, onFile }: { rows: RefileRow[]; onFile: (task: Task, context: DomainId) => void }) {
+  // A long list of re-filing rows used to push the whole Inbox off the first
+  // screen; show a few and let the rest be asked for.
+  const [showAll, setShowAll] = useState(false)
   if (rows.length === 0) return null
+  const PREVIEW = 3
+  const shown = showAll ? rows : rows.slice(0, PREVIEW)
   const familyPrivate = rows.filter((r) => r.kind === 'family-private')
   const privateShared = rows.filter((r) => r.kind === 'private-shared')
   return (
@@ -16,9 +22,9 @@ export function RefileStrip({ rows, onFile }: { rows: RefileRow[]; onFile: (task
         <p className="text-sm text-neutral-700">{privateShared.length} private {privateShared.length === 1 ? 'item is' : 'items are'} readable by the household.</p>
       )}
       <ul className="space-y-2">
-        {rows.map(({ task, kind }) => (
-          <li key={task.id} className="flex items-center justify-between gap-3">
-            <span className="text-sm truncate">{task.title}</span>
+        {shown.map(({ task, kind }) => (
+          <li key={task.id} className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+            <span className="min-w-[10rem] flex-1 text-sm break-words text-neutral-800">{task.title}</span>
             {kind === 'family-private'
               ? <DomainChooser size="sm" onChoose={(d) => onFile(task, d)} />
               : <span className="inline-flex gap-1.5">
@@ -28,6 +34,11 @@ export function RefileStrip({ rows, onFile }: { rows: RefileRow[]; onFile: (task
           </li>
         ))}
       </ul>
+      {rows.length > PREVIEW && (
+        <button type="button" onClick={() => setShowAll((v) => !v)} className="text-sm font-medium text-primary-600 hover:text-primary-700">
+          {showAll ? 'Show fewer' : `Show all ${rows.length}`}
+        </button>
+      )}
     </section>
   )
 }

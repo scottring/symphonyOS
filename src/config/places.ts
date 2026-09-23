@@ -1,11 +1,11 @@
 // src/config/places.ts
 //
-// Place themes: five illustrated worlds, each a sidebar medallion plus an
-// accent-deep re-tint of the app (primary/accent hues shift; the warm paper
-// neutrals stay put so every place stays calm and readable). The CSS lives
-// in index.css under [data-place=...]; this file is the single source of
-// truth for ids and copy. Woodsy Cabin is the default and maps to Nordic
-// Journal's own teal-forest + terracotta — zero overrides.
+// Place themes: five illustrated worlds. "Your place" is THE theme: each
+// place tints selected tabs, primary actions, links and small highlights with
+// a colour drawn from its illustration. The neutral page, ink text and
+// life-area colours never change. The CSS lives in index.css under
+// [data-place=...]; this file is the single source of truth for ids and copy.
+// Woodsy Cabin (forest green) is the default and needs no override.
 
 export type PlaceId = 'urban' | 'small-city' | 'mountain-town' | 'cabin' | 'farm'
 
@@ -14,8 +14,8 @@ export interface Place {
   name: string
   /** One line under the name in the picker. */
   tagline: string
-  /** Swatch pair for the picker chips (primary-500, accent-400 of the place). */
-  swatch: [string, string]
+  /** The place's accent (its primary-500), shown in the picker. */
+  swatch: string
 }
 
 export const PLACES: Place[] = [
@@ -23,31 +23,31 @@ export const PLACES: Place[] = [
     id: 'urban',
     name: 'Densely Urban',
     tagline: 'Steel, glass, and the late train home.',
-    swatch: ['hsl(218 38% 30%)', 'hsl(38 55% 55%)'],
+    swatch: 'hsl(215 30% 36%)', // slate blue
   },
   {
     id: 'small-city',
     name: 'Small City',
     tagline: 'A river, a clock tower, dusk coming on.',
-    swatch: ['hsl(262 36% 30%)', 'hsl(345 45% 55%)'],
+    swatch: 'hsl(315 28% 34%)', // plum
   },
   {
     id: 'mountain-town',
     name: 'Small Mountain Town',
     tagline: 'One road in, peaks over every rooftop.',
-    swatch: ['hsl(210 45% 30%)', 'hsl(28 55% 55%)'],
+    swatch: 'hsl(203 52% 34%)', // alpine blue
   },
   {
     id: 'cabin',
     name: 'Woodsy Cabin',
     tagline: 'Pines, a stream, smoke from the chimney.',
-    swatch: ['hsl(168 45% 30%)', 'hsl(18 50% 55%)'],
+    swatch: 'hsl(150 34% 30%)', // forest green
   },
   {
     id: 'farm',
     name: 'Farm',
     tagline: 'Barn red, wheat gold, rows to the horizon.',
-    swatch: ['hsl(10 48% 32%)', 'hsl(44 55% 52%)'],
+    swatch: 'hsl(6 52% 38%)', // barn red
   },
 ]
 

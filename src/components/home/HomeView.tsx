@@ -280,17 +280,22 @@ export function HomeView({
     // (which this has to agree with) has always walked the nesting.
     const task = findTaskById(tasks, taskId)
     const wasCompleted = task?.completed ?? false
-    ctx.onToggleTask(taskId)
+    const result = ctx.onToggleTask(taskId)
     // Undo sets the EXPLICIT prior state via updateTask — it must NOT call
     // onToggleTask again. `toggleTask` derives the next value from a snapshot of
     // `tasks` captured when this handler was built (still showing the task as
     // incomplete), so a second toggle would re-complete it instead of reverting
     // — the "undo does nothing" bug. Writing `completed` explicitly is immune to
     // that stale closure.
-    pushAction(
-      wasCompleted ? 'Task marked incomplete' : 'Task completed',
-      () => ctx.onUpdateTask?.(taskId, { completed: wasCompleted })
-    )
+    // Only once it saved: a failed write has already rolled the row back and
+    // said so, and "Task completed · Undo" beside that would be a false claim.
+    void Promise.resolve(result).then((ok) => {
+      if (ok === false) return
+      pushAction(
+        wasCompleted ? 'Task marked incomplete' : 'Task completed',
+        () => ctx.onUpdateTask?.(taskId, { completed: wasCompleted })
+      )
+    })
   }, [tasks, ctx.onToggleTask, ctx.onUpdateTask, pushAction])
 
   const handleDeleteTaskWithUndo = useCallback((taskId: string) => {

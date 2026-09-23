@@ -48,7 +48,7 @@ export function PanelShell({
   return (
     <article
       ref={innerRef}
-      className={`relative w-full max-w-md rounded-lg border border-neutral-200 bg-bg-elevated px-4 py-4 md:px-5 md:py-5 ${RHYTHM}`}
+      className={`panel-shell relative w-full max-w-md rounded-lg border border-neutral-200 bg-bg-elevated px-4 py-4 md:px-5 md:py-5 ${RHYTHM}`}
     >
 
       {zones.map((zone, i) =>
