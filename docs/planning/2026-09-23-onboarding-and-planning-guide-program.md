@@ -119,4 +119,16 @@ onboarding and guide surfaces.
 ### 2026-09-23 — session 1
 - Inspected existing onboarding, guidance, and guide surfaces (table above).
 - Cut `claude/onboarding-program` from `origin/main` ca075d26; recorded this plan.
-- **Resume at:** step 3 — confirm the walk surface and account, then storyline 1, action 1.
+- Cleared the demo household's work (15 tasks, 2 routines, planning sessions) into
+  `demo_backup_20260923_*` tables, RLS enabled. Household, 4 members, 8 calendar events kept.
+- **Walked storyline 1 end to end with Scott** on a `vite preview` build at :5199.
+  14 entries logged (S1-01 … S1-14).
+- **Passed:** adding a dated event writes a calendar event, not a task; Week reads as
+  "my week"; placing inbox items to today / flexible week / a named day "all made sense";
+  completing a routine occurrence leaves tomorrow's alone; a day added to a week-committed
+  task keeps the week commitment; un-completing is safe.
+- **Open, in build order:** S1-11 one-click Today · S1-07 capture with a destination ·
+  S1-09 Inbox triage → existing `RescheduleGrid` with day loads · S1-12 focus the detail
+  pane on open · S1-13 the pane must state the item's own date · S1-05a the nav ladder
+  breaks between Week and Month · S1-01 the entry paths themselves.
+- **Resume at:** fix batch 1 (above), then storyline 2.
