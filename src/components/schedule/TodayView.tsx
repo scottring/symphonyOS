@@ -1335,17 +1335,22 @@ export function TodayView({
         aside={data.isToday ? <WeatherChip now={nowForDisplay} /> : undefined}
         // Shell desktop controls live in the page navigation; standalone
         // mounts retain the footer controls as a fallback.
-        footer={<>{!desktopControls && desktopToolbar}<div className="ml-auto">                <button
-                  type="button"
-                  onClick={openPlan}
-                  aria-expanded={chooserOpen}
-                  aria-label={chooserOpen ? 'Close shelves' : 'Shelves'}
-                  className={`daybook-choose${chooserOpen ? ' is-open' : ''}`}
-                >
-                  <PanelLeft className="h-3.5 w-3.5" aria-hidden="true" />
-                  <span>Shelves</span>
-                </button>
-</div></>}
+        // Standalone mounts keep their controls along the foot; in the Shell
+        // there is no foot row at all (it was an empty ruled row, 2026-09-23).
+        footer={!desktopControls ? desktopToolbar : undefined}
+        // Shelves sits beside the date, at the header's bottom right.
+        action={
+          <button
+            type="button"
+            onClick={openPlan}
+            aria-expanded={chooserOpen}
+            aria-label={chooserOpen ? 'Close shelves' : 'Shelves'}
+            className={`daybook-choose${chooserOpen ? ' is-open' : ''}`}
+          >
+            <PanelLeft className="h-3.5 w-3.5" aria-hidden="true" />
+            <span>Shelves</span>
+          </button>
+        }
 
       />
 

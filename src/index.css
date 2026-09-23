@@ -28,10 +28,10 @@
   --color-neutral-100: #efefee;
   --color-neutral-200: #e4e4e2;
   --color-neutral-300: #cacac7;
-  --color-neutral-400: #93938f;
-  --color-neutral-500: #737370;
-  --color-neutral-600: #5c5c59;
-  --color-neutral-700: #454542;
+  --color-neutral-400: #787874;
+  --color-neutral-500: #5e5e5a;
+  --color-neutral-600: #4b4b48;
+  --color-neutral-700: #3b3b39;
   --color-neutral-800: #30302e;
   --color-neutral-900: #232322;
   --color-neutral-950: #171716;
@@ -2190,3 +2190,10 @@ div.chooser-action-group { overflow: visible !important; }
    the frame: no second × and no card-in-a-card. */
 .side-column .panel-close { display: none; }
 .side-column .panel-shell { max-width: none; border: 0; border-radius: 0; box-shadow: none; }
+/* Desktop: the title's action (Shelves) sits at the header's bottom right,
+   under the weather and tools, not tucked after the date. */
+@media (min-width: 768px) {
+  .daybook-masthead-row { position: relative; }
+  .daybook-masthead-row .daybook-title-row { padding-right: 120px; }
+  .daybook-masthead-row .daybook-title-action { position: absolute; right: 0; bottom: 6px; padding-bottom: 0; }
+}

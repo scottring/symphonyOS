@@ -242,7 +242,8 @@ export function HomeHeader(props: HomeHeaderProps) {
         variant="page"
         eyebrow={<PeriodNavEyebrow label={menuButton} onPrev={onPrev} onNext={onNext} prevLabel={prevLabel} nextLabel={nextLabel} trailing={menu} />}
         title={label.long}
-        footer={<div className="ml-auto"><ShelvesButton weekPage={weekStart} /></div>}
+        // Shelves beside the dates, not on a row of its own (2026-09-23).
+        action={<ShelvesButton weekPage={weekStart} />}
         subline={customInputs}
         // The hourly grid needs desk width; below lg the journal is the week.
         aside={props.weekMode && props.onWeekModeChange
