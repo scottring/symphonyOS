@@ -2125,3 +2125,14 @@ div.chooser-action-group { overflow: visible !important; }
 .reference-dock .period-shelves,
 [role="dialog"] .period-shelves { padding:0; border:0; border-radius:0; }
 .period-shelves > header { padding-bottom:16px; border-bottom:1px solid var(--color-neutral-300); }
+
+/* Inbox row triage on phones: the global mobile button padding (1.5rem a
+   side) pushed the row's More button out of view. 44px targets, compact
+   sides. */
+@media (max-width: 768px) {
+  .inbox-triage button { min-height: 44px; padding: 0 12px; font-size: 13px; }
+  .inbox-triage button[aria-haspopup] { min-width: 44px; padding: 0; justify-content: center; display: inline-flex; align-items: center; }
+  .inbox-triage-menu button { min-height: 40px; padding: 0 12px; font-size: 15px; }
+  .inbox-bulk button { min-height: 40px; min-width: 0; padding: 0 10px; font-size: 14px; }
+  .inbox-bulk button[aria-label] { min-width: 40px; padding: 0; }
+}

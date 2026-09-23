@@ -17,8 +17,6 @@ import { useNotes } from '@/hooks/useNotes'
 import { useSupabaseTasks } from '@/hooks/useSupabaseTasks'
 import { useSendToCalendar } from '@/hooks/useSendToCalendar'
 import { showToast } from '@/hooks/useToast'
-import { SchedulePopover } from '@/components/triage'
-import { ConceptIcon } from '@/lib/conceptIcons'
 import { AssigneeFilter } from '@/components/home/AssigneeFilter'
 import { HomeNeedsDetailsSection } from '@/apps/home/inbox/HomeNeedsDetailsSection'
 import { SupernotePagesSection } from '@/components/capture/SupernotePagesSection'
@@ -26,7 +24,8 @@ import { NotePicker, type NotePickerSelection } from '@/components/notes/NotePic
 import { formatInboxBullet } from '@/lib/inboxBullet'
 import { DenseInboxRow, type QuickAction } from './DenseInboxRow'
 import { focusSnapshot } from '@/lib/placement/model'
-import { TriageWhenMenu, type TriageWhen } from './TriageWhenMenu'
+import { InboxTriageActions } from './InboxTriageActions'
+import type { TriageWhen } from './TriageWhenMenu'
 import { getBaseDate, getThisEvening, getNextWeekend, getWeekendAfterNext, getNextMonday } from '@/lib/dateHelpers'
 import { wasWritten } from '@/hooks/useGatedTaskActions'
 import { FocusInboxCard } from './FocusInboxCard'
@@ -525,6 +524,9 @@ export function InboxView({
           case 'next-weekend': message = 'Sent to Next Weekend'; if (onPushTask) ok = await wasWritten(onPushTask(task.id, getWeekendAfterNext())); break
           case 'this-month': message = 'Sent to This Month'; if (onPushTask) ok = await wasWritten(onPushTask(task.id, 'month')); break
           case 'next-month': message = 'Sent to Next Month'; if (onPushTask) ok = await wasWritten(onPushTask(task.id, firstOfNextMonth())); break
+          // Offered in the menu but never handled here: it wrote nothing, then
+          // offered Undo for a move that didn't happen.
+          case 'this-season': message = 'Sent to This Season'; if (onPushTask) ok = await wasWritten(onPushTask(task.id, 'quarter')); break
           case 'someday': message = 'Sent to Someday'; if (onUpdateTask) ok = await wasWritten(onUpdateTask(task.id, { bucket: 'someday', scheduledFor: undefined })); break
         }
         setLeavingIds((s) => { const next = new Set(s); next.delete(task.id); return next })
@@ -545,6 +547,39 @@ export function InboxView({
       })()
     }, 220)
   }, [onPushTask, pushUndo])
+
+  // Bulk triage to the three row destinations. One Undo restores the batch:
+  // the first row through the entry itself, the rest through onUndoExtra.
+  const handleBulkWhen = useCallback(async (when: 'today' | 'this-week' | 'someday') => {
+    const rows = tasks.filter((t) => selectedTaskIds.has(t.id))
+    if (rows.length === 0) return
+    exitSelection()
+    const day = getBaseDate(0)
+    const moved: { id: string; previous: Partial<Task> }[] = []
+    for (const t of rows) {
+      const previous: Partial<Task> = { bucket: t.bucket, scheduledFor: t.scheduledFor, isAllDay: t.isAllDay, focus: focusSnapshot(t) }
+      let ok = true
+      if (when === 'today') {
+        if (onPushTask) ok = await wasWritten(onPushTask(t.id, day))
+        if (ok && onUpdateTask) await onUpdateTask(t.id, { plannedOn: day })
+      } else if (when === 'this-week') {
+        if (onPushTask) ok = await wasWritten(onPushTask(t.id, 'week'))
+      } else if (onUpdateTask) {
+        ok = await wasWritten(onUpdateTask(t.id, { bucket: 'someday', scheduledFor: undefined }))
+      }
+      if (ok) moved.push({ id: t.id, previous })
+    }
+    if (moved.length === 0) return
+    const label = when === 'today' ? 'Today' : when === 'this-week' ? 'This Week' : 'Someday'
+    const [first, ...rest] = moved
+    pushUndo({
+      taskId: first.id,
+      message: moved.length === 1 ? `Sent to ${label}` : `Sent ${moved.length} to ${label}`,
+      previous: first.previous,
+      undoable: true,
+      onUndoExtra: rest.length ? async () => { for (const r of rest) await onUpdateTask?.(r.id, r.previous) } : undefined,
+    })
+  }, [tasks, selectedTaskIds, exitSelection, onPushTask, onUpdateTask, pushUndo])
 
   const handleUndo = useCallback(async () => {
     if (!undo) { setUndo(null); return }
@@ -635,37 +670,17 @@ export function InboxView({
             }
             applyTriage(task, action)
           }}
+          contextControl="readonly"
           triageMenu={
-            <TriageWhenMenu
+            <InboxTriageActions
+              title={task.title}
               onPick={(when) => applyWhen(task, when)}
               onPickDate={(date) => applyDate(task, date)}
               onNote={() => setNotePickerTaskId(task.id)}
+              onSendToCalendar={(date, isAllDay, durationMinutes) => void handleSendToCalendar(task, date, isAllDay, durationMinutes)}
+              calendarBusy={sendingTaskId !== null}
+              onSetArea={(context) => onUpdateTask?.(task.id, { context })}
               onDelete={() => applyTriage(task, { kind: 'delete' })}
-              calendarAction={
-                <SchedulePopover
-                  showDuration
-                  itemTitle={task.title}
-                  onSchedule={(date, isAllDay, durationMinutes) =>
-                    void handleSendToCalendar(task, date, isAllDay, durationMinutes)
-                  }
-                  trigger={
-                    <button
-                      type="button"
-                      aria-label="Send to calendar"
-                      // One hook instance serves the whole page, so a send in
-                      // flight anywhere blocks every chip — and the row actually
-                      // writing says so.
-                      aria-busy={sendingTaskId === task.id}
-                      disabled={sendingTaskId !== null}
-                      className={`text-xs px-2.5 py-1 rounded-md font-medium bg-sky-50 text-sky-700 transition-colors ${
-                        sendingTaskId !== null ? 'opacity-50 cursor-not-allowed' : 'hover:bg-sky-100'
-                      }`}
-                    >
-                      <ConceptIcon name="when" decorative /> Calendar
-                    </button>
-                  }
-                />
-              }
             />
           }
           onToggleComplete={() => onToggleTask?.(task.id)}
@@ -838,19 +853,35 @@ export function InboxView({
       </div>
 
       {selectedTaskIds.size > 0 && (
+        // The shared toolbar for a selection: the same three destinations as
+        // a row, then life area and delete — instead of every row repeating
+        // every action. Wraps on phones (above the tab bar).
         <div
           role="toolbar"
           aria-label="Bulk actions"
-          className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-neutral-900 text-white shadow-xl"
+          className="inbox-bulk fixed bottom-24 md:bottom-6 left-1/2 -translate-x-1/2 z-[55] flex w-[calc(100%-24px)] max-w-2xl flex-wrap items-center justify-center gap-x-2 gap-y-1 px-4 py-2.5 rounded-2xl bg-neutral-900 text-white shadow-xl md:w-auto"
         >
           <span className="text-sm font-medium pr-1">{selectedTaskIds.size} selected</span>
-          <span className="text-neutral-500">·</span>
-          <span className="text-xs text-neutral-400 pl-1">Context:</span>
-          <button type="button" onClick={() => handleBulkContext('work')} className="text-sm px-2 py-1 rounded-lg hover:bg-white/10">Work</button>
-          <button type="button" onClick={() => handleBulkContext('family')} className="text-sm px-2 py-1 rounded-lg hover:bg-white/10">Family</button>
-          <button type="button" onClick={() => handleBulkContext('personal')} className="text-sm px-2 py-1 rounded-lg hover:bg-white/10">Personal</button>
-          <button type="button" onClick={() => handleBulkContext(null)} className="text-sm px-2 py-1 rounded-lg hover:bg-white/10 text-neutral-300">Clear</button>
-          <span className="text-neutral-600 mx-1">|</span>
+          <span className="text-neutral-500" aria-hidden="true">·</span>
+          <button type="button" onClick={() => void handleBulkWhen('today')} className="text-sm px-2 py-1 rounded-lg bg-white/10 hover:bg-white/20 font-medium">Today</button>
+          <button type="button" onClick={() => void handleBulkWhen('this-week')} className="text-sm px-2 py-1 rounded-lg hover:bg-white/10">This week</button>
+          <button type="button" onClick={() => void handleBulkWhen('someday')} className="text-sm px-2 py-1 rounded-lg hover:bg-white/10">Someday</button>
+          <span className="text-neutral-600 mx-1" aria-hidden="true">|</span>
+          <label className="flex items-center gap-1 text-xs text-neutral-400">
+            Area
+            <select
+              aria-label="Life area for selected"
+              value=""
+              onChange={(e) => { const v = e.target.value; if (v) void handleBulkContext(v === 'unsorted' ? null : v as TaskContext) }}
+              className="rounded-lg bg-neutral-800 px-1.5 py-1 text-sm text-white"
+            >
+              <option value="">Set…</option>
+              <option value="work">Work</option>
+              <option value="family">Family</option>
+              <option value="personal">Personal</option>
+              <option value="unsorted">Unsorted</option>
+            </select>
+          </label>
           <button type="button" onClick={handleBulkDelete} className="text-sm px-2 py-1 rounded-lg hover:bg-red-500/30 text-red-300">Delete</button>
           <button type="button" onClick={exitSelection} aria-label="Cancel selection" className="ml-1 p-1 rounded-lg hover:bg-white/10"><X className="w-4 h-4" /></button>
         </div>

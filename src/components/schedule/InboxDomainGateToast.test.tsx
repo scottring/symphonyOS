@@ -68,12 +68,9 @@ describe('InboxView quick-action toast vs a cancelled domain gate', () => {
     vi.useRealTimers()
   })
 
-  // The row's WHEN control (TriageWhenMenu) fans "Today" out into a small
-  // menu (Today / Tonight / Tomorrow) — the chip opens it, the menu item
-  // inside actually picks the when and fires InboxView's applyWhen.
+  // Today is one tap on the row (2026-09-22); it fires InboxView's applyWhen.
   function pickToday() {
     fireEvent.click(screen.getByRole('button', { name: 'Today' }))
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Today' }))
   }
 
   it('shows no "Sent to Today" toast and records no undo when the gate is cancelled', async () => {

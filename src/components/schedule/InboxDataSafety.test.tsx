@@ -4,6 +4,13 @@ import { InboxView } from './InboxView'
 import { ScheduleActionsProvider, type ScheduleActionsValue } from '@/contexts/ScheduleActionsContext'
 import type { Task } from '@/types/task'
 
+/** Row actions beyond Today / This week / Someday live in the row's More menu. */
+function fromMore(item: string | RegExp, index = 0) {
+  fireEvent.click(screen.getAllByRole('button', { name: /^More actions for/ })[index])
+  fireEvent.click(screen.getByRole('menuitem', { name: item }))
+}
+
+
 // UX assessment 2026-09-22: Inbox writes that could lose work without saying so.
 //  - "Send to note" deleted the capture even when the append failed
 //    (updateNote rolls back and returns false; it never throws).
@@ -47,7 +54,7 @@ describe('Inbox data safety', () => {
   it('keeps the capture when appending it to a note fails', async () => {
     notesHook.updateNote.mockResolvedValue(false)
     const { actions } = renderInbox([capture('t1', 'Pegboard for tools')])
-    fireEvent.click(screen.getAllByRole('button', { name: 'Send to note' })[0])
+    fromMore('To a note…')
     fireEvent.click(within(await screen.findByRole('dialog', { name: 'Send to note' })).getByText('Garage ideas'))
     await waitFor(() => expect(notesHook.updateNote).toHaveBeenCalled())
     expect(actions.onDeleteTask).not.toHaveBeenCalled()
@@ -56,7 +63,7 @@ describe('Inbox data safety', () => {
 
   it('removes the capture only after the append succeeds', async () => {
     const { actions } = renderInbox([capture('t1', 'Pegboard for tools')])
-    fireEvent.click(screen.getAllByRole('button', { name: 'Send to note' })[0])
+    fromMore('To a note…')
     fireEvent.click(within(await screen.findByRole('dialog', { name: 'Send to note' })).getByText('Garage ideas'))
     await waitFor(() => expect(actions.onDeleteTask).toHaveBeenCalledWith('t1'))
   })
