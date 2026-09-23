@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, fireEvent, waitFor } from '@/test/test-utils'
+import { render, screen, fireEvent, waitFor, within } from '@/test/test-utils'
 import { InboxView } from './InboxView'
 import { ScheduleActionsProvider, type ScheduleActionsValue } from '@/contexts/ScheduleActionsContext'
 import type { Task } from '@/types/task'
@@ -73,34 +73,49 @@ describe('InboxView quick-action toast vs a cancelled domain gate', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Today' }))
   }
 
-  it('shows no "Sent to Today" toast and records no undo when the gate is cancelled', async () => {
-    // Mirrors the gated onPushTask: an Unsorted row asks first, and a
-    // cancelled ask resolves `false` — nothing was written.
-    const onPushTask = vi.fn().mockResolvedValue(false)
-    renderInbox({ onPushTask })
-
+  // Three outcomes (review 2026-09-22). The Inbox asks for a missing life
+  // area itself, BEFORE writing, so a cancel is known for certain and never
+  // confused with a failed write.
+  it('cancelled: declining the life-area question writes nothing and shows no notice or Undo', async () => {
+    const actions = renderInbox({ onPushTask: vi.fn(), onUpdateTask: vi.fn() })
     pickToday()
-
-    await waitFor(() => expect(onPushTask).toHaveBeenCalled())
-
-    // Give the post-await state updates a tick to land.
-    await waitFor(() => {
-      expect(screen.queryByRole('status')).not.toBeInTheDocument()
-    })
-    expect(screen.queryByText('Sent to Today')).not.toBeInTheDocument()
-    expect(screen.queryByText('Undo')).not.toBeInTheDocument()
+    const dialog = await screen.findByRole('dialog', { name: 'Which domain?' })
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }))
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Which domain?' })).toBeNull())
+    expect(actions.onPushTask).not.toHaveBeenCalled()
+    expect(actions.onUpdateTask).not.toHaveBeenCalled()
+    expect(screen.queryByText(/Sent to|Couldn't confirm/)).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Undo' })).toBeNull()
+    // The row is back, untouched.
+    expect(screen.getByText('Renew passport')).toBeInTheDocument()
   })
 
-  it('shows the "Sent to Today" toast with Undo when the gate is answered (or the row is already tagged)', async () => {
-    const onPushTask = vi.fn().mockResolvedValue(true)
-    renderInbox({ onPushTask })
-
+  it('confirmed: answering writes the area with the placement, then "Sent to Today" with Undo', async () => {
+    const actions = renderInbox({ onPushTask: vi.fn(), onUpdateTask: vi.fn().mockResolvedValue(true) })
     pickToday()
+    const dialog = await screen.findByRole('dialog', { name: 'Which domain?' })
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Family' }))
+    await waitFor(() => expect(screen.getByText('Sent to Today')).toBeInTheDocument())
+    expect(actions.onUpdateTask).toHaveBeenCalledWith('task-unsorted', expect.objectContaining({ context: 'family', bucket: 'timed' }))
+    expect(actions.onUpdateTask).toHaveBeenCalledWith('task-unsorted', expect.objectContaining({ plannedOn: expect.any(Date) }))
+    expect(screen.getByRole('button', { name: 'Undo' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Retry' })).toBeNull()
+  })
 
-    await waitFor(() => expect(onPushTask).toHaveBeenCalled())
-    await waitFor(() => {
-      expect(screen.getByText('Sent to Today')).toBeInTheDocument()
-    })
-    expect(screen.getByText('Undo')).toBeInTheDocument()
+  it('unconfirmed: a failed write after answering keeps a notice with Retry and Undo', async () => {
+    const onUpdateTask = vi.fn().mockResolvedValue(false)
+    renderInbox({ onPushTask: vi.fn(), onUpdateTask })
+    pickToday()
+    fireEvent.click(within(await screen.findByRole('dialog', { name: 'Which domain?' })).getByRole('button', { name: 'Work' }))
+    await waitFor(() => expect(screen.getByText("Couldn't confirm the move to Today")).toBeInTheDocument())
+    expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Undo' })).toBeInTheDocument()
+    // Retry re-runs the move with the SAME answer — no second question.
+    onUpdateTask.mockClear()
+    onUpdateTask.mockResolvedValue(true)
+    fireEvent.click(screen.getByRole('button', { name: 'Retry' }))
+    await waitFor(() => expect(screen.getByText('Sent to Today')).toBeInTheDocument())
+    expect(screen.queryByRole('dialog', { name: 'Which domain?' })).toBeNull()
+    expect(onUpdateTask).toHaveBeenCalledWith('task-unsorted', expect.objectContaining({ context: 'work' }))
   })
 })

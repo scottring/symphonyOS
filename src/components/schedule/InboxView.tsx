@@ -30,6 +30,7 @@ import { getBaseDate, getThisEvening, getNextWeekend, getWeekendAfterNext, getNe
 import { wasWritten, isStep } from '@/hooks/useGatedTaskActions'
 import type { DomainId } from '@/lib/domains'
 import { BulkAreaDialog } from './BulkAreaDialog'
+import { useDomainGate } from '@/components/domain/DomainGate'
 import { FocusInboxCard } from './FocusInboxCard'
 import { InboxModeToggle } from './InboxModeToggle'
 import { InboxUndoToast } from './InboxUndoToast'
@@ -47,6 +48,10 @@ const INBOX_ACTIONS: QuickAction[] = [
 ]
 
 type BulkWhen = 'today' | 'this-week' | 'someday'
+/** Where a move sends a row: a day/time, a period, Someday, Today (dated +
+ *  chosen), or Completed. */
+type MoveTarget = Date | 'today' | 'week' | 'month' | 'quarter' | 'someday' | 'complete'
+type Move = { task: Task; target: MoveTarget; area?: DomainId; previous: Partial<Task> }
 
 type UndoEntry = {
   taskId: string
@@ -61,6 +66,8 @@ type UndoEntry = {
   actionLabel?: string
   /** A failure report: stays until dismissed. */
   persistent?: boolean
+  /** Unconfirmed moves: re-run the forward write for just those rows. */
+  retry?: () => void
   /**
    * Runs when the entry goes away WITHOUT an undo — the toast timed out or was
    * dismissed, another action replaced it, or the page unmounted. Delete uses
@@ -442,121 +449,130 @@ export function InboxView({
     onSelectItem(`task-${taskId}`)
   }, [onSelectItem])
 
+  // ── Moves out of the Inbox: one runner for rows and selections ──
+  // Every move has exactly one of three outcomes (review 2026-09-22):
+  //  - cancelled: the life-area question was declined → nothing written, no Undo;
+  //  - confirmed: every write reported success → "Sent …" with Undo;
+  //  - unconfirmed: a write reported false → persistent notice with Retry and
+  //    Undo. False is not "nothing changed": the task row can save before its
+  //    commitment/focus records fail, so the snapshot is restored on Undo.
+  // Cancel can only happen up front: the Inbox asks for a missing life area
+  // itself and writes it WITH the placement, so no later write can come back
+  // false because a gate was dismissed.
+  const { requireDomain } = useDomainGate()
+
+  /** Write one row's move. True = confirmed. Today also chooses it for today. */
+  const writeMove = useCallback(async (task: Task, target: MoveTarget, area?: DomainId): Promise<boolean> => {
+    const dest = target === 'today' ? getBaseDate(0) : target
+    let ok: boolean
+    if (dest === 'complete') {
+      ok = onUpdateTask ? await wasWritten(onUpdateTask(task.id, { completed: true })) : false
+    } else if (area || dest === 'someday') {
+      // Same placement fields pushTask writes, with the answer in one write.
+      const placement: Partial<Task> = dest === 'someday' || dest === 'week' || dest === 'month' || dest === 'quarter'
+        ? { bucket: dest, scheduledFor: undefined }
+        : { bucket: 'timed', scheduledFor: dest, isAllDay: dest.getHours() === 0 && dest.getMinutes() === 0 }
+      ok = onUpdateTask ? await wasWritten(onUpdateTask(task.id, area ? { context: area, ...placement } : placement)) : false
+    } else {
+      ok = onPushTask ? await wasWritten(onPushTask(task.id, dest)) : false
+    }
+    // Choosing it for today is part of "Today"; its failure is unconfirmed too.
+    if (ok && target === 'today' && onUpdateTask) ok = await wasWritten(onUpdateTask(task.id, { plannedOn: getBaseDate(0) }))
+    return ok
+  }, [onPushTask, onUpdateTask])
+
+  /** Run the moves, then record ONE outcome: confirmed or unconfirmed. */
+  const runMoves = useCallback(async (label: string, moves: Move[], earlier: Move[] = []) => {
+    const confirmed: Move[] = [...earlier]
+    const unconfirmed: Move[] = []
+    for (const m of moves) (await writeMove(m.task, m.target, m.area) ? confirmed : unconfirmed).push(m)
+    setLeavingIds((s) => { const next = new Set(s); moves.forEach((m) => next.delete(m.task.id)); return next })
+    const all = [...confirmed, ...unconfirmed]
+    if (all.length === 0) return
+    const c = confirmed.length, u = unconfirmed.length
+    const message = u === 0
+      ? (label === 'Completed' ? (c === 1 ? 'Completed' : `Completed ${c}`) : c === 1 ? `Sent to ${label}` : `Sent ${c} to ${label}`)
+      : c === 0
+        ? `Couldn't confirm ${u === 1 ? (label === 'Completed' ? 'that it completed' : `the move to ${label}`) : `${u} moves to ${label}`}`
+        : `Sent ${c} to ${label} · ${u} may not have saved`
+    pushUndo({
+      taskId: all[0].task.id,
+      message,
+      previous: {},
+      restores: all.map((m) => ({ id: m.task.id, previous: m.previous })),
+      undoable: true,
+      persistent: u > 0,
+      retry: u > 0 ? () => { void runMoves(label, unconfirmed, confirmed) } : undefined,
+    })
+  }, [writeMove, pushUndo])
+
+  /** Snapshot for Undo, then ask for a missing life area (the only cancel). */
+  const startMove = useCallback(async (task: Task, target: MoveTarget, knownArea?: DomainId): Promise<Move | null> => {
+    const previous: Partial<Task> = {
+      bucket: task.bucket, scheduledFor: task.scheduledFor, isAllDay: task.isAllDay,
+      completed: task.completed, focus: focusSnapshot(task),
+    }
+    const needsArea = target !== 'complete' && task.context == null && !isStep(task)
+    if (!needsArea) return { task, target, previous }
+    const area = knownArea ?? await requireDomain(task)
+    if (!area) return null
+    // Undo also returns a newly classified item to Unsorted.
+    return { task, target, area, previous: { ...previous, context: null } }
+  }, [requireDomain])
+
+  const moveRow = useCallback((task: Task, target: MoveTarget, label: string) => {
+    setLeavingIds((s) => new Set(s).add(task.id))
+    void (async () => {
+      const move = await startMove(task, target)
+      if (!move) {
+        // Cancelled: nothing written, no notice, no Undo.
+        setLeavingIds((s) => { const next = new Set(s); next.delete(task.id); return next })
+        return
+      }
+      await new Promise((r) => setTimeout(r, 220)) // let the row's leave animation play
+      await runMoves(label, [move])
+    })()
+  }, [startMove, runMoves])
+
   const applyTriage = useCallback((task: Task, action: QuickAction) => {
-    const previous: Partial<Task> = {
-      bucket: task.bucket,
-      scheduledFor: task.scheduledFor,
-      isAllDay: task.isAllDay,
-      // Captured so "Done" is undoable — restores the item to the inbox.
-      completed: task.completed,
-      // "Today" also chooses it (S4); Undo restores the focus rows themselves.
-      focus: focusSnapshot(task),
+    if (action.kind === 'delete') {
+      // Hide now, delete when the Undo window closes (onExpire).
+      deleteWithUndo([task.id], 'Deleted')
+      return
     }
+    const byKind: Partial<Record<QuickAction['kind'], [MoveTarget, string]>> = {
+      today: ['today', 'Today'], week: ['week', 'This Week'], month: ['month', 'This Month'],
+      someday: ['someday', 'Someday'], complete: ['complete', 'Completed'],
+    }
+    const spec = byKind[action.kind]
+    if (spec) moveRow(task, spec[0], spec[1])
+  }, [deleteWithUndo, moveRow])
 
-    setLeavingIds((s) => new Set(s).add(task.id))
-
-    setTimeout(() => {
-      void (async () => {
-        let message = ''
-        // A cancelled domain gate (the row is Unsorted, the DomainGate dialog
-        // is up) writes nothing — no toast, no undo entry for a move that
-        // didn't happen. Defaults true: a handler-less action (no
-        // onPushTask/onUpdateTask wired) is a no-op, not a cancel.
-        let ok = true
-        if (action.kind === 'today') {
-          const today = new Date()
-          today.setHours(0, 0, 0, 0)
-          if (onPushTask) ok = await wasWritten(onPushTask(task.id, today))
-          if (ok && onUpdateTask) await onUpdateTask(task.id, { plannedOn: today })
-          message = 'Sent to Today'
-        } else if (action.kind === 'week' || action.kind === 'month') {
-          if (onPushTask) ok = await wasWritten(onPushTask(task.id, action.kind))
-          message = action.kind === 'week' ? 'Sent to This Week' : 'Sent to This Month'
-        } else if (action.kind === 'someday') {
-          // Real someday bucket — the old code sent "Someday" to quarter/season.
-          if (onUpdateTask) ok = await wasWritten(onUpdateTask(task.id, { bucket: 'someday', scheduledFor: undefined }))
-          message = 'Sent to Someday'
-        } else if (action.kind === 'complete') {
-          if (onUpdateTask) ok = await wasWritten(onUpdateTask(task.id, { completed: true }))
-          message = 'Completed'
-        } else if (action.kind === 'delete') {
-          // Hide now, delete when the Undo window closes (onExpire).
-          const id = task.id
-          setLeavingIds((s) => { const next = new Set(s); next.delete(id); return next })
-          deleteWithUndo([id], 'Deleted')
-          return
-        }
-
-        setLeavingIds((s) => { const next = new Set(s); next.delete(task.id); return next })
-        if (ok) pushUndo({ taskId: task.id, message, previous, undoable: true })
-      })()
-    }, 220)
-  }, [onPushTask, onUpdateTask, pushUndo, deleteWithUndo])
-
-  // Fan-out triage: route an inbox item to a specific WHEN. Mirrors applyTriage's
-  // leaving-animation + undo, but covers the richer temporal vocabulary. Dated
-  // whens go through onPushTask (bucket=timed + all-day inference — "Tonight" at
-  // 6pm stays timed); pool whens set the bucket. Someday uses onUpdateTask since
-  // onPushTask's signature predates the 'someday' bucket.
+  // Fan-out triage: route an inbox item to a specific WHEN.
   const applyWhen = useCallback((task: Task, when: TriageWhen) => {
-    const previous: Partial<Task> = {
-      bucket: task.bucket,
-      scheduledFor: task.scheduledFor,
-      isAllDay: task.isAllDay,
-      focus: focusSnapshot(task),
+    const d = new Date()
+    const specs: Record<TriageWhen, [MoveTarget, string]> = {
+      'today': ['today', 'Today'],
+      'tonight': [getThisEvening(), 'Tonight'],
+      'tomorrow': [getBaseDate(1), 'Tomorrow'],
+      'this-week': ['week', 'This Week'],
+      'next-week': [getNextMonday(), 'Next Week'],
+      'this-weekend': [getNextWeekend(), 'This Weekend'],
+      'next-weekend': [getWeekendAfterNext(), 'Next Weekend'],
+      'this-month': ['month', 'This Month'],
+      'next-month': [new Date(d.getFullYear(), d.getMonth() + 1, 1), 'Next Month'],
+      // Was offered but never handled: it wrote nothing and still offered Undo.
+      'this-season': ['quarter', 'This Season'],
+      'someday': ['someday', 'Someday'],
     }
-    setLeavingIds((s) => new Set(s).add(task.id))
-    setTimeout(() => {
-      void (async () => {
-        let message = ''
-        // A cancelled domain gate writes nothing — no toast, no undo entry
-        // for a move that didn't happen. Defaults true: a handler-less case
-        // (no onPushTask/onUpdateTask wired) is a no-op, not a cancel.
-        let ok = true
-        const firstOfNextMonth = () => {
-          const d = new Date()
-          return new Date(d.getFullYear(), d.getMonth() + 1, 1, 0, 0, 0, 0)
-        }
-        switch (when) {
-          case 'today': {
-            // The Today command (S4): dated today AND chosen for my focus.
-            message = 'Sent to Today'
-            const day = getBaseDate(0)
-            if (onPushTask) ok = await wasWritten(onPushTask(task.id, day))
-            if (ok && onUpdateTask) await onUpdateTask(task.id, { plannedOn: day })
-            break
-          }
-          case 'tonight': message = 'Sent to Tonight'; if (onPushTask) ok = await wasWritten(onPushTask(task.id, getThisEvening())); break
-          case 'tomorrow': message = 'Sent to Tomorrow'; if (onPushTask) ok = await wasWritten(onPushTask(task.id, getBaseDate(1))); break
-          case 'this-week': message = 'Sent to This Week'; if (onPushTask) ok = await wasWritten(onPushTask(task.id, 'week')); break
-          case 'next-week': message = 'Sent to Next Week'; if (onPushTask) ok = await wasWritten(onPushTask(task.id, getNextMonday())); break
-          case 'this-weekend': message = 'Sent to This Weekend'; if (onPushTask) ok = await wasWritten(onPushTask(task.id, getNextWeekend())); break
-          case 'next-weekend': message = 'Sent to Next Weekend'; if (onPushTask) ok = await wasWritten(onPushTask(task.id, getWeekendAfterNext())); break
-          case 'this-month': message = 'Sent to This Month'; if (onPushTask) ok = await wasWritten(onPushTask(task.id, 'month')); break
-          case 'next-month': message = 'Sent to Next Month'; if (onPushTask) ok = await wasWritten(onPushTask(task.id, firstOfNextMonth())); break
-          // Offered in the menu but never handled here: it wrote nothing, then
-          // offered Undo for a move that didn't happen.
-          case 'this-season': message = 'Sent to This Season'; if (onPushTask) ok = await wasWritten(onPushTask(task.id, 'quarter')); break
-          case 'someday': message = 'Sent to Someday'; if (onUpdateTask) ok = await wasWritten(onUpdateTask(task.id, { bucket: 'someday', scheduledFor: undefined })); break
-        }
-        setLeavingIds((s) => { const next = new Set(s); next.delete(task.id); return next })
-        if (ok) pushUndo({ taskId: task.id, message, previous, undoable: true })
-      })()
-    }, 220)
-  }, [onPushTask, onUpdateTask, pushUndo])
+    const [target, label] = specs[when]
+    moveRow(task, target, label)
+  }, [moveRow])
 
   // Schedule an inbox item to a specific date/time (the "Pick date" triage path).
   const applyDate = useCallback((task: Task, date: Date) => {
-    const previous: Partial<Task> = { bucket: task.bucket, scheduledFor: task.scheduledFor, isAllDay: task.isAllDay }
-    setLeavingIds((s) => new Set(s).add(task.id))
-    setTimeout(() => {
-      void (async () => {
-        const ok = onPushTask ? await wasWritten(onPushTask(task.id, date)) : true
-        setLeavingIds((s) => { const next = new Set(s); next.delete(task.id); return next })
-        if (ok) pushUndo({ taskId: task.id, message: 'Scheduled', previous, undoable: true })
-      })()
-    }, 220)
-  }, [onPushTask, pushUndo])
+    moveRow(task, date, date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }))
+  }, [moveRow])
 
   // Bulk triage to the three row destinations (2026-09-22). Every
   // unclassified item's life area is collected in ONE dialog before anything
@@ -567,57 +583,12 @@ export function InboxView({
 
   const runBulkWhen = useCallback(async (when: BulkWhen, rows: Task[], areas: Map<string, DomainId>) => {
     exitSelection()
-    const day = getBaseDate(0)
-    const moved: { id: string; previous: Partial<Task> }[] = []
-    const unconfirmed: { id: string; previous: Partial<Task> }[] = []
-    for (const t of rows) {
-      const area = areas.get(t.id)
-      const previous: Partial<Task> = {
-        bucket: t.bucket, scheduledFor: t.scheduledFor, isAllDay: t.isAllDay, focus: focusSnapshot(t),
-        // Undo also returns a newly classified item to Unsorted.
-        ...(area ? { context: t.context ?? null } : {}),
-      }
-      let ok = true
-      if (area) {
-        // The area rides in the same write as the placement: no second ask,
-        // and no half-state where it is classified but not moved.
-        const placement: Partial<Task> = when === 'today'
-          ? { bucket: 'timed', scheduledFor: day, isAllDay: true, plannedOn: day }
-          : { bucket: when === 'this-week' ? 'week' : 'someday', scheduledFor: undefined }
-        ok = onUpdateTask ? await wasWritten(onUpdateTask(t.id, { context: area, ...placement })) : false
-      } else if (when === 'today') {
-        ok = onPushTask ? await wasWritten(onPushTask(t.id, day)) : false
-        // Choosing it for today is part of "Today"; a failure there is unconfirmed too.
-        if (ok && onUpdateTask) ok = await wasWritten(onUpdateTask(t.id, { plannedOn: day }))
-      } else if (when === 'this-week') {
-        ok = onPushTask ? await wasWritten(onPushTask(t.id, 'week')) : false
-      } else {
-        ok = onUpdateTask ? await wasWritten(onUpdateTask(t.id, { bucket: 'someday', scheduledFor: undefined })) : false
-      }
-      // A false result means "not confirmed", not "nothing changed": the row
-      // can save before its commitment/focus records fail. So an unconfirmed
-      // row is reported as such and still goes into Undo — restoring its
-      // snapshot is safe whether or not it moved.
-      if (ok) moved.push({ id: t.id, previous })
-      else unconfirmed.push({ id: t.id, previous })
-    }
-    const label = when === 'today' ? 'Today' : when === 'this-week' ? 'This Week' : 'Someday'
-    const all = [...moved, ...unconfirmed]
-    const message = unconfirmed.length === 0
-      ? (moved.length === 1 ? `Sent to ${label}` : `Sent ${moved.length} to ${label}`)
-      : moved.length === 0
-        ? `Couldn't confirm ${unconfirmed.length === 1 ? 'the move' : `${unconfirmed.length} moves`} to ${label} — check the Inbox, or Undo`
-        : `Sent ${moved.length} to ${label} · ${unconfirmed.length} may not have saved`
-    pushUndo({
-      taskId: all[0].id,
-      message,
-      previous: {},
-      restores: all,
-      undoable: true,
-      // A report of a possible failure stays until it is read.
-      persistent: unconfirmed.length > 0,
-    })
-  }, [exitSelection, onPushTask, onUpdateTask, pushUndo])
+    const target: MoveTarget = when === 'this-week' ? 'week' : when
+    const moves: Move[] = []
+    // Areas were collected up front (BulkAreaDialog), so nothing here can cancel.
+    for (const t of rows) { const m = await startMove(t, target, areas.get(t.id)); if (m) moves.push(m) }
+    await runMoves(when === 'today' ? 'Today' : when === 'this-week' ? 'This Week' : 'Someday', moves)
+  }, [exitSelection, startMove, runMoves])
 
   const handleBulkWhen = useCallback((when: BulkWhen) => {
     const rows = tasks.filter((t) => selectedTaskIds.has(t.id))
@@ -923,6 +894,7 @@ export function InboxView({
           actionLabel={undo.actionLabel}
           persistent={undo.persistent}
           busy={undoBusy}
+          onRetry={undo.retry ? () => { const r = undo.retry!; undoRef.current = null; setUndo(null); r() } : undefined}
         />
       )}
       </div>

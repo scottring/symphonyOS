@@ -174,7 +174,7 @@ describe('Inbox bulk triage: areas first, real results, whole Undo', () => {
     ;(actions.onUpdateTask as ReturnType<typeof vi.fn>).mockResolvedValue(false)
     select('One', 'Two')
     fireEvent.click(within(bar()).getByRole('button', { name: 'Someday' }))
-    await waitFor(() => expect(screen.getByText("Couldn't confirm 2 moves to Someday — check the Inbox, or Undo")).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByText("Couldn't confirm 2 moves to Someday")).toBeInTheDocument())
     expect(toast).not.toHaveBeenCalledWith(expect.stringMatching(/Nothing moved/), expect.anything())
     expect(screen.getByRole('button', { name: 'Undo' })).toBeInTheDocument()
   })
@@ -185,7 +185,7 @@ describe('Inbox bulk triage: areas first, real results, whole Undo', () => {
     ;(actions.onUpdateTask as ReturnType<typeof vi.fn>).mockResolvedValue(false)
     select('One')
     fireEvent.click(within(bar()).getByRole('button', { name: 'Today' }))
-    await waitFor(() => expect(screen.getByText("Couldn't confirm the move to Today — check the Inbox, or Undo")).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByText("Couldn't confirm the move to Today")).toBeInTheDocument())
   })
 
   it('a failed Undo restore stays on screen with Retry, and Retry re-attempts only the failed rows', async () => {
@@ -231,6 +231,60 @@ describe('Inbox bulk triage: areas first, real results, whole Undo', () => {
     for (const id of ['u1', 'u2']) {
       expect(actions.onUpdateTask).toHaveBeenCalledWith(id, expect.objectContaining({ bucket: 'inbox', context: null }))
     }
+  })
+})
+
+describe('Single-row moves share the three outcomes', () => {
+  it("Today: a failed 'chosen for today' follow-up is unconfirmed, with Retry and Undo", async () => {
+    const { actions } = renderInbox([capture('t1', 'Fix gate')])
+    ;(actions.onPushTask as ReturnType<typeof vi.fn>).mockResolvedValue(true)
+    ;(actions.onUpdateTask as ReturnType<typeof vi.fn>).mockResolvedValue(false)
+    fireEvent.click(screen.getByRole('button', { name: 'Today' }))
+    await waitFor(() => expect(screen.getByText("Couldn't confirm the move to Today")).toBeInTheDocument())
+    expect(actions.onUpdateTask).toHaveBeenCalledWith('t1', { plannedOn: expect.any(Date) })
+    expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Undo' })).toBeInTheDocument()
+  })
+
+  it('a failed placement is unconfirmed (not silently dropped) and Undo restores the snapshot', async () => {
+    const { actions } = renderInbox([capture('t1', 'Fix gate')])
+    ;(actions.onPushTask as ReturnType<typeof vi.fn>).mockResolvedValue(false)
+    fireEvent.click(screen.getByRole('button', { name: 'This week' }))
+    await waitFor(() => expect(screen.getByText("Couldn't confirm the move to This Week")).toBeInTheDocument())
+    ;(actions.onUpdateTask as ReturnType<typeof vi.fn>).mockResolvedValue(true)
+    fireEvent.click(screen.getByRole('button', { name: 'Undo' }))
+    await waitFor(() => expect(actions.onUpdateTask).toHaveBeenCalledWith('t1', expect.objectContaining({ bucket: 'inbox' })))
+    await waitFor(() => expect(screen.queryByText(/Couldn't confirm/)).toBeNull())
+  })
+
+  it('a classified row is never asked and a confirmed move offers Undo without Retry', async () => {
+    renderInbox([capture('t1', 'Fix gate')])
+    fireEvent.click(screen.getByRole('button', { name: 'Someday' }))
+    await waitFor(() => expect(screen.getByText('Sent to Someday')).toBeInTheDocument())
+    expect(screen.queryByRole('dialog', { name: 'Which domain?' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Retry' })).toBeNull()
+  })
+})
+
+describe('Bulk Retry', () => {
+  it('re-runs only the unconfirmed rows; afterwards Undo still covers every row', async () => {
+    const { actions } = renderInbox([capture('t1', 'One'), capture('t2', 'Two'), capture('t3', 'Three')])
+    const push = actions.onPushTask as ReturnType<typeof vi.fn>
+    push.mockImplementation(async (id: string) => id !== 't2')
+    fireEvent.click(screen.getByRole('button', { name: 'Select' }))
+    for (const t of ['One', 'Two', 'Three']) fireEvent.click(screen.getByText(t))
+    fireEvent.click(within(screen.getByRole('toolbar', { name: 'Bulk actions' })).getByRole('button', { name: 'This week' }))
+    await waitFor(() => expect(screen.getByText('Sent 2 to This Week · 1 may not have saved')).toBeInTheDocument())
+    push.mockClear()
+    push.mockResolvedValue(true)
+    fireEvent.click(screen.getByRole('button', { name: 'Retry' }))
+    await waitFor(() => expect(screen.getByText('Sent 3 to This Week')).toBeInTheDocument())
+    expect(push.mock.calls.map((c) => c[0])).toEqual(['t2'])
+    const update = actions.onUpdateTask as ReturnType<typeof vi.fn>
+    update.mockClear()
+    update.mockResolvedValue(true)
+    fireEvent.click(screen.getByRole('button', { name: 'Undo' }))
+    await waitFor(() => expect(update).toHaveBeenCalledTimes(3))
   })
 })
 
