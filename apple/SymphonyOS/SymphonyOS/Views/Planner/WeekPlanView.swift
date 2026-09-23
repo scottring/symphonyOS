@@ -153,9 +153,20 @@ struct WeekPlanView: View {
     /// The day card's single "Also due" line: "Also due: Piano practice",
     /// "…: A, B", or "…: A, B +3 more" — never a list.
     static func alsoDueLine(_ names: [String]) -> String {
-        let shown = names.prefix(2).joined(separator: ", ")
+        let parts = alsoDueParts(names)
+        return parts.more.map { "\(parts.names) \($0)" } ?? parts.names
+    }
+
+    /// The fallback when whole names don't fit: "Also due: 4 routines".
+    static func alsoDueCount(_ n: Int) -> String {
+        "Also due: \(n) \(n == 1 ? "routine" : "routines")"
+    }
+
+    /// The line in two pieces — the names, and the "+N more" count.
+    static func alsoDueParts(_ names: [String]) -> (names: String, more: String?) {
+        let shown = "Also due: " + names.prefix(2).joined(separator: ", ")
         let rest = names.count - 2
-        return rest > 0 ? "Also due: \(shown) +\(rest) more" : "Also due: \(shown)"
+        return (shown, rest > 0 ? "+\(rest) more" : nil)
     }
 
     static func shortRange(_ ws: Date) -> String {
@@ -257,9 +268,18 @@ private struct DayCard: View {
             if !alsoDue.isEmpty {
                 HStack(alignment: .firstTextBaseline, spacing: 6) {
                     Image(systemName: "repeat").font(.system(size: 11, weight: .semibold))
-                    Text(WeekPlanView.alsoDueLine(alsoDue))
-                        .lineLimit(1)
-                        .truncationMode(.tail)
+                    let parts = WeekPlanView.alsoDueParts(alsoDue)
+                    // Whole names and "+N more" when they fit on one line;
+                    // otherwise just the count — never a name cut mid-word,
+                    // and never a second line.
+                    ViewThatFits(in: .horizontal) {
+                        HStack(spacing: 4) {
+                            Text(parts.names).fixedSize()
+                            if let more = parts.more { Text(more).fixedSize() }
+                        }
+                        Text(WeekPlanView.alsoDueCount(alsoDue.count)).fixedSize()
+                    }
+                    Spacer(minLength: 0)
                 }
                 .font(.bodySmall)
                 .foregroundStyle(Color.textTertiary)

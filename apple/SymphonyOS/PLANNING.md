@@ -38,3 +38,18 @@ In a Debug build, launching with `-SymphonyDemo` gives you:
 - no sync.
 
 `SymphonyOSUITests/PlannerScreensUITests` walks every screen with this data, at default and accessibility text sizes. It saves screenshots to `$TEST_RUNNER_SCREENSHOT_DIR`.
+
+### Known limitation: the simulator stalls after text entry (2026-09-23)
+
+On Xcode 27 with the iOS 27.0 simulator, after a test types into a text field, XCUITest's "wait for app to idle" times out. It waits 60 s at every later step.
+
+What we know:
+- Seen after typing into the capture bar and into the new goal's name.
+- The app sits at 0% CPU during the stall, so it is not a render loop.
+- Turning off the simulator keyboard's predictions and autocorrect doesn't help.
+- The accessibility-size walk usually passes; the default-size walk usually stalls.
+
+How to run it:
+- Run with `-test-timeouts-enabled YES -default-test-execution-time-allowance 300` so a stall ends the run instead of hanging.
+- Verify text-entry flows (capture bar, search, goal create/edit) on a real iPhone rather than rerunning the walk.
+- Treat a stall here as a test-harness problem, not an app failure, unless a device check shows otherwise.

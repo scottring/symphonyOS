@@ -168,6 +168,15 @@ enum DemoMode {
         routine("Water the tomatoes", RecurrencePattern(type: "weekly", days: [todayKey]), "family", liam)
         routine("Piano practice", RecurrencePattern(type: "weekly", days: [todayKey]), "family", liam)
         routine("Mow the lawn", RecurrencePattern(type: "weekly", days: []), "family", alex)
+        // Tomorrow: several untimed routines with long names, so Week's
+        // "Also due" line must shorten names while keeping "+N more".
+        let tomorrowKey = RoutineRules.weekdayKey(PlanCalendar.addDays(today, 1))
+        routine("Practice the recital pieces for the autumn concert with the metronome",
+                RecurrencePattern(type: "weekly", days: [tomorrowKey]), "family", mia)
+        routine("Sort the recycling and take the bins down to the curb",
+                RecurrencePattern(type: "weekly", days: [tomorrowKey]), "family", liam)
+        routine("Water the front garden beds", RecurrencePattern(type: "weekly", days: [tomorrowKey]), "family", liam)
+        routine("Check the bike tires", RecurrencePattern(type: "weekly", days: [tomorrowKey]), "family", alex)
 
         try? ctx.save()
     }

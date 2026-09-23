@@ -208,6 +208,13 @@ struct PlanSelectorTests {
         #expect(WeekPlanView.alsoDueLine(["Piano practice"]) == "Also due: Piano practice")
         #expect(WeekPlanView.alsoDueLine(["A", "B"]) == "Also due: A, B")
         #expect(WeekPlanView.alsoDueLine(["A", "B", "C", "D", "E"]) == "Also due: A, B +3 more")
+        // The count is its own piece, so long names can't truncate it away.
+        let parts = WeekPlanView.alsoDueParts(["A very long routine name that will not fit", "B", "C"])
+        #expect(parts.more == "+1 more")
+        #expect(!parts.names.contains("more"))
+        #expect(WeekPlanView.alsoDueParts(["A"]).more == nil)
+        #expect(WeekPlanView.alsoDueCount(4) == "Also due: 4 routines")
+        #expect(WeekPlanView.alsoDueCount(1) == "Also due: 1 routine")
     }
 
     @Test func focusKeyMatchesPulledRows() {
