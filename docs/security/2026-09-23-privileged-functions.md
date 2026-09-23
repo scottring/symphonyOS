@@ -13,8 +13,8 @@ Method:
    inside transactions that ended in `rollback`. Output was limited to counts
    and field names; no personal data was printed.
 
-Fix: `supabase/migrations/2026-09-23_privileged_function_access.sql` (not yet
-applied). Proof: `supabase/tests/094_privileged_function_access.test.sql`
+Fix: `supabase/migrations/2026-09-23_privileged_function_access.sql` (applied
+to production 2026-09-23 07:56 UTC; see "Containment" below). Proof: `supabase/tests/094_privileged_function_access.test.sql`
 passes with the migration applied inside a rolled-back transaction, and its
 first assertion fails without it.
 
