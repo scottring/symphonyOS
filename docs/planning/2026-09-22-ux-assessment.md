@@ -178,9 +178,30 @@ On an iPhone, with the test household signed in at app.symphony-os.com:
 
 Report anything that differs; each step names what should happen.
 
+## Two-account permission check — September 23
+
+Run against production in the test household (owner Alex `f9ff9f28…`, member `3431facd…`) as a single transaction that ended in `rollback`. Service-role setup, then `set local role authenticated` with each user's JWT claims; afterwards a query confirmed zero probe rows remained. Setup: a probe member owned by Alex; tasks owned by the other account (T1 shared `couple`, T2 private listing the probe in `assigned_to_all`, T3 private with the probe as `assigned_to`); T4 Alex's own; contacts C1 other-private, C2 other-shared, C3 Alex's own.
+
+| Check (as Alex unless noted) | Result | Expected |
+| --- | --- | --- |
+| Setup scopes kept by triggers | T1 couple, T2–T4 individual | same |
+| (control) Tasks referencing the member Alex can see | T1, T4 | T1, T4; private T2/T3 invisible |
+| Clear the list on T1 and T2 | T1 only; T2 0 rows, no error | same |
+| Unassign T1, T3, T4 | T1, T4; T3 silently skipped | same |
+| Delete member while hidden T3 references it | foreign-key error | FK error |
+| Delete C1, C2, C3 | C2, C3; C1 0 rows, no error | same |
+| Delete member with no FK references left | 1 row | 1 row |
+| Hidden T2's list afterwards | still lists the deleted member | (the gap below) |
+| (control, as the other account) sees its own private T2 | T2 | T2 |
+
+Consequences in the app (PR #57):
+- Zero-row updates and deletes are now detected: nothing leaves the UI unless the row really changed, and restores are verified row by row.
+- A removal blocked by a hidden private assignee now says so ("…a task you can't see…") and restores everything.
+- **Not fixable from the app:** a private task of another account that lists the member in `assigned_to_all` keeps the deleted id, because the remover cannot see that row. Closing this needs a database-level change (e.g. a `before delete` trigger on `family_members` that removes the id from every task), which is a schema/access change awaiting Scott's decision. A read-only query on 2026-09-23 found no such dangling ids in production.
+
 ## Remaining gaps
 
 - Open items: L1–L7, ~60 placeholder-only inputs on lower-traffic screens, desktop row semantics (L4). Week/Month phone headers keep the separate domain row (by decision).
 - Real-device and VoiceOver pass (script above).
-- Cross-account behaviour of member removal (whether RLS lets one household member edit the other's tasks) is detected and reported, not verified with two real accounts.
+- Decision needed: database-level cleanup of `assigned_to_all` on member removal (see the two-account check).
 - Fresh-user research, cross-account privacy and provider sync remain out of scope and unclaimed.
