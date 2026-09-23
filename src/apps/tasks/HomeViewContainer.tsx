@@ -18,6 +18,7 @@ import { useGoogleCalendar, CalendarReconnectError } from '@/hooks/useGoogleCale
 import { showToast } from '@/hooks/useToast';
 import { rangeEventSpan } from '@/lib/weekHelpers';
 import { PageFromPaperFlow } from '@/components/capture/PageFromPaperFlow';
+import { PaperPlanFlow } from '@/components/capture/PaperPlanFlow';
 import { localYmd } from '@/lib/cadence/config';
 import { parseRoutineTimelineId } from '@/lib/today/doseExpansion';
 import { groupItems, addToGroup, removeFromGroup, ungroupTasks } from '@/lib/today/groupTasks';
@@ -840,7 +841,12 @@ export function HomeViewContainer({ fixedView }: { fixedView?: 'today' | 'week' 
         fixedView={fixedView}
       />
 
-      {planFromPaperOpen && (
+      {/* Plan from paper: a real page goes through the conversational review
+          (PaperPlanFlow); the bundled sample keeps the quick week-page sheet. */}
+      {planFromPaperOpen && !sampleBlob && (
+        <PaperPlanFlow members={familyMembers} onClose={() => setPlanFromPaperOpen(false)} />
+      )}
+      {planFromPaperOpen && sampleBlob && (
         <PageFromPaperFlow
           members={familyMembers}
           onClose={() => {

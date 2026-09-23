@@ -235,10 +235,27 @@ function parseUnclear(raw: unknown): string[] {
     .slice(0, MAX_UNCLEAR)
 }
 
-/** Throws when the model's text is not JSON at all, so the caller can retry once. */
-export function parsePageResponse(raw: string, calendar: Set<string>, memberIds: Set<string>, altitude: PageAltitude = 'week'): PageParseResult {
+/**
+ * The JSON object in a reply, even when the model wrapped it in prose ("I need
+ * to look at both pages… {…}") — the failure that broke a two-page spread on
+ * 2026-09-23: both attempts opened with prose and JSON.parse threw on the
+ * first word. Throws when there is no object at all, so the caller can retry.
+ */
+export function extractJsonObject(raw: string): unknown {
   const stripped = raw.trim().replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/, '')
-  const parsed = JSON.parse(stripped) as { items?: unknown; notes?: unknown; unclear?: unknown; page_title?: unknown }
+  try {
+    return JSON.parse(stripped)
+  } catch {
+    const start = stripped.indexOf('{')
+    const end = stripped.lastIndexOf('}')
+    if (start < 0 || end <= start) throw new Error('No JSON object in the reply')
+    return JSON.parse(stripped.slice(start, end + 1))
+  }
+}
+
+/** Throws when the model's text holds no JSON object, so the caller can retry once. */
+export function parsePageResponse(raw: string, calendar: Set<string>, memberIds: Set<string>, altitude: PageAltitude = 'week'): PageParseResult {
+  const parsed = extractJsonObject(raw) as { items?: unknown; notes?: unknown; unclear?: unknown; page_title?: unknown }
   return {
     items: parseItems(parsed.items, calendar, memberIds, altitude),
     notes: parseNotes(parsed.notes),

@@ -6,23 +6,21 @@ import { readSeasons } from '@/lib/cadence/seasons'
 import { validatePageResult, type PageResult } from '@/lib/pageParse'
 import { SessionExpiredError } from '@/lib/authErrors'
 import { toJpeg } from '@/lib/toJpeg'
+import { codeFromBody, paperErrorMessage } from '@/lib/paperPlan/errors'
 import type { FamilyMember } from '@/types/family'
 
 /**
- * A non-2xx `parse-page` response reads as a 401 if either the transport-level
- * status says so, or the function's own JSON body does — `.context` is the
- * raw `Response`, whose body can only be read once and only asynchronously,
- * so a status-less error (as tests construct) still needs a body check.
+ * A non-2xx `parse-page` response, read once: `.context` is the raw
+ * `Response`, whose body can only be read once and only asynchronously. A 401
+ * (by status or by the body's own message) is a sign-out; anything else is
+ * turned into a sentence a person can act on — never the parser's or the
+ * transport's message ("Unexpected token 'I'…", 2026-09-23).
  */
-async function isUnauthorized(fnErr: { context?: { status?: number; json?: () => Promise<unknown> } }): Promise<boolean> {
-  if (fnErr.context?.status === 401) return true
-  try {
-    const body = await fnErr.context?.json?.()
-    return !!body && typeof body === 'object' && 'error' in body &&
-      /invalid token|unauthorized|jwt/i.test(String((body as { error?: unknown }).error ?? ''))
-  } catch {
-    return false
-  }
+async function readFunctionError(fnErr: { context?: { status?: number; json?: () => Promise<unknown> } }): Promise<Error> {
+  let body: unknown = null
+  try { body = await fnErr.context?.json?.() } catch { /* not JSON */ }
+  const code = codeFromBody(body, fnErr.context?.status)
+  return code === 'unauthorized' ? new SessionExpiredError() : new Error(paperErrorMessage(code))
 }
 
 export type PageParseStatus = 'idle' | 'parsing' | 'ready' | 'error'
@@ -75,13 +73,8 @@ export function usePageFromPaper(members: FamilyMember[]) {
         members: members.map((m) => ({ id: m.id, name: m.name, role: m.role_label ?? null })),
       },
     })
-    if (fnErr) {
-      if (await isUnauthorized(fnErr as { context?: { status?: number; json?: () => Promise<unknown> } })) {
-        throw new SessionExpiredError()
-      }
-      throw new Error(fnErr.message)
-    }
-    if (data?.error) throw new Error(String(data.error))
+    if (fnErr) throw await readFunctionError(fnErr as { context?: { status?: number; json?: () => Promise<unknown> } })
+    if (data?.error) throw new Error(paperErrorMessage(codeFromBody(data)))
     // `dates` is only the fallback — the response echoes the window it actually
     // used, and that is what the review sheet must offer.
     setResult(validatePageResult(data, members.map((m) => ({ id: m.id, name: m.name, role: m.role_label ?? null })), dates, altitude))
@@ -102,7 +95,7 @@ export function usePageFromPaper(members: FamilyMember[]) {
       const { error: uploadErr } = await supabase.storage
         .from('attachments')
         .upload(storagePath, upload, { contentType: blob.type === 'application/pdf' ? 'application/pdf' : 'image/jpeg', upsert: true })
-      if (uploadErr) throw new Error(uploadErr.message)
+      if (uploadErr) throw new Error(paperErrorMessage('network'))
 
       storagePathRef.current = storagePath
       await invokeParse(storagePath, altitude)
