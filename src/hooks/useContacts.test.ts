@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { renderHook, waitFor } from '@testing-library/react'
+import { renderHook, waitFor, act } from '@testing-library/react'
 import { useContacts } from './useContacts'
 
 // Mock user for useAuth
@@ -86,6 +86,37 @@ describe('useContacts', () => {
     expect(result.current.contacts).toHaveLength(1)
     expect(result.current.contacts[0].name).toBe('Alice')
     expect(result.current.contacts[0].phone).toBe('555-1234')
+  })
+
+  // Review 2026-09-22: the contact left the list (and its open page) before
+  // the delete was confirmed, so a failed delete still navigated away.
+  describe('deleteContact', () => {
+    const alice = {
+      id: '1', user_id: 'test-user-id', name: 'Alice', phone: null, email: null, notes: null,
+      created_at: '2024-01-01T00:00:00Z', updated_at: '2024-01-01T00:00:00Z',
+    }
+
+    it('keeps the contact and resolves false when the delete fails', async () => {
+      mockSupabaseData.push(alice)
+      const { result } = renderHook(() => useContacts())
+      await waitFor(() => expect(result.current.contacts).toHaveLength(1))
+      mockEq.mockReturnValueOnce(Promise.resolve({ error: { message: 'permission denied' } }))
+      let deleted: boolean | undefined
+      await act(async () => { deleted = await result.current.deleteContact('1') })
+      expect(deleted).toBe(false)
+      expect(result.current.contacts.map((c) => c.name)).toEqual(['Alice'])
+    })
+
+    it('removes the contact only after the delete succeeds', async () => {
+      mockSupabaseData.push(alice)
+      const { result } = renderHook(() => useContacts())
+      await waitFor(() => expect(result.current.contacts).toHaveLength(1))
+      mockEq.mockReturnValueOnce(Promise.resolve({ error: null }))
+      let deleted: boolean | undefined
+      await act(async () => { deleted = await result.current.deleteContact('1') })
+      expect(deleted).toBe(true)
+      expect(result.current.contacts).toHaveLength(0)
+    })
   })
 
   describe('searchContacts', () => {

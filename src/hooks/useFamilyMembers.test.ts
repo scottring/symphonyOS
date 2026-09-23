@@ -66,6 +66,36 @@ const resetMocks = () => {
   }))
 }
 
+// In-memory tasks for deleteMember. `tasksRlsSkip` ids behave like rows RLS
+// hides from an UPDATE: no error, no row returned.
+type TaskRow = { id: string; assigned_to: string | null; assigned_to_all: string[] | null }
+let tasksTable: TaskRow[] = []
+let tasksRlsSkip = new Set<string>()
+function tasksApi() {
+  const query = (filter: (r: TaskRow) => boolean, patch?: Partial<TaskRow>) => {
+    const run = () => {
+      const rows = tasksTable.filter(filter)
+      if (!patch) return { data: rows.map((r) => ({ ...r })), error: null }
+      const hit = rows.filter((r) => !tasksRlsSkip.has(r.id))
+      hit.forEach((r) => Object.assign(r, patch))
+      return { data: hit.map((r) => ({ id: r.id })), error: null }
+    }
+    const q: Record<string, unknown> = {
+      eq: (col: keyof TaskRow, v: unknown) => query((r) => filter(r) && r[col] === v, patch),
+      in: (col: keyof TaskRow, vs: unknown[]) => query((r) => filter(r) && vs.includes(r[col]), patch),
+      contains: (col: keyof TaskRow, vs: string[]) => query((r) => filter(r) && vs.every((v) => ((r[col] as string[] | null) ?? []).includes(v)), patch),
+      select: () => q,
+      order: () => Promise.resolve(run()),
+      then: (res: (v: unknown) => unknown) => Promise.resolve(run()).then(res),
+    }
+    return q
+  }
+  return {
+    select: () => query(() => true),
+    update: (patch: Partial<TaskRow>) => query(() => true, patch),
+  }
+}
+
 // Mock Supabase
 vi.mock('@/lib/supabase', () => {
   const __mod: any = {
@@ -82,17 +112,8 @@ vi.mock('@/lib/supabase', () => {
           delete: mockDelete,
         }
       }
-      // Mock for 'tasks' table (used in deleteMember to unassign tasks)
-      return {
-        select: vi.fn().mockReturnValue({
-          eq: vi.fn().mockReturnValue({
-            order: vi.fn().mockResolvedValue({ data: [], error: null })
-          })
-        }),
-        update: vi.fn().mockReturnValue({
-          eq: vi.fn().mockResolvedValue({ data: null, error: null })
-        }),
-      }
+      // A tiny in-memory 'tasks' table (deleteMember reads and edits it).
+      return tasksApi()
     }),
   },
 }
@@ -114,6 +135,8 @@ describe('useFamilyMembers', () => {
     mockInsertResult = null
     mockUpdateResult = null
     mockError = null
+    tasksTable = []
+    tasksRlsSkip = new Set()
     vi.clearAllMocks()
     resetMocks()
   })
@@ -485,6 +508,66 @@ describe('useFamilyMembers', () => {
         result.current.deleteMember(member.id)
       ).rejects.toBeTruthy()
 
+      consoleSpy.mockRestore()
+    })
+  })
+
+  // Review 2026-09-22: deleting a member left their id in other tasks'
+  // assigned_to_all lists (no foreign key there to catch it).
+  describe('deleteMember and task assignments', () => {
+    const setup = async () => {
+      // Two members: an empty list auto-seeds the user's own row.
+      const member = createMockFamilyMember({ name: 'Liam' })
+      mockFetchResult = [member, createMockFamilyMember({ name: 'Mia' })]
+      const hook = renderHook(() => useFamilyMembers())
+      await waitFor(() => expect(hook.result.current.members).toHaveLength(2))
+      return { member, ...hook }
+    }
+
+    it('removes the member from single and shared assignments, leaving other people', async () => {
+      const { member, result } = await setup()
+      tasksTable = [
+        { id: 'a', assigned_to: member.id, assigned_to_all: [member.id] },
+        { id: 'b', assigned_to: 'mia', assigned_to_all: ['mia', member.id] },
+        { id: 'c', assigned_to: 'mia', assigned_to_all: ['mia'] },
+      ]
+      await act(async () => { await result.current.deleteMember(member.id) })
+      expect(tasksTable).toEqual([
+        { id: 'a', assigned_to: null, assigned_to_all: [] },
+        { id: 'b', assigned_to: 'mia', assigned_to_all: ['mia'] },
+        { id: 'c', assigned_to: 'mia', assigned_to_all: ['mia'] },
+      ])
+      expect(mockDelete).toHaveBeenCalled()
+      expect(result.current.members.map((m) => m.name)).toEqual(['Mia'])
+    })
+
+    it('a shared task the user cannot update stops the delete and restores every change', async () => {
+      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+      const { member, result } = await setup()
+      tasksTable = [
+        { id: 'a', assigned_to: member.id, assigned_to_all: [member.id, 'mia'] },
+        { id: 'b', assigned_to: 'mia', assigned_to_all: ['mia', member.id] },
+      ]
+      tasksRlsSkip = new Set(['b'])
+      await expect(result.current.deleteMember(member.id)).rejects.toMatchObject({ message: expect.stringMatching(/shared task/), restored: true })
+      expect(mockDelete).not.toHaveBeenCalled()
+      expect(tasksTable).toEqual([
+        { id: 'a', assigned_to: member.id, assigned_to_all: [member.id, 'mia'] },
+        { id: 'b', assigned_to: 'mia', assigned_to_all: ['mia', member.id] },
+      ])
+      expect(result.current.members).toHaveLength(2)
+      consoleSpy.mockRestore()
+    })
+
+    it('a failed member delete puts both kinds of assignment back', async () => {
+      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+      const { member, result } = await setup()
+      tasksTable = [{ id: 'a', assigned_to: member.id, assigned_to_all: [member.id, 'mia'] }]
+      mockError = { message: 'Delete failed' }
+      mockEq.mockImplementation(() => Promise.resolve({ error: mockError }))
+      await expect(result.current.deleteMember(member.id)).rejects.toBeTruthy()
+      expect(tasksTable).toEqual([{ id: 'a', assigned_to: member.id, assigned_to_all: [member.id, 'mia'] }])
+      expect(result.current.members).toHaveLength(2)
       consoleSpy.mockRestore()
     })
   })

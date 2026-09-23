@@ -178,7 +178,9 @@ export function SettingsPage({
       onFamilyMembersChanged?.()
     } catch (err) {
       console.error('Failed to delete member:', err)
-      showToast(`Couldn't remove ${deletingMember.name}. Nothing was changed.`, 'error')
+      showToast((err as { restored?: boolean })?.restored === false
+        ? `Couldn't remove ${deletingMember.name}, and some of their task assignments may not have been restored — check their tasks.`
+        : `Couldn't remove ${deletingMember.name}. Nothing was changed.`, 'error')
     } finally {
       setIsDeleting(false)
       setDeletingMember(null)

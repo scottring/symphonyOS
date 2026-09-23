@@ -183,13 +183,12 @@ export function useContacts() {
     }
   }, [contacts])
 
-  const deleteContact = useCallback(async (id: string) => {
-    // Save for rollback
+  // Not optimistic: removing the row first sent the open contact page to the
+  // list (the contact had vanished) even when the delete then failed. The row
+  // leaves only once the delete is confirmed; true = deleted.
+  const deleteContact = useCallback(async (id: string): Promise<boolean> => {
     const contactToDelete = contacts.find((c) => c.id === id)
-    if (!contactToDelete) return
-
-    // Optimistic update
-    setContacts((prev) => prev.filter((c) => c.id !== id))
+    if (!contactToDelete) return false
 
     const { error: deleteError } = await supabase
       .from('contacts')
@@ -197,11 +196,12 @@ export function useContacts() {
       .eq('id', id)
 
     if (deleteError) {
-      // Rollback on error
-      setContacts((prev) => [...prev, contactToDelete].sort((a, b) => a.name.localeCompare(b.name)))
       setError(deleteError.message)
       showToast(`Couldn't delete ${contactToDelete.name}.`, 'error')
+      return false
     }
+    setContacts((prev) => prev.filter((c) => c.id !== id))
+    return true
   }, [contacts])
 
   // Search contacts by name (case-insensitive)
