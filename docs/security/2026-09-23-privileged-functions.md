@@ -59,3 +59,25 @@ The advisor's other warnings are outside this review:
 - Two tables with RLS enabled but no policies (`ai_engine_runs`, `thoughts`).
   They're deny-all to app roles, which is the intended default for server-only
   tables.
+
+## Containment and access-log review — September 23
+
+- **Contained:** migration `privileged_function_access` applied to production at
+  07:56 UTC. `supabase/tests/094` passes against the installed version. School
+  mail shows a forwarding address in Settings, and the 08:00 `cos-ingest` cron
+  run succeeded after the change.
+- **Log review:** the API gateway logs (`edge_logs`) are retained from
+  2026-06-26, the day `get_household_context` was created. All 90 days to
+  2026-09-23 09:00 UTC were searched for calls to the exposed functions, and
+  each day's count was cross-checked server-side. GraphQL is not installed, so
+  REST was the only external path.
+  - `get_household_context`, `cos_ingest_*`, `tasks_sync_from_commitments` and
+    the household helpers: **0 calls**.
+  - `claim_engine_run`: 5,400 calls, all signed-in, from the owner's
+    household and test accounts via the production app, local dev servers or
+    Vercel previews. These are the app's former client-side engine claim;
+    there have been none since 2026-08-22, and no signed-out calls at all.
+  - **Conclusion:** the exposure is established, but no evidence of misuse in
+    the retained logs. This doesn't cover anyone holding database credentials.
+- **Evidence** (request rows with account IDs and IPs) is kept outside the
+  repository, in the owner's private vault, with checksums.
