@@ -25,9 +25,9 @@ export interface DomainDef {
 }
 
 export const DOMAINS: readonly DomainDef[] = [
-  { id: 'work',     label: 'Work',     icon: Briefcase, color: 'rgb(37 99 235)',  bgClass: 'bg-blue-50/20',   shared: false },
-  { id: 'family',   label: 'Family',   icon: Users,     color: 'rgb(217 119 6)',  bgClass: 'bg-amber-50/20',  shared: true },
-  { id: 'personal', label: 'Personal', icon: User,      color: 'rgb(147 51 234)', bgClass: 'bg-purple-50/20', shared: false },
+  { id: 'work',     label: 'Work',     icon: Briefcase, color: 'rgb(63 90 140)',  bgClass: 'bg-blue-50/20',   shared: false },
+  { id: 'family',   label: 'Family',   icon: Users,     color: 'rgb(140 90 49)',  bgClass: 'bg-amber-50/20',  shared: true },
+  { id: 'personal', label: 'Personal', icon: User,      color: 'rgb(114 77 140)', bgClass: 'bg-purple-50/20', shared: false },
 ]
 
 export const UNSORTED_ICON: LucideIcon = Inbox

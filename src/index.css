@@ -5,8 +5,10 @@
    Confident minimalism with magazine-quality typography
    ============================================================================= */
 
-/* Typography - Source Serif 4 (display) + Source Sans 3 (body) */
-@import url('https://fonts.googleapis.com/css2?family=Marcellus&family=Source+Sans+3:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Source+Serif+4:ital,opsz,wght@0,8..60,300;0,8..60,400;0,8..60,500;0,8..60,600;1,8..60,400;1,8..60,500&display=swap');
+/* Typography - Crimson Pro (display) + DM Sans (body): the native iPhone
+   app's pairing (apple/…/DesignSystem/Typography.swift), which is the design
+   source of truth for every surface. */
+@import url('https://fonts.googleapis.com/css2?family=Marcellus&family=Crimson+Pro:ital,wght@0,400;0,500;0,600;1,400;1,500&family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&display=swap');
 
 /* Class-based dark mode (kiosk wall toggles `.dark` on its shell, not the
    document — only the wall opts in for now). Declared after @import per
@@ -19,41 +21,42 @@
      Ink blue, paper white, vermilion accent
      --------------------------------------------------------------------------- */
 
-  /* Paper white and blue-black ink. Color belongs to actions and people. */
-  --color-neutral-50: #f8fafc;
-  --color-neutral-100: #f0f3f7;
-  --color-neutral-200: #dce2ea;
-  --color-neutral-300: #b7c2d1;
-  --color-neutral-400: #7e8ca2;
-  --color-neutral-500: #586981;
-  --color-neutral-600: #40536e;
-  --color-neutral-700: #2c405e;
-  --color-neutral-800: #1c304f;
-  --color-neutral-900: #142744;
-  --color-neutral-950: #0e1d35;
+  /* Warm ivory paper and brown-black ink — the native iPhone palette
+     (NordicColors.swift). Color belongs to actions and people. */
+  --color-neutral-50: #faf7f2;
+  --color-neutral-100: #f5efe7;
+  --color-neutral-200: #e8e0d8;
+  --color-neutral-300: #cfc4b9;
+  --color-neutral-400: #958879;
+  --color-neutral-500: #7d7066;
+  --color-neutral-600: #6b5e54;
+  --color-neutral-700: #4e433b;
+  --color-neutral-800: #372e28;
+  --color-neutral-900: #2c2520;
+  --color-neutral-950: #1e1915;
 
-  /* Primary — deep ink blue. */
-  --color-primary-50: #f1f5fb;
-  --color-primary-100: #e1eaf6;
-  --color-primary-200: #c0d1e8;
-  --color-primary-300: #91afd5;
-  --color-primary-400: #6089bc;
-  --color-primary-500: #3e6598;
-  --color-primary-600: #2b4c79;
-  --color-primary-700: #203b62;
-  --color-primary-800: #192f50;
-  --color-primary-900: #142744;
-  --color-primary-950: #0e1d35;
+  /* Primary — ink. Buttons are ink, as on the phone. */
+  --color-primary-50: #f5efe7;
+  --color-primary-100: #f0ebe3;
+  --color-primary-200: #e0d6cb;
+  --color-primary-300: #c4b6a8;
+  --color-primary-400: #8f8074;
+  --color-primary-500: #4e433b;
+  --color-primary-600: #2c2520;
+  --color-primary-700: #241e1a;
+  --color-primary-800: #1e1915;
+  --color-primary-900: #17130f;
+  --color-primary-950: #0f0c0a;
 
-  /* Accent — vermilion, reserved for small directional marks. */
-  --color-accent-50: #fff4f0;
-  --color-accent-100: #ffe4db;
-  --color-accent-200: #ffc6b5;
-  --color-accent-300: #ff9c80;
-  --color-accent-400: #f9704e;
-  --color-accent-500: #dc482b;
-  --color-accent-600: #b9321b;
-  --color-accent-700: #942916;
+  /* Accent — amber, reserved for small directional marks (Today, badges). */
+  --color-accent-50: #fffbeb;
+  --color-accent-100: #fef3c7;
+  --color-accent-200: #fde68a;
+  --color-accent-300: #fcd34d;
+  --color-accent-400: #f59e0b;
+  --color-accent-500: #d97706;
+  --color-accent-600: #b45309;
+  --color-accent-700: #92400e;
 
   /* Sage - Secondary muted green */
   --color-sage-50: hsl(145 20% 96%);
@@ -85,18 +88,18 @@
   --color-review-600: hsl(30 45% 38%);
 
   /* Background Tiers */
-  --color-bg-base: #ffffff;
+  --color-bg-base: #fbfbfa;
   --color-bg-elevated: #ffffff;
   --color-bg-overlay: hsl(0 0% 100%);
 
   /* ---------------------------------------------------------------------------
      TYPOGRAPHY
-     Source Serif 4 for display, Source Sans 3 for body
+     Crimson Pro for display, DM Sans for body
      --------------------------------------------------------------------------- */
 
-  --font-family-display: 'Source Serif 4', Georgia, serif;
+  --font-family-display: 'Crimson Pro', Georgia, serif;
   --font-family-brand: 'Marcellus', Georgia, serif;
-  --font-family-sans: 'Source Sans 3', system-ui, -apple-system, sans-serif;
+  --font-family-sans: 'DM Sans', system-ui, -apple-system, sans-serif;
 
   /* Font Sizes - More dramatic scale */
   --font-size-xs: 0.75rem;
@@ -153,18 +156,17 @@
      SHADOWS - More dramatic, layered
      --------------------------------------------------------------------------- */
 
-  /* Ink-tinted, not warm-tinted: the paper is white now, so a brown shadow
-     read as a smudge under every card. */
-  --shadow-sm: 0 1px 2px 0 rgb(20 39 68 / 0.05);
-  --shadow-md: 0 4px 8px -2px rgb(20 39 68 / 0.07), 0 2px 4px -1px rgb(20 39 68 / 0.05);
-  --shadow-lg: 0 12px 24px -4px rgb(20 39 68 / 0.09), 0 4px 8px -2px rgb(20 39 68 / 0.05);
-  --shadow-xl: 0 24px 48px -8px rgb(20 39 68 / 0.13), 0 8px 16px -4px rgb(20 39 68 / 0.07);
-  --shadow-card: 0 0 0 1px rgb(220 226 234 / 0.9), 0 2px 8px -2px rgb(20 39 68 / 0.05);
-  --shadow-elevated: 0 0 0 1px rgb(220 226 234 / 0.7), 0 8px 24px -4px rgb(20 39 68 / 0.09);
+  /* Warm-tinted, matching the phone's card shadow (#2C2520 at 6%). */
+  --shadow-sm: 0 1px 2px 0 rgb(44 37 32 / 0.05);
+  --shadow-md: 0 4px 8px -2px rgb(44 37 32 / 0.07), 0 2px 4px -1px rgb(44 37 32 / 0.05);
+  --shadow-lg: 0 12px 24px -4px rgb(44 37 32 / 0.09), 0 4px 8px -2px rgb(44 37 32 / 0.05);
+  --shadow-xl: 0 24px 48px -8px rgb(44 37 32 / 0.13), 0 8px 16px -4px rgb(44 37 32 / 0.07);
+  --shadow-card: 0 0 0 1px rgb(232 224 216), 0 2px 8px rgb(44 37 32 / 0.06);
+  --shadow-elevated: 0 0 0 1px rgb(232 224 216 / 0.9), 0 8px 24px -4px rgb(44 37 32 / 0.1);
 
   /* Colored shadows */
-  --shadow-primary: 0 8px 24px -6px rgb(20 39 68 / 0.2);
-  --shadow-accent: 0 8px 24px -6px rgb(220 72 43 / 0.2);
+  --shadow-primary: 0 8px 24px -6px rgb(44 37 32 / 0.2);
+  --shadow-accent: 0 8px 24px -6px rgb(217 119 6 / 0.2);
 
   /* ---------------------------------------------------------------------------
      TRANSITIONS
@@ -325,8 +327,8 @@ body {
 }
 
 /* Display font utility.
-   Default weight 600: Source Serif 4 at 400 reads lighter than the
-   letterform-bold Instrument Serif it replaced. The weight lives in @layer
+   Default weight 500: the phone sets Crimson Pro titles at Regular and card
+   titles at SemiBold; 500 sits between for the many mid-size headings. The weight lives in @layer
    base so Tailwind weight utilities (layer utilities, higher priority) can
    override it — e.g. font-light on the sidebar wordmark. An unlayered rule
    would beat every utility regardless of specificity. */
@@ -336,7 +338,7 @@ body {
 }
 @layer base {
   .font-display {
-    font-weight: 600;
+    font-weight: 500;
   }
 }
 
@@ -1392,12 +1394,12 @@ html.desktop-shell a {
     color: #000;
   }
   .day-print {
-    font-family: 'Source Sans 3', system-ui, sans-serif;
+    font-family: 'DM Sans', system-ui, sans-serif;
     font-size: 11pt;
     line-height: 1.5;
   }
   .day-print-head { margin-bottom: 14pt; border-bottom: 1px solid #999; padding-bottom: 6pt; }
-  .day-print-head h1 { font-family: 'Source Serif 4', Georgia, serif; font-size: 18pt; font-weight: 600; margin: 0; }
+  .day-print-head h1 { font-family: 'Crimson Pro', Georgia, serif; font-size: 18pt; font-weight: 600; margin: 0; }
   .day-print-head p { margin: 2pt 0 0; font-size: 9.5pt; color: #555; }
   .day-print section { margin-bottom: 11pt; break-inside: avoid; }
   .day-print h2 {
@@ -1842,7 +1844,7 @@ html.desktop-shell a {
   position: absolute; top: 100%; left: 0; z-index: 40;
   min-width: 210px; max-height: 65vh; overflow-y: auto;
   background: var(--color-bg-elevated); border: 1px solid var(--color-neutral-200);
-  box-shadow: 0 8px 24px #14274412; padding: 8px;
+  box-shadow: 0 8px 24px #2c25200f; padding: 8px;
 }
 .page-navigation-utilities .page-navigation-popover { left: auto; right: 0; }
 .page-navigation-popover button { display: flex; width: 100%; padding: 9px 12px; text-align: left; }
@@ -1873,12 +1875,12 @@ html.desktop-shell a {
 }
 .desktop-footer-backdrop {
   position: fixed; inset: 0; z-index: 60; display: grid; place-items: center;
-  background: #14274422; padding: 16px;
+  background: #2c252022; padding: 16px;
 }
 .desktop-footer-dialog {
   width: min(440px, 100%); max-height: 80vh; overflow-y: auto;
   background: var(--color-bg-elevated); border: 1px solid var(--color-neutral-200);
-  box-shadow: 0 12px 32px #14274418; padding: 20px 24px; font-size: 14px; color: var(--color-neutral-700);
+  box-shadow: 0 12px 32px #2c252018; padding: 20px 24px; font-size: 14px; color: var(--color-neutral-700);
 }
 .desktop-footer-dialog:focus { outline: none; }
 .desktop-footer-dialog h2 { font-size: 17px; font-weight: 600; color: var(--color-neutral-950); }
@@ -1911,10 +1913,10 @@ html.desktop-shell a {
 
 /* Review drawer on desktop: a paper sheet in ink. Phones keep their sheet. */
 @media (min-width: 768px) {
-  .review-backdrop { background: #14274422; backdrop-filter: none; }
+  .review-backdrop { background: #2c252022; backdrop-filter: none; }
   .review-sheet {
     border-radius: 0; border: 1px solid var(--color-neutral-200);
-    box-shadow: 0 12px 32px #14274418; background: #fff;
+    box-shadow: 0 12px 32px #2c252018; background: #fff;
   }
   .review-sheet .review-icon { width: auto; height: auto; background: none; color: var(--color-neutral-950); }
   .review-sheet h2 { color: var(--color-neutral-950); }
@@ -2011,24 +2013,24 @@ html.desktop-shell a {
 div.chooser-action-group { overflow: visible !important; }
 
 /* Week planning: one source shelf, commitments, then the days. */
-.shelf-sources { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 3px; padding: 4px; margin-top: 18px; background: #f2f4f6; border-radius: 8px; }
-.shelf-sources button { padding: 8px 2px; font-size: 12px; color: #68788e; border-radius: 5px; }
-.shelf-sources button[aria-pressed="true"] { background: white; color: #233b5a; box-shadow: 0 1px 3px #18304915; font-weight: 600; }
-.shelf-search { width: 100%; margin-top: 16px; padding: 9px 10px; border: 1px solid #dfe5ec; border-radius: 6px; font-size: 13px; background: white; }
-.shelf-intro { margin: 14px 0; font-size: 12px; line-height: 1.6; color: #697a91; }
-.shelf-intro a { display: block; margin-top: 4px; color: #314f76; }
-.shelf-goals { padding: 10px 0; border-bottom: 1px solid #e4e9ef; font-size: 13px; }
-.shelf-goals summary { cursor: pointer; color: #425b79; }
+.shelf-sources { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 3px; padding: 4px; margin-top: 18px; background: var(--color-neutral-100); border-radius: 8px; }
+.shelf-sources button { padding: 8px 2px; font-size: 12px; color: var(--color-neutral-500); border-radius: 5px; }
+.shelf-sources button[aria-pressed="true"] { background: white; color: var(--color-neutral-900); box-shadow: 0 1px 3px #18304915; font-weight: 600; }
+.shelf-search { width: 100%; margin-top: 16px; padding: 9px 10px; border: 1px solid var(--color-neutral-200); border-radius: 6px; font-size: 13px; background: white; }
+.shelf-intro { margin: 14px 0; font-size: 12px; line-height: 1.6; color: var(--color-neutral-500); }
+.shelf-intro a { display: block; margin-top: 4px; color: var(--color-neutral-900); }
+.shelf-goals { padding: 10px 0; border-bottom: 1px solid var(--color-neutral-200); font-size: 13px; }
+.shelf-goals summary { cursor: pointer; color: var(--color-neutral-700); }
 .shelf-goals ul { display: grid; gap: 10px; padding: 12px 0; }
 .week-plan-status { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; margin: 0 0 16px; padding: 8px 0; }
 .week-display-tools { display: flex; align-items: center; justify-content: flex-end; gap: 8px; margin-bottom: 12px; }
-.week-commitments { padding: 18px 20px; margin-bottom: 26px; background: #f7f8fa; border: 1px solid #e5e9ef; border-radius: 8px; }
+.week-commitments { padding: 18px 20px; margin-bottom: 26px; background: var(--color-bg-elevated); border: 1px solid var(--color-neutral-200); border-radius: 8px; }
 .week-task-groups { display: grid; grid-template-columns: minmax(0, 1fr); gap: 22px 28px; margin-top: 18px; }
-.week-task-group h3, .journal-day-groups h3 { font-size: 10px; font-weight: 600; letter-spacing: .09em; text-transform: uppercase; color: #76859a; margin-bottom: 10px; }
+.week-task-group h3, .journal-day-groups h3 { font-size: 10px; font-weight: 600; letter-spacing: .09em; text-transform: uppercase; color: var(--color-neutral-500); margin-bottom: 10px; }
 .week-task-group ul { display: grid; gap: 12px; }
 .week-task-group li { font-size: 14px; }
-.week-completed-toggle { display: block; font-size: 12px; color: #728197; margin-top: 16px; }
-.week-days-heading { font-family: var(--font-display, Georgia, serif); font-size: 20px; color: #253b58; margin-bottom: 12px; }
+.week-completed-toggle { display: block; font-size: 12px; color: var(--color-neutral-500); margin-top: 16px; }
+.week-days-heading { font-family: var(--font-display, Georgia, serif); font-size: 20px; color: var(--color-neutral-900); margin-bottom: 12px; }
 .journal-day-groups { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr)); gap: 18px 28px; }
 @media (max-width: 767px) {
   .week-commitments { padding: 14px; }
@@ -2060,11 +2062,10 @@ div.chooser-action-group { overflow: visible !important; }
 }
 
 /* Today uses the same quiet hierarchy as Week, with the day's work first. */
-.today-focus-card { background: #f7f8fa; border: 1px solid #e5e9ef; border-radius: 8px; padding: 18px 20px 12px; }
-.today-focus-card .daybook-journal-heading { border-bottom: 0; padding-bottom: 10px; }
+/* For today reads as a section like Schedule, not a tinted box (Scott, 2026-09-23). */
 .today-focus-card .schedule-empty-time { display: none; }
-.today-completed { border-top: 1px solid #e1e6ed; margin-top: 12px; padding-top: 12px; }
-.today-completed > button { display: inline-flex; align-items: center; gap: 5px; color: #728197; font-size: 12px; }
+.today-completed { border-top: 1px solid var(--color-neutral-200); margin-top: 12px; padding-top: 12px; }
+.today-completed > button { display: inline-flex; align-items: center; gap: 5px; color: var(--color-neutral-500); font-size: 12px; }
 .today-shelves .shelf-sources { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .today-shelves .chooser-section { margin-top: 18px; }
 .today-shelves .chooser-rows > li { display: grid; grid-template-columns: 16px minmax(0, 1fr); column-gap: 8px; }
@@ -2074,7 +2075,7 @@ div.chooser-action-group { overflow: visible !important; }
 .today-shelves .chooser-rows > li.chooser-row-routine > svg { grid-column: 1; grid-row: 1; }
 .today-shelves .chooser-rows > li.chooser-row-routine > :first-child { display: none; }
 .today-shelves .chooser-rows > li > :last-child { grid-column: 2; justify-self: start; }
-@media (max-width: 767px) { .today-focus-card { padding: 14px 12px 12px; } .today-focus-card .daybook-journal-heading { flex-wrap: wrap; gap: 10px; } }
+@media (max-width: 767px) { .today-focus-card .daybook-journal-heading { flex-wrap: wrap; gap: 10px; } }
 .today-focus-card .schedule-time-column { display: none; }
 
 /* Broader horizons: goals lead; tasks and reference material have distinct homes. */
@@ -2082,14 +2083,14 @@ div.chooser-action-group { overflow: visible !important; }
 .period-plan-status { display:flex; align-items:center; flex-wrap:wrap; gap:12px; margin-bottom:24px; }
 .period-plan-layout { display:grid; gap:28px; align-items:start; }
 .period-plan-main { min-width:0; display:flex; flex-direction:column; gap:28px; }
-.period-goals-card { min-width:0; padding:22px; border:1px solid #e3e8e5; border-radius:12px; background:#f7f9f7; }
+.period-goals-card { min-width:0; padding:22px; border:1px solid var(--color-neutral-200); border-radius:12px; background:var(--color-bg-elevated); }
 .period-tasks-card { min-width:0; padding:0 4px; }
-.period-section-note { margin:6px 4px 0; font-size:12px; line-height:1.6; color:#788596; }
-.period-group-label { margin:18px 8px 6px; font-size:11px; font-weight:600; letter-spacing:.055em; text-transform:uppercase; color:#758293; }
+.period-section-note { margin:6px 4px 0; font-size:12px; line-height:1.6; color:var(--color-neutral-500); }
+.period-group-label { margin:18px 8px 6px; font-size:11px; font-weight:600; letter-spacing:.055em; text-transform:uppercase; color:var(--color-neutral-500); }
 .period-group-label span { margin-left:6px; font-weight:400; }
-.period-assigned-fold { margin-top:18px; padding-top:12px; border-top:1px solid #e0e5e9; }
-.period-assigned-fold > summary { cursor:pointer; color:#66778c; font-size:13px; padding:4px; }
-.period-shelves { min-width:0; padding:20px; border:1px solid #e6e9ed; border-radius:12px; display:flex; flex-direction:column; gap:18px; }
+.period-assigned-fold { margin-top:18px; padding-top:12px; border-top:1px solid var(--color-neutral-200); }
+.period-assigned-fold > summary { cursor:pointer; color:var(--color-neutral-500); font-size:13px; padding:4px; }
+.period-shelves { min-width:0; padding:20px; border:1px solid var(--color-neutral-200); border-radius:12px; display:flex; flex-direction:column; gap:18px; }
 .period-plan-page .period-plan-row { position:relative; gap:10px; padding:14px 6px; }
 .period-plan-page .period-row-actions { position:absolute; right:4px; top:4px; background:var(--color-bg-elevated, #fff); border-radius:6px; box-shadow:0 1px 5px #263a5012; }
 .period-plan-page .period-row-check { min-width:18px; min-height:18px; }
@@ -2137,3 +2138,43 @@ div.chooser-action-group { overflow: visible !important; }
   .inbox-bulk button[aria-label] { min-width: 40px; padding: 0; }
   .bulk-area-dialog [role="group"] button { min-height: 40px; min-width: 0; padding: 0 12px; font-size: 14px; }
 }
+
+/* =============================================================================
+   NATIVE DESIGN — the installed iPhone app is the design source of truth
+   (apple/SymphonyOS/SymphonyOS/DesignSystem). Shared by desktop and phone web.
+   ============================================================================= */
+
+/* Desktop's one right column: Details or AI (SideColumn.tsx). */
+.side-column {
+  position: fixed; top: 0; bottom: 0; right: 0; z-index: 30;
+  display: flex; flex-direction: column;
+  background: var(--color-bg-elevated);
+  border-left: 1px solid var(--color-neutral-200);
+  box-shadow: -8px 0 24px rgb(44 37 32 / 0.05);
+}
+.side-column-bar {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 12px 14px 12px 16px;
+  border-bottom: 1px solid var(--color-neutral-200);
+}
+.native-segmented, .side-column-switch {
+  display: inline-flex; gap: 4px; padding: 3px; border-radius: 999px;
+  background: rgb(240 235 227 / 0.6);
+}
+.native-segmented > button, .side-column-switch > button {
+  padding: 6px 16px; border-radius: 999px; border: 1px solid transparent;
+  font-size: 13px; color: var(--color-neutral-600); background: none;
+}
+.native-segmented > button[aria-pressed="true"], .side-column-switch > button[aria-selected="true"] {
+  background: #fff; border-color: var(--color-neutral-200); font-weight: 600; color: var(--color-neutral-900);
+  box-shadow: 0 1px 2px rgb(44 37 32 / 0.06);
+}
+.side-column-switch > button:disabled { color: var(--color-neutral-300); cursor: default; }
+.side-column-close {
+  display: grid; place-items: center; width: 32px; height: 32px; border-radius: 999px;
+  background: var(--color-neutral-100); border: 1px solid var(--color-neutral-200); color: var(--color-neutral-500);
+}
+.side-column-close:hover { color: var(--color-neutral-900); }
+.side-column-body { position: relative; flex: 1; min-height: 0; }
+.side-column-pane { position: absolute; inset: 0; overflow: auto; }
+.side-column-pane[hidden] { display: none; }

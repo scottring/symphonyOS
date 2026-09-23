@@ -32,6 +32,8 @@ import { useAssistantLaunchRequests, useAssistantLauncher } from '@/contexts/Ass
 import { useShellChrome } from './useShellChrome';
 import { useSelection } from './providers/SelectionProvider';
 import { MOBILE_TAB_BAR_HEIGHT } from './mobileChrome';
+import { SideColumn, SIDE_COLUMN_WIDTH, type SidePane } from './SideColumn';
+import { NoteViewer } from '@/components/chat/NoteViewer';
 import { onQuickAddRequest } from '@/lib/quickAddSignal';
 
 /**
@@ -51,10 +53,10 @@ import { onQuickAddRequest } from '@/lib/quickAddSignal';
  * setting `chromeless: true` on their AppDef — Shell.tsx skips this wrapper for
  * those apps, so the chrome here only ever wraps non-chromeless apps.
  *
- * NOTE on the AI rail: on Today (desktop) the assistant rail is owned by
- * Shell.tsx's <ShellAssistantHost>. For non-Today views ShellLayout renders its
- * own assistant rail toggled by the top-bar AI button — kept self-contained so
- * Shell.tsx's global DetailPanel model is untouched.
+ * NOTE on the right column: on desktop, Details and AI share ONE column
+ * (SideColumn) on every page — one assistant, one conversation, and switching
+ * panes keeps both mounted. Phones keep the full-screen detail panel and a
+ * full-screen assistant overlay.
  */
 
 // Left reference dock at its widest, and the narrowest page worth keeping
@@ -71,9 +73,6 @@ function useViewportWidth() {
   }, []);
   return width;
 }
-
-// Mirrors Shell.tsx — the AI rail is owned by ShellAssistantHost on these paths.
-const TODAY_PATHS = new Set(['/', '/today', '/tasks-new/today', '/tasks-new']);
 
 /**
  * Derive ViewType from pathname so the Sidebar's active-item highlight
@@ -128,7 +127,6 @@ function ShellLayoutInner({ children }: Props) {
 
   const references = useReferenceLists();
   const activeView = useMemo(() => deriveActiveView(location.pathname), [location.pathname]);
-  const isToday = TODAY_PATHS.has(location.pathname);
 
   const { tasks } = useSupabaseTasks();
   const { unreadCount: discussionsUnread } = useDiscussionInbox();
@@ -147,9 +145,8 @@ function ShellLayoutInner({ children }: Props) {
   // Chrome data + handlers, sourced from shared hooks (not props).
   const chrome = useShellChrome();
 
-  // When a detail panel (480px fixed-right) is open, reflow content left so the
-  // panel doesn't obscure it.
-  const { selection } = useSelection();
+  // The selected item opens Details in the right column.
+  const { selection, clearSelection } = useSelection();
 
   // Mobile/UI chrome state
   const [moreSheetOpen, setMoreSheetOpen] = useState(false);
@@ -174,26 +171,36 @@ function ShellLayoutInner({ children }: Props) {
     return () => window.removeEventListener('keydown', onKeyDown);
   }, []);
 
-  // Non-Today AI rail (desktop Today's rail is owned by Shell.tsx's
-  // ShellAssistantHost; mobile Today has no other surface, so this rail's
-  // full-screen mobile overlay covers it too).
-  const [chatOpen, setChatOpen] = useState(false);
+  // One assistant for the whole shell: the desktop column's AI pane and the
+  // phone overlay show the same conversation. On desktop its visibility is
+  // the persisted rail preference (useScratchpadHidden — the masthead's AI
+  // button toggles the same state); phones open it per launch.
   const assistant = useSymphonyAssistant({ persistKey: 'symphony_rail' });
-  const showAiRail = chatOpen && (!isToday || isMobile);
+  const { hidden: aiHidden, setHidden: setAiHidden } = useScratchpadHidden();
+  const [phoneChatOpen, setPhoneChatOpen] = useState(false);
+  const [pane, setPane] = useState<SidePane>('details');
+  const [activeNoteId, setActiveNoteId] = useState<string | null>(null);
+  const aiOpen = !isMobile && !aiHidden;
+  // A new selection brings Details to the front.
+  const selectionKey = selection ? `${selection.kind}:${selection.id}` : null;
+  useEffect(() => { if (selectionKey) setPane('details'); }, [selectionKey]);
+  const showPane = useCallback((next: SidePane) => {
+    if (next === 'ai') setAiHidden(false);
+    setPane(next);
+  }, [setAiHidden]);
 
-  // Programmatic launches (unibox "Ask Symphony", Add-to-today…): this host
-  // owns every surface except desktop-Today (Shell's ShellAssistantHost).
+  // Programmatic launches (unibox "Ask Symphony", Add-to-today…).
   const { openAssistant } = useAssistantLauncher();
   const { nonce: launchNonce, consumeSeed } = useAssistantLaunchRequests();
   const seenLaunchNonce = useRef(0);
   useEffect(() => {
     if (launchNonce === 0 || launchNonce === seenLaunchNonce.current) return;
-    if (isToday && !isMobile) return;
     seenLaunchNonce.current = launchNonce;
-    setChatOpen(true);
+    if (isMobile) setPhoneChatOpen(true);
+    else showPane('ai');
     const seed = consumeSeed();
     if (seed && seed.autoSend !== false) void assistant.sendMessage(seed.message);
-  }, [launchNonce, isToday, isMobile, consumeSeed, assistant]);
+  }, [launchNonce, isMobile, consumeSeed, assistant, showPane]);
 
   // Closing the More sheet returns focus to its tab, not to <body>.
   const moreTabRef = useRef<HTMLButtonElement>(null);
@@ -202,23 +209,14 @@ function ShellLayoutInner({ children }: Props) {
     moreTabRef.current?.focus();
   }, []);
 
-  // The AI rail is shared with main content margin so content isn't covered.
-  const rightRailVisible = showAiRail;
-
-  // Today's assistant rail is owned by Shell.tsx (ShellAssistantHost, 420px wide)
-  // and its visibility is the shared scratchpad-hidden state. When it's open on
-  // Today, reflow the main column left by the rail width instead of letting the
-  // fixed overlay cover it. (Detail-pane `selection` takes precedence below,
-  // matching ShellAssistantHost which hides the rail while a detail pane is open.)
-  const { hidden: scratchpadHidden } = useScratchpadHidden();
-  const todayRailVisible = isToday && !scratchpadHidden && !isMobile;
-  // Pinned lists sit on the LEFT, so they no longer compete with the detail
-  // and AI panes on the right: both stay open while the page keeps a readable
-  // width between them. Only when it would not do the panes still win, and
-  // the lists return when the pane closes. The dock column is reserved only
-  // when a pin actually draws here, so the page centres in the width left.
+  // Pinned lists sit on the LEFT, so they no longer compete with the right
+  // column: both stay open while the page keeps a readable width between
+  // them. Only when it would not do the column still wins, and the lists
+  // return when it closes. The dock column is reserved only when a pin
+  // actually draws here, so the page centres in the width left.
   const viewportWidth = useViewportWidth();
-  const paneWidth = selection ? 480 : rightRailVisible ? 380 : todayRailVisible ? 420 : 0;
+  const columnOpen = !isMobile && (!!selection || aiOpen);
+  const paneWidth = columnOpen ? SIDE_COLUMN_WIDTH : 0;
   const referencesFit = paneWidth === 0 || viewportWidth - paneWidth - REFERENCE_DOCK_WIDTH >= MIN_PAGE_WITH_REFERENCES;
   const referencesPaused = paneWidth > 0 && !referencesFit;
   const referencesVisible = !isMobile && referencesFit
@@ -247,7 +245,7 @@ function ShellLayoutInner({ children }: Props) {
                 // the bar's actual height and clipped AttentionLine.
                 paddingBottom: `calc(${MOBILE_TAB_BAR_HEIGHT} + 0.5rem + env(safe-area-inset-bottom, 0px))`,
               }
-            : { marginRight: selection ? '480px' : rightRailVisible ? '380px' : todayRailVisible ? '420px' : '0' }
+            : { marginRight: `${paneWidth}px` }
         }
       >
         {/* Mobile header — domain switcher (date nav lives in
@@ -293,9 +291,9 @@ function ShellLayoutInner({ children }: Props) {
           <div className="flex items-center gap-2">
             <DomainSwitcher />
             <button
-              onClick={() => setChatOpen((o) => !o)}
+              onClick={() => setAiHidden(aiOpen)}
               className={`w-9 h-9 rounded-full bg-bg-elevated border border-neutral-200 text-neutral-500 hover:text-primary-500 hover:border-primary-300 transition-all grid place-items-center shadow-card ${
-                chatOpen ? 'ring-2 ring-primary-500/30 text-primary-500 border-primary-500' : ''
+                aiOpen ? 'ring-2 ring-primary-500/30 text-primary-500 border-primary-500' : ''
               }`}
               aria-label="AI chat"
               title="AI chat"
@@ -305,7 +303,38 @@ function ShellLayoutInner({ children }: Props) {
           </div>
         )} />
             </div>
-            <div className="desktop-workspace-page min-w-0"><PlanNavigation paused={referencesPaused} />{children}</div>
+            <div className="desktop-workspace-page min-w-0"><PlanNavigation paused={referencesPaused} />
+              <SideColumn
+                hasSelection={!!selection}
+                aiOpen={aiOpen}
+                pane={pane}
+                onPaneChange={showPane}
+                onCloseDetails={clearSelection}
+                onCloseAi={() => setAiHidden(true)}
+                ai={
+                  <ChatPanel
+                    messages={assistant.messages}
+                    loading={assistant.loading}
+                    error={assistant.error}
+                    entityContext={null}
+                    mode="chat"
+                    onSend={assistant.sendMessage}
+                    onClear={assistant.resetSession}
+                    onClose={() => setAiHidden(true)}
+                    onNewChat={assistant.resetSession}
+                    onSourceClick={setActiveNoteId}
+                    toolActivity={assistant.toolActivity}
+                    sessions={assistant.sessions}
+                    sessionsLoading={assistant.sessionsLoading}
+                    onLoadSession={assistant.loadSession}
+                    onDeleteSession={assistant.deleteSession}
+                    activeSessionId={assistant.activeSessionId}
+                  />
+                }
+              >
+                {children}
+              </SideColumn>
+            </div>
             {referencesVisible && <div className="desktop-workspace-dock"><ReferenceListsDock /></div>}
             <DesktopFooter actionRef={setDesktopFooterAction} />
           </div>
@@ -334,34 +363,8 @@ function ShellLayoutInner({ children }: Props) {
         />
       )}
 
-      {/* Non-Today AI rail (desktop). Today's rail is in Shell.tsx. */}
-      {showAiRail && !isMobile && (
-        <aside
-          className="fixed top-0 bottom-0 right-0 w-[380px] bg-bg-elevated border-l border-neutral-200/80 shadow-xl z-20"
-          aria-label="Symphony AI"
-        >
-          <ChatPanel
-            messages={assistant.messages}
-            loading={assistant.loading}
-            error={assistant.error}
-            entityContext={null}
-            mode="chat"
-            onSend={assistant.sendMessage}
-            onClear={assistant.resetSession}
-            onClose={() => setChatOpen(false)}
-            onNewChat={assistant.resetSession}
-            toolActivity={assistant.toolActivity}
-            sessions={assistant.sessions}
-            sessionsLoading={assistant.sessionsLoading}
-            onLoadSession={assistant.loadSession}
-            onDeleteSession={assistant.deleteSession}
-            activeSessionId={assistant.activeSessionId}
-          />
-        </aside>
-      )}
-
       {/* Mobile AI rail — full-screen overlay */}
-      {showAiRail && isMobile && (
+      {phoneChatOpen && isMobile && (
         <div
           className="fixed inset-0 z-50 bg-bg-elevated"
           style={{
@@ -377,7 +380,7 @@ function ShellLayoutInner({ children }: Props) {
             mode="chat"
             onSend={assistant.sendMessage}
             onClear={assistant.resetSession}
-            onClose={() => setChatOpen(false)}
+            onClose={() => setPhoneChatOpen(false)}
             onNewChat={assistant.resetSession}
             toolActivity={assistant.toolActivity}
             sessions={assistant.sessions}
@@ -455,6 +458,10 @@ function ShellLayoutInner({ children }: Props) {
           onClose={closeMoreSheet}
           discussionsUnread={discussionsUnread}
         />
+      )}
+
+      {activeNoteId && (
+        <NoteViewer key={activeNoteId} noteId={activeNoteId} onClose={() => setActiveNoteId(null)} />
       )}
 
       {/* Always mounted, so toast text is announced to screen readers. */}
