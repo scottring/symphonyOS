@@ -11,7 +11,7 @@ interface ContactsListProps {
   /** Kept for call-site compatibility; the masthead no longer renders a back arrow. */
   onBack?: () => void
   onAddContact: (data: { name: string; category?: ContactCategory }) => Promise<Contact | null>
-  onDeleteContact: (id: string) => Promise<void>
+  onDeleteContact: (id: string) => Promise<void | boolean>
 }
 
 const CATEGORY_LABELS: Record<string, string> = {

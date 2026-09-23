@@ -100,8 +100,10 @@ function ContactDetail() {
         onBack={() => navigate('/contacts')}
         onUpdate={updateContact}
         onDelete={async (id) => {
-          await deleteContact(id)
-          navigate('/contacts')
+          // Leave the page only once the delete is confirmed.
+          const deleted = await deleteContact(id)
+          if (deleted) navigate('/contacts')
+          return deleted
         }}
         tasks={tasks}
         onSelectTask={(taskId) => navigate(`/task/${taskId}`)}

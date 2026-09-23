@@ -138,11 +138,29 @@ export function useFamilyMembers() {
   }, [])
 
   const deleteMember = useCallback(async (id: string) => {
+    // A member appears on tasks two ways: `assigned_to` (a foreign key with no
+    // ON DELETE, so it must be cleared before the row can go) and the
+    // `assigned_to_all` list (no key at all, so a delete used to leave the
+    // removed person's id behind). Clear both, confirm every row actually
+    // changed (RLS can silently skip a row), and hand everything back if any
+    // step fails. Scope is deliberately NOT re-derived here: narrowing who can
+    // see a task is an access change, not part of removing a person.
+    const cleared: string[] = []
+    const listsChanged: { id: string; list: string[] }[] = []
+    /** Put back what changed; false if any piece couldn't be restored. */
+    const restore = async (): Promise<boolean> => {
+      let ok = true
+      for (const row of listsChanged) {
+        const { error } = await supabase.from('tasks').update({ assigned_to_all: row.list }).eq('id', row.id)
+        if (error) ok = false
+      }
+      if (cleared.length > 0) {
+        const { error } = await supabase.from('tasks').update({ assigned_to: id }).in('id', cleared)
+        if (error) ok = false
+      }
+      return ok
+    }
     try {
-      // tasks.assigned_to references family_members without ON DELETE, so the
-      // member's tasks must be unassigned before the row can go. Remember
-      // which, so a failed delete can hand them back instead of leaving them
-      // silently unassigned.
       const { data: assigned, error: readError } = await supabase
         .from('tasks')
         .select('id')
@@ -150,30 +168,48 @@ export function useFamilyMembers() {
       if (readError) throw readError
       const taskIds = (assigned ?? []).map((t: { id: string }) => t.id)
 
+      const { data: shared, error: sharedError } = await supabase
+        .from('tasks')
+        .select('id, assigned_to_all')
+        .contains('assigned_to_all', [id])
+      if (sharedError) throw sharedError
+
       if (taskIds.length > 0) {
-        const { error: unassignError } = await supabase
+        const { data: done, error: unassignError } = await supabase
           .from('tasks')
           .update({ assigned_to: null })
           .in('id', taskIds)
-        // Stop here: deleting would fail on the reference anyway.
+          .select('id')
+        cleared.push(...((done ?? []) as { id: string }[]).map((t) => t.id))
         if (unassignError) throw unassignError
+        if (cleared.length !== taskIds.length) {
+          throw new Error(`${taskIds.length - cleared.length} of their tasks couldn't be unassigned`)
+        }
+      }
+
+      for (const row of (shared ?? []) as { id: string; assigned_to_all: string[] | null }[]) {
+        const list = row.assigned_to_all ?? []
+        const { data: done, error: listError } = await supabase
+          .from('tasks')
+          .update({ assigned_to_all: list.filter((m) => m !== id) })
+          .eq('id', row.id)
+          .select('id')
+        if (listError) throw listError
+        if (!done || done.length === 0) throw new Error("A shared task still lists them and couldn't be updated")
+        listsChanged.push({ id: row.id, list })
       }
 
       const { error } = await supabase
         .from('family_members')
         .delete()
         .eq('id', id)
-
-      if (error) {
-        if (taskIds.length > 0) {
-          await supabase.from('tasks').update({ assigned_to: id }).in('id', taskIds)
-        }
-        throw error
-      }
+      if (error) throw error
       setMembers(prev => prev.filter(m => m.id !== id))
     } catch (err) {
+      const restored = await restore()
       console.error('Error deleting family member:', err)
-      throw err
+      // The caller says "nothing was changed" only when that is true.
+      throw Object.assign(err instanceof Error ? err : new Error(String((err as { message?: string })?.message ?? err)), { restored })
     }
   }, [])
 

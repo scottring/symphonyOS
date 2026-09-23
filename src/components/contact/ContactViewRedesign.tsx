@@ -9,7 +9,8 @@ interface ContactViewProps {
   contact: Contact
   onBack: () => void
   onUpdate: (id: string, updates: Partial<Contact>) => Promise<void>
-  onDelete: (id: string) => Promise<void>
+  /** Resolves false when the delete failed — the page then stays put. */
+  onDelete: (id: string) => Promise<void | boolean>
   tasks: Task[]
   onSelectTask: (taskId: string) => void
   // Pin props (available but not used in redesign yet)
@@ -126,7 +127,7 @@ export function ContactViewRedesign({
   }, [contact.id, onUpdate])
 
   const handleDelete = async () => {
-    await onDelete(contact.id)
+    if ((await onDelete(contact.id)) === false) return
     onBack()
   }
 
