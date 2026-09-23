@@ -2212,11 +2212,22 @@ div.chooser-action-group { overflow: visible !important; }
    the scene's horizon behind the navigation, fading at both ends and into the
    page so labels stay readable. Same height as the navigation band. */
 .place-band {
-  position: absolute; left: 0; right: 0; top: 0; height: 88px;
+  position: absolute; left: 0; right: 0; height: 88px;
   overflow: hidden; pointer-events: none;
+}
+.place-band-top {
+  top: 0;
   -webkit-mask-image: linear-gradient(to bottom, black 70%, transparent);
   mask-image: linear-gradient(to bottom, black 70%, transparent);
 }
+/* The footer's band is the scene's ground, fading up into the page. */
+.place-band-bottom {
+  bottom: 0;
+  -webkit-mask-image: linear-gradient(to top, black 70%, transparent);
+  mask-image: linear-gradient(to top, black 70%, transparent);
+}
+.place-band-bottom .place-band-scene { top: -325px; opacity: 0.35; }
+.desktop-footer { position: relative; }
 .place-band-scene {
   position: absolute; left: 50%; top: -230px; width: 560px; height: 560px;
   transform: translateX(-50%);
