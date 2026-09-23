@@ -2110,9 +2110,9 @@ div.chooser-action-group { overflow: visible !important; }
   div.plan-mobile-controls { display: flex; align-items: center; gap: 2px; overflow: visible !important; }
   div.plan-mobile-controls:empty { display: none; }
   /* The horizon switcher leads; Goals and the page's controls sit right. */
-  .plan-page-tools { padding: 6px 12px 2px 16px; }
+  .plan-page-tools { padding: 6px 12px 2px 16px; flex-wrap: wrap; row-gap: 2px; }
   .plan-page-tools .horizon-switcher { margin-right: auto; }
-  .plan-page-tools .plan-range-control select { font-size: 14px; color: var(--color-neutral-600); }
+  .plan-page-tools .plan-range-control select { font-size: 14px; color: var(--color-neutral-600); max-width: 96px; padding-inline: 2px; }
 }
 
 /* Phone horizon switcher (native PlannerView): the current horizon as a
