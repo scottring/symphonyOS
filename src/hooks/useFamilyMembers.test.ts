@@ -73,19 +73,16 @@ const resetMocks = () => {
 }
 let memberDeleteBlocked = false
 
-// In-memory tasks for deleteMember. `tasksRlsSkip` ids behave like rows RLS
-// hides from an UPDATE: no error, no row returned. `tasksBlock` does the same
-// for chosen patches (e.g. only the restore).
+// In-memory tasks: deleteMember must leave them alone (the database trigger
+// clears assignments atomically), so any client write would show up here.
 type TaskRow = { id: string; assigned_to: string | null; assigned_to_all: string[] | null }
 let tasksTable: TaskRow[] = []
-let tasksRlsSkip = new Set<string>()
-let tasksBlock: (row: TaskRow, patch: Partial<TaskRow>) => boolean = () => false
 function tasksApi() {
   const query = (filter: (r: TaskRow) => boolean, patch?: Partial<TaskRow>) => {
     const run = () => {
       const rows = tasksTable.filter(filter)
       if (!patch) return { data: rows.map((r) => ({ ...r })), error: null }
-      const hit = rows.filter((r) => !tasksRlsSkip.has(r.id) && !tasksBlock(r, patch))
+      const hit = rows
       hit.forEach((r) => Object.assign(r, patch))
       return { data: hit.map((r) => ({ id: r.id })), error: null }
     }
@@ -121,7 +118,7 @@ vi.mock('@/lib/supabase', () => {
           delete: mockDelete,
         }
       }
-      // A tiny in-memory 'tasks' table (deleteMember reads and edits it).
+      // A tiny in-memory 'tasks' table (deleteMember must not write to it).
       return tasksApi()
     }),
   },
@@ -145,8 +142,6 @@ describe('useFamilyMembers', () => {
     mockUpdateResult = null
     mockError = null
     tasksTable = []
-    tasksRlsSkip = new Set()
-    tasksBlock = () => false
     memberDeleteBlocked = false
     vi.clearAllMocks()
     resetMocks()
@@ -523,9 +518,13 @@ describe('useFamilyMembers', () => {
     })
   })
 
-  // Review 2026-09-22: deleting a member left their id in other tasks'
-  // assigned_to_all lists (no foreign key there to catch it).
-  describe('deleteMember and task assignments', () => {
+  // Member removal is ONE delete (2026-09-23). The database trigger
+  // family_members_clear_assignments clears every assignment in the same
+  // statement — including private tasks this user cannot see — and rolls back
+  // with a failed delete; that was verified on production in a rolled-back
+  // two-account transaction (see docs/planning/2026-09-22-ux-assessment.md).
+  // Here: the client makes no partial writes, and only a confirmed row counts.
+  describe('deleteMember is one confirmed delete', () => {
     const setup = async () => {
       // Two members: an empty list auto-seeds the user's own row.
       const member = createMockFamilyMember({ name: 'Liam' })
@@ -535,110 +534,47 @@ describe('useFamilyMembers', () => {
       return { member, ...hook }
     }
 
-    it('removes the member from single and shared assignments, leaving other people', async () => {
+    it('deletes the member and writes nothing to tasks itself', async () => {
       const { member, result } = await setup()
-      tasksTable = [
-        { id: 'a', assigned_to: member.id, assigned_to_all: [member.id] },
-        { id: 'b', assigned_to: 'mia', assigned_to_all: ['mia', member.id] },
-        { id: 'c', assigned_to: 'mia', assigned_to_all: ['mia'] },
-      ]
+      tasksTable = [{ id: 'a', assigned_to: member.id, assigned_to_all: [member.id, 'mia'] }]
       await act(async () => { await result.current.deleteMember(member.id) })
-      expect(tasksTable).toEqual([
-        { id: 'a', assigned_to: null, assigned_to_all: [] },
-        { id: 'b', assigned_to: 'mia', assigned_to_all: ['mia'] },
-        { id: 'c', assigned_to: 'mia', assigned_to_all: ['mia'] },
-      ])
       expect(mockDelete).toHaveBeenCalled()
       expect(result.current.members.map((m) => m.name)).toEqual(['Mia'])
+      // The trigger does the cleanup atomically; the client does not.
+      expect(tasksTable).toEqual([{ id: 'a', assigned_to: member.id, assigned_to_all: [member.id, 'mia'] }])
     })
 
-    it('a shared task the user cannot update stops the delete and restores every change', async () => {
+    // RLS answers a forbidden DELETE with zero rows and no error.
+    it('a delete that removes zero rows is a failure and keeps the member', async () => {
       const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
       const { member, result } = await setup()
-      tasksTable = [
-        { id: 'a', assigned_to: member.id, assigned_to_all: [member.id, 'mia'] },
-        { id: 'b', assigned_to: 'mia', assigned_to_all: ['mia', member.id] },
-      ]
-      tasksRlsSkip = new Set(['b'])
-      await expect(result.current.deleteMember(member.id)).rejects.toMatchObject({ message: expect.stringMatching(/shared task/), restored: true })
-      expect(mockDelete).not.toHaveBeenCalled()
-      expect(tasksTable).toEqual([
-        { id: 'a', assigned_to: member.id, assigned_to_all: [member.id, 'mia'] },
-        { id: 'b', assigned_to: 'mia', assigned_to_all: ['mia', member.id] },
-      ])
+      memberDeleteBlocked = true
+      await expect(result.current.deleteMember(member.id)).rejects.toMatchObject({
+        message: expect.stringMatching(/couldn't be removed/), userFacing: true,
+      })
       expect(result.current.members).toHaveLength(2)
       consoleSpy.mockRestore()
     })
 
-    it('a failed member delete puts both kinds of assignment back', async () => {
+    it('explains a delete blocked by screen-time history (FK 23503)', async () => {
       const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
       const { member, result } = await setup()
-      tasksTable = [{ id: 'a', assigned_to: member.id, assigned_to_all: [member.id, 'mia'] }]
+      mockError = { message: 'violates foreign key constraint', code: '23503' } as { message: string }
+      await expect(result.current.deleteMember(member.id)).rejects.toMatchObject({
+        message: expect.stringMatching(/screen-time history/), userFacing: true,
+      })
+      expect(result.current.members).toHaveLength(2)
+      consoleSpy.mockRestore()
+    })
+
+    it('passes other database errors through without calling them user-facing', async () => {
+      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+      const { member, result } = await setup()
       mockError = { message: 'Delete failed' }
-      mockEq.mockImplementation(() => Promise.resolve({ error: mockError }))
-      await expect(result.current.deleteMember(member.id)).rejects.toBeTruthy()
-      expect(tasksTable).toEqual([{ id: 'a', assigned_to: member.id, assigned_to_all: [member.id, 'mia'] }])
-      expect(result.current.members).toHaveLength(2)
-      consoleSpy.mockRestore()
-    })
-
-    // Review 2026-09-23: RLS answers a forbidden DELETE with zero rows and no
-    // error; that used to be read as success.
-    it('a delete that removes zero rows is a failure: member kept, assignments restored', async () => {
-      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
-      const { member, result } = await setup()
-      tasksTable = [{ id: 'a', assigned_to: member.id, assigned_to_all: [member.id, 'mia'] }]
-      memberDeleteBlocked = true
-      await expect(result.current.deleteMember(member.id)).rejects.toMatchObject({
-        message: expect.stringMatching(/couldn't be removed/), restored: true, unrestoredTaskIds: [],
-      })
-      expect(result.current.members.map((m) => m.name)).toEqual(['Liam', 'Mia'])
-      expect(tasksTable).toEqual([{ id: 'a', assigned_to: member.id, assigned_to_all: [member.id, 'mia'] }])
-      consoleSpy.mockRestore()
-    })
-
-    // Two-account check (2026-09-23): a private task the remover cannot see
-    // still has them as assignee, so the FK blocks the DELETE (23503).
-    it('explains a removal blocked by a hidden private task, and restores what it changed', async () => {
-      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
-      const { member, result } = await setup()
-      tasksTable = [{ id: 'a', assigned_to: member.id, assigned_to_all: [member.id] }]
-      mockError = { message: 'update or delete on table "family_members" violates foreign key constraint', code: '23503' } as { message: string }
-      await expect(result.current.deleteMember(member.id)).rejects.toMatchObject({
-        message: expect.stringMatching(/task you can't see/), userFacing: true, restored: true,
-      })
-      expect(tasksTable).toEqual([{ id: 'a', assigned_to: member.id, assigned_to_all: [member.id] }])
-      consoleSpy.mockRestore()
-    })
-
-    it('a restore that RLS silently skips is reported, never "nothing changed"', async () => {
-      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
-      const { member, result } = await setup()
-      tasksTable = [
-        { id: 'a', assigned_to: member.id, assigned_to_all: [member.id] },
-        { id: 'b', assigned_to: 'mia', assigned_to_all: ['mia', member.id] },
-      ]
-      memberDeleteBlocked = true
-      // The removal writes land; the restores for both rows come back empty.
-      tasksBlock = (_row, patch) => patch.assigned_to === member.id || (patch.assigned_to_all ?? []).includes(member.id)
-      await expect(result.current.deleteMember(member.id)).rejects.toMatchObject({
-        restored: false, unrestoredTaskIds: expect.arrayContaining(['a', 'b']),
-      })
-      consoleSpy.mockRestore()
-    })
-
-    it('reports exactly the rows that did not come back when a restore is partial', async () => {
-      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
-      const { member, result } = await setup()
-      tasksTable = [
-        { id: 'a', assigned_to: member.id, assigned_to_all: null },
-        { id: 'c', assigned_to: member.id, assigned_to_all: null },
-      ]
-      memberDeleteBlocked = true
-      tasksBlock = (row, patch) => row.id === 'c' && patch.assigned_to === member.id
       const failure = await result.current.deleteMember(member.id).catch((e) => e)
-      expect(failure).toMatchObject({ restored: false, unrestoredTaskIds: ['c'] })
-      expect(tasksTable.find((t) => t.id === 'a')?.assigned_to).toBe(member.id)
+      expect(failure).toMatchObject({ message: 'Delete failed' })
+      expect(failure.userFacing).toBeUndefined()
+      expect(result.current.members).toHaveLength(2)
       consoleSpy.mockRestore()
     })
   })

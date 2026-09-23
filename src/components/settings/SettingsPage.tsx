@@ -46,7 +46,7 @@ function DeleteConfirmation({ memberName, onConfirm, onCancel, isDeleting }: Del
           Remove {memberName}?
         </h3>
         <p className="text-sm text-neutral-500 text-center mb-6">
-          Tasks assigned to {memberName} will become unassigned. This action cannot be undone.
+          {memberName} will be taken off every task, routine and event note they're assigned to. This action cannot be undone.
         </p>
         <div className="flex gap-3">
           <button
@@ -178,12 +178,11 @@ export function SettingsPage({
       onFamilyMembersChanged?.()
     } catch (err) {
       console.error('Failed to delete member:', err)
-      const failure = err as { restored?: boolean; unrestoredTaskIds?: string[]; userFacing?: boolean; message?: string }
-      const n = failure?.unrestoredTaskIds?.length ?? 0
+      // The removal is one database statement (its assignment cleanup rolls
+      // back with it), so a failure means nothing changed.
+      const failure = err as { userFacing?: boolean; message?: string }
       const why = failure?.userFacing && failure.message ? ` ${failure.message}.` : ''
-      showToast(failure?.restored === false
-        ? `Couldn't remove ${deletingMember.name}, and ${n === 1 ? '1 task' : `${n} tasks`} may no longer list them — check their tasks.${why}`
-        : `Couldn't remove ${deletingMember.name}.${why} Nothing was changed.`, 'error', 10000)
+      showToast(`Couldn't remove ${deletingMember.name}.${why} Nothing was changed.`, 'error', 10000)
     } finally {
       setIsDeleting(false)
       setDeletingMember(null)
