@@ -2035,31 +2035,6 @@ html.desktop-shell a {
 .plan-period-navigation a { padding: 6px 11px; color: var(--color-neutral-500); font-size: 13px; border-radius: 5px; white-space: nowrap; }
 .plan-period-navigation a.is-current { color: var(--color-primary-700); background: white; box-shadow: 0 1px 3px rgb(35 35 34 / 0.08); font-weight: 600; }
 
-/* The horizon row is a SUBROW of Planner, not a sibling of it. Both rows share
-   the same 56px left edge, so alignment alone said nothing — Scott, walk
-   2026-09-23: "we need some visual indication of the fact that the today -
-   week-month... row is a subrow of Planner". On a planning page Planner is
-   underlined and the band grows a notch beneath it, tying the two together.
-   Desktop only: the phone swaps the band for the HorizonSwitcher. */
-@media (min-width: 769px) {
-  .page-navigation > a.is-current { position: relative; }
-  .page-navigation > a.is-current::after {
-    content: ''; position: absolute; left: 0; right: 0; bottom: 1px;
-    border-bottom: 2px solid var(--color-primary-700);
-  }
-  .plan-period-navigation { position: relative; }
-  /* A notch in the band's own neutral-100 was invisible against the warm page
-     ground, so the tie is drawn instead: a hairline dropping from the Planner
-     underline into the band, at the centre of the word "Planner" (22px is half
-     its width at 14px). Same hue as the underline, at a third of its weight, so
-     it connects without shouting. */
-  .plan-period-navigation::before {
-    content: ''; position: absolute; top: -18px; left: 22px;
-    width: 2px; height: 18px;
-    background: var(--color-primary-700); opacity: 0.35;
-  }
-}
-
 .plan-range-control { display: flex; align-items: center; font-size: 12px; color: var(--color-neutral-500); }
 .plan-range-control select { background: transparent; padding: 6px 4px; max-width: 130px; }
 .task-chooser-control { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
