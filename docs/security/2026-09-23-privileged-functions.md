@@ -77,7 +77,9 @@ The advisor's other warnings are outside this review:
     household and test accounts via the production app, local dev servers or
     Vercel previews. These are the app's former client-side engine claim;
     there have been none since 2026-08-22, and no signed-out calls at all.
-  - **Conclusion:** the exposure is established, but no evidence of misuse in
-    the retained logs. This doesn't cover anyone holding database credentials.
+  - **Conclusion:** the leak is contained, with no evidence of misuse in the
+    retained API logs. The exposure itself is established. Logs are evidence
+    within their coverage, not a guarantee; they don't cover anyone holding
+    database credentials.
 - **Evidence** (request rows with account IDs and IPs) is kept outside the
   repository, in the owner's private vault, with checksums.
