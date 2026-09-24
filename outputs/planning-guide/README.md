@@ -41,7 +41,20 @@ browser's again.
 
 ## Where it stands
 
-Each sheet is three sides of paper at both Letter and A4. That is a worksheet
-with real writing room rather than a poster: the line spacing and the size of
-the four areas in "What that means" were kept, and the explanatory prose was
-cut to 8pt on paper instead.
+| Sheet | Sides, Letter and A4 |
+| --- | --- |
+| Week | 1 |
+| Month | 2 |
+| Season | 3 |
+| Year | 3 |
+
+Nine sides in all, and each sheet says its own number on itself. The check
+compares that claim against what Chromium actually prints, so the page cannot
+go on saying "four sheets" while producing twelve sides (Codex, 2026-09-24).
+
+The week sheet earns its single side by **asking less** — a shorter look-back
+folded into one band, two priorities, three next actions, and the family prompt
+as one line rather than a band — not by shrinking the explanation. Print type
+went back UP: 10pt labels, 9.5pt questions, 9pt hints and leads. Bands may now
+run over a page break (blocks may not), because keeping a 460pt band whole
+threw it onto a fresh side and left the one before it half empty.

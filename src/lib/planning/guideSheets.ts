@@ -53,20 +53,33 @@ export interface GuideSheet {
   lead: string
   /** Roughly how long it takes, printed on the sheet. */
   minutes: number
+  /**
+   * How many SIDES of paper this actually prints on, stated on the sheet and
+   * on the page. "Four sheets" meant twelve printed sides and nobody was told
+   * (Codex review, 2026-09-24), so the number is part of the content and the
+   * print check asserts it against what Chromium really produces.
+   */
+  sides: 1 | 2 | 3
   bands: GuideBand[]
 }
 
+const SIDES = ['', 'One side', 'Two sides', 'Three sides'] as const
+export function sidesLabel(sheet: GuideSheet): string { return SIDES[sheet.sides] }
+
 const KEEP_BLANK = 'Leave anything you do not know yet blank. A blank is kept as a blank.'
 
-/** Band 1 is the same three blanks on every sheet, in the same place. */
-function thisIs(periodLabel: string): GuideBand {
+/**
+ * Band 1, in this horizon's own words. A week and a month are dates; a season
+ * is whatever you call it. "Write the season in digits" was nonsense, and the
+ * year sheet asked for the year twice (Codex review, 2026-09-24).
+ */
+function thisIs(fields: { label: string; span?: 1 | 2 | 3 }[], lead: string, note = true): GuideBand {
   return {
     title: 'This is',
-    lead: `Write the ${periodLabel} in digits. A relative phrase — “next week”, “the autumn” — is ambiguous by the time anyone reads it back.`,
+    lead,
     blocks: [
-      { kind: 'fields', fields: [{ label: periodLabel[0].toUpperCase() + periodLabel.slice(1), span: 2 }, { label: 'Year' }] },
-      { kind: 'fields', fields: [{ label: 'Written by', span: 2 }, { label: 'Date filled in' }] },
-      { kind: 'note', text: 'If you forget to fill this in, the sheet is still useful — you will just be asked which period it belongs to.' },
+      { kind: 'fields', fields: [...fields, { label: 'Written by', span: 2 }] },
+      ...(note ? [{ kind: 'note' as const, text: 'If you leave this blank the sheet is still useful — you will just be asked which period it belongs to.' }] : []),
     ],
   }
 }
@@ -135,6 +148,25 @@ function whatThatMeans(): GuideBand {
   }
 }
 
+/**
+ * The week's version: the same four areas, fewer lines and no second helping
+ * of prose, so the sheet is one side at readable type rather than three at
+ * 8pt (Codex review, 2026-09-24).
+ */
+function whatThatMeansBriefly(): GuideBand {
+  return {
+    title: 'What that means',
+    lead: 'Which area a line is written in is the signal.',
+    blocks: [
+      { kind: 'lines', glyph: '☐', label: 'Next actions', hint: 'no date or owner required', count: 3, tail: ['who', 'when'] },
+      { kind: 'lines', glyph: '↻', label: 'Happens repeatedly', count: 2, tail: ['how often'] },
+      { kind: 'lines', glyph: '▣', label: 'Fixed date and time', count: 2, tail: ['date', 'time'] },
+      { kind: 'lines', glyph: '○', label: 'Not yet decided', hint: 'not a commitment', count: 2 },
+      { kind: 'note', text: KEEP_BLANK },
+    ],
+  }
+}
+
 /** The one family prompt. Small, optional, and never a grid of columns. */
 function together(): GuideBand {
   return {
@@ -166,21 +198,41 @@ function whatMatters(questions: string[], count: number, noun: string): GuideBan
 export const GUIDE_SHEETS: readonly GuideSheet[] = [
   {
     level: 'week',
+    // Deliberately the shortest of the four: one side, at the same type as the
+    // rest. A week's exercise that runs to three sides is not a week's
+    // exercise (Codex review, 2026-09-24).
     title: 'The week sheet',
-    lead: 'One person at a desk, or a household at a kitchen table. Fill it in once, at whatever hour suits.',
+    lead: 'The one to start with if you only ever use one.',
     minutes: 10,
+    sides: 1,
     bands: [
-      thisIs('week beginning'),
-      whatHappened(),
-      alreadyCommitted('week'),
-      whatMatters([
-        'What is already fixed?',
-        'What unfinished work still matters?',
-        'Given the room you have, which actions belong to this week?',
-        'Which of them can sit in the week without a day?',
-      ], 2, 'week'),
-      whatThatMeans(),
-      together(),
+      // No lead and no note: on a one-side sheet the field label carries it,
+      // and the guide page says the rest.
+      thisIs([{ label: 'Week beginning (date)', span: 2 }], '', false),
+      {
+        title: 'What the week already holds',
+        blocks: [
+          { kind: 'lines', label: 'Already fixed', hint: 'dates, and other people’s', count: 2 },
+          { kind: 'lines', label: 'Already repeating', count: 1 },
+          { kind: 'lines', label: 'Still unfinished, and still wanted', count: 2 },
+          { kind: 'lines', label: 'Room I actually have this week', count: 1 },
+        ],
+      },
+      {
+        title: 'What matters here',
+        questions: [
+          'Given that, which actions belong to this week?',
+          'Which of them can sit in the week without a day?',
+        ],
+        blocks: [
+          { kind: 'lines', count: 2, tail: ['supports'] },
+          // The family prompt as one line rather than a band of its own: the
+          // week sheet is one side, and a heading costs as much as two lines.
+          { kind: 'lines', label: 'If more than one of you: who has agreed to take the next action', count: 1 },
+          { kind: 'note', text: 'Two is a suggestion, not a limit. “Supports” is usually left blank.' },
+        ],
+      },
+      whatThatMeansBriefly(),
     ],
   },
   {
@@ -188,8 +240,12 @@ export const GUIDE_SHEETS: readonly GuideSheet[] = [
     title: 'The month sheet',
     lead: 'Once a month, in about a quarter of an hour. It works whether or not you ever fill in a season sheet.',
     minutes: 15,
+    sides: 2,
     bands: [
-      thisIs('month'),
+      thisIs(
+        [{ label: 'Month', span: 2 }, { label: 'Year' }],
+        'The month and the year, in digits.',
+      ),
       whatHappened(),
       alreadyCommitted('month'),
       whatMatters([
@@ -207,8 +263,12 @@ export const GUIDE_SHEETS: readonly GuideSheet[] = [
     title: 'The season sheet',
     lead: 'Four times a year, in about half an hour. A season is whatever stretch you actually live in — it does not have to be a quarter.',
     minutes: 25,
+    sides: 3,
     bands: [
-      thisIs('season'),
+      thisIs(
+        [{ label: 'Season', span: 2 }, { label: 'Year' }],
+        'Name the season the way you actually think of it — “autumn”, “Sep–Dec”, “the term” — and give the year.',
+      ),
       whatHappened('What I now know that I didn’t at the start'),
       alreadyCommitted('season'),
       {
@@ -232,8 +292,9 @@ export const GUIDE_SHEETS: readonly GuideSheet[] = [
     title: 'The year sheet',
     lead: 'Once, in about half an hour. Nothing above it is required — a person who only ever fills in the week sheet is using this guide correctly.',
     minutes: 30,
+    sides: 3,
     bands: [
-      thisIs('year'),
+      thisIs([{ label: 'Year', span: 2 }], 'The year, in digits.'),
       whatHappened('What I now know that I didn’t at the start'),
       alreadyCommitted('year'),
       {

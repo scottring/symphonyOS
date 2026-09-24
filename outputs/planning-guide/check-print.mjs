@@ -12,6 +12,7 @@ import { chromium } from 'playwright'
 import { fileURLToPath } from 'node:url'
 import { dirname, join } from 'node:path'
 import { writeFileSync } from 'node:fs'
+import { GUIDE_SIDES } from './sides.mjs'
 
 const here = dirname(fileURLToPath(import.meta.url))
 const file = 'file://' + join(here, 'guide-print-proof.html')
@@ -94,16 +95,17 @@ for (const paper of PAPERS) {
     narrow === 0 ? ok(`${sheet}: every writing line has room`) : bad(`${sheet}: ${narrow} writing lines are too short`)
 
     const pdf = await page.pdf({ format: paper.format, margin: { top: '14mm', right: '14mm', bottom: '14mm', left: '14mm' }, printBackground: true })
-    // A sheet that needs more than three sides of paper is not a worksheet —
-    // and one that reports a single side when it is three times a page tall is
-    // being clipped, which is the failure this check exists for.
+    // The sheet must print on exactly as many sides as it TELLS the reader it
+    // will. "Four sheets" once meant twelve printed sides with nothing said
+    // (Codex, 2026-09-24), and a sheet that reports one side while being three
+    // times a page tall is being clipped — the other failure this catches.
     const pages = (pdf.toString('latin1').match(/\/Type\s*\/Page[^s]/g) ?? []).length
     const tall = await page.evaluate((s) =>
       document.querySelector(`.guide-sheet[data-sheet="${s}"]`).getBoundingClientRect().height, sheet)
-    const expected = Math.max(1, Math.ceil(tall / (page.viewportSize().height - 2 * MARGIN_MM * 3.7795)))
-    pages > 0 && pages <= 3 && pages >= expected - 1
-      ? ok(`${sheet}: ${pages} page${pages > 1 ? 's' : ''} of paper (${Math.round(tall)}px tall)`)
-      : bad(`${sheet}: ${pages} pages of paper for ${Math.round(tall)}px of sheet — clipped or overlong`)
+    const claimed = GUIDE_SIDES[sheet]
+    pages === claimed
+      ? ok(`${sheet}: ${pages} side${pages > 1 ? 's' : ''}, exactly as the sheet says`)
+      : bad(`${sheet}: says ${claimed} side${claimed > 1 ? 's' : ''}, prints ${pages} (${Math.round(tall)}px tall)`)
     if (paper.name === 'Letter') writeFileSync(join(here, `sheet-${sheet}-letter.pdf`), pdf)
     void box
   }

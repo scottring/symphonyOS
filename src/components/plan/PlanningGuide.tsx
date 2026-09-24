@@ -20,7 +20,7 @@ import { Link } from 'react-router-dom'
 import { Printer, ArrowUpRight } from 'lucide-react'
 import { MastheadCard } from '@/components/layout/MastheadCard'
 import { PAGE_COLUMN } from '@/components/layout/pageLayout'
-import { GUIDE_SHEETS, type GuideBand, type GuideBlock, type GuideLevel, type GuideSheet } from '@/lib/planning/guideSheets'
+import { GUIDE_SHEETS, sidesLabel, type GuideBand, type GuideBlock, type GuideLevel, type GuideSheet } from '@/lib/planning/guideSheets'
 
 type PrintTarget = GuideLevel | 'all' | null
 
@@ -108,7 +108,7 @@ function Sheet({ sheet, printOff, onPrint }: { sheet: GuideSheet; printOff: bool
         <div className="min-w-0">
           <h2 className="guide-sheet-title">{sheet.title}</h2>
           <p className="guide-sheet-lead">{sheet.lead}</p>
-          <p className="guide-sheet-time">About {sheet.minutes} minutes. Works on its own.</p>
+          <p className="guide-sheet-time">{sidesLabel(sheet)} · about {sheet.minutes} minutes · works on its own</p>
         </div>
         <button type="button" onClick={onPrint} className="guide-print-btn guide-screen-only">
           <Printer className="h-4 w-4" aria-hidden="true" />
@@ -163,45 +163,55 @@ export function PlanningGuide() {
           variant="page"
           eyebrow={<span className="text-[12px] uppercase tracking-wider text-neutral-500">Planning</span>}
           title="The planning guide"
-          subline={<p className="text-[12px] text-neutral-500">Four sheets you can print. Use one, or none.</p>}
+          subline={<p className="text-[12px] text-neutral-500">Four exercises you can print — nine sides in all, and none of them required.</p>}
           action={(
             <button type="button" onClick={() => print('all')} className="guide-print-btn">
               <Printer className="h-4 w-4" aria-hidden="true" />
-              Print all four
+              Print all nine sides
             </button>
           )}
         />
 
         <section className="guide-intro">
           <p>
-            These sheets are an aid, not a format you have to obey. An ordinary notebook works just
-            as well, and so does writing nothing down at all. Each sheet stands on its own: filling
-            in the week sheet every week and never touching the others is using this correctly.
+            These are an aid, not a format you have to obey. An ordinary notebook works just as
+            well, and so does writing nothing down at all. Each one stands alone: filling in the
+            week sheet every week and never touching the others is using this correctly.
           </p>
           <p>
-            Every sheet asks the same five things in the same order — which period this is, what
-            happened, what the period already holds, what matters, and what that means in practice.
-            The questions under “what matters” change with the horizon, because a week and a year
-            are not asking the same thing.
+            <strong>The week sheet is one side</strong> and is the one to start with. The month is
+            two sides, the season and the year three each — they ask more because there is more to
+            decide, not because they are compulsory. Every one of them begins the same way, with
+            which period this is and what it already holds, before asking what matters; the
+            questions themselves change with the horizon, because a week and a year are not asking
+            the same thing.
           </p>
           <p>
             <strong>Leave blanks blank.</strong> A date you have not decided, an owner nobody has
             agreed to, a priority you are not sure about — all of those are better left empty than
-            guessed at. Nothing filled in here is a commitment until you make it one.
+            guessed at. Nothing written here is a commitment until you make it one.
           </p>
           <h2>Bringing a filled-in sheet back</h2>
           <p>
-            You can photograph a sheet and have Symphony read it — <Link to="/today" className="guide-link">Plan
-            from paper <ArrowUpRight className="mb-0.5 inline h-3 w-3" /></Link> — or simply type
-            things in yourself; both work, and neither is the “right” way.
+            Type things in yourself, or photograph the sheet and have Symphony read
+            it — <Link to="/today" className="guide-link">Plan from paper <ArrowUpRight className="mb-0.5 inline h-3 w-3" /></Link>.
+            Both work, and neither is the “right” way.
           </p>
           <p>
-            When a page is read, you see what it read and what it proposes — outcomes, actions,
-            repeats, fixed dates, and the things you marked as undecided — alongside your original
-            notes, which are kept. You choose what to keep before anything is saved. Where the
-            handwriting or the intent is unclear, you are asked rather than having a date, a
-            repetition or an owner invented for you. A phrase like “swim Tuesday” on its own does
-            not make a weekly routine.
+            If you photograph it, <strong>read the proposed list against your page before you keep
+            anything</strong>, and keep only the lines you want. Things to check as you go:
+          </p>
+          <ul className="guide-checks">
+            <li>a line that came back as the wrong kind of thing — an idea turned into a task, or
+              the other way round;</li>
+            <li>a date, a repetition or an owner on a line where you did not write one. “Swim
+              Tuesday” is not by itself a weekly routine;</li>
+            <li>anything you meant to leave undecided.</li>
+          </ul>
+          <p>
+            Correct it there, or leave it out and add it by hand afterwards. <strong>Keep the paper
+            either way</strong> — it is the record, and what comes back is a draft to check against
+            it.
           </p>
           <p className="guide-source">
             The prompts here are Symphony’s own. Two published <em>Best Laid Plans</em> show notes

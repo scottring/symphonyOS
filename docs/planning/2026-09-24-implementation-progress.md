@@ -550,3 +550,60 @@ view. Different rung, different write path, and it was not what was reported.
 
 **Codex's November fixture is untouched.** `QA connected journey: …` is still
 assigned Sep 20–26 for your recovery/Undo test.
+
+---
+
+## J — the guide's five corrections  ·  12:05 ET
+
+Codex's 11:22 review, all five addressed.
+
+**“Write the season in digits”, and “Year Year”.** Band 1 now asks in each
+horizon's own terms: *Week beginning (date)* · *Month · Year* · *Season · Year* ·
+*Year*. A season is named however the reader thinks of it — “autumn”, “Sep–Dec”,
+“the term” — and the year page asks for the year once. A test pins the field list
+for all four and asserts no sheet repeats a label.
+
+**Importer guarantees.** The hand-back section no longer says what the app will
+do. It says what the reader should **check**: read the proposed list against your
+page before you keep anything, and look for a line that came back as the wrong
+kind of thing, a date or repeat or owner on a line where you wrote none, and
+anything you meant to leave undecided — then correct it there or leave it out.
+It ends “keep the paper either way; it is the record, and what comes back is a
+draft to check against it.” The test now asserts the *absence* of the four
+claims nobody verified: “duplicate”, “automatic”, “you are asked”, “notes which
+are kept”.
+
+**“Five things” against six or seven sections.** Gone. The intro says what is
+true: the week sheet is one side and is the one to start with, the month is two,
+the season and year three each; every sheet opens with which period this is and
+what it already holds before asking what matters, and the questions change with
+the horizon. The test asserts the shape rather than a count.
+
+**Four sheets, twelve sides.** Each sheet now states its own — “One side · about
+10 minutes · works on its own” — the masthead says “Print all nine sides”, and
+`sides` is part of the content. **The print check compares the claim to what
+Chromium actually prints**, at Letter and A4, so the page cannot drift back into
+saying one thing and printing another.
+
+**The week exercise, one page at readable type.** Print type went back UP —
+10pt labels, 9.5pt questions, 9pt hints and leads — and the week sheet earns its
+single side by asking less: the look-back folded into one “What the week already
+holds” band, two priorities, three next actions, and the family prompt as one
+line instead of a band of its own. Every band on it pairs into two columns.
+
+| | Letter | A4 |
+| --- | --- | --- |
+| Week | 1 side | 1 side |
+| Month | 2 | 2 |
+| Season | 3 | 3 |
+| Year | 3 | 3 |
+
+One more real fix fell out of this: bands were `break-inside: avoid`, which threw
+a 460pt band onto a fresh side and left the one before it half empty — three
+sides for two sides of content. Bands may now run over a page break; blocks still
+may not.
+
+**Verified:** 6872 tests passing (only the pre-existing `connectors/whatsapp`
+collection error), tsc clean, eslint 0 errors, build clean, all print checks
+passing at both paper sizes. **Not verified:** nothing has been printed on real
+paper.

@@ -1675,33 +1675,40 @@ html.desktop-shell a {
     break-after: page;
   }
   .guide-sheet:last-of-type { break-after: auto; }
-  .guide-sheet-head { border-bottom: 1px solid #999; padding-bottom: 7pt; margin-bottom: 12pt; }
+  .guide-sheet-head { border-bottom: 1px solid #999; padding-bottom: 5pt; margin-bottom: 9pt; }
   .guide-sheet-title { font-size: 19pt; color: #000; }
   .guide-sheet-lead { font-size: 9.5pt; color: #333; }
   .guide-sheet-time { font-size: 8.5pt; color: #555; }
-  .guide-band { margin-bottom: 10pt; }
+  /* A band may run over a page break; a BLOCK may not. Keeping whole bands
+     together threw a 460pt band onto a fresh side and left the one before it
+     half empty — three sides for two sides of content. */
+  .guide-band { margin-bottom: 7pt; break-inside: auto; }
+  .guide-band-title { break-after: avoid; }
   /* Two columns where the content is a set of short areas rather than a
      sequence — it is the difference between a two-sided worksheet and a
      five-sided one. */
   .guide-band[data-band="what-that-means"] .guide-band-body,
   .guide-band[data-band="what-happened"] .guide-band-body,
+  .guide-band[data-band="what-matters-here"] .guide-band-body,
   .guide-band[data-band="if-more-than-one-of-you-is-filling-this-in"] .guide-band-body,
-  .guide-band[data-band="what-is-already-committed"] .guide-band-body {
+  .guide-band[data-band="what-is-already-committed"] .guide-band-body,
+  /* The week sheet is one side, so EVERY band on it pairs up. */
+  .guide-sheet[data-sheet="week"] .guide-band-body {
     display: grid; grid-template-columns: 1fr 1fr; gap: 0 18pt; align-content: start;
   }
-  .guide-band[data-band="what-that-means"] .guide-note { grid-column: 1 / -1; }
+  .guide-band-body > .guide-note { grid-column: 1 / -1; }
   .guide-block { break-inside: avoid; margin-bottom: 8pt; }
   .guide-band-title { font-size: 8.5pt; color: #333; }
   .guide-band-n { border-color: #888; color: #555; width: 13pt; height: 13pt; font-size: 7pt; }
   .guide-band-optional { color: #666; }
-  .guide-band-lead { font-size: 8pt; color: #444; margin-bottom: 5pt; }
-  .guide-questions li { font-size: 9pt; color: #222; }
+  .guide-band-lead { font-size: 9pt; color: #333; margin-bottom: 5pt; }
+  .guide-questions li { font-size: 9.5pt; color: #111; }
   .guide-note { margin: 2pt 0 6pt; }
-  .guide-block-label { font-size: 9.5pt; color: #000; }
-  .guide-block-hint, .guide-note, .guide-field-label, .guide-rule-tail { font-size: 8pt; color: #444; }
+  .guide-block-label { font-size: 10pt; color: #000; }
+  .guide-block-hint, .guide-note, .guide-field-label, .guide-rule-tail { font-size: 9pt; color: #333; }
   .guide-rule-line, .guide-rule-tail .guide-rule-blank { border-bottom-color: #999; }
-  .guide-line { margin-bottom: 12pt; }
-  .guide-rule-line { height: 13pt; }
+  .guide-line { margin-bottom: 8pt; }
+  .guide-rule-line { height: 11pt; }
   .guide-questions { margin-bottom: 8pt; padding-left: 9pt; }
   .guide-questions li { line-height: 1.5; }
   .guide-band-lead { margin-bottom: 6pt; }

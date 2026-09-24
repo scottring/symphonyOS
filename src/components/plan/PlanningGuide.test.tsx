@@ -31,16 +31,33 @@ describe('PlanningGuide', () => {
     expect(screen.getByText(/leave blanks blank/i)).toBeInTheDocument()
   })
 
-  // It must not promise importer behaviour nobody has verified: what it claims
-  // is a review of what was read, with the original notes kept.
-  it('describes the paper hand-back without promising what is not built', () => {
+  // "Four sheets" meant twelve printed sides and nobody was told (Codex,
+  // 2026-09-24). Each exercise states its own, and so does the page.
+  it('says how much paper each exercise really is', () => {
+    show()
+    expect(within(sheet('week')).getByText(/One side · about 10 minutes/i)).toBeInTheDocument()
+    expect(within(sheet('month')).getByText(/Two sides/i)).toBeInTheDocument()
+    expect(within(sheet('season')).getByText(/Three sides/i)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /print all nine sides/i })).toBeInTheDocument()
+    expect(document.querySelector('.guide-intro')).toHaveTextContent(/the week sheet is one side/i)
+  })
+
+  // It must not promise importer behaviour nobody has verified. It tells the
+  // reader what to CHECK rather than what the app guarantees (Codex,
+  // 2026-09-24).
+  it('gives the reader instructions, not guarantees about the importer', () => {
     show()
     const intro = document.querySelector('.guide-intro')!
-    expect(intro).toHaveTextContent(/you choose what to keep before anything is saved/i)
-    expect(intro).toHaveTextContent(/your original notes, which are kept/i)
-    expect(intro).toHaveTextContent(/does not make a weekly routine/i)
-    expect(intro.textContent).not.toMatch(/duplicate/i)
-    expect(intro.textContent).not.toMatch(/automatically/i)
+    expect(intro).toHaveTextContent(/read the proposed list against your page before you keep anything/i)
+    expect(intro).toHaveTextContent(/keep the paper either way/i)
+    expect(intro).toHaveTextContent(/is not by itself a weekly routine/i)
+    const text = intro.textContent ?? ''
+    // None of these were ever verified, so none of them may be claimed.
+    expect(text).not.toMatch(/duplicate/i)
+    expect(text).not.toMatch(/automatic/i)
+    expect(text).not.toMatch(/you are asked/i)
+    expect(text).not.toMatch(/notes,? which are kept/i)
+    expect(text).not.toMatch(/nothing is saved until/i)
   })
 
   it('credits its source briefly and claims nothing more', () => {
@@ -63,10 +80,10 @@ describe('PlanningGuide', () => {
     expect(sheet('year').dataset.print).toBe('off')
   })
 
-  it('prints all four when all four are asked for', async () => {
+  it('prints everything when everything is asked for', async () => {
     show()
     const user = userEvent.setup()
-    await user.click(screen.getByRole('button', { name: /print all four/i }))
+    await user.click(screen.getByRole('button', { name: /print all nine sides/i }))
     expect(window.print).toHaveBeenCalledTimes(1)
     for (const s of sheets()) expect(s.dataset.print).toBe('on')
   })
