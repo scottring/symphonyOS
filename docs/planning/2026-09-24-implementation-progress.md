@@ -878,3 +878,88 @@ original day and hour; and a host with no writer refuses out loud.
 event. That is Scott's retry, and it needs a connected calendar — the writer
 throws "Not connected to Google Calendar" without one, which now surfaces as
 “No calendar is connected, so this event can’t be moved” instead of silence.
+
+---
+
+## O — Details › Reschedule › Tomorrow  ·  14:10 ET
+
+Traced as its own path, and Codex was right not to let me assume the drag fix
+covered it. **It did not.** Different component, different cause, same silence.
+
+### The cause
+
+`SchedulePicker` has two callbacks. `onSchedule(date, isAllDay)` is what the
+“Pick date & time…” tile calls. Every **relative** tile — Today, Tonight,
+Tomorrow, This weekend, Next weekend, Next week, This month, Someday — calls
+`onReschedule(when)` instead (`SchedulePicker.tsx:170`).
+
+`TapEventPanel` passed **only `onSchedule`**. So for an event, "Pick date &
+time…" worked and *every other tile in the popover did nothing at all* — which
+is precisely what Scott saw.
+
+### The trap underneath it
+
+Wiring the tiles straight through would have introduced a worse bug. Every
+relative tile resolves to **midnight** (`getBaseDate` sets `00:00`), and
+`handleReschedule` takes the hour and minute from the date it is given — so
+"Tomorrow" on a 1–2 PM event would have moved it to **midnight**. A relative
+tile means *move the day, keep the hour*, and that is what it now does.
+
+### The repair
+
+- `dateForWhen(when)` is exported from `RescheduleGrid` — it already owned the
+  mirror of `applyTriageWhen`, so the day a tile PRINTS and the day a caller
+  WRITES cannot drift apart. Pool tiles return null, because they mean no day.
+- `TapEventPanel` handles a relative tile: resolve the day, keep the event's
+  own hour and minute, and route through the same `computeEventReschedule` the
+  date picker uses — so the duration is preserved exactly as before. The panel
+  already `await`s the write and toasts on failure (`TaskDetailPanel`'s
+  `onReschedule`), so error handling and refresh needed no change on this path.
+- **A tile nobody handles is no longer shown.** `SchedulePicker` renders no
+  relative tiles without an `onReschedule`, and a caller may name the subset it
+  can honour. The event panel names five — Today, Tomorrow, This weekend, Next
+  weekend, Next week. **Tonight and the pool tiles are deliberately absent**:
+  an event cannot go to Someday, and "Tonight" would mean inventing an hour
+  nobody asked for. A new time is what "Pick date & time…" is for.
+
+11 tests: 3 on the picker's tile contract (no handler → no tiles; a named
+subset shows and acts; unnamed → all), and 8 on the day resolution and the
+move (Tomorrow keeps 1 PM, the hour survives, the length survives, a pool tile
+does nothing, an event with no times falls back sensibly).
+
+### The 403 claim, softened
+
+`eventMoveErrorMessage` asserted a 403 meant “a calendar you don’t own (an
+invite or shared calendar)”. Codex is right that this is too strong — a shared
+calendar can perfectly well permit edits, and Google does not tell us the
+cause. It now says **“Google refused this edit — you may not have permission to
+change this event”**, and a test asserts the words *shared*, *invite*, *don’t
+own* and *not the owner* do not appear. `TaskDetailPanel` carried its own copy
+of the same over-strong sentence; both paths now share this one.
+
+---
+
+## P — evidence and usability logged, not acted on
+
+### Routines: user-reported PASS
+
+Scott's run: selected weekdays are correct; completing **one occurrence**
+completes only that one; reload preserves **only** the completed occurrence;
+reopening leaves the others unchanged. Recorded as a pass — the
+occurrence-vs-rule grain is holding end to end.
+
+### UX gap — “Daily” vs weekly with days selected
+
+Ambiguous: a routine set to **Daily** and one set to **Weekly with all seven
+days selected** describe the same thing, and the UI does not say which the
+reader has. Not touched. Needs a product call on whether the two collapse into
+one control or the wording separates them.
+
+### Discoverability — “Add a step” under an October goal
+
+On the current walkthrough goal *write a new song*, **“Add a step” was found
+only after explicit coaching to press the caret.** The disclosure is the only
+route to a goal's steps, and it does not announce that it holds the way to add
+one. **Deliberately not altered mid-walk**, per Codex. Worth noting it is the
+same caret lane the hierarchy fix (§H) made consistent, so any change here
+should keep goal titles aligned.

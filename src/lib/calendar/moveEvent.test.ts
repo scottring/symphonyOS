@@ -81,7 +81,7 @@ describe('makeEventMover', () => {
     it('says so where it can be seen, and rejects', async () => {
       const { move, notify } = setup({ updateEvent: boom })
       await expect(move('row-1', { startTime: FRI_1PM, endTime: FRI_2PM })).rejects.toThrow()
-      expect(notify).toHaveBeenCalledWith(expect.stringMatching(/won’t allow edits/), 'error')
+      expect(notify).toHaveBeenCalledWith(expect.stringMatching(/refused this edit/), 'error')
     })
 
     it('does not re-read the range — there is nothing new to see', async () => {
@@ -102,7 +102,12 @@ describe('makeEventMover', () => {
 describe('eventMoveErrorMessage', () => {
   it('tells each failure apart', () => {
     expect(eventMoveErrorMessage(new CalendarReconnectError())).toMatch(/reconnect in Settings/)
-    expect(eventMoveErrorMessage(new Error('403 Forbidden'))).toMatch(/calendar you don’t own/)
+    // A refusal is reported as a refusal. Google does not say WHY, and a
+    // shared calendar can perfectly well permit edits — so no cause is named.
+    const refused = eventMoveErrorMessage(new Error('403 Forbidden'))
+    expect(refused).toMatch(/refused this edit/)
+    expect(refused).toMatch(/may not have permission/)
+    expect(refused).not.toMatch(/shared|invite|don’t own|not the owner/i)
     expect(eventMoveErrorMessage(new Error('Not connected to Google Calendar'))).toMatch(/No calendar is connected/)
     expect(eventMoveErrorMessage(new Error('kaboom'))).toBe('Could not move the event')
   })

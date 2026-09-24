@@ -44,7 +44,7 @@ async function openPicker(user: ReturnType<typeof userEvent.setup>) {
 describe('SchedulePicker', () => {
   it('opens the grid from the trigger', async () => {
     const user = userEvent.setup()
-    render(<SchedulePicker onSchedule={vi.fn()} loads={new Map()} />)
+    render(<SchedulePicker onSchedule={vi.fn()} onReschedule={vi.fn()} loads={new Map()} />)
     await openPicker(user)
     expect(screen.getByText('Tomorrow')).toBeInTheDocument()
   })
@@ -54,6 +54,7 @@ describe('SchedulePicker', () => {
     render(
       <SchedulePicker
         onSchedule={vi.fn()}
+        onReschedule={vi.fn()}
         loads={todayLoads({ bookedMinutes: 390, allDayCount: 5 })}
       />,
     )
@@ -66,7 +67,7 @@ describe('SchedulePicker', () => {
 
   it('shows no bar for a pool tile', async () => {
     const user = userEvent.setup()
-    render(<SchedulePicker onSchedule={vi.fn()} loads={todayLoads()} />)
+    render(<SchedulePicker onSchedule={vi.fn()} onReschedule={vi.fn()} loads={todayLoads()} />)
     await openPicker(user)
 
     const someday = screen.getByText('Someday').closest('[data-tile]')!
@@ -103,7 +104,7 @@ describe('SchedulePicker', () => {
 
   it('goes back to the grid from the peek', async () => {
     const user = userEvent.setup()
-    render(<SchedulePicker onSchedule={vi.fn()} loads={todayLoads({ bookedMinutes: 120 })} />)
+    render(<SchedulePicker onSchedule={vi.fn()} onReschedule={vi.fn()} loads={todayLoads({ bookedMinutes: 120 })} />)
     await openPicker(user)
     await user.click(within(todayTile()).getByLabelText(/15% booked/i))
     await user.click(screen.getByRole('button', { name: /back to schedule for/i }))
@@ -121,6 +122,7 @@ describe('SchedulePicker', () => {
     render(
       <SchedulePicker
         onSchedule={onSchedule}
+        onReschedule={vi.fn()}
         loads={todayLoads({ bookedMinutes: 60, openSlots: [{ start: slotStart, end: slotEnd }] })}
       />,
     )
@@ -135,7 +137,7 @@ describe('SchedulePicker', () => {
     const user = userEvent.setup()
     const onSchedule = vi.fn()
     render(
-      <SchedulePicker onSchedule={onSchedule} loads={todayLoads({ bookedMinutes: 120 })} />,
+      <SchedulePicker onSchedule={onSchedule} onReschedule={vi.fn()} loads={todayLoads({ bookedMinutes: 120 })} />,
     )
     await openPicker(user)
     await user.click(within(todayTile()).getByLabelText(/15% booked/i))
@@ -146,7 +148,7 @@ describe('SchedulePicker', () => {
 
   it('says so when event data is unavailable rather than under-reporting', async () => {
     const user = userEvent.setup()
-    render(<SchedulePicker onSchedule={vi.fn()} loads={todayLoads({ eventsAvailable: false })} />)
+    render(<SchedulePicker onSchedule={vi.fn()} onReschedule={vi.fn()} loads={todayLoads({ eventsAvailable: false })} />)
     await openPicker(user)
     expect(within(todayTile()).getByText(/events unavailable/i)).toBeInTheDocument()
   })
@@ -155,7 +157,7 @@ describe('SchedulePicker', () => {
     const user = userEvent.setup()
     const onClearSchedule = vi.fn()
     const { rerender } = render(
-      <SchedulePicker onSchedule={vi.fn()} onClearSchedule={onClearSchedule} loads={new Map()} />,
+      <SchedulePicker onSchedule={vi.fn()} onReschedule={vi.fn()} onClearSchedule={onClearSchedule} loads={new Map()} />,
     )
     await openPicker(user)
     expect(screen.queryByRole('button', { name: /clear schedule/i })).not.toBeInTheDocument()
@@ -163,6 +165,7 @@ describe('SchedulePicker', () => {
     rerender(
       <SchedulePicker
         onSchedule={vi.fn()}
+        onReschedule={vi.fn()}
         onClearSchedule={onClearSchedule}
         scheduledFor={today}
         loads={new Map()}
@@ -182,4 +185,41 @@ it('task weekend choices promise either day and do not show Saturday-only capaci
   expect(within(button.closest('[data-tile]') as HTMLElement).queryByRole('progressbar')).toBeNull()
   await user.click(button)
   expect(onReschedule).toHaveBeenCalledWith('this-weekend')
+})
+
+// Scott, 2026-09-24: Details › Reschedule › Tomorrow did nothing. The relative
+// tiles call `onReschedule`, and a caller that passes only `onSchedule` gets
+// eight buttons that quietly do nothing.
+describe('a relative tile nobody handles', () => {
+  it('is not shown at all when there is no handler for it', async () => {
+    render(<SchedulePicker onSchedule={vi.fn()} loads={new Map()} />)
+    await userEvent.click(screen.getByRole('button', { name: /schedule/i }))
+    expect(screen.queryByRole('menuitem', { name: /Tomorrow/ })).toBeNull()
+    expect(screen.queryByRole('menuitem', { name: /Someday/ })).toBeNull()
+    // The one that always worked is still there.
+    expect(screen.getByRole('button', { name: /Pick date & time/ })).toBeInTheDocument()
+  })
+
+  it('shows, and acts on, the tiles the caller says it can honour', async () => {
+    const onReschedule = vi.fn()
+    render(
+      <SchedulePicker
+        onSchedule={vi.fn()}
+        onReschedule={onReschedule}
+        whens={['today', 'tomorrow']}
+        loads={new Map()}
+      />,
+    )
+    await userEvent.click(screen.getByRole('button', { name: /schedule/i }))
+    expect(screen.queryByRole('menuitem', { name: /Someday/ })).toBeNull()
+    await userEvent.click(screen.getByRole('menuitem', { name: /Tomorrow/ }))
+    expect(onReschedule).toHaveBeenCalledWith('tomorrow')
+  })
+
+  it('offers every tile when the caller names none', async () => {
+    render(<SchedulePicker onSchedule={vi.fn()} onReschedule={vi.fn()} loads={new Map()} />)
+    await userEvent.click(screen.getByRole('button', { name: /schedule/i }))
+    expect(screen.getByRole('menuitem', { name: /Someday/ })).toBeInTheDocument()
+    expect(screen.getByRole('menuitem', { name: /Tomorrow/ })).toBeInTheDocument()
+  })
 })

@@ -37,6 +37,21 @@ const WHEN_DATE: Partial<Record<TriageWhen, () => Date>> = {
   'next-week': getNextMonday,
 }
 
+/**
+ * The DAY a relative tile means, or null for a pool tile that means no day at
+ * all (this-week / this-month / someday).
+ *
+ * Exported because a caller that acts on `onPick(when)` must land on the same
+ * day the tile printed. The event panel does exactly that, and when this was
+ * private it had no way to — so its tiles did nothing (Scott, 2026-09-24).
+ * Midnight, like every helper here: a caller that must keep a time of day
+ * supplies it itself.
+ */
+export function dateForWhen(when: TriageWhen): Date | null {
+  if (when === 'today' || when === 'tonight') return getBaseDate(0)
+  return WHEN_DATE[when]?.() ?? null
+}
+
 /** Compact tile date, e.g. "Sat Jul 4" — weekday included so weekends read clearly. */
 function tileDate(date: Date): string {
   return date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
@@ -48,6 +63,13 @@ const tileClass =
 
 interface Props {
   flexibleWeekend?: boolean
+  /**
+   * Which tiles to offer. Omitted, all of them — every existing caller is
+   * unchanged. A caller that can only act on some (an event cannot be moved
+   * to "Someday") names the ones it can honour, rather than showing tiles that
+   * quietly do nothing.
+   */
+  whens?: readonly TriageWhen[]
   onPick: (when: TriageWhen) => void
   /** When provided, adds a "Pick date…" tile for a specific date/time. */
   onPickDate?: (date: Date, isAllDay: boolean) => void
@@ -72,7 +94,8 @@ export function loadKeyFor(when: TriageWhen): string {
   return when === 'tonight' ? `${ymd}|evening` : ymd
 }
 
-export function RescheduleGrid({ onPick, onPickDate, loads, onPeek, flexibleWeekend = false }: Props) {
+export function RescheduleGrid({ onPick, onPickDate, loads, onPeek, whens, flexibleWeekend = false }: Props) {
+  const tiles = whens ? WHENS.filter((w) => whens.includes(w.when)) : WHENS
   const [picking, setPicking] = useState(false)
   const [pickingToday, setPickingToday] = useState(false)
 
@@ -139,7 +162,7 @@ export function RescheduleGrid({ onPick, onPickDate, loads, onPeek, flexibleWeek
 
   return (
     <div className="grid grid-cols-2 gap-2">
-      {WHENS.map(({ when, label, Icon }) => {
+      {tiles.map(({ when, label, Icon }) => {
         const dateFn = WHEN_DATE[when]
         const weekend = flexibleWeekend && (when === 'this-weekend' || when === 'next-weekend')
         const sub = weekend ? weekendLabel(relativeWeekend(when === 'next-weekend')).replace('Weekend · ', '') + ' · either day' : dateFn ? tileDate(dateFn()) : null

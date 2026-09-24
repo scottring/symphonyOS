@@ -35,7 +35,12 @@ export interface SchedulePickerProps {
   /** Current schedule, if any — enables "Clear schedule". */
   scheduledFor?: Date
   onSchedule: (date: Date, isAllDay: boolean) => void
+  /** Acts on a relative tile. A picker WITHOUT this shows no relative tiles:
+   *  a tile nobody handles is a button that does nothing, which is how the
+   *  event panel's "Tomorrow" came to be silent (Scott, 2026-09-24). */
   onReschedule?: (when: TriageWhen) => void
+  /** Limit the relative tiles to the ones this caller can honour. */
+  whens?: readonly TriageWhen[]
   onClearSchedule?: () => void
   /** Fullness per dated tile, keyed by `loadKeyFor(when)`. */
   loads: Map<string, DayLoad>
@@ -66,6 +71,7 @@ export function SchedulePicker({
   flexibleWeekend = false,
   onSchedule,
   onReschedule,
+  whens,
   onClearSchedule,
   loads,
   label = 'Schedule',
@@ -160,6 +166,9 @@ export function SchedulePicker({
                 {label} for
               </div>
               <RescheduleGrid flexibleWeekend={flexibleWeekend}
+                // No handler, no relative tiles: only "Pick date & time…"
+                // does anything, and that is what is shown.
+                whens={onReschedule ? whens : []}
                 loads={loads}
                 onPeek={(_date, when) => {
                   const load = loads.get(loadKeyFor(when))

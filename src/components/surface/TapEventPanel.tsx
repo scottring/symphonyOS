@@ -15,6 +15,11 @@ import { PanelActions, type PanelAction } from './sections/PanelActions'
 import { PanelSection } from './sections/PanelSection'
 import { PanelRow } from './sections/PanelRow'
 import { SchedulePicker } from '@/components/schedule/SchedulePicker'
+import { dateForWhen } from '@/components/schedule/RescheduleGrid'
+import type { TriageWhen } from '@/components/schedule/TriageWhenMenu'
+
+/** The relative days an EVENT can be moved to, keeping the hour it runs at. */
+const EVENT_WHENS: readonly TriageWhen[] = ['today', 'tomorrow', 'this-weekend', 'next-weekend', 'next-week']
 import { useDayLoads } from './hooks/useDayLoads'
 import { PanelLocation } from './sections/PanelLocation'
 import { locationLink } from '@/lib/locationLink'
@@ -202,6 +207,25 @@ export function TapEventPanel(props: TapEventPanelProps) {
 
   // SchedulePopover yields the new start as a full Date; reuse the planning
   // reschedule math so the event keeps its original duration.
+  /**
+   * A relative tile — "Tomorrow", "Next week" — means MOVE THE DAY, keeping
+   * the hour the event runs at. The tiles resolve to midnight, so routing them
+   * straight through would have dragged a 1pm meeting to midnight.
+   *
+   * Until now nothing handled them at all: SchedulePicker calls `onReschedule`
+   * for a relative tile and this panel passed only `onSchedule`, so every tile
+   * but "Pick date & time…" was silent (Scott, 2026-09-24).
+   */
+  const handleRelativeReschedule = (when: TriageWhen) => {
+    const day = dateForWhen(when)
+    if (!day) return
+    const orig = startTime ? new Date(startTime) : null
+    handleReschedule(new Date(
+      day.getFullYear(), day.getMonth(), day.getDate(),
+      orig?.getHours() ?? 9, orig?.getMinutes() ?? 0,
+    ))
+  }
+
   const handleReschedule = (date: Date) => {
     const { startTime: newStart, endTime: newEnd } = computeEventReschedule(event, {
       year: date.getFullYear(),
@@ -285,6 +309,13 @@ export function TapEventPanel(props: TapEventPanelProps) {
               label="Reschedule"
               scheduledFor={startTime ? new Date(startTime) : undefined}
               onSchedule={(date) => handleReschedule(date)}
+              onReschedule={handleRelativeReschedule}
+              // The days an event can be MOVED to, keeping its time. "Tonight"
+              // and the pool tiles are left out on purpose: an event cannot go
+              // to Someday, and "Tonight" would mean inventing an hour. A new
+              // time is a job for "Pick date & time…", which was already the
+              // only tile that worked.
+              whens={EVENT_WHENS}
               loads={dayLoads}
             />
           ),

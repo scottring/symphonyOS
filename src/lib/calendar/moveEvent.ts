@@ -44,8 +44,12 @@ export interface MoveEventDeps {
 export function eventMoveErrorMessage(err: unknown): string {
   if (err instanceof CalendarReconnectError) return 'Calendar connection expired — reconnect in Settings'
   const msg = err instanceof Error ? err.message : String(err)
+  // A 403 says the edit was REFUSED. It does not say why: a shared calendar
+  // can perfectly well grant write access, and an owned one can refuse for
+  // other reasons. Naming a cause we were not told would be a guess dressed as
+  // an explanation (Codex, 2026-09-24).
   if (/forbidden|403/i.test(msg)) {
-    return "Google won’t allow edits to this event — it’s on a calendar you don’t own (an invite or shared calendar)"
+    return 'Google refused this edit — you may not have permission to change this event'
   }
   if (/not connected/i.test(msg)) return 'No calendar is connected, so this event can’t be moved'
   return 'Could not move the event'

@@ -36,7 +36,8 @@ import { useSupabaseTasks } from '@/hooks/useSupabaseTasks';
 import { useGatedTaskActions } from '@/hooks/useGatedTaskActions';
 import { useContacts } from '@/hooks/useContacts';
 import { useProjects } from '@/hooks/useProjects';
-import { useGoogleCalendar, CalendarReconnectError, type GoogleCalendarInfo, type CalendarEvent } from '@/hooks/useGoogleCalendar';
+import { useGoogleCalendar, type GoogleCalendarInfo, type CalendarEvent } from '@/hooks/useGoogleCalendar';
+import { eventMoveErrorMessage } from '@/lib/calendar/moveEvent';
 import { useEventNotes, type EventNote } from '@/hooks/useEventNotes';
 import { isEventFree, freeKeyFor, seriesKey } from '@/lib/today/eventFree';
 import { useEventDiscussionFlags } from '@/hooks/useEventDiscussionFlags';
@@ -476,14 +477,10 @@ function getEventDayStart(event: CalendarEvent): Date | null {
 // Human-readable reasons a Google Calendar write can fail. 403 means the event
 // lives on a calendar the user can't edit (an invite / shared / subscribed
 // calendar) — say that plainly instead of a generic failure.
-function eventUpdateErrorMessage(err: unknown): string {
-  if (err instanceof CalendarReconnectError) return 'Calendar connection expired — reconnect in Settings';
-  const msg = err instanceof Error ? err.message : String(err);
-  if (/forbidden|403/i.test(msg)) {
-    return "Google won't allow edits to this event — it's on a calendar you don't own (an invite or shared calendar)";
-  }
-  return 'Could not update the event';
-}
+// One wording for a refused calendar edit, shared with the week's drag: a 403
+// says the edit was refused, not why, and a shared calendar can permit edits
+// (Codex, 2026-09-24). See lib/calendar/moveEvent.
+const eventUpdateErrorMessage = eventMoveErrorMessage;
 
 // ── Event ─────────────────────────────────────────────────────────────────
 function EventPanelBody({ id }: { id: string }) {
