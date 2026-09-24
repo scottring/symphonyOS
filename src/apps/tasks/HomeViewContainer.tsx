@@ -58,7 +58,7 @@ import { useMealEventsForDate } from '@/shell/providers/MealEventsProvider';
 import { FirstWeekCard } from '@/components/schedule/FirstWeekCard';
 import { PlanningNudge } from '@/components/plan/PlanningNudge';
 import { useFirstWeekSignals } from '@/hooks/useFirstWeekSignals';
-import { firstWeekSteps, shouldShowFirstWeek, FIRST_WEEK_HIDE_KEY, hasSampleIds, readSampleIds, clearSampleIdsRecord, deleteSampleRows } from '@/lib/firstWeek';
+import { firstWeekSteps, shouldOpenFirstWeek, FIRST_WEEK_HIDE_KEY, hasSampleIds, readSampleIds, clearSampleIdsRecord, deleteSampleRows } from '@/lib/firstWeek';
 import { getAuthUser } from '@/lib/supabase';
 
 const sameLocalDay = (a: Date, b: Date) =>
@@ -183,7 +183,13 @@ export function HomeViewContainer({ fixedView }: { fixedView?: 'today' | 'week' 
   // /week mounts this same container (fixedView="week") — the card is a
   // Today-only onboarding nudge, never shown on the bench.
   const showFirstWeek = fixedView !== 'week' && firstWeekUid !== null && firstWeekSignals !== null &&
-    (searchParams.get('welcome') === '1' || (tasks.length === 0 && shouldShowFirstWeek(firstWeekStepsList, firstWeekHiddenAt, new Date())));
+    shouldOpenFirstWeek({
+      asked: searchParams.get('welcome') === '1',
+      taskCount: tasks.length,
+      steps: firstWeekStepsList,
+      hiddenAt: firstWeekHiddenAt,
+      now: new Date(),
+    });
 
   const handleHideFirstWeek = useCallback(() => {
     if (!firstWeekUid) return;

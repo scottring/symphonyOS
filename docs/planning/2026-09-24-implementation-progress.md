@@ -1231,3 +1231,79 @@ reload**. Fixture deleted; Scott's three October goals confirmed intact.
   separate today but exposes no status control on the Month row.
 - The dense fixtures are **synthetic, in tests only**. Nothing was seeded into
   the demo account, so the 30/200/60 behaviour has not been seen in a browser.
+
+---
+
+## T — parent linking, goal status, and the review follow-ups  ·  17:20 ET
+
+### The optional link up, and the goal's own status
+
+Both through fields that **already exist** — no migration, no new column:
+
+| | field | row |
+| --- | --- | --- |
+| month goal → season goal | `supportsGoalTaskId` | tasks |
+| season goal → year goal | `goalId` | tasks |
+
+A disclosure under the goal's title: **“Link to a season goal (optional)”**
+when there is none, **“Change or remove this link”** when there is. The
+read-only line that names the parent and opens it **stays above it** — my first
+pass replaced it with the editor and lost the route to the parent, which an
+existing test caught. **“No linked goal”** clears the field, because optional
+means removable.
+
+**Identity is preserved by construction:** linking writes ONE field. A test
+asserts the update object has exactly that key, that nothing is added or
+deleted, and that `id`, `title`, `goalTaskId`, `bucket`, `monthStart`,
+`completed` and `scheduledFor` are all absent from it. Steps, placement and
+history are untouched. The reciprocal read already existed
+(`goalsSupporting` / `seasonGoalsSupporting`) and is covered by the
+name-and-open test.
+
+**Status is Active or Completed**, said by a person about the goal. It never
+reads a step: a goal whose only step is finished still reads Active, and a test
+pins that. **Archive is absent** — the app has no archived state for a goal
+task, and inventing one out of Someday would be a different feature with
+different consequences. The select offers exactly two options and a test says so.
+
+### Review follow-ups
+
+- **The filter is offered when the LIST is long, not when the GOAL COUNT is.**
+  It counted top-level goals, so one goal carrying sixty steps — the case that
+  needs it most — had none. It now counts the rows a reader must scan.
+- **“Filtering does not change what will be saved”**, in both places.
+
+### Getting Started, independent of the planner
+
+`shouldOpenFirstWeek` is now a named function rather than a boolean expression
+in a render, and the independence is a property with a test: **asked for**
+opens it whatever the planner holds, however often it was dismissed, and with
+every step already done; **offered** keeps all its conditions (empty planner,
+work left, no dismissal). The guide already had its own route and its own way
+in from More.
+
+### Evidence
+
+**Automated:** 7012 passing (only the pre-existing `connectors/whatsapp`
+collection error), tsc clean, eslint 0 errors, build clean. 16 new tests — 9 on
+linking and status, 3 on the filter for one long goal, 4 on onboarding
+independence.
+
+**Dense layout, isolated:** `outputs/plan-dense/` renders 30 goals / 200 tasks
+/ one 60-step goal with the built stylesheet and measures it in Chromium.
+**Nothing was seeded into or read from the shared demo** — another session is
+using it. At **1280px and 390px**: all 30 goals drawn; steps bounded with
+exactly one “Show all”; no horizontal page scroll; **no per-card scroll trap**;
+no title sitting under its own controls; every control ≥32px tall; long titles
+wrapping on the phone.
+
+### Remaining limitations
+
+- The dense behaviour is proven **headlessly and in tests only**. Nobody has
+  seen 30 goals in the running app, and I did not create them there.
+- The linking control is on the **Month and Season pages**. A year goal has
+  nothing above it; the season→year direction is wired and tested through the
+  same control but has not been exercised live.
+- Getting Started still **renders on Today**. It is now provably reachable
+  independent of the planner's state, but moving onboarding onto its own route
+  is a product change I have not made.
