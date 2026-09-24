@@ -507,3 +507,46 @@ The three optional entry paths and the printable guide were **already delivered*
 in commits `10d203bf` and `8cece318` — see sections F and G above. `/guide` is a
 permanent page with a sidebar entry; the doors are on the month, season and year
 pages. Nothing further is pending on them but your review.
+
+---
+
+## I — the hover shortcut over "Choose when"  ·  11:50 ET
+
+Codex's live blocker, reproduced headlessly and fixed. Two faults, both needed.
+
+**The geometry.** `.period-row-actions` was `position:absolute; right:4px; top:4px`
+— a chip floating over a row that also carries a persistent timing control. The
+two overlapped by **44×12px**, measured in Chromium, so the right-hand part of
+"Choose when" belonged to the shortcut sitting on top of it. The rail is now in
+flow, after the control: its width is reserved whether or not it is showing, so
+hovering reveals it without moving anything and nothing is ever on top of
+anything.
+
+**The verb.** On the month page "Take it into this week" means *the week
+containing now*. From November that is September — which is exactly the damage
+Codex saw. It is also redundant: the control offers the weeks of the month in
+view, by name. So it is dropped from a row whose control reaches the same rung.
+
+Scoped deliberately: `timingReachesLower` is true on the **month** page only. The
+season page's rung below is the month, which the control does not offer, so its
+verb stays — suppressing it there would have taken away the only way down. Steps
+inherit their page's answer.
+
+**Tested as pointer hit targets, not DOM presence.**
+`outputs/plan-hierarchy/check-hit-targets.mjs` hovers the row and asks
+`elementFromPoint` what is actually under five points of the control — centre and
+all four edges — at 974px (Codex's repro width), 1200px and 1440px, and asserts
+the two rectangles share no pixels. **Reverting the CSS makes it fail** (`right
+edge of "Choose when" hits the hover shortcuts`, `overlap by 44×12px`), so it is
+a real guard rather than a green light. Three unit tests in `PlanRow.test.tsx`
+cover the suppression, the season page keeping its verb, and steps inheriting.
+
+`PeriodPlanPage.test.tsx`'s month shortcut test now asserts the opposite of what
+it used to: the verb is absent and the control is present.
+
+**Not fixed, flagged:** the season page's own "Take it into this month" has the
+same shape of bug — it means the *current* month, not a month of the season in
+view. Different rung, different write path, and it was not what was reported.
+
+**Codex's November fixture is untouched.** `QA connected journey: …` is still
+assigned Sep 20–26 for your recovery/Undo test.

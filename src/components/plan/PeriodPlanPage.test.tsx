@@ -377,17 +377,25 @@ describe('PeriodPlanPage', () => {
     expect(screen.getByRole('button', { name: /Completed this month/ }).textContent).toContain('6')
   })
 
-  it('a month row can be taken into the week, or straight to today', () => {
+  // The month page's rung below is the WEEK, and the timing control chooses
+  // weeks by name — so the "Take it into this week" shortcut is redundant AND
+  // wrong from any month that is not the current one: it means the week
+  // containing now, and on a November row it filed the task into September
+  // (Codex live test, 2026-09-24). The control replaces it.
+  it('a month row is not offered the week shortcut — the timing control names the week', () => {
     const t = task({ title: 'Fix the back door', monthStart: thisMonth })
     state.tasks = [t]
     renderPage('month')
-    // Down a rung: a COPY, so September's list keeps the row and its look-back
-    // still sees the whole plan.
-    fireEvent.click(screen.getByRole('button', { name: 'Take it into this week Fix the back door' }))
-    expect(hook.pushTask).toHaveBeenCalledWith(t.id, 'week')
+    expect(screen.queryByRole('button', { name: /Take it into this week/ })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Choose a week or a day for Fix the back door/ })).toBeInTheDocument()
+  })
+
+  it('a month row still goes straight to today', () => {
+    const t = task({ title: 'Fix the back door', monthStart: thisMonth })
+    state.tasks = [t]
+    renderPage('month')
     // Today (S4) dates it today AND chooses it; the placement module keeps
     // its month commitment.
-    hook.pushTask.mockClear()
     fireEvent.click(screen.getByRole('button', { name: 'Do it today Fix the back door' }))
     const midnight = new Date(); midnight.setHours(0, 0, 0, 0)
     expect(hook.updateTask).toHaveBeenLastCalledWith(t.id, { bucket: 'timed', scheduledFor: midnight, isAllDay: true, plannedOn: midnight })

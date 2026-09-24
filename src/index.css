@@ -1550,6 +1550,12 @@ html.desktop-shell a {
   margin: 22px 0 8px;
   color: var(--color-neutral-800);
 }
+.guide-checks {
+  margin: 0 0 12px;
+  padding-left: 18px;
+  list-style: disc;
+}
+.guide-checks li { margin: 0 0 4px; }
 .guide-intro .guide-source {
   margin-top: 18px;
   font-size: 13px;
@@ -2409,7 +2415,20 @@ div.chooser-action-group { overflow: visible !important; }
 .period-assigned-fold > summary { cursor:pointer; color:var(--color-neutral-500); font-size:13px; padding:4px; }
 .period-shelves { min-width:0; padding:20px; border:1px solid var(--color-neutral-200); border-radius:12px; display:flex; flex-direction:column; gap:18px; }
 .period-plan-page .period-plan-row { position:relative; gap:10px; padding:14px 6px; }
-.period-plan-page .period-row-actions { position:absolute; right:4px; top:4px; background:var(--color-bg-elevated, #fff); border-radius:6px; box-shadow:0 1px 5px #263a5012; }
+/* The hover verbs sit IN the row, after the timing control, never floating
+   over it. They used to be `position:absolute; right:4px` above a row that
+   also carries a persistent "Choose when": the two overlapped, and clicking
+   the control's own hit target landed on "Take it into this week" instead —
+   which filed a November task into September (Codex live test, 2026-09-24).
+   In flow the width is reserved whether or not they are showing, so hovering
+   reveals them without moving anything and nothing is ever on top of
+   anything. */
+.period-plan-page .period-row-actions {
+  align-self: flex-start;
+  margin-top: 2px;
+  background: var(--color-bg-elevated, #fff);
+  border-radius: 6px;
+}
 .period-plan-page .period-row-check { min-width:18px; min-height:18px; }
 
 /* ── A goal and its steps, indented the way they are nested ──────────────────

@@ -97,6 +97,47 @@ describe('a goal holds the steps that serve it', () => {
       .toHaveClass('period-row-caret')
   })
 
+  // Codex live test, 2026-09-24: on a November row the hover shortcut sat over
+  // "Choose when", and pressing it filed the task into the week containing NOW
+  // — September. The control reaches every week the verb could, and says which.
+  it('drops the week shortcut from a row whose timing control reaches the week', () => {
+    render(
+      <ul>
+        <PlanRow row={row({ title: 'Fix the back door' })} actions={['complete', 'to-lower', 'today', 'drop']}
+          onAction={vi.fn()} onOpen={vi.fn()} planWeek={() => <button type="button">Choose when</button>} timingReachesLower />
+      </ul>,
+    )
+    expect(screen.queryByRole('button', { name: /Take it into/ })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Choose when' })).toBeInTheDocument()
+    // The verbs it does NOT replace are untouched.
+    expect(screen.getByRole('button', { name: /Do it today/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Drop/ })).toBeInTheDocument()
+  })
+
+  // The season page's rung below is the MONTH, which the control does not
+  // offer. Suppressing there would take away the only way down.
+  it('keeps the shortcut where the control reaches a different rung', () => {
+    render(
+      <ul>
+        <PlanRow row={row({ title: 'Swap the closets' })} actions={['complete', 'to-lower', 'drop']}
+          lowerLabel="this month"
+          onAction={vi.fn()} onOpen={vi.fn()} planWeek={() => <button type="button">Choose when</button>} />
+      </ul>,
+    )
+    expect(screen.getByRole('button', { name: /Take it into this month/ })).toBeInTheDocument()
+  })
+
+  it('a step inherits its page\'s answer about the shortcut', () => {
+    render(
+      <ul>
+        <PlanRow row={goalWithSteps} actions={[]} onAction={vi.fn()} onOpen={vi.fn()} expanded
+          stepActionsFor={() => ['to-lower', 'drop']}
+          planWeek={() => <button type="button">Choose when</button>} timingReachesLower />
+      </ul>,
+    )
+    expect(screen.queryByRole('button', { name: /Take it into/ })).not.toBeInTheDocument()
+  })
+
   it('indents its steps through the one rule that knows the lanes', () => {
     const { container } = render(
       <ul><PlanRow row={goalWithSteps} actions={[]} onAction={vi.fn()} onOpen={vi.fn()} expanded onAddStep={vi.fn()} /></ul>,

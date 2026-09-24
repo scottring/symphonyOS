@@ -987,7 +987,7 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
               ) : (
                 <ul>
                   {goalRows.filter((r) => !rowIsDone(r.fate)).map((row) => (
-                    <PlanRow key={row.id} row={row} onOpen={open} onOpenPlaced={openPlaced} onOpenSupport={openSupport} onAction={(a, r) => { void act(a, r) }} planWeek={planWeekSlot}
+                    <PlanRow key={row.id} row={row} onOpen={open} onOpenPlaced={openPlaced} onOpenSupport={openSupport} onAction={(a, r) => { void act(a, r) }} planWeek={planWeekSlot} timingReachesLower={level === 'month'}
                       lowerLabel={lowerLabelText}
                       expanded={expandedGoals.has(row.id)}
                       onToggleExpand={toggleGoal}
@@ -1001,7 +1001,7 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
                 <details className="period-assigned-fold" key={`goals-${level}-${bounds.start.toISOString()}`} open={isPast || undefined}>
                   <summary>Completed goals · {goalRows.filter((r) => rowIsDone(r.fate)).length}</summary>
                   <ul>{goalRows.filter((r) => rowIsDone(r.fate)).map((row) => (
-                    <PlanRow key={row.id} row={row} onOpen={open} onOpenPlaced={openPlaced} onOpenSupport={openSupport} planWeek={planWeekSlot}
+                    <PlanRow key={row.id} row={row} onOpen={open} onOpenPlaced={openPlaced} onOpenSupport={openSupport} planWeek={planWeekSlot} timingReachesLower={level === 'month'}
                       onAction={(a, r) => { void act(a, r) }} lowerLabel={lowerLabelText}
                       expanded={expandedGoals.has(row.id)} onToggleExpand={toggleGoal}
                       stepActionsFor={(st) => actionsFor({ fate: st.fate, isGoal: false, isPast, level })}
@@ -1061,7 +1061,7 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
                   {availableTaskRows.length === 0 && <p className="period-section-note">Every open task has a more specific commitment.</p>}
                   <ul>
                     {visibleTaskRows.map((row) => (
-                      <PlanRow key={row.id} row={row} onOpen={open} onOpenPlaced={openPlaced} onOpenSupport={openSupport} onAction={(a, r) => { void act(a, r) }} planWeek={planWeekSlot}
+                      <PlanRow key={row.id} row={row} onOpen={open} onOpenPlaced={openPlaced} onOpenSupport={openSupport} onAction={(a, r) => { void act(a, r) }} planWeek={planWeekSlot} timingReachesLower={level === 'month'}
                         lowerLabel={lowerLabelText}
                         actions={actionsFor({ fate: row.fate, isGoal: row.isGoal, isPast, level, hasGoals: goalRows.length > 0 })} />
                     ))}
@@ -1135,7 +1135,7 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
                   <summary>Already assigned · {assignedTaskRows.length}</summary>
                   <p className="period-section-note">Still part of this {noun}’s plan.</p>
                   <ul>{assignedTaskRows.map((row) => (
-                    <PlanRow key={row.id} row={row} onOpen={open} onOpenPlaced={openPlaced} onOpenSupport={openSupport} planWeek={planWeekSlot}
+                    <PlanRow key={row.id} row={row} onOpen={open} onOpenPlaced={openPlaced} onOpenSupport={openSupport} planWeek={planWeekSlot} timingReachesLower={level === 'month'}
                       onAction={(a, r) => { void act(a, r) }} lowerLabel={lowerLabelText}
                       actions={actionsFor({ fate: row.fate, isGoal: false, isPast, level, hasGoals: goalRows.length > 0 })} />
                   ))}</ul>
@@ -1159,7 +1159,7 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
                   {doneOpen && (
                     <ul className="mt-1 border-t border-neutral-200">
                       {doneTaskRows.map((row) => (
-                        <PlanRow key={row.id} row={row} onOpen={open} onOpenPlaced={openPlaced} onOpenSupport={openSupport} onAction={(a, r) => { void act(a, r) }} planWeek={planWeekSlot}
+                        <PlanRow key={row.id} row={row} onOpen={open} onOpenPlaced={openPlaced} onOpenSupport={openSupport} onAction={(a, r) => { void act(a, r) }} planWeek={planWeekSlot} timingReachesLower={level === 'month'}
                           lowerLabel={lowerLabelText}
                         actions={actionsFor({ fate: row.fate, isGoal: row.isGoal, isPast, level })} />
                       ))}

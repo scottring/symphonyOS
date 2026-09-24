@@ -155,6 +155,7 @@ function SupportLine({ label, refs, onOpen }: {
 export function PlanRow({
   row, actions, onAction, onOpen, onOpenPlaced, onOpenSupport, lowerLabel = 'this week',
   expanded = false, onToggleExpand, onAddStep, stepActionsFor, planWeek,
+  timingReachesLower = false,
 }: {
   row: PlanRowModel
   actions: RowAction[]
@@ -179,6 +180,10 @@ export function PlanRow({
    *  The 'to-lower' verb beside it means the week containing now, which could
    *  never reach a week of the month you are looking at (2026-09-24). */
   planWeek?: (row: PlanRowModel) => ReactNode
+  /** True where `planWeek` reaches the SAME rung 'to-lower' does — the month
+   *  page, whose control chooses weeks. The season page's rung below is the
+   *  month, which the control does not offer, so its verb stays. */
+  timingReachesLower?: boolean
 }) {
   // A row whose copy is finished reads as finished — one status, not a tick
   // that disagrees with an annotation beside it.
@@ -189,7 +194,16 @@ export function PlanRow({
   // 2026-09-13). Only `placed-done` stays locked — that completion belongs to
   // the copy that did the work, and is reopened there.
   const canTick = actions.includes('complete') || rowOwnsCompletion(row.fate)
-  const verbs = actions.filter((a): a is Exclude<RowAction, 'complete'> => a !== 'complete' && a !== 'under-goal')
+  // "Take it into this week" is dropped from a row that carries the timing
+  // control, for two reasons that both showed up live (Codex, 2026-09-24).
+  // It is redundant — the control offers the weeks in view, by name — and it
+  // is WRONG from any period that is not the current one: it means the week
+  // containing now, so pressing it on a November row filed the task into
+  // September. Nothing is lost: the control can reach every week the verb
+  // could, and says which one it is reaching.
+  const hasTimingControl = !row.isGoal && !!planWeek && timingReachesLower
+  const verbs = actions.filter((a): a is Exclude<RowAction, 'complete'> =>
+    a !== 'complete' && a !== 'under-goal' && !(hasTimingControl && a === 'to-lower'))
   // Only a month/season goal holds steps. A year row is a goals-table entity,
   // and a step never nests further, so neither offers a disclosure. A goal
   // with no steps still gets one when it can TAKE them — that is the way in.
@@ -326,6 +340,7 @@ export function PlanRow({
               onOpenPlaced={onOpenPlaced}
               lowerLabel={lowerLabel}
               planWeek={planWeek}
+              timingReachesLower={timingReachesLower}
             />
           ))}
         </ul>
