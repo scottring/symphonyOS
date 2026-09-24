@@ -71,7 +71,21 @@ export function PhoneCaptureField({
         className="min-w-0 flex-1 bg-transparent text-[16px] text-neutral-900 outline-none placeholder:text-neutral-500"
       />
       {value.trim() && (
-        <button type="submit" aria-label="Add" className="phone-capture-send">
+        <button
+          type="submit"
+          aria-label="Add"
+          className="phone-capture-send"
+          // Decline focus. This bar is anchored on whether a text field has
+          // focus: on the keyboard while typing, just above the 67px dock
+          // once focus goes. An ordinary press takes focus on mousedown, the
+          // bar drops 67px mid-press, and the browser fires no click on a
+          // target that moved out from under the finger — so Add appeared to
+          // do nothing while Enter on the same text saved fine (Codex,
+          // 2026-09-24, retrying a capture after a failed offline save).
+          // Keeping focus in the field also keeps the keyboard up for the
+          // next capture, which is what the native bar does.
+          onMouseDown={(e) => e.preventDefault()}
+        >
           <ArrowUp className="h-4 w-4" aria-hidden="true" />
         </button>
       )}

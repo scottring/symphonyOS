@@ -44,6 +44,13 @@ Not signed off: external calendar write, paper analysis/revision (separate works
 
 ## Resumed verification after cc88a8b0
 
+### Follow-up: Drop and connection failure
+
+- Created `Review Drop branch (walkthrough)` in Oct11–17; reviewed from Oct18–24 and selected Drop. Summary explicitly said the task is kept. Saved; item appeared in Inbox as incomplete and survived reload. No carry into Oct18–24 was visible. Drop now has a separate live check.
+- Used Chrome DevTools Network Offline on only the test tab, with the narrow viewport exposing the Inbox phone capture field. Submitting `Failed-save recovery check (walkthrough)` via Enter failed with two visible Failed to add task messages; the field retained its text.
+- Restored No throttling before retry. Clicking the field's Add button did not yield a visible saved item; after leaving/reloading, only the Drop fixture remained. This is a suspected retry-button/focus issue, not yet a confirmed application root cause. Re-entering the same text and submitting with Enter online succeeded; one instance appeared, persisted on reload, and Inbox counted exactly these two items. DevTools closed and No throttling restored. Do not label the button retry fully passed. No global network settings changed.
+- Goal-support commits now 5eaaa7de and e5ea4074. Independently inspected migration and ran `bash scripts/test-goal-support-locally.sh`: all 12 local SQL assertions passed. Initial sandbox attempt could not allocate PostgreSQL shared memory; approved out-of-sandbox local-only run passed and exited cleanly. This minimal-schema harness does not constitute authenticated production/RLS end-to-end validation. Shared migration still not applied by Codex; new relationship UI awaits it and a preview rebuild.
+
 - **S2-25 seven-day Week: live pass.** Paged Sep20 → Sep27 → Oct4. URL became `/week?start=2026-10-04`. Reload retained Oct4–10, browser Back returned Sep27–Oct3, Forward restored Oct4–10. Weekend/custom ranges not tested.
 - **Review Done: live pass.** Created only `Review Done branch (walkthrough)` in Oct4–10. Advanced to Oct11–17, reviewed prior week, selected Done for that fixture, inspected summary naming Oct4–10, and saved. Reloaded and reopened review: fixture appeared under `Finished the week of Oct 4 – Oct 10`. Left fixture completed. Original records untouched. This supersedes the earlier Done coverage limit; Drop and failed-save recovery remain unverified live.
 - Goal-support work was still uncommitted when checked. Claude's terminal acknowledged preserving the compatible dist preview while preparing the shared-schema migration. No shared migration or deployment was authorized by Codex.

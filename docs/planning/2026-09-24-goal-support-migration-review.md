@@ -1,8 +1,8 @@
 # Goal-supports-goal: migration review and deployment order
 
-Status: **written, proved locally, NOT applied.** Nothing has touched the
-shared Supabase project. `dist` on :5199 is the pre-migration build and stays
-compatible with the current schema.
+Status: **APPLIED to the shared project, 2026-09-24, on Scott's explicit
+approval.** Verified in place and the preview rebuilt. Not merged, not pushed,
+not deployed to production — those remain separately unauthorised.
 
 ## What the schema change is
 
@@ -129,3 +129,33 @@ drop trigger if exists tasks_guard_goal_support on public.tasks;
 drop function if exists public.guard_goal_support();
 alter table public.tasks drop column if exists supports_goal_task_id;
 ```
+
+
+## Applied — record
+
+Authorised by Scott, 2026-09-24, for the reviewed migration at commit
+`5eaaa7de`. The file was confirmed byte-identical to that commit before it ran
+(`git diff 5eaaa7de --stat` empty; sha1 `eea66fe9`).
+
+| Step | Result |
+| --- | --- |
+| Target project | `mwadppyrqzuzgstmwpuy` — confirmed via `get_project_url` before anything ran |
+| Pre-check | `supports_goal_task_id` absent; `tasks` held 861 rows |
+| Applied | `apply_migration('goal_supports_goal')` → success. Only this migration. |
+| Column | present, `uuid`, nullable |
+| Foreign key | `FOREIGN KEY (supports_goal_task_id) REFERENCES tasks(id) ON DELETE SET NULL` |
+| Index | `tasks_supports_goal_task_id_idx` present |
+| Trigger | `tasks_guard_goal_support` present |
+| Proof | `095_goal_supports_goal.test.sql` run against the project — all 12 assertions passed, no exception raised |
+| Left behind | none: 0 proof rows, `tasks` still 861, 0 rows linked |
+| Trigger liveness | a separate rollback-only check confirmed a bad link is genuinely rejected in place — the clean proof was not a silent no-op |
+| Preview | `npm run build` clean; `dist` rebuilt 06:33; :5199 returns 200 |
+
+No backfill was run and none is needed — the column is additive and every
+existing row reads `null`.
+
+**Still to do:** Codex walks the hierarchy live on the demo account (create a
+season goal for a year goal and a month goal for that season goal, reload,
+read both ends on /month, /season, /year and the goal page; then carry a task
+forward out of the month goal and confirm neither goal moves). Merge and
+production deployment stay unauthorised and are Scott's call, separately.
