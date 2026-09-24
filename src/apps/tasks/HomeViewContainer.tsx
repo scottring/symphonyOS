@@ -17,6 +17,7 @@ import { useSupabaseTasks } from '@/hooks/useSupabaseTasks';
 import { useGoogleCalendar, CalendarReconnectError } from '@/hooks/useGoogleCalendar';
 import { showToast } from '@/hooks/useToast';
 import { rangeEventSpan } from '@/lib/weekHelpers';
+import { densitySourcesFor, type DensitySources } from '@/lib/planning/dayDensity';
 import { PageFromPaperFlow } from '@/components/capture/PageFromPaperFlow';
 import { localYmd } from '@/lib/cadence/config';
 import { parseRoutineTimelineId } from '@/lib/today/doseExpansion';
@@ -65,7 +66,7 @@ const sameLocalDay = (a: Date, b: Date) =>
 export function HomeViewContainer({ fixedView }: { fixedView?: 'today' | 'week' } = {}) {
   // Data hooks
   const { tasks, loading: tasksLoading, addTask, toggleTask, toggleWaiting, deleteTask, updateTask, updateTasksBulk, pushTask, getLinkedTasks, refetch, updateTaskOrders, userId } = useSupabaseTasks();
-  const { isConnected, events, fetchEvents, createEvent, deleteEvent, removeEventLocal, restoreEventLocal } = useGoogleCalendar();
+  const { isConnected, events, fetchEvents, createEvent, deleteEvent, removeEventLocal, restoreEventLocal, isLoading: calendarLoading, isFetching: calendarFetching, error: calendarError } = useGoogleCalendar();
   // Passing the visible event ids opts in to auto-loading notes (context
   // overrides, assignees, shared-with-family, free) + realtime — without it
   // those persist to the DB but render stale on every fresh window.
@@ -285,21 +286,42 @@ export function HomeViewContainer({ fixedView }: { fixedView?: 'today' | 'week' 
   // appointment never reached the client at all). Week nav keeps
   // `viewedDate` inside the shown week (see HomeView's onWeekChange), so
   // the span follows the grid.
+  // Which range the events we HOLD were fetched for. Paging the week leaves
+  // the previous range's events on screen until the new fetch lands, and a
+  // count drawn from them would describe last week (Codex, 2026-09-24).
+  const [eventsRange, setEventsRange] = useState<{ start: number; end: number } | null>(null);
   const refetchViewedDayEvents = useCallback(async () => {
     if (!isConnected) return;
-    if (fixedView === 'week') {
+    const span = fixedView === 'week'
       // Two weeks, not one: the grid may draw any run of up to seven days
       // starting in the viewed week (a weekend, a custom Thu–Wed).
-      const { start, end } = rangeEventSpan(viewedDate);
-      await fetchEvents(start, end);
-      return;
-    }
-    const startOfDay = new Date(viewedDate);
-    startOfDay.setHours(0, 0, 0, 0);
-    const endOfDay = new Date(viewedDate);
-    endOfDay.setHours(23, 59, 59, 999);
-    await fetchEvents(startOfDay, endOfDay);
+      ? rangeEventSpan(viewedDate)
+      : (() => {
+        const start = new Date(viewedDate); start.setHours(0, 0, 0, 0);
+        const end = new Date(viewedDate); end.setHours(23, 59, 59, 999);
+        return { start, end };
+      })();
+    setEventsRange(null);
+    await fetchEvents(span.start, span.end);
+    setEventsRange({ start: span.start.getTime(), end: span.end.getTime() });
   }, [isConnected, viewedDate, fetchEvents, fixedView]);
+
+  /**
+   * What each source can honestly say about the range in view.
+   *
+   * "Not connected" is not a failure and is never reported as one: there is
+   * simply no calendar to read, and the count is complete without it.
+   */
+  const densitySources = useMemo<DensitySources>(() => {
+    const span = fixedView === 'week' ? rangeEventSpan(viewedDate) : null;
+    return densitySourcesFor({
+      tasksLoading,
+      routinesLoading,
+      calendar: { connected: isConnected, loading: calendarLoading, fetching: calendarFetching, error: calendarError },
+      heldRange: eventsRange,
+      neededRange: span ? { start: span.start.getTime(), end: span.end.getTime() } : null,
+    });
+  }, [fixedView, viewedDate, eventsRange, tasksLoading, routinesLoading, isConnected, calendarError, calendarLoading, calendarFetching]);
 
   useEffect(() => {
     void refetchViewedDayEvents();
@@ -847,6 +869,7 @@ export function HomeViewContainer({ fixedView }: { fixedView?: 'today' | 'week' 
         tasks={tasks}
         userId={userId}
         events={filteredEvents}
+        densitySources={densitySources}
         routines={filteredRoutines}
         allActiveRoutines={activeRoutines}
         projects={projects}

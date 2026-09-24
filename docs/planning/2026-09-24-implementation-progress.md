@@ -743,3 +743,63 @@ day says so, no tile claims hours, and pressing a tile writes that day.
 - Nothing here has been seen in a browser by me.
 
 **Ready for your browser verification.**
+
+---
+
+## M — availability plumbing, and a dedupe claim made true  ·  13:20 ET
+
+Both of Codex's closing findings. Both were right.
+
+### The claim I could not back
+
+The helper takes a dedupe `key`, but `WeekViewV2` passed only `{ id, kind }` —
+so the fallback was `kind:id`, and the same meeting synced to two calendars
+(two ids, one meeting) would have been **counted twice**. `journalDays` does not
+merge them either; it draws both. The commit message described the helper's
+capability as though it were live behaviour. That was wrong to write.
+
+It is now true rather than withdrawn: an event is keyed by **what and when** —
+`event|<title>|<instant>`, all-day by `event|<title>|allday|<day>` — so the
+count merges what the journal draws twice. A test puts the same meeting on two
+calendars and asserts the day says “1 event already”.
+
+### Real readiness, five states, honestly separated
+
+`eventsAvailable?: boolean` is gone. `DensitySources` carries a status per
+source — `ready · loading · stale · error · not-connected` — and
+`densitySourcesFor` derives it from what the hooks actually report:
+
+- **not-connected is not a failure.** It is checked FIRST, so a stale error
+  left over from a previous session cannot turn a disconnected calendar into a
+  broken one. The count is complete — there are no events to miss — and the
+  tile says `nothing on it yet · no calendar connected`, with a test asserting
+  that label contains no “error”, “couldn’t”, “fail” or “loading”.
+- **error** → the count is short: `the calendar couldn’t be read`.
+- **loading / stale** → `still loading`. Stale is the one Codex named: paging
+  the week leaves the previous range's events on screen until the fetch lands,
+  and a count drawn from them describes last week. `HomeViewContainer` now
+  records which range the events it HOLDS were fetched for, clears it while a
+  fetch is in flight, and compares it to the range in view. A held range that
+  *contains* the needed one is ready — the week fetch is deliberately wider.
+- tasks and routines report from their own loading flags, and every missing
+  source is named, not just the first.
+
+### Proving the parent actually supplies it
+
+That was the whole failure: a prop with a safe default and no caller. So:
+
+- `densitySourcesFor` is extracted and tested as a rule in its own right —
+  6 cases including the disconnected-with-a-stale-error trap and the
+  wider-range-is-fine case;
+- **`HomeView.densitySources.test.tsx` renders the real `HomeView` on its week
+  view** and walks the whole hop to the tiles: a paged week reads as still
+  loading and NOT as quiet; no calendar reads as complete and scoped; a failed
+  read reads as an error; and with nothing passed the days read as counted —
+  the old always-ready shape, so no existing caller changed behaviour.
+
+`HomeViewContainer` itself has no test harness (≈15 hooks), so the container's
+own wiring — that it passes `densitySources` at all — is covered by the type
+system and by the extracted rule, not by a mounted test. That is the one hop
+still unproven by a test, and I would rather say so than imply otherwise.
+
+Fixture untouched; scheduling and drag interactions unchanged.

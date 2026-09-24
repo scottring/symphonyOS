@@ -7,6 +7,7 @@ import { useCadenceConfig, readCadenceConfig, weekStartAnchor } from '@/lib/cade
 import { HomeChromeControls } from './HomeChromeControls'
 import type { HomeViewType } from '@/types/homeView'
 import type { Task } from '@/types/task'
+import type { DensitySources } from '@/lib/planning/dayDensity'
 import type { Project } from '@/types/project'
 import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
 import type { Routine, ActionableInstance } from '@/types/actionable'
@@ -44,6 +45,9 @@ import { CalendarReconnectBanner } from '@/components/home/CalendarReconnectBann
 
 interface HomeViewProps {
   tasks: Task[]
+  /** How each source stands for the range in view — handed to the week's day
+   *  tiles so they never draw a day as quiet before they have read it. */
+  densitySources?: DensitySources
   /** Whose day this is — focus (task_focus) is per person. */
   userId?: string | null
   events: CalendarEvent[]
@@ -82,6 +86,7 @@ export function HomeView({
   tasks,
   userId,
   events,
+  densitySources,
   routines,
   allActiveRoutines,
   projects,
@@ -387,6 +392,7 @@ export function HomeView({
           <WeekViewV2
             tasks={filteredTasks}
             events={filteredEvents}
+            sources={densitySources}
             routines={allActiveRoutines}
             dateInstances={dateInstances}
             weekStart={mondayStart}
@@ -430,6 +436,7 @@ export function HomeView({
           <WeekViewV2
             tasks={filteredTasks}
             events={filteredEvents}
+            sources={densitySources}
             routines={allActiveRoutines}
             dateInstances={dateInstances}
             weekStart={weekStart}

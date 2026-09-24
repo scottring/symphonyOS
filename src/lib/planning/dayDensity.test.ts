@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { dayDensity, densityScale, densityCountLabel, densityDescription, DENSITY_SEGMENTS, type DensityItem } from './dayDensity'
+import { dayDensity, densityScale, densityCountLabel, densityDescription, densityReadiness, densitySourcesFor, DENSITY_SEGMENTS, type DensityItem } from './dayDensity'
 
 const d = new Date(2026, 10, 9)
 const items = (...spec: [DensityItem['kind'], string][]): DensityItem[] =>
@@ -72,6 +72,91 @@ describe('densityScale', () => {
   })
 })
 
+// The derivation the week's parent runs. Extracted so it can be tested as
+// what it is — the rule that decides whether a day may be drawn as quiet.
+describe('densitySourcesFor', () => {
+  const week = { start: 1000, end: 2000 }
+  const base = {
+    tasksLoading: false,
+    routinesLoading: false,
+    calendar: { connected: true, loading: false, fetching: false, error: null as unknown },
+    heldRange: week,
+    neededRange: week,
+  }
+
+  it('is ready when everything has landed for THIS range', () => {
+    expect(densitySourcesFor(base)).toEqual({ tasks: 'ready', events: 'ready', routines: 'ready' })
+  })
+
+  it('calls a disconnected calendar disconnected, never an error', () => {
+    const r = densitySourcesFor({ ...base, calendar: { ...base.calendar, connected: false } })
+    expect(r.events).toBe('not-connected')
+    // Even if a stale error is still hanging around from a previous session.
+    expect(densitySourcesFor({ ...base, calendar: { connected: false, loading: false, fetching: false, error: 'boom' } }).events)
+      .toBe('not-connected')
+  })
+
+  it('calls a failed fetch an error', () => {
+    expect(densitySourcesFor({ ...base, calendar: { ...base.calendar, error: 'Google returned 503' } }).events).toBe('error')
+  })
+
+  it('calls a fetch in flight loading, whichever flag is up', () => {
+    expect(densitySourcesFor({ ...base, calendar: { ...base.calendar, loading: true } }).events).toBe('loading')
+    expect(densitySourcesFor({ ...base, calendar: { ...base.calendar, fetching: true } }).events).toBe('loading')
+  })
+
+  // The case that made this necessary: page the week, and the events on screen
+  // are last week's until the new fetch lands.
+  it('calls the previous range stale, not ready', () => {
+    expect(densitySourcesFor({ ...base, neededRange: { start: 3000, end: 4000 } }).events).toBe('stale')
+    expect(densitySourcesFor({ ...base, heldRange: null }).events).toBe('stale')
+    // A held range that CONTAINS the one we need is fine — the week fetch is
+    // deliberately wider than the week.
+    expect(densitySourcesFor({ ...base, heldRange: { start: 0, end: 9000 } }).events).toBe('ready')
+  })
+
+  it('reports tasks and routines from their own loading flags', () => {
+    expect(densitySourcesFor({ ...base, tasksLoading: true }).tasks).toBe('loading')
+    expect(densitySourcesFor({ ...base, routinesLoading: true }).routines).toBe('loading')
+  })
+})
+
+// Codex, 2026-09-24: "not connected" is not "failed", and a count that is
+// still arriving is not a quiet day.
+describe('densityReadiness', () => {
+  const ready = { tasks: 'ready', events: 'ready', routines: 'ready' } as const
+
+  it('is complete when every source has landed', () => {
+    expect(densityReadiness(ready)).toEqual({ known: true })
+  })
+
+  it('treats no calendar as complete, and says so without calling it a failure', () => {
+    const r = densityReadiness({ ...ready, events: 'not-connected' })
+    expect(r.known).toBe(true)
+    expect(r.note).toBe('no calendar connected')
+    expect(r.note).not.toMatch(/error|fail|could/i)
+  })
+
+  it('treats a failed calendar read as incomplete, and says THAT differently', () => {
+    const r = densityReadiness({ ...ready, events: 'error' })
+    expect(r.known).toBe(false)
+    expect(r.note).toBe('the calendar couldn’t be read')
+  })
+
+  it('will not report on a range whose data is still arriving, or belongs to another week', () => {
+    for (const status of ['loading', 'stale'] as const) {
+      expect(densityReadiness({ ...ready, events: status })).toEqual({ known: false, note: 'the calendar still loading' })
+      expect(densityReadiness({ ...ready, tasks: status }).known).toBe(false)
+      expect(densityReadiness({ ...ready, routines: status }).known).toBe(false)
+    }
+  })
+
+  it('names every source that is missing, not just the first', () => {
+    const r = densityReadiness({ tasks: 'loading', events: 'error', routines: 'ready' })
+    expect(r.note).toBe('tasks still loading and the calendar couldn’t be read')
+  })
+})
+
 describe('the words on a day tile', () => {
   it('says the counts, and never a percentage or an hour', () => {
     const r = dayDensity(d, items(['event', 'e1'], ['event', 'e2'], ['task', 't1'], ['routine', 'r1']))
@@ -90,5 +175,20 @@ describe('the words on a day tile', () => {
     expect(densityDescription(dayDensity(d, []), 'Tue, Nov 10')).toBe('Tue, Nov 10 — nothing on it yet')
     expect(densityDescription(dayDensity(d, [], false), 'Tue, Nov 10'))
       .toBe('Tue, Nov 10 — what is already on this day hasn’t loaded yet')
+  })
+
+  // Three answers, three sentences: read and quiet, read but there is no
+  // calendar, and not read at all.
+  it('carries the readiness note through to what a reader hears', () => {
+    const noCalendar = dayDensity(d, items(['task', 't1']), densityReadiness({ tasks: 'ready', routines: 'ready', events: 'not-connected' }))
+    expect(noCalendar.known).toBe(true)
+    expect(densityDescription(noCalendar, 'Mon, Nov 9')).toBe('Mon, Nov 9 — 1 task already · no calendar connected')
+
+    const failed = dayDensity(d, items(['task', 't1']), densityReadiness({ tasks: 'ready', routines: 'ready', events: 'error' }))
+    expect(failed.known).toBe(false)
+    expect(densityDescription(failed, 'Mon, Nov 9')).toBe('Mon, Nov 9 — the calendar couldn’t be read')
+
+    const emptyNoCalendar = dayDensity(d, [], densityReadiness({ tasks: 'ready', routines: 'ready', events: 'not-connected' }))
+    expect(densityDescription(emptyNoCalendar, 'Sat, Nov 14')).toBe('Sat, Nov 14 — nothing on it yet · no calendar connected')
   })
 })

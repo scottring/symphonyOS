@@ -315,6 +315,51 @@ describe('WeekViewV2 journal spread', () => {
     }))
   })
 
+  // Codex, 2026-09-24: the helper supports a dedupe key, but the caller has to
+  // pass one. The journal draws the same meeting twice when two calendars
+  // report it, so the count must merge what the journal does not.
+  it('counts one meeting once, however many calendars report it', () => {
+    const tasks = [createMockTask({ id: 'a', title: 'List supplies to buy', scheduledFor: new Date(2026, 8, 14), isAllDay: true })]
+    const events = [
+      mockEvent({ id: 'cal-a', title: 'PT appointment', start: '2026-09-15T10:00:00', end: '2026-09-15T11:00:00' }),
+      // The same hour, the same meeting, a second calendar's id.
+      mockEvent({ id: 'cal-b', title: 'PT appointment', start: '2026-09-15T10:00:00', end: '2026-09-15T11:00:00' }),
+    ]
+    render(<WeekViewV2 {...defaultProps} routines={[]} weekStart={sunday} tasks={tasks} events={events} />)
+    const monday = within(screen.getByTestId('journal-day-2026-09-14'))
+    fireEvent.click(monday.getByRole('button', { name: /Choose a week or a day for List supplies to buy/ }))
+    expect(screen.getByRole('menuitemradio', { name: /Tue, Sep 15/ })).toHaveAccessibleName(/1 event already/)
+  })
+
+  // The status is the PARENT's to know. An isolated prop test would not have
+  // caught a container that never supplies one.
+  it('says a day is unknown when the week is told its sources are not ready', () => {
+    const tasks = [createMockTask({ id: 'a', title: 'List supplies to buy', scheduledFor: new Date(2026, 8, 14), isAllDay: true })]
+    render(
+      <WeekViewV2 {...defaultProps} routines={[]} weekStart={sunday} tasks={tasks} events={[]}
+        sources={{ tasks: 'ready', routines: 'ready', events: 'stale' }} />,
+    )
+    const monday = within(screen.getByTestId('journal-day-2026-09-14'))
+    fireEvent.click(monday.getByRole('button', { name: /Choose a week or a day for List supplies to buy/ }))
+    // Not "nothing on it" — we have not read it.
+    expect(screen.getByRole('menuitemradio', { name: /Wed, Sep 16/ })).toHaveAccessibleName(/still loading/)
+    expect(screen.getByRole('menuitemradio', { name: /Wed, Sep 16/ })).not.toHaveAccessibleName(/nothing on it yet/)
+  })
+
+  it('still counts a quiet day as quiet when there is simply no calendar', () => {
+    const tasks = [createMockTask({ id: 'a', title: 'List supplies to buy', scheduledFor: new Date(2026, 8, 14), isAllDay: true })]
+    render(
+      <WeekViewV2 {...defaultProps} routines={[]} weekStart={sunday} tasks={tasks} events={[]}
+        sources={{ tasks: 'ready', routines: 'ready', events: 'not-connected' }} />,
+    )
+    const monday = within(screen.getByTestId('journal-day-2026-09-14'))
+    fireEvent.click(monday.getByRole('button', { name: /Choose a week or a day for List supplies to buy/ }))
+    const wed = screen.getByRole('menuitemradio', { name: /Wed, Sep 16/ })
+    // Complete, and scoped — never dressed up as a failure.
+    expect(wed).toHaveAccessibleName(/nothing on it yet · no calendar connected/)
+    expect(wed.getAttribute('aria-label')).not.toMatch(/error|couldn|fail|loading/i)
+  })
+
   it('lists multi-day context once above the days — including one that began last week — and not in the days', () => {
     const events = [
       { id: 'brk', title: 'Fall break', start_time: '2026-09-10T12:00:00.000Z', end_time: '2026-09-16T12:00:00.000Z', all_day: true } as unknown as CalendarEvent,

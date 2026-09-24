@@ -42,16 +42,104 @@ export interface DayDensity {
   routines: number
   /** Everything on the day, after dedupe. */
   total: number
-  /** False when the day's sources had not loaded — unknown, not empty. */
+  /** False when the counts are INCOMPLETE — unknown, not empty. */
   known: boolean
+  /**
+   * What is missing or qualified, in the reader's words. Present on a complete
+   * count too: with no calendar connected the count is complete for everything
+   * that exists, and still worth saying (`no calendar connected`).
+   */
+  note?: string
+}
+
+/**
+ * How one source stands for the range being looked at.
+ *
+ *   ready          it loaded, for THESE days
+ *   loading        still arriving
+ *   stale          what we hold belongs to a different range — the week was
+ *                  paged and the fetch has not landed. Counts drawn from it
+ *                  would describe last week.
+ *   error          it was asked for and failed
+ *   not-connected  there is nothing to ask. NOT a failure, and never reported
+ *                  as one (Codex, 2026-09-24).
+ */
+export type SourceStatus = 'ready' | 'loading' | 'stale' | 'error' | 'not-connected'
+
+export interface DensitySources {
+  tasks: SourceStatus
+  events: SourceStatus
+  routines: SourceStatus
+}
+
+export interface SourceInput {
+  tasksLoading: boolean
+  routinesLoading: boolean
+  /** The calendar, as its own hook reports it. */
+  calendar: { connected: boolean; loading: boolean; fetching: boolean; error: unknown }
+  /** The range the events we HOLD were fetched for; null while one is in flight. */
+  heldRange: { start: number; end: number } | null
+  /** The range being looked at; null when the surface does not scope events. */
+  neededRange: { start: number; end: number } | null
+}
+
+/**
+ * What each source can honestly say about the range in view.
+ *
+ * The order matters. Not connected comes FIRST, because a disconnected
+ * calendar is not a failed one and must never be reported as an error
+ * (Codex, 2026-09-24). A held range that does not cover the range being
+ * looked at is `stale`: paging the week leaves the previous week's events on
+ * screen until the fetch lands, and counting them would describe last week.
+ */
+export function densitySourcesFor(input: SourceInput): DensitySources {
+  const { calendar: c, heldRange, neededRange } = input
+  const covers = !!heldRange && (!neededRange || (heldRange.start <= neededRange.start && heldRange.end >= neededRange.end))
+  return {
+    tasks: input.tasksLoading ? 'loading' : 'ready',
+    routines: input.routinesLoading ? 'loading' : 'ready',
+    events: !c.connected ? 'not-connected'
+      : c.error ? 'error'
+        : (c.loading || c.fetching) ? 'loading'
+          : covers ? 'ready' : 'stale',
+  }
+}
+
+/**
+ * Is a day's count complete, and what must be said about it?
+ *
+ * `not-connected` is the one status that leaves a count complete: with no
+ * calendar there are no events to miss, so the day is known and the tile says
+ * so in a scoped line rather than pretending a failure. Everything else —
+ * loading, stale, error — means the count is short and the tile must not draw
+ * a day as quiet when it has not been read.
+ */
+export function densityReadiness(s: DensitySources): { known: boolean; note?: string } {
+  const say = (what: string, status: SourceStatus): string | null => {
+    if (status === 'loading' || status === 'stale') return `${what} still loading`
+    if (status === 'error') return `${what} couldn’t be read`
+    return null
+  }
+  const problems = [say('tasks', s.tasks), say('the calendar', s.events), say('routines', s.routines)]
+    .filter((x): x is string => x !== null)
+  if (problems.length > 0) {
+    return { known: false, note: problems.length === 1 ? problems[0] : `${problems.slice(0, -1).join(', ')} and ${problems[problems.length - 1]}` }
+  }
+  if (s.events === 'not-connected') return { known: true, note: 'no calendar connected' }
+  return { known: true }
 }
 
 export const DENSITY_SEGMENTS = 6
 
 const dedupeKey = (i: DensityItem) => i.key ?? `${i.kind}:${i.id}`
 
-/** The day's counts, deduped. */
-export function dayDensity(date: Date, items: readonly DensityItem[], known = true): DayDensity {
+/** The day's counts, deduped. `known` may be a readiness verdict. */
+export function dayDensity(
+  date: Date,
+  items: readonly DensityItem[],
+  readiness: boolean | { known: boolean; note?: string } = true,
+): DayDensity {
+  const { known, note } = typeof readiness === 'boolean' ? { known: readiness, note: undefined } : readiness
   const seen = new Set<string>()
   let events = 0, tasks = 0, routines = 0
   for (const item of items) {
@@ -62,7 +150,7 @@ export function dayDensity(date: Date, items: readonly DensityItem[], known = tr
     else if (item.kind === 'task') tasks++
     else routines++
   }
-  return { date, events, tasks, routines, total: seen.size, known }
+  return { date, events, tasks, routines, total: seen.size, known, ...(note ? { note } : {}) }
 }
 
 export interface DensityScale {
@@ -92,8 +180,8 @@ export function densityScale(days: readonly DayDensity[]): DensityScale {
 
 /** "2 events, 1 task and 1 routine" — the counts, never a percentage. */
 export function densityCountLabel(d: DayDensity): string {
-  if (!d.known) return 'not loaded yet'
-  if (d.total === 0) return 'nothing on it yet'
+  if (!d.known) return d.note ?? 'not loaded yet'
+  if (d.total === 0) return d.note ? `nothing on it yet · ${d.note}` : 'nothing on it yet'
   const parts: string[] = []
   const say = (n: number, one: string, many: string) => { if (n > 0) parts.push(`${n} ${n === 1 ? one : many}`) }
   say(d.events, 'event', 'events')
@@ -105,7 +193,21 @@ export function densityCountLabel(d: DayDensity): string {
 
 /** The whole sentence a screen reader hears on a day tile. */
 export function densityDescription(d: DayDensity, dayLabel: string): string {
-  if (!d.known) return `${dayLabel} — what is already on this day hasn’t loaded yet`
-  if (d.total === 0) return `${dayLabel} — nothing on it yet`
-  return `${dayLabel} — ${densityCountLabel(d)} already`
+  if (!d.known) return `${dayLabel} — ${d.note ?? 'what is already on this day hasn’t loaded yet'}`
+  if (d.total === 0) return densityCountLabel(d) === 'nothing on it yet'
+    ? `${dayLabel} — nothing on it yet`
+    : `${dayLabel} — ${densityCountLabel(d)}`
+  const tail = d.note ? ` · ${d.note}` : ''
+  return `${dayLabel} — ${countsOnly(d)} already${tail}`
+}
+
+/** Just the counts, without any qualifying note. */
+function countsOnly(d: DayDensity): string {
+  const parts: string[] = []
+  const say = (n: number, one: string, many: string) => { if (n > 0) parts.push(`${n} ${n === 1 ? one : many}`) }
+  say(d.events, 'event', 'events')
+  say(d.tasks, 'task', 'tasks')
+  say(d.routines, 'routine', 'routines')
+  if (parts.length === 1) return parts[0]
+  return `${parts.slice(0, -1).join(', ')} and ${parts[parts.length - 1]}`
 }

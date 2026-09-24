@@ -41,7 +41,7 @@ import { buildWeekRoutineItems } from './weekRoutineItems'
 import { useWeekInstances } from './useWeekInstances'
 import { edgeForPointer } from './edgeAdvance'
 import { WeekJournal, type JournalDay, type JournalEntry } from './WeekJournal'
-import { dayDensity } from '@/lib/planning/dayDensity'
+import { dayDensity, densityReadiness, type DensitySources } from '@/lib/planning/dayDensity'
 import { formatWeekRange } from '@/lib/dateHelpers'
 import { WeekList } from './WeekList'
 import { makePlanActions } from '@/lib/planning/planActions'
@@ -95,11 +95,13 @@ interface WeekViewV2Props {
   tasks: Task[]
   events: CalendarEvent[]
   /**
-   * False while the calendar could not be read. The day tiles then say a day
-   * is UNKNOWN rather than drawing it empty — "nothing on Thursday" and "we
-   * could not see Thursday" are different answers.
+   * How each source stands for the week being VIEWED. The day tiles draw a day
+   * as quiet only when they have actually read it: "nothing on Thursday", "we
+   * could not read Thursday" and "there is no calendar to read" are three
+   * different answers (Codex, 2026-09-24). Omitted, everything reads ready —
+   * the shape every existing caller and test already has.
    */
-  eventsAvailable?: boolean
+  sources?: DensitySources
   routines: Routine[]
   // dateInstances is reserved for future instance-completion overlays;
   // not yet consumed in rendering but kept in the API for Task 12 wiring.
@@ -159,7 +161,7 @@ export function WeekViewV2(props: WeekViewV2Props) {
   const {
     tasks,
     events,
-    eventsAvailable = true,
+    sources,
     routines,
     weekStart,
     onWeekChange,
@@ -674,14 +676,31 @@ export function WeekViewV2(props: WeekViewV2Props) {
    * are events too, and a dinner is the day's meal, not a commitment to plan
    * around, so it is left out.
    */
-  const dayDensities = useMemo(() => journalDays.map((d) => dayDensity(
-    d.date,
-    [
-      ...d.entries.map((e) => ({ id: e.id, kind: e.kind })),
-      ...d.notes.map((n) => ({ id: `event-${n.google_event_id || n.id}`, kind: 'event' as const })),
-    ],
-    eventsAvailable,
-  )), [journalDays, eventsAvailable])
+  const dayDensities = useMemo(() => {
+    // The week's own instances are part of the count, so a week whose
+    // instances have not landed is not a week we can report on.
+    const readiness = densityReadiness(sources ?? { tasks: 'ready', events: 'ready', routines: 'ready' })
+    return journalDays.map((d) => dayDensity(
+      d.date,
+      [
+        // An event is identified by WHAT and WHEN, not by which calendar sent
+        // it: the same meeting synced to two calendars arrives twice with
+        // different ids (the journal does not merge them — it draws both), and
+        // counting it twice would make a day look busier than it is.
+        ...d.entries.map((e) => ({
+          id: e.id,
+          kind: e.kind,
+          key: e.kind === 'event' ? `event|${e.title}|${e.time?.getTime() ?? d.key}` : undefined,
+        })),
+        ...d.notes.map((n) => ({
+          id: `event-${n.google_event_id || n.id}`,
+          kind: 'event' as const,
+          key: `event|${n.title}|allday|${d.key}`,
+        })),
+      ],
+      readiness,
+    ))
+  }, [journalDays, sources])
 
   const journalSpans = useMemo(
     () => layoutContextSpans(events, journalDays.map((d) => d.date)),
