@@ -167,5 +167,21 @@ onboarding and guide surfaces.
   real cause of the month-page wandering) · S2-10 planning pages open a full page while
   Today/Week open the pane · S2-01 a review should expand commitments · S2-05a the
   ladder breaking between Week and Month · S1-15 parked, treatment rejected.
-- **Resume at:** storyline 2's remaining steps — choosing today's work from the week —
-  then storyline 3.
+### 2026-09-24 — bounded repair, storyline 2 restarted
+- Scott restarted storyline 2 on a stable example: October goal "Take Kaleb to an
+  Islanders game in DC" with "Research games dates and tickets" and "Buy game tickets".
+  Both left deliberately with no week and no day.
+- **Fixed + verified:** S2-16 (the viewed period now lives in `?start=`, so Back from a
+  goal returns to October) · S2-17 (new `PlanWeekMenu` — the weeks of the period in
+  front of you, plus "Another week…"; a chosen week leaves the task undated and keeps
+  both its month commitment and its goal link, confirmed in `task_commitments` on a
+  scratch task that was then deleted; reachable from Week's list and Shelves' Month tab).
+- **Correction:** automatic month navigation is NOT resolved. Only the data-dependent
+  jump was removed; the time-based advance (month ≤6 days left, season ≤14) still fires.
+- **Open, decided but not built:** S2-18 — a goal's Shelves must show its own period by
+  reusing the Month page's Shelves. Needs the Shelves block extracted out of
+  `PeriodPlanPage` and `ReferenceLists` taught to host it on a goal route. See the log
+  entry for the full approach and why it did not fit this batch.
+- **Logged for later, not to be redesigned now:** S2-19 the life-area gate interrupting
+  a week choice.
+- **Resume at:** S2-18, then storyline 2 steps 2–6 on the stable example.
