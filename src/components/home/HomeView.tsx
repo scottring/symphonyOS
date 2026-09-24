@@ -1,5 +1,6 @@
 import { keepsWeekView } from '@/lib/week/keepsWeekView'
-import { useLocation } from 'react-router-dom'
+import { weekStartParam } from '@/lib/week/weekStartParam'
+import { useLocation, useSearchParams } from 'react-router-dom'
 import { presetRange, weekRange, weekRangeFromStartParam } from '@/lib/planning/dateRange'
 import { useState, useMemo, useCallback, useEffect, useRef, type ReactNode } from 'react'
 import { useCadenceConfig, readCadenceConfig, weekStartAnchor } from '@/lib/cadence/config'
@@ -205,6 +206,7 @@ export function HomeView({
   // — it changes what is drawn and writes nothing (Scott, 2026-09-06: the
   // time-block overlay's range picker moved here and the overlay went).
   const location = useLocation()
+  const [, setSearchParams] = useSearchParams()
   const rangePreset = new URLSearchParams(location.search).get('range')
   const startParam = new URLSearchParams(location.search).get('start')
   const [rangeDays, setRangeDays] = useState(7)
@@ -217,22 +219,50 @@ export function HomeView({
     onDateChange(range[0])
   }, [onDateChange])
 
-  // Arriving at /week — from the navigation's Week menu or anywhere else —
-  // opens the seven-day week unless the link names a shorter run
-  // (?range=weekend | three) or a specific week (?start=YYYY-MM-DD, from a
-  // planning nudge naming a week that isn't the current one). Keyed on the
-  // navigation itself, so choosing "Weekend" twice, or "Open week page"
-  // after a weekend, re-applies.
+  // Set by goToWeek: the week it just wrote into the URL is already on screen,
+  // so re-deriving the range from it would only undo the range length and the
+  // Schedule/Journal choice the reader made.
+  const selfWeekNav = useRef(false)
+  /**
+   * Page the week — and put it in the URL (S2-25).
+   *
+   * `weekStart` lived only in this component's state, so the week you paged to
+   * existed nowhere durable: reload, or open a task and come back, and /week
+   * re-derived the week from `new Date()` and returned you to this one
+   * ("Assign a week, reload Week → Week reloads to September"). `?start=` is
+   * already READ on arrival, so writing it makes reload, Back and Forward all
+   * land where you were — the same contract `/month` got in S2-16.
+   *
+   * Only for the seven-day week: a weekend or a custom run has no round-trip
+   * in the URL (`?range=custom` cannot carry its dates), so writing `start`
+   * alone would reopen it as a full week. Those keep today's behaviour.
+   */
+  const goToWeek = useCallback((weekAnchor: Date, viewed: Date = weekAnchor) => {
+    setWeekStart(weekAnchor)
+    onDateChange(viewed)
+    const next = weekStartParam(fixedView, rangeDays, location.search, weekAnchor)
+    if (!next) return
+    selfWeekNav.current = true
+    setSearchParams(next, { replace: false })
+  }, [onDateChange, fixedView, rangeDays, location.search, setSearchParams])
+
   const onDateChangeRef = useRef(onDateChange)
   const viewedDateRef = useRef(viewedDate)
   useEffect(() => {
     onDateChangeRef.current = onDateChange
     viewedDateRef.current = viewedDate
   })
+  // Arriving at /week — from the navigation's Week menu or anywhere else —
+  // opens the seven-day week unless the link names a shorter run
+  // (?range=weekend | three) or a specific week (?start=YYYY-MM-DD, from a
+  // planning nudge naming a week that isn't the current one). Keyed on the
+  // navigation itself, so choosing "Weekend" twice, or "Open week page"
+  // after a weekend, re-applies.
   const previousWeekLocation = useRef<{ pathname: string; search: string } | null>(null)
   useEffect(() => {
     const keepView = keepsWeekView(previousWeekLocation.current, location)
     previousWeekLocation.current = { pathname: location.pathname, search: location.search }
+    if (selfWeekNav.current) { selfWeekNav.current = false; return }
     if (fixedView !== 'week' || keepView) return
     const range = weekRangeFromStartParam(startParam, readCadenceConfig().weekStartsOn)
       ?? (rangePreset === 'weekend' || rangePreset === 'three'
@@ -357,7 +387,7 @@ export function HomeView({
             dateInstances={dateInstances}
             weekStart={mondayStart}
             dayCount={5}
-            onWeekChange={(d) => { setWeekStart(sundayOfWeek(d)); onDateChange(d) }}
+            onWeekChange={(d) => goToWeek(sundayOfWeek(d), d)}
             selectedAssignee={selectedAssigneeForSchedule}
             selectedAssignees={selectedAssignees}
             layers={layers}
@@ -383,7 +413,7 @@ export function HomeView({
             routines={allActiveRoutines}
             dateInstances={dateInstances}
             weekStart={weekStart}
-            onWeekChange={(d) => { setWeekStart(d); onDateChange(d) }}
+            onWeekChange={(d) => goToWeek(d)}
             onSelectDay={handleSelectDay}
             selectedAssignee={selectedAssigneeForSchedule}
             layers={layers}
@@ -403,7 +433,7 @@ export function HomeView({
             // A range start is wherever the range starts: stepping moves the
             // run by its own length, so a weekend stays a weekend and a
             // custom Thu–Wed week stays Thu–Wed.
-            onWeekChange={(d) => { setWeekStart(d); onDateChange(d) }}
+            onWeekChange={(d) => goToWeek(d)}
             selectedAssignee={selectedAssigneeForSchedule}
             selectedAssignees={selectedAssignees}
             layers={layers}
@@ -523,7 +553,7 @@ export function HomeView({
             // Week nav must carry `viewedDate` along with the grid: the
             // container fetches events for the week containing viewedDate,
             // so a week viewedDate isn't in would render without its events.
-            onWeekChange={(d) => { setWeekStart(d); onDateChange(d) }}
+            onWeekChange={(d) => goToWeek(d)}
             rangeDays={rangeDays}
             customRangeRequest={rangePreset === 'custom' ? location.key : undefined}
             weekMode={currentView === 'week' || currentView === 'workweek' ? weekMode : undefined}

@@ -557,6 +557,25 @@ describe('PeriodPlanPage', () => {
     expect(within(rail).queryByRole('button', { name: /Add to/ })).not.toBeInTheDocument()
   })
 
+  // S3-02: the season session offers "For a <year> goal?" and the summary says
+  // "for <that goal>" — but the link was never written, so the saved season
+  // goal came back with goal_id null. A season's rail IS the goals table, so
+  // the pick lands straight on goal_id.
+  it('a season goal created FOR a year goal is saved carrying that year goal', async () => {
+    state.goals = [goal({ id: 'yg1', name: 'Run a half marathon' })]
+    renderPage('season')
+    const label = screen.getByRole('region', { name: / list$/ }).getAttribute('aria-label')!.replace(/ list$/, '')
+    fireEvent.click(screen.getByRole('button', { name: `Plan ${label}` }))
+    fireEvent.change(screen.getByLabelText(new RegExp(`new goal for ${label}`, 'i')), { target: { value: 'A home easier to care for' } })
+    fireEvent.change(screen.getByLabelText(/for a \d{4} goal/i), { target: { value: 'yg1' } })
+    fireEvent.click(screen.getByRole('button', { name: /add goal/i }))
+    fireEvent.click(screen.getByRole('button', { name: /next: save/i }))
+    fireEvent.click(screen.getByRole('button', { name: new RegExp(`save ${label}`, 'i') }))
+    await vi.waitFor(() => expect(saveSession).toHaveBeenCalled())
+    expect(hook.addTask).toHaveBeenCalledWith('A home easier to care for', undefined, undefined, undefined,
+      expect.objectContaining({ bucket: 'quarter', isGoal: true, goalId: 'yg1' }))
+  })
+
   it('Drop on a past month ends that month\'s commitment and never deletes the task', async () => {
     state.tasks = [task({ id: 'p1', title: 'Sort photos', monthStart: lastMonth, commitments: [{ level: 'month', periodStart: lastMonth, status: 'open' }] })]
     renderPageAt('month', `/month?start=${lastMonth.getFullYear()}-${String(lastMonth.getMonth() + 1).padStart(2, '0')}-01`)

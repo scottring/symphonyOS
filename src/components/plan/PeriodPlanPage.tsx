@@ -682,10 +682,17 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
     keep: async (id: string, periodStart: Date, prevStart: Date) =>
       !!(await keepForward(id, isSeasonSession ? { seasonStart: periodStart } : { monthStart: periodStart }, prevStart)),
     // Each item's OWN domain, recorded when it was planned — never the one in view now (I4).
-    addTask: (title: string, o: { id: string; periodStart: Date; day?: Date; isGoal?: boolean; goalTaskId?: string; context: DomainId | null }) =>
-      addTask(title, undefined, undefined, undefined, isSeasonSession
-        ? { id: o.id, bucket: 'quarter' as const, seasonStart: o.periodStart, isGoal: o.isGoal, goalTaskId: o.goalTaskId, context: o.context }
-        : { id: o.id, bucket: 'month' as const, monthStart: o.periodStart, isGoal: o.isGoal, goalTaskId: o.goalTaskId, context: o.context }),
+    addTask: (title: string, o: { id: string; periodStart: Date; day?: Date; isGoal?: boolean; goalTaskId?: string; aboveGoalId?: string; context: DomainId | null }) => {
+      // The goal above, recorded (S3-02). A SEASON's rail is the year, so the
+      // id already IS a goals-table row: stamp it straight onto goal_id. A
+      // MONTH's rail is the season's goal ROWS, so the annual goal is the one
+      // that season goal serves — inherited, exactly as goalId is meant to be
+      // ("stamped on goal promotion, inherited by every copy below").
+      const goalId = isSeasonSession ? o.aboveGoalId : tasks.find((t) => t.id === o.aboveGoalId)?.goalId
+      return addTask(title, undefined, undefined, undefined, isSeasonSession
+        ? { id: o.id, bucket: 'quarter' as const, seasonStart: o.periodStart, isGoal: o.isGoal, goalTaskId: o.goalTaskId, goalId, context: o.context }
+        : { id: o.id, bucket: 'month' as const, monthStart: o.periodStart, isGoal: o.isGoal, goalTaskId: o.goalTaskId, goalId, context: o.context })
+    },
     contextOf: (id: string) => tasks.find((t) => t.id === id)?.context ?? null,
     // Everything a tick does (subtasks, waiting/discussion, a linked list item), and reports whether it wrote.
     complete: (id: string) => completeTask(id),
