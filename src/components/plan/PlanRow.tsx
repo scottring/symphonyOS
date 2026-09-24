@@ -4,7 +4,7 @@
 // offers right now. Shared by This Month / This Season / This Year so the
 // three pages read as one surface.
 
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import { Check, Target, ArrowRight, ArrowUpRight, ArrowDownRight, Sun, CalendarDays, Archive, Trash2, Repeat, ChevronRight, ChevronDown, Plus } from 'lucide-react'
 import type { PlacementFate } from '@/lib/planning/lineage'
 import type { RowAction } from '@/lib/planning/periodPage'
@@ -99,7 +99,7 @@ function PlacementChip({ placed, onOpenPlaced }: {
 
 export function PlanRow({
   row, actions, onAction, onOpen, onOpenPlaced, lowerLabel = 'this week',
-  expanded = false, onToggleExpand, onAddStep, stepActionsFor,
+  expanded = false, onToggleExpand, onAddStep, stepActionsFor, planWeek,
 }: {
   row: PlanRowModel
   actions: RowAction[]
@@ -116,6 +116,10 @@ export function PlanRow({
   onAddStep?: (row: PlanRowModel, title: string) => void
   /** The verbs each step offers; a step is a task, so it is not the goal's. */
   stepActionsFor?: (step: PlanRowModel) => RowAction[]
+  /** "Plan ▾" for a task row: which week of the month being VIEWED it sits on.
+   *  The 'to-lower' verb beside it means the week containing now, which could
+   *  never reach a week of the month you are looking at (2026-09-24). */
+  planWeek?: (row: PlanRowModel) => ReactNode
 }) {
   // A row whose copy is finished reads as finished — one status, not a tick
   // that disagrees with an annotation beside it.
@@ -209,6 +213,7 @@ export function PlanRow({
       )}
       {verbs.length > 0 && (
         <span className="period-row-actions hidden shrink-0 sm:flex items-center gap-0.5 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
+          {!row.isGoal && planWeek?.(row)}
           {verbs.map((a) => (
             <button
               key={a}
@@ -242,6 +247,7 @@ export function PlanRow({
               onOpen={onOpen}
               onOpenPlaced={onOpenPlaced}
               lowerLabel={lowerLabel}
+              planWeek={planWeek}
             />
           ))}
         </ul>

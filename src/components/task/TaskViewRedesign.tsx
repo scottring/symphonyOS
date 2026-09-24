@@ -9,6 +9,7 @@ import { EntityNotesSection } from '@/components/notes/EntityNotesSection'
 import { UnifiedNotesEditor } from '@/components/notes/UnifiedNotesEditor'
 import { CloudUpload, Check } from 'lucide-react'
 import { taskWhenLabel } from '@/lib/planning/taskWhen'
+import { PlanWeekMenu } from '@/components/plan/PlanWeekMenu'
 import { GOAL_STATUSES, GOAL_STATUS_HINT, GOAL_STATUS_LABEL, goalStatusOf, goalStatusUpdate } from '@/lib/planning/goalStatus'
 
 interface TaskViewProps {
@@ -235,6 +236,8 @@ export function TaskViewRedesign({
   const children = isGoal ? (steps ?? []) : (task.subtasks ?? [])
   const childNoun = isGoal ? 'step' : 'subtask'
   const goalStatus = goalStatusOf(task)
+  // A goal's own period, which is what its steps' weeks should be drawn from.
+  const goalPeriodAnchor = task.monthStart ?? task.seasonStart ?? task.weekStart ?? new Date()
   const goalPeriodLabel = (() => {
     if (task.monthStart) return task.monthStart.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
     if (task.seasonStart) return `Season from ${task.seasonStart.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}`
@@ -444,11 +447,28 @@ export function TaskViewRedesign({
                           <span className="flex-shrink-0 text-sm text-neutral-400">
                             {taskWhenLabel(subtask)}
                           </span>
-                          {onPush && (
-                            <span className="flex-shrink-0 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
-                              <PushDropdown size="sm" showTodayOption onPush={(date) => onPush(subtask.id, date)} />
-                            </span>
-                          )}
+                          {/* The weeks offered are the GOAL's own period, not
+                              the week containing now — "Buy game tickets" on an
+                              October goal offers October's weeks. Choosing one
+                              leaves the step undated and keeps both its month
+                              commitment and its goal link (2026-09-24). */}
+                          <span className="flex-shrink-0 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
+                            <PlanWeekMenu
+                              size="sm"
+                              title={subtask.title}
+                              periodStart={goalPeriodAnchor}
+                              currentWeekStart={subtask.weekStart ?? null}
+                              onPickWeek={(weekStart) => onUpdate(subtask.id, { bucket: 'week', weekStart, scheduledFor: undefined })}
+                              onClearWeek={subtask.weekStart || subtask.scheduledFor
+                                ? () => onUpdate(subtask.id, {
+                                    bucket: task.bucket === 'quarter' ? 'quarter' : 'month',
+                                    weekStart: undefined,
+                                    scheduledFor: undefined,
+                                  })
+                                : undefined}
+                              onPickDay={onPush ? (date) => onPush(subtask.id, date) : undefined}
+                            />
+                          </span>
                         </>
                       )}
                     </div>

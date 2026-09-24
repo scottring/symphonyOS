@@ -37,7 +37,7 @@ import { GoalsProvider, useGoalsContext } from '@/contexts/GoalsContext'
 import { filterTasksForLayers, matchesLayers } from '@/lib/today/domainFilter'
 import { placementFateOf, lowerPlacement } from '@/lib/placement/model'
 import { splitGoalRows } from '@/lib/planning/goalSteps'
-import { parseLocalYmd } from '@/lib/cadence/config'
+import { parseLocalYmd, localYmd } from '@/lib/cadence/config'
 import { monthToken, yearToken, type SessionHorizon } from '@/hooks/usePlanningSession'
 import { seasonToken } from '@/lib/cadence/seasons'
 import { usePlanSessionHost } from '@/hooks/usePlanSessionHost'
@@ -58,6 +58,7 @@ import { readOpen, readFoldPref, writeOpen } from './foldState'
 import { PlanSession } from './PlanSession'
 import { PlanNextLine } from './PlanNextLine'
 import { periodCalendarEntries } from '@/lib/planning/periodCalendar'
+import { PlanWeekMenu } from './PlanWeekMenu'
 import { useDayLoadEvents, DAY_LOAD_RANGE_DAYS } from '@/hooks/useDayLoadEvents'
 
 /** How many tasks a period's list shows before it asks. A long plan is still
@@ -112,7 +113,7 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
   const { activeRoutines } = useRoutines()
   const { goals, areas, addGoal, updateGoal, addArea } = useGoalsContext()
 
-  const [searchParams] = useSearchParams()
+  const [searchParams, setSearchParams] = useSearchParams()
   const startParam = searchParams.get('start')
   const explicitStart = useMemo(() => (startParam ? parseLocalYmd(startParam) : null), [startParam])
 
@@ -150,11 +151,24 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
     setLookingAhead(result.lookingAhead)
   }, [tasks.length, loading, seasonsLoading, level, today, seasons, layered, meId])
 
+  /**
+   * Page to another period — and put it in the URL.
+   *
+   * The anchor used to live only in this component's state, so the period you
+   * paged to existed nowhere durable: open a task from October's page and come
+   * back, and `planningPeriod` ran again and returned you to September (Scott,
+   * 2026-09-24: "Back from goal details returns to September instead of
+   * October"). `?start=` is already read on mount as `explicitStart`, so
+   * writing it makes back, forward and reload all land where you were.
+   */
   const goTo = useCallback((d: Date) => {
     anchorSettledRef.current = true
     setLookingAhead(false)
     setAnchor(d)
-  }, [])
+    const next = new URLSearchParams(searchParams)
+    next.set('start', localYmd(periodBounds(level, d, seasons).start))
+    setSearchParams(next, { replace: false })
+  }, [searchParams, setSearchParams, level, seasons])
 
   // ── The list ─────────────────────────────────────────────────────────────
   const rows = useMemo<PlanRowModel[]>(() => {
@@ -402,6 +416,27 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
       context: soleDomain,
     })
   }, [level, bounds.start, soleDomain, addTask])
+
+  // "Plan ▾" on a task row: the weeks of the month being VIEWED. The
+  // 'to-lower' verb beside it commits to the week containing now, which on
+  // October's page could never reach an October week (2026-09-24).
+  const planWeekSlot = useCallback((row: PlanRowModel) => {
+    if (level !== 'month') return null
+    const t = tasks.find((x) => x.id === row.id)
+    return (
+      <PlanWeekMenu
+        size="sm"
+        title={row.title}
+        periodStart={bounds.start}
+        currentWeekStart={t?.weekStart ?? null}
+        onPickWeek={(weekStart) => { void gated.updateTask(row.id, { bucket: 'week', weekStart, scheduledFor: undefined }) }}
+        onClearWeek={t?.weekStart || t?.scheduledFor
+          ? () => { void gated.updateTask(row.id, { bucket: 'month', weekStart: undefined, scheduledFor: undefined }) }
+          : undefined}
+        onPickDay={(date) => { void planActions.chooseTaskDay(row.id, date) }}
+      />
+    )
+  }, [level, bounds.start, gated, planActions, tasks])
 
   const [pickingGoalFor, setPickingGoalFor] = useState<string | null>(null)
   const [linkError, setLinkError] = useState(false)
@@ -886,7 +921,7 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
               ) : (
                 <ul>
                   {goalRows.filter((r) => !rowIsDone(r.fate)).map((row) => (
-                    <PlanRow key={row.id} row={row} onOpen={open} onOpenPlaced={openPlaced} onAction={(a, r) => { void act(a, r) }}
+                    <PlanRow key={row.id} row={row} onOpen={open} onOpenPlaced={openPlaced} onAction={(a, r) => { void act(a, r) }} planWeek={planWeekSlot}
                       lowerLabel={lowerLabelText}
                       expanded={expandedGoals.has(row.id)}
                       onToggleExpand={toggleGoal}
@@ -900,7 +935,7 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
                 <details className="period-assigned-fold" key={`goals-${level}-${bounds.start.toISOString()}`} open={isPast || undefined}>
                   <summary>Completed goals · {goalRows.filter((r) => rowIsDone(r.fate)).length}</summary>
                   <ul>{goalRows.filter((r) => rowIsDone(r.fate)).map((row) => (
-                    <PlanRow key={row.id} row={row} onOpen={open} onOpenPlaced={openPlaced}
+                    <PlanRow key={row.id} row={row} onOpen={open} onOpenPlaced={openPlaced} planWeek={planWeekSlot}
                       onAction={(a, r) => { void act(a, r) }} lowerLabel={lowerLabelText}
                       expanded={expandedGoals.has(row.id)} onToggleExpand={toggleGoal}
                       stepActionsFor={(st) => actionsFor({ fate: st.fate, isGoal: false, isPast, level })}
@@ -960,7 +995,7 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
                   {availableTaskRows.length === 0 && <p className="period-section-note">Every open task has a more specific commitment.</p>}
                   <ul>
                     {visibleTaskRows.map((row) => (
-                      <PlanRow key={row.id} row={row} onOpen={open} onOpenPlaced={openPlaced} onAction={(a, r) => { void act(a, r) }}
+                      <PlanRow key={row.id} row={row} onOpen={open} onOpenPlaced={openPlaced} onAction={(a, r) => { void act(a, r) }} planWeek={planWeekSlot}
                         lowerLabel={lowerLabelText}
                         actions={actionsFor({ fate: row.fate, isGoal: row.isGoal, isPast, level, hasGoals: goalRows.length > 0 })} />
                     ))}
@@ -1034,7 +1069,7 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
                   <summary>Already assigned · {assignedTaskRows.length}</summary>
                   <p className="period-section-note">Still part of this {noun}’s plan.</p>
                   <ul>{assignedTaskRows.map((row) => (
-                    <PlanRow key={row.id} row={row} onOpen={open} onOpenPlaced={openPlaced}
+                    <PlanRow key={row.id} row={row} onOpen={open} onOpenPlaced={openPlaced} planWeek={planWeekSlot}
                       onAction={(a, r) => { void act(a, r) }} lowerLabel={lowerLabelText}
                       actions={actionsFor({ fate: row.fate, isGoal: false, isPast, level, hasGoals: goalRows.length > 0 })} />
                   ))}</ul>
@@ -1058,7 +1093,7 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
                   {doneOpen && (
                     <ul className="mt-1 border-t border-neutral-200">
                       {doneTaskRows.map((row) => (
-                        <PlanRow key={row.id} row={row} onOpen={open} onOpenPlaced={openPlaced} onAction={(a, r) => { void act(a, r) }}
+                        <PlanRow key={row.id} row={row} onOpen={open} onOpenPlaced={openPlaced} onAction={(a, r) => { void act(a, r) }} planWeek={planWeekSlot}
                           lowerLabel={lowerLabelText}
                         actions={actionsFor({ fate: row.fate, isGoal: row.isGoal, isPast, level })} />
                       ))}
