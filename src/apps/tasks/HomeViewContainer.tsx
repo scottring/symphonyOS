@@ -133,17 +133,24 @@ export function HomeViewContainer({ fixedView }: { fixedView?: 'today' | 'week' 
   }, [searchParams]);
 
   /**
-   * Move the viewed day, and say so in the URL when the URL is already naming
-   * one. Without this the param would go stale the moment the reader paged to
-   * another day — the same trap `?start=` had on /week. A page that never
-   * asked for a day keeps its clean URL.
+   * Move the viewed day, and say so in the URL — the contract `?start=`
+   * already has on /week.
+   *
+   * It used to write the param only when one was ALREADY there, to keep a
+   * clean URL. The cost showed up live: page back to Wednesday, reload, and
+   * Today is Thursday again, because the day lived only in component state
+   * (walkthrough, 2026-09-24). Leaving today still clears the param, so the
+   * default case keeps its clean URL; any OTHER day names itself and survives
+   * a reload, a Back and a link.
    */
   const changeViewedDate = useCallback((next: Date) => {
     setViewedDate(next);
+    const isToday = localYmd(next) === localYmd(new Date());
     setSearchParams((prev) => {
-      if (!prev.get('date')) return prev;
+      if (isToday && !prev.get('date')) return prev;
       const out = new URLSearchParams(prev);
-      out.set('date', localYmd(next));
+      if (isToday) out.delete('date');
+      else out.set('date', localYmd(next));
       return out;
     }, { replace: true });
   }, [setSearchParams]);

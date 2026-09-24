@@ -1025,3 +1025,83 @@ trap). The app code path is identical either way — the same `onDragEnd`.
 - **An event's detail panel offers no Delete.** `TapEventPanel`'s ⋯ menu holds
   only “Free”; deletion exists on the Today row menu and in
   `DetailPanelRedesign`, so the newest surface is the one missing it.
+
+---
+
+## R — the rest of the walkthrough, driven by me  ·  15:40 ET
+
+QA fixtures, all created and destroyed by me; Scott's party, goals and tasks
+were read but never written.
+
+### Subtasks — LIVE PASS
+
+Fixture **“QA parent task 2026-09-24 (delete me)”**, id
+`abe44d22-059d-492c-8abd-e8e34a58a93a`, with child **“QA subtask A”**.
+
+| Step | Subtask | Parent |
+| --- | --- | --- |
+| created | present under the parent | `Mark complete` |
+| completed the subtask | `Mark … incomplete` | **`Mark complete` — unchanged, not struck** |
+| reopened the subtask | `Complete …` | **`Mark complete` — unchanged** |
+| reload | `Complete …` | `Mark complete` |
+
+Completing a step never touched its parent, in either direction, and both
+states survived a reload. Fixture deleted afterwards, parent and child both
+gone.
+
+### Today's viewed date on reload — FOUND, FIXED, VERIFIED
+
+Reproduced: page back to Wednesday, reload, and the page is Thursday again.
+The URL said `/today?detail=…` with **no day in it** — `viewedDate` lived only
+in component state.
+
+The machinery was already there: a `?date=` param is read on every change, and
+`changeViewedDate` wrote it — but **only when the URL already named a day**, to
+keep a clean URL. So paging from a clean `/today` never began naming the day,
+and a reload lost it. Now: leaving today still clears the param, so the default
+keeps its clean URL; any other day names itself.
+
+Live: back → `?date=2026-09-23`, “Wednesday, September 23”; **reload →
+still Wednesday**; forward to today → clean `/today`, “Thursday, September 24”.
+
+### The planning guide had no way in — FIXED, VERIFIED
+
+`/guide` rendered correctly (four sheets, “One side · about 10 minutes”, “Print
+all nine sides”) but **nothing in this layout's navigation pointed at it**. The
+sidebar entry added when the guide shipped belongs to a different layout; this
+one uses the top bar and its “More” menu, which listed Getting started and Plan
+from paper but not the guide.
+
+Added to `MORE_GROUPS` beside them, with a printer icon. Live: More → Planning
+guide → `/guide`, four sheets. 3 tests.
+
+### Completed prep task — recovery CONFIRMED, display gap stands
+
+Codex's source finding is right (`TapEventPanel` → `useEntityRelations` with
+`includeCompleted` defaulting false). The work is **not lost**: Scott's
+completed “buy birthday gift” is visible, struck through, on Thursday in the
+week journal. So this is a display filter on one panel, not a broken link.
+Unchanged mid-walk, as instructed.
+
+### Not done, and why
+
+- **Review Drop/Done and no-change save** — the look-back acts on rows from the
+  period just ended. Exercising Drop or Done there would write to Scott's real
+  tasks, and a QA fixture cannot be placed in a past period without editing
+  history. Left untested rather than faked; needs a disposable account or an
+  isolated harness.
+- **Failed-save retry without duplicates** — no way to inject a failure against
+  the live backend from the browser, and an isolated harness would only
+  re-assert what `PlanSession`'s existing partial-failure tests already cover.
+  Untested live; labelled as such rather than claimed.
+- **Existing goal-link capability inventory** — Codex has already established
+  from source that month→season and year→season linking has **no UI at all**.
+  Nothing to verify in the browser; it is a missing capability, queued for the
+  usability batch.
+
+### Logged for the mockup review, not redesigned
+
+- A created event does not appear until a reload.
+- An event's detail panel offers no Delete (the Today row menu has one).
+- “Add a step” under a goal is only reachable through the caret.
+- “Daily” vs “weekly, all seven days selected” are indistinguishable.

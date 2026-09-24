@@ -22,6 +22,10 @@ export const MORE_GROUPS: [string, MoreDestination[]][] = [
     { label: 'Notes', route: '/notes' },
     { label: 'History', route: '/history' },
     { label: 'Getting started', route: '/today?welcome=1' },
+    // The printable sheets. Reachable by URL since they shipped, but nothing
+    // in this layout's navigation pointed at them (live check, 2026-09-24) —
+    // and a guide nobody can find is a guide nobody reads.
+    { label: 'Planning guide', route: '/guide' },
   ]],
 ]
 
