@@ -671,3 +671,75 @@ Codex's November fixture is untouched.
 Single routine toast + Undo live · day URL/reload through View day · standalone
 task later linked to a goal · the entry buttons and the print dialog of the
 revised guide.
+
+---
+
+## L — the timing picker in the approved RescheduleGrid language  ·  12:55 ET
+
+Scott's approved reference: the two-column rounded icon tiles with a small
+segmented bar beneath each, from `RescheduleGrid`. Now in the shared planning
+timing picker, with the one requirement he was explicit about — **relative
+density of things, not an hours or capacity forecast**.
+
+### Why `DayLoadBar`'s math could not be reused
+
+Codex asked me to inspect it first, and it was the right call. `computeDayLoad`
+measures **minutes booked against an 8am–9pm window** and yields a percentage;
+`DayLoadBar` renders that as `aria-label="60% booked"`. Putting counts under
+that bar would have labelled hours as items. It also deliberately **excludes
+routines** and gives an all-day item **zero weight** — both wrong for this
+question. So the fill is new, and the load bar is untouched.
+
+`src/lib/planning/dayDensity.ts` counts instead:
+
+- **events, tasks and routine occurrences**, deduped by a caller-supplied key
+  (the same meeting on two calendars, an occurrence two resolvers both report);
+- all-day items count — a day with four of them is a full day that books no
+  hours;
+- routines count, because the caller passes resolved **occurrences**, not
+  rules. (That was `computeDayLoad`'s stated reason for leaving them out: the
+  routine LIST is identical on every day. Occurrences are not.)
+- the scale is **relative to the days being offered** — the busiest day fills
+  the bar, a day with anything on it always fills at least one segment, and
+  nothing absolute is ever claimed.
+
+**Loaded vs unknown vs empty** are three states, not two: `known: false` draws a
+dashed outline and says “hasn’t loaded yet”, distinct from “nothing on it yet”.
+
+**Accessible labels are counts, in words** — “Mon, Nov 9 — 2 events and 1 task
+already”. A test asserts no tile's label can contain `%`, `hour`, `booked`,
+`capacity` or `free`.
+
+### The days offered are the days in VIEW
+
+`WeekViewV2` supplies the seven days of the week being **viewed** — from a
+November row the tiles say Nov 8…Nov 14 — with the density counted off
+`journalDays`, the very list the page draws beneath, so the tiles cannot
+disagree with the days under them. No silent jump to today.
+
+Everything else is preserved: the week choices above, the explicit date field
+below (relabelled “Another day…” when tiles are present, so any other date is
+still one field away), and the remove/Undo items with their before-the-press
+consequences.
+
+### Tests
+
+11 on the density math (dedupe, relative scale, one-thing-≠-nothing, unknown
+days, the words), 6 on the tiles, 2 on `/week` end to end — the viewed week's
+dates appear, the current day is marked, a busy day states its counts, an empty
+day says so, no tile claims hours, and pressing a tile writes that day.
+
+### Limitations, stated
+
+- **Only `/week` supplies tiles so far.** Today, the month, season and year
+  pickers keep the date field alone. The prop is optional and the menu is
+  byte-identical without it; those surfaces need their own per-day counts
+  before they can be wired honestly.
+- **`eventsAvailable` defaults to true on `/week`.** The week receives a plain
+  events array with no availability signal, so the “unknown” state is reachable
+  (and tested) but nothing on that surface currently sets it. Wiring it needs
+  `useDayLoadEvents`-style availability threaded to the week.
+- Dinners are excluded — the day's meal is not a commitment to plan around.
+- Nothing here has been seen in a browser by me.
+
+**Ready for your browser verification.**

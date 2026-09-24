@@ -269,6 +269,52 @@ describe('WeekViewV2 journal spread', () => {
     expect(seen).toHaveBeenCalled()
   })
 
+  // Scott, 2026-09-24: the picker must offer the days of the week in VIEW.
+  // Every other route to "a day" has meant the week containing now, which is
+  // how a November action ended up in September.
+  it('offers the VIEWED week\'s days in the timing control, not today\'s', () => {
+    const tasks = [
+      createMockTask({ id: 'a', title: 'List supplies to buy', scheduledFor: new Date(2026, 8, 14), isAllDay: true }),
+      // Something already on Tuesday, so the days differ from one another.
+      createMockTask({ id: 'b', title: 'Call the bank', scheduledFor: new Date(2026, 8, 15, 10), isAllDay: false }),
+      createMockTask({ id: 'c', title: 'Dentist', scheduledFor: new Date(2026, 8, 15, 14), isAllDay: false }),
+    ]
+    render(<WeekViewV2 {...defaultProps} routines={[]} weekStart={sunday} tasks={tasks} events={[]} />)
+    const monday = within(screen.getByTestId('journal-day-2026-09-14'))
+    fireEvent.click(monday.getByRole('button', { name: /Choose a week or a day for List supplies to buy/ }))
+
+    // The seven days of the week being viewed, by their real dates.
+    expect(screen.getByText(/^A day in /)).toHaveTextContent('September 13–19')
+    for (const [label, date] of [['Sun', 'Sep 13'], ['Mon', 'Sep 14'], ['Sat', 'Sep 19']] as const) {
+      expect(screen.getByRole('menuitemradio', { name: new RegExp(`${label}, ${date}`) })).toBeInTheDocument()
+    }
+    // The day it is already on is marked, and a busier day says what is on it.
+    expect(screen.getByRole('menuitemradio', { name: /Mon, Sep 14/ })).toHaveAttribute('aria-checked', 'true')
+    expect(screen.getByRole('menuitemradio', { name: /Tue, Sep 15/ })).toHaveAccessibleName(/2 tasks already/)
+    expect(screen.getByRole('menuitemradio', { name: /Wed, Sep 16/ })).toHaveAccessibleName(/nothing on it yet/)
+    // No DAY tile claims hours or capacity (the week rows above are labelled
+    // by their own text and carry no aria-label at all).
+    const dayTiles = screen.getAllByRole('menuitemradio', { name: /^Plan for \w{3}, Sep/ })
+    expect(dayTiles).toHaveLength(7)
+    for (const tile of dayTiles) {
+      expect(tile.getAttribute('aria-label')).not.toMatch(/%|hour|booked|capacity/i)
+    }
+    // And the explicit date alternative is still there, for any other day.
+    expect(screen.getByText('Another day…')).toBeInTheDocument()
+  })
+
+  it('writes the day the tile names', () => {
+    const onUpdateTask = vi.fn()
+    const tasks = [createMockTask({ id: 'a', title: 'List supplies to buy', scheduledFor: new Date(2026, 8, 14), isAllDay: true })]
+    render(<WeekViewV2 {...defaultProps} routines={[]} weekStart={sunday} tasks={tasks} events={[]} onUpdateTask={onUpdateTask} />)
+    const monday = within(screen.getByTestId('journal-day-2026-09-14'))
+    fireEvent.click(monday.getByRole('button', { name: /Choose a week or a day for List supplies to buy/ }))
+    fireEvent.click(screen.getByRole('menuitemradio', { name: /Thu, Sep 17/ }))
+    expect(onUpdateTask).toHaveBeenCalledWith('a', expect.objectContaining({
+      bucket: 'timed', scheduledFor: new Date(2026, 8, 17), isAllDay: true,
+    }))
+  })
+
   it('lists multi-day context once above the days — including one that began last week — and not in the days', () => {
     const events = [
       { id: 'brk', title: 'Fall break', start_time: '2026-09-10T12:00:00.000Z', end_time: '2026-09-16T12:00:00.000Z', all_day: true } as unknown as CalendarEvent,

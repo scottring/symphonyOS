@@ -41,6 +41,8 @@ import { buildWeekRoutineItems } from './weekRoutineItems'
 import { useWeekInstances } from './useWeekInstances'
 import { edgeForPointer } from './edgeAdvance'
 import { WeekJournal, type JournalDay, type JournalEntry } from './WeekJournal'
+import { dayDensity } from '@/lib/planning/dayDensity'
+import { formatWeekRange } from '@/lib/dateHelpers'
 import { WeekList } from './WeekList'
 import { makePlanActions } from '@/lib/planning/planActions'
 import { focusDays, sameDay } from '@/lib/placement/model'
@@ -92,6 +94,12 @@ function formatEarlyTime(d: Date): string {
 interface WeekViewV2Props {
   tasks: Task[]
   events: CalendarEvent[]
+  /**
+   * False while the calendar could not be read. The day tiles then say a day
+   * is UNKNOWN rather than drawing it empty — "nothing on Thursday" and "we
+   * could not see Thursday" are different answers.
+   */
+  eventsAvailable?: boolean
   routines: Routine[]
   // dateInstances is reserved for future instance-completion overlays;
   // not yet consumed in rendering but kept in the API for Task 12 wiring.
@@ -151,6 +159,7 @@ export function WeekViewV2(props: WeekViewV2Props) {
   const {
     tasks,
     events,
+    eventsAvailable = true,
     routines,
     weekStart,
     onWeekChange,
@@ -657,6 +666,23 @@ export function WeekViewV2(props: WeekViewV2Props) {
     return days
   }, [tasks, userId, events, eventItems, extras, routineItems, weekInstances, weekStart, dayCount, labelFor])
 
+  /**
+   * How much is already on each day of the week being VIEWED, for the timing
+   * control's day tiles. Counted off `journalDays` — the list the page itself
+   * draws — rather than re-derived, so the tiles can never disagree with the
+   * days beneath them. Entries are already one-per-thing there; all-day notes
+   * are events too, and a dinner is the day's meal, not a commitment to plan
+   * around, so it is left out.
+   */
+  const dayDensities = useMemo(() => journalDays.map((d) => dayDensity(
+    d.date,
+    [
+      ...d.entries.map((e) => ({ id: e.id, kind: e.kind })),
+      ...d.notes.map((n) => ({ id: `event-${n.google_event_id || n.id}`, kind: 'event' as const })),
+    ],
+    eventsAvailable,
+  )), [journalDays, eventsAvailable])
+
   const journalSpans = useMemo(
     () => layoutContextSpans(events, journalDays.map((d) => d.date)),
     [events, journalDays],
@@ -837,6 +863,14 @@ export function WeekViewV2(props: WeekViewV2Props) {
    * broader commitment to fall back to: with nothing above it, clearing the
    * week has no destination to name, and the brief forbids promising one.
    */
+  /** The week's own days as tiles, with what each already holds. */
+  const dayChoices = useMemo(() => journalDays.map((d, i) => ({
+    date: d.date,
+    label: d.date.toLocaleDateString('en-US', { weekday: 'short' }),
+    dateLabel: d.date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+    density: dayDensities[i],
+  })), [journalDays, dayDensities])
+
   const weekTimingControl = useCallback((task: Task) => {
     const t = taskTiming(task)
     // What actually survives a removal, read from commitments — not from the
@@ -864,13 +898,17 @@ export function WeekViewV2(props: WeekViewV2Props) {
         periodLabel={broader?.label ?? undefined}
         timing={t}
         currentWeekStart={t.week}
+        // The days of the week in VIEW, never today's: choosing from a
+        // November row must offer November days (Scott, 2026-09-24).
+        dayChoices={dayChoices}
+        dayChoicesLabel={`A day in ${formatWeekRange(weekAnchor)}`}
         onPickWeek={(weekStart) => { void onUpdateTask(task.id, { bucket: 'week', weekStart, scheduledFor: undefined }) }}
         onClearWeek={hasTiming(t) ? () => removeTiming('all') : undefined}
         onRemoveDay={t.day ? () => removeTiming('day') : undefined}
         onPickDay={(date) => { void onUpdateTask(task.id, { bucket: 'timed', scheduledFor: date, isAllDay: true }) }}
       />
     )
-  }, [weekAnchor, onUpdateTask])
+  }, [weekAnchor, onUpdateTask, dayChoices])
 
   const weekListFor = (onPlan: () => void) => (
     <WeekList

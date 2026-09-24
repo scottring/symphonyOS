@@ -30,6 +30,8 @@ import { usePopoverFocus } from '@/hooks/usePopoverFocus'
 import { weeksOfMonth } from '@/lib/planning/monthWeeks'
 import { readCadenceConfig, localYmd, weekStartAnchor, parseLocalYmd } from '@/lib/cadence/config'
 import { timingLabel, timingDescription, removeDayOutcome, removeAllOutcome, hasTiming, type TaskTiming } from '@/lib/planning/taskTiming'
+import { densityScale, type DayDensity } from '@/lib/planning/dayDensity'
+import { DayDensityTiles, type DayChoice } from './DayDensityTiles'
 
 /** "Oct 4 – 10" for a week anchor, matching the listed weeks' labels. */
 function weekLabel(start: Date): string {
@@ -42,7 +44,8 @@ function weekLabel(start: Date): string {
 }
 
 export function PlanWeekMenu({
-  title, periodStart, periodLabel, currentWeekStart, timing, onPickWeek, onClearWeek, onRemoveDay, onPickDay, size = 'md',
+  title, periodStart, periodLabel, currentWeekStart, timing, onPickWeek, onClearWeek, onRemoveDay, onPickDay,
+  dayChoices, dayChoicesLabel, size = 'md',
 }: {
   title: string
   /** Any day inside the period whose weeks should be offered — the month being
@@ -64,6 +67,18 @@ export function PlanWeekMenu({
   onRemoveDay?: () => void
   /** "A day…" — a date, which the caller schedules. */
   onPickDay?: (date: Date) => void
+  /**
+   * Dated days to offer as tiles, with what is already on each — the approved
+   * RescheduleGrid language (Scott, 2026-09-24). They are the CALLER's days:
+   * on /week, the seven days of the week in view, so a November row offers
+   * November days instead of jumping to today.
+   *
+   * Omitted, the menu is exactly as it was: the date field below is the only
+   * way to a day, and it stays either way.
+   */
+  dayChoices?: readonly { date: Date; label: string; dateLabel: string; density: DayDensity }[]
+  /** What the tiles are — "A day in Nov 8 – 14". */
+  dayChoicesLabel?: string
   size?: 'sm' | 'md'
 }) {
   const [open, setOpen] = useState(false)
@@ -153,7 +168,9 @@ export function PlanWeekMenu({
           role="menu"
           aria-label={`Plan ${title} for a week`}
           style={position}
-          className="fixed z-[60] w-56 overflow-y-auto rounded-lg border border-neutral-200 bg-white py-1 shadow-lg"
+          className={`fixed z-[60] overflow-y-auto rounded-lg border border-neutral-200 bg-white py-1 shadow-lg ${
+            dayChoices && dayChoices.length > 0 ? 'w-72' : 'w-56'
+          }`}
         >
           <p className="px-3 pb-0.5 pt-2 text-[10px] font-semibold uppercase tracking-wider text-neutral-400" aria-hidden="true">
             A week in {weeksMonthLabel}
@@ -213,10 +230,24 @@ export function PlanWeekMenu({
               </span>
             </button>
           )}
+          {/* The days themselves, when the caller knows which ones to offer.
+              The date field stays below as the explicit alternative — any day
+              at all, including one outside this week. */}
+          {onPickDay && dayChoices && dayChoices.length > 0 && (
+            <DayDensityTiles
+              days={dayChoices.map((d): DayChoice => ({
+                ...d,
+                current: !!timing?.day && localYmd(timing.day) === localYmd(d.date),
+              }))}
+              level={densityScale(dayChoices.map((d) => d.density)).level}
+              heading={dayChoicesLabel ?? 'A day'}
+              onPick={(date) => { setOpen(false); onPickDay(date) }}
+            />
+          )}
           {onPickDay && (
             <div className="px-3 py-1.5">
               <label className="block text-sm text-neutral-700">
-                A day…
+                {dayChoices && dayChoices.length > 0 ? 'Another day…' : 'A day…'}
                 <input
                   type="date"
                   value={dayValue}
