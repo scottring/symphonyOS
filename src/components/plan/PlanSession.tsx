@@ -426,8 +426,15 @@ export function PlanSession({ level, aboveLabel, dayOptions = [], periodLabel: P
           {step === 'plan' && <button type="button" className="rounded-md bg-primary-600 px-3 py-1.5 text-sm font-semibold text-white" onClick={() => goTo('save')}>Next: save →</button>}
           {/* An unchanged plan closes without a write. Offering "Save October"
               over nothing invited a pointless round-trip and implied the
-              existing plan needed saving (requirement 7). */}
-          {step === 'save' && (nothingToSave
+              existing plan needed saving (requirement 7).
+
+              …unless a save already failed. Every row can land and the SESSION
+              RECORD still be refused, and then the draft holds no work, so
+              this read "nothing will be written" and offered only Done — while
+              the alert above it said "Save again retries only these". There
+              was no Save to press, and the period stayed unplanned. Found by
+              the review integration test, 2026-09-24. */}
+          {step === 'save' && (nothingToSave && !saveError
             ? <button type="button" className="rounded-md bg-primary-600 px-3 py-1.5 text-sm font-semibold text-white" onClick={onClose}>Done</button>
             : <button type="button" disabled={saving || missingDomains.length > 0} className="rounded-md bg-primary-600 px-3 py-1.5 text-sm font-semibold text-white disabled:opacity-60" onClick={() => { void onSave() }}>{saving ? 'Saving…' : `Save ${P}`}</button>)}
         </div>
