@@ -2005,3 +2005,31 @@ describe('the planning pages no longer open with an onboarding box', () => {
     })
   }
 })
+
+// Codex acceptance walk, 2026-09-24: the review nested its rows but still
+// showed no completed step — the page stripped them before handing them over.
+describe('the review is given the completed work too', () => {
+  beforeEach(() => {
+    pinClock(); localStorage.clear()
+    state.tasks = [
+      task({ id: 'g1', title: 'Write a new song', isGoal: true, monthStart: thisMonth }),
+      task({ id: 's1', title: 'Draft the first verse', goalTaskId: 'g1', monthStart: thisMonth }),
+      task({ id: 's2', title: 'Use an old chord progression', goalTaskId: 'g1', monthStart: thisMonth, completed: true }),
+    ]
+    state.goals = []; state.loading = false; routinesState.routines = []
+    domainState.layers = new Set(['work', 'family', 'personal', 'unsorted']); domainState.soleDomain = null
+    seasonsState.seasons = DEFAULT_SEASONS; seasonsState.loading = false
+    Object.values(hook).forEach((f) => f.mockClear())
+  })
+  afterEach(() => { vi.useRealTimers() })
+
+  it('counts the finished step, and shows it struck through', () => {
+    renderPage('month')
+    fireEvent.click(screen.getByRole('button', { name: /Plan September|Plan October|Review the plan/ }))
+    const counts = screen.getByRole('button', { name: '1 open · 1 done · show' })
+    fireEvent.click(counts)
+    const done = within(counts.closest('li')!).getByText('Use an old chord progression')
+    expect(done.className).toMatch(/line-through/)
+    expect(within(done.closest('li')!).getByText('completed')).toBeInTheDocument()
+  })
+})

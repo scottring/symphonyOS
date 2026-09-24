@@ -1307,3 +1307,88 @@ wrapping on the phone.
 - Getting Started still **renders on Today**. It is now provably reachable
   independent of the planner's state, but moving onboarding onto its own route
   is a product change I have not made.
+
+---
+
+# Acceptance walk  ·  17:55 ET
+
+Driven by me at `:5199` with disposable `QA-ACC …` fixtures, all deleted after.
+Scott's data and the other session's `QA Year outcome` / Inbox walkthrough rows
+were read, never written.
+
+## One real defect found and fixed
+
+**The review still showed no completed step.** The nesting I shipped was
+correct, but `PeriodPlanPage.tsx:753` stripped completed rows before the
+session ever saw them — `selectPeriodTasks(...).filter((t) => !t.completed)`.
+So the display fix could not help: the data never arrived. Completed rows are
+kept now, and live, "Write a new song in October" reads **“1 done · hide”** with
+**“Use an old chord progression — completed”** struck through beneath it. That
+is Codex's original failure, closed. Regression test added.
+
+## One thing that looked like a defect and was not
+
+Inbox → “This week” appeared to write nothing: `bucket` stayed `inbox`, no
+commitment, no notice. It is the **domain gate** working as designed — an
+unsorted capture must be given a life area first. A MutationObserver caught the
+dialog opening correctly; my own automation had been dismissing it by clicking
+the backdrop. Answering it wrote `bucket: week`, `context: personal`, and a real
+week commitment. **No bug; no change made.**
+
+## Acceptance matrix
+
+Legend — **Live UI**: I drove it in Chrome today. **Harness**: isolated local
+fixture in Chromium, no demo data. **Unit**: tests only. **Prior**: reusing
+earlier evidence for an unchanged path.
+
+| # | Journey step | Method | Result |
+| --- | --- | --- | --- |
+| 1 | Month→season link: set | Live UI | **pass** — writes one field, toast after the save |
+| 1 | …change to another parent | Live UI | **pass** |
+| 1 | …remove (“No linked goal”) | Live UI | **pass** — “no longer supports… Nothing else changed” |
+| 1 | …survives reload | Live UI | **pass** |
+| 1 | …reciprocal readback | Live UI | **pass** — parent shows “Supported by October · …” |
+| 1 | Season→year link | Unit | **pass** — same control, same writer; not walked live |
+| 1 | Goal complete independent of steps | Live UI | **pass** — all steps done, status stayed Active |
+| 1 | Goal complete → reopen from fold | Live UI | **pass** |
+| 2 | Review shows nested goal + steps | Live UI | **pass** |
+| 2 | Review shows completed work | Live UI | **pass after the fix above** |
+| 2 | No-change close (“unchanged”, Done) | Live UI | **pass** — no Save offered, plan intact |
+| 2 | Edit → save → reopen | Unit | **pass** — not walked live (would write Scott's plan) |
+| 2 | Drop / Done verdicts | **Not tested** | acts on Scott's September rows; needs a disposable account |
+| 2 | Cancel / draft recovery | Unit | **pass** — not walked live |
+| 2 | Failed-save retry, no duplicates | Unit | **pass** — no live failure injection available |
+| 3 | Capture → Inbox | Live UI | **pass** |
+| 3 | Inbox → week (with domain gate) | Live UI | **pass** |
+| 3 | Week → day, via the day tiles | Live UI | **pass** — real per-day counts for the viewed week |
+| 3 | Complete → reopen on the day | Live UI | **pass** |
+| 3 | Remove day, week kept | Live UI | **pass** — “Keeps it in September 20–26 and in September.” |
+| 3 | Standalone task later linked to a goal | **Not tested** | ran out of walk before it |
+| 3 | Date URL reload / Back | Prior | **pass** — verified 15:40 today |
+| 4 | Dense list: 30 goals / 200 tasks / 60 steps | Harness | **pass** at 1280px and 390px |
+| 4 | No control overlap, no scroll trap, ≥32px targets | Harness | **pass** |
+| 4 | Filter / expand / show-all / completed **by keyboard** | **Not tested** | see limitations |
+
+## Remaining release blockers
+
+1. **Drop / Done and the full save path are unproven live.** Everything that
+   writes a verdict has only unit evidence, because exercising it means writing
+   Scott's real September rows. A disposable account would close this.
+2. **Keyboard operation of the long-list controls is untested.** The harness
+   measures geometry, not focus order or key handling.
+3. Still open from before, none of which blocked these journeys: completed prep
+   task hidden in the event panel; a created event needing a reload; no Delete
+   on the event detail panel.
+
+## Limitations of this evidence
+
+- The dense list has **never been seen in the running app** — only the harness.
+- The `QA-ACC` fixtures were small and short-lived; nothing exercised a
+  realistic account over time.
+- Season→year linking shares the tested control but was not walked.
+
+## Superseded
+
+The §S limitation “only /week supplies tiles” still holds. The §T limitation
+“the dense behaviour has not been seen in a browser” is now **narrowed**: it has
+been measured in Chromium from an isolated fixture, but still not in the app.

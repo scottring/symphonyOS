@@ -750,7 +750,12 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
   const currentPeriodTasks = useMemo(
     () => (isYearSession
       ? goals.filter((g) => g.year === periodYear && g.status === 'active' && matchesLayers(g.context, layers)).map(goalAsRow)
-      : selectPeriodTasks(layered, placeLevel, bounds.start, isCurrent, meId, seasons).filter((t) => !t.completed)),
+      // Completed rows are KEPT. The review is where finished work most needs
+      // to be visible — it draws each one struck through and marked — and
+      // stripping them here is why "no visible completed song step" survived
+      // the display fix (Codex acceptance walk, 2026-09-24). The page's own
+      // lists sort open from done themselves.
+      : selectPeriodTasks(layered, placeLevel, bounds.start, isCurrent, meId, seasons)),
     [isYearSession, goals, periodYear, layers, layered, placeLevel, bounds.start, isCurrent, meId, seasons],
   )
   const aboveIsCurrent = useMemo(() => isCurrentPeriod(periodBounds('season', aboveStart, seasons), today), [aboveStart, seasons, today])
