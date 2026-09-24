@@ -163,9 +163,26 @@ A label bug found by those tests: the menu said "September" and the toast
 Checks: 6821 passing (only the pre-existing `connectors/whatsapp` collection error),
 tsc clean, eslint 0 errors, build clean.
 
-### Still open from Codex's review
+### Codex review finding 5 — day rows  ·  committed
 
-- **(5) Day rows have no timing control yet.** A is not complete on WeekList alone.
+Status: **done.** Day rows now carry the same control the month, season and week
+rows do, so all four surfaces answer "when" with one component and one reader.
+
+- `TodaySectionList.tsx` takes a `timingFor` slot and renders it through
+  `ScheduleItem`'s existing `belowTitleAccessory` — under the title, deliberately
+  NOT in the trailing rail, which is a fixed four-slot column of glyphs while the
+  timing answer is a sentence.
+- `TodayView.tsx` supplies it, including both removals with their before-press
+  consequences and one confirmation with Undo, reading `broaderCommitment` so a day
+  task with no week is told the truth rather than promised one.
+- `TodaySectionList.timing.test.tsx` — 2 tests: the row states its saved timing
+  without opening anything, and removing the day on a task with no week commitment
+  refuses to name a week.
+
+All five of Codex's A1/A2 findings are now closed.
+
+Checks: 6823 passing (only the pre-existing `connectors/whatsapp` collection error),
+tsc clean, eslint 0 errors, build clean.
 
 ### B (rest) — completion and reopening across views
 

@@ -53,6 +53,9 @@ import { planDropHandlers } from '@/lib/planning/planDrag'
 import { useActionableInstances } from '@/hooks/useActionableInstances'
 import { findTaskById } from '@/lib/findTaskById'
 import { showToast } from '@/hooks/useToast'
+import { PlanWeekMenu } from '@/components/plan/PlanWeekMenu'
+import { taskTiming, hasTiming, broaderCommitment, removeDayOutcome, removeAllOutcome } from '@/lib/planning/taskTiming'
+import { timingRemoval } from '@/lib/planning/planActions'
 import { useNavigate } from 'react-router-dom'
 import { useGoogleCalendar } from '@/hooks/useGoogleCalendar'
 import { ALL_LAYERS } from '@/lib/domains'
@@ -1243,7 +1246,51 @@ export function TodayView({
   ) : undefined
   // Everything each slice of the journal shares — the same rows and actions
   // the one flat list had, handed to three renders of it.
+  /**
+   * The timing control on a day row — the same one the month, season and week
+   * use, so Day is an execution view of the same work rather than a fourth
+   * vocabulary (connected planning, requirement 2 and Codex review finding 5).
+   *
+   * It sits under the title, not in the trailing rail: the rail is a fixed
+   * four-slot column and the timing answer is a sentence, not a glyph.
+   */
+  const dayTimingControl = useCallback((task: Task) => {
+    const t = taskTiming(task)
+    const broader = broaderCommitment(task)
+    const removeTiming = (scope: 'day' | 'all') => {
+      if (!ctx.onUpdateTask) return
+      const period = broader?.level === 'month' ? { monthStart: broader.periodStart }
+        : broader?.level === 'season' ? { seasonStart: broader.periodStart } : {}
+      const { updates, previous } = timingRemoval(task, scope, period)
+      const kept = scope === 'day' ? removeDayOutcome(t, broader?.label ?? null) : removeAllOutcome(t, broader?.label ?? null)
+      const what = scope === 'day'
+        ? `Removed ${t.day!.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })} from “${task.title}”.`
+        : `Removed ${t.day ? 'the day and the week' : 'the week'} from “${task.title}”.`
+      void Promise.resolve(ctx.onUpdateTask(task.id, updates)).then((ok) => {
+        if (ok === false) return
+        showToast(`${what} ${kept}`, 'success', 8000, {
+          label: 'Undo', onClick: () => { void ctx.onUpdateTask?.(task.id, previous) },
+        })
+      })
+    }
+    return (
+      <PlanWeekMenu
+        size="sm"
+        title={task.title}
+        periodStart={viewedDate}
+        periodLabel={broader?.label ?? undefined}
+        timing={t}
+        currentWeekStart={t.week}
+        onPickWeek={(weekStart) => { void ctx.onUpdateTask?.(task.id, { bucket: 'week', weekStart, scheduledFor: undefined }) }}
+        onClearWeek={hasTiming(t) ? () => removeTiming('all') : undefined}
+        onRemoveDay={t.day ? () => removeTiming('day') : undefined}
+        onPickDay={(date) => { void ctx.onUpdateTask?.(task.id, { bucket: 'timed', scheduledFor: date, isAllDay: true }) }}
+      />
+    )
+  }, [ctx, viewedDate])
+
   const listProps = {
+    timingFor: dayTimingControl,
     isReadOnlyEvent,
     viewedDate,
     isMobile,
