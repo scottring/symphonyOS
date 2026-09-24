@@ -325,3 +325,92 @@ in the running app. The wrapper that caused the second one is gone, but there is
   Same one-line shape, but outside what was reported; flagging rather than widening.
 - `lowerPlacement:154` still resolves a bucket-week row with nothing saved to "This
   week" against today. Unchanged, still needs a product call.
+
+---
+
+## F — three optional entry paths  ·  11:05 ET
+
+Status: **done.** `src/components/plan/PlanningEntryPaths.tsx`, shown on the month,
+season and year pages above the planning status line.
+
+“Somewhere to start”, three doors, and nothing that behaves like onboarding: no
+order, no progress, nothing to complete, and the card says in as many words that
+skipping all three leaves you where you are. Each door does something the app
+already does, and offers the matching printable sheet beside it.
+
+- **Capture something now** — goes through `requestQuickAdd()`, the same signal the
+  ⌘K unibox listens to, rather than a second capture path. Beside it, the Inbox.
+- **Plan the next few weeks** — the month. On the month page the door says “You’re on
+  this page” and offers nothing: not a link to where the reader already is, and not a
+  second copy of the “Plan October” button this page already has. (The first version
+  DID clone it, and 19 `PeriodPlanPage` tests caught two identical buttons on one
+  page — the right complaint.) Beside it, `/guide#month`.
+- **Set a season or a year** — the season, the same way. Beside it, `/guide#season`.
+
+It can be hidden for good (localStorage) and always brought back — “Show where to
+start” stays in its place. It is not shown over a period that has ended, or while a
+planning session is open and the reader is mid-draft. Storage that throws — a private
+window — renders the card rather than blowing up.
+
+7 tests in `PlanningEntryPaths.test.tsx`.
+
+**Placement is a judgement call, flagged for Codex:** the doors are on the three
+period plan pages, where the approved prototype put them, and NOT on Today. Today is
+the execution surface and already carries the capture bar; putting a “where to start”
+card above someone’s day reads as a step. Easy to move if you disagree.
+
+## G — the printable planning guide  ·  11:05 ET
+
+Status: **done**, at `/guide`, permanent, with a sidebar entry beside “Plan from
+paper” — pen and camera are the pair.
+
+Content lives in `src/lib/planning/guideSheets.ts` as data, so the wording is
+readable and testable in one place. Four sheets — week, month, season, year — each
+carrying the same five bands in the same order, with **this horizon’s own questions**
+printed above the writing space (Codex’s four sets, verbatim in intent).
+
+Codex’s guide decisions, each one implemented and pinned by a test:
+
+- No horizon belongs to a household. The family prompt is one small optional band —
+  “If more than one of you is filling this in” — not a column each, and ownership is
+  “who has **agreed** to take the next action”.
+- A few priorities are **suggested**: “A few is the suggestion, not the limit — carry
+  on below the lines if you need to.”
+- “Supports” is plain words, optional, and printed as usually left blank. No codes.
+- Next actions and undecided ideas are kept apart by **position**, with the printed
+  note that neither a date nor an owner is required to write an action down, and that
+  nothing in “Not yet decided” becomes a commitment.
+- A blank is kept as a blank, on every sheet.
+- A missing period is a question, not a wasted sheet: “If you forget to fill this in,
+  the sheet is still useful — you will just be asked which period it belongs to.”
+- The hand-back describes a **review of what was read** with the original notes kept
+  and one choice of what to keep before anything is saved. It promises no duplicate
+  detection and nothing automatic; a test asserts those words are absent.
+- One-sentence source note. The reader-facing page carries no methodological essay.
+
+12 tests on the content, 8 on the page.
+
+### The print check, and the bug it caught
+
+`outputs/planning-guide/` renders the guide to a self-contained page with the BUILT
+stylesheet inlined and opens it in Chromium under print media — no sign-in, and
+nothing to do with the demo browser. It asserts that the interface is off the paper,
+that “Print this sheet” leaves exactly one sheet, that nothing runs off the side at
+Letter **and** A4, that every writing line still has room at the printed width, and
+that the number of sides matches the height of the sheet.
+
+That last check earned its place. The first version lifted the printable subtree out
+with `position: absolute; inset: 0`, copying `PrintableDayList`. That works for a
+list that fits on one side; here it left the document no height, so Chromium
+paginated nothing — **a 2464px sheet printed as one page and everything past the
+first side was silently clipped**, while looking perfectly correct on screen. The
+guide now stays in the document flow: `PlanningGuide` tags its ancestors on mount and
+the print stylesheet has each of them give up its layout and its other children.
+
+Each sheet is **three sides** at both paper sizes. Line spacing and the size of the
+four areas in “What that means” were kept; the explanatory prose was cut to 8pt on
+paper instead.
+
+**Not verified:** nothing has been printed on actual paper, and nobody has walked
+`/guide` in a signed-in browser. The Chromium check is the evidence, and it is
+headless.

@@ -18,6 +18,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Plus, Target, ChevronDown, ChevronRight, ArrowUpRight } from 'lucide-react'
 import { ShelvesButton } from '@/components/reference/ShelvesButton'
 import { MastheadCard, PeriodNavEyebrow } from '@/components/layout/MastheadCard'
+import { PlanningEntryPaths } from './PlanningEntryPaths'
 import { HomeChromeControls } from '@/components/home/HomeChromeControls'
 import { DomainSwitcher } from '@/components/domain/DomainSwitcher'
 import { useAppShellChromeOptional } from '@/contexts/AppShellChromeContext'
@@ -533,7 +534,7 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
       label: 'Undo',
       onClick: () => { void gated.updateTask(taskId, previous) },
     })
-  }, [tasks, level, bounds.start, timingPeriodLabel, gated])
+  }, [tasks, timingPeriodLabel, gated])
 
   const planWeekSlot = useCallback((row: PlanRowModel) => {
     if (level === 'year') return null
@@ -902,6 +903,14 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
           </button>
         )}
       </div>
+
+      {/* Three optional ways in. Above the status line, because it is an
+          offer about where to begin, not a summary of this page. Hidden over
+          a period that has ended (a look-back is not a starting point) and
+          while a session is open (the reader is mid-draft). */}
+      {!isPast && !sessionOpen && (
+        <PlanningEntryPaths here={level === 'month' ? 'weeks' : level === 'season' ? 'season' : null} />
+      )}
 
       {/* Guided planning: whether this month is planned, and the door into
           the session. Month and season; a past period is a look-back. */}
