@@ -4,7 +4,7 @@
 // offers right now. Shared by This Month / This Season / This Year so the
 // three pages read as one surface.
 
-import { useRef, useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { Check, Target, ArrowRight, ArrowUpRight, ArrowDownRight, Sun, CalendarDays, Archive, Trash2, Repeat, ChevronRight, ChevronDown, Plus } from 'lucide-react'
 import type { PlacementFate } from '@/lib/planning/lineage'
 import type { RowAction } from '@/lib/planning/periodPage'
@@ -228,12 +228,22 @@ export function PlanRow({
   const tally = counts ?? stepCounts(row)
   const [stepDraft, setStepDraft] = useState('')
   const stepInputRef = useRef<HTMLInputElement>(null)
-  /** Open the goal and put the cursor in its composer, from one press. */
+  /**
+   * "+ Add a step" on a collapsed goal opens it AND puts the cursor in its
+   * composer. The focus waits for an effect rather than a frame: the page's
+   * own goal composer focuses itself on render, and a rAF handoff lost the
+   * race to it (seen live, 2026-09-24).
+   */
+  const [wantStepFocus, setWantStepFocus] = useState(false)
   const addStepHere = () => {
+    setWantStepFocus(true)
     if (!expanded) onToggleExpand?.(row)
-    // After the children mount. A goal already open focuses immediately.
-    requestAnimationFrame(() => stepInputRef.current?.focus())
   }
+  useEffect(() => {
+    if (!wantStepFocus || !expanded) return
+    stepInputRef.current?.focus()
+    setWantStepFocus(false)
+  }, [wantStepFocus, expanded])
   // A hairline between rows, and the hover runs the full width of the card:
   // inside a divided list a rounded, inset hover reads as a floating chip
   // (Scott, 2026-09-13). The last row leaves its border off so the card's

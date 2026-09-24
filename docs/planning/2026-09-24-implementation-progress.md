@@ -1151,3 +1151,83 @@ reload: event “QA drag fixture 2026-09-24 (delete me)”, Google id
 party, goals and tasks were read only.
 
 **Preview:** `:5199` rebuilt and serving `f85cb626`.
+
+---
+
+## S — Month and review, at a realistic size  ·  16:40 ET
+
+Scott approved the inline Month/review direction and asked for the part two
+sample goals cannot show. Read the mockup as direction only; everything here
+is built on existing components and domain operations.
+
+### The rules live in one pure function
+
+`lib/planning/goalListView.ts` — so they can be held by tests against **30
+goals, 200 tasks and a goal with 60 steps** instead of argued about in a
+component.
+
+- **Parent context survives the filter.** A matching step is never orphaned;
+  its goal comes with it. A goal that matches keeps **all** its steps, because
+  the reader asked for the goal, not a subset of it.
+- **Hiding is always counted** — by the filter, the completed fold, or the
+  reveal bound. That is the difference between a bound and a cap.
+- **Completed work is always reachable in review**, and folds away outside it
+  only when the reader says so.
+- **The filter is presentation only.** `goalRows` and the draft stay the source
+  for everything that writes.
+
+### In the Month list
+
+A collapsed goal states **“45 open · 15 done”**. **“+ Add a step” is reachable
+without opening the goal**, and opens it with the cursor in the composer. A long
+goal draws a bounded slice and offers **“Show all 60 steps · 37 more”**. The
+filter appears once a list is long enough to need it; both controls are
+full-size touch targets that stack on a phone; long titles wrap. **Which goals
+are open is remembered per period**, so a detail round trip no longer collapses
+thirty of them.
+
+### In the review
+
+Each step is drawn **under its own goal**, completed work **kept and marked**,
+using the same model — the fix for “separate flat goal/task lists and no
+visible completed song step”. A task with no goal, or one whose goal is not on
+this list, still stands on its own. The filter carries the line *“Save still
+writes your whole plan”*, and a regression proves it.
+
+### Two defects found while checking it live, both fixed
+
+1. **“+ Add a step” focused the wrong field.** The page's goal composer
+   re-focuses itself on render and won the race against a `requestAnimationFrame`
+   handoff. Focus now waits for an effect after the composer mounts.
+2. **The completed-steps disclosure only appeared on long lists.** On a
+   four-goal month, finished steps folded away *and the control to see them was
+   absent* — hidden work with no way to reach it. The fold now appears whenever
+   any step is finished; the filter still waits for a long list.
+
+### Evidence
+
+**Automated:** 6996 passing (only the pre-existing `connectors/whatsapp`
+collection error), tsc clean, eslint 0 errors, build clean. 34 new tests — 19 on
+the model with the dense fixtures, 5 on persistence, 5 on `PlanRow`, 3 on the
+disclosure, 5 on the review including **filtered-save** and **failed-save
+retry without duplicates**.
+
+**Live, on `:5199`, with fixture “QA long-list goal 2026-09-24 (delete me)”**
+(`973a86af-ce5a-4598-9b36-b3861e9b1ef7`): “+ Add a step” on a collapsed goal
+expanded it and focused its composer; counts read “2 open · hide” and “1 done ·
+show” across Scott's real October goals; completing a step folded it away and
+the disclosure brought it back; **the goal was still open after a full page
+reload**. Fixture deleted; Scott's three October goals confirmed intact.
+
+### Unresolved, for your decision
+
+- **Optional parent linking** is in the mockup as a per-goal “Link to a season
+  goal (optional)” control. I have **not** built it: you established there is no
+  UI for month→season or year→season linking anywhere, so this is the missing
+  capability rather than a long-list concern, and it wants its own commit and
+  its own acceptance. Say the word and it is next.
+- **Per-goal status (Active/Completed/Archived)** in the mockup's goal head is
+  likewise a separate capability from step completion; the list keeps them
+  separate today but exposes no status control on the Month row.
+- The dense fixtures are **synthetic, in tests only**. Nothing was seeded into
+  the demo account, so the 30/200/60 behaviour has not been seen in a browser.

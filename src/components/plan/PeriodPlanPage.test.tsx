@@ -1703,3 +1703,39 @@ describe('a month with a realistic number of goals', () => {
     expect(screen.getByLabelText('New step for Goal number 7')).toBeInTheDocument()
   })
 })
+
+// A fold that is missing while work is hidden behind it is how work goes
+// missing. Found live on a four-goal month, 2026-09-24.
+describe('the completed-steps disclosure', () => {
+  beforeEach(() => {
+    pinClock(); localStorage.clear()
+    state.tasks = []; state.goals = []; state.loading = false; routinesState.routines = []
+    domainState.layers = new Set(['work', 'family', 'personal', 'unsorted']); domainState.soleDomain = null
+    seasonsState.seasons = DEFAULT_SEASONS; seasonsState.loading = false
+    Object.values(hook).forEach((f) => f.mockClear())
+  })
+  afterEach(() => { vi.useRealTimers() })
+
+  it('appears on a SHORT list as soon as a step is completed', () => {
+    state.tasks = [
+      task({ id: 'g', title: 'One goal', isGoal: true, monthStart: thisMonth }),
+      task({ id: 's1', title: 'Open step', goalTaskId: 'g', monthStart: thisMonth }),
+      task({ id: 's2', title: 'Finished step', goalTaskId: 'g', monthStart: thisMonth, completed: true }),
+    ]
+    renderPage('month')
+    fireEvent.click(screen.getByRole('button', { name: /Show steps under One goal/ }))
+    expect(screen.queryByText('Finished step')).not.toBeInTheDocument()
+    // …and the way to see it is right there, on a list of one goal.
+    fireEvent.click(screen.getByRole('button', { name: 'Show completed steps' }))
+    expect(screen.getByText('Finished step')).toBeInTheDocument()
+  })
+
+  it('stays away when there is nothing finished to disclose', () => {
+    state.tasks = [
+      task({ id: 'g', title: 'One goal', isGoal: true, monthStart: thisMonth }),
+      task({ id: 's1', title: 'Open step', goalTaskId: 'g', monthStart: thisMonth }),
+    ]
+    renderPage('month')
+    expect(screen.queryByRole('button', { name: /completed steps/i })).toBeNull()
+  })
+})

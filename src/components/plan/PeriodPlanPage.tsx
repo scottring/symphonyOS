@@ -643,6 +643,12 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
     revealed: revealedGoals,
   }), [openGoalRows, goalQuery, showCompletedSteps, expandedGoals, revealedGoals])
   const goalsHidden = hiddenLabel(goalView)
+  /** Is there any finished step to disclose? A fold with nothing behind it is
+   *  noise; a fold that is missing while work IS hidden is a trap. */
+  const anyCompletedSteps = useMemo(
+    () => openGoalRows.some((r) => (r.steps ?? []).some((st) => rowIsDone(st.fate))),
+    [openGoalRows],
+  )
 
   const goalComposerOpen = !isPast && (addingGoal || goalRows.length === 0)
 
@@ -1031,19 +1037,27 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
                 <>
                   {/* A filter and a completed fold, shown only once the list is
                       long enough to need them — on two goals they are clutter. */}
-                  {(openGoalRows.length > 4 || goalQuery) && (
+                  {/* The filter earns its place only on a long list. The
+                      completed fold appears whenever there is finished work
+                      behind it — hiding steps AND the way to see them is how
+                      work goes missing. */}
+                  {(openGoalRows.length > 4 || goalQuery || anyCompletedSteps) && (
                     <div className="period-goals-tools">
-                      <input
-                        type="search"
-                        value={goalQuery}
-                        onChange={(e) => setGoalQuery(e.target.value)}
-                        aria-label={`Filter ${bounds.label} goals and steps`}
-                        placeholder="Filter goals and steps…"
-                        className="period-goals-filter"
-                      />
-                      <button type="button" onClick={toggleCompletedSteps} className="period-goals-toggle">
-                        {showCompletedSteps ? 'Hide completed steps' : 'Show completed steps'}
-                      </button>
+                      {(openGoalRows.length > 4 || goalQuery) && (
+                        <input
+                          type="search"
+                          value={goalQuery}
+                          onChange={(e) => setGoalQuery(e.target.value)}
+                          aria-label={`Filter ${bounds.label} goals and steps`}
+                          placeholder="Filter goals and steps…"
+                          className="period-goals-filter"
+                        />
+                      )}
+                      {anyCompletedSteps && (
+                        <button type="button" onClick={toggleCompletedSteps} className="period-goals-toggle">
+                          {showCompletedSteps ? 'Hide completed steps' : 'Show completed steps'}
+                        </button>
+                      )}
                     </div>
                   )}
                   {/* What the filter is keeping off the screen, said plainly —
