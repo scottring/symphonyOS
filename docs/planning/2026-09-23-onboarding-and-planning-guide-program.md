@@ -279,3 +279,20 @@ specific methods; this note records the reference, not a completed literature re
 Develop original Symphony exercises and explicitly distinguish our adaptations from
 her guidance. Design the worksheets alongside scan-and-review, preserving the user's
 intent and allowing dialogue before creating commitments.
+
+### 2026-09-24 — Usability drafting delegated; priority correction
+
+Scott asked Codex to assign the drafting work to the existing Claude session.
+Codex sent a bounded brief for an original planning-guide content draft and a
+clickable standalone planning-flow mockup, with no application/data/deployment changes.
+Codex retains design direction and review. Scott clarified that enjoyable activities
+should not receive special emphasis: prioritize clarity, efficient planning, accurate
+interpretation, and fewer steps. Best Laid Plans remains a reference, particularly
+monthly/nested and seasonal planning; fun is not a separate design requirement.
+
+Review gates: timing usable without opening details; visible goal/period relationship;
+no forced horizon ladder; existing plans visible during review; accurate no-change and
+save feedback; paper interpretation distinguishable from commitments; editable proposed
+classification/relationships before approval; no invented dates/owners; individuals and
+families both supported. AI dialogue is a proposed interface, not a promised working
+agent. Show and review the proposal before any application implementation.
