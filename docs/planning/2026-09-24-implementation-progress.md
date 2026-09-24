@@ -414,3 +414,40 @@ paper instead.
 **Not verified:** nothing has been printed on actual paper, and nobody has walked
 `/guide` in a signed-in browser. The Chromium check is the evidence, and it is
 headless.
+
+---
+
+## Where this stands  ·  11:10 ET
+
+Branch `claude/onboarding-program`, four new commits, nothing pushed, no PR.
+
+| | |
+| --- | --- |
+| `0c546ab1` | removal releases the week; Undo puts back the week that was chosen |
+| `8f7e4d32` | one routine confirmation, after the write |
+| `10d203bf` | the printable planning guide at `/guide` |
+| `8cece318` | three optional entry paths |
+
+Codex's two documents in `docs/planning/` are left uncommitted and untouched.
+
+**Verified:** 6861 tests passing (only the pre-existing `connectors/whatsapp`
+collection error), tsc `-p tsconfig.app.json` clean, eslint 0 errors, build clean,
+all four of Codex's independent removal tests passing from the repo root, and the
+headless print check passing at Letter and A4. `dist` rebuilt at 11:03, so **:5199
+now serves this code** rather than the 06:43 build Codex was walking.
+
+**Not verified — needs Codex's browser:**
+
+1. That exactly one toast is mounted on a routine completion (no HomeView harness).
+2. The whole removal/Undo flow in the running app: create → goal/action → future week
+   → untimed day → complete/undo → day and week removal → Plan October unchanged →
+   reload. The unit round trips are honest about the placement engine, not about the
+   page.
+3. `/guide` in a signed-in browser, and one sheet on real paper.
+4. The three doors in place on `/month` and `/season` — including the judgement call
+   about keeping them off Today.
+
+**Still open:** duplicate CAPTURE notifications (a different path from S3-12);
+`lowerPlacement:154` resolving a bucket-week row with nothing saved to "This week"
+against today; `onSkipRoutine`/`onSkipEvent` still announce without checking the
+write's result.
