@@ -248,6 +248,29 @@ export function PlanRow({
     stepInputRef.current?.focus()
     setWantStepFocus(false)
   }, [wantStepFocus, expanded])
+  /**
+   * "Show all N steps" deletes itself the moment it is pressed. With a mouse
+   * nobody notices. From the keyboard the element holding focus stops
+   * existing, and focus falls to <body> — the top of the document, every goal
+   * away from the steps that just appeared. Measured on the hydrated page,
+   * 2026-09-24: "after Space on show all, focus = BODY (lost)".
+   *
+   * So focus moves INTO what appeared, landing on the first newly revealed
+   * step, which is also what a screen reader needs to hear. If the reveal did
+   * not happen, focus stays on the counts control rather than nowhere.
+   */
+  const stepsRef = useRef<HTMLUListElement>(null)
+  const countsRef = useRef<HTMLButtonElement>(null)
+  const revealFrom = useRef<number | null>(null)
+  const revealAll = () => { revealFrom.current = shown.length; onShowAllSteps?.(row) }
+  useEffect(() => {
+    const from = revealFrom.current
+    if (from === null || shown.length <= from) return
+    revealFrom.current = null
+    const li = stepsRef.current?.children[from] as HTMLElement | undefined
+    const target = li?.querySelector<HTMLElement>('button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled])')
+    ;(target ?? countsRef.current)?.focus()
+  }, [shown.length])
   // A hairline between rows, and the hover runs the full width of the card:
   // inside a divided list a rounded, inset hover reads as a floating chip
   // (Scott, 2026-09-13). The last row leaves its border off so the card's
@@ -316,7 +339,7 @@ export function PlanRow({
         {canHoldSteps && (tally.total > 0 || !!onAddStep) && (
           <span className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs">
             {tally.total > 0 && (
-              <button type="button" onClick={() => onToggleExpand?.(row)} className="text-primary-700 hover:underline">
+              <button ref={countsRef} type="button" onClick={() => onToggleExpand?.(row)} className="text-primary-700 hover:underline">
                 {countsLabel(tally)}{expanded ? ' · hide' : ' · show'}
               </button>
             )}
@@ -391,7 +414,7 @@ export function PlanRow({
       /* The steps are their own list items in the same <ul>, indented rather
          than nested in a second list, so a screen reader reads one flat plan. */
       <li className="border-b border-neutral-200 last:border-0">
-        <ul className="period-plan-steps">
+        <ul ref={stepsRef} className="period-plan-steps">
           {shown.map((step) => (
             <PlanRow
               key={step.id}
@@ -411,7 +434,7 @@ export function PlanRow({
           <div className="period-plan-steps pb-1">
             <button
               type="button"
-              onClick={() => onShowAllSteps?.(row)}
+              onClick={revealAll}
               className="text-xs font-medium text-primary-700 hover:underline"
             >
               Show all {tally.total} steps · {hiddenByReveal} more

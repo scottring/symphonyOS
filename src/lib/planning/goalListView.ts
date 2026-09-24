@@ -214,3 +214,24 @@ export function planRowsFor(
     loose,
   }
 }
+
+/**
+ * Escape empties a filter box and keeps the cursor in it.
+ *
+ * The only way out of a typed filter was to select the text and delete it:
+ * the list has no visible clear control, and a `type="search"` box only gets
+ * one in WebKit. Escape is what the platform trains for a search field, and
+ * without it a keyboard-only reader could not undo a filter (measured on the
+ * hydrated page, 2026-09-24 — `filter after Escape = "album"`).
+ *
+ * `stopPropagation` keeps it to one layer, the way `usePopoverFocus` does:
+ * clearing the filter must not also close the panel around it.
+ */
+export function clearFilterOnEscape(value: string, clear: () => void) {
+  return (e: import('react').KeyboardEvent<HTMLInputElement>) => {
+    if (e.key !== 'Escape' || !value) return
+    e.preventDefault()
+    e.stopPropagation()
+    clear()
+  }
+}

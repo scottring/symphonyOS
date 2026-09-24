@@ -11,7 +11,7 @@ import { Target, Check } from 'lucide-react'
 import type { Task } from '@/types/task'
 import { DOMAINS, type DomainId } from '@/lib/domains'
 import { verdictOptions, summarize, weekTaskListLabel, placementLevelOf, type SessionDraft, type SessionLevel, type Verdict } from '@/lib/planning/session'
-import { goalListView, planRowsFor, hiddenLabel, countsLabel } from '@/lib/planning/goalListView'
+import { goalListView, planRowsFor, hiddenLabel, countsLabel, clearFilterOnEscape } from '@/lib/planning/goalListView'
 import { stepsThatCarryForward } from '@/lib/planning/goalSteps'
 import { Hint } from './Hint'
 
@@ -230,6 +230,7 @@ export function PlanSession({ level, aboveLabel, dayOptions = [], periodLabel: P
             {(manyRows || planFilter) && (
               <div className="period-goals-tools mt-2">
                 <input type="search" value={planFilter} onChange={(e) => setPlanFilter(e.target.value)}
+                  onKeyDown={clearFilterOnEscape(planFilter, () => setPlanFilter(''))}
                   aria-label={`Filter your ${P} plan`} placeholder="Filter this plan…" className="period-goals-filter" />
               </div>
             )}

@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, within, cleanup, waitFor, act } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { ReferenceListsProvider, useReferenceLists } from '@/components/reference/ReferenceListsContext'
 import { MemoryRouter, useSearchParams } from 'react-router-dom'
 import type { Task } from '@/types/task'
@@ -2031,5 +2032,172 @@ describe('the review is given the completed work too', () => {
     const done = within(counts.closest('li')!).getByText('Use an old chord progression')
     expect(done.className).toMatch(/line-through/)
     expect(within(done.closest('li')!).getByText('completed')).toBeInTheDocument()
+  })
+})
+
+// The adjacent branch Codex asked me to inspect after the month fix: the
+// year's own list filtered `status === 'active'`, so a goal FINISHED this
+// year vanished from the year review — the same defect, one branch over.
+describe('the year review is given the completed goals too', () => {
+  beforeEach(() => {
+    pinClock(); localStorage.clear()
+    state.tasks = []
+    state.goals = [
+      goal({ id: 'yopen', name: 'Run a half marathon' }),
+      goal({ id: 'ydone', name: 'Move the family to a bigger house', status: 'completed' }),
+      // Archived is the one status that was deliberately let go; it stays out.
+      goal({ id: 'ygone', name: 'Learn the cello', status: 'archived' }),
+    ]
+    state.loading = false; routinesState.routines = []
+    domainState.layers = new Set(['work', 'family', 'personal', 'unsorted']); domainState.soleDomain = null
+    seasonsState.seasons = DEFAULT_SEASONS; seasonsState.loading = false
+    Object.values(hook).forEach((f) => f.mockClear())
+  })
+  afterEach(() => { vi.useRealTimers() })
+
+  it('shows this year’s finished goal, struck through, and still hides the archived one', () => {
+    renderPage('year')
+    fireEvent.click(screen.getByRole('button', { name: `Plan ${now.getFullYear()}` }))
+    // No goals for last year, so the session opens straight on the Plan step.
+    const done = screen.getByText('Move the family to a bigger house')
+    expect(done.className).toMatch(/line-through/)
+    expect(screen.getByText('Run a half marathon')).toBeInTheDocument()
+    expect(screen.queryByText('Learn the cello')).not.toBeInTheDocument()
+  })
+})
+
+// ── Keyboard-only operation of the long list ────────────────────────────────
+//
+// Codex, 2026-09-24: "Test keyboard-only Tab/Shift-Tab/Enter/Space/Escape
+// operation of actual hydrated long-list components: filter, expand, show all,
+// completed disclosure, focus visibility/restoration… static geometry is not
+// enough."
+//
+// So this drives the REAL page with real key events — not a static snapshot of
+// its markup. What a DOM without layout cannot answer (does the focus ring
+// actually paint, does the row fit at 390px) is measured separately, in a real
+// browser, by outputs/plan-keyboard.
+describe('the long list can be worked entirely from the keyboard', () => {
+  const user = () => userEvent.setup({ delay: null })
+  const bigGoal = 'Record the album'
+
+  beforeEach(() => {
+    pinClock(); localStorage.clear()
+    // Long enough for the filter to appear (scannableRows > 8), with one goal
+    // past the step-reveal bound and one finished step behind the fold.
+    state.tasks = [
+      task({ id: 'gbig', title: bigGoal, isGoal: true, monthStart: thisMonth }),
+      ...Array.from({ length: 12 }, (_, i) => task({
+        id: `sbig${i}`, title: `Album step ${i}`, goalTaskId: 'gbig', monthStart: thisMonth,
+        completed: i === 0,
+      })),
+      ...Array.from({ length: 9 }, (_, i) => task({
+        id: `g${i}`, title: `Goal number ${i}`, isGoal: true, monthStart: thisMonth,
+      })),
+    ]
+    state.goals = []; state.loading = false; routinesState.routines = []
+    domainState.layers = new Set(['work', 'family', 'personal', 'unsorted']); domainState.soleDomain = null
+    seasonsState.seasons = DEFAULT_SEASONS; seasonsState.loading = false
+    Object.values(hook).forEach((f) => f.mockClear())
+  })
+  afterEach(() => { vi.useRealTimers() })
+
+  /** Tab forward up to `max` times, collecting what each stop focused. */
+  const walk = async (u: ReturnType<typeof user>, max = 60) => {
+    const seen: string[] = []
+    for (let i = 0; i < max; i++) {
+      await u.tab()
+      const el = document.activeElement as HTMLElement | null
+      if (!el || el === document.body) break
+      seen.push(`${el.tagName.toLowerCase()}:${(el.getAttribute('aria-label') || el.textContent || '').trim().slice(0, 40)}`)
+    }
+    return seen
+  }
+
+  it('tabs to the filter and the completed fold without leaving the list', async () => {
+    const u = user()
+    renderPage('month')
+    const seen = await walk(u, 20)
+    // Reached in order, from the top of the page, with no stop that traps.
+    const filter = seen.findIndex((l) => l.startsWith('input:Filter'))
+    const fold = seen.findIndex((l) => l === 'button:Show completed steps')
+    const firstGoal = seen.findIndex((l) => l.includes('Record the album'))
+    expect(filter).toBeGreaterThan(-1)
+    expect(fold).toBe(filter + 1)
+    expect(firstGoal).toBeGreaterThan(fold)
+    // And Shift-Tab walks back out the way it came in.
+    const here = document.activeElement
+    await u.tab({ shift: true })
+    expect(document.activeElement).not.toBe(here)
+    expect(document.activeElement).not.toBe(document.body)
+  })
+
+  it('opens a goal with Enter, keeping focus on the control that opened it', async () => {
+    const u = user()
+    renderPage('month')
+    const counts = screen.getByRole('button', { name: '11 open · 1 done · show' })
+    counts.focus()
+    await u.keyboard('{Enter}')
+    expect(screen.getByRole('button', { name: '11 open · 1 done · hide' })).toBe(document.activeElement)
+    await u.keyboard('{Enter}')
+    expect(screen.getByRole('button', { name: '11 open · 1 done · show' })).toBe(document.activeElement)
+  })
+
+  it('works the completed fold with Space, and the label says what it will do', async () => {
+    const u = user()
+    renderPage('month')
+    const fold = screen.getByRole('button', { name: 'Show completed steps' })
+    fold.focus()
+    await u.keyboard(' ')
+    const after = screen.getByRole('button', { name: 'Hide completed steps' })
+    expect(after).toBe(document.activeElement)
+    await u.keyboard(' ')
+    expect(screen.getByRole('button', { name: 'Show completed steps' })).toBe(document.activeElement)
+  })
+
+  // The defect this batch found: the button deletes itself, and focus fell to
+  // <body> — the top of the page, every goal away from the new steps.
+  it('keeps focus in the list when "Show all" removes itself', async () => {
+    const u = user()
+    renderPage('month')
+    fireEvent.click(screen.getByRole('button', { name: '11 open · 1 done · show' }))
+    const showAll = screen.getByRole('button', { name: /Show all 12 steps/ })
+    showAll.focus()
+    await u.keyboard(' ')
+    expect(screen.queryByRole('button', { name: /Show all/ })).not.toBeInTheDocument()
+    expect(document.activeElement).not.toBe(document.body)
+    // …and it lands on the first step that just appeared, not back at the top.
+    const landed = document.activeElement as HTMLElement
+    expect(within(landed.closest('li')!).getByText('Album step 9')).toBeInTheDocument()
+  })
+
+  it('clears the filter with Escape and leaves the cursor in it', async () => {
+    const u = user()
+    renderPage('month')
+    const filter = screen.getByLabelText(/Filter .* goals and steps/) as HTMLInputElement
+    filter.focus()
+    await u.keyboard('album')
+    expect(filter.value).toBe('album')
+    expect(screen.getByText(/Filtering does not change what will be saved/)).toBeInTheDocument()
+    await u.keyboard('{Escape}')
+    expect(filter.value).toBe('')
+    expect(document.activeElement).toBe(filter)
+    expect(screen.getByText('Goal number 0')).toBeInTheDocument()
+  })
+
+  // The timing popover is portalled to the end of <body>; without the shared
+  // popover-focus hook a keyboard user tabbing off the trigger skipped it.
+  it('closes the timing menu with Escape and comes back to its trigger', async () => {
+    const u = user()
+    renderPage('month')
+    fireEvent.click(screen.getByRole('button', { name: '11 open · 1 done · show' }))
+    const trigger = document.querySelectorAll('.plan-timing-trigger')[0] as HTMLElement
+    trigger.focus()
+    await u.keyboard('{Enter}')
+    expect(screen.getByRole('menu')).toBeInTheDocument()
+    expect(screen.getByRole('menu').contains(document.activeElement)).toBe(true)
+    await u.keyboard('{Escape}')
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument()
+    expect(document.activeElement).toBe(trigger)
   })
 })

@@ -25,7 +25,7 @@ import { PAGE_COLUMN_WIDE } from '@/components/layout/pageLayout'
 import { useSupabaseTasks } from '@/hooks/useSupabaseTasks'
 import { useActionableInstances } from '@/hooks/useActionableInstances'
 import { makePlanActions, timingRemoval } from '@/lib/planning/planActions'
-import { goalListView, hiddenLabel } from '@/lib/planning/goalListView'
+import { goalListView, hiddenLabel, clearFilterOnEscape } from '@/lib/planning/goalListView'
 import { GoalParentLink, GoalStatusControl, parentRungLabel } from './GoalParentLink'
 import { expansionKey, readExpanded, writeExpanded } from './goalExpansion'
 import { planDropHandlers } from '@/lib/planning/planDrag'
@@ -746,10 +746,19 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
     () => (isYearSession ? new Set<string>() : goalsWithHiddenSteps(tasks, back.open, bounds.prev, placeLevel, seasons)),
     [isYearSession, tasks, back.open, bounds.prev, placeLevel, seasons],
   )
-  // The year's "current" list is this year's live goals, as rows.
+  // The year's "current" list is this year's goals, as rows.
+  //
+  // `status !== 'archived'` rather than `=== 'active'`: a goal FINISHED this
+  // year belongs in the year's own review for the same reason a finished
+  // month step does — the review is where completed work most needs to be
+  // visible, and `goalAsRow` already marks it `completed` so the list draws
+  // it struck through. Archived is the one status that was deliberately let
+  // go, and it stays out (same rule as `aboveGoalItems` below). This list
+  // feeds only the plan session; the page's own goal card is built elsewhere,
+  // so nothing else on the year page changes. (Codex, 2026-09-24.)
   const currentPeriodTasks = useMemo(
     () => (isYearSession
-      ? goals.filter((g) => g.year === periodYear && g.status === 'active' && matchesLayers(g.context, layers)).map(goalAsRow)
+      ? goals.filter((g) => g.year === periodYear && g.status !== 'archived' && matchesLayers(g.context, layers)).map(goalAsRow)
       // Completed rows are KEPT. The review is where finished work most needs
       // to be visible — it draws each one struck through and marked — and
       // stripping them here is why "no visible completed song step" survived
@@ -1146,6 +1155,7 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
                           type="search"
                           value={goalQuery}
                           onChange={(e) => setGoalQuery(e.target.value)}
+                          onKeyDown={clearFilterOnEscape(goalQuery, () => setGoalQuery(''))}
                           aria-label={`Filter ${bounds.label} goals and steps`}
                           placeholder="Filter goals and steps…"
                           className="period-goals-filter"
