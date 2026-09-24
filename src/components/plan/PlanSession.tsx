@@ -107,6 +107,15 @@ export function PlanSession({ level, aboveLabel, dayOptions = [], periodLabel: P
     ...monthGoals.map((g) => ({ id: g.id, title: g.title, context: g.context ?? null })),
     ...draft.newGoals.map((g) => ({ id: g.id, title: g.title, context: g.context ?? null })),
   ]
+  // Is there anything for Save to write? A reflection note counts: it is
+  // saved on the session record even when no row changed.
+  const nothingToSave = useMemo(() => {
+    const d = draft
+    return Object.keys(d.verdicts).length === 0
+      && d.newGoals.length === 0 && d.newTasks.length === 0 && d.takenFromAbove.length === 0
+      && !d.wentWell.trim() && !d.didnt.trim()
+  }, [draft])
+
   const lines = useMemo(() => summarize(draft, { open, above, aboveGoals, current, hiddenStepGoals, periodLabel: P, prevLabel: Q, aboveLabel }), [draft, open, above, aboveGoals, current, hiddenStepGoals, P, Q, aboveLabel])
 
   const steps: Array<[Step, string]> = [['back', `Look back at ${Q}`], ['plan', `Plan ${P}`], ['save', 'Save']]
@@ -271,18 +280,50 @@ export function PlanSession({ level, aboveLabel, dayOptions = [], periodLabel: P
         {step === 'save' && (
           <section>
             <h2 className="font-display text-xl text-neutral-800">{copy.saveHead}</h2>
+            {/* "Nothing is saved yet" was said over periods that already held
+                a goal and three tasks, which read as "your work is gone"
+                (S3-04). The sentence is about the CHANGES on this screen, and
+                when there are none it says so instead (requirement 7). */}
             {saveError
               ? <p role="alert" className="mt-1 text-sm text-accent-700">Some of this didn't save. It's still here and in your draft; Save again retries only these.</p>
-              : <p className="mt-1 text-sm text-neutral-500">Nothing is saved yet.</p>}
+              : nothingToSave
+                ? <p className="mt-1 text-sm text-neutral-600">Your {P} plan is unchanged. Nothing will be written.</p>
+                : <p className="mt-1 text-sm text-neutral-500">These changes are not saved yet.</p>}
             {needsDomain.length > 0 && <fieldset className="my-3 rounded border border-neutral-200 p-3"><legend className="text-sm">Choose where these items belong before saving</legend><p className="mb-2 text-xs text-neutral-500">Family is shared with your household. Personal and Work stay private.</p>{needsDomain.map(task => <label key={task.id} className="mb-2 flex flex-wrap items-center justify-between gap-2 text-sm">{task.title}<select aria-label={`Domain for ${task.title}`} value={draft.domains?.[task.id] ?? ''} onChange={event => { const domains = { ...draft.domains }; if (event.target.value) domains[task.id] = event.target.value as DomainId; else delete domains[task.id]; set({ domains }) }} className="rounded border border-neutral-200 p-2"><option value="">Choose a domain</option>{DOMAINS.map(domain => <option key={domain.id} value={domain.id}>{domain.label}</option>)}</select></label>)}</fieldset>}
 
-            <ul className="mt-3 rounded-lg bg-sage-50 px-4 py-2">
-              {lines.length === 0 && <li className="py-1.5 text-sm text-neutral-500">Nothing chosen.</li>}
-              {lines.map((l, i) => (
-                <li key={i} className="grid grid-cols-1 gap-1 border-t border-sage-100 py-1.5 text-sm first:border-t-0 sm:grid-cols-2">
-                  <span className="text-neutral-800">{l.title}</span><span className="text-neutral-600">→ {l.destination}</span>
-                </li>))}
-            </ul>
+            {/* The existing plan, beside the proposed edits rather than
+                replaced by them: a session must start from saved work and
+                keep it visible while changes are being reviewed. Completed
+                work is included — it is what this period got done. */}
+            {(monthGoals.length > 0 || monthTasks.length > 0) && (
+              <section aria-label={`Already in your ${P} plan`} className="mt-3">
+                <h3 className="text-[11px] font-semibold uppercase tracking-wider text-neutral-400">Already in your {P} plan</h3>
+                <ul className="mt-1">
+                  {monthGoals.map((g) => (
+                    <li key={g.id} className="flex items-center gap-2 border-b border-neutral-100 py-1.5 text-sm last:border-0">
+                      <Target className="h-3.5 w-3.5 shrink-0 text-accent-600" aria-hidden="true" />
+                      <span className={g.completed ? 'text-neutral-400 line-through' : 'text-neutral-700'}>{g.title}</span>
+                    </li>))}
+                  {monthTasks.map((x) => (
+                    <li key={x.id} className="border-b border-neutral-100 py-1.5 text-sm last:border-0">
+                      <span className={x.completed ? 'text-neutral-400 line-through' : 'text-neutral-700'}>{x.title}</span>
+                      {x.completed && <span className="ml-1.5 text-[11px] text-neutral-400">completed</span>}
+                    </li>))}
+                </ul>
+              </section>
+            )}
+
+            {lines.length > 0 && (
+              <>
+                <h3 className="mt-4 text-[11px] font-semibold uppercase tracking-wider text-neutral-400">What Save will change</h3>
+                <ul className="mt-1 rounded-lg bg-sage-50 px-4 py-2">
+                  {lines.map((l, i) => (
+                    <li key={i} className="grid grid-cols-1 gap-1 border-t border-sage-100 py-1.5 text-sm first:border-t-0 sm:grid-cols-2">
+                      <span className="text-neutral-800">{l.title}</span><span className="text-neutral-600">→ {l.destination}</span>
+                    </li>))}
+                </ul>
+              </>
+            )}
           </section>
         )}
 
@@ -293,7 +334,12 @@ export function PlanSession({ level, aboveLabel, dayOptions = [], periodLabel: P
           <button type="button" disabled={saving} className="rounded-md border border-neutral-200 px-3 py-1.5 text-sm disabled:opacity-60" onClick={onClose}>Close · keep my draft</button>
           {step === 'back' && <button type="button" className="rounded-md bg-primary-600 px-3 py-1.5 text-sm font-semibold text-white" onClick={() => goTo('plan')}>Next: plan {P} →</button>}
           {step === 'plan' && <button type="button" className="rounded-md bg-primary-600 px-3 py-1.5 text-sm font-semibold text-white" onClick={() => goTo('save')}>Next: save →</button>}
-          {step === 'save' && <button type="button" disabled={saving || missingDomains.length > 0} className="rounded-md bg-primary-600 px-3 py-1.5 text-sm font-semibold text-white disabled:opacity-60" onClick={() => { void onSave() }}>{saving ? 'Saving…' : `Save ${P}`}</button>}
+          {/* An unchanged plan closes without a write. Offering "Save October"
+              over nothing invited a pointless round-trip and implied the
+              existing plan needed saving (requirement 7). */}
+          {step === 'save' && (nothingToSave
+            ? <button type="button" className="rounded-md bg-primary-600 px-3 py-1.5 text-sm font-semibold text-white" onClick={onClose}>Done</button>
+            : <button type="button" disabled={saving || missingDomains.length > 0} className="rounded-md bg-primary-600 px-3 py-1.5 text-sm font-semibold text-white disabled:opacity-60" onClick={() => { void onSave() }}>{saving ? 'Saving…' : `Save ${P}`}</button>)}
         </div>
       </div>
 

@@ -158,3 +158,68 @@ describe('PlanSession — year', () => {
     expect(s.draft.keptIds?.o).toBe(id)
   })
 })
+
+// Requirement 7: a session starts from saved work, says plainly when nothing
+// would change, and closes without a write. "Nothing is saved yet" was shown
+// over months that already held a goal and three tasks (S3-04).
+describe('the save step tells the truth about what is already there', () => {
+  const existing = [
+    t({ id: 'g1', title: 'Take Kaleb to an Islanders game in DC', isGoal: true }),
+    t({ id: 'x1', title: 'Research games dates and tickets' }),
+    t({ id: 'x2', title: 'Buy game tickets', completed: true }),
+  ]
+  /** No look-back rows, so the session opens straight on Plan. */
+  const quiet = { current: existing, finished: [], open: [], above: [], aboveGoals: [] }
+
+  const toSave = () => fireEvent.click(screen.getByRole('button', { name: /next: save/i }))
+
+  it('shows the existing plan on the save step, completed work included', () => {
+    setup(quiet)
+    toSave()
+    const already = within(screen.getByRole('region', { name: /Already in your .* plan/ }))
+    expect(already.getByText('Take Kaleb to an Islanders game in DC')).toBeInTheDocument()
+    expect(already.getByText('Research games dates and tickets')).toBeInTheDocument()
+    expect(already.getByText('Buy game tickets')).toBeInTheDocument()
+    expect(already.getByText('completed')).toBeInTheDocument()
+  })
+
+  it('says the plan is unchanged instead of claiming nothing is saved', () => {
+    setup(quiet)
+    toSave()
+    expect(screen.getByText(/plan is unchanged\. Nothing will be written\./)).toBeInTheDocument()
+    expect(screen.queryByText('Nothing is saved yet.')).toBeNull()
+    expect(screen.queryByText('Nothing chosen.')).toBeNull()
+  })
+
+  it('offers Done, not Save, and closes without writing', () => {
+    const onClose = vi.fn()
+    const { onSave } = setup({ ...quiet, onClose })
+    toSave()
+    expect(screen.queryByRole('button', { name: /^Save / })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Done' }))
+    expect(onClose).toHaveBeenCalled()
+    expect(onSave).not.toHaveBeenCalled()
+  })
+
+  it('once something IS proposed, separates it from the existing plan and offers Save', () => {
+    setup(quiet)
+    fireEvent.change(screen.getByLabelText(/new task for/i), { target: { value: 'Call the box office' } })
+    fireEvent.click(screen.getByRole('button', { name: /add task/i }))
+    toSave()
+    expect(screen.getByText('These changes are not saved yet.')).toBeInTheDocument()
+    expect(screen.getByRole('region', { name: /Already in your .* plan/ })).toBeInTheDocument()
+    expect(screen.getByText('What Save will change')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^Save / })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Done' })).toBeNull()
+  })
+
+  // A reflection note is written to the session record, so it IS a change.
+  it('treats a reflection note alone as something to save', () => {
+    setup({ current: existing, open: [], above: [], aboveGoals: [] })
+    fireEvent.change(screen.getByLabelText(/what went well/i), { target: { value: 'the tickets arrived' } })
+    fireEvent.click(screen.getByRole('button', { name: /next: plan/i }))
+    toSave()
+    expect(screen.getByRole('button', { name: /^Save / })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Done' })).toBeNull()
+  })
+})

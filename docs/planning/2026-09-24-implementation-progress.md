@@ -184,6 +184,27 @@ All five of Codex's A1/A2 findings are now closed.
 Checks: 6823 passing (only the pre-existing `connectors/whatsapp` collection error),
 tsc clean, eslint 0 errors, build clean.
 
+### C — the planning session tells the truth  ·  committed
+
+Status: **done.** S3-04 closed, plus requirement 7.
+
+`PlanSession.tsx`'s save step used to say "Nothing is saved yet" over a period that
+already held a goal and three tasks, with "Nothing chosen" beneath it — a reader was
+told their plan was blank at the moment they were asked to commit to it. Now:
+
+- **The existing plan is on the save step**, in its own "Already in your October
+  plan" section, completed work included and struck through. A session starts from
+  saved work and keeps it visible while edits are reviewed.
+- **The proposed edits are a separate list**, headed "What Save will change", so the
+  two can never be read as one.
+- **An unchanged plan says so** — "Your October plan is unchanged. Nothing will be
+  written." — and the primary button becomes **Done**, which closes without a write.
+  A reflection note counts as a change, because it is written to the session record.
+- Draft keeping, partial-failure retry and the "Some of this didn't save" alert are
+  untouched.
+
+5 tests in `PlanSession.test.tsx`.
+
 ### B (rest) — completion and reopening across views
 
-Status: **next**, with C (planning-session truthfulness) after it.
+Status: **next.** Then the three optional entry paths, then the printable guide.
