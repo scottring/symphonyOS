@@ -350,23 +350,13 @@ export function HomeView({
     pushAction(`Deleted "${task.title}"`, () => {})
   }, [filteredTasks, ctx.onDeleteTask, pushAction])
 
-  const handleCompleteRoutineWithUndo = useCallback((routineId: string, completed: boolean) => {
-    if (!ctx.onCompleteRoutine) return
-    ctx.onCompleteRoutine(routineId, completed)
-    pushAction(
-      completed ? 'Routine completed' : 'Routine marked incomplete',
-      () => ctx.onCompleteRoutine!(routineId, !completed)
-    )
-  }, [ctx.onCompleteRoutine, pushAction])
-
-  const handleCompleteEventWithUndo = useCallback((eventId: string, completed: boolean) => {
-    if (!ctx.onCompleteEvent) return
-    ctx.onCompleteEvent(eventId, completed)
-    pushAction(
-      completed ? 'Event completed' : 'Event marked incomplete',
-      () => ctx.onCompleteEvent!(eventId, !completed)
-    )
-  }, [ctx.onCompleteEvent, pushAction])
+  // Routines and events have NO wrapper here. `useScheduleActions` awaits the
+  // instance write and registers the one named confirmation itself ("Completed
+  // \u201cSchool run\u201d"); a wrapper around it announced a second, generic one
+  // before the write had even been attempted, so one gesture produced two Undo
+  // notifications and the first of them could be a lie (Codex review,
+  // 2026-09-24). A task still needs its wrapper: `onToggleTask` registers
+  // nothing, and its Undo has to write the explicit prior state.
 
   const renderContent = () => {
     if (currentView === 'month') {
@@ -495,10 +485,10 @@ export function HomeView({
           onAssignTask={ctx.onAssignTask}
           onAssignEvent={ctx.onAssignEvent}
           onAssignRoutine={ctx.onAssignRoutine}
-          onCompleteRoutine={handleCompleteRoutineWithUndo}
+          onCompleteRoutine={ctx.onCompleteRoutine}
           onSkipRoutine={ctx.onSkipRoutine}
           onPushRoutine={ctx.onPushRoutine}
-          onCompleteEvent={handleCompleteEventWithUndo}
+          onCompleteEvent={ctx.onCompleteEvent}
           onSkipEvent={ctx.onSkipEvent}
           onPushEvent={ctx.onPushEvent}
         />
@@ -525,8 +515,8 @@ export function HomeView({
         selectedItemId={selectedItemId}
         onSelectItem={onSelectItem}
         onToggleTask={handleToggleTaskWithUndo}
-        onCompleteRoutine={handleCompleteRoutineWithUndo}
-        onCompleteEvent={handleCompleteEventWithUndo}
+        onCompleteRoutine={ctx.onCompleteRoutine}
+        onCompleteEvent={ctx.onCompleteEvent}
         loading={loading}
         viewedDate={viewedDate}
         onDateChange={onDateChange}

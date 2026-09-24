@@ -95,16 +95,27 @@ export function useScheduleActions({
     const routine = allRoutines.find(r => r.id === bareId)
     const routineName = routine?.name || 'Routine'
 
+    // ONE confirmation, registered only once the write has landed. Announcing
+    // before the await claims a completion the database may refuse, and a
+    // second wrapper announcing it too left two Undos for one gesture (Codex
+    // review, 2026-09-24). Reopening is confirmed the same way, so the gesture
+    // is reversible in both directions.
+    const ok = completed
+      ? await markDone('routine', routineId, viewedDate, completedAt)
+      : await undoDone('routine', routineId, viewedDate)
+    refreshDateInstances()
+    if (!ok) return
     if (completed) {
-      await markDone('routine', routineId, viewedDate, completedAt)
       pushAction(`Completed "${routineName}"`, async () => {
         await undoDone('routine', routineId, viewedDate)
         refreshDateInstances()
       })
     } else {
-      await undoDone('routine', routineId, viewedDate)
+      pushAction(`Reopened "${routineName}"`, async () => {
+        await markDone('routine', routineId, viewedDate)
+        refreshDateInstances()
+      })
     }
-    refreshDateInstances()
   }, [allRoutines, viewedDate, markDone, undoDone, refreshDateInstances, pushAction])
 
   const onSkipRoutine = useCallback(async (routineId: string) => {
@@ -150,16 +161,23 @@ export function useScheduleActions({
     const event = events.find(e => (e.google_event_id || e.id) === eventId)
     const eventName = event?.title || 'Event'
 
+    // Same contract as a routine: the confirmation follows the write.
+    const ok = completed
+      ? await markDone('calendar_event', eventId, viewedDate)
+      : await undoDone('calendar_event', eventId, viewedDate)
+    refreshDateInstances()
+    if (!ok) return
     if (completed) {
-      await markDone('calendar_event', eventId, viewedDate)
       pushAction(`Completed "${eventName}"`, async () => {
         await undoDone('calendar_event', eventId, viewedDate)
         refreshDateInstances()
       })
     } else {
-      await undoDone('calendar_event', eventId, viewedDate)
+      pushAction(`Reopened "${eventName}"`, async () => {
+        await markDone('calendar_event', eventId, viewedDate)
+        refreshDateInstances()
+      })
     }
-    refreshDateInstances()
   }, [events, viewedDate, markDone, undoDone, refreshDateInstances, pushAction])
 
   const onSkipEvent = useCallback(async (eventId: string) => {

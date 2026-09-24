@@ -237,3 +237,91 @@ The three optional entry paths, then the printable guide.
 ### Codex urgent independent review — 09:09 ET
 
 Before declaring B complete, read `2026-09-24-codex-implementation-review.md` latest section. Three of four isolated tests of timingRemoval THROUGH planPlacement fail: dated remove-all leaves week open; no-broader remove-all leaves week open; dated Undo fails to restore an explicitly removed week. Current unit tests only inspect patch shape. Full reproduction is in repo root tmp/codex-connected-review/removal.test.ts. No DB writes. Mac is locked, so terminal message/live UI testing are temporarily unavailable; this file is the handoff. Please address before release handoff. Codex has not started demo mutation.
+
+---
+
+## D — the removal blockers Codex reproduced  ·  10:45 ET
+
+Status: **fixed.** All four tests in `tmp/codex-connected-review/removal.test.ts` pass
+(independently rerun from the repository root, unchanged fixture, no DB writes).
+
+### One root cause, not three
+
+`timingRemoval` spoke the legacy dialect — a bucket plus stamps — and the legacy
+dialect **cannot express a removal**. `planPlacement` reads a stamp that is present
+and ignores one that is absent, so `weekStart: undefined` said nothing at all, and
+the week stayed open behind every "Remove day and week". The same gap ran the other
+way on Undo: a dated row's `previous` carried `bucket: 'timed'`, which is not a rung,
+so the restore path matched no branch and put the date back without the week.
+
+A third trap sat underneath: a dated row's cached `weekStart` is the week its **date**
+falls in, not a week anyone chose. Restoring it would have moved a task committed to
+Oct 11 into the week of Oct 4 — so restoring the cache was never an option either.
+
+### The repair — commitments are stated outright
+
+- **`planPlacement` understands a STATED commitment list** (`intentions.ts`), the
+  exact counterpart of the `focus` snapshot beside it. Open commitments named in the
+  list are ensured, which reopens one that was removed; open commitments the list
+  omits are removed; records in any other state — done, carried, already removed —
+  are the row's history and are never touched. `commitments` joins `PLACEMENT_KEYS`,
+  so such a write reconciles from the database first and carries the cache columns.
+- **`timingRemoval` states commitments** instead of a bucket and stamps. `'all'`
+  names every live commitment except the open week; `previous` names them all. It
+  plans against `bootstrapCommitments`, the same list `planPlacement` will build, so
+  a legacy row with no records is removed and restored as what it actually is.
+- **A dated row's rung is its lowest open commitment.** `deriveCache` caches a dated
+  row as `'timed'`, which is not a rung, so `currentLevel` was `undefined` and moving
+  such a row UP to a month never took it off the week's list. That was Codex's stated
+  root cause and it is a real bug beyond removal: it is fixed at the source.
+- The `period` argument is gone from `timingRemoval` and its three call sites. It
+  existed to name a fallback rung; with commitments stated, what survives is said
+  outright and the row's bucket follows from what is left. A task with nothing above
+  it now lands in the Inbox rather than a month nobody chose.
+
+### Tests
+
+`timingRemoval.test.ts` was rewritten to test **round trips**, not patch shapes — the
+thing Codex asked for. Ten tests run every patch through real `planPlacement` and read
+the result with `openCommitment`, covering: remove-day keeps the week and month;
+remove-all releases the week and keeps the month, the season, or nothing; one Undo
+restores day + week + month + focus together; **Undo restores the week that was
+CHOSEN, not the week the date fell in**; and done/carried history survives a removal.
+`PeriodPlanPage.test.tsx`'s season-removal test now reads the same way.
+
+## E — the routine confirmation follows the write  ·  10:45 ET
+
+Status: **fixed**, source concern from Codex's 09:43 review.
+
+`HomeView.handleCompleteRoutineWithUndo` called `ctx.onCompleteRoutine` **without
+awaiting it** and registered a generic success/Undo immediately — so the notification
+preceded the write and could announce a completion the database refused. The event
+wrapper beside it had the same shape.
+
+Both wrappers are **deleted**. `useScheduleActions` already awaited the instance write
+and registers the one named confirmation ("Completed “Morning walk”"), and it now:
+
+- **checks the result** — `markDone`/`undoDone` return `false` on failure — and
+  registers nothing when the write failed, while still refreshing the day so the row
+  snaps back to what the database holds;
+- **confirms a reopen too** ("Reopened “Morning walk”", Undo re-completes), which the
+  deleted wrapper used to provide and the writer did not.
+
+This also removes the duplicate registration at its source rather than relying on the
+single-stack replacement from `c776fbe5`; that replacement stays as the backstop.
+
+Three new tests in `useScheduleActions.test.ts`: a reopen is confirmed once and its
+Undo re-completes; a failed write says nothing; and the confirmation is registered
+only after the write resolves (a deferred `markDone` promise — `pushAction` is not
+called until it lands).
+
+**Still needs Codex live:** that exactly one toast is mounted on a routine completion
+in the running app. The wrapper that caused the second one is gone, but there is no
+`HomeView` harness to prove the mount count.
+
+### Not changed, on purpose
+
+- `onSkipRoutine`/`onSkipEvent` still announce without checking the write's result.
+  Same one-line shape, but outside what was reported; flagging rather than widening.
+- `lowerPlacement:154` still resolves a bucket-week row with nothing saved to "This
+  week" against today. Unchanged, still needs a product call.
