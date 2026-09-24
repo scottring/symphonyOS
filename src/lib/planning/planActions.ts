@@ -26,7 +26,8 @@ import type { Task } from '@/types/task'
 import type { Routine } from '@/types/actionable'
 import type { PlanDragPayload, PlanTarget } from './planDrag'
 import { localYmd } from '@/lib/cadence/config'
-import { focusSnapshot } from '@/lib/placement/model'
+import { focusSnapshot, liveCommitments } from '@/lib/placement/model'
+import { bootstrapCommitments } from '@/lib/placement/intentions'
 
 export interface PlanActionDeps {
   findTask: (id: string) => Task | undefined
@@ -68,10 +69,12 @@ function midnight(d: Date): Date {
  *   'day'  the date goes; an explicit week commitment and the period stay
  *   'all'  the date and the week go; the period and the goal link stay
  *
- * `period` names the rung the task falls back to EXPLICITLY. Left unnamed,
- * planPlacement fills a missing stamp from `ctx.now` and supersedes the real
- * commitment for whatever month happens to be current — the trap that broke
- * three callers in one day (`intentions.ts:175`).
+ * Both are stated as COMMITMENTS, never as a bucket and stamps. A bucket
+ * names the rung a row ends on; it cannot say which week to release, and an
+ * absent stamp is not a removal at all — so the old `{ bucket: 'month',
+ * weekStart: undefined }` write left the week open behind it, and its Undo
+ * restored the date without the week (Codex review, 2026-09-24). The week
+ * commitment is named outright, and every broader one is named as surviving.
  *
  * `previous` is everything the write touches, so a single Undo restores the
  * whole gesture rather than half of it.
@@ -79,15 +82,17 @@ function midnight(d: Date): Date {
 export function timingRemoval(
   task: Task,
   scope: 'day' | 'all',
-  period: { monthStart?: Date; seasonStart?: Date },
 ): { updates: Partial<Task>; previous: Partial<Task> } {
+  // Plan against the same list planPlacement will: a legacy row whose
+  // commitments never loaded is read through its cached stamps exactly as the
+  // placement module bootstraps it, so the removal releases what is really
+  // there and the Undo puts back the state that really existed.
+  const live = liveCommitments({ commitments: bootstrapCommitments(task) })
   const previous: Partial<Task> = {
     focus: focusSnapshot(task),
     scheduledFor: task.scheduledFor,
     isAllDay: task.isAllDay,
-    ...(scope === 'all'
-      ? { bucket: task.bucket, weekStart: task.weekStart, monthStart: task.monthStart, seasonStart: task.seasonStart }
-      : {}),
+    ...(scope === 'all' ? { commitments: live } : {}),
   }
   const clearedDay: Partial<Task> = {
     focus: task.scheduledFor ? focusSnapshot(task).filter((f) => localYmd(f.date) !== localYmd(task.scheduledFor!)) : focusSnapshot(task),
@@ -98,12 +103,10 @@ export function timingRemoval(
   return {
     updates: {
       ...clearedDay,
-      weekStart: undefined,
-      ...(period.monthStart
-        ? { bucket: 'month' as const, monthStart: period.monthStart }
-        : period.seasonStart
-          ? { bucket: 'quarter' as const, seasonStart: period.seasonStart }
-          : {}),
+      // The week commitment goes. Everything above it stays open, and the
+      // row's bucket follows from what is left, so a task with nothing
+      // broader lands in the Inbox instead of a month nobody chose.
+      commitments: live.filter((c) => !(c.level === 'week' && c.status === 'open')),
     },
     previous,
   }

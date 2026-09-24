@@ -695,9 +695,11 @@ describe('PeriodPlanPage', () => {
       expect('monthStart' in updates).toBe(false)
     })
 
-    // The ctx.now trap, at the season: removing the week must return the row
-    // to the SEASON it is being pressed on, not a month it was never on.
-    it('removing a season row\'s week names the season, not a month', async () => {
+    // At the season: removing the week releases the WEEK and leaves the season
+    // commitment standing, naming no month the row was never on. The write
+    // states the commitments outright — a bucket and a dropped stamp left the
+    // week open behind it (Codex review, 2026-09-24).
+    it('removing a season row\'s week releases the week and keeps the season', async () => {
       const seasonStart = periodStartFor('season', new Date(), DEFAULT_SEASONS)
       state.tasks = [task({ id: 'q1', title: 'Fall trips', bucket: 'quarter', seasonStart,
         commitments: [{ level: 'season', periodStart: seasonStart, status: 'open' },
@@ -707,10 +709,11 @@ describe('PeriodPlanPage', () => {
       fireEvent.click(screen.getByRole('menuitem', { name: /^Remove week/ }))
       await vi.waitFor(() => expect(hook.updateTask).toHaveBeenCalled())
       const [, updates] = hook.updateTask.mock.calls.at(-1) as [string, Record<string, unknown>]
-      expect(updates.bucket).toBe('quarter')
-      expect(updates.seasonStart).toEqual(seasonStart)
-      expect(updates.monthStart).toBeUndefined()
-      expect(updates.weekStart).toBeUndefined()
+      const commitments = updates.commitments as { level: string; periodStart: Date; status: string }[]
+      expect(commitments.some((c) => c.level === 'week' && c.status === 'open')).toBe(false)
+      expect(commitments).toContainEqual({ level: 'season', periodStart: seasonStart, status: 'open' })
+      expect('monthStart' in updates).toBe(false)
+      expect('bucket' in updates).toBe(false)
     })
 
     // Requirement 6: the consequence is readable BEFORE the press, and the

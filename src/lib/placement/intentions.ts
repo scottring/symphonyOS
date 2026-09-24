@@ -49,7 +49,7 @@ export interface PlacementPlan {
   local: Task
 }
 
-const PLACEMENT_KEYS = ['bucket', 'scheduledFor', 'weekStart', 'monthStart', 'seasonStart', 'plannedOn', 'weekendStart'] as const
+const PLACEMENT_KEYS = ['bucket', 'scheduledFor', 'weekStart', 'monthStart', 'seasonStart', 'plannedOn', 'weekendStart', 'commitments'] as const
 
 /** Does this write move the task in time or choose it? */
 export function isPlacementWrite(updates: Partial<Task>): boolean {
@@ -154,7 +154,13 @@ export function planPlacement(input: Task, updates: Partial<Task>, ctx: Placemen
 
   const bucket = 'bucket' in updates ? updates.bucket : undefined
   const targetLevel = levelForBucket(bucket)
-  const currentLevel = levelForBucket(deriveCache(task).bucket)
+  // A DATED row caches as 'timed', which is not a rung at all. Read the rung
+  // it actually stands on — its lowest open commitment — or moving it UP to a
+  // month leaves the week it was on open behind it (Codex review 2026-09-24).
+  const cachedBucket = deriveCache(task).bucket
+  const currentLevel = levelForBucket(cachedBucket === 'timed'
+    ? deriveCache({ ...task, scheduledFor: undefined }).bucket
+    : cachedBucket)
 
   // ── The day ──────────────────────────────────────────────────────────────
   if ('scheduledFor' in updates) {
@@ -171,7 +177,28 @@ export function planPlacement(input: Task, updates: Partial<Task>, ctx: Placemen
   }
 
   // ── Commitments ──────────────────────────────────────────────────────────
-  if (targetLevel) {
+  if ('commitments' in updates) {
+    // A STATED list — a removal, or the snapshot that undoes one. The
+    // commitment equivalent of the `focus` list below, and for the same
+    // reason: a cached bucket and stamp cannot express "this exact week goes
+    // and October stays", nor "put that exact week back". An absent stamp is
+    // not a removal, and a dated row's cached `weekStart` is the week its
+    // date falls in, never proof of a week that was chosen — so neither can
+    // carry a removal or its undo (Codex review 2026-09-24).
+    //
+    // Open commitments named in the list are ensured, which reopens one that
+    // was removed. Open commitments the list omits are removed. Records in
+    // any other state — done, carried, already removed — are the row's
+    // history and are left exactly as they are.
+    const want = (updates.commitments ?? []).filter((c) => c.status === 'open')
+    for (const c of task.commitments ?? []) {
+      if (c.status !== 'open') continue
+      if (!want.some((w) => w.level === c.level && sameDay(w.periodStart, c.periodStart))) {
+        commitmentOps.push({ op: 'remove', level: c.level, periodStart: c.periodStart })
+      }
+    }
+    for (const w of want) commitmentOps.push({ op: 'ensure', level: w.level, periodStart: w.periodStart })
+  } else if (targetLevel) {
     const start = stampFor(targetLevel, updates) ?? periodStartFor(targetLevel, ctx.now, ctx.seasons)
     // Same level, a different period: the old placement is superseded.
     for (const c of task.commitments ?? []) {
@@ -257,7 +284,7 @@ export function planPlacement(input: Task, updates: Partial<Task>, ctx: Placemen
   // On a placement the cache columns ride along on the row write, so a reader
   // between the row write and the trigger's sync sees the same answer. A
   // title edit does not touch them (or it would read as a move).
-  const movesRow = (['bucket', 'scheduledFor', 'weekStart', 'monthStart', 'seasonStart'] as const).some((k) => k in updates)
+  const movesRow = (['bucket', 'scheduledFor', 'weekStart', 'monthStart', 'seasonStart', 'commitments'] as const).some((k) => k in updates)
   if (movesRow) {
     row.bucket = cache.bucket
     row.weekStart = cache.weekStart

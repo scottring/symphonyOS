@@ -844,9 +844,7 @@ export function WeekViewV2(props: WeekViewV2Props) {
     // never from the goal link, which is not a period commitment at all.
     const broader = broaderCommitment(task)
     const removeTiming = (scope: 'day' | 'all') => {
-      const period = broader?.level === 'month' ? { monthStart: broader.periodStart }
-        : broader?.level === 'season' ? { seasonStart: broader.periodStart } : {}
-      const { updates, previous } = timingRemoval(task, scope, period)
+      const { updates, previous } = timingRemoval(task, scope)
       const kept = scope === 'day' ? removeDayOutcome(t, broader?.label ?? null) : removeAllOutcome(t, broader?.label ?? null)
       const what = scope === 'day'
         ? `Removed ${t.day!.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })} from “${task.title}”.`

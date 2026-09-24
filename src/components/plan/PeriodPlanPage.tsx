@@ -523,8 +523,7 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
     const t = tasks.find((x) => x.id === taskId)
     if (!t) return
     const before = taskTiming(t)
-    const period = level === 'season' ? { seasonStart: bounds.start } : { monthStart: bounds.start }
-    const { updates, previous } = timingRemoval(t, scope, period)
+    const { updates, previous } = timingRemoval(t, scope)
     if (!(await gated.updateTask(taskId, updates))) return
     const what = scope === 'day'
       ? `Removed ${before.day!.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })} from “${title}”.`

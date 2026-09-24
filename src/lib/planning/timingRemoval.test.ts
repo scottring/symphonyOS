@@ -1,11 +1,18 @@
 import { describe, it, expect } from 'vitest'
 import { timingRemoval } from './planActions'
-import type { Task } from '@/types/task'
+import { planPlacement } from '@/lib/placement/intentions'
+import { deriveCache, openCommitment, liveCommitments } from '@/lib/placement/model'
+import type { Task, TaskCommitment } from '@/types/task'
 
+const SEP22 = new Date(2026, 8, 22)
 const OCT1 = new Date(2026, 9, 1)
 const OCT4 = new Date(2026, 9, 4)
 const OCT6 = new Date(2026, 9, 6)
+const OCT11 = new Date(2026, 9, 11)
 
+const ctx = { now: new Date(2026, 8, 24), userId: 'u1' }
+
+/** A LEGACY row: cached stamps, no commitment records loaded. */
 const task = (over: Partial<Task> = {}): Task => ({
   id: 't1', title: 'Buy game tickets', completed: false, bucket: 'timed',
   scheduledFor: OCT6, isAllDay: true, weekStart: OCT4, monthStart: OCT1,
@@ -13,62 +20,117 @@ const task = (over: Partial<Task> = {}): Task => ({
   createdAt: new Date(), updatedAt: new Date(), ...over,
 } as Task)
 
+/** A row with real commitment records, cache derived from them. */
+const recorded = (commitments: TaskCommitment[], over: Partial<Task> = {}): Task => {
+  const base = task({ ...over, commitments, weekStart: undefined, monthStart: undefined })
+  return { ...base, ...deriveCache(base) }
+}
+
+/** What the write actually leaves on the row — the DB's answer, not the patch. */
+const applied = (t: Task, patch: Partial<Task>): Task => planPlacement(t, patch, ctx).local
+
 describe('timingRemoval', () => {
   it('removing the day clears the date and that day\'s focus, and nothing else', () => {
-    const { updates } = timingRemoval(task(), 'day', { monthStart: OCT1 })
+    const { updates } = timingRemoval(task(), 'day')
     expect(updates.scheduledFor).toBeUndefined()
     expect(updates.isAllDay).toBeUndefined()
     expect(updates.focus).toEqual([])
-    // The week and the period are not in the write at all, so they survive.
+    // The commitments are not in the write at all, so every one of them survives.
+    expect('commitments' in updates).toBe(false)
     expect('weekStart' in updates).toBe(false)
     expect('bucket' in updates).toBe(false)
-    expect('monthStart' in updates).toBe(false)
+  })
+
+  it('removing the day leaves the week and the month standing', () => {
+    const after = applied(task(), timingRemoval(task(), 'day').updates)
+    expect(after.scheduledFor).toBeUndefined()
+    expect(openCommitment(after, 'week')?.periodStart).toEqual(OCT4)
+    expect(openCommitment(after, 'month')?.periodStart).toEqual(OCT1)
+    expect(after.bucket).toBe('week')
   })
 
   it('never touches the goal link', () => {
     for (const scope of ['day', 'all'] as const) {
-      expect('goalTaskId' in timingRemoval(task(), scope, { monthStart: OCT1 }).updates).toBe(false)
-      expect('supportsGoalTaskId' in timingRemoval(task(), scope, { monthStart: OCT1 }).updates).toBe(false)
+      expect('goalTaskId' in timingRemoval(task(), scope).updates).toBe(false)
+      expect('supportsGoalTaskId' in timingRemoval(task(), scope).updates).toBe(false)
     }
   })
 
-  it('removing both returns the task to the period it is TOLD, not the current one', () => {
-    const { updates } = timingRemoval(task(), 'all', { monthStart: OCT1 })
-    expect(updates.bucket).toBe('month')
-    expect(updates.monthStart).toEqual(OCT1)
-    expect(updates.weekStart).toBeUndefined()
-    expect(updates.scheduledFor).toBeUndefined()
+  // The blocker Codex reproduced: the old write named a bucket and dropped a
+  // stamp, and the week it meant to release stayed open behind it.
+  it('removing both actually releases the week and keeps the month', () => {
+    const t = task()
+    const after = applied(t, timingRemoval(t, 'all').updates)
+    expect(after.scheduledFor).toBeUndefined()
+    expect(openCommitment(after, 'week')).toBeUndefined()
+    expect(openCommitment(after, 'month')?.periodStart).toEqual(OCT1)
+    expect(after.bucket).toBe('month')
   })
 
   it('falls back to a season when that is the rung above', () => {
-    const { updates } = timingRemoval(task({ monthStart: undefined, seasonStart: new Date(2026, 8, 22) }), 'all', { seasonStart: new Date(2026, 8, 22) })
-    expect(updates.bucket).toBe('quarter')
-    expect(updates.seasonStart).toEqual(new Date(2026, 8, 22))
+    const t = task({ monthStart: undefined, seasonStart: SEP22 })
+    const after = applied(t, timingRemoval(t, 'all').updates)
+    expect(openCommitment(after, 'week')).toBeUndefined()
+    expect(openCommitment(after, 'season')?.periodStart).toEqual(SEP22)
+    expect(after.bucket).toBe('quarter')
   })
 
-  // With no rung above, the write must not invent one: the caller is expected
-  // to have said so before offering the gesture.
-  it('names no period when it is given none', () => {
-    const { updates } = timingRemoval(task(), 'all', {})
-    expect('bucket' in updates).toBe(false)
-    expect('monthStart' in updates).toBe(false)
-    expect(updates.weekStart).toBeUndefined()
+  // With no rung above, the write must not invent one — and must still let go
+  // of the week rather than leaving it open with nothing said about it.
+  it('with nothing above it, releases the week and names no period', () => {
+    const t = task({ monthStart: undefined })
+    const after = applied(t, timingRemoval(t, 'all').updates)
+    expect(openCommitment(after, 'week')).toBeUndefined()
+    expect(openCommitment(after, 'month')).toBeUndefined()
+    expect(openCommitment(after, 'season')).toBeUndefined()
+    expect(after.bucket).toBe('inbox')
   })
 
-  it('hands back everything the write touched, so one Undo restores the gesture', () => {
+  it('one Undo puts back the day, the week and the month together', () => {
     const t = task()
-    const day = timingRemoval(t, 'day', { monthStart: OCT1 })
-    expect(day.previous).toEqual({ focus: t.focus, scheduledFor: OCT6, isAllDay: true })
-    const all = timingRemoval(t, 'all', { monthStart: OCT1 })
-    expect(all.previous).toEqual({
-      focus: t.focus, scheduledFor: OCT6, isAllDay: true,
-      bucket: 'timed', weekStart: OCT4, monthStart: OCT1, seasonStart: undefined,
-    })
+    const { updates, previous } = timingRemoval(t, 'all')
+    const after = applied(t, updates)
+    const undone = applied(after, previous)
+    expect(undone.scheduledFor).toEqual(OCT6)
+    expect(undone.isAllDay).toBe(true)
+    expect(openCommitment(undone, 'week')?.periodStart).toEqual(OCT4)
+    expect(openCommitment(undone, 'month')?.periodStart).toEqual(OCT1)
+    expect(undone.focus).toEqual(t.focus)
+  })
+
+  // A dated row's cached weekStart is the week its DATE falls in, which is not
+  // the week it was committed to. Restoring the cache would move the task.
+  it('Undo restores the week that was CHOSEN, not the week the date fell in', () => {
+    const t = recorded([
+      { level: 'week', periodStart: OCT11, status: 'open' },
+      { level: 'month', periodStart: OCT1, status: 'open' },
+    ])
+    expect(t.weekStart).toEqual(OCT4) // the cache, from the Oct 6 date
+    const { updates, previous } = timingRemoval(t, 'all')
+    const after = applied(t, updates)
+    expect(openCommitment(after, 'week')).toBeUndefined()
+    const undone = applied(after, previous)
+    expect(openCommitment(undone, 'week')?.periodStart).toEqual(OCT11)
+    expect(openCommitment(undone, 'month')?.periodStart).toEqual(OCT1)
+  })
+
+  it('leaves the row\'s history — a done or carried commitment — alone', () => {
+    const t = recorded([
+      { level: 'week', periodStart: OCT4, status: 'open' },
+      { level: 'week', periodStart: new Date(2026, 8, 27), status: 'carried', carriedTo: OCT4 },
+      { level: 'month', periodStart: new Date(2026, 8, 1), status: 'done' },
+      { level: 'month', periodStart: OCT1, status: 'open' },
+    ])
+    const after = applied(t, timingRemoval(t, 'all').updates)
+    const live = liveCommitments(after)
+    expect(live.find((c) => c.status === 'carried')?.carriedTo).toEqual(OCT4)
+    expect(live.find((c) => c.status === 'done')?.periodStart).toEqual(new Date(2026, 8, 1))
+    expect(openCommitment(after, 'week')).toBeUndefined()
   })
 
   it('keeps other days\' focus when only one day is being removed', () => {
     const t = task({ focus: [{ userId: 'u1', date: OCT6 }, { userId: 'u1', date: new Date(2026, 9, 8) }] })
-    const { updates } = timingRemoval(t, 'day', { monthStart: OCT1 })
+    const { updates } = timingRemoval(t, 'day')
     expect(updates.focus).toEqual([{ userId: 'u1', date: new Date(2026, 9, 8) }])
   })
 })

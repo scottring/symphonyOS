@@ -1259,9 +1259,7 @@ export function TodayView({
     const broader = broaderCommitment(task)
     const removeTiming = (scope: 'day' | 'all') => {
       if (!ctx.onUpdateTask) return
-      const period = broader?.level === 'month' ? { monthStart: broader.periodStart }
-        : broader?.level === 'season' ? { seasonStart: broader.periodStart } : {}
-      const { updates, previous } = timingRemoval(task, scope, period)
+      const { updates, previous } = timingRemoval(task, scope)
       const kept = scope === 'day' ? removeDayOutcome(t, broader?.label ?? null) : removeAllOutcome(t, broader?.label ?? null)
       const what = scope === 'day'
         ? `Removed ${t.day!.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })} from “${task.title}”.`
