@@ -1468,6 +1468,243 @@ html.desktop-shell a {
   @page { margin: 14mm; }
 }
 
+/* ── Somewhere to start: three optional doors ────────────────────────────────
+   Quiet by design. It sits above a page that already works, so it reads as an
+   offer rather than a step, and it can be hidden for good. */
+.entry-paths {
+  margin: 0 0 18px;
+  border: 1px solid var(--color-neutral-200);
+  border-radius: 14px;
+  background: var(--color-bg-elevated, #fff);
+  padding: 16px 18px 14px;
+}
+.entry-paths-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; }
+.entry-paths-eyebrow {
+  margin: 0; font-size: 11px; font-weight: 700; letter-spacing: .09em;
+  text-transform: uppercase; color: var(--color-neutral-500);
+}
+.entry-paths-lead { margin: 4px 0 0; font-size: 13px; color: var(--color-neutral-600); max-width: 64ch; }
+.entry-paths-link { font-size: 13px; font-weight: 600; color: var(--color-primary-700); }
+.entry-paths-link:hover { text-decoration: underline; }
+.entry-paths-back { margin: 0 0 14px; }
+
+.entry-paths-doors {
+  display: grid; gap: 12px; margin: 14px 0 0;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+@media (max-width: 860px) { .entry-paths-doors { grid-template-columns: 1fr; } }
+
+.entry-path {
+  display: flex; flex-direction: column;
+  border: 1px solid var(--color-neutral-200);
+  border-radius: 11px;
+  padding: 12px 13px 11px;
+  background: #fff;
+}
+.entry-path-title {
+  margin: 0 0 4px;
+  font-family: 'Crimson Pro', Georgia, serif;
+  font-size: 17px; line-height: 1.2; color: var(--color-neutral-900);
+}
+.entry-path-body { margin: 0 0 10px; font-size: 12.5px; line-height: 1.5; color: var(--color-neutral-600); }
+.entry-path-foot {
+  margin-top: auto; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px;
+}
+.entry-path-action {
+  display: inline-flex; align-items: center;
+  border: 1px solid var(--color-neutral-200); border-radius: 8px;
+  padding: 5px 11px; font-size: 13px; font-weight: 600;
+  color: var(--color-primary-700); background: #fff;
+  transition: background-color .15s ease;
+}
+.entry-path-action:hover { background: var(--color-neutral-50); }
+.entry-path-here { font-size: 12px; font-weight: 600; color: var(--color-neutral-500); }
+.entry-path-aside { font-size: 12px; color: var(--color-neutral-500); }
+.entry-path-aside:hover { color: var(--color-neutral-700); text-decoration: underline; }
+
+.entry-paths-foot { margin: 14px 0 0; font-size: 12px; color: var(--color-neutral-500); }
+
+@media print { .entry-paths, .entry-paths-back { display: none !important; } }
+
+/* ── The planning guide ──────────────────────────────────────────────────────
+   A readable page on screen and four worksheets on paper. Unlayered, like the
+   print block above, so a stray Tailwind utility on an ancestor cannot leak
+   into a printed sheet.
+
+   The writing lines are real space, not decoration: a sheet with nowhere to
+   write is a poster. `guide-rule-line` grows to fill whatever is left of its
+   row, so a tail ("who:", "when:") shortens the line rather than wrapping it. */
+.guide-page { padding-bottom: 64px; }
+
+.guide-intro {
+  max-width: 62ch;
+  margin: 8px 0 28px;
+  font-size: 15px;
+  line-height: 1.65;
+  color: var(--color-neutral-700);
+}
+.guide-intro p { margin: 0 0 12px; }
+.guide-intro h2 {
+  font-family: 'Crimson Pro', Georgia, serif;
+  font-size: 20px;
+  margin: 22px 0 8px;
+  color: var(--color-neutral-800);
+}
+.guide-intro .guide-source {
+  margin-top: 18px;
+  font-size: 13px;
+  color: var(--color-neutral-500);
+}
+.guide-link { color: var(--color-primary-700); font-weight: 600; }
+
+.guide-print-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  flex-shrink: 0;
+  border: 1px solid var(--color-neutral-200);
+  border-radius: 8px;
+  padding: 6px 12px;
+  font-size: 13px; font-weight: 600;
+  color: var(--color-primary-700);
+  background: #fff;
+  transition: background-color .15s ease;
+}
+.guide-print-btn:hover { background: var(--color-neutral-50); }
+
+.guide-sheet {
+  border: 1px solid var(--color-neutral-200);
+  border-radius: 14px;
+  background: #fff;
+  padding: 22px 24px 26px;
+  margin: 0 0 22px;
+}
+.guide-sheet-head {
+  display: flex; align-items: flex-start; justify-content: space-between; gap: 16px;
+  padding-bottom: 14px; margin-bottom: 18px;
+  border-bottom: 1px solid var(--color-neutral-200);
+}
+.guide-sheet-title {
+  font-family: 'Crimson Pro', Georgia, serif;
+  font-size: 26px; line-height: 1.15; color: var(--color-neutral-900);
+  margin: 0;
+}
+.guide-sheet-lead { margin: 5px 0 0; font-size: 14px; color: var(--color-neutral-600); max-width: 60ch; }
+.guide-sheet-time { margin: 3px 0 0; font-size: 12px; color: var(--color-neutral-500); }
+
+.guide-band { margin: 0 0 22px; break-inside: avoid; }
+.guide-band-title {
+  display: flex; align-items: baseline; gap: 8px;
+  font-size: 13px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase;
+  color: var(--color-neutral-600); margin: 0 0 4px;
+}
+.guide-band-n {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 18px; height: 18px; border-radius: 999px;
+  border: 1px solid var(--color-neutral-300);
+  font-size: 10px; font-weight: 700; letter-spacing: 0; color: var(--color-neutral-500);
+}
+.guide-band-optional {
+  font-size: 10px; font-weight: 600; letter-spacing: .04em; text-transform: none;
+  color: var(--color-neutral-400);
+}
+.guide-band-lead { margin: 0 0 10px; font-size: 13px; color: var(--color-neutral-600); max-width: 66ch; }
+.guide-questions {
+  list-style: none; margin: 0 0 12px; padding: 0 0 0 12px;
+  border-left: 2px solid var(--color-neutral-200);
+}
+.guide-questions li { font-size: 13.5px; line-height: 1.7; color: var(--color-neutral-700); }
+
+.guide-block { margin: 0 0 12px; }
+.guide-block-label { margin: 0 0 1px; font-size: 13px; font-weight: 600; color: var(--color-neutral-800); }
+.guide-block-hint { margin: 0 0 5px; font-size: 12px; color: var(--color-neutral-500); }
+.guide-note { margin: 4px 0 12px; font-size: 12px; font-style: italic; color: var(--color-neutral-500); max-width: 66ch; }
+
+.guide-lines { list-style: none; margin: 0; padding: 0; }
+.guide-line { display: flex; align-items: flex-end; gap: 7px; margin: 0 0 13px; }
+.guide-glyph { flex: 0 0 auto; font-size: 13px; line-height: 1.2; color: var(--color-neutral-400); }
+.guide-rule { display: flex; align-items: flex-end; gap: 12px; flex: 1 1 auto; min-width: 0; }
+.guide-rule-line { flex: 1 1 auto; min-width: 40px; border-bottom: 1px solid var(--color-neutral-300); height: 18px; }
+.guide-rule-tail {
+  flex: 0 0 auto; display: flex; align-items: flex-end; gap: 4px;
+  font-size: 11px; color: var(--color-neutral-500);
+}
+.guide-rule-tail .guide-rule-blank {
+  display: inline-block; width: 64px; height: 16px;
+  border-bottom: 1px solid var(--color-neutral-300);
+}
+
+.guide-fields { display: flex; flex-wrap: wrap; gap: 16px; margin: 0 0 12px; }
+.guide-field { display: flex; align-items: flex-end; gap: 6px; flex-basis: 180px; min-width: 150px; }
+.guide-field-label { flex: 0 0 auto; font-size: 11px; color: var(--color-neutral-500); }
+
+.guide-open { border: 1px dashed var(--color-neutral-300); border-radius: 8px; }
+.guide-open-sm { height: 70px; }
+.guide-open-md { height: 130px; }
+.guide-open-lg { height: 210px; }
+
+@media print {
+  .guide-print, .guide-print * { visibility: visible; }
+  /* The guide stays IN FLOW — an absolutely positioned printable subtree
+     leaves the document no height, and the browser paginates nothing. Each
+     ancestor between the guide and <body> is tagged on mount (PlanningGuide)
+     and gives up its layout and its other children for the duration. */
+  .guide-print-ancestor {
+    display: block !important;
+    position: static !important;
+    width: auto !important; max-width: none !important;
+    height: auto !important; max-height: none !important; min-height: 0 !important;
+    overflow: visible !important;
+    margin: 0 !important; padding: 0 !important;
+    background: #fff !important;
+  }
+  .guide-print-ancestor > *:not(.guide-print-ancestor):not(.guide-print) { display: none !important; }
+  .guide-print {
+    display: block; padding: 0; background: #fff; color: #000;
+    font-family: 'DM Sans', system-ui, sans-serif;
+  }
+  /* "Print this sheet" really does print one sheet. */
+  .guide-sheet[data-print="off"] { display: none; }
+  .guide-screen-only { display: none !important; }
+  .guide-sheet {
+    border: 0; border-radius: 0; padding: 0; margin: 0;
+    break-after: page;
+  }
+  .guide-sheet:last-of-type { break-after: auto; }
+  .guide-sheet-head { border-bottom: 1px solid #999; padding-bottom: 7pt; margin-bottom: 12pt; }
+  .guide-sheet-title { font-size: 19pt; color: #000; }
+  .guide-sheet-lead { font-size: 9.5pt; color: #333; }
+  .guide-sheet-time { font-size: 8.5pt; color: #555; }
+  .guide-band { margin-bottom: 10pt; }
+  /* Two columns where the content is a set of short areas rather than a
+     sequence — it is the difference between a two-sided worksheet and a
+     five-sided one. */
+  .guide-band[data-band="what-that-means"] .guide-band-body,
+  .guide-band[data-band="what-happened"] .guide-band-body,
+  .guide-band[data-band="if-more-than-one-of-you-is-filling-this-in"] .guide-band-body,
+  .guide-band[data-band="what-is-already-committed"] .guide-band-body {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 0 18pt; align-content: start;
+  }
+  .guide-band[data-band="what-that-means"] .guide-note { grid-column: 1 / -1; }
+  .guide-block { break-inside: avoid; margin-bottom: 8pt; }
+  .guide-band-title { font-size: 8.5pt; color: #333; }
+  .guide-band-n { border-color: #888; color: #555; width: 13pt; height: 13pt; font-size: 7pt; }
+  .guide-band-optional { color: #666; }
+  .guide-band-lead { font-size: 8pt; color: #444; margin-bottom: 5pt; }
+  .guide-questions li { font-size: 9pt; color: #222; }
+  .guide-note { margin: 2pt 0 6pt; }
+  .guide-block-label { font-size: 9.5pt; color: #000; }
+  .guide-block-hint, .guide-note, .guide-field-label, .guide-rule-tail { font-size: 8pt; color: #444; }
+  .guide-rule-line, .guide-rule-tail .guide-rule-blank { border-bottom-color: #999; }
+  .guide-line { margin-bottom: 12pt; }
+  .guide-rule-line { height: 13pt; }
+  .guide-questions { margin-bottom: 8pt; padding-left: 9pt; }
+  .guide-questions li { line-height: 1.5; }
+  .guide-band-lead { margin-bottom: 6pt; }
+  .guide-fields { gap: 10pt; margin-bottom: 8pt; }
+  .guide-glyph { color: #666; }
+  .guide-open { border-color: #bbb; }
+  .guide-open-lg { height: 105pt; }
+}
+
 /* Today's daybook: ink, ruled edges, and a single reading surface. Scoped so
    calendar, wall, and library surfaces can retain their own density. */
 .symphony-sidebar {
