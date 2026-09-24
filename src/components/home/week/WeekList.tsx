@@ -42,11 +42,22 @@ export function WeekList({ tasks, weekStart, meId, userId, isCurrent, onToggle, 
   const open = rows.filter((t) => !t.completed)
   const done = rows.filter((t) => t.completed)
   const [showDone, setShowDone] = useState(false)
-  const assigned = (task: Task) => !!weekRowNote(task, weekStart, userId, todayYmd).dayLabel
+  // A dated row belongs under its DAY, once. It used to appear here as a full
+  // row under "Assigned a day" as well as in the day beside this list, so the
+  // week showed the same action twice (connected planning, requirement 4).
+  // The count stays — the brief allows a compact weekly count — and says where
+  // the rows are instead of repeating them.
+  const onADayHere = (task: Task) => !!weekRowNote(task, weekStart, userId, todayYmd).dayLabel
+  const dated = (task: Task) => !!task.scheduledFor
+  const onDays = open.filter(onADayHere)
+  // Committed to THIS week, but dated outside it. Neither "any day" (it has a
+  // day) nor one of this week's days (it is not in one), so it had been
+  // silently sitting in "Any day" claiming to have no date at all.
+  const datedElsewhere = open.filter(task => dated(task) && !onADayHere(task))
   const groups = [
-    { title: 'Any day', rows: open.filter(task => !assigned(task) && !task.weekendStart) },
-    { title: 'Weekend', rows: open.filter(task => !assigned(task) && task.weekendStart) },
-    { title: 'Assigned a day', rows: open.filter(assigned) },
+    { title: 'Any day', rows: open.filter(task => !dated(task) && !task.weekendStart) },
+    { title: 'Weekend', rows: open.filter(task => !dated(task) && task.weekendStart) },
+    { title: 'Scheduled outside this week', rows: datedElsewhere },
     { title: 'Completed', rows: showDone ? done : [] },
   ].filter(group => group.rows.length)
   const ordered = [...open, ...done]
@@ -118,6 +129,11 @@ export function WeekList({ tasks, weekStart, meId, userId, isCurrent, onToggle, 
             )
           })}
         </ul></section>)}</div>
+      )}
+      {onDays.length > 0 && (
+        <p className="week-list-on-days text-[12.5px] text-neutral-500">
+          {onDays.length} {onDays.length === 1 ? 'task is' : 'tasks are'} on a day this week — {onDays.length === 1 ? 'it appears' : 'they appear'} under {onDays.length === 1 ? 'its day' : 'their days'}.
+        </p>
       )}
       {done.length > 0 && <button className="week-completed-toggle" type="button" aria-expanded={showDone} onClick={() => setShowDone(!showDone)}>{showDone ? "Hide completed" : "Completed"} · {done.length}</button>}
       {onAdd && (adding ? (

@@ -13,7 +13,8 @@ import {
 } from '@dnd-kit/core'
 import type { Task } from '@/types/task'
 import { PlanWeekMenu } from '@/components/plan/PlanWeekMenu'
-import { taskTiming, hasTiming } from '@/lib/planning/taskTiming'
+import { taskTiming, hasTiming, broaderCommitment, removeDayOutcome, removeAllOutcome } from '@/lib/planning/taskTiming'
+import { timingRemoval } from '@/lib/planning/planActions'
 import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
 import { useGoogleCalendar } from '@/hooks/useGoogleCalendar'
 import type { Routine, ActionableInstance } from '@/types/actionable'
@@ -838,28 +839,36 @@ export function WeekViewV2(props: WeekViewV2Props) {
    */
   const weekTimingControl = useCallback((task: Task) => {
     const t = taskTiming(task)
-    const broader = task.monthStart ?? task.seasonStart ?? null
-    const broaderLabel = task.monthStart
-      ? task.monthStart.toLocaleDateString('en-US', { month: 'long' })
-      : task.seasonStart
-        ? `the season from ${task.seasonStart.toLocaleDateString('en-US', { month: 'long' })}`
-        : null
+    // What actually survives a removal, read from commitments — not from the
+    // cached monthStart, which outlives a commitment that was removed, and
+    // never from the goal link, which is not a period commitment at all.
+    const broader = broaderCommitment(task)
+    const removeTiming = (scope: 'day' | 'all') => {
+      const period = broader?.level === 'month' ? { monthStart: broader.periodStart }
+        : broader?.level === 'season' ? { seasonStart: broader.periodStart } : {}
+      const { updates, previous } = timingRemoval(task, scope, period)
+      const kept = scope === 'day' ? removeDayOutcome(t, broader?.label ?? null) : removeAllOutcome(t, broader?.label ?? null)
+      const what = scope === 'day'
+        ? `Removed ${t.day!.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })} from “${task.title}”.`
+        : `Removed ${t.day ? 'the day and the week' : 'the week'} from “${task.title}”.`
+      void Promise.resolve(onUpdateTask(task.id, updates)).then((ok) => {
+        if (ok === false) return
+        showToast(`${what} ${kept}`, 'success', 8000, {
+          label: 'Undo', onClick: () => { void onUpdateTask(task.id, previous) },
+        })
+      })
+    }
     return (
       <PlanWeekMenu
         size="sm"
         title={task.title}
         periodStart={weekAnchor}
-        periodLabel={broaderLabel ?? undefined}
+        periodLabel={broader?.label ?? undefined}
         timing={t}
         currentWeekStart={t.week}
         onPickWeek={(weekStart) => { void onUpdateTask(task.id, { bucket: 'week', weekStart, scheduledFor: undefined }) }}
-        onClearWeek={broader && hasTiming(t)
-          ? () => {
-              void onUpdateTask(task.id, task.monthStart
-                ? { bucket: 'month', monthStart: task.monthStart, weekStart: undefined, scheduledFor: undefined }
-                : { bucket: 'quarter', seasonStart: task.seasonStart, weekStart: undefined, scheduledFor: undefined })
-            }
-          : undefined}
+        onClearWeek={hasTiming(t) ? () => removeTiming('all') : undefined}
+        onRemoveDay={t.day ? () => removeTiming('day') : undefined}
         onPickDay={(date) => { void onUpdateTask(task.id, { bucket: 'timed', scheduledFor: date, isAllDay: true }) }}
       />
     )

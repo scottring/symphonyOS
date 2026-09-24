@@ -41,21 +41,49 @@ export interface TaskTiming {
 const anchorOf = (d: Date) => weekStartAnchor(d, readCadenceConfig().weekStartsOn)
 
 /**
+ * The week this task is actually COMMITTED to, or null. The one reader; both
+ * this module and `taskWhen` go through it, so a row and its details can never
+ * disagree about whether a week was chosen (Codex review, 2026-09-24).
+ *
+ * The records/legacy split matches `committedTo`: a row counts as having
+ * records only when the array is non-EMPTY. An empty array is a row whose
+ * commitments loaded and are genuinely none, so treating it as authoritative
+ * and treating it as legacy give the same answer for the week — but going
+ * through `length > 0` keeps the contract identical across readers rather
+ * than accidentally equal.
+ *
+ * With records, a record is the only evidence. The cached `weekStart` is not
+ * consulted at all, because a removed or completed week commitment leaves the
+ * cache behind and reading it would resurrect a week the person ended.
+ *
+ * Without records, the cache is all there is — except on a dated row, where
+ * `deriveCache` fills `weekStart` from the date itself and so proves nothing
+ * about a decision.
+ */
+export function committedWeekOf(
+  task: Pick<Task, 'commitments' | 'weekStart' | 'scheduledFor'>,
+): Date | null {
+  if ((task.commitments?.length ?? 0) > 0) return openCommitment(task, 'week')?.periodStart ?? null
+  if (task.scheduledFor) return null
+  return task.weekStart ?? null
+}
+
+/**
  * What this task's row actually says about when it is to be done.
  *
  * Reads commitments first and the cached columns second, the same order every
  * other placement reader uses. A `bucket === 'week'` row with no `weekStart`
  * and no commitment yields NO week — the old "This week" fallback anchored on
  * today is exactly the invented commitment this module exists to avoid.
+ *
+ * The week comes from `committedWeekOf`, which `taskWhen` also uses.
  */
 export function taskTiming(task: Pick<Task, 'scheduledFor' | 'isAllDay' | 'commitments' | 'bucket' | 'weekStart'>): TaskTiming {
   const day = task.scheduledFor ?? null
-  const committedWeek = openCommitment(task, 'week')?.periodStart
-    ?? (task.bucket === 'week' ? task.weekStart ?? undefined : undefined)
   return {
     day,
     timed: !!day && task.isAllDay !== true,
-    week: committedWeek ?? null,
+    week: committedWeekOf(task),
     weekOfDay: day ? anchorOf(day) : null,
   }
 }
@@ -64,6 +92,40 @@ export function taskTiming(task: Pick<Task, 'scheduledFor' | 'isAllDay' | 'commi
  *  truth about what removing one of them leaves behind. */
 export function dayIsInCommittedWeek(t: TaskTiming): boolean {
   return !!t.day && !!t.week && localYmd(anchorOf(t.day)) === localYmd(t.week)
+}
+
+export interface BroaderCommitment {
+  level: 'month' | 'season'
+  periodStart: Date
+  /** "October", "the season from September" — what survives a removal. */
+  label: string
+}
+
+/**
+ * The period commitment a task still has above the week, or null.
+ *
+ * Read through the same records/legacy contract as `committedWeekOf`, because
+ * removal text must describe what actually survives. Reading the cached
+ * `monthStart` instead would keep naming a month whose commitment was removed
+ * (Codex review, 2026-09-24). A goal link is NOT a period commitment and is
+ * never consulted here: work can serve a goal without being committed to that
+ * goal's month.
+ */
+export function broaderCommitment(
+  task: Pick<Task, 'commitments' | 'monthStart' | 'seasonStart'>,
+): BroaderCommitment | null {
+  const monthLabel = (d: Date) => d.toLocaleDateString('en-US', { month: 'long' })
+  const seasonLabel = (d: Date) => `the season from ${d.toLocaleDateString('en-US', { month: 'long' })}`
+  if ((task.commitments?.length ?? 0) > 0) {
+    const month = openCommitment(task, 'month')?.periodStart
+    if (month) return { level: 'month', periodStart: month, label: monthLabel(month) }
+    const season = openCommitment(task, 'season')?.periodStart
+    if (season) return { level: 'season', periodStart: season, label: seasonLabel(season) }
+    return null
+  }
+  if (task.monthStart) return { level: 'month', periodStart: task.monthStart, label: monthLabel(task.monthStart) }
+  if (task.seasonStart) return { level: 'season', periodStart: task.seasonStart, label: seasonLabel(task.seasonStart) }
+  return null
 }
 
 const dayLabel = (d: Date) => d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
@@ -95,14 +157,20 @@ export function timingDescription(t: TaskTiming, periodLabel?: string): string {
  *
  * `periodLabel` is the period the row is being read on, e.g. "October".
  */
-export function removeDayOutcome(t: TaskTiming, periodLabel: string): string {
+export function removeDayOutcome(t: TaskTiming, periodLabel: string | null): string {
   if (!t.day) return ''
-  if (t.week) return `Keeps it in ${formatWeekRange(t.week)} and in ${periodLabel}.`
-  return `Keeps it in ${periodLabel}. No week is chosen, so it will not appear on a week’s list.`
+  const week = t.week ? `Keeps it in ${formatWeekRange(t.week)}` : null
+  if (week) return periodLabel ? `${week} and in ${periodLabel}.` : `${week}.`
+  if (periodLabel) return `Keeps it in ${periodLabel}. No week is chosen, so it will not appear on a week’s list.`
+  // Nothing above it to name. Saying "keeps it in …" here would invent a
+  // destination, which is the one thing the brief forbids.
+  return 'No week or period is chosen for it, so it will not appear on a week or a month list.'
 }
 
-export function removeAllOutcome(t: TaskTiming, periodLabel: string): string {
-  return `Keeps it in ${periodLabel}, under anything it supports. No day or week will be chosen.`
+export function removeAllOutcome(t: TaskTiming, periodLabel: string | null): string {
+  return periodLabel
+    ? `Keeps it in ${periodLabel}, under anything it supports. No day or week will be chosen.`
+    : 'Keeps it under anything it supports. No day, week or period will be chosen.'
 }
 
 /** True when there is anything to remove at all. */

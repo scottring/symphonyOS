@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { taskTiming, timingLabel, timingDescription, dayIsInCommittedWeek, removeDayOutcome, removeAllOutcome, hasTiming } from './taskTiming'
+import { taskTiming, committedWeekOf, broaderCommitment, timingLabel, timingDescription, dayIsInCommittedWeek, removeDayOutcome, removeAllOutcome, hasTiming } from './taskTiming'
 import type { Task } from '@/types/task'
 
 // 2026: Oct 4 is a Sunday, so the household's default week runs Oct 4 – Oct 10.
@@ -38,6 +38,62 @@ describe('taskTiming — what the row actually says', () => {
   it('invents no week for a week-bucket row with no week saved', () => {
     expect(taskTiming(task({ bucket: 'week', weekStart: undefined })).week).toBeNull()
   })
+})
+
+// One reader for "is a week actually committed", shared with taskWhen, so a
+// row and its details can never disagree (Codex review, 2026-09-24).
+describe('committedWeekOf — the records/legacy contract', () => {
+  it('reads the cache when commitments are UNDEFINED (a legacy row)', () => {
+    expect(committedWeekOf({ commitments: undefined, weekStart: OCT4, scheduledFor: undefined })).toEqual(OCT4)
+  })
+
+  // An EMPTY array takes the legacy branch, exactly as committedTo's
+  // `commitments && commitments.length > 0` does. The point of the shared
+  // reader is that every surface answers this the same way; matching the
+  // existing predicate is what makes that true.
+  it('treats an EMPTY array as a legacy row, the same as committedTo does', () => {
+    expect(committedWeekOf({ commitments: [], weekStart: OCT4, scheduledFor: undefined })).toEqual(OCT4)
+  })
+
+  it('and still claims no week from an empty array with a date', () => {
+    expect(committedWeekOf({ commitments: [], weekStart: OCT4, scheduledFor: OCT6 })).toBeNull()
+  })
+
+  // The cache outlives a commitment that was removed or finished. Reading it
+  // would resurrect a week the person deliberately ended.
+  it('ignores a stale cached week when the record was removed', () => {
+    expect(committedWeekOf({
+      commitments: [{ level: 'week', periodStart: OCT4, status: 'removed' }],
+      weekStart: OCT4, scheduledFor: undefined,
+    })).toBeNull()
+  })
+
+  it('ignores a stale cached week when the record is done', () => {
+    expect(committedWeekOf({
+      commitments: [{ level: 'week', periodStart: OCT4, status: 'done' }],
+      weekStart: OCT4, scheduledFor: undefined,
+    })).toBeNull()
+  })
+
+  it('reads an open record even when the cache disagrees with it', () => {
+    expect(committedWeekOf({
+      commitments: [{ level: 'week', periodStart: OCT18, status: 'open' }],
+      weekStart: OCT4, scheduledFor: undefined,
+    })).toEqual(OCT18)
+  })
+
+  // deriveCache fills weekStart from the date, so on a legacy dated row the
+  // cache is evidence of the date, not of a decision about a week.
+  it('claims no week from a legacy row whose only decision was a date', () => {
+    expect(committedWeekOf({ commitments: undefined, weekStart: OCT4, scheduledFor: OCT6 })).toBeNull()
+  })
+
+  it('still claims no week when a dated row has records but no week record', () => {
+    expect(committedWeekOf({
+      commitments: [{ level: 'month', periodStart: new Date(2026, 9, 1), status: 'open' }],
+      weekStart: OCT4, scheduledFor: OCT6,
+    })).toBeNull()
+  })
 
   it('reads a day, and says the day rather than a week', () => {
     const t = taskTiming(task({ bucket: 'timed', scheduledFor: OCT6, isAllDay: true }))
@@ -69,6 +125,37 @@ describe('taskTiming — what the row actually says', () => {
   })
 })
 
+// What actually survives a removal. The cache outlives a removed commitment,
+// and a goal link is not a period commitment (Codex review, 2026-09-24).
+describe('broaderCommitment', () => {
+  const OCT1 = new Date(2026, 9, 1)
+  it('reads an open month record', () => {
+    expect(broaderCommitment({ commitments: [open('month', OCT1)], monthStart: OCT1 }))
+      .toEqual({ level: 'month', periodStart: OCT1, label: 'October' })
+  })
+
+  it('does not name a month whose commitment was removed, even though the cache still says it', () => {
+    expect(broaderCommitment({
+      commitments: [{ level: 'month', periodStart: OCT1, status: 'removed' }],
+      monthStart: OCT1,
+    })).toBeNull()
+  })
+
+  it('falls back to the season when that is the rung that survives', () => {
+    const sep22 = new Date(2026, 8, 22)
+    expect(broaderCommitment({ commitments: [{ level: 'season', periodStart: sep22, status: 'open' }], seasonStart: sep22 }))
+      .toEqual({ level: 'season', periodStart: sep22, label: 'the season from September' })
+  })
+
+  it('reads the cache for a legacy row with no records', () => {
+    expect(broaderCommitment({ commitments: undefined, monthStart: OCT1 })?.label).toBe('October')
+  })
+
+  it('is nothing when there is nothing above the week', () => {
+    expect(broaderCommitment({ commitments: [open('week', OCT4)] })).toBeNull()
+  })
+})
+
 describe('what a removal would leave behind, said before it is pressed', () => {
   it('names the surviving week when there is one', () => {
     const t = taskTiming(task({ scheduledFor: OCT6, isAllDay: true, commitments: [open('week', OCT4)] }))
@@ -83,6 +170,20 @@ describe('what a removal would leave behind, said before it is pressed', () => {
 
   it('says nothing about removing a day there is not', () => {
     expect(removeDayOutcome(taskTiming(task()), 'October')).toBe('')
+  })
+
+  // With nothing above it, "keeps it in …" would invent a destination.
+  it('names no destination when the task has no period to fall back to', () => {
+    const t = taskTiming(task({ scheduledFor: OCT6, isAllDay: true }))
+    expect(removeDayOutcome(t, null))
+      .toBe('No week or period is chosen for it, so it will not appear on a week or a month list.')
+    expect(removeAllOutcome(t, null))
+      .toBe('Keeps it under anything it supports. No day, week or period will be chosen.')
+  })
+
+  it('names only the week when that is all that survives', () => {
+    const t = taskTiming(task({ scheduledFor: OCT6, isAllDay: true, commitments: [open('week', OCT4)] }))
+    expect(removeDayOutcome(t, null)).toBe('Keeps it in October 4–10.')
   })
 
   it('removing both keeps the period and whatever the task supports', () => {

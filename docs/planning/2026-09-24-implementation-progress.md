@@ -116,6 +116,57 @@ Status: **done.** Files:
 Checks: 6792 passing (only the pre-existing `connectors/whatsapp` collection error),
 tsc clean, eslint 0 errors, build clean.
 
-### B — removal, completion, Undo
+### B (part) + Codex review findings 1–4  ·  committed
 
-Status: **next.**
+Status: **done.** Codex's review of A1/A2 raised five findings; four are closed here.
+
+**(1) One reader contract.** `committedWeekOf` in `taskTiming.ts` is now the single
+answer to "is a week actually committed", and `taskWhen` goes through it, so a row
+and its details cannot disagree. It matches `committedTo` exactly — records count
+only when the array is **non-empty**, so `[]` takes the legacy branch as it does
+everywhere else. With records, the cached `weekStart` is not consulted at all, so a
+removed or done week commitment can no longer be resurrected from a stale cache.
+Tests cover `undefined`, `[]`, removed, done, an open record disagreeing with the
+cache, and a dated-only cache on both legacy and record rows.
+
+**(2) Week list duplication.** A dated row appeared as a full row under "Assigned a
+day" *and* under its day beside the list. The full row now lives only under its day;
+the list keeps a truthful count ("2 tasks are on a day this week — they appear under
+their days"). A row committed to the week but **dated outside it** used to sit in
+"Any day" claiming to have no date; it now has its own "Scheduled outside this week"
+heading. Three tests.
+
+**(3) View day survived one navigation only.** `HomeViewContainer` stripped `?date=`
+the moment it read it, so reload or a return landed on today with no trace of the
+day. The param now stays, is applied on every change (so Back/Forward move the day),
+and `changeViewedDate` keeps it current as the reader pages — the contract `?start=`
+already has on /week.
+
+**(4) Removal text read the cache.** `broaderCommitment` reads what actually
+survives, through the same records/legacy contract; the week view used cached
+`monthStart`, which outlives a removed commitment. A goal link is never consulted —
+work can serve a goal without being committed to that goal's month. When there is
+**nothing** above the week, the copy says so instead of naming a destination.
+
+**Removal itself (batch B):** `timingRemoval` in `planActions.ts` returns the write
+and the way back together, so one Undo restores the whole gesture. Two distinct
+menu items — "Remove <day>" and "Remove day and week" — each printing what it will
+leave behind **before** it is pressed, and one confirmation afterwards repeating the
+same sentence with an Undo. The period is always named explicitly, so the `ctx.now`
+default cannot supersede the real commitment. Both plan pages and the week view use
+it. 7 tests on `timingRemoval`, plus page tests asserting the before-press copy, a
+single toast, the Undo, and that the day write touches neither week nor month.
+
+A label bug found by those tests: the menu said "September" and the toast
+"September 2026". One `timingPeriodLabel` now feeds both.
+
+Checks: 6821 passing (only the pre-existing `connectors/whatsapp` collection error),
+tsc clean, eslint 0 errors, build clean.
+
+### Still open from Codex's review
+
+- **(5) Day rows have no timing control yet.** A is not complete on WeekList alone.
+
+### B (rest) — completion and reopening across views
+
+Status: **next**, with C (planning-session truthfulness) after it.

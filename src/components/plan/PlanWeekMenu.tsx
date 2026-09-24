@@ -29,7 +29,7 @@ import { CalendarRange } from 'lucide-react'
 import { usePopoverFocus } from '@/hooks/usePopoverFocus'
 import { weeksOfMonth } from '@/lib/planning/monthWeeks'
 import { readCadenceConfig, localYmd, weekStartAnchor, parseLocalYmd } from '@/lib/cadence/config'
-import { timingLabel, timingDescription, type TaskTiming } from '@/lib/planning/taskTiming'
+import { timingLabel, timingDescription, removeDayOutcome, removeAllOutcome, hasTiming, type TaskTiming } from '@/lib/planning/taskTiming'
 
 /** "Oct 4 – 10" for a week anchor, matching the listed weeks' labels. */
 function weekLabel(start: Date): string {
@@ -42,7 +42,7 @@ function weekLabel(start: Date): string {
 }
 
 export function PlanWeekMenu({
-  title, periodStart, periodLabel, currentWeekStart, timing, onPickWeek, onClearWeek, onPickDay, size = 'md',
+  title, periodStart, periodLabel, currentWeekStart, timing, onPickWeek, onClearWeek, onRemoveDay, onPickDay, size = 'md',
 }: {
   title: string
   /** Any day inside the period whose weeks should be offered — the month being
@@ -56,8 +56,12 @@ export function PlanWeekMenu({
    *  caller genuinely has no task to read (it then falls back to the verb). */
   timing?: TaskTiming
   onPickWeek: (weekStart: Date) => void
-  /** "Keep it in <Month>" — drops the week, keeps the period commitment. */
+  /** Remove the week and any day, keeping the period commitment. Offered only
+   *  where the caller has a period to fall back to. */
   onClearWeek?: () => void
+  /** Remove the DAY alone. An explicit week commitment survives it; where
+   *  there is none, the menu says so rather than promising a week. */
+  onRemoveDay?: () => void
   /** "A day…" — a date, which the caller schedules. */
   onPickDay?: (date: Date) => void
   size?: 'sm' | 'md'
@@ -190,11 +194,23 @@ export function PlanWeekMenu({
               </button>
             )}
           </div>
-          {(onClearWeek || onPickDay) && <div className="my-1 border-t border-neutral-100" />}
-          {onClearWeek && (
+          {(onClearWeek || onRemoveDay || onPickDay) && <div className="my-1 border-t border-neutral-100" />}
+          {/* What a removal leaves behind, said HERE rather than after the
+              fact — the consequence is never a surprise (requirement 6). The
+              sentences come from taskTiming, so they describe the row's actual
+              saved commitments instead of a general promise. */}
+          {timing?.day && onRemoveDay && (
+            <button type="button" role="menuitem" className={itemClass} onClick={choose(onRemoveDay)}>
+              Remove {timing.day.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
+              <span className="block text-xs text-neutral-400">{removeDayOutcome(timing, monthLabel)}</span>
+            </button>
+          )}
+          {onClearWeek && (!timing || hasTiming(timing)) && (
             <button type="button" role="menuitem" className={itemClass} onClick={choose(onClearWeek)}>
-              Keep it in {monthLabel}
-              <span className="block text-xs text-neutral-400">no week yet</span>
+              {timing?.day ? 'Remove day and week' : 'Remove week'}
+              <span className="block text-xs text-neutral-400">
+                {timing ? removeAllOutcome(timing, monthLabel) : `Keeps it in ${monthLabel}; no week yet.`}
+              </span>
             </button>
           )}
           {onPickDay && (

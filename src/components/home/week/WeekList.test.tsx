@@ -52,6 +52,41 @@ describe('WeekList', () => {
     expect(screen.queryByRole('button', { name: /^When:/ })).toBeNull()
   })
 
+  // Requirement 4: a dated action belongs under its day, once. The list keeps
+  // a truthful count and says where the rows are.
+  describe('a dated row is not repeated here', () => {
+    const inWeek = new Date(2026, 9, 6)   // Tue of the Oct 4 week
+    const outside = new Date(2026, 9, 20) // committed to this week, dated beyond it
+
+    it('counts rows that are on a day this week instead of listing them again', () => {
+      const tasks = [
+        row({ id: 'a', title: 'Undated one' }),
+        row({ id: 'b', title: 'Dated in week', bucket: 'timed', scheduledFor: inWeek, isAllDay: true }),
+      ]
+      render(<WeekList tasks={tasks} weekStart={WEEK} meId={null} userId="me" isCurrent onToggle={vi.fn()} onSelect={vi.fn()} />)
+      const list = within(screen.getByRole('region', { name: "This week's list" }))
+      expect(list.getByText('Undated one')).toBeInTheDocument()
+      expect(list.queryByText('Dated in week')).toBeNull()
+      expect(list.getByText(/1 task is on a day this week/)).toBeInTheDocument()
+      expect(list.queryByRole('region', { name: 'Assigned a day' })).toBeNull()
+    })
+
+    // It has a date, so "Any day" was a lie; the date is not in this week, so
+    // it cannot be under one of this week's days either.
+    it('gives a row dated outside this week its own heading, not "Any day"', () => {
+      const tasks = [row({ id: 'c', title: 'Dated beyond', bucket: 'timed', scheduledFor: outside, isAllDay: true })]
+      render(<WeekList tasks={tasks} weekStart={WEEK} meId={null} userId="me" isCurrent onToggle={vi.fn()} onSelect={vi.fn()} />)
+      const list = within(screen.getByRole('region', { name: "This week's list" }))
+      expect(within(list.getByRole('region', { name: 'Scheduled outside this week' })).getByText('Dated beyond')).toBeInTheDocument()
+      expect(list.queryByRole('region', { name: 'Any day' })).toBeNull()
+    })
+
+    it('says nothing about days when nothing is on one', () => {
+      render(<WeekList tasks={[row({ id: 'a', title: 'Undated one' })]} weekStart={WEEK} meId={null} userId="me" isCurrent onToggle={vi.fn()} onSelect={vi.fn()} />)
+      expect(screen.queryByText(/on a day this week/)).toBeNull()
+    })
+  })
+
   it('ticks and opens', () => {
     const onToggle = vi.fn(), onSelect = vi.fn()
     render(<WeekList tasks={[row({ id: 'b', title: 'Call the plumber' })]} weekStart={WEEK} meId={null} userId="me" isCurrent onToggle={onToggle} onSelect={onSelect} />)

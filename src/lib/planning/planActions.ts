@@ -59,6 +59,56 @@ function midnight(d: Date): Date {
 }
 
 /** Reverse a day commitment without sending the task out of its period lists. */
+/**
+ * Removing timing, with the write and the way back, as one value.
+ *
+ * Two distinct gestures, because they leave different things behind
+ * (connected planning, requirement 6):
+ *
+ *   'day'  the date goes; an explicit week commitment and the period stay
+ *   'all'  the date and the week go; the period and the goal link stay
+ *
+ * `period` names the rung the task falls back to EXPLICITLY. Left unnamed,
+ * planPlacement fills a missing stamp from `ctx.now` and supersedes the real
+ * commitment for whatever month happens to be current — the trap that broke
+ * three callers in one day (`intentions.ts:175`).
+ *
+ * `previous` is everything the write touches, so a single Undo restores the
+ * whole gesture rather than half of it.
+ */
+export function timingRemoval(
+  task: Task,
+  scope: 'day' | 'all',
+  period: { monthStart?: Date; seasonStart?: Date },
+): { updates: Partial<Task>; previous: Partial<Task> } {
+  const previous: Partial<Task> = {
+    focus: focusSnapshot(task),
+    scheduledFor: task.scheduledFor,
+    isAllDay: task.isAllDay,
+    ...(scope === 'all'
+      ? { bucket: task.bucket, weekStart: task.weekStart, monthStart: task.monthStart, seasonStart: task.seasonStart }
+      : {}),
+  }
+  const clearedDay: Partial<Task> = {
+    focus: task.scheduledFor ? focusSnapshot(task).filter((f) => localYmd(f.date) !== localYmd(task.scheduledFor!)) : focusSnapshot(task),
+    scheduledFor: undefined,
+    isAllDay: undefined,
+  }
+  if (scope === 'day') return { updates: clearedDay, previous }
+  return {
+    updates: {
+      ...clearedDay,
+      weekStart: undefined,
+      ...(period.monthStart
+        ? { bucket: 'month' as const, monthStart: period.monthStart }
+        : period.seasonStart
+          ? { bucket: 'quarter' as const, seasonStart: period.seasonStart }
+          : {}),
+    },
+    previous,
+  }
+}
+
 export function taskDayRemoval(task: Task, day: Date): Partial<Task> {
   const ymd = localYmd(day)
   return {

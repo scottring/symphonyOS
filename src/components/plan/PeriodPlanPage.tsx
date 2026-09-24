@@ -24,7 +24,7 @@ import { useAppShellChromeOptional } from '@/contexts/AppShellChromeContext'
 import { PAGE_COLUMN_WIDE } from '@/components/layout/pageLayout'
 import { useSupabaseTasks } from '@/hooks/useSupabaseTasks'
 import { useActionableInstances } from '@/hooks/useActionableInstances'
-import { makePlanActions } from '@/lib/planning/planActions'
+import { makePlanActions, timingRemoval } from '@/lib/planning/planActions'
 import { planDropHandlers } from '@/lib/planning/planDrag'
 import { showToast } from '@/hooks/useToast'
 import { useGatedTaskActions } from '@/hooks/useGatedTaskActions'
@@ -53,7 +53,7 @@ import type { Task } from '@/types/task'
 import type { Goal } from '@/types/goal'
 import { PlanRow, rowIsDone, type PlanRowModel, type SupportRef } from './PlanRow'
 import { supportedGoal, goalsSupporting, seasonGoalsSupporting } from '@/lib/planning/goalSupport'
-import { taskTiming, hasTiming } from '@/lib/planning/taskTiming'
+import { taskTiming, hasTiming, removeDayOutcome, removeAllOutcome } from '@/lib/planning/taskTiming'
 import { readOpen, readFoldPref, writeOpen } from './foldState'
 import { PlanSession } from './PlanSession'
 import { PlanNextLine } from './PlanNextLine'
@@ -505,6 +505,37 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
    * beside it use the dates that are actually saved and the URL conventions
    * the app already has (`/week?start=`, `/today?date=`).
    */
+  /**
+   * Remove a day, or a day and its week — with ONE confirmation that states
+   * the result that actually landed, and an Undo that restores the whole
+   * gesture (requirement 6). The sentence after the write is the same
+   * sentence the menu showed before it, so nothing changes meaning between
+   * reading and pressing.
+   */
+  /** The one name this page gives its period in timing copy. The menu shows a
+   *  consequence before the press and the toast repeats it after; reading two
+   *  different labels made them disagree ("September" vs "September 2026"). */
+  const timingPeriodLabel = level === 'season'
+    ? bounds.label
+    : bounds.start.toLocaleDateString('en-US', { month: 'long' })
+
+  const removeTiming = useCallback(async (taskId: string, title: string, scope: 'day' | 'all') => {
+    const t = tasks.find((x) => x.id === taskId)
+    if (!t) return
+    const before = taskTiming(t)
+    const period = level === 'season' ? { seasonStart: bounds.start } : { monthStart: bounds.start }
+    const { updates, previous } = timingRemoval(t, scope, period)
+    if (!(await gated.updateTask(taskId, updates))) return
+    const what = scope === 'day'
+      ? `Removed ${before.day!.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })} from “${title}”.`
+      : `Removed ${before.day ? 'the day and the week' : 'the week'} from “${title}”.`
+    const kept = scope === 'day' ? removeDayOutcome(before, timingPeriodLabel) : removeAllOutcome(before, timingPeriodLabel)
+    showToast(`${what} ${kept}`, 'success', 8000, {
+      label: 'Undo',
+      onClick: () => { void gated.updateTask(taskId, previous) },
+    })
+  }, [tasks, level, bounds.start, timingPeriodLabel, gated])
+
   const planWeekSlot = useCallback((row: PlanRowModel) => {
     if (level === 'year') return null
     const t = tasks.find((x) => x.id === row.id)
@@ -515,22 +546,12 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
         size="sm"
         title={row.title}
         periodStart={bounds.start}
-        periodLabel={level === 'season' ? bounds.label : undefined}
+        periodLabel={timingPeriodLabel}
         timing={timing}
         currentWeekStart={t?.weekStart ?? null}
         onPickWeek={(weekStart) => { void gated.updateTask(row.id, { bucket: 'week', weekStart, scheduledFor: undefined }) }}
-        onClearWeek={timing && hasTiming(timing)
-          ? () => {
-              // Name the month. Without `monthStart`, planPlacement falls back
-              // to ctx.now (`intentions.ts:175`) and then supersedes the open
-              // commitment for any OTHER month — so "Keep it in October",
-              // pressed in September, moved the task to September and dropped
-              // October (2026-09-24 blocker).
-              void gated.updateTask(row.id, level === 'season'
-                ? { bucket: 'quarter', seasonStart: bounds.start, weekStart: undefined, scheduledFor: undefined }
-                : { bucket: 'month', monthStart: bounds.start, weekStart: undefined, scheduledFor: undefined })
-            }
-          : undefined}
+        onClearWeek={timing && hasTiming(timing) ? () => { void removeTiming(row.id, row.title, 'all') } : undefined}
+        onRemoveDay={timing?.day ? () => { void removeTiming(row.id, row.title, 'day') } : undefined}
         onPickDay={(date) => { void planActions.chooseTaskDay(row.id, date) }}
       />
       {timing?.day && (
@@ -543,7 +564,7 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
       )}
       </span>
     )
-  }, [level, bounds.start, bounds.label, gated, planActions, tasks, navigate])
+  }, [level, bounds.start, timingPeriodLabel, planActions, tasks, navigate, gated, removeTiming])
 
   const [pickingGoalFor, setPickingGoalFor] = useState<string | null>(null)
   const [linkError, setLinkError] = useState(false)

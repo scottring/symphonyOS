@@ -73,6 +73,12 @@ vi.mock('@/hooks/usePlanningSession', () => ({
   yearToken: (y: number) => String(y),
 }))
 vi.mock('@/hooks/useAuth', () => ({ useAuth: () => ({ user: { id: 'u1' } }) }))
+// One confirmation per gesture, with its Undo — asserted rather than assumed.
+const toastSpy = vi.fn()
+vi.mock('@/hooks/useToast', async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  showToast: (...args: unknown[]) => toastSpy(...args),
+}))
 const mockNavigate = vi.fn()
 vi.mock('react-router-dom', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
@@ -95,6 +101,7 @@ describe('PeriodPlanPage', () => {
     Object.values(hook).forEach((f) => f.mockClear())
     Object.values(goalsApi).forEach((f) => f.mockClear())
     mockNavigate.mockClear()
+    toastSpy.mockClear()
   })
 
   it('renders contextual shelves into the shared dock only while opened', () => {
@@ -688,20 +695,58 @@ describe('PeriodPlanPage', () => {
       expect('monthStart' in updates).toBe(false)
     })
 
-    // The ctx.now trap, at the season: "keep it here" must name the SEASON it
-    // is being pressed on, not a month it was never on.
-    it('keeping a season row here names the season, not a month', () => {
+    // The ctx.now trap, at the season: removing the week must return the row
+    // to the SEASON it is being pressed on, not a month it was never on.
+    it('removing a season row\'s week names the season, not a month', async () => {
       const seasonStart = periodStartFor('season', new Date(), DEFAULT_SEASONS)
       state.tasks = [task({ id: 'q1', title: 'Fall trips', bucket: 'quarter', seasonStart,
         commitments: [{ level: 'season', periodStart: seasonStart, status: 'open' },
           { level: 'week', periodStart: new Date(2026, 8, 20), status: 'open' }] })]
       renderPage('season')
       fireEvent.click(timingBtn('Fall trips'))
-      fireEvent.click(screen.getByRole('menuitem', { name: /Keep it in/ }))
+      fireEvent.click(screen.getByRole('menuitem', { name: /^Remove week/ }))
+      await vi.waitFor(() => expect(hook.updateTask).toHaveBeenCalled())
       const [, updates] = hook.updateTask.mock.calls.at(-1) as [string, Record<string, unknown>]
       expect(updates.bucket).toBe('quarter')
       expect(updates.seasonStart).toEqual(seasonStart)
       expect(updates.monthStart).toBeUndefined()
+      expect(updates.weekStart).toBeUndefined()
+    })
+
+    // Requirement 6: the consequence is readable BEFORE the press, and the
+    // two removals are different gestures with different survivors.
+    it('says what each removal leaves behind, before it is pressed', () => {
+      state.tasks = [task({ id: 'a1', title: 'Buy tickets', monthStart: thisMonth,
+        bucket: 'timed', scheduledFor: new Date(2026, 8, 22), isAllDay: true,
+        commitments: [{ level: 'month', periodStart: thisMonth, status: 'open' },
+          { level: 'week', periodStart: new Date(2026, 8, 20), status: 'open' }] })]
+      renderPage('month')
+      fireEvent.click(timingBtn('Buy tickets'))
+      const removeDay = screen.getByRole('menuitem', { name: /^Remove Tue, Sep 22/ })
+      expect(removeDay).toHaveTextContent('Keeps it in September 20–26 and in September.')
+      const removeAll = screen.getByRole('menuitem', { name: /^Remove day and week/ })
+      expect(removeAll).toHaveTextContent('Keeps it in September, under anything it supports.')
+    })
+
+    it('confirms the removal that actually landed, once, with an Undo', async () => {
+      state.tasks = [task({ id: 'a1', title: 'Buy tickets', monthStart: thisMonth,
+        bucket: 'timed', scheduledFor: new Date(2026, 8, 22), isAllDay: true,
+        commitments: [{ level: 'month', periodStart: thisMonth, status: 'open' },
+          { level: 'week', periodStart: new Date(2026, 8, 20), status: 'open' }] })]
+      renderPage('month')
+      fireEvent.click(timingBtn('Buy tickets'))
+      fireEvent.click(screen.getByRole('menuitem', { name: /^Remove Tue, Sep 22/ }))
+      await vi.waitFor(() => expect(toastSpy).toHaveBeenCalled())
+      expect(toastSpy).toHaveBeenCalledTimes(1)
+      const [message, , , action] = toastSpy.mock.calls[0] as [string, string, number, { label: string }]
+      expect(message).toContain('Removed Tue, Sep 22 from \u201cBuy tickets\u201d.')
+      expect(message).toContain('Keeps it in September 20–26 and in September.')
+      expect(action.label).toBe('Undo')
+      // The day goes; the week and the month are not in the write at all.
+      const [, updates] = hook.updateTask.mock.calls.at(-1) as [string, Record<string, unknown>]
+      expect(updates.scheduledFor).toBeUndefined()
+      expect('weekStart' in updates).toBe(false)
+      expect('monthStart' in updates).toBe(false)
     })
 
     it('offers View week for a committed week, and View day for a day', () => {

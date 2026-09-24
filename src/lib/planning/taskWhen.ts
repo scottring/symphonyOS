@@ -19,24 +19,11 @@
 
 import type { Task } from '@/types/task'
 import { weekendEnd } from './weekend'
-import { openCommitment } from '@/lib/placement/model'
+import { committedWeekOf } from './taskTiming'
 
 type WhenTask = Pick<Task,
   'scheduledFor' | 'isAllDay' | 'bucket' | 'weekStart' | 'weekendStart' | 'monthStart' | 'seasonStart'>
   & Partial<Pick<Task, 'commitments'>>
-
-/**
- * The week this task is actually committed to, or null.
- *
- * With commitment records present, only a record counts. Without any, the
- * cached `weekStart` is all there is and is trusted — except on a dated row,
- * where the cache is derived from the date and proves nothing.
- */
-function chosenWeek(task: WhenTask): Date | null {
-  if (task.commitments) return openCommitment(task, 'week')?.periodStart ?? null
-  if (!task.weekStart) return null
-  return task.scheduledFor ? null : task.weekStart
-}
 
 const day = (d: Date) => d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
 const short = (d: Date) => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
@@ -75,7 +62,7 @@ export function taskWhenParts(task: WhenTask, now: Date = new Date()): string[] 
   if (task.weekendStart) {
     parts.push(`Weekend · ${short(task.weekendStart)}–${short(weekendEnd(task.weekendStart))}`)
   } else {
-    const week = chosenWeek(task)
+    const week = committedWeekOf(task)
     if (week) parts.push(`Week of ${short(week)}`)
   }
 

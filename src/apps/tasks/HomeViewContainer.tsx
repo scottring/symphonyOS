@@ -108,17 +108,43 @@ export function HomeViewContainer({ fixedView }: { fixedView?: 'today' | 'week' 
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
 
-  // ?date=YYYY-MM-DD (e.g. from search → "jump to this task's day") sets the
-  // viewed day, then strips the param (keeps ?detail so the panel stays open).
+  // ?date=YYYY-MM-DD (from search's "jump to this task's day", and from the
+  // View day link beside a timing control) sets the viewed day.
+  //
+  // The param used to be STRIPPED as soon as it was read, which made the day
+  // survive exactly one navigation: reload, or come back from a task, and the
+  // page silently returned to today with no sign the day had ever been asked
+  // for (Codex review, 2026-09-24). It now stays in the URL, so reload and
+  // Back land on the day you were reading — the contract `?start=` already
+  // has on /week (S2-25).
+  //
+  // Applied on every change, not once on mount, so browser Back and Forward
+  // move the day without a remount. A param equal to the day already shown is
+  // ignored, which keeps this from fighting `useDayRollover`.
   useEffect(() => {
     const dateParam = searchParams.get('date');
     if (!dateParam) return;
     const [y, m, d] = dateParam.split('-').map(Number);
-    if (y && m && d) setViewedDate(new Date(y, m - 1, d));
-    const next = new URLSearchParams(searchParams);
-    next.delete('date');
-    setSearchParams(next, { replace: true });
-  }, [searchParams, setSearchParams]);
+    if (!y || !m || !d) return;
+    const asked = new Date(y, m - 1, d);
+    setViewedDate((prev) => (localYmd(prev) === localYmd(asked) ? prev : asked));
+  }, [searchParams]);
+
+  /**
+   * Move the viewed day, and say so in the URL when the URL is already naming
+   * one. Without this the param would go stale the moment the reader paged to
+   * another day — the same trap `?start=` had on /week. A page that never
+   * asked for a day keeps its clean URL.
+   */
+  const changeViewedDate = useCallback((next: Date) => {
+    setViewedDate(next);
+    setSearchParams((prev) => {
+      if (!prev.get('date')) return prev;
+      const out = new URLSearchParams(prev);
+      out.set('date', localYmd(next));
+      return out;
+    }, { replace: true });
+  }, [setSearchParams]);
 
   // "Your first week" — a fresh household's onboarding card. uid is fetched
   // once (not via useAuth, which this tree already has several copies of via
@@ -836,7 +862,7 @@ export function HomeViewContainer({ fixedView }: { fixedView?: 'today' | 'week' 
         // they arrive; the rest of the day should never wait on them.
         loading={tasksLoading || routinesLoading}
         viewedDate={viewedDate}
-        onDateChange={setViewedDate}
+        onDateChange={changeViewedDate}
         fixedView={fixedView}
       />
 

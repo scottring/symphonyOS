@@ -40,6 +40,19 @@ describe('taskWhenLabel', () => {
     expect(taskWhenParts({ weekStart: new Date(2026, 8, 20) }, WED)).toEqual(['Week of Sep 20'])
   })
 
+  // Same contract as committedTo: only a NON-empty array counts as records,
+  // so an empty one falls through to the cache like any pre-commitments row.
+  it('treats an empty commitments array as a legacy row, as committedTo does', () => {
+    expect(taskWhenParts({ weekStart: new Date(2026, 8, 20), commitments: [] }, WED)).toEqual(['Week of Sep 20'])
+  })
+
+  it('does not resurrect a week whose commitment was removed', () => {
+    expect(taskWhenParts({
+      weekStart: new Date(2026, 8, 20),
+      commitments: [{ level: 'week', periodStart: new Date(2026, 8, 20), status: 'removed' }],
+    }, WED)).toEqual([])
+  })
+
   it('leaves a weekend two days wide instead of inventing a Saturday', () => {
     expect(taskWhenLabel({ weekStart: new Date(2026, 8, 20), weekendStart: new Date(2026, 8, 26) }, WED))
       .toBe('Weekend · Sep 26–Sep 27')
