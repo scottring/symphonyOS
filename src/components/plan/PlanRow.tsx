@@ -25,7 +25,28 @@ export interface PlanRowModel {
    *  porch". Month and season goals only, and one level deep: a step never
    *  carries steps of its own. */
   steps?: PlanRowModel[]
+  /** The goal one rung UP that this goal supports — a month goal's season
+   *  goal, a season goal's year goal. Read-only here: it is set when the goal
+   *  is written, and it is a different relationship from `steps` (which move
+   *  with their goal; a supported goal never moves). */
+  supports?: SupportRef | null
+  /** The goals one rung DOWN that support this one. The same relationship,
+   *  read from the other end, so a parent is never a dead end. */
+  supportedBy?: SupportRef[]
 }
+
+/** One end of a goal-supports-goal link, as a row draws it. */
+export interface SupportRef {
+  id: string
+  title: string
+  /** "Fall 2026", "October", "2026" — where the linked goal lives. */
+  period?: string
+  /** Which rung it sits on, so the opener knows where to send the reader. */
+  rung: 'month' | 'season' | 'year'
+}
+
+/** At most this many supporting goals are listed before the rest are counted. */
+const SUPPORT_SHOWN = 3
 
 /** Is this row finished? Own completion or its copy's — the distinction
  *  matters for who may REOPEN it, never for how it reads. The list and the
@@ -97,8 +118,42 @@ function PlacementChip({ placed, onOpenPlaced }: {
   )
 }
 
+/** One or more linked goals, named and reachable, on their own quiet line.
+ *  The period comes first — "October · A home easier to care for" — because
+ *  WHEN is what tells you which list to look at. */
+function SupportLine({ label, refs, onOpen }: {
+  label: string
+  refs: SupportRef[]
+  onOpen?: (ref: SupportRef) => void
+}) {
+  const shown = refs.slice(0, SUPPORT_SHOWN)
+  const rest = refs.length - shown.length
+  return (
+    <span className="mt-1 block text-[12px] leading-snug text-neutral-500">
+      <span className="text-neutral-400">{label}</span>
+      {shown.map((ref) => (
+        <span key={ref.id} className="ml-1.5">
+          {onOpen ? (
+            <button
+              type="button"
+              onClick={() => onOpen(ref)}
+              aria-label={`Open ${ref.title}`}
+              className="text-left hover:underline"
+            >
+              {ref.period ? `${ref.period} · ` : ''}{ref.title}
+            </button>
+          ) : (
+            <>{ref.period ? `${ref.period} · ` : ''}{ref.title}</>
+          )}
+        </span>
+      ))}
+      {rest > 0 && <span className="ml-1.5 text-neutral-400">+{rest} more</span>}
+    </span>
+  )
+}
+
 export function PlanRow({
-  row, actions, onAction, onOpen, onOpenPlaced, lowerLabel = 'this week',
+  row, actions, onAction, onOpen, onOpenPlaced, onOpenSupport, lowerLabel = 'this week',
   expanded = false, onToggleExpand, onAddStep, stepActionsFor, planWeek,
 }: {
   row: PlanRowModel
@@ -107,6 +162,10 @@ export function PlanRow({
   onOpen: (row: PlanRowModel) => void
   /** Follow the row's status to the copy that carries it. */
   onOpenPlaced?: (taskId: string) => void
+  /** Open the goal at the other end of a support link. Omitted where the
+   *  links are reference only (a read-only rail), and the lines then read as
+   *  plain text rather than dead buttons. */
+  onOpenSupport?: (ref: SupportRef) => void
   /** The rung 'to-lower' lands on, named so a hover says where it goes. */
   lowerLabel?: string
   /** Goal rows only: whether the steps beneath are showing. */
@@ -178,6 +237,15 @@ export function PlanRow({
         </button>
         {row.subtitle && (
           <span className="mt-1 block text-[13px] leading-snug text-neutral-500">{row.subtitle}</span>
+        )}
+        {/* Both ends of the goal-supports-goal link, quiet, under the title:
+            the goal this one serves, and the goals serving it. A parent that
+            only ever appeared on its children's rows would be a dead end. */}
+        {row.supports && (
+          <SupportLine label="Supports" refs={[row.supports]} onOpen={onOpenSupport} />
+        )}
+        {!!row.supportedBy?.length && (
+          <SupportLine label="Supported by" refs={row.supportedBy} onOpen={onOpenSupport} />
         )}
         {!row.isGoal && actions.includes('under-goal') && <button type="button" onClick={() => onAction('under-goal', row)} className="mt-1 block text-xs text-primary-700 hover:underline" aria-label={`Link ${row.title} to a goal`}>Link to goal</button>}
         {canHoldSteps && !!row.steps?.length && <button type="button" onClick={() => onToggleExpand?.(row)} className="mt-1 block text-xs text-primary-700 hover:underline">{row.steps.length} supporting {row.steps.length === 1 ? 'task' : 'tasks'}{expanded ? ' · hide' : ' · show'}</button>}

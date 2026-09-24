@@ -117,6 +117,9 @@ export interface DbTask {
   source_id: string | null
   goal_id: string | null
   goal_task_id: string | null
+  /** Optional until its migration is applied: `select('*')` against a
+   *  database without the column simply returns rows that lack it. */
+  supports_goal_task_id?: string | null
   is_fun: boolean | null
   sort_order: number | null
   created_at: string
@@ -204,6 +207,7 @@ export function dbTaskToTask(dbTask: DbTask): Task {
     sourceId: dbTask.source_id ?? undefined,
     goalId: dbTask.goal_id ?? undefined,
     goalTaskId: dbTask.goal_task_id ?? undefined,
+    supportsGoalTaskId: dbTask.supports_goal_task_id ?? undefined,
     isFun: dbTask.is_fun ?? undefined,
     sortOrder: dbTask.sort_order ?? null,
     captureMeta: dbTask.capture_meta
@@ -777,6 +781,7 @@ export function useSupabaseTasks() {
     /** Cascade lineage: the annual goal this task serves (inherited by copies). */
     goalId?: string
     goalTaskId?: string
+    supportsGoalTaskId?: string
     /** Fun-audit mark. */
     isFun?: boolean
     /** Rich context carried on the INSERT. Same race rationale as `bucket`: a
@@ -849,6 +854,7 @@ export function useSupabaseTasks() {
       email: options?.email,
       sourceId: options?.sourceId,
       goalId: options?.goalId,
+      supportsGoalTaskId: options?.supportsGoalTaskId,
       isFun: options?.isFun,
       pickedAt: options?.pickedAt,
       notes: options?.notes,
@@ -907,6 +913,11 @@ export function useSupabaseTasks() {
         source_id: options?.sourceId ?? null,
         goal_id: options?.goalId ?? null,
         goal_task_id: options?.goalTaskId ?? null,
+        // Only named when a link is actually being set. A column the shared
+        // database has not got yet would otherwise fail EVERY insert, not
+        // just the one flow that uses it — the migration for this column is
+        // deliberately unapplied while the branch is under review.
+        ...(options?.supportsGoalTaskId ? { supports_goal_task_id: options.supportsGoalTaskId } : {}),
         is_fun: options?.isFun ?? false,
         picked_at: options?.pickedAt?.toISOString() ?? null,
         notes: options?.notes ?? null,
@@ -1773,6 +1784,7 @@ export function useSupabaseTasks() {
     if ('sourceId' in updates) dbUpdates.source_id = updates.sourceId ?? null
     if ('goalId' in updates) dbUpdates.goal_id = updates.goalId ?? null
     if ('goalTaskId' in updates) dbUpdates.goal_task_id = updates.goalTaskId ?? null
+    if ('supportsGoalTaskId' in updates) dbUpdates.supports_goal_task_id = updates.supportsGoalTaskId ?? null
     if ('isFun' in updates) dbUpdates.is_fun = updates.isFun ?? false
     if ('weekDeferredAt' in updates) dbUpdates.week_deferred_at = updates.weekDeferredAt?.toISOString() ?? null
     // `week_start` is a DATE column — localYmd, not toISOString (which shifts the day west of Greenwich).
@@ -1983,6 +1995,7 @@ export function useSupabaseTasks() {
     if ('sourceId' in updates) dbUpdates.source_id = updates.sourceId ?? null
     if ('goalId' in updates) dbUpdates.goal_id = updates.goalId ?? null
     if ('goalTaskId' in updates) dbUpdates.goal_task_id = updates.goalTaskId ?? null
+    if ('supportsGoalTaskId' in updates) dbUpdates.supports_goal_task_id = updates.supportsGoalTaskId ?? null
     if ('isFun' in updates) dbUpdates.is_fun = updates.isFun ?? false
     if ('weekDeferredAt' in updates) dbUpdates.week_deferred_at = updates.weekDeferredAt?.toISOString() ?? null
     // `week_start` is a DATE column — localYmd, not toISOString (which shifts the day west of Greenwich).

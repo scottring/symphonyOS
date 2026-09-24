@@ -51,7 +51,8 @@ import {
 import { firstNoteLine } from '@/lib/planning/goalsReference'
 import type { Task } from '@/types/task'
 import type { Goal } from '@/types/goal'
-import { PlanRow, rowIsDone, type PlanRowModel } from './PlanRow'
+import { PlanRow, rowIsDone, type PlanRowModel, type SupportRef } from './PlanRow'
+import { supportedGoal, goalsSupporting, seasonGoalsSupporting } from '@/lib/planning/goalSupport'
 import { readOpen, readFoldPref, writeOpen } from './foldState'
 import { PlanSession } from './PlanSession'
 import { PlanNextLine } from './PlanNextLine'
@@ -79,7 +80,12 @@ function periodTitle(level: PlanLevel, label: string) {
  *  read off the row itself, relative to the level and period being shown
  *  (a September row kept into October says "carried to October" on
  *  September's list and nothing on October's). */
-export function taskRow(t: Task, level: PlanLevel, periodStart: Date): PlanRowModel {
+/** The two ends of this goal's support link, as the row draws them. Passed in
+ *  rather than looked up inside `taskRow` so the row builder stays pure and
+ *  the read rules live in one place (`goalSupport.ts`). */
+export interface RowSupport { supports?: SupportRef | null; supportedBy?: SupportRef[] }
+
+export function taskRow(t: Task, level: PlanLevel, periodStart: Date, support?: RowSupport): PlanRowModel {
   const lvl = level === 'season' ? 'season' : 'month'
   const lower = t.completed ? null : lowerPlacement(t, lvl, periodStart)
   return {
@@ -90,12 +96,15 @@ export function taskRow(t: Task, level: PlanLevel, periodStart: Date): PlanRowMo
         ? { label: lower.label, id: t.id, kind: lower.kind === 'date' ? 'date' : lower.kind === 'week' ? 'week' : 'placed' }
         : null,
     subtitle: t.isGoal ? firstNoteLine(t.notes) : undefined,
+    supports: support?.supports ?? null,
+    supportedBy: support?.supportedBy,
   }
 }
-function goalRow(g: Goal): PlanRowModel {
+function goalRow(g: Goal, support?: RowSupport): PlanRowModel {
   return {
     id: g.id, title: g.name, isGoal: true, fate: g.status === 'completed' ? 'done' : 'open', kind: 'goal',
     subtitle: g.strategy?.trim() || firstNoteLine(g.notes),
+    supportedBy: support?.supportedBy,
   }
 }
 
@@ -196,16 +205,30 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
   }, [searchParams, setSearchParams, level, seasons])
 
   // ── The list ─────────────────────────────────────────────────────────────
+  /** Both ends of a goal's support link, read from the layer-filtered list so
+   *  a goal the reader may not see cannot leak its title through a child.
+   *  Only goals have one; a task row asks and gets nothing. */
+  const supportFor = useCallback((t: Task): RowSupport | undefined => {
+    if (t.isGoal !== true) return undefined
+    return {
+      supports: supportedGoal(t, layered, goals, seasons),
+      supportedBy: goalsSupporting(t, layered),
+    }
+  }, [layered, goals, seasons])
+
   const rows = useMemo<PlanRowModel[]>(() => {
     if (level === 'year') {
       const year = bounds.start.getFullYear()
-      return goals.filter((g) => g.year === year && g.status !== 'archived' && matchesLayers(g.context, layers)).map(goalRow)
+      return goals
+        .filter((g) => g.year === year && g.status !== 'archived' && matchesLayers(g.context, layers))
+        .map((g) => goalRow(g, { supportedBy: seasonGoalsSupporting(g.id, layered, seasons) }))
     }
-    const list = selectPeriodTasks(layered, level, bounds.start, isCurrent, meId, seasons).map((t) => taskRow(t, level, bounds.start))
+    const list = selectPeriodTasks(layered, level, bounds.start, isCurrent, meId, seasons)
+      .map((t) => taskRow(t, level, bounds.start, supportFor(t)))
     // Goals first — a goal is what the period is for — then tasks, each in
     // the order they were written.
     return [...list.filter((r) => r.isGoal), ...list.filter((r) => !r.isGoal)]
-  }, [level, goals, layers, layered, bounds.start, isCurrent, meId, tasks, seasons])
+  }, [level, goals, layers, layered, bounds.start, isCurrent, meId, tasks, seasons, supportFor])
 
   // ── On the calendar: timed items landing inside this period. The list
   //    above answers a POOL question (bucket === level); this answers a DATE
@@ -249,13 +272,16 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
       // every legacy NULL-seasonStart row regardless of which season it
       // opened on (the exact trap periodPlacement.ts warns about).
       const aboveIsCurrent = isCurrentPeriod(periodBounds('season', aboveStart, seasons), today)
-      return selectPeriodTasks(layered, 'season', aboveStart, aboveIsCurrent, meId, seasons).map((t) => taskRow(t, 'season', aboveStart))
+      return selectPeriodTasks(layered, 'season', aboveStart, aboveIsCurrent, meId, seasons)
+        .map((t) => taskRow(t, 'season', aboveStart, supportFor(t)))
     }
     if (above === 'year') {
-      return goals.filter((g) => g.year === aboveStart.getFullYear() && g.status !== 'archived' && matchesLayers(g.context, layers)).map(goalRow)
+      return goals
+        .filter((g) => g.year === aboveStart.getFullYear() && g.status !== 'archived' && matchesLayers(g.context, layers))
+        .map((g) => goalRow(g, { supportedBy: seasonGoalsSupporting(g.id, layered, seasons) }))
     }
     return []
-  }, [above, layered, aboveStart, seasons, today, meId, tasks, goals, layers])
+  }, [above, layered, aboveStart, seasons, today, meId, tasks, goals, layers, supportFor])
   const railBounds = useMemo(() => (above ? periodBounds(above, aboveStart, seasons) : null), [above, aboveStart, seasons])
 
   // ── Verbs ────────────────────────────────────────────────────────────────
@@ -274,6 +300,13 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
   const monthDrop = level === 'month'
     ? planDropHandlers((payload) => { void planActions.drop(payload, { type: 'period', period: 'month' }) }, setPlanDropOver)
     : {}
+
+  /** A year goal is a goals-table row and opens on its own page; a month or
+   *  season goal is a task and opens in the detail panel — the same split
+   *  `open` makes for a row, made once for the other end of a link. */
+  const openSupport = useCallback((ref: SupportRef) => {
+    navigate(ref.rung === 'year' ? `/goals/${ref.id}` : `/task/${ref.id}`)
+  }, [navigate])
 
   const open = useCallback((row: PlanRowModel) => {
     navigate(row.kind === 'goal' ? `/goals/${row.id}` : `/task/${row.id}`)
@@ -514,10 +547,10 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
   const goalRows = useMemo(() => {
     if (!split) return rows.filter((r) => r.isGoal)
     return split.goals.map((g) => ({
-      ...taskRow(g, level, bounds.start),
+      ...taskRow(g, level, bounds.start, supportFor(g)),
       steps: (split.stepsByGoal.get(g.id) ?? []).map((st) => taskRow(st, level, bounds.start)),
     }))
-  }, [split, rows, tasks])
+  }, [split, rows, tasks, level, bounds.start, supportFor])
   // An empty period opens with the question already asked. The first real
   // walkthrough (Scott, 2026-09-20) stalled on a blank /year: a grey "No goals
   // for this year yet." and a 13px "+ Add a goal" off to the right read as
@@ -683,15 +716,21 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
       !!(await keepForward(id, isSeasonSession ? { seasonStart: periodStart } : { monthStart: periodStart }, prevStart)),
     // Each item's OWN domain, recorded when it was planned — never the one in view now (I4).
     addTask: (title: string, o: { id: string; periodStart: Date; day?: Date; isGoal?: boolean; goalTaskId?: string; aboveGoalId?: string; context: DomainId | null }) => {
-      // The goal above, recorded (S3-02). A SEASON's rail is the year, so the
-      // id already IS a goals-table row: stamp it straight onto goal_id. A
-      // MONTH's rail is the season's goal ROWS, so the annual goal is the one
-      // that season goal serves — inherited, exactly as goalId is meant to be
-      // ("stamped on goal promotion, inherited by every copy below").
+      // The goal above, recorded (S3-02). Which column depends on what the
+      // rail is made of:
+      //   season session — the rail IS the goals table, so the pick is already
+      //     a goals-table id: it belongs on goalId.
+      //   month session — the rail is the SEASON's goal rows, so the pick is a
+      //     task. It goes on supportsGoalTaskId, which keeps WHICH seasonal
+      //     goal was chosen; goalId additionally inherits that season goal's
+      //     own annual goal so roll-up to the year stays a flat filter.
+      // Never goalTaskId: that means "is a step of", and steps are carried
+      // along when their goal moves. A goal must not be carried by another.
+      const support = o.isGoal && !isSeasonSession ? o.aboveGoalId : undefined
       const goalId = isSeasonSession ? o.aboveGoalId : tasks.find((t) => t.id === o.aboveGoalId)?.goalId
       return addTask(title, undefined, undefined, undefined, isSeasonSession
         ? { id: o.id, bucket: 'quarter' as const, seasonStart: o.periodStart, isGoal: o.isGoal, goalTaskId: o.goalTaskId, goalId, context: o.context }
-        : { id: o.id, bucket: 'month' as const, monthStart: o.periodStart, isGoal: o.isGoal, goalTaskId: o.goalTaskId, goalId, context: o.context })
+        : { id: o.id, bucket: 'month' as const, monthStart: o.periodStart, isGoal: o.isGoal, goalTaskId: o.goalTaskId, goalId, supportsGoalTaskId: support, context: o.context })
     },
     contextOf: (id: string) => tasks.find((t) => t.id === id)?.context ?? null,
     // Everything a tick does (subtasks, waiting/discussion, a linked list item), and reports whether it wrote.
@@ -895,7 +934,7 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
               ) : (
                 <ul>
                   {goalRows.filter((r) => !rowIsDone(r.fate)).map((row) => (
-                    <PlanRow key={row.id} row={row} onOpen={open} onOpenPlaced={openPlaced} onAction={(a, r) => { void act(a, r) }} planWeek={planWeekSlot}
+                    <PlanRow key={row.id} row={row} onOpen={open} onOpenPlaced={openPlaced} onOpenSupport={openSupport} onAction={(a, r) => { void act(a, r) }} planWeek={planWeekSlot}
                       lowerLabel={lowerLabelText}
                       expanded={expandedGoals.has(row.id)}
                       onToggleExpand={toggleGoal}
@@ -909,7 +948,7 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
                 <details className="period-assigned-fold" key={`goals-${level}-${bounds.start.toISOString()}`} open={isPast || undefined}>
                   <summary>Completed goals · {goalRows.filter((r) => rowIsDone(r.fate)).length}</summary>
                   <ul>{goalRows.filter((r) => rowIsDone(r.fate)).map((row) => (
-                    <PlanRow key={row.id} row={row} onOpen={open} onOpenPlaced={openPlaced} planWeek={planWeekSlot}
+                    <PlanRow key={row.id} row={row} onOpen={open} onOpenPlaced={openPlaced} onOpenSupport={openSupport} planWeek={planWeekSlot}
                       onAction={(a, r) => { void act(a, r) }} lowerLabel={lowerLabelText}
                       expanded={expandedGoals.has(row.id)} onToggleExpand={toggleGoal}
                       stepActionsFor={(st) => actionsFor({ fate: st.fate, isGoal: false, isPast, level })}
@@ -969,7 +1008,7 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
                   {availableTaskRows.length === 0 && <p className="period-section-note">Every open task has a more specific commitment.</p>}
                   <ul>
                     {visibleTaskRows.map((row) => (
-                      <PlanRow key={row.id} row={row} onOpen={open} onOpenPlaced={openPlaced} onAction={(a, r) => { void act(a, r) }} planWeek={planWeekSlot}
+                      <PlanRow key={row.id} row={row} onOpen={open} onOpenPlaced={openPlaced} onOpenSupport={openSupport} onAction={(a, r) => { void act(a, r) }} planWeek={planWeekSlot}
                         lowerLabel={lowerLabelText}
                         actions={actionsFor({ fate: row.fate, isGoal: row.isGoal, isPast, level, hasGoals: goalRows.length > 0 })} />
                     ))}
@@ -1043,7 +1082,7 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
                   <summary>Already assigned · {assignedTaskRows.length}</summary>
                   <p className="period-section-note">Still part of this {noun}’s plan.</p>
                   <ul>{assignedTaskRows.map((row) => (
-                    <PlanRow key={row.id} row={row} onOpen={open} onOpenPlaced={openPlaced} planWeek={planWeekSlot}
+                    <PlanRow key={row.id} row={row} onOpen={open} onOpenPlaced={openPlaced} onOpenSupport={openSupport} planWeek={planWeekSlot}
                       onAction={(a, r) => { void act(a, r) }} lowerLabel={lowerLabelText}
                       actions={actionsFor({ fate: row.fate, isGoal: false, isPast, level, hasGoals: goalRows.length > 0 })} />
                   ))}</ul>
@@ -1067,7 +1106,7 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
                   {doneOpen && (
                     <ul className="mt-1 border-t border-neutral-200">
                       {doneTaskRows.map((row) => (
-                        <PlanRow key={row.id} row={row} onOpen={open} onOpenPlaced={openPlaced} onAction={(a, r) => { void act(a, r) }} planWeek={planWeekSlot}
+                        <PlanRow key={row.id} row={row} onOpen={open} onOpenPlaced={openPlaced} onOpenSupport={openSupport} onAction={(a, r) => { void act(a, r) }} planWeek={planWeekSlot}
                           lowerLabel={lowerLabelText}
                         actions={actionsFor({ fate: row.fate, isGoal: row.isGoal, isPast, level })} />
                       ))}

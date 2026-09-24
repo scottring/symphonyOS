@@ -576,6 +576,67 @@ describe('PeriodPlanPage', () => {
       expect.objectContaining({ bucket: 'quarter', isGoal: true, goalId: 'yg1' }))
   })
 
+  // The month rail is the SEASON's goals, so the pick is a task, not a
+  // goals-table row. It has to keep WHICH season goal was chosen — recording
+  // only the annual goal loses the reason that seasonal goal was picked.
+  it('a month goal created FOR a season goal records that season goal, and inherits its year goal', async () => {
+    const seasonStart = periodStartFor('season', new Date(), DEFAULT_SEASONS)
+    state.tasks = [task({ id: 'sg1', title: 'A season of repairs', isGoal: true, bucket: 'quarter', seasonStart, goalId: 'yg1' })]
+    renderPage('month')
+    const label = thisMonth.toLocaleDateString('en-US', { month: 'long' })
+    fireEvent.click(screen.getByRole('button', { name: `Plan ${label}` }))
+    fireEvent.change(screen.getByLabelText(new RegExp(`new goal for ${label}`, 'i')), { target: { value: 'A home easier to care for' } })
+    fireEvent.change(screen.getByLabelText(/for a season goal/i), { target: { value: 'sg1' } })
+    fireEvent.click(screen.getByRole('button', { name: /add goal/i }))
+    fireEvent.click(screen.getByRole('button', { name: /next: save/i }))
+    fireEvent.click(screen.getByRole('button', { name: new RegExp(`save ${label}`, 'i') }))
+    await vi.waitFor(() => expect(saveSession).toHaveBeenCalled())
+    expect(hook.addTask).toHaveBeenCalledWith('A home easier to care for', undefined, undefined, undefined,
+      expect.objectContaining({ bucket: 'month', isGoal: true, supportsGoalTaskId: 'sg1', goalId: 'yg1' }))
+    // Never goalTaskId: that would make the month goal a STEP of the season
+    // goal, and steps are carried along when their goal moves.
+    const opts = hook.addTask.mock.calls.at(-1)![4] as { goalTaskId?: string }
+    expect(opts.goalTaskId).toBeUndefined()
+  })
+
+  // Both ends, each on its own page. A parent that only ever appeared on its
+  // children's rows would be a dead end.
+  it('the month goal names the season goal it supports, and links to it', () => {
+    const seasonStart = periodStartFor('season', new Date(), DEFAULT_SEASONS)
+    state.tasks = [
+      task({ id: 'sg1', title: 'A season of repairs', isGoal: true, bucket: 'quarter', seasonStart }),
+      task({ id: 'mg1', title: 'A home easier to care for', isGoal: true, monthStart: thisMonth, supportsGoalTaskId: 'sg1' }),
+    ]
+    renderPage('month')
+    const goalsCard = screen.getByRole('region', { name: /goals$/ })
+    expect(within(goalsCard).getByText('Supports')).toBeInTheDocument()
+    fireEvent.click(within(goalsCard).getByRole('button', { name: 'Open A season of repairs' }))
+    expect(mockNavigate).toHaveBeenCalledWith('/task/sg1')
+  })
+
+  it('the season goal names the month goals supporting it, and links to them', () => {
+    const seasonStart = periodStartFor('season', new Date(), DEFAULT_SEASONS)
+    state.tasks = [
+      task({ id: 'sg1', title: 'A season of repairs', isGoal: true, bucket: 'quarter', seasonStart }),
+      task({ id: 'mg1', title: 'A home easier to care for', isGoal: true, monthStart: thisMonth, supportsGoalTaskId: 'sg1' }),
+    ]
+    renderPage('season')
+    const goalsCard = screen.getByRole('region', { name: /goals$/ })
+    expect(within(goalsCard).getByText('Supported by')).toBeInTheDocument()
+    fireEvent.click(within(goalsCard).getByRole('button', { name: 'Open A home easier to care for' }))
+    expect(mockNavigate).toHaveBeenCalledWith('/task/mg1')
+  })
+
+  it('a year goal names the season goals supporting it', () => {
+    const seasonStart = periodStartFor('season', new Date(), DEFAULT_SEASONS)
+    state.goals = [goal({ id: 'yg1', name: 'Make the house ours' })]
+    state.tasks = [task({ id: 'sg1', title: 'A season of repairs', isGoal: true, bucket: 'quarter', seasonStart, goalId: 'yg1' })]
+    renderPage('year')
+    const goalsCard = screen.getByRole('region', { name: /goals$/ })
+    expect(within(goalsCard).getByText('Supported by')).toBeInTheDocument()
+    expect(within(goalsCard).getByRole('button', { name: 'Open A season of repairs' })).toBeInTheDocument()
+  })
+
   it('Drop on a past month ends that month\'s commitment and never deletes the task', async () => {
     state.tasks = [task({ id: 'p1', title: 'Sort photos', monthStart: lastMonth, commitments: [{ level: 'month', periodStart: lastMonth, status: 'open' }] })]
     renderPageAt('month', `/month?start=${lastMonth.getFullYear()}-${String(lastMonth.getMonth() + 1).padStart(2, '0')}-01`)

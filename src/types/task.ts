@@ -168,6 +168,12 @@ export interface Task {
    *  goals-table row): this one says "belongs under", and it is what lets a
    *  goal hold the work that serves it. One level only; a step has no steps. */
   goalTaskId?: string
+  /** The SEASON goal this month goal supports. Goal-to-goal, one rung up, and
+   *  deliberately not goalTaskId: that one means "is a step of" and a goal's
+   *  open steps are carried along when the goal moves, which must never happen
+   *  to a goal. The other half of the pair needs no field — a season goal's
+   *  parent is a year goal, which is a goals-table row, so it is goalId. */
+  supportsGoalTaskId?: string
   /** Fun-audit mark (Best Laid Plans): this item exists because it's fun. */
   isFun?: boolean
   /** Manual position among items with no time (all-day, unscheduled, group

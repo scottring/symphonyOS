@@ -41,3 +41,9 @@ Commit d7bbf4fd fixes PeriodPlanPage pullDown to name the viewed month explicitl
 ## Explicit coverage limits
 
 Not signed off: external calendar write, paper analysis/revision (separate workstream), year-to-season relationship persistence, review Drop and Done verdicts as separate branches, failed-network recovery, real-phone keyboard/safe areas, cross-household permissions, and every historical-data case. Do not label all flows green. The next work should address correctness gaps first, then a coherent usability mockup and re-walk; do not build onboarding around workarounds.
+
+## Resumed verification after cc88a8b0
+
+- **S2-25 seven-day Week: live pass.** Paged Sep20 → Sep27 → Oct4. URL became `/week?start=2026-10-04`. Reload retained Oct4–10, browser Back returned Sep27–Oct3, Forward restored Oct4–10. Weekend/custom ranges not tested.
+- **Review Done: live pass.** Created only `Review Done branch (walkthrough)` in Oct4–10. Advanced to Oct11–17, reviewed prior week, selected Done for that fixture, inspected summary naming Oct4–10, and saved. Reloaded and reopened review: fixture appeared under `Finished the week of Oct 4 – Oct 10`. Left fixture completed. Original records untouched. This supersedes the earlier Done coverage limit; Drop and failed-save recovery remain unverified live.
+- Goal-support work was still uncommitted when checked. Claude's terminal acknowledged preserving the compatible dist preview while preparing the shared-schema migration. No shared migration or deployment was authorized by Codex.

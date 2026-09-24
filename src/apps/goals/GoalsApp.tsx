@@ -75,6 +75,7 @@ function GoalDetail() {
         goal={goal}
         area={areas.find((a) => a.id === goal.areaId)}
         tasks={tasks}
+        onOpenTask={(taskId) => navigate(`/task/${taskId}`)}
         onBack={() => navigate('/goals')}
         onUpdateGoal={updateGoal}
         onDeleteGoal={deleteGoal}
