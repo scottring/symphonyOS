@@ -637,6 +637,97 @@ describe('PeriodPlanPage', () => {
     expect(within(goalsCard).getByRole('button', { name: 'Open A season of repairs' })).toBeInTheDocument()
   })
 
+  // ── The timing control (connected planning, 2026-09-24) ────────────────
+  // "When have I chosen to do this?" must be answerable from the row. The
+  // control wears the saved answer instead of a verb, a goal's STEPS get one
+  // as much as loose work does, and the season page gets one at all — it
+  // returned null for anything but a month.
+  describe('timing on a period row', () => {
+    const timingBtn = (title: string) =>
+      screen.getByRole('button', { name: new RegExp(`Choose a week or a day for ${title}`) })
+
+    it('states no choice, a chosen week, and a chosen day — on a goal\'s own steps', () => {
+      state.tasks = [
+        task({ id: 'g1', title: 'Islanders game', isGoal: true, monthStart: thisMonth }),
+        task({ id: 's1', title: 'Research tickets', monthStart: thisMonth, goalTaskId: 'g1' }),
+        task({ id: 's2', title: 'Buy tickets', monthStart: thisMonth, goalTaskId: 'g1',
+          commitments: [{ level: 'month', periodStart: thisMonth, status: 'open' },
+            { level: 'week', periodStart: new Date(2026, 8, 20), status: 'open' }] }),
+        task({ id: 's3', title: 'Call the box office', monthStart: thisMonth, goalTaskId: 'g1',
+          bucket: 'timed', scheduledFor: new Date(2026, 8, 22), isAllDay: true,
+          commitments: [{ level: 'month', periodStart: thisMonth, status: 'open' }] }),
+      ]
+      renderPage('month')
+      fireEvent.click(screen.getByRole('button', { name: /Show steps under Islanders game/ }))
+      expect(timingBtn('Research tickets')).toHaveTextContent('Choose when')
+      expect(timingBtn('Buy tickets')).toHaveTextContent('Sep 20 – Sep 26 · any day')
+      expect(timingBtn('Call the box office')).toHaveTextContent('Tue, Sep 22 · any time')
+    })
+
+    it('offers the control on a SEASON row, which had none at all', () => {
+      const seasonStart = periodStartFor('season', new Date(), DEFAULT_SEASONS)
+      state.tasks = [task({ id: 'q1', title: 'Fall trips', bucket: 'quarter', seasonStart })]
+      renderPage('season')
+      expect(timingBtn('Fall trips')).toBeInTheDocument()
+    })
+
+    it('choosing a week writes that week and leaves the goal and the month alone', () => {
+      state.tasks = [
+        task({ id: 'g1', title: 'Islanders game', isGoal: true, monthStart: thisMonth }),
+        task({ id: 's1', title: 'Research tickets', monthStart: thisMonth, goalTaskId: 'g1' }),
+      ]
+      renderPage('month')
+      fireEvent.click(screen.getByRole('button', { name: /Show steps under Islanders game/ }))
+      fireEvent.click(timingBtn('Research tickets'))
+      const weeks = screen.getAllByRole('menuitemradio')
+      fireEvent.click(weeks[1])
+      const [, updates] = hook.updateTask.mock.calls.at(-1) as [string, Record<string, unknown>]
+      expect(updates.bucket).toBe('week')
+      expect(updates.weekStart).toBeInstanceOf(Date)
+      expect('goalTaskId' in updates).toBe(false)
+      expect('monthStart' in updates).toBe(false)
+    })
+
+    // The ctx.now trap, at the season: "keep it here" must name the SEASON it
+    // is being pressed on, not a month it was never on.
+    it('keeping a season row here names the season, not a month', () => {
+      const seasonStart = periodStartFor('season', new Date(), DEFAULT_SEASONS)
+      state.tasks = [task({ id: 'q1', title: 'Fall trips', bucket: 'quarter', seasonStart,
+        commitments: [{ level: 'season', periodStart: seasonStart, status: 'open' },
+          { level: 'week', periodStart: new Date(2026, 8, 20), status: 'open' }] })]
+      renderPage('season')
+      fireEvent.click(timingBtn('Fall trips'))
+      fireEvent.click(screen.getByRole('menuitem', { name: /Keep it in/ }))
+      const [, updates] = hook.updateTask.mock.calls.at(-1) as [string, Record<string, unknown>]
+      expect(updates.bucket).toBe('quarter')
+      expect(updates.seasonStart).toEqual(seasonStart)
+      expect(updates.monthStart).toBeUndefined()
+    })
+
+    it('offers View week for a committed week, and View day for a day', () => {
+      state.tasks = [
+        task({ id: 'a1', title: 'Weekly one', monthStart: thisMonth,
+          commitments: [{ level: 'month', periodStart: thisMonth, status: 'open' },
+            { level: 'week', periodStart: new Date(2026, 8, 20), status: 'open' }] }),
+        task({ id: 'a2', title: 'Dated one', monthStart: thisMonth,
+          bucket: 'timed', scheduledFor: new Date(2026, 8, 22), isAllDay: true,
+          commitments: [{ level: 'month', periodStart: thisMonth, status: 'open' }] }),
+      ]
+      renderPage('month')
+      const list = screen.getByRole('region', { name: / list$/ })
+      fireEvent.click(within(list).getByRole('button', { name: 'View week →' }))
+      expect(mockNavigate).toHaveBeenCalledWith('/week?start=2026-09-20')
+      fireEvent.click(within(list).getByRole('button', { name: 'View day →' }))
+      expect(mockNavigate).toHaveBeenCalledWith('/today?date=2026-09-22')
+    })
+
+    it('offers no View link when nothing is chosen', () => {
+      state.tasks = [task({ id: 'a1', title: 'Untimed one', monthStart: thisMonth })]
+      renderPage('month')
+      expect(screen.queryByRole('button', { name: /^View (week|day) →$/ })).toBeNull()
+    })
+  })
+
   it('Drop on a past month ends that month\'s commitment and never deletes the task', async () => {
     state.tasks = [task({ id: 'p1', title: 'Sort photos', monthStart: lastMonth, commitments: [{ level: 'month', periodStart: lastMonth, status: 'open' }] })]
     renderPageAt('month', `/month?start=${lastMonth.getFullYear()}-${String(lastMonth.getMonth() + 1).padStart(2, '0')}-01`)

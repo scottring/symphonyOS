@@ -1,7 +1,13 @@
 // src/components/plan/PlanWeekMenu.tsx
 //
-// "Plan ▾" on a task that belongs to a period: which WEEK should it sit on,
-// with no day attached.
+// The timing control: what this task's row actually says about when it is to
+// be done, and the one place to change it.
+//
+// The trigger WEARS the answer — "Choose when", "Oct 4 – Oct 10 · any day",
+// "Tue, Oct 6 · any time" — rather than a verb, so nobody has to open anything
+// to find out (connected planning design, 2026-09-24). It reads that answer
+// from `taskTiming`, the module every other surface reads, so Month, Season,
+// Week, Day and details cannot drift apart.
 //
 // Every other route to "a week" means the week containing now, so an October
 // task could only be committed to a September week (2026-09-24). The weeks
@@ -23,6 +29,7 @@ import { CalendarRange } from 'lucide-react'
 import { usePopoverFocus } from '@/hooks/usePopoverFocus'
 import { weeksOfMonth } from '@/lib/planning/monthWeeks'
 import { readCadenceConfig, localYmd, weekStartAnchor, parseLocalYmd } from '@/lib/cadence/config'
+import { timingLabel, timingDescription, type TaskTiming } from '@/lib/planning/taskTiming'
 
 /** "Oct 4 – 10" for a week anchor, matching the listed weeks' labels. */
 function weekLabel(start: Date): string {
@@ -35,7 +42,7 @@ function weekLabel(start: Date): string {
 }
 
 export function PlanWeekMenu({
-  title, periodStart, periodLabel, currentWeekStart, onPickWeek, onClearWeek, onPickDay, size = 'md',
+  title, periodStart, periodLabel, currentWeekStart, timing, onPickWeek, onClearWeek, onPickDay, size = 'md',
 }: {
   title: string
   /** Any day inside the period whose weeks should be offered — the month being
@@ -45,6 +52,9 @@ export function PlanWeekMenu({
   periodLabel?: string
   /** The week it is already on, if any — shown as the current choice. */
   currentWeekStart?: Date | null
+  /** The task's saved timing, which the trigger states. Omitted only where the
+   *  caller genuinely has no task to read (it then falls back to the verb). */
+  timing?: TaskTiming
   onPickWeek: (weekStart: Date) => void
   /** "Keep it in <Month>" — drops the week, keeps the period commitment. */
   onClearWeek?: () => void
@@ -63,7 +73,12 @@ export function PlanWeekMenu({
   const [dayValue, setDayValue] = useState('')
   const weekStartsOn = readCadenceConfig().weekStartsOn
   const weeks = weeksOfMonth(periodStart, weekStartsOn)
-  const monthLabel = periodLabel ?? periodStart.toLocaleDateString('en-US', { month: 'long' })
+  // Two different labels. The list of weeks belongs to `periodStart`'s MONTH
+  // (a season is anchored on its first month and reaches the rest through
+  // "Another week…"), while "keep it in …" names the period the task actually
+  // belongs to — which for a season row is the season, not that month.
+  const weeksMonthLabel = periodStart.toLocaleDateString('en-US', { month: 'long' })
+  const monthLabel = periodLabel ?? weeksMonthLabel
   const currentKey = currentWeekStart ? localYmd(currentWeekStart) : null
   // Any date picked in "Another week…" snaps to that week's anchor, so the
   // value written is always a real week_start and the reader is told which
@@ -100,6 +115,11 @@ export function PlanWeekMenu({
     }
   }, [open])
 
+  // What the trigger says. With no task to read it keeps the old verb, so a
+  // caller that has not been converted still renders something sensible.
+  const label = timing ? timingLabel(timing) : 'Plan'
+  const chosen = !!timing && (!!timing.day || !!timing.week)
+
   const choose = (fn: () => void) => () => { setOpen(false); fn() }
   const itemClass = 'block w-full rounded-md px-3 py-1.5 text-left text-sm text-neutral-700 hover:bg-primary-50 hover:text-primary-700'
 
@@ -108,16 +128,19 @@ export function PlanWeekMenu({
       <button
         ref={triggerRef}
         type="button"
-        aria-label={`Plan ${title} for a week`}
+        aria-label={`Choose a week or a day for ${title}. ${timing ? timingDescription(timing, monthLabel) : 'No timing shown'}`}
         aria-haspopup="menu"
         aria-expanded={open}
         onClick={() => setOpen((v) => !v)}
-        className={`inline-flex items-center gap-1 rounded-md text-neutral-500 hover:bg-neutral-100 hover:text-neutral-700 ${
-          size === 'sm' ? 'px-1.5 py-0.5 text-xs' : 'px-2 py-1 text-[13px]'
-        } ${open ? 'bg-neutral-100' : ''}`}
+        className={`plan-timing-trigger inline-flex max-w-full items-center gap-1 rounded-md border transition-colors ${
+          chosen
+            ? 'border-primary-200 bg-primary-50 text-primary-700 hover:bg-primary-100'
+            : 'border-neutral-200 text-neutral-500 hover:border-neutral-300 hover:bg-neutral-100 hover:text-neutral-700'
+        } ${size === 'sm' ? 'px-1.5 py-0.5 text-xs' : 'px-2 py-1 text-[13px]'} ${open ? 'bg-neutral-100' : ''}`}
       >
-        <CalendarRange className="h-3.5 w-3.5" aria-hidden="true" />
-        <span>Plan</span>
+        <CalendarRange className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+        <span className="truncate">{label}</span>
+        <span aria-hidden="true" className="opacity-50">▾</span>
       </button>
 
       {open && createPortal(
@@ -129,7 +152,7 @@ export function PlanWeekMenu({
           className="fixed z-[60] w-56 overflow-y-auto rounded-lg border border-neutral-200 bg-white py-1 shadow-lg"
         >
           <p className="px-3 pb-0.5 pt-2 text-[10px] font-semibold uppercase tracking-wider text-neutral-400" aria-hidden="true">
-            A week in {monthLabel}
+            A week in {weeksMonthLabel}
           </p>
           {weeks.map((w) => {
             const isCurrent = currentKey === localYmd(w.start)

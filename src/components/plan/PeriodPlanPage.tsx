@@ -53,6 +53,7 @@ import type { Task } from '@/types/task'
 import type { Goal } from '@/types/goal'
 import { PlanRow, rowIsDone, type PlanRowModel, type SupportRef } from './PlanRow'
 import { supportedGoal, goalsSupporting, seasonGoalsSupporting } from '@/lib/planning/goalSupport'
+import { taskTiming, hasTiming } from '@/lib/planning/taskTiming'
 import { readOpen, readFoldPref, writeOpen } from './foldState'
 import { PlanSession } from './PlanSession'
 import { PlanNextLine } from './PlanNextLine'
@@ -493,33 +494,56 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
   // "Plan ▾" on a task row: the weeks of the month being VIEWED. The
   // 'to-lower' verb beside it commits to the week containing now, which on
   // October's page could never reach an October week (2026-09-24).
+  /**
+   * The timing control, and the contextual way to go and look at what was
+   * chosen.
+   *
+   * Every action that belongs to this period gets one — a goal's steps as much
+   * as the loose work beside them, on the season page as much as the month
+   * (requirement 1). The year has no task steps, so it has nothing to time.
+   * The control states the saved answer rather than a verb; the View links
+   * beside it use the dates that are actually saved and the URL conventions
+   * the app already has (`/week?start=`, `/today?date=`).
+   */
   const planWeekSlot = useCallback((row: PlanRowModel) => {
-    if (level !== 'month') return null
+    if (level === 'year') return null
     const t = tasks.find((x) => x.id === row.id)
+    const timing = t ? taskTiming(t) : undefined
     return (
+      <span className="inline-flex max-w-full items-center gap-1">
       <PlanWeekMenu
         size="sm"
         title={row.title}
         periodStart={bounds.start}
+        periodLabel={level === 'season' ? bounds.label : undefined}
+        timing={timing}
         currentWeekStart={t?.weekStart ?? null}
         onPickWeek={(weekStart) => { void gated.updateTask(row.id, { bucket: 'week', weekStart, scheduledFor: undefined }) }}
-        onClearWeek={t?.weekStart || t?.scheduledFor
+        onClearWeek={timing && hasTiming(timing)
           ? () => {
               // Name the month. Without `monthStart`, planPlacement falls back
               // to ctx.now (`intentions.ts:175`) and then supersedes the open
               // commitment for any OTHER month — so "Keep it in October",
               // pressed in September, moved the task to September and dropped
               // October (2026-09-24 blocker).
-              void gated.updateTask(row.id, {
-                bucket: 'month', monthStart: bounds.start,
-                weekStart: undefined, scheduledFor: undefined,
-              })
+              void gated.updateTask(row.id, level === 'season'
+                ? { bucket: 'quarter', seasonStart: bounds.start, weekStart: undefined, scheduledFor: undefined }
+                : { bucket: 'month', monthStart: bounds.start, weekStart: undefined, scheduledFor: undefined })
             }
           : undefined}
         onPickDay={(date) => { void planActions.chooseTaskDay(row.id, date) }}
       />
+      {timing?.day && (
+        <button type="button" onClick={() => navigate(`/today?date=${localYmd(timing.day!)}`)}
+          className="shrink-0 whitespace-nowrap text-xs text-primary-700 hover:underline">View day →</button>
+      )}
+      {!timing?.day && timing?.week && (
+        <button type="button" onClick={() => navigate(`/week?start=${localYmd(timing.week!)}`)}
+          className="shrink-0 whitespace-nowrap text-xs text-primary-700 hover:underline">View week →</button>
+      )}
+      </span>
     )
-  }, [level, bounds.start, gated, planActions, tasks])
+  }, [level, bounds.start, bounds.label, gated, planActions, tasks, navigate])
 
   const [pickingGoalFor, setPickingGoalFor] = useState<string | null>(null)
   const [linkError, setLinkError] = useState(false)
