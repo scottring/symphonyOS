@@ -456,7 +456,17 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
         currentWeekStart={t?.weekStart ?? null}
         onPickWeek={(weekStart) => { void gated.updateTask(row.id, { bucket: 'week', weekStart, scheduledFor: undefined }) }}
         onClearWeek={t?.weekStart || t?.scheduledFor
-          ? () => { void gated.updateTask(row.id, { bucket: 'month', weekStart: undefined, scheduledFor: undefined }) }
+          ? () => {
+              // Name the month. Without `monthStart`, planPlacement falls back
+              // to ctx.now (`intentions.ts:175`) and then supersedes the open
+              // commitment for any OTHER month — so "Keep it in October",
+              // pressed in September, moved the task to September and dropped
+              // October (2026-09-24 blocker).
+              void gated.updateTask(row.id, {
+                bucket: 'month', monthStart: bounds.start,
+                weekStart: undefined, scheduledFor: undefined,
+              })
+            }
           : undefined}
         onPickDay={(date) => { void planActions.chooseTaskDay(row.id, date) }}
       />

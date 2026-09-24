@@ -40,26 +40,30 @@ export function goalStatusOf(task: Pick<Task, 'completed' | 'bucket'>): GoalStat
 }
 
 /**
- * The update that moves a goal to `next`.
+ * The update that moves a goal to `next`, or `null` when nothing would change
+ * — or when the move cannot be expressed.
  *
- * `periodBucket` is the bucket the goal belongs in when active — 'month' or
- * 'quarter' — so un-archiving returns it to its own period rather than
- * guessing. Returns `null` when nothing would change.
+ * It carries ONLY `completed`. A goal may not be placed: `updateTask` refuses
+ * any write to a goal that touches a placement key and shows "Goals aren\u2019t
+ * scheduled" (`useSupabaseTasks.ts:1614`). The first version of this control
+ * sent `{ completed: false, bucket: 'month' }`, so the whole write was refused
+ * and Active did nothing at all — a goal ticked by accident could not be
+ * reopened from its own page (2026-09-24).
+ *
+ * `archived` therefore returns null: parking a month or season goal would mean
+ * `bucket: 'someday'`, which is a placement. Year goals have a real `status`
+ * column; these do not. See `canSetGoalStatus`.
  */
 export function goalStatusUpdate(
   task: Pick<Task, 'completed' | 'bucket'>,
   next: GoalStatus,
-  periodBucket: 'month' | 'quarter',
 ): Partial<Task> | null {
   if (goalStatusOf(task) === next) return null
-  switch (next) {
-    case 'completed':
-      // Leave the bucket alone: a completed goal stays on its period's list,
-      // which is what the look-back reads.
-      return { completed: true }
-    case 'archived':
-      return { completed: false, bucket: 'someday' }
-    default:
-      return { completed: false, bucket: periodBucket }
-  }
+  if (next === 'archived') return null
+  return { completed: next === 'completed' }
+}
+
+/** Whether this control can actually carry out `status` on a month or season goal. */
+export function canSetGoalStatus(status: GoalStatus): boolean {
+  return status !== 'archived'
 }

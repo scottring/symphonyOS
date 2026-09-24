@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { goalStatusOf, goalStatusUpdate } from './goalStatus'
+import { canSetGoalStatus, goalStatusOf, goalStatusUpdate } from './goalStatus'
 
 describe('goalStatusOf', () => {
   it('reads an open month goal as active', () => {
@@ -13,28 +13,39 @@ describe('goalStatusOf', () => {
   })
 })
 
-describe('goalStatusUpdate', () => {
+describe('goalStatusUpdate — only `completed`, never a placement', () => {
   const active = { completed: false, bucket: 'month' as const }
+  const done = { completed: true, bucket: 'month' as const }
 
-  it('completing leaves the goal on its period list, for the look-back', () => {
-    expect(goalStatusUpdate(active, 'completed', 'month')).toEqual({ completed: true })
+  it('completing sends the tick alone', () => {
+    expect(goalStatusUpdate(active, 'completed')).toEqual({ completed: true })
   })
 
-  it('archiving parks it without deleting or completing it', () => {
-    expect(goalStatusUpdate(active, 'archived', 'month')).toEqual({ completed: false, bucket: 'someday' })
+  it('reopening sends the tick alone, so the write is not refused', () => {
+    // The first version sent `{ completed: false, bucket: 'month' }`.
+    // `updateTask` refuses ANY write to a goal that carries a placement key
+    // (useSupabaseTasks.ts:1614), so the whole update was dropped with a toast
+    // and a goal ticked by accident could not be reopened from its own page.
+    expect(goalStatusUpdate(done, 'active')).toEqual({ completed: false })
   })
 
-  it('un-archiving returns the goal to its OWN period, not a guessed one', () => {
-    const archived = { completed: false, bucket: 'someday' as const }
-    expect(goalStatusUpdate(archived, 'active', 'quarter')).toEqual({ completed: false, bucket: 'quarter' })
+  it('never carries a bucket or a period stamp', () => {
+    for (const next of ['active', 'completed'] as const) {
+      const update = goalStatusUpdate(next === 'active' ? done : active, next) ?? {}
+      expect(Object.keys(update)).toEqual(['completed'])
+    }
   })
 
-  it('re-opening a completed goal clears the tick', () => {
-    expect(goalStatusUpdate({ completed: true, bucket: 'month' }, 'active', 'month'))
-      .toEqual({ completed: false, bucket: 'month' })
+  it('cannot archive a month or season goal, and says so rather than pretending', () => {
+    // Parking one would mean bucket 'someday' — a placement, refused for goals.
+    expect(goalStatusUpdate(active, 'archived')).toBeNull()
+    expect(canSetGoalStatus('archived')).toBe(false)
+    expect(canSetGoalStatus('active')).toBe(true)
+    expect(canSetGoalStatus('completed')).toBe(true)
   })
 
   it('writes nothing when the status is already what you asked for', () => {
-    expect(goalStatusUpdate(active, 'active', 'month')).toBeNull()
+    expect(goalStatusUpdate(active, 'active')).toBeNull()
+    expect(goalStatusUpdate(done, 'completed')).toBeNull()
   })
 })

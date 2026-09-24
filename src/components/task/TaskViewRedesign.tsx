@@ -10,7 +10,7 @@ import { UnifiedNotesEditor } from '@/components/notes/UnifiedNotesEditor'
 import { CloudUpload, Check } from 'lucide-react'
 import { taskWhenLabel } from '@/lib/planning/taskWhen'
 import { PlanWeekMenu } from '@/components/plan/PlanWeekMenu'
-import { GOAL_STATUSES, GOAL_STATUS_HINT, GOAL_STATUS_LABEL, goalStatusOf, goalStatusUpdate } from '@/lib/planning/goalStatus'
+import { GOAL_STATUSES, GOAL_STATUS_HINT, GOAL_STATUS_LABEL, canSetGoalStatus, goalStatusOf, goalStatusUpdate } from '@/lib/planning/goalStatus'
 
 interface TaskViewProps {
   task: Task
@@ -464,7 +464,13 @@ export function TaskViewRedesign({
                               onPickWeek={(weekStart) => onUpdate(subtask.id, { bucket: 'week', weekStart, scheduledFor: undefined })}
                               onClearWeek={subtask.weekStart || subtask.scheduledFor
                                 ? () => onUpdate(subtask.id, {
-                                    bucket: task.bucket === 'quarter' ? 'quarter' : 'month',
+                                    // The GOAL's period, named explicitly. Left
+                                    // unnamed, planPlacement defaults to today's
+                                    // month and supersedes the real one
+                                    // (2026-09-24 blocker).
+                                    ...(task.bucket === 'quarter'
+                                      ? { bucket: 'quarter' as const, seasonStart: task.seasonStart }
+                                      : { bucket: 'month' as const, monthStart: task.monthStart }),
                                     weekStart: undefined,
                                     scheduledFor: undefined,
                                   })
@@ -638,13 +644,15 @@ export function TaskViewRedesign({
                           key={value}
                           type="button"
                           aria-pressed={goalStatus === value}
+                          disabled={!canSetGoalStatus(value)}
+                          title={canSetGoalStatus(value) ? undefined : 'Archiving a month or season goal is not available yet'}
                           onClick={() => {
-                            const update = goalStatusUpdate(task, value, task.bucket === 'quarter' ? 'quarter' : 'month')
+                            const update = goalStatusUpdate(task, value)
                             if (update) onUpdate(task.id, update)
                           }}
                           className={`rounded-md px-2.5 py-1 text-sm transition-colors ${goalStatus === value
                             ? 'bg-primary-50 font-semibold text-primary-700'
-                            : 'text-neutral-500 hover:bg-neutral-100 hover:text-neutral-700'}`}
+                            : 'text-neutral-500 hover:bg-neutral-100 hover:text-neutral-700'} disabled:opacity-40 disabled:cursor-not-allowed`}
                         >
                           {GOAL_STATUS_LABEL[value]}
                         </button>
