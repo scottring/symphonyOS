@@ -451,3 +451,59 @@ now serves this code** rather than the 06:43 build Codex was walking.
 `lowerPlacement:154` resolving a bucket-week row with nothing saved to "This week"
 against today; `onSkipRoutine`/`onSkipEvent` still announce without checking the
 write's result.
+
+---
+
+## H — the hierarchy read backwards  ·  11:20 ET
+
+Scott's visual finding, logged and fixed: **a goal's title started further right
+than its own children's.** A goal row wears a tick, a caret and a goal glyph; a
+step wears only a tick. Measured in Chromium before the fix:
+
+```
+desktop   goal 105 · goal without a disclosure 91 · step 57   ← the child sat 48px LEFT of its parent
+phone     goal  79 · goal without a disclosure 55 · step 45   ← 34px left
+```
+
+So the nesting direction was right in the DOM and backwards on the screen, and a
+goal with no disclosure did not even agree with the goal above it.
+
+**The fix, within the approved nesting direction.** The lanes a row carries in
+front of its title are named once in `index.css` — `--plan-lane-caret`,
+`--plan-lane-glyph`, `--plan-lane-gap`, `--plan-step-indent` — and both halves of
+the fix are derived from them:
+
+- a goal with no disclosure (a year row, a completed one) **holds the caret's
+  place**, so goals in one list start at the same x;
+- a step's indent takes it back past the caret and the glyph its goal wears, then
+  puts it 24px to the **right** of the goal's title. Row padding is identical on
+  both rows, so it cancels out of the arithmetic;
+- the "Add a step" field starts exactly where a step's title does, with the “+”
+  standing in the step's tick column.
+
+The hardcoded `pl-7` that used to do this job is gone. It was the drift between
+that number and the lanes above it that reversed the hierarchy, so a test now
+asserts no hardcoded indent sits beside the derived one.
+
+```
+desktop   goal 105 · goal without 105 · step 129 · add-step 129
+phone     goal  79 · goal without  79 · step 103 · add-step 103
+```
+
+**Verification.** happy-dom does no layout, so "is this title to the right of that
+one" cannot be asked in the suite. `outputs/plan-hierarchy/` renders the rows with
+the built stylesheet and measures them in Chromium at 1200px and 390px — all four
+assertions pass at both widths. `PlanRow.test.tsx` gained 4 structural tests
+(the placeholder exists and is `aria-hidden`, a plain task reserves nothing, the
+real disclosure shares the lane, no hardcoded indent).
+
+Nothing else on the row moved: the tick, the verbs, the Plan control, the phone
+Move picker, the support lines and the placement chip are untouched, and no
+scheduling or assignment path was involved.
+
+### On the rest of Codex's 11:15 note
+
+The three optional entry paths and the printable guide were **already delivered**
+in commits `10d203bf` and `8cece318` — see sections F and G above. `/guide` is a
+permanent page with a sidebar entry; the doors are on the month, season and year
+pages. Nothing further is pending on them but your review.

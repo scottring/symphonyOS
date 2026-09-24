@@ -2411,6 +2411,58 @@ div.chooser-action-group { overflow: visible !important; }
 .period-plan-page .period-plan-row { position:relative; gap:10px; padding:14px 6px; }
 .period-plan-page .period-row-actions { position:absolute; right:4px; top:4px; background:var(--color-bg-elevated, #fff); border-radius:6px; box-shadow:0 1px 5px #263a5012; }
 .period-plan-page .period-row-check { min-width:18px; min-height:18px; }
+
+/* ── A goal and its steps, indented the way they are nested ──────────────────
+   Scott, 2026-09-24: a goal wears a tick, a caret and a goal glyph, and a step
+   wears only a tick — so the goal's TITLE started further right than its own
+   children's, and the hierarchy read backwards.
+
+   The lanes a row carries in front of its title are named here once, and both
+   halves of the fix are derived from them. A goal with no disclosure (a year
+   row, a completed one) holds the caret's place, so goals in one list agree
+   with each other. And a step's indent takes it back past the caret and the
+   glyph its goal wears — then puts it clearly to the RIGHT of the goal's
+   title. Both rows carry the same row padding, so that cancels. */
+.period-plan-page {
+  --plan-lane-gap: 10px;
+  --plan-lane-caret: 14px;
+  --plan-lane-glyph: 14px;
+  --plan-lane-glyph-gap: 10px;
+  --plan-row-pad-x: 6px;
+  --plan-step-indent: 24px;
+}
+@media (max-width: 639px) {
+  /* No goal glyph below sm — and a lane that is not rendered takes no gap
+     with it. The caret is a 24px touch target instead. */
+  .period-plan-page {
+    --plan-lane-caret: 24px;
+    --plan-lane-glyph: 0px;
+    --plan-lane-glyph-gap: 0px;
+    --plan-row-pad-x: 4px;
+  }
+}
+.period-row-caret {
+  width: calc(var(--plan-lane-caret, 14px));
+}
+.period-plan-steps {
+  padding-left: calc(
+    var(--plan-lane-caret, 14px) + var(--plan-lane-gap, 10px)
+    + var(--plan-lane-glyph, 14px) + var(--plan-lane-glyph-gap, 10px)
+    + var(--plan-step-indent, 24px)
+  );
+}
+/* The add-step field starts exactly where a step's title does: the same
+   indent, plus the row padding a step carries and this form does not, with
+   the "+" standing in the step's tick column. */
+.period-plan-step-add {
+  gap: var(--plan-lane-gap, 10px);
+  padding-left: calc(
+    var(--plan-lane-caret, 14px) + var(--plan-lane-gap, 10px)
+    + var(--plan-lane-glyph, 14px) + var(--plan-lane-glyph-gap, 10px)
+    + var(--plan-step-indent, 24px) + var(--plan-row-pad-x, 6px)
+  );
+}
+.period-plan-step-add > .period-row-caret { width: 18px; }
 @media (min-width:1024px) {
 
 }

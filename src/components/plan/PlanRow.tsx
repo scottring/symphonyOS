@@ -213,17 +213,23 @@ export function PlanRow({
       >
         <Check className="w-3 h-3" strokeWidth={3} />
       </button>
-      {canHoldSteps && (
+      {canHoldSteps ? (
         <button
           type="button"
           aria-label={`${expanded ? 'Hide' : 'Show'} steps under ${row.title}`}
           aria-expanded={expanded}
           onClick={() => onToggleExpand?.(row)}
-          className="mt-[3px] shrink-0 text-neutral-400 transition-colors hover:text-neutral-700"
+          className="period-row-caret mt-[3px] shrink-0 text-neutral-400 transition-colors hover:text-neutral-700"
         >
           {expanded ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
         </button>
-      )}
+      ) : row.isGoal ? (
+        // A goal that cannot take steps — a year row, or a completed one —
+        // still holds the caret's place, so goals in one list start their
+        // titles at the same x rather than at whichever affordances they
+        // happen to have.
+        <span className="period-row-caret shrink-0" aria-hidden="true" />
+      ) : null}
       {/* The glyph is a desktop convenience; on a phone the section heading
           already says these are goals, and 24px of row is worth more. */}
       {row.isGoal && <Target className="mt-[3px] hidden h-3.5 w-3.5 shrink-0 text-accent-600 sm:block" aria-label="Goal" />}
@@ -309,7 +315,7 @@ export function PlanRow({
       /* The steps are their own list items in the same <ul>, indented rather
          than nested in a second list, so a screen reader reads one flat plan. */
       <li className="border-b border-neutral-200 last:border-0">
-        <ul className="pl-7">
+        <ul className="period-plan-steps">
           {(row.steps ?? []).map((step) => (
             <PlanRow
               key={step.id}
@@ -325,7 +331,7 @@ export function PlanRow({
         </ul>
         {onAddStep && (
           <form
-            className="flex items-center gap-2 py-1.5 pl-7 pr-2"
+            className="period-plan-step-add flex items-center py-1.5 pr-2"
             onSubmit={(e) => {
               e.preventDefault()
               const t = stepDraft.trim()
@@ -333,7 +339,11 @@ export function PlanRow({
               if (t) onAddStep(row, t)
             }}
           >
-            <Plus className="h-3.5 w-3.5 shrink-0 text-neutral-400" />
+            {/* In the step's own tick column, so the field starts exactly
+                where a step's title does. */}
+            <span className="period-row-caret grid shrink-0 place-items-center" aria-hidden="true">
+              <Plus className="h-3.5 w-3.5 text-neutral-400" />
+            </span>
             <input
               aria-label={`New step for ${row.title}`}
               value={stepDraft}

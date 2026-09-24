@@ -74,6 +74,41 @@ describe('a goal holds the steps that serve it', () => {
     expect(screen.queryByRole('button', { name: /steps under Swim again/i })).not.toBeInTheDocument()
   })
 
+  // Scott, 2026-09-24: a goal's title started further right than its own
+  // children's, so the hierarchy read backwards. Which pixel each title lands
+  // on is measured in a browser (outputs/plan-hierarchy); what belongs here is
+  // the structure that makes the measurement come out right.
+  it('a goal with no disclosure still holds the caret\'s place, so goals agree', () => {
+    render(<ul><PlanRow row={row({ id: 'g2', title: 'Swim again', isGoal: true })} actions={[]} onAction={vi.fn()} onOpen={vi.fn()} /></ul>)
+    const lane = screen.getByRole('listitem').querySelector('.period-row-caret')
+    expect(lane).not.toBeNull()
+    expect(lane!.tagName).toBe('SPAN')
+    expect(lane).toHaveAttribute('aria-hidden', 'true')
+  })
+
+  it('a plain task reserves nothing — it is not in a list of goals', () => {
+    render(<ul><PlanRow row={row({ title: 'Call the roofer' })} actions={[]} onAction={vi.fn()} onOpen={vi.fn()} /></ul>)
+    expect(screen.getByRole('listitem').querySelector('.period-row-caret')).toBeNull()
+  })
+
+  it('the real disclosure sits in the same lane as the placeholder', () => {
+    render(<ul><PlanRow row={goalWithSteps} actions={[]} onAction={vi.fn()} onOpen={vi.fn()} /></ul>)
+    expect(screen.getByRole('button', { name: /Show steps under Transform the porch/i }))
+      .toHaveClass('period-row-caret')
+  })
+
+  it('indents its steps through the one rule that knows the lanes', () => {
+    const { container } = render(
+      <ul><PlanRow row={goalWithSteps} actions={[]} onAction={vi.fn()} onOpen={vi.fn()} expanded onAddStep={vi.fn()} /></ul>,
+    )
+    const steps = container.querySelector('.period-plan-steps')
+    expect(steps).not.toBeNull()
+    // Never a hardcoded indent beside the derived one — they drifted apart
+    // once already, which is how the goal ended up to the right of its child.
+    expect(steps!.className).not.toMatch(/\bpl-\d/)
+    expect(container.querySelector('.period-plan-step-add')?.className).not.toMatch(/\bpl-\d/)
+  })
+
   it('a plain task never offers a disclosure', () => {
     render(<ul><PlanRow row={row({ title: 'Call the roofer' })} actions={[]} onAction={vi.fn()} onOpen={vi.fn()} onAddStep={vi.fn()} /></ul>)
     expect(screen.queryByRole('button', { name: /steps under Call the roofer/i })).not.toBeInTheDocument()
