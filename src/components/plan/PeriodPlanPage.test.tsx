@@ -36,7 +36,7 @@ const goal = (over: Partial<Goal>): Goal => ({
   createdAt: new Date(), updatedAt: new Date(), context: null, ...over,
 } as Goal)
 
-const state: { tasks: Task[]; goals: Goal[]; loading: boolean } = { tasks: [], goals: [], loading: false }
+const state: { tasks: Task[]; goals: Goal[]; loading: boolean; goalsLoading?: boolean } = { tasks: [], goals: [], loading: false, goalsLoading: false }
 const defaultAddTask = async (..._a: unknown[]): Promise<string | undefined> => 'new'
 const hook = {
   toggleTask: vi.fn(), deleteTask: vi.fn(), updateTask: vi.fn(async (..._a: unknown[]) => true), updateTasksBulk: vi.fn(),
@@ -72,7 +72,7 @@ const goalsApi = {
 }
 vi.mock('@/contexts/GoalsContext', () => ({
   GoalsProvider: ({ children }: { children: React.ReactNode }) => children,
-  useGoalsContext: () => ({ goals: state.goals, areas: [{ id: 'a1', name: 'General' }], ...goalsApi }),
+  useGoalsContext: () => ({ goals: state.goals, areas: [{ id: 'a1', name: 'General' }], loading: state.goalsLoading ?? false, ...goalsApi }),
 }))
 vi.mock('@/lib/today/domainFilter', () => ({
   filterTasksForLayers: (t: Task[]) => t,
@@ -2199,5 +2199,35 @@ describe('the long list can be worked entirely from the keyboard', () => {
     await u.keyboard('{Escape}')
     expect(screen.queryByRole('menu')).not.toBeInTheDocument()
     expect(document.activeElement).toBe(trigger)
+  })
+})
+
+// Live, 2026-09-24: /year opened on "0 goals" with an empty list for as long
+// as the goals took to load — a household with three year goals told it had
+// none. The page was reading only the TASK load, and the year is drawn from
+// goals.
+describe('a year whose goals have not arrived does not claim to be empty', () => {
+  beforeEach(() => {
+    pinClock(); localStorage.clear()
+    state.tasks = []; state.goals = []; state.loading = false; routinesState.routines = []
+    domainState.layers = new Set(['work', 'family', 'personal', 'unsorted']); domainState.soleDomain = null
+    seasonsState.seasons = DEFAULT_SEASONS; seasonsState.loading = false
+    Object.values(hook).forEach((f) => f.mockClear())
+  })
+  afterEach(() => { state.goalsLoading = false; vi.useRealTimers() })
+
+  it('says it is loading rather than counting a list it does not have', () => {
+    state.goalsLoading = true
+    renderPage('year')
+    expect(screen.getByText('Loading…')).toBeInTheDocument()
+    expect(screen.queryByText(/^0 goals$/)).not.toBeInTheDocument()
+  })
+
+  it('counts them once they arrive', () => {
+    state.goalsLoading = false
+    state.goals = [goal({ name: 'Run a half marathon' })]
+    renderPage('year')
+    expect(screen.getByText('1 goals')).toBeInTheDocument()
+    expect(screen.queryByText('Loading…')).not.toBeInTheDocument()
   })
 })

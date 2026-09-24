@@ -122,7 +122,15 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
   const meId = getCurrentUserMember()?.id ?? null
   const { seasons, loading: seasonsLoading } = useHouseholdSeasons()
   const { activeRoutines } = useRoutines()
-  const { goals, areas, addGoal, updateGoal, addArea } = useGoalsContext()
+  const { goals, areas, addGoal, updateGoal, addArea, loading: goalsLoading } = useGoalsContext()
+  /**
+   * Everything this page's lists are made of. The year draws from `goals`,
+   * which has its own load — and the page was not consulting it, so /year
+   * opened on "0 goals" and an empty list for as long as the goals took to
+   * arrive, telling a household with three year goals that it had none (seen
+   * live, 2026-09-24). Counted once here so every consumer agrees.
+   */
+  const listsLoading = loading || seasonsLoading || (level === 'year' && goalsLoading)
 
   const [searchParams, setSearchParams] = useSearchParams()
   const startParam = searchParams.get('start')
@@ -968,7 +976,7 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
   const host = usePlanSessionHost({
     enabled: true, level, horizon, token,
     periodStart: bounds.start, prevStart: bounds.prev,
-    listsLoading: loading || seasonsLoading,
+    listsLoading,
     back, current: currentPeriodTasks, above: aboveItems,
     writers: sessionWriters,
     prepareDraft: isYearSession ? prepareYearDraft : undefined,
@@ -1077,7 +1085,10 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
               ? <>Couldn&rsquo;t check whether {shortLabel} is planned. <button type="button" onClick={reloadSession} className="font-semibold text-primary-700 hover:underline">Try again</button></>
               : savedSession
                 ? <span className="font-semibold text-sage-600">Planned {savedSession.at.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
-                : `${goalRows.filter((r) => !rowIsDone(r.fate)).length} goals${level === 'year' ? '' : ` · ${openTaskRows.length + supportingTaskCount} tasks`}`}
+                // A count of a list that has not arrived is not a count.
+                : listsLoading
+                  ? <span className="text-neutral-400">Loading…</span>
+                  : `${goalRows.filter((r) => !rowIsDone(r.fate)).length} goals${level === 'year' ? '' : ` · ${openTaskRows.length + supportingTaskCount} tasks`}`}
           </p>
           {/* Never while a session is open: the reader is mid-draft, and this
               link would navigate them out of it. */}
