@@ -803,3 +803,78 @@ system and by the extracted rule, not by a mounted test. That is the one hop
 still unproven by a test, and I would rather say so than imply otherwise.
 
 Fixture untouched; scheduling and drag interactions unchanged.
+
+---
+
+## N — event drag and drop wrote nothing  ·  13:45 ET
+
+Scott's blocker, Codex's static lead. **The lead was exactly right**, and it was
+worse than one missing line.
+
+### What was actually broken
+
+`HomeView` passed `onUpdateEvent={ctx.onUpdateEvent ?? (() => {})}` and
+**no host has ever supplied one.** `ScheduleActionsValue` declares the field
+optional, so TypeScript never said a word. Dropping the Pippa event on Friday
+called a no-op, and the grid then announced `Moved "Pippa"` with an Undo — for
+a write that was never attempted. Verified by reading the chain, not inferred:
+
+- `useWeekDragDrop.ts:217` → `args.onUpdateEvent(...)`
+- `HomeView.tsx:407,454` → `ctx.onUpdateEvent ?? (() => {})`
+- `HomeViewContainer.tsx` → never sets `onUpdateEvent`, and never destructured
+  `updateEvent` from `useGoogleCalendar`.
+
+A second fault sat underneath: even with a writer, the confirmation did not
+wait for it. `onUpdateEvent(...)` was fired without `await` and `pushAction`
+ran on the next line — the same shape as the routine toast fixed this morning.
+
+### The repair
+
+- **A writer exists.** `lib/calendar/moveEvent.ts` — `makeEventMover` — built
+  in the container over `useGoogleCalendar().updateEvent`, following the
+  convention `TaskDetailPanel.onReschedule` already proved in production:
+  `eventId: google_event_id ?? id`, `calendarId: calendar_id ?? calendarId`,
+  so an event on a shared or secondary calendar is written back to **that**
+  calendar. Both ends are sent, so the duration the drop computed is what
+  lands; the event's own time zone rides along when it has one, and otherwise
+  the writer defaults to the browser's, exactly as before.
+- **It re-reads the range on success only**, or the grid — which draws from the
+  fetched events — would spring the event back to where it was.
+- **The confirmation waits for the save.** The drop awaits the write; on
+  success it offers `Moved "Pippa"` with an Undo that writes the old pair back,
+  and on failure it offers neither. The writer says what went wrong in a
+  visible toast, telling a reconnect, a 403 on a calendar you don't own, a
+  disconnected calendar and an unknown failure apart.
+- **A missing writer is now loud.** `onUpdateEvent` is optional on the hook and
+  on `WeekViewV2`, and absent means “this host cannot move events” — said in a
+  toast rather than swallowed. The no-op default is what made a broken feature
+  look like a working one for as long as it has existed.
+
+### The boundary Codex asked to be tested
+
+`makeEventMover` is a plain function precisely so the parent-to-real-update
+boundary can be held: **10 tests** — it writes by the Google id and the event's
+own calendar, accepts either id the grid may drag by, falls back when there is
+no Google id, preserves the duration and the time zone, refetches on success
+and *not* on failure, reports each failure in the right words, and refuses an
+event it cannot find rather than going quiet.
+
+**5 more on the drop itself**: the new time is written with the hour it ran
+for; the confirmation and Undo appear only after the write resolves (a deferred
+promise proves the ordering); a failed write offers neither; Undo restores the
+original day and hour; and a host with no writer refuses out loud.
+
+### Boundaries respected
+
+- **No live event data touched, and no browser driven.** Everything here is
+  unit-level; Scott owns all clicking and entry from now on.
+- Inline time editing and the explicit Saturday/Sunday picker choices are
+  **left alone** as logged usability follow-ups, per Codex.
+- Local only: tests, build, commit. No push, no production, no migration.
+- I hold repository write permission in this worktree and used nothing beyond
+  it; no approval was needed and none was bypassed.
+
+**Not verified by me:** that a real drag in a real browser now moves a real
+event. That is Scott's retry, and it needs a connected calendar — the writer
+throws "Not connected to Google Calendar" without one, which now surfaces as
+“No calendar is connected, so this event can’t be moved” instead of silence.

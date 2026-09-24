@@ -18,6 +18,7 @@ import { useGoogleCalendar, CalendarReconnectError } from '@/hooks/useGoogleCale
 import { showToast } from '@/hooks/useToast';
 import { rangeEventSpan } from '@/lib/weekHelpers';
 import { densitySourcesFor, type DensitySources } from '@/lib/planning/dayDensity';
+import { makeEventMover } from '@/lib/calendar/moveEvent';
 import { PageFromPaperFlow } from '@/components/capture/PageFromPaperFlow';
 import { localYmd } from '@/lib/cadence/config';
 import { parseRoutineTimelineId } from '@/lib/today/doseExpansion';
@@ -66,7 +67,7 @@ const sameLocalDay = (a: Date, b: Date) =>
 export function HomeViewContainer({ fixedView }: { fixedView?: 'today' | 'week' } = {}) {
   // Data hooks
   const { tasks, loading: tasksLoading, addTask, toggleTask, toggleWaiting, deleteTask, updateTask, updateTasksBulk, pushTask, getLinkedTasks, refetch, updateTaskOrders, userId } = useSupabaseTasks();
-  const { isConnected, events, fetchEvents, createEvent, deleteEvent, removeEventLocal, restoreEventLocal, isLoading: calendarLoading, isFetching: calendarFetching, error: calendarError } = useGoogleCalendar();
+  const { isConnected, events, fetchEvents, updateEvent, createEvent, deleteEvent, removeEventLocal, restoreEventLocal, isLoading: calendarLoading, isFetching: calendarFetching, error: calendarError } = useGoogleCalendar();
   // Passing the visible event ids opts in to auto-loading notes (context
   // overrides, assignees, shared-with-family, free) + realtime — without it
   // those persist to the DB but render stale on every fresh window.
@@ -312,6 +313,13 @@ export function HomeViewContainer({ fixedView }: { fixedView?: 'today' | 'week' 
    * "Not connected" is not a failure and is never reported as one: there is
    * simply no calendar to read, and the count is complete without it.
    */
+  const onUpdateEvent = useMemo(() => makeEventMover({
+    events,
+    updateEvent,
+    refetch: refetchViewedDayEvents,
+    notify: (message, tone) => showToast(message, tone, 5000),
+  }), [events, updateEvent, refetchViewedDayEvents]);
+
   const densitySources = useMemo<DensitySources>(() => {
     const span = fixedView === 'week' ? rangeEventSpan(viewedDate) : null;
     return densitySourcesFor({
@@ -801,6 +809,10 @@ export function HomeViewContainer({ fixedView }: { fixedView?: 'today' | 'week' 
       onCompleteEvent: scheduleActions.onCompleteEvent,
       onSkipEvent: scheduleActions.onSkipEvent,
       onPushEvent: scheduleActions.onPushEvent,
+      // Moving an event to another time. Until now nothing supplied this and
+      // HomeView fell back to a no-op, so a week drag announced a move it had
+      // not made (Scott, 2026-09-24).
+      onUpdateEvent,
       onUpdateEventContext: updateEventContext,
       onUpdateEventFree: updateEventFree,
       onShareEventWithFamily: (id: string) => updateEventSharedWithFamily(id, true),

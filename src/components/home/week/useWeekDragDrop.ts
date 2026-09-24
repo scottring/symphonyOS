@@ -14,7 +14,16 @@ interface UseWeekDragDropArgs {
   weekStart: Date
   onWeekChange: (newWeekStart: Date) => void
   onUpdateTask: (taskId: string, updates: TaskUpdates) => Promise<void | boolean> | void
-  onUpdateEvent: (eventId: string, updates: { startTime: Date; endTime: Date }) => Promise<void> | void
+  /**
+   * Move an event. OPTIONAL on purpose, and absent means "this host cannot
+   * move events" — which is said out loud. It used to be required and hosts
+   * satisfied it with a no-op, so a drag announced a move that never happened
+   * (Scott's walkthrough, 2026-09-24).
+   *
+   * It must REJECT when the write fails; the confirmation and the Undo wait
+   * on it.
+   */
+  onUpdateEvent?: (eventId: string, updates: { startTime: Date; endTime: Date }) => Promise<void> | void
   onUpdateRoutine: (routineId: string, updates: Partial<Routine>) => Promise<void> | void
   tasks: (Task & { endTime?: Date })[]
   events: CalendarEvent[]
@@ -214,10 +223,26 @@ export function useWeekDragDrop(args: UseWeekDragDropArgs): UseWeekDragDropResul
         const oldEnd = new Date(endStr)
         const duration = oldEnd.getTime() - oldStart.getTime()
         const newEnd = new Date(newStart.getTime() + duration)
-        void args.onUpdateEvent(eventId, { startTime: newStart, endTime: newEnd })
-        args.pushAction?.(`Moved "${event.title}"`, () => {
-          void args.onUpdateEvent(eventId, { startTime: oldStart, endTime: oldEnd })
-        })
+        const move = args.onUpdateEvent
+        if (!move) {
+          // No writer. Better to say so than to pretend it moved.
+          showToast('Moving events isn’t available here', 'error', 4000)
+          return
+        }
+        void (async () => {
+          try {
+            await move(eventId, { startTime: newStart, endTime: newEnd })
+          } catch {
+            // The writer has already said what went wrong. No confirmation
+            // and no Undo for a move that did not happen.
+            return
+          }
+          args.pushAction?.(`Moved "${event.title}"`, () => {
+            void (async () => {
+              try { await move(eventId, { startTime: oldStart, endTime: oldEnd }) } catch { /* reported by the writer */ }
+            })()
+          })
+        })()
         return
       }
       // 'routine-...' shouldn't reach here (routines are non-draggable per spec).

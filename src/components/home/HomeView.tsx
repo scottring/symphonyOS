@@ -404,7 +404,7 @@ export function HomeView({
             onSelectItem={onSelectItem}
             onUpdateTask={ctx.onUpdateTask ?? (() => {})}
             onUpdateRoutine={ctx.onUpdateRoutine ?? (() => {})}
-            onUpdateEvent={ctx.onUpdateEvent ?? (() => {})}
+            onUpdateEvent={ctx.onUpdateEvent}
             onPushRoutine={ctx.onPushRoutine}
             pushAction={pushAction}
             mode={weekMode}
@@ -451,7 +451,7 @@ export function HomeView({
             onSelectItem={onSelectItem}
             onUpdateTask={ctx.onUpdateTask ?? (() => {})}
             onUpdateRoutine={ctx.onUpdateRoutine ?? (() => {})}
-            onUpdateEvent={ctx.onUpdateEvent ?? (() => {})}
+            onUpdateEvent={ctx.onUpdateEvent}
             onPushRoutine={ctx.onPushRoutine}
             pushAction={pushAction}
             mode={weekMode}

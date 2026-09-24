@@ -116,7 +116,9 @@ interface WeekViewV2Props {
   layers: ReadonlySet<Layer>
   onSelectItem: (id: string | null) => void
   onUpdateTask: (taskId: string, updates: Partial<Task>) => Promise<void | boolean> | void
-  onUpdateEvent: (eventId: string, updates: { startTime: Date; endTime: Date }) => Promise<void> | void
+  /** Move an event. Absent = this host cannot move events, and the grid says
+   *  so rather than announcing a move it did not make. */
+  onUpdateEvent?: (eventId: string, updates: { startTime: Date; endTime: Date }) => Promise<void> | void
   onUpdateRoutine: (routineId: string, updates: Partial<Routine>) => Promise<void> | void
   /** Pin a routine to a time on ONE day (override write, recurrence rule
    *  untouched). Present = routine blocks become draggable. */
