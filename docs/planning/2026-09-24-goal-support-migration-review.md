@@ -154,8 +154,30 @@ Authorised by Scott, 2026-09-24, for the reviewed migration at commit
 No backfill was run and none is needed — the column is additive and every
 existing row reads `null`.
 
-**Still to do:** Codex walks the hierarchy live on the demo account (create a
-season goal for a year goal and a month goal for that season goal, reload,
-read both ends on /month, /season, /year and the goal page; then carry a task
-forward out of the month goal and confirm neither goal moves). Merge and
-production deployment stay unauthorised and are Scott's call, separately.
+## Live verification — complete
+
+Codex, on the demo account, 2026-09-24, after the rebuild:
+
+- A season fixture (`2a6faa1d-21ab-4b84-bf9b-4c226f782105`) created supporting
+  the annual "Make our home easier to maintain"; a month fixture
+  (`f5c1fb69-8ee4-467f-a05e-a70534d819ba`) created supporting that season,
+  plus a task under it. Both ends shown on the annual page, the season list
+  and the month list, all surviving a reload.
+- **Carry-forward independence, live:** the task was planned for Oct 4, then
+  carried by a Keep review into Oct 11–17. After reload the task kept its
+  month-goal association and the October and Fall goals were unmoved — the
+  property the separate column exists for, confirmed outside the tests.
+- Detail pages followed in S3-14 (they showed neither end at first; wired in
+  `47b86310` and re-passed): season detail shows Supports and Supported by,
+  and month → season → annual can be walked entirely on the relationship
+  buttons.
+
+Three labelled hierarchy fixtures are deliberately left on the demo account.
+Scott's Islanders goal, its tasks and the annual goal's own properties were
+not edited, and no historical backfill was run.
+
+**Merge and production deployment remain unauthorised and are Scott's call,
+separately.** Untested and explicitly not claimed: real-iPhone keyboard and
+safe areas, authenticated cross-household access through the app (the
+household rule is proved at the database, not through two signed-in
+accounts), and weekend/custom-range week restoration.

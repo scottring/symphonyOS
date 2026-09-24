@@ -208,3 +208,74 @@ onboarding and guide surfaces.
 - **Resume at:** S3-02 as a correctness investigation — find where, if anywhere, the
   year→season link is written — then the remaining correctness gaps, then the mockup
   and a re-walk. Do not build onboarding around workarounds.
+
+### 2026-09-24 — Printable planning guide: usability requirement reaffirmed
+
+Scott wants a printable guide for individuals and families to do the actual planning
+exercises on paper, then enter or scan their own work into Symphony. Bring this into
+the usability phase; do not build it during the remaining correctness checks. The
+experience should be efficient, accurate, approachable, and enjoyable together.
+
+Design direction to explore: short optional week/month/season/year exercises;
+individual reflection and family discussion; room for a free brainstorm before
+choosing priorities; plain-language prompts distinguishing desired outcomes,
+one-time actions, repeating routines, fixed events, and ideas to keep for later.
+Capture the period/year, relevant person, and explicit relationships where known,
+without requiring users to understand Symphony's internal data model or fill every
+box. Include a lightweight starting path, not a mandatory annual-to-daily process.
+
+Design paper worksheets and Plan from paper review together: preserve the original
+notes, propose goals/tasks/routines/events and their links, flag uncertain handwriting
+or interpretation, and let the user correct the proposal through dialogue before
+approving creation. Scanning should not silently turn every brainstorm item into a
+commitment or invent dates, ownership, or relationships. Existing data and duplicate
+detection belong in the review. These are design requirements, not claims that the
+current importer already supports them. Validate using actual completed handwritten
+worksheets, including family contributions and untidy/freeform notes.
+
+### 2026-09-24 — correctness phase closed; next stage is one mockup
+
+The "resume at S3-02" line two entries above is spent. What it asked for is done,
+and the answer turned out to be larger than a display gap.
+
+- **S3-02 is closed, live-verified end to end.** The year→season link was never
+  written: `applySession` dropped the draft's `linkId` when it created a goal, while
+  passing it for every new task on the next loop. On Scott's instruction the
+  relationship then got its own column rather than a borrowed one — a month goal
+  supports a season goal (`supports_goal_task_id`), a season goal supports a year goal
+  (`goal_id`), and neither is `goal_task_id`, which means "is a step of" and whose rows
+  are carried along when their goal moves. A trigger refuses self-links, wrong rungs,
+  non-goals and cross-household links. The migration was reviewed, then applied with
+  Scott's explicit approval; proof and deployment record in
+  [`2026-09-24-goal-support-migration-review.md`](./2026-09-24-goal-support-migration-review.md).
+- **S2-25** (Week losing its place), **S3-06's Done branch**, **Drop**, **S3-13** (the
+  Inbox Add button that took focus and let the capture bar drop out from under the
+  press) and **S3-14** (a goal's detail page showing neither end of its link) are all
+  fixed and live-verified by Codex.
+- **The standing `planPlacement` risk is unchanged and still Scott's call.**
+- **Still open before anything is called done:** S2-29, S2-08, S3-09, S2-22 (a product
+  decision), S3-12 (duplicate notifications, now seen on the failure path too), S3-04's
+  wording, and S3-07, which stays parked. Untested and not claimed: real-iPhone keyboard
+  and safe areas, cross-household access through two signed-in accounts, weekend and
+  custom-range week restoration, and Plan from paper as a workstream.
+
+**Next stage: one coherent usability mockup against the journeys that have now actually
+been walked — not more piecemeal interface changes, and not implemented until Scott has
+seen it.** The printable planning guide requirement below belongs in the same pass.
+Codex's [`2026-09-24-autonomous-walkthrough.md`](./2026-09-24-autonomous-walkthrough.md)
+§ "Current core coverage summary" is the baseline the mockup should answer to; it also
+lists what must not be called green.
+
+### Planning guide reference — Best Laid Plans
+
+Scott explicitly requested **Best Laid Plans** as a reference for this work.
+Working identification: Sarah Hart-Unger's planning work (book/podcast).
+Official reference: https://theshubox.com/best-laid-plans-podcast
+Use this in the usability and printable-guide research, particularly seasonal
+planning, paper-based reflection, family coordination, and making room for fun.
+The official episode index includes seasonal planning, planning fun, and family
+source-of-truth topics. Read the relevant original material before attributing
+specific methods; this note records the reference, not a completed literature review.
+Develop original Symphony exercises and explicitly distinguish our adaptations from
+her guidance. Design the worksheets alongside scan-and-review, preserving the user's
+intent and allowing dialogue before creating commitments.
