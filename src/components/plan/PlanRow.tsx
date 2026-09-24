@@ -211,9 +211,13 @@ export function PlanRow({
           </select>
         </label>
       )}
+      {/* Plan stays VISIBLE and reachable at every width, and is not gated on
+          the hover verbs beside it. It answers "which week does this belong
+          to", which is the whole motion of the cadence — it cannot be a hover
+          secret (Codex review of cefcdbcc). */}
+      {!row.isGoal && planWeek && <span className="shrink-0">{planWeek(row)}</span>}
       {verbs.length > 0 && (
         <span className="period-row-actions hidden shrink-0 sm:flex items-center gap-0.5 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
-          {!row.isGoal && planWeek?.(row)}
           {verbs.map((a) => (
             <button
               key={a}

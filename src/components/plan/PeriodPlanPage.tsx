@@ -15,7 +15,7 @@ import { createPortal } from 'react-dom'
 import { useReferenceLists } from '@/components/reference/ReferenceListsContext'
 import { useMemo, useState, useCallback, useEffect, useRef } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { Plus, Target, ChevronDown, ChevronRight, Repeat, ArrowUpRight, X } from 'lucide-react'
+import { Plus, Target, ChevronDown, ChevronRight, ArrowUpRight } from 'lucide-react'
 import { ShelvesButton } from '@/components/reference/ShelvesButton'
 import { MastheadCard, PeriodNavEyebrow } from '@/components/layout/MastheadCard'
 import { HomeChromeControls } from '@/components/home/HomeChromeControls'
@@ -44,7 +44,6 @@ import { usePlanSessionHost } from '@/hooks/usePlanSessionHost'
 import { useAuth } from '@/hooks/useAuth'
 import { lookBackRows, isEmptyDraft, goalsWithHiddenSteps, goalAsRow, yearLookBack, type SessionDraft } from '@/lib/planning/session'
 import type { DomainId } from '@/lib/domains'
-import { formatShortDate } from '@/lib/dateHelpers'
 import {
   periodBounds, isCurrentPeriod, selectPeriodTasks, actionsFor, railLevel, lowerLevel, planningPeriod, offerableFromAbove,
   type PlanLevel, type RowAction,
@@ -53,7 +52,6 @@ import { firstNoteLine } from '@/lib/planning/goalsReference'
 import type { Task } from '@/types/task'
 import type { Goal } from '@/types/goal'
 import { PlanRow, rowIsDone, type PlanRowModel } from './PlanRow'
-import { PlanRail } from './PlanRail'
 import { readOpen, readFoldPref, writeOpen } from './foldState'
 import { PlanSession } from './PlanSession'
 import { PlanNextLine } from './PlanNextLine'
@@ -68,7 +66,6 @@ import { useDayLoadEvents, DAY_LOAD_RANGE_DAYS } from '@/hooks/useDayLoadEvents'
  *  by, deliberately. */
 const TASK_PREVIEW_CAP = 5
 
-const TITLE: Record<PlanLevel, string> = { month: 'This Month', season: 'This Season', year: 'This Year' }
 const NOUN: Record<PlanLevel, string> = { month: 'month', season: 'season', year: 'year' }
 /** "September 2026" with the year set back — the period is the page's name,
  *  not a category label like "This Month" (Scott, 2026-09-13). */
@@ -125,6 +122,33 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
   // start was given — the initial-period computation below must never
   // override where they are.
   const anchorSettledRef = useRef(!!explicitStart)
+
+  /**
+   * Keep `anchor` in step with `?start=` after the first mount.
+   *
+   * `goTo` writes the period into the URL (S2-16), but `anchor` only read
+   * `explicitStart` in its initial state. Browser Back and Forward change the
+   * URL WITHOUT remounting, so October → November → Back left the URL saying
+   * October while the heading and the list still showed November (Codex review
+   * of cefcdbcc).
+   *
+   * Only reacts to a CHANGE in the parameter, never to its value on mount —
+   * the first period is chosen by `planningPeriod` below, which may look ahead
+   * near the end of a month, and clobbering that here would undo it. A missing
+   * parameter is the same question the page answers on a cold open, so it is
+   * answered the same way.
+   */
+  const lastStartParamRef = useRef<string | null>(startParam)
+  useEffect(() => {
+    if (startParam === lastStartParamRef.current) return
+    lastStartParamRef.current = startParam
+    anchorSettledRef.current = true
+    const next = explicitStart
+      ? periodBounds(level, explicitStart, seasons).start
+      : planningPeriod({ level, today, seasons }).start
+    setAnchor((prev) => (localYmd(prev) === localYmd(next) ? prev : next))
+    setLookingAhead(false)
+  }, [startParam, explicitStart, level, seasons, today])
 
   const bounds = useMemo(() => periodBounds(level, anchor, seasons), [level, anchor, seasons])
   const isCurrent = isCurrentPeriod(bounds, today)

@@ -17,6 +17,13 @@ nothing else. Findings detail lives in
 | S2-18 | Goal details showed **today's task chooser** | Only `PeriodPlanPage` supplied period Shelves; `ReferenceLists` chose by pathname, so `/task/:id` fell through to `TodayPlanList` | The Shelves block was **extracted unchanged** into `PeriodShelves`; a goal renders that same component for its own period. `ReferenceLists` hands over the slot on a *claim*, not a pathname test |
 | S2-19 | Life-area gate interrupts a week choice | — | **Logged only**, as instructed. Not redesigned. |
 
+### Codex review of `cefcdbcc` — two gaps, both closed
+
+| Gap | What was wrong | Resolution |
+| --- | --- | --- |
+| Plan was hover-only | `PlanRow` put the slot inside `hidden sm:flex opacity-0 group-hover:opacity-100`, and `TaskViewRedesign` wrapped it the same way — so the one control the repair existed to provide was invisible until hover and absent below the `sm` breakpoint | Plan now renders **outside** the hover span and is no longer gated on `verbs.length`, at every width. The secondary verbs keep their hover behaviour untouched |
+| `anchor` read the URL only on mount | `goTo` wrote `?start=`, but `anchor`'s initial state was the only reader. Browser Back and Forward change the URL **without remounting**, so October → November → Back left the heading and list on the wrong month | An effect syncs `anchor` whenever `?start=` *changes*, never on its mount value — so `planningPeriod`'s look-ahead on a cold open is preserved. A missing parameter is answered the same way a cold open answers it |
+
 Goal status semantics, the life-area flow, ordinary task behaviour, onboarding and the
 calendar were left alone.
 
@@ -24,7 +31,8 @@ calendar were left alone.
 
 - `92e10323` fix(plan): keep the viewed period, and let a task reach a week of it
 - `7bbee085` docs(onboarding): record S2-18's approach and why it is its own batch
-- *(this report's commit)* refactor(plan): reuse the Month page's Shelves for a goal
+- `cefcdbcc` refactor(plan): reuse the Month page's Shelves for a goal
+- *(this report's commit)* fix(plan): Plan is visible without hover; the URL drives the month
 
 ## Files
 
@@ -44,11 +52,19 @@ writes `?start=`; exports `taskRow`; hosts the Plan slot) ·
 
 ## Tests
 
-`npx vitest run src` — **6367 passed, 3 skipped**. One failing file,
+`npx vitest run src` — **6370 passed, 3 skipped**. One failing file,
 `connectors/src/whatsapp/adapter.test.ts`, is a pre-existing collection error confirmed
 by stashing this branch's changes and re-running; it needs its own `node_modules`.
 `npx tsc --noEmit -p tsconfig.app.json` clean. `eslint` on the new and changed files:
-0 errors, warnings at repo baseline. `npm run build` succeeds.
+0 errors, warnings at repo baseline (the extraction had left `Repeat`, `X`, `formatShortDate`, `PlanRail` and `TITLE` unused in `PeriodPlanPage`; those are now removed — they were missed in `cefcdbcc` because only the new files were linted). `npm run build` succeeds.
+
+`PeriodPlanPage.test.tsx` gained 3 cases for the URL/anchor contract: opening on the
+month the URL names, **following a `?start=` change while the page stays mounted** (the
+mechanism Back and Forward use), and the stepper writing the month into the URL. The
+middle one was confirmed to FAIL without the sync effect — the heading stayed on
+October while the URL said November — so it is a real regression test rather than a
+restatement. `useNavigate` is mocked in that suite, so the history buttons themselves
+were exercised in the browser instead (below).
 
 New coverage: `monthWeeks.test.ts` (5) pins October's five weeks including the
 boundary week Sep 27 – Oct 3 and a Monday-start household. `PeriodShelves.test.tsx`
@@ -78,6 +94,17 @@ behaviour rather than altering it.
   still shows today's chooser in Shelves, Subtasks, and WHEN · Fri, Sep 25.
 - **Month and Season still render** — October reads "1 goals · 2 tasks" with the goal
   and its two supporting tasks; Fall 2026 reads "THIS YEAR · 2026 · ON THE CALENDAR · 3".
+- **Plan visible with the pointer away** — pointer parked at (120, 880), inside the
+  Shelves panel and far from the rows: "Plan" shows on both step rows while the hover
+  verbs (↘ ☀ 🗑) are correctly absent.
+- **Plan visible at 390px** — checked in a same-origin 390×844 iframe rather than
+  `resize_window`, which misreports. Both step rows show "Plan" beside the narrow
+  "Move ▾" select.
+- **Browser Back and Forward** — October → (Next month) → `?start=2026-11-01`
+  "November 2026" → `history.back()` → `?start=2026-10-01` "October 2026" →
+  `history.forward()` → November again → back once more → October reading
+  "1 goals · 2 tasks" with the goal visible. Heading **and** content follow the URL, not
+  just the address bar.
 
 ## Scott's records
 
@@ -116,7 +143,14 @@ deleted.
 
 ## Where to resume
 
-Storyline 2 from step 2 on the stable example — deciding what progress matters in
-October — with the goal and its two tasks exactly as Scott left them. Steps 3–6 follow
-(create work, choose a week leaving one flexible, choose today's work, confirm
-connections). Stopped here for review rather than starting storyline 3.
+**Corrected** (the earlier "decide what progress matters / create goals" resume point
+was wrong — Scott already has the goal and both tasks; there is nothing to create).
+
+Resume by **choosing "Research games dates and tickets" for the week of Oct 4–10**,
+using Plan ▾ on October's page or on the goal's detail page, and **leaving "Buy game
+tickets" month-only** so the flexible case stays represented. Then check the week reads
+correctly: the chosen task should appear on "List for the week of Oct 4" under ANY DAY
+with "from October", while "Buy game tickets" stays on October's list alone.
+
+All three records must be preserved as they are. Stopped here for review rather than
+starting storyline 3.

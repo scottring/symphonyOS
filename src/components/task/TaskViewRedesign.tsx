@@ -452,7 +452,10 @@ export function TaskViewRedesign({
                               October goal offers October's weeks. Choosing one
                               leaves the step undated and keeps both its month
                               commitment and its goal link (2026-09-24). */}
-                          <span className="flex-shrink-0 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
+                          {/* Visible without hover, at every width: choosing the
+                              week a step belongs to is the point of the page,
+                              not a secondary action (Codex review of cefcdbcc). */}
+                          <span className="flex-shrink-0">
                             <PlanWeekMenu
                               size="sm"
                               title={subtask.title}

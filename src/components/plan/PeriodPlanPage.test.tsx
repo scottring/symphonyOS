@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, within, cleanup, waitFor } from '@testing-library/react'
 import { ReferenceListsProvider, useReferenceLists } from '@/components/reference/ReferenceListsContext'
-import { MemoryRouter } from 'react-router-dom'
+import { MemoryRouter, useSearchParams } from 'react-router-dom'
 import type { Task } from '@/types/task'
 import type { Goal } from '@/types/goal'
 import type { Routine } from '@/types/actionable'
@@ -1266,3 +1266,53 @@ describe('PeriodPlanPage — Plan <Month>', () => {
   })
 })
 
+
+describe('the URL is the period (S2-16, Codex review of cefcdbcc)', () => {
+  // goTo writes ?start=, but `anchor` only read it in its initial state, so
+  // browser Back and Forward — which change the URL WITHOUT remounting — left
+  // the heading and the list on the wrong month.
+  it('opens on the month the URL names, not the month the clock is in', () => {
+    renderPageAt('month', '/month?start=2026-11-01')
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('November')
+  })
+
+  it('follows a ?start= change while the page stays mounted', () => {
+    // This is the mechanism browser Back and Forward use: the search parameter
+    // moves and the page does NOT remount. `anchor` only read the parameter in
+    // its initial state, so October → November → Back left the heading on
+    // November while the URL said October. (`useNavigate` is mocked in this
+    // suite, so the history buttons themselves are verified in the browser.)
+    function Param() {
+      const [params, setParams] = useSearchParams()
+      return (
+        <>
+          <span data-testid="url">{params.get('start')}</span>
+          <button type="button" onClick={() => setParams({ start: '2026-11-01' })}>to november</button>
+          <button type="button" onClick={() => setParams({ start: '2026-10-01' })}>to october</button>
+        </>
+      )
+    }
+    render(
+      <MemoryRouter initialEntries={['/month?start=2026-10-01']}>
+        <Param />
+        <PeriodPlanPage level="month" />
+      </MemoryRouter>,
+    )
+    const heading = () => screen.getByRole('heading', { level: 1 })
+    expect(heading()).toHaveTextContent('October')
+
+    fireEvent.click(screen.getByRole('button', { name: 'to november' }))
+    expect(screen.getByTestId('url')).toHaveTextContent('2026-11-01')
+    expect(heading()).toHaveTextContent('November')
+
+    fireEvent.click(screen.getByRole('button', { name: 'to october' }))
+    expect(screen.getByTestId('url')).toHaveTextContent('2026-10-01')
+    expect(heading()).toHaveTextContent('October')
+  })
+
+  it('paging with the stepper puts the month in the URL', () => {
+    renderPageAt('month', '/month?start=2026-10-01')
+    fireEvent.click(screen.getByRole('button', { name: /next month/i }))
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('November')
+  })
+})
