@@ -11,6 +11,9 @@
 import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { GoalPeriodShelves } from '@/components/plan/GoalPeriodShelves';
+import { useHouseholdSeasons } from '@/hooks/useHouseholdSeasons';
+import { useGoalsContext } from '@/contexts/GoalsContext';
+import { supportedGoal, goalsSupporting, type SupportLink } from '@/lib/planning/goalSupport';
 import type { Note, NoteEntityType } from '@/types/note';
 import { useSupabaseTasks } from '@/hooks/useSupabaseTasks';
 import { useContacts } from '@/hooks/useContacts';
@@ -31,6 +34,8 @@ export function TaskViewContainer({ taskId, onBack }: Props) {
   const { contacts, contactsMap, addContact, searchContacts } = useContacts();
   const { projects, projectsMap, addProject, searchProjects } = useProjects();
   const { addNote, addEntityLink, getNotesForEntity } = useNotesContext();
+  const { seasons } = useHouseholdSeasons();
+  const { goals } = useGoalsContext();
   const { createVaultNote } = useVaultWrite();
   const navigate = useNavigate();
 
@@ -55,6 +60,26 @@ export function TaskViewContainer({ taskId, onBack }: Props) {
       context: task.context ?? undefined,
     });
   }, [addTask, task]);
+  // Both ends of the goal-supports-goal link, read through the one module the
+  // plan pages and the year goal's page also read, so the four surfaces cannot
+  // disagree. A goal opened from a plan row used to be a dead end: the row
+  // said what it served, the detail page said nothing (Codex, live,
+  // 2026-09-24). Ordinary tasks ask and get nothing.
+  const supports = useMemo(
+    () => (isGoal && task ? supportedGoal(task, tasks, goals, seasons) : null),
+    [isGoal, task, tasks, goals, seasons],
+  );
+  const supportedBy = useMemo(
+    () => (isGoal && task ? goalsSupporting(task, tasks) : []),
+    [isGoal, task, tasks],
+  );
+  // A year goal is a goals-table row and opens on its own page; a month or
+  // season goal is a task and opens here — the same split PeriodPlanPage makes.
+  const openGoalLink = useCallback(
+    (link: SupportLink) => navigate(link.rung === 'year' ? `/goals/${link.id}` : `/task/${link.id}`),
+    [navigate],
+  );
+
   const contact = task?.contactId ? contactsMap.get(task.contactId) ?? null : null;
   const project = task?.projectId ? projectsMap.get(task.projectId) ?? null : null;
 
@@ -155,6 +180,9 @@ export function TaskViewContainer({ taskId, onBack }: Props) {
         onAddProject={addProject}
         onAddSubtask={isGoal ? addStep : addSubtask}
         steps={steps}
+        supports={supports}
+        supportedBy={supportedBy}
+        onOpenGoalLink={openGoalLink}
         entityNotes={entityNotes}
         entityNotesLoading={entityNotesLoading}
         onAddEntityNote={handleAddEntityNote}

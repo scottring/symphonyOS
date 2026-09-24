@@ -11,6 +11,8 @@ import { CloudUpload, Check } from 'lucide-react'
 import { taskWhenLabel } from '@/lib/planning/taskWhen'
 import { PlanWeekMenu } from '@/components/plan/PlanWeekMenu'
 import { GOAL_STATUSES, GOAL_STATUS_HINT, GOAL_STATUS_LABEL, canSetGoalStatus, goalStatusOf, goalStatusUpdate } from '@/lib/planning/goalStatus'
+import { GoalSupportLinks } from '@/components/goals/GoalSupportLinks'
+import type { SupportLink } from '@/lib/planning/goalSupport'
 
 interface TaskViewProps {
   task: Task
@@ -39,6 +41,14 @@ interface TaskViewProps {
    * horizon could see it (walk finding S2-06).
    */
   steps?: Task[]
+  /** The goal-supports-goal relationship, both ends, when `task.isGoal`.
+   *  Read by the caller through `lib/planning/goalSupport` — the same module
+   *  the plan pages and the year goal's page read, so the four surfaces cannot
+   *  disagree about what supports what. Distinct from `steps`: a step moves
+   *  with its goal, a supported goal never moves (S3-02). */
+  supports?: SupportLink | null
+  supportedBy?: readonly SupportLink[]
+  onOpenGoalLink?: (link: SupportLink) => void
   // Notes support (linked entity notes)
   entityNotes?: Note[]
   entityNotesLoading?: boolean
@@ -62,6 +72,9 @@ export function TaskViewRedesign({
   onOpenContact,
   onAddSubtask,
   steps,
+  supports,
+  supportedBy,
+  onOpenGoalLink,
   entityNotes = [],
   entityNotesLoading = false,
   onAddEntityNote,
@@ -628,6 +641,14 @@ export function TaskViewRedesign({
                   <p className="mt-1 text-sm text-neutral-500">
                     A goal is what this period should add up to. Its steps carry the dates.
                   </p>
+
+                  {/* Both ends of the goal-supports-goal link, the same
+                      section the year goal's page draws. Without these a goal
+                      opened from a plan row was a dead end: the list said what
+                      it served and the detail page did not (Codex, live,
+                      2026-09-24). */}
+                  <GoalSupportLinks heading="Supports" links={supports ? [supports] : []} onOpen={onOpenGoalLink} />
+                  <GoalSupportLinks heading="Supported by" links={supportedBy ?? []} onOpen={onOpenGoalLink} />
 
                   {/* A goal still has to be closeable. Taking away the
                       task-style checkbox left no way to finish one, so the
