@@ -839,6 +839,7 @@ export function HomeViewContainer({ fixedView }: { fixedView?: 'today' | 'week' 
       )}
 
       <HomeView
+        registerUndo={undo.pushAction}
         // The week reminder is Today's, below its schedule (2026-09-22): a
         // quiet line, never a banner above the date. Renders null when there
         // is nothing to say.

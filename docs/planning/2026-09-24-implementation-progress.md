@@ -205,6 +205,35 @@ told their plan was blank at the moment they were asked to commit to it. Now:
 
 5 tests in `PlanSession.test.tsx`.
 
-### B (rest) — completion and reopening across views
+### B (rest) — one notification per gesture  ·  committed
 
-Status: **next.** Then the three optional entry paths, then the printable guide.
+Status: **done for the duplicate-notification half.** S3-12's root cause found.
+
+`HomeViewContainer` and `HomeView` each own a `useUndo()` **and each rendered an
+`UndoToast`**. The container's ScheduleActions already registers an undo for a
+routine completion; `HomeView` then wrapped the same handler and registered a second
+one in its own stack — so one completion raised two Undo notifications, which is
+exactly what Codex saw live.
+
+`HomeView` now takes `registerUndo` and, when the host provides one, uses that stack
+and draws no second toast. A double registration then lands in a single stack, where
+the later replaces the earlier: one notification. `useUndo.test.ts` pins that
+property (a second push replaces the first; exactly one undo runs, and it is the
+later one).
+
+**Not covered by an automated test:** that only one toast is now mounted. There is no
+`HomeView` harness and building one is disproportionate, so **this needs Codex's live
+confirmation** — the repro is the routine completion on Today.
+
+Completion/reopening itself already satisfied requirement 5: one row means one
+record, so every view of a task updates together, and completing a task never
+touches its goal's status (`goalStatusOf`/`goalStatusUpdate` are a separate control).
+The duplicate CAPTURE notifications remain open and are a different path.
+
+### Next
+
+The three optional entry paths, then the printable guide.
+
+### Codex urgent independent review — 09:09 ET
+
+Before declaring B complete, read `2026-09-24-codex-implementation-review.md` latest section. Three of four isolated tests of timingRemoval THROUGH planPlacement fail: dated remove-all leaves week open; no-broader remove-all leaves week open; dated Undo fails to restore an explicitly removed week. Current unit tests only inspect patch shape. Full reproduction is in repo root tmp/codex-connected-review/removal.test.ts. No DB writes. Mac is locked, so terminal message/live UI testing are temporarily unavailable; this file is the handoff. Please address before release handoff. Codex has not started demo mutation.

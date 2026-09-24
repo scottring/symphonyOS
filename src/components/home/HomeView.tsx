@@ -62,6 +62,18 @@ interface HomeViewProps {
    *  (`/week`) mounts HomeView with fixedView="week" — its own route, not a
    *  switcher state (the D/W/M switcher died with the analog-planning pivot). */
   fixedView?: HomeViewType
+  /**
+   * Register an undo with the HOST's stack instead of this component's own.
+   *
+   * Both this component and `HomeViewContainer` own a `useUndo()` and both
+   * used to render an `UndoToast`, so a single routine completion — which the
+   * container's ScheduleActions already registers — pushed to two independent
+   * stacks and raised TWO Undo notifications (S3-12, seen live 2026-09-24).
+   * Given this, the second stack goes unused and no second toast is drawn;
+   * a double push then lands in one stack, where the later one replaces the
+   * earlier, which is one notification.
+   */
+  registerUndo?: (message: string, undo: () => void) => void
   /** Today's planning reminder, drawn below its schedule (2026-09-22). */
   todayAfterSchedule?: ReactNode
 }
@@ -81,13 +93,15 @@ export function HomeView({
   onDateChange,
   bothPanelsOpen,
   fixedView,
+  registerUndo,
   todayAfterSchedule,
 }: HomeViewProps) {
   const ctx = useScheduleActionsContext()
   const { currentView: hookView, setCurrentView } = useHomeView()
   const currentView = fixedView ?? hookView
   const isMobile = useMobile()
-  const { currentAction, pushAction, executeUndo, dismiss } = useUndo()
+  const { currentAction, pushAction: ownPushAction, executeUndo, dismiss } = useUndo()
+  const pushAction = registerUndo ?? ownPushAction
   const { layers, soleDomain } = useDomain()
 
   // Filter tasks, routines, projects, and events by the checked layer set.
@@ -585,11 +599,15 @@ export function HomeView({
           )}
       </div>
 
-      <UndoToast
-        action={currentAction}
-        onUndo={executeUndo}
-        onDismiss={dismiss}
-      />
+      {/* Only when nobody above is showing one. Two mounted at once is how a
+          single completion produced two Undo notifications. */}
+      {!registerUndo && (
+        <UndoToast
+          action={currentAction}
+          onUndo={executeUndo}
+          onDismiss={dismiss}
+        />
+      )}
     </div>
   )
 }
