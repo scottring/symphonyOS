@@ -185,3 +185,26 @@ onboarding and guide surfaces.
 - **Logged for later, not to be redesigned now:** S2-19 the life-area gate interrupting
   a week choice.
 - **Resume at:** S2-18, then storyline 2 steps 2–6 on the stable example.
+
+### 2026-09-24 — Codex takes over the walkthrough
+- Codex now owns clicking and input, at Scott's request. Its coverage record is
+  [`2026-09-24-autonomous-walkthrough.md`](./2026-09-24-autonomous-walkthrough.md) —
+  **that file, not this one, is the current evidence register for what has been walked.**
+- Three blockers were repaired this day, all one root cause — `planPlacement` filling a
+  missing period stamp from `ctx.now` (`intentions.ts:175`): S2-20 (keep-period, two
+  callers) and S3-01 (`pullDown`). Each fix names the period; each batch left a test
+  documenting the trap rather than changing the default.
+- **The defaulting itself is now the standing risk.** Three callers in one day is a
+  pattern, not a coincidence. Recommend it be decided deliberately: either an unnamed
+  stamp falls back to the task's own open commitment at that level, or it is refused
+  outright. Not changed here — it affects every placement path and is Scott's call.
+- **Correctness before redesign.** Year-to-season persistence is unverified (S3-02,
+  `goal_id: null`); external calendar write is blocked and must stay untested (S3-07);
+  a session opened over a full month still reports it empty (S3-04, save now proven
+  safe, wording still wrong). The usability mockup Scott asked for is deliberately
+  deferred behind these — a redesign built on an unpersisted relationship would encode
+  the bug. Storyline 4 is part-covered only: Keep/Someday/Do-today/complete passed on
+  Codex's own task; Drop and Done were never walked as branches.
+- **Resume at:** S3-02 as a correctness investigation — find where, if anywhere, the
+  year→season link is written — then the remaining correctness gaps, then the mockup
+  and a re-walk. Do not build onboarding around workarounds.

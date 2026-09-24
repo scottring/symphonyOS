@@ -1,0 +1,43 @@
+# Autonomous walkthrough — 2026-09-24
+
+Scott authorized Codex to take over clicking and input and continue the complete walkthrough. Tested the signed-in demo account through localhost:5199. No production deployment, merge, real-account reset, or handwritten-plan import was performed. This is a functional coverage record, not a release approval.
+
+## Coverage and evidence
+
+| Storyline | Walked | Result |
+| --- | --- | --- |
+| 1: Start with tasks/calendar/routines | Quick Add → Inbox → cancel domain gate → retry with Family → Today → complete | Passed in UI. Destination confirmation appears; duplicate completion/capture notifications remain. Both new completed tasks were visible together on Today at the end. |
+| 1: Calendar | Natural-language event preview for tomorrow September 25, 2–2:30 PM | Parser displayed intended event. Create Event was blocked by automatic approval review because the connected primary calendar destination was unverified. No event created; explicit question remains pending. |
+| 1: Routine | New weekly flexible routine → All Day occurrence → complete → reload → reopen → unchoose → pause → reload | Passed. All Day untimed, template remained flexible, paused routine appeared under Resting routines. Existing routine unchanged. Editor said select at least one day even though flexible weekly save succeeded. |
+| 2: Month/week/day | Scott's preceding walkthrough covered goal → steps → specific week → day → completion/reopening → removing day/week | Carry forward earlier evidence; not a fresh exhaustive retest. Known wrong-month Keep action was repaired before this pass. |
+| 2: Reopen existing plan | Plan October with existing goal and 3 tasks → Next save → Save October → reload | Existing goal and all 3 tasks preserved, no visible duplicates. Summary still misleadingly said Nothing chosen / Nothing saved yet. This closes the previously untested save in S3-04; wording remains open. |
+| 3: Year/season/month | Create Fall goal selecting existing yearly home-maintenance goal; add linked supporting task; save; reload; pull task into viewed October | Save and reload retained season goal/task. Pull-down initially wrote September: blocker S3-01. Claude repaired and restored only the new task; rebuilt UI then showed it in October. Year-to-season relationship persistence is NOT verified: Claude notes goal_id null; investigate actual storage before claiming link passed. |
+| 4: Review/change | New task week Sep20 → review Keep into Sep27 → save/reload → next review Someday → save → Someday page → Do today → Today → complete | Passed UI. Existing oil-change task left open in its original week. Someday save required a domain selection, chosen Personal for this test task. |
+
+## Blocker repair observed
+
+Commit d7bbf4fd fixes PeriodPlanPage pullDown to name the viewed month explicitly, rather than default to the clock's month. Claude performed the identity-checked restoration of new task de558463… from September to October. Codex verified the rebuilt October UI contains it and the original Islanders goal and two supporting tasks remain. Database restoration/test claims belong to Claude; Codex independently verified UI, source commit presence, and clean tree before this documentation addition.
+
+## Remaining findings
+
+- S3-02: yearly relationship absent from saved season list; possible persistence problem, not merely presentation. Existing year-goal detail does not show seasonal support, and Shelves there falls back to today's chooser.
+- October shows “Link to goal” on the new maintenance task even though it already supports a seasonal goal. Higher-period context is lost in this view.
+- Planning session reference offers Add to October for work already on October; did not click a second time, so duplicate behavior untested.
+- Empty future Week says “No week tasks match this person” without a deliberate people filter. Misleading empty-state diagnosis.
+- Weekly routine editor requires a weekday in its text but accepts no weekday as Flexible day.
+- Two Undo notifications for one routine completion; duplicate capture notifications.
+- Existing open findings remain: Week reload loses viewed week; Plan overlaps hover controls; detail date and day-removal discoverability; calendar count/duplicate/range problems; total versus open counts; disabled month/season goal Archived.
+- Calendar duplicates were not visible after rebuilt-page reload; this does not prove the original stale/duplicate rendering problem fixed.
+
+## Data intentionally left for inspection
+
+- Fall goal: Have a manageable weekly home-maintenance routine in place by the end of Fall.
+- Its supporting task: List recurring home-maintenance jobs and agree who handles each — visible in October after repair.
+- Weekly home-maintenance check (walkthrough) — paused/resting, no chosen occurrence left.
+- Check smoke-detector batteries (walkthrough) — completed on Today.
+- Review carry-forward check (walkthrough) — carried forward, deferred, returned to Today, completed.
+- Original Islanders goal/two tasks, yearly goals, oil-change task, and Pack bags for school routine left unchanged by this autonomous pass.
+
+## Explicit coverage limits
+
+Not signed off: external calendar write, paper analysis/revision (separate workstream), year-to-season relationship persistence, review Drop and Done verdicts as separate branches, failed-network recovery, real-phone keyboard/safe areas, cross-household permissions, and every historical-data case. Do not label all flows green. The next work should address correctness gaps first, then a coherent usability mockup and re-walk; do not build onboarding around workarounds.
