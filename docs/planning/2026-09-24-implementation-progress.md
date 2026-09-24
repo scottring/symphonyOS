@@ -963,3 +963,65 @@ route to a goal's steps, and it does not announce that it holds the way to add
 one. **Deliberately not altered mid-walk**, per Codex. Worth noting it is the
 same caret lane the hierarchy fix (§H) made consistent, so any change here
 should keep goal titles aligned.
+
+---
+
+## Q — event drag: found, fixed, and verified live  ·  15:05 ET
+
+Scott handed me the browser. **Two** bugs stood between a dragged event and a
+saved one; the first was the diagnosis, the second only appeared once the first
+was fixed and I dragged twice.
+
+### Bug 1 — the drop looked up the wrong id
+
+`eventToTimelineItem` builds a block's id from `google_event_id || id`
+(`types/timeline.ts:149`), and the drop handler matched `ev.id === <that id>`
+(`useWeekDragDrop.ts:213`). For a real calendar event those differ; for one
+cached by the edge function `ev.id` is **absent entirely** — the hazard already
+written down at `useGoogleCalendar.tsx:610`. So the lookup failed, the handler
+returned at the next line **in silence**, and the block snapped back. Every
+repair in `a813f920` sat below that early return, unreachable.
+
+`findEventByItemId` is now the one reverse lookup, beside the function that
+builds the id, and both call sites use it — the grid's own re-mount lookup
+(`WeekViewV2.tsx:536`) had been doing it correctly all along, which is why the
+drag *looked* fine right up to the drop. A miss now says so out loud.
+
+### Bug 2 — the handler held a stale events array
+
+Found by dragging twice: the first move worked, the second said “Couldn’t find
+that event to move”. `onDragEnd` depended on `[tasks, onUpdateTask]` while
+reading `events`, `onUpdateEvent`, `weekStart` and `pushAction`
+(`useWeekDragDrop.ts:258`). A successful move refetches the range — which my own
+repair added — so `events` changed identity, the callback did not rebuild, and
+the second drop searched **the previous array**. Every arg is now read through a
+ref that each render updates.
+
+### Live verification — QA fixture, Scott's data untouched
+
+Fixture: **“QA drag fixture 2026-09-24 (delete me)”**, created through the
+grid's own slot quick-create, Google id `34jfbkqosahkt9bfum6p0evmr8`.
+
+| Step | Before | After | Result |
+| --- | --- | --- | --- |
+| Drag 1 | Mon Sep 21, 3:00 PM | Wed Sep 23, 3:15 PM | moved, toast “Moved …” |
+| Reload | — | Wed Sep 23, 3:15 PM | **persisted** |
+| Drag 2 (same session) | Thu Sep 24 | Sat Sep 26 | moved — the case that failed before |
+| Undo | Sat Sep 26 | Thu Sep 24, 3:30 PM | restored |
+| Reload | — | Thu Sep 24, 3:30 PM | **Undo persisted** |
+
+Fixture **deleted** afterwards through the app's own Today row menu, and its
+absence confirmed after a reload. Scott's party, goals and tasks were never
+touched: no drag, no edit, no delete.
+
+Drags were driven with synthetic PointerEvents, because dnd-kit's PointerSensor
+does not see the automation tool's drag (the known `chrome_tool_dndkit_synthetic_drag`
+trap). The app code path is identical either way — the same `onDragEnd`.
+
+### Logged on the way past, not fixed
+
+- **A created event does not appear until reload.** The quick-create said
+  “Created …” but the block only showed after a page reload.
+- **An event's detail panel offers no Delete.** `TapEventPanel`'s ⋯ menu holds
+  only “Free”; deletion exists on the Today row menu and in
+  `DetailPanelRedesign`, so the newest surface is the one missing it.

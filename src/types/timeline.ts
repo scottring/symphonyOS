@@ -142,12 +142,49 @@ function parseDate(dateStr: string | undefined | null): Date | null {
   return isNaN(date.getTime()) ? null : date
 }
 
+/**
+ * The id an event's timeline item wears — `google_event_id` when there is one,
+ * otherwise the row id.
+ *
+ * Named, and exported, because the reverse lookup MUST use the same rule. It
+ * did not: the week's drop handler matched `ev.id === <the google id>`, which
+ * for a real calendar event never matches — and for an event cached by the
+ * edge function compares against `undefined` (see the note in
+ * useGoogleCalendar, `restoreEventLocal`). So a dragged event found nothing,
+ * returned silently, and snapped back; the whole write path below it was
+ * unreachable (Scott's walkthrough, 2026-09-24).
+ */
+export function eventItemKey(event: CalendarEvent): string {
+  return event.google_event_id || event.id
+}
+
+/** `event-<key>` — the timeline id itself. */
+export function eventItemId(event: CalendarEvent): string {
+  return `event-${eventItemKey(event)}`
+}
+
+/**
+ * The event a timeline/block id refers to, by the SAME rule that built it.
+ * The one reverse lookup; anything matching ids by hand drifts from this.
+ */
+export function findEventByItemId(
+  events: readonly CalendarEvent[],
+  itemId: string,
+): CalendarEvent | undefined {
+  if (!itemId.startsWith('event-')) return undefined
+  const key = itemId.slice('event-'.length)
+  // An event with neither id can never be addressed; it must not match a
+  // stray "event-undefined" either.
+  if (!key || key === 'undefined') return undefined
+  return events.find((ev) => eventItemKey(ev) === key)
+}
+
 export function eventToTimelineItem(event: CalendarEvent): TimelineItem {
   // Handle both snake_case (from edge function) and camelCase (possibly transformed) field names
   const startTimeStr = event.start_time || event.startTime
   const endTimeStr = event.end_time || event.endTime
   const allDay = event.all_day ?? event.allDay
-  const eventId = event.google_event_id || event.id
+  const eventId = eventItemKey(event)
   const calendarName = event.calendar_name || event.calendarName
   const calendarColor = event.calendar_color || event.calendarColor
 

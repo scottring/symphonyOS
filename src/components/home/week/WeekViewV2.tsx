@@ -19,7 +19,7 @@ import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
 import { useGoogleCalendar } from '@/hooks/useGoogleCalendar'
 import type { Routine, ActionableInstance } from '@/types/actionable'
 import { useSupabaseTasks } from '@/hooks/useSupabaseTasks'
-import { taskToTimelineItem, eventToTimelineItem } from '@/types/timeline'
+import { taskToTimelineItem, eventToTimelineItem, findEventByItemId } from '@/types/timeline'
 import { goalTitleMap } from '@/lib/planning/goalSteps'
 import { WeekGrid, dayKey, type PlanSlot } from './WeekGrid'
 import { WeekAllDayChip, WeekAllDayEventChip } from './WeekAllDayChip'
@@ -533,10 +533,7 @@ export function WeekViewV2(props: WeekViewV2Props) {
             const task = tasks.find((t) => t.id === taskId)
             if (task) blocks.push(taskToTimelineItem(task, labelFor(task)))
           } else if (itemId.startsWith('event-')) {
-            const event = events.find((ev) => {
-              const id = ev.google_event_id || ev.id
-              return `event-${id}` === itemId
-            })
+            const event = findEventByItemId(events, itemId)
             if (event) blocks.push(eventToTimelineItem(event))
           }
         }
