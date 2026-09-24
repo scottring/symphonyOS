@@ -10,6 +10,7 @@
 
 import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { GoalPeriodShelves } from '@/components/plan/GoalPeriodShelves';
 import type { Note, NoteEntityType } from '@/types/note';
 import { useSupabaseTasks } from '@/hooks/useSupabaseTasks';
 import { useContacts } from '@/hooks/useContacts';
@@ -131,6 +132,10 @@ export function TaskViewContainer({ taskId, onBack }: Props) {
 
   return (
     <Suspense fallback={<LoadingFallback />}>
+      {/* A goal shows its own period's Shelves — the same component the Month
+          page renders — rather than today's task chooser (S2-18). Goals only:
+          an ordinary task's detail page is unchanged. */}
+      {isGoal && task && <GoalPeriodShelves goal={task} onNavigate={navigate} />}
       <TaskView
         task={task}
         onBack={onBack}
