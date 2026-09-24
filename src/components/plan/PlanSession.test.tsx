@@ -191,6 +191,37 @@ describe('the save step tells the truth about what is already there', () => {
     expect(screen.queryByText('Nothing chosen.')).toBeNull()
   })
 
+  // Codex live test, 2026-09-24: an unchanged November plan said "Nothing will
+  // be written" and then listed every untouched October row under WHAT SAVE
+  // WILL CHANGE, as "Left open in October". No changes may sit under a change
+  // heading.
+  it('never puts an untouched row under "What Save will change"', () => {
+    setup({ ...quiet, open: [t({ id: 'o1', title: 'Tile saw' })] })
+    // A look-back row means the session opens on the look-back step.
+    fireEvent.click(screen.getByRole('button', { name: /next: plan/i }))
+    toSave()
+    expect(screen.getByText(/plan is unchanged\. Nothing will be written\./)).toBeInTheDocument()
+    expect(screen.queryByText('What Save will change')).toBeNull()
+    // Still shown, as review context, under a heading that tells the truth.
+    const untouched = within(screen.getByRole('region', { name: /Unchanged by Save/ }))
+    expect(untouched.getByText('Tile saw')).toBeInTheDocument()
+    expect(untouched.getByText(/Left open in/)).toBeInTheDocument()
+  })
+
+  it('separates the untouched rows from the ones Save really writes', () => {
+    setup({ ...quiet, open: [t({ id: 'o1', title: 'Tile saw' }), t({ id: 'o2', title: 'Library card' })] })
+    // One verdict: that row changes, the other does not.
+    fireEvent.click(screen.getAllByRole('button', { name: 'Keep' })[1])
+    fireEvent.click(screen.getByRole('button', { name: /next: plan/i }))
+    toSave()
+    const changing = within(screen.getByRole('list', { name: 'What Save will change' }))
+    expect(changing.getByText('Library card')).toBeInTheDocument()
+    expect(changing.queryByText('Tile saw')).toBeNull()
+    const untouched = within(screen.getByRole('region', { name: /Unchanged by Save/ }))
+    expect(untouched.getByText('Tile saw')).toBeInTheDocument()
+    expect(untouched.queryByText('Library card')).toBeNull()
+  })
+
   it('offers Done, not Save, and closes without writing', () => {
     const onClose = vi.fn()
     const { onSave } = setup({ ...quiet, onClose })

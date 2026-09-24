@@ -64,11 +64,15 @@ describe('summarize', () => {
       { title: 'Book a PT evaluation', destination: 'October tasks · new next action toward Strength 2x/week' },
       { title: 'Library card', destination: 'October tasks · kept from September' },
       { title: 'Photos', destination: "Dropped from September · the task is kept" },
-      { title: 'Tile saw', destination: 'Left open in September' },
+      // No verdict: Save never writes it, so it is marked as untouched and
+      // the session shows it apart from the changes (Codex, 2026-09-24).
+      { title: 'Tile saw', destination: 'Left open in September', unchanged: true },
       { title: 'Three bids in hand', destination: 'October goals · for Sign a contractor' },
       { title: 'Call Hughes', destination: 'October tasks · toward Three bids in hand' },
       { title: 'Get three bids', destination: 'October tasks · stays on the season, marked "in October"' },
     ])
+    // Everything else on the list is a real write.
+    expect(lines.filter((l) => l.unchanged).map((l) => l.title)).toEqual(['Tile saw'])
   })
 })
 

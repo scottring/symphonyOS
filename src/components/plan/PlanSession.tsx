@@ -117,6 +117,11 @@ export function PlanSession({ level, aboveLabel, dayOptions = [], periodLabel: P
   }, [draft])
 
   const lines = useMemo(() => summarize(draft, { open, above, aboveGoals, current, hiddenStepGoals, periodLabel: P, prevLabel: Q, aboveLabel }), [draft, open, above, aboveGoals, current, hiddenStepGoals, P, Q, aboveLabel])
+  // What Save writes, and what it leaves alone. A row from the look-back with
+  // no verdict is never written, and showing it under a "will change" heading
+  // contradicted the sentence saying nothing would be (Codex, 2026-09-24).
+  const changing = useMemo(() => lines.filter((l) => !l.unchanged), [lines])
+  const untouched = useMemo(() => lines.filter((l) => l.unchanged), [lines])
 
   const steps: Array<[Step, string]> = [['back', `Look back at ${Q}`], ['plan', `Plan ${P}`], ['save', 'Save']]
   const idx = steps.findIndex(([s]) => s === step)
@@ -313,16 +318,33 @@ export function PlanSession({ level, aboveLabel, dayOptions = [], periodLabel: P
               </section>
             )}
 
-            {lines.length > 0 && (
+            {changing.length > 0 && (
               <>
                 <h3 className="mt-4 text-[11px] font-semibold uppercase tracking-wider text-neutral-400">What Save will change</h3>
-                <ul className="mt-1 rounded-lg bg-sage-50 px-4 py-2">
-                  {lines.map((l, i) => (
+                <ul aria-label="What Save will change" className="mt-1 rounded-lg bg-sage-50 px-4 py-2">
+                  {changing.map((l, i) => (
                     <li key={i} className="grid grid-cols-1 gap-1 border-t border-sage-100 py-1.5 text-sm first:border-t-0 sm:grid-cols-2">
                       <span className="text-neutral-800">{l.title}</span><span className="text-neutral-600">→ {l.destination}</span>
                     </li>))}
                 </ul>
               </>
+            )}
+
+            {/* The rows Save does not touch, kept as review context but never
+                under a heading that says they change. */}
+            {untouched.length > 0 && (
+              <section aria-label={`Unchanged by Save`} className="mt-4">
+                <h3 className="text-[11px] font-semibold uppercase tracking-wider text-neutral-400">
+                  Save won&rsquo;t touch these
+                </h3>
+                <ul className="mt-1 px-1">
+                  {untouched.map((l, i) => (
+                    <li key={i} className="grid grid-cols-1 gap-1 border-b border-neutral-100 py-1.5 text-sm last:border-0 sm:grid-cols-2">
+                      <span className="text-neutral-600">{l.title}</span>
+                      <span className="text-neutral-500">{l.destination}</span>
+                    </li>))}
+                </ul>
+              </section>
             )}
           </section>
         )}

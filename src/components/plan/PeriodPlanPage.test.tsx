@@ -9,7 +9,21 @@ import { DEFAULT_SEASONS, type Seasons } from '@/lib/cadence/seasons'
 import { periodStartFor } from '@/lib/placement/model'
 
 // ── Hook mocks: the page is a pure function of these ─────────────────────────
-const now = new Date()
+/**
+ * A FIXED "today", mid-month, and the clock is pinned to it.
+ *
+ * These tests read the current month out of the real clock and then assert the
+ * page shows it. The page does not always show it: `planningPeriod` looks
+ * ahead to the next month once six days or fewer are left. So the whole file
+ * went red at 12:00 on 2026-09-24 — a wall-clock boundary, nothing to do with
+ * the code — and would do so again on the 24th of every month. Sep 10 leaves
+ * three clear weeks, so the page stays where the tests expect it.
+ *
+ * Only Date is faked; real timers are left alone, or `waitFor` would hang.
+ * Blocks that need another date set their own and restore afterwards.
+ */
+const now = new Date(2026, 8, 10, 9, 0)
+const pinClock = () => { vi.useFakeTimers({ toFake: ['Date'] }); vi.setSystemTime(now) }
 const thisMonth = new Date(now.getFullYear(), now.getMonth(), 1)
 const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1)
 let n = 0
@@ -93,7 +107,9 @@ const renderPageAt = (level: 'month' | 'season' | 'year', path: string) =>
   render(<MemoryRouter initialEntries={[path]}><PeriodPlanPage level={level} /></MemoryRouter>)
 
 describe('PeriodPlanPage', () => {
+  afterEach(() => { vi.useRealTimers() })
   beforeEach(() => {
+    pinClock()
     state.tasks = []; state.goals = []; state.loading = false; routinesState.routines = []
     domainState.layers = new Set(['work', 'family', 'personal', 'unsorted']); domainState.soleDomain = null
     seasonsState.seasons = DEFAULT_SEASONS; seasonsState.loading = false
@@ -798,6 +814,7 @@ describe('PeriodPlanPage', () => {
 // look-ahead all need coverage beyond the pure periodPage.test.ts.
 describe('PeriodPlanPage — planningPeriod wiring', () => {
   beforeEach(() => {
+    pinClock()
     state.tasks = []; state.goals = []; state.loading = false; routinesState.routines = []
     domainState.layers = new Set(['work', 'family', 'personal', 'unsorted']); domainState.soleDomain = null
     seasonsState.seasons = DEFAULT_SEASONS; seasonsState.loading = false
@@ -879,6 +896,9 @@ describe('PeriodPlanPage — planningPeriod wiring', () => {
 })
 
 describe('PeriodPlanPage masthead', () => {
+  beforeEach(pinClock)
+  afterEach(() => { vi.useRealTimers() })
+
   it('wears the shared masthead card with the period AS the title and the nav in the eyebrow', () => {
     renderPage('month')
     const card = screen.getByTestId('masthead-card')
@@ -896,7 +916,9 @@ describe('PeriodPlanPage masthead', () => {
 // "Transform the porch" is a September goal; "hang plants" and "buy new chairs"
 // are the work it takes. The goal holds them, and they leave the loose list.
 describe('steps under a goal', () => {
+  afterEach(() => { vi.useRealTimers() })
   beforeEach(() => {
+    pinClock()
     state.tasks = []; state.goals = []; state.loading = false; routinesState.routines = []
     domainState.layers = new Set(['work', 'family', 'personal', 'unsorted']); domainState.soleDomain = null
     vi.clearAllMocks()

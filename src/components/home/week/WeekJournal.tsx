@@ -17,7 +17,7 @@
 // Each day row is ONE drop target: dnd-kit's all-day protocol for rows from the
 // week's own list ({kind:'allDay', dayIso} → useWeekDragDrop, past-day refusal
 // and undo included) and a native drop for rows dragged out of the Today pin.
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 import { useDraggable, useDroppable } from '@dnd-kit/core'
 import { Check, Plus } from 'lucide-react'
 import type { Task } from '@/types/task'
@@ -71,6 +71,18 @@ interface WeekJournalProps {
   dragEnabled?: boolean
   /** Narrow screens: the margin tightens; the layout is the same. */
   narrow?: boolean
+  /**
+   * The same in-place timing control the week's list and the period pages
+   * wear, supplied by the host. Without it a task that moved out of "Any day"
+   * onto a day lost the one control that says when it is to be done — the
+   * answer was visible right up until the moment it was decided (Codex live
+   * test, 2026-09-24).
+   *
+   * Task entries only. An event or a routine occurrence is not placed this
+   * way, and the hourly Schedule grid keeps its own drag interactions —
+   * nothing here touches them.
+   */
+  timingControl?: (task: Task) => ReactNode
 }
 
 const eventId = (ev: CalendarEvent) => `event-${ev.google_event_id || ev.id}`
@@ -103,12 +115,13 @@ function Box({ entry, onToggle }: { entry: JournalEntry; onToggle: () => void })
   )
 }
 
-function Entry({ entry, day, onSelect, onToggle, dragEnabled }: {
+function Entry({ entry, day, onSelect, onToggle, dragEnabled, timingControl }: {
   entry: JournalEntry
   day: JournalDay
   onSelect: (id: string) => void
   onToggle: (entry: JournalEntry, day: JournalDay) => void
   dragEnabled: boolean
+  timingControl?: WeekJournalProps['timingControl']
 }) {
   // An untimed task drags to another day with the chip protocol (a different
   // id from the grid chip's, so the two surfaces never share a registration).
@@ -137,7 +150,7 @@ function Entry({ entry, day, onSelect, onToggle, dragEnabled }: {
         type="button"
         onClick={() => onSelect(entry.id)}
         title={missed ? `${entry.title} — didn't happen` : entry.title}
-        className="min-w-0 flex-1 text-left leading-snug hover:text-neutral-950"
+        className="journal-entry-title min-w-0 flex-1 text-left leading-snug hover:text-neutral-950"
       >
         {entry.time && (
           <time dateTime={entry.time.toISOString()} className="mr-1.5 text-[12px] tabular-nums text-neutral-400">
@@ -151,6 +164,17 @@ function Entry({ entry, day, onSelect, onToggle, dragEnabled }: {
           <span className="ml-1.5 text-[12px] text-neutral-500 break-words">{entry.subtitle}</span>
         )}
       </button>
+      {timingControl && entry.task && !entry.completed && (
+        // The row itself carries the drag listeners, so the control swallows
+        // the pointer before they see it — the same guard the checkbox uses.
+        <span
+          className="shrink-0"
+          onPointerDown={(e) => e.stopPropagation()}
+          onClick={(e) => e.stopPropagation()}
+        >
+          {timingControl(entry.task)}
+        </span>
+      )}
     </li>
   )
 }
@@ -186,7 +210,7 @@ function AddToDay({ day, onAdd }: { day: JournalDay; onAdd: NonNullable<WeekJour
   )
 }
 
-function DayRow({ day, onSelectItem, onToggleEntry, onPlanDrop, onAddToDay, dragEnabled, narrow }: {
+function DayRow({ day, onSelectItem, onToggleEntry, onPlanDrop, onAddToDay, dragEnabled, narrow, timingControl }: {
   day: JournalDay
   onSelectItem: (id: string) => void
   onToggleEntry: WeekJournalProps['onToggleEntry']
@@ -194,6 +218,7 @@ function DayRow({ day, onSelectItem, onToggleEntry, onPlanDrop, onAddToDay, drag
   onAddToDay?: WeekJournalProps['onAddToDay']
   dragEnabled: boolean
   narrow: boolean
+  timingControl?: WeekJournalProps['timingControl']
 }) {
   const { setNodeRef, isOver: dndOver } = useDroppable({
     id: `journal-day:${day.key}`,
@@ -244,7 +269,7 @@ function DayRow({ day, onSelectItem, onToggleEntry, onPlanDrop, onAddToDay, drag
             <section key={group.label} aria-label={group.label}>
               <h3>{group.label}</h3>
               <ul className="flex flex-col gap-2" aria-label={group.label + ' entries'}>
-                {group.entries.map(entry => <Entry key={entry.id} entry={entry} day={day} onSelect={onSelectItem} onToggle={onToggleEntry} dragEnabled={dragEnabled} />)}
+                {group.entries.map(entry => <Entry key={entry.id} entry={entry} day={day} onSelect={onSelectItem} onToggle={onToggleEntry} dragEnabled={dragEnabled} timingControl={timingControl} />)}
               </ul>
             </section>)}
         </div>}
@@ -270,7 +295,7 @@ function DayRow({ day, onSelectItem, onToggleEntry, onPlanDrop, onAddToDay, drag
   )
 }
 
-export function WeekJournal({ days, spans, onSelectItem, onToggleEntry, onPlanDrop, onAddToDay, dragEnabled = true, narrow = false }: WeekJournalProps) {
+export function WeekJournal({ days, spans, onSelectItem, onToggleEntry, onPlanDrop, onAddToDay, dragEnabled = true, narrow = false, timingControl }: WeekJournalProps) {
   return (
     <div data-testid="week-journal" className="border-y border-neutral-300">
       {spans.length > 0 && (
@@ -296,7 +321,8 @@ export function WeekJournal({ days, spans, onSelectItem, onToggleEntry, onPlanDr
       )}
       {days.map((day) => (
         <DayRow key={day.key} day={day} onSelectItem={onSelectItem} onToggleEntry={onToggleEntry}
-          onPlanDrop={onPlanDrop} onAddToDay={onAddToDay} dragEnabled={dragEnabled} narrow={narrow} />
+          onPlanDrop={onPlanDrop} onAddToDay={onAddToDay} dragEnabled={dragEnabled} narrow={narrow}
+          timingControl={timingControl} />
       ))}
     </div>
   )

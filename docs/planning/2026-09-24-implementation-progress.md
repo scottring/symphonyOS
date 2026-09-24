@@ -607,3 +607,67 @@ may not.
 collection error), tsc clean, eslint 0 errors, build clean, all print checks
 passing at both paper sizes. **Not verified:** nothing has been printed on real
 paper.
+
+---
+
+## K — two corrections from the November round trip  ·  12:25 ET
+
+**(1) The dated Week Journal action had no timing control.** The week's list wore
+the shared control; the day rows beneath it did not. So the answer to “when is
+this to be done” was visible right up until the moment it was decided, and then
+disappeared — move a task out of *Any day* onto Monday and the control went with
+it.
+
+`WeekJournal` now takes the same `timingControl` the week's list takes, and
+`WeekViewV2` hands it the same `weekTimingControl` callback at both widths. Task
+entries only: an event or a routine occurrence is not placed this way. A finished
+row does not get one — it is a record, not something to re-time.
+
+**The Schedule grid is untouched.** The journal row carries dnd-kit's drag
+listeners, so the control swallows the pointer before they see it — the same
+guard the row's checkbox already uses. That is tested on the channel that
+actually matters: dnd-kit's listeners are REACT handlers, so a native listener
+would see the event either way; the test puts a React spy on an ancestor, presses
+the control (the spy must not fire) and then presses the row (it must).
+
+**(2) “What Save will change” listed rows it would not touch.** A look-back row
+with no verdict is never written — `applySession` only walks `verdicts` — yet it
+appeared under that heading as “Left open in October”, directly under the
+sentence “Nothing will be written”.
+
+`SummaryLine` now carries `unchanged`, set on exactly that branch, and the save
+step draws two groups: **What Save will change** (real writes only, now with an
+accessible name) and **Save won’t touch these**, quieter, still showing the rows
+as review context. With no edits at all the change heading does not render and
+only the unchanged group remains — no contradiction left to read.
+
+Three focused tests: an untouched row never appears under the change heading; a
+mixed session puts each row in the right group; and `summarize` marks the no-op
+branch and only that branch.
+
+### A red suite that was the calendar, not the code
+
+While verifying, 35 `PeriodPlanPage` tests went red — and stayed red on a clean
+rerun. Not the changes above: the file reads the current month off the real
+clock and asserts the page shows it, but `planningPeriod` looks AHEAD to the
+next month once six days or fewer remain. At 12:00 today, September crossed that
+line: `round((Oct 1 − now) / 1 day)` fell from 7 to 6, the page began opening on
+October, and every assertion of “September” failed. It would have done the same
+on the 24th of every month.
+
+The file now pins the clock to a fixed mid-month date (Sep 10, `Date` only —
+faking timers would hang `waitFor`), in all four of its top-level blocks, and
+restores real time after each. The blocks that need another date still set their
+own.
+
+**Verified:** 6876 tests passing (only the pre-existing `connectors/whatsapp`
+collection error), tsc clean, eslint 0 errors, build clean, and both headless
+harnesses. **Not verified:** neither change has been walked in a browser by me.
+
+Codex's November fixture is untouched.
+
+### Still pending on Codex's list
+
+Single routine toast + Undo live · day URL/reload through View day · standalone
+task later linked to a goal · the entry buttons and the print dialog of the
+revised guide.

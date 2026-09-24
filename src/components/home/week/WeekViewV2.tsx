@@ -926,7 +926,7 @@ export function WeekViewV2(props: WeekViewV2Props) {
           <div className="flex flex-col gap-4">
             {weekListFor(openSession)}
             <h2 className="week-days-heading">The days</h2>
-            <WeekJournal days={journalDays} spans={journalSpans} onSelectItem={onSelectItem} onToggleEntry={handleJournalToggle} onPlanDrop={handlePlanDropOnDay} onAddToDay={handleAddToDay} narrow dragEnabled={false} />
+            <WeekJournal days={journalDays} spans={journalSpans} onSelectItem={onSelectItem} onToggleEntry={handleJournalToggle} onPlanDrop={handlePlanDropOnDay} onAddToDay={handleAddToDay} narrow dragEnabled={false} timingControl={weekTimingControl} />
           </div>
         ) : (
         <div className="flex items-start gap-4">
@@ -936,7 +936,7 @@ export function WeekViewV2(props: WeekViewV2Props) {
           <>
             {weekListFor(openSession)}
             <h2 className="week-days-heading">The days</h2>
-            <WeekJournal days={journalDays} spans={journalSpans} onSelectItem={onSelectItem} onToggleEntry={handleJournalToggle} onPlanDrop={handlePlanDropOnDay} onAddToDay={handleAddToDay} />
+            <WeekJournal days={journalDays} spans={journalSpans} onSelectItem={onSelectItem} onToggleEntry={handleJournalToggle} onPlanDrop={handlePlanDropOnDay} onAddToDay={handleAddToDay} timingControl={weekTimingControl} />
           </>
         ) : (
         <>

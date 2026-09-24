@@ -45,7 +45,18 @@ export interface SessionDraft {
   keptIds?: Record<string, string>
   created: string[]
 }
-export interface SummaryLine { title: string; destination: string }
+export interface SummaryLine {
+  title: string
+  destination: string
+  /**
+   * Save does NOT touch this row. A look-back row with no verdict is never
+   * written — `applySession` only walks `verdicts` — so listing it under
+   * "What Save will change" contradicted the sentence above it saying nothing
+   * would be written (Codex live test, 2026-09-24). It is still worth showing
+   * as review context, under its own heading.
+   */
+  unchanged?: true
+}
 
 export function emptyDraft(level: SessionLevel, periodStart: Date, prevStart: Date): SessionDraft {
   return { level, periodStart: localYmd(periodStart), prevStart: localYmd(prevStart),
@@ -224,7 +235,7 @@ export function summarize(
     else if (v === 'someday') lines.push({ title: t.title, destination: 'Someday page' })
     else if (v === 'drop') lines.push({ title: t.title, destination: L.dropped })
     else if (carriedWith.has(t.id)) lines.push({ title: t.title, destination: `${L.list} · carried with ${carriedWith.get(t.id)}` })
-    else lines.push({ title: t.title, destination: L.left })
+    else lines.push({ title: t.title, destination: L.left, unchanged: true })
   }
   const goalTitle = new Map(d.newGoals.map((g) => [g.id, g.title]))
   for (const g of d.newGoals) {

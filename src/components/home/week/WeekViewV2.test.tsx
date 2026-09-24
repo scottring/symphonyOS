@@ -214,7 +214,9 @@ describe('WeekViewV2 journal spread', () => {
     render(<WeekViewV2 {...defaultProps} routines={[]} weekStart={sunday} tasks={tasks} events={events} />)
     const monday = within(screen.getByTestId('journal-day-2026-09-14'))
     const entries = [...within(monday.getByRole('list', { name: 'Schedule entries' })).getAllByRole('listitem'), ...within(monday.getByRole('list', { name: 'Any time entries' })).getAllByRole('listitem')]
-    expect(entries.map((li) => li.textContent)).toEqual([
+    // The title only: a task row also wears the shared timing control, which
+    // is asserted separately below.
+    expect(entries.map((li) => li.querySelector('.journal-entry-title')?.textContent)).toEqual([
       '6:50aGutter quotes',
       '10aPT appointment',
       '2:30pCall the bank',
@@ -225,6 +227,46 @@ describe('WeekViewV2 journal spread', () => {
     // Done stays on the page, struck, the way a paper week keeps it.
     expect(monday.getByText('Renew license')).toHaveClass('line-through')
     expect(monday.getByText('No school')).toBeInTheDocument()
+  })
+
+  // Codex live test, 2026-09-24: an action that moved out of "Any day" onto
+  // Monday lost the one visible control that says when it is to be done. The
+  // week's list has it, the day rows must too — the same control, in place.
+  it('gives a day\'s task the same timing control the week list wears', () => {
+    const anchor = weekStartAnchor(sunday, readCadenceConfig().weekStartsOn)
+    const tasks = [
+      createMockTask({ id: 'day', title: 'List supplies to buy', scheduledFor: new Date(2026, 8, 14), isAllDay: true,
+        commitments: [{ level: 'week', periodStart: anchor, status: 'open' }] }),
+      createMockTask({ id: 'done', title: 'Renew license', scheduledFor: new Date(2026, 8, 14), isAllDay: true, completed: true }),
+    ]
+    render(<WeekViewV2 {...defaultProps} routines={[]} weekStart={sunday} tasks={tasks} events={[]} />)
+    const monday = within(screen.getByTestId('journal-day-2026-09-14'))
+    const control = monday.getByRole('button', { name: /Choose a week or a day for List supplies to buy/ })
+    // It wears the answer, the way it does everywhere else.
+    expect(control).toHaveTextContent(/Sep 14/)
+    // A finished row is a record, not something to re-time.
+    expect(monday.queryByRole('button', { name: /Choose a week or a day for Renew license/ })).toBeNull()
+  })
+
+  it('keeps the journal control out of the way of the row drag', () => {
+    const tasks = [createMockTask({ id: 'day', title: 'List supplies to buy', scheduledFor: new Date(2026, 8, 14), isAllDay: true })]
+    // dnd-kit's drag listeners are REACT handlers on the row, so the guard has
+    // to stop React's propagation — a native listener would see the event
+    // either way. An ancestor spy in the same React tree tells the two apart:
+    // without the guard the press reaches it, with the guard it does not.
+    const seen = vi.fn()
+    render(
+      <div onPointerDown={seen}>
+        <WeekViewV2 {...defaultProps} routines={[]} weekStart={sunday} tasks={tasks} events={[]} />
+      </div>,
+    )
+    const monday = within(screen.getByTestId('journal-day-2026-09-14'))
+    const control = monday.getByRole('button', { name: /Choose a week or a day for List supplies to buy/ })
+    fireEvent.pointerDown(control)
+    expect(seen).not.toHaveBeenCalled()
+    // A press on the row itself still reaches the drag.
+    fireEvent.pointerDown(monday.getByText('List supplies to buy'))
+    expect(seen).toHaveBeenCalled()
   })
 
   it('lists multi-day context once above the days — including one that began last week — and not in the days', () => {
