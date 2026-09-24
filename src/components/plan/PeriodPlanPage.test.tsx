@@ -919,6 +919,9 @@ describe('steps under a goal', () => {
   afterEach(() => { vi.useRealTimers() })
   beforeEach(() => {
     pinClock()
+    // Which goals are open now PERSISTS per period, so one case's expansion
+    // would otherwise arrive pre-opened in the next (long lists, 2026-09-24).
+    localStorage.clear()
     state.tasks = []; state.goals = []; state.loading = false; routinesState.routines = []
     domainState.layers = new Set(['work', 'family', 'personal', 'unsorted']); domainState.soleDomain = null
     vi.clearAllMocks()
@@ -1580,5 +1583,123 @@ describe('the URL is the period (S2-16, Codex review of cefcdbcc)', () => {
     renderPageAt('month', '/month?start=2026-10-01')
     fireEvent.click(screen.getByRole('button', { name: /next month/i }))
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('November')
+  })
+})
+
+// ── Long lists ──────────────────────────────────────────────────────────────
+// Scott approved the inline Month design and then asked for the part two
+// sample goals cannot show. Synthetic fixtures only; nothing is seeded.
+describe('a month with a realistic number of goals', () => {
+  beforeEach(() => {
+    pinClock()
+    localStorage.clear()
+    state.tasks = []; state.goals = []; state.loading = false; routinesState.routines = []
+    domainState.layers = new Set(['work', 'family', 'personal', 'unsorted']); domainState.soleDomain = null
+    seasonsState.seasons = DEFAULT_SEASONS; seasonsState.loading = false
+    Object.values(hook).forEach((f) => f.mockClear())
+  })
+  afterEach(() => { vi.useRealTimers() })
+
+  /** 30 goals and 200 tasks, one goal carrying 60 steps. */
+  const dense = () => {
+    const rows: Task[] = []
+    const big = task({ id: 'g-big', title: 'Record the album', isGoal: true, monthStart: thisMonth })
+    rows.push(big)
+    for (let i = 0; i < 60; i++) {
+      rows.push(task({ id: `big-${i}`, title: `Album step ${i}`, goalTaskId: 'g-big', monthStart: thisMonth, completed: i % 4 === 0 }))
+    }
+    for (let g = 1; g < 30; g++) {
+      rows.push(task({ id: `g${g}`, title: `Goal number ${g}`, isGoal: true, monthStart: thisMonth }))
+      for (let i = 0; i < (g % 5); i++) {
+        rows.push(task({ id: `g${g}-s${i}`, title: `Step ${i} of goal ${g}`, goalTaskId: `g${g}`, monthStart: thisMonth }))
+      }
+    }
+    while (rows.length < 230) rows.push(task({ title: `Loose task ${rows.length}`, monthStart: thisMonth }))
+    state.tasks = rows
+  }
+
+  it('draws every goal — no cap, nothing dropped', () => {
+    dense()
+    renderPage('month')
+    expect(screen.getByText('Record the album')).toBeInTheDocument()
+    expect(screen.getByText('Goal number 29')).toBeInTheDocument()
+  })
+
+  it('bounds a 60-step goal and offers the rest with the true total', async () => {
+    dense()
+    renderPage('month')
+    fireEvent.click(screen.getByRole('button', { name: /Show steps under Record the album/ }))
+    expect(screen.getByText('Album step 1')).toBeInTheDocument()
+    expect(screen.queryByText('Album step 30')).not.toBeInTheDocument()
+    const more = screen.getByRole('button', { name: /^Show all 60 steps · \d+ more$/ })
+    fireEvent.click(more)
+    expect(screen.getByText('Album step 30')).toBeInTheDocument()
+    // The goal's own bound is spent. (The loose-task list keeps its separate
+    // "Show all 80 — 75 more", which is a different list's cap.)
+    expect(screen.queryByRole('button', { name: /^Show all \d+ steps/ })).toBeNull()
+  })
+
+  it('a collapsed goal says how much is open and how much is done', () => {
+    dense()
+    renderPage('month')
+    // 60 steps, every fourth completed.
+    expect(screen.getByRole('button', { name: '45 open · 15 done · show' })).toBeInTheDocument()
+  })
+
+  it('filters to a step and keeps its goal with it, saying what is hidden', () => {
+    dense()
+    renderPage('month')
+    fireEvent.change(screen.getByRole('searchbox', { name: /Filter .* goals and steps/ }), { target: { value: 'Album step 7' } })
+    expect(screen.getByText('Record the album')).toBeInTheDocument()
+    expect(screen.queryByText('Goal number 3')).not.toBeInTheDocument()
+    expect(screen.getByRole('status')).toHaveTextContent(/\d+ items are hidden by this filter/)
+  })
+
+  // The failure this must never allow: a filter that quietly narrows a write.
+  it('a filter changes what is SHOWN and nothing else', () => {
+    dense()
+    renderPage('month')
+    const search = screen.getByRole('searchbox', { name: /Filter .* goals and steps/ })
+    fireEvent.change(search, { target: { value: 'Album step 7' } })
+    expect(screen.getByRole('status')).toHaveTextContent(/Filtering changes only what you see/)
+    // No write of any kind happened while filtering.
+    expect(hook.updateTask).not.toHaveBeenCalled()
+    expect(hook.updateTasksBulk).not.toHaveBeenCalled()
+    expect(hook.deleteTask).not.toHaveBeenCalled()
+    // Clearing it brings everything back — nothing was lost.
+    fireEvent.change(search, { target: { value: '' } })
+    expect(screen.getByText('Goal number 3')).toBeInTheDocument()
+  })
+
+  it('completed steps fold away outside review, and come back on request', () => {
+    dense()
+    renderPage('month')
+    fireEvent.click(screen.getByRole('button', { name: /Show steps under Record the album/ }))
+    // Album step 0 is completed; step 1 is not.
+    expect(screen.getByText('Album step 1')).toBeInTheDocument()
+    expect(screen.queryByText('Album step 0')).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Show completed steps' }))
+    expect(screen.getByText('Album step 0')).toBeInTheDocument()
+  })
+
+  // Opening a step, reading it and coming back used to collapse everything.
+  it('remembers which goals were open across a remount', () => {
+    dense()
+    const first = renderPage('month')
+    fireEvent.click(screen.getByRole('button', { name: /Show steps under Record the album/ }))
+    expect(screen.getByText('Album step 1')).toBeInTheDocument()
+    first.unmount()
+
+    renderPage('month')
+    expect(screen.getByText('Album step 1')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Hide steps under Record the album/ })).toBeInTheDocument()
+  })
+
+  it('keeps "Add a step" reachable without opening the goal first', () => {
+    dense()
+    renderPage('month')
+    const card = screen.getByText('Goal number 7').closest('li')!
+    fireEvent.click(within(card).getByRole('button', { name: '+ Add a step' }))
+    expect(screen.getByLabelText('New step for Goal number 7')).toBeInTheDocument()
   })
 })

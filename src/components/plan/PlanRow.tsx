@@ -4,10 +4,11 @@
 // offers right now. Shared by This Month / This Season / This Year so the
 // three pages read as one surface.
 
-import { useState, type ReactNode } from 'react'
+import { useRef, useState, type ReactNode } from 'react'
 import { Check, Target, ArrowRight, ArrowUpRight, ArrowDownRight, Sun, CalendarDays, Archive, Trash2, Repeat, ChevronRight, ChevronDown, Plus } from 'lucide-react'
 import type { PlacementFate } from '@/lib/planning/lineage'
 import type { RowAction } from '@/lib/planning/periodPage'
+import { stepCounts, countsLabel, type StepCounts } from '@/lib/planning/goalListView'
 
 export interface PlanRowModel {
   id: string
@@ -156,6 +157,7 @@ export function PlanRow({
   row, actions, onAction, onOpen, onOpenPlaced, onOpenSupport, lowerLabel = 'this week',
   expanded = false, onToggleExpand, onAddStep, stepActionsFor, planWeek,
   timingReachesLower = false,
+  stepsToDraw, counts, hiddenByReveal = 0, onShowAllSteps, hiddenByFilter = 0,
 }: {
   row: PlanRowModel
   actions: RowAction[]
@@ -176,6 +178,20 @@ export function PlanRow({
   onAddStep?: (row: PlanRowModel, title: string) => void
   /** The verbs each step offers; a step is a task, so it is not the goal's. */
   stepActionsFor?: (step: PlanRowModel) => RowAction[]
+  /**
+   * Long lists (Scott, 2026-09-24). The host computes what to draw — see
+   * `lib/planning/goalListView` — and this row draws exactly that, saying out
+   * loud what is not on screen. Omitted, a row behaves as it always did.
+   */
+  /** The steps to draw. Defaults to every step the row carries. */
+  stepsToDraw?: readonly PlanRowModel[]
+  /** Open and completed counts, for a collapsed goal to state. */
+  counts?: StepCounts
+  /** Steps past the reveal bound — offered, never dropped. */
+  hiddenByReveal?: number
+  onShowAllSteps?: (row: PlanRowModel) => void
+  /** Steps this goal has that the current filter removed. */
+  hiddenByFilter?: number
   /** "Plan ▾" for a task row: which week of the month being VIEWED it sits on.
    *  The 'to-lower' verb beside it means the week containing now, which could
    *  never reach a week of the month you are looking at (2026-09-24). */
@@ -208,7 +224,16 @@ export function PlanRow({
   // and a step never nests further, so neither offers a disclosure. A goal
   // with no steps still gets one when it can TAKE them — that is the way in.
   const canHoldSteps = row.isGoal && row.kind === 'task' && (!!onAddStep || (row.steps?.length ?? 0) > 0)
+  const shown = stepsToDraw ?? row.steps ?? []
+  const tally = counts ?? stepCounts(row)
   const [stepDraft, setStepDraft] = useState('')
+  const stepInputRef = useRef<HTMLInputElement>(null)
+  /** Open the goal and put the cursor in its composer, from one press. */
+  const addStepHere = () => {
+    if (!expanded) onToggleExpand?.(row)
+    // After the children mount. A goal already open focuses immediately.
+    requestAnimationFrame(() => stepInputRef.current?.focus())
+  }
   // A hairline between rows, and the hover runs the full width of the card:
   // inside a divided list a rounded, inset hover reads as a floating chip
   // (Scott, 2026-09-13). The last row leaves its border off so the card's
@@ -268,7 +293,26 @@ export function PlanRow({
           <SupportLine label="Supported by" refs={row.supportedBy} onOpen={onOpenSupport} />
         )}
         {!row.isGoal && actions.includes('under-goal') && <button type="button" onClick={() => onAction('under-goal', row)} className="mt-1 block text-xs text-primary-700 hover:underline" aria-label={`Link ${row.title} to a goal`}>Link to goal</button>}
-        {canHoldSteps && !!row.steps?.length && <button type="button" onClick={() => onToggleExpand?.(row)} className="mt-1 block text-xs text-primary-700 hover:underline">{row.steps.length} supporting {row.steps.length === 1 ? 'task' : 'tasks'}{expanded ? ' · hide' : ' · show'}</button>}
+        {/* What the goal holds, said whether it is open or shut — a collapsed
+            goal that only says "5 supporting tasks" hides how much is done. */}
+        {canHoldSteps && (tally.total > 0 || !!onAddStep) && (
+          <span className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs">
+            {tally.total > 0 && (
+              <button type="button" onClick={() => onToggleExpand?.(row)} className="text-primary-700 hover:underline">
+                {countsLabel(tally)}{expanded ? ' · hide' : ' · show'}
+              </button>
+            )}
+            {/* Reachable without opening the goal first (long-list acceptance). */}
+            {onAddStep && (
+              <button type="button" onClick={addStepHere} className="text-neutral-500 hover:text-primary-700 hover:underline">
+                + Add a step
+              </button>
+            )}
+            {hiddenByFilter > 0 && (
+              <span className="text-neutral-400">{hiddenByFilter} hidden by the filter</span>
+            )}
+          </span>
+        )}
         {/* Where this row is committed, on its own line beneath the title —
             the chip a reader scans down, not a whisper in the right margin. */}
         {row.placed && (
@@ -330,7 +374,7 @@ export function PlanRow({
          than nested in a second list, so a screen reader reads one flat plan. */
       <li className="border-b border-neutral-200 last:border-0">
         <ul className="period-plan-steps">
-          {(row.steps ?? []).map((step) => (
+          {shown.map((step) => (
             <PlanRow
               key={step.id}
               row={step}
@@ -344,6 +388,18 @@ export function PlanRow({
             />
           ))}
         </ul>
+        {/* A bound, not a cap: what is past it is counted and one press away. */}
+        {hiddenByReveal > 0 && (
+          <div className="period-plan-steps pb-1">
+            <button
+              type="button"
+              onClick={() => onShowAllSteps?.(row)}
+              className="text-xs font-medium text-primary-700 hover:underline"
+            >
+              Show all {tally.total} steps · {hiddenByReveal} more
+            </button>
+          </div>
+        )}
         {onAddStep && (
           <form
             className="period-plan-step-add flex items-center py-1.5 pr-2"
@@ -360,6 +416,7 @@ export function PlanRow({
               <Plus className="h-3.5 w-3.5 text-neutral-400" />
             </span>
             <input
+              ref={stepInputRef}
               aria-label={`New step for ${row.title}`}
               value={stepDraft}
               onChange={(e) => setStepDraft(e.target.value)}

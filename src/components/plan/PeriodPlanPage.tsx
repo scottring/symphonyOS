@@ -26,6 +26,8 @@ import { PAGE_COLUMN_WIDE } from '@/components/layout/pageLayout'
 import { useSupabaseTasks } from '@/hooks/useSupabaseTasks'
 import { useActionableInstances } from '@/hooks/useActionableInstances'
 import { makePlanActions, timingRemoval } from '@/lib/planning/planActions'
+import { goalListView, hiddenLabel } from '@/lib/planning/goalListView'
+import { expansionKey, readExpanded, writeExpanded } from './goalExpansion'
 import { planDropHandlers } from '@/lib/planning/planDrag'
 import { showToast } from '@/hooks/useToast'
 import { useGatedTaskActions } from '@/hooks/useGatedTaskActions'
@@ -470,15 +472,41 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
   }, [level, areas, addArea, addGoal, soleDomain, bounds.start, updateGoal, addTask])
 
   // ── Steps under a goal ───────────────────────────────────────────────────
-  const [expandedGoals, setExpandedGoals] = useState<Set<string>>(new Set())
+  // Which goals are open is REMEMBERED per period: opening a step, reading it
+  // and pressing Back used to collapse every goal the reader had opened
+  // (long-list acceptance, Scott 2026-09-24).
+  const expansionStore = expansionKey(level, localYmd(bounds.start))
+  const [expandedGoals, setExpandedGoals] = useState<Set<string>>(() => readExpanded(expansionStore))
+  const lastStore = useRef(expansionStore)
+  if (lastStore.current !== expansionStore) {
+    // Paged to another period: pick up that period's shape, not this one's.
+    lastStore.current = expansionStore
+    setExpandedGoals(readExpanded(expansionStore))
+  }
   const toggleGoal = useCallback((row: PlanRowModel) => {
     setExpandedGoals((prev) => {
       const next = new Set(prev)
       if (next.has(row.id)) next.delete(row.id)
       else next.add(row.id)
+      writeExpanded(expansionStore, next)
       return next
     })
+  }, [expansionStore])
+
+  // ── Long lists ───────────────────────────────────────────────────────────
+  /** What the reader typed into the goals filter. Presentation only. */
+  const [goalQuery, setGoalQuery] = useState('')
+  /** Goals opened out past the reveal bound. */
+  const [revealedGoals, setRevealedGoals] = useState<Set<string>>(new Set())
+  const showAllSteps = useCallback((row: PlanRowModel) => {
+    setRevealedGoals((prev) => new Set(prev).add(row.id))
   }, [])
+  /** Completed steps under a goal, outside review. Remembered like any fold. */
+  const completedStepsKey = `symphony.plan.showCompletedSteps.${level}`
+  const [showCompletedSteps, setShowCompletedSteps] = useState<boolean>(() => readOpen(completedStepsKey))
+  const toggleCompletedSteps = useCallback(() => {
+    setShowCompletedSteps((v) => { writeOpen(completedStepsKey, !v); return !v })
+  }, [completedStepsKey])
 
   const addStep = useCallback(async (goalRow: PlanRowModel, title: string) => {
     const t = title.trim()
@@ -601,6 +629,21 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
   // for this year yet." and a 13px "+ Add a goal" off to the right read as
   // "nothing to do here". The composer IS the empty state.
   const supportingTaskCount = goalRows.reduce((sum, row) => sum + (row.steps?.filter(step => !rowIsDone(step.fate)).length ?? 0), 0)
+  const openGoalRows = useMemo(() => goalRows.filter((r) => !rowIsDone(r.fate)), [goalRows])
+  const doneGoalRows = useMemo(() => goalRows.filter((r) => rowIsDone(r.fate)), [goalRows])
+  /**
+   * What the goals list DRAWS. Presentation only — `goalRows` stays the
+   * source for everything that writes, so a filter can never narrow what a
+   * save touches.
+   */
+  const goalView = useMemo(() => goalListView(openGoalRows, [], {
+    query: goalQuery,
+    showCompleted: showCompletedSteps,
+    expanded: expandedGoals,
+    revealed: revealedGoals,
+  }), [openGoalRows, goalQuery, showCompletedSteps, expandedGoals, revealedGoals])
+  const goalsHidden = hiddenLabel(goalView)
+
   const goalComposerOpen = !isPast && (addingGoal || goalRows.length === 0)
 
   const looseRows = useMemo(
@@ -985,22 +1028,57 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
                   <p className="px-2 py-2 text-sm text-neutral-400">Nothing was on this {noun}'s goals.</p>
                 ) : null
               ) : (
-                <ul>
-                  {goalRows.filter((r) => !rowIsDone(r.fate)).map((row) => (
-                    <PlanRow key={row.id} row={row} onOpen={open} onOpenPlaced={openPlaced} onOpenSupport={openSupport} onAction={(a, r) => { void act(a, r) }} planWeek={planWeekSlot} timingReachesLower={level === 'month'}
-                      lowerLabel={lowerLabelText}
-                      expanded={expandedGoals.has(row.id)}
-                      onToggleExpand={toggleGoal}
-                      onAddStep={isPast ? undefined : (g, t) => { void addStep(g, t) }}
-                      stepActionsFor={(st) => actionsFor({ fate: st.fate, isGoal: false, isPast, level })}
-                        actions={actionsFor({ fate: row.fate, isGoal: row.isGoal, isPast, level })} />
-                  ))}
-                </ul>
+                <>
+                  {/* A filter and a completed fold, shown only once the list is
+                      long enough to need them — on two goals they are clutter. */}
+                  {(openGoalRows.length > 4 || goalQuery) && (
+                    <div className="period-goals-tools">
+                      <input
+                        type="search"
+                        value={goalQuery}
+                        onChange={(e) => setGoalQuery(e.target.value)}
+                        aria-label={`Filter ${bounds.label} goals and steps`}
+                        placeholder="Filter goals and steps…"
+                        className="period-goals-filter"
+                      />
+                      <button type="button" onClick={toggleCompletedSteps} className="period-goals-toggle">
+                        {showCompletedSteps ? 'Hide completed steps' : 'Show completed steps'}
+                      </button>
+                    </div>
+                  )}
+                  {/* What the filter is keeping off the screen, said plainly —
+                      and that it changes nothing about what Save would write. */}
+                  {goalsHidden && (
+                    <p role="status" className="period-goals-hidden">
+                      {goalsHidden}. Filtering changes only what you see.
+                    </p>
+                  )}
+                  {goalView.goals.length === 0 ? (
+                    <p className="px-2 py-2 text-sm text-neutral-400">No goal or step matches “{goalQuery}”.</p>
+                  ) : (
+                  <ul>
+                    {goalView.goals.map((g) => (
+                      <PlanRow key={g.row.id} row={g.row} onOpen={open} onOpenPlaced={openPlaced} onOpenSupport={openSupport} onAction={(a, r) => { void act(a, r) }} planWeek={planWeekSlot} timingReachesLower={level === 'month'}
+                        lowerLabel={lowerLabelText}
+                        expanded={g.expanded}
+                        onToggleExpand={toggleGoal}
+                        stepsToDraw={g.steps}
+                        counts={g.counts}
+                        hiddenByReveal={g.hiddenByReveal}
+                        onShowAllSteps={showAllSteps}
+                        hiddenByFilter={g.hiddenByFilter}
+                        onAddStep={isPast ? undefined : (goal, t) => { void addStep(goal, t) }}
+                        stepActionsFor={(st) => actionsFor({ fate: st.fate, isGoal: false, isPast, level })}
+                          actions={actionsFor({ fate: g.row.fate, isGoal: g.row.isGoal, isPast, level })} />
+                    ))}
+                  </ul>
+                  )}
+                </>
               )}
-              {goalRows.some((r) => rowIsDone(r.fate)) && (
+              {doneGoalRows.length > 0 && (
                 <details className="period-assigned-fold" key={`goals-${level}-${bounds.start.toISOString()}`} open={isPast || undefined}>
-                  <summary>Completed goals · {goalRows.filter((r) => rowIsDone(r.fate)).length}</summary>
-                  <ul>{goalRows.filter((r) => rowIsDone(r.fate)).map((row) => (
+                  <summary>Completed goals · {doneGoalRows.length}</summary>
+                  <ul>{doneGoalRows.map((row) => (
                     <PlanRow key={row.id} row={row} onOpen={open} onOpenPlaced={openPlaced} onOpenSupport={openSupport} planWeek={planWeekSlot} timingReachesLower={level === 'month'}
                       onAction={(a, r) => { void act(a, r) }} lowerLabel={lowerLabelText}
                       expanded={expandedGoals.has(row.id)} onToggleExpand={toggleGoal}

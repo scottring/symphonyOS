@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { render, screen, within } from '@testing-library/react'
+import { render, screen, within, fireEvent } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { PlanRow, rowIsDone, rowOwnsCompletion, type PlanRowModel } from './PlanRow'
 
@@ -169,12 +169,61 @@ describe('a goal holds the steps that serve it', () => {
     expect(onAddStep).not.toHaveBeenCalled()
   })
 
-  // Three steps done is not a transformed porch. No scoreboard on the goal.
-  it('makes supporting tasks discoverable without claiming goal progress', () => {
+  // A collapsed goal says how much is open and how much is done — but never
+  // a fraction: three steps done is not a transformed porch.
+  it('states open and completed counts, and claims no goal progress', () => {
     render(<ul><PlanRow row={goalWithSteps} actions={[]} onAction={vi.fn()} onOpen={vi.fn()} /></ul>)
     const goal = screen.getByText('Transform the porch').closest('li')!
-    expect(within(goal).getByRole('button', { name: '2 supporting tasks · show' })).toBeInTheDocument()
+    expect(within(goal).getByRole('button', { name: '2 open · show' })).toBeInTheDocument()
     expect(within(goal).queryByText(/0\s*\/\s*2/)).not.toBeInTheDocument()
+  })
+
+  it('counts done steps separately once some are finished', () => {
+    const mixed = { ...goalWithSteps, steps: [
+      { ...goalWithSteps.steps![0] },
+      { ...goalWithSteps.steps![1], fate: 'done' as const },
+    ] }
+    render(<ul><PlanRow row={mixed} actions={[]} onAction={vi.fn()} onOpen={vi.fn()} /></ul>)
+    const goal = screen.getByText('Transform the porch').closest('li')!
+    expect(within(goal).getByRole('button', { name: '1 open · 1 done · show' })).toBeInTheDocument()
+  })
+
+  // Long lists: reachable without opening the goal first.
+  it('offers "Add a step" on a COLLAPSED goal, and opens it to take one', () => {
+    const onToggleExpand = vi.fn()
+    render(<ul><PlanRow row={goalWithSteps} actions={[]} onAction={vi.fn()} onOpen={vi.fn()} onAddStep={vi.fn()} onToggleExpand={onToggleExpand} /></ul>)
+    const goal = screen.getByText('Transform the porch').closest('li')!
+    fireEvent.click(within(goal).getByRole('button', { name: '+ Add a step' }))
+    expect(onToggleExpand).toHaveBeenCalledWith(goalWithSteps)
+  })
+
+  // A bound, not a cap: the true total is stated and one press gives it back.
+  it('draws only the steps it was given, and offers the rest', () => {
+    const onShowAllSteps = vi.fn()
+    const many = { ...goalWithSteps, steps: Array.from({ length: 12 }, (_, i) => ({
+      id: `s${i}`, title: `Step ${i}`, isGoal: false, kind: 'task' as const, fate: 'open' as const,
+    })) }
+    render(
+      <ul>
+        <PlanRow row={many} actions={[]} onAction={vi.fn()} onOpen={vi.fn()} expanded
+          stepsToDraw={many.steps!.slice(0, 3)} hiddenByReveal={9} onShowAllSteps={onShowAllSteps} />
+      </ul>,
+    )
+    expect(screen.getByText('Step 2')).toBeInTheDocument()
+    expect(screen.queryByText('Step 5')).not.toBeInTheDocument()
+    const more = screen.getByRole('button', { name: 'Show all 12 steps · 9 more' })
+    fireEvent.click(more)
+    expect(onShowAllSteps).toHaveBeenCalledWith(many)
+  })
+
+  it('says when the filter is hiding steps of a goal it kept', () => {
+    render(
+      <ul>
+        <PlanRow row={goalWithSteps} actions={[]} onAction={vi.fn()} onOpen={vi.fn()}
+          stepsToDraw={[goalWithSteps.steps![0]]} hiddenByFilter={1} />
+      </ul>,
+    )
+    expect(screen.getByText('1 hidden by the filter')).toBeInTheDocument()
   })
 
   it('gives each step the verbs the caller allows, not the ones the goal has', () => {
