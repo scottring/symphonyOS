@@ -327,9 +327,24 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
 
   // The rail's one verb: take an open season task into this month — the same
   // row gains a month commitment; the season keeps it, marked "→ September".
+  /**
+   * "Add to this month" on a row from the level above — the Shelves rail.
+   *
+   * Names the month being VIEWED. It used to call `pushTask(id, 'month')`,
+   * which sends no stamp, so `planPlacement` filled it from `ctx.now`
+   * (`intentions.ts:175`): a Fall task pulled down while October was on screen
+   * landed on **September**, the month the clock was in (2026-09-24, S3-01).
+   * The session's own `takeInto` (below) always passed the period explicitly;
+   * this path had been left behind.
+   *
+   * `updateTask` rather than `pushTask` for the same reason `takeInto` uses it:
+   * taking work into the month you are planning is not a deferral, and should
+   * not count against `defer_count`. The season commitment and the goal link
+   * are untouched — descending keeps what is above it.
+   */
   const pullDown = useCallback((row: PlanRowModel) => {
-    void gated.pushTask(row.id, 'month')
-  }, [gated])
+    void gated.updateTask(row.id, { bucket: 'month', monthStart: bounds.start })
+  }, [gated, bounds.start])
 
   // The calendar is a view you OPEN, not the thing that greets you: the page
   // answers "what do we want from this month?" first (Scott, 2026-09-13: the

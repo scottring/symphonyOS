@@ -449,7 +449,24 @@ describe('PeriodPlanPage', () => {
     fireEvent.click(within(rail).getByRole('button', { name: /This Season/ }))
     expect(within(rail).getByText('Fall trips')).toBeInTheDocument()
     fireEvent.click(within(rail).getByRole('button', { name: 'Add to this month: Fall trips' }))
-    expect(hook.pushTask).toHaveBeenCalledWith(expect.any(String), 'month')
+    // Names the month being VIEWED. It used to send pushTask(id, 'month') with
+    // no stamp, so planPlacement filled it from the clock and a Fall task
+    // pulled down while October was on screen landed on September (S3-01).
+    expect(hook.updateTask).toHaveBeenCalledWith(
+      expect.any(String), { bucket: 'month', monthStart: thisMonth },
+    )
+    expect(hook.pushTask).not.toHaveBeenCalled()
+  })
+
+  it('"Add to this month" names the VIEWED month, not the clock\u2019s (S3-01)', () => {
+    state.tasks = [task({ title: 'Fall trips', bucket: 'quarter' })]
+    renderPageAt('month', '/month?start=2026-10-01')
+    const rail = screen.getByRole('complementary', { name: 'This Season' })
+    fireEvent.click(within(rail).getByRole('button', { name: /This Season/ }))
+    fireEvent.click(within(rail).getByRole('button', { name: 'Add to this month: Fall trips' }))
+    expect(hook.updateTask).toHaveBeenCalledWith(
+      expect.any(String), { bucket: 'month', monthStart: new Date(2026, 9, 1) },
+    )
   })
 
   it('the current period offers completion without converting task identity', () => {

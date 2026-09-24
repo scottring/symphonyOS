@@ -340,3 +340,43 @@ describe('"Keep it in October" pressed in September (2026-09-24 blocker)', () =>
     )
   })
 })
+
+describe('"Add to this month" on a season task, October viewed in September (S3-01)', () => {
+  // A Fall goal's task, pulled down from the Shelves rail while the page shows
+  // October. The clock says September 24.
+  const fallTask = () => task({
+    title: 'List recurring home-maintenance jobs and agree who handles each',
+    bucket: 'quarter', seasonStart: FALL, goalTaskId: 'fall-goal',
+    context: 'family',
+    commitments: [c('season', FALL)],
+  })
+
+  it('lands on the month being VIEWED when that month is named', () => {
+    const p = planPlacement(fallTask(), { bucket: 'month', monthStart: OCT }, ctx)
+    expect(p.commitmentOps).toContainEqual({ op: 'ensure', level: 'month', periodStart: OCT })
+    expect(p.row.monthStart).toEqual(OCT)
+  })
+
+  it('keeps the season commitment — descending never gives up what is above', () => {
+    const p = planPlacement(fallTask(), { bucket: 'month', monthStart: OCT }, ctx)
+    expect(p.commitmentOps).not.toContainEqual(
+      expect.objectContaining({ op: 'remove', level: 'season' }),
+    )
+    const after = applyCommitmentOps(fallTask().commitments, p.commitmentOps)
+    expect(after.find((x) => x.level === 'season')?.status).toBe('open')
+  })
+
+  it('never touches the goal link or the life area', () => {
+    const p = planPlacement(fallTask(), { bucket: 'month', monthStart: OCT }, ctx)
+    expect('goalTaskId' in p.row).toBe(false)
+    expect('context' in p.row).toBe(false)
+  })
+
+  it('documents the trap: no month named puts it on the CLOCK’s month', () => {
+    // What `pushTask(id, 'month')` sent. The task appeared under September
+    // while October was on screen, and October's counts never moved.
+    const p = planPlacement(fallTask(), { bucket: 'month' }, ctx)
+    expect(p.commitmentOps).toContainEqual({ op: 'ensure', level: 'month', periodStart: SEP })
+    expect(p.row.monthStart).toEqual(SEP)
+  })
+})
