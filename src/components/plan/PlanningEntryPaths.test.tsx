@@ -77,3 +77,13 @@ describe('PlanningEntryPaths', () => {
     getItem.mockRestore()
   })
 })
+
+// It lives on the Getting Started page now, not above a plan.
+describe('where the doors live', () => {
+  it('no longer claims to be a page you are standing on', () => {
+    render(<MemoryRouter><PlanningEntryPaths /></MemoryRouter>)
+    expect(screen.queryByText(/You’re on this page/)).toBeNull()
+    expect(screen.getByRole('link', { name: 'Go to the month' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Go to the season' })).toBeInTheDocument()
+  })
+})

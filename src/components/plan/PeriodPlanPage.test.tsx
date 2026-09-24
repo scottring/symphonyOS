@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, fireEvent, within, cleanup, waitFor } from '@testing-library/react'
+import { render, screen, fireEvent, within, cleanup, waitFor, act } from '@testing-library/react'
 import { ReferenceListsProvider, useReferenceLists } from '@/components/reference/ReferenceListsContext'
 import { MemoryRouter, useSearchParams } from 'react-router-dom'
 import type { Task } from '@/types/task'
@@ -1895,4 +1895,113 @@ describe('the filter on ONE long goal', () => {
     renderPage('month')
     expect(screen.queryByRole('searchbox', { name: /Filter/ })).toBeNull()
   })
+})
+
+// Codex, 2026-09-24: the confirmation fired on the line after the write. A
+// refused write must not announce a stored relationship.
+describe('linking waits for the write', () => {
+  const seasonStart = () => periodStartFor('season', new Date(), DEFAULT_SEASONS)
+  beforeEach(() => {
+    pinClock(); localStorage.clear()
+    state.tasks = [
+      task({ id: 'sg1', title: 'A season of repairs', isGoal: true, bucket: 'quarter', seasonStart: seasonStart() }),
+      task({ id: 'mg1', title: 'A home easier to care for', isGoal: true, monthStart: thisMonth }),
+    ]
+    state.goals = []; state.loading = false; routinesState.routines = []
+    domainState.layers = new Set(['work', 'family', 'personal', 'unsorted']); domainState.soleDomain = null
+    seasonsState.seasons = DEFAULT_SEASONS; seasonsState.loading = false
+    Object.values(hook).forEach((f) => f.mockClear())
+    toastSpy.mockClear()
+  })
+  afterEach(() => { vi.useRealTimers(); hook.updateTask.mockImplementation(async () => true) })
+
+  /** The editor closes after each choice, so each attempt reopens it. */
+  const link = () => {
+    fireEvent.click(screen.getByRole('button', { name: /Link to a season goal|Change or remove this link/ }))
+    fireEvent.change(screen.getByRole('combobox', { name: /Goal that A home easier to care for supports/ }), { target: { value: 'sg1' } })
+  }
+
+  it('says nothing until the write lands, then confirms once', async () => {
+    let land: (ok: boolean) => void = () => {}
+    hook.updateTask.mockImplementation(() => new Promise((r) => { land = r }))
+    renderPage('month')
+    link()
+    expect(toastSpy).not.toHaveBeenCalled()
+    await act(async () => { land(true) })
+    expect(toastSpy).toHaveBeenCalledWith(expect.stringMatching(/now supports the goal you chose/), 'success', 5000)
+  })
+
+  it('refuses to announce a link the write refused', async () => {
+    hook.updateTask.mockImplementation(async () => false)
+    renderPage('month')
+    link()
+    await act(async () => {})
+    expect(toastSpy).toHaveBeenCalledWith(expect.stringMatching(/Couldn’t link .* Nothing changed/), 'error', 6000)
+    expect(toastSpy).not.toHaveBeenCalledWith(expect.stringMatching(/now supports/), 'success', expect.anything())
+  })
+
+  it('says so when the write throws, and keeps the controls usable for a retry', async () => {
+    hook.updateTask.mockImplementationOnce(async () => { throw new Error('offline') })
+    renderPage('month')
+    link()
+    await act(async () => {})
+    expect(toastSpy).toHaveBeenCalledWith(expect.stringMatching(/Couldn’t link/), 'error', 6000)
+    // Not stuck pending: the same control takes a second attempt.
+    hook.updateTask.mockImplementation(async () => true)
+    link()
+    await act(async () => {})
+    expect(toastSpy).toHaveBeenCalledWith(expect.stringMatching(/now supports/), 'success', 5000)
+  })
+
+  it('holds the controls while the write is in flight', async () => {
+    let land: (ok: boolean) => void = () => {}
+    hook.updateTask.mockImplementation(() => new Promise((r) => { land = r }))
+    renderPage('month')
+    link()
+    expect(screen.getByRole('combobox', { name: /Status of A home easier to care for/ })).toBeDisabled()
+    await act(async () => { land(true) })
+    expect(screen.getByRole('combobox', { name: /Status of A home easier to care for/ })).not.toBeDisabled()
+  })
+
+  it('a refused status change leaves the goal as it was, and says so', async () => {
+    hook.updateTask.mockImplementation(async () => false)
+    renderPage('month')
+    await act(async () => {
+      fireEvent.change(screen.getByRole('combobox', { name: /Status of A home easier to care for/ }), { target: { value: 'completed' } })
+    })
+    expect(toastSpy).toHaveBeenCalledWith(expect.stringMatching(/Couldn’t change the status .* unchanged/), 'error', 6000)
+  })
+
+  // The fold exists to get finished goals back.
+  it('a completed goal can be reopened from the completed fold', async () => {
+    state.tasks = [task({ id: 'mg2', title: 'A finished goal', isGoal: true, monthStart: thisMonth, completed: true })]
+    renderPage('month')
+    fireEvent.click(screen.getByText(/Completed goals/))
+    const status = screen.getByRole('combobox', { name: /Status of A finished goal/ }) as HTMLSelectElement
+    expect(status.value).toBe('completed')
+    await act(async () => { fireEvent.change(status, { target: { value: 'active' } }) })
+    expect(hook.updateTask).toHaveBeenCalledWith('mg2', { completed: false })
+  })
+})
+
+// Scott, via Codex 2026-09-24: a planning page opens on the plan.
+describe('the planning pages no longer open with an onboarding box', () => {
+  beforeEach(() => {
+    pinClock(); localStorage.clear()
+    state.tasks = [task({ id: 'g', title: 'A goal', isGoal: true, monthStart: thisMonth })]
+    state.goals = []; state.loading = false; routinesState.routines = []
+    domainState.layers = new Set(['work', 'family', 'personal', 'unsorted']); domainState.soleDomain = null
+    seasonsState.seasons = DEFAULT_SEASONS; seasonsState.loading = false
+    Object.values(hook).forEach((f) => f.mockClear())
+  })
+  afterEach(() => { vi.useRealTimers() })
+
+  for (const level of ['month', 'season', 'year'] as const) {
+    it(`${level} shows no "Somewhere to start" box`, () => {
+      renderPage(level)
+      expect(screen.queryByLabelText('Somewhere to start')).toBeNull()
+      expect(screen.queryByText(/Pick one, or none/)).toBeNull()
+      expect(screen.queryByRole('button', { name: 'Show where to start' })).toBeNull()
+    })
+  }
 })

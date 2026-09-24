@@ -2438,6 +2438,22 @@ div.chooser-action-group { overflow: visible !important; }
 }
 .period-plan-page .period-row-check { min-width:18px; min-height:18px; }
 
+/* ── Getting started, on its own page ───────────────────────────────────── */
+.getting-started-page { padding-bottom: 56px; }
+.getting-started-body {
+  max-width: 62ch; margin: 8px 0 0;
+  font-size: 15px; line-height: 1.65; color: var(--color-neutral-700);
+}
+.getting-started-body p { margin: 0 0 14px; }
+.getting-started-body h2 {
+  font-family: 'Crimson Pro', Georgia, serif;
+  font-size: 20px; margin: 26px 0 8px; color: var(--color-neutral-800);
+}
+.getting-started-link { color: var(--color-primary-700); font-weight: 600; }
+.getting-started-link:hover { text-decoration: underline; }
+/* On its own page the doors are the content, not an aside. */
+.getting-started-body .entry-paths { margin-bottom: 8px; }
+
 /* ── A goal's head: the optional link up, and its own status ─────────────────
    Both quiet until used. The link is a disclosure, so a goal with no parent
    costs one line and not a select; the status is always a select, because a

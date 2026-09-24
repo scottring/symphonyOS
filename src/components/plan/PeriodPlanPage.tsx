@@ -18,7 +18,6 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Plus, Target, ChevronDown, ChevronRight, ArrowUpRight } from 'lucide-react'
 import { ShelvesButton } from '@/components/reference/ShelvesButton'
 import { MastheadCard, PeriodNavEyebrow } from '@/components/layout/MastheadCard'
-import { PlanningEntryPaths } from './PlanningEntryPaths'
 import { HomeChromeControls } from '@/components/home/HomeChromeControls'
 import { DomainSwitcher } from '@/components/domain/DomainSwitcher'
 import { useAppShellChromeOptional } from '@/contexts/AppShellChromeContext'
@@ -784,21 +783,58 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
     ? aboveGoalItems.map((g) => ({ id: g.id, title: g.title }))
     : [], [level, aboveGoalItems])
 
-  const linkParent = useCallback((row: PlanRowModel, parentId: string | null) => {
+  /** The goal whose link or status is being written, so its controls can wait. */
+  const [pendingGoal, setPendingGoal] = useState<string | null>(null)
+
+  /**
+   * Announce a saved link only once it is SAVED.
+   *
+   * The first version fired the confirmation on the line after
+   * `void gated.updateTask(...)` — the same shape as the routine toast and the
+   * event drag earlier today, and wrong for the same reason: a refused write
+   * would have been announced as a stored relationship (Codex, 2026-09-24).
+   */
+  const linkParent = useCallback(async (row: PlanRowModel, parentId: string | null) => {
     const field = level === 'season' ? 'goalId' : 'supportsGoalTaskId'
-    void gated.updateTask(row.id, { [field]: parentId ?? undefined })
+    setPendingGoal(row.id)
+    let ok = false
+    try {
+      ok = (await gated.updateTask(row.id, { [field]: parentId ?? undefined })) !== false
+    } catch {
+      ok = false
+    } finally {
+      setPendingGoal(null)
+    }
+    if (!ok) {
+      showToast(parentId
+        ? `Couldn’t link “${row.title}”. Nothing changed — try again.`
+        : `Couldn’t remove the link on “${row.title}”. Nothing changed — try again.`, 'error', 6000)
+      return
+    }
     showToast(parentId
       ? `“${row.title}” now supports the goal you chose.`
       : `“${row.title}” no longer supports another goal. Nothing else changed.`, 'success', 5000)
   }, [gated, level])
 
-  const setGoalStatus = useCallback((row: PlanRowModel, next: 'active' | 'completed') => {
+  const setGoalStatus = useCallback(async (row: PlanRowModel, next: 'active' | 'completed') => {
     // The goal's OWN completion. Its steps are not consulted and not touched.
-    void gated.updateTask(row.id, { completed: next === 'completed' })
+    setPendingGoal(row.id)
+    let ok = false
+    try {
+      ok = (await gated.updateTask(row.id, { completed: next === 'completed' })) !== false
+    } catch {
+      ok = false
+    } finally {
+      setPendingGoal(null)
+    }
+    if (!ok) {
+      showToast(`Couldn’t change the status of “${row.title}”. It is unchanged — try again.`, 'error', 6000)
+    }
   }, [gated])
 
   const goalControlsFor = useCallback((row: PlanRowModel) => {
     if (level === 'year' || isPast) return undefined
+    const busy = pendingGoal === row.id
     return (
       <span className="goal-head-controls">
         <GoalParentLink
@@ -806,17 +842,19 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
           rungLabel={parentRungLabel(level === 'season' ? 'season' : 'month')}
           current={row.supports ?? null}
           choices={parentChoices}
-          onLink={(id) => linkParent(row, id)}
-          onUnlink={() => linkParent(row, null)}
+          onLink={(id) => { void linkParent(row, id) }}
+          onUnlink={() => { void linkParent(row, null) }}
+          disabled={busy}
         />
         <GoalStatusControl
           goalTitle={row.title}
           status={rowIsDone(row.fate) ? 'completed' : 'active'}
-          onChange={(next) => setGoalStatus(row, next)}
+          onChange={(next) => { void setGoalStatus(row, next) }}
+          disabled={busy}
         />
       </span>
     )
-  }, [level, isPast, parentChoices, linkParent, setGoalStatus])
+  }, [level, isPast, parentChoices, linkParent, setGoalStatus, pendingGoal])
 
 
   // ── The year's writers. A year row is a GOAL, so every verb is a goal
@@ -1013,14 +1051,9 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
         )}
       </div>
 
-      {/* Three optional ways in. Above the status line, because it is an
-          offer about where to begin, not a summary of this page. Hidden over
-          a period that has ended (a look-back is not a starting point) and
-          while a session is open (the reader is mid-draft). */}
-      {!isPast && !sessionOpen && (
-        <PlanningEntryPaths here={level === 'month' ? 'weeks' : level === 'season' ? 'season' : null} />
-      )}
-
+      {/* The three optional ways in USED to open here, as a large box above
+          the plan. They live on their own page now — a planning page should
+          open on the plan (Scott, via Codex 2026-09-24). See /start. */}
       {/* Guided planning: whether this month is planned, and the door into
           the session. Month and season; a past period is a look-back. */}
       {!isPast && (
@@ -1155,6 +1188,9 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
                   <summary>Completed goals · {doneGoalRows.length}</summary>
                   <ul>{doneGoalRows.map((row) => (
                     <PlanRow key={row.id} row={row} onOpen={open} onOpenPlaced={openPlaced} onOpenSupport={openSupport} planWeek={planWeekSlot} timingReachesLower={level === 'month'}
+                      // A finished goal keeps its controls: reopening one is
+                      // the whole reason to look at this fold (Codex).
+                      goalControls={goalControlsFor(row)}
                       onAction={(a, r) => { void act(a, r) }} lowerLabel={lowerLabelText}
                       expanded={expandedGoals.has(row.id)} onToggleExpand={toggleGoal}
                       stepActionsFor={(st) => actionsFor({ fate: st.fate, isGoal: false, isPast, level })}

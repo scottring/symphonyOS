@@ -21,7 +21,9 @@ export const MORE_GROUPS: [string, MoreDestination[]][] = [
     { label: 'Documents', route: '/documents' },
     { label: 'Notes', route: '/notes' },
     { label: 'History', route: '/history' },
-    { label: 'Getting started', route: '/today?welcome=1' },
+    // Its own page now, not an overlay on Today. `/today?welcome=1` still
+    // opens the first-week checklist for anyone holding that link.
+    { label: 'Getting started', route: '/start' },
     // The printable sheets. Reachable by URL since they shipped, but nothing
     // in this layout's navigation pointed at them (live check, 2026-09-24) —
     // and a guide nobody can find is a guide nobody reads.
@@ -32,7 +34,7 @@ export const MORE_GROUPS: [string, MoreDestination[]][] = [
 /** True when `pathname` is (or is inside) the destination's page. */
 export function isDestinationActive(route: string, pathname: string): boolean {
   const path = route.split('?')[0]
-  if (path === '/today') return false // Getting started is an overlay on Today, not a page
+  if (path === '/today') return false // a destination that is an overlay on Today, not a page
   return pathname === path || pathname.startsWith(`${path}/`)
     // Meals has one app with two entry routes; highlight only the exact one.
     || (path === '/meals/plan' && pathname === '/meals')

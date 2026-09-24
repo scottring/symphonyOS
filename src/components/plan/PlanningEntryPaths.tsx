@@ -31,6 +31,14 @@ export interface PlanningEntryPathsProps {
    * the control this page already has above its own list.
    */
   here?: 'weeks' | 'season' | null
+  /**
+   * Can it be put away? True where it is an ASIDE beside other content.
+   *
+   * False on the Getting Started page, where the doors are the page's whole
+   * point: a reader who hid them once as an aside must not arrive at the page
+   * they chose and find it empty (seen live, 2026-09-24).
+   */
+  dismissible?: boolean
 }
 
 /** Marks the door the reader is already in. */
@@ -38,12 +46,12 @@ function Here() {
   return <span className="entry-path-here">You’re on this page</span>
 }
 
-export function PlanningEntryPaths({ here = null }: PlanningEntryPathsProps) {
-  const [hidden, setHidden] = useState(readHidden)
+export function PlanningEntryPaths({ here = null, dismissible = true }: PlanningEntryPathsProps) {
+  const [hidden, setHidden] = useState(() => dismissible && readHidden())
   const hide = useCallback(() => { setHidden(true); writeHidden(true) }, [])
   const show = useCallback(() => { setHidden(false); writeHidden(false) }, [])
 
-  if (hidden) {
+  if (hidden && dismissible) {
     return (
       <p className="entry-paths-back">
         <button type="button" onClick={show} className="entry-paths-link">Show where to start</button>
@@ -61,7 +69,9 @@ export function PlanningEntryPaths({ here = null }: PlanningEntryPathsProps) {
             you exactly where you are.
           </p>
         </div>
-        <button type="button" onClick={hide} className="entry-paths-link shrink-0">Hide this</button>
+        {dismissible && (
+          <button type="button" onClick={hide} className="entry-paths-link shrink-0">Hide this</button>
+        )}
       </div>
 
       <div className="entry-paths-doors">
