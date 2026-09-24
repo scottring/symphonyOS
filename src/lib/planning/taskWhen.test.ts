@@ -15,10 +15,29 @@ describe('taskWhenLabel', () => {
 
   it('keeps the week commitment beside the day it was given (S1-14)', () => {
     // The walk confirmed the data survives; the pane has to show it, or
-    // choosing a day looks like it consumed the week.
-    const parts = taskWhenParts(
-      { scheduledFor: new Date(2026, 8, 25), isAllDay: true, weekStart: new Date(2026, 8, 20) }, WED)
+    // choosing a day looks like it consumed the week. A COMMITMENT record is
+    // what proves the week was chosen.
+    const parts = taskWhenParts({
+      scheduledFor: new Date(2026, 8, 25), isAllDay: true, weekStart: new Date(2026, 8, 20),
+      commitments: [{ level: 'week', periodStart: new Date(2026, 8, 20), status: 'open' }],
+    }, WED)
     expect(parts).toEqual(['Fri, Sep 25 · all day', 'Week of Sep 20'])
+  })
+
+  // deriveCache gives a dated task the week of its day. Announcing that as a
+  // week is claiming a commitment nobody made.
+  it('does not announce a week the date merely falls inside', () => {
+    expect(taskWhenParts({
+      scheduledFor: new Date(2026, 8, 25), isAllDay: true, weekStart: new Date(2026, 8, 20),
+      monthStart: new Date(2026, 8, 1),
+      commitments: [{ level: 'month', periodStart: new Date(2026, 8, 1), status: 'open' }],
+    }, WED)).toEqual(['Fri, Sep 25 · all day', 'September'])
+  })
+
+  // A row from before commitments has only its cache; it must not lose its
+  // week to the new rule.
+  it('still reads a legacy row\'s cached week when it has no records at all', () => {
+    expect(taskWhenParts({ weekStart: new Date(2026, 8, 20) }, WED)).toEqual(['Week of Sep 20'])
   })
 
   it('leaves a weekend two days wide instead of inventing a Saturday', () => {

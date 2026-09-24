@@ -2,7 +2,7 @@
 // stays whole all week — done rows stay, struck, sorted last. Renders beside
 // (desktop) or above (narrow) the journal on the Week page.
 
-import { useMemo, useState } from 'react'
+import { useMemo, useState, type ReactNode } from 'react'
 import { Check, Target } from 'lucide-react'
 import type { Task } from '@/types/task'
 import { weekListTasks, weekRowNote, weekRowNoteText } from '@/lib/planning/weekList'
@@ -10,7 +10,7 @@ import { goalTitleMap } from '@/lib/planning/goalSteps'
 import { weekListTitle } from '@/components/reference/DayPlanPanel'
 import { localYmd } from '@/lib/cadence/config'
 
-export function WeekList({ tasks, weekStart, meId, userId, isCurrent, onToggle, onSelect, onPlan, onAdd }: {
+export function WeekList({ tasks, weekStart, meId, userId, isCurrent, onToggle, onSelect, onPlan, onAdd, timingControl }: {
   tasks: Task[]
   weekStart: Date
   meId: string | null
@@ -21,6 +21,11 @@ export function WeekList({ tasks, weekStart, meId, userId, isCurrent, onToggle, 
   /** Opens the week session; shown in the empty state and as a quiet link. */
   onPlan?: () => void
   onAdd?: (title: string) => Promise<void>
+  /** The same timing control the period pages use, supplied by the host so
+   *  this list stays presentational. Week and Day are execution views of the
+   *  same work, so the control has to be the same one (connected planning,
+   *  requirement 2). */
+  timingControl?: (task: Task) => ReactNode
 }) {
   const [adding, setAdding] = useState(false)
   const [titleInput, setTitleInput] = useState('')
@@ -108,6 +113,7 @@ export function WeekList({ tasks, weekStart, meId, userId, isCurrent, onToggle, 
                   )}
                   {note && <span className="block text-[11.5px] text-neutral-500">{note}</span>}
                 </div>
+                {timingControl && <span className="shrink-0">{timingControl(task)}</span>}
               </li>
             )
           })}

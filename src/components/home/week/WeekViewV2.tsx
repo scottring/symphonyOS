@@ -12,6 +12,8 @@ import {
   type DragMoveEvent,
 } from '@dnd-kit/core'
 import type { Task } from '@/types/task'
+import { PlanWeekMenu } from '@/components/plan/PlanWeekMenu'
+import { taskTiming, hasTiming } from '@/lib/planning/taskTiming'
 import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
 import { useGoogleCalendar } from '@/hooks/useGoogleCalendar'
 import type { Routine, ActionableInstance } from '@/types/actionable'
@@ -824,6 +826,45 @@ export function WeekViewV2(props: WeekViewV2Props) {
   // the days. When the panel is closed the page offers it in one line, so a
   // week is never a wall of days with no way to fill them.
   const weekIsCurrent = sameDay(weekAnchor, weekStartAnchor(new Date(), readCadenceConfig().weekStartsOn))
+  /**
+   * The timing control on a week row — the same component the month and season
+   * pages use, so the week is an execution view of the same work rather than a
+   * different vocabulary (requirement 2).
+   *
+   * The weeks it offers come from the week being VIEWED, never the week
+   * containing now. "Keep it in <month>" is offered only when the task has a
+   * broader commitment to fall back to: with nothing above it, clearing the
+   * week has no destination to name, and the brief forbids promising one.
+   */
+  const weekTimingControl = useCallback((task: Task) => {
+    const t = taskTiming(task)
+    const broader = task.monthStart ?? task.seasonStart ?? null
+    const broaderLabel = task.monthStart
+      ? task.monthStart.toLocaleDateString('en-US', { month: 'long' })
+      : task.seasonStart
+        ? `the season from ${task.seasonStart.toLocaleDateString('en-US', { month: 'long' })}`
+        : null
+    return (
+      <PlanWeekMenu
+        size="sm"
+        title={task.title}
+        periodStart={weekAnchor}
+        periodLabel={broaderLabel ?? undefined}
+        timing={t}
+        currentWeekStart={t.week}
+        onPickWeek={(weekStart) => { void onUpdateTask(task.id, { bucket: 'week', weekStart, scheduledFor: undefined }) }}
+        onClearWeek={broader && hasTiming(t)
+          ? () => {
+              void onUpdateTask(task.id, task.monthStart
+                ? { bucket: 'month', monthStart: task.monthStart, weekStart: undefined, scheduledFor: undefined }
+                : { bucket: 'quarter', seasonStart: task.seasonStart, weekStart: undefined, scheduledFor: undefined })
+            }
+          : undefined}
+        onPickDay={(date) => { void onUpdateTask(task.id, { bucket: 'timed', scheduledFor: date, isAllDay: true }) }}
+      />
+    )
+  }, [weekAnchor, onUpdateTask])
+
   const weekListFor = (onPlan: () => void) => (
     <WeekList
       key={localYmd(weekAnchor)}
@@ -842,6 +883,7 @@ export function WeekViewV2(props: WeekViewV2Props) {
         pushAction?.(`Added "${title}"`, () => { void deleteTask(id) })
       }}
       onPlan={onPlan}
+      timingControl={weekTimingControl}
     />
   )
 

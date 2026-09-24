@@ -89,6 +89,33 @@ on these surfaces.
 Checks: 6788 tests passing (only the pre-existing `connectors/whatsapp` collection
 error fails), tsc clean, eslint 0 errors, build clean.
 
-### A2 — Week and Day rows, and task details
+### A2 — the same control on the week, and the whole answer in details  ·  committed
+
+Status: **done.** Files:
+
+- `src/lib/planning/taskWhen.ts` + its tests — **a real conflation fixed.**
+  `deriveCache` gives a dated task the week of its day, so details announced
+  "Week of Sep 20" over a task whose only decision was a date: a commitment nobody
+  made, which is exactly what the transition contract forbids. A row carrying
+  commitment records is now asked for a week COMMITMENT; a legacy row with no
+  records keeps reading its cache, so nothing that predates commitments loses its
+  week. Three tests, one per case.
+- `src/components/home/week/WeekList.tsx` — a `timingControl` slot on each row,
+  supplied by the host so the list stays presentational. Two tests, including that
+  the control does not join the title's accessible name.
+- `src/components/home/week/WeekViewV2.tsx` — supplies it: the same `PlanWeekMenu`,
+  anchored on the week being **viewed**. "Keep it in <month>" is offered only when
+  the task actually has a broader commitment to fall back to — with nothing above
+  it, clearing the week has no destination to name and the brief forbids promising
+  one.
+- `src/components/task/TaskViewRedesign.tsx` — the goal-steps control now wears its
+  step's saved timing, and the duplicate label beside it is reduced to the *broader*
+  commitments only. The task's own **When** block states the whole chain beneath the
+  date ("Also committed to Week of Oct 4 · October"), so details and the row agree.
+
+Checks: 6792 passing (only the pre-existing `connectors/whatsapp` collection error),
+tsc clean, eslint 0 errors, build clean.
+
+### B — removal, completion, Undo
 
 Status: **next.**

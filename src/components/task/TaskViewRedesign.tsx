@@ -8,7 +8,8 @@ import { DOMAIN_COLORS } from '@/lib/domainColors'
 import { EntityNotesSection } from '@/components/notes/EntityNotesSection'
 import { UnifiedNotesEditor } from '@/components/notes/UnifiedNotesEditor'
 import { CloudUpload, Check } from 'lucide-react'
-import { taskWhenLabel } from '@/lib/planning/taskWhen'
+import { taskWhenParts } from '@/lib/planning/taskWhen'
+import { taskTiming, hasTiming, timingDescription } from '@/lib/planning/taskTiming'
 import { PlanWeekMenu } from '@/components/plan/PlanWeekMenu'
 import { GOAL_STATUSES, GOAL_STATUS_HINT, GOAL_STATUS_LABEL, canSetGoalStatus, goalStatusOf, goalStatusUpdate } from '@/lib/planning/goalStatus'
 import { GoalSupportLinks } from '@/components/goals/GoalSupportLinks'
@@ -457,9 +458,16 @@ export function TaskViewRedesign({
                           rather than only from the month page. */}
                       {isGoal && (
                         <>
-                          <span className="flex-shrink-0 text-sm text-neutral-400">
-                            {taskWhenLabel(subtask)}
-                          </span>
+                          {/* The control states the step's own timing, so the
+                              separate label beside it was saying it twice. What
+                              it cannot say — the broader commitments the day
+                              sits inside — stays, and only when there is more
+                              than the timing itself. */}
+                          {taskWhenParts(subtask).length > 1 && (
+                            <span className="flex-shrink-0 text-xs text-neutral-400">
+                              {taskWhenParts(subtask).slice(1).join(' · ')}
+                            </span>
+                          )}
                           {/* The weeks offered are the GOAL's own period, not
                               the week containing now — "Buy game tickets" on an
                               October goal offers October's weeks. Choosing one
@@ -474,8 +482,9 @@ export function TaskViewRedesign({
                               title={subtask.title}
                               periodStart={goalPeriodAnchor}
                               currentWeekStart={subtask.weekStart ?? null}
+                              timing={taskTiming(subtask)}
                               onPickWeek={(weekStart) => onUpdate(subtask.id, { bucket: 'week', weekStart, scheduledFor: undefined })}
-                              onClearWeek={subtask.weekStart || subtask.scheduledFor
+                              onClearWeek={hasTiming(taskTiming(subtask))
                                 ? () => onUpdate(subtask.id, {
                                     // The GOAL's period, named explicitly. Left
                                     // unnamed, planPlacement defaults to today's
@@ -688,6 +697,7 @@ export function TaskViewRedesign({
                   When
                 </h3>
                 {!showTimePicker ? (
+                  <>
                   <button
                     onClick={() => setShowTimePicker(true)}
                     className="flex items-center gap-3 w-full text-left group"
@@ -709,6 +719,21 @@ export function TaskViewRedesign({
                       )}
                     </span>
                   </button>
+                  {/* What the date does NOT say: the week, month or season this
+                      task is committed to. Symphony's model is that a day never
+                      consumes them, so details states the whole answer — the
+                      same answer the row's timing control states, from the same
+                      module (connected planning, requirement 2). */}
+                  {taskWhenParts(task).slice(task.scheduledFor ? 1 : 0).length > 0 && (
+                    <p className="mt-2 pl-12 text-sm text-neutral-500">
+                      {task.scheduledFor ? 'Also committed to ' : 'Committed to '}
+                      {taskWhenParts(task).slice(task.scheduledFor ? 1 : 0).join(' · ')}
+                    </p>
+                  )}
+                  {taskWhenParts(task).length === 0 && (
+                    <p className="mt-2 pl-12 text-sm text-neutral-400">{timingDescription(taskTiming(task))}</p>
+                  )}
+                  </>
                 ) : (
                   <div className="bg-white rounded-xl border border-neutral-200 p-4 space-y-4">
                     <input

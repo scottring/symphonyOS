@@ -32,6 +32,26 @@ describe('WeekList', () => {
     expect(list.getAllByRole('listitem')[0]).toHaveTextContent('from October')
   })
 
+  // Week and Day are execution views of the same work, so the host supplies
+  // the same timing control the period pages use. The list stays
+  // presentational; it just has to give it a place on the row.
+  it('renders the host\'s timing control on each row, beside the title rather than inside it', () => {
+    const tasks = [row({ id: 'b', title: 'Call the plumber' })]
+    render(<WeekList tasks={tasks} weekStart={WEEK} meId={null} userId="me" isCurrent
+      onToggle={vi.fn()} onSelect={vi.fn()}
+      timingControl={(t) => <button type="button">When: {t.title}</button>} />)
+    const list = within(screen.getByRole('region', { name: "This week's list" }))
+    expect(list.getByRole('button', { name: 'When: Call the plumber' })).toBeInTheDocument()
+    // Still its own button: the control must not join the title's name.
+    expect(list.getByRole('button', { name: 'Call the plumber' })).toBeInTheDocument()
+  })
+
+  it('renders no timing slot when the host supplies none', () => {
+    render(<WeekList tasks={[row({ id: 'b', title: 'Call the plumber' })]} weekStart={WEEK} meId={null} userId="me" isCurrent
+      onToggle={vi.fn()} onSelect={vi.fn()} />)
+    expect(screen.queryByRole('button', { name: /^When:/ })).toBeNull()
+  })
+
   it('ticks and opens', () => {
     const onToggle = vi.fn(), onSelect = vi.fn()
     render(<WeekList tasks={[row({ id: 'b', title: 'Call the plumber' })]} weekStart={WEEK} meId={null} userId="me" isCurrent onToggle={onToggle} onSelect={onSelect} />)
