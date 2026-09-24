@@ -254,3 +254,92 @@ describe('the save step tells the truth about what is already there', () => {
     expect(screen.queryByRole('button', { name: 'Done' })).toBeNull()
   })
 })
+
+// ── The review, on a plan with a realistic number of rows ───────────────────
+// Codex, 2026-09-24: the review showed two flat lists and no completed step.
+describe('the review draws the saved plan the way Month does', () => {
+  /** A goal with steps, one of them finished, plus loose work. */
+  const song = t({ id: 'song', title: 'Write a new song in October', isGoal: true })
+  const chords = t({ id: 'chords', title: 'Use an old chord progression', completed: true, goalTaskId: 'song' })
+  const verse = t({ id: 'verse', title: 'Draft the first verse', goalTaskId: 'song' })
+  const filters = t({ id: 'filters', title: 'Order new furnace filters' })
+  const plan = { current: [song, chords, verse, filters], finished: [], open: [], above: [], aboveGoals: [] }
+
+  /** With no look-back rows the session already opens on Plan. */
+  const toPlan = () => {
+    const next = screen.queryByRole('button', { name: /next: plan/i })
+    if (next) fireEvent.click(next)
+  }
+
+  it('puts a step under its goal, not in a list of its own', () => {
+    setup(plan)
+    toPlan()
+    const counts = screen.getByRole('button', { name: /1 open · 1 done · show/ })
+    fireEvent.click(counts)
+    // The goal's own row — its title also appears in the "toward a goal"
+    // picker, which is a different thing entirely.
+    const goalItem = counts.closest('li')!
+    expect(within(goalItem).getByText('Write a new song in October')).toBeInTheDocument()
+    expect(within(goalItem).getByText('Draft the first verse')).toBeInTheDocument()
+    expect(within(goalItem).getByText('Use an old chord progression')).toBeInTheDocument()
+  })
+
+  // The completed step Scott could not see.
+  it('shows completed work, marked, and never folds it away in review', () => {
+    setup(plan)
+    toPlan()
+    fireEvent.click(screen.getByRole('button', { name: /1 open · 1 done · show/ }))
+    const done = screen.getByText('Use an old chord progression')
+    expect(done.className).toMatch(/line-through/)
+    expect(within(done.closest('li')!).getByText('completed')).toBeInTheDocument()
+  })
+
+  it('leaves a task with no goal in the task list', () => {
+    setup(plan)
+    toPlan()
+    expect(screen.getByText('Order new furnace filters')).toBeInTheDocument()
+  })
+
+  // The failure this must never allow: a filter that narrows what Save writes.
+  it('a filter narrows the VIEW and never the save', () => {
+    const many = {
+      ...plan,
+      current: [song, chords, verse, filters,
+        ...Array.from({ length: 10 }, (_, i) => t({ id: `x${i}`, title: `Other task ${i}` }))],
+    }
+    const s = setup(many)
+    toPlan()
+    // Add something, so the save has a real scope to preserve.
+    fireEvent.change(screen.getByLabelText(/New task for October/), { target: { value: 'Buy strings' } })
+    fireEvent.click(screen.getByRole('button', { name: /add task/i }))
+    const beforeFilter = JSON.stringify(s.draft)
+
+    fireEvent.change(screen.getByRole('searchbox', { name: /Filter your October plan/ }), { target: { value: 'furnace' } })
+    expect(screen.queryByText('Other task 3')).not.toBeInTheDocument()
+    expect(screen.getByRole('status')).toHaveTextContent(/Save still writes your whole plan/)
+    // Filtering wrote nothing to the draft.
+    expect(JSON.stringify(s.draft)).toBe(beforeFilter)
+
+    fireEvent.click(screen.getByRole('button', { name: /next: save/i }))
+    fireEvent.click(screen.getByRole('button', { name: /^Save October$/ }))
+    expect(s.onSave).toHaveBeenCalledTimes(1)
+    // The draft handed to Save still holds everything, filter or no filter.
+    expect(s.draft.newTasks.map((x) => x.title)).toEqual(['Buy strings'])
+  })
+
+  // Recovery: a save that half-failed must not duplicate on the retry.
+  it('a failed save keeps the draft, says so, and retries without duplicating', () => {
+    const s = setup({ ...plan, saveError: true })
+    toPlan()
+    fireEvent.change(screen.getByLabelText(/New task for October/), { target: { value: 'Buy strings' } })
+    fireEvent.click(screen.getByRole('button', { name: /add task/i }))
+    fireEvent.click(screen.getByRole('button', { name: /next: save/i }))
+
+    expect(screen.getByRole('alert')).toHaveTextContent(/didn't save/i)
+    // Still one item, not two: the draft is the record, and it was kept.
+    expect(s.draft.newTasks).toHaveLength(1)
+    fireEvent.click(screen.getByRole('button', { name: /^Save October$/ }))
+    expect(s.onSave).toHaveBeenCalledTimes(1)
+    expect(s.draft.newTasks).toHaveLength(1)
+  })
+})

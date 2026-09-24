@@ -11,6 +11,7 @@ import { Target, Check } from 'lucide-react'
 import type { Task } from '@/types/task'
 import { DOMAINS, type DomainId } from '@/lib/domains'
 import { verdictOptions, summarize, weekTaskListLabel, placementLevelOf, type SessionDraft, type SessionLevel, type Verdict } from '@/lib/planning/session'
+import { goalListView, planRowsFor, hiddenLabel, countsLabel } from '@/lib/planning/goalListView'
 import { stepsThatCarryForward } from '@/lib/planning/goalSteps'
 import { Hint } from './Hint'
 
@@ -116,6 +117,24 @@ export function PlanSession({ level, aboveLabel, dayOptions = [], periodLabel: P
       && !d.wentWell.trim() && !d.didnt.trim()
   }, [draft])
 
+  /**
+   * The saved plan, drawn the way Month draws it: each step under its goal,
+   * completed work kept and marked. Two flat lists put a step nowhere near the
+   * goal it serves and hid what was already finished (Codex, 2026-09-24).
+   *
+   * The filter is presentation ONLY — the draft, and so everything Save
+   * writes, is untouched by it, and the line beneath it says so.
+   */
+  const [planFilter, setPlanFilter] = useState('')
+  const [revealed, setRevealed] = useState<Set<string>>(new Set())
+  const [openGoals, setOpenGoals] = useState<Set<string>>(new Set())
+  const existing = useMemo(() => planRowsFor(monthGoals, monthTasks), [monthGoals, monthTasks])
+  const existingView = useMemo(() => goalListView(existing.goals, existing.loose, {
+    query: planFilter, inReview: true, expanded: openGoals, revealed,
+  }), [existing, planFilter, openGoals, revealed])
+  const existingHidden = hiddenLabel(existingView)
+  const manyRows = existing.goals.length + existing.loose.length > 8
+
   const lines = useMemo(() => summarize(draft, { open, above, aboveGoals, current, hiddenStepGoals, periodLabel: P, prevLabel: Q, aboveLabel }), [draft, open, above, aboveGoals, current, hiddenStepGoals, P, Q, aboveLabel])
   // What Save writes, and what it leaves alone. A row from the look-back with
   // no verdict is never written, and showing it under a "will change" heading
@@ -208,8 +227,50 @@ export function PlanSession({ level, aboveLabel, dayOptions = [], periodLabel: P
                 <Hint name="month-goals" uid={uid}>Goals are what this period should add up to. They stay on this list; you look at them when you plan a week or a day.</Hint>
               </div>
             )}
+            {(manyRows || planFilter) && (
+              <div className="period-goals-tools mt-2">
+                <input type="search" value={planFilter} onChange={(e) => setPlanFilter(e.target.value)}
+                  aria-label={`Filter your ${P} plan`} placeholder="Filter this plan…" className="period-goals-filter" />
+              </div>
+            )}
+            {existingHidden && (
+              <p role="status" className="period-goals-hidden">
+                {existingHidden}. Filtering changes only what you see — Save still writes your whole plan.
+              </p>
+            )}
             <ul>
-              {monthGoals.map((g) => <li key={g.id} className="flex items-center gap-2 border-b border-neutral-100 py-2 text-sm"><Target className="h-4 w-4 text-accent-600" />{g.title}</li>)}
+              {existingView.goals.map((g) => (
+                <li key={g.row.id} className="border-b border-neutral-100 py-2 text-sm">
+                  <span className="flex items-center gap-2">
+                    <Target className="h-4 w-4 shrink-0 text-accent-600" />
+                    <span className={`min-w-0 flex-1 break-words ${g.row.fate === 'done' ? 'text-neutral-400 line-through' : ''}`}>{g.row.title}</span>
+                    {g.counts.total > 0 && (
+                      <button type="button" onClick={() => setOpenGoals((prev) => { const n = new Set(prev); if (n.has(g.row.id)) n.delete(g.row.id); else n.add(g.row.id); return n })}
+                        className="shrink-0 text-[12px] text-primary-700 hover:underline">
+                        {countsLabel(g.counts)}{g.expanded ? ' · hide' : ' · show'}
+                      </button>
+                    )}
+                  </span>
+                  {g.expanded && (
+                    <ul className="mt-1 ml-6 border-l border-neutral-200 pl-3">
+                      {g.steps.map((st) => (
+                        <li key={st.id} className={`break-words py-1 text-[13px] ${st.fate === 'done' ? 'text-neutral-400 line-through' : 'text-neutral-600'}`}>
+                          {st.title}{st.fate === 'done' && <span className="ml-1.5 text-[11px] no-underline">completed</span>}
+                        </li>
+                      ))}
+                      {g.hiddenByReveal > 0 && (
+                        <li className="py-1">
+                          <button type="button" onClick={() => setRevealed((prev) => new Set(prev).add(g.row.id))}
+                            className="text-[12px] font-medium text-primary-700 hover:underline">
+                            Show all {g.counts.total} steps · {g.hiddenByReveal} more
+                          </button>
+                        </li>
+                      )}
+                      {g.hiddenByFilter > 0 && <li className="py-1 text-[11px] text-neutral-400">{g.hiddenByFilter} hidden by the filter</li>}
+                    </ul>
+                  )}
+                </li>
+              ))}
               {draft.newGoals.map((g) => (
                 <li key={g.id} className="flex items-center gap-2 border-b border-neutral-100 py-2 text-sm">
                   <Target className="h-4 w-4 text-accent-600" />
@@ -242,7 +303,13 @@ export function PlanSession({ level, aboveLabel, dayOptions = [], periodLabel: P
               </div>
             )}
             <ul>
-              {monthTasks.map((x) => <li key={x.id} className="border-b border-neutral-100 py-2 text-sm">{x.title}</li>)}
+              {/* Only what belongs to no goal — the rest is drawn under its
+                  goal above, where it can be read together. */}
+              {existingView.loose.map((x) => (
+                <li key={x.id} className={`break-words border-b border-neutral-100 py-2 text-sm ${x.fate === 'done' ? 'text-neutral-400 line-through' : ''}`}>
+                  {x.title}{x.fate === 'done' && <span className="ml-1.5 text-[11px] no-underline">completed</span>}
+                </li>
+              ))}
               {open.filter((t) => draft.verdicts[t.id] === 'keep-action' && draft.actionTitles[t.id]?.trim()).map((g) => (
                 <li key={`a-${g.id}`} className="border-b border-neutral-100 py-2 text-sm">{draft.actionTitles[g.id]}<span className="block text-[12px] text-neutral-400">new next action toward {g.title}</span></li>))}
               {draft.newTasks.map((x) => (

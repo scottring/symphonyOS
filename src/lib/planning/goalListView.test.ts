@@ -1,7 +1,7 @@
 // Long lists, against the shape Scott asked for: 30 goals, 200 tasks, and one
 // goal carrying 60 steps. Synthetic — nothing is seeded into an account.
 import { describe, it, expect } from 'vitest'
-import { goalListView, stepCounts, countsLabel, hiddenLabel, STEP_REVEAL_LIMIT } from './goalListView'
+import { goalListView, stepCounts, countsLabel, hiddenLabel, planRowsFor, STEP_REVEAL_LIMIT } from './goalListView'
 import type { PlanRowModel } from '@/components/plan/PlanRow'
 
 const step = (id: string, title: string, done = false): PlanRowModel =>
@@ -164,5 +164,41 @@ describe('expansion', () => {
     expect(v.goals.find((g) => g.row.id === 'g-big')!.expanded).toBe(true)
     expect(v.goals.find((g) => g.row.id === 'g1')!.expanded).toBe(true)
     expect(v.goals.find((g) => g.row.id === 'g2')!.expanded).toBe(false)
+  })
+})
+
+describe('the saved plan, as the review must draw it', () => {
+  const goals = [{ id: 'g1', title: 'Write a new song' }, { id: 'g2', title: 'Done goal', completed: true }]
+  const tasks = [
+    { id: 't1', title: 'Use an old chord progression', completed: true, goalTaskId: 'g1' },
+    { id: 't2', title: 'Draft the first verse', goalTaskId: 'g1' },
+    { id: 't3', title: 'Order furnace filters' },
+    { id: 't4', title: 'Orphan step', goalTaskId: 'gone' },
+  ]
+
+  it('puts each step under its own goal', () => {
+    const { goals: rows } = planRowsFor(goals, tasks)
+    expect(rows[0].steps!.map((s) => s.title)).toEqual(['Use an old chord progression', 'Draft the first verse'])
+  })
+
+  // The failure Codex named: a completed step invisible in the review.
+  it('keeps completed work, and marks it', () => {
+    const { goals: rows } = planRowsFor(goals, tasks)
+    const done = rows[0].steps!.find((s) => s.title.startsWith('Use an old'))!
+    expect(done.fate).toBe('done')
+    expect(rows[1].fate).toBe('done')
+    // And in review it is drawn, whatever the outside preference says.
+    const v = goalListView(rows, [], { inReview: true, showCompleted: false })
+    expect(v.goals[0].steps.map((s) => s.title)).toContain('Use an old chord progression')
+  })
+
+  it('leaves a task with no goal — and one whose goal is elsewhere — standing on its own', () => {
+    const { loose } = planRowsFor(goals, tasks)
+    expect(loose.map((r) => r.title)).toEqual(['Order furnace filters', 'Orphan step'])
+  })
+
+  it('gives a goal with no steps an empty list, not a missing one', () => {
+    const { goals: rows } = planRowsFor([{ id: 'x', title: 'Bare' }], [])
+    expect(rows[0].steps).toEqual([])
   })
 })

@@ -175,3 +175,42 @@ export function hiddenLabel(view: GoalListView): string | null {
   const n = view.hiddenByFilter
   return `${n} ${n === 1 ? 'item is' : 'items are'} hidden by this filter`
 }
+
+/**
+ * The saved plan as goals with their steps under them — the shape Month
+ * draws, for the review to draw too.
+ *
+ * The review used to show two flat lists, a goal list and a task list, so a
+ * step sat nowhere near the goal it serves and a completed step was
+ * indistinguishable from an open one (Codex, 2026-09-24: "treat review
+ * experience as failed"). Completed rows are KEPT and marked; the review is
+ * where finished work most needs to be visible.
+ */
+export function planRowsFor(
+  goals: readonly { id: string; title: string; completed?: boolean }[],
+  tasks: readonly { id: string; title: string; completed?: boolean; goalTaskId?: string }[],
+): { goals: PlanRowModel[]; loose: PlanRowModel[] } {
+  const fate = (done?: boolean) => (done ? 'done' : 'open') as PlanRowModel['fate']
+  const byGoal = new Map<string, PlanRowModel[]>()
+  const loose: PlanRowModel[] = []
+  const known = new Set(goals.map((g) => g.id))
+  for (const t of tasks) {
+    const row: PlanRowModel = { id: t.id, title: t.title, isGoal: false, kind: 'task', fate: fate(t.completed) }
+    // A step whose goal is not on this list is not hidden — it stands on its
+    // own rather than disappearing with a goal that is not here.
+    if (t.goalTaskId && known.has(t.goalTaskId)) {
+      const list = byGoal.get(t.goalTaskId) ?? []
+      list.push(row)
+      byGoal.set(t.goalTaskId, list)
+    } else {
+      loose.push(row)
+    }
+  }
+  return {
+    goals: goals.map((g) => ({
+      id: g.id, title: g.title, isGoal: true, kind: 'task',
+      fate: fate(g.completed), steps: byGoal.get(g.id) ?? [],
+    })),
+    loose,
+  }
+}
