@@ -1392,3 +1392,90 @@ earlier evidence for an unchanged path.
 The §S limitation “only /week supplies tiles” still holds. The §T limitation
 “the dense behaviour has not been seen in a browser” is now **narrowed**: it has
 been measured in Chromium from an isolated fixture, but still not in the app.
+
+---
+
+# §V — Codex's bounded batch, 2026-09-24 (evening)
+
+Four items, all closed. Two bugs fixed that no earlier pass had reached, and
+one found by the new integration test.
+
+## What the evidence is, and is not
+
+Codex asked for this to be explicit, so it leads:
+
+| Kind | Where | What it can settle |
+|---|---|---|
+| **Real database** | the demo account at :5199, by hand | that a write reached Postgres and came back after a reload |
+| **Hydrated, real browser** | `outputs/plan-keyboard/` — the app's own components mounted in Chromium with the built stylesheet | focus rings that actually paint, geometry at a real width, real key events |
+| **Hydrated, no layout** | `PeriodPlanPage.test.tsx` — the real page, real handlers, real key events in happy-dom | tab order, activation, focus restoration, state |
+| **Mocked backend** | `PeriodPlanPage.review.integration.test.tsx` — real page/session/writer code over an in-memory table | what the client does with a failed write and a retry |
+| **Static** | `outputs/plan-dense/`, `outputs/planning-guide/` | layout and print geometry only |
+
+Nothing in this section was proven by a mocked test alone where a live check
+was possible, and nothing mocked is reported as a live pass.
+
+## Acceptance matrix
+
+| Item | Evidence | Result |
+|---|---|---|
+| Year review shows goals completed **this** year | Unit (`PeriodPlanPage.test.tsx`), proven red first | **fixed** — was `status === 'active'` |
+| Archived year goals stay out of the review | Unit | **pass** |
+| Tab order: filter → completed fold → goals | Hydrated + real browser, 1280 & 390 | **pass** |
+| Shift-Tab back up the list | Hydrated + real browser | **pass** |
+| Enter / Space on the counts control and the fold | Hydrated + real browser | **pass** |
+| Focus stays and stays **marked** through both | Real browser (computed outline) | **pass** |
+| "Show all N steps" keeps focus | Hydrated + real browser, proven red first | **fixed** — focus fell to `<body>` |
+| Escape clears the filter, cursor stays | Hydrated + real browser, proven red first | **fixed** — there was no way to clear it |
+| Escape closes the timing menu, focus returns | Hydrated | **pass** — `usePopoverFocus` already did this |
+| Parent-link disclosure + status control by keyboard | Real browser, 1280 & 390 | **pass** |
+| Every focused control on screen at 390px | Real browser | **pass** |
+| Season → year: set / change / remove | **Live, real DB** | **pass** |
+| …removal and re-link survive a reload | **Live, real DB** | **pass** |
+| …reciprocal reads back on /year | **Live, real DB** | **pass** — "Supported by Fall 2026 · QA-LNK season goal" |
+| Standalone task → goal, then reload | **Live, real DB** | **pass** — left "To plan into a week", came back as a step |
+| Review: clean Save persists every verdict once | Mocked backend | **pass** |
+| Review: one refused write keeps only that verdict | Mocked backend | **pass** |
+| Review: retry writes nothing twice | Mocked backend | **pass** |
+| Review: a refused **session record** can be retried | Mocked backend, proven red first | **fixed** — only "Done" was offered |
+| Review: Close keeps the draft, writes nothing | Mocked backend | **pass** |
+| /year does not claim "0 goals" while loading | Live, then unit | **fixed** |
+
+## Known user-facing defects still open
+
+Distinct from untested coverage below. None found today are still open — these
+are carried forward from earlier sections:
+
+1. A completed prep task is hidden in the event panel.
+2. A newly created event needs a reload before it appears.
+3. The event detail panel has no Delete.
+
+## Unproven contracts, and what would prove them
+
+The review integration test stops at the task store. These are the contracts
+below that line, and none of them can be settled without a real Postgres:
+
+- `keepForward` writes the new period's commitment and leaves the old one
+  closed, and the `tasks.bucket` / `monthStart` cache triggers follow.
+- `dropCommitment` closes exactly one commitment and no other.
+- `completeTask`'s side effects (subtasks, a linked list item, waiting state).
+- RLS admits each of these for the acting user, and refuses them for a
+  household member who should not see the row.
+- A retry after a partial failure does not duplicate rows *in the database* —
+  the client-side idempotency is proven; the unique constraint behind it is not.
+
+**Required environment:** an isolated Supabase project (or a branch of the
+existing one) seeded with two authenticated test accounts in one household, and
+the app pointed at it. The two-account RLS technique already documented —
+one `execute_sql` with `begin / set local role / rollback` — covers the policy
+half without a second project; the trigger and duplicate-row half needs real
+writes, so it needs the isolated project.
+
+## Fixture state on the demo account
+
+Created and then dropped from every planning surface: `QA-LNK season goal`,
+`QA-LNK loose task`, and the earlier `QA-ACC month goal (delete me)` /
+`QA-ACC step` / `Goal-link verification: …` pair. Dropped, not hard-deleted —
+the planning rows offer Drop, and the hard delete lives on `/task/:id`, which
+these no longer link to. They appear on no planning page, the Inbox or Someday.
+Scott's goals and the other session's two Inbox rows were not touched.
