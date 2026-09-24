@@ -2438,6 +2438,37 @@ div.chooser-action-group { overflow: visible !important; }
 }
 .period-plan-page .period-row-check { min-width:18px; min-height:18px; }
 
+/* ── A goal's head: the optional link up, and its own status ─────────────────
+   Both quiet until used. The link is a disclosure, so a goal with no parent
+   costs one line and not a select; the status is always a select, because a
+   goal is always one thing or the other. */
+.goal-parent-link { display: block; margin-top: 3px; }
+.goal-parent-trigger {
+  font-size: 12px; color: var(--color-primary-700); text-align: left;
+}
+.goal-parent-trigger:hover { text-decoration: underline; }
+.goal-parent-editor { display: block; margin-top: 4px; }
+.goal-parent-label { display: block; }
+.goal-parent-select, .goal-status-select {
+  max-width: 100%; border: 1px solid var(--color-neutral-200); border-radius: 7px;
+  padding: 5px 7px; font-size: 12.5px; min-height: 34px;
+  background: var(--color-bg-elevated, #fff); color: var(--color-neutral-700);
+}
+.goal-parent-note {
+  display: block; margin-top: 3px; font-size: 11px; color: var(--color-neutral-400);
+  max-width: 52ch;
+}
+.goal-head-controls {
+  display: flex; flex-wrap: wrap; align-items: flex-start; gap: 6px 12px;
+  margin-top: 2px;
+}
+.goal-status { flex: 0 0 auto; }
+@media (max-width: 639px) {
+  /* Stacked, each a full-size target rather than two slivers. */
+  .goal-head-controls { gap: 6px; }
+  .goal-status, .goal-parent-link { flex: 1 1 100%; }
+}
+
 /* ── Long goal lists: the filter line and what it is hiding ──────────────────
    Shown only once a list is long enough to need them. Both controls are real
    focusable elements at full size on a phone — a filter you cannot tap is a

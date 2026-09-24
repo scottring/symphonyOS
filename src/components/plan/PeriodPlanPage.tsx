@@ -27,6 +27,7 @@ import { useSupabaseTasks } from '@/hooks/useSupabaseTasks'
 import { useActionableInstances } from '@/hooks/useActionableInstances'
 import { makePlanActions, timingRemoval } from '@/lib/planning/planActions'
 import { goalListView, hiddenLabel } from '@/lib/planning/goalListView'
+import { GoalParentLink, GoalStatusControl, parentRungLabel } from './GoalParentLink'
 import { expansionKey, readExpanded, writeExpanded } from './goalExpansion'
 import { planDropHandlers } from '@/lib/planning/planDrag'
 import { showToast } from '@/hooks/useToast'
@@ -649,6 +650,18 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
     () => openGoalRows.some((r) => (r.steps ?? []).some((st) => rowIsDone(st.fate))),
     [openGoalRows],
   )
+  /**
+   * Is this list long enough to need a filter?
+   *
+   * Counting only top-level goals missed the case that needs it most: ONE
+   * goal carrying sixty steps is a long list, and had no way to search it
+   * (Codex review, 2026-09-24). Count the rows a reader must actually scan.
+   */
+  const scannableRows = useMemo(
+    () => openGoalRows.reduce((n, r) => n + 1 + (r.steps?.length ?? 0), 0),
+    [openGoalRows],
+  )
+  const listIsLong = scannableRows > 8
 
   const goalComposerOpen = !isPast && (addingGoal || goalRows.length === 0)
 
@@ -758,6 +771,53 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
     : aboveTasks.filter((t) => t.isGoal)), [above, goals, aboveStart, layers, aboveTasks])
   // The year has nothing above it: no rail, and no label for one.
   const aboveLabel = isYearSession ? '' : isSeasonSession ? String(aboveStart.getFullYear()) : 'the season'
+
+  /**
+   * The optional link UP, and the goal's own status — one write each, through
+   * the fields that already exist. A month goal points at a season goal with
+   * `supportsGoalTaskId`; a season goal points at a year goal with `goalId`.
+   * Neither touches the goal's id, its steps, its placement or its history.
+   */
+  const parentChoices = useMemo(() => (level === 'month' || level === 'season')
+    // `aboveGoalItems` is the rung above, already filtered by the reader's
+    // layers — a goal they may not see is simply not offered.
+    ? aboveGoalItems.map((g) => ({ id: g.id, title: g.title }))
+    : [], [level, aboveGoalItems])
+
+  const linkParent = useCallback((row: PlanRowModel, parentId: string | null) => {
+    const field = level === 'season' ? 'goalId' : 'supportsGoalTaskId'
+    void gated.updateTask(row.id, { [field]: parentId ?? undefined })
+    showToast(parentId
+      ? `“${row.title}” now supports the goal you chose.`
+      : `“${row.title}” no longer supports another goal. Nothing else changed.`, 'success', 5000)
+  }, [gated, level])
+
+  const setGoalStatus = useCallback((row: PlanRowModel, next: 'active' | 'completed') => {
+    // The goal's OWN completion. Its steps are not consulted and not touched.
+    void gated.updateTask(row.id, { completed: next === 'completed' })
+  }, [gated])
+
+  const goalControlsFor = useCallback((row: PlanRowModel) => {
+    if (level === 'year' || isPast) return undefined
+    return (
+      <span className="goal-head-controls">
+        <GoalParentLink
+          goalTitle={row.title}
+          rungLabel={parentRungLabel(level === 'season' ? 'season' : 'month')}
+          current={row.supports ?? null}
+          choices={parentChoices}
+          onLink={(id) => linkParent(row, id)}
+          onUnlink={() => linkParent(row, null)}
+        />
+        <GoalStatusControl
+          goalTitle={row.title}
+          status={rowIsDone(row.fate) ? 'completed' : 'active'}
+          onChange={(next) => setGoalStatus(row, next)}
+        />
+      </span>
+    )
+  }, [level, isPast, parentChoices, linkParent, setGoalStatus])
+
 
   // ── The year's writers. A year row is a GOAL, so every verb is a goal
   //    write: Keep copies the goal whole into the new year and links it back;
@@ -1041,9 +1101,9 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
                       completed fold appears whenever there is finished work
                       behind it — hiding steps AND the way to see them is how
                       work goes missing. */}
-                  {(openGoalRows.length > 4 || goalQuery || anyCompletedSteps) && (
+                  {(listIsLong || goalQuery || anyCompletedSteps) && (
                     <div className="period-goals-tools">
-                      {(openGoalRows.length > 4 || goalQuery) && (
+                      {(listIsLong || goalQuery) && (
                         <input
                           type="search"
                           value={goalQuery}
@@ -1064,7 +1124,7 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
                       and that it changes nothing about what Save would write. */}
                   {goalsHidden && (
                     <p role="status" className="period-goals-hidden">
-                      {goalsHidden}. Filtering changes only what you see.
+                      {goalsHidden}. Filtering does not change what will be saved.
                     </p>
                   )}
                   {goalView.goals.length === 0 ? (
@@ -1081,6 +1141,7 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
                         hiddenByReveal={g.hiddenByReveal}
                         onShowAllSteps={showAllSteps}
                         hiddenByFilter={g.hiddenByFilter}
+                        goalControls={goalControlsFor(g.row)}
                         onAddStep={isPast ? undefined : (goal, t) => { void addStep(goal, t) }}
                         stepActionsFor={(st) => actionsFor({ fate: st.fate, isGoal: false, isPast, level })}
                           actions={actionsFor({ fate: g.row.fate, isGoal: g.row.isGoal, isPast, level })} />

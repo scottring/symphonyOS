@@ -235,7 +235,7 @@ export function PlanSession({ level, aboveLabel, dayOptions = [], periodLabel: P
             )}
             {existingHidden && (
               <p role="status" className="period-goals-hidden">
-                {existingHidden}. Filtering changes only what you see — Save still writes your whole plan.
+                {existingHidden}. Filtering does not change what will be saved.
               </p>
             )}
             <ul>

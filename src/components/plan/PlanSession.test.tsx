@@ -316,7 +316,7 @@ describe('the review draws the saved plan the way Month does', () => {
 
     fireEvent.change(screen.getByRole('searchbox', { name: /Filter your October plan/ }), { target: { value: 'furnace' } })
     expect(screen.queryByText('Other task 3')).not.toBeInTheDocument()
-    expect(screen.getByRole('status')).toHaveTextContent(/Save still writes your whole plan/)
+    expect(screen.getByRole('status')).toHaveTextContent(/Filtering does not change what will be saved/)
     // Filtering wrote nothing to the draft.
     expect(JSON.stringify(s.draft)).toBe(beforeFilter)
 

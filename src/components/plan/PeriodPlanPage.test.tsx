@@ -1661,7 +1661,7 @@ describe('a month with a realistic number of goals', () => {
     renderPage('month')
     const search = screen.getByRole('searchbox', { name: /Filter .* goals and steps/ })
     fireEvent.change(search, { target: { value: 'Album step 7' } })
-    expect(screen.getByRole('status')).toHaveTextContent(/Filtering changes only what you see/)
+    expect(screen.getByRole('status')).toHaveTextContent(/Filtering does not change what will be saved/)
     // No write of any kind happened while filtering.
     expect(hook.updateTask).not.toHaveBeenCalled()
     expect(hook.updateTasksBulk).not.toHaveBeenCalled()
@@ -1737,5 +1737,162 @@ describe('the completed-steps disclosure', () => {
     ]
     renderPage('month')
     expect(screen.queryByRole('button', { name: /completed steps/i })).toBeNull()
+  })
+})
+
+// ── The optional link up, and the goal's own status ─────────────────────────
+// Codex, 2026-09-24: "existing month-to-season goal linking is a missing UI
+// capability". Both write through fields that already exist; no migration.
+describe('linking a goal to the rung above it', () => {
+  const seasonStart = () => periodStartFor('season', new Date(), DEFAULT_SEASONS)
+  beforeEach(() => {
+    pinClock(); localStorage.clear()
+    state.tasks = []; state.goals = []; state.loading = false; routinesState.routines = []
+    domainState.layers = new Set(['work', 'family', 'personal', 'unsorted']); domainState.soleDomain = null
+    seasonsState.seasons = DEFAULT_SEASONS; seasonsState.loading = false
+    Object.values(hook).forEach((f) => f.mockClear())
+  })
+  afterEach(() => { vi.useRealTimers() })
+
+  const withSeasonGoals = (over: Partial<Task> = {}) => {
+    state.tasks = [
+      task({ id: 'sg1', title: 'A season of repairs', isGoal: true, bucket: 'quarter', seasonStart: seasonStart() }),
+      task({ id: 'sg2', title: 'A season of music', isGoal: true, bucket: 'quarter', seasonStart: seasonStart() }),
+      task({ id: 'mg1', title: 'A home easier to care for', isGoal: true, monthStart: thisMonth, ...over }),
+      task({ id: 'st1', title: 'A step of its own', goalTaskId: 'mg1', monthStart: thisMonth }),
+    ]
+  }
+  const openEditor = () => fireEvent.click(screen.getByRole('button', { name: /Link to a season goal|Change or remove this link/ }))
+  const picker = () => screen.getByRole('combobox', { name: /Goal that A home easier to care for supports/ })
+
+  it('offers the link on a goal that has none, and SETS it', () => {
+    withSeasonGoals()
+    renderPage('month')
+    openEditor()
+    fireEvent.change(picker(), { target: { value: 'sg1' } })
+    // One field. The goal keeps its id, and nothing else is written.
+    expect(hook.updateTask).toHaveBeenCalledWith('mg1', { supportsGoalTaskId: 'sg1' })
+    expect(hook.updateTask).toHaveBeenCalledTimes(1)
+  })
+
+  it('CHANGES an existing link without touching anything else', () => {
+    withSeasonGoals({ supportsGoalTaskId: 'sg1' })
+    renderPage('month')
+    openEditor()
+    fireEvent.change(picker(), { target: { value: 'sg2' } })
+    expect(hook.updateTask).toHaveBeenCalledWith('mg1', { supportsGoalTaskId: 'sg2' })
+  })
+
+  // Optional means removable.
+  it('REMOVES the link when "No linked goal" is chosen', () => {
+    withSeasonGoals({ supportsGoalTaskId: 'sg1' })
+    renderPage('month')
+    openEditor()
+    fireEvent.change(picker(), { target: { value: '' } })
+    expect(hook.updateTask).toHaveBeenCalledWith('mg1', { supportsGoalTaskId: undefined })
+  })
+
+  it('keeps the goal’s identity, steps and placement — it writes one field', () => {
+    withSeasonGoals()
+    renderPage('month')
+    openEditor()
+    fireEvent.change(picker(), { target: { value: 'sg1' } })
+    const [, updates] = hook.updateTask.mock.calls[0] as [string, Record<string, unknown>]
+    expect(Object.keys(updates)).toEqual(['supportsGoalTaskId'])
+    for (const untouched of ['id', 'title', 'goalTaskId', 'bucket', 'monthStart', 'completed', 'scheduledFor']) {
+      expect(untouched in updates).toBe(false)
+    }
+    expect(hook.addTask).not.toHaveBeenCalled()
+    expect(hook.deleteTask).not.toHaveBeenCalled()
+  })
+
+  // The reciprocal read: the parent already lists what supports it.
+  it('names the parent, and opens it, once the link is stored', () => {
+    withSeasonGoals({ supportsGoalTaskId: 'sg1' })
+    renderPage('month')
+    const card = screen.getByRole('region', { name: /goals$/ })
+    expect(within(card).getByText('Supports')).toBeInTheDocument()
+    fireEvent.click(within(card).getByRole('button', { name: 'Open A season of repairs' }))
+    expect(mockNavigate).toHaveBeenCalledWith('/task/sg1')
+  })
+
+  it('offers no link control where there is nothing above to link to', () => {
+    state.tasks = [task({ id: 'mg1', title: 'Lonely goal', isGoal: true, monthStart: thisMonth })]
+    renderPage('month')
+    expect(screen.queryByRole('button', { name: /Link to a season goal/ })).toBeNull()
+  })
+
+  // Archive is not in the app's vocabulary for a goal task, so it is not here.
+  it('offers Active and Completed, and nothing it cannot honour', () => {
+    withSeasonGoals()
+    renderPage('month')
+    const status = screen.getByRole('combobox', { name: /Status of A home easier to care for/ })
+    expect([...status.querySelectorAll('option')].map((o) => o.textContent)).toEqual(['Active', 'Completed'])
+  })
+
+  it('a goal’s status is its own — set here, never read from its steps', () => {
+    withSeasonGoals()
+    renderPage('month')
+    fireEvent.change(screen.getByRole('combobox', { name: /Status of A home easier to care for/ }), { target: { value: 'completed' } })
+    expect(hook.updateTask).toHaveBeenCalledWith('mg1', { completed: true })
+    const [, updates] = hook.updateTask.mock.calls[0] as [string, Record<string, unknown>]
+    expect(Object.keys(updates)).toEqual(['completed'])
+  })
+
+  it('finishing every step does not complete the goal', () => {
+    state.tasks = [
+      task({ id: 'mg1', title: 'A home easier to care for', isGoal: true, monthStart: thisMonth }),
+      task({ id: 's1', title: 'Only step', goalTaskId: 'mg1', monthStart: thisMonth, completed: true }),
+    ]
+    renderPage('month')
+    const status = screen.getByRole('combobox', { name: /Status of A home easier to care for/ }) as HTMLSelectElement
+    expect(status.value).toBe('active')
+  })
+})
+
+// Codex review, 2026-09-24: counting only top-level goals missed the case that
+// needs a filter most — one goal carrying sixty steps.
+describe('the filter on ONE long goal', () => {
+  beforeEach(() => {
+    pinClock(); localStorage.clear()
+    state.tasks = []; state.goals = []; state.loading = false; routinesState.routines = []
+    domainState.layers = new Set(['work', 'family', 'personal', 'unsorted']); domainState.soleDomain = null
+    seasonsState.seasons = DEFAULT_SEASONS; seasonsState.loading = false
+    Object.values(hook).forEach((f) => f.mockClear())
+  })
+  afterEach(() => { vi.useRealTimers() })
+
+  const oneBigGoal = () => {
+    state.tasks = [
+      task({ id: 'g', title: 'Record the album', isGoal: true, monthStart: thisMonth }),
+      ...Array.from({ length: 60 }, (_, i) =>
+        task({ id: `s${i}`, title: `Album step ${i}`, goalTaskId: 'g', monthStart: thisMonth })),
+    ]
+  }
+
+  it('offers a filter, on a list of exactly one goal', () => {
+    oneBigGoal()
+    renderPage('month')
+    expect(screen.getByRole('searchbox', { name: /Filter .* goals and steps/ })).toBeInTheDocument()
+  })
+
+  it('finds a step inside it, and keeps the goal for context', () => {
+    oneBigGoal()
+    renderPage('month')
+    fireEvent.click(screen.getByRole('button', { name: /Show steps under Record the album/ }))
+    fireEvent.change(screen.getByRole('searchbox', { name: /Filter .* goals and steps/ }), { target: { value: 'Album step 47' } })
+    expect(screen.getByText('Record the album')).toBeInTheDocument()
+    expect(screen.getByText('Album step 47')).toBeInTheDocument()
+    expect(screen.queryByText('Album step 12')).not.toBeInTheDocument()
+    expect(screen.getByRole('status')).toHaveTextContent(/Filtering does not change what will be saved/)
+  })
+
+  it('stays away from a genuinely short list', () => {
+    state.tasks = [
+      task({ id: 'g', title: 'Small goal', isGoal: true, monthStart: thisMonth }),
+      task({ id: 's1', title: 'One step', goalTaskId: 'g', monthStart: thisMonth }),
+    ]
+    renderPage('month')
+    expect(screen.queryByRole('searchbox', { name: /Filter/ })).toBeNull()
   })
 })

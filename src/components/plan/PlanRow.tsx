@@ -157,7 +157,7 @@ export function PlanRow({
   row, actions, onAction, onOpen, onOpenPlaced, onOpenSupport, lowerLabel = 'this week',
   expanded = false, onToggleExpand, onAddStep, stepActionsFor, planWeek,
   timingReachesLower = false,
-  stepsToDraw, counts, hiddenByReveal = 0, onShowAllSteps, hiddenByFilter = 0,
+  stepsToDraw, counts, hiddenByReveal = 0, onShowAllSteps, hiddenByFilter = 0, goalControls,
 }: {
   row: PlanRowModel
   actions: RowAction[]
@@ -192,6 +192,10 @@ export function PlanRow({
   onShowAllSteps?: (row: PlanRowModel) => void
   /** Steps this goal has that the current filter removed. */
   hiddenByFilter?: number
+  /** The goal's optional link to the rung above, and its own status — drawn
+   *  in the goal's head, as the approved Month design has them. Omitted, the
+   *  row reads exactly as it did. */
+  goalControls?: ReactNode
   /** "Plan ▾" for a task row: which week of the month being VIEWED it sits on.
    *  The 'to-lower' verb beside it means the week containing now, which could
    *  never reach a week of the month you are looking at (2026-09-24). */
@@ -296,9 +300,13 @@ export function PlanRow({
         {/* Both ends of the goal-supports-goal link, quiet, under the title:
             the goal this one serves, and the goals serving it. A parent that
             only ever appeared on its children's rows would be a dead end. */}
+        {/* The line NAMES the parent and opens it; the control beneath changes
+            or removes the link. Replacing the line with the control lost the
+            way to the parent — which a test caught. */}
         {row.supports && (
           <SupportLine label="Supports" refs={[row.supports]} onOpen={onOpenSupport} />
         )}
+        {goalControls}
         {!!row.supportedBy?.length && (
           <SupportLine label="Supported by" refs={row.supportedBy} onOpen={onOpenSupport} />
         )}
