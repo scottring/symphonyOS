@@ -1105,3 +1105,49 @@ Unchanged mid-walk, as instructed.
 - An event's detail panel offers no Delete (the Today row menu has one).
 - “Add a step” under a goal is only reachable through the caret.
 - “Daily” vs “weekly, all seven days selected” are indistinguishable.
+
+---
+
+# Coverage, by how it was actually checked  ·  15:50 ET
+
+**Live (me)** — I drove it in Chrome at :5199 today, against QA fixtures I made
+and deleted. **User-reported** — Scott drove it; I did not see it.
+**Automated only** — tests pass, nobody has watched it. **Failed** — known
+broken. **Untested** — nobody has checked, and I am not implying otherwise.
+
+| Area | Status | Evidence |
+| --- | --- | --- |
+| Event drag in Week Schedule | **Live (me)** | QA event Mon→Wed, reload held; 2nd drag Thu→Sat; Undo → Thu, reload held |
+| Event drag — 2nd drag in a session | **Live (me)** | the stale-closure bug; fixed and re-verified |
+| Event move persistence | **Live (me)** | reload after each move |
+| Event move Undo | **Live (me)** | restored day survived reload |
+| Subtasks: create / complete / reopen | **Live (me)** | parent untouched throughout; reload held |
+| Today viewed date across reload | **Live (me)** | was broken, now `?date=` survives reload |
+| Planning guide reachable from nav | **Live (me)** | was unreachable; More → Planning guide |
+| Guide renders, four sheets, side counts | **Live (me)** | `/guide`, “One side…”, “Print all nine sides” |
+| Guide print layout at Letter/A4 | **Automated only** | headless Chromium; **never printed on paper** |
+| Relative Reschedule → Tomorrow | **User-reported** | Scott: moved, reload held 1–2 PM |
+| Prep-task drag + persistence + link | **User-reported** | Scott |
+| Routines: weekdays, one occurrence, reload | **User-reported** | Scott |
+| task → person → task round trip, note, link | **User-reported** | Scott |
+| Removal / Undo placement engine | **Automated only** | Codex's 4 harness tests + round-trip unit tests |
+| Day-tile density counts | **Live (Codex)** | counts matched the journal |
+| Source readiness (loading/stale/error) | **Automated only** | the unknown state has no live trigger on /week |
+| Completed prep task in the event panel | **Failed** | display filter; work itself recoverable |
+| Existing goal links (month→season, year→season) | **Failed** | no UI exists |
+| “Review the plan” experience | **Failed** | Codex: flat lists, completed step missing |
+| Review Drop / Done / no-change save | **Untested** | would write Scott's real tasks |
+| Failed-save retry without duplicates | **Untested** | no failure injection available live |
+| Created event appears without reload | **Failed** | observed today |
+| Delete an event from its detail panel | **Failed** | no control there |
+| One routine toast + Undo | **Untested** | still open from Codex's list |
+| Day URL / reload through “View day” | **Untested** | still open from Codex's list |
+| Standalone task later linked to a goal | **Untested** | still open from Codex's list |
+
+**Fixture ledger.** Created and deleted by me today, both confirmed gone after a
+reload: event “QA drag fixture 2026-09-24 (delete me)”, Google id
+`34jfbkqosahkt9bfum6p0evmr8`; task “QA parent task 2026-09-24 (delete me)”,
+`abe44d22-059d-492c-8abd-e8e34a58a93a`, with child “QA subtask A”. Scott's
+party, goals and tasks were read only.
+
+**Preview:** `:5199` rebuilt and serving `f85cb626`.
