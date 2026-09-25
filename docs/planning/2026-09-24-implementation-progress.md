@@ -1960,3 +1960,11 @@ transaction now exists as a migration (NOT applied) and a client path behind
 7209 tests. Review and rollout steps:
 `docs/planning/2026-09-25-transactional-placement-review.md`. The risk above
 stays open in production until that rollout is approved and done.
+
+**Codex review, 2026-09-25 — the prepared transactional save PASSES review
+(not production approval).** Codex independently reran 112/112 hook/helper
+tests at 49bce48d and 99/99 PG checks on the migration. Next is controlled
+rollout verification, and each step needs Scott's approval: migration
+approval → apply → live RPC rollback check → two-account check → preview with
+`VITE_PLACEMENT_RPC=true`. Still pending: calendar verification. Still on the
+older path: mixed saves and group moves.
