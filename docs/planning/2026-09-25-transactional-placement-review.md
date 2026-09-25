@@ -321,3 +321,31 @@ TX2 then went out as the ordinary `PATCH tasks` + `PATCH task_commitments` +
 **Not covered here.** Two-account verification (needs Scott's second login).
 Production enablement: not authorized. Fixtures `QA-TX1 drop` and `QA-TX2 keep`
 are left on the demo account for inspection.
+
+## Two-account check, database level — 2026-09-25 (Scott approved)
+
+Run on the live database inside a single transaction and then rolled back.
+Fixtures were created by the admin inside that transaction; afterwards
+`QA-2ACC%` leftovers = 0. The owner is the demo account `symphonygoals@`, and
+the second member is `symphonyedith@`, in the same household. Every call ran
+as Edith: `set local role authenticated` with her JWT `sub`, and
+`auth.uid()` was confirmed as Edith. So these results come from the real RLS
+policies, but not from a real browser sign-in.
+
+| Case, as Edith | Result |
+|---|---|
+| Her own task, week choice | OK |
+| Owner's **Family** task (scope `compound`), week choice | OK. The row and record are written; the owner is unchanged; `created_by` = Edith |
+| Owner's **Personal** task (scope `individual`), via the RPC | **Refused 42501**, "task not found or not writable". It is invisible to her (count 0), and nothing was written |
+| Same, by direct `task_commitments` insert (baseline) | Refused 42501 by RLS: the same boundary as the RPC |
+| Focus step naming **another user** on her own task | Refused 42501 by the `task_focus` RLS policy |
+| `title` or `user_id` in a row step on the shared task | Refused 22023 (the allowlist), so no takeover through the RPC |
+| Stale plan on the shared task | Refused PT409 |
+| Good first step, then a bad second step, on the shared task | Refused 22023; the first step was rolled back (only the earlier week remained open) |
+
+A task created with `context = 'family'` alone gets scope `individual` and is
+not shared. The app writes `scope = 'compound'` for Family (the live data: 9
+family/compound rows). The first run used such a fixture and was redone.
+
+**Still open:** a real browser sign-in as Edith, which needs the account's
+password.
