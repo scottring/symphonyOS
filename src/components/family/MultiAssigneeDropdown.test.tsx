@@ -39,3 +39,27 @@ describe('MultiAssigneeDropdown click containment', () => {
     expect(ancestorClick).not.toHaveBeenCalled()
   })
 })
+
+describe('MultiAssigneeDropdown from the keyboard and a screen reader', () => {
+  it('names the trigger for its row and says who is assigned', () => {
+    render(<MultiAssigneeDropdown members={members} selectedIds={['m2']} onSelect={vi.fn()} triggerLabel="Assign people to Research" />)
+    const trigger = screen.getByRole('button', { name: 'Assign people to Research. Assigned: Iris' })
+    expect(trigger).toHaveAttribute('aria-expanded', 'false')
+    fireEvent.click(trigger)
+    expect(trigger).toHaveAttribute('aria-expanded', 'true')
+    expect(screen.getByRole('menuitemcheckbox', { name: /Iris/ })).toHaveAttribute('aria-checked', 'true')
+    expect(screen.getByRole('menuitemcheckbox', { name: /Scott/ })).toHaveAttribute('aria-checked', 'false')
+  })
+
+  it('moves focus into the portalled menu, and Tab past the end returns it to the trigger', () => {
+    render(<MultiAssigneeDropdown members={members} selectedIds={[]} onSelect={vi.fn()} triggerLabel="Assign people to Research" />)
+    const trigger = screen.getByRole('button', { name: /Assign people to Research/ })
+    fireEvent.click(trigger)
+    expect(screen.getByRole('menuitemcheckbox', { name: /Scott/ })).toHaveFocus()
+    const last = screen.getByRole('menuitemcheckbox', { name: /Iris/ })
+    last.focus()
+    fireEvent.keyDown(last, { key: 'Tab' })
+    expect(screen.queryByRole('menu')).toBeNull()
+    expect(trigger).toHaveFocus()
+  })
+})

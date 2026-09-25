@@ -5,6 +5,7 @@ import { ReferenceListsProvider, useReferenceLists } from '@/components/referenc
 import { MemoryRouter, useSearchParams } from 'react-router-dom'
 import type { Task } from '@/types/task'
 import type { Goal } from '@/types/goal'
+import type { FamilyMember } from '@/types/family'
 import type { Routine } from '@/types/actionable'
 import { DEFAULT_SEASONS, type Seasons } from '@/lib/cadence/seasons'
 import { periodBounds } from '@/lib/planning/periodPage'
@@ -54,7 +55,10 @@ const domainState: { layers: Set<string>; soleDomain: string | null } = {
   layers: new Set(['work', 'family', 'personal', 'unsorted']), soleDomain: null,
 }
 vi.mock('@/hooks/useDomain', () => ({ useDomain: () => ({ layers: domainState.layers, soleDomain: domainState.soleDomain }) }))
-vi.mock('@/hooks/useFamilyMembers', () => ({ useFamilyMembers: () => ({ getCurrentUserMember: () => ({ id: 'me' }) }) }))
+// The household, as the real hook returns it: a stable array (a new one each
+// render would re-run every effect that lists it).
+const membersState: { members: FamilyMember[] } = { members: [] }
+vi.mock('@/hooks/useFamilyMembers', () => ({ useFamilyMembers: () => ({ members: membersState.members, getCurrentUserMember: () => ({ id: 'me' }) }) }))
 const seasonsState: { seasons: Seasons; loading: boolean } = { seasons: DEFAULT_SEASONS, loading: false }
 vi.mock('@/hooks/useHouseholdSeasons', () => ({
   useHouseholdSeasons: () => ({ seasons: seasonsState.seasons, loading: seasonsState.loading, canEdit: true, setSeasons: vi.fn() }),
@@ -2436,5 +2440,127 @@ describe('the month page offers day tiles for the week a row is on', () => {
     fireEvent.click(tiles[5])
     const day = new Date(weekOfThisMonth.getFullYear(), weekOfThisMonth.getMonth(), weekOfThisMonth.getDate() + 5)
     expect(hook.updateTask).toHaveBeenCalledWith('dated', expect.objectContaining({ scheduledFor: day }))
+  })
+})
+
+describe('Assign people on goal and step rows', () => {
+  // Scott is the signed-in member ('me' in the family-members mock).
+  const scott = { id: 'me', name: 'Scott', initials: 'S', color: 'blue' } as FamilyMember
+  const iris = { id: 'm2', name: 'Iris', initials: 'I', color: 'green' } as FamilyMember
+  afterEach(() => { vi.useRealTimers(); membersState.members = [] })
+  beforeEach(() => {
+    pinClock()
+    state.tasks = []; state.goals = []; state.loading = false; routinesState.routines = []
+    seasonsState.seasons = DEFAULT_SEASONS; seasonsState.loading = false
+    localStorage.clear()
+    Object.values(hook).forEach((f) => f.mockClear())
+    Object.values(goalsApi).forEach((f) => f.mockClear())
+    membersState.members = [scott, iris]
+  })
+  const assignBtn = (title: string) => screen.getByRole('button', { name: new RegExp(`^Assign people to ${title}\\.`) })
+  const goalWithStep = (over: { goal?: Partial<Task>; step?: Partial<Task> } = {}) => {
+    state.tasks = [
+      task({ id: 'g1', title: 'Islanders game', isGoal: true, monthStart: thisMonth, ...over.goal }),
+      task({ id: 's1', title: 'Research tickets', monthStart: thisMonth, goalTaskId: 'g1', ...over.step }),
+    ]
+    renderPage('month')
+    fireEvent.click(screen.getByRole('button', { name: /Show steps under Islanders game/ }))
+  }
+
+  it('gives a goal and each of its steps their own visible control', () => {
+    goalWithStep()
+    expect(assignBtn('Islanders game')).toHaveAccessibleName('Assign people to Islanders game. No one assigned')
+    expect(assignBtn('Research tickets')).toBeVisible()
+  })
+
+  it('assigns one person, with the fields every other surface writes', () => {
+    goalWithStep()
+    fireEvent.click(assignBtn('Islanders game'))
+    fireEvent.click(screen.getByRole('menuitemcheckbox', { name: /Iris/ }))
+    expect(hook.updateTask).toHaveBeenCalledWith('g1', { assignedToAll: ['m2'], assignedTo: 'm2' })
+  })
+
+  it('assigning a goal never assigns its steps', () => {
+    goalWithStep()
+    fireEvent.click(assignBtn('Islanders game'))
+    fireEvent.click(screen.getByRole('menuitemcheckbox', { name: /Iris/ }))
+    expect(hook.updateTask).toHaveBeenCalledTimes(1)
+    expect(hook.updateTask.mock.calls.some(([id]) => id === 's1')).toBe(false)
+  })
+
+  it('adds a second person to a step, keeping the first as its primary', () => {
+    goalWithStep({ step: { assignedTo: 'me', assignedToAll: ['me'] } })
+    expect(assignBtn('Research tickets')).toHaveAccessibleName('Assign people to Research tickets. Assigned: Scott')
+    fireEvent.click(assignBtn('Research tickets'))
+    fireEvent.click(screen.getByRole('menuitemcheckbox', { name: /Iris/ }))
+    expect(hook.updateTask).toHaveBeenCalledWith('s1', { assignedToAll: ['me', 'm2'], assignedTo: 'me' })
+  })
+
+  it('reads a multi-person assignment back, and removing the last person clears both fields', () => {
+    goalWithStep({ goal: { assignedTo: 'me', assignedToAll: ['me', 'm2'] } })
+    expect(assignBtn('Islanders game')).toHaveAccessibleName('Assign people to Islanders game. Assigned: Scott, Iris')
+    fireEvent.click(assignBtn('Islanders game'))
+    expect(screen.getByRole('menuitemcheckbox', { name: /Scott/ })).toHaveAttribute('aria-checked', 'true')
+    fireEvent.click(screen.getByRole('button', { name: 'Clear' }))
+    expect(hook.updateTask).toHaveBeenCalledWith('g1', { assignedToAll: [], assignedTo: undefined })
+  })
+
+  it('works from the keyboard: focus moves into the list, Escape returns it', async () => {
+    const user = userEvent.setup({ advanceTimers: () => {} })
+    goalWithStep()
+    assignBtn('Islanders game').focus()
+    await user.keyboard('{Enter}')
+    const first = screen.getByRole('menuitemcheckbox', { name: /Scott/ })
+    expect(first).toHaveFocus()
+    await user.keyboard(' ')
+    expect(hook.updateTask).toHaveBeenCalledWith('g1', { assignedToAll: ['me'], assignedTo: 'me' })
+    await user.keyboard('{Escape}')
+    expect(assignBtn('Islanders game')).toHaveFocus()
+  })
+
+  it('offers it on a season goal', () => {
+    const seasonStart = periodStartFor('season', new Date(), DEFAULT_SEASONS)
+    state.tasks = [task({ id: 'q1', title: 'Identify activities', isGoal: true, bucket: 'quarter', seasonStart })]
+    renderPage('season')
+    expect(assignBtn('Identify activities')).toBeInTheDocument()
+  })
+
+  it('a year goal offers no picker until its table carries assignees', () => {
+    state.goals = [goal({ id: 'y1', name: 'A calmer house' })]
+    renderPage('year')
+    expect(screen.queryByRole('button', { name: /Assign people to A calmer house/ })).toBeNull()
+  })
+
+  it('a year goal with the column writes through updateGoal', () => {
+    state.goals = [goal({ id: 'y1', name: 'A calmer house', assignedToAll: [] })]
+    renderPage('year')
+    fireEvent.click(assignBtn('A calmer house'))
+    fireEvent.click(screen.getByRole('menuitemcheckbox', { name: /Iris/ }))
+    expect(goalsApi.updateGoal).toHaveBeenCalledWith('y1', { assignedToAll: ['m2'] })
+    expect(hook.updateTask).not.toHaveBeenCalled()
+  })
+
+  it('a past period is read, not written into: no picker', () => {
+    state.tasks = [task({ id: 'old', title: 'Last month goal', isGoal: true, monthStart: lastMonth })]
+    renderPageAt('month', `/month?start=${lastMonth.getFullYear()}-${String(lastMonth.getMonth() + 1).padStart(2, '0')}-01`)
+    expect(screen.queryByRole('button', { name: /Assign people to/ })).toBeNull()
+  })
+
+  // The planning pages list what is unassigned or yours (Scott, 2026-09-05,
+  // `doableBy` in selectPeriodTasks). Assigning a goal ONLY to someone else
+  // therefore takes it off your page. Pinned here so the consequence is a
+  // decision, not a surprise.
+  it('a goal assigned only to someone else is not on my page (the 2026-09-05 rule)', () => {
+    state.tasks = [
+      task({ id: 'g1', title: 'Islanders game', isGoal: true, monthStart: thisMonth, assignedTo: 'm2', assignedToAll: ['m2'] }),
+    ]
+    renderPage('month')
+    expect(screen.queryByText('Islanders game')).toBeNull()
+  })
+
+  it('a household of no one offers no picker', () => {
+    membersState.members = []
+    goalWithStep()
+    expect(screen.queryByRole('button', { name: /Assign people to/ })).toBeNull()
   })
 })

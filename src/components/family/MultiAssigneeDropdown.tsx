@@ -9,6 +9,9 @@ interface MultiAssigneeDropdownProps {
   onSelect: (memberIds: string[]) => void
   size?: 'sm' | 'md' | 'lg'
   label?: string
+  /** What the trigger is for, read aloud — "Assign people to Research". In a
+   *  list of rows every trigger otherwise has the same name. */
+  triggerLabel?: string
 }
 
 const sizeClasses = {
@@ -22,11 +25,13 @@ export function MultiAssigneeDropdown({
   selectedIds,
   onSelect,
   size = 'md',
-  label = 'Assign to family members'
+  label = 'Assign to family members',
+  triggerLabel,
 }: MultiAssigneeDropdownProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [menuPosition, setMenuPosition] = useState({ top: 0, right: 0, placeAbove: false })
   const triggerRef = useRef<HTMLDivElement>(null)
+  const buttonRef = useRef<HTMLButtonElement>(null)
   const menuRef = useRef<HTMLDivElement>(null)
 
   const selectedMembers = members.filter(m => selectedIds.includes(m.id))
@@ -46,6 +51,19 @@ export function MultiAssigneeDropdown({
       })
     }
   }, [isOpen])
+
+  // The menu is portalled to <body>, so Tab from the trigger never reaches
+  // it: focus moves in when it opens, or a keyboard user could open the list
+  // and not tick anyone.
+  useEffect(() => {
+    if (!isOpen) return
+    menuRef.current?.querySelector<HTMLElement>('[role="menuitemcheckbox"]')?.focus()
+  }, [isOpen])
+
+  const closeToTrigger = () => {
+    setIsOpen(false)
+    buttonRef.current?.focus()
+  }
 
   // Close on outside click
   useEffect(() => {
@@ -72,7 +90,10 @@ export function MultiAssigneeDropdown({
   // Close on escape
   useEffect(() => {
     function handleEscape(event: KeyboardEvent) {
-      if (event.key === 'Escape') setIsOpen(false)
+      if (event.key === 'Escape') {
+        setIsOpen(false)
+        buttonRef.current?.focus()
+      }
     }
 
     if (isOpen) {
@@ -100,7 +121,17 @@ export function MultiAssigneeDropdown({
   const menuContent = isOpen ? (
     <div
       ref={menuRef}
+      role="menu"
+      aria-label={label}
       onClick={(e) => e.stopPropagation()}
+      onKeyDown={(e) => {
+        // Tabbing past either end leaves the menu; hand focus back to the
+        // trigger so it continues from the row, not from the end of the page.
+        if (e.key !== 'Tab') return
+        const items = Array.from(menuRef.current?.querySelectorAll<HTMLElement>('button') ?? [])
+        const atEnd = e.shiftKey ? document.activeElement === items[0] : document.activeElement === items[items.length - 1]
+        if (atEnd) { e.preventDefault(); closeToTrigger() }
+      }}
       className="fixed z-[9999] bg-white rounded-xl shadow-lg border border-neutral-200 py-2 min-w-[220px] animate-fade-in-up"
       style={{
         ...(menuPosition.placeAbove
@@ -117,6 +148,7 @@ export function MultiAssigneeDropdown({
       {/* Quick actions */}
       <div className="flex items-center gap-2 px-3 py-1.5 border-b border-neutral-100 mb-1">
         <button
+          type="button"
           onClick={handleSelectAll}
           className="text-xs text-primary-600 hover:text-primary-700 font-medium"
         >
@@ -124,6 +156,7 @@ export function MultiAssigneeDropdown({
         </button>
         <span className="text-neutral-300">|</span>
         <button
+          type="button"
           onClick={handleClearAll}
           className="text-xs text-neutral-500 hover:text-neutral-700 font-medium"
         >
@@ -139,6 +172,9 @@ export function MultiAssigneeDropdown({
         return (
           <button
             key={member.id}
+            type="button"
+            role="menuitemcheckbox"
+            aria-checked={isSelected}
             onClick={() => handleToggleMember(member.id)}
             className={`
               w-full px-3 py-2 flex items-center gap-3 hover:bg-neutral-50 transition-colors
@@ -193,12 +229,19 @@ export function MultiAssigneeDropdown({
     <div ref={triggerRef} className="relative">
       {/* Trigger: stacked avatars or empty state */}
       <button
+        ref={buttonRef}
+        type="button"
+        aria-haspopup="menu"
+        aria-expanded={isOpen}
+        title={triggerLabel}
         onClick={(e) => { e.stopPropagation(); setIsOpen(!isOpen) }}
         className={`
           flex items-center -space-x-2 cursor-pointer hover:opacity-80 transition-opacity
           ${selectedMembers.length === 0 ? 'opacity-50' : ''}
         `}
-        aria-label={`${selectedMembers.length} assigned. Click to change.`}
+        aria-label={triggerLabel
+          ? `${triggerLabel}. ${selectedMembers.length > 0 ? `Assigned: ${selectedMembers.map((m) => m.name).join(', ')}` : 'No one assigned'}`
+          : `${selectedMembers.length} assigned. Click to change.`}
       >
         {selectedMembers.length > 0 ? (
           <>

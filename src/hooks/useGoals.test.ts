@@ -9,6 +9,16 @@ vi.mock('@/hooks/useAuth', () => ({
   useAuth: () => ({ user: mockUser, loading: false }),
 }))
 
+// The household: the owner's own member row, and one other person. A stable
+// array, as the real hook returns.
+const household = [
+  { id: 'm-owner', auth_user_id: 'test-user-id', user_id: 'test-user-id', name: 'Owner' },
+  { id: 'm-other', auth_user_id: null, user_id: 'test-user-id', name: 'Other' },
+]
+vi.mock('@/hooks/useFamilyMembers', () => ({
+  useFamilyMembers: () => ({ members: household }),
+}))
+
 function dbGoal(overrides: Partial<DbGoal> = {}): DbGoal {
   return {
     id: 'goal-1',
@@ -38,6 +48,8 @@ const selectSingleMock = vi.fn()
 const goalsEqMock = vi.fn()
 // What the initial goals fetch returns.
 let goalRows: DbGoal[] = []
+// Every goals.update(payload).eq('id', id).
+const updateMock = vi.fn()
 
 vi.mock('@/lib/supabase', () => ({
   supabase: {
@@ -58,6 +70,12 @@ vi.mock('@/lib/supabase', () => ({
             chain.order = () => Promise.resolve({ data: goalRows, error: null })
             return chain
           },
+          update: (payload: Record<string, unknown>) => ({
+            eq: (_field: string, id: unknown) => {
+              updateMock(id, payload)
+              return Promise.resolve({ error: null })
+            },
+          }),
           insert: (row: Record<string, unknown>) => {
             insertMock(row)
             return {
@@ -153,5 +171,44 @@ describe('useGoals addGoal', () => {
     // No `.eq('year', …)` anywhere in the goals query.
     expect(goalsEqMock.mock.calls.filter(([field]) => field === 'year')).toHaveLength(0)
     expect(result.current.goals.map((g) => g.year).sort()).toEqual([2025, 2026, 2027])
+  })
+})
+
+describe('useGoals: assigning a year goal', () => {
+  beforeEach(() => { updateMock.mockClear() })
+  const load = async (row: DbGoal) => {
+    goalRows = [row]
+    const { result } = renderHook(() => useGoals())
+    await waitFor(() => expect(result.current.goals).toHaveLength(1))
+    return result
+  }
+
+  it('reads no assignees when the table has no column — and writes nothing', async () => {
+    const result = await load(dbGoal())
+    expect(result.current.goals[0].assignedToAll).toBeUndefined()
+    await act(async () => { await result.current.updateGoal('goal-1', { assignedToAll: ['m-other'] }) })
+    expect(updateMock).not.toHaveBeenCalled()
+  })
+
+  it('someone else assigned shares it (couple), and leaves the context alone', async () => {
+    const result = await load(dbGoal({ assigned_to_all: [], scope: 'individual', context: 'personal' }))
+    expect(result.current.goals[0].assignedToAll).toEqual([])
+    await act(async () => { await result.current.updateGoal('goal-1', { assignedToAll: ['m-other'] }) })
+    expect(updateMock).toHaveBeenCalledWith('goal-1', { assigned_to_all: ['m-other'], scope: 'couple' })
+  })
+
+  it('assigning only yourself changes nothing about who can see it', async () => {
+    const result = await load(dbGoal({ assigned_to_all: [], scope: 'individual' }))
+    await act(async () => { await result.current.updateGoal('goal-1', { assignedToAll: ['m-owner'] }) })
+    expect(updateMock).toHaveBeenCalledWith('goal-1', { assigned_to_all: ['m-owner'], scope: 'individual' })
+  })
+
+  it('removing everyone walks a shared personal goal back to private; a family goal stays household-wide', async () => {
+    let result = await load(dbGoal({ assigned_to_all: ['m-other'], scope: 'couple', context: 'personal' }))
+    await act(async () => { await result.current.updateGoal('goal-1', { assignedToAll: [] }) })
+    expect(updateMock).toHaveBeenLastCalledWith('goal-1', { assigned_to_all: null, scope: 'individual' })
+    result = await load(dbGoal({ id: 'goal-1', assigned_to_all: ['m-other'], scope: 'compound', context: 'family' }))
+    await act(async () => { await result.current.updateGoal('goal-1', { assignedToAll: [] }) })
+    expect(updateMock).toHaveBeenLastCalledWith('goal-1', { assigned_to_all: null, scope: 'compound' })
   })
 })

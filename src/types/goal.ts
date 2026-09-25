@@ -64,6 +64,13 @@ export interface Goal {
   milestones: GoalMilestone[]
   /** The previous year's goal this one was kept from (guided planning, Phase 3). */
   carriedFrom?: string | null
+  /** The owner's auth user id — whose "self" an assignment is measured
+   *  against when the sharing scope is derived. */
+  userId?: string
+  /** Household member ids this goal is assigned to. UNDEFINED means the goals
+   *  table has no assignee column yet (the migration is prepared, not
+   *  applied), and the goal offers no picker; an empty list means no one. */
+  assignedToAll?: string[]
   createdAt: Date
   updatedAt: Date
 }
@@ -95,6 +102,9 @@ export interface DbGoal {
   status: GoalStatus
   sort_order: number
   carried_from: string | null
+  /** Present only once migration 2026-09-25_goals_assigned_to_all.sql is
+   *  applied — a row read before then has no such key. */
+  assigned_to_all?: string[] | null
   created_at: string
   updated_at: string
 }

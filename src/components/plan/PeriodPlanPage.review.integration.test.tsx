@@ -123,7 +123,8 @@ vi.mock('@/hooks/useSupabaseTasks', () => ({
 }))
 vi.mock('@/hooks/useGatedTaskActions', () => ({ useGatedTaskActions: (raw: Record<string, unknown>) => raw }))
 vi.mock('@/hooks/useDomain', () => ({ useDomain: () => ({ layers: new Set(['work', 'family', 'personal', 'unsorted']), soleDomain: 'family' }) }))
-vi.mock('@/hooks/useFamilyMembers', () => ({ useFamilyMembers: () => ({ getCurrentUserMember: () => ({ id: 'me' }) }) }))
+const noMembers: never[] = []
+vi.mock('@/hooks/useFamilyMembers', () => ({ useFamilyMembers: () => ({ members: noMembers, getCurrentUserMember: () => ({ id: 'me' }) }) }))
 vi.mock('@/hooks/useHouseholdSeasons', () => ({ useHouseholdSeasons: () => ({ seasons: DEFAULT_SEASONS, loading: false, canEdit: true, setSeasons: vi.fn() }) }))
 vi.mock('@/hooks/useRoutines', () => ({ useRoutines: () => ({ activeRoutines: [], routines: [], loading: false }) }))
 vi.mock('@/contexts/GoalsContext', () => ({
