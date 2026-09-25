@@ -47,7 +47,6 @@ import { PlanningSheet } from '@/components/reference/PlanningSheet'
 import { unhomedRoutines } from '@/lib/week/unhomedRoutines'
 import { useWeekInstances } from '@/components/home/week/useWeekInstances'
 import { useDayChoices } from '@/hooks/useDayChoices'
-import { formatWeekRange } from '@/lib/dateHelpers'
 import { useReferenceLists } from '@/components/reference/ReferenceListsContext'
 import { makePlanActions } from '@/lib/planning/planActions'
 import { localYmd } from '@/lib/cadence/config'
@@ -55,9 +54,7 @@ import { planDropHandlers } from '@/lib/planning/planDrag'
 import { useActionableInstances } from '@/hooks/useActionableInstances'
 import { findTaskById } from '@/lib/findTaskById'
 import { showToast } from '@/hooks/useToast'
-import { PlanWeekMenu } from '@/components/plan/PlanWeekMenu'
-import { taskTiming, hasTiming, broaderCommitment, removeDayOutcome, removeAllOutcome } from '@/lib/planning/taskTiming'
-import { timingRemoval } from '@/lib/planning/planActions'
+import { TaskTimingMenu } from '@/components/plan/TaskTimingMenu'
 import { useNavigate } from 'react-router-dom'
 import { useGoogleCalendar } from '@/hooks/useGoogleCalendar'
 import { ALL_LAYERS } from '@/lib/domains'
@@ -1278,43 +1275,15 @@ export function TodayView({
    * It sits under the title, not in the trailing rail: the rail is a fixed
    * four-slot column and the timing answer is a sentence, not a glyph.
    */
-  const dayTimingControl = useCallback((task: Task) => {
-    const t = taskTiming(task)
-    const broader = broaderCommitment(task)
-    const removeTiming = (scope: 'day' | 'all') => {
-      if (!ctx.onUpdateTask) return
-      const { updates, previous } = timingRemoval(task, scope)
-      const kept = scope === 'day' ? removeDayOutcome(t, broader?.label ?? null) : removeAllOutcome(t, broader?.label ?? null)
-      const what = scope === 'day'
-        ? `Removed ${t.day!.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })} from “${task.title}”.`
-        : `Removed ${t.day ? 'the day and the week' : 'the week'} from “${task.title}”.`
-      void Promise.resolve(ctx.onUpdateTask(task.id, updates)).then((ok) => {
-        if (ok === false) return
-        showToast(`${what} ${kept}`, 'success', 8000, {
-          label: 'Undo', onClick: () => { void ctx.onUpdateTask?.(task.id, previous) },
-        })
-      })
-    }
-    return (
-      <PlanWeekMenu
-        size="sm"
-        title={task.title}
-        periodStart={viewedDate}
-        periodLabel={broader?.label ?? undefined}
-        timing={t}
-        currentWeekStart={t.week}
-        // The days of the week this row would land in — its own when it has
-        // one, otherwise the week being viewed. A week the tiles were not
-        // counted for offers none rather than a partial set.
-        dayChoices={dayChoices.forWeek(t.week ?? currentWeekStart)}
-        dayChoicesLabel={`A day in ${formatWeekRange(currentWeekStart)}`}
-        onPickWeek={(weekStart) => { void ctx.onUpdateTask?.(task.id, { bucket: 'week', weekStart, scheduledFor: undefined }) }}
-        onClearWeek={hasTiming(t) ? () => removeTiming('all') : undefined}
-        onRemoveDay={t.day ? () => removeTiming('day') : undefined}
-        onPickDay={(date) => { void ctx.onUpdateTask?.(task.id, { bucket: 'timed', scheduledFor: date, isAllDay: true }) }}
-      />
-    )
-  }, [ctx, viewedDate, dayChoices, currentWeekStart])
+  const dayTimingControl = useCallback((task: Task) => (
+    <TaskTimingMenu
+      task={task}
+      onUpdateTask={(id, updates) => ctx.onUpdateTask?.(id, updates)}
+      periodStart={viewedDate}
+      fallbackWeekStart={currentWeekStart}
+      dayChoices={dayChoices}
+    />
+  ), [ctx, viewedDate, dayChoices, currentWeekStart])
 
   const listProps = {
     timingFor: dayTimingControl,

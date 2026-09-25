@@ -36,6 +36,8 @@ import { useSupabaseTasks } from '@/hooks/useSupabaseTasks';
 import { useGatedTaskActions } from '@/hooks/useGatedTaskActions';
 import { useContacts } from '@/hooks/useContacts';
 import { useProjects } from '@/hooks/useProjects';
+import { TaskTimingMenu } from '@/components/plan/TaskTimingMenu';
+import { weekStartAnchor, readCadenceConfig } from '@/lib/cadence/config';
 import { useGoogleCalendar, CalendarReconnectError, type GoogleCalendarInfo, type CalendarEvent } from '@/hooks/useGoogleCalendar';
 import { eventMoveErrorMessage } from '@/lib/calendar/moveEvent';
 import { useEventNotes, type EventNote } from '@/hooks/useEventNotes';
@@ -271,6 +273,15 @@ function TaskPanelBody({ id }: { id: string }) {
       onEmailChange={(v) => updateTask(task.id, { email: v })}
       // onSaveNoteToVault intentionally omitted (vault integration removed)
       onToggleComplete={() => toggleTask(task.id)}
+      // A goal is not scheduled, so it gets no timing control.
+      timingControl={task.isGoal ? undefined : (
+        <TaskTimingMenu
+          task={task}
+          onUpdateTask={gated.updateTask}
+          periodStart={new Date()}
+          fallbackWeekStart={weekStartAnchor(new Date(), readCadenceConfig().weekStartsOn)}
+        />
+      )}
       onSchedule={(date, isAllDay) => {
         void (async () => {
           const result = await updateTask(task.id, { bucket: 'timed', scheduledFor: date, isAllDay });

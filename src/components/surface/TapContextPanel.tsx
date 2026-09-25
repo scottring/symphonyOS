@@ -36,6 +36,13 @@ import { scopeForDomain } from '@/lib/scope'
 import type { MightBeRelevantItem } from './types'
 
 interface TapContextPanelProps {
+  /**
+   * The task's own when — the same control its row carries — under the title.
+   * The pane named no date at all (S2-26) and hid "remove the day" at the
+   * bottom of the Schedule popover (S2-27). Supplied by the host, which owns
+   * the writer; omitted, the pane is as it was.
+   */
+  timingControl?: ReactNode
   task: Task
   // Reference data (Plan 1: passed in by caller — Plan 2 may push into context)
   contacts: Contact[]
@@ -242,6 +249,7 @@ export function TapContextPanel(props: TapContextPanelProps) {
           {/* The read-only "FAMILY · timed · for Iris" meta row was removed — it
               duplicated (in jargon) the interactive context chooser + who-picker
               below. The why-chain stays. */}
+          {props.timingControl && <div className="mt-1.5">{props.timingControl}</div>}
           {props.whyChain}
         </>
       }
