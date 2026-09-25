@@ -61,6 +61,8 @@ function setTasksNow(ref: { current: Task[] }, set: (fn: (prev: Task[]) => Task[
   set(fn)
 }
 
+
+export const PARTIAL_SAVE_MESSAGE = 'That change only partly saved — refresh to check'
 export interface DbTask {
   id: string
   user_id: string
@@ -964,7 +966,7 @@ export function useSupabaseTasks() {
     if (options?.plannedOn) {
       const { error: focusError } = await supabase
         .from('task_focus')
-        .upsert({ task_id: (data as DbTask).id, user_id: user.id, date: localYmd(options.plannedOn) }, { onConflict: 'task_id,user_id,date' })
+        .upsert({ task_id: (data as DbTask).id, user_id: user.id, date: localYmd(options.plannedOn) }, { onConflict: 'task_id,user_id,date', ignoreDuplicates: true })
       if (focusError) logger.warn('[addTask] focus row failed:', focusError.message)
       else focus = [{ userId: user.id, date: options.plannedOn }]
     }
@@ -1403,6 +1405,10 @@ export function useSupabaseTasks() {
    * fails too, the task goes back to `before` and is marked unreconciled, so
    * the next placement write must re-read before it may send.
    */
+  // "Saved, but…" claimed a success the caller then reported as a failure: a
+  // review said "Some of this didn't save" beneath a toast saying it had
+  // (walkthrough, 2026-09-25). The row wrote and its commitment did not, so
+  // "partly" is the true word for every caller.
   const writePlacementOps = useCallback(async (taskId: string, plan: PlacementPlan, before?: Task): Promise<boolean> => {
     const now = new Date().toISOString()
     let allOk = true
@@ -1413,7 +1419,7 @@ export function useSupabaseTasks() {
         if (op.op === 'ensure') {
           ;({ error } = await supabase
             .from('task_commitments')
-            .upsert({ ...key, status: 'open', ended_at: null, created_by: user?.id ?? null }, { onConflict: 'task_id,level,period_start' }))
+            .upsert({ ...key, status: 'open', ended_at: null, carried_to: null, created_by: user?.id ?? null }, { onConflict: 'task_id,level,period_start' }))
         } else if (op.op === 'remove') {
           ;({ error } = await supabase
             .from('task_commitments')
@@ -1431,7 +1437,7 @@ export function useSupabaseTasks() {
       if (error) {
         allOk = false
         console.error('[placement] commitment write failed:', op, error.message)
-        showToast('Saved, but its period list may be out of date — refresh to check', 'error', 4000)
+        showToast(PARTIAL_SAVE_MESSAGE, 'error', 4000)
       }
     }
     // A let-go (Someday, or back to the Inbox) that removed commitments: the
@@ -1457,7 +1463,7 @@ export function useSupabaseTasks() {
       if (error) {
         allOk = false
         console.error('[placement] let-go row re-assert failed:', error.message)
-        showToast('Saved, but its period list may be out of date — refresh to check', 'error', 4000)
+        showToast(PARTIAL_SAVE_MESSAGE, 'error', 4000)
       }
     }
     for (const op of plan.focusOps) {
@@ -1466,7 +1472,7 @@ export function useSupabaseTasks() {
         if (op.op === 'set') {
           ;({ error } = await supabase
             .from('task_focus')
-            .upsert({ task_id: taskId, user_id: op.userId, date: localYmd(op.date) }, { onConflict: 'task_id,user_id,date' }))
+            .upsert({ task_id: taskId, user_id: op.userId, date: localYmd(op.date) }, { onConflict: 'task_id,user_id,date', ignoreDuplicates: true }))
         } else {
           let q = supabase.from('task_focus').delete().eq('task_id', taskId).eq('user_id', op.userId)
           if (op.date) q = q.eq('date', localYmd(op.date))

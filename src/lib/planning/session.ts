@@ -10,6 +10,7 @@ import type { Goal } from '@/types/goal'
 import type { DomainId, Layer } from '@/lib/domains'
 import type { Seasons } from '@/lib/cadence/seasons'
 import { committedTo } from '@/lib/placement/model'
+import { planDropCommitment } from '@/lib/placement/intentions'
 import { matchesLayers } from '@/lib/today/domainFilter'
 import { localYmd, parseLocalYmd } from '@/lib/cadence/config'
 import { doableBy } from './poolViews'
@@ -180,6 +181,26 @@ export function weekTaskListLabel(periodLabel: string): string {
   return periodLabel === 'this week' ? "This week's tasks" : `Tasks for ${periodLabel}`
 }
 
+/**
+ * Where a dropped row actually ends up, in words. "The task is kept" was true
+ * and told the reader nothing: a week-only task goes back to the Inbox, one
+ * that October also holds stays in October (walkthrough, 2026-09-25). Read off
+ * the same plan `dropCommitment` writes, so the words cannot disagree with it.
+ */
+export function dropDestination(t: Task, level: SessionLevel, prevStart: Date, seasons?: Seasons): string {
+  const { row } = planDropCommitment(t, placementLevelOf(level), prevStart, seasons)
+  switch (row.bucket) {
+    case 'inbox': return 'back to the Inbox'
+    case 'someday': return 'stays on Someday'
+    case 'month': return row.monthStart
+      ? `stays in ${row.monthStart.toLocaleDateString('en-US', { month: 'long' })}`
+      : 'stays in its month'
+    case 'quarter': return 'stays in its season'
+    case 'week': return 'stays in its week'
+    default: return 'stays on its day'
+  }
+}
+
 export function summarize(
   d: SessionDraft,
   ctx: {
@@ -233,7 +254,7 @@ export function summarize(
     }
     else if (v === 'done') lines.push({ title: t.title, destination: L.done })
     else if (v === 'someday') lines.push({ title: t.title, destination: 'Someday page' })
-    else if (v === 'drop') lines.push({ title: t.title, destination: L.dropped })
+    else if (v === 'drop') lines.push({ title: t.title, destination: year ? L.dropped : `Dropped from ${Q} · ${dropDestination(t, d.level, parseLocalYmd(d.prevStart))}` })
     else if (carriedWith.has(t.id)) lines.push({ title: t.title, destination: `${L.list} · carried with ${carriedWith.get(t.id)}` })
     else lines.push({ title: t.title, destination: L.left, unchanged: true })
   }

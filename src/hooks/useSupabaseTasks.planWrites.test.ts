@@ -628,7 +628,7 @@ describe('a planning session against the real writers', () => {
       const d: SessionDraft = { ...emptyDraft('month', oct, sep), verdicts }
       const lines = summarize(d, { open: lookBackRows(result.current.tasks, sep, null).open, above: [], aboveGoals: [], periodLabel: 'October', prevLabel: 'September', aboveLabel: 'the season' })
       expect(await run(result, d)).toBe(true)
-      expect(lines.find((l) => l.title === 'Buy chairs')!.destination).toBe('Dropped from September · the task is kept')
+      expect(lines.find((l) => l.title === 'Buy chairs')!.destination).toBe('Dropped from September · back to the Inbox')
       expect(status('s1', '2026-09-01')).toBe('removed')
       expect(status('s1', '2026-10-01')).toBeUndefined()
       expect(lines.find((l) => l.title === 'Paint')!.destination).toBe('October tasks · carried with Porch')

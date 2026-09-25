@@ -201,6 +201,21 @@ describe('applyCommitmentOps', () => {
     const out = applyCommitmentOps([c('week', WK20, 'removed')], [{ op: 'ensure', level: 'week', periodStart: WK20 }])
     expect(out).toEqual([c('week', WK20)])
   })
+
+  // Found by the local Postgres harness (096_planning_commitments): Kept from
+  // September into October, then put back on September. Postgres reopens the
+  // carried row; the model left it carried and the task showed in the Inbox.
+  it('putting a task back on a period it was carried out of reopens that period', () => {
+    const SEP = new Date(2026, 8, 1), OCT = new Date(2026, 9, 1)
+    const task = {
+      id: 'k', title: 'Gutters', completed: false, createdAt: SEP, updatedAt: SEP, bucket: 'month', monthStart: OCT,
+      commitments: [{ ...c('month', SEP, 'carried'), carriedTo: OCT }, c('month', OCT)],
+    } as Task
+    const plan = planPlacement(task, { bucket: 'month', monthStart: SEP }, { now: new Date(2026, 8, 25) } as Parameters<typeof planPlacement>[2])
+    expect(plan.row.bucket).toBe('month')
+    expect(plan.row.monthStart).toEqual(SEP)
+    expect(plan.local.commitments).toContainEqual(c('month', SEP))
+  })
 })
 
 describe('planDropCommitment', () => {

@@ -83,7 +83,13 @@ export function applyCommitmentOps(list: readonly TaskCommitment[] | undefined, 
     const i = out.findIndex((c) => c.level === op.level && sameDay(c.periodStart, op.periodStart))
     if (op.op === 'ensure') {
       if (i < 0) out.push({ level: op.level, periodStart: op.periodStart, status: 'open' })
-      else if (out[i].status === 'removed') out[i] = { ...out[i], status: 'open' }
+      // A carried period chosen again is chosen again: the task was Kept out
+      // of September into October and is now put back on September. Leaving
+      // it `carried` sent the task to the Inbox on screen while Postgres —
+      // whose upsert reopens it — put it in September (local harness,
+      // 096_planning_commitments, 2026-09-25). Reopened here exactly as there,
+      // with the forwarding address cleared. `done` is left to reopen.
+      else if (out[i].status === 'removed' || out[i].status === 'carried') out[i] = { ...out[i], status: 'open', carriedTo: undefined }
     } else if (i >= 0) {
       if (op.op === 'remove') out[i] = { ...out[i], status: 'removed' }
       else if (op.op === 'carry') out[i] = { ...out[i], status: 'carried', carriedTo: op.to }

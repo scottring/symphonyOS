@@ -176,7 +176,7 @@ describe('the save step tells the truth about what is already there', () => {
   it('shows the existing plan on the save step, completed work included', () => {
     setup(quiet)
     toSave()
-    const already = within(screen.getByRole('region', { name: /Already in your .* plan/ }))
+    const already = within(screen.getByRole('region', { name: /Already in the plan for / }))
     expect(already.getByText('Take Kaleb to an Islanders game in DC')).toBeInTheDocument()
     expect(already.getByText('Research games dates and tickets')).toBeInTheDocument()
     expect(already.getByText('Buy game tickets')).toBeInTheDocument()
@@ -186,7 +186,7 @@ describe('the save step tells the truth about what is already there', () => {
   it('says the plan is unchanged instead of claiming nothing is saved', () => {
     setup(quiet)
     toSave()
-    expect(screen.getByText(/plan is unchanged\. Nothing will be written\./)).toBeInTheDocument()
+    expect(screen.getByText(/is unchanged\. Nothing will be written\./)).toBeInTheDocument()
     expect(screen.queryByText('Nothing is saved yet.')).toBeNull()
     expect(screen.queryByText('Nothing chosen.')).toBeNull()
   })
@@ -200,7 +200,7 @@ describe('the save step tells the truth about what is already there', () => {
     // A look-back row means the session opens on the look-back step.
     fireEvent.click(screen.getByRole('button', { name: /next: plan/i }))
     toSave()
-    expect(screen.getByText(/plan is unchanged\. Nothing will be written\./)).toBeInTheDocument()
+    expect(screen.getByText(/is unchanged\. Nothing will be written\./)).toBeInTheDocument()
     expect(screen.queryByText('What Save will change')).toBeNull()
     // Still shown, as review context, under a heading that tells the truth.
     const untouched = within(screen.getByRole('region', { name: /Unchanged by Save/ }))
@@ -222,6 +222,18 @@ describe('the save step tells the truth about what is already there', () => {
     expect(untouched.queryByText('Library card')).toBeNull()
   })
 
+  // Walkthrough, 2026-09-25: a Keep the reader had only proposed was listed
+  // under "Already in the plan" AND under "What Save will change".
+  it('a proposed Keep is a change, never "already in the plan"', () => {
+    setup({ ...quiet, open: [t({ id: 'o1', title: 'Tile saw' })] })
+    fireEvent.click(screen.getByRole('button', { name: 'Keep' }))
+    fireEvent.click(screen.getByRole('button', { name: /next: plan/i }))
+    toSave()
+    const already = within(screen.getByRole('region', { name: /Already in the plan for / }))
+    expect(already.queryByText('Tile saw')).toBeNull()
+    expect(within(screen.getByRole('list', { name: 'What Save will change' })).getByText('Tile saw')).toBeInTheDocument()
+  })
+
   it('offers Done, not Save, and closes without writing', () => {
     const onClose = vi.fn()
     const { onSave } = setup({ ...quiet, onClose })
@@ -238,7 +250,7 @@ describe('the save step tells the truth about what is already there', () => {
     fireEvent.click(screen.getByRole('button', { name: /add task/i }))
     toSave()
     expect(screen.getByText('These changes are not saved yet.')).toBeInTheDocument()
-    expect(screen.getByRole('region', { name: /Already in your .* plan/ })).toBeInTheDocument()
+    expect(screen.getByRole('region', { name: /Already in the plan for / })).toBeInTheDocument()
     expect(screen.getByText('What Save will change')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /^Save / })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Done' })).toBeNull()

@@ -103,6 +103,12 @@ export function PlanSession({ level, aboveLabel, dayOptions = [], periodLabel: P
   const monthGoals = week ? [] : [...current.filter((t) => t.isGoal), ...kept.filter((t) => t.isGoal)]
   const monthTasks = [...current.filter((t) => !t.isGoal), ...kept.filter((t) => !t.isGoal), ...carried]
     .filter((t, i, all) => all.findIndex((x) => x.id === t.id) === i)
+  // The Save step's "Already in your plan" is what is SAVED — never a Keep
+  // the reader has only proposed. Listing kept rows there put the same row
+  // under "already in" and "what Save will change" at once (walkthrough,
+  // 2026-09-25). The Plan step still shows the draft's whole list.
+  const savedGoals = week ? [] : current.filter((t) => t.isGoal)
+  const savedTasks = current.filter((t) => !t.isGoal)
   // A task toward a goal belongs to the goal's domain; a loose one to the domain in view.
   const towardOptions = [
     ...monthGoals.map((g) => ({ id: g.id, title: g.title, context: g.context ?? null })),
@@ -360,7 +366,7 @@ export function PlanSession({ level, aboveLabel, dayOptions = [], periodLabel: P
             {saveError
               ? <p role="alert" className="mt-1 text-sm text-accent-700">Some of this didn't save. It's still here and in your draft; Save again retries only these.</p>
               : nothingToSave
-                ? <p className="mt-1 text-sm text-neutral-600">Your {P} plan is unchanged. Nothing will be written.</p>
+                ? <p className="mt-1 text-sm text-neutral-600">Your plan for {P} is unchanged. Nothing will be written.</p>
                 : <p className="mt-1 text-sm text-neutral-500">These changes are not saved yet.</p>}
             {needsDomain.length > 0 && <fieldset className="my-3 rounded border border-neutral-200 p-3"><legend className="text-sm">Choose where these items belong before saving</legend><p className="mb-2 text-xs text-neutral-500">Family is shared with your household. Personal and Work stay private.</p>{needsDomain.map(task => <label key={task.id} className="mb-2 flex flex-wrap items-center justify-between gap-2 text-sm">{task.title}<select aria-label={`Domain for ${task.title}`} value={draft.domains?.[task.id] ?? ''} onChange={event => { const domains = { ...draft.domains }; if (event.target.value) domains[task.id] = event.target.value as DomainId; else delete domains[task.id]; set({ domains }) }} className="rounded border border-neutral-200 p-2"><option value="">Choose a domain</option>{DOMAINS.map(domain => <option key={domain.id} value={domain.id}>{domain.label}</option>)}</select></label>)}</fieldset>}
 
@@ -368,16 +374,16 @@ export function PlanSession({ level, aboveLabel, dayOptions = [], periodLabel: P
                 replaced by them: a session must start from saved work and
                 keep it visible while changes are being reviewed. Completed
                 work is included — it is what this period got done. */}
-            {(monthGoals.length > 0 || monthTasks.length > 0) && (
-              <section aria-label={`Already in your ${P} plan`} className="mt-3">
-                <h3 className="text-[11px] font-semibold uppercase tracking-wider text-neutral-400">Already in your {P} plan</h3>
+            {(savedGoals.length > 0 || savedTasks.length > 0) && (
+              <section aria-label={`Already in the plan for ${P}`} className="mt-3">
+                <h3 className="text-[11px] font-semibold uppercase tracking-wider text-neutral-400">Already in the plan for {P}</h3>
                 <ul className="mt-1">
-                  {monthGoals.map((g) => (
+                  {savedGoals.map((g) => (
                     <li key={g.id} className="flex items-center gap-2 border-b border-neutral-100 py-1.5 text-sm last:border-0">
                       <Target className="h-3.5 w-3.5 shrink-0 text-accent-600" aria-hidden="true" />
                       <span className={g.completed ? 'text-neutral-400 line-through' : 'text-neutral-700'}>{g.title}</span>
                     </li>))}
-                  {monthTasks.map((x) => (
+                  {savedTasks.map((x) => (
                     <li key={x.id} className="border-b border-neutral-100 py-1.5 text-sm last:border-0">
                       <span className={x.completed ? 'text-neutral-400 line-through' : 'text-neutral-700'}>{x.title}</span>
                       {x.completed && <span className="ml-1.5 text-[11px] text-neutral-400">completed</span>}
