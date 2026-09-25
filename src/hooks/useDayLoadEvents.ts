@@ -87,8 +87,6 @@ let inflightGen = 0
  * A mutation arriving during a request must not simply be discarded.
  */
 let changeSeq = 0
-/** The `changeSeq` the in-flight read was started for. */
-let inflightSeq = 0
 
 const subscribers = new Set<() => void>()
 
@@ -105,7 +103,6 @@ export function __resetDayLoadCache(): void {
   generation = 0
   inflightGen = 0
   changeSeq = 0
-  inflightSeq = 0
   unwireSignals()
   wiredCount = 0
 }
@@ -126,7 +123,6 @@ function start(accountId: string | null): void {
   const seq = changeSeq
   inflightKey = key
   inflightGen = gen
-  inflightSeq = seq
   void (async () => {
     let outcome: 'ok' | 'failed' = 'failed'
     let events: CalendarEvent[] = []

@@ -62,7 +62,6 @@ function isPastDay(dayIso: string): boolean {
 }
 
 export function useWeekDragDrop(args: UseWeekDragDropArgs): UseWeekDragDropResult {
-  const { tasks, onUpdateTask } = args
   const [activeDragId, setActiveDragId] = useState<string | null>(null)
 
   const onDragStart = useCallback((e: DragStartEvent) => {

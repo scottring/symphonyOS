@@ -2,7 +2,7 @@
 // edit it in place. These hold the three things that make that safe —
 // duration when only the day moves, a cancel that changes nothing, and a
 // refused save that keeps the edit instead of swallowing it.
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { CalendarEvent } from '@/hooks/useGoogleCalendar'

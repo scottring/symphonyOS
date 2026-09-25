@@ -25,7 +25,6 @@
 // task, and inventing one out of Someday would be a different feature with
 // different consequences.
 import { useState } from 'react'
-import { Target } from 'lucide-react'
 import type { SupportLink } from '@/lib/planning/goalSupport'
 
 export interface ParentChoice {
