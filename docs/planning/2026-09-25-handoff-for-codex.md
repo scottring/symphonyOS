@@ -134,3 +134,15 @@ Next steps need approval:
 - **Evidence.** PG 100/100, loading both files, with a guard against 40001 and
   40P01. Hook/helper tests 113/113; full suite 7219.
 - The switch stays off. Applying the follow-up needs Scott's approval.
+
+## Conflict-code fix applied and verified (08:44 UTC)
+
+The migration was applied unchanged, and the installed source has PT409 with
+no retried codes. One stale PostgREST request:
+- HTTP 409 PT409 in 322 ms;
+- data unchanged;
+- exactly 1 refusal in the Postgres logs, and no retries.
+
+The switch is still off. Next, with Scott's go-ahead: preview with the switch
+on; the two-account check (needs his second login). Production approval is
+separate.

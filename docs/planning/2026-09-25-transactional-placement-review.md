@@ -271,3 +271,27 @@ PostgREST.
 - **Do not enable the switch, or call the function directly, until the
   follow-up is applied.**
 - The probe is clean: in the Inbox, week record removed.
+
+## Conflict-code fix APPLIED and verified live — 2026-09-25 08:44 UTC (Scott approved)
+
+**Applied.** `apply_migration('apply_task_placement_conflict_code')`, migration
+version 20260925084406, the file unchanged (sha256 `fed32ed1…76b9`).
+
+**Installed.**
+- One version, `(uuid,jsonb,jsonb)`.
+- `prosecdef=false`; `search_path` pinned.
+- anon cannot execute; authenticated can.
+- The source contains `PT409` and no 40001 or 40P01.
+- The body md5 equals the file's (`9a78b35e…`).
+
+**One stale request through PostgREST,** from the demo's signed-in page with a
+10-second abort guard. The probe had no open records; the request expected
+week 10-11.
+
+| Check | Result |
+|---|---|
+| Response | **HTTP 409**, code `PT409`, "placement changed since it was read", **322 ms** |
+| Data | Unchanged: probe records `[10-11: removed]`, bucket inbox, 4 events (same as before the call) |
+| Refusals in the Postgres logs since the fix | **Exactly 1** (08:44:51.524 UTC, `PT409`, via `authenticator`); none in the 27 s after it |
+
+No retries recurred. The switch is still off; the preview is not yet enabled.
