@@ -15,6 +15,10 @@ export function FirstWeekCard({ onHide, onClearSample }: {
       <button type="button" onClick={() => setPath('goal')}>Start with a goal</button>
       <button type="button" onClick={onHide} className="text-neutral-500">Explore on my own</button>
     </div>
+    {/* S1-01: two doors, and neither said a calendar event, a capture or a
+        routine was possible. Getting Started holds all three ways in and the
+        guide — a link, not another step. */}
+    <p className="mt-2 text-sm"><Link to="/start" className="text-primary-700 underline">More ways to start →</Link></p>
     {path === 'today' && <p className="mt-3 text-sm text-neutral-600">Add a task in For today. For later work, use <Link to="/week" className="text-primary-700 underline">Week</Link>; Shelves lets you choose it for a day. Completing a task updates it wherever it appears.</p>}
     {path === 'goal' && <div className="mt-3 text-sm text-neutral-600"><p>What would you like to make progress on? Choose a horizon; add a supporting task when you're ready.</p><div className="mt-2 flex gap-4">{['month', 'season', 'year'].map(level => <Link className="text-primary-700 underline" key={level} to={`/${level}`}>{level[0].toUpperCase() + level.slice(1)}</Link>)}</div></div>}
     {onClearSample && <button type="button" className="mt-3 text-xs text-neutral-500 underline" onClick={onClearSample}>Clear sample</button>}

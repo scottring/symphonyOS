@@ -79,6 +79,8 @@ export function PlanningEntryPaths({ here = null, dismissible = true }: Planning
           <h3 className="entry-path-title">Capture something now</h3>
           <p className="entry-path-body">
             One line, no decisions. It waits in the Inbox until you want to deal with it.
+            Start the line with “event:” to put it on the calendar, or say how often
+            (“every Tuesday”) and it offers a routine instead.
           </p>
           <div className="entry-path-foot">
             <button type="button" onClick={() => requestQuickAdd()} className="entry-path-action">
