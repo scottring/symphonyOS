@@ -14,7 +14,7 @@
 // VIEW, so choosing from a November row offers November days rather than
 // silently jumping to today.
 import { CalendarDays } from 'lucide-react'
-import { DENSITY_SEGMENTS, densityDescription, densityCountLabel, type DayDensity } from '@/lib/planning/dayDensity'
+import { DENSITY_SEGMENTS, DENSITY_SCOPE, densityDescription, densityCountLabel, type DayDensity } from '@/lib/planning/dayDensity'
 
 export interface DayChoice {
   /** The day itself — what gets written. */
@@ -68,9 +68,15 @@ export function DayDensityTiles({ days, level, onPick, heading }: {
 }) {
   return (
     <div className="px-2 pb-1">
-      <p className="px-1 pb-1 pt-1 text-[10px] font-semibold uppercase tracking-wider text-neutral-400" aria-hidden="true">
+      <p className="px-1 pt-1 text-[10px] font-semibold uppercase tracking-wider text-neutral-400" aria-hidden="true">
         {heading}
       </p>
+      {/* The scope, said rather than assumed. These counts are universal —
+          every domain, everyone — because a day is full regardless of which
+          domain filled it. Without this line the same Tuesday read one way
+          under a domain filter and another without one, and nothing on screen
+          explained why (Codex, 2026-09-25). */}
+      <p className="px-1 pb-1 text-[10px] text-neutral-400">{DENSITY_SCOPE}</p>
       <div className="grid grid-cols-2 gap-1.5">
         {days.map((day) => (
           <button

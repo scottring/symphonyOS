@@ -22,6 +22,7 @@ import { NotesProvider } from '@/contexts/NotesContext';
 import { ListsProvider } from '@/contexts/ListsContext';
 import { PinsProvider } from '@/contexts/PinsContext';
 import { useAuth } from '@/hooks/useAuth';
+import { setCurrentAccount } from '@/lib/currentAccount';
 import { useMobile } from '@/hooks/useMobile';
 import { useDomain } from '@/hooks/useDomain';
 import { filterInboxTasksForLayers } from '@/lib/today/domainFilter';
@@ -124,6 +125,10 @@ function ShellLayoutInner({ children }: Props) {
   const typing = useTextEntryActive();
   const planDestination = usePlanDestination();
   const { user, signOut } = useAuth();
+  // Module caches that are not components — the planning calendar behind the
+  // day tiles — key their data on who is signed in. The shell is the one
+  // place that knows, once.
+  useEffect(() => { setCurrentAccount(user?.id ?? null); }, [user?.id]);
 
   const [desktopControls, setDesktopControls] = useState<HTMLDivElement | null>(null);
   const [mobilePlanControls, setMobilePlanControls] = useState<HTMLDivElement | null>(null);

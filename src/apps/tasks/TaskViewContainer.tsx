@@ -17,7 +17,6 @@ import { supportedGoal, goalsSupporting, type SupportLink } from '@/lib/planning
 import type { Note, NoteEntityType } from '@/types/note';
 import { useSupabaseTasks } from '@/hooks/useSupabaseTasks';
 import { useRoutines } from '@/hooks/useRoutines';
-import { useDomain } from '@/hooks/useDomain';
 import { useAuth } from '@/hooks/useAuth';
 import { useDayChoices } from '@/hooks/useDayChoices';
 import { weeksOfMonth } from '@/lib/planning/monthWeeks';
@@ -47,7 +46,6 @@ export function TaskViewContainer({ taskId, onBack }: Props) {
 
   const task = useMemo(() => tasks.find(t => t.id === taskId) ?? null, [tasks, taskId]);
   const { activeRoutines } = useRoutines();
-  const { layers } = useDomain();
   const { user } = useAuth();
 
   /**
@@ -64,7 +62,7 @@ export function TaskViewContainer({ taskId, onBack }: Props) {
   }, [task?.monthStart, task?.seasonStart, task?.weekStart]);
   const dayChoices = useDayChoices({
     windowStart: timingWindow.start, dayCount: timingWindow.dayCount,
-    tasks, userId: user?.id ?? null, routines: activeRoutines, layers,
+    tasks, userId: user?.id ?? null, routines: activeRoutines,
   });
 
   // A goal's children are its STEPS, joined by goal_task_id and carrying the

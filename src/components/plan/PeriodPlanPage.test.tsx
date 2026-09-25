@@ -89,7 +89,8 @@ vi.mock('@/hooks/usePlanningSession', () => ({
 }))
 vi.mock('@/hooks/useAuth', () => ({ useAuth: () => ({ user: { id: 'u1' } }) }))
 // The day tiles' two sources, held flat so a case can make one unavailable.
-const dayLoad = { events: [] as unknown[], available: true, loading: false }
+const dayLoad = { events: [] as unknown[], available: true, loading: false, failed: false,
+  range: { start: Date.now() - 30 * 86_400_000, end: Date.now() + 90 * 86_400_000 } }
 vi.mock('@/hooks/useDayLoadEvents', () => ({
   DAY_LOAD_RANGE_DAYS: 45,
   DAY_LOAD_BACK_DAYS: 7,
@@ -2253,7 +2254,7 @@ describe('the month page offers day tiles for the week a row is on', () => {
 
   beforeEach(() => {
     pinClock(); localStorage.clear()
-    dayLoad.events = []; dayLoad.available = true; dayLoad.loading = false
+    dayLoad.events = []; dayLoad.available = true; dayLoad.loading = false; dayLoad.failed = false
     state.tasks = [
       task({ id: 'dated', title: 'Fix the gate', monthStart: thisMonth, weekStart: weekOfThisMonth }),
       task({ id: 'loose', title: 'Call the roofer', monthStart: thisMonth }),
@@ -2301,13 +2302,39 @@ describe('the month page offers day tiles for the week a row is on', () => {
   })
 
   it('says a day is not known rather than drawing it empty when the calendar failed', () => {
-    dayLoad.available = false
+    // Read and FAILED — distinct from "not read yet", which draws no bar for
+    // a different reason and says a different thing.
+    dayLoad.available = false; dayLoad.failed = true
     renderPage('month')
     openTiming('Fix the gate')
     const tiles = screen.getAllByRole('menuitemradio').filter((b) => /^Plan for /.test(b.getAttribute('aria-label') ?? ''))
     expect(tiles).toHaveLength(7)
     expect(tiles.filter((t) => /couldn’t be read/.test(t.getAttribute('aria-label') ?? ''))).toHaveLength(7)
     expect(tiles.some((t) => /nothing on it yet/.test(t.getAttribute('aria-label') ?? ''))).toBe(false)
+  })
+
+  // Codex, 2026-09-25: the window counted is a whole month of weeks, but the
+  // seven days OFFERED must be scaled against each other — a monstrous day
+  // three weeks away must not flatten the week on screen.
+  it('scales the bars against the week shown, not the month behind it', () => {
+    const weekAfter = new Date(weekOfThisMonth.getFullYear(), weekOfThisMonth.getMonth(), weekOfThisMonth.getDate() + 7)
+    state.tasks = [
+      ...state.tasks,
+      // Twelve things on one day of the NEXT week, inside the same window.
+      ...Array.from({ length: 12 }, (_, i) => task({
+        id: `flood${i}`, title: `Flood ${i}`, monthStart: thisMonth, bucket: 'timed', isAllDay: true,
+        scheduledFor: new Date(weekAfter.getFullYear(), weekAfter.getMonth(), weekAfter.getDate() + 1),
+      })),
+    ]
+    renderPage('month')
+    openTiming('Fix the gate')
+    const tiles = screen.getAllByRole('menuitemradio').filter((b) => /^Plan for /.test(b.getAttribute('aria-label') ?? ''))
+    // The Friday of the week on screen holds one task and is the busiest day
+    // OF THIS WEEK, so it fills the bar.
+    const friday = tiles.find((t) => /1 task already/.test(t.getAttribute('aria-label') ?? ''))!
+    const filled = within(friday).getAllByRole('generic', { hidden: true })
+      .filter((el) => /bg-primary-/.test(el.className)).length
+    expect(filled).toBe(6)
   })
 
   it('picking a day from a tile plans that exact day', () => {

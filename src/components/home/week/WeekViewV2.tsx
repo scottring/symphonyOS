@@ -38,11 +38,12 @@ import { useGatedTaskActions } from '@/hooks/useGatedTaskActions'
 import { weekStartAnchor, readCadenceConfig } from '@/lib/cadence/config'
 import { partitionWeekExtras } from '@/lib/week/weekExtras'
 import { buildWeekRoutineItems } from './weekRoutineItems'
-import { eventDensityKey, routineDayIndex, routineDayState, routineIdOf } from '@/lib/planning/weekDensity'
+import { routineDayIndex, routineDayState, routineIdOf } from '@/lib/planning/weekDensity'
+import { useDayChoices } from '@/hooks/useDayChoices'
 import { useWeekInstances } from './useWeekInstances'
 import { edgeForPointer } from './edgeAdvance'
 import { WeekJournal, type JournalDay, type JournalEntry } from './WeekJournal'
-import { dayDensity, densityReadiness, type DensitySources } from '@/lib/planning/dayDensity'
+import type { DensitySources } from '@/lib/planning/dayDensity'
 import { formatWeekRange } from '@/lib/dateHelpers'
 import { WeekList } from './WeekList'
 import { makePlanActions } from '@/lib/planning/planActions'
@@ -102,6 +103,19 @@ interface WeekViewV2Props {
    * the shape every existing caller and test already has.
    */
   sources?: DensitySources
+  /**
+   * The UNFILTERED lists, and the range the events were actually fetched for
+   * — for the day tiles' counts only, never for what the journal draws.
+   *
+   * Density is universal: a day is full regardless of which domain filled it
+   * or whose it is. `tasks`/`events` above are what this view DRAWS, narrowed
+   * to the reader's layers and assignee, and counting those made /week the
+   * one surface that answered "how busy is Tuesday" differently from every
+   * other (Codex, 2026-09-25). Omitted, the tiles fall back to the drawn
+   * lists and under-count exactly as much as the view is filtered.
+   */
+  densityTasks?: Task[]
+  densityEvents?: CalendarEvent[]
   routines: Routine[]
   // dateInstances is reserved for future instance-completion overlays;
   // not yet consumed in rendering but kept in the API for Task 12 wiring.
@@ -175,6 +189,8 @@ export function WeekViewV2(props: WeekViewV2Props) {
     onUpdateRoutine,
     onPushRoutine,
     dayCount = 7,
+    densityTasks,
+    densityEvents,
     pushAction,
   } = props
 
@@ -673,31 +689,32 @@ export function WeekViewV2(props: WeekViewV2Props) {
    * are events too, and a dinner is the day's meal, not a commitment to plan
    * around, so it is left out.
    */
-  const dayDensities = useMemo(() => {
-    // The week's own instances are part of the count, so a week whose
-    // instances have not landed is not a week we can report on.
-    const readiness = densityReadiness(sources ?? { tasks: 'ready', events: 'ready', routines: 'ready' })
-    return journalDays.map((d) => dayDensity(
-      d.date,
-      [
-        // An event is identified by WHAT and WHEN, not by which calendar sent
-        // it: the same meeting synced to two calendars arrives twice with
-        // different ids (the journal does not merge them — it draws both), and
-        // counting it twice would make a day look busier than it is.
-        ...d.entries.map((e) => ({
-          id: e.id,
-          kind: e.kind,
-          key: e.kind === 'event' ? eventDensityKey(e.title, e.time, d.key) : undefined,
-        })),
-        ...d.notes.map((n) => ({
-          id: `event-${n.google_event_id || n.id}`,
-          kind: 'event' as const,
-          key: eventDensityKey(n.title ?? '', null, d.key),
-        })),
-      ],
-      readiness,
-    ))
-  }, [journalDays, sources])
+  /**
+   * The same hook every other surface uses, given /week's OWN calendar read.
+   *
+   * The counting rules moved out of this component in the previous batch; the
+   * SOURCES follow them now. Two weeks around the week on screen reaches
+   * further than the shared planning window, so a week paged into December is
+   * still counted — and because the lists handed over are unfiltered, the
+   * answer matches Today's and the planning pages' for the same day.
+   *
+   * The journal above is untouched: what it draws is still the reader's own
+   * filtered view. Only the tiles' counts changed, and they say their scope.
+   */
+  const dayChoiceSource = useDayChoices({
+    windowStart: weekStart,
+    dayCount,
+    tasks: densityTasks ?? tasks,
+    userId: userId ?? null,
+    routines,
+    instances: weekInstances,
+    calendar: {
+      events: densityEvents ?? events,
+      // `sources.events` already answers "does what we hold cover the week on
+      // screen" — `densitySourcesFor` is given that exact range.
+      status: sources?.events ?? 'ready',
+    },
+  })
 
   const journalSpans = useMemo(
     () => layoutContextSpans(events, journalDays.map((d) => d.date)),
@@ -880,12 +897,10 @@ export function WeekViewV2(props: WeekViewV2Props) {
    * week has no destination to name, and the brief forbids promising one.
    */
   /** The week's own days as tiles, with what each already holds. */
-  const dayChoices = useMemo(() => journalDays.map((d, i) => ({
-    date: d.date,
-    label: d.date.toLocaleDateString('en-US', { weekday: 'short' }),
-    dateLabel: d.date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-    density: dayDensities[i],
-  })), [journalDays, dayDensities])
+  const dayChoices = useMemo(
+    () => dayChoiceSource.forWeek(weekStart, dayCount),
+    [dayChoiceSource, weekStart, dayCount],
+  )
 
   const weekTimingControl = useCallback((task: Task) => {
     const t = taskTiming(task)

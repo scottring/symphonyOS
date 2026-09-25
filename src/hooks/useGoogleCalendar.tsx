@@ -1,4 +1,6 @@
 import { useState, useEffect, useCallback, createContext, useContext, type ReactNode } from 'react'
+import { emitCalendarChanged } from '@/lib/calendarChangedSignal'
+import { setCalendarConnected } from '@/lib/calendarConnection'
 import { supabase, getAuthUser } from '@/lib/supabase'
 import { logger } from '@/lib/logger'
 import { getRecurringBaseId } from './useHiddenCalendarEvents'
@@ -147,6 +149,9 @@ const GoogleCalendarContext = createContext<GoogleCalendarContextValue | null>(n
 export function GoogleCalendarProvider({ children }: { children: ReactNode }) {
 
   const [isConnected, setIsConnected] = useState(false)
+  // Published for readers that are not components — the day tiles' planning
+  // calendar, which must tell "no calendar" from "could not read it".
+  useEffect(() => { setCalendarConnected(isConnected) }, [isConnected])
   const [connectedProviders, setConnectedProviders] = useState<CalendarProvider[]>([])
   const [needsReconnect, setNeedsReconnect] = useState(false)
   const [reconnectProviders, setReconnectProviders] = useState<CalendarProvider[]>([])
@@ -514,6 +519,9 @@ export function GoogleCalendarProvider({ children }: { children: ReactNode }) {
       throw new Error(data.error)
     }
 
+    // Anything holding its own copy of the calendar — the planning calendar
+    // behind the day tiles — has no realtime channel to learn this from.
+    emitCalendarChanged()
     return { id: data.eventId, htmlLink: data.htmlLink }
   }, [isConnected])
 
@@ -596,6 +604,7 @@ export function GoogleCalendarProvider({ children }: { children: ReactNode }) {
       if (params.title !== undefined) patched.title = params.title
       return patched
     }))
+    emitCalendarChanged()
   }, [isConnected])
 
   // Optimistically remove an event from the local cache.
@@ -667,6 +676,7 @@ export function GoogleCalendarProvider({ children }: { children: ReactNode }) {
       console.warn('Failed to clear discussion flag for deleted event:', err)
       // Non-fatal: realtime sub will eventually reconcile, and the orphan is harmless.
     }
+    emitCalendarChanged()
   }, [isConnected])
 
   // Move an event between calendars (Google events.move endpoint)

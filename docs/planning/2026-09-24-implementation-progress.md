@@ -1595,3 +1595,157 @@ are **not** the whole backlog. Also still open, and none of it touched here:
 - Plan-from-paper analysis and revision (a separate workstream);
 - real-iPhone keyboard and safe areas;
 - authenticated cross-household access testing.
+
+---
+
+# §X — the shared density data, made correct (2026-09-25)
+
+§W put every "Choose when" on one counting path. Codex then reviewed what that
+path actually reads, and found the cache underneath it was never built to be
+shared. This closes that, and the two semantic gaps §W left open.
+
+## What was wrong with the cache
+
+`useDayLoadEvents` held `cache`, `inflight` and `cacheFailed` as module
+globals with no subscribers, no key and no invalidation:
+
+| Defect | What it meant on screen |
+|---|---|
+| Only the hook that STARTED the read re-rendered | A second picker opened while the first was still loading never learned the answer arrived — it sat on "not loaded yet" until something else re-rendered it |
+| …and if that hook had unmounted, nobody re-rendered | An open menu is normally closed before a slow calendar answers, so this was the common case, not the edge |
+| `cacheFailed` latched for the life of the tab | One failed read and every day tile, everywhere, said "couldn't be read" until a reload |
+| No account key | Sign out, sign in as somebody else, and the first account's calendar was still being counted |
+| No date key | A tab open overnight kept yesterday's window and called today's days covered |
+| No invalidation on a write | Move an event in the app and the tiles kept reporting the day's old count |
+| Coverage derived from the clock, not the data | The reader computed "is this day covered" from `today ± constants`, which a cache filled yesterday passes |
+
+## What it is now
+
+One read per **account** per **day-window**, with the window's real range
+stored beside the data. Every consumer subscribes; whoever started the read is
+irrelevant to who hears about it. A failure is remembered for that one window
+for `DAY_LOAD_RETRY_AFTER_MS` (60s) and then may be tried again — demand
+driven, never on a timer. Re-read on three things and nothing else:
+
+- **a calendar write in this tab** — a new `calendarChangedSignal`, emitted by
+  `createEvent` / `updateEvent` / `deleteEvent`, the same shape as
+  `instancesChangedSignal`. The view calendar refetches because the component
+  that wrote it owns the fetch; this cache has no owner, so it listens.
+- **returning to the tab** — `useRefreshOnVisible`, the mechanism already used
+  for the view calendar.
+- **the key changing** — a new account, or a new day.
+
+Requests are still deduped: three consumers mounting together make one call.
+Nothing polls, and the view calendar's own data is untouched.
+
+Two small modules carry what a module cache cannot ask a hook for:
+`lib/currentAccount.ts` (published once by `ShellLayout`, which every app
+route is mounted inside) and `lib/calendarConnection.ts` (published by
+`GoogleCalendarProvider`). Both answer "unknown" rather than throwing, so a
+picker in an isolated harness still renders.
+
+## The two semantic gaps from §W
+
+**Disconnected calendar.** The planning read succeeds with zero events for a
+household that has no calendar, so those tiles said "nothing on it yet" while
+/week said "no calendar connected". The connection is now published, the
+shared read is not started at all when there is no calendar, and the status is
+`not-connected` — a COMPLETE count, with the reason, on every surface.
+
+**Domain filtering.** /week counted its own layer-filtered rows; every other
+surface counted the universal planning calendar. The same Tuesday, two
+answers. Density is now **universal everywhere — every domain, everyone** —
+which is the rule the planning calendar was already written to (*"a day is
+full regardless of which domain filled it"*), and the tiles PRINT it:
+`Everyone, every domain`, under the heading, once, readable by a screen
+reader.
+
+To get there without touching what the journal draws:
+
+- `useDayChoices` no longer takes `layers` or `member` at all. A caller
+  cannot narrow the scope; routines resolve for everyone in every layer.
+- Surfaces whose task list is the reader's filtered view now pass the
+  unfiltered one for counting only — `densityTasks` on TodayView and
+  WeekViewV2, supplied by HomeView.
+- /week's tiles come from the shared hook too, given /week's OWN calendar read
+  through a new `calendar` override. That keeps its wider coverage (two weeks
+  around whatever week is on screen, which reaches past the planning window)
+  while the counting is identical. Its journal is unchanged: 199 tests green,
+  including the day-tile ones, on real dates outside the planning window.
+
+The override's `status` carries coverage, because `densitySourcesFor` is given
+the exact range on screen and answers `stale` when what is held does not cover
+it. The shared cache cannot say that — its window is anchored on today and
+outlives the day it was filled — so it reports the range it read and is
+checked against it.
+
+## Relative scaling — audited
+
+`forWeek` slices seven days out of a window that may be a month. The scale is
+computed by `PlanWeekMenu` over **the tiles it is given**, so the seven are
+scaled against each other; an unseen busy day elsewhere in the window cannot
+flatten them. That was already true, and is now held by two tests: one on the
+composition (`densityScale(forWeek(…))` → max 2 for a quiet week, 12 for the
+busy one beside it), and one on the rendered bars (a 1-task Friday fills all
+six segments while twelve things sit on a day in the next week of the same
+window).
+
+## Coverage
+
+| Contract | Evidence | Result |
+|---|---|---|
+| Two consumers, one read; both woken | `useDayLoadEvents.test.ts` | **pass** |
+| The read lands and wakes the others after the initiator unmounts | `useDayLoadEvents.test.ts` | **pass** |
+| No second read while one is in flight (3 consumers → 1 call) | `useDayLoadEvents.test.ts` | **pass** |
+| A failure is not retried inside the cooldown | `useDayLoadEvents.test.ts` | **pass** |
+| …and IS retried after it — not latched for the tab | `useDayLoadEvents.test.ts` | **pass** |
+| A calendar write in this tab retries immediately | `useDayLoadEvents.test.ts` | **pass** |
+| …and re-reads, so the tiles stop showing the old count | `useDayLoadEvents.test.ts` | **pass** |
+| The signal is ignored when not enabled — nothing polls | `useDayLoadEvents.test.ts` | **pass** |
+| A second account never sees the first's calendar | `useDayLoadEvents.test.ts` | **pass** |
+| The window key changes at midnight; the read follows | `useDayLoadEvents.test.ts` | **pass** |
+| The range returned is the range actually read | `useDayLoadEvents.test.ts` | **pass** |
+| A day outside the read range is unknown, and says which side | `useDayChoices.test.tsx` | **pass** |
+| Yesterday's cache does not pass as today's coverage | `useDayChoices.test.tsx` | **pass** |
+| "Nothing read yet" is its own answer | `useDayChoices.test.tsx` | **pass** |
+| No calendar → complete count, "no calendar connected", nothing fetched | `useDayChoices.test.tsx` | **pass** |
+| Routines resolve for everyone, every layer; scope is not a parameter | `useDayChoices.test.tsx` | **pass** |
+| A caller's own calendar status is trusted, and stale carries through | `useDayChoices.test.tsx` | **pass** |
+| Seven offered days scale against each other, not the window | `useDayChoices.test.tsx` + `PeriodPlanPage.test.tsx` | **pass** |
+| A shorter run (workweek) offers five tiles | `useDayChoices.test.tsx` | **pass** |
+| /week's journal and its tiles unchanged by the move | `components/home/week` (199) | **pass** |
+| **Live, /month** — 7 tiles for Oct 4–10, unchanged counts, and the new scope line reads "Everyone, every domain" | demo, read-only | **pass** |
+| **Live, /week** — identical counts to before the move, on all seven days | demo, read-only | **pass** |
+
+7098 tests pass (only the pre-existing `connectors/whatsapp` collection
+error); tsc and eslint clean. No demo data was written this batch: every live
+check opened a menu and read it.
+
+## Exact remaining gaps
+
+1. **Cross-tab writes.** A calendar change made in ANOTHER tab does not
+   invalidate this tab's cache; it is a `window` event, not a storage one. The
+   foreground return covers the common case.
+2. **Changes made in Google itself** are not known until the tab is returned
+   to, or the day rolls over. Nothing polls, by instruction.
+3. **Two coverage mechanisms.** /week states coverage through
+   `densitySourcesFor`; the shared cache through its stored range. Same
+   semantic, two implementations — the seam is the `calendar` override.
+4. **A tile can legitimately out-count the column beneath it** on /week, now
+   that tiles are universal and the journal stays filtered. The scope line is
+   what explains it; nothing else does.
+5. **`densityTasks` is opt-in.** A host rendering TodayView or WeekViewV2
+   without it falls back to the filtered list and under-counts. Only HomeView
+   renders them today.
+6. **Account isolation depends on `ShellLayout`** publishing the account.
+   Every app route is mounted inside it; a surface rendered outside keys as
+   `anon`.
+7. **Retry is demand-driven.** A calendar that is failing continuously is
+   retried at most once a minute, and only when something asks.
+
+Still outstanding for Scott, unchanged from §W and not addressed here: inline
+event time; both weekend days; weekend/custom-range restoration; goal archive
+semantics and the obscured controls; external calendar creation; plan-from-paper
+analysis; real-iPhone keyboard and safe areas; authenticated cross-household
+access testing — plus the three logged calendar findings, which remain a
+subset of that list rather than the whole of it.

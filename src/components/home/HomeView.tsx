@@ -392,6 +392,9 @@ export function HomeView({
           <WeekViewV2
             tasks={filteredTasks}
             events={filteredEvents}
+            // Unfiltered, for the tiles' universal counts only.
+            densityTasks={tasks}
+            densityEvents={events}
             sources={densitySources}
             routines={allActiveRoutines}
             dateInstances={dateInstances}
@@ -436,6 +439,9 @@ export function HomeView({
           <WeekViewV2
             tasks={filteredTasks}
             events={filteredEvents}
+            // Unfiltered, for the tiles' universal counts only.
+            densityTasks={tasks}
+            densityEvents={events}
             sources={densitySources}
             routines={allActiveRoutines}
             dateInstances={dateInstances}
@@ -508,6 +514,9 @@ export function HomeView({
         headerControls={<HomeChromeControls className="flex" />}
         afterSchedule={todayAfterSchedule}
         tasks={filteredTasks}
+        // The day tiles count universally — every domain, everyone — so they
+        // are given the unfiltered list rather than the drawn one.
+        densityTasks={tasks}
         userId={userId}
         allRoutines={allActiveRoutines}
         events={filteredEvents}

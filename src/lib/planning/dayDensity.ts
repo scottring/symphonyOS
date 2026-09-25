@@ -131,6 +131,18 @@ export function densityReadiness(s: DensitySources): { known: boolean; note?: st
 
 export const DENSITY_SEGMENTS = 6
 
+/**
+ * What the counts include, in the reader's words.
+ *
+ * Density is UNIVERSAL — every domain, everyone — because a day is full
+ * regardless of which domain filled it or whose it is. The picker must not
+ * quietly count only the reader's current filter and call a day free that is
+ * not. Printed under the tiles' heading — once, and readable by a screen
+ * reader, rather than repeated on all seven labels — so the scope is never
+ * something the reader has to infer.
+ */
+export const DENSITY_SCOPE = 'Everyone, every domain'
+
 const dedupeKey = (i: DensityItem) => i.key ?? `${i.kind}:${i.id}`
 
 /** The day's counts, deduped. `known` may be a readiness verdict. */

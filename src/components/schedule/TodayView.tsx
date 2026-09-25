@@ -121,6 +121,16 @@ interface TodayViewProps {
   /** Every active routine, not only the day's: the Planning sheet lists
    *  weekly routines with no day of their own, which no single day carries. */
   allRoutines?: Routine[]
+  /**
+   * The UNFILTERED task list, for the day tiles' counts only.
+   *
+   * `tasks` above is what this view draws, already narrowed to the reader's
+   * layers and assignee. Density is universal — a day is full regardless of
+   * which domain filled it — so counting the drawn list would call a day free
+   * that is not. Omitted, the tiles fall back to `tasks` and under-count
+   * exactly as much as the view is filtered.
+   */
+  densityTasks?: Task[]
   dateInstances?: ActionableInstance[]
   projects?: Project[]
   selectedItemId: string | null
@@ -178,6 +188,7 @@ export function TodayView({
   events,
   routines = [],
   allRoutines,
+  densityTasks,
   dateInstances = [],
   projects = [],
   selectedItemId,
@@ -349,8 +360,8 @@ export function TodayView({
    */
   const dayChoices = useDayChoices({
     windowStart: currentWeekStart, dayCount: 7,
-    tasks, userId: userId ?? null, routines: allRoutines ?? routines, layers,
-    member: selectedAssignees ?? [], instances: weekInstances,
+    tasks: densityTasks ?? tasks, userId: userId ?? null, routines: allRoutines ?? routines,
+    instances: weekInstances,
   })
   const todayInput = useMemo(() => ({
     tasks,

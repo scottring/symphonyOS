@@ -592,7 +592,7 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
   const dayChoices = useDayChoices({
     windowStart: timingWindow.start, dayCount: timingWindow.dayCount,
     tasks, tasksLoading: loading, userId: user?.id ?? null,
-    routines: activeRoutines, layers,
+    routines: activeRoutines,
   })
 
   const planWeekSlot = useCallback((row: PlanRowModel) => {
