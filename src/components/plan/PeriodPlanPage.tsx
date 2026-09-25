@@ -1066,6 +1066,27 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
   // the host owns it, so it arrives here.
   draftRef.current = shownDraft
 
+  // S2-01: a review has to open with what is already TRUE. The calendar stays
+  // folded at rest (Scott, 2026-09-13), but entering a planning session opens
+  // Shelves on it — and leaving the session puts both back as they were.
+  const openedForSession = useRef<{ pinned: boolean } | null>(null)
+  const showCalendar = useCallback(() => {
+    const alreadyPinned = !!references?.pins.some((p) => p.kind === 'today')
+    if (!alreadyPinned) references?.pin('today')
+    setCalendarOpen(true)
+    return alreadyPinned
+  }, [references])
+  const beginSession = useCallback(() => {
+    openedForSession.current = { pinned: showCalendar() }
+    startSession()
+  }, [showCalendar, startSession])
+  useEffect(() => {
+    if (sessionOpen || !openedForSession.current) return
+    if (!openedForSession.current.pinned) references?.unpin('today')
+    setCalendarOpen(readOpen(calendarKey))
+    openedForSession.current = null
+  }, [sessionOpen, references, calendarKey])
+
   // The Shelves themselves live in `PeriodShelves`, so a goal's own page can
   // render the identical component for its period instead of falling back to
   // today's chooser (2026-09-24). Every value below is what this page already
@@ -1163,6 +1184,17 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
                 : listsLoading
                   ? <span className="text-neutral-400">Loading…</span>
                   : `${goalRows.filter((r) => !rowIsDone(r.fate)).length} goals${level === 'year' ? '' : ` · ${openTaskRows.length + supportingTaskCount} tasks`}`}
+            {/* S2-15: the body said "0 goals · 0 tasks" while five things
+                were already on the calendar, all behind a closed Shelves.
+                The count is here; the button opens them. */}
+            {dated.length > 0 && (
+              <>
+                {' · '}
+                <button type="button" onClick={() => { showCalendar() }} className="text-neutral-500 underline decoration-dotted underline-offset-2 hover:text-neutral-700">
+                  {dated.length} on the calendar
+                </button>
+              </>
+            )}
           </p>
           {/* Never while a session is open: the reader is mid-draft, and this
               link would navigate them out of it. */}
@@ -1174,7 +1206,7 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
           )}
           <span className="flex-1" />
           {!sessionOpen && (
-            <button type="button" onClick={startSession} disabled={!sessionReady} aria-busy={sessionLoading || undefined}
+            <button type="button" onClick={beginSession} disabled={!sessionReady} aria-busy={sessionLoading || undefined}
               className={`${savedSession
                 ? 'rounded-md border border-neutral-200 px-3 py-1.5 text-sm text-neutral-700'
                 : 'rounded-md border border-neutral-200 px-3 py-1.5 text-sm font-semibold text-primary-700'} disabled:opacity-50`}>
@@ -1335,7 +1367,7 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
                             Nothing on this {noun}'s list yet.{!savedSession && (
                               <>
                                 {' '}
-                                <button type="button" onClick={startSession} disabled={!sessionReady}
+                                <button type="button" onClick={beginSession} disabled={!sessionReady}
                                   className="font-semibold text-primary-700 hover:underline disabled:opacity-50">
                                   Plan {shortLabel} →
                                 </button>
@@ -1460,10 +1492,15 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
           )}
         </div>
 
-        {references?.shelvesTarget ? createPortal(periodShelves, references.shelvesTarget) : !references ? periodShelves : null}
+        {/* Outside a shell (tests, previews) the Shelves sit in this column. */}
+        {!references ? periodShelves : null}
 
       </div>
       )}
+      {/* Portalled OUTSIDE the session/list switch: opening a planning
+          session opens Shelves on the calendar (S2-01), and inside the list
+          branch the panel it opened was empty. */}
+      {references?.shelvesTarget ? createPortal(periodShelves, references.shelvesTarget) : null}
     </div>
   )
 }

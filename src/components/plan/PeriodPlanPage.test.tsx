@@ -288,6 +288,14 @@ describe('PeriodPlanPage', () => {
     expect(hook.toggleTask).toHaveBeenLastCalledWith('g1')
   })
 
+  // S2-15: the body read "0 goals · 0 tasks" while commitments sat on the
+  // calendar behind a closed Shelves.
+  it('the status line says what is already on the calendar', () => {
+    state.tasks = [task({ title: 'Picture day', bucket: 'timed', scheduledFor: new Date(thisMonth.getFullYear(), thisMonth.getMonth(), 20, 9), monthStart: undefined })]
+    renderPage('month')
+    expect(screen.getByRole('button', { name: '1 on the calendar' })).toBeInTheDocument()
+  })
+
   it("never dresses a row's SCHEDULED date up as the day it was done", () => {
     const scheduledFor = new Date(now.getFullYear(), now.getMonth(), 15, 9, 0)
     state.tasks = [
