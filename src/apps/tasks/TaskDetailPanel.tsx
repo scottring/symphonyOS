@@ -37,6 +37,7 @@ import { useGatedTaskActions } from '@/hooks/useGatedTaskActions';
 import { useContacts } from '@/hooks/useContacts';
 import { useProjects } from '@/hooks/useProjects';
 import { TaskTimingMenu } from '@/components/plan/TaskTimingMenu';
+import { MakeGoalControl } from '@/components/plan/MakeGoalControl';
 import { goalOfTask } from '@/lib/planning/goalSupport';
 import { useHouseholdSeasons } from '@/hooks/useHouseholdSeasons';
 import { weekStartAnchor, readCadenceConfig } from '@/lib/cadence/config';
@@ -202,7 +203,7 @@ function TaskPanelBody({ id }: { id: string }) {
   const { clearSelection } = useSelection();
   const navigate = useNavigate();
 
-  const { tasks, addTask, addSubtask, deleteTask, toggleTask, updateTask: rawUpdateTask, updateTasksBulk, pushTask, setBucket, refetch } = useSupabaseTasks();
+  const { tasks, addTask, addSubtask, deleteTask, toggleTask, updateTask: rawUpdateTask, updateTasksBulk, pushTask, setBucket, setGoal, refetch } = useSupabaseTasks();
   const { contacts, addContact, searchContacts } = useContacts();
   // The "To buy" conversion the row's strip used to offer on Today. The task
   // is deleted when it moves (an item lives in one place), so the panel
@@ -281,15 +282,21 @@ function TaskPanelBody({ id }: { id: string }) {
       // shows nothing rather than a prompt.
       purpose={(() => {
         const goal = goalOfTask(task, tasks, seasons);
+        // "Make it a goal" sits with what the task is FOR: it changes the
+        // same row into a goal, and says why when it cannot (Scott, 2026-09-25).
+        const toGoal = <MakeGoalControl task={task} tasks={tasks} setGoal={setGoal} />;
         return goal ? (
-          <p className="text-[13px] text-neutral-500">
-            <span className="text-neutral-400">For</span>{' '}
-            <button type="button" onClick={() => navigate(`/task/${goal.id}`)} className="text-left text-neutral-700 hover:underline">
-              {goal.title}
-            </button>
-            {goal.period && <span className="text-neutral-400"> · {goal.period}</span>}
-          </p>
-        ) : undefined;
+          <>
+            <p className="text-[13px] text-neutral-500">
+              <span className="text-neutral-400">For</span>{' '}
+              <button type="button" onClick={() => navigate(`/task/${goal.id}`)} className="text-left text-neutral-700 hover:underline">
+                {goal.title}
+              </button>
+              {goal.period && <span className="text-neutral-400"> · {goal.period}</span>}
+            </p>
+            {toGoal}
+          </>
+        ) : toGoal;
       })()}
       // A goal is not scheduled, so it gets no timing control.
       timingControl={task.isGoal ? undefined : (

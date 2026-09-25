@@ -2652,3 +2652,64 @@ describe('the month page offers a flexible weekend', () => {
     expect(within(g).getAllByRole('menuitemradio', { name: /keeping the weekend$/ })).toHaveLength(2)
   })
 })
+
+describe('season page: make a task a goal, and take it into the month before the season', () => {
+  // The clock is pinned to Sep 10 2026; the default Fall runs Sep–Nov.
+  const fall = periodStartFor('season', new Date(2026, 8, 10), DEFAULT_SEASONS)
+  beforeEach(() => {
+    pinClock(); localStorage.clear()
+    state.tasks = [
+      task({ id: 'q1', title: 'Nourish a love of reading', bucket: 'quarter', seasonStart: fall, context: 'family', assignedToAll: ['me', 'm2'],
+        commitments: [{ level: 'season', periodStart: fall, status: 'open' }] }),
+      task({ id: 'qg', title: 'Family adventures', isGoal: true, bucket: 'quarter', seasonStart: fall }),
+      task({ id: 'qs', title: 'Pick three trails', bucket: 'quarter', seasonStart: fall, goalTaskId: 'qg' }),
+    ]
+    state.goals = []; state.loading = false; routinesState.routines = []
+    seasonsState.seasons = DEFAULT_SEASONS; seasonsState.loading = false
+    Object.values(hook).forEach((f) => f.mockClear()); toastSpy.mockClear()
+  })
+  afterEach(() => { vi.useRealTimers() })
+
+  it('a loose season task offers "Make it a goal", which converts the SAME row, with Undo', () => {
+    renderPage('season')
+    fireEvent.click(screen.getByRole('button', { name: 'Make Nourish a love of reading a goal' }))
+    expect(hook.setGoal).toHaveBeenCalledWith('q1', true)
+    // No new row, no other write: identity, season, area and people untouched.
+    expect(hook.addTask).not.toHaveBeenCalled()
+    expect(hook.updateTask).not.toHaveBeenCalled()
+  })
+
+  it('Undo converts it back', async () => {
+    renderPage('season')
+    fireEvent.click(screen.getByRole('button', { name: 'Make Nourish a love of reading a goal' }))
+    await waitFor(() => expect(toastSpy).toHaveBeenCalled())
+    const [msg, , , action] = toastSpy.mock.calls.at(-1) as [string, string, number, { label: string; onClick: () => void }]
+    expect(msg).toMatch(/is now a goal/)
+    action.onClick()
+    expect(hook.setGoal).toHaveBeenLastCalledWith('q1', false)
+  })
+
+  it('works from the keyboard', async () => {
+    const user = userEvent.setup({ advanceTimers: () => {} })
+    renderPage('season')
+    screen.getByRole('button', { name: 'Make Nourish a love of reading a goal' }).focus()
+    await user.keyboard('{Enter}')
+    expect(hook.setGoal).toHaveBeenCalledWith('q1', true)
+  })
+
+  it('a goal, and a step under a goal, are not offered it on the row', () => {
+    renderPage('season')
+    expect(screen.queryByRole('button', { name: 'Make Family adventures a goal' })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: /Show steps under Family adventures/ }))
+    expect(screen.queryByRole('button', { name: 'Make Pick three trails a goal' })).toBeNull()
+  })
+
+  it('"Into a month…" offers the month before the season, and choosing it keeps the season', () => {
+    renderPage('season')
+    const select = screen.getByRole('combobox', { name: 'Take Nourish a love of reading into a month' })
+    const options = within(select).getAllByRole('option').map((o) => o.textContent)
+    expect(options).toEqual(['Into a month…', 'August (before Fall)', 'September', 'October', 'November'])
+    fireEvent.change(select, { target: { value: '2026-08-01' } })
+    expect(hook.updateTask).toHaveBeenCalledWith('q1', { bucket: 'month', monthStart: new Date(2026, 7, 1) })
+  })
+})

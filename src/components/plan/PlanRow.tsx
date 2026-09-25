@@ -163,7 +163,7 @@ export function PlanRow({
   expanded = false, onToggleExpand, onAddStep, stepActionsFor, planWeek,
   timingReachesLower = false,
   stepsToDraw, counts, hiddenByReveal = 0, onShowAllSteps, hiddenByFilter = 0, goalControls,
-  assign,
+  assign, makeGoal,
 }: {
   row: PlanRowModel
   actions: RowAction[]
@@ -215,6 +215,10 @@ export function PlanRow({
    *  people are its own, never copied from its goal. Visible at every width,
    *  like the timing control: who is doing it is not a hover secret. */
   assign?: (row: PlanRowModel) => ReactNode
+  /** "Make it a goal" for this row, or undefined where it cannot be one.
+   *  The SAME row becomes the goal (goalConversion); offered as a visible
+   *  labelled link, not a hover icon, because it changes what the row is. */
+  makeGoal?: (row: PlanRowModel) => (() => void) | undefined
 }) {
   // A row whose copy is finished reads as finished — one status, not a tick
   // that disagrees with an annotation beside it.
@@ -353,6 +357,14 @@ export function PlanRow({
         {/* A row that already serves a goal says so above; offering to link
             it read as though it served nothing (S3-08). */}
         {!row.isGoal && !row.supports && actions.includes('under-goal') && <button type="button" onClick={() => onAction('under-goal', row)} className="mt-1 block text-xs text-primary-700 hover:underline" aria-label={`Link ${row.title} to a goal`}>Link to goal</button>}
+        {(() => {
+          const toGoal = makeGoal?.(row)
+          return toGoal ? (
+            <button type="button" onClick={toGoal} className="mt-1 block text-xs text-primary-700 hover:underline" aria-label={`Make ${row.title} a goal`}>
+              Make it a goal
+            </button>
+          ) : null
+        })()}
         {/* What the goal holds, said whether it is open or shut — a collapsed
             goal that only says "5 supporting tasks" hides how much is done. */}
         {canHoldSteps && (tally.total > 0 || !!onAddStep) && (

@@ -238,3 +238,25 @@ export function offerableFromAbove(
     return c === 'legacy' || (c !== undefined && c.status === 'open')
   })
 }
+
+/**
+ * What a season row's "Into a month…" offers: every month of the season, and
+ * the month just BEFORE it — so a plan written on paper for Fall can still put
+ * work into the September already under way (Scott, 2026-09-25). Choosing it
+ * keeps the season commitment (moving down never closes a higher rung), so the
+ * row stays on the season's list, marked "→ September". Across a year boundary
+ * the earlier month names its year ("December 2026 (before Winter)").
+ */
+export function intoMonthChoices(bounds: Pick<PeriodBounds, 'start' | 'end' | 'label'>): { date: Date; label: string; beforeSeason: boolean }[] {
+  const months: Date[] = []
+  for (let d = new Date(bounds.start.getFullYear(), bounds.start.getMonth(), 1); d < bounds.end; d = new Date(d.getFullYear(), d.getMonth() + 1, 1)) months.push(d)
+  if (months.length === 0) return []
+  const first = months[0]
+  const before = new Date(first.getFullYear(), first.getMonth() - 1, 1)
+  const name = (d: Date, withYear: boolean) => d.toLocaleDateString('en-US', withYear ? { month: 'long', year: 'numeric' } : { month: 'long' })
+  const season = bounds.label.replace(/\s+\d{4}(\s*[–-]\s*\d{2,4})?$/, '')
+  return [
+    { date: before, label: `${name(before, before.getFullYear() !== first.getFullYear())} (before ${season})`, beforeSeason: true },
+    ...months.map((d) => ({ date: d, label: name(d, false), beforeSeason: false })),
+  ]
+}

@@ -53,7 +53,7 @@ import { useAuth } from '@/hooks/useAuth'
 import { lookBackRows, isEmptyDraft, goalsWithHiddenSteps, goalAsRow, yearLookBack, type SessionDraft } from '@/lib/planning/session'
 import type { DomainId } from '@/lib/domains'
 import {
-  periodBounds, isCurrentPeriod, selectPeriodTasks, actionsFor, railLevel, lowerLevel, planningPeriod, offerableFromAbove,
+  periodBounds, isCurrentPeriod, selectPeriodTasks, actionsFor, intoMonthChoices, railLevel, lowerLevel, planningPeriod, offerableFromAbove,
   type PlanLevel, type RowAction,
 } from '@/lib/planning/periodPage'
 import { firstNoteLine } from '@/lib/planning/goalsReference'
@@ -69,6 +69,8 @@ import { periodCalendarEntries } from '@/lib/planning/periodCalendar'
 import { PlanWeekMenu } from './PlanWeekMenu'
 import { weekendsTouching, weekendEnd } from '@/lib/planning/weekend'
 import { MultiAssigneeDropdown } from '@/components/family'
+import { goalConversion } from '@/lib/planning/goalConversion'
+import { makeTaskAGoal } from './MakeGoalControl'
 import { PeriodShelves } from './PeriodShelves'
 import { useDayLoadEvents, DAY_LOAD_RANGE_DAYS } from '@/hooks/useDayLoadEvents'
 
@@ -441,6 +443,19 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
    * `updateTask` derives the sharing scope from the people chosen.
    * A look-back is read, not written into: no picker on a past period.
    */
+  /**
+   * "Make it a goal" on a loose task row: the same row becomes a goal of this
+   * list (goalConversion says when it can; details explain when it cannot).
+   * Offered as a labelled link, not among the hover verbs, because it changes
+   * what the row IS — the reason it was taken off those verbs on 2026-09-22.
+   */
+  const makeGoalFor = useCallback((row: PlanRowModel) => {
+    if (isPast || row.isGoal || row.kind !== 'task' || level === 'year') return undefined
+    const t = tasks.find((x) => x.id === row.id)
+    if (!t || !goalConversion(t, tasks).ok) return undefined
+    return () => { void makeTaskAGoal(t, setGoal) }
+  }, [isPast, level, tasks, setGoal])
+
   const assignFor = useCallback((row: PlanRowModel) => {
     if (isPast || familyMembers.length === 0 || row.assigneeIds === undefined) return null
     const onSelect = (ids: string[]) => {
@@ -692,12 +707,9 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
   })
 
   /** The months a season spans, first to last — what S3-03's chooser offers. */
-  const seasonMonths = useMemo(() => {
-    if (level !== 'season') return []
-    const out: Date[] = []
-    for (let d = new Date(bounds.start.getFullYear(), bounds.start.getMonth(), 1); d < bounds.end; d = new Date(d.getFullYear(), d.getMonth() + 1, 1)) out.push(d)
-    return out
-  }, [level, bounds.start, bounds.end])
+  // What "Into a month…" offers — the season's months and the one before it
+  // (intoMonthChoices).
+  const intoMonthOptions = useMemo(() => (level === 'season' ? intoMonthChoices(bounds) : []), [level, bounds])
   const planWeekSlot = useCallback((row: PlanRowModel) => {
     if (level === 'year') return null
     const t = tasks.find((x) => x.id === row.id)
@@ -729,19 +741,19 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
       {/* S3-03: a season row can go into ANY of its season's months, named,
           not only the one "Take it into" means. A plain select: reachable by
           touch, keyboard and screen reader alike. */}
-      {level === 'season' && !row.isGoal && seasonMonths.length > 1 && (
+      {level === 'season' && !row.isGoal && intoMonthOptions.length > 1 && (
         <select
           aria-label={`Take ${row.title} into a month`}
           value=""
           onChange={(e) => {
-            const m = seasonMonths.find((d) => localYmd(d) === e.target.value)
+            const m = intoMonthOptions.find((o) => localYmd(o.date) === e.target.value)?.date
             if (m) void gated.updateTask(row.id, { bucket: 'month', monthStart: m })
           }}
           className="rounded-md border border-neutral-200 bg-white px-1.5 py-0.5 text-xs text-neutral-600"
         >
           <option value="" disabled>Into a month…</option>
-          {seasonMonths.map((d) => (
-            <option key={localYmd(d)} value={localYmd(d)}>{d.toLocaleDateString('en-US', { month: 'long' })}</option>
+          {intoMonthOptions.map((o) => (
+            <option key={localYmd(o.date)} value={localYmd(o.date)}>{o.label}</option>
           ))}
         </select>
       )}
@@ -755,7 +767,7 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
       )}
       </span>
     )
-  }, [level, bounds.start, timingPeriodLabel, planActions, tasks, navigate, gated, removeTiming, dayChoices, seasonMonths, monthWeekends])
+  }, [level, bounds.start, timingPeriodLabel, planActions, tasks, navigate, gated, removeTiming, dayChoices, intoMonthOptions, monthWeekends])
 
   const [pickingGoalFor, setPickingGoalFor] = useState<string | null>(null)
   const [linkError, setLinkError] = useState(false)
@@ -1388,7 +1400,7 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
                   ) : (
                   <ul>
                     {goalView.goals.map((g) => (
-                      <PlanRow assign={assignFor} key={g.row.id} row={g.row} onOpen={open} onOpenPlaced={openPlaced} onOpenSupport={openSupport} onAction={(a, r) => { void act(a, r) }} planWeek={planWeekSlot} timingReachesLower={level === 'month'}
+                      <PlanRow assign={assignFor} makeGoal={makeGoalFor} key={g.row.id} row={g.row} onOpen={open} onOpenPlaced={openPlaced} onOpenSupport={openSupport} onAction={(a, r) => { void act(a, r) }} planWeek={planWeekSlot} timingReachesLower={level === 'month'}
                         lowerLabel={lowerLabelText}
                         expanded={g.expanded}
                         onToggleExpand={toggleGoal}
@@ -1410,7 +1422,7 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
                 <details className="period-assigned-fold" key={`goals-${level}-${bounds.start.toISOString()}`} open={isPast || undefined}>
                   <summary>Completed goals · {doneGoalRows.length}</summary>
                   <ul>{doneGoalRows.map((row) => (
-                    <PlanRow assign={assignFor} key={row.id} row={row} onOpen={open} onOpenPlaced={openPlaced} onOpenSupport={openSupport} planWeek={planWeekSlot} timingReachesLower={level === 'month'}
+                    <PlanRow assign={assignFor} makeGoal={makeGoalFor} key={row.id} row={row} onOpen={open} onOpenPlaced={openPlaced} onOpenSupport={openSupport} planWeek={planWeekSlot} timingReachesLower={level === 'month'}
                       // A finished goal keeps its controls: reopening one is
                       // the whole reason to look at this fold (Codex).
                       goalControls={goalControlsFor(row)}
@@ -1473,7 +1485,7 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
                   {availableTaskRows.length === 0 && <p className="period-section-note">Every open task has a more specific commitment.</p>}
                   <ul>
                     {visibleTaskRows.map((row) => (
-                      <PlanRow assign={assignFor} key={row.id} row={row} onOpen={open} onOpenPlaced={openPlaced} onOpenSupport={openSupport} onAction={(a, r) => { void act(a, r) }} planWeek={planWeekSlot} timingReachesLower={level === 'month'}
+                      <PlanRow assign={assignFor} makeGoal={makeGoalFor} key={row.id} row={row} onOpen={open} onOpenPlaced={openPlaced} onOpenSupport={openSupport} onAction={(a, r) => { void act(a, r) }} planWeek={planWeekSlot} timingReachesLower={level === 'month'}
                         lowerLabel={lowerLabelText}
                         actions={actionsFor({ fate: row.fate, isGoal: row.isGoal, isPast, level, hasGoals: goalRows.length > 0 })} />
                     ))}
@@ -1547,7 +1559,7 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
                   <summary>Already assigned · {assignedTaskRows.length}</summary>
                   <p className="period-section-note">Still part of this {noun}’s plan.</p>
                   <ul>{assignedTaskRows.map((row) => (
-                    <PlanRow assign={assignFor} key={row.id} row={row} onOpen={open} onOpenPlaced={openPlaced} onOpenSupport={openSupport} planWeek={planWeekSlot} timingReachesLower={level === 'month'}
+                    <PlanRow assign={assignFor} makeGoal={makeGoalFor} key={row.id} row={row} onOpen={open} onOpenPlaced={openPlaced} onOpenSupport={openSupport} planWeek={planWeekSlot} timingReachesLower={level === 'month'}
                       onAction={(a, r) => { void act(a, r) }} lowerLabel={lowerLabelText}
                       actions={actionsFor({ fate: row.fate, isGoal: false, isPast, level, hasGoals: goalRows.length > 0 })} />
                   ))}</ul>
@@ -1571,7 +1583,7 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
                   {doneOpen && (
                     <ul className="mt-1 border-t border-neutral-200">
                       {doneTaskRows.map((row) => (
-                        <PlanRow assign={assignFor} key={row.id} row={row} onOpen={open} onOpenPlaced={openPlaced} onOpenSupport={openSupport} onAction={(a, r) => { void act(a, r) }} planWeek={planWeekSlot} timingReachesLower={level === 'month'}
+                        <PlanRow assign={assignFor} makeGoal={makeGoalFor} key={row.id} row={row} onOpen={open} onOpenPlaced={openPlaced} onOpenSupport={openSupport} onAction={(a, r) => { void act(a, r) }} planWeek={planWeekSlot} timingReachesLower={level === 'month'}
                           lowerLabel={lowerLabelText}
                         actions={actionsFor({ fate: row.fate, isGoal: row.isGoal, isPast, level })} />
                       ))}

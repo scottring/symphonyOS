@@ -147,3 +147,25 @@ phone-width titles squeezed to 0–30px on /month and /week (b58a2e75, live
 
 Still open: S1-01, S1-04, S1-05/S1-05a (product), S1-06, S2-02 (needs repro),
 S3-07 (parked, external calendar).
+
+## Open finding: Month → Week has no next step once everything has timing (2026-09-25)
+
+**Seen by Scott** while entering a paper plan. On the Month page, once every
+month item has a week (or a day), the items collapse under *Already assigned*
+and the page offers no obvious next step. Nothing says which weeks now hold
+the work, and nothing leads on to planning those weeks.
+
+**Proposed; not built, and not yet approved.** A visible "tasks by week" line
+on the Month page, e.g. "Sep 6–12 · 3 · Open week →", with one row per week of
+the month that holds any of its items. Each row carries:
+- the count of month items committed to that week (the same selector the week
+  list uses, so the counts mirror what the Week page renders);
+- an **Open week** link to `/week?start=<that week>`.
+
+It would sit where the empty "Month tasks" list leaves off. That turns the end
+of month planning into the start of week planning without a mandatory
+cascade.
+
+**Coordination.** This touches `PeriodPlanPage.tsx` (the month list and its
+folds). The paper-import session owns the importer's type and assignee work,
+not this page. Record only; nothing implemented.
