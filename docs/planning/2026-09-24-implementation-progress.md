@@ -1804,3 +1804,69 @@ world before the write.
 26 tests on the cache, 7107 overall. The density cache is not "accepted" by me
 — that is Codex's call — but every contract in the addendum now has a test
 that fails without its fix.
+
+---
+
+# §Y — Completion checklist (durable; update in place)  ·  started 2026-09-25
+
+The program's remaining authorized scope, one line per item, kept current so a
+fresh session can resume from here. Evidence kinds: **Live** (driven on :5199,
+real DB), **PG** (throwaway local Postgres with the live schema —
+`scripts/test-planning-commitments-locally.sh`), **Unit/Hydrated**, **Harness**
+(isolated Chromium). Mocked tests never stand in for Live or PG.
+
+Model: this session runs **Opus 5.5** (`claude-opus-5-5`), as Scott preferred.
+
+## Verified
+
+| Item | Evidence | Commit |
+|---|---|---|
+| Choose-when density: one counting path, universal scope printed, loading / failed / not-connected / out-of-range states, seven-day relative scaling | Unit + Live (read-only) | §W–§X.1 |
+| Inline event date/start/end editing; refused save keeps the edit; Escape returns focus | Unit + Live (open/cancel; save not exercised live — no disposable calendar) | 52888c78 |
+| Both weekend days for events, each with density; tasks keep "either day" (now on its own line — it overflowed the tile) | Unit + Live | 52888c78 |
+| Guide's "Plan from paper" opens the flow (it only navigated to Today) | Unit + Live | 509a3fa9 |
+| Review Drop + Keep save, partial failure keeps only the failed verdict, retry writes nothing twice, survives reload | **Live** (forced write failure via fetch interception) + Unit | 65f96555 |
+| Review save screen: saved plan vs proposed changes separated; Drop names its destination | Unit + Live | 65f96555 |
+| keepForward / dropCommitment / complete-reopen / retry idempotency / cross-household RLS | **PG** 11/11 | 65f96555 |
+| Carried period chosen again reopens (model showed Inbox, DB reopened) | Unit (red first) + PG | 65f96555 |
+| Focus re-send no longer hits RLS (task_focus has no UPDATE policy) | PG | 65f96555 |
+| Earlier: link set/change/remove/reload/reciprocal, goal complete independent of steps, standalone task → goal, keyboard long list, year review completed goals | Live / Hydrated (§V, Acceptance walk) | prior |
+
+## Implementation remaining (authorized, unblocked)
+
+Status from a read-only code audit on 2026-09-25 (file:line in the audit).
+
+- [ ] Event panel: completed prep task hidden (`TapEventPanel` → `includeCompleted`)
+- [ ] Event panel: no Delete (`deleteEvent` exists; add `PanelMoreMenu`)
+- [ ] New event from /week quick-create needs reload (no refetch)
+- [ ] S2-26 detail pane Schedule button shows no date; S2-27 remove-day in pane hidden in popover
+- [ ] S2-08 `/task/:id` says "Task not found" while loading
+- [ ] S3-10 empty week says "No week tasks match this person" with no filter applied (confirmed live)
+- [ ] S3-08 month task already linked to a season goal still offers "Link to goal"; no Supports line
+- [ ] S3-09 "Add to October" offered for work already in October
+- [ ] S2-29 period calendar never de-duplicates events
+- [ ] S2-23 goal row circle completes a goal with no confirmation/Undo
+- [ ] S3-12 capture toasts success before the write settles (duplicate/contradictory)
+- [ ] S3-11 / §P routine copy: "Select at least one day" contradicts a flexible save; Daily vs Weekly-all-days explained
+- [ ] Weekend / custom-range week lost on reload (`weekStartParam` only handles 7 days)
+- [ ] S2-10 plan pages open the full page, Today/Week open the pane
+- [ ] S2-19 domain gate does not say which action it is holding
+- [ ] S2-01 / S2-15 planning session opens without the calendar commitments in view
+- [ ] Week inline add closes after one Enter (second typed title lost) — low
+
+## Acceptance remaining (needs a live walk after the above)
+
+- [ ] Event edit → save, reschedule, drag/resize, prep association, complete/reopen — live, on a disposable event (needs a writable non-primary calendar or explicit approval)
+- [ ] Capture → Inbox/life-area gate → week → day/time → edit → complete/reopen → remove day keeps week — re-walk on the current build
+- [ ] Dense list in the running app (only ever seen in the harness)
+- [ ] Narrow (390px) pass over the changed surfaces
+
+## Genuinely blocked / needs Scott
+
+- **S2-22 month/season goal archive** — no status column for period goals; a schema/product decision. Not faked with placement.
+- **S1-05 / S1-05a nav labels** ("Planner" over period tabs) — product decision.
+- **External calendar creation** (S3-07) — destination/approval unresolved; no real event writes.
+- **Real iPhone keyboard / safe areas; paper print on a real printer** — manual.
+- **Authenticated two-account live RLS** — PG proves policies; a live two-account walk needs a second demo login.
+- **Row-before-commitment write order**: a Drop whose commitment write fails leaves the row in the Inbox with the week still open until retry (seen live). Retry converges (PG 3/4). Reordering is a core-writer change — flagged for Codex, not done.
+- **Demo fixtures left**: `QA-REV drop me` (Inbox), `QA-REV keep me` (week of Sep 20). Not hard-deleted (browser safety rules); safe to Drop/complete.
