@@ -1953,3 +1953,10 @@ function; a live two-account test.
 **Concurrency, all orders:** separate requests are not atomic, and two writers
 (another tab, the partner, the wall) can interleave. Ordering bounds a single
 client's failure; only the transaction serialises writers.
+
+**Update 2026-09-25 (later) — transactional fix prepared.** The recommended
+transaction now exists as a migration (NOT applied) and a client path behind
+`VITE_PLACEMENT_RPC` (off by default): e08dc90a, 88b257d9. PG proof 76/76;
+7209 tests. Review and rollout steps:
+`docs/planning/2026-09-25-transactional-placement-review.md`. The risk above
+stays open in production until that rollout is approved and done.
