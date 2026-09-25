@@ -110,6 +110,32 @@ describe('SelectionProvider', () => {
     expect(screen.getByTestId('selection').textContent).toBe('none');
   });
 
+  // S2-10: the planning pages opened a task on its full page because a
+  // selection made there was stripped at once. An app may HOST a kind it
+  // does not own; one that does not still loses it.
+  it('keeps a selection on a page whose app hosts the kind, and strips it elsewhere', () => {
+    const hostRegistry = createRegistry([
+      fakeApp('tasks', '/today', ['task']),
+      { ...fakeApp('plan-month', '/month'), hostsSelectionKinds: ['task'] },
+      fakeApp('jobs', '/jobs', ['application']),
+    ]);
+    const at = (path: string) => (
+      <MemoryRouter key={path} initialEntries={[path]}>
+        <SelectionProvider registry={hostRegistry}>
+          <Routes>
+            <Route path="/month/*" element={<Probe />} />
+            <Route path="/jobs/*" element={<Probe />} />
+          </Routes>
+        </SelectionProvider>
+      </MemoryRouter>
+    );
+    const { rerender } = render(at('/month?start=2026-10-01&detail=task:abc'));
+    expect(screen.getByTestId('selection').textContent).toBe('task:abc');
+    expect(screen.getByTestId('search').textContent).toContain('start=2026-10-01');
+    rerender(at('/jobs?detail=task:abc'));
+    expect(screen.getByTestId('selection').textContent).toBe('none');
+  });
+
   it('keeps a task selection on /today when tasks is the index app (route "/")', () => {
     // Regression for the cutover bug: the real tasks app has route '/' + index
     // but renders Today at /today. findAppForPath must fall back to the index app

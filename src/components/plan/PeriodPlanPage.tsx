@@ -30,6 +30,7 @@ import { GoalParentLink, GoalStatusControl, parentRungLabel } from './GoalParent
 import { expansionKey, readExpanded, writeExpanded } from './goalExpansion'
 import { planDropHandlers } from '@/lib/planning/planDrag'
 import { showToast } from '@/hooks/useToast'
+import { useSelectionOptional } from '@/shell/providers/SelectionProvider'
 import { useGatedTaskActions } from '@/hooks/useGatedTaskActions'
 import { useDomain } from '@/hooks/useDomain'
 import { useFamilyMembers } from '@/hooks/useFamilyMembers'
@@ -334,9 +335,20 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
     navigate(ref.rung === 'year' ? `/goals/${ref.id}` : `/task/${ref.id}`)
   }, [navigate])
 
+  // A TASK opens in the detail pane, as it does on Today and Week, so the
+  // period stays under it (S2-10: "page, not pane. why?"). A goal keeps its
+  // own page — that is where its steps, its period's Shelves and its support
+  // links live (S2-18, S3-14). Outside the shell there is no pane: the page.
+  const selection = useSelectionOptional()
+  const openTask = useCallback((id: string) => {
+    if (selection) selection.setSelection({ kind: 'task', id })
+    else navigate(`/task/${id}`)
+  }, [selection, navigate])
   const open = useCallback((row: PlanRowModel) => {
-    navigate(row.kind === 'goal' ? `/goals/${row.id}` : `/task/${row.id}`)
-  }, [navigate])
+    if (row.kind === 'goal') navigate(`/goals/${row.id}`)
+    else if (row.isGoal) navigate(`/task/${row.id}`)
+    else openTask(row.id)
+  }, [navigate, openTask])
 
   // A goal's circle sits where a task's tick sits, and one stray click closed
   // a whole period's outcome with nothing to say it had (S2-23). Completing a
@@ -747,7 +759,10 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
   const overCap = availableTaskRows.length > TASK_PREVIEW_CAP
   const hiddenTaskCount = availableTaskRows.length - visibleTaskRows.length
 
-  const openPlaced = useCallback((taskId: string) => { navigate(`/task/${taskId}`) }, [navigate])
+  const openPlaced = useCallback((taskId: string) => {
+    if (tasks.find((t) => t.id === taskId)?.isGoal) navigate(`/task/${taskId}`)
+    else openTask(taskId)
+  }, [tasks, navigate, openTask])
 
   const noun = NOUN[level]
   const shortLabel = level === 'month'
