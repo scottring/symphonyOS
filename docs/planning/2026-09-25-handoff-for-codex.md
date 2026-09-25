@@ -82,3 +82,25 @@ hook.
 
 **Still not applied or deployed.** Live calendar and two-account checks are
 pending. Mixed saves and group moves stay on the ordinary path.
+
+## Round 3 — recovery restores every placement field (2026-09-25)
+
+- `reconcileTaskPlacement` now reads the commitments, focus and row, and
+  copies back **every** placement field: bucket, week/month/season, weekend,
+  `scheduledFor`, `isAllDay`, `plannedOn`, `deferCount`, `deferredUntil` and
+  `weekDeferredAt`.
+- A failed read of any of the three, focus included, is an incomplete re-read
+  (null): the snapshot stands and the task is marked unreconciled.
+- Tests: "recovery restores every placement field", 4 tests.
+  - dated rollback → no date;
+  - dated lost response → the committed date;
+  - deferral fields restored;
+  - failed focus read → saves blocked, unsent, until a full read.
+  - 3 of the 4 fail on the previous hook. The lost-response test passes on
+    both, because the optimistic value equals the committed one.
+- Numbers:
+  - hook/helper tests **112/112**;
+  - full suite 7218 (only the known connectors error);
+  - PG 100 **99/99**; 096–099 unchanged and passing;
+  - tsc clean, eslint 0 errors, build clean.
+- Still not applied; the switch stays off.

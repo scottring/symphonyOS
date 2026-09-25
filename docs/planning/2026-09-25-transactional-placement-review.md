@@ -65,6 +65,14 @@ read fails too, the snapshot stands in and the task is marked unreconciled, so
 the next placement save is refused unsent until a read succeeds. This is the
 same rule Drop and Keep already follow.
 
+**Recovery restores every placement field (Codex review, round 3).** The
+re-read (`reconcileTaskPlacement`) now reads the records, the focus and the
+row. It copies back every placement column: bucket and stamps, weekend,
+date/time, all-day, planned-on, and the deferral fields. Before this, a dated
+move that rolled back kept its rejected date on screen. All three reads must
+succeed. A failed focus read counts as an incomplete re-read: the snapshot
+stands in and the task stays blocked until a full read.
+
 **Which stay on the ordinary requests even with the switch on, by design:**
 - A save that also changes a title, domain, notes or similar. The function
   writes placement only.
@@ -108,6 +116,10 @@ if any step fails.
 | Hook: a stale Drop is refused | Hook | pass |
 | Hook: a lost response after the commit re-reads and does NOT restore the old snapshot | Hook | pass |
 | Hook: lost response + failed re-read → placement saves blocked, unsent, until a read succeeds | Hook | pass |
+| Hook: a dated move that rolls back shows no date, no focus, the old bucket (the DB's) | Hook | pass (red on previous hook) |
+| Hook: a dated move whose response is lost shows the committed date, all-day and focus | Hook | pass |
+| Hook: deferral fields come back from the DB after a rollback | Hook | pass (red on previous hook) |
+| Hook: a failed focus read → snapshot stands, saves blocked unsent until a full read | Hook | pass (red on previous hook) |
 | The client allowlist matches the migration's `allowed` | Unit | pass |
 
 The PG totals are **99 passed and 0 failed** (parity 9, rollback 10, retry 12, concurrency 4, stale 15, security 45, pinning 4). Rerun with

@@ -1569,25 +1569,44 @@ export function useSupabaseTasks() {
    *  from local state. Returns the task to plan from: the RECONCILED one when a
    *  re-read was needed, the current one otherwise, or null = refuse the write. */
   /**
-   * The records AND the row, re-read. `reconcileCommitments` rebuilds the cache
-   * from the records, which is right for the bucket — but a weekend stamp, or a
-   * Someday the sync trigger turned into 'inbox', lives only on the row. After
-   * a Drop whose final row write failed, planning a retry from the derived
-   * cache would call the row already correct and write nothing (Codex review of
-   * the Drop investigation, 2026-09-25). Null = either read failed.
+   * The task's whole placement, re-read: its period records, its focus, and
+   * EVERY placement column on its row — bucket and stamps, the date and time,
+   * all-day, planned-on, the deferral bookkeeping. After a save whose outcome
+   * is not known, anything left over from the optimistic plan is a lie: a
+   * dated move that rolled back kept its rejected date on screen because only
+   * bucket and stamps were copied back (Codex review, round 3).
+   *
+   * All three reads must succeed. A failed focus read is not "no focus", and
+   * a half-read task is not reconciled — null, so the caller keeps its
+   * snapshot and marks the task unreconciled.
    */
   const reconcileTaskPlacement = useCallback(async (taskId: string): Promise<Task | null> => {
-    const read = await reconcileCommitments(taskId)
-    if (!read) return null
-    let row: { data: unknown; error: unknown }
-    try { row = await supabase.from('tasks').select('*').eq('id', taskId).maybeSingle() } catch (e) { row = { data: null, error: e } }
-    if (row.error || !row.data) return null
-    const r = dbTaskToTask(row.data as DbTask)
-    const truth: Task = { ...read, bucket: r.bucket, weekStart: r.weekStart, monthStart: r.monthStart, seasonStart: r.seasonStart, weekendStart: r.weekendStart }
+    let cRes: { data: unknown; error: unknown }, fRes: { data: unknown; error: unknown }, rRes: { data: unknown; error: unknown }
+    try {
+      ;[cRes, fRes, rRes] = await Promise.all([
+        supabase.from('task_commitments').select('*').eq('task_id', taskId),
+        supabase.from('task_focus').select('*').eq('task_id', taskId),
+        supabase.from('tasks').select('*').eq('id', taskId).maybeSingle(),
+      ])
+    } catch {
+      return null
+    }
+    if (cRes.error || !cRes.data || fRes.error || !fRes.data || rRes.error || !rRes.data) return null
+    const base = lookupTaskById(tasksRef.current, taskId)
+    if (!base) return null
+    const r = dbTaskToTask(rRes.data as DbTask)
+    const truth: Task = {
+      ...base,
+      commitments: (cRes.data as DbTaskCommitment[]).map(dbCommitmentToCommitment),
+      focus: (fRes.data as DbTaskFocus[]).map(dbFocusToFocus),
+      bucket: r.bucket, weekStart: r.weekStart, monthStart: r.monthStart, seasonStart: r.seasonStart,
+      weekendStart: r.weekendStart, scheduledFor: r.scheduledFor, isAllDay: r.isAllDay, plannedOn: r.plannedOn,
+      deferCount: r.deferCount, deferredUntil: r.deferredUntil, weekDeferredAt: r.weekDeferredAt,
+    }
     tasksRef.current = patchTaskRecords(tasksRef.current, taskId, () => truth)
     setTasks((prev) => patchTaskRecords(prev, taskId, () => truth))
     return truth
-  }, [reconcileCommitments])
+  }, [])
 
   const ensureReconciled = useCallback(async (taskId: string): Promise<Task | null> => {
     if (!unreconciledTasks.has(taskId)) return findTaskById(taskId) ?? null

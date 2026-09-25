@@ -1082,3 +1082,76 @@ describe('transactional placement: stale plans and uncertain failures', () => {
     expect(openWeeks()).toEqual([O4])
   })
 })
+
+// Codex review, round 3: recovery copied back only bucket and stamps, so a
+// dated move that ROLLED BACK kept its rejected date on screen. Every
+// placement field now comes back from the database, and a failed focus read
+// is an incomplete re-read, not "no focus".
+describe('transactional placement: recovery restores every placement field', () => {
+  beforeEach(() => { vi.stubEnv('VITE_PLACEMENT_RPC', 'true') })
+  afterEach(() => { vi.unstubAllEnvs() })
+
+  const WED = new Date(2026, 8, 23)
+  const seed = () => {
+    db.seed('tasks', dbTaskRow({ id: 't1', title: 'Gutters', bucket: 'week', week_start: '2026-09-20', defer_count: 2 }))
+    db.seed('task_commitments', { id: 'cw', task_id: 't1', level: 'week', period_start: '2026-09-20', status: 'open', carried_to: null, ended_at: null })
+  }
+  const mount = async () => {
+    const hook = renderHook(() => useSupabaseTasks())
+    await waitFor(() => expect(hook.result.current.tasks.find((t) => t.id === 't1')).toBeTruthy())
+    return hook
+  }
+  const local = (h: Awaited<ReturnType<typeof mount>>) => h.result.current.tasks.find((t) => t.id === 't1')!
+  /** A dated move that is also chosen for the day: a row step AND a focus step — one call. */
+  const dateIt = async (h: Awaited<ReturnType<typeof mount>>, extra: Partial<Task> = {}) => {
+    let ok: boolean | undefined
+    await act(async () => { ok = await h.result.current.updateTask('t1', { scheduledFor: WED, isAllDay: true, plannedOn: WED, ...extra }) })
+    return ok
+  }
+
+  it('a dated move that rolls back shows NO date — the database has none', async () => {
+    seed()
+    const h = await mount()
+    db.failOnce('task_focus', 'upsert', { message: 'boom', code: 'XX000' })   // the focus step fails → the row step is rolled back too
+    expect(await dateIt(h)).toBe(false)
+    expect(db.rpcCalls().at(-1)!.p_steps.map((st) => st.t)).toContain('focus_set')
+    expect(db.rows('tasks').find((r) => r.id === 't1')!.scheduled_for).toBeNull()
+    expect(local(h).scheduledFor).toBeUndefined()                       // was: the rejected Wednesday
+    expect(local(h).focus ?? []).toHaveLength(0)
+    expect(local(h).bucket).toBe('week')
+  })
+
+  it('a dated move whose response is lost shows the date — it committed', async () => {
+    seed()
+    const h = await mount()
+    db.rpcLandButLoseResponse()
+    expect(await dateIt(h)).toBe(false)
+    expect(db.rows('tasks').find((r) => r.id === 't1')!.scheduled_for).toBe(WED.toISOString())
+    expect(local(h).scheduledFor?.getTime()).toBe(WED.getTime())
+    expect(local(h).isAllDay).toBe(true)
+    expect(local(h).focus).toHaveLength(1)
+  })
+
+  it('deferral bookkeeping comes back from the database too', async () => {
+    seed()
+    const h = await mount()
+    db.failOnce('task_focus', 'upsert', { message: 'boom', code: 'XX000' })
+    expect(await dateIt(h, { deferCount: 5 })).toBe(false)
+    expect(local(h).deferCount).toBe(2)                                  // not the optimistic 5
+  })
+
+  it('a failed FOCUS read is an incomplete re-read: the snapshot stands and placement saves wait for a full read', async () => {
+    seed()
+    const h = await mount()
+    db.failOnce('task_focus', 'upsert', { message: 'boom', code: 'XX000' })
+    db.failOn('task_focus', { message: 'offline', code: 'XX000' }, { writesOk: true })   // focus READS fail
+    expect(await dateIt(h)).toBe(false)
+    expect(local(h).scheduledFor).toBeUndefined()                       // the pre-save snapshot, not the optimistic date
+    const calls = db.rpcCalls().length
+    expect(await dateIt(h)).toBe(false)                                  // refused before sending
+    expect(db.rpcCalls().length).toBe(calls)
+    db.clearFailures()
+    expect(await dateIt(h)).toBe(true)                                   // a full read, then the save
+    expect(local(h).scheduledFor?.getTime()).toBe(WED.getTime())
+  })
+})
