@@ -118,3 +118,19 @@ Next steps need approval:
 - PostgREST rollback observation;
 - two-account signed-in check;
 - preview with the switch on.
+
+## Live step 1 — rollback observed; 40001 retry storm found and fixed (prepared)
+
+- **PostgREST rollback is now observed,** not inferred. A real
+  `/rest/v1/rpc` call with a failing second step returned 400/22023 and left
+  0 records and 0 events on the probe.
+- **Retry storm.** A stale call refused with 40001 was retried by PostgREST
+  about 100 times a second: 23,899 refusals from 08:32 to 08:37 UTC. It
+  outlived the tab and stopped only when the state was made to match. No data
+  was written.
+- **Fix (not applied).** The follow-up migration
+  `2026-09-25_apply_task_placement_conflict_code.sql` refuses with PT409
+  (HTTP 409, not retried), and the client recognises PT409.
+- **Evidence.** PG 100/100, loading both files, with a guard against 40001 and
+  40P01. Hook/helper tests 113/113; full suite 7219.
+- The switch stays off. Applying the follow-up needs Scott's approval.

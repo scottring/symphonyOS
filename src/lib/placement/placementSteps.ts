@@ -65,7 +65,7 @@ export function commitmentSteps(ops: readonly CommitmentOp[]): PlacementStep[] {
 
 /**
  * The open period records a plan was made from — the function refuses the
- * save (40001) if the database no longer holds exactly these. Null when the
+ * save (PT409, HTTP 409) if the database no longer holds exactly these. Null when the
  * task's records were never read: the caller must re-read before planning.
  */
 export function expectedOpen(task: Task): Array<{ level: string; period_start: string }> | null {

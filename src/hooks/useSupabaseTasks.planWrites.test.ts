@@ -179,7 +179,7 @@ function createFakeDb() {
     const want = [...new Set((args.p_expected_open ?? []).map((e) => key(e.level, e.period_start)))].sort()
     const have = [...new Set(rows('task_commitments').filter((c) => c.task_id === args.p_task_id && c.status === 'open').map((c) => key(c.level as string, c.period_start as string)))].sort()
     if (!args.p_expected_open || JSON.stringify(want) !== JSON.stringify(have)) {
-      return { data: null, error: { message: 'placement changed since it was read', code: '40001' } }
+      return { data: null, error: { message: 'placement changed since it was read', code: 'PT409' } }
     }
     const lost = rpcLost.shift()
     const snapshot = new Map([...tables].map(([k, v]) => [k, v.map((r) => ({ ...r }))]))
@@ -1153,5 +1153,24 @@ describe('transactional placement: recovery restores every placement field', () 
     db.clearFailures()
     expect(await dateIt(h)).toBe(true)                                   // a full read, then the save
     expect(local(h).scheduledFor?.getTime()).toBe(WED.getTime())
+  })
+})
+
+// Live, 2026-09-25: the first stale refusal used 40001, which PostgREST retries.
+// Only PT409 is the function's refusal now; a 40001 (were one ever to surface)
+// is an unknown outcome and is re-read like any other failure.
+describe('transactional placement: the refusal code', () => {
+  beforeEach(() => { vi.stubEnv('VITE_PLACEMENT_RPC', 'true') })
+  afterEach(() => { vi.unstubAllEnvs() })
+  it('the stale-plan message follows PT409, not 40001', async () => {
+    const toast = (await import('@/hooks/useToast')).showToast as unknown as ReturnType<typeof vi.fn>
+    db.seed('tasks', dbTaskRow({ id: 't1', title: 'Gutters', bucket: 'week', week_start: '2026-09-20' }))
+    db.seed('task_commitments', { id: 'c20', task_id: 't1', level: 'week', period_start: '2026-09-20', status: 'open', carried_to: null, ended_at: null })
+    const h = renderHook(() => useSupabaseTasks())
+    await waitFor(() => expect(h.result.current.tasks.find((t) => t.id === 't1')).toBeTruthy())
+    Object.assign(db.rows('task_commitments')[0], { status: 'removed' })        // another device dropped it
+    toast.mockClear()
+    await act(async () => { await h.result.current.updateTask('t1', { bucket: 'week', weekStart: new Date(2026, 8, 27) }) })
+    expect(toast).toHaveBeenCalledWith(expect.stringMatching(/changed somewhere else/), 'error', 4000)
   })
 })

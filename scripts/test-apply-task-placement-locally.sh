@@ -48,6 +48,10 @@ psql -v ON_ERROR_STOP=1 -c "alter default privileges in schema public grant all 
 
 psql -v ON_ERROR_STOP=1 -f "$MIGRATION" >/dev/null
 echo "loaded $MIGRATION (sha256 $(shasum -a 256 "$MIGRATION" | cut -c1-12))"
+# The follow-up, in order, as it is applied to the project.
+FOLLOWUP=supabase/migrations/2026-09-25_apply_task_placement_conflict_code.sql
+psql -v ON_ERROR_STOP=1 -f "$FOLLOWUP" >/dev/null
+echo "loaded $FOLLOWUP (sha256 $(shasum -a 256 "$FOLLOWUP" | cut -c1-12))"
 
 psql -v ON_ERROR_STOP=1 <<'SQL' >/dev/null
 insert into auth.users (id) values
@@ -121,7 +125,7 @@ for sc in drop keep day letgo push clear; do
   COUNTS=$(q "select (select count(*) from task_commitments where task_id = '$T') || ' records, ' || (select count(*) from task_focus where task_id = '$T') || ' focus, ' || apt.events('$T') || ' events (single call: ' || apt.events('$TW') || ')'")
   if [ "$CHANGED" = "t" ] && [ "$BLIND" != "refused" ]; then fail "retry lost-response $sc: blind retry was not refused"
   elif [ "$BLIND_SAME" != "t" ]; then fail "retry lost-response $sc: blind retry changed state"
-  elif [ "$SAME" = "t" ]; then pass "retry 7.$sc: lost response → blind identical retry $BLIND$([ "$BLIND" = refused ] && echo ' (40001, nothing written)'); re-read retry → ok; = one call, events included — $COUNTS"
+  elif [ "$SAME" = "t" ]; then pass "retry 7.$sc: lost response → blind identical retry $BLIND$([ "$BLIND" = refused ] && echo ' (PT409, nothing written)'); re-read retry → ok; = one call, events included — $COUNTS"
   else fail "retry lost-response $sc: $(q "select apt.norm('$T')") vs $(q "select apt.norm('$TW')")"; fi
 done
 
@@ -205,7 +209,7 @@ SQL
   E_MS=${E_OUT%%|*}; E_RES=${E_OUT#*|}
   WEEKS=$(q "select apt.open_weeks('$E')")
   ROW=$(q "select week_start from tasks where id = '$E'")
-  if [[ "$E_RES" == 40001* ]] && [ "${E_MS:-0}" -ge 1200 ] && [ "$WEEKS" = "2026-09-27" ] && [ "$ROW" = "2026-09-27" ] && [ "$(q "select apt.consistent('$E')")" = t ]; then
+  if [[ "$E_RES" == PT409* ]] && [ "${E_MS:-0}" -ge 1200 ] && [ "$WEEKS" = "2026-09-27" ] && [ "$ROW" = "2026-09-27" ] && [ "$(q "select apt.consistent('$E')")" = t ]; then
     pass "stale 12.$round: concurrent — B waited ${E_MS} ms, then ${E_RES%% placement*} 'placement changed since it was read'; open weeks = $WEEKS only, row week $ROW, consistent"
   else fail "stale concurrent round $round: B '$E_RES' after ${E_MS:-?} ms; open weeks $WEEKS; row $ROW"; fi
 done

@@ -1485,7 +1485,10 @@ export function useSupabaseTasks() {
    * state another save has replaced is refused, not applied (Codex review:
    * two stale plans left two weeks open).
    *
-   * Only a returned 40001 is known to have written nothing. Anything else —
+   * Only a returned PT409 (the function's stale-plan refusal, HTTP 409) is
+   * known to have written nothing. It is not 40001, which PostgREST retries
+   * as a serialization failure — one stale call was retried 23,899 times
+   * (live, 2026-09-25). Anything else —
    * another error, a thrown fetch, a response lost after the commit — may or
    * may not have landed, and is reported `failed` for the caller to re-read.
    */
@@ -1496,7 +1499,7 @@ export function useSupabaseTasks() {
       const { error } = await supabase.rpc('apply_task_placement', { p_task_id: task.id, p_steps: steps, p_expected_open: expected })
       if (!error) return 'ok'
       console.error('[placement] transactional save failed:', error.message)
-      return (error as { code?: string }).code === '40001' ? 'stale' : 'failed'
+      return (error as { code?: string }).code === 'PT409' ? 'stale' : 'failed'
     } catch (e) {
       console.error('[placement] transactional save failed:', e)
       return 'failed'

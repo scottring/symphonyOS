@@ -233,3 +233,41 @@ records remain.
 - A two-account check from real signed-in sessions.
 - Preview with `VITE_PLACEMENT_RPC=true`.
 - A staged production turn-on.
+
+## Live rollout step 1 — PostgREST rollback observed, and a retry storm found (2026-09-25 08:32–08:37 UTC)
+
+A throwaway task, `QA-RPC rollback probe`, was captured in the demo account.
+Real calls to `/rest/v1/rpc/apply_task_placement` were then made from the
+demo's signed-in page.
+
+| Call | Result |
+|---|---|
+| ensure week 10-11, then a `title` row step | **HTTP 400, 22023**. Afterwards the probe has **0 records and 0 events**: PostgREST rolled the whole call back (**observed**, no longer inferred) |
+| ensure week 10-11 + row, expected `[]` | ok: the week opened and the row matches |
+| undo (remove + row) | ok |
+| **stale call** (expected ≠ current) | **Hung.** PostgREST **retried it ~100 times a second**: 23,899 refusals in the Postgres logs from 08:32 to 08:37 UTC |
+
+**Cause.** The stale refusal used SQLSTATE `40001`, which PostgREST retries as
+a serialization failure. The retries continued after the browser tab was
+closed. They stopped only when the probe's state was made to match the
+pending plan, at 08:37:00. Every retry was refused and rolled back, so no data
+was written. The load on the shared database was real but brief.
+
+**Why the local proof missed it.** It calls the function directly, not through
+PostgREST.
+
+**Fix (prepared, NOT applied; needs Scott's approval).**
+- `supabase/migrations/2026-09-25_apply_task_placement_conflict_code.sql`
+  refuses with **PT409**. PostgREST returns HTTP 409 and does not retry it.
+  Only that one errcode changes.
+- The client recognises PT409.
+- The local proof loads both migrations in order: **100/100**, with a new guard
+  that fails if the function ever raises 40001 or 40P01.
+- New hook test for the refusal code: red with the old code check.
+
+**State now.**
+- The live function still has the 40001 refusal. That is harmless while the
+  switch is off, because the app never calls it.
+- **Do not enable the switch, or call the function directly, until the
+  follow-up is applied.**
+- The probe is clean: in the Inbox, week record removed.

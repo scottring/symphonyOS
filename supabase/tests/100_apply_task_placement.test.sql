@@ -386,7 +386,7 @@ end $$;
 
 -- ════════════════════════════════════════════════════════════════════════════
 -- 3. Retry / idempotency. With p_expected_open, repeating the SAME call after
---    it committed is refused (40001: the records it was planned from are
+--    it committed is refused (PT409: the records it was planned from are
 --    gone). The correct retry re-reads and re-plans: here the same intended
 --    steps with the expected set re-read (the runner repeats this across real
 --    separate sessions for the lost-response case).
@@ -416,7 +416,7 @@ begin
       -- the save did not change the open records: the old plan is still current
       perform apt.check(r = 'ok', format('retry %s: identical call with unchanged records: %s', sc.name, r));
     else
-      perform apt.check(r like '40001 %', format('retry %s: identical call after commit expected 40001, got %s', sc.name, r));
+      perform apt.check(r like 'PT409 %', format('retry %s: identical call after commit expected PT409, got %s', sc.name, r));
       perform apt.check(apt.exact(t) = before, format('retry %s: refused retry wrote', sc.name));
     end if;
 
@@ -432,7 +432,7 @@ begin
     perform apt.check(c1 = c2 and f1 = f2, format('retry %s: records %s→%s focus %s→%s', sc.name, c1, c2, f1, f2));
     perform apt.check(apt.events(t) = e1, format('retry %s: the retry logged %s more events', sc.name, apt.events(t) - e1));
     raise notice 'PASS retry %: % — identical repeat → %; re-read + re-plan → ok, = one call; % records, % focus; one call logs % events [%], the retry 0',
-      i, sc.name, case when exp0 = exp1 then 'ok (records unchanged, plan still current)' else '40001, nothing written' end,
+      i, sc.name, case when exp0 = exp1 then 'ok (records unchanged, plan still current)' else 'PT409, nothing written' end,
       c2, f2, e1 - e0,
       coalesce((select string_agg(kind, ',' order by id) from (select kind, id from public.task_placement_events where task_id = t order by id desc limit (e1 - e0)) z), '-');
   end loop;
@@ -471,7 +471,7 @@ begin
   perform apt.act_as('partner');
   r := apt.try(apt.rpc_sql(t, sb, rd));
   perform apt.as_admin();
-  perform apt.check(r like '40001 %', 'stale B expected 40001, got ' || r);
+  perform apt.check(r like 'PT409 %', 'stale B expected PT409, got ' || r);
   perform apt.check(apt.exact(t) = before, 'stale B wrote');
   perform apt.check(apt.open_weeks(t) = '2026-09-27', 'stale (a) open weeks ' || apt.open_weeks(t));
   perform apt.check((select week_start = '2026-09-27' and bucket = 'week' from public.tasks where id = t), 'stale (a) row');
@@ -508,16 +508,16 @@ begin
   -- a task with two open records: week 2026-09-20 and month 2026-09-01
   t := apt.setup('week+month');
   perform apt.expect_state(3, 'expected has a spurious extra entry', t,
-    '[{"level":"week","period_start":"2026-09-20"},{"level":"month","period_start":"2026-09-01"},{"level":"week","period_start":"2026-09-27"}]', '40001');
+    '[{"level":"week","period_start":"2026-09-20"},{"level":"month","period_start":"2026-09-01"},{"level":"week","period_start":"2026-09-27"}]', 'PT409');
   perform apt.expect_state(4, 'expected is missing an open record', t,
-    '[{"level":"week","period_start":"2026-09-20"}]', '40001');
-  perform apt.expect_state(5, 'expected empty while two are open', t, '[]', '40001');
+    '[{"level":"week","period_start":"2026-09-20"}]', 'PT409');
+  perform apt.expect_state(5, 'expected empty while two are open', t, '[]', 'PT409');
   perform apt.expect_state(6, 'expected names the right date at the wrong level', t,
-    '[{"level":"week","period_start":"2026-09-20"},{"level":"season","period_start":"2026-09-01"}]', '40001');
+    '[{"level":"week","period_start":"2026-09-20"},{"level":"season","period_start":"2026-09-01"}]', 'PT409');
   perform apt.expect_state(7, 'expected entry missing period_start', t,
-    '[{"level":"week","period_start":"2026-09-20"},{"level":"month"}]', '40001');
+    '[{"level":"week","period_start":"2026-09-20"},{"level":"month"}]', 'PT409');
   perform apt.expect_state(8, 'expected entry is not an object', t,
-    '[{"level":"week","period_start":"2026-09-20"},"month|2026-09-01"]', '40001');
+    '[{"level":"week","period_start":"2026-09-20"},"month|2026-09-01"]', 'PT409');
   perform apt.expect_state(9, 'duplicates in expected, reverse order (tolerated: distinct, order-insensitive)', t,
     '[{"period_start":"2026-09-01","level":"month"},{"level":"week","period_start":"2026-09-20"},{"level":"month","period_start":"2026-09-01"}]', 'ok');
   -- now week + month + season are open; a date spelled differently still matches (compared as dates)
@@ -529,7 +529,7 @@ begin
   perform public.apply_task_placement(t, keep, apt.open_now(t));
   perform apt.as_admin();
   perform apt.expect_state(11, 'expected names a record that is now carried', t,
-    '[{"level":"week","period_start":"2026-09-20"},{"level":"week","period_start":"2026-09-27"}]', '40001');
+    '[{"level":"week","period_start":"2026-09-20"},{"level":"week","period_start":"2026-09-27"}]', 'PT409');
 end $$;
 
 -- ════════════════════════════════════════════════════════════════════════════
@@ -681,4 +681,20 @@ begin
   raise notice 'PASS pinning 4: only apply_task_placement(uuid, jsonb, jsonb) exists — no 2-argument overload';
   raise notice 'OBSERVE pinning: service_role execute = % (from Supabase default privileges, simulated by the runner)',
     has_function_privilege('service_role', 'public.apply_task_placement(uuid, jsonb, jsonb)', 'execute');
+end $$;
+
+-- The stale refusal must never be a code PostgREST retries: 40001 and 40P01
+-- are retried as serialization/deadlock failures (live, 2026-09-25: one
+-- stale call retried 23,899 times). Guard the function source itself.
+do $$
+declare src text;
+begin
+  select prosrc into src from pg_proc where oid = 'public.apply_task_placement(uuid,jsonb,jsonb)'::regprocedure;
+  if src ~ $re$errcode\s*=\s*'40(001|P01)'$re$ then
+    raise exception 'FAIL pinning: apply_task_placement raises a code PostgREST retries';
+  end if;
+  if src !~ $re$errcode\s*=\s*'PT409'$re$ then
+    raise exception 'FAIL pinning: stale refusal is not PT409';
+  end if;
+  raise notice 'PASS pinning 5: the stale refusal is PT409 (HTTP 409), never a code PostgREST retries';
 end $$;
