@@ -120,7 +120,7 @@ driven on :5199 against the demo account's real database.
 | S2-15 | fixed — "N on the calendar" on the status line opens Shelves there | f77a3658 | live |
 | S2-19 | fixed — the gate says why it asks and what each answer shares | 8a2abc45 | live |
 | S2-22 | **needs Scott** — no status column for period goals | — | audit |
-| S2-23 | fixed — completing a goal says so, steps untouched, with Undo | a77a3064 | unit |
+| S2-23 | fixed — completing a goal says so, steps untouched, with Undo | a77a3064 | unit + live (QA-GU, reload) |
 | S2-24 | fixed (earlier, 69cd228e) | — | audit |
 | S2-26 | fixed — the pane states its own when (shared TaskTimingMenu) | 3c9b9f13, e57e83de | live |
 | S2-27 | fixed — Remove day in the pane, consequence stated, Undo | 3c9b9f13 | unit |
@@ -129,11 +129,11 @@ driven on :5199 against the demo account's real database.
 | S3-03 | fixed — named month, plus "Into a month…" across the season | f1956b33, 408c9f5d | unit + live |
 | S3-04 | fixed (earlier); save screen now also keeps proposed Keeps out of "already in" | 65f96555 | live |
 | S3-06 | Drop + failed-save recovery now **live-verified** | 65f96555 | live, forced failure |
-| S3-08 | fixed — "Supports <goal> · Fall 2026", no "Link to goal" | 6d2d9a7e | unit |
-| S3-09 | fixed — work already on this month is not offered again | 6d2d9a7e | unit, red first |
+| S3-08 | fixed — "Supports <goal> · Fall 2026", no "Link to goal" | 6d2d9a7e | unit + live (QA-S38) |
+| S3-09 | fixed — work already on this month is not offered again | 6d2d9a7e | unit, red first + live (QA-S38) |
 | S3-10 | fixed — no people-filter blame without a filter | efa6fe1b | unit + live |
 | S3-11 | fixed (copy) — no-day weekly says it is flexible; the full form no longer blocks it | 6d2d9a7e | unit |
-| S3-12 | fixed for capture and week-add; the doubled phone-offline "Failed to add task" not reproduced (one call, one toast in code) | 43adbda1, efa6fe1b | unit + live |
+| S3-12 | fixed for capture and week-add; the phone-offline "two Failed to add task" is the visible toast + its sr-only announcement (one visible, announced once) — not a defect | 43adbda1, efa6fe1b | unit + live + 390 offline |
 
 New, found and fixed this pass: carried period re-chosen showed Inbox
 (65f96555, PG + unit); focus re-send hit RLS (65f96555, PG); prep tasks were

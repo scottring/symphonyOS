@@ -1849,8 +1849,6 @@ Integrated at the last check: 7187 tests pass (only the known
 
 ## Implementation remaining (authorized, unblocked, not done)
 
-- S3-12 tail: two "Failed to add task" on one phone offline capture — not
-  reproduced; one call, one toast in code. Needs a phone-width offline repro.
 
 ## Acceptance remaining
 
@@ -1859,7 +1857,7 @@ Integrated at the last check: 7187 tests pass (only the known
   Scott's approval. Everything short of the write is verified.
 - Dense list (200 tasks) in the running app — harness only; seeding 200 rows
   into the shared demo account was judged too disruptive.
-- Goal-completion Undo (a77a3064) and S3-08/S3-09 walked by unit only.
+- (Closed 2026-09-25, Codex follow-up — see "Codex follow-up acceptance" below.)
 
 ## Genuinely blocked / needs Scott
 
@@ -1880,3 +1878,21 @@ Integrated at the last check: 7187 tests pass (only the known
 (week of Sep 20), `QA-ACC2b walk` (Inbox), `QA-PREP bring forms` (prep for PT,
 Fri Sep 25, created before the all-day fix so still 12:00 AM). Not
 hard-deleted (browser rules); safe to Drop or complete.
+
+## Codex follow-up acceptance  ·  2026-09-25 (later)
+
+| Item | Method | Result |
+|---|---|---|
+| S3-12 tail: phone offline capture "two Failed to add task" | **390** frame, Inbox phone capture; only `POST /rest/v1/tasks` rejected with `TypeError: Failed to fetch`; MutationObserver + DOM census; Enter and the Add button | **Not a duplicate.** One POST, one toast event, text restored to the field. The two DOM nodes are the visible toast and its `sr-only role=alert` announcement; the visible toast is not itself a live region, so a screen reader hears it once. A text/a11y-tree extraction shows it twice — the likely source of the original report. No change. |
+| S3-08 on real data | **Live**, fixtures `QA-S38 season goal` (Fall) + `QA-S38 step`, taken into October with the season "Into a month…" chooser (the life-area gate asked; Personal) | October row: "QA-S38 step · Supports Fall 2026 · QA-S38 season goal"; no "Link to goal"; survives reload. Scott's existing "List recurring home-maintenance jobs…" now also reads "Supports Fall 2026 · …". |
+| S3-09 on real data | **Live**, October planning session, Plan step | The season rail offers no "Add to October" for `QA-S38 step` (it is listed under "October tasks"). No other season-only open task existed, so the positive case stays unit-proven. Closed without writing. |
+| Goal-completion Undo | **Live**, fixture `QA-GU month goal` (October) | Tick → "Completed the goal “QA-GU month goal”. Its steps are unchanged. Undo"; goal moves to Completed goals. Undo → reopened; survives reload. (A first attempt clicked beside the link — automation, not the app.) |
+| Dense list 30 goals / 200 tasks | **Harness** (`outputs/plan-dense`), rerun on the current code | pass at 1280 and 390. Limit: the harness renders desktop markup, so it does not exercise the phone-only timing placement (b58a2e75); that was measured live at 390 instead. Not seeded into the shared demo. |
+
+New demo fixtures from this pass: `QA-S38 season goal`, `QA-S38 step`
+(October), `QA-GU month goal` (October, open). No `QA-OFF` row was created
+(the offline capture never reached the database; the field was cleared).
+
+Integrated at this point: 7188 tests pass (only the known
+`connectors/whatsapp` collection error), tsc clean, eslint 0 errors, build
+clean, PG harness 11/11.
