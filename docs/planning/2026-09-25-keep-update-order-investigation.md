@@ -403,9 +403,13 @@ Dates are MM-DD in 2026. `#` is the request's position in that policy's list. `o
   it per placement kind would mean classifying plans inside the core writer —
   the core rewrite Codex ruled out. Which leftover is preferable for U3b/U6c is
   a design call for Codex/Scott.
-- **Open spec question (not a write-order issue):** moving a task's DATE into
-  another week sends no week op; the old week's commitment stays open and none
-  opens for the new week. Needs a planning-spec decision.
+- **Date vs week — clarified, not open** (Codex, 2026-09-25): the design
+  (connected-planning-design.md 16–17, 119–130) says a date keeps explicit
+  broader commitments and infers no week. That is the intended behaviour; the
+  timing label now names the week when the date is outside it.
+- **updateTask ordering is an unresolved reliability risk**, recorded with the
+  affected flows and the transactional recommendation in §Y of
+  2026-09-24-implementation-progress.md.
 - **Concurrency limit (all orders):** these are separate PostgREST requests,
   not one transaction. A second writer (another tab, the partner, the wall)
   can interleave between them; ordering bounds what a *single* client's

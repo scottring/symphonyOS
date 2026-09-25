@@ -138,15 +138,21 @@ const dayLabel = (d: Date) => d.toLocaleDateString('en-US', { weekday: 'short', 
  *   a week            "Oct 4 – 10 · any day"
  *   a day             "Mon, Oct 6 · any time"   (or the time, when there is one)
  */
+// A date never implies a week, and a week kept beside a date outside it is
+// still the explicit commitment (connected-planning-design.md, transition
+// contract). When the two differ, both are said — the date alone hid the week
+// the task is still on (Codex, 2026-09-25).
+const offWeek = (t: TaskTiming) => !!t.day && !!t.week && !dayIsInCommittedWeek(t)
+
 export function timingLabel(t: TaskTiming): string {
-  if (t.day) return `${dayLabel(t.day)} · ${t.timed ? t.day.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) : 'any time'}`
+  if (t.day) return `${dayLabel(t.day)} · ${t.timed ? t.day.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) : 'any time'}${offWeek(t) ? ` · still on ${formatWeekRangeShort(t.week!)}` : ''}`
   if (t.week) return `${formatWeekRangeShort(t.week)} · any day`
   return 'Choose when'
 }
 
 /** The same answer as a sentence, for a screen reader and for details. */
 export function timingDescription(t: TaskTiming, periodLabel?: string): string {
-  if (t.day) return `Chosen for ${dayLabel(t.day)}${t.timed ? '' : ', any time'}`
+  if (t.day) return `Chosen for ${dayLabel(t.day)}${t.timed ? '' : ', any time'}${offWeek(t) ? `. Still on the week of ${formatWeekRange(t.week!)}, which that day is outside` : ''}`
   if (t.week) return `Chosen for ${formatWeekRange(t.week)}, any day`
   return periodLabel ? `No week or day chosen. In ${periodLabel}.` : 'No week or day chosen'
 }

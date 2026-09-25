@@ -123,6 +123,18 @@ describe('committedWeekOf — the records/legacy contract', () => {
     expect(outside.week).toEqual(OCT4)
     expect(outside.weekOfDay).toEqual(OCT18)
   })
+
+  // A date never implies a week; a week kept beside a date outside it is still
+  // the explicit commitment — so the label says both (Codex, 2026-09-25).
+  it('the label names the explicit week when the date is outside it, and only then', () => {
+    const inside = taskTiming(task({ scheduledFor: OCT6, isAllDay: true, commitments: [open('week', OCT4)] }))
+    const outside = taskTiming(task({ scheduledFor: OCT18, isAllDay: true, commitments: [open('week', OCT4)] }))
+    const noWeek = taskTiming(task({ bucket: 'timed', scheduledFor: OCT18, isAllDay: true }))
+    expect(timingLabel(inside)).not.toMatch(/still on/)
+    expect(timingLabel(noWeek)).not.toMatch(/still on/)
+    expect(timingLabel(outside)).toMatch(/· still on Oct 4/)
+    expect(timingDescription(outside)).toMatch(/Still on the week of Oct\S* 4/)
+  })
 })
 
 // What actually survives a removal. The cache outlives a removed commitment,

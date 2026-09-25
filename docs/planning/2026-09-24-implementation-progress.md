@@ -1844,8 +1844,10 @@ Model: this session ran **Opus 5.5** (`claude-opus-5-5`).
 | Guide's Plan from paper opens the flow; empty Today links to Getting Started; capture path names events/routines | Unit + Live | 509a3fa9, 7a4beee7 |
 | Earlier: links set/change/remove/reload/reciprocal, standalone → goal, goal complete independent, keyboard long list | Live / Hydrated | §V, Acceptance walk |
 
-Integrated at the last check: 7187 tests pass (only the known
-`connectors/whatsapp` collection error), tsc clean, eslint 0 errors, build clean.
+Integrated at final HEAD (2026-09-25): 7199 tests pass (only the known
+`connectors/whatsapp` collection error; 36 in the write-order suite), tsc clean,
+eslint 0 errors, build clean, preview rebuilt. PG: 096 11/11, 097 12/12,
+098 7/7, 099 23/23.
 
 ## Implementation remaining (authorized, unblocked, not done)
 
@@ -1883,8 +1885,11 @@ Integrated at the last check: 7187 tests pass (only the known
   one transaction. Order bounds what one client's failure leaves; it does not
   serialise two writers (another tab, the partner, the wall). Only the RPC
   option (097 c; migration + security review) is atomic.
-- **Spec question**: moving a task's DATE into another week sends no week op —
-  the old week stays open, none opens for the new one.
+- **Date vs week — CLARIFIED (Codex, 2026-09-25)**: connected-planning-design.md
+  (lines 16–17, 119–130) already answers it: a date preserves explicit broader
+  commitments and never infers a week. Behaviour kept. The timing chip and its
+  description now say both when they differ ("Sun, Oct 18 · any time · still
+  on Oct 4 – 10"); the week list already grouped "Scheduled outside this week".
 - **Release**: nothing pushed, merged or deployed. Production needs Scott.
 
 ## Demo fixtures left (all disposable, named QA-)
@@ -1908,6 +1913,43 @@ New demo fixtures from this pass: `QA-S38 season goal`, `QA-S38 step`
 (October), `QA-GU month goal` (October, open). No `QA-OFF` row was created
 (the offline capture never reached the database; the field was cleared).
 
-Integrated at this point: 7188 tests pass (only the known
-`connectors/whatsapp` collection error), tsc clean, eslint 0 errors, build
-clean, PG harness 11/11.
+(Counts at that point superseded — see the final figures under "Verified".)
+
+## Unresolved technical reliability risk — updateTask write order  ·  2026-09-25
+
+Codex decision: keep updateTask's order (row first, then ops) for now; do not
+pick a known-inconsistent intermediate state as a product preference.
+
+**What can go wrong.** updateTask's placement path sends the row UPDATE, then
+each commitment op, then focus ops — separate PostgREST requests. If a request
+after the first fails (error, timeout, lost response, closed tab), the row and
+its records can disagree until a later write or retry repairs them. Evidence:
+`scripts/investigate-keep-update-order.sh` (099, 23/23), blocks U1–U7.
+
+| Flow | Failure point | What is left |
+|---|---|---|
+| Move a week task up to its month / season (U7) | op after the row | row on the higher period, lower commitment still open → shows on both |
+| Let go to Someday with two commitments (U5) | 2nd remove | row someday, one period still open |
+| Remove day AND week (U4b) | the remove | row back on the month, week still open |
+| Move back / to another week (U3c) | ensure or remove | row on one week, records on the other (or on both) |
+| Dated task sent to another week (U3b) | remove after ensure | on two weeks — or, with ops first, on its old day with the week moved |
+| Weekend task moved to another week (U6c) | row after ops | two weeks — or, with ops first, the old weekend on the new week |
+| Focus (planned-on) | focus op | the day's focus missing while the placement landed (no trigger couples them) |
+
+Every case converges on a retry of the same write (099); none loses data. The
+risk is a visible split for other devices until then.
+
+**Recommendation.** One transactional RPC per placement write — the shape
+already proven in isolation as 097 option (c): SECURITY INVOKER (caller's RLS),
+row lock, ops then the final row inside one transaction, idempotent on retry.
+Then Drop and Keep move onto it too.
+
+**Before rollout** (not authorised here): a shared migration; a security review
+(invoker rights, no privilege widening, input validation of op payloads, RLS
+on every table touched, grants); a PostgREST rollback check that a raised
+exception rolls the whole call back; the 096–099 harnesses re-pointed at the
+function; a live two-account test.
+
+**Concurrency, all orders:** separate requests are not atomic, and two writers
+(another tab, the partner, the wall) can interleave. Ordering bounds a single
+client's failure; only the transaction serialises writers.
