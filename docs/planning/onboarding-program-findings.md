@@ -101,3 +101,49 @@ close each as the matching storyline is walked.
 | This inspection | `firstWeekSteps` computed but no longer rendered | 1 |
 | This inspection | No way back into onboarding once dismissed | 1 |
 | This inspection | No Planning Guide surface anywhere | 2–4 |
+
+## Status update — 2026-09-25 (Claude, onboarding-program)
+
+Rows above keep their original text; this is the current status. Verified
+against the code by a read-only audit, then fixed where marked. "Live" means
+driven on :5199 against the demo account's real database.
+
+| ID | Now | Commit | Evidence |
+| --- | --- | --- | --- |
+| S1-02 | doc corrected (no greeting exists; the doc no longer promises one) | 06516e37 | — |
+| S1-03 | fixed — "Nothing else coming up this week." | 06516e37 | unit |
+| S1-07 | kept, and now the ONLY confirmation — after the write, "Go to inbox" | 43adbda1, bd4bf593 | live |
+| S2-01 | fixed — a planning session opens Shelves on the calendar, restores on close | f77a3658 | live |
+| S2-03 | fixed (earlier) | — | audit |
+| S2-08 | fixed on /task/:id too — loading, not "Task not found" | 6d2d9a7e | unit, red first |
+| S2-10 | fixed — task rows open the pane over the period; goals keep their page | 3a40401e | live |
+| S2-15 | fixed — "N on the calendar" on the status line opens Shelves there | f77a3658 | live |
+| S2-19 | fixed — the gate says why it asks and what each answer shares | 8a2abc45 | live |
+| S2-22 | **needs Scott** — no status column for period goals | — | audit |
+| S2-23 | fixed — completing a goal says so, steps untouched, with Undo | a77a3064 | unit |
+| S2-24 | fixed (earlier, 69cd228e) | — | audit |
+| S2-26 | fixed — the pane states its own when (shared TaskTimingMenu) | 3c9b9f13, e57e83de | live |
+| S2-27 | fixed — Remove day in the pane, consequence stated, Undo | 3c9b9f13 | unit |
+| S2-28 | fixed (earlier) | — | audit |
+| S2-29 | fixed — de-duplicated; all-day dates parse as local days | 6d2d9a7e | unit + live (Columbus Day once) |
+| S3-03 | partly — a season row goes into a NAMED month (never the clock's); no chooser across months yet | f1956b33 | unit |
+| S3-04 | fixed (earlier); save screen now also keeps proposed Keeps out of "already in" | 65f96555 | live |
+| S3-06 | Drop + failed-save recovery now **live-verified** | 65f96555 | live, forced failure |
+| S3-08 | fixed — "Supports <goal> · Fall 2026", no "Link to goal" | 6d2d9a7e | unit |
+| S3-09 | fixed — work already on this month is not offered again | 6d2d9a7e | unit, red first |
+| S3-10 | fixed — no people-filter blame without a filter | efa6fe1b | unit + live |
+| S3-11 | fixed (copy) — no-day weekly says it is flexible; the full form no longer blocks it | 6d2d9a7e | unit |
+| S3-12 | fixed for capture and week-add; the doubled phone-offline "Failed to add task" not reproduced (one call, one toast in code) | 43adbda1, efa6fe1b | unit + live |
+
+New, found and fixed this pass: carried period re-chosen showed Inbox
+(65f96555, PG + unit); focus re-send hit RLS (65f96555, PG); prep tasks were
+12:00 AM timed rows (efa6fe1b, live); two identical ⋯ on the event panel and
+Escape closing the panel (efa6fe1b, live); weekend "either day" overflowed its
+tile (52888c78, live); the guide's Plan from paper did not open the flow
+(509a3fa9, live); week inline add closed on Enter and erased the next title
+(0412cb06, unit); Quick Add stayed open after "Go to inbox" (bd4bf593, live);
+phone-width titles squeezed to 0–30px on /month and /week (b58a2e75, live
+390px).
+
+Still open: S1-01, S1-04, S1-05/S1-05a (product), S1-06, S2-02 (needs repro),
+S3-03 chooser, S3-07 (parked, external calendar).
