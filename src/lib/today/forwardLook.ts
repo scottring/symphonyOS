@@ -56,10 +56,11 @@ export function forwardLook(
 
 const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
 
-/** "Tomorrow: Book flights" · "Thursday: Piano · 4:00 PM" · "Nothing on the
- *  board this week." when nothing is coming up. */
+/** "Tomorrow: Book flights" · "Thursday: Piano · 4:00 PM" · "Nothing else
+ *  coming up this week." when nothing is. (It said "Nothing on the board" —
+ *  a word nobody had been taught, S1-03.) */
 export function forwardLine(item: ForwardItem | null, today: Date): string {
-  if (!item) return 'Nothing on the board this week.'
+  if (!item) return 'Nothing else coming up this week.'
   const todayStart = startOfDay(today)
   const itemStart = startOfDay(item.when)
   const dayDiff = Math.round((itemStart.getTime() - todayStart.getTime()) / DAY_MS)

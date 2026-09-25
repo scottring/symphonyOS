@@ -815,7 +815,7 @@ export function TodayView({
         ? `Next: ${upNext.item.title}${nextTimeLabel ? ` · ${nextTimeLabel}` : ''}`
         : forwardLine(forwardLook(tasks, viewedDate), viewedDate)
       : data.counts.totalItems === 0
-        ? 'Nothing on the board for this day.'
+        ? 'Nothing planned for this day.'
         : firstTimed
           ? `Starts with: ${firstTimed.title}${firstTimedLabel ? ` · ${firstTimedLabel}` : ''}`
           : 'Nothing with a time on it.'
