@@ -59,7 +59,7 @@ import { firstNoteLine } from '@/lib/planning/goalsReference'
 import type { Task } from '@/types/task'
 import type { Goal } from '@/types/goal'
 import { PlanRow, rowIsDone, type PlanRowModel, type SupportRef } from './PlanRow'
-import { supportedGoal, goalsSupporting, seasonGoalsSupporting } from '@/lib/planning/goalSupport'
+import { supportedGoal, goalsSupporting, goalOfTask, seasonGoalsSupporting } from '@/lib/planning/goalSupport'
 import { taskTiming, hasTiming, removeDayOutcome, removeAllOutcome } from '@/lib/planning/taskTiming'
 import { readOpen, readFoldPref, writeOpen } from './foldState'
 import { PlanSession } from './PlanSession'
@@ -224,14 +224,23 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
   // ── The list ─────────────────────────────────────────────────────────────
   /** Both ends of a goal's support link, read from the layer-filtered list so
    *  a goal the reader may not see cannot leak its title through a child.
-   *  Only goals have one; a task row asks and gets nothing. */
+   *  A task answers with the goal it is a step of — seen here only when that
+   *  goal is not on this page to nest it (a Fall goal's task on October). */
   const supportFor = useCallback((t: Task): RowSupport | undefined => {
-    if (t.isGoal !== true) return undefined
+    if (t.isGoal !== true) {
+      // A step of a goal ON this page is drawn nested under it; naming the
+      // goal again beneath the step would only repeat the indent.
+      const g = t.goalTaskId ? layered.find((x) => x.id === t.goalTaskId) : undefined
+      const start = level === 'month' ? g?.monthStart : level === 'season' ? g?.seasonStart : undefined
+      if (start && start.getTime() === bounds.start.getTime()) return undefined
+      const of = goalOfTask(t, layered, seasons)
+      return of ? { supports: of, supportedBy: [] } : undefined
+    }
     return {
       supports: supportedGoal(t, layered, goals, seasons),
       supportedBy: goalsSupporting(t, layered),
     }
-  }, [layered, goals, seasons])
+  }, [layered, goals, seasons, level, bounds.start])
 
   const rows = useMemo<PlanRowModel[]>(() => {
     if (level === 'year') {
@@ -703,8 +712,10 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
   const goalComposerOpen = !isPast && (addingGoal || goalRows.length === 0)
 
   const looseRows = useMemo(
-    () => (split ? split.loose.map((t) => taskRow(t, level, bounds.start)) : rows.filter((r) => !r.isGoal)),
-    [split, rows, tasks],
+    // With support, as `rows` has it: this rebuild dropped it, so a task
+    // serving a Fall goal lost its "Supports" line on October (S3-08).
+    () => (split ? split.loose.map((t) => taskRow(t, level, bounds.start, supportFor(t))) : rows.filter((r) => !r.isGoal)),
+    [split, rows, tasks, supportFor],
   )
   // Finished work leaves the working list and waits behind a fold. On a PAST
   // period the fold opens by default: a look-back is precisely about what got
@@ -811,10 +822,13 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
     : []), [above, layered, aboveStart, seasons, aboveIsCurrent, meId])
   // Only season work still OPEN on that season is offered down; a row already
   // carried on (or dropped) is reference, as the goals beside it are.
-  const aboveItems = useMemo(
-    () => offerableFromAbove(aboveTasks, 'season', aboveStart, aboveIsCurrent, seasons),
-    [aboveTasks, aboveStart, aboveIsCurrent, seasons],
-  )
+  // …and never one already on THIS period: descending keeps the season's
+  // commitment open, so work taken into October still reads as open Fall
+  // work, and the session offered "Add to October" for it again (S3-09).
+  const aboveItems = useMemo(() => {
+    const here = new Set(currentPeriodTasks.map((t) => t.id))
+    return offerableFromAbove(aboveTasks, 'season', aboveStart, aboveIsCurrent, seasons).filter((t) => !here.has(t.id))
+  }, [aboveTasks, aboveStart, aboveIsCurrent, seasons, currentPeriodTasks])
   // A season's rail is the YEAR: goals to write beside, never tasks to take
   // down (the year plans in goals alone).
   const aboveGoalItems = useMemo(() => (above === 'year'

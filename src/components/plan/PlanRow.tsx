@@ -333,7 +333,9 @@ export function PlanRow({
         {!!row.supportedBy?.length && (
           <SupportLine label="Supported by" refs={row.supportedBy} onOpen={onOpenSupport} />
         )}
-        {!row.isGoal && actions.includes('under-goal') && <button type="button" onClick={() => onAction('under-goal', row)} className="mt-1 block text-xs text-primary-700 hover:underline" aria-label={`Link ${row.title} to a goal`}>Link to goal</button>}
+        {/* A row that already serves a goal says so above; offering to link
+            it read as though it served nothing (S3-08). */}
+        {!row.isGoal && !row.supports && actions.includes('under-goal') && <button type="button" onClick={() => onAction('under-goal', row)} className="mt-1 block text-xs text-primary-700 hover:underline" aria-label={`Link ${row.title} to a goal`}>Link to goal</button>}
         {/* What the goal holds, said whether it is open or shut — a collapsed
             goal that only says "5 supporting tasks" hides how much is done. */}
         {canHoldSteps && (tally.total > 0 || !!onAddStep) && (

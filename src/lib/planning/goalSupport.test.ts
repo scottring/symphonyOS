@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { supportedGoal, goalsSupporting, monthGoalsSupporting, seasonGoalsSupporting } from './goalSupport'
+import { supportedGoal, goalsSupporting, monthGoalsSupporting, seasonGoalsSupporting, goalOfTask } from './goalSupport'
 import { stepsThatCarryForward } from './goalSteps'
 import { DEFAULT_SEASONS } from '@/lib/cadence/seasons'
 import type { Task } from '@/types/task'
@@ -127,5 +127,22 @@ describe('support is independent of task carry-forward', () => {
     const after = [sg, mg, moved]
     expect(supportedGoal(mg, after, [], DEFAULT_SEASONS)?.id).toBe('sg1')
     expect(goalsSupporting(sg, after).map((r) => r.id)).toEqual(['mg1'])
+  })
+})
+
+// S3-08: a task under a Fall goal, seen on October's list, offered "Link to
+// goal" as though it served nothing.
+describe('goalOfTask — the goal a task is a step of', () => {
+  it('names a season goal with its season, and a month goal with its month', () => {
+    const sg = season(), mg = month()
+    expect(goalOfTask(task({ goalTaskId: sg.id }), [sg], DEFAULT_SEASONS)).toMatchObject({ id: sg.id, rung: 'season', period: expect.stringMatching(/Fall/) })
+    expect(goalOfTask(task({ goalTaskId: mg.id }), [mg], DEFAULT_SEASONS)).toMatchObject({ id: mg.id, rung: 'month', period: 'October' })
+  })
+
+  it('is nothing for a goal, an unlinked task, or a goal the reader cannot see', () => {
+    const sg = season()
+    expect(goalOfTask(sg, [sg], DEFAULT_SEASONS)).toBeNull()
+    expect(goalOfTask(task(), [sg], DEFAULT_SEASONS)).toBeNull()
+    expect(goalOfTask(task({ goalTaskId: sg.id }), [], DEFAULT_SEASONS)).toBeNull()
   })
 })

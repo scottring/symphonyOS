@@ -13,6 +13,8 @@
 
 import type { Task } from '@/types/task'
 import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
+import { parseLocalYmd } from '@/lib/cadence/config'
+import { eventDensityKey } from './weekDensity'
 
 export interface PeriodCalendarEntry {
   id: string
@@ -52,16 +54,28 @@ export function periodCalendarEntries(
     })
   }
 
+  // One meeting on two calendars is one entry — the rule the day tiles
+  // already count by (eventDensityKey). October's list showed Columbus Day
+  // twice beside a count of two (S2-29).
+  const seen = new Set<string>()
   for (const e of events) {
     // CalendarEvent carries both snake_case (edge function) and camelCase
     // (cached/transformed) spellings; `dayLoad.ts` reads it the same way.
     const raw = e.start_time ?? e.startTime
     if (!raw) continue
-    const at = new Date(raw)
+    const allDay = !!(e.all_day ?? e.allDay)
+    // A bare date is a LOCAL day. `new Date('2026-10-12')` is UTC midnight —
+    // the evening before in any US zone — which moved an all-day event into
+    // the previous day, and across a month's first or last day, into the
+    // wrong month.
+    const at = typeof raw === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(raw) ? parseLocalYmd(raw) : new Date(raw)
     if (Number.isNaN(at.getTime()) || at < start || at >= end) continue
+    const key = eventDensityKey(e.title ?? '', allDay ? null : at, `${at.getFullYear()}-${at.getMonth()}-${at.getDate()}`)
+    if (seen.has(key)) continue
+    seen.add(key)
     entries.push({
       id: `event-${e.id}`, kind: 'event', title: e.title || '(no title)',
-      at, allDay: !!(e.all_day ?? e.allDay),
+      at, allDay,
     })
   }
 

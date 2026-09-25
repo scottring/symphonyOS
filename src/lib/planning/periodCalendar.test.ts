@@ -56,3 +56,29 @@ describe('periodCalendarEntries (S2-14)', () => {
     expect(entries).toEqual([])
   })
 })
+
+// S2-29: October's list repeated Columbus Day beside a count of two.
+describe('periodCalendarEntries — one entry per event', () => {
+  const NOV = new Date(2026, 10, 1)
+
+  it('the same holiday on two calendars is listed once', () => {
+    const a = event({ id: 'h1', title: 'Columbus Day', start_time: '2026-10-12', all_day: true })
+    const b = event({ id: 'h2', title: 'Columbus Day', start_time: '2026-10-12', all_day: true })
+    expect(periodCalendarEntries([], [a, b], OCT, NOV).map((e) => e.title)).toEqual(['Columbus Day'])
+  })
+
+  it('the same meeting on two calendars is listed once; two meetings are two', () => {
+    const m1 = event({ id: 'm1', title: 'Standup', start_time: '2026-10-05T13:00:00Z' })
+    const m2 = event({ id: 'm2', title: 'Standup', start_time: '2026-10-05T13:00:00Z' })
+    const m3 = event({ id: 'm3', title: 'Standup', start_time: '2026-10-06T13:00:00Z' })
+    expect(periodCalendarEntries([], [m1, m2, m3], OCT, NOV)).toHaveLength(2)
+  })
+
+  it('an all-day date is a local day, so the 1st of a month stays in that month', () => {
+    const first = event({ id: 'f', title: 'Rent due', start_time: '2026-10-01', all_day: true })
+    expect(periodCalendarEntries([], [first], SEP, OCT)).toHaveLength(0)
+    const inOct = periodCalendarEntries([], [first], OCT, NOV)
+    expect(inOct).toHaveLength(1)
+    expect(inOct[0].at.getDate()).toBe(1)
+  })
+})

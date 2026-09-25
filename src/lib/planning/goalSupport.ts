@@ -78,6 +78,24 @@ export function supportedGoal(
   return null
 }
 
+/**
+ * The goal a TASK is a step of (`goalTaskId`), as a support link — so a row
+ * that already serves a goal can say which, instead of offering "Link to
+ * goal" as though it served nothing (S3-08: a task under a Fall goal, seen on
+ * October's list). Same privacy rule as above: read from the caller's
+ * filtered list, so a goal the reader may not see is simply absent.
+ */
+export function goalOfTask(task: Task, tasks: readonly Task[], seasons: Seasons): SupportLink | null {
+  if (task.isGoal === true || !task.goalTaskId) return null
+  const goal = tasks.find((t) => t.id === task.goalTaskId)
+  if (!goal || goal.isGoal !== true) return null
+  if (isSeasonGoal(goal)) {
+    return { id: goal.id, title: goal.title, rung: 'season', period: goal.seasonStart ? seasonLabel(goal.seasonStart, seasons) : undefined }
+  }
+  if (isMonthGoal(goal)) return { id: goal.id, title: goal.title, rung: 'month', period: monthName(goal.monthStart) }
+  return null
+}
+
 /** The month goals that support this season goal, oldest first. */
 export function monthGoalsSupporting(seasonGoalId: string, tasks: readonly Task[]): SupportLink[] {
   return tasks

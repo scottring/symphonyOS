@@ -35,7 +35,7 @@ interface Props {
 }
 
 export function TaskViewContainer({ taskId, onBack }: Props) {
-  const { tasks, addTask, addSubtask, deleteTask, toggleTask, updateTask, pushTask } = useSupabaseTasks();
+  const { tasks, loading, addTask, addSubtask, deleteTask, toggleTask, updateTask, pushTask } = useSupabaseTasks();
   const { contacts, contactsMap, addContact, searchContacts } = useContacts();
   const { projects, projectsMap, addProject, searchProjects } = useProjects();
   const { addNote, addEntityLink, getNotesForEntity } = useNotesContext();
@@ -167,6 +167,10 @@ export function TaskViewContainer({ taskId, onBack }: Props) {
     },
     [deleteTask, onBack],
   );
+
+  // Not found is an answer only once the tasks have arrived. A hard load of
+  // /task/:id said "Task not found" for several seconds first (S2-08).
+  if (!task && loading) return <LoadingFallback />;
 
   if (!task) {
     return (

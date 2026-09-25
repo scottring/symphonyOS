@@ -7,6 +7,7 @@ import type { Task } from '@/types/task'
 import type { Goal } from '@/types/goal'
 import type { Routine } from '@/types/actionable'
 import { DEFAULT_SEASONS, type Seasons } from '@/lib/cadence/seasons'
+import { periodBounds } from '@/lib/planning/periodPage'
 import { periodStartFor } from '@/lib/placement/model'
 
 // ── Hook mocks: the page is a pure function of these ─────────────────────────
@@ -499,6 +500,24 @@ describe('PeriodPlanPage', () => {
     expect(hook.pushTask).not.toHaveBeenCalled()
   })
 
+  // S3-09: descending keeps the season's commitment open, so work already
+  // taken into this month still read as open season work, and the planning
+  // session offered to add it to this month again.
+  it('the planning session does not offer season work already on this month', async () => {
+    const seasonStart = periodBounds('season', thisMonth, DEFAULT_SEASONS).start
+    state.tasks = [
+      task({ id: 'fq', title: 'Fall trips', bucket: 'quarter' }),
+      task({ id: 'fm', title: 'Order firewood', bucket: 'month', monthStart: thisMonth, seasonStart,
+        commitments: [{ level: 'season', periodStart: seasonStart, status: 'open' }, { level: 'month', periodStart: thisMonth, status: 'open' }] }),
+    ]
+    renderPage('month')
+    fireEvent.click(screen.getByRole('button', { name: /Plan September|Plan October|Plan [A-Z][a-z]+$|Review the plan/ }))
+    const nexts = screen.queryAllByRole('button', { name: /next: plan/i })
+    if (nexts.length) fireEvent.click(nexts[0])
+    expect(screen.getByRole('button', { name: /^Add to .*: Fall trips$/ })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /^Add to .*: Order firewood$/ })).toBeNull()
+  })
+
   it('"Add to this month" names the VIEWED month, not the clock\u2019s (S3-01)', () => {
     state.tasks = [task({ title: 'Fall trips', bucket: 'quarter' })]
     renderPageAt('month', '/month?start=2026-10-01')
@@ -980,6 +999,19 @@ describe('steps under a goal', () => {
     const picker = screen.getByRole('dialog', { name: /Link to goal/i })
     fireEvent.click(within(picker).getByRole('button', { name: /Transform the porch/i }))
     expect(hook.updateTask).toHaveBeenCalledWith('l1', { goalTaskId: 'g1' })
+  })
+
+  // S3-08: a task that already serves a Fall goal, on October's list, offered
+  // "Link to goal" and never said which goal it served.
+  it('a task under a season goal says what it supports, and is not offered a link', () => {
+    state.tasks = [
+      task({ id: 'g1', title: 'Transform the porch', isGoal: true, monthStart: thisMonth }),
+      task({ id: 'sg', title: 'A season of repairs', isGoal: true, bucket: 'quarter', seasonStart: thisMonth, monthStart: undefined }),
+      task({ id: 'l2', title: 'Clean the gutters', goalTaskId: 'sg', monthStart: thisMonth }),
+    ]
+    renderPage('month')
+    expect(screen.queryByRole('button', { name: /Link Clean the gutters to a goal/i })).toBeNull()
+    expect(screen.getAllByText(/A season of repairs/).length).toBeGreaterThan(0)
   })
 
   it('retains the goal picker and allows retry after a failed link', async () => {

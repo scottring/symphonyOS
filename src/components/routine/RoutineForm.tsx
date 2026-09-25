@@ -396,9 +396,12 @@ export function RoutineForm({ routine, contacts = [], familyMembers = [], onBack
           {hasChanges() && (
             <button
               onClick={handleSave}
+              // A weekly routine with no day is a flexible one, not an
+              // incomplete one — the panel saves it and the editor says so
+              // (S3-11), so this page no longer refuses it.
               disabled={
                 isSaving ||
-                (isNLRoutine ? !nlIsValid : (!name.trim() || (recurrenceType === 'weekly' && selectedDays.length === 0)))
+                (isNLRoutine ? !nlIsValid : !name.trim())
               }
               className="w-full py-3 rounded-xl bg-amber-500 text-white font-medium
                          hover:bg-amber-600 active:bg-amber-700
