@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { NavLink, useLocation, useNavigate } from 'react-router-dom'
-import { PanelLeft, Target, ChevronDown, Check } from 'lucide-react'
+import { PanelLeft, Target, ChevronDown, Check, CornerDownRight } from 'lucide-react'
 import { periodBounds } from '@/lib/planning/periodPage'
 import { readSeasons } from '@/lib/cadence/seasons'
 import { useReferenceLists } from '@/components/reference/ReferenceListsContext'
@@ -110,10 +110,14 @@ export function PlanNavigation({ mobile = false, paused = false, mobileControlsR
   const range = new URLSearchParams(search).get('range') ?? 'today'
   return <div className="plan-page-tools" data-period={period}>
     {period && <div className="plan-period-controls">
-      {mobile ? <HorizonSwitcher period={period} /> : <nav aria-label="Planning period" className="plan-period-navigation">
-        {PERIODS.map(value => <NavLink key={value} to={`/${value}`} aria-current={period === value ? 'page' : undefined}
-          className={period === value ? 'is-current' : ''}>{value[0].toUpperCase() + value.slice(1)}</NavLink>)}
-      </nav>}
+      {mobile ? <HorizonSwitcher period={period} /> : <>
+        {/* The horizons hang off Planner in the row above (Scott's sketch, 2026-09-25). */}
+        <CornerDownRight size={14} aria-hidden="true" className="plan-period-connector" />
+        <nav aria-label="Planning period" className="plan-period-navigation">
+          {PERIODS.map(value => <NavLink key={value} to={`/${value}`} aria-current={period === value ? 'page' : undefined}
+            className={period === value ? 'is-current' : ''}>{value[0].toUpperCase() + value.slice(1)}</NavLink>)}
+        </nav>
+      </>}
       {period === 'week' && <label className="plan-range-control"><span className="sr-only">Range</span>
         <select aria-label="Week range" value={['week', 'weekend', 'three', 'custom'].includes(range) ? range : 'week'}
           onChange={event => navigate(event.target.value === 'week' ? '/week' : `/week?range=${event.target.value}`)}>
