@@ -11,6 +11,7 @@ import { PanelFooter } from './sections/PanelFooter'
 import { useEntityRelations } from './hooks/useEntityRelations'
 import type { MightBeRelevantItem } from './types'
 import { PanelShell } from './PanelShell'
+import { EventWhenLine } from './sections/EventWhenLine'
 import { PanelActions, type PanelAction } from './sections/PanelActions'
 import { PanelSection } from './sections/PanelSection'
 import { PanelRow } from './sections/PanelRow'
@@ -66,7 +67,10 @@ interface TapEventPanelProps {
    * Google Calendar (this instance only for a recurring series). When omitted,
    * the Reschedule control is hidden.
    */
-  onReschedule?: (startTime: Date, endTime: Date) => void
+  /** Returning `false` means Google refused it — the inline editor keeps
+   *  the edit and says so rather than closing over a change that did not
+   *  happen. A host that returns nothing is taken at its word, as before. */
+  onReschedule?: (startTime: Date, endTime: Date) => void | Promise<boolean | void>
   /** The event's calendar, resolved by the caller from the Google calendar list.
    *  readOnly=true means Google will refuse writes — edit affordances hide. */
   calendarAccess?: { name: string | null; readOnly: boolean }
@@ -216,8 +220,10 @@ export function TapEventPanel(props: TapEventPanelProps) {
    * for a relative tile and this panel passed only `onSchedule`, so every tile
    * but "Pick date & time…" was silent (Scott, 2026-09-24).
    */
-  const handleRelativeReschedule = (when: TriageWhen) => {
-    const day = dateForWhen(when)
+  const handleRelativeReschedule = (when: TriageWhen, chosen?: Date) => {
+    // A weekend tile names its own day — Saturday or Sunday, whichever the
+    // reader picked. Everything else resolves as it always did.
+    const day = chosen ?? dateForWhen(when)
     if (!day) return
     const orig = startTime ? new Date(startTime) : null
     handleReschedule(new Date(
@@ -316,6 +322,9 @@ export function TapEventPanel(props: TapEventPanelProps) {
               // time is a job for "Pick date & time…", which was already the
               // only tile that worked.
               whens={EVENT_WHENS}
+              // An event ends at a particular time, so "either day" is not an
+              // answer it can take: the weekend offers Saturday AND Sunday.
+              weekendDays
               loads={dayLoads}
             />
           ),
@@ -377,8 +386,17 @@ export function TapEventPanel(props: TapEventPanelProps) {
           onClose={props.onClose}
         />
 
-        {/* When — the one fact that defines an event, stated plainly. */}
+        {/* When — the one fact that defines an event, stated plainly, and
+            editable in place where Google will take the write (Scott's
+            walkthrough: "click the date/time under the title to edit it"). */}
         {startTime && (
+          <EventWhenLine
+            event={event}
+            startTime={new Date(startTime)}
+            endTime={endTime ? new Date(endTime) : null}
+            spansDays={!!endTime && spansDays(startTime, endTime)}
+            onSave={canEdit && props.onReschedule ? props.onReschedule : undefined}
+          >
           <div className="mt-1.5 flex items-baseline gap-2 flex-wrap">
             <span className="text-[15px] font-medium text-neutral-800">{formatDayLabel(startTime)}</span>
             {/* A multi-day event must name the day it ends on. Without it a
@@ -396,6 +414,7 @@ export function TapEventPanel(props: TapEventPanelProps) {
               <span className="text-[13px] text-neutral-400">· {formatDuration(durationMinutes)}</span>
             )}
           </div>
+          </EventWhenLine>
         )}
 
         {/* Which calendar this event lives on + move / view-only affordance */}

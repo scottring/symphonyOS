@@ -38,7 +38,9 @@ export interface SchedulePickerProps {
   /** Acts on a relative tile. A picker WITHOUT this shows no relative tiles:
    *  a tile nobody handles is a button that does nothing, which is how the
    *  event panel's "Tomorrow" came to be silent (Scott, 2026-09-24). */
-  onReschedule?: (when: TriageWhen) => void
+  onReschedule?: (when: TriageWhen, day?: Date) => void
+  /** Offer both days of a weekend — for a caller that must land on one. */
+  weekendDays?: boolean
   /** Limit the relative tiles to the ones this caller can honour. */
   whens?: readonly TriageWhen[]
   onClearSchedule?: () => void
@@ -71,6 +73,7 @@ export function SchedulePicker({
   flexibleWeekend = false,
   onSchedule,
   onReschedule,
+  weekendDays = false,
   whens,
   onClearSchedule,
   loads,
@@ -165,7 +168,7 @@ export function SchedulePicker({
               <div className="px-1 pb-2 text-[11px] uppercase tracking-wider text-neutral-400">
                 {label} for
               </div>
-              <RescheduleGrid flexibleWeekend={flexibleWeekend}
+              <RescheduleGrid flexibleWeekend={flexibleWeekend} weekendDays={weekendDays}
                 // No handler, no relative tiles: only "Pick date & time…"
                 // does anything, and that is what is shown.
                 whens={onReschedule ? whens : []}
@@ -174,9 +177,10 @@ export function SchedulePicker({
                   const load = loads.get(loadKeyFor(when))
                   if (load) setPeek(load)
                 }}
-                onPick={(when) => {
+                onPick={(when, day) => {
                   close()
-                  onReschedule?.(when)
+                  if (day) onReschedule?.(when, day)
+                  else onReschedule?.(when)
                 }}
                 onPickDate={(date, isAllDay) => {
                   close()

@@ -688,8 +688,12 @@ function EventPanelBody({ id }: { id: string }) {
             calendarId: event.calendar_id ?? event.calendarId,
           });
           showToast('Event updated', 'success');
+          return true;
         } catch (err) {
           showToast(eventUpdateErrorMessage(err), 'error', 4000);
+          // Said out loud, so the inline editor can keep the edit rather than
+          // closing over a change Google refused.
+          return false;
         }
       }}
     />
