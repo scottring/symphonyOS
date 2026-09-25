@@ -170,10 +170,18 @@ function createFakeDb() {
    * fails every table is put back as it was — one transaction. The log shows
    * one `rpc:apply_task_placement`, not the steps inside it.
    */
-  async function rpc(name: string, args: { p_task_id: string; p_steps: Array<Record<string, unknown>> }): Promise<Result> {
+  async function rpc(name: string, args: { p_task_id: string; p_steps: Array<Record<string, unknown>>; p_expected_open?: Array<{ level: string; period_start: string }> }): Promise<Result> {
     if (name !== 'apply_task_placement') return { data: null, error: { message: `unknown rpc ${name}` } }
     writes.push({ table: 'rpc', op: 'update' })
     rpcCalls.push(args)
+    // The stale-plan check, as the migration does it under the row lock.
+    const key = (l: string, d: string) => `${l}|${d}`
+    const want = [...new Set((args.p_expected_open ?? []).map((e) => key(e.level, e.period_start)))].sort()
+    const have = [...new Set(rows('task_commitments').filter((c) => c.task_id === args.p_task_id && c.status === 'open').map((c) => key(c.level as string, c.period_start as string)))].sort()
+    if (!args.p_expected_open || JSON.stringify(want) !== JSON.stringify(have)) {
+      return { data: null, error: { message: 'placement changed since it was read', code: '40001' } }
+    }
+    const lost = rpcLost.shift()
     const snapshot = new Map([...tables].map(([k, v]) => [k, v.map((r) => ({ ...r }))]))
     const logged = writes.length
     const id = args.p_task_id
@@ -193,16 +201,21 @@ function createFakeDb() {
       }
     }
     writes.length = logged
+    // Committed, but the response never arrived.
+    if (lost) return { data: null, error: { message: 'Failed to fetch' } }
     return { data: {}, error: null }
   }
-  const rpcCalls: Array<{ p_task_id: string; p_steps: Array<Record<string, unknown>> }> = []
+  const rpcCalls: Array<{ p_task_id: string; p_steps: Array<Record<string, unknown>>; p_expected_open?: Array<{ level: string; period_start: string }> }> = []
+  const rpcLost: boolean[] = []
 
   return {
     from: (table: string) => new Query(table),
     rpc,
     rpcCalls: () => rpcCalls,
+    /** The next function call COMMITS, then its response is lost. */
+    rpcLandButLoseResponse() { rpcLost.push(true) },
     reset() {
-      tables.clear(); inserted.clear(); writes.length = 0; rpcCalls.length = 0
+      tables.clear(); inserted.clear(); writes.length = 0; rpcCalls.length = 0; rpcLost.length = 0
       this.clearFailures()
     },
     seed(table: string, row: Row) { rows(table).push(row) },
@@ -241,7 +254,7 @@ vi.mock('@/lib/supabase', () => ({
       return ch
     }),
     from: (table: string) => db.from(table),
-    rpc: (name: string, args: { p_task_id: string; p_steps: Array<Record<string, unknown>> }) => db.rpc(name, args),
+    rpc: (name: string, args: { p_task_id: string; p_steps: Array<Record<string, unknown>>; p_expected_open?: Array<{ level: string; period_start: string }> }) => db.rpc(name, args),
   },
 }))
 
@@ -977,5 +990,95 @@ describe('transactional placement (VITE_PLACEMENT_RPC=true)', () => {
     await act(async () => { await h.result.current.dropCommitment('t1', 'week', new Date(2026, 8, 20)) })
     expect(db.rpcCalls()).toHaveLength(0)
     expect(db.writeLog()).toEqual(['task_commitments:update', 'tasks:update'])
+  })
+})
+
+// Codex review of the prepared transaction: (1) a plan made from a state
+// another save has replaced must be refused, not applied — two stale plans
+// left two weeks open; (2) a failure whose outcome is unknown (a lost
+// response after the commit) must re-read, never restore the old snapshot.
+describe('transactional placement: stale plans and uncertain failures', () => {
+  beforeEach(() => { vi.stubEnv('VITE_PLACEMENT_RPC', 'true') })
+  afterEach(() => { vi.unstubAllEnvs() })
+
+  const S20 = '2026-09-20', S27 = '2026-09-27', O4 = '2026-10-04'
+  const seed = () => {
+    db.seed('tasks', dbTaskRow({ id: 't1', title: 'Gutters', bucket: 'week', week_start: S20 }))
+    db.seed('task_commitments', { id: 'c20', task_id: 't1', level: 'week', period_start: S20, status: 'open', carried_to: null, ended_at: null })
+  }
+  const mount = async () => {
+    const hook = renderHook(() => useSupabaseTasks())
+    await waitFor(() => expect(hook.result.current.tasks.find((t) => t.id === 't1')).toBeTruthy())
+    return hook
+  }
+  /** Another device moves the task to Sep 27 — this tab is not told. */
+  const otherDeviceMovesTo27 = () => {
+    Object.assign(db.rows('task_commitments').find((c) => c.id === 'c20')!, { status: 'removed' })
+    db.seed('task_commitments', { id: 'c27', task_id: 't1', level: 'week', period_start: S27, status: 'open', carried_to: null, ended_at: null })
+    Object.assign(db.rows('tasks').find((r) => r.id === 't1')!, { week_start: S27 })
+  }
+  const openWeeks = () => db.rows('task_commitments').filter((c) => c.task_id === 't1' && c.status === 'open').map((c) => c.period_start).sort()
+  const moveTo = async (h: Awaited<ReturnType<typeof mount>>, ymd: string) => {
+    const [y, m, d] = ymd.split('-').map(Number)
+    let ok: boolean | undefined
+    await act(async () => { ok = await h.result.current.updateTask('t1', { bucket: 'week', weekStart: new Date(y, m - 1, d) }) })
+    return ok
+  }
+
+  it('the save states the records it was planned from', async () => {
+    seed()
+    const h = await mount()
+    expect(await moveTo(h, S27)).toBe(true)
+    expect(db.rpcCalls()[0].p_expected_open).toEqual([{ level: 'week', period_start: S20 }])
+  })
+
+  it('a STALE plan is refused, writes nothing, and the tab shows what is saved', async () => {
+    seed()
+    const h = await mount()
+    otherDeviceMovesTo27()
+    expect(await moveTo(h, O4)).toBe(false)                              // planned from Sep 20 — refused
+    expect(openWeeks()).toEqual([S27])                                   // NOT Sep 27 and Oct 4
+    const local = h.result.current.tasks.find((t) => t.id === 't1')!
+    expect(local.commitments!.filter((c) => c.status === 'open').map((c) => localYmd(c.periodStart))).toEqual([S27])
+    // The person chooses again — from the truth — and it lands cleanly.
+    expect(await moveTo(h, O4)).toBe(true)
+    expect(openWeeks()).toEqual([O4])
+  })
+
+  it('a stale Drop is refused too, and the task keeps the other device\'s week', async () => {
+    seed()
+    const h = await mount()
+    otherDeviceMovesTo27()
+    let r: boolean | undefined
+    await act(async () => { r = await h.result.current.dropCommitment('t1', 'week', new Date(2026, 8, 20)) })
+    expect(r).toBe(false)
+    expect(openWeeks()).toEqual([S27])
+  })
+
+  it('a lost response after the commit re-reads — it does NOT restore the old state', async () => {
+    seed()
+    const h = await mount()
+    db.rpcLandButLoseResponse()
+    expect(await moveTo(h, S27)).toBe(false)                             // unknown outcome, reported as failed
+    expect(openWeeks()).toEqual([S27])                                   // it had committed
+    const local = h.result.current.tasks.find((t) => t.id === 't1')!
+    expect(local.commitments!.filter((c) => c.status === 'open').map((c) => localYmd(c.periodStart))).toEqual([S27])
+    expect(localYmd(local.weekStart!)).toBe(S27)                         // not the Sep 20 snapshot
+    expect(await moveTo(h, O4)).toBe(true)                               // the next save plans from the truth
+    expect(openWeeks()).toEqual([O4])
+  })
+
+  it('lost response AND the re-read fails: placement saves are blocked, unsent, until a read succeeds', async () => {
+    seed()
+    const h = await mount()
+    db.rpcLandButLoseResponse()
+    db.failOn('task_commitments', { message: 'offline', code: 'XX000' }, { writesOk: true })   // reads fail
+    expect(await moveTo(h, S27)).toBe(false)
+    const calls = db.rpcCalls().length
+    expect(await moveTo(h, O4)).toBe(false)                              // refused before sending
+    expect(db.rpcCalls().length).toBe(calls)
+    db.clearFailures()
+    expect(await moveTo(h, O4)).toBe(true)                               // re-read, then planned from Sep 27
+    expect(openWeeks()).toEqual([O4])
   })
 })

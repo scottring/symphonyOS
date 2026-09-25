@@ -22,7 +22,7 @@ serialise two writers. See `2026-09-25-drop-partial-failure-investigation.md`,
 
 | Piece | Where |
 |---|---|
-| Migration: `public.apply_task_placement(p_task_id uuid, p_steps jsonb)` | `supabase/migrations/2026-09-25_apply_task_placement.sql` |
+| Migration: `public.apply_task_placement(p_task_id uuid, p_steps jsonb, p_expected_open jsonb)` | `supabase/migrations/2026-09-25_apply_task_placement.sql` |
 | Client switch + plan→steps | `src/lib/placement/placementSteps.ts` |
 | Switched paths in Drop, Keep, updateTask | `src/hooks/useSupabaseTasks.ts` (`applyPlacementAtomically`) |
 | Hook tests, switch on/off | `src/hooks/useSupabaseTasks.planWrites.test.ts` — "transactional placement" |
@@ -46,6 +46,24 @@ The steps are `row` (placement columns only), `ensure`, `remove`, `carry`,
 - Drop and Keep, always.
 - updateTask, only when a save writes placement columns only and has records
   to write.
+
+**Stale plans are refused (Codex review, round 2).** The client sends the
+open period records it planned from (`p_expected_open`). Under the row lock,
+the function compares them with the database and refuses with **40001** when
+they differ, writing nothing. The lock alone only serialises writes: Codex
+showed two clients that both planned from "week of Sep 20" and chose different
+weeks left Sep 27 AND Oct 4 open. After a 40001 the client re-reads and says
+"This changed somewhere else — it has been refreshed. Try again." The person's
+next save is planned from the truth, so the rule is last-writer-wins and never
+leaves a split. A task whose records were never read is re-read before
+planning.
+
+**Uncertain failures re-read, never restore (Codex review, round 2).** Only a
+returned 40001 is known to have written nothing. Any other failure, including
+a response lost after the commit, re-reads the records and the row. If that
+read fails too, the snapshot stands in and the task is marked unreconciled, so
+the next placement save is refused unsent until a read succeeds. This is the
+same rule Drop and Keep already follow.
 
 **Which stay on the ordinary requests even with the switch on, by design:**
 - A save that also changes a title, domain, notes or similar. The function
@@ -78,9 +96,21 @@ if any step fails.
 | Switch on: a failure leaves nothing written and the task restored | Hook | pass |
 | Switch on: a mixed save (title + week) uses the ordinary requests | Hook | pass |
 | Switch off: no call is made; requests are exactly as before | Hook | pass |
+| **Stale (Codex's reproduction).** Sequential: A ok; B → 40001; only Sep 27 open | PG stale | pass |
+| **Stale, truly concurrent** (two sessions, 3 rounds): B waits ~1.5 s, then 40001; never two weeks open | PG stale | pass |
+| After a refusal, re-read and re-plan → only Oct 4 open | PG stale | pass |
+| Expected-set rules: an extra, missing or wrong entry → 40001; duplicates, order and date spelling tolerated | PG stale | 15/15 |
+| An identical repeat after a commit → 40001, nothing written; re-read + re-plan converges | PG retry | pass |
+| Bad `p_expected_open` (null, object, string, bad date) → rejected | PG security | pass |
+| No 2-arg overload exists; the migration drops any earlier one | PG pinning | pass |
+| Hook: the save states the records it planned from | Hook | pass |
+| Hook: a stale plan is refused, writes nothing, the tab shows the other device's week; the next save lands cleanly | Hook | pass |
+| Hook: a stale Drop is refused | Hook | pass |
+| Hook: a lost response after the commit re-reads and does NOT restore the old snapshot | Hook | pass |
+| Hook: lost response + failed re-read → placement saves blocked, unsent, until a read succeeds | Hook | pass |
 | The client allowlist matches the migration's `allowed` | Unit | pass |
 
-The PG totals are 76 passed and 0 failed. Rerun with
+The PG totals are **99 passed and 0 failed** (parity 9, rollback 10, retry 12, concurrency 4, stale 15, security 45, pinning 4). Rerun with
 `./scripts/test-apply-task-placement-locally.sh` (`VERBOSE=1` for detail).
 
 **Defect found and fixed during the proof.** The first draft's UPDATE named

@@ -15,6 +15,7 @@
 
 import { localYmd } from '@/lib/cadence/config'
 import type { CommitmentOp, FocusOp } from './intentions'
+import type { Task } from '@/types/task'
 
 export type PlacementStep =
   | { t: 'row'; set: Record<string, unknown> }
@@ -61,3 +62,23 @@ export function focusStep(op: FocusOp): PlacementStep {
 export function commitmentSteps(ops: readonly CommitmentOp[]): PlacementStep[] {
   return ops.map(commitmentStep).filter((s): s is PlacementStep => s !== null)
 }
+
+/**
+ * The open period records a plan was made from — the function refuses the
+ * save (40001) if the database no longer holds exactly these. Null when the
+ * task's records were never read: the caller must re-read before planning.
+ */
+export function expectedOpen(task: Task): Array<{ level: string; period_start: string }> | null {
+  if (!task.commitments) return null
+  return task.commitments
+    .filter((c) => c.status === 'open')
+    .map((c) => ({ level: c.level, period_start: localYmd(c.periodStart) }))
+}
+
+/** The outcome of one transactional save. `stale`: refused, nothing written,
+ *  the plan was made from a state another save has replaced. `failed`: the
+ *  outcome is not known for certain (an error, or a lost response after a
+ *  commit) — the caller must re-read before trusting either state. */
+export type AtomicOutcome = 'ok' | 'stale' | 'failed'
+
+export const STALE_PLACEMENT_MESSAGE = 'This changed somewhere else — it has been refreshed. Try again.'

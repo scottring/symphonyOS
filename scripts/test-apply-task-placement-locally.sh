@@ -73,12 +73,19 @@ fail() { REPORT="$REPORT"$'\n'"FAIL-> $1"; echo "FAIL-> $1"; FAILS=$((FAILS + 1)
 printf '%s\n' "$REPORT"
 
 # Multi-session helpers (committed; the fault triggers from the .sql file stay armed-off).
-q "create function apt.timed(t uuid, steps jsonb) returns int language plpgsql as \$\$
-   declare t0 timestamptz := clock_timestamp();
-   begin perform public.apply_task_placement(t, steps); return (extract(epoch from clock_timestamp() - t0) * 1000)::int; end \$\$;
+# apt.timed_try: one call, caught; returns '<ms>|<ok or sqlstate message>'.
+q "create function apt.timed_try(t uuid, steps jsonb, expected jsonb) returns text language plpgsql as \$\$
+   declare t0 timestamptz := clock_timestamp(); r text;
+   begin r := apt.try(apt.rpc_sql(t, steps, expected));
+         return (extract(epoch from clock_timestamp() - t0) * 1000)::int || '|' || r; end \$\$;
    create table apt.saved (k text primary key, v jsonb);" >/dev/null
 STEPS() { q "select steps from apt.scenarios where name = '$1'"; }
+OPEN() { q "select apt.open_now('$1')"; }
+# One committed call in its own session: exit status 0 = committed.
+CALL() { psql -v ON_ERROR_STOP=1 >/dev/null 2>&1 -c "begin; select apt.act_as('$1'); select public.apply_task_placement('$2', '$3', '$4'); commit;"; }
 LETGO_B='[{"t":"row","set":{"bucket":"someday","week_start":null,"month_start":null,"season_start":null}},{"t":"remove","level":"week","period_start":"2026-09-27"},{"t":"row","set":{"bucket":"someday","week_start":null,"month_start":null,"season_start":null}}]'
+W0920='[{"level":"week","period_start":"2026-09-20"}]'
+W0927='[{"level":"week","period_start":"2026-09-27"}]'
 
 # ── A. Top-level rollback: a fault mid-call in a real transaction ────────────
 for pos in 1 3 5; do
@@ -88,7 +95,7 @@ for pos in 1 3 5; do
 begin;
 select apt.act_as('alex');
 select apt.arm($pos);
-select public.apply_task_placement('$T', (select steps from apt.scenarios where name = 'letgo'));
+select public.apply_task_placement('$T', (select steps from apt.scenarios where name = 'letgo'), apt.open_now('$T'));
 commit;
 SQL
   then fail "rollback-toplevel $pos: the faulted call committed"
@@ -97,47 +104,52 @@ SQL
   else fail "rollback-toplevel $pos: state changed"; fi
 done
 
-# ── B. Lost response: call commits, client retries in a NEW session ──────────
+# ── B. Lost response: the call commits, the client retries in a NEW session ──
 for sc in drop keep day letgo push clear; do
   ACTOR=$(q "select actor from apt.scenarios where name = '$sc'")
   START=$(q "select start from apt.scenarios where name = '$sc'")
   T=$(q "select apt.setup('$START')"); TW=$(q "select apt.setup('$START')")
-  S=$(STEPS "$sc")
-  CALL="begin; select apt.act_as('$ACTOR'); select public.apply_task_placement('%s', '$S'); commit;"
-  psql -v ON_ERROR_STOP=1 -c "$(printf "$CALL" "$T")" >/dev/null   # response lost
-  psql -v ON_ERROR_STOP=1 -c "$(printf "$CALL" "$T")" >/dev/null   # retry
-  psql -v ON_ERROR_STOP=1 -c "$(printf "$CALL" "$TW")" >/dev/null  # one clean call
+  S=$(STEPS "$sc"); EXP=$(OPEN "$T")
+  CALL "$ACTOR" "$T" "$S" "$EXP" || fail "retry lost-response $sc: first call failed"   # committed, response lost
+  q "insert into apt.saved values ('B$sc', apt.exact('$T'))" >/dev/null
+  if CALL "$ACTOR" "$T" "$S" "$EXP"; then BLIND=ok; else BLIND=refused; fi              # blind identical retry
+  BLIND_SAME=$(q "select apt.exact('$T') = v from apt.saved where k = 'B$sc'")
+  CHANGED=$(q "select '$EXP'::jsonb <> apt.open_now('$T')")
+  CALL "$ACTOR" "$T" "$S" "$(OPEN "$T")" || fail "retry lost-response $sc: re-read retry failed"  # correct retry
+  CALL "$ACTOR" "$TW" "$S" "$(OPEN "$TW")" || fail "retry lost-response $sc: twin failed"          # one clean call
   SAME=$(q "select apt.norm('$T') = apt.norm('$TW')")
   COUNTS=$(q "select (select count(*) from task_commitments where task_id = '$T') || ' records, ' || (select count(*) from task_focus where task_id = '$T') || ' focus, ' || apt.events('$T') || ' events (single call: ' || apt.events('$TW') || ')'")
-  if [ "$SAME" = "t" ]; then pass "retry 7.$sc: lost response + retry in a new session = one call, events included — $COUNTS"
+  if [ "$CHANGED" = "t" ] && [ "$BLIND" != "refused" ]; then fail "retry lost-response $sc: blind retry was not refused"
+  elif [ "$BLIND_SAME" != "t" ]; then fail "retry lost-response $sc: blind retry changed state"
+  elif [ "$SAME" = "t" ]; then pass "retry 7.$sc: lost response → blind identical retry $BLIND$([ "$BLIND" = refused ] && echo ' (40001, nothing written)'); re-read retry → ok; = one call, events included — $COUNTS"
   else fail "retry lost-response $sc: $(q "select apt.norm('$T')") vs $(q "select apt.norm('$TW')")"; fi
 done
 
 # ── C. Concurrency, same task: A holds the row lock, B waits ────────────────
+# B planned from A's result ({week 09-27}), so it passes once it gets the lock.
 KEEP=$(STEPS keep)
 C=$(q "select apt.setup('week')"); CT=$(q "select apt.setup('week')")
 psql -v ON_ERROR_STOP=1 >/dev/null <<SQL &
 begin;
 select apt.act_as('partner');
-select public.apply_task_placement('$C', '$KEEP');
+select public.apply_task_placement('$C', '$KEEP', '$W0920');
 select pg_sleep(2);
 commit;
 SQL
 PID_A=$!
-B_MS=$(psql -At -v ON_ERROR_STOP=1 <<SQL | tail -1
+B_OUT=$(psql -At -v ON_ERROR_STOP=1 <<SQL | tail -1
 select pg_sleep(0.5);
 begin;
 select apt.act_as('alex');
-select apt.timed('$C', '$LETGO_B');
+select apt.timed_try('$C', '$LETGO_B', '$W0927');
 commit;
 SQL
 )
 wait $PID_A
-# The serial order A then B, on the twin, in separate transactions.
-psql -v ON_ERROR_STOP=1 -c "begin; select apt.act_as('partner'); select public.apply_task_placement('$CT', '$KEEP'); commit;" >/dev/null
-psql -v ON_ERROR_STOP=1 -c "begin; select apt.act_as('alex'); select public.apply_task_placement('$CT', '$LETGO_B'); commit;" >/dev/null
-if [ "${B_MS:-0}" -ge 1200 ]; then pass "concurrency 1: B on the same task waited ${B_MS} ms for A's lock (A held it ~1.5 s after B started)"
-else fail "concurrency: B did not wait (${B_MS:-?} ms)"; fi
+B_MS=${B_OUT%%|*}; B_RES=${B_OUT#*|}
+CALL partner "$CT" "$KEEP" "$W0920"; CALL alex "$CT" "$LETGO_B" "$W0927"   # serial A then B
+if [ "$B_RES" = ok ] && [ "${B_MS:-0}" -ge 1200 ]; then pass "concurrency 1: B on the same task waited ${B_MS} ms for A's lock (A held it ~1.5 s after B started), then saved"
+else fail "concurrency: B $B_RES after ${B_MS:-?} ms"; fi
 if [ "$(q "select apt.norm('$C') = apt.norm('$CT')")" = "t" ]; then
   pass "concurrency 2: concurrent A+B final state = A-then-B serial (row, records, focus, events): $(q "select bucket || ', open records ' || (select count(*) from task_commitments where task_id = '$C' and status = 'open') from tasks where id = '$C'")"
 else fail "concurrency: concurrent $(q "select apt.norm('$C')") <> serial $(q "select apt.norm('$CT')")"; fi
@@ -149,25 +161,61 @@ D1=$(q "select apt.setup('week')"); D2=$(q "select apt.setup('week')")
 psql -v ON_ERROR_STOP=1 >/dev/null <<SQL &
 begin;
 select apt.act_as('partner');
-select public.apply_task_placement('$D1', '$KEEP');
+select public.apply_task_placement('$D1', '$KEEP', '$W0920');
 select pg_sleep(2);
 commit;
 SQL
 PID_A=$!
-D_MS=$(psql -At -v ON_ERROR_STOP=1 <<SQL | tail -1
+D_OUT=$(psql -At -v ON_ERROR_STOP=1 <<SQL | tail -1
 select pg_sleep(0.5);
 begin;
 select apt.act_as('alex');
-select apt.timed('$D2', '$KEEP');
+select apt.timed_try('$D2', '$KEEP', '$W0920');
 commit;
 SQL
 )
 wait $PID_A
-if [ "${D_MS:-9999}" -lt 500 ]; then pass "concurrency 4: B on a different task finished in ${D_MS} ms while A held its own task's lock"
-else fail "concurrency: different task blocked (${D_MS:-?} ms)"; fi
+D_MS=${D_OUT%%|*}; D_RES=${D_OUT#*|}
+if [ "$D_RES" = ok ] && [ "${D_MS:-9999}" -lt 500 ]; then pass "concurrency 4: B on a different task finished in ${D_MS} ms while A held its own task's lock"
+else fail "concurrency: different task $D_RES after ${D_MS:-?} ms"; fi
+
+# ── E. Stale plans, truly concurrent (Codex's reproduction) ─────────────────
+# Both read {week 09-20}. A moves it to 09-27 and holds the lock; B, planned
+# from the same read, moves it to 10-04. B must wait, then be refused.
+SA=$(q "select v from apt.stale where k = 'A'"); SB=$(q "select v from apt.stale where k = 'B'"); SB2=$(q "select v from apt.stale where k = 'B2'")
+for round in 1 2 3; do
+  E=$(q "select apt.setup('week')")
+  psql -v ON_ERROR_STOP=1 >/dev/null <<SQL &
+begin;
+select apt.act_as('alex');
+select public.apply_task_placement('$E', '$SA', '$W0920');
+select pg_sleep(2);
+commit;
+SQL
+  PID_A=$!
+  E_OUT=$(psql -At -v ON_ERROR_STOP=1 <<SQL | tail -1
+select pg_sleep(0.5);
+begin;
+select apt.act_as('partner');
+select apt.timed_try('$E', '$SB', '$W0920');
+commit;
+SQL
+)
+  wait $PID_A
+  E_MS=${E_OUT%%|*}; E_RES=${E_OUT#*|}
+  WEEKS=$(q "select apt.open_weeks('$E')")
+  ROW=$(q "select week_start from tasks where id = '$E'")
+  if [[ "$E_RES" == 40001* ]] && [ "${E_MS:-0}" -ge 1200 ] && [ "$WEEKS" = "2026-09-27" ] && [ "$ROW" = "2026-09-27" ] && [ "$(q "select apt.consistent('$E')")" = t ]; then
+    pass "stale 12.$round: concurrent — B waited ${E_MS} ms, then ${E_RES%% placement*} 'placement changed since it was read'; open weeks = $WEEKS only, row week $ROW, consistent"
+  else fail "stale concurrent round $round: B '$E_RES' after ${E_MS:-?} ms; open weeks $WEEKS; row $ROW"; fi
+done
+# (c) after the refusal B re-reads and re-plans
+if CALL partner "$E" "$SB2" "$W0927" && [ "$(q "select apt.open_weeks('$E')")" = "2026-10-04" ] && [ "$(q "select week_start from tasks where id = '$E'")" = "2026-10-04" ]; then
+  pass "stale 13: after the concurrent refusal, B re-reads {week 09-27} and re-plans → ok; open weeks = 2026-10-04 only"
+else fail "stale re-plan after concurrent refusal: open weeks $(q "select apt.open_weeks('$E')")"; fi
 
 echo
-for cat in parity rollback retry concurrency security pinning; do
+for cat in parity rollback retry concurrency stale security pinning; do
   printf '  %-12s %s passed\n' "$cat" "$(printf '%s\n' "$REPORT" | grep -c "^PASS $cat " || true)"
 done
 PASSES=$(printf '%s\n' "$REPORT" | grep -c '^PASS ' || true)

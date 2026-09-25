@@ -69,8 +69,18 @@ exception when others then
   return sqlstate || ' ' || sqlerrm;
 end $$;
 
-create function apt.rpc_sql(t uuid, steps jsonb) returns text language sql immutable as $$
-  select format('select public.apply_task_placement(%L::uuid, %L::jsonb)', t, steps) $$;
+-- The open period records the task has NOW: what a client that just read the
+-- task sends as p_expected_open. SECURITY DEFINER so it is the truth whoever
+-- is acting (an outsider's call still fails on the row lock first).
+create function apt.open_now(t uuid) returns jsonb language sql stable security definer set search_path = public as $$
+  select coalesce(jsonb_agg(jsonb_build_object('level', level, 'period_start', period_start) order by level, period_start), '[]'::jsonb)
+    from public.task_commitments where task_id = t and status = 'open' $$;
+grant execute on function apt.open_now(uuid) to authenticated, anon;
+
+-- A call as SQL text, planned from the task's current open records unless an
+-- expected set is given.
+create function apt.rpc_sql(t uuid, steps jsonb, expected jsonb default null) returns text language sql stable as $$
+  select format('select public.apply_task_placement(%L::uuid, %L::jsonb, %L::jsonb)', t, steps, coalesce(expected, apt.open_now(t))) $$;
 
 -- ── Fault injection (test-only) ────────────────────────────────────────────
 -- apt.fail_at = N: the N-th depth-1 row trigger firing (a write the caller's
@@ -244,7 +254,7 @@ begin
     t1 := apt.setup(sc.start);
     t2 := apt.setup(sc.start);
     perform apt.act_as(sc.actor);
-    perform public.apply_task_placement(t1, sc.steps);
+    perform public.apply_task_placement(t1, sc.steps, apt.open_now(t1));
     perform apt.control(t2, sc.steps);
     perform apt.as_admin();
     a := apt.norm(t1); b := apt.norm(t2);
@@ -261,18 +271,18 @@ declare t uuid; r jsonb; st jsonb := (select steps from apt.scenarios where name
 begin
   t := apt.setup('week');
   perform apt.act_as('partner');
-  r := public.apply_task_placement(t, st);
+  r := public.apply_task_placement(t, st, apt.open_now(t));
   perform apt.as_admin();
   perform apt.check(r->>'bucket' = 'week' and r->>'week_start' = '2026-09-27', 'return value ' || r::text);
   raise notice 'PASS parity 7: return value carries the saved cache (%); planned_on / defer_* are not in it', r;
 end $$;
 
--- Fidelity probe A: the RPC's UPDATE names ALL eleven columns, so every
--- "BEFORE/AFTER UPDATE OF <col>" trigger fires on each row step even when
--- the step did not name that column. A PATCH names only what it sends.
--- tasks_fill_period_stamps (UPDATE OF bucket) is the only one that acts on
--- that difference: a period-bucket row with NO stamp, patched with an
--- unrelated placement column (planned_on).
+-- Fidelity probe A (regression for the first review): a row step must name
+-- only the columns it sends, as a PATCH does, or "UPDATE OF <col>" triggers
+-- fire on saves that never touched <col>. tasks_fill_period_stamps (UPDATE OF
+-- bucket) is the one that acts on it: a period-bucket row with NO stamp,
+-- written with an unrelated placement column (planned_on), used to gain a
+-- stamp, an open record and a 'committed' event through the RPC only.
 do $$
 declare t1 uuid; t2 uuid; a jsonb; b jsonb; steps jsonb := '[{"t":"row","set":{"planned_on":"2026-09-24"}}]';
 begin
@@ -286,20 +296,14 @@ begin
   alter table public.tasks enable trigger tasks_fill_period_stamps;
   perform apt.check((select bool_and(bucket = 'month' and month_start is null) from public.tasks where id in (t1, t2)), 'probe state');
   perform apt.act_as('alex');
-  perform public.apply_task_placement(t1, steps);
+  perform public.apply_task_placement(t1, steps, apt.open_now(t1));
   perform apt.control(t2, steps);
   perform apt.as_admin();
   a := apt.norm(t1); b := apt.norm(t2);
   if a = b then
-    raise notice 'PASS parity 8: UPDATE-OF probe — no divergence';
+    raise notice 'PASS parity 8: UPDATE-OF probe — a row step fires only the triggers a PATCH of the same columns fires (rpc = PATCH on a stamp-less month row)';
   else
-    raise notice 'OBSERVE parity-divergence: row step {planned_on} on bucket=month/month_start=null — rpc row=% | PATCH row=% | rpc open records=% | PATCH open records=% | rpc events=% | PATCH events=%',
-      (select jsonb_build_object('bucket', bucket, 'month_start', month_start) from public.tasks where id = t1),
-      (select jsonb_build_object('bucket', bucket, 'month_start', month_start) from public.tasks where id = t2),
-      (select count(*) from public.task_commitments where task_id = t1 and status = 'open'),
-      (select count(*) from public.task_commitments where task_id = t2 and status = 'open'),
-      jsonb_array_length(a->'events'), jsonb_array_length(b->'events');
-    raise notice 'PASS parity 8: UPDATE-OF probe characterised (divergence reported above, not a failure)';
+    raise exception 'FAIL parity 8: row step fired triggers a PATCH would not: rpc % | PATCH %', a, b;
   end if;
 end $$;
 
@@ -310,7 +314,7 @@ declare t1 uuid; t2 uuid; steps jsonb := '[{"t":"row","set":{"defer_count":null}
 begin
   t1 := apt.setup('week'); t2 := apt.setup('week');
   perform apt.act_as('alex');
-  perform public.apply_task_placement(t1, steps);
+  perform public.apply_task_placement(t1, steps, apt.open_now(t1));
   perform apt.control(t2, steps);
   perform apt.as_admin();
   select defer_count into a from public.tasks where id = t1;
@@ -332,7 +336,7 @@ begin
     tc := apt.setup(sc.start);
     perform apt.act_as(sc.actor);
     perform apt.arm(0);
-    perform public.apply_task_placement(tc, sc.steps);
+    perform public.apply_task_placement(tc, sc.steps, apt.open_now(tc));
     n := current_setting('apt.hits')::int; log := current_setting('apt.hitlog');
     perform apt.arm(null);
     perform apt.as_admin();
@@ -354,7 +358,7 @@ begin
     end loop;
     -- The untouched task still saves cleanly and matches the twin.
     perform apt.act_as(sc.actor);
-    perform public.apply_task_placement(t, sc.steps);
+    perform public.apply_task_placement(t, sc.steps, apt.open_now(t));
     perform apt.as_admin();
     perform apt.check(apt.norm(t) - 'events' = apt.norm(tc) - 'events', format('rollback %s: clean save after faults differs from twin', sc.name));
     raise notice 'PASS rollback %: % — % steps, % write positions [%], each fault → row/records/focus/events exactly as before', s, sc.name, jsonb_array_length(sc.steps), n, log;
@@ -381,35 +385,151 @@ begin
 end $$;
 
 -- ════════════════════════════════════════════════════════════════════════════
--- 3. Retry / idempotency (same transaction pair; the runner repeats this
---    across real separate sessions for the lost-response case)
+-- 3. Retry / idempotency. With p_expected_open, repeating the SAME call after
+--    it committed is refused (40001: the records it was planned from are
+--    gone). The correct retry re-reads and re-plans: here the same intended
+--    steps with the expected set re-read (the runner repeats this across real
+--    separate sessions for the lost-response case).
 -- ════════════════════════════════════════════════════════════════════════════
 do $$
-declare sc record; t uuid; once jsonb; twice jsonb; e1 int; e2 int; i int := 0; c1 int; c2 int; f1 int; f2 int;
+declare sc record; t uuid; once jsonb; twice jsonb; e0 int; e1 int; i int := 0; c1 int; c2 int; f1 int; f2 int;
+  exp0 jsonb; exp1 jsonb; before jsonb; r text;
 begin
   for sc in select * from apt.scenarios order by ord loop
     i := i + 1;
     t := apt.setup(sc.start);
-    e1 := apt.events(t);
+    e0 := apt.events(t);
+    exp0 := apt.open_now(t);
     perform apt.act_as(sc.actor);
-    perform public.apply_task_placement(t, sc.steps);
+    perform public.apply_task_placement(t, sc.steps, exp0);
     perform apt.as_admin();
-    once := apt.norm(t); e2 := apt.events(t);
+    once := apt.norm(t); e1 := apt.events(t); exp1 := apt.open_now(t);
     select count(*) into c1 from public.task_commitments where task_id = t;
     select count(*) into f1 from public.task_focus where task_id = t;
+
+    -- (a) the identical call again (stale expected)
+    before := apt.exact(t);
     perform apt.act_as(sc.actor);
-    perform public.apply_task_placement(t, sc.steps);
+    r := apt.try(apt.rpc_sql(t, sc.steps, exp0));
+    perform apt.as_admin();
+    if exp0 = exp1 then
+      -- the save did not change the open records: the old plan is still current
+      perform apt.check(r = 'ok', format('retry %s: identical call with unchanged records: %s', sc.name, r));
+    else
+      perform apt.check(r like '40001 %', format('retry %s: identical call after commit expected 40001, got %s', sc.name, r));
+      perform apt.check(apt.exact(t) = before, format('retry %s: refused retry wrote', sc.name));
+    end if;
+
+    -- (b) the correct retry: re-read, re-plan, send
+    perform apt.act_as(sc.actor);
+    r := apt.try(apt.rpc_sql(t, sc.steps, apt.open_now(t)));
     perform apt.as_admin();
     twice := apt.norm(t);
     select count(*) into c2 from public.task_commitments where task_id = t;
     select count(*) into f2 from public.task_focus where task_id = t;
+    perform apt.check(r = 'ok', format('retry %s: re-planned retry: %s', sc.name, r));
     perform apt.check((once - 'events') = (twice - 'events'), format('retry %s: state moved %s → %s', sc.name, once, twice));
     perform apt.check(c1 = c2 and f1 = f2, format('retry %s: records %s→%s focus %s→%s', sc.name, c1, c2, f1, f2));
-    perform apt.check(apt.events(t) = e2, format('retry %s: the retry logged %s more events', sc.name, apt.events(t) - e2));
-    raise notice 'PASS retry %: % twice = once; % records, % focus; one call logs % events [%], the retry logs 0',
-      i, sc.name, c2, f2, e2 - e1,
-      (select string_agg(kind, ',' order by id) from public.task_placement_events where task_id = t and id > (select coalesce(max(id), 0) from public.task_placement_events where task_id = t) - (e2 - e1));
+    perform apt.check(apt.events(t) = e1, format('retry %s: the retry logged %s more events', sc.name, apt.events(t) - e1));
+    raise notice 'PASS retry %: % — identical repeat → %; re-read + re-plan → ok, = one call; % records, % focus; one call logs % events [%], the retry 0',
+      i, sc.name, case when exp0 = exp1 then 'ok (records unchanged, plan still current)' else '40001, nothing written' end,
+      c2, f2, e1 - e0,
+      coalesce((select string_agg(kind, ',' order by id) from (select kind, id from public.task_placement_events where task_id = t order by id desc limit (e1 - e0)) z), '-');
   end loop;
+end $$;
+
+-- ════════════════════════════════════════════════════════════════════════════
+-- 4s. Stale plans (Codex's reproduction). Two clients both read week
+--     2026-09-20 open. A moves it to 09-27, B to 10-04, both planned from
+--     [{week, 2026-09-20}]. (The truly concurrent run is in the runner.)
+-- ════════════════════════════════════════════════════════════════════════════
+create table apt.stale (k text primary key, v jsonb);
+insert into apt.stale values
+  ('A', '[{"t":"remove","level":"week","period_start":"2026-09-20"},{"t":"ensure","level":"week","period_start":"2026-09-27"},{"t":"row","set":{"bucket":"week","week_start":"2026-09-27"}}]'),
+  ('B', '[{"t":"remove","level":"week","period_start":"2026-09-20"},{"t":"ensure","level":"week","period_start":"2026-10-04"},{"t":"row","set":{"bucket":"week","week_start":"2026-10-04"}}]'),
+  ('B2','[{"t":"remove","level":"week","period_start":"2026-09-27"},{"t":"ensure","level":"week","period_start":"2026-10-04"},{"t":"row","set":{"bucket":"week","week_start":"2026-10-04"}}]'),
+  ('read', '[{"level":"week","period_start":"2026-09-20"}]');
+grant select on apt.stale to authenticated;
+
+create function apt.open_weeks(t uuid) returns text language sql stable as $$
+  select coalesce(string_agg(period_start::text, ',' order by period_start), '-')
+    from public.task_commitments where task_id = t and level = 'week' and status = 'open' $$;
+
+do $$
+declare t uuid; r text; before jsonb;
+  sa jsonb := (select v from apt.stale where k = 'A'); sb jsonb := (select v from apt.stale where k = 'B');
+  sb2 jsonb := (select v from apt.stale where k = 'B2'); rd jsonb := (select v from apt.stale where k = 'read');
+begin
+  t := apt.setup('week');
+  perform apt.check(apt.open_now(t) = rd, 'stale: start state');
+  -- (a) sequential: A lands, B's plan is stale
+  perform apt.act_as('alex');
+  r := apt.try(apt.rpc_sql(t, sa, rd));
+  perform apt.as_admin();
+  perform apt.check(r = 'ok', 'stale A: ' || r);
+  before := apt.exact(t);
+  perform apt.act_as('partner');
+  r := apt.try(apt.rpc_sql(t, sb, rd));
+  perform apt.as_admin();
+  perform apt.check(r like '40001 %', 'stale B expected 40001, got ' || r);
+  perform apt.check(apt.exact(t) = before, 'stale B wrote');
+  perform apt.check(apt.open_weeks(t) = '2026-09-27', 'stale (a) open weeks ' || apt.open_weeks(t));
+  perform apt.check((select week_start = '2026-09-27' and bucket = 'week' from public.tasks where id = t), 'stale (a) row');
+  perform apt.check(apt.consistent(t), 'stale (a) consistent');
+  raise notice 'PASS stale 1: sequential — A ok; B planned from the same read → % (nothing written); open weeks = %, row week 2026-09-27, consistent', r, apt.open_weeks(t);
+  -- (c) B re-reads and re-plans
+  perform apt.act_as('partner');
+  r := apt.try(apt.rpc_sql(t, sb2, '[{"level":"week","period_start":"2026-09-27"}]'));
+  perform apt.as_admin();
+  perform apt.check(r = 'ok', 'stale B2: ' || r);
+  perform apt.check(apt.open_weeks(t) = '2026-10-04', 'stale (c) open weeks ' || apt.open_weeks(t));
+  perform apt.check((select week_start = '2026-10-04' from public.tasks where id = t) and apt.consistent(t), 'stale (c) row');
+  raise notice 'PASS stale 2: B re-reads and re-plans from {week 2026-09-27} → ok; open weeks = %, row week 2026-10-04, consistent', apt.open_weeks(t);
+end $$;
+
+-- Expected-set matching: exact set, distinct, order-insensitive.
+create function apt.expect_state(p_n int, p_label text, t uuid, p_expected jsonb, p_state text) returns void language plpgsql as $$
+declare before jsonb; r text; steps jsonb := '[{"t":"ensure","level":"season","period_start":"2026-09-01"}]';
+begin
+  before := apt.exact(t);
+  perform apt.act_as('alex');
+  r := apt.try(apt.rpc_sql(t, steps, p_expected));
+  perform apt.as_admin();
+  perform apt.check(r like p_state || '%', format('%s: expected %s, got %s', p_label, p_state, r));
+  if p_state <> 'ok' then
+    perform apt.check(apt.exact(t) = before, p_label || ': something was written');
+  end if;
+  raise notice 'PASS stale %: % → %', p_n, p_label, r;
+end $$;
+
+do $$
+declare t uuid; keep jsonb := (select steps from apt.scenarios where name = 'keep');
+begin
+  -- a task with two open records: week 2026-09-20 and month 2026-09-01
+  t := apt.setup('week+month');
+  perform apt.expect_state(3, 'expected has a spurious extra entry', t,
+    '[{"level":"week","period_start":"2026-09-20"},{"level":"month","period_start":"2026-09-01"},{"level":"week","period_start":"2026-09-27"}]', '40001');
+  perform apt.expect_state(4, 'expected is missing an open record', t,
+    '[{"level":"week","period_start":"2026-09-20"}]', '40001');
+  perform apt.expect_state(5, 'expected empty while two are open', t, '[]', '40001');
+  perform apt.expect_state(6, 'expected names the right date at the wrong level', t,
+    '[{"level":"week","period_start":"2026-09-20"},{"level":"season","period_start":"2026-09-01"}]', '40001');
+  perform apt.expect_state(7, 'expected entry missing period_start', t,
+    '[{"level":"week","period_start":"2026-09-20"},{"level":"month"}]', '40001');
+  perform apt.expect_state(8, 'expected entry is not an object', t,
+    '[{"level":"week","period_start":"2026-09-20"},"month|2026-09-01"]', '40001');
+  perform apt.expect_state(9, 'duplicates in expected, reverse order (tolerated: distinct, order-insensitive)', t,
+    '[{"period_start":"2026-09-01","level":"month"},{"level":"week","period_start":"2026-09-20"},{"level":"month","period_start":"2026-09-01"}]', 'ok');
+  -- now week + month + season are open; a date spelled differently still matches (compared as dates)
+  perform apt.expect_state(10, 'expected dates in another spelling (2026-9-1) still match', t,
+    '[{"level":"season","period_start":"2026-9-1"},{"level":"month","period_start":"2026-9-1"},{"level":"week","period_start":"2026-9-20"}]', 'ok');
+  -- a carried/removed record is not open: naming it is stale
+  t := apt.setup('week');
+  perform apt.act_as('alex');
+  perform public.apply_task_placement(t, keep, apt.open_now(t));
+  perform apt.as_admin();
+  perform apt.expect_state(11, 'expected names a record that is now carried', t,
+    '[{"level":"week","period_start":"2026-09-20"},{"level":"week","period_start":"2026-09-27"}]', '40001');
 end $$;
 
 -- ════════════════════════════════════════════════════════════════════════════
@@ -418,11 +538,12 @@ end $$;
 -- Each case: act, call, expect a SQLSTATE, and nothing written anywhere.
 create function apt.expect_reject(p_n int, p_label text, p_actor text, t uuid, p_steps jsonb, p_state text, p_sql text default null)
 returns void language plpgsql as $$
-declare before jsonb; r text;
+declare before jsonb; r text; q text;
 begin
   before := apt.exact(t);
+  q := coalesce(p_sql, apt.rpc_sql(t, p_steps));   -- planned from the true open records
   if p_actor = 'anon' then perform apt.act_as_anon(); else perform apt.act_as(p_actor); end if;
-  r := apt.try(coalesce(p_sql, apt.rpc_sql(t, p_steps)));
+  r := apt.try(q);
   perform apt.as_admin();
   perform apt.check(r like p_state || ' %', format('%s: expected %s, got %s', p_label, p_state, r));
   perform apt.check(apt.exact(t) = before, format('%s: something was written', p_label));
@@ -477,7 +598,7 @@ begin
   perform apt.expect_reject(16, 'missing kind',         'alex', t, '[{"level":"week","period_start":"2026-09-20"}]', '22023');
   perform apt.expect_reject(17, 'steps not an array',   'alex', t, '{"t":"row","set":{"bucket":"inbox"}}', '22023');
   perform apt.expect_reject(18, 'steps null',           'alex', t, null, '22023',
-    format('select public.apply_task_placement(%L::uuid, null)', t));
+    format('select public.apply_task_placement(%L::uuid, null, ''[]''::jsonb)', t));
   perform apt.expect_reject(19, 'step not an object',   'alex', t, '["row"]', '22023');
   perform apt.expect_reject(20, 'row without set',      'alex', t, '[{"t":"row"}]', '22023');
   perform apt.expect_reject(21, 'row set not an object','alex', t, '[{"t":"row","set":["bucket"]}]', '22023');
@@ -486,7 +607,7 @@ begin
   select jsonb_agg('{"t":"ensure","level":"week","period_start":"2026-09-20"}'::jsonb) into thirty_two from generate_series(1, 32);
   perform apt.expect_reject(23, '33 steps',             'alex', t, thirty_three, '22023');
   perform apt.expect_reject(24, 'null task id',         'alex', t, null, '22023',
-    'select public.apply_task_placement(null, ''[]''::jsonb)');
+    'select public.apply_task_placement(null, ''[]''::jsonb, ''[]''::jsonb)');
   perform apt.expect_reject(25, 'unparseable date',     'alex', t, '[{"t":"ensure","level":"week","period_start":"not-a-date"}]', '22007');
   perform apt.expect_reject(26, 'impossible date',      'alex', t, '[{"t":"ensure","level":"week","period_start":"2026-02-30"}]', '22008');
   perform apt.expect_reject(27, 'bad carry-to date',    'alex', t, '[{"t":"carry","level":"week","period_start":"2026-09-20","to":"someday"}]', '22007');
@@ -501,6 +622,23 @@ begin
   perform apt.as_admin();
   perform apt.check(r = 'ok', '32 steps: ' || r);
   raise notice 'PASS security 33: exactly 32 steps accepted';
+
+  -- p_expected_open itself
+  perform apt.expect_reject(40, 'p_expected_open null',   'alex', t, null, '22023',
+    format('select public.apply_task_placement(%L::uuid, %L::jsonb, null)', t, '[{"t":"ensure","level":"week","period_start":"2026-09-27"}]'));
+  perform apt.expect_reject(41, 'p_expected_open an object', 'alex', t, null, '22023',
+    format('select public.apply_task_placement(%L::uuid, %L::jsonb, %L::jsonb)', t, '[{"t":"ensure","level":"week","period_start":"2026-09-27"}]', '{"level":"week","period_start":"2026-09-20"}'));
+  perform apt.expect_reject(42, 'p_expected_open a string', 'alex', t, null, '22023',
+    format('select public.apply_task_placement(%L::uuid, %L::jsonb, %L::jsonb)', t, '[{"t":"ensure","level":"week","period_start":"2026-09-27"}]', '"week|2026-09-20"'));
+  perform apt.expect_reject(43, 'malformed date in p_expected_open', 'alex', t, null, '22007',
+    format('select public.apply_task_placement(%L::uuid, %L::jsonb, %L::jsonb)', t, '[{"t":"ensure","level":"week","period_start":"2026-09-27"}]', '[{"level":"week","period_start":"20-09-2026x"}]'));
+  perform apt.expect_reject(44, 'impossible date in p_expected_open', 'alex', t, null, '22008',
+    format('select public.apply_task_placement(%L::uuid, %L::jsonb, %L::jsonb)', t, '[{"t":"ensure","level":"week","period_start":"2026-09-27"}]', '[{"level":"week","period_start":"2026-02-30"}]'));
+  perform apt.expect_reject(45, 'injection in p_expected_open', 'alex', t, null, '22007',
+    format('select public.apply_task_placement(%L::uuid, %L::jsonb, %L::jsonb)', t, '[{"t":"ensure","level":"week","period_start":"2026-09-27"}]',
+      '[{"level":"week","period_start":"2026-09-20''); delete from public.task_commitments; --"}]'));
+  perform apt.expect_reject(46, 'old 2-argument call', 'alex', t, null, '42883',
+    format('select public.apply_task_placement(%L::uuid, %L::jsonb)', t, '[]'));
 
   -- Injection-shaped values are data
   t := apt.setup('week');
@@ -529,15 +667,18 @@ do $$
 declare p record;
 begin
   select prosecdef, proconfig, provolatile, proacl into p from pg_proc
-   where oid = 'public.apply_task_placement(uuid, jsonb)'::regprocedure;
+   where oid = 'public.apply_task_placement(uuid, jsonb, jsonb)'::regprocedure;
   perform apt.check(p.prosecdef = false, 'prosecdef');
   raise notice 'PASS pinning 1: SECURITY INVOKER (prosecdef = false)';
   perform apt.check(p.proconfig = array['search_path=public, pg_temp'], 'proconfig ' || coalesce(p.proconfig::text, 'NULL'));
   raise notice 'PASS pinning 2: search_path pinned (proconfig = %)', p.proconfig;
-  perform apt.check(not has_function_privilege('anon', 'public.apply_task_placement(uuid, jsonb)', 'execute'), 'anon can execute');
-  perform apt.check(has_function_privilege('authenticated', 'public.apply_task_placement(uuid, jsonb)', 'execute'), 'authenticated cannot execute');
+  perform apt.check(not has_function_privilege('anon', 'public.apply_task_placement(uuid, jsonb, jsonb)', 'execute'), 'anon can execute');
+  perform apt.check(has_function_privilege('authenticated', 'public.apply_task_placement(uuid, jsonb, jsonb)', 'execute'), 'authenticated cannot execute');
   perform apt.check(not exists (select 1 from aclexplode(p.proacl) where grantee = 0), 'PUBLIC can execute');
   raise notice 'PASS pinning 3: EXECUTE — authenticated yes, anon no, PUBLIC no (acl %)', p.proacl;
+  perform apt.check((select count(*) from pg_proc where proname = 'apply_task_placement') = 1
+    and to_regprocedure('public.apply_task_placement(uuid, jsonb)') is null, 'an apply_task_placement overload besides (uuid, jsonb, jsonb) exists');
+  raise notice 'PASS pinning 4: only apply_task_placement(uuid, jsonb, jsonb) exists — no 2-argument overload';
   raise notice 'OBSERVE pinning: service_role execute = % (from Supabase default privileges, simulated by the runner)',
-    has_function_privilege('service_role', 'public.apply_task_placement(uuid, jsonb)', 'execute');
+    has_function_privilege('service_role', 'public.apply_task_placement(uuid, jsonb, jsonb)', 'execute');
 end $$;

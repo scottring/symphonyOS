@@ -46,3 +46,39 @@ Rollout step 4 observes it on the live function.
 - Live calendar edit/save, drag/resize and Delete.
 - Two-account live verification.
 - Codex's own docs were not edited.
+
+## Round 2 — your two findings, addressed (2026-09-25)
+
+1. **Stale concurrent plans.** The signature is now
+   `apply_task_placement(uuid, jsonb, p_expected_open jsonb)`. The expected
+   open-record set is **required** and checked under the FOR UPDATE lock; a
+   mismatch gives 40001 and writes nothing. Your reproduction is in
+   `supabase/tests/100_apply_task_placement.test.sql`, category "stale":
+   - sequential, and truly concurrent in two sessions over 3 rounds;
+   - B waits, then is refused, and two weeks are never open;
+   - after a re-read, re-planning lands cleanly.
+
+   The migration also drops any earlier `(uuid, jsonb)` overload.
+2. **Lost response restoring stale UI.**
+   - Every transactional failure except 40001 now re-reads the records and the
+     row (`afterAtomicFailure`).
+   - If the re-read fails, the snapshot stands in and the task is marked
+     unreconciled: further placement saves are refused unsent until a read
+     succeeds.
+   - A task whose records were never read is re-read before planning
+     (`placementBase`).
+
+**Regression tests.** In `src/hooks/useSupabaseTasks.planWrites.test.ts`,
+"stale plans and uncertain failures", 5 tests; 4 of them fail on the previous
+hook.
+
+**Numbers at this point**
+- PG `./scripts/test-apply-task-placement-locally.sh`: **99/99**.
+- Hook and helper tests: **108/108**
+  (`npx vitest run src/hooks/useSupabaseTasks.planWrites.test.ts src/lib/placement`).
+- Full suite 7214 (only the known connectors error); tsc clean; eslint 0
+  errors; build clean.
+- 096 11/11 · 097 12/12 · 098 7/7 · 099 23/23.
+
+**Still not applied or deployed.** Live calendar and two-account checks are
+pending. Mixed saves and group moves stay on the ordinary path.

@@ -42,11 +42,20 @@
 --   bound, never concatenated into SQL.
 --   EXECUTE is granted to `authenticated` only.
 --
+-- STALE PLANS are refused (40001): the caller states the open period
+-- records it planned from, and the function checks them under the lock
+-- before writing anything. A retry must re-read and re-plan.
+--
 -- IDEMPOTENT. Every step is safe to repeat: ensure is an upsert, remove/carry
 -- touch only an OPEN record, focus_set ignores a duplicate, the row write sets
 -- absolute values. A retry after a lost response converges.
 
-create or replace function public.apply_task_placement(p_task_id uuid, p_steps jsonb)
+-- An earlier draft took (uuid, jsonb) without the stale-plan check. It was
+-- never applied anywhere shared, but if it ever were, `create or replace` with
+-- the new signature would leave it callable beside this one. Remove it.
+drop function if exists public.apply_task_placement(uuid, jsonb);
+
+create or replace function public.apply_task_placement(p_task_id uuid, p_steps jsonb, p_expected_open jsonb)
 returns jsonb
 language plpgsql
 security invoker
@@ -66,6 +75,8 @@ declare
                                    'defer_count', 'deferred_until', 'week_deferred_at'];
   s jsonb;
   setlist text;
+  have jsonb;
+  want jsonb;
 begin
   if p_task_id is null then
     raise exception 'p_task_id is required' using errcode = '22023';
@@ -82,6 +93,27 @@ begin
   perform 1 from public.tasks where id = p_task_id for update;
   if not found then
     raise exception 'task not found or not writable' using errcode = '42501';
+  end if;
+
+  -- STALE PLAN CHECK, under the lock. The steps were planned from the open
+  -- period records the client last read (`p_expected_open`). If another save
+  -- landed in between, those steps are no longer the right ones: two clients
+  -- both planning from "week of Sep 20" and choosing different weeks left
+  -- Sep 27 AND Oct 4 open (Codex, reproduced in isolated PG). The lock alone
+  -- only serialises; this refuses a plan made from a state that is gone.
+  -- 40001 tells the client to re-read and let the person choose again.
+  if p_expected_open is null or jsonb_typeof(p_expected_open) <> 'array' then
+    raise exception 'p_expected_open must be a JSON array' using errcode = '22023';
+  end if;
+  select coalesce(jsonb_agg(x order by x), '[]'::jsonb) into want
+    from (select distinct (e->>'level') || '|' || ((e->>'period_start')::date)::text as x
+            from jsonb_array_elements(p_expected_open) e) w;
+  select coalesce(jsonb_agg(x order by x), '[]'::jsonb) into have
+    from (select distinct level || '|' || period_start::text as x
+            from public.task_commitments where task_id = p_task_id and status = 'open') h;
+  if have <> want then
+    raise exception 'placement changed since it was read' using errcode = '40001',
+      detail = format('expected open %s, found %s', want, have);
   end if;
 
   for step in select * from jsonb_array_elements(p_steps) loop
@@ -175,9 +207,9 @@ begin
 end;
 $$;
 
-revoke all on function public.apply_task_placement(uuid, jsonb) from public;
-revoke all on function public.apply_task_placement(uuid, jsonb) from anon;
-grant execute on function public.apply_task_placement(uuid, jsonb) to authenticated;
+revoke all on function public.apply_task_placement(uuid, jsonb, jsonb) from public;
+revoke all on function public.apply_task_placement(uuid, jsonb, jsonb) from anon;
+grant execute on function public.apply_task_placement(uuid, jsonb, jsonb) to authenticated;
 
-comment on function public.apply_task_placement(uuid, jsonb) is
+comment on function public.apply_task_placement(uuid, jsonb, jsonb) is
   'One placement save (row cache + task_commitments + task_focus) in one transaction, as the caller (SECURITY INVOKER). Steps run in the order sent. Only placement columns may be written. See docs/planning/2026-09-25-transactional-placement-review.md.';
