@@ -359,6 +359,8 @@ function ShellLayoutInner({ children }: Props) {
           showFab={false}
           onAdd={chrome.onQuickAdd}
           onAddRich={chrome.onQuickAddRich}
+          // useShellChrome confirms every capture once its write lands.
+          confirmsAfterWrite
           onAddNote={chrome.onQuickAddNote}
           eventCalendarName={chrome.eventCalendarName}
           onPlanFromPaper={() => { if (!requestPlanFromPaper()) navigate('/today') }}
