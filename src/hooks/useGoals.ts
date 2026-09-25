@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/hooks/useAuth'
-import { scopeForDomain, type Scope } from '@/lib/scope'
+import { scopeForDomain, memberForAuthUser, type Scope } from '@/lib/scope'
+import { useFamilyMembers } from '@/hooks/useFamilyMembers'
 import type {
   Goal, GoalAction, GoalArea, GoalMilestone, Quarter,
   DbGoal, DbGoalAction, DbGoalArea, DbGoalMilestone,
@@ -55,6 +56,9 @@ function dbGoalToGoal(db: DbGoal, actions: GoalAction[], milestones: GoalMilesto
     actions: actions.filter(a => a.goalId === db.id),
     milestones: milestones.filter(m => m.goalId === db.id),
     carriedFrom: db.carried_from ?? undefined,
+    userId: db.user_id,
+    // Feature-detected: only a row that HAS the column says who is assigned.
+    assignedToAll: 'assigned_to_all' in db ? (db.assigned_to_all ?? []) : undefined,
     createdAt: new Date(db.created_at),
     updatedAt: new Date(db.updated_at),
   }
@@ -84,6 +88,7 @@ function dbActionToAction(db: DbGoalAction): GoalAction {
 // `g.year` themselves.
 export function useGoals() {
   const { user } = useAuth()
+  const { members: familyMembers } = useFamilyMembers()
   /** Only the default for a goal created without an explicit year. */
   const currentYear = new Date().getFullYear()
 
@@ -318,9 +323,21 @@ export function useGoals() {
     return real
   }, [user, currentYear, goals])
 
-  const updateGoal = useCallback(async (id: string, updates: Partial<Pick<Goal, 'name' | 'notes' | 'status' | 'areaId' | 'sortOrder' | 'strategy' | 'domainSlug' | 'layerId' | 'context' | 'year' | 'carriedFrom'>>) => {
+  const updateGoal = useCallback(async (id: string, rawUpdates: Partial<Pick<Goal, 'name' | 'notes' | 'status' | 'areaId' | 'sortOrder' | 'strategy' | 'domainSlug' | 'layerId' | 'context' | 'year' | 'carriedFrom' | 'assignedToAll'>>) => {
     const goal = goals.find(g => g.id === id)
     if (!goal) return
+    let updates: Partial<Goal> = rawUpdates
+    // Assignment shares, never relabels — the task rule (updateTask): someone
+    // else assigned raises scope to 'couple' so they can read it; no one else
+    // assigned walks it back; a family goal stays household-wide. The context
+    // is never touched. A goal from before the column has no assignees to
+    // write, so the call is ignored rather than failing.
+    if ('assignedToAll' in rawUpdates) {
+      if (goal.assignedToAll === undefined) return
+      const ids = rawUpdates.assignedToAll ?? []
+      const self = memberForAuthUser(familyMembers, goal.userId)?.id
+      updates = { ...rawUpdates, assignedToAll: ids, scope: scopeForDomain(goal.context ?? null, ids, self) }
+    }
 
     setGoals(prev => prev.map(g => g.id === id ? { ...g, ...updates } : g))
 
@@ -336,6 +353,8 @@ export function useGoals() {
     if (updates.context !== undefined) dbUpdates.context = updates.context ?? null
     if (updates.year !== undefined) dbUpdates.year = updates.year
     if (updates.carriedFrom !== undefined) dbUpdates.carried_from = updates.carriedFrom ?? null
+    if (updates.assignedToAll !== undefined) dbUpdates.assigned_to_all = updates.assignedToAll.length > 0 ? updates.assignedToAll : null
+    if (updates.scope !== undefined) dbUpdates.scope = updates.scope
 
     const { error: updateError } = await supabase
       .from('goals')
@@ -346,7 +365,7 @@ export function useGoals() {
       setGoals(prev => prev.map(g => g.id === id ? goal : g))
       setError(updateError.message)
     }
-  }, [goals])
+  }, [goals, familyMembers])
 
   const deleteGoal = useCallback(async (id: string) => {
     const goalToDelete = goals.find(g => g.id === id)

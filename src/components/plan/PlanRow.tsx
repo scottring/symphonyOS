@@ -35,6 +35,10 @@ export interface PlanRowModel {
   /** The goals one rung DOWN that support this one. The same relationship,
    *  read from the other end, so a parent is never a dead end. */
   supportedBy?: SupportRef[]
+  /** Who this row is assigned to: household member ids, in the order they
+   *  were chosen. Undefined where the row cannot carry an assignment (a year
+   *  goal, until its table has the column). */
+  assigneeIds?: readonly string[]
 }
 
 /** One end of a goal-supports-goal link, as a row draws it. */
@@ -159,6 +163,7 @@ export function PlanRow({
   expanded = false, onToggleExpand, onAddStep, stepActionsFor, planWeek,
   timingReachesLower = false,
   stepsToDraw, counts, hiddenByReveal = 0, onShowAllSteps, hiddenByFilter = 0, goalControls,
+  assign,
 }: {
   row: PlanRowModel
   actions: RowAction[]
@@ -205,6 +210,11 @@ export function PlanRow({
    *  page, whose control chooses weeks. The season page's rung below is the
    *  month, which the control does not offer, so its verb stays. */
   timingReachesLower?: boolean
+  /** "Assign people": the household picker for this row, or null where the
+   *  row cannot be assigned. Goals and steps each get their own — a step's
+   *  people are its own, never copied from its goal. Visible at every width,
+   *  like the timing control: who is doing it is not a hover secret. */
+  assign?: (row: PlanRowModel) => ReactNode
 }) {
   // A row whose copy is finished reads as finished — one status, not a tick
   // that disagrees with an annotation beside it.
@@ -228,6 +238,7 @@ export function PlanRow({
   // letter a line under the chip (390px check, 2026-09-25).
   const mobile = useMobile()
   const timing = !row.isGoal && planWeek ? planWeek(row) : null
+  const who = assign ? assign(row) : null
   const verbs = actions.filter((a): a is Exclude<RowAction, 'complete'> =>
     a !== 'complete' && a !== 'under-goal' && !(hasTimingControl && a === 'to-lower'))
   // Only a month/season goal holds steps. A year row is a goals-table entity,
@@ -367,7 +378,9 @@ export function PlanRow({
         {row.placed && (
           <PlacementChip placed={row.placed} onOpenPlaced={onOpenPlaced} />
         )}
-        {mobile && timing && <span className="mt-1.5 flex max-w-full">{timing}</span>}
+        {mobile && (timing || who) && (
+          <span className="mt-1.5 flex max-w-full items-center gap-2">{timing}{who}</span>
+        )}
       </span>
       {/* Hover verbs, desktop only. On a phone they were invisible (no hover)
           yet still took the width of four 48px touch buttons, which squeezed a
@@ -397,6 +410,7 @@ export function PlanRow({
           the hover verbs beside it. It answers "which week does this belong
           to", which is the whole motion of the cadence — it cannot be a hover
           secret (Codex review of cefcdbcc). */}
+      {!mobile && who && <span className="period-row-assign shrink-0">{who}</span>}
       {!mobile && timing && <span className="shrink-0">{timing}</span>}
       {verbs.length > 0 && (
         <span className="period-row-actions hidden shrink-0 sm:flex items-center gap-0.5 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
@@ -435,6 +449,7 @@ export function PlanRow({
               lowerLabel={lowerLabel}
               planWeek={planWeek}
               timingReachesLower={timingReachesLower}
+              assign={assign}
             />
           ))}
         </ul>

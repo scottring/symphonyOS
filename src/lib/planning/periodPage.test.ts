@@ -188,3 +188,42 @@ describe('offerableFromAbove', () => {
     expect(out.map((t) => t.id)).toEqual(['open', 'legacy'])
   })
 })
+
+// Scott, 2026-09-25: a household goal assigned to someone else stays on the
+// plan — unless it is private. Personal and Work are private; Family (and a
+// row with no area) is the household's.
+describe('selectPeriodTasks: goals and steps assigned only to others', () => {
+  const sep = d(2026, 8, 1)
+  const onSep = { bucket: 'month' as const, monthStart: sep }
+  const toIris = { assignedTo: 'iris', assignedToAll: ['iris'] }
+  const pick = (all: Task[]) => selectPeriodTasks(all, 'month', sep, true, 'me').map((t) => t.title)
+
+  it('a Family goal stays; a Personal or Work goal leaves', () => {
+    expect(pick([
+      task({ title: 'family goal', isGoal: true, context: 'family', ...onSep, ...toIris }),
+      task({ title: 'personal goal', isGoal: true, context: 'personal', ...onSep, ...toIris }),
+      task({ title: 'work goal', isGoal: true, context: 'work', ...onSep, ...toIris }),
+      task({ title: 'untagged goal', isGoal: true, context: null, ...onSep, ...toIris }),
+    ])).toEqual(['family goal', 'untagged goal'])
+  })
+
+  it('a step with no area of its own follows its goal', () => {
+    const fam = task({ id: 'gf', title: 'family goal', isGoal: true, context: 'family', ...onSep })
+    const priv = task({ id: 'gp', title: 'personal goal', isGoal: true, context: 'personal', ...onSep })
+    expect(pick([
+      fam, priv,
+      task({ title: 'family step', goalTaskId: 'gf', context: null, ...onSep, ...toIris }),
+      task({ title: 'personal step', goalTaskId: 'gp', context: null, ...onSep, ...toIris }),
+    ])).toEqual(['family goal', 'personal goal', 'family step'])
+  })
+
+  it('a step\'s own Personal area wins over a Family goal', () => {
+    const fam = task({ id: 'gf2', title: 'family goal', isGoal: true, context: 'family', ...onSep })
+    expect(pick([fam, task({ title: 'private step', goalTaskId: 'gf2', context: 'personal', ...onSep, ...toIris })]))
+      .toEqual(['family goal'])
+  })
+
+  it('a plain task assigned to someone else still leaves (the 2026-09-05 rule)', () => {
+    expect(pick([task({ title: 'family task', context: 'family', ...onSep, ...toIris })])).toEqual([])
+  })
+})

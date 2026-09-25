@@ -67,6 +67,7 @@ import { PlanSession } from './PlanSession'
 import { PlanNextLine } from './PlanNextLine'
 import { periodCalendarEntries } from '@/lib/planning/periodCalendar'
 import { PlanWeekMenu } from './PlanWeekMenu'
+import { MultiAssigneeDropdown } from '@/components/family'
 import { PeriodShelves } from './PeriodShelves'
 import { useDayLoadEvents, DAY_LOAD_RANGE_DAYS } from '@/hooks/useDayLoadEvents'
 
@@ -107,6 +108,9 @@ export function taskRow(t: Task, level: PlanLevel, periodStart: Date, support?: 
     subtitle: t.isGoal ? firstNoteLine(t.notes) : undefined,
     supports: support?.supports ?? null,
     supportedBy: support?.supportedBy,
+    // Already normalised by the task mapper: a legacy single assignee reads
+    // as a one-person list.
+    assigneeIds: t.assignedToAll ?? [],
   }
 }
 function goalRow(g: Goal, support?: RowSupport): PlanRowModel {
@@ -114,6 +118,10 @@ function goalRow(g: Goal, support?: RowSupport): PlanRowModel {
     id: g.id, title: g.name, isGoal: true, fate: g.status === 'completed' ? 'done' : 'open', kind: 'goal',
     subtitle: g.strategy?.trim() || firstNoteLine(g.notes),
     supportedBy: support?.supportedBy,
+    // Undefined until the goals table carries assignees (migration
+    // 2026-09-25_goals_assigned_to_all.sql, prepared, not applied): the row
+    // then offers no picker rather than one that cannot save.
+    assigneeIds: g.assignedToAll,
   }
 }
 
@@ -123,7 +131,7 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
   const { tasks, loading, toggleTask, deleteTask, updateTask, updateTasksBulk, addTask, setGoal, pushTask, keepForward, dropCommitment, completeTask } = useSupabaseTasks()
   const gated = useGatedTaskActions({ updateTask, pushTask, updateTasksBulk }, (id) => tasks.find((t) => t.id === id))
   const { layers, soleDomain } = useDomain()
-  const { getCurrentUserMember } = useFamilyMembers()
+  const { members: familyMembers, getCurrentUserMember } = useFamilyMembers()
   const meId = getCurrentUserMember()?.id ?? null
   const { seasons, loading: seasonsLoading } = useHouseholdSeasons()
   const { activeRoutines } = useRoutines()
@@ -421,6 +429,34 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
     }
     else if (action === 'under-goal') setPickingGoalFor(row.id)
   }, [goals, updateGoal, addGoal, bounds.next, bounds.start, isPast, toggleTask, deleteTask, dropCommitment, gated, setGoal, keepForward, level, planActions, tasks, confirmGoalDone, lowerMonth])
+
+  /**
+   * "Assign people" on a goal or a step: the household picker the rest of the
+   * app uses, writing the same fields the same way (Today, Triage and the
+   * detail panel all send the list AND its first person, so clearing the list
+   * also clears a legacy single assignee). Each row is its own: assigning a
+   * goal never assigns its steps. The write goes through the gate, so an
+   * untagged row is asked for its area first, as it is everywhere else, and
+   * `updateTask` derives the sharing scope from the people chosen.
+   * A look-back is read, not written into: no picker on a past period.
+   */
+  const assignFor = useCallback((row: PlanRowModel) => {
+    if (isPast || familyMembers.length === 0 || row.assigneeIds === undefined) return null
+    const onSelect = (ids: string[]) => {
+      if (row.kind === 'goal') void updateGoal(row.id, { assignedToAll: ids })
+      else void gated.updateTask(row.id, { assignedToAll: ids, assignedTo: ids[0] ?? undefined })
+    }
+    return (
+      <MultiAssigneeDropdown
+        members={familyMembers}
+        selectedIds={[...row.assigneeIds]}
+        onSelect={onSelect}
+        size="sm"
+        label="Assign people"
+        triggerLabel={`Assign people to ${row.title}`}
+      />
+    )
+  }, [isPast, familyMembers, updateGoal, gated])
 
   // The rail's one verb: take an open season task into this month — the same
   // row gains a month commitment; the season keeps it, marked "→ September".
@@ -1336,7 +1372,7 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
                   ) : (
                   <ul>
                     {goalView.goals.map((g) => (
-                      <PlanRow key={g.row.id} row={g.row} onOpen={open} onOpenPlaced={openPlaced} onOpenSupport={openSupport} onAction={(a, r) => { void act(a, r) }} planWeek={planWeekSlot} timingReachesLower={level === 'month'}
+                      <PlanRow assign={assignFor} key={g.row.id} row={g.row} onOpen={open} onOpenPlaced={openPlaced} onOpenSupport={openSupport} onAction={(a, r) => { void act(a, r) }} planWeek={planWeekSlot} timingReachesLower={level === 'month'}
                         lowerLabel={lowerLabelText}
                         expanded={g.expanded}
                         onToggleExpand={toggleGoal}
@@ -1358,7 +1394,7 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
                 <details className="period-assigned-fold" key={`goals-${level}-${bounds.start.toISOString()}`} open={isPast || undefined}>
                   <summary>Completed goals · {doneGoalRows.length}</summary>
                   <ul>{doneGoalRows.map((row) => (
-                    <PlanRow key={row.id} row={row} onOpen={open} onOpenPlaced={openPlaced} onOpenSupport={openSupport} planWeek={planWeekSlot} timingReachesLower={level === 'month'}
+                    <PlanRow assign={assignFor} key={row.id} row={row} onOpen={open} onOpenPlaced={openPlaced} onOpenSupport={openSupport} planWeek={planWeekSlot} timingReachesLower={level === 'month'}
                       // A finished goal keeps its controls: reopening one is
                       // the whole reason to look at this fold (Codex).
                       goalControls={goalControlsFor(row)}
@@ -1421,7 +1457,7 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
                   {availableTaskRows.length === 0 && <p className="period-section-note">Every open task has a more specific commitment.</p>}
                   <ul>
                     {visibleTaskRows.map((row) => (
-                      <PlanRow key={row.id} row={row} onOpen={open} onOpenPlaced={openPlaced} onOpenSupport={openSupport} onAction={(a, r) => { void act(a, r) }} planWeek={planWeekSlot} timingReachesLower={level === 'month'}
+                      <PlanRow assign={assignFor} key={row.id} row={row} onOpen={open} onOpenPlaced={openPlaced} onOpenSupport={openSupport} onAction={(a, r) => { void act(a, r) }} planWeek={planWeekSlot} timingReachesLower={level === 'month'}
                         lowerLabel={lowerLabelText}
                         actions={actionsFor({ fate: row.fate, isGoal: row.isGoal, isPast, level, hasGoals: goalRows.length > 0 })} />
                     ))}
@@ -1495,7 +1531,7 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
                   <summary>Already assigned · {assignedTaskRows.length}</summary>
                   <p className="period-section-note">Still part of this {noun}’s plan.</p>
                   <ul>{assignedTaskRows.map((row) => (
-                    <PlanRow key={row.id} row={row} onOpen={open} onOpenPlaced={openPlaced} onOpenSupport={openSupport} planWeek={planWeekSlot} timingReachesLower={level === 'month'}
+                    <PlanRow assign={assignFor} key={row.id} row={row} onOpen={open} onOpenPlaced={openPlaced} onOpenSupport={openSupport} planWeek={planWeekSlot} timingReachesLower={level === 'month'}
                       onAction={(a, r) => { void act(a, r) }} lowerLabel={lowerLabelText}
                       actions={actionsFor({ fate: row.fate, isGoal: false, isPast, level, hasGoals: goalRows.length > 0 })} />
                   ))}</ul>
@@ -1519,7 +1555,7 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
                   {doneOpen && (
                     <ul className="mt-1 border-t border-neutral-200">
                       {doneTaskRows.map((row) => (
-                        <PlanRow key={row.id} row={row} onOpen={open} onOpenPlaced={openPlaced} onOpenSupport={openSupport} onAction={(a, r) => { void act(a, r) }} planWeek={planWeekSlot} timingReachesLower={level === 'month'}
+                        <PlanRow assign={assignFor} key={row.id} row={row} onOpen={open} onOpenPlaced={openPlaced} onOpenSupport={openSupport} onAction={(a, r) => { void act(a, r) }} planWeek={planWeekSlot} timingReachesLower={level === 'month'}
                           lowerLabel={lowerLabelText}
                         actions={actionsFor({ fate: row.fate, isGoal: row.isGoal, isPast, level })} />
                       ))}
