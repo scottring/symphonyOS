@@ -67,6 +67,7 @@ import { PlanSession } from './PlanSession'
 import { PlanNextLine } from './PlanNextLine'
 import { periodCalendarEntries } from '@/lib/planning/periodCalendar'
 import { PlanWeekMenu } from './PlanWeekMenu'
+import { weekendsTouching, weekendEnd } from '@/lib/planning/weekend'
 import { MultiAssigneeDropdown } from '@/components/family'
 import { PeriodShelves } from './PeriodShelves'
 import { useDayLoadEvents, DAY_LOAD_RANGE_DAYS } from '@/hooks/useDayLoadEvents'
@@ -667,11 +668,23 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
    * covered whenever the menu could have set it, and a week outside it gets
    * no tiles rather than half of one.
    */
+  // Widened to cover every weekend the month touches: a weekend that straddles
+  // the month (or week) edge needs both of its days counted, or its bars
+  // would be missing exactly where the boundary is.
+  const monthWeekends = useMemo(() => (level === 'year' ? [] : weekendsTouching(bounds.start)), [level, bounds.start])
   const timingWindow = useMemo(() => {
     if (level === 'year') return { start: null as Date | null, dayCount: 0 }
     const weeks = weeksOfMonth(bounds.start, readCadenceConfig().weekStartsOn)
-    return { start: weeks[0]?.start ?? null, dayCount: weeks.length * 7 }
-  }, [level, bounds.start])
+    if (!weeks[0]) return { start: null as Date | null, dayCount: 0 }
+    const dayMs = 86_400_000
+    const weeksEnd = new Date(weeks[0].start.getFullYear(), weeks[0].start.getMonth(), weeks[0].start.getDate() + weeks.length * 7)
+    const firstSat = monthWeekends[0]
+    const lastSun = monthWeekends.length ? weekendEnd(monthWeekends[monthWeekends.length - 1]) : null
+    const start = firstSat && firstSat < weeks[0].start ? firstSat : weeks[0].start
+    const endExclusive = lastSun && lastSun >= weeksEnd
+      ? new Date(lastSun.getFullYear(), lastSun.getMonth(), lastSun.getDate() + 1) : weeksEnd
+    return { start, dayCount: Math.round((endExclusive.getTime() - start.getTime()) / dayMs) }
+  }, [level, bounds.start, monthWeekends])
   const dayChoices = useDayChoices({
     windowStart: timingWindow.start, dayCount: timingWindow.dayCount,
     tasks, tasksLoading: loading, userId: user?.id ?? null,
@@ -709,6 +722,9 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
         onClearWeek={timing && hasTiming(timing) ? () => { void removeTiming(row.id, row.title, 'all') } : undefined}
         onRemoveDay={timing?.day ? () => { void removeTiming(row.id, row.title, 'day') } : undefined}
         onPickDay={(date) => { void planActions.chooseTaskDay(row.id, date) }}
+        weekends={monthWeekends.map((saturday) => ({ saturday, days: dayChoices.forDays([saturday, weekendEnd(saturday)]) }))}
+        onPickWeekend={t && !t.completed ? (saturday) => { void planActions.planTaskWeekend(row.id, saturday) } : undefined}
+        onPickWeekendDay={(saturday, day) => { void planActions.planTaskWeekendDay(row.id, saturday, day) }}
       />
       {/* S3-03: a season row can go into ANY of its season's months, named,
           not only the one "Take it into" means. A plain select: reachable by
@@ -739,7 +755,7 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
       )}
       </span>
     )
-  }, [level, bounds.start, timingPeriodLabel, planActions, tasks, navigate, gated, removeTiming, dayChoices, seasonMonths])
+  }, [level, bounds.start, timingPeriodLabel, planActions, tasks, navigate, gated, removeTiming, dayChoices, seasonMonths, monthWeekends])
 
   const [pickingGoalFor, setPickingGoalFor] = useState<string | null>(null)
   const [linkError, setLinkError] = useState(false)

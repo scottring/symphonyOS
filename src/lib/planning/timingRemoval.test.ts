@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { timingRemoval } from './planActions'
+import { weekendPlacement } from './weekend'
 import { planPlacement } from '@/lib/placement/intentions'
 import { deriveCache, openCommitment, liveCommitments } from '@/lib/placement/model'
 import type { Task, TaskCommitment } from '@/types/task'
@@ -132,5 +133,41 @@ describe('timingRemoval', () => {
     const t = task({ focus: [{ userId: 'u1', date: OCT6 }, { userId: 'u1', date: new Date(2026, 9, 8) }] })
     const { updates } = timingRemoval(t, 'day')
     expect(updates.focus).toEqual([{ userId: 'u1', date: new Date(2026, 9, 8) }])
+  })
+})
+
+describe('a flexible weekend chosen from the Month page', () => {
+  // A month row, as the Month page holds it: October, nothing below.
+  const monthRow = () => recorded([{ level: 'month', periodStart: OCT1, status: 'open' }], { scheduledFor: undefined, isAllDay: undefined, focus: [] })
+  const SAT10 = new Date(2026, 9, 10), SUN11 = new Date(2026, 9, 11)
+  const onWeekend = () => applied(monthRow(), weekendPlacement(SAT10))
+
+  it('adds the weekend and its week, and keeps the month', () => {
+    const t = onWeekend()
+    expect(t.weekendStart).toEqual(SAT10)
+    expect(t.scheduledFor).toBeUndefined()
+    expect(openCommitment(t, 'week')).toBeTruthy()
+    expect(openCommitment(t, 'month')?.periodStart).toEqual(OCT1)
+    expect(t.goalTaskId).toBe('g1')
+  })
+
+  it('one of its days keeps the weekend; removing that day returns to "either day"', () => {
+    const withDay = applied(onWeekend(), { bucket: 'timed', scheduledFor: SUN11, isAllDay: true })
+    expect(withDay.weekendStart).toEqual(SAT10)
+    const back = applied(withDay, timingRemoval(withDay, 'day').updates)
+    expect(back.scheduledFor).toBeUndefined()
+    expect(back.weekendStart).toEqual(SAT10)
+    expect(openCommitment(back, 'week')).toBeTruthy()
+    expect(openCommitment(back, 'month')?.periodStart).toEqual(OCT1)
+  })
+
+  it('"Remove weekend" clears the weekend with its week, keeps the month, and Undo puts it back', () => {
+    const t = onWeekend()
+    const { updates, previous } = timingRemoval(t, 'all')
+    const after = applied(t, updates)
+    expect(after.weekendStart).toBeUndefined()
+    expect(openCommitment(after, 'week')).toBeUndefined()
+    expect(openCommitment(after, 'month')?.periodStart).toEqual(OCT1)
+    expect(applied(after, previous).weekendStart).toEqual(SAT10)
   })
 })

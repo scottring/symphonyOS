@@ -23,6 +23,7 @@ import type { Task } from '@/types/task'
 import { openCommitment } from '@/lib/placement/model'
 import { readCadenceConfig, weekStartAnchor, localYmd } from '@/lib/cadence/config'
 import { formatWeekRange, formatWeekRangeShort } from '@/lib/dateHelpers'
+import { weekendRangeLabel, inTaskWeekend } from './weekend'
 
 export interface TaskTiming {
   /** The day this task is scheduled for, if any. */
@@ -36,6 +37,9 @@ export interface TaskTiming {
   /** The week `day` falls inside, when there is a day. Not a commitment: it is
    *  where the date happens to land, and is labelled that way. */
   weekOfDay: Date | null
+  /** The Saturday of a flexible weekend ("either day"), when one is chosen.
+   *  It survives choosing one of its two days (flexible-weekend.md). */
+  weekend?: Date | null
 }
 
 const anchorOf = (d: Date) => weekStartAnchor(d, readCadenceConfig().weekStartsOn)
@@ -78,13 +82,14 @@ export function committedWeekOf(
  *
  * The week comes from `committedWeekOf`, which `taskWhen` also uses.
  */
-export function taskTiming(task: Pick<Task, 'scheduledFor' | 'isAllDay' | 'commitments' | 'bucket' | 'weekStart'>): TaskTiming {
+export function taskTiming(task: Pick<Task, 'scheduledFor' | 'isAllDay' | 'commitments' | 'bucket' | 'weekStart'> & Partial<Pick<Task, 'weekendStart'>>): TaskTiming {
   const day = task.scheduledFor ?? null
   return {
     day,
     timed: !!day && task.isAllDay !== true,
     week: committedWeekOf(task),
     weekOfDay: day ? anchorOf(day) : null,
+    weekend: task.weekendStart ?? null,
   }
 }
 
@@ -142,9 +147,15 @@ const dayLabel = (d: Date) => d.toLocaleDateString('en-US', { weekday: 'short', 
 // still the explicit commitment (connected-planning-design.md, transition
 // contract). When the two differ, both are said — the date alone hid the week
 // the task is still on (Codex, 2026-09-25).
+// A weekend's Sunday can open the NEXT week (Sunday-start weeks) while the
+// weekend's week commitment is the Saturday's. That day is inside what was
+// chosen, so it is not "off" anything.
 const offWeek = (t: TaskTiming) => !!t.day && !!t.week && !dayIsInCommittedWeek(t)
+  && !(t.weekend && inTaskWeekend({ weekendStart: t.weekend }, t.day))
 
 export function timingLabel(t: TaskTiming): string {
+  // A weekend says so until a day is chosen — never silently "Saturday".
+  if (!t.day && t.weekend) return `Weekend · ${weekendRangeLabel(t.weekend)} · either day`
   if (t.day) return `${dayLabel(t.day)} · ${t.timed ? t.day.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) : 'any time'}${offWeek(t) ? ` · still on ${formatWeekRangeShort(t.week!)}` : ''}`
   if (t.week) return `${formatWeekRangeShort(t.week)} · any day`
   return 'Choose when'
@@ -152,6 +163,7 @@ export function timingLabel(t: TaskTiming): string {
 
 /** The same answer as a sentence, for a screen reader and for details. */
 export function timingDescription(t: TaskTiming, periodLabel?: string): string {
+  if (!t.day && t.weekend) return `Chosen for the weekend of ${weekendRangeLabel(t.weekend)}, either day`
   if (t.day) return `Chosen for ${dayLabel(t.day)}${t.timed ? '' : ', any time'}${offWeek(t) ? `. Still on the week of ${formatWeekRange(t.week!)}, which that day is outside` : ''}`
   if (t.week) return `Chosen for ${formatWeekRange(t.week)}, any day`
   return periodLabel ? `No week or day chosen. In ${periodLabel}.` : 'No week or day chosen'
@@ -165,6 +177,8 @@ export function timingDescription(t: TaskTiming, periodLabel?: string): string {
  */
 export function removeDayOutcome(t: TaskTiming, periodLabel: string | null): string {
   if (!t.day) return ''
+  // Removing one day of a weekend returns it to the weekend, either day.
+  if (t.weekend) return `Keeps it on the weekend of ${weekendRangeLabel(t.weekend)}, either day${periodLabel ? `, and in ${periodLabel}` : ''}.`
   const week = t.week ? `Keeps it in ${formatWeekRange(t.week)}` : null
   if (week) return periodLabel ? `${week} and in ${periodLabel}.` : `${week}.`
   if (periodLabel) return `Keeps it in ${periodLabel}. No week is chosen, so it will not appear on a week’s list.`
@@ -180,4 +194,4 @@ export function removeAllOutcome(t: TaskTiming, periodLabel: string | null): str
 }
 
 /** True when there is anything to remove at all. */
-export function hasTiming(t: TaskTiming): boolean { return !!t.day || !!t.week }
+export function hasTiming(t: TaskTiming): boolean { return !!t.day || !!t.week || !!t.weekend }

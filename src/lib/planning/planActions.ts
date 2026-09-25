@@ -1,4 +1,4 @@
-import { weekendPlacement } from './weekend'
+import { weekendPlacement, inTaskWeekend } from './weekend'
 /**
  * The writes behind every plan gesture — pin buttons, pin drags, the Today
  * reopen line, Week day drops — so each surface places work the same way.
@@ -92,7 +92,7 @@ export function timingRemoval(
     focus: focusSnapshot(task),
     scheduledFor: task.scheduledFor,
     isAllDay: task.isAllDay,
-    ...(scope === 'all' ? { commitments: live } : {}),
+    ...(scope === 'all' ? { commitments: live, weekendStart: task.weekendStart } : {}),
   }
   const clearedDay: Partial<Task> = {
     focus: task.scheduledFor ? focusSnapshot(task).filter((f) => localYmd(f.date) !== localYmd(task.scheduledFor!)) : focusSnapshot(task),
@@ -107,6 +107,9 @@ export function timingRemoval(
       // row's bucket follows from what is left, so a task with nothing
       // broader lands in the Inbox instead of a month nobody chose.
       commitments: live.filter((c) => !(c.level === 'week' && c.status === 'open')),
+      // A weekend is a week commitment with a preference inside it; with the
+      // week gone, the preference would name a weekend nothing holds.
+      weekendStart: undefined,
     },
     previous,
   }
@@ -175,6 +178,22 @@ export function makePlanActions(deps: PlanActionDeps) {
     const task = deps.findTask(taskId)
     if (!task || task.completed || task.isGoal) return false
     const result = await deps.updateTask(taskId, weekendPlacement(saturday))
+    return result !== false
+  }
+
+  /**
+   * One day of a weekend, chosen from the weekend itself: the weekend context
+   * and its week, AND the day, in one write — the same state as planning the
+   * weekend and then choosing that day ("choosing either weekend day retains
+   * that context", flexible-weekend.md), without a half-way row between two
+   * saves. A day outside the weekend is refused rather than silently moved.
+   */
+  async function planTaskWeekendDay(taskId: string, saturday: Date, day: Date) {
+    const task = deps.findTask(taskId)
+    if (!task || task.completed || task.isGoal) return false
+    const d = midnight(day)
+    if (!inTaskWeekend({ weekendStart: weekendPlacement(saturday).weekendStart }, d)) return false
+    const result = await deps.updateTask(taskId, { ...weekendPlacement(saturday), bucket: 'timed', scheduledFor: d, isAllDay: true })
     return result !== false
   }
 
@@ -262,7 +281,7 @@ export function makePlanActions(deps: PlanActionDeps) {
     deps.pushAction?.(`Placed "${routine?.name ?? title}"`, () => { if (prev) void deps.updateRoutine?.(routineId, prev) })
   }
 
-  return { planTaskWeekend, chooseTaskDay, unchooseTask, timeTask, commitTask, somedayTask, chooseRoutine, placeRoutineOnce, placeRoutineRule, drop }
+  return { planTaskWeekend, planTaskWeekendDay, chooseTaskDay, unchooseTask, timeTask, commitTask, somedayTask, chooseRoutine, placeRoutineOnce, placeRoutineRule, drop }
 }
 
 export type PlanActions = ReturnType<typeof makePlanActions>

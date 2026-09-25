@@ -17,7 +17,7 @@ const open = (level: 'week' | 'month', periodStart: Date) => ({ level, periodSta
 describe('taskTiming — what the row actually says', () => {
   it('reads nothing when only a period is committed', () => {
     const t = taskTiming(task())
-    expect(t).toEqual({ day: null, timed: false, week: null, weekOfDay: null })
+    expect(t).toEqual({ day: null, timed: false, week: null, weekOfDay: null, weekend: null })
     expect(hasTiming(t)).toBe(false)
     expect(timingLabel(t)).toBe('Choose when')
   })
@@ -213,5 +213,20 @@ describe('timingDescription', () => {
   })
   it('states a chosen week', () => {
     expect(timingDescription(taskTiming(task({ commitments: [open('week', OCT4)] })))).toBe('Chosen for October 4–10, any day')
+  })
+})
+
+describe('a flexible weekend on the timing control', () => {
+  const SAT = new Date(2026, 9, 10)
+  it('says the weekend, either day, until a day is chosen', () => {
+    const t = taskTiming(task({ weekendStart: SAT, commitments: [open('week', new Date(2026, 9, 4))] }))
+    expect(timingLabel(t)).toBe('Weekend · Oct 10–11 · either day')
+    expect(timingDescription(t)).toBe('Chosen for the weekend of Oct 10–11, either day')
+    expect(hasTiming(t)).toBe(true)
+  })
+  it('with a day chosen, names the day — and removing it returns to the weekend', () => {
+    const t = taskTiming(task({ weekendStart: SAT, scheduledFor: new Date(2026, 9, 11), isAllDay: true, commitments: [open('week', new Date(2026, 9, 4))] }))
+    expect(timingLabel(t)).toBe('Sun, Oct 11 · any time')
+    expect(removeDayOutcome(t, 'October')).toBe('Keeps it on the weekend of Oct 10–11, either day, and in October.')
   })
 })
