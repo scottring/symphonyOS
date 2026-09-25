@@ -20,6 +20,7 @@ import { Link } from 'react-router-dom'
 import { Printer, ArrowUpRight } from 'lucide-react'
 import { MastheadCard } from '@/components/layout/MastheadCard'
 import { PAGE_COLUMN } from '@/components/layout/pageLayout'
+import { requestPlanFromPaper } from '@/lib/planFromPaperSignal'
 import { GUIDE_SHEETS, sidesLabel, type GuideBand, type GuideBlock, type GuideLevel, type GuideSheet } from '@/lib/planning/guideSheets'
 
 type PrintTarget = GuideLevel | 'all' | null
@@ -194,7 +195,14 @@ export function PlanningGuide() {
           <h2>Bringing a filled-in sheet back</h2>
           <p>
             Type things in yourself, or photograph the sheet and have Symphony read
-            it — <Link to="/today" className="guide-link">Plan from paper <ArrowUpRight className="mb-0.5 inline h-3 w-3" /></Link>.
+            it — <Link
+              to="/today"
+              // Ask for the flow, not just the page: nothing on /guide can
+              // answer, so the request waits and Today opens it on mount — the
+              // same path the sidebar's Plan from paper takes.
+              onClick={() => { requestPlanFromPaper() }}
+              className="guide-link"
+            >Plan from paper <ArrowUpRight className="mb-0.5 inline h-3 w-3" /></Link>.
             Both work, and neither is the “right” way.
           </p>
           <p>

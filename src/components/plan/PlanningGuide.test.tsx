@@ -3,6 +3,7 @@ import { render, screen, within, act } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import { PlanningGuide } from './PlanningGuide'
+import { consumePlanFromPaperRequest } from '@/lib/planFromPaperSignal'
 
 const sheets = () => Array.from(document.querySelectorAll<HTMLElement>('.guide-sheet'))
 const sheet = (level: string) => document.querySelector<HTMLElement>(`.guide-sheet[data-sheet="${level}"]`)!
@@ -23,6 +24,15 @@ describe('PlanningGuide', () => {
     for (const level of ['week', 'month', 'season', 'year']) expect(sheet(level).id).toBe(level)
     expect(screen.getByRole('heading', { name: 'The week sheet' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'The year sheet' })).toBeInTheDocument()
+  })
+
+  // The link used to land on Today and stop there: the flow is opened by a
+  // request Today consumes on mount, and the guide never made one.
+  it('Plan from paper asks for the flow, not just the Today page', async () => {
+    show()
+    consumePlanFromPaperRequest()
+    await userEvent.click(screen.getByRole('link', { name: /Plan from paper/ }))
+    expect(consumePlanFromPaperRequest()).toBe(true)
   })
 
   it('says the sheets are optional and that a blank is kept as a blank', () => {
