@@ -1868,7 +1868,7 @@ eslint 0 errors, build clean, preview rebuilt. PG: 096 11/11, 097 12/12,
 - **S2-02** needs a reproduction with Scott.
 - **External calendar creation** (S3-07) — destination/approval.
 - **Real iPhone keyboard/safe areas; paper printing** — manual.
-- **Two-account live RLS** — PG proves the policies; live needs a second login.
+- **Two-account live RLS — DONE 2026-09-25.** Rolled-back as-Edith RLS run (demo household), two real sign-ins across households (smkaufman / demo), and Codex's same-household walkthrough (Scott/Iris, `2026-09-25-codex-household-browser-acceptance.md`; its fixtures verified gone in the DB). See the transactional-placement review.
 - **Write order — DONE for Drop and Keep, deliberately NOT for updateTask**
   (Codex's instruction, 2026-09-25). Drop: commitments first, row last
   (90cfb136). Keep: ensure destination, then carry, stop at first failure,
