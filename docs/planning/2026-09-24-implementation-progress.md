@@ -1867,11 +1867,24 @@ Integrated at the last check: 7187 tests pass (only the known
 - **External calendar creation** (S3-07) — destination/approval.
 - **Real iPhone keyboard/safe areas; paper printing** — manual.
 - **Two-account live RLS** — PG proves the policies; live needs a second login.
-- **Row-before-commitment order** — investigated, not changed (Codex's
-  instruction): `docs/planning/2026-09-25-drop-partial-failure-investigation.md`,
-  PG 12/12. A failed commitment write leaves the row and records split for
-  every other device until a retry. Recommended fix (a): commitments first,
-  row write last, in `dropCommitment` first. Awaiting Codex/Scott.
+- **Write order — DONE for Drop and Keep, deliberately NOT for updateTask**
+  (Codex's instruction, 2026-09-25). Drop: commitments first, row last
+  (90cfb136). Keep: ensure destination, then carry, stop at first failure,
+  row last (3557f1b1). Both: a failure re-reads records AND row and stays a
+  failure; the retry writes the row if it still differs. Evidence: hook tests
+  (8 new, all red on the previous hook), PG 098 7/7 and 099 23/23, and live on
+  :5199 — a Drop with its removal forced to fail sent NO row write and left the
+  Inbox count unchanged; the retry sent removal → row → session record; a Keep
+  sent ensure → carry → row. updateTask: ops-first is safe only for some
+  placements; weekend/dated moves to another week trade one retry-repairable
+  leftover for another — a design call for Codex/Scott
+  (`2026-09-25-keep-update-order-investigation.md`, Decision).
+- **Concurrency limit**: every writer is several independent requests, not
+  one transaction. Order bounds what one client's failure leaves; it does not
+  serialise two writers (another tab, the partner, the wall). Only the RPC
+  option (097 c; migration + security review) is atomic.
+- **Spec question**: moving a task's DATE into another week sends no week op —
+  the old week stays open, none opens for the new one.
 - **Release**: nothing pushed, merged or deployed. Production needs Scott.
 
 ## Demo fixtures left (all disposable, named QA-)
