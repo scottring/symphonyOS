@@ -85,13 +85,31 @@ export function planningPeriod({ level, today, seasons, explicitStart }: Plannin
 }
 
 /**
+ * Does a goal, or a step of one, stay on the plan when it is assigned only to
+ * other people? A household goal is the household's plan: yes, unless it is
+ * private. Scott, 2026-09-25: "if they're assigned with a personal context,
+ * then no they should not stay visible on my page". Work is private in the
+ * same way (Personal and Work are private; Family is shared). A step with no
+ * area of its own is read by its goal's — a step inherits its goal's domain,
+ * as `updateTask` derives it. Plain tasks are not covered: someone else's
+ * task still leaves your list (the 2026-09-05 rule).
+ */
+export function staysOnSharedPlan(t: Task, byId: ReadonlyMap<string, Task>): boolean {
+  const goal = t.isGoal ? t : t.goalTaskId ? byId.get(t.goalTaskId) : undefined
+  if (!goal?.isGoal) return false
+  const area = t.context ?? goal.context ?? null
+  return area !== 'personal' && area !== 'work'
+}
+
+/**
  * The tasks on a month or season list. The CURRENT period is a pool question
  * (`belongsTo*` — a legacy NULL row is this period's); any other period is a
  * membership question (`isPlacedOn*` — or a NULL row would repeat in every
  * period you page to). Scoped to `meId` the way the week strip and the Month
- * rail are: unassigned and mine stay, someone else's goes. Completed and
- * placed rows are INCLUDED — the list is the record, and the look-back needs
- * them. Year lists are goals, not tasks; see the page.
+ * rail are: unassigned and mine stay, someone else's goes — except a shared
+ * goal and its steps, which stay (`staysOnSharedPlan`). Completed and placed
+ * rows are INCLUDED — the list is the record, and the look-back needs them.
+ * Year lists are goals, not tasks; see the page.
  */
 export function selectPeriodTasks(
   tasks: readonly Task[],
@@ -106,9 +124,10 @@ export function selectPeriodTasks(
   // season list and the month list; a month item dated Wednesday is still on
   // the month list, marked "→ Wednesday". A row with no records answers from
   // its cached bucket + stamp the way it always did (the NULL rule).
+  const byId = new Map(tasks.map((t) => [t.id, t]))
   return tasks
     .filter((t) => {
-      if (meId && !doableBy(t, meId)) return false
+      if (meId && !doableBy(t, meId) && !staysOnSharedPlan(t, byId)) return false
       return committedTo(t, level, start, { isCurrent, seasons }) !== undefined
     })
     .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime())

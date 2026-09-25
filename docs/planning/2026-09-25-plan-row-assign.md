@@ -79,19 +79,32 @@ migration, and the tests.
   (checked before and after; unchanged). "Research" was not present in the
   demo DB when checked.
 
-## Decision needed (not a code defect)
+## Visibility of goals assigned to others (decided, implemented)
 
-**A row assigned only to other people leaves your own Season/Month page.**
-The period pages list only unassigned rows and your own (`doableBy` in
-`selectPeriodTasks`, Scott's 2026-09-05 rule "scope month dropdown properly").
-Live: assigning the goal only to Edith removed it from the demo owner's page
-("0 goals"), and its unassigned step then showed as a loose task. This is
-pinned by a test and left unchanged, because the rule was a deliberate
-decision.
+Before this change, the period pages listed only unassigned rows and your own
+(`doableBy` in `selectPeriodTasks`, the 2026-09-05 rule). So a goal assigned
+only to someone else left your page (seen live: "0 goals").
 
-- **Recommendation:** exempt goals (and their steps) from that filter, since
-  a household plan is shared by design, or show an "Assigned to others"
-  fold. Scott's call.
+Scott, 2026-09-25: *"if they're assigned with a personal context, then no
+they should not stay visible on my page."* The rule is now
+`staysOnSharedPlan`, in `lib/planning/periodPage.ts`:
+
+- **A goal assigned only to others STAYS** unless its area is Personal or
+  Work. Work is treated as private like Personal (CLAUDE.md: "Work and
+  Personal are private").
+- **Untagged or Family goals stay.** Untagged ones are rare, because assigning
+  an untagged row asks for its area first.
+- **A step** with no area of its own follows its goal's area; a step's own
+  Personal or Work area wins.
+- **Plain tasks** assigned only to others still leave your list, as before.
+
+Because the rule lives in `selectPeriodTasks`, it applies wherever plan rows
+are selected: the period pages, their rails and Shelves, the Week page's
+month fold, and the paper-draft matcher. This is presentation only; RLS is
+unchanged. Tests: 4 new `periodPage` cases, and the page test flipped to
+"Family stays, Personal leaves". Live on :5199 with disposable December
+fixtures (since deleted): the Family goal assigned to Edith shows with her
+avatar and "1 goals"; the Personal one is absent.
 
 ## Smaller notes
 

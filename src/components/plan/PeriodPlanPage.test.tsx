@@ -2546,16 +2546,16 @@ describe('Assign people on goal and step rows', () => {
     expect(screen.queryByRole('button', { name: /Assign people to/ })).toBeNull()
   })
 
-  // The planning pages list what is unassigned or yours (Scott, 2026-09-05,
-  // `doableBy` in selectPeriodTasks). Assigning a goal ONLY to someone else
-  // therefore takes it off your page. Pinned here so the consequence is a
-  // decision, not a surprise.
-  it('a goal assigned only to someone else is not on my page (the 2026-09-05 rule)', () => {
+  // Scott, 2026-09-25: a goal assigned only to someone else stays on the
+  // plan unless it is private (Personal or Work).
+  it('a Family goal assigned only to someone else stays on my page; a Personal one leaves', () => {
     state.tasks = [
-      task({ id: 'g1', title: 'Islanders game', isGoal: true, monthStart: thisMonth, assignedTo: 'm2', assignedToAll: ['m2'] }),
+      task({ id: 'g1', title: 'Islanders game', isGoal: true, context: 'family', monthStart: thisMonth, assignedTo: 'm2', assignedToAll: ['m2'] }),
+      task({ id: 'g2', title: 'Iris checkup', isGoal: true, context: 'personal', monthStart: thisMonth, assignedTo: 'm2', assignedToAll: ['m2'] }),
     ]
     renderPage('month')
-    expect(screen.queryByText('Islanders game')).toBeNull()
+    expect(assignBtn('Islanders game')).toHaveAccessibleName('Assign people to Islanders game. Assigned: Iris')
+    expect(screen.queryByText('Iris checkup')).toBeNull()
   })
 
   it('a household of no one offers no picker', () => {
