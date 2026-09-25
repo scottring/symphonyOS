@@ -782,3 +782,68 @@ describe('Drop: commitments first, row last', () => {
     expect(db.writeLog()).toEqual([])
   })
 })
+
+// Keep: ensure the destination, THEN carry the source, THEN the row — and stop
+// at the first failure (docs/planning/2026-09-25-keep-update-order-investigation.md).
+describe('Keep: destination first, carry second, row last', () => {
+  const mountMonth = async () => {
+    const h = await mountWith([monthTask('t1', sep)])
+    db.clearWriteLog()
+    return h
+  }
+  const keep = async (h: Awaited<ReturnType<typeof mountMonth>>) => {
+    let r: string | undefined = 'x'
+    await act(async () => { r = await h.result.current.keepForward('t1', { monthStart: oct }, sep) })
+    return r
+  }
+  const c = (start: string) => db.rows('task_commitments').find((x) => x.task_id === 't1' && x.period_start === start)
+  const row = () => db.rows('tasks').find((r) => r.id === 't1')!
+
+  it('sends ensure(October), carry(September), then the row', async () => {
+    const h = await mountMonth()
+    expect(await keep(h)).toBe('t1')
+    expect(db.writeLog()).toEqual(['task_commitments:upsert', 'task_commitments:update', 'tasks:update'])
+    expect(c('2026-09-01')!.status).toBe('carried')
+    expect(c('2026-10-01')!.status).toBe('open')
+    expect(row().month_start).toBe('2026-10-01')
+  })
+
+  it('a failed ensure sends nothing else: no carry to a month that was never opened', async () => {
+    const h = await mountMonth()
+    db.failOnce('task_commitments', 'upsert', { message: 'boom', code: 'XX000' })
+    expect(await keep(h)).toBeUndefined()
+    expect(db.writeLog()).toEqual(['task_commitments:upsert'])
+    expect(c('2026-09-01')!.status).toBe('open')
+    expect(row().bucket).toBe('month')
+    expect(row().month_start).toBe('2026-09-01')
+  })
+
+  it('a failed carry after the ensure: no row write, row agrees with the records, retry carries September', async () => {
+    const h = await mountMonth()
+    db.failOnce('task_commitments', 'update', { message: 'boom', code: 'XX000' })
+    expect(await keep(h)).toBeUndefined()
+    expect(db.writeLog()).toEqual(['task_commitments:upsert', 'task_commitments:update'])
+    expect(c('2026-09-01')!.status).toBe('open')
+    expect(c('2026-10-01')!.status).toBe('open')
+    expect(row().month_start).toBe('2026-10-01')                          // the sync trigger's derivation, not a stale write
+    expect(await keep(h)).toBe('t1')
+    expect(c('2026-09-01')!.status).toBe('carried')
+  })
+
+  it('a week Keep whose row write fails stays FAILED, and the retry clears the weekend', async () => {
+    const W1 = '2026-09-20', W2 = '2026-09-27'
+    db.seed('tasks', dbTaskRow({ id: 't1', title: 'Gutters', bucket: 'week', week_start: W1, weekend_start: '2026-09-26' }))
+    db.seed('task_commitments', { id: 'cw', task_id: 't1', level: 'week', period_start: W1, status: 'open', carried_to: null, ended_at: null })
+    const h = renderHook(() => useSupabaseTasks())
+    await waitFor(() => expect(h.result.current.tasks.find((t) => t.id === 't1')).toBeTruthy())
+    db.failOnce('tasks', 'update', { message: 'boom', code: 'XX000' })
+    let r: string | undefined = 'x'
+    await act(async () => { r = await h.result.current.keepForward('t1', { weekStart: new Date(2026, 8, 27) }, new Date(2026, 8, 20)) })
+    expect(r).toBeUndefined()
+    expect(row().weekend_start).toBe('2026-09-26')
+    expect(row().week_start).toBe(W2)                                    // records moved; row derived to match
+    await act(async () => { r = await h.result.current.keepForward('t1', { weekStart: new Date(2026, 8, 27) }, new Date(2026, 8, 20)) })
+    expect(r).toBe('t1')
+    expect(row().weekend_start).toBeNull()
+  })
+})

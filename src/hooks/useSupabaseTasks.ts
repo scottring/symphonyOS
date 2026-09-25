@@ -1439,10 +1439,15 @@ export function useSupabaseTasks() {
    * (tasks_sync_from_commitments). True only when every op wrote. No toast —
    * the caller says what failed, once.
    */
-  const writeCommitmentOps = useCallback(async (taskId: string, ops: PlacementPlan['commitmentOps']): Promise<boolean> => {
+  const writeCommitmentOps = useCallback(async (taskId: string, ops: PlacementPlan['commitmentOps'], opts: { stopOnFailure?: boolean } = {}): Promise<boolean> => {
     const now = new Date().toISOString()
     let allOk = true
     for (const op of ops) {
+      // Carrying on past a failed op is safe for one op and NOT for several:
+      // a carry that lands after its ensure failed leaves a task "carried to
+      // October" with no October (docs/planning/2026-09-25-keep-update-order-
+      // investigation.md, PG). Drop and Keep stop at the first failure.
+      if (!allOk && opts.stopOnFailure) break
       const key = commitmentRow(taskId, op)
       let error: { message: string } | null | undefined
       try {
@@ -1599,26 +1604,43 @@ export function useSupabaseTasks() {
     const to = period.weekStart ?? period.monthStart ?? period.seasonStart
     if (!level || !to) return undefined
 
+    // Same shape as Drop, with one more rule the evidence required: OPEN THE
+    // DESTINATION BEFORE CARRYING THE SOURCE. planKeep lists carry, then
+    // ensure; sent in that order, a failed ensure left the task "carried to
+    // October" with no October — in the Inbox or on the wrong month (PG,
+    // docs/planning/2026-09-25-keep-update-order-investigation.md K1/K2).
+    // Ensure first, stop at the first failure, row last: across every
+    // failure boundary the row and records never disagree and every retry
+    // converges. The row write is still needed for a weekend reset; if it is
+    // the part that fails, the Keep is reported failed and the retry — whose
+    // ensure is idempotent — writes it.
     const keepOne = async (taskId: string) => {
       const t = await ensureReconciled(taskId)
       if (!t) return false
       const plan = planKeep(t, level, to, from)
       const before = t
       setTasksNow(tasksRef, setTasks, (prev) => prev.map((x) => (x.id === t.id ? plan.local : x)))
-      const dbRow: Record<string, unknown> = {
-        ...('weekendStart' in plan.row ? { weekend_start: plan.row.weekendStart ? localYmd(plan.row.weekendStart) : null } : {}),
-        bucket: plan.row.bucket,
-        week_start: plan.row.weekStart ? localYmd(plan.row.weekStart) : null,
-        month_start: plan.row.monthStart ? localYmd(plan.row.monthStart) : null,
-        season_start: plan.row.seasonStart ? localYmd(plan.row.seasonStart) : null,
-      }
-      const { error } = await supabase.from('tasks').update(dbRow).eq('id', t.id)
-      if (error) {
-        setTasksNow(tasksRef, setTasks, (prev) => prev.map((x) => (x.id === t.id ? before : x)))
+      const failed = async () => {
+        const truth = await reconcileTaskPlacement(t.id)
+        if (!truth) {
+          setTasksNow(tasksRef, setTasks, (prev) => patchTaskRecords(prev, t.id, () => before))
+          unreconciledTasks.add(t.id)
+        }
         showToast('Failed to keep it forward', 'error', 4000)
         return false
       }
-      if (!(await writePlacementOps(t.id, plan, before))) return false
+      const ensureFirst = [...plan.commitmentOps.filter((op) => op.op === 'ensure'), ...plan.commitmentOps.filter((op) => op.op !== 'ensure')]
+      if (!(await writeCommitmentOps(t.id, ensureFirst, { stopOnFailure: true }))) return failed()
+      let rowError: unknown = null
+      try {
+        ;({ error: rowError } = await supabase.from('tasks').update(placementRowDb(plan.row)).eq('id', t.id))
+      } catch (e) {
+        rowError = e
+      }
+      if (rowError) {
+        console.error('[placement] keep row write failed:', rowError)
+        return failed()
+      }
       announceLocalWrite({ kind: 'update', task: plan.local })
       return true
     }
@@ -1642,7 +1664,7 @@ export function useSupabaseTasks() {
     // verdict and retries; the goal's own carry is idempotent (planKeep sees
     // the source already carried and only ensures the destination).
     return allStepsOk ? task.id : undefined
-  }, [findTaskById, ensureReconciled, writePlacementOps])
+  }, [findTaskById, ensureReconciled, writeCommitmentOps, reconcileTaskPlacement])
 
   /**
    * Drop: end ONE period commitment. The task is kept (spec: guided planning).
@@ -1686,7 +1708,7 @@ export function useSupabaseTasks() {
       return false
     }
 
-    if (!(await writeCommitmentOps(id, plan.commitmentOps))) return failed()
+    if (!(await writeCommitmentOps(id, plan.commitmentOps, { stopOnFailure: true }))) return failed()
     let rowError: unknown = null
     try {
       ;({ error: rowError } = await supabase.from('tasks').update(placementRowDb(plan.row)).eq('id', id))
