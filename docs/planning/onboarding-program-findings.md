@@ -126,7 +126,7 @@ driven on :5199 against the demo account's real database.
 | S2-27 | fixed — Remove day in the pane, consequence stated, Undo | 3c9b9f13 | unit |
 | S2-28 | fixed (earlier) | — | audit |
 | S2-29 | fixed — de-duplicated; all-day dates parse as local days | 6d2d9a7e | unit + live (Columbus Day once) |
-| S3-03 | partly — a season row goes into a NAMED month (never the clock's); no chooser across months yet | f1956b33 | unit |
+| S3-03 | fixed — named month, plus "Into a month…" across the season | f1956b33, 408c9f5d | unit + live |
 | S3-04 | fixed (earlier); save screen now also keeps proposed Keeps out of "already in" | 65f96555 | live |
 | S3-06 | Drop + failed-save recovery now **live-verified** | 65f96555 | live, forced failure |
 | S3-08 | fixed — "Supports <goal> · Fall 2026", no "Link to goal" | 6d2d9a7e | unit |
@@ -146,4 +146,4 @@ phone-width titles squeezed to 0–30px on /month and /week (b58a2e75, live
 390px).
 
 Still open: S1-01, S1-04, S1-05/S1-05a (product), S1-06, S2-02 (needs repro),
-S3-03 chooser, S3-07 (parked, external calendar).
+S3-07 (parked, external calendar).

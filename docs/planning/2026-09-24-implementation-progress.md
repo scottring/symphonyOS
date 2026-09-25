@@ -1839,7 +1839,7 @@ Model: this session ran **Opus 5.5** (`claude-opus-5-5`).
 | Carried period re-chosen reopens (model showed Inbox); focus re-send no RLS error | Unit (red first) + PG | 65f96555 |
 | Planning session opens Shelves on the calendar; status line "N on the calendar"; period calendar de-duplicated | Unit + Live | f77a3658, 6d2d9a7e |
 | S2-08, S3-08, S3-09, S3-10, S2-23, S2-19, S3-11 copy, weekend/custom range reload | Unit (several red first); S3-10/S2-19 Live | 6d2d9a7e, a77a3064, 8a2abc45, efa6fe1b |
-| Season row → named month, never the clock's | Unit | f1956b33 |
+| Season row → named month, never the clock's; "Into a month…" across the season (S3-03) | Unit + Live | f1956b33, 408c9f5d |
 | Phone width: titles no longer squeezed on /month, /week; nothing past the edge on /today /week /month /season /inbox /guide; review + panes fit | **390** | b58a2e75 |
 | Guide's Plan from paper opens the flow; empty Today links to Getting Started; capture path names events/routines | Unit + Live | 509a3fa9, 7a4beee7 |
 | Earlier: links set/change/remove/reload/reciprocal, standalone → goal, goal complete independent, keyboard long list | Live / Hydrated | §V, Acceptance walk |
@@ -1849,8 +1849,6 @@ Integrated at the last check: 7187 tests pass (only the known
 
 ## Implementation remaining (authorized, unblocked, not done)
 
-- S3-03: a chooser across the season's months from the rail (today: the
-  viewed month, and the season page names one month).
 - S3-12 tail: two "Failed to add task" on one phone offline capture — not
   reproduced; one call, one toast in code. Needs a phone-width offline repro.
 
