@@ -1854,9 +1854,10 @@ eslint 0 errors, build clean, preview rebuilt. PG: 096 11/11, 097 12/12,
 
 ## Acceptance remaining
 
-- Inline event SAVE, reschedule, drag/resize and Delete against a real calendar:
-  blocked by "no real event writes" — needs a disposable writable calendar or
-  Scott's approval. Everything short of the write is verified.
+- Inline event SAVE, reschedule, drag, duration and Delete against a real calendar:
+  **DONE 2026-09-25** on the demo's Google calendar with one disposable event;
+  the other events were unchanged by ID and fields (`2026-09-25-stage-1-release.md`).
+  Grid resize is behind `VITE_WEEK_RESIZE_ENABLED` and does not ship.
 - Dense list (200 tasks) in the running app — harness only; seeding 200 rows
   into the shared demo account was judged too disruptive.
 - (Closed 2026-09-25, Codex follow-up — see "Codex follow-up acceptance" below.)

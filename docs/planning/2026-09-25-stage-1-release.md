@@ -68,11 +68,11 @@ preview, including the same-household walkthrough (Codex,
 `2026-09-25-codex-household-browser-acceptance.md`; fixtures confirmed gone in
 the DB) and the cross-household probes.
 
+**Real calendar writes: VERIFIED 2026-09-25** (Scott approved; the demo's
+Google calendar `symphonygoals@gmail.com`; one disposable event). See
+"Real-calendar check" below.
+
 **Not verified. These ship on the strength of tests and dry runs only:**
-- **Real calendar writes:** inline event save, reschedule, drag/resize and
-  Delete have never been run against a real calendar ("no real event writes").
-  Everything up to the provider call is verified. This is the largest
-  functional risk in Stage 1.
 - A 200-task list in the running app (harness only).
 - A real iPhone keyboard and safe areas; printing the guide on paper.
 
@@ -107,3 +107,37 @@ Set `VITE_PLACEMENT_RPC=true` in Vercel Production and redeploy. Watch the
 Postgres logs for refusal counts (expect rare PT409s and no repeats), RPC
 error rates, and "only partly saved" / stale toasts. To roll back, remove the
 setting and redeploy.
+
+## Real-calendar check — 2026-09-25 (Scott approved; demo calendar only)
+
+Run on :5199 (switch off) as the demo account, against its connected Google
+calendar. The fixture was a single event, `QA-CAL disposable`
+(`qacal1790339099767`, calendar `symphonygoals@gmail.com`), created through
+the app's own `google-calendar-create-event` function.
+
+Google's side was read through `google-calendar-events` with `domain: 'all'`,
+which fetches live from the Google API with the demo's token. (The Google
+Calendar connector available to Claude is signed in to a different account and
+cannot see the demo calendar.) Before creating anything, every event from
+Sep 27 to Oct 18 was snapshotted by **ID and fields**: calendar, title,
+start, end, all-day, location, description length, attendee count,
+recurrence and meeting URL. `updated_at` was left out because it is the fetch
+time, not an edit time. The range held 2 events: "Dentist appointment" (Sep
+29) and "Columbus Day" (holiday calendar).
+
+| Step (in the app) | Request | Google after | App after reload | Others vs snapshot |
+|---|---|---|---|---|
+| Created Wed Oct 14, 10–11 AM | create-event 200 | 10–11 AM | shown at 10a | identical |
+| Inline "when" edit to 1–2 PM | create-event (update) 200 | Oct 14 13:00–14:00 | 1p | identical |
+| Reschedule → "Next weekend, Sat Oct 3" | create-event 200 | Oct 3 13:00–14:00 | 1p, week of Sep 27 | identical |
+| Drag on the Schedule grid → Fri Oct 2 | create-event 200 | Oct 2 15:30–16:30 (length kept) | panel shows Fri Oct 2, 3:30–4:30 | identical |
+| Duration menu 1 hr → 2 hr | create-event 200 | Oct 2 15:30–17:30 | panel shows 3:30–5:30 · 2 hr | identical |
+| ⋯ → Delete → Confirm delete | first click sends **nothing**; confirm sends delete-event 200 + discussion-flag cleanup 204 | **gone** | gone (weeks of Sep 27 and Oct 11) | identical (2 events) |
+
+After the delete, the `calendar_events` cache has 0 rows for the fixture and
+there are 0 discussion flags.
+
+**Grid resize does not ship.** The resize handles are behind
+`VITE_WEEK_RESIZE_ENABLED` (see `WeekEventBlock.tsx`), which is unset locally
+and in Vercel Production. An event's length is changed from the panel's
+duration menu, which was verified above.
