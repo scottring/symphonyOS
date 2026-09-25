@@ -179,6 +179,13 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
 
   const bounds = useMemo(() => periodBounds(level, anchor, seasons), [level, anchor, seasons])
   const isCurrent = isCurrentPeriod(bounds, today)
+  // The month a season row is taken into, NAMED. "Take it into this month"
+  // on a future season meant the clock's month — Winter work put in
+  // September (the S3-01 / S2-20 class). The season in progress gives the
+  // month in progress; any other season, its own first month.
+  const lowerMonth = useMemo(() => (level === 'season'
+    ? (isCurrent ? new Date(today.getFullYear(), today.getMonth(), 1) : new Date(bounds.start.getFullYear(), bounds.start.getMonth(), 1))
+    : null), [level, isCurrent, today, bounds.start])
   const isPast = bounds.end <= today
   // Page chrome for the card's corner — only inside an AppShell (tests mount bare).
   const chrome = useAppShellChromeOptional()
@@ -401,7 +408,10 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
     // look-back still sees the whole plan. Nothing is copied.
     else if (action === 'to-lower') {
       const lower = lowerLevel(level)
-      if (lower) await gated.pushTask(row.id, lower)
+      // A season names its month (see lowerMonth); updateTask, not pushTask —
+      // taking work into a month being planned is not a deferral (S3-01).
+      if (lower === 'month' && lowerMonth) await gated.updateTask(row.id, { bucket: 'month', monthStart: lowerMonth })
+      else if (lower) await gated.pushTask(row.id, lower)
     }
     else if (action === 'today') {
       // The Today command (S4): dated today, all-day, and chosen for my
@@ -410,7 +420,7 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
       await planActions.chooseTaskDay(row.id, new Date())
     }
     else if (action === 'under-goal') setPickingGoalFor(row.id)
-  }, [goals, updateGoal, addGoal, bounds.next, bounds.start, isPast, toggleTask, deleteTask, dropCommitment, gated, setGoal, keepForward, level, planActions, tasks, confirmGoalDone])
+  }, [goals, updateGoal, addGoal, bounds.next, bounds.start, isPast, toggleTask, deleteTask, dropCommitment, gated, setGoal, keepForward, level, planActions, tasks, confirmGoalDone, lowerMonth])
 
   // The rail's one verb: take an open season task into this month — the same
   // row gains a month commitment; the season keeps it, marked "→ September".
@@ -750,7 +760,7 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
   // done (Scott, 2026-09-13).
   const openTaskRows = useMemo(() => looseRows.filter((r) => !rowIsDone(r.fate)), [looseRows])
   const doneTaskRows = useMemo(() => looseRows.filter((r) => rowIsDone(r.fate)), [looseRows])
-  const lowerLabelText = lowerLevel(level) === 'week' ? 'this week' : 'this month'
+  const lowerLabelText = lowerLevel(level) === 'week' ? 'this week' : lowerMonth ? lowerMonth.toLocaleDateString('en-US', { month: 'long' }) : 'this month'
   const availableTaskRows = openTaskRows.filter((r) => !r.placed)
   const assignedTaskRows = openTaskRows.filter((r) => !!r.placed)
   const visibleTaskRows = showAll ? availableTaskRows : availableTaskRows.slice(0, TASK_PREVIEW_CAP)

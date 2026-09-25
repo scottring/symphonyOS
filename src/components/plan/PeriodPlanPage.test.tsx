@@ -458,12 +458,28 @@ describe('PeriodPlanPage', () => {
     expect(hook.pushTask).not.toHaveBeenCalled()
   })
 
-  it('a season row goes into the MONTH — each page names the rung below it', () => {
+  it('a season row goes into a NAMED month — the month in progress, for this season', () => {
     const t = task({ title: 'Swap the closets', bucket: 'quarter', seasonStart: undefined })
     state.tasks = [t]
     renderPage('season')
-    fireEvent.click(screen.getByRole('button', { name: 'Take it into this month Swap the closets' }))
-    expect(hook.pushTask).toHaveBeenCalledWith(t.id, 'month')
+    const month = thisMonth.toLocaleDateString('en-US', { month: 'long' })
+    fireEvent.click(screen.getByRole('button', { name: `Take it into ${month} Swap the closets` }))
+    expect(hook.updateTask).toHaveBeenCalledWith(t.id, { bucket: 'month', monthStart: thisMonth })
+    expect(hook.pushTask).not.toHaveBeenCalled()
+  })
+
+  // "Take it into this month" on a FUTURE season meant the clock's month:
+  // Winter work landed in September (the S3-01 / S2-20 class).
+  it('on a future season, a row goes into that season\u2019s first month, not the clock\u2019s', () => {
+    const next = periodBounds('season', thisMonth, DEFAULT_SEASONS).next
+    const first = new Date(next.getFullYear(), next.getMonth(), 1)
+    const t = task({ title: 'Swap the closets', bucket: 'quarter', seasonStart: next,
+      commitments: [{ level: 'season', periodStart: next, status: 'open' }] })
+    state.tasks = [t]
+    renderPageAt('season', `/season?start=${first.getFullYear()}-${String(first.getMonth() + 1).padStart(2, '0')}-${String(next.getDate()).padStart(2, '0')}`)
+    const month = first.toLocaleDateString('en-US', { month: 'long' })
+    fireEvent.click(screen.getByRole('button', { name: `Take it into ${month} Swap the closets` }))
+    expect(hook.updateTask).toHaveBeenCalledWith(t.id, { bucket: 'month', monthStart: first })
   })
 
   it('a goal is never offered a rung', () => {
