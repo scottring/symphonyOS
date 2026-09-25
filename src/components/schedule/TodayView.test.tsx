@@ -25,6 +25,14 @@ vi.mock('@/hooks/useNotes', () => ({ useNotes: () => ({ notes: [], loading: fals
 vi.mock('@/hooks/useSupabaseTasks', () => ({ useSupabaseTasks: () => ({ tasks: [], loading: false, addTask: vi.fn(), updateTask: vi.fn(), deleteTask: vi.fn() }) }))
 vi.mock('@/hooks/useFamilyMembers', () => ({ useFamilyMembers: () => ({ members: [], loading: false, error: null, getCurrentUserMember: () => ({ id: 'me', name: 'Scott' }) }) }))
 vi.mock('@/hooks/usePinnedItems', () => ({ usePinnedItems: () => ({ isPinned: () => false, pin: vi.fn(), unpin: vi.fn() }) }))
+// The day tiles' two sources. Today holds its own week instances, so the hook
+// is given them and must not ask again; the calendar is the shared 45-day read.
+vi.mock('@/hooks/useDayLoadEvents', () => ({
+  DAY_LOAD_RANGE_DAYS: 45,
+  DAY_LOAD_BACK_DAYS: 7,
+  useDayLoadEvents: () => ({ events: [], available: true, loading: false }),
+}))
+vi.mock('@/components/home/week/useWeekInstances', () => ({ useWeekInstances: () => [] }))
 vi.mock('@/hooks/useActionQueue', () => ({ useActionQueue: () => ({ actions: [], loading: false, approveAction: vi.fn(), rejectAction: vi.fn(), pendingCount: 0, refetch: vi.fn() }) }))
 vi.mock('@/hooks/useDomain.tsx', async (importOriginal) => {
   const actual = await importOriginal() as Record<string, unknown>
@@ -784,5 +792,44 @@ describe('TodayView weather', () => {
     renderView()
     expect(screen.queryByRole('button', { name: /^weather/i })).not.toBeInTheDocument()
     expect(screen.getByTestId('masthead-aside')).toBeEmptyDOMElement()
+  })
+})
+
+// Scott asked for "Choose when" to say which day has room wherever it offers a
+// day. Today offers the days of the week in VIEW; the counting rules live in
+// lib/planning/weekDensity and are tested there.
+describe('Today’s Choose when offers the viewed week’s days', () => {
+  const sunday = (() => { const d = new Date(TODAY); d.setDate(d.getDate() - d.getDay()); d.setHours(0, 0, 0, 0); return d })()
+  const thursday = new Date(sunday.getFullYear(), sunday.getMonth(), sunday.getDate() + 4)
+
+  const open = (title: string) =>
+    fireEvent.click(screen.getByRole('button', { name: new RegExp(`Choose a week or a day for ${title}`) }))
+  const tiles = () => screen.queryAllByRole('menuitemradio')
+    .filter((b) => /^Plan for /.test(b.getAttribute('aria-label') ?? ''))
+
+  afterEach(() => { mockUseMobile.mockReturnValue(true) })
+
+  it('draws seven days of this week, counting what is already on them', () => {
+    mockUseMobile.mockReturnValue(false)
+    renderView({
+      tasks: [
+        { id: 'a', title: 'Fix the gate', completed: false, createdAt: TODAY, updatedAt: TODAY, bucket: 'week', weekStart: sunday, focus: [{ userId: 'me', date: TODAY }] },
+        { id: 'b', title: 'Pick up the parcel', completed: false, createdAt: TODAY, updatedAt: TODAY, bucket: 'timed', scheduledFor: thursday, isAllDay: true },
+      ],
+      viewedDate: TODAY,
+    })
+    open('Fix the gate')
+    expect(tiles()).toHaveLength(7)
+    // The tiles are this week's days, in order, starting on its first day.
+    const first = tiles()[0].getAttribute('aria-label') ?? ''
+    expect(first).toContain(sunday.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }))
+    // And the Thursday says what is on it rather than reading as empty.
+    const thu = tiles().find((t) => (t.getAttribute('aria-label') ?? '').includes(
+      thursday.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })))!
+    // Both rows land on that day — one scheduled, one chosen for today.
+    expect(thu.getAttribute('aria-label')).toMatch(/2 tasks already/)
+    // Every day of the week in view is counted, including the ones already
+    // past: the planning calendar is read a week back for exactly this.
+    expect(tiles().every((t) => !/read for/.test(t.getAttribute('aria-label') ?? ''))).toBe(true)
   })
 })

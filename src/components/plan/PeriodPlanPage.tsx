@@ -35,6 +35,10 @@ import { useDomain } from '@/hooks/useDomain'
 import { useFamilyMembers } from '@/hooks/useFamilyMembers'
 import { useHouseholdSeasons } from '@/hooks/useHouseholdSeasons'
 import { useRoutines } from '@/hooks/useRoutines'
+import { useDayChoices } from '@/hooks/useDayChoices'
+import { weeksOfMonth } from '@/lib/planning/monthWeeks'
+import { readCadenceConfig } from '@/lib/cadence/config'
+import { formatWeekRange } from '@/lib/dateHelpers'
 import { routinePatterns } from '@/lib/planning/routinePatterns'
 import { GoalsProvider, useGoalsContext } from '@/contexts/GoalsContext'
 import { filterTasksForLayers, matchesLayers } from '@/lib/today/domainFilter'
@@ -122,6 +126,7 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
   const meId = getCurrentUserMember()?.id ?? null
   const { seasons, loading: seasonsLoading } = useHouseholdSeasons()
   const { activeRoutines } = useRoutines()
+  const { user } = useAuth()
   const { goals, areas, addGoal, updateGoal, addArea, loading: goalsLoading } = useGoalsContext()
   /**
    * Everything this page's lists are made of. The year draws from `goals`,
@@ -572,10 +577,33 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
     })
   }, [tasks, timingPeriodLabel, gated])
 
+  /**
+   * What each day of the period's weeks already holds, counted once for the
+   * whole page rather than per row. The window is exactly the weeks the menu
+   * offers — `weeksOfMonth` of the period's anchor — so a row's own week is
+   * covered whenever the menu could have set it, and a week outside it gets
+   * no tiles rather than half of one.
+   */
+  const timingWindow = useMemo(() => {
+    if (level === 'year') return { start: null as Date | null, dayCount: 0 }
+    const weeks = weeksOfMonth(bounds.start, readCadenceConfig().weekStartsOn)
+    return { start: weeks[0]?.start ?? null, dayCount: weeks.length * 7 }
+  }, [level, bounds.start])
+  const dayChoices = useDayChoices({
+    windowStart: timingWindow.start, dayCount: timingWindow.dayCount,
+    tasks, tasksLoading: loading, userId: user?.id ?? null,
+    routines: activeRoutines, layers,
+  })
+
   const planWeekSlot = useCallback((row: PlanRowModel) => {
     if (level === 'year') return null
     const t = tasks.find((x) => x.id === row.id)
     const timing = t ? taskTiming(t) : undefined
+    // The days of the week this row is already committed to, with what each
+    // one already holds. A row with no week yet is asking WHICH WEEK, and the
+    // menu answers that first; inventing a week's worth of days for it would
+    // be a day grid nobody asked for.
+    const days = dayChoices.forWeek(t?.weekStart ?? null)
     return (
       <span className="inline-flex max-w-full items-center gap-1">
       <PlanWeekMenu
@@ -585,6 +613,8 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
         periodLabel={timingPeriodLabel}
         timing={timing}
         currentWeekStart={t?.weekStart ?? null}
+        dayChoices={days}
+        dayChoicesLabel={t?.weekStart ? `A day in ${formatWeekRange(t.weekStart)}` : undefined}
         onPickWeek={(weekStart) => { void gated.updateTask(row.id, { bucket: 'week', weekStart, scheduledFor: undefined }) }}
         onClearWeek={timing && hasTiming(timing) ? () => { void removeTiming(row.id, row.title, 'all') } : undefined}
         onRemoveDay={timing?.day ? () => { void removeTiming(row.id, row.title, 'day') } : undefined}
@@ -600,7 +630,7 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
       )}
       </span>
     )
-  }, [level, bounds.start, timingPeriodLabel, planActions, tasks, navigate, gated, removeTiming])
+  }, [level, bounds.start, timingPeriodLabel, planActions, tasks, navigate, gated, removeTiming, dayChoices])
 
   const [pickingGoalFor, setPickingGoalFor] = useState<string | null>(null)
   const [linkError, setLinkError] = useState(false)
@@ -987,7 +1017,6 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
   const { saved: savedSession, loading: sessionLoading, error: sessionReadError, reload: reloadSession } = host.session
   const { sessionReady, draft, shownDraft, sessionOpen, savingSession, justSaved, saveError,
     startSession, changeDraft, closeSession, saveDraft, dismissJustSaved } = host
-  const { user } = useAuth()
   // The year's Keep reads the draft being saved for the id it must re-use;
   // the host owns it, so it arrives here.
   draftRef.current = shownDraft

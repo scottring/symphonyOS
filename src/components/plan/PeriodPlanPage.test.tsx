@@ -88,6 +88,14 @@ vi.mock('@/hooks/usePlanningSession', () => ({
   yearToken: (y: number) => String(y),
 }))
 vi.mock('@/hooks/useAuth', () => ({ useAuth: () => ({ user: { id: 'u1' } }) }))
+// The day tiles' two sources, held flat so a case can make one unavailable.
+const dayLoad = { events: [] as unknown[], available: true, loading: false }
+vi.mock('@/hooks/useDayLoadEvents', () => ({
+  DAY_LOAD_RANGE_DAYS: 45,
+  DAY_LOAD_BACK_DAYS: 7,
+  useDayLoadEvents: () => dayLoad,
+}))
+vi.mock('@/components/home/week/useWeekInstances', () => ({ useWeekInstances: () => [] }))
 // One confirmation per gesture, with its Undo — asserted rather than assumed.
 const toastSpy = vi.fn()
 vi.mock('@/hooks/useToast', async (importOriginal) => ({
@@ -2229,5 +2237,85 @@ describe('a year whose goals have not arrived does not claim to be empty', () =>
     renderPage('year')
     expect(screen.getByText('1 goals')).toBeInTheDocument()
     expect(screen.queryByText('Loading…')).not.toBeInTheDocument()
+  })
+})
+
+// Scott: "Choose when" should say which day has room wherever it offers a day,
+// not only on /week. The counting rules are weekDensity.test.ts's; this is the
+// month page's wiring to them.
+describe('the month page offers day tiles for the week a row is on', () => {
+  const weekOfThisMonth = (() => {
+    // A Sunday inside the month the page will show.
+    const d = new Date(thisMonth)
+    d.setDate(d.getDate() + (7 - d.getDay()) % 7)
+    return d
+  })()
+
+  beforeEach(() => {
+    pinClock(); localStorage.clear()
+    dayLoad.events = []; dayLoad.available = true; dayLoad.loading = false
+    state.tasks = [
+      task({ id: 'dated', title: 'Fix the gate', monthStart: thisMonth, weekStart: weekOfThisMonth }),
+      task({ id: 'loose', title: 'Call the roofer', monthStart: thisMonth }),
+      // On the Friday of that week — a day the planning calendar reaches, so
+      // its count is knowable. (The window starts at today; see the past-days
+      // case below.)
+      task({ id: 'busy', title: 'Already on Friday', monthStart: thisMonth, bucket: 'timed',
+        scheduledFor: new Date(weekOfThisMonth.getFullYear(), weekOfThisMonth.getMonth(), weekOfThisMonth.getDate() + 5), isAllDay: true }),
+    ]
+    state.goals = []; state.loading = false; routinesState.routines = []
+    domainState.layers = new Set(['work', 'family', 'personal', 'unsorted']); domainState.soleDomain = null
+    seasonsState.seasons = DEFAULT_SEASONS; seasonsState.loading = false
+    Object.values(hook).forEach((f) => f.mockClear())
+  })
+  afterEach(() => { vi.useRealTimers() })
+
+  const openTiming = (title: string) => {
+    fireEvent.click(screen.getByRole('button', { name: new RegExp(`Choose a week or a day for ${title}`) }))
+  }
+
+  it('draws the seven days of the row’s own week, with what each already holds', () => {
+    renderPage('month')
+    openTiming('Fix the gate')
+    const tiles = screen.getAllByRole('menuitemradio').filter((b) => /^Plan for /.test(b.getAttribute('aria-label') ?? ''))
+    expect(tiles).toHaveLength(7)
+    // The day the other task sits on says so; the rest say they are empty.
+    const busy = tiles.find((t) => /1 task already/.test(t.getAttribute('aria-label') ?? ''))
+    expect(busy).toBeDefined()
+    // The other six read as empty — including the days of this week already
+    // past, which the planning calendar is read back far enough to cover.
+    expect(tiles.filter((t) => /nothing on it yet/.test(t.getAttribute('aria-label') ?? ''))).toHaveLength(6)
+    expect(tiles.every((t) => !/read for/.test(t.getAttribute('aria-label') ?? ''))).toBe(true)
+    // The shared day-choice pattern, not a new one: the other-day path stays,
+    // and now reads "Another day…" because tiles came first.
+    expect(screen.getByText('Another day…')).toBeInTheDocument()
+  })
+
+  it('offers no tiles for a row with no week yet — that row is still choosing a week', () => {
+    renderPage('month')
+    openTiming('Call the roofer')
+    expect(screen.queryAllByRole('menuitemradio').filter((b) => /^Plan for /.test(b.getAttribute('aria-label') ?? ''))).toHaveLength(0)
+    // …and the way to a specific day is untouched: the shared other-day path,
+    // which reads "A day…" precisely because no tiles precede it.
+    expect(screen.getByText('A day…')).toBeInTheDocument()
+  })
+
+  it('says a day is not known rather than drawing it empty when the calendar failed', () => {
+    dayLoad.available = false
+    renderPage('month')
+    openTiming('Fix the gate')
+    const tiles = screen.getAllByRole('menuitemradio').filter((b) => /^Plan for /.test(b.getAttribute('aria-label') ?? ''))
+    expect(tiles).toHaveLength(7)
+    expect(tiles.filter((t) => /couldn’t be read/.test(t.getAttribute('aria-label') ?? ''))).toHaveLength(7)
+    expect(tiles.some((t) => /nothing on it yet/.test(t.getAttribute('aria-label') ?? ''))).toBe(false)
+  })
+
+  it('picking a day from a tile plans that exact day', () => {
+    renderPage('month')
+    openTiming('Fix the gate')
+    const tiles = screen.getAllByRole('menuitemradio').filter((b) => /^Plan for /.test(b.getAttribute('aria-label') ?? ''))
+    fireEvent.click(tiles[5])
+    const day = new Date(weekOfThisMonth.getFullYear(), weekOfThisMonth.getMonth(), weekOfThisMonth.getDate() + 5)
+    expect(hook.updateTask).toHaveBeenCalledWith('dated', expect.objectContaining({ scheduledFor: day }))
   })
 })

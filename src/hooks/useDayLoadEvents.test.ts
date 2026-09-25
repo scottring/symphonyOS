@@ -8,7 +8,7 @@ vi.mock('@/lib/supabase', () => ({
   supabase: { functions: { invoke: (...args: unknown[]) => invoke(...args) } },
 }))
 
-import { useDayLoadEvents, DAY_LOAD_RANGE_DAYS, __resetDayLoadCache } from './useDayLoadEvents'
+import { useDayLoadEvents, DAY_LOAD_RANGE_DAYS, DAY_LOAD_BACK_DAYS, __resetDayLoadCache } from './useDayLoadEvents'
 
 describe('useDayLoadEvents', () => {
   beforeEach(() => {
@@ -21,7 +21,7 @@ describe('useDayLoadEvents', () => {
     expect(invoke).not.toHaveBeenCalled()
   })
 
-  it(`fetches a ${DAY_LOAD_RANGE_DAYS}-day range when enabled`, async () => {
+  it(`fetches ${DAY_LOAD_BACK_DAYS} days back and ${DAY_LOAD_RANGE_DAYS} forward when enabled`, async () => {
     invoke.mockResolvedValue({ data: { events: [{ id: 'e1', title: 'Standup' }] }, error: null })
     const { result } = renderHook(() => useDayLoadEvents(true))
 
@@ -33,7 +33,12 @@ describe('useDayLoadEvents', () => {
     const days = Math.round(
       (new Date(body.endDate).getTime() - new Date(body.startDate).getTime()) / 86_400_000,
     )
-    expect(days).toBe(DAY_LOAD_RANGE_DAYS)
+    // Back far enough to cover the week containing today — the day tiles
+    // offer a whole week, and on a Thursday four of its days are already past.
+    expect(days).toBe(DAY_LOAD_RANGE_DAYS + DAY_LOAD_BACK_DAYS)
+    const today = new Date(); today.setHours(0, 0, 0, 0)
+    const startsBack = Math.round((today.getTime() - new Date(body.startDate).getTime()) / 86_400_000)
+    expect(startsBack).toBe(DAY_LOAD_BACK_DAYS)
   })
 
   it('fetches once, not on every re-render', async () => {

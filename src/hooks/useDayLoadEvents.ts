@@ -5,6 +5,17 @@ import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
 /** Far enough forward to cover every relative tile, including "this month". */
 export const DAY_LOAD_RANGE_DAYS = 45
 
+/**
+ * And far enough BACK to cover the current week.
+ *
+ * The day tiles offer the days of a week, and on Today or the current month
+ * that week normally begins before today. Reading only forward left those
+ * days reported as "not read" — four blank tiles on a Thursday — while /week,
+ * which fetches its own whole week, counted them. Seven days back covers any
+ * week containing today, whichever day a household starts its week on.
+ */
+export const DAY_LOAD_BACK_DAYS = 7
+
 export interface DayLoadEvents {
   events: CalendarEvent[]
   available: boolean
@@ -53,7 +64,9 @@ export function useDayLoadEvents(enabled: boolean): DayLoadEvents {
 
     const start = new Date()
     start.setHours(0, 0, 0, 0)
-    const end = new Date(start)
+    start.setDate(start.getDate() - DAY_LOAD_BACK_DAYS)
+    const end = new Date()
+    end.setHours(0, 0, 0, 0)
     end.setDate(end.getDate() + DAY_LOAD_RANGE_DAYS)
 
     inflight = (async () => {

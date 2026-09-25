@@ -10,6 +10,8 @@ import { UnifiedNotesEditor } from '@/components/notes/UnifiedNotesEditor'
 import { CloudUpload, Check } from 'lucide-react'
 import { taskWhenParts } from '@/lib/planning/taskWhen'
 import { taskTiming, hasTiming, timingDescription } from '@/lib/planning/taskTiming'
+import { formatWeekRange } from '@/lib/dateHelpers'
+import type { TimingDayChoice } from '@/hooks/useDayChoices'
 import { PlanWeekMenu } from '@/components/plan/PlanWeekMenu'
 import { GOAL_STATUSES, GOAL_STATUS_HINT, GOAL_STATUS_LABEL, canSetGoalStatus, goalStatusOf, goalStatusUpdate } from '@/lib/planning/goalStatus'
 import { GoalSupportLinks } from '@/components/goals/GoalSupportLinks'
@@ -57,6 +59,14 @@ interface TaskViewProps {
   onNavigateToNote?: (noteId: string) => void
   /** Promote the current task notes into a persisting vault note linked to this task. */
   onSaveNoteToVault?: (content: string) => Promise<{ ok: boolean; url?: string }>
+  /**
+   * The days of a step's own week, with what each one already holds, so
+   * "Choose when" here says which day has room — the same tiles /week and
+   * Today offer. Supplied by the container, which is where the tasks,
+   * routines and calendar to count live. Omitted, the menu behaves exactly as
+   * it did: weeks, and the "A day…" path.
+   */
+  dayChoicesFor?: (weekStart: Date | null | undefined) => readonly TimingDayChoice[] | undefined
 }
 
 export function TaskViewRedesign({
@@ -81,6 +91,7 @@ export function TaskViewRedesign({
   onAddEntityNote,
   onNavigateToNote,
   onSaveNoteToVault,
+  dayChoicesFor,
 }: TaskViewProps) {
   // Title editing
   const [isEditingTitle, setIsEditingTitle] = useState(false)
@@ -482,6 +493,12 @@ export function TaskViewRedesign({
                               title={subtask.title}
                               periodStart={goalPeriodAnchor}
                               currentWeekStart={subtask.weekStart ?? null}
+                              // Anchored to the step's OWN week, inside the
+                              // goal's period. With no week yet the question
+                              // is still which week, and the menu answers
+                              // that first.
+                              dayChoices={dayChoicesFor?.(subtask.weekStart ?? null)}
+                              dayChoicesLabel={subtask.weekStart ? `A day in ${formatWeekRange(subtask.weekStart)}` : undefined}
                               timing={taskTiming(subtask)}
                               onPickWeek={(weekStart) => onUpdate(subtask.id, { bucket: 'week', weekStart, scheduledFor: undefined })}
                               onClearWeek={hasTiming(taskTiming(subtask))

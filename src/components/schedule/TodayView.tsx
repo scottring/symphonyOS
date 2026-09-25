@@ -46,6 +46,8 @@ import { panelActionsFor } from '@/components/reference/DayPlanPanel'
 import { PlanningSheet } from '@/components/reference/PlanningSheet'
 import { unhomedRoutines } from '@/lib/week/unhomedRoutines'
 import { useWeekInstances } from '@/components/home/week/useWeekInstances'
+import { useDayChoices } from '@/hooks/useDayChoices'
+import { formatWeekRange } from '@/lib/dateHelpers'
 import { useReferenceLists } from '@/components/reference/ReferenceListsContext'
 import { makePlanActions } from '@/lib/planning/planActions'
 import { localYmd } from '@/lib/cadence/config'
@@ -339,6 +341,17 @@ export function TodayView({
   // Every instance touching this week: a flexible routine already placed on
   // one of its days has a home for the week and leaves the sheet's To plan.
   const weekInstances = useWeekInstances(currentWeekStart, 7)
+  /**
+   * What each day of the VIEWED week already holds, for the timing control's
+   * day tiles. Anchored to the week in view, never to today's: a row opened
+   * on a November day offers November days (Scott, 2026-09-24). The week's
+   * instances are already here, so the hook does not fetch them again.
+   */
+  const dayChoices = useDayChoices({
+    windowStart: currentWeekStart, dayCount: 7,
+    tasks, userId: userId ?? null, routines: allRoutines ?? routines, layers,
+    member: selectedAssignees ?? [], instances: weekInstances,
+  })
   const todayInput = useMemo(() => ({
     tasks,
     events,
@@ -1279,13 +1292,18 @@ export function TodayView({
         periodLabel={broader?.label ?? undefined}
         timing={t}
         currentWeekStart={t.week}
+        // The days of the week this row would land in — its own when it has
+        // one, otherwise the week being viewed. A week the tiles were not
+        // counted for offers none rather than a partial set.
+        dayChoices={dayChoices.forWeek(t.week ?? currentWeekStart)}
+        dayChoicesLabel={`A day in ${formatWeekRange(currentWeekStart)}`}
         onPickWeek={(weekStart) => { void ctx.onUpdateTask?.(task.id, { bucket: 'week', weekStart, scheduledFor: undefined }) }}
         onClearWeek={hasTiming(t) ? () => removeTiming('all') : undefined}
         onRemoveDay={t.day ? () => removeTiming('day') : undefined}
         onPickDay={(date) => { void ctx.onUpdateTask?.(task.id, { bucket: 'timed', scheduledFor: date, isAllDay: true }) }}
       />
     )
-  }, [ctx, viewedDate])
+  }, [ctx, viewedDate, dayChoices, currentWeekStart])
 
   const listProps = {
     timingFor: dayTimingControl,

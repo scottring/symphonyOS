@@ -16,6 +16,12 @@ import { useGoalsContext } from '@/contexts/GoalsContext';
 import { supportedGoal, goalsSupporting, type SupportLink } from '@/lib/planning/goalSupport';
 import type { Note, NoteEntityType } from '@/types/note';
 import { useSupabaseTasks } from '@/hooks/useSupabaseTasks';
+import { useRoutines } from '@/hooks/useRoutines';
+import { useDomain } from '@/hooks/useDomain';
+import { useAuth } from '@/hooks/useAuth';
+import { useDayChoices } from '@/hooks/useDayChoices';
+import { weeksOfMonth } from '@/lib/planning/monthWeeks';
+import { readCadenceConfig } from '@/lib/cadence/config';
 import { useContacts } from '@/hooks/useContacts';
 import { useProjects } from '@/hooks/useProjects';
 import { useNotesContext } from '@/contexts/NotesContext';
@@ -40,6 +46,26 @@ export function TaskViewContainer({ taskId, onBack }: Props) {
   const navigate = useNavigate();
 
   const task = useMemo(() => tasks.find(t => t.id === taskId) ?? null, [tasks, taskId]);
+  const { activeRoutines } = useRoutines();
+  const { layers } = useDomain();
+  const { user } = useAuth();
+
+  /**
+   * The day tiles for a step's "Choose when", counted over the weeks of the
+   * GOAL's period — the same weeks the menu offers. The goal's page is where
+   * a step gets its week, so it is where "which day has room" matters most,
+   * and it was the one place the picker still answered blind.
+   */
+  const timingWindow = useMemo(() => {
+    const anchor = task?.monthStart ?? task?.seasonStart ?? task?.weekStart ?? null;
+    if (!anchor) return { start: null as Date | null, dayCount: 0 };
+    const weeks = weeksOfMonth(anchor, readCadenceConfig().weekStartsOn);
+    return { start: weeks[0]?.start ?? null, dayCount: weeks.length * 7 };
+  }, [task?.monthStart, task?.seasonStart, task?.weekStart]);
+  const dayChoices = useDayChoices({
+    windowStart: timingWindow.start, dayCount: timingWindow.dayCount,
+    tasks, userId: user?.id ?? null, routines: activeRoutines, layers,
+  });
 
   // A goal's children are its STEPS, joined by goal_task_id and carrying the
   // goal's own period — not subtasks. Adding a subtask under a goal wrote
@@ -187,6 +213,7 @@ export function TaskViewContainer({ taskId, onBack }: Props) {
         entityNotesLoading={entityNotesLoading}
         onAddEntityNote={handleAddEntityNote}
         onSaveNoteToVault={handleSaveNoteToVault}
+        dayChoicesFor={dayChoices.forWeek}
       />
     </Suspense>
   );

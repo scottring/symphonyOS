@@ -1479,3 +1479,119 @@ Created and then dropped from every planning surface: `QA-LNK season goal`,
 the planning rows offer Drop, and the hard delete lives on `/task/:id`, which
 these no longer link to. They appear on no planning page, the Inbox or Someday.
 Scott's goals and the other session's two Inbox rows were not touched.
+
+---
+
+# §W — "Choose when" says which day has room, everywhere it offers a day
+
+Scott's outstanding request, and the §S limitation this log has carried since:
+*only /week supplied tiles*. It no longer does.
+
+## The inventory that started it
+
+Four surfaces render `PlanWeekMenu`. Exactly one passed `dayChoices`:
+
+| Surface | Before | After |
+|---|---|---|
+| `/week` (WeekViewV2) | 7 tiles, counted off the week journal | unchanged |
+| `/today` (TodayView) | weeks only, no tiles | 7 tiles for the week in view |
+| `/month`, `/season` (PeriodPlanPage) | weeks only, no tiles | 7 tiles for the week a row is on |
+| a goal's page (TaskViewRedesign) | weeks only, no tiles | 7 tiles for the step's own week |
+| `/year` | **no timing control at all** | unchanged — a year plans in goals |
+
+`RescheduleGrid`'s `DayLoadBar` is deliberately untouched. It is the other
+thing — hours booked against a window, a capacity forecast — and Scott asked
+for relative counts. The two stay apart.
+
+## What is shared now
+
+- **`lib/planning/weekDensity.ts`** — the counting rules, stated once: a task
+  on the day it is scheduled for or chosen for; timed events on their day but
+  never a multi-day one; single-day all-day events; a routine occurrence when
+  it has a time, was put on that day, is pinned, or is done; never a meal.
+  WeekViewV2's journal now reads `routineDayState` and `eventDensityKey` from
+  here too, so the journal and the tiles cannot drift apart — the journal's
+  lanes and the tiles' counts are the same three facts.
+- **`hooks/useDayChoices.ts`** — the hook each surface calls once per page,
+  not once per row. It counts over the weeks the menu could offer and hands a
+  caller the seven tiles for a given week, or nothing.
+- The tiles themselves, the scale and the wording are `DayDensityTiles` and
+  `dayDensity` exactly as they already were. No new picker, no new design.
+
+## The anchor
+
+Day tiles show **the days of the week the choice would land in** — the week in
+view on Today and /week, the week a row is already committed to on the
+planning pages and a goal's page. A row with no week yet is asking *which
+week*, and the menu answers that first; it gets no tiles and keeps the
+existing "A day…" path. Nothing invents a month-wide day grid.
+
+## Honesty about what could not be read
+
+`useDayLoadEvents` — the separate cached calendar read that exists so a picker
+never calls a day free because nobody asked — now reaches **7 days back** as
+well as 45 forward. Without that, four of seven tiles on a Thursday said "not
+read", while /week counted those same days from its own fetch. One extra week
+on one cached call, and the two surfaces agree.
+
+Outside that window, and while any source is loading or failed, a day says so
+and draws no bar: "further back than the calendar was read", "past what the
+calendar was read for", "the calendar couldn't be read", "tasks still
+loading". Unknown and empty stay different answers.
+
+## Coverage
+
+| Claim | Evidence | Result |
+|---|---|---|
+| The counting rules (9 cases: scheduled, chosen, someone else's choice, one task one day, all-day, multi-day, two calendars one meeting, timed routine, untimed-unchosen routine) | `lib/planning/weekDensity.test.ts` (17) | **pass** |
+| Unknown vs empty, and per-day out-of-range | `weekDensity.test.ts` | **pass** |
+| The hook offers a week inside its window, a later week, and nothing outside it | `hooks/useDayChoices.test.tsx` (13) | **pass** |
+| No window → no tiles AND no fetches (calendar not asked, instances not asked) | `useDayChoices.test.tsx` | **pass** |
+| Instances the caller already holds are not fetched twice | `useDayChoices.test.tsx` | **pass** |
+| Loading / failed / several-missing sources each say so | `useDayChoices.test.tsx` | **pass** |
+| This week's already-past days are counted, not blanked | `useDayChoices.test.tsx` | **pass** |
+| Month: a row with a week draws 7 tiles with counts; the other-day path stays | `PeriodPlanPage.test.tsx` | **pass** |
+| Month: a row with **no** week draws none and keeps "A day…" | `PeriodPlanPage.test.tsx` | **pass** |
+| Month: a failed calendar leaves every tile unknown, not empty | `PeriodPlanPage.test.tsx` | **pass** |
+| Month: picking a tile plans that exact day | `PeriodPlanPage.test.tsx` | **pass** |
+| Today: 7 tiles for the viewed week, counting both a scheduled and a chosen task on one day | `TodayView.test.tsx` | **pass** |
+| The calendar read is 7 back + 45 forward | `useDayLoadEvents.test.ts` | **pass** |
+| /week's journal is unchanged by the shared extraction | `components/home/week` (195) | **pass** |
+| **Live, /month** — a step on Oct 4–10 opened from a September day: `Sun Oct 4 — nothing on it yet`, `Mon Oct 5 — 1 routine already`, … 7 tiles, anchored to **October**, not to today's week | demo account, read-only | **pass** |
+| **Live, a goal's page** — the same seven tiles for the same step | demo account, read-only | **pass** |
+| **Live, a goal's page** — the step with no week: 0 tiles, "Another week…" and "A day…" intact | demo account, read-only | **pass** |
+| **Live, /today** — 7 tiles for Sep 20–26 with real counts (`2 events and 1 routine already`, `1 task and 1 routine already`, …), including days already past | demo account, one disposable row, deleted after | **pass** |
+| **Live, /week vs /today** — the same week, the same counts on all seven days | demo account, read-only | **pass** |
+
+Demo mutation this batch: one task, `QA-DENS today row`, created on Today and
+deleted. Nothing else was written; every other check opened a menu and read it.
+
+## Gaps this batch leaves
+
+- **A row with no week gets no tiles.** By design — but it means the *first*
+  question a month row asks is still answered without density.
+- **`/year` has no timing control**, so nothing to add tiles to.
+- **Two event sources.** /week counts the events its own view fetched, which
+  are layer-filtered; the other surfaces count the planning calendar's read,
+  which is universal. They agreed on every day checked live, but a household
+  using domain filters could see a difference.
+- **A disconnected calendar** reads on the planning surfaces as a complete
+  count with no events, without /week's "no calendar connected" note.
+- **Outside 7 days back / 45 forward** a day is unknown. Planning three months
+  out will see tiles with no counts.
+
+## Still outstanding for Scott, beyond the three calendar findings
+
+The three logged calendar items — a completed prep task hidden in the event
+panel, a created event needing a reload, no Delete on the event detail panel —
+are **not** the whole backlog. Also still open, and none of it touched here:
+
+- editing an event's time **inline**, rather than through the picker;
+- "This weekend" resolving to one day when the request was to offer **both
+  weekend days**;
+- weekend / custom-range week restoration;
+- goal archive semantics, and the controls Scott called misleading or obscured;
+- external calendar creation (destination and approval unresolved);
+- Plan-from-paper analysis and revision (a separate workstream);
+- real-iPhone keyboard and safe areas;
+- authenticated cross-household access testing.

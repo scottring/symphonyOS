@@ -38,6 +38,7 @@ import { useGatedTaskActions } from '@/hooks/useGatedTaskActions'
 import { weekStartAnchor, readCadenceConfig } from '@/lib/cadence/config'
 import { partitionWeekExtras } from '@/lib/week/weekExtras'
 import { buildWeekRoutineItems } from './weekRoutineItems'
+import { eventDensityKey, routineDayIndex, routineDayState, routineIdOf } from '@/lib/planning/weekDensity'
 import { useWeekInstances } from './useWeekInstances'
 import { edgeForPointer } from './edgeAdvance'
 import { WeekJournal, type JournalDay, type JournalEntry } from './WeekJournal'
@@ -54,7 +55,6 @@ import { localYmd } from '@/lib/cadence/config'
 import { publishViewedWeek } from '@/lib/viewedWeekSignal'
 import { useMediaQuery } from '@/hooks/useMediaQuery'
 import type { AssigneeFilter } from '@/lib/today/types'
-import { isTimelineObligation } from '@/lib/routineUtils'
 import type { Layer } from '@/lib/domains'
 import { WeekPlanHost } from './WeekPlanHost'
 
@@ -643,14 +643,12 @@ export function WeekViewV2(props: WeekViewV2Props) {
     // day's entries; an untimed one nobody chose is only available — the same
     // split Today and its pin make (dayPlan.ts).
     for (const r of routineItems) {
-      const idx = Number(r.id.match(/-day(\d+)$/)?.[1] ?? -1)
-      const day = days[idx]
+      const day = days[routineDayIndex(r.id)]
       if (!day) continue
-      const routineId = r.id.slice('routine-'.length).replace(/-day\d+$/, '')
-      const instance = weekInstances.find((i) => i.entity_type === 'routine' && i.entity_id === routineId && i.date === day.key)
-      const completed = instance?.status === 'completed'
-      const planned = instance?.planned_on === day.key
-      const pinned = !!r.originalRoutine && isTimelineObligation(r.originalRoutine)
+      const routineId = routineIdOf(r.id)
+      // The same three facts the day tiles read, from the same place — the
+      // journal and the tiles must not disagree about a Tuesday.
+      const { completed, planned, pinned } = routineDayState(routineId, day.key, r, weekInstances)
       const entry: JournalEntry = {
         id: r.id, kind: 'routine', time: r.startTime ?? undefined, title: r.title, completed, routineId,
       }
@@ -689,12 +687,12 @@ export function WeekViewV2(props: WeekViewV2Props) {
         ...d.entries.map((e) => ({
           id: e.id,
           kind: e.kind,
-          key: e.kind === 'event' ? `event|${e.title}|${e.time?.getTime() ?? d.key}` : undefined,
+          key: e.kind === 'event' ? eventDensityKey(e.title, e.time, d.key) : undefined,
         })),
         ...d.notes.map((n) => ({
           id: `event-${n.google_event_id || n.id}`,
           kind: 'event' as const,
-          key: `event|${n.title}|allday|${d.key}`,
+          key: eventDensityKey(n.title ?? '', null, d.key),
         })),
       ],
       readiness,
