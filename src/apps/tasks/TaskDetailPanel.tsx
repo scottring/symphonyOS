@@ -36,7 +36,7 @@ import { useSupabaseTasks } from '@/hooks/useSupabaseTasks';
 import { useGatedTaskActions } from '@/hooks/useGatedTaskActions';
 import { useContacts } from '@/hooks/useContacts';
 import { useProjects } from '@/hooks/useProjects';
-import { useGoogleCalendar, type GoogleCalendarInfo, type CalendarEvent } from '@/hooks/useGoogleCalendar';
+import { useGoogleCalendar, CalendarReconnectError, type GoogleCalendarInfo, type CalendarEvent } from '@/hooks/useGoogleCalendar';
 import { eventMoveErrorMessage } from '@/lib/calendar/moveEvent';
 import { useEventNotes, type EventNote } from '@/hooks/useEventNotes';
 import { isEventFree, freeKeyFor, seriesKey } from '@/lib/today/eventFree';
@@ -487,9 +487,9 @@ function EventPanelBody({ id }: { id: string }) {
   const autoOpenDiscussion = useAutoOpenDiscussion();
   const { clearSelection } = useSelection();
   const navigate = useNavigate();
-  const { events, updateEvent, moveEvent, fetchEvents, fetchCalendarList, isFetching, isLoading } = useGoogleCalendar();
+  const { events, updateEvent, moveEvent, deleteEvent, removeEventLocal, fetchEvents, fetchCalendarList, isFetching, isLoading } = useGoogleCalendar();
   const { getNote, updateNote, fetchNote, addEventLink, updateEventFree } = useEventNotes();
-  const { tasks, addPrepTask } = useSupabaseTasks();
+  const { tasks, addPrepTask, toggleTask } = useSupabaseTasks();
   const {
     isFlagged,
     getFlag,
@@ -636,12 +636,36 @@ function EventPanelBody({ id }: { id: string }) {
         }
       }}
       onClose={handleClose}
+      onDeleteEvent={async () => {
+        try {
+          // This instance only for a recurring series (deleteSeries defaults
+          // off), with the event's own calendar — a secondary-calendar event
+          // sent to 'primary' 404s.
+          await deleteEvent({ eventId, calendarId: eventCalendarId });
+          // deleteEvent writes to Google only; drop it from the held events
+          // so no view keeps drawing it until the next fetch.
+          removeEventLocal(eventId);
+          showToast('Event deleted', 'success');
+          return true;
+        } catch (err) {
+          console.error('Failed to delete event:', err);
+          showToast(
+            err instanceof CalendarReconnectError
+              ? 'Calendar connection expired — reconnect in Settings'
+              : 'Could not delete the event',
+            'error',
+            4000,
+          );
+          return false;
+        }
+      }}
       onNotesChange={(html) => updateNote(eventId, html)}
       onAddPrepTask={(title) => {
         // Prep tasks land on the event's day (a plain timed task linked to it).
         const when = getEventDayStart(event) ?? new Date();
         addPrepTask(title, eventId, when);
       }}
+      onTogglePrepTask={(tid) => { void toggleTask(tid); }}
       links={getNote(eventId)?.links}
       onAddLink={(url) => addEventLink(eventId, url)}
       discussion={{ flagged: isFlagged(eventId), note: getFlag(eventId)?.discussionNote }}

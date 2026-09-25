@@ -31,6 +31,11 @@ export interface PanelActionsProps {
   actions: PanelAction[]
   /** The panel's more-menu. Always rendered last, never counted against the cap. */
   overflow?: ReactNode
+  /**
+   * The more-menu, given the actions past the cap so ONE ⋯ holds both. When
+   * set it replaces `overflow` and the built-in fold menu.
+   */
+  renderOverflow?: (folded: PanelAction[]) => ReactNode
 }
 
 const BASE =
@@ -95,7 +100,7 @@ function Chip({ action }: { action: PanelAction }) {
  * or of when to stop. Panels now say what the actions ARE; this decides how they
  * look and where they stop.
  */
-export function PanelActions({ actions, overflow }: PanelActionsProps) {
+export function PanelActions({ actions, overflow, renderOverflow }: PanelActionsProps) {
   const visible = actions.slice(0, MAX_VISIBLE_ACTIONS)
   const folded = actions.slice(MAX_VISIBLE_ACTIONS)
   const [open, setOpen] = useState(false)
@@ -116,7 +121,7 @@ export function PanelActions({ actions, overflow }: PanelActionsProps) {
         <Chip key={a.id} action={a} />
       ))}
 
-      {folded.length > 0 && (
+      {folded.length > 0 && !renderOverflow && (
         <div className="relative" ref={ref}>
           <button
             type="button"
@@ -148,7 +153,7 @@ export function PanelActions({ actions, overflow }: PanelActionsProps) {
         </div>
       )}
 
-      {overflow}
+      {renderOverflow ? renderOverflow(folded) : overflow}
     </div>
   )
 }

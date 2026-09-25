@@ -10,10 +10,13 @@ import { goalTitleMap } from '@/lib/planning/goalSteps'
 import { weekListTitle } from '@/components/reference/DayPlanPanel'
 import { localYmd } from '@/lib/cadence/config'
 
-export function WeekList({ tasks, weekStart, meId, userId, isCurrent, onToggle, onSelect, onPlan, onAdd, timingControl }: {
+export function WeekList({ tasks, weekStart, meId, userId, isCurrent, peopleFiltered = false, onToggle, onSelect, onPlan, onAdd, timingControl }: {
   tasks: Task[]
   weekStart: Date
   meId: string | null
+  /** A people filter is narrowing the list. `meId` is always the signed-in
+   *  member — the list is MY week — so it says nothing about a filter. */
+  peopleFiltered?: boolean
   userId: string | null
   isCurrent: boolean
   onToggle: (task: Task) => void
@@ -75,7 +78,9 @@ export function WeekList({ tasks, weekStart, meId, userId, isCurrent, onToggle, 
       </h2>
       {ordered.length === 0 ? (
         <p className="text-sm text-neutral-500">
-          {meId ? "No week tasks match this person. Change the people filter to see other work." : isCurrent ? "Nothing on this week's list in this view yet." : "Nothing on this week’s list in this view."}
+          {/* It blamed a people filter on every empty week, filter or not:
+              `meId` is always set (S3-10, confirmed live 2026-09-25). */}
+          {peopleFiltered ? "No week tasks match this person. Change the people filter to see other work." : isCurrent ? "Nothing on this week's list in this view yet." : "Nothing on this week’s list in this view."}
           {onPlan && (
             <>
               {' '}

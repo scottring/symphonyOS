@@ -2292,6 +2292,10 @@ export function useSupabaseTasks() {
       createdAt: now,
       updatedAt: now,
       scheduledFor,
+      // Prep for an event is due on its DAY, not at midnight: without this a
+      // prep task sat on Today as a 12:00 AM timed row, "up next since
+      // 12:00 AM" (live, 2026-09-25). The caller passes the day's start.
+      isAllDay: true,
       linkedEventId,
     }
     setTasks((prev) => [optimisticTask, ...prev])
@@ -2304,6 +2308,7 @@ export function useSupabaseTasks() {
         completed: false,
         bucket: 'timed',
         scheduled_for: scheduledFor.toISOString(),
+        is_all_day: true,
         linked_event_id: linkedEventId,
       })
       .select()

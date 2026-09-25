@@ -17,6 +17,7 @@ import { taskTiming, hasTiming, broaderCommitment, removeDayOutcome, removeAllOu
 import { timingRemoval } from '@/lib/planning/planActions'
 import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
 import { useGoogleCalendar } from '@/hooks/useGoogleCalendar'
+import { useOptionalScheduleActionsContext } from '@/contexts/ScheduleActionsContext'
 import type { Routine, ActionableInstance } from '@/types/actionable'
 import { useSupabaseTasks } from '@/hooks/useSupabaseTasks'
 import { taskToTimelineItem, eventToTimelineItem, findEventByItemId } from '@/types/timeline'
@@ -201,6 +202,9 @@ export function WeekViewV2(props: WeekViewV2Props) {
   const { getCurrentUserMember } = useFamilyMembers()
   const meId = getCurrentUserMember()?.id ?? null
   const { createEvent, deleteEvent } = useGoogleCalendar()
+  // createEvent never updates the held events; without a refetch a
+  // quick-created event only showed up after a reload.
+  const refetchEvents = useOptionalScheduleActionsContext()?.onRefetchEvents
   const gridCreate = useGridCreate()
 
   // Pool-pill triage. Defers run through the DomainGate (a context-less task
@@ -276,6 +280,9 @@ export function WeekViewV2(props: WeekViewV2Props) {
             void deleteEvent({ eventId: result.id })
           })
         }
+        // Same as Today's inline create: re-read the range on screen so the
+        // new event appears now, not after a reload.
+        await refetchEvents?.()
       } else if (params.type === 'routine') {
         // Routines need a recurrence pattern that doesn't fit the popover.
         // Build an NL string from the slot's title/weekday/time and navigate
@@ -297,7 +304,7 @@ export function WeekViewV2(props: WeekViewV2Props) {
       }
       gridCreate.close()
     },
-    [addTask, deleteTask, createEvent, deleteEvent, navigate, gridCreate, pushAction],
+    [addTask, deleteTask, createEvent, deleteEvent, refetchEvents, navigate, gridCreate, pushAction],
   )
 
   // Drag-drop wiring. Domain-on-drop needs nothing here: onUpdateTask is the
@@ -949,14 +956,20 @@ export function WeekViewV2(props: WeekViewV2Props) {
       meId={meId}
       userId={userId}
       isCurrent={weekIsCurrent}
+      peopleFiltered={Array.isArray(selectedAssignees) ? selectedAssignees.length > 0 : !!selectedAssignees}
       onToggle={(task) => handleJournalToggle({ id: `task-${task.id}`, kind: 'task', title: task.title, completed: task.completed, task }, journalDays[0])}
       onSelect={(id) => onSelectItem(`task-${id}`)}
       onAdd={async (title) => {
         const id = await addTask(title, undefined, undefined, undefined, { bucket: 'week', weekStart: weekAnchor, assignedTo: meId ?? undefined })
         if (!id) throw new Error('Task creation failed')
         const hidden = !layers.has('unsorted')
-        showToast(`Added to the week · Unsorted · only you${hidden ? ' · hidden by your current view' : ''}`, hidden ? 'warning' : 'success', hidden ? 8000 : undefined)
-        pushAction?.(`Added "${title}"`, () => { void deleteTask(id) })
+        // ONE notification per add (S3-12): the Undo carries what the old
+        // second toast said. A row the current view hides still warns on its
+        // own, because that is news the Undo line does not give.
+        const where = 'to the week · Unsorted · only you'
+        if (pushAction) pushAction(`Added "${title}" ${where}`, () => { void deleteTask(id) })
+        else showToast(`Added ${where}`, 'success')
+        if (hidden) showToast('Hidden by your current view — turn on Unsorted to see it', 'warning', 8000)
       }}
       onPlan={onPlan}
       timingControl={weekTimingControl}

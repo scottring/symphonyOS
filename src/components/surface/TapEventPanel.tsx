@@ -15,6 +15,8 @@ import { EventWhenLine } from './sections/EventWhenLine'
 import { PanelActions, type PanelAction } from './sections/PanelActions'
 import { PanelSection } from './sections/PanelSection'
 import { PanelRow } from './sections/PanelRow'
+import { PanelMoreMenu } from './sections/PanelMoreMenu'
+import { Checkmark } from './sections/PanelSubtasks'
 import { SchedulePicker } from '@/components/schedule/SchedulePicker'
 import { dateForWhen } from '@/components/schedule/RescheduleGrid'
 import type { TriageWhen } from '@/components/schedule/TriageWhenMenu'
@@ -50,6 +52,8 @@ interface TapEventPanelProps {
   onClose: () => void
   onNotesChange: (next: string) => void
   onAddPrepTask: (title: string) => void
+  /** Complete / reopen a prep task in place. When omitted, rows only open. */
+  onTogglePrepTask?: (id: string) => void
   onAddLink: (url: string) => void
   onOpenTask: (id: string) => void
   onOpenProject: (id: string) => void
@@ -78,6 +82,12 @@ interface TapEventPanelProps {
   writableCalendars?: { id: string; summary: string }[]
   /** Move the event onto another (writable) calendar. */
   onMoveToCalendar?: (destinationCalendarId: string) => void
+  /**
+   * Delete the event from Google Calendar. Offered only where Google will take
+   * the write (the same gate as the inline when-line editor). Resolving
+   * `false` means the delete failed: the panel stays open and says so.
+   */
+  onDeleteEvent?: () => Promise<boolean | void>
   /** Needs-discussion flag — surfaces on the family kiosk's For Discussion list. */
   discussion?: { flagged: boolean; note?: string }
   /** Flag/unflag this event for discussion. When omitted, the Discuss chip hides. */
@@ -164,13 +174,21 @@ export function TapEventPanel(props: TapEventPanelProps) {
   const [assistOpen, setAssistOpen] = useState(props.autoOpenDiscussion === true)
   useEffect(() => { if (props.autoOpenDiscussion) setAssistOpen(true) }, [props.autoOpenDiscussion])
 
+  const [deleteError, setDeleteError] = useState<string | null>(null)
+
+  // Completed prep tasks stay listed, struck through: ticking one off used to
+  // make it vanish from the event it was prep for, with no way to reopen it
+  // here (event-panel review, finding a).
   const relations = useEntityRelations({
     kind: 'event',
     entity: event,
     allTasks,
     allEvents: [],
     allProjects: [],
+    includeCompleted: true,
   })
+  // Open work first; done rows sink below it (stable within each group).
+  const prepTasks = [...relations.tasks].sort((a, b) => Number(!!a.completed) - Number(!!b.completed))
 
   const startTime = getStartTime(event)
   const endTime = getEndTime(event)
@@ -241,6 +259,19 @@ export function TapEventPanel(props: TapEventPanelProps) {
       minute: date.getMinutes(),
     })
     props.onReschedule?.(newStart, newEnd)
+  }
+
+  // Deleting is irreversible from here, so PanelMoreMenu's two-step confirm
+  // stands in front of it. Close only on success; a refused delete keeps the
+  // panel open and says so rather than failing silently (finding c).
+  const handleDelete = async () => {
+    setDeleteError(null)
+    const ok = await props.onDeleteEvent?.()
+    if (ok === false) {
+      setDeleteError("Couldn't delete this event — it's still on your calendar.")
+      return
+    }
+    props.onClose()
   }
 
   const commitPrepTask = () => {
@@ -453,7 +484,22 @@ export function TapEventPanel(props: TapEventPanelProps) {
           )}
         </div>
       }
-      act={<PanelActions actions={actions} />}
+      act={
+        <>
+          <PanelActions
+            actions={actions}
+            // Same gate as the when-line editor: a view-only calendar (or a
+            // host that didn't wire it) gets no Delete at all. With Delete,
+            // the folded actions ride in the same ⋯ rather than a second one.
+            renderOverflow={canEdit && props.onDeleteEvent
+              ? (folded) => <PanelMoreMenu items={folded} onDelete={() => { void handleDelete() }} />
+              : undefined}
+          />
+          {deleteError && (
+            <p role="alert" className="mt-2 text-[13px] text-rose-700">{deleteError}</p>
+          )}
+        </>
+      }
       details={
         <>
           {/* Location editor: for physical addresses or to add one. A virtual
@@ -502,18 +548,36 @@ export function TapEventPanel(props: TapEventPanelProps) {
           <PanelSection
             id="prep-tasks"
             label="Prep tasks"
-            preview={relations.tasks.length ? `${relations.tasks.length} task${relations.tasks.length === 1 ? '' : 's'}` : undefined}
+            preview={prepTasks.length ? `${prepTasks.length} task${prepTasks.length === 1 ? '' : 's'}` : undefined}
           >
             <div className="flex flex-col gap-1.5">
-              {relations.tasks.map((t) => (
-                <PanelRow
-                  key={t.id}
-                  onClick={() => props.onOpenTask(t.id)}
-                  icon={<span className="w-6 h-6 flex items-center justify-center rounded-md bg-amber-100"><ConceptIcon name="list" decorative /></span>}
-                >
-                  <span className="block text-[15px] text-neutral-800">{t.title}</span>
-                </PanelRow>
-              ))}
+              {prepTasks.map((t) => {
+                const row = (
+                  <PanelRow
+                    key={t.id}
+                    onClick={() => props.onOpenTask(t.id)}
+                    icon={<span className="w-6 h-6 flex items-center justify-center rounded-md bg-amber-100"><ConceptIcon name="list" decorative /></span>}
+                  >
+                    <span className={`block text-[15px] ${t.completed ? 'line-through text-neutral-400' : 'text-neutral-800'}`}>{t.title}</span>
+                  </PanelRow>
+                )
+                if (!props.onTogglePrepTask) return row
+                // Split row, as subtasks do: the mark completes or reopens,
+                // the title opens the task.
+                return (
+                  <div key={t.id} className="flex items-start gap-2">
+                    <button
+                      type="button"
+                      onClick={() => props.onTogglePrepTask?.(t.id)}
+                      aria-label={`Mark ${t.title} ${t.completed ? 'incomplete' : 'complete'}`}
+                      className="mt-2.5 flex-shrink-0"
+                    >
+                      <Checkmark completed={!!t.completed} />
+                    </button>
+                    <div className="min-w-0 flex-1">{row}</div>
+                  </div>
+                )
+              })}
               {!props.free && (
                 <input
                   type="text"

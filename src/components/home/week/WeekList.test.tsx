@@ -54,6 +54,16 @@ describe('WeekList', () => {
 
   // Requirement 4: a dated action belongs under its day, once. The list keeps
   // a truthful count and says where the rows are.
+  // S3-10, confirmed live 2026-09-25: `meId` is always the signed-in member,
+  // so an empty week blamed a people filter nobody had set.
+  it('an empty week blames a people filter only when one is set', () => {
+    const { rerender } = render(<WeekList tasks={[]} weekStart={WEEK} meId="m1" userId="me" isCurrent onToggle={vi.fn()} onSelect={vi.fn()} />)
+    expect(screen.queryByText(/people filter/)).toBeNull()
+    expect(screen.getByText(/Nothing on this week's list/)).toBeInTheDocument()
+    rerender(<WeekList tasks={[]} weekStart={WEEK} meId="m1" userId="me" isCurrent peopleFiltered onToggle={vi.fn()} onSelect={vi.fn()} />)
+    expect(screen.getByText(/Change the people filter/)).toBeInTheDocument()
+  })
+
   describe('a dated row is not repeated here', () => {
     const inWeek = new Date(2026, 9, 6)   // Tue of the Oct 4 week
     const outside = new Date(2026, 9, 20) // committed to this week, dated beyond it

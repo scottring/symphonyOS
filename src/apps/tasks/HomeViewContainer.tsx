@@ -826,6 +826,9 @@ export function HomeViewContainer({ fixedView }: { fixedView?: 'today' | 'week' 
       // HomeView fell back to a no-op, so a week drag announced a move it had
       // not made (Scott, 2026-09-24).
       onUpdateEvent,
+      // /week's quick-create refetches through this, the same range the grid
+      // draws from — createEvent alone never updates the held events.
+      onRefetchEvents: refetchViewedDayEvents,
       onUpdateEventContext: updateEventContext,
       onUpdateEventFree: updateEventFree,
       onShareEventWithFamily: (id: string) => updateEventSharedWithFamily(id, true),
@@ -864,7 +867,7 @@ export function HomeViewContainer({ fixedView }: { fixedView?: 'today' | 'week' 
       contactsMap, projectsMap, projects, contacts, familyMembers, lists, listsByCategory,
       eventNotesMapWithDefaults, eventContextOverrides,
       addProject, handleConvertTaskToProject, searchContacts, addContact, getDomainForCalendar,
-      refreshDateInstances, updateEventProject,
+      refreshDateInstances, updateEventProject, refetchViewedDayEvents,
     ],
   );
 
