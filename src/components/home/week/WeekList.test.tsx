@@ -133,8 +133,25 @@ it('adds a task directly and keeps the entry available after a failed save', asy
   expect(await screen.findByRole('alert')).toHaveTextContent('Could not add')
   expect(screen.getByRole('textbox')).toHaveValue('  Book car service  ')
   fireEvent.click(screen.getByRole('button', { name: 'Add', exact: true }))
-  await waitFor(() => expect(screen.queryByRole('textbox')).toBeNull())
-  expect(onAdd).toHaveBeenLastCalledWith('Book car service')
+  await waitFor(() => expect(onAdd).toHaveBeenLastCalledWith('Book car service'))
+  // Stays open for the next one, emptied.
+  await waitFor(() => expect(screen.getByRole('textbox', { name: 'New week task' })).toHaveValue(''))
+})
+
+// Walkthrough 2026-09-25: the field closed on every Enter, and the second
+// title typed while the first saved was erased when the save landed.
+it('keeps a title typed while the previous one was saving', async () => {
+  let land!: () => void
+  const onAdd = vi.fn().mockImplementationOnce(() => new Promise<void>((r) => { land = r })).mockResolvedValue(undefined)
+  render(<WeekList tasks={[]} weekStart={WEEK} meId={null} userId="me" isCurrent onToggle={vi.fn()} onSelect={vi.fn()} onAdd={onAdd} />)
+  fireEvent.click(screen.getByRole('button', { name: /Add task to this week/ }))
+  const field = screen.getByRole('textbox', { name: 'New week task' })
+  fireEvent.change(field, { target: { value: 'First' } })
+  fireEvent.submit(field)
+  fireEvent.change(field, { target: { value: 'Second' } })
+  land()
+  await waitFor(() => expect(onAdd).toHaveBeenCalledWith('First'))
+  await waitFor(() => expect(screen.getByRole('textbox', { name: 'New week task' })).toHaveValue('Second'))
 })
 
 describe('the goal a week row serves', () => {

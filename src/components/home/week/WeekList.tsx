@@ -144,10 +144,14 @@ export function WeekList({ tasks, weekStart, meId, userId, isCurrent, peopleFilt
       {onAdd && (adding ? (
         <form className="mt-3 flex flex-wrap gap-2" onSubmit={async (event) => {
           event.preventDefault()
-          if (!titleInput.trim() || saving) return
+          const submitted = titleInput.trim()
+          if (!submitted || saving) return
           setSaving(true)
           setError(false)
-          try { await onAdd(titleInput.trim()); setTitleInput(''); setAdding(false) }
+          // Stay open for the next one, and clear only what was sent: the
+          // field closed on every Enter, and clearing it when the save landed
+          // erased whatever had been typed meanwhile (walkthrough 2026-09-25).
+          try { await onAdd(submitted); setTitleInput((v) => (v.trim() === submitted ? '' : v)) }
           catch { setError(true) }
           finally { setSaving(false) }
         }}>
