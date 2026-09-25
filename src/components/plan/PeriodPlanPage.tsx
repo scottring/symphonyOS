@@ -642,6 +642,13 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
     routines: activeRoutines,
   })
 
+  /** The months a season spans, first to last — what S3-03's chooser offers. */
+  const seasonMonths = useMemo(() => {
+    if (level !== 'season') return []
+    const out: Date[] = []
+    for (let d = new Date(bounds.start.getFullYear(), bounds.start.getMonth(), 1); d < bounds.end; d = new Date(d.getFullYear(), d.getMonth() + 1, 1)) out.push(d)
+    return out
+  }, [level, bounds.start, bounds.end])
   const planWeekSlot = useCallback((row: PlanRowModel) => {
     if (level === 'year') return null
     const t = tasks.find((x) => x.id === row.id)
@@ -667,6 +674,25 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
         onRemoveDay={timing?.day ? () => { void removeTiming(row.id, row.title, 'day') } : undefined}
         onPickDay={(date) => { void planActions.chooseTaskDay(row.id, date) }}
       />
+      {/* S3-03: a season row can go into ANY of its season's months, named,
+          not only the one "Take it into" means. A plain select: reachable by
+          touch, keyboard and screen reader alike. */}
+      {level === 'season' && !row.isGoal && seasonMonths.length > 1 && (
+        <select
+          aria-label={`Take ${row.title} into a month`}
+          value=""
+          onChange={(e) => {
+            const m = seasonMonths.find((d) => localYmd(d) === e.target.value)
+            if (m) void gated.updateTask(row.id, { bucket: 'month', monthStart: m })
+          }}
+          className="rounded-md border border-neutral-200 bg-white px-1.5 py-0.5 text-xs text-neutral-600"
+        >
+          <option value="" disabled>Into a month…</option>
+          {seasonMonths.map((d) => (
+            <option key={localYmd(d)} value={localYmd(d)}>{d.toLocaleDateString('en-US', { month: 'long' })}</option>
+          ))}
+        </select>
+      )}
       {timing?.day && (
         <button type="button" onClick={() => navigate(`/today?date=${localYmd(timing.day!)}`)}
           className="shrink-0 whitespace-nowrap text-xs text-primary-700 hover:underline">View day →</button>
@@ -677,7 +703,7 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
       )}
       </span>
     )
-  }, [level, bounds.start, timingPeriodLabel, planActions, tasks, navigate, gated, removeTiming, dayChoices])
+  }, [level, bounds.start, timingPeriodLabel, planActions, tasks, navigate, gated, removeTiming, dayChoices, seasonMonths])
 
   const [pickingGoalFor, setPickingGoalFor] = useState<string | null>(null)
   const [linkError, setLinkError] = useState(false)

@@ -482,6 +482,21 @@ describe('PeriodPlanPage', () => {
     expect(hook.updateTask).toHaveBeenCalledWith(t.id, { bucket: 'month', monthStart: first })
   })
 
+  // S3-03: a season row could only go into the one month "Take it into"
+  // meant; the season's other months were unreachable from its row.
+  it('a season row can go into any month of its season, named', () => {
+    const t = task({ title: 'Swap the closets', bucket: 'quarter', seasonStart: undefined })
+    state.tasks = [t]
+    renderPage('season')
+    const pick = screen.getByRole('combobox', { name: 'Take Swap the closets into a month' })
+    const months = within(pick).getAllByRole('option').slice(1)
+    expect(months.length).toBeGreaterThan(1)
+    const last = months[months.length - 1] as HTMLOptionElement
+    fireEvent.change(pick, { target: { value: last.value } })
+    const [y, m] = last.value.split('-').map(Number)
+    expect(hook.updateTask).toHaveBeenCalledWith(t.id, { bucket: 'month', monthStart: new Date(y, m - 1, 1) })
+  })
+
   it('a goal is never offered a rung', () => {
     state.tasks = [task({ title: 'A home easier to care for', monthStart: thisMonth, isGoal: true })]
     renderPage('month')
