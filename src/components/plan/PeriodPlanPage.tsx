@@ -652,7 +652,7 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
     // be a day grid nobody asked for.
     const days = dayChoices.forWeek(t?.weekStart ?? null)
     return (
-      <span className="inline-flex max-w-full items-center gap-1">
+      <span className="inline-flex max-w-full flex-wrap items-center gap-x-1 gap-y-0.5">
       <PlanWeekMenu
         size="sm"
         title={row.title}
@@ -1143,9 +1143,12 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
             prevLabel={`Previous ${noun}`}
             nextLabel={`Next ${noun}`}
             trailing={isCurrent ? undefined : (
-              <button type="button" onClick={() => goTo(today)}
+              <button type="button" onClick={() => goTo(today)} aria-label={`Back to this ${noun}`}
                 className="period-return ml-1 inline-flex shrink-0 items-center gap-1 rounded-full border border-primary-100 bg-primary-50 px-2 py-0.5 text-[11px] font-semibold text-primary-600 transition-colors hover:bg-primary-100">
-                Back to this {noun}
+                {/* Shorter on a phone: the full chip ran under the Shelves
+                    button beside the title (390px check, 2026-09-25). */}
+                <span className="hidden sm:inline">Back to this {noun}</span>
+                <span className="sm:hidden">This {noun}</span>
               </button>
             )}
           />

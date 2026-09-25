@@ -7,6 +7,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { Check, Target, ArrowRight, ArrowUpRight, ArrowDownRight, Sun, CalendarDays, Archive, Trash2, Repeat, ChevronRight, ChevronDown, Plus } from 'lucide-react'
 import type { PlacementFate } from '@/lib/planning/lineage'
+import { useMobile } from '@/hooks/useMobile'
 import type { RowAction } from '@/lib/planning/periodPage'
 import { stepCounts, countsLabel, type StepCounts } from '@/lib/planning/goalListView'
 
@@ -222,6 +223,11 @@ export function PlanRow({
   // September. Nothing is lost: the control can reach every week the verb
   // could, and says which one it is reaching.
   const hasTimingControl = !row.isGoal && !!planWeek && timingReachesLower
+  // On a phone the timing control goes UNDER the title, as Today's rows do.
+  // Trailing it beside the Move control left a step's title 0px wide — one
+  // letter a line under the chip (390px check, 2026-09-25).
+  const mobile = useMobile()
+  const timing = !row.isGoal && planWeek ? planWeek(row) : null
   const verbs = actions.filter((a): a is Exclude<RowAction, 'complete'> =>
     a !== 'complete' && a !== 'under-goal' && !(hasTimingControl && a === 'to-lower'))
   // Only a month/season goal holds steps. A year row is a goals-table entity,
@@ -361,6 +367,7 @@ export function PlanRow({
         {row.placed && (
           <PlacementChip placed={row.placed} onOpenPlaced={onOpenPlaced} />
         )}
+        {mobile && timing && <span className="mt-1.5 flex max-w-full">{timing}</span>}
       </span>
       {/* Hover verbs, desktop only. On a phone they were invisible (no hover)
           yet still took the width of four 48px touch buttons, which squeezed a
@@ -390,7 +397,7 @@ export function PlanRow({
           the hover verbs beside it. It answers "which week does this belong
           to", which is the whole motion of the cadence — it cannot be a hover
           secret (Codex review of cefcdbcc). */}
-      {!row.isGoal && planWeek && <span className="shrink-0">{planWeek(row)}</span>}
+      {!mobile && timing && <span className="shrink-0">{timing}</span>}
       {verbs.length > 0 && (
         <span className="period-row-actions hidden shrink-0 sm:flex items-center gap-0.5 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
           {verbs.map((a) => (

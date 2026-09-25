@@ -26,6 +26,7 @@ import type { TimelineItem } from '@/types/timeline'
 import { isMissedPlacement } from '@/lib/week/missedPlacement'
 import { journalTime, type ContextSpan } from '@/lib/week/journalSpread'
 import { planDropHandlers, type PlanDragPayload } from '@/lib/planning/planDrag'
+import { useMobile } from '@/hooks/useMobile'
 
 export interface JournalEntry {
   /** Selectable id — 'task-<uuid>', 'event-<id>', 'routine-<id>'. */
@@ -134,6 +135,9 @@ function Entry({ entry, day, onSelect, onToggle, dragEnabled, timingControl }: {
   // Its day passed without a tick — the live copy is back on the list; what
   // stays here is the record, faded.
   const missed = entry.task && !entry.time ? isMissedPlacement(entry.task.scheduledFor, entry.task.completed, new Date()) : false
+  // On a phone the timing chip takes its own line under the title; trailing
+  // it left the title ~30px wide (390px check, 2026-09-25).
+  const mobile = useMobile()
   return (
     <li
       ref={setNodeRef}
@@ -141,7 +145,7 @@ function Entry({ entry, day, onSelect, onToggle, dragEnabled, timingControl }: {
       // make it a role="button" tab stop, and this grid has no keyboard
       // sensor — the pin and ⋯ menus are the keyboard path).
       {...(movable ? listeners : {})}
-      className={`flex min-w-0 items-start gap-2 ${movable ? 'cursor-grab touch-none' : ''} ${isDragging ? 'opacity-40' : ''} ${missed ? 'opacity-50' : ''}`}
+      className={`flex min-w-0 items-start gap-2 ${mobile ? 'flex-wrap' : ''} ${movable ? 'cursor-grab touch-none' : ''} ${isDragging ? 'opacity-40' : ''} ${missed ? 'opacity-50' : ''}`}
     >
       {entry.kind === 'event'
         ? <span aria-hidden="true" className="mt-[9px] h-px w-3.5 shrink-0 bg-neutral-400" />
@@ -168,7 +172,7 @@ function Entry({ entry, day, onSelect, onToggle, dragEnabled, timingControl }: {
         // The row itself carries the drag listeners, so the control swallows
         // the pointer before they see it — the same guard the checkbox uses.
         <span
-          className="shrink-0"
+          className={mobile ? 'basis-full pl-7' : 'shrink-0'}
           onPointerDown={(e) => e.stopPropagation()}
           onClick={(e) => e.stopPropagation()}
         >

@@ -9,6 +9,7 @@ import { weekListTasks, weekRowNote, weekRowNoteText } from '@/lib/planning/week
 import { goalTitleMap } from '@/lib/planning/goalSteps'
 import { weekListTitle } from '@/components/reference/DayPlanPanel'
 import { localYmd } from '@/lib/cadence/config'
+import { useMobile } from '@/hooks/useMobile'
 
 export function WeekList({ tasks, weekStart, meId, userId, isCurrent, peopleFiltered = false, onToggle, onSelect, onPlan, onAdd, timingControl }: {
   tasks: Task[]
@@ -31,6 +32,7 @@ export function WeekList({ tasks, weekStart, meId, userId, isCurrent, peopleFilt
   timingControl?: (task: Task) => ReactNode
 }) {
   const [adding, setAdding] = useState(false)
+  const mobile = useMobile()
   const [titleInput, setTitleInput] = useState('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(false)
@@ -128,8 +130,11 @@ export function WeekList({ tasks, weekStart, meId, userId, isCurrent, peopleFilt
                     </span>
                   )}
                   {note && <span className="block text-[11.5px] text-neutral-500">{note}</span>}
+                  {/* Under the title on a phone: trailing, the chip left the
+                      title ~30px — a word a line (390px check, 2026-09-25). */}
+                  {mobile && timingControl && <span className="mt-1 flex max-w-full">{timingControl(task)}</span>}
                 </div>
-                {timingControl && <span className="shrink-0">{timingControl(task)}</span>}
+                {!mobile && timingControl && <span className="shrink-0">{timingControl(task)}</span>}
               </li>
             )
           })}
