@@ -146,3 +146,20 @@ no retried codes. One stale PostgREST request:
 The switch is still off. Next, with Scott's go-ahead: preview with the switch
 on; the two-account check (needs his second login). Production approval is
 separate.
+
+## Preview with the switch on — verified, switch back off
+
+See the review doc's "Preview verification with the switch ON" for the table.
+- One RPC per placement save: week chip, Drop, Keep; the look-back saves one
+  per verdict plus the session record.
+- Stale conflict forced by a competing write just before the RPC: one 409
+  PT409 in 207 ms, exactly 1 refusal in the Postgres logs, and no retries.
+  Nothing was written, the UI refreshed with the "changed somewhere else"
+  toast, and the retry succeeded with one open week.
+- Day choices with no record changes stay a single PATCH, and mixed saves
+  stay on the legacy path, both by design. Everything persisted after reload.
+- :5199 has been rebuilt with the switch OFF, and the legacy request sequence
+  is confirmed.
+
+Still open: the two-account check (Scott's login). Production is a separate
+decision.

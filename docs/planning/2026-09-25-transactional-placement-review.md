@@ -295,3 +295,29 @@ week 10-11.
 | Refusals in the Postgres logs since the fix | **Exactly 1** (08:44:51.524 UTC, `PT409`, via `authenticator`); none in the 27 s after it |
 
 No retries recurred. The switch is still off; the preview is not yet enabled.
+
+## Preview verification with the switch ON — 2026-09-25 (Scott approved, preview only)
+
+Built `VITE_PLACEMENT_RPC=true npm run build` at `f60d52bb`, served on :5199,
+demo account. Disposable fixtures `QA-TX1 drop` and `QA-TX2 keep`. Requests
+were logged by wrapping `fetch` in the page; the DB was read after each save.
+
+| Journey | Requests | DB after |
+|---|---|---|
+| Week chip, task with records (TX1 → Sep 27, TX2 → Sep 27) | **1 × `rpc/apply_task_placement` 200** each | old week removed, new week open, row matches |
+| Look-back: Drop TX1, Keep TX2, Save | **2 × RPC 200** (one per verdict) + `planning_sessions` 200 | TX1: Sep 27 removed, keeps its Sep 29 date ("stays on its day", as the preview said). TX2: Sep 27 carried → Oct 4, Oct 4 open |
+| Week change after another device's write, realtime already delivered | 1 × RPC 200 | Client planned from the fresh state; both old weeks closed, one open |
+| **Stale conflict** (competing `task_commitments` insert sent as the demo user immediately before the RPC) | **1 × RPC 409 `PT409`, 207 ms** | Refused plan wrote nothing; UI refreshed to the other write's week and showed "This changed somewhere else — it has been refreshed. Try again." Postgres logs: **exactly 1** refusal, no retries |
+| Retry of the same choice | 1 × RPC 200, 370 ms | Exactly one open week (Oct 4); the other three removed |
+| Day choice inside the already-open week | 1 × `PATCH tasks` | By design: no record changes, so no RPC (the single PATCH is already atomic) |
+| Reload | — | Week, carry and day all persisted as saved |
+| Mixed save (Inbox → week via the domain gate, sets context) | legacy PATCH + POST | By design: not placement-only |
+
+**Switch restored OFF.** Rebuilt without `VITE_PLACEMENT_RPC` (unset in
+`.env` and `.env.production`); :5199 serves the new bundle. A week change on
+TX2 then went out as the ordinary `PATCH tasks` + `PATCH task_commitments` +
+`POST task_commitments`, ending with one open week (Oct 11).
+
+**Not covered here.** Two-account verification (needs Scott's second login).
+Production enablement: not authorized. Fixtures `QA-TX1 drop` and `QA-TX2 keep`
+are left on the demo account for inspection.
