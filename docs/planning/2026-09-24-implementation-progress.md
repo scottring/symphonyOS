@@ -1867,9 +1867,11 @@ Integrated at the last check: 7187 tests pass (only the known
 - **External calendar creation** (S3-07) — destination/approval.
 - **Real iPhone keyboard/safe areas; paper printing** — manual.
 - **Two-account live RLS** — PG proves the policies; live needs a second login.
-- **Row-before-commitment order**: a failed Drop commitment write leaves the
-  row in the Inbox with the week open until retry (seen live); retry
-  converges (PG). Reordering the core writer is flagged for Codex.
+- **Row-before-commitment order** — investigated, not changed (Codex's
+  instruction): `docs/planning/2026-09-25-drop-partial-failure-investigation.md`,
+  PG 12/12. A failed commitment write leaves the row and records split for
+  every other device until a retry. Recommended fix (a): commitments first,
+  row write last, in `dropCommitment` first. Awaiting Codex/Scott.
 - **Release**: nothing pushed, merged or deployed. Production needs Scott.
 
 ## Demo fixtures left (all disposable, named QA-)
