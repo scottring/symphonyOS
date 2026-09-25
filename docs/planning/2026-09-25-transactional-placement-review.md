@@ -349,3 +349,26 @@ family/compound rows). The first run used such a fixture and was redone.
 
 **Still open:** a real browser sign-in as Edith, which needs the account's
 password.
+
+## Two real sign-ins, through the app — 2026-09-25 (Scott approved)
+
+A switch-ON build was served separately on `127.0.0.1:5211`: a different
+origin, so a separate session. :5199 stayed switch-off. Scott signed in
+himself: `smkaufman@` (Leviner-Kaufman household) on :5211, and the demo
+`symphonygoals@` (Chen household) on :5199. The two accounts are in different
+households, so this checks isolation between them, not Family sharing; the
+Edith check above covers sharing. The only fixtures were two throwaway tasks,
+`QA-SK week` and `QA-SK drop`, in Scott's account. No real task was read or
+changed.
+
+| Check | Result |
+|---|---|
+| Scott, in the app: Inbox → This week (both fixtures) | 1 × RPC 200 each |
+| Scott, in the app: week chip → Remove week | 1 × RPC 200. The task is back in the Inbox; the record is removed |
+| Scott, in the app: week chip → Sep 27 | 1 × RPC 200. Sep 20 removed, Sep 27 open; `created_by` = Scott. Persisted after reload |
+| Scott's session → demo task: read / RPC / direct record insert | 0 rows / **403 42501** "task not found or not writable" / 403 42501. The demo task was unchanged |
+| Demo session → Scott's fixture: read tasks, read records / RPC / direct insert / direct PATCH | 0 rows, 0 rows / **403 42501** / 403 42501 / 200 with 0 rows updated. The fixture was unchanged |
+
+**Cleanup.** The two fixtures were deleted by ID, owner and title; their
+records and focus rows cascaded. Verified: 0 tasks, 0 records and 0 focus rows
+left. The :5211 server was stopped and its build removed.
