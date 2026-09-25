@@ -371,7 +371,10 @@ describe('PageReviewSheet — domain, page title, duplicates', () => {
       notes: [],
       items: [{ ...base, title: 'Trash out', kind: 'recurring', placement: { kind: 'week' }, recurring: { days: ['sat', 'sun'], until: null } }],
     })
-    expect(screen.getByText('Routine · Sat, Sun')).toBeInTheDocument()
+    expect(screen.getByRole('combobox', { name: 'Type of "Trash out"' })).toHaveValue('routine')
+    expect(screen.getByRole('button', { name: 'Saturday' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('button', { name: 'Sunday' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('button', { name: 'Monday' })).toHaveAttribute('aria-pressed', 'false')
     expect(screen.queryByRole('combobox', { name: 'When' })).toBeNull()
   })
 })

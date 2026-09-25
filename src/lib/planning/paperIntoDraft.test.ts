@@ -86,6 +86,16 @@ describe('mergePaperIntoDraft', () => {
     expect(second.matched.map((m) => m.where)).toEqual(['draft', 'draft'])
   })
 
+  it('leaves appointments and activities for the ordinary commit, so their type is saved', () => {
+    const r = mergePaperIntoDraft(draftFor('week', '2026-10-05'), page([
+      line('Dentist', { kind: 'date', date: '2026-10-07' }, { category: 'event' }),
+      line('Swim', { kind: 'week' }, { category: 'activity' }),
+      line('Fix gate', { kind: 'week' }, { category: 'task' }),
+    ]), empty)
+    expect(r.draft.newTasks.map((t) => t.title)).toEqual(['Fix gate'])
+    expect(r.rest.items.map((i) => [i.title, i.category])).toEqual([['Dentist', 'event'], ['Swim', 'activity']])
+  })
+
   it('leaves day-facts and recurring lines for the ordinary commit', () => {
     const p: PageReviewPayload = {
       ...page([

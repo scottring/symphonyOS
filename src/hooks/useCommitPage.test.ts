@@ -64,6 +64,23 @@ beforeEach(() => {
 })
 
 describe('useCommitPage', () => {
+  it('writes the type chosen on the sheet: category on the task insert, a routines row for a routine', async () => {
+    await commit()({
+      items: [
+        { ...ITEM, title: 'Dentist', category: 'event', placement: { kind: 'date', date: '2026-10-07' }, time: '14:00' },
+        { ...ITEM, title: 'Swim', category: 'activity' },
+        { ...ITEM, title: 'Water plants', kind: 'recurring', recurring: { days: ['tue'], until: null }, time: '08:00' },
+      ],
+      notes: [], domain: 'family', storagePath: null, altitude: 'week',
+    })
+    expect(mocks.addTask).toHaveBeenCalledTimes(2)
+    expect(mocks.addTask.mock.calls[0][4]).toMatchObject({ category: 'event', isAllDay: false })
+    expect(mocks.addTask.mock.calls[1][4]).toMatchObject({ category: 'activity', bucket: 'inbox' })
+    expect(mocks.addRoutine).toHaveBeenCalledWith(expect.objectContaining({
+      name: 'Water plants', recurrence_pattern: { type: 'weekly', days: ['tue'] }, time_of_day: '08:00',
+    }))
+  })
+
   it('reports the failure instead of claiming success when addTask writes nothing', async () => {
     // addTask does not throw on failure — it toasts and returns undefined. The
     // old code counted the REQUESTED items, so a page that wrote nothing still
