@@ -160,6 +160,13 @@ function ShellLayoutInner({ children }: Props) {
   // Mobile/UI chrome state
   const [moreSheetOpen, setMoreSheetOpen] = useState(false);
   const [quickAddOpen, setQuickAddOpen] = useState(false);
+  // Following a capture's "Go to inbox" (or any link) left Quick Add open
+  // over the page it had just sent you to. Going somewhere closes it.
+  const [quickAddPath, setQuickAddPath] = useState(location.pathname);
+  if (quickAddPath !== location.pathname) {
+    setQuickAddPath(location.pathname);
+    if (quickAddOpen) setQuickAddOpen(false);
+  }
   // "Add task" from the Planning panel (dock or sheet) asks the shell to open
   // the same unibox ⌘K opens — one add box, wherever it is asked for.
   useEffect(() => onQuickAddRequest(() => setQuickAddOpen(true)), []);
