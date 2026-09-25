@@ -399,14 +399,47 @@ describe('useScheduleActions', () => {
       expect(message).toBe('Completed "Morning walk"')
     })
 
-    it('does not push action when uncompleting', async () => {
+    // Reopening is a gesture too, and it needs its own way back. It used to be
+    // announced by a wrapper in HomeView that fired BEFORE the write; the
+    // confirmation now belongs to the writer, so it can only follow the write.
+    it('confirms a reopen once, with a way back', async () => {
       const { result, mocks } = renderActions()
 
       await act(async () => {
         await result.current.onCompleteRoutine('routine-1', false)
       })
 
+      expect(mocks.pushAction).toHaveBeenCalledTimes(1)
+      const [message, undo] = mocks.pushAction.mock.calls[0]
+      expect(message).toBe('Reopened "Morning walk"')
+      await act(async () => { await undo() })
+      expect(mocks.markDone).toHaveBeenCalledWith('routine', 'routine-1', expect.any(Date))
+    })
+
+    it('says nothing when the completion write fails', async () => {
+      const markDone = vi.fn().mockResolvedValue(false)
+      const { result, mocks } = renderActions({ markDone })
+
+      await act(async () => {
+        await result.current.onCompleteRoutine('routine-1', true)
+      })
+
+      expect(markDone).toHaveBeenCalled()
       expect(mocks.pushAction).not.toHaveBeenCalled()
+      // The day still re-reads, so the row snaps back to what the DB holds.
+      expect(mocks.refreshDateInstances).toHaveBeenCalled()
+    })
+
+    it('registers the confirmation only after the write resolves', async () => {
+      let land: (ok: boolean) => void = () => {}
+      const markDone = vi.fn().mockReturnValue(new Promise<boolean>((r) => { land = r }))
+      const { result, mocks } = renderActions({ markDone })
+
+      let done: Promise<void> = Promise.resolve()
+      await act(async () => { done = result.current.onCompleteRoutine('routine-1', true) as Promise<void> })
+      expect(mocks.pushAction).not.toHaveBeenCalled()
+      await act(async () => { land(true); await done })
+      expect(mocks.pushAction).toHaveBeenCalledTimes(1)
     })
 
     it('always calls refreshDateInstances', async () => {

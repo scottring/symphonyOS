@@ -67,7 +67,8 @@ function SubtaskReschedule({
   )
 }
 
-function Checkmark({ completed }: { completed: boolean }) {
+/** The round done-mark every task row in a panel uses (subtasks, prep tasks). */
+export function Checkmark({ completed }: { completed: boolean }) {
   return (
     <span className={`w-4 h-4 rounded-full border flex items-center justify-center flex-shrink-0
       ${completed ? 'bg-primary-600 border-primary-600 text-white' : 'border-neutral-300 text-transparent'}`}

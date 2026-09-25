@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { screen } from '@testing-library/react'
+import { screen, within } from '@testing-library/react'
 import { render } from '@/test/test-utils'
 import { TapEventPanel } from './TapEventPanel'
 import { createMockTask } from '@/test/mocks/factories'
@@ -385,6 +385,97 @@ describe('TapEventPanel', () => {
       await user.type(input, 'Nope{Enter}')
       expect(onRenameEvent).not.toHaveBeenCalled()
       expect(screen.getByText('Annual physical')).toBeInTheDocument()
+    })
+  })
+
+  // Event-panel review, finding a: a prep task ticked off vanished from the
+  // event it was prep for, with no way to reopen it there.
+  describe('completed prep tasks', () => {
+    it('keeps a completed prep task visible, struck through', () => {
+      const done = createMockTask({ id: 't1', linkedEventId: 'e1', title: 'Bring vaccine card', completed: true })
+      render(<TapEventPanel event={mockEvent} notes={undefined} allTasks={[done]} {...baseHandlers} />)
+      expect(screen.getByText('Bring vaccine card')).toHaveClass('line-through')
+    })
+
+    it('completes and reopens a prep task from the panel', async () => {
+      const onTogglePrepTask = vi.fn()
+      const open = createMockTask({ id: 't1', linkedEventId: 'e1', title: 'Fill the form' })
+      const done = createMockTask({ id: 't2', linkedEventId: 'e1', title: 'Bring vaccine card', completed: true })
+      const { user } = render(<TapEventPanel
+        event={mockEvent} notes={undefined} allTasks={[done, open]} {...baseHandlers}
+        onTogglePrepTask={onTogglePrepTask}
+      />)
+      await user.click(screen.getByRole('button', { name: 'Mark Bring vaccine card incomplete' }))
+      expect(onTogglePrepTask).toHaveBeenCalledWith('t2')
+      await user.click(screen.getByRole('button', { name: 'Mark Fill the form complete' }))
+      expect(onTogglePrepTask).toHaveBeenCalledWith('t1')
+      // The title still opens the task; open work is listed before done work.
+      await user.click(screen.getByText('Bring vaccine card'))
+      expect(baseHandlers.onOpenTask).toHaveBeenCalledWith('t2')
+      const titles = screen.getAllByText(/Fill the form|Bring vaccine card/).map((n) => n.textContent)
+      expect(titles).toEqual(['Fill the form', 'Bring vaccine card'])
+    })
+  })
+
+  // Event-panel review, finding c: the event panel had no Delete at all.
+  describe('delete', () => {
+    it('is offered on a writable calendar and only runs after confirmation, then closes', async () => {
+      const onDeleteEvent = vi.fn().mockResolvedValue(true)
+      const { user } = render(<TapEventPanel
+        event={mockEvent} notes={undefined} allTasks={[]} {...baseHandlers}
+        calendarAccess={{ name: 'Family', readOnly: false }}
+        onDeleteEvent={onDeleteEvent}
+      />)
+      await user.click(screen.getByRole('button', { name: 'More actions' }))
+      // Pinning means nothing for an event — only Delete is on offer.
+      expect(screen.queryByText(/^pin$/i)).not.toBeInTheDocument()
+      await user.click(screen.getByText(/^delete$/i))
+      expect(onDeleteEvent).not.toHaveBeenCalled()
+      await user.click(screen.getByText(/confirm delete/i))
+      expect(onDeleteEvent).toHaveBeenCalledOnce()
+      await vi.waitFor(() => expect(baseHandlers.onClose).toHaveBeenCalledOnce())
+    })
+
+    it('keeps the panel open and says so when the delete fails', async () => {
+      const onDeleteEvent = vi.fn().mockResolvedValue(false)
+      const { user } = render(<TapEventPanel
+        event={mockEvent} notes={undefined} allTasks={[]} {...baseHandlers}
+        calendarAccess={{ name: 'Family', readOnly: false }}
+        onDeleteEvent={onDeleteEvent}
+      />)
+      await user.click(screen.getByRole('button', { name: 'More actions' }))
+      await user.click(screen.getByText(/^delete$/i))
+      await user.click(screen.getByText(/confirm delete/i))
+      expect(await screen.findByRole('alert')).toHaveTextContent(/couldn't delete/i)
+      expect(baseHandlers.onClose).not.toHaveBeenCalled()
+    })
+
+    // Live, 2026-09-25: six actions folded "Free" into one ⋯ and Delete added
+    // a second, identical ⋯ beside it.
+    it('shares one ⋯ with the actions that did not fit', async () => {
+      const onToggleFree = vi.fn()
+      const { user } = render(<TapEventPanel
+        event={{ ...mockEvent, location: '1 Main St' }} notes={undefined} allTasks={[]} {...baseHandlers}
+        calendarAccess={{ name: 'Family', readOnly: false }}
+        onReschedule={vi.fn()} onToggleDiscussion={vi.fn()} onToggleFree={onToggleFree}
+        onDeleteEvent={vi.fn().mockResolvedValue(true)}
+      />)
+      const more = screen.getAllByRole('button', { name: 'More actions' })
+      expect(more).toHaveLength(1)
+      await user.click(more[0])
+      const menu = within(screen.getByRole('group', { name: 'More actions' }))
+      expect(menu.getByText(/^delete$/i)).toBeInTheDocument()
+      await user.click(menu.getByText(/^free$/i))
+      expect(onToggleFree).toHaveBeenCalled()
+    })
+
+    it('is not offered on a view-only calendar', () => {
+      render(<TapEventPanel
+        event={mockEvent} notes={undefined} allTasks={[]} {...baseHandlers}
+        calendarAccess={{ name: 'Work', readOnly: true }}
+        onDeleteEvent={vi.fn()}
+      />)
+      expect(screen.queryByRole('button', { name: 'More actions' })).not.toBeInTheDocument()
     })
   })
 })

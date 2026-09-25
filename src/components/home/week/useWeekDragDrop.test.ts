@@ -3,6 +3,7 @@ import { renderHook, act } from '@testing-library/react'
 import { useWeekDragDrop } from './useWeekDragDrop'
 
 vi.mock('@/hooks/useToast', () => ({ showToast: vi.fn() }))
+import { showToast } from '@/hooks/useToast'
 
 // The fixtures below live in May 2026. Pool-chip drops onto a PAST day are
 // refused (see isPastDay), so pin the clock to the fixture week — a test
@@ -202,6 +203,129 @@ describe('useWeekDragDrop', () => {
     // Undo restores the pre-drop bucket, not a re-toggle.
     await act(async () => { pushAction.mock.calls[0][1]() })
     expect(onUpdateTask.mock.calls[1][1].bucket).toBe('week')
+  })
+
+  // Scott's walkthrough, 2026-09-24: dropping an event on Friday announced the
+  // move and left the event on Saturday. Two faults — no writer was supplied
+  // at all, and the confirmation did not wait for the write.
+  describe('moving an event', () => {
+    // A REAL calendar event: a row id AND a different google_event_id. The
+    // block is built with the google one (eventToTimelineItem), so a fixture
+    // carrying only `id` passed while the app snapped back (Scott, 2026-09-24).
+    const pippa = {
+      id: 'row-uuid-1', google_event_id: 'goog_pippa_123', title: 'Pippa',
+      start_time: new Date(2026, 4, 16, 13, 0).toISOString(),
+      end_time: new Date(2026, 4, 16, 14, 0).toISOString(),
+    } as never
+    const eventDrop = () => ({
+      active: { id: 'block:event-goog_pippa_123', data: { current: { kind: 'block', itemId: 'event-goog_pippa_123', originStartIso: '2026-05-16T13:00:00' } } },
+      over: { id: 'slot:2026-05-19:13:00', data: { current: { kind: 'timed', dayIso: '2026-05-19', hour: 13, minute: 0 } } },
+    })
+    const args = (over: Record<string, unknown>) => ({
+      weekStart: new Date(2026, 4, 17),
+      onWeekChange: vi.fn(), onUpdateTask: vi.fn(), onUpdateRoutine: vi.fn(),
+      tasks: [], events: [pippa], routines: [],
+      ...over,
+    })
+
+    it('writes the new time, keeping the hour it ran for', async () => {
+      const onUpdateEvent = vi.fn(async () => {})
+      const { result } = renderHook(() => useWeekDragDrop(args({ onUpdateEvent })))
+      await act(async () => { result.current.dndHandlers.onDragEnd(eventDrop() as never) })
+      const [id, when] = onUpdateEvent.mock.calls[0]
+      // The id the writer resolves the event by — the same one the block wore.
+      expect(id).toBe('goog_pippa_123')
+      expect((when as { startTime: Date }).startTime.getDate()).toBe(19)
+      expect((when as { endTime: Date }).endTime.getTime() - (when as { startTime: Date }).startTime.getTime()).toBe(60 * 60_000)
+    })
+
+    it('confirms and offers Undo only once the write has landed', async () => {
+      let land: () => void = () => {}
+      const onUpdateEvent = vi.fn(() => new Promise<void>((r) => { land = r }))
+      const pushAction = vi.fn()
+      const { result } = renderHook(() => useWeekDragDrop(args({ onUpdateEvent, pushAction })))
+      await act(async () => { result.current.dndHandlers.onDragEnd(eventDrop() as never) })
+      expect(onUpdateEvent).toHaveBeenCalledTimes(1)
+      expect(pushAction).not.toHaveBeenCalled()
+      await act(async () => { land() })
+      expect(pushAction).toHaveBeenCalledTimes(1)
+      expect(pushAction.mock.calls[0][0]).toBe('Moved "Pippa"')
+    })
+
+    it('says nothing, and offers no Undo, when the write fails', async () => {
+      const onUpdateEvent = vi.fn(async () => { throw new Error('Forbidden') })
+      const pushAction = vi.fn()
+      const { result } = renderHook(() => useWeekDragDrop(args({ onUpdateEvent, pushAction })))
+      await act(async () => { result.current.dndHandlers.onDragEnd(eventDrop() as never) })
+      expect(pushAction).not.toHaveBeenCalled()
+    })
+
+    it('Undo puts it back where it was', async () => {
+      const onUpdateEvent = vi.fn(async () => {})
+      const pushAction = vi.fn()
+      const { result } = renderHook(() => useWeekDragDrop(args({ onUpdateEvent, pushAction })))
+      await act(async () => { result.current.dndHandlers.onDragEnd(eventDrop() as never) })
+      await act(async () => { pushAction.mock.calls[0][1]() })
+      const [, back] = onUpdateEvent.mock.calls[1]
+      expect((back as { startTime: Date }).startTime.getDate()).toBe(16)
+      expect((back as { startTime: Date }).startTime.getHours()).toBe(13)
+    })
+
+    // The shape of the original bug: a host with no writer. It must not claim
+    // the event moved.
+    // An event cached by the edge function has NO row id at all; the old
+    // lookup compared `undefined === '<google id>'` and silently gave up.
+    it('moves an event that has no row id, only a Google one', async () => {
+      const cached = {
+        google_event_id: 'goog_cached_456', title: 'Cached',
+        start_time: new Date(2026, 4, 16, 13, 0).toISOString(),
+        end_time: new Date(2026, 4, 16, 14, 0).toISOString(),
+      } as never
+      const onUpdateEvent = vi.fn(async () => {})
+      const { result } = renderHook(() => useWeekDragDrop(args({ onUpdateEvent, events: [cached] })))
+      await act(async () => {
+        result.current.dndHandlers.onDragEnd({
+          active: { id: 'block:event-goog_cached_456', data: { current: { kind: 'block', itemId: 'event-goog_cached_456', originStartIso: '2026-05-16T13:00:00' } } },
+          over: { id: 'slot:2026-05-19:13:00', data: { current: { kind: 'timed', dayIso: '2026-05-19', hour: 13, minute: 0 } } },
+        } as never)
+      })
+      expect(onUpdateEvent).toHaveBeenCalledWith('goog_cached_456', expect.anything())
+    })
+
+    // Found live while verifying the id repair: the FIRST event drag of a
+    // session worked and the second said "couldn't find that event". A
+    // successful move refetches the range, which replaces the events array —
+    // and onDragEnd's dependency list did not include it, so the handler kept
+    // looking things up in the previous one.
+    it('sees the events array this render has, not the one it was built with', async () => {
+      const onUpdateEvent = vi.fn(async () => {})
+      const { result, rerender } = renderHook(
+        (props: { events: never[] }) => useWeekDragDrop(args({ onUpdateEvent, events: props.events })),
+        { initialProps: { events: [] as never[] } },
+      )
+      // The event arrives after the hook first ran — a refetch, exactly as a
+      // successful move triggers.
+      rerender({ events: [pippa] as never[] })
+      await act(async () => { result.current.dndHandlers.onDragEnd(eventDrop() as never) })
+      expect(onUpdateEvent).toHaveBeenCalledWith('goog_pippa_123', expect.anything())
+    })
+
+    // The old silence: a drop that found nothing said nothing and snapped back.
+    it('says so when it cannot find the event, instead of going quiet', async () => {
+      const onUpdateEvent = vi.fn(async () => {})
+      const { result } = renderHook(() => useWeekDragDrop(args({ onUpdateEvent, events: [] })))
+      await act(async () => { result.current.dndHandlers.onDragEnd(eventDrop() as never) })
+      expect(onUpdateEvent).not.toHaveBeenCalled()
+      expect(showToast).toHaveBeenCalledWith(expect.stringMatching(/find that event/i), 'error', 4000)
+    })
+
+    it('refuses, out loud, when the host supplies no writer at all', async () => {
+      const pushAction = vi.fn()
+      const { result } = renderHook(() => useWeekDragDrop(args({ pushAction })))
+      await act(async () => { result.current.dndHandlers.onDragEnd(eventDrop() as never) })
+      expect(pushAction).not.toHaveBeenCalled()
+      expect(showToast).toHaveBeenCalledWith(expect.stringMatching(/isn’t available here/), 'error', 4000)
+    })
   })
 
   it('routine block drop pins ONE day via onPushRoutine — never a rule rewrite', async () => {

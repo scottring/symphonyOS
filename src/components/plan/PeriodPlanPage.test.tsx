@@ -1,15 +1,31 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, fireEvent, within, cleanup, waitFor } from '@testing-library/react'
+import { render, screen, fireEvent, within, cleanup, waitFor, act } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { ReferenceListsProvider, useReferenceLists } from '@/components/reference/ReferenceListsContext'
-import { MemoryRouter } from 'react-router-dom'
+import { MemoryRouter, useSearchParams } from 'react-router-dom'
 import type { Task } from '@/types/task'
 import type { Goal } from '@/types/goal'
 import type { Routine } from '@/types/actionable'
 import { DEFAULT_SEASONS, type Seasons } from '@/lib/cadence/seasons'
+import { periodBounds } from '@/lib/planning/periodPage'
 import { periodStartFor } from '@/lib/placement/model'
 
 // ── Hook mocks: the page is a pure function of these ─────────────────────────
-const now = new Date()
+/**
+ * A FIXED "today", mid-month, and the clock is pinned to it.
+ *
+ * These tests read the current month out of the real clock and then assert the
+ * page shows it. The page does not always show it: `planningPeriod` looks
+ * ahead to the next month once six days or fewer are left. So the whole file
+ * went red at 12:00 on 2026-09-24 — a wall-clock boundary, nothing to do with
+ * the code — and would do so again on the 24th of every month. Sep 10 leaves
+ * three clear weeks, so the page stays where the tests expect it.
+ *
+ * Only Date is faked; real timers are left alone, or `waitFor` would hang.
+ * Blocks that need another date set their own and restore afterwards.
+ */
+const now = new Date(2026, 8, 10, 9, 0)
+const pinClock = () => { vi.useFakeTimers({ toFake: ['Date'] }); vi.setSystemTime(now) }
 const thisMonth = new Date(now.getFullYear(), now.getMonth(), 1)
 const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1)
 let n = 0
@@ -21,7 +37,7 @@ const goal = (over: Partial<Goal>): Goal => ({
   createdAt: new Date(), updatedAt: new Date(), context: null, ...over,
 } as Goal)
 
-const state: { tasks: Task[]; goals: Goal[]; loading: boolean } = { tasks: [], goals: [], loading: false }
+const state: { tasks: Task[]; goals: Goal[]; loading: boolean; goalsLoading?: boolean } = { tasks: [], goals: [], loading: false, goalsLoading: false }
 const defaultAddTask = async (..._a: unknown[]): Promise<string | undefined> => 'new'
 const hook = {
   toggleTask: vi.fn(), deleteTask: vi.fn(), updateTask: vi.fn(async (..._a: unknown[]) => true), updateTasksBulk: vi.fn(),
@@ -57,7 +73,7 @@ const goalsApi = {
 }
 vi.mock('@/contexts/GoalsContext', () => ({
   GoalsProvider: ({ children }: { children: React.ReactNode }) => children,
-  useGoalsContext: () => ({ goals: state.goals, areas: [{ id: 'a1', name: 'General' }], ...goalsApi }),
+  useGoalsContext: () => ({ goals: state.goals, areas: [{ id: 'a1', name: 'General' }], loading: state.goalsLoading ?? false, ...goalsApi }),
 }))
 vi.mock('@/lib/today/domainFilter', () => ({
   filterTasksForLayers: (t: Task[]) => t,
@@ -73,6 +89,21 @@ vi.mock('@/hooks/usePlanningSession', () => ({
   yearToken: (y: number) => String(y),
 }))
 vi.mock('@/hooks/useAuth', () => ({ useAuth: () => ({ user: { id: 'u1' } }) }))
+// The day tiles' two sources, held flat so a case can make one unavailable.
+const dayLoad = { events: [] as unknown[], available: true, loading: false, failed: false,
+  range: { start: Date.now() - 30 * 86_400_000, end: Date.now() + 90 * 86_400_000 } }
+vi.mock('@/hooks/useDayLoadEvents', () => ({
+  DAY_LOAD_RANGE_DAYS: 45,
+  DAY_LOAD_BACK_DAYS: 7,
+  useDayLoadEvents: () => dayLoad,
+}))
+vi.mock('@/components/home/week/useWeekInstances', () => ({ useWeekInstances: () => [] }))
+// One confirmation per gesture, with its Undo — asserted rather than assumed.
+const toastSpy = vi.fn()
+vi.mock('@/hooks/useToast', async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  showToast: (...args: unknown[]) => toastSpy(...args),
+}))
 const mockNavigate = vi.fn()
 vi.mock('react-router-dom', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
@@ -87,7 +118,9 @@ const renderPageAt = (level: 'month' | 'season' | 'year', path: string) =>
   render(<MemoryRouter initialEntries={[path]}><PeriodPlanPage level={level} /></MemoryRouter>)
 
 describe('PeriodPlanPage', () => {
+  afterEach(() => { vi.useRealTimers() })
   beforeEach(() => {
+    pinClock()
     state.tasks = []; state.goals = []; state.loading = false; routinesState.routines = []
     domainState.layers = new Set(['work', 'family', 'personal', 'unsorted']); domainState.soleDomain = null
     seasonsState.seasons = DEFAULT_SEASONS; seasonsState.loading = false
@@ -95,6 +128,7 @@ describe('PeriodPlanPage', () => {
     Object.values(hook).forEach((f) => f.mockClear())
     Object.values(goalsApi).forEach((f) => f.mockClear())
     mockNavigate.mockClear()
+    toastSpy.mockClear()
   })
 
   it('renders contextual shelves into the shared dock only while opened', () => {
@@ -231,6 +265,35 @@ describe('PeriodPlanPage', () => {
     expect(tick).not.toBeDisabled()
     fireEvent.click(tick)
     expect(goalsApi.updateGoal).toHaveBeenCalledWith(state.goals[0].id, { status: 'active' })
+  })
+
+  // S2-23: one stray click on a goal's circle closed the goal, and nothing
+  // said so. Completing a goal names it, says the steps are untouched, and
+  // offers Undo; completing a task stays as quiet as it was.
+  it('completing a goal says so, with Undo; completing a task does not', async () => {
+    state.tasks = [
+      task({ id: 'g1', title: 'Transform the porch', isGoal: true, monthStart: thisMonth }),
+      task({ id: 'l1', title: 'Renew car registration', monthStart: thisMonth }),
+    ]
+    hook.toggleTask.mockResolvedValue(true)
+    renderPage('month')
+    fireEvent.click(screen.getByRole('button', { name: /^Complete Renew car registration/ }))
+    await waitFor(() => expect(hook.toggleTask).toHaveBeenCalledWith('l1'))
+    expect(toastSpy).not.toHaveBeenCalledWith(expect.stringMatching(/Completed the goal/), expect.anything(), expect.anything(), expect.anything())
+    fireEvent.click(screen.getByRole('button', { name: /^Complete Transform the porch/ }))
+    await waitFor(() => expect(toastSpy).toHaveBeenCalledWith(
+      expect.stringMatching(/Completed the goal “Transform the porch”\. Its steps are unchanged\./), 'success', 8000, expect.objectContaining({ label: 'Undo' })))
+    const undo = toastSpy.mock.calls.find((c) => /Completed the goal/.test(c[0]))![3]
+    undo.onClick()
+    expect(hook.toggleTask).toHaveBeenLastCalledWith('g1')
+  })
+
+  // S2-15: the body read "0 goals · 0 tasks" while commitments sat on the
+  // calendar behind a closed Shelves.
+  it('the status line says what is already on the calendar', () => {
+    state.tasks = [task({ title: 'Picture day', bucket: 'timed', scheduledFor: new Date(thisMonth.getFullYear(), thisMonth.getMonth(), 20, 9), monthStart: undefined })]
+    renderPage('month')
+    expect(screen.getByRole('button', { name: '1 on the calendar' })).toBeInTheDocument()
   })
 
   it("never dresses a row's SCHEDULED date up as the day it was done", () => {
@@ -370,29 +433,68 @@ describe('PeriodPlanPage', () => {
     expect(screen.getByRole('button', { name: /Completed this month/ }).textContent).toContain('6')
   })
 
-  it('a month row can be taken into the week, or straight to today', () => {
+  // The month page's rung below is the WEEK, and the timing control chooses
+  // weeks by name — so the "Take it into this week" shortcut is redundant AND
+  // wrong from any month that is not the current one: it means the week
+  // containing now, and on a November row it filed the task into September
+  // (Codex live test, 2026-09-24). The control replaces it.
+  it('a month row is not offered the week shortcut — the timing control names the week', () => {
     const t = task({ title: 'Fix the back door', monthStart: thisMonth })
     state.tasks = [t]
     renderPage('month')
-    // Down a rung: a COPY, so September's list keeps the row and its look-back
-    // still sees the whole plan.
-    fireEvent.click(screen.getByRole('button', { name: 'Take it into this week Fix the back door' }))
-    expect(hook.pushTask).toHaveBeenCalledWith(t.id, 'week')
+    expect(screen.queryByRole('button', { name: /Take it into this week/ })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Choose a week or a day for Fix the back door/ })).toBeInTheDocument()
+  })
+
+  it('a month row still goes straight to today', () => {
+    const t = task({ title: 'Fix the back door', monthStart: thisMonth })
+    state.tasks = [t]
+    renderPage('month')
     // Today (S4) dates it today AND chooses it; the placement module keeps
     // its month commitment.
-    hook.pushTask.mockClear()
     fireEvent.click(screen.getByRole('button', { name: 'Do it today Fix the back door' }))
     const midnight = new Date(); midnight.setHours(0, 0, 0, 0)
     expect(hook.updateTask).toHaveBeenLastCalledWith(t.id, { bucket: 'timed', scheduledFor: midnight, isAllDay: true, plannedOn: midnight })
     expect(hook.pushTask).not.toHaveBeenCalled()
   })
 
-  it('a season row goes into the MONTH — each page names the rung below it', () => {
+  it('a season row goes into a NAMED month — the month in progress, for this season', () => {
     const t = task({ title: 'Swap the closets', bucket: 'quarter', seasonStart: undefined })
     state.tasks = [t]
     renderPage('season')
-    fireEvent.click(screen.getByRole('button', { name: 'Take it into this month Swap the closets' }))
-    expect(hook.pushTask).toHaveBeenCalledWith(t.id, 'month')
+    const month = thisMonth.toLocaleDateString('en-US', { month: 'long' })
+    fireEvent.click(screen.getByRole('button', { name: `Take it into ${month} Swap the closets` }))
+    expect(hook.updateTask).toHaveBeenCalledWith(t.id, { bucket: 'month', monthStart: thisMonth })
+    expect(hook.pushTask).not.toHaveBeenCalled()
+  })
+
+  // "Take it into this month" on a FUTURE season meant the clock's month:
+  // Winter work landed in September (the S3-01 / S2-20 class).
+  it('on a future season, a row goes into that season\u2019s first month, not the clock\u2019s', () => {
+    const next = periodBounds('season', thisMonth, DEFAULT_SEASONS).next
+    const first = new Date(next.getFullYear(), next.getMonth(), 1)
+    const t = task({ title: 'Swap the closets', bucket: 'quarter', seasonStart: next,
+      commitments: [{ level: 'season', periodStart: next, status: 'open' }] })
+    state.tasks = [t]
+    renderPageAt('season', `/season?start=${first.getFullYear()}-${String(first.getMonth() + 1).padStart(2, '0')}-${String(next.getDate()).padStart(2, '0')}`)
+    const month = first.toLocaleDateString('en-US', { month: 'long' })
+    fireEvent.click(screen.getByRole('button', { name: `Take it into ${month} Swap the closets` }))
+    expect(hook.updateTask).toHaveBeenCalledWith(t.id, { bucket: 'month', monthStart: first })
+  })
+
+  // S3-03: a season row could only go into the one month "Take it into"
+  // meant; the season's other months were unreachable from its row.
+  it('a season row can go into any month of its season, named', () => {
+    const t = task({ title: 'Swap the closets', bucket: 'quarter', seasonStart: undefined })
+    state.tasks = [t]
+    renderPage('season')
+    const pick = screen.getByRole('combobox', { name: 'Take Swap the closets into a month' })
+    const months = within(pick).getAllByRole('option').slice(1)
+    expect(months.length).toBeGreaterThan(1)
+    const last = months[months.length - 1] as HTMLOptionElement
+    fireEvent.change(pick, { target: { value: last.value } })
+    const [y, m] = last.value.split('-').map(Number)
+    expect(hook.updateTask).toHaveBeenCalledWith(t.id, { bucket: 'month', monthStart: new Date(y, m - 1, 1) })
   })
 
   it('a goal is never offered a rung', () => {
@@ -449,7 +551,42 @@ describe('PeriodPlanPage', () => {
     fireEvent.click(within(rail).getByRole('button', { name: /This Season/ }))
     expect(within(rail).getByText('Fall trips')).toBeInTheDocument()
     fireEvent.click(within(rail).getByRole('button', { name: 'Add to this month: Fall trips' }))
-    expect(hook.pushTask).toHaveBeenCalledWith(expect.any(String), 'month')
+    // Names the month being VIEWED. It used to send pushTask(id, 'month') with
+    // no stamp, so planPlacement filled it from the clock and a Fall task
+    // pulled down while October was on screen landed on September (S3-01).
+    expect(hook.updateTask).toHaveBeenCalledWith(
+      expect.any(String), { bucket: 'month', monthStart: thisMonth },
+    )
+    expect(hook.pushTask).not.toHaveBeenCalled()
+  })
+
+  // S3-09: descending keeps the season's commitment open, so work already
+  // taken into this month still read as open season work, and the planning
+  // session offered to add it to this month again.
+  it('the planning session does not offer season work already on this month', async () => {
+    const seasonStart = periodBounds('season', thisMonth, DEFAULT_SEASONS).start
+    state.tasks = [
+      task({ id: 'fq', title: 'Fall trips', bucket: 'quarter' }),
+      task({ id: 'fm', title: 'Order firewood', bucket: 'month', monthStart: thisMonth, seasonStart,
+        commitments: [{ level: 'season', periodStart: seasonStart, status: 'open' }, { level: 'month', periodStart: thisMonth, status: 'open' }] }),
+    ]
+    renderPage('month')
+    fireEvent.click(screen.getByRole('button', { name: /Plan September|Plan October|Plan [A-Z][a-z]+$|Review the plan/ }))
+    const nexts = screen.queryAllByRole('button', { name: /next: plan/i })
+    if (nexts.length) fireEvent.click(nexts[0])
+    expect(screen.getByRole('button', { name: /^Add to .*: Fall trips$/ })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /^Add to .*: Order firewood$/ })).toBeNull()
+  })
+
+  it('"Add to this month" names the VIEWED month, not the clock\u2019s (S3-01)', () => {
+    state.tasks = [task({ title: 'Fall trips', bucket: 'quarter' })]
+    renderPageAt('month', '/month?start=2026-10-01')
+    const rail = screen.getByRole('complementary', { name: 'This Season' })
+    fireEvent.click(within(rail).getByRole('button', { name: /This Season/ }))
+    fireEvent.click(within(rail).getByRole('button', { name: 'Add to this month: Fall trips' }))
+    expect(hook.updateTask).toHaveBeenCalledWith(
+      expect.any(String), { bucket: 'month', monthStart: new Date(2026, 9, 1) },
+    )
   })
 
   it('the current period offers completion without converting task identity', () => {
@@ -540,6 +677,218 @@ describe('PeriodPlanPage', () => {
     expect(within(rail).queryByRole('button', { name: /Add to/ })).not.toBeInTheDocument()
   })
 
+  // S3-02: the season session offers "For a <year> goal?" and the summary says
+  // "for <that goal>" — but the link was never written, so the saved season
+  // goal came back with goal_id null. A season's rail IS the goals table, so
+  // the pick lands straight on goal_id.
+  it('a season goal created FOR a year goal is saved carrying that year goal', async () => {
+    state.goals = [goal({ id: 'yg1', name: 'Run a half marathon' })]
+    renderPage('season')
+    const label = screen.getByRole('region', { name: / list$/ }).getAttribute('aria-label')!.replace(/ list$/, '')
+    fireEvent.click(screen.getByRole('button', { name: `Plan ${label}` }))
+    fireEvent.change(screen.getByLabelText(new RegExp(`new goal for ${label}`, 'i')), { target: { value: 'A home easier to care for' } })
+    fireEvent.change(screen.getByLabelText(/for a \d{4} goal/i), { target: { value: 'yg1' } })
+    fireEvent.click(screen.getByRole('button', { name: /add goal/i }))
+    fireEvent.click(screen.getByRole('button', { name: /next: save/i }))
+    fireEvent.click(screen.getByRole('button', { name: new RegExp(`save ${label}`, 'i') }))
+    await vi.waitFor(() => expect(saveSession).toHaveBeenCalled())
+    expect(hook.addTask).toHaveBeenCalledWith('A home easier to care for', undefined, undefined, undefined,
+      expect.objectContaining({ bucket: 'quarter', isGoal: true, goalId: 'yg1' }))
+  })
+
+  // The month rail is the SEASON's goals, so the pick is a task, not a
+  // goals-table row. It has to keep WHICH season goal was chosen — recording
+  // only the annual goal loses the reason that seasonal goal was picked.
+  it('a month goal created FOR a season goal records that season goal, and inherits its year goal', async () => {
+    const seasonStart = periodStartFor('season', new Date(), DEFAULT_SEASONS)
+    state.tasks = [task({ id: 'sg1', title: 'A season of repairs', isGoal: true, bucket: 'quarter', seasonStart, goalId: 'yg1' })]
+    renderPage('month')
+    const label = thisMonth.toLocaleDateString('en-US', { month: 'long' })
+    fireEvent.click(screen.getByRole('button', { name: `Plan ${label}` }))
+    fireEvent.change(screen.getByLabelText(new RegExp(`new goal for ${label}`, 'i')), { target: { value: 'A home easier to care for' } })
+    fireEvent.change(screen.getByLabelText(/for a season goal/i), { target: { value: 'sg1' } })
+    fireEvent.click(screen.getByRole('button', { name: /add goal/i }))
+    fireEvent.click(screen.getByRole('button', { name: /next: save/i }))
+    fireEvent.click(screen.getByRole('button', { name: new RegExp(`save ${label}`, 'i') }))
+    await vi.waitFor(() => expect(saveSession).toHaveBeenCalled())
+    expect(hook.addTask).toHaveBeenCalledWith('A home easier to care for', undefined, undefined, undefined,
+      expect.objectContaining({ bucket: 'month', isGoal: true, supportsGoalTaskId: 'sg1', goalId: 'yg1' }))
+    // Never goalTaskId: that would make the month goal a STEP of the season
+    // goal, and steps are carried along when their goal moves.
+    const opts = hook.addTask.mock.calls.at(-1)![4] as { goalTaskId?: string }
+    expect(opts.goalTaskId).toBeUndefined()
+  })
+
+  // Both ends, each on its own page. A parent that only ever appeared on its
+  // children's rows would be a dead end.
+  it('the month goal names the season goal it supports, and links to it', () => {
+    const seasonStart = periodStartFor('season', new Date(), DEFAULT_SEASONS)
+    state.tasks = [
+      task({ id: 'sg1', title: 'A season of repairs', isGoal: true, bucket: 'quarter', seasonStart }),
+      task({ id: 'mg1', title: 'A home easier to care for', isGoal: true, monthStart: thisMonth, supportsGoalTaskId: 'sg1' }),
+    ]
+    renderPage('month')
+    const goalsCard = screen.getByRole('region', { name: /goals$/ })
+    expect(within(goalsCard).getByText('Supports')).toBeInTheDocument()
+    fireEvent.click(within(goalsCard).getByRole('button', { name: 'Open A season of repairs' }))
+    expect(mockNavigate).toHaveBeenCalledWith('/task/sg1')
+  })
+
+  it('the season goal names the month goals supporting it, and links to them', () => {
+    const seasonStart = periodStartFor('season', new Date(), DEFAULT_SEASONS)
+    state.tasks = [
+      task({ id: 'sg1', title: 'A season of repairs', isGoal: true, bucket: 'quarter', seasonStart }),
+      task({ id: 'mg1', title: 'A home easier to care for', isGoal: true, monthStart: thisMonth, supportsGoalTaskId: 'sg1' }),
+    ]
+    renderPage('season')
+    const goalsCard = screen.getByRole('region', { name: /goals$/ })
+    expect(within(goalsCard).getByText('Supported by')).toBeInTheDocument()
+    fireEvent.click(within(goalsCard).getByRole('button', { name: 'Open A home easier to care for' }))
+    expect(mockNavigate).toHaveBeenCalledWith('/task/mg1')
+  })
+
+  it('a year goal names the season goals supporting it', () => {
+    const seasonStart = periodStartFor('season', new Date(), DEFAULT_SEASONS)
+    state.goals = [goal({ id: 'yg1', name: 'Make the house ours' })]
+    state.tasks = [task({ id: 'sg1', title: 'A season of repairs', isGoal: true, bucket: 'quarter', seasonStart, goalId: 'yg1' })]
+    renderPage('year')
+    const goalsCard = screen.getByRole('region', { name: /goals$/ })
+    expect(within(goalsCard).getByText('Supported by')).toBeInTheDocument()
+    expect(within(goalsCard).getByRole('button', { name: 'Open A season of repairs' })).toBeInTheDocument()
+  })
+
+  // ── The timing control (connected planning, 2026-09-24) ────────────────
+  // "When have I chosen to do this?" must be answerable from the row. The
+  // control wears the saved answer instead of a verb, a goal's STEPS get one
+  // as much as loose work does, and the season page gets one at all — it
+  // returned null for anything but a month.
+  describe('timing on a period row', () => {
+    const timingBtn = (title: string) =>
+      screen.getByRole('button', { name: new RegExp(`Choose a week or a day for ${title}`) })
+
+    it('states no choice, a chosen week, and a chosen day — on a goal\'s own steps', () => {
+      state.tasks = [
+        task({ id: 'g1', title: 'Islanders game', isGoal: true, monthStart: thisMonth }),
+        task({ id: 's1', title: 'Research tickets', monthStart: thisMonth, goalTaskId: 'g1' }),
+        task({ id: 's2', title: 'Buy tickets', monthStart: thisMonth, goalTaskId: 'g1',
+          commitments: [{ level: 'month', periodStart: thisMonth, status: 'open' },
+            { level: 'week', periodStart: new Date(2026, 8, 20), status: 'open' }] }),
+        task({ id: 's3', title: 'Call the box office', monthStart: thisMonth, goalTaskId: 'g1',
+          bucket: 'timed', scheduledFor: new Date(2026, 8, 22), isAllDay: true,
+          commitments: [{ level: 'month', periodStart: thisMonth, status: 'open' }] }),
+      ]
+      renderPage('month')
+      fireEvent.click(screen.getByRole('button', { name: /Show steps under Islanders game/ }))
+      expect(timingBtn('Research tickets')).toHaveTextContent('Choose when')
+      expect(timingBtn('Buy tickets')).toHaveTextContent('Sep 20 – Sep 26 · any day')
+      expect(timingBtn('Call the box office')).toHaveTextContent('Tue, Sep 22 · any time')
+    })
+
+    it('offers the control on a SEASON row, which had none at all', () => {
+      const seasonStart = periodStartFor('season', new Date(), DEFAULT_SEASONS)
+      state.tasks = [task({ id: 'q1', title: 'Fall trips', bucket: 'quarter', seasonStart })]
+      renderPage('season')
+      expect(timingBtn('Fall trips')).toBeInTheDocument()
+    })
+
+    it('choosing a week writes that week and leaves the goal and the month alone', () => {
+      state.tasks = [
+        task({ id: 'g1', title: 'Islanders game', isGoal: true, monthStart: thisMonth }),
+        task({ id: 's1', title: 'Research tickets', monthStart: thisMonth, goalTaskId: 'g1' }),
+      ]
+      renderPage('month')
+      fireEvent.click(screen.getByRole('button', { name: /Show steps under Islanders game/ }))
+      fireEvent.click(timingBtn('Research tickets'))
+      const weeks = screen.getAllByRole('menuitemradio')
+      fireEvent.click(weeks[1])
+      const [, updates] = hook.updateTask.mock.calls.at(-1) as [string, Record<string, unknown>]
+      expect(updates.bucket).toBe('week')
+      expect(updates.weekStart).toBeInstanceOf(Date)
+      expect('goalTaskId' in updates).toBe(false)
+      expect('monthStart' in updates).toBe(false)
+    })
+
+    // At the season: removing the week releases the WEEK and leaves the season
+    // commitment standing, naming no month the row was never on. The write
+    // states the commitments outright — a bucket and a dropped stamp left the
+    // week open behind it (Codex review, 2026-09-24).
+    it('removing a season row\'s week releases the week and keeps the season', async () => {
+      const seasonStart = periodStartFor('season', new Date(), DEFAULT_SEASONS)
+      state.tasks = [task({ id: 'q1', title: 'Fall trips', bucket: 'quarter', seasonStart,
+        commitments: [{ level: 'season', periodStart: seasonStart, status: 'open' },
+          { level: 'week', periodStart: new Date(2026, 8, 20), status: 'open' }] })]
+      renderPage('season')
+      fireEvent.click(timingBtn('Fall trips'))
+      fireEvent.click(screen.getByRole('menuitem', { name: /^Remove week/ }))
+      await vi.waitFor(() => expect(hook.updateTask).toHaveBeenCalled())
+      const [, updates] = hook.updateTask.mock.calls.at(-1) as [string, Record<string, unknown>]
+      const commitments = updates.commitments as { level: string; periodStart: Date; status: string }[]
+      expect(commitments.some((c) => c.level === 'week' && c.status === 'open')).toBe(false)
+      expect(commitments).toContainEqual({ level: 'season', periodStart: seasonStart, status: 'open' })
+      expect('monthStart' in updates).toBe(false)
+      expect('bucket' in updates).toBe(false)
+    })
+
+    // Requirement 6: the consequence is readable BEFORE the press, and the
+    // two removals are different gestures with different survivors.
+    it('says what each removal leaves behind, before it is pressed', () => {
+      state.tasks = [task({ id: 'a1', title: 'Buy tickets', monthStart: thisMonth,
+        bucket: 'timed', scheduledFor: new Date(2026, 8, 22), isAllDay: true,
+        commitments: [{ level: 'month', periodStart: thisMonth, status: 'open' },
+          { level: 'week', periodStart: new Date(2026, 8, 20), status: 'open' }] })]
+      renderPage('month')
+      fireEvent.click(timingBtn('Buy tickets'))
+      const removeDay = screen.getByRole('menuitem', { name: /^Remove Tue, Sep 22/ })
+      expect(removeDay).toHaveTextContent('Keeps it in September 20–26 and in September.')
+      const removeAll = screen.getByRole('menuitem', { name: /^Remove day and week/ })
+      expect(removeAll).toHaveTextContent('Keeps it in September, under anything it supports.')
+    })
+
+    it('confirms the removal that actually landed, once, with an Undo', async () => {
+      state.tasks = [task({ id: 'a1', title: 'Buy tickets', monthStart: thisMonth,
+        bucket: 'timed', scheduledFor: new Date(2026, 8, 22), isAllDay: true,
+        commitments: [{ level: 'month', periodStart: thisMonth, status: 'open' },
+          { level: 'week', periodStart: new Date(2026, 8, 20), status: 'open' }] })]
+      renderPage('month')
+      fireEvent.click(timingBtn('Buy tickets'))
+      fireEvent.click(screen.getByRole('menuitem', { name: /^Remove Tue, Sep 22/ }))
+      await vi.waitFor(() => expect(toastSpy).toHaveBeenCalled())
+      expect(toastSpy).toHaveBeenCalledTimes(1)
+      const [message, , , action] = toastSpy.mock.calls[0] as [string, string, number, { label: string }]
+      expect(message).toContain('Removed Tue, Sep 22 from \u201cBuy tickets\u201d.')
+      expect(message).toContain('Keeps it in September 20–26 and in September.')
+      expect(action.label).toBe('Undo')
+      // The day goes; the week and the month are not in the write at all.
+      const [, updates] = hook.updateTask.mock.calls.at(-1) as [string, Record<string, unknown>]
+      expect(updates.scheduledFor).toBeUndefined()
+      expect('weekStart' in updates).toBe(false)
+      expect('monthStart' in updates).toBe(false)
+    })
+
+    it('offers View week for a committed week, and View day for a day', () => {
+      state.tasks = [
+        task({ id: 'a1', title: 'Weekly one', monthStart: thisMonth,
+          commitments: [{ level: 'month', periodStart: thisMonth, status: 'open' },
+            { level: 'week', periodStart: new Date(2026, 8, 20), status: 'open' }] }),
+        task({ id: 'a2', title: 'Dated one', monthStart: thisMonth,
+          bucket: 'timed', scheduledFor: new Date(2026, 8, 22), isAllDay: true,
+          commitments: [{ level: 'month', periodStart: thisMonth, status: 'open' }] }),
+      ]
+      renderPage('month')
+      const list = screen.getByRole('region', { name: / list$/ })
+      fireEvent.click(within(list).getByRole('button', { name: 'View week →' }))
+      expect(mockNavigate).toHaveBeenCalledWith('/week?start=2026-09-20')
+      fireEvent.click(within(list).getByRole('button', { name: 'View day →' }))
+      expect(mockNavigate).toHaveBeenCalledWith('/today?date=2026-09-22')
+    })
+
+    it('offers no View link when nothing is chosen', () => {
+      state.tasks = [task({ id: 'a1', title: 'Untimed one', monthStart: thisMonth })]
+      renderPage('month')
+      expect(screen.queryByRole('button', { name: /^View (week|day) →$/ })).toBeNull()
+    })
+  })
+
   it('Drop on a past month ends that month\'s commitment and never deletes the task', async () => {
     state.tasks = [task({ id: 'p1', title: 'Sort photos', monthStart: lastMonth, commitments: [{ level: 'month', periodStart: lastMonth, status: 'open' }] })]
     renderPageAt('month', `/month?start=${lastMonth.getFullYear()}-${String(lastMonth.getMonth() + 1).padStart(2, '0')}-01`)
@@ -554,6 +903,7 @@ describe('PeriodPlanPage', () => {
 // look-ahead all need coverage beyond the pure periodPage.test.ts.
 describe('PeriodPlanPage — planningPeriod wiring', () => {
   beforeEach(() => {
+    pinClock()
     state.tasks = []; state.goals = []; state.loading = false; routinesState.routines = []
     domainState.layers = new Set(['work', 'family', 'personal', 'unsorted']); domainState.soleDomain = null
     seasonsState.seasons = DEFAULT_SEASONS; seasonsState.loading = false
@@ -635,6 +985,9 @@ describe('PeriodPlanPage — planningPeriod wiring', () => {
 })
 
 describe('PeriodPlanPage masthead', () => {
+  beforeEach(pinClock)
+  afterEach(() => { vi.useRealTimers() })
+
   it('wears the shared masthead card with the period AS the title and the nav in the eyebrow', () => {
     renderPage('month')
     const card = screen.getByTestId('masthead-card')
@@ -652,7 +1005,12 @@ describe('PeriodPlanPage masthead', () => {
 // "Transform the porch" is a September goal; "hang plants" and "buy new chairs"
 // are the work it takes. The goal holds them, and they leave the loose list.
 describe('steps under a goal', () => {
+  afterEach(() => { vi.useRealTimers() })
   beforeEach(() => {
+    pinClock()
+    // Which goals are open now PERSISTS per period, so one case's expansion
+    // would otherwise arrive pre-opened in the next (long lists, 2026-09-24).
+    localStorage.clear()
     state.tasks = []; state.goals = []; state.loading = false; routinesState.routines = []
     domainState.layers = new Set(['work', 'family', 'personal', 'unsorted']); domainState.soleDomain = null
     vi.clearAllMocks()
@@ -701,6 +1059,19 @@ describe('steps under a goal', () => {
     const picker = screen.getByRole('dialog', { name: /Link to goal/i })
     fireEvent.click(within(picker).getByRole('button', { name: /Transform the porch/i }))
     expect(hook.updateTask).toHaveBeenCalledWith('l1', { goalTaskId: 'g1' })
+  })
+
+  // S3-08: a task that already serves a Fall goal, on October's list, offered
+  // "Link to goal" and never said which goal it served.
+  it('a task under a season goal says what it supports, and is not offered a link', () => {
+    state.tasks = [
+      task({ id: 'g1', title: 'Transform the porch', isGoal: true, monthStart: thisMonth }),
+      task({ id: 'sg', title: 'A season of repairs', isGoal: true, bucket: 'quarter', seasonStart: thisMonth, monthStart: undefined }),
+      task({ id: 'l2', title: 'Clean the gutters', goalTaskId: 'sg', monthStart: thisMonth }),
+    ]
+    renderPage('month')
+    expect(screen.queryByRole('button', { name: /Link Clean the gutters to a goal/i })).toBeNull()
+    expect(screen.getAllByText(/A season of repairs/).length).toBeGreaterThan(0)
   })
 
   it('retains the goal picker and allows retry after a failed link', async () => {
@@ -1266,3 +1637,804 @@ describe('PeriodPlanPage — Plan <Month>', () => {
   })
 })
 
+
+describe('the URL is the period (S2-16, Codex review of cefcdbcc)', () => {
+  // goTo writes ?start=, but `anchor` only read it in its initial state, so
+  // browser Back and Forward — which change the URL WITHOUT remounting — left
+  // the heading and the list on the wrong month.
+  it('opens on the month the URL names, not the month the clock is in', () => {
+    renderPageAt('month', '/month?start=2026-11-01')
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('November')
+  })
+
+  it('follows a ?start= change while the page stays mounted', () => {
+    // This is the mechanism browser Back and Forward use: the search parameter
+    // moves and the page does NOT remount. `anchor` only read the parameter in
+    // its initial state, so October → November → Back left the heading on
+    // November while the URL said October. (`useNavigate` is mocked in this
+    // suite, so the history buttons themselves are verified in the browser.)
+    function Param() {
+      const [params, setParams] = useSearchParams()
+      return (
+        <>
+          <span data-testid="url">{params.get('start')}</span>
+          <button type="button" onClick={() => setParams({ start: '2026-11-01' })}>to november</button>
+          <button type="button" onClick={() => setParams({ start: '2026-10-01' })}>to october</button>
+        </>
+      )
+    }
+    render(
+      <MemoryRouter initialEntries={['/month?start=2026-10-01']}>
+        <Param />
+        <PeriodPlanPage level="month" />
+      </MemoryRouter>,
+    )
+    const heading = () => screen.getByRole('heading', { level: 1 })
+    expect(heading()).toHaveTextContent('October')
+
+    fireEvent.click(screen.getByRole('button', { name: 'to november' }))
+    expect(screen.getByTestId('url')).toHaveTextContent('2026-11-01')
+    expect(heading()).toHaveTextContent('November')
+
+    fireEvent.click(screen.getByRole('button', { name: 'to october' }))
+    expect(screen.getByTestId('url')).toHaveTextContent('2026-10-01')
+    expect(heading()).toHaveTextContent('October')
+  })
+
+  it('paging with the stepper puts the month in the URL', () => {
+    renderPageAt('month', '/month?start=2026-10-01')
+    fireEvent.click(screen.getByRole('button', { name: /next month/i }))
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('November')
+  })
+})
+
+// ── Long lists ──────────────────────────────────────────────────────────────
+// Scott approved the inline Month design and then asked for the part two
+// sample goals cannot show. Synthetic fixtures only; nothing is seeded.
+describe('a month with a realistic number of goals', () => {
+  beforeEach(() => {
+    pinClock()
+    localStorage.clear()
+    state.tasks = []; state.goals = []; state.loading = false; routinesState.routines = []
+    domainState.layers = new Set(['work', 'family', 'personal', 'unsorted']); domainState.soleDomain = null
+    seasonsState.seasons = DEFAULT_SEASONS; seasonsState.loading = false
+    Object.values(hook).forEach((f) => f.mockClear())
+  })
+  afterEach(() => { vi.useRealTimers() })
+
+  /** 30 goals and 200 tasks, one goal carrying 60 steps. */
+  const dense = () => {
+    const rows: Task[] = []
+    const big = task({ id: 'g-big', title: 'Record the album', isGoal: true, monthStart: thisMonth })
+    rows.push(big)
+    for (let i = 0; i < 60; i++) {
+      rows.push(task({ id: `big-${i}`, title: `Album step ${i}`, goalTaskId: 'g-big', monthStart: thisMonth, completed: i % 4 === 0 }))
+    }
+    for (let g = 1; g < 30; g++) {
+      rows.push(task({ id: `g${g}`, title: `Goal number ${g}`, isGoal: true, monthStart: thisMonth }))
+      for (let i = 0; i < (g % 5); i++) {
+        rows.push(task({ id: `g${g}-s${i}`, title: `Step ${i} of goal ${g}`, goalTaskId: `g${g}`, monthStart: thisMonth }))
+      }
+    }
+    while (rows.length < 230) rows.push(task({ title: `Loose task ${rows.length}`, monthStart: thisMonth }))
+    state.tasks = rows
+  }
+
+  it('draws every goal — no cap, nothing dropped', () => {
+    dense()
+    renderPage('month')
+    expect(screen.getByText('Record the album')).toBeInTheDocument()
+    expect(screen.getByText('Goal number 29')).toBeInTheDocument()
+  })
+
+  it('bounds a 60-step goal and offers the rest with the true total', async () => {
+    dense()
+    renderPage('month')
+    fireEvent.click(screen.getByRole('button', { name: /Show steps under Record the album/ }))
+    expect(screen.getByText('Album step 1')).toBeInTheDocument()
+    expect(screen.queryByText('Album step 30')).not.toBeInTheDocument()
+    const more = screen.getByRole('button', { name: /^Show all 60 steps · \d+ more$/ })
+    fireEvent.click(more)
+    expect(screen.getByText('Album step 30')).toBeInTheDocument()
+    // The goal's own bound is spent. (The loose-task list keeps its separate
+    // "Show all 80 — 75 more", which is a different list's cap.)
+    expect(screen.queryByRole('button', { name: /^Show all \d+ steps/ })).toBeNull()
+  })
+
+  it('a collapsed goal says how much is open and how much is done', () => {
+    dense()
+    renderPage('month')
+    // 60 steps, every fourth completed.
+    expect(screen.getByRole('button', { name: '45 open · 15 done · show' })).toBeInTheDocument()
+  })
+
+  it('filters to a step and keeps its goal with it, saying what is hidden', () => {
+    dense()
+    renderPage('month')
+    fireEvent.change(screen.getByRole('searchbox', { name: /Filter .* goals and steps/ }), { target: { value: 'Album step 7' } })
+    expect(screen.getByText('Record the album')).toBeInTheDocument()
+    expect(screen.queryByText('Goal number 3')).not.toBeInTheDocument()
+    expect(screen.getByRole('status')).toHaveTextContent(/\d+ items are hidden by this filter/)
+  })
+
+  // The failure this must never allow: a filter that quietly narrows a write.
+  it('a filter changes what is SHOWN and nothing else', () => {
+    dense()
+    renderPage('month')
+    const search = screen.getByRole('searchbox', { name: /Filter .* goals and steps/ })
+    fireEvent.change(search, { target: { value: 'Album step 7' } })
+    expect(screen.getByRole('status')).toHaveTextContent(/Filtering does not change what will be saved/)
+    // No write of any kind happened while filtering.
+    expect(hook.updateTask).not.toHaveBeenCalled()
+    expect(hook.updateTasksBulk).not.toHaveBeenCalled()
+    expect(hook.deleteTask).not.toHaveBeenCalled()
+    // Clearing it brings everything back — nothing was lost.
+    fireEvent.change(search, { target: { value: '' } })
+    expect(screen.getByText('Goal number 3')).toBeInTheDocument()
+  })
+
+  it('completed steps fold away outside review, and come back on request', () => {
+    dense()
+    renderPage('month')
+    fireEvent.click(screen.getByRole('button', { name: /Show steps under Record the album/ }))
+    // Album step 0 is completed; step 1 is not.
+    expect(screen.getByText('Album step 1')).toBeInTheDocument()
+    expect(screen.queryByText('Album step 0')).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Show completed steps' }))
+    expect(screen.getByText('Album step 0')).toBeInTheDocument()
+  })
+
+  // Opening a step, reading it and coming back used to collapse everything.
+  it('remembers which goals were open across a remount', () => {
+    dense()
+    const first = renderPage('month')
+    fireEvent.click(screen.getByRole('button', { name: /Show steps under Record the album/ }))
+    expect(screen.getByText('Album step 1')).toBeInTheDocument()
+    first.unmount()
+
+    renderPage('month')
+    expect(screen.getByText('Album step 1')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Hide steps under Record the album/ })).toBeInTheDocument()
+  })
+
+  it('keeps "Add a step" reachable without opening the goal first', () => {
+    dense()
+    renderPage('month')
+    const card = screen.getByText('Goal number 7').closest('li')!
+    fireEvent.click(within(card).getByRole('button', { name: '+ Add a step' }))
+    expect(screen.getByLabelText('New step for Goal number 7')).toBeInTheDocument()
+  })
+})
+
+// A fold that is missing while work is hidden behind it is how work goes
+// missing. Found live on a four-goal month, 2026-09-24.
+describe('the completed-steps disclosure', () => {
+  beforeEach(() => {
+    pinClock(); localStorage.clear()
+    state.tasks = []; state.goals = []; state.loading = false; routinesState.routines = []
+    domainState.layers = new Set(['work', 'family', 'personal', 'unsorted']); domainState.soleDomain = null
+    seasonsState.seasons = DEFAULT_SEASONS; seasonsState.loading = false
+    Object.values(hook).forEach((f) => f.mockClear())
+  })
+  afterEach(() => { vi.useRealTimers() })
+
+  it('appears on a SHORT list as soon as a step is completed', () => {
+    state.tasks = [
+      task({ id: 'g', title: 'One goal', isGoal: true, monthStart: thisMonth }),
+      task({ id: 's1', title: 'Open step', goalTaskId: 'g', monthStart: thisMonth }),
+      task({ id: 's2', title: 'Finished step', goalTaskId: 'g', monthStart: thisMonth, completed: true }),
+    ]
+    renderPage('month')
+    fireEvent.click(screen.getByRole('button', { name: /Show steps under One goal/ }))
+    expect(screen.queryByText('Finished step')).not.toBeInTheDocument()
+    // …and the way to see it is right there, on a list of one goal.
+    fireEvent.click(screen.getByRole('button', { name: 'Show completed steps' }))
+    expect(screen.getByText('Finished step')).toBeInTheDocument()
+  })
+
+  it('stays away when there is nothing finished to disclose', () => {
+    state.tasks = [
+      task({ id: 'g', title: 'One goal', isGoal: true, monthStart: thisMonth }),
+      task({ id: 's1', title: 'Open step', goalTaskId: 'g', monthStart: thisMonth }),
+    ]
+    renderPage('month')
+    expect(screen.queryByRole('button', { name: /completed steps/i })).toBeNull()
+  })
+})
+
+// ── The optional link up, and the goal's own status ─────────────────────────
+// Codex, 2026-09-24: "existing month-to-season goal linking is a missing UI
+// capability". Both write through fields that already exist; no migration.
+describe('linking a goal to the rung above it', () => {
+  const seasonStart = () => periodStartFor('season', new Date(), DEFAULT_SEASONS)
+  beforeEach(() => {
+    pinClock(); localStorage.clear()
+    state.tasks = []; state.goals = []; state.loading = false; routinesState.routines = []
+    domainState.layers = new Set(['work', 'family', 'personal', 'unsorted']); domainState.soleDomain = null
+    seasonsState.seasons = DEFAULT_SEASONS; seasonsState.loading = false
+    Object.values(hook).forEach((f) => f.mockClear())
+  })
+  afterEach(() => { vi.useRealTimers() })
+
+  const withSeasonGoals = (over: Partial<Task> = {}) => {
+    state.tasks = [
+      task({ id: 'sg1', title: 'A season of repairs', isGoal: true, bucket: 'quarter', seasonStart: seasonStart() }),
+      task({ id: 'sg2', title: 'A season of music', isGoal: true, bucket: 'quarter', seasonStart: seasonStart() }),
+      task({ id: 'mg1', title: 'A home easier to care for', isGoal: true, monthStart: thisMonth, ...over }),
+      task({ id: 'st1', title: 'A step of its own', goalTaskId: 'mg1', monthStart: thisMonth }),
+    ]
+  }
+  const openEditor = () => fireEvent.click(screen.getByRole('button', { name: /Link to a season goal|Change or remove this link/ }))
+  const picker = () => screen.getByRole('combobox', { name: /Goal that A home easier to care for supports/ })
+
+  it('offers the link on a goal that has none, and SETS it', () => {
+    withSeasonGoals()
+    renderPage('month')
+    openEditor()
+    fireEvent.change(picker(), { target: { value: 'sg1' } })
+    // One field. The goal keeps its id, and nothing else is written.
+    expect(hook.updateTask).toHaveBeenCalledWith('mg1', { supportsGoalTaskId: 'sg1' })
+    expect(hook.updateTask).toHaveBeenCalledTimes(1)
+  })
+
+  it('CHANGES an existing link without touching anything else', () => {
+    withSeasonGoals({ supportsGoalTaskId: 'sg1' })
+    renderPage('month')
+    openEditor()
+    fireEvent.change(picker(), { target: { value: 'sg2' } })
+    expect(hook.updateTask).toHaveBeenCalledWith('mg1', { supportsGoalTaskId: 'sg2' })
+  })
+
+  // Optional means removable.
+  it('REMOVES the link when "No linked goal" is chosen', () => {
+    withSeasonGoals({ supportsGoalTaskId: 'sg1' })
+    renderPage('month')
+    openEditor()
+    fireEvent.change(picker(), { target: { value: '' } })
+    expect(hook.updateTask).toHaveBeenCalledWith('mg1', { supportsGoalTaskId: undefined })
+  })
+
+  it('keeps the goal’s identity, steps and placement — it writes one field', () => {
+    withSeasonGoals()
+    renderPage('month')
+    openEditor()
+    fireEvent.change(picker(), { target: { value: 'sg1' } })
+    const [, updates] = hook.updateTask.mock.calls[0] as [string, Record<string, unknown>]
+    expect(Object.keys(updates)).toEqual(['supportsGoalTaskId'])
+    for (const untouched of ['id', 'title', 'goalTaskId', 'bucket', 'monthStart', 'completed', 'scheduledFor']) {
+      expect(untouched in updates).toBe(false)
+    }
+    expect(hook.addTask).not.toHaveBeenCalled()
+    expect(hook.deleteTask).not.toHaveBeenCalled()
+  })
+
+  // The reciprocal read: the parent already lists what supports it.
+  it('names the parent, and opens it, once the link is stored', () => {
+    withSeasonGoals({ supportsGoalTaskId: 'sg1' })
+    renderPage('month')
+    const card = screen.getByRole('region', { name: /goals$/ })
+    expect(within(card).getByText('Supports')).toBeInTheDocument()
+    fireEvent.click(within(card).getByRole('button', { name: 'Open A season of repairs' }))
+    expect(mockNavigate).toHaveBeenCalledWith('/task/sg1')
+  })
+
+  it('offers no link control where there is nothing above to link to', () => {
+    state.tasks = [task({ id: 'mg1', title: 'Lonely goal', isGoal: true, monthStart: thisMonth })]
+    renderPage('month')
+    expect(screen.queryByRole('button', { name: /Link to a season goal/ })).toBeNull()
+  })
+
+  // Archive is not in the app's vocabulary for a goal task, so it is not here.
+  it('offers Active and Completed, and nothing it cannot honour', () => {
+    withSeasonGoals()
+    renderPage('month')
+    const status = screen.getByRole('combobox', { name: /Status of A home easier to care for/ })
+    expect([...status.querySelectorAll('option')].map((o) => o.textContent)).toEqual(['Active', 'Completed'])
+  })
+
+  it('a goal’s status is its own — set here, never read from its steps', () => {
+    withSeasonGoals()
+    renderPage('month')
+    fireEvent.change(screen.getByRole('combobox', { name: /Status of A home easier to care for/ }), { target: { value: 'completed' } })
+    expect(hook.updateTask).toHaveBeenCalledWith('mg1', { completed: true })
+    const [, updates] = hook.updateTask.mock.calls[0] as [string, Record<string, unknown>]
+    expect(Object.keys(updates)).toEqual(['completed'])
+  })
+
+  it('finishing every step does not complete the goal', () => {
+    state.tasks = [
+      task({ id: 'mg1', title: 'A home easier to care for', isGoal: true, monthStart: thisMonth }),
+      task({ id: 's1', title: 'Only step', goalTaskId: 'mg1', monthStart: thisMonth, completed: true }),
+    ]
+    renderPage('month')
+    const status = screen.getByRole('combobox', { name: /Status of A home easier to care for/ }) as HTMLSelectElement
+    expect(status.value).toBe('active')
+  })
+})
+
+// Codex review, 2026-09-24: counting only top-level goals missed the case that
+// needs a filter most — one goal carrying sixty steps.
+describe('the filter on ONE long goal', () => {
+  beforeEach(() => {
+    pinClock(); localStorage.clear()
+    state.tasks = []; state.goals = []; state.loading = false; routinesState.routines = []
+    domainState.layers = new Set(['work', 'family', 'personal', 'unsorted']); domainState.soleDomain = null
+    seasonsState.seasons = DEFAULT_SEASONS; seasonsState.loading = false
+    Object.values(hook).forEach((f) => f.mockClear())
+  })
+  afterEach(() => { vi.useRealTimers() })
+
+  const oneBigGoal = () => {
+    state.tasks = [
+      task({ id: 'g', title: 'Record the album', isGoal: true, monthStart: thisMonth }),
+      ...Array.from({ length: 60 }, (_, i) =>
+        task({ id: `s${i}`, title: `Album step ${i}`, goalTaskId: 'g', monthStart: thisMonth })),
+    ]
+  }
+
+  it('offers a filter, on a list of exactly one goal', () => {
+    oneBigGoal()
+    renderPage('month')
+    expect(screen.getByRole('searchbox', { name: /Filter .* goals and steps/ })).toBeInTheDocument()
+  })
+
+  it('finds a step inside it, and keeps the goal for context', () => {
+    oneBigGoal()
+    renderPage('month')
+    fireEvent.click(screen.getByRole('button', { name: /Show steps under Record the album/ }))
+    fireEvent.change(screen.getByRole('searchbox', { name: /Filter .* goals and steps/ }), { target: { value: 'Album step 47' } })
+    expect(screen.getByText('Record the album')).toBeInTheDocument()
+    expect(screen.getByText('Album step 47')).toBeInTheDocument()
+    expect(screen.queryByText('Album step 12')).not.toBeInTheDocument()
+    expect(screen.getByRole('status')).toHaveTextContent(/Filtering does not change what will be saved/)
+  })
+
+  it('stays away from a genuinely short list', () => {
+    state.tasks = [
+      task({ id: 'g', title: 'Small goal', isGoal: true, monthStart: thisMonth }),
+      task({ id: 's1', title: 'One step', goalTaskId: 'g', monthStart: thisMonth }),
+    ]
+    renderPage('month')
+    expect(screen.queryByRole('searchbox', { name: /Filter/ })).toBeNull()
+  })
+})
+
+// Codex, 2026-09-24: the confirmation fired on the line after the write. A
+// refused write must not announce a stored relationship.
+describe('linking waits for the write', () => {
+  const seasonStart = () => periodStartFor('season', new Date(), DEFAULT_SEASONS)
+  beforeEach(() => {
+    pinClock(); localStorage.clear()
+    state.tasks = [
+      task({ id: 'sg1', title: 'A season of repairs', isGoal: true, bucket: 'quarter', seasonStart: seasonStart() }),
+      task({ id: 'mg1', title: 'A home easier to care for', isGoal: true, monthStart: thisMonth }),
+    ]
+    state.goals = []; state.loading = false; routinesState.routines = []
+    domainState.layers = new Set(['work', 'family', 'personal', 'unsorted']); domainState.soleDomain = null
+    seasonsState.seasons = DEFAULT_SEASONS; seasonsState.loading = false
+    Object.values(hook).forEach((f) => f.mockClear())
+    toastSpy.mockClear()
+  })
+  afterEach(() => { vi.useRealTimers(); hook.updateTask.mockImplementation(async () => true) })
+
+  /** The editor closes after each choice, so each attempt reopens it. */
+  const link = () => {
+    fireEvent.click(screen.getByRole('button', { name: /Link to a season goal|Change or remove this link/ }))
+    fireEvent.change(screen.getByRole('combobox', { name: /Goal that A home easier to care for supports/ }), { target: { value: 'sg1' } })
+  }
+
+  it('says nothing until the write lands, then confirms once', async () => {
+    let land: (ok: boolean) => void = () => {}
+    hook.updateTask.mockImplementation(() => new Promise((r) => { land = r }))
+    renderPage('month')
+    link()
+    expect(toastSpy).not.toHaveBeenCalled()
+    await act(async () => { land(true) })
+    expect(toastSpy).toHaveBeenCalledWith(expect.stringMatching(/now supports the goal you chose/), 'success', 5000)
+  })
+
+  it('refuses to announce a link the write refused', async () => {
+    hook.updateTask.mockImplementation(async () => false)
+    renderPage('month')
+    link()
+    await act(async () => {})
+    expect(toastSpy).toHaveBeenCalledWith(expect.stringMatching(/Couldn’t link .* Nothing changed/), 'error', 6000)
+    expect(toastSpy).not.toHaveBeenCalledWith(expect.stringMatching(/now supports/), 'success', expect.anything())
+  })
+
+  it('says so when the write throws, and keeps the controls usable for a retry', async () => {
+    hook.updateTask.mockImplementationOnce(async () => { throw new Error('offline') })
+    renderPage('month')
+    link()
+    await act(async () => {})
+    expect(toastSpy).toHaveBeenCalledWith(expect.stringMatching(/Couldn’t link/), 'error', 6000)
+    // Not stuck pending: the same control takes a second attempt.
+    hook.updateTask.mockImplementation(async () => true)
+    link()
+    await act(async () => {})
+    expect(toastSpy).toHaveBeenCalledWith(expect.stringMatching(/now supports/), 'success', 5000)
+  })
+
+  it('holds the controls while the write is in flight', async () => {
+    let land: (ok: boolean) => void = () => {}
+    hook.updateTask.mockImplementation(() => new Promise((r) => { land = r }))
+    renderPage('month')
+    link()
+    expect(screen.getByRole('combobox', { name: /Status of A home easier to care for/ })).toBeDisabled()
+    await act(async () => { land(true) })
+    expect(screen.getByRole('combobox', { name: /Status of A home easier to care for/ })).not.toBeDisabled()
+  })
+
+  it('a refused status change leaves the goal as it was, and says so', async () => {
+    hook.updateTask.mockImplementation(async () => false)
+    renderPage('month')
+    await act(async () => {
+      fireEvent.change(screen.getByRole('combobox', { name: /Status of A home easier to care for/ }), { target: { value: 'completed' } })
+    })
+    expect(toastSpy).toHaveBeenCalledWith(expect.stringMatching(/Couldn’t change the status .* unchanged/), 'error', 6000)
+  })
+
+  // The fold exists to get finished goals back.
+  it('a completed goal can be reopened from the completed fold', async () => {
+    state.tasks = [task({ id: 'mg2', title: 'A finished goal', isGoal: true, monthStart: thisMonth, completed: true })]
+    renderPage('month')
+    fireEvent.click(screen.getByText(/Completed goals/))
+    const status = screen.getByRole('combobox', { name: /Status of A finished goal/ }) as HTMLSelectElement
+    expect(status.value).toBe('completed')
+    await act(async () => { fireEvent.change(status, { target: { value: 'active' } }) })
+    expect(hook.updateTask).toHaveBeenCalledWith('mg2', { completed: false })
+  })
+})
+
+// Scott, via Codex 2026-09-24: a planning page opens on the plan.
+describe('the planning pages no longer open with an onboarding box', () => {
+  beforeEach(() => {
+    pinClock(); localStorage.clear()
+    state.tasks = [task({ id: 'g', title: 'A goal', isGoal: true, monthStart: thisMonth })]
+    state.goals = []; state.loading = false; routinesState.routines = []
+    domainState.layers = new Set(['work', 'family', 'personal', 'unsorted']); domainState.soleDomain = null
+    seasonsState.seasons = DEFAULT_SEASONS; seasonsState.loading = false
+    Object.values(hook).forEach((f) => f.mockClear())
+  })
+  afterEach(() => { vi.useRealTimers() })
+
+  for (const level of ['month', 'season', 'year'] as const) {
+    it(`${level} shows no "Somewhere to start" box`, () => {
+      renderPage(level)
+      expect(screen.queryByLabelText('Somewhere to start')).toBeNull()
+      expect(screen.queryByText(/Pick one, or none/)).toBeNull()
+      expect(screen.queryByRole('button', { name: 'Show where to start' })).toBeNull()
+    })
+  }
+})
+
+// Codex acceptance walk, 2026-09-24: the review nested its rows but still
+// showed no completed step — the page stripped them before handing them over.
+describe('the review is given the completed work too', () => {
+  beforeEach(() => {
+    pinClock(); localStorage.clear()
+    state.tasks = [
+      task({ id: 'g1', title: 'Write a new song', isGoal: true, monthStart: thisMonth }),
+      task({ id: 's1', title: 'Draft the first verse', goalTaskId: 'g1', monthStart: thisMonth }),
+      task({ id: 's2', title: 'Use an old chord progression', goalTaskId: 'g1', monthStart: thisMonth, completed: true }),
+    ]
+    state.goals = []; state.loading = false; routinesState.routines = []
+    domainState.layers = new Set(['work', 'family', 'personal', 'unsorted']); domainState.soleDomain = null
+    seasonsState.seasons = DEFAULT_SEASONS; seasonsState.loading = false
+    Object.values(hook).forEach((f) => f.mockClear())
+  })
+  afterEach(() => { vi.useRealTimers() })
+
+  it('counts the finished step, and shows it struck through', () => {
+    renderPage('month')
+    fireEvent.click(screen.getByRole('button', { name: /Plan September|Plan October|Review the plan/ }))
+    const counts = screen.getByRole('button', { name: '1 open · 1 done · show' })
+    fireEvent.click(counts)
+    const done = within(counts.closest('li')!).getByText('Use an old chord progression')
+    expect(done.className).toMatch(/line-through/)
+    expect(within(done.closest('li')!).getByText('completed')).toBeInTheDocument()
+  })
+})
+
+// The adjacent branch Codex asked me to inspect after the month fix: the
+// year's own list filtered `status === 'active'`, so a goal FINISHED this
+// year vanished from the year review — the same defect, one branch over.
+describe('the year review is given the completed goals too', () => {
+  beforeEach(() => {
+    pinClock(); localStorage.clear()
+    state.tasks = []
+    state.goals = [
+      goal({ id: 'yopen', name: 'Run a half marathon' }),
+      goal({ id: 'ydone', name: 'Move the family to a bigger house', status: 'completed' }),
+      // Archived is the one status that was deliberately let go; it stays out.
+      goal({ id: 'ygone', name: 'Learn the cello', status: 'archived' }),
+    ]
+    state.loading = false; routinesState.routines = []
+    domainState.layers = new Set(['work', 'family', 'personal', 'unsorted']); domainState.soleDomain = null
+    seasonsState.seasons = DEFAULT_SEASONS; seasonsState.loading = false
+    Object.values(hook).forEach((f) => f.mockClear())
+  })
+  afterEach(() => { vi.useRealTimers() })
+
+  it('shows this year’s finished goal, struck through, and still hides the archived one', () => {
+    renderPage('year')
+    fireEvent.click(screen.getByRole('button', { name: `Plan ${now.getFullYear()}` }))
+    // No goals for last year, so the session opens straight on the Plan step.
+    const done = screen.getByText('Move the family to a bigger house')
+    expect(done.className).toMatch(/line-through/)
+    expect(screen.getByText('Run a half marathon')).toBeInTheDocument()
+    expect(screen.queryByText('Learn the cello')).not.toBeInTheDocument()
+  })
+})
+
+// ── Keyboard-only operation of the long list ────────────────────────────────
+//
+// Codex, 2026-09-24: "Test keyboard-only Tab/Shift-Tab/Enter/Space/Escape
+// operation of actual hydrated long-list components: filter, expand, show all,
+// completed disclosure, focus visibility/restoration… static geometry is not
+// enough."
+//
+// So this drives the REAL page with real key events — not a static snapshot of
+// its markup. What a DOM without layout cannot answer (does the focus ring
+// actually paint, does the row fit at 390px) is measured separately, in a real
+// browser, by outputs/plan-keyboard.
+describe('the long list can be worked entirely from the keyboard', () => {
+  const user = () => userEvent.setup({ delay: null })
+  const bigGoal = 'Record the album'
+
+  beforeEach(() => {
+    pinClock(); localStorage.clear()
+    // Long enough for the filter to appear (scannableRows > 8), with one goal
+    // past the step-reveal bound and one finished step behind the fold.
+    state.tasks = [
+      task({ id: 'gbig', title: bigGoal, isGoal: true, monthStart: thisMonth }),
+      ...Array.from({ length: 12 }, (_, i) => task({
+        id: `sbig${i}`, title: `Album step ${i}`, goalTaskId: 'gbig', monthStart: thisMonth,
+        completed: i === 0,
+      })),
+      ...Array.from({ length: 9 }, (_, i) => task({
+        id: `g${i}`, title: `Goal number ${i}`, isGoal: true, monthStart: thisMonth,
+      })),
+    ]
+    state.goals = []; state.loading = false; routinesState.routines = []
+    domainState.layers = new Set(['work', 'family', 'personal', 'unsorted']); domainState.soleDomain = null
+    seasonsState.seasons = DEFAULT_SEASONS; seasonsState.loading = false
+    Object.values(hook).forEach((f) => f.mockClear())
+  })
+  afterEach(() => { vi.useRealTimers() })
+
+  /** Tab forward up to `max` times, collecting what each stop focused. */
+  const walk = async (u: ReturnType<typeof user>, max = 60) => {
+    const seen: string[] = []
+    for (let i = 0; i < max; i++) {
+      await u.tab()
+      const el = document.activeElement as HTMLElement | null
+      if (!el || el === document.body) break
+      seen.push(`${el.tagName.toLowerCase()}:${(el.getAttribute('aria-label') || el.textContent || '').trim().slice(0, 40)}`)
+    }
+    return seen
+  }
+
+  it('tabs to the filter and the completed fold without leaving the list', async () => {
+    const u = user()
+    renderPage('month')
+    const seen = await walk(u, 20)
+    // Reached in order, from the top of the page, with no stop that traps.
+    const filter = seen.findIndex((l) => l.startsWith('input:Filter'))
+    const fold = seen.findIndex((l) => l === 'button:Show completed steps')
+    const firstGoal = seen.findIndex((l) => l.includes('Record the album'))
+    expect(filter).toBeGreaterThan(-1)
+    expect(fold).toBe(filter + 1)
+    expect(firstGoal).toBeGreaterThan(fold)
+    // And Shift-Tab walks back out the way it came in.
+    const here = document.activeElement
+    await u.tab({ shift: true })
+    expect(document.activeElement).not.toBe(here)
+    expect(document.activeElement).not.toBe(document.body)
+  })
+
+  it('opens a goal with Enter, keeping focus on the control that opened it', async () => {
+    const u = user()
+    renderPage('month')
+    const counts = screen.getByRole('button', { name: '11 open · 1 done · show' })
+    counts.focus()
+    await u.keyboard('{Enter}')
+    expect(screen.getByRole('button', { name: '11 open · 1 done · hide' })).toBe(document.activeElement)
+    await u.keyboard('{Enter}')
+    expect(screen.getByRole('button', { name: '11 open · 1 done · show' })).toBe(document.activeElement)
+  })
+
+  it('works the completed fold with Space, and the label says what it will do', async () => {
+    const u = user()
+    renderPage('month')
+    const fold = screen.getByRole('button', { name: 'Show completed steps' })
+    fold.focus()
+    await u.keyboard(' ')
+    const after = screen.getByRole('button', { name: 'Hide completed steps' })
+    expect(after).toBe(document.activeElement)
+    await u.keyboard(' ')
+    expect(screen.getByRole('button', { name: 'Show completed steps' })).toBe(document.activeElement)
+  })
+
+  // The defect this batch found: the button deletes itself, and focus fell to
+  // <body> — the top of the page, every goal away from the new steps.
+  it('keeps focus in the list when "Show all" removes itself', async () => {
+    const u = user()
+    renderPage('month')
+    fireEvent.click(screen.getByRole('button', { name: '11 open · 1 done · show' }))
+    const showAll = screen.getByRole('button', { name: /Show all 12 steps/ })
+    showAll.focus()
+    await u.keyboard(' ')
+    expect(screen.queryByRole('button', { name: /Show all/ })).not.toBeInTheDocument()
+    expect(document.activeElement).not.toBe(document.body)
+    // …and it lands on the first step that just appeared, not back at the top.
+    const landed = document.activeElement as HTMLElement
+    expect(within(landed.closest('li')!).getByText('Album step 9')).toBeInTheDocument()
+  })
+
+  it('clears the filter with Escape and leaves the cursor in it', async () => {
+    const u = user()
+    renderPage('month')
+    const filter = screen.getByLabelText(/Filter .* goals and steps/) as HTMLInputElement
+    filter.focus()
+    await u.keyboard('album')
+    expect(filter.value).toBe('album')
+    expect(screen.getByText(/Filtering does not change what will be saved/)).toBeInTheDocument()
+    await u.keyboard('{Escape}')
+    expect(filter.value).toBe('')
+    expect(document.activeElement).toBe(filter)
+    expect(screen.getByText('Goal number 0')).toBeInTheDocument()
+  })
+
+  // The timing popover is portalled to the end of <body>; without the shared
+  // popover-focus hook a keyboard user tabbing off the trigger skipped it.
+  it('closes the timing menu with Escape and comes back to its trigger', async () => {
+    const u = user()
+    renderPage('month')
+    fireEvent.click(screen.getByRole('button', { name: '11 open · 1 done · show' }))
+    const trigger = document.querySelectorAll('.plan-timing-trigger')[0] as HTMLElement
+    trigger.focus()
+    await u.keyboard('{Enter}')
+    expect(screen.getByRole('menu')).toBeInTheDocument()
+    expect(screen.getByRole('menu').contains(document.activeElement)).toBe(true)
+    await u.keyboard('{Escape}')
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument()
+    expect(document.activeElement).toBe(trigger)
+  })
+})
+
+// Live, 2026-09-24: /year opened on "0 goals" with an empty list for as long
+// as the goals took to load — a household with three year goals told it had
+// none. The page was reading only the TASK load, and the year is drawn from
+// goals.
+describe('a year whose goals have not arrived does not claim to be empty', () => {
+  beforeEach(() => {
+    pinClock(); localStorage.clear()
+    state.tasks = []; state.goals = []; state.loading = false; routinesState.routines = []
+    domainState.layers = new Set(['work', 'family', 'personal', 'unsorted']); domainState.soleDomain = null
+    seasonsState.seasons = DEFAULT_SEASONS; seasonsState.loading = false
+    Object.values(hook).forEach((f) => f.mockClear())
+  })
+  afterEach(() => { state.goalsLoading = false; vi.useRealTimers() })
+
+  it('says it is loading rather than counting a list it does not have', () => {
+    state.goalsLoading = true
+    renderPage('year')
+    expect(screen.getByText('Loading…')).toBeInTheDocument()
+    expect(screen.queryByText(/^0 goals$/)).not.toBeInTheDocument()
+  })
+
+  it('counts them once they arrive', () => {
+    state.goalsLoading = false
+    state.goals = [goal({ name: 'Run a half marathon' })]
+    renderPage('year')
+    expect(screen.getByText('1 goals')).toBeInTheDocument()
+    expect(screen.queryByText('Loading…')).not.toBeInTheDocument()
+  })
+})
+
+// Scott: "Choose when" should say which day has room wherever it offers a day,
+// not only on /week. The counting rules are weekDensity.test.ts's; this is the
+// month page's wiring to them.
+describe('the month page offers day tiles for the week a row is on', () => {
+  const weekOfThisMonth = (() => {
+    // A Sunday inside the month the page will show.
+    const d = new Date(thisMonth)
+    d.setDate(d.getDate() + (7 - d.getDay()) % 7)
+    return d
+  })()
+
+  beforeEach(() => {
+    pinClock(); localStorage.clear()
+    dayLoad.events = []; dayLoad.available = true; dayLoad.loading = false; dayLoad.failed = false
+    state.tasks = [
+      task({ id: 'dated', title: 'Fix the gate', monthStart: thisMonth, weekStart: weekOfThisMonth }),
+      task({ id: 'loose', title: 'Call the roofer', monthStart: thisMonth }),
+      // On the Friday of that week — a day the planning calendar reaches, so
+      // its count is knowable. (The window starts at today; see the past-days
+      // case below.)
+      task({ id: 'busy', title: 'Already on Friday', monthStart: thisMonth, bucket: 'timed',
+        scheduledFor: new Date(weekOfThisMonth.getFullYear(), weekOfThisMonth.getMonth(), weekOfThisMonth.getDate() + 5), isAllDay: true }),
+    ]
+    state.goals = []; state.loading = false; routinesState.routines = []
+    domainState.layers = new Set(['work', 'family', 'personal', 'unsorted']); domainState.soleDomain = null
+    seasonsState.seasons = DEFAULT_SEASONS; seasonsState.loading = false
+    Object.values(hook).forEach((f) => f.mockClear())
+  })
+  afterEach(() => { vi.useRealTimers() })
+
+  const openTiming = (title: string) => {
+    fireEvent.click(screen.getByRole('button', { name: new RegExp(`Choose a week or a day for ${title}`) }))
+  }
+
+  it('draws the seven days of the row’s own week, with what each already holds', () => {
+    renderPage('month')
+    openTiming('Fix the gate')
+    const tiles = screen.getAllByRole('menuitemradio').filter((b) => /^Plan for /.test(b.getAttribute('aria-label') ?? ''))
+    expect(tiles).toHaveLength(7)
+    // The day the other task sits on says so; the rest say they are empty.
+    const busy = tiles.find((t) => /1 task already/.test(t.getAttribute('aria-label') ?? ''))
+    expect(busy).toBeDefined()
+    // The other six read as empty — including the days of this week already
+    // past, which the planning calendar is read back far enough to cover.
+    expect(tiles.filter((t) => /nothing on it yet/.test(t.getAttribute('aria-label') ?? ''))).toHaveLength(6)
+    expect(tiles.every((t) => !/read for/.test(t.getAttribute('aria-label') ?? ''))).toBe(true)
+    // The shared day-choice pattern, not a new one: the other-day path stays,
+    // and now reads "Another day…" because tiles came first.
+    expect(screen.getByText('Another day…')).toBeInTheDocument()
+  })
+
+  it('offers no tiles for a row with no week yet — that row is still choosing a week', () => {
+    renderPage('month')
+    openTiming('Call the roofer')
+    expect(screen.queryAllByRole('menuitemradio').filter((b) => /^Plan for /.test(b.getAttribute('aria-label') ?? ''))).toHaveLength(0)
+    // …and the way to a specific day is untouched: the shared other-day path,
+    // which reads "A day…" precisely because no tiles precede it.
+    expect(screen.getByText('A day…')).toBeInTheDocument()
+  })
+
+  it('says a day is not known rather than drawing it empty when the calendar failed', () => {
+    // Read and FAILED — distinct from "not read yet", which draws no bar for
+    // a different reason and says a different thing.
+    dayLoad.available = false; dayLoad.failed = true
+    renderPage('month')
+    openTiming('Fix the gate')
+    const tiles = screen.getAllByRole('menuitemradio').filter((b) => /^Plan for /.test(b.getAttribute('aria-label') ?? ''))
+    expect(tiles).toHaveLength(7)
+    expect(tiles.filter((t) => /couldn’t be read/.test(t.getAttribute('aria-label') ?? ''))).toHaveLength(7)
+    expect(tiles.some((t) => /nothing on it yet/.test(t.getAttribute('aria-label') ?? ''))).toBe(false)
+  })
+
+  // Codex, 2026-09-25: the window counted is a whole month of weeks, but the
+  // seven days OFFERED must be scaled against each other — a monstrous day
+  // three weeks away must not flatten the week on screen.
+  it('scales the bars against the week shown, not the month behind it', () => {
+    const weekAfter = new Date(weekOfThisMonth.getFullYear(), weekOfThisMonth.getMonth(), weekOfThisMonth.getDate() + 7)
+    state.tasks = [
+      ...state.tasks,
+      // Twelve things on one day of the NEXT week, inside the same window.
+      ...Array.from({ length: 12 }, (_, i) => task({
+        id: `flood${i}`, title: `Flood ${i}`, monthStart: thisMonth, bucket: 'timed', isAllDay: true,
+        scheduledFor: new Date(weekAfter.getFullYear(), weekAfter.getMonth(), weekAfter.getDate() + 1),
+      })),
+    ]
+    renderPage('month')
+    openTiming('Fix the gate')
+    const tiles = screen.getAllByRole('menuitemradio').filter((b) => /^Plan for /.test(b.getAttribute('aria-label') ?? ''))
+    // The Friday of the week on screen holds one task and is the busiest day
+    // OF THIS WEEK, so it fills the bar.
+    const friday = tiles.find((t) => /1 task already/.test(t.getAttribute('aria-label') ?? ''))!
+    const filled = within(friday).getAllByRole('generic', { hidden: true })
+      .filter((el) => /bg-primary-/.test(el.className)).length
+    expect(filled).toBe(6)
+  })
+
+  it('picking a day from a tile plans that exact day', () => {
+    renderPage('month')
+    openTiming('Fix the gate')
+    const tiles = screen.getAllByRole('menuitemradio').filter((b) => /^Plan for /.test(b.getAttribute('aria-label') ?? ''))
+    fireEvent.click(tiles[5])
+    const day = new Date(weekOfThisMonth.getFullYear(), weekOfThisMonth.getMonth(), weekOfThisMonth.getDate() + 5)
+    expect(hook.updateTask).toHaveBeenCalledWith('dated', expect.objectContaining({ scheduledFor: day }))
+  })
+})

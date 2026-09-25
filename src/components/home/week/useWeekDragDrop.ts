@@ -5,6 +5,7 @@ import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
 import type { Routine } from '@/types/actionable'
 import { localYmd } from '@/lib/cadence/config'
 import { showToast } from '@/hooks/useToast'
+import { findEventByItemId, eventItemKey } from '@/types/timeline'
 
 // Task updates may include endTime (timed duration) even though it's not yet
 // on the base Task type — the DB layer accepts it via the update handler.
@@ -14,7 +15,16 @@ interface UseWeekDragDropArgs {
   weekStart: Date
   onWeekChange: (newWeekStart: Date) => void
   onUpdateTask: (taskId: string, updates: TaskUpdates) => Promise<void | boolean> | void
-  onUpdateEvent: (eventId: string, updates: { startTime: Date; endTime: Date }) => Promise<void> | void
+  /**
+   * Move an event. OPTIONAL on purpose, and absent means "this host cannot
+   * move events" — which is said out loud. It used to be required and hosts
+   * satisfied it with a no-op, so a drag announced a move that never happened
+   * (Scott's walkthrough, 2026-09-24).
+   *
+   * It must REJECT when the write fails; the confirmation and the Undo wait
+   * on it.
+   */
+  onUpdateEvent?: (eventId: string, updates: { startTime: Date; endTime: Date }) => Promise<void> | void
   onUpdateRoutine: (routineId: string, updates: Partial<Routine>) => Promise<void> | void
   tasks: (Task & { endTime?: Date })[]
   events: CalendarEvent[]
@@ -52,7 +62,6 @@ function isPastDay(dayIso: string): boolean {
 }
 
 export function useWeekDragDrop(args: UseWeekDragDropArgs): UseWeekDragDropResult {
-  const { tasks, onUpdateTask } = args
   const [activeDragId, setActiveDragId] = useState<string | null>(null)
 
   const onDragStart = useCallback((e: DragStartEvent) => {
@@ -63,7 +72,23 @@ export function useWeekDragDrop(args: UseWeekDragDropArgs): UseWeekDragDropResul
     setActiveDragId(null)
   }, [])
 
+  /**
+   * Every render's args, for handlers that must NOT be rebuilt on each one.
+   *
+   * `onDragEnd` depended on `[tasks, onUpdateTask]` while reading `events`,
+   * `onUpdateEvent`, `weekStart` and `pushAction` — so whenever the events
+   * array changed identity without those two changing, the handler kept
+   * looking things up in the PREVIOUS array. Live, that meant the first event
+   * drag of a session worked and the second said "couldn't find that event":
+   * a successful move refetches the range, which replaces `events`
+   * (2026-09-24, found while verifying the id-lookup repair).
+   */
+  const argsRef = useRef(args)
+  argsRef.current = args
+
   const onDragEnd = useCallback((e: DragEndEvent) => {
+    const a = argsRef.current
+    const { tasks, onUpdateTask } = a
     setActiveDragId(null)
     if (!e.over) return
 
@@ -111,7 +136,7 @@ export function useWeekDragDrop(args: UseWeekDragDropArgs): UseWeekDragDropResul
       // chooses the task for anyone's focus. Dated work shows on its day's
       // Tasks without focus (S12).
       void onUpdateTask(taskId, { isAllDay: true, scheduledFor: newDay, bucket: 'timed' })
-      args.pushAction?.(`Moved "${task?.title ?? 'task'}"`, () => {
+      a.pushAction?.(`Moved "${task?.title ?? 'task'}"`, () => {
         void onUpdateTask(taskId, {
           isAllDay: prevIsAllDay,
           scheduledFor: prevScheduledFor as Date,
@@ -129,7 +154,7 @@ export function useWeekDragDrop(args: UseWeekDragDropArgs): UseWeekDragDropResul
     // Shelf routine pill: the drop only ASKS — scope (rule vs one week) is
     // the host's popover decision, never an implicit write.
     if (activeData.kind === 'routineChip' && activeData.routineId) {
-      args.onRoutinePlaceRequest?.({ routineId: activeData.routineId, when: newStart })
+      a.onRoutinePlaceRequest?.({ routineId: activeData.routineId, when: newStart })
       return
     }
 
@@ -148,7 +173,7 @@ export function useWeekDragDrop(args: UseWeekDragDropArgs): UseWeekDragDropResul
         endTime: new Date(newStart.getTime() + DEFAULT_DURATION_MS),
         bucket: 'timed',
       })
-      args.pushAction?.(`Scheduled "${task?.title ?? 'task'}"`, () => {
+      a.pushAction?.(`Scheduled "${task?.title ?? 'task'}"`, () => {
         void onUpdateTask(activeData.taskId!, {
           isAllDay: prevIsAllDay,
           scheduledFor: prevScheduledFor as Date,
@@ -175,9 +200,9 @@ export function useWeekDragDrop(args: UseWeekDragDropArgs): UseWeekDragDropResul
         // dragged FROM. Without it the override lands on whatever day the rest
         // of the app happens to be viewing, which is how a drag on Thursday
         // silently rewrote Monday.
-        const fromDate = new Date(args.weekStart)
+        const fromDate = new Date(a.weekStart)
         fromDate.setDate(fromDate.getDate() + (dayMatch ? Number(dayMatch[1]) : 0))
-        args.onPushRoutine?.(routineId, newStart, fromDate)
+        a.onPushRoutine?.(routineId, newStart, fromDate)
         return
       }
       if (itemId.startsWith('task-')) {
@@ -191,7 +216,7 @@ export function useWeekDragDrop(args: UseWeekDragDropArgs): UseWeekDragDropResul
           scheduledFor: newStart,
           endTime: new Date(newStart.getTime() + duration),
         })
-        args.pushAction?.(`Moved "${task.title}"`, () => {
+        a.pushAction?.(`Moved "${task.title}"`, () => {
           void onUpdateTask(taskId, {
             scheduledFor: oldStart,
             endTime: oldEnd,
@@ -200,9 +225,15 @@ export function useWeekDragDrop(args: UseWeekDragDropArgs): UseWeekDragDropResul
         return
       }
       if (itemId.startsWith('event-')) {
-        const eventId = itemId.slice('event-'.length)
-        const event = args.events.find((ev) => ev.id === eventId)
-        if (!event) return
+        // By the SAME rule that built the id. Matching `ev.id` here looked
+        // right and never matched a real calendar event, so every drop
+        // returned on the next line without a word (Scott, 2026-09-24).
+        const event = findEventByItemId(a.events, itemId)
+        if (!event) {
+          showToast('Couldn’t find that event to move', 'error', 4000)
+          return
+        }
+        const eventId = eventItemKey(event)
         const startStr =
           (event as { start_time?: string }).start_time ??
           (event as { startTime?: string }).startTime
@@ -214,16 +245,34 @@ export function useWeekDragDrop(args: UseWeekDragDropArgs): UseWeekDragDropResul
         const oldEnd = new Date(endStr)
         const duration = oldEnd.getTime() - oldStart.getTime()
         const newEnd = new Date(newStart.getTime() + duration)
-        void args.onUpdateEvent(eventId, { startTime: newStart, endTime: newEnd })
-        args.pushAction?.(`Moved "${event.title}"`, () => {
-          void args.onUpdateEvent(eventId, { startTime: oldStart, endTime: oldEnd })
-        })
+        const move = a.onUpdateEvent
+        if (!move) {
+          // No writer. Better to say so than to pretend it moved.
+          showToast('Moving events isn’t available here', 'error', 4000)
+          return
+        }
+        void (async () => {
+          try {
+            await move(eventId, { startTime: newStart, endTime: newEnd })
+          } catch {
+            // The writer has already said what went wrong. No confirmation
+            // and no Undo for a move that did not happen.
+            return
+          }
+          a.pushAction?.(`Moved "${event.title}"`, () => {
+            void (async () => {
+              try { await move(eventId, { startTime: oldStart, endTime: oldEnd }) } catch { /* reported by the writer */ }
+            })()
+          })
+        })()
         return
       }
       // 'routine-...' shouldn't reach here (routines are non-draggable per spec).
       return
     }
-  }, [tasks, onUpdateTask])
+  // Nothing from props: the handler reads this render's args through the ref
+  // above, so it can never hold a stale events list again.
+  }, [])
 
   const advanceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const cooldownRef = useRef<boolean>(false)

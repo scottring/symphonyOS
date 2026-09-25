@@ -65,7 +65,10 @@ export function ReferenceListsDock() {
   if (!showing.length) return null
   return <aside aria-label="Pinned reference lists" className="reference-dock">
     {showing.map(pin => pin.kind === 'today'
-      ? /^\/(month|season|year)(?:\/|$)/.test(pathname)
+      /* A planning route owns this slot; so does anything that has CLAIMED it —
+         today, only a goal's detail page (S2-18). Everything else, an ordinary
+         task included, keeps the day's plan. */
+      ? /^\/(month|season|year)(?:\/|$)/.test(pathname) || ref!.periodShelvesClaimed
         ? <div key="period-shelves" ref={ref!.setShelvesTarget} />
         : <TodayPlanList key="today" onClose={() => ref!.unpin('today')} />
       : <ReferenceList key={`${pin.kind}:${pin.date}`} pin={pin} onClose={() => ref!.unpin(pin.kind)} />)}

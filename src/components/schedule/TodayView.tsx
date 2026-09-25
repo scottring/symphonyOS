@@ -46,6 +46,7 @@ import { panelActionsFor } from '@/components/reference/DayPlanPanel'
 import { PlanningSheet } from '@/components/reference/PlanningSheet'
 import { unhomedRoutines } from '@/lib/week/unhomedRoutines'
 import { useWeekInstances } from '@/components/home/week/useWeekInstances'
+import { useDayChoices } from '@/hooks/useDayChoices'
 import { useReferenceLists } from '@/components/reference/ReferenceListsContext'
 import { makePlanActions } from '@/lib/planning/planActions'
 import { localYmd } from '@/lib/cadence/config'
@@ -53,6 +54,7 @@ import { planDropHandlers } from '@/lib/planning/planDrag'
 import { useActionableInstances } from '@/hooks/useActionableInstances'
 import { findTaskById } from '@/lib/findTaskById'
 import { showToast } from '@/hooks/useToast'
+import { TaskTimingMenu } from '@/components/plan/TaskTimingMenu'
 import { useNavigate } from 'react-router-dom'
 import { useGoogleCalendar } from '@/hooks/useGoogleCalendar'
 import { ALL_LAYERS } from '@/lib/domains'
@@ -116,6 +118,16 @@ interface TodayViewProps {
   /** Every active routine, not only the day's: the Planning sheet lists
    *  weekly routines with no day of their own, which no single day carries. */
   allRoutines?: Routine[]
+  /**
+   * The UNFILTERED task list, for the day tiles' counts only.
+   *
+   * `tasks` above is what this view draws, already narrowed to the reader's
+   * layers and assignee. Density is universal — a day is full regardless of
+   * which domain filled it — so counting the drawn list would call a day free
+   * that is not. Omitted, the tiles fall back to `tasks` and under-count
+   * exactly as much as the view is filtered.
+   */
+  densityTasks?: Task[]
   dateInstances?: ActionableInstance[]
   projects?: Project[]
   selectedItemId: string | null
@@ -173,6 +185,7 @@ export function TodayView({
   events,
   routines = [],
   allRoutines,
+  densityTasks,
   dateInstances = [],
   projects = [],
   selectedItemId,
@@ -336,6 +349,17 @@ export function TodayView({
   // Every instance touching this week: a flexible routine already placed on
   // one of its days has a home for the week and leaves the sheet's To plan.
   const weekInstances = useWeekInstances(currentWeekStart, 7)
+  /**
+   * What each day of the VIEWED week already holds, for the timing control's
+   * day tiles. Anchored to the week in view, never to today's: a row opened
+   * on a November day offers November days (Scott, 2026-09-24). The week's
+   * instances are already here, so the hook does not fetch them again.
+   */
+  const dayChoices = useDayChoices({
+    windowStart: currentWeekStart, dayCount: 7,
+    tasks: densityTasks ?? tasks, userId: userId ?? null, routines: allRoutines ?? routines,
+    instances: weekInstances,
+  })
   const todayInput = useMemo(() => ({
     tasks,
     events,
@@ -791,7 +815,7 @@ export function TodayView({
         ? `Next: ${upNext.item.title}${nextTimeLabel ? ` · ${nextTimeLabel}` : ''}`
         : forwardLine(forwardLook(tasks, viewedDate), viewedDate)
       : data.counts.totalItems === 0
-        ? 'Nothing on the board for this day.'
+        ? 'Nothing planned for this day.'
         : firstTimed
           ? `Starts with: ${firstTimed.title}${firstTimedLabel ? ` · ${firstTimedLabel}` : ''}`
           : 'Nothing with a time on it.'
@@ -1243,7 +1267,26 @@ export function TodayView({
   ) : undefined
   // Everything each slice of the journal shares — the same rows and actions
   // the one flat list had, handed to three renders of it.
+  /**
+   * The timing control on a day row — the same one the month, season and week
+   * use, so Day is an execution view of the same work rather than a fourth
+   * vocabulary (connected planning, requirement 2 and Codex review finding 5).
+   *
+   * It sits under the title, not in the trailing rail: the rail is a fixed
+   * four-slot column and the timing answer is a sentence, not a glyph.
+   */
+  const dayTimingControl = useCallback((task: Task) => (
+    <TaskTimingMenu
+      task={task}
+      onUpdateTask={(id, updates) => ctx.onUpdateTask?.(id, updates)}
+      periodStart={viewedDate}
+      fallbackWeekStart={currentWeekStart}
+      dayChoices={dayChoices}
+    />
+  ), [ctx, viewedDate, dayChoices, currentWeekStart])
+
   const listProps = {
+    timingFor: dayTimingControl,
     isReadOnlyEvent,
     viewedDate,
     isMobile,

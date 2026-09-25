@@ -165,6 +165,13 @@ export interface ScheduleActionsValue {
 
   /** Reschedule a Google Calendar event (drag-to-move). Accepts new start + end (durations preserved by caller). */
   onUpdateEvent?: (eventId: string, updates: { startTime: Date; endTime: Date }) => Promise<void> | void
+  /**
+   * Re-read the calendar for the range on screen. `createEvent` writes to
+   * Google but never touches the held `events`, so a surface that creates one
+   * must refetch or the new event only appears after a reload (/week
+   * quick-create did exactly that; Today's inline create already refetched).
+   */
+  onRefetchEvents?: () => Promise<void>
 
   /** Structured create from the smart Add-to-Today input. */
   /** Resolves false when the save failed, so the capture box can keep the text. */
@@ -184,6 +191,12 @@ export function ScheduleActionsProvider({ value, children }: { value: ScheduleAc
       {children}
     </ScheduleActionsContext.Provider>
   )
+}
+
+/** The same context, or null outside a provider — for a view that is also
+ *  mounted bare (tests, previews) and treats every action as optional. */
+export function useOptionalScheduleActionsContext(): ScheduleActionsValue | null {
+  return useContext(ScheduleActionsContext)
 }
 
 export function useScheduleActionsContext(): ScheduleActionsValue {

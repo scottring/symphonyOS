@@ -15,7 +15,7 @@ describe('forwardLook / forwardLine', () => {
   })
 
   it('nothing within 7 days', () => {
-    expect(forwardLine(forwardLook([], new Date(2026, 8, 6)), new Date(2026, 8, 6))).toBe('Nothing on the board this week.')
+    expect(forwardLine(forwardLook([], new Date(2026, 8, 6)), new Date(2026, 8, 6))).toBe('Nothing else coming up this week.')
   })
 
   it('skips completed and today\'s own items, and anything beyond the window', () => {

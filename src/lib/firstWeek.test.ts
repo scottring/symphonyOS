@@ -19,16 +19,7 @@ const h = vi.hoisted(() => {
 
 vi.mock('@/lib/supabase', () => ({ supabase: { from: h.from } }))
 
-import {
-  firstWeekSteps,
-  shouldShowFirstWeek,
-  readSampleIds,
-  writeSampleIds,
-  clearSampleIdsRecord,
-  hasSampleIds,
-  deleteSampleRows,
-  type FirstWeekSignals,
-} from './firstWeek'
+import { firstWeekSteps, shouldShowFirstWeek, readSampleIds, writeSampleIds, clearSampleIdsRecord, hasSampleIds, deleteSampleRows, type FirstWeekSignals, shouldOpenFirstWeek } from './firstWeek'
 
 const none: FirstWeekSignals = {
   yearPlanned: false,
@@ -135,5 +126,40 @@ describe('deleteSampleRows', () => {
   it('touches no table when there is nothing recorded', async () => {
     expect(await deleteSampleRows({ taskIds: [], noteIds: [] })).toBe(true)
     expect(h.from).not.toHaveBeenCalled()
+  })
+})
+
+// Codex, 2026-09-24: "Remaining scope also includes independent Getting
+// Started access." Independent means: reachable because somebody asked, not
+// because the planner happens to be empty.
+describe('shouldOpenFirstWeek', () => {
+  const twoLeft = firstWeekSteps({
+    yearPlanned: false, memberCount: 1, pageCommitted: false,
+    partnerInvited: false, routineCount: 0,
+  })
+  const allDone = firstWeekSteps({
+    yearPlanned: true, memberCount: 3, pageCommitted: true,
+    partnerInvited: true, routineCount: 2,
+  })
+  const now = new Date(2026, 8, 24)
+
+  it('opens when asked, however full the planner is', () => {
+    expect(shouldOpenFirstWeek({ asked: true, taskCount: 500, steps: twoLeft, hiddenAt: null, now })).toBe(true)
+  })
+
+  it('opens when asked, even after it was dismissed', () => {
+    expect(shouldOpenFirstWeek({ asked: true, taskCount: 0, steps: twoLeft, hiddenAt: '2026-09-01', now })).toBe(true)
+  })
+
+  it('opens when asked, even with every step already done', () => {
+    expect(shouldOpenFirstWeek({ asked: true, taskCount: 12, steps: allDone, hiddenAt: '2026-09-01', now })).toBe(true)
+  })
+
+  // The unasked-for OFFER keeps all its conditions.
+  it('offers itself only to an empty planner with work left and no dismissal', () => {
+    expect(shouldOpenFirstWeek({ asked: false, taskCount: 0, steps: twoLeft, hiddenAt: null, now })).toBe(true)
+    expect(shouldOpenFirstWeek({ asked: false, taskCount: 1, steps: twoLeft, hiddenAt: null, now })).toBe(false)
+    expect(shouldOpenFirstWeek({ asked: false, taskCount: 0, steps: twoLeft, hiddenAt: '2026-09-01', now })).toBe(false)
+    expect(shouldOpenFirstWeek({ asked: false, taskCount: 0, steps: allDone, hiddenAt: null, now })).toBe(false)
   })
 })

@@ -21,6 +21,7 @@ import {
   List,
   FileText,
   NotebookPen,
+  Printer,
   Repeat,
   Target,
   History,
@@ -296,6 +297,19 @@ export function Sidebar({
         >
           <NotebookPen className="w-5 h-5 shrink-0" />
           {!collapsed && <span>Plan from paper</span>}
+        </button>
+
+        {/* The paper's companion: four printable sheets, one per horizon. A
+            permanent page, never a step — it sits beside Plan from paper
+            because that is the pair, pen then camera. */}
+        <button
+          onClick={() => navigate('/guide')}
+          aria-label="Planning guide"
+          title="Planning guide — four sheets you can print"
+          className={navItemClass(location.pathname === '/guide')}
+        >
+          <Printer className="w-5 h-5 shrink-0" />
+          {!collapsed && <span>Planning guide</span>}
         </button>
 
         {/* Discussions — the inbox of item conversations. Part of the loop, not

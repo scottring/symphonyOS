@@ -86,6 +86,37 @@ export function shouldShowFirstWeek(steps: FirstWeekStep[], hiddenAt: string | n
 
 export const FIRST_WEEK_HIDE_KEY = (uid: string) => `symphony.firstWeek.hidden.${uid}`
 
+/**
+ * Is Getting Started open right now?
+ *
+ * Two quite different reasons, and keeping them apart is the point:
+ *
+ *   ASKED FOR — somebody chose "Getting started" from the menu. That works
+ *   whatever the planner holds, whether it was dismissed before, and whether
+ *   this is a first week or a thousandth. Onboarding you cannot re-open is
+ *   not independent of the planner; it is a function of how empty it is.
+ *
+ *   OFFERED — a genuinely empty planner, with steps left and no dismissal.
+ *   This is the nudge, and it obeys every one of those conditions.
+ *
+ * Extracted from HomeViewContainer so the independence is a property with a
+ * name and a test, rather than a boolean expression in a render (Codex,
+ * 2026-09-24: "Remaining scope also includes independent Getting Started
+ * access").
+ */
+export function shouldOpenFirstWeek(input: {
+  /** ?welcome=1 — an explicit request. */
+  asked: boolean
+  /** How much the planner holds. Only consulted for the OFFER. */
+  taskCount: number
+  steps: FirstWeekStep[]
+  hiddenAt: string | null
+  now: Date
+}): boolean {
+  if (input.asked) return true
+  return input.taskCount === 0 && shouldShowFirstWeek(input.steps, input.hiddenAt, input.now)
+}
+
 // ---------------------------------------------------------------------------
 // Sample page — "no paper handy?" commits the bundled sample image through
 // the exact same paper flow as a real page. The rows it creates are real

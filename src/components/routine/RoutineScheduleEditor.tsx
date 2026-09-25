@@ -14,6 +14,7 @@
 
 import type { RecurrencePattern, RecurrenceType, RecurrenceUnit } from '@/types/actionable'
 import { TIME_INPUT_LARGE_CLASS } from '@/lib/inputStyles'
+import { isEverydayRoutine } from '@/lib/routineUtils'
 
 const DAYS = [
   { key: 'sun', label: 'Sun' },
@@ -140,6 +141,14 @@ export function RoutineScheduleEditor({
         </div>
       </div>
 
+      {/* Daily is the one to compare against Weekend and a flexible Weekly:
+          those settle once per window, this asks again every day. */}
+      {type === 'daily' && (
+        <p className="text-sm text-neutral-600">
+          Every day. Each day has its own to tick off — doing it today doesn't settle tomorrow.
+        </p>
+      )}
+
       {/* Weekend: no days to pick — that is the whole point. Say what it will
           do, because "Weekend" alone reads like a Sat+Sun shortcut. */}
       {type === 'weekend' && (
@@ -170,8 +179,29 @@ export function RoutineScheduleEditor({
               </button>
             ))}
           </div>
+          {/* No day is a valid choice, not an error: the routine saves as a
+              flexible weekly one (the Rhythm page's "Flexible day"), placed on
+              a day each week. The old red "Select at least one day" said the
+              opposite of what saving then did (S3-11). */}
           {selectedDays.length === 0 && (
-            <p className="text-sm text-red-500 mt-2">Select at least one day</p>
+            <p className="text-sm text-neutral-600 mt-2">
+              No day chosen, so it's a flexible day — once a week, on whichever day you give it.
+            </p>
+          )}
+          {/* Seven days every week IS Daily — say so rather than leave two
+              controls that look like different answers. Not at "every 2 weeks",
+              where the two genuinely differ. */}
+          {selectedDays.length === 7 && weeklyInterval === 1 && (
+            <p className="text-sm text-neutral-600 mt-2">
+              Every day of the week — the same as Daily.
+            </p>
+          )}
+          {/* Mon–Fri counts as daily (isEverydayRoutine), so "Hide daily" on
+              Today sweeps it too. Nothing else here would tell you that. */}
+          {selectedDays.length < 7 && isEverydayRoutine(p) && (
+            <p className="text-sm text-neutral-600 mt-2">
+              Every weekday, so it counts as daily — “Hide daily” on Today hides it too.
+            </p>
           )}
 
           <div className="mt-3 flex items-center gap-3">

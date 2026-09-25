@@ -77,6 +77,13 @@ const ALLOWED = new Map<string, string>([
   ['types/actionable.ts', 'the column declarations'],
   ['hooks/useRoutines.ts', 'the WRITE path: create/update and the paused_until auto-resume'],
   ['components/routine/RoutineForm.tsx', 'the editor UI that toggles the flags'],
+  [
+    'components/routine/RoutineScheduleEditor.tsx',
+    'EXPLAINS the rule, never applies it: under a Mon–Fri schedule it says ' +
+      'the routine counts as daily, so "Hide daily" on Today hides it too ' +
+      '(S3-11, 2026-09-25). It asks isEverydayRoutine rather than re-deriving ' +
+      'the rule, so the sentence cannot drift from what Today does.',
+  ],
   ['components/detail/DetailPanelRedesign.tsx', 'the detail panel that toggles the flags'],
   ['components/surface/TapRoutinePanel.tsx', 'the tap panel that toggles the flags'],
   [

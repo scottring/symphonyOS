@@ -277,3 +277,24 @@ describe('useUndo', () => {
     })
   })
 })
+
+// The property the S3-12 fix leans on: a single stack shows a single
+// notification. Two handlers registering an undo for the same gesture — the
+// container's ScheduleActions and HomeView's wrapper both do, for a routine
+// completion — must leave ONE action standing, not two.
+describe('one stack, one notification', () => {
+  it('a second push replaces the first rather than queueing beside it', () => {
+    const { result } = renderHook(() => useUndo())
+    const first = vi.fn()
+    const second = vi.fn()
+    act(() => { result.current.pushAction('Routine completed', first) })
+    act(() => { result.current.pushAction('Routine completed', second) })
+    expect(result.current.currentAction?.message).toBe('Routine completed')
+    act(() => { result.current.executeUndo() })
+    // Exactly one undo runs, and it is the later one.
+    expect(second).toHaveBeenCalledTimes(1)
+    expect(first).not.toHaveBeenCalled()
+    expect(result.current.currentAction).toBeNull()
+  })
+})
+

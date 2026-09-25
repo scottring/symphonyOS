@@ -22,6 +22,7 @@ import { NotesProvider } from '@/contexts/NotesContext';
 import { ListsProvider } from '@/contexts/ListsContext';
 import { PinsProvider } from '@/contexts/PinsContext';
 import { useAuth } from '@/hooks/useAuth';
+import { setCurrentAccount } from '@/lib/currentAccount';
 import { useMobile } from '@/hooks/useMobile';
 import { useDomain } from '@/hooks/useDomain';
 import { filterInboxTasksForLayers } from '@/lib/today/domainFilter';
@@ -124,6 +125,10 @@ function ShellLayoutInner({ children }: Props) {
   const typing = useTextEntryActive();
   const planDestination = usePlanDestination();
   const { user, signOut } = useAuth();
+  // Module caches that are not components — the planning calendar behind the
+  // day tiles — key their data on who is signed in. The shell is the one
+  // place that knows, once.
+  useEffect(() => { setCurrentAccount(user?.id ?? null); }, [user?.id]);
 
   const [desktopControls, setDesktopControls] = useState<HTMLDivElement | null>(null);
   const [mobilePlanControls, setMobilePlanControls] = useState<HTMLDivElement | null>(null);
@@ -155,6 +160,13 @@ function ShellLayoutInner({ children }: Props) {
   // Mobile/UI chrome state
   const [moreSheetOpen, setMoreSheetOpen] = useState(false);
   const [quickAddOpen, setQuickAddOpen] = useState(false);
+  // Following a capture's "Go to inbox" (or any link) left Quick Add open
+  // over the page it had just sent you to. Going somewhere closes it.
+  const [quickAddPath, setQuickAddPath] = useState(location.pathname);
+  if (quickAddPath !== location.pathname) {
+    setQuickAddPath(location.pathname);
+    if (quickAddOpen) setQuickAddOpen(false);
+  }
   // "Add task" from the Planning panel (dock or sheet) asks the shell to open
   // the same unibox ⌘K opens — one add box, wherever it is asked for.
   useEffect(() => onQuickAddRequest(() => setQuickAddOpen(true)), []);
@@ -354,6 +366,8 @@ function ShellLayoutInner({ children }: Props) {
           showFab={false}
           onAdd={chrome.onQuickAdd}
           onAddRich={chrome.onQuickAddRich}
+          // useShellChrome confirms every capture once its write lands.
+          confirmsAfterWrite
           onAddNote={chrome.onQuickAddNote}
           eventCalendarName={chrome.eventCalendarName}
           onPlanFromPaper={() => { if (!requestPlanFromPaper()) navigate('/today') }}

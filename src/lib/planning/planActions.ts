@@ -26,7 +26,8 @@ import type { Task } from '@/types/task'
 import type { Routine } from '@/types/actionable'
 import type { PlanDragPayload, PlanTarget } from './planDrag'
 import { localYmd } from '@/lib/cadence/config'
-import { focusSnapshot } from '@/lib/placement/model'
+import { focusSnapshot, liveCommitments } from '@/lib/placement/model'
+import { bootstrapCommitments } from '@/lib/placement/intentions'
 
 export interface PlanActionDeps {
   findTask: (id: string) => Task | undefined
@@ -59,6 +60,58 @@ function midnight(d: Date): Date {
 }
 
 /** Reverse a day commitment without sending the task out of its period lists. */
+/**
+ * Removing timing, with the write and the way back, as one value.
+ *
+ * Two distinct gestures, because they leave different things behind
+ * (connected planning, requirement 6):
+ *
+ *   'day'  the date goes; an explicit week commitment and the period stay
+ *   'all'  the date and the week go; the period and the goal link stay
+ *
+ * Both are stated as COMMITMENTS, never as a bucket and stamps. A bucket
+ * names the rung a row ends on; it cannot say which week to release, and an
+ * absent stamp is not a removal at all — so the old `{ bucket: 'month',
+ * weekStart: undefined }` write left the week open behind it, and its Undo
+ * restored the date without the week (Codex review, 2026-09-24). The week
+ * commitment is named outright, and every broader one is named as surviving.
+ *
+ * `previous` is everything the write touches, so a single Undo restores the
+ * whole gesture rather than half of it.
+ */
+export function timingRemoval(
+  task: Task,
+  scope: 'day' | 'all',
+): { updates: Partial<Task>; previous: Partial<Task> } {
+  // Plan against the same list planPlacement will: a legacy row whose
+  // commitments never loaded is read through its cached stamps exactly as the
+  // placement module bootstraps it, so the removal releases what is really
+  // there and the Undo puts back the state that really existed.
+  const live = liveCommitments({ commitments: bootstrapCommitments(task) })
+  const previous: Partial<Task> = {
+    focus: focusSnapshot(task),
+    scheduledFor: task.scheduledFor,
+    isAllDay: task.isAllDay,
+    ...(scope === 'all' ? { commitments: live } : {}),
+  }
+  const clearedDay: Partial<Task> = {
+    focus: task.scheduledFor ? focusSnapshot(task).filter((f) => localYmd(f.date) !== localYmd(task.scheduledFor!)) : focusSnapshot(task),
+    scheduledFor: undefined,
+    isAllDay: undefined,
+  }
+  if (scope === 'day') return { updates: clearedDay, previous }
+  return {
+    updates: {
+      ...clearedDay,
+      // The week commitment goes. Everything above it stays open, and the
+      // row's bucket follows from what is left, so a task with nothing
+      // broader lands in the Inbox instead of a month nobody chose.
+      commitments: live.filter((c) => !(c.level === 'week' && c.status === 'open')),
+    },
+    previous,
+  }
+}
+
 export function taskDayRemoval(task: Task, day: Date): Partial<Task> {
   const ymd = localYmd(day)
   return {

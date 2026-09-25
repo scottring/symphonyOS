@@ -63,12 +63,16 @@ describe('summarize', () => {
       { title: 'Strength 2x/week', destination: 'October goals · kept from September' },
       { title: 'Book a PT evaluation', destination: 'October tasks · new next action toward Strength 2x/week' },
       { title: 'Library card', destination: 'October tasks · kept from September' },
-      { title: 'Photos', destination: "Dropped from September · the task is kept" },
-      { title: 'Tile saw', destination: 'Left open in September' },
+      { title: 'Photos', destination: "Dropped from September · back to the Inbox" },
+      // No verdict: Save never writes it, so it is marked as untouched and
+      // the session shows it apart from the changes (Codex, 2026-09-24).
+      { title: 'Tile saw', destination: 'Left open in September', unchanged: true },
       { title: 'Three bids in hand', destination: 'October goals · for Sign a contractor' },
       { title: 'Call Hughes', destination: 'October tasks · toward Three bids in hand' },
       { title: 'Get three bids', destination: 'October tasks · stays on the season, marked "in October"' },
     ])
+    // Everything else on the list is a real write.
+    expect(lines.filter((l) => l.unchanged).map((l) => l.title)).toEqual(['Tile saw'])
   })
 })
 
@@ -92,7 +96,7 @@ describe('summarize — steps under a kept goal', () => {
   it('a step with its own Drop stays dropped, whatever order the verdicts were clicked in', () => {
     for (const verdicts of [{ g: 'keep' as const, s1: 'drop' as const }, { s1: 'drop' as const, g: 'keep' as const }]) {
       const lines = summarize({ ...emptyDraft('month', oct, sep), verdicts }, ctx)
-      expect(lines.find((l) => l.title === 'Buy chairs')!.destination).toBe('Dropped from September · the task is kept')
+      expect(lines.find((l) => l.title === 'Buy chairs')!.destination).toBe('Dropped from September · back to the Inbox')
       expect(lines.find((l) => l.title === 'Paint')!.destination).toBe('October tasks · carried with Porch')
     }
   })
@@ -220,7 +224,7 @@ describe('week sessions', () => {
       above: [t({ id: 'm1', title: 'Three bids', bucket: 'month' })], aboveGoals: [], periodLabel: 'this week', prevLabel: 'last week', aboveLabel: 'October' })
     expect(lines).toEqual([
       { title: 'Bike rack', destination: "This week's tasks · kept from last week" },
-      { title: 'Old thing', destination: 'Dropped from last week · the task is kept' },
+      { title: 'Old thing', destination: 'Dropped from last week · back to the Inbox' },
       { title: 'Call the plumber', destination: "This week's tasks, on Thu" },
       { title: 'Sort the garage', destination: "This week's tasks" },
       { title: 'Three bids', destination: 'This week\'s tasks · stays on October, marked "on this week"' },
@@ -274,6 +278,23 @@ describe('season and year sessions', () => {
     expect(row.createdAt).toBeInstanceOf(Date)
   })
 
+  // "The task is kept" told the reader nothing (walkthrough, 2026-09-25). A
+  // week task October also holds stays in October; only a task nothing else
+  // holds goes back to the Inbox.
+  it('a dropped week task names where it really goes', () => {
+    const OCT = new Date(2026, 9, 1), LAST = new Date(2026, 8, 27), WEEK = new Date(2026, 9, 4)
+    const onLast = (over: Partial<Task>) => t({ bucket: 'week', weekStart: LAST, commitments: [{ level: 'week', periodStart: LAST, status: 'open' }], ...over })
+    const d: SessionDraft = { ...emptyDraft('week', WEEK, LAST), verdicts: { a: 'drop', b: 'drop' } }
+    const alsoOctober = onLast({ id: 'a', title: 'Gutters', monthStart: OCT,
+      commitments: [{ level: 'week', periodStart: LAST, status: 'open' }, { level: 'month', periodStart: OCT, status: 'open' }] })
+    const weekOnly = onLast({ id: 'b', title: 'Old thing' })
+    const lines = summarize(d, { open: [alsoOctober, weekOnly], above: [], aboveGoals: [], periodLabel: 'this week', prevLabel: 'last week', aboveLabel: 'October' })
+    expect(lines).toEqual([
+      { title: 'Gutters', destination: 'Dropped from last week · stays in October' },
+      { title: 'Old thing', destination: 'Dropped from last week · back to the Inbox' },
+    ])
+  })
+
   // The season speaks in month words, with the season's own label; there is no
   // level above to pull from, so "stays on …" never occurs.
   it('summarize for the season uses the month wording with the season label', () => {
@@ -282,7 +303,7 @@ describe('season and year sessions', () => {
     expect(summarize(d, { open: rows, above: [], aboveGoals: [], periodLabel: 'Winter 2026', prevLabel: 'Fall 2026', aboveLabel: '2026' })).toEqual([
       { title: 'Porch', destination: 'Winter 2026 goals · kept from Fall 2026' },
       { title: 'Bids', destination: 'Done in Fall 2026' },
-      { title: 'Old', destination: 'Dropped from Fall 2026 · the task is kept' },
+      { title: 'Old', destination: 'Dropped from Fall 2026 · back to the Inbox' },
     ])
   })
 

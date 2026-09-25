@@ -12,11 +12,15 @@ import {
   type DragMoveEvent,
 } from '@dnd-kit/core'
 import type { Task } from '@/types/task'
+import { PlanWeekMenu } from '@/components/plan/PlanWeekMenu'
+import { taskTiming, hasTiming, broaderCommitment, removeDayOutcome, removeAllOutcome } from '@/lib/planning/taskTiming'
+import { timingRemoval } from '@/lib/planning/planActions'
 import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
 import { useGoogleCalendar } from '@/hooks/useGoogleCalendar'
+import { useOptionalScheduleActionsContext } from '@/contexts/ScheduleActionsContext'
 import type { Routine, ActionableInstance } from '@/types/actionable'
 import { useSupabaseTasks } from '@/hooks/useSupabaseTasks'
-import { taskToTimelineItem, eventToTimelineItem } from '@/types/timeline'
+import { taskToTimelineItem, eventToTimelineItem, findEventByItemId } from '@/types/timeline'
 import { goalTitleMap } from '@/lib/planning/goalSteps'
 import { WeekGrid, dayKey, type PlanSlot } from './WeekGrid'
 import { WeekAllDayChip, WeekAllDayEventChip } from './WeekAllDayChip'
@@ -35,9 +39,13 @@ import { useGatedTaskActions } from '@/hooks/useGatedTaskActions'
 import { weekStartAnchor, readCadenceConfig } from '@/lib/cadence/config'
 import { partitionWeekExtras } from '@/lib/week/weekExtras'
 import { buildWeekRoutineItems } from './weekRoutineItems'
+import { routineDayIndex, routineDayState, routineIdOf } from '@/lib/planning/weekDensity'
+import { useDayChoices } from '@/hooks/useDayChoices'
 import { useWeekInstances } from './useWeekInstances'
 import { edgeForPointer } from './edgeAdvance'
 import { WeekJournal, type JournalDay, type JournalEntry } from './WeekJournal'
+import type { DensitySources } from '@/lib/planning/dayDensity'
+import { formatWeekRange } from '@/lib/dateHelpers'
 import { WeekList } from './WeekList'
 import { makePlanActions } from '@/lib/planning/planActions'
 import { focusDays, sameDay } from '@/lib/placement/model'
@@ -49,7 +57,6 @@ import { localYmd } from '@/lib/cadence/config'
 import { publishViewedWeek } from '@/lib/viewedWeekSignal'
 import { useMediaQuery } from '@/hooks/useMediaQuery'
 import type { AssigneeFilter } from '@/lib/today/types'
-import { isTimelineObligation } from '@/lib/routineUtils'
 import type { Layer } from '@/lib/domains'
 import { WeekPlanHost } from './WeekPlanHost'
 
@@ -89,6 +96,27 @@ function formatEarlyTime(d: Date): string {
 interface WeekViewV2Props {
   tasks: Task[]
   events: CalendarEvent[]
+  /**
+   * How each source stands for the week being VIEWED. The day tiles draw a day
+   * as quiet only when they have actually read it: "nothing on Thursday", "we
+   * could not read Thursday" and "there is no calendar to read" are three
+   * different answers (Codex, 2026-09-24). Omitted, everything reads ready —
+   * the shape every existing caller and test already has.
+   */
+  sources?: DensitySources
+  /**
+   * The UNFILTERED lists, and the range the events were actually fetched for
+   * — for the day tiles' counts only, never for what the journal draws.
+   *
+   * Density is universal: a day is full regardless of which domain filled it
+   * or whose it is. `tasks`/`events` above are what this view DRAWS, narrowed
+   * to the reader's layers and assignee, and counting those made /week the
+   * one surface that answered "how busy is Tuesday" differently from every
+   * other (Codex, 2026-09-25). Omitted, the tiles fall back to the drawn
+   * lists and under-count exactly as much as the view is filtered.
+   */
+  densityTasks?: Task[]
+  densityEvents?: CalendarEvent[]
   routines: Routine[]
   // dateInstances is reserved for future instance-completion overlays;
   // not yet consumed in rendering but kept in the API for Task 12 wiring.
@@ -103,7 +131,9 @@ interface WeekViewV2Props {
   layers: ReadonlySet<Layer>
   onSelectItem: (id: string | null) => void
   onUpdateTask: (taskId: string, updates: Partial<Task>) => Promise<void | boolean> | void
-  onUpdateEvent: (eventId: string, updates: { startTime: Date; endTime: Date }) => Promise<void> | void
+  /** Move an event. Absent = this host cannot move events, and the grid says
+   *  so rather than announcing a move it did not make. */
+  onUpdateEvent?: (eventId: string, updates: { startTime: Date; endTime: Date }) => Promise<void> | void
   onUpdateRoutine: (routineId: string, updates: Partial<Routine>) => Promise<void> | void
   /** Pin a routine to a time on ONE day (override write, recurrence rule
    *  untouched). Present = routine blocks become draggable. */
@@ -148,6 +178,7 @@ export function WeekViewV2(props: WeekViewV2Props) {
   const {
     tasks,
     events,
+    sources,
     routines,
     weekStart,
     onWeekChange,
@@ -159,6 +190,8 @@ export function WeekViewV2(props: WeekViewV2Props) {
     onUpdateRoutine,
     onPushRoutine,
     dayCount = 7,
+    densityTasks,
+    densityEvents,
     pushAction,
   } = props
 
@@ -169,6 +202,9 @@ export function WeekViewV2(props: WeekViewV2Props) {
   const { getCurrentUserMember } = useFamilyMembers()
   const meId = getCurrentUserMember()?.id ?? null
   const { createEvent, deleteEvent } = useGoogleCalendar()
+  // createEvent never updates the held events; without a refetch a
+  // quick-created event only showed up after a reload.
+  const refetchEvents = useOptionalScheduleActionsContext()?.onRefetchEvents
   const gridCreate = useGridCreate()
 
   // Pool-pill triage. Defers run through the DomainGate (a context-less task
@@ -244,6 +280,9 @@ export function WeekViewV2(props: WeekViewV2Props) {
             void deleteEvent({ eventId: result.id })
           })
         }
+        // Same as Today's inline create: re-read the range on screen so the
+        // new event appears now, not after a reload.
+        await refetchEvents?.()
       } else if (params.type === 'routine') {
         // Routines need a recurrence pattern that doesn't fit the popover.
         // Build an NL string from the slot's title/weekday/time and navigate
@@ -265,7 +304,7 @@ export function WeekViewV2(props: WeekViewV2Props) {
       }
       gridCreate.close()
     },
-    [addTask, deleteTask, createEvent, deleteEvent, navigate, gridCreate, pushAction],
+    [addTask, deleteTask, createEvent, deleteEvent, refetchEvents, navigate, gridCreate, pushAction],
   )
 
   // Drag-drop wiring. Domain-on-drop needs nothing here: onUpdateTask is the
@@ -517,10 +556,7 @@ export function WeekViewV2(props: WeekViewV2Props) {
             const task = tasks.find((t) => t.id === taskId)
             if (task) blocks.push(taskToTimelineItem(task, labelFor(task)))
           } else if (itemId.startsWith('event-')) {
-            const event = events.find((ev) => {
-              const id = ev.google_event_id || ev.id
-              return `event-${id}` === itemId
-            })
+            const event = findEventByItemId(events, itemId)
             if (event) blocks.push(eventToTimelineItem(event))
           }
         }
@@ -630,14 +666,12 @@ export function WeekViewV2(props: WeekViewV2Props) {
     // day's entries; an untimed one nobody chose is only available — the same
     // split Today and its pin make (dayPlan.ts).
     for (const r of routineItems) {
-      const idx = Number(r.id.match(/-day(\d+)$/)?.[1] ?? -1)
-      const day = days[idx]
+      const day = days[routineDayIndex(r.id)]
       if (!day) continue
-      const routineId = r.id.slice('routine-'.length).replace(/-day\d+$/, '')
-      const instance = weekInstances.find((i) => i.entity_type === 'routine' && i.entity_id === routineId && i.date === day.key)
-      const completed = instance?.status === 'completed'
-      const planned = instance?.planned_on === day.key
-      const pinned = !!r.originalRoutine && isTimelineObligation(r.originalRoutine)
+      const routineId = routineIdOf(r.id)
+      // The same three facts the day tiles read, from the same place — the
+      // journal and the tiles must not disagree about a Tuesday.
+      const { completed, planned, pinned } = routineDayState(routineId, day.key, r, weekInstances)
       const entry: JournalEntry = {
         id: r.id, kind: 'routine', time: r.startTime ?? undefined, title: r.title, completed, routineId,
       }
@@ -653,6 +687,41 @@ export function WeekViewV2(props: WeekViewV2Props) {
     }
     return days
   }, [tasks, userId, events, eventItems, extras, routineItems, weekInstances, weekStart, dayCount, labelFor])
+
+  /**
+   * How much is already on each day of the week being VIEWED, for the timing
+   * control's day tiles. Counted off `journalDays` — the list the page itself
+   * draws — rather than re-derived, so the tiles can never disagree with the
+   * days beneath them. Entries are already one-per-thing there; all-day notes
+   * are events too, and a dinner is the day's meal, not a commitment to plan
+   * around, so it is left out.
+   */
+  /**
+   * The same hook every other surface uses, given /week's OWN calendar read.
+   *
+   * The counting rules moved out of this component in the previous batch; the
+   * SOURCES follow them now. Two weeks around the week on screen reaches
+   * further than the shared planning window, so a week paged into December is
+   * still counted — and because the lists handed over are unfiltered, the
+   * answer matches Today's and the planning pages' for the same day.
+   *
+   * The journal above is untouched: what it draws is still the reader's own
+   * filtered view. Only the tiles' counts changed, and they say their scope.
+   */
+  const dayChoiceSource = useDayChoices({
+    windowStart: weekStart,
+    dayCount,
+    tasks: densityTasks ?? tasks,
+    userId: userId ?? null,
+    routines,
+    instances: weekInstances,
+    calendar: {
+      events: densityEvents ?? events,
+      // `sources.events` already answers "does what we hold cover the week on
+      // screen" — `densitySourcesFor` is given that exact range.
+      status: sources?.events ?? 'ready',
+    },
+  })
 
   const journalSpans = useMemo(
     () => layoutContextSpans(events, journalDays.map((d) => d.date)),
@@ -824,6 +893,61 @@ export function WeekViewV2(props: WeekViewV2Props) {
   // the days. When the panel is closed the page offers it in one line, so a
   // week is never a wall of days with no way to fill them.
   const weekIsCurrent = sameDay(weekAnchor, weekStartAnchor(new Date(), readCadenceConfig().weekStartsOn))
+  /**
+   * The timing control on a week row — the same component the month and season
+   * pages use, so the week is an execution view of the same work rather than a
+   * different vocabulary (requirement 2).
+   *
+   * The weeks it offers come from the week being VIEWED, never the week
+   * containing now. "Keep it in <month>" is offered only when the task has a
+   * broader commitment to fall back to: with nothing above it, clearing the
+   * week has no destination to name, and the brief forbids promising one.
+   */
+  /** The week's own days as tiles, with what each already holds. */
+  const dayChoices = useMemo(
+    () => dayChoiceSource.forWeek(weekStart, dayCount),
+    [dayChoiceSource, weekStart, dayCount],
+  )
+
+  const weekTimingControl = useCallback((task: Task) => {
+    const t = taskTiming(task)
+    // What actually survives a removal, read from commitments — not from the
+    // cached monthStart, which outlives a commitment that was removed, and
+    // never from the goal link, which is not a period commitment at all.
+    const broader = broaderCommitment(task)
+    const removeTiming = (scope: 'day' | 'all') => {
+      const { updates, previous } = timingRemoval(task, scope)
+      const kept = scope === 'day' ? removeDayOutcome(t, broader?.label ?? null) : removeAllOutcome(t, broader?.label ?? null)
+      const what = scope === 'day'
+        ? `Removed ${t.day!.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })} from “${task.title}”.`
+        : `Removed ${t.day ? 'the day and the week' : 'the week'} from “${task.title}”.`
+      void Promise.resolve(onUpdateTask(task.id, updates)).then((ok) => {
+        if (ok === false) return
+        showToast(`${what} ${kept}`, 'success', 8000, {
+          label: 'Undo', onClick: () => { void onUpdateTask(task.id, previous) },
+        })
+      })
+    }
+    return (
+      <PlanWeekMenu
+        size="sm"
+        title={task.title}
+        periodStart={weekAnchor}
+        periodLabel={broader?.label ?? undefined}
+        timing={t}
+        currentWeekStart={t.week}
+        // The days of the week in VIEW, never today's: choosing from a
+        // November row must offer November days (Scott, 2026-09-24).
+        dayChoices={dayChoices}
+        dayChoicesLabel={`A day in ${formatWeekRange(weekAnchor)}`}
+        onPickWeek={(weekStart) => { void onUpdateTask(task.id, { bucket: 'week', weekStart, scheduledFor: undefined }) }}
+        onClearWeek={hasTiming(t) ? () => removeTiming('all') : undefined}
+        onRemoveDay={t.day ? () => removeTiming('day') : undefined}
+        onPickDay={(date) => { void onUpdateTask(task.id, { bucket: 'timed', scheduledFor: date, isAllDay: true }) }}
+      />
+    )
+  }, [weekAnchor, onUpdateTask, dayChoices])
+
   const weekListFor = (onPlan: () => void) => (
     <WeekList
       key={localYmd(weekAnchor)}
@@ -832,16 +956,23 @@ export function WeekViewV2(props: WeekViewV2Props) {
       meId={meId}
       userId={userId}
       isCurrent={weekIsCurrent}
+      peopleFiltered={Array.isArray(selectedAssignees) ? selectedAssignees.length > 0 : !!selectedAssignees}
       onToggle={(task) => handleJournalToggle({ id: `task-${task.id}`, kind: 'task', title: task.title, completed: task.completed, task }, journalDays[0])}
       onSelect={(id) => onSelectItem(`task-${id}`)}
       onAdd={async (title) => {
         const id = await addTask(title, undefined, undefined, undefined, { bucket: 'week', weekStart: weekAnchor, assignedTo: meId ?? undefined })
         if (!id) throw new Error('Task creation failed')
         const hidden = !layers.has('unsorted')
-        showToast(`Added to the week · Unsorted · only you${hidden ? ' · hidden by your current view' : ''}`, hidden ? 'warning' : 'success', hidden ? 8000 : undefined)
-        pushAction?.(`Added "${title}"`, () => { void deleteTask(id) })
+        // ONE notification per add (S3-12): the Undo carries what the old
+        // second toast said. A row the current view hides still warns on its
+        // own, because that is news the Undo line does not give.
+        const where = 'to the week · Unsorted · only you'
+        if (pushAction) pushAction(`Added "${title}" ${where}`, () => { void deleteTask(id) })
+        else showToast(`Added ${where}`, 'success')
+        if (hidden) showToast('Hidden by your current view — turn on Unsorted to see it', 'warning', 8000)
       }}
       onPlan={onPlan}
+      timingControl={weekTimingControl}
     />
   )
 
@@ -877,7 +1008,7 @@ export function WeekViewV2(props: WeekViewV2Props) {
           <div className="flex flex-col gap-4">
             {weekListFor(openSession)}
             <h2 className="week-days-heading">The days</h2>
-            <WeekJournal days={journalDays} spans={journalSpans} onSelectItem={onSelectItem} onToggleEntry={handleJournalToggle} onPlanDrop={handlePlanDropOnDay} onAddToDay={handleAddToDay} narrow dragEnabled={false} />
+            <WeekJournal days={journalDays} spans={journalSpans} onSelectItem={onSelectItem} onToggleEntry={handleJournalToggle} onPlanDrop={handlePlanDropOnDay} onAddToDay={handleAddToDay} narrow dragEnabled={false} timingControl={weekTimingControl} />
           </div>
         ) : (
         <div className="flex items-start gap-4">
@@ -887,7 +1018,7 @@ export function WeekViewV2(props: WeekViewV2Props) {
           <>
             {weekListFor(openSession)}
             <h2 className="week-days-heading">The days</h2>
-            <WeekJournal days={journalDays} spans={journalSpans} onSelectItem={onSelectItem} onToggleEntry={handleJournalToggle} onPlanDrop={handlePlanDropOnDay} onAddToDay={handleAddToDay} />
+            <WeekJournal days={journalDays} spans={journalSpans} onSelectItem={onSelectItem} onToggleEntry={handleJournalToggle} onPlanDrop={handlePlanDropOnDay} onAddToDay={handleAddToDay} timingControl={weekTimingControl} />
           </>
         ) : (
         <>

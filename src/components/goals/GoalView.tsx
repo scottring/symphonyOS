@@ -1,6 +1,9 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { PAGE_COLUMN } from '@/components/layout/pageLayout'
 import { GoalChapters } from './GoalChapters'
+import { GoalSupportLinks } from './GoalSupportLinks'
+import { seasonGoalsSupporting } from '@/lib/planning/goalSupport'
+import { readSeasons } from '@/lib/cadence/seasons'
 import type { Goal, GoalArea } from '@/types/goal'
 import type { Task } from '@/types/task'
 
@@ -11,12 +14,16 @@ interface GoalViewProps {
   onBack: () => void
   onUpdateGoal: (id: string, updates: Partial<Pick<Goal, 'name' | 'notes' | 'status' | 'strategy' | 'domainSlug' | 'layerId'>>) => void
   onDeleteGoal: (id: string) => void
+  /** Open a season goal named under "Supported by". Omitted where the page
+   *  has nowhere to send the reader, and the titles then read as plain text. */
+  onOpenTask?: (taskId: string) => void
 }
 
 export function GoalView({
   goal,
   area,
   tasks,
+  onOpenTask,
   onBack,
   onUpdateGoal,
   onDeleteGoal,
@@ -138,6 +145,12 @@ export function GoalView({
                        resize-none transition-all"
           />
         </div>
+
+        <GoalSupportLinks
+          heading="Supported by"
+          links={seasonGoalsSupporting(goal.id, tasks, readSeasons())}
+          onOpen={onOpenTask ? (link) => onOpenTask(link.id) : undefined}
+        />
 
         <GoalChapters goalId={goal.id} tasks={tasks} />
 

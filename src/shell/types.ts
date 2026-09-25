@@ -28,6 +28,14 @@ export interface AppDef {
   /** Selection kinds this app owns (e.g., ['task'] or ['application']). Must be unique across registry. */
   ownsSelectionKinds?: string[];
   /**
+   * Selection kinds another app OWNS that this app's pages may show in the
+   * global DetailPanel without navigating away. Without it, a selection made
+   * on a page whose app does not own the kind is stripped at once — which is
+   * why the planning pages sent a task to the full /task/:id page while Today
+   * and Week opened the pane (S2-10).
+   */
+  hostsSelectionKinds?: string[];
+  /**
    * If true, the app renders without Shell chrome (sidebar / topbar / etc.).
    * Default (omitted or false) wraps the app's Component in <ShellLayout>.
    * Use this for kiosk/fullscreen surfaces like Wall.

@@ -1,11 +1,12 @@
 import { keepsWeekView } from '@/lib/week/keepsWeekView'
-import { useLocation } from 'react-router-dom'
-import { presetRange, weekRange, weekRangeFromStartParam } from '@/lib/planning/dateRange'
+import { weekRangeFromParams, weekStartParam } from '@/lib/week/weekStartParam'
+import { useLocation, useSearchParams } from 'react-router-dom'
 import { useState, useMemo, useCallback, useEffect, useRef, type ReactNode } from 'react'
 import { useCadenceConfig, readCadenceConfig, weekStartAnchor } from '@/lib/cadence/config'
 import { HomeChromeControls } from './HomeChromeControls'
 import type { HomeViewType } from '@/types/homeView'
 import type { Task } from '@/types/task'
+import type { DensitySources } from '@/lib/planning/dayDensity'
 import type { Project } from '@/types/project'
 import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
 import type { Routine, ActionableInstance } from '@/types/actionable'
@@ -43,6 +44,9 @@ import { CalendarReconnectBanner } from '@/components/home/CalendarReconnectBann
 
 interface HomeViewProps {
   tasks: Task[]
+  /** How each source stands for the range in view — handed to the week's day
+   *  tiles so they never draw a day as quiet before they have read it. */
+  densitySources?: DensitySources
   /** Whose day this is — focus (task_focus) is per person. */
   userId?: string | null
   events: CalendarEvent[]
@@ -61,6 +65,18 @@ interface HomeViewProps {
    *  (`/week`) mounts HomeView with fixedView="week" — its own route, not a
    *  switcher state (the D/W/M switcher died with the analog-planning pivot). */
   fixedView?: HomeViewType
+  /**
+   * Register an undo with the HOST's stack instead of this component's own.
+   *
+   * Both this component and `HomeViewContainer` own a `useUndo()` and both
+   * used to render an `UndoToast`, so a single routine completion — which the
+   * container's ScheduleActions already registers — pushed to two independent
+   * stacks and raised TWO Undo notifications (S3-12, seen live 2026-09-24).
+   * Given this, the second stack goes unused and no second toast is drawn;
+   * a double push then lands in one stack, where the later one replaces the
+   * earlier, which is one notification.
+   */
+  registerUndo?: (message: string, undo: () => void) => void
   /** Today's planning reminder, drawn below its schedule (2026-09-22). */
   todayAfterSchedule?: ReactNode
 }
@@ -69,6 +85,7 @@ export function HomeView({
   tasks,
   userId,
   events,
+  densitySources,
   routines,
   allActiveRoutines,
   projects,
@@ -80,13 +97,15 @@ export function HomeView({
   onDateChange,
   bothPanelsOpen,
   fixedView,
+  registerUndo,
   todayAfterSchedule,
 }: HomeViewProps) {
   const ctx = useScheduleActionsContext()
   const { currentView: hookView, setCurrentView } = useHomeView()
   const currentView = fixedView ?? hookView
   const isMobile = useMobile()
-  const { currentAction, pushAction, executeUndo, dismiss } = useUndo()
+  const { currentAction, pushAction: ownPushAction, executeUndo, dismiss } = useUndo()
+  const pushAction = registerUndo ?? ownPushAction
   const { layers, soleDomain } = useDomain()
 
   // Filter tasks, routines, projects, and events by the checked layer set.
@@ -205,39 +224,72 @@ export function HomeView({
   // — it changes what is drawn and writes nothing (Scott, 2026-09-06: the
   // time-block overlay's range picker moved here and the overlay went).
   const location = useLocation()
+  const [, setSearchParams] = useSearchParams()
   const rangePreset = new URLSearchParams(location.search).get('range')
   const startParam = new URLSearchParams(location.search).get('start')
   const [rangeDays, setRangeDays] = useState(7)
   // Journal (the paper week) or Schedule (the hourly grid). Always opens as
   // the journal; switching is presentation only — same dates, same data.
   const [weekMode, setWeekMode] = useState<WeekMode>('journal')
+  // Set by goToWeek and onRangeChange: the run they just wrote into the URL is
+  // already on screen, so re-deriving it would only undo the Schedule/Journal
+  // choice the reader made.
+  const selfWeekNav = useRef(false)
+  // A range picked from the masthead goes into the URL too, or a reload (or
+  // Back from a task) would drop it for the full week. Replace, not push: the
+  // custom start/end inputs fire on every edit, and each is not a place to go
+  // Back to.
   const onRangeChange = useCallback((range: Date[]) => {
     setWeekStart(range[0])
     setRangeDays(range.length)
     onDateChange(range[0])
-  }, [onDateChange])
+    const next = weekStartParam(fixedView, range.length, location.search, range[0], readCadenceConfig().weekStartsOn)
+    if (!next) return
+    selfWeekNav.current = true
+    setSearchParams(next, { replace: true })
+  }, [onDateChange, fixedView, location.search, setSearchParams])
+  /**
+   * Page the week — and put it in the URL (S2-25).
+   *
+   * `weekStart` lived only in this component's state, so the week you paged to
+   * existed nowhere durable: reload, or open a task and come back, and /week
+   * re-derived the week from `new Date()` and returned you to this one
+   * ("Assign a week, reload Week → Week reloads to September"). `?start=` is
+   * already READ on arrival, so writing it makes reload, Back and Forward all
+   * land where you were — the same contract `/month` got in S2-16.
+   *
+   * A weekend or a custom run also writes its `range` and `days` — `start`
+   * alone would reopen it as the full week around that day.
+   */
+  const goToWeek = useCallback((weekAnchor: Date, viewed: Date = weekAnchor) => {
+    setWeekStart(weekAnchor)
+    onDateChange(viewed)
+    const next = weekStartParam(fixedView, rangeDays, location.search, weekAnchor, readCadenceConfig().weekStartsOn)
+    if (!next) return
+    selfWeekNav.current = true
+    setSearchParams(next, { replace: false })
+  }, [onDateChange, fixedView, rangeDays, location.search, setSearchParams])
 
-  // Arriving at /week — from the navigation's Week menu or anywhere else —
-  // opens the seven-day week unless the link names a shorter run
-  // (?range=weekend | three) or a specific week (?start=YYYY-MM-DD, from a
-  // planning nudge naming a week that isn't the current one). Keyed on the
-  // navigation itself, so choosing "Weekend" twice, or "Open week page"
-  // after a weekend, re-applies.
   const onDateChangeRef = useRef(onDateChange)
   const viewedDateRef = useRef(viewedDate)
   useEffect(() => {
     onDateChangeRef.current = onDateChange
     viewedDateRef.current = viewedDate
   })
+  // Arriving at /week — from the navigation's Week menu or anywhere else —
+  // opens the seven-day week unless the link names a shorter run
+  // (?range=weekend | three) or a specific week (?start=YYYY-MM-DD, from a
+  // planning nudge naming a week that isn't the current one), or carries the
+  // exact run paged to (?start=…&range=…&days=N). Keyed on the
+  // navigation itself, so choosing "Weekend" twice, or "Open week page"
+  // after a weekend, re-applies.
   const previousWeekLocation = useRef<{ pathname: string; search: string } | null>(null)
   useEffect(() => {
     const keepView = keepsWeekView(previousWeekLocation.current, location)
     previousWeekLocation.current = { pathname: location.pathname, search: location.search }
+    if (selfWeekNav.current) { selfWeekNav.current = false; return }
     if (fixedView !== 'week' || keepView) return
-    const range = weekRangeFromStartParam(startParam, readCadenceConfig().weekStartsOn)
-      ?? (rangePreset === 'weekend' || rangePreset === 'three'
-        ? presetRange(rangePreset, new Date())
-        : weekRange(new Date(), readCadenceConfig().weekStartsOn))
+    const range = weekRangeFromParams(new URLSearchParams(location.search), readCadenceConfig().weekStartsOn, new Date())
     setWeekStart(range[0])
     setRangeDays(range.length)
     setWeekMode('journal')
@@ -246,7 +298,7 @@ export function HomeView({
     if (sundayOfWeek(viewedDateRef.current).getTime() !== sundayOfWeek(range[0]).getTime()) {
       onDateChangeRef.current(range[0])
     }
-  }, [fixedView, rangePreset, startParam, location.key, location.pathname, location.search])
+  }, [fixedView, location.key, location.pathname, location.search])
 
   // Changing the setting re-anchors the week on screen. Without this the view
   // keeps whatever the initial state captured until a remount, so the setting
@@ -306,23 +358,13 @@ export function HomeView({
     pushAction(`Deleted "${task.title}"`, () => {})
   }, [filteredTasks, ctx.onDeleteTask, pushAction])
 
-  const handleCompleteRoutineWithUndo = useCallback((routineId: string, completed: boolean) => {
-    if (!ctx.onCompleteRoutine) return
-    ctx.onCompleteRoutine(routineId, completed)
-    pushAction(
-      completed ? 'Routine completed' : 'Routine marked incomplete',
-      () => ctx.onCompleteRoutine!(routineId, !completed)
-    )
-  }, [ctx.onCompleteRoutine, pushAction])
-
-  const handleCompleteEventWithUndo = useCallback((eventId: string, completed: boolean) => {
-    if (!ctx.onCompleteEvent) return
-    ctx.onCompleteEvent(eventId, completed)
-    pushAction(
-      completed ? 'Event completed' : 'Event marked incomplete',
-      () => ctx.onCompleteEvent!(eventId, !completed)
-    )
-  }, [ctx.onCompleteEvent, pushAction])
+  // Routines and events have NO wrapper here. `useScheduleActions` awaits the
+  // instance write and registers the one named confirmation itself ("Completed
+  // \u201cSchool run\u201d"); a wrapper around it announced a second, generic one
+  // before the write had even been attempted, so one gesture produced two Undo
+  // notifications and the first of them could be a lie (Codex review,
+  // 2026-09-24). A task still needs its wrapper: `onToggleTask` registers
+  // nothing, and its Undo has to write the explicit prior state.
 
   const renderContent = () => {
     if (currentView === 'month') {
@@ -353,18 +395,22 @@ export function HomeView({
           <WeekViewV2
             tasks={filteredTasks}
             events={filteredEvents}
+            // Unfiltered, for the tiles' universal counts only.
+            densityTasks={tasks}
+            densityEvents={events}
+            sources={densitySources}
             routines={allActiveRoutines}
             dateInstances={dateInstances}
             weekStart={mondayStart}
             dayCount={5}
-            onWeekChange={(d) => { setWeekStart(sundayOfWeek(d)); onDateChange(d) }}
+            onWeekChange={(d) => goToWeek(sundayOfWeek(d), d)}
             selectedAssignee={selectedAssigneeForSchedule}
             selectedAssignees={selectedAssignees}
             layers={layers}
             onSelectItem={onSelectItem}
             onUpdateTask={ctx.onUpdateTask ?? (() => {})}
             onUpdateRoutine={ctx.onUpdateRoutine ?? (() => {})}
-            onUpdateEvent={ctx.onUpdateEvent ?? (() => {})}
+            onUpdateEvent={ctx.onUpdateEvent}
             onPushRoutine={ctx.onPushRoutine}
             pushAction={pushAction}
             mode={weekMode}
@@ -383,7 +429,7 @@ export function HomeView({
             routines={allActiveRoutines}
             dateInstances={dateInstances}
             weekStart={weekStart}
-            onWeekChange={(d) => { setWeekStart(d); onDateChange(d) }}
+            onWeekChange={(d) => goToWeek(d)}
             onSelectDay={handleSelectDay}
             selectedAssignee={selectedAssigneeForSchedule}
             layers={layers}
@@ -396,6 +442,10 @@ export function HomeView({
           <WeekViewV2
             tasks={filteredTasks}
             events={filteredEvents}
+            // Unfiltered, for the tiles' universal counts only.
+            densityTasks={tasks}
+            densityEvents={events}
+            sources={densitySources}
             routines={allActiveRoutines}
             dateInstances={dateInstances}
             weekStart={weekStart}
@@ -403,14 +453,14 @@ export function HomeView({
             // A range start is wherever the range starts: stepping moves the
             // run by its own length, so a weekend stays a weekend and a
             // custom Thu–Wed week stays Thu–Wed.
-            onWeekChange={(d) => { setWeekStart(d); onDateChange(d) }}
+            onWeekChange={(d) => goToWeek(d)}
             selectedAssignee={selectedAssigneeForSchedule}
             selectedAssignees={selectedAssignees}
             layers={layers}
             onSelectItem={onSelectItem}
             onUpdateTask={ctx.onUpdateTask ?? (() => {})}
             onUpdateRoutine={ctx.onUpdateRoutine ?? (() => {})}
-            onUpdateEvent={ctx.onUpdateEvent ?? (() => {})}
+            onUpdateEvent={ctx.onUpdateEvent}
             onPushRoutine={ctx.onPushRoutine}
             pushAction={pushAction}
             mode={weekMode}
@@ -451,10 +501,10 @@ export function HomeView({
           onAssignTask={ctx.onAssignTask}
           onAssignEvent={ctx.onAssignEvent}
           onAssignRoutine={ctx.onAssignRoutine}
-          onCompleteRoutine={handleCompleteRoutineWithUndo}
+          onCompleteRoutine={ctx.onCompleteRoutine}
           onSkipRoutine={ctx.onSkipRoutine}
           onPushRoutine={ctx.onPushRoutine}
-          onCompleteEvent={handleCompleteEventWithUndo}
+          onCompleteEvent={ctx.onCompleteEvent}
           onSkipEvent={ctx.onSkipEvent}
           onPushEvent={ctx.onPushEvent}
         />
@@ -467,6 +517,9 @@ export function HomeView({
         headerControls={<HomeChromeControls className="flex" />}
         afterSchedule={todayAfterSchedule}
         tasks={filteredTasks}
+        // The day tiles count universally — every domain, everyone — so they
+        // are given the unfiltered list rather than the drawn one.
+        densityTasks={tasks}
         userId={userId}
         allRoutines={allActiveRoutines}
         events={filteredEvents}
@@ -481,8 +534,8 @@ export function HomeView({
         selectedItemId={selectedItemId}
         onSelectItem={onSelectItem}
         onToggleTask={handleToggleTaskWithUndo}
-        onCompleteRoutine={handleCompleteRoutineWithUndo}
-        onCompleteEvent={handleCompleteEventWithUndo}
+        onCompleteRoutine={ctx.onCompleteRoutine}
+        onCompleteEvent={ctx.onCompleteEvent}
         loading={loading}
         viewedDate={viewedDate}
         onDateChange={onDateChange}
@@ -523,9 +576,12 @@ export function HomeView({
             // Week nav must carry `viewedDate` along with the grid: the
             // container fetches events for the week containing viewedDate,
             // so a week viewedDate isn't in would render without its events.
-            onWeekChange={(d) => { setWeekStart(d); onDateChange(d) }}
+            onWeekChange={(d) => goToWeek(d)}
             rangeDays={rangeDays}
-            customRangeRequest={rangePreset === 'custom' ? location.key : undefined}
+            // Only the navigation's bare "Custom range…" asks for the inputs. A
+            // custom run already in the URL (with its start) is restored as
+            // days on screen, not re-opened for editing on every reload.
+            customRangeRequest={rangePreset === 'custom' && !startParam ? location.key : undefined}
             weekMode={currentView === 'week' || currentView === 'workweek' ? weekMode : undefined}
             onWeekModeChange={setWeekMode}
             onRangeChange={onRangeChange}
@@ -555,11 +611,15 @@ export function HomeView({
           )}
       </div>
 
-      <UndoToast
-        action={currentAction}
-        onUndo={executeUndo}
-        onDismiss={dismiss}
-      />
+      {/* Only when nobody above is showing one. Two mounted at once is how a
+          single completion produced two Undo notifications. */}
+      {!registerUndo && (
+        <UndoToast
+          action={currentAction}
+          onUndo={executeUndo}
+          onDismiss={dismiss}
+        />
+      )}
     </div>
   )
 }

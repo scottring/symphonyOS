@@ -45,6 +45,31 @@ describe('TapContextPanel', () => {
     expect(screen.getByText('Call Dr. Smith')).toBeInTheDocument()
   })
 
+  // S2-26: the pane named no date for the task it was showing.
+  it('draws the host\u2019s timing control under the title', () => {
+    const task = createMockTask({ title: 'Call Dr. Smith' })
+    render(<TapContextPanel
+      task={task} contacts={[]} projects={[]} events={[]} familyMembers={[]}
+      siblingTaskCandidates={[]} allTasks={[task]} {...baseHandlers}
+      timingControl={<button type="button">Tue, Sep 22 · any time</button>}
+    />)
+    expect(screen.getByRole('button', { name: 'Tue, Sep 22 · any time' })).toBeInTheDocument()
+  })
+
+  // Connected planning: details lead with what the task is FOR.
+  it('draws the goal a task serves before its when', () => {
+    const task = createMockTask({ title: 'Buy game tickets' })
+    render(<TapContextPanel
+      task={task} contacts={[]} projects={[]} events={[]} familyMembers={[]}
+      siblingTaskCandidates={[]} allTasks={[task]} {...baseHandlers}
+      purpose={<p>For Take Kaleb to an Islanders game</p>}
+      timingControl={<button type="button">Choose when</button>}
+    />)
+    const purpose = screen.getByText(/For Take Kaleb/)
+    const when = screen.getByRole('button', { name: 'Choose when' })
+    expect(purpose.compareDocumentPosition(when) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
   it('renders contact when linked', () => {
     const contact = createMockContact({ id: 'c1', name: 'Dr. Smith', phone: '555-0107' })
     const task = createMockTask({ contactId: 'c1' })

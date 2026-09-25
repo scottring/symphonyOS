@@ -11,10 +11,18 @@ import { PanelFooter } from './sections/PanelFooter'
 import { useEntityRelations } from './hooks/useEntityRelations'
 import type { MightBeRelevantItem } from './types'
 import { PanelShell } from './PanelShell'
+import { EventWhenLine } from './sections/EventWhenLine'
 import { PanelActions, type PanelAction } from './sections/PanelActions'
 import { PanelSection } from './sections/PanelSection'
 import { PanelRow } from './sections/PanelRow'
+import { PanelMoreMenu } from './sections/PanelMoreMenu'
+import { Checkmark } from './sections/PanelSubtasks'
 import { SchedulePicker } from '@/components/schedule/SchedulePicker'
+import { dateForWhen } from '@/components/schedule/RescheduleGrid'
+import type { TriageWhen } from '@/components/schedule/TriageWhenMenu'
+
+/** The relative days an EVENT can be moved to, keeping the hour it runs at. */
+const EVENT_WHENS: readonly TriageWhen[] = ['today', 'tomorrow', 'this-weekend', 'next-weekend', 'next-week']
 import { useDayLoads } from './hooks/useDayLoads'
 import { PanelLocation } from './sections/PanelLocation'
 import { locationLink } from '@/lib/locationLink'
@@ -44,6 +52,8 @@ interface TapEventPanelProps {
   onClose: () => void
   onNotesChange: (next: string) => void
   onAddPrepTask: (title: string) => void
+  /** Complete / reopen a prep task in place. When omitted, rows only open. */
+  onTogglePrepTask?: (id: string) => void
   onAddLink: (url: string) => void
   onOpenTask: (id: string) => void
   onOpenProject: (id: string) => void
@@ -61,7 +71,10 @@ interface TapEventPanelProps {
    * Google Calendar (this instance only for a recurring series). When omitted,
    * the Reschedule control is hidden.
    */
-  onReschedule?: (startTime: Date, endTime: Date) => void
+  /** Returning `false` means Google refused it — the inline editor keeps
+   *  the edit and says so rather than closing over a change that did not
+   *  happen. A host that returns nothing is taken at its word, as before. */
+  onReschedule?: (startTime: Date, endTime: Date) => void | Promise<boolean | void>
   /** The event's calendar, resolved by the caller from the Google calendar list.
    *  readOnly=true means Google will refuse writes — edit affordances hide. */
   calendarAccess?: { name: string | null; readOnly: boolean }
@@ -69,6 +82,12 @@ interface TapEventPanelProps {
   writableCalendars?: { id: string; summary: string }[]
   /** Move the event onto another (writable) calendar. */
   onMoveToCalendar?: (destinationCalendarId: string) => void
+  /**
+   * Delete the event from Google Calendar. Offered only where Google will take
+   * the write (the same gate as the inline when-line editor). Resolving
+   * `false` means the delete failed: the panel stays open and says so.
+   */
+  onDeleteEvent?: () => Promise<boolean | void>
   /** Needs-discussion flag — surfaces on the family kiosk's For Discussion list. */
   discussion?: { flagged: boolean; note?: string }
   /** Flag/unflag this event for discussion. When omitted, the Discuss chip hides. */
@@ -155,13 +174,21 @@ export function TapEventPanel(props: TapEventPanelProps) {
   const [assistOpen, setAssistOpen] = useState(props.autoOpenDiscussion === true)
   useEffect(() => { if (props.autoOpenDiscussion) setAssistOpen(true) }, [props.autoOpenDiscussion])
 
+  const [deleteError, setDeleteError] = useState<string | null>(null)
+
+  // Completed prep tasks stay listed, struck through: ticking one off used to
+  // make it vanish from the event it was prep for, with no way to reopen it
+  // here (event-panel review, finding a).
   const relations = useEntityRelations({
     kind: 'event',
     entity: event,
     allTasks,
     allEvents: [],
     allProjects: [],
+    includeCompleted: true,
   })
+  // Open work first; done rows sink below it (stable within each group).
+  const prepTasks = [...relations.tasks].sort((a, b) => Number(!!a.completed) - Number(!!b.completed))
 
   const startTime = getStartTime(event)
   const endTime = getEndTime(event)
@@ -202,6 +229,27 @@ export function TapEventPanel(props: TapEventPanelProps) {
 
   // SchedulePopover yields the new start as a full Date; reuse the planning
   // reschedule math so the event keeps its original duration.
+  /**
+   * A relative tile — "Tomorrow", "Next week" — means MOVE THE DAY, keeping
+   * the hour the event runs at. The tiles resolve to midnight, so routing them
+   * straight through would have dragged a 1pm meeting to midnight.
+   *
+   * Until now nothing handled them at all: SchedulePicker calls `onReschedule`
+   * for a relative tile and this panel passed only `onSchedule`, so every tile
+   * but "Pick date & time…" was silent (Scott, 2026-09-24).
+   */
+  const handleRelativeReschedule = (when: TriageWhen, chosen?: Date) => {
+    // A weekend tile names its own day — Saturday or Sunday, whichever the
+    // reader picked. Everything else resolves as it always did.
+    const day = chosen ?? dateForWhen(when)
+    if (!day) return
+    const orig = startTime ? new Date(startTime) : null
+    handleReschedule(new Date(
+      day.getFullYear(), day.getMonth(), day.getDate(),
+      orig?.getHours() ?? 9, orig?.getMinutes() ?? 0,
+    ))
+  }
+
   const handleReschedule = (date: Date) => {
     const { startTime: newStart, endTime: newEnd } = computeEventReschedule(event, {
       year: date.getFullYear(),
@@ -211,6 +259,19 @@ export function TapEventPanel(props: TapEventPanelProps) {
       minute: date.getMinutes(),
     })
     props.onReschedule?.(newStart, newEnd)
+  }
+
+  // Deleting is irreversible from here, so PanelMoreMenu's two-step confirm
+  // stands in front of it. Close only on success; a refused delete keeps the
+  // panel open and says so rather than failing silently (finding c).
+  const handleDelete = async () => {
+    setDeleteError(null)
+    const ok = await props.onDeleteEvent?.()
+    if (ok === false) {
+      setDeleteError("Couldn't delete this event — it's still on your calendar.")
+      return
+    }
+    props.onClose()
   }
 
   const commitPrepTask = () => {
@@ -285,6 +346,16 @@ export function TapEventPanel(props: TapEventPanelProps) {
               label="Reschedule"
               scheduledFor={startTime ? new Date(startTime) : undefined}
               onSchedule={(date) => handleReschedule(date)}
+              onReschedule={handleRelativeReschedule}
+              // The days an event can be MOVED to, keeping its time. "Tonight"
+              // and the pool tiles are left out on purpose: an event cannot go
+              // to Someday, and "Tonight" would mean inventing an hour. A new
+              // time is a job for "Pick date & time…", which was already the
+              // only tile that worked.
+              whens={EVENT_WHENS}
+              // An event ends at a particular time, so "either day" is not an
+              // answer it can take: the weekend offers Saturday AND Sunday.
+              weekendDays
               loads={dayLoads}
             />
           ),
@@ -346,8 +417,17 @@ export function TapEventPanel(props: TapEventPanelProps) {
           onClose={props.onClose}
         />
 
-        {/* When — the one fact that defines an event, stated plainly. */}
+        {/* When — the one fact that defines an event, stated plainly, and
+            editable in place where Google will take the write (Scott's
+            walkthrough: "click the date/time under the title to edit it"). */}
         {startTime && (
+          <EventWhenLine
+            event={event}
+            startTime={new Date(startTime)}
+            endTime={endTime ? new Date(endTime) : null}
+            spansDays={!!endTime && spansDays(startTime, endTime)}
+            onSave={canEdit && props.onReschedule ? props.onReschedule : undefined}
+          >
           <div className="mt-1.5 flex items-baseline gap-2 flex-wrap">
             <span className="text-[15px] font-medium text-neutral-800">{formatDayLabel(startTime)}</span>
             {/* A multi-day event must name the day it ends on. Without it a
@@ -365,6 +445,7 @@ export function TapEventPanel(props: TapEventPanelProps) {
               <span className="text-[13px] text-neutral-400">· {formatDuration(durationMinutes)}</span>
             )}
           </div>
+          </EventWhenLine>
         )}
 
         {/* Which calendar this event lives on + move / view-only affordance */}
@@ -403,7 +484,22 @@ export function TapEventPanel(props: TapEventPanelProps) {
           )}
         </div>
       }
-      act={<PanelActions actions={actions} />}
+      act={
+        <>
+          <PanelActions
+            actions={actions}
+            // Same gate as the when-line editor: a view-only calendar (or a
+            // host that didn't wire it) gets no Delete at all. With Delete,
+            // the folded actions ride in the same ⋯ rather than a second one.
+            renderOverflow={canEdit && props.onDeleteEvent
+              ? (folded) => <PanelMoreMenu items={folded} onDelete={() => { void handleDelete() }} />
+              : undefined}
+          />
+          {deleteError && (
+            <p role="alert" className="mt-2 text-[13px] text-rose-700">{deleteError}</p>
+          )}
+        </>
+      }
       details={
         <>
           {/* Location editor: for physical addresses or to add one. A virtual
@@ -452,18 +548,36 @@ export function TapEventPanel(props: TapEventPanelProps) {
           <PanelSection
             id="prep-tasks"
             label="Prep tasks"
-            preview={relations.tasks.length ? `${relations.tasks.length} task${relations.tasks.length === 1 ? '' : 's'}` : undefined}
+            preview={prepTasks.length ? `${prepTasks.length} task${prepTasks.length === 1 ? '' : 's'}` : undefined}
           >
             <div className="flex flex-col gap-1.5">
-              {relations.tasks.map((t) => (
-                <PanelRow
-                  key={t.id}
-                  onClick={() => props.onOpenTask(t.id)}
-                  icon={<span className="w-6 h-6 flex items-center justify-center rounded-md bg-amber-100"><ConceptIcon name="list" decorative /></span>}
-                >
-                  <span className="block text-[15px] text-neutral-800">{t.title}</span>
-                </PanelRow>
-              ))}
+              {prepTasks.map((t) => {
+                const row = (
+                  <PanelRow
+                    key={t.id}
+                    onClick={() => props.onOpenTask(t.id)}
+                    icon={<span className="w-6 h-6 flex items-center justify-center rounded-md bg-amber-100"><ConceptIcon name="list" decorative /></span>}
+                  >
+                    <span className={`block text-[15px] ${t.completed ? 'line-through text-neutral-400' : 'text-neutral-800'}`}>{t.title}</span>
+                  </PanelRow>
+                )
+                if (!props.onTogglePrepTask) return row
+                // Split row, as subtasks do: the mark completes or reopens,
+                // the title opens the task.
+                return (
+                  <div key={t.id} className="flex items-start gap-2">
+                    <button
+                      type="button"
+                      onClick={() => props.onTogglePrepTask?.(t.id)}
+                      aria-label={`Mark ${t.title} ${t.completed ? 'incomplete' : 'complete'}`}
+                      className="mt-2.5 flex-shrink-0"
+                    >
+                      <Checkmark completed={!!t.completed} />
+                    </button>
+                    <div className="min-w-0 flex-1">{row}</div>
+                  </div>
+                )
+              })}
               {!props.free && (
                 <input
                   type="text"

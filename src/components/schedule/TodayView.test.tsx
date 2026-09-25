@@ -25,6 +25,15 @@ vi.mock('@/hooks/useNotes', () => ({ useNotes: () => ({ notes: [], loading: fals
 vi.mock('@/hooks/useSupabaseTasks', () => ({ useSupabaseTasks: () => ({ tasks: [], loading: false, addTask: vi.fn(), updateTask: vi.fn(), deleteTask: vi.fn() }) }))
 vi.mock('@/hooks/useFamilyMembers', () => ({ useFamilyMembers: () => ({ members: [], loading: false, error: null, getCurrentUserMember: () => ({ id: 'me', name: 'Scott' }) }) }))
 vi.mock('@/hooks/usePinnedItems', () => ({ usePinnedItems: () => ({ isPinned: () => false, pin: vi.fn(), unpin: vi.fn() }) }))
+// The day tiles' two sources. Today holds its own week instances, so the hook
+// is given them and must not ask again; the calendar is the shared 45-day read.
+vi.mock('@/hooks/useDayLoadEvents', () => ({
+  DAY_LOAD_RANGE_DAYS: 45,
+  DAY_LOAD_BACK_DAYS: 7,
+  useDayLoadEvents: () => ({ events: [], available: true, loading: false, failed: false,
+    range: { start: Date.now() - 30 * 86_400_000, end: Date.now() + 90 * 86_400_000 } }),
+}))
+vi.mock('@/components/home/week/useWeekInstances', () => ({ useWeekInstances: () => [] }))
 vi.mock('@/hooks/useActionQueue', () => ({ useActionQueue: () => ({ actions: [], loading: false, approveAction: vi.fn(), rejectAction: vi.fn(), pendingCount: 0, refetch: vi.fn() }) }))
 vi.mock('@/hooks/useDomain.tsx', async (importOriginal) => {
   const actual = await importOriginal() as Record<string, unknown>
@@ -784,5 +793,50 @@ describe('TodayView weather', () => {
     renderView()
     expect(screen.queryByRole('button', { name: /^weather/i })).not.toBeInTheDocument()
     expect(screen.getByTestId('masthead-aside')).toBeEmptyDOMElement()
+  })
+})
+
+// Scott asked for "Choose when" to say which day has room wherever it offers a
+// day. Today offers the days of the week in VIEW; the counting rules live in
+// lib/planning/weekDensity and are tested there.
+describe('Today’s Choose when offers the viewed week’s days', () => {
+  // Pinned: which weekday "today" is decides which tile the two rows land on,
+  // and the case is about the tiles, not the calendar.
+  const PINNED = new Date(2026, 9, 7, 9, 0)            // Wednesday 7 Oct 2026
+  const sunday = new Date(2026, 9, 4)
+  const wednesday = new Date(2026, 9, 7)           // the day in view
+
+  const open = (title: string) =>
+    fireEvent.click(screen.getByRole('button', { name: new RegExp(`Choose a week or a day for ${title}`) }))
+  const tiles = () => screen.queryAllByRole('menuitemradio')
+    .filter((b) => /^Plan for /.test(b.getAttribute('aria-label') ?? ''))
+
+  afterEach(() => { mockUseMobile.mockReturnValue(true) })
+
+  beforeEach(() => { vi.useFakeTimers({ toFake: ['Date'] }); vi.setSystemTime(PINNED) })
+  afterEach(() => { vi.useRealTimers() })
+
+  it('draws seven days of this week, counting what is already on them', () => {
+    mockUseMobile.mockReturnValue(false)
+    renderView({
+      tasks: [
+        { id: 'a', title: 'Fix the gate', completed: false, createdAt: PINNED, updatedAt: PINNED, bucket: 'week', weekStart: sunday, focus: [{ userId: 'me', date: wednesday }] },
+        { id: 'b', title: 'Pick up the parcel', completed: false, createdAt: PINNED, updatedAt: PINNED, bucket: 'timed', scheduledFor: wednesday, isAllDay: true },
+      ],
+      viewedDate: PINNED,
+    })
+    open('Fix the gate')
+    expect(tiles()).toHaveLength(7)
+    // The tiles are this week's days, in order, starting on its first day.
+    const first = tiles()[0].getAttribute('aria-label') ?? ''
+    expect(first).toContain(sunday.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }))
+    // And the Thursday says what is on it rather than reading as empty.
+    const wed = tiles().find((t) => (t.getAttribute('aria-label') ?? '').includes(
+      wednesday.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })))!
+    // Both rows land on that day — one scheduled for it, one chosen for it.
+    expect(wed.getAttribute('aria-label')).toMatch(/2 tasks already/)
+    // Every day of the week in view is counted, including the ones already
+    // past: the planning calendar is read a week back for exactly this.
+    expect(tiles().every((t) => !/read for/.test(t.getAttribute('aria-label') ?? ''))).toBe(true)
   })
 })

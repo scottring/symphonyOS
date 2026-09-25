@@ -36,9 +36,24 @@ export function useWeekInstances(weekStart: Date, dayCount: number): ActionableI
   }, [weekStartMs, dayCount, getInstancesForRange])
 
   useEffect(() => {
+    // `dayCount <= 0` is "no window, don't ask": the shared day-choice hook
+    // runs on surfaces that may have no week to offer, and hooks cannot be
+    // called conditionally. Every existing caller passes 7.
+    //
+    // It must not SET state either, even to empty. A caller whose
+    // `getInstancesForRange` is a fresh function each render (a test double,
+    // typically) rebuilds `refresh` every render, so an unconditional
+    // `setInstances([])` here re-rendered forever — a real out-of-memory
+    // crash, found by TodayView's tests the moment a second copy of this hook
+    // was mounted. The functional update below is a no-op once the list is
+    // already empty, so React bails out instead.
+    if (dayCount <= 0) {
+      setInstances((prev) => (prev.length === 0 ? prev : []))
+      return
+    }
     void refresh()
     return onInstancesChanged(() => void refresh())
-  }, [refresh])
+  }, [refresh, dayCount])
 
   return instances
 }

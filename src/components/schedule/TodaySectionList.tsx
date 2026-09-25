@@ -104,6 +104,10 @@ export interface TodaySectionListProps {
   selectedKeys: Set<string>
   onToggleBulkSelect: (key: string) => void
   tasksMap: Map<string, Task>
+  /** The shared timing control, for a task row on a day. Supplied by the host
+   *  so this list stays presentational; Day is an execution view of the same
+   *  work, so it must be the same control the period pages use. */
+  timingFor?: (task: Task) => React.ReactNode
   shareNudgeByEventId: Map<string, { eventId: string; context: string }>
   parserContext: ParserContext
   insert: ReturnType<typeof useTimelineInsert>
@@ -157,6 +161,7 @@ export function TodaySectionList({
   selectedKeys,
   onToggleBulkSelect,
   tasksMap,
+  timingFor,
   shareNudgeByEventId,
   parserContext,
   insert,
@@ -541,6 +546,11 @@ export function TodaySectionList({
                       return (
                         <>
                     <ScheduleItem
+                      belowTitleAccessory={
+                        item.type === 'task' && taskId && timingFor
+                          ? (() => { const t = tasksMap.get(taskId); return t ? timingFor(t) : undefined })()
+                          : undefined
+                      }
                       spineAbove={spineSegments?.above}
                       spineBelow={spineSegments?.below}
                       // On a phone dinner is an ordinary row too; it reads

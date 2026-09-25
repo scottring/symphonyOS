@@ -17,6 +17,8 @@ import { useSupabaseTasks } from '@/hooks/useSupabaseTasks';
 import { useGoogleCalendar, CalendarReconnectError } from '@/hooks/useGoogleCalendar';
 import { showToast } from '@/hooks/useToast';
 import { rangeEventSpan } from '@/lib/weekHelpers';
+import { densitySourcesFor, type DensitySources } from '@/lib/planning/dayDensity';
+import { makeEventMover } from '@/lib/calendar/moveEvent';
 import { PageFromPaperFlow } from '@/components/capture/PageFromPaperFlow';
 import { localYmd } from '@/lib/cadence/config';
 import { parseRoutineTimelineId } from '@/lib/today/doseExpansion';
@@ -56,7 +58,7 @@ import { useMealEventsForDate } from '@/shell/providers/MealEventsProvider';
 import { FirstWeekCard } from '@/components/schedule/FirstWeekCard';
 import { PlanningNudge } from '@/components/plan/PlanningNudge';
 import { useFirstWeekSignals } from '@/hooks/useFirstWeekSignals';
-import { firstWeekSteps, shouldShowFirstWeek, FIRST_WEEK_HIDE_KEY, hasSampleIds, readSampleIds, clearSampleIdsRecord, deleteSampleRows } from '@/lib/firstWeek';
+import { firstWeekSteps, shouldOpenFirstWeek, FIRST_WEEK_HIDE_KEY, hasSampleIds, readSampleIds, clearSampleIdsRecord, deleteSampleRows } from '@/lib/firstWeek';
 import { getAuthUser } from '@/lib/supabase';
 
 const sameLocalDay = (a: Date, b: Date) =>
@@ -65,7 +67,7 @@ const sameLocalDay = (a: Date, b: Date) =>
 export function HomeViewContainer({ fixedView }: { fixedView?: 'today' | 'week' } = {}) {
   // Data hooks
   const { tasks, loading: tasksLoading, addTask, toggleTask, toggleWaiting, deleteTask, updateTask, updateTasksBulk, pushTask, getLinkedTasks, refetch, updateTaskOrders, userId } = useSupabaseTasks();
-  const { isConnected, events, fetchEvents, createEvent, deleteEvent, removeEventLocal, restoreEventLocal } = useGoogleCalendar();
+  const { isConnected, events, fetchEvents, updateEvent, createEvent, deleteEvent, removeEventLocal, restoreEventLocal, isLoading: calendarLoading, isFetching: calendarFetching, error: calendarError } = useGoogleCalendar();
   // Passing the visible event ids opts in to auto-loading notes (context
   // overrides, assignees, shared-with-family, free) + realtime — without it
   // those persist to the DB but render stale on every fresh window.
@@ -108,17 +110,50 @@ export function HomeViewContainer({ fixedView }: { fixedView?: 'today' | 'week' 
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
 
-  // ?date=YYYY-MM-DD (e.g. from search → "jump to this task's day") sets the
-  // viewed day, then strips the param (keeps ?detail so the panel stays open).
+  // ?date=YYYY-MM-DD (from search's "jump to this task's day", and from the
+  // View day link beside a timing control) sets the viewed day.
+  //
+  // The param used to be STRIPPED as soon as it was read, which made the day
+  // survive exactly one navigation: reload, or come back from a task, and the
+  // page silently returned to today with no sign the day had ever been asked
+  // for (Codex review, 2026-09-24). It now stays in the URL, so reload and
+  // Back land on the day you were reading — the contract `?start=` already
+  // has on /week (S2-25).
+  //
+  // Applied on every change, not once on mount, so browser Back and Forward
+  // move the day without a remount. A param equal to the day already shown is
+  // ignored, which keeps this from fighting `useDayRollover`.
   useEffect(() => {
     const dateParam = searchParams.get('date');
     if (!dateParam) return;
     const [y, m, d] = dateParam.split('-').map(Number);
-    if (y && m && d) setViewedDate(new Date(y, m - 1, d));
-    const next = new URLSearchParams(searchParams);
-    next.delete('date');
-    setSearchParams(next, { replace: true });
-  }, [searchParams, setSearchParams]);
+    if (!y || !m || !d) return;
+    const asked = new Date(y, m - 1, d);
+    setViewedDate((prev) => (localYmd(prev) === localYmd(asked) ? prev : asked));
+  }, [searchParams]);
+
+  /**
+   * Move the viewed day, and say so in the URL — the contract `?start=`
+   * already has on /week.
+   *
+   * It used to write the param only when one was ALREADY there, to keep a
+   * clean URL. The cost showed up live: page back to Wednesday, reload, and
+   * Today is Thursday again, because the day lived only in component state
+   * (walkthrough, 2026-09-24). Leaving today still clears the param, so the
+   * default case keeps its clean URL; any OTHER day names itself and survives
+   * a reload, a Back and a link.
+   */
+  const changeViewedDate = useCallback((next: Date) => {
+    setViewedDate(next);
+    const isToday = localYmd(next) === localYmd(new Date());
+    setSearchParams((prev) => {
+      if (isToday && !prev.get('date')) return prev;
+      const out = new URLSearchParams(prev);
+      if (isToday) out.delete('date');
+      else out.set('date', localYmd(next));
+      return out;
+    }, { replace: true });
+  }, [setSearchParams]);
 
   // "Your first week" — a fresh household's onboarding card. uid is fetched
   // once (not via useAuth, which this tree already has several copies of via
@@ -148,7 +183,13 @@ export function HomeViewContainer({ fixedView }: { fixedView?: 'today' | 'week' 
   // /week mounts this same container (fixedView="week") — the card is a
   // Today-only onboarding nudge, never shown on the bench.
   const showFirstWeek = fixedView !== 'week' && firstWeekUid !== null && firstWeekSignals !== null &&
-    (searchParams.get('welcome') === '1' || (tasks.length === 0 && shouldShowFirstWeek(firstWeekStepsList, firstWeekHiddenAt, new Date())));
+    shouldOpenFirstWeek({
+      asked: searchParams.get('welcome') === '1',
+      taskCount: tasks.length,
+      steps: firstWeekStepsList,
+      hiddenAt: firstWeekHiddenAt,
+      now: new Date(),
+    });
 
   const handleHideFirstWeek = useCallback(() => {
     if (!firstWeekUid) return;
@@ -259,21 +300,49 @@ export function HomeViewContainer({ fixedView }: { fixedView?: 'today' | 'week' 
   // appointment never reached the client at all). Week nav keeps
   // `viewedDate` inside the shown week (see HomeView's onWeekChange), so
   // the span follows the grid.
+  // Which range the events we HOLD were fetched for. Paging the week leaves
+  // the previous range's events on screen until the new fetch lands, and a
+  // count drawn from them would describe last week (Codex, 2026-09-24).
+  const [eventsRange, setEventsRange] = useState<{ start: number; end: number } | null>(null);
   const refetchViewedDayEvents = useCallback(async () => {
     if (!isConnected) return;
-    if (fixedView === 'week') {
+    const span = fixedView === 'week'
       // Two weeks, not one: the grid may draw any run of up to seven days
       // starting in the viewed week (a weekend, a custom Thu–Wed).
-      const { start, end } = rangeEventSpan(viewedDate);
-      await fetchEvents(start, end);
-      return;
-    }
-    const startOfDay = new Date(viewedDate);
-    startOfDay.setHours(0, 0, 0, 0);
-    const endOfDay = new Date(viewedDate);
-    endOfDay.setHours(23, 59, 59, 999);
-    await fetchEvents(startOfDay, endOfDay);
+      ? rangeEventSpan(viewedDate)
+      : (() => {
+        const start = new Date(viewedDate); start.setHours(0, 0, 0, 0);
+        const end = new Date(viewedDate); end.setHours(23, 59, 59, 999);
+        return { start, end };
+      })();
+    setEventsRange(null);
+    await fetchEvents(span.start, span.end);
+    setEventsRange({ start: span.start.getTime(), end: span.end.getTime() });
   }, [isConnected, viewedDate, fetchEvents, fixedView]);
+
+  /**
+   * What each source can honestly say about the range in view.
+   *
+   * "Not connected" is not a failure and is never reported as one: there is
+   * simply no calendar to read, and the count is complete without it.
+   */
+  const onUpdateEvent = useMemo(() => makeEventMover({
+    events,
+    updateEvent,
+    refetch: refetchViewedDayEvents,
+    notify: (message, tone) => showToast(message, tone, 5000),
+  }), [events, updateEvent, refetchViewedDayEvents]);
+
+  const densitySources = useMemo<DensitySources>(() => {
+    const span = fixedView === 'week' ? rangeEventSpan(viewedDate) : null;
+    return densitySourcesFor({
+      tasksLoading,
+      routinesLoading,
+      calendar: { connected: isConnected, loading: calendarLoading, fetching: calendarFetching, error: calendarError },
+      heldRange: eventsRange,
+      neededRange: span ? { start: span.start.getTime(), end: span.end.getTime() } : null,
+    });
+  }, [fixedView, viewedDate, eventsRange, tasksLoading, routinesLoading, isConnected, calendarError, calendarLoading, calendarFetching]);
 
   useEffect(() => {
     void refetchViewedDayEvents();
@@ -753,6 +822,13 @@ export function HomeViewContainer({ fixedView }: { fixedView?: 'today' | 'week' 
       onCompleteEvent: scheduleActions.onCompleteEvent,
       onSkipEvent: scheduleActions.onSkipEvent,
       onPushEvent: scheduleActions.onPushEvent,
+      // Moving an event to another time. Until now nothing supplied this and
+      // HomeView fell back to a no-op, so a week drag announced a move it had
+      // not made (Scott, 2026-09-24).
+      onUpdateEvent,
+      // /week's quick-create refetches through this, the same range the grid
+      // draws from — createEvent alone never updates the held events.
+      onRefetchEvents: refetchViewedDayEvents,
       onUpdateEventContext: updateEventContext,
       onUpdateEventFree: updateEventFree,
       onShareEventWithFamily: (id: string) => updateEventSharedWithFamily(id, true),
@@ -791,7 +867,7 @@ export function HomeViewContainer({ fixedView }: { fixedView?: 'today' | 'week' 
       contactsMap, projectsMap, projects, contacts, familyMembers, lists, listsByCategory,
       eventNotesMapWithDefaults, eventContextOverrides,
       addProject, handleConvertTaskToProject, searchContacts, addContact, getDomainForCalendar,
-      refreshDateInstances, updateEventProject,
+      refreshDateInstances, updateEventProject, refetchViewedDayEvents,
     ],
   );
 
@@ -813,6 +889,7 @@ export function HomeViewContainer({ fixedView }: { fixedView?: 'today' | 'week' 
       )}
 
       <HomeView
+        registerUndo={undo.pushAction}
         // The week reminder is Today's, below its schedule (2026-09-22): a
         // quiet line, never a banner above the date. Renders null when there
         // is nothing to say.
@@ -820,6 +897,7 @@ export function HomeViewContainer({ fixedView }: { fixedView?: 'today' | 'week' 
         tasks={tasks}
         userId={userId}
         events={filteredEvents}
+        densitySources={densitySources}
         routines={filteredRoutines}
         allActiveRoutines={activeRoutines}
         projects={projects}
@@ -836,7 +914,7 @@ export function HomeViewContainer({ fixedView }: { fixedView?: 'today' | 'week' 
         // they arrive; the rest of the day should never wait on them.
         loading={tasksLoading || routinesLoading}
         viewedDate={viewedDate}
-        onDateChange={setViewedDate}
+        onDateChange={changeViewedDate}
         fixedView={fixedView}
       />
 

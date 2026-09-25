@@ -10,8 +10,17 @@
 
 import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { GoalPeriodShelves } from '@/components/plan/GoalPeriodShelves';
+import { useHouseholdSeasons } from '@/hooks/useHouseholdSeasons';
+import { useGoalsContext } from '@/contexts/GoalsContext';
+import { supportedGoal, goalsSupporting, type SupportLink } from '@/lib/planning/goalSupport';
 import type { Note, NoteEntityType } from '@/types/note';
 import { useSupabaseTasks } from '@/hooks/useSupabaseTasks';
+import { useRoutines } from '@/hooks/useRoutines';
+import { useAuth } from '@/hooks/useAuth';
+import { useDayChoices } from '@/hooks/useDayChoices';
+import { weeksOfMonth } from '@/lib/planning/monthWeeks';
+import { readCadenceConfig } from '@/lib/cadence/config';
 import { useContacts } from '@/hooks/useContacts';
 import { useProjects } from '@/hooks/useProjects';
 import { useNotesContext } from '@/contexts/NotesContext';
@@ -26,14 +35,75 @@ interface Props {
 }
 
 export function TaskViewContainer({ taskId, onBack }: Props) {
-  const { tasks, addSubtask, deleteTask, toggleTask, updateTask, pushTask } = useSupabaseTasks();
+  const { tasks, loading, addTask, addSubtask, deleteTask, toggleTask, updateTask, pushTask } = useSupabaseTasks();
   const { contacts, contactsMap, addContact, searchContacts } = useContacts();
   const { projects, projectsMap, addProject, searchProjects } = useProjects();
   const { addNote, addEntityLink, getNotesForEntity } = useNotesContext();
+  const { seasons } = useHouseholdSeasons();
+  const { goals } = useGoalsContext();
   const { createVaultNote } = useVaultWrite();
   const navigate = useNavigate();
 
   const task = useMemo(() => tasks.find(t => t.id === taskId) ?? null, [tasks, taskId]);
+  const { activeRoutines } = useRoutines();
+  const { user } = useAuth();
+
+  /**
+   * The day tiles for a step's "Choose when", counted over the weeks of the
+   * GOAL's period — the same weeks the menu offers. The goal's page is where
+   * a step gets its week, so it is where "which day has room" matters most,
+   * and it was the one place the picker still answered blind.
+   */
+  const timingWindow = useMemo(() => {
+    const anchor = task?.monthStart ?? task?.seasonStart ?? task?.weekStart ?? null;
+    if (!anchor) return { start: null as Date | null, dayCount: 0 };
+    const weeks = weeksOfMonth(anchor, readCadenceConfig().weekStartsOn);
+    return { start: weeks[0]?.start ?? null, dayCount: weeks.length * 7 };
+  }, [task?.monthStart, task?.seasonStart, task?.weekStart]);
+  const dayChoices = useDayChoices({
+    windowStart: timingWindow.start, dayCount: timingWindow.dayCount,
+    tasks, userId: user?.id ?? null, routines: activeRoutines,
+  });
+
+  // A goal's children are its STEPS, joined by goal_task_id and carrying the
+  // goal's own period — not subtasks. Adding a subtask under a goal wrote
+  // parent_task_id with bucket 'inbox', which no horizon page renders, so the
+  // work vanished (walk finding S2-06).
+  const isGoal = task?.isGoal === true;
+  const steps = useMemo(
+    () => (isGoal && task ? tasks.filter(t => t.goalTaskId === task.id) : []),
+    [isGoal, task, tasks],
+  );
+  const addStep = useCallback(async (goalId: string, title: string) => {
+    if (!task) return undefined;
+    return addTask(title, undefined, undefined, undefined, {
+      bucket: task.bucket === 'quarter' ? 'quarter' : 'month',
+      monthStart: task.monthStart,
+      seasonStart: task.seasonStart,
+      goalTaskId: goalId,
+      context: task.context ?? undefined,
+    });
+  }, [addTask, task]);
+  // Both ends of the goal-supports-goal link, read through the one module the
+  // plan pages and the year goal's page also read, so the four surfaces cannot
+  // disagree. A goal opened from a plan row used to be a dead end: the row
+  // said what it served, the detail page said nothing (Codex, live,
+  // 2026-09-24). Ordinary tasks ask and get nothing.
+  const supports = useMemo(
+    () => (isGoal && task ? supportedGoal(task, tasks, goals, seasons) : null),
+    [isGoal, task, tasks, goals, seasons],
+  );
+  const supportedBy = useMemo(
+    () => (isGoal && task ? goalsSupporting(task, tasks) : []),
+    [isGoal, task, tasks],
+  );
+  // A year goal is a goals-table row and opens on its own page; a month or
+  // season goal is a task and opens here — the same split PeriodPlanPage makes.
+  const openGoalLink = useCallback(
+    (link: SupportLink) => navigate(link.rung === 'year' ? `/goals/${link.id}` : `/task/${link.id}`),
+    [navigate],
+  );
+
   const contact = task?.contactId ? contactsMap.get(task.contactId) ?? null : null;
   const project = task?.projectId ? projectsMap.get(task.projectId) ?? null : null;
 
@@ -98,6 +168,10 @@ export function TaskViewContainer({ taskId, onBack }: Props) {
     [deleteTask, onBack],
   );
 
+  // Not found is an answer only once the tasks have arrived. A hard load of
+  // /task/:id said "Task not found" for several seconds first (S2-08).
+  if (!task && loading) return <LoadingFallback />;
+
   if (!task) {
     return (
       <div className="p-8 text-center text-neutral-500">
@@ -111,6 +185,10 @@ export function TaskViewContainer({ taskId, onBack }: Props) {
 
   return (
     <Suspense fallback={<LoadingFallback />}>
+      {/* A goal shows its own period's Shelves — the same component the Month
+          page renders — rather than today's task chooser (S2-18). Goals only:
+          an ordinary task's detail page is unchanged. */}
+      {isGoal && task && <GoalPeriodShelves goal={task} onNavigate={navigate} />}
       <TaskView
         task={task}
         onBack={onBack}
@@ -128,11 +206,16 @@ export function TaskViewContainer({ taskId, onBack }: Props) {
         onSearchProjects={searchProjects}
         onOpenProject={(projectId) => navigate(`/projects/${projectId}`)}
         onAddProject={addProject}
-        onAddSubtask={addSubtask}
+        onAddSubtask={isGoal ? addStep : addSubtask}
+        steps={steps}
+        supports={supports}
+        supportedBy={supportedBy}
+        onOpenGoalLink={openGoalLink}
         entityNotes={entityNotes}
         entityNotesLoading={entityNotesLoading}
         onAddEntityNote={handleAddEntityNote}
         onSaveNoteToVault={handleSaveNoteToVault}
+        dayChoicesFor={dayChoices.forWeek}
       />
     </Suspense>
   );

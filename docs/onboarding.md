@@ -11,7 +11,7 @@ The planning chain — Steps 4 to 8, year to today — is the guided path; every
 **Where you are:** The sign-in page, then the first-run setup.
 **Why it exists:** Symphony is for a household, not just one person. Naming the people first means everything you add later can belong to someone.
 **Do this:** Sign in, name your household, and add the people in it.
-**You'll see:** Today opens, greeting you by name.
+**You'll see:** Today opens on the date. Your name is under the account menu (top right); the redesign removed the greeting.
 **Status:** reads cleanly
 
 ## Step 1 · Today, empty

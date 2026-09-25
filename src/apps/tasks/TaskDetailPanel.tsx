@@ -36,7 +36,12 @@ import { useSupabaseTasks } from '@/hooks/useSupabaseTasks';
 import { useGatedTaskActions } from '@/hooks/useGatedTaskActions';
 import { useContacts } from '@/hooks/useContacts';
 import { useProjects } from '@/hooks/useProjects';
+import { TaskTimingMenu } from '@/components/plan/TaskTimingMenu';
+import { goalOfTask } from '@/lib/planning/goalSupport';
+import { useHouseholdSeasons } from '@/hooks/useHouseholdSeasons';
+import { weekStartAnchor, readCadenceConfig } from '@/lib/cadence/config';
 import { useGoogleCalendar, CalendarReconnectError, type GoogleCalendarInfo, type CalendarEvent } from '@/hooks/useGoogleCalendar';
+import { eventMoveErrorMessage } from '@/lib/calendar/moveEvent';
 import { useEventNotes, type EventNote } from '@/hooks/useEventNotes';
 import { isEventFree, freeKeyFor, seriesKey } from '@/lib/today/eventFree';
 import { useEventDiscussionFlags } from '@/hooks/useEventDiscussionFlags';
@@ -208,6 +213,7 @@ function TaskPanelBody({ id }: { id: string }) {
   const { events } = useGoogleCalendar();
   const { members: familyMembers } = useFamilyMembers();
   const pinnedItems = usePinnedItems();
+  const { seasons } = useHouseholdSeasons();
 
   // Iris's rule: any process on an Unsorted item has to involve giving it a
   // domain — this panel is the other global mutation surface besides
@@ -270,6 +276,32 @@ function TaskPanelBody({ id }: { id: string }) {
       onEmailChange={(v) => updateTask(task.id, { email: v })}
       // onSaveNoteToVault intentionally omitted (vault integration removed)
       onToggleComplete={() => toggleTask(task.id)}
+      // What the task is FOR, first — the connected-planning contract: details
+      // lead with the goal it serves, then its when. A task under no goal
+      // shows nothing rather than a prompt.
+      purpose={(() => {
+        const goal = goalOfTask(task, tasks, seasons);
+        return goal ? (
+          <p className="text-[13px] text-neutral-500">
+            <span className="text-neutral-400">For</span>{' '}
+            <button type="button" onClick={() => navigate(`/task/${goal.id}`)} className="text-left text-neutral-700 hover:underline">
+              {goal.title}
+            </button>
+            {goal.period && <span className="text-neutral-400"> · {goal.period}</span>}
+          </p>
+        ) : undefined;
+      })()}
+      // A goal is not scheduled, so it gets no timing control.
+      timingControl={task.isGoal ? undefined : (
+        <TaskTimingMenu
+          task={task}
+          onUpdateTask={gated.updateTask}
+          // The task's OWN period, never the clock's: an October step opened
+          // in September must offer October's weeks (the S2-17 class).
+          periodStart={task.weekStart ?? task.monthStart ?? task.scheduledFor ?? new Date()}
+          fallbackWeekStart={task.weekStart ?? weekStartAnchor(task.monthStart ?? task.scheduledFor ?? new Date(), readCadenceConfig().weekStartsOn)}
+        />
+      )}
       onSchedule={(date, isAllDay) => {
         void (async () => {
           const result = await updateTask(task.id, { bucket: 'timed', scheduledFor: date, isAllDay });
@@ -476,23 +508,19 @@ function getEventDayStart(event: CalendarEvent): Date | null {
 // Human-readable reasons a Google Calendar write can fail. 403 means the event
 // lives on a calendar the user can't edit (an invite / shared / subscribed
 // calendar) — say that plainly instead of a generic failure.
-function eventUpdateErrorMessage(err: unknown): string {
-  if (err instanceof CalendarReconnectError) return 'Calendar connection expired — reconnect in Settings';
-  const msg = err instanceof Error ? err.message : String(err);
-  if (/forbidden|403/i.test(msg)) {
-    return "Google won't allow edits to this event — it's on a calendar you don't own (an invite or shared calendar)";
-  }
-  return 'Could not update the event';
-}
+// One wording for a refused calendar edit, shared with the week's drag: a 403
+// says the edit was refused, not why, and a shared calendar can permit edits
+// (Codex, 2026-09-24). See lib/calendar/moveEvent.
+const eventUpdateErrorMessage = eventMoveErrorMessage;
 
 // ── Event ─────────────────────────────────────────────────────────────────
 function EventPanelBody({ id }: { id: string }) {
   const autoOpenDiscussion = useAutoOpenDiscussion();
   const { clearSelection } = useSelection();
   const navigate = useNavigate();
-  const { events, updateEvent, moveEvent, fetchEvents, fetchCalendarList, isFetching, isLoading } = useGoogleCalendar();
+  const { events, updateEvent, moveEvent, deleteEvent, removeEventLocal, fetchEvents, fetchCalendarList, isFetching, isLoading } = useGoogleCalendar();
   const { getNote, updateNote, fetchNote, addEventLink, updateEventFree } = useEventNotes();
-  const { tasks, addPrepTask } = useSupabaseTasks();
+  const { tasks, addPrepTask, toggleTask } = useSupabaseTasks();
   const {
     isFlagged,
     getFlag,
@@ -639,12 +667,36 @@ function EventPanelBody({ id }: { id: string }) {
         }
       }}
       onClose={handleClose}
+      onDeleteEvent={async () => {
+        try {
+          // This instance only for a recurring series (deleteSeries defaults
+          // off), with the event's own calendar — a secondary-calendar event
+          // sent to 'primary' 404s.
+          await deleteEvent({ eventId, calendarId: eventCalendarId });
+          // deleteEvent writes to Google only; drop it from the held events
+          // so no view keeps drawing it until the next fetch.
+          removeEventLocal(eventId);
+          showToast('Event deleted', 'success');
+          return true;
+        } catch (err) {
+          console.error('Failed to delete event:', err);
+          showToast(
+            err instanceof CalendarReconnectError
+              ? 'Calendar connection expired — reconnect in Settings'
+              : 'Could not delete the event',
+            'error',
+            4000,
+          );
+          return false;
+        }
+      }}
       onNotesChange={(html) => updateNote(eventId, html)}
       onAddPrepTask={(title) => {
         // Prep tasks land on the event's day (a plain timed task linked to it).
         const when = getEventDayStart(event) ?? new Date();
         addPrepTask(title, eventId, when);
       }}
+      onTogglePrepTask={(tid) => { void toggleTask(tid); }}
       links={getNote(eventId)?.links}
       onAddLink={(url) => addEventLink(eventId, url)}
       discussion={{ flagged: isFlagged(eventId), note: getFlag(eventId)?.discussionNote }}
@@ -691,8 +743,12 @@ function EventPanelBody({ id }: { id: string }) {
             calendarId: event.calendar_id ?? event.calendarId,
           });
           showToast('Event updated', 'success');
+          return true;
         } catch (err) {
           showToast(eventUpdateErrorMessage(err), 'error', 4000);
+          // Said out loud, so the inline editor can keep the edit rather than
+          // closing over a change Google refused.
+          return false;
         }
       }}
     />

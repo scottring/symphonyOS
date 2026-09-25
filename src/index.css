@@ -1468,6 +1468,256 @@ html.desktop-shell a {
   @page { margin: 14mm; }
 }
 
+/* ── Somewhere to start: three optional doors ────────────────────────────────
+   Quiet by design. It sits above a page that already works, so it reads as an
+   offer rather than a step, and it can be hidden for good. */
+.entry-paths {
+  margin: 0 0 18px;
+  border: 1px solid var(--color-neutral-200);
+  border-radius: 14px;
+  background: var(--color-bg-elevated, #fff);
+  padding: 16px 18px 14px;
+}
+.entry-paths-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; }
+.entry-paths-eyebrow {
+  margin: 0; font-size: 11px; font-weight: 700; letter-spacing: .09em;
+  text-transform: uppercase; color: var(--color-neutral-500);
+}
+.entry-paths-lead { margin: 4px 0 0; font-size: 13px; color: var(--color-neutral-600); max-width: 64ch; }
+.entry-paths-link { font-size: 13px; font-weight: 600; color: var(--color-primary-700); }
+.entry-paths-link:hover { text-decoration: underline; }
+.entry-paths-back { margin: 0 0 14px; }
+
+.entry-paths-doors {
+  display: grid; gap: 12px; margin: 14px 0 0;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+@media (max-width: 860px) { .entry-paths-doors { grid-template-columns: 1fr; } }
+
+.entry-path {
+  display: flex; flex-direction: column;
+  border: 1px solid var(--color-neutral-200);
+  border-radius: 11px;
+  padding: 12px 13px 11px;
+  background: #fff;
+}
+.entry-path-title {
+  margin: 0 0 4px;
+  font-family: 'Crimson Pro', Georgia, serif;
+  font-size: 17px; line-height: 1.2; color: var(--color-neutral-900);
+}
+.entry-path-body { margin: 0 0 10px; font-size: 12.5px; line-height: 1.5; color: var(--color-neutral-600); }
+.entry-path-foot {
+  margin-top: auto; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px;
+}
+.entry-path-action {
+  display: inline-flex; align-items: center;
+  border: 1px solid var(--color-neutral-200); border-radius: 8px;
+  padding: 5px 11px; font-size: 13px; font-weight: 600;
+  color: var(--color-primary-700); background: #fff;
+  transition: background-color .15s ease;
+}
+.entry-path-action:hover { background: var(--color-neutral-50); }
+.entry-path-here { font-size: 12px; font-weight: 600; color: var(--color-neutral-500); }
+.entry-path-aside { font-size: 12px; color: var(--color-neutral-500); }
+.entry-path-aside:hover { color: var(--color-neutral-700); text-decoration: underline; }
+
+.entry-paths-foot { margin: 14px 0 0; font-size: 12px; color: var(--color-neutral-500); }
+
+@media print { .entry-paths, .entry-paths-back { display: none !important; } }
+
+/* ── The planning guide ──────────────────────────────────────────────────────
+   A readable page on screen and four worksheets on paper. Unlayered, like the
+   print block above, so a stray Tailwind utility on an ancestor cannot leak
+   into a printed sheet.
+
+   The writing lines are real space, not decoration: a sheet with nowhere to
+   write is a poster. `guide-rule-line` grows to fill whatever is left of its
+   row, so a tail ("who:", "when:") shortens the line rather than wrapping it. */
+.guide-page { padding-bottom: 64px; }
+
+.guide-intro {
+  max-width: 62ch;
+  margin: 8px 0 28px;
+  font-size: 15px;
+  line-height: 1.65;
+  color: var(--color-neutral-700);
+}
+.guide-intro p { margin: 0 0 12px; }
+.guide-intro h2 {
+  font-family: 'Crimson Pro', Georgia, serif;
+  font-size: 20px;
+  margin: 22px 0 8px;
+  color: var(--color-neutral-800);
+}
+.guide-checks {
+  margin: 0 0 12px;
+  padding-left: 18px;
+  list-style: disc;
+}
+.guide-checks li { margin: 0 0 4px; }
+.guide-intro .guide-source {
+  margin-top: 18px;
+  font-size: 13px;
+  color: var(--color-neutral-500);
+}
+.guide-link { color: var(--color-primary-700); font-weight: 600; }
+
+.guide-print-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  flex-shrink: 0;
+  border: 1px solid var(--color-neutral-200);
+  border-radius: 8px;
+  padding: 6px 12px;
+  font-size: 13px; font-weight: 600;
+  color: var(--color-primary-700);
+  background: #fff;
+  transition: background-color .15s ease;
+}
+.guide-print-btn:hover { background: var(--color-neutral-50); }
+
+.guide-sheet {
+  border: 1px solid var(--color-neutral-200);
+  border-radius: 14px;
+  background: #fff;
+  padding: 22px 24px 26px;
+  margin: 0 0 22px;
+}
+.guide-sheet-head {
+  display: flex; align-items: flex-start; justify-content: space-between; gap: 16px;
+  padding-bottom: 14px; margin-bottom: 18px;
+  border-bottom: 1px solid var(--color-neutral-200);
+}
+.guide-sheet-title {
+  font-family: 'Crimson Pro', Georgia, serif;
+  font-size: 26px; line-height: 1.15; color: var(--color-neutral-900);
+  margin: 0;
+}
+.guide-sheet-lead { margin: 5px 0 0; font-size: 14px; color: var(--color-neutral-600); max-width: 60ch; }
+.guide-sheet-time { margin: 3px 0 0; font-size: 12px; color: var(--color-neutral-500); }
+
+.guide-band { margin: 0 0 22px; break-inside: avoid; }
+.guide-band-title {
+  display: flex; align-items: baseline; gap: 8px;
+  font-size: 13px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase;
+  color: var(--color-neutral-600); margin: 0 0 4px;
+}
+.guide-band-n {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 18px; height: 18px; border-radius: 999px;
+  border: 1px solid var(--color-neutral-300);
+  font-size: 10px; font-weight: 700; letter-spacing: 0; color: var(--color-neutral-500);
+}
+.guide-band-optional {
+  font-size: 10px; font-weight: 600; letter-spacing: .04em; text-transform: none;
+  color: var(--color-neutral-400);
+}
+.guide-band-lead { margin: 0 0 10px; font-size: 13px; color: var(--color-neutral-600); max-width: 66ch; }
+.guide-questions {
+  list-style: none; margin: 0 0 12px; padding: 0 0 0 12px;
+  border-left: 2px solid var(--color-neutral-200);
+}
+.guide-questions li { font-size: 13.5px; line-height: 1.7; color: var(--color-neutral-700); }
+
+.guide-block { margin: 0 0 12px; }
+.guide-block-label { margin: 0 0 1px; font-size: 13px; font-weight: 600; color: var(--color-neutral-800); }
+.guide-block-hint { margin: 0 0 5px; font-size: 12px; color: var(--color-neutral-500); }
+.guide-note { margin: 4px 0 12px; font-size: 12px; font-style: italic; color: var(--color-neutral-500); max-width: 66ch; }
+
+.guide-lines { list-style: none; margin: 0; padding: 0; }
+.guide-line { display: flex; align-items: flex-end; gap: 7px; margin: 0 0 13px; }
+.guide-glyph { flex: 0 0 auto; font-size: 13px; line-height: 1.2; color: var(--color-neutral-400); }
+.guide-rule { display: flex; align-items: flex-end; gap: 12px; flex: 1 1 auto; min-width: 0; }
+.guide-rule-line { flex: 1 1 auto; min-width: 40px; border-bottom: 1px solid var(--color-neutral-300); height: 18px; }
+.guide-rule-tail {
+  flex: 0 0 auto; display: flex; align-items: flex-end; gap: 4px;
+  font-size: 11px; color: var(--color-neutral-500);
+}
+.guide-rule-tail .guide-rule-blank {
+  display: inline-block; width: 64px; height: 16px;
+  border-bottom: 1px solid var(--color-neutral-300);
+}
+
+.guide-fields { display: flex; flex-wrap: wrap; gap: 16px; margin: 0 0 12px; }
+.guide-field { display: flex; align-items: flex-end; gap: 6px; flex-basis: 180px; min-width: 150px; }
+.guide-field-label { flex: 0 0 auto; font-size: 11px; color: var(--color-neutral-500); }
+
+.guide-open { border: 1px dashed var(--color-neutral-300); border-radius: 8px; }
+.guide-open-sm { height: 70px; }
+.guide-open-md { height: 130px; }
+.guide-open-lg { height: 210px; }
+
+@media print {
+  .guide-print, .guide-print * { visibility: visible; }
+  /* The guide stays IN FLOW — an absolutely positioned printable subtree
+     leaves the document no height, and the browser paginates nothing. Each
+     ancestor between the guide and <body> is tagged on mount (PlanningGuide)
+     and gives up its layout and its other children for the duration. */
+  .guide-print-ancestor {
+    display: block !important;
+    position: static !important;
+    width: auto !important; max-width: none !important;
+    height: auto !important; max-height: none !important; min-height: 0 !important;
+    overflow: visible !important;
+    margin: 0 !important; padding: 0 !important;
+    background: #fff !important;
+  }
+  .guide-print-ancestor > *:not(.guide-print-ancestor):not(.guide-print) { display: none !important; }
+  .guide-print {
+    display: block; padding: 0; background: #fff; color: #000;
+    font-family: 'DM Sans', system-ui, sans-serif;
+  }
+  /* "Print this sheet" really does print one sheet. */
+  .guide-sheet[data-print="off"] { display: none; }
+  .guide-screen-only { display: none !important; }
+  .guide-sheet {
+    border: 0; border-radius: 0; padding: 0; margin: 0;
+    break-after: page;
+  }
+  .guide-sheet:last-of-type { break-after: auto; }
+  .guide-sheet-head { border-bottom: 1px solid #999; padding-bottom: 5pt; margin-bottom: 9pt; }
+  .guide-sheet-title { font-size: 19pt; color: #000; }
+  .guide-sheet-lead { font-size: 9.5pt; color: #333; }
+  .guide-sheet-time { font-size: 8.5pt; color: #555; }
+  /* A band may run over a page break; a BLOCK may not. Keeping whole bands
+     together threw a 460pt band onto a fresh side and left the one before it
+     half empty — three sides for two sides of content. */
+  .guide-band { margin-bottom: 7pt; break-inside: auto; }
+  .guide-band-title { break-after: avoid; }
+  /* Two columns where the content is a set of short areas rather than a
+     sequence — it is the difference between a two-sided worksheet and a
+     five-sided one. */
+  .guide-band[data-band="what-that-means"] .guide-band-body,
+  .guide-band[data-band="what-happened"] .guide-band-body,
+  .guide-band[data-band="what-matters-here"] .guide-band-body,
+  .guide-band[data-band="if-more-than-one-of-you-is-filling-this-in"] .guide-band-body,
+  .guide-band[data-band="what-is-already-committed"] .guide-band-body,
+  /* The week sheet is one side, so EVERY band on it pairs up. */
+  .guide-sheet[data-sheet="week"] .guide-band-body {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 0 18pt; align-content: start;
+  }
+  .guide-band-body > .guide-note { grid-column: 1 / -1; }
+  .guide-block { break-inside: avoid; margin-bottom: 8pt; }
+  .guide-band-title { font-size: 8.5pt; color: #333; }
+  .guide-band-n { border-color: #888; color: #555; width: 13pt; height: 13pt; font-size: 7pt; }
+  .guide-band-optional { color: #666; }
+  .guide-band-lead { font-size: 9pt; color: #333; margin-bottom: 5pt; }
+  .guide-questions li { font-size: 9.5pt; color: #111; }
+  .guide-note { margin: 2pt 0 6pt; }
+  .guide-block-label { font-size: 10pt; color: #000; }
+  .guide-block-hint, .guide-note, .guide-field-label, .guide-rule-tail { font-size: 9pt; color: #333; }
+  .guide-rule-line, .guide-rule-tail .guide-rule-blank { border-bottom-color: #999; }
+  .guide-line { margin-bottom: 8pt; }
+  .guide-rule-line { height: 11pt; }
+  .guide-questions { margin-bottom: 8pt; padding-left: 9pt; }
+  .guide-questions li { line-height: 1.5; }
+  .guide-band-lead { margin-bottom: 6pt; }
+  .guide-fields { gap: 10pt; margin-bottom: 8pt; }
+  .guide-glyph { color: #666; }
+  .guide-open { border-color: #bbb; }
+  .guide-open-lg { height: 105pt; }
+}
+
 /* Today's daybook: ink, ruled edges, and a single reading surface. Scoped so
    calendar, wall, and library surfaces can retain their own density. */
 .symphony-sidebar {
@@ -2034,6 +2284,7 @@ html.desktop-shell a {
 .plan-period-navigation { display: flex; gap: 2px; padding: 3px; border-radius: 7px; background: var(--color-neutral-100); }
 .plan-period-navigation a { padding: 6px 11px; color: var(--color-neutral-500); font-size: 13px; border-radius: 5px; white-space: nowrap; }
 .plan-period-navigation a.is-current { color: var(--color-primary-700); background: white; box-shadow: 0 1px 3px rgb(35 35 34 / 0.08); font-weight: 600; }
+
 .plan-range-control { display: flex; align-items: center; font-size: 12px; color: var(--color-neutral-500); }
 .plan-range-control select { background: transparent; padding: 6px 4px; max-width: 130px; }
 .task-chooser-control { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
@@ -2171,8 +2422,150 @@ div.chooser-action-group { overflow: visible !important; }
 .period-assigned-fold > summary { cursor:pointer; color:var(--color-neutral-500); font-size:13px; padding:4px; }
 .period-shelves { min-width:0; padding:20px; border:1px solid var(--color-neutral-200); border-radius:12px; display:flex; flex-direction:column; gap:18px; }
 .period-plan-page .period-plan-row { position:relative; gap:10px; padding:14px 6px; }
-.period-plan-page .period-row-actions { position:absolute; right:4px; top:4px; background:var(--color-bg-elevated, #fff); border-radius:6px; box-shadow:0 1px 5px #263a5012; }
+/* The hover verbs sit IN the row, after the timing control, never floating
+   over it. They used to be `position:absolute; right:4px` above a row that
+   also carries a persistent "Choose when": the two overlapped, and clicking
+   the control's own hit target landed on "Take it into this week" instead —
+   which filed a November task into September (Codex live test, 2026-09-24).
+   In flow the width is reserved whether or not they are showing, so hovering
+   reveals them without moving anything and nothing is ever on top of
+   anything. */
+.period-plan-page .period-row-actions {
+  align-self: flex-start;
+  margin-top: 2px;
+  background: var(--color-bg-elevated, #fff);
+  border-radius: 6px;
+}
 .period-plan-page .period-row-check { min-width:18px; min-height:18px; }
+
+/* ── Getting started, on its own page ───────────────────────────────────── */
+.getting-started-page { padding-bottom: 56px; }
+.getting-started-body {
+  max-width: 62ch; margin: 8px 0 0;
+  font-size: 15px; line-height: 1.65; color: var(--color-neutral-700);
+}
+.getting-started-body p { margin: 0 0 14px; }
+.getting-started-body h2 {
+  font-family: 'Crimson Pro', Georgia, serif;
+  font-size: 20px; margin: 26px 0 8px; color: var(--color-neutral-800);
+}
+.getting-started-link { color: var(--color-primary-700); font-weight: 600; }
+.getting-started-link:hover { text-decoration: underline; }
+/* On its own page the doors are the content, not an aside. */
+.getting-started-body .entry-paths { margin-bottom: 8px; }
+
+/* ── A goal's head: the optional link up, and its own status ─────────────────
+   Both quiet until used. The link is a disclosure, so a goal with no parent
+   costs one line and not a select; the status is always a select, because a
+   goal is always one thing or the other. */
+.goal-parent-link { display: block; margin-top: 3px; }
+.goal-parent-trigger {
+  font-size: 12px; color: var(--color-primary-700); text-align: left;
+}
+.goal-parent-trigger:hover { text-decoration: underline; }
+.goal-parent-editor { display: block; margin-top: 4px; }
+.goal-parent-label { display: block; }
+.goal-parent-select, .goal-status-select {
+  max-width: 100%; border: 1px solid var(--color-neutral-200); border-radius: 7px;
+  padding: 5px 7px; font-size: 12.5px; min-height: 34px;
+  background: var(--color-bg-elevated, #fff); color: var(--color-neutral-700);
+}
+.goal-parent-note {
+  display: block; margin-top: 3px; font-size: 11px; color: var(--color-neutral-400);
+  max-width: 52ch;
+}
+.goal-head-controls {
+  display: flex; flex-wrap: wrap; align-items: flex-start; gap: 6px 12px;
+  margin-top: 2px;
+}
+.goal-status { flex: 0 0 auto; }
+@media (max-width: 639px) {
+  /* Stacked, each a full-size target rather than two slivers. */
+  .goal-head-controls { gap: 6px; }
+  .goal-status, .goal-parent-link { flex: 1 1 100%; }
+}
+
+/* ── Long goal lists: the filter line and what it is hiding ──────────────────
+   Shown only once a list is long enough to need them. Both controls are real
+   focusable elements at full size on a phone — a filter you cannot tap is a
+   filter that does not exist. */
+.period-goals-tools {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+  margin: 0 4px 10px;
+}
+.period-goals-filter {
+  flex: 1 1 200px; min-width: 0;
+  border: 1px solid var(--color-neutral-200); border-radius: 8px;
+  padding: 7px 10px; font-size: 13px; min-height: 38px;
+  background: var(--color-bg-elevated, #fff); color: var(--color-neutral-800);
+}
+.period-goals-filter::placeholder { color: var(--color-neutral-400); }
+.period-goals-toggle {
+  flex: 0 0 auto;
+  border: 1px solid var(--color-neutral-200); border-radius: 8px;
+  padding: 7px 11px; font-size: 12.5px; min-height: 38px;
+  color: var(--color-neutral-600); background: var(--color-bg-elevated, #fff);
+}
+.period-goals-toggle:hover { color: var(--color-primary-700); }
+.period-goals-hidden {
+  margin: 0 5px 8px; font-size: 12px; color: var(--color-neutral-500);
+}
+@media (max-width: 639px) {
+  /* Full width each, so neither is a sliver beside the other. */
+  .period-goals-filter, .period-goals-toggle { flex: 1 1 100%; }
+}
+
+/* ── A goal and its steps, indented the way they are nested ──────────────────
+   Scott, 2026-09-24: a goal wears a tick, a caret and a goal glyph, and a step
+   wears only a tick — so the goal's TITLE started further right than its own
+   children's, and the hierarchy read backwards.
+
+   The lanes a row carries in front of its title are named here once, and both
+   halves of the fix are derived from them. A goal with no disclosure (a year
+   row, a completed one) holds the caret's place, so goals in one list agree
+   with each other. And a step's indent takes it back past the caret and the
+   glyph its goal wears — then puts it clearly to the RIGHT of the goal's
+   title. Both rows carry the same row padding, so that cancels. */
+.period-plan-page {
+  --plan-lane-gap: 10px;
+  --plan-lane-caret: 14px;
+  --plan-lane-glyph: 14px;
+  --plan-lane-glyph-gap: 10px;
+  --plan-row-pad-x: 6px;
+  --plan-step-indent: 24px;
+}
+@media (max-width: 639px) {
+  /* No goal glyph below sm — and a lane that is not rendered takes no gap
+     with it. The caret is a 24px touch target instead. */
+  .period-plan-page {
+    --plan-lane-caret: 24px;
+    --plan-lane-glyph: 0px;
+    --plan-lane-glyph-gap: 0px;
+    --plan-row-pad-x: 4px;
+  }
+}
+.period-row-caret {
+  width: calc(var(--plan-lane-caret, 14px));
+}
+.period-plan-steps {
+  padding-left: calc(
+    var(--plan-lane-caret, 14px) + var(--plan-lane-gap, 10px)
+    + var(--plan-lane-glyph, 14px) + var(--plan-lane-glyph-gap, 10px)
+    + var(--plan-step-indent, 24px)
+  );
+}
+/* The add-step field starts exactly where a step's title does: the same
+   indent, plus the row padding a step carries and this form does not, with
+   the "+" standing in the step's tick column. */
+.period-plan-step-add {
+  gap: var(--plan-lane-gap, 10px);
+  padding-left: calc(
+    var(--plan-lane-caret, 14px) + var(--plan-lane-gap, 10px)
+    + var(--plan-lane-glyph, 14px) + var(--plan-lane-glyph-gap, 10px)
+    + var(--plan-step-indent, 24px) + var(--plan-row-pad-x, 6px)
+  );
+}
+.period-plan-step-add > .period-row-caret { width: 18px; }
 @media (min-width:1024px) {
 
 }

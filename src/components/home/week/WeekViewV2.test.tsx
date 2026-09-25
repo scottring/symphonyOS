@@ -214,7 +214,9 @@ describe('WeekViewV2 journal spread', () => {
     render(<WeekViewV2 {...defaultProps} routines={[]} weekStart={sunday} tasks={tasks} events={events} />)
     const monday = within(screen.getByTestId('journal-day-2026-09-14'))
     const entries = [...within(monday.getByRole('list', { name: 'Schedule entries' })).getAllByRole('listitem'), ...within(monday.getByRole('list', { name: 'Any time entries' })).getAllByRole('listitem')]
-    expect(entries.map((li) => li.textContent)).toEqual([
+    // The title only: a task row also wears the shared timing control, which
+    // is asserted separately below.
+    expect(entries.map((li) => li.querySelector('.journal-entry-title')?.textContent)).toEqual([
       '6:50aGutter quotes',
       '10aPT appointment',
       '2:30pCall the bank',
@@ -225,6 +227,137 @@ describe('WeekViewV2 journal spread', () => {
     // Done stays on the page, struck, the way a paper week keeps it.
     expect(monday.getByText('Renew license')).toHaveClass('line-through')
     expect(monday.getByText('No school')).toBeInTheDocument()
+  })
+
+  // Codex live test, 2026-09-24: an action that moved out of "Any day" onto
+  // Monday lost the one visible control that says when it is to be done. The
+  // week's list has it, the day rows must too — the same control, in place.
+  it('gives a day\'s task the same timing control the week list wears', () => {
+    const anchor = weekStartAnchor(sunday, readCadenceConfig().weekStartsOn)
+    const tasks = [
+      createMockTask({ id: 'day', title: 'List supplies to buy', scheduledFor: new Date(2026, 8, 14), isAllDay: true,
+        commitments: [{ level: 'week', periodStart: anchor, status: 'open' }] }),
+      createMockTask({ id: 'done', title: 'Renew license', scheduledFor: new Date(2026, 8, 14), isAllDay: true, completed: true }),
+    ]
+    render(<WeekViewV2 {...defaultProps} routines={[]} weekStart={sunday} tasks={tasks} events={[]} />)
+    const monday = within(screen.getByTestId('journal-day-2026-09-14'))
+    const control = monday.getByRole('button', { name: /Choose a week or a day for List supplies to buy/ })
+    // It wears the answer, the way it does everywhere else.
+    expect(control).toHaveTextContent(/Sep 14/)
+    // A finished row is a record, not something to re-time.
+    expect(monday.queryByRole('button', { name: /Choose a week or a day for Renew license/ })).toBeNull()
+  })
+
+  it('keeps the journal control out of the way of the row drag', () => {
+    const tasks = [createMockTask({ id: 'day', title: 'List supplies to buy', scheduledFor: new Date(2026, 8, 14), isAllDay: true })]
+    // dnd-kit's drag listeners are REACT handlers on the row, so the guard has
+    // to stop React's propagation — a native listener would see the event
+    // either way. An ancestor spy in the same React tree tells the two apart:
+    // without the guard the press reaches it, with the guard it does not.
+    const seen = vi.fn()
+    render(
+      <div onPointerDown={seen}>
+        <WeekViewV2 {...defaultProps} routines={[]} weekStart={sunday} tasks={tasks} events={[]} />
+      </div>,
+    )
+    const monday = within(screen.getByTestId('journal-day-2026-09-14'))
+    const control = monday.getByRole('button', { name: /Choose a week or a day for List supplies to buy/ })
+    fireEvent.pointerDown(control)
+    expect(seen).not.toHaveBeenCalled()
+    // A press on the row itself still reaches the drag.
+    fireEvent.pointerDown(monday.getByText('List supplies to buy'))
+    expect(seen).toHaveBeenCalled()
+  })
+
+  // Scott, 2026-09-24: the picker must offer the days of the week in VIEW.
+  // Every other route to "a day" has meant the week containing now, which is
+  // how a November action ended up in September.
+  it('offers the VIEWED week\'s days in the timing control, not today\'s', () => {
+    const tasks = [
+      createMockTask({ id: 'a', title: 'List supplies to buy', scheduledFor: new Date(2026, 8, 14), isAllDay: true }),
+      // Something already on Tuesday, so the days differ from one another.
+      createMockTask({ id: 'b', title: 'Call the bank', scheduledFor: new Date(2026, 8, 15, 10), isAllDay: false }),
+      createMockTask({ id: 'c', title: 'Dentist', scheduledFor: new Date(2026, 8, 15, 14), isAllDay: false }),
+    ]
+    render(<WeekViewV2 {...defaultProps} routines={[]} weekStart={sunday} tasks={tasks} events={[]} />)
+    const monday = within(screen.getByTestId('journal-day-2026-09-14'))
+    fireEvent.click(monday.getByRole('button', { name: /Choose a week or a day for List supplies to buy/ }))
+
+    // The seven days of the week being viewed, by their real dates.
+    expect(screen.getByText(/^A day in /)).toHaveTextContent('September 13–19')
+    for (const [label, date] of [['Sun', 'Sep 13'], ['Mon', 'Sep 14'], ['Sat', 'Sep 19']] as const) {
+      expect(screen.getByRole('menuitemradio', { name: new RegExp(`${label}, ${date}`) })).toBeInTheDocument()
+    }
+    // The day it is already on is marked, and a busier day says what is on it.
+    expect(screen.getByRole('menuitemradio', { name: /Mon, Sep 14/ })).toHaveAttribute('aria-checked', 'true')
+    expect(screen.getByRole('menuitemradio', { name: /Tue, Sep 15/ })).toHaveAccessibleName(/2 tasks already/)
+    expect(screen.getByRole('menuitemradio', { name: /Wed, Sep 16/ })).toHaveAccessibleName(/nothing on it yet/)
+    // No DAY tile claims hours or capacity (the week rows above are labelled
+    // by their own text and carry no aria-label at all).
+    const dayTiles = screen.getAllByRole('menuitemradio', { name: /^Plan for \w{3}, Sep/ })
+    expect(dayTiles).toHaveLength(7)
+    for (const tile of dayTiles) {
+      expect(tile.getAttribute('aria-label')).not.toMatch(/%|hour|booked|capacity/i)
+    }
+    // And the explicit date alternative is still there, for any other day.
+    expect(screen.getByText('Another day…')).toBeInTheDocument()
+  })
+
+  it('writes the day the tile names', () => {
+    const onUpdateTask = vi.fn()
+    const tasks = [createMockTask({ id: 'a', title: 'List supplies to buy', scheduledFor: new Date(2026, 8, 14), isAllDay: true })]
+    render(<WeekViewV2 {...defaultProps} routines={[]} weekStart={sunday} tasks={tasks} events={[]} onUpdateTask={onUpdateTask} />)
+    const monday = within(screen.getByTestId('journal-day-2026-09-14'))
+    fireEvent.click(monday.getByRole('button', { name: /Choose a week or a day for List supplies to buy/ }))
+    fireEvent.click(screen.getByRole('menuitemradio', { name: /Thu, Sep 17/ }))
+    expect(onUpdateTask).toHaveBeenCalledWith('a', expect.objectContaining({
+      bucket: 'timed', scheduledFor: new Date(2026, 8, 17), isAllDay: true,
+    }))
+  })
+
+  // Codex, 2026-09-24: the helper supports a dedupe key, but the caller has to
+  // pass one. The journal draws the same meeting twice when two calendars
+  // report it, so the count must merge what the journal does not.
+  it('counts one meeting once, however many calendars report it', () => {
+    const tasks = [createMockTask({ id: 'a', title: 'List supplies to buy', scheduledFor: new Date(2026, 8, 14), isAllDay: true })]
+    const events = [
+      mockEvent({ id: 'cal-a', title: 'PT appointment', start: '2026-09-15T10:00:00', end: '2026-09-15T11:00:00' }),
+      // The same hour, the same meeting, a second calendar's id.
+      mockEvent({ id: 'cal-b', title: 'PT appointment', start: '2026-09-15T10:00:00', end: '2026-09-15T11:00:00' }),
+    ]
+    render(<WeekViewV2 {...defaultProps} routines={[]} weekStart={sunday} tasks={tasks} events={events} />)
+    const monday = within(screen.getByTestId('journal-day-2026-09-14'))
+    fireEvent.click(monday.getByRole('button', { name: /Choose a week or a day for List supplies to buy/ }))
+    expect(screen.getByRole('menuitemradio', { name: /Tue, Sep 15/ })).toHaveAccessibleName(/1 event already/)
+  })
+
+  // The status is the PARENT's to know. An isolated prop test would not have
+  // caught a container that never supplies one.
+  it('says a day is unknown when the week is told its sources are not ready', () => {
+    const tasks = [createMockTask({ id: 'a', title: 'List supplies to buy', scheduledFor: new Date(2026, 8, 14), isAllDay: true })]
+    render(
+      <WeekViewV2 {...defaultProps} routines={[]} weekStart={sunday} tasks={tasks} events={[]}
+        sources={{ tasks: 'ready', routines: 'ready', events: 'stale' }} />,
+    )
+    const monday = within(screen.getByTestId('journal-day-2026-09-14'))
+    fireEvent.click(monday.getByRole('button', { name: /Choose a week or a day for List supplies to buy/ }))
+    // Not "nothing on it" — we have not read it.
+    expect(screen.getByRole('menuitemradio', { name: /Wed, Sep 16/ })).toHaveAccessibleName(/still loading/)
+    expect(screen.getByRole('menuitemradio', { name: /Wed, Sep 16/ })).not.toHaveAccessibleName(/nothing on it yet/)
+  })
+
+  it('still counts a quiet day as quiet when there is simply no calendar', () => {
+    const tasks = [createMockTask({ id: 'a', title: 'List supplies to buy', scheduledFor: new Date(2026, 8, 14), isAllDay: true })]
+    render(
+      <WeekViewV2 {...defaultProps} routines={[]} weekStart={sunday} tasks={tasks} events={[]}
+        sources={{ tasks: 'ready', routines: 'ready', events: 'not-connected' }} />,
+    )
+    const monday = within(screen.getByTestId('journal-day-2026-09-14'))
+    fireEvent.click(monday.getByRole('button', { name: /Choose a week or a day for List supplies to buy/ }))
+    const wed = screen.getByRole('menuitemradio', { name: /Wed, Sep 16/ })
+    // Complete, and scoped — never dressed up as a failure.
+    expect(wed).toHaveAccessibleName(/nothing on it yet · no calendar connected/)
+    expect(wed.getAttribute('aria-label')).not.toMatch(/error|couldn|fail|loading/i)
   })
 
   it('lists multi-day context once above the days — including one that began last week — and not in the days', () => {

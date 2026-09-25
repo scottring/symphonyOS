@@ -158,3 +158,200 @@ describe('PlanSession — year', () => {
     expect(s.draft.keptIds?.o).toBe(id)
   })
 })
+
+// Requirement 7: a session starts from saved work, says plainly when nothing
+// would change, and closes without a write. "Nothing is saved yet" was shown
+// over months that already held a goal and three tasks (S3-04).
+describe('the save step tells the truth about what is already there', () => {
+  const existing = [
+    t({ id: 'g1', title: 'Take Kaleb to an Islanders game in DC', isGoal: true }),
+    t({ id: 'x1', title: 'Research games dates and tickets' }),
+    t({ id: 'x2', title: 'Buy game tickets', completed: true }),
+  ]
+  /** No look-back rows, so the session opens straight on Plan. */
+  const quiet = { current: existing, finished: [], open: [], above: [], aboveGoals: [] }
+
+  const toSave = () => fireEvent.click(screen.getByRole('button', { name: /next: save/i }))
+
+  it('shows the existing plan on the save step, completed work included', () => {
+    setup(quiet)
+    toSave()
+    const already = within(screen.getByRole('region', { name: /Already in the plan for / }))
+    expect(already.getByText('Take Kaleb to an Islanders game in DC')).toBeInTheDocument()
+    expect(already.getByText('Research games dates and tickets')).toBeInTheDocument()
+    expect(already.getByText('Buy game tickets')).toBeInTheDocument()
+    expect(already.getByText('completed')).toBeInTheDocument()
+  })
+
+  it('says the plan is unchanged instead of claiming nothing is saved', () => {
+    setup(quiet)
+    toSave()
+    expect(screen.getByText(/is unchanged\. Nothing will be written\./)).toBeInTheDocument()
+    expect(screen.queryByText('Nothing is saved yet.')).toBeNull()
+    expect(screen.queryByText('Nothing chosen.')).toBeNull()
+  })
+
+  // Codex live test, 2026-09-24: an unchanged November plan said "Nothing will
+  // be written" and then listed every untouched October row under WHAT SAVE
+  // WILL CHANGE, as "Left open in October". No changes may sit under a change
+  // heading.
+  it('never puts an untouched row under "What Save will change"', () => {
+    setup({ ...quiet, open: [t({ id: 'o1', title: 'Tile saw' })] })
+    // A look-back row means the session opens on the look-back step.
+    fireEvent.click(screen.getByRole('button', { name: /next: plan/i }))
+    toSave()
+    expect(screen.getByText(/is unchanged\. Nothing will be written\./)).toBeInTheDocument()
+    expect(screen.queryByText('What Save will change')).toBeNull()
+    // Still shown, as review context, under a heading that tells the truth.
+    const untouched = within(screen.getByRole('region', { name: /Unchanged by Save/ }))
+    expect(untouched.getByText('Tile saw')).toBeInTheDocument()
+    expect(untouched.getByText(/Left open in/)).toBeInTheDocument()
+  })
+
+  it('separates the untouched rows from the ones Save really writes', () => {
+    setup({ ...quiet, open: [t({ id: 'o1', title: 'Tile saw' }), t({ id: 'o2', title: 'Library card' })] })
+    // One verdict: that row changes, the other does not.
+    fireEvent.click(screen.getAllByRole('button', { name: 'Keep' })[1])
+    fireEvent.click(screen.getByRole('button', { name: /next: plan/i }))
+    toSave()
+    const changing = within(screen.getByRole('list', { name: 'What Save will change' }))
+    expect(changing.getByText('Library card')).toBeInTheDocument()
+    expect(changing.queryByText('Tile saw')).toBeNull()
+    const untouched = within(screen.getByRole('region', { name: /Unchanged by Save/ }))
+    expect(untouched.getByText('Tile saw')).toBeInTheDocument()
+    expect(untouched.queryByText('Library card')).toBeNull()
+  })
+
+  // Walkthrough, 2026-09-25: a Keep the reader had only proposed was listed
+  // under "Already in the plan" AND under "What Save will change".
+  it('a proposed Keep is a change, never "already in the plan"', () => {
+    setup({ ...quiet, open: [t({ id: 'o1', title: 'Tile saw' })] })
+    fireEvent.click(screen.getByRole('button', { name: 'Keep' }))
+    fireEvent.click(screen.getByRole('button', { name: /next: plan/i }))
+    toSave()
+    const already = within(screen.getByRole('region', { name: /Already in the plan for / }))
+    expect(already.queryByText('Tile saw')).toBeNull()
+    expect(within(screen.getByRole('list', { name: 'What Save will change' })).getByText('Tile saw')).toBeInTheDocument()
+  })
+
+  it('offers Done, not Save, and closes without writing', () => {
+    const onClose = vi.fn()
+    const { onSave } = setup({ ...quiet, onClose })
+    toSave()
+    expect(screen.queryByRole('button', { name: /^Save / })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Done' }))
+    expect(onClose).toHaveBeenCalled()
+    expect(onSave).not.toHaveBeenCalled()
+  })
+
+  it('once something IS proposed, separates it from the existing plan and offers Save', () => {
+    setup(quiet)
+    fireEvent.change(screen.getByLabelText(/new task for/i), { target: { value: 'Call the box office' } })
+    fireEvent.click(screen.getByRole('button', { name: /add task/i }))
+    toSave()
+    expect(screen.getByText('These changes are not saved yet.')).toBeInTheDocument()
+    expect(screen.getByRole('region', { name: /Already in the plan for / })).toBeInTheDocument()
+    expect(screen.getByText('What Save will change')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^Save / })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Done' })).toBeNull()
+  })
+
+  // A reflection note is written to the session record, so it IS a change.
+  it('treats a reflection note alone as something to save', () => {
+    setup({ current: existing, open: [], above: [], aboveGoals: [] })
+    fireEvent.change(screen.getByLabelText(/what went well/i), { target: { value: 'the tickets arrived' } })
+    fireEvent.click(screen.getByRole('button', { name: /next: plan/i }))
+    toSave()
+    expect(screen.getByRole('button', { name: /^Save / })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Done' })).toBeNull()
+  })
+})
+
+// ── The review, on a plan with a realistic number of rows ───────────────────
+// Codex, 2026-09-24: the review showed two flat lists and no completed step.
+describe('the review draws the saved plan the way Month does', () => {
+  /** A goal with steps, one of them finished, plus loose work. */
+  const song = t({ id: 'song', title: 'Write a new song in October', isGoal: true })
+  const chords = t({ id: 'chords', title: 'Use an old chord progression', completed: true, goalTaskId: 'song' })
+  const verse = t({ id: 'verse', title: 'Draft the first verse', goalTaskId: 'song' })
+  const filters = t({ id: 'filters', title: 'Order new furnace filters' })
+  const plan = { current: [song, chords, verse, filters], finished: [], open: [], above: [], aboveGoals: [] }
+
+  /** With no look-back rows the session already opens on Plan. */
+  const toPlan = () => {
+    const next = screen.queryByRole('button', { name: /next: plan/i })
+    if (next) fireEvent.click(next)
+  }
+
+  it('puts a step under its goal, not in a list of its own', () => {
+    setup(plan)
+    toPlan()
+    const counts = screen.getByRole('button', { name: /1 open · 1 done · show/ })
+    fireEvent.click(counts)
+    // The goal's own row — its title also appears in the "toward a goal"
+    // picker, which is a different thing entirely.
+    const goalItem = counts.closest('li')!
+    expect(within(goalItem).getByText('Write a new song in October')).toBeInTheDocument()
+    expect(within(goalItem).getByText('Draft the first verse')).toBeInTheDocument()
+    expect(within(goalItem).getByText('Use an old chord progression')).toBeInTheDocument()
+  })
+
+  // The completed step Scott could not see.
+  it('shows completed work, marked, and never folds it away in review', () => {
+    setup(plan)
+    toPlan()
+    fireEvent.click(screen.getByRole('button', { name: /1 open · 1 done · show/ }))
+    const done = screen.getByText('Use an old chord progression')
+    expect(done.className).toMatch(/line-through/)
+    expect(within(done.closest('li')!).getByText('completed')).toBeInTheDocument()
+  })
+
+  it('leaves a task with no goal in the task list', () => {
+    setup(plan)
+    toPlan()
+    expect(screen.getByText('Order new furnace filters')).toBeInTheDocument()
+  })
+
+  // The failure this must never allow: a filter that narrows what Save writes.
+  it('a filter narrows the VIEW and never the save', () => {
+    const many = {
+      ...plan,
+      current: [song, chords, verse, filters,
+        ...Array.from({ length: 10 }, (_, i) => t({ id: `x${i}`, title: `Other task ${i}` }))],
+    }
+    const s = setup(many)
+    toPlan()
+    // Add something, so the save has a real scope to preserve.
+    fireEvent.change(screen.getByLabelText(/New task for October/), { target: { value: 'Buy strings' } })
+    fireEvent.click(screen.getByRole('button', { name: /add task/i }))
+    const beforeFilter = JSON.stringify(s.draft)
+
+    fireEvent.change(screen.getByRole('searchbox', { name: /Filter your October plan/ }), { target: { value: 'furnace' } })
+    expect(screen.queryByText('Other task 3')).not.toBeInTheDocument()
+    expect(screen.getByRole('status')).toHaveTextContent(/Filtering does not change what will be saved/)
+    // Filtering wrote nothing to the draft.
+    expect(JSON.stringify(s.draft)).toBe(beforeFilter)
+
+    fireEvent.click(screen.getByRole('button', { name: /next: save/i }))
+    fireEvent.click(screen.getByRole('button', { name: /^Save October$/ }))
+    expect(s.onSave).toHaveBeenCalledTimes(1)
+    // The draft handed to Save still holds everything, filter or no filter.
+    expect(s.draft.newTasks.map((x) => x.title)).toEqual(['Buy strings'])
+  })
+
+  // Recovery: a save that half-failed must not duplicate on the retry.
+  it('a failed save keeps the draft, says so, and retries without duplicating', () => {
+    const s = setup({ ...plan, saveError: true })
+    toPlan()
+    fireEvent.change(screen.getByLabelText(/New task for October/), { target: { value: 'Buy strings' } })
+    fireEvent.click(screen.getByRole('button', { name: /add task/i }))
+    fireEvent.click(screen.getByRole('button', { name: /next: save/i }))
+
+    expect(screen.getByRole('alert')).toHaveTextContent(/didn't save/i)
+    // Still one item, not two: the draft is the record, and it was kept.
+    expect(s.draft.newTasks).toHaveLength(1)
+    fireEvent.click(screen.getByRole('button', { name: /^Save October$/ }))
+    expect(s.onSave).toHaveBeenCalledTimes(1)
+    expect(s.draft.newTasks).toHaveLength(1)
+  })
+})

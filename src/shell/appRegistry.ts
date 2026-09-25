@@ -16,6 +16,8 @@ import { routinesAppDef } from '@/apps/routines';
 // import { projectsAppDef } from '@/apps/projects';  // hidden — see Sidebar.tsx
 import { goalsAppDef } from '@/apps/goals';
 import { monthPlanAppDef, seasonPlanAppDef, yearPlanAppDef } from '@/apps/plan';
+import { guideAppDef } from '@/apps/guide';
+import { gettingStartedAppDef } from '@/apps/start';
 import { familyAppDef } from '@/apps/family';
 import { agentAppDef } from '@/apps/agent';
 
@@ -86,6 +88,8 @@ export const appRegistry: AppRegistry = createRegistry([
   monthPlanAppDef,
   seasonPlanAppDef,
   yearPlanAppDef,
+  guideAppDef,
+  gettingStartedAppDef,
   familyAppDef,
   agentAppDef,
 ]);

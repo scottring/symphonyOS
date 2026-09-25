@@ -31,6 +31,7 @@ import { useMessages } from '@/hooks/useMessages'
 import { MealEventSection } from './MealEventSection'
 import { useEventDiscussionFlags } from '@/hooks/useEventDiscussionFlags'
 import { MessageCircle, CloudUpload, Check } from 'lucide-react'
+import { taskWhenLabel } from '@/lib/planning/taskWhen'
 
 function toLocalInputValue(d: Date): string {
   const pad = (n: number) => String(n).padStart(2, '0')
@@ -667,6 +668,7 @@ export function DetailPanelRedesign({
 }: DetailPanelRedesignProps) {
   // Title editing
   const [isEditingTitle, setIsEditingTitle] = useState(false)
+  const panelRef = useRef<HTMLDivElement>(null)
   const [editedTitle, setEditedTitle] = useState(item?.title || '')
   const titleInputRef = useRef<HTMLInputElement>(null)
 
@@ -796,6 +798,22 @@ export function DetailPanelRedesign({
     setEditedTitle(item?.title || '')
     setIsEditingTitle(false)
   }, [item?.id, item?.title])
+
+  // Opening the pane used to change nothing you could notice: no focus moved
+  // and nothing was announced, so people kept hunting the page for an item
+  // already on screen (walk finding S1-12). Moving focus to the pane names it
+  // for a screen reader and puts the keyboard where the eye should go. Guarded
+  // so it never steals focus from a field you are already typing in.
+  useEffect(() => {
+    if (!item?.id) return
+    const node = panelRef.current
+    if (!node) return
+    const active = document.activeElement
+    if (active && node.contains(active)) return
+    if (active instanceof HTMLElement && ['INPUT', 'TEXTAREA'].includes(active.tagName)) return
+    if (active instanceof HTMLElement && active.isContentEditable) return
+    node.focus({ preventScroll: true })
+  }, [item?.id])
 
   useEffect(() => {
     if (isEditingTitle && titleInputRef.current) {
@@ -1403,6 +1421,11 @@ export function DetailPanelRedesign({
     onUpdate(item.originalTask.id, { links: newLinks.length > 0 ? newLinks : undefined })
   }
 
+  // A task's own "when", day first and then the commitments the day sits
+  // inside — the pane used to state neither (walk finding S1-13). Events keep
+  // timeDisplay below; their "when" is a start and an end, not a commitment.
+  const whenLabel = isTask && item.originalTask ? taskWhenLabel(item.originalTask) : null
+
   // Show date context for both tasks and events (e.g., "Today 3pm", "Tomorrow 1p|3p")
   const timeDisplay = item.startTime
     ? item.endTime
@@ -1451,7 +1474,13 @@ export function DetailPanelRedesign({
   }
 
   return (
-    <div className="h-full flex flex-col bg-bg-base">
+    <div
+      ref={panelRef}
+      tabIndex={-1}
+      role="region"
+      aria-label={item.title ? `Details: ${item.title}` : 'Details'}
+      className="h-full flex flex-col bg-bg-base focus:outline-none"
+    >
       {/* ========================================
           ZONE 1: HEADER (Hero)
           - Title is largest text, primary focus
@@ -1528,7 +1557,20 @@ export function DetailPanelRedesign({
 
             {/* Inline metadata pills - only show if populated */}
             <div className="flex flex-wrap gap-2 mt-3">
-              {item.startTime && (
+              {whenLabel && (
+                <button
+                  onClick={() => setShowTimePicker(!showTimePicker)}
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1
+                            bg-neutral-100 text-neutral-600 text-sm rounded-full
+                            hover:bg-neutral-200 transition-colors"
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
+                  {whenLabel}
+                </button>
+              )}
+              {!isTask && item.startTime && (
                 <button
                   onClick={() => (isTask || (isEvent && !item.allDay)) && setShowTimePicker(!showTimePicker)}
                   className="inline-flex items-center gap-1.5 px-2.5 py-1

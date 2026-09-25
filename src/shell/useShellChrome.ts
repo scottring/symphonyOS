@@ -30,7 +30,7 @@ import { useSelection } from './providers/SelectionProvider';
 import { useNavigate } from 'react-router-dom';
 import { useDomain } from '@/hooks/useDomain';
 import { layerOf } from '@/lib/domains';
-import { audienceLabel, contextLabel, hiddenByView } from '@/lib/capture/destination';
+import { audienceLabel, captureConfirmation, contextLabel, hiddenByView } from '@/lib/capture/destination';
 import type { TaskContext } from '@/types/task';
 import { useDesktopBridge } from '@/desktop/useDesktopBridge';
 import type { PinnableEntityType } from '@/types/pin';
@@ -108,6 +108,8 @@ export function useShellChrome() {
         message: `Added to Inbox · ${contextLabel(context)} · ${audienceLabel(context)}`,
         hint: hidden ? `Hidden by your current view (${contextLabel(context)} is unchecked).` : 'All set — or schedule it now:',
         actions: [
+          // S1-07: say where it went AND link there — from any page.
+          { label: 'Go to inbox', onClick: () => { dismissConfirmationToast(); navigate('/inbox'); } },
           { label: 'View', onClick: () => { dismissConfirmationToast(); navigate(`/task/${taskId}`); } },
           ...(hidden ? [{ label: `Show ${contextLabel(context)}`, onClick: () => { toggleLayer(layer); dismissConfirmationToast(); } }] : []),
           { label: 'Today', onClick: () => scheduleFor(0) },
@@ -222,15 +224,18 @@ export function useShellChrome() {
         if (data.scheduledFor) {
           const hidden = hiddenByView(data.context ?? null, layers);
           const when = data.scheduledFor.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+          // S1-07's link, now that this is the only confirmation (S3-12).
+          const there = captureConfirmation({ kind: 'dated', context: data.context ?? null, when: data.scheduledFor, isToday: data.scheduledFor.toDateString() === new Date().toDateString() });
           showToast(
             `Scheduled for ${when} · ${contextLabel(data.context ?? null)} · ${audienceLabel(data.context ?? null)}${hidden ? ' · hidden by your current view' : ''}`,
             hidden ? 'warning' : 'success',
-            hidden ? 8000 : undefined,
+            hidden ? 8000 : 5000,
+            { label: there.linkLabel, onClick: () => { navigate(there.route); } },
           );
         } else showCaptureConfirmation(taskId, data.context ?? null);
       }
     },
-    [addTask, addRoutine, isConnected, createEvent, fetchEvents, defaultCalendarId, getCalendarForDomain, getDomainForCalendar, getCurrentUserMember, showToast, showCaptureConfirmation, layers],
+    [addTask, addRoutine, isConnected, createEvent, fetchEvents, defaultCalendarId, getCalendarForDomain, getDomainForCalendar, getCurrentUserMember, showToast, showCaptureConfirmation, layers, navigate],
   );
 
   const onQuickAddNote = useCallback(

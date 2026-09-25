@@ -2,17 +2,22 @@
 // stays whole all week — done rows stay, struck, sorted last. Renders beside
 // (desktop) or above (narrow) the journal on the Week page.
 
-import { useState } from 'react'
-import { Check } from 'lucide-react'
+import { useMemo, useState, type ReactNode } from 'react'
+import { Check, Target } from 'lucide-react'
 import type { Task } from '@/types/task'
 import { weekListTasks, weekRowNote, weekRowNoteText } from '@/lib/planning/weekList'
+import { goalTitleMap } from '@/lib/planning/goalSteps'
 import { weekListTitle } from '@/components/reference/DayPlanPanel'
 import { localYmd } from '@/lib/cadence/config'
+import { useMobile } from '@/hooks/useMobile'
 
-export function WeekList({ tasks, weekStart, meId, userId, isCurrent, onToggle, onSelect, onPlan, onAdd }: {
+export function WeekList({ tasks, weekStart, meId, userId, isCurrent, peopleFiltered = false, onToggle, onSelect, onPlan, onAdd, timingControl }: {
   tasks: Task[]
   weekStart: Date
   meId: string | null
+  /** A people filter is narrowing the list. `meId` is always the signed-in
+   *  member — the list is MY week — so it says nothing about a filter. */
+  peopleFiltered?: boolean
   userId: string | null
   isCurrent: boolean
   onToggle: (task: Task) => void
@@ -20,21 +25,44 @@ export function WeekList({ tasks, weekStart, meId, userId, isCurrent, onToggle, 
   /** Opens the week session; shown in the empty state and as a quiet link. */
   onPlan?: () => void
   onAdd?: (title: string) => Promise<void>
+  /** The same timing control the period pages use, supplied by the host so
+   *  this list stays presentational. Week and Day are execution views of the
+   *  same work, so the control has to be the same one (connected planning,
+   *  requirement 2). */
+  timingControl?: (task: Task) => ReactNode
 }) {
   const [adding, setAdding] = useState(false)
+  const mobile = useMobile()
   const [titleInput, setTitleInput] = useState('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(false)
   const todayYmd = localYmd(new Date())
+  // Which broader commitment a row is serving. The grid and the journal have
+  // shown this on DATED rows for a while, but the week's list — where work
+  // with no day lives — never did, so a week could not be read as "this
+  // serves October, that is just this week" (Scott, 2026-09-23: "none of the
+  // three weeks coming up say antying about the october goal").
+  const goalTitles = useMemo(() => goalTitleMap(tasks), [tasks])
   const rows = weekListTasks(tasks, weekStart, meId, { isCurrent })
   const open = rows.filter((t) => !t.completed)
   const done = rows.filter((t) => t.completed)
   const [showDone, setShowDone] = useState(false)
-  const assigned = (task: Task) => !!weekRowNote(task, weekStart, userId, todayYmd).dayLabel
+  // A dated row belongs under its DAY, once. It used to appear here as a full
+  // row under "Assigned a day" as well as in the day beside this list, so the
+  // week showed the same action twice (connected planning, requirement 4).
+  // The count stays — the brief allows a compact weekly count — and says where
+  // the rows are instead of repeating them.
+  const onADayHere = (task: Task) => !!weekRowNote(task, weekStart, userId, todayYmd).dayLabel
+  const dated = (task: Task) => !!task.scheduledFor
+  const onDays = open.filter(onADayHere)
+  // Committed to THIS week, but dated outside it. Neither "any day" (it has a
+  // day) nor one of this week's days (it is not in one), so it had been
+  // silently sitting in "Any day" claiming to have no date at all.
+  const datedElsewhere = open.filter(task => dated(task) && !onADayHere(task))
   const groups = [
-    { title: 'Any day', rows: open.filter(task => !assigned(task) && !task.weekendStart) },
-    { title: 'Weekend', rows: open.filter(task => !assigned(task) && task.weekendStart) },
-    { title: 'Assigned a day', rows: open.filter(assigned) },
+    { title: 'Any day', rows: open.filter(task => !dated(task) && !task.weekendStart) },
+    { title: 'Weekend', rows: open.filter(task => !dated(task) && task.weekendStart) },
+    { title: 'Scheduled outside this week', rows: datedElsewhere },
     { title: 'Completed', rows: showDone ? done : [] },
   ].filter(group => group.rows.length)
   const ordered = [...open, ...done]
@@ -52,7 +80,9 @@ export function WeekList({ tasks, weekStart, meId, userId, isCurrent, onToggle, 
       </h2>
       {ordered.length === 0 ? (
         <p className="text-sm text-neutral-500">
-          {meId ? "No week tasks match this person. Change the people filter to see other work." : isCurrent ? "Nothing on this week's list in this view yet." : "Nothing on this week’s list in this view."}
+          {/* It blamed a people filter on every empty week, filter or not:
+              `meId` is always set (S3-10, confirmed live 2026-09-25). */}
+          {peopleFiltered ? "No week tasks match this person. Change the people filter to see other work." : isCurrent ? "Nothing on this week's list in this view yet." : "Nothing on this week’s list in this view."}
           {onPlan && (
             <>
               {' '}
@@ -93,21 +123,40 @@ export function WeekList({ tasks, weekStart, meId, userId, isCurrent, onToggle, 
                       {task.title}
                     </span>
                   </button>
+                  {task.goalTaskId && goalTitles.get(task.goalTaskId) && (
+                    <span className="block text-[11.5px] text-neutral-500">
+                      <Target className="mr-1 inline h-3 w-3 align-[-1px]" aria-hidden="true" />
+                      {goalTitles.get(task.goalTaskId)}
+                    </span>
+                  )}
                   {note && <span className="block text-[11.5px] text-neutral-500">{note}</span>}
+                  {/* Under the title on a phone: trailing, the chip left the
+                      title ~30px — a word a line (390px check, 2026-09-25). */}
+                  {mobile && timingControl && <span className="mt-1 flex max-w-full">{timingControl(task)}</span>}
                 </div>
+                {!mobile && timingControl && <span className="shrink-0">{timingControl(task)}</span>}
               </li>
             )
           })}
         </ul></section>)}</div>
       )}
+      {onDays.length > 0 && (
+        <p className="week-list-on-days text-[12.5px] text-neutral-500">
+          {onDays.length} {onDays.length === 1 ? 'task is' : 'tasks are'} on a day this week — {onDays.length === 1 ? 'it appears' : 'they appear'} under {onDays.length === 1 ? 'its day' : 'their days'}.
+        </p>
+      )}
       {done.length > 0 && <button className="week-completed-toggle" type="button" aria-expanded={showDone} onClick={() => setShowDone(!showDone)}>{showDone ? "Hide completed" : "Completed"} · {done.length}</button>}
       {onAdd && (adding ? (
         <form className="mt-3 flex flex-wrap gap-2" onSubmit={async (event) => {
           event.preventDefault()
-          if (!titleInput.trim() || saving) return
+          const submitted = titleInput.trim()
+          if (!submitted || saving) return
           setSaving(true)
           setError(false)
-          try { await onAdd(titleInput.trim()); setTitleInput(''); setAdding(false) }
+          // Stay open for the next one, and clear only what was sent: the
+          // field closed on every Enter, and clearing it when the save landed
+          // erased whatever had been typed meanwhile (walkthrough 2026-09-25).
+          try { await onAdd(submitted); setTitleInput((v) => (v.trim() === submitted ? '' : v)) }
           catch { setError(true) }
           finally { setSaving(false) }
         }}>

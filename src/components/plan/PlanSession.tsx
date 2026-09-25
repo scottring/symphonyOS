@@ -11,6 +11,7 @@ import { Target, Check } from 'lucide-react'
 import type { Task } from '@/types/task'
 import { DOMAINS, type DomainId } from '@/lib/domains'
 import { verdictOptions, summarize, weekTaskListLabel, placementLevelOf, type SessionDraft, type SessionLevel, type Verdict } from '@/lib/planning/session'
+import { goalListView, planRowsFor, hiddenLabel, countsLabel, clearFilterOnEscape } from '@/lib/planning/goalListView'
 import { stepsThatCarryForward } from '@/lib/planning/goalSteps'
 import { Hint } from './Hint'
 
@@ -102,12 +103,50 @@ export function PlanSession({ level, aboveLabel, dayOptions = [], periodLabel: P
   const monthGoals = week ? [] : [...current.filter((t) => t.isGoal), ...kept.filter((t) => t.isGoal)]
   const monthTasks = [...current.filter((t) => !t.isGoal), ...kept.filter((t) => !t.isGoal), ...carried]
     .filter((t, i, all) => all.findIndex((x) => x.id === t.id) === i)
+  // The Save step's "Already in your plan" is what is SAVED — never a Keep
+  // the reader has only proposed. Listing kept rows there put the same row
+  // under "already in" and "what Save will change" at once (walkthrough,
+  // 2026-09-25). The Plan step still shows the draft's whole list.
+  const savedGoals = week ? [] : current.filter((t) => t.isGoal)
+  const savedTasks = current.filter((t) => !t.isGoal)
   // A task toward a goal belongs to the goal's domain; a loose one to the domain in view.
   const towardOptions = [
     ...monthGoals.map((g) => ({ id: g.id, title: g.title, context: g.context ?? null })),
     ...draft.newGoals.map((g) => ({ id: g.id, title: g.title, context: g.context ?? null })),
   ]
+  // Is there anything for Save to write? A reflection note counts: it is
+  // saved on the session record even when no row changed.
+  const nothingToSave = useMemo(() => {
+    const d = draft
+    return Object.keys(d.verdicts).length === 0
+      && d.newGoals.length === 0 && d.newTasks.length === 0 && d.takenFromAbove.length === 0
+      && !d.wentWell.trim() && !d.didnt.trim()
+  }, [draft])
+
+  /**
+   * The saved plan, drawn the way Month draws it: each step under its goal,
+   * completed work kept and marked. Two flat lists put a step nowhere near the
+   * goal it serves and hid what was already finished (Codex, 2026-09-24).
+   *
+   * The filter is presentation ONLY — the draft, and so everything Save
+   * writes, is untouched by it, and the line beneath it says so.
+   */
+  const [planFilter, setPlanFilter] = useState('')
+  const [revealed, setRevealed] = useState<Set<string>>(new Set())
+  const [openGoals, setOpenGoals] = useState<Set<string>>(new Set())
+  const existing = useMemo(() => planRowsFor(monthGoals, monthTasks), [monthGoals, monthTasks])
+  const existingView = useMemo(() => goalListView(existing.goals, existing.loose, {
+    query: planFilter, inReview: true, expanded: openGoals, revealed,
+  }), [existing, planFilter, openGoals, revealed])
+  const existingHidden = hiddenLabel(existingView)
+  const manyRows = existing.goals.length + existing.loose.length > 8
+
   const lines = useMemo(() => summarize(draft, { open, above, aboveGoals, current, hiddenStepGoals, periodLabel: P, prevLabel: Q, aboveLabel }), [draft, open, above, aboveGoals, current, hiddenStepGoals, P, Q, aboveLabel])
+  // What Save writes, and what it leaves alone. A row from the look-back with
+  // no verdict is never written, and showing it under a "will change" heading
+  // contradicted the sentence saying nothing would be (Codex, 2026-09-24).
+  const changing = useMemo(() => lines.filter((l) => !l.unchanged), [lines])
+  const untouched = useMemo(() => lines.filter((l) => l.unchanged), [lines])
 
   const steps: Array<[Step, string]> = [['back', `Look back at ${Q}`], ['plan', `Plan ${P}`], ['save', 'Save']]
   const idx = steps.findIndex(([s]) => s === step)
@@ -194,8 +233,51 @@ export function PlanSession({ level, aboveLabel, dayOptions = [], periodLabel: P
                 <Hint name="month-goals" uid={uid}>Goals are what this period should add up to. They stay on this list; you look at them when you plan a week or a day.</Hint>
               </div>
             )}
+            {(manyRows || planFilter) && (
+              <div className="period-goals-tools mt-2">
+                <input type="search" value={planFilter} onChange={(e) => setPlanFilter(e.target.value)}
+                  onKeyDown={clearFilterOnEscape(planFilter, () => setPlanFilter(''))}
+                  aria-label={`Filter your ${P} plan`} placeholder="Filter this plan…" className="period-goals-filter" />
+              </div>
+            )}
+            {existingHidden && (
+              <p role="status" className="period-goals-hidden">
+                {existingHidden}. Filtering does not change what will be saved.
+              </p>
+            )}
             <ul>
-              {monthGoals.map((g) => <li key={g.id} className="flex items-center gap-2 border-b border-neutral-100 py-2 text-sm"><Target className="h-4 w-4 text-accent-600" />{g.title}</li>)}
+              {existingView.goals.map((g) => (
+                <li key={g.row.id} className="border-b border-neutral-100 py-2 text-sm">
+                  <span className="flex items-center gap-2">
+                    <Target className="h-4 w-4 shrink-0 text-accent-600" />
+                    <span className={`min-w-0 flex-1 break-words ${g.row.fate === 'done' ? 'text-neutral-400 line-through' : ''}`}>{g.row.title}</span>
+                    {g.counts.total > 0 && (
+                      <button type="button" onClick={() => setOpenGoals((prev) => { const n = new Set(prev); if (n.has(g.row.id)) n.delete(g.row.id); else n.add(g.row.id); return n })}
+                        className="shrink-0 text-[12px] text-primary-700 hover:underline">
+                        {countsLabel(g.counts)}{g.expanded ? ' · hide' : ' · show'}
+                      </button>
+                    )}
+                  </span>
+                  {g.expanded && (
+                    <ul className="mt-1 ml-6 border-l border-neutral-200 pl-3">
+                      {g.steps.map((st) => (
+                        <li key={st.id} className={`break-words py-1 text-[13px] ${st.fate === 'done' ? 'text-neutral-400 line-through' : 'text-neutral-600'}`}>
+                          {st.title}{st.fate === 'done' && <span className="ml-1.5 text-[11px] no-underline">completed</span>}
+                        </li>
+                      ))}
+                      {g.hiddenByReveal > 0 && (
+                        <li className="py-1">
+                          <button type="button" onClick={() => setRevealed((prev) => new Set(prev).add(g.row.id))}
+                            className="text-[12px] font-medium text-primary-700 hover:underline">
+                            Show all {g.counts.total} steps · {g.hiddenByReveal} more
+                          </button>
+                        </li>
+                      )}
+                      {g.hiddenByFilter > 0 && <li className="py-1 text-[11px] text-neutral-400">{g.hiddenByFilter} hidden by the filter</li>}
+                    </ul>
+                  )}
+                </li>
+              ))}
               {draft.newGoals.map((g) => (
                 <li key={g.id} className="flex items-center gap-2 border-b border-neutral-100 py-2 text-sm">
                   <Target className="h-4 w-4 text-accent-600" />
@@ -228,7 +310,13 @@ export function PlanSession({ level, aboveLabel, dayOptions = [], periodLabel: P
               </div>
             )}
             <ul>
-              {monthTasks.map((x) => <li key={x.id} className="border-b border-neutral-100 py-2 text-sm">{x.title}</li>)}
+              {/* Only what belongs to no goal — the rest is drawn under its
+                  goal above, where it can be read together. */}
+              {existingView.loose.map((x) => (
+                <li key={x.id} className={`break-words border-b border-neutral-100 py-2 text-sm ${x.fate === 'done' ? 'text-neutral-400 line-through' : ''}`}>
+                  {x.title}{x.fate === 'done' && <span className="ml-1.5 text-[11px] no-underline">completed</span>}
+                </li>
+              ))}
               {open.filter((t) => draft.verdicts[t.id] === 'keep-action' && draft.actionTitles[t.id]?.trim()).map((g) => (
                 <li key={`a-${g.id}`} className="border-b border-neutral-100 py-2 text-sm">{draft.actionTitles[g.id]}<span className="block text-[12px] text-neutral-400">new next action toward {g.title}</span></li>))}
               {draft.newTasks.map((x) => (
@@ -271,18 +359,67 @@ export function PlanSession({ level, aboveLabel, dayOptions = [], periodLabel: P
         {step === 'save' && (
           <section>
             <h2 className="font-display text-xl text-neutral-800">{copy.saveHead}</h2>
+            {/* "Nothing is saved yet" was said over periods that already held
+                a goal and three tasks, which read as "your work is gone"
+                (S3-04). The sentence is about the CHANGES on this screen, and
+                when there are none it says so instead (requirement 7). */}
             {saveError
               ? <p role="alert" className="mt-1 text-sm text-accent-700">Some of this didn't save. It's still here and in your draft; Save again retries only these.</p>
-              : <p className="mt-1 text-sm text-neutral-500">Nothing is saved yet.</p>}
+              : nothingToSave
+                ? <p className="mt-1 text-sm text-neutral-600">Your plan for {P} is unchanged. Nothing will be written.</p>
+                : <p className="mt-1 text-sm text-neutral-500">These changes are not saved yet.</p>}
             {needsDomain.length > 0 && <fieldset className="my-3 rounded border border-neutral-200 p-3"><legend className="text-sm">Choose where these items belong before saving</legend><p className="mb-2 text-xs text-neutral-500">Family is shared with your household. Personal and Work stay private.</p>{needsDomain.map(task => <label key={task.id} className="mb-2 flex flex-wrap items-center justify-between gap-2 text-sm">{task.title}<select aria-label={`Domain for ${task.title}`} value={draft.domains?.[task.id] ?? ''} onChange={event => { const domains = { ...draft.domains }; if (event.target.value) domains[task.id] = event.target.value as DomainId; else delete domains[task.id]; set({ domains }) }} className="rounded border border-neutral-200 p-2"><option value="">Choose a domain</option>{DOMAINS.map(domain => <option key={domain.id} value={domain.id}>{domain.label}</option>)}</select></label>)}</fieldset>}
 
-            <ul className="mt-3 rounded-lg bg-sage-50 px-4 py-2">
-              {lines.length === 0 && <li className="py-1.5 text-sm text-neutral-500">Nothing chosen.</li>}
-              {lines.map((l, i) => (
-                <li key={i} className="grid grid-cols-1 gap-1 border-t border-sage-100 py-1.5 text-sm first:border-t-0 sm:grid-cols-2">
-                  <span className="text-neutral-800">{l.title}</span><span className="text-neutral-600">→ {l.destination}</span>
-                </li>))}
-            </ul>
+            {/* The existing plan, beside the proposed edits rather than
+                replaced by them: a session must start from saved work and
+                keep it visible while changes are being reviewed. Completed
+                work is included — it is what this period got done. */}
+            {(savedGoals.length > 0 || savedTasks.length > 0) && (
+              <section aria-label={`Already in the plan for ${P}`} className="mt-3">
+                <h3 className="text-[11px] font-semibold uppercase tracking-wider text-neutral-400">Already in the plan for {P}</h3>
+                <ul className="mt-1">
+                  {savedGoals.map((g) => (
+                    <li key={g.id} className="flex items-center gap-2 border-b border-neutral-100 py-1.5 text-sm last:border-0">
+                      <Target className="h-3.5 w-3.5 shrink-0 text-accent-600" aria-hidden="true" />
+                      <span className={g.completed ? 'text-neutral-400 line-through' : 'text-neutral-700'}>{g.title}</span>
+                    </li>))}
+                  {savedTasks.map((x) => (
+                    <li key={x.id} className="border-b border-neutral-100 py-1.5 text-sm last:border-0">
+                      <span className={x.completed ? 'text-neutral-400 line-through' : 'text-neutral-700'}>{x.title}</span>
+                      {x.completed && <span className="ml-1.5 text-[11px] text-neutral-400">completed</span>}
+                    </li>))}
+                </ul>
+              </section>
+            )}
+
+            {changing.length > 0 && (
+              <>
+                <h3 className="mt-4 text-[11px] font-semibold uppercase tracking-wider text-neutral-400">What Save will change</h3>
+                <ul aria-label="What Save will change" className="mt-1 rounded-lg bg-sage-50 px-4 py-2">
+                  {changing.map((l, i) => (
+                    <li key={i} className="grid grid-cols-1 gap-1 border-t border-sage-100 py-1.5 text-sm first:border-t-0 sm:grid-cols-2">
+                      <span className="text-neutral-800">{l.title}</span><span className="text-neutral-600">→ {l.destination}</span>
+                    </li>))}
+                </ul>
+              </>
+            )}
+
+            {/* The rows Save does not touch, kept as review context but never
+                under a heading that says they change. */}
+            {untouched.length > 0 && (
+              <section aria-label={`Unchanged by Save`} className="mt-4">
+                <h3 className="text-[11px] font-semibold uppercase tracking-wider text-neutral-400">
+                  Save won&rsquo;t touch these
+                </h3>
+                <ul className="mt-1 px-1">
+                  {untouched.map((l, i) => (
+                    <li key={i} className="grid grid-cols-1 gap-1 border-b border-neutral-100 py-1.5 text-sm last:border-0 sm:grid-cols-2">
+                      <span className="text-neutral-600">{l.title}</span>
+                      <span className="text-neutral-500">{l.destination}</span>
+                    </li>))}
+                </ul>
+              </section>
+            )}
           </section>
         )}
 
@@ -293,7 +430,19 @@ export function PlanSession({ level, aboveLabel, dayOptions = [], periodLabel: P
           <button type="button" disabled={saving} className="rounded-md border border-neutral-200 px-3 py-1.5 text-sm disabled:opacity-60" onClick={onClose}>Close · keep my draft</button>
           {step === 'back' && <button type="button" className="rounded-md bg-primary-600 px-3 py-1.5 text-sm font-semibold text-white" onClick={() => goTo('plan')}>Next: plan {P} →</button>}
           {step === 'plan' && <button type="button" className="rounded-md bg-primary-600 px-3 py-1.5 text-sm font-semibold text-white" onClick={() => goTo('save')}>Next: save →</button>}
-          {step === 'save' && <button type="button" disabled={saving || missingDomains.length > 0} className="rounded-md bg-primary-600 px-3 py-1.5 text-sm font-semibold text-white disabled:opacity-60" onClick={() => { void onSave() }}>{saving ? 'Saving…' : `Save ${P}`}</button>}
+          {/* An unchanged plan closes without a write. Offering "Save October"
+              over nothing invited a pointless round-trip and implied the
+              existing plan needed saving (requirement 7).
+
+              …unless a save already failed. Every row can land and the SESSION
+              RECORD still be refused, and then the draft holds no work, so
+              this read "nothing will be written" and offered only Done — while
+              the alert above it said "Save again retries only these". There
+              was no Save to press, and the period stayed unplanned. Found by
+              the review integration test, 2026-09-24. */}
+          {step === 'save' && (nothingToSave && !saveError
+            ? <button type="button" className="rounded-md bg-primary-600 px-3 py-1.5 text-sm font-semibold text-white" onClick={onClose}>Done</button>
+            : <button type="button" disabled={saving || missingDomains.length > 0} className="rounded-md bg-primary-600 px-3 py-1.5 text-sm font-semibold text-white disabled:opacity-60" onClick={() => { void onSave() }}>{saving ? 'Saving…' : `Save ${P}`}</button>)}
         </div>
       </div>
 

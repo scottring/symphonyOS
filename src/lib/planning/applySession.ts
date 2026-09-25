@@ -18,7 +18,7 @@ import type { SessionDraft, Verdict } from './session'
 export interface SessionWriters {
   keep: (id: string, periodStart: Date, prevStart: Date) => Promise<boolean>
   /** `context` is the item's own (recorded when planned), never the domain in view at Save. */
-  addTask: (title: string, opts: { id: string; periodStart: Date; day?: Date; isGoal?: boolean; goalTaskId?: string; context: DomainId | null }) => Promise<string | undefined>
+  addTask: (title: string, opts: { id: string; periodStart: Date; day?: Date; isGoal?: boolean; goalTaskId?: string; aboveGoalId?: string; context: DomainId | null }) => Promise<string | undefined>
   /** An existing row's domain — a next action takes its goal's. */
   contextOf: (id: string) => DomainId | null
   complete: (id: string) => Promise<boolean>
@@ -75,7 +75,12 @@ export async function applySession(
 
   for (const g of d.newGoals) {
     if (cur.created.includes(g.id)) { progress({ ...cur, newGoals: cur.newGoals.filter((x) => x.id !== g.id) }); continue }
-    if (await wrote(() => w.addTask(g.title, { id: g.id, periodStart, isGoal: true, context: g.context ?? null }))) {
+    // `linkId` is the goal ABOVE that this one serves — the season's year goal,
+    // the month's season goal. The session says "for <that goal>" while the
+    // draft is open; without this the link was shown and never written
+    // (S3-02). The writer decides which column records it, because what the
+    // id points AT differs by level.
+    if (await wrote(() => w.addTask(g.title, { id: g.id, periodStart, isGoal: true, aboveGoalId: g.linkId, context: g.context ?? null }))) {
       progress({ ...cur, created: [...cur.created, g.id], newGoals: cur.newGoals.filter((x) => x.id !== g.id) })
     }
   }

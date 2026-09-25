@@ -164,10 +164,58 @@ function createFakeDb() {
     }
   }
 
+  /**
+   * apply_task_placement, faithfully enough: the steps run through the same
+   * table semantics and triggers as the separate requests, and if ANY step
+   * fails every table is put back as it was — one transaction. The log shows
+   * one `rpc:apply_task_placement`, not the steps inside it.
+   */
+  async function rpc(name: string, args: { p_task_id: string; p_steps: Array<Record<string, unknown>>; p_expected_open?: Array<{ level: string; period_start: string }> }): Promise<Result> {
+    if (name !== 'apply_task_placement') return { data: null, error: { message: `unknown rpc ${name}` } }
+    writes.push({ table: 'rpc', op: 'update' })
+    rpcCalls.push(args)
+    // The stale-plan check, as the migration does it under the row lock.
+    const key = (l: string, d: string) => `${l}|${d}`
+    const want = [...new Set((args.p_expected_open ?? []).map((e) => key(e.level, e.period_start)))].sort()
+    const have = [...new Set(rows('task_commitments').filter((c) => c.task_id === args.p_task_id && c.status === 'open').map((c) => key(c.level as string, c.period_start as string)))].sort()
+    if (!args.p_expected_open || JSON.stringify(want) !== JSON.stringify(have)) {
+      return { data: null, error: { message: 'placement changed since it was read', code: 'PT409' } }
+    }
+    const lost = rpcLost.shift()
+    const snapshot = new Map([...tables].map(([k, v]) => [k, v.map((r) => ({ ...r }))]))
+    const logged = writes.length
+    const id = args.p_task_id
+    for (const st of args.p_steps) {
+      let q: Query
+      if (st.t === 'row') q = new Query('tasks').update(st.set as Row).eq('id', id)
+      else if (st.t === 'ensure') q = new Query('task_commitments').upsert({ task_id: id, level: st.level, period_start: st.period_start, status: 'open', ended_at: null, carried_to: null }, { onConflict: 'task_id,level,period_start' })
+      else if (st.t === 'remove') q = new Query('task_commitments').update({ status: 'removed' }).eq('task_id', id).eq('level', st.level).eq('period_start', st.period_start).eq('status', 'open')
+      else if (st.t === 'carry') q = new Query('task_commitments').update({ status: 'carried', carried_to: st.to }).eq('task_id', id).eq('level', st.level).eq('period_start', st.period_start).eq('status', 'open')
+      else if (st.t === 'focus_set') q = new Query('task_focus').upsert({ task_id: id, user_id: st.user_id, date: st.date }, { onConflict: 'task_id,user_id,date' })
+      else q = new Query('task_focus').delete().eq('task_id', id).eq('user_id', st.user_id)
+      const { error } = await q
+      if (error) {
+        tables.clear(); for (const [k, v] of snapshot) tables.set(k, v)
+        writes.length = logged
+        return { data: null, error }
+      }
+    }
+    writes.length = logged
+    // Committed, but the response never arrived.
+    if (lost) return { data: null, error: { message: 'Failed to fetch' } }
+    return { data: {}, error: null }
+  }
+  const rpcCalls: Array<{ p_task_id: string; p_steps: Array<Record<string, unknown>>; p_expected_open?: Array<{ level: string; period_start: string }> }> = []
+  const rpcLost: boolean[] = []
+
   return {
     from: (table: string) => new Query(table),
+    rpc,
+    rpcCalls: () => rpcCalls,
+    /** The next function call COMMITS, then its response is lost. */
+    rpcLandButLoseResponse() { rpcLost.push(true) },
     reset() {
-      tables.clear(); inserted.clear(); writes.length = 0
+      tables.clear(); inserted.clear(); writes.length = 0; rpcCalls.length = 0; rpcLost.length = 0
       this.clearFailures()
     },
     seed(table: string, row: Row) { rows(table).push(row) },
@@ -190,6 +238,9 @@ function createFakeDb() {
     rows: (table: string) => rows(table),
     insertedIds: (table: string) => inserted.get(table) ?? [],
     writeCount: (table: string, op?: Op) => writes.filter((w) => w.table === table && (!op || w.op === op)).length,
+    /** Every write, in the order the hook sent it: `table:op`. */
+    writeLog: () => writes.map((w) => `${w.table}:${w.op}`),
+    clearWriteLog() { writes.length = 0 },
   }
 }
 
@@ -203,6 +254,7 @@ vi.mock('@/lib/supabase', () => ({
       return ch
     }),
     from: (table: string) => db.from(table),
+    rpc: (name: string, args: { p_task_id: string; p_steps: Array<Record<string, unknown>>; p_expected_open?: Array<{ level: string; period_start: string }> }) => db.rpc(name, args),
   },
 }))
 
@@ -628,7 +680,7 @@ describe('a planning session against the real writers', () => {
       const d: SessionDraft = { ...emptyDraft('month', oct, sep), verdicts }
       const lines = summarize(d, { open: lookBackRows(result.current.tasks, sep, null).open, above: [], aboveGoals: [], periodLabel: 'October', prevLabel: 'September', aboveLabel: 'the season' })
       expect(await run(result, d)).toBe(true)
-      expect(lines.find((l) => l.title === 'Buy chairs')!.destination).toBe('Dropped from September · the task is kept')
+      expect(lines.find((l) => l.title === 'Buy chairs')!.destination).toBe('Dropped from September · back to the Inbox')
       expect(status('s1', '2026-09-01')).toBe('removed')
       expect(status('s1', '2026-10-01')).toBeUndefined()
       expect(lines.find((l) => l.title === 'Paint')!.destination).toBe('October tasks · carried with Porch')
@@ -684,3 +736,441 @@ describe('letting go of a row with several open commitments', () => {
   })
 })
 
+
+// Drop writes its commitments FIRST and its row LAST (Codex-approved option a
+// of docs/planning/2026-09-25-drop-partial-failure-investigation.md). The fake
+// database runs the sync trigger after every commitment write, as Postgres
+// does, so these assert what a stopped Drop leaves behind, not just the order.
+describe('Drop: commitments first, row last', () => {
+  const WEEK = '2026-09-20', SAT = '2026-09-26'
+  const seedWeek = (over: Row = {}, month = false) => {
+    db.seed('tasks', dbTaskRow({ id: 't1', title: 'Gutters', bucket: 'week', week_start: WEEK, month_start: month ? '2026-09-01' : null, ...over }))
+    db.seed('task_commitments', { id: 'cw', task_id: 't1', level: 'week', period_start: WEEK, status: 'open', carried_to: null, ended_at: null })
+    if (month) db.seed('task_commitments', { id: 'cm', task_id: 't1', level: 'month', period_start: '2026-09-01', status: 'open', carried_to: null, ended_at: null })
+  }
+  const mount = async () => {
+    const hook = renderHook(() => useSupabaseTasks())
+    await waitFor(() => expect(hook.result.current.tasks.find((t) => t.id === 't1')).toBeTruthy())
+    db.clearWriteLog()
+    return hook
+  }
+  const drop = async (h: Awaited<ReturnType<typeof mount>>) => {
+    let r: boolean | undefined
+    await act(async () => { r = await h.result.current.dropCommitment('t1', 'week', new Date(2026, 8, 20)) })
+    return r
+  }
+  const row = () => db.rows('tasks').find((r) => r.id === 't1')!
+  const week = () => db.rows('task_commitments').find((c) => c.id === 'cw')!
+
+  it('sole week: removes the commitment, THEN writes the row — back to the Inbox', async () => {
+    seedWeek()
+    const h = await mount()
+    expect(await drop(h)).toBe(true)
+    expect(db.writeLog()).toEqual(['task_commitments:update', 'tasks:update'])
+    expect(week().status).toBe('removed')
+    expect(row().bucket).toBe('inbox')
+  })
+
+  it('week with a month: the month stays, and the row says so', async () => {
+    seedWeek({}, true)
+    const h = await mount()
+    expect(await drop(h)).toBe(true)
+    expect(row().bucket).toBe('month')
+    expect(row().week_start).toBeNull()
+    expect(row().month_start).toBe('2026-09-01')
+  })
+
+  it('a failed removal sends no row write, fails, and leaves row and records agreeing', async () => {
+    seedWeek()
+    const h = await mount()
+    db.failOnce('task_commitments', 'update', { message: 'boom', code: 'XX000' })
+    expect(await drop(h)).toBe(false)
+    expect(db.writeLog()).toEqual(['task_commitments:update'])
+    expect(week().status).toBe('open')
+    expect(row().bucket).toBe('week')                                    // not 'inbox' beside an open week
+    expect(h.result.current.tasks.find((t) => t.id === 't1')!.bucket).toBe('week')
+  })
+
+  it('weekend reset: a failed final row stays FAILED, and the retry still clears the weekend', async () => {
+    seedWeek({ weekend_start: SAT })
+    const h = await mount()
+    db.failOnce('tasks', 'update', { message: 'boom', code: 'XX000' })
+    expect(await drop(h)).toBe(false)
+    expect(week().status).toBe('removed')                                // the removal landed
+    expect(row().weekend_start).toBe(SAT)                                // the row did not
+    // Locally it is what the database holds — not the optimistic plan.
+    expect(localYmd(h.result.current.tasks.find((t) => t.id === 't1')!.weekendStart!)).toBe(SAT)
+    db.clearWriteLog()
+    expect(await drop(h)).toBe(true)
+    expect(db.writeLog()).toEqual(['tasks:update'])                      // no removal left; the row is still written
+    expect(row().weekend_start).toBeNull()
+    expect(row().bucket).toBe('inbox')
+  })
+
+  it('lost response on the removal: fails, re-reads, and the retry finishes without a second removal', async () => {
+    seedWeek()
+    const h = await mount()
+    db.landButErrorOnce('task_commitments', 'update', { message: 'timeout', code: 'XX000' })
+    expect(await drop(h)).toBe(false)
+    expect(week().status).toBe('removed')
+    expect(h.result.current.tasks.find((t) => t.id === 't1')!.commitments!.find((c) => c.level === 'week')!.status).toBe('removed')
+    db.clearWriteLog()
+    expect(await drop(h)).toBe(true)
+    expect(db.writeLog().filter((w) => w.startsWith('task_commitments'))).toEqual([])
+    expect(row().bucket).toBe('inbox')
+  })
+
+  it('lost response on the final row: fails, and the retry sees it done without writing again', async () => {
+    seedWeek({ weekend_start: SAT })
+    const h = await mount()
+    db.landButErrorOnce('tasks', 'update', { message: 'timeout', code: 'XX000' })
+    expect(await drop(h)).toBe(false)
+    expect(row().weekend_start).toBeNull()
+    db.clearWriteLog()
+    expect(await drop(h)).toBe(true)
+    expect(db.writeLog()).toEqual([])
+  })
+})
+
+// Keep: ensure the destination, THEN carry the source, THEN the row — and stop
+// at the first failure (docs/planning/2026-09-25-keep-update-order-investigation.md).
+describe('Keep: destination first, carry second, row last', () => {
+  const mountMonth = async () => {
+    const h = await mountWith([monthTask('t1', sep)])
+    db.clearWriteLog()
+    return h
+  }
+  const keep = async (h: Awaited<ReturnType<typeof mountMonth>>) => {
+    let r: string | undefined = 'x'
+    await act(async () => { r = await h.result.current.keepForward('t1', { monthStart: oct }, sep) })
+    return r
+  }
+  const c = (start: string) => db.rows('task_commitments').find((x) => x.task_id === 't1' && x.period_start === start)
+  const row = () => db.rows('tasks').find((r) => r.id === 't1')!
+
+  it('sends ensure(October), carry(September), then the row', async () => {
+    const h = await mountMonth()
+    expect(await keep(h)).toBe('t1')
+    expect(db.writeLog()).toEqual(['task_commitments:upsert', 'task_commitments:update', 'tasks:update'])
+    expect(c('2026-09-01')!.status).toBe('carried')
+    expect(c('2026-10-01')!.status).toBe('open')
+    expect(row().month_start).toBe('2026-10-01')
+  })
+
+  it('a failed ensure sends nothing else: no carry to a month that was never opened', async () => {
+    const h = await mountMonth()
+    db.failOnce('task_commitments', 'upsert', { message: 'boom', code: 'XX000' })
+    expect(await keep(h)).toBeUndefined()
+    expect(db.writeLog()).toEqual(['task_commitments:upsert'])
+    expect(c('2026-09-01')!.status).toBe('open')
+    expect(row().bucket).toBe('month')
+    expect(row().month_start).toBe('2026-09-01')
+  })
+
+  it('a failed carry after the ensure: no row write, row agrees with the records, retry carries September', async () => {
+    const h = await mountMonth()
+    db.failOnce('task_commitments', 'update', { message: 'boom', code: 'XX000' })
+    expect(await keep(h)).toBeUndefined()
+    expect(db.writeLog()).toEqual(['task_commitments:upsert', 'task_commitments:update'])
+    expect(c('2026-09-01')!.status).toBe('open')
+    expect(c('2026-10-01')!.status).toBe('open')
+    expect(row().month_start).toBe('2026-10-01')                          // the sync trigger's derivation, not a stale write
+    expect(await keep(h)).toBe('t1')
+    expect(c('2026-09-01')!.status).toBe('carried')
+  })
+
+  it('a week Keep whose row write fails stays FAILED, and the retry clears the weekend', async () => {
+    const W1 = '2026-09-20', W2 = '2026-09-27'
+    db.seed('tasks', dbTaskRow({ id: 't1', title: 'Gutters', bucket: 'week', week_start: W1, weekend_start: '2026-09-26' }))
+    db.seed('task_commitments', { id: 'cw', task_id: 't1', level: 'week', period_start: W1, status: 'open', carried_to: null, ended_at: null })
+    const h = renderHook(() => useSupabaseTasks())
+    await waitFor(() => expect(h.result.current.tasks.find((t) => t.id === 't1')).toBeTruthy())
+    db.failOnce('tasks', 'update', { message: 'boom', code: 'XX000' })
+    let r: string | undefined = 'x'
+    await act(async () => { r = await h.result.current.keepForward('t1', { weekStart: new Date(2026, 8, 27) }, new Date(2026, 8, 20)) })
+    expect(r).toBeUndefined()
+    expect(row().weekend_start).toBe('2026-09-26')
+    expect(row().week_start).toBe(W2)                                    // records moved; row derived to match
+    await act(async () => { r = await h.result.current.keepForward('t1', { weekStart: new Date(2026, 8, 27) }, new Date(2026, 8, 20)) })
+    expect(r).toBe('t1')
+    expect(row().weekend_start).toBeNull()
+  })
+})
+
+// The switch ON: one transactional save instead of separate requests. The
+// fake's apply_task_placement runs the same steps through the same triggers
+// and puts every table back if any step fails.
+describe('transactional placement (VITE_PLACEMENT_RPC=true)', () => {
+  beforeEach(() => { vi.stubEnv('VITE_PLACEMENT_RPC', 'true') })
+  afterEach(() => { vi.unstubAllEnvs() })
+
+  const WEEK = '2026-09-20'
+  const seedWeek = (over: Row = {}) => {
+    db.seed('tasks', dbTaskRow({ id: 't1', title: 'Gutters', bucket: 'week', week_start: WEEK, ...over }))
+    db.seed('task_commitments', { id: 'cw', task_id: 't1', level: 'week', period_start: WEEK, status: 'open', carried_to: null, ended_at: null })
+  }
+  const mount = async () => {
+    const hook = renderHook(() => useSupabaseTasks())
+    await waitFor(() => expect(hook.result.current.tasks.find((t) => t.id === 't1')).toBeTruthy())
+    db.clearWriteLog()
+    return hook
+  }
+  const row = () => db.rows('tasks').find((r) => r.id === 't1')!
+  const snapshot = () => JSON.stringify({ t: db.rows('tasks'), c: db.rows('task_commitments'), f: db.rows('task_focus') })
+
+  it('Drop is one call: removal then row, and it lands', async () => {
+    seedWeek({ weekend_start: '2026-09-26' })
+    const h = await mount()
+    let r: boolean | undefined
+    await act(async () => { r = await h.result.current.dropCommitment('t1', 'week', new Date(2026, 8, 20)) })
+    expect(r).toBe(true)
+    expect(db.writeLog()).toEqual(['rpc:update'])
+    expect(db.rpcCalls()[0].p_steps.map((st) => st.t)).toEqual(['remove', 'row'])
+    expect(row().bucket).toBe('inbox')
+    expect(row().weekend_start).toBeNull()
+  })
+
+  it('Drop whose row step fails leaves NOTHING written, and says it failed', async () => {
+    seedWeek({ weekend_start: '2026-09-26' })
+    const h = await mount()
+    const before = snapshot()
+    db.failOnce('tasks', 'update', { message: 'boom', code: 'XX000' })
+    let r: boolean | undefined
+    await act(async () => { r = await h.result.current.dropCommitment('t1', 'week', new Date(2026, 8, 20)) })
+    expect(r).toBe(false)
+    expect(snapshot()).toBe(before)                                      // the removal was rolled back too
+    expect(h.result.current.tasks.find((t) => t.id === 't1')!.commitments!.find((c) => c.level === 'week')!.status).toBe('open')
+  })
+
+  it('Keep is one call — ensure, carry, row — and a failed carry rolls back the ensure', async () => {
+    const h0 = await mountWith([monthTask('t1', sep)])
+    db.clearWriteLog()
+    const before = snapshot()
+    db.failOnce('task_commitments', 'update', { message: 'boom', code: 'XX000' })
+    let r: string | undefined = 'x'
+    await act(async () => { r = await h0.result.current.keepForward('t1', { monthStart: oct }, sep) })
+    expect(r).toBeUndefined()
+    expect(snapshot()).toBe(before)                                      // no orphan October
+    await act(async () => { r = await h0.result.current.keepForward('t1', { monthStart: oct }, sep) })
+    expect(r).toBe('t1')
+    expect(db.rpcCalls().at(-1)!.p_steps.map((st) => st.t)).toEqual(['ensure', 'carry', 'row'])
+    expect(db.rows('task_commitments').find((c) => c.task_id === 't1' && c.period_start === '2026-09-01')!.status).toBe('carried')
+  })
+
+  it('a placement-only updateTask is one call; a save that also changes the title uses the ordinary requests', async () => {
+    const h = await mountWith([monthTask('t1', sep)])
+    db.clearWriteLog()
+    let ok: boolean | undefined
+    await act(async () => { ok = await h.result.current.updateTask('t1', { bucket: 'week', weekStart: new Date(2026, 8, 20) }) })
+    expect(ok).toBe(true)
+    expect(db.writeLog()).toEqual(['rpc:update'])
+    expect(db.rows('task_commitments').some((c) => c.task_id === 't1' && c.level === 'week' && c.status === 'open')).toBe(true)
+    db.clearWriteLog()
+    await act(async () => { ok = await h.result.current.updateTask('t1', { title: 'Renamed', bucket: 'week', weekStart: new Date(2026, 8, 27) }) })
+    expect(ok).toBe(true)
+    expect(db.writeLog()).toContain('tasks:update')
+    expect(db.writeLog()).not.toContain('rpc:update')
+  })
+
+  it('a failed placement-only updateTask writes nothing and restores the task', async () => {
+    const h = await mountWith([monthTask('t1', sep)])
+    const before = snapshot()
+    db.failOnce('task_commitments', 'upsert', { message: 'boom', code: 'XX000' })
+    let ok: boolean | undefined
+    await act(async () => { ok = await h.result.current.updateTask('t1', { bucket: 'week', weekStart: new Date(2026, 8, 20) }) })
+    expect(ok).toBe(false)
+    expect(snapshot()).toBe(before)
+    expect(h.result.current.tasks.find((t) => t.id === 't1')!.bucket).toBe('month')
+  })
+
+  it('with the switch OFF nothing calls the function', async () => {
+    vi.unstubAllEnvs()
+    seedWeek()
+    const h = await mount()
+    await act(async () => { await h.result.current.dropCommitment('t1', 'week', new Date(2026, 8, 20)) })
+    expect(db.rpcCalls()).toHaveLength(0)
+    expect(db.writeLog()).toEqual(['task_commitments:update', 'tasks:update'])
+  })
+})
+
+// Codex review of the prepared transaction: (1) a plan made from a state
+// another save has replaced must be refused, not applied — two stale plans
+// left two weeks open; (2) a failure whose outcome is unknown (a lost
+// response after the commit) must re-read, never restore the old snapshot.
+describe('transactional placement: stale plans and uncertain failures', () => {
+  beforeEach(() => { vi.stubEnv('VITE_PLACEMENT_RPC', 'true') })
+  afterEach(() => { vi.unstubAllEnvs() })
+
+  const S20 = '2026-09-20', S27 = '2026-09-27', O4 = '2026-10-04'
+  const seed = () => {
+    db.seed('tasks', dbTaskRow({ id: 't1', title: 'Gutters', bucket: 'week', week_start: S20 }))
+    db.seed('task_commitments', { id: 'c20', task_id: 't1', level: 'week', period_start: S20, status: 'open', carried_to: null, ended_at: null })
+  }
+  const mount = async () => {
+    const hook = renderHook(() => useSupabaseTasks())
+    await waitFor(() => expect(hook.result.current.tasks.find((t) => t.id === 't1')).toBeTruthy())
+    return hook
+  }
+  /** Another device moves the task to Sep 27 — this tab is not told. */
+  const otherDeviceMovesTo27 = () => {
+    Object.assign(db.rows('task_commitments').find((c) => c.id === 'c20')!, { status: 'removed' })
+    db.seed('task_commitments', { id: 'c27', task_id: 't1', level: 'week', period_start: S27, status: 'open', carried_to: null, ended_at: null })
+    Object.assign(db.rows('tasks').find((r) => r.id === 't1')!, { week_start: S27 })
+  }
+  const openWeeks = () => db.rows('task_commitments').filter((c) => c.task_id === 't1' && c.status === 'open').map((c) => c.period_start).sort()
+  const moveTo = async (h: Awaited<ReturnType<typeof mount>>, ymd: string) => {
+    const [y, m, d] = ymd.split('-').map(Number)
+    let ok: boolean | undefined
+    await act(async () => { ok = await h.result.current.updateTask('t1', { bucket: 'week', weekStart: new Date(y, m - 1, d) }) })
+    return ok
+  }
+
+  it('the save states the records it was planned from', async () => {
+    seed()
+    const h = await mount()
+    expect(await moveTo(h, S27)).toBe(true)
+    expect(db.rpcCalls()[0].p_expected_open).toEqual([{ level: 'week', period_start: S20 }])
+  })
+
+  it('a STALE plan is refused, writes nothing, and the tab shows what is saved', async () => {
+    seed()
+    const h = await mount()
+    otherDeviceMovesTo27()
+    expect(await moveTo(h, O4)).toBe(false)                              // planned from Sep 20 — refused
+    expect(openWeeks()).toEqual([S27])                                   // NOT Sep 27 and Oct 4
+    const local = h.result.current.tasks.find((t) => t.id === 't1')!
+    expect(local.commitments!.filter((c) => c.status === 'open').map((c) => localYmd(c.periodStart))).toEqual([S27])
+    // The person chooses again — from the truth — and it lands cleanly.
+    expect(await moveTo(h, O4)).toBe(true)
+    expect(openWeeks()).toEqual([O4])
+  })
+
+  it('a stale Drop is refused too, and the task keeps the other device\'s week', async () => {
+    seed()
+    const h = await mount()
+    otherDeviceMovesTo27()
+    let r: boolean | undefined
+    await act(async () => { r = await h.result.current.dropCommitment('t1', 'week', new Date(2026, 8, 20)) })
+    expect(r).toBe(false)
+    expect(openWeeks()).toEqual([S27])
+  })
+
+  it('a lost response after the commit re-reads — it does NOT restore the old state', async () => {
+    seed()
+    const h = await mount()
+    db.rpcLandButLoseResponse()
+    expect(await moveTo(h, S27)).toBe(false)                             // unknown outcome, reported as failed
+    expect(openWeeks()).toEqual([S27])                                   // it had committed
+    const local = h.result.current.tasks.find((t) => t.id === 't1')!
+    expect(local.commitments!.filter((c) => c.status === 'open').map((c) => localYmd(c.periodStart))).toEqual([S27])
+    expect(localYmd(local.weekStart!)).toBe(S27)                         // not the Sep 20 snapshot
+    expect(await moveTo(h, O4)).toBe(true)                               // the next save plans from the truth
+    expect(openWeeks()).toEqual([O4])
+  })
+
+  it('lost response AND the re-read fails: placement saves are blocked, unsent, until a read succeeds', async () => {
+    seed()
+    const h = await mount()
+    db.rpcLandButLoseResponse()
+    db.failOn('task_commitments', { message: 'offline', code: 'XX000' }, { writesOk: true })   // reads fail
+    expect(await moveTo(h, S27)).toBe(false)
+    const calls = db.rpcCalls().length
+    expect(await moveTo(h, O4)).toBe(false)                              // refused before sending
+    expect(db.rpcCalls().length).toBe(calls)
+    db.clearFailures()
+    expect(await moveTo(h, O4)).toBe(true)                               // re-read, then planned from Sep 27
+    expect(openWeeks()).toEqual([O4])
+  })
+})
+
+// Codex review, round 3: recovery copied back only bucket and stamps, so a
+// dated move that ROLLED BACK kept its rejected date on screen. Every
+// placement field now comes back from the database, and a failed focus read
+// is an incomplete re-read, not "no focus".
+describe('transactional placement: recovery restores every placement field', () => {
+  beforeEach(() => { vi.stubEnv('VITE_PLACEMENT_RPC', 'true') })
+  afterEach(() => { vi.unstubAllEnvs() })
+
+  const WED = new Date(2026, 8, 23)
+  const seed = () => {
+    db.seed('tasks', dbTaskRow({ id: 't1', title: 'Gutters', bucket: 'week', week_start: '2026-09-20', defer_count: 2 }))
+    db.seed('task_commitments', { id: 'cw', task_id: 't1', level: 'week', period_start: '2026-09-20', status: 'open', carried_to: null, ended_at: null })
+  }
+  const mount = async () => {
+    const hook = renderHook(() => useSupabaseTasks())
+    await waitFor(() => expect(hook.result.current.tasks.find((t) => t.id === 't1')).toBeTruthy())
+    return hook
+  }
+  const local = (h: Awaited<ReturnType<typeof mount>>) => h.result.current.tasks.find((t) => t.id === 't1')!
+  /** A dated move that is also chosen for the day: a row step AND a focus step — one call. */
+  const dateIt = async (h: Awaited<ReturnType<typeof mount>>, extra: Partial<Task> = {}) => {
+    let ok: boolean | undefined
+    await act(async () => { ok = await h.result.current.updateTask('t1', { scheduledFor: WED, isAllDay: true, plannedOn: WED, ...extra }) })
+    return ok
+  }
+
+  it('a dated move that rolls back shows NO date — the database has none', async () => {
+    seed()
+    const h = await mount()
+    db.failOnce('task_focus', 'upsert', { message: 'boom', code: 'XX000' })   // the focus step fails → the row step is rolled back too
+    expect(await dateIt(h)).toBe(false)
+    expect(db.rpcCalls().at(-1)!.p_steps.map((st) => st.t)).toContain('focus_set')
+    expect(db.rows('tasks').find((r) => r.id === 't1')!.scheduled_for).toBeNull()
+    expect(local(h).scheduledFor).toBeUndefined()                       // was: the rejected Wednesday
+    expect(local(h).focus ?? []).toHaveLength(0)
+    expect(local(h).bucket).toBe('week')
+  })
+
+  it('a dated move whose response is lost shows the date — it committed', async () => {
+    seed()
+    const h = await mount()
+    db.rpcLandButLoseResponse()
+    expect(await dateIt(h)).toBe(false)
+    expect(db.rows('tasks').find((r) => r.id === 't1')!.scheduled_for).toBe(WED.toISOString())
+    expect(local(h).scheduledFor?.getTime()).toBe(WED.getTime())
+    expect(local(h).isAllDay).toBe(true)
+    expect(local(h).focus).toHaveLength(1)
+  })
+
+  it('deferral bookkeeping comes back from the database too', async () => {
+    seed()
+    const h = await mount()
+    db.failOnce('task_focus', 'upsert', { message: 'boom', code: 'XX000' })
+    expect(await dateIt(h, { deferCount: 5 })).toBe(false)
+    expect(local(h).deferCount).toBe(2)                                  // not the optimistic 5
+  })
+
+  it('a failed FOCUS read is an incomplete re-read: the snapshot stands and placement saves wait for a full read', async () => {
+    seed()
+    const h = await mount()
+    db.failOnce('task_focus', 'upsert', { message: 'boom', code: 'XX000' })
+    db.failOn('task_focus', { message: 'offline', code: 'XX000' }, { writesOk: true })   // focus READS fail
+    expect(await dateIt(h)).toBe(false)
+    expect(local(h).scheduledFor).toBeUndefined()                       // the pre-save snapshot, not the optimistic date
+    const calls = db.rpcCalls().length
+    expect(await dateIt(h)).toBe(false)                                  // refused before sending
+    expect(db.rpcCalls().length).toBe(calls)
+    db.clearFailures()
+    expect(await dateIt(h)).toBe(true)                                   // a full read, then the save
+    expect(local(h).scheduledFor?.getTime()).toBe(WED.getTime())
+  })
+})
+
+// Live, 2026-09-25: the first stale refusal used 40001, which PostgREST retries.
+// Only PT409 is the function's refusal now; a 40001 (were one ever to surface)
+// is an unknown outcome and is re-read like any other failure.
+describe('transactional placement: the refusal code', () => {
+  beforeEach(() => { vi.stubEnv('VITE_PLACEMENT_RPC', 'true') })
+  afterEach(() => { vi.unstubAllEnvs() })
+  it('the stale-plan message follows PT409, not 40001', async () => {
+    const toast = (await import('@/hooks/useToast')).showToast as unknown as ReturnType<typeof vi.fn>
+    db.seed('tasks', dbTaskRow({ id: 't1', title: 'Gutters', bucket: 'week', week_start: '2026-09-20' }))
+    db.seed('task_commitments', { id: 'c20', task_id: 't1', level: 'week', period_start: '2026-09-20', status: 'open', carried_to: null, ended_at: null })
+    const h = renderHook(() => useSupabaseTasks())
+    await waitFor(() => expect(h.result.current.tasks.find((t) => t.id === 't1')).toBeTruthy())
+    Object.assign(db.rows('task_commitments')[0], { status: 'removed' })        // another device dropped it
+    toast.mockClear()
+    await act(async () => { await h.result.current.updateTask('t1', { bucket: 'week', weekStart: new Date(2026, 8, 27) }) })
+    expect(toast).toHaveBeenCalledWith(expect.stringMatching(/changed somewhere else/), 'error', 4000)
+  })
+})

@@ -2,10 +2,12 @@ import { useState, useRef, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { MoreHorizontal, Pin, PinOff, Trash2, FolderMinus } from 'lucide-react'
 import { usePopoverFocus } from '@/hooks/usePopoverFocus'
+import { ConceptIcon, type ConceptName } from '@/lib/conceptIcons'
 
 interface PanelMoreMenuProps {
-  isPinned: boolean
-  onTogglePin: () => void
+  isPinned?: boolean
+  /** Omitted where pinning means nothing (a calendar event) — the Pin row hides. */
+  onTogglePin?: () => void
   onDelete: () => void
   /**
    * Group actions — passed only when the task is a group wrapper (has
@@ -15,9 +17,15 @@ interface PanelMoreMenuProps {
    */
   onUngroup?: () => void
   onDeleteGroup?: () => void
+  /**
+   * Actions the row had no room for, listed first. Without them a panel with
+   * both folded actions and this menu drew two identical ⋯ buttons side by
+   * side (event panel, 2026-09-25).
+   */
+  items?: { id: string; label: string; icon?: ConceptName; onClick?: () => void }[]
 }
 
-export function PanelMoreMenu({ isPinned, onTogglePin, onDelete, onUngroup, onDeleteGroup }: PanelMoreMenuProps) {
+export function PanelMoreMenu({ isPinned, onTogglePin, onDelete, onUngroup, onDeleteGroup, items = [] }: PanelMoreMenuProps) {
   const isGroup = !!onUngroup || !!onDeleteGroup
   const [open, setOpen] = useState(false)
   const [confirming, setConfirming] = useState(false)
@@ -75,13 +83,27 @@ export function PanelMoreMenu({ isPinned, onTogglePin, onDelete, onUngroup, onDe
           className="fixed z-[100] bg-white rounded-xl border border-neutral-200 shadow-lg p-1.5 min-w-[170px]"
           style={{ top: pos.top, right: pos.right }}
         >
-          <button
-            onClick={() => { onTogglePin(); close() }}
-            className="w-full flex items-center gap-2 px-2.5 py-2 rounded-lg text-[15px] text-neutral-700 hover:bg-neutral-100 transition-colors"
-          >
-            {isPinned ? <PinOff className="w-4 h-4" /> : <Pin className="w-4 h-4" />}
-            <span>{isPinned ? 'Unpin' : 'Pin'}</span>
-          </button>
+          {items.map((a) => (
+            <button
+              key={a.id}
+              type="button"
+              onClick={() => { close(); a.onClick?.() }}
+              className="w-full flex items-center gap-2 px-2.5 py-2 rounded-lg text-[15px] text-neutral-700 hover:bg-neutral-100 transition-colors"
+            >
+              {a.icon && <ConceptIcon name={a.icon} decorative />}
+              <span>{a.label}</span>
+            </button>
+          ))}
+
+          {onTogglePin && (
+            <button
+              onClick={() => { onTogglePin(); close() }}
+              className="w-full flex items-center gap-2 px-2.5 py-2 rounded-lg text-[15px] text-neutral-700 hover:bg-neutral-100 transition-colors"
+            >
+              {isPinned ? <PinOff className="w-4 h-4" /> : <Pin className="w-4 h-4" />}
+              <span>{isPinned ? 'Unpin' : 'Pin'}</span>
+            </button>
+          )}
 
           {/* Group wrapper: Ungroup (keep tasks) instead of a plain delete that
               would orphan the children. */}
@@ -95,7 +117,7 @@ export function PanelMoreMenu({ isPinned, onTogglePin, onDelete, onUngroup, onDe
             </button>
           )}
 
-          <div className="border-t border-neutral-100 my-1" />
+          {(items.length > 0 || onTogglePin || (isGroup && onUngroup)) && <div className="border-t border-neutral-100 my-1" />}
 
           {isGroup ? (
             onDeleteGroup && (

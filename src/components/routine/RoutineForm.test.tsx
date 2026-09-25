@@ -520,21 +520,10 @@ describe('RoutineForm', () => {
       expect(saveButton).toBeDisabled()
     })
 
-    it('disables save button when weekly has no days selected', () => {
-      const routine = createMockRoutine({
-        recurrence_pattern: { type: 'weekly', days: ['mon'] },
-        raw_input: null,
-      })
-      renderForm(routine)
-
-      // Deselect the only selected day
-      fireEvent.click(screen.getByRole('button', { name: 'Mon' }))
-
-      const saveButton = screen.getByRole('button', { name: /Save Changes/i })
-      expect(saveButton).toBeDisabled()
-    })
-
-    it('shows validation message when no days selected', () => {
+    // S3-11: no day is a flexible weekly routine, which the panel already
+    // saved — this page refusing it, under a red "Select at least one day",
+    // made the same choice valid in one place and an error in the other.
+    it('saves a weekly routine with no day chosen, as a flexible one', () => {
       const routine = createMockRoutine({
         recurrence_pattern: { type: 'weekly', days: ['mon'] },
         raw_input: null,
@@ -543,7 +532,14 @@ describe('RoutineForm', () => {
 
       fireEvent.click(screen.getByRole('button', { name: 'Mon' }))
 
-      expect(screen.getByText('Select at least one day')).toBeInTheDocument()
+      expect(screen.queryByText('Select at least one day')).not.toBeInTheDocument()
+      expect(screen.getByText(/flexible day/)).toBeInTheDocument()
+      const save = screen.getByRole('button', { name: /Save Changes/i })
+      expect(save).toBeEnabled()
+      fireEvent.click(save)
+      expect(mockOnUpdate).toHaveBeenCalledWith(routine.id, expect.objectContaining({
+        recurrence_pattern: expect.objectContaining({ type: 'weekly', days: [] }),
+      }))
     })
   })
 

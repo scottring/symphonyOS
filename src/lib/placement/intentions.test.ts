@@ -201,6 +201,21 @@ describe('applyCommitmentOps', () => {
     const out = applyCommitmentOps([c('week', WK20, 'removed')], [{ op: 'ensure', level: 'week', periodStart: WK20 }])
     expect(out).toEqual([c('week', WK20)])
   })
+
+  // Found by the local Postgres harness (096_planning_commitments): Kept from
+  // September into October, then put back on September. Postgres reopens the
+  // carried row; the model left it carried and the task showed in the Inbox.
+  it('putting a task back on a period it was carried out of reopens that period', () => {
+    const SEP = new Date(2026, 8, 1), OCT = new Date(2026, 9, 1)
+    const task = {
+      id: 'k', title: 'Gutters', completed: false, createdAt: SEP, updatedAt: SEP, bucket: 'month', monthStart: OCT,
+      commitments: [{ ...c('month', SEP, 'carried'), carriedTo: OCT }, c('month', OCT)],
+    } as Task
+    const plan = planPlacement(task, { bucket: 'month', monthStart: SEP }, { now: new Date(2026, 8, 25) } as Parameters<typeof planPlacement>[2])
+    expect(plan.row.bucket).toBe('month')
+    expect(plan.row.monthStart).toEqual(SEP)
+    expect(plan.local.commitments).toContainEqual(c('month', SEP))
+  })
 })
 
 describe('planDropCommitment', () => {
@@ -288,5 +303,95 @@ describe('flexible weekend placement', () => {
     const t = task({ weekendStart: saturday, bucket: 'week', commitments: [c('week', WK20)] })
     expect(planKeep(t, 'week', WK27, WK20).local.weekendStart).toBeUndefined()
     expect(planDropCommitment(t, 'week', WK20).local.weekendStart).toBeUndefined()
+  })
+})
+
+describe('"Keep it in October" pressed in September (2026-09-24 blocker)', () => {
+  const WK_OCT4 = new Date(2026, 9, 4)
+  // The reported sequence: an October step given the week of Oct 4, then a day,
+  // then the day removed (week kept), then Plan ▾ → "Keep it in October".
+  const octStep = () => task({
+    title: 'Research games dates and tickets',
+    bucket: 'week', monthStart: OCT, weekStart: WK_OCT4,
+    goalTaskId: 'goal-1',
+    commitments: [c('month', OCT), c('week', WK_OCT4)],
+  })
+
+  it('keeps October when the month is NAMED, dropping only the week', () => {
+    const p = planPlacement(octStep(), {
+      bucket: 'month', monthStart: OCT, weekStart: undefined, scheduledFor: undefined,
+    }, ctx)
+    // October stays open; only the week is given up.
+    expect(p.commitmentOps).toContainEqual({ op: 'ensure', level: 'month', periodStart: OCT })
+    expect(p.commitmentOps).not.toContainEqual(
+      expect.objectContaining({ op: 'remove', level: 'month', periodStart: OCT }),
+    )
+    expect(p.commitmentOps).toContainEqual(
+      expect.objectContaining({ op: 'remove', level: 'week', periodStart: WK_OCT4 }),
+    )
+    expect(p.row.monthStart).toEqual(OCT)
+  })
+
+  it('the goal link is never touched by a keep-period write', () => {
+    const p = planPlacement(octStep(), {
+      bucket: 'month', monthStart: OCT, weekStart: undefined, scheduledFor: undefined,
+    }, ctx)
+    expect('goalTaskId' in p.row).toBe(false)
+  })
+
+  it('documents the trap: an UNNAMED month is read as today’s month', () => {
+    // This is what the Plan menu used to send. `stampFor` finds no monthStart,
+    // so `planPlacement` falls back to ctx.now — September — and then
+    // supersedes the open October commitment as a different period at the same
+    // level. The task left October for a month the user never chose, and
+    // October's count fell by one. Callers must name the period; this case is
+    // pinned so the fallback cannot change meaning unnoticed.
+    const p = planPlacement(octStep(), {
+      bucket: 'month', weekStart: undefined, scheduledFor: undefined,
+    }, ctx)
+    expect(p.commitmentOps).toContainEqual({ op: 'ensure', level: 'month', periodStart: SEP })
+    expect(p.commitmentOps).toContainEqual(
+      expect.objectContaining({ op: 'remove', level: 'month', periodStart: OCT }),
+    )
+  })
+})
+
+describe('"Add to this month" on a season task, October viewed in September (S3-01)', () => {
+  // A Fall goal's task, pulled down from the Shelves rail while the page shows
+  // October. The clock says September 24.
+  const fallTask = () => task({
+    title: 'List recurring home-maintenance jobs and agree who handles each',
+    bucket: 'quarter', seasonStart: FALL, goalTaskId: 'fall-goal',
+    context: 'family',
+    commitments: [c('season', FALL)],
+  })
+
+  it('lands on the month being VIEWED when that month is named', () => {
+    const p = planPlacement(fallTask(), { bucket: 'month', monthStart: OCT }, ctx)
+    expect(p.commitmentOps).toContainEqual({ op: 'ensure', level: 'month', periodStart: OCT })
+    expect(p.row.monthStart).toEqual(OCT)
+  })
+
+  it('keeps the season commitment — descending never gives up what is above', () => {
+    const p = planPlacement(fallTask(), { bucket: 'month', monthStart: OCT }, ctx)
+    expect(p.commitmentOps).not.toContainEqual(
+      expect.objectContaining({ op: 'remove', level: 'season' }),
+    )
+    const after = applyCommitmentOps(fallTask().commitments, p.commitmentOps)
+    expect(after.find((x) => x.level === 'season')?.status).toBe('open')
+  })
+
+  it('never touches the goal link or the life area', () => {
+    const p = planPlacement(fallTask(), { bucket: 'month', monthStart: OCT }, ctx)
+    expect('goalTaskId' in p.row).toBe(false)
+    expect('context' in p.row).toBe(false)
+  })
+
+  it('documents the trap: no month named puts it on the CLOCK’s month', () => {
+    // What `pushTask(id, 'month')` sent. The task appeared under September
+    // while October was on screen, and October's counts never moved.
+    const p = planPlacement(fallTask(), { bucket: 'month' }, ctx)
+    expect(p.commitmentOps).toContainEqual({ op: 'ensure', level: 'month', periodStart: SEP })
+    expect(p.row.monthStart).toEqual(SEP)
   })
 })

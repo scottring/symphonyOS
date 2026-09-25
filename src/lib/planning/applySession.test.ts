@@ -122,6 +122,18 @@ describe('applySession', () => {
     expect(w.takeInto).toHaveBeenCalledWith('m1', WEEK, undefined)
   })
 
+  // S3-02: the session shows "for <the goal above>" while the draft is open.
+  // It used to be shown and never written — the saved goal came back unlinked.
+  it('hands the writer the goal ABOVE that a new goal was created for', async () => {
+    const { w } = writers()
+    await applySession({ ...emptyDraft('season', oct, sep),
+      newGoals: [{ id: 'G1', title: 'A home easier to care for', linkId: 'YEAR-GOAL' }, { id: 'G2', title: 'Unlinked' }],
+    }, w, () => false)
+    const optsOf = (title: string) => (w.addTask as ReturnType<typeof vi.fn>).mock.calls.find((c) => c[0] === title)![1]
+    expect(optsOf('A home easier to care for').aboveGoalId).toBe('YEAR-GOAL')
+    expect(optsOf('Unlinked').aboveGoalId).toBeUndefined()
+  })
+
   it('creates each new item in the domain it was planned in; a next action takes its goal\'s', async () => {
     const { w } = writers({ contextOf: vi.fn((id: string) => (id === 'g' ? 'family' as const : null)) })
     await applySession({ ...emptyDraft('month', oct, sep),

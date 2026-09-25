@@ -58,16 +58,22 @@ export interface PlanningPeriodInput {
   today: Date
   seasons: Seasons
   explicitStart?: Date | null
-  countFor: (start: Date) => number
 }
 
 /** The period a planning page should show first: an explicit start (from the
  *  URL) always wins; otherwise the current period — unless it is nearly over
- *  (≤14 days left for a season, ≤6 for a month) or already empty while the
- *  next period has a list, in which case the page opens on the coming period
- *  instead (demo run 2026-09-06: pages opened on the clock's period while the
- *  user's items sat on the next one). A year page never looks ahead. */
-export function planningPeriod({ level, today, seasons, explicitStart, countFor }: PlanningPeriodInput): { start: Date; lookingAhead: boolean } {
+ *  (≤14 days left for a season, ≤6 for a month), in which case the page opens
+ *  on the coming period. A year page never looks ahead.
+ *
+ *  There used to be a second rule: if the current period was empty and the next
+ *  had a list, the page silently opened on the next one (demo run 2026-09-06).
+ *  It was removed on 2026-09-23. It did not fire when Scott needed it — he
+ *  landed on an empty September with his October plan invisible — and a jump
+ *  that depends on data makes the page you arrive at unpredictable. The page
+ *  now stays where the clock says and NAMES the neighbour that holds the plan
+ *  ("October has 1 goal and 2 tasks →"), which keeps orientation and leaves the
+ *  move to the reader. See `neighbourWithWork` in `PeriodPlanPage`. */
+export function planningPeriod({ level, today, seasons, explicitStart }: PlanningPeriodInput): { start: Date; lookingAhead: boolean } {
   if (explicitStart) return { start: periodBounds(level, explicitStart, seasons).start, lookingAhead: false }
   const cur = periodBounds(level, today, seasons)
   if (level === 'year') return { start: cur.start, lookingAhead: false }
@@ -75,7 +81,6 @@ export function planningPeriod({ level, today, seasons, explicitStart, countFor 
   const threshold = level === 'season' ? 14 : 6
   const nextStart = cur.next
   if (daysLeft <= threshold) return { start: nextStart, lookingAhead: true }
-  if (countFor(cur.start) === 0 && countFor(nextStart) > 0) return { start: nextStart, lookingAhead: true }
   return { start: cur.start, lookingAhead: false }
 }
 

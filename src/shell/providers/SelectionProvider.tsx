@@ -88,7 +88,8 @@ export function SelectionProvider({ registry, children }: ProviderProps) {
     if (!selection) return;
     const activeApp = findAppForPath(registry, location.pathname);
     const owningApp = resolveAppForSelection(registry, selection.kind);
-    if (!activeApp || !owningApp || activeApp.id !== owningApp.id) {
+    const hosted = !!activeApp?.hostsSelectionKinds?.includes(selection.kind);
+    if (!activeApp || !owningApp || (activeApp.id !== owningApp.id && !hosted)) {
       clearSelection();
     }
   }, [selection, location.pathname, registry, clearSelection]);
