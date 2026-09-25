@@ -42,6 +42,16 @@ describe('DomainGateProvider', () => {
     expect(screen.getByText('Call plumber')).toBeInTheDocument()
   })
 
+  it('says why it is asking, and what each answer shares (S2-19)', async () => {
+    const user = userEvent.setup()
+    renderHarness(null)
+    await user.click(screen.getByRole('button', { name: 'Ask' }))
+    expect(screen.getByRole('dialog', { name: 'Which domain?' })).toBeInTheDocument()
+    expect(screen.getByText('Call plumber')).toBeInTheDocument()
+    expect(screen.getByText(/needs a life area before it can be planned/)).toBeInTheDocument()
+    expect(screen.getByText(/Personal and Work stay private/)).toBeInTheDocument()
+  })
+
   it('choosing Family resolves \'family\' and closes the dialog', async () => {
     const user = userEvent.setup()
     renderHarness(null)
