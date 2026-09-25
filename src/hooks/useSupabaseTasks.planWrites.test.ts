@@ -190,6 +190,9 @@ function createFakeDb() {
     rows: (table: string) => rows(table),
     insertedIds: (table: string) => inserted.get(table) ?? [],
     writeCount: (table: string, op?: Op) => writes.filter((w) => w.table === table && (!op || w.op === op)).length,
+    /** Every write, in the order the hook sent it: `table:op`. */
+    writeLog: () => writes.map((w) => `${w.table}:${w.op}`),
+    clearWriteLog() { writes.length = 0 },
   }
 }
 
@@ -684,3 +687,98 @@ describe('letting go of a row with several open commitments', () => {
   })
 })
 
+
+// Drop writes its commitments FIRST and its row LAST (Codex-approved option a
+// of docs/planning/2026-09-25-drop-partial-failure-investigation.md). The fake
+// database runs the sync trigger after every commitment write, as Postgres
+// does, so these assert what a stopped Drop leaves behind, not just the order.
+describe('Drop: commitments first, row last', () => {
+  const WEEK = '2026-09-20', SAT = '2026-09-26'
+  const seedWeek = (over: Row = {}, month = false) => {
+    db.seed('tasks', dbTaskRow({ id: 't1', title: 'Gutters', bucket: 'week', week_start: WEEK, month_start: month ? '2026-09-01' : null, ...over }))
+    db.seed('task_commitments', { id: 'cw', task_id: 't1', level: 'week', period_start: WEEK, status: 'open', carried_to: null, ended_at: null })
+    if (month) db.seed('task_commitments', { id: 'cm', task_id: 't1', level: 'month', period_start: '2026-09-01', status: 'open', carried_to: null, ended_at: null })
+  }
+  const mount = async () => {
+    const hook = renderHook(() => useSupabaseTasks())
+    await waitFor(() => expect(hook.result.current.tasks.find((t) => t.id === 't1')).toBeTruthy())
+    db.clearWriteLog()
+    return hook
+  }
+  const drop = async (h: Awaited<ReturnType<typeof mount>>) => {
+    let r: boolean | undefined
+    await act(async () => { r = await h.result.current.dropCommitment('t1', 'week', new Date(2026, 8, 20)) })
+    return r
+  }
+  const row = () => db.rows('tasks').find((r) => r.id === 't1')!
+  const week = () => db.rows('task_commitments').find((c) => c.id === 'cw')!
+
+  it('sole week: removes the commitment, THEN writes the row — back to the Inbox', async () => {
+    seedWeek()
+    const h = await mount()
+    expect(await drop(h)).toBe(true)
+    expect(db.writeLog()).toEqual(['task_commitments:update', 'tasks:update'])
+    expect(week().status).toBe('removed')
+    expect(row().bucket).toBe('inbox')
+  })
+
+  it('week with a month: the month stays, and the row says so', async () => {
+    seedWeek({}, true)
+    const h = await mount()
+    expect(await drop(h)).toBe(true)
+    expect(row().bucket).toBe('month')
+    expect(row().week_start).toBeNull()
+    expect(row().month_start).toBe('2026-09-01')
+  })
+
+  it('a failed removal sends no row write, fails, and leaves row and records agreeing', async () => {
+    seedWeek()
+    const h = await mount()
+    db.failOnce('task_commitments', 'update', { message: 'boom', code: 'XX000' })
+    expect(await drop(h)).toBe(false)
+    expect(db.writeLog()).toEqual(['task_commitments:update'])
+    expect(week().status).toBe('open')
+    expect(row().bucket).toBe('week')                                    // not 'inbox' beside an open week
+    expect(h.result.current.tasks.find((t) => t.id === 't1')!.bucket).toBe('week')
+  })
+
+  it('weekend reset: a failed final row stays FAILED, and the retry still clears the weekend', async () => {
+    seedWeek({ weekend_start: SAT })
+    const h = await mount()
+    db.failOnce('tasks', 'update', { message: 'boom', code: 'XX000' })
+    expect(await drop(h)).toBe(false)
+    expect(week().status).toBe('removed')                                // the removal landed
+    expect(row().weekend_start).toBe(SAT)                                // the row did not
+    // Locally it is what the database holds — not the optimistic plan.
+    expect(localYmd(h.result.current.tasks.find((t) => t.id === 't1')!.weekendStart!)).toBe(SAT)
+    db.clearWriteLog()
+    expect(await drop(h)).toBe(true)
+    expect(db.writeLog()).toEqual(['tasks:update'])                      // no removal left; the row is still written
+    expect(row().weekend_start).toBeNull()
+    expect(row().bucket).toBe('inbox')
+  })
+
+  it('lost response on the removal: fails, re-reads, and the retry finishes without a second removal', async () => {
+    seedWeek()
+    const h = await mount()
+    db.landButErrorOnce('task_commitments', 'update', { message: 'timeout', code: 'XX000' })
+    expect(await drop(h)).toBe(false)
+    expect(week().status).toBe('removed')
+    expect(h.result.current.tasks.find((t) => t.id === 't1')!.commitments!.find((c) => c.level === 'week')!.status).toBe('removed')
+    db.clearWriteLog()
+    expect(await drop(h)).toBe(true)
+    expect(db.writeLog().filter((w) => w.startsWith('task_commitments'))).toEqual([])
+    expect(row().bucket).toBe('inbox')
+  })
+
+  it('lost response on the final row: fails, and the retry sees it done without writing again', async () => {
+    seedWeek({ weekend_start: SAT })
+    const h = await mount()
+    db.landButErrorOnce('tasks', 'update', { message: 'timeout', code: 'XX000' })
+    expect(await drop(h)).toBe(false)
+    expect(row().weekend_start).toBeNull()
+    db.clearWriteLog()
+    expect(await drop(h)).toBe(true)
+    expect(db.writeLog()).toEqual([])
+  })
+})

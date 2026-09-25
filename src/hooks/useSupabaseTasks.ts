@@ -63,6 +63,30 @@ function setTasksNow(ref: { current: Task[] }, set: (fn: (prev: Task[]) => Task[
 
 
 export const PARTIAL_SAVE_MESSAGE = 'That change only partly saved — refresh to check'
+
+/** A placement plan's cache row in the database's shape — the whole
+ *  bucket/stamp set, never a partial row. */
+function placementRowDb(row: PlacementPlan['row']): Record<string, unknown> {
+  return {
+    ...('weekendStart' in row ? { weekend_start: row.weekendStart ? localYmd(row.weekendStart) : null } : {}),
+    bucket: row.bucket,
+    week_start: row.weekStart ? localYmd(row.weekStart) : null,
+    month_start: row.monthStart ? localYmd(row.monthStart) : null,
+    season_start: row.seasonStart ? localYmd(row.seasonStart) : null,
+  }
+}
+
+const sameYmd = (a?: Date, b?: Date) => (a ? localYmd(a) : null) === (b ? localYmd(b) : null)
+
+/** Does the task's row already say what the plan's row says? A weekend stamp
+ *  counts only when the plan sets it. */
+export function placementRowMatches(task: Task, row: PlacementPlan['row']): boolean {
+  return task.bucket === row.bucket
+    && sameYmd(task.weekStart, row.weekStart)
+    && sameYmd(task.monthStart, row.monthStart)
+    && sameYmd(task.seasonStart, row.seasonStart)
+    && (!('weekendStart' in row) || sameYmd(task.weekendStart, row.weekendStart))
+}
 export interface DbTask {
   id: string
   user_id: string
@@ -1409,10 +1433,16 @@ export function useSupabaseTasks() {
   // review said "Some of this didn't save" beneath a toast saying it had
   // (walkthrough, 2026-09-25). The row wrote and its commitment did not, so
   // "partly" is the true word for every caller.
-  const writePlacementOps = useCallback(async (taskId: string, plan: PlacementPlan, before?: Task): Promise<boolean> => {
+  /**
+   * The commitment ops alone, in order, stopping at nothing: each is its own
+   * request, and the database re-derives the row after every one
+   * (tasks_sync_from_commitments). True only when every op wrote. No toast —
+   * the caller says what failed, once.
+   */
+  const writeCommitmentOps = useCallback(async (taskId: string, ops: PlacementPlan['commitmentOps']): Promise<boolean> => {
     const now = new Date().toISOString()
     let allOk = true
-    for (const op of plan.commitmentOps) {
+    for (const op of ops) {
       const key = commitmentRow(taskId, op)
       let error: { message: string } | null | undefined
       try {
@@ -1437,9 +1467,14 @@ export function useSupabaseTasks() {
       if (error) {
         allOk = false
         console.error('[placement] commitment write failed:', op, error.message)
-        showToast(PARTIAL_SAVE_MESSAGE, 'error', 4000)
       }
     }
+    return allOk
+  }, [user])
+
+  const writePlacementOps = useCallback(async (taskId: string, plan: PlacementPlan, before?: Task): Promise<boolean> => {
+    let allOk = await writeCommitmentOps(taskId, plan.commitmentOps)
+    if (!allOk) showToast(PARTIAL_SAVE_MESSAGE, 'error', 4000)
     // A let-go (Someday, or back to the Inbox) that removed commitments: the
     // sync trigger re-derives the row after EACH removal, so with two open
     // commitments the first removal sets bucket 'month' and the second, seeing
@@ -1497,21 +1532,42 @@ export function useSupabaseTasks() {
       }
     }
     return allOk
-  }, [user, reconcileCommitments])
+  }, [writeCommitmentOps, reconcileCommitments])
 
   /** A task whose last write failed and could not be re-read may not be written
    *  from local state. Returns the task to plan from: the RECONCILED one when a
    *  re-read was needed, the current one otherwise, or null = refuse the write. */
+  /**
+   * The records AND the row, re-read. `reconcileCommitments` rebuilds the cache
+   * from the records, which is right for the bucket — but a weekend stamp, or a
+   * Someday the sync trigger turned into 'inbox', lives only on the row. After
+   * a Drop whose final row write failed, planning a retry from the derived
+   * cache would call the row already correct and write nothing (Codex review of
+   * the Drop investigation, 2026-09-25). Null = either read failed.
+   */
+  const reconcileTaskPlacement = useCallback(async (taskId: string): Promise<Task | null> => {
+    const read = await reconcileCommitments(taskId)
+    if (!read) return null
+    let row: { data: unknown; error: unknown }
+    try { row = await supabase.from('tasks').select('*').eq('id', taskId).maybeSingle() } catch (e) { row = { data: null, error: e } }
+    if (row.error || !row.data) return null
+    const r = dbTaskToTask(row.data as DbTask)
+    const truth: Task = { ...read, bucket: r.bucket, weekStart: r.weekStart, monthStart: r.monthStart, seasonStart: r.seasonStart, weekendStart: r.weekendStart }
+    tasksRef.current = patchTaskRecords(tasksRef.current, taskId, () => truth)
+    setTasks((prev) => patchTaskRecords(prev, taskId, () => truth))
+    return truth
+  }, [reconcileCommitments])
+
   const ensureReconciled = useCallback(async (taskId: string): Promise<Task | null> => {
     if (!unreconciledTasks.has(taskId)) return findTaskById(taskId) ?? null
-    const fresh = await reconcileCommitments(taskId)
+    const fresh = await reconcileTaskPlacement(taskId)
     if (!fresh) {
       showToast("Couldn't check this task's plan. Try again in a moment.", 'error', 4000)
       return null
     }
     unreconciledTasks.delete(taskId)
     return fresh
-  }, [reconcileCommitments, findTaskById])
+  }, [reconcileTaskPlacement, findTaskById])
 
   /**
    * The look-back's "Keep": the SAME row — task OR goal — carried into the
@@ -1588,30 +1644,62 @@ export function useSupabaseTasks() {
     return allStepsOk ? task.id : undefined
   }, [findTaskById, ensureReconciled, writePlacementOps])
 
-  /** Drop: end ONE period commitment. The task is kept (spec: guided planning). */
+  /**
+   * Drop: end ONE period commitment. The task is kept (spec: guided planning).
+   *
+   * COMMITMENTS FIRST, ROW LAST. The row write used to go first: when the
+   * removal then failed, the row said 'inbox' while the week stayed open, and
+   * every other device showed the task in both places until a retry (seen
+   * live 2026-09-25; investigated in docs/planning/2026-09-25-drop-partial-
+   * failure-investigation.md, option a). Each removal makes the database
+   * re-derive the row from the open records, so stopping anywhere leaves the
+   * two agreeing; the final row write adds only what the records cannot say —
+   * a cleared weekend, a Someday kept.
+   *
+   * A failure is a failure, wherever it lands: nothing after it is sent, the
+   * records AND the row are re-read, and false is returned. A retry plans from
+   * what was read. With the removal already done it has no ops left, but if
+   * the row still differs from the plan's it writes the row — it never calls
+   * a half-finished Drop done.
+   *
+   * Not atomic: these are separate requests. A crash between them leaves a
+   * consistent-but-unfinished state (records dropped, row as the trigger
+   * derived it) that the next Drop completes.
+   */
   const dropCommitment = useCallback(async (id: string, level: PlacementLevel, periodStart: Date): Promise<boolean> => {
     const task = await ensureReconciled(id)
     if (!task) return false
     const plan = planDropCommitment(task, level, periodStart)
-    if (plan.commitmentOps.length === 0) return true
+    if (plan.commitmentOps.length === 0 && placementRowMatches(task, plan.row)) return true
     const before = task
     setTasksNow(tasksRef, setTasks, (prev) => prev.map((x) => (x.id === id ? plan.local : x)))
-    const { error } = await supabase.from('tasks').update({
-      ...('weekendStart' in plan.row ? { weekend_start: plan.row.weekendStart ? localYmd(plan.row.weekendStart) : null } : {}),
-      bucket: plan.row.bucket,
-      week_start: plan.row.weekStart ? localYmd(plan.row.weekStart) : null,
-      month_start: plan.row.monthStart ? localYmd(plan.row.monthStart) : null,
-      season_start: plan.row.seasonStart ? localYmd(plan.row.seasonStart) : null,
-    }).eq('id', id)
-    if (error) {
-      setTasksNow(tasksRef, setTasks, (prev) => prev.map((x) => (x.id === id ? before : x)))
+
+    const failed = async () => {
+      // The database is the truth again. If it cannot be read, go back to what
+      // we had and make the next placement write re-read before it may send.
+      const truth = await reconcileTaskPlacement(id)
+      if (!truth) {
+        setTasksNow(tasksRef, setTasks, (prev) => patchTaskRecords(prev, id, () => before))
+        unreconciledTasks.add(id)
+      }
       showToast("Couldn't drop it from that period", 'error', 4000)
       return false
     }
-    if (!(await writePlacementOps(id, plan, before))) return false
+
+    if (!(await writeCommitmentOps(id, plan.commitmentOps))) return failed()
+    let rowError: unknown = null
+    try {
+      ;({ error: rowError } = await supabase.from('tasks').update(placementRowDb(plan.row)).eq('id', id))
+    } catch (e) {
+      rowError = e
+    }
+    if (rowError) {
+      console.error('[placement] drop row write failed:', rowError)
+      return failed()
+    }
     announceLocalWrite({ kind: 'update', task: plan.local })
     return true
-  }, [ensureReconciled, writePlacementOps])
+  }, [ensureReconciled, writeCommitmentOps, reconcileTaskPlacement])
 
   const updateTask = useCallback(async (id: string, updates: Partial<Task>) => {
     logger.debug('[updateTask] Called with:', { id, updates })
