@@ -43,6 +43,8 @@ interface TapContextPanelProps {
    * the writer; omitted, the pane is as it was.
    */
   timingControl?: ReactNode
+  /** The goal this task serves, drawn first under the title. */
+  purpose?: ReactNode
   task: Task
   // Reference data (Plan 1: passed in by caller — Plan 2 may push into context)
   contacts: Contact[]
@@ -249,6 +251,7 @@ export function TapContextPanel(props: TapContextPanelProps) {
           {/* The read-only "FAMILY · timed · for Iris" meta row was removed — it
               duplicated (in jargon) the interactive context chooser + who-picker
               below. The why-chain stays. */}
+          {props.purpose && <div className="mt-1">{props.purpose}</div>}
           {props.timingControl && <div className="mt-1.5">{props.timingControl}</div>}
           {props.whyChain}
         </>

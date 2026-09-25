@@ -37,6 +37,8 @@ import { useGatedTaskActions } from '@/hooks/useGatedTaskActions';
 import { useContacts } from '@/hooks/useContacts';
 import { useProjects } from '@/hooks/useProjects';
 import { TaskTimingMenu } from '@/components/plan/TaskTimingMenu';
+import { goalOfTask } from '@/lib/planning/goalSupport';
+import { useHouseholdSeasons } from '@/hooks/useHouseholdSeasons';
 import { weekStartAnchor, readCadenceConfig } from '@/lib/cadence/config';
 import { useGoogleCalendar, CalendarReconnectError, type GoogleCalendarInfo, type CalendarEvent } from '@/hooks/useGoogleCalendar';
 import { eventMoveErrorMessage } from '@/lib/calendar/moveEvent';
@@ -211,6 +213,7 @@ function TaskPanelBody({ id }: { id: string }) {
   const { events } = useGoogleCalendar();
   const { members: familyMembers } = useFamilyMembers();
   const pinnedItems = usePinnedItems();
+  const { seasons } = useHouseholdSeasons();
 
   // Iris's rule: any process on an Unsorted item has to involve giving it a
   // domain — this panel is the other global mutation surface besides
@@ -273,13 +276,30 @@ function TaskPanelBody({ id }: { id: string }) {
       onEmailChange={(v) => updateTask(task.id, { email: v })}
       // onSaveNoteToVault intentionally omitted (vault integration removed)
       onToggleComplete={() => toggleTask(task.id)}
+      // What the task is FOR, first — the connected-planning contract: details
+      // lead with the goal it serves, then its when. A task under no goal
+      // shows nothing rather than a prompt.
+      purpose={(() => {
+        const goal = goalOfTask(task, tasks, seasons);
+        return goal ? (
+          <p className="text-[13px] text-neutral-500">
+            <span className="text-neutral-400">For</span>{' '}
+            <button type="button" onClick={() => navigate(`/task/${goal.id}`)} className="text-left text-neutral-700 hover:underline">
+              {goal.title}
+            </button>
+            {goal.period && <span className="text-neutral-400"> · {goal.period}</span>}
+          </p>
+        ) : undefined;
+      })()}
       // A goal is not scheduled, so it gets no timing control.
       timingControl={task.isGoal ? undefined : (
         <TaskTimingMenu
           task={task}
           onUpdateTask={gated.updateTask}
-          periodStart={new Date()}
-          fallbackWeekStart={weekStartAnchor(new Date(), readCadenceConfig().weekStartsOn)}
+          // The task's OWN period, never the clock's: an October step opened
+          // in September must offer October's weeks (the S2-17 class).
+          periodStart={task.weekStart ?? task.monthStart ?? task.scheduledFor ?? new Date()}
+          fallbackWeekStart={task.weekStart ?? weekStartAnchor(task.monthStart ?? task.scheduledFor ?? new Date(), readCadenceConfig().weekStartsOn)}
         />
       )}
       onSchedule={(date, isAllDay) => {
