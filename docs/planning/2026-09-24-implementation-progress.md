@@ -1749,3 +1749,58 @@ semantics and the obscured controls; external calendar creation; plan-from-paper
 analysis; real-iPhone keyboard and safe areas; authenticated cross-household
 access testing — plus the three logged calendar findings, which remain a
 subset of that list rather than the whole of it.
+
+## §X.1 — the concurrency bug Codex found in §X (same day)
+
+§X gave the cache subscribers and a key, and fixed the wrong half of the
+sharing problem. Two defects survived, both found by reading the source rather
+than the tests:
+
+1. **Forced reads bypassed the dedupe.** `ensure(account, true)` skipped the
+   in-flight check, and every *enabled consumer* subscribed to
+   `onCalendarChanged` and to visibility on its own account. One write with
+   three pickers open started three reads.
+2. **No generation protection.** With more than one request in the air — which
+   (1) guaranteed, and which an account change causes anyway — whichever
+   answered LAST won, not whichever was newest. An older response could
+   overwrite newer data, including overwriting good data with a late failure.
+
+And a third, implied by fixing the first two naively: a write arriving **while
+a read is in flight** must not simply be deduped away. That read describes the
+world before the write.
+
+### What it is now
+
+- **The signals belong to the module**, ref-counted by mounted consumers. One
+  `calendarChanged`, one `visibilitychange`, one account subscription per tab,
+  whatever the consumer count — and unwired when the last consumer goes.
+- **`invalidate()` is the single entry point** for "the world changed". It
+  bumps `changeSeq`, clears the failure cooldown, and either starts a read or,
+  if one is already in flight, lets that read's completion start the follow-up.
+- **`generation` guards every response.** Only the newest read started may
+  write to the cache; an older one — success or failure — is dropped.
+- **`changeSeq` guards staleness.** A read that lands having been started
+  before the latest change is kept (better than nothing) and immediately
+  followed by a fresh read. Several writes during one request still produce
+  exactly one follow-up.
+- **The cooldown still applies to mounting**, and deliberately does not apply
+  to a forced read: a write or a foreground return is caused by the user, not
+  by a timer, and refusing to retry right after somebody reconnected their
+  calendar would be the wrong answer.
+
+### Coverage
+
+| Contract | Evidence | Result |
+|---|---|---|
+| One write, three consumers → one read | `useDayLoadEvents.test.ts`, proven red first | **pass** |
+| Signals unwire with the last consumer, and re-wire for the next | same | **pass** |
+| An older response never overwrites a newer one | same, proven red first | **pass** |
+| A late failure from an orphaned read does not mark the current one failed | same | **pass** |
+| A write mid-request causes a fresh read, not a discard | same, proven red first | **pass** |
+| Several writes during one request → exactly one re-read | same, proven red first | **pass** |
+| A forced read bypasses the cooldown | same | **pass** |
+| …but a mounting consumer inside the cooldown still does not | same | **pass** |
+
+26 tests on the cache, 7107 overall. The density cache is not "accepted" by me
+— that is Codex's call — but every contract in the addendum now has a test
+that fails without its fix.

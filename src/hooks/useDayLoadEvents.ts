@@ -1,9 +1,8 @@
-import { useCallback, useEffect, useReducer } from 'react'
+import { useEffect, useReducer } from 'react'
 import { supabase } from '@/lib/supabase'
 import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
 import { getCurrentAccount, onAccountChanged } from '@/lib/currentAccount'
 import { onCalendarChanged } from '@/lib/calendarChangedSignal'
-import { useRefreshOnVisible } from '@/hooks/useRefreshOnVisible'
 
 /** Far enough forward to cover every relative tile, including "this month". */
 export const DAY_LOAD_RANGE_DAYS = 45
@@ -72,6 +71,25 @@ let read: Read | null = null
 let failedKey: string | null = null
 let failedAt = 0
 let inflightKey: string | null = null
+/**
+ * Which read is the newest one STARTED. A response from an older read must
+ * never overwrite a newer one's data: an account change or a write landing
+ * mid-flight puts two requests in the air, and the network decides which
+ * answers first (Codex, 2026-09-25).
+ */
+let generation = 0
+/** The generation currently in flight, so its own `finally` can identify it. */
+let inflightGen = 0
+/**
+ * How many times the world has been declared changed. A read started before
+ * the latest change describes the world before it, so when such a read lands
+ * it is kept (better than nothing) and immediately followed by a fresh one.
+ * A mutation arriving during a request must not simply be discarded.
+ */
+let changeSeq = 0
+/** The `changeSeq` the in-flight read was started for. */
+let inflightSeq = 0
+
 const subscribers = new Set<() => void>()
 
 function notify(): void {
@@ -84,6 +102,12 @@ export function __resetDayLoadCache(): void {
   failedKey = null
   failedAt = 0
   inflightKey = null
+  generation = 0
+  inflightGen = 0
+  changeSeq = 0
+  inflightSeq = 0
+  unwireSignals()
+  wiredCount = 0
 }
 
 const ymd = (d: Date) => `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`
@@ -95,19 +119,17 @@ export function dayLoadWindow(accountId: string | null, now: Date = new Date()):
   return { key: `${accountId ?? 'anon'}|${ymd(start)}|${ymd(end)}`, range: { start: start.getTime(), end: end.getTime() } }
 }
 
-/**
- * Read the window if it is not already held, already in flight, or recently
- * failed. Returns nothing: every caller learns the outcome by subscription.
- */
-function ensure(accountId: string | null, force = false): void {
+/** Start a read. Callers have already decided that one is wanted. */
+function start(accountId: string | null): void {
   const { key, range } = dayLoadWindow(accountId)
-  if (!force) {
-    if (read?.key === key) return
-    if (inflightKey === key) return
-    if (failedKey === key && Date.now() - failedAt < DAY_LOAD_RETRY_AFTER_MS) return
-  }
+  const gen = ++generation
+  const seq = changeSeq
   inflightKey = key
+  inflightGen = gen
+  inflightSeq = seq
   void (async () => {
+    let outcome: 'ok' | 'failed' = 'failed'
+    let events: CalendarEvent[] = []
     try {
       const { data, error } = await supabase.functions.invoke('google-calendar-events', {
         body: {
@@ -119,18 +141,114 @@ function ensure(accountId: string | null, force = false): void {
         },
       })
       if (error || data?.error) throw error ?? new Error(String(data.error))
-      read = { key, range, events: (data?.events ?? []) as CalendarEvent[] }
-      if (failedKey === key) { failedKey = null; failedAt = 0 }
+      events = (data?.events ?? []) as CalendarEvent[]
+      outcome = 'ok'
     } catch {
-      // A failed fetch must NOT read as "these days are free".
-      failedKey = key
-      failedAt = Date.now()
-      if (read?.key === key) read = null
-    } finally {
-      if (inflightKey === key) inflightKey = null
-      notify()
+      outcome = 'failed'
     }
+
+    // An older response has nothing to say about the world any more.
+    const newest = gen === generation
+    if (newest) {
+      if (outcome === 'ok') {
+        read = { key, range, events }
+        if (failedKey === key) { failedKey = null; failedAt = 0 }
+      } else {
+        // A failed fetch must NOT read as "these days are free".
+        failedKey = key
+        failedAt = Date.now()
+        if (read?.key === key) read = null
+      }
+    }
+
+    if (inflightGen === gen) { inflightKey = null; inflightGen = 0 }
+
+    // Something changed while this was in the air: what just landed predates
+    // it, so read again rather than leaving the tiles on a stale count.
+    const stale = newest && changeSeq > seq && inflightKey === null
+    if (stale) start(getCurrentAccount())
+    notify()
   })()
+}
+
+/**
+ * Read the window if it is not already held, already in flight, or recently
+ * failed. The MOUNT path: cheap, deduped, and respectful of the cooldown.
+ */
+function ensure(accountId: string | null): void {
+  const { key } = dayLoadWindow(accountId)
+  if (read?.key === key) return
+  if (inflightKey === key) return
+  if (failedKey === key && Date.now() - failedAt < DAY_LOAD_RETRY_AFTER_MS) return
+  start(accountId)
+}
+
+/**
+ * The world changed — we wrote to the calendar, or the tab came back and the
+ * day may have rolled over. ONE read follows, however many consumers are
+ * mounted: this is called once per signal, from the module's own single
+ * subscription, not once per hook.
+ *
+ * Deliberately clears the failure cooldown. A forced read is caused by the
+ * user, not by a timer, so it is not the polling the cooldown exists to
+ * prevent — and refusing to retry after the user just fixed their calendar
+ * connection would be the wrong answer.
+ */
+function invalidate(): void {
+  changeSeq++
+  const account = getCurrentAccount()
+  const { key } = dayLoadWindow(account)
+  if (failedKey === key) { failedKey = null; failedAt = 0 }
+  // Already reading: that request either postdates this change (nothing to
+  // do) or predates it, in which case its own completion starts the re-read.
+  if (inflightKey !== null) return
+  read = null
+  start(account)
+}
+
+// ── The module's own subscriptions ──────────────────────────────────────────
+//
+// One per tab, ref-counted by mounted consumers — NOT one per consumer. Three
+// open pickers sharing a cache must make one read when a signal fires, and
+// before this each of them started its own (Codex, 2026-09-25).
+
+/** How long after a foreground return before another one counts. */
+const VISIBILITY_THROTTLE_MS = 30_000
+
+let wiredCount = 0
+let teardown: Array<() => void> = []
+let lastVisibleAt = 0
+
+function wireSignals(): void {
+  const onVisible = () => {
+    if (typeof document === 'undefined' || document.visibilityState !== 'visible') return
+    const now = Date.now()
+    if (now - lastVisibleAt < VISIBILITY_THROTTLE_MS) return
+    lastVisibleAt = now
+    invalidate()
+  }
+  lastVisibleAt = Date.now()
+  teardown.push(onCalendarChanged(() => invalidate()))
+  teardown.push(onAccountChanged(() => {
+    // The read held belongs to the previous account; it must not be shown.
+    read = null
+    failedKey = null
+    changeSeq++
+    generation++                       // orphan anything in flight for the old account
+    inflightKey = null
+    inflightGen = 0
+    notify()
+    start(getCurrentAccount())
+  }))
+  if (typeof document !== 'undefined') {
+    document.addEventListener('visibilitychange', onVisible)
+    teardown.push(() => document.removeEventListener('visibilitychange', onVisible))
+  }
+}
+
+function unwireSignals(): void {
+  for (const off of teardown) off()
+  teardown = []
 }
 
 /**
@@ -161,33 +279,20 @@ export function useDayLoadEvents(enabled: boolean): DayLoadEvents {
     return () => { subscribers.delete(force) }
   }, [force])
 
+  // The signals are the MODULE's, ref-counted here. A consumer subscribing on
+  // its own account meant one calendar write started as many reads as there
+  // were open pickers.
+  useEffect(() => {
+    if (!enabled) return
+    if (wiredCount++ === 0) wireSignals()
+    return () => { if (--wiredCount === 0) unwireSignals() }
+  }, [enabled])
+
   const { key } = dayLoadWindow(accountId)
   useEffect(() => {
     if (!enabled) return
     ensure(accountId)
   }, [enabled, accountId, key])
-
-  // A different account signed in. The read held is the previous account's;
-  // the key below stops matching, and this wakes every consumer to say so.
-  useEffect(() => onAccountChanged(() => {
-    if (read && read.key.split('|')[0] !== (getCurrentAccount() ?? 'anon')) read = null
-    force()
-  }), [force])
-
-  // A write WE made. The view calendar refetches because the component that
-  // wrote it owns the fetch; this cache has no owner, so it listens.
-  useEffect(() => {
-    if (!enabled) return
-    return onCalendarChanged(() => ensure(accountId, true))
-  }, [enabled, accountId])
-
-  // Coming back to the tab: the day may have rolled over, the calendar may
-  // have changed elsewhere, and a failed read deserves another chance.
-  const onVisible = useCallback(async () => {
-    if (!enabled) return
-    ensure(accountId, true)
-  }, [enabled, accountId])
-  useRefreshOnVisible(onVisible, { enabled })
 
   const mine = read?.key === key ? read : null
   return {
