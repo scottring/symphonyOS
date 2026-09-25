@@ -1331,7 +1331,7 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
     keep: async (id: string, periodStart: Date, prevStart: Date) =>
       !!(await keepForward(id, isSeasonSession ? { seasonStart: periodStart } : { monthStart: periodStart }, prevStart)),
     // Each item's OWN domain, recorded when it was planned — never the one in view now (I4).
-    addTask: (title: string, o: { id: string; periodStart: Date; day?: Date; isGoal?: boolean; goalTaskId?: string; aboveGoalId?: string; context: DomainId | null }) => {
+    addTask: (title: string, o: { id: string; periodStart: Date; day?: Date; isGoal?: boolean; goalTaskId?: string; aboveGoalId?: string; context: DomainId | null; assignedTo?: string | null }) => {
       // The goal above, recorded (S3-02). Which column depends on what the
       // rail is made of:
       //   season session — the rail IS the goals table, so the pick is already
@@ -1344,9 +1344,11 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
       // along when their goal moves. A goal must not be carried by another.
       const support = o.isGoal && !isSeasonSession ? o.aboveGoalId : undefined
       const goalId = isSeasonSession ? o.aboveGoalId : tasks.find((t) => t.id === o.aboveGoalId)?.goalId
+      // A page's chosen person (null = Unassigned); absent = addTask's default.
+      const who = o.assignedTo !== undefined ? { assignedTo: o.assignedTo } : {}
       return addTask(title, undefined, undefined, undefined, isSeasonSession
-        ? { id: o.id, bucket: 'quarter' as const, seasonStart: o.periodStart, isGoal: o.isGoal, goalTaskId: o.goalTaskId, goalId, context: o.context }
-        : { id: o.id, bucket: 'month' as const, monthStart: o.periodStart, isGoal: o.isGoal, goalTaskId: o.goalTaskId, goalId, supportsGoalTaskId: support, context: o.context })
+        ? { id: o.id, bucket: 'quarter' as const, seasonStart: o.periodStart, isGoal: o.isGoal, goalTaskId: o.goalTaskId, goalId, context: o.context, ...who }
+        : { id: o.id, bucket: 'month' as const, monthStart: o.periodStart, isGoal: o.isGoal, goalTaskId: o.goalTaskId, goalId, supportsGoalTaskId: support, context: o.context, ...who })
     },
     contextOf: (id: string) => tasks.find((t) => t.id === id)?.context ?? null,
     // Everything a tick does (subtasks, waiting/discussion, a linked list item), and reports whether it wrote.

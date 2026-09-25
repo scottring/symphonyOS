@@ -3,6 +3,7 @@ import { NotebookPen, X } from 'lucide-react'
 import { usePendingPages, type PendingPage } from '@/hooks/usePendingPages'
 import { useCommitPage } from '@/hooks/useCommitPage'
 import { useFamilyMembers } from '@/hooks/useFamilyMembers'
+import { signedInMember } from '@/lib/paperAssignee'
 import { PageReviewSheet, type PageReviewPayload } from '@/components/capture/PageReviewSheet'
 import type { FamilyMember } from '@/types/family'
 
@@ -19,7 +20,8 @@ import type { FamilyMember } from '@/types/family'
  * is empty almost all the time.
  */
 export function SupernotePagesSection() {
-  const { members } = useFamilyMembers()
+  const { members, currentUserId } = useFamilyMembers()
+  const currentMemberId = signedInMember(members, currentUserId)?.id ?? null
   const planMembers = useMemo(() => members.map((m) => ({ id: m.id, name: m.name, role: m.role_label ?? null })), [members])
   const { pages, dismiss } = usePendingPages(planMembers)
   const [openId, setOpenId] = useState<string | null>(null)
@@ -62,6 +64,7 @@ export function SupernotePagesSection() {
         <SupernotePageReview
           page={open}
           members={members}
+          currentMemberId={currentMemberId}
           dismiss={dismiss}
           onClose={() => setOpenId(null)}
         />
@@ -73,6 +76,7 @@ export function SupernotePagesSection() {
 interface SupernotePageReviewProps {
   page: PendingPage
   members: FamilyMember[]
+  currentMemberId: string | null
   dismiss: (captureId: string) => Promise<boolean>
   onClose: () => void
 }
@@ -84,7 +88,7 @@ interface SupernotePageReviewProps {
  * instantiate only for the moment a review is in progress, not on every
  * Inbox render.
  */
-function SupernotePageReview({ page, members, dismiss, onClose }: SupernotePageReviewProps) {
+function SupernotePageReview({ page, members, currentMemberId, dismiss, onClose }: SupernotePageReviewProps) {
   const { commitPage } = useCommitPage()
   const [committing, setCommitting] = useState(false)
 
@@ -115,6 +119,7 @@ function SupernotePageReview({ page, members, dismiss, onClose }: SupernotePageR
       windowDates={page.result.windowDates}
       altitude={page.result.altitude}
       members={members}
+      currentMemberId={currentMemberId}
       committing={committing}
       onCommit={(payload) => void handleCommit(payload)}
       onClose={onClose}

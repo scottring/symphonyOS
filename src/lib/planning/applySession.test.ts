@@ -163,4 +163,13 @@ describe('applySession', () => {
     expect(ctxOf('Under a new work goal')).toBe('work')
     expect(ctxOf('Chosen personal')).toBe('personal')      // an explicit choice still wins
   })
+
+  it('hands a draft row\'s chosen person to the writer — Unassigned as null, and nothing when the row made no choice', async () => {
+    const { w } = writers()
+    await applySession({ ...emptyDraft('month', oct, sep),
+      newGoals: [{ id: 'G1', title: 'Paint', assignedTo: 'm-iris' }],
+      newTasks: [{ id: 'T1', title: 'Mine', assignedTo: 'm-scott' }, { id: 'T2', title: 'Nobody', assignedTo: null }, { id: 'T3', title: 'Typed in session' }] }, w, () => false)
+    const opts = (w.addTask as ReturnType<typeof vi.fn>).mock.calls.map(([title, o]) => [title, 'assignedTo' in o ? o.assignedTo : 'absent'])
+    expect(opts).toEqual([['Paint', 'm-iris'], ['Mine', 'm-scott'], ['Nobody', null], ['Typed in session', 'absent']])
+  })
 })

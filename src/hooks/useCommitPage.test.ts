@@ -19,9 +19,6 @@ vi.mock('@/lib/supabase', () => ({
 }))
 vi.mock('@/hooks/useSupabaseTasks', () => ({ useSupabaseTasks: () => ({ addTask: mocks.addTask }) }))
 vi.mock('@/hooks/useNotes', () => ({ useNotes: () => ({ addNote: mocks.addNote }) }))
-vi.mock('@/hooks/useFamilyMembers', () => ({
-  useFamilyMembers: () => ({ getCurrentUserMember: () => ({ id: 'member-1' }) }),
-}))
 vi.mock('@/hooks/useRoutines', () => ({ useRoutines: () => ({ addRoutine: mocks.addRoutine }) }))
 vi.mock('@/hooks/useToast', () => ({ showToast: mocks.showToast }))
 vi.mock('@/contexts/GoalsContext', () => ({
@@ -79,6 +76,23 @@ describe('useCommitPage', () => {
     expect(mocks.addRoutine).toHaveBeenCalledWith(expect.objectContaining({
       name: 'Water plants', recurrence_pattern: { type: 'weekly', days: ['tue'] }, time_of_day: '08:00',
     }))
+  })
+
+  it('writes each line\'s person as chosen — Unassigned stays null for tasks AND routines, with no default slipped in', async () => {
+    await commit()({
+      items: [
+        { ...ITEM, title: 'Mine', assigneeId: 'member-1' },
+        { ...ITEM, title: 'Iris', assigneeId: 'm-iris' },
+        { ...ITEM, title: 'Nobody', assigneeId: null },
+        { ...ITEM, title: 'Routine nobody', kind: 'recurring', recurring: { days: ['mon'], until: null }, assigneeId: null },
+        { ...ITEM, title: 'Routine mine', kind: 'recurring', recurring: { days: ['mon'], until: null }, assigneeId: 'member-1' },
+      ],
+      notes: [], domain: 'family', storagePath: null, altitude: 'week',
+    })
+    const taskOpts = mocks.addTask.mock.calls.map((c) => c[4])
+    expect(taskOpts.map((o) => o.assignedTo)).toEqual(['member-1', 'm-iris', null])
+    for (const o of taskOpts) expect(o).not.toHaveProperty('defaultAssigneeId')
+    expect(mocks.addRoutine.mock.calls.map((c) => c[0].assigned_to)).toEqual([null, 'member-1'])
   })
 
   it('reports the failure instead of claiming success when addTask writes nothing', async () => {

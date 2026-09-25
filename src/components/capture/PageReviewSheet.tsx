@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useDialogFocus } from '@/hooks/useDialogFocus'
 import { X, NotebookPen, HelpCircle, Target, ChevronLeft, ChevronRight, CalendarCheck2, AlertCircle } from 'lucide-react'
 import { parseLocalYmd } from '@/lib/cadence/config'
@@ -11,6 +11,7 @@ import type { PageNote } from '@/lib/pageParse'
 import type { FamilyMember } from '@/types/family'
 import { hasItemType, inferredCategory, itemTypeOf, itemTypeProblem, normalizeForSave, withItemType, type PaperItemType } from '@/lib/paperItemType'
 import { ItemTypeSelect, RoutineDaysPicker } from './ItemTypeControls'
+import { assigneeOptions, initialAssignee, UNASSIGNED } from '@/lib/paperAssignee'
 
 // The payload's shape lives with the rest of the page-from-paper model.
 export type { PageReviewPayload } from '@/lib/planParse'
@@ -41,6 +42,9 @@ export interface PageReviewSheetProps {
   /** The domain to open on. Default: the one remembered for this altitude, else Family. */
   initialDomain?: DomainId
   members: FamilyMember[]
+  /** The signed-in user's member id, found by auth identity (signedInMember).
+   *  Unnamed lines start on it; null = not known, and they start Unassigned. */
+  currentMemberId?: string | null
   committing: boolean
   /** Called with only the checked rows, as edited. */
   onCommit: (payload: PageReviewPayload) => void
@@ -62,10 +66,12 @@ interface ItemRow extends PlanItem {
   dupDismissed?: boolean
   /** Said once a type change undid something (a goal that stopped being one). */
   typeNotice?: string | null
+  /** The page named no one and nobody has picked yet — the assignee is the
+   *  signed-in default, filled in if that identity arrives after opening. */
+  assigneeDefaulted?: boolean
 }
 interface NoteRow extends PageNote { included: boolean }
 
-const UNASSIGNED = ''
 
 function placementValue(p: PlanPlacement): string {
   return p.kind === 'date' ? p.date : p.kind
@@ -150,8 +156,13 @@ function rememberedDomain(altitude: PageAltitude): DomainId | null {
 export function PageReviewSheet({
   items, notes, unclear, windowDates, altitude = 'week', seasons = readSeasons(), today = new Date(),
   titlePeriod = null, pageTitle = null, existingTasks = [], calendarTitlesByDay,
-  initialDomain, members, committing, onCommit, onClose, draftLabelFor, onAddToDraft,
+  initialDomain, members, currentMemberId = null, committing, onCommit, onClose, draftLabelFor, onAddToDraft,
 }: PageReviewSheetProps) {
+  // The picker: you once (by id), everyone else, and a real Unassigned. Every
+  // row's assignee is decided here, so the save writes exactly what is shown.
+  const memberIds = useMemo(() => new Set(members.map((m) => m.id)), [members])
+  const meId = currentMemberId && memberIds.has(currentMemberId) ? currentMemberId : null
+  const peopleOptions = useMemo(() => assigneeOptions(members, meId), [members, meId])
   // A caller's boundaries may be hand-written and out of calendar order; the
   // season maths below assume ordered ones.
   const seasonsOrdered = useMemo(() => normalizeSeasons(seasons), [seasons])
@@ -170,10 +181,20 @@ export function PageReviewSheet({
       .map((i) => ({
         ...i,
         ...(i.kind === 'task' && hasItemType(i) && !i.category ? { category: inferredCategory(i) } : {}),
+        assigneeId: initialAssignee(i, memberIds, meId),
+        assigneeDefaulted: !(i.assigneeId && memberIds.has(i.assigneeId)),
         included: true,
         dup: findLikelyDuplicate(i.title, existingTasks),
       })),
   )
+  // The household can finish loading after the sheet opens: rows still on the
+  // default then take the signed-in member. A row someone picked is left alone.
+  useEffect(() => {
+    if (!meId) return
+    setItemRows((rows) => (rows.some((r) => r.assigneeDefaulted && r.assigneeId === null)
+      ? rows.map((r) => (r.assigneeDefaulted && r.assigneeId === null ? { ...r, assigneeId: meId } : r))
+      : rows))
+  }, [meId])
   const [noteRows, setNoteRows] = useState<NoteRow[]>(() => notes.map((n) => ({ ...n, included: true })))
   const [unread, setUnread] = useState<string[]>(() => unclear)
   const [domain, setDomain] = useState<DomainId>(() => initialDomain ?? rememberedDomain(altitude) ?? 'family')
@@ -269,7 +290,7 @@ export function PageReviewSheet({
     setNoteRows((prev) => prev.map((r, i) => (i === index ? { ...r, ...patch } : r)))
 
   const promoteToTask = (line: string) => {
-    setItemRows((prev) => [...prev, { title: line, placement: { kind: 'inbox' }, time: null, assigneeId: null, note: null, dateHint: null, kind: 'task', category: 'task', recurring: null, phone: null, contactMemberId: null, included: true, dup: findLikelyDuplicate(line, existingTasks) }])
+    setItemRows((prev) => [...prev, { title: line, placement: { kind: 'inbox' }, time: null, assigneeId: meId, assigneeDefaulted: true, note: null, dateHint: null, kind: 'task', category: 'task', recurring: null, phone: null, contactMemberId: null, included: true, dup: findLikelyDuplicate(line, existingTasks) }])
     setUnread((prev) => prev.filter((l) => l !== line))
   }
   const promoteToNote = (line: string) => {
@@ -284,7 +305,7 @@ export function PageReviewSheet({
       domain,
       items: itemRows
         .filter((r) => r.included && r.title.trim())
-        .map(({ included: _included, dup: _dup, dupDismissed: _dupDismissed, typeNotice: _typeNotice, ...item }) => normalizeForSave({ ...item, title: item.title.trim() })),
+        .map(({ included: _included, dup: _dup, dupDismissed: _dupDismissed, typeNotice: _typeNotice, assigneeDefaulted: _assigneeDefaulted, ...item }) => normalizeForSave({ ...item, title: item.title.trim() })),
       notes: noteRows
         .filter((r) => r.included && r.content.trim())
         .map(({ included: _included, ...note }) => ({ title: note.title.trim(), content: note.content.trim() })),
@@ -510,16 +531,16 @@ export function PageReviewSheet({
                           className="text-[13px] text-neutral-700 bg-neutral-100 rounded-lg px-2 py-1.5 shrink-0 w-[104px]"
                         />
                       )}
-                      {/* A goal has no assignee — it is the household's year, not a chore. */}
-                      {row.placement.kind !== 'goal' && <select
+                      {/* A year goal has no assignee — it is the household's year,
+                          not a chore — and a day-fact is a note. */}
+                      {row.placement.kind !== 'goal' && row.kind !== 'dayfact' && <select
                         value={row.assigneeId ?? UNASSIGNED}
-                        onChange={(e) => updateItem(i, { assigneeId: e.target.value === UNASSIGNED ? null : e.target.value })}
-                        aria-label="Assignee"
-                        className="text-[13px] text-neutral-700 bg-neutral-100 rounded-lg px-2 py-1.5 shrink-0 max-w-[110px]"
+                        onChange={(e) => updateItem(i, { assigneeId: e.target.value === UNASSIGNED ? null : e.target.value, assigneeDefaulted: false })}
+                        aria-label={`Assignee for "${row.title}"`}
+                        className="text-[13px] text-neutral-700 bg-neutral-100 rounded-lg px-2 py-1.5 shrink-0 max-w-[140px]"
                       >
-                        <option value={UNASSIGNED}>Me</option>
-                        {members.map((m) => (
-                          <option key={m.id} value={m.id}>{m.name}</option>
+                        {peopleOptions.map((o) => (
+                          <option key={o.value} value={o.value}>{o.label}</option>
                         ))}
                       </select>}
                     </div>
@@ -528,8 +549,9 @@ export function PageReviewSheet({
               </div>
             )}
 
-            {(typeCounts.appointment > 0 || (draftLabel && onAddToDraft && savedDirectly > 0)) && (
+            {(!meId || typeCounts.appointment > 0 || (draftLabel && onAddToDraft && savedDirectly > 0)) && (
               <div className="space-y-1 text-[12px] text-neutral-500">
+                {!meId && <p>Symphony couldn&rsquo;t confirm which household member you are, so lines without a name start Unassigned.</p>}
                 {typeCounts.appointment > 0 && <p>Appointments are saved in Symphony only. Nothing is added to Google Calendar.</p>}
                 {draftLabel && onAddToDraft && savedDirectly > 0 && (
                   <p>Appointments, activities and routines are saved directly. Tasks and goals join the plan you&rsquo;re writing.</p>

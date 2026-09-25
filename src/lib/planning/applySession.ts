@@ -18,7 +18,8 @@ import type { SessionDraft, Verdict } from './session'
 export interface SessionWriters {
   keep: (id: string, periodStart: Date, prevStart: Date) => Promise<boolean>
   /** `context` is the item's own (recorded when planned), never the domain in view at Save. */
-  addTask: (title: string, opts: { id: string; periodStart: Date; day?: Date; isGoal?: boolean; goalTaskId?: string; aboveGoalId?: string; context: DomainId | null }) => Promise<string | undefined>
+  /** `assignedTo` is passed only when the draft row carries a choice (null = Unassigned). */
+  addTask: (title: string, opts: { id: string; periodStart: Date; day?: Date; isGoal?: boolean; goalTaskId?: string; aboveGoalId?: string; context: DomainId | null; assignedTo?: string | null }) => Promise<string | undefined>
   /** An existing row's domain — a next action takes its goal's. */
   contextOf: (id: string) => DomainId | null
   complete: (id: string) => Promise<boolean>
@@ -80,7 +81,7 @@ export async function applySession(
     // draft is open; without this the link was shown and never written
     // (S3-02). The writer decides which column records it, because what the
     // id points AT differs by level.
-    if (await wrote(() => w.addTask(g.title, { id: g.id, periodStart, isGoal: true, aboveGoalId: g.linkId, context: g.context ?? null }))) {
+    if (await wrote(() => w.addTask(g.title, { id: g.id, periodStart, isGoal: true, aboveGoalId: g.linkId, context: g.context ?? null, ...(g.assignedTo !== undefined ? { assignedTo: g.assignedTo } : {}) }))) {
       progress({ ...cur, created: [...cur.created, g.id], newGoals: cur.newGoals.filter((x) => x.id !== g.id) })
     }
   }
@@ -90,7 +91,7 @@ export async function applySession(
     // A new next action under a goal takes the goal's area unless the draft
     // chose one — the same default "keep, and add a next action" already has.
     const area = t.context ?? (t.linkId ? (d.newGoals.find((g) => g.id === t.linkId)?.context ?? w.contextOf(t.linkId)) : null) ?? null
-    if (await wrote(() => w.addTask(t.title, { id: t.id, periodStart, day: t.day ? parseLocalYmd(t.day) : undefined, goalTaskId: t.linkId, context: area }))) {
+    if (await wrote(() => w.addTask(t.title, { id: t.id, periodStart, day: t.day ? parseLocalYmd(t.day) : undefined, goalTaskId: t.linkId, context: area, ...(t.assignedTo !== undefined ? { assignedTo: t.assignedTo } : {}) }))) {
       progress({ ...cur, newTasks: cur.newTasks.filter((x) => x.id !== t.id) })
     }
   }

@@ -22,7 +22,10 @@ export type Verdict = 'keep' | 'keep-action' | 'done' | 'someday' | 'drop'
  *  domain in view at Save (final review I4). Absent on a draft from before. */
 export interface NewItem { id: string; title: string; linkId?: string; context?: DomainId | null
   /** Week only: an optional day (local YYYY-MM-DD) for a time-sensitive task. */
-  day?: string }
+  day?: string
+  /** Who it is for, when it came with a choice (a page's review sheet): a
+   *  member id, or null for Unassigned. Absent = the writer's own default. */
+  assignedTo?: string | null }
 export type SessionLevel = 'month' | 'week' | 'season' | 'year'
 
 /** The placement level a session's rows live on. A year row is a GOAL, not a

@@ -179,7 +179,8 @@ export function mergePaperIntoDraft(draft: SessionDraft, payload: PageReviewPayl
     if (hit) { matched.push(hit); continue }
 
     const isGoal = item.placement.kind === 'goal' || item.goal === true
-    const entry: NewItem = { id: crypto.randomUUID(), title, context: null }
+    // The person chosen on the sheet rides the draft row, Unassigned included.
+    const entry: NewItem = { id: crypto.randomUUID(), title, context: null, assignedTo: item.assigneeId }
     if (!isGoal && draft.level === 'week' && item.placement.kind === 'date') entry.day = item.placement.date
     if (isGoal) newGoals.push(entry)
     else newTasks.push(entry)

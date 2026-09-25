@@ -284,7 +284,9 @@ export interface PlanAddTaskArgs {
     isGoal?: boolean
     pickedAt?: Date
     isAllDay?: boolean
-    assignedTo?: string
+    /** Who the review sheet settled on: a member id, or null for Unassigned.
+     *  Always explicit — never left for addTask to default. */
+    assignedTo: string | null
     context: TaskContext | null
     /** Task / Appointment ('event') / Activity, as chosen on the sheet. */
     category?: 'task' | 'event' | 'activity'
@@ -303,9 +305,9 @@ export interface PlanAddTaskArgs {
  */
 export function planItemToAddTaskArgs(item: PlanItem, ctx: PlanCommitContext): PlanAddTaskArgs {
   const base = {
-    // Unassigned lines default via addTask's defaultAssigneeId (the planner);
-    // only an explicitly named member overrides it.
-    assignedTo: item.assigneeId ?? undefined,
+    // The sheet decided every row's person (the signed-in member by default,
+    // Unassigned when chosen): null is written as null, not re-defaulted.
+    assignedTo: item.assigneeId,
     context: ctx.context,
     ...(item.category ? { category: item.category } : {}),
     notes: item.note ?? undefined,

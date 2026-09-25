@@ -96,6 +96,17 @@ describe('mergePaperIntoDraft', () => {
     expect(r.rest.items.map((i) => [i.title, i.category])).toEqual([['Dentist', 'event'], ['Swim', 'activity']])
   })
 
+  it('carries each line\'s chosen person onto the draft row, Unassigned included', () => {
+    const r = mergePaperIntoDraft(draftFor('month', '2026-10-01'), page([
+      line('Mine', { kind: 'month' }, { assigneeId: 'm-scott' }),
+      line('Iris\'s', { kind: 'month' }, { assigneeId: 'm-iris' }),
+      line('Nobody', { kind: 'month' }, { assigneeId: null }),
+      line('Goal for Iris', { kind: 'month' }, { assigneeId: 'm-iris', goal: true }),
+    ]), empty)
+    expect(r.draft.newTasks.map((t) => [t.title, t.assignedTo])).toEqual([['Mine', 'm-scott'], ['Iris\'s', 'm-iris'], ['Nobody', null]])
+    expect(r.draft.newGoals[0].assignedTo).toBe('m-iris')
+  })
+
   it('leaves day-facts and recurring lines for the ordinary commit', () => {
     const p: PageReviewPayload = {
       ...page([
