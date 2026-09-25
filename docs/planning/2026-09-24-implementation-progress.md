@@ -1807,66 +1807,78 @@ that fails without its fix.
 
 ---
 
-# §Y — Completion checklist (durable; update in place)  ·  started 2026-09-25
+# §Y — Completion checklist (durable; update in place)  ·  2026-09-25
 
-The program's remaining authorized scope, one line per item, kept current so a
-fresh session can resume from here. Evidence kinds: **Live** (driven on :5199,
-real DB), **PG** (throwaway local Postgres with the live schema —
-`scripts/test-planning-commitments-locally.sh`), **Unit/Hydrated**, **Harness**
-(isolated Chromium). Mocked tests never stand in for Live or PG.
+The program's remaining authorized scope, kept current so a fresh session can
+resume here. Evidence: **Live** = driven on :5199 against the demo account's
+real database; **PG** = throwaway local Postgres with the live schema
+(`scripts/test-planning-commitments-locally.sh`, 11/11); **390** = same-origin
+390px frame, signed in; **Unit** = vitest (mocked backend). Mocked tests never
+stand in for Live or PG. Per-finding status: `onboarding-program-findings.md`
+§ "Status update — 2026-09-25".
 
-Model: this session runs **Opus 5.5** (`claude-opus-5-5`), as Scott preferred.
+Model: this session ran **Opus 5.5** (`claude-opus-5-5`).
 
 ## Verified
 
-| Item | Evidence | Commit |
+| Area | Evidence | Commits |
 |---|---|---|
-| Choose-when density: one counting path, universal scope printed, loading / failed / not-connected / out-of-range states, seven-day relative scaling | Unit + Live (read-only) | §W–§X.1 |
-| Inline event date/start/end editing; refused save keeps the edit; Escape returns focus | Unit + Live (open/cancel; save not exercised live — no disposable calendar) | 52888c78 |
-| Both weekend days for events, each with density; tasks keep "either day" (now on its own line — it overflowed the tile) | Unit + Live | 52888c78 |
-| Guide's "Plan from paper" opens the flow (it only navigated to Today) | Unit + Live | 509a3fa9 |
-| Review Drop + Keep save, partial failure keeps only the failed verdict, retry writes nothing twice, survives reload | **Live** (forced write failure via fetch interception) + Unit | 65f96555 |
-| Review save screen: saved plan vs proposed changes separated; Drop names its destination | Unit + Live | 65f96555 |
+| Choose-when density: one path, universal scope printed, loading/failed/not-connected/out-of-range, seven-day scaling | Unit + Live | §W–§X.1 |
+| Inline event date/start/end; refused save keeps edit; Escape → focus back | Unit + Live (open/cancel) + 390 | 52888c78 |
+| Both weekend days for events; tasks keep "either day" (own line) | Unit + Live | 52888c78 |
+| Event panel: completed prep stays, reopen in place; prep is any-time on the day | Unit + Live | efa6fe1b |
+| Event panel Delete (writable calendars, two-step confirm, refusal stays open); one ⋯ | Unit + Live (menu only) | efa6fe1b |
+| /week quick-create refetches | Unit | efa6fe1b |
+| Task pane: "For <goal> · period", then its when (shared TaskTimingMenu, own period); Remove day with consequence + Undo | Unit + Live | 3c9b9f13, e57e83de |
+| Plan pages open a task in the pane over the period (hostsSelectionKinds) | Unit + Live | 3a40401e |
+| Capture → one post-write confirmation with "Go to inbox"; Quick Add closes on navigation | Unit + Live | 43adbda1, bd4bf593 |
+| Journey: capture → Inbox → life-area gate (now explains itself) → week → day → complete/reopen → remove day keeps week | **Live**, current build | this pass |
+| Review: Drop + Keep save; forced Drop failure keeps only it; retry writes once; reload | **Live** | 65f96555 |
+| Review save screen: saved vs proposed; Drop names destination; "Your plan for <period> is unchanged" | Unit + Live + 390 | 65f96555 |
 | keepForward / dropCommitment / complete-reopen / retry idempotency / cross-household RLS | **PG** 11/11 | 65f96555 |
-| Carried period chosen again reopens (model showed Inbox, DB reopened) | Unit (red first) + PG | 65f96555 |
-| Focus re-send no longer hits RLS (task_focus has no UPDATE policy) | PG | 65f96555 |
-| Earlier: link set/change/remove/reload/reciprocal, goal complete independent of steps, standalone task → goal, keyboard long list, year review completed goals | Live / Hydrated (§V, Acceptance walk) | prior |
+| Carried period re-chosen reopens (model showed Inbox); focus re-send no RLS error | Unit (red first) + PG | 65f96555 |
+| Planning session opens Shelves on the calendar; status line "N on the calendar"; period calendar de-duplicated | Unit + Live | f77a3658, 6d2d9a7e |
+| S2-08, S3-08, S3-09, S3-10, S2-23, S2-19, S3-11 copy, weekend/custom range reload | Unit (several red first); S3-10/S2-19 Live | 6d2d9a7e, a77a3064, 8a2abc45, efa6fe1b |
+| Season row → named month, never the clock's | Unit | f1956b33 |
+| Phone width: titles no longer squeezed on /month, /week; nothing past the edge on /today /week /month /season /inbox /guide; review + panes fit | **390** | b58a2e75 |
+| Guide's Plan from paper opens the flow; empty Today links to Getting Started; capture path names events/routines | Unit + Live | 509a3fa9, 7a4beee7 |
+| Earlier: links set/change/remove/reload/reciprocal, standalone → goal, goal complete independent, keyboard long list | Live / Hydrated | §V, Acceptance walk |
 
-## Implementation remaining (authorized, unblocked)
+Integrated at the last check: 7187 tests pass (only the known
+`connectors/whatsapp` collection error), tsc clean, eslint 0 errors, build clean.
 
-Status from a read-only code audit on 2026-09-25 (file:line in the audit).
+## Implementation remaining (authorized, unblocked, not done)
 
-- [ ] Event panel: completed prep task hidden (`TapEventPanel` → `includeCompleted`)
-- [ ] Event panel: no Delete (`deleteEvent` exists; add `PanelMoreMenu`)
-- [ ] New event from /week quick-create needs reload (no refetch)
-- [ ] S2-26 detail pane Schedule button shows no date; S2-27 remove-day in pane hidden in popover
-- [ ] S2-08 `/task/:id` says "Task not found" while loading
-- [ ] S3-10 empty week says "No week tasks match this person" with no filter applied (confirmed live)
-- [ ] S3-08 month task already linked to a season goal still offers "Link to goal"; no Supports line
-- [ ] S3-09 "Add to October" offered for work already in October
-- [ ] S2-29 period calendar never de-duplicates events
-- [ ] S2-23 goal row circle completes a goal with no confirmation/Undo
-- [ ] S3-12 capture toasts success before the write settles (duplicate/contradictory)
-- [ ] S3-11 / §P routine copy: "Select at least one day" contradicts a flexible save; Daily vs Weekly-all-days explained
-- [ ] Weekend / custom-range week lost on reload (`weekStartParam` only handles 7 days)
-- [ ] S2-10 plan pages open the full page, Today/Week open the pane
-- [ ] S2-19 domain gate does not say which action it is holding
-- [ ] S2-01 / S2-15 planning session opens without the calendar commitments in view
-- [ ] Week inline add closes after one Enter (second typed title lost) — low
+- S3-03: a chooser across the season's months from the rail (today: the
+  viewed month, and the season page names one month).
+- S3-12 tail: two "Failed to add task" on one phone offline capture — not
+  reproduced; one call, one toast in code. Needs a phone-width offline repro.
 
-## Acceptance remaining (needs a live walk after the above)
+## Acceptance remaining
 
-- [ ] Event edit → save, reschedule, drag/resize, prep association, complete/reopen — live, on a disposable event (needs a writable non-primary calendar or explicit approval)
-- [ ] Capture → Inbox/life-area gate → week → day/time → edit → complete/reopen → remove day keeps week — re-walk on the current build
-- [ ] Dense list in the running app (only ever seen in the harness)
-- [ ] Narrow (390px) pass over the changed surfaces
+- Inline event SAVE, reschedule, drag/resize and Delete against a real calendar:
+  blocked by "no real event writes" — needs a disposable writable calendar or
+  Scott's approval. Everything short of the write is verified.
+- Dense list (200 tasks) in the running app — harness only; seeding 200 rows
+  into the shared demo account was judged too disruptive.
+- Goal-completion Undo (a77a3064) and S3-08/S3-09 walked by unit only.
 
 ## Genuinely blocked / needs Scott
 
-- **S2-22 month/season goal archive** — no status column for period goals; a schema/product decision. Not faked with placement.
-- **S1-05 / S1-05a nav labels** ("Planner" over period tabs) — product decision.
-- **External calendar creation** (S3-07) — destination/approval unresolved; no real event writes.
-- **Real iPhone keyboard / safe areas; paper print on a real printer** — manual.
-- **Authenticated two-account live RLS** — PG proves policies; a live two-account walk needs a second demo login.
-- **Row-before-commitment write order**: a Drop whose commitment write fails leaves the row in the Inbox with the week still open until retry (seen live). Retry converges (PG 3/4). Reordering is a core-writer change — flagged for Codex, not done.
-- **Demo fixtures left**: `QA-REV drop me` (Inbox), `QA-REV keep me` (week of Sep 20). Not hard-deleted (browser safety rules); safe to Drop/complete.
+- **S2-22** month/season goal archive — schema/product decision; not faked.
+- **S1-04** four add routes on empty Today; **S1-05/S1-05a** nav labels — product.
+- **S2-02** needs a reproduction with Scott.
+- **External calendar creation** (S3-07) — destination/approval.
+- **Real iPhone keyboard/safe areas; paper printing** — manual.
+- **Two-account live RLS** — PG proves the policies; live needs a second login.
+- **Row-before-commitment order**: a failed Drop commitment write leaves the
+  row in the Inbox with the week open until retry (seen live); retry
+  converges (PG). Reordering the core writer is flagged for Codex.
+- **Release**: nothing pushed, merged or deployed. Production needs Scott.
+
+## Demo fixtures left (all disposable, named QA-)
+
+`QA-REV drop me` (Inbox), `QA-REV keep me` (week of Sep 20), `QA-ACC2 walk`
+(week of Sep 20), `QA-ACC2b walk` (Inbox), `QA-PREP bring forms` (prep for PT,
+Fri Sep 25, created before the all-day fix so still 12:00 AM). Not
+hard-deleted (browser rules); safe to Drop or complete.
