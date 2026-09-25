@@ -338,11 +338,23 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
     navigate(row.kind === 'goal' ? `/goals/${row.id}` : `/task/${row.id}`)
   }, [navigate])
 
+  // A goal's circle sits where a task's tick sits, and one stray click closed
+  // a whole period's outcome with nothing to say it had (S2-23). Completing a
+  // goal now says what it did — and what it did not: its steps are untouched
+  // — with Undo, the app's pattern for a reversible write.
+  const confirmGoalDone = useCallback((title: string, undo: () => void) => {
+    showToast(`Completed the goal “${title}”. Its steps are unchanged.`, 'success', 8000, { label: 'Undo', onClick: undo })
+  }, [])
+
   const act = useCallback(async (action: RowAction, row: PlanRowModel) => {
     if (row.kind === 'goal') {
       const g = goals.find((x) => x.id === row.id)
       if (!g) return
-      if (action === 'complete') await updateGoal(g.id, { status: g.status === 'completed' ? 'active' : 'completed' })
+      if (action === 'complete') {
+        const finishing = g.status !== 'completed'
+        await updateGoal(g.id, { status: finishing ? 'completed' : 'active' })
+        if (finishing) confirmGoalDone(row.title, () => { void updateGoal(g.id, { status: 'active' }) })
+      }
       // Drop lets a goal GO, it does not erase the year it was held in: the
       // year's session and its look-back still need the record (Task 4).
       else if (action === 'drop') await updateGoal(g.id, { status: 'archived' })
@@ -352,7 +364,11 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
       }
       return
     }
-    if (action === 'complete') await toggleTask(row.id)
+    if (action === 'complete') {
+      const finishing = row.isGoal && !tasks.find((x) => x.id === row.id)?.completed
+      const ok = await toggleTask(row.id)
+      if (finishing && ok !== false) confirmGoalDone(row.title, () => { void toggleTask(row.id) })
+    }
     else if (action === 'drop') {
       // A past period's Drop ends THAT period's commitment; the task lives on
       // (guided planning spec). In the current period Drop still means
@@ -382,7 +398,7 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
       await planActions.chooseTaskDay(row.id, new Date())
     }
     else if (action === 'under-goal') setPickingGoalFor(row.id)
-  }, [goals, updateGoal, addGoal, bounds.next, bounds.start, isPast, toggleTask, deleteTask, dropCommitment, gated, setGoal, keepForward, level, planActions])
+  }, [goals, updateGoal, addGoal, bounds.next, bounds.start, isPast, toggleTask, deleteTask, dropCommitment, gated, setGoal, keepForward, level, planActions, tasks, confirmGoalDone])
 
   // The rail's one verb: take an open season task into this month — the same
   // row gains a month commitment; the season keeps it, marked "→ September".

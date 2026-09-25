@@ -267,6 +267,27 @@ describe('PeriodPlanPage', () => {
     expect(goalsApi.updateGoal).toHaveBeenCalledWith(state.goals[0].id, { status: 'active' })
   })
 
+  // S2-23: one stray click on a goal's circle closed the goal, and nothing
+  // said so. Completing a goal names it, says the steps are untouched, and
+  // offers Undo; completing a task stays as quiet as it was.
+  it('completing a goal says so, with Undo; completing a task does not', async () => {
+    state.tasks = [
+      task({ id: 'g1', title: 'Transform the porch', isGoal: true, monthStart: thisMonth }),
+      task({ id: 'l1', title: 'Renew car registration', monthStart: thisMonth }),
+    ]
+    hook.toggleTask.mockResolvedValue(true)
+    renderPage('month')
+    fireEvent.click(screen.getByRole('button', { name: /^Complete Renew car registration/ }))
+    await waitFor(() => expect(hook.toggleTask).toHaveBeenCalledWith('l1'))
+    expect(toastSpy).not.toHaveBeenCalledWith(expect.stringMatching(/Completed the goal/), expect.anything(), expect.anything(), expect.anything())
+    fireEvent.click(screen.getByRole('button', { name: /^Complete Transform the porch/ }))
+    await waitFor(() => expect(toastSpy).toHaveBeenCalledWith(
+      expect.stringMatching(/Completed the goal “Transform the porch”\. Its steps are unchanged\./), 'success', 8000, expect.objectContaining({ label: 'Undo' })))
+    const undo = toastSpy.mock.calls.find((c) => /Completed the goal/.test(c[0]))![3]
+    undo.onClick()
+    expect(hook.toggleTask).toHaveBeenLastCalledWith('g1')
+  })
+
   it("never dresses a row's SCHEDULED date up as the day it was done", () => {
     const scheduledFor = new Date(now.getFullYear(), now.getMonth(), 15, 9, 0)
     state.tasks = [
