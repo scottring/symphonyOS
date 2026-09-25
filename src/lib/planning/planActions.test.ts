@@ -158,6 +158,24 @@ it('undo restores the flexible weekend after choosing another day', async () => 
   undo[0]()
   expect(deps.updateTask).toHaveBeenLastCalledWith('weekend', expect.objectContaining({ weekendStart, scheduledFor: undefined }))
 })
+it('one day of a weekend keeps the weekend and its week, in ONE write', async () => {
+  const task = createMockTask({ id: 'task', bucket: 'month', monthStart: new Date(2026, 8, 1), goalTaskId: 'g1', assignedToAll: ['m2'] })
+  const { deps, actions } = setup([task])
+  const saturday = new Date(2026, 8, 26), sunday = new Date(2026, 8, 27, 15)
+  expect(await actions.planTaskWeekendDay('task', saturday, sunday)).toBe(true)
+  expect(deps.updateTask).toHaveBeenCalledTimes(1)
+  const [, u] = deps.updateTask.mock.calls[0] as unknown as [string, Partial<Task>]
+  expect(u).toMatchObject({ bucket: 'timed', weekendStart: saturday, scheduledFor: new Date(2026, 8, 27), isAllDay: true })
+  expect(u.weekStart).toBeInstanceOf(Date)
+  // The month, the goal and the people are not this write's business.
+  for (const k of ['monthStart', 'goalTaskId', 'assignedTo', 'assignedToAll']) expect(u).not.toHaveProperty(k)
+})
+it('refuses a day that is not in the weekend, and a goal', async () => {
+  const { deps, actions } = setup([createMockTask({ id: 'task' }), createMockTask({ id: 'goal', isGoal: true })])
+  expect(await actions.planTaskWeekendDay('task', new Date(2026, 8, 26), new Date(2026, 8, 28))).toBe(false)
+  expect(await actions.planTaskWeekendDay('goal', new Date(2026, 8, 26), new Date(2026, 8, 26))).toBe(false)
+  expect(deps.updateTask).not.toHaveBeenCalled()
+})
 it('a cancelled time placement does not offer undo for an unwritten change', async () => {
   const { actions, deps, undo } = setup([createMockTask({ id: 'task' })])
   deps.updateTask.mockResolvedValueOnce(false)

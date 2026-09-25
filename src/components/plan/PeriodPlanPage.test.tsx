@@ -2374,7 +2374,7 @@ describe('the month page offers day tiles for the week a row is on', () => {
   it('draws the seven days of the row’s own week, with what each already holds', () => {
     renderPage('month')
     openTiming('Fix the gate')
-    const tiles = screen.getAllByRole('menuitemradio').filter((b) => /^Plan for /.test(b.getAttribute('aria-label') ?? ''))
+    const tiles = screen.getAllByRole('menuitemradio').filter((b) => /^Plan for /.test(b.getAttribute('aria-label') ?? '') && !b.closest('[role="group"]'))
     expect(tiles).toHaveLength(7)
     // The day the other task sits on says so; the rest say they are empty.
     const busy = tiles.find((t) => /1 task already/.test(t.getAttribute('aria-label') ?? ''))
@@ -2391,7 +2391,7 @@ describe('the month page offers day tiles for the week a row is on', () => {
   it('offers no tiles for a row with no week yet — that row is still choosing a week', () => {
     renderPage('month')
     openTiming('Call the roofer')
-    expect(screen.queryAllByRole('menuitemradio').filter((b) => /^Plan for /.test(b.getAttribute('aria-label') ?? ''))).toHaveLength(0)
+    expect(screen.queryAllByRole('menuitemradio').filter((b) => /^Plan for /.test(b.getAttribute('aria-label') ?? '') && !b.closest('[role="group"]'))).toHaveLength(0)
     // …and the way to a specific day is untouched: the shared other-day path,
     // which reads "A day…" precisely because no tiles precede it.
     expect(screen.getByText('A day…')).toBeInTheDocument()
@@ -2403,7 +2403,7 @@ describe('the month page offers day tiles for the week a row is on', () => {
     dayLoad.available = false; dayLoad.failed = true
     renderPage('month')
     openTiming('Fix the gate')
-    const tiles = screen.getAllByRole('menuitemradio').filter((b) => /^Plan for /.test(b.getAttribute('aria-label') ?? ''))
+    const tiles = screen.getAllByRole('menuitemradio').filter((b) => /^Plan for /.test(b.getAttribute('aria-label') ?? '') && !b.closest('[role="group"]'))
     expect(tiles).toHaveLength(7)
     expect(tiles.filter((t) => /couldn’t be read/.test(t.getAttribute('aria-label') ?? ''))).toHaveLength(7)
     expect(tiles.some((t) => /nothing on it yet/.test(t.getAttribute('aria-label') ?? ''))).toBe(false)
@@ -2424,7 +2424,7 @@ describe('the month page offers day tiles for the week a row is on', () => {
     ]
     renderPage('month')
     openTiming('Fix the gate')
-    const tiles = screen.getAllByRole('menuitemradio').filter((b) => /^Plan for /.test(b.getAttribute('aria-label') ?? ''))
+    const tiles = screen.getAllByRole('menuitemradio').filter((b) => /^Plan for /.test(b.getAttribute('aria-label') ?? '') && !b.closest('[role="group"]'))
     // The Friday of the week on screen holds one task and is the busiest day
     // OF THIS WEEK, so it fills the bar.
     const friday = tiles.find((t) => /1 task already/.test(t.getAttribute('aria-label') ?? ''))!
@@ -2436,7 +2436,7 @@ describe('the month page offers day tiles for the week a row is on', () => {
   it('picking a day from a tile plans that exact day', () => {
     renderPage('month')
     openTiming('Fix the gate')
-    const tiles = screen.getAllByRole('menuitemradio').filter((b) => /^Plan for /.test(b.getAttribute('aria-label') ?? ''))
+    const tiles = screen.getAllByRole('menuitemradio').filter((b) => /^Plan for /.test(b.getAttribute('aria-label') ?? '') && !b.closest('[role="group"]'))
     fireEvent.click(tiles[5])
     const day = new Date(weekOfThisMonth.getFullYear(), weekOfThisMonth.getMonth(), weekOfThisMonth.getDate() + 5)
     expect(hook.updateTask).toHaveBeenCalledWith('dated', expect.objectContaining({ scheduledFor: day }))
@@ -2562,5 +2562,93 @@ describe('Assign people on goal and step rows', () => {
     membersState.members = []
     goalWithStep()
     expect(screen.queryByRole('button', { name: /Assign people to/ })).toBeNull()
+  })
+})
+
+describe('the month page offers a flexible weekend', () => {
+  // September 2026; the clock is pinned to Sep 10. Weeks start on Sunday.
+  const SEP = (d: number) => new Date(2026, 8, d)
+  beforeEach(() => {
+    pinClock(); localStorage.clear()
+    dayLoad.events = []; dayLoad.available = true; dayLoad.loading = false; dayLoad.failed = false
+    state.tasks = [
+      task({ id: 'loose', title: 'Call the roofer', monthStart: thisMonth, goalTaskId: 'g0', assignedTo: 'me', assignedToAll: ['me'] }),
+      // As a weekend chosen from this page leaves it: the month AND the week.
+      task({ id: 'wk', title: 'Clean the garage', monthStart: thisMonth, bucket: 'week', weekStart: SEP(6), weekendStart: SEP(12),
+        commitments: [{ level: 'month', periodStart: thisMonth, status: 'open' }, { level: 'week', periodStart: SEP(6), status: 'open' }] }),
+      task({ id: 'oct', title: 'Rake the leaves', monthStart: new Date(2026, 9, 1) }),
+      // Something already on Saturday the 19th, so that weekend reads busier.
+      task({ id: 'busy', title: 'Already on Saturday', monthStart: thisMonth, bucket: 'timed', scheduledFor: SEP(19), isAllDay: true }),
+    ]
+    state.goals = []; state.loading = false; routinesState.routines = []
+    seasonsState.seasons = DEFAULT_SEASONS; seasonsState.loading = false
+    Object.values(hook).forEach((f) => f.mockClear())
+  })
+  afterEach(() => { vi.useRealTimers() })
+  const openTiming = (title: string) =>
+    fireEvent.click(screen.getByRole('button', { name: new RegExp(`Choose a week or a day for ${title}`) }))
+  const weekend = (label: string) => screen.getByRole('group', { name: `Weekend ${label}` })
+  const lastWrite = () => hook.updateTask.mock.calls.at(-1) as unknown as [string, Partial<Task>]
+
+  it('lists every weekend of the month, each as either day and as its two days, with what each day holds', () => {
+    renderPage('month')
+    openTiming('Call the roofer')
+    expect(screen.getByText('A weekend in September')).toBeInTheDocument()
+    for (const label of ['Sep 5–6', 'Sep 12–13', 'Sep 19–20', 'Sep 26–27']) {
+      const g = weekend(label)
+      expect(within(g).getByRole('menuitemradio', { name: new RegExp(`^Plan for the weekend of ${label}, either day`) })).toBeInTheDocument()
+      expect(within(g).getAllByRole('menuitemradio', { name: /keeping the weekend$/ })).toHaveLength(2)
+    }
+    expect(within(weekend('Sep 19–20')).getByRole('menuitemradio', { name: /^Plan for Sat, Sep 19.*1 task already/ })).toBeInTheDocument()
+  })
+
+  it('"either day" plans the weekend and its week — no day — and leaves month, goal and people alone', () => {
+    renderPage('month')
+    openTiming('Call the roofer')
+    fireEvent.click(within(weekend('Sep 12–13')).getByRole('menuitemradio', { name: /either day/ }))
+    const [id, u] = lastWrite()
+    expect(id).toBe('loose')
+    expect(u).toMatchObject({ bucket: 'week', weekendStart: SEP(12), weekStart: SEP(6), scheduledFor: undefined })
+    for (const k of ['monthStart', 'goalTaskId', 'assignedTo', 'assignedToAll']) expect(u).not.toHaveProperty(k)
+  })
+
+  it('a Sunday across the week boundary keeps the Saturday\'s weekend and week', () => {
+    renderPage('month')
+    openTiming('Call the roofer')
+    fireEvent.click(within(weekend('Sep 26–27')).getByRole('menuitemradio', { name: /^Plan for Sun, Sep 27/ }))
+    const [, u] = lastWrite()
+    expect(u).toMatchObject({ bucket: 'timed', scheduledFor: SEP(27), isAllDay: true, weekendStart: SEP(26), weekStart: SEP(20) })
+  })
+
+  it('a weekend row says so, marks its weekend (not the week), and can remove it', () => {
+    renderPage('month')
+    const trigger = screen.getByRole('button', { name: /Choose a week or a day for Clean the garage/ })
+    expect(trigger).toHaveTextContent('Weekend · Sep 12–13 · either day')
+    fireEvent.click(trigger)
+    expect(within(weekend('Sep 12–13')).getByRole('menuitemradio', { name: /either day/ })).toHaveAttribute('aria-checked', 'true')
+    const weekRows = screen.getAllByRole('menuitemradio').filter((b) => !b.closest('[role="group"]') && /^Sep|^Aug|^Oct/.test(b.textContent ?? ''))
+    expect(weekRows.every((b) => b.getAttribute('aria-checked') === 'false')).toBe(true)
+    fireEvent.click(screen.getByRole('menuitem', { name: /Remove weekend/ }))
+    const [, u] = lastWrite()
+    expect(u).toHaveProperty('weekendStart', undefined)
+    expect((u.commitments ?? []).some((c) => c.level === 'week' && c.status === 'open')).toBe(false)
+  })
+
+  it('works from the keyboard', async () => {
+    const user = userEvent.setup({ advanceTimers: () => {} })
+    renderPage('month')
+    screen.getByRole('button', { name: /Choose a week or a day for Call the roofer/ }).focus()
+    await user.keyboard('{Enter}')
+    const either = within(weekend('Sep 5–6')).getByRole('menuitemradio', { name: /either day/ })
+    either.focus()
+    await user.keyboard('{Enter}')
+    expect(lastWrite()[1]).toMatchObject({ weekendStart: SEP(5), bucket: 'week' })
+  })
+
+  it('October offers the weekend it shares with November, with both days counted', () => {
+    renderPageAt('month', '/month?start=2026-10-01')
+    openTiming('Rake the leaves')
+    const g = weekend('Oct 31 – Nov 1')
+    expect(within(g).getAllByRole('menuitemradio', { name: /keeping the weekend$/ })).toHaveLength(2)
   })
 })

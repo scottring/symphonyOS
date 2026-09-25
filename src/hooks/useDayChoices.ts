@@ -108,6 +108,7 @@ const EPOCH = new Date(1970, 0, 1)
 export interface DayChoices {
   /** The tiles for `weekStart`, or undefined when we cannot offer any. */
   forWeek: (weekStart: Date | null | undefined, count?: number) => readonly TimingDayChoice[] | undefined
+  forDays: (dates: readonly Date[]) => readonly TimingDayChoice[] | undefined
   /** What each source could say — exposed for tests and for callers that explain themselves. */
   sources: DensitySources
 }
@@ -190,6 +191,23 @@ export function useDayChoices(input: DayChoicesInput): DayChoices {
         const density = byDay.get(localYmd(date))
         // A week the window does not cover gets NO tiles rather than partial
         // ones: half a week's counts cannot be scaled against each other.
+        if (!density) return undefined
+        out.push({
+          date,
+          label: date.toLocaleDateString('en-US', { weekday: 'short' }),
+          dateLabel: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+          density,
+        })
+      }
+      return out
+    },
+    /** Named days, e.g. a weekend's Saturday and Sunday — undefined unless the
+     *  window covers every one, for the same reason as `forWeek`. */
+    forDays: (dates) => {
+      if (!enabled || dates.length === 0) return undefined
+      const out: TimingDayChoice[] = []
+      for (const date of dates) {
+        const density = byDay.get(localYmd(date))
         if (!density) return undefined
         out.push({
           date,

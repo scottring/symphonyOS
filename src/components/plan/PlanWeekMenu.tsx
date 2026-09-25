@@ -31,7 +31,8 @@ import { weeksOfMonth } from '@/lib/planning/monthWeeks'
 import { readCadenceConfig, localYmd, weekStartAnchor, parseLocalYmd } from '@/lib/cadence/config'
 import { timingLabel, timingDescription, removeDayOutcome, removeAllOutcome, hasTiming, type TaskTiming } from '@/lib/planning/taskTiming'
 import { densityScale, type DayDensity } from '@/lib/planning/dayDensity'
-import { DayDensityTiles, type DayChoice } from './DayDensityTiles'
+import { DayDensityTiles, WeekendChoices, type DayChoice, type WeekendChoice } from './DayDensityTiles'
+import { weekendRangeLabel } from '@/lib/planning/weekend'
 
 /** "Oct 4 – 10" for a week anchor, matching the listed weeks' labels. */
 function weekLabel(start: Date): string {
@@ -46,6 +47,7 @@ function weekLabel(start: Date): string {
 export function PlanWeekMenu({
   title, periodStart, periodLabel, currentWeekStart, timing, onPickWeek, onClearWeek, onRemoveDay, onPickDay,
   dayChoices, dayChoicesLabel, size = 'md',
+  weekends, onPickWeekend, onPickWeekendDay,
 }: {
   title: string
   /** Any day inside the period whose weeks should be offered — the month being
@@ -80,6 +82,16 @@ export function PlanWeekMenu({
   /** What the tiles are — "A day in Nov 8 – 14". */
   dayChoicesLabel?: string
   size?: 'sm' | 'md'
+  /**
+   * The flexible weekends to offer — the Saturdays of the weekends the viewed
+   * month touches, each with its two days when the caller counted them.
+   * Omitted, or without `onPickWeekend`, the menu has no weekend section.
+   */
+  weekends?: readonly { saturday: Date; days?: readonly { date: Date; label: string; dateLabel: string; density: DayDensity }[] }[]
+  /** Plan for the weekend, either day. */
+  onPickWeekend?: (saturday: Date) => void
+  /** One of the weekend's two days, keeping the weekend. */
+  onPickWeekendDay?: (saturday: Date, day: Date) => void
 }) {
   const [open, setOpen] = useState(false)
   const wrapRef = useRef<HTMLDivElement>(null)
@@ -113,8 +125,13 @@ export function PlanWeekMenu({
     const below = window.innerHeight - r.bottom - 8
     const above = r.top - 8
     const up = below < 300 && above > below
+    // Right-aligned to the trigger, but never off the left edge: on a phone
+    // the trigger sits under the title at the LEFT of the row, and a menu
+    // wide enough for the day and weekend tiles overhung the screen (390px
+    // check, 2026-09-25).
+    const width = menuRef.current?.offsetWidth ?? 0
     setPosition({
-      right: Math.max(8, window.innerWidth - r.right),
+      right: Math.max(8, Math.min(window.innerWidth - r.right, window.innerWidth - width - 8)),
       ...(up ? { bottom: window.innerHeight - r.top + 4 } : { top: r.bottom + 4 }),
       maxHeight: Math.max(160, (up ? above : below) - 4),
     })
@@ -137,7 +154,7 @@ export function PlanWeekMenu({
   // What the trigger says. With no task to read it keeps the old verb, so a
   // caller that has not been converted still renders something sensible.
   const label = timing ? timingLabel(timing) : 'Plan'
-  const chosen = !!timing && (!!timing.day || !!timing.week)
+  const chosen = !!timing && (!!timing.day || !!timing.week || !!timing.weekend)
 
   const choose = (fn: () => void) => () => { setOpen(false); fn() }
   const itemClass = 'block w-full rounded-md px-3 py-1.5 text-left text-sm text-neutral-700 hover:bg-primary-50 hover:text-primary-700'
@@ -169,14 +186,16 @@ export function PlanWeekMenu({
           aria-label={`Plan ${title} for a week`}
           style={position}
           className={`fixed z-[60] overflow-y-auto rounded-lg border border-neutral-200 bg-white py-1 shadow-lg ${
-            dayChoices && dayChoices.length > 0 ? 'w-72' : 'w-56'
+            (dayChoices && dayChoices.length > 0) || (onPickWeekend && weekends && weekends.length > 0) ? 'w-72' : 'w-56'
           }`}
         >
           <p className="px-3 pb-0.5 pt-2 text-[10px] font-semibold uppercase tracking-wider text-neutral-400" aria-hidden="true">
             A week in {weeksMonthLabel}
           </p>
           {weeks.map((w) => {
-            const isCurrent = currentKey === localYmd(w.start)
+            // A weekend sits inside its week; the weekend is the choice that
+            // was made, so it is the one marked, not the week around it.
+            const isCurrent = currentKey === localYmd(w.start) && !timing?.weekend
             return (
               <button
                 key={w.label}
@@ -190,6 +209,29 @@ export function PlanWeekMenu({
               </button>
             )
           })}
+          {onPickWeekend && weekends && weekends.length > 0 && (() => {
+            const savedWeekend = timing?.weekend ? localYmd(timing.weekend) : null
+            const savedDay = timing?.day ? localYmd(timing.day) : null
+            const choices: WeekendChoice[] = weekends.map((w) => ({
+              saturday: w.saturday,
+              label: weekendRangeLabel(w.saturday),
+              current: savedWeekend === localYmd(w.saturday) && !savedDay,
+              days: w.days?.map((d) => ({ ...d, current: savedWeekend === localYmd(w.saturday) && savedDay === localYmd(d.date) })),
+            }))
+            const scale = densityScale(weekends.flatMap((w) => (w.days ?? []).map((d) => d.density)))
+            return (
+              <>
+                <div className="my-1 border-t border-neutral-100" />
+                <WeekendChoices
+                  weekends={choices}
+                  level={scale.level}
+                  heading={`A weekend in ${weeksMonthLabel}`}
+                  onPickWeekend={(sat) => { setOpen(false); onPickWeekend(sat) }}
+                  onPickDay={(sat, day) => { setOpen(false); (onPickWeekendDay ?? ((_s: Date, d: Date) => onPickDay?.(d)))(sat, day) }}
+                />
+              </>
+            )
+          })()}
           <div className="my-1 border-t border-neutral-100" />
           <div className="px-3 py-1.5">
             <label className="block text-sm text-neutral-700">
@@ -224,7 +266,7 @@ export function PlanWeekMenu({
           )}
           {onClearWeek && (!timing || hasTiming(timing)) && (
             <button type="button" role="menuitem" className={itemClass} onClick={choose(onClearWeek)}>
-              {timing?.day ? 'Remove day and week' : 'Remove week'}
+              {timing?.day ? (timing.weekend ? 'Remove day and weekend' : 'Remove day and week') : timing?.weekend ? 'Remove weekend' : 'Remove week'}
               <span className="block text-xs text-neutral-400">
                 {timing ? removeAllOutcome(timing, monthLabel) : `Keeps it in ${monthLabel}; no week yet.`}
               </span>

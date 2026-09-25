@@ -108,3 +108,79 @@ export function DayDensityTiles({ days, level, onPick, heading }: {
     </div>
   )
 }
+
+/** One weekend as the menu offers it: its Saturday, and its two days with what
+ *  each already holds (absent when the window does not cover them). */
+export interface WeekendChoice {
+  saturday: Date
+  /** "Sep 5–6", or "Oct 31 – Nov 1" across a month edge. */
+  label: string
+  days?: readonly DayChoice[]
+  /** This weekend is the row's saved weekend, with no day chosen. */
+  current?: boolean
+}
+
+/**
+ * "A weekend" — the flexible weekend (flexible-weekend.md): Saturday AND
+ * Sunday, either day, never silently Saturday. Each weekend offers itself
+ * first, then its two days for anyone who does want to pick one. The days
+ * wear the same bars as the day tiles, scaled across every weekend day shown,
+ * so a busy Saturday reads as busy next to the others.
+ */
+export function WeekendChoices({ weekends, level, onPickWeekend, onPickDay, heading }: {
+  weekends: readonly WeekendChoice[]
+  level: (d: DayDensity) => number
+  onPickWeekend: (saturday: Date) => void
+  onPickDay: (saturday: Date, day: Date) => void
+  heading: string
+}) {
+  return (
+    <div className="px-2 pb-1">
+      <p className="px-1 pt-1 text-[10px] font-semibold uppercase tracking-wider text-neutral-400" aria-hidden="true">
+        {heading}
+      </p>
+      {weekends.some((w) => w.days) && <p className="px-1 pb-1 text-[10px] text-neutral-400">{DENSITY_SCOPE}</p>}
+      <div className="space-y-1.5">
+        {weekends.map((w) => (
+          <div key={w.label} role="group" aria-label={`Weekend ${w.label}`} className="rounded-lg bg-neutral-50 p-1">
+            <button
+              type="button"
+              role="menuitemradio"
+              aria-checked={!!w.current}
+              aria-label={`Plan for the weekend of ${w.label}, either day${w.days ? `. ${w.days.map((d) => densityDescription(d.density, `${d.label}, ${d.dateLabel}`)).join('. ')}` : ''}`}
+              onClick={() => onPickWeekend(w.saturday)}
+              className={`flex w-full items-center gap-1.5 rounded-md px-2 py-1 text-left text-[13px] transition-colors ${
+                w.current ? 'bg-primary-50 font-semibold text-primary-700 ring-1 ring-primary-200' : 'text-neutral-700 hover:bg-primary-50 hover:text-primary-700'
+              }`}
+            >
+              <CalendarDays className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+              <span className="truncate">{w.label}</span>
+              <span className="ml-auto shrink-0 text-[11px] font-normal text-neutral-400">either day</span>
+            </button>
+            {w.days && (
+              <div className="mt-1 grid grid-cols-2 gap-1">
+                {w.days.map((day) => (
+                  <button
+                    key={day.dateLabel}
+                    type="button"
+                    role="menuitemradio"
+                    aria-checked={!!day.current}
+                    aria-label={`Plan for ${densityDescription(day.density, `${day.label}, ${day.dateLabel}`)}, keeping the weekend`}
+                    onClick={() => onPickDay(w.saturday, day.date)}
+                    className={`flex flex-col rounded-md px-2 py-1 text-left transition-colors ${
+                      day.current ? 'bg-primary-50 text-primary-700 ring-1 ring-primary-200' : 'bg-white text-neutral-700 hover:bg-primary-50 hover:text-primary-700'
+                    }`}
+                  >
+                    <span className="text-[12px] font-medium">{day.label} <span className="font-normal text-neutral-400">{day.dateLabel}</span></span>
+                    <Bar density={day.density} level={level(day.density)} />
+                    <span className="sr-only">{densityCountLabel(day.density)}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
