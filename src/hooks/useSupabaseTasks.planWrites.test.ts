@@ -164,10 +164,45 @@ function createFakeDb() {
     }
   }
 
+  /**
+   * apply_task_placement, faithfully enough: the steps run through the same
+   * table semantics and triggers as the separate requests, and if ANY step
+   * fails every table is put back as it was — one transaction. The log shows
+   * one `rpc:apply_task_placement`, not the steps inside it.
+   */
+  async function rpc(name: string, args: { p_task_id: string; p_steps: Array<Record<string, unknown>> }): Promise<Result> {
+    if (name !== 'apply_task_placement') return { data: null, error: { message: `unknown rpc ${name}` } }
+    writes.push({ table: 'rpc', op: 'update' })
+    rpcCalls.push(args)
+    const snapshot = new Map([...tables].map(([k, v]) => [k, v.map((r) => ({ ...r }))]))
+    const logged = writes.length
+    const id = args.p_task_id
+    for (const st of args.p_steps) {
+      let q: Query
+      if (st.t === 'row') q = new Query('tasks').update(st.set as Row).eq('id', id)
+      else if (st.t === 'ensure') q = new Query('task_commitments').upsert({ task_id: id, level: st.level, period_start: st.period_start, status: 'open', ended_at: null, carried_to: null }, { onConflict: 'task_id,level,period_start' })
+      else if (st.t === 'remove') q = new Query('task_commitments').update({ status: 'removed' }).eq('task_id', id).eq('level', st.level).eq('period_start', st.period_start).eq('status', 'open')
+      else if (st.t === 'carry') q = new Query('task_commitments').update({ status: 'carried', carried_to: st.to }).eq('task_id', id).eq('level', st.level).eq('period_start', st.period_start).eq('status', 'open')
+      else if (st.t === 'focus_set') q = new Query('task_focus').upsert({ task_id: id, user_id: st.user_id, date: st.date }, { onConflict: 'task_id,user_id,date' })
+      else q = new Query('task_focus').delete().eq('task_id', id).eq('user_id', st.user_id)
+      const { error } = await q
+      if (error) {
+        tables.clear(); for (const [k, v] of snapshot) tables.set(k, v)
+        writes.length = logged
+        return { data: null, error }
+      }
+    }
+    writes.length = logged
+    return { data: {}, error: null }
+  }
+  const rpcCalls: Array<{ p_task_id: string; p_steps: Array<Record<string, unknown>> }> = []
+
   return {
     from: (table: string) => new Query(table),
+    rpc,
+    rpcCalls: () => rpcCalls,
     reset() {
-      tables.clear(); inserted.clear(); writes.length = 0
+      tables.clear(); inserted.clear(); writes.length = 0; rpcCalls.length = 0
       this.clearFailures()
     },
     seed(table: string, row: Row) { rows(table).push(row) },
@@ -206,6 +241,7 @@ vi.mock('@/lib/supabase', () => ({
       return ch
     }),
     from: (table: string) => db.from(table),
+    rpc: (name: string, args: { p_task_id: string; p_steps: Array<Record<string, unknown>> }) => db.rpc(name, args),
   },
 }))
 
@@ -845,5 +881,101 @@ describe('Keep: destination first, carry second, row last', () => {
     await act(async () => { r = await h.result.current.keepForward('t1', { weekStart: new Date(2026, 8, 27) }, new Date(2026, 8, 20)) })
     expect(r).toBe('t1')
     expect(row().weekend_start).toBeNull()
+  })
+})
+
+// The switch ON: one transactional save instead of separate requests. The
+// fake's apply_task_placement runs the same steps through the same triggers
+// and puts every table back if any step fails.
+describe('transactional placement (VITE_PLACEMENT_RPC=true)', () => {
+  beforeEach(() => { vi.stubEnv('VITE_PLACEMENT_RPC', 'true') })
+  afterEach(() => { vi.unstubAllEnvs() })
+
+  const WEEK = '2026-09-20'
+  const seedWeek = (over: Row = {}) => {
+    db.seed('tasks', dbTaskRow({ id: 't1', title: 'Gutters', bucket: 'week', week_start: WEEK, ...over }))
+    db.seed('task_commitments', { id: 'cw', task_id: 't1', level: 'week', period_start: WEEK, status: 'open', carried_to: null, ended_at: null })
+  }
+  const mount = async () => {
+    const hook = renderHook(() => useSupabaseTasks())
+    await waitFor(() => expect(hook.result.current.tasks.find((t) => t.id === 't1')).toBeTruthy())
+    db.clearWriteLog()
+    return hook
+  }
+  const row = () => db.rows('tasks').find((r) => r.id === 't1')!
+  const snapshot = () => JSON.stringify({ t: db.rows('tasks'), c: db.rows('task_commitments'), f: db.rows('task_focus') })
+
+  it('Drop is one call: removal then row, and it lands', async () => {
+    seedWeek({ weekend_start: '2026-09-26' })
+    const h = await mount()
+    let r: boolean | undefined
+    await act(async () => { r = await h.result.current.dropCommitment('t1', 'week', new Date(2026, 8, 20)) })
+    expect(r).toBe(true)
+    expect(db.writeLog()).toEqual(['rpc:update'])
+    expect(db.rpcCalls()[0].p_steps.map((st) => st.t)).toEqual(['remove', 'row'])
+    expect(row().bucket).toBe('inbox')
+    expect(row().weekend_start).toBeNull()
+  })
+
+  it('Drop whose row step fails leaves NOTHING written, and says it failed', async () => {
+    seedWeek({ weekend_start: '2026-09-26' })
+    const h = await mount()
+    const before = snapshot()
+    db.failOnce('tasks', 'update', { message: 'boom', code: 'XX000' })
+    let r: boolean | undefined
+    await act(async () => { r = await h.result.current.dropCommitment('t1', 'week', new Date(2026, 8, 20)) })
+    expect(r).toBe(false)
+    expect(snapshot()).toBe(before)                                      // the removal was rolled back too
+    expect(h.result.current.tasks.find((t) => t.id === 't1')!.commitments!.find((c) => c.level === 'week')!.status).toBe('open')
+  })
+
+  it('Keep is one call — ensure, carry, row — and a failed carry rolls back the ensure', async () => {
+    const h0 = await mountWith([monthTask('t1', sep)])
+    db.clearWriteLog()
+    const before = snapshot()
+    db.failOnce('task_commitments', 'update', { message: 'boom', code: 'XX000' })
+    let r: string | undefined = 'x'
+    await act(async () => { r = await h0.result.current.keepForward('t1', { monthStart: oct }, sep) })
+    expect(r).toBeUndefined()
+    expect(snapshot()).toBe(before)                                      // no orphan October
+    await act(async () => { r = await h0.result.current.keepForward('t1', { monthStart: oct }, sep) })
+    expect(r).toBe('t1')
+    expect(db.rpcCalls().at(-1)!.p_steps.map((st) => st.t)).toEqual(['ensure', 'carry', 'row'])
+    expect(db.rows('task_commitments').find((c) => c.task_id === 't1' && c.period_start === '2026-09-01')!.status).toBe('carried')
+  })
+
+  it('a placement-only updateTask is one call; a save that also changes the title uses the ordinary requests', async () => {
+    const h = await mountWith([monthTask('t1', sep)])
+    db.clearWriteLog()
+    let ok: boolean | undefined
+    await act(async () => { ok = await h.result.current.updateTask('t1', { bucket: 'week', weekStart: new Date(2026, 8, 20) }) })
+    expect(ok).toBe(true)
+    expect(db.writeLog()).toEqual(['rpc:update'])
+    expect(db.rows('task_commitments').some((c) => c.task_id === 't1' && c.level === 'week' && c.status === 'open')).toBe(true)
+    db.clearWriteLog()
+    await act(async () => { ok = await h.result.current.updateTask('t1', { title: 'Renamed', bucket: 'week', weekStart: new Date(2026, 8, 27) }) })
+    expect(ok).toBe(true)
+    expect(db.writeLog()).toContain('tasks:update')
+    expect(db.writeLog()).not.toContain('rpc:update')
+  })
+
+  it('a failed placement-only updateTask writes nothing and restores the task', async () => {
+    const h = await mountWith([monthTask('t1', sep)])
+    const before = snapshot()
+    db.failOnce('task_commitments', 'upsert', { message: 'boom', code: 'XX000' })
+    let ok: boolean | undefined
+    await act(async () => { ok = await h.result.current.updateTask('t1', { bucket: 'week', weekStart: new Date(2026, 8, 20) }) })
+    expect(ok).toBe(false)
+    expect(snapshot()).toBe(before)
+    expect(h.result.current.tasks.find((t) => t.id === 't1')!.bucket).toBe('month')
+  })
+
+  it('with the switch OFF nothing calls the function', async () => {
+    vi.unstubAllEnvs()
+    seedWeek()
+    const h = await mount()
+    await act(async () => { await h.result.current.dropCommitment('t1', 'week', new Date(2026, 8, 20)) })
+    expect(db.rpcCalls()).toHaveLength(0)
+    expect(db.writeLog()).toEqual(['task_commitments:update', 'tasks:update'])
   })
 })

@@ -13,6 +13,7 @@ import { monthStartOf, isPlacement } from '@/lib/planning/periodPlacement'
 import { stepsThatCarryForward } from '@/lib/planning/goalSteps'
 import { readSeasons, seasonStartFor } from '@/lib/cadence/seasons'
 import { planPlacement, planKeep, planDropCommitment, commitmentRow, isPlacementWrite, type PlacementPlan } from '@/lib/placement/intentions'
+import { placementRpcEnabled, isPlacementOnlyRow, rowStep, commitmentSteps, focusStep, type PlacementStep } from '@/lib/placement/placementSteps'
 import type { TaskCommitment, TaskFocusEntry, PlacementLevel } from '@/types/task'
 import { committedTo, deriveCache, focusSnapshot } from '@/lib/placement/model'
 import { onRealtimeResumed } from '@/lib/realtime/keepAlive'
@@ -1477,6 +1478,25 @@ export function useSupabaseTasks() {
     return allOk
   }, [user])
 
+  /**
+   * The same writes as one transaction (apply_task_placement), when the build
+   * switch is on — see src/lib/placement/placementSteps.ts. All land or none
+   * do, so a failure leaves nothing to reconcile but the local optimism.
+   */
+  const applyPlacementAtomically = useCallback(async (taskId: string, steps: PlacementStep[]): Promise<boolean> => {
+    try {
+      const { error } = await supabase.rpc('apply_task_placement', { p_task_id: taskId, p_steps: steps })
+      if (error) {
+        console.error('[placement] transactional save failed:', error.message)
+        return false
+      }
+      return true
+    } catch (e) {
+      console.error('[placement] transactional save failed:', e)
+      return false
+    }
+  }, [])
+
   const writePlacementOps = useCallback(async (taskId: string, plan: PlacementPlan, before?: Task): Promise<boolean> => {
     let allOk = await writeCommitmentOps(taskId, plan.commitmentOps)
     if (!allOk) showToast(PARTIAL_SAVE_MESSAGE, 'error', 4000)
@@ -1630,6 +1650,11 @@ export function useSupabaseTasks() {
         return false
       }
       const ensureFirst = [...plan.commitmentOps.filter((op) => op.op === 'ensure'), ...plan.commitmentOps.filter((op) => op.op !== 'ensure')]
+      if (placementRpcEnabled()) {
+        if (!(await applyPlacementAtomically(t.id, [...commitmentSteps(ensureFirst), rowStep(placementRowDb(plan.row))]))) return failed()
+        announceLocalWrite({ kind: 'update', task: plan.local })
+        return true
+      }
       if (!(await writeCommitmentOps(t.id, ensureFirst, { stopOnFailure: true }))) return failed()
       let rowError: unknown = null
       try {
@@ -1664,7 +1689,7 @@ export function useSupabaseTasks() {
     // verdict and retries; the goal's own carry is idempotent (planKeep sees
     // the source already carried and only ensures the destination).
     return allStepsOk ? task.id : undefined
-  }, [findTaskById, ensureReconciled, writeCommitmentOps, reconcileTaskPlacement])
+  }, [findTaskById, ensureReconciled, writeCommitmentOps, reconcileTaskPlacement, applyPlacementAtomically])
 
   /**
    * Drop: end ONE period commitment. The task is kept (spec: guided planning).
@@ -1708,6 +1733,12 @@ export function useSupabaseTasks() {
       return false
     }
 
+    if (placementRpcEnabled()) {
+      // One transaction: the same removals then the same row, or nothing.
+      if (!(await applyPlacementAtomically(id, [...commitmentSteps(plan.commitmentOps), rowStep(placementRowDb(plan.row))]))) return failed()
+      announceLocalWrite({ kind: 'update', task: plan.local })
+      return true
+    }
     if (!(await writeCommitmentOps(id, plan.commitmentOps, { stopOnFailure: true }))) return failed()
     let rowError: unknown = null
     try {
@@ -1721,7 +1752,7 @@ export function useSupabaseTasks() {
     }
     announceLocalWrite({ kind: 'update', task: plan.local })
     return true
-  }, [ensureReconciled, writeCommitmentOps, reconcileTaskPlacement])
+  }, [ensureReconciled, writeCommitmentOps, reconcileTaskPlacement, applyPlacementAtomically])
 
   const updateTask = useCallback(async (id: string, updates: Partial<Task>) => {
     logger.debug('[updateTask] Called with:', { id, updates })
@@ -1919,6 +1950,33 @@ export function useSupabaseTasks() {
     // stated focus list that changes nothing (un-choosing a day that was not
     // chosen) names no column either — no empty UPDATE for that.
     const recordsOnly = Object.keys(dbUpdates).length === 0
+
+    // The transactional path (switch on): a PLACEMENT save that writes only
+    // placement columns goes as one apply_task_placement call, in this
+    // writer's own order — the row, the records, the let-go re-assert, the
+    // focus. A save that also changes anything else (a title, a domain)
+    // keeps the ordinary requests: the function writes placement only.
+    const hasRecords = plan.commitmentOps.length > 0 || plan.focusOps.length > 0
+    // A group move (its children follow in a separate write) stays on the
+    // ordinary path too: the function saves one task.
+    if (placementRpcEnabled() && hasRecords && childrenToMove.length === 0 && (recordsOnly || isPlacementOnlyRow(dbUpdates))) {
+      const letGo = (plan.row.bucket === 'someday' || plan.row.bucket === 'inbox') && plan.commitmentOps.some((op) => op.op === 'remove')
+      const steps: PlacementStep[] = [
+        ...(recordsOnly ? [] : [rowStep(dbUpdates)]),
+        ...commitmentSteps(plan.commitmentOps),
+        ...(letGo ? [rowStep(placementRowDb(plan.row))] : []),
+        ...plan.focusOps.map(focusStep),
+      ]
+      if (!(await applyPlacementAtomically(id, steps))) {
+        // Nothing was written: the task is exactly what it was.
+        setTasksNow(tasksRef, setTasks, (prev) => patchTaskRecords(prev, id, () => task!))
+        showToast('Failed to update task', 'error', 3000)
+        return false
+      }
+      announceLocalWrite({ kind: 'update', task: { ...task, ...updates } })
+      return true
+    }
+
     const { data, error: updateError, status, count } = recordsOnly
       ? { data: [{ id }] as unknown[], error: null, status: 200, count: 1 }
       : await supabase
