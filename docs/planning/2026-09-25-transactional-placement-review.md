@@ -191,3 +191,45 @@ PATCH would store NULL. The app always sends `?? 0`.
 - Group moves, and saves mixed with non-placement fields, on the transactional
   path. They stay on the ordinary requests; extending them would need a wider
   function.
+
+## Applied — 2026-09-25 08:30 UTC (Scott approved)
+
+`apply_migration('apply_task_placement')` applied the file **byte-for-byte as
+reviewed** at 12a3afc0 (sha256 `d4b4ef73…882b`). The header's "NOT
+APPLIED" wording is left as reviewed; this section is the record. The
+**switch is still off**, so the app does not call the function yet.
+
+**Read-only preflight, before applying.**
+- The function did not exist.
+- All 11 written columns exist with the expected types.
+- The live triggers on `tasks`, `task_commitments` and `task_focus` are the
+  same 6 as the fixture.
+- Unique keys match.
+- The trigger functions and helpers (10) match the fixture by
+  `md5(pg_get_functiondef)`. So the local 99/99 proof ran against the live
+  logic.
+
+**Installed.**
+- One version, `apply_task_placement(uuid,jsonb,jsonb)`; no 2-argument
+  version.
+- `prosecdef=false`; `search_path=public, pg_temp`.
+- anon cannot execute; authenticated can.
+- The body md5 equals the reviewed file's body.
+
+**Live checks: one transaction, rolled back.** Afterwards 0 rows and 0
+records remain.
+
+| # | Check | Result |
+|---|---|---|
+| 1 | Owner's save: remove 09-20, ensure 09-27, row | ok — open = 09-27, row week 09-27 |
+| 2 | Stale plan (expected 09-20 after the move) | **40001**, open still 09-27 |
+| 3 | A later step fails (`title` in the row step) | **22023**; the earlier remove/ensure rolled back (09-27 still open, no 10-04); title unchanged |
+| 4 | Outsider (other household) | **42501** |
+| 5 | Household partner on a couple task | ok — open = 10-04 |
+| 6 | anon | **42501** permission denied for function |
+
+**Still pending** (each needs approval):
+- The PostgREST-level rollback observation (step 4 of the rollout).
+- A two-account check from real signed-in sessions.
+- Preview with `VITE_PLACEMENT_RPC=true`.
+- A staged production turn-on.

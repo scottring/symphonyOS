@@ -1968,3 +1968,7 @@ rollout verification, and each step needs Scott's approval: migration
 approval → apply → live RPC rollback check → two-account check → preview with
 `VITE_PLACEMENT_RPC=true`. Still pending: calendar verification. Still on the
 older path: mixed saves and group moves.
+
+**2026-09-25 08:30 UTC — migration APPLIED** (Scott approved). Unchanged from the reviewed
+file; the switch is still off. Live rolled-back checks 6/6; nothing remains.
+See the "Applied" section of `docs/planning/2026-09-25-transactional-placement-review.md`.

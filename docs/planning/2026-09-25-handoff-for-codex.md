@@ -104,3 +104,17 @@ pending. Mixed saves and group moves stay on the ordinary path.
   - PG 100 **99/99**; 096–099 unchanged and passing;
   - tsc clean, eslint 0 errors, build clean.
 - Still not applied; the switch stays off.
+
+## Applied — 2026-09-25 08:30 UTC (Scott approved)
+
+The migration was applied unchanged; the switch is still off. Preflight: the
+live triggers and helper function bodies match the fixture by hash.
+Installed-function checks pass. A live rolled-back transaction checked six
+cases: success; stale → 40001; a failing later step rolls back earlier steps;
+outsider → 42501; partner ok; anon denied. Nothing remains. Details are in the
+"Applied" section of `2026-09-25-transactional-placement-review.md`.
+
+Next steps need approval:
+- PostgREST rollback observation;
+- two-account signed-in check;
+- preview with the switch on.
