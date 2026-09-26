@@ -47,6 +47,7 @@ import { WeekJournal, type JournalDay, type JournalEntry } from './WeekJournal'
 import type { DensitySources } from '@/lib/planning/dayDensity'
 import { formatWeekRange } from '@/lib/dateHelpers'
 import { WeekList } from './WeekList'
+import { monthStartOf } from '@/lib/planning/periodPlacement'
 import { makePlanActions } from '@/lib/planning/planActions'
 import { focusDays, sameDay } from '@/lib/placement/model'
 import type { PlanDragPayload } from '@/lib/planning/planDrag'
@@ -943,10 +944,32 @@ export function WeekViewV2(props: WeekViewV2Props) {
         onPickWeek={(weekStart) => { void onUpdateTask(task.id, { bucket: 'week', weekStart, scheduledFor: undefined }) }}
         onClearWeek={hasTiming(t) ? () => removeTiming('all') : undefined}
         onRemoveDay={t.day ? () => removeTiming('day') : undefined}
-        onPickDay={(date) => { void onUpdateTask(task.id, { bucket: 'timed', scheduledFor: date, isAllDay: true }) }}
+        onPickDay={(date) => {
+          void (async () => {
+            if ((await onUpdateTask(task.id, { bucket: 'timed', scheduledFor: date, isAllDay: true })) === false) return
+            // Where it went and the way there; no time is implied (horizon flows).
+            const isToday = localYmd(date) === localYmd(new Date())
+            showToast(`Planned “${task.title}” for ${isToday ? 'today' : date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })} — any time that day. It stays on this week.`, 'success', 6000, {
+              label: isToday ? 'Open Today' : 'Open day',
+              onClick: () => navigate(isToday ? '/today' : `/today?date=${localYmd(date)}`),
+            })
+          })()
+        }}
       />
     )
-  }, [weekAnchor, onUpdateTask, dayChoices])
+  }, [weekAnchor, onUpdateTask, dayChoices, navigate])
+
+  /** The month's open goals, for the week's add box: the month this week
+   *  mostly lives in, as the week session reads it. */
+  const weekGoals = useMemo(() => {
+    const month = monthStartOf(new Date(weekAnchor.getTime() + 3 * 86_400_000))
+    return {
+      label: month.toLocaleDateString('en-US', { month: 'long' }),
+      goals: tasks
+        .filter((t) => t.isGoal && !t.completed && t.bucket === 'month' && t.monthStart && localYmd(t.monthStart) === localYmd(month))
+        .map((t) => ({ id: t.id, title: t.title })),
+    }
+  }, [tasks, weekAnchor])
 
   const weekListFor = (onPlan: () => void) => (
     <WeekList
@@ -959,14 +982,20 @@ export function WeekViewV2(props: WeekViewV2Props) {
       peopleFiltered={Array.isArray(selectedAssignees) ? selectedAssignees.length > 0 : !!selectedAssignees}
       onToggle={(task) => handleJournalToggle({ id: `task-${task.id}`, kind: 'task', title: task.title, completed: task.completed, task }, journalDays[0])}
       onSelect={(id) => onSelectItem(`task-${id}`)}
-      onAdd={async (title) => {
-        const id = await addTask(title, undefined, undefined, undefined, { bucket: 'week', weekStart: weekAnchor, assignedTo: meId ?? undefined })
+      goals={weekGoals.goals}
+      goalsLabel={weekGoals.label}
+      onAdd={async (title, goalId) => {
+        // Toward a goal: its next action, born in the goal's life area (the
+        // rule the month page's next-action box follows). The goal stays on
+        // its month; only the action is on the week.
+        const goal = goalId ? tasks.find((t) => t.id === goalId) : undefined
+        const id = await addTask(title, undefined, undefined, undefined, { bucket: 'week', weekStart: weekAnchor, assignedTo: meId ?? undefined, goalTaskId: goal?.id, context: goal?.context ?? undefined })
         if (!id) throw new Error('Task creation failed')
-        const hidden = !layers.has('unsorted')
+        const hidden = goal?.context ? !layers.has(goal.context) : !layers.has('unsorted')
         // ONE notification per add (S3-12): the Undo carries what the old
         // second toast said. A row the current view hides still warns on its
         // own, because that is news the Undo line does not give.
-        const where = 'to the week · Unsorted · only you'
+        const where = goal ? `to the week · toward “${goal.title}”` : 'to the week · Unsorted · only you'
         if (pushAction) pushAction(`Added "${title}" ${where}`, () => { void deleteTask(id) })
         else showToast(`Added ${where}`, 'success')
         if (hidden) showToast('Hidden by your current view — turn on Unsorted to see it', 'warning', 8000)

@@ -1,0 +1,13 @@
+import { open, shot, BASE } from './pw.mjs'
+const { browser, page } = await open()
+await page.goto(BASE + '/today'); await page.waitForTimeout(3000)
+await page.getByText('Choose chairs').first().click(); await page.waitForTimeout(1200)
+await page.getByRole('button', { name: /^Schedule$/ }).last().click(); await page.waitForTimeout(500)
+await page.getByRole('button', { name: /Pick date & time/ }).click(); await page.waitForTimeout(500)
+await page.locator('input[type=date]').fill('2026-09-26'); await page.locator('input[type=time]').fill('14:00')
+await page.waitForTimeout(400); const set = page.locator("button").filter({ hasText: /^Set/ }).first(); console.log('set btn:', await set.innerText()); await set.click()
+await page.waitForTimeout(1500); await page.keyboard.press('Escape')
+await page.goto(BASE + '/today'); await page.waitForTimeout(3000)
+await shot(page, '44-today-timed')
+console.log('TODAY:', (await page.locator('main').innerText()).replace(/\n+/g, ' | ').slice(0, 500))
+await browser.close()

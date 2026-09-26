@@ -46,6 +46,9 @@ export function PlanSession({ level, aboveLabel, dayOptions = [], periodLabel: P
   const [taskText, setTaskText] = useState('')
   const [taskToward, setTaskToward] = useState('')
   const [taskDay, setTaskDay] = useState('')
+  // Month and season plan in outcomes; the single-action box is the second
+  // route, one press away (horizon flows, 2026-09-26). The week IS actions.
+  const [addingTask, setAddingTask] = useState(false)
   const week = level === 'week'
   const season = level === 'season'
   const year = level === 'year'
@@ -62,10 +65,10 @@ export function PlanSession({ level, aboveLabel, dayOptions = [], periodLabel: P
       : year
       ? 'Goals only. Seasons and months plan the work.'
       : season
-      ? `Write ${P}'s goals with ${aboveLabel} beside you, then the tasks that move them. Goals are never scheduled.`
-      : `Write ${P}'s goals with the season beside you, then the tasks that move them. Goals are never scheduled.`,
+      ? `Write ${P}'s goals and projects with ${aboveLabel} beside you. Goals stay on the season; their next actions are planned into weeks.`
+      : `Write ${P}'s goals and projects with the season beside you. Goals stay on the month; their next actions are planned into weeks.`,
     saveHead: week ? 'Here\'s the week' : year ? `Here's ${P}` : `Here's ${P}'s plan`,
-    taskHead: week ? weekTaskListLabel(P) : `${P} tasks`,
+    taskHead: week ? weekTaskListLabel(P) : 'Single actions and next actions',
     marker: week ? `· on ${P}` : `· in ${P}`,
     aboveEmpty: season ? `${aboveLabel} has no goals yet.` : `${aboveLabel} has no list yet.`,
     goalForWord: season ? aboveLabel : 'season',
@@ -110,10 +113,15 @@ export function PlanSession({ level, aboveLabel, dayOptions = [], periodLabel: P
   const savedGoals = week ? [] : current.filter((t) => t.isGoal)
   const savedTasks = current.filter((t) => !t.isGoal)
   // A task toward a goal belongs to the goal's domain; a loose one to the domain in view.
-  const towardOptions = [
-    ...monthGoals.map((g) => ({ id: g.id, title: g.title, context: g.context ?? null })),
-    ...draft.newGoals.map((g) => ({ id: g.id, title: g.title, context: g.context ?? null })),
-  ]
+  // On a week the goals are the MONTH's (the rung above): a new week task
+  // written toward one is that goal's next action, with the goal kept whole
+  // on its month (horizon flows).
+  const towardOptions = week
+    ? aboveGoals.map((g) => ({ id: g.id, title: g.title, context: g.context ?? null }))
+    : [
+      ...monthGoals.map((g) => ({ id: g.id, title: g.title, context: g.context ?? null })),
+      ...draft.newGoals.map((g) => ({ id: g.id, title: g.title, context: g.context ?? null })),
+    ]
   // Is there anything for Save to write? A reflection note counts: it is
   // saved on the session record even when no row changed.
   const nothingToSave = useMemo(() => {
@@ -147,6 +155,12 @@ export function PlanSession({ level, aboveLabel, dayOptions = [], periodLabel: P
   // contradicted the sentence saying nothing would be (Codex, 2026-09-24).
   const changing = useMemo(() => lines.filter((l) => !l.unchanged), [lines])
   const untouched = useMemo(() => lines.filter((l) => l.unchanged), [lines])
+
+  /** "+ Add to <week>" for one row of the level above, or its marker once taken. */
+  const aboveAdd = (a: Task) => (step === 'plan' ? (draft.takenFromAbove.includes(a.id)
+    ? <span className="ml-1 text-[12px] font-semibold text-sage-600">{copy.marker}</span>
+    : <button type="button" aria-label={`Add to ${P}: ${a.title}`} className="block text-[12px] font-semibold text-primary-700"
+        onClick={() => set({ takenFromAbove: [...draft.takenFromAbove, a.id] })}>+ Add to {P}</button>) : null)
 
   const steps: Array<[Step, string]> = [['back', `Look back at ${Q}`], ['plan', `Plan ${P}`], ['save', 'Save']]
   const idx = steps.findIndex(([s]) => s === step)
@@ -298,12 +312,12 @@ export function PlanSession({ level, aboveLabel, dayOptions = [], periodLabel: P
                   {aboveGoals.map((g) => <option key={g.id} value={g.id}>{g.title}</option>)}
                 </select>
               )}
-              <button type="submit" className="rounded-md border border-neutral-200 px-3 text-sm font-semibold">Add goal</button>
+              <button type="submit" className="rounded-md bg-primary-600 px-3 text-sm font-semibold text-white">Add goal</button>
             </form>
             </>)}
 
             {!year && (<>
-            <h3 className="mt-5 border-b border-neutral-300 pb-1 font-display text-lg text-neutral-800">{copy.taskHead}</h3>
+            <h3 className={`mt-5 border-b border-neutral-300 pb-1 font-display ${week ? 'text-lg text-neutral-800' : 'text-base text-neutral-700'}`}>{copy.taskHead}{!week && <span className="ml-1.5 font-sans text-[12px] text-neutral-400">optional</span>}</h3>
             {week && (
               <div className="mt-2">
                 <Hint name="week-list" uid={uid}>Adding a month task here puts it on this week's list too. The month keeps it and shows "on this week".</Hint>
@@ -330,6 +344,11 @@ export function PlanSession({ level, aboveLabel, dayOptions = [], periodLabel: P
                   <button type="button" className="text-[12px] text-primary-700" onClick={() => set({ takenFromAbove: draft.takenFromAbove.filter((id) => id !== a.id) })}>Remove</button>
                 </li>))}
             </ul>
+            {!week && !addingTask && draft.newTasks.length === 0 ? (
+              <button type="button" onClick={() => setAddingTask(true)} className="mt-2 text-[13px] text-neutral-500 hover:text-primary-700">
+                + Add a single action or a next action
+              </button>
+            ) : (
             <form className="mt-2 flex flex-wrap gap-2" onSubmit={(e) => {
               e.preventDefault()
               const title = taskText.trim()
@@ -344,14 +363,15 @@ export function PlanSession({ level, aboveLabel, dayOptions = [], periodLabel: P
                   {dayOptions.map((o) => <option key={o.ymd} value={o.ymd}>{o.label}</option>)}
                 </select>
               )}
-              {!week && towardOptions.length > 0 && (
-                <select aria-label={`Toward a ${P} goal`} className="rounded-md border border-neutral-200 px-2 text-sm" value={taskToward} onChange={(e) => setTaskToward(e.target.value)}>
-                  <option value="">Toward a {P} goal? (optional)</option>
+              {towardOptions.length > 0 && (
+                <select aria-label={week ? `Toward a goal for ${aboveLabel}` : `Toward a goal for ${P}`} className="rounded-md border border-neutral-200 px-2 text-sm" value={taskToward} onChange={(e) => setTaskToward(e.target.value)}>
+                  <option value="">{week ? `Toward a goal for ${aboveLabel}? (optional)` : `Toward a goal for ${P}? (optional)`}</option>
                   {towardOptions.map((o) => <option key={o.id} value={o.id}>{o.title}</option>)}
                 </select>
               )}
               <button type="submit" className="rounded-md border border-neutral-200 px-3 text-sm font-semibold">Add task</button>
             </form>
+            )}
             </>)}
           </section>
         )}
@@ -450,8 +470,21 @@ export function PlanSession({ level, aboveLabel, dayOptions = [], periodLabel: P
         <aside className="min-w-0 rounded-xl bg-neutral-50 p-3 lg:sticky lg:top-3">
           <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-neutral-400">{aboveLabel}</p>
           <ul className="mt-1">
-            {aboveGoals.map((g) => <li key={g.id} className="flex items-center gap-1.5 border-t border-neutral-200 py-1.5 text-[13px] text-neutral-700"><Target className="h-3.5 w-3.5 text-accent-600" />{g.title}</li>)}
-            {above.map((a) => (
+            {aboveGoals.map((g) => (
+              <li key={g.id} className="border-t border-neutral-200 py-1.5 text-[13px] text-neutral-700">
+                <span className="flex items-center gap-1.5"><Target className="h-3.5 w-3.5 shrink-0 text-accent-600" />{g.title}</span>
+                {/* On the week, the goal's own next actions sit under it — the
+                    parent in view while its actions are chosen. */}
+                {week && above.some((a) => a.goalTaskId === g.id) && (
+                  <ul className="ml-5 mt-0.5">
+                    {above.filter((a) => a.goalTaskId === g.id).map((a) => (
+                      <li key={a.id} className="py-1 text-[13px] text-neutral-700">{a.title}{aboveAdd(a)}</li>
+                    ))}
+                  </ul>
+                )}
+              </li>
+            ))}
+            {above.filter((a) => !(week && a.goalTaskId && aboveGoals.some((g) => g.id === a.goalTaskId))).map((a) => (
               <li key={a.id} className="border-t border-neutral-200 py-1.5 text-[13px] text-neutral-700">
                 {a.title}
                 {step === 'plan' && (draft.takenFromAbove.includes(a.id)
