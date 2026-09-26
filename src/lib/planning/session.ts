@@ -265,7 +265,11 @@ export function summarize(
     lines.push({ title: g.title, destination: `${L.goals}${forTitle ? ` · for ${forTitle}` : ''}` })
   }
   for (const n of d.newTasks) {
-    const toward = n.linkId ? goalTitle.get(n.linkId) ?? ctx.open.find((t) => t.id === n.linkId)?.title : undefined
+    // A new task may serve a goal written in this session, one already on the
+    // period, or (on a week) one of the month's goals above.
+    const toward = n.linkId
+      ? goalTitle.get(n.linkId) ?? [...ctx.open, ...(ctx.current ?? []), ...ctx.aboveGoals].find((t) => t.id === n.linkId)?.title
+      : undefined
     // A week task may name a day; the weekday is the whole of what it adds.
     const onDay = n.day ? `, on ${parseLocalYmd(n.day).toLocaleDateString('en-US', { weekday: 'short' })}` : ''
     lines.push({ title: n.title, destination: `${L.list}${toward ? ` · toward ${toward}` : ''}${onDay}` })

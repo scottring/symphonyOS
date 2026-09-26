@@ -72,6 +72,7 @@ import { MultiAssigneeDropdown } from '@/components/family'
 import { goalConversion } from '@/lib/planning/goalConversion'
 import { makeTaskAGoal } from './MakeGoalControl'
 import { NextLevelStrip } from './NextLevelStrip'
+import { RefineGoalControl } from './RefineGoalControl'
 import { nextLevelChoices } from '@/lib/planning/nextLevel'
 import { PeriodShelves } from './PeriodShelves'
 import { useDayLoadEvents, DAY_LOAD_RANGE_DAYS } from '@/hooks/useDayLoadEvents'
@@ -343,6 +344,25 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
     rescheduleRoutine: (id, from, when) => rescheduleInstance('routine', id, from, when),
     notify: (m) => showToast(m, 'warning'),
   }), [tasks, gated, setPlanned, rescheduleInstance])
+  /** The confirmation after work goes into a week: where it went, and the
+   *  way there — the week is where its days get planned (nested horizons). */
+  const plannedInto = useCallback((title: string, weekStart: Date, where: string, underGoal = false) => {
+    showToast(`Planned “${title}” for ${where}.${underGoal ? ` Its goal stays on this ${NOUN[level]}.` : ''}`, 'success', 6000, {
+      label: 'Open week',
+      onClick: () => navigate(`/week?start=${localYmd(weekStart)}`),
+    })
+  }, [navigate, level])
+  /** The same, for a day: where it is now, and the way to that day. A day
+   *  needs no time — the day's page is where a time is chosen, if ever. */
+  const plannedDay = useCallback(async (taskId: string, title: string, date: Date) => {
+    if (!(await planActions.chooseTaskDay(taskId, date))) return
+    const isToday = localYmd(date) === localYmd(new Date())
+    const label = date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
+    showToast(`Planned “${title}” for ${isToday ? 'today' : label} — any time that day.`, 'success', 6000, {
+      label: isToday ? 'Open Today' : 'Open day',
+      onClick: () => navigate(isToday ? '/today' : `/today?date=${localYmd(date)}`),
+    })
+  }, [planActions, navigate])
   const [planDropOver, setPlanDropOver] = useState(false)
   const monthDrop = level === 'month'
     ? planDropHandlers((payload) => { void planActions.drop(payload, { type: 'period', period: 'month' }) }, setPlanDropOver)
@@ -430,10 +450,10 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
       // The Today command (S4): dated today, all-day, and chosen for my
       // focus. The month or season commitment stays — a date never erases the
       // broader commitment.
-      await planActions.chooseTaskDay(row.id, new Date())
+      await plannedDay(row.id, row.title, new Date())
     }
     else if (action === 'under-goal') setPickingGoalFor(row.id)
-  }, [goals, updateGoal, addGoal, bounds.next, bounds.start, isPast, toggleTask, deleteTask, dropCommitment, gated, setGoal, keepForward, level, planActions, tasks, confirmGoalDone, lowerMonth])
+  }, [goals, updateGoal, addGoal, bounds.next, bounds.start, isPast, toggleTask, deleteTask, dropCommitment, gated, setGoal, keepForward, level, tasks, confirmGoalDone, lowerMonth, plannedDay])
 
   /**
    * "Assign people" on a goal or a step: the household picker the rest of the
@@ -574,30 +594,47 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
   // Two affordances, one writer. The shared input with a "Goal" toggle made
   // you set a mode before typing; a "+" on each list says which list you are
   // writing to (Scott, 2026-09-13).
+  // Goal-first (horizon flows, Scott, 2026-09-26): Year, Season and Month
+  // hold outcomes, so the goal box is always open and comes first. A single
+  // action is still one press away — "+ Add a single action" — but it is the
+  // secondary route, not the page's default.
   const [goalDraft, setGoalDraft] = useState('')
+  const [goalParent, setGoalParent] = useState('')
   const [taskDraft, setTaskDraft] = useState('')
-  const [addingGoal, setAddingGoal] = useState(false)
+  const [addingTask, setAddingTask] = useState(false)
   const goalInputRef = useRef<HTMLInputElement>(null)
 
-  const addRow = useCallback(async (title: string, asGoal: boolean) => {
+  /**
+   * Write one row onto this period. A goal may name the goal one rung up it
+   * supports — optional, and through the links that already exist: a month
+   * goal's `supportsGoalTaskId` (and the season goal's own year goal on
+   * `goalId`, so roll-up stays a flat filter, as the session writes it); a
+   * season goal's `goalId`. A new goal takes its parent's life area when
+   * nothing narrower is in view, so a Family outcome's refinement is Family.
+   */
+  const addRow = useCallback(async (title: string, asGoal: boolean, parentId?: string): Promise<string | undefined> => {
     const t = title.trim()
-    if (!t) return
+    if (!t) return undefined
     if (level === 'year') {
       const areaId = areas[0]?.id ?? (await addArea('General'))?.id
-      if (!areaId) return
+      if (!areaId) return undefined
       const g = await addGoal(areaId, t, soleDomain ?? undefined)
       const year = bounds.start.getFullYear()
       if (g && g.year !== year) await updateGoal(g.id, { year })
-      return
+      return g?.id
     }
-    await addTask(t, undefined, undefined, undefined, {
+    const parentTask = asGoal && parentId && level === 'month' ? tasks.find((x) => x.id === parentId) : undefined
+    const parentGoal = asGoal && parentId && level === 'season' ? goals.find((x) => x.id === parentId) : undefined
+    return addTask(t, undefined, undefined, undefined, {
       bucket: level === 'month' ? 'month' : 'quarter',
       monthStart: level === 'month' ? bounds.start : undefined,
       seasonStart: level === 'season' ? bounds.start : undefined,
       isGoal: asGoal,
-      context: soleDomain,
+      supportsGoalTaskId: parentTask?.id,
+      goalId: parentGoal?.id ?? parentTask?.goalId,
+      context: soleDomain ?? parentTask?.context ?? parentGoal?.context ?? undefined,
     })
-  }, [level, areas, addArea, addGoal, soleDomain, bounds.start, updateGoal, addTask])
+  }, [level, areas, addArea, addGoal, soleDomain, bounds.start, updateGoal, addTask, tasks, goals])
 
   // ── Steps under a goal ───────────────────────────────────────────────────
   // Which goals are open is REMEMBERED per period: opening a step, reading it
@@ -636,10 +673,10 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
     setShowCompletedSteps((v) => { writeOpen(completedStepsKey, !v); return !v })
   }, [completedStepsKey])
 
-  const addStep = useCallback(async (goalRow: PlanRowModel, title: string) => {
+  const addStep = useCallback(async (goalRow: PlanRowModel, title: string, weekStart?: Date) => {
     const t = title.trim()
     if (!t) return
-    await addTask(t, undefined, undefined, undefined, {
+    const id = await addTask(t, undefined, undefined, undefined, {
       bucket: level === 'month' ? 'month' : 'quarter',
       monthStart: level === 'month' ? bounds.start : undefined,
       seasonStart: level === 'season' ? bounds.start : undefined,
@@ -651,7 +688,19 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
       // domain in view, as before. Existing actions are never touched.
       context: tasks.find((t) => t.id === goalRow.id)?.context ?? soleDomain,
     })
-  }, [level, bounds.start, soleDomain, addTask, tasks])
+    // Planned into a week as it is written (horizon flows): the same write
+    // "Plan ▾" makes on the new row — the month commitment stays, the goal
+    // link stays, and the week is added. No day is invented.
+    if (id && weekStart) {
+      if ((await gated.updateTask(id, { bucket: 'week', weekStart, scheduledFor: undefined })) === false) return
+      plannedInto(t, weekStart, formatWeekRange(weekStart), true)
+    }
+  }, [level, bounds.start, soleDomain, addTask, tasks, gated, plannedInto])
+  /** The weeks the next-action box offers — the month page only; a season's
+   *  next actions go into a month first. */
+  const stepWeeks = useMemo(() => (level === 'month'
+    ? weeksOfMonth(bounds.start, readCadenceConfig().weekStartsOn).map((w) => ({ start: w.start, label: `Week of ${formatWeekRange(w.start)}` }))
+    : undefined), [level, bounds.start])
 
   // "Plan ▾" on a task row: the weeks of the month being VIEWED. The
   // 'to-lower' verb beside it commits to the week containing now, which on
@@ -731,14 +780,6 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
   // What "Into a month…" offers — the season's months and the one before it
   // (intoMonthChoices).
   const intoMonthOptions = useMemo(() => (level === 'season' ? intoMonthChoices(bounds) : []), [level, bounds])
-  /** The confirmation after work goes into a week: where it went, and the
-   *  way there — the week is where its days get planned (nested horizons). */
-  const plannedInto = useCallback((title: string, weekStart: Date, where: string) => {
-    showToast(`Planned “${title}” for ${where}.`, 'success', 6000, {
-      label: 'Open week',
-      onClick: () => navigate(`/week?start=${localYmd(weekStart)}`),
-    })
-  }, [navigate])
 
   const planWeekSlot = useCallback((row: PlanRowModel) => {
     if (level === 'year') return null
@@ -763,17 +804,17 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
         onPickWeek={(weekStart) => {
           void (async () => {
             if ((await gated.updateTask(row.id, { bucket: 'week', weekStart, scheduledFor: undefined })) === false) return
-            plannedInto(row.title, weekStart, formatWeekRange(weekStart))
+            plannedInto(row.title, weekStart, formatWeekRange(weekStart), !!t?.goalTaskId)
           })()
         }}
         onClearWeek={timing && hasTiming(timing) ? () => { void removeTiming(row.id, row.title, 'all') } : undefined}
         onRemoveDay={timing?.day ? () => { void removeTiming(row.id, row.title, 'day') } : undefined}
-        onPickDay={(date) => { void planActions.chooseTaskDay(row.id, date) }}
+        onPickDay={(date) => { void plannedDay(row.id, row.title, date) }}
         weekends={monthWeekends.map((saturday) => ({ saturday, days: dayChoices.forDays([saturday, weekendEnd(saturday)]) }))}
         onPickWeekend={t && !t.completed ? (saturday) => {
           void (async () => {
             if (!(await planActions.planTaskWeekend(row.id, saturday))) return
-            plannedInto(row.title, weekStartAnchor(saturday, readCadenceConfig().weekStartsOn), `the weekend of ${weekendRangeLabel(saturday)}`)
+            plannedInto(row.title, weekStartAnchor(saturday, readCadenceConfig().weekStartsOn), `the weekend of ${weekendRangeLabel(saturday)}`, !!t.goalTaskId)
           })()
         } : undefined}
         onPickWeekendDay={(saturday, day) => { void planActions.planTaskWeekendDay(row.id, saturday, day) }}
@@ -807,7 +848,7 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
       )}
       </span>
     )
-  }, [level, bounds.start, timingPeriodLabel, planActions, tasks, navigate, gated, removeTiming, dayChoices, intoMonthOptions, monthWeekends, plannedInto])
+  }, [level, bounds.start, timingPeriodLabel, planActions, tasks, navigate, gated, removeTiming, dayChoices, intoMonthOptions, monthWeekends, plannedInto, plannedDay])
 
   const [pickingGoalFor, setPickingGoalFor] = useState<string | null>(null)
   const [linkError, setLinkError] = useState(false)
@@ -877,7 +918,7 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
   )
   const listIsLong = scannableRows > 8
 
-  const goalComposerOpen = !isPast && (addingGoal || goalRows.length === 0)
+  const goalComposerOpen = !isPast
 
   const looseRows = useMemo(
     // With support, as `rows` has it: this rebuild dropped it, so a task
@@ -912,6 +953,35 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
   const shortLabel = level === 'month'
     ? bounds.start.toLocaleDateString('en-US', { month: 'long' })
     : bounds.label
+
+  /**
+   * A smaller goal one rung down, supporting this one (horizon flows): a
+   * season goal under a year goal, a month goal under a season goal. Written
+   * on the CHILD's own period, with the link that already exists, in the
+   * parent's life area. The parent is not touched — not its id, its status or
+   * its steps. The toast says where the new goal lives and opens it.
+   */
+  const refinePeriods = useMemo(() => nextLevel.map((c) => ({ start: c.start, label: c.label, current: c.current })), [nextLevel])
+  const refineFor = useCallback((row: PlanRowModel) => {
+    if (isPast || level === 'month' || !row.isGoal || rowIsDone(row.fate)) return undefined
+    if (level === 'season' && row.kind !== 'task') return undefined
+    const childNoun = level === 'year' ? 'season' : 'month'
+    const onAdd = async (title: string, periodStart: Date) => {
+      const parentTask = level === 'season' ? tasks.find((t) => t.id === row.id) : undefined
+      const parentGoal = level === 'year' ? goals.find((g) => g.id === row.id) : undefined
+      const id = await addTask(title, undefined, undefined, undefined, childNoun === 'season'
+        ? { bucket: 'quarter', seasonStart: periodStart, isGoal: true, goalId: row.id, context: parentGoal?.context ?? soleDomain }
+        : { bucket: 'month', monthStart: periodStart, isGoal: true, supportsGoalTaskId: row.id, goalId: parentTask?.goalId, context: parentTask?.context ?? soleDomain })
+      if (!id) return false
+      const where = nextLevel.find((c) => c.start.getTime() === periodStart.getTime())
+      showToast(`Added “${title}” to ${where?.label ?? `that ${childNoun}`}. It supports “${row.title}”, which stays here.`, 'success', 7000, where ? {
+        label: `Open ${childNoun}`,
+        onClick: () => navigate(where.href),
+      } : undefined)
+      return true
+    }
+    return <RefineGoalControl goalTitle={row.title} rungNoun={childNoun} periods={refinePeriods} onAdd={onAdd} />
+  }, [isPast, level, tasks, goals, addTask, soleDomain, nextLevel, refinePeriods, navigate])
   /**
    * When this period is empty, whether an adjacent one holds the plan.
    *
@@ -1391,7 +1461,7 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
                 <button
                   type="button"
                   aria-label={`Add a goal for ${shortLabel}`}
-                  onClick={() => { if (goalRows.length === 0) goalInputRef.current?.focus(); else setAddingGoal((v) => !v) }}
+                  onClick={() => goalInputRef.current?.focus()}
                   className="mt-1.5 shrink-0 text-[13px] text-neutral-500 transition-colors hover:text-primary-700"
                 >
                   + Add a goal
@@ -1399,10 +1469,10 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
               )}
             </div>
             <p className="period-section-note">{level === 'year'
-                ? 'What do you want this year to add up to?'
+                ? 'What do you want this year to add up to? Break a goal into season goals when you are ready.'
                 : level === 'season'
-                  ? 'What deserves attention this season? Add the next actions under each goal.'
-                  : 'What progress do you want to make this month? Add the next actions under each goal, then plan them into weeks.'}</p>
+                  ? 'The outcomes and projects this season is for. Break one into month goals, or add its next actions.'
+                  : 'The outcomes and projects this month is for. Add each one’s next actions and plan them into weeks — the goal stays here.'}</p>
             <div className="mt-3">
               {goalRows.length === 0 ? (
                 isPast ? (
@@ -1459,7 +1529,9 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
                         hiddenByFilter={g.hiddenByFilter}
                         goalControls={goalControlsFor(g.row)}
                         focusComposer={composerFocusId === g.row.id} onComposerFocused={clearComposerFocus}
-                        onAddStep={isPast ? undefined : (goal, t) => { void addStep(goal, t) }}
+                        onAddStep={isPast ? undefined : (goal, t, week) => { void addStep(goal, t, week) }}
+                        stepWeeks={stepWeeks}
+                        refine={refineFor(g.row)}
                         stepActionsFor={(st) => actionsFor({ fate: st.fate, isGoal: false, isPast, level })}
                           actions={actionsFor({ fate: g.row.fate, isGoal: g.row.isGoal, isPast, level })} />
                     ))}
@@ -1484,19 +1556,44 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
               )}
               {goalComposerOpen && (
                 <form
-                  className="mt-1 flex items-center gap-2 px-2"
-                  onSubmit={(e) => { e.preventDefault(); const t = goalDraft; setGoalDraft(''); void addRow(t, true) }}
+                  className="period-goal-add mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 px-2"
+                  onSubmit={(e) => {
+                    e.preventDefault()
+                    const t = goalDraft
+                    const parent = goalParent || undefined
+                    setGoalDraft('')
+                    void addRow(t, true, parent).then((id) => {
+                      // A month goal is where next actions are written: open
+                      // it with the cursor in its next-action box.
+                      if (id && level === 'month') setComposerFocusId(id)
+                    })
+                  }}
                 >
-                  <Target className="h-4 w-4 shrink-0 text-accent-600" />
+                  <Target className="h-4 w-4 shrink-0 text-accent-600" aria-hidden="true" />
                   <input
                     ref={goalInputRef}
-                    autoFocus={addingGoal}
                     aria-label={`New goal for ${shortLabel}`}
                     value={goalDraft}
                     onChange={(e) => setGoalDraft(e.target.value)}
-                    placeholder={`What do you want from this ${noun}?`}
-                    className="min-w-0 flex-1 bg-transparent py-1.5 text-sm text-neutral-800 placeholder:text-neutral-400 focus:outline-none"
+                    placeholder={level === 'year' ? `An outcome for ${shortLabel}` : `A goal or project for ${shortLabel}`}
+                    className="min-w-[12rem] flex-1 bg-transparent py-1.5 text-sm text-neutral-800 placeholder:text-neutral-400 focus:outline-none"
                   />
+                  {/* Optional, and remembered for the next goal typed: a run
+                      of month goals usually serves the same season goal. */}
+                  {parentChoices.length > 0 && (
+                    <select
+                      aria-label={`Supports a ${level === 'season' ? 'year' : 'season'} goal (optional)`}
+                      value={goalParent}
+                      onChange={(e) => setGoalParent(e.target.value)}
+                      className="max-w-full shrink rounded-md border border-neutral-200 bg-white px-1.5 py-1 text-xs text-neutral-600"
+                    >
+                      <option value="">{level === 'season' ? 'Supports a year goal? (optional)' : 'Supports a season goal? (optional)'}</option>
+                      {parentChoices.map((c) => <option key={c.id} value={c.id}>{c.title}</option>)}
+                    </select>
+                  )}
+                  <button type="submit" disabled={!goalDraft.trim()} className="shrink-0 rounded-md bg-primary-600 px-2.5 py-1 text-xs font-semibold text-white disabled:opacity-40">
+                    Add goal
+                  </button>
                 </form>
               )}
             </div>
@@ -1505,10 +1602,12 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
           {/* Tasks — the concrete things. The year plans in goals alone. */}
           {level !== 'year' && (
             <section aria-label={`${bounds.label} list`} className="period-tasks-card">
-              <h2 className="px-1 font-display text-2xl text-neutral-800">{noun[0].toUpperCase() + noun.slice(1)} tasks</h2>
+              {/* Secondary by design (horizon flows): the page is for outcomes,
+                  and a one-off action that needs no goal still has a home. */}
+              <h2 className="px-1 font-display text-xl text-neutral-700">Single actions</h2>
               <p className="period-section-note">{level === 'month'
-                ? 'Single actions for the month. Plan each into a week — or break a bigger one into next actions.'
-                : 'Work for the season. Plan each into a month — or break a bigger one into next actions.'}</p>
+                ? 'One-off work that needs no goal. Plan each into a week — or break a bigger one into next actions.'
+                : 'One-off work that needs no goal. Plan each into a month — or break a bigger one into next actions.'}</p>
               <div className="mt-3">
                 {openTaskRows.length === 0 ? (
                   <p className="px-2 py-2 text-sm text-neutral-400">
@@ -1518,7 +1617,7 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
                         ? `Nothing was on this ${noun}'s list.`
                         : (
                           <>
-                            Nothing on this {noun}'s list yet.{!savedSession && (
+                            No single actions for this {noun}.{!savedSession && goalRows.length === 0 && (
                               <>
                                 {' '}
                                 <button type="button" onClick={beginSession} disabled={!sessionReady}
@@ -1588,21 +1687,28 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
                   </button>
                 )}
 
-                {!isPast && (
+                {!isPast && (addingTask ? (
                   <form
                     className="mt-1 flex items-center gap-2 px-2"
                     onSubmit={(e) => { e.preventDefault(); const t = taskDraft; setTaskDraft(''); void addRow(t, false) }}
+                    onKeyDown={(e) => { if (e.key === 'Escape' && !taskDraft) setAddingTask(false) }}
                   >
-                    <Plus className="h-4 w-4 shrink-0 text-neutral-400" />
+                    <Plus className="h-4 w-4 shrink-0 text-neutral-400" aria-hidden="true" />
                     <input
+                      autoFocus
                       aria-label={`Add to this ${noun}`}
                       value={taskDraft}
                       onChange={(e) => setTaskDraft(e.target.value)}
-                      placeholder={`Add a task for ${shortLabel}`}
+                      placeholder={`A single action for ${shortLabel}`}
                       className="min-w-0 flex-1 bg-transparent py-1.5 text-sm text-neutral-800 placeholder:text-neutral-400 focus:outline-none"
                     />
                   </form>
-                )}
+                ) : (
+                  <button type="button" onClick={() => setAddingTask(true)}
+                    className="mt-1 px-2 py-1 text-[13px] text-neutral-500 transition-colors hover:text-primary-700">
+                    + Add a single action
+                  </button>
+                ))}
               </div>
 
               {assignedTaskRows.length > 0 && (
