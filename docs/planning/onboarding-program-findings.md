@@ -155,7 +155,7 @@ month item has a week (or a day), the items collapse under *Already assigned*
 and the page offers no obvious next step. Nothing says which weeks now hold
 the work, and nothing leads on to planning those weeks.
 
-**Proposed; not built, and not yet approved.** A visible "tasks by week" line
+**Addressed on `claude/nested-horizons` (2026-09-26, local; see `2026-09-26-nested-horizons.md`).** The original proposal was: A visible "tasks by week" line
 on the Month page, e.g. "Sep 6–12 · 3 · Open week →", with one row per week of
 the month that holds any of its items. Each row carries:
 - the count of month items committed to that week (the same selector the week

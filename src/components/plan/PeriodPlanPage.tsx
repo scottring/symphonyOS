@@ -38,7 +38,7 @@ import { useHouseholdSeasons } from '@/hooks/useHouseholdSeasons'
 import { useRoutines } from '@/hooks/useRoutines'
 import { useDayChoices } from '@/hooks/useDayChoices'
 import { weeksOfMonth } from '@/lib/planning/monthWeeks'
-import { readCadenceConfig } from '@/lib/cadence/config'
+import { readCadenceConfig, weekStartAnchor } from '@/lib/cadence/config'
 import { formatWeekRange } from '@/lib/dateHelpers'
 import { routinePatterns } from '@/lib/planning/routinePatterns'
 import { GoalsProvider, useGoalsContext } from '@/contexts/GoalsContext'
@@ -67,10 +67,12 @@ import { PlanSession } from './PlanSession'
 import { PlanNextLine } from './PlanNextLine'
 import { periodCalendarEntries } from '@/lib/planning/periodCalendar'
 import { PlanWeekMenu } from './PlanWeekMenu'
-import { weekendsTouching, weekendEnd } from '@/lib/planning/weekend'
+import { weekendsTouching, weekendEnd, weekendRangeLabel } from '@/lib/planning/weekend'
 import { MultiAssigneeDropdown } from '@/components/family'
 import { goalConversion } from '@/lib/planning/goalConversion'
 import { makeTaskAGoal } from './MakeGoalControl'
+import { NextLevelStrip } from './NextLevelStrip'
+import { nextLevelChoices } from '@/lib/planning/nextLevel'
 import { PeriodShelves } from './PeriodShelves'
 import { useDayLoadEvents, DAY_LOAD_RANGE_DAYS } from '@/hooks/useDayLoadEvents'
 
@@ -444,17 +446,28 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
    * A look-back is read, not written into: no picker on a past period.
    */
   /**
-   * "Make it a goal" on a loose task row: the same row becomes a goal of this
-   * list (goalConversion says when it can; details explain when it cannot).
-   * Offered as a labelled link, not among the hover verbs, because it changes
-   * what the row IS — the reason it was taken off those verbs on 2026-09-22.
+   * "Break into next actions" on a loose task row (nested horizons, Scott and
+   * Iris, 2026-09-26). A month or season holds OUTCOMES; the concrete next
+   * actions are what go into a week or a day. A broad item — "Make the yard
+   * nice enough to sit in" — is not pushed into a week whole: the same row
+   * becomes the goal that holds its next actions, stays on this list, and the
+   * cursor lands in its next-action box. Explicit and undoable; nothing is
+   * reclassified unless someone asks (goalConversion says when it can, task
+   * details explain when it cannot). A simple one-step task needs none of
+   * this and is planned into a week directly.
    */
+  const [composerFocusId, setComposerFocusId] = useState<string | null>(null)
+  const clearComposerFocus = useCallback(() => setComposerFocusId(null), [])
   const makeGoalFor = useCallback((row: PlanRowModel) => {
     if (isPast || row.isGoal || row.kind !== 'task' || level === 'year') return undefined
     const t = tasks.find((x) => x.id === row.id)
     if (!t || !goalConversion(t, tasks).ok) return undefined
-    return () => { void makeTaskAGoal(t, setGoal) }
-  }, [isPast, level, tasks, setGoal])
+    return () => {
+      const where = level === 'month' ? bounds.start.toLocaleDateString('en-US', { month: 'long' }) : bounds.label
+      void makeTaskAGoal(t, setGoal, `“${t.title}” now holds its next actions — it is a goal on ${where}. Add them below.`)
+        .then(() => setComposerFocusId(t.id))
+    }
+  }, [isPast, level, tasks, setGoal, bounds])
 
   const assignFor = useCallback((row: PlanRowModel) => {
     if (isPast || familyMembers.length === 0 || row.assigneeIds === undefined) return null
@@ -710,6 +723,15 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
   // What "Into a month…" offers — the season's months and the one before it
   // (intoMonthChoices).
   const intoMonthOptions = useMemo(() => (level === 'season' ? intoMonthChoices(bounds) : []), [level, bounds])
+  /** The confirmation after work goes into a week: where it went, and the
+   *  way there — the week is where its days get planned (nested horizons). */
+  const plannedInto = useCallback((title: string, weekStart: Date, where: string) => {
+    showToast(`Planned “${title}” for ${where}.`, 'success', 6000, {
+      label: 'Open week',
+      onClick: () => navigate(`/week?start=${localYmd(weekStart)}`),
+    })
+  }, [navigate])
+
   const planWeekSlot = useCallback((row: PlanRowModel) => {
     if (level === 'year') return null
     const t = tasks.find((x) => x.id === row.id)
@@ -730,12 +752,22 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
         currentWeekStart={t?.weekStart ?? null}
         dayChoices={days}
         dayChoicesLabel={t?.weekStart ? `A day in ${formatWeekRange(t.weekStart)}` : undefined}
-        onPickWeek={(weekStart) => { void gated.updateTask(row.id, { bucket: 'week', weekStart, scheduledFor: undefined }) }}
+        onPickWeek={(weekStart) => {
+          void (async () => {
+            if ((await gated.updateTask(row.id, { bucket: 'week', weekStart, scheduledFor: undefined })) === false) return
+            plannedInto(row.title, weekStart, formatWeekRange(weekStart))
+          })()
+        }}
         onClearWeek={timing && hasTiming(timing) ? () => { void removeTiming(row.id, row.title, 'all') } : undefined}
         onRemoveDay={timing?.day ? () => { void removeTiming(row.id, row.title, 'day') } : undefined}
         onPickDay={(date) => { void planActions.chooseTaskDay(row.id, date) }}
         weekends={monthWeekends.map((saturday) => ({ saturday, days: dayChoices.forDays([saturday, weekendEnd(saturday)]) }))}
-        onPickWeekend={t && !t.completed ? (saturday) => { void planActions.planTaskWeekend(row.id, saturday) } : undefined}
+        onPickWeekend={t && !t.completed ? (saturday) => {
+          void (async () => {
+            if (!(await planActions.planTaskWeekend(row.id, saturday))) return
+            plannedInto(row.title, weekStartAnchor(saturday, readCadenceConfig().weekStartsOn), `the weekend of ${weekendRangeLabel(saturday)}`)
+          })()
+        } : undefined}
         onPickWeekendDay={(saturday, day) => { void planActions.planTaskWeekendDay(row.id, saturday, day) }}
       />
       {/* S3-03: a season row can go into ANY of its season's months, named,
@@ -767,7 +799,7 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
       )}
       </span>
     )
-  }, [level, bounds.start, timingPeriodLabel, planActions, tasks, navigate, gated, removeTiming, dayChoices, intoMonthOptions, monthWeekends])
+  }, [level, bounds.start, timingPeriodLabel, planActions, tasks, navigate, gated, removeTiming, dayChoices, intoMonthOptions, monthWeekends, plannedInto])
 
   const [pickingGoalFor, setPickingGoalFor] = useState<string | null>(null)
   const [linkError, setLinkError] = useState(false)
@@ -865,6 +897,10 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
   }, [tasks, navigate, openTask])
 
   const noun = NOUN[level]
+  const nextLevel = useMemo(
+    () => nextLevelChoices(level, bounds, layered, meId, seasons, today),
+    [level, bounds, layered, meId, seasons, today],
+  )
   const shortLabel = level === 'month'
     ? bounds.start.toLocaleDateString('en-US', { month: 'long' })
     : bounds.label
@@ -1354,7 +1390,11 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
                 </button>
               )}
             </div>
-            <p className="period-section-note">{level === 'year' ? 'What do you want this year to add up to?' : level === 'season' ? 'What deserves attention this season?' : 'What progress do you want to make this month?'}</p>
+            <p className="period-section-note">{level === 'year'
+                ? 'What do you want this year to add up to?'
+                : level === 'season'
+                  ? 'What deserves attention this season? Add the next actions under each goal.'
+                  : 'What progress do you want to make this month? Add the next actions under each goal, then plan them into weeks.'}</p>
             <div className="mt-3">
               {goalRows.length === 0 ? (
                 isPast ? (
@@ -1410,6 +1450,7 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
                         onShowAllSteps={showAllSteps}
                         hiddenByFilter={g.hiddenByFilter}
                         goalControls={goalControlsFor(g.row)}
+                        focusComposer={composerFocusId === g.row.id} onComposerFocused={clearComposerFocus}
                         onAddStep={isPast ? undefined : (goal, t) => { void addStep(goal, t) }}
                         stepActionsFor={(st) => actionsFor({ fate: st.fate, isGoal: false, isPast, level })}
                           actions={actionsFor({ fate: g.row.fate, isGoal: g.row.isGoal, isPast, level })} />
@@ -1457,7 +1498,9 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
           {level !== 'year' && (
             <section aria-label={`${bounds.label} list`} className="period-tasks-card">
               <h2 className="px-1 font-display text-2xl text-neutral-800">{noun[0].toUpperCase() + noun.slice(1)} tasks</h2>
-              <p className="period-section-note">{level === 'month' ? 'Actions for the month. Choose a week when you’re ready.' : 'Work worth committing to this season.'}</p>
+              <p className="period-section-note">{level === 'month'
+                ? 'Single actions for the month. Plan each into a week — or break a bigger one into next actions.'
+                : 'Work for the season. Plan each into a month — or break a bigger one into next actions.'}</p>
               <div className="mt-3">
                 {openTaskRows.length === 0 ? (
                   <p className="px-2 py-2 text-sm text-neutral-400">
@@ -1556,8 +1599,10 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
 
               {assignedTaskRows.length > 0 && (
                 <details className="period-assigned-fold" key={`${level}-${bounds.start.toISOString()}`}>
-                  <summary>Already assigned · {assignedTaskRows.length}</summary>
-                  <p className="period-section-note">Still part of this {noun}’s plan.</p>
+                  {/* Where the work went, not "assigned" — that word now means
+                      people (Assign people). Still this period's plan. */}
+                  <summary>{level === 'month' ? 'Planned into weeks' : 'Planned into months'} · {assignedTaskRows.length}</summary>
+                  <p className="period-section-note">Still part of this {noun}’s plan — open {level === 'month' ? 'a week' : 'a month'} below to plan its days.</p>
                   <ul>{assignedTaskRows.map((row) => (
                     <PlanRow assign={assignFor} makeGoal={makeGoalFor} key={row.id} row={row} onOpen={open} onOpenPlaced={openPlaced} onOpenSupport={openSupport} planWeek={planWeekSlot} timingReachesLower={level === 'month'}
                       onAction={(a, r) => { void act(a, r) }} lowerLabel={lowerLabelText}
@@ -1592,6 +1637,22 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
                 </div>
               )}
             </section>
+          )}
+
+          {/* The way down: the next rung's periods, what is on each, and where
+              to open it — so a month whose work all has weeks ends in a next
+              step, not an "Already assigned" fold (nested horizons). */}
+          {!isPast && (
+            <NextLevelStrip
+              heading={level === 'month' ? 'Plan work for a week' : level === 'season' ? 'Plan work for a month' : 'Plan a season'}
+              note={level === 'month'
+                ? 'Next actions and tasks go into weeks; the goals stay here. Open a week to plan its days.'
+                : level === 'season'
+                  ? 'Goals stay on the season. Open a month to add their next actions and plan its weeks.'
+                  : 'The year holds outcomes. Open a season to set its goals and next actions.'}
+              choices={nextLevel}
+              onOpen={(c) => navigate(c.href)}
+            />
           )}
         </div>
 

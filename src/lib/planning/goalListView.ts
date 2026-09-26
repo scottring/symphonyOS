@@ -162,7 +162,7 @@ export function goalListView(
 
 /** "3 open · 2 done" — what a collapsed goal says about itself. */
 export function countsLabel(c: StepCounts): string {
-  if (c.total === 0) return 'No steps yet'
+  if (c.total === 0) return 'No next actions yet'
   const parts: string[] = []
   if (c.open > 0) parts.push(`${c.open} open`)
   if (c.completed > 0) parts.push(`${c.completed} done`)

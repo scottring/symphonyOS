@@ -163,7 +163,7 @@ export function PlanRow({
   expanded = false, onToggleExpand, onAddStep, stepActionsFor, planWeek,
   timingReachesLower = false,
   stepsToDraw, counts, hiddenByReveal = 0, onShowAllSteps, hiddenByFilter = 0, goalControls,
-  assign, makeGoal,
+  assign, makeGoal, focusComposer = false, onComposerFocused,
 }: {
   row: PlanRowModel
   actions: RowAction[]
@@ -215,10 +215,15 @@ export function PlanRow({
    *  people are its own, never copied from its goal. Visible at every width,
    *  like the timing control: who is doing it is not a hover secret. */
   assign?: (row: PlanRowModel) => ReactNode
-  /** "Make it a goal" for this row, or undefined where it cannot be one.
-   *  The SAME row becomes the goal (goalConversion); offered as a visible
-   *  labelled link, not a hover icon, because it changes what the row is. */
+  /** "Break into next actions" for a loose task row, or undefined where it
+   *  cannot be one. The SAME row becomes the goal that holds its next actions
+   *  (goalConversion); a visible labelled link, not a hover icon, because it
+   *  changes what the row is. */
   makeGoal?: (row: PlanRowModel) => (() => void) | undefined
+  /** Open this goal and put the cursor in its next-action box — the moment a
+   *  row has just been broken into next actions. */
+  focusComposer?: boolean
+  onComposerFocused?: () => void
 }) {
   // A row whose copy is finished reads as finished — one status, not a tick
   // that disagrees with an annotation beside it.
@@ -254,7 +259,7 @@ export function PlanRow({
   const [stepDraft, setStepDraft] = useState('')
   const stepInputRef = useRef<HTMLInputElement>(null)
   /**
-   * "+ Add a step" on a collapsed goal opens it AND puts the cursor in its
+   * "+ Add a next action" on a collapsed goal opens it AND puts the cursor in its
    * composer. The focus waits for an effect rather than a frame: the page's
    * own goal composer focuses itself on render, and a rAF handoff lost the
    * race to it (seen live, 2026-09-24).
@@ -268,7 +273,15 @@ export function PlanRow({
     if (!wantStepFocus || !expanded) return
     stepInputRef.current?.focus()
     setWantStepFocus(false)
-  }, [wantStepFocus, expanded])
+    onComposerFocused?.()
+  }, [wantStepFocus, expanded, onComposerFocused])
+  // Asked from outside (just broken into next actions): open and focus once.
+  useEffect(() => {
+    if (!focusComposer || !canHoldSteps) return
+    setWantStepFocus(true)
+    if (!expanded) onToggleExpand?.(row)
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- once per request, not per render
+  }, [focusComposer, canHoldSteps])
   /**
    * "Show all N steps" deletes itself the moment it is pressed. With a mouse
    * nobody notices. From the keyboard the element holding focus stops
@@ -313,7 +326,7 @@ export function PlanRow({
       {canHoldSteps ? (
         <button
           type="button"
-          aria-label={`${expanded ? 'Hide' : 'Show'} steps under ${row.title}`}
+          aria-label={`${expanded ? 'Hide' : 'Show'} next actions under ${row.title}`}
           aria-expanded={expanded}
           onClick={() => onToggleExpand?.(row)}
           className="period-row-caret mt-[3px] shrink-0 text-neutral-400 transition-colors hover:text-neutral-700"
@@ -360,8 +373,8 @@ export function PlanRow({
         {(() => {
           const toGoal = makeGoal?.(row)
           return toGoal ? (
-            <button type="button" onClick={toGoal} className="mt-1 block text-xs text-primary-700 hover:underline" aria-label={`Make ${row.title} a goal`}>
-              Make it a goal
+            <button type="button" onClick={toGoal} className="mt-1 block text-xs text-primary-700 hover:underline" aria-label={`Break ${row.title} into next actions`}>
+              Break into next actions
             </button>
           ) : null
         })()}
@@ -377,7 +390,7 @@ export function PlanRow({
             {/* Reachable without opening the goal first (long-list acceptance). */}
             {onAddStep && (
               <button type="button" onClick={addStepHere} className="text-neutral-500 hover:text-primary-700 hover:underline">
-                + Add a step
+                + Add a next action
               </button>
             )}
             {hiddenByFilter > 0 && (
@@ -494,10 +507,10 @@ export function PlanRow({
             </span>
             <input
               ref={stepInputRef}
-              aria-label={`New step for ${row.title}`}
+              aria-label={`New next action for ${row.title}`}
               value={stepDraft}
               onChange={(e) => setStepDraft(e.target.value)}
-              placeholder="Add a step"
+              placeholder="Add a next action"
               className="min-w-0 flex-1 bg-transparent py-1.5 text-[15px] text-neutral-800 placeholder:text-neutral-400 focus:outline-none"
             />
           </form>

@@ -14,9 +14,10 @@ import { showToast } from '@/hooks/useToast'
 export async function makeTaskAGoal(
   task: Pick<Task, 'id' | 'title'>,
   setGoal: (id: string, isGoal: boolean) => Promise<void> | void,
+  message = `“${task.title}” is now a goal. Its lists, links and people are unchanged.`,
 ): Promise<void> {
   await setGoal(task.id, true)
-  showToast(`“${task.title}” is now a goal. Its lists, links and people are unchanged.`, 'success', 8000, {
+  showToast(message, 'success', 8000, {
     label: 'Undo',
     onClick: () => { void setGoal(task.id, false) },
   })
