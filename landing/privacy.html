@@ -79,7 +79,7 @@ footer a { color: var(--text-muted); margin-left: 12px; }
 <main>
   <h1>Privacy</h1>
   <p class="lede">Symphony holds the working details of your household. This page says exactly what it keeps, who else touches it, and how to get it deleted. No legalese.</p>
-  <p class="effective">Effective September 5, 2026. Questions: <a href="mailto:hello@symphony-os.com">hello@symphony-os.com</a>.</p>
+  <p class="effective">Effective September 26, 2026. Questions: <a href="mailto:hello@symphony-os.com">hello@symphony-os.com</a>.</p>
 
   <div class="card">
     <p><strong>The short version.</strong> Your data is yours. We never sell it, never show ads, and never use it to train anything. The only people who can see your household's information are the people you invite into it. Email us and we delete everything within 30 days.</p>
@@ -98,11 +98,11 @@ footer a { color: var(--text-muted); margin-left: 12px; }
 
   <h3>What you connect, if you choose to</h3>
   <ul>
-    <li><strong>Google Calendar.</strong> With your permission Symphony reads your calendars to show events alongside your tasks, and creates or edits events when you ask it to.</li>
+    <li><strong>Google Calendar.</strong> With your permission Symphony reads your calendars to show events alongside your tasks, and creates, edits, moves, or deletes events when you ask it to.</li>
     <li><strong>Gmail.</strong> The same Google connection lets the assistant search and read your mail when you ask it to, and draft or send a message on your behalf when you explicitly tell it to. Symphony never sends email on its own.</li>
     <li><strong>School email.</strong> Your household gets a private forwarding address. Emails you forward there are read to pull out the event, the date, and what each child needs. We keep the text of the email so you can always see the source behind an item.</li>
   </ul>
-  <p>Symphony's use of information received from Google APIs adheres to the <a href="https://developers.google.com/terms/api-services-user-data-policy" rel="noopener">Google API Services User Data Policy</a>, including the Limited Use requirements. You can disconnect Google at any time in Settings, which revokes Symphony's access.</p>
+  <p>Symphony's use of information received from Google APIs adheres to the <a href="https://developers.google.com/terms/api-services-user-data-policy" rel="noopener">Google API Services User Data Policy</a>, including the Limited Use requirements. You can disconnect Google at any time in Settings, which removes the saved connection. You can also revoke the authorization in your Google account's third-party connections settings.</p>
 
   <h3>Technical data</h3>
   <p>When something breaks we get an error report. A small sample of sessions is recorded for debugging with all text masked and all images and media blocked, so we can see where a layout broke, not what you wrote. If you have not set a home location, your approximate location is estimated from your IP address only to show the weather, and only after your browser declines to share it. There are no advertising trackers, and the marketing site runs no analytics at all.</p>
@@ -120,7 +120,7 @@ footer a { color: var(--text-muted); margin-left: 12px; }
     <tr><td>Vercel</td><td>Serves the app and this website</td><td>Standard request logs</td></tr>
     <tr><td>Cloudflare</td><td>Receives mail sent to your forwarding address and passes it to Symphony</td><td>Forwarded emails in transit</td></tr>
     <tr><td>Anthropic</td><td>AI extraction and the assistant</td><td>The item, email, or photo being worked on</td></tr>
-    <tr><td>Google</td><td>Calendar, Gmail, and place lookup, only if you connect or search</td><td>What you authorize</td></tr>
+    <tr><td>Google</td><td>Calendar and place lookup, only if you connect or search</td><td>What you authorize</td></tr>
     <tr><td>Open-Meteo</td><td>Weather, and finding your home on the map</td><td>Your home coordinates, and the town or ZIP you type for home</td></tr>
     <tr><td>ipapi.co</td><td>Location fallback for weather</td><td>Your IP address, only if no home location is set</td></tr>
     <tr><td>Sentry</td><td>Error reports and masked session samples</td><td>Errors and masked layouts</td></tr>
@@ -137,8 +137,8 @@ footer a { color: var(--text-muted); margin-left: 12px; }
   <h2>Deleting things</h2>
   <ul>
     <li><strong>Any item</strong> can be deleted in the app. The stored text of forwarded emails is removed with your account, or sooner on request.</li>
-    <li><strong>Google access</strong> is revoked the moment you disconnect in Settings. You can also revoke it from your Google account.</li>
-    <li><strong>Your account and everything in it:</strong> email <a href="mailto:hello@symphony-os.com">hello@symphony-os.com</a> from the address on the account. We delete the household's data within 30 days and confirm when it is done. Backups roll off within 30 days after that.</li>
+    <li><strong>Google access</strong>: disconnect in Settings to remove the saved connection. To revoke the authorization itself, remove Symphony from your Google account's third-party connections settings.</li>
+    <li><strong>Your account and everything in it:</strong> email <a href="mailto:hello@symphony-os.com">hello@symphony-os.com</a> from the address on the account. We delete the household's data within 30 days and confirm when it is done. Supabase automated database backups are retained on a rolling seven-day schedule. Deleted database records may remain in those backups until they expire. These database backups do not contain uploaded files.</li>
   </ul>
   <p>If you want a copy of your data before it goes, ask in the same email and we will send an export.</p>
 
