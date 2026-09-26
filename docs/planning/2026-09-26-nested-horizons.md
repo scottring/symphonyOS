@@ -122,8 +122,32 @@ December 2026, created **through the UI** and deleted afterwards (4 rows).
 | Year 2026, live | "Winter 2025–26 · Spring · Summer · Fall (this season) · Winter 2026–27" |
 | 390px (same-origin iframe, signed in) | no horizontal scroll; all five Open week buttons 44px tall and on screen; the Break link is a 44px target; the goal title wraps, 157px wide; "+ Add a next action" is on screen |
 
+### Two accounts, live (2026-09-26)
+
+Edith (`symphonyedith@gmail.com`, the demo household's second member) signed
+in by Scott in an incognito Chrome window that Claude cannot reach. The owner's
+side was done by Claude through the page; Edith's side was checked by Scott in
+her window, and by a rolled-back database read as her account.
+
+Fixtures, December 2026, deleted afterwards:
+- "QA-2A Family goal" (Family, shared), plus a next action added under it
+  through the page and planned into Dec 13–19. Answering the area question
+  with Family gave the action `scope` `compound`, a week record and December.
+- "QA-2A Private goal" (Personal) with a private action, as the control.
+
+| Check | Result |
+|---|---|
+| RLS as Edith (rolled-back read, real policies) | sees the Family goal and the shared action (and their 3 records); does **not** see the private goal or its action |
+| Scott, in Edith's window: Month, December 2026 | the Family goal is visible with the shared action under it, on Dec 13–19; the private goal is absent; "Plan work for a week" reads Dec 13 – 19 — 1 on its list |
+| Scott, in Edith's window: Open week | the week page lists the shared action with its parent goal |
+| Cleanup | 4 QA-2A rows deleted; the demo's 41 rows and their records hash **identical** to the baseline |
+
+**Finding (not fixed):** a next action added under a goal is created without
+the goal's area. So planning it into a week asks "Where does this belong?",
+even under a Family goal. Inheriting the goal's area when the action is created
+would remove that step. Recorded for a follow-up.
+
 **Not covered live:**
-- A second account's view of shared next actions.
 - Keyboard focus-ring painting. The harness (`outputs/plan-keyboard`) covers
   the goal list, not the new list at the bottom of the page.
 - The fixture Chromium harness planned for this change was not built. Live
