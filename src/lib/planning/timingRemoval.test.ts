@@ -171,3 +171,16 @@ describe('a flexible weekend chosen from the Month page', () => {
     expect(applied(after, previous).weekendStart).toEqual(SAT10)
   })
 })
+
+describe('a season row taken into the month BEFORE its season', () => {
+  it('keeps the season commitment, adds the month, and moves nothing else', () => {
+    const OCT = new Date(2026, 9, 1), SEP = new Date(2026, 8, 1)
+    const row = recorded([{ level: 'season', periodStart: OCT, status: 'open' }],
+      { scheduledFor: undefined, isAllDay: undefined, focus: [], bucket: 'quarter', seasonStart: OCT, goalTaskId: undefined, assignedToAll: ['m1'] })
+    const after = applied(row, { bucket: 'month', monthStart: SEP })
+    expect(openCommitment(after, 'season')?.periodStart).toEqual(OCT)
+    expect(openCommitment(after, 'month')?.periodStart).toEqual(SEP)
+    expect(after.id).toBe(row.id)
+    expect(after.assignedToAll).toEqual(['m1'])
+  })
+})

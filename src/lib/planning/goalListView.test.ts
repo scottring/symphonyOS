@@ -63,7 +63,7 @@ describe('a dense month', () => {
     expect(c.open + c.completed).toBe(60)
     expect(c.completed).toBe(15)
     expect(countsLabel(c)).toBe('45 open · 15 done')
-    expect(countsLabel({ open: 0, completed: 0, total: 0 })).toBe('No steps yet')
+    expect(countsLabel({ open: 0, completed: 0, total: 0 })).toBe('No next actions yet')
     expect(countsLabel({ open: 2, completed: 0, total: 2 })).toBe('2 open')
   })
 })

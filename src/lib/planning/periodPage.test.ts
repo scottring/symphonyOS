@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest'
-import { periodBounds, isCurrentPeriod, selectPeriodTasks, selectDatedInPeriod, actionsFor, railLevel, planningPeriod, offerableFromAbove } from './periodPage'
+import { periodBounds, isCurrentPeriod, selectPeriodTasks, intoMonthChoices, selectDatedInPeriod, actionsFor, railLevel, planningPeriod, offerableFromAbove } from './periodPage'
 import { DEFAULT_SEASONS } from '@/lib/cadence/seasons'
 import type { Task } from '@/types/task'
 
@@ -225,5 +225,19 @@ describe('selectPeriodTasks: goals and steps assigned only to others', () => {
 
   it('a plain task assigned to someone else still leaves (the 2026-09-05 rule)', () => {
     expect(pick([task({ title: 'family task', context: 'family', ...onSep, ...toIris })])).toEqual([])
+  })
+})
+
+describe('intoMonthChoices — a season row\'s "Into a month…"', () => {
+  const labels = (b: { start: Date; end: Date; label: string }) => intoMonthChoices(b).map((c) => c.label)
+  it('offers the month before the season first, then the season\'s months', () => {
+    // A household Fall that starts in October (Scott's).
+    expect(labels({ start: new Date(2026, 9, 1), end: new Date(2027, 0, 1), label: 'Fall 2026' }))
+      .toEqual(['September (before Fall)', 'October', 'November', 'December'])
+  })
+  it('names the year across a year boundary', () => {
+    const c = intoMonthChoices({ start: new Date(2027, 0, 1), end: new Date(2027, 3, 1), label: 'Winter 2027' })
+    expect(c[0]).toMatchObject({ label: 'December 2026 (before Winter)', beforeSeason: true })
+    expect(c[0].date).toEqual(new Date(2026, 11, 1))
   })
 })
