@@ -210,8 +210,19 @@
   }
 
   /* -------------------------------------------------------------- loop --- */
+  // Fit the Inbox to the height left under it, so the panel never runs off
+  // the stage on a short screen or leaves a blank tail on a tall one.
+  function fitInbox() {
+    if (!list || innerWidth <= 760) { if (list) list.parentNode.style.removeProperty('--rows'); return; }
+    var panel = list.parentNode, stage = panel.closest('.stage');
+    panel.style.setProperty('--rows', '1');
+    var room = stage.getBoundingClientRect().bottom - panel.getBoundingClientRect().bottom - 56;
+    panel.style.setProperty('--rows', String(Math.max(4, Math.min(9, 1 + Math.floor(room / rowH)))));
+  }
+
   function measure() {
     if (list) rowH = px(list.parentNode, '--row-h') || 46;
+    fitInbox();
     if (stack) stackH = stack.clientHeight;
     if (planWrap) strip = px(planWrap, '--strip') || 50;
     shown = -1; lastK = -1;
