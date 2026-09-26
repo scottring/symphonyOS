@@ -361,9 +361,12 @@ function ShellLayoutInner({ children }: Props) {
       {/* QuickCapture FAB — all routes except the agent view (which has its own input) */}
       {activeView !== 'agent' && (
         <QuickCapture
-          // Phones add through the dock's + (and the capture bar); desktop
-          // through ⌘K and the navigation's search button.
-          showFab={false}
+          // Desktop keeps its round + at the bottom right (Scott, 2026-09-26:
+          // "desktop has ALWAYS had a round circle + button" — it did until
+          // the 2026-09-18 top-navigation redesign hid it). It opens the same
+          // ⌘K add box as the "+ Add ⌘K" button and the shortcut. Phones add
+          // through the dock's + (and the capture bar) instead.
+          showFab={!isMobile}
           onAdd={chrome.onQuickAdd}
           onAddRich={chrome.onQuickAddRich}
           // useShellChrome confirms every capture once its write lands.
