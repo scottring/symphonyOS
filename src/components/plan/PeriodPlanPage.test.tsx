@@ -2788,3 +2788,55 @@ describe('nested horizons: a broad item holds its next actions; the page leads d
     expect(within(screen.getByRole('region', { name: 'Plan a season' })).getAllByRole('button').length).toBeGreaterThanOrEqual(4)
   })
 })
+
+describe('a new next action is born in its goal\'s life area', () => {
+  beforeEach(() => {
+    pinClock(); localStorage.clear()
+    state.goals = []; state.loading = false; routinesState.routines = []
+    seasonsState.seasons = DEFAULT_SEASONS; seasonsState.loading = false
+    domainState.layers = new Set(['work', 'family', 'personal', 'unsorted']); domainState.soleDomain = null
+    Object.values(hook).forEach((f) => f.mockClear())
+  })
+  afterEach(() => { vi.useRealTimers(); domainState.soleDomain = null })
+  const addUnder = (goal: string, title: string) => {
+    fireEvent.click(screen.getByRole('button', { name: new RegExp(`Show next actions under ${goal}`) }))
+    const box = screen.getByRole('textbox', { name: `New next action for ${goal}` })
+    fireEvent.change(box, { target: { value: title } })
+    fireEvent.submit(box.closest('form')!)
+  }
+  const lastOpts = () => hook.addTask.mock.calls.at(-1)![4] as { context?: string | null; goalTaskId?: string }
+
+  it('under a Family goal, with no domain in view, the action is Family', () => {
+    state.tasks = [task({ id: 'fg', title: 'Family trip', isGoal: true, context: 'family', monthStart: thisMonth })]
+    renderPage('month')
+    addUnder('Family trip', 'Book the cabin')
+    expect(lastOpts()).toMatchObject({ goalTaskId: 'fg', context: 'family' })
+  })
+
+  it('the goal\'s area wins over the domain in view', () => {
+    domainState.soleDomain = 'work'
+    state.tasks = [task({ id: 'fg', title: 'Family trip', isGoal: true, context: 'family', monthStart: thisMonth })]
+    renderPage('month')
+    addUnder('Family trip', 'Book the cabin')
+    expect(lastOpts().context).toBe('family')
+  })
+
+  it('a goal with no area falls back to the domain in view, as before', () => {
+    domainState.soleDomain = 'personal'
+    state.tasks = [task({ id: 'ng', title: 'Untagged goal', isGoal: true, context: null, monthStart: thisMonth })]
+    renderPage('month')
+    addUnder('Untagged goal', 'Something')
+    expect(lastOpts().context).toBe('personal')
+  })
+
+  it('existing next actions are not rewritten', () => {
+    state.tasks = [
+      task({ id: 'fg', title: 'Family trip', isGoal: true, context: 'family', monthStart: thisMonth }),
+      task({ id: 'old', title: 'Old untagged action', goalTaskId: 'fg', context: null, monthStart: thisMonth }),
+    ]
+    renderPage('month')
+    addUnder('Family trip', 'Book the cabin')
+    expect(hook.updateTask).not.toHaveBeenCalled()
+    expect(hook.addTask).toHaveBeenCalledTimes(1)
+  })
+})

@@ -644,9 +644,14 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
       monthStart: level === 'month' ? bounds.start : undefined,
       seasonStart: level === 'season' ? bounds.start : undefined,
       goalTaskId: goalRow.id,
-      context: soleDomain,
+      // A next action is born in its goal's life area (Scott and Iris,
+      // 2026-09-26): an action under a Family goal is Family, so planning it
+      // into a week does not stop to ask "Where does this belong?". It stays
+      // editable like any area. A goal with no area falls back to the
+      // domain in view, as before. Existing actions are never touched.
+      context: tasks.find((t) => t.id === goalRow.id)?.context ?? soleDomain,
     })
-  }, [level, bounds.start, soleDomain, addTask])
+  }, [level, bounds.start, soleDomain, addTask, tasks])
 
   // "Plan ▾" on a task row: the weeks of the month being VIEWED. The
   // 'to-lower' verb beside it commits to the week containing now, which on
