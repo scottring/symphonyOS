@@ -71,26 +71,63 @@ The previous branch's fixes are kept as they are: the month before a season in
 
 ## Evidence
 
-**Verified (automated):**
-- The full suite passes (689 files, 7289 tests), as do tsc, eslint (0 errors)
-  and the build.
-- New tests:
-  - Break into next actions converts the same row and adds no new row; the
+### Automated (harness and fixtures, not the live database)
+
+- **Full suite** passes (689 files, 7295 tests), as do tsc (both configs),
+  eslint (0 errors) and the build.
+- **Page tests** (`PeriodPlanPage.test.tsx`, happy-dom):
+  - Break into next actions converts the same row and adds no new one; the
     new goal opens with focus in its next-action box; Undo works.
   - A one-step task still goes straight to a week.
   - The "Open week" toast navigates to the right week.
-  - The Month page's week list shows the Week page's count, never counts
-    goals, and opens the week; the season lists months and the year lists
-    seasons.
-  - `nextLevelChoices` has its own unit tests.
-- The previous branch's tests (month before a season, `goalConversion`) still
-  pass.
+  - The Month page's week list shows the Week page's own count and never
+    counts goals; Season lists months and Year lists seasons.
+- **Conversion against the fake database**
+  (`useSupabaseTasks.planWrites.test.ts`, "goal conversion and its Undo
+  preserve the row"):
+  - `setGoal` writes `is_goal` only, in one row update, and adds no row.
+  - The open and the carried season records, `assigned_to`/`assigned_to_all`,
+    `goal_id`, notes, area and scope are identical after converting and after
+    Undo.
+  - A row planned into a week is refused, with nothing written.
+- **Boundaries** (`nextLevel.test.ts`):
+  - Year 2026 lists "Winter 2025–26 · Spring · Summer · Fall · Winter
+    2026–27". This was a defect before the fix: two entries both read
+    "Winter".
+  - A Winter season's months read "December · January 2027 · February 2027".
+  - December's last week is "Dec 27 – Jan 2", counted as the Week page counts
+    it, including an item dated Jan 1.
+  - A week shared by November and December shows the same count on both.
 
-**Not verified:**
-- **Live in the running app.** After the reboot the browser is signed out of
-  the demo at `localhost:5199`, and Claude cannot sign in. It needs Scott to
-  sign in there first.
-- Narrow-screen rendering of the new list.
+### Live acceptance on :5199 (2026-09-26)
+
+Account confirmed before any write: `symphonygoals@gmail.com`
+(`f9ff9f28-…`). Build: branch at `84771c00`. All fixtures were `QA-NH …` rows in
+December 2026, created **through the UI** and deleted afterwards (4 rows).
+
+- **Baseline:** before any write, the demo's 41 other tasks and their records
+  were hashed. After cleanup the count and both hashes were **identical**, so
+  none of Scott's imported plans were touched.
+
+| Step | Observed live |
+|---|---|
+| Add "QA-NH Complete solo album" by keyboard in *Add a task for December* | one `POST tasks 201`; the row shows **Break into next actions** |
+| Keyboard focus on *Break …*, then Enter | one `PATCH tasks {"is_goal":true}`; the row moves to Month goals; **focus lands in "New next action for …"**; toast: "…now holds its next actions — it is a goal on December. Add them below." with Undo |
+| Type two next actions, Enter after each | two `POST tasks 201`; both under the goal (`goal_task_id` set), each with its December record; focus stays in the box |
+| Plan *Try chord progressions* into Dec 13–19 | the life-area question appears first (existing rule for untagged items; the test goal had no area). Answered, it sent a `PATCH` plus a `POST task_commitments` week record, with December kept. The **parent stays on the month**; the action shows "→ December 13–19"; toast "Planned … for December 13–19." |
+| The toast's **Open week** (second action) | lands on `/week?start=2026-12-13`. The Week list holds both actions, each showing its parent goal and "From December"; the parent itself is not a week item |
+| Full reload of December | persisted: the parent is a goal; both actions read "Chosen for December 13–19"; header "1 goals · 2 tasks"; the weeks list reads "Dec 13 – 19 — 2 on its list", matching the Week page's "2 tasks on the week's list" |
+| Keyboard Enter on "Open the week of Dec 27 – Jan 2" | lands on `/week?start=2026-12-27` (the year boundary) |
+| Break into next actions → **Undo** on a second fixture | `PATCH {"is_goal":true}`, then `PATCH {"is_goal":false}`; the DB row is back to `is_goal=false` with its December record open |
+| Year 2026, live | "Winter 2025–26 · Spring · Summer · Fall (this season) · Winter 2026–27" |
+| 390px (same-origin iframe, signed in) | no horizontal scroll; all five Open week buttons 44px tall and on screen; the Break link is a 44px target; the goal title wraps, 157px wide; "+ Add a next action" is on screen |
+
+**Not covered live:**
+- A second account's view of shared next actions.
+- Keyboard focus-ring painting. The harness (`outputs/plan-keyboard`) covers
+  the goal list, not the new list at the bottom of the page.
+- The fixture Chromium harness planned for this change was not built. Live
+  acceptance became possible first and superseded it.
 
 ## Open
 
