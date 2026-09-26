@@ -2988,3 +2988,88 @@ describe('horizon flows: outcomes on Year/Season/Month, next actions into weeks 
     expect(mockNavigate).toHaveBeenCalledWith('/today')
   })
 })
+
+describe('choosing goals from an imported, flat season list', () => {
+  const fall = periodStartFor('season', new Date(2026, 8, 10), DEFAULT_SEASONS)
+  const q = (id: string, title: string, over: Partial<Task> = {}) => task({ id, title, bucket: 'quarter', seasonStart: fall, ...over })
+  beforeEach(() => {
+    pinClock(); localStorage.clear()
+    state.goals = []; state.loading = false; routinesState.routines = []
+    seasonsState.seasons = DEFAULT_SEASONS; seasonsState.loading = false
+    Object.values(hook).forEach((f) => f.mockClear()); toastSpy.mockClear()
+    hook.updateTask.mockImplementation(async () => true)
+    state.tasks = [
+      q('v', 'Plan winter vacation', { context: 'family', notes: 'Somewhere warm', assignedToAll: ['me', 'm2'] }),
+      q('r', 'Nourish a love of reading', { context: 'family' }),
+      q('p', 'Renew the passports'),
+      q('f', 'Book flu shots', { bucket: 'timed', scheduledFor: new Date(2026, 9, 3), isAllDay: true,
+        commitments: [{ level: 'season', periodStart: fall, status: 'open' }] }),
+    ]
+  })
+  afterEach(() => { vi.useRealTimers(); hook.updateTask.mockImplementation(async () => true) })
+
+  it('a season with no goals opens on the question, not an empty box above the list', () => {
+    renderPage('season')
+    const goals = screen.getByRole('region', { name: /goals$/ })
+    expect(within(goals).getByText(/list has 4 items and no goals yet/)).toBeInTheDocument()
+    expect(within(goals).getByRole('button', { name: 'Choose Fall 2026’s goals' })).toBeInTheDocument()
+    // The per-row conversion link steps aside while the whole-list sort is offered.
+    expect(screen.queryByRole('button', { name: /^Break .* into next actions$/ })).toBeNull()
+  })
+
+  it('pick → preview → confirm flips isGoal on the chosen rows only, and nothing else', async () => {
+    renderPage('season')
+    fireEvent.click(screen.getByRole('button', { name: 'Choose Fall 2026’s goals' }))
+    const panel = screen.getByRole('region', { name: 'Choose Fall 2026\'s goals' })
+    fireEvent.click(within(panel).getByRole('checkbox', { name: /Plan winter vacation/ }))
+    fireEvent.click(within(panel).getByRole('checkbox', { name: /Nourish a love of reading/ }))
+    // The dated action is not offered; the reason is.
+    expect(within(panel).queryByRole('checkbox', { name: /Book flu shots/ })).toBeNull()
+    expect(within(panel).getByText(/already has a day/)).toBeInTheDocument()
+    expect(hook.updateTask).not.toHaveBeenCalled()
+    fireEvent.click(within(panel).getByRole('button', { name: 'Preview 2 goals' }))
+    expect(within(panel).getByRole('heading', { name: '2 items become goals for Fall 2026' })).toHaveFocus()
+    expect(within(panel).getByText(/1 stays a single action|2 stay single actions/)).toBeInTheDocument()
+    fireEvent.click(within(panel).getByRole('button', { name: 'Make 2 goals' }))
+    await waitFor(() => expect(hook.updateTask).toHaveBeenCalledTimes(2))
+    expect(hook.updateTask.mock.calls).toEqual([['v', { isGoal: true }], ['r', { isGoal: true }]])
+  })
+
+  it('a row that fails to save is named, retried alone, and the panel stays open', async () => {
+    hook.updateTask.mockImplementation(async (id: unknown) => id !== 'r')
+    renderPage('season')
+    fireEvent.click(screen.getByRole('button', { name: 'Choose Fall 2026’s goals' }))
+    const panel = screen.getByRole('region', { name: 'Choose Fall 2026\'s goals' })
+    fireEvent.click(within(panel).getByRole('button', { name: /Tick all/ }))
+    fireEvent.click(within(panel).getByRole('button', { name: /^Preview/ }))
+    fireEvent.click(within(panel).getByRole('button', { name: /^Make \d goals$/ }))
+    expect(await within(panel).findByRole('alert')).toHaveTextContent('1 didn’t save')
+    hook.updateTask.mockClear(); hook.updateTask.mockImplementation(async () => true)
+    fireEvent.click(within(panel).getByRole('button', { name: 'Try the 1 again' }))
+    await waitFor(() => expect(hook.updateTask.mock.calls).toEqual([['r', { isGoal: true }]]))
+  })
+
+  it('the sort can be undone from the page after the toast has gone', async () => {
+    renderPage('season')
+    fireEvent.click(screen.getByRole('button', { name: 'Choose Fall 2026’s goals' }))
+    const panel = screen.getByRole('region', { name: 'Choose Fall 2026\'s goals' })
+    fireEvent.click(within(panel).getByRole('checkbox', { name: /Plan winter vacation/ }))
+    fireEvent.click(within(panel).getByRole('button', { name: /^Preview/ }))
+    fireEvent.click(within(panel).getByRole('button', { name: 'Make 1 goal' }))
+    await waitFor(() => expect(hook.updateTask).toHaveBeenCalledWith('v', { isGoal: true }))
+    // The database answer arrives: the row is now a goal.
+    state.tasks = state.tasks.map((x) => (x.id === 'v' ? { ...x, isGoal: true } : x))
+    cleanup(); renderPage('season')
+    fireEvent.click(await screen.findByRole('button', { name: 'Undo the sort' }))
+    await waitFor(() => expect(hook.updateTask).toHaveBeenLastCalledWith('v', { isGoal: false }))
+  })
+
+  it('"Not now" is remembered, and a quiet way in stays by the list', () => {
+    const { unmount } = renderPage('season')
+    fireEvent.click(screen.getByRole('button', { name: 'Not now' }))
+    unmount(); renderPage('season')
+    expect(screen.queryByRole('button', { name: 'Choose Fall 2026’s goals' })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Any of these goals? Choose…' }))
+    expect(screen.getByRole('region', { name: 'Choose Fall 2026\'s goals' })).toBeInTheDocument()
+  })
+})

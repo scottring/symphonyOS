@@ -37,14 +37,14 @@ export function RefineGoalControl({ goalTitle, rungNoun, periods, onAdd }: {
     return (
       <button type="button" onClick={() => setOpen(true)}
         aria-label={`Add a ${rungNoun} goal for ${goalTitle}`}
-        className="mt-1 block text-xs text-neutral-500 hover:text-primary-700 hover:underline">
+        className="goal-refine-open text-xs text-neutral-500 hover:text-primary-700 hover:underline [:not(.flex)>&]:mt-1 [:not(.flex)>&]:block">
         + Add a {rungNoun} goal for it
       </button>
     )
   }
   return (
     <form
-      className="goal-refine-form mt-1.5 flex flex-wrap items-center gap-2"
+      className="goal-refine-form mt-1.5 flex w-full basis-full flex-wrap items-center gap-2"
       onSubmit={async (e) => {
         e.preventDefault()
         const t = title.trim()

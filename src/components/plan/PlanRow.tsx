@@ -372,7 +372,9 @@ export function PlanRow({
           <SupportLine label="Supports" refs={[row.supports]} onOpen={onOpenSupport} />
         )}
         {goalControls}
-        {refine}
+        {/* A goal that takes next actions carries its refine link on the same
+            line as "+ Add a next action" (below); a year goal has only this. */}
+        {!canHoldSteps && refine}
         {!!row.supportedBy?.length && (
           <SupportLine label="Supported by" refs={row.supportedBy} onOpen={onOpenSupport} />
         )}
@@ -389,8 +391,9 @@ export function PlanRow({
         })()}
         {/* What the goal holds, said whether it is open or shut — a collapsed
             goal that only says "5 supporting tasks" hides how much is done. */}
-        {canHoldSteps && (tally.total > 0 || !!onAddStep) && (
+        {canHoldSteps && (tally.total > 0 || !!onAddStep || !!refine) && (
           <span className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs">
+            {refine}
             {tally.total > 0 && (
               <button ref={countsRef} type="button" onClick={() => onToggleExpand?.(row)} className="text-primary-700 hover:underline">
                 {countsLabel(tally)}{expanded ? ' · hide' : ' · show'}
