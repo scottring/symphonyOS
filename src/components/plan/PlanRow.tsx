@@ -501,7 +501,7 @@ export function PlanRow({
         )}
         {onAddStep && (
           <form
-            className="period-plan-step-add flex items-center py-1.5 pr-2"
+            className="period-plan-step-add flex flex-wrap items-center gap-y-1 py-1.5 pr-2"
             onSubmit={(e) => {
               e.preventDefault()
               const t = stepDraft.trim()
@@ -521,7 +521,7 @@ export function PlanRow({
               value={stepDraft}
               onChange={(e) => setStepDraft(e.target.value)}
               placeholder="Add a next action"
-              className="min-w-0 flex-1 bg-transparent py-1.5 text-[15px] text-neutral-800 placeholder:text-neutral-400 focus:outline-none"
+              className="min-w-[10rem] flex-1 bg-transparent py-1.5 text-[15px] text-neutral-800 placeholder:text-neutral-400 focus:outline-none"
             />
             {/* The week, chosen as the action is written — optional, and it
                 sticks for the next one so a run of actions lands together.
@@ -531,7 +531,7 @@ export function PlanRow({
                 aria-label={`Which week — next action for ${row.title}`}
                 value={stepWeek}
                 onChange={(e) => setStepWeek(e.target.value)}
-                className="period-step-week ml-2 shrink-0 rounded-md border border-neutral-200 bg-white px-1.5 py-1 text-xs text-neutral-600"
+                className="period-step-week max-w-full rounded-md border border-neutral-200 bg-white px-1.5 py-1 text-xs text-neutral-600"
               >
                 <option value="">No week yet</option>
                 {stepWeeks.map((w) => <option key={w.start.getTime()} value={String(w.start.getTime())}>{w.label}</option>)}

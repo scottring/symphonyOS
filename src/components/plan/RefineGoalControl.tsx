@@ -60,7 +60,7 @@ export function RefineGoalControl({ goalTitle, rungNoun, periods, onAdd }: {
       }}
       onKeyDown={(e) => { if (e.key === 'Escape') { e.stopPropagation(); setOpen(false) } }}
     >
-      <Plus className="h-3.5 w-3.5 shrink-0 text-neutral-400" aria-hidden="true" />
+      <Plus className="hidden h-3.5 w-3.5 shrink-0 text-neutral-400 sm:block" aria-hidden="true" />
       <input
         autoFocus
         aria-label={`New ${rungNoun} goal for ${goalTitle}`}
