@@ -87,7 +87,10 @@ export async function applySession(
   const pendingGoals = new Set(cur.newGoals.map((g) => g.id))
   for (const t of d.newTasks) {
     if (t.linkId && pendingGoals.has(t.linkId)) continue            // its goal isn't written yet — wait
-    if (await wrote(() => w.addTask(t.title, { id: t.id, periodStart, day: t.day ? parseLocalYmd(t.day) : undefined, goalTaskId: t.linkId, context: t.context ?? null }))) {
+    // A new next action under a goal takes the goal's area unless the draft
+    // chose one — the same default "keep, and add a next action" already has.
+    const area = t.context ?? (t.linkId ? (d.newGoals.find((g) => g.id === t.linkId)?.context ?? w.contextOf(t.linkId)) : null) ?? null
+    if (await wrote(() => w.addTask(t.title, { id: t.id, periodStart, day: t.day ? parseLocalYmd(t.day) : undefined, goalTaskId: t.linkId, context: area }))) {
       progress({ ...cur, newTasks: cur.newTasks.filter((x) => x.id !== t.id) })
     }
   }

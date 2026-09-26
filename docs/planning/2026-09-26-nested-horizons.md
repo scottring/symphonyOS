@@ -142,10 +142,28 @@ Fixtures, December 2026, deleted afterwards:
 | Scott, in Edith's window: Open week | the week page lists the shared action with its parent goal |
 | Cleanup | 4 QA-2A rows deleted; the demo's 41 rows and their records hash **identical** to the baseline |
 
-**Finding (not fixed):** a next action added under a goal is created without
-the goal's area. So planning it into a week asks "Where does this belong?",
-even under a Family goal. Inheriting the goal's area when the action is created
-would remove that step. Recorded for a follow-up.
+**Finding, then fixed (branch `claude/next-action-area`, 2026-09-26):** a next
+action added under a goal used to be created without the goal's area, so
+planning it into a week asked "Where does this belong?" even under a Family
+goal. The agreed default:
+- A **new** next action takes its goal's life area.
+- It stays editable like any area, and existing actions are left unchanged.
+- An explicitly chosen area still wins, and a goal with no area falls back to
+  the domain in view.
+- This covers both creation paths: the plan page's next-action box
+  (`PeriodPlanPage.addStep`) and a planning session's new tasks linked to a
+  goal (`applySession`, including a goal created in the same session). A
+  session's "keep, and add a next action" already did this.
+
+Evidence:
+- Tests: the page's goal area beats the domain in view; an untagged goal falls
+  back to the domain in view; existing actions are not rewritten; in a
+  session, an explicit area wins.
+- Live on :5199 (demo; a disposable "QA-AREA" Family goal): a next action
+  added through the page was created as `family`/`compound`. Planning it into
+  Dec 13–19 went straight through, with no area question (a `PATCH` and a
+  week record). The fixtures were deleted, and the other 41 rows hash
+  identical to the baseline.
 
 **Not covered live:**
 - Keyboard focus-ring painting. The harness (`outputs/plan-keyboard`) covers

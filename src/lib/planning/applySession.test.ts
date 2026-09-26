@@ -147,4 +147,20 @@ describe('applySession', () => {
     expect(ctxOf('Call Hughes')).toBe('work')
     expect(ctxOf('Loose')).toBeNull()
   })
+
+  it('a new next action with no area of its own takes its goal\'s — an existing goal\'s or one made in the same session', async () => {
+    const { w } = writers({ contextOf: vi.fn((id: string) => (id === 'FAM' ? 'family' as const : null)) })
+    await applySession({ ...emptyDraft('month', oct, sep),
+      newGoals: [{ id: 'G1', title: 'Three bids', context: 'work' }],
+      newTasks: [
+        { id: 'T1', title: 'Under a family goal', linkId: 'FAM' },
+        { id: 'T2', title: 'Under a new work goal', linkId: 'G1', context: null },
+        { id: 'T3', title: 'Chosen personal', linkId: 'FAM', context: 'personal' },
+      ],
+    }, w, () => false)
+    const ctxOf = (title: string) => (w.addTask as ReturnType<typeof vi.fn>).mock.calls.find((c) => c[0] === title)![1].context
+    expect(ctxOf('Under a family goal')).toBe('family')
+    expect(ctxOf('Under a new work goal')).toBe('work')
+    expect(ctxOf('Chosen personal')).toBe('personal')      // an explicit choice still wins
+  })
 })
