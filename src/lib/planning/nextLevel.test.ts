@@ -34,3 +34,35 @@ describe('nextLevelChoices — the way down from a plan page', () => {
     expect(seasons.filter((s) => s.current)).toHaveLength(1)
   })
 })
+
+describe('nextLevelChoices at month and year boundaries', () => {
+  const at = new Date(2026, 8, 26)
+  it('Year 2026 names both Winters it touches, so they cannot be confused', () => {
+    const seasons = nextLevelChoices('year', { start: new Date(2026, 0, 1), end: new Date(2027, 0, 1) }, [], null, DEFAULT_SEASONS, at)
+    expect(seasons.map((s) => s.label)).toEqual(['Winter 2025–26', 'Spring', 'Summer', 'Fall', 'Winter 2026–27'])
+    expect(seasons.map((s) => s.href)).toEqual(['/season?start=2025-12-01', '/season?start=2026-03-01', '/season?start=2026-06-01', '/season?start=2026-09-01', '/season?start=2026-12-01'])
+    expect(new Set(seasons.map((s) => s.label)).size).toBe(seasons.length)
+  })
+  it('a Winter season names the months of the next year with their year', () => {
+    const months = nextLevelChoices('season', { start: new Date(2026, 11, 1), end: new Date(2027, 2, 1) }, [], null, DEFAULT_SEASONS, at)
+    expect(months.map((m) => m.label)).toEqual(['December', 'January 2027', 'February 2027'])
+    expect(months[1].href).toBe('/month?start=2027-01-01')
+  })
+  it('December includes the week that crosses into January, and counts it as the Week page does', () => {
+    const DEC27 = new Date(2026, 11, 27)
+    const onIt = { bucket: 'week' as const, weekStart: DEC27, commitments: [{ level: 'week' as const, periodStart: DEC27, status: 'open' as const }] }
+    const tasks = [task(onIt), task({ ...onIt, scheduledFor: new Date(2027, 0, 1), bucket: 'timed' })]
+    const weeks = nextLevelChoices('month', { start: new Date(2026, 11, 1), end: new Date(2027, 0, 1) }, tasks, null, DEFAULT_SEASONS, at)
+    const last = weeks.at(-1)!
+    expect(last).toMatchObject({ label: 'Dec 27 – Jan 2', href: '/week?start=2026-12-27', open: 2 })
+    expect(weeks[0].href).toBe('/week?start=2026-11-29')
+  })
+  it('a week shared by two months shows the same count on both — it is one week', () => {
+    const NOV29 = new Date(2026, 10, 29)
+    const tasks = [task({ bucket: 'week', weekStart: NOV29, commitments: [{ level: 'week', periodStart: NOV29, status: 'open' }] })]
+    const nov = nextLevelChoices('month', { start: new Date(2026, 10, 1), end: new Date(2026, 11, 1) }, tasks, null, DEFAULT_SEASONS, at)
+    const dec = nextLevelChoices('month', { start: new Date(2026, 11, 1), end: new Date(2027, 0, 1) }, tasks, null, DEFAULT_SEASONS, at)
+    expect(nov.find((w) => w.href === '/week?start=2026-11-29')?.open).toBe(1)
+    expect(dec.find((w) => w.href === '/week?start=2026-11-29')?.open).toBe(1)
+  })
+})

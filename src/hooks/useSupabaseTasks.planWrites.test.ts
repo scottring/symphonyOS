@@ -1174,3 +1174,57 @@ describe('transactional placement: the refusal code', () => {
     expect(toast).toHaveBeenCalledWith(expect.stringMatching(/changed somewhere else/), 'error', 4000)
   })
 })
+
+// Nested horizons (2026-09-26): "Break into next actions" and task-details
+// "Make it a goal" call setGoal on the SAME row, and Undo calls it back. Against
+// the fake database: only `is_goal` changes, in one row write; every commitment,
+// assignee, link, note and area is exactly what it was, before and after Undo.
+describe('goal conversion and its Undo preserve the row', () => {
+  const FALL = '2026-10-01'
+  const seed = (over: Row = {}) => {
+    db.seed('tasks', dbTaskRow({
+      id: 't1', title: 'Nourish a love of reading', bucket: 'quarter', season_start: FALL,
+      context: 'family', scope: 'compound', assigned_to: 'm1', assigned_to_all: ['m1', 'm2'],
+      goal_id: 'year-goal-1', notes: 'Library card for each kid', ...over,
+    }))
+    db.seed('task_commitments', { id: 'cs', task_id: 't1', level: 'season', period_start: FALL, status: 'open', carried_to: null, ended_at: null })
+    db.seed('task_commitments', { id: 'cold', task_id: 't1', level: 'season', period_start: '2026-06-01', status: 'carried', carried_to: FALL, ended_at: '2026-06-30T00:00:00Z' })
+  }
+  const mount = async () => {
+    const h = renderHook(() => useSupabaseTasks())
+    await waitFor(() => expect(h.result.current.tasks.find((t) => t.id === 't1')).toBeTruthy())
+    db.clearWriteLog()
+    return h
+  }
+  const snapshot = () => ({
+    row: { ...db.rows('tasks').find((r) => r.id === 't1')! },
+    records: db.rows('task_commitments').filter((c) => c.task_id === 't1').map((c) => ({ ...c })),
+  })
+  const strip = (r: Row) => { const { updated_at: _u, is_goal: _g, ...rest } = r; return rest }
+
+  it('converting writes is_goal only; Undo restores the row exactly', async () => {
+    seed()
+    const before = snapshot()
+    const h = await mount()
+    await act(async () => { await h.result.current.setGoal('t1', true) })
+    const mid = snapshot()
+    expect(mid.row.is_goal).toBe(true)
+    expect(strip(mid.row)).toEqual(strip(before.row))
+    expect(mid.records).toEqual(before.records)
+    expect(db.writeLog().every((w) => w === 'tasks:update')).toBe(true)
+    expect(db.rows('tasks')).toHaveLength(1)                              // no duplicate row
+    await act(async () => { await h.result.current.setGoal('t1', false) })
+    const after = snapshot()
+    expect(strip(after.row)).toEqual(strip(before.row))
+    expect(after.row.is_goal).toBe(false)
+    expect(after.records).toEqual(before.records)
+  })
+
+  it('a row planned into a week is refused, and nothing is written', async () => {
+    seed({ bucket: 'week', week_start: '2026-10-04' })
+    const h = await mount()
+    await act(async () => { await h.result.current.setGoal('t1', true) })
+    expect(db.writeLog()).toEqual([])
+    expect(db.rows('tasks').find((r) => r.id === 't1')!.is_goal).toBe(false)
+  })
+})

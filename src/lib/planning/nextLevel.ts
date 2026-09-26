@@ -38,6 +38,25 @@ export interface NextLevelChoice {
   current: boolean
 }
 
+/**
+ * A season named so two of the same name on one year page cannot be confused:
+ * Year 2026 holds the Winter that ENDS in it and the one that begins in it
+ * (2026-09-26, found at the year boundary). A season inside one calendar year
+ * is just its name.
+ */
+function seasonSpanLabel(b: { start: Date; end: Date; label: string }): string {
+  const name = b.label.replace(/\s+\d{4}$/, '')
+  const lastDay = new Date(b.end.getFullYear(), b.end.getMonth(), b.end.getDate() - 1)
+  return lastDay.getFullYear() === b.start.getFullYear()
+    ? name
+    : `${name} ${b.start.getFullYear()}–${String(lastDay.getFullYear()).slice(-2)}`
+}
+
+/** A month names its year only when the season it sits in began in another. */
+function monthLabel(month: Date, seasonStart: Date): string {
+  return month.toLocaleDateString('en-US', month.getFullYear() === seasonStart.getFullYear() ? { month: 'long' } : { month: 'long', year: 'numeric' })
+}
+
 export function nextLevelChoices(
   level: PlanLevel,
   bounds: { start: Date; end: Date },
@@ -68,7 +87,7 @@ export function nextLevelChoices(
     out.push({
       level: childLevel,
       start: b.start,
-      label: childLevel === 'month' ? b.start.toLocaleDateString('en-US', { month: 'long' }) : b.label.replace(/\s+\d{4}$/, ''),
+      label: childLevel === 'month' ? monthLabel(b.start, bounds.start) : seasonSpanLabel(b),
       open: selectPeriodTasks(tasks, childLevel, b.start, current, meId, seasons).filter((t) => !t.completed).length,
       href: `/${childLevel}?start=${localYmd(b.start)}`,
       current,

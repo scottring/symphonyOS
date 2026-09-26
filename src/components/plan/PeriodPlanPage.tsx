@@ -460,6 +460,9 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
   const clearComposerFocus = useCallback(() => setComposerFocusId(null), [])
   const makeGoalFor = useCallback((row: PlanRowModel) => {
     if (isPast || row.isGoal || row.kind !== 'task' || level === 'year') return undefined
+    // Only a row still open HERE: one already planned lower (a season row in
+    // October, a month row on a week) would become a goal on two lists at once.
+    if (row.fate !== 'open') return undefined
     const t = tasks.find((x) => x.id === row.id)
     if (!t || !goalConversion(t, tasks).ok) return undefined
     return () => {
