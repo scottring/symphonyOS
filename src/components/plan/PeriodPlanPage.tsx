@@ -84,6 +84,11 @@ import { useDayLoadEvents, DAY_LOAD_RANGE_DAYS } from '@/hooks/useDayLoadEvents'
 const TASK_PREVIEW_CAP = 5
 
 const NOUN: Record<PlanLevel, string> = { month: 'month', season: 'season', year: 'year' }
+/** "1 goal · 3 tasks" — the status line's count, singular when it is one. */
+function countLine(goals: number, tasks: number | null): string {
+  const g = `${goals} goal${goals === 1 ? '' : 's'}`
+  return tasks === null ? g : `${g} · ${tasks} task${tasks === 1 ? '' : 's'}`
+}
 /** "September 2026" with the year set back — the period is the page's name,
  *  not a category label like "This Month" (Scott, 2026-09-13). */
 function periodTitle(level: PlanLevel, label: string) {
@@ -1400,7 +1405,7 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
                 // A count of a list that has not arrived is not a count.
                 : listsLoading
                   ? <span className="text-neutral-400">Loading…</span>
-                  : `${goalRows.filter((r) => !rowIsDone(r.fate)).length} goals${level === 'year' ? '' : ` · ${openTaskRows.length + supportingTaskCount} tasks`}`}
+                  : countLine(goalRows.filter((r) => !rowIsDone(r.fate)).length, level === 'year' ? null : openTaskRows.length + supportingTaskCount)}
             {/* S2-15: the body said "0 goals · 0 tasks" while five things
                 were already on the calendar, all behind a closed Shelves.
                 The count is here; the button opens them. */}

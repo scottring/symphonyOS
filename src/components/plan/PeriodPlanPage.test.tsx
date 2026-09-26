@@ -2341,7 +2341,7 @@ describe('a year whose goals have not arrived does not claim to be empty', () =>
     state.goalsLoading = false
     state.goals = [goal({ name: 'Run a half marathon' })]
     renderPage('year')
-    expect(screen.getByText('1 goals')).toBeInTheDocument()
+    expect(screen.getByText('1 goal')).toBeInTheDocument()
     expect(screen.queryByText('Loading…')).not.toBeInTheDocument()
   })
 })
