@@ -324,9 +324,10 @@ describe('Grouped More menu and desktop capture', () => {
     expect(plan).not.toContainElement(screen.getByRole('button', { name: 'Plan from paper' }))
   })
 
-  it('adds from the dock + on phones, with no floating button anywhere', () => {
+  // Desktop keeps its round + (Scott, 2026-09-26); phones add from the dock's +.
+  it('desktop has its round + button; phones add from the dock + with no floating button', () => {
     const desktop = renderAt('/today')
-    expect(screen.getByTestId('quick-capture')).toHaveAttribute('data-fab', 'false')
+    expect(screen.getByTestId('quick-capture')).toHaveAttribute('data-fab', 'true')
     expect(screen.queryByRole('button', { name: 'Add' })).not.toBeInTheDocument()
     desktop.unmount()
     mobileState.isMobile = true
