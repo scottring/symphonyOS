@@ -1,345 +1,408 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="description" content="A place for everything life brings. Symphony connects what matters in your life with what needs doing today, and keeps what you need to do it right beside the work.">
-<meta name="theme-color" content="#ffffff">
-<meta property="og:title" content="Symphony — A place for everything life brings.">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Symphony · A place for everything life brings</title>
+<meta name="description" content="Symphony connects what matters in your life with what needs doing today, and keeps what you need to do it right beside the work.">
+<meta name="theme-color" content="#eef4f1">
+<meta property="og:title" content="Symphony · A place for everything life brings">
 <meta property="og:description" content="Connect what matters in your life with what needs doing today, and arrive ready to do it.">
-<title>Symphony — A place for everything life brings.</title>
 <link rel="icon" href="symphony-logo.jpg">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Source+Sans+3:ital,wght@0,400;0,500;0,600;1,400&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,500;1,8..60,400&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="journal.css">
+<link href="https://fonts.googleapis.com/css2?family=Crimson+Pro:ital,wght@0,400;0,500;1,400&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="scrollcraft.css">
+<link rel="stylesheet" href="symphony.css">
 </head>
 <body>
 <a class="skip" href="#main">Skip to content</a>
 
-<header class="site-header page-width">
-  <a class="wordmark" href="#" aria-label="Symphony home">Symphony<span class="brand-dot">.</span></a>
-  <nav aria-label="Main navigation">
-    <a class="nav-optional" href="#how-it-works">How it works</a>
-    <a href="https://app.symphony-os.com">Sign in</a>
-    <a class="join-link" href="#waitlist"><span class="join-long">Join the founding households</span><span class="join-short">Join us</span> <span class="arrow" aria-hidden="true">↗</span></a>
-  </nav>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <defs>
+    <symbol id="i-phone" viewBox="0 0 24 24"><path d="M5 3.5h3.2l1.6 4-2 1.3a10.5 10.5 0 0 0 5.4 5.4l1.3-2 4 1.6V17a2.5 2.5 0 0 1-2.5 2.5A15 15 0 0 1 2.5 6 2.5 2.5 0 0 1 5 3.5Z"/></symbol>
+    <symbol id="i-link" viewBox="0 0 24 24"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></symbol>
+    <symbol id="i-note" viewBox="0 0 24 24"><path d="M6 3.5h9l3.5 3.5v13.5H6ZM9.5 11h6M9.5 14.5h6M9.5 18h3.5"/></symbol>
+    <symbol id="i-mail" viewBox="0 0 24 24"><path d="M3.5 6h17v12h-17ZM4 6.5l8 6.5 8-6.5"/></symbol>
+    <symbol id="i-pin" viewBox="0 0 24 24"><path d="M12 21s-6.5-6.2-6.5-11a6.5 6.5 0 0 1 13 0c0 4.8-6.5 11-6.5 11Z"/><circle cx="12" cy="10" r="2.3"/></symbol>
+    <symbol id="i-lock" viewBox="0 0 24 24"><path d="M6.5 11h11v9h-11ZM8.5 11V8a3.5 3.5 0 0 1 7 0v3"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="m5.5 12.5 4.2 4.2 8.8-9.4"/></symbol>
+    <symbol id="i-goal" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3.5"/></symbol>
+    <symbol id="i-repeat" viewBox="0 0 24 24"><path d="M4.5 11V9.5a3 3 0 0 1 3-3h11m-3-3 3 3-3 3M19.5 13v1.5a3 3 0 0 1-3 3h-11m3 3-3-3 3-3"/></symbol>
+    <symbol id="i-camera" viewBox="0 0 24 24"><path d="M3.5 8h4l1.8-2.5h5.4L16.5 8h4v11h-17Z"/><circle cx="12" cy="13" r="3.4"/></symbol>
+  </defs>
+</svg>
+
+<header class="bar">
+  <div class="bar-inner">
+    <a class="wordmark" href="#main" aria-label="Symphony, back to top">Symphony</a>
+    <nav class="bar-nav" aria-label="Page sections">
+      <a href="#today" data-nav="today">Today</a>
+      <a href="#plan" data-nav="plan">Plan</a>
+      <a href="#inbox" data-nav="inbox">Inbox</a>
+      <a href="#more" data-nav="more">More</a>
+    </nav>
+    <div class="bar-end">
+      <a class="bar-signin" href="https://app.symphony-os.com">Sign in</a>
+      <a class="button" href="#waitlist">Save your place</a>
+    </div>
+  </div>
 </header>
 
 <main id="main">
 
-  <!-- Hero: headline beside the tree. Everything in the illustration is fictional. -->
-  <section class="hero page-width" aria-labelledby="hero-title">
-    <div class="hero-copy">
-      <p class="eyebrow">For the fullness of everyday life</p>
-      <h1 id="hero-title">A place for everything <em>life brings.</em></h1>
-      <p class="intro">Symphony connects what matters in your life with what needs doing today, and keeps what you need to do it right beside the work.</p>
-      <div class="hero-actions">
-        <a class="primary-button" href="#waitlist">Join the founding households <span aria-hidden="true">↗</span></a>
-        <a class="quiet-link" href="#daybook">See a day inside <span aria-hidden="true">↓</span></a>
-      </div>
-      <p class="offer-line">Ten founding households · $25/month, locked for life</p>
-    </div>
-
-    <figure class="tree-story" aria-labelledby="tree-caption">
-      <div class="illustration-caption">
-        <span id="tree-caption" class="caption-text">Everything in its place, and ready when it’s time.</span>
-        <span class="motion-controls">
-          <button id="motion-toggle" type="button" aria-controls="life-tree" hidden><span>Pause<span class="motion-word"> animation</span></span></button>
-        </span>
-      </div>
-
-      <svg id="life-tree" viewBox="0 70 600 430" role="img" aria-labelledby="tree-title tree-description">
-        <title id="tree-title">Everything life brings, finding its place</title>
-        <desc id="tree-description">Sticky notes, phone calls, appointments, a soccer ball, a baseball, a violin, a drawing tablet, colored pencils, conversations, emails, a car, and a bicycle rain down into a tree whose branches open like a funnel. They gather down the trunk, and three roots carry them into Today, This week, and This month. One item on Today opens with everything needed to do it.</desc>
-        <defs>
-          <symbol id="note" viewBox="0 0 48 48"><path d="M8 5h32v28L29 44H8Z" fill="#fff2ce"/><path d="M40 33H29v11M15 15h17M15 22h12"/></symbol>
-          <symbol id="call" viewBox="0 0 48 48"><path d="m12 5 9 10-6 7c3 6 5 8 11 11l7-6 10 9-5 7C20 45 3 27 5 10Z" fill="#edf2f8"/></symbol>
-          <symbol id="appointment" viewBox="0 0 48 48"><rect x="6" y="9" width="36" height="33" rx="3" fill="#fff"/><path d="M6 19h36M15 5v9M33 5v9m-17 16 5 5 10-11"/></symbol>
-          <symbol id="soccer" viewBox="0 0 48 48"><circle cx="24" cy="24" r="20" fill="#fff"/><path d="m24 14 10 7-4 12H18l-4-12Z" fill="#586981"/><path d="M24 14V4m10 17 9-3m-13 15 6 8m-18-8-6 8m2-20-9-3"/></symbol>
-          <symbol id="baseball" viewBox="0 0 48 48"><circle cx="24" cy="24" r="20" fill="#fff"/><path d="M12 8c10 9 10 23 0 32M36 8c-10 9-10 23 0 32" stroke="#c66650"/><path d="m14 14 4-2m-2 7 5-1m-5 7h5m-4 7 4 1m20-19-4-2m2 7-5-1m5 7h-5m4 7-4 1" stroke="#c66650" stroke-width="1.2"/></symbol>
-          <symbol id="violin" viewBox="0 0 48 64"><path d="M22 3h5v11h-5Z"/><path d="M24.5 14v9"/><path d="M19 23c-8-2-12 6-7 11 3 3 3 4-1 7-7 6-2 18 13 18s20-12 13-18c-4-3-4-4-1-7 5-5 1-13-7-11" fill="#efcfab"/><path d="M24.5 23v28m-4 0h8M20 36c1 1 1 3 0 4m9-4c-1 1-1 3 0 4M41 5 30 58"/></symbol>
-          <symbol id="tablet" viewBox="0 0 56 48"><rect x="3" y="7" width="44" height="34" rx="3" fill="#edf2f8"/><rect x="8" y="12" width="34" height="23" rx="1" fill="#fff"/><path d="m13 30 7-8 5 5 4-4 7 7M50 4l-8 26 4-2 8-23Z"/></symbol>
-          <symbol id="pencils" viewBox="0 0 48 48"><path d="m10 39 3-32 7 1-3 32-4 6Z" fill="#c3d3e6"/><path d="m23 38 4-33 7 1-4 33-4 6Z" fill="#efb7a8"/><path d="m35 38 3-26 7 1-3 26-4 6Z" fill="#eddb95"/><path d="m10 39 7 1m6-2 7 1m5-1 7 1"/></symbol>
-          <symbol id="chat" viewBox="0 0 48 48"><path d="M7 6h34v26H23L12 42V32H7Z" fill="#e4ece3"/><path d="M14 15h20M14 22h13"/></symbol>
-          <symbol id="mail" viewBox="0 0 48 48"><rect x="3" y="10" width="42" height="29" rx="2" fill="#fff"/><path d="m4 12 20 16 20-16M4 38l14-13m26 13L30 25"/></symbol>
-          <symbol id="car" viewBox="0 0 64 48"><path d="m5 31 3-14h8l7-10h20l9 12 8 5v12H5Z" fill="#dce6f0"/><path d="m18 18 7-8h15l6 9H18ZM7 26h7m35 0h8"/><circle cx="17" cy="35" r="6" fill="#fff"/><circle cx="47" cy="35" r="6" fill="#fff"/></symbol>
-          <symbol id="bicycle" viewBox="0 0 64 48"><circle cx="13" cy="33" r="11" fill="#fff"/><circle cx="51" cy="33" r="11" fill="#fff"/><path d="m13 33 13-20 12 20H13m25 0 9-24h-7m7 0 4 24M21 10h10m-5 3-3-3m4 8h17"/></symbol>
-          <symbol id="leaf" viewBox="-10 -5 20 10"><path d="M-9 0Q0-7 9 0Q0 7-9 0Z" fill="#e7ece8" stroke="#81958b" stroke-width=".8"/><path d="M-7 0H6" stroke="#81958b" stroke-width=".6"/></symbol>
-        </defs>
-
-        <!-- Rain: fine diagonal strokes that thin out as the storm passes. -->
-        <g id="rain" stroke="#b7c2d1" stroke-width="1" stroke-linecap="round" opacity="0"></g>
-
-        <!-- Ground: a single ruled line, like a page. -->
-        <path class="ground" d="M40 400H268M332 400H560" stroke="#dce2ea" fill="none"/>
-
-        <!-- The tree. Its branches open upward like a funnel. -->
-        <g class="tree" fill="none" stroke-linecap="round" stroke-linejoin="round">
-          <g stroke="#7d8ca1" stroke-width="1">
-            <path d="M96 150Q86 148 77 143 M96 150Q94 141 88 134 M200 238Q199 228 194 219 M147 195Q139 195 131 192 M168 124Q159 120 152 112 M168 124Q168 115 166 106 M235 224Q236 214 234 204 M200 175Q192 173 186 169 M244 112Q237 105 233 95 M244 112Q247 104 248 94 M270 215Q275 206 276 196 M255 165Q249 160 244 154 M302 104Q297 95 295 85 M302 104Q307 96 310 88 M300 203Q307 196 311 187 M300 153Q295 147 292 140 M356 112Q352 103 351 93 M356 112Q362 105 365 97 M331 215Q339 211 346 203 M345 165Q341 158 340 150 M432 124Q431 114 434 104 M432 124Q440 120 446 113 M366 224Q376 222 385 217 M400 175Q399 167 401 159 M504 150Q506 140 512 132 M504 150Q513 148 521 143 M400 238Q410 239 420 237 M453 195Q455 187 458 180"/>
-            <path d="M194 219Q195 215 195 210 M234 204Q236 200 237 196 M276 196Q279 193 281 189 M311 187Q315 184 319 182 M346 203Q350 201 355 200 M385 217Q389 217 394 217 M420 237Q424 238 429 239" stroke-width=".8"/>
-          </g>
-          <g stroke="#586981" stroke-width="1.4">
-            <path d="M298 330C262 280 170 220 96 150"/>
-            <path d="M299 324C276 270 214 205 168 124"/>
-            <path d="M300 320C290 262 258 196 244 112"/>
-            <path d="M300 318C302 250 298 180 302 104"/>
-            <path d="M301 320C312 262 342 196 356 112"/>
-            <path d="M302 324C326 270 386 205 432 124"/>
-            <path d="M303 330C338 280 430 220 504 150"/>
-          </g>
-          <g stroke="#2c405e" stroke-width="1.5">
-            <path d="M293 400c3-20 5-48 5-70M307 400c-3-20-5-48-5-70"/>
-            <path d="M286 400c4-2 6-5 7-10M314 400c-4-2-6-5-7-10"/>
-            <path d="M299 392v-14m2-24v-12" stroke="#b7c2d1" stroke-width="1"/>
-          </g>
-        </g>
-        <g class="leaves">
-          <use href="#leaf" width="20" height="10" transform="translate(77 143) rotate(-161) translate(-2 -5)"/>
-          <use href="#leaf" width="20" height="10" transform="translate(88 134) rotate(-115) translate(-2 -5)"/>
-          <use href="#leaf" width="20" height="10" transform="translate(92 146) rotate(-137) translate(-2 -5)"/>
-          <use href="#leaf" width="20" height="10" transform="translate(194 219) rotate(-107) translate(-2 -5)"/>
-          <use href="#leaf" width="20" height="10" transform="translate(195 210) rotate(-86) translate(-2 -5)"/>
-          <use href="#leaf" width="20" height="10" transform="translate(131 192) rotate(-172) translate(-2 -5)"/>
-          <use href="#leaf" width="20" height="10" transform="translate(152 112) rotate(-144) translate(-2 -5)"/>
-          <use href="#leaf" width="20" height="10" transform="translate(166 106) rotate(-98) translate(-2 -5)"/>
-          <use href="#leaf" width="20" height="10" transform="translate(165 119) rotate(-120) translate(-2 -5)"/>
-          <use href="#leaf" width="20" height="10" transform="translate(234 204) rotate(-92) translate(-2 -5)"/>
-          <use href="#leaf" width="20" height="10" transform="translate(237 196) rotate(-71) translate(-2 -5)"/>
-          <use href="#leaf" width="20" height="10" transform="translate(186 169) rotate(-156) translate(-2 -5)"/>
-          <use href="#leaf" width="20" height="10" transform="translate(233 95) rotate(-124) translate(-2 -5)"/>
-          <use href="#leaf" width="20" height="10" transform="translate(248 94) rotate(-78) translate(-2 -5)"/>
-          <use href="#leaf" width="20" height="10" transform="translate(243 106) rotate(-99) translate(-2 -5)"/>
-          <use href="#leaf" width="20" height="10" transform="translate(276 196) rotate(-73) translate(-2 -5)"/>
-          <use href="#leaf" width="20" height="10" transform="translate(281 189) rotate(-53) translate(-2 -5)"/>
-          <use href="#leaf" width="20" height="10" transform="translate(244 154) rotate(-136) translate(-2 -5)"/>
-          <use href="#leaf" width="20" height="10" transform="translate(295 85) rotate(-111) translate(-2 -5)"/>
-          <use href="#leaf" width="20" height="10" transform="translate(310 88) rotate(-65) translate(-2 -5)"/>
-          <use href="#leaf" width="20" height="10" transform="translate(302 98) rotate(-87) translate(-2 -5)"/>
-          <use href="#leaf" width="20" height="10" transform="translate(311 187) rotate(-56) translate(-2 -5)"/>
-          <use href="#leaf" width="20" height="10" transform="translate(319 182) rotate(-35) translate(-2 -5)"/>
-          <use href="#leaf" width="20" height="10" transform="translate(292 140) rotate(-121) translate(-2 -5)"/>
-          <use href="#leaf" width="20" height="10" transform="translate(351 93) rotate(-105) translate(-2 -5)"/>
-          <use href="#leaf" width="20" height="10" transform="translate(365 97) rotate(-59) translate(-2 -5)"/>
-          <use href="#leaf" width="20" height="10" transform="translate(357 106) rotate(-81) translate(-2 -5)"/>
-          <use href="#leaf" width="20" height="10" transform="translate(346 203) rotate(-39) translate(-2 -5)"/>
-          <use href="#leaf" width="20" height="10" transform="translate(355 200) rotate(-18) translate(-2 -5)"/>
-          <use href="#leaf" width="20" height="10" transform="translate(340 150) rotate(-107) translate(-2 -5)"/>
-          <use href="#leaf" width="20" height="10" transform="translate(434 104) rotate(-84) translate(-2 -5)"/>
-          <use href="#leaf" width="20" height="10" transform="translate(446 113) rotate(-39) translate(-2 -5)"/>
-          <use href="#leaf" width="20" height="10" transform="translate(435 119) rotate(-60) translate(-2 -5)"/>
-          <use href="#leaf" width="20" height="10" transform="translate(385 217) rotate(-20) translate(-2 -5)"/>
-          <use href="#leaf" width="20" height="10" transform="translate(394 217) rotate(1) translate(-2 -5)"/>
-          <use href="#leaf" width="20" height="10" transform="translate(401 159) rotate(-88) translate(-2 -5)"/>
-          <use href="#leaf" width="20" height="10" transform="translate(512 132) rotate(-67) translate(-2 -5)"/>
-          <use href="#leaf" width="20" height="10" transform="translate(521 143) rotate(-22) translate(-2 -5)"/>
-          <use href="#leaf" width="20" height="10" transform="translate(508 146) rotate(-43) translate(-2 -5)"/>
-          <use href="#leaf" width="20" height="10" transform="translate(420 237) rotate(-5) translate(-2 -5)"/>
-          <use href="#leaf" width="20" height="10" transform="translate(429 239) rotate(16) translate(-2 -5)"/>
-          <use href="#leaf" width="20" height="10" transform="translate(458 180) rotate(-71) translate(-2 -5)"/>
-        </g>
-
-        <!-- Roots: one for each planning list, reaching down to the lists below. -->
-        <g class="roots" fill="none" stroke-linecap="round">
-          <g stroke="#dce2ea" stroke-width="1">
-            <path d="M296 408c-18 18-58 22-86 40M304 408c18 18 58 22 86 40M152 452c-10 4-18 10-22 20M448 452c10 4 18 10 22 20M300 440c-8 10-12 22-12 34M300 440c8 10 12 22 12 34"/>
-          </g>
-          <path id="root-today" class="root" d="M300 400C300 446 100 440 100 500" stroke="#2c405e" stroke-width="1.5"/>
-          <path id="root-week" class="root" d="M300 400V500" stroke="#2c405e" stroke-width="1.5"/>
-          <path id="root-month" class="root" d="M300 400C300 446 500 440 500 500" stroke="#2c405e" stroke-width="1.5"/>
-        </g>
-
-        <g id="falling-objects" fill="none" stroke="#40536e" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></g>
-        <g id="root-sparks" fill="#dc482b"></g>
-      </svg>
-
-      <!-- Where the roots lead. Visible without JavaScript; the animation fills them in. -->
-      <div class="root-ledger">
-        <section class="ledger" data-root="today" aria-label="Today">
-          <p class="ledger-title" aria-hidden="true">Today</p>
-          <p class="ledger-date">Friday, Sep 18</p>
-          <ul>
-            <li data-from="call" class="ready-row"><svg class="ledger-icon" aria-hidden="true" viewBox="0 0 48 48"><use href="#call"/></svg><span><time>10:00</time> Call the pharmacy</span></li>
-            <li data-from="soccer"><svg class="ledger-icon" aria-hidden="true" viewBox="0 0 48 48"><use href="#soccer"/></svg><span><time>3:30</time> Soccer practice</span></li>
-            <li data-from="appointment"><svg class="ledger-icon" aria-hidden="true" viewBox="0 0 48 48"><use href="#appointment"/></svg><span><time>4:30</time> Eye exam</span></li>
-            <li data-from="note"><svg class="ledger-icon" aria-hidden="true" viewBox="0 0 48 48"><use href="#note"/></svg><span>Sign the trip form</span></li>
-          </ul>
-        </section>
-        <section class="ledger" data-root="week" aria-label="This week">
-          <p class="ledger-title" aria-hidden="true">This week</p>
-          <p class="ledger-date">Sep 14–20</p>
-          <ul>
-            <li data-from="violin"><svg class="ledger-icon" aria-hidden="true" viewBox="0 0 48 64"><use href="#violin"/></svg><span>Violin lesson, Thu</span></li>
-            <li data-from="mail"><svg class="ledger-icon" aria-hidden="true" viewBox="0 0 48 48"><use href="#mail"/></svg><span>Reply to the coach</span></li>
-            <li data-from="chat"><svg class="ledger-icon" aria-hidden="true" viewBox="0 0 48 48"><use href="#chat"/></svg><span>Plan Saturday</span></li>
-            <li data-from="baseball"><svg class="ledger-icon" aria-hidden="true" viewBox="0 0 48 48"><use href="#baseball"/></svg><span>Baseball sign-ups</span></li>
-          </ul>
-        </section>
-        <section class="ledger" data-root="month" aria-label="This month">
-          <p class="ledger-title" aria-hidden="true">This month</p>
-          <p class="ledger-date">September</p>
-          <ul>
-            <li data-from="car"><svg class="ledger-icon" aria-hidden="true" viewBox="0 0 64 48"><use href="#car"/></svg><span>Car service</span></li>
-            <li data-from="tablet"><svg class="ledger-icon" aria-hidden="true" viewBox="0 0 56 48"><use href="#tablet"/></svg><span>Art class begins</span></li>
-            <li data-from="pencils"><svg class="ledger-icon" aria-hidden="true" viewBox="0 0 48 48"><use href="#pencils"/></svg><span>School supplies</span></li>
-            <li data-from="bicycle"><svg class="ledger-icon" aria-hidden="true" viewBox="0 0 64 48"><use href="#bicycle"/></svg><span>Family bike ride</span></li>
-          </ul>
-        </section>
-      </div>
-      <!-- The point of it all: one item on Today, ready to do. Fictional details. -->
-      <div class="ready-card" aria-label="An item on Today, ready to do">
-        <div class="ready-head">
-          <p class="eyebrow">Today · 10:00 AM</p>
-          <p class="ready-title">Call the pharmacy</p>
+  <!-- 1 · RECOGNITION. The surface already in a state: the Inbox, filling. -->
+  <section id="inbox" class="act act-inbox" data-sc-act="pin" data-sc-span="1.9" aria-labelledby="hero-title">
+    <div data-sc-stage class="stage">
+      <!-- Your place: the Woodsy Cabin skyline the app wears behind its navigation, cut into planes. -->
+      <div class="place" aria-hidden="true">
+        <div class="place-plane place-far" data-sc-parallax="0.35">
+          <svg viewBox="0 0 640 88" preserveAspectRatio="xMidYMax slice"><path d="M-1 88L10 40L21 88ZM25 88L34 50L43 88ZM46 88L58 34L70 88ZM74 88L84 46L94 88ZM99 88L110 38L121 88ZM127 88L136 52L145 88ZM148 88L160 36L172 88ZM176 88L186 48L196 88ZM201 88L212 42L223 88ZM229 88L238 54L247 88ZM389 88L400 44L411 88ZM414 88L426 36L438 88ZM443 88L452 50L461 88ZM465 88L476 40L487 88ZM490 88L502 32L514 88ZM518 88L528 46L538 88ZM543 88L554 38L565 88ZM571 88L580 50L589 88ZM592 88L604 36L616 88ZM620 88L630 46L640 88Z"/></svg>
         </div>
-        <dl class="ready-facts">
-          <div><dt>Call</dt><dd>Maple Street Pharmacy · <span class="ready-number">(555) 010-4477</span></dd></div>
-          <div><dt>About</dt><dd>Mia’s inhaler refill. Only one of two arrived.</dd></div>
-          <div><dt>Last time</dt><dd>Sep 11: “Should be ready Thursday.”</dd></div>
-        </dl>
-        <div class="ready-foot"><span class="ready-answer">Record the answer…</span><span class="ready-follow">+ Follow-up</span></div>
+        <div class="place-plane place-near" data-sc-parallax="0.9">
+          <svg viewBox="0 0 640 88" preserveAspectRatio="xMidYMax slice"><g class="scene-shift">
+            <path d="M193 88L206 30L219 88ZM225 88L236 44L247 88ZM251 88L262 38L273 88ZM368 88L380 36L392 88ZM398 88L408 46L418 88ZM423 88L434 40L445 88ZM290 88L290 62L322 42L354 62L354 88ZM336 44h8v44h-8Z"/>
+            <g class="smoke"><circle cx="342" cy="36" r="4"/><circle cx="347" cy="28" r="5"/><circle cx="354" cy="19" r="6"/></g>
+          </g></svg>
+        </div>
+        <div class="place-plane place-fore" data-sc-parallax="1.9">
+          <svg viewBox="0 0 640 88" preserveAspectRatio="xMidYMax slice"><path d="M-14 88L14 6L42 88ZM30 88L52 34L74 88ZM566 88L590 22L614 88ZM600 88L628 0L656 88Z"/></svg>
+        </div>
       </div>
-    </figure>
-  </section>
 
-  <section id="how-it-works" class="overview page-width" aria-labelledby="overview-title">
-    <p class="section-index">01 / How it works</p>
-    <div class="overview-heading">
-      <h2 id="overview-title">Choose the right work.<br><em>Arrive ready to do it.</em></h2>
-      <p>You don’t have to plan your whole life before you start. Begin with what’s on your mind, plan at the pace that suits you, and open Today when it’s time to act.</p>
-    </div>
+      <div class="hero-grid wrap">
+        <div class="masthead hero-masthead">
+          <p class="eyebrow" data-date="day">Saturday · September 26</p>
+          <h1 id="hero-title" class="title title-hero">A place for everything life brings.</h1>
+          <p class="sub">Symphony connects what matters in your life with what needs doing today, and keeps what you need right beside it.</p>
+        </div>
 
-    <ol class="cadence" aria-label="The planning cadence">
-      <li>Year</li><li>Season</li><li>Month</li><li>Week</li><li class="cadence-today">Today</li>
-    </ol>
-
-    <ol class="steps">
-      <li>
-        <span class="number">01</span>
-        <h3>Capture it.</h3>
-        <p>Put thoughts, tasks, and things to follow up on into your Inbox. Capture quickly; organize later. “Call the pharmacy about the missing refill” is enough to start.</p>
-      </li>
-      <li>
-        <span class="number">02</span>
-        <h3>Give it a home and context.</h3>
-        <p>Decide what it is: a task, a goal, something to keep for reference, or a someday idea. Choose its domain, like Work, Personal, or Family, and show one, several, or all of them, like calendar layers. Your private items stay private; Family is shared with your household. Add what will make it useful later: notes, links, a phone number, a place, a person.</p>
-      </li>
-      <li>
-        <span class="number">03</span>
-        <h3>Decide what matters over time.</h3>
-        <p>Year, season, and month plans give you room to think beyond today. Add a goal at any horizon; a September goal doesn’t need to have been in January’s plan. Each month keeps the goals you’re working toward apart from the tasks you mean to do.</p>
-      </li>
-      <li>
-        <span class="number">04</span>
-        <h3>Choose the week.</h3>
-        <p>With the month’s plan and your calendar in view, choose commitments for that dated week. They can stay a simple checklist, without a day or time. “Do the kitchen laundry this week” counts.</p>
-      </li>
-      <li class="step-today">
-        <span class="number">05</span>
-        <h3>Arrive ready today.</h3>
-        <p>Look at your appointments and the week’s commitments, then choose what you’ll do. Open “Call the pharmacy” and the number, the details, and your last notes are already there. Record the answer and add the follow-up. It’s still the same task on the week’s list, with one checkmark. And urgent things can go straight to Today.</p>
-      </li>
-    </ol>
-
-    <div class="supporting">
-      <article>
-        <h3>Routines carry the recurring work.</h3>
-        <p>Set up a routine once. Each occurrence gets its own checkmark, and moving this week’s occurrence to another day doesn’t change the pattern.</p>
-      </article>
-      <article>
-        <h3>Turn the page deliberately.</h3>
-        <p>At the end of a week or month, look back at the plan. Carry forward what still matters, make it more concrete, park it for someday, or let it go. Past plans stay where you left them.</p>
-      </article>
-      <article>
-        <h3>Already think on paper?</h3>
-        <p>Photograph a written plan with <strong>Plan from paper</strong>, check what it read, and bring it in at the right horizon.</p>
-      </article>
+        <div class="panel inbox-panel" role="group" aria-label="A sample inbox">
+          <div class="panel-head">
+            <h2 class="panel-title">Inbox</h2>
+            <span class="panel-meta"><span data-inbox-count>4</span> to sort</span>
+          </div>
+          <ol class="inbox-list" data-inbox>
+            <li><span class="dot" aria-hidden="true"></span><span class="row-text">Call the pharmacy about Mia’s refill</span><span class="row-meta">7:02</span></li>
+            <li><span class="dot" aria-hidden="true"></span><span class="row-text">Soccer sign-ups close Friday</span><span class="row-meta">7:10</span></li>
+            <li><span class="dot" aria-hidden="true"></span><span class="row-text">Send Dana the Q4 draft</span><span class="row-meta">8:24</span></li>
+            <li><span class="dot" aria-hidden="true"></span><span class="row-text">The car’s making that noise again</span><span class="row-meta">8:31</span></li>
+            <li><span class="dot" aria-hidden="true"></span><span class="row-text">Book Leo’s eye exam</span><span class="row-meta">9:05</span></li>
+            <li><span class="dot" aria-hidden="true"></span><span class="row-text">Reply to the coach</span><span class="row-meta">9:40</span></li>
+            <li><span class="dot" aria-hidden="true"></span><span class="row-text">Prep for Tuesday’s review</span><span class="row-meta">11:15</span></li>
+            <li><span class="dot" aria-hidden="true"></span><span class="row-text">Renew my passport</span><span class="row-meta">12:02</span></li>
+            <li><span class="dot" aria-hidden="true"></span><span class="row-text">Groceries for Thursday’s tacos</span><span class="row-meta">12:48</span></li>
+            <li><span class="dot" aria-hidden="true"></span><span class="row-text">Violin moved to Thursday</span><span class="row-meta">2:20</span></li>
+            <li><span class="dot" aria-hidden="true"></span><span class="row-text">Call Mom back</span><span class="row-meta">3:05</span></li>
+            <li><span class="dot" aria-hidden="true"></span><span class="row-text">Fix the gate latch</span><span class="row-meta">4:30</span></li>
+            <li><span class="dot" aria-hidden="true"></span><span class="row-text">Birthday gift for Ana</span><span class="row-meta">6:12</span></li>
+            <li><span class="dot" aria-hidden="true"></span><span class="row-text">Sign the field trip form</span><span class="row-meta">9:48</span></li>
+          </ol>
+          <p class="capture-hint" aria-hidden="true"><span>+</span> Capture anything. Sort it later.</p>
+        </div>
+      </div>
+      <p class="sample-note wrap">A sample household. Nothing here is saved.</p>
     </div>
   </section>
 
-  <section id="daybook" class="daybook-section page-width" aria-labelledby="daybook-title">
-    <p class="section-index">02 / A day with Symphony</p>
-    <div class="section-heading">
-      <h2 id="daybook-title">The work, and what you need to do it.</h2>
-      <p>Try it. Open an item to see its details, record an answer, add a follow-up. Pin the week beside Today and bring something onto today’s page.</p>
-    </div>
+  <!-- 2 · RELIEF. A wipe: the same pile, sorted. -->
+  <section id="sort" class="act act-sort" data-sc-act="pin" data-sc-span="1.8" aria-labelledby="sort-title">
+    <div data-sc-stage class="stage">
+      <div class="wrap sort-wrap">
+        <div class="masthead sort-masthead">
+          <h2 id="sort-title" class="title">Give everything a home.</h2>
+          <p class="sub">A life area, a time to do it, and what you’ll need when it’s time: a number, a link, a note.</p>
+        </div>
 
-    <div class="journal-demo">
-      <div class="demo-navigation">
-        <div role="tablist" aria-label="Sample planning pages">
-          <button type="button" role="tab" id="tab-today" aria-controls="sample-page" aria-selected="true" data-view="today">Today</button>
-          <button type="button" role="tab" id="tab-week" aria-controls="sample-page" aria-selected="false" data-view="week" tabindex="-1">This week</button>
-          <button type="button" role="tab" id="tab-month" aria-controls="sample-page" aria-selected="false" data-view="month" tabindex="-1">This month</button>
+        <div class="board">
+          <!-- Under: the pile, as it arrived. -->
+          <div class="board-layer board-pile" aria-hidden="true">
+            <p class="board-label">Inbox · 14 to sort</p>
+            <ul class="pile">
+              <li>Call the pharmacy about Mia’s refill</li><li>Soccer sign-ups close Friday</li><li>Send Dana the Q4 draft</li>
+              <li>The car’s making that noise again</li><li>Book Leo’s eye exam</li><li>Reply to the coach</li>
+              <li>Prep for Tuesday’s review</li><li>Renew my passport</li><li>Groceries for Thursday’s tacos</li>
+              <li>Violin moved to Thursday</li><li>Call Mom back</li><li>Fix the gate latch</li>
+              <li>Birthday gift for Ana</li><li>Sign the field trip form</li>
+            </ul>
+          </div>
+          <!-- Over: the same fourteen, each with a home. -->
+          <div class="board-layer board-sorted" data-sc-reveal="left" data-sc-reveal-at="0.08 0.62">
+            <section class="col" aria-label="Today">
+              <h3 class="col-title">Today</h3>
+              <ul>
+                <li class="fam"><span class="dot"></span>Call the pharmacy about Mia’s refill<svg class="ctx"><use href="#i-phone"/></svg></li>
+                <li class="work"><span class="dot"></span>Send Dana the Q4 draft<svg class="ctx"><use href="#i-link"/></svg></li>
+                <li class="pers"><span class="dot"></span>Call Mom back<svg class="ctx"><use href="#i-phone"/></svg></li>
+                <li class="fam"><span class="dot"></span>Sign the field trip form<svg class="ctx"><use href="#i-note"/></svg></li>
+              </ul>
+            </section>
+            <section class="col" aria-label="This week">
+              <h3 class="col-title">This week</h3>
+              <ul>
+                <li class="fam"><span class="dot"></span>Soccer sign-ups<svg class="ctx"><use href="#i-link"/></svg></li>
+                <li class="fam"><span class="dot"></span>Reply to the coach<svg class="ctx"><use href="#i-mail"/></svg></li>
+                <li class="work"><span class="dot"></span>Prep for Tuesday’s review<svg class="ctx"><use href="#i-note"/></svg></li>
+                <li class="fam"><span class="dot"></span>Groceries for Thursday<svg class="ctx"><use href="#i-note"/></svg></li>
+                <li class="fam"><span class="dot"></span>Violin, Thursday<svg class="ctx"><use href="#i-pin"/></svg></li>
+              </ul>
+            </section>
+            <section class="col" aria-label="This month">
+              <h3 class="col-title">This month</h3>
+              <ul>
+                <li class="fam"><span class="dot"></span>Car service<svg class="ctx"><use href="#i-phone"/></svg></li>
+                <li class="fam"><span class="dot"></span>Book Leo’s eye exam<svg class="ctx"><use href="#i-phone"/></svg></li>
+                <li class="pers"><span class="dot"></span>Renew my passport<svg class="ctx"><use href="#i-link"/></svg></li>
+                <li class="fam"><span class="dot"></span>Fix the gate latch<svg class="ctx"><use href="#i-note"/></svg></li>
+                <li class="pers"><span class="dot"></span>Birthday gift for Ana<svg class="ctx"><use href="#i-link"/></svg></li>
+              </ul>
+            </section>
+          </div>
         </div>
-        <div class="reference-chips" role="group" aria-label="Pin lists for reference">
-          <span class="reference-label" aria-hidden="true">Reference</span>
-          <button type="button" class="chip" data-pin="week" aria-pressed="false">Pin week list</button>
-          <button type="button" class="chip" data-pin="month" aria-pressed="false">Pin month list</button>
-        </div>
+
+        <p class="legend">
+          <span class="work"><span class="dot"></span>Work</span>
+          <span class="pers"><span class="dot"></span>Personal</span>
+          <span class="legend-note"><svg class="ico"><use href="#i-lock"/></svg>private to you</span>
+          <span class="fam"><span class="dot"></span>Family</span>
+          <span class="legend-note">shared with your household</span>
+        </p>
       </div>
+    </div>
+  </section>
 
-      <div class="demo-workspace">
-        <div id="sample-page" role="tabpanel" aria-labelledby="tab-today">
-          <header class="demo-masthead">
-            <div class="date-stamp" aria-hidden="true"><span>SEP</span><strong>18</strong></div>
-            <div>
-              <p class="eyebrow" id="demo-eyebrow">Friday · September 18</p>
-              <h3 id="demo-title">Good morning</h3>
-              <p id="demo-subtitle">Next: Call the repair shop · 10:00 AM</p>
+  <!-- 3 · CALM. Plain type on paper, the quiet before the descent. -->
+  <section id="cadence" class="act act-cadence" data-sc-act="flow" aria-labelledby="cadence-title">
+    <div class="wrap cadence-wrap" data-sc-in data-sc-stagger="60">
+      <h2 id="cadence-title" class="title">Plan at the pace that suits you.</h2>
+      <p class="sub">You don’t have to plan your whole life before you start. Begin with what’s on your mind, plan further out when you have room to think, and open Today when it’s time to act. Urgent things can go straight there.</p>
+      <ol class="cadence">
+        <li><span class="cad-name">Year</span><span class="cad-line">What matters, in a few plain goals.</span></li>
+        <li><span class="cad-name">Season</span><span class="cad-line">Closer in, still room to think.</span></li>
+        <li><span class="cad-name">Month</span><span class="cad-line">Goals kept apart from the tasks you mean to do.</span></li>
+        <li><span class="cad-name">Week</span><span class="cad-line">Commitments for dated days, or just a checklist.</span></li>
+        <li class="cad-today"><span class="cad-name">Today</span><span class="cad-line">Your appointments, and what you choose to do.</span></li>
+      </ol>
+    </div>
+  </section>
+
+  <!-- 4 · PEAK. One task, from the year down to this morning. -->
+  <section id="plan" class="act act-plan" data-sc-act="pin" data-sc-span="4" aria-labelledby="plan-title">
+    <span id="today" class="today-anchor" aria-hidden="true"></span>
+    <div data-sc-stage class="stage">
+      <div class="wrap plan-wrap">
+        <aside class="help">
+          <h2 id="plan-title" class="title">One task, all the way down.</h2>
+          <ol class="help-steps">
+            <li data-help="0"><strong>The year.</strong> What matters, in a few plain goals.</li>
+            <li data-help="1"><strong>The season.</strong> Closer in, and still room to think.</li>
+            <li data-help="2"><strong>The month</strong> keeps its goals apart from the tasks you mean to do.</li>
+            <li data-help="3"><strong>The week.</strong> Choose commitments for these dates.</li>
+            <li data-help="4"><strong>Today.</strong> Open it, and the number, the details and your last notes are already there.</li>
+          </ol>
+        </aside>
+
+        <div class="stack" data-stack>
+          <!-- Year -->
+          <article class="pg" data-pg="0" aria-label="Year page">
+            <header class="pg-strip">
+              <span class="pg-label" data-date="year">Year · 2026</span>
+              <span class="pg-thread goal"><svg class="ico"><use href="#i-goal"/></svg>Keep everyone healthy</span>
+            </header>
+            <div class="pg-body">
+              <p class="pg-title">This year</p>
+              <p class="pg-kicker">Goals</p>
+              <ul class="rows">
+                <li class="fam"><span class="dot"></span>Finish the basement</li>
+                <li class="pers"><span class="dot"></span>Two weekends away, just us</li>
+                <li class="work"><span class="dot"></span>Ship the new client plan</li>
+              </ul>
             </div>
-          </header>
-          <ol id="demo-entries" class="demo-entries"></ol>
-          <form id="demo-capture" class="demo-capture" autocomplete="off">
-            <label for="demo-capture-input" class="visually-hidden" id="demo-capture-label">Add to Today</label>
-            <span class="capture-plus" aria-hidden="true">+</span>
-            <input id="demo-capture-input" type="text" maxlength="60" placeholder="Add to today…">
-          </form>
-          <p class="demo-footer" id="demo-footer-label">A sample page. Nothing here is saved.</p>
+          </article>
+          <!-- Season -->
+          <article class="pg" data-pg="1" aria-label="Season page">
+            <header class="pg-strip">
+              <span class="pg-label" data-date="season">Fall · Sep to Nov</span>
+              <span class="pg-thread goal"><svg class="ico"><use href="#i-goal"/></svg>Check-ups and refills, sorted</span>
+            </header>
+            <div class="pg-body">
+              <p class="pg-title">This season</p>
+              <p class="pg-kicker">Goals</p>
+              <ul class="rows">
+                <li class="fam"><span class="dot"></span>Soccer season, start to finish</li>
+                <li class="fam"><span class="dot"></span>Put the garden to bed</li>
+              </ul>
+            </div>
+          </article>
+          <!-- Month -->
+          <article class="pg" data-pg="2" aria-label="Month page">
+            <header class="pg-strip">
+              <span class="pg-label" data-date="month">September</span>
+              <span class="pg-thread task" data-task><span class="box" aria-hidden="true"><svg><use href="#i-check"/></svg></span>Call the pharmacy about Mia’s refill</span>
+            </header>
+            <div class="pg-body">
+              <p class="pg-title">This month</p>
+              <p class="pg-kicker">Goals</p>
+              <ul class="rows"><li class="fam"><span class="dot"></span>Check-ups and refills, sorted</li></ul>
+              <p class="pg-kicker">Tasks</p>
+              <ul class="rows">
+                <li class="fam"><span class="box"></span>Book Leo’s eye exam</li>
+                <li class="fam"><span class="box"></span>Car service</li>
+              </ul>
+            </div>
+          </article>
+          <!-- Week -->
+          <article class="pg" data-pg="3" aria-label="Week page">
+            <header class="pg-strip">
+              <span class="pg-label" data-date="week">Week · Sep 21 to 27</span>
+              <span class="pg-thread task" data-task><span class="box" aria-hidden="true"><svg><use href="#i-check"/></svg></span>Call the pharmacy about Mia’s refill</span>
+            </header>
+            <div class="pg-body">
+              <p class="pg-title">This week</p>
+              <ul class="rows">
+                <li class="fam"><span class="box"></span>Soccer sign-ups</li>
+                <li class="fam"><span class="box"></span>Reply to the coach</li>
+                <li class="work"><span class="box"></span>Prep for Tuesday’s review</li>
+              </ul>
+            </div>
+          </article>
+          <!-- Today -->
+          <article class="pg pg-today" data-pg="4" aria-label="Today page">
+            <header class="pg-strip">
+              <span class="pg-label" data-date="todaylabel">Today · Sat, Sep 26</span>
+              <span class="pg-strip-meta">Good morning</span>
+            </header>
+            <div class="pg-body">
+              <ol class="agenda">
+                <li class="fam"><time>9:30</time><span class="dot"></span><span>Soccer, Riverside field</span></li>
+                <li class="fam thread-row" data-task>
+                  <time>10:00</time>
+                  <button type="button" class="tick" aria-pressed="false" data-tick>
+                    <span class="box" aria-hidden="true"><svg><use href="#i-check"/></svg></span>
+                    <span class="visually-hidden">Mark done: </span><span class="tick-text">Call the pharmacy about Mia’s refill</span>
+                  </button>
+                  <span class="invite" data-invite aria-hidden="true">Go on, tick it.</span>
+                  <dl class="context">
+                    <div><dt><svg class="ico"><use href="#i-phone"/></svg>Call</dt><dd>Maple Street Pharmacy · <span class="num">(555) 010-4477</span></dd></div>
+                    <div><dt><svg class="ico"><use href="#i-note"/></svg>About</dt><dd>Mia’s inhaler. Only one of two arrived.</dd></div>
+                    <div><dt><svg class="ico"><use href="#i-goal"/></svg>Toward</dt><dd>Check-ups and refills, sorted</dd></div>
+                    <div><dt><svg class="ico"><use href="#i-repeat"/></svg>Last time</dt><dd>“Should be ready by the weekend.”</dd></div>
+                  </dl>
+                </li>
+                <li class="fam"><time></time><span class="box"></span><span>Sign the field trip form</span></li>
+                <li class="pers"><time></time><span class="box"></span><span>Call Mom back</span></li>
+              </ol>
+            </div>
+          </article>
         </div>
-        <aside id="reference-panel" hidden aria-label="Pinned lists"></aside>
+        <p class="tick-status" role="status" aria-live="polite" data-status></p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 5 · CONFIDENCE. The rest of the surface, sideways. -->
+  <section id="more" class="act act-more" data-sc-act="pan" data-sc-span="3" aria-labelledby="more-title">
+    <div data-sc-stage class="stage">
+      <div class="rail" data-sc-pan="0.04">
+        <div class="rail-lead">
+          <h2 id="more-title" class="title">And the rest of the week holds up.</h2>
+          <p class="sub">The parts that keep a plan true after Monday.</p>
+        </div>
+
+        <article class="tile">
+          <h3 class="tile-name"><svg class="ico"><use href="#i-repeat"/></svg>Routines</h3>
+          <div class="tile-surface">
+            <p class="ts-title">Recycling out <span>Weekly · Tue</span></p>
+            <ol class="week-strip" aria-label="This week's occurrences">
+              <li><span>M</span></li>
+              <li class="moved-from"><span>T</span></li>
+              <li class="is-on done"><span>W</span><em>moved</em></li>
+              <li><span>T</span></li><li><span>F</span></li><li><span>S</span></li><li><span>S</span></li>
+            </ol>
+          </div>
+          <p class="tile-copy">Set a routine up once. Each occurrence gets its own checkmark, and moving this week’s doesn’t change the pattern.</p>
+        </article>
+
+        <article class="tile">
+          <h3 class="tile-name"><svg class="ico"><use href="#i-check"/></svg>Review</h3>
+          <div class="tile-surface">
+            <p class="ts-title">Still open from last week</p>
+            <p class="ts-row">Fix the gate latch</p>
+            <div class="choices" role="group" aria-label="Sample review choices">
+              <button type="button" class="choice" aria-pressed="true">Carry forward</button>
+              <button type="button" class="choice" aria-pressed="false">Make it concrete</button>
+              <button type="button" class="choice" aria-pressed="false">Someday</button>
+              <button type="button" class="choice" aria-pressed="false">Let it go</button>
+            </div>
+          </div>
+          <p class="tile-copy">At the end of a week or a month, look back. Keep what still matters and let the rest go. Past plans stay where you left them.</p>
+        </article>
+
+        <article class="tile">
+          <h3 class="tile-name"><svg class="ico"><use href="#i-camera"/></svg>Paper</h3>
+          <div class="tile-surface paper-surface">
+            <div class="paper" aria-hidden="true">
+              <p>Sat: gutters</p><p>call Dr. Lee re: Leo</p><p>Oct: book the cabin</p>
+            </div>
+            <ul class="parsed" aria-label="What it read">
+              <li>Clean the gutters <span>Saturday</span></li>
+              <li>Call Dr. Lee about Leo <span>This week</span></li>
+              <li>Book the cabin <span>October</span></li>
+            </ul>
+          </div>
+          <p class="tile-copy">Already think on paper? Photograph a written plan, check what it read, and bring it in at the right horizon.</p>
+        </article>
+
+        <article class="tile">
+          <h3 class="tile-name"><svg class="ico"><use href="#i-phone"/></svg>Phone</h3>
+          <div class="tile-surface phone-surface">
+            <div class="phone" aria-hidden="true">
+              <p class="phone-date">Today</p>
+              <p class="phone-row fam"><span class="dot"></span>Soccer, 9:30</p>
+              <p class="phone-row fam done"><span class="dot"></span>Call the pharmacy</p>
+              <p class="phone-row fam"><span class="dot"></span>Trip form</p>
+              <p class="phone-add">+ Add</p>
+            </div>
+          </div>
+          <p class="tile-copy">Plan with a wider view on your computer. Carry the day with you on your phone, and swipe it done.</p>
+        </article>
+
+        <p class="rail-end">The plans kept.<br>The day, ready.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 6 · RESOLVE. The Inbox capture bar, asking for one thing. -->
+  <section id="waitlist" class="act act-close" aria-labelledby="close-title">
+    <div class="wrap close-wrap">
+      <h2 id="close-title" class="title title-close">Keep the plans.<br><em>Make room for the living.</em></h2>
+      <p class="sub close-offer">We’re opening Symphony to ten founding households, and we set each one up with you, personally. $25 a month, locked for life.</p>
+
+      <div class="capture">
+        <form id="founding-form" class="capture-form" action="mailto:hello@symphony-os.com" method="post" enctype="text/plain" novalidate>
+          <label for="founding-email" class="capture-label">Add your email to our inbox</label>
+          <div class="capture-row">
+            <span class="capture-plus" aria-hidden="true">+</span>
+            <input type="email" id="founding-email" name="email" placeholder="you@example.com" required autocomplete="email" inputmode="email" spellcheck="false" aria-describedby="founding-note">
+            <button type="submit" id="founding-submit" class="button">Save your place</button>
+          </div>
+          <input type="text" name="website" id="founding-website" tabindex="-1" autocomplete="off" aria-hidden="true" class="honeypot">
+        </form>
+        <p id="founding-note" class="capture-note" aria-live="polite">We’ll write back within a day to set things up together. Or write to <a href="mailto:hello@symphony-os.com?subject=Founding%20household">hello@symphony-os.com</a>.</p>
       </div>
     </div>
 
-    <div class="below-demo">
-      <p><span class="small-rule" aria-hidden="true"></span>Plan with a wider view on your computer. Carry the day with you on your phone.</p>
-      <p>Choosing something for today doesn’t erase it from the week or month. It’s one task, in one place, with one checkmark.</p>
-    </div>
-  </section>
-
-  <section class="closing page-width" aria-labelledby="closing-title">
-    <p class="eyebrow">A little less to carry in your head</p>
-    <h2 id="closing-title">Keep the plans.<br><em>Make room for the living.</em></h2>
-    <p>The call you meant to make. The ride you wanted to take. The ordinary, important things that make a life yours.</p>
-  </section>
-
-  <section id="waitlist" class="signup page-width" aria-labelledby="signup-title">
-    <div>
-      <p class="section-index">An invitation</p>
-      <h2 id="signup-title">Let’s make room<br>for your household.</h2>
-      <p>Ten founding households, personally onboarded.<br>$25/month, locked for life.</p>
-    </div>
-    <div class="signup-form">
-      <form id="founding-form" novalidate>
-        <label for="founding-email">Your email address</label>
-        <div class="email-row">
-          <input type="email" id="founding-email" name="email" placeholder="you@example.com" required autocomplete="email" inputmode="email" spellcheck="false" aria-describedby="founding-note">
-          <button type="submit" id="founding-submit">Join the founding households <span aria-hidden="true">↗</span></button>
-        </div>
-        <input type="text" name="website" id="founding-website" tabindex="-1" autocomplete="off" aria-hidden="true" class="honeypot">
-      </form>
-      <p id="founding-note" aria-live="polite">Leave your email and we’ll write back within a day to set things up together. Or write to <a href="mailto:hello@symphony-os.com?subject=Founding%20household">hello@symphony-os.com</a>.</p>
-    </div>
+    <footer class="foot wrap">
+      <span class="wordmark wordmark-sm">Symphony</span>
+      <span class="foot-line">Everyday life, thoughtfully arranged.</span>
+      <span class="foot-links"><a href="/privacy">Privacy</a><a href="https://app.symphony-os.com">Sign in</a><span>© 2026 Symphony</span></span>
+    </footer>
   </section>
 </main>
 
-<footer class="site-footer page-width">
-  <a href="#" class="wordmark">Symphony<span class="brand-dot">.</span></a>
-  <span>Everyday life, thoughtfully arranged.</span>
-  <div><a href="/privacy">Privacy</a><a href="https://app.symphony-os.com">Sign in</a><span>© 2026 Symphony</span></div>
-</footer>
-
-<script src="journal.js"></script>
+<script src="scrollcraft.js"></script>
+<script>ScrollCraft.mount(document.body);</script>
+<script src="symphony.js"></script>
 <script src="waitlist.js"></script>
 </body>
 </html>
