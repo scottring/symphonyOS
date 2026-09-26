@@ -79,3 +79,7 @@ Families: pin, parallax, reveal, flow, pan (five). There's no family twice in a 
 - Sample household (Sam, Jess, Mia, Leo), labelled on the page as a sample. Nothing is saved.
 - Only claims the live landing already makes: capture to Inbox; domains (Work/Personal private, Family shared with the household); year/season/month/week/today horizons; one task with one checkmark across week and today; context on the task (number, notes, last time); routines with per-occurrence checkmarks; reviews that carry forward; Plan from paper; plan on the computer, carry the day on the phone; ten founding households, personally onboarded, $25/month locked for life.
 - No counters, no statistics, no testimonials.
+
+## Addendum 2026-09-26: Your place
+
+At Scott's request the hero carries the app's own theme picker ("Your place": Densely Urban, Small City, Small Mountain Town, Woodsy Cabin, Farm). Each place re-tints the page, the accent and the skyline planes, using the values from `src/index.css` and `PlaceSkyline.tsx`. The choice is remembered per visitor in localStorage. Life-area colours never change.

@@ -14,6 +14,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Crimson+Pro:ital,wght@0,400;0,500;1,400&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="scrollcraft.css">
 <link rel="stylesheet" href="symphony.css">
+<script>try{var p=localStorage.getItem('symphony-place');if(p&&p!=='cabin')document.documentElement.setAttribute('data-place',p)}catch(e){}</script>
 </head>
 <body>
 <a class="skip" href="#main">Skip to content</a>
@@ -57,13 +58,10 @@
       <!-- Your place: the Woodsy Cabin skyline the app wears behind its navigation, cut into planes. -->
       <div class="place" aria-hidden="true">
         <div class="place-plane place-far" data-sc-parallax="0.35">
-          <svg viewBox="0 0 640 88" preserveAspectRatio="xMidYMax slice"><path d="M-1 88L10 40L21 88ZM25 88L34 50L43 88ZM46 88L58 34L70 88ZM74 88L84 46L94 88ZM99 88L110 38L121 88ZM127 88L136 52L145 88ZM148 88L160 36L172 88ZM176 88L186 48L196 88ZM201 88L212 42L223 88ZM229 88L238 54L247 88ZM389 88L400 44L411 88ZM414 88L426 36L438 88ZM443 88L452 50L461 88ZM465 88L476 40L487 88ZM490 88L502 32L514 88ZM518 88L528 46L538 88ZM543 88L554 38L565 88ZM571 88L580 50L589 88ZM592 88L604 36L616 88ZM620 88L630 46L640 88Z"/></svg>
+          <svg viewBox="0 0 640 88" preserveAspectRatio="xMidYMax slice"><path data-sky="far" d="M-1 88L10 40L21 88ZM25 88L34 50L43 88ZM46 88L58 34L70 88ZM74 88L84 46L94 88ZM99 88L110 38L121 88ZM127 88L136 52L145 88ZM148 88L160 36L172 88ZM176 88L186 48L196 88ZM201 88L212 42L223 88ZM229 88L238 54L247 88ZM389 88L400 44L411 88ZM414 88L426 36L438 88ZM443 88L452 50L461 88ZM465 88L476 40L487 88ZM490 88L502 32L514 88ZM518 88L528 46L538 88ZM543 88L554 38L565 88ZM571 88L580 50L589 88ZM592 88L604 36L616 88ZM620 88L630 46L640 88Z"/></svg>
         </div>
         <div class="place-plane place-near" data-sc-parallax="0.9">
-          <svg viewBox="0 0 640 88" preserveAspectRatio="xMidYMax slice"><g class="scene-shift">
-            <path d="M193 88L206 30L219 88ZM225 88L236 44L247 88ZM251 88L262 38L273 88ZM368 88L380 36L392 88ZM398 88L408 46L418 88ZM423 88L434 40L445 88ZM290 88L290 62L322 42L354 62L354 88ZM336 44h8v44h-8Z"/>
-            <g class="smoke"><circle cx="342" cy="36" r="4"/><circle cx="347" cy="28" r="5"/><circle cx="354" cy="19" r="6"/></g>
-          </g></svg>
+          <svg viewBox="0 0 640 88" preserveAspectRatio="xMidYMax slice"><g class="scene-shift"><path data-sky="near" d="M193 88L206 30L219 88ZM225 88L236 44L247 88ZM251 88L262 38L273 88ZM290 88V62L322 42L354 62V88ZM336 88V44H344V88ZM338 36a4 4 0 1 0 8 0a4 4 0 1 0 -8 0ZM342 28a5 5 0 1 0 10 0a5 5 0 1 0 -10 0ZM348 19a6 6 0 1 0 12 0a6 6 0 1 0 -12 0ZM368 88L380 36L392 88ZM398 88L408 46L418 88ZM423 88L434 40L445 88Z"/></g></svg>
         </div>
         <div class="place-plane place-fore" data-sc-parallax="1.9">
           <svg viewBox="0 0 640 88" preserveAspectRatio="xMidYMax slice"><path d="M-14 88L14 6L42 88ZM30 88L52 34L74 88ZM566 88L590 22L614 88ZM600 88L628 0L656 88Z"/></svg>
@@ -75,6 +73,17 @@
           <p class="eyebrow" data-date="day">Saturday · September 26</p>
           <h1 id="hero-title" class="title title-hero">A place for everything life brings.</h1>
           <p class="sub">Symphony connects what matters in your life with what needs doing today, and keeps what you need right beside it.</p>
+          <div class="place-picker" role="group" aria-labelledby="place-label">
+            <span id="place-label" class="place-picker-label">Your place</span>
+            <div class="place-swatches">
+              <button type="button" class="swatch" data-place="urban" style="--sw: hsl(215 30% 36%)" aria-pressed="false" aria-label="Densely Urban" title="Densely Urban"></button>
+              <button type="button" class="swatch" data-place="small-city" style="--sw: hsl(315 28% 34%)" aria-pressed="false" aria-label="Small City" title="Small City"></button>
+              <button type="button" class="swatch" data-place="mountain-town" style="--sw: hsl(203 52% 34%)" aria-pressed="false" aria-label="Small Mountain Town" title="Small Mountain Town"></button>
+              <button type="button" class="swatch" data-place="cabin" style="--sw: hsl(150 34% 30%)" aria-pressed="true" aria-label="Woodsy Cabin" title="Woodsy Cabin"></button>
+              <button type="button" class="swatch" data-place="farm" style="--sw: hsl(6 52% 38%)" aria-pressed="false" aria-label="Farm" title="Farm"></button>
+            </div>
+            <span class="place-name" data-place-name>Woodsy Cabin <span>· Pines, a stream, smoke from the chimney.</span></span>
+          </div>
         </div>
 
         <div class="panel inbox-panel" role="group" aria-label="A sample inbox">

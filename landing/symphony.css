@@ -5,6 +5,7 @@
    product colours (src/lib/domainColors.ts). */
 
 :root {
+  --h: 150; /* the place's hue; Woodsy Cabin by default */
   --sc-canvas: hsl(150 20% 95%);
   --sc-surface: #ffffff;
   --sc-ink: #171716;
@@ -16,7 +17,8 @@
   --sc-shadow-color: 60 3% 14%;
 
   --accent-deep: hsl(150 34% 21%);
-  --accent-wash: hsl(150 25% 96.5%);
+  --accent-wash: hsl(var(--h) 25% 96.5%);
+  --accent-line: hsl(var(--h) 25% 88%);
   --p300: hsl(150 24% 72%);
   --p400: hsl(150 29% 55%);
   --p500: hsl(150 34% 30%);
@@ -141,7 +143,7 @@ a { color: inherit; }
   min-height: 42px; padding: 0 18px; border: 0; border-radius: var(--r-ctl);
   background: var(--sc-accent); color: var(--sc-accent-ink);
   font-size: 15px; font-weight: 600; text-decoration: none; cursor: pointer;
-  box-shadow: 0 1px 0 rgb(255 255 255 / 0.12) inset, 0 6px 16px -8px hsl(150 34% 20% / 0.6);
+  box-shadow: 0 1px 0 rgb(255 255 255 / 0.12) inset, 0 6px 16px -8px hsl(var(--h) 34% 20% / 0.6);
   transition: background-color 140ms var(--sc-ease-out), transform 120ms var(--sc-ease-out);
 }
 .button:hover { background: var(--accent-deep); }
@@ -299,7 +301,7 @@ a { color: inherit; }
 .pg-thread.goal .ico { color: var(--sc-accent); }
 .pg-thread, .tick-text { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .pg-thread.is-done { color: var(--sc-ink-soft); }
-.pg-thread.is-done .box { box-shadow: 0 0 0 4px hsl(150 34% 28% / 0.14); }
+.pg-thread.is-done .box { box-shadow: 0 0 0 4px color-mix(in oklab, var(--sc-accent) 16%, transparent); }
 .pg-strip-meta { margin-left: auto; font-family: var(--sc-font-display); font-style: italic; font-size: 20px; color: var(--sc-ink); }
 .pg-body { padding: 16px 20px; }
 .pg-title { font-family: var(--sc-font-display); font-size: 30px; line-height: 1.1; letter-spacing: -0.03em; margin-bottom: 8px; }
@@ -316,7 +318,7 @@ a { color: inherit; }
   background: var(--accent-wash); border-radius: 10px;
   margin: 6px -12px; padding: 12px !important; border-bottom: 0 !important;
   grid-template-columns: 48px minmax(0, 1fr) !important;
-  box-shadow: 0 0 0 1px hsl(150 25% 88%);
+  box-shadow: 0 0 0 1px var(--accent-line);
 }
 .tick {
   display: flex; align-items: center; gap: 12px; min-width: 0; min-height: 36px;
@@ -439,6 +441,47 @@ a { color: inherit; }
 .foot-links a { text-decoration: none; }
 .foot-links a:hover { color: var(--sc-ink); text-decoration: underline; }
 
+
+/* ---------------------------------------------------------------- places --
+   "Your place" is the theme, as in the app (Settings > Your place). Each place
+   re-tints the page, the accent and the skyline; the life-area colours never
+   change. Values from src/index.css [data-place=...]. */
+:root[data-place="urban"] {
+  --h: 215; --sc-canvas: hsl(215 24% 95%); --sc-accent: hsl(215 30% 36%); --accent-deep: hsl(215 30% 28%);
+  --p300: hsl(215 21% 72%); --p400: hsl(215 26% 55%); --p500: hsl(215 30% 36%);
+}
+:root[data-place="small-city"] {
+  --h: 315; --sc-canvas: hsl(315 16% 95.5%); --sc-accent: hsl(315 28% 34%); --accent-deep: hsl(315 28% 26%);
+  --p300: hsl(315 20% 72%); --p400: hsl(315 24% 55%); --p500: hsl(315 28% 34%);
+}
+:root[data-place="mountain-town"] {
+  --h: 203; --sc-canvas: hsl(203 32% 95%); --sc-accent: hsl(203 52% 32%); --accent-deep: hsl(203 52% 25%);
+  --p300: hsl(203 36% 72%); --p400: hsl(203 44% 55%); --p500: hsl(203 52% 34%);
+}
+:root[data-place="farm"] {
+  --h: 6; --sc-canvas: hsl(8 22% 95.5%); --sc-accent: hsl(6 52% 36%); --accent-deep: hsl(6 52% 28%);
+  --p300: hsl(6 36% 72%); --p400: hsl(6 44% 55%); --p500: hsl(6 52% 38%);
+}
+/* Pines in the foreground belong to the wooded places only. */
+:root:is([data-place="urban"], [data-place="small-city"], [data-place="farm"]) .place-fore { display: none; }
+body { transition: background-color 300ms var(--sc-ease-out); }
+
+.place-picker { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; margin-top: 22px; }
+.place-picker-label { font-size: 12px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--sc-ink-soft); }
+.place-swatches { display: flex; gap: 8px; }
+.swatch {
+  width: 30px; height: 30px; border-radius: 50%; padding: 0; cursor: pointer;
+  border: 2px solid var(--sc-canvas); background: var(--sw);
+  box-shadow: 0 0 0 1px var(--rule-strong);
+  transition: box-shadow 160ms var(--sc-ease-out), transform 120ms var(--sc-ease-out);
+}
+.swatch:hover { transform: scale(1.08); }
+.swatch:active { transform: scale(0.95); }
+.swatch[aria-pressed="true"] { box-shadow: 0 0 0 2px var(--sw); }
+.swatch:focus-visible { outline-offset: 4px; border-radius: 50%; }
+.place-name { font-size: 14px; color: var(--sc-ink); }
+.place-name span { color: var(--sc-ink-soft); }
+
 /* ---------------------------------------------------------------- tablet -- */
 @media (max-width: 1100px) {
   .plan-wrap { grid-template-columns: minmax(0, 16rem) minmax(0, 1fr); }
@@ -458,6 +501,8 @@ a { color: inherit; }
   .hero-masthead .eyebrow { margin-bottom: 8px; }
   .title-hero { font-size: clamp(2.2rem, 1.3rem + 4.2vw, 2.9rem); }
   .hero-masthead .sub { margin-top: 12px; font-size: 16px; }
+  .place-picker { margin-top: 14px; gap: 8px 12px; }
+  .place-name span { display: none; }
   .inbox-panel { --row-h: 42px; --rows: 5; padding: 0 16px 2px; }
   .panel-head { padding: 10px 0 8px; }
   .panel-title { font-size: 24px; }
