@@ -12,7 +12,7 @@ import { localYmd, parseLocalYmd } from '@/lib/cadence/config'
 import { monthStartOf, isPlacement } from '@/lib/planning/periodPlacement'
 import { stepsThatCarryForward } from '@/lib/planning/goalSteps'
 import { readSeasons, seasonStartFor } from '@/lib/cadence/seasons'
-import { planPlacement, planKeep, planDropCommitment, commitmentRow, isPlacementWrite, type PlacementPlan } from '@/lib/placement/intentions'
+import { planPlacement, planKeep, commitmentsAfterCompletion, planDropCommitment, commitmentRow, isPlacementWrite, type PlacementPlan } from '@/lib/placement/intentions'
 import { placementRpcEnabled, isPlacementOnlyRow, rowStep, commitmentSteps, focusStep, expectedOpen, STALE_PLACEMENT_MESSAGE, type PlacementStep, type AtomicOutcome } from '@/lib/placement/placementSteps'
 import type { TaskCommitment, TaskFocusEntry, PlacementLevel } from '@/types/task'
 import { committedTo, deriveCache, focusSnapshot } from '@/lib/placement/model'
@@ -1207,6 +1207,8 @@ export function useSupabaseTasks() {
             return {
               ...t,
               completed: newCompleted,
+              // The records move with the tick, as the trigger moves them.
+              commitments: commitmentsAfterCompletion(t.commitments, newCompleted),
               // Clear waiting state when completing
               ...(newCompleted && t.isWaiting ? { isWaiting: false, waitingSince: undefined, waitingFor: undefined } : {}),
               // Clear discussion flag when completing
@@ -1269,6 +1271,10 @@ export function useSupabaseTasks() {
         task: {
           ...task,
           completed: newCompleted,
+          // The records too: other instances (the plan page has several)
+          // otherwise keep the pre-tick statuses, and a later move reads
+          // them — a reopened action then stayed open on its old week.
+          commitments: commitmentsAfterCompletion(task.commitments, newCompleted),
           ...(newCompleted && task.isWaiting ? { isWaiting: false, waitingSince: undefined, waitingFor: undefined } : {}),
           ...(newCompleted && task.needsDiscussion ? { needsDiscussion: false, discussionNote: undefined } : {}),
           subtasks: newCompleted

@@ -154,6 +154,18 @@ it('keeps a title typed while the previous one was saving', async () => {
   await waitFor(() => expect(screen.getByRole('textbox', { name: 'New week task' })).toHaveValue('Second'))
 })
 
+// Horizon flows: the week's add box can write a goal's next action.
+it('offers the month\'s goals, optionally, and adds toward the one chosen', async () => {
+  const onAdd = vi.fn().mockResolvedValue(undefined)
+  render(<WeekList tasks={[]} weekStart={WEEK} meId={null} userId="me" isCurrent onToggle={vi.fn()} onSelect={vi.fn()} onAdd={onAdd}
+    goals={[{ id: 'patio', title: 'Finish the patio' }]} goalsLabel="October" />)
+  fireEvent.click(screen.getByRole('button', { name: /Add task to this week/ }))
+  fireEvent.change(screen.getByRole('textbox', { name: 'New week task' }), { target: { value: 'Clear the patio' } })
+  fireEvent.change(screen.getByRole('combobox', { name: 'Toward a goal for October (optional)' }), { target: { value: 'patio' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Add', exact: true }))
+  await waitFor(() => expect(onAdd).toHaveBeenCalledWith('Clear the patio', 'patio'))
+})
+
 describe('the goal a week row serves', () => {
   it('names the goal under a step, so a week reads as commitments not noise', () => {
     // Scott, 2026-09-23: "none of the three weeks coming up say antying about

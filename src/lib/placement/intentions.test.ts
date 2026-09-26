@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { planPlacement, planKeep, planDropCommitment, applyCommitmentOps, isPlacementWrite } from './intentions'
+import { planPlacement, planKeep, planDropCommitment, applyCommitmentOps, isPlacementWrite, commitmentsAfterCompletion } from './intentions'
 import type { Task, TaskCommitment } from '@/types/task'
 import { DEFAULT_SEASONS } from '@/lib/cadence/seasons'
 
@@ -393,5 +393,25 @@ describe('"Add to this month" on a season task, October viewed in September (S3-
     const p = planPlacement(fallTask(), { bucket: 'month' }, ctx)
     expect(p.commitmentOps).toContainEqual({ op: 'ensure', level: 'month', periodStart: SEP })
     expect(p.row.monthStart).toEqual(SEP)
+  })
+})
+
+describe('commitmentsAfterCompletion — the tick mirrors the trigger', () => {
+  const wk = (d: number) => new Date(2026, 8, d)
+  const records = [
+    { level: 'month' as const, periodStart: new Date(2026, 8, 1), status: 'open' as const },
+    { level: 'week' as const, periodStart: wk(20), status: 'open' as const },
+    { level: 'week' as const, periodStart: wk(13), status: 'removed' as const },
+  ]
+  it('completing marks the open records done and leaves history alone', () => {
+    expect(commitmentsAfterCompletion(records, true)!.map((c) => c.status)).toEqual(['done', 'done', 'removed'])
+  })
+  it('reopening restores them, so a later move closes the old week (no action on two weeks)', () => {
+    const reopened = commitmentsAfterCompletion(commitmentsAfterCompletion(records, true), false)!
+    expect(reopened.map((c) => c.status)).toEqual(['open', 'open', 'removed'])
+    const task = { id: 'x', title: 'Sweep the floor', completed: false, createdAt: new Date(), updatedAt: new Date(), bucket: 'week', weekStart: wk(20), monthStart: new Date(2026, 8, 1), commitments: reopened } as Task
+    const plan = planPlacement(task, { bucket: 'week', weekStart: wk(27), scheduledFor: undefined }, { now: wk(26), userId: 'u' })
+    expect(plan.commitmentOps).toContainEqual({ op: 'remove', level: 'week', periodStart: wk(20) })
+    expect(plan.local.commitments!.filter((c) => c.level === 'week' && c.status === 'open').map((c) => c.periodStart)).toEqual([wk(27)])
   })
 })

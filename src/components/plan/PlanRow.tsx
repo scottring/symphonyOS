@@ -163,7 +163,7 @@ export function PlanRow({
   expanded = false, onToggleExpand, onAddStep, stepActionsFor, planWeek,
   timingReachesLower = false,
   stepsToDraw, counts, hiddenByReveal = 0, onShowAllSteps, hiddenByFilter = 0, goalControls,
-  assign, makeGoal, focusComposer = false, onComposerFocused,
+  assign, makeGoal, focusComposer = false, onComposerFocused, refine, stepWeeks,
 }: {
   row: PlanRowModel
   actions: RowAction[]
@@ -180,8 +180,15 @@ export function PlanRow({
   /** Goal rows only: whether the steps beneath are showing. */
   expanded?: boolean
   onToggleExpand?: (row: PlanRowModel) => void
-  /** Omitted on a past period — a look-back is read, not written into. */
-  onAddStep?: (row: PlanRowModel, title: string) => void
+  /** Omitted on a past period — a look-back is read, not written into.
+   *  `weekStart` is set when the reader chose a week in the same breath. */
+  onAddStep?: (row: PlanRowModel, title: string, weekStart?: Date) => void
+  /** The weeks a new next action may be planned into as it is written (the
+   *  month page). Omitted, the box writes the action onto the period alone. */
+  stepWeeks?: ReadonlyArray<{ start: Date; label: string }>
+  /** A goal's way to a SMALLER goal one rung down (year → season, season →
+   *  month) — see RefineGoalControl. */
+  refine?: ReactNode
   /** The verbs each step offers; a step is a task, so it is not the goal's. */
   stepActionsFor?: (step: PlanRowModel) => RowAction[]
   /**
@@ -257,6 +264,7 @@ export function PlanRow({
   const shown = stepsToDraw ?? row.steps ?? []
   const tally = counts ?? stepCounts(row)
   const [stepDraft, setStepDraft] = useState('')
+  const [stepWeek, setStepWeek] = useState('')
   const stepInputRef = useRef<HTMLInputElement>(null)
   /**
    * "+ Add a next action" on a collapsed goal opens it AND puts the cursor in its
@@ -364,6 +372,7 @@ export function PlanRow({
           <SupportLine label="Supports" refs={[row.supports]} onOpen={onOpenSupport} />
         )}
         {goalControls}
+        {refine}
         {!!row.supportedBy?.length && (
           <SupportLine label="Supported by" refs={row.supportedBy} onOpen={onOpenSupport} />
         )}
@@ -492,12 +501,13 @@ export function PlanRow({
         )}
         {onAddStep && (
           <form
-            className="period-plan-step-add flex items-center py-1.5 pr-2"
+            className="period-plan-step-add flex flex-wrap items-center gap-y-1 py-1.5 pr-2"
             onSubmit={(e) => {
               e.preventDefault()
               const t = stepDraft.trim()
               setStepDraft('')
-              if (t) onAddStep(row, t)
+              const week = stepWeeks?.find((w) => String(w.start.getTime()) === stepWeek)?.start
+              if (t) { if (week) onAddStep(row, t, week); else onAddStep(row, t) }
             }}
           >
             {/* In the step's own tick column, so the field starts exactly
@@ -511,8 +521,22 @@ export function PlanRow({
               value={stepDraft}
               onChange={(e) => setStepDraft(e.target.value)}
               placeholder="Add a next action"
-              className="min-w-0 flex-1 bg-transparent py-1.5 text-[15px] text-neutral-800 placeholder:text-neutral-400 focus:outline-none"
+              className="min-w-[10rem] flex-1 bg-transparent py-1.5 text-[15px] text-neutral-800 placeholder:text-neutral-400 focus:outline-none"
             />
+            {/* The week, chosen as the action is written — optional, and it
+                sticks for the next one so a run of actions lands together.
+                Enter in the title still adds. */}
+            {!!stepWeeks?.length && (
+              <select
+                aria-label={`Which week — next action for ${row.title}`}
+                value={stepWeek}
+                onChange={(e) => setStepWeek(e.target.value)}
+                className="period-step-week max-w-full rounded-md border border-neutral-200 bg-white px-1.5 py-1 text-xs text-neutral-600"
+              >
+                <option value="">No week yet</option>
+                {stepWeeks.map((w) => <option key={w.start.getTime()} value={String(w.start.getTime())}>{w.label}</option>)}
+              </select>
+            )}
           </form>
         )}
       </li>

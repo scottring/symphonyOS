@@ -1,0 +1,33 @@
+import { open, shot, BASE } from './pw.mjs'
+const { browser, page } = await open()
+// Week session for Oct 4–10: a next action toward October's goal
+await page.goto(BASE + '/week?start=2026-10-04'); await page.waitForTimeout(3000)
+await page.getByRole('button', { name: /^Plan the week of/ }).click(); await page.waitForTimeout(1200)
+if (await page.getByRole('button', { name: /Next: plan/ }).count()) await page.getByRole('button', { name: /Next: plan/ }).click()
+await page.waitForTimeout(600)
+await shot(page, '70-week-session-plan')
+await page.getByLabel(/New task for/).fill('Measure the patio for a rug')
+await page.getByRole('combobox', { name: /Toward a goal for/ }).selectOption({ label: 'Finish the patio' })
+await page.getByRole('button', { name: 'Add task', exact: true }).click()
+await page.getByRole('button', { name: /Next: save/ }).click(); await page.waitForTimeout(500)
+console.log('SAVE:', (await page.locator('body').innerText()).match(/What Save will change.{0,200}/is)?.[0].replace(/\n+/g, ' | '))
+await page.getByRole('button', { name: /^Save / }).click(); await page.waitForTimeout(3000)
+await page.reload(); await page.waitForTimeout(3000)
+await shot(page, '71-week-after-session')
+console.log('WEEK:', (await page.getByRole('region', { name: "This week's list" }).innerText()).replace(/\n+/g, ' | ').slice(0, 300))
+// Week add box toward a goal
+await page.getByRole('button', { name: /Add task to this week/ }).click()
+await page.getByRole('textbox', { name: 'New week task' }).fill('Price patio heaters')
+await page.getByRole('combobox', { name: /Toward a goal for/ }).selectOption({ label: 'Finish the patio' })
+await page.getByRole('button', { name: 'Add', exact: true }).click(); await page.waitForTimeout(2000)
+// Urgent Today entry, straight in
+await page.goto(BASE + '/today'); await page.waitForTimeout(3000)
+await page.getByRole('button', { name: /^Add task$/ }).first().click(); await page.waitForTimeout(400)
+await page.keyboard.type('Call the plumber — leak under sink'); await page.keyboard.press('Enter'); await page.waitForTimeout(2000)
+await shot(page, '72-today-urgent')
+// Direct single action on the month
+await page.goto(BASE + '/month?start=2026-10-01'); await page.waitForTimeout(3000)
+await page.getByRole('button', { name: '+ Add a single action' }).click()
+await page.keyboard.type('Renew the car registration'); await page.keyboard.press('Enter'); await page.waitForTimeout(2000)
+await shot(page, '73-month-single-action')
+await browser.close()

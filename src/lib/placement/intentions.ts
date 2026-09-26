@@ -114,6 +114,22 @@ export function applyFocusOps(list: readonly TaskFocusEntry[] | undefined, ops: 
 }
 
 /**
+ * The commitments after a tick, as the database trigger leaves them: every
+ * open one is done with the task, and reopening restores the done ones.
+ *
+ * The tick's optimistic update used to flip `completed` alone. After a
+ * complete → reopen the client still held last week's record as `done` while
+ * the database had reopened it, so moving the action to another week never
+ * closed the old one — and the action sat on BOTH weeks' lists (horizon flows
+ * acceptance, 2026-09-26).
+ */
+export function commitmentsAfterCompletion(list: readonly TaskCommitment[] | undefined, completed: boolean): TaskCommitment[] | undefined {
+  if (!list) return list
+  return list.map((c) => (completed && c.status === 'open' ? { ...c, status: 'done' as const }
+    : !completed && c.status === 'done' ? { ...c, status: 'open' as const } : c))
+}
+
+/**
  * A row whose records are UNKNOWN (never loaded — an older client, a test, a
  * failed records fetch) is read from its cached stamps: each stamp present is
  * an open commitment. Without this a placement write on such a row would

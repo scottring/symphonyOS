@@ -11,7 +11,7 @@ import { weekListTitle } from '@/components/reference/DayPlanPanel'
 import { localYmd } from '@/lib/cadence/config'
 import { useMobile } from '@/hooks/useMobile'
 
-export function WeekList({ tasks, weekStart, meId, userId, isCurrent, peopleFiltered = false, onToggle, onSelect, onPlan, onAdd, timingControl }: {
+export function WeekList({ tasks, weekStart, meId, userId, isCurrent, peopleFiltered = false, onToggle, onSelect, onPlan, onAdd, timingControl, goals = [], goalsLabel }: {
   tasks: Task[]
   weekStart: Date
   meId: string | null
@@ -24,7 +24,14 @@ export function WeekList({ tasks, weekStart, meId, userId, isCurrent, peopleFilt
   onSelect: (taskId: string) => void
   /** Opens the week session; shown in the empty state and as a quiet link. */
   onPlan?: () => void
-  onAdd?: (title: string) => Promise<void>
+  /** `goalId` is set when the new task is written as a goal's next action. */
+  onAdd?: (title: string, goalId?: string) => Promise<void>
+  /** The month's open goals this week's work may serve (horizon flows). The
+   *  add box offers them, optionally, so a next action is written with its
+   *  parent from the week itself. */
+  goals?: ReadonlyArray<{ id: string; title: string }>
+  /** "September" — whose goals these are. */
+  goalsLabel?: string
   /** The same timing control the period pages use, supplied by the host so
    *  this list stays presentational. Week and Day are execution views of the
    *  same work, so the control has to be the same one (connected planning,
@@ -34,6 +41,7 @@ export function WeekList({ tasks, weekStart, meId, userId, isCurrent, peopleFilt
   const [adding, setAdding] = useState(false)
   const mobile = useMobile()
   const [titleInput, setTitleInput] = useState('')
+  const [goalInput, setGoalInput] = useState('')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(false)
   const todayYmd = localYmd(new Date())
@@ -156,11 +164,20 @@ export function WeekList({ tasks, weekStart, meId, userId, isCurrent, peopleFilt
           // Stay open for the next one, and clear only what was sent: the
           // field closed on every Enter, and clearing it when the save landed
           // erased whatever had been typed meanwhile (walkthrough 2026-09-25).
-          try { await onAdd(submitted); setTitleInput((v) => (v.trim() === submitted ? '' : v)) }
+          // The goal choice sticks for the next one: a run of next actions
+          // usually serves the same goal.
+          try { await (goals.some((g) => g.id === goalInput) ? onAdd(submitted, goalInput) : onAdd(submitted)); setTitleInput((v) => (v.trim() === submitted ? '' : v)) }
           catch { setError(true) }
           finally { setSaving(false) }
         }}>
           <input autoFocus aria-label="New week task" placeholder="What will you work on?" value={titleInput} onChange={(event) => setTitleInput(event.target.value)} className="min-w-0 flex-1 rounded border border-neutral-200 px-3 py-2 text-sm" />
+          {goals.length > 0 && (
+            <select aria-label={`Toward a goal for ${goalsLabel ?? 'the month'} (optional)`} value={goalInput} onChange={(event) => setGoalInput(event.target.value)}
+              className="min-w-0 max-w-full rounded border border-neutral-200 bg-white px-2 py-2 text-sm text-neutral-700">
+              <option value="">{`Toward a goal for ${goalsLabel ?? 'the month'}? (optional)`}</option>
+              {goals.map((g) => <option key={g.id} value={g.id}>{g.title}</option>)}
+            </select>
+          )}
           <button type="submit" disabled={saving || !titleInput.trim()} className="text-sm text-primary-700 disabled:opacity-50">{saving ? 'Adding…' : 'Add'}</button>
           <button type="button" disabled={saving} onClick={() => setAdding(false)} className="text-sm text-neutral-500">Cancel</button>
           {error && <p role="alert" className="w-full text-sm text-red-600">Could not add the task. Try again.</p>}

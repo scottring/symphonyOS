@@ -1,0 +1,16 @@
+import { open, shot, BASE } from './pw.mjs'
+const { browser, page } = await open()
+const toast = async () => { await page.waitForTimeout(900); return (await page.locator('[role=status], [role=alert]').allInnerTexts()).join(' / ').replace(/\s+/g, ' ') }
+await page.goto(BASE + '/month?start=2026-09-01'); await page.waitForTimeout(2500)
+await page.getByRole('button', { name: 'Show next actions under Finish the patio' }).click()
+const box = page.getByRole('textbox', { name: 'New next action for Finish the patio' })
+const week = page.getByRole('combobox', { name: 'Which week — next action for Finish the patio' })
+console.log('week options:', (await week.locator('option').allInnerTexts()).join(' | '))
+await week.selectOption({ index: 4 }); await box.fill('Choose chairs'); await box.press('Enter')
+console.log('toast1:', await toast())
+await week.selectOption({ index: 5 }); await box.fill('Order lights'); await box.press('Enter')
+console.log('toast2:', await toast())
+await week.selectOption(''); await box.fill('Clear the patio'); await box.press('Enter')
+await page.waitForTimeout(1500)
+await shot(page, '20-month-actions')
+await browser.close()

@@ -89,7 +89,10 @@ describe('PlanSession — week', () => {
     fireEvent.click(screen.getByRole('button', { name: /next: plan this week/i }))
     expect(screen.queryByLabelText(/new goal for/i)).toBeNull()
     expect(screen.getByText('October')).toBeInTheDocument()
-    expect(screen.getByText('Finish the kitchen')).toBeInTheDocument()
+    // The month's goal sits beside the week, and the week's task box can
+    // write a next action toward it (horizon flows).
+    expect(screen.getByRole('complementary')).toHaveTextContent('Finish the kitchen')
+    expect(screen.getByRole('option', { name: 'Finish the kitchen' })).toBeInTheDocument()
   })
 
   it('a new task may take a day; "+ Add to this week" copies a month task down', () => {
@@ -105,6 +108,25 @@ describe('PlanSession — week', () => {
     fireEvent.click(screen.getByRole('button', { name: /next: save/i }))
     expect(screen.getByText(/stays on October/)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /save this week/i })).toBeInTheDocument()
+  })
+
+  it('writes a next action toward a month goal, in its area; the month goal\'s own next actions sit under it', () => {
+    const s = week({
+      above: [t({ id: 'm1', title: 'Three bids', bucket: 'month' }), t({ id: 'st', title: 'Order lights', bucket: 'month', goalTaskId: 'mg' })],
+      aboveGoals: [t({ id: 'mg', title: 'Finish the kitchen', isGoal: true, bucket: 'month', context: 'family' })],
+    })
+    fireEvent.click(screen.getByRole('button', { name: /next: plan this week/i }))
+    // The parent in view while its actions are chosen: its step is listed under it.
+    const aside = screen.getByRole('complementary')
+    const goalItem = within(aside).getByText('Finish the kitchen').closest('li')!
+    expect(within(goalItem).getByText('Order lights')).toBeInTheDocument()
+    expect(within(goalItem).getByRole('button', { name: 'Add to this week: Order lights' })).toBeInTheDocument()
+    fireEvent.change(screen.getByLabelText(/new task for this week/i), { target: { value: 'Choose chairs' } })
+    fireEvent.change(screen.getByRole('combobox', { name: 'Toward a goal for October' }), { target: { value: 'mg' } })
+    fireEvent.click(screen.getByRole('button', { name: /add task/i }))
+    expect(s.draft.newTasks[0]).toMatchObject({ title: 'Choose chairs', linkId: 'mg', context: 'family' })
+    fireEvent.click(screen.getByRole('button', { name: /next: save/i }))
+    expect(screen.getByText(/toward Finish the kitchen/)).toBeInTheDocument()
   })
 
   it('shows the week-list hint on the Plan step', () => {
@@ -246,6 +268,7 @@ describe('the save step tells the truth about what is already there', () => {
 
   it('once something IS proposed, separates it from the existing plan and offers Save', () => {
     setup(quiet)
+    fireEvent.click(screen.getByRole('button', { name: /add a single action or a next action/i }))
     fireEvent.change(screen.getByLabelText(/new task for/i), { target: { value: 'Call the box office' } })
     fireEvent.click(screen.getByRole('button', { name: /add task/i }))
     toSave()
@@ -322,6 +345,7 @@ describe('the review draws the saved plan the way Month does', () => {
     const s = setup(many)
     toPlan()
     // Add something, so the save has a real scope to preserve.
+    fireEvent.click(screen.getByRole('button', { name: /add a single action or a next action/i }))
     fireEvent.change(screen.getByLabelText(/New task for October/), { target: { value: 'Buy strings' } })
     fireEvent.click(screen.getByRole('button', { name: /add task/i }))
     const beforeFilter = JSON.stringify(s.draft)
@@ -343,6 +367,7 @@ describe('the review draws the saved plan the way Month does', () => {
   it('a failed save keeps the draft, says so, and retries without duplicating', () => {
     const s = setup({ ...plan, saveError: true })
     toPlan()
+    fireEvent.click(screen.getByRole('button', { name: /add a single action or a next action/i }))
     fireEvent.change(screen.getByLabelText(/New task for October/), { target: { value: 'Buy strings' } })
     fireEvent.click(screen.getByRole('button', { name: /add task/i }))
     fireEvent.click(screen.getByRole('button', { name: /next: save/i }))
