@@ -189,12 +189,21 @@ describe('a goal holds the steps that serve it', () => {
   })
 
   // Long lists: reachable without opening the goal first.
-  it('offers "Add a step" on a COLLAPSED goal, and opens it to take one', () => {
+  // Scott, 2026-09-26: a goal's controls show when it is opened, so a list
+  // of goals reads as goals. Opening is a real button — tap and keyboard.
+  it('shows its add and link controls only once opened, through a real button', () => {
     const onToggleExpand = vi.fn()
-    render(<ul><PlanRow row={goalWithSteps} actions={[]} onAction={vi.fn()} onOpen={vi.fn()} onAddStep={vi.fn()} onToggleExpand={onToggleExpand} /></ul>)
+    const { rerender } = render(<ul><PlanRow row={goalWithSteps} actions={[]} onAction={vi.fn()} onOpen={vi.fn()} onAddStep={vi.fn()} onToggleExpand={onToggleExpand}
+      goalControls={<button type="button">Link control</button>} refine={<button type="button">Refine control</button>} /></ul>)
     const goal = screen.getByText('Transform the porch').closest('li')!
-    fireEvent.click(within(goal).getByRole('button', { name: '+ Add a next action' }))
+    expect(within(goal).queryByRole('button', { name: '+ Add a next action' })).toBeNull()
+    expect(within(goal).queryByRole('button', { name: 'Link control' })).toBeNull()
+    expect(within(goal).queryByRole('button', { name: 'Refine control' })).toBeNull()
+    fireEvent.click(within(goal).getByRole('button', { name: /· show$/ }))
     expect(onToggleExpand).toHaveBeenCalledWith(goalWithSteps)
+    rerender(<ul><PlanRow row={goalWithSteps} actions={[]} onAction={vi.fn()} onOpen={vi.fn()} onAddStep={vi.fn()} onToggleExpand={onToggleExpand} expanded
+      goalControls={<button type="button">Link control</button>} refine={<button type="button">Refine control</button>} /></ul>)
+    for (const name of ['+ Add a next action', 'Link control', 'Refine control']) expect(screen.getByRole('button', { name })).toBeInTheDocument()
   })
 
   // A bound, not a cap: the true total is stated and one press gives it back.

@@ -38,6 +38,11 @@ const goal = (over: Partial<Goal>): Goal => ({
   createdAt: new Date(), updatedAt: new Date(), context: null, ...over,
 } as Goal)
 
+/** Open a goal (its controls appear when it is opened), unless it already is. */
+const openGoal = (title: string) => {
+  const caret = screen.getByRole('button', { name: new RegExp(`(Show|Hide) next actions under ${title}`) })
+  if (caret.getAttribute('aria-expanded') !== 'true') fireEvent.click(caret)
+}
 const state: { tasks: Task[]; goals: Goal[]; loading: boolean; goalsLoading?: boolean } = { tasks: [], goals: [], loading: false, goalsLoading: false }
 const defaultAddTask = async (..._a: unknown[]): Promise<string | undefined> => 'new'
 const hook = {
@@ -1810,9 +1815,10 @@ describe('a month with a realistic number of goals', () => {
     expect(screen.getByRole('button', { name: /Hide next actions under Record the album/ })).toBeInTheDocument()
   })
 
-  it('keeps "Add a step" reachable without opening the goal first', () => {
+  it('"Add a next action" is one press after opening the goal (controls show on open)', () => {
     dense()
     renderPage('month')
+    openGoal('Goal number 7')
     const card = screen.getByText('Goal number 7').closest('li')!
     fireEvent.click(within(card).getByRole('button', { name: '+ Add a next action' }))
     expect(screen.getByLabelText('New next action for Goal number 7')).toBeInTheDocument()
@@ -1877,7 +1883,7 @@ describe('linking a goal to the rung above it', () => {
       task({ id: 'st1', title: 'A step of its own', goalTaskId: 'mg1', monthStart: thisMonth }),
     ]
   }
-  const openEditor = () => fireEvent.click(screen.getByRole('button', { name: /Link to a season goal|Change or remove this link/ }))
+  const openEditor = () => { openGoal('A home easier to care for'); fireEvent.click(screen.getByRole('button', { name: /Link to a season goal|Change or remove this link/ })) }
   const picker = () => screen.getByRole('combobox', { name: /Goal that A home easier to care for supports/ })
 
   it('offers the link on a goal that has none, and SETS it', () => {
@@ -1934,24 +1940,28 @@ describe('linking a goal to the rung above it', () => {
   it('offers no link control where there is nothing above to link to', () => {
     state.tasks = [task({ id: 'mg1', title: 'Lonely goal', isGoal: true, monthStart: thisMonth })]
     renderPage('month')
+    openGoal('Lonely goal')
     expect(screen.queryByRole('button', { name: /Link to a season goal/ })).toBeNull()
   })
 
-  // Archive is not in the app's vocabulary for a goal task, so it is not here.
-  it('offers Active and Completed, and nothing it cannot honour', () => {
+  // The row's circle IS the goal's status (Scott, 2026-09-26): a second
+  // Active/Completed control beside it only competed with the goal.
+  it('has one status control — the circle — and no dropdown beside it', () => {
     withSeasonGoals()
     renderPage('month')
-    const status = screen.getByRole('combobox', { name: /Status of A home easier to care for/ })
-    expect([...status.querySelectorAll('option')].map((o) => o.textContent)).toEqual(['Active', 'Completed'])
+    openGoal('A home easier to care for')
+    expect(screen.queryByRole('combobox', { name: /Status of/ })).toBeNull()
+    expect(screen.getByRole('button', { name: 'Complete A home easier to care for' })).toBeInTheDocument()
   })
 
-  it('a goal’s status is its own — set here, never read from its steps', () => {
+  it('a goal’s status is its own — the circle ticks the goal alone, with Undo', async () => {
     withSeasonGoals()
     renderPage('month')
-    fireEvent.change(screen.getByRole('combobox', { name: /Status of A home easier to care for/ }), { target: { value: 'completed' } })
-    expect(hook.updateTask).toHaveBeenCalledWith('mg1', { completed: true })
-    const [, updates] = hook.updateTask.mock.calls[0] as [string, Record<string, unknown>]
-    expect(Object.keys(updates)).toEqual(['completed'])
+    fireEvent.click(screen.getByRole('button', { name: 'Complete A home easier to care for' }))
+    await waitFor(() => expect(hook.toggleTask).toHaveBeenCalledWith('mg1'))
+    expect(hook.toggleTask).toHaveBeenCalledTimes(1)
+    expect(hook.updateTask).not.toHaveBeenCalled()
+    await waitFor(() => expect(toastSpy).toHaveBeenCalledWith(expect.stringMatching(/Completed the goal .* Its steps are unchanged/), 'success', 8000, expect.objectContaining({ label: 'Undo' })))
   })
 
   it('finishing every step does not complete the goal', () => {
@@ -1960,8 +1970,8 @@ describe('linking a goal to the rung above it', () => {
       task({ id: 's1', title: 'Only step', goalTaskId: 'mg1', monthStart: thisMonth, completed: true }),
     ]
     renderPage('month')
-    const status = screen.getByRole('combobox', { name: /Status of A home easier to care for/ }) as HTMLSelectElement
-    expect(status.value).toBe('active')
+    expect(screen.getByRole('button', { name: 'Complete A home easier to care for' })).toBeInTheDocument()
+    expect(screen.queryByText(/Completed goals/)).toBeNull()
   })
 })
 
@@ -2032,6 +2042,7 @@ describe('linking waits for the write', () => {
 
   /** The editor closes after each choice, so each attempt reopens it. */
   const link = () => {
+    openGoal('A home easier to care for')
     fireEvent.click(screen.getByRole('button', { name: /Link to a season goal|Change or remove this link/ }))
     fireEvent.change(screen.getByRole('combobox', { name: /Goal that A home easier to care for supports/ }), { target: { value: 'sg1' } })
   }
@@ -2073,18 +2084,20 @@ describe('linking waits for the write', () => {
     hook.updateTask.mockImplementation(() => new Promise((r) => { land = r }))
     renderPage('month')
     link()
-    expect(screen.getByRole('combobox', { name: /Status of A home easier to care for/ })).toBeDisabled()
+    // Reopened mid-write, the goal picker waits for the write to land.
+    fireEvent.click(screen.getByRole('button', { name: /Link to a season goal|Change or remove this link/ }))
+    const picker = () => screen.getByRole('combobox', { name: /Goal that A home easier to care for supports/ })
+    expect(picker()).toBeDisabled()
     await act(async () => { land(true) })
-    expect(screen.getByRole('combobox', { name: /Status of A home easier to care for/ })).not.toBeDisabled()
+    expect(picker()).not.toBeDisabled()
   })
 
-  it('a refused status change leaves the goal as it was, and says so', async () => {
-    hook.updateTask.mockImplementation(async () => false)
+  it('a refused tick on a goal does not announce a completed goal', async () => {
+    hook.toggleTask.mockImplementationOnce(async () => false)
     renderPage('month')
-    await act(async () => {
-      fireEvent.change(screen.getByRole('combobox', { name: /Status of A home easier to care for/ }), { target: { value: 'completed' } })
-    })
-    expect(toastSpy).toHaveBeenCalledWith(expect.stringMatching(/Couldn’t change the status .* unchanged/), 'error', 6000)
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Complete A home easier to care for' })) })
+    expect(hook.toggleTask).toHaveBeenCalledWith('mg1')
+    expect(toastSpy).not.toHaveBeenCalledWith(expect.stringMatching(/Completed the goal/), expect.anything(), expect.anything(), expect.anything())
   })
 
   // The fold exists to get finished goals back.
@@ -2092,10 +2105,8 @@ describe('linking waits for the write', () => {
     state.tasks = [task({ id: 'mg2', title: 'A finished goal', isGoal: true, monthStart: thisMonth, completed: true })]
     renderPage('month')
     fireEvent.click(screen.getByText(/Completed goals/))
-    const status = screen.getByRole('combobox', { name: /Status of A finished goal/ }) as HTMLSelectElement
-    expect(status.value).toBe('completed')
-    await act(async () => { fireEvent.change(status, { target: { value: 'active' } }) })
-    expect(hook.updateTask).toHaveBeenCalledWith('mg2', { completed: false })
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Reopen A finished goal' })) })
+    expect(hook.toggleTask).toHaveBeenCalledWith('mg2')
   })
 })
 
@@ -2951,6 +2962,7 @@ describe('horizon flows: outcomes on Year/Season/Month, next actions into weeks 
   it('a season goal refines into a month goal that supports it', async () => {
     state.tasks = [task({ id: 'sg', title: 'Create a usable outdoor space', isGoal: true, bucket: 'quarter', seasonStart: fall, goalId: 'yg', context: 'family' })]
     renderPage('season')
+    openGoal('Create a usable outdoor space')
     fireEvent.click(screen.getByRole('button', { name: 'Add a month goal for Create a usable outdoor space' }))
     const box = screen.getByRole('textbox', { name: 'New month goal for Create a usable outdoor space' })
     fireEvent.change(box, { target: { value: 'Finish the patio' } })

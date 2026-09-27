@@ -26,7 +26,7 @@ import { useSupabaseTasks } from '@/hooks/useSupabaseTasks'
 import { useActionableInstances } from '@/hooks/useActionableInstances'
 import { makePlanActions, timingRemoval } from '@/lib/planning/planActions'
 import { goalListView, hiddenLabel, clearFilterOnEscape } from '@/lib/planning/goalListView'
-import { GoalParentLink, GoalStatusControl, parentRungLabel } from './GoalParentLink'
+import { GoalParentLink, parentRungLabel } from './GoalParentLink'
 import { expansionKey, readExpanded, writeExpanded } from './goalExpansion'
 import { planDropHandlers } from '@/lib/planning/planDrag'
 import { showToast } from '@/hooks/useToast'
@@ -1209,21 +1209,6 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
       : `“${row.title}” no longer supports another goal. Nothing else changed.`, 'success', 5000)
   }, [gated, level])
 
-  const setGoalStatus = useCallback(async (row: PlanRowModel, next: 'active' | 'completed') => {
-    // The goal's OWN completion. Its steps are not consulted and not touched.
-    setPendingGoal(row.id)
-    let ok = false
-    try {
-      ok = (await gated.updateTask(row.id, { completed: next === 'completed' })) !== false
-    } catch {
-      ok = false
-    } finally {
-      setPendingGoal(null)
-    }
-    if (!ok) {
-      showToast(`Couldn’t change the status of “${row.title}”. It is unchanged — try again.`, 'error', 6000)
-    }
-  }, [gated])
 
   const goalControlsFor = useCallback((row: PlanRowModel) => {
     if (level === 'year' || isPast) return undefined
@@ -1239,15 +1224,9 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
           onUnlink={() => { void linkParent(row, null) }}
           disabled={busy}
         />
-        <GoalStatusControl
-          goalTitle={row.title}
-          status={rowIsDone(row.fate) ? 'completed' : 'active'}
-          onChange={(next) => { void setGoalStatus(row, next) }}
-          disabled={busy}
-        />
       </span>
     )
-  }, [level, isPast, parentChoices, linkParent, setGoalStatus, pendingGoal])
+  }, [level, isPast, parentChoices, linkParent, pendingGoal])
 
 
   // ── The year's writers. A year row is a GOAL, so every verb is a goal

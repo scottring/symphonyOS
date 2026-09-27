@@ -371,7 +371,11 @@ export function PlanRow({
         {row.supports && (
           <SupportLine label="Supports" refs={[row.supports]} onOpen={onOpenSupport} />
         )}
-        {goalControls}
+        {/* A goal's controls — its link up, its refine and next-action
+            links — appear when the goal is OPENED, so a list of goals reads
+            as goals, not as a wall of controls (Scott, 2026-09-26). Opening
+            is a real button (the caret, and the line below), never hover. */}
+        {(!canHoldSteps || expanded) && goalControls}
         {/* A goal that takes next actions carries its refine link on the same
             line as "+ Add a next action" (below); a year goal has only this. */}
         {!canHoldSteps && refine}
@@ -393,14 +397,15 @@ export function PlanRow({
             goal that only says "5 supporting tasks" hides how much is done. */}
         {canHoldSteps && (tally.total > 0 || !!onAddStep || !!refine) && (
           <span className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs">
-            {refine}
-            {tally.total > 0 && (
-              <button ref={countsRef} type="button" onClick={() => onToggleExpand?.(row)} className="text-primary-700 hover:underline">
-                {countsLabel(tally)}{expanded ? ' · hide' : ' · show'}
-              </button>
-            )}
-            {/* Reachable without opening the goal first (long-list acceptance). */}
-            {onAddStep && (
+            {/* ONE element open or shut, so keyboard focus stays on it. On a
+                phone it is a full 44px target when shut: the way in to a goal
+                is a tap, never a hover. */}
+            <button ref={countsRef} type="button" onClick={() => onToggleExpand?.(row)}
+              className={`period-goal-open inline-flex items-center text-primary-700 hover:underline ${expanded ? '' : 'min-h-[44px] sm:min-h-0'}`}>
+              {tally.total > 0 ? countsLabel(tally) : 'No next actions yet'}{expanded ? ' · hide' : ' · show'}
+            </button>
+            {expanded && refine}
+            {expanded && onAddStep && (
               <button type="button" onClick={addStepHere} className="text-neutral-500 hover:text-primary-700 hover:underline">
                 + Add a next action
               </button>
