@@ -73,6 +73,22 @@ Filing an existing action writes that one column through `updateTask`, which has
   - Proved on the local stack (`a4.mjs`): the PATCH was allowed to commit and its response was dropped; the dialog said "Added" and the DB held the link.
 - **Concurrent relink.** The write is a compare-and-set, `… where goal_task_id = <the goal it was shown under>` (or `is null`). In `a4.mjs`, while "Move it to …" was open, Sam moved "Look up swim lessons" to his own goal. Alex's move said "Not changed … it is now under 'GEA Plan winter break'", and the DB kept Sam's change. "Remove from goal" is conditional the same way.
 
+## Codex follow-up review of 6c942547: fixed
+
+- **A relationship-only broadcast.** `setGoalLink` announces `{ kind: 'goalLink', id, goalTaskId }`, which every instance applies to its current row, rather than a whole pre-request snapshot.
+  - Hook test: a notes edit made in another instance while the link request is held keeps its new notes in both instances.
+  - Mutation check: putting the old snapshot broadcast back fails this test.
+- **A recovery gate.** When both the write and the read-back fail, the task goes into a module-scope `unverifiedGoalLinks`, which every mounted instance honours. No further link write for that task starts until a fresh read succeeds.
+  - The retry recovers first. If the row turns out to be under a different goal than expected, the result is a conflict, not an overwrite.
+  - Hook tests cover: a gated retry with reads still failing (nothing written), recovery then conflict, and the gate shared across instances.
+  - Local DB (`a4.mjs` step 4): after an unknown result, the retry read the row back and then added it.
+- **The dialog can't get stuck.** `onLink` is wrapped in try/catch/finally; a throwing callback reports "Couldn't confirm" and releases the busy state (test).
+- **Hook tests** (`useSupabaseTasks.goalLink.test.ts`, fake DB) cover:
+  - the exact conditional query (`eq id`, plus `is goal_task_id null` or `eq goal_task_id <expected>`), with only `goal_task_id` in the payload;
+  - lost-response recovery reaching both instances;
+  - a competing relink and a stale unlink leaving the other goal in place;
+  - a refused write coming back as `failed`.
+
 ## Limitations and follow-ups
 
 - Year goals take no existing actions (see above). Offering it would need a real next-action relationship for the `goals` table, which is a product decision plus a migration.

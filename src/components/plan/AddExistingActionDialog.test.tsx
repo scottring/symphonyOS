@@ -103,4 +103,13 @@ describe('AddExistingActionDialog', () => {
     expect(screen.getByRole('alert')).toHaveTextContent('Couldn’t confirm whether “Look up music lessons” was added')
     expect(screen.getByRole('alert')).not.toHaveTextContent('Nothing was changed')
   })
+
+  it('a callback that throws never leaves the picker stuck busy, and claims nothing', async () => {
+    const user = userEvent.setup()
+    renderDialog([task('a', 'Look up music lessons'), task('b', 'Buy stain')], vi.fn(async (): Promise<LinkOutcome> => { throw new Error('boom') }))
+    await user.click(screen.getByRole('button', { name: /Look up music lessons/ }))
+    expect(screen.getByRole('alert')).toHaveTextContent('Couldn’t confirm whether “Look up music lessons” was added')
+    // Not busy: the other result can still be chosen.
+    expect(screen.getByRole('button', { name: /Buy stain/ })).not.toBeDisabled()
+  })
 })

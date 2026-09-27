@@ -40,4 +40,8 @@ await ctx.route(/\/rest\/v1\/tasks\?.*goal_task_id/, (r) => r.abort('failed'))
 await search.fill('errand 02'); await page.waitForTimeout(300)
 await dlg.getByRole('button', { name: /GEA Errand 02/ }).click(); await page.waitForTimeout(1500)
 console.log('3 UNKNOWN →', await dlg.getByRole('alert').innerText().catch(() => 'no alert'))
+// 4. Connection back: the retry reads first (the row is still free), then writes.
+await ctx.unrouteAll({ behavior: 'ignoreErrors' })
+await dlg.getByRole('button', { name: /GEA Errand 02/ }).click(); await page.waitForTimeout(1500)
+console.log('4 RETRY AFTER RECOVERY →', await dlg.getByRole('status').innerText().catch(() => 'no status'))
 await browser.close()

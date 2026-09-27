@@ -39,6 +39,10 @@ type LocalTaskWrite =
   | { kind: 'insert'; task: Task }
   | { kind: 'update'; task: Task }
   | { kind: 'delete'; id: string }
+  /** ONE field: which goal a task is a next action for. Applied to each
+   *  instance's CURRENT row — never a whole task snapshot, which would put
+   *  back fields edited while the link request was in flight. */
+  | { kind: 'goalLink'; id: string; goalTaskId: string | null }
 const localTaskWrites = new EventTarget()
 function announceLocalWrite(detail: LocalTaskWrite): void {
   localTaskWrites.dispatchEvent(new CustomEvent<LocalTaskWrite>('write', { detail }))
@@ -50,6 +54,17 @@ function announceLocalWrite(detail: LocalTaskWrite): void {
 // like localTaskWrites: every mounted instance honours it, not only the one
 // whose write failed (final review M9).
 const unreconciledTasks = new Set<string>()
+
+// Tasks whose goal link write AND its read-back both failed: whether the link
+// changed is unknown. No goal-link write may start from the local value until
+// a fresh read of the row succeeds. Module scope, so every mounted instance
+// honours it (Codex review of 6c942547).
+const unverifiedGoalLinks = new Set<string>()
+
+/** Set one task's goal link on a list, touching nothing else on the row. */
+function withGoalLink(rows: Task[], id: string, goalTaskId: string | null): Task[] {
+  return rows.map((t) => (t.id === id ? { ...t, goalTaskId: goalTaskId ?? undefined } : t))
+}
 
 /**
  * A local write that a LATER write in the same flow plans from: applied to the
@@ -452,6 +467,7 @@ export function __resetTasksCache(): void {
   tasksCache = null
   tasksInFlight = null
   unreconciledTasks.clear()
+  unverifiedGoalLinks.clear()
 }
 
 /** Test seam — age the cache past its TTL without waiting a minute. */
@@ -753,6 +769,11 @@ export function useSupabaseTasks() {
       const detail = (e as CustomEvent<LocalTaskWrite>).detail
       if (detail.kind === 'insert') applyIncomingInsert(detail.task)
       else if (detail.kind === 'update') applyIncomingUpdate(detail.task)
+      else if (detail.kind === 'goalLink') {
+        const patch = (rows: Task[]) => withGoalLink(rows, detail.id, detail.goalTaskId)
+        setTasksNow(tasksRef, setTasks, patch)
+        patchCache(patch)
+      }
       else applyIncomingDelete(detail.id)
     }
     localTaskWrites.addEventListener('write', onLocalWrite)
@@ -2126,34 +2147,53 @@ export function useSupabaseTasks() {
   const setGoalLink = useCallback(async (taskId: string, goalId: string | null, expected: string | null): Promise<LinkOutcome> => {
     const before = findTaskById(taskId)
     if (!before) return { status: 'failed' }
-    const put = (goalTaskId: string | null) => {
-      setTasksNow(tasksRef, setTasks, (prev) => prev.map((t) => (t.id === taskId ? { ...t, goalTaskId: goalTaskId ?? undefined } : t)))
-    }
-    put(goalId)
-    let wrote = false
-    try {
-      const base = supabase.from('tasks').update({ goal_task_id: goalId }).eq('id', taskId)
-      const { data, error } = await (expected === null ? base.is('goal_task_id', null) : base.eq('goal_task_id', expected)).select('id')
-      wrote = !error && !!data && data.length === 1
-    } catch { /* a lost response: read it back below */ }
-    let reread: { goalTaskId: string | null } | undefined
-    if (!wrote) {
+    const readLink = async (): Promise<{ goalTaskId: string | null } | undefined> => {
       try {
         const { data, error } = await supabase.from('tasks').select('goal_task_id').eq('id', taskId).maybeSingle()
-        if (!error && data) reread = { goalTaskId: (data as { goal_task_id: string | null }).goal_task_id }
-      } catch { /* unknown */ }
+        return !error && data ? { goalTaskId: (data as { goal_task_id: string | null }).goal_task_id } : undefined
+      } catch { return undefined }
     }
-    const outcome = linkOutcome(wrote, goalId, expected, reread)
-    // The local row ends where the database is — or, when that is unknown,
-    // where it was, until realtime or a reload says otherwise.
-    const settled = outcome.status === 'ok' ? goalId
-      : outcome.status === 'conflict' ? outcome.currentGoalId
-        : reread ? reread.goalTaskId : (before.goalTaskId ?? null)
-    put(settled)
-    if (outcome.status === 'ok' || outcome.status === 'conflict') {
-      announceLocalWrite({ kind: 'update', task: { ...before, goalTaskId: settled ?? undefined } })
+    // What the database holds, told to every instance as the one field.
+    const settle = (goalTaskId: string | null) => {
+      setTasksNow(tasksRef, setTasks, (rows) => withGoalLink(rows, taskId, goalTaskId))
+      announceLocalWrite({ kind: 'goalLink', id: taskId, goalTaskId })
     }
-    return outcome
+    try {
+      // A link left unknown by an earlier failure is read before anything is
+      // written from it: a retry recovers first, and never overwrites a
+      // different goal that is really there.
+      if (unverifiedGoalLinks.has(taskId)) {
+        const now = await readLink()
+        if (!now) return { status: 'unknown' }
+        unverifiedGoalLinks.delete(taskId)
+        settle(now.goalTaskId)
+        if (now.goalTaskId === goalId) return { status: 'ok' }
+        if (now.goalTaskId !== expected) return { status: 'conflict', currentGoalId: now.goalTaskId }
+      }
+      // Optimistic, this instance only; announced once the database answers.
+      setTasksNow(tasksRef, setTasks, (rows) => withGoalLink(rows, taskId, goalId))
+      let wrote = false
+      try {
+        const base = supabase.from('tasks').update({ goal_task_id: goalId }).eq('id', taskId)
+        const { data, error } = await (expected === null ? base.is('goal_task_id', null) : base.eq('goal_task_id', expected)).select('id')
+        wrote = !error && !!data && data.length === 1
+      } catch { /* a lost response: read it back below */ }
+      const reread = wrote ? undefined : await readLink()
+      const outcome = linkOutcome(wrote, goalId, expected, reread)
+      if (outcome.status === 'unknown') {
+        // Neither the write nor the read answered: show what it was, and let
+        // no further link write start from that until a read succeeds.
+        unverifiedGoalLinks.add(taskId)
+        setTasksNow(tasksRef, setTasks, (rows) => withGoalLink(rows, taskId, before.goalTaskId ?? null))
+        return outcome
+      }
+      settle(outcome.status === 'ok' ? goalId : outcome.status === 'conflict' ? outcome.currentGoalId : (reread?.goalTaskId ?? null))
+      return outcome
+    } catch {
+      unverifiedGoalLinks.add(taskId)
+      setTasksNow(tasksRef, setTasks, (rows) => withGoalLink(rows, taskId, before.goalTaskId ?? null))
+      return { status: 'unknown' }
+    }
   }, [findTaskById])
 
   // Bulk update multiple tasks at once

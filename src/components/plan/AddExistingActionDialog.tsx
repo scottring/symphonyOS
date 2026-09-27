@@ -38,8 +38,16 @@ export function AddExistingActionDialog({ goal, tasks, members = [], onLink, onC
     setSaving(true)
     setError(null)
     // The goal it was SHOWN under — the move is made only if that is still so.
-    const out = await onLink(c.task.id, c.task.goalTaskId ?? null)
-    setSaving(false)
+    let out: LinkOutcome
+    try {
+      out = await onLink(c.task.id, c.task.goalTaskId ?? null)
+    } catch {
+      // The callback's contract is to resolve, but a throw must never leave
+      // the picker stuck busy — and nothing is known about the save.
+      out = { status: 'unknown' }
+    } finally {
+      setSaving(false)
+    }
     setConfirming(null)
     if (out.status === 'ok') { setAdded((a) => [...a, c.task.title]); return }
     if (out.status === 'conflict') {
@@ -48,7 +56,7 @@ export function AddExistingActionDialog({ goal, tasks, members = [], onLink, onC
       return
     }
     if (out.status === 'unknown') {
-      setError(`Couldn’t confirm whether “${c.task.title}” was added — the connection dropped. It will show under this goal if it saved.`)
+      setError(`Couldn’t confirm whether “${c.task.title}” was added — the connection dropped. Symphony will check it again before any further change to it.`)
       return
     }
     setError(`Could not add “${c.task.title}”. Nothing was changed — try again.`)

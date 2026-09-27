@@ -13,4 +13,14 @@ Keep these fixes scoped to relationship writes. Do not expand into a placement r
 
 ## Coordination
 
+## Follow-up review of 6c942547 (15:23 UTC)
+
+Independent targeted run: 86/86 tests passed. Conditional goal_task_id writes and read-back outcomes address the stale-parent write and lost-response classification. Remaining implementation work:
+
+- `setGoalLink` announces `{ ...before, goalTaskId: settled }` after awaiting network requests. This broadcasts an entire old task snapshot. If the action's notes, people, schedule or completion changed while the link request was pending, the fan-out can restore stale fields in mounted consumers. Broadcast a relationship-only patch applied to each consumer's current task, rather than the pre-request task object. Add a hook-level test with a concurrent unrelated-field update and multiple consumers; verify only goalTaskId changes.
+- When both write and read-back fail, the hook restores an unverified old relationship and allows the next write immediately. Finish the requested recovery gate: no further goal-link write for that task until a fresh relationship read succeeds (across mounted hook instances); make a retry perform recovery first, without silently overwriting a different parent.
+- The dialog still has no catch/finally around onLink. The hook catches transport failures, but its callback contract can reject; add a defensive catch/finally and a rejecting-callback test so the dialog never remains permanently busy.
+
+The present tests exercise outcome mapping and dialog mocks; add hook tests proving actual conditional query construction, lost-response recovery, stale unlink and the incomplete-read gate. Keep real data untouched. These are bounded corrections, not deployment authorization.
+
 Instructions were pasted into the existing VS Code left terminal, Horizon flow implementation, but clipboard operation timed out. The verification screenshot then reported the Mac locked. Submission is UNCONFIRMED; do not assume Claude received the request. Stop UI retries until Scott confirms manual unlock. Preserve the real Fall goals and September import preview.
