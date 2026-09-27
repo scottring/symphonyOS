@@ -16,13 +16,17 @@ import { Plus } from 'lucide-react'
 
 export interface RefinePeriod { start: Date; label: string; current?: boolean }
 
-export function RefineGoalControl({ goalTitle, rungNoun, periods, onAdd }: {
+export function RefineGoalControl({ goalTitle, rungNoun, periods, onAdd, linkable = [], onLink }: {
   goalTitle: string
   /** 'season' on a year goal, 'month' on a season goal. */
   rungNoun: 'season' | 'month'
   /** The periods one rung down that the smaller goal may live in. */
   periods: readonly RefinePeriod[]
   onAdd: (title: string, periodStart: Date) => Promise<boolean>
+  /** Goals one rung down, not yet linked to anything, that could support
+   *  this one — "create OR link" (product contract, 2026-09-27). */
+  linkable?: ReadonlyArray<{ id: string; title: string; period?: string }>
+  onLink?: (childId: string) => Promise<boolean>
 }) {
   const [open, setOpen] = useState(false)
   const [title, setTitle] = useState('')
@@ -78,7 +82,26 @@ export function RefineGoalControl({ goalTitle, rungNoun, periods, onAdd }: {
         {saving ? 'Adding…' : 'Add'}
       </button>
       <button type="button" onClick={() => setOpen(false)} className="text-xs text-neutral-500">Cancel</button>
-      {error && <p role="alert" className="w-full text-xs text-red-600">Couldn’t add it. Nothing changed — try again.</p>}
+      {linkable.length > 0 && onLink && (
+        <label className="flex w-full flex-wrap items-center gap-2 text-xs text-neutral-500">
+          Or link one you already have:
+          <select value="" disabled={saving}
+            onChange={async (e) => {
+              const id = e.target.value
+              if (!id) return
+              setSaving(true); setError(false)
+              const ok = await onLink(id).catch(() => false)
+              setSaving(false)
+              if (!ok) { setError(true); return }
+              setOpen(false)
+            }}
+            className="max-w-full rounded-md border border-neutral-200 bg-white px-1.5 py-1 text-xs text-neutral-700">
+            <option value="">Choose a {rungNoun} goal…</option>
+            {linkable.map((g) => <option key={g.id} value={g.id}>{g.period ? `${g.period} · ${g.title}` : g.title}</option>)}
+          </select>
+        </label>
+      )}
+      {error && <p role="alert" className="w-full text-xs text-red-600">Couldn’t save that. Nothing changed — try again.</p>}
     </form>
   )
 }

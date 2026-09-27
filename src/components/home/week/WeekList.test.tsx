@@ -178,7 +178,10 @@ describe('the goal a week row serves', () => {
     render(<WeekList tasks={[goal, step]} weekStart={WEEK} meId={null} userId="me" isCurrent onToggle={vi.fn()} onSelect={vi.fn()} />)
     const list = within(screen.getByRole('region', { name: "This week's list" }))
     expect(list.getByText('research tickets')).toBeInTheDocument()
-    expect(list.getByText('Take Kaleb to an Islanders game in DC')).toBeInTheDocument()
+    // Named twice on purpose: under the step, and in the week's
+    // "Goals this week serves" reference line (product contract, 2026-09-27).
+    expect(list.getAllByText('Take Kaleb to an Islanders game in DC')).toHaveLength(2)
+    expect(list.getByText('(1 this week)')).toBeInTheDocument()
   })
 
   it('says nothing for a row that serves no goal', () => {
@@ -187,4 +190,17 @@ describe('the goal a week row serves', () => {
     expect(list.getByText('book the car in')).toBeInTheDocument()
     expect(list.queryByText(/Islanders/)).not.toBeInTheDocument()
   })
+})
+
+it('names the goals the week serves for reference, with what is on the week for each', () => {
+  const onSelect = vi.fn()
+  const step = row({ id: 's1', title: 'Choose chairs', goalTaskId: 'patio' })
+  const patio = createMockTask({ id: 'patio', title: 'Finish the patio', isGoal: true, bucket: 'month' })
+  render(<WeekList tasks={[patio, step]} weekStart={WEEK} meId={null} userId="me" isCurrent onToggle={vi.fn()} onSelect={onSelect}
+    goals={[{ id: 'patio', title: 'Finish the patio' }, { id: 'garage', title: 'Clear out the garage' }]} goalsLabel="October" />)
+  const ref = screen.getByText('Goals this week serves:').parentElement!
+  expect(ref).toHaveTextContent('Finish the patio (1 this week)')
+  expect(ref).toHaveTextContent('Clear out the garage (nothing this week yet)')
+  fireEvent.click(within(ref).getByRole('button', { name: 'Clear out the garage' }))
+  expect(onSelect).toHaveBeenCalledWith('garage')
 })

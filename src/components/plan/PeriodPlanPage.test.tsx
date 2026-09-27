@@ -158,7 +158,7 @@ describe('PeriodPlanPage', () => {
     expect(within(slot).getByRole('complementary', { name: 'This Season' })).toBeInTheDocument()
     fireEvent.click(within(slot).getByRole('button', { name: 'Close shelves' }))
     expect(screen.queryByTestId('shelves-slot')).toBeNull()
-    expect(screen.getByRole('heading', { name: 'Month goals' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Month goals and projects' })).toBeInTheDocument()
   })
 
   it("This Month: goals first, then tasks, each under its own heading; Iris's rows stay out", () => {
@@ -178,7 +178,7 @@ describe('PeriodPlanPage', () => {
     // only tell. Goals come first, and the goal is in the GOALS list.
     const goals = screen.getByRole('region', { name: /goals$/ })
     const list = screen.getByRole('region', { name: /list$/ })
-    expect(within(goals).getByRole('heading', { name: 'Month goals' })).toBeInTheDocument()
+    expect(within(goals).getByRole('heading', { name: 'Month goals and projects' })).toBeInTheDocument()
     // Goal-first (horizon flows): the task list is the secondary route.
     expect(within(list).getByRole('heading', { name: 'Single actions' })).toBeInTheDocument()
     expect(goals.compareDocumentPosition(list) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
@@ -641,7 +641,7 @@ describe('PeriodPlanPage', () => {
     expect(hook.addTask).toHaveBeenCalledWith('Repaint the porch', undefined, undefined, undefined,
       expect.objectContaining({ bucket: 'month', monthStart: thisMonth, isGoal: false }))
     // The goals list has its own "+", and what you type there IS a goal.
-    fireEvent.click(screen.getByRole('button', { name: `Add a goal for ${monthName}` }))
+    fireEvent.click(screen.getByRole('button', { name: `Add a goal or project for ${monthName}` }))
     const goalInput = screen.getByLabelText(`New goal for ${monthName}`)
     fireEvent.change(goalInput, { target: { value: 'Read more' } })
     fireEvent.submit(goalInput.closest('form')!)
@@ -655,11 +655,11 @@ describe('PeriodPlanPage', () => {
   it('an empty period opens with the goal question already asked', () => {
     state.goals = []
     renderPage('year')
-    const input = screen.getByPlaceholderText(`An outcome for ${now.getFullYear()}`)
+    const input = screen.getByPlaceholderText(`Add a goal or project for ${now.getFullYear()}`)
     expect(input).toBeInTheDocument()
     expect(screen.queryByText(/No goals for this year yet/)).not.toBeInTheDocument()
     // "+ Add a goal" puts the cursor in the box, which is always open.
-    fireEvent.click(screen.getByRole('button', { name: `Add a goal for ${now.getFullYear()}` }))
+    fireEvent.click(screen.getByRole('button', { name: `Add a goal or project for ${now.getFullYear()}` }))
     expect(input).toHaveFocus()
     fireEvent.change(input, { target: { value: 'Move the family to a bigger house' } })
     fireEvent.submit(input.closest('form')!)
@@ -2883,7 +2883,7 @@ describe('horizon flows: outcomes on Year/Season/Month, next actions into weeks 
     ]
     renderPage('month')
     const box = screen.getByRole('textbox', { name: 'New goal for September' })
-    expect(box).toHaveAttribute('placeholder', 'A goal or project for September')
+    expect(box).toHaveAttribute('placeholder', 'Add a goal or project for September')
     fireEvent.change(box, { target: { value: 'Finish the patio' } })
     fireEvent.change(screen.getByRole('combobox', { name: 'Supports a season goal (optional)' }), { target: { value: 'sg' } })
     fireEvent.submit(box.closest('form')!)
@@ -3019,19 +3019,25 @@ describe('choosing goals from an imported, flat season list', () => {
   })
   afterEach(() => { vi.useRealTimers(); hook.updateTask.mockImplementation(async () => true) })
 
-  it('a season with no goals opens on the question, not an empty box above the list', () => {
+  // Product contract, 2026-09-27: the empty goals state invites an OUTCOME;
+  // organizing an imported list is a separate, labelled one-time step.
+  it('the empty goals state invites a goal; the one-time repair sits by the list it is about', () => {
     renderPage('season')
     const goals = screen.getByRole('region', { name: /goals$/ })
-    expect(within(goals).getByText(/list has 4 items and no goals yet/)).toBeInTheDocument()
-    expect(within(goals).getByRole('button', { name: 'Choose Fall 2026’s goals' })).toBeInTheDocument()
+    expect(within(goals).getByText(/No goals or projects for Fall 2026 yet/)).toBeInTheDocument()
+    expect(within(goals).getByRole('textbox', { name: 'New goal for Fall 2026' })).toBeInTheDocument()
+    expect(within(goals).queryByRole('button', { name: 'Organize the list' })).toBeNull()
+    const list = screen.getByRole('region', { name: /list$/ })
+    expect(within(list).getByText('One-time: organize this list.')).toBeInTheDocument()
+    expect(within(list).getByRole('button', { name: 'Organize the list' })).toBeInTheDocument()
     // The per-row conversion link steps aside while the whole-list sort is offered.
     expect(screen.queryByRole('button', { name: /^Break .* into next actions$/ })).toBeNull()
   })
 
   it('pick → preview → confirm flips isGoal on the chosen rows only, and nothing else', async () => {
     renderPage('season')
-    fireEvent.click(screen.getByRole('button', { name: 'Choose Fall 2026’s goals' }))
-    const panel = screen.getByRole('region', { name: 'Choose Fall 2026\'s goals' })
+    fireEvent.click(screen.getByRole('button', { name: 'Organize the list' }))
+    const panel = screen.getByRole('region', { name: 'Organize Fall 2026\'s list' })
     fireEvent.click(within(panel).getByRole('checkbox', { name: /Plan winter vacation/ }))
     fireEvent.click(within(panel).getByRole('checkbox', { name: /Nourish a love of reading/ }))
     // The dated action is not offered; the reason is.
@@ -3049,8 +3055,8 @@ describe('choosing goals from an imported, flat season list', () => {
   it('a row that fails to save is named, retried alone, and the panel stays open', async () => {
     hook.updateTask.mockImplementation(async (id: unknown) => id !== 'r')
     renderPage('season')
-    fireEvent.click(screen.getByRole('button', { name: 'Choose Fall 2026’s goals' }))
-    const panel = screen.getByRole('region', { name: 'Choose Fall 2026\'s goals' })
+    fireEvent.click(screen.getByRole('button', { name: 'Organize the list' }))
+    const panel = screen.getByRole('region', { name: 'Organize Fall 2026\'s list' })
     fireEvent.click(within(panel).getByRole('button', { name: /Tick all/ }))
     fireEvent.click(within(panel).getByRole('button', { name: /^Preview/ }))
     fireEvent.click(within(panel).getByRole('button', { name: /^Make \d goals$/ }))
@@ -3062,8 +3068,8 @@ describe('choosing goals from an imported, flat season list', () => {
 
   it('the sort can be undone from the page after the toast has gone', async () => {
     renderPage('season')
-    fireEvent.click(screen.getByRole('button', { name: 'Choose Fall 2026’s goals' }))
-    const panel = screen.getByRole('region', { name: 'Choose Fall 2026\'s goals' })
+    fireEvent.click(screen.getByRole('button', { name: 'Organize the list' }))
+    const panel = screen.getByRole('region', { name: 'Organize Fall 2026\'s list' })
     fireEvent.click(within(panel).getByRole('checkbox', { name: /Plan winter vacation/ }))
     fireEvent.click(within(panel).getByRole('button', { name: /^Preview/ }))
     fireEvent.click(within(panel).getByRole('button', { name: 'Make 1 goal' }))
@@ -3075,12 +3081,73 @@ describe('choosing goals from an imported, flat season list', () => {
     await waitFor(() => expect(hook.updateTask).toHaveBeenLastCalledWith('v', { isGoal: false }))
   })
 
-  it('"Not now" is remembered, and a quiet way in stays by the list', () => {
+  it('"Dismiss" is remembered, and a quiet way in stays by the list', () => {
     const { unmount } = renderPage('season')
-    fireEvent.click(screen.getByRole('button', { name: 'Not now' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Dismiss' }))
     unmount(); renderPage('season')
-    expect(screen.queryByRole('button', { name: 'Choose Fall 2026’s goals' })).toBeNull()
-    fireEvent.click(screen.getByRole('button', { name: 'Any of these goals? Choose…' }))
-    expect(screen.getByRole('region', { name: 'Choose Fall 2026\'s goals' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Organize the list' })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Organize into goals…' }))
+    expect(screen.getByRole('region', { name: 'Organize Fall 2026\'s list' })).toBeInTheDocument()
+  })
+})
+
+describe('everyday horizons (product contract, 2026-09-27)', () => {
+  const fall = periodStartFor('season', new Date(2026, 8, 10), DEFAULT_SEASONS)
+  beforeEach(() => {
+    pinClock(); localStorage.clear()
+    state.goals = []; state.loading = false; routinesState.routines = []
+    seasonsState.seasons = DEFAULT_SEASONS; seasonsState.loading = false
+    domainState.layers = new Set(['work', 'family', 'personal', 'unsorted']); domainState.soleDomain = null
+    Object.values(hook).forEach((f) => f.mockClear()); toastSpy.mockClear()
+    hook.addTask.mockImplementation(defaultAddTask); hook.updateTask.mockImplementation(async () => true)
+  })
+  afterEach(() => { vi.useRealTimers() })
+
+  it('an empty season creates a goal from its primary box — no conversion, no sorting', () => {
+    state.tasks = []
+    renderPage('season')
+    expect(screen.getByText(/No goals or projects for Fall 2026 yet/)).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Organize the list' })).toBeNull()
+    const box = screen.getByRole('textbox', { name: 'New goal for Fall 2026' })
+    fireEvent.change(box, { target: { value: 'Create a usable outdoor space' } })
+    fireEvent.submit(box.closest('form')!)
+    expect(hook.addTask).toHaveBeenCalledWith('Create a usable outdoor space', undefined, undefined, undefined,
+      expect.objectContaining({ bucket: 'quarter', seasonStart: fall, isGoal: true }))
+  })
+
+  it('a goal with no next actions can become a single action again, with Undo — on any device', async () => {
+    state.tasks = [task({ id: 'g', title: 'Plan winter vacation', isGoal: true, bucket: 'quarter', seasonStart: fall })]
+    renderPage('season')
+    fireEvent.click(screen.getByRole('button', { name: 'Make it a single action Plan winter vacation' }))
+    await waitFor(() => expect(hook.setGoal).toHaveBeenCalledWith('g', false))
+    const [msg, , , undo] = toastSpy.mock.calls.at(-1) as [string, string, number, { label: string; onClick: () => void }]
+    expect(msg).toMatch(/single action again\. Nothing else changed/)
+    undo.onClick()
+    expect(hook.setGoal).toHaveBeenLastCalledWith('g', true)
+  })
+
+  it('…but not while it holds next actions', () => {
+    state.tasks = [
+      task({ id: 'g', title: 'Plan winter vacation', isGoal: true, bucket: 'quarter', seasonStart: fall }),
+      task({ id: 's', title: 'Price flights', bucket: 'quarter', seasonStart: fall, goalTaskId: 'g' }),
+    ]
+    renderPage('season')
+    expect(screen.queryByRole('button', { name: 'Make it a single action Plan winter vacation' })).toBeNull()
+  })
+
+  it('refining can LINK an existing month goal instead of creating one', async () => {
+    state.tasks = [
+      task({ id: 'sg', title: 'Create a usable outdoor space', isGoal: true, bucket: 'quarter', seasonStart: fall }),
+      task({ id: 'mg', title: 'Finish the patio', isGoal: true, bucket: 'month', monthStart: new Date(2026, 9, 1) }),
+      task({ id: 'mg2', title: 'Already linked', isGoal: true, bucket: 'month', monthStart: new Date(2026, 9, 1), supportsGoalTaskId: 'sg' }),
+    ]
+    renderPage('season')
+    openGoal('Create a usable outdoor space')
+    fireEvent.click(screen.getByRole('button', { name: 'Add a month goal for Create a usable outdoor space' }))
+    const link = screen.getByRole('combobox', { name: /Or link one you already have/ })
+    expect(within(link).getAllByRole('option').map((o) => o.textContent)).toEqual(['Choose a month goal…', 'October · Finish the patio'])
+    fireEvent.change(link, { target: { value: 'mg' } })
+    await waitFor(() => expect(hook.updateTask).toHaveBeenCalledWith('mg', { supportsGoalTaskId: 'sg' }))
+    expect(hook.addTask).not.toHaveBeenCalled()
   })
 })

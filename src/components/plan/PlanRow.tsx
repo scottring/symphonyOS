@@ -76,7 +76,7 @@ const ACTION_LABEL: Record<Exclude<RowAction, 'complete'>, string> = {
   someday: 'Someday',
   drop: 'Drop',
   'make-goal': 'Make it a goal',
-  'make-task': 'Make it a task',
+  'make-task': 'Make it a single action',
   'to-lower': 'Take it into',
   'under-goal': 'Link to goal',
   today: 'Do it today',

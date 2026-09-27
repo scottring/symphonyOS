@@ -52,6 +52,21 @@ export function WeekList({ tasks, weekStart, meId, userId, isCurrent, peopleFilt
   // three weeks coming up say antying about the october goal").
   const goalTitles = useMemo(() => goalTitleMap(tasks), [tasks])
   const rows = weekListTasks(tasks, weekStart, meId, { isCurrent })
+  // The goals this week serves, for reference (product contract, 2026-09-27):
+  // the month's open goals, plus any other goal one of this week's actions is
+  // under. Read from the caller's filtered list, so no hidden goal is named.
+  const servedGoals = useMemo(() => {
+    const byId = new Map(goals.map((g) => [g.id, { ...g, open: 0 }]))
+    for (const t of rows) {
+      if (t.completed || !t.goalTaskId) continue
+      const title = goalTitles.get(t.goalTaskId)
+      if (!title) continue
+      const g = byId.get(t.goalTaskId) ?? { id: t.goalTaskId, title, open: 0 }
+      g.open += 1
+      byId.set(t.goalTaskId, g)
+    }
+    return [...byId.values()]
+  }, [goals, rows, goalTitles])
   const open = rows.filter((t) => !t.completed)
   const done = rows.filter((t) => t.completed)
   const [showDone, setShowDone] = useState(false)
@@ -86,6 +101,20 @@ export function WeekList({ tasks, weekStart, meId, userId, isCurrent, peopleFilt
       <h2 className="font-display text-lg text-neutral-800">
         {heading}
       </h2>
+      {servedGoals.length > 0 && (
+        <div className="week-served-goals mb-2 text-[12.5px] leading-snug text-neutral-500">
+          <span className="mr-1">Goals this week serves:</span>
+          {servedGoals.map((g, i) => (
+            <span key={g.id}>
+              {i > 0 && <span aria-hidden="true"> · </span>}
+              <button type="button" onClick={() => onSelect(g.id)} className="inline text-left text-neutral-700 underline decoration-neutral-300 underline-offset-2 hover:text-primary-700">
+                <Target className="mr-0.5 inline h-3 w-3 align-[-1px] text-accent-600" aria-hidden="true" />{g.title}
+              </button>
+              <span className="text-neutral-400"> {g.open ? `(${g.open} this week)` : '(nothing this week yet)'}</span>
+            </span>
+          ))}
+        </div>
+      )}
       {ordered.length === 0 ? (
         <p className="text-sm text-neutral-500">
           {/* It blamed a people filter on every empty week, filter or not:
