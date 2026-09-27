@@ -519,7 +519,7 @@ export function PageReviewSheet({
                             row.goal ? 'border-amber-200 bg-amber-50 text-amber-800' : 'border-neutral-200 bg-white text-neutral-500 hover:text-neutral-800'
                           }`}
                         >
-                          <Target className="w-3.5 h-3.5" />{row.goal ? 'Goal' : 'Make a goal'}
+                          <Target className="w-3.5 h-3.5" />{row.goal ? 'Goal or project' : 'Make it a goal'}
                         </button>
                       )}
                       {(row.placement.kind === 'date' || row.kind === 'recurring') && (

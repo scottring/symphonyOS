@@ -227,3 +227,33 @@ describe('parsePageResponse — date_hint, kind, recurring, phone, page_title', 
     expect(out.items[0]).toMatchObject({ kind: 'task', recurring: null, phone: null, date_hint: null })
   })
 })
+
+// Horizon flows (2026-09-27): a season or month page proposes its outcomes and
+// projects as goals — not only lines under a "Goals" heading — while single
+// actions, dated lines and repeating lines keep their meaning.
+describe('long-horizon pages propose outcomes and projects as goals', () => {
+  for (const altitude of ['season', 'month'] as const) {
+    it(`a ${altitude} prompt asks for outcomes/projects as goals, and never goal-by-page`, () => {
+      const prompt = buildPagePrompt(windowCalendar('2026-09-01', '2026-09-02'), [], '2026-09-01', altitude)
+      expect(prompt).toContain('OUTCOME or PROJECT')
+      expect(prompt).toContain('whether or not the page labels it a goal')
+      expect(prompt).toContain(`Never make a line a goal just because it is on a ${altitude} page`)
+      expect(prompt).toContain('a single action stays an action')
+    })
+  }
+  it('a week prompt still never proposes goals', () => {
+    const prompt = buildPagePrompt(windowCalendar('2026-09-01', '2026-09-02'), [], '2026-09-01', 'week')
+    expect(prompt).not.toContain('OUTCOME or PROJECT')
+  })
+  it('a season goal line comes back as a goal; an undated action and a dated line keep theirs', () => {
+    const raw = JSON.stringify({ items: [
+      { title: 'Nourish a love of reading', day: 'goal' },
+      { title: 'Renew the passports', day: 'season' },
+      { title: 'Flu shots', day: '2026-09-02' },
+    ], notes: [], unclear: [] })
+    const out = parsePageResponse(raw, new Set(['2026-09-01', '2026-09-02']), new Set(), 'season')
+    expect(out.items.map((i) => [i.title, i.day])).toEqual([
+      ['Nourish a love of reading', 'goal'], ['Renew the passports', 'season'], ['Flu shots', '2026-09-02'],
+    ])
+  })
+})
