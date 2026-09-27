@@ -3155,3 +3155,26 @@ describe('everyday horizons (product contract, 2026-09-27)', () => {
     expect(hook.addTask).not.toHaveBeenCalled()
   })
 })
+
+describe('the import repair stays out of an ordinary, populated plan', () => {
+  beforeEach(() => {
+    pinClock(); localStorage.clear()
+    state.goals = []; state.loading = false; routinesState.routines = []
+    seasonsState.seasons = DEFAULT_SEASONS; seasonsState.loading = false
+    Object.values(hook).forEach((f) => f.mockClear())
+  })
+  afterEach(() => { vi.useRealTimers() })
+
+  it('a month with goals and several genuine single actions offers no sorting at all', () => {
+    state.tasks = [
+      task({ id: 'g', title: 'Host Thanksgiving', isGoal: true, monthStart: thisMonth }),
+      task({ id: 'a', title: 'Buy stamps', monthStart: thisMonth }),
+      task({ id: 'b', title: 'Call the dentist', monthStart: thisMonth }),
+      task({ id: 'c', title: 'Pay the water bill', monthStart: thisMonth }),
+    ]
+    renderPage('month')
+    expect(screen.queryByText('One-time: organize this list.')).toBeNull()
+    expect(screen.queryByRole('button', { name: /Organize/ })).toBeNull()
+    expect(screen.getByText('Buy stamps')).toBeInTheDocument()
+  })
+})

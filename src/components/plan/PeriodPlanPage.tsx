@@ -1717,7 +1717,9 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
                   and a one-off action that needs no goal still has a home. */}
               <div className="flex flex-wrap items-baseline gap-x-3 px-1">
                 <h2 className="font-display text-xl text-neutral-700">Single actions</h2>
-                {!sortOpen && !sortProminent && sortableCount >= 2 && (
+                {/* The repair is for a plan with NO goals yet; a populated
+                    plan's single actions are just single actions. */}
+                {!sortOpen && !sortProminent && goalRows.length === 0 && sortableCount >= 2 && (
                   <button type="button" onClick={() => setSortOpen(true)}
                     className="text-[13px] text-primary-700 hover:underline">
                     Organize into goals…

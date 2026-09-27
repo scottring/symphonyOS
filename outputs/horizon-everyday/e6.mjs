@@ -1,0 +1,22 @@
+import { open, shot, BASE } from './pw.mjs'
+const { browser, ctx, page } = await open({ who: 'casey' })
+const go = async (u) => { await page.goto(BASE + u); await page.waitForTimeout(3500) }
+await go('/season?start=2026-09-01'); await shot(page, 'e30-import-before-desk', false)
+// Dismiss is honest: the notice goes, a quiet way back stays, nothing is written.
+await page.getByRole('button', { name: 'Dismiss' }).click(); await page.waitForTimeout(400)
+console.log('after dismiss — quiet link:', await page.getByRole('button', { name: 'Organize into goals…' }).count())
+await shot(page, 'e31-import-dismissed', false)
+await page.getByRole('button', { name: 'Organize into goals…' }).click(); await page.waitForTimeout(400)
+const panel = page.getByRole('region', { name: "Organize Fall 2026's list" })
+for (const t of ['Plan winter vacation', 'Nourish a love of reading', 'Get the house ready for winter', 'Build a steady running habit', 'Finish the basement playroom', 'Get finances organized', 'Deepen friendships', 'Learn three new weeknight', 'Launch the newsletter']) await panel.getByRole('checkbox', { name: new RegExp(t) }).check()
+await panel.scrollIntoViewIfNeeded(); await shot(page, 'e32-import-review', false)
+await panel.getByRole('button', { name: /^Preview/ }).click(); await page.waitForTimeout(300)
+await shot(page, 'e33-import-preview', false)
+console.log('PREVIEW:', (await panel.innerText()).replace(/\n+/g, ' | ').slice(-420))
+await panel.getByRole('button', { name: 'Make 9 goals' }).click(); await page.waitForTimeout(4000)
+await go('/season?start=2026-09-01'); await shot(page, 'e34-import-after-desk', false)
+await ctx.storageState({ path: new URL('./state-casey.json', import.meta.url).pathname })
+await browser.close()
+const p2 = await open({ who: 'casey', width: 390, height: 844 })
+await p2.page.goto(BASE + '/season?start=2026-09-01'); await p2.page.waitForTimeout(3500); await shot(p2.page, 'e35-import-after-phone', false)
+await p2.browser.close()
