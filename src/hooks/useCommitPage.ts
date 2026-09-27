@@ -91,7 +91,7 @@ export function useCommitPage() {
   const { areas, addGoal } = useGoalsContext()
   const { getCurrentUserMember } = useFamilyMembers()
 
-  const commitPage = useCallback(async ({ items, notes, storagePath, monthStart, seasonStart, domain, altitude }: CommitPagePayload): Promise<CommitPageResult> => {
+  const commitPage = useCallback(async ({ items: pageItems, notes, storagePath, monthStart, seasonStart, domain, altitude }: CommitPagePayload): Promise<CommitPageResult> => {
     // A committed page writes the page's own domain everywhere it lands.
     const context = domain
     const now = new Date()
@@ -108,8 +108,14 @@ export function useCommitPage() {
     let tasksCreated = 0
     let failures = 0
     const createdTaskIds: string[] = []
+    // A line the sheet reuses ("Use existing item") IS that existing item:
+    // nothing of any kind is written for it — not a task, and not a goal,
+    // routine or note either. It used to be skipped only here, so a reused
+    // year goal or routine line was still inserted.
+    const reused = pageItems.filter((i) => i.sourceId)
+    const items = pageItems.filter((i) => !i.sourceId)
     const tasks = items.filter((i) => i.placement.kind !== 'goal' && i.kind === 'task')
-    let tasksLinked = 0
+    const tasksLinked = reused.length
     for (const item of tasks) {
       // "Link" on a likely duplicate means THIS line IS that existing task
       // (one enduring row per action): nothing is inserted, and the existing
@@ -117,7 +123,6 @@ export function useCommitPage() {
       // it is. It used to insert a second row pointing at the first, which
       // put the same errand on the plan twice (horizon-flows acceptance,
       // 2026-09-27).
-      if (item.sourceId) { tasksLinked += 1; continue }
       const args = planItemToAddTaskArgs(item, commitCtx)
       // The assignee is explicit on every row (the review sheet decides it):
       // no default here, so an Unassigned line stays unassigned.

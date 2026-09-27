@@ -77,6 +77,22 @@ describe('useCommitPage', () => {
     expect(res).toMatchObject({ tasksCreated: 1, tasksLinked: 1, failures: 0 })
   })
 
+  it('a reused line writes NOTHING, whatever its type — no goal, routine or note either', async () => {
+    const res = await commit()({
+      items: [
+        { ...GOAL, sourceId: 'existing-goal-task' },
+        { ...ITEM, title: 'Water plants', kind: 'recurring', recurring: { days: ['tue'], until: null }, sourceId: 'existing-2' },
+        { ...ITEM, title: 'No school', kind: 'dayfact', placement: { kind: 'date', date: '2026-10-12' }, sourceId: 'existing-3' },
+      ],
+      notes: [], domain: 'family', storagePath: null, altitude: 'year',
+    })
+    expect(mocks.addGoal).not.toHaveBeenCalled()
+    expect(mocks.addRoutine).not.toHaveBeenCalled()
+    expect(mocks.addNote).not.toHaveBeenCalled()
+    expect(mocks.addTask).not.toHaveBeenCalled()
+    expect(res).toMatchObject({ tasksCreated: 0, goalsCreated: 0, routinesCreated: 0, notesCreated: 0, tasksLinked: 3, failures: 0 })
+  })
+
   it('writes the type chosen on the sheet: category on the task insert, a routines row for a routine', async () => {
     await commit()({
       items: [
