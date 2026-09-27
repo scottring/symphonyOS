@@ -13,7 +13,7 @@ import { useNavigate } from 'react-router-dom';
 import { GoalPeriodShelves } from '@/components/plan/GoalPeriodShelves';
 import { useHouseholdSeasons } from '@/hooks/useHouseholdSeasons';
 import { useGoalsContext } from '@/contexts/GoalsContext';
-import { supportedGoal, goalsSupporting, type SupportLink } from '@/lib/planning/goalSupport';
+import { supportedGoal, goalsSupporting, goalOfTask, type SupportLink } from '@/lib/planning/goalSupport';
 import type { Note, NoteEntityType } from '@/types/note';
 import { useSupabaseTasks } from '@/hooks/useSupabaseTasks';
 import { useRoutines } from '@/hooks/useRoutines';
@@ -27,6 +27,10 @@ import { useNotesContext } from '@/contexts/NotesContext';
 import { useVaultWrite } from '@/hooks/useVaultWrite';
 import { LoadingFallback } from '@/components/layout/LoadingFallback';
 import { TaskView } from '@/components/lazy';
+import { AddExistingActionDialog } from '@/components/plan/AddExistingActionDialog';
+import { fileUnderGoalUpdate, removeFromGoalUpdate } from '@/lib/planning/existingActions';
+import { useFamilyMembers } from '@/hooks/useFamilyMembers';
+import { showToast } from '@/hooks/useToast';
 
 interface Props {
   taskId: string;
@@ -46,6 +50,8 @@ export function TaskViewContainer({ taskId, onBack }: Props) {
 
   const task = useMemo(() => tasks.find(t => t.id === taskId) ?? null, [tasks, taskId]);
   const { activeRoutines } = useRoutines();
+  const { members: familyMembers } = useFamilyMembers();
+  const [addingExisting, setAddingExisting] = useState(false);
   const { user } = useAuth();
 
   /**
@@ -84,6 +90,20 @@ export function TaskViewContainer({ taskId, onBack }: Props) {
       context: task.context ?? undefined,
     });
   }, [addTask, task]);
+  // "Add an existing action" and its undo, from the goal's own page: the one
+  // goal_task_id write, nothing else about the task.
+  const linkExisting = useCallback(async (taskId: string) => {
+    if (!task) return false;
+    return (await updateTask(taskId, fileUnderGoalUpdate(task.id))) !== false;
+  }, [task, updateTask]);
+  const removeStep = useCallback(async (stepId: string) => {
+    const step = tasks.find((t) => t.id === stepId);
+    if ((await updateTask(stepId, removeFromGoalUpdate())) === false) {
+      showToast(`Could not remove “${step?.title ?? 'that action'}” from this goal. Nothing was changed.`, 'error', 6000);
+    } else {
+      showToast(`“${step?.title ?? 'That action'}” is no longer a next action here. The task itself is unchanged.`, 'success', 5000);
+    }
+  }, [tasks, updateTask]);
   // Both ends of the goal-supports-goal link, read through the one module the
   // plan pages and the year goal's page also read, so the four surfaces cannot
   // disagree. A goal opened from a plan row used to be a dead end: the row
@@ -92,6 +112,10 @@ export function TaskViewContainer({ taskId, onBack }: Props) {
   const supports = useMemo(
     () => (isGoal && task ? supportedGoal(task, tasks, goals, seasons) : null),
     [isGoal, task, tasks, goals, seasons],
+  );
+  const stepOf = useMemo(
+    () => (!isGoal && task ? goalOfTask(task, tasks, seasons) : null),
+    [isGoal, task, tasks, seasons],
   );
   const supportedBy = useMemo(
     () => (isGoal && task ? goalsSupporting(task, tasks) : []),
@@ -208,6 +232,10 @@ export function TaskViewContainer({ taskId, onBack }: Props) {
         onAddProject={addProject}
         onAddSubtask={isGoal ? addStep : addSubtask}
         steps={steps}
+        onAddExistingStep={isGoal ? () => setAddingExisting(true) : undefined}
+        onRemoveStep={isGoal ? (id) => { void removeStep(id); } : undefined}
+        stepOf={stepOf}
+        onRemoveFromGoal={!isGoal && task && stepOf ? () => { void removeStep(task.id); } : undefined}
         supports={supports}
         supportedBy={supportedBy}
         onOpenGoalLink={openGoalLink}
@@ -217,6 +245,15 @@ export function TaskViewContainer({ taskId, onBack }: Props) {
         onSaveNoteToVault={handleSaveNoteToVault}
         dayChoicesFor={dayChoices.forWeek}
       />
+      {addingExisting && task && isGoal && (
+        <AddExistingActionDialog
+          goal={task}
+          tasks={tasks}
+          members={familyMembers}
+          onLink={linkExisting}
+          onClose={() => setAddingExisting(false)}
+        />
+      )}
     </Suspense>
   );
 }

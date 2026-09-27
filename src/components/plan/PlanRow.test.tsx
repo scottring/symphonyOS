@@ -274,3 +274,26 @@ describe('the row renders no source comments', () => {
     expect(onAction).toHaveBeenCalledWith('someday', expect.objectContaining({ id: 'r1' }))
   })
 })
+
+describe('PlanRow — existing actions under a goal (2026-09-27)', () => {
+  const goal = row({ id: 'g', title: 'Identify family activities for fall', isGoal: true, kind: 'task', steps: [
+    row({ id: 's1', title: 'Look up music lessons', elsewhere: 'Inbox' }),
+    row({ id: 's2', title: 'Dentist for Mia', elsewhere: '' }),
+  ] })
+  it('offers "Add an existing action" beside the new-action box, and says where an off-list action lives', async () => {
+    const onAddExisting = vi.fn()
+    render(<ul><PlanRow row={goal} actions={[]} onAction={vi.fn()} onOpen={vi.fn()} expanded onAddStep={vi.fn()} onAddExisting={onAddExisting}
+      stepActionsFor={() => ['complete', 'off-goal']} /></ul>)
+    await userEvent.click(screen.getByRole('button', { name: 'Add an existing action to Identify family activities for fall' }))
+    expect(onAddExisting).toHaveBeenCalledWith(goal)
+    expect(screen.getByText('Not on this list · Inbox')).toBeInTheDocument()
+    // A dated one says only that it is off the list; its timing control says when.
+    expect(screen.getByText('Not on this list')).toBeInTheDocument()
+  })
+  it('a step offers "Remove from goal"', async () => {
+    const onAction = vi.fn()
+    render(<ul><PlanRow row={goal} actions={[]} onAction={onAction} onOpen={vi.fn()} expanded stepActionsFor={() => ['complete', 'off-goal']} /></ul>)
+    await userEvent.click(screen.getByRole('button', { name: 'Remove from goal Look up music lessons' }))
+    expect(onAction).toHaveBeenCalledWith('off-goal', expect.objectContaining({ id: 's1' }))
+  })
+})

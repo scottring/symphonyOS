@@ -7,7 +7,7 @@ import { PushDropdown, ContextPicker } from '@/components/triage'
 import { DOMAIN_COLORS } from '@/lib/domainColors'
 import { EntityNotesSection } from '@/components/notes/EntityNotesSection'
 import { UnifiedNotesEditor } from '@/components/notes/UnifiedNotesEditor'
-import { CloudUpload, Check } from 'lucide-react'
+import { CloudUpload, Check, Unlink, ListPlus } from 'lucide-react'
 import { taskWhenParts } from '@/lib/planning/taskWhen'
 import { taskTiming, hasTiming, timingDescription } from '@/lib/planning/taskTiming'
 import { formatWeekRange } from '@/lib/dateHelpers'
@@ -44,6 +44,17 @@ interface TaskViewProps {
    * horizon could see it (walk finding S2-06).
    */
   steps?: Task[]
+  /** Goals only: open "Add an existing action" — file a task already in
+   *  Symphony under this goal (the same goal_task_id link a new step gets). */
+  onAddExistingStep?: () => void
+  /** Goals only: take a step out from under this goal. The task is kept,
+   *  with its dates and commitments; only the link goes. */
+  onRemoveStep?: (stepId: string) => void
+  /** A next action: the goal it serves (goal_task_id), read the same way the
+   *  plan rows read it (goalOfTask) — the other end of the goal's Steps. */
+  stepOf?: SupportLink | null
+  /** Take THIS task out from under its goal; the task is kept as it is. */
+  onRemoveFromGoal?: () => void
   /** The goal-supports-goal relationship, both ends, when `task.isGoal`.
    *  Read by the caller through `lib/planning/goalSupport` — the same module
    *  the plan pages and the year goal's page read, so the four surfaces cannot
@@ -83,6 +94,10 @@ export function TaskViewRedesign({
   onOpenContact,
   onAddSubtask,
   steps,
+  onAddExistingStep,
+  onRemoveStep,
+  stepOf,
+  onRemoveFromGoal,
   supports,
   supportedBy,
   onOpenGoalLink,
@@ -374,6 +389,26 @@ export function TaskViewRedesign({
                 </button>
               </div>
 
+              {/* The goal this action serves, at every width (the sidebar is
+                  hidden on a phone) — the reciprocal of the goal's Steps. */}
+              {!isGoal && stepOf && (
+                <p className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-neutral-500">
+                  <span>Next action for</span>
+                  {onOpenGoalLink ? (
+                    <button type="button" onClick={() => onOpenGoalLink(stepOf)} className="font-medium text-primary-700 hover:underline">
+                      {stepOf.period ? `${stepOf.period} · ` : ''}{stepOf.title}
+                    </button>
+                  ) : (
+                    <span className="font-medium text-neutral-700">{stepOf.period ? `${stepOf.period} · ` : ''}{stepOf.title}</span>
+                  )}
+                  {onRemoveFromGoal && (
+                    <button type="button" onClick={onRemoveFromGoal} className="inline-flex items-center gap-1 text-xs text-neutral-500 hover:text-neutral-800">
+                      <Unlink className="h-3.5 w-3.5" aria-hidden="true" />Remove from goal
+                    </button>
+                  )}
+                </p>
+              )}
+
               {/* Delete confirmation - inline */}
               {showDeleteConfirm && (
                 <div className="mt-6 p-5 bg-red-50/80 border border-red-200/60 rounded-2xl backdrop-blur-sm">
@@ -517,6 +552,17 @@ export function TaskViewRedesign({
                               onPickDay={onPush ? (date) => onPush(subtask.id, date) : undefined}
                             />
                           </span>
+                          {onRemoveStep && (
+                            <button
+                              type="button"
+                              onClick={() => onRemoveStep(subtask.id)}
+                              aria-label={`Remove ${subtask.title} from this goal`}
+                              title="Remove from goal — the task itself is kept"
+                              className="flex-shrink-0 rounded-lg p-1.5 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-700"
+                            >
+                              <Unlink className="h-4 w-4" aria-hidden="true" />
+                            </button>
+                          )}
                         </>
                       )}
                     </div>
@@ -587,6 +633,17 @@ export function TaskViewRedesign({
                       <span className="text-base">Add a {childNoun}</span>
                     </button>
                   )
+                )}
+                {isGoal && onAddExistingStep && (
+                  <button
+                    type="button"
+                    onClick={onAddExistingStep}
+                    className="flex items-center gap-4 py-3 px-4 -mx-4 rounded-xl w-full text-left
+                               text-primary-700 hover:bg-white/60 transition-colors"
+                  >
+                    <ListPlus className="w-6 h-6 p-0.5 flex-shrink-0" aria-hidden="true" />
+                    <span className="text-base">Add an existing action</span>
+                  </button>
                 )}
               </div>
 

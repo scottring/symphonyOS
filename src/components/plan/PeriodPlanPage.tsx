@@ -74,6 +74,8 @@ import { makeTaskAGoal } from './MakeGoalControl'
 import { NextLevelStrip } from './NextLevelStrip'
 import { RefineGoalControl } from './RefineGoalControl'
 import { SortPlanPanel } from './SortPlanPanel'
+import { AddExistingActionDialog } from './AddExistingActionDialog'
+import { offPeriodSteps, actionWhereLabel, fileUnderGoalUpdate, removeFromGoalUpdate } from '@/lib/planning/existingActions'
 import { sortCandidates, sortUndo, readSortBatch, writeSortBatch, type SortBatch } from '@/lib/planning/sortPlan'
 import { nextLevelChoices } from '@/lib/planning/nextLevel'
 import { PeriodShelves } from './PeriodShelves'
@@ -487,6 +489,13 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
       await plannedDay(row.id, row.title, new Date())
     }
     else if (action === 'under-goal') setPickingGoalFor(row.id)
+    // Only the link goes: the task keeps its dates, commitments and state,
+    // and stays on whatever list it is on (loose, if it is on this one).
+    else if (action === 'off-goal') {
+      if ((await gated.updateTask(row.id, removeFromGoalUpdate())) === false) {
+        showToast(`Could not remove “${row.title}” from its goal. Nothing was changed.`, 'error', 6000)
+      } else showToast(`“${row.title}” is no longer a next action for that goal. The task itself is unchanged.`, 'success', 5000)
+    }
   }, [goals, updateGoal, addGoal, bounds.next, bounds.start, isPast, toggleTask, deleteTask, dropCommitment, gated, setGoal, keepForward, level, tasks, confirmGoalDone, lowerMonth, plannedDay, updateTask])
 
   /**
@@ -885,6 +894,14 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
   }, [level, bounds.start, timingPeriodLabel, planActions, tasks, navigate, gated, removeTiming, dayChoices, intoMonthOptions, monthWeekends, plannedInto, plannedDay])
 
   const [pickingGoalFor, setPickingGoalFor] = useState<string | null>(null)
+  const [addingExistingFor, setAddingExistingFor] = useState<PlanRowModel | null>(null)
+  // "Add an existing action": the same goal_task_id write fileUnderGoal makes,
+  // from the goal's end. The goal's steps open so the result is in view.
+  const addExistingAction = useCallback(async (goalId: string, taskId: string) => {
+    const ok = (await gated.updateTask(taskId, fileUnderGoalUpdate(goalId))) !== false
+    if (ok) setExpandedGoals((prev) => new Set(prev).add(goalId))
+    return ok
+  }, [gated])
   const [linkError, setLinkError] = useState(false)
   const fileUnderGoal = useCallback(async (taskId: string, goalId: string) => {
     setLinkError(false)
@@ -909,11 +926,25 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
 
   const goalRows = useMemo(() => {
     if (!split) return rows.filter((r) => r.isGoal)
+    // A goal's next actions are ALL the tasks filed under it that the reader
+    // may see — not only the ones on this period's list. An existing action
+    // filed here from the Inbox or another month keeps its own placement, so
+    // it is drawn under the goal saying where it lives, never re-placed.
+    const onPage = new Set([...split.goals, ...split.loose, ...[...split.stepsByGoal.values()].flat()].map((t) => t.id))
     return split.goals.map((g) => ({
       ...taskRow(g, level, bounds.start, supportFor(g)),
-      steps: (split.stepsByGoal.get(g.id) ?? []).map((st) => taskRow(st, level, bounds.start)),
+      steps: [
+        ...(split.stepsByGoal.get(g.id) ?? []).map((st) => taskRow(st, level, bounds.start)),
+        // A dated or week-committed one already shows its when in the row's
+        // own timing control; only an undated one needs its list named.
+        ...offPeriodSteps(g.id, layered, onPage).map((st) => ({
+          ...taskRow(st, level, bounds.start),
+          placed: st.completed ? taskRow(st, level, bounds.start).placed : null,
+          elsewhere: hasTiming(taskTiming(st)) ? '' : actionWhereLabel(st),
+        })),
+      ],
     }))
-  }, [split, rows, tasks, level, bounds.start, supportFor])
+  }, [split, rows, tasks, layered, level, bounds.start, supportFor])
   // An empty period opens with the question already asked. The first real
   // walkthrough (Scott, 2026-09-20) stalled on a blank /year: a grey "No goals
   // for this year yet." and a 13px "+ Add a goal" off to the right read as
@@ -1660,9 +1691,10 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
                         goalControls={goalControlsFor(g.row)}
                         focusComposer={composerFocusId === g.row.id} onComposerFocused={clearComposerFocus}
                         onAddStep={isPast ? undefined : (goal, t, week) => { void addStep(goal, t, week) }}
+                        onAddExisting={isPast || level === 'year' ? undefined : setAddingExistingFor}
                         stepWeeks={stepWeeks}
                         refine={refineFor(g.row)}
-                        stepActionsFor={(st) => actionsFor({ fate: st.fate, isGoal: false, isPast, level })}
+                        stepActionsFor={(st) => actionsFor({ fate: st.fate, isGoal: false, isPast, level, isStep: true, elsewhere: st.elsewhere !== undefined })}
                           actions={goalActions(g.row)} />
                     ))}
                   </ul>
@@ -1679,7 +1711,7 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
                       goalControls={goalControlsFor(row)}
                       onAction={(a, r) => { void act(a, r) }} lowerLabel={lowerLabelText}
                       expanded={expandedGoals.has(row.id)} onToggleExpand={toggleGoal}
-                      stepActionsFor={(st) => actionsFor({ fate: st.fate, isGoal: false, isPast, level })}
+                      stepActionsFor={(st) => actionsFor({ fate: st.fate, isGoal: false, isPast, level, isStep: true, elsewhere: st.elsewhere !== undefined })}
                       actions={actionsFor({ fate: row.fate, isGoal: true, isPast, level })} />
                   ))}</ul>
                 </details>
@@ -1941,6 +1973,20 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
           session opens Shelves on the calendar (S2-01), and inside the list
           branch the panel it opened was empty. */}
       {references?.shelvesTarget ? createPortal(periodShelves, references.shelvesTarget) : null}
+      {/* A modal, mounted where it always renders — not inside a list that
+          may be empty. */}
+      {addingExistingFor && (() => {
+        const goalTask = tasks.find((t) => t.id === addingExistingFor.id)
+        return goalTask ? (
+          <AddExistingActionDialog
+            goal={goalTask}
+            tasks={tasks}
+            members={familyMembers}
+            onLink={(taskId) => addExistingAction(goalTask.id, taskId)}
+            onClose={() => setAddingExistingFor(null)}
+          />
+        ) : null
+      })()}
     </div>
   )
 }
