@@ -14,7 +14,7 @@ import { TargetSection } from './sections/TargetSection'
 import { ContextPicker } from '@/components/triage/ContextPicker'
 import { MultiAssigneeDropdown } from '@/components/family'
 import { RoutineScheduleEditor } from '@/components/routine/RoutineScheduleEditor'
-import { isDayBoundRoutine } from '@/lib/routineUtils'
+import { namesDueDays } from '@/lib/routineUtils'
 import { RoutineStepsSection } from './sections/RoutineStepsSection'
 import { PanelAttachments } from './sections/PanelAttachments'
 import { ExtractSteps } from '@/components/routine/ExtractSteps'
@@ -230,14 +230,15 @@ export function TapRoutinePanel(props: TapRoutinePanelProps) {
             </div>
             <p className="mt-1 text-xs text-neutral-400">
               {/* Said as it behaves (dayPlan.ts): a time puts it at that time;
-                  a rule naming the day puts it on that day, untimed; any
-                  other rule offers it on Today to choose. */}
+                  a rule naming its days puts it on each of them, untimed; a
+                  rule that leaves the day open (the weekend window, "since
+                  last") is offered on Today to choose. */}
               {!onToday
                 ? "Still runs, still on the kitchen wall — it just doesn't take a row on Today or the week grid."
                 : routine.time_of_day
                   ? 'Takes a row on Today and the week grid at its time.'
-                  : isDayBoundRoutine(routine)
-                    ? 'On Today on the days it repeats — no time needed.'
+                  : namesDueDays(routine.recurrence_pattern)
+                    ? 'On Today and the week on each day it’s due — no time needed.'
                     : 'Offered on Today to choose — it has no set day.'}
             </p>
           </div>

@@ -4,7 +4,8 @@ import { createMockRoutine } from '@/test/mocks/factories'
 import { ALL_LAYERS } from '@/lib/domains'
 import type { ActionableInstance } from '@/types/actionable'
 const weekStart = new Date(2026, 8, 20)
-const routine = createMockRoutine({ id: 'read', name: 'Read', time_of_day: null, recurrence_pattern: { type: 'daily' } })
+// Show in Today not positively set (null): offered as a choice each day.
+const routine = createMockRoutine({ id: 'read', name: 'Read', time_of_day: null, recurrence_pattern: { type: 'daily' }, show_on_timeline: null as unknown as boolean })
 const input = { weekStart, selectedAssignee: [] as string[], hideRoutines: false, layers: ALL_LAYERS }
 
 describe('week routine choices', () => {
@@ -26,5 +27,10 @@ describe('week routine choices', () => {
     const days = weekRoutineChoices(input, [routine], () => [routine], instances)
     expect(days[1].entries).toEqual([])
     expect(days[2].entries).toHaveLength(1)
+  })
+  it('a due routine with Show in Today on is never offered — it is already on each of its days', () => {
+    const on = createMockRoutine({ id: 'on', name: 'Vitamins', time_of_day: null, recurrence_pattern: { type: 'daily' }, show_on_timeline: true })
+    const days = weekRoutineChoices(input, [on], () => [on], [])
+    expect(days.every((d) => d.entries.length === 0)).toBe(true)
   })
 })

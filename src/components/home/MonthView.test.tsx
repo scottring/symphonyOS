@@ -82,7 +82,7 @@ describe('MonthView responds to the "hide daily routines" toggle', () => {
   // and gone once it's flipped on — both assertions in play so neither can
   // pass vacuously.
   it('hides an everyday routine once the toggle is switched on, and shows it again when off', () => {
-    const routines = [createMockRoutine({ name: 'Daily Routine' })] // factory default: daily, unpinned
+    const routines = [createMockRoutine({ name: 'Daily Routine', show_on_timeline: null as unknown as boolean })] // factory default: daily, unpinned
 
     render(<MonthView {...defaultProps} routines={routines} />)
 
@@ -109,7 +109,7 @@ describe('MonthView responds to the "hide daily routines" toggle', () => {
   // never firing.
   it('sweeps a plain everyday routine but keeps a pinned one, once the toggle is on', () => {
     const routines = [
-      createMockRoutine({ name: 'Daily Routine' }), // factory default: daily, unpinned
+      createMockRoutine({ name: 'Daily Routine', show_on_timeline: null as unknown as boolean }), // factory default: daily, unpinned
       createMockRoutine({ name: 'Pinned Daily Routine', pin_to_timeline: true }),
     ]
 

@@ -417,11 +417,29 @@ describe('WeekViewV2 journal spread', () => {
   // stayed in the journal's "Available" line with routines switched off
   // (Scott, 2026-09-20). Off means none.
   it('the Routines switch also hides an untimed weekly routine from the Available line', () => {
-    const routines = [createMockRoutine({ name: 'Take out garbage', time_of_day: null, recurrence_pattern: { type: 'weekly', days: ['sun'] } as RecurrencePattern })]
+    // Show in Today not positively set: available, not an entry.
+    const routines = [createMockRoutine({ name: 'Take out garbage', time_of_day: null, recurrence_pattern: { type: 'weekly', days: ['sun'] } as RecurrencePattern, show_on_timeline: null as unknown as boolean })]
     render(<WeekViewV2 {...defaultProps} routines={routines} weekStart={sunday} />)
     expect(screen.queryByText('Take out garbage')).toBeNull()
     fireEvent.click(screen.getByRole('switch', { name: 'Routines' }))
     expect(screen.queryByText('Take out garbage')).toBeNull()
+    fireEvent.click(screen.getByRole('switch', { name: 'Routines' }))
+  })
+
+  // Scott, 2026-09-27: Show in Today ON + due = on the day, untimed, in the
+  // journal AND Schedule's all-day cell — as on Today. Off means none.
+  it('a due routine with Show in Today on is a Sunday entry in both modes, untimed, and the switch still hides it', () => {
+    const routines = [createMockRoutine({ id: 'wp', name: 'Water houseplants', time_of_day: null, recurrence_pattern: { type: 'weekly', days: ['sun'] } as RecurrencePattern, show_on_timeline: true })]
+    render(<WeekViewV2 {...defaultProps} routines={routines} weekStart={sunday} />)
+    const sun = within(screen.getByTestId('journal-day-2026-09-13'))
+    expect(within(sun.getByRole('list', { name: 'Any time entries' })).getByText('Water houseplants')).toBeInTheDocument()
+    expect(screen.getAllByText('Water houseplants')).toHaveLength(1)
+    fireEvent.click(screen.getByRole('radio', { name: 'Schedule' }))
+    expect(within(screen.getByTestId('allday-2026-09-13')).getByText('Water houseplants')).toBeInTheDocument()
+    expect(within(screen.getByTestId('allday-2026-09-14')).queryByText('Water houseplants')).toBeNull()
+    fireEvent.click(screen.getByRole('radio', { name: 'Journal' }))
+    fireEvent.click(screen.getByRole('switch', { name: 'Routines' }))
+    expect(screen.queryByText('Water houseplants')).toBeNull()
     fireEvent.click(screen.getByRole('switch', { name: 'Routines' }))
   })
 
@@ -482,7 +500,8 @@ describe('WeekViewV2 — Journal and Schedule agree', () => {
     }]
     const routines = [
       createMockRoutine({ id: 'chosen', name: 'Family reading time', time_of_day: null, recurrence_pattern: { type: 'weekly', days: ['sat'] } }),
-      createMockRoutine({ id: 'waiting', name: 'Kids clean rooms', time_of_day: null, recurrence_pattern: { type: 'weekly', days: ['sat'] } }),
+      // Show in Today not positively set: only available until chosen.
+      createMockRoutine({ id: 'waiting', name: 'Kids clean rooms', time_of_day: null, recurrence_pattern: { type: 'weekly', days: ['sat'] }, show_on_timeline: null as unknown as boolean }),
     ]
     render(<WeekViewV2 {...defaultProps} routines={routines} weekStart={sunday} />)
     const saturday = within(screen.getByTestId('journal-day-2026-09-19'))

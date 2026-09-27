@@ -1,65 +1,71 @@
-# Today: a routine whose rule names the day is on that day (2026-09-27)
+# Due routines with Show in Today on: on their days, untimed (2026-09-27)
 
-Branch `claude/today-daybound-routines`, from main `6653a7e6`. It is local only: not pushed, merged or deployed, and it needs no migration.
+Branch `claude/today-daybound-routines`, from main `6653a7e6`. It is local only: not pushed, merged or deployed. No migration is needed, and no user records were edited.
 
-## Bug
+## The bug
 
-"Water houseplants every weekend" is Active, On Today, Every Sun, untimed and assigned to Scott. On Sunday it was missing from Today's main list and appeared only in Shelves › Routines ("Choose … for today" off). No records were changed.
+"Water houseplants every weekend" is Active, Show in Today on, Every Sun, untimed. On Sunday it was missing from Today's main list and appeared only in Shelves ("Choose … for today" off).
 
-The cause was in `selectDayPlan` (`src/lib/today/dayPlan.ts`). It sent every untimed, unpinned routine occurrence to the chooser (`available`, `offMainRoutineItemIds`) unless its instance had `planned_on` set. This happened even when the recurrence already selected the day, and even though `resolveRoutine` showed it.
+The cause was `selectDayPlan` (`src/lib/today/dayPlan.ts`). It sent every untimed, unpinned occurrence to the chooser unless its instance had `planned_on` set, even when the recurrence already named the day. The week journal (`routineDayState`) made the same split.
 
-## Fix
+## Final semantics (after Codex review of 9830ae80)
 
-A new `isDayBoundRoutine` in `src/lib/routineUtils.ts` answers whether the rule names the day. It returns true for:
-- weekly with exactly one day, at any interval;
-- monthly, quarterly and yearly;
-- `specific_days`.
+**A routine is on its due days, untimed, with no second "Choose" when both hold:**
+1. Show in Today is positively on: `show_on_timeline === true`.
+2. Its rule names its due days (`namesDueDays`): `daily`; `weekly` with any listed days (Sun; Tue/Thu; Sat+Sun); `monthly`; `quarterly`; `yearly`; `specific_days`.
 
-`selectDayPlan` treats such an occurrence like a timed or pinned one:
-- It is on the main list, with no time invented (it lands in the untimed group of "For today").
-- It is listed once in the chooser, as "On today's schedule" (`onToday`).
-- It is not counted as a choice and is not on the week's To-plan list.
+Where it shows:
+- On Today it is on the main list once (in the untimed "For today" group). The chooser lists it as "On today's schedule", never offered, and it is not counted as a choice.
+- On the Week journal it is one of the day's untimed entries. Schedule's all-day cell shows it too, because it reads the journal.
 
-Unchanged, and still offered as a choice:
-- `daily`, and Mon–Fri weekly (the hide-daily setting still governs these);
-- weekly with two or more days, e.g. a Sat+Sun chore, which is the "wall of weekend chores" decision of 2026-09-19;
-- the `weekend` window;
-- `since_last`.
+**Still a choice (offered in Shelves, not placed):**
+- A rule that leaves the day open: the `weekend` window ("either day, once"), `since_last`, or weekly with no days.
+- A routine whose Show in Today is `null` ("not said"). This is never read as a deliberate choice.
 
-Visibility is also unchanged. Off Today, resting, layers, people, and occurrences that are skipped, completed or moved away all come from `resolveRoutine` and the instance, exactly as before.
+**Off Today** (`false`) keeps it off Today and the week entirely, as before.
 
-**Copy.** The On Today helper in `TapRoutinePanel` now says what will happen:
-- a timed routine: "at its time";
-- a day-bound routine: "On Today on the days it repeats — no time needed";
-- a flexible routine: "Offered on Today to choose — it has no set day".
+**Hide daily** (the generic sweep) yields to a routine positively set to show in Today on a day it is due. It still sweeps everyday routines that did not say (`null`). With no day at all (`date: null`, the guided session's drag pool) it sweeps as before, so planning pools are unchanged.
 
-**Behaviour change.** A biweekly one-day routine ("every other Saturday") is now on Today on its week instead of waiting to be chosen. The existing test was updated to match.
+**Unchanged:**
+- frequency and occurrence identity;
+- actual recurrence dates, interval weeks, and pauses (resting);
+- skips, completions (one occurrence, done), and deferrals (moved away = absent);
+- privacy, people and life-area filters;
+- the completed fold and collection de-duplication (a collection shows once, with its steps inside);
+- timed routines (at their time) and pinned/dosed routines.
+
+**Copy:** the On Today helper now says what will happen:
+- timed: "Takes a row on Today and the week grid at its time."
+- names its due days: "On Today and the week on each day it's due — no time needed."
+- leaves the day open: "Offered on Today to choose — it has no set day."
+
+## Unavoidable ambiguity: documented, no records changed
+
+`routines.show_on_timeline` is nullable with **default `true`**. Production today, counted without reading any content, has **93 routines `true`, 12 `false`, 0 `null`, 0 pinned**. A routine saved with the default is therefore indistinguishable from one switched on. As implemented, "explicit On wins over hide-daily" means:
+- **Hide daily no longer hides any of the 93** on a day they are due.
+- **Every untimed daily or listed-day routine with Show in Today on now appears on Today and the week on its days**, instead of waiting to be chosen.
+
+To keep one off Today, switch it Off Today; that setting is respected everywhere. No stored values were changed to hide this. If Scott wants hide-daily to keep sweeping by default, that needs a real "explicitly shown" signal (a new column or a data decision), which is not in this change.
 
 ## Evidence
 
-- `dayPlan.test.ts` has a new block covering:
-  - Sunday untimed: on the main list once, in the untimed group, "on today" in the chooser, never offered;
-  - Saturday: absent;
-  - Off Today: absent;
-  - already chosen: still one row;
-  - completed: one row, done;
-  - moved away: absent;
-  - skipped: identical to a timed routine's handling;
-  - flexible weekend window / Sat+Sun / daily / since_last: still choices, with hide-daily still hiding daily only;
-  - timed: keeps its time;
-  - monthly and listed dates: day-bound;
-  - assignee lens and layers still apply;
-  - a Sunday collection: on the list once with its steps inside, while a Sat+Sun collection stays a choice.
-- `TapRoutinePanel.test.tsx` covers the copy.
-- Full suite: 7,489 pass. The one failing file is the connectors WhatsApp dependency, as on main. `tsc` and eslint are clean.
-- Local stack, as the fictional Sky on Sunday Sep 27 (`outputs/today-daybound/`):
-  - "For today" shows the Every-Sun routine once, untimed.
-  - The Sat+Sun chore, weekend window, Saturday-only and Off-Today routines are not on the main list.
-  - In Shelves › Routines, the Every-Sun routine reads "On today's schedule" with no Choose; the flexible ones offer Choose.
-  - At 390px it appears once, with no sideways scroll.
-  - No real-account data was read or written.
-
-## Not changed: open for a decision
-
-- **The week page** (`WeekViewV2` journal and Schedule, via `routineDayState` in `weekDensity.ts`) still treats an untimed one-day routine as "available", not an entry. Aligning it changes two deliberate week tests, and must move the journal and the Schedule grid together. It is left for a separate, explicit change.
-- **Multi-day weekly rules** (e.g. Tue+Thu) remain choices, which is conservative. Say if those should be day-bound too.
+- **Unit and component tests.** Full suite: 7,501 pass. The one failing file is the connectors WhatsApp dependency, as on main. `tsc` and eslint are clean.
+  - `dayPlan.test.ts` (due-routines block) covers:
+    - Sunday: once, untimed, "on today", not offered; Saturday: absent;
+    - daily: every day;
+    - Tue/Thu: Tuesday yes, Wednesday no;
+    - explicit Sat+Sun: on both days, while the weekend window stays a choice;
+    - since-last: a choice; Off Today: absent; `null`: offered;
+    - generic hide-daily vs explicit On (and still sweeping the unspecified, keeping pinned);
+    - chosen: no duplicate; completed, moved-away and skipped cases;
+    - paused: absent; timed keeps its time; monthly and listed dates;
+    - assignee lens and layers; a collection shows once.
+  - `dueRoutineParity.test.ts`: Today and the Week journal give the same "on the day" set and the same "offered" set for daily, Sun, Sat+Sun, Tue/Thu, weekend window, unspecified and off routines on Sunday.
+  - `WeekViewV2.test.tsx`: a due routine is one Sunday entry in the journal and the all-day cell, Monday is empty, and the Routines switch still hides it.
+  - `weekDensity.test.ts`, `weekRoutineChoices.test.ts`, `statusMaps.test.ts`, the visibility corpus (explicit On beats hide-daily on a due day, with `date: null` unaffected), and `todayParity.test.ts` (the divergence from the frozen legacy pipeline is declared) all cover this change.
+  - Hide-daily tests in Today, Week, Month and River keep their intent, using fixtures whose Show in Today is `null`.
+- **Local stack**, as the fictional Sky on Sunday Sep 27 (`outputs/today-daybound/t4.mjs`):
+  - Today's main list has Water houseplants (Every Sun), Kids clean rooms (Sat+Sun) and Vitamins (daily), each ×1, with no times.
+  - Piano (Tue/Thu), the weekend window, Saturday-only and Off Today are absent.
+  - The Week journal's Sunday entries and the Schedule's Sunday all-day cell list the same three.
+  - Earlier checks (`t2`, `t3`): Shelves shows "On today's schedule" with no Choose, and at 390px there is one row and no sideways scroll.

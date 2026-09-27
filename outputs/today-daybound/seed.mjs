@@ -8,7 +8,9 @@ await c.from('routines').delete().like('name', 'TDB %')
 const base = { user_id: uid, visibility: 'active', show_on_timeline: true, context: 'family', scope: 'compound', time_of_day: null }
 const rows = [
   { ...base, name: 'TDB Water houseplants every weekend', recurrence_pattern: { type: 'weekly', days: ['sun'] } },
-  { ...base, name: 'TDB Kids clean rooms (Sat+Sun chore)', recurrence_pattern: { type: 'weekly', days: ['sat', 'sun'] } },
+  { ...base, name: 'TDB Kids clean rooms (Sat+Sun)', recurrence_pattern: { type: 'weekly', days: ['sat', 'sun'] } },
+  { ...base, name: 'TDB Vitamins (daily)', recurrence_pattern: { type: 'daily' } },
+  { ...base, name: 'TDB Piano (Tue/Thu)', recurrence_pattern: { type: 'weekly', days: ['tue', 'thu'] } },
   { ...base, name: 'TDB Mow the lawn (weekend window)', recurrence_pattern: { type: 'weekend' } },
   { ...base, name: 'TDB Saturday-only chore', recurrence_pattern: { type: 'weekly', days: ['sat'] } },
   { ...base, name: 'TDB Sunday off-Today', recurrence_pattern: { type: 'weekly', days: ['sun'] }, show_on_timeline: false },

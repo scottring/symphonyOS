@@ -663,8 +663,10 @@ export function WeekViewV2(props: WeekViewV2Props) {
 
     for (const [key, entries] of extras.dinnersByDay) byKey.get(key)?.dinners.push(...entries)
 
-    // Routine occurrences: with a time, or chosen for the day, they are the
-    // day's entries; an untimed one nobody chose is only available — the same
+    // Routine occurrences: with a time, chosen for the day, or due on it with
+    // Show in Today on, they are the day's entries (untimed ones in the day's
+    // untimed list, and Schedule's all-day cell via plannedAllDay); one whose
+    // rule leaves the day open and nobody chose is only available — the same
     // split Today and its pin make (dayPlan.ts).
     for (const r of routineItems) {
       const day = days[routineDayIndex(r.id)]
@@ -672,12 +674,12 @@ export function WeekViewV2(props: WeekViewV2Props) {
       const routineId = routineIdOf(r.id)
       // The same three facts the day tiles read, from the same place — the
       // journal and the tiles must not disagree about a Tuesday.
-      const { completed, planned, pinned } = routineDayState(routineId, day.key, r, weekInstances)
+      const { completed, planned, pinned, dayBound } = routineDayState(routineId, day.key, r, weekInstances)
       const entry: JournalEntry = {
         id: r.id, kind: 'routine', time: r.startTime ?? undefined, title: r.title, completed, routineId,
       }
       if (r.startTime) timed.get(day.key)!.push(entry)
-      else if (planned || pinned || completed) untimed.get(day.key)!.push(entry)
+      else if (planned || pinned || dayBound || completed) untimed.get(day.key)!.push(entry)
       else day.available.push({ ...r, completed })
     }
 

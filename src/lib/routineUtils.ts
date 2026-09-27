@@ -42,31 +42,40 @@ export function isTimelineObligation(routine: Pick<Routine, 'pin_to_timeline'>):
 }
 
 /**
- * Does the routine's own rule name THE day it happens — one weekday ("every
- * Sunday", every other Sunday), a day of the month or year, or listed dates?
- * Then its occurrence is a commitment on that day, like a dated task: it
- * belongs on Today's main list without a second "Choose for today" and
- * without a time being invented for it (Scott, 2026-09-27 — "Water
- * houseplants", every Sun, was only in the chooser).
- *
- * NOT day-bound, and still offered as a choice: `daily` (and Mon–Fri, which
- * the hide-daily setting governs), a weekly rule naming SEVERAL days (a
- * "Sat + Sun" chore means "sometime this weekend" — the wall of weekend
- * chores of 2026-09-19), the `weekend` window, and `since_last`.
- * Placement only, like isTimelineObligation: it never decides visibility.
+ * Does the routine's rule NAME the days it is due — every day, listed
+ * weekdays (Tue/Thu, Sat+Sun), a day of the month or year, or listed dates?
+ * Only a rule that leaves the day open does not: the `weekend` window
+ * ("either day, once"), `since_last` ("when it's time again"), or a weekly
+ * rule with no days yet. A weekly ['sat','sun'] rule is two named days, not
+ * the weekend window.
  */
-export function isDayBoundRoutine(routine: Pick<Routine, 'recurrence_pattern'>): boolean {
-  const p = routine.recurrence_pattern
+export function namesDueDays(p: RecurrencePattern | null | undefined): boolean {
   switch (p?.type) {
-    case 'weekly': return (p.days?.length ?? 0) === 1
+    case 'daily':
     case 'monthly':
     case 'quarterly':
     case 'yearly':
     case 'specific_days':
       return true
+    case 'weekly':
+      return (p.days?.length ?? 0) > 0
     default:
       return false
   }
+}
+
+/**
+ * On Today by its own settings, on every day it is due (Scott, 2026-09-27):
+ * "Show in Today" POSITIVELY on (`show_on_timeline === true`) and a rule that
+ * names its due days. Such an occurrence is on Today's main list and the week
+ * journal on those days, untimed — no second "Choose for today", no invented
+ * time. `null` is "not said", never read as a deliberate choice; `false` is
+ * off Today (resolveRoutine hides it before this is asked).
+ * Placement only, like isTimelineObligation — except that resolveRoutine's
+ * generic hide-daily sweep also yields to it (see there).
+ */
+export function isDayBoundRoutine(routine: Pick<Routine, 'recurrence_pattern' | 'show_on_timeline'>): boolean {
+  return routine.show_on_timeline === true && namesDueDays(routine.recurrence_pattern)
 }
 
 /**
@@ -399,7 +408,14 @@ export function resolveRoutine(routine: Routine, ctx: ResolveRoutineCtx): Routin
   if (!matchesLayers(routine.context, ctx.prefs.layers)) return hide('other-domain')
   if (!matchesOwners(owners, ctx.member)) return hide('not-theirs')
   if (routine.parent_routine_id != null) return hide('in-collection')
-  if (ctx.prefs.hideRoutines && isEverydayRoutine(routine.recurrence_pattern) && !isPinnedToTimeline(routine)) {
+  // The generic "hide daily" preference yields, on a real day it is due, to a
+  // routine positively set to show in Today (Scott, 2026-09-27): the specific
+  // choice wins. With no day (date: null — a planning drag pool) the sweep
+  // applies as before. NOTE: the column defaults to true, so a routine saved
+  // with the default reads the same as one switched on — see
+  // docs/planning/2026-09-27-today-daybound-routines.md.
+  const showsWhenDue = ctx.date !== null && routine.show_on_timeline === true
+  if (ctx.prefs.hideRoutines && isEverydayRoutine(routine.recurrence_pattern) && !isPinnedToTimeline(routine) && !showsWhenDue) {
     return hide('everyday')
   }
   return { shows: true, reason: 'shows', owners }

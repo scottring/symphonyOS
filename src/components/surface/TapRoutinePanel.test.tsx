@@ -100,8 +100,13 @@ describe('TapRoutinePanel', () => {
       return text
     }
     expect(say(routine)).toMatch(/at its time/)
-    expect(say({ ...routine, time_of_day: null, recurrence_pattern: { type: 'weekly', days: ['sun'] } })).toMatch(/On Today on the days it repeats — no time needed/)
+    const onDays = /On Today and the week on each day it’s due — no time needed/
+    expect(say({ ...routine, time_of_day: null, recurrence_pattern: { type: 'weekly', days: ['sun'] } })).toMatch(onDays)
+    expect(say({ ...routine, time_of_day: null, recurrence_pattern: { type: 'daily' } })).toMatch(onDays)
+    expect(say({ ...routine, time_of_day: null, recurrence_pattern: { type: 'weekly', days: ['tue', 'thu'] } })).toMatch(onDays)
+    expect(say({ ...routine, time_of_day: null, recurrence_pattern: { type: 'weekly', days: ['sat', 'sun'] } })).toMatch(onDays)
     expect(say({ ...routine, time_of_day: null, recurrence_pattern: { type: 'weekend' } })).toMatch(/Offered on Today to choose/)
+    expect(say({ ...routine, time_of_day: null, recurrence_pattern: { type: 'daily' } })).not.toMatch(/no set day/)
   })
 
   it('says nothing about Today while the routine is resting off everything', () => {

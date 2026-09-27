@@ -239,7 +239,7 @@ describe('WeekView', () => {
     // once it's flipped on — both assertions in play so neither can pass
     // vacuously.
     it('responds to the "hide daily routines" toggle', () => {
-      const routines = [createMockRoutine({ name: 'Daily Routine' })] // factory default: daily, unpinned
+      const routines = [createMockRoutine({ name: 'Daily Routine', show_on_timeline: null as unknown as boolean })] // factory default: daily, unpinned
 
       render(<WeekView {...defaultProps} routines={routines} />)
 
@@ -264,7 +264,7 @@ describe('WeekView', () => {
     // substring so the two regexes can't cross-match each other.
     it('sweeps a plain everyday routine but keeps a pinned one, once the toggle is on', () => {
       const routines = [
-        createMockRoutine({ name: 'Daily Routine' }), // factory default: daily, unpinned
+        createMockRoutine({ name: 'Daily Routine', show_on_timeline: null as unknown as boolean }), // factory default: daily, unpinned
         createMockRoutine({ name: 'Pinned Med Routine', pin_to_timeline: true }),
       ]
 

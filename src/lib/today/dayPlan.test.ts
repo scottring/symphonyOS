@@ -28,8 +28,11 @@ function inst(entityId: string, over: Partial<ActionableInstance> = {}): Actiona
   }
 }
 
+// A flexible chore: named days, but Show in Today not positively set (null =
+// "not said"), so it stays a CHOICE on the day (isDayBoundRoutine). The
+// positively-set case is the "due routines" block at the end.
 const weekend = (over: Partial<Routine>) => createMockRoutine({
-  time_of_day: null, recurrence_pattern: { type: 'weekly', days: ['sat', 'sun'] }, ...over,
+  time_of_day: null, recurrence_pattern: { type: 'weekly', days: ['sat', 'sun'] }, show_on_timeline: null as unknown as boolean, ...over,
 })
 
 describe('selectDayPlan — dated vs chosen tasks', () => {
@@ -142,8 +145,8 @@ describe('selectDayPlan — routine occurrences', () => {
     expect(mainRoutines.map((i) => i.id)).toEqual(['routine-fp-sat'])
   })
 
-  it('does not turn hidden daily routines back on', () => {
-    const daily = createMockRoutine({ id: 'd', name: 'Brush teeth', time_of_day: null, recurrence_pattern: { type: 'daily' } })
+  it('does not turn hidden daily routines back on (Show in Today not positively set)', () => {
+    const daily = createMockRoutine({ id: 'd', name: 'Brush teeth', time_of_day: null, recurrence_pattern: { type: 'daily' }, show_on_timeline: null as unknown as boolean })
     expect(selectDayPlan(input({ routines: [daily], hideRoutines: true })).available).toEqual([])
     expect(selectDayPlan(input({ routines: [daily], hideRoutines: false })).available.map((e) => e.id)).toEqual(['d'])
   })
@@ -383,89 +386,119 @@ it('offers this week’s unfinished work when planning next week without committ
   expect(task.commitments).toHaveLength(1)
 })
 
-// Scott, 2026-09-27: "Water houseplants every weekend" — Every Sun, On Today,
-// no time — was only in the chooser ("Choose … for today" OFF) on Sunday.
-describe('day-bound routines are on their day without being chosen', () => {
+// Scott, 2026-09-27: "Water houseplants every weekend" — Every Sun, Show in
+// Today ON, no time — was only in the chooser on Sunday. Clarified: a routine
+// positively set to show in Today is on Today on EVERY day its rule names —
+// daily, Tue/Thu, Sat+Sun alike — with no second choosing and no time.
+describe('due routines with Show in Today on are on their days without being chosen', () => {
   const SUN = new Date(2026, 8, 27, 10, 0)
   const SUN_YMD = '2026-09-27'
   const SUN_WEEK = new Date(2026, 8, 27)
-  const plants = (over: Partial<Routine> = {}) => createMockRoutine({
-    id: 'wp', name: 'Water houseplants every weekend', time_of_day: null,
-    recurrence_pattern: { type: 'weekly', days: ['sun'] }, show_on_timeline: true, ...over,
+  const TUE = new Date(2026, 8, 29, 10, 0)
+  const WED = new Date(2026, 8, 30, 10, 0)
+  const due = (id: string, name: string, pattern: Routine['recurrence_pattern'], over: Partial<Routine> = {}) => createMockRoutine({
+    id, name, time_of_day: null, recurrence_pattern: pattern, show_on_timeline: true, ...over,
   })
-  const onSun = (over: Partial<DayPlanInput> = {}) => input({ viewedDate: SUN, weekStart: SUN_WEEK, ...over })
+  const plants = (over: Partial<Routine> = {}) => due('wp', 'Water houseplants every weekend', { type: 'weekly', days: ['sun'] }, over)
+  const at = (viewedDate: Date, over: Partial<DayPlanInput> = {}) => input({ viewedDate, weekStart: SUN_WEEK, ...over })
+  const onSun = (over: Partial<DayPlanInput> = {}) => at(SUN, over)
   const sunInst = (id: string, over: Partial<ActionableInstance> = {}) => inst(id, { date: SUN_YMD, ...over })
   const mainRoutineRows = (d: ReturnType<typeof computeTodayData>) => Object.values(d.grouped).flat().filter((i) => i.type === 'routine' || i.type === 'routine-collection')
+  const onMain = (inp: DayPlanInput, title: string) => mainRoutineRows(computeTodayData({ ...inp, events: [] })).filter((i) => i.title === title).length
+  const chooser = (plan: ReturnType<typeof selectDayPlan>, id: string) => plan.chooserRoutines.filter((e) => e.id === id)
 
-  it('Sunday: on the main list once, untimed, and "Already on today" in the chooser — never offered again', () => {
+  it('Sunday: on the main list once, untimed, and "on today" in the chooser — never offered again', () => {
     const plan = selectDayPlan(onSun({ routines: [plants()] }))
     expect(plan.available).toEqual([])
     expect(plan.offMainRoutineItemIds.size).toBe(0)
     expect(plan.counts.available).toBe(0)
-    expect(plan.chooserRoutines.filter((e) => e.id === 'wp')).toEqual([expect.objectContaining({ onToday: true, planned: true })])
+    expect(chooser(plan, 'wp')).toEqual([expect.objectContaining({ onToday: true, planned: true })])
     expect(plan.toPlan.find((e) => e.id === 'wp')).toBeUndefined()
     const d = computeTodayData({ ...onSun({ routines: [plants()] }), events: [] })
     const rows = mainRoutineRows(d).filter((i) => i.title === 'Water houseplants every weekend')
     expect(rows).toHaveLength(1)
-    // No time is invented: it sits with the untimed work.
-    expect(rows[0].startTime ?? null).toBeNull()
+    expect(rows[0].startTime ?? null).toBeNull() // no invented time
     expect(d.grouped.unscheduled.map((i) => i.title)).toContain('Water houseplants every weekend')
   })
 
-  it('Saturday: not there at all (the rule says Sunday)', () => {
-    const plan = selectDayPlan(input({ routines: [plants()] }))
-    expect(plan.available).toEqual([])
-    expect(plan.chooserRoutines.find((e) => e.id === 'wp')).toBeUndefined()
-    const d = computeTodayData({ ...input({ routines: [plants()] }), events: [] })
-    expect(mainRoutineRows(d).find((i) => i.title === 'Water houseplants every weekend')).toBeUndefined()
+  it('Saturday: not there at all — the rule says Sunday', () => {
+    expect(onMain(input({ routines: [plants()] }), 'Water houseplants every weekend')).toBe(0)
+    expect(chooser(selectDayPlan(input({ routines: [plants()] })), 'wp')).toEqual([])
   })
 
-  it('"Off Today" keeps it off Today entirely', () => {
-    const d = computeTodayData({ ...onSun({ routines: [plants({ show_on_timeline: false })] }), events: [] })
-    expect(mainRoutineRows(d).find((i) => i.title === 'Water houseplants every weekend')).toBeUndefined()
-    expect(d.dayPlan.chooserRoutines.find((e) => e.id === 'wp')).toBeUndefined()
+  it('daily: on the main list every day', () => {
+    const r = due('d', 'Read 20 minutes', { type: 'daily' })
+    for (const day of [SUN, TUE, WED]) expect(onMain(at(day, { routines: [r] }), 'Read 20 minutes')).toBe(1)
+  })
+
+  it('Tue/Thu: on Tuesday, not on Wednesday', () => {
+    const r = due('tt', 'Piano practice', { type: 'weekly', days: ['tue', 'thu'] })
+    expect(onMain(at(TUE, { routines: [r] }), 'Piano practice')).toBe(1)
+    expect(onMain(at(WED, { routines: [r] }), 'Piano practice')).toBe(0)
+    expect(selectDayPlan(at(WED, { routines: [r] })).chooserRoutines).toEqual([])
+  })
+
+  it('an explicit Sat+Sun rule is due on both days; the weekend WINDOW stays a choice', () => {
+    const satSun = due('ss', 'Kids clean rooms', { type: 'weekly', days: ['sat', 'sun'] })
+    const window = due('win', 'Mow the lawn', { type: 'weekend' })
+    for (const day of [SAT, SUN]) {
+      const plan = selectDayPlan(at(day, { routines: [satSun, window] }))
+      expect(plan.available.map((e) => e.id)).toEqual(['win'])
+      expect(chooser(plan, 'ss')).toEqual([expect.objectContaining({ onToday: true })])
+      expect(onMain(at(day, { routines: [satSun, window] }), 'Kids clean rooms')).toBe(1)
+      expect(onMain(at(day, { routines: [satSun, window] }), 'Mow the lawn')).toBe(0)
+    }
+  })
+
+  it('rules that leave the day open stay a choice: since-last, a weekly rule with no days yet', () => {
+    const since = due('sl', 'Change the filter', { type: 'since_last', interval: 2, unit: 'weeks' })
+    const plan = selectDayPlan(onSun({ routines: [since] }))
+    expect(plan.available.map((e) => e.id)).toEqual(['sl'])
+  })
+
+  it('"Off Today" keeps it off Today entirely, even when due', () => {
+    expect(onMain(onSun({ routines: [plants({ show_on_timeline: false })] }), 'Water houseplants every weekend')).toBe(0)
+    expect(chooser(selectDayPlan(onSun({ routines: [plants({ show_on_timeline: false })] })), 'wp')).toEqual([])
+  })
+
+  it('Show in Today not positively set (null) is not read as a choice: it stays offered', () => {
+    const plan = selectDayPlan(onSun({ routines: [plants({ show_on_timeline: null as unknown as boolean })] }))
+    expect(plan.available.map((e) => e.id)).toEqual(['wp'])
+  })
+
+  it('generic hide-daily yields to Show in Today on; it still sweeps a daily routine that did not say', () => {
+    const on = due('on', 'Vitamins', { type: 'daily' })
+    const unsaid = due('un', 'Brush teeth', { type: 'daily' }, { show_on_timeline: null as unknown as boolean })
+    const pinned = due('pin', 'PT exercises', { type: 'daily' }, { show_on_timeline: null as unknown as boolean, pin_to_timeline: true })
+    const d = computeTodayData({ ...onSun({ routines: [on, unsaid, pinned], hideRoutines: true }), events: [] })
+    const titles = mainRoutineRows(d).map((i) => i.title)
+    expect(titles).toContain('Vitamins')
+    expect(titles).toContain('PT exercises')
+    expect(titles).not.toContain('Brush teeth')
   })
 
   it('already chosen for the day: still one row (no duplicate)', () => {
-    const d = computeTodayData({ ...onSun({ routines: [plants()], dateInstances: [sunInst('wp', { planned_on: SUN_YMD })] }), events: [] })
-    expect(mainRoutineRows(d).filter((i) => i.title === 'Water houseplants every weekend')).toHaveLength(1)
+    expect(onMain(onSun({ routines: [plants()], dateInstances: [sunInst('wp', { planned_on: SUN_YMD })] }), 'Water houseplants every weekend')).toBe(1)
   })
 
-  it('completed: one row, done; skipped or moved away: kept as the instance says', () => {
+  it('completed: one row, done; moved away: absent; skipped: handled as a timed routine is', () => {
     const done = computeTodayData({ ...onSun({ routines: [plants()], dateInstances: [sunInst('wp', { status: 'completed' })] }), events: [] })
     expect(mainRoutineRows(done).filter((i) => i.title === 'Water houseplants every weekend').map((i) => i.completed)).toEqual([true])
     const moved = selectDayPlan(onSun({ routines: [plants()], dateInstances: [sunInst('wp', { status: 'deferred', deferred_to: new Date(2026, 8, 28, 9).toISOString() })] }))
-    expect(moved.chooserRoutines.find((e) => e.id === 'wp')).toBeUndefined()
-    expect(moved.available).toEqual([])
-    // Skipped: the day plan does exactly what it did before for a timed/pinned
-    // routine — the instance status rides on the row.
-    const skippedBefore = selectDayPlan(onSun({ routines: [plants({ time_of_day: '09:00:00' })], dateInstances: [sunInst('wp', { status: 'skipped' })] }))
-    const skippedNow = selectDayPlan(onSun({ routines: [plants()], dateInstances: [sunInst('wp', { status: 'skipped' })] }))
-    expect(skippedNow.chooserRoutines.map((e) => [e.id, e.completed, e.onToday])).toEqual(skippedBefore.chooserRoutines.map((e) => [e.id, e.completed, e.onToday]))
+    expect(chooser(moved, 'wp')).toEqual([])
+    const skippedTimed = selectDayPlan(onSun({ routines: [plants({ time_of_day: '09:00:00' })], dateInstances: [sunInst('wp', { status: 'skipped' })] }))
+    const skipped = selectDayPlan(onSun({ routines: [plants()], dateInstances: [sunInst('wp', { status: 'skipped' })] }))
+    expect(skipped.chooserRoutines.map((e) => [e.id, e.completed, e.onToday])).toEqual(skippedTimed.chooserRoutines.map((e) => [e.id, e.completed, e.onToday]))
   })
 
-  it('flexible rules stay a choice: the weekend window, a Sat+Sun chore, daily, and "since last"', () => {
-    const flex = [
-      createMockRoutine({ id: 'win', name: 'Weekend window', time_of_day: null, recurrence_pattern: { type: 'weekend' } }),
-      createMockRoutine({ id: 'ss', name: 'Kids clean rooms', time_of_day: null, recurrence_pattern: { type: 'weekly', days: ['sat', 'sun'] } }),
-      createMockRoutine({ id: 'd', name: 'Read 20 min', time_of_day: null, recurrence_pattern: { type: 'daily' } }),
-      createMockRoutine({ id: 'sl', name: 'Change the filter', time_of_day: null, recurrence_pattern: { type: 'since_last', interval: 2, unit: 'weeks' } }),
-    ]
-    const plan = selectDayPlan(onSun({ routines: flex }))
-    expect(plan.available.map((e) => e.id).sort()).toEqual(['d', 'sl', 'ss', 'win'])
-    expect(plan.offMainRoutineItemIds.size).toBe(4)
-    // Hide daily still hides the daily one (and only it).
-    expect(selectDayPlan(onSun({ routines: flex, hideRoutines: true })).available.map((e) => e.id).sort()).toEqual(['sl', 'ss', 'win'])
+  it('a paused (resting) routine is not there', () => {
+    expect(onMain(onSun({ routines: [plants({ visibility: 'reference', paused_until: '2026-10-10T00:00:00Z' })] }), 'Water houseplants every weekend')).toBe(0)
   })
 
-  it('a timed one-day routine keeps its time', () => {
-    const plan = selectDayPlan(onSun({ routines: [plants({ time_of_day: '09:30:00' })] }))
-    expect(plan.chooserRoutines.find((e) => e.id === 'wp')?.context).toMatch(/9:30/)
-  })
-
-  it('monthly and listed-date rules are day-bound too', () => {
-    const monthly = createMockRoutine({ id: 'm', name: 'Pay rent', time_of_day: null, recurrence_pattern: { type: 'monthly', day_of_month: 27 } })
-    const dates = createMockRoutine({ id: 'sd', name: 'Recital', time_of_day: null, recurrence_pattern: { type: 'specific_days', dates: [SUN_YMD] } })
+  it('a timed one keeps its time; monthly and listed dates are due days too', () => {
+    expect(chooser(selectDayPlan(onSun({ routines: [plants({ time_of_day: '09:30:00' })] })), 'wp')[0]?.context).toMatch(/9:30/)
+    const monthly = due('m', 'Pay rent', { type: 'monthly', day_of_month: 27 })
+    const dates = due('sd', 'Recital', { type: 'specific_days', dates: [SUN_YMD] })
     const plan = selectDayPlan(onSun({ routines: [monthly, dates] }))
     expect(plan.available).toEqual([])
     expect(plan.chooserRoutines.filter((e) => e.onToday).map((e) => e.id).sort()).toEqual(['m', 'sd'])
@@ -473,25 +506,21 @@ describe('day-bound routines are on their day without being chosen', () => {
 
   it('the assignee lens and life areas still apply', () => {
     const iris = plants({ assigned_to: 'iris', assigned_to_all: ['iris'] })
-    expect(selectDayPlan(onSun({ routines: [iris], selectedAssignee: ['scott'] })).chooserRoutines.find((e) => e.id === 'wp')).toBeUndefined()
+    expect(chooser(selectDayPlan(onSun({ routines: [iris], selectedAssignee: ['scott'] })), 'wp')).toEqual([])
     const work = plants({ context: 'work' })
-    expect(selectDayPlan(onSun({ routines: [work], layers: new Set(['family']) as never })).chooserRoutines.find((e) => e.id === 'wp')).toBeUndefined()
+    expect(chooser(selectDayPlan(onSun({ routines: [work], layers: new Set(['family']) as never })), 'wp')).toEqual([])
   })
 
-  it('a collection whose own rule names Sunday is on today once, its steps inside it; a Sat+Sun collection stays a choice', () => {
-    const coll = (id: string, days: string[]) => [
-      createMockRoutine({ id, name: `Coll ${id}`, time_of_day: null, recurrence_pattern: { type: 'weekly', days } }),
-      createMockRoutine({ id: `${id}-1`, name: `${id} step 1`, time_of_day: null, parent_routine_id: id, step_order: 0, recurrence_pattern: { type: 'weekly', days } }),
-      createMockRoutine({ id: `${id}-2`, name: `${id} step 2`, time_of_day: null, parent_routine_id: id, step_order: 1, recurrence_pattern: { type: 'weekly', days } }),
+  it('a collection due today is on the list once, its steps inside it', () => {
+    const coll = [
+      due('c', 'Sunday reset', { type: 'weekly', days: ['sun'] }),
+      due('c-1', 'c step 1', { type: 'weekly', days: ['sun'] }, { parent_routine_id: 'c', step_order: 0 }),
+      due('c-2', 'c step 2', { type: 'weekly', days: ['sun'] }, { parent_routine_id: 'c', step_order: 1 }),
     ]
-    const routines = [...coll('sun', ['sun']), ...coll('both', ['sat', 'sun'])]
-    const plan = selectDayPlan(onSun({ routines }))
-    expect(plan.chooserRoutines.filter((e) => e.id === 'sun')).toEqual([expect.objectContaining({ onToday: true })])
-    expect(plan.available.map((e) => e.id)).toEqual(['both'])
-    const d = computeTodayData({ ...onSun({ routines }), events: [] })
-    const rows = mainRoutineRows(d)
-    expect(rows.filter((i) => i.title === 'Coll sun')).toHaveLength(1)
-    expect(rows.find((i) => i.title === 'sun step 1')).toBeUndefined() // only inside the collection
-    expect(rows.find((i) => i.title === 'Coll both')).toBeUndefined()
+    const plan = selectDayPlan(onSun({ routines: coll }))
+    expect(chooser(plan, 'c')).toEqual([expect.objectContaining({ onToday: true })])
+    const rows = mainRoutineRows(computeTodayData({ ...onSun({ routines: coll }), events: [] }))
+    expect(rows.filter((i) => i.title === 'Sunday reset')).toHaveLength(1)
+    expect(rows.find((i) => i.title === 'c step 1')).toBeUndefined()
   })
 })

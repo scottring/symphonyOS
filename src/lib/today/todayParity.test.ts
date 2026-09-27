@@ -150,6 +150,20 @@ const KNOWN_DIVERGENCES: readonly KnownDivergence[] = [
       '`selectVisibleRoutines`/`resolveRoutine` — legacy behavior (before) is the one that was ' +
       'wrong here, which is exactly why this is an onlyAfter divergence rather than a regression.',
   },
+  // 2026-09-27: Show in Today positively ON beats the generic hide-daily sweep
+  // on a day the routine is due (Scott). Legacy (frozen) always swept.
+  ...[
+    'Show in Today on beats hide-daily on a due day',
+    'Show in Today on beats hide-daily for a Mon–Fri routine on a due day',
+  ].flatMap((label): KnownDivergence[] => {
+    const routineId = corpusRoutineId(label)
+    return [{
+      routineId,
+      direction: 'onlyAfter',
+      matchesScenario: (ctx) => ctx.prefs.hideRoutines === true && ctx.date !== null,
+      reason: 'Show in Today positively on (show_on_timeline === true) wins over hide-daily on a due day (Scott, 2026-09-27); the frozen legacy pipeline always swept everyday routines.',
+    }]
+  }),
 ]
 
 // NOT a divergence, despite two corpus rows looking like one at first glance:
