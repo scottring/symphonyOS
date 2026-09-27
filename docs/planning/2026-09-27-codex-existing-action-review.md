@@ -24,3 +24,11 @@ Independent targeted run: 86/86 tests passed. Conditional goal_task_id writes an
 The present tests exercise outcome mapping and dialog mocks; add hook tests proving actual conditional query construction, lost-response recovery, stale unlink and the incomplete-read gate. Keep real data untouched. These are bounded corrections, not deployment authorization.
 
 Instructions were pasted into the existing VS Code left terminal, Horizon flow implementation, but clipboard operation timed out. The verification screenshot then reported the Mac locked. Submission is UNCONFIRMED; do not assume Claude received the request. Stop UI retries until Scott confirms manual unlock. Preserve the real Fall goals and September import preview.
+
+## Final scoped review — 2abff22f
+
+The three follow-up findings are addressed: goal-link-only fan-out preserves other current fields, the shared recovery gate re-reads before retrying an uncertain relationship write, and the dialog catches rejected callbacks and releases busy state. Reviewed the eight hook tests, including conditional writes, stale unlink, lost response, cross-instance recovery and concurrent notes edits.
+
+Independent rerun: 95/95 tests passed across useSupabaseTasks.goalLink, existingActions, AddExistingActionDialog, PlanRow and useCommitPage. The prior isolated database permission proof passed; its SQL is unchanged. No remaining blocker found in this scoped review. This is not an independent rerun of Claude's full suite or browser acceptance.
+
+Release pending: Scott's separate approval for the prepared goal-visibility migration and for deployment. Selector fix 19a47bac passed review and can release independently. Year goals remain unsupported by this existing-action picker; PR61's future importer must separately align with the selector, and parser classification quality is not established by these UI tests. No real data changed during review. Pause the supervision heartbeat now that unblocked implementation/review is complete; do not treat this as deployment approval.
