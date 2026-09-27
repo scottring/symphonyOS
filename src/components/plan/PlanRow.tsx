@@ -261,6 +261,9 @@ export function PlanRow({
   // and a step never nests further, so neither offers a disclosure. A goal
   // with no steps still gets one when it can TAKE them — that is the way in.
   const canHoldSteps = row.isGoal && row.kind === 'task' && (!!onAddStep || (row.steps?.length ?? 0) > 0)
+  /** A goal shown shut: on a phone it is one compact entry — its people ride
+   *  the "· show" line and its Move menu waits until it is opened. */
+  const goalShut = canHoldSteps && !expanded
   const shown = stepsToDraw ?? row.steps ?? []
   const tally = counts ?? stepCounts(row)
   const [stepDraft, setStepDraft] = useState('')
@@ -273,10 +276,6 @@ export function PlanRow({
    * race to it (seen live, 2026-09-24).
    */
   const [wantStepFocus, setWantStepFocus] = useState(false)
-  const addStepHere = () => {
-    setWantStepFocus(true)
-    if (!expanded) onToggleExpand?.(row)
-  }
   useEffect(() => {
     if (!wantStepFocus || !expanded) return
     stepInputRef.current?.focus()
@@ -405,14 +404,12 @@ export function PlanRow({
               {tally.total > 0 ? countsLabel(tally) : 'No next actions yet'}{expanded ? ' · hide' : ' · show'}
             </button>
             {expanded && refine}
-            {expanded && onAddStep && (
-              <button type="button" onClick={addStepHere} className="text-neutral-500 hover:text-primary-700 hover:underline">
-                + Add a next action
-              </button>
-            )}
+            {/* No "+ Add a next action" link here: once a goal is open its
+                next-action box is right below, and the link repeated it. */}
             {hiddenByFilter > 0 && (
               <span className="text-neutral-400">{hiddenByFilter} hidden by the filter</span>
             )}
+            {mobile && goalShut && who && <span className="ml-auto">{who}</span>}
           </span>
         )}
         {/* Where this row is committed, on its own line beneath the title —
@@ -420,7 +417,7 @@ export function PlanRow({
         {row.placed && (
           <PlacementChip placed={row.placed} onOpenPlaced={onOpenPlaced} />
         )}
-        {mobile && (timing || who) && (
+        {mobile && (timing || who) && !(goalShut && !timing) && (
           <span className="mt-1.5 flex max-w-full items-center gap-2">{timing}{who}</span>
         )}
       </span>
@@ -431,7 +428,7 @@ export function PlanRow({
       {/* Phone: the same verbs behind one visible Move control (native
           MoveMenuButton) — a native picker, so it is reachable by touch,
           keyboard and screen reader alike, and never swipe-only. */}
-      {verbs.length > 0 && (
+      {verbs.length > 0 && !goalShut && (
         <label className="period-row-move sm:hidden">
           <span aria-hidden="true">Move</span>
           <ChevronDown className="h-3 w-3" aria-hidden="true" />

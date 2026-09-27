@@ -203,7 +203,10 @@ describe('a goal holds the steps that serve it', () => {
     expect(onToggleExpand).toHaveBeenCalledWith(goalWithSteps)
     rerender(<ul><PlanRow row={goalWithSteps} actions={[]} onAction={vi.fn()} onOpen={vi.fn()} onAddStep={vi.fn()} onToggleExpand={onToggleExpand} expanded
       goalControls={<button type="button">Link control</button>} refine={<button type="button">Refine control</button>} /></ul>)
-    for (const name of ['+ Add a next action', 'Link control', 'Refine control']) expect(screen.getByRole('button', { name })).toBeInTheDocument()
+    for (const name of ['Link control', 'Refine control']) expect(screen.getByRole('button', { name })).toBeInTheDocument()
+    // Open, the next-action box is there — once, with no link repeating it.
+    expect(screen.getByRole('textbox', { name: 'New next action for Transform the porch' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Add a next action/ })).toBeNull()
   })
 
   // A bound, not a cap: the true total is stated and one press gives it back.

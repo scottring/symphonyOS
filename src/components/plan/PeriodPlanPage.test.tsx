@@ -1815,13 +1815,12 @@ describe('a month with a realistic number of goals', () => {
     expect(screen.getByRole('button', { name: /Hide next actions under Record the album/ })).toBeInTheDocument()
   })
 
-  it('"Add a next action" is one press after opening the goal (controls show on open)', () => {
+  it('opening a goal shows its next-action box, once', () => {
     dense()
     renderPage('month')
     openGoal('Goal number 7')
-    const card = screen.getByText('Goal number 7').closest('li')!
-    fireEvent.click(within(card).getByRole('button', { name: '+ Add a next action' }))
     expect(screen.getByLabelText('New next action for Goal number 7')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Add a next action/ })).toBeNull()
   })
 })
 
