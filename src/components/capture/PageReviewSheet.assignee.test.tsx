@@ -68,7 +68,7 @@ describe('PageReviewSheet — assignee', () => {
   it('a task turned into a routine keeps its person', async () => {
     const user = userEvent.setup()
     const { onCommit } = renderSheet([line('Swim', { assigneeId: 'm-iris', placement: { kind: 'date', date: '2026-10-07' } })])
-    await user.selectOptions(screen.getByRole('combobox', { name: 'Type of "Swim"' }), 'routine')
+    await user.selectOptions(screen.getByRole('combobox', { name: 'What is "Swim"?' }), 'routine')
     await user.click(screen.getByRole('button', { name: /add 1 item/i }))
     expect(onCommit.mock.calls[0][0].items[0]).toMatchObject({ kind: 'recurring', assigneeId: 'm-iris' })
   })

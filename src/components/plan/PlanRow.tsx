@@ -5,7 +5,7 @@
 // three pages read as one surface.
 
 import { useEffect, useRef, useState, type ReactNode } from 'react'
-import { Check, Target, ArrowRight, ArrowUpRight, ArrowDownRight, Sun, CalendarDays, Archive, Trash2, Repeat, ChevronRight, ChevronDown, Plus } from 'lucide-react'
+import { Check, Target, ArrowRight, ArrowUpRight, ArrowDownRight, Sun, CalendarDays, Archive, Trash2, Repeat, ChevronRight, ChevronDown, Plus, Unlink, ListPlus } from 'lucide-react'
 import type { PlacementFate } from '@/lib/planning/lineage'
 import { useMobile } from '@/hooks/useMobile'
 import type { RowAction } from '@/lib/planning/periodPage'
@@ -35,6 +35,10 @@ export interface PlanRowModel {
   /** The goals one rung DOWN that support this one. The same relationship,
    *  read from the other end, so a parent is never a dead end. */
   supportedBy?: SupportRef[]
+  /** A next action that is not on this page's own list — where it lives
+   *  ("Inbox", "Someday"); '' when its own timing control already says when.
+   *  It is still this goal's, so it is drawn under it, saying so. */
+  elsewhere?: string
   /** Who this row is assigned to: household member ids, in the order they
    *  were chosen. Undefined where the row cannot carry an assignment (a year
    *  goal, until its table has the column). */
@@ -79,6 +83,7 @@ const ACTION_LABEL: Record<Exclude<RowAction, 'complete'>, string> = {
   'make-task': 'Make it a single action',
   'to-lower': 'Take it into',
   'under-goal': 'Link to goal',
+  'off-goal': 'Remove from goal',
   today: 'Do it today',
 }
 
@@ -94,6 +99,7 @@ function ActionIcon({ action }: { action: Exclude<RowAction, 'complete'> }) {
   if (action === 'to-lower') return <ArrowDownRight className="w-3.5 h-3.5" />
   if (action === 'today') return <Sun className="w-3.5 h-3.5" />
   if (action === 'under-goal') return <Target className="w-3.5 h-3.5" />
+  if (action === 'off-goal') return <Unlink className="w-3.5 h-3.5" />
   return <Repeat className="w-3.5 h-3.5" />
 }
 
@@ -163,7 +169,7 @@ export function PlanRow({
   expanded = false, onToggleExpand, onAddStep, stepActionsFor, planWeek,
   timingReachesLower = false,
   stepsToDraw, counts, hiddenByReveal = 0, onShowAllSteps, hiddenByFilter = 0, goalControls,
-  assign, makeGoal, focusComposer = false, onComposerFocused, refine, stepWeeks,
+  assign, makeGoal, focusComposer = false, onComposerFocused, refine, stepWeeks, onAddExisting,
 }: {
   row: PlanRowModel
   actions: RowAction[]
@@ -183,6 +189,9 @@ export function PlanRow({
   /** Omitted on a past period — a look-back is read, not written into.
    *  `weekStart` is set when the reader chose a week in the same breath. */
   onAddStep?: (row: PlanRowModel, title: string, weekStart?: Date) => void
+  /** "Add an existing action": file a task already in Symphony under this
+   *  goal. Omitted where the goal takes no next actions, or in a look-back. */
+  onAddExisting?: (row: PlanRowModel) => void
   /** The weeks a new next action may be planned into as it is written (the
    *  month page). Omitted, the box writes the action onto the period alone. */
   stepWeeks?: ReadonlyArray<{ start: Date; label: string }>
@@ -428,6 +437,9 @@ export function PlanRow({
         {row.placed && (
           <PlacementChip placed={row.placed} onOpenPlaced={onOpenPlaced} />
         )}
+        {row.elsewhere !== undefined && (
+          <span className="mt-0.5 block text-[12px] text-neutral-500">Not on this list{row.elsewhere ? ` · ${row.elsewhere}` : ''}</span>
+        )}
         {mobile && (timing || who) && !(goalShut && !timing) && (
           <span className="mt-1.5 flex max-w-full items-center gap-2">{timing}{who}</span>
         )}
@@ -554,6 +566,20 @@ export function PlanRow({
               </select>
             )}
           </form>
+        )}
+        {/* Beside writing a new one: file an action that already exists —
+            same link, the task itself unchanged. */}
+        {onAddExisting && (
+          <div className="period-plan-step-add pb-1.5 pr-2">
+            <button
+              type="button"
+              onClick={() => onAddExisting(row)}
+              aria-label={`Add an existing action to ${row.title}`}
+              className="inline-flex min-h-[44px] items-center gap-1.5 text-xs font-medium text-primary-700 hover:underline sm:min-h-0"
+            >
+              <ListPlus className="h-3.5 w-3.5" aria-hidden="true" />Add an existing action
+            </button>
+          </div>
         )}
       </li>
     )}

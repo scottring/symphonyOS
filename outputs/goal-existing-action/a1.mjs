@@ -1,0 +1,25 @@
+// Month page as Alex: open the goal, Add an existing action, file the Inbox one, reload.
+import { open, shot, BASE } from './pw.mjs'
+const { browser, page } = await open({ who: 'alex' })
+await page.goto(BASE + '/month?start=2026-10-01'); await page.waitForTimeout(3500)
+const goalName = 'GEA Identify family activities for fall'
+const openBtn = page.locator('li', { hasText: goalName }).locator('.period-goal-open').first()
+await openBtn.click(); await page.waitForTimeout(600)
+await shot(page, 'a1-goal-open', false)
+await page.getByRole('button', { name: `Add an existing action to ${goalName}` }).click(); await page.waitForTimeout(500)
+await page.getByRole('searchbox', { name: 'Search your actions' }).fill('music'); await page.waitForTimeout(300)
+const dlg = page.getByRole('dialog', { name: 'Add an existing action' })
+console.log('RESULTS:', (await dlg.getByRole('list', { name: 'Actions' }).innerText()).replace(/\n+/g, ' | '))
+await shot(page, 'a1-dialog-music', false)
+// The Inbox one (Alex's, with a note and a person).
+await dlg.getByRole('button', { name: /GEA Look up music lessons — Inbox/ }).click(); await page.waitForTimeout(1200)
+console.log('STATUS:', await dlg.getByRole('status').innerText().catch(() => 'none'))
+await dlg.getByRole('button', { name: 'Done' }).click(); await page.waitForTimeout(800)
+await shot(page, 'a1-after-link', false)
+await page.reload(); await page.waitForTimeout(3500)
+await page.locator('li', { hasText: goalName }).locator('.period-goal-open').first().click().catch(() => {}); await page.waitForTimeout(600)
+const goalBlock = await page.locator('body').innerText()
+const i = goalBlock.indexOf(goalName)
+console.log('AFTER RELOAD:', goalBlock.slice(i, i + 400).replace(/\n+/g, ' | '))
+await shot(page, 'a1-after-reload', false)
+await browser.close()

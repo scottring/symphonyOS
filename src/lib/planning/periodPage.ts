@@ -165,6 +165,9 @@ export type RowAction =
   /** File a loose row under one of the period's goals. You write "call the
    *  roofer" and only then realise it is porch work. */
   | 'under-goal'
+  /** Take a next action out from under its goal. The task stays exactly
+   *  where it is — dated, committed, done or not — only the link goes. */
+  | 'off-goal'
 
 /**
  * The verbs a row offers.
@@ -184,21 +187,29 @@ export type RowAction =
  * copies of the same task from landing in twenty seconds.
  */
 export function actionsFor(
-  { fate, isGoal, isPast, level = 'month', hasGoals = false }:
-  { fate: PlacementFate; isGoal: boolean; isPast: boolean; level?: PlanLevel; hasGoals?: boolean },
+  { fate, isGoal, isPast, level = 'month', hasGoals = false, isStep = false, elsewhere = false }:
+  { fate: PlacementFate; isGoal: boolean; isPast: boolean; level?: PlanLevel; hasGoals?: boolean
+    /** A next action drawn under its goal: it can be taken out from under it. */
+    isStep?: boolean
+    /** A step that is not on this page's own list: only ticked or taken out
+     *  from here — its placement belongs to the list it is on. */
+    elsewhere?: boolean },
 ): RowAction[] {
-  if (fate === 'done' || fate === 'placed-done') return []
-  if (fate === 'placed-open') return isPast ? ['keep', 'drop'] : ['complete', ...(!isGoal && hasGoals ? ['under-goal' as const] : [])]
+  // A look-back is read, not rewired; otherwise any step may leave its goal.
+  const offGoal: RowAction[] = isStep && !isGoal && !isPast ? ['off-goal'] : []
+  if (elsewhere) return fate === 'done' || fate === 'placed-done' ? offGoal : [...(isPast ? [] : ['complete' as const]), ...offGoal]
+  if (fate === 'done' || fate === 'placed-done') return offGoal
+  if (fate === 'placed-open') return isPast ? ['keep', 'drop'] : ['complete', ...(!isGoal && hasGoals && !isStep ? ['under-goal' as const] : []), ...offGoal]
   const kind: RowAction[] = [] // Goals guide actions; planning never converts their identity.
   // A year row is a goal entity and has no rung below it on this page.
   const canDescend = !isGoal && level !== 'year'
   // Only a loose row, and only where there is a goal to file it under. A goal
   // never goes under a goal: one level, on purpose.
-  const underGoal: RowAction[] = !isGoal && hasGoals ? ['under-goal'] : []
+  const underGoal: RowAction[] = !isGoal && hasGoals && !isStep ? ['under-goal'] : []
   if (!isPast) {
     return canDescend
-      ? ['complete', 'to-lower', 'today', ...underGoal, ...kind, 'drop']
-      : ['complete', ...underGoal, ...kind, 'drop']
+      ? ['complete', 'to-lower', 'today', ...underGoal, ...offGoal, ...kind, 'drop']
+      : ['complete', ...underGoal, ...offGoal, ...kind, 'drop']
   }
   return isGoal ? ['complete', 'keep', ...kind, 'drop'] : ['complete', 'keep', 'someday', ...kind, 'drop']
 }

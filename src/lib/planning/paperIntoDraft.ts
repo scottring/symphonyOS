@@ -147,6 +147,15 @@ const asExisting = (n: NewItem): ExistingTask => ({ id: n.id, title: n.title })
  * once, and re-importing the same page adds nothing), then the level above,
  * the previous period, and the current list. A match is reported, not added.
  */
+/** Does this goal line belong on a draft at this level? A year draft holds
+ *  year goals, a month or season draft its own list's goals, a week none. */
+export function goalJoinsDraft(item: Pick<PageReviewPayload['items'][number], 'placement'>, level: SessionLevel): boolean {
+  if (level === 'year') return item.placement.kind === 'goal'
+  if (level === 'month') return item.placement.kind === 'month'
+  if (level === 'season') return item.placement.kind === 'season'
+  return false
+}
+
 export function mergePaperIntoDraft(draft: SessionDraft, payload: PageReviewPayload, ctx: MergeContext): MergeResult {
   const newGoals = [...draft.newGoals]
   const newTasks = [...draft.newTasks]
@@ -160,8 +169,11 @@ export function mergePaperIntoDraft(draft: SessionDraft, payload: PageReviewPayl
     // a thing the plan lists. An appointment or activity chosen on the sheet
     // keeps its type only on the direct-commit path — the draft's rows are
     // plain list tasks and would save it as one. All stay on that path.
-    const typed = item.category === 'event' || item.category === 'activity'
-    if (item.kind !== 'task' || typed || !title) {
+    const isGoal = item.placement.kind === 'goal' || item.goal === true
+    const typed = !isGoal && (item.category === 'event' || item.category === 'activity')
+    // A goal joins only a draft of its own period; a goal for another list (a
+    // week page's goal is the month's) is saved directly, where it belongs.
+    if (item.kind !== 'task' || typed || !title || (isGoal && !goalJoinsDraft(item, draft.level))) {
       restItems.push(item)
       continue
     }
@@ -178,7 +190,6 @@ export function mergePaperIntoDraft(draft: SessionDraft, payload: PageReviewPayl
     }
     if (hit) { matched.push(hit); continue }
 
-    const isGoal = item.placement.kind === 'goal' || item.goal === true
     // The person chosen on the sheet rides the draft row, Unassigned included.
     const entry: NewItem = { id: crypto.randomUUID(), title, context: null, assignedTo: item.assigneeId }
     if (!isGoal && draft.level === 'week' && item.placement.kind === 'date') entry.day = item.placement.date

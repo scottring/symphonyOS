@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useDialogFocus } from '@/hooks/useDialogFocus'
-import { X, NotebookPen, HelpCircle, Target, ChevronLeft, ChevronRight, CalendarCheck2, AlertCircle } from 'lucide-react'
+import { X, NotebookPen, HelpCircle, Link2, ChevronLeft, ChevronRight, CalendarCheck2, AlertCircle } from 'lucide-react'
 import { parseLocalYmd } from '@/lib/cadence/config'
 import { pageMonthStart, pageSeasonStart, planWindowDates, rewindowPlanItems, type PlanItem, type PlanPlacement, type PageAltitude, type PageReviewPayload } from '@/lib/planParse'
 import { normalizeSeasons, readSeasons, seasonLabel, nextSeasonStart, seasonStartFor, type Seasons } from '@/lib/cadence/seasons'
@@ -9,7 +9,8 @@ import { DOMAINS, type DomainId } from '@/lib/domains'
 import type { TitlePeriod } from '@/lib/planTitle'
 import type { PageNote } from '@/lib/pageParse'
 import type { FamilyMember } from '@/types/family'
-import { hasItemType, inferredCategory, itemTypeOf, itemTypeProblem, normalizeForSave, withItemType, type PaperItemType } from '@/lib/paperItemType'
+import { hasItemType, inferredCategory, isGoalRow, itemTypeOf, itemTypeProblem, normalizeForSave, withItemType, type PaperItemType, type TypeDrafts } from '@/lib/paperItemType'
+import { goalJoinsDraft } from '@/lib/planning/paperIntoDraft'
 import { ItemTypeSelect, RoutineDaysPicker } from './ItemTypeControls'
 import { assigneeOptions, initialAssignee, UNASSIGNED } from '@/lib/paperAssignee'
 
@@ -35,7 +36,7 @@ export interface PageReviewSheetProps {
   titlePeriod?: TitlePeriod
   /** The heading as written, so the sheet can say why it opened where it did. */
   pageTitle?: string | null
-  /** Open tasks a line might already be — the Link / Keep separate offer. */
+  /** Open tasks a line might already be — the Use existing item / Add as new offer. */
   existingTasks?: ExistingTask[]
   /** 'YYYY-MM-DD' → the day's event titles, for day-facts already on the calendar. */
   calendarTitlesByDay?: Map<string, string[]>
@@ -62,10 +63,11 @@ interface ItemRow extends PlanItem {
   included: boolean
   /** The open task this line probably repeats, if any. */
   dup?: ExistingTask | null
-  /** "Keep separate" was pressed — the offer is done with. */
+  /** "Add as new" was pressed — the offer is done with. */
   dupDismissed?: boolean
-  /** Said once a type change undid something (a goal that stopped being one). */
-  typeNotice?: string | null
+  /** Where-and-when kept for each type this row has been, so switching back
+   *  restores it. Never saved. */
+  typeDrafts?: TypeDrafts
   /** The page named no one and nobody has picked yet — the assignee is the
    *  signed-in default, filled in if that identity arrives after opening. */
   assigneeDefaulted?: boolean
@@ -99,12 +101,13 @@ const ALTITUDE_BLURB: Record<PageAltitude, string> = {
   week: 'Check what Symphony read before it changes the week.',
   month: "Read as a month page — undated lines go on the month's list.",
   season: "Read as a season page — undated lines go on the season's list.",
-  year: 'Read as a year page — lines become goals for the year.',
+  year: 'Read as a year page — outcomes and projects are goals for the year; set anything else to what it is.',
 }
 
-/** A goal toggle belongs on a row that sits on a month or season list. */
-function canBeGoal(altitude: PageAltitude, p: PlanPlacement): boolean {
-  return (altitude === 'month' || altitude === 'season') && (p.kind === 'month' || p.kind === 'season')
+/** Where a row goes when its day is cleared: the page's own list (a year
+ *  page has none, so Someday). */
+function undatedPlacement(altitude: PageAltitude): PlanPlacement {
+  return altitude === 'year' ? { kind: 'someday' } : { kind: altitude }
 }
 
 function dateLabel(ymd: string): string {
@@ -180,7 +183,7 @@ export function PageReviewSheet({
       // one on screen is the one saved.
       .map((i) => ({
         ...i,
-        ...(i.kind === 'task' && hasItemType(i) && !i.category ? { category: inferredCategory(i) } : {}),
+        ...(i.kind === 'task' && !isGoalRow(i) && !i.category ? { category: inferredCategory(i) } : {}),
         assigneeId: initialAssignee(i, memberIds, meId),
         assigneeDefaulted: !(i.assigneeId && memberIds.has(i.assigneeId)),
         included: true,
@@ -219,10 +222,9 @@ export function PageReviewSheet({
   // dated row the moment Winter is chosen (and back again).
   const rewindowTo = (periodStart: Date) => {
     const win = planWindowDates(today, altitude, seasonsOrdered, periodStart)
-    // rewindowPlanItems returns each row spread, so `included` / `dup` ride along.
-    // A row that lands on a date is no longer a goal — goals are never scheduled.
-    setItemRows((rows) => (rewindowPlanItems(rows, win, altitude) as ItemRow[])
-      .map((r) => (r.goal && !canBeGoal(altitude, r.placement) ? { ...r, goal: false } : r)))
+    // rewindowPlanItems returns each row spread, so `included` / `dup` ride
+    // along. A goal is never scheduled, so it keeps its list whatever the chip.
+    setItemRows((rows) => rows.map((r) => (isGoalRow(r) ? r : rewindowPlanItems([r], win, altitude)[0] as ItemRow)))
   }
   const shiftMonth = (by: number) => {
     const next = new Date(monthStart.getFullYear(), monthStart.getMonth() + by, 1)
@@ -245,47 +247,57 @@ export function PageReviewSheet({
     () => itemRows.filter((r) => r.included).length + noteRows.filter((r) => r.included).length,
     [itemRows, noteRows],
   )
+  // What each checked row will be saved as — its selected type, exactly. A
+  // linked row saves nothing of its own and is counted apart.
   const typeCounts = useMemo(() => {
-    const counts: Record<PaperItemType, number> = { task: 0, appointment: 0, activity: 0, routine: 0 }
+    const counts: Record<PaperItemType, number> = { goal: 0, task: 0, appointment: 0, activity: 0, routine: 0 }
     for (const r of itemRows) {
-      if (r.included && hasItemType(r) && !r.goal) counts[itemTypeOf(r)] += 1
+      if (r.included && hasItemType(r) && !r.sourceId) counts[itemTypeOf(r)] += 1
     }
     return counts
   }, [itemRows])
+  const linkedCount = useMemo(() => itemRows.filter((r) => r.included && r.sourceId).length, [itemRows])
   const summary = useMemo(() => {
-    const includedGoals = itemRows.filter((r) => r.included && (r.placement.kind === 'goal' || r.goal)).length
     const includedDays = itemRows.filter((r) => r.included && r.kind === 'dayfact').length
     const includedNotes = noteRows.filter((r) => r.included).length
     const n = (count: number, one: string, many = `${one}s`) => (count > 0 ? `${count} ${count === 1 ? one : many}` : null)
     const typed = [
-      n(typeCounts.task, 'task'),
+      n(typeCounts.goal, 'goal or project', 'goals or projects'),
+      n(typeCounts.task, 'action'),
       n(typeCounts.appointment, 'appointment'),
       n(typeCounts.activity, 'activity', 'activities'),
       n(typeCounts.routine, 'routine'),
     ]
     return [
-      ...(typed.some(Boolean) || includedGoals > 0 ? typed : ['0 tasks']),
-      n(includedGoals, 'goal'),
+      ...(typed.some(Boolean) ? typed : ['nothing new']),
+      linkedCount > 0 ? `${linkedCount} already on your plan` : null,
       n(includedDays, 'day note'),
       n(includedNotes, 'note'),
       unread.length > 0 ? `${unread.length} unclear` : null,
     ].filter(Boolean).join(' / ')
-  }, [itemRows, noteRows, unread.length, typeCounts])
-  // Rows that cannot save as the type chosen — a routine with no days.
-  const problems = useMemo(
-    () => itemRows.filter((r) => r.included && itemTypeProblem(r)).length,
+  }, [itemRows, noteRows, unread.length, typeCounts, linkedCount])
+  // Rows that cannot save as the type chosen: a routine with no days, an
+  // appointment with no day. A linked row saves nothing, so it has none.
+  const problemRows = useMemo(
+    () => itemRows.filter((r) => r.included && !r.sourceId && itemTypeProblem(r)),
     [itemRows],
   )
+  const problems = problemRows.length
+  const problemText = useMemo(() => {
+    const routines = problemRows.filter((r) => itemTypeOf(r) === 'routine').length
+    const appts = problemRows.length - routines
+    return [
+      routines ? (routines === 1 ? '1 routine needs its days' : `${routines} routines need their days`) : null,
+      appts ? (appts === 1 ? '1 appointment needs its day' : `${appts} appointments need their days`) : null,
+    ].filter(Boolean).join(' and ')
+  }, [problemRows])
   const isEmpty = itemRows.length === 0 && noteRows.length === 0 && unread.length === 0 && alreadyOnCalendar.length === 0
 
   const updateItem = (index: number, patch: Partial<ItemRow>) =>
     setItemRows((prev) => prev.map((r, i) => (i === index ? { ...r, ...patch } : r)))
+  // A linked row IS the existing item: it has no type of its own to change.
   const changeType = (index: number, type: PaperItemType) =>
-    setItemRows((prev) => prev.map((r, i) => {
-      if (i !== index) return r
-      const { item, notice } = withItemType(r, type)
-      return { ...(item as ItemRow), typeNotice: notice }
-    }))
+    setItemRows((prev) => prev.map((r, i) => (i !== index || r.sourceId ? r : withItemType(r, type, altitude))))
   const updateNote = (index: number, patch: Partial<NoteRow>) =>
     setNoteRows((prev) => prev.map((r, i) => (i === index ? { ...r, ...patch } : r)))
 
@@ -305,7 +317,7 @@ export function PageReviewSheet({
       domain,
       items: itemRows
         .filter((r) => r.included && r.title.trim())
-        .map(({ included: _included, dup: _dup, dupDismissed: _dupDismissed, typeNotice: _typeNotice, assigneeDefaulted: _assigneeDefaulted, ...item }) => normalizeForSave({ ...item, title: item.title.trim() })),
+        .map(({ included: _included, dup: _dup, dupDismissed: _dupDismissed, assigneeDefaulted: _assigneeDefaulted, ...item }) => normalizeForSave({ ...item, title: item.title.trim() })),
       notes: noteRows
         .filter((r) => r.included && r.content.trim())
         .map(({ included: _included, ...note }) => ({ title: note.title.trim(), content: note.content.trim() })),
@@ -321,8 +333,12 @@ export function PageReviewSheet({
   // The page joins the plan being written instead of landing on the list
   // directly — the same rows, one destination up the flow.
   const addToDraft = () => { if (!blocked) onAddToDraft?.(buildPayload()) }
-  // What the draft cannot hold keeps its type by being saved directly.
-  const savedDirectly = typeCounts.appointment + typeCounts.activity + typeCounts.routine
+  // What the draft cannot hold keeps its type by being saved directly: every
+  // appointment, activity and routine, and a goal for another period's list.
+  const goalsElsewhere = itemRows.filter((r) => r.included && !r.sourceId && isGoalRow(r) && !goalJoinsDraft(r, altitude)).length
+  const savedDirectly = typeCounts.appointment + typeCounts.activity + typeCounts.routine + goalsElsewhere
+  const monthName = monthStart.toLocaleDateString('en-US', { month: 'long', ...(monthStart.getFullYear() !== today.getFullYear() ? { year: 'numeric' } : {}) })
+  const seasonName = seasonLabel(seasonStart, seasonsOrdered)
 
   // The period chip: ‹ September › / ‹ Fall 2026 › — which list this page fills.
   const periodChip = (altitude === 'month' || altitude === 'season') && (
@@ -424,13 +440,14 @@ export function PageReviewSheet({
                       />
                       <div className="min-w-0 flex-1">
                         <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
-                          {/* What KIND of line this is stays on the left, always —
-                              a goal is a state of the row, not its kind. */}
-                          {row.placement.kind === 'goal'
-                            ? <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-800"><Target className="w-3 h-3" />Goal</span>
-                            : row.kind === 'dayfact'
-                              ? <span className="inline-flex shrink-0 items-center rounded-md border border-neutral-200 bg-neutral-50 px-1.5 py-0.5 text-[10px] font-semibold leading-none text-neutral-500">Day</span>
-                              : <ItemTypeSelect value={itemTypeOf(row)} title={row.title} disabled={!!row.sourceId} onChange={(t) => changeType(i, t)} />}
+                          {/* What this line IS, once, on the left: the one
+                              control that decides what it is saved as. A linked
+                              line is the existing item — it has no type here. */}
+                          {row.kind === 'dayfact'
+                            ? <span className="inline-flex shrink-0 items-center rounded-md border border-neutral-200 bg-neutral-50 px-1.5 py-0.5 text-[10px] font-semibold leading-none text-neutral-500">Day</span>
+                            : row.sourceId
+                              ? <span className="inline-flex shrink-0 items-center gap-1 rounded-md border border-neutral-200 bg-neutral-50 px-1.5 py-1 text-[11px] font-semibold leading-none text-neutral-600"><Link2 className="w-3 h-3" aria-hidden="true" />Existing item</span>
+                              : <ItemTypeSelect value={itemTypeOf(row)} title={row.title} onChange={(t) => changeType(i, t)} />}
                           <input
                             value={row.title}
                             readOnly={!!row.sourceId}
@@ -440,9 +457,8 @@ export function PageReviewSheet({
                           />
                         </div>
                         {row.note && <p className="mt-1 text-[13px] text-neutral-500 line-clamp-2">{row.note}</p>}
-                        {row.typeNotice && <p className="mt-1 text-[12px] text-amber-800">{row.typeNotice}</p>}
                         {/* A routine's pattern is its when: the days it repeats. */}
-                        {row.kind === 'recurring' && (
+                        {row.kind === 'recurring' && !row.sourceId && (
                           <RoutineDaysPicker
                             title={row.title}
                             days={row.recurring?.days ?? []}
@@ -450,99 +466,119 @@ export function PageReviewSheet({
                             onChange={(days) => updateItem(i, { recurring: { days, until: row.recurring?.until ?? null } })}
                           />
                         )}
-                        {/* The same errand, written twice: one tap says which. */}
+                        {/* The same errand, written twice: one tap says which.
+                            Reuse only skips the insert — it never files the
+                            existing item under a goal (that is "Add an existing
+                            action" on the goal itself). */}
                         {row.dup && !row.dupDismissed && (
                           row.sourceId
                             ? (
                               <p role="status" className="mt-1 flex flex-wrap items-center gap-1.5 text-[12px] text-neutral-600">
-                                <span>Uses <i className="text-neutral-800">{row.dup.title}</i>, already on your plan, exactly as it is — nothing on this line is saved.</span>
+                                <span>Using <i className="text-neutral-800">{row.dup.title}</i>, already on your plan, exactly as it is — nothing new is saved for this line, and it is not put under a goal.</span>
                                 <button
                                   type="button"
                                   onClick={() => updateItem(i, { sourceId: undefined })}
                                   className="rounded-md border border-neutral-200 bg-white px-1.5 py-0.5 font-medium text-neutral-700 hover:bg-neutral-50"
                                 >
-                                  Unlink
+                                  Don&rsquo;t use it
                                 </button>
                               </p>
                             )
                             : (
-                              <p className="mt-1 flex flex-wrap items-center gap-1.5 text-[12px] text-neutral-500">
-                                Looks like <i className="text-neutral-700">{row.dup.title}</i>
-                                <button
-                                  type="button"
-                                  onClick={() => updateItem(i, { sourceId: row.dup?.id })}
-                                  className="rounded-md border border-neutral-200 bg-white px-1.5 py-0.5 font-medium text-neutral-700 hover:bg-neutral-50"
-                                >
-                                  Link
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => updateItem(i, { dupDismissed: true })}
-                                  className="rounded-md px-1 py-0.5 text-neutral-500 hover:text-neutral-700"
-                                >
-                                  Keep separate
-                                </button>
-                              </p>
+                              <div className="mt-1 text-[12px] text-neutral-500">
+                                <p className="flex flex-wrap items-center gap-1.5">
+                                  Looks like <i className="text-neutral-700">{row.dup.title}</i>, already on your plan.
+                                  <button
+                                    type="button"
+                                    onClick={() => updateItem(i, { sourceId: row.dup?.id })}
+                                    aria-describedby={`dup-why-${i}`}
+                                    className="rounded-md border border-neutral-200 bg-white px-1.5 py-0.5 font-medium text-neutral-700 hover:bg-neutral-50"
+                                  >
+                                    Use existing item
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => updateItem(i, { dupDismissed: true })}
+                                    className="rounded-md px-1 py-0.5 text-neutral-500 hover:text-neutral-700"
+                                  >
+                                    Add as new
+                                  </button>
+                                </p>
+                                <p id={`dup-why-${i}`} className="mt-0.5 text-[11px] text-neutral-400">Avoids a duplicate. It doesn&rsquo;t put the item under a goal.</p>
+                              </div>
                             )
                         )}
                       </div>
                     </div>
                     <div className="ml-7 flex flex-wrap items-center gap-2 sm:ml-0 sm:shrink-0 sm:flex-nowrap">
-                      {row.kind !== 'recurring' && <select
-                        disabled={!!row.sourceId}
-                        value={placementValue(row.placement)}
-                        onChange={(e) => {
-                          const placement = placementFromValue(e.target.value)
-                          // A time only lives on a real date. Moving a row to
-                          // This week / Inbox must drop it, or a stale "14:00"
-                          // rides along on a row that no longer shows one.
-                          // A goal only lives on a month/season list — goals
-                          // are never scheduled, so a move off the list
-                          // makes it a task again.
-                          updateItem(i, {
-                            placement,
-                            ...(placement.kind === 'date' ? {} : { time: null }),
-                            ...(canBeGoal(altitude, placement) ? {} : { goal: false }),
-                          })
-                        }}
-                        aria-label="When"
-                        className="text-[13px] text-neutral-700 bg-neutral-100 rounded-lg px-2 py-1.5 shrink-0"
-                      >
-                        {HORIZON_OPTIONS.map((o) => (
-                          <option key={o.value} value={o.value}>{o.label}</option>
-                        ))}
-                        {/* A goal is only offered where it can be written: a year page. */}
-                        {(altitude === 'year' || row.placement.kind === 'goal') && <option value="goal">Year goal</option>}
-                        {windowNow.map((d) => (
-                          <option key={d} value={d}>{dateLabel(d)}</option>
-                        ))}
-                      </select>}
-                      {/* A goal on the month's or season's list — ticked, never
-                          placed. A control with a word on it, not a badge. */}
-                      {/* Only a Task can be a goal: an appointment, activity or
-                          routine is a commitment, not what the period is for. */}
-                      {canBeGoal(altitude, row.placement) && row.kind === 'task' && itemTypeOf(row) === 'task' && (
-                        <button
-                          type="button"
-                          aria-pressed={!!row.goal}
-                          disabled={!!row.sourceId}
-                          aria-label={`Make "${row.title}" a goal`}
-                          title={row.goal ? 'A goal on this list — tap to make it a task' : 'Make it a goal'}
-                          onClick={() => updateItem(i, { goal: !row.goal })}
-                          className={`inline-flex shrink-0 items-center gap-1 rounded-lg border px-2 py-1.5 text-[13px] font-medium transition-colors ${
-                            row.goal ? 'border-amber-200 bg-amber-50 text-amber-800' : 'border-neutral-200 bg-white text-neutral-500 hover:text-neutral-800'
-                          }`}
-                        >
-                          <Target className="w-3.5 h-3.5" />{row.goal ? 'Goal or project' : 'Make it a goal'}
-                        </button>
-                      )}
-                      {(row.placement.kind === 'date' || row.kind === 'recurring') && (
+                      {!row.sourceId && (() => {
+                        const type = itemTypeOf(row)
+                        if (row.kind === 'dayfact') return null
+                        // A goal sits on a list, never on a day.
+                        if (type === 'goal') return (
+                          <select
+                            value={placementValue(row.placement)}
+                            onChange={(e) => updateItem(i, { placement: placementFromValue(e.target.value), goal: e.target.value !== 'goal' })}
+                            aria-label={`Goal for "${row.title}"`}
+                            className="text-[13px] text-neutral-700 bg-neutral-100 rounded-lg px-2 py-1.5 shrink-0"
+                          >
+                            {(altitude === 'year' || row.placement.kind === 'goal') && <option value="goal">Goal for {today.getFullYear()}</option>}
+                            <option value="season">Goal for {seasonName}</option>
+                            <option value="month">Goal for {monthName}</option>
+                          </select>
+                        )
+                        // A routine's when is its days (above).
+                        if (type === 'routine') return null
+                        // An appointment is on a day — any day, not only the page's.
+                        if (type === 'appointment') return (
+                          <input
+                            type="date"
+                            required
+                            value={row.placement.kind === 'date' ? row.placement.date : ''}
+                            onChange={(e) => updateItem(i, e.target.value
+                              ? { placement: { kind: 'date', date: e.target.value } }
+                              : { placement: undatedPlacement(altitude), time: null })}
+                            aria-label={`Day of "${row.title}"`}
+                            aria-invalid={row.included && row.placement.kind !== 'date'}
+                            className={`text-[13px] text-neutral-700 bg-neutral-100 rounded-lg px-2 py-1.5 shrink-0 ${row.included && row.placement.kind !== 'date' ? 'ring-1 ring-danger-500' : ''}`}
+                          />
+                        )
+                        return (
+                          <select
+                            value={placementValue(row.placement)}
+                            onChange={(e) => {
+                              const placement = placementFromValue(e.target.value)
+                              // A time only lives on a real date. Moving a row to
+                              // This week / Inbox must drop it, or a stale "14:00"
+                              // rides along on a row that no longer shows one.
+                              updateItem(i, { placement, ...(placement.kind === 'date' ? {} : { time: null }) })
+                            }}
+                            aria-label="When"
+                            className="text-[13px] text-neutral-700 bg-neutral-100 rounded-lg px-2 py-1.5 shrink-0"
+                          >
+                            {HORIZON_OPTIONS.map((o) => (
+                              <option key={o.value} value={o.value}>{o.label}</option>
+                            ))}
+                            {/* A date chosen elsewhere (an appointment's) stays selectable. */}
+                            {row.placement.kind === 'date' && !windowNow.includes(row.placement.date) && (
+                              <option value={row.placement.date}>{dateLabel(row.placement.date)}</option>
+                            )}
+                            {windowNow.map((d) => (
+                              <option key={d} value={d}>{dateLabel(d)}</option>
+                            ))}
+                          </select>
+                        )
+                      })()}
+                      {/* A time belongs to an action, appointment or activity on
+                          a day, or a routine — never a goal, a linked line, or a
+                          day-fact (saved as a note, where a time goes nowhere). */}
+                      {!row.sourceId && row.kind !== 'dayfact' && (row.placement.kind === 'date' || row.kind === 'recurring') && !isGoalRow(row) && (
                         <input
                           type="time"
                           value={row.time ?? ''}
                           onChange={(e) => updateItem(i, { time: e.target.value || null })}
                           aria-label={`Time for "${row.title}"`}
-                          className="text-[13px] text-neutral-700 bg-neutral-100 rounded-lg px-2 py-1.5 shrink-0 w-[104px]"
+                          className="text-[13px] text-neutral-700 bg-neutral-100 rounded-lg px-2 py-1.5 shrink-0 w-auto min-w-[104px] max-w-full"
                         />
                       )}
                       {/* Every row but a day-fact (a note) says who — Year goals
@@ -569,7 +605,9 @@ export function PageReviewSheet({
                 {!meId && <p>Symphony couldn&rsquo;t confirm which household member you are, so lines without a name start Unassigned.</p>}
                 {typeCounts.appointment > 0 && <p>Appointments are saved in Symphony only. Nothing is added to Google Calendar.</p>}
                 {draftLabel && onAddToDraft && savedDirectly > 0 && (
-                  <p>Appointments, activities and routines are saved directly. Tasks and goals join the plan you&rsquo;re writing.</p>
+                  <p>{altitude === 'week'
+                    ? 'Appointments, activities, routines and goals are saved directly. Actions join the plan you’re writing.'
+                    : 'Appointments, activities, routines and goals for another period are saved directly. Actions and this period’s goals join the plan you’re writing.'}</p>
                 )}
               </div>
             )}
@@ -656,7 +694,7 @@ export function PageReviewSheet({
         {!isEmpty && problems > 0 && (
           <p role="alert" className="flex items-center gap-1.5 px-5 pt-3 text-[12px] font-medium text-danger-600">
             <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-            {problems === 1 ? '1 routine needs its days' : `${problems} routines need their days`} before this page can be added.
+            {problemText} before this page can be added.
           </p>
         )}
         <div className="flex flex-wrap items-center justify-end gap-2 px-5 py-4 border-t border-neutral-200/60 min-w-0">
