@@ -377,10 +377,12 @@ export function PlanRow({
         {(!canHoldSteps || expanded) && goalControls}
         {/* A goal that takes next actions carries its refine link on the same
             line as "+ Add a next action" (below); a year goal has only this. */}
-        {!canHoldSteps && refine}
         {!!row.supportedBy?.length && (
           <SupportLine label="Supported by" refs={row.supportedBy} onOpen={onOpenSupport} />
         )}
+        {/* A goal that takes next actions carries its refine link on its
+            open line (below); a year goal has only this, after what it has. */}
+        {!canHoldSteps && refine}
         {/* A row that already serves a goal says so above; offering to link
             it read as though it served nothing (S3-08). */}
         {!row.isGoal && !row.supports && actions.includes('under-goal') && <button type="button" onClick={() => onAction('under-goal', row)} className="mt-1 block text-xs text-primary-700 hover:underline" aria-label={`Link ${row.title} to a goal`}>Link to goal</button>}

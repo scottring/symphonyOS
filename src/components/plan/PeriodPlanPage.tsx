@@ -1702,7 +1702,7 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
                       {parentChoices.map((c) => <option key={c.id} value={c.id}>{c.title}</option>)}
                     </select>
                   )}
-                  <button type="submit" disabled={!goalDraft.trim()} className="shrink-0 rounded-md bg-primary-600 px-2.5 py-1 text-xs font-semibold text-white disabled:opacity-40">
+                  <button type="submit" disabled={!goalDraft.trim()} aria-label={`Add this goal or project to ${shortLabel}`} className="shrink-0 rounded-md bg-primary-600 px-2.5 py-1 text-xs font-semibold text-white disabled:opacity-40">
                     Add
                   </button>
                 </form>
@@ -1742,11 +1742,15 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
                   </span>
                 </div>
               ) : null}
-              <p className="period-section-note">{level === 'month'
+              {looseRows.length > 0 && <p className="period-section-note">{level === 'month'
                 ? 'One-off work that needs no goal. Plan each into a week — or break a bigger one into next actions.'
-                : 'One-off work that needs no goal. Plan each into a month — or break a bigger one into next actions.'}</p>
+                : 'One-off work that needs no goal. Plan each into a month — or break a bigger one into next actions.'}</p>}
               <div className="mt-3">
-                {openTaskRows.length === 0 ? (
+                {openTaskRows.length === 0 && doneTaskRows.length === 0 && assignedTaskRows.length === 0 && supportingTaskCount === 0 && !isPast ? (
+                  // Nothing here at all: say nothing. The page's invitation is
+                  // the goal box above; a single action is one press below.
+                  null
+                ) : openTaskRows.length === 0 ? (
                   <p className="px-2 py-2 text-sm text-neutral-400">
                     {supportingTaskCount > 0 ? `${supportingTaskCount} supporting ${supportingTaskCount === 1 ? 'task is' : 'tasks are'} listed under the goals above.` : doneTaskRows.length > 0
                       ? `Everything on this ${noun}'s list is done.`

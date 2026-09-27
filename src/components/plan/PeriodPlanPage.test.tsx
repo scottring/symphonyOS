@@ -1161,13 +1161,17 @@ describe('PeriodPlanPage — Plan <Month>', () => {
     expect(screen.getByRole('button', { name: /review the plan/i })).toBeInTheDocument()
   })
 
-  it('an empty, unplanned month invites the session from its empty list, and opens it', () => {
+  // Product contract, 2026-09-27: an empty month invites an OUTCOME (the goal
+  // box); the empty single-action list stays quiet. The page's own Plan
+  // button is the one way into the session.
+  it('an empty, unplanned month: a quiet list, the goal box leads, and Plan opens the session', () => {
     renderPage('month')
     const label = thisMonth.toLocaleDateString('en-US', { month: 'long' })
     const list = screen.getByRole('region', { name: /list$/ })
-    const button = within(list).getByRole('button', { name: /^Plan .* →$/ })
-    expect(button).toHaveAccessibleName(`Plan ${label} →`)
-    fireEvent.click(button)
+    expect(within(list).queryByRole('button', { name: /^Plan .* →$/ })).toBeNull()
+    expect(within(list).getByRole('button', { name: '+ Add a single action' })).toBeInTheDocument()
+    expect(screen.getByText(new RegExp(`No goals or projects for ${label} yet`))).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: `Plan ${label}` }))
     expect(screen.getByLabelText('Planning steps')).toBeInTheDocument()
   })
 
@@ -1176,7 +1180,7 @@ describe('PeriodPlanPage — Plan <Month>', () => {
     renderPage('month')
     const list = screen.getByRole('region', { name: /list$/ })
     expect(within(list).queryByRole('button', { name: /^Plan .* →$/ })).toBeNull()
-    expect(within(list).getByText(`No single actions for this month.`)).toBeInTheDocument()
+    expect(within(list).queryByText(/No single actions/)).toBeNull()
   })
 
   it('a past month\'s empty list never offers a session button', () => {

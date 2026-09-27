@@ -78,7 +78,7 @@ export function RefineGoalControl({ goalTitle, rungNoun, periods, onAdd, linkabl
         className="rounded-md border border-neutral-200 bg-white px-1.5 py-1 text-xs text-neutral-700">
         {periods.map((p) => <option key={p.start.getTime()} value={String(p.start.getTime())}>{p.label}</option>)}
       </select>
-      <button type="submit" disabled={saving || !title.trim()} className="text-xs font-semibold text-primary-700 disabled:opacity-50">
+      <button type="submit" disabled={saving || !title.trim()} aria-label={`Add this ${rungNoun} goal`} className="text-xs font-semibold text-primary-700 disabled:opacity-50">
         {saving ? 'Adding…' : 'Add'}
       </button>
       <button type="button" onClick={() => setOpen(false)} className="text-xs text-neutral-500">Cancel</button>
