@@ -562,13 +562,16 @@ export function PageReviewSheet({
                           </select>
                         )
                       })()}
-                      {!row.sourceId && (row.placement.kind === 'date' || row.kind === 'recurring') && !isGoalRow(row) && (
+                      {/* A time belongs to an action, appointment or activity on
+                          a day, or a routine — never a goal, a linked line, or a
+                          day-fact (saved as a note, where a time goes nowhere). */}
+                      {!row.sourceId && row.kind !== 'dayfact' && (row.placement.kind === 'date' || row.kind === 'recurring') && !isGoalRow(row) && (
                         <input
                           type="time"
                           value={row.time ?? ''}
                           onChange={(e) => updateItem(i, { time: e.target.value || null })}
                           aria-label={`Time for "${row.title}"`}
-                          className="text-[13px] text-neutral-700 bg-neutral-100 rounded-lg px-2 py-1.5 shrink-0 w-[104px]"
+                          className="text-[13px] text-neutral-700 bg-neutral-100 rounded-lg px-2 py-1.5 shrink-0 w-auto min-w-[104px] max-w-full"
                         />
                       )}
                       {/* Every row but a day-fact (a note) says who — Year goals

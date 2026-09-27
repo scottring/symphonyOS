@@ -218,3 +218,25 @@ describe('PageReviewSheet — item types', () => {
     expect(screen.getByText(/saved directly/i)).toBeInTheDocument()
   })
 })
+
+describe('PageReviewSheet — times', () => {
+  it('a day-fact (saved as a note) has no time input; a dated action and a routine do', () => {
+    renderSheet([
+      line('No school', { kind: 'dayfact', placement: { kind: 'date', date: '2026-10-06' } }),
+      line('Dentist', { placement: { kind: 'date', date: '2026-10-06' }, time: '14:00' }),
+      line('Water plants', { kind: 'recurring', recurring: { days: ['tue'], until: null }, time: '08:00' }),
+      line('Finish the patio', { placement: { kind: 'month' }, goal: true }),
+    ], { altitude: 'month', today: new Date(2026, 9, 2) })
+    expect(screen.queryByLabelText('Time for "No school"')).toBeNull()
+    expect(screen.queryByLabelText('Time for "Finish the patio"')).toBeNull()
+    expect(screen.getByLabelText('Time for "Dentist"')).toHaveValue('14:00')
+    expect(screen.getByLabelText('Time for "Water plants"')).toHaveValue('08:00')
+  })
+
+  it('the time input sizes to its content, so AM/PM is never clipped on a phone', () => {
+    renderSheet([line('Dentist', { placement: { kind: 'date', date: '2026-10-06' }, time: '14:00' })])
+    const time = screen.getByLabelText('Time for "Dentist"')
+    expect(time).toHaveClass('w-auto')
+    expect(time.className).not.toMatch(/(^|\s)w-\[/)
+  })
+})

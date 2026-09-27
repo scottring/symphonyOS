@@ -22,7 +22,9 @@ When are gone, so a row can no longer read Task and Goal at once.
 - **Linked lines.** A line linked to an existing item shows "Linked", has no type or When, and saves nothing (it never edits the existing record). Unlink returns its own type and details.
 - **Summary.** "Ready to add" counts each selected type ("2 goals or projects / 3 actions / 1 appointment …"), with linked lines counted separately as "already on your plan".
 - **Adding to a plan draft.** A goal joins a draft only when it is for that draft's own list (the Year draft takes year goals; Month and Season drafts take their own list's goals; Week drafts take none). Anything else is saved directly on its own list. Before this change, a month goal added to a Year draft became a year goal.
-- **Defaults** are unchanged, and still come from `parse-page` (deployed v10). On Year/Season/Month pages, outcomes and multi-step projects start as goals, while dated, repeating and single actions keep their evidence. Week and Today start as actions (`validatePlanItems` turns a week "goal" into Someday).
+- **Defaults: this branch does NOT change them, and does not by itself fix the original September classification.** The parser (`parse-page` v10, deployed with #73) is untouched. Evidence is split in two:
+  - *Deterministic, tested* (`PageReviewSheet.defaults.test.tsx`): given the model's answer, the real `parsePageResponse` → `validatePageResult` path carries it to the sheet unchanged. On a representative month or season page, "Plan Mia's birthday party" and "Finish the patio" (`day: "goal"`) start as **Goal or project**. "Renew the passports" (`month`) starts as **Action**, a dated dentist line as **Appointment**, and a Tue/Thu line as **Routine**. A year page's goals are year goals. Week and Today start as actions, even for a line the model called a goal (it goes to Someday).
+  - *Model-dependent, NOT verified here:* whether the model answers `goal` for a real handwritten project line and `month` for a single action. That depends on the image and the model. The tests only assert that the v10 instructions ask for it ("goal for an OUTCOME or PROJECT … whether or not the page labels it a goal"; "Never make a line a goal just because it is on a month page"). The September page has not been re-parsed by this branch. Check it by re-importing it after deploy. What this branch guarantees is that a wrong guess is one control to fix.
 - No schema or migration changes.
 
 ## Coverage matrix
@@ -48,12 +50,12 @@ Checked and not in scope (not import classification):
 
 - There is no general "change what this is" for items already saved (task ⇄ event ⇄ routine). The out-of-scope list above covers the existing goal conversions.
 - `ExistingTask` carries no type. A linked line therefore shows "Linked", not the existing item's own type.
-- At 390px, the review sheet's time input (fixed 104px) clips "PM". This predates this change and is also visible on main.
-- A day-fact row on a date still shows an (unused) time input. This also predates this change.
+- At 320px, a long title ("Dentist appointment for Mia") is cut off at the row's edge. It is an editable input, so the text is all still there. This predates this change.
+- Fixed on this branch: the time input sizes to its content, so "02:00 PM" is fully readable at 390px and 320px, with no sideways scroll. Day-fact rows (saved as notes) no longer show a time input.
 
 ## Verification (local, isolated fixtures; no real-account writes)
 
-- `npx vitest run`: 7,424 passed. The one failing file is `connectors/src/whatsapp/adapter.test.ts`, whose dependency (`@whiskeysockets/baileys`) is not installed; the same happens on main.
+- `npx vitest run`: 7,440 passed. The one failing file is `connectors/src/whatsapp/adapter.test.ts`, whose dependency (`@whiskeysockets/baileys`) is not installed; the same happens on main.
 - New tests:
   - all 20 type-to-type switches and back;
   - Year, Season, Month and Week defaults and goal placement;
@@ -65,6 +67,7 @@ Checked and not in scope (not import classification):
 - `tsc -p tsconfig.app.json` and eslint are clean.
 - Visual checks on a local fixture page (made-up rows, no auth, no database):
   - desktop Season, Year and Week;
+  - 390px and 320px side by side (Month): times read "02:00 PM" / "04:30 PM"; page scrollWidth equals viewport (390/320); no time input on the "No school" day-fact;
   - a 390px phone view (Month) with no horizontal scroll;
   - keyboard: Tab from the checkbox reaches "What is this?", and typing "G" makes it a goal, which shows "Goal for September";
   - the save payload for the Year fixture carried only each type's own fields.
