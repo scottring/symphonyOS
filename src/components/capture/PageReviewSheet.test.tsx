@@ -340,19 +340,19 @@ describe('PageReviewSheet — domain, page title, duplicates', () => {
       existingTasks: [{ id: 'x1', title: 'Go to pumpkin patch' }],
     })
     expect(screen.getByText(/Looks like/)).toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: /^Link/ }))
+    await user.click(screen.getByRole('button', { name: 'Use existing item' }))
     await user.click(screen.getByRole('button', { name: /^Add/ }))
     expect(onCommit.mock.calls[0][0].items[0].sourceId).toBe('x1')
   })
 
-  it('Keep separate drops the duplicate line and commits without a sourceId', async () => {
+  it('Add as new drops the duplicate line and commits without a sourceId', async () => {
     const user = userEvent.setup()
     const { onCommit } = renderSheet({
       notes: [],
       items: [{ ...base, title: 'Pumpkin patch', placement: { kind: 'date', date: '2026-08-18' } }],
       existingTasks: [{ id: 'x1', title: 'Go to pumpkin patch' }],
     })
-    await user.click(screen.getByRole('button', { name: /^Keep separate/ }))
+    await user.click(screen.getByRole('button', { name: /^Add as new/ }))
     expect(screen.queryByText(/Looks like/)).toBeNull()
     await user.click(screen.getByRole('button', { name: /^Add/ }))
     expect(onCommit.mock.calls[0][0].items[0].sourceId).toBeUndefined()
@@ -389,15 +389,15 @@ describe('PageReviewSheet — linked lines and Year goals (Codex review, 2026-09
       items: [{ ...base, title: 'Renew the passports', placement: { kind: 'season' } }],
       existingTasks: [{ id: 'x1', title: 'Renew the passports', completed: false }],
     })
-    await user.click(screen.getByRole('button', { name: /^Link/ }))
-    expect(screen.getByRole('status')).toHaveTextContent(/already on your plan, exactly as it is — nothing on this line is saved/)
+    await user.click(screen.getByRole('button', { name: 'Use existing item' }))
+    expect(screen.getByRole('status')).toHaveTextContent(/already on your plan, exactly as it is — nothing new is saved for this line, and it is not put under a goal/)
     // No type, no when: the line IS the existing item.
     expect(screen.queryByRole('combobox', { name: /when/i })).toBeNull()
     expect(screen.queryByRole('combobox', { name: 'What is "Renew the passports"?' })).toBeNull()
-    expect(screen.getByText('Linked')).toBeInTheDocument()
+    expect(screen.getByText('Existing item')).toBeInTheDocument()
     expect(screen.getByRole('combobox', { name: 'Assignee for "Renew the passports"' })).toBeDisabled()
     expect(screen.getByRole('textbox', { name: 'Task title' })).toHaveAttribute('readonly')
-    await user.click(screen.getByRole('button', { name: 'Unlink' }))
+    await user.click(screen.getByRole('button', { name: 'Don’t use it' }))
     expect(screen.getByRole('combobox', { name: /when/i })).not.toBeDisabled()
     expect(screen.getByRole('combobox', { name: 'What is "Renew the passports"?' })).toHaveValue('task')
     await user.click(screen.getByRole('button', { name: /add 1 item/i }))
@@ -422,5 +422,16 @@ describe('PageReviewSheet — linked lines and Year goals (Codex review, 2026-09
     expect(screen.getByRole('combobox', { name: 'Assignee for "Renew the passports"' })).toHaveValue('m-iris')
     await user.click(screen.getByRole('button', { name: /add 1 item/i }))
     expect(onCommit.mock.calls[0][0].items[0]).toMatchObject({ placement: { kind: 'goal' }, note: 'Both expire in March', assigneeId: 'm-iris' })
+  })
+})
+
+describe('PageReviewSheet — reuse wording (2026-09-27)', () => {
+  it('offers "Use existing item" with an explanation that it avoids a duplicate and makes no goal link', () => {
+    render(<PageReviewSheet items={[{ title: 'Look up music lessons', placement: { kind: 'month' }, time: null, assigneeId: null, note: null, dateHint: null, kind: 'task', recurring: null, phone: null, contactMemberId: null }]}
+      notes={[]} unclear={[]} windowDates={[]} altitude="month" today={new Date(2026, 8, 5)} members={[]} committing={false}
+      existingTasks={[{ id: 'x1', title: 'Look up music lessons' }]} onCommit={vi.fn()} onClose={vi.fn()} />)
+    const use = screen.getByRole('button', { name: 'Use existing item' })
+    expect(use).toHaveAccessibleDescription(/avoids a duplicate\. it doesn.t put the item under a goal/i)
+    expect(screen.queryByRole('button', { name: /^Link$/ })).toBeNull()
   })
 })

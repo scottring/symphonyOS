@@ -191,7 +191,7 @@ describe('PageReviewSheet — item types', () => {
       line('Change the furnace filter', { placement: { kind: 'season' } }),
     ], { altitude: 'season', today: new Date(2026, 8, 2), existingTasks: [{ id: 't-1', title: 'Change the furnace filter' }] })
     expect(screen.getByText(/Ready to add:/).parentElement).toHaveTextContent('1 goal or project / 2 actions')
-    await user.click(screen.getByRole('button', { name: 'Link' }))
+    await user.click(screen.getByRole('button', { name: 'Use existing item' }))
     expect(screen.getByText(/Ready to add:/).parentElement).toHaveTextContent('1 goal or project / 1 action / 1 already on your plan')
     await user.selectOptions(typeOf('Buy stain'), 'activity')
     expect(screen.getByText(/Ready to add:/).parentElement).toHaveTextContent('1 goal or project / 1 activity / 1 already on your plan')
@@ -200,13 +200,13 @@ describe('PageReviewSheet — item types', () => {
   it('a linked line has no type to change: it says Linked, saves nothing new, and unlinking returns its own type', async () => {
     const user = userEvent.setup()
     const { onCommit } = renderSheet([line('Change the furnace filter', { placement: { kind: 'month' }, goal: true })], { altitude: 'month', today: new Date(2026, 9, 2), existingTasks: [{ id: 't-1', title: 'Change the furnace filter' }] })
-    await user.click(screen.getByRole('button', { name: 'Link' }))
+    await user.click(screen.getByRole('button', { name: 'Use existing item' }))
     expect(screen.queryByRole('combobox', { name: /What is/ })).toBeNull()
-    expect(screen.getByText('Linked')).toBeInTheDocument()
+    expect(screen.getByText('Existing item')).toBeInTheDocument()
     expect(screen.queryByRole('combobox', { name: /Goal for/ })).toBeNull()
     await user.click(screen.getByRole('button', { name: /add 1 item/i }))
     expect(onCommit.mock.calls[0][0].items[0]).toMatchObject({ sourceId: 't-1' })
-    await user.click(screen.getByRole('button', { name: 'Unlink' }))
+    await user.click(screen.getByRole('button', { name: 'Don’t use it' }))
     expect(typeOf('Change the furnace filter')).toHaveValue('goal')
   })
 

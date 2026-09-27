@@ -36,7 +36,7 @@ export interface PageReviewSheetProps {
   titlePeriod?: TitlePeriod
   /** The heading as written, so the sheet can say why it opened where it did. */
   pageTitle?: string | null
-  /** Open tasks a line might already be — the Link / Keep separate offer. */
+  /** Open tasks a line might already be — the Use existing item / Add as new offer. */
   existingTasks?: ExistingTask[]
   /** 'YYYY-MM-DD' → the day's event titles, for day-facts already on the calendar. */
   calendarTitlesByDay?: Map<string, string[]>
@@ -63,7 +63,7 @@ interface ItemRow extends PlanItem {
   included: boolean
   /** The open task this line probably repeats, if any. */
   dup?: ExistingTask | null
-  /** "Keep separate" was pressed — the offer is done with. */
+  /** "Add as new" was pressed — the offer is done with. */
   dupDismissed?: boolean
   /** Where-and-when kept for each type this row has been, so switching back
    *  restores it. Never saved. */
@@ -446,7 +446,7 @@ export function PageReviewSheet({
                           {row.kind === 'dayfact'
                             ? <span className="inline-flex shrink-0 items-center rounded-md border border-neutral-200 bg-neutral-50 px-1.5 py-0.5 text-[10px] font-semibold leading-none text-neutral-500">Day</span>
                             : row.sourceId
-                              ? <span className="inline-flex shrink-0 items-center gap-1 rounded-md border border-neutral-200 bg-neutral-50 px-1.5 py-1 text-[11px] font-semibold leading-none text-neutral-600"><Link2 className="w-3 h-3" aria-hidden="true" />Linked</span>
+                              ? <span className="inline-flex shrink-0 items-center gap-1 rounded-md border border-neutral-200 bg-neutral-50 px-1.5 py-1 text-[11px] font-semibold leading-none text-neutral-600"><Link2 className="w-3 h-3" aria-hidden="true" />Existing item</span>
                               : <ItemTypeSelect value={itemTypeOf(row)} title={row.title} onChange={(t) => changeType(i, t)} />}
                           <input
                             value={row.title}
@@ -466,39 +466,46 @@ export function PageReviewSheet({
                             onChange={(days) => updateItem(i, { recurring: { days, until: row.recurring?.until ?? null } })}
                           />
                         )}
-                        {/* The same errand, written twice: one tap says which. */}
+                        {/* The same errand, written twice: one tap says which.
+                            Reuse only skips the insert — it never files the
+                            existing item under a goal (that is "Add an existing
+                            action" on the goal itself). */}
                         {row.dup && !row.dupDismissed && (
                           row.sourceId
                             ? (
                               <p role="status" className="mt-1 flex flex-wrap items-center gap-1.5 text-[12px] text-neutral-600">
-                                <span>Uses <i className="text-neutral-800">{row.dup.title}</i>, already on your plan, exactly as it is — nothing on this line is saved. Unlink to choose what this line is.</span>
+                                <span>Using <i className="text-neutral-800">{row.dup.title}</i>, already on your plan, exactly as it is — nothing new is saved for this line, and it is not put under a goal.</span>
                                 <button
                                   type="button"
                                   onClick={() => updateItem(i, { sourceId: undefined })}
                                   className="rounded-md border border-neutral-200 bg-white px-1.5 py-0.5 font-medium text-neutral-700 hover:bg-neutral-50"
                                 >
-                                  Unlink
+                                  Don&rsquo;t use it
                                 </button>
                               </p>
                             )
                             : (
-                              <p className="mt-1 flex flex-wrap items-center gap-1.5 text-[12px] text-neutral-500">
-                                Looks like <i className="text-neutral-700">{row.dup.title}</i>
-                                <button
-                                  type="button"
-                                  onClick={() => updateItem(i, { sourceId: row.dup?.id })}
-                                  className="rounded-md border border-neutral-200 bg-white px-1.5 py-0.5 font-medium text-neutral-700 hover:bg-neutral-50"
-                                >
-                                  Link
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => updateItem(i, { dupDismissed: true })}
-                                  className="rounded-md px-1 py-0.5 text-neutral-500 hover:text-neutral-700"
-                                >
-                                  Keep separate
-                                </button>
-                              </p>
+                              <div className="mt-1 text-[12px] text-neutral-500">
+                                <p className="flex flex-wrap items-center gap-1.5">
+                                  Looks like <i className="text-neutral-700">{row.dup.title}</i>, already on your plan.
+                                  <button
+                                    type="button"
+                                    onClick={() => updateItem(i, { sourceId: row.dup?.id })}
+                                    aria-describedby={`dup-why-${i}`}
+                                    className="rounded-md border border-neutral-200 bg-white px-1.5 py-0.5 font-medium text-neutral-700 hover:bg-neutral-50"
+                                  >
+                                    Use existing item
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => updateItem(i, { dupDismissed: true })}
+                                    className="rounded-md px-1 py-0.5 text-neutral-500 hover:text-neutral-700"
+                                  >
+                                    Add as new
+                                  </button>
+                                </p>
+                                <p id={`dup-why-${i}`} className="mt-0.5 text-[11px] text-neutral-400">Avoids a duplicate. It doesn&rsquo;t put the item under a goal.</p>
+                              </div>
                             )
                         )}
                       </div>
