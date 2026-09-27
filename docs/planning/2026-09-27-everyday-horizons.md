@@ -10,15 +10,15 @@ writes to anyone's real plan. This implements the product contract
 | Contract | Before this branch | This branch |
 |---|---|---|
 | 1. Y/S/M lead with goals and projects; the primary control creates one; the empty state invites an outcome | The goal box was first and always open (#71). When a period had no goals, the **import sorter was the empty state** (#72). | "Year/Season/Month **goals and projects**", "+ Add a goal or project", and "Add a goal or project for Fall 2026". The empty state reads "No goals or projects for Fall 2026 yet. What should this season add up to?" An empty page has no single-action or sorting chatter under it. |
-| 2. Collapsed goals are quiet; opening them reveals the rest | Done in #72: the circle is the status, and a goal's controls show when it is opened. | Kept. |
+| 2. Collapsed goals are quiet; opening them reveals the rest | Done for month and season goals in #72; **Year rows were exempt** (no open state) | Year goals now open and shut the same way: "1 season goal · show", with refine/link inside. Focus stays on the toggle, and the circle still completes the goal. |
 | 3. Refine: create **or link** | Create only | Refining can now **link** an existing unlinked goal one rung down ("Or link one you already have"). |
 | 4. No day/time controls on goals; moving is not refining | Already held | — |
-| 5. Week: goals for reference, and the parent on each action | The parent line on each action existed, but the month's goals sat in the closed Shelves panel. | "**Goals this week serves:** Finish the patio (2 this week) · …" at the top of the week's list, each opening the goal. |
+| 5. Week: goals for reference, and the parent on each action | The parent line on each action existed, but the month's goals sat in the closed Shelves panel. | "**This week serves:** Finish the patio (2) · …" lists only goals with an action on the week: 3 shown (2 on a phone), then "+N more". The month's whole list is a separate "All November goals · 32" disclosure, closed by default. The first version seeded every month goal, unbounded; Codex caught it and it was fixed. |
 | 6. Single actions secondary but reachable; nothing hidden | A capped, counted list with "Show all N" | Kept. It is quiet when empty. |
 | 7. The next step carries the period | The next-level strip did; the line after a planning session linked to bare `/month` or `/week`. | The line after a session now carries the period (the current or first month/week inside the plan). |
 | 8. Assignment, area, privacy, inheritance and dates are preserved | Already held | Verified live (below). |
 | Import repair is one-time and separate | It was the page's empty state | It is now a labelled **"One-time: organize this list"** notice beside the list it is about, with **Organize the list** and **Dismiss**. Once dismissed, a quiet "Organize into goals…" link stays, but only while the period has no goals. A populated plan shows no sorting at all. |
-| Honest undo | "You can undo this afterwards" | The sort explains its limits: "Undo stays on this page, in this browser." There is now a durable way back on any device: a goal with no next actions offers **Make it a single action** in its menu, with Undo. |
+| Honest undo | "You can undo this afterwards" | **Make it a single action** acts on the write's own answer: a refused or throwing save says "Couldn’t change … still a goal" and never announces success. The first version always announced success, because `setGoal` returns nothing; Codex caught it and it was fixed, with regression tests. The sort explains its limits: "Undo stays on this page, in this browser." There is now a durable way back on any device: a goal with no next actions offers **Make it a single action** in its menu, with Undo. |
 
 Codex's `510d707a` (auto-opening the sorter as the page content) was not
 adopted. The contract says a permanently open sorter is not the product. That
@@ -68,15 +68,25 @@ worktree is untouched.
 
 **Production.** Nothing on this branch was checked in production, and nothing is deployed.
 
+## Follow-up evidence (after Codex's review)
+
+- Long Week (`e40`/`e41`, desktop and 390px): 18 actions serving 14 goals, with a 32-goal November behind them.
+  - Desktop: the "serves" line is one line (17px), and the first action sits at y=131.
+  - Phone: 2 goals are shown and the line is 88px tall; the first action sits at y=201.
+  - "+N more" and the month disclosure both work from the keyboard (Enter), with focus kept.
+  - No horizontal overflow.
+  - On a phone, the goal icons in this line rendered oversized (a global mobile rule sizes icons inside buttons), so they were removed from it.
+- Year (`e42`/`e43`, desktop and phone): shut by default. Enter opens it, focus stays on "1 season goal · hide", and the refine control appears.
+- Make it a single action: the refused and throwing save cases are covered by vitest. A live refused write was not forced against the database.
+
 ## Gaps and dependencies
 
-- **Importer defaults are a coordinated dependency and are not in this branch.** Plan from paper is owned by open PR #61 (`claude/plan-from-paper`: `planParse`, `paperIntoDraft`, the `parse-page` and `plan-from-paper` functions, `PageReviewSheet`). Its session is not running, and its worktree has uncommitted work. The spec for the owner:
+- **Importer defaults are a coordinated dependency and are not in this branch.** The handoff was posted on PR #61, its existing channel: https://github.com/scottring/symphonyOS/pull/61#issuecomment-5853984048. The **pending owner** is the Plan-from-paper session (PR #61, author scottring). The **pending change** is items 1–5 of that comment, built on its unpushed type selector `fdcb6126`. Its local branch has diverged from the PR head `7a0625d1`, and its uncommitted work was left untouched. Plan from paper is owned by open PR #61 (`claude/plan-from-paper`: `planParse`, `paperIntoDraft`, the `parse-page` and `plan-from-paper` functions, `PageReviewSheet`). Its session is not running, and its worktree has uncommitted work. The spec for the owner:
   1. On year, season and month pages, lines the parser reads as outcomes or projects go to the goal list; explicit actions, appointments and routines keep their types.
   2. Never make every line a goal because of the page's title.
   3. The review sheet shows each line's resulting type and horizon before saving, and the type stays editable.
   4. Dated or timed lines stay actions or appointments.
 - Undo of a whole sort is per browser. On any device, the way back is per goal: Make it a single action.
-- Year goals have no open/closed state, so "+ Add a season goal for it" shows on every Year row.
 - Items assigned only to someone else aren't on your own list, so they aren't offered for sorting (the existing "my plan" lens).
 - A live partial-save failure in the sort was not reproduced against the database; it is covered by mocked tests only.
 - Pre-existing and out of scope: on a phone, the Week page's "No calendar connected" banner is cramped.

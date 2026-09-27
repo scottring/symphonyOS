@@ -446,9 +446,16 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
       // The way back from a goal, on any device: the SAME row becomes a
       // single action again, with Undo. Offered only while it holds no next
       // actions — they would otherwise be left under a row that is no goal.
-      await setGoal(row.id, false)
+      // The write's own answer decides what is said: setGoal returns nothing,
+      // so a refused save used to be announced as done (Codex, 2026-09-27).
+      const wrote = (isGoal: boolean) => Promise.resolve(updateTask(row.id, { isGoal })).then((r) => r !== false, () => false)
+      if (!(await wrote(false))) {
+        showToast(`Couldn’t change “${row.title}”. It is still a goal — try again.`, 'error', 6000)
+        return
+      }
       showToast(`“${row.title}” is a single action again. Nothing else changed.`, 'success', 8000, {
-        label: 'Undo', onClick: () => { void setGoal(row.id, true) },
+        label: 'Undo',
+        onClick: () => { void wrote(true).then((ok) => { if (!ok) showToast(`Couldn’t undo — “${row.title}” is still a single action.`, 'error', 6000) }) },
       })
     }
     else if (action === 'keep') {
@@ -473,7 +480,7 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
       await plannedDay(row.id, row.title, new Date())
     }
     else if (action === 'under-goal') setPickingGoalFor(row.id)
-  }, [goals, updateGoal, addGoal, bounds.next, bounds.start, isPast, toggleTask, deleteTask, dropCommitment, gated, setGoal, keepForward, level, tasks, confirmGoalDone, lowerMonth, plannedDay])
+  }, [goals, updateGoal, addGoal, bounds.next, bounds.start, isPast, toggleTask, deleteTask, dropCommitment, gated, setGoal, keepForward, level, tasks, confirmGoalDone, lowerMonth, plannedDay, updateTask])
 
   /**
    * "Assign people" on a goal or a step: the household picker the rest of the

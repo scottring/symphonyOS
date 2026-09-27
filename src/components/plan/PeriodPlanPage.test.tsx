@@ -2945,6 +2945,7 @@ describe('horizon flows: outcomes on Year/Season/Month, next actions into weeks 
     state.tasks = []
     state.goals = [goal({ id: 'yg', name: 'Make our home work better for our family', context: 'family' })]
     renderPage('year')
+    fireEvent.click(screen.getByRole('button', { name: 'Show season goals for Make our home work better for our family' }))
     fireEvent.click(screen.getByRole('button', { name: 'Add a season goal for Make our home work better for our family' }))
     const box = screen.getByRole('textbox', { name: 'New season goal for Make our home work better for our family' })
     fireEvent.change(box, { target: { value: 'Create a usable outdoor space' } })
@@ -3123,11 +3124,31 @@ describe('everyday horizons (product contract, 2026-09-27)', () => {
     state.tasks = [task({ id: 'g', title: 'Plan winter vacation', isGoal: true, bucket: 'quarter', seasonStart: fall })]
     renderPage('season')
     fireEvent.click(screen.getByRole('button', { name: 'Make it a single action Plan winter vacation' }))
-    await waitFor(() => expect(hook.setGoal).toHaveBeenCalledWith('g', false))
+    await waitFor(() => expect(hook.updateTask).toHaveBeenCalledWith('g', { isGoal: false }))
+    await waitFor(() => expect(toastSpy).toHaveBeenCalled())
     const [msg, , , undo] = toastSpy.mock.calls.at(-1) as [string, string, number, { label: string; onClick: () => void }]
     expect(msg).toMatch(/single action again\. Nothing else changed/)
     undo.onClick()
-    expect(hook.setGoal).toHaveBeenLastCalledWith('g', true)
+    await waitFor(() => expect(hook.updateTask).toHaveBeenLastCalledWith('g', { isGoal: true }))
+  })
+
+  it('a refused save is never announced as done (regression: setGoal swallowed the result)', async () => {
+    hook.updateTask.mockImplementation(async () => false)
+    state.tasks = [task({ id: 'g', title: 'Plan winter vacation', isGoal: true, bucket: 'quarter', seasonStart: fall })]
+    renderPage('season')
+    fireEvent.click(screen.getByRole('button', { name: 'Make it a single action Plan winter vacation' }))
+    await waitFor(() => expect(toastSpy).toHaveBeenCalled())
+    expect(toastSpy).not.toHaveBeenCalledWith(expect.stringMatching(/single action again/), expect.anything(), expect.anything(), expect.anything())
+    expect(toastSpy).toHaveBeenCalledWith(expect.stringMatching(/Couldn’t change .* still a goal/), 'error', 6000)
+  })
+
+  it('…and a throwing save is treated the same way', async () => {
+    hook.updateTask.mockImplementation(async () => { throw new Error('offline') })
+    state.tasks = [task({ id: 'g', title: 'Plan winter vacation', isGoal: true, bucket: 'quarter', seasonStart: fall })]
+    renderPage('season')
+    fireEvent.click(screen.getByRole('button', { name: 'Make it a single action Plan winter vacation' }))
+    await waitFor(() => expect(toastSpy).toHaveBeenCalledWith(expect.stringMatching(/Couldn’t change/), 'error', 6000))
+    expect(toastSpy).not.toHaveBeenCalledWith(expect.stringMatching(/single action again/), expect.anything(), expect.anything(), expect.anything())
   })
 
   it('…but not while it holds next actions', () => {
@@ -3176,5 +3197,40 @@ describe('the import repair stays out of an ordinary, populated plan', () => {
     expect(screen.queryByText('One-time: organize this list.')).toBeNull()
     expect(screen.queryByRole('button', { name: /Organize/ })).toBeNull()
     expect(screen.getByText('Buy stamps')).toBeInTheDocument()
+  })
+})
+
+describe('year goals open and shut like every other horizon (contract item 2)', () => {
+  beforeEach(() => {
+    pinClock(); localStorage.clear()
+    state.tasks = []; state.loading = false; routinesState.routines = []
+    seasonsState.seasons = DEFAULT_SEASONS; seasonsState.loading = false
+    Object.values(hook).forEach((f) => f.mockClear()); Object.values(goalsApi).forEach((f) => f.mockClear())
+    state.goals = [goal({ id: 'yg', name: 'Make our home work better for our family' })]
+  })
+  afterEach(() => { vi.useRealTimers() })
+
+  it('shut by default: title and a "· show" line, no refine control', () => {
+    renderPage('year')
+    expect(screen.queryByRole('button', { name: /Add a season goal for/ })).toBeNull()
+    expect(screen.getByRole('button', { name: 'No season goals yet · show' })).toBeInTheDocument()
+  })
+
+  it('opens from the keyboard, keeps focus on the toggle, and shows the refine control', async () => {
+    const u = userEvent.setup({ advanceTimers: () => {} })
+    renderPage('year')
+    const toggle = screen.getByRole('button', { name: 'No season goals yet · show' })
+    toggle.focus()
+    await u.keyboard('{Enter}')
+    const open = screen.getByRole('button', { name: 'No season goals yet · hide' })
+    expect(open).toBe(document.activeElement)
+    expect(screen.getByRole('button', { name: 'Add a season goal for Make our home work better for our family' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Hide season goals for Make our home work better for our family' })).toHaveAttribute('aria-expanded', 'true')
+  })
+
+  it('its circle still completes it, open or shut', async () => {
+    renderPage('year')
+    fireEvent.click(screen.getByRole('button', { name: 'Complete Make our home work better for our family' }))
+    await waitFor(() => expect(goalsApi.updateGoal).toHaveBeenCalledWith('yg', { status: 'completed' }))
   })
 })

@@ -181,7 +181,7 @@ describe('the goal a week row serves', () => {
     // Named twice on purpose: under the step, and in the week's
     // "Goals this week serves" reference line (product contract, 2026-09-27).
     expect(list.getAllByText('Take Kaleb to an Islanders game in DC')).toHaveLength(2)
-    expect(list.getByText('(1 this week)')).toBeInTheDocument()
+    expect(list.getByText('(1)')).toBeInTheDocument()
   })
 
   it('says nothing for a row that serves no goal', () => {
@@ -192,15 +192,29 @@ describe('the goal a week row serves', () => {
   })
 })
 
-it('names the goals the week serves for reference, with what is on the week for each', () => {
+it('names only the goals this week serves, compactly; the month's full list is a separate disclosure', () => {
   const onSelect = vi.fn()
   const step = row({ id: 's1', title: 'Choose chairs', goalTaskId: 'patio' })
   const patio = createMockTask({ id: 'patio', title: 'Finish the patio', isGoal: true, bucket: 'month' })
   render(<WeekList tasks={[patio, step]} weekStart={WEEK} meId={null} userId="me" isCurrent onToggle={vi.fn()} onSelect={onSelect}
     goals={[{ id: 'patio', title: 'Finish the patio' }, { id: 'garage', title: 'Clear out the garage' }]} goalsLabel="October" />)
-  const ref = screen.getByText('Goals this week serves:').parentElement!
-  expect(ref).toHaveTextContent('Finish the patio (1 this week)')
-  expect(ref).toHaveTextContent('Clear out the garage (nothing this week yet)')
-  fireEvent.click(within(ref).getByRole('button', { name: 'Clear out the garage' }))
-  expect(onSelect).toHaveBeenCalledWith('garage')
+  const served = screen.getByText('This week serves:').parentElement!
+  expect(served).toHaveTextContent('Finish the patio (1)')
+  expect(served).not.toHaveTextContent('Clear out the garage')
+  const all = screen.getByText('All October goals · 2').closest('details')!
+  expect(all).not.toHaveAttribute('open')
+  expect(all).toHaveTextContent('Clear out the garage · nothing this week')
+  fireEvent.click(within(served).getByRole('button', { name: 'Finish the patio' }))
+  expect(onSelect).toHaveBeenCalledWith('patio')
+})
+
+it('a week serving many goals shows three and says how many more, one press away', () => {
+  const goals = Array.from({ length: 6 }, (_, i) => createMockTask({ id: `g${i}`, title: `Goal ${i}`, isGoal: true, bucket: 'month' }))
+  const steps = goals.map((g, i) => row({ id: `s${i}`, title: `Step ${i}`, goalTaskId: g.id }))
+  render(<WeekList tasks={[...goals, ...steps]} weekStart={WEEK} meId={null} userId="me" isCurrent onToggle={vi.fn()} onSelect={vi.fn()} />)
+  const served = screen.getByText('This week serves:').parentElement!
+  expect(within(served).getAllByRole('button', { name: /^Goal \d$/ })).toHaveLength(3)
+  fireEvent.click(within(served).getByRole('button', { name: '+3 more' }))
+  expect(within(served).getAllByRole('button', { name: /^Goal \d$/ })).toHaveLength(6)
+  expect(within(served).getByRole('button', { name: 'Show fewer' })).toHaveAttribute('aria-expanded', 'true')
 })
