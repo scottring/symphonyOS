@@ -42,6 +42,34 @@ export function isTimelineObligation(routine: Pick<Routine, 'pin_to_timeline'>):
 }
 
 /**
+ * Does the routine's own rule name THE day it happens — one weekday ("every
+ * Sunday", every other Sunday), a day of the month or year, or listed dates?
+ * Then its occurrence is a commitment on that day, like a dated task: it
+ * belongs on Today's main list without a second "Choose for today" and
+ * without a time being invented for it (Scott, 2026-09-27 — "Water
+ * houseplants", every Sun, was only in the chooser).
+ *
+ * NOT day-bound, and still offered as a choice: `daily` (and Mon–Fri, which
+ * the hide-daily setting governs), a weekly rule naming SEVERAL days (a
+ * "Sat + Sun" chore means "sometime this weekend" — the wall of weekend
+ * chores of 2026-09-19), the `weekend` window, and `since_last`.
+ * Placement only, like isTimelineObligation: it never decides visibility.
+ */
+export function isDayBoundRoutine(routine: Pick<Routine, 'recurrence_pattern'>): boolean {
+  const p = routine.recurrence_pattern
+  switch (p?.type) {
+    case 'weekly': return (p.days?.length ?? 0) === 1
+    case 'monthly':
+    case 'quarterly':
+    case 'yearly':
+    case 'specific_days':
+      return true
+    default:
+      return false
+  }
+}
+
+/**
  * True when a routine effectively recurs at least every weekday (>= 5x/week).
  * Covers:
  *   - `daily` (7x/week)
