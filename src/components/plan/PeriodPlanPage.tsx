@@ -69,7 +69,7 @@ import { periodCalendarEntries } from '@/lib/planning/periodCalendar'
 import { PlanWeekMenu } from './PlanWeekMenu'
 import { weekendsTouching, weekendEnd, weekendRangeLabel } from '@/lib/planning/weekend'
 import { MultiAssigneeDropdown } from '@/components/family'
-import { goalConversion } from '@/lib/planning/goalConversion'
+import { goalConversion, goalToTaskConversion } from '@/lib/planning/goalConversion'
 import { makeTaskAGoal } from './MakeGoalControl'
 import { NextLevelStrip } from './NextLevelStrip'
 import { RefineGoalControl } from './RefineGoalControl'
@@ -443,6 +443,13 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
     else if (action === 'someday') await gated.updateTask(row.id, { bucket: 'someday', scheduledFor: undefined, isAllDay: undefined })
     else if (action === 'make-goal') await setGoal(row.id, true)
     else if (action === 'make-task') {
+      const t = tasks.find((x) => x.id === row.id)
+      const check = t ? goalToTaskConversion(t, tasks) : { ok: false as const, reason: 'It could not be found.' }
+      if (!check.ok) {
+        // Explained, never silently unlinked (Codex, 2026-09-27).
+        showToast(`“${row.title}” stays a goal. ${check.reason}`, 'info', 8000)
+        return
+      }
       // The way back from a goal, on any device: the SAME row becomes a
       // single action again, with Undo. Offered only while it holds no next
       // actions — they would otherwise be left under a row that is no goal.
@@ -1021,17 +1028,20 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
     writeSortBatch(level, periodYmd, missed.length ? next : null)
     setSortBatch(missed.length ? next : null)
     const parts = [`${revert.length - missed.length} back to single actions.`]
-    if (kept.length) parts.push(`${kept.length} kept as ${kept.length === 1 ? 'a goal' : 'goals'} — ${kept.length === 1 ? 'it now holds' : 'they now hold'} next actions.`)
+    // The real reason, per goal: next actions, a supporting goal, or its own link.
+    if (kept.length === 1) parts.push(`“${kept[0].task.title}” ${kept[0].reason.replace(/^It stays/, 'stays')}`)
+    else if (kept.length) parts.push(`${kept.length} kept as goals — each still has next actions or linked goals.`)
     if (missed.length) parts.push(`${missed.length} didn’t change — try again.`)
     showToast(parts.join(' '), missed.length ? 'warning' : 'success', 7000)
   }, [sortBatch, tasks, updateTask, level, periodYmd])
-  /** A goal's verbs, plus the way back to a single action while it holds no
-   *  next actions (month and season goals only; a year goal is its own table). */
+  /** A goal's verbs, plus the way back to a single action (month and season
+   *  goals; a year goal is its own table). Offered on every open goal; when a
+   *  relationship would be stranded, pressing it says which and why
+   *  (goalToTaskConversion) — explained, never hidden, never unlinked. */
   const goalActions = useCallback((row: PlanRowModel) => [
     ...actionsFor({ fate: row.fate, isGoal: row.isGoal, isPast, level }),
-    ...(!isPast && row.kind === 'task' && row.isGoal && !rowIsDone(row.fate)
-      && !tasks.some((t) => t.goalTaskId === row.id) ? ['make-task' as const] : []),
-  ], [isPast, level, tasks])
+    ...(!isPast && row.kind === 'task' && row.isGoal && !rowIsDone(row.fate) ? ['make-task' as const] : []),
+  ], [isPast, level])
 
   // One row at a time is the wrong tool for a whole list: when the sort is on
   // offer, the per-row "Break into next actions" link steps aside (it stays

@@ -79,6 +79,31 @@ worktree is untouched.
 - Year (`e42`/`e43`, desktop and phone): shut by default. Enter opens it, focus stays on "1 season goal · hide", and the refine control appears.
 - Make it a single action: the refused and throwing save cases are covered by vitest. A live refused write was not forced against the database.
 
+## Finding: converting a goal back could strand a goal link (Codex, a418ff01)
+
+**Verified.** On the local database, as the user through RLS
+(`outputs/horizon-everyday/repro-strand.mjs`):
+- A season goal could be turned back into a task while a month goal still supported it, leaving the child pointing at a non-goal.
+- A linked month goal could itself become a task that still carried the link.
+
+`guard_goal_support` runs only when a row's own `supports_goal_task_id` changes, so it allowed both. The app checked only `goal_task_id` children, both in "Make it a single action" and in the sort's Undo.
+
+**Fixed in the app.** One rule, `goalToTaskConversion` in `goalConversion.ts`, now governs both single conversion and bulk Undo. A goal stays a goal, with the reason stated, while any of these hold:
+- it holds next actions;
+- any month goal supports it (named: "“Book the rental” supports it. Unlink that goal first");
+- it supports a goal itself ("Remove that link first — choose No linked goal").
+
+Links are never removed silently. A season goal's year link (`goal_id`) is kept, because a task may serve a year goal.
+
+Live check (`e8.mjs`, `e50`/`e51`):
+- Refused cases write nothing: the parent stayed a goal, and the child stayed a goal and stayed linked.
+- The sort's Undo returned 8 goals and kept the linked one. Its message now gives the real reason (the first version said "it now holds next actions"; that was fixed and is tested).
+- Tests: `goalConversion.toTask.test.ts`, `sortPlan.test.ts`, and PeriodPlanPage (three refusal cases, plus the Undo message).
+
+**Remaining gap: a database guard, prepared but not applied.** The app cannot see rows RLS hides from the person converting. If someone else's private month goal supports a shared season goal, the app would allow converting that season goal. `docs/planning/2026-09-27-guard-goal-conversion.proposed.sql` adds a `before update of is_goal` guard (security definer) that refuses both conversions.
+- **Proven on the local copy only.** Both stranding cases are refused, and ordinary conversion, re-conversion and completion still pass (`guard-allowed.mjs`).
+- **Not applied to the shared project.** It is a shared schema change and needs its own approval.
+
 ## Gaps and dependencies
 
 - **Importer defaults are a coordinated dependency and are not in this branch.** The handoff was posted on PR #61, its existing channel: https://github.com/scottring/symphonyOS/pull/61#issuecomment-5853984048. The **pending owner** is the Plan-from-paper session (PR #61, author scottring). The **pending change** is items 1–5 of that comment, built on its unpushed type selector `fdcb6126`. Its local branch has diverged from the PR head `7a0625d1`, and its uncommitted work was left untouched. Plan from paper is owned by open PR #61 (`claude/plan-from-paper`: `planParse`, `paperIntoDraft`, the `parse-page` and `plan-from-paper` functions, `PageReviewSheet`). Its session is not running, and its worktree has uncommitted work. The spec for the owner:

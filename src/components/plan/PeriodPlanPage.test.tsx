@@ -3151,13 +3151,40 @@ describe('everyday horizons (product contract, 2026-09-27)', () => {
     expect(toastSpy).not.toHaveBeenCalledWith(expect.stringMatching(/single action again/), expect.anything(), expect.anything(), expect.anything())
   })
 
-  it('…but not while it holds next actions', () => {
+  // Codex review, 2026-09-27: the database's guard checks a link only on the
+  // row that carries it, so it lets both of these strand a relationship.
+  const refused = async (title: string, reason: RegExp) => {
+    fireEvent.click(screen.getByRole('button', { name: `Make it a single action ${title}` }))
+    await waitFor(() => expect(toastSpy).toHaveBeenCalledWith(expect.stringMatching(reason), 'info', 8000))
+    expect(hook.updateTask).not.toHaveBeenCalled()
+    expect(hook.setGoal).not.toHaveBeenCalled()
+  }
+
+  it('…not while it holds next actions: it says so and writes nothing', async () => {
     state.tasks = [
       task({ id: 'g', title: 'Plan winter vacation', isGoal: true, bucket: 'quarter', seasonStart: fall }),
       task({ id: 's', title: 'Price flights', bucket: 'quarter', seasonStart: fall, goalTaskId: 'g' }),
     ]
     renderPage('season')
-    expect(screen.queryByRole('button', { name: 'Make it a single action Plan winter vacation' })).toBeNull()
+    await refused('Plan winter vacation', /stays a goal\. It holds a next action/)
+  })
+
+  it('…not while a month goal supports it — the child’s link is never stranded', async () => {
+    state.tasks = [
+      task({ id: 'sg', title: 'Create a usable outdoor space', isGoal: true, bucket: 'quarter', seasonStart: fall }),
+      task({ id: 'mg', title: 'Finish the patio', isGoal: true, bucket: 'month', monthStart: new Date(2026, 9, 1), supportsGoalTaskId: 'sg' }),
+    ]
+    renderPage('season')
+    await refused('Create a usable outdoor space', /“Finish the patio” supports it\. Unlink that goal first/)
+  })
+
+  it('…not while it is itself linked up: the link is kept, and it says how to remove it', async () => {
+    state.tasks = [
+      task({ id: 'sg', title: 'Create a usable outdoor space', isGoal: true, bucket: 'quarter', seasonStart: fall }),
+      task({ id: 'mg', title: 'Finish the patio', isGoal: true, monthStart: thisMonth, supportsGoalTaskId: 'sg' }),
+    ]
+    renderPage('month')
+    await refused('Finish the patio', /It supports “Create a usable outdoor space”\. Remove that link first/)
   })
 
   it('refining can LINK an existing month goal instead of creating one', async () => {
@@ -3232,5 +3259,31 @@ describe('year goals open and shut like every other horizon (contract item 2)', 
     renderPage('year')
     fireEvent.click(screen.getByRole('button', { name: 'Complete Make our home work better for our family' }))
     await waitFor(() => expect(goalsApi.updateGoal).toHaveBeenCalledWith('yg', { status: 'completed' }))
+  })
+})
+
+describe('Undo the sort names the real reason a goal is kept', () => {
+  const fall = periodStartFor('season', new Date(2026, 8, 10), DEFAULT_SEASONS)
+  beforeEach(() => {
+    pinClock(); localStorage.clear()
+    state.goals = []; state.loading = false; routinesState.routines = []
+    seasonsState.seasons = DEFAULT_SEASONS; seasonsState.loading = false
+    Object.values(hook).forEach((f) => f.mockClear()); toastSpy.mockClear()
+    hook.updateTask.mockImplementation(async () => true)
+  })
+  afterEach(() => { vi.useRealTimers() })
+
+  it('a sorted goal that a month goal now supports stays a goal, and the message says so', async () => {
+    state.tasks = [
+      task({ id: 'v', title: 'Plan winter vacation', isGoal: true, bucket: 'quarter', seasonStart: fall }),
+      task({ id: 'p', title: 'Renew the passports', isGoal: true, bucket: 'quarter', seasonStart: fall }),
+      task({ id: 'm', title: 'Book the rental', isGoal: true, bucket: 'month', monthStart: new Date(2026, 9, 1), supportsGoalTaskId: 'v' }),
+    ]
+    localStorage.setItem('symphony.plan.sortBatch.season.2026-09-01', JSON.stringify({ ids: ['v', 'p'], at: Date.now() }))
+    renderPage('season')
+    fireEvent.click(screen.getByRole('button', { name: 'Undo the sort' }))
+    await waitFor(() => expect(hook.updateTask).toHaveBeenCalledWith('p', { isGoal: false }))
+    expect(hook.updateTask).not.toHaveBeenCalledWith('v', expect.anything())
+    await waitFor(() => expect(toastSpy).toHaveBeenCalledWith(expect.stringMatching(/1 back to single actions\. “Plan winter vacation” stays a goal: “Book the rental” supports it/), 'success', 7000))
   })
 })

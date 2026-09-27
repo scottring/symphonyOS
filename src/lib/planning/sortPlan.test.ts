@@ -43,3 +43,18 @@ describe('sortUndo', () => {
     expect(u.kept.map((k) => k.task.id)).toEqual(['b'])
   })
 })
+
+describe('sortUndo — relationships are never stranded (Codex review, 2026-09-27)', () => {
+  it('keeps a goal that a month goal now supports, and one that is itself linked up, with the reason', () => {
+    const all = [
+      t({ id: 'free', isGoal: true }),
+      t({ id: 'parent', title: 'Create a usable outdoor space', isGoal: true }),
+      t({ id: 'kid', title: 'Finish the patio', isGoal: true, bucket: 'month', supportsGoalTaskId: 'parent' }),
+    ]
+    const u = sortUndo(['free', 'parent', 'kid'], all)
+    expect(u.revert.map((x) => x.id)).toEqual(['free'])
+    expect(u.kept.map((k) => k.task.id)).toEqual(['parent', 'kid'])
+    expect(u.kept[0].reason).toMatch(/“Finish the patio” supports it/)
+    expect(u.kept[1].reason).toMatch(/It supports “Create a usable outdoor space”/)
+  })
+})
