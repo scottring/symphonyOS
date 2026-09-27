@@ -100,9 +100,34 @@ Live check (`e8.mjs`, `e50`/`e51`):
 - The sort's Undo returned 8 goals and kept the linked one. Its message now gives the real reason (the first version said "it now holds next actions"; that was fixed and is tested).
 - Tests: `goalConversion.toTask.test.ts`, `sortPlan.test.ts`, and PeriodPlanPage (three refusal cases, plus the Undo message).
 
-**Remaining gap: a database guard, prepared but not applied.** The app cannot see rows RLS hides from the person converting. If someone else's private month goal supports a shared season goal, the app would allow converting that season goal. `docs/planning/2026-09-27-guard-goal-conversion.proposed.sql` adds a `before update of is_goal` guard (security definer) that refuses both conversions.
-- **Proven on the local copy only.** Both stranding cases are refused, and ordinary conversion, re-conversion and completion still pass (`guard-allowed.mjs`).
-- **Not applied to the shared project.** It is a shared schema change and needs its own approval.
+**Remaining gap: a database guard, prepared for review and not applied.** The app cannot see rows RLS hides from the person converting. `docs/planning/2026-09-27-guard-goal-conversion.proposed.sql` (v2) closes this in the database.
+
+### Database guard: concurrency review (Codex, 902d2f4d)
+
+Proven on the **isolated local copy only**, with `outputs/horizon-everyday/guard-concurrency.mjs`:
+- It uses two real connections, each running as `authenticated` with a fictional member's JWT claims: Riley converts a shared goal while Drew links a private row under it.
+- It covers two link kinds × two interleavings × three endings (the first commits first, the second commits first, or the first rolls back).
+- It also checks hidden rows, ordinary conversion and completion, and that a refusal changes no data.
+- Run it with `PG_MODULE=<path to node_modules/pg> node guard-concurrency.mjs`. It refuses any host but `127.0.0.1:55322`.
+
+**v1 (the earlier proposal) — reproduced, 10/19:**
+- **All 8 variants where both sides commit left an invalid link, in both commit orders, and neither transaction waited.** An uncommitted child is invisible to the reverse check, and the foreign key's KEY SHARE lock doesn't conflict with an update of `is_goal`.
+- **A hidden `goal_task_id` next action bypassed it.** Riley converted a shared goal with Drew's private next action under it, because v1 checked only `supports_goal_task_id`.
+
+**v2 — 19/19:**
+- **Both paths now coordinate on the parent row.** The link path (a new trigger on `supports_goal_task_id` and `goal_task_id`) locks the parent `FOR SHARE` and re-reads it. The conversion path's own UPDATE lock conflicts with that, and it checks for children only once it holds the lock, with a fresh snapshot, for either kind of link.
+- **In every race, the second transaction waits, then refuses, or succeeds if the first rolled back, and no invalid link remains.** The "second commits first" order can't happen any more, because the second always waits.
+- **Hidden supporting goals and hidden next actions both block conversion.** The refusal names nothing ("a goal with linked goals or next actions cannot become a task"), and the rows' hash is unchanged.
+- **Ordinary actions still work:** conversion, re-conversion, filing a next action under a goal, and completing a goal or its next action.
+- **Also run under v2:**
+  - The existing `supabase/tests/095_goal_supports_goal.test.sql`: all 12 assertions passed, inside a rolled-back transaction.
+  - The app's own write path (`guard-app-path.mjs`, PostgREST as Riley): adding a next action under a goal works, one under a task is refused, and converting a goal that has one is refused.
+
+**Intentional new rule, documented in the SQL:** a next action can be filed only under a goal, meaning `goal_task_id` must point at an `is_goal` row when it is **set**. The app only does this, and without it the link path has nothing to re-check. Stored rows are not re-validated.
+
+**Out of scope, documented:** moving a season goal to another bucket, and deleting a goal (the foreign keys already set the link to null).
+
+**Not applied to the shared project; not pushed.** Applying it is a shared schema change and needs Scott's approval.
 
 ## Gaps and dependencies
 
