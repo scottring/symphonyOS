@@ -1,0 +1,41 @@
+import { open, shot, BASE } from './pw.mjs'
+import { execSync } from 'node:child_process'
+const goals = () => execSync(`psql postgresql://postgres:postgres@127.0.0.1:55322/postgres -Atc "select count(*) from tasks where user_id='00303a97-b751-48c5-86f6-511cc67ddb4a' and is_goal"`).toString().trim()
+const { browser, page } = await open({ who: 'casey' })
+const toast = async () => { await page.waitForTimeout(1500); return (await page.locator('[role=status]').allInnerTexts()).filter((s) => s.trim() && !/calendar/i.test(s)).join(' / ').replace(/\s+/g, ' ') }
+await page.goto(BASE + '/season?start=2026-09-01'); await page.waitForTimeout(3500)
+const pick = async () => {
+  await page.getByRole('button', { name: 'Choose Fall 2026’s goals' }).click()
+  const panel = page.getByRole('region', { name: "Choose Fall 2026's goals" })
+  for (const t of ['Plan winter vacation', 'Nourish a love of reading', 'Get the house ready for winter', 'Build a steady running habit', 'Finish the basement playroom', 'Get finances organized', 'Deepen friendships', 'Learn three new weeknight', 'Launch the newsletter']) await panel.getByRole('checkbox', { name: new RegExp(t) }).check()
+  await panel.getByRole('button', { name: /^Preview/ }).click(); await panel.getByRole('button', { name: /^Make 9 goals$/ }).click(); await page.waitForTimeout(3500)
+}
+await pick(); console.log('sorted, goals in DB:', goals())
+await page.reload(); await page.waitForTimeout(3000)
+await page.getByRole('button', { name: 'Undo the sort' }).click()
+console.log('undo toast:', await toast(), '| goals in DB:', goals())
+await page.reload(); await page.waitForTimeout(3000)
+console.log('prompt back?', await page.getByRole('button', { name: 'Choose Fall 2026’s goals' }).count())
+await pick(); console.log('re-sorted, goals in DB:', goals())
+// Route down: a month goal for the house, then a next action planned into a week
+await page.reload(); await page.waitForTimeout(3000)
+await page.getByRole('button', { name: 'Add a month goal for Get the house ready for winter' }).click()
+await page.keyboard.type('Winterize the yard')
+await page.getByLabel('Which month').selectOption({ label: 'October' })
+await page.keyboard.press('Enter').catch(() => {})
+await page.getByRole('button', { name: 'Add', exact: true }).click().catch(() => {})
+console.log('refine toast:', await toast())
+await shot(page, 'k5-fall-after-refine', false)
+// An existing single action filed under a season goal
+const link = page.getByRole('button', { name: 'Link Buy snow tires to a goal' })
+if (await link.count()) { await link.click(); await page.getByRole('dialog', { name: 'Link to goal' }).getByRole('button', { name: /Get the house ready for winter/ }).click(); await page.waitForTimeout(1500); console.log('linked snow tires') } else console.log('no link control for snow tires')
+await page.goto(BASE + '/month?start=2026-10-01'); await page.waitForTimeout(3500)
+const exp = page.getByRole('button', { name: 'Show next actions under Winterize the yard' }); if (await exp.count()) await exp.click()
+await page.getByRole('combobox', { name: 'Which week — next action for Winterize the yard' }).selectOption({ label: 'Week of October 4–10' })
+await page.getByRole('textbox', { name: 'New next action for Winterize the yard' }).fill('Drain the outdoor taps'); await page.keyboard.press('Enter')
+console.log('action toast:', await toast())
+await shot(page, 'k6-october-after', true)
+await page.goto(BASE + '/week?start=2026-10-04'); await page.waitForTimeout(3500)
+console.log('WEEK:', (await page.getByRole('region', { name: "This week's list" }).innerText()).replace(/\n+/g, ' | ').slice(0, 250))
+await shot(page, 'k7-week-oct4', false)
+await browser.close()

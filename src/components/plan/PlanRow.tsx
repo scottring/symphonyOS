@@ -261,6 +261,9 @@ export function PlanRow({
   // and a step never nests further, so neither offers a disclosure. A goal
   // with no steps still gets one when it can TAKE them — that is the way in.
   const canHoldSteps = row.isGoal && row.kind === 'task' && (!!onAddStep || (row.steps?.length ?? 0) > 0)
+  /** A goal shown shut: on a phone it is one compact entry — its people ride
+   *  the "· show" line and its Move menu waits until it is opened. */
+  const goalShut = canHoldSteps && !expanded
   const shown = stepsToDraw ?? row.steps ?? []
   const tally = counts ?? stepCounts(row)
   const [stepDraft, setStepDraft] = useState('')
@@ -273,10 +276,6 @@ export function PlanRow({
    * race to it (seen live, 2026-09-24).
    */
   const [wantStepFocus, setWantStepFocus] = useState(false)
-  const addStepHere = () => {
-    setWantStepFocus(true)
-    if (!expanded) onToggleExpand?.(row)
-  }
   useEffect(() => {
     if (!wantStepFocus || !expanded) return
     stepInputRef.current?.focus()
@@ -371,8 +370,14 @@ export function PlanRow({
         {row.supports && (
           <SupportLine label="Supports" refs={[row.supports]} onOpen={onOpenSupport} />
         )}
-        {goalControls}
-        {refine}
+        {/* A goal's controls — its link up, its refine and next-action
+            links — appear when the goal is OPENED, so a list of goals reads
+            as goals, not as a wall of controls (Scott, 2026-09-26). Opening
+            is a real button (the caret, and the line below), never hover. */}
+        {(!canHoldSteps || expanded) && goalControls}
+        {/* A goal that takes next actions carries its refine link on the same
+            line as "+ Add a next action" (below); a year goal has only this. */}
+        {!canHoldSteps && refine}
         {!!row.supportedBy?.length && (
           <SupportLine label="Supported by" refs={row.supportedBy} onOpen={onOpenSupport} />
         )}
@@ -389,22 +394,22 @@ export function PlanRow({
         })()}
         {/* What the goal holds, said whether it is open or shut — a collapsed
             goal that only says "5 supporting tasks" hides how much is done. */}
-        {canHoldSteps && (tally.total > 0 || !!onAddStep) && (
+        {canHoldSteps && (tally.total > 0 || !!onAddStep || !!refine) && (
           <span className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs">
-            {tally.total > 0 && (
-              <button ref={countsRef} type="button" onClick={() => onToggleExpand?.(row)} className="text-primary-700 hover:underline">
-                {countsLabel(tally)}{expanded ? ' · hide' : ' · show'}
-              </button>
-            )}
-            {/* Reachable without opening the goal first (long-list acceptance). */}
-            {onAddStep && (
-              <button type="button" onClick={addStepHere} className="text-neutral-500 hover:text-primary-700 hover:underline">
-                + Add a next action
-              </button>
-            )}
+            {/* ONE element open or shut, so keyboard focus stays on it. On a
+                phone it is a full 44px target when shut: the way in to a goal
+                is a tap, never a hover. */}
+            <button ref={countsRef} type="button" onClick={() => onToggleExpand?.(row)}
+              className={`period-goal-open inline-flex items-center text-primary-700 hover:underline ${expanded ? '' : 'min-h-[44px] sm:min-h-0'}`}>
+              {tally.total > 0 ? countsLabel(tally) : 'No next actions yet'}{expanded ? ' · hide' : ' · show'}
+            </button>
+            {expanded && refine}
+            {/* No "+ Add a next action" link here: once a goal is open its
+                next-action box is right below, and the link repeated it. */}
             {hiddenByFilter > 0 && (
               <span className="text-neutral-400">{hiddenByFilter} hidden by the filter</span>
             )}
+            {mobile && goalShut && who && <span className="ml-auto">{who}</span>}
           </span>
         )}
         {/* Where this row is committed, on its own line beneath the title —
@@ -412,7 +417,7 @@ export function PlanRow({
         {row.placed && (
           <PlacementChip placed={row.placed} onOpenPlaced={onOpenPlaced} />
         )}
-        {mobile && (timing || who) && (
+        {mobile && (timing || who) && !(goalShut && !timing) && (
           <span className="mt-1.5 flex max-w-full items-center gap-2">{timing}{who}</span>
         )}
       </span>
@@ -423,7 +428,7 @@ export function PlanRow({
       {/* Phone: the same verbs behind one visible Move control (native
           MoveMenuButton) — a native picker, so it is reachable by touch,
           keyboard and screen reader alike, and never swipe-only. */}
-      {verbs.length > 0 && (
+      {verbs.length > 0 && !goalShut && (
         <label className="period-row-move sm:hidden">
           <span aria-hidden="true">Move</span>
           <ChevronDown className="h-3 w-3" aria-hidden="true" />

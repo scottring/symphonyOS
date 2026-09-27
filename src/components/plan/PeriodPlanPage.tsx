@@ -26,7 +26,7 @@ import { useSupabaseTasks } from '@/hooks/useSupabaseTasks'
 import { useActionableInstances } from '@/hooks/useActionableInstances'
 import { makePlanActions, timingRemoval } from '@/lib/planning/planActions'
 import { goalListView, hiddenLabel, clearFilterOnEscape } from '@/lib/planning/goalListView'
-import { GoalParentLink, GoalStatusControl, parentRungLabel } from './GoalParentLink'
+import { GoalParentLink, parentRungLabel } from './GoalParentLink'
 import { expansionKey, readExpanded, writeExpanded } from './goalExpansion'
 import { planDropHandlers } from '@/lib/planning/planDrag'
 import { showToast } from '@/hooks/useToast'
@@ -73,6 +73,8 @@ import { goalConversion } from '@/lib/planning/goalConversion'
 import { makeTaskAGoal } from './MakeGoalControl'
 import { NextLevelStrip } from './NextLevelStrip'
 import { RefineGoalControl } from './RefineGoalControl'
+import { SortPlanPanel } from './SortPlanPanel'
+import { sortCandidates, sortUndo, readSortBatch, writeSortBatch, type SortBatch } from '@/lib/planning/sortPlan'
 import { nextLevelChoices } from '@/lib/planning/nextLevel'
 import { PeriodShelves } from './PeriodShelves'
 import { useDayLoadEvents, DAY_LOAD_RANGE_DAYS } from '@/hooks/useDayLoadEvents'
@@ -84,6 +86,11 @@ import { useDayLoadEvents, DAY_LOAD_RANGE_DAYS } from '@/hooks/useDayLoadEvents'
 const TASK_PREVIEW_CAP = 5
 
 const NOUN: Record<PlanLevel, string> = { month: 'month', season: 'season', year: 'year' }
+/** The period as the sort's sentences name it: "Fall 2026", "October". */
+function shortLabelFor(level: PlanLevel, bounds: { start: Date; label: string }): string {
+  return level === 'month' ? bounds.start.toLocaleDateString('en-US', { month: 'long' }) : bounds.label
+}
+
 /** "1 goal · 3 tasks" — the status line's count, singular when it is one. */
 function countLine(goals: number, tasks: number | null): string {
   const g = `${goals} goal${goals === 1 ? '' : 's'}`
@@ -938,6 +945,76 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
   const doneTaskRows = useMemo(() => looseRows.filter((r) => rowIsDone(r.fate)), [looseRows])
   const lowerLabelText = lowerLevel(level) === 'week' ? 'this week' : lowerMonth ? lowerMonth.toLocaleDateString('en-US', { month: 'long' }) : 'this month'
   const availableTaskRows = openTaskRows.filter((r) => !r.placed)
+
+  // ── Sorting an existing list into goals (horizon flows correction) ─────────
+  // An imported plan arrives flat — outcomes and single actions as equals —
+  // and new-item defaults cannot fix what is already there. The sort is ONE
+  // reviewed step over the whole list: pick, preview, confirm, undo.
+  const sortLevel = level === 'season' ? 'season' : 'month'
+  const candidates = useMemo(() => (split && !isPast
+    ? sortCandidates(split.loose, tasks, (t) => placementFateOf(t, sortLevel, bounds.start))
+    : []), [split, isPast, tasks, sortLevel, bounds.start])
+  const sortableCount = candidates.filter((c) => !c.blocked).length
+  const periodYmd = localYmd(bounds.start)
+  const promptKey = `symphony.plan.sortPrompt.${level}.${periodYmd}`
+  const [sortOpen, setSortOpen] = useState(false)
+  const [promptDismissed, setPromptDismissed] = useState(() => readOpen(promptKey))
+  const [sortBatch, setSortBatch] = useState<SortBatch | null>(() => readSortBatch(level, periodYmd))
+  const lastSortPeriod = useRef(periodYmd)
+  if (lastSortPeriod.current !== periodYmd) {
+    lastSortPeriod.current = periodYmd
+    setSortOpen(false)
+    setPromptDismissed(readOpen(promptKey))
+    setSortBatch(readSortBatch(level, periodYmd))
+  }
+  /** The prominent invitation: a period with NO goals whose list holds
+   *  several things that could be. Otherwise the way in is a quiet link. */
+  const sortProminent = !isPast && level !== 'year' && goalRows.length === 0 && sortableCount >= 2 && !promptDismissed
+  const dismissPrompt = useCallback(() => {
+    writeOpen(promptKey, true); setPromptDismissed(true); setSortOpen(false)
+  }, [promptKey])
+
+  const confirmSort = useCallback(async (ids: string[]): Promise<string[]> => {
+    const missed: string[] = []
+    for (const id of ids) {
+      // `isGoal` alone: not a placement write and not gated, so twenty rows
+      // do not mean twenty "Where does this belong?" questions.
+      const ok = await Promise.resolve(updateTask(id, { isGoal: true })).then((r) => r !== false, () => false)
+      if (!ok) missed.push(id)
+    }
+    const landed = ids.filter((id) => !missed.includes(id))
+    if (landed.length) {
+      const batch = { ids: [...new Set([...(sortBatch?.ids ?? []), ...landed])], at: Date.now() }
+      writeSortBatch(level, periodYmd, batch)
+      setSortBatch(batch)
+      showToast(`${shortLabelFor(level, bounds)} now has ${landed.length} new goal${landed.length === 1 ? '' : 's'}. Open one to add month goals or next actions.`, 'success', 7000)
+    }
+    if (missed.length === 0) setSortOpen(false)
+    return missed
+  }, [updateTask, sortBatch, level, periodYmd, bounds])
+
+  const undoSort = useCallback(async () => {
+    if (!sortBatch) return
+    const { revert, kept } = sortUndo(sortBatch.ids, tasks)
+    const missed: string[] = []
+    for (const t of revert) {
+      const ok = await Promise.resolve(updateTask(t.id, { isGoal: false })).then((r) => r !== false, () => false)
+      if (!ok) missed.push(t.id)
+    }
+    const remaining = [...kept.map((k) => k.task.id), ...missed]
+    const next = remaining.length ? { ids: remaining, at: sortBatch.at } : null
+    writeSortBatch(level, periodYmd, missed.length ? next : null)
+    setSortBatch(missed.length ? next : null)
+    const parts = [`${revert.length - missed.length} back to single actions.`]
+    if (kept.length) parts.push(`${kept.length} kept as ${kept.length === 1 ? 'a goal' : 'goals'} — ${kept.length === 1 ? 'it now holds' : 'they now hold'} next actions.`)
+    if (missed.length) parts.push(`${missed.length} didn’t change — try again.`)
+    showToast(parts.join(' '), missed.length ? 'warning' : 'success', 7000)
+  }, [sortBatch, tasks, updateTask, level, periodYmd])
+  // One row at a time is the wrong tool for a whole list: when the sort is on
+  // offer, the per-row "Break into next actions" link steps aside (it stays
+  // in task details, and a lone candidate still gets it).
+  const rowMakeGoal = sortableCount >= 2 ? undefined : makeGoalFor
+  const sortBatchLive = sortBatch ? sortBatch.ids.filter((id) => tasks.find((t) => t.id === id)?.isGoal).length : 0
   const assignedTaskRows = openTaskRows.filter((r) => !!r.placed)
   const visibleTaskRows = showAll ? availableTaskRows : availableTaskRows.slice(0, TASK_PREVIEW_CAP)
   // Gated on the LIST being long, not on rows being hidden right now —
@@ -1132,21 +1209,6 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
       : `“${row.title}” no longer supports another goal. Nothing else changed.`, 'success', 5000)
   }, [gated, level])
 
-  const setGoalStatus = useCallback(async (row: PlanRowModel, next: 'active' | 'completed') => {
-    // The goal's OWN completion. Its steps are not consulted and not touched.
-    setPendingGoal(row.id)
-    let ok = false
-    try {
-      ok = (await gated.updateTask(row.id, { completed: next === 'completed' })) !== false
-    } catch {
-      ok = false
-    } finally {
-      setPendingGoal(null)
-    }
-    if (!ok) {
-      showToast(`Couldn’t change the status of “${row.title}”. It is unchanged — try again.`, 'error', 6000)
-    }
-  }, [gated])
 
   const goalControlsFor = useCallback((row: PlanRowModel) => {
     if (level === 'year' || isPast) return undefined
@@ -1162,15 +1224,9 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
           onUnlink={() => { void linkParent(row, null) }}
           disabled={busy}
         />
-        <GoalStatusControl
-          goalTitle={row.title}
-          status={rowIsDone(row.fate) ? 'completed' : 'active'}
-          onChange={(next) => { void setGoalStatus(row, next) }}
-          disabled={busy}
-        />
       </span>
     )
-  }, [level, isPast, parentChoices, linkParent, setGoalStatus, pendingGoal])
+  }, [level, isPast, parentChoices, linkParent, pendingGoal])
 
 
   // ── The year's writers. A year row is a GOAL, so every verb is a goal
@@ -1478,6 +1534,30 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
                 : level === 'season'
                   ? 'The outcomes and projects this season is for. Break one into month goals, or add its next actions.'
                   : 'The outcomes and projects this month is for. Add each one’s next actions and plan them into weeks — the goal stays here.'}</p>
+            {sortOpen ? (
+              <SortPlanPanel periodLabel={shortLabel} candidates={candidates} onConfirm={confirmSort} onClose={() => setSortOpen(false)} />
+            ) : sortProminent ? (
+              <div className="sort-plan-prompt mt-3 rounded-xl border border-primary-100 bg-primary-50/60 p-4">
+                <p className="text-[15px] leading-snug text-neutral-800">
+                  {shortLabel}’s list has {sortableCount + candidates.filter((c) => c.blocked).length} items and no goals yet.
+                </p>
+                <p className="mt-1 text-[13px] leading-snug text-neutral-600">
+                  Some are probably outcomes or projects{candidates[0] ? <> — like “{candidates.find((c) => !c.blocked)?.task.title}”</> : null} — and some are single actions. Choose the outcomes: they become {shortLabel}’s goals, the same items with nothing copied or lost.
+                </p>
+                <div className="mt-3 flex flex-wrap items-center gap-2">
+                  <button type="button" onClick={() => setSortOpen(true)}
+                    className="rounded-md bg-primary-600 px-3 py-2 text-sm font-semibold text-white">Choose {shortLabel}’s goals</button>
+                  <button type="button" onClick={dismissPrompt} className="rounded-md px-3 py-2 text-sm text-neutral-600 hover:bg-white">Not now</button>
+                </div>
+              </div>
+            ) : null}
+            {!sortOpen && sortBatchLive > 0 && (
+              <p className="sort-plan-undo mt-2 flex flex-wrap items-center gap-x-2 px-1 text-[13px] text-neutral-500">
+                <span>{sortBatchLive} of these goals came from sorting {shortLabel}’s list.</span>
+                <button type="button" onClick={() => { void undoSort() }} className="font-medium text-primary-700 hover:underline">Undo the sort</button>
+                <button type="button" onClick={() => { writeSortBatch(level, periodYmd, null); setSortBatch(null) }} className="text-neutral-400 hover:text-neutral-600" aria-label="Keep them as goals and hide this">Keep</button>
+              </p>
+            )}
             <div className="mt-3">
               {goalRows.length === 0 ? (
                 isPast ? (
@@ -1523,7 +1603,7 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
                   ) : (
                   <ul>
                     {goalView.goals.map((g) => (
-                      <PlanRow assign={assignFor} makeGoal={makeGoalFor} key={g.row.id} row={g.row} onOpen={open} onOpenPlaced={openPlaced} onOpenSupport={openSupport} onAction={(a, r) => { void act(a, r) }} planWeek={planWeekSlot} timingReachesLower={level === 'month'}
+                      <PlanRow assign={assignFor} makeGoal={rowMakeGoal} key={g.row.id} row={g.row} onOpen={open} onOpenPlaced={openPlaced} onOpenSupport={openSupport} onAction={(a, r) => { void act(a, r) }} planWeek={planWeekSlot} timingReachesLower={level === 'month'}
                         lowerLabel={lowerLabelText}
                         expanded={g.expanded}
                         onToggleExpand={toggleGoal}
@@ -1548,7 +1628,7 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
                 <details className="period-assigned-fold" key={`goals-${level}-${bounds.start.toISOString()}`} open={isPast || undefined}>
                   <summary>Completed goals · {doneGoalRows.length}</summary>
                   <ul>{doneGoalRows.map((row) => (
-                    <PlanRow assign={assignFor} makeGoal={makeGoalFor} key={row.id} row={row} onOpen={open} onOpenPlaced={openPlaced} onOpenSupport={openSupport} planWeek={planWeekSlot} timingReachesLower={level === 'month'}
+                    <PlanRow assign={assignFor} makeGoal={rowMakeGoal} key={row.id} row={row} onOpen={open} onOpenPlaced={openPlaced} onOpenSupport={openSupport} planWeek={planWeekSlot} timingReachesLower={level === 'month'}
                       // A finished goal keeps its controls: reopening one is
                       // the whole reason to look at this fold (Codex).
                       goalControls={goalControlsFor(row)}
@@ -1609,7 +1689,15 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
             <section aria-label={`${bounds.label} list`} className="period-tasks-card">
               {/* Secondary by design (horizon flows): the page is for outcomes,
                   and a one-off action that needs no goal still has a home. */}
-              <h2 className="px-1 font-display text-xl text-neutral-700">Single actions</h2>
+              <div className="flex flex-wrap items-baseline gap-x-3 px-1">
+                <h2 className="font-display text-xl text-neutral-700">Single actions</h2>
+                {!sortOpen && !sortProminent && sortableCount >= 1 && (
+                  <button type="button" onClick={() => setSortOpen(true)}
+                    className="text-[13px] text-primary-700 hover:underline">
+                    Any of these goals? Choose…
+                  </button>
+                )}
+              </div>
               <p className="period-section-note">{level === 'month'
                 ? 'One-off work that needs no goal. Plan each into a week — or break a bigger one into next actions.'
                 : 'One-off work that needs no goal. Plan each into a month — or break a bigger one into next actions.'}</p>
@@ -1640,7 +1728,7 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
                   {availableTaskRows.length === 0 && <p className="period-section-note">Every open task has a more specific commitment.</p>}
                   <ul>
                     {visibleTaskRows.map((row) => (
-                      <PlanRow assign={assignFor} makeGoal={makeGoalFor} key={row.id} row={row} onOpen={open} onOpenPlaced={openPlaced} onOpenSupport={openSupport} onAction={(a, r) => { void act(a, r) }} planWeek={planWeekSlot} timingReachesLower={level === 'month'}
+                      <PlanRow assign={assignFor} makeGoal={rowMakeGoal} key={row.id} row={row} onOpen={open} onOpenPlaced={openPlaced} onOpenSupport={openSupport} onAction={(a, r) => { void act(a, r) }} planWeek={planWeekSlot} timingReachesLower={level === 'month'}
                         lowerLabel={lowerLabelText}
                         actions={actionsFor({ fate: row.fate, isGoal: row.isGoal, isPast, level, hasGoals: goalRows.length > 0 })} />
                     ))}
@@ -1723,7 +1811,7 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
                   <summary>{level === 'month' ? 'Planned into weeks' : 'Planned into months'} · {assignedTaskRows.length}</summary>
                   <p className="period-section-note">Still part of this {noun}’s plan — open {level === 'month' ? 'a week' : 'a month'} below to plan its days.</p>
                   <ul>{assignedTaskRows.map((row) => (
-                    <PlanRow assign={assignFor} makeGoal={makeGoalFor} key={row.id} row={row} onOpen={open} onOpenPlaced={openPlaced} onOpenSupport={openSupport} planWeek={planWeekSlot} timingReachesLower={level === 'month'}
+                    <PlanRow assign={assignFor} makeGoal={rowMakeGoal} key={row.id} row={row} onOpen={open} onOpenPlaced={openPlaced} onOpenSupport={openSupport} planWeek={planWeekSlot} timingReachesLower={level === 'month'}
                       onAction={(a, r) => { void act(a, r) }} lowerLabel={lowerLabelText}
                       actions={actionsFor({ fate: row.fate, isGoal: false, isPast, level, hasGoals: goalRows.length > 0 })} />
                   ))}</ul>
@@ -1747,7 +1835,7 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
                   {doneOpen && (
                     <ul className="mt-1 border-t border-neutral-200">
                       {doneTaskRows.map((row) => (
-                        <PlanRow assign={assignFor} makeGoal={makeGoalFor} key={row.id} row={row} onOpen={open} onOpenPlaced={openPlaced} onOpenSupport={openSupport} onAction={(a, r) => { void act(a, r) }} planWeek={planWeekSlot} timingReachesLower={level === 'month'}
+                        <PlanRow assign={assignFor} makeGoal={rowMakeGoal} key={row.id} row={row} onOpen={open} onOpenPlaced={openPlaced} onOpenSupport={openSupport} onAction={(a, r) => { void act(a, r) }} planWeek={planWeekSlot} timingReachesLower={level === 'month'}
                           lowerLabel={lowerLabelText}
                         actions={actionsFor({ fate: row.fate, isGoal: row.isGoal, isPast, level })} />
                       ))}
