@@ -1,5 +1,6 @@
--- PREPARED — NOT APPLIED to the shared project. Needs review and Scott's
--- explicit approval, as its own step. Local proof:
+-- APPLIED to the shared project 2026-09-27 on Scott's approval (after Codex
+-- review of 2abff22f), before the UI that relies on it was deployed. Verified
+-- there by catalog and a rolled-back call (no account data). Local proof:
 --   supabase/tests/102_goal_link_visible.test.sql (as `authenticated`, rolled back)
 -- Rollback: supabase/migrations/rollback/2026-09-27_goal_link_visible.down.sql
 --

@@ -4,7 +4,7 @@ Branch `claude/goal-existing-action`, stacked on `claude/paper-type-selector`. I
 
 1. `Page review: "Use existing item" instead of "Link"`: import-sheet wording only.
 2. `Goals: add an existing action`: the feature (UI, lib, unit tests).
-3. `Prepared migration: goal links only to goals you can see`: **NOT APPLIED to the shared project**; needs review and Scott's approval.
+3. `Prepared migration: goal links only to goals you can see`: **applied to production on 2026-09-27** on Scott's approval, before the deploy.
 4. This doc and the local acceptance scripts.
 
 A separate commit on the selector branch, `19a47bac`, fixes a pre-existing bug found in the audit: a reused ("Use existing item") year-goal, routine or day-fact line was still inserted. It needs its own review before the selector ships.
@@ -40,7 +40,9 @@ Filing an existing action writes that one column through `updateTask`, which has
 - **The goal side is a gap on production today.** The applied `guard_goal_link_target` is `SECURITY DEFINER` and checks only that the target is a goal. A signed-in user could therefore file a task under a goal id they cannot see, including one in another household. The prepared migration `2026-09-27_goal_link_visible.sql` refuses that (`42501`), using the tasks SELECT rule. Server writers are unchanged.
   - Proof: `supabase/tests/102_goal_link_visible.test.sql` runs as real `authenticated` users on the local stack, rolled back (`run-102.sh`). Case 4 fails without the migration and every case passes with it.
 - **A private action under a shared goal** stays private. The picker says so, and a household member sharing the goal does not see it (test case 9, and live as Sam: two shared actions shown, the private one not).
-- The UI now **must not be deployed without the migration**, or the goal side is enforced only by the client offering visible goals.
+- The migration was applied to production before the UI deployed (2026-09-27).
+  - Verified there by catalog and a rolled-back call: the guard checks visibility for both link columns; an unknown/unseen goal returns false; server writers are unchanged; `authenticated` cannot call the helper.
+  - A behavioural check with a real account was not run on production. The full behaviour is proven on the local stack (`run-102.sh`).
 
 ## Verification
 
