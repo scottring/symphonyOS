@@ -27,7 +27,7 @@ worktree is untouched.
 ## Evidence
 
 **Component and mocked integration (vitest).**
-- 7325 passed and 3 skipped across the full suite. The one failing file is `connectors/src/whatsapp/adapter.test.ts`: the `@whiskeysockets/baileys` package isn't installed in this worktree, which is unrelated.
+- 7333 passed and 3 skipped across the full suite. The one failing file is `connectors/src/whatsapp/adapter.test.ts`: the `@whiskeysockets/baileys` package isn't installed in this worktree, which is unrelated.
 - tsc, `npm run build` and lint are clean (0 errors).
 - New or updated tests:
   - An empty season creates a goal from its primary box, with no conversion.
