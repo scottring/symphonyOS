@@ -430,9 +430,10 @@ export function PageReviewSheet({
                             ? <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-800"><Target className="w-3 h-3" />Goal</span>
                             : row.kind === 'dayfact'
                               ? <span className="inline-flex shrink-0 items-center rounded-md border border-neutral-200 bg-neutral-50 px-1.5 py-0.5 text-[10px] font-semibold leading-none text-neutral-500">Day</span>
-                              : <ItemTypeSelect value={itemTypeOf(row)} title={row.title} onChange={(t) => changeType(i, t)} />}
+                              : <ItemTypeSelect value={itemTypeOf(row)} title={row.title} disabled={!!row.sourceId} onChange={(t) => changeType(i, t)} />}
                           <input
                             value={row.title}
+                            readOnly={!!row.sourceId}
                             onChange={(e) => updateItem(i, { title: e.target.value })}
                             aria-label="Task title"
                             className="min-w-[11rem] flex-1 bg-transparent text-[15px] text-neutral-900 focus:outline-none"
@@ -452,7 +453,18 @@ export function PageReviewSheet({
                         {/* The same errand, written twice: one tap says which. */}
                         {row.dup && !row.dupDismissed && (
                           row.sourceId
-                            ? <p className="mt-1 text-[12px] text-neutral-500">Already on your plan as <i className="text-neutral-700">{row.dup.title}</i> — it won’t be added again.</p>
+                            ? (
+                              <p role="status" className="mt-1 flex flex-wrap items-center gap-1.5 text-[12px] text-neutral-600">
+                                <span>Uses <i className="text-neutral-800">{row.dup.title}</i>, already on your plan, exactly as it is — nothing on this line is saved.</span>
+                                <button
+                                  type="button"
+                                  onClick={() => updateItem(i, { sourceId: undefined })}
+                                  className="rounded-md border border-neutral-200 bg-white px-1.5 py-0.5 font-medium text-neutral-700 hover:bg-neutral-50"
+                                >
+                                  Unlink
+                                </button>
+                              </p>
+                            )
                             : (
                               <p className="mt-1 flex flex-wrap items-center gap-1.5 text-[12px] text-neutral-500">
                                 Looks like <i className="text-neutral-700">{row.dup.title}</i>
@@ -477,6 +489,7 @@ export function PageReviewSheet({
                     </div>
                     <div className="ml-7 flex flex-wrap items-center gap-2 sm:ml-0 sm:shrink-0 sm:flex-nowrap">
                       {row.kind !== 'recurring' && <select
+                        disabled={!!row.sourceId}
                         value={placementValue(row.placement)}
                         onChange={(e) => {
                           const placement = placementFromValue(e.target.value)
@@ -512,6 +525,7 @@ export function PageReviewSheet({
                         <button
                           type="button"
                           aria-pressed={!!row.goal}
+                          disabled={!!row.sourceId}
                           aria-label={`Make "${row.title}" a goal`}
                           title={row.goal ? 'A goal on this list — tap to make it a task' : 'Make it a goal'}
                           onClick={() => updateItem(i, { goal: !row.goal })}
@@ -531,9 +545,10 @@ export function PageReviewSheet({
                           className="text-[13px] text-neutral-700 bg-neutral-100 rounded-lg px-2 py-1.5 shrink-0 w-[104px]"
                         />
                       )}
-                      {/* A year goal has no assignee — it is the household's year,
-                          not a chore — and a day-fact is a note. */}
-                      {row.placement.kind !== 'goal' && row.kind !== 'dayfact' && <select
+                      {/* Every row but a day-fact (a note) says who — Year goals
+                          included, which take assignees since #64. */}
+                      {row.kind !== 'dayfact' && <select
+                        disabled={!!row.sourceId}
                         value={row.assigneeId ?? UNASSIGNED}
                         onChange={(e) => updateItem(i, { assigneeId: e.target.value === UNASSIGNED ? null : e.target.value, assigneeDefaulted: false })}
                         aria-label={`Assignee for "${row.title}"`}

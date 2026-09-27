@@ -251,7 +251,7 @@ export function useGoals() {
     areaId: string | null,
     name: string,
     context?: 'work' | 'family' | 'personal',
-    extra?: { notes?: string | null; scope?: Scope; id?: string; year?: number; strategy?: string | null; carriedFrom?: string | null },
+    extra?: { notes?: string | null; scope?: Scope; id?: string; year?: number; strategy?: string | null; carriedFrom?: string | null; assignedToAll?: string[] },
   ) => {
     if (!user) return null
 
@@ -270,6 +270,7 @@ export function useGoals() {
       actions: [],
       milestones: [],
       carriedFrom: extra?.carriedFrom ?? undefined,
+      ...(extra?.assignedToAll ? { assignedToAll: extra.assignedToAll } : {}),
       createdAt: new Date(),
       updatedAt: new Date(),
     }
@@ -288,6 +289,9 @@ export function useGoals() {
         notes: extra?.notes ?? null,
         strategy: extra?.strategy ?? null,
         carried_from: extra?.carriedFrom ?? null,
+        // The people, as updateGoal writes them: an empty list is stored as
+        // null (Unassigned). Only sent when the caller chose — see updateGoal.
+        ...(extra?.assignedToAll ? { assigned_to_all: extra.assignedToAll.length ? extra.assignedToAll : null } : {}),
         // goals RLS shares on scope, not context — a family goal without this
         // stays private to its author despite looking shared. It is DERIVED,
         // never chosen (scope.ts).

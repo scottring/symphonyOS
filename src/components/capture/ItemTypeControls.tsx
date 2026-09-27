@@ -13,9 +13,11 @@ const META: Record<PaperItemType, { Icon: typeof Circle; className: string }> = 
 
 /** A row's type, as a native select: keyboard, screen reader and the phone's
  *  own picker all come with it. */
-export function ItemTypeSelect({ value, title, onChange }: {
+export function ItemTypeSelect({ value, title, onChange, disabled = false }: {
   value: PaperItemType
   title: string
+  /** A linked row saves nothing of its own, so its type cannot change. */
+  disabled?: boolean
   onChange: (type: PaperItemType) => void
 }) {
   const { Icon, className } = META[value]
@@ -24,6 +26,7 @@ export function ItemTypeSelect({ value, title, onChange }: {
       <Icon className="pointer-events-none absolute left-1.5 h-3 w-3" aria-hidden="true" />
       <select
         value={value}
+        disabled={disabled}
         onChange={(e) => onChange(e.target.value as PaperItemType)}
         aria-label={`Type of "${title}"`}
         className="appearance-none bg-transparent py-1 pl-[1.9em] pr-[1.7em] text-[11px] font-semibold leading-none text-inherit focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-400 rounded-md cursor-pointer"

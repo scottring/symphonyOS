@@ -25,6 +25,7 @@ import { useRoutines } from '@/hooks/useRoutines'
 import { useGoalsContext } from '@/contexts/GoalsContext'
 import { scopeForDomain } from '@/lib/scope'
 import { showToast } from '@/hooks/useToast'
+import { useFamilyMembers } from '@/hooks/useFamilyMembers'
 import type { TaskContext } from '@/types/task'
 
 export interface CommitPagePayload {
@@ -88,6 +89,7 @@ export function useCommitPage() {
   // GoalsProvider wraps the whole tasks app, so this is the already-loaded
   // goals state, not a second fetch.
   const { areas, addGoal } = useGoalsContext()
+  const { getCurrentUserMember } = useFamilyMembers()
 
   const commitPage = useCallback(async ({ items, notes, storagePath, monthStart, seasonStart, domain, altitude }: CommitPagePayload): Promise<CommitPageResult> => {
     // A committed page writes the page's own domain everywhere it lands.
@@ -161,9 +163,14 @@ export function useCommitPage() {
     // note and derived scope ride the row.
     let goalsCreated = 0
     for (const item of items.filter((i) => i.placement.kind === 'goal')) {
+      // The person chosen on the sheet rides the insert, as on every other
+      // row (Year goals take assignees since #64): Unassigned stays empty, and
+      // the scope is derived from the people exactly as updateGoal derives it.
+      const people = item.assigneeId ? [item.assigneeId] : []
       const created = await addGoal(areas[0]?.id ?? null, item.title, context, {
         notes: item.note,
-        scope: scopeForDomain(context, [], null),
+        assignedToAll: people,
+        scope: scopeForDomain(context, people, getCurrentUserMember()?.id ?? null),
       })
       if (created) goalsCreated += 1
       else failures += 1
@@ -242,11 +249,16 @@ export function useCommitPage() {
         6000,
       )
     } else if (parts.length) {
-      showToast(`Added ${parts.join(', ')} to ${periodLabel}`, 'success', 4000)
+      const linkedNote = tasksLinked ? `. ${tasksLinked} already on your plan, left as ${tasksLinked === 1 ? 'it is' : 'they are'}` : ''
+      showToast(`Added ${parts.join(', ')} to ${periodLabel}${linkedNote}`, 'success', 4000)
+    } else if (tasksLinked) {
+      // Every line was linked to a task already on the plan: say so, rather
+      // than closing the sheet in silence.
+      showToast(`Nothing new to add — ${tasksLinked === 1 ? 'that item is' : `all ${tasksLinked} items are`} already on your plan, left as ${tasksLinked === 1 ? 'it is' : 'they are'}.`, 'success', 5000)
     }
 
     return { tasksCreated, ...(tasksLinked ? { tasksLinked } : {}), goalsCreated, notesCreated, routinesCreated, failures, route, periodLabel, createdTaskIds, createdNoteIds }
-  }, [addTask, addNote, addRoutine, areas, addGoal])
+  }, [addTask, addNote, addRoutine, areas, addGoal, getCurrentUserMember])
 
   return { commitPage }
 }
