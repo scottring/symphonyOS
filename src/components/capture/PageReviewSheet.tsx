@@ -1,15 +1,17 @@
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useDialogFocus } from '@/hooks/useDialogFocus'
-import { X, NotebookPen, HelpCircle, Target, ChevronLeft, ChevronRight, CalendarCheck2 } from 'lucide-react'
+import { X, NotebookPen, HelpCircle, Target, ChevronLeft, ChevronRight, CalendarCheck2, AlertCircle } from 'lucide-react'
 import { parseLocalYmd } from '@/lib/cadence/config'
-import { pageMonthStart, pageSeasonStart, planWindowDates, rewindowPlanItems, type PlanDay, type PlanItem, type PlanPlacement, type PageAltitude, type PageReviewPayload } from '@/lib/planParse'
+import { pageMonthStart, pageSeasonStart, planWindowDates, rewindowPlanItems, type PlanItem, type PlanPlacement, type PageAltitude, type PageReviewPayload } from '@/lib/planParse'
 import { normalizeSeasons, readSeasons, seasonLabel, nextSeasonStart, seasonStartFor, type Seasons } from '@/lib/cadence/seasons'
 import { findLikelyDuplicate, type ExistingTask } from '@/lib/planDuplicates'
 import { DOMAINS, type DomainId } from '@/lib/domains'
 import type { TitlePeriod } from '@/lib/planTitle'
 import type { PageNote } from '@/lib/pageParse'
 import type { FamilyMember } from '@/types/family'
-import { TaskKindBadge } from '@/components/task/TaskKindBadge'
+import { hasItemType, inferredCategory, itemTypeOf, itemTypeProblem, normalizeForSave, withItemType, type PaperItemType } from '@/lib/paperItemType'
+import { ItemTypeSelect, RoutineDaysPicker } from './ItemTypeControls'
+import { assigneeOptions, initialAssignee, UNASSIGNED } from '@/lib/paperAssignee'
 
 // The payload's shape lives with the rest of the page-from-paper model.
 export type { PageReviewPayload } from '@/lib/planParse'
@@ -40,6 +42,9 @@ export interface PageReviewSheetProps {
   /** The domain to open on. Default: the one remembered for this altitude, else Family. */
   initialDomain?: DomainId
   members: FamilyMember[]
+  /** The signed-in user's member id, found by auth identity (signedInMember).
+   *  Unnamed lines start on it; null = not known, and they start Unassigned. */
+  currentMemberId?: string | null
   committing: boolean
   /** Called with only the checked rows, as edited. */
   onCommit: (payload: PageReviewPayload) => void
@@ -59,10 +64,14 @@ interface ItemRow extends PlanItem {
   dup?: ExistingTask | null
   /** "Keep separate" was pressed — the offer is done with. */
   dupDismissed?: boolean
+  /** Said once a type change undid something (a goal that stopped being one). */
+  typeNotice?: string | null
+  /** The page named no one and nobody has picked yet — the assignee is the
+   *  signed-in default, filled in if that identity arrives after opening. */
+  assigneeDefaulted?: boolean
 }
 interface NoteRow extends PageNote { included: boolean }
 
-const UNASSIGNED = ''
 
 function placementValue(p: PlanPlacement): string {
   return p.kind === 'date' ? p.date : p.kind
@@ -102,9 +111,6 @@ function dateLabel(ymd: string): string {
   return parseLocalYmd(ymd).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
 }
 
-const DAY_LABEL: Record<PlanDay, string> = {
-  sun: 'Sun', mon: 'Mon', tue: 'Tue', wed: 'Wed', thu: 'Thu', fri: 'Fri', sat: 'Sat',
-}
 
 /** A day-fact and a calendar entry rarely word it the same: "No school —
  *  Labor Day" against "Labor Day". Strip the framing and compare what's left. */
@@ -150,8 +156,13 @@ function rememberedDomain(altitude: PageAltitude): DomainId | null {
 export function PageReviewSheet({
   items, notes, unclear, windowDates, altitude = 'week', seasons = readSeasons(), today = new Date(),
   titlePeriod = null, pageTitle = null, existingTasks = [], calendarTitlesByDay,
-  initialDomain, members, committing, onCommit, onClose, draftLabelFor, onAddToDraft,
+  initialDomain, members, currentMemberId = null, committing, onCommit, onClose, draftLabelFor, onAddToDraft,
 }: PageReviewSheetProps) {
+  // The picker: you once (by id), everyone else, and a real Unassigned. Every
+  // row's assignee is decided here, so the save writes exactly what is shown.
+  const memberIds = useMemo(() => new Set(members.map((m) => m.id)), [members])
+  const meId = currentMemberId && memberIds.has(currentMemberId) ? currentMemberId : null
+  const peopleOptions = useMemo(() => assigneeOptions(members, meId), [members, meId])
   // A caller's boundaries may be hand-written and out of calendar order; the
   // season maths below assume ordered ones.
   const seasonsOrdered = useMemo(() => normalizeSeasons(seasons), [seasons])
@@ -165,8 +176,25 @@ export function PageReviewSheet({
   const [itemRows, setItemRows] = useState<ItemRow[]>(() =>
     items
       .filter((i) => !onCalendar(i, calendarTitlesByDay))
-      .map((i) => ({ ...i, included: true, dup: findLikelyDuplicate(i.title, existingTasks) })),
+      // The type the badge used to only show is stamped on the row, so the
+      // one on screen is the one saved.
+      .map((i) => ({
+        ...i,
+        ...(i.kind === 'task' && hasItemType(i) && !i.category ? { category: inferredCategory(i) } : {}),
+        assigneeId: initialAssignee(i, memberIds, meId),
+        assigneeDefaulted: !(i.assigneeId && memberIds.has(i.assigneeId)),
+        included: true,
+        dup: findLikelyDuplicate(i.title, existingTasks),
+      })),
   )
+  // The household can finish loading after the sheet opens: rows still on the
+  // default then take the signed-in member. A row someone picked is left alone.
+  useEffect(() => {
+    if (!meId) return
+    setItemRows((rows) => (rows.some((r) => r.assigneeDefaulted && r.assigneeId === null)
+      ? rows.map((r) => (r.assigneeDefaulted && r.assigneeId === null ? { ...r, assigneeId: meId } : r))
+      : rows))
+  }, [meId])
   const [noteRows, setNoteRows] = useState<NoteRow[]>(() => notes.map((n) => ({ ...n, included: true })))
   const [unread, setUnread] = useState<string[]>(() => unclear)
   const [domain, setDomain] = useState<DomainId>(() => initialDomain ?? rememberedDomain(altitude) ?? 'family')
@@ -217,26 +245,52 @@ export function PageReviewSheet({
     () => itemRows.filter((r) => r.included).length + noteRows.filter((r) => r.included).length,
     [itemRows, noteRows],
   )
+  const typeCounts = useMemo(() => {
+    const counts: Record<PaperItemType, number> = { task: 0, appointment: 0, activity: 0, routine: 0 }
+    for (const r of itemRows) {
+      if (r.included && hasItemType(r) && !r.goal) counts[itemTypeOf(r)] += 1
+    }
+    return counts
+  }, [itemRows])
   const summary = useMemo(() => {
     const includedGoals = itemRows.filter((r) => r.included && (r.placement.kind === 'goal' || r.goal)).length
-    const includedItems = itemRows.filter((r) => r.included).length - includedGoals
+    const includedDays = itemRows.filter((r) => r.included && r.kind === 'dayfact').length
     const includedNotes = noteRows.filter((r) => r.included).length
+    const n = (count: number, one: string, many = `${one}s`) => (count > 0 ? `${count} ${count === 1 ? one : many}` : null)
+    const typed = [
+      n(typeCounts.task, 'task'),
+      n(typeCounts.appointment, 'appointment'),
+      n(typeCounts.activity, 'activity', 'activities'),
+      n(typeCounts.routine, 'routine'),
+    ]
     return [
-      includedItems > 0 || includedGoals === 0 ? `${includedItems} task${includedItems === 1 ? '' : 's'}` : null,
-      includedGoals > 0 ? `${includedGoals} goal${includedGoals === 1 ? '' : 's'}` : null,
-      includedNotes > 0 ? `${includedNotes} note${includedNotes === 1 ? '' : 's'}` : null,
+      ...(typed.some(Boolean) || includedGoals > 0 ? typed : ['0 tasks']),
+      n(includedGoals, 'goal'),
+      n(includedDays, 'day note'),
+      n(includedNotes, 'note'),
       unread.length > 0 ? `${unread.length} unclear` : null,
     ].filter(Boolean).join(' / ')
-  }, [itemRows, noteRows, unread.length])
+  }, [itemRows, noteRows, unread.length, typeCounts])
+  // Rows that cannot save as the type chosen — a routine with no days.
+  const problems = useMemo(
+    () => itemRows.filter((r) => r.included && itemTypeProblem(r)).length,
+    [itemRows],
+  )
   const isEmpty = itemRows.length === 0 && noteRows.length === 0 && unread.length === 0 && alreadyOnCalendar.length === 0
 
   const updateItem = (index: number, patch: Partial<ItemRow>) =>
     setItemRows((prev) => prev.map((r, i) => (i === index ? { ...r, ...patch } : r)))
+  const changeType = (index: number, type: PaperItemType) =>
+    setItemRows((prev) => prev.map((r, i) => {
+      if (i !== index) return r
+      const { item, notice } = withItemType(r, type)
+      return { ...(item as ItemRow), typeNotice: notice }
+    }))
   const updateNote = (index: number, patch: Partial<NoteRow>) =>
     setNoteRows((prev) => prev.map((r, i) => (i === index ? { ...r, ...patch } : r)))
 
   const promoteToTask = (line: string) => {
-    setItemRows((prev) => [...prev, { title: line, placement: { kind: 'inbox' }, time: null, assigneeId: null, note: null, dateHint: null, kind: 'task', recurring: null, phone: null, contactMemberId: null, included: true, dup: findLikelyDuplicate(line, existingTasks) }])
+    setItemRows((prev) => [...prev, { title: line, placement: { kind: 'inbox' }, time: null, assigneeId: meId, assigneeDefaulted: true, note: null, dateHint: null, kind: 'task', category: 'task', recurring: null, phone: null, contactMemberId: null, included: true, dup: findLikelyDuplicate(line, existingTasks) }])
     setUnread((prev) => prev.filter((l) => l !== line))
   }
   const promoteToNote = (line: string) => {
@@ -251,7 +305,7 @@ export function PageReviewSheet({
       domain,
       items: itemRows
         .filter((r) => r.included && r.title.trim())
-        .map(({ included: _included, dup: _dup, dupDismissed: _dupDismissed, ...item }) => ({ ...item, title: item.title.trim() })),
+        .map(({ included: _included, dup: _dup, dupDismissed: _dupDismissed, typeNotice: _typeNotice, assigneeDefaulted: _assigneeDefaulted, ...item }) => normalizeForSave({ ...item, title: item.title.trim() })),
       notes: noteRows
         .filter((r) => r.included && r.content.trim())
         .map(({ included: _included, ...note }) => ({ title: note.title.trim(), content: note.content.trim() })),
@@ -260,12 +314,15 @@ export function PageReviewSheet({
     }
   }
 
-  const commit = () => onCommit(buildPayload())
+  const blocked = committing || includedCount === 0 || problems > 0
+  const commit = () => { if (!blocked) onCommit(buildPayload()) }
   const chosenStart = altitude === 'month' ? monthStart : altitude === 'season' ? seasonStart : null
   const draftLabel = draftLabelFor?.(chosenStart)
   // The page joins the plan being written instead of landing on the list
   // directly — the same rows, one destination up the flow.
-  const addToDraft = () => onAddToDraft?.(buildPayload())
+  const addToDraft = () => { if (!blocked) onAddToDraft?.(buildPayload()) }
+  // What the draft cannot hold keeps its type by being saved directly.
+  const savedDirectly = typeCounts.appointment + typeCounts.activity + typeCounts.routine
 
   // The period chip: ‹ September › / ‹ Fall 2026 › — which list this page fills.
   const periodChip = (altitude === 'month' || altitude === 'season') && (
@@ -366,26 +423,48 @@ export function PageReviewSheet({
                         className="mt-1 w-4 h-4 accent-primary-600 shrink-0"
                       />
                       <div className="min-w-0 flex-1">
-                        <div className="flex min-w-0 items-center gap-2">
+                        <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
                           {/* What KIND of line this is stays on the left, always —
                               a goal is a state of the row, not its kind. */}
                           {row.placement.kind === 'goal'
                             ? <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-800"><Target className="w-3 h-3" />Goal</span>
                             : row.kind === 'dayfact'
                               ? <span className="inline-flex shrink-0 items-center rounded-md border border-neutral-200 bg-neutral-50 px-1.5 py-0.5 text-[10px] font-semibold leading-none text-neutral-500">Day</span>
-                              : <TaskKindBadge title={row.title} note={row.note} kind={row.kind === 'recurring' ? 'routine' : undefined} label />}
+                              : <ItemTypeSelect value={itemTypeOf(row)} title={row.title} disabled={!!row.sourceId} onChange={(t) => changeType(i, t)} />}
                           <input
                             value={row.title}
+                            readOnly={!!row.sourceId}
                             onChange={(e) => updateItem(i, { title: e.target.value })}
                             aria-label="Task title"
-                            className="min-w-0 flex-1 bg-transparent text-[15px] text-neutral-900 focus:outline-none"
+                            className="min-w-[11rem] flex-1 bg-transparent text-[15px] text-neutral-900 focus:outline-none"
                           />
                         </div>
                         {row.note && <p className="mt-1 text-[13px] text-neutral-500 line-clamp-2">{row.note}</p>}
+                        {row.typeNotice && <p className="mt-1 text-[12px] text-amber-800">{row.typeNotice}</p>}
+                        {/* A routine's pattern is its when: the days it repeats. */}
+                        {row.kind === 'recurring' && (
+                          <RoutineDaysPicker
+                            title={row.title}
+                            days={row.recurring?.days ?? []}
+                            invalid={row.included && !!itemTypeProblem(row)}
+                            onChange={(days) => updateItem(i, { recurring: { days, until: row.recurring?.until ?? null } })}
+                          />
+                        )}
                         {/* The same errand, written twice: one tap says which. */}
                         {row.dup && !row.dupDismissed && (
                           row.sourceId
-                            ? <p className="mt-1 text-[12px] text-neutral-500">Linked to <i className="text-neutral-700">{row.dup.title}</i></p>
+                            ? (
+                              <p role="status" className="mt-1 flex flex-wrap items-center gap-1.5 text-[12px] text-neutral-600">
+                                <span>Uses <i className="text-neutral-800">{row.dup.title}</i>, already on your plan, exactly as it is — nothing on this line is saved.</span>
+                                <button
+                                  type="button"
+                                  onClick={() => updateItem(i, { sourceId: undefined })}
+                                  className="rounded-md border border-neutral-200 bg-white px-1.5 py-0.5 font-medium text-neutral-700 hover:bg-neutral-50"
+                                >
+                                  Unlink
+                                </button>
+                              </p>
+                            )
                             : (
                               <p className="mt-1 flex flex-wrap items-center gap-1.5 text-[12px] text-neutral-500">
                                 Looks like <i className="text-neutral-700">{row.dup.title}</i>
@@ -409,13 +488,8 @@ export function PageReviewSheet({
                       </div>
                     </div>
                     <div className="ml-7 flex flex-wrap items-center gap-2 sm:ml-0 sm:shrink-0 sm:flex-nowrap">
-                      {/* A routine has no single day — the pattern IS its when. */}
-                      {row.kind === 'recurring' && row.recurring && (
-                        <span className="shrink-0 rounded-lg bg-primary-50 px-2 py-1.5 text-[13px] font-medium text-primary-800">
-                          Routine · {row.recurring.days.map((d) => DAY_LABEL[d]).join(', ')}
-                        </span>
-                      )}
                       {row.kind !== 'recurring' && <select
+                        disabled={!!row.sourceId}
                         value={placementValue(row.placement)}
                         onChange={(e) => {
                           const placement = placementFromValue(e.target.value)
@@ -445,10 +519,13 @@ export function PageReviewSheet({
                       </select>}
                       {/* A goal on the month's or season's list — ticked, never
                           placed. A control with a word on it, not a badge. */}
-                      {canBeGoal(altitude, row.placement) && row.kind !== 'recurring' && (
+                      {/* Only a Task can be a goal: an appointment, activity or
+                          routine is a commitment, not what the period is for. */}
+                      {canBeGoal(altitude, row.placement) && row.kind === 'task' && itemTypeOf(row) === 'task' && (
                         <button
                           type="button"
                           aria-pressed={!!row.goal}
+                          disabled={!!row.sourceId}
                           aria-label={`Make "${row.title}" a goal`}
                           title={row.goal ? 'A goal on this list — tap to make it a task' : 'Make it a goal'}
                           onClick={() => updateItem(i, { goal: !row.goal })}
@@ -456,7 +533,7 @@ export function PageReviewSheet({
                             row.goal ? 'border-amber-200 bg-amber-50 text-amber-800' : 'border-neutral-200 bg-white text-neutral-500 hover:text-neutral-800'
                           }`}
                         >
-                          <Target className="w-3.5 h-3.5" />{row.goal ? 'Goal' : 'Make a goal'}
+                          <Target className="w-3.5 h-3.5" />{row.goal ? 'Goal or project' : 'Make it a goal'}
                         </button>
                       )}
                       {(row.placement.kind === 'date' || row.kind === 'recurring') && (
@@ -468,21 +545,32 @@ export function PageReviewSheet({
                           className="text-[13px] text-neutral-700 bg-neutral-100 rounded-lg px-2 py-1.5 shrink-0 w-[104px]"
                         />
                       )}
-                      {/* A goal has no assignee — it is the household's year, not a chore. */}
-                      {row.placement.kind !== 'goal' && <select
+                      {/* Every row but a day-fact (a note) says who — Year goals
+                          included, which take assignees since #64. */}
+                      {row.kind !== 'dayfact' && <select
+                        disabled={!!row.sourceId}
                         value={row.assigneeId ?? UNASSIGNED}
-                        onChange={(e) => updateItem(i, { assigneeId: e.target.value === UNASSIGNED ? null : e.target.value })}
-                        aria-label="Assignee"
-                        className="text-[13px] text-neutral-700 bg-neutral-100 rounded-lg px-2 py-1.5 shrink-0 max-w-[110px]"
+                        onChange={(e) => updateItem(i, { assigneeId: e.target.value === UNASSIGNED ? null : e.target.value, assigneeDefaulted: false })}
+                        aria-label={`Assignee for "${row.title}"`}
+                        className="text-[13px] text-neutral-700 bg-neutral-100 rounded-lg px-2 py-1.5 shrink-0 max-w-[140px]"
                       >
-                        <option value={UNASSIGNED}>Me</option>
-                        {members.map((m) => (
-                          <option key={m.id} value={m.id}>{m.name}</option>
+                        {peopleOptions.map((o) => (
+                          <option key={o.value} value={o.value}>{o.label}</option>
                         ))}
                       </select>}
                     </div>
                   </div>
                 ))}
+              </div>
+            )}
+
+            {(!meId || typeCounts.appointment > 0 || (draftLabel && onAddToDraft && savedDirectly > 0)) && (
+              <div className="space-y-1 text-[12px] text-neutral-500">
+                {!meId && <p>Symphony couldn&rsquo;t confirm which household member you are, so lines without a name start Unassigned.</p>}
+                {typeCounts.appointment > 0 && <p>Appointments are saved in Symphony only. Nothing is added to Google Calendar.</p>}
+                {draftLabel && onAddToDraft && savedDirectly > 0 && (
+                  <p>Appointments, activities and routines are saved directly. Tasks and goals join the plan you&rsquo;re writing.</p>
+                )}
               </div>
             )}
 
@@ -565,6 +653,12 @@ export function PageReviewSheet({
           </div>
         )}
 
+        {!isEmpty && problems > 0 && (
+          <p role="alert" className="flex items-center gap-1.5 px-5 pt-3 text-[12px] font-medium text-danger-600">
+            <AlertCircle className="w-3.5 h-3.5 shrink-0" />
+            {problems === 1 ? '1 routine needs its days' : `${problems} routines need their days`} before this page can be added.
+          </p>
+        )}
         <div className="flex flex-wrap items-center justify-end gap-2 px-5 py-4 border-t border-neutral-200/60 min-w-0">
           <button type="button" onClick={onClose} className="px-4 py-2 rounded-lg text-[14px] text-neutral-600 hover:bg-neutral-100 transition-colors">
             Cancel
@@ -573,7 +667,7 @@ export function PageReviewSheet({
             <button
               type="button"
               onClick={addToDraft}
-              disabled={committing || includedCount === 0}
+              disabled={blocked}
               className="btn-primary px-4 py-2 rounded-lg text-[14px] disabled:opacity-50 max-w-full"
             >
               <span className="break-words">{`Add to the plan I’m writing (${draftLabel})`}</span>
@@ -583,7 +677,7 @@ export function PageReviewSheet({
             <button
               type="button"
               onClick={commit}
-              disabled={committing || includedCount === 0}
+              disabled={blocked}
               className="btn-primary px-4 py-2 rounded-lg text-[14px] disabled:opacity-50"
             >
               {committing ? 'Adding…' : `Add ${includedCount} ${includedCount === 1 ? 'item' : 'items'}`}

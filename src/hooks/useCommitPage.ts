@@ -21,11 +21,11 @@ import { weekStartAnchor, readCadenceConfig, localYmd, parseLocalYmd } from '@/l
 import { readSeasons, seasonLabel } from '@/lib/cadence/seasons'
 import { useSupabaseTasks } from '@/hooks/useSupabaseTasks'
 import { useNotes } from '@/hooks/useNotes'
-import { useFamilyMembers } from '@/hooks/useFamilyMembers'
 import { useRoutines } from '@/hooks/useRoutines'
 import { useGoalsContext } from '@/contexts/GoalsContext'
 import { scopeForDomain } from '@/lib/scope'
 import { showToast } from '@/hooks/useToast'
+import { useFamilyMembers } from '@/hooks/useFamilyMembers'
 import type { TaskContext } from '@/types/task'
 
 export interface CommitPagePayload {
@@ -48,6 +48,8 @@ export interface CommitPagePayload {
 
 export interface CommitPageResult {
   tasksCreated: number
+  /** Lines linked to a task already on the plan — nothing inserted for them. */
+  tasksLinked?: number
   goalsCreated: number
   notesCreated: number
   routinesCreated: number
@@ -83,11 +85,11 @@ function pageMimeType(storagePath: string): string {
 export function useCommitPage() {
   const { addTask } = useSupabaseTasks()
   const { addNote } = useNotes()
-  const { getCurrentUserMember } = useFamilyMembers()
   const { addRoutine } = useRoutines()
   // GoalsProvider wraps the whole tasks app, so this is the already-loaded
   // goals state, not a second fetch.
   const { areas, addGoal } = useGoalsContext()
+  const { getCurrentUserMember } = useFamilyMembers()
 
   const commitPage = useCallback(async ({ items, notes, storagePath, monthStart, seasonStart, domain, altitude }: CommitPagePayload): Promise<CommitPageResult> => {
     // A committed page writes the page's own domain everywhere it lands.
@@ -99,7 +101,6 @@ export function useCommitPage() {
       seasonStart: seasonStart ?? pageSeasonStart(now, readSeasons()),
       context,
     }
-    const defaultAssigneeId = getCurrentUserMember()?.id
 
     // Everything rides the INSERT — a follow-up update can be dropped before
     // the temp→real id swap lands (the addTask-then-setBucket race).
@@ -108,12 +109,19 @@ export function useCommitPage() {
     let failures = 0
     const createdTaskIds: string[] = []
     const tasks = items.filter((i) => i.placement.kind !== 'goal' && i.kind === 'task')
+    let tasksLinked = 0
     for (const item of tasks) {
+      // "Link" on a likely duplicate means THIS line IS that existing task
+      // (one enduring row per action): nothing is inserted, and the existing
+      // row — its dates, commitments, notes and people — is left exactly as
+      // it is. It used to insert a second row pointing at the first, which
+      // put the same errand on the plan twice (horizon-flows acceptance,
+      // 2026-09-27).
+      if (item.sourceId) { tasksLinked += 1; continue }
       const args = planItemToAddTaskArgs(item, commitCtx)
-      const id = await addTask(args.title, args.contactId, undefined, args.scheduledFor, {
-        ...args.options,
-        defaultAssigneeId,
-      })
+      // The assignee is explicit on every row (the review sheet decides it):
+      // no default here, so an Unassigned line stays unassigned.
+      const id = await addTask(args.title, args.contactId, undefined, args.scheduledFor, args.options)
       if (id) {
         tasksCreated += 1
         firstTaskId ??= id
@@ -135,7 +143,8 @@ export function useCommitPage() {
         context,
         recurrence_pattern: { type: 'weekly', days },
         time_of_day: item.time ?? undefined,
-        assigned_to: item.assigneeId ?? undefined,
+        // Same rule as a task: the sheet's choice, null included.
+        assigned_to: item.assigneeId,
       })
       if (created) routinesCreated += 1
       else failures += 1
@@ -154,9 +163,14 @@ export function useCommitPage() {
     // note and derived scope ride the row.
     let goalsCreated = 0
     for (const item of items.filter((i) => i.placement.kind === 'goal')) {
+      // The person chosen on the sheet rides the insert, as on every other
+      // row (Year goals take assignees since #64): Unassigned stays empty, and
+      // the scope is derived from the people exactly as updateGoal derives it.
+      const people = item.assigneeId ? [item.assigneeId] : []
       const created = await addGoal(areas[0]?.id ?? null, item.title, context, {
         notes: item.note,
-        scope: scopeForDomain(context, [], null),
+        assignedToAll: people,
+        scope: scopeForDomain(context, people, getCurrentUserMember()?.id ?? null),
       })
       if (created) goalsCreated += 1
       else failures += 1
@@ -235,11 +249,16 @@ export function useCommitPage() {
         6000,
       )
     } else if (parts.length) {
-      showToast(`Added ${parts.join(', ')} to ${periodLabel}`, 'success', 4000)
+      const linkedNote = tasksLinked ? `. ${tasksLinked} already on your plan, left as ${tasksLinked === 1 ? 'it is' : 'they are'}` : ''
+      showToast(`Added ${parts.join(', ')} to ${periodLabel}${linkedNote}`, 'success', 4000)
+    } else if (tasksLinked) {
+      // Every line was linked to a task already on the plan: say so, rather
+      // than closing the sheet in silence.
+      showToast(`Nothing new to add — ${tasksLinked === 1 ? 'that item is' : `all ${tasksLinked} items are`} already on your plan, left as ${tasksLinked === 1 ? 'it is' : 'they are'}.`, 'success', 5000)
     }
 
-    return { tasksCreated, goalsCreated, notesCreated, routinesCreated, failures, route, periodLabel, createdTaskIds, createdNoteIds }
-  }, [addTask, addNote, addRoutine, getCurrentUserMember, areas, addGoal])
+    return { tasksCreated, ...(tasksLinked ? { tasksLinked } : {}), goalsCreated, notesCreated, routinesCreated, failures, route, periodLabel, createdTaskIds, createdNoteIds }
+  }, [addTask, addNote, addRoutine, areas, addGoal, getCurrentUserMember])
 
   return { commitPage }
 }

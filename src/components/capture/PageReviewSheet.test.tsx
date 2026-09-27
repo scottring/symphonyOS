@@ -159,8 +159,9 @@ describe('PageReviewSheet — altitudes', () => {
     expect(screen.getByText(/1 task \/ 1 goal/)).toBeInTheDocument()
     const whens = screen.getAllByRole('combobox', { name: /when/i })
     expect(Array.from(whens[1].querySelectorAll('option')).map((o) => o.textContent)).toContain('Year goal')
-    // A goal has no assignee: one Assignee select for the season task, none for the goal.
-    expect(screen.getAllByRole('combobox', { name: /assignee/i })).toHaveLength(1)
+    // Year goals take people (#64): the goal row has its own Assignee select too.
+    expect(screen.getAllByRole('combobox', { name: /assignee/i })).toHaveLength(2)
+    expect(screen.getByRole('combobox', { name: 'Assignee for "Half marathon"' })).toBeInTheDocument()
     await user.selectOptions(whens[0], 'someday')
     await user.click(screen.getByRole('button', { name: /add 2 items/i }))
     expect(onCommit.mock.calls[0][0].items.map((i: { placement: unknown }) => i.placement)).toEqual([{ kind: 'someday' }, { kind: 'season' }])
@@ -371,7 +372,53 @@ describe('PageReviewSheet — domain, page title, duplicates', () => {
       notes: [],
       items: [{ ...base, title: 'Trash out', kind: 'recurring', placement: { kind: 'week' }, recurring: { days: ['sat', 'sun'], until: null } }],
     })
-    expect(screen.getByText('Routine · Sat, Sun')).toBeInTheDocument()
+    expect(screen.getByRole('combobox', { name: 'Type of "Trash out"' })).toHaveValue('routine')
+    expect(screen.getByRole('button', { name: 'Saturday' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('button', { name: 'Sunday' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('button', { name: 'Monday' })).toHaveAttribute('aria-pressed', 'false')
     expect(screen.queryByRole('combobox', { name: 'When' })).toBeNull()
+  })
+})
+
+describe('PageReviewSheet — linked lines and Year goals (Codex review, 2026-09-27)', () => {
+  const base = { time: null, assigneeId: null, note: null, dateHint: null, kind: 'task' as const, recurring: null, phone: null, contactMemberId: null }
+  it('a linked line is locked and says it reuses the existing item unchanged; Unlink gives the controls back', async () => {
+    const user = userEvent.setup()
+    const { onCommit } = renderSheet({
+      altitude: 'season', windowDates: [], notes: [],
+      items: [{ ...base, title: 'Renew the passports', placement: { kind: 'season' } }],
+      existingTasks: [{ id: 'x1', title: 'Renew the passports', completed: false }],
+    })
+    await user.click(screen.getByRole('button', { name: /^Link/ }))
+    expect(screen.getByRole('status')).toHaveTextContent(/already on your plan, exactly as it is — nothing on this line is saved/)
+    expect(screen.getByRole('combobox', { name: /when/i })).toBeDisabled()
+    expect(screen.getByRole('combobox', { name: 'Type of "Renew the passports"' })).toBeDisabled()
+    expect(screen.getByRole('combobox', { name: 'Assignee for "Renew the passports"' })).toBeDisabled()
+    expect(screen.getByRole('textbox', { name: 'Task title' })).toHaveAttribute('readonly')
+    await user.click(screen.getByRole('button', { name: 'Unlink' }))
+    expect(screen.getByRole('combobox', { name: /when/i })).not.toBeDisabled()
+    await user.click(screen.getByRole('button', { name: /add 1 item/i }))
+    expect(onCommit.mock.calls[0][0].items[0].sourceId).toBeUndefined()
+  })
+
+  it('a wrongly classified Year goal becomes an action or a routine through When and Type, and back — note and person kept', async () => {
+    const user = userEvent.setup()
+    const { onCommit } = renderSheet({
+      altitude: 'year', windowDates: [], notes: [],
+      items: [{ ...base, title: 'Renew the passports', placement: { kind: 'goal' }, note: 'Both expire in March', assigneeId: 'm-iris' }],
+    })
+    // A Year goal row: a Goal badge (no Type selector), a When select, a person.
+    expect(screen.queryByRole('combobox', { name: 'Type of "Renew the passports"' })).toBeNull()
+    const when = screen.getByRole('combobox', { name: /when/i })
+    await user.selectOptions(when, 'season')                      // → an action on the season's list
+    const type = screen.getByRole('combobox', { name: 'Type of "Renew the passports"' })
+    await user.selectOptions(type, 'appointment')                 // → an appointment
+    await user.selectOptions(type, 'task')
+    await user.selectOptions(screen.getByRole('combobox', { name: /when/i }), 'goal')   // → back to a Year goal
+    expect(screen.getByText('Goal')).toBeInTheDocument()
+    expect(screen.getByText('Both expire in March')).toBeInTheDocument()
+    expect(screen.getByRole('combobox', { name: 'Assignee for "Renew the passports"' })).toHaveValue('m-iris')
+    await user.click(screen.getByRole('button', { name: /add 1 item/i }))
+    expect(onCommit.mock.calls[0][0].items[0]).toMatchObject({ placement: { kind: 'goal' }, note: 'Both expire in March', assigneeId: 'm-iris' })
   })
 })

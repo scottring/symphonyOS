@@ -158,7 +158,7 @@ describe('PeriodPlanPage', () => {
     expect(within(slot).getByRole('complementary', { name: 'This Season' })).toBeInTheDocument()
     fireEvent.click(within(slot).getByRole('button', { name: 'Close shelves' }))
     expect(screen.queryByTestId('shelves-slot')).toBeNull()
-    expect(screen.getByRole('heading', { name: 'Month goals' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Month goals and projects' })).toBeInTheDocument()
   })
 
   it("This Month: goals first, then tasks, each under its own heading; Iris's rows stay out", () => {
@@ -178,7 +178,7 @@ describe('PeriodPlanPage', () => {
     // only tell. Goals come first, and the goal is in the GOALS list.
     const goals = screen.getByRole('region', { name: /goals$/ })
     const list = screen.getByRole('region', { name: /list$/ })
-    expect(within(goals).getByRole('heading', { name: 'Month goals' })).toBeInTheDocument()
+    expect(within(goals).getByRole('heading', { name: 'Month goals and projects' })).toBeInTheDocument()
     // Goal-first (horizon flows): the task list is the secondary route.
     expect(within(list).getByRole('heading', { name: 'Single actions' })).toBeInTheDocument()
     expect(goals.compareDocumentPosition(list) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
@@ -641,7 +641,7 @@ describe('PeriodPlanPage', () => {
     expect(hook.addTask).toHaveBeenCalledWith('Repaint the porch', undefined, undefined, undefined,
       expect.objectContaining({ bucket: 'month', monthStart: thisMonth, isGoal: false }))
     // The goals list has its own "+", and what you type there IS a goal.
-    fireEvent.click(screen.getByRole('button', { name: `Add a goal for ${monthName}` }))
+    fireEvent.click(screen.getByRole('button', { name: `Add a goal or project for ${monthName}` }))
     const goalInput = screen.getByLabelText(`New goal for ${monthName}`)
     fireEvent.change(goalInput, { target: { value: 'Read more' } })
     fireEvent.submit(goalInput.closest('form')!)
@@ -655,11 +655,11 @@ describe('PeriodPlanPage', () => {
   it('an empty period opens with the goal question already asked', () => {
     state.goals = []
     renderPage('year')
-    const input = screen.getByPlaceholderText(`An outcome for ${now.getFullYear()}`)
+    const input = screen.getByPlaceholderText(`Add a goal or project for ${now.getFullYear()}`)
     expect(input).toBeInTheDocument()
     expect(screen.queryByText(/No goals for this year yet/)).not.toBeInTheDocument()
     // "+ Add a goal" puts the cursor in the box, which is always open.
-    fireEvent.click(screen.getByRole('button', { name: `Add a goal for ${now.getFullYear()}` }))
+    fireEvent.click(screen.getByRole('button', { name: `Add a goal or project for ${now.getFullYear()}` }))
     expect(input).toHaveFocus()
     fireEvent.change(input, { target: { value: 'Move the family to a bigger house' } })
     fireEvent.submit(input.closest('form')!)
@@ -1161,13 +1161,17 @@ describe('PeriodPlanPage — Plan <Month>', () => {
     expect(screen.getByRole('button', { name: /review the plan/i })).toBeInTheDocument()
   })
 
-  it('an empty, unplanned month invites the session from its empty list, and opens it', () => {
+  // Product contract, 2026-09-27: an empty month invites an OUTCOME (the goal
+  // box); the empty single-action list stays quiet. The page's own Plan
+  // button is the one way into the session.
+  it('an empty, unplanned month: a quiet list, the goal box leads, and Plan opens the session', () => {
     renderPage('month')
     const label = thisMonth.toLocaleDateString('en-US', { month: 'long' })
     const list = screen.getByRole('region', { name: /list$/ })
-    const button = within(list).getByRole('button', { name: /^Plan .* →$/ })
-    expect(button).toHaveAccessibleName(`Plan ${label} →`)
-    fireEvent.click(button)
+    expect(within(list).queryByRole('button', { name: /^Plan .* →$/ })).toBeNull()
+    expect(within(list).getByRole('button', { name: '+ Add a single action' })).toBeInTheDocument()
+    expect(screen.getByText(new RegExp(`No goals or projects for ${label} yet`))).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: `Plan ${label}` }))
     expect(screen.getByLabelText('Planning steps')).toBeInTheDocument()
   })
 
@@ -1176,7 +1180,7 @@ describe('PeriodPlanPage — Plan <Month>', () => {
     renderPage('month')
     const list = screen.getByRole('region', { name: /list$/ })
     expect(within(list).queryByRole('button', { name: /^Plan .* →$/ })).toBeNull()
-    expect(within(list).getByText(`No single actions for this month.`)).toBeInTheDocument()
+    expect(within(list).queryByText(/No single actions/)).toBeNull()
   })
 
   it('a past month\'s empty list never offers a session button', () => {
@@ -2883,7 +2887,7 @@ describe('horizon flows: outcomes on Year/Season/Month, next actions into weeks 
     ]
     renderPage('month')
     const box = screen.getByRole('textbox', { name: 'New goal for September' })
-    expect(box).toHaveAttribute('placeholder', 'A goal or project for September')
+    expect(box).toHaveAttribute('placeholder', 'Add a goal or project for September')
     fireEvent.change(box, { target: { value: 'Finish the patio' } })
     fireEvent.change(screen.getByRole('combobox', { name: 'Supports a season goal (optional)' }), { target: { value: 'sg' } })
     fireEvent.submit(box.closest('form')!)
@@ -2941,6 +2945,7 @@ describe('horizon flows: outcomes on Year/Season/Month, next actions into weeks 
     state.tasks = []
     state.goals = [goal({ id: 'yg', name: 'Make our home work better for our family', context: 'family' })]
     renderPage('year')
+    fireEvent.click(screen.getByRole('button', { name: 'Show season goals for Make our home work better for our family' }))
     fireEvent.click(screen.getByRole('button', { name: 'Add a season goal for Make our home work better for our family' }))
     const box = screen.getByRole('textbox', { name: 'New season goal for Make our home work better for our family' })
     fireEvent.change(box, { target: { value: 'Create a usable outdoor space' } })
@@ -3019,19 +3024,25 @@ describe('choosing goals from an imported, flat season list', () => {
   })
   afterEach(() => { vi.useRealTimers(); hook.updateTask.mockImplementation(async () => true) })
 
-  it('a season with no goals opens on the question, not an empty box above the list', () => {
+  // Product contract, 2026-09-27: the empty goals state invites an OUTCOME;
+  // organizing an imported list is a separate, labelled one-time step.
+  it('the empty goals state invites a goal; the one-time repair sits by the list it is about', () => {
     renderPage('season')
     const goals = screen.getByRole('region', { name: /goals$/ })
-    expect(within(goals).getByText(/list has 4 items and no goals yet/)).toBeInTheDocument()
-    expect(within(goals).getByRole('button', { name: 'Choose Fall 2026’s goals' })).toBeInTheDocument()
+    expect(within(goals).getByText(/No goals or projects for Fall 2026 yet/)).toBeInTheDocument()
+    expect(within(goals).getByRole('textbox', { name: 'New goal for Fall 2026' })).toBeInTheDocument()
+    expect(within(goals).queryByRole('button', { name: 'Organize the list' })).toBeNull()
+    const list = screen.getByRole('region', { name: /list$/ })
+    expect(within(list).getByText('One-time: organize this list.')).toBeInTheDocument()
+    expect(within(list).getByRole('button', { name: 'Organize the list' })).toBeInTheDocument()
     // The per-row conversion link steps aside while the whole-list sort is offered.
     expect(screen.queryByRole('button', { name: /^Break .* into next actions$/ })).toBeNull()
   })
 
   it('pick → preview → confirm flips isGoal on the chosen rows only, and nothing else', async () => {
     renderPage('season')
-    fireEvent.click(screen.getByRole('button', { name: 'Choose Fall 2026’s goals' }))
-    const panel = screen.getByRole('region', { name: 'Choose Fall 2026\'s goals' })
+    fireEvent.click(screen.getByRole('button', { name: 'Organize the list' }))
+    const panel = screen.getByRole('region', { name: 'Organize Fall 2026\'s list' })
     fireEvent.click(within(panel).getByRole('checkbox', { name: /Plan winter vacation/ }))
     fireEvent.click(within(panel).getByRole('checkbox', { name: /Nourish a love of reading/ }))
     // The dated action is not offered; the reason is.
@@ -3049,8 +3060,8 @@ describe('choosing goals from an imported, flat season list', () => {
   it('a row that fails to save is named, retried alone, and the panel stays open', async () => {
     hook.updateTask.mockImplementation(async (id: unknown) => id !== 'r')
     renderPage('season')
-    fireEvent.click(screen.getByRole('button', { name: 'Choose Fall 2026’s goals' }))
-    const panel = screen.getByRole('region', { name: 'Choose Fall 2026\'s goals' })
+    fireEvent.click(screen.getByRole('button', { name: 'Organize the list' }))
+    const panel = screen.getByRole('region', { name: 'Organize Fall 2026\'s list' })
     fireEvent.click(within(panel).getByRole('button', { name: /Tick all/ }))
     fireEvent.click(within(panel).getByRole('button', { name: /^Preview/ }))
     fireEvent.click(within(panel).getByRole('button', { name: /^Make \d goals$/ }))
@@ -3062,8 +3073,8 @@ describe('choosing goals from an imported, flat season list', () => {
 
   it('the sort can be undone from the page after the toast has gone', async () => {
     renderPage('season')
-    fireEvent.click(screen.getByRole('button', { name: 'Choose Fall 2026’s goals' }))
-    const panel = screen.getByRole('region', { name: 'Choose Fall 2026\'s goals' })
+    fireEvent.click(screen.getByRole('button', { name: 'Organize the list' }))
+    const panel = screen.getByRole('region', { name: 'Organize Fall 2026\'s list' })
     fireEvent.click(within(panel).getByRole('checkbox', { name: /Plan winter vacation/ }))
     fireEvent.click(within(panel).getByRole('button', { name: /^Preview/ }))
     fireEvent.click(within(panel).getByRole('button', { name: 'Make 1 goal' }))
@@ -3075,12 +3086,204 @@ describe('choosing goals from an imported, flat season list', () => {
     await waitFor(() => expect(hook.updateTask).toHaveBeenLastCalledWith('v', { isGoal: false }))
   })
 
-  it('"Not now" is remembered, and a quiet way in stays by the list', () => {
+  it('"Dismiss" is remembered, and a quiet way in stays by the list', () => {
     const { unmount } = renderPage('season')
-    fireEvent.click(screen.getByRole('button', { name: 'Not now' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Dismiss' }))
     unmount(); renderPage('season')
-    expect(screen.queryByRole('button', { name: 'Choose Fall 2026’s goals' })).toBeNull()
-    fireEvent.click(screen.getByRole('button', { name: 'Any of these goals? Choose…' }))
-    expect(screen.getByRole('region', { name: 'Choose Fall 2026\'s goals' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Organize the list' })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Organize into goals…' }))
+    expect(screen.getByRole('region', { name: 'Organize Fall 2026\'s list' })).toBeInTheDocument()
+  })
+})
+
+describe('everyday horizons (product contract, 2026-09-27)', () => {
+  const fall = periodStartFor('season', new Date(2026, 8, 10), DEFAULT_SEASONS)
+  beforeEach(() => {
+    pinClock(); localStorage.clear()
+    state.goals = []; state.loading = false; routinesState.routines = []
+    seasonsState.seasons = DEFAULT_SEASONS; seasonsState.loading = false
+    domainState.layers = new Set(['work', 'family', 'personal', 'unsorted']); domainState.soleDomain = null
+    Object.values(hook).forEach((f) => f.mockClear()); toastSpy.mockClear()
+    hook.addTask.mockImplementation(defaultAddTask); hook.updateTask.mockImplementation(async () => true)
+  })
+  afterEach(() => { vi.useRealTimers() })
+
+  it('an empty season creates a goal from its primary box — no conversion, no sorting', () => {
+    state.tasks = []
+    renderPage('season')
+    expect(screen.getByText(/No goals or projects for Fall 2026 yet/)).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Organize the list' })).toBeNull()
+    const box = screen.getByRole('textbox', { name: 'New goal for Fall 2026' })
+    fireEvent.change(box, { target: { value: 'Create a usable outdoor space' } })
+    fireEvent.submit(box.closest('form')!)
+    expect(hook.addTask).toHaveBeenCalledWith('Create a usable outdoor space', undefined, undefined, undefined,
+      expect.objectContaining({ bucket: 'quarter', seasonStart: fall, isGoal: true }))
+  })
+
+  it('a goal with no next actions can become a single action again, with Undo — on any device', async () => {
+    state.tasks = [task({ id: 'g', title: 'Plan winter vacation', isGoal: true, bucket: 'quarter', seasonStart: fall })]
+    renderPage('season')
+    fireEvent.click(screen.getByRole('button', { name: 'Make it a single action Plan winter vacation' }))
+    await waitFor(() => expect(hook.updateTask).toHaveBeenCalledWith('g', { isGoal: false }))
+    await waitFor(() => expect(toastSpy).toHaveBeenCalled())
+    const [msg, , , undo] = toastSpy.mock.calls.at(-1) as [string, string, number, { label: string; onClick: () => void }]
+    expect(msg).toMatch(/single action again\. Nothing else changed/)
+    undo.onClick()
+    await waitFor(() => expect(hook.updateTask).toHaveBeenLastCalledWith('g', { isGoal: true }))
+  })
+
+  it('a refused save is never announced as done (regression: setGoal swallowed the result)', async () => {
+    hook.updateTask.mockImplementation(async () => false)
+    state.tasks = [task({ id: 'g', title: 'Plan winter vacation', isGoal: true, bucket: 'quarter', seasonStart: fall })]
+    renderPage('season')
+    fireEvent.click(screen.getByRole('button', { name: 'Make it a single action Plan winter vacation' }))
+    await waitFor(() => expect(toastSpy).toHaveBeenCalled())
+    expect(toastSpy).not.toHaveBeenCalledWith(expect.stringMatching(/single action again/), expect.anything(), expect.anything(), expect.anything())
+    expect(toastSpy).toHaveBeenCalledWith(expect.stringMatching(/Couldn’t change .* still a goal/), 'error', 6000)
+  })
+
+  it('…and a throwing save is treated the same way', async () => {
+    hook.updateTask.mockImplementation(async () => { throw new Error('offline') })
+    state.tasks = [task({ id: 'g', title: 'Plan winter vacation', isGoal: true, bucket: 'quarter', seasonStart: fall })]
+    renderPage('season')
+    fireEvent.click(screen.getByRole('button', { name: 'Make it a single action Plan winter vacation' }))
+    await waitFor(() => expect(toastSpy).toHaveBeenCalledWith(expect.stringMatching(/Couldn’t change/), 'error', 6000))
+    expect(toastSpy).not.toHaveBeenCalledWith(expect.stringMatching(/single action again/), expect.anything(), expect.anything(), expect.anything())
+  })
+
+  // Codex review, 2026-09-27: the database's guard checks a link only on the
+  // row that carries it, so it lets both of these strand a relationship.
+  const refused = async (title: string, reason: RegExp) => {
+    fireEvent.click(screen.getByRole('button', { name: `Make it a single action ${title}` }))
+    await waitFor(() => expect(toastSpy).toHaveBeenCalledWith(expect.stringMatching(reason), 'info', 8000))
+    expect(hook.updateTask).not.toHaveBeenCalled()
+    expect(hook.setGoal).not.toHaveBeenCalled()
+  }
+
+  it('…not while it holds next actions: it says so and writes nothing', async () => {
+    state.tasks = [
+      task({ id: 'g', title: 'Plan winter vacation', isGoal: true, bucket: 'quarter', seasonStart: fall }),
+      task({ id: 's', title: 'Price flights', bucket: 'quarter', seasonStart: fall, goalTaskId: 'g' }),
+    ]
+    renderPage('season')
+    await refused('Plan winter vacation', /stays a goal\. It holds a next action/)
+  })
+
+  it('…not while a month goal supports it — the child’s link is never stranded', async () => {
+    state.tasks = [
+      task({ id: 'sg', title: 'Create a usable outdoor space', isGoal: true, bucket: 'quarter', seasonStart: fall }),
+      task({ id: 'mg', title: 'Finish the patio', isGoal: true, bucket: 'month', monthStart: new Date(2026, 9, 1), supportsGoalTaskId: 'sg' }),
+    ]
+    renderPage('season')
+    await refused('Create a usable outdoor space', /“Finish the patio” supports it\. Unlink that goal first/)
+  })
+
+  it('…not while it is itself linked up: the link is kept, and it says how to remove it', async () => {
+    state.tasks = [
+      task({ id: 'sg', title: 'Create a usable outdoor space', isGoal: true, bucket: 'quarter', seasonStart: fall }),
+      task({ id: 'mg', title: 'Finish the patio', isGoal: true, monthStart: thisMonth, supportsGoalTaskId: 'sg' }),
+    ]
+    renderPage('month')
+    await refused('Finish the patio', /It supports “Create a usable outdoor space”\. Remove that link first/)
+  })
+
+  it('refining can LINK an existing month goal instead of creating one', async () => {
+    state.tasks = [
+      task({ id: 'sg', title: 'Create a usable outdoor space', isGoal: true, bucket: 'quarter', seasonStart: fall }),
+      task({ id: 'mg', title: 'Finish the patio', isGoal: true, bucket: 'month', monthStart: new Date(2026, 9, 1) }),
+      task({ id: 'mg2', title: 'Already linked', isGoal: true, bucket: 'month', monthStart: new Date(2026, 9, 1), supportsGoalTaskId: 'sg' }),
+    ]
+    renderPage('season')
+    openGoal('Create a usable outdoor space')
+    fireEvent.click(screen.getByRole('button', { name: 'Add a month goal for Create a usable outdoor space' }))
+    const link = screen.getByRole('combobox', { name: /Or link one you already have/ })
+    expect(within(link).getAllByRole('option').map((o) => o.textContent)).toEqual(['Choose a month goal…', 'October · Finish the patio'])
+    fireEvent.change(link, { target: { value: 'mg' } })
+    await waitFor(() => expect(hook.updateTask).toHaveBeenCalledWith('mg', { supportsGoalTaskId: 'sg' }))
+    expect(hook.addTask).not.toHaveBeenCalled()
+  })
+})
+
+describe('the import repair stays out of an ordinary, populated plan', () => {
+  beforeEach(() => {
+    pinClock(); localStorage.clear()
+    state.goals = []; state.loading = false; routinesState.routines = []
+    seasonsState.seasons = DEFAULT_SEASONS; seasonsState.loading = false
+    Object.values(hook).forEach((f) => f.mockClear())
+  })
+  afterEach(() => { vi.useRealTimers() })
+
+  it('a month with goals and several genuine single actions offers no sorting at all', () => {
+    state.tasks = [
+      task({ id: 'g', title: 'Host Thanksgiving', isGoal: true, monthStart: thisMonth }),
+      task({ id: 'a', title: 'Buy stamps', monthStart: thisMonth }),
+      task({ id: 'b', title: 'Call the dentist', monthStart: thisMonth }),
+      task({ id: 'c', title: 'Pay the water bill', monthStart: thisMonth }),
+    ]
+    renderPage('month')
+    expect(screen.queryByText('One-time: organize this list.')).toBeNull()
+    expect(screen.queryByRole('button', { name: /Organize/ })).toBeNull()
+    expect(screen.getByText('Buy stamps')).toBeInTheDocument()
+  })
+})
+
+describe('year goals open and shut like every other horizon (contract item 2)', () => {
+  beforeEach(() => {
+    pinClock(); localStorage.clear()
+    state.tasks = []; state.loading = false; routinesState.routines = []
+    seasonsState.seasons = DEFAULT_SEASONS; seasonsState.loading = false
+    Object.values(hook).forEach((f) => f.mockClear()); Object.values(goalsApi).forEach((f) => f.mockClear())
+    state.goals = [goal({ id: 'yg', name: 'Make our home work better for our family' })]
+  })
+  afterEach(() => { vi.useRealTimers() })
+
+  it('shut by default: title and a "· show" line, no refine control', () => {
+    renderPage('year')
+    expect(screen.queryByRole('button', { name: /Add a season goal for/ })).toBeNull()
+    expect(screen.getByRole('button', { name: 'No season goals yet · show' })).toBeInTheDocument()
+  })
+
+  it('opens from the keyboard, keeps focus on the toggle, and shows the refine control', async () => {
+    const u = userEvent.setup({ advanceTimers: () => {} })
+    renderPage('year')
+    const toggle = screen.getByRole('button', { name: 'No season goals yet · show' })
+    toggle.focus()
+    await u.keyboard('{Enter}')
+    const open = screen.getByRole('button', { name: 'No season goals yet · hide' })
+    expect(open).toBe(document.activeElement)
+    expect(screen.getByRole('button', { name: 'Add a season goal for Make our home work better for our family' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Hide season goals for Make our home work better for our family' })).toHaveAttribute('aria-expanded', 'true')
+  })
+
+  it('its circle still completes it, open or shut', async () => {
+    renderPage('year')
+    fireEvent.click(screen.getByRole('button', { name: 'Complete Make our home work better for our family' }))
+    await waitFor(() => expect(goalsApi.updateGoal).toHaveBeenCalledWith('yg', { status: 'completed' }))
+  })
+})
+
+describe('Undo the sort names the real reason a goal is kept', () => {
+  const fall = periodStartFor('season', new Date(2026, 8, 10), DEFAULT_SEASONS)
+  beforeEach(() => {
+    pinClock(); localStorage.clear()
+    state.goals = []; state.loading = false; routinesState.routines = []
+    seasonsState.seasons = DEFAULT_SEASONS; seasonsState.loading = false
+    Object.values(hook).forEach((f) => f.mockClear()); toastSpy.mockClear()
+    hook.updateTask.mockImplementation(async () => true)
+  })
+  afterEach(() => { vi.useRealTimers() })
+
+  it('a sorted goal that a month goal now supports stays a goal, and the message says so', async () => {
+    state.tasks = [
+      task({ id: 'v', title: 'Plan winter vacation', isGoal: true, bucket: 'quarter', seasonStart: fall }),
+      task({ id: 'p', title: 'Renew the passports', isGoal: true, bucket: 'quarter', seasonStart: fall }),
+      task({ id: 'm', title: 'Book the rental', isGoal: true, bucket: 'month', monthStart: new Date(2026, 9, 1), supportsGoalTaskId: 'v' }),
+    ]
+    localStorage.setItem('symphony.plan.sortBatch.season.2026-09-01', JSON.stringify({ ids: ['v', 'p'], at: Date.now() }))
+    renderPage('season')
+    fireEvent.click(screen.getByRole('button', { name: 'Undo the sort' }))
+    await waitFor(() => expect(hook.updateTask).toHaveBeenCalledWith('p', { isGoal: false }))
+    expect(hook.updateTask).not.toHaveBeenCalledWith('v', expect.anything())
+    await waitFor(() => expect(toastSpy).toHaveBeenCalledWith(expect.stringMatching(/1 back to single actions\. “Plan winter vacation” stays a goal: “Book the rental” supports it/), 'success', 7000))
   })
 })

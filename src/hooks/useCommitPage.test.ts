@@ -19,9 +19,6 @@ vi.mock('@/lib/supabase', () => ({
 }))
 vi.mock('@/hooks/useSupabaseTasks', () => ({ useSupabaseTasks: () => ({ addTask: mocks.addTask }) }))
 vi.mock('@/hooks/useNotes', () => ({ useNotes: () => ({ addNote: mocks.addNote }) }))
-vi.mock('@/hooks/useFamilyMembers', () => ({
-  useFamilyMembers: () => ({ getCurrentUserMember: () => ({ id: 'member-1' }) }),
-}))
 vi.mock('@/hooks/useRoutines', () => ({ useRoutines: () => ({ addRoutine: mocks.addRoutine }) }))
 vi.mock('@/hooks/useToast', () => ({ showToast: mocks.showToast }))
 vi.mock('@/contexts/GoalsContext', () => ({
@@ -64,6 +61,55 @@ beforeEach(() => {
 })
 
 describe('useCommitPage', () => {
+  // Horizon-flows acceptance (2026-09-27): "Link" meant a SECOND row pointing
+  // at the first, so the same errand was on the plan twice.
+  it('a line linked to an existing task inserts nothing — the existing task is the one', async () => {
+    const res = await commit()({
+      items: [
+        { ...ITEM, title: 'Renew the passports', sourceId: 'existing-1' },
+        { ...ITEM, title: 'Buy snow tires' },
+      ],
+      notes: [], domain: 'family', storagePath: null, altitude: 'season',
+    })
+    expect(mocks.addTask).toHaveBeenCalledTimes(1)
+    expect(mocks.addTask.mock.calls[0][0]).toBe('Buy snow tires')
+    expect(res).toMatchObject({ tasksCreated: 1, tasksLinked: 1, failures: 0 })
+  })
+
+  it('writes the type chosen on the sheet: category on the task insert, a routines row for a routine', async () => {
+    await commit()({
+      items: [
+        { ...ITEM, title: 'Dentist', category: 'event', placement: { kind: 'date', date: '2026-10-07' }, time: '14:00' },
+        { ...ITEM, title: 'Swim', category: 'activity' },
+        { ...ITEM, title: 'Water plants', kind: 'recurring', recurring: { days: ['tue'], until: null }, time: '08:00' },
+      ],
+      notes: [], domain: 'family', storagePath: null, altitude: 'week',
+    })
+    expect(mocks.addTask).toHaveBeenCalledTimes(2)
+    expect(mocks.addTask.mock.calls[0][4]).toMatchObject({ category: 'event', isAllDay: false })
+    expect(mocks.addTask.mock.calls[1][4]).toMatchObject({ category: 'activity', bucket: 'inbox' })
+    expect(mocks.addRoutine).toHaveBeenCalledWith(expect.objectContaining({
+      name: 'Water plants', recurrence_pattern: { type: 'weekly', days: ['tue'] }, time_of_day: '08:00',
+    }))
+  })
+
+  it('writes each line\'s person as chosen — Unassigned stays null for tasks AND routines, with no default slipped in', async () => {
+    await commit()({
+      items: [
+        { ...ITEM, title: 'Mine', assigneeId: 'member-1' },
+        { ...ITEM, title: 'Iris', assigneeId: 'm-iris' },
+        { ...ITEM, title: 'Nobody', assigneeId: null },
+        { ...ITEM, title: 'Routine nobody', kind: 'recurring', recurring: { days: ['mon'], until: null }, assigneeId: null },
+        { ...ITEM, title: 'Routine mine', kind: 'recurring', recurring: { days: ['mon'], until: null }, assigneeId: 'member-1' },
+      ],
+      notes: [], domain: 'family', storagePath: null, altitude: 'week',
+    })
+    const taskOpts = mocks.addTask.mock.calls.map((c) => c[4])
+    expect(taskOpts.map((o) => o.assignedTo)).toEqual(['member-1', 'm-iris', null])
+    for (const o of taskOpts) expect(o).not.toHaveProperty('defaultAssigneeId')
+    expect(mocks.addRoutine.mock.calls.map((c) => c[0].assigned_to)).toEqual([null, 'member-1'])
+  })
+
   it('reports the failure instead of claiming success when addTask writes nothing', async () => {
     // addTask does not throw on failure — it toasts and returns undefined. The
     // old code counted the REQUESTED items, so a page that wrote nothing still
@@ -186,7 +232,7 @@ describe('useCommitPage — domain, routines, day-facts, lineage, route', () => 
   it('a year goal keeps its note and gets the derived scope; no area is invented', async () => {
     const { result } = renderHook(() => useCommitPage())
     await act(() => result.current.commitPage({ items: [{ ...GOAL, note: 'Chicago does not count' }], notes: [], domain: 'family', storagePath: null, altitude: 'year' }))
-    expect(mocks.addGoal).toHaveBeenCalledWith(null, GOAL.title, 'family', { notes: 'Chicago does not count', scope: 'compound' })
+    expect(mocks.addGoal).toHaveBeenCalledWith(null, GOAL.title, 'family', { notes: 'Chicago does not count', scope: 'compound', assignedToAll: [] })
     expect(mocks.addArea).not.toHaveBeenCalled()
   })
 
@@ -228,11 +274,13 @@ describe('useCommitPage — domain, routines, day-facts, lineage, route', () => 
     expect(res.tasksCreated).toBe(1)
   })
 
-  it('phone and lineage ride the INSERT', async () => {
+  it('the phone number rides the INSERT', async () => {
     const { result } = renderHook(() => useCommitPage())
-    await act(() => result.current.commitPage({ items: [{ ...ITEM, phone: '410-555-0142', sourceId: 'src-1' }], notes: [], domain: 'family', storagePath: null, altitude: 'week' }))
-    expect(mocks.addTask).toHaveBeenCalledWith(expect.any(String), undefined, undefined, undefined, expect.objectContaining({ phoneNumber: '410-555-0142', sourceId: 'src-1' }))
+    await act(() => result.current.commitPage({ items: [{ ...ITEM, phone: '410-555-0142' }], notes: [], domain: 'family', storagePath: null, altitude: 'week' }))
+    expect(mocks.addTask).toHaveBeenCalledWith(expect.any(String), undefined, undefined, undefined, expect.objectContaining({ phoneNumber: '410-555-0142' }))
   })
+  // A LINKED line (sourceId) is the existing task: no insert at all — see
+  // 'a line linked to an existing task inserts nothing' above.
 })
 
 // A year page's lines are goals, not tasks (altitudes, 2026-09-05).
@@ -240,7 +288,7 @@ describe('useCommitPage — goals', () => {
   it('writes a goal row into the first existing area and never calls addTask for it', async () => {
     mocks.areas.push({ id: 'area-1', name: 'Health' })
     const result = await commit()({ items: [GOAL, ITEM], notes: [], domain: 'family', storagePath: null, altitude: 'week' })
-    expect(mocks.addGoal).toHaveBeenCalledWith('area-1', 'Run a half marathon', 'family', { notes: null, scope: 'compound' })
+    expect(mocks.addGoal).toHaveBeenCalledWith('area-1', 'Run a half marathon', 'family', { notes: null, scope: 'compound', assignedToAll: [] })
     expect(mocks.addArea).not.toHaveBeenCalled()
     expect(mocks.addTask).toHaveBeenCalledTimes(1)
     expect(result).toEqual({ tasksCreated: 1, goalsCreated: 1, notesCreated: 0, routinesCreated: 0, failures: 0, route: '/week', periodLabel: 'this week', createdTaskIds: ['task-1'], createdNoteIds: [] })
@@ -276,5 +324,26 @@ describe('useCommitPage — goals', () => {
   it('stamps the page\'s own month when the payload names none', async () => {
     await commit()({ items: [{ ...ITEM, placement: { kind: 'month' } }], notes: [], domain: 'family', storagePath: null, altitude: 'month' })
     expect(mocks.addTask.mock.calls[0][4].monthStart).toBeInstanceOf(Date)
+  })
+})
+
+// Codex review (2026-09-27): Year goals take people since #64, but the
+// importer dropped the person the sheet chose; and an all-linked page closed
+// with no confirmation at all.
+describe('useCommitPage — year-goal people and linked lines', () => {
+  it('a Year goal keeps the person chosen on the sheet, with the scope derived from them', async () => {
+    await commit()({ items: [{ ...GOAL, title: 'Kayak trip', assigneeId: 'm-rowan' }, { ...GOAL, title: 'Garden', assigneeId: null }], notes: [], domain: 'personal', storagePath: null, altitude: 'year' })
+    expect(mocks.addGoal.mock.calls[0][3]).toMatchObject({ assignedToAll: ['m-rowan'], scope: 'couple' })
+    expect(mocks.addGoal.mock.calls[1][3]).toMatchObject({ assignedToAll: [], scope: 'individual' })
+  })
+  it('an all-linked page says so instead of closing silently', async () => {
+    const res = await commit()({ items: [{ ...ITEM, title: 'Renew the passports', sourceId: 'x1' }], notes: [], domain: 'family', storagePath: null, altitude: 'season' })
+    expect(mocks.addTask).not.toHaveBeenCalled()
+    expect(res.tasksLinked).toBe(1)
+    expect(successToasts().map((c) => c[0])).toEqual(['Nothing new to add — that item is already on your plan, left as it is.'])
+  })
+  it('a mixed page names what was added and what was already there', async () => {
+    await commit()({ items: [{ ...ITEM, title: 'Renew the passports', sourceId: 'x1' }, { ...ITEM, title: 'Buy snow tires' }], notes: [], domain: 'family', storagePath: null, altitude: 'week' })
+    expect(successToasts()[0][0]).toMatch(/^Added 1 task to this week\. 1 already on your plan, left as it is$/)
   })
 })

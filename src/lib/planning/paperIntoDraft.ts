@@ -123,8 +123,8 @@ export interface MergeResult {
   /** Titles actually added to the draft. */
   added: string[]
   matched: PaperMatch[]
-  /** The page minus the lines the draft took: day-facts, recurring lines and
-   *  notes still go through the ordinary commit. */
+  /** The page minus the lines the draft took: day-facts, recurring lines,
+   *  appointments, activities and notes still go through the ordinary commit. */
   rest: PageReviewPayload
 }
 
@@ -157,8 +157,11 @@ export function mergePaperIntoDraft(draft: SessionDraft, payload: PageReviewPayl
   for (const item of payload.items) {
     const title = item.title.trim()
     // A day-fact is not a to-do and a recurring line is a routine: neither is
-    // a thing the plan lists. They stay on the direct-commit path.
-    if (item.kind !== 'task' || !title) {
+    // a thing the plan lists. An appointment or activity chosen on the sheet
+    // keeps its type only on the direct-commit path — the draft's rows are
+    // plain list tasks and would save it as one. All stay on that path.
+    const typed = item.category === 'event' || item.category === 'activity'
+    if (item.kind !== 'task' || typed || !title) {
       restItems.push(item)
       continue
     }
@@ -176,7 +179,8 @@ export function mergePaperIntoDraft(draft: SessionDraft, payload: PageReviewPayl
     if (hit) { matched.push(hit); continue }
 
     const isGoal = item.placement.kind === 'goal' || item.goal === true
-    const entry: NewItem = { id: crypto.randomUUID(), title, context: null }
+    // The person chosen on the sheet rides the draft row, Unassigned included.
+    const entry: NewItem = { id: crypto.randomUUID(), title, context: null, assignedTo: item.assigneeId }
     if (!isGoal && draft.level === 'week' && item.placement.kind === 'date') entry.day = item.placement.date
     if (isGoal) newGoals.push(entry)
     else newTasks.push(entry)

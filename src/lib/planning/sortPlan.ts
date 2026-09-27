@@ -19,7 +19,7 @@
 
 import type { Task } from '@/types/task'
 import type { PlacementFate } from './lineage'
-import { goalConversion } from './goalConversion'
+import { goalConversion, goalToTaskConversion } from './goalConversion'
 
 export interface SortCandidate {
   task: Task
@@ -78,10 +78,11 @@ export function sortPreview(candidates: readonly SortCandidate[], chosen: Readon
 }
 
 /**
- * What an Undo of a sort may put back. A goal that has gained next actions
- * since is left a goal: turning it back into a task would strand its actions
- * under a row that is no longer a goal. Everything else returns to a single
- * action, the same row.
+ * What an Undo of a sort may put back. A goal that has gained next actions,
+ * a supporting month goal, or a link of its own since is left a goal
+ * (goalToTaskConversion): turning it back would strand a relationship on a
+ * row that is no longer a goal. Everything else returns to a single action,
+ * the same row.
  */
 export function sortUndo(batch: readonly string[], all: readonly Task[]): { revert: Task[]; kept: Array<{ task: Task; reason: string }> } {
   const revert: Task[] = []
@@ -89,9 +90,11 @@ export function sortUndo(batch: readonly string[], all: readonly Task[]): { reve
   for (const id of batch) {
     const t = all.find((x) => x.id === id)
     if (!t || !t.isGoal) continue
-    if (all.some((x) => x.goalTaskId === id)) {
-      kept.push({ task: t, reason: 'It now holds next actions, so it stays a goal.' })
-    } else revert.push(t)
+    // The same rule a single conversion follows: next actions under it,
+    // goals supporting it, or its own link up all keep it a goal.
+    const check = goalToTaskConversion({ ...t, completed: false }, all)
+    if (check.ok) revert.push(t)
+    else kept.push({ task: t, reason: `It stays a goal: ${check.reason}` })
   }
   return { revert, kept }
 }

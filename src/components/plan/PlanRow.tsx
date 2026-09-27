@@ -76,7 +76,7 @@ const ACTION_LABEL: Record<Exclude<RowAction, 'complete'>, string> = {
   someday: 'Someday',
   drop: 'Drop',
   'make-goal': 'Make it a goal',
-  'make-task': 'Make it a task',
+  'make-task': 'Make it a single action',
   'to-lower': 'Take it into',
   'under-goal': 'Link to goal',
   today: 'Do it today',
@@ -263,7 +263,13 @@ export function PlanRow({
   const canHoldSteps = row.isGoal && row.kind === 'task' && (!!onAddStep || (row.steps?.length ?? 0) > 0)
   /** A goal shown shut: on a phone it is one compact entry — its people ride
    *  the "· show" line and its Move menu waits until it is opened. */
-  const goalShut = canHoldSteps && !expanded
+  /** A year goal (its own table, no next actions) opens too — to its
+   *  refine and link controls — so every horizon's goals read quietly shut
+   *  (product contract item 2, Codex 2026-09-27). */
+  const opensForRefine = row.isGoal && row.kind === 'goal' && !!refine && !!onToggleExpand
+  const canOpen = canHoldSteps || opensForRefine
+  const goalShut = canOpen && !expanded
+  const supportCount = row.supportedBy?.length ?? 0
   const shown = stepsToDraw ?? row.steps ?? []
   const tally = counts ?? stepCounts(row)
   const [stepDraft, setStepDraft] = useState('')
@@ -330,10 +336,10 @@ export function PlanRow({
       >
         <Check className="w-3 h-3" strokeWidth={3} />
       </button>
-      {canHoldSteps ? (
+      {canOpen ? (
         <button
           type="button"
-          aria-label={`${expanded ? 'Hide' : 'Show'} next actions under ${row.title}`}
+          aria-label={`${expanded ? 'Hide' : 'Show'} ${canHoldSteps ? 'next actions under' : 'season goals for'} ${row.title}`}
           aria-expanded={expanded}
           onClick={() => onToggleExpand?.(row)}
           className="period-row-caret mt-[3px] shrink-0 text-neutral-400 transition-colors hover:text-neutral-700"
@@ -377,10 +383,12 @@ export function PlanRow({
         {(!canHoldSteps || expanded) && goalControls}
         {/* A goal that takes next actions carries its refine link on the same
             line as "+ Add a next action" (below); a year goal has only this. */}
-        {!canHoldSteps && refine}
         {!!row.supportedBy?.length && (
           <SupportLine label="Supported by" refs={row.supportedBy} onOpen={onOpenSupport} />
         )}
+        {/* A goal that takes next actions carries its refine link on its
+            open line (below); a year goal has only this, after what it has. */}
+        {!canOpen && refine}
         {/* A row that already serves a goal says so above; offering to link
             it read as though it served nothing (S3-08). */}
         {!row.isGoal && !row.supports && actions.includes('under-goal') && <button type="button" onClick={() => onAction('under-goal', row)} className="mt-1 block text-xs text-primary-700 hover:underline" aria-label={`Link ${row.title} to a goal`}>Link to goal</button>}
@@ -394,14 +402,17 @@ export function PlanRow({
         })()}
         {/* What the goal holds, said whether it is open or shut — a collapsed
             goal that only says "5 supporting tasks" hides how much is done. */}
-        {canHoldSteps && (tally.total > 0 || !!onAddStep || !!refine) && (
+        {(opensForRefine || (canHoldSteps && (tally.total > 0 || !!onAddStep || !!refine))) && (
           <span className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs">
             {/* ONE element open or shut, so keyboard focus stays on it. On a
                 phone it is a full 44px target when shut: the way in to a goal
                 is a tap, never a hover. */}
             <button ref={countsRef} type="button" onClick={() => onToggleExpand?.(row)}
               className={`period-goal-open inline-flex items-center text-primary-700 hover:underline ${expanded ? '' : 'min-h-[44px] sm:min-h-0'}`}>
-              {tally.total > 0 ? countsLabel(tally) : 'No next actions yet'}{expanded ? ' · hide' : ' · show'}
+              {canHoldSteps
+                ? (tally.total > 0 ? countsLabel(tally) : 'No next actions yet')
+                : (supportCount > 0 ? `${supportCount} season goal${supportCount === 1 ? '' : 's'}` : 'No season goals yet')}
+              {expanded ? ' · hide' : ' · show'}
             </button>
             {expanded && refine}
             {/* No "+ Add a next action" link here: once a goal is open its

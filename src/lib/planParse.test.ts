@@ -104,11 +104,11 @@ describe('planItemToAddTaskArgs', () => {
     expect(args.options.weekStart).toBeUndefined()
   })
 
-  it('passes a named assignee and leaves unnamed for the default', () => {
+  it('passes the sheet\'s assignee through, and Unassigned (null) as an explicit null — never left for a default', () => {
     const named: PlanItem = { title: 'X', placement: { kind: 'inbox' }, time: null, assigneeId: 'm-iris', note: null, dateHint: null, kind: 'task', recurring: null, phone: null, contactMemberId: null }
     expect(planItemToAddTaskArgs(named, ctx).options.assignedTo).toBe('m-iris')
     const unnamed: PlanItem = { title: 'Y', placement: { kind: 'inbox' }, time: null, assigneeId: null, note: null, dateHint: null, kind: 'task', recurring: null, phone: null, contactMemberId: null }
-    expect(planItemToAddTaskArgs(unnamed, ctx).options.assignedTo).toBeUndefined()
+    expect(planItemToAddTaskArgs(unnamed, ctx).options.assignedTo).toBeNull()
   })
 })
 

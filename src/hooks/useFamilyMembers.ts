@@ -199,6 +199,9 @@ export function useFamilyMembers() {
     deleteMember,
     getMember,
     getCurrentUserMember,
+    /** The signed-in auth user's id (null until known). For strict identity
+     *  lookups (signedInMember) that must not fall back to a guess. */
+    currentUserId,
     refetch: fetchMembers,
   }
 }

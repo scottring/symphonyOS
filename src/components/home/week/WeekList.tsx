@@ -52,6 +52,27 @@ export function WeekList({ tasks, weekStart, meId, userId, isCurrent, peopleFilt
   // three weeks coming up say antying about the october goal").
   const goalTitles = useMemo(() => goalTitleMap(tasks), [tasks])
   const rows = weekListTasks(tasks, weekStart, meId, { isCurrent })
+  // The goals this week actually serves — those with an open action on this
+  // list — kept compact: the week is for doing (Codex, 2026-09-27). The
+  // month's whole goal list is a separate, labelled disclosure below it.
+  // Both read the caller's filtered list, so no hidden goal is named.
+  const servedGoals = useMemo(() => {
+    const byId = new Map<string, { id: string; title: string; open: number }>()
+    for (const t of rows) {
+      if (t.completed || !t.goalTaskId) continue
+      const title = goalTitles.get(t.goalTaskId)
+      if (!title) continue
+      const g = byId.get(t.goalTaskId) ?? { id: t.goalTaskId, title, open: 0 }
+      g.open += 1
+      byId.set(t.goalTaskId, g)
+    }
+    return [...byId.values()].sort((a, b) => b.open - a.open)
+  }, [rows, goalTitles])
+  const openOnWeek = (goalId: string) => rows.filter((t) => !t.completed && t.goalTaskId === goalId).length
+  const [allServed, setAllServed] = useState(false)
+  // Two on a phone, where each title can take a line of its own.
+  const SERVED_SHOWN = mobile ? 2 : 3
+  const servedShown = allServed ? servedGoals : servedGoals.slice(0, SERVED_SHOWN)
   const open = rows.filter((t) => !t.completed)
   const done = rows.filter((t) => t.completed)
   const [showDone, setShowDone] = useState(false)
@@ -86,6 +107,42 @@ export function WeekList({ tasks, weekStart, meId, userId, isCurrent, peopleFilt
       <h2 className="font-display text-lg text-neutral-800">
         {heading}
       </h2>
+      {servedGoals.length > 0 && (
+        <p className="week-served-goals mb-1 text-[12.5px] leading-snug text-neutral-500">
+          <span className="mr-1">This week serves:</span>
+          {servedShown.map((g, i) => (
+            <span key={g.id}>
+              {i > 0 && <span aria-hidden="true"> · </span>}
+              <button type="button" onClick={() => onSelect(g.id)} className="inline text-left text-neutral-700 underline decoration-neutral-300 underline-offset-2 hover:text-primary-700">
+                {g.title}
+              </button>
+              <span className="text-neutral-400"> ({g.open})</span>
+            </span>
+          ))}
+          {servedGoals.length > SERVED_SHOWN && (
+            <button type="button" aria-expanded={allServed} onClick={() => setAllServed((v) => !v)}
+              className="ml-1.5 text-primary-700 hover:underline">
+              {allServed ? 'Show fewer' : `+${servedGoals.length - SERVED_SHOWN} more`}
+            </button>
+          )}
+        </p>
+      )}
+      {goals.length > 0 && (
+        <details className="week-month-goals mb-2 text-[12.5px] text-neutral-500">
+          <summary className="cursor-pointer select-none">All {goalsLabel ?? 'month'} goals · {goals.length}</summary>
+          <ul className="mt-1 max-h-64 overflow-y-auto pl-1">
+            {goals.map((g) => {
+              const n = openOnWeek(g.id)
+              return (
+                <li key={g.id} className="py-0.5">
+                  <button type="button" onClick={() => onSelect(g.id)} className="text-left text-neutral-700 hover:text-primary-700 hover:underline">{g.title}</button>
+                  <span className="text-neutral-400"> {n ? `· ${n} this week` : '· nothing this week'}</span>
+                </li>
+              )
+            })}
+          </ul>
+        </details>
+      )}
       {ordered.length === 0 ? (
         <p className="text-sm text-neutral-500">
           {/* It blamed a people filter on every empty week, filter or not:

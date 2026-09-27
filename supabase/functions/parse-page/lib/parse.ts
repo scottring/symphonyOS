@@ -75,14 +75,16 @@ const ALTITUDE_GUIDE: Record<PageAltitude, string> = {
 - "inbox" if it has no time frame at all.`,
   month: `This is a MONTH page: the user is planning the month ahead. "day" for an item is:
 - "YYYY-MM-DD" from the calendar above if the line names a date or a day of the month (the calendar covers the rest of this month and all of next month);
-- "month" for a line with no date — the default on this page;
-- "goal" for a line the page marks as a goal, intention, or outcome for the month rather than a thing to do (under a "Goals" heading, or phrased as an outcome: "Read more", "Be home for dinner");
+- "goal" for an OUTCOME or PROJECT for the month — a result to reach, or a body of work that takes several steps ("Finish the patio", "Plan Mia's birthday party", "Read more", "Be home for dinner") — whether or not the page labels it a goal;
+- "month" for a single concrete action with no date ("Renew the passports", "Return the library books", "Call the roofer") — the default for an undated action on this page;
+- Never make a line a goal just because it is on a month page: a single action stays an action, an appointment stays dated, a repeating line stays repeating;
 - "week" only if the line says it must happen this week or in the next few days;
 - "season" for something explicitly pushed past this month; "someday" for a wish with no timeframe;
 - "inbox" only for a line that is clearly a capture, not a plan.`,
   season: `This is a SEASON page: the user is planning the next three months. "day" for an item is:
-- "season" for a line with no date — the default on this page;
-- "goal" for a line the page marks as a goal, intention, or outcome for the season rather than a thing to do (under a "Goals" heading, or phrased as an outcome);
+- "goal" for an OUTCOME or PROJECT for the season — a result to reach, or a body of work that takes several steps ("Plan winter vacation", "Nourish a love of reading", "Get the house ready for winter") — whether or not the page labels it a goal;
+- "season" for a single concrete action with no date ("Renew the passports", "Buy snow tires") — the default for an undated action on this page;
+- Never make a line a goal just because it is on a season page: a single action stays an action, a dated line stays dated, a repeating line stays repeating;
 - "YYYY-MM-DD" from the calendar above only when the line names an actual date;
 - "month" only when the line says it is for THIS month (the month today falls in). A line naming a later month stays "season" — put the month name in "note";
 - "week" only when the line says it must happen this week;

@@ -70,6 +70,10 @@ export interface PlanItem {
   dateHint: string | null
   /** A day-fact ("no school") is not a to-do; a recurring line is a routine. */
   kind: 'task' | 'dayfact' | 'recurring'
+  /** For a 'task' row: what kind of item it is saved as — Task, Appointment
+   *  ('event') or Activity (`tasks.category`). Chosen on the review sheet;
+   *  absent = a plain task. Ignored on day-facts and routines. */
+  category?: 'task' | 'event' | 'activity'
   recurring: PlanRecurring | null
   phone: string | null
   /** The named member a line is ABOUT (e.g. "Mia: dentist" → Mia), set by
@@ -280,8 +284,12 @@ export interface PlanAddTaskArgs {
     isGoal?: boolean
     pickedAt?: Date
     isAllDay?: boolean
-    assignedTo?: string
+    /** Who the review sheet settled on: a member id, or null for Unassigned.
+     *  Always explicit — never left for addTask to default. */
+    assignedTo: string | null
     context: TaskContext | null
+    /** Task / Appointment ('event') / Activity, as chosen on the sheet. */
+    category?: 'task' | 'event' | 'activity'
     notes?: string
     /** Tap-to-call number a line named ("Call the vet, 410-555-0142"). */
     phoneNumber?: string
@@ -297,10 +305,11 @@ export interface PlanAddTaskArgs {
  */
 export function planItemToAddTaskArgs(item: PlanItem, ctx: PlanCommitContext): PlanAddTaskArgs {
   const base = {
-    // Unassigned lines default via addTask's defaultAssigneeId (the planner);
-    // only an explicitly named member overrides it.
-    assignedTo: item.assigneeId ?? undefined,
+    // The sheet decided every row's person (the signed-in member by default,
+    // Unassigned when chosen): null is written as null, not re-defaulted.
+    assignedTo: item.assigneeId,
     context: ctx.context,
+    ...(item.category ? { category: item.category } : {}),
     notes: item.note ?? undefined,
     phoneNumber: item.phone ?? undefined,
     sourceId: item.sourceId,

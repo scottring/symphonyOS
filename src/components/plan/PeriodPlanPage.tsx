@@ -69,7 +69,7 @@ import { periodCalendarEntries } from '@/lib/planning/periodCalendar'
 import { PlanWeekMenu } from './PlanWeekMenu'
 import { weekendsTouching, weekendEnd, weekendRangeLabel } from '@/lib/planning/weekend'
 import { MultiAssigneeDropdown } from '@/components/family'
-import { goalConversion } from '@/lib/planning/goalConversion'
+import { goalConversion, goalToTaskConversion } from '@/lib/planning/goalConversion'
 import { makeTaskAGoal } from './MakeGoalControl'
 import { NextLevelStrip } from './NextLevelStrip'
 import { RefineGoalControl } from './RefineGoalControl'
@@ -442,7 +442,29 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
     }
     else if (action === 'someday') await gated.updateTask(row.id, { bucket: 'someday', scheduledFor: undefined, isAllDay: undefined })
     else if (action === 'make-goal') await setGoal(row.id, true)
-    else if (action === 'make-task') await setGoal(row.id, false)
+    else if (action === 'make-task') {
+      const t = tasks.find((x) => x.id === row.id)
+      const check = t ? goalToTaskConversion(t, tasks) : { ok: false as const, reason: 'It could not be found.' }
+      if (!check.ok) {
+        // Explained, never silently unlinked (Codex, 2026-09-27).
+        showToast(`“${row.title}” stays a goal. ${check.reason}`, 'info', 8000)
+        return
+      }
+      // The way back from a goal, on any device: the SAME row becomes a
+      // single action again, with Undo. Offered only while it holds no next
+      // actions — they would otherwise be left under a row that is no goal.
+      // The write's own answer decides what is said: setGoal returns nothing,
+      // so a refused save used to be announced as done (Codex, 2026-09-27).
+      const wrote = (isGoal: boolean) => Promise.resolve(updateTask(row.id, { isGoal })).then((r) => r !== false, () => false)
+      if (!(await wrote(false))) {
+        showToast(`Couldn’t change “${row.title}”. It is still a goal — try again.`, 'error', 6000)
+        return
+      }
+      showToast(`“${row.title}” is a single action again. Nothing else changed.`, 'success', 8000, {
+        label: 'Undo',
+        onClick: () => { void wrote(true).then((ok) => { if (!ok) showToast(`Couldn’t undo — “${row.title}” is still a single action.`, 'error', 6000) }) },
+      })
+    }
     else if (action === 'keep') {
       // Carried FROM this page's period, stated: never inferred from which
       // commitment happens to be open latest (review 2026-09-21).
@@ -465,7 +487,7 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
       await plannedDay(row.id, row.title, new Date())
     }
     else if (action === 'under-goal') setPickingGoalFor(row.id)
-  }, [goals, updateGoal, addGoal, bounds.next, bounds.start, isPast, toggleTask, deleteTask, dropCommitment, gated, setGoal, keepForward, level, tasks, confirmGoalDone, lowerMonth, plannedDay])
+  }, [goals, updateGoal, addGoal, bounds.next, bounds.start, isPast, toggleTask, deleteTask, dropCommitment, gated, setGoal, keepForward, level, tasks, confirmGoalDone, lowerMonth, plannedDay, updateTask])
 
   /**
    * "Assign people" on a goal or a step: the household picker the rest of the
@@ -969,7 +991,7 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
   }
   /** The prominent invitation: a period with NO goals whose list holds
    *  several things that could be. Otherwise the way in is a quiet link. */
-  const sortProminent = !isPast && level !== 'year' && goalRows.length === 0 && sortableCount >= 2 && !promptDismissed
+  const sortProminent = !isPast && level !== 'year' && goalRows.length === 0 && sortableCount >= 3 && !promptDismissed
   const dismissPrompt = useCallback(() => {
     writeOpen(promptKey, true); setPromptDismissed(true); setSortOpen(false)
   }, [promptKey])
@@ -1006,10 +1028,21 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
     writeSortBatch(level, periodYmd, missed.length ? next : null)
     setSortBatch(missed.length ? next : null)
     const parts = [`${revert.length - missed.length} back to single actions.`]
-    if (kept.length) parts.push(`${kept.length} kept as ${kept.length === 1 ? 'a goal' : 'goals'} — ${kept.length === 1 ? 'it now holds' : 'they now hold'} next actions.`)
+    // The real reason, per goal: next actions, a supporting goal, or its own link.
+    if (kept.length === 1) parts.push(`“${kept[0].task.title}” ${kept[0].reason.replace(/^It stays/, 'stays')}`)
+    else if (kept.length) parts.push(`${kept.length} kept as goals — each still has next actions or linked goals.`)
     if (missed.length) parts.push(`${missed.length} didn’t change — try again.`)
     showToast(parts.join(' '), missed.length ? 'warning' : 'success', 7000)
   }, [sortBatch, tasks, updateTask, level, periodYmd])
+  /** A goal's verbs, plus the way back to a single action (month and season
+   *  goals; a year goal is its own table). Offered on every open goal; when a
+   *  relationship would be stranded, pressing it says which and why
+   *  (goalToTaskConversion) — explained, never hidden, never unlinked. */
+  const goalActions = useCallback((row: PlanRowModel) => [
+    ...actionsFor({ fate: row.fate, isGoal: row.isGoal, isPast, level }),
+    ...(!isPast && row.kind === 'task' && row.isGoal && !rowIsDone(row.fate) ? ['make-task' as const] : []),
+  ], [isPast, level])
+
   // One row at a time is the wrong tool for a whole list: when the sort is on
   // offer, the per-row "Break into next actions" link steps aside (it stays
   // in task details, and a lone candidate still gets it).
@@ -1062,8 +1095,27 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
       } : undefined)
       return true
     }
-    return <RefineGoalControl goalTitle={row.title} rungNoun={childNoun} periods={refinePeriods} onAdd={onAdd} />
-  }, [isPast, level, tasks, goals, addTask, soleDomain, nextLevel, refinePeriods, navigate])
+    // Link instead of create: an open goal one rung down, inside this period,
+    // that supports nothing yet. Read from the layer-filtered list, so a goal
+    // the reader may not see is never offered.
+    const inPeriod = (d?: Date) => !!d && d >= bounds.start && d < bounds.end
+    const linkable = layered
+      .filter((t) => t.isGoal && !t.completed && (childNoun === 'season'
+        ? t.bucket === 'quarter' && inPeriod(t.seasonStart) && !t.goalId
+        : t.bucket === 'month' && inPeriod(t.monthStart) && !t.supportsGoalTaskId))
+      .map((t) => ({
+        id: t.id, title: t.title,
+        period: childNoun === 'season'
+          ? nextLevel.find((c) => t.seasonStart && c.start.getTime() === t.seasonStart.getTime())?.label
+          : t.monthStart?.toLocaleDateString('en-US', { month: 'long' }),
+      }))
+    const onLink = async (childId: string) => {
+      const ok = (await gated.updateTask(childId, childNoun === 'season' ? { goalId: row.id } : { supportsGoalTaskId: row.id })) !== false
+      if (ok) showToast(`Linked: “${layered.find((t) => t.id === childId)?.title}” now supports “${row.title}”. Nothing else changed.`, 'success', 5000)
+      return ok
+    }
+    return <RefineGoalControl goalTitle={row.title} rungNoun={childNoun} periods={refinePeriods} onAdd={onAdd} linkable={linkable} onLink={onLink} />
+  }, [isPast, level, tasks, goals, addTask, soleDomain, nextLevel, refinePeriods, navigate, layered, bounds.start, bounds.end, gated])
   /**
    * When this period is empty, whether an adjacent one holds the plan.
    *
@@ -1279,7 +1331,7 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
     keep: async (id: string, periodStart: Date, prevStart: Date) =>
       !!(await keepForward(id, isSeasonSession ? { seasonStart: periodStart } : { monthStart: periodStart }, prevStart)),
     // Each item's OWN domain, recorded when it was planned — never the one in view now (I4).
-    addTask: (title: string, o: { id: string; periodStart: Date; day?: Date; isGoal?: boolean; goalTaskId?: string; aboveGoalId?: string; context: DomainId | null }) => {
+    addTask: (title: string, o: { id: string; periodStart: Date; day?: Date; isGoal?: boolean; goalTaskId?: string; aboveGoalId?: string; context: DomainId | null; assignedTo?: string | null }) => {
       // The goal above, recorded (S3-02). Which column depends on what the
       // rail is made of:
       //   season session — the rail IS the goals table, so the pick is already
@@ -1292,9 +1344,11 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
       // along when their goal moves. A goal must not be carried by another.
       const support = o.isGoal && !isSeasonSession ? o.aboveGoalId : undefined
       const goalId = isSeasonSession ? o.aboveGoalId : tasks.find((t) => t.id === o.aboveGoalId)?.goalId
+      // A page's chosen person (null = Unassigned); absent = addTask's default.
+      const who = o.assignedTo !== undefined ? { assignedTo: o.assignedTo } : {}
       return addTask(title, undefined, undefined, undefined, isSeasonSession
-        ? { id: o.id, bucket: 'quarter' as const, seasonStart: o.periodStart, isGoal: o.isGoal, goalTaskId: o.goalTaskId, goalId, context: o.context }
-        : { id: o.id, bucket: 'month' as const, monthStart: o.periodStart, isGoal: o.isGoal, goalTaskId: o.goalTaskId, goalId, supportsGoalTaskId: support, context: o.context })
+        ? { id: o.id, bucket: 'quarter' as const, seasonStart: o.periodStart, isGoal: o.isGoal, goalTaskId: o.goalTaskId, goalId, context: o.context, ...who }
+        : { id: o.id, bucket: 'month' as const, monthStart: o.periodStart, isGoal: o.isGoal, goalTaskId: o.goalTaskId, goalId, supportsGoalTaskId: support, context: o.context, ...who })
     },
     contextOf: (id: string) => tasks.find((t) => t.id === id)?.context ?? null,
     // Everything a tick does (subtasks, waiting/discussion, a linked list item), and reports whether it wrote.
@@ -1498,7 +1552,9 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
           planned={shortLabel}
           message={`When you’re ready, plan the ${nextRung} with ${shortLabel} beside you.`}
           nextLabel={`the ${nextRung}`}
-          to={`/${nextRung}`}
+          // Carries the period: the month or week IN this plan — the current
+          // one if it is inside, else the first — never whatever /month means today.
+          to={(nextLevel.find((c) => c.current) ?? nextLevel[0])?.href ?? `/${nextRung}`}
           onDismiss={dismissJustSaved}
         />
       )}
@@ -1517,15 +1573,15 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
           {/* Goals — what you want from the period. */}
           <section aria-label={`${bounds.label} goals`} className="period-goals-card">
             <div className="flex items-start gap-2 px-1">
-              <h2 className="min-w-0 flex-1 font-display text-2xl text-neutral-800">{noun[0].toUpperCase() + noun.slice(1)} goals</h2>
+              <h2 className="min-w-0 flex-1 font-display text-2xl text-neutral-800">{noun[0].toUpperCase() + noun.slice(1)} goals and projects</h2>
               {!isPast && (
                 <button
                   type="button"
-                  aria-label={`Add a goal for ${shortLabel}`}
+                  aria-label={`Add a goal or project for ${shortLabel}`}
                   onClick={() => goalInputRef.current?.focus()}
                   className="mt-1.5 shrink-0 text-[13px] text-neutral-500 transition-colors hover:text-primary-700"
                 >
-                  + Add a goal
+                  + Add a goal or project
                 </button>
               )}
             </div>
@@ -1534,23 +1590,6 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
                 : level === 'season'
                   ? 'The outcomes and projects this season is for. Break one into month goals, or add its next actions.'
                   : 'The outcomes and projects this month is for. Add each one’s next actions and plan them into weeks — the goal stays here.'}</p>
-            {sortOpen ? (
-              <SortPlanPanel periodLabel={shortLabel} candidates={candidates} onConfirm={confirmSort} onClose={() => setSortOpen(false)} />
-            ) : sortProminent ? (
-              <div className="sort-plan-prompt mt-3 rounded-xl border border-primary-100 bg-primary-50/60 p-4">
-                <p className="text-[15px] leading-snug text-neutral-800">
-                  {shortLabel}’s list has {sortableCount + candidates.filter((c) => c.blocked).length} items and no goals yet.
-                </p>
-                <p className="mt-1 text-[13px] leading-snug text-neutral-600">
-                  Some are probably outcomes or projects{candidates[0] ? <> — like “{candidates.find((c) => !c.blocked)?.task.title}”</> : null} — and some are single actions. Choose the outcomes: they become {shortLabel}’s goals, the same items with nothing copied or lost.
-                </p>
-                <div className="mt-3 flex flex-wrap items-center gap-2">
-                  <button type="button" onClick={() => setSortOpen(true)}
-                    className="rounded-md bg-primary-600 px-3 py-2 text-sm font-semibold text-white">Choose {shortLabel}’s goals</button>
-                  <button type="button" onClick={dismissPrompt} className="rounded-md px-3 py-2 text-sm text-neutral-600 hover:bg-white">Not now</button>
-                </div>
-              </div>
-            ) : null}
             {!sortOpen && sortBatchLive > 0 && (
               <p className="sort-plan-undo mt-2 flex flex-wrap items-center gap-x-2 px-1 text-[13px] text-neutral-500">
                 <span>{sortBatchLive} of these goals came from sorting {shortLabel}’s list.</span>
@@ -1562,7 +1601,13 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
               {goalRows.length === 0 ? (
                 isPast ? (
                   <p className="px-2 py-2 text-sm text-neutral-400">Nothing was on this {noun}'s goals.</p>
-                ) : null
+                ) : (
+                  // The empty state asks for an OUTCOME — never scheduling,
+                  // never a sorting step (product contract, 2026-09-27).
+                  <p className="period-goals-empty px-2 pb-1 text-[15px] leading-snug text-neutral-600">
+                    No goals or projects for {shortLabel} yet. What should {level === 'year' ? 'this year' : level === 'season' ? 'this season' : 'this month'} add up to?
+                  </p>
+                )
               ) : (
                 <>
                   {/* A filter and a completed fold, shown only once the list is
@@ -1618,7 +1663,7 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
                         stepWeeks={stepWeeks}
                         refine={refineFor(g.row)}
                         stepActionsFor={(st) => actionsFor({ fate: st.fate, isGoal: false, isPast, level })}
-                          actions={actionsFor({ fate: g.row.fate, isGoal: g.row.isGoal, isPast, level })} />
+                          actions={goalActions(g.row)} />
                     ))}
                   </ul>
                   )}
@@ -1660,7 +1705,7 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
                     aria-label={`New goal for ${shortLabel}`}
                     value={goalDraft}
                     onChange={(e) => setGoalDraft(e.target.value)}
-                    placeholder={level === 'year' ? `An outcome for ${shortLabel}` : `A goal or project for ${shortLabel}`}
+                    placeholder={`Add a goal or project for ${shortLabel}`}
                     className="min-w-[12rem] flex-1 bg-transparent py-1.5 text-sm text-neutral-800 placeholder:text-neutral-400 focus:outline-none"
                   />
                   {/* Optional, and remembered for the next goal typed: a run
@@ -1676,8 +1721,8 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
                       {parentChoices.map((c) => <option key={c.id} value={c.id}>{c.title}</option>)}
                     </select>
                   )}
-                  <button type="submit" disabled={!goalDraft.trim()} className="shrink-0 rounded-md bg-primary-600 px-2.5 py-1 text-xs font-semibold text-white disabled:opacity-40">
-                    Add goal
+                  <button type="submit" disabled={!goalDraft.trim()} aria-label={`Add this goal or project to ${shortLabel}`} className="shrink-0 rounded-md bg-primary-600 px-2.5 py-1 text-xs font-semibold text-white disabled:opacity-40">
+                    Add
                   </button>
                 </form>
               )}
@@ -1691,18 +1736,42 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
                   and a one-off action that needs no goal still has a home. */}
               <div className="flex flex-wrap items-baseline gap-x-3 px-1">
                 <h2 className="font-display text-xl text-neutral-700">Single actions</h2>
-                {!sortOpen && !sortProminent && sortableCount >= 1 && (
+                {/* The repair is for a plan with NO goals yet; a populated
+                    plan's single actions are just single actions. */}
+                {!sortOpen && !sortProminent && goalRows.length === 0 && sortableCount >= 2 && (
                   <button type="button" onClick={() => setSortOpen(true)}
                     className="text-[13px] text-primary-700 hover:underline">
-                    Any of these goals? Choose…
+                    Organize into goals…
                   </button>
                 )}
               </div>
-              <p className="period-section-note">{level === 'month'
+              {/* The ONE-TIME repair for a plan that arrived flat (an import):
+                  a labelled notice beside the list it is about, never the
+                  page's empty state. Dismissed, it leaves a quiet link. */}
+              {sortOpen ? (
+                <SortPlanPanel periodLabel={shortLabel} candidates={candidates} onConfirm={confirmSort} onClose={() => setSortOpen(false)} />
+              ) : sortProminent ? (
+                <div className="sort-plan-prompt mt-2 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg border border-neutral-200 bg-bg-elevated px-3 py-2.5">
+                  <p className="min-w-[14rem] flex-1 text-[13px] leading-snug text-neutral-600">
+                    <span className="font-semibold text-neutral-800">One-time: organize this list.</span>{' '}
+                    These {sortableCount} came in as single actions. If some are really goals or projects, pick them once and they move up to {shortLabel}’s goals — the same items, nothing copied or lost.
+                  </p>
+                  <span className="flex shrink-0 items-center gap-2">
+                    <button type="button" onClick={() => setSortOpen(true)}
+                      className="rounded-md border border-primary-200 bg-white px-3 py-1.5 text-sm font-semibold text-primary-700">Organize the list</button>
+                    <button type="button" onClick={dismissPrompt} className="rounded-md px-2 py-1.5 text-sm text-neutral-500 hover:text-neutral-800">Dismiss</button>
+                  </span>
+                </div>
+              ) : null}
+              {looseRows.length > 0 && <p className="period-section-note">{level === 'month'
                 ? 'One-off work that needs no goal. Plan each into a week — or break a bigger one into next actions.'
-                : 'One-off work that needs no goal. Plan each into a month — or break a bigger one into next actions.'}</p>
+                : 'One-off work that needs no goal. Plan each into a month — or break a bigger one into next actions.'}</p>}
               <div className="mt-3">
-                {openTaskRows.length === 0 ? (
+                {openTaskRows.length === 0 && doneTaskRows.length === 0 && assignedTaskRows.length === 0 && supportingTaskCount === 0 && !isPast ? (
+                  // Nothing here at all: say nothing. The page's invitation is
+                  // the goal box above; a single action is one press below.
+                  null
+                ) : openTaskRows.length === 0 ? (
                   <p className="px-2 py-2 text-sm text-neutral-400">
                     {supportingTaskCount > 0 ? `${supportingTaskCount} supporting ${supportingTaskCount === 1 ? 'task is' : 'tasks are'} listed under the goals above.` : doneTaskRows.length > 0
                       ? `Everything on this ${noun}'s list is done.`

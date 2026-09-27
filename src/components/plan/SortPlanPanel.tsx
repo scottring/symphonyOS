@@ -50,12 +50,12 @@ export function SortPlanPanel({ periodLabel, candidates, onConfirm, onClose }: {
   const n = preview.goals.length
 
   return (
-    <section aria-label={`Choose ${periodLabel}'s goals`} className="sort-plan-panel mt-3 rounded-xl border border-primary-100 bg-white p-4"
+    <section aria-label={`Organize ${periodLabel}'s list`} className="sort-plan-panel mt-3 rounded-xl border border-primary-100 bg-white p-4"
       onKeyDown={(e) => { if (e.key === 'Escape' && !saving) { e.stopPropagation(); onClose() } }}>
       {step === 'pick' ? (
         <>
           <h3 ref={headingRef} tabIndex={-1} className="font-display text-lg text-neutral-800 focus:outline-none">
-            Which of these are outcomes or projects?
+            Organize {periodLabel}’s list: which are goals or projects?
           </h3>
           <p className="mt-1 text-[13px] leading-snug text-neutral-500">
             Tick the ones that are bigger than a single action — they become {periodLabel}’s goals, and you can then add month goals and next actions under them. Leave the single actions unticked. You’ll see a preview before anything changes.
@@ -119,7 +119,7 @@ export function SortPlanPanel({ periodLabel, candidates, onConfirm, onClose }: {
               <li>{preview.untagged.length} {preview.untagged.length === 1 ? 'has' : 'have'} no area, so {preview.untagged.length === 1 ? 'it stays' : 'they stay'} private to {preview.untagged.length === 1 ? 'its' : 'their'} owner, as now.</li>
             )}
             <li>{preview.staying.length} {preview.staying.length === 1 ? 'stays a single action' : 'stay single actions'}.</li>
-            <li>You can undo this afterwards, from this page.</li>
+            <li>Undo stays on this page, in this browser. Anywhere else, open a goal that has no next actions and choose “Make it a single action”.</li>
           </ul>
           {failed.length > 0 && (
             <p role="alert" className="mt-3 text-sm text-red-700">

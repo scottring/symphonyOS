@@ -13,6 +13,7 @@ import { readDraft, writeDraftAndAnnounce } from '@/lib/planning/sessionDraft'
 import { useSupabaseTasks } from '@/hooks/useSupabaseTasks'
 import { useDomain } from '@/hooks/useDomain'
 import { useFamilyMembers } from '@/hooks/useFamilyMembers'
+import { signedInMember } from '@/lib/paperAssignee'
 import { useHouseholdSeasons } from '@/hooks/useHouseholdSeasons'
 import { useGoalsContext } from '@/contexts/GoalsContext'
 import { showToast } from '@/hooks/useToast'
@@ -73,7 +74,7 @@ export function PageFromPaperFlow({ members, onClose, existingTasks, calendarTit
   // pages build them — so an import cannot add what the plan already holds.
   const { tasks } = useSupabaseTasks()
   const { layers } = useDomain()
-  const { getCurrentUserMember } = useFamilyMembers()
+  const { getCurrentUserMember, currentUserId } = useFamilyMembers()
   const { seasons } = useHouseholdSeasons()
   const { goals } = useGoalsContext()
   const meId = getCurrentUserMember()?.id ?? null
@@ -246,6 +247,7 @@ export function PageFromPaperFlow({ members, onClose, existingTasks, calendarTit
           initialDomain={rememberedDomain(result.altitude)}
           {...(today ? { today } : {})}
           members={members}
+          currentMemberId={signedInMember(members, currentUserId)?.id ?? null}
           committing={committing}
           onCommit={(payload) => void handleCommit(payload)}
           draftLabelFor={(chosenStart) => targetFor(chosenStart)?.label}

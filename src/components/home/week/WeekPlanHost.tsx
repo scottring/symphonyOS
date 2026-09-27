@@ -85,9 +85,11 @@ export function WeekPlanHost({ tasks, weekStart, meId, isPast, children, tools }
     // writes `week_start` only for a bucket='week' insert (a `scheduledFor`
     // insert lands as 'timed' with no week), so creating it dated would leave it
     // off the week list entirely. A date keeps the week commitment (planPlacement).
-    addTask: async (title: string, o: { id: string; periodStart: Date; day?: Date; isGoal?: boolean; goalTaskId?: string; context: DomainId | null }) => {
+    addTask: async (title: string, o: { id: string; periodStart: Date; day?: Date; isGoal?: boolean; goalTaskId?: string; context: DomainId | null; assignedTo?: string | null }) => {
       const id = await addTask(title, undefined, undefined, undefined, {
         id: o.id, bucket: 'week' as const, weekStart: o.periodStart, goalTaskId: o.goalTaskId, context: o.context,
+        // A page's chosen person (null = Unassigned); absent = addTask's default.
+        ...(o.assignedTo !== undefined ? { assignedTo: o.assignedTo } : {}),
       })
       if (!id) return undefined
       // A lost day is a lost decision: report the step as unwritten so it stays
