@@ -192,7 +192,7 @@ describe('the goal a week row serves', () => {
   })
 })
 
-it('names only the goals this week serves, compactly; the month's full list is a separate disclosure', () => {
+it('names only the goals this week serves, compactly; the month’s full list is a separate disclosure', () => {
   const onSelect = vi.fn()
   const step = row({ id: 's1', title: 'Choose chairs', goalTaskId: 'patio' })
   const patio = createMockTask({ id: 'patio', title: 'Finish the patio', isGoal: true, bucket: 'month' })
