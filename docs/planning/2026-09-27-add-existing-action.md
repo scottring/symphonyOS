@@ -61,6 +61,18 @@ Filing an existing action writes that one column through `updateTask`, which has
   - Keyboard: Enter opens the dialog, the search field is focused, Tab moves to a result, Enter files it, Escape closes.
   - An injected 500 shows "Could not add … Nothing was changed", and the DB was confirmed unchanged.
 
+## Codex review of ee451922: fixed
+
+- **A lost save response** is no longer reported from what was sent.
+  - Every link, move and removal goes through `setGoalLink`. If a write doesn't come back with its row, the row is read again, and `linkOutcome` decides from the database:
+    - committed → "Added";
+    - unchanged → "Nothing was changed";
+    - changed by someone else → a conflict;
+    - read-back also failed → "Couldn't confirm", which claims neither success nor failure.
+  - The local row always ends on the database value.
+  - Proved on the local stack (`a4.mjs`): the PATCH was allowed to commit and its response was dropped; the dialog said "Added" and the DB held the link.
+- **Concurrent relink.** The write is a compare-and-set, `… where goal_task_id = <the goal it was shown under>` (or `is null`). In `a4.mjs`, while "Move it to …" was open, Sam moved "Look up swim lessons" to his own goal. Alex's move said "Not changed … it is now under 'GEA Plan winter break'", and the DB kept Sam's change. "Remove from goal" is conditional the same way.
+
 ## Limitations and follow-ups
 
 - Year goals take no existing actions (see above). Offering it would need a real next-action relationship for the `goals` table, which is a product decision plus a migration.

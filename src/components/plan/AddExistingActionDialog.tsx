@@ -9,15 +9,17 @@ import { useMemo, useRef, useState } from 'react'
 import { Search, X, Target, Lock, Check } from 'lucide-react'
 import { useDialogFocus } from '@/hooks/useDialogFocus'
 import type { Task } from '@/types/task'
-import { existingActionCandidates, type ExistingActionCandidate } from '@/lib/planning/existingActions'
+import { existingActionCandidates, type ExistingActionCandidate, type LinkOutcome } from '@/lib/planning/existingActions'
 
 export interface AddExistingActionDialogProps {
   goal: Pick<Task, 'id' | 'title' | 'scope' | 'context'>
   /** Every task the reader holds (what RLS loaded). */
   tasks: readonly Task[]
   members?: readonly { id: string; name: string }[]
-  /** Files the task under the goal. Resolves false when the save failed. */
-  onLink: (taskId: string) => Promise<boolean>
+  /** Files the task under the goal only if it is still under `expected` (the
+   *  goal it was shown under, null = none); resolves with what the database
+   *  says happened. */
+  onLink: (taskId: string, expected: string | null) => Promise<LinkOutcome>
   onClose: () => void
 }
 
@@ -31,14 +33,25 @@ export function AddExistingActionDialog({ goal, tasks, members = [], onLink, onC
   const [added, setAdded] = useState<string[]>([])
   const result = useMemo(() => existingActionCandidates(goal, tasks, query, members), [goal, tasks, query, members])
 
+  const goalTitle = (id: string | null) => (id === null ? null : tasks.find((t) => t.id === id)?.title ?? null)
   const link = async (c: ExistingActionCandidate) => {
     setSaving(true)
     setError(null)
-    const ok = await onLink(c.task.id)
+    // The goal it was SHOWN under — the move is made only if that is still so.
+    const out = await onLink(c.task.id, c.task.goalTaskId ?? null)
     setSaving(false)
-    if (!ok) { setError(`Could not add “${c.task.title}”. Nothing was changed — try again.`); return }
     setConfirming(null)
-    setAdded((a) => [...a, c.task.title])
+    if (out.status === 'ok') { setAdded((a) => [...a, c.task.title]); return }
+    if (out.status === 'conflict') {
+      const now = out.currentGoalId === null ? 'is under no goal' : out.currentGoalId === goal.id ? 'is already here' : `is now under “${goalTitle(out.currentGoalId) ?? 'a goal you can’t see'}”`
+      setError(`Not changed: “${c.task.title}” was changed by someone else while you were choosing — it ${now}. Choose it again if you still want it here.`)
+      return
+    }
+    if (out.status === 'unknown') {
+      setError(`Couldn’t confirm whether “${c.task.title}” was added — the connection dropped. It will show under this goal if it saved.`)
+      return
+    }
+    setError(`Could not add “${c.task.title}”. Nothing was changed — try again.`)
   }
   const choose = (c: ExistingActionCandidate) => {
     if (c.state === 'here' || saving) return

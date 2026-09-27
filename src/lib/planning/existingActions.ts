@@ -153,13 +153,6 @@ export function existingActionCandidates(
   return { shown: matches.slice(0, limit).map((m) => m.c), total: matches.length }
 }
 
-/** The one write filing an existing action makes — and removing it. Nothing else changes. */
-export function fileUnderGoalUpdate(goalId: string): Pick<Task, 'goalTaskId'> {
-  return { goalTaskId: goalId }
-}
-export function removeFromGoalUpdate(): Pick<Task, 'goalTaskId'> {
-  return { goalTaskId: undefined }
-}
 
 /** An action linked to this goal that is not on the page's own list — say where it lives. */
 export function offPeriodSteps(goalId: string, tasks: readonly Task[], onPage: ReadonlySet<string>): Task[] {
@@ -169,3 +162,46 @@ export function offPeriodSteps(goalId: string, tasks: readonly Task[], onPage: R
 }
 
 export { whereOf as actionWhereLabel }
+
+/**
+ * What a goal-link write actually did. A write can fail, be refused, find the
+ * link changed under it, or lose its RESPONSE after committing — so a write
+ * that did not come back clean is never reported from what was sent: the row
+ * is read again and the answer comes from the database.
+ */
+export type LinkOutcome =
+  | { status: 'ok' }
+  /** Someone else changed which goal it is under since it was shown here. */
+  | { status: 'conflict'; currentGoalId: string | null }
+  /** Read back unchanged: nothing was written. */
+  | { status: 'failed' }
+  /** Could not even read it back: whether it saved is not known. */
+  | { status: 'unknown' }
+
+/**
+ * Decide the outcome of `set goal_task_id = target where goal_task_id =
+ * expected`. `wrote` is whether the write came back with its row; `reread` is
+ * the row's goal_task_id read afterwards (null = no goal), or undefined when
+ * the read-back itself failed.
+ */
+export function linkOutcome(
+  wrote: boolean,
+  target: string | null,
+  expected: string | null,
+  reread?: { goalTaskId: string | null } | undefined,
+): LinkOutcome {
+  if (wrote) return { status: 'ok' }
+  if (!reread) return { status: 'unknown' }
+  // The response was lost but the write landed (or it already said so).
+  if (reread.goalTaskId === target) return { status: 'ok' }
+  if (reread.goalTaskId !== expected) return { status: 'conflict', currentGoalId: reread.goalTaskId }
+  return { status: 'failed' }
+}
+
+/** What to say after "Remove from goal", from what the database says happened. */
+export function removeOutcomeToast(title: string, out: LinkOutcome): [string, 'success' | 'error' | 'warning'] {
+  if (out.status === 'ok') return [`“${title}” is no longer a next action for that goal. The task itself is unchanged.`, 'success']
+  if (out.status === 'conflict') return [`Not changed: someone else moved “${title}” to ${out.currentGoalId === null ? 'no goal' : 'another goal'} meanwhile.`, 'warning']
+  if (out.status === 'unknown') return [`Couldn’t confirm whether “${title}” was removed from its goal — the connection dropped.`, 'warning']
+  return [`Could not remove “${title}” from its goal. Nothing was changed.`, 'error']
+}

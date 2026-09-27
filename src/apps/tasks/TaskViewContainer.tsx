@@ -28,7 +28,7 @@ import { useVaultWrite } from '@/hooks/useVaultWrite';
 import { LoadingFallback } from '@/components/layout/LoadingFallback';
 import { TaskView } from '@/components/lazy';
 import { AddExistingActionDialog } from '@/components/plan/AddExistingActionDialog';
-import { fileUnderGoalUpdate, removeFromGoalUpdate } from '@/lib/planning/existingActions';
+import { removeOutcomeToast } from '@/lib/planning/existingActions';
 import { useFamilyMembers } from '@/hooks/useFamilyMembers';
 import { showToast } from '@/hooks/useToast';
 
@@ -39,7 +39,7 @@ interface Props {
 }
 
 export function TaskViewContainer({ taskId, onBack }: Props) {
-  const { tasks, loading, addTask, addSubtask, deleteTask, toggleTask, updateTask, pushTask } = useSupabaseTasks();
+  const { tasks, loading, addTask, addSubtask, deleteTask, toggleTask, updateTask, setGoalLink, pushTask } = useSupabaseTasks();
   const { contacts, contactsMap, addContact, searchContacts } = useContacts();
   const { projects, projectsMap, addProject, searchProjects } = useProjects();
   const { addNote, addEntityLink, getNotesForEntity } = useNotesContext();
@@ -92,18 +92,15 @@ export function TaskViewContainer({ taskId, onBack }: Props) {
   }, [addTask, task]);
   // "Add an existing action" and its undo, from the goal's own page: the one
   // goal_task_id write, nothing else about the task.
-  const linkExisting = useCallback(async (taskId: string) => {
-    if (!task) return false;
-    return (await updateTask(taskId, fileUnderGoalUpdate(task.id))) !== false;
-  }, [task, updateTask]);
+  const linkExisting = useCallback(async (taskId: string, expected: string | null) => {
+    if (!task) return { status: 'failed' } as const;
+    return setGoalLink(taskId, task.id, expected);
+  }, [task, setGoalLink]);
   const removeStep = useCallback(async (stepId: string) => {
     const step = tasks.find((t) => t.id === stepId);
-    if ((await updateTask(stepId, removeFromGoalUpdate())) === false) {
-      showToast(`Could not remove “${step?.title ?? 'that action'}” from this goal. Nothing was changed.`, 'error', 6000);
-    } else {
-      showToast(`“${step?.title ?? 'That action'}” is no longer a next action here. The task itself is unchanged.`, 'success', 5000);
-    }
-  }, [tasks, updateTask]);
+    const [msg, kind] = removeOutcomeToast(step?.title ?? 'That action', await setGoalLink(stepId, null, step?.goalTaskId ?? null));
+    showToast(msg, kind, 6000);
+  }, [tasks, setGoalLink]);
   // Both ends of the goal-supports-goal link, read through the one module the
   // plan pages and the year goal's page also read, so the four surfaces cannot
   // disagree. A goal opened from a plan row used to be a dead end: the row

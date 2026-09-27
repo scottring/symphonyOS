@@ -75,7 +75,7 @@ import { NextLevelStrip } from './NextLevelStrip'
 import { RefineGoalControl } from './RefineGoalControl'
 import { SortPlanPanel } from './SortPlanPanel'
 import { AddExistingActionDialog } from './AddExistingActionDialog'
-import { offPeriodSteps, actionWhereLabel, fileUnderGoalUpdate, removeFromGoalUpdate } from '@/lib/planning/existingActions'
+import { offPeriodSteps, actionWhereLabel, removeOutcomeToast } from '@/lib/planning/existingActions'
 import { sortCandidates, sortUndo, readSortBatch, writeSortBatch, type SortBatch } from '@/lib/planning/sortPlan'
 import { nextLevelChoices } from '@/lib/planning/nextLevel'
 import { PeriodShelves } from './PeriodShelves'
@@ -148,7 +148,7 @@ function goalRow(g: Goal, support?: RowSupport): PlanRowModel {
 function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
   const references = useReferenceLists()
   const navigate = useNavigate()
-  const { tasks, loading, toggleTask, deleteTask, updateTask, updateTasksBulk, addTask, setGoal, pushTask, keepForward, dropCommitment, completeTask } = useSupabaseTasks()
+  const { tasks, loading, toggleTask, deleteTask, updateTask, setGoalLink, updateTasksBulk, addTask, setGoal, pushTask, keepForward, dropCommitment, completeTask } = useSupabaseTasks()
   const gated = useGatedTaskActions({ updateTask, pushTask, updateTasksBulk }, (id) => tasks.find((t) => t.id === id))
   const { layers, soleDomain } = useDomain()
   const { members: familyMembers, getCurrentUserMember } = useFamilyMembers()
@@ -492,11 +492,11 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
     // Only the link goes: the task keeps its dates, commitments and state,
     // and stays on whatever list it is on (loose, if it is on this one).
     else if (action === 'off-goal') {
-      if ((await gated.updateTask(row.id, removeFromGoalUpdate())) === false) {
-        showToast(`Could not remove “${row.title}” from its goal. Nothing was changed.`, 'error', 6000)
-      } else showToast(`“${row.title}” is no longer a next action for that goal. The task itself is unchanged.`, 'success', 5000)
+      const current = tasks.find((t) => t.id === row.id)?.goalTaskId ?? null
+      const [msg, kind] = removeOutcomeToast(row.title, await setGoalLink(row.id, null, current))
+      showToast(msg, kind, 6000)
     }
-  }, [goals, updateGoal, addGoal, bounds.next, bounds.start, isPast, toggleTask, deleteTask, dropCommitment, gated, setGoal, keepForward, level, tasks, confirmGoalDone, lowerMonth, plannedDay, updateTask])
+  }, [goals, updateGoal, addGoal, bounds.next, bounds.start, isPast, toggleTask, deleteTask, dropCommitment, gated, setGoal, keepForward, level, tasks, confirmGoalDone, lowerMonth, plannedDay, updateTask, setGoalLink])
 
   /**
    * "Assign people" on a goal or a step: the household picker the rest of the
@@ -897,11 +897,11 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
   const [addingExistingFor, setAddingExistingFor] = useState<PlanRowModel | null>(null)
   // "Add an existing action": the same goal_task_id write fileUnderGoal makes,
   // from the goal's end. The goal's steps open so the result is in view.
-  const addExistingAction = useCallback(async (goalId: string, taskId: string) => {
-    const ok = (await gated.updateTask(taskId, fileUnderGoalUpdate(goalId))) !== false
-    if (ok) setExpandedGoals((prev) => new Set(prev).add(goalId))
-    return ok
-  }, [gated])
+  const addExistingAction = useCallback(async (goalId: string, taskId: string, expected: string | null) => {
+    const out = await setGoalLink(taskId, goalId, expected)
+    if (out.status === 'ok') setExpandedGoals((prev) => new Set(prev).add(goalId))
+    return out
+  }, [setGoalLink])
   const [linkError, setLinkError] = useState(false)
   const fileUnderGoal = useCallback(async (taskId: string, goalId: string) => {
     setLinkError(false)
@@ -1982,7 +1982,7 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
             goal={goalTask}
             tasks={tasks}
             members={familyMembers}
-            onLink={(taskId) => addExistingAction(goalTask.id, taskId)}
+            onLink={(taskId, expected) => addExistingAction(goalTask.id, taskId, expected)}
             onClose={() => setAddingExistingFor(null)}
           />
         ) : null

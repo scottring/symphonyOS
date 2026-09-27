@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import type { Task } from '@/types/task'
-import { existingActionCandidates, isEligibleAction, offPeriodSteps, fileUnderGoalUpdate, removeFromGoalUpdate, CANDIDATE_LIMIT } from './existingActions'
+import { existingActionCandidates, isEligibleAction, offPeriodSteps, linkOutcome, removeOutcomeToast, CANDIDATE_LIMIT } from './existingActions'
 import { actionsFor } from './periodPage'
 
 const at = (d: string) => new Date(`${d}T12:00:00`)
@@ -90,12 +90,32 @@ describe('existingActionCandidates', () => {
   })
 })
 
-describe('the write', () => {
-  it('filing and removing touch goal_task_id only', () => {
-    expect(fileUnderGoalUpdate('g1')).toEqual({ goalTaskId: 'g1' })
-    const off = removeFromGoalUpdate()
-    expect(Object.keys(off)).toEqual(['goalTaskId'])
-    expect(off.goalTaskId).toBeUndefined()
+describe('linkOutcome — what the database says happened', () => {
+  it('a clean write is a success', () => {
+    expect(linkOutcome(true, 'g1', null)).toEqual({ status: 'ok' })
+  })
+  it('a lost response whose write landed is a success, not "nothing changed"', () => {
+    expect(linkOutcome(false, 'g1', null, { goalTaskId: 'g1' })).toEqual({ status: 'ok' })
+    // Removing: the link is gone when read back.
+    expect(linkOutcome(false, null, 'g1', { goalTaskId: null })).toEqual({ status: 'ok' })
+  })
+  it('read back unchanged: nothing was written', () => {
+    expect(linkOutcome(false, 'g1', null, { goalTaskId: null })).toEqual({ status: 'failed' })
+    expect(linkOutcome(false, 'g1', 'g2', { goalTaskId: 'g2' })).toEqual({ status: 'failed' })
+  })
+  it('read back under a third goal: someone else changed it — a conflict, not an overwrite', () => {
+    expect(linkOutcome(false, 'g1', 'g2', { goalTaskId: 'g3' })).toEqual({ status: 'conflict', currentGoalId: 'g3' })
+    expect(linkOutcome(false, 'g1', 'g2', { goalTaskId: null })).toEqual({ status: 'conflict', currentGoalId: null })
+    expect(linkOutcome(false, null, 'g1', { goalTaskId: 'g3' })).toEqual({ status: 'conflict', currentGoalId: 'g3' })
+  })
+  it('could not even read back: unknown, never a claim either way', () => {
+    expect(linkOutcome(false, 'g1', null, undefined)).toEqual({ status: 'unknown' })
+  })
+  it('each outcome is said plainly on removal', () => {
+    expect(removeOutcomeToast('Swim', { status: 'ok' })[1]).toBe('success')
+    expect(removeOutcomeToast('Swim', { status: 'failed' })[0]).toMatch(/Nothing was changed/)
+    expect(removeOutcomeToast('Swim', { status: 'conflict', currentGoalId: 'g3' })[0]).toMatch(/Not changed: someone else moved/)
+    expect(removeOutcomeToast('Swim', { status: 'unknown' })[0]).toMatch(/Couldn’t confirm/)
   })
 })
 

@@ -11,6 +11,7 @@ import { scopeForDomain, memberForAuthUser, type Scope } from '@/lib/scope'
 import { localYmd, parseLocalYmd } from '@/lib/cadence/config'
 import { monthStartOf, isPlacement } from '@/lib/planning/periodPlacement'
 import { stepsThatCarryForward } from '@/lib/planning/goalSteps'
+import { linkOutcome, type LinkOutcome } from '@/lib/planning/existingActions'
 import { readSeasons, seasonStartFor } from '@/lib/cadence/seasons'
 import { planPlacement, planKeep, commitmentsAfterCompletion, planDropCommitment, commitmentRow, isPlacementWrite, type PlacementPlan } from '@/lib/placement/intentions'
 import { placementRpcEnabled, isPlacementOnlyRow, rowStep, commitmentSteps, focusStep, expectedOpen, STALE_PLACEMENT_MESSAGE, type PlacementStep, type AtomicOutcome } from '@/lib/placement/placementSteps'
@@ -2114,6 +2115,47 @@ export function useSupabaseTasks() {
     return !updateError && !!data && data.length > 0 && opsOk
   }, [tasks, familyMembers, findTaskById, findParentOfSubtask, selfMemberIdForOwner, user, writePlacementOps, placementBase, applyPlacementAtomically, afterAtomicFailure])
 
+  /**
+   * File a task under a goal, move it, or take it out (goalId null) — ONLY if
+   * it is still under `expected`, the goal it was shown under. A compare-and-
+   * set on goal_task_id, so a change someone else made meanwhile is reported,
+   * never overwritten. A write that does not come back clean is read again:
+   * a lost response that committed is a success, and the local row always
+   * ends on what the database holds. See linkOutcome.
+   */
+  const setGoalLink = useCallback(async (taskId: string, goalId: string | null, expected: string | null): Promise<LinkOutcome> => {
+    const before = findTaskById(taskId)
+    if (!before) return { status: 'failed' }
+    const put = (goalTaskId: string | null) => {
+      setTasksNow(tasksRef, setTasks, (prev) => prev.map((t) => (t.id === taskId ? { ...t, goalTaskId: goalTaskId ?? undefined } : t)))
+    }
+    put(goalId)
+    let wrote = false
+    try {
+      const base = supabase.from('tasks').update({ goal_task_id: goalId }).eq('id', taskId)
+      const { data, error } = await (expected === null ? base.is('goal_task_id', null) : base.eq('goal_task_id', expected)).select('id')
+      wrote = !error && !!data && data.length === 1
+    } catch { /* a lost response: read it back below */ }
+    let reread: { goalTaskId: string | null } | undefined
+    if (!wrote) {
+      try {
+        const { data, error } = await supabase.from('tasks').select('goal_task_id').eq('id', taskId).maybeSingle()
+        if (!error && data) reread = { goalTaskId: (data as { goal_task_id: string | null }).goal_task_id }
+      } catch { /* unknown */ }
+    }
+    const outcome = linkOutcome(wrote, goalId, expected, reread)
+    // The local row ends where the database is — or, when that is unknown,
+    // where it was, until realtime or a reload says otherwise.
+    const settled = outcome.status === 'ok' ? goalId
+      : outcome.status === 'conflict' ? outcome.currentGoalId
+        : reread ? reread.goalTaskId : (before.goalTaskId ?? null)
+    put(settled)
+    if (outcome.status === 'ok' || outcome.status === 'conflict') {
+      announceLocalWrite({ kind: 'update', task: { ...before, goalTaskId: settled ?? undefined } })
+    }
+    return outcome
+  }, [findTaskById])
+
   // Bulk update multiple tasks at once
   const updateTasksBulk = useCallback(async (requestedIds: string[], updates: Partial<Task>) => {
     // Goals aren't placed. A bulk placement that includes some drops them,
@@ -2589,5 +2631,5 @@ export function useSupabaseTasks() {
   }, [tasks])
 
   // `userId`: whose focus rows count on a day (task_focus is per person).
-  return { tasks, loading, error, refetch, addTask, addSubtask, addPrepTask, getPrepTasks, getLinkedTasks, toggleTask, toggleWaiting, deleteTask, updateTask, updateTasksBulk, updateTaskOrders, scheduleTask, pushTask, setBucket, setGoal, keepForward, dropCommitment, completeTask, userId: user?.id ?? null }
+  return { tasks, loading, error, refetch, addTask, addSubtask, addPrepTask, getPrepTasks, getLinkedTasks, toggleTask, toggleWaiting, deleteTask, updateTask, setGoalLink, updateTasksBulk, updateTaskOrders, scheduleTask, pushTask, setBucket, setGoal, keepForward, dropCommitment, completeTask, userId: user?.id ?? null }
 }
