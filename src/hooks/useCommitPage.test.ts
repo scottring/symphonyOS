@@ -61,6 +61,21 @@ beforeEach(() => {
 })
 
 describe('useCommitPage', () => {
+  // Horizon-flows acceptance (2026-09-27): "Link" meant a SECOND row pointing
+  // at the first, so the same errand was on the plan twice.
+  it('a line linked to an existing task inserts nothing — the existing task is the one', async () => {
+    const res = await commit()({
+      items: [
+        { ...ITEM, title: 'Renew the passports', sourceId: 'existing-1' },
+        { ...ITEM, title: 'Buy snow tires' },
+      ],
+      notes: [], domain: 'family', storagePath: null, altitude: 'season',
+    })
+    expect(mocks.addTask).toHaveBeenCalledTimes(1)
+    expect(mocks.addTask.mock.calls[0][0]).toBe('Buy snow tires')
+    expect(res).toMatchObject({ tasksCreated: 1, tasksLinked: 1, failures: 0 })
+  })
+
   it('writes the type chosen on the sheet: category on the task insert, a routines row for a routine', async () => {
     await commit()({
       items: [
@@ -259,11 +274,13 @@ describe('useCommitPage — domain, routines, day-facts, lineage, route', () => 
     expect(res.tasksCreated).toBe(1)
   })
 
-  it('phone and lineage ride the INSERT', async () => {
+  it('the phone number rides the INSERT', async () => {
     const { result } = renderHook(() => useCommitPage())
-    await act(() => result.current.commitPage({ items: [{ ...ITEM, phone: '410-555-0142', sourceId: 'src-1' }], notes: [], domain: 'family', storagePath: null, altitude: 'week' }))
-    expect(mocks.addTask).toHaveBeenCalledWith(expect.any(String), undefined, undefined, undefined, expect.objectContaining({ phoneNumber: '410-555-0142', sourceId: 'src-1' }))
+    await act(() => result.current.commitPage({ items: [{ ...ITEM, phone: '410-555-0142' }], notes: [], domain: 'family', storagePath: null, altitude: 'week' }))
+    expect(mocks.addTask).toHaveBeenCalledWith(expect.any(String), undefined, undefined, undefined, expect.objectContaining({ phoneNumber: '410-555-0142' }))
   })
+  // A LINKED line (sourceId) is the existing task: no insert at all — see
+  // 'a line linked to an existing task inserts nothing' above.
 })
 
 // A year page's lines are goals, not tasks (altitudes, 2026-09-05).

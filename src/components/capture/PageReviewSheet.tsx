@@ -452,7 +452,7 @@ export function PageReviewSheet({
                         {/* The same errand, written twice: one tap says which. */}
                         {row.dup && !row.dupDismissed && (
                           row.sourceId
-                            ? <p className="mt-1 text-[12px] text-neutral-500">Linked to <i className="text-neutral-700">{row.dup.title}</i></p>
+                            ? <p className="mt-1 text-[12px] text-neutral-500">Already on your plan as <i className="text-neutral-700">{row.dup.title}</i> — it won’t be added again.</p>
                             : (
                               <p className="mt-1 flex flex-wrap items-center gap-1.5 text-[12px] text-neutral-500">
                                 Looks like <i className="text-neutral-700">{row.dup.title}</i>

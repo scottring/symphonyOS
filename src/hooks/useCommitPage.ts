@@ -47,6 +47,8 @@ export interface CommitPagePayload {
 
 export interface CommitPageResult {
   tasksCreated: number
+  /** Lines linked to a task already on the plan — nothing inserted for them. */
+  tasksLinked?: number
   goalsCreated: number
   notesCreated: number
   routinesCreated: number
@@ -105,7 +107,15 @@ export function useCommitPage() {
     let failures = 0
     const createdTaskIds: string[] = []
     const tasks = items.filter((i) => i.placement.kind !== 'goal' && i.kind === 'task')
+    let tasksLinked = 0
     for (const item of tasks) {
+      // "Link" on a likely duplicate means THIS line IS that existing task
+      // (one enduring row per action): nothing is inserted, and the existing
+      // row — its dates, commitments, notes and people — is left exactly as
+      // it is. It used to insert a second row pointing at the first, which
+      // put the same errand on the plan twice (horizon-flows acceptance,
+      // 2026-09-27).
+      if (item.sourceId) { tasksLinked += 1; continue }
       const args = planItemToAddTaskArgs(item, commitCtx)
       // The assignee is explicit on every row (the review sheet decides it):
       // no default here, so an Unassigned line stays unassigned.
@@ -235,7 +245,7 @@ export function useCommitPage() {
       showToast(`Added ${parts.join(', ')} to ${periodLabel}`, 'success', 4000)
     }
 
-    return { tasksCreated, goalsCreated, notesCreated, routinesCreated, failures, route, periodLabel, createdTaskIds, createdNoteIds }
+    return { tasksCreated, ...(tasksLinked ? { tasksLinked } : {}), goalsCreated, notesCreated, routinesCreated, failures, route, periodLabel, createdTaskIds, createdNoteIds }
   }, [addTask, addNote, addRoutine, areas, addGoal])
 
   return { commitPage }
