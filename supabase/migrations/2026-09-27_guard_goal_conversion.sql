@@ -1,6 +1,12 @@
--- PROPOSED — NOT APPLIED to the shared project. Proven on the isolated local
--- copy only (2026-09-27): outputs/horizon-everyday/guard-concurrency.mjs.
--- Apply only with Scott's approval, as its own reviewed change.
+-- PREPARED — NOT APPLIED to the shared project. Apply only with Scott's
+-- explicit approval, as its own step (see the release order in
+-- docs/planning/2026-09-27-everyday-horizons.md).
+-- Proof: supabase/tests/101_guard_goal_conversion.test.sql (invariant, as
+-- postgres, rolled back) and supabase/tests/guard_goal_conversion.concurrency.mjs
+-- (two real connections as `authenticated`, RLS on — races and hidden rows).
+-- Rollback: supabase/migrations/rollback/2026-09-27_guard_goal_conversion.down.sql
+-- Existing data: a read-only count on 2026-09-27 found no row breaking the
+-- invariant (and no goal links at all); the guard validates only CHANGES.
 --
 -- THE INVARIANT: no goal link points at a row that is not a goal —
 --   supports_goal_task_id (a month goal supporting a season goal), and

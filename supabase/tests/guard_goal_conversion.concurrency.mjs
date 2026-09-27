@@ -5,7 +5,9 @@
 // claims, so RLS applies exactly as in the app. Every row this creates is
 // titled GUARDTEST and deleted at the end.
 //
-//   PG_MODULE=/path/to/node_modules/pg node guard-concurrency.mjs
+//   PG_MODULE=/path/to/node_modules/pg node supabase/tests/guard_goal_conversion.concurrency.mjs
+// Needs the two fictional accounts below in that local database (see
+// outputs/horizon-everyday/setup-lee.mjs and e0.mjs); it never runs elsewhere.
 import { createRequire } from 'node:module'
 const require = createRequire(import.meta.url)
 const { Client } = require(process.env.PG_MODULE ?? 'pg')
