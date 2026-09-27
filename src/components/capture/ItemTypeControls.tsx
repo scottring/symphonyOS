@@ -1,23 +1,22 @@
-import { CalendarClock, CheckSquare, ChevronDown, Circle, RefreshCw } from 'lucide-react'
+import { CalendarClock, CheckSquare, ChevronDown, Circle, RefreshCw, Target } from 'lucide-react'
 import type { PlanDay } from '@/lib/planParse'
 import { PAPER_ITEM_TYPES, type PaperItemType } from '@/lib/paperItemType'
 
 // The same colours and icons TaskKindBadge draws, so the selector reads as
 // the badge it replaced — only now it is a control.
 const META: Record<PaperItemType, { Icon: typeof Circle; className: string }> = {
+  goal: { Icon: Target, className: 'border-amber-200 bg-amber-50 text-amber-800' },
   task: { Icon: Circle, className: 'border-neutral-200 bg-white text-neutral-600' },
   appointment: { Icon: CalendarClock, className: 'border-blue-200 bg-blue-50 text-blue-700' },
   activity: { Icon: CheckSquare, className: 'border-sage-200 bg-sage-50 text-sage-600' },
   routine: { Icon: RefreshCw, className: 'border-primary-200 bg-primary-50 text-primary-700' },
 }
 
-/** A row's type, as a native select: keyboard, screen reader and the phone's
- *  own picker all come with it. */
-export function ItemTypeSelect({ value, title, onChange, disabled = false }: {
+/** A row's one "What is this?" answer, as a native select: keyboard, screen
+ *  reader and the phone's own picker all come with it. */
+export function ItemTypeSelect({ value, title, onChange }: {
   value: PaperItemType
   title: string
-  /** A linked row saves nothing of its own, so its type cannot change. */
-  disabled?: boolean
   onChange: (type: PaperItemType) => void
 }) {
   const { Icon, className } = META[value]
@@ -26,9 +25,8 @@ export function ItemTypeSelect({ value, title, onChange, disabled = false }: {
       <Icon className="pointer-events-none absolute left-1.5 h-3 w-3" aria-hidden="true" />
       <select
         value={value}
-        disabled={disabled}
         onChange={(e) => onChange(e.target.value as PaperItemType)}
-        aria-label={`Type of "${title}"`}
+        aria-label={`What is "${title}"?`}
         className="appearance-none bg-transparent py-1 pl-[1.9em] pr-[1.7em] text-[11px] font-semibold leading-none text-inherit focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-400 rounded-md cursor-pointer"
       >
         {PAPER_ITEM_TYPES.map((t) => (

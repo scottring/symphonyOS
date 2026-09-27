@@ -25,6 +25,18 @@ function draftFor(level: SessionLevel, periodStart: string): SessionDraft {
 beforeEach(() => localStorage.clear())
 
 describe('mergePaperIntoDraft', () => {
+  it('a goal joins only a draft of its own period; a week draft takes none', () => {
+    const monthGoal = page([line('Read more', { kind: 'month' }, { goal: true })])
+    expect(mergePaperIntoDraft(draftFor('month', '2026-10-01'), monthGoal, empty).draft.newGoals.map((g) => g.title)).toEqual(['Read more'])
+    const week = mergePaperIntoDraft(draftFor('week', '2026-10-05'), monthGoal, empty)
+    expect(week.draft.newGoals).toEqual([])
+    expect(week.draft.newTasks).toEqual([])
+    expect(week.rest.items.map((i) => i.title)).toEqual(['Read more'])
+    const seasonGoal = page([line('Plan winter trip', { kind: 'season' }, { goal: true })])
+    expect(mergePaperIntoDraft(draftFor('month', '2026-10-01'), seasonGoal, empty).rest.items).toHaveLength(1)
+    expect(mergePaperIntoDraft(draftFor('season', '2026-09-01'), seasonGoal, empty).draft.newGoals).toHaveLength(1)
+  })
+
   const empty = { open: [], above: [], current: [] }
 
   it('routes a goal line to newGoals and a task line to newTasks', () => {
@@ -35,11 +47,13 @@ describe('mergePaperIntoDraft', () => {
       line('Fix the porch railing', { kind: 'month' }, { goal: true }),
     ]), empty)
 
-    expect(r.draft.newGoals.map((g) => g.title)).toEqual(['Run a half marathon', 'Fix the porch railing'])
+    // A month-list goal is not a year goal: it is saved directly, on its month.
+    expect(r.draft.newGoals.map((g) => g.title)).toEqual(['Run a half marathon'])
     expect(r.draft.newTasks.map((t) => t.title)).toEqual(['Book the race'])
     expect(r.draft.newTasks[0].context).toBeNull()
     expect(r.draft.newTasks[0].id).toBeTruthy()
-    expect(r.added).toEqual(['Run a half marathon', 'Book the race', 'Fix the porch railing'])
+    expect(r.added).toEqual(['Run a half marathon', 'Book the race'])
+    expect(r.rest.items.map((i) => i.title)).toEqual(['Fix the porch railing'])
   })
 
   it('carries the line’s date as the day, on a WEEK draft only', () => {

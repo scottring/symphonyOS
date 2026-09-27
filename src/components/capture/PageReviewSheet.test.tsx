@@ -143,7 +143,7 @@ describe('PageReviewSheet — altitudes', () => {
     expect(onCommit.mock.calls[0][0].items[0].placement).toEqual({ kind: 'month' })
   })
 
-  it('on a year page, lines read as goals show a Goal badge, count as goals, and can still be demoted', async () => {
+  it('on a year page, lines read as goals are Goal or project, count as goals, and can still be made actions', async () => {
     const user = userEvent.setup()
     const { onCommit } = renderSheet({
       altitude: 'year',
@@ -154,15 +154,13 @@ describe('PageReviewSheet — altitudes', () => {
         { title: 'Book Iceland flights', placement: { kind: 'season' }, time: null, assigneeId: null, note: null, dateHint: null, kind: 'task' as const, recurring: null, phone: null, contactMemberId: null },
       ],
     })
-    expect(screen.getByText('Goal')).toBeInTheDocument()
+    expect(screen.getByRole('combobox', { name: 'What is "Half marathon"?' })).toHaveValue('goal')
     expect(screen.getByText(/read as a year page/i)).toBeInTheDocument()
-    expect(screen.getByText(/1 task \/ 1 goal/)).toBeInTheDocument()
-    const whens = screen.getAllByRole('combobox', { name: /when/i })
-    expect(Array.from(whens[1].querySelectorAll('option')).map((o) => o.textContent)).toContain('Year goal')
+    expect(screen.getByText(/1 goal or project \/ 1 action/)).toBeInTheDocument()
     // Year goals take people (#64): the goal row has its own Assignee select too.
     expect(screen.getAllByRole('combobox', { name: /assignee/i })).toHaveLength(2)
     expect(screen.getByRole('combobox', { name: 'Assignee for "Half marathon"' })).toBeInTheDocument()
-    await user.selectOptions(whens[0], 'someday')
+    await user.selectOptions(screen.getByRole('combobox', { name: 'What is "Half marathon"?' }), 'task')
     await user.click(screen.getByRole('button', { name: /add 2 items/i }))
     expect(onCommit.mock.calls[0][0].items.map((i: { placement: unknown }) => i.placement)).toEqual([{ kind: 'someday' }, { kind: 'season' }])
   })
@@ -203,7 +201,7 @@ describe('PageReviewSheet — altitudes', () => {
       expect(onCommit.mock.calls[0][0].seasonStart).toEqual(new Date(2026, 5, 1))
     })
 
-    it('a goal line is badged, toggleable, and commits as a goal on the month', async () => {
+    it('a goal line reads Goal or project, is chosen in the same control, and commits as a goal on the month', async () => {
       const user = userEvent.setup()
       const { onCommit } = renderSheet({
         altitude: 'month', today: new Date(2026, 8, 5),
@@ -213,25 +211,27 @@ describe('PageReviewSheet — altitudes', () => {
         ],
         notes: [],
       })
-      expect(screen.getByText(/1 task \/ 1 goal/)).toBeInTheDocument()
-      expect(screen.getByRole('button', { name: 'Make "Read more" a goal' })).toHaveAttribute('aria-pressed', 'true')
-      await user.click(screen.getByRole('button', { name: 'Make "Repaint the porch" a goal' }))
-      expect(screen.getByText(/2 goals/)).toBeInTheDocument()
+      expect(screen.getByText(/1 goal or project \/ 1 action/)).toBeInTheDocument()
+      expect(screen.getByRole('combobox', { name: 'What is "Read more"?' })).toHaveValue('goal')
+      await user.selectOptions(screen.getByRole('combobox', { name: 'What is "Repaint the porch"?' }), 'goal')
+      expect(screen.getByText(/2 goals or projects/)).toBeInTheDocument()
       await user.click(screen.getByRole('button', { name: /add 2 items/i }))
       expect(onCommit.mock.calls[0][0].items.map((i: { goal?: boolean }) => !!i.goal)).toEqual([true, true])
     })
 
-    it('a goal moved onto a date stops being a goal — goals are never scheduled', async () => {
+    it('a goal has no day to pick — only which list it is for; an action made from it may take a day', async () => {
       const user = userEvent.setup()
       const { onCommit } = renderSheet({
         altitude: 'month', today: new Date(2026, 8, 5),
         items: [{ title: 'Read more', placement: { kind: 'month' }, time: null, assigneeId: null, note: null, goal: true, dateHint: null, kind: 'task' as const, recurring: null, phone: null, contactMemberId: null }],
         notes: [],
       })
+      expect(screen.queryByRole('combobox', { name: /when/i })).toBeNull()
+      expect(screen.getByRole('combobox', { name: 'Goal for "Read more"' })).toHaveValue('month')
+      await user.selectOptions(screen.getByRole('combobox', { name: 'What is "Read more"?' }), 'task')
       await user.selectOptions(screen.getByRole('combobox', { name: /when/i }), '2026-09-18')
-      expect(screen.queryByRole('button', { name: 'Make "Read more" a goal' })).toBeNull()
       await user.click(screen.getByRole('button', { name: /add 1 item/i }))
-      expect(onCommit.mock.calls[0][0].items[0].goal).toBeFalsy()
+      expect(onCommit.mock.calls[0][0].items[0]).toMatchObject({ goal: false, placement: { kind: 'date', date: '2026-09-18' } })
     })
 
     it('a week page offers no goal toggle and no period chip', () => {
@@ -358,13 +358,13 @@ describe('PageReviewSheet — domain, page title, duplicates', () => {
     expect(onCommit.mock.calls[0][0].items[0].sourceId).toBeUndefined()
   })
 
-  it('the Goal control is a labelled button to the right of When, not a badge', () => {
+  it('goal or action is one labelled choice on the left — no separate goal button', () => {
     renderSheet({
       altitude: 'month', today: new Date(2026, 8, 5), notes: [],
       items: [{ ...base, title: 'Read a book', placement: { kind: 'month' } }],
     })
-    expect(screen.getByRole('button', { name: 'Make "Read a book" a goal' })).toHaveAttribute('aria-pressed', 'false')
-    expect(screen.getByText('Task')).toBeInTheDocument() // the kind badge stays
+    expect(screen.getByRole('combobox', { name: 'What is "Read a book"?' })).toHaveValue('task')
+    expect(screen.queryByRole('button', { name: /a goal$/ })).toBeNull()
   })
 
   it('a recurring line reads as a routine with its days, not a When select', () => {
@@ -372,7 +372,7 @@ describe('PageReviewSheet — domain, page title, duplicates', () => {
       notes: [],
       items: [{ ...base, title: 'Trash out', kind: 'recurring', placement: { kind: 'week' }, recurring: { days: ['sat', 'sun'], until: null } }],
     })
-    expect(screen.getByRole('combobox', { name: 'Type of "Trash out"' })).toHaveValue('routine')
+    expect(screen.getByRole('combobox', { name: 'What is "Trash out"?' })).toHaveValue('routine')
     expect(screen.getByRole('button', { name: 'Saturday' })).toHaveAttribute('aria-pressed', 'true')
     expect(screen.getByRole('button', { name: 'Sunday' })).toHaveAttribute('aria-pressed', 'true')
     expect(screen.getByRole('button', { name: 'Monday' })).toHaveAttribute('aria-pressed', 'false')
@@ -391,31 +391,33 @@ describe('PageReviewSheet — linked lines and Year goals (Codex review, 2026-09
     })
     await user.click(screen.getByRole('button', { name: /^Link/ }))
     expect(screen.getByRole('status')).toHaveTextContent(/already on your plan, exactly as it is — nothing on this line is saved/)
-    expect(screen.getByRole('combobox', { name: /when/i })).toBeDisabled()
-    expect(screen.getByRole('combobox', { name: 'Type of "Renew the passports"' })).toBeDisabled()
+    // No type, no when: the line IS the existing item.
+    expect(screen.queryByRole('combobox', { name: /when/i })).toBeNull()
+    expect(screen.queryByRole('combobox', { name: 'What is "Renew the passports"?' })).toBeNull()
+    expect(screen.getByText('Linked')).toBeInTheDocument()
     expect(screen.getByRole('combobox', { name: 'Assignee for "Renew the passports"' })).toBeDisabled()
     expect(screen.getByRole('textbox', { name: 'Task title' })).toHaveAttribute('readonly')
     await user.click(screen.getByRole('button', { name: 'Unlink' }))
     expect(screen.getByRole('combobox', { name: /when/i })).not.toBeDisabled()
+    expect(screen.getByRole('combobox', { name: 'What is "Renew the passports"?' })).toHaveValue('task')
     await user.click(screen.getByRole('button', { name: /add 1 item/i }))
     expect(onCommit.mock.calls[0][0].items[0].sourceId).toBeUndefined()
   })
 
-  it('a wrongly classified Year goal becomes an action or a routine through When and Type, and back — note and person kept', async () => {
+  it('a wrongly classified Year goal becomes an action, an appointment or a routine, and back — note and person kept', async () => {
     const user = userEvent.setup()
     const { onCommit } = renderSheet({
       altitude: 'year', windowDates: [], notes: [],
       items: [{ ...base, title: 'Renew the passports', placement: { kind: 'goal' }, note: 'Both expire in March', assigneeId: 'm-iris' }],
     })
-    // A Year goal row: a Goal badge (no Type selector), a When select, a person.
-    expect(screen.queryByRole('combobox', { name: 'Type of "Renew the passports"' })).toBeNull()
-    const when = screen.getByRole('combobox', { name: /when/i })
-    await user.selectOptions(when, 'season')                      // → an action on the season's list
-    const type = screen.getByRole('combobox', { name: 'Type of "Renew the passports"' })
-    await user.selectOptions(type, 'appointment')                 // → an appointment
+    const type = screen.getByRole('combobox', { name: 'What is "Renew the passports"?' })
+    expect(type).toHaveValue('goal')
     await user.selectOptions(type, 'task')
-    await user.selectOptions(screen.getByRole('combobox', { name: /when/i }), 'goal')   // → back to a Year goal
-    expect(screen.getByText('Goal')).toBeInTheDocument()
+    await user.selectOptions(screen.getByRole('combobox', { name: /when/i }), 'season')   // → an action on the season's list
+    await user.selectOptions(type, 'appointment')
+    await user.selectOptions(type, 'routine')
+    await user.selectOptions(type, 'goal')                                                 // → back to a Year goal
+    expect(screen.getByRole('combobox', { name: 'Goal for "Renew the passports"' })).toHaveValue('goal')
     expect(screen.getByText('Both expire in March')).toBeInTheDocument()
     expect(screen.getByRole('combobox', { name: 'Assignee for "Renew the passports"' })).toHaveValue('m-iris')
     await user.click(screen.getByRole('button', { name: /add 1 item/i }))

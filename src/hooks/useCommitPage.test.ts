@@ -26,6 +26,7 @@ vi.mock('@/contexts/GoalsContext', () => ({
 }))
 
 import { useCommitPage } from './useCommitPage'
+import { normalizeForSave, withItemType, type PaperItemType } from '@/lib/paperItemType'
 
 const ITEM: PlanItem = {
   title: 'Buy milk',
@@ -91,6 +92,36 @@ describe('useCommitPage', () => {
     expect(mocks.addRoutine).toHaveBeenCalledWith(expect.objectContaining({
       name: 'Water plants', recurrence_pattern: { type: 'weekly', days: ['tue'] }, time_of_day: '08:00',
     }))
+  })
+
+  // "What is this?" (2026-09-27): each of the five answers, chosen on the
+  // sheet, writes through the existing writer for that entity — not a label.
+  it.each([
+    ['goal', 'week', { addTask: { bucket: 'month', isGoal: true } }],
+    ['goal', 'season', { addTask: { bucket: 'quarter', isGoal: true } }],
+    ['goal', 'year', { addGoal: true }],
+    ['task', 'month', { addTask: { category: 'task', isAllDay: false } }],
+    ['appointment', 'month', { addTask: { category: 'event', isAllDay: false } }],
+    ['activity', 'month', { addTask: { category: 'activity' } }],
+    ['routine', 'month', { addRoutine: { days: ['wed'] } }],
+  ] as const)('a line chosen as %s on a %s page commits through its own writer', async (type, altitude, expected) => {
+    const line: PlanItem = { ...ITEM, title: 'Swim', placement: { kind: 'date', date: '2026-10-07' }, time: '16:30', category: 'task' }
+    const item = normalizeForSave(withItemType(line, type as PaperItemType, altitude))
+    await commit()({ items: [item], notes: [], domain: 'family', storagePath: null, altitude })
+    if ('addTask' in expected) {
+      expect(mocks.addTask).toHaveBeenCalledTimes(1)
+      expect(mocks.addTask.mock.calls[0][4]).toMatchObject(expected.addTask)
+      expect(mocks.addRoutine).not.toHaveBeenCalled()
+      expect(mocks.addGoal).not.toHaveBeenCalled()
+    }
+    if ('addGoal' in expected) {
+      expect(mocks.addGoal).toHaveBeenCalledTimes(1)
+      expect(mocks.addTask).not.toHaveBeenCalled()
+    }
+    if ('addRoutine' in expected) {
+      expect(mocks.addRoutine).toHaveBeenCalledWith(expect.objectContaining({ name: 'Swim', recurrence_pattern: { type: 'weekly', days: expected.addRoutine.days }, time_of_day: '16:30' }))
+      expect(mocks.addTask).not.toHaveBeenCalled()
+    }
   })
 
   it('writes each line\'s person as chosen — Unassigned stays null for tasks AND routines, with no default slipped in', async () => {
