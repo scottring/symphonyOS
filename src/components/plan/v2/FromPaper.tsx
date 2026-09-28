@@ -19,15 +19,19 @@ export function FromPaper({ altitude, periodStart, tasks, label = 'Add from pape
   tasks: readonly Task[]
   label?: string
 }) {
+  // Each click mounts a fresh flow: a run that ended without calling onClose
+  // (a crashed parse, a closed tab) can never leave the button dead.
+  const [run, setRun] = useState(0)
   const [open, setOpen] = useState(false)
   const { members } = useFamilyMembers()
   return (
     <>
-      <button type="button" className="pv2-paper" onClick={() => setOpen(true)}>
+      <button type="button" className="pv2-paper" onClick={() => { setRun((n) => n + 1); setOpen(true) }}>
         <Camera className="w-3.5 h-3.5" aria-hidden="true" />{label}
       </button>
       {open && (
         <PageFromPaperFlow
+          key={run}
           members={members}
           onClose={() => setOpen(false)}
           existingTasks={tasks.filter((t) => !t.completed).map((t) => ({ id: t.id, title: t.title }))}
