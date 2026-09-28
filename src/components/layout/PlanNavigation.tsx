@@ -115,8 +115,7 @@ export function PlanNavigation({ mobile = false, paused = false, mobileControlsR
   /** Phone only: the slot MobilePlanControls portals into. */
   mobileControlsRef?: (node: HTMLDivElement | null) => void
 }) {
-  const { pathname, search } = useLocation()
-  const navigate = useNavigate()
+  const { pathname } = useLocation()
   const period = planPeriodForPath(pathname)
   const references = useReferenceLists()
   const pinned = !!references?.pins.some(pin => pin.kind === 'today')
@@ -131,7 +130,6 @@ export function PlanNavigation({ mobile = false, paused = false, mobileControlsR
   // The kept-pins note ("Lists return when you close the side panel") is
   // still said on Today, even though its chooser button lives on the page.
   const pausedNote = !mobile && paused && !!references && references.pins.length > 0
-  const range = new URLSearchParams(search).get('range') ?? 'today'
   if (!mobile) {
     // Desktop: the horizon rail IS the main navigation (Scott, 2026-09-28 —
     // "Planner" is gone from the row above). Centred on every page; a page
@@ -140,13 +138,8 @@ export function PlanNavigation({ mobile = false, paused = false, mobileControlsR
       <div className="plan-rail-side" />
       <HorizonRail period={period} />
       <div className="plan-rail-side is-right">
-        {period === 'week' && <label className="plan-range-control"><span className="sr-only">Range</span>
-          <select aria-label="Week range" value={['week', 'weekend', 'three', 'custom'].includes(range) ? range : 'week'}
-            onChange={event => navigate(event.target.value === 'week' ? '/week' : `/week?range=${event.target.value}`)}>
-            <option value="week">Full week</option><option value="weekend">Weekend</option>
-            <option value="three">3 days</option><option value="custom">Custom range…</option>
-          </select>
-        </label>}
+        {/* No week-range picker here (Scott, 2026-09-28: "I don't understand
+            what it is") — the Week heading's own menu offers the same ranges. */}
         {(showChooser || pausedNote) && references && <div className="task-chooser-control">
           {showChooser && <button type="button" aria-label={pinned ? 'Close shelves' : 'Shelves'} aria-pressed={pinned}
             onClick={() => pinned ? references.unpin('today') : references.pin('today')}>
@@ -161,13 +154,6 @@ export function PlanNavigation({ mobile = false, paused = false, mobileControlsR
   return <div className="plan-page-tools" data-period={period}>
     {period && <div className="plan-period-controls">
       <HorizonSwitcher period={period} />
-      {period === 'week' && <label className="plan-range-control"><span className="sr-only">Range</span>
-        <select aria-label="Week range" value={['week', 'weekend', 'three', 'custom'].includes(range) ? range : 'week'}
-          onChange={event => navigate(event.target.value === 'week' ? '/week' : `/week?range=${event.target.value}`)}>
-          <option value="week">Full week</option><option value="weekend">Weekend</option>
-          <option value="three">3 days</option><option value="custom">Custom range…</option>
-        </select>
-      </label>}
     </div>}
     {(showChooser || pausedNote) && references && <div className="task-chooser-control">
       {showChooser && <button type="button" aria-label={pinned && !mobile ? 'Close shelves' : 'Shelves'}
