@@ -1,12 +1,11 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { NavLink, useLocation, useNavigate } from 'react-router-dom'
-import { PanelLeft, Target, ChevronDown, Check } from 'lucide-react'
+import { PanelLeft, ChevronDown, Check } from 'lucide-react'
 import { periodBounds } from '@/lib/planning/periodPage'
 import { readSeasons } from '@/lib/cadence/seasons'
 import { useReferenceLists } from '@/components/reference/ReferenceListsContext'
 import { PlanningSheet } from '@/components/reference/PlanningSheet'
-import { GoalsSheet } from '@/components/plan/GoalsSheet'
 import { DomainSwitcher } from '@/components/domain/DomainSwitcher'
 import { horizonNumerals } from '@/lib/planning/horizonNumerals'
 import { readCadenceConfig } from '@/lib/cadence/config'
@@ -122,9 +121,8 @@ export function PlanNavigation({ mobile = false, paused = false, mobileControlsR
   const references = useReferenceLists()
   const pinned = !!references?.pins.some(pin => pin.kind === 'today')
   const [sheetPath, setSheetPath] = useState<string | null>(null)
-  // The ◎ Goals reference opens the same sheet at every width (ruling: one
-  // component; a desktop pinned panel is a follow-up).
-  const [goalsOpen, setGoalsOpen] = useState(false)
+  // No ◎ Goals control (Scott, 2026-09-28: "unnecessary") — the Year,
+  // Season and Month pages are where goals are read.
   const sheetOpen = sheetPath === pathname
   // Horizon pages own their Shelves launcher in the date masthead.
   const onToday = pathname === '/' || pathname === '/today' || pathname.startsWith('/tasks-new')
@@ -156,13 +154,7 @@ export function PlanNavigation({ mobile = false, paused = false, mobileControlsR
           </button>}
           {pausedNote && <span>Lists return when you close the side panel.</span>}
         </div>}
-        {period && <div className="goals-reference-control">
-          <button type="button" aria-label="Goals" aria-expanded={goalsOpen} onClick={() => setGoalsOpen(open => !open)}>
-            <Target size={15} aria-hidden="true" /><span className="goals-reference-label">Goals</span>
-          </button>
-        </div>}
       </div>
-      {period && <GoalsSheet open={goalsOpen} onClose={() => setGoalsOpen(false)} />}
     </div>
   }
   if (!period && !showChooser && !pausedNote) return null
@@ -185,16 +177,10 @@ export function PlanNavigation({ mobile = false, paused = false, mobileControlsR
       </button>}
       {pausedNote && <span>Lists return when you close the side panel.</span>}
     </div>}
-    {period && <div className="goals-reference-control">
-      <button type="button" aria-label="Goals" aria-expanded={goalsOpen} onClick={() => setGoalsOpen(open => !open)}>
-        <Target size={15} aria-hidden="true" /><span className="goals-reference-label">Goals</span>
-      </button>
-    </div>}
     {/* Phone: the life-area lens rides on this row (Today folds it into
         its Filters control instead). */}
     {period && mobile && period !== 'today' && <DomainSwitcher />}
     {period && mobile && <div ref={mobileControlsRef} className="plan-mobile-controls" />}
-    {period && <GoalsSheet open={goalsOpen} onClose={() => setGoalsOpen(false)} />}
     {mobile && showChooser && <PlanningSheet open={sheetOpen} onClose={() => setSheetPath(null)} periodShelves={broaderPeriod} />}
   </div>
 }

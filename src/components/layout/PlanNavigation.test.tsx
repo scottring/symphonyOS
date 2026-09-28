@@ -13,24 +13,13 @@ const { PlanNavigation, usePlanDestination } = await import('./PlanNavigation')
 
 afterEach(cleanup)
 
-describe('PlanNavigation — the ◎ Goals control', () => {
-  it('toggles the Goals reference on a planning page', () => {
+describe('PlanNavigation', () => {
+  it('has no ◎ Goals control at any width (2026-09-28: the planning pages hold the goals)', () => {
     render(<MemoryRouter initialEntries={['/month']}><PlanNavigation /></MemoryRouter>)
-    const button = screen.getByRole('button', { name: 'Goals' })
-    expect(button).toHaveAttribute('aria-expanded', 'false')
-    expect(screen.queryByRole('dialog', { name: 'Goals' })).not.toBeInTheDocument()
-
-    fireEvent.click(button)
-    expect(button).toHaveAttribute('aria-expanded', 'true')
-    expect(screen.getByRole('dialog', { name: 'Goals' })).toBeInTheDocument()
-
-    fireEvent.click(button)
-    expect(screen.queryByRole('dialog', { name: 'Goals' })).not.toBeInTheDocument()
-  })
-
-  it('offers it on the phone too — one component at every width', () => {
+    expect(screen.queryByRole('button', { name: 'Goals' })).not.toBeInTheDocument()
+    cleanup()
     render(<MemoryRouter initialEntries={['/season']}><PlanNavigation mobile /></MemoryRouter>)
-    expect(screen.getByRole('button', { name: 'Goals' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Goals' })).not.toBeInTheDocument()
   })
 
   it('switches horizons on a phone from the title menu, one horizon at a time', () => {
