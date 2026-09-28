@@ -60,6 +60,8 @@ import { useMediaQuery } from '@/hooks/useMediaQuery'
 import type { AssigneeFilter } from '@/lib/today/types'
 import type { Layer } from '@/lib/domains'
 import { WeekPlanHost } from './WeekPlanHost'
+import { WeekV2 } from '@/components/plan/v2/WeekV2'
+import { planV2Enabled } from '@/lib/planning/v2/planV2'
 
 /** Does this calendar event span the whole day? Explicit flags win; otherwise
  *  a full-day span (midnight start, 24h+ duration — how a holiday reads from
@@ -1045,7 +1047,14 @@ export function WeekViewV2(props: WeekViewV2Props) {
         <div className="flex items-start gap-4">
         {/* Edge auto-advance measures THIS box, not the whole view. */}
         <div ref={gridBoundsRef} data-week-bounds className="flex-1 min-w-0">
-        {!showSchedule ? (
+        {!showSchedule && planV2Enabled() ? (
+          // v2 (docs/planning/2026-09-28-planning-v2.md): the same journal and
+          // list, laid out as the prototype's day column + "Any day this week".
+          <WeekV2 tasks={tasks} weekStart={weekAnchor} meId={meId} isCurrent={weekIsCurrent} onPlan={openSession}
+            onSelectTask={(id) => onSelectItem(`task-${id}`)}
+            list={weekListFor(openSession)}
+            days={<WeekJournal days={journalDays} spans={journalSpans} onSelectItem={onSelectItem} onToggleEntry={handleJournalToggle} onPlanDrop={handlePlanDropOnDay} onAddToDay={handleAddToDay} timingControl={weekTimingControl} />} />
+        ) : !showSchedule ? (
           <>
             {weekListFor(openSession)}
             <h2 className="week-days-heading">The days</h2>

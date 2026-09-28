@@ -3060,6 +3060,17 @@ div.chooser-action-group { overflow: visible !important; }
 .pv2-stamp-someday { color: hsl(36 72% 38%); }
 .pv2-stamp-dropped { color: var(--color-neutral-500); }
 
+.pv2-week { --pv2-slate: hsl(212 38% 34%); --pv2-num: 'Jost', var(--font-family-sans); }
+.pv2-wgrid { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(300px, 1fr); gap: 40px; align-items: start; }
+.pv2-wgrid.is-ref { grid-template-columns: minmax(0, 1.2fr) minmax(260px, .9fr) 230px; gap: 28px; }
+.pv2-wside { position: sticky; top: 76px; }
+.pv2-rrow-sans { font: 400 14px/1.4 var(--font-family-sans); }
+/* The day column: the prototype's big thin day numbers, the journal's rows. */
+.pv2-days [data-testid="week-journal"] header > span:first-child { font: 200 34px/1 var(--pv2-num); }
+@media (max-width: 1060px) {
+  .pv2-wgrid.is-ref { grid-template-columns: minmax(0, 1fr) minmax(240px, .9fr); }
+  .pv2-wgrid.is-ref .pv2-ref { grid-column: 1 / -1; position: static; max-height: none; }
+}
 @media (max-width: 1060px) {
   .pv2-grid3 { grid-template-columns: 200px minmax(0, 1fr); }
   .pv2-grid3 .pv2-cal { grid-column: 1 / -1; position: static; }

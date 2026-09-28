@@ -24,6 +24,7 @@ import { PlanSession } from '@/components/plan/PlanSession'
 import { PlanNextLine } from '@/components/plan/PlanNextLine'
 import type { DomainId } from '@/lib/domains'
 import type { Task } from '@/types/task'
+import { planV2Enabled } from '@/lib/planning/v2/planV2'
 
 const DAY = 86_400_000
 
@@ -120,10 +121,12 @@ export function WeekPlanHost({ tasks, weekStart, meId, isPast, children, tools }
   const { sessionReady, draft, shownDraft, sessionOpen, savingSession, justSaved, saveError, dismissJustSaved,
     startSession, changeDraft, closeSession, saveDraft } = host
   const { user } = useAuth()
+  // v2 carries the plan's status and "Plan this week" in its own toolbar.
+  const v2 = planV2Enabled()
 
   return (
     <>
-      {!isPast && (
+      {!isPast && !v2 && (
         <div className="week-plan-status">
           <p className="text-[13px] text-neutral-500">
             {sessionReadError
@@ -145,7 +148,7 @@ export function WeekPlanHost({ tasks, weekStart, meId, isPast, children, tools }
           <div className="week-plan-tools">{tools}</div>
         </div>
       )}
-      {isPast && <div className="week-display-tools">{tools}</div>}
+      {(isPast || v2) && <div className="week-display-tools">{tools}</div>}
       {justSaved && !sessionOpen && (
         <PlanNextLine
           planned="The week"
