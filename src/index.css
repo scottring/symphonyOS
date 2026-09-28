@@ -3006,6 +3006,19 @@ div.chooser-action-group { overflow: visible !important; }
 .pv2-colh { font: 500 17px var(--font-family-display); margin: 0 0 10px; display: flex; gap: 10px; align-items: baseline; justify-content: space-between; }
 .pv2-paper { display: inline-flex; align-items: center; gap: 5px; margin-left: auto; font: 400 12.5px var(--font-family-sans); color: var(--color-primary-700); white-space: nowrap; }
 .pv2-paper:hover { text-decoration: underline; }
+.pv2-panel { background: var(--color-bg-elevated); border: 1px solid var(--color-neutral-200); border-radius: 14px; padding: 16px 18px 10px; }
+.pv2-wl-h { margin: 12px 0 4px; font: 500 10.5px var(--pv2-num, 'Jost'); letter-spacing: .14em; text-transform: uppercase; color: var(--color-neutral-500); }
+.pv2-wl-row { display: flex; gap: 10px; align-items: flex-start; padding: 8px 0; border-top: 1px solid var(--color-neutral-100); }
+.pv2-wl-row:first-child { border-top: 0; }
+.pv2-wl-check { flex: none; width: 16px; height: 16px; margin-top: 3px; border-radius: 50%; border: 1.5px solid var(--color-neutral-400); display: grid; place-items: center; color: #fff; }
+.pv2-wl-check.is-on { background: var(--color-primary-600); border-color: var(--color-primary-600); }
+.pv2-wl-title { display: block; width: 100%; text-align: left; font-size: 14.5px; line-height: 1.4; color: var(--color-neutral-900); overflow-wrap: anywhere; }
+.pv2-wl-title:hover { color: var(--color-primary-700); }
+.pv2-wl-row.is-done .pv2-wl-title { text-decoration: line-through; color: var(--color-neutral-500); }
+.pv2-wl-goal { display: flex; align-items: center; gap: 6px; margin-top: 2px; font-size: 12px; color: var(--color-neutral-500); }
+.pv2-goal.is-tiny { width: 5px; height: 5px; }
+.pv2-wl-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 6px; }
+.pv2-wl-row .pv2-hov { opacity: 1; }
 .pv2-wside-tools { display: flex; justify-content: flex-end; margin-bottom: 8px; }
 .pv2-colh small { font: 400 12.5px var(--font-family-sans); color: var(--color-neutral-500); }
 .pv2-sect { font: italic 400 16px var(--font-family-display); color: var(--color-neutral-500); margin: 26px 0 6px; }

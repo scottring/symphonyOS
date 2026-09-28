@@ -1040,7 +1040,7 @@ export function WeekViewV2(props: WeekViewV2Props) {
         {narrow && planV2Enabled() ? (
           <WeekV2 tasks={tasks} weekStart={weekAnchor} meId={meId} isCurrent={weekIsCurrent}
             onSelectTask={(id) => onSelectItem(`task-${id}`)}
-            list={weekListFor(() => window.dispatchEvent(new Event('pv2:plan-week')))}
+            timingControl={weekTimingControl}
             days={<WeekJournal days={journalDays} spans={journalSpans} onSelectItem={onSelectItem} onToggleEntry={handleJournalToggle} onPlanDrop={handlePlanDropOnDay} onAddToDay={handleAddToDay} narrow dragEnabled={false} timingControl={weekTimingControl} />} />
         ) : narrow ? (
           <div className="flex flex-col gap-4">
@@ -1057,8 +1057,7 @@ export function WeekViewV2(props: WeekViewV2Props) {
           // list, laid out as the prototype's day column + "Any day this week".
           <WeekV2 tasks={tasks} weekStart={weekAnchor} meId={meId} isCurrent={weekIsCurrent} onPlan={openSession}
             onSelectTask={(id) => onSelectItem(`task-${id}`)}
-            // The list's own "Plan this week" opens v2's meeting, not v1's session.
-            list={weekListFor(() => window.dispatchEvent(new Event('pv2:plan-week')))}
+            timingControl={weekTimingControl}
             days={<WeekJournal days={journalDays} spans={journalSpans} onSelectItem={onSelectItem} onToggleEntry={handleJournalToggle} onPlanDrop={handlePlanDropOnDay} onAddToDay={handleAddToDay} timingControl={weekTimingControl} />} />
         ) : !showSchedule ? (
           <>

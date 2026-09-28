@@ -29,11 +29,14 @@ import type { Task } from '@/types/task'
 import type { LineActions, LineVM } from './PlanLine'
 import { FocusDeck, CloseOut, type CloseDecision } from './FocusDeck'
 import { FromPaper } from './FromPaper'
+import { WeekListV2 } from './WeekListV2'
+import { useDomain } from '@/hooks/useDomain'
+import type { TaskContext } from '@/types/task'
 
 const DAY = 86_400_000
 const shortDay = (d: Date) => d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
 
-export function WeekV2({ tasks, weekStart, meId, isCurrent, list, days, onSelectTask }: {
+export function WeekV2({ tasks, weekStart, meId, isCurrent, days, onSelectTask, timingControl }: {
   /** Layer-filtered tasks, as the week receives them. */
   tasks: Task[]
   weekStart: Date
@@ -41,8 +44,10 @@ export function WeekV2({ tasks, weekStart, meId, isCurrent, list, days, onSelect
   isCurrent: boolean
   /** v1's session (WeekPlanHost) — v2 runs its own meeting instead. */
   onPlan?: () => void
-  /** The week's list ("Any day this week"), as WeekViewV2 builds it. */
-  list: ReactNode
+  /** v1's list, no longer drawn in v2 (WeekListV2 carries the triage). */
+  list?: ReactNode
+  /** The week's own "when" control, as WeekViewV2 builds it. */
+  timingControl?: (task: Task) => ReactNode
   /** The journal of days, as WeekViewV2 builds it. */
   days: ReactNode
   onSelectTask: (id: string) => void
@@ -52,6 +57,7 @@ export function WeekV2({ tasks, weekStart, meId, isCurrent, list, days, onSelect
   const { toggleTask, updateTask, pushTask, updateTasksBulk, keepForward, dropCommitment, addTask } = useSupabaseTasks()
   const gated = useGatedTaskActions({ updateTask, pushTask, updateTasksBulk }, (id) => tasks.find((t) => t.id === id))
   const { members } = useFamilyMembers()
+  const { soleDomain } = useDomain()
   const session = usePlanningSession('weekly', weekToken(weekStart))
   const [view, setViewState] = useState<PlanView>(() => readPlanView('week'))
   const setView = (v: PlanView) => { setViewState(v); writePlanView('week', v) }
@@ -174,7 +180,15 @@ export function WeekV2({ tasks, weekStart, meId, isCurrent, list, days, onSelect
       ) : (
         <div className={`pv2-wgrid${view === 'ref' ? ' is-ref' : ''}`}>
           <section className="pv2-days" aria-label="The days">{days}</section>
-          <div className="pv2-wside"><div className="pv2-wside-tools"><FromPaper altitude="week" periodStart={weekStart} tasks={tasks} /></div>{list}</div>
+          <div className="pv2-wside"><div className="pv2-wside-tools"><FromPaper altitude="week" periodStart={weekStart} tasks={tasks} /></div>
+            <div className="pv2-panel">
+              <WeekListV2 title={isCurrent ? 'This week’s list' : `List for the week of ${weekStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`}
+                lines={lines} weekStart={weekStart} members={members} actions={actions} timingControl={timingControl}
+                onContext={(t, c: TaskContext | undefined) => { void gated.updateTask(t.id, { context: c }) }}
+                onAdd={async (title) => { await addTask(title, undefined, undefined, undefined, { bucket: 'week', weekStart, assignedTo: meId ?? undefined, context: soleDomain ?? undefined }) }}
+                goalTitle={(t) => (t.goalTaskId ? tasks.find((x) => x.id === t.goalTaskId)?.title ?? null : null)} />
+            </div>
+          </div>
           {view === 'ref' && (
             <aside className="pv2-ref" aria-label={`${monthName}, for reference`}>
               <div className="pv2-colh">{monthName} <small>for reference</small></div>
