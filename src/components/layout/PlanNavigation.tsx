@@ -8,6 +8,8 @@ import { useReferenceLists } from '@/components/reference/ReferenceListsContext'
 import { PlanningSheet } from '@/components/reference/PlanningSheet'
 import { GoalsSheet } from '@/components/plan/GoalsSheet'
 import { DomainSwitcher } from '@/components/domain/DomainSwitcher'
+import { horizonNumerals } from '@/lib/planning/horizonNumerals'
+import { readCadenceConfig } from '@/lib/cadence/config'
 
 /** Phone: a page's own header controls (filters, ⋯) join the horizon-tab row
  *  instead of adding rows above the date. Falls back to inline rendering. */
@@ -83,6 +85,31 @@ function HorizonSwitcher({ period }: { period: typeof PERIODS[number] }) {
   </div>
 }
 
+const RAIL_ORDER = ['year', 'season', 'month', 'week', 'today'] as const
+
+/** Desktop: "2026 Year — 09–11 Fall — 09 September — 40 Week — 28 Today". */
+function HorizonRail({ period }: { period: typeof PERIODS[number] }) {
+  const { search } = useLocation()
+  const now = new Date()
+  const nums = horizonNumerals(now, readSeasons(), readCadenceConfig().weekStartsOn)
+  // The horizon on screen wears the period being SHOWN — October's page says
+  // "10 October", not the clock's "09 September".
+  const start = new URLSearchParams(search).get('start')
+  if (start && /^\d{4}-\d{2}-\d{2}$/.test(start) && (period === 'month' || period === 'season' || period === 'week')) {
+    const [y, m, d] = start.split('-').map(Number)
+    nums[period] = horizonNumerals(new Date(y, m - 1, d), readSeasons(), readCadenceConfig().weekStartsOn)[period]
+  }
+  return <nav aria-label="Planning period" className="horizon-rail">
+    {RAIL_ORDER.map((value, k) => <span key={value} className="horizon-rail-step">
+      {k > 0 && <span className="horizon-rail-join" aria-hidden="true" />}
+      <NavLink to={`/${value}`} aria-current={period === value ? 'page' : undefined} className={period === value ? 'is-current' : ''}
+        aria-label={HORIZON_NAMES[value]} title={`${HORIZON_NAMES[value]} · ${nums[value].label}`}>
+        <span className="horizon-rail-n">{nums[value].n}</span><span className="horizon-rail-l">{nums[value].label}</span>
+      </NavLink>
+    </span>)}
+  </nav>
+}
+
 /** Page tools are deliberately outside primary destination navigation. */
 export function PlanNavigation({ mobile = false, paused = false, mobileControlsRef }: {
   mobile?: boolean; paused?: boolean
@@ -111,12 +138,11 @@ export function PlanNavigation({ mobile = false, paused = false, mobileControlsR
   return <div className="plan-page-tools" data-period={period}>
     {period && <div className="plan-period-controls">
       {mobile ? <HorizonSwitcher period={period} /> : <>
-        {/* The horizons hang off Planner in the row above (Scott's sketch, 2026-09-25). */}
+        {/* The horizons hang off Planner in the row above (Scott's sketch,
+            2026-09-25), big to small, each named by its own date — the
+            numbered rail from the planning prototype (2026-09-28). */}
         <CornerDownRight size={14} aria-hidden="true" className="plan-period-connector" />
-        <nav aria-label="Planning period" className="plan-period-navigation">
-          {PERIODS.map(value => <NavLink key={value} to={`/${value}`} aria-current={period === value ? 'page' : undefined}
-            className={period === value ? 'is-current' : ''}>{value[0].toUpperCase() + value.slice(1)}</NavLink>)}
-        </nav>
+        <HorizonRail period={period} />
       </>}
       {period === 'week' && <label className="plan-range-control"><span className="sr-only">Range</span>
         <select aria-label="Week range" value={['week', 'weekend', 'three', 'custom'].includes(range) ? range : 'week'}

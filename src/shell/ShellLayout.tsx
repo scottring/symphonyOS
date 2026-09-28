@@ -295,8 +295,6 @@ function ShellLayoutInner({ children }: Props) {
           // centred in the window, or in the space left beside a side pane or
           // the pinned reference lists.
           <>
-          {/* Your place, as a shallow landscape behind the navigation band. */}
-          <PlaceBand />
           <div className={`desktop-workspace relative${referencesVisible ? ' has-references' : ''}`}>
             <div className="desktop-workspace-nav">
         <DesktopNavigation inboxCount={inboxCount} discussionsUnread={discussionsUnread}
@@ -352,6 +350,9 @@ function ShellLayoutInner({ children }: Props) {
               </SideColumn>
             </div>
             {referencesVisible && <div className="desktop-workspace-dock"><ReferenceListsDock /></div>}
+            {/* Your place, as ground under the page — it anchors the bottom
+                rather than crowding the navigation (Scott, 2026-09-28). */}
+            <PlaceBand ground />
             <DesktopFooter actionRef={setDesktopFooterAction} />
           </div>
           </>

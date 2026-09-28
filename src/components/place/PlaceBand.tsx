@@ -13,9 +13,9 @@ import { PlaceSkyline } from './PlaceSkyline'
  * the content frame, with the workspace after it as a `relative` sibling, so
  * the navigation paints over it without either making a stacking context.
  */
-export function PlaceBand() {
+export function PlaceBand({ ground = false }: { ground?: boolean }) {
   return (
-    <div aria-hidden="true" className="place-band">
+    <div aria-hidden="true" className={`place-band${ground ? ' is-ground' : ''}`}>
       <div className="place-band-scene">
         <PlaceSkyline className="h-full w-full" />
       </div>
