@@ -211,4 +211,16 @@ describe('useGoals: assigning a year goal', () => {
     await act(async () => { await result.current.updateGoal('goal-1', { assignedToAll: [] }) })
     expect(updateMock).toHaveBeenLastCalledWith('goal-1', { assigned_to_all: null, scope: 'compound' })
   })
+
+  it('a new life area moves who can read it: Family → Personal is private again, Personal → Family is household-wide', async () => {
+    let result = await load(dbGoal({ assigned_to_all: [], scope: 'compound', context: 'family' }))
+    await act(async () => { await result.current.updateGoal('goal-1', { context: 'personal' }) })
+    expect(updateMock).toHaveBeenLastCalledWith('goal-1', { context: 'personal', scope: 'individual' })
+    result = await load(dbGoal({ id: 'goal-1', assigned_to_all: ['m-other'], scope: 'couple', context: 'personal' }))
+    await act(async () => { await result.current.updateGoal('goal-1', { context: 'work' }) })
+    expect(updateMock).toHaveBeenLastCalledWith('goal-1', { context: 'work', scope: 'couple' })
+    result = await load(dbGoal({ id: 'goal-1', assigned_to_all: [], scope: 'individual', context: 'personal' }))
+    await act(async () => { await result.current.updateGoal('goal-1', { context: 'family' }) })
+    expect(updateMock).toHaveBeenLastCalledWith('goal-1', { context: 'family', scope: 'compound' })
+  })
 })

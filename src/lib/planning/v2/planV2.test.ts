@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { lineFate, endedIn, closeOutCandidates, landmarksIn, planV2Enabled } from './planV2'
+import { lineFate, lineDropUpdates, endedIn, closeOutCandidates, landmarksIn, planV2Enabled } from './planV2'
 import type { Task } from '@/types/task'
+import { planPlacement } from '@/lib/placement/intentions'
 import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
 
 const SEP = new Date(2026, 8, 1), OCT = new Date(2026, 9, 1), NOV = new Date(2026, 10, 1)
@@ -75,5 +76,34 @@ describe('planV2Enabled', () => {
   it('the build flag makes it the default', () => {
     vi.stubEnv('VITE_PLAN_V2', 'true')
     expect(planV2Enabled('')).toBe(true)
+  })
+})
+
+describe('lineDropUpdates (a month line put down on its calendar)', () => {
+  const WK = new Date(2026, 8, 27), DAY = new Date(2026, 8, 30)
+  const wk = (periodStart: Date) => ({ level: 'week' as const, periodStart, status: 'open' as const })
+  const ops = (t: Task, u: Partial<Task>) => planPlacement(t, u, { now: new Date(2026, 8, 28), userId: 'u' }).commitmentOps
+    .map((o) => `${o.op} ${o.level} ${o.periodStart.getDate()}`)
+
+  it('a week keeps the month and adds that week — even off a day', () => {
+    const dated = task({ bucket: 'timed', scheduledFor: DAY, isAllDay: true, commitments: [c(SEP, 'open')] })
+    const u = lineDropUpdates(dated, { kind: 'week', at: WK })
+    expect('commitments' in u).toBe(false)
+    expect(u).toMatchObject({ bucket: 'week', weekStart: WK, scheduledFor: undefined })
+    expect(ops(dated, u)).toEqual(expect.arrayContaining(['ensure week 27']))
+    expect(ops(dated, u)).not.toContain('remove month 1')
+  })
+  it('a day dates it and keeps the month', () => {
+    const t = task({ bucket: 'month', commitments: [c(SEP, 'open')] })
+    const u = lineDropUpdates(t, { kind: 'day', at: DAY })
+    expect(u).toMatchObject({ scheduledFor: DAY, isAllDay: true, bucket: 'timed' })
+    expect(ops(t, u)).not.toContain('remove month 1')
+  })
+  it('back on the list: the week and the day go, the month stays', () => {
+    const t = task({ bucket: 'timed', scheduledFor: DAY, isAllDay: true, commitments: [c(SEP, 'open'), wk(WK)] })
+    const u = lineDropUpdates(t, { kind: 'list' })
+    expect(u.scheduledFor).toBeUndefined()
+    expect(ops(t, u)).toContain('remove week 27')
+    expect(ops(t, u)).not.toContain('remove month 1')
   })
 })

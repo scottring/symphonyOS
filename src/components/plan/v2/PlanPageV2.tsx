@@ -10,7 +10,8 @@
 // Nothing new is stored. Lines, fates, people, the plan's "agreed" date and the
 // Details pane are the records and writers v1 uses.
 
-import { useCallback, useEffect, useMemo, useState, type ReactElement } from 'react'
+import { useCallback, useEffect, useMemo, useState, type ReactElement, type ReactNode } from 'react'
+import { DndContext, DragOverlay, PointerSensor, pointerWithin, useDroppable, useSensor, useSensors, type DragEndEvent, type DragStartEvent } from '@dnd-kit/core'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { GoalsProvider, useGoalsContext } from '@/contexts/GoalsContext'
 import { useSupabaseTasks } from '@/hooks/useSupabaseTasks'
@@ -33,15 +34,18 @@ import { lowerPlacement } from '@/lib/placement/model'
 import { supportedGoal, goalOfTask, type SupportLink } from '@/lib/planning/goalSupport'
 import { periodBounds, isCurrentPeriod, planningPeriod, selectPeriodTasks } from '@/lib/planning/periodPage'
 import {
-  lineFate, endedIn, closeOutCandidates, landmarksIn, leavePlanV2, readPlanView, writePlanView,
+  lineFate, lineDropUpdates, endedIn, closeOutCandidates, landmarksIn, leavePlanV2, readPlanView, writePlanView,
   type PlanView, type Landmark,
 } from '@/lib/planning/v2/planV2'
 import type { Task } from '@/types/task'
 import { PlanLine, type LineActions, type LineVM } from './PlanLine'
-import { DatesCalendar } from './DatesCalendar'
+import { DatesCalendar, type CalMark } from './DatesCalendar'
+import { useMobile } from '@/hooks/useMobile'
+import { readCadenceConfig, weekStartAnchor } from '@/lib/cadence/config'
+import { weekOfYear } from '@/lib/planning/horizonNumerals'
 import { FocusDeck, CloseOut, type CloseDecision } from './FocusDeck'
 import { FromPaper } from './FromPaper'
-import { makePlanActions } from '@/lib/planning/planActions'
+import { makePlanActions, timingRemoval } from '@/lib/planning/planActions'
 import { useActionableInstances } from '@/hooks/useActionableInstances'
 import { goalToTaskConversion } from '@/lib/planning/goalConversion'
 import { removeOutcomeToast } from '@/lib/planning/existingActions'
@@ -53,9 +57,15 @@ const two = (n: number) => String(n).padStart(2, '0')
 const monthName = (d: Date) => d.toLocaleDateString('en-US', { month: 'long' })
 const shortDay = (d: Date) => d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
 
+/** A place a month's line can be put down; inert outside the DndContext. */
+function DropZone({ id, data, className, children }: { id: string; data: Record<string, unknown>; className?: string; children: ReactNode }) {
+  const { setNodeRef, isOver } = useDroppable({ id, data })
+  return <div ref={setNodeRef} className={`${className ?? ''}${isOver ? ' is-over' : ''}`}>{children}</div>
+}
+
 function Inner({ level }: { level: Level }) {
   const navigate = useNavigate()
-  const { tasks, loading, toggleTask, updateTask, addTask, pushTask, keepForward, dropCommitment, updateTasksBulk, setGoal, setGoalLink } = useSupabaseTasks()
+  const { tasks, loading, toggleTask, updateTask, addTask, deleteTask, pushTask, keepForward, dropCommitment, updateTasksBulk, setGoal, setGoalLink } = useSupabaseTasks()
   const gated = useGatedTaskActions({ updateTask, pushTask, updateTasksBulk }, (id) => tasks.find((t) => t.id === id))
   const { layers, soleDomain } = useDomain()
   const { members, getCurrentUserMember } = useFamilyMembers()
@@ -262,22 +272,87 @@ function Inner({ level }: { level: Level }) {
       bucket: level === 'month' ? 'month' : 'quarter', ...periodPatch(bounds), context: soleDomain ?? undefined,
     })
   }
-  const addFromAbove = async (row: typeof aboveRows[number]) => {
+  // A season task taken into the month is the SAME task, now also on the month.
+  const takeIn = async (task: Task) => {
+    await gated.updateTask(task.id, { bucket: 'month', monthStart: bounds.start })
+    showToast(`“${task.title}” is on ${name}’s plan too.`, 'success', 4000)
+  }
+  // A child of a line one rung up, written on this period (the week's "+ Step",
+  // Scott 2026-09-28). Under a plain season task it is a new month task that
+  // remembers where it came from (source_id); under a goal, this period's part
+  // of it — a month goal serving a season goal, a season goal under a year goal.
+  const addFromAbove = async (row: typeof aboveRows[number], title: string) => {
     if (row.task && !row.isGoal) {
-      // A season task taken into the month is the SAME task, now also on the month.
-      await gated.updateTask(row.task.id, { bucket: 'month', monthStart: bounds.start })
+      await addTask(title, undefined, undefined, undefined, {
+        bucket: 'month', monthStart: bounds.start, sourceId: row.task.id, goalId: row.task.goalId,
+        context: row.task.context ?? soleDomain ?? undefined, assignedTo: meId ?? undefined,
+      })
     } else if (row.task) {
-      await addTask(row.title, undefined, undefined, undefined, {
+      await addTask(title, undefined, undefined, undefined, {
         bucket: 'month', monthStart: bounds.start, isGoal: true, supportsGoalTaskId: row.task.id,
         goalId: row.task.goalId, context: row.task.context ?? soleDomain ?? undefined,
       })
     } else if (row.goal) {
-      await addTask(row.title, undefined, undefined, undefined, {
+      await addTask(title, undefined, undefined, undefined, {
         bucket: 'quarter', seasonStart: bounds.start, isGoal: true, goalId: row.goal.id, context: row.goal.context ?? soleDomain ?? undefined,
       })
     }
-    showToast(`Added to ${name}, as part of “${row.title}”.`, 'success', 4000)
+    setChildFor(null); setChildDraft('')
+    showToast(`“${title}” added to ${name}, as part of “${row.title}”.`, 'success', 4000)
   }
+  const [childFor, setChildFor] = useState<string | null>(null)
+  const [childDraft, setChildDraft] = useState('')
+
+  // ── The month's calendar takes its lines (the week's drag, one rung up) ──
+  // A line dropped on a DAY is dated that day; on a WEEK's number it is given
+  // that week; back on the list it loses both and stays the month's. A goal is
+  // never placed — dropping one puts down its next step, named as the goal is.
+  const mobile = useMobile()
+  const dragOn = level === 'month' && !mobile
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }))
+  const [dragId, setDragId] = useState<string | null>(null)
+  const weekStartsOn = readCadenceConfig().weekStartsOn
+  const thisWeekYmd = localYmd(weekStartAnchor(today, weekStartsOn))
+  const monthIds = useMemo(() => {
+    const ids = new Set(main.map((l) => l.task.id))
+    for (const l of main) if (l.task.isGoal) for (const s of l.steps ?? []) ids.add(s.id)
+    return ids
+  }, [main])
+  const placed = useMemo(() => layered.filter((t) => monthIds.has(t.id) && !t.completed), [layered, monthIds])
+  const dayMarks = useCallback((ymd: string): CalMark[] => placed.filter((t) => t.scheduledFor && localYmd(t.scheduledFor) === ymd).map((t) => ({ id: t.id, title: t.title })), [placed])
+  const weekMarks = useCallback((ymd: string): CalMark[] => placed.filter((t) => !t.scheduledFor && t.weekStart && localYmd(t.weekStart) === ymd && !t.isGoal).map((t) => ({ id: t.id, title: t.title })), [placed])
+  const onDragEnd = async (e: DragEndEvent) => {
+    setDragId(null)
+    const taskId = (e.active.data.current as { taskId?: string } | undefined)?.taskId
+    const over = e.over?.data.current as { kind?: string; ymd?: string } | undefined
+    const task = taskId ? tasks.find((t) => t.id === taskId) : undefined
+    if (!task || !over?.kind) return
+    const { previous } = timingRemoval(task, 'all')
+    const undo = () => { void gated.updateTask(task.id, previous) }
+    if (over.kind === 'mlist') {
+      if (!task.scheduledFor && !lowerPlacement(task, level, bounds.start)) return
+      void gated.updateTask(task.id, lineDropUpdates(task, { kind: 'list' }))
+      showToast(`“${task.title}” is back on ${name}’s list — no week or day.`, 'success', 6000, { label: 'Undo', onClick: undo })
+      return
+    }
+    const ymd = over.ymd!
+    const isDay = over.kind === 'mday'
+    if (isDay ? ymd < localYmd(today) : ymd < thisWeekYmd) { showToast(`That ${isDay ? 'day' : 'week'} has passed — put it on today or later.`, 'warning'); return }
+    const at = parseLocalYmd(ymd)
+    const label = isDay ? shortDay(at) : `week ${weekOfYear(at, weekStartsOn)}`
+    if (task.isGoal) {
+      const id = await addTask(task.title, undefined, undefined, isDay ? at : undefined, {
+        ...(isDay ? { isAllDay: true } : { bucket: 'week' as const, weekStart: at }),
+        goalTaskId: task.id, context: task.context ?? undefined, assignedTo: meId ?? undefined,
+      })
+      if (id) showToast(`A next step for “${task.title}” is on ${label}. Rename it in its details.`, 'success', 7000, { label: 'Undo', onClick: () => { void deleteTask(id) } })
+      return
+    }
+    const ok = await gated.updateTask(task.id, lineDropUpdates(task, { kind: isDay ? 'day' : 'week', at }))
+    if (ok === false) return
+    showToast(`“${task.title}” → ${label} · still on ${name}’s plan.`, 'success', 6000, { label: 'Undo', onClick: undo })
+  }
+  const dragTitle = dragId ? tasks.find((t) => `line:${t.id}` === dragId)?.title : null
 
   // ── Rendering ──────────────────────────────────────────────────────────
   const [openLine, setOpenLine] = useState<string | null>(null)
@@ -290,10 +365,11 @@ function Inner({ level }: { level: Level }) {
 
   const row = (vm: LineVM) => (
     <PlanLine key={vm.task.id} vm={vm} actions={actions} members={members} nextLabel={nextName}
-      open={openLine === vm.task.id} onToggle={() => setOpenLine((o) => (o === vm.task.id ? null : vm.task.id))} editable={inMeeting} />
+      open={openLine === vm.task.id} onToggle={() => setOpenLine((o) => (o === vm.task.id ? null : vm.task.id))} editable={inMeeting} draggable={dragOn} />
   )
   const section = (label: string, vms: LineVM[]) => vms.length ? <><div className="pv2-sect">{label}</div><ul className="pv2-list">{vms.map(row)}</ul></> : null
   const listColumn = (
+    <DropZone id="mlist" data={{ kind: 'mlist' }} className="pv2-dropcol">
     <section aria-label={`${name} plan`}>
       <div className="pv2-colh">{inMeeting ? `${name}’s list` : 'Our plan'}<FromPaper altitude={level} periodStart={bounds.start} tasks={layered} /></div>
       {loading && !main.length ? <p className="pv2-hint">Loading…</p> : null}
@@ -317,16 +393,29 @@ function Inner({ level }: { level: Level }) {
         <button type="button" className="pv2-link pv2-quiet" onClick={() => setShowDropped((s) => !s)}>{showDropped ? 'Hide' : 'Show'} {dropped.length} dropped</button>
       </>}
     </section>
+    </DropZone>
   )
   const refColumn = (
     <aside className="pv2-ref" aria-label={`${aboveName}, for reference`}>
       <div className="pv2-colh">{aboveName} <small>for reference</small></div>
       {aboveRows.length ? (
         <ul className="pv2-list">{aboveRows.map((r) => (
-          <li key={r.id} className="pv2-rrow">
-            <span className="pv2-goal is-small" aria-hidden="true" />
-            <span className="flex-1">{r.title}</span>
-            {inMeeting && <button type="button" className="pv2-addbtn" onClick={() => void addFromAbove(r)} aria-label={`Add a ${name} line from ${r.title}`}>+ Add</button>}
+          <li key={r.id} className="pv2-rrow pv2-rrow-sans">
+            {r.isGoal ? <span className="pv2-goal is-small" aria-hidden="true" /> : <span className="pv2-dash" style={{ marginTop: 10 }} aria-hidden="true" />}
+            <button type="button" className="flex-1 text-left" onClick={() => (r.task ? openTask(r.task.id) : navigate(`/goals/${r.id}`))}>{r.title}</button>
+            <span className="pv2-refacts">
+              {r.task && !r.isGoal && <button type="button" className="pv2-addbtn" onClick={() => void takeIn(r.task!)} aria-label={`Add ${r.title} to ${name}`}>+ {level === 'month' ? 'This month' : name}</button>}
+              <button type="button" className="pv2-addbtn" onClick={() => { setChildFor(r.id); setChildDraft(r.isGoal ? r.title : '') }}
+                aria-label={`Add ${name}’s part of ${r.title}`}>{r.isGoal ? '+ Add' : '+ Step'}</button>
+            </span>
+            {childFor === r.id && (
+              <form className="pv2-stepform" onSubmit={(e) => { e.preventDefault(); const v = childDraft.trim(); if (v) void addFromAbove(r, v) }}>
+                <label className="pv2-hint" htmlFor={`child-${r.id}`}>{r.isGoal ? `What’s ${name}’s part of it?` : `A step of “${r.title}” for ${name}`}</label>
+                <input id={`child-${r.id}`} autoFocus className="pv2-input" value={childDraft} onChange={(e) => setChildDraft(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Escape') setChildFor(null) }} />
+                <div className="pv2-acts"><button type="submit" className="pv2-btn">Add to {name}</button><button type="button" className="pv2-link pv2-quiet" onClick={() => setChildFor(null)}>Cancel</button></div>
+              </form>
+            )}
           </li>
         ))}</ul>
       ) : <p className="pv2-hint">Nothing written for {aboveName}. That’s fine.</p>}
@@ -334,7 +423,8 @@ function Inner({ level }: { level: Level }) {
   )
   const calendar = level === 'month' ? (
     <DatesCalendar start={bounds.start} end={bounds.end} landmarks={landmarks} today={today} selected={openLm} onSelect={setOpenLm}
-      onOpenWeek={(ws) => navigate(`/week?start=${localYmd(ws)}`)} available={available || eventsLoading} planned={plannedOn} />
+      onOpenWeek={(ws) => navigate(`/week?start=${localYmd(ws)}`)} available={available || eventsLoading} planned={plannedOn}
+      dayMarks={dayMarks} weekMarks={weekMarks} />
   ) : null
 
   const viewSwitch = (
@@ -406,7 +496,13 @@ function Inner({ level }: { level: Level }) {
         </div>
       )}
 
-      {body}
+      {dragOn && meeting?.step !== 1 && view !== 'focus' ? (
+        <DndContext sensors={sensors} collisionDetection={pointerWithin}
+          onDragStart={(e: DragStartEvent) => setDragId(String(e.active.id))} onDragEnd={(e) => void onDragEnd(e)} onDragCancel={() => setDragId(null)}>
+          {body}
+          <DragOverlay dropAnimation={null}>{dragTitle ? <div className="pv2-dragpill">{dragTitle}</div> : null}</DragOverlay>
+        </DndContext>
+      ) : body}
 
       <p className="pv2-foot">
         New planning page · <button type="button" className="pv2-link pv2-quiet" onClick={() => { leavePlanV2(); window.location.assign(window.location.pathname) }}>Back to the current page</button>

@@ -32,7 +32,7 @@ const shortDay = (d: Date) => d.toLocaleDateString('en-US', { weekday: 'short', 
 function asLine(g: Goal): Task {
   return {
     id: g.id, title: g.name, isGoal: true, completed: g.status === 'completed', notes: g.strategy?.trim() || g.notes || '',
-    assignedToAll: g.assignedToAll, createdAt: g.createdAt, updatedAt: g.updatedAt,
+    assignedToAll: g.assignedToAll, context: g.context ?? undefined, createdAt: g.createdAt, updatedAt: g.updatedAt,
   } as Task
 }
 
@@ -91,6 +91,7 @@ function Inner() {
     details: (t) => navigate(`/goals/${t.id}`),
     rename: (t, title) => { void updateGoal(t.id, { name: title }) },
     openPartOf: () => {},
+    setContext: (t, c) => { void updateGoal(t.id, { context: c ?? null }) },
   }
   const decide = async (vm: LineVM, d: CloseDecision) => {
     const g = byId(vm.task.id); if (!g) return

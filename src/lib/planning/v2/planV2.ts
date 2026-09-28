@@ -7,6 +7,7 @@
 import type { Task } from '@/types/task'
 import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
 import { parseLocalYmd } from '@/lib/cadence/config'
+import { timingRemoval } from '@/lib/planning/planActions'
 
 const SWITCH_KEY = 'symphony-plan-v2'
 
@@ -135,4 +136,19 @@ export function landmarksIn(events: readonly CalendarEvent[], start: Date, end: 
     out.push({ id: e.id, title: e.title || '(no title)', start: first, end: last })
   }
   return out.sort((a, b) => a.start.getTime() - b.start.getTime() || b.end.getTime() - a.end.getTime())
+}
+
+/**
+ * The write for a line put down on a month's calendar, or back on its list.
+ * A DAY dates it; a WEEK gives it that week (off its day, if it had one); the
+ * LIST takes both away and leaves the month's own commitment.
+ *
+ * The week never rides with a stated commitment list: planPlacement honours
+ * a stated list over the week the dialect names, so `{ commitments, bucket:
+ * 'week', weekStart }` saved nothing (found live, 2026-09-28).
+ */
+export function lineDropUpdates(task: Task, target: { kind: 'day' | 'week'; at: Date } | { kind: 'list' }): Partial<Task> {
+  if (target.kind === 'day') return { isAllDay: true, scheduledFor: target.at, bucket: 'timed' }
+  if (target.kind === 'week') return { ...(task.scheduledFor ? timingRemoval(task, 'day').updates : {}), bucket: 'week', weekStart: target.at }
+  return timingRemoval(task, 'all').updates
 }

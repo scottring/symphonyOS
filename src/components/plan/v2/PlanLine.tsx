@@ -6,7 +6,8 @@
 // folds the line open where it is; "All details" is the existing Details pane.
 
 import { useEffect, useRef, useState } from 'react'
-import { Check, MoreHorizontal, ArrowRight, Moon, X, PanelRight, Target, Sun, ArrowDownRight, Unlink } from 'lucide-react'
+import { useDraggable } from '@dnd-kit/core'
+import { Check, GripVertical, MoreHorizontal, ArrowRight, Moon, X, PanelRight, Target, Sun, ArrowDownRight, Unlink } from 'lucide-react'
 import type { Task, TaskContext } from '@/types/task'
 import { ContextPicker } from '@/components/triage/ContextPicker'
 import type { FamilyMember } from '@/types/family'
@@ -90,7 +91,7 @@ export function LineMenu({ vm, actions, nextLabel }: { vm: LineVM; actions: Line
   )
 }
 
-export function PlanLine({ vm, actions, members, nextLabel, open, onToggle, editable }: {
+export function PlanLine({ vm, actions, members, nextLabel, open, onToggle, editable, draggable = false }: {
   vm: LineVM
   actions: LineActions
   members: FamilyMember[]
@@ -99,13 +100,18 @@ export function PlanLine({ vm, actions, members, nextLabel, open, onToggle, edit
   onToggle: () => void
   /** In a planning meeting the fold edits the wording. */
   editable: boolean
+  /** The month's lines pick up onto its calendar (PlanPageV2's DndContext). */
+  draggable?: boolean
 }) {
   const t = vm.task
   const who = assigneesOf(t)
   const muted = vm.fate !== 'open'
+  const movable = draggable && vm.fate === 'open' && !t.completed
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: `line:${t.id}`, data: { kind: 'line', taskId: t.id }, disabled: !movable })
   return (
-    <li className={`pv2-line${vm.nested ? ' is-nested' : ''}${open ? ' is-open' : ''}${muted ? ' is-muted' : ''}${vm.fate === 'dropped' ? ' is-dropped' : ''}${t.completed ? ' is-done' : ''}`}>
+    <li ref={setNodeRef} className={`pv2-line${vm.nested ? ' is-nested' : ''}${open ? ' is-open' : ''}${muted ? ' is-muted' : ''}${vm.fate === 'dropped' ? ' is-dropped' : ''}${t.completed ? ' is-done' : ''}${isDragging ? ' is-dragging' : ''}`}>
       <div className="pv2-line-main">
+        {movable && <span className="pv2-grip pv2-linegrip pv2-hov" {...listeners} {...attributes} aria-label={`Drag ${t.title} onto a week or a day`} title="Drag onto a week or a day"><GripVertical className="h-3.5 w-3.5" /></span>}
         <span className="pv2-mark" aria-hidden="true">
           {t.isGoal ? <span className="pv2-goal" /> : <span className="pv2-dash" />}
         </span>
@@ -118,12 +124,12 @@ export function PlanLine({ vm, actions, members, nextLabel, open, onToggle, edit
             <Check className="w-4 h-4" />
           </button>
           {actions.setContext && (
-            <span className={t.context ? '' : 'pv2-hov'}>
+            <span className="pv2-hov">
               <ContextPicker size="sm" value={t.context ?? null} onChange={(c) => actions.setContext!(t, c)} />
             </span>
           )}
           {members.length > 0 && (
-            <span className={who.length ? '' : 'pv2-hov'}>
+            <span className="pv2-hov">
               <MultiAssigneeDropdown members={members} selectedIds={who} onSelect={(ids) => actions.assign(t, ids)} size="sm" triggerLabel={`Assign people to ${t.title}`} />
             </span>
           )}
