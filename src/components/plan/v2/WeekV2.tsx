@@ -185,7 +185,7 @@ export function WeekV2({ tasks, weekStart, meId, isCurrent, list, days, onSelect
                     <button type="button" className="flex-1 text-left" onClick={() => onSelectTask(t.id)}>{t.title}</button>
                     {meeting && (t.isGoal
                       ? <button type="button" className="pv2-addbtn" onClick={() => { setStepFor(t.id); setStepDraft(t.title) }} aria-label={`Add a next step for ${t.title} to this week`}>+ Next step</button>
-                      : <button type="button" className="pv2-addbtn" onClick={() => void takeIn(t)} aria-label={`Add ${t.title} to this week`}>+ Add</button>)}
+                      : <button type="button" className="pv2-addbtn" onClick={() => void takeIn(t)} aria-label={`Add ${t.title} to this week`}>+ This week</button>)}
                     {stepFor === t.id && (
                       <form className="pv2-stepform" onSubmit={(e) => { e.preventDefault(); const v = stepDraft.trim(); if (v) void addStep(t, v) }}>
                         <label className="pv2-hint" htmlFor={`step-${t.id}`}>What’s the next step?</label>
