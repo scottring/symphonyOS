@@ -49,7 +49,7 @@ export function WeekV2({ tasks, weekStart, meId, isCurrent, list, days, onSelect
 }) {
   const navigate = useNavigate()
   const { user } = useAuth()
-  const { toggleTask, updateTask, pushTask, updateTasksBulk, keepForward, dropCommitment } = useSupabaseTasks()
+  const { toggleTask, updateTask, pushTask, updateTasksBulk, keepForward, dropCommitment, addTask } = useSupabaseTasks()
   const gated = useGatedTaskActions({ updateTask, pushTask, updateTasksBulk }, (id) => tasks.find((t) => t.id === id))
   const { members } = useFamilyMembers()
   const session = usePlanningSession('weekly', weekToken(weekStart))
@@ -93,7 +93,10 @@ export function WeekV2({ tasks, weekStart, meId, isCurrent, list, days, onSelect
   const startMeeting = () => {
     const candidateIds = prevTasks.filter((t) => !t.completed && !t.scheduledFor).map((t) => t.id)
     setMeeting({ step: candidateIds.length ? 1 : 2, candidateIds })
-    if (view === 'list') setViewState('ref')
+    // A meeting always opens with the month beside the week: choosing from it
+    // is the meeting's job (it had opened in the last-used view, and "One at a
+    // time" showed an empty week with nothing to choose from).
+    setViewState('ref')
     window.scrollTo({ top: 0 })
   }
   const endMeeting = async (keep: boolean) => {
@@ -109,6 +112,16 @@ export function WeekV2({ tasks, weekStart, meId, isCurrent, list, days, onSelect
     window.addEventListener('pv2:plan-week', open)
     return () => window.removeEventListener('pv2:plan-week', open)
   })
+  // A goal stays on its month; what goes into the week is its next step
+  // (goal_task_id), the rule the week's own list and the month page follow.
+  const [stepFor, setStepFor] = useState<string | null>(null)
+  const [stepDraft, setStepDraft] = useState('')
+  const addStep = async (goal: Task, title: string) => {
+    const id = await addTask(title, undefined, undefined, undefined, { bucket: 'week', weekStart, goalTaskId: goal.id, context: goal.context ?? undefined, assignedTo: meId ?? undefined })
+    if (!id) return
+    setStepFor(null); setStepDraft('')
+    showToast(`“${title}” → this week, as a step toward “${goal.title}”.`, 'success', 5000)
+  }
   const takeIn = async (t: Task) => {
     await gated.updateTask(t.id, { bucket: 'week', weekStart })
     showToast(`“${t.title}” → this week · still on ${monthName}’s plan.`, 'success', 4000)
@@ -156,7 +169,8 @@ export function WeekV2({ tasks, weekStart, meId, isCurrent, list, days, onSelect
         <CloseOut lines={prevLines} candidateIds={meeting.candidateIds} members={members} actions={actions} prevName="last week" nextName="this week"
           onDecide={decide} onFinish={() => setMeeting({ ...meeting, step: 2 })} />
       ) : view === 'focus' ? (
-        <FocusDeck lines={lines} actions={actions} members={members} nextLabel="next week" context={`Week ${weekNo}`} label={`Week ${weekNo}`} />
+        <FocusDeck lines={lines} actions={actions} members={members} nextLabel="next week" context={`Week ${weekNo}`} label={`Week ${weekNo}`}
+          empty={`Nothing on this week yet. “Plan this week” lets you choose from ${monthName}’s plan.`} />
       ) : (
         <div className={`pv2-wgrid${view === 'ref' ? ' is-ref' : ''}`}>
           <section className="pv2-days" aria-label="The days">{days}</section>
@@ -169,7 +183,17 @@ export function WeekV2({ tasks, weekStart, meId, isCurrent, list, days, onSelect
                   <li key={t.id} className="pv2-rrow pv2-rrow-sans">
                     {t.isGoal ? <span className="pv2-goal is-small" aria-hidden="true" /> : <span className="pv2-dash" style={{ marginTop: 10 }} aria-hidden="true" />}
                     <button type="button" className="flex-1 text-left" onClick={() => onSelectTask(t.id)}>{t.title}</button>
-                    {meeting && <button type="button" className="pv2-addbtn" onClick={() => void takeIn(t)} aria-label={`Add ${t.title} to this week`}>+ Add</button>}
+                    {meeting && (t.isGoal
+                      ? <button type="button" className="pv2-addbtn" onClick={() => { setStepFor(t.id); setStepDraft(t.title) }} aria-label={`Add a next step for ${t.title} to this week`}>+ Next step</button>
+                      : <button type="button" className="pv2-addbtn" onClick={() => void takeIn(t)} aria-label={`Add ${t.title} to this week`}>+ Add</button>)}
+                    {stepFor === t.id && (
+                      <form className="pv2-stepform" onSubmit={(e) => { e.preventDefault(); const v = stepDraft.trim(); if (v) void addStep(t, v) }}>
+                        <label className="pv2-hint" htmlFor={`step-${t.id}`}>What’s the next step?</label>
+                        <input id={`step-${t.id}`} autoFocus className="pv2-input" value={stepDraft} onChange={(e) => setStepDraft(e.target.value)}
+                          onKeyDown={(e) => { if (e.key === 'Escape') setStepFor(null) }} />
+                        <div className="pv2-acts"><button type="submit" className="pv2-btn">Add to this week</button><button type="button" className="pv2-link pv2-quiet" onClick={() => setStepFor(null)}>Cancel</button></div>
+                      </form>
+                    )}
                   </li>
                 ))}</ul>
               ) : <p className="pv2-hint">Nothing open on {monthName}’s plan.</p>}

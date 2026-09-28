@@ -163,7 +163,8 @@ function Inner({ level }: { level: Level }) {
   const startMeeting = () => {
     const candidateIds = closeOutCandidates(prevLines.map((l) => l.task), level, prevBounds.start, prevBounds.end).map((t) => t.id)
     setMeeting({ step: candidateIds.length ? 1 : 2, candidateIds })
-    if (view === 'list') setViewState('ref')
+    // The level above sits beside the list for the whole meeting.
+    setViewState('ref')
     window.scrollTo({ top: 0 })
   }
   const endMeeting = async (keep: boolean) => {
@@ -312,7 +313,8 @@ function Inner({ level }: { level: Level }) {
     body = <CloseOut lines={prevLines} candidateIds={meeting.candidateIds} members={members} actions={actions} prevName={prevName} nextName={name}
       onDecide={decide} onFinish={() => setMeeting({ ...meeting, step: 2 })} />
   } else if (view === 'focus') {
-    body = <FocusDeck lines={lines} actions={actions} members={members} nextLabel={nextName} context={`${name} plan`} label={`${name}’s plan`} />
+    body = <FocusDeck lines={lines} actions={actions} members={members} nextLabel={nextName} context={`${name} plan`} label={`${name}’s plan`}
+      empty={`Nothing on ${name}’s plan yet. “Plan ${name}” writes it${level === 'month' ? `, with ${aboveName} beside you` : ''}.`} />
   } else if (view === 'ref') {
     body = <div className={level === 'month' ? 'pv2-grid3' : 'pv2-grid2 is-ref'}>{refColumn}{listColumn}{calendar}</div>
   } else {

@@ -68,7 +68,7 @@ function Facts({ vm, actions, members }: { vm: LineVM; actions: LineActions; mem
   )
 }
 
-export function FocusDeck({ lines, actions, members, nextLabel, context, label }: {
+export function FocusDeck({ lines, actions, members, nextLabel, context, label, empty }: {
   lines: LineVM[]
   actions: LineActions
   members: FamilyMember[]
@@ -76,6 +76,8 @@ export function FocusDeck({ lines, actions, members, nextLabel, context, label }
   /** The rim text: "September plan". */
   context: string
   label: string
+  /** What an empty deck says — where its lines come from. */
+  empty?: string
 }) {
   const [k, setK] = useState(0)
   const [fresh, setFresh] = useState<string | null>(null)
@@ -84,7 +86,7 @@ export function FocusDeck({ lines, actions, members, nextLabel, context, label }
   const prev = () => setK((x) => Math.max(0, x - 1))
   const next = () => setK((x) => Math.min(n - 1, x + 1))
   useArrowKeys(prev, next)
-  if (!n) return <div className="pv2-focus"><div className="pv2-card"><p className="pv2-hint">Nothing on this plan yet.</p></div></div>
+  if (!n) return <div className="pv2-focus"><div className="pv2-card"><p className="pv2-hint">{empty ?? 'Nothing on this plan yet.'}</p></div></div>
   const vm = lines[i]
   const t = vm.task
   const stamped = (fn: (t: typeof vm.task) => void) => () => { setFresh(t.id); fn(t); window.setTimeout(() => setFresh(null), 700) }

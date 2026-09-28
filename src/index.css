@@ -3056,9 +3056,8 @@ div.chooser-action-group { overflow: visible !important; }
 .pv2-ref { position: sticky; top: 76px; max-height: calc(100vh - 100px); overflow: auto; padding: 14px 14px 10px; border-radius: 14px; background: var(--color-neutral-50); }
 .pv2-rrow { display: flex; gap: 8px; align-items: flex-start; padding: 3px 0; font: 400 14.5px/1.35 var(--font-family-display); color: var(--color-neutral-700); }
 .pv2-addbtn { font-size: 12.5px; color: var(--color-primary-700); white-space: nowrap; font-family: var(--font-family-sans); }
-.pv2-rrow .pv2-addbtn { opacity: 0; }
-.pv2-rrow:hover .pv2-addbtn, .pv2-addbtn:focus-visible { opacity: 1; }
-@media (hover: none) { .pv2-rrow .pv2-addbtn { opacity: 1; } }
+/* In a meeting, "+ Add" is how the level above becomes this plan — always shown. */
+.pv2-rrow .pv2-addbtn { flex: none; padding-top: 1px; }
 
 .pv2-cal { position: sticky; top: 76px; }
 .pv2-dow { display: grid; grid-template-columns: repeat(7, 1fr); padding-bottom: 4px; font: 500 10px var(--pv2-num); letter-spacing: .14em; color: var(--color-neutral-500); }
@@ -3104,7 +3103,8 @@ div.chooser-action-group { overflow: visible !important; }
 .pv2-wgrid { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(300px, 1fr); gap: 40px; align-items: start; }
 .pv2-wgrid.is-ref { grid-template-columns: minmax(0, 1.2fr) minmax(260px, .9fr) 230px; gap: 28px; }
 .pv2-wside { position: sticky; top: 76px; }
-.pv2-rrow-sans { font: 400 14px/1.4 var(--font-family-sans); }
+.pv2-rrow-sans { font: 400 14px/1.4 var(--font-family-sans); flex-wrap: wrap; }
+.pv2-stepform { flex-basis: 100%; display: grid; gap: 6px; margin: 4px 0 8px 14px; }
 /* The day column: the prototype's big thin day numbers, the journal's rows. */
 .pv2-days [data-testid="week-journal"] header > span:first-child { font: 200 34px/1 var(--pv2-num); }
 @media (max-width: 1060px) {
