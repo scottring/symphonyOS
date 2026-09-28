@@ -28,6 +28,7 @@ import { readPlanView, writePlanView, type PlanView } from '@/lib/planning/v2/pl
 import type { Task } from '@/types/task'
 import type { LineActions, LineVM } from './PlanLine'
 import { FocusDeck, CloseOut, type CloseDecision } from './FocusDeck'
+import { FromPaper } from './FromPaper'
 
 const DAY = 86_400_000
 const shortDay = (d: Date) => d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
@@ -159,7 +160,7 @@ export function WeekV2({ tasks, weekStart, meId, isCurrent, list, days, onSelect
       ) : (
         <div className={`pv2-wgrid${view === 'ref' ? ' is-ref' : ''}`}>
           <section className="pv2-days" aria-label="The days">{days}</section>
-          <div className="pv2-wside">{list}</div>
+          <div className="pv2-wside"><div className="pv2-wside-tools"><FromPaper altitude="week" periodStart={weekStart} tasks={tasks} /></div>{list}</div>
           {view === 'ref' && (
             <aside className="pv2-ref" aria-label={`${monthName}, for reference`}>
               <div className="pv2-colh">{monthName} <small>for reference</small></div>

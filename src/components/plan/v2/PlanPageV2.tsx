@@ -40,6 +40,7 @@ import type { Task } from '@/types/task'
 import { PlanLine, type LineActions, type LineVM } from './PlanLine'
 import { DatesCalendar } from './DatesCalendar'
 import { FocusDeck, CloseOut, type CloseDecision } from './FocusDeck'
+import { FromPaper } from './FromPaper'
 
 type Level = 'month' | 'season'
 const NOUN: Record<Level, string> = { month: 'Month', season: 'Season' }
@@ -256,7 +257,7 @@ function Inner({ level }: { level: Level }) {
   const section = (label: string, vms: LineVM[]) => vms.length ? <><div className="pv2-sect">{label}</div><ul className="pv2-list">{vms.map(row)}</ul></> : null
   const listColumn = (
     <section aria-label={`${name} plan`}>
-      <div className="pv2-colh">{inMeeting ? `${name}’s list` : 'Our plan'}</div>
+      <div className="pv2-colh">{inMeeting ? `${name}’s list` : 'Our plan'}<FromPaper altitude={level} periodStart={bounds.start} tasks={layered} /></div>
       {loading && !main.length ? <p className="pv2-hint">Loading…</p> : null}
       {!loading && !main.length && <p className="pv2-hint">{inMeeting ? 'Nothing yet. Write whatever comes up — no types, no dates needed.' : `Nothing on ${name}’s plan yet.`}</p>}
       {/* A goal and its steps are one group, so two columns never split them. */}

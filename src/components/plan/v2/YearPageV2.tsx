@@ -24,6 +24,7 @@ import type { Goal } from '@/types/goal'
 import type { Task } from '@/types/task'
 import { PlanLine, type LineActions, type LineVM } from './PlanLine'
 import { FocusDeck, CloseOut, type CloseDecision } from './FocusDeck'
+import { FromPaper } from './FromPaper'
 
 const shortDay = (d: Date) => d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
 
@@ -137,7 +138,7 @@ function Inner() {
   } else {
     body = (
       <section aria-label={`${year} plan`}>
-        <div className="pv2-colh">{inMeeting ? `${year}’s goals` : 'Our plan'}</div>
+        <div className="pv2-colh">{inMeeting ? `${year}’s goals` : 'Our plan'}<FromPaper altitude="year" periodStart={new Date(year, 0, 1)} tasks={layered} /></div>
         {loading && !main.length ? <p className="pv2-hint">Loading…</p> : null}
         {!loading && !main.length && <p className="pv2-hint">{inMeeting ? 'Write what you want this year to hold.' : `Nothing on ${year}’s plan yet. That’s fine.`}</p>}
         <ul className="pv2-list pv2-brain">{main.map(row)}</ul>
