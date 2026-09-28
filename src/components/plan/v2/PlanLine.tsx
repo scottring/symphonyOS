@@ -87,7 +87,7 @@ export function PlanLine({ vm, actions, members, nextLabel, open, onToggle, edit
   const who = assigneesOf(t)
   const muted = vm.fate !== 'open'
   return (
-    <li className={`pv2-line${vm.nested ? ' is-nested' : ''}${open ? ' is-open' : ''}${muted ? ' is-muted' : ''}${vm.fate === 'dropped' ? ' is-dropped' : ''}`}>
+    <li className={`pv2-line${vm.nested ? ' is-nested' : ''}${open ? ' is-open' : ''}${muted ? ' is-muted' : ''}${vm.fate === 'dropped' ? ' is-dropped' : ''}${t.completed ? ' is-done' : ''}`}>
       <div className="pv2-line-main">
         <span className="pv2-mark" aria-hidden="true">
           {t.isGoal ? <span className="pv2-goal" /> : <span className="pv2-dash" />}

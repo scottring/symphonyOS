@@ -2013,7 +2013,7 @@ html.desktop-shell a {
 .desktop-workspace-page { grid-area: page; }
 .desktop-footer { grid-area: footer; }
 .desktop-ground {
-  grid-area: footer; position: sticky; bottom: 0; z-index: 5; min-width: 0;
+  grid-area: footer; position: sticky; bottom: 0; z-index: 15; min-width: 0;
   /* The page scrolls BEHIND the ground: solid page colour under the scene
      and footer, fading in above them so rows slip out of sight softly. */
   background: linear-gradient(to bottom, color-mix(in srgb, var(--color-bg-base) 0%, transparent), var(--color-bg-base) 36px);
@@ -3024,6 +3024,9 @@ div.chooser-action-group { overflow: visible !important; }
 .pv2-line-text.is-goal { font: 500 18px/1.35 var(--font-family-display); }
 .pv2-line.is-muted .pv2-line-text { color: var(--color-neutral-500); }
 .pv2-line.is-dropped .pv2-line-text { text-decoration: line-through; text-decoration-color: var(--color-neutral-300); }
+/* Done is crossed off, the way the paper list does it (Scott, 2026-09-28). */
+.pv2-line.is-done > .pv2-line-main .pv2-line-text { text-decoration: line-through; text-decoration-color: var(--color-neutral-400); text-decoration-thickness: 1px; }
+.pv2-card.is-stamped .pv2-card-title > span:last-child { text-decoration: none; }
 .pv2-tick { display: inline; width: 14px; height: 14px; margin: 0 0 2px 8px; color: var(--color-primary-600); vertical-align: middle; }
 .pv2-rail { display: inline-flex; align-items: center; gap: 2px; flex: none; margin-left: auto; }
 .pv2-rb { height: 26px; min-width: 26px; padding: 0 4px; border-radius: 7px; display: inline-grid; place-items: center; color: var(--color-neutral-500); }
