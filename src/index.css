@@ -1793,6 +1793,14 @@ html.desktop-shell a {
 .daybook-date {
   display: none;
 }
+/* Planning v2: every heading wears its horizon's big thin number, and the
+   heavy rule above the heading goes (the rail is the page's top now). */
+.masthead-numeral { flex: none; font: 200 88px/.82 'Jost', var(--font-family-sans); letter-spacing: -.03em; color: var(--color-neutral-900); align-self: flex-end; margin-right: 6px; }
+:root.plan-v2 .daybook-masthead { border-top: 0; }
+:root.plan-v2 .daybook-masthead-inner { padding-top: 8px; }
+@media (max-width: 640px) {
+  .masthead-numeral { font-size: 60px; }
+}
 .daybook-title,
 .symphony-wordmark {
   font-family: var(--font-family-display);
@@ -1990,8 +1998,8 @@ html.desktop-shell a {
   display: grid;
   min-height: 100%;
   grid-template-columns: minmax(0, 1fr);
-  grid-template-rows: auto 1fr auto auto;
-  grid-template-areas: "nav" "page" "ground" "footer";
+  grid-template-rows: auto 1fr auto;
+  grid-template-areas: "nav" "page" "footer";
 }
 .desktop-workspace-nav,
 .desktop-workspace-page,
@@ -2004,12 +2012,22 @@ html.desktop-shell a {
 .desktop-workspace-nav { grid-area: nav; }
 .desktop-workspace-page { grid-area: page; }
 .desktop-footer { grid-area: footer; }
-.desktop-workspace > .place-band.is-ground { grid-area: ground; }
+.desktop-ground {
+  grid-area: footer; position: sticky; bottom: 0; z-index: 5; min-width: 0;
+  /* The page scrolls BEHIND the ground: solid page colour under the scene
+     and footer, fading in above them so rows slip out of sight softly. */
+  background: linear-gradient(to bottom, color-mix(in srgb, var(--color-bg-base) 0%, transparent), var(--color-bg-base) 36px);
+  pointer-events: none;
+}
+.desktop-ground > * { pointer-events: auto; }
+.desktop-ground .desktop-footer { margin-inline: auto; padding-top: 8px; padding-bottom: 16px; }
+.desktop-ground .place-band.is-ground { margin-top: 0; height: 72px; margin-inline: auto; display: block; pointer-events: none; }
+.desktop-ground .place-band.is-ground .place-band-scene { height: 72px; }
 .desktop-workspace-dock { grid-area: dock; align-self: stretch; min-width: 0; }
 /* References stay in the desktop workspace across route changes. */
 .desktop-workspace.has-references {
   grid-template-columns: auto minmax(0, 1fr);
-  grid-template-areas: "dock nav" "dock page" "dock ground" "dock footer";
+  grid-template-areas: "dock nav" "dock page" "dock footer";
 }
 .reference-dock {
   position: sticky;
@@ -3017,6 +3035,11 @@ div.chooser-action-group { overflow: visible !important; }
 .pv2-fact { display: flex; gap: 10px; align-items: flex-start; font-size: 14px; }
 .pv2-k { flex: none; width: 64px; padding-top: 3px; font: 500 10px var(--pv2-num); letter-spacing: .12em; text-transform: uppercase; color: var(--color-neutral-500); }
 .pv2-notes { white-space: pre-line; color: var(--color-neutral-700); }
+.pv2-line.is-nested { margin-left: 26px; }
+.pv2-steps-list { margin: 0; padding-left: 16px; display: grid; gap: 2px; }
+.pv2-step { text-align: left; color: var(--color-neutral-800); }
+.pv2-step:hover { color: var(--color-primary-700); text-decoration: underline; }
+.pv2-step.is-done { color: var(--color-neutral-500); text-decoration: line-through; }
 .pv2-input { width: 100%; border: 1px solid var(--color-neutral-200); background: var(--color-bg-base); border-radius: 8px; padding: 8px 10px; font-size: 14px; }
 .pv2-acts { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .pv2-write { display: flex; align-items: center; gap: 10px; padding: 6px 0; }
@@ -3086,10 +3109,14 @@ div.chooser-action-group { overflow: visible !important; }
   .pv2-grid3 .pv2-cal { grid-column: 1 / -1; position: static; }
 }
 @media (max-width: 860px) {
-  .pv2-grid2, .pv2-grid2.is-ref, .pv2-grid3 { grid-template-columns: 1fr; gap: 26px; }
+  .pv2-grid2, .pv2-grid2.is-ref, .pv2-grid3, .pv2-wgrid, .pv2-wgrid.is-ref { grid-template-columns: 1fr; gap: 26px; }
+  .pv2-wside { position: static; order: -1; }
+  .pv2-wgrid.is-ref .pv2-ref { grid-column: auto; }
   .pv2-cal, .pv2-ref { position: static; max-height: none; }
   .pv2-brain { columns: 1; }
 }
+/* Phones carry the life-area lens in the shell's own header already. */
+@media (max-width: 767px) { .pv2-chrome { display: none; } }
 @media (max-width: 640px) {
   .pv2-page { padding: 18px 16px 96px; }
   .pv2-head { grid-template-columns: auto 1fr; gap: 14px; }

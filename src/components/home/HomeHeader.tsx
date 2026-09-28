@@ -9,6 +9,8 @@ import { readCadenceConfig } from '@/lib/cadence/config'
 import { MastheadCard, PeriodNavEyebrow } from '@/components/layout/MastheadCard'
 import { ShelvesButton } from '@/components/reference/ShelvesButton'
 import { WeekModeSwitch, type WeekMode } from './week/WeekViewV2'
+import { planV2Enabled } from '@/lib/planning/v2/planV2'
+import { weekOfYear } from '@/lib/planning/horizonNumerals'
 
 interface HomeHeaderProps {
   currentView: HomeViewType
@@ -242,6 +244,7 @@ export function HomeHeader(props: HomeHeaderProps) {
         variant="page"
         eyebrow={<PeriodNavEyebrow label={menuButton} onPrev={onPrev} onNext={onNext} prevLabel={prevLabel} nextLabel={nextLabel} trailing={menu} />}
         title={label.long}
+        numeral={planV2Enabled() ? String(weekOfYear(weekStart, readCadenceConfig().weekStartsOn)) : undefined}
         // Shelves beside the dates, not on a row of its own (2026-09-23).
         action={<ShelvesButton weekPage={weekStart} />}
         subline={customInputs}

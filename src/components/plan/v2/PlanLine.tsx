@@ -21,12 +21,17 @@ export interface LineVM {
   partOf: SupportLink | null
   /** Where its work is now — "Week of Sep 14", "Thursday, September 17". */
   where: string | null
+  /** A goal's next actions (goal_task_id), each with where it is. */
+  steps?: { id: string; title: string; done: boolean; where: string | null }[]
+  /** Drawn beneath its goal on the same list. */
+  nested?: boolean
 }
 
 export interface LineActions {
   done: (t: Task) => void
   carry: (t: Task) => void
-  someday: (t: Task) => void
+  /** Absent where a period has no Someday (a year goal). */
+  someday?: (t: Task) => void
   drop: (t: Task) => void
   assign: (t: Task, ids: string[]) => void
   details: (t: Task) => void
@@ -58,7 +63,7 @@ export function LineMenu({ vm, actions, nextLabel }: { vm: LineVM; actions: Line
         <div role="menu" className="pv2-menu">
           <button role="menuitem" type="button" onClick={pick(actions.done)}><Check className="w-3.5 h-3.5" />{t.completed ? 'Reopen' : 'Done'}</button>
           {!t.completed && vm.fate !== 'carried' && <button role="menuitem" type="button" onClick={pick(actions.carry)}><ArrowRight className="w-3.5 h-3.5" />Carry to {nextLabel}</button>}
-          {!t.completed && vm.fate !== 'someday' && <button role="menuitem" type="button" onClick={pick(actions.someday)}><Moon className="w-3.5 h-3.5" />Someday</button>}
+          {!t.completed && vm.fate !== 'someday' && actions.someday && <button role="menuitem" type="button" onClick={pick(actions.someday)}><Moon className="w-3.5 h-3.5" />Someday</button>}
           {!t.completed && <button role="menuitem" type="button" onClick={pick(actions.drop)}><X className="w-3.5 h-3.5" />Drop it</button>}
           <div className="pv2-msep" />
           <button role="menuitem" type="button" onClick={pick(actions.details)}><PanelRight className="w-3.5 h-3.5" />All details</button>
@@ -82,7 +87,7 @@ export function PlanLine({ vm, actions, members, nextLabel, open, onToggle, edit
   const who = assigneesOf(t)
   const muted = vm.fate !== 'open'
   return (
-    <li className={`pv2-line${open ? ' is-open' : ''}${muted ? ' is-muted' : ''}${vm.fate === 'dropped' ? ' is-dropped' : ''}`}>
+    <li className={`pv2-line${vm.nested ? ' is-nested' : ''}${open ? ' is-open' : ''}${muted ? ' is-muted' : ''}${vm.fate === 'dropped' ? ' is-dropped' : ''}`}>
       <div className="pv2-line-main">
         <span className="pv2-mark" aria-hidden="true">
           {t.isGoal ? <span className="pv2-goal" /> : <span className="pv2-dash" />}
@@ -119,7 +124,18 @@ export function PlanLine({ vm, actions, members, nextLabel, open, onToggle, edit
             </div>
           )}
           {vm.where && <div className="pv2-fact"><span className="pv2-k">Now</span><span>{vm.where}</span></div>}
-          {t.notes?.trim() && <div className="pv2-fact"><span className="pv2-k">Notes</span><span className="pv2-notes">{t.notes.trim().split('\n')[0]}</span></div>}
+          {t.isGoal ? <>
+            {/* A goal says what it means and holds its possible work — the Fall
+                page Scott liked (prototype, 2026-09-28). Both are the goal's own
+                records: its notes and its steps. */}
+            <div className="pv2-fact"><span className="pv2-k">Means</span>
+              {t.notes?.trim() ? <span className="pv2-notes">{t.notes.trim()}</span> : <span className="pv2-hint">Blank for now.</span>}</div>
+            <div className="pv2-fact"><span className="pv2-k">Work</span>
+              {vm.steps?.length ? <ul className="pv2-steps-list">{vm.steps.map((s) => (
+                <li key={s.id}><button type="button" className={`pv2-step${s.done ? ' is-done' : ''}`} onClick={() => actions.details({ ...t, id: s.id })}>{s.title}</button>
+                  {s.where && <span className="pv2-hint"> · {s.where}</span>}</li>
+              ))}</ul> : <span className="pv2-hint">No possible work written yet.</span>}</div>
+          </> : t.notes?.trim() && <div className="pv2-fact"><span className="pv2-k">Notes</span><span className="pv2-notes">{t.notes.trim().split('\n')[0]}</span></div>}
           <div className="pv2-acts">
             <button type="button" className="pv2-qbtn" onClick={() => actions.details(t)}>All details →</button>
             <button type="button" className="pv2-link" onClick={onToggle}>Close</button>

@@ -101,8 +101,12 @@ function Inner({ level }: { level: Level }) {
     const where = t.completed
       ? `Done${t.completedAt ? ` ${shortDay(t.completedAt)}` : ''}`
       : lower ? lower.label.replace(/^./, (c) => c.toUpperCase()) : null
-    return { task: t, fate, partOf: partOf(t), where }
-  }, [level, partOf])
+    const steps = t.isGoal ? layered.filter((x) => x.goalTaskId === t.id).map((x) => {
+      const lp = x.completed ? null : lowerPlacement(x, level, b.start)
+      return { id: x.id, title: x.title, done: !!x.completed, where: x.completed ? 'done' : lp ? lp.label : null }
+    }) : undefined
+    return { task: t, fate, partOf: partOf(t), where, steps }
+  }, [level, partOf, layered])
 
   const lines = useMemo(() => {
     const listed = selectPeriodTasks(layered, level, bounds.start, isCurrent, meId, seasons)
@@ -114,7 +118,14 @@ function Inner({ level }: { level: Level }) {
     selectPeriodTasks(layered, level, prevBounds.start, isCurrentPeriod(prevBounds, today), meId, seasons).map((t) => toVM(t, prevBounds))
   ), [layered, level, prevBounds, today, meId, seasons, toVM])
 
-  const main = lines.filter((l) => l.fate === 'open' || l.fate === 'done')
+  // A goal's steps on the same list read beneath it, not twice (v1 nests them too).
+  const mainAll = lines.filter((l) => l.fate === 'open' || l.fate === 'done')
+  const goalIds = new Set(mainAll.filter((l) => l.task.isGoal).map((l) => l.task.id))
+  const main = mainAll.flatMap((l) => {
+    if (l.task.goalTaskId && goalIds.has(l.task.goalTaskId)) return []
+    if (!l.task.isGoal) return [l]
+    return [l, ...mainAll.filter((s) => s.task.goalTaskId === l.task.id).map((s) => ({ ...s, nested: true }))]
+  })
   const carried = lines.filter((l) => l.fate === 'carried')
   const someday = lines.filter((l) => l.fate === 'someday')
   const dropped = lines.filter((l) => l.fate === 'dropped')

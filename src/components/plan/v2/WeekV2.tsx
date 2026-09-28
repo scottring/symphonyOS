@@ -8,7 +8,7 @@
 // It is chrome AROUND the existing week: the journal, the list, drag and drop,
 // add-to-day and the week's planning session are WeekViewV2's, unchanged.
 
-import { useMemo, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useSupabaseTasks } from '@/hooks/useSupabaseTasks'
 import { useGatedTaskActions } from '@/hooks/useGatedTaskActions'
@@ -27,19 +27,19 @@ import { weekOfYear } from '@/lib/planning/horizonNumerals'
 import { readPlanView, writePlanView, type PlanView } from '@/lib/planning/v2/planV2'
 import type { Task } from '@/types/task'
 import type { LineActions, LineVM } from './PlanLine'
-import { FocusDeck } from './FocusDeck'
+import { FocusDeck, CloseOut, type CloseDecision } from './FocusDeck'
 
 const DAY = 86_400_000
 const shortDay = (d: Date) => d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
 
-export function WeekV2({ tasks, weekStart, meId, isCurrent, onPlan, list, days, onSelectTask }: {
+export function WeekV2({ tasks, weekStart, meId, isCurrent, list, days, onSelectTask }: {
   /** Layer-filtered tasks, as the week receives them. */
   tasks: Task[]
   weekStart: Date
   meId: string | null
   isCurrent: boolean
-  /** Opens the week's planning session (WeekPlanHost). */
-  onPlan: () => void
+  /** v1's session (WeekPlanHost) — v2 runs its own meeting instead. */
+  onPlan?: () => void
   /** The week's list ("Any day this week"), as WeekViewV2 builds it. */
   list: ReactNode
   /** The journal of days, as WeekViewV2 builds it. */
@@ -60,12 +60,17 @@ export function WeekV2({ tasks, weekStart, meId, isCurrent, onPlan, list, days, 
   const monthRows = useMemo(() => selectPeriodTasks(tasks, 'month', monthStart, isCurrent, meId, readSeasons())
     .filter((t) => !t.completed && !lowerPlacement(t, 'month', monthStart)), [tasks, monthStart, isCurrent, meId])
   const weekTasks = useMemo(() => weekListTasks(tasks, weekStart, meId, { isCurrent }), [tasks, weekStart, meId, isCurrent])
-  const nextWeek = new Date(weekStart.getTime() + 7 * DAY)
+  const nextWeek = useMemo(() => new Date(weekStart.getTime() + 7 * DAY), [weekStart])
+  const prevWeek = useMemo(() => new Date(weekStart.getTime() - 7 * DAY), [weekStart])
+  const prevTasks = useMemo(() => weekListTasks(tasks, prevWeek, meId, { isCurrent: false }), [tasks, prevWeek, meId])
+  const [meeting, setMeeting] = useState<null | { step: 1 | 2; candidateIds: string[] }>(null)
 
-  const lines: LineVM[] = weekTasks.map((t) => ({
+  const toVM = (t: Task, anyDay: string): LineVM => ({
     task: t, fate: t.completed ? 'done' : 'open', partOf: goalOfTask(t, tasks, readSeasons()),
-    where: t.scheduledFor ? t.scheduledFor.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' }) : 'Any day this week',
-  }))
+    where: t.scheduledFor ? t.scheduledFor.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' }) : anyDay,
+  })
+  const lines: LineVM[] = weekTasks.map((t) => toVM(t, 'Any day this week'))
+  const prevLines: LineVM[] = prevTasks.map((t) => toVM(t, 'Any day last week'))
   const actions: LineActions = {
     done: async (t) => { if ((await toggleTask(t.id)) !== false) showToast(t.completed ? `Reopened “${t.title}”.` : `Done — “${t.title}”.`, 'success', 5000, { label: 'Undo', onClick: () => { void toggleTask(t.id) } }) },
     carry: async (t) => { if (await keepForward(t.id, { weekStart: nextWeek }, weekStart)) showToast(`“${t.title}” moved to next week.`, 'success', 5000) },
@@ -77,28 +82,79 @@ export function WeekV2({ tasks, weekStart, meId, isCurrent, onPlan, list, days, 
     openPartOf: (link) => navigate(`/task/${link.id}`),
   }
 
+  const decide = async (vm: LineVM, d: CloseDecision) => {
+    const t = vm.task
+    if (d === 'carried') await keepForward(t.id, { weekStart }, prevWeek)
+    else if (d === 'done') { if (!t.completed) await toggleTask(t.id) }
+    else if (d === 'someday') await gated.updateTask(t.id, { bucket: 'someday', scheduledFor: undefined, isAllDay: undefined })
+    else if (d === 'dropped') await dropCommitment(t.id, 'week', prevWeek)
+  }
+  const startMeeting = () => {
+    const candidateIds = prevTasks.filter((t) => !t.completed && !t.scheduledFor).map((t) => t.id)
+    setMeeting({ step: candidateIds.length ? 1 : 2, candidateIds })
+    if (view === 'list') setViewState('ref')
+    window.scrollTo({ top: 0 })
+  }
+  const endMeeting = async (keep: boolean) => {
+    if (keep) {
+      if (!(await session.save({ wentWell: session.mine?.wentWell ?? '', didnt: session.mine?.didnt ?? '' }))) { showToast('Couldn’t save the plan — try again.', 'error', 5000); return }
+      showToast(`Saved as our week ${weekOfYear(weekStart, readCadenceConfig().weekStartsOn)} plan.`, 'success', 5000)
+    }
+    setMeeting(null)
+    setViewState(readPlanView('week'))
+  }
+  useEffect(() => {
+    const open = () => startMeeting()
+    window.addEventListener('pv2:plan-week', open)
+    return () => window.removeEventListener('pv2:plan-week', open)
+  })
+  const takeIn = async (t: Task) => {
+    await gated.updateTask(t.id, { bucket: 'week', weekStart })
+    showToast(`“${t.title}” → this week · still on ${monthName}’s plan.`, 'success', 4000)
+  }
   const agreedBy = session.saved
     ? (session.saved.authorId === user?.id ? 'you' : members.find((m) => m.auth_user_id === session.saved!.authorId)?.name ?? 'your household')
     : null
   const weekNo = weekOfYear(weekStart, readCadenceConfig().weekStartsOn)
+  const viewSwitch = (
+    <div className="pv2-seg" role="group" aria-label="View">
+      {([['list', 'List'], ['ref', `With ${monthName}`], ['focus', 'One at a time']] as const).map(([v, l]) => (
+        <button key={v} type="button" aria-pressed={view === v} onClick={() => setView(v)}>{l}</button>
+      ))}
+    </div>
+  )
 
   return (
     <div className="pv2-week" data-week={localYmd(weekStart)}>
+      {meeting ? (
+        <div className="pv2-sbar" role="region" aria-label={`Planning week ${weekNo}`}>
+          <span className="pv2-st">Planning week {weekNo}<small>a planning meeting</small></span>
+          {meeting.candidateIds.length > 0 ? (
+            <div className="pv2-steps">
+              <button type="button" aria-current={meeting.step === 1 ? 'step' : undefined} onClick={() => setMeeting({ ...meeting, step: 1 })}><b>1</b>Close out last week</button>
+              <button type="button" aria-current={meeting.step === 2 ? 'step' : undefined} onClick={() => setMeeting({ ...meeting, step: 2 })}><b>2</b>Plan this week</button>
+            </div>
+          ) : <span className="flex-1" />}
+          {meeting.step === 2 && viewSwitch}
+          <button type="button" className="pv2-link pv2-quiet" onClick={() => void endMeeting(false)}>Leave for now</button>
+          <button type="button" className="pv2-btn" onClick={() => void endMeeting(true)}>This is our week</button>
+        </div>
+      ) : (
       <div className="pv2-toolbar">
         <div className="pv2-status">
           {session.saved
             ? <><span className="pv2-seal" aria-hidden="true" /><span><b>Our week {weekNo} plan</b> · agreed {shortDay(session.saved.at)} · {agreedBy}</span></>
             : <span className="pv2-hint">{session.loading ? '' : `No plan for week ${weekNo} yet`}</span>}
         </div>
-        <div className="pv2-seg" role="group" aria-label="View">
-          {([['list', 'List'], ['ref', `With ${monthName}`], ['focus', 'One at a time']] as const).map(([v, l]) => (
-            <button key={v} type="button" aria-pressed={view === v} onClick={() => setView(v)}>{l}</button>
-          ))}
-        </div>
-        <button type="button" className={session.saved ? 'pv2-qbtn' : 'pv2-btn'} onClick={onPlan}>Plan this week</button>
+        {viewSwitch}
+        <button type="button" className={session.saved ? 'pv2-qbtn' : 'pv2-btn'} onClick={startMeeting}>Plan this week</button>
       </div>
+      )}
 
-      {view === 'focus' ? (
+      {meeting?.step === 1 ? (
+        <CloseOut lines={prevLines} candidateIds={meeting.candidateIds} members={members} actions={actions} prevName="last week" nextName="this week"
+          onDecide={decide} onFinish={() => setMeeting({ ...meeting, step: 2 })} />
+      ) : view === 'focus' ? (
         <FocusDeck lines={lines} actions={actions} members={members} nextLabel="next week" context={`Week ${weekNo}`} label={`Week ${weekNo}`} />
       ) : (
         <div className={`pv2-wgrid${view === 'ref' ? ' is-ref' : ''}`}>
@@ -112,6 +168,7 @@ export function WeekV2({ tasks, weekStart, meId, isCurrent, onPlan, list, days, 
                   <li key={t.id} className="pv2-rrow pv2-rrow-sans">
                     {t.isGoal ? <span className="pv2-goal is-small" aria-hidden="true" /> : <span className="pv2-dash" style={{ marginTop: 10 }} aria-hidden="true" />}
                     <button type="button" className="flex-1 text-left" onClick={() => onSelectTask(t.id)}>{t.title}</button>
+                    {meeting && <button type="button" className="pv2-addbtn" onClick={() => void takeIn(t)} aria-label={`Add ${t.title} to this week`}>+ Add</button>}
                   </li>
                 ))}</ul>
               ) : <p className="pv2-hint">Nothing open on {monthName}’s plan.</p>}

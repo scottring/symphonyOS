@@ -25,7 +25,7 @@ import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { PlaceWash } from '@/components/place/PlaceWash'
 import { PageMotif, type MotifId } from '@/components/place/motifs/PageMotif'
 
-export function MastheadCard({ eyebrow, title, subline, controls, aside, footer, motif, variant = 'card', date, className = '', action }: {
+export function MastheadCard({ eyebrow, title, subline, controls, aside, footer, motif, variant = 'card', date, className = '', action, numeral }: {
   eyebrow?: ReactNode
   title: ReactNode
   /** The page's one primary action, beside the title at every width —
@@ -45,6 +45,9 @@ export function MastheadCard({ eyebrow, title, subline, controls, aside, footer,
   variant?: 'card' | 'daybook' | 'page'
   date?: Date
   className?: string
+  /** The horizon's big thin number in the margin — "40" on Week (planning
+   *  v2, 2026-09-28). Absent, nothing changes. */
+  numeral?: string
 }) {
   const open = variant !== 'card'
   return (
@@ -70,6 +73,7 @@ export function MastheadCard({ eyebrow, title, subline, controls, aside, footer,
                motif's own label would just be read out twice. */
             <span aria-hidden="true" className="contents"><PageMotif motif={motif} className="daybook-stamp" /></span>
           )}
+          {numeral && <div aria-hidden="true" className="masthead-numeral">{numeral}</div>}
           <div className="daybook-masthead-text min-w-0 flex-1">
             {eyebrow && <div data-testid="masthead-eyebrow" className="mb-1 -ml-1.5">{eyebrow}</div>}
             <div className={action ? 'daybook-title-row' : undefined}>

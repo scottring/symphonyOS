@@ -266,14 +266,15 @@ describe('Centred desktop workspace and footer', () => {
   it('keeps navigation, page, and footer in one column, with a dock column only while a list draws', () => {
     sessionStorage.setItem('symphony-reference-lists:anonymous', JSON.stringify([{ kind: 'week', date: new Date().toISOString() }]))
     const today = renderAt('/today')
-    const workspace = screen.getByRole('contentinfo').parentElement!
+    // The footer rides in the sticky ground block (2026-09-28), one level down.
+    const workspace = screen.getByRole('contentinfo').closest('.desktop-workspace') as HTMLElement
     expect(workspace).toHaveClass('desktop-workspace', 'has-references')
     expect(workspace).toContainElement(screen.getByRole('navigation', { name: 'Main navigation' }))
     expect(workspace).toContainElement(screen.getByTestId('app-content'))
     today.unmount()
     // /week already shows the week list, so no empty dock column is reserved.
     renderAt('/week')
-    expect(screen.getByRole('contentinfo').parentElement).not.toHaveClass('has-references')
+    expect(screen.getByRole('contentinfo').closest('.desktop-workspace')).not.toHaveClass('has-references')
   })
 
   it('carries only the page-supplied action at left, so other routes offer no review', () => {
