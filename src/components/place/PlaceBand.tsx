@@ -17,7 +17,7 @@ export function PlaceBand({ ground = false }: { ground?: boolean }) {
   return (
     <div aria-hidden="true" className={`place-band${ground ? ' is-ground' : ''}`}>
       <div className="place-band-scene">
-        <PlaceSkyline className="h-full w-full" />
+        <PlaceSkyline className="h-full w-full" wide={ground} />
       </div>
     </div>
   )

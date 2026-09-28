@@ -120,13 +120,31 @@ function draw(shape: Shape, i: number) {
   }
 }
 
-export function PlaceSkyline({ place, className = '' }: { place?: PlaceId; className?: string }) {
+export function PlaceSkyline({ place, className = '', wide = false }: {
+  place?: PlaceId; className?: string
+  /** For a band wider than the art (the ground under the page): the scene
+   *  is mirrored out to both sides, so its edges meet themselves with no
+   *  seam, and the SVG crops to the width it is given. */
+  wide?: boolean
+}) {
   const current = usePlaceOrDefault()
   const scene = SCENES[place ?? current]
+  const layers = <>
+    <g className="place-skyline-far">{scene.far.map(draw)}</g>
+    <g className="place-skyline-near">{scene.near.map(draw)}</g>
+  </>
+  if (wide) {
+    return (
+      <svg viewBox={`${-W} 0 ${3 * W} ${G}`} preserveAspectRatio="xMidYMax slice" className={className} aria-hidden="true">
+        <g transform="scale(-1,1)">{layers}</g>
+        {layers}
+        <g transform={`translate(${2 * W},0) scale(-1,1)`}>{layers}</g>
+      </svg>
+    )
+  }
   return (
     <svg viewBox={`0 0 ${W} ${G}`} preserveAspectRatio="xMidYMax meet" className={className} aria-hidden="true">
-      <g className="place-skyline-far">{scene.far.map(draw)}</g>
-      <g className="place-skyline-near">{scene.near.map(draw)}</g>
+      {layers}
     </svg>
   )
 }

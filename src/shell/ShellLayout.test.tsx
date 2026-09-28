@@ -226,25 +226,23 @@ describe('Phone AI beside Details', () => {
 
 describe('Consolidated desktop navigation', () => {
   beforeEach(() => { mobileState.isMobile = false; selectionState.selection = null; sessionStorage.clear(); localStorage.removeItem('symphony-plan-period') })
-  it('separates destinations from the task chooser and keeps period links within Plan', () => {
-    // Today draws its own Choose control on its "For today" heading
-    // (2026-09-22); the page-tools chooser is every other page's door.
+  it('the horizon rail is the main way between horizons, on every page (2026-09-28)', () => {
+    // No "Planner" and no "Routines" in the top row: the numbered rail is the
+    // navigation, shown on pages that are no horizon too, with none marked.
     renderAt('/notes')
     const nav = screen.getByRole('navigation', { name: 'Main navigation' })
     const chooser = screen.getByRole('button', { name: 'Shelves' })
     expect(nav).not.toContainElement(chooser)
-    expect(screen.queryByRole('navigation', { name: 'Planning period' })).not.toBeInTheDocument()
-    fireEvent.click(screen.getByRole('link', { name: 'Planner' }))
-    expect(screen.getByRole('navigation', { name: 'Planning period' })).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: 'Today' })).toHaveAttribute('aria-current', 'page')
+    expect(screen.queryByRole('link', { name: 'Planner' })).not.toBeInTheDocument()
+    const rail = screen.getByRole('navigation', { name: 'Planning period' })
+    expect(rail.querySelector('[aria-current="page"]')).toBeNull()
     fireEvent.click(screen.getByRole('link', { name: 'Month' }))
     expect(screen.getByRole('link', { name: 'Month' })).toHaveAttribute('aria-current', 'page')
-    // Leaving the planner and coming back lands on Today, not on the horizon
-    // you happened to open last. Remembering it put Today two clicks away for
-    // the rest of the session (walk finding S1-11).
-    fireEvent.click(screen.getByRole('link', { name: 'Routines' }))
-    fireEvent.click(screen.getByRole('link', { name: 'Planner' }))
+    fireEvent.click(screen.getByRole('link', { name: 'Today' }))
     expect(screen.getByRole('link', { name: 'Today' })).toHaveAttribute('aria-current', 'page')
+    // Routines lives under More now.
+    fireEvent.click(screen.getByRole('button', { name: /^More/ }))
+    expect(screen.getByRole('button', { name: 'Routines' })).toBeInTheDocument()
   })
   it('places page-specific controls in the consolidated navigation', () => {
     renderAt('/today', <DesktopPageControls><button>Page options</button></DesktopPageControls>)
@@ -392,7 +390,7 @@ describe('Capture and the Today pin from every desktop page', () => {
     expect(screen.getByRole('region', { name: 'Shelves' })).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Close shelves', pressed: true }))
     expect(screen.queryByRole('region', { name: 'Shelves' })).not.toBeInTheDocument()
-    // Today is still one destination.
-    expect(screen.getAllByRole('link', { name: 'Planner' })).toHaveLength(1)
+    // Today is still one click away, on the rail.
+    expect(screen.getAllByRole('link', { name: 'Today' })).toHaveLength(1)
   })
 })

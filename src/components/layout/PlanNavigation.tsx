@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { NavLink, useLocation, useNavigate } from 'react-router-dom'
-import { PanelLeft, Target, ChevronDown, Check, CornerDownRight } from 'lucide-react'
+import { PanelLeft, Target, ChevronDown, Check } from 'lucide-react'
 import { periodBounds } from '@/lib/planning/periodPage'
 import { readSeasons } from '@/lib/cadence/seasons'
 import { useReferenceLists } from '@/components/reference/ReferenceListsContext'
@@ -88,7 +88,7 @@ function HorizonSwitcher({ period }: { period: typeof PERIODS[number] }) {
 const RAIL_ORDER = ['year', 'season', 'month', 'week', 'today'] as const
 
 /** Desktop: "2026 Year — 09–11 Fall — 09 September — 40 Week — 28 Today". */
-function HorizonRail({ period }: { period: typeof PERIODS[number] }) {
+function HorizonRail({ period }: { period?: typeof PERIODS[number] }) {
   const { search } = useLocation()
   const now = new Date()
   const nums = horizonNumerals(now, readSeasons(), readCadenceConfig().weekStartsOn)
@@ -133,17 +133,42 @@ export function PlanNavigation({ mobile = false, paused = false, mobileControlsR
   // The kept-pins note ("Lists return when you close the side panel") is
   // still said on Today, even though its chooser button lives on the page.
   const pausedNote = !mobile && paused && !!references && references.pins.length > 0
-  if (!period && !showChooser && !pausedNote) return null
   const range = new URLSearchParams(search).get('range') ?? 'today'
+  if (!mobile) {
+    // Desktop: the horizon rail IS the main navigation (Scott, 2026-09-28 —
+    // "Planner" is gone from the row above). Centred on every page; a page
+    // that is no horizon simply has none marked.
+    return <div className="plan-page-tools is-rail" data-period={period}>
+      <div className="plan-rail-side" />
+      <HorizonRail period={period} />
+      <div className="plan-rail-side is-right">
+        {period === 'week' && <label className="plan-range-control"><span className="sr-only">Range</span>
+          <select aria-label="Week range" value={['week', 'weekend', 'three', 'custom'].includes(range) ? range : 'week'}
+            onChange={event => navigate(event.target.value === 'week' ? '/week' : `/week?range=${event.target.value}`)}>
+            <option value="week">Full week</option><option value="weekend">Weekend</option>
+            <option value="three">3 days</option><option value="custom">Custom range…</option>
+          </select>
+        </label>}
+        {(showChooser || pausedNote) && references && <div className="task-chooser-control">
+          {showChooser && <button type="button" aria-label={pinned ? 'Close shelves' : 'Shelves'} aria-pressed={pinned}
+            onClick={() => pinned ? references.unpin('today') : references.pin('today')}>
+            <PanelLeft size={15} aria-hidden="true" />Shelves
+          </button>}
+          {pausedNote && <span>Lists return when you close the side panel.</span>}
+        </div>}
+        {period && <div className="goals-reference-control">
+          <button type="button" aria-label="Goals" aria-expanded={goalsOpen} onClick={() => setGoalsOpen(open => !open)}>
+            <Target size={15} aria-hidden="true" /><span className="goals-reference-label">Goals</span>
+          </button>
+        </div>}
+      </div>
+      {period && <GoalsSheet open={goalsOpen} onClose={() => setGoalsOpen(false)} />}
+    </div>
+  }
+  if (!period && !showChooser && !pausedNote) return null
   return <div className="plan-page-tools" data-period={period}>
     {period && <div className="plan-period-controls">
-      {mobile ? <HorizonSwitcher period={period} /> : <>
-        {/* The horizons hang off Planner in the row above (Scott's sketch,
-            2026-09-25), big to small, each named by its own date — the
-            numbered rail from the planning prototype (2026-09-28). */}
-        <CornerDownRight size={14} aria-hidden="true" className="plan-period-connector" />
-        <HorizonRail period={period} />
-      </>}
+      <HorizonSwitcher period={period} />
       {period === 'week' && <label className="plan-range-control"><span className="sr-only">Range</span>
         <select aria-label="Week range" value={['week', 'weekend', 'three', 'custom'].includes(range) ? range : 'week'}
           onChange={event => navigate(event.target.value === 'week' ? '/week' : `/week?range=${event.target.value}`)}>

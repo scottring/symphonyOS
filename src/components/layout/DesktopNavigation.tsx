@@ -2,7 +2,6 @@ import { createContext, useContext, useEffect, useRef, useState, type ReactNode 
 import { createPortal } from 'react-dom'
 import { NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { ChevronDown, Inbox, Plus, Search, UserRound } from 'lucide-react'
-import { usePlanDestination, planPeriodForPath } from './PlanNavigation'
 import { requestPlanFromPaper } from '@/lib/planFromPaperSignal'
 import { appRegistry } from '@/shell/appRegistry'
 import { MORE_GROUPS, isDestinationActive } from './moreDestinations'
@@ -19,7 +18,6 @@ export function DesktopNavigation({ inboxCount, discussionsUnread, onSearch, onQ
   onQuickAdd?: () => void
   auxiliaryControls?: ReactNode; userName?: string; paused: boolean; controlsRef: (node: HTMLDivElement | null) => void
 }) {
-  const planDestination = usePlanDestination()
   const navigate = useNavigate()
   const { pathname } = useLocation()
   const [open, setOpen] = useState<string | null>(null)
@@ -50,8 +48,8 @@ export function DesktopNavigation({ inboxCount, discussionsUnread, onSearch, onQ
   ]])
   const destinations = groups.flatMap(([, items]) => items)
   return <nav ref={root} className="page-navigation" aria-label="Main navigation">
-    <NavLink to={planDestination} aria-current={planPeriodForPath(pathname) ? 'page' : undefined} className={planPeriodForPath(pathname) ? 'is-current' : ''}>Planner</NavLink>
-    <NavLink to="/routines">Routines</NavLink>
+    {/* No "Planner" and no "Routines" here (Scott, 2026-09-28): the horizon
+        rail beneath is the main navigation, and Routines lives under More. */}
     <NavLink to="/inbox" aria-label={`Inbox${inboxCount ? `, ${inboxCount} ${inboxCount === 1 ? 'item' : 'items'}` : ''}`}><Inbox size={16} aria-hidden="true" /><span>Inbox</span>{inboxCount > 0 && <span className="navigation-count">{inboxCount}</span>}</NavLink>
     {menu('more', <>More{discussionsUnread > 0 && <span className="navigation-count">{discussionsUnread}</span>}</>, <div className="page-navigation-more">
       <div className="page-navigation-groups">
