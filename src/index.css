@@ -2697,9 +2697,11 @@ div.chooser-action-group { overflow: visible !important; }
   mask-image: linear-gradient(to bottom, black 60%, transparent);
 }
 /* Two layers in the place's own colour: a paler range behind, the town or
-   trees in front. */
+   trees in front. The front layer is solid (mixed into the page colour, not
+   see-through) so the hills sit behind the buildings instead of showing
+   through them (Scott, 2026-09-28). */
 .place-skyline-far { fill: var(--color-primary-300); opacity: 0.45; }
-.place-skyline-near { fill: var(--color-primary-400); opacity: 0.5; }
+.place-skyline-near { fill: color-mix(in srgb, var(--color-primary-400) 62%, var(--color-bg-base)); }
 .place-band-scene {
   position: absolute; left: 50%; top: 0; width: 640px; height: 88px;
   transform: translateX(-50%);
