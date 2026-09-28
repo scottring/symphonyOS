@@ -108,27 +108,64 @@ describe('RoutineCollectionRow dose handling', () => {
     expect(handlers.onCompleteStep).toHaveBeenCalledWith('routine-chin#0', false)
   })
 
-  it('Skip all skips every unresolved dose, leaving completed ones alone', () => {
+  it('"Skip the rest today" (⋯) skips every unresolved dose, leaving completed ones alone', () => {
     const item = collectionItem()
     item.collectionSteps![0].doses[1] = { id: 'routine-chin#1', time: '09:00', completed: true }
     renderRow(item)
-    expandRow()
 
-    fireEvent.click(screen.getByText(/skip all/i))
+    fireEvent.click(screen.getByRole('button', { name: /routine options/i }))
+    fireEvent.click(screen.getByRole('menuitem', { name: /skip the rest today/i }))
     expect(handlers.onSkipStep).toHaveBeenCalledTimes(1)
     expect(handlers.onSkipStep).toHaveBeenCalledWith('routine-chin#0')
     expect(handlers.onCompleteStep).not.toHaveBeenCalled()
   })
+})
 
-  it('Mark all done leaves skipped doses alone', () => {
+// Scott, 2026-09-28: a routine block is a row like a task — its own check
+// circle in the task column, a chevron after the name only when it has
+// steps to show.
+describe('RoutineCollectionRow block circle and expand', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  it('the block circle completes every open dose and leaves skipped ones alone', () => {
     const item = collectionItem()
     item.collectionSteps![0].doses[0] = { id: 'routine-chin#0', time: '07:00', completed: false, skipped: true }
     renderRow(item)
-    expandRow()
-
-    fireEvent.click(screen.getByText(/mark all done/i))
+    fireEvent.click(screen.getByRole('button', { name: 'Mark all of Shoulder HEP done' }))
     expect(handlers.onCompleteStep).toHaveBeenCalledTimes(1)
     expect(handlers.onCompleteStep).toHaveBeenCalledWith('routine-chin#1', true)
+  })
+
+  it('a done block taps back to open', () => {
+    const item = collectionItem()
+    item.collectionSteps![0].doses = item.collectionSteps![0].doses.map(d => ({ ...d, completed: true }))
+    renderRow(item)
+    fireEvent.click(screen.getByRole('button', { name: 'Mark Shoulder HEP not done' }))
+    expect(handlers.onCompleteStep).toHaveBeenCalledWith('routine-chin#0', false)
+    expect(handlers.onCompleteStep).toHaveBeenCalledWith('routine-chin#1', false)
+  })
+
+  it('a block whose one step is itself has no chevron or step count; its name opens it', () => {
+    const item = collectionItem({ title: 'Tidy bedrooms', collectionProgress: { done: 0, total: 1 } })
+    item.collectionSteps = [{ stepId: 't', name: 'Tidy bedrooms', progress: { done: 0, total: 1 }, doses: [{ id: 'routine-t', time: null, completed: false }] }]
+    renderRow(item)
+    const name = screen.getByText('Tidy bedrooms').closest('button')!
+    expect(name).not.toHaveAttribute('aria-expanded')
+    expect(screen.queryByText(/1 step/)).toBeNull()
+    fireEvent.click(name)
+    expect(handlers.onSelect).toHaveBeenCalledTimes(1)
+    fireEvent.click(screen.getByRole('button', { name: 'Mark all of Tidy bedrooms done' }))
+    expect(handlers.onCompleteStep).toHaveBeenCalledWith('routine-t', true)
+  })
+
+  it('a block with steps expands on its name, steps listed one per line', () => {
+    renderRow(collectionItem({ startTime: TOMORROW }))
+    const name = screen.getByText('Shoulder HEP').closest('button')!
+    expect(name).toHaveAttribute('aria-expanded', 'false')
+    fireEvent.click(name)
+    expect(name).toHaveAttribute('aria-expanded', 'true')
+    expect(screen.getByRole('listitem')).toHaveTextContent('Chin Tuck')
+    expect(screen.queryByText(/mark all done/i)).toBeNull()
   })
 })
 
