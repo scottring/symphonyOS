@@ -41,6 +41,10 @@ import { PlanLine, type LineActions, type LineVM } from './PlanLine'
 import { DatesCalendar } from './DatesCalendar'
 import { FocusDeck, CloseOut, type CloseDecision } from './FocusDeck'
 import { FromPaper } from './FromPaper'
+import { makePlanActions } from '@/lib/planning/planActions'
+import { useActionableInstances } from '@/hooks/useActionableInstances'
+import { goalToTaskConversion } from '@/lib/planning/goalConversion'
+import { removeOutcomeToast } from '@/lib/planning/existingActions'
 
 type Level = 'month' | 'season'
 const NOUN: Record<Level, string> = { month: 'Month', season: 'Season' }
@@ -51,7 +55,7 @@ const shortDay = (d: Date) => d.toLocaleDateString('en-US', { weekday: 'short', 
 
 function Inner({ level }: { level: Level }) {
   const navigate = useNavigate()
-  const { tasks, loading, toggleTask, updateTask, addTask, pushTask, keepForward, dropCommitment, updateTasksBulk } = useSupabaseTasks()
+  const { tasks, loading, toggleTask, updateTask, addTask, pushTask, keepForward, dropCommitment, updateTasksBulk, setGoal, setGoalLink } = useSupabaseTasks()
   const gated = useGatedTaskActions({ updateTask, pushTask, updateTasksBulk }, (id) => tasks.find((t) => t.id === id))
   const { layers, soleDomain } = useDomain()
   const { members, getCurrentUserMember } = useFamilyMembers()
@@ -186,6 +190,20 @@ function Inner({ level }: { level: Level }) {
     if (selection) selection.setSelection({ kind: 'task', id })
     else navigate(`/task/${id}`)
   }, [selection, navigate])
+  // The same plan writes v1's row verbs use (Today command, day choice).
+  const { setPlanned, reschedule: rescheduleInstance } = useActionableInstances()
+  const planActions = useMemo(() => makePlanActions({
+    findTask: (id) => tasks.find((t) => t.id === id),
+    updateTask: (id, u) => gated.updateTask(id, u),
+    pushTask: (id, target) => gated.pushTask(id, target),
+    setRoutinePlanned: (id, day, planned) => setPlanned('routine', id, day, planned),
+    rescheduleRoutine: (id, from, when) => rescheduleInstance('routine', id, from, when),
+    notify: (m) => showToast(m, 'warning'),
+  }), [tasks, gated, setPlanned, rescheduleInstance])
+  // A season names the month it hands work to (v1's lowerMonth, S3-01).
+  const lowerMonth = level === 'season'
+    ? (isCurrent ? new Date(today.getFullYear(), today.getMonth(), 1) : new Date(bounds.start.getFullYear(), bounds.start.getMonth(), 1))
+    : null
   const periodPatch = (b: typeof bounds) => (level === 'month' ? { monthStart: b.start } : { seasonStart: b.start })
   const actions: LineActions = {
     done: async (t) => {
@@ -212,6 +230,25 @@ function Inner({ level }: { level: Level }) {
     details: (t) => openTask(t.id),
     rename: (t, title) => { void updateTask(t.id, { title }) },
     openPartOf: (link) => navigate(link.rung === 'year' ? `/goals/${link.id}` : `/task/${link.id}`),
+    setContext: (t, c) => { void gated.updateTask(t.id, { context: c }) },
+    today: async (t) => {
+      if (!(await planActions.chooseTaskDay(t.id, new Date()))) return
+      showToast(`“${t.title}” is on today — any time. ${name}’s plan keeps it.`, 'success', 5000, { label: 'Open Today', onClick: () => navigate('/today') })
+    },
+    intoLower: level === 'month'
+      ? (isCurrent ? { label: 'Into this week', run: async (t) => { await gated.pushTask(t.id, 'week'); showToast(`“${t.title}” → this week · still on ${name}’s plan.`, 'success', 5000, { label: 'Open week', onClick: () => navigate('/week') }) } } : undefined)
+      : lowerMonth ? { label: `Into ${monthName(lowerMonth)}`, run: async (t) => { await gated.updateTask(t.id, { bucket: 'month', monthStart: lowerMonth }); showToast(`“${t.title}” → ${monthName(lowerMonth)} · still on ${name}’s plan.`, 'success', 5000) } } : undefined,
+    toggleGoal: async (t) => {
+      if (!t.isGoal) { await setGoal(t.id, true); showToast(`“${t.title}” is a goal now.`, 'success', 5000, { label: 'Undo', onClick: () => { void updateTask(t.id, { isGoal: false }) } }); return }
+      const check = goalToTaskConversion(t, tasks)
+      if (!check.ok) { showToast(`“${t.title}” stays a goal. ${check.reason}`, 'info', 8000); return }
+      if ((await updateTask(t.id, { isGoal: false })) === false) { showToast(`Couldn’t change “${t.title}”.`, 'error', 5000); return }
+      showToast(`“${t.title}” is a single action again.`, 'success', 5000, { label: 'Undo', onClick: () => { void updateTask(t.id, { isGoal: true }) } })
+    },
+    unlink: async (t) => {
+      const [msg, kind] = removeOutcomeToast(t.title, await setGoalLink(t.id, null, t.goalTaskId ?? null))
+      showToast(msg, kind, 6000)
+    },
   }
   const decide = async (vm: LineVM, d: CloseDecision) => {
     const t = vm.task

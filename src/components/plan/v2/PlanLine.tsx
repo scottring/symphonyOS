@@ -6,8 +6,9 @@
 // folds the line open where it is; "All details" is the existing Details pane.
 
 import { useEffect, useRef, useState } from 'react'
-import { Check, MoreHorizontal, ArrowRight, Moon, X, PanelRight } from 'lucide-react'
-import type { Task } from '@/types/task'
+import { Check, MoreHorizontal, ArrowRight, Moon, X, PanelRight, Target, Sun, ArrowDownRight, Unlink } from 'lucide-react'
+import type { Task, TaskContext } from '@/types/task'
+import { ContextPicker } from '@/components/triage/ContextPicker'
 import type { FamilyMember } from '@/types/family'
 import type { SupportLink } from '@/lib/planning/goalSupport'
 import type { LineFate } from '@/lib/planning/v2/planV2'
@@ -37,6 +38,17 @@ export interface LineActions {
   details: (t: Task) => void
   rename: (t: Task, title: string) => void
   openPartOf: (link: SupportLink) => void
+  // Production's other row verbs (PlanRow / RowActionRail), where a page offers them.
+  /** "Make it a goal" / "Make it a single action". */
+  toggleGoal?: (t: Task) => void
+  /** Down a rung: "Into this week" on a month, "Into October" on a season. */
+  intoLower?: { label: string; run: (t: Task) => void }
+  /** Dated today, chosen for today; the broader commitment stays. */
+  today?: (t: Task) => void
+  /** Only the link to its goal goes. */
+  unlink?: (t: Task) => void
+  /** Life area (Work / Family / Personal), through the gated update. */
+  setContext?: (t: Task, c: TaskContext | undefined) => void
 }
 
 
@@ -65,6 +77,11 @@ export function LineMenu({ vm, actions, nextLabel }: { vm: LineVM; actions: Line
           {!t.completed && vm.fate !== 'carried' && <button role="menuitem" type="button" onClick={pick(actions.carry)}><ArrowRight className="w-3.5 h-3.5" />Carry to {nextLabel}</button>}
           {!t.completed && vm.fate !== 'someday' && actions.someday && <button role="menuitem" type="button" onClick={pick(actions.someday)}><Moon className="w-3.5 h-3.5" />Someday</button>}
           {!t.completed && <button role="menuitem" type="button" onClick={pick(actions.drop)}><X className="w-3.5 h-3.5" />Drop it</button>}
+          {(actions.intoLower || actions.today || actions.toggleGoal || (actions.unlink && t.goalTaskId)) && !t.completed && <div className="pv2-msep" />}
+          {actions.intoLower && !t.completed && !t.isGoal && <button role="menuitem" type="button" onClick={pick(actions.intoLower.run)}><ArrowDownRight className="w-3.5 h-3.5" />{actions.intoLower.label}</button>}
+          {actions.today && !t.completed && !t.isGoal && <button role="menuitem" type="button" onClick={pick(actions.today)}><Sun className="w-3.5 h-3.5" />Do it today</button>}
+          {actions.toggleGoal && !t.completed && <button role="menuitem" type="button" onClick={pick(actions.toggleGoal)}><Target className="w-3.5 h-3.5" />{t.isGoal ? 'Make it a single action' : 'Make it a goal'}</button>}
+          {actions.unlink && t.goalTaskId && <button role="menuitem" type="button" onClick={pick(actions.unlink)}><Unlink className="w-3.5 h-3.5" />Remove from goal</button>}
           <div className="pv2-msep" />
           <button role="menuitem" type="button" onClick={pick(actions.details)}><PanelRight className="w-3.5 h-3.5" />All details</button>
         </div>
@@ -100,6 +117,11 @@ export function PlanLine({ vm, actions, members, nextLabel, open, onToggle, edit
           <button type="button" className="pv2-rb pv2-hov" aria-label={t.completed ? `Reopen ${t.title}` : `Mark ${t.title} done`} title={t.completed ? 'Reopen' : 'Done'} onClick={() => actions.done(t)}>
             <Check className="w-4 h-4" />
           </button>
+          {actions.setContext && (
+            <span className={t.context ? '' : 'pv2-hov'}>
+              <ContextPicker size="sm" value={t.context ?? null} onChange={(c) => actions.setContext!(t, c)} />
+            </span>
+          )}
           {members.length > 0 && (
             <span className={who.length ? '' : 'pv2-hov'}>
               <MultiAssigneeDropdown members={members} selectedIds={who} onSelect={(ids) => actions.assign(t, ids)} size="sm" triggerLabel={`Assign people to ${t.title}`} />

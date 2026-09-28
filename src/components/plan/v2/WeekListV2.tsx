@@ -10,7 +10,8 @@
 // control), and ⋯ for next week / Someday / Drop / All details.
 
 import { useState, type ReactNode } from 'react'
-import { Check } from 'lucide-react'
+import { useDraggable, useDroppable } from '@dnd-kit/core'
+import { Check, GripVertical } from 'lucide-react'
 import type { Task, TaskContext } from '@/types/task'
 import type { FamilyMember } from '@/types/family'
 import { ContextPicker } from '@/components/triage/ContextPicker'
@@ -19,7 +20,7 @@ import { assigneesOf } from '@/lib/planning/v2/planV2'
 import { localYmd } from '@/lib/cadence/config'
 import { LineMenu, type LineActions, type LineVM } from './PlanLine'
 
-export function WeekListV2({ title, lines, weekStart, members, actions, timingControl, onContext, onAdd, goalTitle }: {
+export function WeekListV2({ title, lines, weekStart, members, actions, timingControl, onContext, onAdd, goalTitle, sourceTitle, dragEnabled = true }: {
   title: string
   lines: LineVM[]
   weekStart: Date
@@ -30,6 +31,9 @@ export function WeekListV2({ title, lines, weekStart, members, actions, timingCo
   onContext: (task: Task, context: TaskContext | undefined) => void
   onAdd: (title: string) => Promise<void>
   goalTitle: (task: Task) => string | null
+  /** The month line a week task was made from (source_id), when it has one. */
+  sourceTitle?: (task: Task) => string | null
+  dragEnabled?: boolean
 }) {
   const [draft, setDraft] = useState('')
   const [showDone, setShowDone] = useState(false)
@@ -45,32 +49,13 @@ export function WeekListV2({ title, lines, weekStart, members, actions, timingCo
     { title: 'Completed', rows: showDone ? done : [] },
   ].filter((g) => g.rows.length)
 
-  const row = (vm: LineVM) => {
-    const t = vm.task, goal = goalTitle(t)
-    return (
-      <li key={t.id} className={`pv2-wl-row${t.completed ? ' is-done' : ''}`}>
-        <button type="button" className={`pv2-wl-check${t.completed ? ' is-on' : ''}`} onClick={() => actions.done(t)}
-          aria-label={t.completed ? `Mark ${t.title} not done` : `Complete ${t.title}`}>
-          {t.completed && <Check className="h-2.5 w-2.5" strokeWidth={3} aria-hidden="true" />}
-        </button>
-        <div className="min-w-0 flex-1">
-          <div className="flex items-start gap-2">
-            <button type="button" className="pv2-wl-title" onClick={() => actions.details(t)}>{t.title}</button>
-            <LineMenu vm={vm} actions={actions} nextLabel="next week" />
-          </div>
-          {goal && <span className="pv2-wl-goal"><span className="pv2-goal is-tiny" aria-hidden="true" />{goal}</span>}
-          <div className="pv2-wl-tools">
-            <ContextPicker size="sm" value={t.context ?? null} onChange={(c) => onContext(t, c)} />
-            {members.length > 0 && <MultiAssigneeDropdown members={members} selectedIds={assigneesOf(t)} onSelect={(ids) => actions.assign(t, ids)} size="sm" triggerLabel={`Assign people to ${t.title}`} />}
-            {timingControl && <span className="min-w-0">{timingControl(t)}</span>}
-          </div>
-        </div>
-      </li>
-    )
-  }
-
+  // The list takes things back: a day's task dropped here loses its day and
+  // stays this week (useWeekDragDrop, kind 'weekList').
+  const { setNodeRef: dropRef, isOver } = useDroppable({ id: 'week-list', data: { kind: 'weekList' }, disabled: !dragEnabled })
+  const row = (vm: LineVM) => <Card key={vm.task.id} vm={vm} actions={actions} members={members} timingControl={timingControl}
+    onContext={onContext} goal={goalTitle(vm.task)} source={sourceTitle?.(vm.task) ?? null} dragEnabled={dragEnabled} />
   return (
-    <section aria-label="This week's list" className="pv2-wl">
+    <section ref={dropRef} aria-label="This week's list" className={`pv2-wl${isOver ? ' is-over' : ''}`}>
       <div className="pv2-colh">{title}</div>
       {!open.length && !done.length && <p className="pv2-hint">Nothing on this week’s list yet. “Plan this week” lets you choose from the month.</p>}
       {groups.map((g) => (
@@ -86,5 +71,43 @@ export function WeekListV2({ title, lines, weekStart, members, actions, timingCo
         <input value={draft} onChange={(e) => setDraft(e.target.value)} placeholder="Add something for this week" aria-label="Add to this week" />
       </form>
     </section>
+  )
+}
+
+// A card drags onto a day with the week's own chip protocol ('pool:<id>',
+// {kind:'chip'} → useWeekDragDrop: an all-day date on that day, past days
+// refused, Undo offered; WeekViewV2 already draws its floating pill).
+function Card({ vm, actions, members, timingControl, onContext, goal, source, dragEnabled }: {
+  vm: LineVM; actions: LineActions; members: FamilyMember[]
+  timingControl?: (task: Task) => ReactNode
+  onContext: (task: Task, context: TaskContext | undefined) => void
+  goal: string | null; source: string | null; dragEnabled: boolean
+}) {
+  const t = vm.task
+  const movable = dragEnabled && !t.completed
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: `pool:${t.id}`, data: { kind: 'chip', taskId: t.id }, disabled: !movable })
+  return (
+    <li ref={setNodeRef} className={`pv2-wl-row${t.completed ? ' is-done' : ''}${movable ? ' is-card' : ''}${isDragging ? ' is-dragging' : ''}`}>
+      {movable && <span className="pv2-grip" {...listeners} {...attributes} aria-label={`Drag ${t.title} onto a day`} title="Drag onto a day"><GripVertical className="h-3.5 w-3.5" /></span>}
+      <button type="button" className={`pv2-wl-check${t.completed ? ' is-on' : ''}`} onClick={() => actions.done(t)}
+        aria-label={t.completed ? `Mark ${t.title} not done` : `Complete ${t.title}`}>
+        {t.completed && <Check className="h-2.5 w-2.5" strokeWidth={3} aria-hidden="true" />}
+      </button>
+      {/* Just the words (Scott, 2026-09-28: "perhaps just the title is
+          warranted"). What it serves is its tooltip; life area, people and
+          when come up on hover or focus, beside ⋯. */}
+      <div className="min-w-0 flex-1">
+        <div className="flex items-start gap-2">
+          <button type="button" className="pv2-wl-title" onClick={() => actions.details(t)}
+            title={[goal && `Toward “${goal}”`, source && `From “${source}”`].filter(Boolean).join(' · ') || undefined}>{t.title}</button>
+          <LineMenu vm={vm} actions={actions} nextLabel="next week" />
+        </div>
+        <div className="pv2-wl-tools">
+          <ContextPicker size="sm" value={t.context ?? null} onChange={(c) => onContext(t, c)} />
+          {members.length > 0 && <MultiAssigneeDropdown members={members} selectedIds={assigneesOf(t)} onSelect={(ids) => actions.assign(t, ids)} size="sm" triggerLabel={`Assign people to ${t.title}`} />}
+          {timingControl && <span className="min-w-0">{timingControl(t)}</span>}
+        </div>
+      </div>
+    </li>
   )
 }

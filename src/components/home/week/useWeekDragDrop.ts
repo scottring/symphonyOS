@@ -6,6 +6,7 @@ import type { Routine } from '@/types/actionable'
 import { localYmd } from '@/lib/cadence/config'
 import { showToast } from '@/hooks/useToast'
 import { findEventByItemId, eventItemKey } from '@/types/timeline'
+import { timingRemoval } from '@/lib/planning/planActions'
 
 // Task updates may include endTime (timed duration) even though it's not yet
 // on the base Task type — the DB layer accepts it via the update handler.
@@ -109,6 +110,27 @@ export function useWeekDragDrop(args: UseWeekDragDropArgs): UseWeekDragDropResul
     // and say why; a block already on the grid may still be moved anywhere.
     if (activeData.kind === 'chip' && overData.dayIso && isPastDay(overData.dayIso)) {
       showToast('That day has passed — drop it on today or later', 'warning')
+      return
+    }
+
+    // Dropped back on the week's list (v2): off its day, still this week —
+    // "Any day" again. The day comes off the way the timing menu's "Remove
+    // the day" takes it off; the week is (re)stated, so a task that was only
+    // ever dated joins the list rather than falling to the Inbox.
+    if (overData.kind === 'weekList') {
+      const taskId =
+        activeData.kind === 'chip'
+          ? activeData.taskId
+          : activeData.itemId?.startsWith('task-')
+          ? activeData.itemId.slice('task-'.length)
+          : undefined
+      const task = taskId ? tasks.find((t) => t.id === taskId) : undefined
+      if (!task || !task.scheduledFor) return
+      const { updates, previous } = timingRemoval(task, 'day')
+      void onUpdateTask(task.id, { ...updates, bucket: 'week', weekStart: a.weekStart })
+      a.pushAction?.(`“${task.title}” is back on the week’s list`, () => {
+        void onUpdateTask(task.id, { ...previous, bucket: task.bucket })
+      })
       return
     }
 

@@ -3010,6 +3010,22 @@ div.chooser-action-group { overflow: visible !important; }
 .pv2-wl-h { margin: 12px 0 4px; font: 500 10.5px var(--pv2-num, 'Jost'); letter-spacing: .14em; text-transform: uppercase; color: var(--color-neutral-500); }
 .pv2-wl-row { display: flex; gap: 10px; align-items: flex-start; padding: 8px 0; border-top: 1px solid var(--color-neutral-100); }
 .pv2-wl-row:first-child { border-top: 0; }
+/* Cards: picked up by the grip and dropped on a day. */
+.pv2-wl-row.is-card { margin: 6px -8px; padding: 8px 8px 8px 4px; border: 1px solid var(--color-neutral-200); border-radius: 10px; background: var(--color-bg-elevated); }
+.pv2-wl-row.is-card:hover { border-color: var(--color-neutral-300); box-shadow: 0 6px 16px -12px rgb(0 0 0 / .3); }
+.pv2-wl-row.is-dragging { opacity: .4; }
+.pv2-grip { flex: none; margin-top: 2px; color: var(--color-neutral-300); cursor: grab; touch-action: none; }
+.pv2-wl-row:hover .pv2-grip { color: var(--color-neutral-500); }
+/* Compact rows: the title alone until the pointer or focus is on it. */
+.pv2-wl.is-over { outline: 2px dashed var(--color-primary-300); outline-offset: 4px; background: var(--color-primary-50); }
+@media (hover: hover) {
+  .pv2-wl-row.is-card .pv2-wl-tools { display: none; }
+  .pv2-wl-row.is-card:hover .pv2-wl-tools, .pv2-wl-row.is-card:focus-within .pv2-wl-tools { display: flex; }
+  :root.plan-v2 .journal-entry-sub { display: none; }
+  :root.plan-v2 .journal-entry-when { opacity: 0; transition: opacity .12s; }
+  :root.plan-v2 li:hover > .journal-entry-when, :root.plan-v2 li:focus-within > .journal-entry-when { opacity: 1; }
+}
+.pv2-refacts { display: inline-flex; gap: 10px; flex: none; }
 .pv2-wl-check { flex: none; width: 16px; height: 16px; margin-top: 3px; border-radius: 50%; border: 1.5px solid var(--color-neutral-400); display: grid; place-items: center; color: #fff; }
 .pv2-wl-check.is-on { background: var(--color-primary-600); border-color: var(--color-primary-600); }
 .pv2-wl-title { display: block; width: 100%; text-align: left; font-size: 14.5px; line-height: 1.4; color: var(--color-neutral-900); overflow-wrap: anywhere; }

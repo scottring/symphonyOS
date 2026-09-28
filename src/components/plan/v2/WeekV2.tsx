@@ -30,13 +30,15 @@ import type { LineActions, LineVM } from './PlanLine'
 import { FocusDeck, CloseOut, type CloseDecision } from './FocusDeck'
 import { FromPaper } from './FromPaper'
 import { WeekListV2 } from './WeekListV2'
+import { makePlanActions } from '@/lib/planning/planActions'
+import { useActionableInstances } from '@/hooks/useActionableInstances'
 import { useDomain } from '@/hooks/useDomain'
 import type { TaskContext } from '@/types/task'
 
 const DAY = 86_400_000
 const shortDay = (d: Date) => d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
 
-export function WeekV2({ tasks, weekStart, meId, isCurrent, days, onSelectTask, timingControl }: {
+export function WeekV2({ tasks, weekStart, meId, isCurrent, days, onSelectTask, timingControl, dragEnabled = true }: {
   /** Layer-filtered tasks, as the week receives them. */
   tasks: Task[]
   weekStart: Date
@@ -48,6 +50,8 @@ export function WeekV2({ tasks, weekStart, meId, isCurrent, days, onSelectTask, 
   list?: ReactNode
   /** The week's own "when" control, as WeekViewV2 builds it. */
   timingControl?: (task: Task) => ReactNode
+  /** Cards on the list drag onto the days (off on touch-width layouts). */
+  dragEnabled?: boolean
   /** The journal of days, as WeekViewV2 builds it. */
   days: ReactNode
   onSelectTask: (id: string) => void
@@ -58,6 +62,15 @@ export function WeekV2({ tasks, weekStart, meId, isCurrent, days, onSelectTask, 
   const gated = useGatedTaskActions({ updateTask, pushTask, updateTasksBulk }, (id) => tasks.find((t) => t.id === id))
   const { members } = useFamilyMembers()
   const { soleDomain } = useDomain()
+  const { setPlanned, reschedule: rescheduleInstance } = useActionableInstances()
+  const planActions = useMemo(() => makePlanActions({
+    findTask: (id) => tasks.find((t) => t.id === id),
+    updateTask: (id, u) => gated.updateTask(id, u),
+    pushTask: (id, target) => gated.pushTask(id, target),
+    setRoutinePlanned: (id, day, planned) => setPlanned('routine', id, day, planned),
+    rescheduleRoutine: (id, from, when) => rescheduleInstance('routine', id, from, when),
+    notify: (m) => showToast(m, 'warning'),
+  }), [tasks, gated, setPlanned, rescheduleInstance])
   const session = usePlanningSession('weekly', weekToken(weekStart))
   const [view, setViewState] = useState<PlanView>(() => readPlanView('week'))
   const setView = (v: PlanView) => { setViewState(v); writePlanView('week', v) }
@@ -87,6 +100,7 @@ export function WeekV2({ tasks, weekStart, meId, isCurrent, days, onSelectTask, 
     details: (t) => onSelectTask(t.id),
     rename: (t, title) => { void updateTask(t.id, { title }) },
     openPartOf: (link) => navigate(`/task/${link.id}`),
+    today: async (t) => { if (await planActions.chooseTaskDay(t.id, new Date())) showToast(`“${t.title}” is on today — any time.`, 'success', 5000) },
   }
 
   const decide = async (vm: LineVM, d: CloseDecision) => {
@@ -122,11 +136,18 @@ export function WeekV2({ tasks, weekStart, meId, isCurrent, days, onSelectTask, 
   // (goal_task_id), the rule the week's own list and the month page follow.
   const [stepFor, setStepFor] = useState<string | null>(null)
   const [stepDraft, setStepDraft] = useState('')
-  const addStep = async (goal: Task, title: string) => {
-    const id = await addTask(title, undefined, undefined, undefined, { bucket: 'week', weekStart, goalTaskId: goal.id, context: goal.context ?? undefined, assignedTo: meId ?? undefined })
+  // A child of a month line, into this week (Scott, 2026-09-28: "spawn a child
+  // task which then creates a new list item in this week's list"). Under a
+  // goal it is the goal's next step (goal_task_id). Under a plain line it is a
+  // new week task that remembers where it came from (source_id — "copied down
+  // from", the cascade link) and serves the same goal; a subtask would not do,
+  // because subtasks never appear on a week's list.
+  const addStep = async (parent: Task, title: string) => {
+    const link = parent.isGoal ? { goalTaskId: parent.id } : { sourceId: parent.id, goalTaskId: parent.goalTaskId }
+    const id = await addTask(title, undefined, undefined, undefined, { bucket: 'week', weekStart, ...link, context: parent.context ?? undefined, assignedTo: meId ?? undefined })
     if (!id) return
     setStepFor(null); setStepDraft('')
-    showToast(`“${title}” → this week, as a step toward “${goal.title}”.`, 'success', 5000)
+    showToast(parent.isGoal ? `“${title}” → this week, as a step toward “${parent.title}”.` : `“${title}” → this week, from “${parent.title}”.`, 'success', 5000)
   }
   const takeIn = async (t: Task) => {
     await gated.updateTask(t.id, { bucket: 'week', weekStart })
@@ -186,7 +207,9 @@ export function WeekV2({ tasks, weekStart, meId, isCurrent, days, onSelectTask, 
                 lines={lines} weekStart={weekStart} members={members} actions={actions} timingControl={timingControl}
                 onContext={(t, c: TaskContext | undefined) => { void gated.updateTask(t.id, { context: c }) }}
                 onAdd={async (title) => { await addTask(title, undefined, undefined, undefined, { bucket: 'week', weekStart, assignedTo: meId ?? undefined, context: soleDomain ?? undefined }) }}
-                goalTitle={(t) => (t.goalTaskId ? tasks.find((x) => x.id === t.goalTaskId)?.title ?? null : null)} />
+                goalTitle={(t) => (t.goalTaskId ? tasks.find((x) => x.id === t.goalTaskId)?.title ?? null : null)}
+                sourceTitle={(t) => (t.sourceId ? tasks.find((x) => x.id === t.sourceId)?.title ?? null : null)}
+                dragEnabled={dragEnabled} />
             </div>
           </div>
           {view === 'ref' && (
@@ -197,12 +220,14 @@ export function WeekV2({ tasks, weekStart, meId, isCurrent, days, onSelectTask, 
                   <li key={t.id} className="pv2-rrow pv2-rrow-sans">
                     {t.isGoal ? <span className="pv2-goal is-small" aria-hidden="true" /> : <span className="pv2-dash" style={{ marginTop: 10 }} aria-hidden="true" />}
                     <button type="button" className="flex-1 text-left" onClick={() => onSelectTask(t.id)}>{t.title}</button>
-                    {meeting && (t.isGoal
-                      ? <button type="button" className="pv2-addbtn" onClick={() => { setStepFor(t.id); setStepDraft(t.title) }} aria-label={`Add a next step for ${t.title} to this week`}>+ Next step</button>
-                      : <button type="button" className="pv2-addbtn" onClick={() => void takeIn(t)} aria-label={`Add ${t.title} to this week`}>+ This week</button>)}
+                    <span className="pv2-refacts">
+                      {!t.isGoal && <button type="button" className="pv2-addbtn" onClick={() => void takeIn(t)} aria-label={`Add ${t.title} to this week`}>+ This week</button>}
+                      <button type="button" className="pv2-addbtn" onClick={() => { setStepFor(t.id); setStepDraft(t.isGoal ? t.title : '') }}
+                        aria-label={`Add a ${t.isGoal ? 'next step' : 'step'} for ${t.title} to this week`}>{t.isGoal ? '+ Next step' : '+ Step'}</button>
+                    </span>
                     {stepFor === t.id && (
                       <form className="pv2-stepform" onSubmit={(e) => { e.preventDefault(); const v = stepDraft.trim(); if (v) void addStep(t, v) }}>
-                        <label className="pv2-hint" htmlFor={`step-${t.id}`}>What’s the next step?</label>
+                        <label className="pv2-hint" htmlFor={`step-${t.id}`}>{t.isGoal ? 'What’s the next step?' : `A step of “${t.title}” for this week`}</label>
                         <input id={`step-${t.id}`} autoFocus className="pv2-input" value={stepDraft} onChange={(e) => setStepDraft(e.target.value)}
                           onKeyDown={(e) => { if (e.key === 'Escape') setStepFor(null) }} />
                         <div className="pv2-acts"><button type="submit" className="pv2-btn">Add to this week</button><button type="button" className="pv2-link pv2-quiet" onClick={() => setStepFor(null)}>Cancel</button></div>
