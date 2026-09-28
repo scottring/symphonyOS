@@ -34,7 +34,8 @@ describe('statusMaps', () => {
     expect(m.size).toBe(1)
   })
   it('visible routines: show_on_timeline!==false, and hideRoutines drops everyday', () => {
-    const daily = { id: 'd', visibility: 'active', show_on_timeline: true, recurrence_pattern: { type: 'daily' } } as unknown as Routine
+    // Show in Today not positively set (null): the generic hide-daily sweep applies.
+    const daily = { id: 'd', visibility: 'active', show_on_timeline: null, recurrence_pattern: { type: 'daily' } } as unknown as Routine
     const weekly = { id: 'w', visibility: 'active', show_on_timeline: true, recurrence_pattern: { type: 'weekly', days: ['tue'] } } as unknown as Routine
     const hidden = { id: 'h', visibility: 'active', show_on_timeline: false, recurrence_pattern: { type: 'daily' } } as unknown as Routine
     expect(selectVisibleRoutines([daily, weekly, hidden], { date: DATE, prefs: { hideRoutines: false, layers: ALL_LAYERS } }).map(r => r.id)).toEqual(['d', 'w'])
@@ -43,15 +44,20 @@ describe('statusMaps', () => {
   it('hideRoutines keeps collection parent and its steps visible when hide-daily is ON', () => {
     const parent = { id: 'col-parent', visibility: 'active', show_on_timeline: true, recurrence_pattern: { type: 'daily' } } as unknown as Routine
     const step = { id: 'col-step', visibility: 'active', show_on_timeline: true, recurrence_pattern: { type: 'daily' }, parent_routine_id: 'col-parent', times_per_day: ['09:00'] } as unknown as Routine
-    const plainDaily = { id: 'plain', visibility: 'active', show_on_timeline: true, recurrence_pattern: { type: 'daily' } } as unknown as Routine
+    const plainDaily = { id: 'plain', visibility: 'active', show_on_timeline: null, recurrence_pattern: { type: 'daily' } } as unknown as Routine
     const result = selectVisibleRoutines([parent, step, plainDaily], { date: DATE, prefs: { hideRoutines: true, layers: ALL_LAYERS } })
     const ids = result.map(r => r.id)
     expect(ids).toContain('col-parent')
     expect(ids).toContain('col-step')
     expect(ids).not.toContain('plain')
   })
+  it('hideRoutines yields to Show in Today positively ON (Scott, 2026-09-27)', () => {
+    const on = { id: 'on', visibility: 'active', show_on_timeline: true, recurrence_pattern: { type: 'daily' } } as unknown as Routine
+    const unsaid = { id: 'un', visibility: 'active', show_on_timeline: null, recurrence_pattern: { type: 'daily' } } as unknown as Routine
+    expect(selectVisibleRoutines([on, unsaid], { date: DATE, prefs: { hideRoutines: true, layers: ALL_LAYERS } }).map(r => r.id)).toEqual(['on'])
+  })
   it('hideRoutines keeps pinned and dosed everyday routines on Today', () => {
-    const plainDaily = { id: 'd', visibility: 'active', show_on_timeline: true, recurrence_pattern: { type: 'daily' } } as unknown as Routine
+    const plainDaily = { id: 'd', visibility: 'active', show_on_timeline: null, recurrence_pattern: { type: 'daily' } } as unknown as Routine
     const pinned = { id: 'p', visibility: 'active', show_on_timeline: true, recurrence_pattern: { type: 'daily' }, pin_to_timeline: true } as unknown as Routine
     const dosed = { id: 'x', visibility: 'active', show_on_timeline: true, recurrence_pattern: { type: 'daily' }, times_per_day: ['09:00', '18:00'] } as unknown as Routine
     // With hideRoutines on, the plain daily is swept but pinned + dosed survive.

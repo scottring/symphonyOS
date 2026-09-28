@@ -197,6 +197,9 @@ describe('CascadingRiverView responds to the "hide daily routines" toggle', () =
       name: 'Daily Routine',
       assigned_to: 'scott',
       time_of_day: '09:00',
+      // Show in Today not positively set: the generic sweep applies (an ON
+      // setting wins over it on a due day — routineUtils.resolveRoutine).
+      show_on_timeline: null as unknown as boolean,
     }) // factory default recurrence: daily, unpinned
 
     render(<CascadingRiverView {...BASE_PROPS} routines={[routine]} />)
@@ -224,6 +227,9 @@ describe('CascadingRiverView responds to the "hide daily routines" toggle', () =
       name: 'Daily Routine',
       assigned_to: 'scott',
       time_of_day: '09:00',
+      // Show in Today not positively set: the generic sweep applies (an ON
+      // setting wins over it on a due day — routineUtils.resolveRoutine).
+      show_on_timeline: null as unknown as boolean,
     }) // factory default recurrence: daily, unpinned
     const pinned = createMockRoutine({
       name: 'Pinned Med Routine',

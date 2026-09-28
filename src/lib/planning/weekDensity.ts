@@ -36,7 +36,7 @@ import type { TimelineItem } from '@/types/timeline'
 import { localYmd } from '@/lib/cadence/config'
 import { focusDays } from '@/lib/placement/model'
 import { eventDays, isMultiDayEvent } from '@/lib/week/journalSpread'
-import { isTimelineObligation } from '@/lib/routineUtils'
+import { isTimelineObligation, isDayBoundRoutine } from '@/lib/routineUtils'
 import { dayDensity, type DayDensity, type DensityItem } from './dayDensity'
 
 /**
@@ -64,13 +64,16 @@ export function routineDayState(
   dayKey: string,
   item: Pick<TimelineItem, 'startTime' | 'originalRoutine'>,
   instances: readonly ActionableInstance[],
-): { completed: boolean; planned: boolean; pinned: boolean; counts: boolean } {
+): { completed: boolean; planned: boolean; pinned: boolean; dayBound: boolean; counts: boolean } {
   const instance = instances.find((i) => i.entity_type === 'routine' && i.entity_id === routineId && i.date === dayKey)
   const completed = instance?.status === 'completed'
   const planned = instance?.planned_on === dayKey
   // Through the shared resolver, never by reading the column here.
   const pinned = !!item.originalRoutine && isTimelineObligation(item.originalRoutine)
-  return { completed, planned, pinned, counts: !!item.startTime || planned || pinned || completed }
+  // Show in Today on, and its rule names this day: one of the day's entries,
+  // untimed — exactly as Today draws it (dayPlan.ts, isDayBoundRoutine).
+  const dayBound = !!item.originalRoutine && isDayBoundRoutine(item.originalRoutine)
+  return { completed, planned, pinned, dayBound, counts: !!item.startTime || planned || pinned || dayBound || completed }
 }
 
 /** The routine id inside a week item's `routine-<id>-day<n>` key. */

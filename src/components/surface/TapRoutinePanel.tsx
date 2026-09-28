@@ -14,6 +14,7 @@ import { TargetSection } from './sections/TargetSection'
 import { ContextPicker } from '@/components/triage/ContextPicker'
 import { MultiAssigneeDropdown } from '@/components/family'
 import { RoutineScheduleEditor } from '@/components/routine/RoutineScheduleEditor'
+import { namesDueDays } from '@/lib/routineUtils'
 import { RoutineStepsSection } from './sections/RoutineStepsSection'
 import { PanelAttachments } from './sections/PanelAttachments'
 import { ExtractSteps } from '@/components/routine/ExtractSteps'
@@ -228,9 +229,17 @@ export function TapRoutinePanel(props: TapRoutinePanelProps) {
               </button>
             </div>
             <p className="mt-1 text-xs text-neutral-400">
-              {onToday
-                ? 'Takes a row on Today and the week grid at its time.'
-                : "Still runs, still on the kitchen wall — it just doesn't take a row on Today or the week grid."}
+              {/* Said as it behaves (dayPlan.ts): a time puts it at that time;
+                  a rule naming its days puts it on each of them, untimed; a
+                  rule that leaves the day open (the weekend window, "since
+                  last") is offered on Today to choose. */}
+              {!onToday
+                ? "Still runs, still on the kitchen wall — it just doesn't take a row on Today or the week grid."
+                : routine.time_of_day
+                  ? 'Takes a row on Today and the week grid at its time.'
+                  : namesDueDays(routine.recurrence_pattern)
+                    ? 'On Today and the week on each day it’s due — no time needed.'
+                    : 'Offered on Today to choose — it has no set day.'}
             </p>
           </div>
         )}

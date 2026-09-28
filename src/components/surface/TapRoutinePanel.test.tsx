@@ -92,6 +92,23 @@ describe('TapRoutinePanel', () => {
     expect(screen.getByText(/still on the kitchen wall/i)).toBeInTheDocument()
   })
 
+  it('On Today says what it will actually do: at its time, on its day, or offered to choose', () => {
+    const say = (r: Routine) => {
+      const { unmount } = render(<TapRoutinePanel routine={r} onClose={vi.fn()} onNotesChange={vi.fn()} onContextChange={vi.fn()} onVisibilityChange={vi.fn()} onShowOnTodayChange={vi.fn()} />)
+      const text = document.body.textContent ?? ''
+      unmount()
+      return text
+    }
+    expect(say(routine)).toMatch(/at its time/)
+    const onDays = /On Today and the week on each day it’s due — no time needed/
+    expect(say({ ...routine, time_of_day: null, recurrence_pattern: { type: 'weekly', days: ['sun'] } })).toMatch(onDays)
+    expect(say({ ...routine, time_of_day: null, recurrence_pattern: { type: 'daily' } })).toMatch(onDays)
+    expect(say({ ...routine, time_of_day: null, recurrence_pattern: { type: 'weekly', days: ['tue', 'thu'] } })).toMatch(onDays)
+    expect(say({ ...routine, time_of_day: null, recurrence_pattern: { type: 'weekly', days: ['sat', 'sun'] } })).toMatch(onDays)
+    expect(say({ ...routine, time_of_day: null, recurrence_pattern: { type: 'weekend' } })).toMatch(/Offered on Today to choose/)
+    expect(say({ ...routine, time_of_day: null, recurrence_pattern: { type: 'daily' } })).not.toMatch(/no set day/)
+  })
+
   it('says nothing about Today while the routine is resting off everything', () => {
     render(
       <TapRoutinePanel routine={{ ...routine, visibility: 'reference' }} onClose={vi.fn()} onNotesChange={vi.fn()}

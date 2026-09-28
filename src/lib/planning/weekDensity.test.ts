@@ -147,11 +147,20 @@ describe('the pieces the week journal shares with the tiles', () => {
     expect(routineDayIndex('task-1')).toBe(-1)
   })
 
+  it('a due routine with Show in Today on counts on its day, untimed and unchosen — as Today draws it', () => {
+    const on = { ...routineItem('wp', 0, null), originalRoutine: { id: 'wp', pin_to_timeline: false, show_on_timeline: true, recurrence_pattern: { type: 'weekly', days: ['sun'] } } } as never
+    expect(routineDayState('wp', '2026-10-05', on, [])).toMatchObject({ dayBound: true, counts: true })
+    const unsaid = { ...routineItem('u', 0, null), originalRoutine: { id: 'u', pin_to_timeline: false, show_on_timeline: null, recurrence_pattern: { type: 'weekly', days: ['sun'] } } } as never
+    expect(routineDayState('u', '2026-10-05', unsaid, [])).toMatchObject({ dayBound: false, counts: false })
+    const window = { ...routineItem('w', 0, null), originalRoutine: { id: 'w', pin_to_timeline: false, show_on_timeline: true, recurrence_pattern: { type: 'weekend' } } } as never
+    expect(routineDayState('w', '2026-10-05', window, [])).toMatchObject({ dayBound: false, counts: false })
+  })
+
   it('reports the three facts the journal lanes are built from', () => {
     const state = routineDayState('r', '2026-10-05', routineItem('r', 0, null), [
       instance({ entity_id: 'r', date: '2026-10-05', status: 'completed', planned_on: '2026-10-05' } as never),
     ])
-    expect(state).toEqual({ completed: true, planned: true, pinned: false, counts: true })
+    expect(state).toEqual({ completed: true, planned: true, pinned: false, dayBound: false, counts: true })
   })
 })
 

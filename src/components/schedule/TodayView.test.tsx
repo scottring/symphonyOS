@@ -375,6 +375,8 @@ describe('TodayView', () => {
       const unpinned = createMockRoutine({
         recurrence_pattern: { type: 'daily' },
         time_of_day: null,
+        // Show in Today not positively set: the everyday sweep applies.
+        show_on_timeline: null as unknown as boolean,
       })
       const { user } = renderView({ routines: [unpinned] })
       await openOverflow(user)

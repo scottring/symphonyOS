@@ -152,9 +152,11 @@ export const VISIBILITY_CORPUS: CorpusRow[] = [
   // date: null with hideRoutines: true for the guided weekly session's drag
   // pool, so ambient everyday routines are never offered) and it was
   // previously the only one of the seven non-rung-2 rungs left unpinned.
+  // …but not with no day at all: a planning pool is not "due" (the guided
+  // session's pool keeps sweeping everyday routines, Show in Today or not).
   {
     label: 'date: null with hideRoutines sweeps an everyday routine — rung 7 is unaffected',
-    routine: base({ recurrence_pattern: { type: 'daily' } }),
+    routine: base({ recurrence_pattern: { type: 'daily' }, show_on_timeline: true }),
     ctx: ctx({ date: null, prefs: { hideRoutines: true, layers: ALL_LAYERS } }),
     expected: 'everyday',
   },
@@ -259,17 +261,32 @@ export const VISIBILITY_CORPUS: CorpusRow[] = [
   },
 
   // --- rung 7: everyday ---
+  // Show in Today not positively set (null = "not said"): the generic sweep.
   {
     label: 'daily routine swept by hide-daily',
-    routine: base({ recurrence_pattern: { type: 'daily' } }),
+    routine: base({ recurrence_pattern: { type: 'daily' }, show_on_timeline: null as unknown as boolean }),
     ctx: ctx({ prefs: { hideRoutines: true, layers: ALL_LAYERS } }),
     expected: 'everyday',
   },
   {
     label: 'weekday-only weekly counts as everyday',
-    routine: base({ recurrence_pattern: { type: 'weekly', days: ['mon', 'tue', 'wed', 'thu', 'fri'] } }),
+    routine: base({ recurrence_pattern: { type: 'weekly', days: ['mon', 'tue', 'wed', 'thu', 'fri'] }, show_on_timeline: null as unknown as boolean }),
     ctx: ctx({ prefs: { hideRoutines: true, layers: ALL_LAYERS } }),
     expected: 'everyday',
+  },
+  // Show in Today positively ON wins over the generic sweep on a day it is due
+  // (Scott, 2026-09-27)…
+  {
+    label: 'Show in Today on beats hide-daily on a due day',
+    routine: base({ recurrence_pattern: { type: 'daily' }, show_on_timeline: true }),
+    ctx: ctx({ prefs: { hideRoutines: true, layers: ALL_LAYERS } }),
+    expected: 'shows',
+  },
+  {
+    label: 'Show in Today on beats hide-daily for a Mon–Fri routine on a due day',
+    routine: base({ recurrence_pattern: { type: 'weekly', days: ['mon', 'tue', 'wed', 'thu', 'fri'] }, show_on_timeline: true }),
+    ctx: ctx({ prefs: { hideRoutines: true, layers: ALL_LAYERS } }),
+    expected: 'shows',
   },
   {
     label: 'pin_to_timeline survives hide-daily',

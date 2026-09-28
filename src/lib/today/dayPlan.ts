@@ -7,10 +7,13 @@
  * the day is committed to at a time, plus what was deliberately CHOSEN for it:
  *
  *   main       appointments, anything with a time, pinned-to-timeline routines,
+ *              routines whose own rule names this day ("every Sunday" —
+ *              isDayBoundRoutine; untimed, no second choosing, 2026-09-27),
  *              and tasks/occurrences chosen for this day (`planned_on`)
  *   scheduled  untimed tasks DATED today but not chosen — commitments, never
  *              relabelled optional; they wait in the pin, counted on Today
- *   available  untimed routine occurrences for today — a choice
+ *   available  untimed routine occurrences for today whose rule leaves the day
+ *              open (daily, a Sat+Sun chore, the weekend window) — a choice
  *   week/month this week's and month's lists — a choice, folded by default
  *
  * Every entry appears ONCE, in its most specific group. A chosen entry stays
@@ -40,7 +43,7 @@ import { committedTo } from '@/lib/placement/model'
 import { selectCarriedOver } from './taskPools'
 import { localYmd } from '@/lib/cadence/config'
 import { monthStartOf } from '@/lib/planning/periodPlacement'
-import { isTimelineObligation, type ResolveRoutineCtx } from '@/lib/routineUtils'
+import { isTimelineObligation, isDayBoundRoutine, type ResolveRoutineCtx } from '@/lib/routineUtils'
 import { isFocused } from '@/lib/placement/model'
 import { weekListTasks, weekRowNote, weekRowNoteText } from '@/lib/planning/weekList'
 import { selectStaleWeekPlacements } from './horizons'
@@ -348,8 +351,10 @@ export function selectDayPlan(input: DayPlanInput): DayPlan {
     // Timed: the main list's. Tracked obligations (PT exercises) are pinned to
     // the timeline on purpose. A collection whose time lives on its parent row
     // ("Kids bedtime routine, 7pm", steps untimed) is a timed commitment even
-    // when no step has a time.
-    if (item.startTime || (routine && isTimelineObligation(routine)) || routine?.time_of_day) {
+    // when no step has a time. A routine whose rule names the day ("every
+    // Sunday") is committed to it the same way — on its day, untimed, with no
+    // second choosing (isDayBoundRoutine; 2026-09-27).
+    if (item.startTime || (routine && (isTimelineObligation(routine) || isDayBoundRoutine(routine))) || routine?.time_of_day) {
       if (onDaySeen.has(rid)) continue
       onDaySeen.add(rid)
       const cadence = routine ? routineCadence(routine) : 'Routine'
