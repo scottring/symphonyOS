@@ -19,6 +19,17 @@ type Shape =
 
 interface Scene { far: Shape[]; near: Shape[] }
 
+// Four sails turned off the square — at 0°/90° they read as a cross
+// (Scott, 2026-09-28). Each sail is a thin wedge from the hub to its tip.
+const sails = (cx: number, cy: number, len: number, turn: number): Shape[] =>
+  [0, 90, 180, 270].map((deg) => {
+    const a = ((deg + turn) * Math.PI) / 180
+    const [dx, dy] = [Math.sin(a), -Math.cos(a)]
+    const pt = (along: number, across: number) =>
+      `${(cx + dx * along - dy * across).toFixed(1)},${(cy + dy * along + dx * across).toFixed(1)}`
+    return ['poly', `${pt(0, 0)} ${pt(len, 0)} ${pt(1, 2.5)}`]
+  })
+
 const rects = (xs: Array<[number, number, number]>): Shape[] => xs.map(([x, y, w]) => ['rect', x, y, w])
 
 const SCENES: Record<PlaceId, Scene> = {
@@ -85,7 +96,7 @@ const SCENES: Record<PlaceId, Scene> = {
       ['tree', 178, 66, 11],
       // the barn, the silo and the windmill
       ['gable', 262, 52, 60, 22], ['rect', 326, 36, 16], ['dome', 334, 36, 8],
-      ['rect', 398, 34, 3], ['poly', '399.5,34 399.5,14 402,33'], ['poly', '399.5,34 419,32 401,36'], ['poly', '399.5,34 399,54 397,35'], ['poly', '399.5,34 380,36 398,32'],
+      ['rect', 398, 34, 3], ...sails(399.5, 34, 20, 25),
       ['tree', 470, 66, 11], ['tree', 496, 70, 8],
       ['gable', 540, 70, 26, 9], ['tree', 598, 66, 12], ['tree', 624, 70, 9],
     ],
