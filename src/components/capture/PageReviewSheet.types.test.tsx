@@ -240,3 +240,33 @@ describe('PageReviewSheet — times', () => {
     expect(time.className).not.toMatch(/(^|\s)w-\[/)
   })
 })
+
+describe('PageReviewSheet — changing several lines at once (2026-09-28)', () => {
+  it('selects lines and makes them all goals; the include checkbox is untouched', async () => {
+    const user = userEvent.setup()
+    const { onCommit } = renderSheet([line('Buy a bench'), line('Hang porch plants'), line('Weed')])
+    await user.click(screen.getByRole('button', { name: 'Select several' }))
+    await user.click(screen.getByRole('checkbox', { name: 'Select "Buy a bench"' }))
+    await user.click(screen.getByRole('checkbox', { name: 'Select "Weed"' }))
+    const bar = screen.getByRole('toolbar', { name: 'Change selected lines' })
+    expect(within(bar).getByText('2 selected')).toBeInTheDocument()
+    await user.click(within(bar).getByRole('button', { name: 'Goal or project' }))
+    expect(typeOf('Buy a bench')).toHaveValue('goal')
+    expect(typeOf('Hang porch plants')).toHaveValue('task')
+    expect(typeOf('Weed')).toHaveValue('goal')
+    expect(screen.getByRole('checkbox', { name: 'Include "Hang porch plants"' })).toBeChecked()
+    await user.click(screen.getByRole('button', { name: /add 3 items/i }))
+    const items = onCommit.mock.calls[0][0].items as PlanItem[]
+    expect(items.map((i) => i.title)).toEqual(['Buy a bench', 'Hang porch plants', 'Weed'])
+  })
+
+  it("'Don't add' leaves the selected lines out", async () => {
+    const user = userEvent.setup()
+    const { onCommit } = renderSheet([line('Buy a bench'), line('Weed')])
+    await user.click(screen.getByRole('button', { name: 'Select several' }))
+    await user.click(screen.getByRole('checkbox', { name: 'Select "Weed"' }))
+    await user.click(within(screen.getByRole('toolbar', { name: 'Change selected lines' })).getByRole('button', { name: /Don.t add/ }))
+    await user.click(screen.getByRole('button', { name: /add 1 item/i }))
+    expect((onCommit.mock.calls[0][0].items as PlanItem[]).map((i) => i.title)).toEqual(['Buy a bench'])
+  })
+})
