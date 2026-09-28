@@ -94,7 +94,11 @@ export function RoutineCollectionRow({ item, onSelect, onSelectStep, onCompleteS
           lines up with the tasks and events around it; the chevron sits where
           their check circle does and is the only affordance saying "expands". */}
       <div className="flex items-center gap-3 pl-5 min-w-0">
-        <div className="w-16 shrink-0 text-xs font-medium tabular-nums text-neutral-500">
+        {/* The same column classes a task row uses, so "For today" (which
+            hides the time column) drops it here too — without them the block
+            sat 64px right of the tasks above it and read as nested under
+            the last one (Scott, 2026-09-28). */}
+        <div className={`${gutterLabel ? 'schedule-time-column' : 'schedule-empty-time'} w-16 shrink-0 text-xs font-medium tabular-nums text-neutral-500`}>
           {gutterLabel || <span className="text-neutral-300">—</span>}
         </div>
         <button

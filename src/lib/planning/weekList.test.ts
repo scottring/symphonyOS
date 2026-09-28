@@ -47,8 +47,13 @@ describe('weekRowNote', () => {
       focus: [{ userId: 'me', date: new Date(2026, 9, 6) }],
       commitments: [c('week', LAST, 'carried', WEEK), c('week', WEEK), c('month', new Date(2026, 9, 1))] })
     const n = weekRowNote(t, WEEK, 'me', '2026-10-06')
-    expect(n).toEqual({ origin: 'kept', monthLabel: 'October', dayLabel: 'Thu', pickedToday: true })
-    expect(weekRowNoteText(n)).toBe('kept from last week · Thu · picked for today')
+    expect(n).toEqual({ origin: 'kept', monthLabel: 'October', dayLabel: 'Thu, Oct 8', pickedToday: true })
+    expect(weekRowNoteText(n)).toBe('kept from last week · Thu, Oct 8 · picked for today')
+  })
+  it('a day that came and went with the row open reads as missed, with its date', () => {
+    const t = createMockTask({ id: 'x', bucket: 'timed', scheduledFor: new Date(2026, 9, 5), isAllDay: true, commitments: [c('week', WEEK)] })
+    expect(weekRowNoteText(weekRowNote(t, WEEK, 'me', '2026-10-06'))).toBe('missed Mon, Oct 5')
+    expect(weekRowNoteText(weekRowNote(t, WEEK, 'me', '2026-10-05'))).toBe('Mon, Oct 5')
   })
   it('a month task copied down says "from October"; a plain row says nothing', () => {
     const m = createMockTask({ id: 'm', bucket: 'week', weekStart: WEEK, commitments: [c('week', WEEK), c('month', new Date(2026, 9, 1))] })

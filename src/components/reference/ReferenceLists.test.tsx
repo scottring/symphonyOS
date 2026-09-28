@@ -183,7 +183,7 @@ describe('The Planning panel', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Pin Planning' }))
     fireEvent.click(screen.getByRole('button', { name: 'Pin week list' }))
     const plan = screen.getByRole('region', { name: 'Shelves' })
-    expect(plan).toHaveTextContent("This week's tasks")
+    expect(plan).toHaveTextContent("Still to place")
     expect(plan).toHaveTextContent('Routines')
     expect(screen.getByText('Book a service visit')).toBeInTheDocument()
     expect(planMock.chooseTaskDay).not.toHaveBeenCalled()

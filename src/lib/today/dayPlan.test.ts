@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { selectDayPlan, type DayPlanInput } from './dayPlan'
+import { alreadyPlaced, selectDayPlan, type DayPlanEntry, type DayPlanInput } from './dayPlan'
 import { computeTodayData } from './computeTodayData'
 import { createMockRoutine, createMockTask } from '@/test/mocks/factories'
 import { ALL_LAYERS } from '@/lib/domains'
@@ -268,10 +268,25 @@ describe('toPlan — the week list stays whole (guided planning, Phase 2)', () =
     expect(plan.toPlan.map((e) => [e.id, e.completed])).toEqual([['w2', true]])
   })
 
-  it('a row given a day this week stays, with its day as context', () => {
+  it('a row given a day this week stays, with its date as context — "missed" once the day has passed', () => {
     const t = onWeek({ id: 'w3', bucket: 'timed', scheduledFor: new Date(2026, 8, 17), isAllDay: true })
     const plan = selectDayPlan(input({ tasks: [t] }))
-    expect(plan.toPlan[0]).toMatchObject({ id: 'w3', context: 'Thu' })
+    expect(plan.toPlan[0]).toMatchObject({ id: 'w3', context: 'missed Thu, Sep 17' })
+  })
+
+  // Scott, 2026-09-28: the chooser answers "what still needs a day?".
+  it('alreadyPlaced: picked, dated today or later, or a weekend ahead — not a passed day, not done', () => {
+    const e = (task: Partial<Task>, extra: Partial<DayPlanEntry> = {}): DayPlanEntry =>
+      ({ key: 'task:x', kind: 'task', id: 'x', title: 'x', completed: false, planned: false, group: 'plan', task: onWeek({ id: 'x', ...task }), ...extra })
+    const mon = new Date(2026, 8, 28)
+    expect(alreadyPlaced(e({}), mon)).toBe(false)
+    expect(alreadyPlaced(e({}, { planned: true }), mon)).toBe(true)
+    expect(alreadyPlaced(e({ scheduledFor: new Date(2026, 8, 28, 9) }), mon)).toBe(true)
+    expect(alreadyPlaced(e({ scheduledFor: new Date(2026, 9, 3) }), mon)).toBe(true)
+    expect(alreadyPlaced(e({ scheduledFor: new Date(2026, 8, 27) }), mon)).toBe(false)
+    expect(alreadyPlaced(e({ scheduledFor: new Date(2026, 9, 3) }, { completed: true }), mon)).toBe(false)
+    expect(alreadyPlaced(e({ weekendStart: new Date(2026, 9, 3) }), mon)).toBe(true)
+    expect(alreadyPlaced(e({ weekendStart: new Date(2026, 9, 3) }), new Date(2026, 9, 3))).toBe(false)
   })
 
   it('a month task copied down says where it came from', () => {

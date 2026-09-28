@@ -46,11 +46,11 @@ describe('DayPlanPanel — the Planning panel', () => {
   // Beside a day the panel is Today's chooser (approved white journal,
   // 2026-09-22): two ruled sections, and a quiet foot line instead of a
   // dismissible hint.
-  it('beside a day, is the chooser: "This week\'s tasks" with the week\'s range, a foot line, no dismissible hint', () => {
+  it('beside a day, is the chooser: "Still to place" with the week\'s range, a foot line, no dismissible hint', () => {
     render(<DayPlanPanel plan={plan(1)} day={day} actions={actions} />)
-    expect(screen.getByRole('heading', { name: /This week's tasks/ })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: /Still to place/ })).toBeInTheDocument()
     expect(screen.queryByRole('note')).not.toBeInTheDocument()
-    expect(screen.getByText(/Choices stay on your week's list/)).toBeInTheDocument()
+    expect(screen.getByText(/Tasks with a day move to Already planned/)).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /Browse month plan/ })).toBeNull()
   })
 
@@ -64,7 +64,7 @@ describe('DayPlanPanel — the Planning panel', () => {
   it('beside a day, stays a capped reference', () => {
     const n = PLAN_GROUP_CAP + 4
     render(<DayPlanPanel plan={plan(n)} day={day} actions={actions} />)
-    expect(screen.getByRole('heading', { name: /This week's tasks/ })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: /Still to place/ })).toBeInTheDocument()
     expect(screen.queryByText(`Item ${n}`)).not.toBeInTheDocument()
     expect(screen.getByText(/Show 4 more/)).toBeInTheDocument()
   })
@@ -80,12 +80,43 @@ describe('DayPlanPanel — the Planning panel', () => {
     expect(screen.getByRole('button', { name: 'Choose Take a walk for today' })).toHaveAttribute('aria-pressed', 'false')
   })
 
+  // Scott, 2026-09-28: a row given a day "persisting" in the drawer was
+  // confusing. It leaves "Still to place" and folds under "Already planned";
+  // a day that passed with the row open comes back to place.
+  it('beside a day, rows that already have their day fold under "Already planned"', () => {
+    const p = plan(0)
+    const t = (id: string, extra: Record<string, unknown>) => ({ id, title: id, completed: false, ...extra })
+    p.chooserTasks = [
+      { key: 'task:open', kind: 'task', id: 'open', title: 'No day yet', completed: false, planned: false, group: 'plan', task: t('open', {}) as never },
+      { key: 'task:sat', kind: 'task', id: 'sat', title: 'Poop in yard', completed: false, planned: false, group: 'plan', context: 'Sat, Sep 26', task: t('sat', { scheduledFor: new Date(2026, 8, 26) }) as never },
+      { key: 'task:today', kind: 'task', id: 'today', title: 'Write Ms. K', completed: false, planned: true, group: 'plan', task: t('today', { scheduledFor: day }) as never },
+      { key: 'task:past', kind: 'task', id: 'past', title: 'Dryer duct', completed: false, planned: false, group: 'plan', context: 'missed Thu, Sep 17', task: t('past', { scheduledFor: new Date(2026, 8, 17) }) as never },
+    ]
+    render(<DayPlanPanel plan={p} day={day} actions={actions} />)
+    const toPlace = screen.getByRole('region', { name: /Still to place/ })
+    expect(toPlace).toHaveTextContent('No day yet')
+    expect(toPlace).toHaveTextContent('Dryer duct')
+    expect(toPlace).not.toHaveTextContent('Poop in yard')
+    expect(toPlace).not.toHaveTextContent('Write Ms. K')
+    const placed = screen.getByText('Already planned · 2').closest('details')!
+    expect(placed).toHaveTextContent('Poop in yard')
+    expect(placed).toHaveTextContent('Write Ms. K')
+  })
+
+  it('beside a day, a week whose every row has a day says so instead of "no week tasks"', () => {
+    const p = plan(0)
+    p.chooserTasks = [{ key: 'task:sat', kind: 'task', id: 'sat', title: 'Poop in yard', completed: false, planned: false, group: 'plan', task: { id: 'sat', scheduledFor: new Date(2026, 8, 26) } as never }]
+    render(<DayPlanPanel plan={p} day={day} actions={actions} />)
+    expect(screen.getByText("Every task on this week's list has a day.")).toBeInTheDocument()
+    expect(screen.queryByText(/No week tasks in this view/)).toBeNull()
+  })
+
   it('beside a day, a section folds on its heading without closing the chooser, and the fold is remembered', () => {
     localStorage.removeItem('symphony.chooser.folded')
     const p = plan(2)
     p.chooserRoutines = [{ key: 'routine:r1', kind: 'routine', id: 'r1', title: 'Take a walk', completed: false, planned: false, group: 'available', context: 'Daily routine' }]
     const view = render(<DayPlanPanel plan={p} day={day} actions={actions} />)
-    const tasksHeading = screen.getByRole('button', { name: /This week's tasks/ })
+    const tasksHeading = screen.getByRole('button', { name: /Still to place/ })
     expect(tasksHeading).toHaveAttribute('aria-expanded', 'true')
     fireEvent.click(tasksHeading)
     expect(tasksHeading).toHaveAttribute('aria-expanded', 'false')
@@ -93,10 +124,10 @@ describe('DayPlanPanel — the Planning panel', () => {
     // The other section and the foot are untouched — the chooser is still open.
     fireEvent.click(screen.getByRole('navigation', { name: 'Shelf source' }).querySelector('button:last-child')!)
     expect(screen.getByText('Take a walk')).toBeInTheDocument()
-    expect(screen.getByText(/Choices stay on your week's list/)).toBeInTheDocument()
+    expect(screen.getByText(/Tasks with a day move to Already planned/)).toBeInTheDocument()
     view.unmount()
     render(<DayPlanPanel plan={p} day={day} actions={actions} />)
-    expect(screen.getByRole('button', { name: /This week's tasks/ })).toHaveAttribute('aria-expanded', 'false')
+    expect(screen.getByRole('button', { name: /Still to place/ })).toHaveAttribute('aria-expanded', 'false')
     localStorage.removeItem('symphony.chooser.folded')
   })
 
