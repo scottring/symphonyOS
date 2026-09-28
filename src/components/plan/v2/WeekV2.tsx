@@ -8,7 +8,7 @@
 // It is chrome AROUND the existing week: the journal, the list, drag and drop,
 // add-to-day and the week's planning session are WeekViewV2's, unchanged.
 
-import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useSupabaseTasks } from '@/hooks/useSupabaseTasks'
 import { useGatedTaskActions } from '@/hooks/useGatedTaskActions'
@@ -24,13 +24,14 @@ import { goalOfTask } from '@/lib/planning/goalSupport'
 import { readSeasons } from '@/lib/cadence/seasons'
 import { readCadenceConfig, localYmd } from '@/lib/cadence/config'
 import { weekOfYear } from '@/lib/planning/horizonNumerals'
-import { readPlanView, writePlanView, type PlanView } from '@/lib/planning/v2/planV2'
+import { readPlanView, writePlanView, lineDropUpdates, type PlanView } from '@/lib/planning/v2/planV2'
 import type { Task } from '@/types/task'
 import type { LineActions, LineVM } from './PlanLine'
 import { FocusDeck, CloseOut, type CloseDecision } from './FocusDeck'
 import { FromPaper } from './FromPaper'
 import { WeekListV2 } from './WeekListV2'
-import { makePlanActions } from '@/lib/planning/planActions'
+import { WeekRefShelves } from './RefShelves'
+import { makePlanActions, timingRemoval } from '@/lib/planning/planActions'
 import { useActionableInstances } from '@/hooks/useActionableInstances'
 import { useDomain } from '@/hooks/useDomain'
 import type { TaskContext } from '@/types/task'
@@ -134,8 +135,27 @@ export function WeekV2({ tasks, weekStart, meId, isCurrent, days, onSelectTask, 
   })
   // A goal stays on its month; what goes into the week is its next step
   // (goal_task_id), the rule the week's own list and the month page follow.
-  const [stepFor, setStepFor] = useState<string | null>(null)
-  const [stepDraft, setStepDraft] = useState('')
+  // "+ Next step" / "+ Step" open the new row ON THIS WEEK'S LIST, where it
+  // will live, naming its month line — not a form under the month line
+  // (Scott, 2026-09-28: "it should create it on this week's list and on
+  // hover have a reference to the parent item in the month list").
+  const [childOf, setChildOf] = useState<Task | null>(null)
+  // The month line a hovered week row came from, lit in the month column.
+  const [litParent, setLitParent] = useState<string | null>(null)
+  const parentOf = useCallback((t: Task) => {
+    const id = t.sourceId ?? t.goalTaskId
+    const p = id ? tasks.find((x) => x.id === id) : undefined
+    return p ? { id: p.id, title: p.title, isGoal: !!p.isGoal } : null
+  }, [tasks])
+  // Show the parent where it is: in the month column when it is on screen,
+  // else its details.
+  const showParent = (id: string) => {
+    const el = document.querySelector<HTMLElement>(`[data-ref-id="${id}"]`)
+    if (!el) { onSelectTask(id); return }
+    el.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+    el.classList.remove('is-flash'); void el.offsetWidth; el.classList.add('is-flash')
+  }
+  const openRef = useCallback((_kind: 'task' | 'routine', id: string) => onSelectTask(id), [onSelectTask])
   // A child of a month line, into this week (Scott, 2026-09-28: "spawn a child
   // task which then creates a new list item in this week's list"). Under a
   // goal it is the goal's next step (goal_task_id). Under a plain line it is a
@@ -146,8 +166,13 @@ export function WeekV2({ tasks, weekStart, meId, isCurrent, days, onSelectTask, 
     const link = parent.isGoal ? { goalTaskId: parent.id } : { sourceId: parent.id, goalTaskId: parent.goalTaskId }
     const id = await addTask(title, undefined, undefined, undefined, { bucket: 'week', weekStart, ...link, context: parent.context ?? undefined, assignedTo: meId ?? undefined })
     if (!id) return
-    setStepFor(null); setStepDraft('')
+    setChildOf(null)
     showToast(parent.isGoal ? `“${title}” → this week, as a step toward “${parent.title}”.` : `“${title}” → this week, from “${parent.title}”.`, 'success', 5000)
+  }
+  const takeInEarlier = async (t: Task) => {
+    const undo = timingRemoval(t, 'all').previous
+    if ((await gated.updateTask(t.id, lineDropUpdates(t, { kind: 'week', at: weekStart }))) === false) return
+    showToast(`“${t.title}” → this week, any day.`, 'success', 5000, { label: 'Undo', onClick: () => { void gated.updateTask(t.id, undo) } })
   }
   const takeIn = async (t: Task) => {
     await gated.updateTask(t.id, { bucket: 'week', weekStart })
@@ -207,8 +232,9 @@ export function WeekV2({ tasks, weekStart, meId, isCurrent, days, onSelectTask, 
                 lines={lines} weekStart={weekStart} members={members} actions={actions} timingControl={timingControl}
                 onContext={(t, c: TaskContext | undefined) => { void gated.updateTask(t.id, { context: c }) }}
                 onAdd={async (title) => { await addTask(title, undefined, undefined, undefined, { bucket: 'week', weekStart, assignedTo: meId ?? undefined, context: soleDomain ?? undefined }) }}
-                goalTitle={(t) => (t.goalTaskId ? tasks.find((x) => x.id === t.goalTaskId)?.title ?? null : null)}
-                sourceTitle={(t) => (t.sourceId ? tasks.find((x) => x.id === t.sourceId)?.title ?? null : null)}
+                parentOf={parentOf} onHoverParent={setLitParent} onShowParent={showParent}
+                draftChild={childOf ? { id: childOf.id, title: childOf.title, isGoal: !!childOf.isGoal } : null}
+                onDraftChild={(title) => { if (childOf) void addStep(childOf, title) }} onCancelChild={() => setChildOf(null)}
                 dragEnabled={dragEnabled} />
             </div>
           </div>
@@ -217,26 +243,19 @@ export function WeekV2({ tasks, weekStart, meId, isCurrent, days, onSelectTask, 
               <div className="pv2-colh">{monthName} <small>for reference</small></div>
               {monthRows.length ? (
                 <ul className="pv2-list">{monthRows.map((t) => (
-                  <li key={t.id} className="pv2-rrow pv2-rrow-sans">
+                  <li key={t.id} data-ref-id={t.id} className={`pv2-rrow pv2-rrow-sans${litParent === t.id || childOf?.id === t.id ? ' is-linked' : ''}`}>
                     {t.isGoal ? <span className="pv2-goal is-small" aria-hidden="true" /> : <span className="pv2-dash" style={{ marginTop: 10 }} aria-hidden="true" />}
                     <button type="button" className="flex-1 text-left" onClick={() => onSelectTask(t.id)}>{t.title}</button>
                     <span className="pv2-refacts">
                       {!t.isGoal && <button type="button" className="pv2-addbtn" onClick={() => void takeIn(t)} aria-label={`Add ${t.title} to this week`}>+ This week</button>}
-                      <button type="button" className="pv2-addbtn" onClick={() => { setStepFor(t.id); setStepDraft(t.isGoal ? t.title : '') }}
+                      <button type="button" className="pv2-addbtn" onClick={() => setChildOf(t)}
                         aria-label={`Add a ${t.isGoal ? 'next step' : 'step'} for ${t.title} to this week`}>{t.isGoal ? '+ Next step' : '+ Step'}</button>
                     </span>
-                    {stepFor === t.id && (
-                      <form className="pv2-stepform" onSubmit={(e) => { e.preventDefault(); const v = stepDraft.trim(); if (v) void addStep(t, v) }}>
-                        <label className="pv2-hint" htmlFor={`step-${t.id}`}>{t.isGoal ? 'What’s the next step?' : `A step of “${t.title}” for this week`}</label>
-                        <input id={`step-${t.id}`} autoFocus className="pv2-input" value={stepDraft} onChange={(e) => setStepDraft(e.target.value)}
-                          onKeyDown={(e) => { if (e.key === 'Escape') setStepFor(null) }} />
-                        <div className="pv2-acts"><button type="submit" className="pv2-btn">Add to this week</button><button type="button" className="pv2-link pv2-quiet" onClick={() => setStepFor(null)}>Cancel</button></div>
-                      </form>
-                    )}
                   </li>
                 ))}</ul>
               ) : <p className="pv2-hint">Nothing open on {monthName}’s plan.</p>}
               <button type="button" className="pv2-link" style={{ marginTop: 8 }} onClick={() => navigate(`/month?start=${localYmd(monthStart)}`)}>Open {monthName} →</button>
+              <WeekRefShelves weekStart={weekStart} isCurrent={isCurrent} onOpen={openRef} onTakeIn={(t) => void takeInEarlier(t)} />
             </aside>
           )}
         </div>

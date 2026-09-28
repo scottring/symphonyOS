@@ -54,3 +54,50 @@ export function routinePatterns(routines: readonly Routine[], layers: ReadonlySe
     .filter((r) => !horizon || belongsToHorizon(r, horizon, layers))
     .map((r) => ({ id: r.id, name: r.name, cadence: describeRecurrence(r.recurrence_pattern) }))
 }
+
+/** The horizon a routine's cadence belongs to. A daily rhythm lives on Today
+ *  and is never a planning reference; a weekly one is the week's; monthly the
+ *  month's; quarterly and yearly the season's. Specific dates belong to
+ *  whichever period they fall in (null here — the caller checks the dates). */
+export function routineHorizon(r: Routine): 'day' | 'week' | 'month' | 'season' | null {
+  const p = r.recurrence_pattern
+  switch (p.type) {
+    case 'daily': return 'day'
+    case 'weekly': case 'weekend': return 'week'
+    case 'monthly': return 'month'
+    case 'quarterly': case 'yearly': return 'season'
+    case 'since_last': return p.unit === 'months' ? 'month' : p.unit === 'weeks' ? 'week' : (p.interval ?? 1) >= 7 ? 'week' : 'day'
+    default: return null
+  }
+}
+
+/**
+ * The routines a horizon's reference column lists (Scott, 2026-09-28): only
+ * the ones with NO set time — a weekly "kids tidy their rooms" on Sundays
+ * with no hour is something to plan around; a 7:30 routine is already on the
+ * clock and needs nothing from a planning meeting. Each is listed on its OWN
+ * horizon only, and only when it falls inside the period. A collection's
+ * steps ride with it and are never listed on their own.
+ */
+export function untimedRoutines(
+  routines: readonly Routine[],
+  layers: ReadonlySet<Layer>,
+  horizon: { level: 'week' | 'month' | 'season'; start: Date; end: Date },
+): RoutinePattern[] {
+  return routines
+    .filter((r) => !r.parent_routine_id && !r.time_of_day && !(r.times_per_day?.length))
+    .filter((r) => resolveRoutineEligible(r, { prefs: { hideRoutines: false, layers } }).shows)
+    .filter((r) => {
+      const h = routineHorizon(r)
+      if (h === 'day') return false
+      if (h !== null && h !== horizon.level) return false
+      const p = r.recurrence_pattern
+      // No particular day to match: a flexible month, a relative rhythm.
+      if (p.type === 'since_last' || ((p.type === 'monthly' || p.type === 'quarterly') && !p.day_of_month)) return h === horizon.level
+      for (const date = new Date(horizon.start); date < horizon.end; date.setDate(date.getDate() + 1)) {
+        if (resolveRoutine(r, { date, prefs: { hideRoutines: false, layers } }).shows) return true
+      }
+      return false
+    })
+    .map((r) => ({ id: r.id, name: r.name, cadence: describeRecurrence(r.recurrence_pattern) }))
+}

@@ -45,6 +45,7 @@ import { readCadenceConfig, weekStartAnchor } from '@/lib/cadence/config'
 import { weekOfYear } from '@/lib/planning/horizonNumerals'
 import { FocusDeck, CloseOut, type CloseDecision } from './FocusDeck'
 import { FromPaper } from './FromPaper'
+import { PeriodRefRoutines } from './RefShelves'
 import { makePlanActions, timingRemoval } from '@/lib/planning/planActions'
 import { useActionableInstances } from '@/hooks/useActionableInstances'
 import { goalToTaskConversion } from '@/lib/planning/goalConversion'
@@ -419,6 +420,8 @@ function Inner({ level }: { level: Level }) {
           </li>
         ))}</ul>
       ) : <p className="pv2-hint">Nothing written for {aboveName}. That’s fine.</p>}
+      {/* What the Shelves held for a month or season, folded in here. */}
+      <div className="pv2-refshelves"><PeriodRefRoutines level={level} start={bounds.start} end={bounds.end} noun={NOUN[level].toLowerCase()} /></div>
     </aside>
   )
   const calendar = level === 'month' ? (

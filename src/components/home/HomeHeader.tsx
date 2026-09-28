@@ -246,7 +246,8 @@ export function HomeHeader(props: HomeHeaderProps) {
         title={label.long}
         numeral={planV2Enabled() ? String(weekOfYear(weekStart, readCadenceConfig().weekStartsOn)) : undefined}
         // Shelves beside the dates, not on a row of its own (2026-09-23).
-        action={<ShelvesButton weekPage={weekStart} />}
+        // v2: no Shelves here — what they held is in the month column.
+        action={planV2Enabled() ? undefined : <ShelvesButton weekPage={weekStart} />}
         subline={customInputs}
         // The hourly grid needs desk width; below lg the journal is the week.
         aside={props.weekMode && props.onWeekModeChange

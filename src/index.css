@@ -3025,6 +3025,27 @@ div.chooser-action-group { overflow: visible !important; }
   :root.plan-v2 .journal-entry-when { opacity: 0; transition: opacity .12s; }
   :root.plan-v2 li:hover > .journal-entry-when, :root.plan-v2 li:focus-within > .journal-entry-when { opacity: 1; }
 }
+/* A week row's month line, on hover; the line itself lights in the column. */
+.pv2-wl-parent { display: none; align-items: center; gap: 4px; margin-top: 2px; max-width: 100%; font-size: 12px; color: var(--color-neutral-500); text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pv2-wl-parent:hover { color: var(--color-primary-700); }
+.pv2-wl-row:hover .pv2-wl-parent, .pv2-wl-row:focus-within .pv2-wl-parent, .pv2-wl-parent.is-shown { display: inline-flex; }
+@media (hover: none) { .pv2-wl-parent { display: inline-flex; } }
+.pv2-wl-row.is-draft { border-style: dashed; border-color: var(--color-primary-300); }
+.pv2-wl-draft { width: 100%; background: transparent; font-size: 15px; color: var(--color-neutral-900); outline: none; }
+.pv2-rrow.is-linked { background: color-mix(in srgb, var(--color-primary-100) 70%, transparent); box-shadow: -8px 0 0 color-mix(in srgb, var(--color-primary-100) 70%, transparent), 8px 0 0 color-mix(in srgb, var(--color-primary-100) 70%, transparent); border-radius: 2px; }
+.pv2-rrow.is-flash { animation: pv2-flash 1.2s ease-out; }
+@keyframes pv2-flash { 0%, 30% { background: var(--color-primary-100); } 100% { background: transparent; } }
+@media (prefers-reduced-motion: reduce) { .pv2-rrow.is-flash { animation: none; } }
+/* What the Shelves held, folded under the reference column. */
+.pv2-refshelves { margin-top: 18px; display: grid; gap: 14px; }
+.pv2-refshelf { border-top: 1px solid var(--color-neutral-200); padding-top: 10px; }
+.pv2-refshelf > summary { cursor: pointer; list-style: none; font: 500 10.5px var(--pv2-num); letter-spacing: .14em; text-transform: uppercase; color: var(--color-neutral-500); }
+.pv2-refshelf > summary::-webkit-details-marker { display: none; }
+.pv2-refshelf > summary::before { content: '▸'; display: inline-block; width: 12px; transition: transform .12s; }
+.pv2-refshelf[open] > summary::before { transform: rotate(90deg); }
+.pv2-refshelf > summary:hover { color: var(--color-neutral-800); }
+.pv2-refshelf > .pv2-list, .pv2-refshelf > .chooser-section { margin-top: 8px; }
+.pv2-addbtn.is-quiet { color: var(--color-neutral-500); }
 .pv2-refacts { display: inline-flex; gap: 10px; flex: none; }
 .pv2-wl-check { flex: none; width: 16px; height: 16px; margin-top: 3px; border-radius: 50%; border: 1.5px solid var(--color-neutral-400); display: grid; place-items: center; color: #fff; }
 .pv2-wl-check.is-on { background: var(--color-primary-600); border-color: var(--color-primary-600); }
