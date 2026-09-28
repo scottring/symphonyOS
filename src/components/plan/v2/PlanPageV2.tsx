@@ -259,7 +259,11 @@ function Inner({ level }: { level: Level }) {
       <div className="pv2-colh">{inMeeting ? `${name}’s list` : 'Our plan'}</div>
       {loading && !main.length ? <p className="pv2-hint">Loading…</p> : null}
       {!loading && !main.length && <p className="pv2-hint">{inMeeting ? 'Nothing yet. Write whatever comes up — no types, no dates needed.' : `Nothing on ${name}’s plan yet.`}</p>}
-      <ul className={`pv2-list${level === 'season' && view === 'list' && !inMeeting ? ' pv2-brain' : ''}`}>{main.map(row)}</ul>
+      {/* A goal and its steps are one group, so two columns never split them. */}
+      <ul className={`pv2-list${level === 'season' && view === 'list' && !inMeeting ? ' pv2-brain' : ''}`}>{
+        main.reduce<LineVM[][]>((groups, l) => { if (l.nested && groups.length) groups[groups.length - 1].push(l); else groups.push([l]); return groups }, [])
+          .map((g) => g.length === 1 ? row(g[0]) : <li key={`g-${g[0].task.id}`} className="pv2-group"><ul className="pv2-list">{g.map(row)}</ul></li>)
+      }</ul>
       {inMeeting && (
         <form className="pv2-write" onSubmit={(e) => { e.preventDefault(); const v = draft.trim(); if (v) { void addLine(v); setDraft('') } }}>
           <span className="pv2-dash" aria-hidden="true" />

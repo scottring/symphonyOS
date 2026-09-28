@@ -3010,6 +3010,7 @@ div.chooser-action-group { overflow: visible !important; }
 .pv2-list { list-style: none; margin: 0 0 8px; padding: 0; }
 .pv2-brain { columns: 2; column-gap: 48px; }
 .pv2-brain > li { break-inside: avoid; }
+.pv2-group > .pv2-list { margin: 0; }
 .pv2-line-main { position: relative; display: flex; align-items: flex-start; gap: 10px; padding: 5px 8px; margin: 0 -8px; border-radius: 8px; }
 .pv2-line-main:hover, .pv2-line.is-open > .pv2-line-main { background: var(--color-neutral-50); }
 .pv2-mark { width: 18px; height: 22px; display: inline-grid; place-items: center; flex: none; }
