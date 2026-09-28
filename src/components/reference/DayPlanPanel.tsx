@@ -6,7 +6,7 @@ import { useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { Check, ChevronDown, ChevronRight, GripVertical, MoreHorizontal, Repeat } from 'lucide-react'
 import { WeekRoutineChoices } from './WeekRoutineChoices'
 import { SchedulePopover } from '@/components/triage'
-import type { DayPlan, DayPlanEntry } from '@/lib/today/dayPlan'
+import { alreadyPlaced, type DayPlan, type DayPlanEntry } from '@/lib/today/dayPlan'
 import { writePlanDrag } from '@/lib/planning/planDrag'
 import { localYmd, weekStartAnchor, readCadenceConfig } from '@/lib/cadence/config'
 import { formatWeekRangeShort } from '@/lib/dateHelpers'
@@ -696,6 +696,10 @@ function TodayChooser({ plan, day, actions, draggable, wide }: {
     return !h
   })
   const anyDone = tasks.some((e) => e.completed) || routines.some((e) => e.completed)
+  // Rows that already have their day leave the list and fold below it: the
+  // decision the chooser asked for is made, and it says so (Scott, 2026-09-28).
+  const placed = tasks.filter((e) => alreadyPlaced(e, day)).filter(matches)
+  const toPlace = tasks.filter((e) => !alreadyPlaced(e, day))
   return (
     <div data-testid="day-plan-panel" className="today-shelves">
       <nav aria-label="Shelf source" className="shelf-sources">
@@ -713,9 +717,9 @@ function TodayChooser({ plan, day, actions, draggable, wide }: {
       )}
       {source === 'week' && <ChooserSection
         id="week"
-        title="This week's tasks"
+        title="Still to place"
         note={formatWeekRangeShort(weekStart)}
-        entries={tasks.filter(matches)}
+        entries={toPlace.filter(matches)}
         day={day}
         actions={actions}
         draggable={draggable}
@@ -725,14 +729,22 @@ function TodayChooser({ plan, day, actions, draggable, wide }: {
         wide={wide}
         empty={
           <>
-            <span>{query ? "No matching week tasks." : "No week tasks in this view. Add work on Week, or check your people and domain filters."}</span>
+            <span>{query ? "No matching week tasks." : tasks.length ? "Every task on this week's list has a day." : "No week tasks in this view. Add work on Week, or check your people and domain filters."}</span>
             {/* A plain anchor, like the fold's Inbox link: this panel is
                 drawn inside and outside the router. */}
             <a href="/week">Plan your week →</a>
           </>
         }
-        allDone={<span>Everything on this week's list is done.</span>}
+        allDone={<span>{placed.length ? "Everything on this week's list has a day or is done." : "Everything on this week's list is done."}</span>}
       />}
+      {source === 'week' && placed.length > 0 && (
+        <details className="shelf-goals chooser-placed">
+          <summary>Already planned · {placed.length}</summary>
+          <ul className="chooser-rows">
+            {placed.map((e) => <ChooserRow key={e.key} entry={e} day={day} actions={actions} draggable={draggable} wide={wide} />)}
+          </ul>
+        </details>
+      )}
       {source === 'routines' && (
         <ChooserSection
           id="routines"
@@ -752,7 +764,7 @@ function TodayChooser({ plan, day, actions, draggable, wide }: {
         />
       )}
 
-      <p className="chooser-foot">Choices stay on your week's list.<br />Routine choices apply to this occurrence only.</p>
+      <p className="chooser-foot">Tasks with a day move to Already planned and stay on your week.<br />Routine choices apply to this occurrence only.</p>
     </div>
   )
 }

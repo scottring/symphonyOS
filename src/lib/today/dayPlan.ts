@@ -38,7 +38,7 @@ import { buildRoutineStatusMap, selectVisibleRoutines } from './statusMaps'
 import { buildRoutineDayItems } from './grouping'
 import { deferredInRoutineIds } from './deferredRoutines'
 import { groupRoutineSteps } from './routineCollections'
-import { inTaskWeekend } from '@/lib/planning/weekend'
+import { inTaskWeekend, weekendEnd } from '@/lib/planning/weekend'
 import { committedTo } from '@/lib/placement/model'
 import { selectCarriedOver } from './taskPools'
 import { localYmd } from '@/lib/cadence/config'
@@ -153,6 +153,25 @@ export function routineResolveCtx(input: Pick<DayPlanInput, 'viewedDate' | 'sele
     prefs: { hideRoutines: input.hideRoutines, layers: input.layers },
     deferredInto: deferredInRoutineIds(input.dateInstances, input.viewedDate),
   }
+}
+
+/**
+ * Today's chooser answers "what still needs a day?" (Scott, 2026-09-28: a row
+ * given a day "persisting" there was confusing). A week row is already placed
+ * when it is picked for the viewed day, has a day that is the viewed day or
+ * later, or has a weekend that is still ahead. It keeps its week commitment
+ * and its place on the Week page; the chooser folds it under "Already
+ * planned". A day that passed with the row open is not placed: it is back
+ * among the rows to place, marked "missed <date>". Done rows are not placed.
+ */
+export function alreadyPlaced(e: DayPlanEntry, day: Date): boolean {
+  if (e.kind !== 'task' || !e.task || e.completed) return false
+  if (e.planned) return true
+  const ymd = localYmd(day)
+  const t = e.task
+  if (t.scheduledFor && localYmd(t.scheduledFor) >= ymd) return true
+  if (!t.scheduledFor && t.weekendStart && !inTaskWeekend(t, day) && localYmd(weekendEnd(t.weekendStart)) >= ymd) return true
+  return false
 }
 
 /**
