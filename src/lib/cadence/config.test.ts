@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import { weekStartAnchor, weekToken, getDueSession, DEFAULT_CADENCE, orderedWeekDays, orderedDayKeys, localYmd, parseLocalYmd, weekOf } from './config'
+import { weekStartAnchor, weekToken, getDueSession, DEFAULT_CADENCE, orderedWeekDays, orderedDayKeys, localYmd, parseLocalYmd, weekOf, isWeekStart, readCadenceConfig, applyWeekStart } from './config'
+import { weekendStartFor, weekendPlacement } from '@/lib/planning/weekend'
 
 describe('cadence config', () => {
   describe('weekStartAnchor', () => {
@@ -15,6 +16,27 @@ describe('cadence config', () => {
       const wed = new Date(2026, 5, 10, 14, 0, 0)
       const anchor = weekStartAnchor(wed, 1)
       expect(anchor.getDate()).toBe(8) // Monday
+    })
+    it('Saturday start (a Friday planning session): Fri Oct 2 is in Sat Sep 26’s week, Sat Oct 3 starts the next', () => {
+      expect(localYmd(weekStartAnchor(new Date(2026, 9, 2, 20), 6))).toBe('2026-09-26')
+      expect(localYmd(weekStartAnchor(new Date(2026, 9, 3, 8), 6))).toBe('2026-10-03')
+      expect(orderedDayKeys(6)).toEqual(['sat', 'sun', 'mon', 'tue', 'wed', 'thu', 'fri'])
+    })
+    it('Saturday start: the weekend is the week’s first two days, on the week it opens', () => {
+      const week = new Date(2026, 9, 3)
+      expect(localYmd(weekendStartFor(new Date(2026, 9, 2), week))).toBe('2026-10-03')
+      localStorage.setItem('symphony-cadence-config', JSON.stringify({ weekStartsOn: 6 }))
+      expect(localYmd(weekendPlacement(new Date(2026, 9, 3)).weekStart!)).toBe('2026-10-03')
+      localStorage.removeItem('symphony-cadence-config')
+    })
+    it('only Sunday, Monday and Saturday are week starts; a stray stored value reads as Sunday', () => {
+      expect([0, 1, 6].every(isWeekStart)).toBe(true)
+      expect([2, 3, 4, 5, 7, null, '6'].some(isWeekStart)).toBe(false)
+      localStorage.setItem('symphony-cadence-config', JSON.stringify({ weekStartsOn: 3 }))
+      expect(readCadenceConfig().weekStartsOn).toBe(0)
+      applyWeekStart(6)
+      expect(readCadenceConfig().weekStartsOn).toBe(6)
+      localStorage.removeItem('symphony-cadence-config')
     })
     it('on the start day itself, anchor is that day', () => {
       const sun = new Date(2026, 5, 7, 9, 0, 0)
