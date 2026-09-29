@@ -100,3 +100,18 @@ describe('WeekV2 reference — a week across a month end shows both months', () 
     expect(screen.queryByRole('button', { name: 'Open September →' })).toBeNull()
   })
 })
+
+// Walkthrough 2026-09-29: during the first seconds the reference said
+// "Nothing open on October's plan" over twelve goals still loading.
+describe('WeekV2 reference while tasks load', () => {
+  it('says Loading, not Nothing open', async () => {
+    vi.resetModules()
+    vi.doMock('@/hooks/useSupabaseTasks', () => ({ useSupabaseTasks: () => ({ loading: true, toggleTask: vi.fn(), updateTask: vi.fn(), pushTask: vi.fn(), updateTasksBulk: vi.fn(), keepForward: vi.fn(), dropCommitment: vi.fn(), addTask: vi.fn() }) }))
+    const { WeekV2: Fresh } = await import('./WeekV2')
+    render(<MemoryRouter><Fresh tasks={[]} weekStart={new Date(2026, 8, 26)} meId="me" isCurrent days={null} onSelectTask={vi.fn()} /></MemoryRouter>)
+    fireEvent.click(screen.getByRole('button', { name: /^Plan week \d+$/ }))
+    expect(screen.getAllByText('Loading…').length).toBe(2)
+    expect(screen.queryByText(/Nothing open on/)).toBeNull()
+    vi.doUnmock('@/hooks/useSupabaseTasks')
+  })
+})

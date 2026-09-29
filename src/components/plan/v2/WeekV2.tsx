@@ -63,7 +63,7 @@ export function WeekV2({ tasks, weekStart, meId, isCurrent, days, onSelectTask, 
 }) {
   const navigate = useNavigate()
   const { user } = useAuth()
-  const { toggleTask, updateTask, pushTask, updateTasksBulk, keepForward, dropCommitment, addTask } = useSupabaseTasks()
+  const { toggleTask, updateTask, pushTask, updateTasksBulk, keepForward, dropCommitment, addTask, loading: tasksLoading } = useSupabaseTasks()
   const gated = useGatedTaskActions({ updateTask, pushTask, updateTasksBulk }, (id) => tasks.find((t) => t.id === id))
   const { members } = useFamilyMembers()
   const addArea = useAddArea()
@@ -274,7 +274,7 @@ export function WeekV2({ tasks, weekStart, meId, isCurrent, days, onSelectTask, 
                         </span>
                       </li>
                     ))}</ul>
-                  ) : <p className="pv2-hint">Nothing open on {m.name}’s plan.</p>}
+                  ) : <p className="pv2-hint">{tasksLoading ? 'Loading…' : `Nothing open on ${m.name}’s plan.`}</p>}
                   <button type="button" className="pv2-link" style={{ marginTop: 8 }} onClick={() => navigate(`/month?start=${localYmd(m.start)}`)}>Open {m.name} →</button>
                 </div>
               ))}
