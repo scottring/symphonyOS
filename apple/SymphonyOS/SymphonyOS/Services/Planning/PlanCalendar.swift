@@ -1,15 +1,30 @@
 import Foundation
 
 /// The planning periods, matching the web and the database triggers:
-/// weeks start on **Sunday** (`tasks_fill_period_stamps`), months on the 1st,
+/// weeks start on the **household's day** (`households.week_starts_on`, Sunday
+/// by default — `week_start_of(day, start)`), months on the 1st,
 /// seasons on the household's four boundaries, years on Jan 1. Every period
 /// is a real, dated range — never an open-ended bucket.
 enum PlanCalendar {
     static var calendar: Calendar {
         var cal = Calendar(identifier: .gregorian)
         cal.timeZone = .current
-        cal.firstWeekday = 1   // Sunday
+        cal.firstWeekday = weekStartsOn + 1   // Calendar counts Sunday as 1
         return cal
+    }
+
+    /// The household's week start as the database stores it
+    /// (`households.week_starts_on`): 0 Sunday, 1 Monday, 6 Saturday. Week
+    /// records match by their EXACT start day, so the phone must agree with the
+    /// database. SyncEngine sets it from the household on every sync; it is kept
+    /// in UserDefaults so an offline launch agrees too.
+    static let weekStartsOnKey = "symphony.weekStartsOn"
+    static var weekStartsOn: Int {
+        get {
+            let v = UserDefaults.standard.object(forKey: weekStartsOnKey) as? Int ?? 0
+            return [0, 1, 6].contains(v) ? v : 0
+        }
+        set { UserDefaults.standard.set(newValue, forKey: weekStartsOnKey) }
     }
 
     /// The web's defaults (lib/cadence/seasons.ts; SQL `season_start_for`).
@@ -28,17 +43,23 @@ enum PlanCalendar {
 
     // MARK: Week
 
-    /// The Sunday that starts `date`'s week.
-    static func weekStart(_ date: Date) -> Date {
+    /// The day that starts `date`'s week (SQL `week_start_of(day, start)`).
+    static func weekStart(_ date: Date, startsOn: Int = weekStartsOn) -> Date {
         let d = day(date)
-        let weekday = calendar.component(.weekday, from: d)   // 1 = Sunday
-        return addDays(d, -(weekday - 1))
+        let dow = calendar.component(.weekday, from: d) - 1   // 0 = Sunday, as SQL counts
+        return addDays(d, -((dow - startsOn + 7) % 7))
     }
 
     static func weekDays(_ start: Date) -> [Date] { (0..<7).map { addDays(start, $0) } }
 
-    /// The week's Saturday — what `tasks.weekend_start` stores.
-    static func weekendSaturday(ofWeek start: Date) -> Date { addDays(weekStart(start), 6) }
+    /// The week's weekend Saturday — what `tasks.weekend_start` stores: the
+    /// first Saturday on or after the week's start (its last day in a Sunday
+    /// week, its first in a Saturday week), as the web's `weekendStartFor`.
+    static func weekendSaturday(ofWeek start: Date, startsOn: Int = weekStartsOn) -> Date {
+        let ws = weekStart(start, startsOn: startsOn)
+        let dow = calendar.component(.weekday, from: ws) - 1
+        return addDays(ws, (6 - dow + 7) % 7)
+    }
 
     // MARK: Month / season / year
 

@@ -75,7 +75,7 @@ enum PageIngest {
                        members: [FamilyMember], modelContext: ModelContext) async -> CommitOutcome {
         var outcome = CommitOutcome()
         let vm = TaskViewModel(modelContext: modelContext)
-        let weekStart = PageParse.weekStartAnchor(now: Date())
+        let weekStart = PlanCalendar.weekStart(Date())
         // Two different questions, two different lookups: `defaultAssignee`
         // is "who is the app user" (FamilyMember.current's broader fallback
         // chain, fine for defaulting an unassigned line to the planner), but

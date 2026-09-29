@@ -28,9 +28,23 @@ private func routine(_ name: String, _ pattern: RecurrencePattern, time: String?
 struct PlanCalendarTests {
     @Test func weeksStartOnSunday() {
         // Wed Sep 23 2026 → Sun Sep 20 (the database triggers' week).
-        #expect(PlanCalendar.ymd(PlanCalendar.weekStart(day(2026, 9, 23))) == "2026-09-20")
-        #expect(PlanCalendar.ymd(PlanCalendar.weekStart(day(2026, 9, 20))) == "2026-09-20")
-        #expect(PlanCalendar.ymd(PlanCalendar.weekendSaturday(ofWeek: day(2026, 9, 23))) == "2026-09-26")
+        #expect(PlanCalendar.ymd(PlanCalendar.weekStart(day(2026, 9, 23), startsOn: 0)) == "2026-09-20")
+        #expect(PlanCalendar.ymd(PlanCalendar.weekStart(day(2026, 9, 20), startsOn: 0)) == "2026-09-20")
+        #expect(PlanCalendar.ymd(PlanCalendar.weekendSaturday(ofWeek: day(2026, 9, 23), startsOn: 0)) == "2026-09-26")
+    }
+
+    @Test func aSaturdayHouseholdsWeeksStartOnSaturday() {
+        // SQL week_start_of(day, 6): Tue Sep 29 2026 → Sat Sep 26; a Saturday
+        // starts its own week; Friday Oct 2 still belongs to it.
+        #expect(PlanCalendar.ymd(PlanCalendar.weekStart(day(2026, 9, 29), startsOn: 6)) == "2026-09-26")
+        #expect(PlanCalendar.ymd(PlanCalendar.weekStart(day(2026, 9, 26), startsOn: 6)) == "2026-09-26")
+        #expect(PlanCalendar.ymd(PlanCalendar.weekStart(day(2026, 10, 2), startsOn: 6)) == "2026-09-26")
+        #expect(PlanCalendar.ymd(PlanCalendar.weekStart(day(2026, 10, 3), startsOn: 6)) == "2026-10-03")
+        // The weekend is the week's first two days, as the web's weekendStartFor.
+        #expect(PlanCalendar.ymd(PlanCalendar.weekendSaturday(ofWeek: day(2026, 9, 29), startsOn: 6)) == "2026-09-26")
+        // Monday households, for completeness.
+        #expect(PlanCalendar.ymd(PlanCalendar.weekStart(day(2026, 9, 27), startsOn: 1)) == "2026-09-21")
+        #expect(PlanCalendar.ymd(PlanCalendar.weekendSaturday(ofWeek: day(2026, 9, 23), startsOn: 1)) == "2026-09-26")
     }
 
     @Test func seasonsUseHouseholdBoundariesOrDefaults() {

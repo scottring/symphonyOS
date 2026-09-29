@@ -20,7 +20,7 @@ final class TaskCommitment {
     var taskId: UUID
     /// "season" | "month" | "week"
     var level: String
-    /// Local midnight of the period's first day (Sunday for a week).
+    /// Local midnight of the period's first day (the household's week start for a week).
     var periodStart: Date
     /// "open" | "done" | "carried" | "removed"
     var status: String

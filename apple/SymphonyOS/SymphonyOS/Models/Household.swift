@@ -10,6 +10,9 @@ final class Household {
     /// The household's four season boundaries (`households.seasons` jsonb).
     /// Nil → the web's defaults (see PlanCalendar.defaultSeasons).
     var seasons: [SeasonBoundary]? = nil
+    /// The day the household's weeks start (`households.week_starts_on`):
+    /// 0 Sunday, 1 Monday, 6 Saturday. Nil → Sunday.
+    var weekStartsOn: Int? = nil
 
     // Sync
     var syncStatus: SyncStatus

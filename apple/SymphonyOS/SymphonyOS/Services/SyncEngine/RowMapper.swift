@@ -281,6 +281,7 @@ enum RowMapper {
         let model = Household(id: id, name: row.string("name") ?? "My Household", ownerId: ownerId, syncStatus: .synced)
         model.address = row.string("address")
         model.seasons = row.codable("seasons")
+        model.weekStartsOn = row.int("week_starts_on")
         model.lastSyncedAt = Date()
         model.createdAt = row.date("created_at") ?? Date()
         model.updatedAt = row.date("updated_at") ?? Date()

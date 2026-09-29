@@ -1,7 +1,7 @@
 import SwiftUI
 import SwiftData
 
-/// A dated week (Sunday–Saturday): its list (any day, the weekend), the
+/// A dated week (seven days from the household's week start): its list (any day, the weekend), the
 /// month's goals and tasks as a reference line, then each day. Last week's
 /// open commitments wait behind one review line — Keep, Done, Someday or
 /// Drop, each a deliberate decision.

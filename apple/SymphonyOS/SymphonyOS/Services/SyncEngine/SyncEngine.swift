@@ -191,6 +191,7 @@ actor SyncEngine {
         // Each table pulls + saves independently, so one bad row/table can't
         // roll back the entire sync (the previous single-shared-context save did).
         await pullTable("households", as: Household.self, userId: userId)
+        adoptHouseholdWeekStart()
         await pullTable("user_profiles", as: UserProfile.self, userId: userId)
         await pullTable("family_members", as: FamilyMember.self, userId: userId)
         await pullTable("contacts", as: Contact.self, userId: userId)
@@ -744,6 +745,14 @@ actor SyncEngine {
             await channel.subscribe()
             realtimeChannels.append(channel)
         }
+    }
+
+    /// Every week the phone computes must start on the household's day, as the
+    /// database stamps them (the household it answers for: the oldest one).
+    private func adoptHouseholdWeekStart() {
+        let context = ModelContext(modelContainer)
+        let households = (try? context.fetch(FetchDescriptor<Household>(sortBy: [SortDescriptor(\.createdAt)]))) ?? []
+        PlanCalendar.weekStartsOn = households.first?.weekStartsOn ?? 0
     }
 
     private func handleRealtimeChange(table: String, change: AnyAction) async {
