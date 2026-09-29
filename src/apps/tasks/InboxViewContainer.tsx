@@ -28,7 +28,7 @@ import { useSelection } from '@/shell/providers/SelectionProvider';
 
 export function InboxViewContainer() {
   const navigate = useNavigate();
-  const { tasks, loading: tasksLoading, addTask, toggleTask, toggleWaiting, deleteTask, updateTask, updateTasksBulk, pushTask } = useSupabaseTasks();
+  const { tasks, loading: tasksLoading, error: tasksError, refetch: refetchTasks, addTask, toggleTask, toggleWaiting, deleteTask, updateTask, updateTasksBulk, pushTask } = useSupabaseTasks();
   const { events } = useGoogleCalendar();
   // Event ids opt in to auto-loaded, realtime event notes (see useEventNotes)
   const visibleEventIds = useMemo(() => events.map((e) => e.google_event_id || e.id), [events]);
@@ -42,6 +42,7 @@ export function InboxViewContainer() {
   const { getDomainForCalendar } = useCalendarDomainMappings();
   const { lists, listsByCategory, addList } = useListsContext();
   const undo = useUndo();
+  const retryTasks = useCallback(() => { void refetchTasks(); }, [refetchTasks]);
 
   // The "To buy" nudge on a buyish inbox row ("Buy strawberries…") needs a
   // sender in this provider or InboxView never renders it — this container
@@ -212,6 +213,10 @@ export function InboxViewContainer() {
         panelOpen={selection !== null}
         onClosePanel={clearSelection}
         loading={tasksLoading}
+        // The hook's error is also set by failed writes; it means "didn't
+        // load" only when nothing arrived.
+        loadFailed={!tasksLoading && !!tasksError && tasks.length === 0}
+        onRetryLoad={retryTasks}
       />
     </ScheduleActionsProvider>
   );

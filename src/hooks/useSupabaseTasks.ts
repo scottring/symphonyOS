@@ -669,6 +669,10 @@ export function useSupabaseTasks() {
     try {
       const rows = await loadTasks(user.id, setError)
       if (rows) setTasks(cloneRows(rows))
+      // A load shared with another instance only reports its error to the
+      // instance that started it; every waiter must still learn it failed, or
+      // its page reads the empty list as "nothing here".
+      else setError((prev) => prev ?? "Couldn't load tasks")
     } finally {
       setLoading(false)
     }

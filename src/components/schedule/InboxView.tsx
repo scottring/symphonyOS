@@ -1,5 +1,6 @@
 // src/components/schedule/InboxView.tsx
 import { useMemo, useCallback, useState, useRef, useEffect } from 'react'
+import { LoadFailedNotice } from '@/components/common/LoadFailedNotice'
 import { PAGE_COLUMN_WIDE } from '@/components/layout/pageLayout'
 import { MastheadCard } from '@/components/layout/MastheadCard'
 import { HomeChromeControls } from '@/components/home/HomeChromeControls'
@@ -91,12 +92,19 @@ interface InboxViewProps {
   /** True while the first task fetch is in flight — gates the empty state so the
    *  inbox shows "Loading…" instead of a false "Inbox zero" before items arrive. */
   loading?: boolean
+  /** The task read failed and nothing arrived. Shown instead of "Inbox zero",
+   *  which would tell someone their captures are gone. */
+  loadFailed?: boolean
+  /** Reload the tasks (the tasks hook's refetch). */
+  onRetryLoad?: () => void
 }
 
 export function InboxView({
   tasks: allTasks, selectedItemId: _selectedItemId, onSelectItem,
   panelOpen: _panelOpen, onClosePanel: _onClosePanel,
   loading = false,
+  loadFailed = false,
+  onRetryLoad,
 }: InboxViewProps) {
   const navigate = useNavigate()
   const { hash } = useLocation()
@@ -787,7 +795,7 @@ export function InboxView({
         title="Inbox"
         subline={
           totalCount === 0
-            ? (loading ? 'Loading your inbox…' : hiddenByFilter ? 'Filtered — nothing in this view' : 'All clear — nothing to triage')
+            ? (loading ? 'Loading your inbox…' : loadFailed ? 'Didn’t load' : hiddenByFilter ? 'Filtered — nothing in this view' : 'All clear — nothing to triage')
             : `${totalCount} item${totalCount !== 1 ? 's' : ''} to triage`
         }
         controls={chrome ? <HomeChromeControls className="flex" /> : undefined}
@@ -825,6 +833,13 @@ export function InboxView({
         <div className="text-center py-16">
           <p className="font-display text-xl text-neutral-700">Loading your inbox…</p>
         </div>
+      ) : totalCount === 0 && loadFailed && onRetryLoad ? (
+        <LoadFailedNotice
+          className="mx-auto max-w-xl py-16 text-center"
+          title="Your Inbox didn’t load."
+          body="Your captures are safe — this is a connection problem."
+          onRetry={onRetryLoad}
+        />
       ) : hiddenByFilter ? (
         <div className="mx-auto max-w-xl py-16 text-center">
           <p className="mb-2 font-display text-[24px] text-neutral-800">Nothing matches these filters</p>

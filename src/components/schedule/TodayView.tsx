@@ -102,6 +102,7 @@ import { DiscussionBadge } from './DiscussionBadge'
 import { PrintableDayList } from './PrintableDayList'
 import { DuplicateSweep, DuplicateSweepTrigger } from './DuplicateSweep'
 import { useDuplicateSweep } from '@/hooks/useDuplicateSweep'
+import { LoadFailedNotice } from '@/components/common/LoadFailedNotice'
 import { ProposalPreview, ProposalTrigger } from './ProposalPreview'
 import { useTodayProposal } from '@/hooks/useTodayProposal'
 import { readHideRoutines, writeHideRoutines, onHideRoutinesChange } from '@/lib/hideRoutinesSignal'
@@ -134,6 +135,10 @@ interface TodayViewProps {
   selectedItemId: string | null
   onSelectItem: (id: string | null) => void
   loading?: boolean
+  /** The task read failed and nothing arrived: say so, never "Nothing chosen yet." */
+  tasksLoadFailed?: boolean
+  /** Reload the tasks (the tasks hook's refetch). */
+  onRetryTasks?: () => void
   viewedDate: Date
   onDateChange: (date: Date) => void
   // Undo-wrapped handlers from HomeView
@@ -195,6 +200,8 @@ export function TodayView({
   onCompleteRoutine,
   onCompleteEvent,
   loading,
+  tasksLoadFailed = false,
+  onRetryTasks,
   viewedDate,
   onDateChange,
   selectedAssignees,
@@ -814,9 +821,10 @@ export function TodayView({
     : data.isToday
       ? upNext
         ? `Next: ${upNext.item.title}${nextTimeLabel ? ` · ${nextTimeLabel}` : ''}`
-        : forwardLine(forwardLook(tasks, viewedDate), viewedDate)
+        // A failed task read knows nothing about the week ahead.
+        : tasksLoadFailed ? 'Your tasks didn’t load.' : forwardLine(forwardLook(tasks, viewedDate), viewedDate)
       : data.counts.totalItems === 0
-        ? 'Nothing planned for this day.'
+        ? (tasksLoadFailed ? 'Your tasks didn’t load.' : 'Nothing planned for this day.')
         : firstTimed
           ? `Starts with: ${firstTimed.title}${firstTimedLabel ? ` · ${firstTimedLabel}` : ''}`
           : 'Nothing with a time on it.'
@@ -1516,6 +1524,9 @@ export function TodayView({
             {!usePin && (
               <PlanningSheet open={planOpenInline} onClose={() => setPlanOpenDay(null)} plan={data.dayPlan} day={viewedDate} actions={planPanelActions} />
             )}
+            {tasksLoadFailed && onRetryTasks && (
+              <LoadFailedNotice title="Today didn’t load." body="Your tasks are safe — this is a connection problem." onRetry={onRetryTasks} />
+            )}
             {focusWork.activeCount > 0 ? (
               <TodaySectionList
                 {...listProps}
@@ -1526,7 +1537,7 @@ export function TodayView({
                 dropTargets={false}
                 anytimeHeader={false}
               />
-            ) : (
+            ) : tasksLoadFailed && onRetryTasks ? null : (
               // One door to the chooser (the labelled Shelves button),
               // one to adding (Add task by the date) — the empty list says
               // what those are for and offers no third prompt (Scott via

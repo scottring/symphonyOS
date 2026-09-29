@@ -67,7 +67,12 @@ const sameLocalDay = (a: Date, b: Date) =>
 
 export function HomeViewContainer({ fixedView }: { fixedView?: 'today' | 'week' } = {}) {
   // Data hooks
-  const { tasks, loading: tasksLoading, addTask, toggleTask, toggleWaiting, deleteTask, updateTask, updateTasksBulk, pushTask, getLinkedTasks, refetch, updateTaskOrders, userId } = useSupabaseTasks();
+  const { tasks, loading: tasksLoading, error: tasksError, addTask, toggleTask, toggleWaiting, deleteTask, updateTask, updateTasksBulk, pushTask, getLinkedTasks, refetch, updateTaskOrders, userId } = useSupabaseTasks();
+  // A failed read leaves `tasks` empty; that must not read as an empty day.
+  // (`error` is also set by failed writes, so it only means "didn't load"
+  // when nothing arrived.)
+  const tasksLoadFailed = !tasksLoading && !!tasksError && tasks.length === 0;
+  const retryTasks = useCallback(() => { void refetch(); }, [refetch]);
   const { isConnected, events, fetchEvents, updateEvent, createEvent, deleteEvent, removeEventLocal, restoreEventLocal, isLoading: calendarLoading, isFetching: calendarFetching, error: calendarError } = useGoogleCalendar();
   // Passing the visible event ids opts in to auto-loading notes (context
   // overrides, assignees, shared-with-family, free) + realtime — without it
@@ -914,6 +919,8 @@ export function HomeViewContainer({ fixedView }: { fixedView?: 'today' | 'week' 
         // had arrived perfectly well (2026-09-04, prod). Events fill in when
         // they arrive; the rest of the day should never wait on them.
         loading={tasksLoading || routinesLoading}
+        tasksLoadFailed={tasksLoadFailed}
+        onRetryTasks={retryTasks}
         viewedDate={viewedDate}
         onDateChange={changeViewedDate}
         fixedView={fixedView}

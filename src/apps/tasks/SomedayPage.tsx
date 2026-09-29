@@ -10,6 +10,7 @@
 import { useMemo } from 'react'
 import { usePendingDelete } from '@/hooks/usePendingDelete'
 import { UndoToast } from '@/components/undo/UndoToast'
+import { LoadFailedNotice } from '@/components/common/LoadFailedNotice'
 import { useSupabaseTasks } from '@/hooks/useSupabaseTasks'
 import { useGatedTaskActions } from '@/hooks/useGatedTaskActions'
 import { useDomain } from '@/hooks/useDomain'
@@ -20,7 +21,7 @@ import { TriageRow, applyTriageVerdict, type Verdict } from '@/components/schedu
 import type { Task } from '@/types/task'
 
 export function SomedayPage() {
-  const { tasks, loading, toggleTask, updateTask, deleteTask, pushTask, updateTasksBulk } = useSupabaseTasks()
+  const { tasks, loading, error, refetch, toggleTask, updateTask, deleteTask, pushTask, updateTasksBulk } = useSupabaseTasks()
   const { layers, all: showAllDomains } = useDomain()
   const gated = useGatedTaskActions({ updateTask, pushTask, updateTasksBulk }, (id) => tasks.find((t) => t.id === id))
 
@@ -38,6 +39,9 @@ export function SomedayPage() {
   )
   // Empty because of the domain filter, not because nothing was set aside.
   const hiddenByFilter = rows.length === 0 && setAside.length > 0
+  // A failed read leaves the list empty; that is not "Nothing set aside."
+  // (The hook's error is also set by failed writes, so only when nothing arrived.)
+  const loadFailed = !loading && !!error && tasks.length === 0
 
   const viewedDate = useMemo(() => new Date(), [])
   const onVerdict = (t: Task, v: Verdict) => {
@@ -61,6 +65,8 @@ export function SomedayPage() {
         <section aria-label="Someday" className="mt-4">
           {loading && rows.length === 0 ? (
             <p className="py-6 text-[15px] text-neutral-500">Loading…</p>
+          ) : loadFailed ? (
+            <LoadFailedNotice variant="inline" className="py-6 text-[15px] text-neutral-500" title="Someday didn’t load." onRetry={() => { void refetch() }} />
           ) : hiddenByFilter ? (
             <p className="py-6 text-[15px] text-neutral-500">
               Nothing set aside in the domains you're viewing.{' '}

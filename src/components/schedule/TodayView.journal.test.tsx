@@ -169,6 +169,27 @@ describe('Today as a daily journal', () => {
     expect(screen.queryByRole('button', { name: 'Show everything' })).toBeNull()
   })
 
+  // A failed read is not an empty day: "Nothing chosen yet." over tasks that
+  // never arrived tells someone their list is gone.
+  it('a failed task read says Today didn’t load and offers Try again — never "Nothing chosen yet."', () => {
+    const onRetryTasks = vi.fn()
+    renderView({ tasks: [], tasksLoadFailed: true, onRetryTasks })
+    const notice = screen.getByRole('alert')
+    expect(notice).toHaveTextContent('Today didn’t load.')
+    expect(notice).toHaveTextContent('Your tasks are safe — this is a connection problem.')
+    expect(screen.queryByText('Nothing chosen yet.')).toBeNull()
+    expect(screen.queryByText('Nothing else coming up this week.')).toBeNull()
+    fireEvent.click(within(notice).getByRole('button', { name: 'Try again' }))
+    expect(onRetryTasks).toHaveBeenCalledOnce()
+  })
+
+  it('an empty list that did load keeps the empty copy and no error', () => {
+    renderView({ tasks: [], tasksLoadFailed: false, onRetryTasks: vi.fn() })
+    expect(screen.getByText('Nothing chosen yet.')).toBeInTheDocument()
+    expect(screen.queryByText('Today didn’t load.')).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Try again' })).toBeNull()
+  })
+
   it('keeps the decisions column when there is something to decide', () => {
     const slipped = createMockTask({ id: 'old', title: 'Slipped thing', bucket: 'timed', isAllDay: true, scheduledFor: new Date(2026, 5, 1), createdAt: new Date(2026, 5, 1) })
     renderView({ tasks: [...tasks, slipped] })

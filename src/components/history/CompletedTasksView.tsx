@@ -1,4 +1,5 @@
 import { MastheadCard } from '@/components/layout/MastheadCard'
+import { LoadFailedNotice } from '@/components/common/LoadFailedNotice'
 import { useState, useMemo } from 'react'
 import type { Task } from '@/types/task'
 import type { Contact } from '@/types/contact'
@@ -9,6 +10,12 @@ interface CompletedTasksViewProps {
   contactsMap: Map<string, Contact>
   projectsMap: Map<string, Project>
   onSelectTask: (taskId: string) => void
+  /** The first task fetch is in flight — "0 completed tasks" would be a guess. */
+  loading?: boolean
+  /** The task read failed and nothing arrived. */
+  loadFailed?: boolean
+  /** Reload the tasks (the tasks hook's refetch). */
+  onRetry?: () => void
   /** Kept for call-site compatibility; the masthead no longer renders Back. */
   onBack?: () => void
 }
@@ -62,6 +69,9 @@ export function CompletedTasksView({
   // projectsMap stays on the props — HistoryApp still hands it over — but
   // nothing here reads it any more (2026-09-02, see Sidebar.tsx).
   onSelectTask,
+  loading = false,
+  loadFailed = false,
+  onRetry,
 }: CompletedTasksViewProps) {
   const [searchQuery, setSearchQuery] = useState('')
   const [visibleMonths, setVisibleMonths] = useState(3)
@@ -101,6 +111,10 @@ export function CompletedTasksView({
   // Visible groups (for pagination)
   const visibleGroups = monthGroups.slice(0, visibleMonths)
   const hasMore = monthGroups.length > visibleMonths
+  // Until the list has arrived (or while it failed to) the page states no
+  // count and no "No completed tasks yet" — those would be guesses.
+  const pending = loading && completedTasks.length === 0
+  const failed = !pending && loadFailed && completedTasks.length === 0 && !!onRetry
 
   return (
     <div className="h-full overflow-auto">
@@ -111,7 +125,7 @@ export function CompletedTasksView({
           variant="page"
           title="History"
           motif="history"
-          subline={`${completedTasks.length} completed task${completedTasks.length !== 1 ? 's' : ''}`}
+          subline={pending ? 'Loading…' : failed ? 'Didn’t load' : `${completedTasks.length} completed task${completedTasks.length !== 1 ? 's' : ''}`}
         />
 
         {/* Search */}
@@ -150,7 +164,16 @@ export function CompletedTasksView({
         </div>
 
         {/* Task list by month */}
-        {filteredTasks.length > 0 ? (
+        {pending ? (
+          <p className="py-12 text-center font-display text-xl text-neutral-700">Loading your history…</p>
+        ) : failed ? (
+          <LoadFailedNotice
+            className="py-12 text-center"
+            title="Your history didn’t load."
+            body="Your completed tasks are safe — this is a connection problem."
+            onRetry={onRetry!}
+          />
+        ) : filteredTasks.length > 0 ? (
           <div className="space-y-6">
             {visibleGroups.map((group) => (
               <div key={group.key}>

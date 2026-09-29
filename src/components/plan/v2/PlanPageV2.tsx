@@ -55,6 +55,7 @@ import { makePlanActions, timingRemoval } from '@/lib/planning/planActions'
 import { useActionableInstances } from '@/hooks/useActionableInstances'
 import { goalToTaskConversion } from '@/lib/planning/goalConversion'
 import { removeOutcomeToast } from '@/lib/planning/existingActions'
+import { LoadFailedNotice } from '@/components/common/LoadFailedNotice'
 
 type Level = 'month' | 'season'
 const NOUN: Record<Level, string> = { month: 'Month', season: 'Season' }
@@ -71,7 +72,7 @@ function DropZone({ id, data, className, children }: { id: string; data: Record<
 
 function Inner({ level }: { level: Level }) {
   const navigate = useNavigate()
-  const { tasks, loading, toggleTask, updateTask, addTask, deleteTask, pushTask, keepForward, dropCommitment, updateTasksBulk, setGoal, setGoalLink } = useSupabaseTasks()
+  const { tasks, loading, error: tasksError, refetch: refetchTasks, toggleTask, updateTask, addTask, deleteTask, pushTask, keepForward, dropCommitment, updateTasksBulk, setGoal, setGoalLink } = useSupabaseTasks()
   const gated = useGatedTaskActions({ updateTask, pushTask, updateTasksBulk }, (id) => tasks.find((t) => t.id === id))
   const { layers, soleDomain } = useDomain()
   const { members, getCurrentUserMember } = useFamilyMembers()
@@ -400,6 +401,7 @@ function Inner({ level }: { level: Level }) {
   const [showDropped, setShowDropped] = useState(false)
   const [draft, setDraft] = useState('')
   const inMeeting = !!meeting
+  const tasksLoadFailed = !loading && !!tasksError && tasks.length === 0
   const numeral = level === 'month'
     ? two(bounds.start.getMonth() + 1)
     : `${two(bounds.start.getMonth() + 1)}–${two(new Date(bounds.end.getTime() - 86400000).getMonth() + 1)}`
@@ -415,7 +417,13 @@ function Inner({ level }: { level: Level }) {
     <section aria-label={`${name} plan`}>
       <div className="pv2-colh">{inMeeting ? `${name}’s list` : 'Our plan'}<FromPaper altitude={level} periodStart={bounds.start} tasks={layered} /></div>
       {loading && !main.length ? <p className="pv2-hint">Loading…</p> : null}
-      {!loading && !main.length && <p className="pv2-hint">{inMeeting ? 'Nothing yet. Write whatever comes up — no types, no dates needed.' : `Nothing on ${name}’s plan yet. Add a line below, or choose “Plan ${name}” to write it with ${aboveName} beside you.`}</p>}
+      {/* A failed read is not an empty plan: "Nothing on October's plan
+          yet" over a list that didn't load invites re-writing it. The hook's
+          error is also set by failed writes, so it counts only when nothing
+          arrived. */}
+      {tasksLoadFailed && <LoadFailedNotice variant="inline" className="pv2-hint" buttonClassName="pv2-link"
+        title="Your plan didn’t load." onRetry={() => { void refetchTasks() }} />}
+      {!loading && !tasksLoadFailed && !main.length && <p className="pv2-hint">{inMeeting ? 'Nothing yet. Write whatever comes up — no types, no dates needed.' : `Nothing on ${name}’s plan yet. Add a line below, or choose “Plan ${name}” to write it with ${aboveName} beside you.`}</p>}
       {childFor && <ul className="pv2-list"><DraftLine key={childFor.id} parentTitle={childFor.title} isGoal={childFor.isGoal}
         placeholder={childFor.isGoal ? `${name}’s part of it` : `A step for ${name}`}
         onAdd={(t) => void addFromAbove(childFor, t)} onCancel={() => setChildFor(null)} /></ul>}
