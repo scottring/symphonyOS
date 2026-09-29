@@ -115,7 +115,7 @@ describe('RhythmPage', () => {
       <RhythmPage {...noop} onUpdateRoutine={vi.fn()} routines={[]} hiddenByFilter onShowAllDomains={onShowAllDomains} />
     )
     expect(screen.queryByText('No routines yet')).not.toBeInTheDocument()
-    expect(screen.getByText("No routines in the domains you're viewing")).toBeInTheDocument()
+    expect(screen.getByText("No routines in the areas you're viewing")).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Show all domains' }))
     expect(onShowAllDomains).toHaveBeenCalled()
   })

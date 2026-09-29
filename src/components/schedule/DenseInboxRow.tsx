@@ -74,7 +74,7 @@ const CONTEXT_OPTIONS: Array<{ value: TaskContext | null; label: string }> = [
   { value: 'work', label: 'Work' },
   { value: 'family', label: 'Family' },
   { value: 'personal', label: 'Personal' },
-  { value: null, label: 'Clear' },
+  { value: null, label: 'No area' },
 ]
 
 export const DenseInboxRow = memo(function DenseInboxRow({

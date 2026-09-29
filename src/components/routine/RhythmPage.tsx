@@ -340,7 +340,7 @@ export function RhythmPage(props: RhythmPageProps) {
 
         {!loading && routines.length === 0 && hiddenByFilter && (
           <div className="py-16 text-center">
-            <h2 className="mb-2 font-display text-[24px] text-neutral-800">No routines in the domains you're viewing</h2>
+            <h2 className="mb-2 font-display text-[24px] text-neutral-800">No routines in the areas you're viewing</h2>
             <p className="mx-auto mb-6 max-w-sm text-[15px] text-neutral-500">
               Your other routines are hidden by the domain filter.
             </p>

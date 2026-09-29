@@ -302,7 +302,7 @@ export function ChatPanel({
             <p className="text-xs text-neutral-400">
               {mode === 'guided_reflection'
                 ? "I'll ask questions to help you explore this — save the result if it's worth keeping"
-                : "I can manage your tasks, projects, and calendar in Symphony"
+                : "I can manage your tasks, plans, and calendar in Symphony"
               }
             </p>
             {suggestions && suggestions.length > 0 && (

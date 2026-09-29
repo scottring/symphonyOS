@@ -69,7 +69,7 @@ export function SomedayPage() {
             <LoadFailedNotice variant="inline" className="py-6 text-[15px] text-neutral-500" title="Someday didn’t load." onRetry={() => { void refetch() }} />
           ) : hiddenByFilter ? (
             <p className="py-6 text-[15px] text-neutral-500">
-              Nothing set aside in the domains you're viewing.{' '}
+              Nothing set aside in the areas you're viewing.{' '}
               <button type="button" onClick={showAllDomains} className="font-medium text-primary-600 underline-offset-2 hover:underline">
                 Show all domains
               </button>
