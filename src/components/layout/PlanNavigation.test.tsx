@@ -22,6 +22,16 @@ describe('PlanNavigation', () => {
     expect(screen.queryByRole('button', { name: 'Goals' })).not.toBeInTheDocument()
   })
 
+  it('each rail link opens the period it names — the one on screen keeps its date (2026-09-29)', () => {
+    render(<MemoryRouter initialEntries={['/month?start=2026-10-01']}><PlanNavigation /></MemoryRouter>)
+    const rail = screen.getByRole('navigation', { name: 'Planning period' })
+    const month = rail.querySelector('a[aria-current="page"]')!
+    expect(month.textContent).toContain('October')
+    expect(month.getAttribute('href')).toBe('/month?start=2026-10-01')
+    // Another horizon opens on the period you are in — the page's default.
+    expect(rail.querySelector('a[href="/season"]')).toBeTruthy()
+  })
+
   it('switches horizons on a phone from the title menu, one horizon at a time', () => {
     render(<MemoryRouter initialEntries={['/season']}><PlanNavigation mobile /></MemoryRouter>)
     expect(screen.queryByRole('navigation', { name: 'Planning period' })).not.toBeInTheDocument()

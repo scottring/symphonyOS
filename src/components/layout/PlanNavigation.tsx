@@ -94,14 +94,17 @@ function HorizonRail({ period }: { period?: typeof PERIODS[number] }) {
   // The horizon on screen wears the period being SHOWN — October's page says
   // "10 October", not the clock's "09 September".
   const start = new URLSearchParams(search).get('start')
-  if (start && /^\d{4}-\d{2}-\d{2}$/.test(start) && (period === 'month' || period === 'season' || period === 'week')) {
-    const [y, m, d] = start.split('-').map(Number)
+  const shown = !!start && /^\d{4}-\d{2}-\d{2}$/.test(start) && (period === 'month' || period === 'season' || period === 'week')
+  if (shown) {
+    const [y, m, d] = start!.split('-').map(Number)
     nums[period] = horizonNumerals(new Date(y, m - 1, d), readSeasons(), readCadenceConfig().weekStartsOn)[period]
   }
   return <nav aria-label="Planning period" className="horizon-rail">
     {RAIL_ORDER.map((value, k) => <span key={value} className="horizon-rail-step">
       {k > 0 && <span className="horizon-rail-join" aria-hidden="true" />}
-      <NavLink to={`/${value}`} aria-current={period === value ? 'page' : undefined} className={period === value ? 'is-current' : ''}
+      {/* Each link opens the period it names: the one on screen keeps its
+          date, so "10 October" never lands on September (2026-09-29). */}
+      <NavLink to={shown && value === period ? `/${value}?start=${start}` : `/${value}`} aria-current={period === value ? 'page' : undefined} className={period === value ? 'is-current' : ''}
         aria-label={HORIZON_NAMES[value]} title={`${HORIZON_NAMES[value]} · ${nums[value].label}`}>
         <span className="horizon-rail-n">{nums[value].n}</span><span className="horizon-rail-l">{nums[value].label}</span>
       </NavLink>

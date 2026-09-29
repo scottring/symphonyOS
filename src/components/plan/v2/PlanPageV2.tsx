@@ -33,7 +33,7 @@ import { seasonToken } from '@/lib/cadence/seasons'
 import { parseLocalYmd, localYmd } from '@/lib/cadence/config'
 import { lowerPlacement } from '@/lib/placement/model'
 import { supportedGoal, goalOfTask, type SupportLink } from '@/lib/planning/goalSupport'
-import { periodBounds, isCurrentPeriod, planningPeriod, selectPeriodTasks } from '@/lib/planning/periodPage'
+import { periodBounds, isCurrentPeriod, selectPeriodTasks } from '@/lib/planning/periodPage'
 import {
   lineFate, lineDropUpdates, endedIn, closeOutCandidates, landmarksIn, readPlanView, writePlanView,
   type PlanView, type Landmark,
@@ -84,8 +84,12 @@ function Inner({ level }: { level: Level }) {
   // ── The period ─────────────────────────────────────────────────────────
   const startParam = params.get('start')
   const anchor = useMemo(
-    () => (startParam ? parseLocalYmd(startParam) : planningPeriod({ level, today, seasons }).start),
-    [startParam, level, today, seasons],
+    // Without a date the page is the period you are IN — what the horizon
+    // rail names. v1's planningPeriod looked ahead near a month's end, so
+    // "09 September" on the rail opened October (Scott, 2026-09-29). The
+    // next period is one ›, or its review, away.
+    () => (startParam ? parseLocalYmd(startParam) : today),
+    [startParam, today],
   )
   const bounds = useMemo(() => periodBounds(level, anchor, seasons), [level, anchor, seasons])
   const prevBounds = useMemo(() => periodBounds(level, bounds.prev, seasons), [level, bounds.prev, seasons])
@@ -97,8 +101,7 @@ function Inner({ level }: { level: Level }) {
     setParams(next)
   }, [params, setParams, level, seasons])
   // Name the period in the URL, so the horizon rail and Back agree with the
-  // page when it opened on the period ahead (planningPeriod looks ahead near
-  // a month's end).
+  // page.
   useEffect(() => {
     if (startParam) return
     const next = new URLSearchParams(params)
