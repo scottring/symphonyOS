@@ -113,8 +113,15 @@ export function WeekV2({ tasks, weekStart, meId, isCurrent, days, onSelectTask, 
     else if (d === 'someday') await gated.updateTask(t.id, { bucket: 'someday', scheduledFor: undefined, isAllDay: undefined })
     else if (d === 'dropped') await dropCommitment(t.id, 'week', prevWeek)
   }
+  // "Plan this week" read as a gate you had to pass before adding anything
+  // (Scott, 2026-09-29). It is the REVIEW: close out what the last period
+  // left, write this one with the level above beside it, agree it. It asks
+  // for attention only while there is a review to do — the period not yet
+  // agreed, or the last one leaving undecided lines — and is quiet after.
+  const reviewIds = prevTasks.filter((t) => !t.completed && !t.scheduledFor).map((t) => t.id)
+  const reviewDue = !session.saved || reviewIds.length > 0
   const startMeeting = () => {
-    const candidateIds = prevTasks.filter((t) => !t.completed && !t.scheduledFor).map((t) => t.id)
+    const candidateIds = reviewIds
     setMeeting({ step: candidateIds.length ? 1 : 2, candidateIds })
     // A meeting always opens with the month beside the week: choosing from it
     // is the meeting's job (it had opened in the last-used view, and "One at a
@@ -195,8 +202,8 @@ export function WeekV2({ tasks, weekStart, meId, isCurrent, days, onSelectTask, 
   return (
     <div className="pv2-week" data-week={localYmd(weekStart)}>
       {meeting ? (
-        <div className="pv2-sbar" role="region" aria-label={`Planning week ${weekNo}`}>
-          <span className="pv2-st">Planning week {weekNo}<small>a planning meeting</small></span>
+        <div className="pv2-sbar" role="region" aria-label={`Weekly review, week ${weekNo}`}>
+          <span className="pv2-st">Weekly review<small>week {weekNo}</small></span>
           {meeting.candidateIds.length > 0 ? (
             <div className="pv2-steps">
               <button type="button" aria-current={meeting.step === 1 ? 'step' : undefined} onClick={() => setMeeting({ ...meeting, step: 1 })}><b>1</b>Close out last week</button>
@@ -216,7 +223,7 @@ export function WeekV2({ tasks, weekStart, meId, isCurrent, days, onSelectTask, 
         </div>
         {tools && <div className="pv2-wtools">{tools}</div>}
         {viewSwitch}
-        <button type="button" className={session.saved ? 'pv2-qbtn' : 'pv2-btn'} onClick={startMeeting}>Plan this week</button>
+        <button type="button" className={reviewDue ? 'pv2-btn' : 'pv2-qbtn'} onClick={startMeeting}>Weekly review</button>
       </div>
       )}
 
@@ -225,7 +232,7 @@ export function WeekV2({ tasks, weekStart, meId, isCurrent, days, onSelectTask, 
           onDecide={decide} onFinish={() => setMeeting({ ...meeting, step: 2 })} />
       ) : view === 'focus' ? (
         <FocusDeck lines={lines} actions={actions} members={members} nextLabel="next week" context={`Week ${weekNo}`} label={`Week ${weekNo}`}
-          empty={`Nothing on this week yet. “Plan this week” lets you choose from ${monthName}’s plan.`} />
+          empty={`Nothing on this week yet. Add to the list, or start the weekly review to choose from ${monthName}’s plan.`} />
       ) : (
         <div className={`pv2-wgrid${view === 'ref' ? ' is-ref' : ''}`}>
           {/* One spread: three columns, one heading line across them, no

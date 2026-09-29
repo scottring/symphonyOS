@@ -3022,8 +3022,13 @@ div.chooser-action-group { overflow: visible !important; }
   .pv2-wl-row.is-card .pv2-wl-tools { display: none; }
   .pv2-wl-row.is-card:hover .pv2-wl-tools, .pv2-wl-row.is-card:focus-within .pv2-wl-tools { display: flex; }
   :root.plan-v2 .journal-entry-sub { display: none; }
-  :root.plan-v2 .journal-entry-when { opacity: 0; transition: opacity .12s; }
-  :root.plan-v2 li:hover > .journal-entry-when, :root.plan-v2 li:focus-within > .journal-entry-when { opacity: 1; }
+  /* The day's "when" control, as its calendar icon alone: the day already
+     says when, and the full chip (~170px, even at opacity 0) wrapped a day's
+     title a word a line (Scott, 2026-09-29). Same menu on click. */
+  :root.plan-v2 .journal-entry-when { opacity: 0; pointer-events: none; transition: opacity .12s; }
+  :root.plan-v2 .journal-entry-when .plan-timing-trigger { padding: 3px 4px; }
+  :root.plan-v2 .journal-entry-when .plan-timing-trigger > span { display: none; }
+  :root.plan-v2 li:hover > .journal-entry-when, :root.plan-v2 li:focus-within > .journal-entry-when { opacity: 1; pointer-events: auto; }
 }
 /* A week row's month line, on hover; the line itself lights in the column. */
 .pv2-wl-parent { display: none; align-items: center; gap: 4px; margin-top: 2px; max-width: 100%; font-size: 12px; color: var(--color-neutral-500); text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

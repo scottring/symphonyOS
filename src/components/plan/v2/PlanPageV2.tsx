@@ -175,8 +175,16 @@ function Inner({ level }: { level: Level }) {
   const [meeting, setMeeting] = useState<null | { step: 1 | 2; candidateIds: string[] }>(null)
   const [view, setViewState] = useState<PlanView>(() => readPlanView(level))
   const setView = (v: PlanView) => { setViewState(v); writePlanView(level, v) }
+  // "Plan this week" read as a gate you had to pass before adding anything
+  // (Scott, 2026-09-29). It is the REVIEW: close out what the last period
+  // left, write this one with the level above beside it, agree it. It asks
+  // for attention only while there is a review to do — the period not yet
+  // agreed, or the last one leaving undecided lines — and is quiet after.
+  const reviewIds = closeOutCandidates(prevLines.map((l) => l.task), level, prevBounds.start, prevBounds.end).map((t) => t.id)
+  const reviewDue = !session.saved || reviewIds.length > 0
+  const review = level === 'month' ? 'Monthly review' : 'Season review'
   const startMeeting = () => {
-    const candidateIds = closeOutCandidates(prevLines.map((l) => l.task), level, prevBounds.start, prevBounds.end).map((t) => t.id)
+    const candidateIds = reviewIds
     setMeeting({ step: candidateIds.length ? 1 : 2, candidateIds })
     // The level above sits beside the list for the whole meeting.
     setViewState('ref')
@@ -444,7 +452,7 @@ function Inner({ level }: { level: Level }) {
       onDecide={decide} onFinish={() => setMeeting({ ...meeting, step: 2 })} />
   } else if (view === 'focus') {
     body = <FocusDeck lines={lines} actions={actions} members={members} nextLabel={nextName} context={`${name} plan`} label={`${name}’s plan`}
-      empty={`Nothing on ${name}’s plan yet. “Plan ${name}” writes it${level === 'month' ? `, with ${aboveName} beside you` : ''}.`} />
+      empty={`Nothing on ${name}’s plan yet. The ${review.toLowerCase()} writes it${level === 'month' ? `, with ${aboveName} beside you` : ''}.`} />
   } else if (view === 'ref') {
     body = <div className={level === 'month' ? 'pv2-grid3' : 'pv2-grid2 is-ref'}>{refColumn}{listColumn}{calendar}</div>
   } else {
@@ -475,8 +483,8 @@ function Inner({ level }: { level: Level }) {
       </header>
 
       {inMeeting ? (
-        <div className="pv2-sbar" role="region" aria-label={`Planning ${name}`}>
-          <span className="pv2-st">Planning {name}<small>a planning meeting</small></span>
+        <div className="pv2-sbar" role="region" aria-label={`${review}, ${name}`}>
+          <span className="pv2-st">{review}<small>{name}</small></span>
           {meeting!.candidateIds.length > 0 ? (
             <div className="pv2-steps">
               <button type="button" aria-current={meeting!.step === 1 ? 'step' : undefined} onClick={() => setMeeting({ ...meeting!, step: 1 })}><b>1</b>Close out {prevName}</button>
@@ -495,7 +503,7 @@ function Inner({ level }: { level: Level }) {
               : <span className="pv2-hint">{session.loading ? '' : `No ${name} plan yet`}</span>}
           </div>
           {viewSwitch}
-          <button type="button" className={session.saved ? 'pv2-qbtn' : 'pv2-btn'} onClick={startMeeting}>Plan {name}</button>
+          <button type="button" className={reviewDue ? 'pv2-btn' : 'pv2-qbtn'} onClick={startMeeting}>{review}</button>
         </div>
       )}
 

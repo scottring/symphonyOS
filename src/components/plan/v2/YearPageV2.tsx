@@ -103,8 +103,11 @@ function Inner() {
     const areaId = areas[0]?.id ?? (await addArea('General'))?.id ?? null
     await addGoal(areaId, name, soleDomain ?? undefined, { year })
   }
+  // The year's review (see PlanPageV2): prominent only while one is due.
+  const reviewIds = prevLines.filter((l) => l.fate === 'open').map((l) => l.task.id)
+  const reviewDue = !session.saved || reviewIds.length > 0
   const startMeeting = () => {
-    const candidateIds = prevLines.filter((l) => l.fate === 'open').map((l) => l.task.id)
+    const candidateIds = reviewIds
     setMeeting({ step: candidateIds.length ? 1 : 2, candidateIds })
     window.scrollTo({ top: 0 })
   }
@@ -176,8 +179,8 @@ function Inner() {
         <div className="pv2-chrome">{chrome ? <HomeChromeControls className="flex" /> : <DomainSwitcher />}</div>
       </header>
       {inMeeting ? (
-        <div className="pv2-sbar" role="region" aria-label={`Planning ${year}`}>
-          <span className="pv2-st">Planning {year}<small>a planning meeting</small></span>
+        <div className="pv2-sbar" role="region" aria-label={`Year review, ${year}`}>
+          <span className="pv2-st">Year review<small>{year}</small></span>
           {meeting!.candidateIds.length > 0 ? (
             <div className="pv2-steps">
               <button type="button" aria-current={meeting!.step === 1 ? 'step' : undefined} onClick={() => setMeeting({ ...meeting!, step: 1 })}><b>1</b>Close out {year - 1}</button>
@@ -196,7 +199,7 @@ function Inner() {
               : <span className="pv2-hint">{session.loading ? '' : `No ${year} plan yet`}</span>}
           </div>
           {viewSwitch}
-          <button type="button" className={session.saved ? 'pv2-qbtn' : 'pv2-btn'} onClick={startMeeting}>Plan {year}</button>
+          <button type="button" className={reviewDue ? 'pv2-btn' : 'pv2-qbtn'} onClick={startMeeting}>Year review</button>
         </div>
       )}
       {body}
