@@ -49,7 +49,7 @@ describe('SomedayPage', () => {
     try {
       render(<SomedayPage />)
       expect(screen.queryByText('Nothing set aside.')).not.toBeInTheDocument()
-      expect(screen.getByText(/Nothing set aside in the domains you're viewing/)).toBeInTheDocument()
+      expect(screen.getByText(/Nothing set aside in the areas you're viewing/)).toBeInTheDocument()
       fireEvent.click(screen.getByRole('button', { name: 'Show all domains' }))
       expect(screen.getByText('Learn the cello')).toBeInTheDocument()
     } finally {

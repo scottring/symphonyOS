@@ -167,7 +167,7 @@ export function CalendarSetupWizard({ onComplete }: CalendarSetupWizardProps) {
         </button>
 
         <p className="text-sm text-neutral-500 text-center">
-          Your calendar data stays private. Events only appear in the domains you assign them to.
+          Your calendar data stays private. Events only appear in the areas you assign them to.
         </p>
       </div>
     )

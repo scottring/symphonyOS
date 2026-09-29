@@ -115,26 +115,26 @@ describe('ShellLayout domain switcher', () => {
   it.each(['/week', '/inbox'])('renders the domain switcher in the mobile header on %s', (path) => {
     mobileState.isMobile = true
     renderAt(path)
-    expect(screen.getByRole('button', { name: 'Layers: All' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Areas: All' })).toBeInTheDocument()
     expect(screen.getByTestId('app-content')).toBeInTheDocument()
   })
 
   it('leaves mobile Today to its own Filters control, so the header row is gone', () => {
     mobileState.isMobile = true
     renderAt('/today')
-    expect(screen.queryByRole('button', { name: /^Layers:/ })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /^Areas:/ })).not.toBeInTheDocument()
   })
 
   it('on desktop keeps the switcher off Today and Inbox (their masthead cards own it) and on for other views', () => {
     mobileState.isMobile = false
     const { unmount } = renderAt('/today')
-    expect(screen.queryByRole('button', { name: /^Layers:/ })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /^Areas:/ })).not.toBeInTheDocument()
     unmount()
     const second = renderAt('/inbox')
-    expect(screen.queryByRole('button', { name: /^Layers:/ })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /^Areas:/ })).not.toBeInTheDocument()
     second.unmount()
     renderAt('/routines')
-    expect(screen.getByRole('button', { name: 'Layers: All' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Areas: All' })).toBeInTheDocument()
   })
 })
 

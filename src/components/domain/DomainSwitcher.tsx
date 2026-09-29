@@ -71,7 +71,7 @@ export function DomainSwitcher() {
     <div
       ref={menuRef}
       role="menu"
-      aria-label="Layers"
+      aria-label="Areas"
       className="fixed z-[9999] bg-white rounded-xl border border-neutral-200 shadow-lg p-2 min-w-[200px] animate-fade-in-up"
       style={{ top: menuPosition.top, bottom: menuPosition.bottom, right: menuPosition.right }}
     >
@@ -131,8 +131,8 @@ export function DomainSwitcher() {
         onClick={() => setIsOpen((o) => !o)}
         aria-haspopup="menu"
         aria-expanded={isOpen}
-        aria-label={`Layers: ${label}`}
-        title={`Layers: ${label}`}
+        aria-label={`Areas: ${label}`}
+        title={`Areas: ${label}`}
         className={`domain-switcher-trigger inline-flex items-center gap-1.5 px-3 py-2.5 rounded-lg bg-bg-elevated/90 backdrop-blur-sm border transition-colors ${isOpen ? 'border-primary-300 bg-neutral-50' : 'border-neutral-200 hover:bg-neutral-50/50'}`}
         style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04), inset 0 1px 0 rgba(255,255,255,0.4)' }}
       >
