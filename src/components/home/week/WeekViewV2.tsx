@@ -1012,13 +1012,17 @@ export function WeekViewV2(props: WeekViewV2Props) {
   // A past week is a look-back, not a plan.
   const weekIsPast = weekAnchor.getTime() + 7 * 86_400_000 <= Date.now()
 
+  const weekTools = <>
+    {!narrow && props.mode === undefined && (
+      <div className="mr-auto"><WeekModeSwitch mode={mode} onChange={setOwnMode} /></div>
+    )}
+    <RoutinesToggle hidden={hideRoutines} onToggle={() => writeHideRoutines(!hideRoutines)} />
+  </>
+  // v2 draws these in its one toolbar, not on a row of their own.
+  const v2Page = planV2Enabled() && (narrow || !showSchedule)
+
   return (
-    <WeekPlanHost tasks={tasks} weekStart={weekAnchor} meId={meId} isPast={weekIsPast} tools={<>
-        {!narrow && props.mode === undefined && (
-          <div className="mr-auto"><WeekModeSwitch mode={mode} onChange={setOwnMode} /></div>
-        )}
-        <RoutinesToggle hidden={hideRoutines} onToggle={() => writeHideRoutines(!hideRoutines)} />
-      </>}>
+    <WeekPlanHost tasks={tasks} weekStart={weekAnchor} meId={meId} isPast={weekIsPast} tools={v2Page ? undefined : weekTools}>
       {({ openSession }) => (
     <div className="relative week-content">
 
@@ -1038,7 +1042,7 @@ export function WeekViewV2(props: WeekViewV2Props) {
             never by dragging from it. On a narrow screen the list sits above
             the stacked days instead. */}
         {narrow && planV2Enabled() ? (
-          <WeekV2 tasks={tasks} weekStart={weekAnchor} meId={meId} isCurrent={weekIsCurrent} dragEnabled={false}
+          <WeekV2 tasks={tasks} weekStart={weekAnchor} meId={meId} isCurrent={weekIsCurrent} dragEnabled={false} tools={weekTools}
             onSelectTask={(id) => onSelectItem(`task-${id}`)}
             timingControl={weekTimingControl}
             days={<WeekJournal days={journalDays} spans={journalSpans} onSelectItem={onSelectItem} onToggleEntry={handleJournalToggle} onPlanDrop={handlePlanDropOnDay} onAddToDay={handleAddToDay} narrow dragEnabled={false} timingControl={weekTimingControl} />} />
@@ -1055,7 +1059,7 @@ export function WeekViewV2(props: WeekViewV2Props) {
         {!showSchedule && planV2Enabled() ? (
           // v2 (docs/planning/2026-09-28-planning-v2.md): the same journal and
           // list, laid out as the prototype's day column + "Any day this week".
-          <WeekV2 tasks={tasks} weekStart={weekAnchor} meId={meId} isCurrent={weekIsCurrent} onPlan={openSession}
+          <WeekV2 tasks={tasks} weekStart={weekAnchor} meId={meId} isCurrent={weekIsCurrent} onPlan={openSession} tools={weekTools}
             onSelectTask={(id) => onSelectItem(`task-${id}`)}
             timingControl={weekTimingControl}
             days={<WeekJournal days={journalDays} spans={journalSpans} onSelectItem={onSelectItem} onToggleEntry={handleJournalToggle} onPlanDrop={handlePlanDropOnDay} onAddToDay={handleAddToDay} timingControl={weekTimingControl} />} />

@@ -148,7 +148,7 @@ export function WeekPlanHost({ tasks, weekStart, meId, isPast, children, tools }
           <div className="week-plan-tools">{tools}</div>
         </div>
       )}
-      {(isPast || v2) && <div className="week-display-tools">{tools}</div>}
+      {(isPast || v2) && tools && <div className="week-display-tools">{tools}</div>}
       {justSaved && !sessionOpen && (
         <PlanNextLine
           planned="The week"

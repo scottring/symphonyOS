@@ -22,7 +22,7 @@ import { LineMenu, type LineActions, type LineVM } from './PlanLine'
 
 type Parent = { id: string; title: string; isGoal: boolean }
 
-export function WeekListV2({ title, lines, weekStart, members, actions, timingControl, onContext, onAdd, parentOf, onHoverParent, onShowParent, draftChild, onDraftChild, onCancelChild, dragEnabled = true }: {
+export function WeekListV2({ title, lines, weekStart, members, actions, timingControl, onContext, onAdd, parentOf, onHoverParent, onShowParent, draftChild, onDraftChild, onCancelChild, dragEnabled = true, headerAction }: {
   title: string
   lines: LineVM[]
   weekStart: Date
@@ -43,6 +43,8 @@ export function WeekListV2({ title, lines, weekStart, members, actions, timingCo
   onDraftChild?: (title: string) => void
   onCancelChild?: () => void
   dragEnabled?: boolean
+  /** Drawn at the right of the heading (Add from paper). */
+  headerAction?: ReactNode
 }) {
   const [draft, setDraft] = useState('')
   const [showDone, setShowDone] = useState(false)
@@ -65,7 +67,7 @@ export function WeekListV2({ title, lines, weekStart, members, actions, timingCo
     onContext={onContext} parent={parentOf(vm.task)} onHoverParent={onHoverParent} onShowParent={onShowParent} dragEnabled={dragEnabled} />
   return (
     <section ref={dropRef} aria-label="This week's list" className={`pv2-wl${isOver ? ' is-over' : ''}`}>
-      <div className="pv2-colh">{title}</div>
+      <div className="pv2-colh">{title}{headerAction}</div>
       {draftChild && onDraftChild && <DraftChild key={draftChild.id} parent={draftChild} onAdd={onDraftChild} onCancel={() => onCancelChild?.()} />}
       {!open.length && !done.length && !draftChild && <p className="pv2-hint">Nothing on this week’s list yet. “Plan this week” lets you choose from the month.</p>}
       {groups.map((g) => (

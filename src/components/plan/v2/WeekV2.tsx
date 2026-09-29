@@ -39,7 +39,7 @@ import type { TaskContext } from '@/types/task'
 const DAY = 86_400_000
 const shortDay = (d: Date) => d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
 
-export function WeekV2({ tasks, weekStart, meId, isCurrent, days, onSelectTask, timingControl, dragEnabled = true }: {
+export function WeekV2({ tasks, weekStart, meId, isCurrent, days, onSelectTask, timingControl, dragEnabled = true, tools }: {
   /** Layer-filtered tasks, as the week receives them. */
   tasks: Task[]
   weekStart: Date
@@ -53,6 +53,8 @@ export function WeekV2({ tasks, weekStart, meId, isCurrent, days, onSelectTask, 
   timingControl?: (task: Task) => ReactNode
   /** Cards on the list drag onto the days (off on touch-width layouts). */
   dragEnabled?: boolean
+  /** The week's display toggles (Routines), drawn in this toolbar. */
+  tools?: ReactNode
   /** The journal of days, as WeekViewV2 builds it. */
   days: ReactNode
   onSelectTask: (id: string) => void
@@ -212,6 +214,7 @@ export function WeekV2({ tasks, weekStart, meId, isCurrent, days, onSelectTask, 
             ? <><span className="pv2-seal" aria-hidden="true" /><span><b>Our week {weekNo} plan</b> · agreed {shortDay(session.saved.at)} · {agreedBy}</span></>
             : <span className="pv2-hint">{session.loading ? '' : `No plan for week ${weekNo} yet`}</span>}
         </div>
+        {tools && <div className="pv2-wtools">{tools}</div>}
         {viewSwitch}
         <button type="button" className={session.saved ? 'pv2-qbtn' : 'pv2-btn'} onClick={startMeeting}>Plan this week</button>
       </div>
@@ -225,9 +228,11 @@ export function WeekV2({ tasks, weekStart, meId, isCurrent, days, onSelectTask, 
           empty={`Nothing on this week yet. “Plan this week” lets you choose from ${monthName}’s plan.`} />
       ) : (
         <div className={`pv2-wgrid${view === 'ref' ? ' is-ref' : ''}`}>
-          <section className="pv2-days" aria-label="The days">{days}</section>
-          <div className="pv2-wside"><div className="pv2-wside-tools"><FromPaper altitude="week" periodStart={weekStart} tasks={tasks} /></div>
-            <div className="pv2-panel">
+          {/* One spread: three columns, one heading line across them, no
+              boxes (Scott, 2026-09-29: "a bunch of stuff randomly put down"). */}
+          <section className="pv2-days" aria-label="The days"><div className="pv2-colh">The days</div>{days}</section>
+          <div className="pv2-wside">
+            <div>
               <WeekListV2 title={isCurrent ? 'This week’s list' : `List for the week of ${weekStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`}
                 lines={lines} weekStart={weekStart} members={members} actions={actions} timingControl={timingControl}
                 onContext={(t, c: TaskContext | undefined) => { void gated.updateTask(t.id, { context: c }) }}
@@ -235,7 +240,7 @@ export function WeekV2({ tasks, weekStart, meId, isCurrent, days, onSelectTask, 
                 parentOf={parentOf} onHoverParent={setLitParent} onShowParent={showParent}
                 draftChild={childOf ? { id: childOf.id, title: childOf.title, isGoal: !!childOf.isGoal } : null}
                 onDraftChild={(title) => { if (childOf) void addStep(childOf, title) }} onCancelChild={() => setChildOf(null)}
-                dragEnabled={dragEnabled} />
+                dragEnabled={dragEnabled} headerAction={<FromPaper altitude="week" periodStart={weekStart} tasks={tasks} />} />
             </div>
           </div>
           {view === 'ref' && (
