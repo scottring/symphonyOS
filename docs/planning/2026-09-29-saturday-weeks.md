@@ -42,7 +42,7 @@ lost the other's week (already true of the old Monday option).
 Either order is safe: the app falls back to the device setting until the column
 exists, and the migration changes nothing until someone switches.
 
-1. Apply the migration to the shared project.
+1. Apply the migration to the shared project. **Done 2026-09-29.**
 2. Merge the app.
 3. Scott switches to Saturday in Settings → Planning rhythm (as household owner).
 

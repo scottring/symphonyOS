@@ -1,5 +1,5 @@
--- PREPARED — NOT APPLIED to the shared project. Apply only with Scott's
--- explicit approval, as its own step.
+-- APPLIED to the shared project 2026-09-29 with Scott's approval
+-- (verified: all households still Sunday, no week records moved).
 -- Proof: supabase/tests/103_household_week_start.test.sql (as postgres and as
 -- two `authenticated` household members, ends in ROLLBACK).
 -- Rollback: supabase/migrations/rollback/2026-09-29_household_week_start.down.sql
