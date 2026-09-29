@@ -25,11 +25,14 @@ import type { Goal } from '@/types/goal'
 import type { Task } from '@/types/task'
 import { PlanLine, type LineActions, type LineVM } from './PlanLine'
 import { FocusDeck, CloseOut, type CloseDecision } from './FocusDeck'
+import { PlanMeetingBar, PlanSavedLine, PlanToolbar } from './PlanStatus'
+import { EMPTY_TALLY, addToTally, lookBackWhy, nextAfterSave, tallySentence, type Tally } from '@/lib/planning/v2/planTally'
+import { periodBounds } from '@/lib/planning/periodPage'
+import { readSeasons } from '@/lib/cadence/seasons'
 import { FromPaper } from './FromPaper'
 import { ViewSwitch } from './ViewSwitch'
 import { useAddArea } from './AddArea'
 
-const shortDay = (d: Date) => d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
 
 /** A goal row in the task shape the shared line and card draw. */
 function asLine(g: Goal): Task {
@@ -103,7 +106,10 @@ function Inner() {
       }
     },
   }
+  const [tally, setTally] = useState<Tally>(EMPTY_TALLY)
+  const [justSaved, setJustSaved] = useState<null | { detail: string }>(null)
   const decide = async (vm: LineVM, d: CloseDecision) => {
+    setTally((x) => addToTally(x, d))
     const g = byId(vm.task.id); if (!g) return
     if (d === 'carried') await carryInto(g, year)
     else if (d === 'done') await updateGoal(g.id, { status: 'completed' })
@@ -119,13 +125,17 @@ function Inner() {
   const reviewDue = !session.saved || reviewIds.length > 0
   const startMeeting = () => {
     const candidateIds = reviewIds
+    setTally(EMPTY_TALLY)
+    setJustSaved(null)
     setMeeting({ step: candidateIds.length ? 1 : 2, candidateIds })
     window.scrollTo({ top: 0 })
   }
   const endMeeting = async (keep: boolean) => {
     if (keep) {
       if (!(await session.save({ wentWell: session.mine?.wentWell ?? '', didnt: session.mine?.didnt ?? '' }))) { showToast('Couldn’t save the plan — try again.', 'error', 5000); return }
-      showToast(`Saved as our ${year} plan.`, 'success', 5000)
+      const open = lines.filter((l) => l.fate === 'open').length
+      const done = lines.filter((l) => l.fate === 'done').length
+      setJustSaved({ detail: [`${open} open${done ? `, ${done} done` : ''}.`, tallySentence(tally, String(year - 1))].filter(Boolean).join(' ') })
     }
     setMeeting(null)
   }
@@ -133,6 +143,12 @@ function Inner() {
     ? (session.saved.authorId === user?.id ? 'you' : members.find((m) => m.auth_user_id === session.saved!.authorId)?.name ?? 'your household')
     : null
   const inMeeting = !!meeting
+  // After a save, the season that takes the year forward.
+  const seasons = readSeasons()
+  const nextStep = nextAfterSave('year', new Date(year, 0, 1), year === new Date().getFullYear(), new Date(), {
+    weekStartOf: (d) => d, weekNumber: () => 0,
+    seasonOf: (d) => { const b = periodBounds('season', d, seasons); return { start: b.start, name: b.label.replace(/\s+\d{4}$/, '') } },
+  })
   const main = lines.filter((l) => l.fate === 'open' || l.fate === 'done')
   const carried = lines.filter((l) => l.fate === 'carried')
   const dropped = lines.filter((l) => l.fate === 'dropped')
@@ -173,35 +189,21 @@ function Inner() {
     <div className="pv2-page">
       <MastheadCard variant="page" numeral={String(year)} title={`Jan – Dec ${year}`}
         eyebrow={<PeriodNavEyebrow label="Year" onPrev={() => goTo(year - 1)} onNext={() => goTo(year + 1)} prevLabel={String(year - 1)} nextLabel={String(year + 1)} />}
-        subline={meeting?.step === 1 ? `First, decide what happens to what’s left of ${year - 1}.` : inMeeting ? 'Write what this year is for.' : undefined}
         controls={chrome ? <HomeChromeControls className="flex" /> : <DomainSwitcher />} />
       {inMeeting ? (
-        <div className="pv2-sbar" role="region" aria-label={`Year review, ${year}`}>
-          <span className="pv2-st">Year review<small>{year}</small></span>
-          {meeting!.candidateIds.length > 0 ? (
-            <div className="pv2-steps">
-              <button type="button" aria-current={meeting!.step === 1 ? 'step' : undefined} onClick={() => setMeeting({ ...meeting!, step: 1 })}><b>1</b>Close out {year - 1}</button>
-              <button type="button" aria-current={meeting!.step === 2 ? 'step' : undefined} onClick={() => setMeeting({ ...meeting!, step: 2 })}><b>2</b>Write {year}</button>
-            </div>
-          ) : <span className="flex-1" />}
-          {/* With steps in the bar there is no room for the views too — the
-              review writes with the level above beside it anyway. */}
-          {meeting!.step === 2 && meeting!.candidateIds.length === 0 && viewSwitch}
-          <button type="button" className="pv2-link pv2-quiet" onClick={() => void endMeeting(false)}>Leave for now</button>
-          <button type="button" className="pv2-btn" onClick={() => void endMeeting(true)}>This is our {year} plan</button>
-        </div>
-      ) : (
-        <div className="pv2-toolbar">
-          <div className="pv2-status">
-            {session.saved
-              ? <><span className="pv2-seal" aria-hidden="true" /><span><b>Our {year} plan</b> · agreed {shortDay(session.saved.at)} · {agreedBy}</span></>
-              : (session.loading ? null : <span className="pv2-noplan"><span className="pv2-hint">{`No ${year} plan yet`}</span>
-                <button type="button" className="pv2-link" onClick={startMeeting}>Plan your year →</button></span>)}
-          </div>
-          {viewSwitch}
-          <button type="button" className={session.saved && reviewDue ? 'pv2-btn' : 'pv2-qbtn'} onClick={startMeeting}>Year review</button>
-        </div>
-      )}
+        <PlanMeetingBar period={String(year)} prevName={String(year - 1)} step={meeting!.step} lookBack={meeting!.candidateIds.length > 0}
+          why={meeting!.step === 1 ? lookBackWhy(String(year - 1), String(year), meeting!.candidateIds.length)
+            : 'Write what this year is for. A few lines is plenty; each can hold smaller plans later.'}
+          onStep={(step) => setMeeting({ ...meeting!, step })}
+          viewSwitch={meeting!.step === 2 && meeting!.candidateIds.length === 0 ? viewSwitch : undefined}
+          onLeave={() => void endMeeting(false)} onSave={() => void endMeeting(true)} saveLabel={`This is our ${year} plan`} />
+      ) : (<>
+        {justSaved && <PlanSavedLine title={`${year} plan saved.`} detail={justSaved.detail}
+          next={{ label: nextStep.label, onClick: () => navigate(nextStep.to) }}
+          onDone={() => setJustSaved(null)} />}
+        <PlanToolbar period={String(year)} saved={session.saved} loading={session.loading} error={!!session.error} agreedBy={agreedBy}
+          reviewDue={reviewDue} onPlan={startMeeting} onRetry={session.reload} viewSwitch={viewSwitch} />
+      </>)}
       {body}
     </div>
   )

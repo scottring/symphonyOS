@@ -28,8 +28,10 @@ describe('PlanNavigation', () => {
     const month = rail.querySelector('a[aria-current="page"]')!
     expect(month.textContent).toContain('October')
     expect(month.getAttribute('href')).toBe('/month?start=2026-10-01')
-    // Another horizon opens on the period you are in — the page's default.
-    expect(rail.querySelector('a[href="/season"]')).toBeTruthy()
+    // The other steps follow the period on screen (decision D, 2026-09-29):
+    // the week holding October 1, not the clock's week. Today stays today.
+    expect(rail.querySelector('a[href^="/week?start="]')).toBeTruthy()
+    expect(rail.querySelector('a[href="/today"]')).toBeTruthy()
   })
 
   it('switches horizons on a phone from the title menu, one horizon at a time', () => {

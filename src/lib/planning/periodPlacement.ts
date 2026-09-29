@@ -18,6 +18,18 @@ export function monthStartOf(date: Date): Date {
 }
 
 /**
+ * The months a week's seven days touch, earliest first: one month, or two when
+ * the week crosses a month end. A Sat Sep 26 – Fri Oct 2 week touches both
+ * September and October (2026-09-29: its reference showed only September,
+ * finished, while October's open goals were hidden).
+ */
+export function monthsOfWeek(weekStart: Date): Date[] {
+  const first = monthStartOf(weekStart)
+  const last = monthStartOf(new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate() + 6))
+  return first.getTime() === last.getTime() ? [first] : [first, last]
+}
+
+/**
  * Does `task` belong to the month starting `monthStart`? — the POOL question.
  * A row with no month of its own (every row that predates this column) counts:
  * its old meaning was "the current month", and scoping it to one month would

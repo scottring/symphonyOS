@@ -140,7 +140,7 @@ describe('buildSaveRows', () => {
   })
 
   it('summarises what will be saved', () => {
-    expect(summarizeRows(rows)).toMatchObject({ yearGoals: 1, seasonGoals: 1, seasonTasks: 1, monthTasks: 1, routines: 1, notes: 1, total: 7 })
+    expect(summarizeRows(rows)).toMatchObject({ yearGoals: 1, seasonGoals: 1, seasonTasks: 1, monthTasks: 1, routines: 1, notes: 1, total: 7, seasonStart: '2026-09-01', monthStart: '2026-10-01' })
   })
 })
 

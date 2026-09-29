@@ -239,8 +239,13 @@ export function buildSaveRows(analysis: Analysis, instructions: string | null, o
 
 /** Counts for the "Save N changes" confirmation. */
 export function summarizeRows(rows: SavePlanRows) {
-  const tasks = rows.tasks as { bucket: string; is_goal: boolean }[]
+  const tasks = rows.tasks as { bucket: string; is_goal: boolean; season_start?: string | null; month_start?: string | null }[]
+  // Where the saved lines live, earliest first, so "Open" lands on that period
+  // (Fall saved in September opens Fall, not the running season).
+  const first = (k: 'season_start' | 'month_start') => tasks.map((t) => t[k]).filter((v): v is string => !!v).sort()[0] ?? null
   return {
+    seasonStart: first('season_start'),
+    monthStart: first('month_start'),
     yearGoals: rows.goals.length,
     seasonGoals: tasks.filter((t) => t.is_goal && t.bucket === 'quarter').length,
     monthGoals: tasks.filter((t) => t.is_goal && t.bucket === 'month').length,

@@ -45,6 +45,8 @@ import { useMobile } from '@/hooks/useMobile'
 import { readCadenceConfig, weekStartAnchor } from '@/lib/cadence/config'
 import { weekOfYear } from '@/lib/planning/horizonNumerals'
 import { FocusDeck, CloseOut, type CloseDecision } from './FocusDeck'
+import { PlanMeetingBar, PlanSavedLine, PlanToolbar } from './PlanStatus'
+import { EMPTY_TALLY, addToTally, lookBackWhy, nextAfterSave, tallySentence, type Tally } from '@/lib/planning/v2/planTally'
 import { FromPaper } from './FromPaper'
 import { ViewSwitch } from './ViewSwitch'
 import { PeriodRefRoutines } from './RefShelves'
@@ -188,9 +190,21 @@ function Inner({ level }: { level: Level }) {
   // agreed, or the last one leaving undecided lines — and is quiet after.
   const reviewIds = closeOutCandidates(prevLines.map((l) => l.task), level, prevBounds.start, prevBounds.end).map((t) => t.id)
   const reviewDue = !session.saved || reviewIds.length > 0
-  const review = level === 'month' ? 'Monthly review' : 'Season review'
+  const [tally, setTally] = useState<Tally>(EMPTY_TALLY)
+  const [justSaved, setJustSaved] = useState<null | { detail: string }>(null)
+  // After a save, the next level down: a season hands work to its month (the
+  // current one, or its first when planning ahead); a month to its week.
+  const nextStep = useMemo(() => {
+    const wso = readCadenceConfig().weekStartsOn
+    return nextAfterSave(level, bounds.start, isCurrent, today, {
+      weekStartOf: (d) => weekStartAnchor(d, wso), weekNumber: (d) => weekOfYear(d, wso),
+      seasonOf: (d) => { const b = periodBounds('season', d, seasons); return { start: b.start, name: b.label.replace(/\s+\d{4}$/, '') } },
+    })
+  }, [level, isCurrent, today, bounds.start, seasons])
   const startMeeting = () => {
     const candidateIds = reviewIds
+    setTally(EMPTY_TALLY)
+    setJustSaved(null)
     setMeeting({ step: candidateIds.length ? 1 : 2, candidateIds })
     // The level above sits beside the list for the whole meeting.
     setViewState('ref')
@@ -200,7 +214,9 @@ function Inner({ level }: { level: Level }) {
     if (keep) {
       const ok = await session.save({ wentWell: session.mine?.wentWell ?? '', didnt: session.mine?.didnt ?? '' })
       if (!ok) { showToast('Couldn’t save the plan — try again.', 'error', 5000); return }
-      showToast(`Saved as our ${name} plan.`, 'success', 5000)
+      const open = lines.filter((l) => l.fate === 'open').length
+      const done = lines.filter((l) => l.fate === 'done').length
+      setJustSaved({ detail: [`${open} open${done ? `, ${done} done` : ''}.`, tallySentence(tally, prevName)].filter(Boolean).join(' ') })
     }
     setMeeting(null)
     setViewState(readPlanView(level))
@@ -277,6 +293,7 @@ function Inner({ level }: { level: Level }) {
   }
   const decide = async (vm: LineVM, d: CloseDecision) => {
     const t = vm.task
+    setTally((x) => addToTally(x, d))
     if (d === 'carried') await keepForward(t.id, periodPatch(bounds), prevBounds.start)
     else if (d === 'done') { if (!t.completed) await toggleTask(t.id) }
     else if (d === 'someday') await gated.updateTask(t.id, { bucket: 'someday', scheduledFor: undefined, isAllDay: undefined })
@@ -398,7 +415,7 @@ function Inner({ level }: { level: Level }) {
     <section aria-label={`${name} plan`}>
       <div className="pv2-colh">{inMeeting ? `${name}’s list` : 'Our plan'}<FromPaper altitude={level} periodStart={bounds.start} tasks={layered} /></div>
       {loading && !main.length ? <p className="pv2-hint">Loading…</p> : null}
-      {!loading && !main.length && <p className="pv2-hint">{inMeeting ? 'Nothing yet. Write whatever comes up — no types, no dates needed.' : `Nothing on ${name}’s plan yet. Add a line below, or start the ${review.toLowerCase()}.`}</p>}
+      {!loading && !main.length && <p className="pv2-hint">{inMeeting ? 'Nothing yet. Write whatever comes up — no types, no dates needed.' : `Nothing on ${name}’s plan yet. Add a line below, or choose “Plan ${name}” to write it with ${aboveName} beside you.`}</p>}
       {childFor && <ul className="pv2-list"><DraftLine key={childFor.id} parentTitle={childFor.title} isGoal={childFor.isGoal}
         placeholder={childFor.isGoal ? `${name}’s part of it` : `A step for ${name}`}
         onAdd={(t) => void addFromAbove(childFor, t)} onCancel={() => setChildFor(null)} /></ul>}
@@ -459,7 +476,7 @@ function Inner({ level }: { level: Level }) {
       onDecide={decide} onFinish={() => setMeeting({ ...meeting, step: 2 })} />
   } else if (view === 'focus') {
     body = <FocusDeck lines={lines} actions={actions} members={members} nextLabel={nextName} context={`${name} plan`} label={`${name}’s plan`}
-      empty={`Nothing on ${name}’s plan yet. The ${review.toLowerCase()} writes it${level === 'month' ? `, with ${aboveName} beside you` : ''}.`} />
+      empty={inMeeting ? `Nothing on ${name}’s plan yet. Switch to the list to write the first line.` : `Nothing on ${name}’s plan yet. Choose “Plan ${name}” to write it with ${aboveName} beside you.`} />
   } else if (view === 'ref') {
     body = <div className={level === 'month' ? 'pv2-grid3' : 'pv2-grid2 is-ref'}>{refColumn}{listColumn}{calendar}</div>
   } else {
@@ -477,37 +494,22 @@ function Inner({ level }: { level: Level }) {
             <button type="button" onClick={() => goTo(today)} aria-label={`Back to this ${NOUN[level].toLowerCase()}`}
               className="period-return ml-1 inline-flex shrink-0 items-center gap-1 rounded-full border border-primary-100 bg-primary-50 px-2 py-0.5 text-[11px] font-semibold text-primary-600 transition-colors hover:bg-primary-100">This {NOUN[level].toLowerCase()}</button>
           )} />}
-        subline={meeting?.step === 1 ? `First, decide what happens to what’s left of ${prevName}.`
-          : inMeeting ? `Look at ${aboveName}${level === 'month' ? ' and the calendar' : ''}, then write what ${name} is for.` : undefined}
+
         controls={chrome ? <HomeChromeControls className="flex" /> : <DomainSwitcher />} />
 
       {inMeeting ? (
-        <div className="pv2-sbar" role="region" aria-label={`${review}, ${name}`}>
-          <span className="pv2-st">{review}<small>{name}</small></span>
-          {meeting!.candidateIds.length > 0 ? (
-            <div className="pv2-steps">
-              <button type="button" aria-current={meeting!.step === 1 ? 'step' : undefined} onClick={() => setMeeting({ ...meeting!, step: 1 })}><b>1</b>Close out {prevName}</button>
-              <button type="button" aria-current={meeting!.step === 2 ? 'step' : undefined} onClick={() => setMeeting({ ...meeting!, step: 2 })}><b>2</b>Write {name}</button>
-            </div>
-          ) : <span className="flex-1" />}
-          {/* With steps in the bar there is no room for the views too — the
-              review writes with the level above beside it anyway. */}
-          {meeting!.step === 2 && meeting!.candidateIds.length === 0 && viewSwitch}
-          <button type="button" className="pv2-link pv2-quiet" onClick={() => void endMeeting(false)}>Leave for now</button>
-          <button type="button" className="pv2-btn" onClick={() => void endMeeting(true)}>This is our {name} plan</button>
-        </div>
-      ) : (
-        <div className="pv2-toolbar">
-          <div className="pv2-status">
-            {session.saved
-              ? <><span className="pv2-seal" aria-hidden="true" /><span><b>Our {name} plan</b> · agreed {shortDay(session.saved.at)} · {agreedBy}</span></>
-              : (session.loading ? null : <span className="pv2-noplan"><span className="pv2-hint">{`No ${name} plan yet`}</span>
-                <button type="button" className="pv2-link" onClick={startMeeting}>Plan your {level === 'month' ? 'month' : 'season'} →</button></span>)}
-          </div>
-          {viewSwitch}
-          <button type="button" className={session.saved && reviewDue ? 'pv2-btn' : 'pv2-qbtn'} onClick={startMeeting}>{review}</button>
-        </div>
-      )}
+        <PlanMeetingBar period={name} prevName={prevName} step={meeting!.step} lookBack={meeting!.candidateIds.length > 0}
+          why={meeting!.step === 1 ? lookBackWhy(prevName, name, meeting!.candidateIds.length)
+            : `Look at ${aboveName}${level === 'month' ? ' and the calendar' : ''} beside the list, then write what ${name} is for. ${level === 'month' ? 'A quiet month is fine.' : 'A few lines is plenty.'}`}
+          onStep={(step) => setMeeting({ ...meeting!, step })}
+          viewSwitch={meeting!.step === 2 && meeting!.candidateIds.length === 0 ? viewSwitch : undefined}
+          onLeave={() => void endMeeting(false)} onSave={() => void endMeeting(true)} saveLabel={`This is our ${name} plan`} />
+      ) : (<>
+        {justSaved && <PlanSavedLine title={`${name} plan saved.`} detail={justSaved.detail}
+          next={{ label: nextStep.label, onClick: () => navigate(nextStep.to) }} onDone={() => setJustSaved(null)} />}
+        <PlanToolbar period={name} saved={session.saved} loading={session.loading} error={!!session.error} agreedBy={agreedBy}
+          reviewDue={reviewDue} onPlan={startMeeting} onRetry={session.reload} viewSwitch={viewSwitch} />
+      </>)}
 
       {dragOn && meeting?.step !== 1 && view !== 'focus' ? (
         <DndContext sensors={sensors} collisionDetection={pointerWithin}
