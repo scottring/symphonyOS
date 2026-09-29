@@ -161,3 +161,22 @@ describe('defaultInclude / withAnalysis', () => {
     expect(revised.rowIds).not.toHaveProperty('n')
   })
 })
+
+// 2026-09-29: the type picker uses the review sheet's shared types, so a line
+// can be an Activity — saved as tasks.category 'activity', not a plain task.
+describe('Activity', () => {
+  const withActivity: Analysis = { ...analysis, items: analysis.items.map((i) => (i.id === 't' ? { ...i, category: 'activity' as const } : i)) }
+
+  it('saves an Activity as category activity; an unmarked task stays a task', () => {
+    const rows = buildSaveRows(withActivity, '', opts)
+    expect(rows.tasks.find((t) => t.id === 'row-t')!.category).toBe('activity')
+    expect(rows.tasks.find((t) => t.id === 'row-m')!.category).toBe('task')
+  })
+
+  it('stays an Activity through a revision that does not mention it', () => {
+    const first = withAnalysis(newImport('family'), withActivity)
+    const revised = withAnalysis(first, analysis) // the server's copy carries no category
+    expect(revised.analysis!.items.find((i) => i.id === 't')!.category).toBe('activity')
+    expect(revised.analysis!.items.find((i) => i.id === 'm')!.category).toBeUndefined()
+  })
+})

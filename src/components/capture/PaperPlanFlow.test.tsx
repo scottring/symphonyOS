@@ -126,4 +126,22 @@ describe('PaperPlanFlow', () => {
     expect(analyzePages).toHaveBeenCalledTimes(1)
     await waitFor(() => expect(loadImport(USER)?.analysis?.items[0].placement.level).toBe('month'))
   })
+
+  it('offers the shared “What is this?” types (no Appointment — nothing lands on a day) and saves an Activity as one', async () => {
+    seed()
+    analyzePages.mockResolvedValue({ ok: true, analysis })
+    writePlanRows.mockResolvedValue(undefined)
+    renderFlow()
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Read my pages' }))
+    const picker = (await screen.findAllByRole('combobox', { name: 'What is this?' }))[0] as HTMLSelectElement
+    expect([...picker.options].map((o) => o.text)).toEqual(['Goal or project', 'Action / task', 'Activity', 'Routine', 'Note'])
+    fireEvent.change(picker, { target: { value: 'activity' } })
+    expect((screen.getAllByRole('combobox', { name: 'What is this?' })[0] as HTMLSelectElement).value).toBe('activity')
+
+    fireEvent.click(screen.getByRole('button', { name: 'Review changes' }))
+    fireEvent.click(screen.getByRole('button', { name: /^Save 2 changes$/ }))
+    await screen.findByText('Your plan is in')
+    expect(writePlanRows.mock.calls[0][0].tasks[0]).toMatchObject({ title: 'Buy a rain barrel', category: 'activity' })
+  })
 })

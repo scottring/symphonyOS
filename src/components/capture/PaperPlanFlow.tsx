@@ -20,10 +20,22 @@ import { PaperPlanError, isRetryable, paperErrorMessage } from '@/lib/paperPlan/
 import { loadImport, newImport, storeImport, withAnalysis, type PaperImage, type PaperImport } from '@/lib/paperPlan/importState'
 import { buildSaveRows, summarizeRows } from '@/lib/paperPlan/savePlan'
 import { writePlanRows } from '@/lib/paperPlan/writeRows'
+import { PAPER_ITEM_TYPES, type PaperItemType } from '@/lib/paperItemType'
 
 const MAX_IMAGES = 6
-const KIND_LABEL: Record<ItemKind, string> = { goal: 'Goal', task: 'Task', routine: 'Routine idea', note: 'Note' }
+const KIND_HEADING: Record<ItemKind, string> = { goal: 'Goals and projects', task: 'Actions', routine: 'Routines', note: 'Notes' }
 const KIND_ORDER: ItemKind[] = ['goal', 'task', 'routine', 'note']
+/** "What is this?" — the review sheet's shared types (PAPER_ITEM_TYPES), less
+ *  Appointment: nothing from paper lands on a day. Plus Note, for a line kept
+ *  only in the source-pages note. */
+type ChoiceId = Exclude<PaperItemType, 'appointment'> | 'note'
+const TYPE_CHOICES: { id: ChoiceId; label: string }[] = [
+  ...PAPER_ITEM_TYPES.filter((t): t is { id: Exclude<PaperItemType, 'appointment'>; label: string } => t.id !== 'appointment'),
+  { id: 'note', label: 'Note' },
+]
+function choiceOf(item: Item): ChoiceId {
+  return item.kind === 'task' && item.category === 'activity' ? 'activity' : item.kind
+}
 const LEVEL_LABEL: Record<Level, string> = { year: 'Year', season: 'Season', month: 'Month', week: 'This week', someday: 'Someday', none: 'No list' }
 
 type Step = 'intake' | 'reading' | 'review' | 'confirm' | 'saving' | 'saved'
@@ -456,7 +468,7 @@ export function PaperPlanFlow({ members, onClose }: Props) {
           <div className="max-w-xl mx-auto px-4 py-10 space-y-4 text-center">
             <div className="mx-auto w-12 h-12 rounded-full bg-success-100 flex items-center justify-center"><Check className="w-6 h-6 text-success-700" /></div>
             <h2 className="font-display text-2xl text-neutral-900">Your plan is in</h2>
-            <p className="text-[14px] text-neutral-600">{summary.total} changes saved. Routine ideas are waiting, switched off, until you turn them on.</p>
+            <p className="text-[14px] text-neutral-600">{summary.total} changes saved. Routines are saved switched off until you turn them on.</p>
             <div className="flex flex-wrap justify-center gap-2 pt-2">
               {summary.seasonGoals + summary.seasonTasks > 0 && (
                 <button type="button" className="btn-secondary px-4 py-2 rounded-xl text-[14px]" onClick={() => { onClose(); navigate('/season') }}>Open the season</button>
@@ -624,7 +636,7 @@ function PlanPanel({ imp, context, disabled, onEdit, onInclude }: {
               if (!group.length) return null
               return (
                 <div key={kind} className="mb-3">
-                  <p className="text-[12px] uppercase tracking-wide text-neutral-500 mb-1">{KIND_LABEL[kind]}s</p>
+                  <p className="text-[12px] uppercase tracking-wide text-neutral-500 mb-1">{KIND_HEADING[kind]}</p>
                   <ul className="space-y-2">
                     {group.map((item) => (
                       <ItemRow key={item.id} item={item} included={imp.include[item.id] !== false} labelOf={labelOf}
@@ -677,12 +689,16 @@ function ItemRow({ item, included, labelOf, analysis, context, onEdit, onInclude
             className="w-full resize-none [field-sizing:content] bg-transparent text-[15px] leading-snug text-neutral-900 border-b border-transparent focus:border-neutral-300 outline-none" />
           {item.title !== item.original && <p className="text-[12px] text-neutral-500">On paper: “{item.original}”</p>}
           <div className="flex flex-wrap items-center gap-1.5 text-[12px]">
-            <select value={item.kind} aria-label="Kind" onChange={(e) => {
-              const kind = e.target.value as ItemKind
+            <select value={choiceOf(item)} aria-label="What is this?" onChange={(e) => {
+              const choice = e.target.value as ChoiceId
+              const kind: ItemKind = choice === 'activity' ? 'task' : choice
               const level: Level = kind === 'note' ? 'none' : kind === 'goal' && !['year', 'season', 'month'].includes(item.placement.level) ? 'season' : item.placement.level
-              onEdit(item.id, { kind, placement: level === item.placement.level ? item.placement : placementFor(level, analysis, context) })
+              onEdit(item.id, {
+                kind, category: choice === 'activity' ? 'activity' : undefined,
+                placement: level === item.placement.level ? item.placement : placementFor(level, analysis, context),
+              })
             }} className="rounded-full border border-neutral-200 bg-bg-elevated px-2 py-0.5 text-neutral-700">
-              {KIND_ORDER.map((k) => <option key={k} value={k}>{KIND_LABEL[k]}</option>)}
+              {TYPE_CHOICES.map((t) => <option key={t.id} value={t.id}>{t.label}</option>)}
             </select>
             {item.kind !== 'note' && (
               <select value={item.placement.level} aria-label="List" onChange={(e) => onEdit(item.id, { placement: placementFor(e.target.value as Level, analysis, context) })}

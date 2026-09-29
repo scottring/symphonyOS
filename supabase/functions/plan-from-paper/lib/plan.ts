@@ -42,6 +42,10 @@ export interface Item {
   flags: Flag[]
   routine: RoutineDetail | null
   why: string | null
+  /** A task's category, set in review ("Activity"); absent = an action. The
+   *  reader never sets it — nothing from paper lands on a day, so no
+   *  appointments. */
+  category?: 'task' | 'activity'
 }
 export interface Analysis {
   summary: string

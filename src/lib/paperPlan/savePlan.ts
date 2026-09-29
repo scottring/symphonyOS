@@ -202,7 +202,7 @@ export function buildSaveRows(analysis: Analysis, instructions: string | null, o
       month_start: t.bucket === 'month' ? startOfMonth(t.start) : null,
       season_start: t.bucket === 'quarter' ? t.start : null,
       is_goal: t.isGoal,
-      category: 'task',
+      category: item.category ?? 'task',
       context: o.domain, scope,
       goal_id: goalId, goal_task_id: goalTaskId, source_id: sourceId, parent_task_id: parentTaskId,
       notes: noteLines(item, mine),

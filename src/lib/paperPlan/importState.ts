@@ -81,7 +81,17 @@ export function storeImport(userId: string, imp: PaperImport | null): void {
  * row id and include choice it already had, and a newly proposed item gets a
  * fresh row id and the default choice.
  */
-export function withAnalysis(imp: PaperImport, analysis: Analysis): PaperImport {
+export function withAnalysis(imp: PaperImport, incoming: Analysis): PaperImport {
+  // The server drops what the reader never sets: a task marked Activity in
+  // review stays one through a revision while it is still a task.
+  const before = new Map((imp.analysis?.items ?? []).map((i) => [i.id, i]))
+  const analysis: Analysis = {
+    ...incoming,
+    items: incoming.items.map((item) => {
+      const prev = before.get(item.id)
+      return item.kind === 'task' && prev?.kind === 'task' && prev.category && !item.category ? { ...item, category: prev.category } : item
+    }),
+  }
   const ids = new Set(analysis.items.map((i) => i.id))
   const rowIds: Record<string, string> = {}
   const include: Record<string, boolean> = {}
