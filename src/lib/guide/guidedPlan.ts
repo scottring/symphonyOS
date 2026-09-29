@@ -1,0 +1,224 @@
+// src/lib/guide/guidedPlan.ts
+//
+// Guided planning: an optional path through the ordinary planning pages —
+// the bigger picture (Year → Season → Month → Week → Today), the month ahead
+// (Month → Week → Today), this week (Week → Today) or just today. It is not a
+// second planner: every step is the real page, with a guide bar on top, and
+// what you write is the plan itself. Beta walkthrough 2026-09-29 + Codex
+// build brief (onboarding suite).
+//
+// Pure: the dates each step plans, the words each step asks, and moving
+// through the path. Persistence lives in useGuidedPlan.
+import { periodBounds } from '@/lib/planning/periodPage'
+import { weekStartAnchor, type WeekStart } from '@/lib/cadence/config'
+import type { Seasons } from '@/lib/cadence/seasons'
+
+export type GuideRoute = 'bigger' | 'month' | 'week' | 'today'
+export type GuideStep = 'year' | 'season' | 'month' | 'week' | 'today'
+
+export const ROUTE_STEPS: Record<GuideRoute, GuideStep[]> = {
+  bigger: ['year', 'season', 'month', 'week', 'today'],
+  month: ['month', 'week', 'today'],
+  week: ['week', 'today'],
+  today: ['today'],
+}
+
+export const ROUTE_CHOICES: { id: GuideRoute; title: string; body: string; path: string }[] = [
+  { id: 'bigger', title: 'The bigger picture', body: 'Connect the year ahead with what you can do next.', path: 'Year · Season · Month · Week · Today' },
+  { id: 'month', title: 'The month ahead', body: 'Choose priorities for the month and steps for this week.', path: 'Month · Week · Today' },
+  { id: 'week', title: 'This week', body: 'Work out what fits this week and what to do today.', path: 'Week · Today' },
+  { id: 'today', title: 'Just today', body: 'Choose what needs your attention today.', path: 'Today' },
+]
+
+/** The saved progress. Versioned: an unknown shape is ignored, not trusted. */
+export interface GuideState {
+  v: 1
+  route: GuideRoute
+  /** The steps of this run, after dropping any that don't apply (a week
+   *  planned ahead has no "today" step). */
+  steps: GuideStep[]
+  /** Each step's period, as its first day (YYYY-MM-DD). */
+  periods: Partial<Record<GuideStep, string>>
+  current: number
+  done: GuideStep[]
+  status: 'active' | 'paused' | 'finished'
+  updatedAt: string
+}
+
+export function parseGuideState(raw: unknown): GuideState | null {
+  const s = raw as Partial<GuideState> | null
+  if (!s || s.v !== 1 || !s.route || !(s.route in ROUTE_STEPS) || !Array.isArray(s.steps) || typeof s.current !== 'number') return null
+  if (s.status !== 'active' && s.status !== 'paused' && s.status !== 'finished') return null
+  return { ...s, periods: s.periods ?? {}, done: Array.isArray(s.done) ? s.done : [] } as GuideState
+}
+
+const DAY = 86400000
+const ymd = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+export function parseYmd(s: string): Date { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d) }
+const startOfDay = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate())
+
+/** Close to a period's end, the next one is the one worth planning. */
+const MONTH_LOOKAHEAD_DAYS = 7
+const SEASON_LOOKAHEAD_DAYS = 14
+
+export interface PeriodChoice { start: string; label: string }
+
+/**
+ * The periods a route's FIRST step can plan: the current one, and the next
+ * one when the current is nearly over (Sep 29: September or October; Fall
+ * starting Oct 1: Summer or Fall). The recommended one comes first.
+ */
+export function firstStepChoices(step: GuideStep, today: Date, seasons: Seasons, weekStartsOn: WeekStart): PeriodChoice[] {
+  const t = startOfDay(today)
+  if (step === 'season') {
+    const cur = periodBounds('season', t, seasons)
+    const next = periodBounds('season', cur.end, seasons)
+    const soon = (cur.end.getTime() - t.getTime()) / DAY <= SEASON_LOOKAHEAD_DAYS
+    const opt = (b: typeof cur) => ({ start: ymd(b.start), label: `${b.label.replace(/\s+\d{4}$/, '')} · ${fmtRange(b.start, new Date(b.end.getTime() - DAY))}` })
+    return soon ? [opt(next), opt(cur)] : [opt(cur)]
+  }
+  if (step === 'month') {
+    const cur = new Date(t.getFullYear(), t.getMonth(), 1)
+    const next = new Date(t.getFullYear(), t.getMonth() + 1, 1)
+    const soon = (next.getTime() - t.getTime()) / DAY <= MONTH_LOOKAHEAD_DAYS
+    const opt = (m: Date) => ({ start: ymd(m), label: m.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }) })
+    return soon ? [opt(next), opt(cur)] : [opt(cur)]
+  }
+  if (step === 'year') return [{ start: `${t.getFullYear()}-01-01`, label: String(t.getFullYear()) }]
+  if (step === 'week') {
+    const w = weekStartAnchor(t, weekStartsOn)
+    return [{ start: ymd(w), label: `This week · ${fmtRange(w, new Date(w.getTime() + 6 * DAY))}` }]
+  }
+  return [{ start: ymd(t), label: 'Today' }]
+}
+
+/**
+ * Every step's period, each derived from the one above it: a future season
+ * hands to its first month, a future month to the week holding its first day.
+ * Today is always today — so it is dropped from the steps when the chosen
+ * week is not this week (planning ahead ends at the week, and never puts
+ * future work on today's date).
+ */
+export function planPeriods(route: GuideRoute, firstStart: string, today: Date, seasons: Seasons, weekStartsOn: WeekStart): { steps: GuideStep[]; periods: Partial<Record<GuideStep, string>> } {
+  const t = startOfDay(today)
+  const all = ROUTE_STEPS[route]
+  const periods: Partial<Record<GuideStep, string>> = {}
+  // `anchor` is a day inside the period just chosen — today when that period
+  // is running, its first day when it is ahead. A running period hands on
+  // with the same look-ahead the first step offers (Sep 29: Fall, October).
+  let anchor: Date = t
+  all.forEach((step, i) => {
+    const running = anchor.getTime() === t.getTime()
+    const pick = (fallback: Date) => (i === 0 ? parseYmd(firstStart) : fallback)
+    if (step === 'year') {
+      const y = pick(t).getFullYear()
+      periods.year = `${y}-01-01`
+      anchor = y === t.getFullYear() ? t : new Date(y, 0, 1)
+    } else if (step === 'season') {
+      const at = pick(running ? parseYmd(firstStepChoices('season', t, seasons, weekStartsOn)[0].start) : anchor)
+      const b = periodBounds('season', at, seasons)
+      periods.season = ymd(b.start)
+      anchor = t >= b.start && t < b.end ? t : b.start
+    } else if (step === 'month') {
+      let m: Date
+      if (i === 0) m = parseYmd(firstStart)
+      else if (running) {
+        m = parseYmd(firstStepChoices('month', t, seasons, weekStartsOn)[0].start)
+        // Stay inside the season just chosen.
+        const sEnd = periods.season ? periodBounds('season', parseYmd(periods.season), seasons).end : null
+        if (sEnd && m >= sEnd) m = new Date(t.getFullYear(), t.getMonth(), 1)
+      } else m = new Date(anchor.getFullYear(), anchor.getMonth(), 1)
+      periods.month = ymd(m)
+      const end = new Date(m.getFullYear(), m.getMonth() + 1, 1)
+      anchor = t >= m && t < end ? t : m
+    } else if (step === 'week') {
+      periods.week = ymd(weekStartAnchor(pick(anchor), weekStartsOn))
+    } else {
+      periods.today = ymd(t)
+    }
+  })
+  const thisWeek = ymd(weekStartAnchor(t, weekStartsOn))
+  const steps = all.filter((s) => s !== 'today' || !periods.week || periods.week === thisWeek)
+  if (!steps.includes('today')) delete periods.today
+  return { steps, periods }
+}
+
+export function startGuide(route: GuideRoute, firstStart: string, today: Date, seasons: Seasons, weekStartsOn: WeekStart): GuideState {
+  const { steps, periods } = planPeriods(route, firstStart, today, seasons, weekStartsOn)
+  return { v: 1, route, steps, periods, current: 0, done: [], status: 'active', updatedAt: new Date().toISOString() }
+}
+
+export const currentStep = (s: GuideState): GuideStep => s.steps[Math.min(s.current, s.steps.length - 1)]
+
+export function advance(s: GuideState): GuideState {
+  const step = currentStep(s)
+  const done = s.done.includes(step) ? s.done : [...s.done, step]
+  const last = s.current >= s.steps.length - 1
+  return { ...s, done, current: last ? s.current : s.current + 1, status: last ? 'finished' : 'active', updatedAt: new Date().toISOString() }
+}
+export function back(s: GuideState): GuideState {
+  return { ...s, current: Math.max(0, s.current - 1), status: 'active', updatedAt: new Date().toISOString() }
+}
+export function pause(s: GuideState): GuideState { return { ...s, status: 'paused', updatedAt: new Date().toISOString() } }
+export function resume(s: GuideState): GuideState { return { ...s, status: 'active', updatedAt: new Date().toISOString() } }
+export function finishHere(s: GuideState): GuideState {
+  const step = currentStep(s)
+  return { ...s, done: s.done.includes(step) ? s.done : [...s.done, step], status: 'finished', updatedAt: new Date().toISOString() }
+}
+
+/** Where a step's page lives, dated. */
+export function stepPath(step: GuideStep, s: GuideState): string {
+  const start = s.periods[step]
+  if (step === 'today') return '/today'
+  return start ? `/${step}?start=${start}` : `/${step}`
+}
+
+/** Does the page on screen show this step's period? */
+export function onStepPage(step: GuideStep, s: GuideState, pathname: string, search: string): boolean {
+  if (step === 'today') return pathname === '/today' || pathname === '/'
+  if (pathname !== `/${step}`) return false
+  const start = new URLSearchParams(search).get('start')
+  return !start || start === s.periods[step]
+}
+
+function fmtRange(a: Date, b: Date): string {
+  const md = (d: Date) => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+  const wd = (d: Date) => d.toLocaleDateString('en-US', { weekday: 'short' })
+  return `${wd(a)} ${md(a)} – ${wd(b)} ${md(b)}`
+}
+
+/** The step's name as the bar says it: "October", "Week 40 · Sat Sep 26 – Fri Oct 2", "Today, Tue Sep 29". */
+export function stepTitle(step: GuideStep, s: GuideState, seasons: Seasons, weekNumber: (d: Date) => number): string {
+  const start = s.periods[step] ? parseYmd(s.periods[step]!) : new Date()
+  if (step === 'year') return String(start.getFullYear())
+  if (step === 'season') { const b = periodBounds('season', start, seasons); return `${b.label.replace(/\s+\d{4}$/, '')} · ${fmtRange(b.start, new Date(b.end.getTime() - DAY))}` }
+  if (step === 'month') return start.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+  if (step === 'week') return `Week ${weekNumber(start)} · ${fmtRange(start, new Date(start.getTime() + 6 * DAY))}`
+  return `Today, ${start.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}`
+}
+
+/** Short name for the path and buttons: "October", "week 40", "Fall", "2026", "today". */
+export function stepShortName(step: GuideStep, s: GuideState, seasons: Seasons, weekNumber: (d: Date) => number): string {
+  const start = s.periods[step] ? parseYmd(s.periods[step]!) : new Date()
+  if (step === 'year') return String(start.getFullYear())
+  if (step === 'season') return periodBounds('season', start, seasons).label.replace(/\s+\d{4}$/, '')
+  if (step === 'month') return start.toLocaleDateString('en-US', { month: 'long' })
+  if (step === 'week') return `week ${weekNumber(start)}`
+  return 'today'
+}
+
+export const STEP_QUESTION: Record<GuideStep, string> = {
+  year: 'What matters most to you this year?',
+  season: 'What would meaningful progress look like this season?',
+  month: 'What do you want to move forward this month?',
+  week: 'What are a few next steps you can take this week?',
+  today: 'What deserves your attention today?',
+}
+
+export const STEP_WHY: Record<GuideStep, string> = {
+  year: 'A few outcomes or bodies of work. Keep what’s here, add what’s missing — it’s fine to leave it short.',
+  season: 'Add what this season should move forward. Link a line to a year goal if it serves one; it doesn’t have to.',
+  month: 'Keep what still matters and add anything missing. One or two is plenty; a quiet month is fine too.',
+  week: 'Pick next steps from the month beside the list, or write your own. A step keeps its link to the goal it serves. Nothing needs a day yet.',
+  today: 'Choose a few things from this week for today. Appointments are already here. A time is optional.',
+}

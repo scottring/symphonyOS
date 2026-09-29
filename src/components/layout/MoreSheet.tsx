@@ -30,7 +30,7 @@ const ICONS: Record<string, ComponentType<{ className?: string }>> = {
   Documents: FileText,
   Notes: StickyNote,
   History,
-  'Getting started': Compass,
+  'Plan with guidance': Compass,
   'Planning guide': Printer,
   Settings,
 }

@@ -59,6 +59,10 @@ export function FirstRunGate({ user, children }: { user: User; children: ReactNo
         user={user}
         onDone={() => {
           markFirstRunDoneLocally(user.id)
+          // A new household lands on Plan with guidance — choose what to plan,
+          // or "Explore on my own" — not on an empty Today (onboarding suite,
+          // 2026-09-29). The shell mounts after this, so its router reads it.
+          try { window.history.replaceState(null, '', '/start') } catch { /* not a browser */ }
           setStage('ready')
         }}
       />

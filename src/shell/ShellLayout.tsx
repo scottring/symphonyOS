@@ -41,6 +41,8 @@ import { NoteViewer } from '@/components/chat/NoteViewer';
 import { PlaceBand } from '@/components/place/PlaceBand';
 import { planV2Enabled } from '@/lib/planning/v2/planV2';
 import { onQuickAddRequest } from '@/lib/quickAddSignal';
+import { GuideProvider } from '@/hooks/useGuidedPlan';
+import { GuideBar } from '@/components/guide/GuideBar';
 
 /**
  * ShellLayout wraps Shell-mounted apps with the Symphony app chrome — the
@@ -296,6 +298,8 @@ function ShellLayoutInner({ children }: Props) {
         {isMobile ? (
           <div>
             <PlanNavigation mobile mobileControlsRef={setMobilePlanControls} />
+            {/* Off the planner the area lens rides top-right; the guide sits below it. */}
+            <div className={`guide-slot${planPeriodForPath(location.pathname) ? '' : ' has-lens'}`}><GuideBar /></div>
             <div className="min-w-0">{children}</div>
           </div>
         ) : (
@@ -354,6 +358,8 @@ function ShellLayoutInner({ children }: Props) {
                   />
                 }
               >
+                {/* Guided planning rides above the page it is guiding. */}
+                <div className="guide-slot"><GuideBar /></div>
                 {children}
               </SideColumn>
             </div>
@@ -539,7 +545,7 @@ export function ShellLayout({ children }: Props) {
     <ListsProvider>
       <NotesProvider>
         <PinsProvider>
-          <ReferenceListsProvider key={user?.id ?? "anonymous"} userId={user?.id ?? "anonymous"}><ShellLayoutInner>{children}</ShellLayoutInner></ReferenceListsProvider>
+          <ReferenceListsProvider key={user?.id ?? "anonymous"} userId={user?.id ?? "anonymous"}><GuideProvider><ShellLayoutInner>{children}</ShellLayoutInner></GuideProvider></ReferenceListsProvider>
         </PinsProvider>
       </NotesProvider>
     </ListsProvider>
