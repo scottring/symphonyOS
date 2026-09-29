@@ -1,11 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor, act, within } from '@testing-library/react'
 import { AuthForm } from './AuthForm'
 import { INVITE_ONLY_MESSAGE, WAITLIST_URL } from '@/lib/signupGate'
 
-const { mockSignInWithEmail, mockSignUpWithEmail } = vi.hoisted(() => ({
+const { mockSignInWithEmail, mockSignUpWithEmail, mockResetPassword } = vi.hoisted(() => ({
   mockSignInWithEmail: vi.fn(),
   mockSignUpWithEmail: vi.fn(),
+  mockResetPassword: vi.fn(),
 }))
 
 // Mock the useAuth hook
@@ -13,6 +14,7 @@ vi.mock('@/hooks/useAuth', () => ({
   useAuth: () => ({
     signInWithEmail: mockSignInWithEmail,
     signUpWithEmail: mockSignUpWithEmail,
+    resetPassword: mockResetPassword,
   }),
 }))
 
@@ -21,6 +23,7 @@ describe('AuthForm', () => {
     vi.clearAllMocks()
     mockSignInWithEmail.mockImplementation(() => Promise.resolve({ error: null }))
     mockSignUpWithEmail.mockImplementation(() => Promise.resolve({ error: null }))
+    mockResetPassword.mockImplementation(() => Promise.resolve({ error: null }))
   })
 
   describe('rendering', () => {
@@ -218,7 +221,7 @@ describe('AuthForm', () => {
       fireEvent.click(screen.getByRole('button', { name: 'Create Account' }))
 
       await waitFor(() => {
-        expect(screen.getByText('Check your email for a confirmation link!')).toBeInTheDocument()
+        expect(screen.getByText('Check your inbox')).toBeInTheDocument()
       })
     })
 
@@ -250,7 +253,7 @@ describe('AuthForm', () => {
       fireEvent.click(screen.getByRole('button', { name: 'Create Account' }))
 
       await waitFor(() => {
-        const message = screen.getByText('Check your email for a confirmation link!')
+        const message = screen.getByText('Check your inbox')
         expect(message.closest('div')).toHaveClass('bg-success-50')
       })
     })
@@ -368,7 +371,7 @@ describe('AuthForm', () => {
       })
 
       await waitFor(() => {
-        expect(screen.getByText('Check your email for a confirmation link!')).toBeInTheDocument()
+        expect(screen.getByText('Check your inbox')).toBeInTheDocument()
       })
       expect(screen.queryByRole('link', { name: 'Request an invite' })).not.toBeInTheDocument()
     })
@@ -405,7 +408,78 @@ describe('AuthForm', () => {
       expect(await screen.findByText('Creating account...')).toBeInTheDocument()
       expect(screen.queryByText('Signing in...')).not.toBeInTheDocument()
       await act(async () => { resolve({ error: null }) })
-      expect(await screen.findByRole('status')).toHaveTextContent('Check your email')
+      expect(await screen.findByRole('status')).toHaveTextContent('Check your inbox')
+    })
+  })
+
+  // Supabase answers a sign-up for an address that already has a confirmed
+  // account with the same success as a new one — and sends nothing. The
+  // notice must hold for both without saying which (that would reveal who
+  // has an account), and never promise that a mail was sent.
+  describe('after a sign-up is accepted', () => {
+    const signUp = async (email = 'maybe@example.com') => {
+      render(<AuthForm />)
+      fireEvent.click(screen.getByRole('button', { name: 'Sign Up' }))
+      fireEvent.change(screen.getByLabelText('Email'), { target: { value: email } })
+      fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'password123' } })
+      const form = screen.getByRole('button', { name: 'Create Account' }).closest('form')!
+      await act(async () => { fireEvent.submit(form) })
+      return screen.findByRole('status')
+    }
+
+    it('covers both a new and an existing account, without promising delivery', async () => {
+      const notice = await signUp()
+      expect(notice).toHaveTextContent('Check your inbox')
+      expect(notice).toHaveTextContent('If this email is new to Symphony, a confirmation link is on its way. If you already have an account, sign in instead.')
+      expect(notice).toHaveTextContent('Nothing after a few minutes? Check spam, or sign in if you’ve used Symphony before.')
+      expect(notice).not.toHaveTextContent('Check your email for a confirmation link')
+      expect(within(notice).getByRole('button', { name: 'Sign in' })).toBeInTheDocument()
+      expect(within(notice).getByRole('button', { name: 'Reset my password' })).toBeInTheDocument()
+    })
+
+    it('Sign in switches to signing in and keeps the email', async () => {
+      const notice = await signUp('kept@example.com')
+      fireEvent.click(within(notice).getByRole('button', { name: 'Sign in' }))
+      expect(screen.getByRole('heading', { name: 'Sign In' })).toBeInTheDocument()
+      expect(screen.getByLabelText('Email')).toHaveValue('kept@example.com')
+      expect(screen.queryByText('Check your inbox')).not.toBeInTheDocument()
+    })
+
+    it('Reset my password switches to the reset form and keeps the email', async () => {
+      const notice = await signUp('kept@example.com')
+      fireEvent.click(within(notice).getByRole('button', { name: 'Reset my password' }))
+      expect(screen.getByRole('heading', { name: 'Reset Password' })).toBeInTheDocument()
+      expect(screen.getByLabelText('Email')).toHaveValue('kept@example.com')
+      expect(screen.queryByText('Check your inbox')).not.toBeInTheDocument()
+    })
+  })
+
+  describe('password reset', () => {
+    it('shows a sent reset as a success notice, not an error', async () => {
+      render(<AuthForm />)
+      fireEvent.click(screen.getByRole('button', { name: 'Forgot your password?' }))
+      fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'me@example.com' } })
+      const form = screen.getByRole('button', { name: 'Send Reset Link' }).closest('form')!
+      await act(async () => { fireEvent.submit(form) })
+
+      expect(mockResetPassword).toHaveBeenCalledWith('me@example.com')
+      const notice = await screen.findByRole('status')
+      expect(notice).toHaveTextContent('Check your email for a password reset link!')
+      expect(notice).toHaveClass('bg-success-50')
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    })
+
+    it('shows a failed reset as an error', async () => {
+      mockResetPassword.mockImplementation(() => Promise.resolve({ error: { message: 'Rate limit exceeded' } }))
+      render(<AuthForm />)
+      fireEvent.click(screen.getByRole('button', { name: 'Forgot your password?' }))
+      fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'me@example.com' } })
+      const form = screen.getByRole('button', { name: 'Send Reset Link' }).closest('form')!
+      await act(async () => { fireEvent.submit(form) })
+
+      const alert = await screen.findByRole('alert')
+      expect(alert).toHaveTextContent('Rate limit exceeded')
+      expect(alert).toHaveClass('bg-danger-50')
     })
   })
 })

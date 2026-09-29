@@ -14,6 +14,15 @@ export function AuthForm({ message }: AuthFormProps = {}) {
   const [isSignUp, setIsSignUp] = useState(false)
   const [isForgotPassword, setIsForgotPassword] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // What went RIGHT, kept apart from `error`: success used to be an error
+  // string that happened to contain "Check your email", and the styling
+  // sniffed for that phrase.
+  //
+  // 'signup-sent' never claims a mail went out. Supabase answers a sign-up
+  // for an address that already has a confirmed account with the same
+  // success and sends nothing, so the notice covers both cases without
+  // saying which one this is (saying so would reveal who has an account).
+  const [notice, setNotice] = useState<'signup-sent' | 'reset-sent' | null>(null)
   // The invite gate is not a fault the user can retry away, so it reads as
   // an explanation with a way forward rather than a red failure.
   const [inviteOnly, setInviteOnly] = useState(false)
@@ -23,6 +32,7 @@ export function AuthForm({ message }: AuthFormProps = {}) {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError(null)
+    setNotice(null)
     setInviteOnly(false)
     setLoading(true)
 
@@ -31,7 +41,7 @@ export function AuthForm({ message }: AuthFormProps = {}) {
       if (error) {
         setError(error.message)
       } else {
-        setError('Check your email for a password reset link!')
+        setNotice('reset-sent')
       }
       setLoading(false)
       return
@@ -43,7 +53,7 @@ export function AuthForm({ message }: AuthFormProps = {}) {
         setError(error.message)
         setInviteOnly(Boolean(error.inviteOnly))
       } else {
-        setError('Check your email for a confirmation link!')
+        setNotice('signup-sent')
       }
       setLoading(false)
       return
@@ -56,6 +66,11 @@ export function AuthForm({ message }: AuthFormProps = {}) {
 
     setLoading(false)
   }
+
+  // Mode switches keep the email: someone who just tried to sign up with an
+  // address they already use should not have to type it again.
+  const showSignIn = () => { setIsSignUp(false); setIsForgotPassword(false); setError(null); setNotice(null) }
+  const showReset = () => { setIsSignUp(false); setIsForgotPassword(true); setError(null); setNotice(null) }
 
   return (
     <div className="min-h-screen bg-bg-base flex flex-col items-center justify-center px-6 py-12">
@@ -136,12 +151,34 @@ export function AuthForm({ message }: AuthFormProps = {}) {
             )}
 
             {error && !inviteOnly && (
-              <div role={error.includes('Check your email') ? 'status' : 'alert'} className={`p-3 rounded-lg text-sm ${
-                error.includes('Check your email')
-                  ? 'bg-success-50 text-success-700'
-                  : 'bg-danger-50 text-danger-700'
-              }`}>
+              <div role="alert" className="p-3 rounded-lg text-sm bg-danger-50 text-danger-700">
                 {error}
+              </div>
+            )}
+
+            {notice === 'reset-sent' && (
+              <div role="status" className="p-3 rounded-lg text-sm bg-success-50 text-success-700">
+                Check your email for a password reset link!
+              </div>
+            )}
+
+            {notice === 'signup-sent' && (
+              <div role="status" className="p-3 rounded-lg text-sm bg-success-50 text-success-700">
+                <p className="font-medium">Check your inbox</p>
+                <p className="mt-1">
+                  If this email is new to Symphony, a confirmation link is on its way. If you already have an account, sign in instead.
+                </p>
+                <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1">
+                  <button type="button" onClick={showSignIn} className="font-medium underline hover:no-underline">
+                    Sign in
+                  </button>
+                  <button type="button" onClick={showReset} className="font-medium underline hover:no-underline">
+                    Reset my password
+                  </button>
+                </div>
+                <p className="mt-2 text-xs">
+                  Nothing after a few minutes? Check spam, or sign in if you&rsquo;ve used Symphony before.
+                </p>
               </div>
             )}
 
@@ -170,7 +207,7 @@ export function AuthForm({ message }: AuthFormProps = {}) {
             <div className="mt-4 text-center">
               <button
                 type="button"
-                onClick={() => { setIsForgotPassword(true); setError(null) }}
+                onClick={() => { setIsForgotPassword(true); setError(null); setNotice(null) }}
                 className="text-sm text-neutral-500 hover:text-primary-600"
               >
                 Forgot your password?
@@ -185,7 +222,7 @@ export function AuthForm({ message }: AuthFormProps = {}) {
                   Remember your password?{' '}
                   <button
                     type="button"
-                    onClick={() => { setIsForgotPassword(false); setError(null) }}
+                    onClick={() => { setIsForgotPassword(false); setError(null); setNotice(null) }}
                     className="text-primary-600 font-medium hover:text-primary-700"
                   >
                     Sign In
@@ -196,7 +233,7 @@ export function AuthForm({ message }: AuthFormProps = {}) {
                   {isSignUp ? 'Already have an account?' : "Don't have an account?"}{' '}
                   <button
                     type="button"
-                    onClick={() => { setIsSignUp(!isSignUp); setError(null) }}
+                    onClick={() => { setIsSignUp(!isSignUp); setError(null); setNotice(null) }}
                     className="text-primary-600 font-medium hover:text-primary-700"
                   >
                     {isSignUp ? 'Sign In' : 'Sign Up'}
