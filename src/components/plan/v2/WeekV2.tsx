@@ -214,11 +214,12 @@ export function WeekV2({ tasks, weekStart, meId, isCurrent, days, onSelectTask, 
         <div className="pv2-status">
           {session.saved
             ? <><span className="pv2-seal" aria-hidden="true" /><span><b>Our week {weekNo} plan</b> · agreed {shortDay(session.saved.at)} · {agreedBy}</span></>
-            : <span className="pv2-hint">{session.loading ? '' : `No plan for week ${weekNo} yet`}</span>}
+            : (session.loading ? null : <span className="pv2-noplan"><span className="pv2-hint">{`No plan for week ${weekNo} yet`}</span>
+                <button type="button" className="pv2-link" onClick={startMeeting}>Plan your week →</button></span>)}
         </div>
         {tools && <div className="pv2-wtools">{tools}</div>}
         {viewSwitch}
-        <button type="button" className={reviewDue ? 'pv2-btn' : 'pv2-qbtn'} onClick={startMeeting}>Weekly review</button>
+        <button type="button" className={session.saved && reviewDue ? 'pv2-btn' : 'pv2-qbtn'} onClick={startMeeting}>Weekly review</button>
       </div>
       )}
 
