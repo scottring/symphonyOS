@@ -168,3 +168,32 @@ The five horizon screenshots in the same example are `i31-year`, `i32-season`, `
    - The owner's dirty worktree was left untouched.
 5. The remaining limitations are listed in section 3: whole-sort Undo only in the sorting browser; items assigned only to someone else not offered for sorting; and the lens, carry-forward and banner behaviours.
 6. **An outbound call to the shared project was noticed:** the Today weather widget calls its public weather function via a hard-coded URL, even from the local build. It is read-only and carries no user data. It is pre-existing.
+
+---
+
+## Release record (2026-09-27): what was actually released and verified
+
+Approved by Scott ("yes" to push, CI, merge/deploy, apply the guard and redeploy the page reader), relayed by Codex. Reviewed head `2950643f`.
+
+| Component | Evidence | Rollback target |
+|---|---|---|
+| **App** | PR https://github.com/scottring/symphonyOS/pull/73. CI passed on all four checks: lint-typecheck-test, build, Vercel and Vercel Preview Comments. Squash-merged as `main a0307f2e` (its tree matches `2950643f` for the migration and `parse-page`). Production `dpl_2BpuWmBuJBY25zgqEJYUhDoqc4fs` is **Ready**, aliased to app.symphony-os.com and serving `index-Buo9SR0U.js`, which contains the release strings ("No goals or projects for", "Organize the list", "This week serves", "nothing on this line is saved"). `/`, `/year`, `/season`, `/month`, `/week` and `/today` all return 200. | `symphony-rebuild-6tgtb3utq` (#72). Instant-rollback in Vercel, then revert `a0307f2e`. |
+| **Goal-conversion guard** | Before applying: 0 rows broke the invariant, and no guard objects were present (read-only). Applied `supabase/migrations/2026-09-27_guard_goal_conversion.sql` with the Supabase migration tool as `2026_09_27_guard_goal_conversion`, byte-identical to the reviewed file, and it succeeded. `tasks_guard_goal_target_lock` and `tasks_guard_goal_unconvert` are present and enabled, next to `tasks_guard_goal_support`. | `supabase/migrations/rollback/2026-09-27_guard_goal_conversion.down.sql`. Data is unaffected either way. |
+| **Guard proof on production** | Test `101`'s assertions ran in one transaction ending in **ROLLBACK** and passed: 1, 2, 3, 4 and 4b refused; "a refusal changed nothing" held; ordinary completion, unlink, conversion, re-conversion and delete all passed. **Adaptation:** production's signup allowlist trigger (`check_allowed_signup`) refuses creating the test's throwaway `auth.users` row, which the schema-only local copy never had. So the same assertions ran against the demo test account's id, with the change hash limited to the test's own five rows. Afterwards: 0 leftover `101 …` rows and 0 fake users. **`095` was not run on production**: it seeds three fixed auth users, which the same allowlist refuses. It passed 12/12 on the isolated copy with the guard applied. | — |
+| **parse-page** | Before: version 9, deployed 2026-09-06 14:50Z (matching main's last parse-page commit `d9f3cdf0`). Deployed with `supabase functions deploy parse-page --use-api` from the released tree. After: **version 10, ACTIVE**, and its deployed source contains the new season/month guidance ("OUTCOME or PROJECT", "Never make a line a goal just because…"). | Redeploy parse-page from `3b3981d6`, which returns to v9's source. |
+
+**Real-photo parser check** (review only, live model, production v10):
+- **Setup:** Scott signed the browser into the **demo** account. The demo's existing test spread (`paper-plan/2fc37a1e…/page-1-left.jpg` and `page-1-right.jpg`, uploaded 2026-09-23 for the plan-from-paper work) was sent to the deployed `parse-page` as the app does. Nothing was imported: a read-only count showed 0 task, goal or routine writes for the demo in the following 15 minutes. The page content is private family material, so only counts are recorded here.
+- **Left half as a season page** (page title "Fall (Sept–Dec) Brainstorm", 23 s): **15 goals, 6 undated season actions, 2 routines, 0 dated.**
+- **Right half as a month page** (page title "September", 28 s): **4 goals, 16 undated month actions, 1 routine, 1 dated line**, plus 2 notes and 1 unclear line.
+- **Result:** the model follows the new guidance. Broad outcomes on the season page become goals, while concrete actions stay actions even though they sit on a season page. The month page is mostly actions with a few outcomes, repeating lines stay routines, and a dated line stays dated. **Not every line became a goal because of the page.** Individual calls can be argued, for example a book to read, or a planning habit read as a routine. The review sheet lets each one be changed before saving.
+
+**Observed on production, not changed:** Scott's own Fall 2026 page now reads "21 goals · 0 tasks". Every item there is a goal, apparently from an earlier use of #72's sort. Some look like single actions. The way back, per item, is "Make it a single action", while the goal holds no next actions. Nothing was changed on Scott's account; the release checks there were read-only.
+
+**Remaining limitations:**
+- Whole-list sort Undo is only in the browser that sorted.
+- Items assigned only to someone else aren't offered for sorting.
+- Changing an item's type by keyboard in the review sheet wasn't proven in the harness.
+- `095` hasn't run on production (above).
+- The Week page's calendar banner is cramped on a phone (pre-existing).
+- PR #61, the plan-from-paper rebuild, is still its owner's. It must rebase onto `main` or drop `fdcb6126` and `1272ccee`.
