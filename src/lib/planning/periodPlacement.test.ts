@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import {
   monthStartOf, belongsToMonth, isPlacedOnMonth, belongsToSeason, isPlacedOnSeason,
-  monthStartForBucket, seasonStartForBucket, isPlacement,
+  monthStartForBucket, seasonStartForBucket, isPlacement, monthsOfWeek,
 } from './periodPlacement'
 import type { Seasons } from '@/lib/cadence/seasons'
 
@@ -123,5 +123,17 @@ describe('isPlacement', () => {
     expect(isPlacement({ completed: true })).toBe(false)
     expect(isPlacement({ notes: 'y', context: 'family' })).toBe(false)
     expect(isPlacement({})).toBe(false)
+  })
+})
+
+describe('monthsOfWeek', () => {
+  it('a week inside one month touches one month', () => {
+    expect(monthsOfWeek(new Date(2026, 9, 3)).map((d) => d.getMonth())).toEqual([9])
+  })
+  it('a week across a month end touches both, earliest first', () => {
+    expect(monthsOfWeek(new Date(2026, 8, 26)).map((d) => [d.getFullYear(), d.getMonth(), d.getDate()])).toEqual([[2026, 8, 1], [2026, 9, 1]])
+  })
+  it('crosses a year end', () => {
+    expect(monthsOfWeek(new Date(2026, 11, 28)).map((d) => [d.getFullYear(), d.getMonth()])).toEqual([[2026, 11], [2027, 0]])
   })
 })

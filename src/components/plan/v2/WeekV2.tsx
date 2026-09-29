@@ -18,7 +18,7 @@ import { useAuth } from '@/hooks/useAuth'
 import { showToast } from '@/hooks/useToast'
 import { weekListTasks } from '@/lib/planning/weekList'
 import { selectPeriodTasks } from '@/lib/planning/periodPage'
-import { monthStartOf } from '@/lib/planning/periodPlacement'
+import { monthStartOf, monthsOfWeek } from '@/lib/planning/periodPlacement'
 import { lowerPlacement } from '@/lib/placement/model'
 import { goalOfTask } from '@/lib/planning/goalSupport'
 import { readSeasons } from '@/lib/cadence/seasons'
@@ -79,10 +79,18 @@ export function WeekV2({ tasks, weekStart, meId, isCurrent, days, onSelectTask, 
   const [view, setViewState] = useState<PlanView>(() => readPlanView('week'))
   const setView = (v: PlanView) => { setViewState(v); writePlanView('week', v) }
 
+  // The week's own month (its middle day) names it; the reference shows every
+  // month the week touches, so a week across a month end shows both plans.
   const monthStart = useMemo(() => monthStartOf(new Date(weekStart.getTime() + 3 * DAY)), [weekStart])
-  const monthName = monthStart.toLocaleDateString('en-US', { month: 'long' })
-  const monthRows = useMemo(() => selectPeriodTasks(tasks, 'month', monthStart, isCurrent, meId, readSeasons())
-    .filter((t) => !t.completed && !lowerPlacement(t, 'month', monthStart)), [tasks, monthStart, isCurrent, meId])
+  const refMonths = useMemo(() => monthsOfWeek(weekStart).map((start) => {
+    const name = start.toLocaleDateString('en-US', { month: 'long' })
+    // Legacy undated rows answer to the current period: the week's own month.
+    const current = isCurrent && start.getTime() === monthStart.getTime()
+    const rows = selectPeriodTasks(tasks, 'month', start, current, meId, readSeasons())
+      .filter((t) => !t.completed && !lowerPlacement(t, 'month', start))
+    return { start, name, rows }
+  }), [tasks, weekStart, monthStart, isCurrent, meId])
+  const monthName = refMonths.map((m) => m.name).join(' and ')
   const weekTasks = useMemo(() => weekListTasks(tasks, weekStart, meId, { isCurrent }), [tasks, weekStart, meId, isCurrent])
   const nextWeek = useMemo(() => new Date(weekStart.getTime() + 7 * DAY), [weekStart])
   const prevWeek = useMemo(() => new Date(weekStart.getTime() - 7 * DAY), [weekStart])
@@ -184,9 +192,9 @@ export function WeekV2({ tasks, weekStart, meId, isCurrent, days, onSelectTask, 
     if ((await gated.updateTask(t.id, lineDropUpdates(t, { kind: 'week', at: weekStart }))) === false) return
     showToast(`“${t.title}” → this week, any day.`, 'success', 5000, { label: 'Undo', onClick: () => { void gated.updateTask(t.id, undo) } })
   }
-  const takeIn = async (t: Task) => {
+  const takeIn = async (t: Task, month: string) => {
     await gated.updateTask(t.id, { bucket: 'week', weekStart })
-    showToast(`“${t.title}” → this week · still on ${monthName}’s plan.`, 'success', 4000)
+    showToast(`“${t.title}” → this week · still on ${month}’s plan.`, 'success', 4000)
   }
   const agreedBy = session.saved
     ? (session.saved.authorId === user?.id ? 'you' : members.find((m) => m.auth_user_id === session.saved!.authorId)?.name ?? 'your household')
@@ -228,7 +236,9 @@ export function WeekV2({ tasks, weekStart, meId, isCurrent, days, onSelectTask, 
           onDecide={decide} onFinish={() => setMeeting({ ...meeting, step: 2 })} />
       ) : view === 'focus' ? (
         <FocusDeck lines={lines} actions={actions} members={members} nextLabel="next week" context={`Week ${weekNo}`} label={`Week ${weekNo}`}
-          empty={`Nothing on this week yet. Add to the list, or start the weekly review to choose from ${monthName}’s plan.`} />
+          empty={meeting
+            ? `Nothing on this week yet. Choose next steps from ${monthName}’s plan, or add your own.`
+            : `Nothing on this week yet. Add to the list, or start the weekly review to choose from ${monthName}’s plan.`} />
       ) : (
         <div className={`pv2-wgrid${view === 'ref' ? ' is-ref' : ''}`}>
           {/* One spread: three columns, one heading line across them, no
@@ -244,26 +254,33 @@ export function WeekV2({ tasks, weekStart, meId, isCurrent, days, onSelectTask, 
                 parentOf={parentOf} onHoverParent={setLitParent} onShowParent={showParent}
                 draftChild={childOf ? { id: childOf.id, title: childOf.title, isGoal: !!childOf.isGoal } : null}
                 onDraftChild={(title) => { if (childOf) void addStep(childOf, title) }} onCancelChild={() => setChildOf(null)}
-                dragEnabled={dragEnabled} headerAction={<FromPaper altitude="week" periodStart={weekStart} tasks={tasks} />} />
+                dragEnabled={dragEnabled} headerAction={<FromPaper altitude="week" periodStart={weekStart} tasks={tasks} />}
+                emptyHint={meeting
+                  ? `Nothing on this week’s list yet. Choose next steps from ${monthName}’s plan beside it, or add your own below.`
+                  : undefined} />
             </div>
           </div>
           {view === 'ref' && (
             <aside className="pv2-ref" aria-label={`${monthName}, for reference`}>
-              <div className="pv2-colh">{monthName} <small>for reference</small></div>
-              {monthRows.length ? (
-                <ul className="pv2-list">{monthRows.map((t) => (
-                  <li key={t.id} data-ref-id={t.id} className={`pv2-rrow pv2-rrow-sans${litParent === t.id || childOf?.id === t.id ? ' is-linked' : ''}`}>
-                    {t.isGoal ? <span className="pv2-goal is-small" aria-hidden="true" /> : <span className="pv2-dash" style={{ marginTop: 10 }} aria-hidden="true" />}
-                    <button type="button" className="flex-1 text-left" onClick={() => onSelectTask(t.id)}>{t.title}</button>
-                    <span className="pv2-refacts">
-                      {!t.isGoal && <button type="button" className="pv2-addbtn" onClick={() => void takeIn(t)} aria-label={`Add ${t.title} to this week`}>+ This week</button>}
-                      <button type="button" className="pv2-addbtn" onClick={() => setChildOf(t)}
-                        aria-label={`Add a ${t.isGoal ? 'next step' : 'step'} for ${t.title} to this week`}>{t.isGoal ? '+ Next step' : '+ Step'}</button>
-                    </span>
-                  </li>
-                ))}</ul>
-              ) : <p className="pv2-hint">Nothing open on {monthName}’s plan.</p>}
-              <button type="button" className="pv2-link" style={{ marginTop: 8 }} onClick={() => navigate(`/month?start=${localYmd(monthStart)}`)}>Open {monthName} →</button>
+              {refMonths.map((m) => (
+                <div key={m.name} className="pv2-refmonth">
+                  <div className="pv2-colh">{m.name} <small>for reference</small></div>
+                  {m.rows.length ? (
+                    <ul className="pv2-list">{m.rows.map((t) => (
+                      <li key={t.id} data-ref-id={t.id} className={`pv2-rrow pv2-rrow-sans${litParent === t.id || childOf?.id === t.id ? ' is-linked' : ''}`}>
+                        {t.isGoal ? <span className="pv2-goal is-small" aria-hidden="true" /> : <span className="pv2-dash" style={{ marginTop: 10 }} aria-hidden="true" />}
+                        <button type="button" className="flex-1 text-left" onClick={() => onSelectTask(t.id)}>{t.title}</button>
+                        <span className="pv2-refacts">
+                          {!t.isGoal && <button type="button" className="pv2-addbtn" onClick={() => void takeIn(t, m.name)} aria-label={`Add ${t.title} to this week`}>+ This week</button>}
+                          <button type="button" className="pv2-addbtn" onClick={() => setChildOf(t)}
+                            aria-label={`Add a ${t.isGoal ? 'next step' : 'step'} for ${t.title} to this week`}>{t.isGoal ? '+ Next step' : '+ Step'}</button>
+                        </span>
+                      </li>
+                    ))}</ul>
+                  ) : <p className="pv2-hint">Nothing open on {m.name}’s plan.</p>}
+                  <button type="button" className="pv2-link" style={{ marginTop: 8 }} onClick={() => navigate(`/month?start=${localYmd(m.start)}`)}>Open {m.name} →</button>
+                </div>
+              ))}
               <WeekRefShelves weekStart={weekStart} isCurrent={isCurrent} onOpen={openRef} onTakeIn={(t) => void takeInEarlier(t)} />
             </aside>
           )}

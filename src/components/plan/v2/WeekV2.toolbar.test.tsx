@@ -47,3 +47,35 @@ describe('WeekV2 toolbar — an unplanned week says what to do', () => {
     expect(screen.queryByRole('button', { name: /Plan your week/ })).toBeNull()
   })
 })
+
+// 2026-09-29 (beta walkthrough): Sat Sep 26 – Fri Oct 2 showed only September,
+// all done, and hid October's open goals.
+describe('WeekV2 reference — a week across a month end shows both months', () => {
+  beforeEach(() => { session.saved = null; session.loading = false })
+  const goal = (id: string, title: string, month: Date, completed = false) => ({
+    id, title, completed, isGoal: true, bucket: 'month', monthStart: month, createdAt: new Date(2026, 8, 29), assignedTo: 'me',
+  }) as unknown as import('@/types/task').Task
+
+  it('lists September and October, each with its own open items', () => {
+    const tasks = [goal('s1', 'Finish the garden', new Date(2026, 8, 1), true), goal('o1', 'Book flu shots', new Date(2026, 9, 1))]
+    render(<MemoryRouter><WeekV2 tasks={tasks} weekStart={new Date(2026, 8, 26)} meId="me" isCurrent days={null} onSelectTask={vi.fn()} /></MemoryRouter>)
+    fireEvent.click(screen.getByRole('button', { name: /Plan your week/ }))
+    expect(screen.getByText('Nothing open on September’s plan.')).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Book flu shots' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Open October →' })).toBeTruthy()
+  })
+
+  it('in an open review the empty list does not ask to start the review', () => {
+    render(<MemoryRouter><WeekV2 tasks={[]} weekStart={new Date(2026, 8, 26)} meId="me" isCurrent days={null} onSelectTask={vi.fn()} /></MemoryRouter>)
+    fireEvent.click(screen.getByRole('button', { name: /Plan your week/ }))
+    expect(screen.queryByText(/start the weekly review/)).toBeNull()
+    expect(screen.getByText(/Choose next steps from September and October’s plan/)).toBeTruthy()
+  })
+
+  it('a week inside one month shows one month', () => {
+    render(<MemoryRouter><WeekV2 tasks={[]} weekStart={new Date(2026, 9, 3)} meId="me" isCurrent days={null} onSelectTask={vi.fn()} /></MemoryRouter>)
+    fireEvent.click(screen.getByRole('button', { name: /Plan your week/ }))
+    expect(screen.getByRole('button', { name: 'Open October →' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Open September →' })).toBeNull()
+  })
+})

@@ -3219,6 +3219,8 @@ div.chooser-action-group { overflow: visible !important; }
 :is(.pv2-week, .pv2-page) .pv2-ref { position: static; padding: 0; border-radius: 0; background: none; overflow: visible; max-height: none; }
 :is(.pv2-week, .pv2-page) .pv2-ref .pv2-colh small { margin-left: auto; margin-right: 0; }
 :is(.pv2-week, .pv2-page) .pv2-ref .pv2-list { margin-top: 8px; }
+/* A week across a month end: one block per month, the second set apart. */
+.pv2-refmonth + .pv2-refmonth { margin-top: 22px; }
 :is(.pv2-week, .pv2-page) .pv2-ref .pv2-rrow { padding: 6px 0; color: var(--color-neutral-600); border-bottom: 1px solid var(--color-neutral-100); flex-wrap: nowrap; }
 :is(.pv2-week, .pv2-page) .pv2-ref .pv2-rrow > button { line-height: 1.4; }
 :is(.pv2-week, .pv2-page) .pv2-ref .pv2-rrow:has(> form) { flex-wrap: wrap; }
