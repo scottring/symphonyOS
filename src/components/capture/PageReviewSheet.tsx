@@ -4,7 +4,7 @@ import { X, Check, NotebookPen, HelpCircle, Link2, ChevronLeft, ChevronRight, Ca
 import { parseLocalYmd } from '@/lib/cadence/config'
 import { pageMonthStart, pageSeasonStart, planWindowDates, rewindowPlanItems, type PlanItem, type PlanPlacement, type PageAltitude, type PageReviewPayload } from '@/lib/planParse'
 import { normalizeSeasons, readSeasons, seasonLabel, nextSeasonStart, seasonStartFor, type Seasons } from '@/lib/cadence/seasons'
-import { findLikelyDuplicate, type ExistingTask } from '@/lib/planDuplicates'
+import { findLikelyDuplicate, isSameLine, type ExistingTask } from '@/lib/planDuplicates'
 import { DOMAINS, type DomainId } from '@/lib/domains'
 import type { TitlePeriod } from '@/lib/planTitle'
 import type { PageNote } from '@/lib/pageParse'
@@ -181,14 +181,20 @@ export function PageReviewSheet({
       .filter((i) => !onCalendar(i, calendarTitlesByDay))
       // The type the badge used to only show is stamped on the row, so the
       // one on screen is the one saved.
-      .map((i) => ({
-        ...i,
-        ...(i.kind === 'task' && !isGoalRow(i) && !i.category ? { category: inferredCategory(i) } : {}),
-        assigneeId: initialAssignee(i, memberIds, meId),
-        assigneeDefaulted: !(i.assigneeId && memberIds.has(i.assigneeId)),
-        included: true,
-        dup: findLikelyDuplicate(i.title, existingTasks),
-      })),
+      .map((i) => {
+        const dup = findLikelyDuplicate(i.title, existingTasks)
+        return {
+          ...i,
+          ...(i.kind === 'task' && !isGoalRow(i) && !i.category ? { category: inferredCategory(i) } : {}),
+          assigneeId: initialAssignee(i, memberIds, meId),
+          assigneeDefaulted: !(i.assigneeId && memberIds.has(i.assigneeId)),
+          included: true,
+          dup,
+          // A word-for-word repeat of something already on the plan starts as
+          // that item (nothing new saved); "Don't use it" makes it new again.
+          ...(dup && !i.sourceId && i.kind !== 'dayfact' && isSameLine(i.title, dup.title) ? { sourceId: dup.id } : {}),
+        }
+      }),
   )
   // The household can finish loading after the sheet opens: rows still on the
   // default then take the signed-in member. A row someone picked is left alone.

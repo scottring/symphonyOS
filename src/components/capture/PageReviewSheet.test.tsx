@@ -389,7 +389,7 @@ describe('PageReviewSheet — linked lines and Year goals (Codex review, 2026-09
       items: [{ ...base, title: 'Renew the passports', placement: { kind: 'season' } }],
       existingTasks: [{ id: 'x1', title: 'Renew the passports', completed: false }],
     })
-    await user.click(screen.getByRole('button', { name: 'Use existing item' }))
+    // A word-for-word repeat starts linked (2026-09-29).
     expect(screen.getByRole('status')).toHaveTextContent(/already on your plan, exactly as it is — nothing new is saved for this line, and it is not put under a goal/)
     // No type, no when: the line IS the existing item.
     expect(screen.queryByRole('combobox', { name: /when/i })).toBeNull()
@@ -429,9 +429,31 @@ describe('PageReviewSheet — reuse wording (2026-09-27)', () => {
   it('offers "Use existing item" with an explanation that it avoids a duplicate and makes no goal link', () => {
     render(<PageReviewSheet items={[{ title: 'Look up music lessons', placement: { kind: 'month' }, time: null, assigneeId: null, note: null, dateHint: null, kind: 'task', recurring: null, phone: null, contactMemberId: null }]}
       notes={[]} unclear={[]} windowDates={[]} altitude="month" today={new Date(2026, 8, 5)} members={[]} committing={false}
-      existingTasks={[{ id: 'x1', title: 'Look up music lessons' }]} onCommit={vi.fn()} onClose={vi.fn()} />)
+      existingTasks={[{ id: 'x1', title: 'Look up music lessons for the kids' }]} onCommit={vi.fn()} onClose={vi.fn()} />)
     const use = screen.getByRole('button', { name: 'Use existing item' })
     expect(use).toHaveAccessibleDescription(/avoids a duplicate\. it doesn.t put the item under a goal/i)
     expect(screen.queryByRole('button', { name: /^Link$/ })).toBeNull()
+  })
+})
+
+// 2026-09-29: the same Fall page imported twice saved all 23 goals twice — the
+// sheet flagged each repeat but left it to be added as new unless each row's
+// "Use existing item" was clicked.
+describe('PageReviewSheet — a page imported again', () => {
+  const row = (title: string) => ({ title, placement: { kind: 'season' as const }, time: null, assigneeId: null, note: null, dateHint: null, kind: 'task' as const, recurring: null, phone: null, contactMemberId: null, goal: true })
+  it('a word-for-word repeat starts as the existing item and saves nothing new; a near-match is only offered', async () => {
+    const user = userEvent.setup()
+    const onCommit = vi.fn()
+    render(<PageReviewSheet items={[row('Big kid skill: lights out'), row('Plan winter vacation'), row('Weed the garden')]}
+      notes={[]} unclear={[]} windowDates={[]} altitude="season" today={new Date(2026, 9, 2)} members={[]} committing={false}
+      existingTasks={[{ id: 'g1', title: 'Big kid skill — lights out' }, { id: 'g2', title: 'Plan winter vacation' }, { id: 'g3', title: 'Weed the whole garden' }]}
+      onCommit={onCommit} onClose={vi.fn()} />)
+    expect(screen.getByText(/Ready to add:/).parentElement).toHaveTextContent('2 already on your plan')
+    expect(screen.getAllByRole('button', { name: 'Use existing item' })).toHaveLength(1)
+    await user.click(screen.getByRole('button', { name: /^Add \d+ item/i }))
+    const items = onCommit.mock.calls[0][0].items
+    expect(items.map((i: { title: string; sourceId?: string }) => [i.title, i.sourceId])).toEqual([
+      ['Big kid skill: lights out', 'g1'], ['Plan winter vacation', 'g2'], ['Weed the garden', undefined],
+    ])
   })
 })

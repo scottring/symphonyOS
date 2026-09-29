@@ -53,3 +53,16 @@ export function findLikelyDuplicate(title: string, existing: ExistingTask[]): Ex
   }
   return best?.task ?? null
 }
+
+/**
+ * The same line, word for word once case and punctuation are set aside ("Big
+ * kid skill — lights out" / "Big kid skill: lights out"); every word counts. A
+ * page photographed twice repeats every line exactly, so the review sheet
+ * reuses the existing item for these by default; a near-match stays an offer
+ * (2026-09-29: a Fall page imported twice saved all 23 goals twice).
+ */
+export function isSameLine(a: string, b: string): boolean {
+  const flat = (x: string) => x.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()
+  const fa = flat(a)
+  return fa.length > 0 && fa === flat(b)
+}

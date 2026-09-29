@@ -189,7 +189,7 @@ describe('PageReviewSheet — item types', () => {
       line('Finish the patio', { placement: { kind: 'season' }, goal: true }),
       line('Buy stain', { placement: { kind: 'season' } }),
       line('Change the furnace filter', { placement: { kind: 'season' } }),
-    ], { altitude: 'season', today: new Date(2026, 8, 2), existingTasks: [{ id: 't-1', title: 'Change the furnace filter' }] })
+    ], { altitude: 'season', today: new Date(2026, 8, 2), existingTasks: [{ id: 't-1', title: 'Change the furnace filters' }] })
     expect(screen.getByText(/Ready to add:/).parentElement).toHaveTextContent('1 goal or project / 2 actions')
     await user.click(screen.getByRole('button', { name: 'Use existing item' }))
     expect(screen.getByText(/Ready to add:/).parentElement).toHaveTextContent('1 goal or project / 1 action / 1 already on your plan')
@@ -200,7 +200,7 @@ describe('PageReviewSheet — item types', () => {
   it('a linked line has no type to change: it says Linked, saves nothing new, and unlinking returns its own type', async () => {
     const user = userEvent.setup()
     const { onCommit } = renderSheet([line('Change the furnace filter', { placement: { kind: 'month' }, goal: true })], { altitude: 'month', today: new Date(2026, 9, 2), existingTasks: [{ id: 't-1', title: 'Change the furnace filter' }] })
-    await user.click(screen.getByRole('button', { name: 'Use existing item' }))
+    // A word-for-word repeat starts linked (2026-09-29).
     expect(screen.queryByRole('combobox', { name: /What is/ })).toBeNull()
     expect(screen.getByText('Existing item')).toBeInTheDocument()
     expect(screen.queryByRole('combobox', { name: /Goal for/ })).toBeNull()
