@@ -93,7 +93,14 @@ function Inner() {
     details: (t) => navigate(`/goals/${t.id}`),
     rename: (t, title) => { void updateGoal(t.id, { name: title }) },
     openPartOf: () => {},
-    setContext: (t, c) => { void updateGoal(t.id, { context: c ?? null }) },
+    setContext: async (t, c) => {
+      // Re-tagging moves who may read it; the database refuses a partner who
+      // would make the owner's shared goal private (two-account check,
+      // 2026-09-29) — say so rather than let the chip quietly spring back.
+      if ((await updateGoal(t.id, { context: c ?? null })) === false) {
+        showToast(`Couldn’t change “${t.title}”. A shared goal can only be made private by the person who wrote it.`, 'error', 7000)
+      }
+    },
   }
   const decide = async (vm: LineVM, d: CloseDecision) => {
     const g = byId(vm.task.id); if (!g) return

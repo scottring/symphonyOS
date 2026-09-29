@@ -376,7 +376,11 @@ export function useGoals() {
     if (updateError) {
       setGoals(prev => prev.map(g => g.id === id ? goal : g))
       setError(updateError.message)
+      // Refused writes are reported, so a surface can say why (a partner
+      // making the owner's shared goal private is refused by RLS).
+      return false
     }
+    return true
   }, [goals, familyMembers])
 
   const deleteGoal = useCallback(async (id: string) => {
