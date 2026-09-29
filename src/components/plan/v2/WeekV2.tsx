@@ -29,6 +29,7 @@ import type { Task } from '@/types/task'
 import type { LineActions, LineVM } from './PlanLine'
 import { FocusDeck, CloseOut, type CloseDecision } from './FocusDeck'
 import { FromPaper } from './FromPaper'
+import { ViewSwitch } from './ViewSwitch'
 import { WeekListV2 } from './WeekListV2'
 import { WeekRefShelves } from './RefShelves'
 import { useAddArea } from './AddArea'
@@ -191,13 +192,7 @@ export function WeekV2({ tasks, weekStart, meId, isCurrent, days, onSelectTask, 
     ? (session.saved.authorId === user?.id ? 'you' : members.find((m) => m.auth_user_id === session.saved!.authorId)?.name ?? 'your household')
     : null
   const weekNo = weekOfYear(weekStart, readCadenceConfig().weekStartsOn)
-  const viewSwitch = (
-    <div className="pv2-seg" role="group" aria-label="View">
-      {([['list', 'List'], ['ref', `With ${monthName}`], ['focus', 'One at a time']] as const).map(([v, l]) => (
-        <button key={v} type="button" aria-pressed={view === v} onClick={() => setView(v)}>{l}</button>
-      ))}
-    </div>
-  )
+  const viewSwitch = <ViewSwitch view={view} onChange={setView} aboveName={monthName} />
 
   return (
     <div className="pv2-week" data-week={localYmd(weekStart)}>

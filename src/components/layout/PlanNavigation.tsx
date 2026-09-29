@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
+import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { PanelLeft, ChevronDown, Check } from 'lucide-react'
@@ -133,11 +133,28 @@ export function PlanNavigation({ mobile = false, paused = false, mobileControlsR
   // The kept-pins note ("Lists return when you close the side panel") is
   // still said on Today, even though its chooser button lives on the page.
   const pausedNote = !mobile && paused && !!references && references.pins.length > 0
+  // The rail pins to the top once the row above scrolls away (2026-09-29):
+  // it is the main navigation. A marker just above it says when it is
+  // pinned — the hairline appears then, and the footer's scene steps down.
+  const sentinel = useRef<HTMLDivElement>(null)
+  const [stuck, setStuck] = useState(false)
+  useEffect(() => {
+    const el = sentinel.current
+    if (mobile || !el || typeof IntersectionObserver === 'undefined') return
+    const io = new IntersectionObserver(([e]) => setStuck(!e.isIntersecting), { threshold: 0 })
+    io.observe(el)
+    return () => io.disconnect()
+  }, [mobile])
+  useEffect(() => {
+    document.documentElement.classList.toggle('rail-stuck', stuck)
+    return () => document.documentElement.classList.remove('rail-stuck')
+  }, [stuck])
   if (!mobile) {
     // Desktop: the horizon rail IS the main navigation (Scott, 2026-09-28 —
     // "Planner" is gone from the row above). Centred on every page; a page
     // that is no horizon simply has none marked.
-    return <div className="plan-page-tools is-rail" data-period={period}>
+    return <><div ref={sentinel} className="plan-rail-sentinel" aria-hidden="true" />
+    <div className={`plan-page-tools is-rail${stuck ? ' is-stuck' : ''}`} data-period={period}>
       <div className="plan-rail-side" />
       <HorizonRail period={period} />
       <div className="plan-rail-side is-right">
@@ -151,7 +168,7 @@ export function PlanNavigation({ mobile = false, paused = false, mobileControlsR
           {pausedNote && <span>Lists return when you close the side panel.</span>}
         </div>}
       </div>
-    </div>
+    </div></>
   }
   if (!period && !showChooser && !pausedNote) return null
   return <div className="plan-page-tools" data-period={period}>

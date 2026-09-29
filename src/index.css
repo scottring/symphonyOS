@@ -2306,6 +2306,27 @@ html.desktop-shell a {
 .plan-period-navigation a { padding: 6px 11px; color: var(--color-neutral-500); font-size: 13px; border-radius: 5px; white-space: nowrap; }
 .plan-period-navigation a.is-current { color: var(--color-primary-700); background: white; box-shadow: 0 1px 3px rgb(35 35 34 / 0.08); font-weight: 600; }
 .plan-page-tools.is-rail { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 12px; }
+/* Pinned once the row above scrolls away; a hairline only while pinned. */
+.plan-page-tools.is-rail { position: sticky; top: 0; z-index: 14; padding-top: 6px; padding-bottom: 6px; background: var(--color-bg-base); transition: box-shadow .15s; }
+.plan-page-tools.is-rail.is-stuck { box-shadow: 0 1px 0 var(--color-neutral-200), 0 8px 16px -14px rgb(0 0 0 / .18); }
+.plan-rail-sentinel { height: 1px; margin-bottom: -1px; }
+/* While the rail is pinned, the footer's scene steps down a little. */
+.desktop-ground .place-band.is-ground, .desktop-ground .place-band.is-ground .place-band-scene { transition: height .2s ease; }
+html.rail-stuck .desktop-ground .place-band.is-ground, html.rail-stuck .desktop-ground .place-band.is-ground .place-band-scene { height: 52px; }
+@media (prefers-reduced-motion: reduce) { .plan-page-tools.is-rail, .desktop-ground .place-band.is-ground, .desktop-ground .place-band.is-ground .place-band-scene { transition: none; } }
+/* The top bar: icon buttons one size (2026-09-29). */
+.page-navigation-icon { position: relative; display: inline-grid; place-items: center; width: 34px; height: 34px; border-radius: 9px; color: var(--color-neutral-600); }
+.page-navigation-icon:hover { background: var(--color-neutral-100); color: var(--color-neutral-900); }
+.page-navigation-icon .navigation-count { position: absolute; top: 1px; right: -2px; margin: 0; }
+.page-navigation-menu.is-hamburger > button, .page-navigation-menu.is-account > button { position: relative; display: inline-grid; place-items: center; width: 34px; height: 34px; padding: 0; border-radius: 9px; color: var(--color-neutral-600); }
+.page-navigation-menu.is-hamburger > button:hover, .page-navigation-menu.is-account > button:hover { background: var(--color-neutral-100); color: var(--color-neutral-900); }
+.page-navigation-menu.is-hamburger > button .navigation-count { position: absolute; top: 1px; right: -2px; margin: 0; }
+/* Icon segmented controls: the plan views, Journal / Schedule. */
+.pv2-seg.is-icons button { display: inline-grid; place-items: center; width: 34px; height: 28px; padding: 0; }
+.icon-seg { display: inline-flex; gap: 2px; padding: 3px; border-radius: 10px; background: var(--color-neutral-100); }
+.icon-seg button { display: inline-grid; place-items: center; width: 32px; height: 26px; border-radius: 8px; color: var(--color-neutral-500); }
+.icon-seg button[aria-checked="true"] { background: var(--color-bg-elevated); color: var(--color-neutral-900); box-shadow: 0 1px 2px rgb(0 0 0 / .08); }
+.icon-seg button:hover { color: var(--color-neutral-900); }
 .plan-rail-side { display: flex; align-items: center; gap: 12px; min-width: 0; }
 .plan-rail-side.is-right { justify-content: flex-end; }
 .horizon-rail { display: flex; align-items: center; }
@@ -3120,7 +3141,7 @@ div.chooser-action-group { overflow: visible !important; }
 /* In a meeting, "+ Add" is how the level above becomes this plan — always shown. */
 .pv2-rrow .pv2-addbtn { flex: none; padding-top: 1px; }
 
-.pv2-cal { position: sticky; top: 76px; }
+.pv2-cal { position: sticky; top: 64px; }
 .pv2-dow { display: grid; grid-template-columns: 26px repeat(7, 1fr); padding-bottom: 4px; font: 500 10px var(--pv2-num); letter-spacing: .14em; color: var(--color-neutral-500); }
 .pv2-dow span { padding-left: 6px; }
 .pv2-wk { position: relative; display: grid; grid-template-columns: 26px repeat(7, 1fr); min-height: 58px; padding-bottom: 6px; border-top: 1px solid var(--color-neutral-200); }
@@ -3184,7 +3205,7 @@ div.chooser-action-group { overflow: visible !important; }
 .pv2-week { --pv2-slate: hsl(212 38% 34%); --pv2-num: 'Jost', var(--font-family-sans); }
 .pv2-wgrid { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(320px, 1fr); gap: 48px; align-items: start; }
 .pv2-wgrid.is-ref { grid-template-columns: minmax(0, 1fr) minmax(280px, 1fr) 280px; gap: 36px; }
-.pv2-wside { position: sticky; top: 76px; }
+.pv2-wside { position: sticky; top: 64px; }
 /* One spread (2026-09-29; every horizon since): every column opens on the same heading line —
    serif name, ruled beneath — and none sits in a box. The list's cards are
    the only raised things on the page, because they are the things you move. */

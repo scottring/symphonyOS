@@ -1,5 +1,5 @@
 import { publishViewedDay } from '@/lib/viewedDaySignal'
-import { DesktopPageControls, DesktopControlsContext } from '@/components/layout/DesktopNavigation'
+import { DesktopControlsContext } from '@/components/layout/DesktopNavigation'
 import { DesktopFooterAction, DesktopFooterActionContext } from '@/components/layout/DesktopFooter'
 /**
  * TodayView — editorial Today shell.
@@ -1318,7 +1318,9 @@ export function TodayView({
 
   return (
     <div className="w-full max-w-[1152px] mr-auto px-0 py-2 md:px-10 lg:px-14 md:pt-2 md:pb-8">
-      {desktopControls && !isMobile && <DesktopPageControls>{desktopToolbar}</DesktopPageControls>}
+      {/* Today's filter and ⋯ live in its heading beside the lens and the
+          assistant, as every horizon's page controls do — the top bar is the
+          same on every page (2026-09-29). */}
       {reviewInFooter && data.isToday && (
         <DesktopFooterAction>
           <button type="button" onClick={() => setReviewMode('evening')} title="Reflect, prep for tomorrow, and close the day">
@@ -1378,7 +1380,7 @@ export function TodayView({
         // looking forward, or another day's opener.
         subline={data.isToday && upNext ? undefined : heroLine}
         // Domain chooser + assistant toggle, in the card's corner.
-        controls={headerControls}
+        controls={desktopControls && !isMobile ? <div className="flex items-center gap-2">{headerControls}{desktopToolbar}</div> : headerControls}
         // The masthead's ear: today's weather, one quiet line. The feed only
         // knows today, so another day's page says nothing rather than
         // showing today's sky over Saturday.

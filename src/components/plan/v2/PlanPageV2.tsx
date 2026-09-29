@@ -46,6 +46,7 @@ import { readCadenceConfig, weekStartAnchor } from '@/lib/cadence/config'
 import { weekOfYear } from '@/lib/planning/horizonNumerals'
 import { FocusDeck, CloseOut, type CloseDecision } from './FocusDeck'
 import { FromPaper } from './FromPaper'
+import { ViewSwitch } from './ViewSwitch'
 import { PeriodRefRoutines } from './RefShelves'
 import { useAddArea } from './AddArea'
 import { makePlanActions, timingRemoval } from '@/lib/planning/planActions'
@@ -450,13 +451,7 @@ function Inner({ level }: { level: Level }) {
       dayMarks={dayMarks} weekMarks={weekMarks} />
   ) : null
 
-  const viewSwitch = (
-    <div className="pv2-seg" role="group" aria-label="View">
-      {([['list', 'List'], ['ref', `With ${aboveName}`], ['focus', 'One at a time']] as const).map(([v, l]) => (
-        <button key={v} type="button" aria-pressed={view === v} onClick={() => setView(v)}>{l}</button>
-      ))}
-    </div>
-  )
+  const viewSwitch = <ViewSwitch view={view} onChange={setView} aboveName={aboveName} />
 
   let body: ReactElement
   if (meeting?.step === 1) {
