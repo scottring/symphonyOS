@@ -75,7 +75,9 @@ function validateProposal(raw: unknown): RoutineProposal | null {
   const rec = p.recurrence as Record<string, unknown> | undefined
   let recurrence: RoutineProposal['recurrence']
   if (rec?.type === 'weekly' && Array.isArray(rec.days)) {
-    const days = rec.days.filter((d): d is string => typeof d === 'string' && DAYS.has(d.toLowerCase())).map((d) => d.toLowerCase())
+    // The app's day keys ('mon' …), not the names the model writes — a
+    // routine saved with "monday" matched no day (2026-09-29).
+    const days = rec.days.filter((d): d is string => typeof d === 'string' && DAYS.has(d.toLowerCase())).map((d) => d.toLowerCase().slice(0, 3))
     recurrence = days.length > 0 ? { type: 'weekly', days } : { type: 'daily' }
   } else {
     recurrence = { type: 'daily' }
