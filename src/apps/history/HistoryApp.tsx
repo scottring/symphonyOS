@@ -19,13 +19,18 @@ import { CompletedTasksView } from '@/components/history/CompletedTasksView'
  */
 export function HistoryApp() {
   const navigate = useNavigate()
-  const { tasks } = useSupabaseTasks()
+  const { tasks, loading, error, refetch } = useSupabaseTasks()
   const { contactsMap } = useContacts()
   const { projectsMap } = useProjects()
 
   return (
     <CompletedTasksView
       tasks={tasks}
+      loading={loading}
+      // The hook's error is also set by failed writes; it means "didn't load"
+      // only when nothing arrived.
+      loadFailed={!loading && !!error && tasks.length === 0}
+      onRetry={() => { void refetch() }}
       contactsMap={contactsMap}
       projectsMap={projectsMap}
       onSelectTask={(taskId) => navigate(`/task/${taskId}`)}

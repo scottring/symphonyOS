@@ -57,6 +57,11 @@ interface HomeViewProps {
   selectedItemId: string | null
   onSelectItem: (id: string | null) => void
   loading?: boolean
+  /** The task read failed and nothing arrived — Today says so instead of
+   *  drawing an empty day. */
+  tasksLoadFailed?: boolean
+  /** The tasks hook's refetch, for Try again. */
+  onRetryTasks?: () => void
   viewedDate: Date
   onDateChange: (date: Date) => void
   bothPanelsOpen?: boolean
@@ -93,6 +98,8 @@ export function HomeView({
   selectedItemId,
   onSelectItem,
   loading,
+  tasksLoadFailed,
+  onRetryTasks,
   viewedDate,
   onDateChange,
   bothPanelsOpen,
@@ -537,6 +544,8 @@ export function HomeView({
         onCompleteRoutine={ctx.onCompleteRoutine}
         onCompleteEvent={ctx.onCompleteEvent}
         loading={loading}
+        tasksLoadFailed={tasksLoadFailed}
+        onRetryTasks={onRetryTasks}
         viewedDate={viewedDate}
         onDateChange={onDateChange}
         projects={filteredProjects}

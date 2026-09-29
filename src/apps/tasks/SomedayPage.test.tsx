@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent } from '@/test/test-utils'
 import { SomedayPage } from './SomedayPage'
 import { createMockTask } from '@/test/mocks/factories'
@@ -6,7 +6,7 @@ import { createMockTask } from '@/test/mocks/factories'
 // Someday was a one-way door: the route redirected to Today, so a task sent
 // there could only be found by search (walkthrough, 2026-09-20).
 const hook = vi.hoisted(() => ({
-  tasks: [] as unknown[],
+  tasks: [] as unknown[], error: null as string | null, refetch: vi.fn(async () => {}),
   toggleTask: vi.fn(), updateTask: vi.fn(async () => {}), deleteTask: vi.fn(async () => {}),
   pushTask: vi.fn(async () => {}), updateTasksBulk: vi.fn(async () => {}),
 }))
@@ -74,5 +74,27 @@ describe('SomedayPage', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Delete "Learn the cello"' }))
     fireEvent.click(screen.getByRole('button', { name: 'Dismiss' }))
     expect(hook.deleteTask).toHaveBeenCalledWith('s1')
+  })
+
+  // A failed read drew "Nothing set aside." — as if the shelf were empty.
+  describe('a failed load', () => {
+    afterEach(() => { hook.error = null; hook.refetch.mockClear() })
+
+    it('says Someday didn’t load, and Try again calls the tasks refetch', () => {
+      hook.tasks = []
+      hook.error = 'Failed to fetch'
+      render(<SomedayPage />)
+      expect(screen.getByRole('alert')).toHaveTextContent('Someday didn’t load.')
+      expect(screen.queryByText('Nothing set aside.')).not.toBeInTheDocument()
+      fireEvent.click(screen.getByRole('button', { name: 'Try again' }))
+      expect(hook.refetch).toHaveBeenCalledOnce()
+    })
+
+    it('a write error with rows on screen leaves the list alone', () => {
+      hook.error = 'update failed'
+      render(<SomedayPage />)
+      expect(screen.getByText('Learn the cello')).toBeInTheDocument()
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    })
   })
 })
