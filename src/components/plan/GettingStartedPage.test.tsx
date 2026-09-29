@@ -40,6 +40,8 @@ describe('Plan with guidance', () => {
     const october = screen.getByRole('radio', { name: /October 2026/ }) as HTMLInputElement
     expect(october.checked).toBe(true)
     expect(screen.getByRole('radio', { name: /September 2026/ })).toBeTruthy()
+    // Names both months (walkthrough: "this month is nearly over" read as October).
+    expect(screen.getByText('September is nearly over, so October is the one to plan.')).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: 'Start planning' }))
     await waitFor(() => expect(screen.getByTestId('where').textContent).toBe('/month?start=2026-10-01'))
     expect(guide.set).toHaveBeenCalledWith(expect.objectContaining({ route: 'month', steps: ['month', 'week', 'today'], status: 'active' }))

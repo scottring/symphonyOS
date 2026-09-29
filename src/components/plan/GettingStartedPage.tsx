@@ -109,7 +109,7 @@ export function GettingStartedPage() {
                   <label key={c.start} className={`guide-choice${chosenStart === c.start ? ' is-selected' : ''}`}>
                     <input type="radio" name="guide-period" value={c.start} checked={chosenStart === c.start} onChange={() => setPeriodStart(c.start)} />
                     <span className="guide-choice-title">{c.label}</span>
-                    {k === 0 && <span className="guide-choice-body">{first === 'month' ? 'This month is nearly over, so this is the one to plan.' : 'This one starts soon, so it’s the one to plan.'}</span>}
+                    {k === 0 && <span className="guide-choice-body">{lookAheadWhy(first, choices)}</span>}
                   </label>
                 ))}
               </div>
@@ -138,6 +138,18 @@ export function GettingStartedPage() {
       </section>
     </div>
   )
+}
+
+/** Why the first choice is recommended, naming both periods: "September is
+ *  nearly over, so October is the one to plan." */
+function lookAheadWhy(step: GuideStep, choices: { start: string; label: string }[]): string {
+  const name = (c: { start: string; label: string }) => (step === 'month'
+    ? parseYmd(c.start).toLocaleDateString('en-US', { month: 'long' })
+    : c.label.split(' · ')[0])
+  if (choices.length < 2) return ''
+  return step === 'month'
+    ? `${name(choices[1])} is nearly over, so ${name(choices[0])} is the one to plan.`
+    : `${name(choices[0])} starts soon, so it’s the one to plan.`
 }
 
 /** What the finished run left: counted from the real lists, not from the run. */

@@ -53,6 +53,12 @@ describe('GuideBar', () => {
     expect(screen.getByTestId('where').textContent).toBe('/month?start=2026-10-01')
   })
 
+  it('stays off /start, which offers Resume itself', () => {
+    guide.state = monthRun()
+    show('/start')
+    expect(screen.queryByRole('region', { name: 'Guided planning' })).toBeNull()
+  })
+
   it('elsewhere, it offers the way back to the step', () => {
     guide.state = monthRun()
     show('/inbox')

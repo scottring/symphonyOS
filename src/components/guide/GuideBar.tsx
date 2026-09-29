@@ -41,7 +41,8 @@ export function GuideBar() {
   const step = state ? currentStep(state) : 'today'
   const { horizon, token } = state ? tokenFor(step, state) : { horizon: 'weekly' as SessionHorizon, token: '' }
   const session = usePlanningSession(horizon, token)
-  if (!state || state.status === 'finished') return null
+  // /start is where a run is chosen and resumed; it says so itself.
+  if (!state || state.status === 'finished' || pathname === '/start') return null
 
   const seasons = readSeasons()
   const wso = readCadenceConfig().weekStartsOn

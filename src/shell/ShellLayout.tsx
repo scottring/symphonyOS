@@ -298,7 +298,8 @@ function ShellLayoutInner({ children }: Props) {
         {isMobile ? (
           <div>
             <PlanNavigation mobile mobileControlsRef={setMobilePlanControls} />
-            <div className="guide-slot"><GuideBar /></div>
+            {/* Off the planner the area lens rides top-right; the guide sits below it. */}
+            <div className={`guide-slot${planPeriodForPath(location.pathname) ? '' : ' has-lens'}`}><GuideBar /></div>
             <div className="min-w-0">{children}</div>
           </div>
         ) : (

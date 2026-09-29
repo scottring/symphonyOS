@@ -3349,3 +3349,7 @@ div.chooser-action-group { overflow: visible !important; }
 .guide-slot { padding: 12px 0 0; }
 @media (min-width: 768px) { .guide-slot { padding: 16px 40px 0; max-width: 1152px; } }
 @media (min-width: 1024px) { .guide-slot { padding: 16px 56px 0; } }
+/* While the guide is running, its button is the one to press: the page's
+   own "Plan <period>" steps back (walkthrough 2026-09-29: two dark buttons). */
+.guide-slot:has(.guide-bar) ~ * .pv2-toolbar > .pv2-btn { background: var(--color-bg-elevated); color: var(--color-neutral-700); border: 1px solid var(--color-neutral-200); box-shadow: none; }
+@media (max-width: 767px) { .guide-slot.has-lens:has(.guide-bar, .guide-pause) { padding-top: calc(env(safe-area-inset-top, 0px) + 52px); } }
