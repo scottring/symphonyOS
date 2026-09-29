@@ -2960,8 +2960,12 @@ div.chooser-action-group { overflow: visible !important; }
    date we can't move. Everything else stays quiet.
    ============================================================================= */
 .pv2-page { --pv2-slate: hsl(212 38% 34%); --pv2-slate-wash: hsl(212 40% 95%); --pv2-num: 'Jost', var(--font-family-sans);
-  max-width: 1200px; margin: 0 auto; padding: 28px 24px 96px; color: var(--color-neutral-900); }
-.pv2-head { display: grid; grid-template-columns: auto 1fr auto; gap: 22px; align-items: end; margin-bottom: 20px; }
+  max-width: 1200px; margin: 0 auto; padding: 28px 16px 96px; color: var(--color-neutral-900); }
+/* The app's own gutter (PAGE_GUTTER_X: 16 / 40 / 56px), so every horizon
+   shares the week's left and right edges. */
+@media (min-width: 768px) { .pv2-page { padding-left: 40px; padding-right: 40px; } }
+@media (min-width: 1024px) { .pv2-page { padding-left: 56px; padding-right: 56px; } }
+.pv2-head { display: grid; grid-template-columns: auto 1fr auto; gap: 22px; align-items: end; margin-bottom: 20px; padding-bottom: 10px; border-bottom: 1px solid var(--color-neutral-300); }
 .pv2-numeral { font: 200 100px/.82 var(--pv2-num); letter-spacing: -.03em; color: var(--color-neutral-900); }
 .pv2-numeral.is-wide { font-size: 80px; }
 .pv2-eyebrow { font: 500 11px var(--pv2-num); letter-spacing: .18em; text-transform: uppercase; color: var(--color-neutral-500); }
@@ -3001,8 +3005,8 @@ div.chooser-action-group { overflow: visible !important; }
 .pv2-foot { margin-top: 48px; font-size: 12.5px; color: var(--color-neutral-500); }
 
 .pv2-grid2 { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(290px, 1fr); gap: 48px; align-items: start; }
-.pv2-grid2.is-ref { grid-template-columns: 260px minmax(0, 1fr); }
-.pv2-grid3 { display: grid; grid-template-columns: 220px minmax(0, 1.4fr) minmax(280px, 1fr); gap: 36px; align-items: start; }
+.pv2-grid2.is-ref { grid-template-columns: 280px minmax(0, 1fr); gap: 36px; }
+.pv2-grid3 { display: grid; grid-template-columns: 260px minmax(0, 1fr) 300px; gap: 36px; align-items: start; }
 .pv2-colh { font: 500 17px var(--font-family-display); margin: 0 0 10px; display: flex; gap: 10px; align-items: baseline; justify-content: space-between; }
 .pv2-paper { display: inline-flex; align-items: center; gap: 5px; margin-left: auto; font: 400 12.5px var(--font-family-sans); color: var(--color-primary-700); white-space: nowrap; }
 .pv2-paper:hover { text-decoration: underline; }
@@ -3171,21 +3175,22 @@ div.chooser-action-group { overflow: visible !important; }
 .pv2-wgrid { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(320px, 1fr); gap: 48px; align-items: start; }
 .pv2-wgrid.is-ref { grid-template-columns: minmax(0, 1fr) minmax(280px, 1fr) 280px; gap: 36px; }
 .pv2-wside { position: sticky; top: 76px; }
-/* One spread (2026-09-29): every column opens on the same heading line —
+/* One spread (2026-09-29; every horizon since): every column opens on the same heading line —
    serif name, ruled beneath — and none sits in a box. The list's cards are
    the only raised things on the page, because they are the things you move. */
-.pv2-week .pv2-colh { min-height: 30px; margin: 0 0 6px; padding-bottom: 8px; border-bottom: 1px solid var(--color-neutral-300); align-items: flex-end; }
+:is(.pv2-week, .pv2-page) .pv2-colh { min-height: 30px; margin: 0 0 6px; padding-bottom: 8px; border-bottom: 1px solid var(--color-neutral-300); align-items: flex-end; }
 .pv2-week .pv2-days [data-testid="week-journal"] { border-top: 0; }
 .pv2-week .pv2-wl-row.is-card { margin-left: 0; margin-right: 0; }
 .pv2-week .pv2-wl .pv2-wl-h:first-of-type { margin-top: 10px; }
-.pv2-week .pv2-ref { padding: 0; border-radius: 0; background: none; overflow: visible; max-height: none; }
-.pv2-week .pv2-ref .pv2-colh small { margin-left: auto; margin-right: 0; }
-.pv2-week .pv2-ref .pv2-list { margin-top: 8px; }
-.pv2-week .pv2-ref .pv2-rrow { padding: 6px 0; color: var(--color-neutral-600); border-bottom: 1px solid var(--color-neutral-100); flex-wrap: nowrap; }
-.pv2-week .pv2-ref .pv2-rrow > button { line-height: 1.4; }
-.pv2-week .pv2-ref .pv2-rrow .pv2-refacts { opacity: .55; transition: opacity .12s; }
-.pv2-week .pv2-ref .pv2-rrow:hover .pv2-refacts, .pv2-week .pv2-ref .pv2-rrow:focus-within .pv2-refacts { opacity: 1; }
-@media (hover: none) { .pv2-week .pv2-ref .pv2-rrow .pv2-refacts { opacity: 1; } }
+:is(.pv2-week, .pv2-page) .pv2-ref { position: static; padding: 0; border-radius: 0; background: none; overflow: visible; max-height: none; }
+:is(.pv2-week, .pv2-page) .pv2-ref .pv2-colh small { margin-left: auto; margin-right: 0; }
+:is(.pv2-week, .pv2-page) .pv2-ref .pv2-list { margin-top: 8px; }
+:is(.pv2-week, .pv2-page) .pv2-ref .pv2-rrow { padding: 6px 0; color: var(--color-neutral-600); border-bottom: 1px solid var(--color-neutral-100); flex-wrap: nowrap; }
+:is(.pv2-week, .pv2-page) .pv2-ref .pv2-rrow > button { line-height: 1.4; }
+:is(.pv2-week, .pv2-page) .pv2-ref .pv2-rrow:has(> form) { flex-wrap: wrap; }
+:is(.pv2-week, .pv2-page) .pv2-ref .pv2-rrow .pv2-refacts { opacity: .55; transition: opacity .12s; }
+:is(.pv2-week, .pv2-page) .pv2-ref .pv2-rrow:hover .pv2-refacts, :is(.pv2-week, .pv2-page) .pv2-ref .pv2-rrow:focus-within .pv2-refacts { opacity: 1; }
+@media (hover: none) { :is(.pv2-week, .pv2-page) .pv2-ref .pv2-rrow .pv2-refacts { opacity: 1; } }
 .pv2-wtools { display: flex; align-items: center; gap: 8px; }
 .pv2-wtools + .pv2-seg { margin-left: 0; }
 .pv2-rrow-sans { font: 400 14px/1.4 var(--font-family-sans); flex-wrap: wrap; }
@@ -3206,6 +3211,9 @@ div.chooser-action-group { overflow: visible !important; }
   .pv2-wgrid.is-ref .pv2-ref { grid-column: auto; }
   .pv2-cal, .pv2-ref { position: static; max-height: none; }
   .pv2-brain { columns: 1; }
+  /* One column: the plan first, the level above after it (as on the week). */
+  .pv2-grid3 > .pv2-ref, .pv2-grid2.is-ref > .pv2-ref { order: 3; }
+  :is(.pv2-week, .pv2-page) .pv2-ref .pv2-rrow > button { min-height: 0; }
 }
 /* Phones carry the life-area lens in the shell's own header already. */
 @media (max-width: 767px) { .pv2-chrome { display: none; } }
