@@ -5,10 +5,10 @@
 // accessible name, and "With September" keeps the period's name there: the
 // reference column's own heading names it too.
 
-import { List, Columns2, SquareStack } from 'lucide-react'
+import { List, Columns2, GalleryHorizontal } from 'lucide-react'
 import type { PlanView } from '@/lib/planning/v2/planV2'
 
-const ICONS = { list: List, ref: Columns2, focus: SquareStack } as const
+const ICONS = { list: List, ref: Columns2, focus: GalleryHorizontal } as const
 
 export function ViewSwitch({ view, onChange, aboveName, withRef = true }: {
   view: PlanView
