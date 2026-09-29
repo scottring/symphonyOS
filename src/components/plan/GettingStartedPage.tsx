@@ -55,7 +55,7 @@ export function GettingStartedPage() {
   return (
     <div className={`${PAGE_COLUMN} getting-started-page`}>
       <MastheadCard variant="page"
-        eyebrow={<span className="text-[12px] uppercase tracking-wider text-neutral-500">Plan with guidance</span>}
+        eyebrow={<span className="pl-1.5 text-[12px] uppercase tracking-wider text-neutral-500">Plan with guidance</span>}
         title={showFinish ? 'Your plan is ready' : 'What would you like to plan?'}
         subline={showFinish ? undefined : <p className="text-[13px] text-neutral-500">Start with what matters to you, then choose manageable steps for the time ahead. You can look at the bigger picture or just get today sorted.</p>} />
 
