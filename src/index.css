@@ -3026,6 +3026,13 @@ div.chooser-action-group { overflow: visible !important; }
    narrow bar the link drops under the hint instead of both breaking. */
 .pv2-noplan { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 10px; }
 .pv2-noplan > * { white-space: nowrap; }
+/* While planning: one sentence under the bar saying what this step is for. */
+.pv2-sbar-why { flex-basis: 100%; margin: 0; font-size: 13px; line-height: 1.45; color: var(--color-neutral-600); }
+/* A save leaves one line: what was saved, and one optional next step. */
+.pv2-saved { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; margin: 0 0 22px; padding: 12px 14px; border-radius: 12px; background: var(--color-primary-50); border: 1px solid var(--color-primary-100); font-size: 13.5px; color: var(--color-neutral-700); }
+.pv2-saved-text { flex: 1 1 260px; min-width: 0; }
+.pv2-saved-text b { color: var(--color-neutral-900); font-weight: 600; }
+.pv2-toolbar button:disabled { opacity: .5; cursor: not-allowed; }
 .pv2-foot { margin-top: 48px; font-size: 12.5px; color: var(--color-neutral-500); }
 
 .pv2-grid2 { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(290px, 1fr); gap: 48px; align-items: start; }

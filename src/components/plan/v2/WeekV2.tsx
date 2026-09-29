@@ -19,6 +19,8 @@ import { showToast } from '@/hooks/useToast'
 import { weekListTasks } from '@/lib/planning/weekList'
 import { selectPeriodTasks } from '@/lib/planning/periodPage'
 import { monthStartOf, monthsOfWeek } from '@/lib/planning/periodPlacement'
+import { PlanMeetingBar, PlanSavedLine, PlanToolbar } from './PlanStatus'
+import { EMPTY_TALLY, addToTally, lookBackWhy, tallySentence, type Tally } from '@/lib/planning/v2/planTally'
 import { lowerPlacement } from '@/lib/placement/model'
 import { goalOfTask } from '@/lib/planning/goalSupport'
 import { readSeasons } from '@/lib/cadence/seasons'
@@ -38,7 +40,6 @@ import { useActionableInstances } from '@/hooks/useActionableInstances'
 import type { TaskContext } from '@/types/task'
 
 const DAY = 86_400_000
-const shortDay = (d: Date) => d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
 
 export function WeekV2({ tasks, weekStart, meId, isCurrent, days, onSelectTask, timingControl, dragEnabled = true, tools }: {
   /** Layer-filtered tasks, as the week receives them. */
@@ -115,8 +116,11 @@ export function WeekV2({ tasks, weekStart, meId, isCurrent, days, onSelectTask, 
     today: async (t) => { if (await planActions.chooseTaskDay(t.id, new Date())) showToast(`“${t.title}” is on today — any time.`, 'success', 5000) },
   }
 
+  const [tally, setTally] = useState<Tally>(EMPTY_TALLY)
+  const [justSaved, setJustSaved] = useState<null | { detail: string }>(null)
   const decide = async (vm: LineVM, d: CloseDecision) => {
     const t = vm.task
+    setTally((x) => addToTally(x, d))
     if (d === 'carried') await keepForward(t.id, { weekStart }, prevWeek)
     else if (d === 'done') { if (!t.completed) await toggleTask(t.id) }
     else if (d === 'someday') await gated.updateTask(t.id, { bucket: 'someday', scheduledFor: undefined, isAllDay: undefined })
@@ -131,6 +135,8 @@ export function WeekV2({ tasks, weekStart, meId, isCurrent, days, onSelectTask, 
   const reviewDue = !session.saved || reviewIds.length > 0
   const startMeeting = () => {
     const candidateIds = reviewIds
+    setTally(EMPTY_TALLY)
+    setJustSaved(null)
     setMeeting({ step: candidateIds.length ? 1 : 2, candidateIds })
     // A meeting always opens with the month beside the week: choosing from it
     // is the meeting's job (it had opened in the last-used view, and "One at a
@@ -141,7 +147,10 @@ export function WeekV2({ tasks, weekStart, meId, isCurrent, days, onSelectTask, 
   const endMeeting = async (keep: boolean) => {
     if (keep) {
       if (!(await session.save({ wentWell: session.mine?.wentWell ?? '', didnt: session.mine?.didnt ?? '' }))) { showToast('Couldn’t save the plan — try again.', 'error', 5000); return }
-      showToast(`Saved as our week ${weekOfYear(weekStart, readCadenceConfig().weekStartsOn)} plan.`, 'success', 5000)
+      const open = lines.filter((l) => l.fate === 'open').length
+      const done = lines.filter((l) => l.fate === 'done').length
+      const onADay = lines.filter((l) => l.fate === 'open' && l.task.scheduledFor).length
+      setJustSaved({ detail: [`${open} on the list${open ? (onADay ? `, ${onADay} on a day` : ', none on a day yet') : ''}${done ? `, ${done} done` : ''}.`, tallySentence(tally, 'last week')].filter(Boolean).join(' ') })
     }
     setMeeting(null)
     setViewState(readPlanView('week'))
@@ -205,31 +214,19 @@ export function WeekV2({ tasks, weekStart, meId, isCurrent, days, onSelectTask, 
   return (
     <div className="pv2-week" data-week={localYmd(weekStart)}>
       {meeting ? (
-        <div className="pv2-sbar" role="region" aria-label={`Weekly review, week ${weekNo}`}>
-          <span className="pv2-st">Weekly review<small>week {weekNo}</small></span>
-          {meeting.candidateIds.length > 0 ? (
-            <div className="pv2-steps">
-              <button type="button" aria-current={meeting.step === 1 ? 'step' : undefined} onClick={() => setMeeting({ ...meeting, step: 1 })}><b>1</b>Close out last week</button>
-              <button type="button" aria-current={meeting.step === 2 ? 'step' : undefined} onClick={() => setMeeting({ ...meeting, step: 2 })}><b>2</b>Plan this week</button>
-            </div>
-          ) : <span className="flex-1" />}
-          {meeting.step === 2 && viewSwitch}
-          <button type="button" className="pv2-link pv2-quiet" onClick={() => void endMeeting(false)}>Leave for now</button>
-          <button type="button" className="pv2-btn" onClick={() => void endMeeting(true)}>This is our week</button>
-        </div>
-      ) : (
-      <div className="pv2-toolbar">
-        <div className="pv2-status">
-          {session.saved
-            ? <><span className="pv2-seal" aria-hidden="true" /><span><b>Our week {weekNo} plan</b> · agreed {shortDay(session.saved.at)} · {agreedBy}</span></>
-            : (session.loading ? null : <span className="pv2-noplan"><span className="pv2-hint">{`No plan for week ${weekNo} yet`}</span>
-                <button type="button" className="pv2-link" onClick={startMeeting}>Plan your week →</button></span>)}
-        </div>
-        {tools && <div className="pv2-wtools">{tools}</div>}
-        {viewSwitch}
-        <button type="button" className={session.saved && reviewDue ? 'pv2-btn' : 'pv2-qbtn'} onClick={startMeeting}>Weekly review</button>
-      </div>
-      )}
+        <PlanMeetingBar period={`week ${weekNo}`} prevName="last week" step={meeting.step} lookBack={meeting.candidateIds.length > 0}
+          why={meeting.step === 1 ? lookBackWhy('Last week', 'this week', meeting.candidateIds.length)
+            : `Choose next steps from ${monthName}’s plan beside the list, or write your own. Nothing needs a day yet.`}
+          onStep={(step) => setMeeting({ ...meeting, step })} viewSwitch={meeting.step === 2 ? viewSwitch : undefined}
+          onLeave={() => void endMeeting(false)} onSave={() => void endMeeting(true)} saveLabel="This is our week" />
+      ) : (<>
+        {justSaved && <PlanSavedLine title={`Week ${weekNo} plan saved.`} detail={justSaved.detail}
+          next={isCurrent ? { label: 'Pick something for today', onClick: () => navigate('/today') } : null}
+          onDone={() => setJustSaved(null)} />}
+        <PlanToolbar period={`week ${weekNo}`} saved={session.saved} loading={session.loading} error={!!session.error} agreedBy={agreedBy}
+          reviewDue={reviewDue} onPlan={startMeeting} onRetry={session.reload} viewSwitch={viewSwitch}
+          tools={tools && <div className="pv2-wtools">{tools}</div>} />
+      </>)}
 
       {meeting?.step === 1 ? (
         <CloseOut lines={prevLines} candidateIds={meeting.candidateIds} members={members} actions={actions} prevName="last week" nextName="this week"
@@ -238,7 +235,7 @@ export function WeekV2({ tasks, weekStart, meId, isCurrent, days, onSelectTask, 
         <FocusDeck lines={lines} actions={actions} members={members} nextLabel="next week" context={`Week ${weekNo}`} label={`Week ${weekNo}`}
           empty={meeting
             ? `Nothing on this week yet. Choose next steps from ${monthName}’s plan, or add your own.`
-            : `Nothing on this week yet. Add to the list, or start the weekly review to choose from ${monthName}’s plan.`} />
+            : `Nothing on this week yet. Add to the list, or choose “Plan week ${weekNo}” to pick from ${monthName}’s plan.`} />
       ) : (
         <div className={`pv2-wgrid${view === 'ref' ? ' is-ref' : ''}`}>
           {/* One spread: three columns, one heading line across them, no
@@ -257,7 +254,7 @@ export function WeekV2({ tasks, weekStart, meId, isCurrent, days, onSelectTask, 
                 dragEnabled={dragEnabled} headerAction={<FromPaper altitude="week" periodStart={weekStart} tasks={tasks} />}
                 emptyHint={meeting
                   ? `Nothing on this week’s list yet. Choose next steps from ${monthName}’s plan beside it, or add your own below.`
-                  : undefined} />
+                  : `Nothing on this week’s list yet. Add below, or choose “Plan week ${weekNo}” to pick from ${monthName}’s plan.`} />
             </div>
           </div>
           {view === 'ref' && (

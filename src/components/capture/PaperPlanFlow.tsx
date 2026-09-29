@@ -471,11 +471,13 @@ export function PaperPlanFlow({ members, onClose }: Props) {
             <p className="text-[14px] text-neutral-600">{summary.total} changes saved. Routines are saved switched off until you turn them on.</p>
             <div className="flex flex-wrap justify-center gap-2 pt-2">
               {summary.seasonGoals + summary.seasonTasks > 0 && (
-                <button type="button" className="btn-secondary px-4 py-2 rounded-xl text-[14px]" onClick={() => { onClose(); navigate('/season') }}>Open the season</button>
+                <button type="button" className="btn-secondary px-4 py-2 rounded-xl text-[14px]" onClick={() => { onClose(); navigate(summary.seasonStart ? `/season?start=${summary.seasonStart}` : '/season') }}>Open the season</button>
               )}
               {summary.monthGoals + summary.monthTasks > 0 && (
-                <button type="button" className="btn-secondary px-4 py-2 rounded-xl text-[14px]" onClick={() => { onClose(); navigate('/month') }}>Open the month</button>
+                <button type="button" className="btn-secondary px-4 py-2 rounded-xl text-[14px]" onClick={() => { onClose(); navigate(summary.monthStart ? `/month?start=${summary.monthStart}` : '/month') }}>Open the month</button>
               )}
+              {/* The next step after a plan is in: choose what this week takes from it. */}
+              <button type="button" className="btn-secondary px-4 py-2 rounded-xl text-[14px]" onClick={() => { onClose(); navigate('/week') }}>Choose steps for this week</button>
               <button type="button" className="btn-primary px-4 py-2 rounded-xl text-[14px]" onClick={onClose}>Done</button>
             </div>
           </div>
