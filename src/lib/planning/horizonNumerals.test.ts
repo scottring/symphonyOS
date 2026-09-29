@@ -46,4 +46,15 @@ describe('railEntries — the rail follows the period on screen', () => {
     expect(r.month).toMatchObject({ label: 'September', to: '/month' })
     expect(r.season.label).toBe('Summer')
   })
+
+  // Scott, 2026-09-29: Year 2026 read "Winter · January · week 1", and a
+  // Fall page starting Sep 1 read "week 36".
+  it('a period that holds today reads from today', () => {
+    const y = railEntries(now, { period: 'year', start: new Date(2026, 0, 1) }, custom, 6)
+    expect(y.month.label).toBe('September')
+    expect(y.season.label).toBe('Summer')
+    expect(y.week.n).toBe('40')
+    const other = railEntries(now, { period: 'year', start: new Date(2027, 0, 1) }, custom, 6)
+    expect(other.month.label).toBe('January')
+  })
 })
