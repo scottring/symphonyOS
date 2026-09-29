@@ -20,8 +20,9 @@ export function RoutinesToggle({ hidden, onToggle }: { hidden: boolean; onToggle
           : 'bg-neutral-50 border-neutral-200 text-neutral-400'
       }`}
     >
-      <Repeat className="w-3.5 h-3.5" />
-      Routines
+      {/* The repeat mark says "routines" everywhere in the app; the word
+          lives in the tooltip and the accessible name (2026-09-29). */}
+      <Repeat className="w-3.5 h-3.5" aria-hidden="true" />
       <span className={`ml-0.5 w-6 h-3.5 rounded-full relative transition-colors ${on ? 'bg-primary-500' : 'bg-neutral-300'}`}>
         <span className={`absolute top-0.5 w-2.5 h-2.5 rounded-full bg-white transition-all ${on ? 'right-0.5' : 'left-0.5'}`} />
       </span>

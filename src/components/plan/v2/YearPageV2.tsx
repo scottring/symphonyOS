@@ -26,6 +26,7 @@ import type { Task } from '@/types/task'
 import { PlanLine, type LineActions, type LineVM } from './PlanLine'
 import { FocusDeck, CloseOut, type CloseDecision } from './FocusDeck'
 import { FromPaper } from './FromPaper'
+import { ViewSwitch } from './ViewSwitch'
 import { useAddArea } from './AddArea'
 
 const shortDay = (d: Date) => d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
@@ -137,11 +138,7 @@ function Inner() {
   const dropped = lines.filter((l) => l.fate === 'dropped')
   const row = (vm: LineVM) => <PlanLine key={vm.task.id} vm={vm} actions={actions} members={members} nextLabel={String(year + 1)}
     open={openLine === vm.task.id} onToggle={() => setOpenLine((o) => (o === vm.task.id ? null : vm.task.id))} editable={inMeeting} />
-  const viewSwitch = (
-    <div className="pv2-seg" role="group" aria-label="View">
-      {([['list', 'List'], ['focus', 'One at a time']] as const).map(([v, l]) => <button key={v} type="button" aria-pressed={view === v} onClick={() => setView(v)}>{l}</button>)}
-    </div>
-  )
+  const viewSwitch = <ViewSwitch view={view} onChange={setView} withRef={false} />
 
   let body: ReactElement
   if (meeting?.step === 1) {

@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { NavLink, useLocation, useNavigate } from 'react-router-dom'
-import { ChevronDown, Inbox, Plus, Search, UserRound } from 'lucide-react'
+import { ChevronDown, Inbox, Menu, Plus, Search, UserRound } from 'lucide-react'
 import { requestPlanFromPaper } from '@/lib/planFromPaperSignal'
 import { appRegistry } from '@/shell/appRegistry'
 import { MORE_GROUPS, isDestinationActive } from './moreDestinations'
@@ -32,10 +32,10 @@ export function DesktopNavigation({ inboxCount, discussionsUnread, onSearch, onQ
     document.addEventListener('keydown', escape)
     return () => { document.removeEventListener('pointerdown', outside); document.removeEventListener('keydown', escape) }
   }, [open])
-  function menu(id: string, label: ReactNode, content: ReactNode, active = false) {
-    return <div className="page-navigation-menu">
-      <button type="button" aria-expanded={open === id} aria-controls={`navigation-${id}`} className={active ? 'is-current' : ''}
-        onClick={e => { trigger.current = e.currentTarget; setOpen(open === id ? null : id) }}>{label}<ChevronDown size={12} aria-hidden="true" /></button>
+  function menu(id: string, label: ReactNode, content: ReactNode, active = false, opts: { ariaLabel?: string; chevron?: boolean; className?: string } = {}) {
+    return <div className={`page-navigation-menu${opts.className ? ` ${opts.className}` : ''}`}>
+      <button type="button" aria-expanded={open === id} aria-controls={`navigation-${id}`} className={active ? 'is-current' : ''} aria-label={opts.ariaLabel} title={opts.ariaLabel}
+        onClick={e => { trigger.current = e.currentTarget; setOpen(open === id ? null : id) }}>{label}{opts.chevron !== false && <ChevronDown size={12} aria-hidden="true" />}</button>
       {open === id && <div id={`navigation-${id}`} className="page-navigation-popover">{content}</div>}
     </div>
   }
@@ -49,9 +49,10 @@ export function DesktopNavigation({ inboxCount, discussionsUnread, onSearch, onQ
   const destinations = groups.flatMap(([, items]) => items)
   return <nav ref={root} className="page-navigation" aria-label="Main navigation">
     {/* No "Planner" and no "Routines" here (Scott, 2026-09-28): the horizon
-        rail beneath is the main navigation, and Routines lives under More. */}
-    <NavLink to="/inbox" aria-label={`Inbox${inboxCount ? `, ${inboxCount} ${inboxCount === 1 ? 'item' : 'items'}` : ''}`}><Inbox size={16} aria-hidden="true" /><span>Inbox</span>{inboxCount > 0 && <span className="navigation-count">{inboxCount}</span>}</NavLink>
-    {menu('more', <>More{discussionsUnread > 0 && <span className="navigation-count">{discussionsUnread}</span>}</>, <div className="page-navigation-more">
+        rail beneath is the main navigation, and Routines lives under More.
+        One bar on every page (2026-09-29): the menu at the left; at the right
+        Inbox, search, Add and you — page controls live in the page heading. */}
+    {menu('more', <><Menu size={18} aria-hidden="true" />{discussionsUnread > 0 && <span className="navigation-count">{discussionsUnread}</span>}</>, <div className="page-navigation-more">
       <div className="page-navigation-groups">
         {groups.map(([group, items]) => <div key={group} role="group" aria-labelledby={`navigation-group-${group}`} className="page-navigation-group">
           <h3 id={`navigation-group-${group}`}>{group}</h3>
@@ -65,17 +66,22 @@ export function DesktopNavigation({ inboxCount, discussionsUnread, onSearch, onQ
         <button onClick={() => { setOpen(null); if (!requestPlanFromPaper()) navigate('/today') }}>Plan from paper</button>
         <span>Photograph a paper page into your plan</span>
       </div>
-    </div>, destinations.some(([, route]) => isDestinationActive(route, pathname)))}
+    </div>, destinations.some(([, route]) => isDestinationActive(route, pathname)),
+      { ariaLabel: discussionsUnread > 0 ? `More, ${discussionsUnread} unread discussions` : 'More', chevron: false, className: 'is-hamburger' })}
     <div className="page-navigation-utilities">
       {auxiliaryControls}
       <div ref={controlsRef} className="page-navigation-page-controls" />
+      <NavLink to="/inbox" className="page-navigation-icon" title="Inbox"
+        aria-label={`Inbox${inboxCount ? `, ${inboxCount} ${inboxCount === 1 ? 'item' : 'items'}` : ''}`}>
+        <Inbox size={17} aria-hidden="true" />{inboxCount > 0 && <span className="navigation-count">{inboxCount}</span>}
+      </NavLink>
+      <button onClick={onSearch} aria-label="Search" title="Search" className="page-navigation-icon"><Search size={17} aria-hidden="true" /></button>
       {/* The visible twin of ⌘K: capture from any page without knowing the shortcut. */}
       <button type="button" onClick={onQuickAdd ?? onSearch} aria-label="Add — ⌘K" title="Add a task, note or event (⌘K)"
         className="page-navigation-add"><Plus size={15} aria-hidden="true" /><span>Add</span><kbd>⌘K</kbd></button>
-      <button onClick={onSearch} aria-label="Search"><Search size={16} /></button>
-      {menu('account', <><UserRound size={16} /><span className="sr-only">Account</span></>, <>
+      {menu('account', <><UserRound size={17} aria-hidden="true" /><span className="sr-only">Account</span></>, <>
         {userName && <p>{userName}</p>}<button onClick={() => go('/settings')}>Settings</button><button onClick={() => { setOpen(null); onSignOut() }}>Sign out</button>
-      </>)}
+      </>, false, { chevron: false, className: 'is-account' })}
     </div>
   </nav>
 }

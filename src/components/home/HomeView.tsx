@@ -591,7 +591,11 @@ export function HomeView({
         </div>
       )}
 
-      <div className="flex-1 overflow-y-auto">
+      {/* On desktop the shell scrolls the page; an inner scroller here (one that
+          never scrolls — it grows with its content) made every sticky column
+          inside it, the week's list and the month's calendar, stick to IT and
+          so never stick at all (2026-09-29). Phones keep it for their header. */}
+      <div className="flex-1 overflow-y-auto md:overflow-y-visible">
         {/* Today draws its own masthead inside the day card, and HomeHeader
             returns null for it — the padded wrapper that used to mount it
             here was an empty band above the date (2026-09-22). */}

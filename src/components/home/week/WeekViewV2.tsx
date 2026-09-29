@@ -1,4 +1,5 @@
 import { useMemo, useState, useCallback, useEffect, useRef } from 'react'
+import { BookOpen, CalendarDays } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import {
   DndContext,
@@ -158,21 +159,18 @@ export type WeekMode = 'journal' | 'schedule'
 /** Journal | Schedule — presentation only: same dates, same data. */
 export function WeekModeSwitch({ mode, onChange }: { mode: WeekMode; onChange: (m: WeekMode) => void }) {
   return (
-    <div role="radiogroup" aria-label="Week layout" className="inline-flex items-center gap-3 text-xs font-medium">
-      {(['journal', 'schedule'] as const).map((m) => (
-        <button
-          key={m}
-          type="button"
-          role="radio"
-          aria-checked={mode === m}
-          onClick={() => onChange(m)}
-          className={`border-b py-0.5 transition-colors ${
-            mode === m ? 'border-neutral-800 text-neutral-900' : 'border-transparent text-neutral-400 hover:text-neutral-700'
-          }`}
-        >
-          {m === 'journal' ? 'Journal' : 'Schedule'}
-        </button>
-      ))}
+    // Icons, named in the tooltip and to a screen reader (2026-09-29): an
+    // open book for the journal of days, a calendar grid for the hours.
+    <div role="radiogroup" aria-label="Week layout" className="icon-seg">
+      {(['journal', 'schedule'] as const).map((m) => {
+        const Icon = m === 'journal' ? BookOpen : CalendarDays
+        const label = m === 'journal' ? 'Journal' : 'Schedule'
+        return (
+          <button key={m} type="button" role="radio" aria-checked={mode === m} aria-label={label} title={label} onClick={() => onChange(m)}>
+            <Icon className="h-4 w-4" aria-hidden="true" />
+          </button>
+        )
+      })}
     </div>
   )
 }
