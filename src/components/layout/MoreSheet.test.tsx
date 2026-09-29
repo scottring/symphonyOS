@@ -18,10 +18,11 @@ describe('Phone secondary destinations', () => {
       expect(close).toHaveBeenCalledOnce()
     })
 
-  it('offers every desktop More destination on the phone', () => {
+  it('offers every desktop More destination on the phone — except Routines, which the dock carries', () => {
     renderSheet()
-    for (const [, items] of MORE_GROUPS) for (const { label } of items) {
-      expect(screen.getByRole('button', { name: label })).toBeInTheDocument()
+    for (const [, items] of MORE_GROUPS) for (const { label, route } of items) {
+      if (route === '/routines') expect(screen.queryByRole('button', { name: label })).not.toBeInTheDocument()
+      else expect(screen.getByRole('button', { name: label })).toBeInTheDocument()
     }
   })
 

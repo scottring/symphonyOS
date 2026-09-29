@@ -342,6 +342,14 @@ export function useGoals() {
       const self = memberForAuthUser(familyMembers, goal.userId)?.id
       updates = { ...rawUpdates, assignedToAll: ids, scope: scopeForDomain(goal.context ?? null, ids, self) }
     }
+    // A new life area moves who may read it, the same way: scope is derived
+    // from the domain and the assignees, so re-tagging a Family goal Personal
+    // takes it out of the household's view (it kept its old scope before).
+    if ('context' in rawUpdates) {
+      const ids = updates.assignedToAll ?? goal.assignedToAll ?? []
+      const self = memberForAuthUser(familyMembers, goal.userId)?.id
+      updates = { ...updates, scope: scopeForDomain(rawUpdates.context ?? null, ids, self) }
+    }
 
     setGoals(prev => prev.map(g => g.id === id ? { ...g, ...updates } : g))
 
@@ -368,7 +376,11 @@ export function useGoals() {
     if (updateError) {
       setGoals(prev => prev.map(g => g.id === id ? goal : g))
       setError(updateError.message)
+      // Refused writes are reported, so a surface can say why (a partner
+      // making the owner's shared goal private is refused by RLS).
+      return false
     }
+    return true
   }, [goals, familyMembers])
 
   const deleteGoal = useCallback(async (id: string) => {

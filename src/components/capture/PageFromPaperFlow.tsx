@@ -113,6 +113,16 @@ export function PageFromPaperFlow({ members, onClose, existingTasks, calendarTit
     if (file) handleBlob(file)
     else close()
   }, [handleBlob, close])
+  // Closing the file picker without choosing fires no change event — only
+  // `cancel`. Without this the flow stayed mounted and invisible, and the
+  // button that opened it could not open it again (Scott, 2026-09-28).
+  useEffect(() => {
+    const input = fileInputRef.current
+    if (!input) return
+    const onCancel = () => close()
+    input.addEventListener('cancel', onCancel)
+    return () => input.removeEventListener('cancel', onCancel)
+  }, [close])
 
   const handleCommit = useCallback(async (payload: PageReviewPayload) => {
     setCommitting(true)
@@ -178,7 +188,8 @@ export function PageFromPaperFlow({ members, onClose, existingTasks, calendarTit
         type="file"
         accept="image/*,application/pdf"
         className="hidden"
-        onChange={(e) => handleFile(e.target.files?.[0] ?? null)}
+        // Cleared after reading, so choosing the same file again still fires.
+        onChange={(e) => { handleFile(e.target.files?.[0] ?? null); e.target.value = '' }}
       />
 
       {camera && (
@@ -199,7 +210,7 @@ export function PageFromPaperFlow({ members, onClose, existingTasks, calendarTit
         <div className="fixed inset-0 z-[60] bg-black/40 flex items-center justify-center p-4">
           <div className="bg-bg-elevated rounded-2xl shadow-2xl px-8 py-6 flex items-center gap-3">
             <Loader2 className="w-5 h-5 animate-spin text-primary-600" />
-            <span className="text-[15px] text-neutral-700">Reading your page…</span>
+            <span className="text-[15px] text-neutral-700">Reading your page…<span className="block text-[12.5px] text-neutral-500">This usually takes 20–30 seconds.</span></span>
           </div>
         </div>
       )}

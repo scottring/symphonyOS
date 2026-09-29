@@ -8,7 +8,7 @@
 /* Typography - Crimson Pro (display) + DM Sans (body): the native iPhone
    app's pairing (apple/…/DesignSystem/Typography.swift), which is the design
    source of truth for every surface. */
-@import url('https://fonts.googleapis.com/css2?family=Marcellus&family=Crimson+Pro:ital,wght@0,400;0,500;0,600;1,400;1,500&family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Marcellus&family=Jost:wght@200;300;400;500&family=Crimson+Pro:ital,wght@0,400;0,500;0,600;1,400;1,500&family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&display=swap');
 
 /* Class-based dark mode (kiosk wall toggles `.dark` on its shell, not the
    document — only the wall opts in for now). Declared after @import per
@@ -1793,6 +1793,14 @@ html.desktop-shell a {
 .daybook-date {
   display: none;
 }
+/* Planning v2: every heading wears its horizon's big thin number, and the
+   heavy rule above the heading goes (the rail is the page's top now). */
+.masthead-numeral { flex: none; font: 200 88px/.82 'Jost', var(--font-family-sans); letter-spacing: -.03em; color: var(--color-neutral-900); align-self: flex-end; margin-right: 6px; }
+:root.plan-v2 .daybook-masthead { border-top: 0; }
+:root.plan-v2 .daybook-masthead-inner { padding-top: 8px; }
+@media (max-width: 640px) {
+  .masthead-numeral { font-size: 60px; }
+}
 .daybook-title,
 .symphony-wordmark {
   font-family: var(--font-family-display);
@@ -2004,6 +2012,17 @@ html.desktop-shell a {
 .desktop-workspace-nav { grid-area: nav; }
 .desktop-workspace-page { grid-area: page; }
 .desktop-footer { grid-area: footer; }
+.desktop-ground {
+  grid-area: footer; position: sticky; bottom: 0; z-index: 15; min-width: 0;
+  /* The page scrolls BEHIND the ground: solid page colour under the scene
+     and footer, fading in above them so rows slip out of sight softly. */
+  background: linear-gradient(to bottom, color-mix(in srgb, var(--color-bg-base) 0%, transparent), var(--color-bg-base) 36px);
+  pointer-events: none;
+}
+.desktop-ground > * { pointer-events: auto; }
+.desktop-ground .desktop-footer { margin-inline: auto; padding-top: 8px; padding-bottom: 16px; }
+.desktop-ground .place-band.is-ground { margin-top: 0; height: 72px; margin-inline: auto; display: block; pointer-events: none; }
+.desktop-ground .place-band.is-ground .place-band-scene { height: 72px; }
 .desktop-workspace-dock { grid-area: dock; align-self: stretch; min-width: 0; }
 /* References stay in the desktop workspace across route changes. */
 .desktop-workspace.has-references {
@@ -2286,6 +2305,19 @@ html.desktop-shell a {
 .plan-period-navigation { display: flex; gap: 2px; padding: 3px; border-radius: 7px; background: var(--color-neutral-100); }
 .plan-period-navigation a { padding: 6px 11px; color: var(--color-neutral-500); font-size: 13px; border-radius: 5px; white-space: nowrap; }
 .plan-period-navigation a.is-current { color: var(--color-primary-700); background: white; box-shadow: 0 1px 3px rgb(35 35 34 / 0.08); font-weight: 600; }
+.plan-page-tools.is-rail { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 12px; }
+.plan-rail-side { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.plan-rail-side.is-right { justify-content: flex-end; }
+.horizon-rail { display: flex; align-items: center; }
+.horizon-rail-step { display: flex; align-items: center; }
+.horizon-rail-join { width: 16px; height: 1px; background: var(--color-neutral-300); flex: none; }
+.horizon-rail a { display: flex; align-items: baseline; gap: 6px; padding: 6px 10px; border-radius: 8px; color: var(--color-neutral-500); white-space: nowrap; }
+.horizon-rail a:hover { color: var(--color-neutral-900); }
+.horizon-rail-n { font: 300 17px 'Jost', var(--font-family-sans); }
+.horizon-rail-l { font-size: 13px; }
+.horizon-rail a.is-current { color: var(--color-neutral-900); }
+.horizon-rail a.is-current .horizon-rail-n { color: var(--color-primary-600); font-weight: 400; }
+.horizon-rail a.is-current .horizon-rail-l { font-weight: 600; }
 
 .plan-range-control { display: flex; align-items: center; font-size: 12px; color: var(--color-neutral-500); }
 .plan-range-control select { background: transparent; padding: 6px 4px; max-width: 130px; }
@@ -2702,6 +2734,22 @@ div.chooser-action-group { overflow: visible !important; }
    through them (Scott, 2026-09-28). */
 .place-skyline-far { fill: var(--color-primary-300); opacity: 0.45; }
 .place-skyline-near { fill: color-mix(in srgb, var(--color-primary-400) 62%, var(--color-bg-base)); }
+/* The place as GROUND under the page (Scott, 2026-09-28: "move the scenes
+   down to the bottom to anchor the page visually") — standing on the footer,
+   fading up into the page instead of down from the navigation. */
+.place-band.is-ground {
+  position: relative; top: auto; height: 96px; margin-top: 48px;
+  width: 100%; max-width: 1152px; justify-self: center; padding-inline: 56px; box-sizing: border-box;
+  -webkit-mask-image: linear-gradient(to top, black 55%, transparent);
+  mask-image: linear-gradient(to top, black 55%, transparent);
+}
+/* Out to the ends of the footer's line, fading as it gets there. */
+.place-band.is-ground .place-band-scene {
+  position: relative; left: auto; top: auto; transform: none; width: 100%; height: 96px;
+  -webkit-mask-image: linear-gradient(to right, transparent, black 22%, black 78%, transparent);
+  mask-image: linear-gradient(to right, transparent, black 22%, black 78%, transparent);
+}
+@media (max-width: 1023px) { .place-band.is-ground { padding-inline: 40px; } }
 .place-band-scene {
   position: absolute; left: 50%; top: 0; width: 640px; height: 88px;
   transform: translateX(-50%);
@@ -2904,3 +2952,327 @@ div.chooser-action-group { overflow: visible !important; }
 .period-row-move select { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; min-height: 44px; }
 .period-row-move:focus-within { outline: 2px solid var(--color-primary-500); outline-offset: 2px; }
 .phone-capture-chip.is-on { background: var(--color-primary-50); border-color: var(--color-primary-300); color: var(--color-primary-700); }
+
+/* =============================================================================
+   PLANNING v2 (docs/planning/2026-09-28-planning-v2.md) — the month and season
+   pages from the 2026-09-28 prototype. The big thin numeral carries the
+   horizon; the place accent (primary) carries goals and actions; slate is a
+   date we can't move. Everything else stays quiet.
+   ============================================================================= */
+.pv2-page { --pv2-slate: hsl(212 38% 34%); --pv2-slate-wash: hsl(212 40% 95%); --pv2-num: 'Jost', var(--font-family-sans);
+  max-width: 1200px; margin: 0 auto; padding: 28px 16px 96px; color: var(--color-neutral-900); }
+/* The app's own gutter (PAGE_GUTTER_X: 16 / 40 / 56px), so every horizon
+   shares the week's left and right edges. */
+@media (min-width: 768px) { .pv2-page { padding-left: 40px; padding-right: 40px; } }
+@media (min-width: 1024px) { .pv2-page { padding-left: 56px; padding-right: 56px; } }
+.pv2-head { display: grid; grid-template-columns: auto 1fr auto; gap: 22px; align-items: end; margin-bottom: 20px; padding-bottom: 10px; border-bottom: 1px solid var(--color-neutral-300); }
+.pv2-numeral { font: 200 100px/.82 var(--pv2-num); letter-spacing: -.03em; color: var(--color-neutral-900); }
+.pv2-numeral.is-wide { font-size: 80px; }
+.pv2-eyebrow { font: 500 11px var(--pv2-num); letter-spacing: .18em; text-transform: uppercase; color: var(--color-neutral-500); }
+.pv2-title { font: 500 36px/1.1 var(--font-family-display); margin: 3px 0 4px; display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 16px; }
+.pv2-mnav { display: inline-flex; gap: 12px; font: 400 13px var(--font-family-sans); }
+.pv2-mnav button { color: var(--color-primary-700); }
+.pv2-mnav button:hover { text-decoration: underline; }
+.pv2-purpose { font-size: 15px; color: var(--color-neutral-600); margin: 0; }
+.pv2-chrome { align-self: start; }
+
+.pv2-toolbar, .pv2-sbar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; margin: 0 0 26px; }
+.pv2-toolbar { padding-bottom: 14px; border-bottom: 1px solid var(--color-neutral-200); }
+.pv2-sbar { padding: 12px 16px; background: var(--color-bg-elevated); border: 1px solid var(--color-neutral-200); border-left: 3px solid var(--color-primary-500); border-radius: 12px; box-shadow: 0 18px 40px -24px rgb(0 0 0 / .3); }
+.pv2-st { font: 500 17px var(--font-family-display); }
+.pv2-st small { font: 400 13px var(--font-family-sans); color: var(--color-neutral-500); margin-left: 8px; }
+.pv2-steps { display: flex; gap: 4px; margin-right: auto; }
+.pv2-steps button { font-size: 13px; padding: 4px 10px; border-radius: 999px; color: var(--color-neutral-500); }
+.pv2-steps button b { font: 500 11px var(--pv2-num); margin-right: 6px; }
+.pv2-steps button[aria-current="step"] { background: var(--color-primary-50); color: var(--color-primary-700); font-weight: 500; }
+.pv2-status { display: flex; align-items: center; gap: 8px; margin-right: auto; font-size: 13.5px; color: var(--color-neutral-600); }
+.pv2-status b { color: var(--color-neutral-900); font-weight: 600; }
+.pv2-seal { width: 16px; height: 16px; border-radius: 50%; border: 2px solid var(--color-primary-500); position: relative; }
+.pv2-seal::after { content: ''; position: absolute; left: 3px; top: 2.5px; width: 6px; height: 3.5px; border: solid var(--color-primary-600); border-width: 0 0 2px 2px; transform: rotate(-45deg); }
+.pv2-seg { display: inline-flex; gap: 2px; padding: 3px; border-radius: 10px; background: var(--color-neutral-100); }
+.pv2-seg button { padding: 5px 12px; border-radius: 8px; font-size: 13px; color: var(--color-neutral-600); white-space: nowrap; }
+.pv2-seg button[aria-pressed="true"] { background: var(--color-bg-elevated); color: var(--color-neutral-900); font-weight: 500; box-shadow: 0 1px 3px rgb(0 0 0 / .08); }
+.pv2-btn { background: var(--color-primary-600); color: #fff; border-radius: 9px; padding: 8px 14px; font-size: 13.5px; font-weight: 500; white-space: nowrap; }
+.pv2-btn:hover { background: var(--color-primary-700); }
+.pv2-btn:disabled, .pv2-qbtn:disabled { opacity: .45; cursor: default; }
+.pv2-qbtn { border: 1px solid var(--color-neutral-200); background: var(--color-bg-elevated); border-radius: 9px; padding: 7px 12px; font-size: 13px; color: var(--color-neutral-700); white-space: nowrap; }
+.pv2-qbtn:hover:not(:disabled) { border-color: var(--color-neutral-300); color: var(--color-neutral-900); }
+.pv2-qbtn.is-on { border-color: var(--color-neutral-800); color: var(--color-neutral-900); background: var(--color-neutral-50); }
+.pv2-link { color: var(--color-primary-700); font-size: 13px; text-align: left; }
+.pv2-link:hover { text-decoration: underline; }
+.pv2-quiet { color: var(--color-neutral-500); }
+.pv2-hint { font-size: 12.5px; color: var(--color-neutral-500); }
+.pv2-foot { margin-top: 48px; font-size: 12.5px; color: var(--color-neutral-500); }
+
+.pv2-grid2 { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(290px, 1fr); gap: 48px; align-items: start; }
+.pv2-grid2.is-ref { grid-template-columns: 280px minmax(0, 1fr); gap: 36px; }
+.pv2-grid3 { display: grid; grid-template-columns: 260px minmax(0, 1fr) 300px; gap: 36px; align-items: start; }
+.pv2-colh { font: 500 17px var(--font-family-display); margin: 0 0 10px; display: flex; gap: 10px; align-items: baseline; justify-content: space-between; }
+.pv2-paper { display: inline-flex; align-items: center; gap: 5px; margin-left: auto; font: 400 12.5px var(--font-family-sans); color: var(--color-primary-700); white-space: nowrap; }
+.pv2-paper:hover { text-decoration: underline; }
+.pv2-panel { background: var(--color-bg-elevated); border: 1px solid var(--color-neutral-200); border-radius: 14px; padding: 16px 18px 10px; }
+.pv2-wl-h { margin: 12px 0 4px; font: 500 10.5px var(--pv2-num, 'Jost'); letter-spacing: .14em; text-transform: uppercase; color: var(--color-neutral-500); }
+.pv2-wl-row { display: flex; gap: 10px; align-items: flex-start; padding: 8px 0; border-top: 1px solid var(--color-neutral-100); }
+.pv2-wl-row:first-child { border-top: 0; }
+/* Cards: picked up by the grip and dropped on a day. */
+.pv2-wl-row.is-card { margin: 6px -8px; padding: 8px 8px 8px 4px; border: 1px solid var(--color-neutral-200); border-radius: 10px; background: var(--color-bg-elevated); }
+.pv2-wl-row.is-card:hover { border-color: var(--color-neutral-300); box-shadow: 0 6px 16px -12px rgb(0 0 0 / .3); }
+.pv2-wl-row.is-dragging { opacity: .4; }
+.pv2-grip { flex: none; margin-top: 2px; color: var(--color-neutral-300); cursor: grab; touch-action: none; }
+.pv2-wl-row:hover .pv2-grip { color: var(--color-neutral-500); }
+/* Compact rows: the title alone until the pointer or focus is on it. */
+.pv2-wl.is-over { outline: 2px dashed var(--color-primary-300); outline-offset: 4px; background: var(--color-primary-50); }
+@media (hover: hover) {
+  .pv2-wl-row.is-card .pv2-wl-tools { display: none; }
+  .pv2-wl-row.is-card:hover .pv2-wl-tools, .pv2-wl-row.is-card:focus-within .pv2-wl-tools { display: flex; }
+  :root.plan-v2 .journal-entry-sub { display: none; }
+  /* The day's "when" control, as its calendar icon alone: the day already
+     says when, and the full chip (~170px, even at opacity 0) wrapped a day's
+     title a word a line (Scott, 2026-09-29). Same menu on click. */
+  :root.plan-v2 .journal-entry-when { opacity: 0; pointer-events: none; transition: opacity .12s; }
+  :root.plan-v2 .journal-entry-when .plan-timing-trigger { padding: 3px 4px; }
+  :root.plan-v2 .journal-entry-when .plan-timing-trigger > span { display: none; }
+  :root.plan-v2 li:hover > .journal-entry-when, :root.plan-v2 li:focus-within > .journal-entry-when { opacity: 1; pointer-events: auto; }
+}
+/* A week row's month line, on hover; the line itself lights in the column. */
+.pv2-wl-parent { display: none; align-items: center; gap: 4px; margin-top: 2px; min-width: 0; max-width: 100%; font-size: 12px; color: var(--color-neutral-500); text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pv2-wl-parent:hover { color: var(--color-primary-700); }
+.pv2-wl-row:hover .pv2-wl-parent, .pv2-wl-row:focus-within .pv2-wl-parent, .pv2-wl-parent.is-shown { display: inline-flex; }
+@media (hover: none) { .pv2-wl-parent { display: inline-flex; } }
+.pv2-wl-row.is-draft { border-style: dashed; border-color: var(--color-primary-300); }
+.pv2-wl-draft { width: 100%; background: transparent; font-size: 15px; color: var(--color-neutral-900); outline: none; }
+.pv2-rrow.is-linked { background: color-mix(in srgb, var(--color-primary-100) 70%, transparent); box-shadow: -8px 0 0 color-mix(in srgb, var(--color-primary-100) 70%, transparent), 8px 0 0 color-mix(in srgb, var(--color-primary-100) 70%, transparent); border-radius: 2px; }
+.pv2-rrow.is-flash { animation: pv2-flash 1.2s ease-out; }
+@keyframes pv2-flash { 0%, 30% { background: var(--color-primary-100); } 100% { background: transparent; } }
+@media (prefers-reduced-motion: reduce) { .pv2-rrow.is-flash { animation: none; } }
+/* What the Shelves held, folded under the reference column. */
+.pv2-refshelves { margin-top: 18px; display: grid; gap: 14px; }
+.pv2-refshelf { border-top: 1px solid var(--color-neutral-200); padding-top: 10px; }
+.pv2-refshelf > summary { cursor: pointer; list-style: none; font: 500 10.5px var(--pv2-num); letter-spacing: .14em; text-transform: uppercase; color: var(--color-neutral-500); }
+.pv2-refshelf > summary::-webkit-details-marker { display: none; }
+.pv2-refshelf > summary::before { content: '▸'; display: inline-block; width: 12px; transition: transform .12s; }
+.pv2-refshelf[open] > summary::before { transform: rotate(90deg); }
+.pv2-refshelf > summary:hover { color: var(--color-neutral-800); }
+.pv2-refshelf > .pv2-list, .pv2-refshelf > .chooser-section { margin-top: 8px; }
+.pv2-addbtn.is-quiet { color: var(--color-neutral-500); }
+.pv2-refacts { display: inline-flex; gap: 10px; flex: none; }
+.pv2-wl-check { flex: none; width: 16px; height: 16px; margin-top: 3px; border-radius: 50%; border: 1.5px solid var(--color-neutral-400); display: grid; place-items: center; color: #fff; }
+.pv2-wl-check.is-on { background: var(--color-primary-600); border-color: var(--color-primary-600); }
+.pv2-wl-title { display: block; width: 100%; text-align: left; font-size: 14.5px; line-height: 1.4; color: var(--color-neutral-900); overflow-wrap: anywhere; }
+.pv2-wl-title:hover { color: var(--color-primary-700); }
+.pv2-wl-row.is-done .pv2-wl-title { text-decoration: line-through; color: var(--color-neutral-500); }
+.pv2-wl-goal { display: flex; align-items: center; gap: 6px; margin-top: 2px; font-size: 12px; color: var(--color-neutral-500); }
+.pv2-goal.is-tiny { width: 5px; height: 5px; }
+.pv2-wl-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 6px; }
+.pv2-wl-row .pv2-hov { opacity: 1; }
+.pv2-wside-tools { display: flex; justify-content: flex-end; margin-bottom: 8px; }
+.pv2-colh small { font: 400 12.5px var(--font-family-sans); color: var(--color-neutral-500); }
+.pv2-sect { font: italic 400 16px var(--font-family-display); color: var(--color-neutral-500); margin: 26px 0 6px; }
+
+.pv2-list { list-style: none; margin: 0 0 8px; padding: 0; }
+.pv2-brain { columns: 2; column-gap: 48px; }
+.pv2-brain > li { break-inside: avoid; }
+.pv2-group > .pv2-list { margin: 0; }
+.pv2-line-main { position: relative; display: flex; align-items: flex-start; gap: 10px; padding: 5px 8px; margin: 0 -8px; border-radius: 8px; }
+.pv2-line-main:hover, .pv2-line.is-open > .pv2-line-main { background: var(--color-neutral-50); }
+.pv2-mark { width: 18px; height: 22px; display: inline-grid; place-items: center; flex: none; }
+.pv2-dash { display: inline-block; width: 9px; height: 1.5px; background: var(--color-neutral-300); border-radius: 1px; }
+.pv2-goal { display: inline-block; width: 8px; height: 8px; background: var(--color-primary-500); transform: rotate(45deg); border-radius: 1px; flex: none; }
+.pv2-goal.is-small { width: 6px; height: 6px; margin-top: 7px; }
+.pv2-line-text { flex: 1; min-width: 0; text-align: left; font-size: 15px; line-height: 1.45; padding: 1px 0; }
+.pv2-line-text.is-goal { font: 500 18px/1.35 var(--font-family-display); }
+.pv2-line.is-muted .pv2-line-text { color: var(--color-neutral-500); }
+.pv2-line.is-dropped .pv2-line-text { text-decoration: line-through; text-decoration-color: var(--color-neutral-300); }
+/* Done is crossed off, the way the paper list does it (Scott, 2026-09-28). */
+.pv2-line.is-done > .pv2-line-main .pv2-line-text { text-decoration: line-through; text-decoration-color: var(--color-neutral-400); text-decoration-thickness: 1px; }
+.pv2-card.is-stamped .pv2-card-title > span:last-child { text-decoration: none; }
+.pv2-tick { display: inline; width: 14px; height: 14px; margin: 0 0 2px 8px; color: var(--color-primary-600); vertical-align: middle; }
+.pv2-rail { display: inline-flex; align-items: center; gap: 2px; flex: none; margin-left: auto; }
+.pv2-rb { height: 26px; min-width: 26px; padding: 0 4px; border-radius: 7px; display: inline-grid; place-items: center; color: var(--color-neutral-500); }
+.pv2-rb:hover { background: var(--color-bg-elevated); color: var(--color-neutral-900); box-shadow: 0 0 0 1px var(--color-neutral-200); }
+.pv2-hov { opacity: 0; transition: opacity .12s; }
+.pv2-line-main:hover .pv2-hov, .pv2-line-main:focus-within .pv2-hov { opacity: 1; }
+@media (hover: none) { .pv2-hov { opacity: 1; } }
+.pv2-menu { position: absolute; right: 0; top: calc(100% + 4px); z-index: 30; min-width: 210px; display: grid; padding: 6px; background: var(--color-bg-elevated); border: 1px solid var(--color-neutral-200); border-radius: 12px; box-shadow: 0 18px 40px -20px rgb(0 0 0 / .35); }
+.pv2-menu > button { display: flex; align-items: center; gap: 10px; padding: 7px 10px; border-radius: 7px; font-size: 14px; text-align: left; color: var(--color-neutral-800); }
+.pv2-menu > button:hover { background: var(--color-neutral-50); }
+.pv2-msep { height: 1px; background: var(--color-neutral-200); margin: 5px 4px; }
+.pv2-fold { margin: 4px 0 14px 28px; padding: 14px 16px; display: grid; gap: 10px; background: var(--color-bg-elevated); border: 1px solid var(--color-neutral-200); border-radius: 12px; }
+.pv2-fact { display: flex; gap: 10px; align-items: flex-start; font-size: 14px; }
+.pv2-k { flex: none; width: 64px; padding-top: 3px; font: 500 10px var(--pv2-num); letter-spacing: .12em; text-transform: uppercase; color: var(--color-neutral-500); }
+.pv2-notes { white-space: pre-line; color: var(--color-neutral-700); }
+.pv2-line.is-nested { margin-left: 26px; }
+.pv2-steps-list { margin: 0; padding-left: 16px; display: grid; gap: 2px; }
+.pv2-step { text-align: left; color: var(--color-neutral-800); }
+.pv2-step:hover { color: var(--color-primary-700); text-decoration: underline; }
+.pv2-step.is-done { color: var(--color-neutral-500); text-decoration: line-through; }
+.pv2-input { width: 100%; border: 1px solid var(--color-neutral-200); background: var(--color-bg-base); border-radius: 8px; padding: 8px 10px; font-size: 14px; }
+.pv2-acts { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.pv2-write { display: flex; align-items: center; gap: 10px; padding: 6px 0; }
+.pv2-write input { flex: 1; min-width: 0; border: 0; border-bottom: 1px dashed var(--color-neutral-300); background: transparent; padding: 6px 0; font-size: 15px; }
+.pv2-write input:focus { outline: none; border-bottom-color: var(--color-primary-500); }
+.pv2-addarea { flex: none; opacity: .7; transition: opacity .12s; }
+.pv2-write:hover .pv2-addarea, .pv2-write:focus-within .pv2-addarea { opacity: 1; }
+
+.pv2-ref { position: sticky; top: 76px; max-height: calc(100vh - 100px); overflow: auto; padding: 14px 14px 10px; border-radius: 14px; background: var(--color-neutral-50); }
+.pv2-rrow { display: flex; gap: 8px; align-items: flex-start; padding: 3px 0; font: 400 14.5px/1.35 var(--font-family-display); color: var(--color-neutral-700); }
+.pv2-addbtn { font-size: 12.5px; color: var(--color-primary-700); white-space: nowrap; font-family: var(--font-family-sans); }
+/* In a meeting, "+ Add" is how the level above becomes this plan — always shown. */
+.pv2-rrow .pv2-addbtn { flex: none; padding-top: 1px; }
+
+.pv2-cal { position: sticky; top: 76px; }
+.pv2-dow { display: grid; grid-template-columns: 26px repeat(7, 1fr); padding-bottom: 4px; font: 500 10px var(--pv2-num); letter-spacing: .14em; color: var(--color-neutral-500); }
+.pv2-dow span { padding-left: 6px; }
+.pv2-wk { position: relative; display: grid; grid-template-columns: 26px repeat(7, 1fr); min-height: 58px; padding-bottom: 6px; border-top: 1px solid var(--color-neutral-200); }
+.pv2-wk:last-of-type { border-bottom: 1px solid var(--color-neutral-200); }
+.pv2-wk.is-current { background: color-mix(in srgb, var(--color-primary-50) 70%, transparent); }
+.pv2-d { grid-row: 1; padding: 5px 6px 2px; font: 300 13px var(--pv2-num); color: var(--color-neutral-700); border-left: 1px solid var(--color-neutral-200); }
+.pv2-d:first-child { border-left: 0; }
+.pv2-d.is-out { color: var(--color-neutral-300); }
+.pv2-d.is-today > span:first-child { display: inline-grid; place-items: center; width: 22px; height: 22px; margin: -3px 0 0 -4px; border-radius: 50%; background: var(--color-primary-600); color: #fff; font-weight: 400; }
+.pv2-lm { min-width: 0; margin: 1px 2px; padding: 1px 4px; border-radius: 4px; text-align: left; font-size: 11px; line-height: 1.2; color: var(--pv2-slate); overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow-wrap: anywhere; }
+.pv2-lm:hover, .pv2-lm.is-sel { background: var(--pv2-slate-wash); }
+.pv2-lm.is-span { display: block; white-space: nowrap; text-overflow: ellipsis; background: var(--pv2-slate-wash); border-left: 2.5px solid var(--pv2-slate); border-radius: 2px; font-weight: 500; }
+.pv2-lm.is-cont { border-left-color: transparent; }
+.pv2-lm.is-dot { justify-self: start; align-self: start; width: 7px; height: 7px; min-height: 0; min-width: 0; margin: 2px 0 0 7px; padding: 0; border-radius: 50%; background: var(--pv2-slate); }
+.pv2-lm.is-dot:hover, .pv2-lm.is-dot.is-sel { background: var(--color-primary-700); box-shadow: 0 0 0 3px var(--pv2-slate-wash); }
+/* The dates named, in order, under the grid. */
+.pv2-lmlist { margin-top: 12px; display: grid; gap: 2px; }
+.pv2-lmlist button { display: flex; gap: 10px; width: 100%; padding: 3px 4px; border-radius: 6px; text-align: left; font-size: 13px; color: var(--color-neutral-700); }
+.pv2-lmlist button:hover, .pv2-lmlist button.is-sel { background: var(--pv2-slate-wash); }
+.pv2-lmwhen { flex: none; width: 58px; font: 500 11.5px var(--pv2-num); letter-spacing: .02em; color: var(--pv2-slate); padding-top: 1px; }
+.pv2-lmname { min-width: 0; }
+/* The week's number, in the calendar's margin: open it, or put a line there. */
+.pv2-wkn { grid-row: 1 / span 9; align-self: stretch; display: flex; flex-direction: column; align-items: flex-start; gap: 4px; padding: 6px 0 0 2px; font: 500 10px var(--pv2-num); letter-spacing: .06em; color: var(--color-neutral-400); text-align: left; border-radius: 4px; }
+.pv2-wkn:hover { color: var(--color-primary-700); }
+.pv2-wkn.is-over, .pv2-d.is-over { background: color-mix(in srgb, var(--color-primary-100) 80%, transparent); box-shadow: inset 0 0 0 1.5px var(--color-primary-400); }
+.pv2-d { position: relative; }
+.pv2-pls { display: flex; gap: 2px; flex-wrap: wrap; }
+.pv2-d .pv2-pls { position: absolute; right: 4px; top: 7px; }
+.pv2-pls i { width: 5px; height: 5px; border-radius: 50%; background: var(--color-primary-500); }
+.pv2-dropcol { border-radius: 10px; transition: background .12s; }
+.pv2-dropcol.is-over { outline: 2px dashed var(--color-primary-300); outline-offset: 6px; background: color-mix(in srgb, var(--color-primary-50) 70%, transparent); }
+.pv2-linegrip { position: absolute; left: -14px; top: 7px; }
+.pv2-line.is-dragging { opacity: .4; }
+.pv2-dragpill { display: inline-block; max-width: 280px; padding: 6px 12px; border-radius: 999px; background: var(--color-bg-elevated); border: 1px solid var(--color-neutral-300); box-shadow: 0 10px 24px -12px rgb(0 0 0 / .4); font-size: 14px; color: var(--color-neutral-800); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: grabbing; }
+.pv2-wkgo { position: absolute; right: 6px; bottom: 6px; font: 500 10px var(--pv2-num); letter-spacing: .1em; text-transform: uppercase; color: var(--color-primary-700); }
+.pv2-lmcard { margin-top: 14px; padding: 14px 16px; display: grid; gap: 8px; background: var(--color-bg-elevated); border: 1px solid var(--color-neutral-200); border-left: 3px solid var(--pv2-slate); border-radius: 10px; }
+.pv2-when { font: 500 10.5px var(--pv2-num); letter-spacing: .12em; text-transform: uppercase; color: var(--pv2-slate); }
+.pv2-lmttl { font: 500 18px var(--font-family-display); }
+
+.pv2-focus { max-width: 660px; margin: 0 auto; }
+.pv2-fnav { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; font-size: 13px; color: var(--color-neutral-500); }
+.pv2-pos { font: 400 13px var(--pv2-num); letter-spacing: .06em; }
+.pv2-bar { height: 3px; margin-bottom: 18px; border-radius: 3px; background: var(--color-neutral-200); overflow: hidden; }
+.pv2-bar i { display: block; height: 100%; background: var(--color-primary-500); transition: width .2s; }
+.pv2-card { position: relative; display: grid; gap: 14px; padding: 30px 32px 24px; background: var(--color-bg-elevated); border: 1px solid var(--color-neutral-200); border-radius: 18px; box-shadow: 0 18px 40px -24px rgb(0 0 0 / .3); }
+.pv2-card-title { display: flex; gap: 12px; align-items: baseline; margin: 0; padding-right: 120px; font: 500 30px/1.2 var(--font-family-display); }
+.pv2-card.is-stamped .pv2-card-title > span:last-child { opacity: .75; }
+.pv2-fates { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding-top: 12px; margin-top: 4px; border-top: 1px solid var(--color-neutral-200); }
+.pv2-fnav2 { display: flex; justify-content: space-between; margin-top: 14px; }
+.pv2-summary { font: 500 28px/1.25 var(--font-family-display); }
+
+.pv2-stamp { position: absolute; top: -30px; right: -26px; width: 172px; height: 172px; transform: rotate(-14deg); opacity: .9; pointer-events: none; z-index: 2; mix-blend-mode: multiply; }
+.pv2-stamp.is-fresh { animation: pv2-thump .55s cubic-bezier(.2, 1.4, .4, 1) both; }
+@keyframes pv2-thump { 0% { transform: scale(1.9) rotate(-2deg); opacity: 0; } 55% { transform: scale(.92) rotate(-15deg); opacity: 1; } 100% { transform: scale(1) rotate(-14deg); opacity: .9; } }
+@media (prefers-reduced-motion: reduce) { .pv2-stamp.is-fresh { animation: none; } }
+.pv2-stamp-done { color: var(--color-primary-600); }
+.pv2-stamp-carried { color: var(--pv2-slate); }
+.pv2-stamp-someday { color: hsl(36 72% 38%); }
+.pv2-stamp-dropped { color: var(--color-neutral-500); }
+
+.pv2-week { --pv2-slate: hsl(212 38% 34%); --pv2-num: 'Jost', var(--font-family-sans); }
+.pv2-wgrid { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(320px, 1fr); gap: 48px; align-items: start; }
+.pv2-wgrid.is-ref { grid-template-columns: minmax(0, 1fr) minmax(280px, 1fr) 280px; gap: 36px; }
+.pv2-wside { position: sticky; top: 76px; }
+/* One spread (2026-09-29; every horizon since): every column opens on the same heading line —
+   serif name, ruled beneath — and none sits in a box. The list's cards are
+   the only raised things on the page, because they are the things you move. */
+:is(.pv2-week, .pv2-page) .pv2-colh { min-height: 30px; margin: 0 0 6px; padding-bottom: 8px; border-bottom: 1px solid var(--color-neutral-300); align-items: flex-end; }
+.pv2-week .pv2-days [data-testid="week-journal"] { border-top: 0; }
+.pv2-week .pv2-wl-row.is-card { margin-left: 0; margin-right: 0; }
+.pv2-week .pv2-wl .pv2-wl-h:first-of-type { margin-top: 10px; }
+:is(.pv2-week, .pv2-page) .pv2-ref { position: static; padding: 0; border-radius: 0; background: none; overflow: visible; max-height: none; }
+:is(.pv2-week, .pv2-page) .pv2-ref .pv2-colh small { margin-left: auto; margin-right: 0; }
+:is(.pv2-week, .pv2-page) .pv2-ref .pv2-list { margin-top: 8px; }
+:is(.pv2-week, .pv2-page) .pv2-ref .pv2-rrow { padding: 6px 0; color: var(--color-neutral-600); border-bottom: 1px solid var(--color-neutral-100); flex-wrap: nowrap; }
+:is(.pv2-week, .pv2-page) .pv2-ref .pv2-rrow > button { line-height: 1.4; }
+:is(.pv2-week, .pv2-page) .pv2-ref .pv2-rrow:has(> form) { flex-wrap: wrap; }
+:is(.pv2-week, .pv2-page) .pv2-ref .pv2-rrow .pv2-refacts { opacity: .55; transition: opacity .12s; }
+:is(.pv2-week, .pv2-page) .pv2-ref .pv2-rrow:hover .pv2-refacts, :is(.pv2-week, .pv2-page) .pv2-ref .pv2-rrow:focus-within .pv2-refacts { opacity: 1; }
+@media (hover: none) { :is(.pv2-week, .pv2-page) .pv2-ref .pv2-rrow .pv2-refacts { opacity: 1; } }
+.pv2-wtools { display: flex; align-items: center; gap: 8px; }
+.pv2-wtools + .pv2-seg { margin-left: 0; }
+.pv2-rrow-sans { font: 400 14px/1.4 var(--font-family-sans); flex-wrap: wrap; }
+.pv2-stepform { flex-basis: 100%; display: grid; gap: 6px; margin: 4px 0 8px 14px; }
+/* The day column: the prototype's big thin day numbers, the journal's rows. */
+.pv2-days [data-testid="week-journal"] header > span:first-child { font: 200 34px/1 var(--pv2-num); }
+@media (max-width: 1060px) {
+  .pv2-wgrid.is-ref { grid-template-columns: minmax(0, 1fr) minmax(240px, .9fr); }
+  .pv2-wgrid.is-ref .pv2-ref { grid-column: 1 / -1; position: static; max-height: none; }
+}
+@media (max-width: 1060px) {
+  .pv2-grid3 { grid-template-columns: 200px minmax(0, 1fr); }
+  .pv2-grid3 .pv2-cal { grid-column: 1 / -1; position: static; }
+}
+@media (max-width: 860px) {
+  .pv2-grid2, .pv2-grid2.is-ref, .pv2-grid3, .pv2-wgrid, .pv2-wgrid.is-ref { grid-template-columns: 1fr; gap: 26px; }
+  .pv2-wside { position: static; order: -1; }
+  .pv2-wgrid.is-ref .pv2-ref { grid-column: auto; }
+  .pv2-cal, .pv2-ref { position: static; max-height: none; }
+  .pv2-brain { columns: 1; }
+  /* One column: the plan first, the level above after it (as on the week). */
+  .pv2-grid3 > .pv2-ref, .pv2-grid2.is-ref > .pv2-ref { order: 3; }
+  :is(.pv2-week, .pv2-page) .pv2-ref .pv2-rrow > button { min-height: 0; }
+}
+/* Phones carry the life-area lens in the shell's own header already. */
+@media (max-width: 767px) { .pv2-chrome { display: none; } }
+@media (max-width: 640px) {
+  .pv2-page { padding: 18px 16px 96px; }
+  .pv2-head { grid-template-columns: auto 1fr; gap: 14px; }
+  .pv2-chrome { grid-column: 1 / -1; grid-row: 1; justify-self: end; }
+  .pv2-numeral { font-size: 64px; } .pv2-numeral.is-wide { font-size: 48px; }
+  .pv2-title { font-size: 28px; }
+  .pv2-seg button { padding: 5px 9px; font-size: 12.5px; }
+  .pv2-fold { margin-left: 0; }
+  .pv2-card { padding: 22px 18px 18px; }
+  .pv2-card-title { font-size: 24px; padding-right: 70px; }
+  .pv2-stamp { width: 112px; height: 112px; top: -18px; right: -10px; }
+  .pv2-lm { font-size: 10px; padding: 1px 2px; }
+}
+
+/* Phones and touch (audit, 2026-09-29). Without hover a row keeps its title
+   and ⋯ — Done, the moves and All details are all in ⋯ — and the toolbar is
+   two quiet lines: where the plan stands with its review, then the views. */
+@media (hover: none) {
+  .pv2-line .pv2-rail > :not(:last-child) { display: none; }
+  .pv2-week .pv2-wl-row .pv2-wl-tools { display: none; }
+  .pv2-wl-check { position: relative; width: 20px; height: 20px; min-width: 0; min-height: 0; }
+  .pv2-wl-check::after { content: ''; position: absolute; inset: -12px; }
+}
+@media (max-width: 640px) {
+  .pv2-toolbar { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px 12px; align-items: center; }
+  .pv2-toolbar > .pv2-status { grid-column: 1; grid-row: 1; margin: 0; }
+  .pv2-toolbar > .pv2-btn, .pv2-toolbar > .pv2-qbtn { grid-column: 2; grid-row: 1; }
+  .pv2-toolbar > .pv2-seg { grid-column: 1 / -1; grid-row: 2; display: flex; }
+  .pv2-toolbar > .pv2-seg button { flex: 1; min-height: 36px; }
+  .pv2-toolbar > .pv2-wtools { grid-column: 1 / -1; grid-row: 3; }
+}
+/* Grid columns may shrink below their content — a long nowrap line (a
+   step's "↳ Step toward …") was widening the phone's one column past the
+   screen and clipping each row's ⋯. */
+.pv2-wgrid > *, .pv2-grid2 > *, .pv2-grid3 > * { min-width: 0; }
+@media (hover: none) {
+  /* The app's 44px touch floor, where the row itself is the target already:
+     text buttons stood taller than their marks and headings. */
+  .pv2-line-text, .pv2-wl-title, .pv2-colh .pv2-paper, .pv2-rrow > button { min-height: 0; }
+}
+
+/* A plan line's "↳ Part of …", on hover (the week list's parent line). */
+.pv2-line-parent { display: none; align-items: center; gap: 4px; margin: -2px 0 4px 26px; min-width: 0; max-width: calc(100% - 26px); font-size: 12px; color: var(--color-neutral-500); text-align: left; }
+.pv2-line-parent:hover { color: var(--color-primary-700); }
+.pv2-line:hover > .pv2-line-parent, .pv2-line:focus-within > .pv2-line-parent, .pv2-line-parent.is-shown { display: flex; }
+.pv2-line.is-draft > .pv2-line-main { border: 1px dashed var(--color-primary-300); background: var(--color-bg-elevated); }
+.pv2-line-draft { flex: 1; min-width: 0; background: transparent; font-size: 15px; outline: none; padding: 1px 0; }
+/* The add row's area picker is a choice, not a warning: no "untagged" ring. */
+.pv2-addarea .tag-needs-context { animation: none; box-shadow: none; outline: none; background: none; }

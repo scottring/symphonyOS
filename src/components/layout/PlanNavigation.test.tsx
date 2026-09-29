@@ -13,24 +13,23 @@ const { PlanNavigation, usePlanDestination } = await import('./PlanNavigation')
 
 afterEach(cleanup)
 
-describe('PlanNavigation — the ◎ Goals control', () => {
-  it('toggles the Goals reference on a planning page', () => {
+describe('PlanNavigation', () => {
+  it('has no ◎ Goals control at any width (2026-09-28: the planning pages hold the goals)', () => {
     render(<MemoryRouter initialEntries={['/month']}><PlanNavigation /></MemoryRouter>)
-    const button = screen.getByRole('button', { name: 'Goals' })
-    expect(button).toHaveAttribute('aria-expanded', 'false')
-    expect(screen.queryByRole('dialog', { name: 'Goals' })).not.toBeInTheDocument()
-
-    fireEvent.click(button)
-    expect(button).toHaveAttribute('aria-expanded', 'true')
-    expect(screen.getByRole('dialog', { name: 'Goals' })).toBeInTheDocument()
-
-    fireEvent.click(button)
-    expect(screen.queryByRole('dialog', { name: 'Goals' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Goals' })).not.toBeInTheDocument()
+    cleanup()
+    render(<MemoryRouter initialEntries={['/season']}><PlanNavigation mobile /></MemoryRouter>)
+    expect(screen.queryByRole('button', { name: 'Goals' })).not.toBeInTheDocument()
   })
 
-  it('offers it on the phone too — one component at every width', () => {
-    render(<MemoryRouter initialEntries={['/season']}><PlanNavigation mobile /></MemoryRouter>)
-    expect(screen.getByRole('button', { name: 'Goals' })).toBeInTheDocument()
+  it('each rail link opens the period it names — the one on screen keeps its date (2026-09-29)', () => {
+    render(<MemoryRouter initialEntries={['/month?start=2026-10-01']}><PlanNavigation /></MemoryRouter>)
+    const rail = screen.getByRole('navigation', { name: 'Planning period' })
+    const month = rail.querySelector('a[aria-current="page"]')!
+    expect(month.textContent).toContain('October')
+    expect(month.getAttribute('href')).toBe('/month?start=2026-10-01')
+    // Another horizon opens on the period you are in — the page's default.
+    expect(rail.querySelector('a[href="/season"]')).toBeTruthy()
   })
 
   it('switches horizons on a phone from the title menu, one horizon at a time', () => {

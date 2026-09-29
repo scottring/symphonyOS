@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useDialogFocus } from '@/hooks/useDialogFocus'
-import { X, NotebookPen, HelpCircle, Link2, ChevronLeft, ChevronRight, CalendarCheck2, AlertCircle } from 'lucide-react'
+import { X, Check, NotebookPen, HelpCircle, Link2, ChevronLeft, ChevronRight, CalendarCheck2, AlertCircle } from 'lucide-react'
 import { parseLocalYmd } from '@/lib/cadence/config'
 import { pageMonthStart, pageSeasonStart, planWindowDates, rewindowPlanItems, type PlanItem, type PlanPlacement, type PageAltitude, type PageReviewPayload } from '@/lib/planParse'
 import { normalizeSeasons, readSeasons, seasonLabel, nextSeasonStart, seasonStartFor, type Seasons } from '@/lib/cadence/seasons'
@@ -9,7 +9,7 @@ import { DOMAINS, type DomainId } from '@/lib/domains'
 import type { TitlePeriod } from '@/lib/planTitle'
 import type { PageNote } from '@/lib/pageParse'
 import type { FamilyMember } from '@/types/family'
-import { hasItemType, inferredCategory, isGoalRow, itemTypeOf, itemTypeProblem, normalizeForSave, withItemType, type PaperItemType, type TypeDrafts } from '@/lib/paperItemType'
+import { hasItemType, inferredCategory, isGoalRow, itemTypeOf, itemTypeProblem, normalizeForSave, withItemType, PAPER_ITEM_TYPES, type PaperItemType, type TypeDrafts } from '@/lib/paperItemType'
 import { goalJoinsDraft } from '@/lib/planning/paperIntoDraft'
 import { ItemTypeSelect, RoutineDaysPicker } from './ItemTypeControls'
 import { assigneeOptions, initialAssignee, UNASSIGNED } from '@/lib/paperAssignee'
@@ -298,6 +298,20 @@ export function PageReviewSheet({
   // A linked row IS the existing item: it has no type of its own to change.
   const changeType = (index: number, type: PaperItemType) =>
     setItemRows((prev) => prev.map((r, i) => (i !== index || r.sourceId ? r : withItemType(r, type, altitude))))
+
+  // Several lines at once (Scott, 2026-09-28: "select, and reclassify in bulk
+  // — all selected items → goal or project"). Selecting is its own mode, so
+  // the row's checkbox keeps meaning one thing: add this line. A day note or a
+  // line matched to an existing item has no type to change and is skipped.
+  const [selecting, setSelecting] = useState(false)
+  const [selected, setSelected] = useState<Set<number>>(() => new Set())
+  const retypable = (r: ItemRow) => !r.sourceId && r.kind !== 'dayfact'
+  const toggleSelected = (i: number) => setSelected((prev) => { const next = new Set(prev); if (next.has(i)) next.delete(i); else next.add(i); return next })
+  const bulkType = (type: PaperItemType) =>
+    setItemRows((prev) => prev.map((r, i) => (selected.has(i) && retypable(r) ? withItemType(r, type, altitude) : r)))
+  const bulkInclude = (included: boolean) =>
+    setItemRows((prev) => prev.map((r, i) => (selected.has(i) ? { ...r, included } : r)))
+  const endSelecting = () => { setSelecting(false); setSelected(new Set()) }
   const updateNote = (index: number, patch: Partial<NoteRow>) =>
     setNoteRows((prev) => prev.map((r, i) => (i === index ? { ...r, ...patch } : r)))
 
@@ -422,8 +436,29 @@ export function PageReviewSheet({
         ) : (
           <div className="flex-1 overflow-y-auto px-5 py-3 space-y-4">
             {summary && (
-              <div className="rounded-xl border border-primary-100 bg-primary-50/50 px-3 py-2 text-[13px] text-primary-800">
-                <span className="font-semibold">Ready to add:</span> {summary}
+              <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-primary-100 bg-primary-50/50 px-3 py-2 text-[13px] text-primary-800">
+                <span><span className="font-semibold">Ready to add:</span> {summary}</span>
+                {itemRows.some(retypable) && !selecting && (
+                  <button type="button" onClick={() => setSelecting(true)} className="shrink-0 font-medium text-primary-700 hover:underline">Select several</button>
+                )}
+              </div>
+            )}
+            {selecting && (
+              <div role="toolbar" aria-label="Change selected lines" className="sticky top-0 z-10 flex flex-wrap items-center gap-2 rounded-xl border border-neutral-200 bg-white px-3 py-2 text-[13px] shadow-sm">
+                <span className="font-semibold text-neutral-800">{selected.size} selected</span>
+                <button type="button" className="text-primary-700 hover:underline" onClick={() => setSelected(new Set(itemRows.map((_, i) => i)))}>Select all</button>
+                <span className="text-neutral-300" aria-hidden="true">·</span>
+                <span className="text-neutral-500">Make them:</span>
+                {PAPER_ITEM_TYPES.map((t) => (
+                  <button key={t.id} type="button" disabled={!selected.size} onClick={() => bulkType(t.id)}
+                    className="rounded-md border border-neutral-200 bg-white px-2 py-1 text-neutral-700 hover:border-neutral-300 hover:text-neutral-950 disabled:opacity-40">
+                    {t.label}
+                  </button>
+                ))}
+                <span className="text-neutral-300" aria-hidden="true">·</span>
+                <button type="button" disabled={!selected.size} onClick={() => bulkInclude(false)} className="text-neutral-600 hover:underline disabled:opacity-40">Don&rsquo;t add</button>
+                <button type="button" disabled={!selected.size} onClick={() => bulkInclude(true)} className="text-neutral-600 hover:underline disabled:opacity-40">Add</button>
+                <button type="button" onClick={endSelecting} className="ml-auto font-medium text-primary-700 hover:underline">Done</button>
               </div>
             )}
             {itemRows.length > 0 && (
@@ -431,6 +466,13 @@ export function PageReviewSheet({
                 {itemRows.map((row, i) => (
                   <div key={`i-${i}`} className={`flex flex-col gap-2 rounded-xl border border-neutral-200/70 px-3 py-2.5 sm:flex-row sm:items-center sm:gap-3 ${row.included ? 'bg-white' : 'bg-neutral-50 opacity-60'}`}>
                     <div className="flex min-w-0 flex-1 items-start gap-3">
+                      {selecting && (
+                        <button type="button" role="checkbox" aria-checked={selected.has(i)} aria-label={`Select "${row.title}"`}
+                          onClick={() => toggleSelected(i)}
+                          className={`mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full border-[1.5px] ${selected.has(i) ? 'border-neutral-900 bg-neutral-900 text-white' : 'border-neutral-300 bg-white'}`}>
+                          {selected.has(i) && <Check className="h-3 w-3" strokeWidth={3} aria-hidden="true" />}
+                        </button>
+                      )}
                       <input
                         type="checkbox"
                         checked={row.included}

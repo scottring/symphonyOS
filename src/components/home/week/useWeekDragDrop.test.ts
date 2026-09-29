@@ -510,3 +510,42 @@ describe('useWeekDragDrop — journal day drops', () => {
     expect(onUpdateTask).not.toHaveBeenCalled()
   })
 })
+
+describe('drop on the week\'s list (v2)', () => {
+  const mk = (task: Record<string, unknown>) => {
+    const onUpdateTask = vi.fn()
+    const pushAction = vi.fn()
+    const weekStart = new Date(2026, 4, 17)
+    const { result } = renderHook(() => useWeekDragDrop({
+      weekStart, onWeekChange: vi.fn(), onUpdateTask, onUpdateRoutine: vi.fn(), pushAction,
+      tasks: [task as never], events: [], routines: [],
+    }))
+    const drop = () => act(async () => {
+      result.current.dndHandlers.onDragEnd({
+        active: { id: 'journal:t1', data: { current: { kind: 'chip', taskId: 't1' } } },
+        over: { id: 'week-list', data: { current: { kind: 'weekList' } } },
+      } as never)
+    })
+    return { onUpdateTask, pushAction, weekStart, drop }
+  }
+
+  it('takes the day off and keeps the week, with an Undo', async () => {
+    const day = new Date(2026, 4, 20)
+    const { onUpdateTask, pushAction, weekStart, drop } = mk({ id: 't1', title: 'Call Liam', scheduledFor: day, isAllDay: true, bucket: 'timed', completed: false })
+    await drop()
+    expect(onUpdateTask).toHaveBeenCalledTimes(1)
+    const [id, u] = onUpdateTask.mock.calls[0]
+    expect(id).toBe('t1')
+    expect(u).toMatchObject({ scheduledFor: undefined, bucket: 'week', weekStart })
+    expect('scheduledFor' in u).toBe(true)
+    // Undo restores the day.
+    pushAction.mock.calls[0][1]()
+    expect(onUpdateTask.mock.calls[1][1]).toMatchObject({ scheduledFor: day, isAllDay: true, bucket: 'timed' })
+  })
+
+  it('does nothing for a task already on the list', async () => {
+    const { onUpdateTask, drop } = mk({ id: 't1', title: 'Call Liam', bucket: 'week', completed: false })
+    await drop()
+    expect(onUpdateTask).not.toHaveBeenCalled()
+  })
+})

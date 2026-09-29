@@ -38,6 +38,7 @@ import { SideColumn, SIDE_COLUMN_WIDTH, type SidePane } from './SideColumn';
 import { PhonePaneSwitch } from './PhonePaneSwitch';
 import { NoteViewer } from '@/components/chat/NoteViewer';
 import { PlaceBand } from '@/components/place/PlaceBand';
+import { planV2Enabled } from '@/lib/planning/v2/planV2';
 import { onQuickAddRequest } from '@/lib/quickAddSignal';
 
 /**
@@ -121,6 +122,9 @@ interface Props {
 function ShellLayoutInner({ children }: Props) {
   const navigate = useNavigate();
   const location = useLocation();
+  // Planning v2 dresses the whole shell (headings, the day numeral) while it
+  // is on for this device (docs/planning/2026-09-28-planning-v2.md).
+  useEffect(() => { document.documentElement.classList.toggle('plan-v2', planV2Enabled()); }, [location.search]);
   const isMobile = useMobile();
   const typing = useTextEntryActive();
   const planDestination = usePlanDestination();
@@ -295,8 +299,6 @@ function ShellLayoutInner({ children }: Props) {
           // centred in the window, or in the space left beside a side pane or
           // the pinned reference lists.
           <>
-          {/* Your place, as a shallow landscape behind the navigation band. */}
-          <PlaceBand />
           <div className={`desktop-workspace relative${referencesVisible ? ' has-references' : ''}`}>
             <div className="desktop-workspace-nav">
         <DesktopNavigation inboxCount={inboxCount} discussionsUnread={discussionsUnread}
@@ -352,7 +354,13 @@ function ShellLayoutInner({ children }: Props) {
               </SideColumn>
             </div>
             {referencesVisible && <div className="desktop-workspace-dock"><ReferenceListsDock /></div>}
-            <DesktopFooter actionRef={setDesktopFooterAction} />
+            {/* Your place, as ground under the page — it anchors the bottom
+                rather than crowding the navigation — and it stays put: the
+                page scrolls, the ground and footer do not (Scott, 2026-09-28). */}
+            <div className="desktop-ground">
+              <PlaceBand ground />
+              <DesktopFooter actionRef={setDesktopFooterAction} />
+            </div>
           </div>
           </>
         )}

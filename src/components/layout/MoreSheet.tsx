@@ -35,9 +35,10 @@ const ICONS: Record<string, ComponentType<{ className?: string }>> = {
   Settings,
 }
 
+// The phone dock already carries Routines; only the desktop's More needs it.
 const GROUPS = MORE_GROUPS.map(([group, items]) => [
   group,
-  group === 'Reference' ? [...items, { label: 'Settings', route: '/settings' }] : items,
+  group === 'Reference' ? [...items, { label: 'Settings', route: '/settings' }] : items.filter((i) => i.route !== '/routines'),
 ] as const)
 
 export function MoreSheet({ isOpen, onClose, discussionsUnread, onAskSymphony }: MoreSheetProps) {

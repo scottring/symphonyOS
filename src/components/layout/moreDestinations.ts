@@ -8,7 +8,7 @@ export interface MoreDestination {
 }
 
 export const MORE_GROUPS: [string, MoreDestination[]][] = [
-  ['Organize', [{ label: 'Someday', route: '/someday' }]],
+  ['Organize', [{ label: 'Routines', route: '/routines' }, { label: 'Someday', route: '/someday' }]],
   ['Home', [
     { label: 'Meals', route: '/meals/plan' },
     { label: 'Meal shelf', route: '/meals/shelf' },

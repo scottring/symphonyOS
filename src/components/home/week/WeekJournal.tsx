@@ -165,14 +165,14 @@ function Entry({ entry, day, onSelect, onToggle, dragEnabled, timingControl }: {
           {entry.title}
         </span>
         {entry.subtitle && (
-          <span className="ml-1.5 text-[12px] text-neutral-500 break-words">{entry.subtitle}</span>
+          <span className="journal-entry-sub ml-1.5 text-[12px] text-neutral-500 break-words">{entry.subtitle}</span>
         )}
       </button>
       {timingControl && entry.task && !entry.completed && (
         // The row itself carries the drag listeners, so the control swallows
         // the pointer before they see it — the same guard the checkbox uses.
         <span
-          className={mobile ? 'basis-full pl-7' : 'shrink-0'}
+          className={`journal-entry-when ${mobile ? 'basis-full pl-7' : 'shrink-0'}`}
           onPointerDown={(e) => e.stopPropagation()}
           onClick={(e) => e.stopPropagation()}
         >

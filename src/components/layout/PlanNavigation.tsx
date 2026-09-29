@@ -1,13 +1,14 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { NavLink, useLocation, useNavigate } from 'react-router-dom'
-import { PanelLeft, Target, ChevronDown, Check, CornerDownRight } from 'lucide-react'
+import { PanelLeft, ChevronDown, Check } from 'lucide-react'
 import { periodBounds } from '@/lib/planning/periodPage'
 import { readSeasons } from '@/lib/cadence/seasons'
 import { useReferenceLists } from '@/components/reference/ReferenceListsContext'
 import { PlanningSheet } from '@/components/reference/PlanningSheet'
-import { GoalsSheet } from '@/components/plan/GoalsSheet'
 import { DomainSwitcher } from '@/components/domain/DomainSwitcher'
+import { horizonNumerals } from '@/lib/planning/horizonNumerals'
+import { readCadenceConfig } from '@/lib/cadence/config'
 
 /** Phone: a page's own header controls (filters, ⋯) join the horizon-tab row
  *  instead of adding rows above the date. Falls back to inline rendering. */
@@ -83,21 +84,47 @@ function HorizonSwitcher({ period }: { period: typeof PERIODS[number] }) {
   </div>
 }
 
+const RAIL_ORDER = ['year', 'season', 'month', 'week', 'today'] as const
+
+/** Desktop: "2026 Year — 09–11 Fall — 09 September — 40 Week — 28 Today". */
+function HorizonRail({ period }: { period?: typeof PERIODS[number] }) {
+  const { search } = useLocation()
+  const now = new Date()
+  const nums = horizonNumerals(now, readSeasons(), readCadenceConfig().weekStartsOn)
+  // The horizon on screen wears the period being SHOWN — October's page says
+  // "10 October", not the clock's "09 September".
+  const start = new URLSearchParams(search).get('start')
+  const shown = !!start && /^\d{4}-\d{2}-\d{2}$/.test(start) && (period === 'month' || period === 'season' || period === 'week')
+  if (shown) {
+    const [y, m, d] = start!.split('-').map(Number)
+    nums[period] = horizonNumerals(new Date(y, m - 1, d), readSeasons(), readCadenceConfig().weekStartsOn)[period]
+  }
+  return <nav aria-label="Planning period" className="horizon-rail">
+    {RAIL_ORDER.map((value, k) => <span key={value} className="horizon-rail-step">
+      {k > 0 && <span className="horizon-rail-join" aria-hidden="true" />}
+      {/* Each link opens the period it names: the one on screen keeps its
+          date, so "10 October" never lands on September (2026-09-29). */}
+      <NavLink to={shown && value === period ? `/${value}?start=${start}` : `/${value}`} aria-current={period === value ? 'page' : undefined} className={period === value ? 'is-current' : ''}
+        aria-label={HORIZON_NAMES[value]} title={`${HORIZON_NAMES[value]} · ${nums[value].label}`}>
+        <span className="horizon-rail-n">{nums[value].n}</span><span className="horizon-rail-l">{nums[value].label}</span>
+      </NavLink>
+    </span>)}
+  </nav>
+}
+
 /** Page tools are deliberately outside primary destination navigation. */
 export function PlanNavigation({ mobile = false, paused = false, mobileControlsRef }: {
   mobile?: boolean; paused?: boolean
   /** Phone only: the slot MobilePlanControls portals into. */
   mobileControlsRef?: (node: HTMLDivElement | null) => void
 }) {
-  const { pathname, search } = useLocation()
-  const navigate = useNavigate()
+  const { pathname } = useLocation()
   const period = planPeriodForPath(pathname)
   const references = useReferenceLists()
   const pinned = !!references?.pins.some(pin => pin.kind === 'today')
   const [sheetPath, setSheetPath] = useState<string | null>(null)
-  // The ◎ Goals reference opens the same sheet at every width (ruling: one
-  // component; a desktop pinned panel is a follow-up).
-  const [goalsOpen, setGoalsOpen] = useState(false)
+  // No ◎ Goals control (Scott, 2026-09-28: "unnecessary") — the Year,
+  // Season and Month pages are where goals are read.
   const sheetOpen = sheetPath === pathname
   // Horizon pages own their Shelves launcher in the date masthead.
   const onToday = pathname === '/' || pathname === '/today' || pathname.startsWith('/tasks-new')
@@ -106,25 +133,30 @@ export function PlanNavigation({ mobile = false, paused = false, mobileControlsR
   // The kept-pins note ("Lists return when you close the side panel") is
   // still said on Today, even though its chooser button lives on the page.
   const pausedNote = !mobile && paused && !!references && references.pins.length > 0
+  if (!mobile) {
+    // Desktop: the horizon rail IS the main navigation (Scott, 2026-09-28 —
+    // "Planner" is gone from the row above). Centred on every page; a page
+    // that is no horizon simply has none marked.
+    return <div className="plan-page-tools is-rail" data-period={period}>
+      <div className="plan-rail-side" />
+      <HorizonRail period={period} />
+      <div className="plan-rail-side is-right">
+        {/* No week-range picker here (Scott, 2026-09-28: "I don't understand
+            what it is") — the Week heading's own menu offers the same ranges. */}
+        {(showChooser || pausedNote) && references && <div className="task-chooser-control">
+          {showChooser && <button type="button" aria-label={pinned ? 'Close shelves' : 'Shelves'} aria-pressed={pinned}
+            onClick={() => pinned ? references.unpin('today') : references.pin('today')}>
+            <PanelLeft size={15} aria-hidden="true" />Shelves
+          </button>}
+          {pausedNote && <span>Lists return when you close the side panel.</span>}
+        </div>}
+      </div>
+    </div>
+  }
   if (!period && !showChooser && !pausedNote) return null
-  const range = new URLSearchParams(search).get('range') ?? 'today'
   return <div className="plan-page-tools" data-period={period}>
     {period && <div className="plan-period-controls">
-      {mobile ? <HorizonSwitcher period={period} /> : <>
-        {/* The horizons hang off Planner in the row above (Scott's sketch, 2026-09-25). */}
-        <CornerDownRight size={14} aria-hidden="true" className="plan-period-connector" />
-        <nav aria-label="Planning period" className="plan-period-navigation">
-          {PERIODS.map(value => <NavLink key={value} to={`/${value}`} aria-current={period === value ? 'page' : undefined}
-            className={period === value ? 'is-current' : ''}>{value[0].toUpperCase() + value.slice(1)}</NavLink>)}
-        </nav>
-      </>}
-      {period === 'week' && <label className="plan-range-control"><span className="sr-only">Range</span>
-        <select aria-label="Week range" value={['week', 'weekend', 'three', 'custom'].includes(range) ? range : 'week'}
-          onChange={event => navigate(event.target.value === 'week' ? '/week' : `/week?range=${event.target.value}`)}>
-          <option value="week">Full week</option><option value="weekend">Weekend</option>
-          <option value="three">3 days</option><option value="custom">Custom range…</option>
-        </select>
-      </label>}
+      <HorizonSwitcher period={period} />
     </div>}
     {(showChooser || pausedNote) && references && <div className="task-chooser-control">
       {showChooser && <button type="button" aria-label={pinned && !mobile ? 'Close shelves' : 'Shelves'}
@@ -134,16 +166,10 @@ export function PlanNavigation({ mobile = false, paused = false, mobileControlsR
       </button>}
       {pausedNote && <span>Lists return when you close the side panel.</span>}
     </div>}
-    {period && <div className="goals-reference-control">
-      <button type="button" aria-label="Goals" aria-expanded={goalsOpen} onClick={() => setGoalsOpen(open => !open)}>
-        <Target size={15} aria-hidden="true" /><span className="goals-reference-label">Goals</span>
-      </button>
-    </div>}
     {/* Phone: the life-area lens rides on this row (Today folds it into
         its Filters control instead). */}
     {period && mobile && period !== 'today' && <DomainSwitcher />}
     {period && mobile && <div ref={mobileControlsRef} className="plan-mobile-controls" />}
-    {period && <GoalsSheet open={goalsOpen} onClose={() => setGoalsOpen(false)} />}
     {mobile && showChooser && <PlanningSheet open={sheetOpen} onClose={() => setSheetPath(null)} periodShelves={broaderPeriod} />}
   </div>
 }
