@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { getAuthUser } from '@/lib/supabase'
+import { clearPendingJoin, setPendingJoin } from '@/lib/pendingJoin'
 import { useHouseholdInvitations } from '@/hooks/useHouseholdInvitations'
 import type { HouseholdInvitation, InvitationPreview } from '@/hooks/useHouseholdInvitations'
 
@@ -68,6 +69,7 @@ export function JoinHousehold() {
 
     try {
       await acceptInvitation(token, chosenId ?? null)
+      clearPendingJoin()
       setStatus('success')
       // Redirect to home after brief delay
       setTimeout(() => navigate('/'), 2000)
@@ -78,9 +80,11 @@ export function JoinHousehold() {
   }, [token, needsChoice, acceptInvitation, chosenId, navigate])
 
   const handleSignIn = useCallback(() => {
-    // Store the join token so we can redirect back after auth
-    sessionStorage.setItem('symphony-join-token', token || '')
-    navigate('/')
+    // Come back here after signing in (?return=, read by AuthGate) — and, for
+    // a new account confirmed from the email in another tab, the first-run
+    // gate finds the pending invitation and returns here instead of setup.
+    if (token) setPendingJoin(token)
+    navigate(token ? `/?return=${encodeURIComponent(`/join/${token}`)}` : '/')
   }, [token, navigate])
 
   return (

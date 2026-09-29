@@ -7,6 +7,7 @@ import {
   markFirstRunDoneLocally,
   needsFirstRun,
 } from '@/lib/firstRun'
+import { getPendingJoin } from '@/lib/pendingJoin'
 
 type Stage = 'checking' | 'setup' | 'ready'
 
@@ -31,6 +32,9 @@ export function FirstRunGate({ user, children }: { user: User; children: ReactNo
       .then((signals) => {
         if (!live) return
         if (needsFirstRun(signals)) {
+          // Invited to a household: join it, rather than setting up a new one.
+          const invite = getPendingJoin()
+          if (invite) { window.location.replace(`/join/${invite}`); return }
           setStage('setup')
         } else {
           markFirstRunDoneLocally(user.id)
