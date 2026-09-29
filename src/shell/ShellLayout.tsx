@@ -306,7 +306,7 @@ function ShellLayoutInner({ children }: Props) {
           <div className={`desktop-workspace relative${referencesVisible ? ' has-references' : ''}`}>
             <div className="desktop-workspace-nav">
         <DesktopNavigation inboxCount={inboxCount} discussionsUnread={discussionsUnread}
-          onSearch={() => setQuickAddOpen(true)} onQuickAdd={() => setQuickAddOpen(true)} onSignOut={signOut}
+          onSearch={() => setQuickAddOpen(true)} onSignOut={signOut}
           userName={user?.user_metadata?.name ?? user?.email}
           paused={referencesPaused} controlsRef={setDesktopControls}
           auxiliaryControls={!pageOwnsFilterChrome(location.pathname) && (
@@ -376,7 +376,7 @@ function ShellLayoutInner({ children }: Props) {
           // Desktop keeps its round + at the bottom right (Scott, 2026-09-26:
           // "desktop has ALWAYS had a round circle + button" — it did until
           // the 2026-09-18 top-navigation redesign hid it). It opens the same
-          // ⌘K add box as the "+ Add ⌘K" button and the shortcut. Phones add
+          // ⌘K add box as the shortcut. Phones add
           // through the dock's + (and the capture bar) instead.
           showFab={!isMobile}
           onAdd={chrome.onQuickAdd}

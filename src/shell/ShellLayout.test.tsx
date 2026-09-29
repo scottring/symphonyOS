@@ -369,11 +369,11 @@ describe('Pinned lists on the left', () => {
 describe('Capture and the Today pin from every desktop page', () => {
   beforeEach(() => { mobileState.isMobile = false; selectionState.selection = null; sessionStorage.clear(); localStorage.removeItem('symphony-plan-period') })
 
-  it.each(['/today', '/week', '/month', '/notes', '/inbox'])('%s has a visible Add button that opens the ⌘K capture', (path) => {
+  // Scott, 2026-09-29: no "+ Add ⌘K" in the top bar — the round + and ⌘K add.
+  it.each(['/today', '/week', '/month', '/notes', '/inbox'])('%s has no Add button in the top bar; the round + stays', (path) => {
     renderAt(path)
-    expect(screen.getByTestId('quick-capture')).toHaveAttribute('data-open', 'false')
-    fireEvent.click(screen.getByRole('button', { name: 'Add — ⌘K' }))
-    expect(screen.getByTestId('quick-capture')).toHaveAttribute('data-open', 'true')
+    expect(screen.queryByRole('button', { name: 'Add — ⌘K' })).not.toBeInTheDocument()
+    expect(screen.getByTestId('quick-capture')).toHaveAttribute('data-fab', 'true')
   })
 
   it('⌘K still toggles the same capture', () => {

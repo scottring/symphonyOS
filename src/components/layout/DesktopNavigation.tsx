@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { NavLink, useLocation, useNavigate } from 'react-router-dom'
-import { ChevronDown, Inbox, Menu, Plus, Search, UserRound } from 'lucide-react'
+import { ChevronDown, Inbox, Menu, Search, UserRound } from 'lucide-react'
 import { requestPlanFromPaper } from '@/lib/planFromPaperSignal'
 import { appRegistry } from '@/shell/appRegistry'
 import { MORE_GROUPS, isDestinationActive } from './moreDestinations'
@@ -12,10 +12,8 @@ export function DesktopPageControls({ children }: { children: ReactNode }) {
   return host ? createPortal(children, host) : <>{children}</>
 }
 
-export function DesktopNavigation({ inboxCount, discussionsUnread, onSearch, onQuickAdd, onSignOut, userName, controlsRef, auxiliaryControls }: {
+export function DesktopNavigation({ inboxCount, discussionsUnread, onSearch, onSignOut, userName, controlsRef, auxiliaryControls }: {
   inboxCount: number; discussionsUnread: number; onSearch: () => void; onSignOut: () => void
-  /** Opens the ⌘K unibox ready to add — the visible twin of the shortcut. Falls back to onSearch. */
-  onQuickAdd?: () => void
   auxiliaryControls?: ReactNode; userName?: string; paused: boolean; controlsRef: (node: HTMLDivElement | null) => void
 }) {
   const navigate = useNavigate()
@@ -51,7 +49,8 @@ export function DesktopNavigation({ inboxCount, discussionsUnread, onSearch, onQ
     {/* No "Planner" and no "Routines" here (Scott, 2026-09-28): the horizon
         rail beneath is the main navigation, and Routines lives under More.
         One bar on every page (2026-09-29): the menu at the left; at the right
-        Inbox, search, Add and you — page controls live in the page heading. */}
+        Inbox, search and you — page controls live in the page heading. No Add
+        button (Scott, 2026-09-29): the round + and ⌘K already add. */}
     {menu('more', <><Menu size={18} aria-hidden="true" />{discussionsUnread > 0 && <span className="navigation-count">{discussionsUnread}</span>}</>, <div className="page-navigation-more">
       <div className="page-navigation-groups">
         {groups.map(([group, items]) => <div key={group} role="group" aria-labelledby={`navigation-group-${group}`} className="page-navigation-group">
@@ -76,9 +75,6 @@ export function DesktopNavigation({ inboxCount, discussionsUnread, onSearch, onQ
         <Inbox size={17} aria-hidden="true" />{inboxCount > 0 && <span className="navigation-count">{inboxCount}</span>}
       </NavLink>
       <button onClick={onSearch} aria-label="Search" title="Search" className="page-navigation-icon"><Search size={17} aria-hidden="true" /></button>
-      {/* The visible twin of ⌘K: capture from any page without knowing the shortcut. */}
-      <button type="button" onClick={onQuickAdd ?? onSearch} aria-label="Add — ⌘K" title="Add a task, note or event (⌘K)"
-        className="page-navigation-add"><Plus size={15} aria-hidden="true" /><span>Add</span><kbd>⌘K</kbd></button>
       {menu('account', <><UserRound size={17} aria-hidden="true" /><span className="sr-only">Account</span></>, <>
         {userName && <p>{userName}</p>}<button onClick={() => go('/settings')}>Settings</button><button onClick={() => { setOpen(null); onSignOut() }}>Sign out</button>
       </>, false, { chevron: false, className: 'is-account' })}
