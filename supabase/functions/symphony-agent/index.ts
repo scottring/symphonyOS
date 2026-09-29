@@ -22,6 +22,19 @@ import { normalizeSchedule, etOffsetMinutes, APP_TZ } from './schedule.ts'
 //   {type:'session'|'text'|'tool'|'done'|'error'}
 // ════════════════════════════════════════════════════════════════
 
+
+// A weekly routine's days are the app's three-letter keys ('sun' … 'sat').
+// The model writes "tuesday"; a routine saved that way matched no day and
+// never appeared (Scott, 2026-09-29). Same rule as src/lib/recurrenceDays.ts.
+const DAY_KEYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat']
+function withDayKeys(p: unknown): unknown {
+  if (!p || typeof p !== 'object') return p
+  const pat = p as { days?: unknown }
+  if (!Array.isArray(pat.days)) return p
+  const keys = new Set(pat.days.map((d) => (typeof d === 'string' ? d.trim().toLowerCase().slice(0, 3) : '')).filter((k) => DAY_KEYS.includes(k)))
+  return { ...pat, days: DAY_KEYS.filter((k) => keys.has(k)) }
+}
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -250,12 +263,14 @@ const TOOLS = [
       properties: {
         name: { type: 'string' },
         description: { type: 'string', description: 'instructions shown when expanded' },
-        recurrence_pattern: { type: 'object', description: 'defaults to {"type":"daily"}' },
+        recurrence_pattern: { type: 'object', description: 'defaults to {"type":"daily"}. Weekly on set days: {"type":"weekly","days":["tue"]} — days are three-letter keys sun mon tue wed thu fri sat.' },
         times_per_day: { type: 'array', items: { type: 'string' }, description: 'HH:MM list, e.g. ["09:00","18:00"]' },
         time_of_day: { type: 'string', description: 'HH:MM for a once-a-day routine' },
         context: { type: 'string', enum: CONTEXT_ENUM },
         image_url: { type: 'string' },
         project_id: { type: 'string', description: 'id of the program/project this exercise belongs to' },
+        assigned_to: { type: 'string', description: 'household member id who DOES this routine (see symphony_list_household_members / the household roster)' },
+        assigned_to_all: { type: 'array', items: { type: 'string' }, description: 'every household member id who does it, when more than one' },
       },
       required: ['name'],
     },
@@ -273,7 +288,7 @@ const TOOLS = [
   },
   {
     name: 'symphony_update_routine',
-    description: 'Update a routine by id. Set parent_routine_id (plus step_order) to fold this routine into a parent routine as a step, or null to detach it. Also rename, change context, time_of_day, etc.',
+    description: 'Update a routine by id. Set parent_routine_id (plus step_order) to fold this routine into a parent routine as a step, or null to detach it. Also rename, change context, time_of_day, assign it to household members (assigned_to / assigned_to_all), etc.',
     input_schema: {
       type: 'object',
       properties: {
@@ -281,8 +296,10 @@ const TOOLS = [
         name: { type: 'string' },
         description: { type: 'string' },
         context: { type: ['string', 'null'], enum: [...CONTEXT_ENUM, null] },
-        recurrence_pattern: { type: 'object' },
+        recurrence_pattern: { type: 'object', description: 'weekly days are three-letter keys: {"type":"weekly","days":["tue","thu"]}' },
         time_of_day: { type: ['string', 'null'], description: 'HH:MM' },
+        assigned_to: { type: ['string', 'null'], description: 'household member id who DOES this routine' },
+        assigned_to_all: { type: ['array', 'null'], items: { type: 'string' }, description: 'every household member id who does it' },
         times_per_day: { type: 'array', items: { type: 'string' } },
         parent_routine_id: { type: ['string', 'null'], description: 'id of the parent routine collection this is a step of' },
         step_order: { type: ['number', 'null'], description: 'order within the parent collection' },
@@ -788,7 +805,7 @@ async function runTool(
         const { recurrence_pattern, ...rest } = input as Record<string, unknown>
         const row: Record<string, unknown> = {
           ...rest,
-          recurrence_pattern: recurrence_pattern ?? { type: 'daily' },
+          recurrence_pattern: withDayKeys(recurrence_pattern) ?? { type: 'daily' },
           visibility: 'active',
           show_on_timeline: true,
           user_id: userId,
@@ -797,6 +814,8 @@ async function runTool(
         // "my tasks" filter (otherwise unassigned routines are hidden). Family
         // routines stay unassigned/shared. Only fills when not explicitly set.
         const ctx = row.context
+        if (typeof row.assigned_to === 'string' && row.assigned_to_all == null) row.assigned_to_all = [row.assigned_to]
+        if (row.assigned_to == null && Array.isArray(row.assigned_to_all) && row.assigned_to_all.length) row.assigned_to = row.assigned_to_all[0]
         if (row.assigned_to == null && currentMemberId && (ctx === 'personal' || ctx == null)) {
           row.assigned_to = currentMemberId
           row.assigned_to_all = [currentMemberId]
@@ -830,6 +849,9 @@ async function runTool(
       case 'symphony_update_routine': {
         const { id, ...updates } = input as Record<string, unknown>
         if (!id) return 'Error: id is required'
+        if ('recurrence_pattern' in updates) updates.recurrence_pattern = withDayKeys(updates.recurrence_pattern)
+        // One assignee given alone is also the whole list, as the app writes it.
+        if (typeof updates.assigned_to === 'string' && !('assigned_to_all' in updates)) updates.assigned_to_all = [updates.assigned_to]
         // A scope the caller passed is not a choice — drop it before the guard,
         // or `{id, scope}` on its own reaches .update(updates) verbatim.
         delete updates.scope

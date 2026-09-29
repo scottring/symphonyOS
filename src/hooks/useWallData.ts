@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
+import { withDayKeys } from '@/lib/recurrenceDays'
 import { supabase } from '@/lib/supabase'
 import { useGoogleCalendar } from '@/hooks/useGoogleCalendar'
 import { useAuth } from '@/hooks/useAuth'
@@ -380,7 +381,7 @@ export function useWallData(): UseWallDataReturn {
       // hour on its collection. Built before any filtering, because a parent
       // is typically 'reference' and may carry a different context than its
       // Steps ("After camp routine" is context null, its Steps are family).
-      const allRoutines = (routinesRes.data || []) as Routine[]
+      const allRoutines = ((routinesRes.data || []) as Routine[]).map(withDayKeys)
       const routinesById = new Map(allRoutines.map(r => [r.id, r]))
       const routines = allRoutines
         .map(r => ({ ...r, time_of_day: effectiveTimeOfDay(r, routinesById) }))

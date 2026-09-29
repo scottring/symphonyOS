@@ -1,4 +1,5 @@
 import { parseLocalDate } from '@/lib/dateUtils'
+import { withDayKeys } from '@/lib/recurrenceDays'
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase, getAuthUser } from '@/lib/supabase'
 import type { Routine, RecurrencePattern, RoutineVisibility, PrepFollowupTemplate, TargetUnit } from '@/types/actionable'
@@ -259,7 +260,8 @@ export function useRoutines() {
 
       if (fetchError) throw fetchError
 
-      const routines = (data || []) as Routine[]
+      // Day names written by older tools read as the app's day keys.
+      const routines = ((data || []) as Routine[]).map(withDayKeys)
 
       // Auto-resume routines whose pause period has expired
       const now = new Date()
@@ -331,7 +333,7 @@ export function useRoutines() {
           return
         }
         const row = payload.new as Routine
-        if (row?.id) setRoutines(prev => applyUpsert(prev, row))
+        if (row?.id) setRoutines(prev => applyUpsert(prev, withDayKeys(row)))
       })
       .subscribe()
 
