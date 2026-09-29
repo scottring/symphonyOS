@@ -7,7 +7,7 @@ import { readSeasons } from '@/lib/cadence/seasons'
 import { useReferenceLists } from '@/components/reference/ReferenceListsContext'
 import { PlanningSheet } from '@/components/reference/PlanningSheet'
 import { DomainSwitcher } from '@/components/domain/DomainSwitcher'
-import { horizonNumerals } from '@/lib/planning/horizonNumerals'
+import { railEntries } from '@/lib/planning/horizonNumerals'
 import { readCadenceConfig } from '@/lib/cadence/config'
 
 /** Phone: a page's own header controls (filters, ⋯) join the horizon-tab row
@@ -89,24 +89,20 @@ const RAIL_ORDER = ['year', 'season', 'month', 'week', 'today'] as const
 /** Desktop: "2026 Year — 09–11 Fall — 09 September — 40 Week — 28 Today". */
 function HorizonRail({ period }: { period?: typeof PERIODS[number] }) {
   const { search } = useLocation()
-  const now = new Date()
-  const nums = horizonNumerals(now, readSeasons(), readCadenceConfig().weekStartsOn)
-  // The horizon on screen wears the period being SHOWN — October's page says
-  // "10 October", not the clock's "09 September".
-  const start = new URLSearchParams(search).get('start')
-  const shown = !!start && /^\d{4}-\d{2}-\d{2}$/.test(start) && (period === 'month' || period === 'season' || period === 'week')
-  if (shown) {
-    const [y, m, d] = start!.split('-').map(Number)
-    nums[period] = horizonNumerals(new Date(y, m - 1, d), readSeasons(), readCadenceConfig().weekStartsOn)[period]
-  }
+  // The rail wears the period being SHOWN, big to small — October's page
+  // says "10 October" and its week, not the clock's September. Today is
+  // always today.
+  const params = new URLSearchParams(search)
+  const start = params.get('start') ?? (period === 'week' ? params.get('date') : null)
+  const valid = !!start && /^\d{4}-\d{2}-\d{2}$/.test(start) && (period === 'month' || period === 'season' || period === 'week' || period === 'year')
+  const shown = valid ? (() => { const [y, m, d] = start!.split('-').map(Number); return { period: period as 'year' | 'season' | 'month' | 'week', start: new Date(y, m - 1, d) } })() : null
+  const steps = railEntries(new Date(), shown, readSeasons(), readCadenceConfig().weekStartsOn)
   return <nav aria-label="Planning period" className="horizon-rail">
     {RAIL_ORDER.map((value, k) => <span key={value} className="horizon-rail-step">
       {k > 0 && <span className="horizon-rail-join" aria-hidden="true" />}
-      {/* Each link opens the period it names: the one on screen keeps its
-          date, so "10 October" never lands on September (2026-09-29). */}
-      <NavLink to={shown && value === period ? `/${value}?start=${start}` : `/${value}`} aria-current={period === value ? 'page' : undefined} className={period === value ? 'is-current' : ''}
-        aria-label={HORIZON_NAMES[value]} title={`${HORIZON_NAMES[value]} · ${nums[value].label}`}>
-        <span className="horizon-rail-n">{nums[value].n}</span><span className="horizon-rail-l">{nums[value].label}</span>
+      <NavLink to={steps[value].to} aria-current={period === value ? 'page' : undefined} className={period === value ? 'is-current' : ''}
+        aria-label={HORIZON_NAMES[value]} title={`${HORIZON_NAMES[value]} · ${steps[value].label}`}>
+        <span className="horizon-rail-n">{steps[value].n}</span><span className="horizon-rail-l">{steps[value].label}</span>
       </NavLink>
     </span>)}
   </nav>
