@@ -66,16 +66,16 @@ describe('landmarksIn', () => {
 
 describe('planV2Enabled', () => {
   beforeEach(() => { localStorage.clear(); vi.unstubAllEnvs() })
-  it('is off by default and remembers ?plan=v2 / ?plan=v1', () => {
-    expect(planV2Enabled('')).toBe(false)
-    expect(planV2Enabled('?plan=v2')).toBe(true)
+  it('is on by default and remembers ?plan=v1 / ?plan=v2', () => {
     expect(planV2Enabled('')).toBe(true)
     expect(planV2Enabled('?plan=v1')).toBe(false)
     expect(planV2Enabled('')).toBe(false)
-  })
-  it('the build flag makes it the default', () => {
-    vi.stubEnv('VITE_PLAN_V2', 'true')
+    expect(planV2Enabled('?plan=v2')).toBe(true)
     expect(planV2Enabled('')).toBe(true)
+  })
+  it('a build with VITE_PLAN_V2=false turns it off', () => {
+    vi.stubEnv('VITE_PLAN_V2', 'false')
+    expect(planV2Enabled('')).toBe(false)
   })
 })
 

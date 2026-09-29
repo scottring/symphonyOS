@@ -190,7 +190,15 @@ describe('HomeHeader — Journal | Schedule sits by the dates', () => {
 })
 
 
-it('puts the week Shelves launcher inside the date header', () => {
+it('old planning pages (?plan=v1): the week Shelves launcher sits inside the date header', () => {
+  localStorage.setItem('symphony-plan-v2', 'off')
   renderWeek()
   expect(screen.getByTestId('masthead-card')).toContainElement(screen.getByRole('button', { name: /Shelves/i }))
+  localStorage.removeItem('symphony-plan-v2')
+})
+
+it('new planning pages (the default): no Shelves on the week — they live in the month column', () => {
+  localStorage.removeItem('symphony-plan-v2')
+  renderWeek()
+  expect(screen.queryByRole('button', { name: /Shelves/i })).not.toBeInTheDocument()
 })

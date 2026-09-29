@@ -23,7 +23,9 @@ const mount = () => render(<MemoryRouter><WeekPlanHost tasks={[open, monthTask]}
 describe('WeekPlanHost', () => {
   // WEEK is "this week" only if the clock says so — the copy turns on it.
   afterAll(() => { vi.useRealTimers() })
-  beforeEach(() => { vi.useFakeTimers({ shouldAdvanceTime: true }); vi.setSystemTime(new Date(2026, 9, 6, 9)); localStorage.clear(); Object.values(hook).forEach((f) => f.mockClear()); session.save.mockClear(); session.saved = null })
+  beforeEach(() => { vi.useFakeTimers({ shouldAdvanceTime: true }); vi.setSystemTime(new Date(2026, 9, 6, 9)); localStorage.clear()
+    // These cover the old week session, still reached with ?plan=v1.
+    localStorage.setItem('symphony-plan-v2', 'off'); Object.values(hook).forEach((f) => f.mockClear()); session.save.mockClear(); session.saved = null })
 
   it('says the week is not planned, opens the session in place of the days, and saves every decision once', async () => {
     mount()

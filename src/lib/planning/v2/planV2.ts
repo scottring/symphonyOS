@@ -12,9 +12,9 @@ import { timingRemoval } from '@/lib/planning/planActions'
 const SWITCH_KEY = 'symphony-plan-v2'
 
 /**
- * Is the v2 planning page on for this device? `?plan=v2` / `?plan=v1` flips it
- * and is remembered, so Scott and Iris can try it on real data without anyone
- * else seeing it. `VITE_PLAN_V2=true` makes it the default (still refusable).
+ * Is the v2 planning page on for this device? It is the default; `?plan=v1`
+ * opts a device back to the old pages and `?plan=v2` returns it, both
+ * remembered. A build with `VITE_PLAN_V2=false` turns it off everywhere.
  */
 export function planV2Enabled(search: string = typeof location !== 'undefined' ? location.search : ''): boolean {
   const asked = new URLSearchParams(search).get('plan')
@@ -26,7 +26,10 @@ export function planV2Enabled(search: string = typeof location !== 'undefined' ?
     if (stored === 'off') return false
   } catch { /* storage blocked: fall through to the build default */ }
   if (asked === 'v2') return true
-  return import.meta.env.VITE_PLAN_V2 === 'true'
+  // On for everyone (Scott, 2026-09-29: ship the redesign to the household);
+  // ?plan=v1 still opts a device back to the old pages, and a build with
+  // VITE_PLAN_V2=false turns it off everywhere.
+  return import.meta.env.VITE_PLAN_V2 !== 'false'
 }
 
 /** Turn v2 off on this device (the page's "Back to the current page" link). */
