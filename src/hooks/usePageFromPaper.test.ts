@@ -31,14 +31,27 @@ describe('usePageFromPaper', () => {
     expect(result.current.status).toBe('error')
   })
 
-  it('a non-401 function error surfaces its own message', async () => {
+  it('a failed reading says what to do, never the parser error (2026-09-23 regression)', async () => {
     invoke.mockResolvedValue({
       data: null,
-      error: Object.assign(new Error('boom'), { context: { status: 500 } }),
+      error: Object.assign(new Error('Edge Function returned a non-2xx status code'), {
+        context: { status: 500, json: async () => ({ error: 'Unexpected token \'I\', "I need to "... is not valid JSON', code: 'reply_unreadable' }) },
+      }),
     })
     const { result } = renderHook(() => usePageFromPaper([]))
     await act(() => result.current.parseFromBlob(new Blob(['x'], { type: 'image/jpeg' }), 'week'))
-    expect(result.current.error).toBe('boom')
+    expect(result.current.error).toMatch(/Try again/)
+    expect(result.current.error).not.toMatch(/Unexpected token|non-2xx/)
+  })
+
+  it('a busy reader says to wait and try again', async () => {
+    invoke.mockResolvedValue({
+      data: null,
+      error: Object.assign(new Error('boom'), { context: { status: 500, json: async () => ({ error: 'Anthropic returned 529', code: 'model_busy' }) } }),
+    })
+    const { result } = renderHook(() => usePageFromPaper([]))
+    await act(() => result.current.parseFromBlob(new Blob(['x'], { type: 'image/jpeg' }), 'week'))
+    expect(result.current.error).toMatch(/busy/)
   })
 })
 
