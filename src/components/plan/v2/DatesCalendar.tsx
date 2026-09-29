@@ -91,20 +91,37 @@ export function DatesCalendar({ start, end, landmarks, today, selected, onSelect
                 {marks.length > 0 && <span className="pv2-pls" title={marks.map((m) => m.title).join(' · ')}>{marks.slice(0, 3).map((m) => <i key={m.id} />)}</span>}
               </DayCell>
             })}
-            {placed.map((h) => (
-              <button
-                key={h.l.id} type="button"
-                className={`pv2-lm${h.a !== h.b || h.l.start < h.l.end ? ' is-span' : ''}${h.cont && wi > 0 ? ' is-cont' : ''}${selected === h.l.id ? ' is-sel' : ''}`}
-                style={{ gridColumn: `${h.a + 2} / ${h.b + 3}`, gridRow: h.lane + 2 }}
-                title={h.l.title}
-                onClick={() => onSelect(selected === h.l.id ? null : h.l.id)}
-              >{h.cont && wi > 0 ? '' : h.l.title}</button>
-            ))}
+            {placed.map((h) => {
+              // A one-day date is a mark in its cell — a day is ~34px, and its
+              // name broke into "Colu mb…" there. The list beneath names it.
+              const span = h.a !== h.b || h.l.start < h.l.end
+              return (
+                <button
+                  key={h.l.id} type="button"
+                  className={`pv2-lm${span ? ' is-span' : ' is-dot'}${h.cont && wi > 0 ? ' is-cont' : ''}${selected === h.l.id ? ' is-sel' : ''}`}
+                  style={{ gridColumn: `${h.a + 2} / ${h.b + 3}`, gridRow: h.lane + 2 }}
+                  title={h.l.title} aria-label={h.l.title}
+                  onClick={() => onSelect(selected === h.l.id ? null : h.l.id)}
+                >{span && !(h.cont && wi > 0) ? h.l.title : ''}</button>
+              )
+            })}
             {current && <button type="button" className="pv2-wkgo" onClick={() => onOpenWeek(ws)}>This week →</button>}
           </div>
         )
       })}
       {!available && <p className="pv2-hint" style={{ marginTop: 8 }}>The calendar couldn’t be read for this period.</p>}
+      {landmarks.length > 0 && (
+        <ul className="pv2-lmlist" aria-label="The dates, in order">
+          {[...landmarks].sort((x, y) => x.start.getTime() - y.start.getTime()).map((l) => (
+            <li key={l.id}>
+              <button type="button" className={selected === l.id ? 'is-sel' : ''} onClick={() => onSelect(selected === l.id ? null : l.id)}>
+                <span className="pv2-lmwhen">{l.start.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}{l.end > l.start ? `–${l.end.getMonth() === l.start.getMonth() ? l.end.getDate() : l.end.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}` : ''}</span>
+                <span className="pv2-lmname">{l.title}</span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
       {sel && (
         <div className="pv2-lmcard">
           <div className="pv2-when">{sel.start.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}{sel.end > sel.start ? ` – ${sel.end.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}` : ''}</div>

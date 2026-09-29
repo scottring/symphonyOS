@@ -7,7 +7,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { useDraggable } from '@dnd-kit/core'
-import { Check, GripVertical, MoreHorizontal, ArrowRight, Moon, X, PanelRight, Target, Sun, ArrowDownRight, Unlink } from 'lucide-react'
+import { Check, CornerDownRight, GripVertical, MoreHorizontal, ArrowRight, Moon, X, PanelRight, Target, Sun, ArrowDownRight, Unlink } from 'lucide-react'
 import type { Task, TaskContext } from '@/types/task'
 import { ContextPicker } from '@/components/triage/ContextPicker'
 import type { FamilyMember } from '@/types/family'
@@ -91,7 +91,7 @@ export function LineMenu({ vm, actions, nextLabel }: { vm: LineVM; actions: Line
   )
 }
 
-export function PlanLine({ vm, actions, members, nextLabel, open, onToggle, editable, draggable = false }: {
+export function PlanLine({ vm, actions, members, nextLabel, open, onToggle, editable, draggable = false, onHoverPartOf, onShowPartOf }: {
   vm: LineVM
   actions: LineActions
   members: FamilyMember[]
@@ -102,6 +102,10 @@ export function PlanLine({ vm, actions, members, nextLabel, open, onToggle, edit
   editable: boolean
   /** The month's lines pick up onto its calendar (PlanPageV2's DndContext). */
   draggable?: boolean
+  /** Hovering the line lights what it is part of in the reference column;
+   *  its "↳ Part of …" shows it there (the week list's rule). */
+  onHoverPartOf?: (id: string | null) => void
+  onShowPartOf?: (link: SupportLink) => void
 }) {
   const t = vm.task
   const who = assigneesOf(t)
@@ -109,7 +113,8 @@ export function PlanLine({ vm, actions, members, nextLabel, open, onToggle, edit
   const movable = draggable && vm.fate === 'open' && !t.completed
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: `line:${t.id}`, data: { kind: 'line', taskId: t.id }, disabled: !movable })
   return (
-    <li ref={setNodeRef} className={`pv2-line${vm.nested ? ' is-nested' : ''}${open ? ' is-open' : ''}${muted ? ' is-muted' : ''}${vm.fate === 'dropped' ? ' is-dropped' : ''}${t.completed ? ' is-done' : ''}${isDragging ? ' is-dragging' : ''}`}>
+    <li ref={setNodeRef} onMouseEnter={vm.partOf && onHoverPartOf ? () => onHoverPartOf(vm.partOf!.id) : undefined}
+      onMouseLeave={vm.partOf && onHoverPartOf ? () => onHoverPartOf(null) : undefined} className={`pv2-line${vm.nested ? ' is-nested' : ''}${open ? ' is-open' : ''}${muted ? ' is-muted' : ''}${vm.fate === 'dropped' ? ' is-dropped' : ''}${t.completed ? ' is-done' : ''}${isDragging ? ' is-dragging' : ''}`}>
       <div className="pv2-line-main">
         {movable && <span className="pv2-grip pv2-linegrip pv2-hov" {...listeners} {...attributes} aria-label={`Drag ${t.title} onto a week or a day`} title="Drag onto a week or a day"><GripVertical className="h-3.5 w-3.5" /></span>}
         <span className="pv2-mark" aria-hidden="true">
@@ -136,6 +141,12 @@ export function PlanLine({ vm, actions, members, nextLabel, open, onToggle, edit
           <LineMenu vm={vm} actions={actions} nextLabel={nextLabel} />
         </span>
       </div>
+      {vm.partOf && !open && (
+        <button type="button" className="pv2-line-parent" onClick={() => (onShowPartOf ?? actions.openPartOf)(vm.partOf!)}
+          aria-label={`Part of ${vm.partOf.title} — show it`}>
+          <CornerDownRight className="h-3 w-3 shrink-0" aria-hidden="true" /><span className="truncate">Part of “{vm.partOf.title}”</span>
+        </button>
+      )}
       {open && (
         <div className="pv2-fold">
           {editable && (
@@ -174,3 +185,27 @@ export function PlanLine({ vm, actions, members, nextLabel, open, onToggle, edit
   )
 }
 
+
+/** A line being named on the list it will join, opened from the level above
+ *  ("+ Add" / "+ Step" in the reference column): it says whose part it is.
+ *  Enter adds; Escape, or leaving it empty, lets it go. */
+export function DraftLine({ parentTitle, isGoal, placeholder, onAdd, onCancel }: {
+  parentTitle: string
+  isGoal: boolean
+  placeholder: string
+  onAdd: (title: string) => void
+  onCancel: () => void
+}) {
+  const [v, setV] = useState('')
+  return (
+    <li className="pv2-line is-draft">
+      <form className="pv2-line-main" onSubmit={(e) => { e.preventDefault(); const t = v.trim(); if (t) onAdd(t) }}>
+        <span className="pv2-mark" aria-hidden="true">{isGoal ? <span className="pv2-goal" /> : <span className="pv2-dash" />}</span>
+        <input autoFocus className="pv2-line-draft" value={v} onChange={(e) => setV(e.target.value)} placeholder={placeholder}
+          aria-label={`${placeholder} — part of ${parentTitle}`}
+          onKeyDown={(e) => { if (e.key === 'Escape') onCancel() }} onBlur={() => { if (!v.trim()) onCancel() }} />
+      </form>
+      <span className="pv2-line-parent is-shown"><CornerDownRight className="h-3 w-3 shrink-0" aria-hidden="true" /><span className="truncate">Part of “{parentTitle}” · Enter to add</span></span>
+    </li>
+  )
+}

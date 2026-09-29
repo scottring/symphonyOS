@@ -25,6 +25,7 @@ import { useSelectionOptional } from '@/shell/providers/SelectionProvider'
 import { useAuth } from '@/hooks/useAuth'
 import { useAppShellChromeOptional } from '@/contexts/AppShellChromeContext'
 import { HomeChromeControls } from '@/components/home/HomeChromeControls'
+import { MastheadCard, PeriodNavEyebrow } from '@/components/layout/MastheadCard'
 import { DomainSwitcher } from '@/components/domain/DomainSwitcher'
 import { showToast } from '@/hooks/useToast'
 import { filterTasksForLayers, matchesLayers } from '@/lib/today/domainFilter'
@@ -34,11 +35,11 @@ import { lowerPlacement } from '@/lib/placement/model'
 import { supportedGoal, goalOfTask, type SupportLink } from '@/lib/planning/goalSupport'
 import { periodBounds, isCurrentPeriod, planningPeriod, selectPeriodTasks } from '@/lib/planning/periodPage'
 import {
-  lineFate, lineDropUpdates, endedIn, closeOutCandidates, landmarksIn, leavePlanV2, readPlanView, writePlanView,
+  lineFate, lineDropUpdates, endedIn, closeOutCandidates, landmarksIn, readPlanView, writePlanView,
   type PlanView, type Landmark,
 } from '@/lib/planning/v2/planV2'
 import type { Task } from '@/types/task'
-import { PlanLine, type LineActions, type LineVM } from './PlanLine'
+import { PlanLine, DraftLine, type LineActions, type LineVM } from './PlanLine'
 import { DatesCalendar, type CalMark } from './DatesCalendar'
 import { useMobile } from '@/hooks/useMobile'
 import { readCadenceConfig, weekStartAnchor } from '@/lib/cadence/config'
@@ -46,6 +47,7 @@ import { weekOfYear } from '@/lib/planning/horizonNumerals'
 import { FocusDeck, CloseOut, type CloseDecision } from './FocusDeck'
 import { FromPaper } from './FromPaper'
 import { PeriodRefRoutines } from './RefShelves'
+import { useAddArea } from './AddArea'
 import { makePlanActions, timingRemoval } from '@/lib/planning/planActions'
 import { useActionableInstances } from '@/hooks/useActionableInstances'
 import { goalToTaskConversion } from '@/lib/planning/goalConversion'
@@ -276,9 +278,10 @@ function Inner({ level }: { level: Level }) {
     else if (d === 'someday') await gated.updateTask(t.id, { bucket: 'someday', scheduledFor: undefined, isAllDay: undefined })
     else if (d === 'dropped') await dropCommitment(t.id, level, prevBounds.start)
   }
+  const addArea = useAddArea()
   const addLine = async (title: string) => {
     await addTask(title, undefined, undefined, undefined, {
-      bucket: level === 'month' ? 'month' : 'quarter', ...periodPatch(bounds), context: soleDomain ?? undefined,
+      bucket: level === 'month' ? 'month' : 'quarter', ...periodPatch(bounds), context: addArea.area,
     })
   }
   // A season task taken into the month is the SAME task, now also on the month.
@@ -306,11 +309,19 @@ function Inner({ level }: { level: Level }) {
         bucket: 'quarter', seasonStart: bounds.start, isGoal: true, goalId: row.goal.id, context: row.goal.context ?? soleDomain ?? undefined,
       })
     }
-    setChildFor(null); setChildDraft('')
+    setChildFor(null)
     showToast(`“${title}” added to ${name}, as part of “${row.title}”.`, 'success', 4000)
   }
-  const [childFor, setChildFor] = useState<string | null>(null)
-  const [childDraft, setChildDraft] = useState('')
+  // "+ Add" / "+ Step" open the new line on THIS period's list, naming its
+  // parent — the week's rule (Scott, 2026-09-29), not a form under the line.
+  const [childFor, setChildFor] = useState<typeof aboveRows[number] | null>(null)
+  const [litParent, setLitParent] = useState<string | null>(null)
+  const showPartOf = (link: SupportLink) => {
+    const el = document.querySelector<HTMLElement>(`[data-ref-id="${link.id}"]`)
+    if (!el) { actions.openPartOf(link); return }
+    el.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+    el.classList.remove('is-flash'); void el.offsetWidth; el.classList.add('is-flash')
+  }
 
   // ── The month's calendar takes its lines (the week's drag, one rung up) ──
   // A line dropped on a DAY is dated that day; on a WEEK's number it is given
@@ -374,7 +385,8 @@ function Inner({ level }: { level: Level }) {
 
   const row = (vm: LineVM) => (
     <PlanLine key={vm.task.id} vm={vm} actions={actions} members={members} nextLabel={nextName}
-      open={openLine === vm.task.id} onToggle={() => setOpenLine((o) => (o === vm.task.id ? null : vm.task.id))} editable={inMeeting} draggable={dragOn} />
+      open={openLine === vm.task.id} onToggle={() => setOpenLine((o) => (o === vm.task.id ? null : vm.task.id))} editable={inMeeting} draggable={dragOn}
+      onHoverPartOf={view === 'ref' || inMeeting ? setLitParent : undefined} onShowPartOf={showPartOf} />
   )
   const section = (label: string, vms: LineVM[]) => vms.length ? <><div className="pv2-sect">{label}</div><ul className="pv2-list">{vms.map(row)}</ul></> : null
   const listColumn = (
@@ -383,6 +395,9 @@ function Inner({ level }: { level: Level }) {
       <div className="pv2-colh">{inMeeting ? `${name}’s list` : 'Our plan'}<FromPaper altitude={level} periodStart={bounds.start} tasks={layered} /></div>
       {loading && !main.length ? <p className="pv2-hint">Loading…</p> : null}
       {!loading && !main.length && <p className="pv2-hint">{inMeeting ? 'Nothing yet. Write whatever comes up — no types, no dates needed.' : `Nothing on ${name}’s plan yet. Add a line below, or start the ${review.toLowerCase()}.`}</p>}
+      {childFor && <ul className="pv2-list"><DraftLine key={childFor.id} parentTitle={childFor.title} isGoal={childFor.isGoal}
+        placeholder={childFor.isGoal ? `${name}’s part of it` : `A step for ${name}`}
+        onAdd={(t) => void addFromAbove(childFor, t)} onCancel={() => setChildFor(null)} /></ul>}
       {/* A goal and its steps are one group, so two columns never split them. */}
       <ul className={`pv2-list${level === 'season' && view === 'list' && !inMeeting ? ' pv2-brain' : ''}`}>{
         main.reduce<LineVM[][]>((groups, l) => { if (l.nested && groups.length) groups[groups.length - 1].push(l); else groups.push([l]); return groups }, [])
@@ -394,6 +409,7 @@ function Inner({ level }: { level: Level }) {
       <form className="pv2-write" onSubmit={(e) => { e.preventDefault(); const v = draft.trim(); if (v) { void addLine(v); setDraft('') } }}>
         <span className="pv2-dash" aria-hidden="true" />
         <input value={draft} onChange={(e) => setDraft(e.target.value)} placeholder={`Add to ${name}`} aria-label={`Add to ${name}`} />
+        {addArea.picker}
       </form>
       {section(`Carried to ${nextName}`, carried)}
       {section('Someday', someday)}
@@ -410,22 +426,14 @@ function Inner({ level }: { level: Level }) {
       <div className="pv2-colh">{aboveName} <small>for reference</small></div>
       {aboveRows.length ? (
         <ul className="pv2-list">{aboveRows.map((r) => (
-          <li key={r.id} className="pv2-rrow pv2-rrow-sans">
+          <li key={r.id} data-ref-id={r.id} className={`pv2-rrow pv2-rrow-sans${litParent === r.id || childFor?.id === r.id ? ' is-linked' : ''}`}>
             {r.isGoal ? <span className="pv2-goal is-small" aria-hidden="true" /> : <span className="pv2-dash" style={{ marginTop: 10 }} aria-hidden="true" />}
             <button type="button" className="flex-1 text-left" onClick={() => (r.task ? openTask(r.task.id) : navigate(`/goals/${r.id}`))}>{r.title}</button>
             <span className="pv2-refacts">
               {r.task && !r.isGoal && <button type="button" className="pv2-addbtn" onClick={() => void takeIn(r.task!)} aria-label={`Add ${r.title} to ${name}`}>+ {level === 'month' ? 'This month' : name}</button>}
-              <button type="button" className="pv2-addbtn" onClick={() => { setChildFor(r.id); setChildDraft(r.isGoal ? r.title : '') }}
+              <button type="button" className="pv2-addbtn" onClick={() => setChildFor(r)}
                 aria-label={`Add ${name}’s part of ${r.title}`}>{r.isGoal ? '+ Add' : '+ Step'}</button>
             </span>
-            {childFor === r.id && (
-              <form className="pv2-stepform" onSubmit={(e) => { e.preventDefault(); const v = childDraft.trim(); if (v) void addFromAbove(r, v) }}>
-                <label className="pv2-hint" htmlFor={`child-${r.id}`}>{r.isGoal ? `What’s ${name}’s part of it?` : `A step of “${r.title}” for ${name}`}</label>
-                <input id={`child-${r.id}`} autoFocus className="pv2-input" value={childDraft} onChange={(e) => setChildDraft(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === 'Escape') setChildFor(null) }} />
-                <div className="pv2-acts"><button type="submit" className="pv2-btn">Add to {name}</button><button type="button" className="pv2-link pv2-quiet" onClick={() => setChildFor(null)}>Cancel</button></div>
-              </form>
-            )}
           </li>
         ))}</ul>
       ) : <p className="pv2-hint">Nothing written for {aboveName}. That’s fine.</p>}
@@ -462,26 +470,18 @@ function Inner({ level }: { level: Level }) {
 
   return (
     <div className="pv2-page">
-      <header className="pv2-head">
-        <div className={`pv2-numeral${level === 'season' ? ' is-wide' : ''}`} aria-hidden="true">{numeral}</div>
-        <div className="min-w-0">
-          <div className="pv2-eyebrow">{NOUN[level]}</div>
-          <h1 className="pv2-title">
-            {bounds.label}
-            <span className="pv2-mnav">
-              <button type="button" onClick={() => goTo(bounds.prev)}>← {prevName}</button>
-              <button type="button" onClick={() => goTo(bounds.next)}>{nextName} →</button>
-              {!isCurrent && <button type="button" onClick={() => goTo(today)}>This {NOUN[level].toLowerCase()}</button>}
-            </span>
-          </h1>
-          <p className="pv2-purpose">
-            {meeting?.step === 1 ? `First, decide what happens to what’s left of ${prevName}.`
-              : inMeeting ? `Look at ${aboveName}${level === 'month' ? ' and the calendar' : ''}, then write what ${name} is for.`
-              : level === 'month' ? 'Our plan for the month, and the dates we can’t move.' : `What we want this ${NOUN[level].toLowerCase()}.`}
-          </p>
-        </div>
-        <div className="pv2-chrome">{chrome ? <HomeChromeControls className="flex" /> : <DomainSwitcher />}</div>
-      </header>
+      {/* The masthead every horizon wears (Week and Today's MastheadCard):
+          the numeral in the margin, "‹ MONTH ›" above the name. A line under
+          it only while the review is saying what to do next. */}
+      <MastheadCard variant="page" numeral={numeral} title={bounds.label}
+        eyebrow={<PeriodNavEyebrow label={NOUN[level]} onPrev={() => goTo(bounds.prev)} onNext={() => goTo(bounds.next)}
+          prevLabel={prevName} nextLabel={nextName} trailing={isCurrent ? undefined : (
+            <button type="button" onClick={() => goTo(today)} aria-label={`Back to this ${NOUN[level].toLowerCase()}`}
+              className="period-return ml-1 inline-flex shrink-0 items-center gap-1 rounded-full border border-primary-100 bg-primary-50 px-2 py-0.5 text-[11px] font-semibold text-primary-600 transition-colors hover:bg-primary-100">This {NOUN[level].toLowerCase()}</button>
+          )} />}
+        subline={meeting?.step === 1 ? `First, decide what happens to what’s left of ${prevName}.`
+          : inMeeting ? `Look at ${aboveName}${level === 'month' ? ' and the calendar' : ''}, then write what ${name} is for.` : undefined}
+        controls={chrome ? <HomeChromeControls className="flex" /> : <DomainSwitcher />} />
 
       {inMeeting ? (
         <div className="pv2-sbar" role="region" aria-label={`${review}, ${name}`}>
@@ -492,7 +492,9 @@ function Inner({ level }: { level: Level }) {
               <button type="button" aria-current={meeting!.step === 2 ? 'step' : undefined} onClick={() => setMeeting({ ...meeting!, step: 2 })}><b>2</b>Write {name}</button>
             </div>
           ) : <span className="flex-1" />}
-          {meeting!.step === 2 && viewSwitch}
+          {/* With steps in the bar there is no room for the views too — the
+              review writes with the level above beside it anyway. */}
+          {meeting!.step === 2 && meeting!.candidateIds.length === 0 && viewSwitch}
           <button type="button" className="pv2-link pv2-quiet" onClick={() => void endMeeting(false)}>Leave for now</button>
           <button type="button" className="pv2-btn" onClick={() => void endMeeting(true)}>This is our {name} plan</button>
         </div>
@@ -516,9 +518,6 @@ function Inner({ level }: { level: Level }) {
         </DndContext>
       ) : body}
 
-      <p className="pv2-foot">
-        New planning page · <button type="button" className="pv2-link pv2-quiet" onClick={() => { leavePlanV2(); window.location.assign(window.location.pathname) }}>Back to the current page</button>
-      </p>
     </div>
   )
 }

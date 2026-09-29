@@ -16,15 +16,17 @@ import { usePlanningSession, yearToken } from '@/hooks/usePlanningSession'
 import { useAuth } from '@/hooks/useAuth'
 import { useAppShellChromeOptional } from '@/contexts/AppShellChromeContext'
 import { HomeChromeControls } from '@/components/home/HomeChromeControls'
+import { MastheadCard, PeriodNavEyebrow } from '@/components/layout/MastheadCard'
 import { DomainSwitcher } from '@/components/domain/DomainSwitcher'
 import { showToast } from '@/hooks/useToast'
 import { filterTasksForLayers, matchesLayers } from '@/lib/today/domainFilter'
-import { readPlanView, writePlanView, leavePlanV2, type PlanView } from '@/lib/planning/v2/planV2'
+import { readPlanView, writePlanView, type PlanView } from '@/lib/planning/v2/planV2'
 import type { Goal } from '@/types/goal'
 import type { Task } from '@/types/task'
 import { PlanLine, type LineActions, type LineVM } from './PlanLine'
 import { FocusDeck, CloseOut, type CloseDecision } from './FocusDeck'
 import { FromPaper } from './FromPaper'
+import { useAddArea } from './AddArea'
 
 const shortDay = (d: Date) => d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
 
@@ -40,7 +42,7 @@ function Inner() {
   const navigate = useNavigate()
   const { goals, areas, addGoal, updateGoal, addArea, loading } = useGoalsContext()
   const { tasks } = useSupabaseTasks()
-  const { layers, soleDomain } = useDomain()
+  const { layers } = useDomain()
   const { members } = useFamilyMembers()
   const { user } = useAuth()
   const chrome = useAppShellChromeOptional()
@@ -99,9 +101,10 @@ function Inner() {
     else if (d === 'done') await updateGoal(g.id, { status: 'completed' })
     else if (d === 'dropped') await updateGoal(g.id, { status: 'archived' })
   }
+  const addAreaChoice = useAddArea()
   const addLine = async (name: string) => {
     const areaId = areas[0]?.id ?? (await addArea('General'))?.id ?? null
-    await addGoal(areaId, name, soleDomain ?? undefined, { year })
+    await addGoal(areaId, name, addAreaChoice.area, { year })
   }
   // The year's review (see PlanPageV2): prominent only while one is due.
   const reviewIds = prevLines.filter((l) => l.fate === 'open').map((l) => l.task.id)
@@ -150,6 +153,7 @@ function Inner() {
         <form className="pv2-write" onSubmit={(e) => { e.preventDefault(); const v = draft.trim(); if (v) { void addLine(v); setDraft('') } }}>
           <span className="pv2-goal" aria-hidden="true" />
           <input value={draft} onChange={(e) => setDraft(e.target.value)} placeholder="Add a goal for the year" aria-label={`Add to ${year}`} />
+          {addAreaChoice.picker}
         </form>
         {carried.length > 0 && <><div className="pv2-sect">Carried to {year + 1}</div><ul className="pv2-list">{carried.map(row)}</ul></>}
         {dropped.length > 0 && <>
@@ -163,20 +167,10 @@ function Inner() {
 
   return (
     <div className="pv2-page">
-      <header className="pv2-head">
-        <div className="pv2-numeral is-wide" aria-hidden="true">{year}</div>
-        <div className="min-w-0">
-          <div className="pv2-eyebrow">Year</div>
-          <h1 className="pv2-title">{year}
-            <span className="pv2-mnav">
-              <button type="button" onClick={() => goTo(year - 1)}>← {year - 1}</button>
-              <button type="button" onClick={() => goTo(year + 1)}>{year + 1} →</button>
-            </span>
-          </h1>
-          <p className="pv2-purpose">{meeting?.step === 1 ? `First, decide what happens to what’s left of ${year - 1}.` : inMeeting ? 'Write what this year is for.' : 'What we want this year.'}</p>
-        </div>
-        <div className="pv2-chrome">{chrome ? <HomeChromeControls className="flex" /> : <DomainSwitcher />}</div>
-      </header>
+      <MastheadCard variant="page" numeral={String(year)} title={`Jan – Dec ${year}`}
+        eyebrow={<PeriodNavEyebrow label="Year" onPrev={() => goTo(year - 1)} onNext={() => goTo(year + 1)} prevLabel={String(year - 1)} nextLabel={String(year + 1)} />}
+        subline={meeting?.step === 1 ? `First, decide what happens to what’s left of ${year - 1}.` : inMeeting ? 'Write what this year is for.' : undefined}
+        controls={chrome ? <HomeChromeControls className="flex" /> : <DomainSwitcher />} />
       {inMeeting ? (
         <div className="pv2-sbar" role="region" aria-label={`Year review, ${year}`}>
           <span className="pv2-st">Year review<small>{year}</small></span>
@@ -186,7 +180,9 @@ function Inner() {
               <button type="button" aria-current={meeting!.step === 2 ? 'step' : undefined} onClick={() => setMeeting({ ...meeting!, step: 2 })}><b>2</b>Write {year}</button>
             </div>
           ) : <span className="flex-1" />}
-          {meeting!.step === 2 && viewSwitch}
+          {/* With steps in the bar there is no room for the views too — the
+              review writes with the level above beside it anyway. */}
+          {meeting!.step === 2 && meeting!.candidateIds.length === 0 && viewSwitch}
           <button type="button" className="pv2-link pv2-quiet" onClick={() => void endMeeting(false)}>Leave for now</button>
           <button type="button" className="pv2-btn" onClick={() => void endMeeting(true)}>This is our {year} plan</button>
         </div>
@@ -202,7 +198,6 @@ function Inner() {
         </div>
       )}
       {body}
-      <p className="pv2-foot">New planning page · <button type="button" className="pv2-link pv2-quiet" onClick={() => { leavePlanV2(); window.location.assign(window.location.pathname) }}>Back to the current page</button></p>
     </div>
   )
 }

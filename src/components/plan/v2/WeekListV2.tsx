@@ -22,7 +22,7 @@ import { LineMenu, type LineActions, type LineVM } from './PlanLine'
 
 type Parent = { id: string; title: string; isGoal: boolean }
 
-export function WeekListV2({ title, lines, weekStart, members, actions, timingControl, onContext, onAdd, parentOf, onHoverParent, onShowParent, draftChild, onDraftChild, onCancelChild, dragEnabled = true, headerAction }: {
+export function WeekListV2({ title, lines, weekStart, members, actions, timingControl, onContext, onAdd, parentOf, onHoverParent, onShowParent, draftChild, onDraftChild, onCancelChild, dragEnabled = true, headerAction, addPicker }: {
   title: string
   lines: LineVM[]
   weekStart: Date
@@ -45,6 +45,8 @@ export function WeekListV2({ title, lines, weekStart, members, actions, timingCo
   dragEnabled?: boolean
   /** Drawn at the right of the heading (Add from paper). */
   headerAction?: ReactNode
+  /** The add row's life-area choice (AddArea). */
+  addPicker?: ReactNode
 }) {
   const [draft, setDraft] = useState('')
   const [showDone, setShowDone] = useState(false)
@@ -81,6 +83,7 @@ export function WeekListV2({ title, lines, weekStart, members, actions, timingCo
       <form className="pv2-write" onSubmit={(e) => { e.preventDefault(); const v = draft.trim(); if (v) { void onAdd(v); setDraft('') } }}>
         <span className="pv2-wl-check" aria-hidden="true" />
         <input value={draft} onChange={(e) => setDraft(e.target.value)} placeholder="Add something for this week" aria-label="Add to this week" />
+        {addPicker}
       </form>
     </section>
   )
@@ -122,7 +125,7 @@ function Card({ vm, actions, members, timingControl, onContext, parent, onHoverP
         {parent && (
           <button type="button" className="pv2-wl-parent" onClick={() => onShowParent?.(parent.id)}
             aria-label={`${parent.isGoal ? 'Step toward' : 'From'} ${parent.title} — show it in the month`}>
-            <CornerDownRight className="h-3 w-3" aria-hidden="true" />{parent.isGoal ? 'Step toward' : 'From'} “{parent.title}”
+            <CornerDownRight className="h-3 w-3 shrink-0" aria-hidden="true" /><span className="truncate">{parent.isGoal ? 'Step toward' : 'From'} “{parent.title}”</span>
           </button>
         )}
         <div className="pv2-wl-tools">
@@ -147,7 +150,7 @@ function DraftChild({ parent, onAdd, onCancel }: { parent: Parent; onAdd: (title
         <input autoFocus className="pv2-wl-draft" value={v} onChange={(e) => setV(e.target.value)}
           onKeyDown={(e) => { if (e.key === 'Escape') onCancel() }} onBlur={() => { if (!v.trim()) onCancel() }}
           placeholder={parent.isGoal ? 'Name the next step' : 'Name the step'} aria-label={`${parent.isGoal ? 'Next step toward' : 'Step of'} ${parent.title}`} />
-        <span className="pv2-wl-parent is-shown"><CornerDownRight className="h-3 w-3" aria-hidden="true" />{parent.isGoal ? 'Step toward' : 'From'} “{parent.title}” · Enter to add</span>
+        <span className="pv2-wl-parent is-shown"><CornerDownRight className="h-3 w-3 shrink-0" aria-hidden="true" /><span className="truncate">{parent.isGoal ? 'Step toward' : 'From'} “{parent.title}” · Enter to add</span></span>
       </div>
     </form>
   )

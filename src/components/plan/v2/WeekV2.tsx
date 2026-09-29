@@ -31,9 +31,9 @@ import { FocusDeck, CloseOut, type CloseDecision } from './FocusDeck'
 import { FromPaper } from './FromPaper'
 import { WeekListV2 } from './WeekListV2'
 import { WeekRefShelves } from './RefShelves'
+import { useAddArea } from './AddArea'
 import { makePlanActions, timingRemoval } from '@/lib/planning/planActions'
 import { useActionableInstances } from '@/hooks/useActionableInstances'
-import { useDomain } from '@/hooks/useDomain'
 import type { TaskContext } from '@/types/task'
 
 const DAY = 86_400_000
@@ -64,7 +64,7 @@ export function WeekV2({ tasks, weekStart, meId, isCurrent, days, onSelectTask, 
   const { toggleTask, updateTask, pushTask, updateTasksBulk, keepForward, dropCommitment, addTask } = useSupabaseTasks()
   const gated = useGatedTaskActions({ updateTask, pushTask, updateTasksBulk }, (id) => tasks.find((t) => t.id === id))
   const { members } = useFamilyMembers()
-  const { soleDomain } = useDomain()
+  const addArea = useAddArea()
   const { setPlanned, reschedule: rescheduleInstance } = useActionableInstances()
   const planActions = useMemo(() => makePlanActions({
     findTask: (id) => tasks.find((t) => t.id === id),
@@ -243,7 +243,8 @@ export function WeekV2({ tasks, weekStart, meId, isCurrent, days, onSelectTask, 
               <WeekListV2 title={isCurrent ? 'This week’s list' : `List for the week of ${weekStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`}
                 lines={lines} weekStart={weekStart} members={members} actions={actions} timingControl={timingControl}
                 onContext={(t, c: TaskContext | undefined) => { void gated.updateTask(t.id, { context: c }) }}
-                onAdd={async (title) => { await addTask(title, undefined, undefined, undefined, { bucket: 'week', weekStart, assignedTo: meId ?? undefined, context: soleDomain ?? undefined }) }}
+                onAdd={async (title) => { await addTask(title, undefined, undefined, undefined, { bucket: 'week', weekStart, assignedTo: meId ?? undefined, context: addArea.area }) }}
+                addPicker={addArea.picker}
                 parentOf={parentOf} onHoverParent={setLitParent} onShowParent={showParent}
                 draftChild={childOf ? { id: childOf.id, title: childOf.title, isGoal: !!childOf.isGoal } : null}
                 onDraftChild={(title) => { if (childOf) void addStep(childOf, title) }} onCancelChild={() => setChildOf(null)}
