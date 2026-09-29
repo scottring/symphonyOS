@@ -3274,3 +3274,5 @@ div.chooser-action-group { overflow: visible !important; }
 .pv2-line:hover > .pv2-line-parent, .pv2-line:focus-within > .pv2-line-parent, .pv2-line-parent.is-shown { display: flex; }
 .pv2-line.is-draft > .pv2-line-main { border: 1px dashed var(--color-primary-300); background: var(--color-bg-elevated); }
 .pv2-line-draft { flex: 1; min-width: 0; background: transparent; font-size: 15px; outline: none; padding: 1px 0; }
+/* The add row's area picker is a choice, not a warning: no "untagged" ring. */
+.pv2-addarea .tag-needs-context { animation: none; box-shadow: none; outline: none; background: none; }
