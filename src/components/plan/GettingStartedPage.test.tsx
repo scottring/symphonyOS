@@ -1,22 +1,72 @@
-// Scott asked for the "Somewhere to start" box OUT of the planning pages and
-// into an independent place (Codex, 2026-09-24).
-import { describe, it, expect, beforeEach } from 'vitest'
-import { render, screen, within } from '@testing-library/react'
-import { MemoryRouter } from 'react-router-dom'
+// Plan with guidance (/start): choose what to plan, then plan on the real
+// pages with the guide bar (onboarding suite, 2026-09-29).
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { MemoryRouter, Routes, Route, useLocation } from 'react-router-dom'
+import type { GuideState } from '@/lib/guide/guidedPlan'
+
+const guide = { state: null as GuideState | null, loaded: true, savedIn: 'account' as const, set: vi.fn(async () => {}) }
+vi.mock('@/hooks/useGuidedPlan', () => ({ useGuidedPlan: () => guide }))
+vi.mock('@/hooks/useSupabaseTasks', () => ({ useSupabaseTasks: () => ({ tasks: [] }) }))
+vi.mock('@/hooks/useFamilyMembers', () => ({ useFamilyMembers: () => ({ getCurrentUserMember: () => undefined }) }))
+vi.mock('@/lib/planFromPaperSignal', () => ({ requestPlanFromPaper: vi.fn(() => true) }))
+
 import { GettingStartedPage } from './GettingStartedPage'
 import { MORE_GROUPS } from '@/components/layout/moreDestinations'
+import { requestPlanFromPaper } from '@/lib/planFromPaperSignal'
 
-const show = () => render(<MemoryRouter><GettingStartedPage /></MemoryRouter>)
+function Where() { const l = useLocation(); return <p data-testid="where">{l.pathname}{l.search}</p> }
+const show = (at = '/start') => render(
+  <MemoryRouter initialEntries={[at]}>
+    <Routes><Route path="/start" element={<GettingStartedPage />} /><Route path="*" element={<Where />} /></Routes>
+  </MemoryRouter>,
+)
 
-describe('the Getting Started page', () => {
-  beforeEach(() => localStorage.clear())
+describe('Plan with guidance', () => {
+  beforeEach(() => { vi.useFakeTimers({ toFake: ['Date'] }); vi.setSystemTime(new Date(2026, 8, 29, 10)); guide.state = null; guide.set.mockClear(); localStorage.clear() })
+  afterEach(() => vi.useRealTimers())
 
-  it('carries the three optional entries', () => {
+  it('asks what to plan, with four paths and a way out', () => {
     show()
-    const doors = within(screen.getByLabelText('Somewhere to start'))
-    expect(doors.getByRole('heading', { name: 'Capture something now' })).toBeInTheDocument()
-    expect(doors.getByRole('heading', { name: 'Plan the next few weeks' })).toBeInTheDocument()
-    expect(doors.getByRole('heading', { name: 'Set a season or a year' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'What would you like to plan?' })).toBeTruthy()
+    for (const name of ['The bigger picture', 'The month ahead', 'This week', 'Just today']) expect(screen.getByText(name)).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Explore on my own' }))
+    expect(screen.getByTestId('where').textContent).toBe('/today')
+  })
+
+  it('month ahead on Sep 29 recommends October, then starts on October’s page', async () => {
+    show()
+    fireEvent.click(screen.getByRole('button', { name: 'Continue' }))
+    const october = screen.getByRole('radio', { name: /October 2026/ }) as HTMLInputElement
+    expect(october.checked).toBe(true)
+    expect(screen.getByRole('radio', { name: /September 2026/ })).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Start planning' }))
+    await waitFor(() => expect(screen.getByTestId('where').textContent).toBe('/month?start=2026-10-01'))
+    expect(guide.set).toHaveBeenCalledWith(expect.objectContaining({ route: 'month', steps: ['month', 'week', 'today'], status: 'active' }))
+  })
+
+  it('can start from a paper plan', async () => {
+    show()
+    fireEvent.click(screen.getByRole('button', { name: 'Continue' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Photograph a paper plan first' }))
+    await waitFor(() => expect(requestPlanFromPaper).toHaveBeenCalled())
+  })
+
+  it('offers Resume for a paused run', () => {
+    guide.state = { v: 1, route: 'week', steps: ['week', 'today'], periods: { week: '2026-09-26', today: '2026-09-29' }, current: 1, done: ['week'], status: 'paused', updatedAt: '' }
+    show()
+    expect(screen.getByText(/partway through/)).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Resume' }))
+    expect(screen.getByTestId('where').textContent).toBe('/today')
+  })
+
+  it('a finished run says what is ready and opens Today', () => {
+    guide.state = { v: 1, route: 'today', steps: ['today'], periods: { today: '2026-09-29' }, current: 0, done: ['today'], status: 'finished', updatedAt: '' }
+    show('/start?done=1')
+    expect(screen.getByRole('heading', { name: 'Your plan is ready' })).toBeTruthy()
+    expect(screen.getByText('Nothing chosen yet')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Open Today' }))
+    expect(screen.getByTestId('where').textContent).toBe('/today')
   })
 
   it('links to the planning guide', () => {
@@ -24,35 +74,8 @@ describe('the Getting Started page', () => {
     expect(screen.getByRole('link', { name: /Open the planning guide/ })).toHaveAttribute('href', '/guide')
   })
 
-  // An existing link must keep working.
-  it('preserves the first-week deep link', () => {
-    show()
-    expect(screen.getByRole('link', { name: /opens\s+on request/ })).toHaveAttribute('href', '/today?welcome=1')
-  })
-
-  it('says plainly that none of it is required', () => {
-    show()
-    expect(screen.getByText(/no right order and no first step you owe anyone/i)).toBeInTheDocument()
-  })
-
-  it('is where More sends "Getting started"', () => {
-    const entry = MORE_GROUPS.flatMap(([, items]) => items).find((d) => d.label === 'Getting started')
+  it('is where More → Plan with guidance goes', () => {
+    const entry = MORE_GROUPS.flatMap(([, items]) => items).find((d) => d.label === 'Plan with guidance')
     expect(entry?.route).toBe('/start')
-  })
-})
-
-// A dismissal made when the doors were an aside must not empty the page you
-// navigated to on purpose (seen live, 2026-09-24).
-describe('a previous dismissal', () => {
-  it('does not hide the content of this page', () => {
-    localStorage.setItem('symphony.planningEntryPaths.hidden', '1')
-    show()
-    expect(screen.getByLabelText('Somewhere to start')).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Show where to start' })).toBeNull()
-  })
-
-  it('offers no "Hide this" here — there is nothing to hide it from', () => {
-    show()
-    expect(screen.queryByRole('button', { name: 'Hide this' })).toBeNull()
   })
 })

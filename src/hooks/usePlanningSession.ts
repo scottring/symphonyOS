@@ -35,6 +35,8 @@ export function usePlanningSession(horizon: SessionHorizon, token: string) {
 
   const load = useCallback(async () => {
     const req = ++latest.current
+    // No period (the guide bar with nothing to guide): nothing to read.
+    if (!token) { setLoading(false); return }
     setLoading(true)
     setLoadedToken(null)
     setError(null)

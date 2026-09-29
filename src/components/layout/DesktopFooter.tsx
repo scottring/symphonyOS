@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { X } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
 import { DOMAINS } from '@/lib/domains'
 import { domainHotkeyLabel } from '@/lib/domainHotkey'
 
@@ -49,6 +50,7 @@ function FooterDialog({ title, onClose, children }: { title: string; onClose: ()
 export function DesktopFooter({ actionRef }: { actionRef: (node: HTMLDivElement | null) => void }) {
   const [open, setOpen] = useState<'shortcuts' | 'help' | null>(null)
   const close = () => setOpen(null)
+  const navigate = useNavigate()
   return <footer className="desktop-footer">
     <div className="desktop-footer-rule">
       <div ref={actionRef} className="desktop-footer-action" />
@@ -69,6 +71,11 @@ export function DesktopFooter({ actionRef }: { actionRef: (node: HTMLDivElement 
       <p>On Windows and Linux, use Ctrl in place of ⌘.</p>
     </FooterDialog>}
     {open === 'help' && <FooterDialog title="Help" onClose={close}>
+      <p className="desktop-footer-guide">
+        <strong>New here, or want a hand?</strong>{' '}
+        <button type="button" className="pv2-link" onClick={() => { close(); navigate('/start') }}>Plan with guidance</button>
+        {' '}walks you through the year, a month, a week or just today — on the real pages, and you can stop any time.
+      </p>
       <ul className="desktop-footer-help">
         <li><strong>Today</strong> holds what you have chosen to do today, with what you need to do it.</li>
         <li><strong>Week and Month</strong> open their pages, or pin their lists beside the page you are on.</li>

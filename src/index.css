@@ -3309,3 +3309,43 @@ div.chooser-action-group { overflow: visible !important; }
 .pv2-line-draft { flex: 1; min-width: 0; background: transparent; font-size: 15px; outline: none; padding: 1px 0; }
 /* The add row's area picker is a choice, not a warning: no "untagged" ring. */
 .pv2-addarea .tag-needs-context { animation: none; box-shadow: none; outline: none; background: none; }
+
+/* ── Guided planning (2026-09-29) ─────────────────────────────────────────
+   A quiet band above the ordinary page: the path, one question, how to move
+   on. Paused, one line on Today. */
+.guide-bar { display: flex; flex-direction: column; gap: 8px; margin: 0 0 22px; padding: 14px 18px; border-radius: 14px; background: var(--color-primary-50); border: 1px solid var(--color-primary-100); }
+.guide-path { display: flex; flex-wrap: wrap; gap: 4px 14px; margin: 0; padding: 0; list-style: none; font-size: 12px; color: var(--color-neutral-500); }
+.guide-path li.is-on { color: var(--color-primary-700); font-weight: 600; }
+.guide-path li.is-done { color: var(--color-sage-600); }
+.guide-q { margin: 0; font-family: var(--font-family-display); font-size: 1.45rem; font-weight: 500; line-height: 1.2; color: var(--color-neutral-900); text-wrap: balance; }
+.guide-why { margin: 0; max-width: 68ch; font-size: 13.5px; line-height: 1.5; color: var(--color-neutral-600); }
+.guide-acts { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; margin-top: 2px; }
+.guide-pause { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; margin: 0 0 16px; padding: 10px 14px; border: 1px dashed var(--color-neutral-300, #d4d4d1); border-radius: 12px; font-size: 13.5px; color: var(--color-neutral-600); }
+.guide-pause b { color: var(--color-neutral-900); font-weight: 600; }
+@media (max-width: 640px) {
+  .guide-bar { margin: 0 12px 16px; padding: 12px 14px; }
+  .guide-q { font-size: 1.2rem; }
+  .guide-pause { margin: 0 12px 12px; }
+  .guide-acts .pv2-btn { width: 100%; justify-content: center; }
+}
+/* Plan with guidance: the path choices and the finish summary. */
+.guide-choices { display: flex; flex-direction: column; margin: 8px 0 14px; border-top: 1px solid var(--color-neutral-200); }
+.guide-choice { display: grid; grid-template-columns: 22px 1fr; column-gap: 12px; row-gap: 2px; padding: 12px 8px; border-bottom: 1px solid var(--color-neutral-200); cursor: pointer; }
+.guide-choice input { grid-row: span 3; margin-top: 4px; accent-color: var(--color-primary-600); width: 16px; height: 16px; }
+.guide-choice.is-selected { background: var(--color-primary-50); }
+.guide-choice-title { font-weight: 600; color: var(--color-neutral-900); }
+.guide-choice-body { font-size: 13.5px; color: var(--color-neutral-600); }
+.guide-choice-path { font-size: 12px; color: var(--color-neutral-500); }
+.guide-choice:focus-within { outline: 2px solid var(--color-primary-500); outline-offset: -2px; }
+.guide-example { margin: 0 0 16px; padding-left: 12px; border-left: 2px solid var(--color-neutral-200); font-size: 13.5px; color: var(--color-neutral-600); }
+.guide-example summary { cursor: pointer; color: var(--color-primary-700); }
+.guide-example ol { margin: 6px 0; padding-left: 18px; }
+.guide-finish { display: flex; flex-direction: column; gap: 12px; margin-bottom: 24px; }
+.guide-summary { display: grid; gap: 8px; margin: 0; }
+.guide-summary > div { display: grid; grid-template-columns: minmax(90px, 160px) 1fr; gap: 12px; padding-bottom: 8px; border-bottom: 1px solid var(--color-neutral-100); font-size: 14px; }
+.guide-summary dt { color: var(--color-neutral-500); }
+.guide-summary dd { margin: 0; color: var(--color-neutral-900); min-width: 0; }
+.guide-slot:empty { display: none; }
+.guide-slot { padding: 12px 0 0; }
+@media (min-width: 768px) { .guide-slot { padding: 16px 40px 0; max-width: 1152px; } }
+@media (min-width: 1024px) { .guide-slot { padding: 16px 56px 0; } }
