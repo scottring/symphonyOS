@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { ChevronDown, ChevronRight, Check, SkipForward, Clock, MoreHorizontal, EyeOff, Pencil, CalendarOff } from 'lucide-react'
 import type { TimelineItem, CollectionDose } from '@/types/timeline'
+import { TaskCheckbox } from './TaskCheckbox'
 
 interface Props {
   item: TimelineItem // type === 'routine-collection'
@@ -53,6 +54,19 @@ export function RoutineCollectionRow({ item, onSelect, onSelectStep, onCompleteS
   // other row rather than trailing the title.
   const gutterLabel = nextUp?.time ? fmt(nextUp.time) : item.startTime ? fmtAt(new Date(item.startTime)) : ''
 
+  const groups = item.collectionSteps ?? []
+  const doses = groups.flatMap(g => g.doses)
+  // Something to open: more than one step, or one step that is not simply
+  // the block again under its own name.
+  const expandable = groups.length > 1 || (groups.length === 1 && (groups[0].doses.length > 1 || groups[0].name.trim().toLowerCase() !== item.title.trim().toLowerCase()))
+  const allDone = item.completed || (doses.length > 0 && doses.every(d => d.completed || d.skipped) && doses.some(d => d.completed))
+  const openDoses = doses.filter(d => !d.completed && !d.skipped)
+  const toggleAll = () => {
+    if (allDone) { for (const d of doses) if (d.completed) onCompleteStep(d.id, false); return }
+    // Leave explicitly-skipped doses alone; complete the rest.
+    for (const d of openDoses) onCompleteStep(d.id, true)
+  }
+
   /** A dose whose slot time has passed and is still unresolved. */
   const isPastDue = (dose: CollectionDose): boolean => {
     if (!dose.time || dose.completed || dose.skipped) return false
@@ -91,8 +105,7 @@ export function RoutineCollectionRow({ item, onSelect, onSelectStep, onCompleteS
     <div className="group rounded-xl border border-transparent px-3 py-2 md:py-1 transition-all duration-200 hover:bg-primary-50/50 hover:border-primary-100">
       {/* Collapsed: a plain agenda row, not a card. The column widths mirror
           ScheduleItem (pl-5 bulk gutter, w-16 time, w-5 control) so a routine
-          lines up with the tasks and events around it; the chevron sits where
-          their check circle does and is the only affordance saying "expands". */}
+          lines up with the tasks and events around it. */}
       <div className="flex items-center gap-3 pl-5 min-w-0">
         {/* The same column classes a task row uses, so "For today" (which
             hides the time column) drops it here too — without them the block
@@ -101,35 +114,50 @@ export function RoutineCollectionRow({ item, onSelect, onSelectStep, onCompleteS
         <div className={`${gutterLabel ? 'schedule-time-column' : 'schedule-empty-time'} w-16 shrink-0 text-xs font-medium tabular-nums text-neutral-500`}>
           {gutterLabel || <span className="text-neutral-300">—</span>}
         </div>
-        <button
-          onClick={() => setOpen(o => !o)}
-          aria-expanded={open}
-          aria-label={open ? `Collapse ${item.title}` : `Expand ${item.title}`}
-          className="w-5 shrink-0 flex items-center justify-center text-neutral-400 hover:text-neutral-600 transition-colors"
-        >
-          {open ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
-        </button>
+        {/* The block's own check circle, in the column every task's circle
+            sits in (Scott, 2026-09-28): a tap completes every open step, and
+            a done block taps back to open. */}
+        <div className="w-5 shrink-0 flex items-center justify-center">
+          <TaskCheckbox
+            completed={allDone}
+            onToggleComplete={toggleAll}
+            onToggleWaiting={() => {}}
+            shape="circle"
+            label={allDone ? `Mark ${item.title} not done` : `Mark all of ${item.title} done`}
+          />
+        </div>
         {/* Inline padding: a phone-wide rule pads every button 25px a side for
             touch, which left this name 42px of its 93px column (2026-09-21).
             The row itself is the target; the name needs no padding. */}
-        <button onClick={() => setOpen(o => !o)} className="flex-1 min-w-0 py-1.5 text-left" style={{ paddingLeft: 0, paddingRight: 0 }}>
+        <button
+          onClick={() => (expandable ? setOpen(o => !o) : onSelect())}
+          {...(expandable ? { 'aria-expanded': open } : {})}
+          className="flex-1 min-w-0 py-1.5 text-left"
+          style={{ paddingLeft: 0, paddingRight: 0 }}
+        >
           {/* The name takes the room that is left, rather than half of it: at
-              390px the time gutter, chevron and action rail leave ~93px, and
-              `max-w-[50%]` rendered "Kids Bedtime routine" as "K.." (2026-09-19). */}
-          <span className="min-w-0 line-clamp-2 break-words text-[16px] leading-snug font-medium text-neutral-800">{item.title}</span>
-          {/* One muted line under the name, the same place every other row
-              keeps its context: how many steps, and the next one. The
-              progress fraction used to sit at the far end of the row with the
-              next step trailing it — read as two more labels competing with
-              the name (2026-09-21). */}
-          <span className="block truncate text-[12px] leading-tight text-neutral-500 mt-0.5">
-            {p.total} {p.total === 1 ? 'step' : 'steps'}
-            {item.completed
-              ? ' · done'
-              : p.done > 0
-                ? ` · ${p.done} done${nextUp ? ` · next: ${nextUp.stepName}` : ''}`
-                : nextUp ? ` · next: ${nextUp.stepName}` : ''}
+              390px the time gutter, circle and action rail leave ~93px, and
+              `max-w-[50%]` rendered "Kids Bedtime routine" as "K.." (2026-09-19).
+              The chevron trails the name, and only when there are steps to
+              show — a block whose one step is itself has nothing to open. */}
+          <span className={`min-w-0 line-clamp-2 break-words text-[16px] leading-snug font-medium ${allDone ? 'text-neutral-400 line-through' : 'text-neutral-800'}`}>
+            {item.title}
+            {expandable && (open
+              ? <ChevronDown aria-hidden className="inline-block w-4 h-4 ml-1 -mt-0.5 text-neutral-400" />
+              : <ChevronRight aria-hidden className="inline-block w-4 h-4 ml-1 -mt-0.5 text-neutral-400" />)}
           </span>
+          {/* One muted line under the name, the same place every other row
+              keeps its context: how many steps, and the next one. */}
+          {expandable && (
+            <span className="block truncate text-[12px] leading-tight text-neutral-500 mt-0.5">
+              {p.total} {p.total === 1 ? 'step' : 'steps'}
+              {item.completed
+                ? ' · done'
+                : p.done > 0
+                  ? ` · ${p.done} done${nextUp ? ` · next: ${nextUp.stepName}` : ''}`
+                  : nextUp ? ` · next: ${nextUp.stepName}` : ''}
+            </span>
+          )}
         </button>
         {/* Management menu: hide-for-today / edit / archive, mirroring task
             rows — and like theirs, quiet until you reach for it on desktop. */}
@@ -165,6 +193,15 @@ export function RoutineCollectionRow({ item, onSelect, onSelectStep, onCompleteS
                 >
                   <Pencil className="w-4 h-4 text-neutral-400" /> Edit routine
                 </button>
+                {onSkipStep && !allDone && openDoses.length > 0 && (
+                  <button
+                    role="menuitem"
+                    onClick={() => { for (const d of openDoses) onSkipStep(d.id); setMgmtOpen(false) }}
+                    className="w-full flex items-center gap-2 px-3 py-1.5 text-left text-sm text-neutral-700 hover:bg-neutral-50"
+                  >
+                    <SkipForward className="w-4 h-4 text-neutral-400" /> Skip the rest today
+                  </button>
+                )}
                 {onRemove && (
                   <button
                     role="menuitem"
@@ -179,175 +216,149 @@ export function RoutineCollectionRow({ item, onSelect, onSelectStep, onCompleteS
           )}
         </div>
       </div>
-      {/* Expanded steps hang off the title column (ml-32 = pl-5 + w-16 + gap-3
-          + w-5 + gap-3) with a hairline rail, so they read as nested under the
-          routine without reintroducing a card. */}
-      {open && (
-        <div className="ml-32 border-l border-neutral-200 pl-3 py-1 space-y-2.5">
-          {/* Bulk resolve: complete or skip every remaining dose in one tap. */}
-          {!item.completed && (item.collectionSteps ?? []).some(g => g.doses.some(d => !d.completed && !d.skipped)) && (
-            <div className="flex justify-end gap-3">
-              {onSkipStep && (
-                <button
-                  onClick={() => {
-                    for (const g of item.collectionSteps ?? []) {
-                      for (const d of g.doses) {
-                        if (!d.completed && !d.skipped) onSkipStep(d.id)
-                      }
-                    }
-                  }}
-                  className="text-xs text-neutral-400 hover:text-neutral-600"
-                >
-                  Skip all
-                </button>
-              )}
-              <button
-                onClick={() => {
-                  for (const g of item.collectionSteps ?? []) {
-                    for (const d of g.doses) {
-                      // Leave explicitly-skipped doses alone; complete the rest.
-                      if (!d.completed && !d.skipped) onCompleteStep(d.id, true)
-                    }
-                  }
-                }}
-                className="text-xs text-primary-600 hover:text-primary-700"
-              >
-                Mark all done
-              </button>
-            </div>
-          )}
-          {/* One row per exercise; its doses are tappable. A timed dose is a
-              pill showing its time (filled = done); an untimed ("anytime")
-              dose is the standard check circle instead, since it has no time
-              to show and a text pill didn't read as tappable. */}
-          {(item.collectionSteps ?? []).map(group => {
+      {/* Expanded steps start under the name (Scott, 2026-09-28: the old
+          list sat a card's width to the right and a bulk-action line below
+          the name). The spacers mirror the header's columns, so For today —
+          which hides the time column — lines them up too. Each step is one
+          line: an untimed step's circle leads it like a task's; timed doses
+          trail the name as pills. Completing or skipping everything lives on
+          the block's own circle and its ⋯ menu. */}
+      {open && expandable && (
+        <div className="flex gap-3 pl-5">
+          <div className="schedule-empty-time w-16 shrink-0" />
+          <div className="w-5 shrink-0" />
+          <ul className="flex-1 min-w-0 space-y-1.5 pb-1.5">
+          {groups.map(group => {
             const stepDone = group.progress.done === group.progress.total && group.progress.total > 0
-            return (
-              <div key={group.stepId}>
-                <div className="flex items-center justify-between gap-2">
-                  <button
-                    type="button"
-                    className={`min-w-0 text-left text-[15px] leading-snug truncate cursor-pointer ${stepDone ? 'text-neutral-400' : 'text-neutral-700'}`}
-                    onClick={() => onSelectStep(`routine-${group.stepId}`)}
-                  >
-                    {group.name}
-                  </button>
-                  <span className="text-xs text-neutral-400 flex-none">{group.progress.done}/{group.progress.total}</span>
-                </div>
-                <div className="flex flex-wrap gap-1 mt-1">
+            const untimedOnly = group.doses.every(d => !d.time)
+            const doseControls = (
+              <span className="flex flex-wrap items-center gap-1 shrink-0">
                   {group.doses.map(dose => {
-                    const pastDue = isPastDue(dose)
-                    const untimed = !dose.time
-                    const label = dose.completed
-                      ? `Uncomplete ${group.name}${dose.time ? ` at ${fmt(dose.time)}` : ''}`
-                      : dose.skipped
-                      ? `Unskip ${group.name}${dose.time ? ` at ${fmt(dose.time)}` : ''}`
-                      : pastDue
-                      ? `Resolve missed ${group.name}${dose.time ? ` at ${fmt(dose.time)}` : ''}`
-                      : `Complete ${group.name}${dose.time ? ` at ${fmt(dose.time)}` : ''}`
-                    return (
-                      <span key={dose.id} className="relative">
-                        {untimed ? (
-                          // Untimed dose: no time to show, so render the app's
-                          // standard check circle (same shape/size/border
-                          // language as TaskCheckbox) instead of a text pill —
-                          // an "anytime" pill didn't read as tappable. Colors
-                          // are the same ones the pill already used per state,
-                          // just carried by a circle instead of pill text.
-                          <button
-                            onClick={() => handleDoseClick(dose)}
-                            aria-label={label}
-                            className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors ${
-                              dose.completed
-                                ? 'bg-primary-500 border-primary-500 text-white'
-                                : dose.skipped
-                                ? 'bg-neutral-100 border-neutral-300 text-neutral-400'
-                                : pastDue
-                                ? 'bg-amber-50 border-amber-300 text-amber-700 hover:border-amber-400'
-                                : 'bg-bg-base border-neutral-300 hover:border-primary-400'
-                            }`}
-                          >
-                            {dose.completed ? (
-                              <Check className="w-3 h-3" strokeWidth={3} />
-                            ) : dose.skipped ? (
-                              <SkipForward className="w-2.5 h-2.5" />
-                            ) : null}
-                          </button>
-                        ) : (
-                          <button
-                            onClick={() => handleDoseClick(dose)}
-                            aria-label={label}
-                            className={`px-2 py-0.5 rounded-full text-xs border transition-colors ${
-                              dose.completed
-                                ? 'bg-primary-600 border-primary-600 text-white'
-                                : dose.skipped
-                                ? 'bg-neutral-100 border-neutral-200 text-neutral-400 line-through'
-                                : pastDue
-                                ? 'bg-amber-50 border-amber-300 text-amber-700 hover:border-amber-400'
-                                : 'bg-bg-base border-neutral-300 text-neutral-600 hover:border-primary-300'
-                            }`}
-                          >
-                            {fmtShort(dose.time)}
-                          </button>
-                        )}
+                  const pastDue = isPastDue(dose)
+                  const untimed = !dose.time
+                  const label = dose.completed
+                    ? `Uncomplete ${group.name}${dose.time ? ` at ${fmt(dose.time)}` : ''}`
+                    : dose.skipped
+                    ? `Unskip ${group.name}${dose.time ? ` at ${fmt(dose.time)}` : ''}`
+                    : pastDue
+                    ? `Resolve missed ${group.name}${dose.time ? ` at ${fmt(dose.time)}` : ''}`
+                    : `Complete ${group.name}${dose.time ? ` at ${fmt(dose.time)}` : ''}`
+                  return (
+                    <span key={dose.id} className="relative">
+                      {untimed ? (
+                        // Untimed dose: no time to show, so render the app's
+                        // standard check circle (same shape/size/border
+                        // language as TaskCheckbox) instead of a text pill —
+                        // an "anytime" pill didn't read as tappable. Colors
+                        // are the same ones the pill already used per state,
+                        // just carried by a circle instead of pill text.
+                        <button
+                          onClick={() => handleDoseClick(dose)}
+                          aria-label={label}
+                          className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors ${
+                            dose.completed
+                              ? 'bg-primary-500 border-primary-500 text-white'
+                              : dose.skipped
+                              ? 'bg-neutral-100 border-neutral-300 text-neutral-400'
+                              : pastDue
+                              ? 'bg-amber-50 border-amber-300 text-amber-700 hover:border-amber-400'
+                              : 'bg-bg-base border-neutral-300 hover:border-primary-400'
+                          }`}
+                        >
+                          {dose.completed ? (
+                            <Check className="w-3 h-3" strokeWidth={3} />
+                          ) : dose.skipped ? (
+                            <SkipForward className="w-2.5 h-2.5" />
+                          ) : null}
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => handleDoseClick(dose)}
+                          aria-label={label}
+                          className={`px-2 py-0.5 rounded-full text-xs border transition-colors ${
+                            dose.completed
+                              ? 'bg-primary-600 border-primary-600 text-white'
+                              : dose.skipped
+                              ? 'bg-neutral-100 border-neutral-200 text-neutral-400 line-through'
+                              : pastDue
+                              ? 'bg-amber-50 border-amber-300 text-amber-700 hover:border-amber-400'
+                              : 'bg-bg-base border-neutral-300 text-neutral-600 hover:border-primary-300'
+                          }`}
+                        >
+                          {fmtShort(dose.time)}
+                        </button>
+                      )}
 
-                        {menuDoseId === dose.id && (
-                          <>
-                            {/* Click-away backdrop */}
-                            <span
-                              className="fixed inset-0 z-10"
-                              aria-hidden
-                              onClick={() => setMenuDoseId(null)}
-                            />
-                            <span
-                              role="menu"
-                              aria-label={`Missed ${group.name} options`}
-                              className="absolute z-20 top-full left-0 mt-1 w-48 rounded-xl border border-neutral-200 bg-white shadow-lg p-1.5 flex flex-col gap-0.5"
-                              onClick={(e) => e.stopPropagation()}
+                      {menuDoseId === dose.id && (
+                        <>
+                          {/* Click-away backdrop */}
+                          <span
+                            className="fixed inset-0 z-10"
+                            aria-hidden
+                            onClick={() => setMenuDoseId(null)}
+                          />
+                          <span
+                            role="menu"
+                            aria-label={`Missed ${group.name} options`}
+                            className="absolute z-20 top-full left-0 mt-1 w-48 rounded-xl border border-neutral-200 bg-white shadow-lg p-1.5 flex flex-col gap-0.5"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <button
+                              onClick={() => { onCompleteStep(dose.id, true); setMenuDoseId(null) }}
+                              className="flex items-center gap-2 w-full text-left px-2.5 py-1.5 rounded-lg text-[13px] text-neutral-700 hover:bg-neutral-50"
                             >
-                              <button
-                                onClick={() => { onCompleteStep(dose.id, true); setMenuDoseId(null) }}
-                                className="flex items-center gap-2 w-full text-left px-2.5 py-1.5 rounded-lg text-[13px] text-neutral-700 hover:bg-neutral-50"
-                              >
-                                <Check className="w-3.5 h-3.5 text-primary-600" /> Done now
-                              </button>
-                              {onCompleteStepAt && (
-                                <span className="flex items-center gap-1.5 px-2.5 py-1">
-                                  <Clock className="w-3.5 h-3.5 text-neutral-400 shrink-0" />
-                                  <input
-                                    type="time"
-                                    value={menuTime}
-                                    onChange={(e) => setMenuTime(e.target.value)}
-                                    aria-label="Time you did it"
-                                    className="flex-1 min-w-0 text-[12px] rounded-md border border-neutral-200 px-1.5 py-0.5 text-neutral-700"
-                                  />
-                                  <button
-                                    disabled={!menuTime}
-                                    onClick={() => { onCompleteStepAt(dose.id, dateAtTime(menuTime)); setMenuDoseId(null) }}
-                                    className="text-[12px] font-medium text-primary-600 hover:text-primary-700 disabled:opacity-40"
-                                  >
-                                    Did then
-                                  </button>
-                                </span>
-                              )}
-                              {onSkipStep && (
+                              <Check className="w-3.5 h-3.5 text-primary-600" /> Done now
+                            </button>
+                            {onCompleteStepAt && (
+                              <span className="flex items-center gap-1.5 px-2.5 py-1">
+                                <Clock className="w-3.5 h-3.5 text-neutral-400 shrink-0" />
+                                <input
+                                  type="time"
+                                  value={menuTime}
+                                  onChange={(e) => setMenuTime(e.target.value)}
+                                  aria-label="Time you did it"
+                                  className="flex-1 min-w-0 text-[12px] rounded-md border border-neutral-200 px-1.5 py-0.5 text-neutral-700"
+                                />
                                 <button
-                                  onClick={() => { onSkipStep(dose.id); setMenuDoseId(null) }}
-                                  className="flex items-center gap-2 w-full text-left px-2.5 py-1.5 rounded-lg text-[13px] text-neutral-500 hover:bg-neutral-50"
+                                  disabled={!menuTime}
+                                  onClick={() => { onCompleteStepAt(dose.id, dateAtTime(menuTime)); setMenuDoseId(null) }}
+                                  className="text-[12px] font-medium text-primary-600 hover:text-primary-700 disabled:opacity-40"
                                 >
-                                  <SkipForward className="w-3.5 h-3.5 text-neutral-400" /> Skip this one
+                                  Did then
                                 </button>
-                              )}
-                            </span>
-                          </>
-                        )}
-                      </span>
-                    )
-                  })}
-                </div>
-              </div>
+                              </span>
+                            )}
+                            {onSkipStep && (
+                              <button
+                                onClick={() => { onSkipStep(dose.id); setMenuDoseId(null) }}
+                                className="flex items-center gap-2 w-full text-left px-2.5 py-1.5 rounded-lg text-[13px] text-neutral-500 hover:bg-neutral-50"
+                              >
+                                <SkipForward className="w-3.5 h-3.5 text-neutral-400" /> Skip this one
+                              </button>
+                            )}
+                          </span>
+                        </>
+                      )}
+                    </span>
+                  )
+                })}
+              </span>
+            )
+            return (
+              <li key={group.stepId} className="flex items-center gap-2.5 min-w-0">
+                {untimedOnly && doseControls}
+                <button
+                  type="button"
+                  className={`min-w-0 text-left text-[15px] leading-snug truncate cursor-pointer ${stepDone ? 'text-neutral-400 line-through' : 'text-neutral-700'}`}
+                  onClick={() => onSelectStep(`routine-${group.stepId}`)}
+                >
+                  {group.name}
+                </button>
+                {!untimedOnly && doseControls}
+              </li>
             )
           })}
+          </ul>
         </div>
       )}
     </div>

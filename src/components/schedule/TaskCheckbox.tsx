@@ -13,6 +13,9 @@ interface TaskCheckboxProps {
    *  circle, whatever the item is. Unset keeps the older square-for-tasks
    *  shape the Inbox still draws. */
   shape?: 'circle' | 'square'
+  /** Overrides the default accessible name (a routine block says what a tap
+   *  does to its steps). */
+  label?: string
 }
 
 export const TaskCheckbox = memo(function TaskCheckbox({
@@ -24,6 +27,7 @@ export const TaskCheckbox = memo(function TaskCheckbox({
   contextColor,
   className = '',
   shape,
+  label: labelOverride,
 }: TaskCheckboxProps) {
   const round = shape ? shape === 'circle' : !!isRoutine
   const { pressing, handlers } = useLongPress({
@@ -32,11 +36,11 @@ export const TaskCheckbox = memo(function TaskCheckbox({
     onPress: onToggleComplete,
   })
 
-  const label = completed
+  const label = labelOverride ?? (completed
     ? 'Mark incomplete'
     : isWaiting
       ? 'Waiting — tap to complete, hold to cancel'
-      : 'Mark complete (hold to mark waiting)'
+      : 'Mark complete (hold to mark waiting)')
 
   return (
     <button
