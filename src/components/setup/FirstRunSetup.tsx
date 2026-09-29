@@ -106,7 +106,8 @@ export function FirstRunSetup({ user, onDone }: Props) {
 
         <div className="card p-8">
           <h2 className="font-display text-xl font-medium text-neutral-800 mb-1 text-center">Set up your household</h2>
-          <p className="text-sm text-neutral-500 mb-6 text-center">Two minutes. Everything here can be changed in Settings.</p>
+          <p className="text-sm text-neutral-500 mb-2 text-center">Two minutes. Everything here can be changed in Settings.</p>
+          <p className="text-xs text-neutral-500 mb-6 text-center">Invited by someone? Open their invitation link again to join their household instead of starting a new one.</p>
 
           <form onSubmit={handleSubmit} className="space-y-6">
             <div className="space-y-2">

@@ -41,4 +41,28 @@ describe('FirstRunGate', () => {
     render(<FirstRunGate user={user}><div>APP</div></FirstRunGate>)
     expect(await screen.findByText('APP')).toBeInTheDocument()
   })
+
+  // Clarity audit 2026-09-29: an invited partner who signed up was sent to
+  // setup and made a second household.
+  it('sends a fresh account with a pending invitation back to it, not to setup', async () => {
+    h.signals.mockResolvedValue({ completed: false, hasTasks: false, memberCount: 1 })
+    localStorage.setItem('symphony.pendingJoin', JSON.stringify({ token: 'tok-9', at: Date.now() }))
+    const replace = vi.fn()
+    const loc = window.location
+    Object.defineProperty(window, 'location', { configurable: true, value: { ...loc, replace } })
+    try {
+      render(<FirstRunGate user={user}><div>APP</div></FirstRunGate>)
+      await vi.waitFor(() => expect(replace).toHaveBeenCalledWith('/join/tok-9'))
+      expect(screen.queryByText('SETUP SCREEN')).not.toBeInTheDocument()
+    } finally {
+      Object.defineProperty(window, 'location', { configurable: true, value: loc })
+    }
+  })
+
+  it('ignores an invitation older than a week', async () => {
+    h.signals.mockResolvedValue({ completed: false, hasTasks: false, memberCount: 1 })
+    localStorage.setItem('symphony.pendingJoin', JSON.stringify({ token: 'old', at: Date.now() - 8 * 86400000 }))
+    render(<FirstRunGate user={user}><div>APP</div></FirstRunGate>)
+    expect(await screen.findByText('SETUP SCREEN')).toBeInTheDocument()
+  })
 })

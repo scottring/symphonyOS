@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
-import { MemoryRouter, Route, Routes } from 'react-router-dom'
+import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
 
 // The invitee joined the household but was never linked to their existing
 // family_members row (demo run 2026-09-06). The join page now shows who
@@ -99,3 +99,37 @@ describe('JoinHousehold preview', () => {
     await waitFor(() => expect(mocks.acceptInvitation).toHaveBeenCalledWith('tok', null))
   })
 })
+
+// Clarity audit 2026-09-29: "Sign in to continue" stashed the token where
+// nothing read it, so a new partner ended up in setup making a 2nd household.
+describe('JoinHousehold signed out', () => {
+  it('"Sign in to continue" remembers the invitation and returns here after sign-in', async () => {
+    localStorage.clear()
+    mocks.getAuthUser.mockResolvedValue({ data: { user: null } })
+    mocks.getInvitationPreview.mockResolvedValue(null)
+    render(
+      <MemoryRouter initialEntries={['/join/tok']}>
+        <Routes>
+          <Route path="/join/:token" element={<JoinHousehold />} />
+          <Route path="/" element={<ReturnTo />} />
+        </Routes>
+      </MemoryRouter>,
+    )
+    fireEvent.click(await screen.findByRole('button', { name: 'Sign in to continue' }))
+    expect(await screen.findByTestId('return')).toHaveTextContent('/join/tok')
+    expect(JSON.parse(localStorage.getItem('symphony.pendingJoin')!).token).toBe('tok')
+  })
+
+  it('joining clears the remembered invitation', async () => {
+    localStorage.setItem('symphony.pendingJoin', JSON.stringify({ token: 'tok', at: Date.now() }))
+    mocks.getInvitationPreview.mockResolvedValue(null)
+    renderJoin()
+    fireEvent.click(await screen.findByRole('button', { name: /Join/ }))
+    await waitFor(() => expect(localStorage.getItem('symphony.pendingJoin')).toBeNull())
+  })
+})
+
+function ReturnTo() {
+  const params = new URLSearchParams(useLocation().search)
+  return <p data-testid="return">{params.get('return')}</p>
+}
