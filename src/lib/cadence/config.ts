@@ -9,8 +9,14 @@
 import { useState, useEffect, useCallback } from 'react'
 import { readSeasons, isSeasonBoundary, seasonToken as configuredSeasonToken } from '@/lib/cadence/seasons'
 
-/** 0 = Sunday (default), 1 = Monday. The two starts Scott asked to support. */
-export type WeekStart = 0 | 1
+/** 0 = Sunday (default), 1 = Monday, 6 = Saturday — for a household that
+ *  plans on Friday for the week ahead, weekend first (Scott, 2026-09-29).
+ *  A household setting (households.week_starts_on), mirrored here. */
+export type WeekStart = 0 | 1 | 6
+
+export function isWeekStart(v: unknown): v is WeekStart {
+  return v === 0 || v === 1 || v === 6
+}
 
 export interface CadenceConfig {
   /** Which day the planning week begins on. Default Sunday. */
@@ -36,7 +42,8 @@ export function readCadenceConfig(): CadenceConfig {
     if (!raw) return DEFAULT_CADENCE
     const parsed = JSON.parse(raw) as Partial<CadenceConfig>
     // Merge over defaults so a partial/old payload never yields undefined fields.
-    return { ...DEFAULT_CADENCE, ...parsed }
+    const merged = { ...DEFAULT_CADENCE, ...parsed }
+    return isWeekStart(merged.weekStartsOn) ? merged : { ...merged, weekStartsOn: 0 }
   } catch {
     return DEFAULT_CADENCE
   }
@@ -159,6 +166,13 @@ export function readDismissedNudgeToken(): string | null {
 export function dismissNudgeForToken(token: string): void {
   try { localStorage.setItem(NUDGE_DISMISS_KEY, token) } catch { /* ignore */ }
   try { window.dispatchEvent(new Event(NUDGE_DISMISS_EVENT)) } catch { /* ignore */ }
+}
+
+/** Mirror the household's week start into this device's config, and tell
+ *  every open reader (useCadenceConfig) it changed. */
+export function applyWeekStart(weekStartsOn: WeekStart): void {
+  writeCadenceConfig({ ...readCadenceConfig(), weekStartsOn })
+  try { window.dispatchEvent(new Event(SYNC_EVENT)) } catch { /* no window in tests */ }
 }
 
 /** Shared hook: read + update the cadence config, synced across consumers/tabs. */

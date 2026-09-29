@@ -21,6 +21,7 @@ import { ChatPanel } from '@/components/chat/ChatPanel';
 import { NotesProvider } from '@/contexts/NotesContext';
 import { ListsProvider } from '@/contexts/ListsContext';
 import { PinsProvider } from '@/contexts/PinsContext';
+import { useHouseholdWeekStart } from '@/hooks/useHouseholdWeekStart';
 import { useAuth } from '@/hooks/useAuth';
 import { setCurrentAccount } from '@/lib/currentAccount';
 import { useMobile } from '@/hooks/useMobile';
@@ -133,6 +134,9 @@ function ShellLayoutInner({ children }: Props) {
   // day tiles — key their data on who is signed in. The shell is the one
   // place that knows, once.
   useEffect(() => { setCurrentAccount(user?.id ?? null); }, [user?.id]);
+  // The household's week start (Saturday for a Friday planning session), for
+  // every device in it — read once here, mirrored into the cadence config.
+  useHouseholdWeekStart();
 
   const [desktopControls, setDesktopControls] = useState<HTMLDivElement | null>(null);
   const [mobilePlanControls, setMobilePlanControls] = useState<HTMLDivElement | null>(null);
