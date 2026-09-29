@@ -195,10 +195,11 @@ function Inner() {
           <div className="pv2-status">
             {session.saved
               ? <><span className="pv2-seal" aria-hidden="true" /><span><b>Our {year} plan</b> · agreed {shortDay(session.saved.at)} · {agreedBy}</span></>
-              : <span className="pv2-hint">{session.loading ? '' : `No ${year} plan yet`}</span>}
+              : (session.loading ? null : <span className="pv2-noplan"><span className="pv2-hint">{`No ${year} plan yet`}</span>
+                <button type="button" className="pv2-link" onClick={startMeeting}>Plan your year →</button></span>)}
           </div>
           {viewSwitch}
-          <button type="button" className={reviewDue ? 'pv2-btn' : 'pv2-qbtn'} onClick={startMeeting}>Year review</button>
+          <button type="button" className={session.saved && reviewDue ? 'pv2-btn' : 'pv2-qbtn'} onClick={startMeeting}>Year review</button>
         </div>
       )}
       {body}

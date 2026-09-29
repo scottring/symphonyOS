@@ -501,10 +501,11 @@ function Inner({ level }: { level: Level }) {
           <div className="pv2-status">
             {session.saved
               ? <><span className="pv2-seal" aria-hidden="true" /><span><b>Our {name} plan</b> · agreed {shortDay(session.saved.at)} · {agreedBy}</span></>
-              : <span className="pv2-hint">{session.loading ? '' : `No ${name} plan yet`}</span>}
+              : (session.loading ? null : <span className="pv2-noplan"><span className="pv2-hint">{`No ${name} plan yet`}</span>
+                <button type="button" className="pv2-link" onClick={startMeeting}>Plan your {level === 'month' ? 'month' : 'season'} →</button></span>)}
           </div>
           {viewSwitch}
-          <button type="button" className={reviewDue ? 'pv2-btn' : 'pv2-qbtn'} onClick={startMeeting}>{review}</button>
+          <button type="button" className={session.saved && reviewDue ? 'pv2-btn' : 'pv2-qbtn'} onClick={startMeeting}>{review}</button>
         </div>
       )}
 
