@@ -146,12 +146,11 @@ function Inner() {
         {loading && !main.length ? <p className="pv2-hint">Loading…</p> : null}
         {!loading && !main.length && <p className="pv2-hint">{inMeeting ? 'Write what you want this year to hold.' : `Nothing on ${year}’s plan yet. That’s fine.`}</p>}
         <ul className="pv2-list pv2-brain">{main.map(row)}</ul>
-        {inMeeting && (
-          <form className="pv2-write" onSubmit={(e) => { e.preventDefault(); const v = draft.trim(); if (v) { void addLine(v); setDraft('') } }}>
-            <span className="pv2-goal" aria-hidden="true" />
-            <input value={draft} onChange={(e) => setDraft(e.target.value)} placeholder="Add a goal for the year" aria-label={`Add to ${year}`} />
-          </form>
-        )}
+        {/* Always open, as on every horizon: the review is not a gate on writing. */}
+        <form className="pv2-write" onSubmit={(e) => { e.preventDefault(); const v = draft.trim(); if (v) { void addLine(v); setDraft('') } }}>
+          <span className="pv2-goal" aria-hidden="true" />
+          <input value={draft} onChange={(e) => setDraft(e.target.value)} placeholder="Add a goal for the year" aria-label={`Add to ${year}`} />
+        </form>
         {carried.length > 0 && <><div className="pv2-sect">Carried to {year + 1}</div><ul className="pv2-list">{carried.map(row)}</ul></>}
         {dropped.length > 0 && <>
           <div className="pv2-sect">Dropped</div>

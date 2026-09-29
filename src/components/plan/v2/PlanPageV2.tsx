@@ -382,18 +382,19 @@ function Inner({ level }: { level: Level }) {
     <section aria-label={`${name} plan`}>
       <div className="pv2-colh">{inMeeting ? `${name}’s list` : 'Our plan'}<FromPaper altitude={level} periodStart={bounds.start} tasks={layered} /></div>
       {loading && !main.length ? <p className="pv2-hint">Loading…</p> : null}
-      {!loading && !main.length && <p className="pv2-hint">{inMeeting ? 'Nothing yet. Write whatever comes up — no types, no dates needed.' : `Nothing on ${name}’s plan yet.`}</p>}
+      {!loading && !main.length && <p className="pv2-hint">{inMeeting ? 'Nothing yet. Write whatever comes up — no types, no dates needed.' : `Nothing on ${name}’s plan yet. Add a line below, or start the ${review.toLowerCase()}.`}</p>}
       {/* A goal and its steps are one group, so two columns never split them. */}
       <ul className={`pv2-list${level === 'season' && view === 'list' && !inMeeting ? ' pv2-brain' : ''}`}>{
         main.reduce<LineVM[][]>((groups, l) => { if (l.nested && groups.length) groups[groups.length - 1].push(l); else groups.push([l]); return groups }, [])
           .map((g) => g.length === 1 ? row(g[0]) : <li key={`g-${g[0].task.id}`} className="pv2-group"><ul className="pv2-list">{g.map(row)}</ul></li>)
       }</ul>
-      {inMeeting && (
-        <form className="pv2-write" onSubmit={(e) => { e.preventDefault(); const v = draft.trim(); if (v) { void addLine(v); setDraft('') } }}>
-          <span className="pv2-dash" aria-hidden="true" />
-          <input value={draft} onChange={(e) => setDraft(e.target.value)} placeholder="Add a line" aria-label={`Add to ${name}`} />
-        </form>
-      )}
+      {/* Always open (Scott, 2026-09-29: "why is it not possible to add items
+          directly to the month list?") — the review is for closing out and
+          agreeing, not a gate on writing. */}
+      <form className="pv2-write" onSubmit={(e) => { e.preventDefault(); const v = draft.trim(); if (v) { void addLine(v); setDraft('') } }}>
+        <span className="pv2-dash" aria-hidden="true" />
+        <input value={draft} onChange={(e) => setDraft(e.target.value)} placeholder={`Add to ${name}`} aria-label={`Add to ${name}`} />
+      </form>
       {section(`Carried to ${nextName}`, carried)}
       {section('Someday', someday)}
       {dropped.length > 0 && <>
