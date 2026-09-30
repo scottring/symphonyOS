@@ -179,13 +179,22 @@ describe('HomeHeader week masthead card', () => {
 })
 
 describe('HomeHeader — Journal | Schedule sits by the dates', () => {
-  it('draws the switch in the masthead and reports a change; Journal is what is on', () => {
+  it('old planning pages: draws the switch in the masthead and reports a change; Journal is what is on', () => {
+    localStorage.setItem('symphony-plan-v2', 'off')
     const onWeekModeChange = vi.fn()
     renderWeek({ weekMode: 'journal', onWeekModeChange })
     const aside = screen.getByTestId('masthead-aside')
     expect(within(aside).getByRole('radio', { name: 'Journal' })).toHaveAttribute('aria-checked', 'true')
     fireEvent.click(within(aside).getByRole('radio', { name: 'Schedule' }))
     expect(onWeekModeChange).toHaveBeenCalledWith('schedule')
+    localStorage.removeItem('symphony-plan-v2')
+  })
+
+  // Scott, 2026-09-30: on v2 the switch sits in the week's control row, beside
+  // the view icons (WeekViewV2), not in the masthead corner.
+  it('v2: no switch in the masthead', () => {
+    renderWeek({ weekMode: 'journal', onWeekModeChange: vi.fn() })
+    expect(screen.queryByRole('radio', { name: 'Journal' })).toBeNull()
   })
 })
 

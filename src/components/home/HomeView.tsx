@@ -40,6 +40,7 @@ import { TodayView } from '@/components/schedule/TodayView'
 import { PAGE_GUTTER_X } from '@/components/layout/pageLayout'
 import { UndoToast } from '@/components/undo/UndoToast'
 import { HomeHeader } from '@/components/home/HomeHeader'
+import { planV2Enabled } from '@/lib/planning/v2/planV2'
 import { CalendarReconnectBanner } from '@/components/home/CalendarReconnectBanner'
 
 interface HomeViewProps {
@@ -471,6 +472,7 @@ export function HomeView({
             onPushRoutine={ctx.onPushRoutine}
             pushAction={pushAction}
             mode={weekMode}
+            onModeChange={isWeekV2Enabled() && planV2Enabled() ? setWeekMode : undefined}
           />
         </>
       )
