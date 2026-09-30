@@ -2,6 +2,9 @@ import { useState } from 'react'
 import { ChevronDown, ChevronRight, Check, SkipForward, Clock, MoreHorizontal, EyeOff, Pencil, CalendarOff } from 'lucide-react'
 import type { TimelineItem, CollectionDose } from '@/types/timeline'
 import { TaskCheckbox } from './TaskCheckbox'
+import type { FamilyMember } from '@/types/family'
+import { MultiAssigneeDropdown } from '@/components/family'
+import { routineOwners } from '@/lib/routineUtils'
 
 interface Props {
   item: TimelineItem // type === 'routine-collection'
@@ -16,6 +19,11 @@ interface Props {
   onHideToday?: () => void
   /** Archive the whole collection to reference (reactivate on /routines). */
   onRemove?: () => void
+  /** Who does it — the same control a task or single routine row carries
+   *  (Scott, 2026-09-30: "Ella & Kaleb math time" couldn't be given to them
+   *  from Today). */
+  familyMembers?: FamilyMember[]
+  onAssignAll?: (memberIds: string[]) => void
 }
 
 function fmt(t: string | null): string {
@@ -40,7 +48,8 @@ function fmtShort(t: string | null): string {
   return m === 0 ? `${hr}${ampm}` : `${hr}:${String(m).padStart(2, '0')}${ampm}`
 }
 
-export function RoutineCollectionRow({ item, onSelect, onSelectStep, onCompleteStep, onSkipStep, onCompleteStepAt, onHideToday, onRemove }: Props) {
+export function RoutineCollectionRow({ item, onSelect, onSelectStep, onCompleteStep, onSkipStep, onCompleteStepAt, onHideToday, onRemove, familyMembers = [], onAssignAll }: Props) {
+  const owners = item.originalRoutine ? routineOwners(item.originalRoutine) : []
   const [open, setOpen] = useState(false)
   const [mgmtOpen, setMgmtOpen] = useState(false)
   const [renderedAt] = useState(() => Date.now())
@@ -159,6 +168,14 @@ export function RoutineCollectionRow({ item, onSelect, onSelectStep, onCompleteS
             </span>
           )}
         </button>
+        {/* Who: shown when someone is on it, and on hover when no one is —
+            the task rows' rule. */}
+        {onAssignAll && familyMembers.length > 0 && (
+          <div className={`shrink-0 transition-opacity ${owners.length ? '' : 'md:opacity-0 md:group-hover:opacity-100 md:group-focus-within:opacity-100'}`}>
+            <MultiAssigneeDropdown members={familyMembers} selectedIds={owners} onSelect={onAssignAll} size="sm"
+              label="Who's responsible?" triggerLabel={`Assign people to ${item.title}`} />
+          </div>
+        )}
         {/* Management menu: hide-for-today / edit / archive, mirroring task
             rows — and like theirs, quiet until you reach for it on desktop. */}
         <div className="relative shrink-0 pr-2 transition-opacity md:opacity-0 md:group-hover:opacity-100 md:group-focus-within:opacity-100">

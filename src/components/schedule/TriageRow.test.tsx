@@ -58,3 +58,19 @@ describe('applyTriageVerdict — "today" chooses the day', () => {
     expect(onUpdateTask).not.toHaveBeenCalled()
   })
 })
+
+// Scott, 2026-09-30: the Inbox's expired rows needed this weekend / next week
+// / next weekend. Each is a day, written like "Tomorrow" — dated, not chosen.
+describe('applyTriageVerdict — the week choices land on their day', () => {
+  it('"this-weekend" dates it to the coming Saturday and does not choose it for today', async () => {
+    vi.useFakeTimers(); vi.setSystemTime(new Date(2026, 8, 30, 10, 0)) // Wed Sep 30
+    const onPushTask = vi.fn(async () => true)
+    const onUpdateTask = vi.fn(async () => true)
+    await applyTriageVerdict(task(), 'this-weekend', { viewedDate: new Date(), onUpdateTask, onPushTask })
+    expect(onPushTask).toHaveBeenCalledWith('t1', new Date(2026, 9, 3))
+    expect(onUpdateTask).not.toHaveBeenCalled()
+    await applyTriageVerdict(task(), 'next-weekend', { viewedDate: new Date(), onUpdateTask, onPushTask })
+    expect(onPushTask).toHaveBeenLastCalledWith('t1', new Date(2026, 9, 10))
+    vi.useRealTimers()
+  })
+})

@@ -110,7 +110,7 @@ export function ExpiredSection({
               key={row.task.id}
               task={row.task}
               meta={ageLabel(row.ageDays)}
-              offer={['today', 'tomorrow', 'week', 'someday', 'deleted']}
+              offer={['today', 'tomorrow', 'week', 'this-weekend', 'next-week', 'next-weekend', 'someday', 'deleted']}
               // The Inbox hides a deleted row until its Undo window closes; a
               // row that is live again was undone — don't leave it wearing
               // "✓ deleted".

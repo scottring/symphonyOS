@@ -456,6 +456,8 @@ export function TodaySectionList({
                         <div className={isUpNext ? UP_NEXT_ROW_CLASS : undefined}>
                         <RoutineCollectionRow
                           item={item}
+                          familyMembers={familyMembers}
+                          onAssignAll={onAssignRoutineAll ? (memberIds) => onAssignRoutineAll(item.id.replace('routine-collection-', ''), memberIds) : undefined}
                           onSelect={() => onSelectItem(item.id)}
                           onSelectStep={(stepId) => onSelectItem(stepId)}
                           onCompleteStep={(stepTimelineId, completed) => {
