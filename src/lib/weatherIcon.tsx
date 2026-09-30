@@ -11,3 +11,22 @@ export function weatherIcon(code: number): LucideIcon {
   if (code === 0) return Sun
   return Cloud
 }
+
+/** WMO weather code → condition words ("Partly Cloudy"). */
+export function weatherCondition(code: number): string {
+  if (code === 0) return 'Clear'
+  if (code <= 2) return 'Partly Cloudy'
+  if (code === 3) return 'Cloudy'
+  if (code <= 48) return 'Foggy'
+  if (code <= 55) return 'Drizzle'
+  if (code <= 57) return 'Freezing Drizzle'
+  if (code <= 65) return 'Rain'
+  if (code <= 67) return 'Freezing Rain'
+  if (code <= 75) return 'Snow'
+  if (code <= 77) return 'Snow Grains'
+  if (code <= 82) return 'Showers'
+  if (code <= 86) return 'Snow Showers'
+  if (code === 95) return 'Thunderstorm'
+  if (code <= 99) return 'Thunderstorm + Hail'
+  return 'Unknown'
+}

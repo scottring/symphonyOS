@@ -64,6 +64,7 @@ import type { AssigneeFilter } from '@/lib/today/types'
 import type { Layer } from '@/lib/domains'
 import { WeekPlanHost } from './WeekPlanHost'
 import { WeekV2 } from '@/components/plan/v2/WeekV2'
+import { useWeather } from '@/hooks/useWeather'
 import { planV2Enabled } from '@/lib/planning/v2/planV2'
 
 /** Does this calendar event span the whole day? Explicit flags win; otherwise
@@ -614,6 +615,12 @@ export function WeekViewV2(props: WeekViewV2Props) {
   // days instead of hours. Unlike the grid it keeps the whole day: tasks too
   // early for the grid's first hour, all-day tasks, all-day events, and what
   // has been done (struck, the way a paper week keeps it).
+  // Each day ahead wears its forecast (Scott, 2026-09-30).
+  const { weather } = useWeather()
+  const forecast = useMemo(
+    () => Object.fromEntries((weather?.dailyForecast ?? []).map((d) => [d.date, d])),
+    [weather],
+  )
   const journalDays = useMemo<JournalDay[]>(() => {
     const days: JournalDay[] = Array.from({ length: dayCount }, (_, i) => {
       const date = new Date(weekStart)
@@ -1054,12 +1061,12 @@ export function WeekViewV2(props: WeekViewV2Props) {
           <WeekV2 tasks={tasks} weekStart={weekAnchor} meId={meId} isCurrent={weekIsCurrent} dragEnabled={false} tools={weekTools}
             onSelectTask={(id) => onSelectItem(`task-${id}`)}
             timingControl={weekTimingControl}
-            days={<WeekJournal days={journalDays} spans={journalSpans} onSelectItem={onSelectItem} onToggleEntry={handleJournalToggle} onPlanDrop={handlePlanDropOnDay} onAddToDay={handleAddToDay} narrow dragEnabled={false} timingControl={weekTimingControl} />} />
+            days={<WeekJournal days={journalDays} spans={journalSpans} onSelectItem={onSelectItem} onToggleEntry={handleJournalToggle} onPlanDrop={handlePlanDropOnDay} onAddToDay={handleAddToDay} narrow dragEnabled={false} timingControl={weekTimingControl} forecast={forecast} />} />
         ) : narrow ? (
           <div className="flex flex-col gap-4">
             {weekListFor(openSession)}
             <h2 className="week-days-heading">The days</h2>
-            <WeekJournal days={journalDays} spans={journalSpans} onSelectItem={onSelectItem} onToggleEntry={handleJournalToggle} onPlanDrop={handlePlanDropOnDay} onAddToDay={handleAddToDay} narrow dragEnabled={false} timingControl={weekTimingControl} />
+            <WeekJournal days={journalDays} spans={journalSpans} onSelectItem={onSelectItem} onToggleEntry={handleJournalToggle} onPlanDrop={handlePlanDropOnDay} onAddToDay={handleAddToDay} narrow dragEnabled={false} timingControl={weekTimingControl} forecast={forecast} />
           </div>
         ) : (
         <div className="flex items-start gap-4">
@@ -1071,12 +1078,12 @@ export function WeekViewV2(props: WeekViewV2Props) {
           <WeekV2 tasks={tasks} weekStart={weekAnchor} meId={meId} isCurrent={weekIsCurrent} onPlan={openSession} tools={weekTools}
             onSelectTask={(id) => onSelectItem(`task-${id}`)}
             timingControl={weekTimingControl}
-            days={<WeekJournal days={journalDays} spans={journalSpans} onSelectItem={onSelectItem} onToggleEntry={handleJournalToggle} onPlanDrop={handlePlanDropOnDay} onAddToDay={handleAddToDay} timingControl={weekTimingControl} />} />
+            days={<WeekJournal days={journalDays} spans={journalSpans} onSelectItem={onSelectItem} onToggleEntry={handleJournalToggle} onPlanDrop={handlePlanDropOnDay} onAddToDay={handleAddToDay} timingControl={weekTimingControl} forecast={forecast} />} />
         ) : !showSchedule ? (
           <>
             {weekListFor(openSession)}
             <h2 className="week-days-heading">The days</h2>
-            <WeekJournal days={journalDays} spans={journalSpans} onSelectItem={onSelectItem} onToggleEntry={handleJournalToggle} onPlanDrop={handlePlanDropOnDay} onAddToDay={handleAddToDay} timingControl={weekTimingControl} />
+            <WeekJournal days={journalDays} spans={journalSpans} onSelectItem={onSelectItem} onToggleEntry={handleJournalToggle} onPlanDrop={handlePlanDropOnDay} onAddToDay={handleAddToDay} timingControl={weekTimingControl} forecast={forecast} />
           </>
         ) : (
         <>
