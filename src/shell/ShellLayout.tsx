@@ -42,7 +42,7 @@ import { PlaceBand } from '@/components/place/PlaceBand';
 import { planV2Enabled } from '@/lib/planning/v2/planV2';
 import { onQuickAddRequest } from '@/lib/quickAddSignal';
 import { GuideProvider } from '@/hooks/useGuidedPlan';
-import { GuideBar } from '@/components/guide/GuideBar';
+import { GuideBar, GuideHostContext } from '@/components/guide/GuideBar';
 
 /**
  * ShellLayout wraps Shell-mounted apps with the Symphony app chrome — the
@@ -141,6 +141,8 @@ function ShellLayoutInner({ children }: Props) {
   useHouseholdWeekStart();
 
   const [desktopControls, setDesktopControls] = useState<HTMLDivElement | null>(null);
+  // The spot under a planning page's heading where the guide sits (GuideAnchor).
+  const [guideHost, setGuideHost] = useState<HTMLElement | null>(null);
   const [desktopLead, setDesktopLead] = useState<HTMLDivElement | null>(null);
   const [desktopCenter, setDesktopCenter] = useState<HTMLDivElement | null>(null);
   const [mobilePlanControls, setMobilePlanControls] = useState<HTMLDivElement | null>(null);
@@ -256,6 +258,7 @@ function ShellLayoutInner({ children }: Props) {
     <DesktopCenterContext.Provider value={desktopCenter}>
     <MobilePlanControlsContext.Provider value={mobilePlanControls}>
     <DesktopFooterActionContext.Provider value={desktopFooterAction}>
+    <GuideHostContext.Provider value={setGuideHost}>
     <div className="h-screen flex overflow-hidden overflow-x-hidden bg-bg-base w-full max-w-[100vw]">
       {/* "New version available — reload" banner: shows when a newer build
           deployed while this tab stayed open (stale-tab guard). */}
@@ -303,7 +306,7 @@ function ShellLayoutInner({ children }: Props) {
           <div>
             <PlanNavigation mobile mobileControlsRef={setMobilePlanControls} />
             {/* Off the planner the area lens rides top-right; the guide sits below it. */}
-            <div className={`guide-slot${planPeriodForPath(location.pathname) ? '' : ' has-lens'}`}><GuideBar /></div>
+            <div className={`guide-slot${planPeriodForPath(location.pathname) ? '' : ' has-lens'}`}><GuideBar host={guideHost} /></div>
             <div className="min-w-0">{children}</div>
           </div>
         ) : (
@@ -366,7 +369,7 @@ function ShellLayoutInner({ children }: Props) {
                 }
               >
                 {/* Guided planning rides above the page it is guiding. */}
-                <div className="guide-slot"><GuideBar /></div>
+                <div className="guide-slot"><GuideBar host={guideHost} /></div>
                 {children}
               </SideColumn>
             </div>
@@ -537,6 +540,7 @@ function ShellLayoutInner({ children }: Props) {
         />
       )}
     </div>
+    </GuideHostContext.Provider>
     </DesktopFooterActionContext.Provider>
     </MobilePlanControlsContext.Provider>
     </DesktopCenterContext.Provider>

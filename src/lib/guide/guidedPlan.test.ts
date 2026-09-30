@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { advance, back, finishHere, firstStepChoices, onStepPage, parseGuideState, pause, planPeriods, startGuide, stepPath } from './guidedPlan'
+import { advance, back, finishHere, firstStepChoices, onStepPage, parseGuideState, pause, planPeriods, startGuide, stepIdeas, stepPath } from './guidedPlan'
 import type { Seasons } from '@/lib/cadence/seasons'
 
 // Scott's household: custom seasons, Fall = Oct 1 – Dec 31; Saturday weeks.
@@ -76,5 +76,24 @@ describe('moving through a run', () => {
     expect(parseGuideState(null)).toBeNull()
     const s = startGuide('today', '2026-09-29', sep29, seasons, SAT)
     expect(parseGuideState(JSON.parse(JSON.stringify(s)))).toEqual(s)
+  })
+})
+
+describe('stepIdeas — help for a blank step', () => {
+  const s = startGuide('bigger', '2026-01-01', sep29, seasons, SAT)
+  const wk = () => 40
+  it('the season step asks of each year goal what would be true by the season’s end, naming the button', () => {
+    const i = stepIdeas('season', s, seasons, wk)
+    expect(i.prompt).toContain('each 2026 goal')
+    expect(i.prompt).toContain('by the end of Fall')
+    expect(i.prompt).toContain('“+ Add to Fall”')
+    expect(i.patterns.length).toBeGreaterThanOrEqual(3)
+  })
+  it('the month step names the season above and the month', () => {
+    expect(stepIdeas('month', s, seasons, wk).prompt).toMatch(/each Fall line .* October’s part/)
+  })
+  it('a month-ahead run has no season: it still reads', () => {
+    const m = startGuide('month', '2026-10-01', sep29, seasons, SAT)
+    expect(stepIdeas('month', m, seasons, wk).prompt).toContain('each season line')
   })
 })

@@ -381,7 +381,7 @@ export const ScheduleItem = memo(function ScheduleItem({
         {/* Completing is not opening: the checkbox's click stays out of the card's tap. */}
         <div className="w-12 h-12 -ml-3 shrink-0 flex items-center justify-center relative" onClick={(e) => e.stopPropagation()}>
           {item.focused && (
-            <span aria-hidden="true" className="row-focus-dot absolute left-1 top-1/2 -translate-y-1/2 h-1.5 w-1.5 rounded-full bg-sage-500" />
+            <span aria-hidden="true" title="You chose this for today" className="row-focus-dot absolute left-1 top-1/2 -translate-y-1/2 h-1.5 w-1.5 rounded-full bg-sage-500" />
           )}
           {isActionable ? (
             <TaskCheckbox
@@ -680,7 +680,7 @@ export const ScheduleItem = memo(function ScheduleItem({
                 the page because you chose it. */}
             {item.focused && (
               <>
-                <span aria-hidden="true" className="absolute -left-3 top-1/2 -translate-y-1/2 h-1.5 w-1.5 rounded-full bg-sage-500" />
+                <span aria-hidden="true" title="You chose this for today" className="absolute -left-3 top-1/2 -translate-y-1/2 h-1.5 w-1.5 rounded-full bg-sage-500" />
                 <span className="sr-only">Chosen for today</span>
               </>
             )}

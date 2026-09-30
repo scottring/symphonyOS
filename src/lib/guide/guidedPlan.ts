@@ -219,6 +219,54 @@ export const STEP_WHY: Record<GuideStep, string> = {
   year: 'A few outcomes or bodies of work. Keep what’s here, add what’s missing — it’s fine to leave it short.',
   season: 'Add what this season should move forward. Link a line to a year goal if it serves one; it doesn’t have to.',
   month: 'Keep what still matters and add anything missing. One or two is plenty; a quiet month is fine too.',
-  week: 'Pick next steps from the month beside the list, or write your own. A step keeps its link to the goal it serves. Nothing needs a day yet.',
+  week: 'Pick next steps from the month plans beside the list, or write your own. A step keeps its link to the goal it serves. Nothing needs a day yet.',
   today: 'Choose a few things from this week for today. Appointments are already here. A time is optional.',
+}
+
+/** The step above this one on the calendar — what sits beside the list. */
+const ABOVE: Partial<Record<GuideStep, GuideStep>> = { season: 'year', month: 'season', week: 'month', today: 'week' }
+
+export interface StepIdeas { prompt: string; patterns: string[] }
+
+/**
+ * Help for a blank page (walkthrough 2026-09-30: "some people won't know what
+ * to enter for 'meaningful progress this season'"): one question to ask of
+ * each line beside the list, and a few shapes an answer can take. Words only —
+ * nothing here is written to the plan.
+ */
+export function stepIdeas(step: GuideStep, s: GuideState, seasons: Seasons, weekNumber: (d: Date) => number): StepIdeas {
+  const name = (st: GuideStep) => {
+    const n = stepShortName(st, s, seasons, weekNumber)
+    return st === 'week' ? n.replace(/^w/, 'W') : n
+  }
+  const above = ABOVE[step]
+  const aboveName = above && (s.periods[above] || above === 'year') ? name(above) : null
+  const here = name(step)
+  switch (step) {
+    case 'year':
+      return {
+        prompt: 'Go through the parts of your life — family, health, home, work, money, friends — and ask of each: what would make this year feel well spent?',
+        patterns: ['An outcome: “Get healthy”', 'A body of work: “Finish the house projects”', 'A way of living: “More time outdoors as a family”'],
+      }
+    case 'season':
+      return {
+        prompt: `Take each ${aboveName ?? 'year'} goal beside the list and ask: by the end of ${here}, what would be true? Then use “+ Add to ${here}” beside it, so the line stays linked.`,
+        patterns: ['Finish something: “Finish the kids’ rooms”', 'Start something: “Swim twice a week”', 'Decide something: “Choose a couples therapist”'],
+      }
+    case 'month':
+      return {
+        prompt: `For each ${aboveName ?? 'season'} line beside the list, ask: what is ${here}’s part of it? One or two lines is plenty.`,
+        patterns: ['A milestone: “Kids’ rooms painted”', 'A first step on something new: “Book a trial piano lesson”', 'A decision with a date: “Pick break dates by the 15th”'],
+      }
+    case 'week':
+      return {
+        prompt: `For each ${aboveName ?? 'month'} line beside the list, ask: what is the very next thing someone could actually do — a call, an email, an errand?`,
+        patterns: ['A call or email: “Email two piano teachers”', 'An errand: “Buy porch plant hooks”', 'A conversation: “Talk with Iris about break dates”'],
+      }
+    default:
+      return {
+        prompt: 'Look at this week beside the day and ask: what has to happen today, and what would make tomorrow easier?',
+        patterns: ['Something with a deadline', 'One step on something that matters', 'Something small that clears the way'],
+      }
+  }
 }

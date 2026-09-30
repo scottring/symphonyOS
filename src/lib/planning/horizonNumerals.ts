@@ -50,6 +50,32 @@ export function railEntries(
   shown: { period: 'year' | 'season' | 'month' | 'week'; start: Date } | null,
   seasons: Seasons,
   weekStartsOn: WeekStart,
+  /** A guided run's periods (each its first day). While one runs, the rail
+   *  names what the run is planning — the Fall and October just planned, not
+   *  the clock's Summer and September (walkthrough 2026-09-30) — except the
+   *  level on screen, which is always the page's own. */
+  pinned?: Partial<Record<'year' | 'season' | 'month' | 'week', Date>>,
+): Record<RailStep, RailEntry> {
+  const base = railEntriesFor(now, shown, seasons, weekStartsOn)
+  if (!pinned) return base
+  for (const level of ['year', 'season', 'month', 'week'] as const) {
+    const at = pinned[level]
+    if (!at || shown?.period === level) continue
+    const n = horizonNumerals(level === 'week' ? new Date(at.getTime() + 3 * 86400000) : at, seasons, weekStartsOn)[level]
+    const start = level === 'year' ? new Date(at.getFullYear(), 0, 1)
+      : level === 'season' ? periodBounds('season', at, seasons).start
+        : level === 'month' ? new Date(at.getFullYear(), at.getMonth(), 1)
+          : weekStartAnchor(at, weekStartsOn)
+    base[level] = { ...n, to: `/${level}?start=${ymd(start)}` }
+  }
+  return base
+}
+
+function railEntriesFor(
+  now: Date,
+  shown: { period: 'year' | 'season' | 'month' | 'week'; start: Date } | null,
+  seasons: Seasons,
+  weekStartsOn: WeekStart,
 ): Record<RailStep, RailEntry> {
   // A period that holds today reads from today (2026 → this season, this
   // month, this week — not Winter, January, week 1; Scott, 2026-09-29); one

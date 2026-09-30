@@ -276,8 +276,12 @@ export function WeekV2({ tasks, weekStart, meId, isCurrent, days, onSelectTask, 
                           {stepsThisWeek(t.id) > 0 && <span className="pv2-stepcount block">{stepsThisWeek(t.id)} {stepsThisWeek(t.id) === 1 ? 'step' : 'steps'} this week</span>}</button>
                         <span className="pv2-refacts">
                           {!t.isGoal && <button type="button" className="pv2-addbtn" onClick={() => void takeIn(t, m.name)} aria-label={`Add ${t.title} to this week`}>+ This week</button>}
+                          {/* The same words the Month and Season pages use beside a
+                              goal (walkthrough 2026-09-30: "+ Next step" here,
+                              "+ Add" there). */}
                           <button type="button" className="pv2-addbtn" onClick={() => setChildOf(t)}
-                            aria-label={`Add a ${t.isGoal ? 'next step' : 'step'} for ${t.title} to this week`}>{t.isGoal ? '+ Next step' : '+ Step'}</button>
+                            title={t.isGoal ? `Add week ${weekNo}’s next step for “${t.title}” — it stays linked to that goal` : `Add a step of “${t.title}” to week ${weekNo}`}
+                            aria-label={`Add a ${t.isGoal ? 'next step' : 'step'} for ${t.title} to this week`}>{t.isGoal ? `+ Add to week ${weekNo}` : '+ Step'}</button>
                         </span>
                       </li>
                     ))}</ul>

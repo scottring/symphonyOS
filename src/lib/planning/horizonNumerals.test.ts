@@ -58,3 +58,31 @@ describe('railEntries — the rail follows the period on screen', () => {
     expect(other.month.label).toBe('January')
   })
 })
+
+describe('railEntries — while a guided run is on, the rail names what it plans', () => {
+  const custom = [
+    { name: 'Winter', month: 1, day: 1 }, { name: 'Spring', month: 4, day: 1 },
+    { name: 'Summer', month: 7, day: 1 }, { name: 'Fall', month: 10, day: 1 },
+  ] as unknown as Parameters<typeof railEntries>[2]
+  const now = new Date(2026, 8, 30) // Wed Sep 30, inside week 40 (Sat Sep 26 – Fri Oct 2)
+  const run = { year: new Date(2026, 0, 1), season: new Date(2026, 9, 1), month: new Date(2026, 9, 1), week: new Date(2026, 8, 26) }
+
+  it('on week 40 (which holds today): October and Fall, not September and Summer (walkthrough 2026-09-30)', () => {
+    const r = railEntries(now, { period: 'week', start: new Date(2026, 8, 26) }, custom, 6, run)
+    expect(r.month).toMatchObject({ label: 'October', to: '/month?start=2026-10-01' })
+    expect(r.season).toMatchObject({ label: 'Fall', to: '/season?start=2026-10-01' })
+    expect(r.week).toMatchObject({ n: '40', to: '/week?start=2026-09-26' })
+  })
+
+  it('the level on screen stays the page’s own', () => {
+    const r = railEntries(now, { period: 'month', start: new Date(2026, 8, 1) }, custom, 6, run)
+    expect(r.month.label).toBe('September')
+    expect(r.season.label).toBe('Fall')
+  })
+
+  it('without a run, the rail reads the clock as before', () => {
+    const r = railEntries(now, { period: 'week', start: new Date(2026, 8, 26) }, custom, 6)
+    expect(r.month.label).toBe('September')
+    expect(r.season.label).toBe('Summer')
+  })
+})

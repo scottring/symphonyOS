@@ -3429,3 +3429,29 @@ html.rail-stuck .desktop-workspace-nav:has(.page-navigation-center:not(:empty)) 
 .page-navigation-utilities .domain-switcher-trigger:hover,
 .page-navigation-utilities .domain-switcher-trigger[aria-expanded="true"] { background: var(--color-neutral-100) !important; color: var(--color-neutral-900); }
 .page-navigation-utilities .domain-switcher-trigger svg { width: 17px; height: 17px; }
+
+/* Walkthrough 2 (2026-09-30). The guide sits under a page's heading, in
+   place of the page's own "Plan …" row, which steps aside while it runs. */
+.guide-anchor:empty { display: none; }
+.guide-anchor .guide-bar { margin: 4px 0 18px; }
+.pv2-toolbar.is-guided .pv2-status:empty { flex: 1; }
+.guide-ideas { font-size: 13.5px; color: var(--color-neutral-600); max-width: 72ch; }
+.guide-ideas summary { cursor: pointer; width: fit-content; color: var(--color-primary-700); font-weight: 500; }
+.guide-ideas p { margin: 6px 0 4px; line-height: 1.5; }
+.guide-ideas ul { margin: 0; padding-left: 18px; list-style: disc; line-height: 1.6; }
+/* A goal picker inside a line's ⋯ menu: long lists scroll, long names clip. */
+.pv2-menu.is-floating { max-height: min(70vh, 460px); overflow-y: auto; max-width: 320px; }
+.pv2-mhead { padding: 6px 10px 4px; font-size: 12px; color: var(--color-neutral-500); }
+/* "+ Add to October" names where the line goes, so it is longer than "+ Add"
+   was: with a pointer it appears on the row's hover, over the row's end,
+   and the goal names keep the column's full width (walkthrough 2026-09-30). */
+@media (hover: hover) {
+  :is(.pv2-week, .pv2-page) .pv2-ref .pv2-rrow { position: relative; }
+  :is(.pv2-week, .pv2-page) .pv2-ref .pv2-rrow .pv2-refacts {
+    position: absolute; right: 0; top: 4px; padding: 2px 0 2px 32px; opacity: 0; pointer-events: none;
+    background: linear-gradient(to right, transparent, var(--color-bg-base) 28px);
+  }
+  :is(.pv2-week, .pv2-page) .pv2-ref .pv2-rrow:hover .pv2-refacts,
+  :is(.pv2-week, .pv2-page) .pv2-ref .pv2-rrow:focus-within .pv2-refacts,
+  :is(.pv2-week, .pv2-page) .pv2-ref .pv2-rrow.is-linked .pv2-refacts { opacity: 1; pointer-events: auto; }
+}

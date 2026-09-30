@@ -91,6 +91,9 @@ import { HorizonPoolDropdown } from './HorizonPoolDropdown'
 import { DayNavCluster } from './DayNavCluster'
 import { MastheadCard } from '@/components/layout/MastheadCard'
 import { planV2Enabled, readPlanView, writePlanView, type PlanView } from '@/lib/planning/v2/planV2'
+import { GuideAnchor } from '@/components/guide/GuideBar'
+import { useGuidedPlan } from '@/hooks/useGuidedPlan'
+import { currentStep } from '@/lib/guide/guidedPlan'
 import { ViewSwitch } from '@/components/plan/v2/ViewSwitch'
 import { weekOfYear } from '@/lib/planning/horizonNumerals'
 import { WeatherChip } from './WeatherChip'
@@ -429,6 +432,12 @@ export function TodayView({
   // alone); "Pick something for today" opens it with the week showing.
   const [todayView, setTodayViewState] = useState<PlanView>(() => readPlanView('today') === 'ref' ? 'ref' : 'list')
   const setTodayView = (v: PlanView) => { setTodayViewState(v); writePlanView('today', v) }
+  // The guide's Today step asks you to choose from the week, so the week is
+  // beside the day for it — without changing the view you keep afterwards
+  // (walkthrough 2026-09-30: the step opened on the day alone).
+  const { state: guide } = useGuidedPlan()
+  const guideOnToday = guide?.status === 'active' && currentStep(guide) === 'today'
+  useEffect(() => { if (guideOnToday) setTodayViewState('ref') }, [guideOnToday])
   const showWeek = todayView === 'ref'
   const weekNo = weekOfYear(viewedDate, readCadenceConfig().weekStartsOn)
   // The dock's Today pin showed this same list beside the page; the column
@@ -829,7 +838,9 @@ export function TodayView({
         : tasksLoadFailed ? 'Your tasks didn’t load.'
           // "Nothing else coming up this week" read wrong over a week list
           // with steps still to place (walkthrough 2026-09-30): say so.
-          : (() => { const ahead = forwardLook(tasks, viewedDate); return !ahead && stillToPlace > 0 ? `Nothing else dated this week · ${stillToPlace} still to place.` : forwardLine(ahead, viewedDate) })()
+          // The count lives once, in the control row below (walkthrough
+          // 2026-09-30: it was said twice).
+          : (() => { const ahead = forwardLook(tasks, viewedDate); return !ahead && stillToPlace > 0 ? 'Nothing on the days ahead this week.' : forwardLine(ahead, viewedDate) })()
       : data.counts.totalItems === 0
         ? (tasksLoadFailed ? 'Your tasks didn’t load.' : 'Nothing planned for this day.')
         : firstTimed
@@ -1419,6 +1430,7 @@ export function TodayView({
 
       {/* The same control row every horizon has: what the column beside is,
           and the view icons (list, or with the level above). */}
+      <GuideAnchor />
       <div className="pv2-toolbar today-toolbar px-4 md:px-0">
         <div className="pv2-status"><span className="pv2-hint">Week {weekNo} · {stillToPlace === 0 ? 'nothing still to place' : `${stillToPlace} still to place`}</span></div>
         {desktopControls && !isMobile && <div className="pv2-rowcontrols hidden md:flex">{desktopToolbar}</div>}
