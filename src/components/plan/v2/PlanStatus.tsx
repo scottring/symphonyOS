@@ -55,7 +55,7 @@ export function PlanToolbar({ period, saved, loading, error, agreedBy, reviewDue
   )
 }
 
-export function PlanMeetingBar({ period, prevName, step, lookBack, why, onStep, viewSwitch, onLeave, onSave, saveLabel }: {
+export function PlanMeetingBar({ period, prevName, step, lookBack, why, onStep, viewSwitch, tools, onLeave, onSave, saveLabel }: {
   period: string
   prevName: string
   step: 1 | 2
@@ -65,6 +65,8 @@ export function PlanMeetingBar({ period, prevName, step, lookBack, why, onStep, 
   why: string
   onStep: (s: 1 | 2) => void
   viewSwitch?: ReactNode
+  /** The page's own controls (area, assistant…), as in the toolbar. */
+  tools?: ReactNode
   onLeave: () => void
   onSave: () => void
   saveLabel: string
@@ -78,6 +80,7 @@ export function PlanMeetingBar({ period, prevName, step, lookBack, why, onStep, 
           <button type="button" aria-current={step === 2 ? 'step' : undefined} onClick={() => onStep(2)}><b>2</b>Plan {period}</button>
         </div>
       ) : <span className="flex-1" />}
+      {tools}
       {viewSwitch}
       <button type="button" className="pv2-link pv2-quiet" onClick={onLeave}>Leave for now</button>
       <button type="button" className="pv2-btn" onClick={onSave}>{saveLabel}</button>

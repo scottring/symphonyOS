@@ -452,7 +452,7 @@ function Inner({ level }: { level: Level }) {
   )
   const refColumn = (
     <aside className="pv2-ref" aria-label={`${aboveName}, for reference`}>
-      <div className="pv2-colh">{aboveName} <small>for reference</small></div>
+      <div className="pv2-colh">{aboveName} <small>(for reference)</small></div>
       {aboveRows.length ? (
         <ul className="pv2-list">{aboveRows.map((r) => (
           <li key={r.id} data-ref-id={r.id} className={`pv2-rrow pv2-rrow-sans${litParent === r.id || childFor?.id === r.id ? ' is-linked' : ''}`}>
@@ -495,6 +495,7 @@ function Inner({ level }: { level: Level }) {
     body = level === 'month' ? <div className="pv2-grid2 is-cal-first">{calendar}{listColumn}</div> : listColumn
   }
 
+  const rowControls = <div className="pv2-rowcontrols hidden md:flex">{chrome ? <HomeChromeControls className="flex" /> : <DomainSwitcher />}</div>
   return (
     <div className="pv2-page">
       {/* The masthead every horizon wears (Week and Today's MastheadCard):
@@ -509,7 +510,9 @@ function Inner({ level }: { level: Level }) {
               className="period-return ml-1 inline-flex shrink-0 items-center gap-1 rounded-full border border-primary-100 bg-primary-50 px-2 py-0.5 text-[11px] font-semibold text-primary-600 transition-colors hover:bg-primary-100">Back to {nameOf(periodBounds(level, today, seasons))}</button>
           )} />}
 
-        controls={chrome ? <HomeChromeControls className="flex" /> : <DomainSwitcher />} />
+        // Desktop: the page's controls sit in the control row, as on every
+        // horizon (Scott, 2026-09-30); the masthead corner stays clear.
+        />
 
       {inMeeting ? (
         <PlanMeetingBar period={name} prevName={prevName} step={meeting!.step} lookBack={meeting!.candidateIds.length > 0}
@@ -517,10 +520,10 @@ function Inner({ level }: { level: Level }) {
             : `Look at ${aboveName}${level === 'month' ? ' and the calendar' : ''} beside the list, then write what ${name} is for. ${level === 'month' ? 'A quiet month is fine.' : 'A few lines is plenty.'}`}
           onStep={(step) => setMeeting({ ...meeting!, step })}
           viewSwitch={meeting!.step === 2 && meeting!.candidateIds.length === 0 ? viewSwitch : undefined}
-          onLeave={() => void endMeeting(false)} onSave={() => void endMeeting(true)} saveLabel={`Mark ${name} planned`} />
+          tools={rowControls} onLeave={() => void endMeeting(false)} onSave={() => void endMeeting(true)} saveLabel={`Mark ${name} planned`} />
       ) : (
         <PlanToolbar period={name} saved={session.saved} loading={session.loading} error={!!session.error} agreedBy={agreedBy}
-          reviewDue={reviewDue} onPlan={startMeeting} onRetry={session.reload} viewSwitch={viewSwitch}
+          reviewDue={reviewDue} onPlan={startMeeting} onRetry={session.reload} viewSwitch={viewSwitch} tools={rowControls}
           justSaved={justSaved && {
             detail: justSaved.detail,
             // The next page opens with this one's level above beside it.

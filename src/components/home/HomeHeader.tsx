@@ -250,10 +250,12 @@ export function HomeHeader(props: HomeHeaderProps) {
         action={planV2Enabled() ? undefined : <ShelvesButton weekPage={weekStart} />}
         subline={customInputs}
         // The hourly grid needs desk width; below lg the journal is the week.
-        aside={props.weekMode && props.onWeekModeChange
+        // v2: the journal/hourly switch sits in the week's control row.
+        aside={props.weekMode && props.onWeekModeChange && !planV2Enabled()
           ? <div className="hidden lg:block"><WeekModeSwitch mode={props.weekMode} onChange={props.onWeekModeChange} /></div>
           : undefined}
-        controls={<HomeChromeControls className="flex" />}
+        // v2: the page's controls live in the week's control row (WeekV2).
+        controls={planV2Enabled() ? undefined : <HomeChromeControls className="flex" />}
       />
     )
   }

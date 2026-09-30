@@ -3379,8 +3379,39 @@ div.chooser-action-group { overflow: visible !important; }
 .today-ref { position: sticky; top: 76px; max-height: calc(100vh - 100px); overflow: auto; padding: 0; background: none; border-radius: 0; }
 .today-ref .pv2-colh { min-height: 30px; margin: 0 0 6px; padding-bottom: 8px; border-bottom: 1px solid var(--color-neutral-300); align-items: flex-end; }
 .today-ref .pv2-colh small { margin-left: auto; margin-right: 0; }
+/* Its heading rule meets For today's (22px heading + 8px pad) on one line. */
+.today-ref > .pv2-colh:first-child { min-height: 41px; }
 .today-ref .today-ref-sub { margin-top: 18px; }
 @container (max-width: 48rem) { .today-ref { position: static; max-height: none; } }
 @media (max-width: 860px) { .today-ref { position: static; max-height: none; } }
 
 .pv2-stepcount { font-size: 12px; color: var(--color-sage-600, #3f6b4f); white-space: nowrap; font-family: var(--font-family-sans); }
+
+/* The page's own controls (area, assistant, people, ⋯) in the control row,
+   just left of the view icons — every horizon alike (2026-09-30). */
+.pv2-rowcontrols { align-items: center; gap: 8px; }
+.today-toolbar .pv2-rowcontrols { margin-left: auto; }
+
+/* One top bar (Scott, 2026-09-30): ☰ and the weather at left, the horizon
+   rail centred, Inbox · search · you at right. The bar pins as a whole. */
+.page-navigation:has(> .page-navigation-center) { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 12px; }
+.page-navigation-left { display: flex; align-items: center; gap: 20px; min-width: 0; }
+.page-navigation:has(> .page-navigation-center) .page-navigation-utilities { justify-self: end; margin-left: 0; }
+.page-navigation-center { display: flex; justify-content: center; min-width: 0; }
+.page-navigation-center:empty { display: none; }
+.desktop-workspace-nav:has(.page-navigation-center:not(:empty)) { position: sticky; top: 0; z-index: 14; background: var(--color-bg-base); transition: box-shadow .15s; }
+html.rail-stuck .desktop-workspace-nav:has(.page-navigation-center:not(:empty)) { box-shadow: 0 1px 0 var(--color-neutral-200), 0 8px 16px -14px rgb(0 0 0 / .18); }
+.plan-page-tools.is-rail-extras { justify-content: flex-end; padding-top: 0; }
+/* The weather stays one line beside the ☰: icon, temperature, high/low —
+   the condition word is the icon's (and the button's label), since the bar
+   never grows wide enough for it beside the rail. */
+.page-navigation-lead .daybook-weather-line { white-space: nowrap; flex-wrap: nowrap; }
+.page-navigation-lead .daybook-weather-line > span:not([class]):not([data-testid]) { display: none; }
+/* Narrower windows: the rail keeps its numbers (the words stay in each
+   step's tooltip) and the weather keeps its icon and temperature. */
+@media (max-width: 1180px) {
+  .page-navigation-center .horizon-rail-l { display: none; }
+  .page-navigation-center .horizon-rail a { padding-inline: 7px; }
+  .page-navigation-center .horizon-rail-join { width: 10px; }
+  .page-navigation-lead .daybook-weather-line > span:not(.daybook-weather-temp) { display: none; }
+}

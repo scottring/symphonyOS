@@ -20,6 +20,8 @@ import { weekListTasks } from '@/lib/planning/weekList'
 import { selectPeriodTasks } from '@/lib/planning/periodPage'
 import { monthStartOf, monthsOfWeek } from '@/lib/planning/periodPlacement'
 import { PlanMeetingBar, PlanToolbar } from './PlanStatus'
+import { HomeChromeControls } from '@/components/home/HomeChromeControls'
+import { useAppShellChromeOptional } from '@/contexts/AppShellChromeContext'
 import { EMPTY_TALLY, addToTally, lookBackWhy, tallySentence, type Tally } from '@/lib/planning/v2/planTally'
 import { lowerPlacement } from '@/lib/placement/model'
 import { goalOfTask } from '@/lib/planning/goalSupport'
@@ -62,6 +64,7 @@ export function WeekV2({ tasks, weekStart, meId, isCurrent, days, onSelectTask, 
   onSelectTask: (id: string) => void
 }) {
   const navigate = useNavigate()
+  const chrome = useAppShellChromeOptional()
   const { user } = useAuth()
   const { toggleTask, updateTask, pushTask, updateTasksBulk, keepForward, dropCommitment, addTask, loading: tasksLoading } = useSupabaseTasks()
   const gated = useGatedTaskActions({ updateTask, pushTask, updateTasksBulk }, (id) => tasks.find((t) => t.id === id))
@@ -214,6 +217,9 @@ export function WeekV2({ tasks, weekStart, meId, isCurrent, days, onSelectTask, 
   const stepsThisWeek = (id: string) => weekTasks.filter((x) => x.goalTaskId === id || x.sourceId === id).length
   const viewSwitch = <ViewSwitch view={view} onChange={setView} aboveName={monthName} />
 
+  // The page's controls (area, assistant) in the control row, as on every
+  // horizon (Scott, 2026-09-30) — moved out of the Week masthead.
+  const rowControls = chrome ? <div className="pv2-rowcontrols hidden md:flex"><HomeChromeControls className="flex" /></div> : null
   return (
     <div className="pv2-week" data-week={localYmd(weekStart)}>
       {meeting ? (
@@ -221,11 +227,11 @@ export function WeekV2({ tasks, weekStart, meId, isCurrent, days, onSelectTask, 
           why={meeting.step === 1 ? lookBackWhy('Last week', 'this week', meeting.candidateIds.length)
             : `Choose next steps from ${monthName}’s plan beside the list, or write your own. Nothing needs a day yet.`}
           onStep={(step) => setMeeting({ ...meeting, step })} viewSwitch={meeting.step === 2 ? viewSwitch : undefined}
-          onLeave={() => void endMeeting(false)} onSave={() => void endMeeting(true)} saveLabel={`Mark week ${weekNo} planned`} />
+          tools={rowControls} onLeave={() => void endMeeting(false)} onSave={() => void endMeeting(true)} saveLabel={`Mark week ${weekNo} planned`} />
       ) : (
         <PlanToolbar period={`week ${weekNo}`} saved={session.saved} loading={session.loading} error={!!session.error} agreedBy={agreedBy}
           reviewDue={reviewDue} onPlan={startMeeting} onRetry={session.reload} viewSwitch={viewSwitch}
-          tools={tools && <div className="pv2-wtools">{tools}</div>}
+          tools={<>{rowControls}{tools && <div className="pv2-wtools">{tools}</div>}</>}
           justSaved={justSaved && {
             detail: justSaved.detail,
             // Today opens with the week beside it — the thing to choose from.
@@ -267,7 +273,7 @@ export function WeekV2({ tasks, weekStart, meId, isCurrent, days, onSelectTask, 
             <aside className="pv2-ref" aria-label={`${monthName}, for reference`}>
               {refMonths.map((m) => (
                 <div key={m.name} className="pv2-refmonth">
-                  <div className="pv2-colh">{m.name} <small>for reference</small></div>
+                  <div className="pv2-colh">{m.name} <small>(for reference)</small></div>
                   {m.rows.length ? (
                     <ul className="pv2-list">{m.rows.map((t) => (
                       <li key={t.id} data-ref-id={t.id} className={`pv2-rrow pv2-rrow-sans${litParent === t.id || childOf?.id === t.id ? ' is-linked' : ''}`}>

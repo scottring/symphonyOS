@@ -1,6 +1,6 @@
 import { PlanNavigation, usePlanDestination, planPeriodForPath, MobilePlanControlsContext } from '@/components/layout/PlanNavigation';
 import { requestPlanFromPaper } from '@/lib/planFromPaperSignal';
-import { DesktopNavigation, DesktopControlsContext, DesktopLeadContext } from '@/components/layout/DesktopNavigation';
+import { DesktopNavigation, DesktopControlsContext, DesktopLeadContext, DesktopCenterContext } from '@/components/layout/DesktopNavigation';
 import { ReferenceListsProvider, useReferenceLists } from '@/components/reference/ReferenceListsContext';
 import { ReferenceListsDock } from '@/components/reference/ReferenceLists';
 import { pinIsOnPage } from '@/components/reference/periodsOnPage';
@@ -142,6 +142,7 @@ function ShellLayoutInner({ children }: Props) {
 
   const [desktopControls, setDesktopControls] = useState<HTMLDivElement | null>(null);
   const [desktopLead, setDesktopLead] = useState<HTMLDivElement | null>(null);
+  const [desktopCenter, setDesktopCenter] = useState<HTMLDivElement | null>(null);
   const [mobilePlanControls, setMobilePlanControls] = useState<HTMLDivElement | null>(null);
   const [desktopFooterAction, setDesktopFooterAction] = useState<HTMLDivElement | null>(null);
 
@@ -252,6 +253,7 @@ function ShellLayoutInner({ children }: Props) {
   return (
     <DesktopControlsContext.Provider value={desktopControls}>
     <DesktopLeadContext.Provider value={desktopLead}>
+    <DesktopCenterContext.Provider value={desktopCenter}>
     <MobilePlanControlsContext.Provider value={mobilePlanControls}>
     <DesktopFooterActionContext.Provider value={desktopFooterAction}>
     <div className="h-screen flex overflow-hidden overflow-x-hidden bg-bg-base w-full max-w-[100vw]">
@@ -314,7 +316,7 @@ function ShellLayoutInner({ children }: Props) {
         <DesktopNavigation inboxCount={inboxCount} discussionsUnread={discussionsUnread}
           onSearch={() => setQuickAddOpen(true)} onSignOut={signOut}
           userName={user?.user_metadata?.name ?? user?.email}
-          paused={referencesPaused} controlsRef={setDesktopControls} leadRef={setDesktopLead}
+          paused={referencesPaused} controlsRef={setDesktopControls} leadRef={setDesktopLead} centerRef={setDesktopCenter}
           auxiliaryControls={!pageOwnsFilterChrome(location.pathname) && (
           <div className="flex items-center gap-2">
             <DomainSwitcher />
@@ -534,6 +536,7 @@ function ShellLayoutInner({ children }: Props) {
     </div>
     </DesktopFooterActionContext.Provider>
     </MobilePlanControlsContext.Provider>
+    </DesktopCenterContext.Provider>
     </DesktopLeadContext.Provider>
     </DesktopControlsContext.Provider>
   );

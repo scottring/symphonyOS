@@ -41,7 +41,7 @@ import { useDomain } from '@/hooks/useDomain'
 import { MobilePlanControls } from '@/components/layout/PlanNavigation'
 import { PhoneFilterControl } from '@/components/layout/PhoneFilterControl'
 
-import { Eye, EyeOff, Binoculars, Printer, GripVertical, Moon, Sparkles, ArrowRight, ChevronDown, ChevronRight, Plus, History } from 'lucide-react'
+import { Eye, EyeOff, Binoculars, Printer, GripVertical, Moon, Sparkles, ChevronDown, ChevronRight, Plus, History } from 'lucide-react'
 import { splitTodayJournal, splitCompletedFocus } from '@/lib/today/journalSplit'
 import { panelActionsFor } from '@/components/reference/DayPlanPanel'
 import { TodayWeekColumn } from './TodayWeekColumn'
@@ -786,7 +786,6 @@ export function TodayView({
     () => viewedDate.toLocaleDateString('en-US', { weekday: 'long' }),
     [viewedDate],
   )
-  const decisionCount = data.attentionItems.length + emailCaptures.length + visibleUnpromptedItems.length
 
   const nextTimeLabel = upNext?.item.allDay
     ? ''
@@ -1400,7 +1399,10 @@ export function TodayView({
         // looking forward, or another day's opener.
         subline={data.isToday && upNext ? undefined : heroLine}
         // Domain chooser + assistant toggle, in the card's corner.
-        controls={desktopControls && !isMobile ? <div className="flex items-center gap-2">{headerControls}{desktopToolbar}</div> : headerControls}
+        // Desktop: the page's controls sit in the control row below, as on
+        // every horizon (Scott, 2026-09-30). The masthead keeps them only where
+        // there is no control row to hold them.
+        controls={desktopControls && !isMobile ? undefined : headerControls}
         // The masthead's ear: today's weather, one quiet line. The feed only
         // knows today, so another day's page says nothing rather than
         // showing today's sky over Saturday. In the desktop Shell it sits in
@@ -1419,11 +1421,12 @@ export function TodayView({
           and the view icons (list, or with the level above). */}
       <div className="pv2-toolbar today-toolbar px-4 md:px-0">
         <div className="pv2-status"><span className="pv2-hint">Week {weekNo} · {stillToPlace === 0 ? 'nothing still to place' : `${stillToPlace} still to place`}</span></div>
+        {desktopControls && !isMobile && <div className="pv2-rowcontrols hidden md:flex">{headerControls}{desktopToolbar}</div>}
         <ViewSwitch view={todayView} onChange={setTodayView} aboveName={`week ${weekNo}`} withFocus={false} />
       </div>
       {/* The column beside the day: the week (and anything needing a
           decision). The day gets the full width only when there is none. */}
-      <div className={`px-4 md:px-0 ${showWeek || decisionCount > 0 ? '@[48rem]:grid @[48rem]:grid-cols-[minmax(0,1fr)_280px] @[48rem]:items-start @[48rem]:gap-9' : ''}`}>
+      <div className={`px-4 md:px-0 ${showWeek ? '@[48rem]:grid @[48rem]:grid-cols-[minmax(0,1fr)_280px] @[48rem]:items-start @[48rem]:gap-9' : ''}`}>
         <main className="min-w-0">
           {/* The "N need a decision" banner that stood here at narrow widths
               is gone (Scott, 2026-09-21): a count on Today is a scoreboard,
@@ -1678,52 +1681,13 @@ export function TodayView({
       </div>
         </main>
 
-        {/* The decision rail is not a permanent fixture — it appears when the
-            assistant, the inbox or email actually put something in it, and is
-            absent otherwise. A card whose job is to announce its own emptiness
-            still costs a third of the page. */}
-        {(decisionCount > 0 || showWeek) && (
-        <aside className="today-aside mt-6 space-y-6 @[48rem]:mt-0">
-          {decisionCount > 0 && (<div className="hidden @[48rem]:block">
-          <section className="daybook-decisions">
-            <div className="mb-3 flex items-center justify-between gap-3">
-              <div>
-                <p className="text-[12px] font-semibold uppercase tracking-[0.08em] text-accent-600">Needs a Decision</p>
-                <h2 className="font-display text-lg font-semibold text-neutral-900">
-                  {decisionCount} item{decisionCount === 1 ? '' : 's'}
-                </h2>
-              </div>
-              <button
-                type="button"
-                onClick={() => navigate('/inbox')}
-                className="rounded-lg p-2 text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-neutral-700"
-                aria-label="Open inbox"
-              >
-                <ArrowRight className="h-4 w-4" />
-              </button>
-            </div>
-            <div className="space-y-2 text-sm">
-              {data.attentionItems.length > 0 && (
-                <button type="button" onClick={() => setReviewMode('morning')} className="flex w-full items-center justify-between border-b border-neutral-200 px-3 py-2 text-left text-amber-900 transition-colors hover:bg-amber-100/70">
-                  <span className="min-w-0 truncate">Review attention queue</span>
-                  <span className="ml-3 shrink-0 text-xs font-semibold tabular-nums">{data.attentionItems.length}</span>
-                </button>
-              )}
-              {emailCaptures.length > 0 && (
-                <button type="button" onClick={() => setEmailReviewOpen(true)} className="flex w-full items-center justify-between border-b border-neutral-200 px-3 py-2 text-left text-primary-900 transition-colors hover:bg-primary-100/70">
-                  <span className="min-w-0 truncate">Review captured email</span>
-                  <span className="ml-3 shrink-0 text-xs font-semibold tabular-nums">{emailCaptures.length}</span>
-                </button>
-              )}
-              {visibleUnpromptedItems.length > 0 && (
-                <button type="button" onClick={() => setSuggestionsEnabled(true)} className="flex w-full items-center justify-between border-b border-neutral-200 px-3 py-2 text-left text-neutral-700 transition-colors hover:bg-neutral-50">
-                  <span className="min-w-0 truncate">Show assistant suggestions</span>
-                  <span className="ml-3 shrink-0 text-xs font-semibold tabular-nums">{visibleUnpromptedItems.length}</span>
-                </button>
-              )}
-            </div>
-          </section>
-          </div>)}
+        {/* Today is the day alone unless its week is asked for (Scott,
+            2026-09-30). The "Needs a decision" rail that stood here was never
+            visible (no @container ancestor) and stays gone: carried-over
+            work is ⋯ → Review carried-over work; captured email is the
+            "New from email" line; suggestions are in the ⋯ menu. */}
+        {showWeek && (
+        <aside className="today-aside mt-6 @[48rem]:mt-0">
           {showWeek && (
             <TodayWeekColumn plan={data.dayPlan} day={viewedDate} weekNo={weekNo}
               weekStart={weekStartAnchor(viewedDate, readCadenceConfig().weekStartsOn)} actions={planPanelActions} />

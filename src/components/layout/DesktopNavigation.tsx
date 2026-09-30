@@ -13,11 +13,15 @@ export function DesktopPageControls({ children }: { children: ReactNode }) {
 }
 /** The slot right of the ☰: a page's one quiet reading (Today's weather). */
 export const DesktopLeadContext = createContext<HTMLElement | null>(null)
+/** The bar's centre: the horizon rail (PlanNavigation portals it here), so the
+ *  bar is one row — ☰ · rail · you (Scott, 2026-09-30). */
+export const DesktopCenterContext = createContext<HTMLElement | null>(null)
 
-export function DesktopNavigation({ inboxCount, discussionsUnread, onSearch, onSignOut, userName, controlsRef, leadRef, auxiliaryControls }: {
+export function DesktopNavigation({ inboxCount, discussionsUnread, onSearch, onSignOut, userName, controlsRef, leadRef, centerRef, auxiliaryControls }: {
   inboxCount: number; discussionsUnread: number; onSearch: () => void; onSignOut: () => void
   auxiliaryControls?: ReactNode; userName?: string; paused: boolean; controlsRef: (node: HTMLDivElement | null) => void
   leadRef?: (node: HTMLDivElement | null) => void
+  centerRef?: (node: HTMLDivElement | null) => void
 }) {
   const navigate = useNavigate()
   const { pathname } = useLocation()
@@ -54,6 +58,7 @@ export function DesktopNavigation({ inboxCount, discussionsUnread, onSearch, onS
         One bar on every page (2026-09-29): the menu at the left; at the right
         Inbox, search and you — page controls live in the page heading. No Add
         button (Scott, 2026-09-29): the round + and ⌘K already add. */}
+    <div className="page-navigation-left">
     {menu('more', <><Menu size={18} aria-hidden="true" />{discussionsUnread > 0 && <span className="navigation-count">{discussionsUnread}</span>}</>, <div className="page-navigation-more">
       <div className="page-navigation-groups">
         {groups.map(([group, items]) => <div key={group} role="group" aria-labelledby={`navigation-group-${group}`} className="page-navigation-group">
@@ -71,6 +76,8 @@ export function DesktopNavigation({ inboxCount, discussionsUnread, onSearch, onS
     </div>, destinations.some(([, route]) => isDestinationActive(route, pathname)),
       { ariaLabel: discussionsUnread > 0 ? `More, ${discussionsUnread} unread discussions` : 'More', chevron: false, className: 'is-hamburger' })}
     {leadRef && <div ref={leadRef} className="page-navigation-lead" />}
+    </div>
+    {centerRef && <div ref={centerRef} className="page-navigation-center" />}
     <div className="page-navigation-utilities">
       {auxiliaryControls}
       <div ref={controlsRef} className="page-navigation-page-controls" />
