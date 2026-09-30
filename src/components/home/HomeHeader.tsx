@@ -253,7 +253,8 @@ export function HomeHeader(props: HomeHeaderProps) {
         aside={props.weekMode && props.onWeekModeChange
           ? <div className="hidden lg:block"><WeekModeSwitch mode={props.weekMode} onChange={props.onWeekModeChange} /></div>
           : undefined}
-        controls={<HomeChromeControls className="flex" />}
+        // v2: the page's controls live in the week's control row (WeekV2).
+        controls={planV2Enabled() ? undefined : <HomeChromeControls className="flex" />}
       />
     )
   }

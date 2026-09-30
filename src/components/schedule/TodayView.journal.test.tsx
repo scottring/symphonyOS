@@ -191,10 +191,14 @@ describe('Today as a daily journal', () => {
     expect(screen.queryByRole('button', { name: 'Try again' })).toBeNull()
   })
 
-  it('keeps the decisions column when there is something to decide', () => {
+  // Scott, 2026-09-30: Today is the day alone unless its week is asked for —
+  // no "Needs a Decision" column (it was never visible anyway: no
+  // @container ancestor). Slipped work stays behind ⋯ → Review carried-over work.
+  it('stays column-free when there is something to decide', () => {
     const slipped = createMockTask({ id: 'old', title: 'Slipped thing', bucket: 'timed', isAllDay: true, scheduledFor: new Date(2026, 5, 1), createdAt: new Date(2026, 5, 1) })
     renderView({ tasks: [...tasks, slipped] })
-    expect(screen.getByText('Needs a Decision')).toBeInTheDocument()
+    expect(screen.queryByText('Needs a Decision')).toBeNull()
+    expect(screen.queryByRole('region', { name: /for reference$/ })).toBeNull()
   })
 
   it('another day reads as one Schedule, with nothing folded', () => {

@@ -185,21 +185,24 @@ function Inner() {
     )
   }
 
+  const rowControls = <div className="pv2-rowcontrols hidden md:flex">{chrome ? <HomeChromeControls className="flex" /> : <DomainSwitcher />}</div>
   return (
     <div className="pv2-page">
       <MastheadCard variant="page" numeral={String(year)} title={`Jan – Dec ${year}`}
         eyebrow={<PeriodNavEyebrow label="Year" onPrev={() => goTo(year - 1)} onNext={() => goTo(year + 1)} prevLabel={String(year - 1)} nextLabel={String(year + 1)} />}
-        controls={chrome ? <HomeChromeControls className="flex" /> : <DomainSwitcher />} />
+        // Desktop: the page's controls sit in the control row, as on every
+        // horizon (Scott, 2026-09-30); the masthead corner stays clear.
+        />
       {inMeeting ? (
         <PlanMeetingBar period={String(year)} prevName={String(year - 1)} step={meeting!.step} lookBack={meeting!.candidateIds.length > 0}
           why={meeting!.step === 1 ? lookBackWhy(String(year - 1), String(year), meeting!.candidateIds.length)
             : 'Write what this year is for. A few lines is plenty; each can hold smaller plans later.'}
           onStep={(step) => setMeeting({ ...meeting!, step })}
           viewSwitch={meeting!.step === 2 && meeting!.candidateIds.length === 0 ? viewSwitch : undefined}
-          onLeave={() => void endMeeting(false)} onSave={() => void endMeeting(true)} saveLabel={`Mark ${year} planned`} />
+          tools={rowControls} onLeave={() => void endMeeting(false)} onSave={() => void endMeeting(true)} saveLabel={`Mark ${year} planned`} />
       ) : (
         <PlanToolbar period={String(year)} saved={session.saved} loading={session.loading} error={!!session.error} agreedBy={agreedBy}
-          reviewDue={reviewDue} onPlan={startMeeting} onRetry={session.reload} viewSwitch={viewSwitch}
+          reviewDue={reviewDue} onPlan={startMeeting} onRetry={session.reload} viewSwitch={viewSwitch} tools={rowControls}
           justSaved={justSaved && {
             detail: justSaved.detail,
             next: { label: nextStep.label, onClick: () => { writePlanView('season', 'ref'); navigate(nextStep.to) } },
