@@ -7,6 +7,7 @@ import { readSeasons } from '@/lib/cadence/seasons'
 import { useReferenceLists } from '@/components/reference/ReferenceListsContext'
 import { PlanningSheet } from '@/components/reference/PlanningSheet'
 import { DomainSwitcher } from '@/components/domain/DomainSwitcher'
+import { DesktopCenterContext } from '@/components/layout/DesktopNavigation'
 import { railEntries } from '@/lib/planning/horizonNumerals'
 import { readCadenceConfig } from '@/lib/cadence/config'
 
@@ -132,6 +133,7 @@ export function PlanNavigation({ mobile = false, paused = false, mobileControlsR
   // The rail pins to the top once the row above scrolls away (2026-09-29):
   // it is the main navigation. A marker just above it says when it is
   // pinned — the hairline appears then, and the footer's scene steps down.
+  const center = useContext(DesktopCenterContext)
   const sentinel = useRef<HTMLDivElement>(null)
   const [stuck, setStuck] = useState(false)
   useEffect(() => {
@@ -145,6 +147,24 @@ export function PlanNavigation({ mobile = false, paused = false, mobileControlsR
     document.documentElement.classList.toggle('rail-stuck', stuck)
     return () => document.documentElement.classList.remove('rail-stuck')
   }, [stuck])
+  if (!mobile && center) {
+    // Desktop in the Shell: the rail sits in the centre of the top bar — one
+    // row, ☰ · rail · you (Scott, 2026-09-30); the bar pins as a whole. What
+    // this row still carries (Shelves off the planner, the paused note)
+    // keeps a slim row of its own, only when there is some.
+    return <><div ref={sentinel} className="plan-rail-sentinel" aria-hidden="true" />
+      {createPortal(<HorizonRail period={period} />, center)}
+      {(showChooser || pausedNote) && references && <div className="plan-page-tools is-rail-extras">
+        <div className="task-chooser-control">
+          {showChooser && <button type="button" aria-label={pinned ? 'Close shelves' : 'Shelves'} aria-pressed={pinned}
+            onClick={() => pinned ? references.unpin('today') : references.pin('today')}>
+            <PanelLeft size={15} aria-hidden="true" />Shelves
+          </button>}
+          {pausedNote && <span>Lists return when you close the side panel.</span>}
+        </div>
+      </div>}
+    </>
+  }
   if (!mobile) {
     // Desktop: the horizon rail IS the main navigation (Scott, 2026-09-28 —
     // "Planner" is gone from the row above). Centred on every page; a page
