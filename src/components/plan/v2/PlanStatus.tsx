@@ -7,6 +7,7 @@
 // opened the same thing under two names, a save said nothing about what to do
 // next, and an open review still told you to start the review.
 import type { ReactNode } from 'react'
+import { GuideAnchor, useGuideRunning } from '@/components/guide/GuideBar'
 
 export interface NextStep { label: string; onClick: () => void }
 
@@ -33,25 +34,32 @@ export function PlanToolbar({ period, saved, loading, error, agreedBy, reviewDue
 }) {
   const day = (d: Date) => d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
   const prominent = !error && !loading && (!saved || reviewDue)
+  // While a guided plan runs, the guide asks the question and marks the
+  // period planned; the page's own status and "Plan …" button said the same
+  // thing a second time (walkthrough 2026-09-30). The views stay.
+  const guided = useGuideRunning()
   return (
-    <div className="pv2-toolbar" role={justSaved ? 'status' : undefined}>
-      <div className="pv2-status">
+    <>
+    <GuideAnchor />
+    <div className={`pv2-toolbar${guided ? ' is-guided' : ''}`} role={justSaved ? 'status' : undefined}>
+      {guided ? <div className="pv2-status" /> : <div className="pv2-status">
         {error
           ? <span className="pv2-noplan"><span className="pv2-hint">Couldn’t check whether {period} is planned.</span>
             <button type="button" className="pv2-link" onClick={onRetry}>Try again</button></span>
           : saved
             ? <><span className="pv2-seal" aria-hidden="true" /><span><b>{cap(period)} planned</b> · {day(saved.at)} · {agreedBy}{justSaved?.detail ? <> · {justSaved.detail}</> : null}</span></>
             : loading ? null : <span className="pv2-hint">{`${cap(period)} isn’t planned yet`}</span>}
-      </div>
+      </div>}
       {tools}
       {viewSwitch}
-      {justSaved
+      {guided ? null : justSaved
         ? <>
             {justSaved.next && <button type="button" className="pv2-btn" onClick={justSaved.next.onClick}>{justSaved.next.label}</button>}
             <button type="button" className="pv2-link pv2-quiet" onClick={justSaved.onDone}>Done for now</button>
           </>
         : <button type="button" className={prominent ? 'pv2-btn' : 'pv2-qbtn'} onClick={onPlan} disabled={error}>Plan {period}</button>}
     </div>
+    </>
   )
 }
 

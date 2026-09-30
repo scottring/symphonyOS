@@ -287,6 +287,23 @@ function Inner({ level }: { level: Level }) {
       const [msg, kind] = removeOutcomeToast(t.title, await setGoalLink(t.id, null, t.goalTaskId ?? null))
       showToast(msg, kind, 6000)
     },
+    // The links "+ Add to …" writes, for a line already here. On a month: a
+    // goal SUPPORTS a season goal; a plain task is one of its steps. On a
+    // season: a goal supports a year goal. A plain season task has no link
+    // up that the page can show, so it isn't offered one.
+    linkUp: {
+      rung: aboveName,
+      goals: aboveRows.filter((r) => r.isGoal).map((r) => ({ id: r.id, title: r.title })),
+      applies: (t) => level === 'month' || !!t.isGoal,
+      run: async (t, goalId) => {
+        const goal = aboveRows.find((r) => r.id === goalId)
+        let ok: boolean
+        if (level === 'season') ok = (await gated.updateTask(t.id, { goalId })) !== false
+        else if (t.isGoal) ok = (await gated.updateTask(t.id, { supportsGoalTaskId: goalId })) !== false
+        else ok = (await setGoalLink(t.id, goalId, t.goalTaskId ?? null)).status === 'ok'
+        showToast(ok ? `“${t.title}” is part of “${goal?.title ?? 'that goal'}” now.` : `Couldn’t link “${t.title}” — try again.`, ok ? 'success' : 'error', 5000)
+      },
+    },
   }
   const decide = async (vm: LineVM, d: CloseDecision) => {
     const t = vm.task
@@ -456,8 +473,11 @@ function Inner({ level }: { level: Level }) {
             <button type="button" className="flex-1 text-left" onClick={() => (r.task ? openTask(r.task.id) : navigate(`/goals/${r.id}`))}>{r.title}</button>
             <span className="pv2-refacts">
               {r.task && !r.isGoal && <button type="button" className="pv2-addbtn" onClick={() => void takeIn(r.task!)} aria-label={`Add ${r.title} to ${name}`}>+ {level === 'month' ? 'This month' : name}</button>}
+              {/* Says where the new line goes (walkthrough 2026-09-30: "+ Add"
+                  beside a Fall goal didn't say to what). */}
               <button type="button" className="pv2-addbtn" onClick={() => setChildFor(r)}
-                aria-label={`Add ${name}’s part of ${r.title}`}>{r.isGoal ? '+ Add' : '+ Step'}</button>
+                title={r.isGoal ? `Add ${name}’s part of “${r.title}” — it stays linked to that goal` : `Add a step of “${r.title}” to ${name}`}
+                aria-label={`Add ${name}’s part of ${r.title}`}>{r.isGoal ? `+ Add to ${name}` : '+ Step'}</button>
             </span>
           </li>
         ))}</ul>

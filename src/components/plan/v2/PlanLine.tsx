@@ -8,7 +8,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useDraggable } from '@dnd-kit/core'
-import { Check, CornerDownRight, GripVertical, MoreHorizontal, ArrowRight, Moon, X, PanelRight, Target, Sun, ArrowDownRight, Unlink } from 'lucide-react'
+import { Check, CornerDownRight, GripVertical, MoreHorizontal, ArrowRight, Moon, X, PanelRight, Target, Sun, ArrowDownRight, Unlink, Link2 } from 'lucide-react'
 import type { Task, TaskContext } from '@/types/task'
 import { ContextPicker } from '@/components/triage/ContextPicker'
 import type { FamilyMember } from '@/types/family'
@@ -51,6 +51,10 @@ export interface LineActions {
   unlink?: (t: Task) => void
   /** Life area (Work / Family / Personal), through the gated update. */
   setContext?: (t: Task, c: TaskContext | undefined) => void
+  /** Tie a line already on the plan to a goal one rung up — "Link to a Fall
+   *  goal…" (walkthrough 2026-09-30: October's lines, carried from
+   *  September, had no way to say which Fall goal they serve). */
+  linkUp?: { rung: string; goals: { id: string; title: string }[]; applies: (t: Task) => boolean; run: (t: Task, goalId: string) => void }
 }
 
 
@@ -92,6 +96,9 @@ export function LineMenu({ vm, actions, nextLabel }: { vm: LineVM; actions: Line
   }, [open])
   const t = vm.task
   const pick = (fn: (t: Task) => void) => () => { setOpen(false); fn(t) }
+  const [linking, setLinking] = useState(false)
+  useEffect(() => { if (!open) setLinking(false) }, [open])
+  const linkUp = actions.linkUp && !t.completed && actions.linkUp.applies(t) && actions.linkUp.goals.some((g) => g.id !== t.id) ? actions.linkUp : null
   return (
     <div ref={ref} className="relative">
       <button type="button" className={`pv2-rb ${open ? '' : 'pv2-hov'}`} aria-label={`More for ${t.title}`} aria-expanded={open} onClick={() => setOpen((o) => !o)}>
@@ -99,6 +106,17 @@ export function LineMenu({ vm, actions, nextLabel }: { vm: LineVM; actions: Line
       </button>
       {open && pos && createPortal(
         <div ref={menuRef} role="menu" className="pv2-menu is-floating" style={{ top: pos.top, bottom: pos.bottom, right: pos.right }}>
+          {linking && linkUp ? <>
+            <div className="pv2-mhead">Part of which {linkUp.rung} goal?</div>
+            {linkUp.goals.filter((g) => g.id !== t.id).map((g) => (
+              <button key={g.id} role="menuitemradio" aria-checked={vm.partOf?.id === g.id} type="button"
+                onClick={() => { setOpen(false); linkUp.run(t, g.id) }}>
+                <Target className="w-3.5 h-3.5" /><span className="truncate">{g.title}</span>{vm.partOf?.id === g.id && <Check className="w-3.5 h-3.5 ml-auto" />}
+              </button>
+            ))}
+            <div className="pv2-msep" />
+            <button role="menuitem" type="button" onClick={() => setLinking(false)}>Back</button>
+          </> : <>
           <button role="menuitem" type="button" onClick={pick(actions.done)}><Check className="w-3.5 h-3.5" />{t.completed ? 'Reopen' : 'Done'}</button>
           {!t.completed && vm.fate !== 'carried' && <button role="menuitem" type="button" onClick={pick(actions.carry)}><ArrowRight className="w-3.5 h-3.5" />Carry to {nextLabel}</button>}
           {!t.completed && vm.fate !== 'someday' && actions.someday && <button role="menuitem" type="button" onClick={pick(actions.someday)}><Moon className="w-3.5 h-3.5" />Someday</button>}
@@ -108,8 +126,10 @@ export function LineMenu({ vm, actions, nextLabel }: { vm: LineVM; actions: Line
           {actions.today && !t.completed && !t.isGoal && <button role="menuitem" type="button" onClick={pick(actions.today)}><Sun className="w-3.5 h-3.5" />Do it today</button>}
           {actions.toggleGoal && !t.completed && <button role="menuitem" type="button" onClick={pick(actions.toggleGoal)}><Target className="w-3.5 h-3.5" />{t.isGoal ? 'Make it a single action' : 'Make it a goal'}</button>}
           {actions.unlink && t.goalTaskId && <button role="menuitem" type="button" onClick={pick(actions.unlink)}><Unlink className="w-3.5 h-3.5" />Remove from goal</button>}
+          {linkUp && <button role="menuitem" type="button" onClick={() => setLinking(true)}><Link2 className="w-3.5 h-3.5" />{vm.partOf ? `Change ${linkUp.rung} goal…` : `Link to a ${linkUp.rung} goal…`}</button>}
           <div className="pv2-msep" />
           <button role="menuitem" type="button" onClick={pick(actions.details)}><PanelRight className="w-3.5 h-3.5" />All details</button>
+          </>}
         </div>,
         document.body,
       )}
