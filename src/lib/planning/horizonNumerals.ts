@@ -51,8 +51,15 @@ export function railEntries(
   seasons: Seasons,
   weekStartsOn: WeekStart,
 ): Record<RailStep, RailEntry> {
-  const anchor = !shown ? now
-    : shown.period === 'week' ? new Date(weekStartAnchor(shown.start, weekStartsOn).getTime() + 3 * 86400000)
+  // A period that holds today reads from today (2026 → this season, this
+  // month, this week — not Winter, January, week 1; Scott, 2026-09-29); one
+  // ahead or behind reads from its own days (a week by its middle day).
+  const bounds = !shown ? null
+    : shown.period === 'week' ? { start: weekStartAnchor(shown.start, weekStartsOn), end: new Date(weekStartAnchor(shown.start, weekStartsOn).getTime() + 7 * 86400000) }
+      : periodBounds(shown.period, shown.start, seasons)
+  const holdsToday = !!bounds && now >= bounds.start && now < bounds.end
+  const anchor = !shown || holdsToday ? now
+    : shown.period === 'week' ? new Date(bounds!.start.getTime() + 3 * 86400000)
       : shown.start
   const at = horizonNumerals(anchor, seasons, weekStartsOn)
   const today = horizonNumerals(now, seasons, weekStartsOn).today

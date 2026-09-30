@@ -3125,6 +3125,8 @@ div.chooser-action-group { overflow: visible !important; }
 .pv2-line-main:hover .pv2-hov, .pv2-line-main:focus-within .pv2-hov { opacity: 1; }
 @media (hover: none) { .pv2-hov { opacity: 1; } }
 .pv2-menu { position: absolute; right: 0; top: calc(100% + 4px); z-index: 30; min-width: 210px; display: grid; padding: 6px; background: var(--color-bg-elevated); border: 1px solid var(--color-neutral-200); border-radius: 12px; box-shadow: 0 18px 40px -20px rgb(0 0 0 / .35); }
+/* Portalled to <body>, pinned to its ⋯ button (PlanLine's LineMenu). */
+.pv2-menu.is-floating { position: fixed; z-index: 60; }
 .pv2-menu > button { display: flex; align-items: center; gap: 10px; padding: 7px 10px; border-radius: 7px; font-size: 14px; text-align: left; color: var(--color-neutral-800); }
 .pv2-menu > button:hover { background: var(--color-neutral-50); }
 .pv2-msep { height: 1px; background: var(--color-neutral-200); margin: 5px 4px; }

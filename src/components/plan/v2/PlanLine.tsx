@@ -5,7 +5,8 @@
 // rail on the right holds ACTIONS, fading in on hover. A click on the words
 // folds the line open where it is; "All details" is the existing Details pane.
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { useDraggable } from '@dnd-kit/core'
 import { Check, CornerDownRight, GripVertical, MoreHorizontal, ArrowRight, Moon, X, PanelRight, Target, Sun, ArrowDownRight, Unlink } from 'lucide-react'
 import type { Task, TaskContext } from '@/types/task'
@@ -53,13 +54,37 @@ export interface LineActions {
 }
 
 
-/** The ⋯ menu: the verbs a planning row offers, in one place. */
+/** The ⋯ menu: the verbs a planning row offers, in one place. Rendered in a
+ *  portal, pinned to its button: the Year and Season lists are two CSS
+ *  columns, and a menu inside them was split across the columns — half under
+ *  the row, half floating at the top of the other column (Scott, 2026-09-29:
+ *  "the year page is all wonky when I click ⋯"). */
 export function LineMenu({ vm, actions, nextLabel }: { vm: LineVM; actions: LineActions; nextLabel: string }) {
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
+  const menuRef = useRef<HTMLDivElement>(null)
+  const [pos, setPos] = useState<{ top?: number; bottom?: number; right: number } | null>(null)
+  useLayoutEffect(() => {
+    if (!open) { setPos(null); return }
+    const place = () => {
+      const r = ref.current?.getBoundingClientRect()
+      if (!r) return
+      const right = Math.max(8, window.innerWidth - r.right)
+      // Open upward when there isn't room below.
+      setPos(window.innerHeight - r.bottom < 320 && r.top > 320 ? { bottom: window.innerHeight - r.top + 4, right } : { top: r.bottom + 4, right })
+    }
+    place()
+    const close = () => setOpen(false)
+    window.addEventListener('resize', close)
+    window.addEventListener('scroll', place, true)
+    return () => { window.removeEventListener('resize', close); window.removeEventListener('scroll', place, true) }
+  }, [open])
   useEffect(() => {
     if (!open) return
-    const onDown = (e: MouseEvent) => { if (!ref.current?.contains(e.target as Node)) setOpen(false) }
+    const onDown = (e: MouseEvent) => {
+      const n = e.target as Node
+      if (!ref.current?.contains(n) && !menuRef.current?.contains(n)) setOpen(false)
+    }
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false) }
     document.addEventListener('mousedown', onDown)
     document.addEventListener('keydown', onKey)
@@ -72,8 +97,8 @@ export function LineMenu({ vm, actions, nextLabel }: { vm: LineVM; actions: Line
       <button type="button" className={`pv2-rb ${open ? '' : 'pv2-hov'}`} aria-label={`More for ${t.title}`} aria-expanded={open} onClick={() => setOpen((o) => !o)}>
         <MoreHorizontal className="w-4 h-4" />
       </button>
-      {open && (
-        <div role="menu" className="pv2-menu">
+      {open && pos && createPortal(
+        <div ref={menuRef} role="menu" className="pv2-menu is-floating" style={{ top: pos.top, bottom: pos.bottom, right: pos.right }}>
           <button role="menuitem" type="button" onClick={pick(actions.done)}><Check className="w-3.5 h-3.5" />{t.completed ? 'Reopen' : 'Done'}</button>
           {!t.completed && vm.fate !== 'carried' && <button role="menuitem" type="button" onClick={pick(actions.carry)}><ArrowRight className="w-3.5 h-3.5" />Carry to {nextLabel}</button>}
           {!t.completed && vm.fate !== 'someday' && actions.someday && <button role="menuitem" type="button" onClick={pick(actions.someday)}><Moon className="w-3.5 h-3.5" />Someday</button>}
@@ -85,7 +110,8 @@ export function LineMenu({ vm, actions, nextLabel }: { vm: LineVM; actions: Line
           {actions.unlink && t.goalTaskId && <button role="menuitem" type="button" onClick={pick(actions.unlink)}><Unlink className="w-3.5 h-3.5" />Remove from goal</button>}
           <div className="pv2-msep" />
           <button role="menuitem" type="button" onClick={pick(actions.details)}><PanelRight className="w-3.5 h-3.5" />All details</button>
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   )
