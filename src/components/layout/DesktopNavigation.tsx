@@ -11,10 +11,13 @@ export function DesktopPageControls({ children }: { children: ReactNode }) {
   const host = useContext(DesktopControlsContext)
   return host ? createPortal(children, host) : <>{children}</>
 }
+/** The slot right of the ☰: a page's one quiet reading (Today's weather). */
+export const DesktopLeadContext = createContext<HTMLElement | null>(null)
 
-export function DesktopNavigation({ inboxCount, discussionsUnread, onSearch, onSignOut, userName, controlsRef, auxiliaryControls }: {
+export function DesktopNavigation({ inboxCount, discussionsUnread, onSearch, onSignOut, userName, controlsRef, leadRef, auxiliaryControls }: {
   inboxCount: number; discussionsUnread: number; onSearch: () => void; onSignOut: () => void
   auxiliaryControls?: ReactNode; userName?: string; paused: boolean; controlsRef: (node: HTMLDivElement | null) => void
+  leadRef?: (node: HTMLDivElement | null) => void
 }) {
   const navigate = useNavigate()
   const { pathname } = useLocation()
@@ -67,6 +70,7 @@ export function DesktopNavigation({ inboxCount, discussionsUnread, onSearch, onS
       </div>
     </div>, destinations.some(([, route]) => isDestinationActive(route, pathname)),
       { ariaLabel: discussionsUnread > 0 ? `More, ${discussionsUnread} unread discussions` : 'More', chevron: false, className: 'is-hamburger' })}
+    {leadRef && <div ref={leadRef} className="page-navigation-lead" />}
     <div className="page-navigation-utilities">
       {auxiliaryControls}
       <div ref={controlsRef} className="page-navigation-page-controls" />

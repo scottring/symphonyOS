@@ -1,5 +1,6 @@
 import { publishViewedDay } from '@/lib/viewedDaySignal'
-import { DesktopControlsContext } from '@/components/layout/DesktopNavigation'
+import { DesktopControlsContext, DesktopLeadContext } from '@/components/layout/DesktopNavigation'
+import { createPortal } from 'react-dom'
 import { DesktopFooterAction, DesktopFooterActionContext } from '@/components/layout/DesktopFooter'
 /**
  * TodayView — editorial Today shell.
@@ -453,6 +454,7 @@ export function TodayView({
   const { getCurrentUserMember } = useFamilyMembers()
   const meId = getCurrentUserMember()?.id ?? null
   const desktopControls = useContext(DesktopControlsContext)
+  const desktopLead = useContext(DesktopLeadContext)
   // In the desktop shell the day's review lives in the page footer, so the
   // ⋯ menu drops its copy there (phones keep the menu entry).
   const reviewInFooter = !!useContext(DesktopFooterActionContext) && !isMobile
@@ -1379,6 +1381,8 @@ export function TodayView({
         </div>
       )}
 
+      {data.isToday && desktopLead && !isMobile && createPortal(<WeatherChip now={nowForDisplay} />, desktopLead)}
+
       {/* An open masthead and continuous agenda give Today the shape of a daybook. */}
       <MastheadCard
         variant="daybook"
@@ -1399,8 +1403,9 @@ export function TodayView({
         controls={desktopControls && !isMobile ? <div className="flex items-center gap-2">{headerControls}{desktopToolbar}</div> : headerControls}
         // The masthead's ear: today's weather, one quiet line. The feed only
         // knows today, so another day's page says nothing rather than
-        // showing today's sky over Saturday.
-        aside={data.isToday ? <WeatherChip now={nowForDisplay} /> : undefined}
+        // showing today's sky over Saturday. In the desktop Shell it sits in
+        // the top bar beside the ☰ instead (Scott, 2026-09-30).
+        aside={data.isToday && !(desktopLead && !isMobile) ? <WeatherChip now={nowForDisplay} /> : undefined}
         // Shell desktop controls live in the page navigation; standalone
         // mounts retain the footer controls as a fallback.
         // Standalone mounts keep their controls along the foot; in the Shell

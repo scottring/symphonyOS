@@ -1913,6 +1913,13 @@ html.desktop-shell a {
 }
 @media (min-width: 768px) {
   .daybook-masthead-aside { flex-basis: auto; flex-shrink: 0; }
+  /* Beside the corner controls, the weather centres on their 36px line
+     rather than hanging from its top edge. */
+  .daybook-masthead-controls + .daybook-masthead-aside:has(.daybook-weather) {
+    display: flex;
+    align-items: center;
+    min-height: 36px;
+  }
   .daybook-weather-line { font-size: 15px; }
   .daybook-weather-temp { font-size: 18px; }
   .daybook-weather-hours { left: auto; right: 0; }
@@ -2158,6 +2165,13 @@ html.desktop-shell a {
 .page-navigation-pin-toggle.is-pinned { color: var(--color-primary-700); background: var(--color-primary-50); }
 .page-navigation-utilities { margin-left: auto; display: flex; align-items: center; gap: 18px; }
 .page-navigation-page-controls { display: flex; align-items: center; }
+/* Beside the ☰: Today's weather at the bar's own size, its hourly strip
+   opening under it rather than off to the left. */
+.page-navigation-lead { display: flex; align-items: center; }
+.page-navigation-lead:empty { display: none; }
+.page-navigation-lead .daybook-weather-line { font-size: 14px; }
+.page-navigation-lead .daybook-weather-temp { font-size: 15px; }
+.page-navigation-lead .daybook-weather-hours { left: 0; right: auto; }
 .page-navigation-popover {
   position: absolute; top: 100%; left: 0; z-index: 40;
   min-width: 210px; max-height: 65vh; overflow-y: auto;

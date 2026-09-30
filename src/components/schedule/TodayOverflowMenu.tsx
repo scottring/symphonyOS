@@ -33,7 +33,7 @@ export function TodayOverflowMenu({ children }: Props) {
         aria-label="More controls"
         aria-expanded={open}
         title="More controls"
-        className="flex items-center rounded-lg p-1.5 text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-neutral-700"
+        className="flex items-center rounded-lg p-2 text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-neutral-700"
       >
         <MoreHorizontal className="h-5 w-5" />
       </button>
