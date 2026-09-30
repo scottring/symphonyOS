@@ -2330,10 +2330,16 @@ html.rail-stuck .desktop-ground .place-band.is-ground, html.rail-stuck .desktop-
 /* The top bar: icon buttons one size (2026-09-29). */
 .page-navigation-icon { position: relative; display: inline-grid; place-items: center; width: 34px; height: 34px; border-radius: 9px; color: var(--color-neutral-600); }
 .page-navigation-icon:hover { background: var(--color-neutral-100); color: var(--color-neutral-900); }
-.page-navigation-icon .navigation-count { position: absolute; top: 1px; right: -2px; margin: 0; }
+/* A count sits ON its icon's corner as a small pill (Scott, 2026-09-30: a
+   bare "1" floating right of Inbox read as part of the search icon). */
+.page-navigation-icon .navigation-count,
+.page-navigation-menu.is-hamburger > button .navigation-count {
+  position: absolute; top: 2px; right: 1px; margin: 0; min-width: 15px; height: 15px; padding: 0 4px; border-radius: 999px;
+  display: grid; place-items: center; font-size: 10px; font-weight: 600; line-height: 1; font-variant-numeric: tabular-nums;
+  color: #fff; background: var(--color-primary-600); box-shadow: 0 0 0 2px var(--color-bg-base);
+}
 .page-navigation-menu.is-hamburger > button, .page-navigation-menu.is-account > button { position: relative; display: inline-grid; place-items: center; width: 34px; height: 34px; padding: 0; border-radius: 9px; color: var(--color-neutral-600); }
 .page-navigation-menu.is-hamburger > button:hover, .page-navigation-menu.is-account > button:hover { background: var(--color-neutral-100); color: var(--color-neutral-900); }
-.page-navigation-menu.is-hamburger > button .navigation-count { position: absolute; top: 1px; right: -2px; margin: 0; }
 /* Icon segmented controls: the plan views, Journal / Schedule. */
 .pv2-seg.is-icons button { display: inline-grid; place-items: center; width: 34px; height: 28px; padding: 0; }
 .icon-seg { display: inline-flex; gap: 2px; padding: 3px; border-radius: 10px; background: var(--color-neutral-100); }
