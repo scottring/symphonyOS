@@ -34,6 +34,13 @@ describe('PlanNavigation', () => {
     expect(rail.querySelector('a[href="/today"]')).toBeTruthy()
   })
 
+  // Scott, 2026-09-30: ascending, Today first — the same order as the phone's menu.
+  it('runs Today → Week → Month → Season → Year on desktop', () => {
+    render(<MemoryRouter initialEntries={['/week']}><PlanNavigation /></MemoryRouter>)
+    const rail = screen.getByRole('navigation', { name: 'Planning period' })
+    expect([...rail.querySelectorAll('a')].map((a) => a.getAttribute('aria-label'))).toEqual(['Today', 'Week', 'Month', 'Season', 'Year'])
+  })
+
   it('switches horizons on a phone from the title menu, one horizon at a time', () => {
     render(<MemoryRouter initialEntries={['/season']}><PlanNavigation mobile /></MemoryRouter>)
     expect(screen.queryByRole('navigation', { name: 'Planning period' })).not.toBeInTheDocument()
