@@ -1421,7 +1421,7 @@ export function TodayView({
           and the view icons (list, or with the level above). */}
       <div className="pv2-toolbar today-toolbar px-4 md:px-0">
         <div className="pv2-status"><span className="pv2-hint">Week {weekNo} · {stillToPlace === 0 ? 'nothing still to place' : `${stillToPlace} still to place`}</span></div>
-        {desktopControls && !isMobile && <div className="pv2-rowcontrols hidden md:flex">{headerControls}{desktopToolbar}</div>}
+        {desktopControls && !isMobile && <div className="pv2-rowcontrols hidden md:flex">{desktopToolbar}</div>}
         <ViewSwitch view={todayView} onChange={setTodayView} aboveName={`week ${weekNo}`} withFocus={false} />
       </div>
       {/* The column beside the day: the week (and anything needing a

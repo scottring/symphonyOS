@@ -125,16 +125,15 @@ describe('ShellLayout domain switcher', () => {
     expect(screen.queryByRole('button', { name: /^Areas:/ })).not.toBeInTheDocument()
   })
 
-  it('on desktop keeps the switcher off Today and Inbox (their masthead cards own it) and on for other views', () => {
+  // Scott, 2026-09-30: area + assistant sit in the top bar on every page —
+  // Today and Inbox included — and the pages no longer repeat them.
+  it('on desktop the top bar carries the area switcher on every view', () => {
     mobileState.isMobile = false
-    const { unmount } = renderAt('/today')
-    expect(screen.queryByRole('button', { name: /^Areas:/ })).not.toBeInTheDocument()
-    unmount()
-    const second = renderAt('/inbox')
-    expect(screen.queryByRole('button', { name: /^Areas:/ })).not.toBeInTheDocument()
-    second.unmount()
-    renderAt('/routines')
-    expect(screen.getByRole('button', { name: 'Areas: All' })).toBeInTheDocument()
+    for (const path of ['/today', '/inbox', '/routines']) {
+      const view = renderAt(path)
+      expect(screen.getAllByRole('button', { name: /^Areas:/ })).toHaveLength(1)
+      view.unmount()
+    }
   })
 })
 
