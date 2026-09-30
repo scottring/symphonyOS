@@ -80,13 +80,16 @@ describe('ascend and replan', () => {
   })
 })
 
-describe('schedule / unschedule — commitments and focus untouched', () => {
-  it('scheduling a dated task elsewhere changes only the day', () => {
+describe('schedule / unschedule — commitments untouched; my choice follows the date', () => {
+  it('scheduling a dated task elsewhere moves the day and my choice with it', () => {
     const t = task({ bucket: 'timed', scheduledFor: new Date(2026, 8, 23), commitments: [c('month', SEP), c('week', WK20)], focus: [{ userId: 'scott', date: new Date(2026, 8, 23) }] })
     const p = planPlacement(t, { scheduledFor: new Date(2026, 8, 25) }, ctx)
     expect(p.commitmentOps).toEqual([])
-    expect(p.focusOps).toEqual([])
-    expect(p.local.focus).toEqual(t.focus)
+    expect(p.focusOps).toEqual([
+      { op: 'clear', userId: 'scott', date: new Date(2026, 8, 23) },
+      { op: 'set', userId: 'scott', date: new Date(2026, 8, 25) },
+    ])
+    expect(p.local.focus).toEqual([{ userId: 'scott', date: new Date(2026, 8, 25) }])
     expect(p.row.scheduledFor).toEqual(new Date(2026, 8, 25))
   })
   it('unschedule keeps the week and period commitments and the focus', () => {
@@ -141,13 +144,38 @@ describe('focus — a stated list (undo restore, one-day un-choose)', () => {
     expect(p.focusOps).toEqual([{ op: 'clear', userId: 'scott', date: WED }])
     expect('plannedOn' in p.row && p.row.plannedOn === undefined).toBe(true)
   })
-  it('rescheduling to another day keeps focus (S13) and leaves the week commitment (S4)', () => {
+  it('rescheduling to another day carries my choice there (S13) and leaves the week commitment (S4)', () => {
     const t = task({ bucket: 'week', commitments: [c('week', WK20)], focus: [{ userId: 'scott', date: WED }] })
-    const p = planPlacement(t, { bucket: 'timed', scheduledFor: new Date(2026, 8, 25), isAllDay: true }, ctx)
-    expect(p.focusOps).toEqual([])
+    const FRI = new Date(2026, 8, 25)
+    const p = planPlacement(t, { bucket: 'timed', scheduledFor: FRI, isAllDay: true }, ctx)
+    expect(p.focusOps).toEqual([{ op: 'clear', userId: 'scott', date: WED }, { op: 'set', userId: 'scott', date: FRI }])
     expect(p.commitmentOps).toEqual([])
-    expect(p.local.focus).toEqual([{ userId: 'scott', date: WED }])
+    expect(p.local.focus).toEqual([{ userId: 'scott', date: FRI }])
     expect(p.local.commitments).toEqual([c('week', WK20)])
+  })
+  // Scott, 2026-09-30: a task chosen for today and moved to Friday by its date
+  // chip stayed on Today, because the choice for today was kept.
+  it('a chosen-for-today task moved to another day leaves today', () => {
+    const t = task({ bucket: 'timed', isAllDay: true, scheduledFor: WED, focus: [{ userId: 'scott', date: WED }] })
+    const p = planPlacement(t, { scheduledFor: new Date(2026, 8, 25), isAllDay: true }, ctx)
+    expect(p.local.focus?.some((f) => f.date.getDate() === 23)).toBe(false)
+  })
+  it('a past day\'s choice and other people\'s choices stay; nobody\'s choice is invented', () => {
+    const FRI = new Date(2026, 8, 25)
+    const past = task({ focus: [{ userId: 'scott', date: MON }, { userId: 'iris', date: WED }] })
+    expect(planPlacement(past, { scheduledFor: FRI }, ctx).focusOps).toEqual([])
+    expect(planPlacement(task({ focus: [] }), { scheduledFor: FRI }, ctx).focusOps).toEqual([])
+  })
+  it('a new time on the chosen day keeps the choice as it is', () => {
+    const t = task({ bucket: 'timed', scheduledFor: WED, isAllDay: true, focus: [{ userId: 'scott', date: WED }] })
+    expect(planPlacement(t, { scheduledFor: new Date(2026, 8, 23, 15), isAllDay: false }, ctx).focusOps).toEqual([])
+  })
+  it('a legacy shared choice for today follows the date as my focus row', () => {
+    const FRI = new Date(2026, 8, 25)
+    const t = task({ plannedOn: WED, focus: [] })
+    const p = planPlacement(t, { scheduledFor: FRI }, ctx)
+    expect(p.focusOps).toEqual([{ op: 'set', userId: 'scott', date: FRI }])
+    expect('plannedOn' in p.row && p.row.plannedOn === undefined).toBe(true)
   })
 })
 

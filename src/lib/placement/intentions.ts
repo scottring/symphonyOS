@@ -7,7 +7,8 @@
 //
 //   commit / plan for a week  → a commitment row (higher commitments untouched)
 //   move UP a level           → a commitment row; open lower ones removed
-//   schedule / unschedule     → scheduledFor only (commitments and focus untouched)
+//   schedule / unschedule     → scheduledFor; commitments untouched; my choice
+//                               of a current day follows a new date
 //   focus / unfocus           → this person's focus row only
 //   let go (inbox, someday)   → open commitments removed, day cleared
 //   keep into the next period → this commitment carried; next one opened
@@ -287,6 +288,24 @@ export function planPlacement(input: Task, updates: Partial<Task>, ctx: Placemen
       if ((f.userId === me || f.userId === '') && !have.has(ymd)) { focusOps.push({ op: 'set', userId: me, date: f.date }); have.set(ymd, f.date) }
     }
     if (task.plannedOn && !want.has(localYmd(task.plannedOn))) row.plannedOn = undefined
+  } else if ('scheduledFor' in updates && updates.scheduledFor && ctx.userId) {
+    // Rescheduling carries this person's choice to the new day (S13, revised
+    // by Scott 2026-09-30): chosen for today and moved to Friday, it leaves
+    // today and is chosen on Friday. Kept on the old day, the choice held the
+    // task on a Today it had been moved off. Past days are history and stay;
+    // other people's choices are theirs; a task nobody chose gains no choice.
+    const me = ctx.userId
+    const newDay = localYmd(updates.scheduledFor)
+    const todayYmd = localYmd(ctx.now)
+    const mine = (task.focus ?? []).filter((f) => f.userId === me)
+    const legacy = mine.length === 0 && !(task.focus ?? []).length && task.plannedOn ? task.plannedOn : null
+    const stale = [...mine.map((f) => f.date), ...(legacy ? [legacy] : [])]
+      .filter((d) => localYmd(d) >= todayYmd && localYmd(d) !== newDay)
+    if (stale.length > 0) {
+      for (const date of stale) if (date !== legacy) focusOps.push({ op: 'clear', userId: me, date })
+      if (!mine.some((f) => localYmd(f.date) === newDay)) focusOps.push({ op: 'set', userId: me, date: updates.scheduledFor })
+      if (legacy) row.plannedOn = undefined
+    }
   }
 
   // ── Completion mirrors onto the commitments (the trigger does the same) ──
