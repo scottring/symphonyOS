@@ -10,17 +10,19 @@ import type { PlanView } from '@/lib/planning/v2/planV2'
 
 const ICONS = { list: List, ref: Columns2, focus: GalleryHorizontal } as const
 
-export function ViewSwitch({ view, onChange, aboveName, withRef = true }: {
+export function ViewSwitch({ view, onChange, aboveName, withRef = true, withFocus = true }: {
   view: PlanView
   onChange: (v: PlanView) => void
   /** The level above ("September", "Fall"); omitted where there is none (Year). */
   aboveName?: string
   withRef?: boolean
+  /** Today has no one-at-a-time view. */
+  withFocus?: boolean
 }) {
   const views: [PlanView, string][] = [
     ['list', 'List'],
     ...(withRef && aboveName ? [['ref', `With ${aboveName}`] as [PlanView, string]] : []),
-    ['focus', 'One at a time'],
+    ...(withFocus ? [['focus', 'One at a time'] as [PlanView, string]] : []),
   ]
   return (
     <div className="pv2-seg is-icons" role="group" aria-label="View">

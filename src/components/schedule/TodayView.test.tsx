@@ -152,6 +152,7 @@ describe('TodayView', () => {
     expect(screen.queryByText("Iris's month")).not.toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'This month pool' }))
     await user.click(screen.getByRole('button', { name: 'This week pool' }))
+    // (Today opens without its week column, so only the pool shows these.)
     expect(screen.getByText('Our week')).toBeInTheDocument()
     expect(screen.queryByText("Iris's week")).not.toBeInTheDocument()
   })
@@ -381,11 +382,12 @@ describe('TodayView', () => {
       const { user } = renderView({ routines: [unpinned] })
       await openOverflow(user)
       await user.click(screen.getByLabelText(/clarity/i))
-      await screen.findByRole('dialog', { name: /clarity/i })
+      const curtain = await screen.findByRole('dialog', { name: /clarity/i })
       // Depending on time of day the curtain shows either "You're clear" or
       // the per-step "Your day is placed" line — neither contains "to place",
-      // so this holds regardless of when the suite runs.
-      expect(screen.queryByText(/to place/i)).not.toBeInTheDocument()
+      // so this holds regardless of when the suite runs. (Scoped to the
+      // curtain: the week column beside the day says "Still to place".)
+      expect(within(curtain).queryByText(/to place/i)).not.toBeInTheDocument()
     })
   })
 

@@ -45,7 +45,7 @@ import { useMobile } from '@/hooks/useMobile'
 import { readCadenceConfig, weekStartAnchor } from '@/lib/cadence/config'
 import { weekOfYear } from '@/lib/planning/horizonNumerals'
 import { FocusDeck, CloseOut, type CloseDecision } from './FocusDeck'
-import { PlanMeetingBar, PlanSavedLine, PlanToolbar } from './PlanStatus'
+import { PlanMeetingBar, PlanToolbar } from './PlanStatus'
 import { EMPTY_TALLY, addToTally, lookBackWhy, nextAfterSave, tallySentence, type Tally } from '@/lib/planning/v2/planTally'
 import { FromPaper } from './FromPaper'
 import { ViewSwitch } from './ViewSwitch'
@@ -486,9 +486,13 @@ function Inner({ level }: { level: Level }) {
     body = <FocusDeck lines={lines} actions={actions} members={members} nextLabel={nextName} context={`${name} plan`} label={`${name}’s plan`}
       empty={inMeeting ? `Nothing on ${name}’s plan yet. Switch to the list to write the first line.` : `Nothing on ${name}’s plan yet. Choose “Plan ${name}” to write it with ${aboveName} beside you.`} />
   } else if (view === 'ref') {
-    body = <div className={level === 'month' ? 'pv2-grid3' : 'pv2-grid2 is-ref'}>{refColumn}{listColumn}{calendar}</div>
+    // One shape on every horizon (Scott, 2026-09-30: "above all else, it has
+    // to be consistent"): the period's own time on the left (the Month's
+    // dates, as the Week's days), its list in the middle, the level above on
+    // the right — as on Week and Today.
+    body = <div className={level === 'month' ? 'pv2-grid3' : 'pv2-grid2 is-ref'}>{calendar}{listColumn}{refColumn}</div>
   } else {
-    body = level === 'month' ? <div className="pv2-grid2">{listColumn}{calendar}</div> : listColumn
+    body = level === 'month' ? <div className="pv2-grid2 is-cal-first">{calendar}{listColumn}</div> : listColumn
   }
 
   return (
@@ -499,8 +503,10 @@ function Inner({ level }: { level: Level }) {
       <MastheadCard variant="page" numeral={numeral} title={bounds.label}
         eyebrow={<PeriodNavEyebrow label={NOUN[level]} onPrev={() => goTo(bounds.prev)} onNext={() => goTo(bounds.next)}
           prevLabel={prevName} nextLabel={nextName} trailing={isCurrent ? undefined : (
-            <button type="button" onClick={() => goTo(today)} aria-label={`Back to this ${NOUN[level].toLowerCase()}`}
-              className="period-return ml-1 inline-flex shrink-0 items-center gap-1 rounded-full border border-primary-100 bg-primary-50 px-2 py-0.5 text-[11px] font-semibold text-primary-600 transition-colors hover:bg-primary-100">This {NOUN[level].toLowerCase()}</button>
+            // Names where it goes — "Back to September" — so it isn't read as
+            // a label for the period on screen (walkthrough 2026-09-30).
+            <button type="button" onClick={() => goTo(today)} aria-label={`Back to ${nameOf(periodBounds(level, today, seasons))}`}
+              className="period-return ml-1 inline-flex shrink-0 items-center gap-1 rounded-full border border-primary-100 bg-primary-50 px-2 py-0.5 text-[11px] font-semibold text-primary-600 transition-colors hover:bg-primary-100">Back to {nameOf(periodBounds(level, today, seasons))}</button>
           )} />}
 
         controls={chrome ? <HomeChromeControls className="flex" /> : <DomainSwitcher />} />
@@ -511,13 +517,17 @@ function Inner({ level }: { level: Level }) {
             : `Look at ${aboveName}${level === 'month' ? ' and the calendar' : ''} beside the list, then write what ${name} is for. ${level === 'month' ? 'A quiet month is fine.' : 'A few lines is plenty.'}`}
           onStep={(step) => setMeeting({ ...meeting!, step })}
           viewSwitch={meeting!.step === 2 && meeting!.candidateIds.length === 0 ? viewSwitch : undefined}
-          onLeave={() => void endMeeting(false)} onSave={() => void endMeeting(true)} saveLabel={`This is our ${name} plan`} />
-      ) : (<>
-        {justSaved && <PlanSavedLine title={`${name} plan saved.`} detail={justSaved.detail}
-          next={{ label: nextStep.label, onClick: () => navigate(nextStep.to) }} onDone={() => setJustSaved(null)} />}
+          onLeave={() => void endMeeting(false)} onSave={() => void endMeeting(true)} saveLabel={`Mark ${name} planned`} />
+      ) : (
         <PlanToolbar period={name} saved={session.saved} loading={session.loading} error={!!session.error} agreedBy={agreedBy}
-          reviewDue={reviewDue} onPlan={startMeeting} onRetry={session.reload} viewSwitch={viewSwitch} />
-      </>)}
+          reviewDue={reviewDue} onPlan={startMeeting} onRetry={session.reload} viewSwitch={viewSwitch}
+          justSaved={justSaved && {
+            detail: justSaved.detail,
+            // The next page opens with this one's level above beside it.
+            next: { label: nextStep.label, onClick: () => { writePlanView(level === 'season' ? 'month' : 'week', 'ref'); navigate(nextStep.to) } },
+            onDone: () => setJustSaved(null),
+          }} />
+      )}
 
       {dragOn && meeting?.step !== 1 && view !== 'focus' ? (
         <DndContext sensors={sensors} collisionDetection={pointerWithin}

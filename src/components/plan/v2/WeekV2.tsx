@@ -19,7 +19,7 @@ import { showToast } from '@/hooks/useToast'
 import { weekListTasks } from '@/lib/planning/weekList'
 import { selectPeriodTasks } from '@/lib/planning/periodPage'
 import { monthStartOf, monthsOfWeek } from '@/lib/planning/periodPlacement'
-import { PlanMeetingBar, PlanSavedLine, PlanToolbar } from './PlanStatus'
+import { PlanMeetingBar, PlanToolbar } from './PlanStatus'
 import { EMPTY_TALLY, addToTally, lookBackWhy, tallySentence, type Tally } from '@/lib/planning/v2/planTally'
 import { lowerPlacement } from '@/lib/placement/model'
 import { goalOfTask } from '@/lib/planning/goalSupport'
@@ -209,6 +209,9 @@ export function WeekV2({ tasks, weekStart, meId, isCurrent, days, onSelectTask, 
     ? (session.saved.authorId === user?.id ? 'you' : members.find((m) => m.auth_user_id === session.saved!.authorId)?.name ?? 'your household')
     : null
   const weekNo = weekOfYear(weekStart, readCadenceConfig().weekStartsOn)
+  // A month line shows how many steps this week serve it (walkthrough
+  // 2026-09-30: nothing said "Hang porch plants" had a step this week).
+  const stepsThisWeek = (id: string) => weekTasks.filter((x) => x.goalTaskId === id || x.sourceId === id).length
   const viewSwitch = <ViewSwitch view={view} onChange={setView} aboveName={monthName} />
 
   return (
@@ -218,15 +221,18 @@ export function WeekV2({ tasks, weekStart, meId, isCurrent, days, onSelectTask, 
           why={meeting.step === 1 ? lookBackWhy('Last week', 'this week', meeting.candidateIds.length)
             : `Choose next steps from ${monthName}’s plan beside the list, or write your own. Nothing needs a day yet.`}
           onStep={(step) => setMeeting({ ...meeting, step })} viewSwitch={meeting.step === 2 ? viewSwitch : undefined}
-          onLeave={() => void endMeeting(false)} onSave={() => void endMeeting(true)} saveLabel="This is our week" />
-      ) : (<>
-        {justSaved && <PlanSavedLine title={`Week ${weekNo} plan saved.`} detail={justSaved.detail}
-          next={isCurrent ? { label: 'Pick something for today', onClick: () => navigate('/today') } : null}
-          onDone={() => setJustSaved(null)} />}
+          onLeave={() => void endMeeting(false)} onSave={() => void endMeeting(true)} saveLabel={`Mark week ${weekNo} planned`} />
+      ) : (
         <PlanToolbar period={`week ${weekNo}`} saved={session.saved} loading={session.loading} error={!!session.error} agreedBy={agreedBy}
           reviewDue={reviewDue} onPlan={startMeeting} onRetry={session.reload} viewSwitch={viewSwitch}
-          tools={tools && <div className="pv2-wtools">{tools}</div>} />
-      </>)}
+          tools={tools && <div className="pv2-wtools">{tools}</div>}
+          justSaved={justSaved && {
+            detail: justSaved.detail,
+            // Today opens with the week beside it — the thing to choose from.
+            next: isCurrent ? { label: 'Pick something for today', onClick: () => { writePlanView('today', 'ref'); navigate('/today') } } : null,
+            onDone: () => setJustSaved(null),
+          }} />
+      )}
 
       {meeting?.step === 1 ? (
         <CloseOut lines={prevLines} candidateIds={meeting.candidateIds} members={members} actions={actions} prevName="last week" nextName="this week"
@@ -266,7 +272,8 @@ export function WeekV2({ tasks, weekStart, meId, isCurrent, days, onSelectTask, 
                     <ul className="pv2-list">{m.rows.map((t) => (
                       <li key={t.id} data-ref-id={t.id} className={`pv2-rrow pv2-rrow-sans${litParent === t.id || childOf?.id === t.id ? ' is-linked' : ''}`}>
                         {t.isGoal ? <span className="pv2-goal is-small" aria-hidden="true" /> : <span className="pv2-dash" style={{ marginTop: 10 }} aria-hidden="true" />}
-                        <button type="button" className="flex-1 text-left" onClick={() => onSelectTask(t.id)}>{t.title}</button>
+                        <button type="button" className="flex-1 text-left" onClick={() => onSelectTask(t.id)}>{t.title}
+                          {stepsThisWeek(t.id) > 0 && <span className="pv2-stepcount block">{stepsThisWeek(t.id)} {stepsThisWeek(t.id) === 1 ? 'step' : 'steps'} this week</span>}</button>
                         <span className="pv2-refacts">
                           {!t.isGoal && <button type="button" className="pv2-addbtn" onClick={() => void takeIn(t, m.name)} aria-label={`Add ${t.title} to this week`}>+ This week</button>}
                           <button type="button" className="pv2-addbtn" onClick={() => setChildOf(t)}

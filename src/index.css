@@ -3036,8 +3036,9 @@ div.chooser-action-group { overflow: visible !important; }
 .pv2-foot { margin-top: 48px; font-size: 12.5px; color: var(--color-neutral-500); }
 
 .pv2-grid2 { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(290px, 1fr); gap: 48px; align-items: start; }
-.pv2-grid2.is-ref { grid-template-columns: 280px minmax(0, 1fr); gap: 36px; }
-.pv2-grid3 { display: grid; grid-template-columns: 260px minmax(0, 1fr) 300px; gap: 36px; align-items: start; }
+.pv2-grid2.is-ref { grid-template-columns: minmax(0, 1fr) 280px; gap: 36px; }
+.pv2-grid2.is-cal-first { grid-template-columns: minmax(290px, 1fr) minmax(0, 1.5fr); }
+.pv2-grid3 { display: grid; grid-template-columns: 300px minmax(0, 1fr) 260px; gap: 36px; align-items: start; }
 .pv2-colh { font: 500 17px var(--font-family-display); margin: 0 0 10px; display: flex; gap: 10px; align-items: baseline; justify-content: space-between; }
 .pv2-paper { display: inline-flex; align-items: center; gap: 5px; margin-left: auto; font: 400 12.5px var(--font-family-sans); color: var(--color-primary-700); white-space: nowrap; }
 .pv2-paper:hover { text-decoration: underline; }
@@ -3066,7 +3067,8 @@ div.chooser-action-group { overflow: visible !important; }
   :root.plan-v2 li:hover > .journal-entry-when, :root.plan-v2 li:focus-within > .journal-entry-when { opacity: 1; pointer-events: auto; }
 }
 /* A week row's month line, on hover; the line itself lights in the column. */
-.pv2-wl-parent { display: none; align-items: center; gap: 4px; margin-top: 2px; min-width: 0; max-width: 100%; font-size: 12px; color: var(--color-neutral-500); text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Always shown (walkthrough 2026-09-30): a step says which goal it serves. */
+.pv2-wl-parent { display: inline-flex; align-items: center; gap: 4px; margin-top: 2px; min-width: 0; max-width: 100%; font-size: 12px; color: var(--color-neutral-500); text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pv2-wl-parent:hover { color: var(--color-primary-700); }
 .pv2-wl-row:hover .pv2-wl-parent, .pv2-wl-row:focus-within .pv2-wl-parent, .pv2-wl-parent.is-shown { display: inline-flex; }
 @media (hover: none) { .pv2-wl-parent { display: inline-flex; } }
@@ -3225,17 +3227,17 @@ div.chooser-action-group { overflow: visible !important; }
 .pv2-week .pv2-days [data-testid="week-journal"] { border-top: 0; }
 .pv2-week .pv2-wl-row.is-card { margin-left: 0; margin-right: 0; }
 .pv2-week .pv2-wl .pv2-wl-h:first-of-type { margin-top: 10px; }
-:is(.pv2-week, .pv2-page) .pv2-ref { position: static; padding: 0; border-radius: 0; background: none; overflow: visible; max-height: none; }
-:is(.pv2-week, .pv2-page) .pv2-ref .pv2-colh small { margin-left: auto; margin-right: 0; }
-:is(.pv2-week, .pv2-page) .pv2-ref .pv2-list { margin-top: 8px; }
+:is(.pv2-week, .pv2-page, .today-aside) .pv2-ref { position: static; padding: 0; border-radius: 0; background: none; overflow: visible; max-height: none; }
+:is(.pv2-week, .pv2-page, .today-aside) .pv2-ref .pv2-colh small { margin-left: auto; margin-right: 0; }
+:is(.pv2-week, .pv2-page, .today-aside) .pv2-ref .pv2-list { margin-top: 8px; }
 /* A week across a month end: one block per month, the second set apart. */
 .pv2-refmonth + .pv2-refmonth { margin-top: 22px; }
-:is(.pv2-week, .pv2-page) .pv2-ref .pv2-rrow { padding: 6px 0; color: var(--color-neutral-600); border-bottom: 1px solid var(--color-neutral-100); flex-wrap: nowrap; }
-:is(.pv2-week, .pv2-page) .pv2-ref .pv2-rrow > button { line-height: 1.4; }
-:is(.pv2-week, .pv2-page) .pv2-ref .pv2-rrow:has(> form) { flex-wrap: wrap; }
-:is(.pv2-week, .pv2-page) .pv2-ref .pv2-rrow .pv2-refacts { opacity: .55; transition: opacity .12s; }
-:is(.pv2-week, .pv2-page) .pv2-ref .pv2-rrow:hover .pv2-refacts, :is(.pv2-week, .pv2-page) .pv2-ref .pv2-rrow:focus-within .pv2-refacts { opacity: 1; }
-@media (hover: none) { :is(.pv2-week, .pv2-page) .pv2-ref .pv2-rrow .pv2-refacts { opacity: 1; } }
+:is(.pv2-week, .pv2-page, .today-aside) .pv2-ref .pv2-rrow { padding: 6px 0; color: var(--color-neutral-600); border-bottom: 1px solid var(--color-neutral-100); flex-wrap: nowrap; }
+:is(.pv2-week, .pv2-page, .today-aside) .pv2-ref .pv2-rrow > button { line-height: 1.4; }
+:is(.pv2-week, .pv2-page, .today-aside) .pv2-ref .pv2-rrow:has(> form) { flex-wrap: wrap; }
+:is(.pv2-week, .pv2-page, .today-aside) .pv2-ref .pv2-rrow .pv2-refacts { opacity: .55; transition: opacity .12s; }
+:is(.pv2-week, .pv2-page, .today-aside) .pv2-ref .pv2-rrow:hover .pv2-refacts, :is(.pv2-week, .pv2-page, .today-aside) .pv2-ref .pv2-rrow:focus-within .pv2-refacts { opacity: 1; }
+@media (hover: none) { :is(.pv2-week, .pv2-page, .today-aside) .pv2-ref .pv2-rrow .pv2-refacts { opacity: 1; } }
 .pv2-wtools { display: flex; align-items: center; gap: 8px; }
 .pv2-wtools + .pv2-seg { margin-left: 0; }
 .pv2-rrow-sans { font: 400 14px/1.4 var(--font-family-sans); flex-wrap: wrap; }
@@ -3247,18 +3249,19 @@ div.chooser-action-group { overflow: visible !important; }
   .pv2-wgrid.is-ref .pv2-ref { grid-column: 1 / -1; position: static; max-height: none; }
 }
 @media (max-width: 1060px) {
-  .pv2-grid3 { grid-template-columns: 200px minmax(0, 1fr); }
-  .pv2-grid3 .pv2-cal { grid-column: 1 / -1; position: static; }
+  .pv2-grid3 { grid-template-columns: minmax(0, 1fr) 220px; }
+  .pv2-grid3 .pv2-cal { grid-column: 1 / -1; order: 3; position: static; }
 }
 @media (max-width: 860px) {
-  .pv2-grid2, .pv2-grid2.is-ref, .pv2-grid3, .pv2-wgrid, .pv2-wgrid.is-ref { grid-template-columns: 1fr; gap: 26px; }
+  .pv2-grid2, .pv2-grid2.is-ref, .pv2-grid2.is-cal-first, .pv2-grid3, .pv2-wgrid, .pv2-wgrid.is-ref { grid-template-columns: 1fr; gap: 26px; }
   .pv2-wside { position: static; order: -1; }
   .pv2-wgrid.is-ref .pv2-ref { grid-column: auto; }
   .pv2-cal, .pv2-ref { position: static; max-height: none; }
   .pv2-brain { columns: 1; }
   /* One column: the plan first, the level above after it (as on the week). */
   .pv2-grid3 > .pv2-ref, .pv2-grid2.is-ref > .pv2-ref { order: 3; }
-  :is(.pv2-week, .pv2-page) .pv2-ref .pv2-rrow > button { min-height: 0; }
+  .pv2-grid2.is-cal-first > .pv2-cal, .pv2-grid3 > .pv2-cal { order: 4; }
+  :is(.pv2-week, .pv2-page, .today-aside) .pv2-ref .pv2-rrow > button { min-height: 0; }
 }
 /* Phones carry the life-area lens in the shell's own header already. */
 @media (max-width: 767px) { .pv2-chrome { display: none; } }
@@ -3355,3 +3358,15 @@ div.chooser-action-group { overflow: visible !important; }
    own "Plan <period>" steps back (walkthrough 2026-09-29: two dark buttons). */
 .guide-slot:has(.guide-bar) ~ * .pv2-toolbar > .pv2-btn { background: var(--color-bg-elevated); color: var(--color-neutral-700); border: 1px solid var(--color-neutral-200); box-shadow: none; }
 @media (max-width: 767px) { .guide-slot.has-lens:has(.guide-bar, .guide-pause) { padding-top: calc(env(safe-area-inset-top, 0px) + 52px); } }
+
+/* Today's week column (2026-09-30): the same reference column the other
+   horizons carry on their right — flat, headed "Week 40 for reference". */
+.today-toolbar { margin-bottom: 18px; }
+.today-ref { position: sticky; top: 76px; max-height: calc(100vh - 100px); overflow: auto; padding: 0; background: none; border-radius: 0; }
+.today-ref .pv2-colh { min-height: 30px; margin: 0 0 6px; padding-bottom: 8px; border-bottom: 1px solid var(--color-neutral-300); align-items: flex-end; }
+.today-ref .pv2-colh small { margin-left: auto; margin-right: 0; }
+.today-ref .today-ref-sub { margin-top: 18px; }
+@container (max-width: 48rem) { .today-ref { position: static; max-height: none; } }
+@media (max-width: 860px) { .today-ref { position: static; max-height: none; } }
+
+.pv2-stepcount { font-size: 12px; color: var(--color-sage-600, #3f6b4f); white-space: nowrap; font-family: var(--font-family-sans); }
