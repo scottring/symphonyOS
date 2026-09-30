@@ -35,7 +35,7 @@ Nothing here is built unless it says so.
 | S10 | Routines with no set day ("Any day") | One occurrence per recurrence window. A weekly routine gets one per week, never one per day. Choosing Today or a date places that occurrence without changing the repeating rule. Completing it settles the window, and it becomes available again next window. Untimed occurrences appear in Tasks, never as midnight appointments. Beside a future week, the picker targets that week. |
 | S11 | Capture submission | Enter accepts the **visible** parsed destination. While parsing is pending, submission waits. The confirmation names the actual destination; Inbox pulses only when the item went there. A failed save keeps the draft. |
 | S12 | Today's Tasks | Tasks contains untimed tasks dated today, plus personally chosen work. Focus orders and highlights; it does not decide whether dated work is visible. |
-| S13 | Rescheduling and focus | Ordinary rescheduling keeps personal focus and shows the new date clearly on the row. (Settles the former O1.) |
+| S13 | Rescheduling and focus | Ordinary rescheduling keeps personal focus and carries it to the new date: chosen for today and moved to Friday, it leaves today and is chosen on Friday. Past days' choices and other people's stay. (Settles the former O1; revised 2026-09-30.) |
 | S14 | Assignment vs audience | Assignment says who should act. Audience says who may see it. Assigning never shares an item, and never on its own puts it on someone's Today or on the wall; that still needs the right visibility and a date. |
 | S15 | Plan page shapes | Week, Month, Season and Year share navigation and behaviour, not one layout. Week stays dated days plus the optional Choose tasks panel. |
 
