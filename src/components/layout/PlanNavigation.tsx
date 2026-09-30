@@ -85,9 +85,11 @@ function HorizonSwitcher({ period }: { period: typeof PERIODS[number] }) {
   </div>
 }
 
-const RAIL_ORDER = ['year', 'season', 'month', 'week', 'today'] as const
+// Ascending, Today first (Scott, 2026-09-30): the one used most leads, and
+// desktop now runs the same way as the phone's horizon menu.
+const RAIL_ORDER = ['today', 'week', 'month', 'season', 'year'] as const
 
-/** Desktop: "2026 Year — 09–11 Fall — 09 September — 40 Week — 28 Today". */
+/** Desktop: "30 Today — 40 Week — 09 September — 09–11 Fall — 2026 Year". */
 function HorizonRail({ period }: { period?: typeof PERIODS[number] }) {
   const { search } = useLocation()
   // The rail wears the period being SHOWN, big to small — October's page
