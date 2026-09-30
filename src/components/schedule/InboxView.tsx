@@ -3,8 +3,6 @@ import { useMemo, useCallback, useState, useRef, useEffect } from 'react'
 import { LoadFailedNotice } from '@/components/common/LoadFailedNotice'
 import { PAGE_COLUMN_WIDE } from '@/components/layout/pageLayout'
 import { MastheadCard } from '@/components/layout/MastheadCard'
-import { HomeChromeControls } from '@/components/home/HomeChromeControls'
-import { useAppShellChromeOptional } from '@/contexts/AppShellChromeContext'
 import { X, CornerDownRight, CalendarDays, Sun } from 'lucide-react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import type { Task, TaskContext } from '@/types/task'
@@ -167,9 +165,7 @@ export function InboxView({
     })
   }, [onDeleteTask, pushUndo])
 
-  // Page chrome for the card's corner — only inside an AppShell (tests mount bare).
 
-  const chrome = useAppShellChromeOptional()
 
   // How full each candidate day already is, so a triage tile can show what it
   // is about to add to (S1-09). Computed once for the list; the grid keys into
@@ -798,7 +794,7 @@ export function InboxView({
             ? (loading ? 'Loading your inbox…' : loadFailed ? 'Didn’t load' : hiddenByFilter ? 'Filtered — nothing in this view' : 'All clear — nothing to triage')
             : `${totalCount} item${totalCount !== 1 ? 's' : ''} to triage`
         }
-        controls={chrome ? <HomeChromeControls className="flex" /> : undefined}
+        controls={undefined /* area + assistant: the top bar (2026-09-30) */}
         footer={(totalCount > 0 || familyMembers.length > 0) ? (
           <div className="flex flex-wrap items-center gap-3">
             {totalCount > 0 && (

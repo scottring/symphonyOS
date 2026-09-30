@@ -18,7 +18,6 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Plus, Target, ChevronDown, ChevronRight, ArrowUpRight } from 'lucide-react'
 import { ShelvesButton } from '@/components/reference/ShelvesButton'
 import { MastheadCard, PeriodNavEyebrow } from '@/components/layout/MastheadCard'
-import { HomeChromeControls } from '@/components/home/HomeChromeControls'
 import { DomainSwitcher } from '@/components/domain/DomainSwitcher'
 import { useAppShellChromeOptional } from '@/contexts/AppShellChromeContext'
 import { PAGE_COLUMN_WIDE } from '@/components/layout/pageLayout'
@@ -1513,7 +1512,8 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
         // The plan pages mount outside TasksApp's chrome context, so the
         // assistant toggle isn't reachable here; the domain lens still is,
         // and this page scopes by it (soleDomain).
-        controls={chrome ? <HomeChromeControls className="flex" /> : <DomainSwitcher />}
+        // In the Shell, area + assistant are in the top bar (2026-09-30).
+        controls={chrome ? undefined : <DomainSwitcher />}
       />
 
       {/* Who this page is showing, and the door to the period just ended —

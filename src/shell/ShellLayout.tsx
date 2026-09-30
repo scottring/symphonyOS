@@ -317,7 +317,9 @@ function ShellLayoutInner({ children }: Props) {
           onSearch={() => setQuickAddOpen(true)} onSignOut={signOut}
           userName={user?.user_metadata?.name ?? user?.email}
           paused={referencesPaused} controlsRef={setDesktopControls} leadRef={setDesktopLead} centerRef={setDesktopCenter}
-          auxiliaryControls={!pageOwnsFilterChrome(location.pathname) && (
+          // Area and assistant live in the top bar on EVERY page (Scott,
+          // 2026-09-30) — beside Inbox, search and you; pages don't repeat them.
+          auxiliaryControls={(
           <div className="flex items-center gap-2">
             <DomainSwitcher />
             <button

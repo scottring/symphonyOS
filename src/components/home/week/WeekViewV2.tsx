@@ -1,5 +1,3 @@
-import { HomeChromeControls } from '@/components/home/HomeChromeControls'
-import { useAppShellChromeOptional } from '@/contexts/AppShellChromeContext'
 import { useMemo, useState, useCallback, useEffect, useRef } from 'react'
 import { BookOpen, CalendarDays } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
@@ -476,7 +474,6 @@ export function WeekViewV2(props: WeekViewV2Props) {
   // Controlled from the masthead when HomeView hosts it (the switch sits by
   // the dates); uncontrolled — with its own switch — when mounted alone.
   const [ownMode, setOwnMode] = useState<WeekMode>('journal')
-  const shellChrome = useAppShellChromeOptional()
   const mode = props.mode ?? ownMode
   const narrow = useMediaQuery('(max-width: 1023px)')
   const showSchedule = mode === 'schedule' && !narrow
@@ -1016,12 +1013,7 @@ export function WeekViewV2(props: WeekViewV2Props) {
   // A past week is a look-back, not a plan.
   const weekIsPast = weekAnchor.getTime() + 7 * 86_400_000 <= Date.now()
 
-  // The hourly grid keeps the week's older tools row; on v2 the page's own
-  // controls (area, assistant) left the masthead for the control row, so
-  // they ride here too.
-  const scheduleChrome = planV2Enabled() && showSchedule && !narrow && shellChrome ? <HomeChromeControls className="flex" /> : null
   const weekTools = <>
-    {scheduleChrome}
     {!narrow && (props.mode === undefined || props.onModeChange) && (
       <div className={planV2Enabled() ? '' : 'mr-auto'}><WeekModeSwitch mode={mode} onChange={props.onModeChange ?? setOwnMode} /></div>
     )}

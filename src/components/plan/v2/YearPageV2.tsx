@@ -14,10 +14,7 @@ import { useDomain } from '@/hooks/useDomain'
 import { useFamilyMembers } from '@/hooks/useFamilyMembers'
 import { usePlanningSession, yearToken } from '@/hooks/usePlanningSession'
 import { useAuth } from '@/hooks/useAuth'
-import { useAppShellChromeOptional } from '@/contexts/AppShellChromeContext'
-import { HomeChromeControls } from '@/components/home/HomeChromeControls'
 import { MastheadCard, PeriodNavEyebrow } from '@/components/layout/MastheadCard'
-import { DomainSwitcher } from '@/components/domain/DomainSwitcher'
 import { showToast } from '@/hooks/useToast'
 import { filterTasksForLayers, matchesLayers } from '@/lib/today/domainFilter'
 import { readPlanView, writePlanView, type PlanView } from '@/lib/planning/v2/planV2'
@@ -49,7 +46,6 @@ function Inner() {
   const { layers } = useDomain()
   const { members } = useFamilyMembers()
   const { user } = useAuth()
-  const chrome = useAppShellChromeOptional()
   const [params, setParams] = useSearchParams()
   const startParam = params.get('start')
   const year = startParam ? Number(startParam.slice(0, 4)) : new Date().getFullYear()
@@ -185,7 +181,6 @@ function Inner() {
     )
   }
 
-  const rowControls = <div className="pv2-rowcontrols hidden md:flex">{chrome ? <HomeChromeControls className="flex" /> : <DomainSwitcher />}</div>
   return (
     <div className="pv2-page">
       <MastheadCard variant="page" numeral={String(year)} title={`Jan – Dec ${year}`}
@@ -199,10 +194,10 @@ function Inner() {
             : 'Write what this year is for. A few lines is plenty; each can hold smaller plans later.'}
           onStep={(step) => setMeeting({ ...meeting!, step })}
           viewSwitch={meeting!.step === 2 && meeting!.candidateIds.length === 0 ? viewSwitch : undefined}
-          tools={rowControls} onLeave={() => void endMeeting(false)} onSave={() => void endMeeting(true)} saveLabel={`Mark ${year} planned`} />
+          onLeave={() => void endMeeting(false)} onSave={() => void endMeeting(true)} saveLabel={`Mark ${year} planned`} />
       ) : (
         <PlanToolbar period={String(year)} saved={session.saved} loading={session.loading} error={!!session.error} agreedBy={agreedBy}
-          reviewDue={reviewDue} onPlan={startMeeting} onRetry={session.reload} viewSwitch={viewSwitch} tools={rowControls}
+          reviewDue={reviewDue} onPlan={startMeeting} onRetry={session.reload} viewSwitch={viewSwitch}
           justSaved={justSaved && {
             detail: justSaved.detail,
             next: { label: nextStep.label, onClick: () => { writePlanView('season', 'ref'); navigate(nextStep.to) } },

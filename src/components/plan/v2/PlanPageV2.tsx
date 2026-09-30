@@ -23,10 +23,7 @@ import { useDayLoadEvents } from '@/hooks/useDayLoadEvents'
 import { usePlanningSession, monthToken } from '@/hooks/usePlanningSession'
 import { useSelectionOptional } from '@/shell/providers/SelectionProvider'
 import { useAuth } from '@/hooks/useAuth'
-import { useAppShellChromeOptional } from '@/contexts/AppShellChromeContext'
-import { HomeChromeControls } from '@/components/home/HomeChromeControls'
 import { MastheadCard, PeriodNavEyebrow } from '@/components/layout/MastheadCard'
-import { DomainSwitcher } from '@/components/domain/DomainSwitcher'
 import { showToast } from '@/hooks/useToast'
 import { filterTasksForLayers, matchesLayers } from '@/lib/today/domainFilter'
 import { seasonToken } from '@/lib/cadence/seasons'
@@ -81,7 +78,6 @@ function Inner({ level }: { level: Level }) {
   const { goals } = useGoalsContext()
   const selection = useSelectionOptional()
   const { user } = useAuth()
-  const chrome = useAppShellChromeOptional()
   const [params, setParams] = useSearchParams()
   const today = useMemo(() => new Date(), [])
 
@@ -495,7 +491,6 @@ function Inner({ level }: { level: Level }) {
     body = level === 'month' ? <div className="pv2-grid2 is-cal-first">{calendar}{listColumn}</div> : listColumn
   }
 
-  const rowControls = <div className="pv2-rowcontrols hidden md:flex">{chrome ? <HomeChromeControls className="flex" /> : <DomainSwitcher />}</div>
   return (
     <div className="pv2-page">
       {/* The masthead every horizon wears (Week and Today's MastheadCard):
@@ -520,10 +515,10 @@ function Inner({ level }: { level: Level }) {
             : `Look at ${aboveName}${level === 'month' ? ' and the calendar' : ''} beside the list, then write what ${name} is for. ${level === 'month' ? 'A quiet month is fine.' : 'A few lines is plenty.'}`}
           onStep={(step) => setMeeting({ ...meeting!, step })}
           viewSwitch={meeting!.step === 2 && meeting!.candidateIds.length === 0 ? viewSwitch : undefined}
-          tools={rowControls} onLeave={() => void endMeeting(false)} onSave={() => void endMeeting(true)} saveLabel={`Mark ${name} planned`} />
+          onLeave={() => void endMeeting(false)} onSave={() => void endMeeting(true)} saveLabel={`Mark ${name} planned`} />
       ) : (
         <PlanToolbar period={name} saved={session.saved} loading={session.loading} error={!!session.error} agreedBy={agreedBy}
-          reviewDue={reviewDue} onPlan={startMeeting} onRetry={session.reload} viewSwitch={viewSwitch} tools={rowControls}
+          reviewDue={reviewDue} onPlan={startMeeting} onRetry={session.reload} viewSwitch={viewSwitch}
           justSaved={justSaved && {
             detail: justSaved.detail,
             // The next page opens with this one's level above beside it.

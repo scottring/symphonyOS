@@ -192,9 +192,15 @@ describe('HomeHeader — Journal | Schedule sits by the dates', () => {
 
   // Scott, 2026-09-30: on v2 the switch sits in the week's control row, beside
   // the view icons (WeekViewV2), not in the masthead corner.
-  it('v2: no switch in the masthead', () => {
-    renderWeek({ weekMode: 'journal', onWeekModeChange: vi.fn() })
-    expect(screen.queryByRole('radio', { name: 'Journal' })).toBeNull()
+  // v2 (Scott, 2026-09-30): the switch sits on the date's line at right, not
+  // in the corner aside.
+  it('v2: the switch is on the date line, not in the aside', () => {
+    const onWeekModeChange = vi.fn()
+    renderWeek({ weekMode: 'journal', onWeekModeChange })
+    expect(screen.queryByTestId('masthead-aside')).toBeNull()
+    const card = screen.getByTestId('masthead-card')
+    fireEvent.click(within(card).getByRole('radio', { name: 'Schedule' }))
+    expect(onWeekModeChange).toHaveBeenCalledWith('schedule')
   })
 })
 

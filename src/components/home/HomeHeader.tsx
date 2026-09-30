@@ -247,7 +247,11 @@ export function HomeHeader(props: HomeHeaderProps) {
         numeral={planV2Enabled() ? String(weekOfYear(weekStart, readCadenceConfig().weekStartsOn)) : undefined}
         // Shelves beside the dates, not on a row of its own (2026-09-23).
         // v2: no Shelves here — what they held is in the month column.
-        action={planV2Enabled() ? undefined : <ShelvesButton weekPage={weekStart} />}
+        // v2: the journal/hourly switch sits on the date's line at right
+        // (Scott, 2026-09-30), where Shelves once stood.
+        action={planV2Enabled()
+          ? (props.weekMode && props.onWeekModeChange ? <div className="hidden lg:block"><WeekModeSwitch mode={props.weekMode} onChange={props.onWeekModeChange} /></div> : undefined)
+          : <ShelvesButton weekPage={weekStart} />}
         subline={customInputs}
         // The hourly grid needs desk width; below lg the journal is the week.
         // v2: the journal/hourly switch sits in the week's control row.
