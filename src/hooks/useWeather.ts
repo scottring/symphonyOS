@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/hooks/useAuth'
+import { weatherCondition } from '@/lib/weatherIcon'
 
 export interface WeatherData {
   currentTemp: number
@@ -9,6 +10,16 @@ export interface WeatherData {
   highTemp: number
   lowTemp: number
   hourlyForecast: { hour: number; temp: number; code: number }[]
+  /** Today and the days ahead, keyed by the place's local YYYY-MM-DD. Absent
+   *  on readings cached before the week showed weather. */
+  dailyForecast?: DayForecast[]
+}
+
+export interface DayForecast {
+  date: string
+  code: number
+  high: number
+  low: number
 }
 
 const REFRESH_INTERVAL = 30 * 60 * 1000 // 30 minutes
@@ -63,25 +74,6 @@ function cacheWeather(data: WeatherData) {
   } catch { /* ignore */ }
 }
 
-// WMO Weather Code → human-readable condition
-function getCondition(code: number): string {
-  if (code === 0) return 'Clear'
-  if (code <= 2) return 'Partly Cloudy'
-  if (code === 3) return 'Cloudy'
-  if (code <= 48) return 'Foggy'
-  if (code <= 55) return 'Drizzle'
-  if (code <= 57) return 'Freezing Drizzle'
-  if (code <= 65) return 'Rain'
-  if (code <= 67) return 'Freezing Rain'
-  if (code <= 75) return 'Snow'
-  if (code <= 77) return 'Snow Grains'
-  if (code <= 82) return 'Showers'
-  if (code <= 86) return 'Snow Showers'
-  if (code === 95) return 'Thunderstorm'
-  if (code <= 99) return 'Thunderstorm + Hail'
-  return 'Unknown'
-}
-
 function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
   return Promise.race([
     promise,
@@ -113,8 +105,8 @@ async function fetchOpenMeteo(lat: number, lng: number) {
   const params =
     `latitude=${lat}&longitude=${lng}` +
     `&current=temperature_2m,weather_code&hourly=temperature_2m,weather_code` +
-    `&daily=temperature_2m_max,temperature_2m_min&temperature_unit=fahrenheit` +
-    `&timezone=auto&forecast_hours=8&forecast_days=1`
+    `&daily=temperature_2m_max,temperature_2m_min,weather_code&temperature_unit=fahrenheit` +
+    `&timezone=auto&forecast_hours=8&forecast_days=10`
 
   // 1) Supabase proxy
   try {
@@ -150,10 +142,17 @@ async function fetchWeatherData(lat: number, lng: number): Promise<WeatherData> 
   return {
     currentTemp: Math.round(data.current.temperature_2m),
     weatherCode: data.current.weather_code,
-    condition: getCondition(data.current.weather_code),
+    condition: weatherCondition(data.current.weather_code),
     highTemp: Math.round(data.daily.temperature_2m_max[0]),
     lowTemp: Math.round(data.daily.temperature_2m_min[0]),
     hourlyForecast,
+    // The week's days wear these. An older proxy sends one day and no codes.
+    dailyForecast: (data.daily.weather_code ? data.daily.time ?? [] : []).map((date: string, i: number) => ({
+      date,
+      code: data.daily.weather_code[i],
+      high: Math.round(data.daily.temperature_2m_max[i]),
+      low: Math.round(data.daily.temperature_2m_min[i]),
+    })),
   }
 }
 

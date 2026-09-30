@@ -17,7 +17,7 @@
 // Each day row is ONE drop target: dnd-kit's all-day protocol for rows from the
 // week's own list ({kind:'allDay', dayIso} → useWeekDragDrop, past-day refusal
 // and undo included) and a native drop for rows dragged out of the Today pin.
-import { useState, type ReactNode } from 'react'
+import { createElement, useState, type ReactNode } from 'react'
 import { useDraggable, useDroppable } from '@dnd-kit/core'
 import { Check, Plus } from 'lucide-react'
 import type { Task } from '@/types/task'
@@ -27,6 +27,8 @@ import { isMissedPlacement } from '@/lib/week/missedPlacement'
 import { journalTime, type ContextSpan } from '@/lib/week/journalSpread'
 import { planDropHandlers, type PlanDragPayload } from '@/lib/planning/planDrag'
 import { useMobile } from '@/hooks/useMobile'
+import type { DayForecast } from '@/hooks/useWeather'
+import { weatherCondition, weatherIcon } from '@/lib/weatherIcon'
 
 export interface JournalEntry {
   /** Selectable id — 'task-<uuid>', 'event-<id>', 'routine-<id>'. */
@@ -84,6 +86,9 @@ interface WeekJournalProps {
    * nothing here touches them.
    */
   timingControl?: (task: Task) => ReactNode
+  /** The forecast by local YYYY-MM-DD: a day that has one wears a small
+   *  sky and high under its weekday. Past days have none. */
+  forecast?: Record<string, DayForecast>
 }
 
 const eventId = (ev: CalendarEvent) => `event-${ev.google_event_id || ev.id}`
@@ -214,8 +219,20 @@ function AddToDay({ day, onAdd }: { day: JournalDay; onAdd: NonNullable<WeekJour
   )
 }
 
-function DayRow({ day, onSelectItem, onToggleEntry, onPlanDrop, onAddToDay, dragEnabled, narrow, timingControl }: {
+function DayWeather({ weather, narrow }: { weather: DayForecast; narrow: boolean }) {
+  const label = `${weatherCondition(weather.code)}, high ${weather.high}°, low ${weather.low}°`
+  return (
+    <span className="mt-1.5 flex items-center gap-1 text-[11px] tabular-nums text-neutral-500" title={label} aria-label={label} role="img">
+      {createElement(weatherIcon(weather.code), { className: 'h-3.5 w-3.5 shrink-0', strokeWidth: 1.5, 'aria-hidden': true })}
+      <span aria-hidden="true">{weather.high}°</span>
+      {!narrow && <span aria-hidden="true" className="text-neutral-400">{weather.low}°</span>}
+    </span>
+  )
+}
+
+function DayRow({ day, onSelectItem, onToggleEntry, onPlanDrop, onAddToDay, dragEnabled, narrow, timingControl, weather }: {
   day: JournalDay
+  weather?: DayForecast
   onSelectItem: (id: string) => void
   onToggleEntry: WeekJournalProps['onToggleEntry']
   onPlanDrop?: WeekJournalProps['onPlanDrop']
@@ -251,6 +268,7 @@ function DayRow({ day, onSelectItem, onToggleEntry, onPlanDrop, onAddToDay, drag
           {day.date.toLocaleDateString('en-US', { weekday: 'short' })}
         </span>
         {today && <span className="sr-only">(today)</span>}
+        {weather && <DayWeather weather={weather} narrow={narrow} />}
       </header>
 
       <div className="flex min-w-0 flex-col gap-1.5">
@@ -299,7 +317,7 @@ function DayRow({ day, onSelectItem, onToggleEntry, onPlanDrop, onAddToDay, drag
   )
 }
 
-export function WeekJournal({ days, spans, onSelectItem, onToggleEntry, onPlanDrop, onAddToDay, dragEnabled = true, narrow = false, timingControl }: WeekJournalProps) {
+export function WeekJournal({ days, spans, onSelectItem, onToggleEntry, onPlanDrop, onAddToDay, dragEnabled = true, narrow = false, timingControl, forecast }: WeekJournalProps) {
   return (
     <div data-testid="week-journal" className="border-y border-neutral-300">
       {spans.length > 0 && (
@@ -326,7 +344,7 @@ export function WeekJournal({ days, spans, onSelectItem, onToggleEntry, onPlanDr
       {days.map((day) => (
         <DayRow key={day.key} day={day} onSelectItem={onSelectItem} onToggleEntry={onToggleEntry}
           onPlanDrop={onPlanDrop} onAddToDay={onAddToDay} dragEnabled={dragEnabled} narrow={narrow}
-          timingControl={timingControl} />
+          timingControl={timingControl} weather={forecast?.[day.key]} />
       ))}
     </div>
   )
