@@ -452,7 +452,7 @@ function Inner({ level }: { level: Level }) {
   )
   const refColumn = (
     <aside className="pv2-ref" aria-label={`${aboveName}, for reference`}>
-      <div className="pv2-colh">{aboveName} <small>for reference</small></div>
+      <div className="pv2-colh">{aboveName} <small>(for reference)</small></div>
       {aboveRows.length ? (
         <ul className="pv2-list">{aboveRows.map((r) => (
           <li key={r.id} data-ref-id={r.id} className={`pv2-rrow pv2-rrow-sans${litParent === r.id || childFor?.id === r.id ? ' is-linked' : ''}`}>

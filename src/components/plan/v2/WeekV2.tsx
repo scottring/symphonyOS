@@ -273,7 +273,7 @@ export function WeekV2({ tasks, weekStart, meId, isCurrent, days, onSelectTask, 
             <aside className="pv2-ref" aria-label={`${monthName}, for reference`}>
               {refMonths.map((m) => (
                 <div key={m.name} className="pv2-refmonth">
-                  <div className="pv2-colh">{m.name} <small>for reference</small></div>
+                  <div className="pv2-colh">{m.name} <small>(for reference)</small></div>
                   {m.rows.length ? (
                     <ul className="pv2-list">{m.rows.map((t) => (
                       <li key={t.id} data-ref-id={t.id} className={`pv2-rrow pv2-rrow-sans${litParent === t.id || childOf?.id === t.id ? ' is-linked' : ''}`}>

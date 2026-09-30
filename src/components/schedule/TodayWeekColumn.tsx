@@ -40,7 +40,7 @@ export function TodayWeekColumn({ plan, day, weekNo, weekStart, actions }: {
   )
   return (
     <section className="pv2-ref today-ref" aria-label={`Week ${weekNo}, for reference`}>
-      <div className="pv2-colh">Week {weekNo} <small>for reference</small></div>
+      <div className="pv2-colh">Week {weekNo} <small>(for reference)</small></div>
       {tasks.length ? <ul className="pv2-list">{tasks.map(row)}</ul> : <p className="pv2-hint">Nothing still to place this week.</p>}
       {routines.length > 0 && (
         <>
