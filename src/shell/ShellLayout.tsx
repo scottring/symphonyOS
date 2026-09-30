@@ -320,17 +320,18 @@ function ShellLayoutInner({ children }: Props) {
           // Area and assistant live in the top bar on EVERY page (Scott,
           // 2026-09-30) — beside Inbox, search and you; pages don't repeat them.
           auxiliaryControls={(
-          <div className="flex items-center gap-2">
+          // Plain icons like Inbox, search and you — no circles (Scott,
+          // 2026-09-30); one even gap across the group.
+          <div className="contents">
             <DomainSwitcher />
             <button
               onClick={() => setAiHidden(aiOpen)}
-              className={`w-9 h-9 rounded-full bg-bg-elevated border border-neutral-200 text-neutral-500 hover:text-primary-500 hover:border-primary-300 transition-all grid place-items-center shadow-card ${
-                aiOpen ? 'ring-2 ring-primary-500/30 text-primary-500 border-primary-500' : ''
-              }`}
+              className={`page-navigation-icon${aiOpen ? ' is-on' : ''}`}
               aria-label="AI chat"
+              aria-pressed={aiOpen}
               title="AI chat"
             >
-              <Sparkles className="w-4 h-4" />
+              <Sparkles className="w-[17px] h-[17px]" aria-hidden="true" />
             </button>
           </div>
         )} />

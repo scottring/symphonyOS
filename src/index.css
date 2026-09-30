@@ -2163,7 +2163,7 @@ html.desktop-shell a {
 .page-navigation-pin-toggle { display: inline-flex; align-items: center; gap: 5px; height: 24px; padding: 0 8px; border-radius: 4px; font-size: 13px; color: var(--color-neutral-500); cursor: pointer; }
 .page-navigation-pin-toggle:hover { color: var(--color-neutral-800); background: var(--color-neutral-100); }
 .page-navigation-pin-toggle.is-pinned { color: var(--color-primary-700); background: var(--color-primary-50); }
-.page-navigation-utilities { margin-left: auto; display: flex; align-items: center; gap: 18px; }
+.page-navigation-utilities { margin-left: auto; display: flex; align-items: center; gap: 2px; }
 .page-navigation-page-controls { display: flex; align-items: center; }
 /* Beside the ☰: Today's weather at the bar's own size, its hourly strip
    opening under it rather than off to the left. */
@@ -3415,3 +3415,17 @@ html.rail-stuck .desktop-workspace-nav:has(.page-navigation-center:not(:empty)) 
   .page-navigation-center .horizon-rail-join { width: 10px; }
   .page-navigation-lead .daybook-weather-line > span:not(.daybook-weather-temp) { display: none; }
 }
+
+/* The top bar's right-hand icons are one family (Scott, 2026-09-30): plain
+   34px icons, no circles or shadows, one even gap. The area switcher's own
+   pill is undone here only (inline shadow → !important). */
+.page-navigation-page-controls:empty { display: none; }
+.page-navigation-icon.is-on { color: var(--color-primary-700); background: var(--color-primary-50); }
+.page-navigation-utilities .domain-switcher-trigger {
+  height: 34px !important; min-width: 34px; padding: 0 6px !important; border-radius: 9px !important;
+  background: none !important; border-color: transparent !important; box-shadow: none !important; backdrop-filter: none !important;
+  color: var(--color-neutral-600);
+}
+.page-navigation-utilities .domain-switcher-trigger:hover,
+.page-navigation-utilities .domain-switcher-trigger[aria-expanded="true"] { background: var(--color-neutral-100) !important; color: var(--color-neutral-900); }
+.page-navigation-utilities .domain-switcher-trigger svg { width: 17px; height: 17px; }
