@@ -3,6 +3,7 @@ import { Check, MoreHorizontal, Target, Trash2 } from 'lucide-react'
 import type { Task } from '@/types/task'
 import { wasWritten } from '@/hooks/useGatedTaskActions'
 import type { PlacementFate } from '@/lib/planning/lineage'
+import { WeekChoiceChip, weekChoices, type WeekChoice } from './WeekChoiceChip'
 
 /**
  * One triage row — a task title plus one-tap fate buttons — shared by the
@@ -19,12 +20,13 @@ import type { PlacementFate } from '@/lib/planning/lineage'
  * render, so React remounts the whole list on each verdict.
  */
 
-export type Verdict = 'today' | 'tomorrow' | 'week' | 'someday' | 'deleted' | 'completed'
+export type Verdict = 'today' | 'tomorrow' | 'week' | WeekChoice | 'someday' | 'deleted' | 'completed'
 
 export const VERDICT_LABEL: Record<Verdict, string> = {
   today: 'today', tomorrow: 'tomorrow', week: 'this week', someday: 'someday', deleted: 'deleted',
-  completed: 'done',
+  completed: 'done', 'this-weekend': 'this weekend', 'next-week': 'next week', 'next-weekend': 'next weekend',
 }
+const WEEK_CHOICES: Verdict[] = ['this-weekend', 'next-week', 'next-weekend']
 
 interface VerdictHandlers {
   viewedDate: Date
@@ -51,6 +53,9 @@ export async function applyTriageVerdict(t: Task, v: Verdict, h: VerdictHandlers
     return chooseDay(t, day, h, v === 'today')
   } else if (v === 'week') {
     return wasWritten(h.onPushTask?.(t.id, 'week'))
+  } else if (v === 'this-weekend' || v === 'next-week' || v === 'next-weekend') {
+    // A day, as the Inbox's own weekend / next-week choices write it.
+    return chooseDay(t, weekChoices().find((c) => c.when === v)!.date, h, false)
   } else if (v === 'someday') {
     // Same shape RescheduleButton writes — never a partial upsert.
     return wasWritten(h.onUpdateTask(t.id, { bucket: 'someday', scheduledFor: undefined, isAllDay: undefined }))
@@ -176,7 +181,11 @@ export function TriageRow({ task, meta, metaTitle, isNew, offer, verdict, canDel
 
       {!decided && !isGoal && !lead && (
         <span className="mt-1.5 flex flex-wrap items-center justify-end gap-1">
-          {offer.map((v) => verbButton(v, SHORT_LABEL[v] ?? v))}
+          {offer.filter((v) => !WEEK_CHOICES.includes(v)).map((v) => v === 'week' && offer.some((x) => WEEK_CHOICES.includes(x))
+            ? <WeekChoiceChip key={v} label={SHORT_LABEL.week!} title={task.title} onThisWeek={() => onVerdict(task, 'week')}
+                onPick={(w) => onVerdict(task, w)} className="text-xs font-medium px-2 py-1 rounded-md transition-colors text-primary-700 bg-primary-50 hover:bg-primary-100"
+                caretClassName="rounded-md text-primary-700 bg-primary-50 hover:bg-primary-100" />
+            : verbButton(v, SHORT_LABEL[v] ?? v))}
         </span>
       )}
       {!decided && !isGoal && lead && (

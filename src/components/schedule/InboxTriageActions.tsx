@@ -8,6 +8,7 @@ import { MoreHorizontal } from 'lucide-react'
 import { usePopoverFocus } from '@/hooks/usePopoverFocus'
 import { SchedulePopover } from '@/components/triage/SchedulePopover'
 import { RescheduleGrid } from './RescheduleGrid'
+import { WeekChoiceChip } from './WeekChoiceChip'
 import type { TriageWhen } from './TriageWhenMenu'
 import type { TaskContext } from '@/types/task'
 import type { DayLoad } from '@/lib/today/dayLoad'
@@ -92,9 +93,9 @@ export function InboxTriageActions({
       <button type="button" onClick={() => onPick('today')} className={`${direct} bg-primary-50 text-primary-700 hover:bg-primary-100`}>
         Today
       </button>
-      <button type="button" onClick={() => onPick('this-week')} className={`${direct} bg-neutral-50 text-neutral-600 hover:bg-neutral-100`}>
-        This week
-      </button>
+      <WeekChoiceChip label="This week" title={title} onThisWeek={() => onPick('this-week')} onPick={onPick}
+        className={`${direct} bg-neutral-50 text-neutral-600 hover:bg-neutral-100`}
+        caretClassName="rounded-md bg-neutral-50 text-neutral-500 hover:bg-neutral-100 hover:text-neutral-800" />
       <button type="button" onClick={() => onPick('someday')} className={`${direct} bg-neutral-50 text-neutral-600 hover:bg-neutral-100`}>
         Someday
       </button>

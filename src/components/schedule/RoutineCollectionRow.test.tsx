@@ -301,3 +301,19 @@ describe('RoutineCollectionRow at phone width', () => {
     expect(screen.queryByText('0/2')).toBeNull()
   })
 })
+
+describe('RoutineCollectionRow — who does it', () => {
+  it('offers the assignee control a task row has, and shows who is on it', () => {
+    const members = [
+      { id: 'ella', name: 'Ella', initials: 'EL', color: 'teal', member_type: 'core' },
+      { id: 'kaleb', name: 'Kaleb', initials: 'KA', color: 'orange', member_type: 'core' },
+    ] as unknown as Parameters<typeof RoutineCollectionRow>[0]['familyMembers']
+    const item = collectionItem({ title: 'Ella & Kaleb math time', originalRoutine: { assigned_to_all: ['ella', 'kaleb'] } as never })
+    render(<RoutineCollectionRow item={item} {...handlers} familyMembers={members} onAssignAll={vi.fn()} />)
+    expect(screen.getByTitle('Assign people to Ella & Kaleb math time')).toBeInTheDocument()
+  })
+  it('without an assign handler there is no control', () => {
+    render(<RoutineCollectionRow item={collectionItem()} {...handlers} />)
+    expect(screen.queryByTitle(/Assign people to/)).toBeNull()
+  })
+})
