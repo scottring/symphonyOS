@@ -10,12 +10,14 @@ import type { ReactNode } from 'react'
 
 export interface NextStep { label: string; onClick: () => void }
 
-export function PlanToolbar({ period, saved, loading, error, agreedBy, reviewDue, onPlan, onRetry, viewSwitch, tools }: {
+const cap = (s: string) => s.replace(/^./, (c) => c.toUpperCase())
+
+export function PlanToolbar({ period, saved, loading, error, agreedBy, reviewDue, onPlan, onRetry, viewSwitch, tools, justSaved }: {
   /** "week 40", "October", "Fall", "2026" */
   period: string
   saved: { at: Date } | null
   loading: boolean
-  /** The agreed-plan record could not be read: don't claim "no plan", and
+  /** The plan record could not be read: don't claim "not planned", and
    *  don't offer a save that could overwrite what is there. */
   error: boolean
   agreedBy: string | null
@@ -24,22 +26,31 @@ export function PlanToolbar({ period, saved, loading, error, agreedBy, reviewDue
   onRetry: () => void
   viewSwitch?: ReactNode
   tools?: ReactNode
+  /** Just marked planned: the same row says what it holds and offers the
+   *  next step in place of the Plan button (Scott, 2026-09-30: the saved
+   *  card and the status row said one thing twice). */
+  justSaved?: { detail: string; next?: NextStep | null; onDone: () => void } | null
 }) {
   const day = (d: Date) => d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
   const prominent = !error && !loading && (!saved || reviewDue)
   return (
-    <div className="pv2-toolbar">
+    <div className="pv2-toolbar" role={justSaved ? 'status' : undefined}>
       <div className="pv2-status">
         {error
-          ? <span className="pv2-noplan"><span className="pv2-hint">Couldn’t check whether this plan was agreed.</span>
+          ? <span className="pv2-noplan"><span className="pv2-hint">Couldn’t check whether {period} is planned.</span>
             <button type="button" className="pv2-link" onClick={onRetry}>Try again</button></span>
           : saved
-            ? <><span className="pv2-seal" aria-hidden="true" /><span><b>Our {period} plan</b> · agreed {day(saved.at)} · {agreedBy}</span></>
-            : loading ? null : <span className="pv2-hint">{`No ${period} plan yet`}</span>}
+            ? <><span className="pv2-seal" aria-hidden="true" /><span><b>{cap(period)} planned</b> · {day(saved.at)} · {agreedBy}{justSaved?.detail ? <> · {justSaved.detail}</> : null}</span></>
+            : loading ? null : <span className="pv2-hint">{`${cap(period)} isn’t planned yet`}</span>}
       </div>
       {tools}
       {viewSwitch}
-      <button type="button" className={prominent ? 'pv2-btn' : 'pv2-qbtn'} onClick={onPlan} disabled={error}>Plan {period}</button>
+      {justSaved
+        ? <>
+            {justSaved.next && <button type="button" className="pv2-btn" onClick={justSaved.next.onClick}>{justSaved.next.label}</button>}
+            <button type="button" className="pv2-link pv2-quiet" onClick={justSaved.onDone}>Done for now</button>
+          </>
+        : <button type="button" className={prominent ? 'pv2-btn' : 'pv2-qbtn'} onClick={onPlan} disabled={error}>Plan {period}</button>}
     </div>
   )
 }
@@ -70,26 +81,7 @@ export function PlanMeetingBar({ period, prevName, step, lookBack, why, onStep, 
       {viewSwitch}
       <button type="button" className="pv2-link pv2-quiet" onClick={onLeave}>Leave for now</button>
       <button type="button" className="pv2-btn" onClick={onSave}>{saveLabel}</button>
-      <p className="pv2-sbar-why" aria-live="polite">{why}</p>
+      <p className="pv2-sbar-why" aria-live="polite">{why}{step === 2 ? ` Your changes are already saved; “${saveLabel}” records that ${period} is planned.` : ''}</p>
     </div>
   )
 }
-
-/** Left behind by a save until dismissed: what was saved, where it lives, and
- *  one optional next step. */
-export function PlanSavedLine({ title, detail, next, onDone }: {
-  title: string
-  detail: string
-  next?: NextStep | null
-  onDone: () => void
-}) {
-  return (
-    <div className="pv2-saved" role="status">
-      <span className="pv2-seal" aria-hidden="true" />
-      <span className="pv2-saved-text"><b>{title}</b> {detail}</span>
-      {next && <button type="button" className="pv2-btn" onClick={next.onClick}>{next.label}</button>}
-      <button type="button" className="pv2-link pv2-quiet" onClick={onDone}>Done for now</button>
-    </div>
-  )
-}
-

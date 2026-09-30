@@ -1,5 +1,6 @@
 import { publishViewedDay } from '@/lib/viewedDaySignal'
-import { DesktopControlsContext } from '@/components/layout/DesktopNavigation'
+import { DesktopControlsContext, DesktopLeadContext } from '@/components/layout/DesktopNavigation'
+import { createPortal } from 'react-dom'
 import { DesktopFooterAction, DesktopFooterActionContext } from '@/components/layout/DesktopFooter'
 /**
  * TodayView — editorial Today shell.
@@ -40,10 +41,11 @@ import { useDomain } from '@/hooks/useDomain'
 import { MobilePlanControls } from '@/components/layout/PlanNavigation'
 import { PhoneFilterControl } from '@/components/layout/PhoneFilterControl'
 
-import { Eye, EyeOff, Binoculars, Printer, GripVertical, Moon, Sparkles, ArrowRight, PanelLeft, ChevronDown, ChevronRight, Plus, History } from 'lucide-react'
+import { Eye, EyeOff, Binoculars, Printer, GripVertical, Moon, Sparkles, ArrowRight, ChevronDown, ChevronRight, Plus, History } from 'lucide-react'
 import { splitTodayJournal, splitCompletedFocus } from '@/lib/today/journalSplit'
 import { panelActionsFor } from '@/components/reference/DayPlanPanel'
-import { PlanningSheet } from '@/components/reference/PlanningSheet'
+import { TodayWeekColumn } from './TodayWeekColumn'
+import { alreadyPlaced } from '@/lib/today/dayPlan'
 import { unhomedRoutines } from '@/lib/week/unhomedRoutines'
 import { useWeekInstances } from '@/components/home/week/useWeekInstances'
 import { useDayChoices } from '@/hooks/useDayChoices'
@@ -88,7 +90,9 @@ import { ReviewDrawer, type ReviewMode } from './ReviewDrawer'
 import { HorizonPoolDropdown } from './HorizonPoolDropdown'
 import { DayNavCluster } from './DayNavCluster'
 import { MastheadCard } from '@/components/layout/MastheadCard'
-import { planV2Enabled } from '@/lib/planning/v2/planV2'
+import { planV2Enabled, readPlanView, writePlanView, type PlanView } from '@/lib/planning/v2/planV2'
+import { ViewSwitch } from '@/components/plan/v2/ViewSwitch'
+import { weekOfYear } from '@/lib/planning/horizonNumerals'
 import { WeatherChip } from './WeatherChip'
 import { TodayBacklogFooter } from './TodayBacklogFooter'
 import { EmailReviewSheet } from './EmailReviewSheet'
@@ -399,7 +403,6 @@ export function TodayView({
   // never make an obligation disappear. Built from this page's own handlers:
   // no second task fetch.
   const references = useReferenceLists()
-  const todayPinned = !!references?.pins.some((p) => p.kind === 'today')
   const { setPlanned, reschedule: rescheduleInstance } = useActionableInstances()
   const planActions = useMemo(() => makePlanActions({
     findTask: (id) => findTaskById(tasks, id),
@@ -418,23 +421,24 @@ export function TodayView({
     // The sheet's row titles open the same detail pane the page's rows do.
     open: (kind, id) => onSelectItem(`${kind}-${id}`),
   }), [viewedDate, planActions, onToggleTask, onCompleteRoutine, navigate, onSelectItem])
-  const [planOpenDay, setPlanOpenDay] = useState<string | null>(null)
-  const planOpenInline = planOpenDay === localYmd(viewedDate)
-  // The desktop pin is always TODAY's plan; another day, or a phone (which
-  // has no dock), opens the same panel inline instead.
-  // Desktop always plans in the dock (it plans the real today, whichever day
-  // is being read); the sheet is the phone's. Keying this on `isToday` sent a
-  // desktop day-browse to the phone sheet (review, 2026-09-21).
-  const usePin = !isMobile && !!references
-  // Opens the plan: the shell's dock on desktop (pin Today), the sheet on a
-  // phone. Declared here because the ⋯ menu, built above the return, uses it.
-  // One control, open or closed (2026-09-22): the chooser is closable from
-  // the same button that opened it.
-  const openPlan = () => {
-    if (usePin) { if (todayPinned) references!.unpin('today'); else references!.pin('today') }
-    else setPlanOpenDay(planOpenInline ? null : localYmd(viewedDate))
-  }
-  const chooserOpen = usePin ? todayPinned : planOpenInline
+  // The week beside the day (Scott, 2026-09-30: "above all else, it has to
+  // be consistent"): every horizon keeps the level above in a column on its
+  // right, switched by the same view icons — Today too. The Shelves drawer
+  // this replaces made Today the one page that hid what you choose from.
+  // Hidden unless chosen (Scott, 2026-09-30: Today's default stays the day
+  // alone); "Pick something for today" opens it with the week showing.
+  const [todayView, setTodayViewState] = useState<PlanView>(() => readPlanView('today') === 'ref' ? 'ref' : 'list')
+  const setTodayView = (v: PlanView) => { setTodayViewState(v); writePlanView('today', v) }
+  const showWeek = todayView === 'ref'
+  const weekNo = weekOfYear(viewedDate, readCadenceConfig().weekStartsOn)
+  // The dock's Today pin showed this same list beside the page; the column
+  // holds it now, so the page never shows it twice.
+  useEffect(() => {
+    if (references?.pins.some((p) => p.kind === 'today')) references.unpin('today')
+  }, [references])
+  // The column's own rule (DayPlanPanel's "Still to place"), so the count
+  // and the list beside it agree.
+  const stillToPlace = data.dayPlan.chooserTasks.filter((e) => !e.completed && !alreadyPlaced(e, viewedDate)).length
   const [agendaDropOver, setAgendaDropOver] = useState(false)
   const agendaDrop = planDropHandlers((payload) => {
     void planActions.drop(payload, { type: 'day', day: viewedDate }, { chooseOnly: true })
@@ -450,6 +454,7 @@ export function TodayView({
   const { getCurrentUserMember } = useFamilyMembers()
   const meId = getCurrentUserMember()?.id ?? null
   const desktopControls = useContext(DesktopControlsContext)
+  const desktopLead = useContext(DesktopLeadContext)
   // In the desktop shell the day's review lives in the page footer, so the
   // ⋯ menu drops its copy there (phones keep the menu entry).
   const reviewInFooter = !!useContext(DesktopFooterActionContext) && !isMobile
@@ -822,7 +827,10 @@ export function TodayView({
       ? upNext
         ? `Next: ${upNext.item.title}${nextTimeLabel ? ` · ${nextTimeLabel}` : ''}`
         // A failed task read knows nothing about the week ahead.
-        : tasksLoadFailed ? 'Your tasks didn’t load.' : forwardLine(forwardLook(tasks, viewedDate), viewedDate)
+        : tasksLoadFailed ? 'Your tasks didn’t load.'
+          // "Nothing else coming up this week" read wrong over a week list
+          // with steps still to place (walkthrough 2026-09-30): say so.
+          : (() => { const ahead = forwardLook(tasks, viewedDate); return !ahead && stillToPlace > 0 ? `Nothing else dated this week · ${stillToPlace} still to place.` : forwardLine(ahead, viewedDate) })()
       : data.counts.totalItems === 0
         ? (tasksLoadFailed ? 'Your tasks didn’t load.' : 'Nothing planned for this day.')
         : firstTimed
@@ -1325,7 +1333,9 @@ export function TodayView({
   }
 
   return (
-    <div className="w-full max-w-[1152px] mr-auto px-0 py-2 md:px-10 lg:px-14 md:pt-2 md:pb-8">
+    // @container: the day and its week column split on the page's own width
+    // (no ancestor declared one, so the old decision rail never went beside).
+    <div className="@container w-full max-w-[1152px] mr-auto px-0 py-2 md:px-10 lg:px-14 md:pt-2 md:pb-8">
       {/* Today's filter and ⋯ live in its heading beside the lens and the
           assistant, as every horizon's page controls do — the top bar is the
           same on every page (2026-09-29). */}
@@ -1371,6 +1381,8 @@ export function TodayView({
         </div>
       )}
 
+      {data.isToday && desktopLead && !isMobile && createPortal(<WeatherChip now={nowForDisplay} />, desktopLead)}
+
       {/* An open masthead and continuous agenda give Today the shape of a daybook. */}
       <MastheadCard
         variant="daybook"
@@ -1391,33 +1403,27 @@ export function TodayView({
         controls={desktopControls && !isMobile ? <div className="flex items-center gap-2">{headerControls}{desktopToolbar}</div> : headerControls}
         // The masthead's ear: today's weather, one quiet line. The feed only
         // knows today, so another day's page says nothing rather than
-        // showing today's sky over Saturday.
-        aside={data.isToday ? <WeatherChip now={nowForDisplay} /> : undefined}
+        // showing today's sky over Saturday. In the desktop Shell it sits in
+        // the top bar beside the ☰ instead (Scott, 2026-09-30).
+        aside={data.isToday && !(desktopLead && !isMobile) ? <WeatherChip now={nowForDisplay} /> : undefined}
         // Shell desktop controls live in the page navigation; standalone
         // mounts retain the footer controls as a fallback.
         // Standalone mounts keep their controls along the foot; in the Shell
         // there is no foot row at all (it was an empty ruled row, 2026-09-23).
         footer={!desktopControls ? desktopToolbar : undefined}
-        // Shelves sits beside the date, at the header's bottom right.
-        action={
-          <button
-            type="button"
-            onClick={openPlan}
-            aria-expanded={chooserOpen}
-            aria-label={chooserOpen ? 'Close shelves' : 'Shelves'}
-            className={`daybook-choose${chooserOpen ? ' is-open' : ''}`}
-          >
-            <PanelLeft className="h-3.5 w-3.5" aria-hidden="true" />
-            <span>Shelves</span>
-          </button>
-        }
 
       />
 
 
-      {/* The rail column only exists when the rail does; otherwise the day gets
-          the full width instead of a 320px empty gutter. */}
-      <div className={`px-4 md:px-0 ${decisionCount > 0 ? '@[62rem]:grid @[62rem]:grid-cols-[minmax(0,1fr)_320px] @[62rem]:items-start @[62rem]:gap-8' : ''}`}>
+      {/* The same control row every horizon has: what the column beside is,
+          and the view icons (list, or with the level above). */}
+      <div className="pv2-toolbar today-toolbar px-4 md:px-0">
+        <div className="pv2-status"><span className="pv2-hint">Week {weekNo} · {stillToPlace === 0 ? 'nothing still to place' : `${stillToPlace} still to place`}</span></div>
+        <ViewSwitch view={todayView} onChange={setTodayView} aboveName={`week ${weekNo}`} withFocus={false} />
+      </div>
+      {/* The column beside the day: the week (and anything needing a
+          decision). The day gets the full width only when there is none. */}
+      <div className={`px-4 md:px-0 ${showWeek || decisionCount > 0 ? '@[48rem]:grid @[48rem]:grid-cols-[minmax(0,1fr)_280px] @[48rem]:items-start @[48rem]:gap-9' : ''}`}>
         <main className="min-w-0">
           {/* The "N need a decision" banner that stood here at narrow widths
               is gone (Scott, 2026-09-21): a count on Today is a scoreboard,
@@ -1520,10 +1526,6 @@ export function TodayView({
                 />
               </div>
             )}
-            {/* On a phone the Planning panel is a sheet, not an inline fold. */}
-            {!usePin && (
-              <PlanningSheet open={planOpenInline} onClose={() => setPlanOpenDay(null)} plan={data.dayPlan} day={viewedDate} actions={planPanelActions} />
-            )}
             {tasksLoadFailed && onRetryTasks && (
               <LoadFailedNotice title="Today didn’t load." body="Your tasks are safe — this is a connection problem." onRetry={onRetryTasks} />
             )}
@@ -1545,13 +1547,16 @@ export function TodayView({
               <div className="py-4">
                 <p className="font-display text-lg text-neutral-600">{focusWork.completedCount ? 'Everything on your list is done.' : 'Nothing chosen yet.'}</p>
                 <p className="mt-1 text-[14px] text-neutral-500">
-                  Choose from this week's tasks, or add something for {data.isToday ? 'today' : 'this day'}.
+                  {showWeek
+                    ? <>Choose from week {weekNo} {isMobile ? 'below' : 'beside this list'}, or add something for {data.isToday ? 'today' : 'this day'}.</>
+                    : <>Add something for {data.isToday ? 'today' : 'this day'}, or{' '}
+                        <button type="button" className="text-primary-700 underline underline-offset-2" onClick={() => setTodayView('ref')}>show week {weekNo}</button> to choose from it.</>}
                 </p>
                 {/* Say when the view is narrowed, so an empty filtered list
                     isn't read as an empty day. No hidden counts. */}
                 {filtersNarrowing && (
                   <p className="mt-2 text-[14px] text-neutral-500">
-                    Domain or person filters are on.{' '}
+                    Area or person filters are on.{' '}
                     <button type="button" onClick={showEverything} className="font-medium text-primary-600 underline-offset-2 hover:underline">
                       Show everything
                     </button>
@@ -1677,8 +1682,9 @@ export function TodayView({
             assistant, the inbox or email actually put something in it, and is
             absent otherwise. A card whose job is to announce its own emptiness
             still costs a third of the page. */}
-        {decisionCount > 0 && (
-        <aside className="mt-4 hidden space-y-3 @[62rem]:mt-0 @[62rem]:block">
+        {(decisionCount > 0 || showWeek) && (
+        <aside className="today-aside mt-6 space-y-6 @[48rem]:mt-0">
+          {decisionCount > 0 && (<div className="hidden @[48rem]:block">
           <section className="daybook-decisions">
             <div className="mb-3 flex items-center justify-between gap-3">
               <div>
@@ -1717,7 +1723,11 @@ export function TodayView({
               )}
             </div>
           </section>
-
+          </div>)}
+          {showWeek && (
+            <TodayWeekColumn plan={data.dayPlan} day={viewedDate} weekNo={weekNo}
+              weekStart={weekStartAnchor(viewedDate, readCadenceConfig().weekStartsOn)} actions={planPanelActions} />
+          )}
         </aside>
         )}
       </div>

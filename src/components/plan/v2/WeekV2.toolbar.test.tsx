@@ -27,7 +27,7 @@ describe('WeekV2 toolbar — one "Plan week N" action', () => {
 
   it('an unplanned week says so, and its one Plan button is prominent and opens planning', () => {
     renderWeek()
-    expect(screen.getByText(/No week \d+ plan yet/)).toBeTruthy()
+    expect(screen.getByText(/Week \d+ isn’t planned yet/)).toBeTruthy()
     expect(screen.queryByRole('button', { name: 'Weekly review' })).toBeNull()
     const plan = screen.getByRole('button', { name: /^Plan week \d+$/ })
     expect(plan.className).toBe('pv2-btn')
@@ -38,20 +38,20 @@ describe('WeekV2 toolbar — one "Plan week N" action', () => {
   it('an agreed week shows its status and a quiet Plan button', () => {
     session.saved = { authorId: 'me', at: new Date(2026, 8, 26) }
     renderWeek()
-    expect(screen.getByText(/Our week \d+ plan/)).toBeTruthy()
+    expect(screen.getByText(/Week \d+ planned/)).toBeTruthy()
     expect(screen.getByRole('button', { name: /^Plan week \d+$/ }).className).toBe('pv2-qbtn')
   })
 
   it('no "no plan" claim while the session is still loading', () => {
     session.loading = true
     renderWeek()
-    expect(screen.queryByText(/No week \d+ plan yet/)).toBeNull()
+    expect(screen.queryByText(/Week \d+ isn’t planned yet/)).toBeNull()
   })
 
   it('a failed read says so, offers Try again, and cannot start a save that would overwrite', () => {
     session.error = 'network'
     renderWeek()
-    expect(screen.queryByText(/No week \d+ plan yet/)).toBeNull()
+    expect(screen.queryByText(/Week \d+ isn’t planned yet/)).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: 'Try again' }))
     expect(session.reload).toHaveBeenCalled()
     expect((screen.getByRole('button', { name: /^Plan week \d+$/ }) as HTMLButtonElement).disabled).toBe(true)
@@ -61,11 +61,12 @@ describe('WeekV2 toolbar — one "Plan week N" action', () => {
     session.save.mockResolvedValue(true)
     renderWeek()
     fireEvent.click(screen.getByRole('button', { name: /^Plan week \d+$/ }))
-    fireEvent.click(screen.getByRole('button', { name: 'This is our week' }))
-    expect(await screen.findByText(/Week \d+ plan saved\./)).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: /^Mark week \d+ planned$/ }))
+    expect(await screen.findByRole('button', { name: 'Done for now' })).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Pick something for today' })).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: 'Done for now' }))
-    expect(screen.queryByText(/plan saved\./)).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Done for now' })).toBeNull()
+    expect(screen.getByRole('button', { name: /^Plan week \d+$/ })).toBeTruthy()
   })
 })
 
@@ -113,5 +114,17 @@ describe('WeekV2 reference while tasks load', () => {
     expect(screen.getAllByText('Loading…').length).toBe(2)
     expect(screen.queryByText(/Nothing open on/)).toBeNull()
     vi.doUnmock('@/hooks/useSupabaseTasks')
+  })
+})
+
+// Walkthrough 2026-09-30: nothing said "Hang porch plants" had a step this week.
+describe('WeekV2 — a month goal says how many steps this week serve it', () => {
+  beforeEach(() => { session.saved = null; session.loading = false; session.error = null })
+  it('counts the week’s steps under their goal', () => {
+    const goal = { id: 'g1', title: 'Hang porch plants', completed: false, isGoal: true, bucket: 'month', monthStart: new Date(2026, 9, 1), createdAt: new Date(2026, 8, 29), assignedTo: 'me' }
+    const step = { id: 's1', title: 'Buy porch plant hooks', completed: false, bucket: 'week', weekStart: new Date(2026, 8, 26), goalTaskId: 'g1', createdAt: new Date(2026, 8, 30), assignedTo: 'me' }
+    render(<MemoryRouter><WeekV2 tasks={[goal, step] as never} weekStart={new Date(2026, 8, 26)} meId="me" isCurrent days={null} onSelectTask={vi.fn()} /></MemoryRouter>)
+    fireEvent.click(screen.getByRole('button', { name: /^Plan week \d+$/ }))
+    expect(screen.getByText('1 step this week')).toBeTruthy()
   })
 })

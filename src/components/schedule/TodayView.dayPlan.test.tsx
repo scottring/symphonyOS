@@ -70,7 +70,7 @@ function renderView(props: Record<string, unknown> = {}) {
   return { ...view, onToggleTask }
 }
 
-beforeEach(() => { sessionStorage.clear(); mobile.value = true })
+beforeEach(() => { sessionStorage.clear(); localStorage.removeItem('symphony-plan-v2.view.today'); mobile.value = true })
 
 describe('Today — the way to Planning', () => {
   // Scott, 2026-09-21: Today shows what you scheduled for today plus what you
@@ -88,37 +88,32 @@ describe('Today — the way to Planning', () => {
     expect(screen.queryByText(/\d scheduled for today/)).toBeNull()
   })
 
-  it('on a phone the "For today" heading\'s Choose button opens the sheet with the same plan, titled "Reference"', () => {
+  // Scott, 2026-09-30: one shape on every horizon — the level above in a
+  // column beside the list, no drawer. Today shows its week there.
+  it('the week sits beside the day once chosen — flat rows, + Today; no Shelves drawer', () => {
     const { onToggleTask } = renderView()
-    const line = screen.getByRole('button', { name: 'Shelves' })
-    expect(line).toHaveAttribute('aria-expanded', 'false')
-    fireEvent.click(line)
-    const sheet = screen.getByRole('dialog', { name: 'Shelves' })
-    expect(within(sheet).getByRole('heading', { name: 'Shelves' })).toBeInTheDocument()
-    const panel = within(sheet).getByTestId('day-plan-panel')
-    // The dated task is on the page, not in the sheet; the chore waits here.
-    expect(within(panel).queryByText('Pick up foot meds')).not.toBeInTheDocument()
-    fireEvent.click(within(panel).getByRole('navigation', { name: 'Shelf source' }).querySelector('button:last-child')!)
-    expect(within(panel).getByText('Kids clean rooms')).toBeInTheDocument()
-    // Touch layout: no drag handles, every action is a button.
-    expect(panel.querySelector('[draggable="true"]')).toBeNull()
-    expect(within(panel).getByRole('button', { name: 'Choose Kids clean rooms for today' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Shelves' })).toBeNull()
+    // Today opens on the day alone (Scott, 2026-09-30); the view icon adds the week.
+    expect(screen.queryByRole('region', { name: /for reference$/ })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: /^With week \d+$/ }))
+    const column = screen.getByRole('region', { name: /^Week \d+, for reference$/ })
+    // The dated task is on the page, not in the column; the chore waits here.
+    expect(within(column).queryByText('Pick up foot meds')).not.toBeInTheDocument()
+    expect(within(column).getByText('Kids clean rooms')).toBeInTheDocument()
+    expect(within(column).getByRole('button', { name: 'Add Kids clean rooms to today' })).toBeInTheDocument()
     expect(onToggleTask).not.toHaveBeenCalled()
-    // The same button closes it.
-    fireEvent.click(within(screen.getByTestId('masthead-card')).getByRole('button', { name: 'Close shelves' }))
-    expect(screen.getByRole('button', { name: 'Shelves' })).toHaveAttribute('aria-expanded', 'false')
   })
 
-  it('on desktop the "For today" heading\'s Choose button pins the chooser beside the page and unpins it again; no second prompt', () => {
+  it('the same view icons as every horizon: List hides the week, With week N brings it back', () => {
     mobile.value = false
     renderView()
-    expect(screen.getByTestId('pins')).toHaveTextContent('')
-    expect(screen.queryByRole('button', { name: /Choose something for today/ })).toBeNull()
-    const choose = screen.getByRole('button', { name: 'Shelves' })
-    expect(choose).toHaveAttribute('aria-expanded', 'false')
-    fireEvent.click(choose)
-    expect(screen.getByTestId('pins')).toHaveTextContent('today')
-    fireEvent.click(within(screen.getByTestId('masthead-card')).getByRole('button', { name: 'Close shelves' }))
+    fireEvent.click(screen.getByRole('button', { name: /^With week \d+$/ }))
+    expect(screen.getByRole('region', { name: /for reference$/ })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'List' }))
+    expect(screen.queryByRole('region', { name: /for reference$/ })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: /^With week \d+$/ }))
+    expect(screen.getByRole('region', { name: /for reference$/ })).toBeInTheDocument()
+    // The column replaces the dock's Today pin — never both.
     expect(screen.getByTestId('pins')).toHaveTextContent('')
     expect(ctxValue.onUpdateTask).not.toHaveBeenCalled()
   })

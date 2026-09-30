@@ -25,7 +25,7 @@ import type { Goal } from '@/types/goal'
 import type { Task } from '@/types/task'
 import { PlanLine, type LineActions, type LineVM } from './PlanLine'
 import { FocusDeck, CloseOut, type CloseDecision } from './FocusDeck'
-import { PlanMeetingBar, PlanSavedLine, PlanToolbar } from './PlanStatus'
+import { PlanMeetingBar, PlanToolbar } from './PlanStatus'
 import { EMPTY_TALLY, addToTally, lookBackWhy, nextAfterSave, tallySentence, type Tally } from '@/lib/planning/v2/planTally'
 import { periodBounds } from '@/lib/planning/periodPage'
 import { readSeasons } from '@/lib/cadence/seasons'
@@ -196,14 +196,16 @@ function Inner() {
             : 'Write what this year is for. A few lines is plenty; each can hold smaller plans later.'}
           onStep={(step) => setMeeting({ ...meeting!, step })}
           viewSwitch={meeting!.step === 2 && meeting!.candidateIds.length === 0 ? viewSwitch : undefined}
-          onLeave={() => void endMeeting(false)} onSave={() => void endMeeting(true)} saveLabel={`This is our ${year} plan`} />
-      ) : (<>
-        {justSaved && <PlanSavedLine title={`${year} plan saved.`} detail={justSaved.detail}
-          next={{ label: nextStep.label, onClick: () => navigate(nextStep.to) }}
-          onDone={() => setJustSaved(null)} />}
+          onLeave={() => void endMeeting(false)} onSave={() => void endMeeting(true)} saveLabel={`Mark ${year} planned`} />
+      ) : (
         <PlanToolbar period={String(year)} saved={session.saved} loading={session.loading} error={!!session.error} agreedBy={agreedBy}
-          reviewDue={reviewDue} onPlan={startMeeting} onRetry={session.reload} viewSwitch={viewSwitch} />
-      </>)}
+          reviewDue={reviewDue} onPlan={startMeeting} onRetry={session.reload} viewSwitch={viewSwitch}
+          justSaved={justSaved && {
+            detail: justSaved.detail,
+            next: { label: nextStep.label, onClick: () => { writePlanView('season', 'ref'); navigate(nextStep.to) } },
+            onDone: () => setJustSaved(null),
+          }} />
+      )}
       {body}
     </div>
   )

@@ -111,7 +111,7 @@ export function GuideBar() {
         {!last && <button type="button" className="pv2-link pv2-quiet" onClick={() => void onFinishHere()}>Finish here</button>}
         {here
           ? <button type="button" className="pv2-btn" onClick={() => void onContinue()}>
-              {last ? (step === 'today' ? 'Finish' : `Save ${short} and finish`) : `Save ${short} and continue`}
+              {last ? (step === 'today' ? 'Finish' : `Mark ${short} planned and finish`) : step === 'today' ? 'Continue' : `Mark ${short} planned and continue`}
             </button>
           : <button type="button" className="pv2-btn" onClick={() => go(state)}>Go to {short}</button>}
       </div>

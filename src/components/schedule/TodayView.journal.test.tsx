@@ -108,6 +108,7 @@ describe('Carried over', () => {
 })
 
 beforeEach(() => {
+  localStorage.removeItem('symphony-plan-v2.view.today')
   domainMock.layers = ALL_LAYERS
   sessionStorage.clear()
   mobile.value = false
@@ -142,14 +143,14 @@ describe('Today as a daily journal', () => {
     expect(screen.getByText('Do kids laundry')).toBeInTheDocument()
   })
 
-  it('an empty focus says what the two heading controls are for; Choose opens the Today pin', () => {
+  it('an empty focus offers the week to choose from — a control you can see', () => {
     renderView({ tasks: tasks.filter((t) => t.id !== 'dryer') })
     expect(screen.getByText('Nothing chosen yet.')).toBeInTheDocument()
-    expect(screen.getByText(/Choose from this week's tasks, or add something for today/)).toBeInTheDocument()
-    // One door, on the heading — no second prompt in the empty state.
     expect(screen.queryByRole('button', { name: /Choose something for today/ })).toBeNull()
-    fireEvent.click(screen.getByRole('button', { name: 'Shelves' }))
-    expect(screen.getByTestId('pins')).toHaveTextContent('today')
+    // Today opens without the week; the empty state offers it.
+    fireEvent.click(screen.getByRole('button', { name: /^show week \d+$/ }))
+    expect(screen.getByRole('region', { name: /for reference$/ })).toBeInTheDocument()
+    expect(screen.getByText(/Choose from week \d+ (beside this list|below), or add something for today/)).toBeInTheDocument()
   })
 
   it('an empty list under filters says the filters are on and offers Show everything', () => {
