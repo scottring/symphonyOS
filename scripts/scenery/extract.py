@@ -3,8 +3,13 @@
 Each concept is a full-page mockup with UI text baked in. The illustration
 is taken only from regions the UI never touched: below the task column,
 beside the right column, and above the footer line. The paper-coloured sky
-is keyed to transparency so the art sits on any page tint, and each half
-fades out on its inner edge so the centre stays clear.
+is keyed to transparency so the art sits on any page tint.
+
+Each place yields three images: its left and right halves (tall at the outer
+edges, fading out toward the middle), and a strip of its lowest ground from
+the middle of the scene, mirrored so it tiles without a seam. The app stands
+the halves in the two bottom corners and runs the ground between them, so
+the scene dips low under the page's content.
 
 Usage (needs Pillow + numpy):
     python scripts/scenery/extract.py <concepts-dir> src/assets/scenery
@@ -64,37 +69,62 @@ def key_paper(rgb):
     return np.clip(color, 0, 255), a
 
 
-def inner_fade(w, side, start=0.52):
+
+def inner_fade(w, side, start=0.72):
     x = np.linspace(0, 1, w)
-    if side == 'left':
-        t = np.clip((x - start) / (1 - start), 0, 1)
-    else:
-        t = np.clip(((1 - x) - start) / (1 - start), 0, 1)
+    t = np.clip(((x if side == 'left' else 1 - x) - start) / (1 - start), 0, 1)
     return 1 - t * t * (3 - 2 * t)
 
 
-meta = {}
+# A stretch of each scene's lowest ground (canvas coords) that repeats without
+# drawing the eye — no benches, planters or barns to be seen twice: stream
+# and rocks, wheat, grass and flowers, river water, sidewalk.
+GROUND = {
+    'cabin': (400, 812, 640, Y_BOTTOM),
+    'farm': (640, 812, 780, Y_BOTTOM),
+    'mountain-town': (800, 828, 960, Y_BOTTOM),
+    'small-city': (560, 816, 660, Y_BOTTOM),
+    'urban': (140, 840, 400, Y_BOTTOM),
+}
+
+
+def ground_tile(theme):
+    a, b, c, d = GROUND[theme]
+    im = Image.open(SRC / f'{theme}.png').convert('RGB').crop((a, b, c, d))
+    color, alpha = key_paper(np.array(im, dtype=np.float32))
+    color = calm(color)
+    h = alpha.shape[0]
+    y = np.linspace(0, 1, h)[:, None]
+    t = np.clip(y / 0.45, 0, 1)
+    alpha = alpha * (t * t * (3 - 2 * t))  # soft top edge
+    rgba = np.dstack([color, alpha * 255]).astype(np.uint8)
+    tile = np.concatenate([rgba, rgba[:, ::-1]], axis=1)  # mirrored: seamless repeat
+    Image.fromarray(tile, 'RGBA').save(OUT / f'{theme}-ground.webp', 'WEBP', quality=84, method=6, exact=False)
+    return tile.shape
+
+
+def calm(color):
+    """Less saturation, lifted a touch toward the paper."""
+    lum = (color * np.array([0.299, 0.587, 0.114])).sum(axis=2, keepdims=True)
+    color = lum + (color - lum) * 0.86
+    return color * 0.94 + PAPER * 0.06
+
+
 for theme in ['urban', 'small-city', 'mountain-town', 'cabin', 'farm']:
     im = Image.open(SRC / f'{theme}.png').convert('RGB').crop((X0, Y_TOP, X1, Y_BOTTOM))
     rgb = np.array(im, dtype=np.float32)
     color, alpha = key_paper(rgb)
     alpha = alpha * ui_mask(im.width, im.height)
-    # Calm it a touch: less saturation, lifted toward the paper.
-    lum = (color * np.array([0.299, 0.587, 0.114])).sum(axis=2, keepdims=True)
-    color = lum + (color - lum) * 0.86
-    color = color * 0.94 + PAPER * 0.06
+    color = calm(color)
 
-    # Trim empty sky rows off the top (shared by both halves).
+    # Trim empty sky rows off the top.
     rows = np.where(alpha.max(axis=1) > 0.04)[0]
     top = int(rows[0]) if len(rows) else 0
     color, alpha = color[top:], alpha[top:]
     h, w = alpha.shape
     half = w // 2
-    meta[theme] = {'height': h, 'halfWidth': half, 'top': Y_TOP + top}
     for side, sl in (('left', slice(0, half)), ('right', slice(w - half, w))):
         a = alpha[:, sl] * inner_fade(half, side)[None, :]
         rgba = np.dstack([color[:, sl], a * 255]).astype(np.uint8)
-        img = Image.fromarray(rgba, 'RGBA')
-        img.save(OUT / f'{theme}-{side}.webp', 'WEBP', quality=84, method=6, exact=False)
-    print(theme, meta[theme])
-
+        Image.fromarray(rgba, 'RGBA').save(OUT / f'{theme}-{side}.webp', 'WEBP', quality=84, method=6, exact=False)
+    print(theme, {'height': h, 'halfWidth': half, 'ground': ground_tile(theme)[:2]})

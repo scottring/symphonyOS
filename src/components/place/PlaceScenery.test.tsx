@@ -30,7 +30,7 @@ describe('PlaceScenery', () => {
     expect(scenery).toHaveAttribute('aria-hidden', 'true')
     expect(scenery.textContent).toBe('')
     expect(scenery.querySelectorAll('button, a, input, [tabindex]')).toHaveLength(0)
-    // Both corners draw, as images with empty alt text.
+    // Both sides draw, as images with empty alt text.
     const art = scenery.querySelectorAll('img')
     expect(art).toHaveLength(2)
     art.forEach((img) => expect(img).toHaveAttribute('alt', ''))

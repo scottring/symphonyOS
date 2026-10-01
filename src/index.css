@@ -2755,7 +2755,8 @@ div.chooser-action-group { overflow: visible !important; }
   box-shadow: none;
 }
 /* Your place BEHIND the page (PlaceScenery.tsx, Scott 2026-09-30): the scene
-   stands in the two bottom corners of the window, the centre clear, and takes
+   runs along the bottom of the window, tall at the sides and dipping low in
+   the middle under the page's content, and takes
    no layout space — the page gets the whole viewport. A paper veil over the
    art thickens over the first 150px of scroll (--scenery-progress, written by
    sceneryVeil.ts), so the place shows in unused space at the top of the page
@@ -2764,10 +2765,11 @@ div.chooser-action-group { overflow: visible !important; }
   position: fixed; top: 0; bottom: 0; left: 0; /* right: the side pane, inline */
   overflow: hidden; pointer-events: none; user-select: none;
   container-type: inline-size;
-  /* How tall each corner stands — small and low, a vignette rather than a
-     backdrop (Scott, 2026-10-01: "smaller, like the left side" of the
-     reference). */
-  --scenery-height: min(20vh, 190px);
+  /* The tallest the scene may stand at its sides; the middle stays low. */
+  --scenery-height: min(30vh, 270px);
+  /* px per source px: the scene drawn small, or smaller still when the two
+     halves (514 source px each) would not fit side by side. */
+  --scenery-unit: min(0.72px, calc(50cqw / 514));
   /* What it stands on: the desktop footer, or the phone's tab bar (inline). */
   --scenery-floor: 60px;
   /* Paper over the art at the top of the page, and once scrolled. */
@@ -2779,20 +2781,24 @@ div.chooser-action-group { overflow: visible !important; }
    its own text off the art, so the scene may show fully where the page is
    empty. Every other page gets the quiet scene above. */
 html.has-place-paper .place-scenery { --scenery-rest: 0; }
-.place-scenery-ground { position: absolute; left: 0; right: 0; bottom: var(--scenery-floor); }
-/* Each corner is a wide, low window onto its half of the scene: shown at one
-   scale (so the two ground lines stay level), cut to the corner's height,
-   with whatever rises above it — the tallest trees and towers — fading into
-   the sky rather than shrinking the whole scene to fit. Each half is 514
-   source px wide; on a narrow screen the scale drops until both fit. */
+/* Taller at both sides, dipping in the middle (Scott, 2026-10-01): each half
+   of the scene stands in its corner, and between them runs a low strip of
+   the scene's own ground, so the art under the page's content is only ever
+   that strip. */
+.place-scenery-ground { position: absolute; left: 0; right: 0; bottom: var(--scenery-floor); height: var(--scenery-height); }
+.place-scenery-strip {
+  position: absolute; left: 0; right: 0; bottom: 0;
+  height: calc(var(--scenery-ground-rise) * var(--scenery-unit));
+  background: var(--scenery-ground) center bottom / auto 100% repeat-x;
+}
 .place-scenery-corner {
-  --scenery-unit: min(0.72px, calc(50cqw / 514));
   position: absolute; bottom: 0;
   width: calc(514 * var(--scenery-unit));
   height: min(var(--scenery-height), calc(var(--scenery-rise) * var(--scenery-unit)));
   overflow: hidden;
-  -webkit-mask-image: linear-gradient(to bottom, transparent, #000 40%);
-  mask-image: linear-gradient(to bottom, transparent, #000 40%);
+  /* Anything taller than the corner fades into the sky, not a hard edge. */
+  -webkit-mask-image: linear-gradient(to bottom, transparent, #000 18%);
+  mask-image: linear-gradient(to bottom, transparent, #000 18%);
 }
 .place-scenery-corner.is-left { left: 0; }
 .place-scenery-corner.is-right { right: 0; }
@@ -2809,7 +2815,7 @@ html.has-place-paper .place-scenery { --scenery-rest: 0; }
 /* Short windows and phones: smaller art and more paper from the start, so
    the page reads without scrolling first. */
 @media (max-height: 720px) {
-  .place-scenery { --scenery-height: 17vh; }
+  .place-scenery { --scenery-height: 24vh; }
   html.has-place-paper .place-scenery { --scenery-rest: 0.25; }
 }
 @media (max-width: 767px) {
