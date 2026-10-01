@@ -41,8 +41,22 @@ describe('refusalFor', () => {
   it('refuses a synthetic meal item', () => {
     expect(refusalFor(item({ id: 'meal:mon-dinner', type: 'event' }), () => false)).toMatch(/meal/i)
   })
-  it('refuses a routine collection', () => {
-    expect(refusalFor(item({ id: 'routine-collection-1', type: 'routine-collection' }), () => false)).toBeTruthy()
+  it('allows a routine whose steps carry no time of their own — the routine holds the hour', () => {
+    const coll = item({
+      id: 'routine-collection-1', type: 'routine-collection',
+      collectionSteps: [{ stepId: 's1', name: 'Tidy', progress: { done: 0, total: 1 }, doses: [{ id: 'routine-s1', time: null, completed: false, skipped: false }] }],
+    })
+    expect(refusalFor(coll, () => false)).toBeNull()
+  })
+  it('refuses a routine whose steps keep their own times — one drop cannot move them all', () => {
+    const coll = item({
+      id: 'routine-collection-1', type: 'routine-collection',
+      collectionSteps: [{ stepId: 's1', name: 'Stretch', progress: { done: 0, total: 2 }, doses: [
+        { id: 'routine-s1#0', time: '07:00', completed: false, skipped: false },
+        { id: 'routine-s1#1', time: '19:00', completed: false, skipped: false },
+      ] }],
+    })
+    expect(refusalFor(coll, () => false)).toMatch(/own times/i)
   })
   it('refuses a DOSED routine step', () => {
     // grouping.ts applies a deferred_to override by BARE id only, so a dosed
@@ -532,5 +546,35 @@ describe('writeMoveAndRegisterUndo', () => {
 
     expect(ok).toBe(true)
     expect(registerUndo).not.toHaveBeenCalled()
+  })
+})
+
+describe('a multi-step routine on Today', () => {
+  const coll = item({ id: 'routine-collection-c1', type: 'routine-collection', collectionSteps: [] })
+
+  it('dropped on a band, gets a time for the day', () => {
+    const sections = emptySections<TimelineItem>()
+    sections.unscheduled = [coll]
+    const out = resolveDrop(ctx({ activeId: coll.id, overId: bandDropId('afternoon'), sections }))
+    expect(out).toHaveLength(1)
+    expect(out[0]).toMatchObject({ kind: 'set-time', itemId: 'routine-collection-c1' })
+    if (out[0].kind === 'set-time') expect(out[0].when.getHours()).toBe(12)
+  })
+
+  it('never joins a group — it has no member ref to join with', () => {
+    const t = item({ id: 'task-t1' })
+    const sections = emptySections<TimelineItem>()
+    sections.unscheduled = [coll]
+    sections.morning = [t]
+    const out = resolveDrop(ctx({ activeId: coll.id, overId: rowDropId('task-t1'), sections }))
+    expect(out).toEqual([{ kind: 'refuse', reason: expect.stringMatching(/group/i) }])
+  })
+
+  it('is not a group target either', () => {
+    const t = item({ id: 'task-t1' })
+    const sections = emptySections<TimelineItem>()
+    sections.morning = [t, { ...coll, startTime: new Date(2026, 6, 25, 9) }]
+    const out = resolveDrop(ctx({ activeId: 'task-t1', overId: rowDropId(coll.id), sections }))
+    expect(out).toEqual([{ kind: 'refuse', reason: expect.stringMatching(/group/i) }])
   })
 })

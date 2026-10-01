@@ -114,8 +114,12 @@ export function refusalFor(
   if (String(item.id).startsWith('meal:')) {
     return 'Meals come from the meal plan — change it there.'
   }
-  if (item.type === 'routine-collection') {
-    return 'Open the routine to give its steps times.'
+  // A multi-step routine moves as one block when the ROUTINE holds the hour
+  // (its steps have none of their own): the drop writes a one-day time on the
+  // routine itself, which buildCollectionItem reads back. Steps with their own
+  // times would stay put while the row moved, so those are still refused.
+  if (item.type === 'routine-collection' && item.collectionSteps?.some((s) => s.doses.some((d) => d.time))) {
+    return "This routine's steps have their own times — set them on the routine."
   }
   if (item.type === 'routine' && String(item.id).includes('#')) {
     // grouping.ts applies a deferred_to time override by BARE id only, so a
@@ -275,6 +279,11 @@ export function resolveDrop(ctx: DropContext): DropIntent[] {
     if (targetId === ctx.activeId) return []
     const target = findItem(ctx.sections, targetId)
     if (!target) return []
+    // A multi-step routine has no group_members ref, so a group would silently
+    // drop it. Say so instead.
+    if (active.type === 'routine-collection' || target.type === 'routine-collection') {
+      return [{ kind: 'refuse', reason: "Routines with steps can't be grouped." }]
+    }
     // Grouping onto a refused item would reparent nothing and silently do half
     // the job, so refuse the pairing outright.
     if (refusalFor(target, ctx.isReadOnlyEvent)) return []
