@@ -77,7 +77,7 @@ export function SlotAddInput({ placeholder, onCreate, onCancel }: {
         onCreate(name)
         setValue('')
       }}
-      className="w-full rounded-lg border border-primary-300 bg-white px-2 py-1 text-xs
+      className="w-full rounded-lg border border-primary-300 bg-bg-elevated px-2 py-1 text-xs
                  text-neutral-700 outline-none focus:border-primary-500"
     />
   )

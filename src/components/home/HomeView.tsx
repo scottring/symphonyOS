@@ -40,6 +40,7 @@ import { TodayView } from '@/components/schedule/TodayView'
 import { PAGE_GUTTER_X } from '@/components/layout/pageLayout'
 import { UndoToast } from '@/components/undo/UndoToast'
 import { HomeHeader } from '@/components/home/HomeHeader'
+import { PlanMastheadSlotsContext } from '@/components/plan/v2/planMastheadSlots'
 import { CalendarReconnectBanner } from '@/components/home/CalendarReconnectBanner'
 
 interface HomeViewProps {
@@ -238,6 +239,21 @@ export function HomeView({
   // Journal (the paper week) or Schedule (the hourly grid). Always opens as
   // the journal; switching is presentation only — same dates, same data.
   const [weekMode, setWeekMode] = useState<WeekMode>('journal')
+  // Desktop /week folds the week's control row into its masthead (layout
+  // system, 2026-10-01): HomeHeader draws two hosts, WeekV2 portals its plan
+  // status and controls into them. Phones keep the row.
+  const [planSublineHost, setPlanSublineHost] = useState<HTMLElement | null>(null)
+  const [planControlsHost, setPlanControlsHost] = useState<HTMLElement | null>(null)
+  const planSlotsOn = currentView === 'week' && !isMobile
+  const planSlots = useMemo(
+    () => (planSlotsOn && planSublineHost && planControlsHost ? { subline: planSublineHost, controls: planControlsHost } : null),
+    [planSlotsOn, planSublineHost, planControlsHost])
+  // Week reads in the one column (880px, PAGE_COLUMN's width, left-aligned);
+  // its hourly grid is a canvas and keeps the full width (lg+, where it is
+  // drawn — below lg the journal stands in for it).
+  const weekColumn = (currentView === 'week' || currentView === 'workweek') && isWeekV2Enabled()
+    ? ` week-column w-full max-w-[992px] mr-auto${weekMode === 'schedule' ? ' lg:max-w-none' : ''}`
+    : ''
   // Set by goToWeek and onRangeChange: the run they just wrote into the URL is
   // already on screen, so re-deriving it would only undo the Schedule/Journal
   // choice the reader made.
@@ -575,7 +591,7 @@ export function HomeView({
       {/* Week keeps its masthead on a phone too: it is the only way to step
           to another week or pick a shorter run there. */}
       {(!isMobile || currentView === 'week') && currentView !== 'today' && (
-        <div className={`${PAGE_GUTTER_X} pt-4`}>
+        <div className={`${PAGE_GUTTER_X} pt-4${weekColumn}`}>
           <HomeHeader
             currentView={currentView}
             onViewChange={handleViewChange}
@@ -596,6 +612,7 @@ export function HomeView({
             onRangeChange={onRangeChange}
             monthStart={monthStart}
             onMonthChange={setMonthStart}
+            planSlots={planSlotsOn ? { subline: setPlanSublineHost, controls: setPlanControlsHost } : undefined}
           />
         </div>
       )}
@@ -620,7 +637,9 @@ export function HomeView({
             // Week/month/workweek draw no column of their own — they used to
             // start flush against the content edge, 56px left of their own
             // masthead card. One gutter, one left edge (Scott, 2026-09-07).
-            <div className={PAGE_GUTTER_X}>{renderContent()}</div>
+            <div className={`${PAGE_GUTTER_X}${weekColumn}`}>
+              <PlanMastheadSlotsContext.Provider value={planSlots}>{renderContent()}</PlanMastheadSlotsContext.Provider>
+            </div>
           )}
       </div>
 

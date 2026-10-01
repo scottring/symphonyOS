@@ -1,5 +1,6 @@
 import { MastheadCard } from '@/components/layout/MastheadCard'
-import { PAGE_COLUMN_WIDE } from '@/components/layout/pageLayout'
+import { PAGE_COLUMN } from '@/components/layout/pageLayout'
+import { SectionHeading, GroupLabel } from '@/components/layout/SectionHeading'
 import { useState } from 'react'
 import { showToast } from '@/hooks/useToast'
 import { useIsAppAdmin } from '@/hooks/useIsAppAdmin'
@@ -35,7 +36,7 @@ interface DeleteConfirmationProps {
 function DeleteConfirmation({ memberName, onConfirm, onCancel, isDeleting }: DeleteConfirmationProps) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
-      <div className="bg-white rounded-2xl shadow-xl max-w-sm w-full p-6 animate-scale-up">
+      <div className="bg-bg-elevated rounded-2xl shadow-xl max-w-sm w-full p-6 animate-scale-up">
         <div className="w-12 h-12 rounded-full bg-red-100 flex items-center justify-center mx-auto mb-4">
           <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
@@ -291,7 +292,7 @@ export function SettingsPage({
 
   return (
     <div className="h-full overflow-auto">
-      <div className={PAGE_COLUMN_WIDE}>
+      <div className={PAGE_COLUMN}>
         <MastheadCard
           variant="page"
           title="Settings"
@@ -337,11 +338,11 @@ export function SettingsPage({
 
             {/* Text Size */}
             <section>
-              <h2 className="mb-2 font-display text-[22px] text-neutral-900">Text Size</h2>
-              <div className="flex items-center justify-between border-y border-neutral-200 px-1 py-4">
+              <SectionHeading>Text Size</SectionHeading>
+              <div className="flex items-center justify-between gap-4 py-3">
                 <div>
-                  <p className="text-[16px] leading-snug text-neutral-800">Large text</p>
-                  <p className="text-[13px] text-neutral-500">Increase font sizes for easier reading</p>
+                  <p className="text-[16px] leading-snug text-neutral-900">Large text</p>
+                  <p className="mt-0.5 text-[14px] text-neutral-500">Increase font sizes for easier reading</p>
                 </div>
                 <button
                   onClick={() => setLargeText(!largeText)}
@@ -369,7 +370,7 @@ export function SettingsPage({
 
             {/* People Section */}
             <section>
-              <h2 className="mb-2 font-display text-[22px] text-neutral-900">People</h2>
+              <SectionHeading>People</SectionHeading>
               <p className="text-sm text-neutral-500 mb-6">
                 Add family members to assign tasks, routines, and events. People don't need an account to be assignees.
               </p>
@@ -377,7 +378,7 @@ export function SettingsPage({
               {/* Main user */}
               {mainUser && (
                 <div className="mb-4">
-                  <label className="block text-sm text-neutral-500 mb-2">You</label>
+                  <GroupLabel as="div">You</GroupLabel>
                   {editingId === mainUser.id ? (
                     <div className="p-4 bg-neutral-50 rounded-lg border border-neutral-200">
                       <input
@@ -422,11 +423,11 @@ export function SettingsPage({
                       </div>
                     </div>
                   ) : (
-                    <div className="flex items-center gap-3 border-b border-neutral-200 px-1 py-3.5">
+                    <div className="flex items-center gap-3 py-2.5">
                       <div className={`w-10 h-10 rounded-full ${getColorClass(mainUser.color)} flex items-center justify-center text-white font-medium`}>
                         {mainUser.initials}
                       </div>
-                      <span className="text-neutral-700 font-medium flex-1">{mainUser.name}</span>
+                      <span className="flex-1 min-w-0 truncate text-[16px] text-neutral-900">{mainUser.name}</span>
                       <span className="text-xs text-primary-600 bg-primary-50 px-2 py-1 rounded">Account owner</span>
                       <button
                         onClick={() => startEditing(mainUser)}
@@ -444,10 +445,10 @@ export function SettingsPage({
 
               {/* Family members */}
               <div>
-                <label className="block text-sm text-neutral-500 mb-2">Family members</label>
+                <GroupLabel as="div">Family members</GroupLabel>
 
                 {otherMembers.length > 0 ? (
-                  <ul className="space-y-2 mb-4">
+                  <ul className="mb-4">
                     {otherMembers.map((member) => (
                       <li key={member.id}>
                         {editingId === member.id ? (
@@ -494,11 +495,11 @@ export function SettingsPage({
                             </div>
                           </div>
                         ) : (
-                          <div className="flex items-center gap-3 border-b border-neutral-200 px-1 py-3.5">
+                          <div className="flex items-center gap-3 py-2.5">
                             <div className={`w-10 h-10 rounded-full ${getColorClass(member.color)} flex items-center justify-center text-white font-medium`}>
                               {member.initials}
                             </div>
-                            <span className="text-neutral-700 font-medium flex-1">{member.name}</span>
+                            <span className="flex-1 min-w-0 truncate text-[16px] text-neutral-900">{member.name}</span>
                             <button
                               onClick={() => startEditing(member)}
                               className="text-neutral-400 hover:text-neutral-600 p-1"
@@ -523,7 +524,7 @@ export function SettingsPage({
                     ))}
                   </ul>
                 ) : (
-                  <p className="text-neutral-400 text-sm mb-4 text-center py-4">
+                  <p className="mb-4 py-2 text-[14px] text-neutral-500">
                     No family members added yet
                   </p>
                 )}
@@ -586,9 +587,9 @@ export function SettingsPage({
               </div>
 
               {/* Invite Partner Section */}
-              <div className="mt-6 pt-6 border-t border-neutral-100">
-                <label className="block text-sm text-neutral-500 mb-2">Invite partner</label>
-                <p className="text-xs text-neutral-400 mb-3">
+              <div className="mt-6">
+                <GroupLabel as="div">Invite partner</GroupLabel>
+                <p className="text-[14px] text-neutral-500 mb-3">
                   Invite someone with their own account to share tasks, events, and routines.
                 </p>
 
@@ -638,17 +639,17 @@ export function SettingsPage({
 
                 {/* Pending invitations */}
                 {invitations.length > 0 && (
-                  <div className="mt-3 space-y-2">
+                  <div className="mt-3">
                     {invitations.map((inv) => {
                       const isExpired = new Date(inv.expires_at) < new Date()
                       return (
                         <div
                           key={inv.id}
-                          className="flex items-center gap-3 border-b border-neutral-200 px-1 py-3"
+                          className="flex items-center gap-3 py-2.5"
                         >
                           <div className="flex-1 min-w-0">
-                            <p className="text-sm text-neutral-700 truncate">{inv.email}</p>
-                            <p className={`text-xs ${isExpired ? 'text-red-500' : 'text-neutral-400'}`}>
+                            <p className="text-[16px] text-neutral-900 truncate">{inv.email}</p>
+                            <p className={`mt-0.5 text-[12px] ${isExpired ? 'text-danger-600' : 'text-neutral-500'}`}>
                               {isExpired ? 'Expired' : `Expires ${new Date(inv.expires_at).toLocaleDateString()}`}
                             </p>
                           </div>
@@ -689,7 +690,7 @@ export function SettingsPage({
         {activeTab === 'admin' && isAppAdmin && (
           <div className="space-y-8">
             <section>
-              <h2 className="mb-2 font-display text-[22px] text-neutral-900">Demo Controls</h2>
+              <SectionHeading>Demo Controls</SectionHeading>
               <p className="text-sm text-neutral-500 mb-6">
                 Set up and reset demo data for presentations.
               </p>
@@ -697,7 +698,7 @@ export function SettingsPage({
             </section>
 
             <section>
-              <h2 className="mb-2 font-display text-[22px] text-neutral-900">Founding households</h2>
+              <SectionHeading>Founding households</SectionHeading>
               <p className="text-sm text-neutral-500 mb-6">
                 Signups are gated on an approved waitlist row. Approve one to let that email create an account.
               </p>
@@ -713,12 +714,12 @@ export function SettingsPage({
               {waitlistAdminRows.length === 0 ? (
                 <p className="text-sm text-neutral-400">No signups yet.</p>
               ) : (
-                <ul className="divide-y divide-neutral-100 rounded-lg border border-neutral-100 bg-white">
+                <ul>
                   {waitlistAdminRows.map((row) => (
-                    <li key={row.id} className="flex items-center justify-between gap-3 px-4 py-3">
+                    <li key={row.id} className="flex items-center justify-between gap-3 py-2.5">
                       <div className="min-w-0">
-                        <p className="truncate text-sm text-neutral-800">{row.email}</p>
-                        <p className="text-xs text-neutral-400">
+                        <p className="truncate text-[16px] text-neutral-900">{row.email}</p>
+                        <p className="mt-0.5 text-[12px] text-neutral-500">
                           {row.createdAt.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                         </p>
                       </div>
@@ -742,7 +743,7 @@ export function SettingsPage({
             </section>
 
             <section>
-              <h2 className="mb-2 font-display text-[22px] text-neutral-900">Waitlist</h2>
+              <SectionHeading>Waitlist</SectionHeading>
               <p className="text-sm text-neutral-500 mb-6">
                 Manage waitlist signups from the landing page.
               </p>

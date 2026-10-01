@@ -8,7 +8,9 @@ import { RecipeUrlPasteDialog } from './RecipeUrlPasteDialog'
 import { RecipeManualEditor } from './RecipeManualEditor'
 import { RecipeDetailModal } from './RecipeDetailModal'
 import { MastheadCard } from '@/components/layout/MastheadCard'
-import { PAGE_COLUMN_WIDE } from '@/components/layout/pageLayout'
+import { PAGE_COLUMN } from '@/components/layout/pageLayout'
+import { EmptyState } from '@/components/layout/EmptyState'
+import { PageSearch } from '@/components/layout/PageSearch'
 import { MealsTabs } from '../MealsTabs'
 
 export function MemoryShelfPage() {
@@ -48,7 +50,7 @@ export function MemoryShelfPage() {
   }
 
   return (
-    <div className={PAGE_COLUMN_WIDE}>
+    <div className={PAGE_COLUMN}>
       <MastheadCard
         variant="page"
         title={<>What we cook <span className="italic text-primary-600">together.</span></>}
@@ -62,57 +64,46 @@ export function MemoryShelfPage() {
         }
         subline={<MealsTabs className="-mb-1" />}
         footer={
-          <AddRecipeButton
-            onPasteUrl={() => setPasteOpen(true)}
-            onManualEntry={() => setManualOpen(true)}
-          />
+          <>
+            <AddRecipeButton
+              onPasteUrl={() => setPasteOpen(true)}
+              onManualEntry={() => setManualOpen(true)}
+            />
+            {/* The page's search, compact in the tools row like Notes' and
+                Contacts' — it searches titles, tags and ingredients. */}
+            <PageSearch value={search} onChange={setSearch} placeholder="Search the shelf…" ariaLabel="Search the shelf — title, tags, ingredients" />
+          </>
         }
       />
-
-      <div className="mb-5 relative">
-        <input
-          type="text"
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-          placeholder="Search the shelf — title, tags, ingredients…"
-          className="w-full rounded-md border border-neutral-300 bg-bg-elevated py-2.5 pl-10 pr-10 text-[15px] focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
-        />
-        <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-neutral-400 text-[15px]" aria-hidden>⌕</span>
-        {search && (
-          <button
-            onClick={() => setSearch('')}
-            aria-label="Clear search"
-            className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-neutral-700 text-[14px]"
-          >×</button>
-        )}
-      </div>
 
       <ShelfFilterRow active={filter} onChange={setFilter} />
 
       {loading && (
-        <div className="py-24 text-center text-[12px] uppercase tracking-widest text-neutral-400">
-          Loading…
-        </div>
+        <p className="py-4 text-[14px] text-neutral-400">Loading…</p>
       )}
       {error && (
-        <div className="py-12 text-center text-accent-500">{error}</div>
+        <p className="py-4 text-[14px] text-accent-500">{error}</p>
       )}
       {!loading && !error && recipes.length === 0 && (
-        <div className="py-24 text-center">
-          <div className="text-[0.7rem] font-bold uppercase tracking-[0.25em] text-neutral-400 mb-3">
-            EMPTY SHELF
-          </div>
-          <h2 className="font-display text-3xl text-neutral-700">
-            No recipes saved yet — paste an NYT Cooking URL to start.
-          </h2>
-        </div>
+        <EmptyState title="No recipes saved yet.">
+          Paste an NYT Cooking link or write one in by hand, from the + above.
+        </EmptyState>
       )}
       {!loading && recipes.length > 0 && visibleRecipes.length === 0 && (
-        <div className="py-16 text-center">
-          <p className="font-display italic text-[1rem] text-neutral-400">
-            Nothing matches "{search}". <button onClick={() => setSearch('')} className="text-primary-500 underline">Clear</button>
-          </p>
-        </div>
+        <EmptyState
+          title={<>Nothing matches “{search}”.</>}
+          action={
+            <button
+              type="button"
+              onClick={() => setSearch('')}
+              className="rounded-md px-3 py-2 text-[14px] text-primary-700 transition-colors hover:bg-primary-50"
+            >
+              Clear the search
+            </button>
+          }
+        >
+          The shelf searches titles, tags and ingredients.
+        </EmptyState>
       )}
       {!loading && visibleRecipes.length > 0 && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 mt-8">

@@ -8,7 +8,8 @@
 // It is chrome AROUND the existing week: the journal, the list, drag and drop,
 // add-to-day and the week's planning session are WeekViewV2's, unchanged.
 
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import { useSupabaseTasks } from '@/hooks/useSupabaseTasks'
 import { useGatedTaskActions } from '@/hooks/useGatedTaskActions'
@@ -19,7 +20,9 @@ import { showToast } from '@/hooks/useToast'
 import { weekListTasks } from '@/lib/planning/weekList'
 import { selectPeriodTasks } from '@/lib/planning/periodPage'
 import { monthStartOf, monthsOfWeek } from '@/lib/planning/periodPlacement'
-import { PlanMeetingBar, PlanToolbar } from './PlanStatus'
+import { PlanMastheadSlotsContext } from './planMastheadSlots'
+import { PlanMeetingBar, PlanToolbar, PlanToolbarControls, PlanToolbarStatus, type PlanToolbarProps } from './PlanStatus'
+import { GuideAnchor } from '@/components/guide/GuideBar'
 import { EMPTY_TALLY, addToTally, lookBackWhy, tallySentence, type Tally } from '@/lib/planning/v2/planTally'
 import { lowerPlacement } from '@/lib/placement/model'
 import { goalOfTask } from '@/lib/planning/goalSupport'
@@ -213,6 +216,20 @@ export function WeekV2({ tasks, weekStart, meId, isCurrent, days, onSelectTask, 
   // 2026-09-30: nothing said "Hang porch plants" had a step this week).
   const stepsThisWeek = (id: string) => weekTasks.filter((x) => x.goalTaskId === id || x.sourceId === id).length
   const viewSwitch = <ViewSwitch view={view} onChange={setView} aboveName={monthName} />
+  const toolbar: PlanToolbarProps = {
+    period: `week ${weekNo}`, saved: session.saved, loading: session.loading, error: !!session.error, agreedBy,
+    reviewDue, onPlan: startMeeting, onRetry: session.reload, viewSwitch,
+    tools: tools && <div className="pv2-wtools">{tools}</div>,
+    justSaved: justSaved && {
+      detail: justSaved.detail,
+      // Today opens with the week beside it — the thing to choose from.
+      next: isCurrent ? { label: 'Pick something for today', onClick: () => { writePlanView('today', 'ref'); navigate('/today') } } : null,
+      onDone: () => setJustSaved(null),
+    },
+  }
+  // HomeHeader's masthead, when it offers a place for the folded row
+  // (desktop only; HomeView decides).
+  const slots = useContext(PlanMastheadSlotsContext)
 
   return (
     <div className="pv2-week" data-week={localYmd(weekStart)}>
@@ -222,17 +239,15 @@ export function WeekV2({ tasks, weekStart, meId, isCurrent, days, onSelectTask, 
             : `Choose next steps from ${monthName}’s plan beside the list, or write your own. Nothing needs a day yet.`}
           onStep={(step) => setMeeting({ ...meeting, step })} viewSwitch={meeting.step === 2 ? viewSwitch : undefined}
           onLeave={() => void endMeeting(false)} onSave={() => void endMeeting(true)} saveLabel={`Mark week ${weekNo} planned`} />
-      ) : (
-        <PlanToolbar period={`week ${weekNo}`} saved={session.saved} loading={session.loading} error={!!session.error} agreedBy={agreedBy}
-          reviewDue={reviewDue} onPlan={startMeeting} onRetry={session.reload} viewSwitch={viewSwitch}
-          tools={tools && <div className="pv2-wtools">{tools}</div>}
-          justSaved={justSaved && {
-            detail: justSaved.detail,
-            // Today opens with the week beside it — the thing to choose from.
-            next: isCurrent ? { label: 'Pick something for today', onClick: () => { writePlanView('today', 'ref'); navigate('/today') } } : null,
-            onDone: () => setJustSaved(null),
-          }} />
-      )}
+      ) : slots?.subline && slots.controls ? (
+        // Desktop: the control row folds into the week's masthead (HomeHeader
+        // draws it; layout system 2026-10-01). The guide still opens here.
+        <>
+          <GuideAnchor />
+          {createPortal(<PlanToolbarStatus {...toolbar} />, slots.subline)}
+          {createPortal(<PlanToolbarControls {...toolbar} />, slots.controls)}
+        </>
+      ) : <PlanToolbar {...toolbar} />}
 
       {meeting?.step === 1 ? (
         <CloseOut lines={prevLines} candidateIds={meeting.candidateIds} members={members} actions={actions} prevName="last week" nextName="this week"
@@ -285,7 +300,7 @@ export function WeekV2({ tasks, weekStart, meId, isCurrent, days, onSelectTask, 
                         </span>
                       </li>
                     ))}</ul>
-                  ) : <p className="pv2-hint">{tasksLoading ? 'Loading…' : `Nothing open on ${m.name}’s plan.`}</p>}
+                  ) : <p className={`pv2-hint${tasksLoading ? '' : ' ds-empty-body'}`}>{tasksLoading ? 'Loading…' : `Nothing open on ${m.name}’s plan.`}</p>}
                   <button type="button" className="pv2-link" style={{ marginTop: 8 }} onClick={() => navigate(`/month?start=${localYmd(m.start)}`)}>Open {m.name} →</button>
                 </div>
               ))}

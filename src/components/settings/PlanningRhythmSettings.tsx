@@ -8,6 +8,7 @@ import { useState } from 'react'
 import { useCadenceConfig, type WeekStart } from '@/lib/cadence/config'
 import { useHouseholdWeekStart } from '@/hooks/useHouseholdWeekStart'
 import { showToast } from '@/hooks/useToast'
+import { SectionHeading } from '@/components/layout/SectionHeading'
 
 /** Sunday, Monday, and Saturday — the week a Friday planning session plans. */
 const WEEK_STARTS: WeekStart[] = [0, 1, 6]
@@ -59,7 +60,7 @@ export function PlanningRhythmSettings() {
 
   return (
     <section>
-      <h2 className="text-lg font-semibold text-neutral-700 mb-2">Planning Rhythm</h2>
+      <SectionHeading>Planning Rhythm</SectionHeading>
       <p className="text-sm text-neutral-500 mb-4">
         Set when your planning week begins and when Symphony gently reminds you to plan it.
       </p>

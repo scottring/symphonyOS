@@ -3134,8 +3134,10 @@ div.chooser-action-group { overflow: visible !important; }
 .pv2-page { --pv2-slate: hsl(212 38% 34%); --pv2-slate-wash: hsl(212 40% 95%); --pv2-num: 'Jost', var(--font-family-sans);
   max-width: 1200px; margin: 0 auto; padding: 28px 16px 96px; color: var(--color-neutral-900); }
 /* The app's own gutter (PAGE_GUTTER_X: 16 / 40 / 56px), so every horizon
-   shares the week's left and right edges. */
-@media (min-width: 768px) { .pv2-page { padding-left: 40px; padding-right: 40px; } }
+   shares the week's left and right edges. Desktop: the one column
+   (PAGE_COLUMN — 992px with the gutter, 880px of content at lg), left-aligned
+   like every page (layout system, 2026-10-01). */
+@media (min-width: 768px) { .pv2-page { padding-left: 40px; padding-right: 40px; max-width: 992px; margin-left: 0; margin-right: auto; } }
 @media (min-width: 1024px) { .pv2-page { padding-left: 56px; padding-right: 56px; } }
 .pv2-head { display: grid; grid-template-columns: auto 1fr auto; gap: 22px; align-items: end; margin-bottom: 20px; padding-bottom: 10px; border-bottom: 1px solid var(--color-neutral-300); }
 .pv2-numeral { font: 200 100px/.82 var(--pv2-num); letter-spacing: -.03em; color: var(--color-neutral-900); }

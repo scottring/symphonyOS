@@ -14,6 +14,7 @@ import type { FamilyMember } from '@/types/family'
 import { nextOccurrence } from '@/lib/quickRecurrence'
 import { SlotAdd, type CreateRoutineInSlot } from './SlotAdd'
 import { RoutineRow } from './RoutineRow'
+import { SectionHeading } from '@/components/layout/SectionHeading'
 
 /** When this routine next lands, as a person would say it. A resting routine
  *  answers with its wake date instead — `paused_until` is stored at UTC
@@ -64,14 +65,13 @@ export function CadenceBand({
   if (routines.length === 0 && !onCreateInSlot) return null
 
   return (
-    <section aria-label={heading} className="min-w-0">
-      <div className="flex items-baseline gap-2">
-        <h2 className="font-display text-2xl text-neutral-900">{heading}</h2>
-        {hint && <p className="text-[13px] text-neutral-500">{hint}</p>}
-      </div>
+    // `group`: the band's quiet "+ add" (SlotAdd) shows while the band is
+    // under the pointer.
+    <section aria-label={heading} className="group min-w-0">
+      <SectionHeading aside={hint}>{heading}</SectionHeading>
 
       {routines.length > 0 && (
-        <ul className="mt-2 border-t border-neutral-300">
+        <ul>
           {routines.map((r) => (
             <RoutineRow
               key={r.id}
@@ -88,11 +88,11 @@ export function CadenceBand({
       )}
 
       {routines.length === 0 && (
-        <p className="mt-2 px-1 text-[13px] text-neutral-400">Nothing on this rung.</p>
+        <p className="py-2 pl-[52px] text-[13px] text-neutral-500 md:pl-[var(--ds-body)]">Nothing on this rung.</p>
       )}
 
       {onCreateInSlot && createPattern && (
-        <div className="mt-1.5 px-1">
+        <div className="mt-1 pl-[44px] md:pl-[calc(var(--ds-body)-8px)]">
           <SlotAdd
             label={addLabel ?? `Add a ${heading.toLowerCase()} routine`}
             onCreate={(name) => onCreateInSlot({ name, recurrence_pattern: createPattern })}

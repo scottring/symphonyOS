@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen, fireEvent, within } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 
 const session = { saved: null as null | { authorId: string; at: Date }, mine: null, loading: false, loadedToken: '', error: null as null | string, reload: vi.fn(), save: vi.fn() }
@@ -15,6 +15,7 @@ vi.mock('./FromPaper', () => ({ FromPaper: () => null }))
 vi.mock('./RefShelves', () => ({ WeekRefShelves: () => null }))
 
 import { WeekV2 } from './WeekV2'
+import { PlanMastheadSlotsContext } from './planMastheadSlots'
 
 const renderWeek = () => render(
   <MemoryRouter>
@@ -67,6 +68,32 @@ describe('WeekV2 toolbar — one "Plan week N" action', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Done for now' }))
     expect(screen.queryByRole('button', { name: 'Done for now' })).toBeNull()
     expect(screen.getByRole('button', { name: /^Plan week \d+$/ })).toBeTruthy()
+  })
+})
+
+// Layout system 2026-10-01: on desktop the control row folds into the week's
+// masthead (HomeHeader's hosts); without hosts (phones) the row stays.
+describe('WeekV2 toolbar — folded into the masthead', () => {
+  beforeEach(() => { session.saved = null; session.loading = false; session.error = null })
+  it('portals the status and the controls into the masthead hosts, with no row of its own', () => {
+    const subline = document.createElement('div')
+    const controls = document.createElement('div')
+    document.body.append(subline, controls)
+    const { container } = render(
+      <MemoryRouter>
+        <PlanMastheadSlotsContext.Provider value={{ subline, controls }}>
+          <WeekV2 tasks={[]} weekStart={new Date(2026, 8, 27)} meId="me" isCurrent days={null} onSelectTask={vi.fn()} />
+        </PlanMastheadSlotsContext.Provider>
+      </MemoryRouter>,
+    )
+    expect(container.querySelector('.pv2-toolbar')).toBeNull()
+    expect(subline.textContent).toMatch(/Week \d+ isn’t planned yet/)
+    const plan = within(controls).getByRole('button', { name: /^Plan week \d+$/ })
+    expect(within(controls).getByRole('group', { name: 'View' })).toBeTruthy()
+    fireEvent.click(plan)
+    // Planning keeps its own bar in the page.
+    expect(screen.getByRole('region', { name: /Planning week \d+/ })).toBeTruthy()
+    subline.remove(); controls.remove()
   })
 })
 

@@ -109,15 +109,23 @@ export const DenseInboxRow = memo(function DenseInboxRow({
     <div
       data-row
       data-task-id={task.id}
-      // A ruled row on the page, not a floating card: the inbox is a list to
-      // read down, and twenty shadowed tiles read as twenty separate things.
+      // The library row (layout system, 2026-10-01): no card, no rule between
+      // rows — the hover tint marks the one under your hand. The leading
+      // controls stand in the margin lane (40px phone / 64px desktop) so the
+      // title starts at the page's body edge. It stays a wrapping flex row,
+      // not LIST_ROW's grid: when the row is narrower than title + triage
+      // controls, the controls wrap under the title as one unit. The box
+      // bleeds 12px past the column (-mx-3 px-3) so its content sits on it.
       className={`
-        group flex flex-wrap items-start gap-2 border-b border-neutral-200
-        px-3 py-3 transition-colors duration-200
-        ${isSelected ? 'bg-primary-50/50' : ''}
-        ${isLeaving ? 'opacity-0 translate-x-2 max-h-0 py-0 my-0 overflow-hidden border-transparent' : 'hover:bg-neutral-50'}
+        group -mx-3 flex flex-wrap items-start gap-x-3 gap-y-2 rounded-xl border
+        px-3 py-2.5 transition-colors duration-200
+        ${isSelected ? 'bg-primary-50/50 border-primary-100' : 'border-transparent'}
+        ${isLeaving ? 'opacity-0 translate-x-2 max-h-0 py-0 my-0 overflow-hidden border-transparent' : 'hover:bg-primary-50/50 hover:border-primary-100'}
       `}
     >
+      {/* The margin lane: grip, the leading check and the focus star, set
+          against the body edge. Grows rather than overflows if all three show. */}
+      <div className="flex min-w-10 shrink-0 items-start justify-end gap-1 md:min-w-16">
       {/* Grip handle — the ONLY draggable surface on the row. Drag must not
           hijack clicks on the checkbox/title/popovers/quick actions, so the
           draggable + dragStart attributes live here, not on the row div.
@@ -176,6 +184,7 @@ export const DenseInboxRow = memo(function DenseInboxRow({
           <Star className="w-4 h-4" fill={focusToggle.active ? 'currentColor' : 'none'} />
         </button>
       )}
+      </div>
 
       {/* Title. The floor is what a title needs to read as one line; when
           the row is narrower than title + triage controls (a detail panel
@@ -189,12 +198,12 @@ export const DenseInboxRow = memo(function DenseInboxRow({
             ? 'text-neutral-400 line-through'
             : task.isWaiting
               ? 'text-amber-600/70 italic'
-              : 'text-neutral-800'
+              : 'text-neutral-900'
         }`}
       >
         {task.title}
         {lineage && (
-          <span className="mt-1 block truncate text-[12px] font-normal leading-tight text-neutral-400 no-underline">
+          <span className="mt-0.5 block truncate text-[12px] font-normal leading-snug text-neutral-500 no-underline">
             {lineage}
           </span>
         )}
@@ -237,7 +246,7 @@ export const DenseInboxRow = memo(function DenseInboxRow({
           />
         </button>
         {contextOpen && (
-          <div className="absolute z-40 top-full right-0 mt-1 bg-white border border-neutral-200 rounded-lg shadow-lg py-1 min-w-[120px]">
+          <div className="absolute z-40 top-full right-0 mt-1 bg-bg-elevated border border-neutral-200 rounded-lg shadow-lg py-1 min-w-[120px]">
             {CONTEXT_OPTIONS.map((opt) => (
               <button
                 key={opt.label}

@@ -6,6 +6,7 @@ import { setHomeCoords } from '@/hooks/useWeather'
 import { resetHomeLocationCache } from '@/lib/homeLocation'
 import { PlacesAutocomplete, type PlaceSelection } from '@/components/location/PlacesAutocomplete'
 import { useDirections } from '@/hooks/useDirections'
+import { SectionHeading } from '@/components/layout/SectionHeading'
 
 // Local storage key for home location (shared with DirectionsBuilder)
 const HOME_LOCATION_KEY = 'symphony_home_location'
@@ -125,7 +126,7 @@ export function HomeAddressSettings() {
 
   return (
     <section>
-      <h2 className="text-lg font-semibold text-neutral-700 mb-2">Home Address</h2>
+      <SectionHeading>Home Address</SectionHeading>
       <p className="text-sm text-neutral-500 mb-4">
         Set your default home address for directions. This will be used as the default starting point when getting directions.
       </p>

@@ -1,4 +1,8 @@
 import { MastheadCard } from '@/components/layout/MastheadCard'
+import { PAGE_COLUMN } from '@/components/layout/pageLayout'
+import { GroupLabel } from '@/components/layout/SectionHeading'
+import { EmptyState } from '@/components/layout/EmptyState'
+import { LIST_ROW, LIST_ROW_BODY, LIST_ROW_LANE, LIST_ROW_META, LIST_ROW_TITLE, LIST_ROW_TRAIL } from '@/components/layout/listRow'
 import { LoadFailedNotice } from '@/components/common/LoadFailedNotice'
 import { useState, useMemo } from 'react'
 import type { Task } from '@/types/task'
@@ -63,6 +67,12 @@ function formatCompletionDate(date: Date): string {
   return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
 }
 
+/** The phone lane is 40px: "Yesterday" doesn't fit it, "Yest." does. */
+function formatCompletionDateShort(date: Date): string {
+  const full = formatCompletionDate(date)
+  return full === 'Yesterday' ? 'Yest.' : full
+}
+
 export function CompletedTasksView({
   tasks,
   contactsMap,
@@ -118,7 +128,7 @@ export function CompletedTasksView({
 
   return (
     <div className="h-full overflow-auto">
-      <div className="p-6 max-w-2xl mx-auto">
+      <div className={PAGE_COLUMN}>
         {/* Header — shared Library masthead (design-unification 2026-09-01).
             The Back link and icon medallion died with it: History is a page. */}
         <MastheadCard
@@ -165,10 +175,10 @@ export function CompletedTasksView({
 
         {/* Task list by month */}
         {pending ? (
-          <p className="py-12 text-center font-display text-xl text-neutral-700">Loading your history…</p>
+          <EmptyState title="Loading your history…" />
         ) : failed ? (
           <LoadFailedNotice
-            className="py-12 text-center"
+            className="py-4"
             title="Your history didn’t load."
             body="Your completed tasks are safe — this is a connection problem."
             onRetry={onRetry!}
@@ -177,10 +187,8 @@ export function CompletedTasksView({
           <div className="space-y-6">
             {visibleGroups.map((group) => (
               <div key={group.key}>
-                <h2 className="mb-2 text-[12px] font-semibold uppercase tracking-[0.08em] text-neutral-400">
-                  {group.label}
-                </h2>
-                <div className="divide-y divide-neutral-200 border-y border-neutral-300">
+                <GroupLabel>{group.label}</GroupLabel>
+                <div>
                   {group.tasks.map((task) => (
                     <TaskHistoryRow
                       key={task.id}
@@ -195,10 +203,10 @@ export function CompletedTasksView({
 
             {/* Load more button */}
             {hasMore && (
-              <div className="text-center py-4">
+              <div className="py-2">
                 <button
                   onClick={() => setVisibleMonths((prev) => prev + 3)}
-                  className="text-[14px] font-medium text-primary-700 transition-colors hover:underline"
+                  className="-ml-3 rounded-md px-3 py-2 text-[14px] font-medium text-primary-700 transition-colors hover:underline"
                 >
                   Load more...
                 </button>
@@ -206,21 +214,9 @@ export function CompletedTasksView({
             )}
           </div>
         ) : (
-          <div className="py-12 text-center">
-            <div className="mx-auto mb-4 flex items-center justify-center">
-              <svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" className="h-8 w-8 text-neutral-400" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd" />
-              </svg>
-            </div>
-            <h3 className="mb-1 font-display text-[24px] text-neutral-800">
-              {searchQuery ? 'No matching tasks' : 'No completed tasks yet'}
-            </h3>
-            <p className="text-[15px] text-neutral-500">
-              {searchQuery
-                ? 'Try a different search term'
-                : 'Completed tasks will appear here'}
-            </p>
-          </div>
+          <EmptyState title={searchQuery ? 'No matching tasks' : 'No completed tasks yet'}>
+            {searchQuery ? 'Try a different search term.' : 'Tasks you finish land here, by the month you finished them.'}
+          </EmptyState>
         )}
       </div>
     </div>
@@ -244,52 +240,60 @@ function TaskHistoryRow({
       : task.notes
     : null
 
+  const when = formatCompletionDate(task.updatedAt)
+  const whenShort = formatCompletionDateShort(task.updatedAt)
+
+  // The library row: the completion date in the margin lane, the title at
+  // the body edge with who/notes under it, the done mark and chevron trailing.
   return (
     <button
+      type="button"
       onClick={onSelect}
-      className="flex w-full flex-col gap-1 px-4 py-3.5 text-left transition-colors hover:bg-neutral-50"
+      className={LIST_ROW}
     >
-      <div className="flex items-center gap-3">
-        {/* Completed checkbox */}
-        <span className="w-5 h-5 rounded bg-primary-500 flex items-center justify-center text-white flex-shrink-0">
-          <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3" viewBox="0 0 20 20" fill="currentColor">
+      <span className={LIST_ROW_LANE}>
+        <time dateTime={task.updatedAt.toISOString()} title={task.updatedAt.toLocaleDateString()}>
+          {whenShort !== when ? (
+            <>
+              <span className="md:hidden">{whenShort}</span>
+              <span className="hidden md:inline">{when}</span>
+            </>
+          ) : when}
+        </time>
+      </span>
+
+      <span className={LIST_ROW_BODY}>
+        <span className={LIST_ROW_TITLE}>{task.title}</span>
+        {/* Metadata: contact, notes. The project chip lived between them
+            until Projects were hidden (2026-09-02 — see the note in Sidebar.tsx). */}
+        {(contact || notesSnippet) && (
+          <span className={`${LIST_ROW_META} flex items-center gap-2`}>
+            {contact && (
+              <span className="flex shrink-0 items-center gap-1">
+                <svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" className="w-3 h-3" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
+                </svg>
+                {contact.name}
+              </span>
+            )}
+            {notesSnippet && (
+              <span className="min-w-0 truncate italic">"{notesSnippet}"</span>
+            )}
+          </span>
+        )}
+      </span>
+
+      <span className={LIST_ROW_TRAIL}>
+        {/* Done mark — every row here is finished; it says so at a glance. */}
+        <span aria-hidden="true" className="flex h-4 w-4 items-center justify-center rounded-full bg-primary-500 text-white">
+          <svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" className="h-2.5 w-2.5" viewBox="0 0 20 20" fill="currentColor">
             <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
           </svg>
         </span>
-
-        {/* Title */}
-        <span className="flex-1 truncate text-[16px] leading-snug text-neutral-800">
-          {task.title}
-        </span>
-
-        {/* Date */}
-        <span className="shrink-0 text-[12px] text-neutral-400">
-          {formatCompletionDate(task.updatedAt)}
-        </span>
-
-        {/* Chevron */}
-        <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 text-neutral-400 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor">
+        <svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" className="w-4 h-4 text-neutral-400" viewBox="0 0 20 20" fill="currentColor">
           <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
         </svg>
-      </div>
-
-      {/* Metadata row: contact, notes. The project chip lived between them
-          until Projects were hidden (2026-09-02 — see the note in Sidebar.tsx). */}
-      {(contact || notesSnippet) && (
-        <div className="ml-8 flex flex-wrap items-center gap-2 text-[12px] text-neutral-500">
-          {contact && (
-            <span className="flex items-center gap-1">
-              <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
-              </svg>
-              {contact.name}
-            </span>
-          )}
-          {notesSnippet && (
-            <span className="italic">"{notesSnippet}"</span>
-          )}
-        </div>
-      )}
+      </span>
     </button>
   )
 }

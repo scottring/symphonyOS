@@ -1,9 +1,13 @@
 import { useState, useRef, useEffect } from 'react'
-import { Sparkles, FolderInput, Plus } from 'lucide-react'
+import { Sparkles, FolderInput, Plus, Target, Trash2 } from 'lucide-react'
 import type { Goal, GoalArea } from '@/types/goal'
 import type { TaskContext } from '@/types/task'
 import { PAGE_COLUMN } from '@/components/layout/pageLayout'
-import { PageMasthead, QuietAction } from '@/components/layout/PageMasthead'
+import { QuietAction } from '@/components/layout/PageMasthead'
+import { MastheadCard } from '@/components/layout/MastheadCard'
+import { SectionHeading } from '@/components/layout/SectionHeading'
+import { EmptyState } from '@/components/layout/EmptyState'
+import { LIST_ROW, LIST_ROW_BODY, LIST_ROW_LANE, LIST_ROW_TRAIL } from '@/components/layout/listRow'
 import { looksVague } from '@/lib/planning/goalQuality'
 import { useGoalSharpen, type GoalSharpenState } from '@/hooks/useGoalSharpen'
 import { ContextPicker } from '@/components/triage/ContextPicker'
@@ -94,28 +98,30 @@ export function GoalsList({
     goals.filter(g => g.areaId === areaId && g.status !== 'archived')
 
   return (
-    <div className="h-full overflow-auto bg-[var(--color-bg-base)]">
-      {/* Subtle accent gradient */}
-      <div className="absolute top-0 left-0 right-0 h-48 bg-gradient-to-b from-primary-50/50 to-transparent pointer-events-none" />
-
-      <div className={`relative ${PAGE_COLUMN}`}>
-        {/* The shared Library masthead (design-unification 2026-09-01): serif
-            title, one muted line, a QUIET action. The wizard-era header wore a
-            filled "New Area" pill and a "2026 · Q3" quarter tag; the quarter
-            went with the season wizard, and a goal's year is the whole line. */}
-        <PageMasthead
+    // No page background of its own: the place's painted scenery is the page
+    // (layout system, 2026-10-01).
+    <div className="h-full overflow-auto">
+      <div className={PAGE_COLUMN}>
+        {/* The one masthead (layout system, 2026-10-01): stamp in the margin
+            lane, serif title, one muted line, a QUIET action beside the title
+            at every width. The wizard-era header wore a filled "New Area" pill
+            and a "2026 · Q3" quarter tag; the quarter went with the season
+            wizard, and a goal's year is the whole line. */}
+        <MastheadCard
+          variant="page"
+          motif="lists"
           title="Goals"
-          description={
+          subline={
             goals.length === 0
               ? `${year}`
               : `${year} · ${goals.length} goal${goals.length === 1 ? '' : 's'} across ${areas.length} area${areas.length === 1 ? '' : 's'}`
           }
-          actions={!creatingArea && <QuietAction icon={Plus} label="Add area" onClick={() => setCreatingArea(true)} />}
+          action={!creatingArea ? <QuietAction icon={Plus} label="Add area" onClick={() => setCreatingArea(true)} /> : undefined}
         />
 
-        {/* New area form */}
+        {/* New area form — inline on the page, no card behind it. */}
         {creatingArea && (
-          <div className="mb-8 p-6 rounded-2xl bg-white border border-primary-200 shadow-lg animate-fade-in-scale">
+          <div className="mb-8 border-b border-neutral-300 pb-6 animate-fade-in-scale">
             <label className="text-sm font-medium text-neutral-500 mb-2 block">Life Area</label>
             <input
               ref={areaInputRef}
@@ -127,7 +133,7 @@ export function GoalsList({
                 if (e.key === 'Escape') { setCreatingArea(false); setNewAreaName('') }
               }}
               placeholder="e.g. Family & Relationships, Home, Career..."
-              className="w-full px-4 py-3 rounded-xl border border-neutral-200 bg-neutral-50
+              className="w-full px-4 py-3 rounded-xl border border-neutral-300 bg-bg-elevated
                          text-neutral-800 placeholder:text-neutral-400 text-xl font-display
                          focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all"
             />
@@ -151,43 +157,52 @@ export function GoalsList({
 
         {/* Loading state — hold the empty state until goals settle */}
         {loading && areas.length === 0 && (
-          <p className="text-center py-16 text-neutral-400">Loading goals…</p>
+          <EmptyState title="Loading goals…" />
         )}
 
         {/* Empty state */}
         {!loading && areas.length === 0 && !creatingArea && (
-          <div className="text-center py-16 animate-fade-in-up">
-            <div className="w-20 h-20 rounded-2xl bg-primary-100 flex items-center justify-center mx-auto mb-5">
-              <svg xmlns="http://www.w3.org/2000/svg" className="w-10 h-10 text-primary-500" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M3 6a3 3 0 013-3h10a1 1 0 01.8 1.6L14.25 8l2.55 3.4A1 1 0 0116 13H6a1 1 0 00-1 1v3a1 1 0 11-2 0V6z" clipRule="evenodd" />
-              </svg>
-            </div>
-            <h2 className="font-display text-xl font-semibold text-neutral-700 mb-2">No goals yet</h2>
-            <p className="text-neutral-500 mb-6 max-w-sm mx-auto">
-              Start by creating a life area (like "Family & Relationships" or "Home"), then add your annual goals under each area.
-            </p>
-            <button
-              onClick={() => setCreatingArea(true)}
-              className="inline-flex items-center gap-2 px-5 py-2.5 bg-primary-500 text-white rounded-xl font-medium
-                         hover:bg-primary-600 transition-colors shadow-sm"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" />
-              </svg>
-              Create your first area
-            </button>
-          </div>
+          <EmptyState
+            title="No goals yet"
+            action={<QuietAction icon={Plus} label="Create your first area" onClick={() => setCreatingArea(true)} />}
+          >
+            Start with a life area (like &ldquo;Family &amp; Relationships&rdquo; or &ldquo;Home&rdquo;), then add the year&rsquo;s goals under it.
+          </EmptyState>
         )}
 
         {/* Areas with their goals */}
-        <div className="space-y-10">
+        <div className="space-y-[var(--ds-section-gap)]">
           {areas.map((area) => {
             const areaGoals = getGoalsForArea(area.id)
 
             return (
               <section key={area.id}>
-                {/* Area header */}
-                <div className="flex items-center justify-between mb-4">
+                {/* Area header — the one section heading; click the name to rename. */}
+                <SectionHeading
+                  aside={
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => { setAddingGoalAreaId(area.id); setNewGoalName('') }}
+                        className="-my-1 flex items-center gap-1 rounded-md px-2 py-1 text-[13px] font-medium text-primary-700 transition-colors hover:bg-primary-50"
+                      >
+                        <Plus className="h-3.5 w-3.5" aria-hidden="true" />
+                        Add Goal
+                      </button>
+                      {areaGoals.length === 0 && (
+                        <button
+                          type="button"
+                          onClick={() => onDeleteArea(area.id)}
+                          className="-my-1 rounded-md p-1.5 text-neutral-400 transition-colors hover:text-red-500"
+                          title="Delete area"
+                          aria-label="Delete area"
+                        >
+                          <Trash2 className="h-4 w-4" aria-hidden="true" />
+                        </button>
+                      )}
+                    </>
+                  }
+                >
                   {editingAreaId === area.id ? (
                     <input
                       ref={renameInputRef}
@@ -199,45 +214,24 @@ export function GoalsList({
                         if (e.key === 'Enter') commitAreaRename(area)
                         if (e.key === 'Escape') setEditingAreaId(null)
                       }}
-                      className="font-display text-lg font-semibold text-neutral-700 bg-transparent border-b border-primary-300 focus:outline-none focus:border-primary-500 min-w-0 flex-1 mr-3"
+                      className="w-full min-w-0 bg-transparent border-b border-primary-300 focus:outline-none focus:border-primary-500"
                       aria-label="Area name"
                     />
                   ) : (
-                    <h2
+                    <button
+                      type="button"
                       onClick={() => { setEditingAreaId(area.id); setEditingAreaName(area.name) }}
                       title="Click to rename"
-                      className="font-display text-lg font-semibold text-neutral-700 cursor-pointer hover:text-primary-700 transition-colors"
+                      className="text-left transition-colors hover:text-primary-700"
                     >
                       {area.name}
-                    </h2>
-                  )}
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => { setAddingGoalAreaId(area.id); setNewGoalName('') }}
-                      className="flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium text-primary-600 hover:bg-primary-50 rounded-lg transition-colors"
-                    >
-                      <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" viewBox="0 0 20 20" fill="currentColor">
-                        <path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" />
-                      </svg>
-                      Add Goal
                     </button>
-                    {areaGoals.length === 0 && (
-                      <button
-                        onClick={() => onDeleteArea(area.id)}
-                        className="p-1.5 text-neutral-300 hover:text-red-500 rounded-lg transition-colors"
-                        title="Delete area"
-                      >
-                        <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
-                          <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
-                        </svg>
-                      </button>
-                    )}
-                  </div>
-                </div>
+                  )}
+                </SectionHeading>
 
                 {/* Inline goal creation for this area */}
                 {addingGoalAreaId === area.id && (
-                  <div className="mb-4 p-4 rounded-xl bg-white border border-primary-200 shadow-sm">
+                  <div className="mb-2 py-2 pl-[52px] md:pl-[var(--ds-body)]">
                     <input
                       ref={goalInputRef}
                       type="text"
@@ -248,7 +242,7 @@ export function GoalsList({
                         if (e.key === 'Escape') { setAddingGoalAreaId(null); setNewGoalName('') }
                       }}
                       placeholder={GOAL_PLACEHOLDER}
-                      className="w-full px-3 py-2 rounded-lg border border-neutral-200 bg-neutral-50
+                      className="w-full px-3 py-2 rounded-lg border border-neutral-300 bg-bg-elevated
                                  text-neutral-800 placeholder:text-neutral-400 text-lg font-display
                                  focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all"
                     />
@@ -272,9 +266,9 @@ export function GoalsList({
 
                 {/* Goals in this area */}
                 {areaGoals.length === 0 && addingGoalAreaId !== area.id ? (
-                  <p className="text-sm text-neutral-400 italic pl-1">No goals yet in this area</p>
+                  <p className="py-2 pl-[52px] text-sm italic text-neutral-500 md:pl-[var(--ds-body)]">No goals yet in this area</p>
                 ) : (
-                  <div className="space-y-3">
+                  <div>
                     {areaGoals.map((goal) => (
                       <GoalRow
                         key={goal.id}
@@ -327,40 +321,90 @@ function GoalRow({ goal, sharpenState, onSelect, onSharpen, onDismissSharpen, on
   const vague = looksVague(goal.name)
   const { loading, suggestion, error } = sharpenState
 
+  // The library row, the way a goal reads on the Year page: a goal mark in
+  // the margin lane, the goal at the body edge with its coaching under it,
+  // and its quiet controls trailing. No card behind it.
   return (
-    <div className="p-5 rounded-2xl bg-white border border-neutral-100 hover:border-primary-200 hover:shadow-md transition-all duration-200">
-      <div className="flex items-start gap-2">
-        <button onClick={onSelect} className="flex-1 min-w-0 text-left group">
-          <div className="flex items-start justify-between gap-3">
-            <div className="flex items-center gap-2 min-w-0">
-              <h3 className="font-medium text-neutral-800 group-hover:text-primary-700 transition-colors">
-                {goal.name}
-              </h3>
-              {goal.status === 'completed' && (
-                <span className="shrink-0 text-[10px] font-medium px-1.5 py-0.5 bg-primary-50 text-primary-600 rounded">
-                  Completed
-                </span>
-              )}
-            </div>
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              className="w-5 h-5 text-neutral-300 group-hover:text-primary-400 group-hover:translate-x-1 transition-all flex-shrink-0"
-              viewBox="0 0 20 20"
-              fill="currentColor"
-            >
-              <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
-            </svg>
-          </div>
+    <div className={`${LIST_ROW} items-start!`}>
+      <span className={`${LIST_ROW_LANE} pt-1 text-primary-500`} aria-hidden="true">
+        <Target className="h-4 w-4" />
+      </span>
+
+      <div className={LIST_ROW_BODY}>
+        <button type="button" onClick={onSelect} className="flex w-full min-w-0 items-baseline gap-2 text-left">
+          <h3 className={`min-w-0 text-[16px] leading-snug transition-colors group-hover:text-primary-700 ${goal.status === 'completed' ? 'text-neutral-500 line-through decoration-neutral-400' : 'text-neutral-900'}`}>
+            {goal.name}
+          </h3>
+          {goal.status === 'completed' && (
+            <span className="shrink-0 text-[12px] text-primary-700">Completed</span>
+          )}
         </button>
+
+        {/* Sharpen affordance + vague hint — hidden while a suggestion is showing. */}
+        {!suggestion && !loading && (
+          <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px]">
+            <button
+              type="button"
+              onClick={onSharpen}
+              className="inline-flex items-center gap-1 font-medium text-primary-600 hover:text-primary-700 transition-colors"
+            >
+              <Sparkles className="w-3.5 h-3.5" />
+              Sharpen
+            </button>
+            {vague && !hintDismissed && (
+              <span className="inline-flex items-center gap-1.5 text-amber-700/90">
+                name what&rsquo;s true by next year
+                <button
+                  type="button"
+                  onClick={() => setHintDismissed(true)}
+                  aria-label="Dismiss hint"
+                  className="text-amber-500 hover:text-amber-700 leading-none"
+                >
+                  &times;
+                </button>
+              </span>
+            )}
+          </div>
+        )}
+
+        {loading && <p className="mt-0.5 text-[12px] text-neutral-500">Sharpening&hellip;</p>}
+        {error && <p className="mt-0.5 text-[12px] text-red-600">Couldn&rsquo;t sharpen &mdash; try again.</p>}
+
+        {suggestion && (
+          <div className="mt-2 rounded-xl border border-primary-100 bg-primary-50/70 p-3">
+            <p className="text-sm text-neutral-800">{suggestion.suggestion}</p>
+            {suggestion.why && <p className="text-xs text-neutral-500 mt-1">{suggestion.why}</p>}
+            <div className="flex gap-2 mt-3">
+              <button
+                type="button"
+                onClick={() => onUseSuggestion(suggestion.suggestion)}
+                className="px-3 py-1.5 text-xs font-medium text-white bg-primary-500 hover:bg-primary-600 rounded-lg transition-colors"
+              >
+                Use this
+              </button>
+              <button
+                type="button"
+                onClick={onDismissSharpen}
+                className="px-3 py-1.5 text-xs font-medium text-neutral-600 hover:bg-neutral-100 rounded-lg transition-colors"
+              >
+                Keep mine
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      <div className={`${LIST_ROW_TRAIL} -mt-1`}>
         {/* Move to another area — the goal's area is otherwise fixed at
             creation. Only shown when there's somewhere to move it to. */}
         {otherAreas.length > 0 && (
-          <div onClick={(e) => e.stopPropagation()} className="relative shrink-0 -mt-1">
+          <div onClick={(e) => e.stopPropagation()} className="relative shrink-0">
             <button
+              type="button"
               onClick={() => setMoveOpen((o) => !o)}
               aria-label="Move to area"
               title="Move to another area"
-              className="p-2 rounded-lg text-neutral-300 hover:text-primary-500 hover:bg-neutral-100 transition-colors"
+              className="p-2 rounded-lg text-neutral-400 hover:text-primary-600 hover:bg-neutral-100 transition-colors"
             >
               <FolderInput className="w-4 h-4" />
             </button>
@@ -372,11 +416,12 @@ function GoalRow({ goal, sharpenState, onSelect, onSharpen, onDismissSharpen, on
                   onClick={() => setMoveOpen(false)}
                   className="fixed inset-0 z-40 cursor-default"
                 />
-                <div className="absolute right-0 top-full mt-1 z-50 min-w-[180px] bg-white rounded-xl border border-neutral-200 shadow-lg p-1.5">
-                  <p className="px-2.5 py-1 text-[11px] font-medium uppercase tracking-wide text-neutral-400">Move to</p>
+                <div className="absolute right-0 top-full mt-1 z-50 min-w-[180px] bg-bg-elevated rounded-xl border border-neutral-200 shadow-lg p-1.5">
+                  <p className="px-2.5 py-1 text-[11px] font-medium uppercase tracking-wide text-neutral-500">Move to</p>
                   {otherAreas.map((a) => (
                     <button
                       key={a.id}
+                      type="button"
                       aria-label={`Move to ${a.name}`}
                       onClick={() => { onMoveToArea(a.id); setMoveOpen(false) }}
                       className="w-full px-2.5 py-1.5 text-sm text-left rounded-lg hover:bg-neutral-50 text-neutral-700 truncate"
@@ -392,59 +437,10 @@ function GoalRow({ goal, sharpenState, onSelect, onSharpen, onDismissSharpen, on
         {/* Domain tag — always visible, so any goal can be (re)tagged even after
             creation. Untagged goals (created in the all-domains view) render the
             grey "Set context" state, which is how orphans get a home. */}
-        <div onClick={(e) => e.stopPropagation()} className="shrink-0 -mr-1 -mt-1">
+        <div onClick={(e) => e.stopPropagation()} className="shrink-0">
           <ContextPicker value={goal.context} onChange={onSetContext} />
         </div>
       </div>
-
-      {/* Sharpen affordance + vague hint — hidden while a suggestion is showing. */}
-      {!suggestion && !loading && (
-        <div className="mt-2 flex items-center gap-3 text-xs">
-          <button
-            onClick={onSharpen}
-            className="inline-flex items-center gap-1 font-medium text-primary-600 hover:text-primary-700 transition-colors"
-          >
-            <Sparkles className="w-3.5 h-3.5" />
-            Sharpen
-          </button>
-          {vague && !hintDismissed && (
-            <span className="inline-flex items-center gap-1.5 text-amber-700/90">
-              name what&rsquo;s true by next year
-              <button
-                onClick={() => setHintDismissed(true)}
-                aria-label="Dismiss hint"
-                className="text-amber-400 hover:text-amber-600 leading-none"
-              >
-                &times;
-              </button>
-            </span>
-          )}
-        </div>
-      )}
-
-      {loading && <p className="mt-2 text-xs text-neutral-400">Sharpening&hellip;</p>}
-      {error && <p className="mt-2 text-xs text-red-500">Couldn&rsquo;t sharpen &mdash; try again.</p>}
-
-      {suggestion && (
-        <div className="mt-3 p-3 rounded-xl bg-primary-50/70 border border-primary-100">
-          <p className="text-sm text-neutral-800">{suggestion.suggestion}</p>
-          {suggestion.why && <p className="text-xs text-neutral-500 mt-1">{suggestion.why}</p>}
-          <div className="flex gap-2 mt-3">
-            <button
-              onClick={() => onUseSuggestion(suggestion.suggestion)}
-              className="px-3 py-1.5 text-xs font-medium text-white bg-primary-500 hover:bg-primary-600 rounded-lg transition-colors"
-            >
-              Use this
-            </button>
-            <button
-              onClick={onDismissSharpen}
-              className="px-3 py-1.5 text-xs font-medium text-neutral-600 hover:bg-neutral-100 rounded-lg transition-colors"
-            >
-              Keep mine
-            </button>
-          </div>
-        </div>
-      )}
     </div>
   )
 }

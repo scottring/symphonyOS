@@ -95,3 +95,96 @@
   .today-focus-card .schedule-time-column,
   .today-focus-card .schedule-empty-time { display: block; visibility: hidden; }
 }
+
+/* --- Planning pages (Week/Month/Season/Year) --- */
+/* The control row folded into the masthead (PlanToolbarStatus / Controls):
+   the plan's status as the subline, the views and "Plan <period>" at the
+   title's right. Rendered on desktop only, so these apply at every width. */
+.pv2-mstatus { margin-right: 0; flex-wrap: wrap; font-size: var(--ds-text-body); color: var(--color-neutral-500); }
+.pv2-mstatus .pv2-hint { font-size: inherit; }
+.pv2-mslot:empty { display: none; }
+.pv2-mcontrols { display: flex; align-items: center; gap: 8px; }
+.pv2-mcontrols button:disabled { opacity: .5; cursor: not-allowed; }
+.daybook-masthead-controls:has(.pv2-mcontrols) { align-self: flex-end; padding-bottom: 2px; }
+.guide-slot:has(.guide-bar) ~ * .pv2-mcontrols > .pv2-btn { background: var(--color-bg-elevated); color: var(--color-neutral-700); border: 1px solid var(--color-neutral-200); box-shadow: none; }
+
+/* Phones keep the planning pages' quiet hint where the empty sentence is
+   (.ds-empty-body) — the native app anchors phone type. */
+@media (max-width: 767px) {
+  .pv2-hint.ds-empty-body { margin: 0; font-size: 12.5px; line-height: inherit; }
+}
+
+@media (min-width: 768px) {
+  /* One section heading: every column's heading is SectionHeading's. */
+  :is(.pv2-week, .pv2-page) .pv2-colh,
+  .week-days-heading {
+    display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 6px 16px;
+    min-height: 0; margin: 0 0 6px; padding-bottom: 8px;
+    border-bottom: 1px solid var(--color-neutral-300);
+    font-family: var(--font-family-display); font-weight: 500;
+    font-size: var(--ds-text-section); line-height: 1.2; letter-spacing: -0.01em;
+    color: var(--color-neutral-950);
+  }
+  :is(.pv2-week, .pv2-page) .pv2-colh small,
+  :is(.pv2-week, .pv2-page) .pv2-colh .pv2-paper { font-size: 13px; letter-spacing: 0; color: var(--color-neutral-500); }
+  :is(.pv2-week, .pv2-page) .pv2-colh .pv2-paper:hover { color: var(--color-primary-700); }
+
+  /* One group label: groups inside a section ("Any day", "Carried to …",
+     "Someday") are GroupLabel's small caps, no rule. */
+  :is(.pv2-week, .pv2-page) :is(.pv2-wl-h, .pv2-sect) {
+    margin: 14px 0 4px;
+    font: 600 var(--ds-text-label)/1.4 var(--font-family-sans);
+    letter-spacing: 0.08em; text-transform: uppercase; font-style: normal;
+    color: var(--color-neutral-500);
+  }
+  .pv2-week .pv2-wl .pv2-wl-h:first-of-type { margin-top: 4px; }
+
+  /* One row: 16px titles, 12px meta, 7–8px vertical padding, no rules
+     between rows, the hover tint every row wears. The box bleeds 12px past
+     the column (1px of it the border) so the words sit on the column's
+     edge; in these multi-column pages there is no margin lane. */
+  :is(.pv2-week, .pv2-page) .pv2-line-main {
+    margin: 0 -12px; padding: 6px 11px; border: 1px solid transparent; border-radius: 12px;
+    transition: background-color .12s, border-color .12s;
+  }
+  :is(.pv2-week, .pv2-page) .pv2-line-main:hover,
+  :is(.pv2-week, .pv2-page) .pv2-line.is-open > .pv2-line-main {
+    background: color-mix(in srgb, var(--color-primary-50) 50%, transparent);
+    border-color: var(--color-primary-100);
+  }
+  :is(.pv2-week, .pv2-page) .pv2-line.is-draft > .pv2-line-main { border: 1px dashed var(--color-primary-300); background: var(--color-bg-elevated); }
+  /* The grip keeps its place beside the words (the box grew 4px). */
+  :is(.pv2-week, .pv2-page) .pv2-linegrip { left: -10px; }
+  /* A goal keeps its serif line (18px): it is the outcome, not a row. */
+  :is(.pv2-week, .pv2-page) .pv2-line-text:not(.is-goal) { font-size: var(--ds-text-row); line-height: 1.4; }
+  :is(.pv2-week, .pv2-page) :is(.pv2-line-draft, .pv2-wl-draft, .pv2-write input) { font-size: var(--ds-text-row); }
+  :is(.pv2-week, .pv2-page) .pv2-line-parent { font-size: var(--ds-text-meta); }
+
+  /* The week's list: a 20px completion circle, 16px titles. Rows that
+     can't be dragged are plain rows; the cards — the things you move onto a
+     day — keep their raised box. */
+  .pv2-week .pv2-wl-check { width: 20px; height: 20px; margin-top: 1px; }
+  .pv2-week .pv2-wl-title { font-size: var(--ds-text-row); line-height: 1.4; }
+  .pv2-week .pv2-wl-row:not(.is-card) {
+    margin: 0 -12px; padding: 7px 11px; border: 1px solid transparent; border-radius: 12px;
+    transition: background-color .12s, border-color .12s;
+  }
+  .pv2-week .pv2-wl-row:not(.is-card):hover {
+    background: color-mix(in srgb, var(--color-primary-50) 50%, transparent);
+    border-color: var(--color-primary-100);
+  }
+  .pv2-week :is(.pv2-wl-parent, .pv2-wl-goal) { font-size: var(--ds-text-meta); }
+}
+
+/* Three panes (Week or Month with the level above beside it) are a split,
+   like Today with its week column: they take PAGE_COLUMN_SPLIT's width so
+   the middle list isn't squeezed to ~250px. One page, one width at a time;
+   the left edge never moves. */
+@media (min-width: 768px) {
+  :root:has(.pv2-wgrid.is-ref, .pv2-grid3) :is(.pv2-page, .week-column) { max-width: 1152px; }
+}
+
+/* The page scroller always reserves its scrollbar, so a page long enough to
+   scroll doesn't start 5px left of a short one (measured 2026-10-01: 341 vs
+   346px). The left edge is a constant of the app. */
+.scenery-scroll { scrollbar-gutter: stable; }

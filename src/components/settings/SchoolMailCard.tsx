@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Check, Copy, Mail, RefreshCw } from 'lucide-react'
 import { useSchoolMail } from '@/hooks/useSchoolMail'
+import { SectionHeading } from '@/components/layout/SectionHeading'
 
 /** "2h ago" / "3d ago" / a date once it stops being recent. */
 function relativeTime(iso: string, now: Date = new Date()): string {
@@ -57,7 +58,7 @@ export function SchoolMailCard() {
 
   return (
     <section>
-      <h2 className="text-lg font-semibold text-neutral-700 mb-2">School mail</h2>
+      <SectionHeading>School mail</SectionHeading>
       <p className="text-sm text-neutral-500 mb-6">
         Forward school email here once, or set a Gmail filter. Events land on their day with what
         each kid needs.

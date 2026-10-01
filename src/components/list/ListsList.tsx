@@ -1,10 +1,13 @@
 import { useState, useRef, useEffect } from 'react'
-import { PAGE_COLUMN_WIDE } from '@/components/layout/pageLayout'
+import { PAGE_COLUMN } from '@/components/layout/pageLayout'
+import { GroupLabel } from '@/components/layout/SectionHeading'
+import { EmptyState } from '@/components/layout/EmptyState'
+import { LIST_ROW, LIST_ROW_LANE, LIST_ROW_BODY, LIST_ROW_TITLE, LIST_ROW_META, LIST_ROW_TRAIL } from '@/components/layout/listRow'
 import type { List, ListCategory } from '@/types/list'
 import { getCategoryLabel, LIST_CATEGORIES } from '@/types/list'
 import { QuietAction } from '@/components/layout/PageMasthead'
 import { MastheadCard } from '@/components/layout/MastheadCard'
-import { Clapperboard, UtensilsCrossed, ShoppingBag, Plane, Users2, Home, ClipboardList, Plus } from 'lucide-react'
+import { Clapperboard, UtensilsCrossed, ShoppingBag, Plane, Users2, Home, ClipboardList, Plus, ChevronRight } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
 // Lucide category icons (design-unification 2026-09-01) — chrome never uses
@@ -75,7 +78,7 @@ export function ListsList({ lists, loading = false, listsByCategory, onSelectLis
 
   return (
     <div className="h-full overflow-auto">
-      <div className={PAGE_COLUMN_WIDE}>
+      <div className={PAGE_COLUMN}>
         {/* Header — shared Library masthead (design-unification 2026-09-01) */}
         <MastheadCard
           variant="page"
@@ -145,58 +148,46 @@ export function ListsList({ lists, loading = false, listsByCategory, onSelectLis
           </div>
         )}
 
-        {/* Lists by category */}
+        {/* Lists by category — groups within one list, rows on the library
+            row (layout system): the list's icon in the margin lane. */}
         {loading && lists.length === 0 ? (
-          <p className="py-12 text-center text-[15px] text-neutral-400">Loading lists…</p>
+          <p className="py-4 text-[14px] text-neutral-400">Loading lists…</p>
         ) : lists.length === 0 ? (
-          <div className="py-12 text-center">
-            <div className="mx-auto mb-4 flex items-center justify-center">
-              <svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" className="h-8 w-8 text-primary-400" viewBox="0 0 20 20" fill="currentColor">
-                <path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z" />
-                <path fillRule="evenodd" d="M4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm3 4a1 1 0 000 2h.01a1 1 0 100-2H7zm3 0a1 1 0 000 2h3a1 1 0 100-2h-3zm-3 4a1 1 0 100 2h.01a1 1 0 100-2H7zm3 0a1 1 0 100 2h3a1 1 0 100-2h-3z" clipRule="evenodd" />
-              </svg>
-            </div>
-            <p className="mb-2 font-display text-[24px] text-neutral-800">No lists yet</p>
-            <p className="text-[15px] text-neutral-500">Create a list to remember things</p>
-          </div>
+          <EmptyState title="No lists yet">Create a list to remember things</EmptyState>
         ) : (
-          <div className="space-y-8">
+          <div>
             {categoriesWithLists.map((category) => (
-              <div key={category}>
-                <h2 className="mb-2 flex items-center gap-2 text-[12px] font-semibold uppercase tracking-[0.08em] text-neutral-400">
-                  {(() => { const Icon = CATEGORY_ICONS[category]; return <Icon className="w-4 h-4 text-neutral-400" /> })()}
-                  {getCategoryLabel(category)}
-                </h2>
-                <div className="border-t border-neutral-300">
-                  {listsByCategory[category].map((list) => (
-                    <button
-                      key={list.id}
-                      onClick={() => onSelectList(list.id)}
-                      className="flex w-full items-center gap-3 border-b border-neutral-200 px-4 py-3.5 text-left transition-colors hover:bg-neutral-50"
-                    >
-                      <div className="w-10 h-10 rounded-full bg-primary-50 flex items-center justify-center text-xl flex-shrink-0">
-                        {list.icon || (() => { const Icon = CATEGORY_ICONS[list.category]; return <Icon className="w-5 h-5 text-primary-500" /> })()}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="truncate text-[16px] leading-snug text-neutral-800">{list.title}</div>
-                        <div className="mt-0.5 text-[12px] text-neutral-400">
-                          {list.visibility === 'family' && (
-                            <span className="inline-flex items-center gap-1 mr-2">
-                              <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3" viewBox="0 0 20 20" fill="currentColor">
-                                <path d="M9 6a3 3 0 11-6 0 3 3 0 016 0zM17 6a3 3 0 11-6 0 3 3 0 016 0zM12.93 17c.046-.327.07-.66.07-1a6.97 6.97 0 00-1.5-4.33A5 5 0 0119 16v1h-6.07zM6 11a5 5 0 015 5v1H1v-1a5 5 0 015-5z" />
-                              </svg>
-                              Shared
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                      <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-neutral-400" viewBox="0 0 20 20" fill="currentColor">
-                        <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
-                      </svg>
-                    </button>
-                  ))}
-                </div>
-              </div>
+              <section key={category} className="mb-6">
+                <GroupLabel>{getCategoryLabel(category)}</GroupLabel>
+                {listsByCategory[category].map((list) => (
+                  <button
+                    key={list.id}
+                    type="button"
+                    onClick={() => onSelectList(list.id)}
+                    className={`${LIST_ROW}`}
+                  >
+                    <span className={LIST_ROW_LANE}>
+                      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary-50 text-lg">
+                        {list.icon || (() => { const Icon = CATEGORY_ICONS[list.category]; return <Icon className="h-[18px] w-[18px] text-primary-500" /> })()}
+                      </span>
+                    </span>
+                    <span className={LIST_ROW_BODY}>
+                      <span className={LIST_ROW_TITLE}>{list.title}</span>
+                      {list.visibility === 'family' && (
+                        <span className={LIST_ROW_META}>
+                          <span className="inline-flex items-center gap-1">
+                            <Users2 className="h-3 w-3" aria-hidden="true" />
+                            Shared
+                          </span>
+                        </span>
+                      )}
+                    </span>
+                    <span className={LIST_ROW_TRAIL}>
+                      <ChevronRight className="h-4 w-4 text-neutral-400" aria-hidden="true" />
+                    </span>
+                  </button>
+                ))}
+              </section>
             ))}
           </div>
         )}

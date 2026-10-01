@@ -22,7 +22,9 @@ import type { Goal } from '@/types/goal'
 import type { Task } from '@/types/task'
 import { PlanLine, type LineActions, type LineVM } from './PlanLine'
 import { FocusDeck, CloseOut, type CloseDecision } from './FocusDeck'
-import { PlanMeetingBar, PlanToolbar } from './PlanStatus'
+import { PlanMeetingBar, PlanToolbar, PlanToolbarControls, PlanToolbarStatus, type PlanToolbarProps } from './PlanStatus'
+import { GuideAnchor } from '@/components/guide/GuideBar'
+import { useMobile } from '@/hooks/useMobile'
 import { EMPTY_TALLY, addToTally, lookBackWhy, nextAfterSave, tallySentence, type Tally } from '@/lib/planning/v2/planTally'
 import { periodBounds } from '@/lib/planning/periodPage'
 import { readSeasons } from '@/lib/cadence/seasons'
@@ -139,6 +141,7 @@ function Inner() {
     ? (session.saved.authorId === user?.id ? 'you' : members.find((m) => m.auth_user_id === session.saved!.authorId)?.name ?? 'your household')
     : null
   const inMeeting = !!meeting
+  const mobile = useMobile()
   // After a save, the season that takes the year forward.
   const seasons = readSeasons()
   const nextStep = nextAfterSave('year', new Date(year, 0, 1), year === new Date().getFullYear(), new Date(), {
@@ -151,6 +154,17 @@ function Inner() {
   const row = (vm: LineVM) => <PlanLine key={vm.task.id} vm={vm} actions={actions} members={members} nextLabel={String(year + 1)}
     open={openLine === vm.task.id} onToggle={() => setOpenLine((o) => (o === vm.task.id ? null : vm.task.id))} editable={inMeeting} />
   const viewSwitch = <ViewSwitch view={view} onChange={setView} withRef={false} />
+  const toolbar: PlanToolbarProps = {
+    period: String(year), saved: session.saved, loading: session.loading, error: !!session.error, agreedBy,
+    reviewDue, onPlan: startMeeting, onRetry: session.reload, viewSwitch,
+    justSaved: justSaved && {
+      detail: justSaved.detail,
+      next: { label: nextStep.label, onClick: () => { writePlanView('season', 'ref'); navigate(nextStep.to) } },
+      onDone: () => setJustSaved(null),
+    },
+  }
+  // Desktop: the control row folds into the masthead; a meeting keeps its bar.
+  const folded = !mobile && !inMeeting
 
   let body: ReactElement
   if (meeting?.step === 1) {
@@ -163,7 +177,7 @@ function Inner() {
       <section aria-label={`${year} plan`}>
         <div className="pv2-colh">{inMeeting ? `${year}’s goals` : 'Our plan'}<FromPaper altitude="year" periodStart={new Date(year, 0, 1)} tasks={layered} /></div>
         {loading && !main.length ? <p className="pv2-hint">Loading…</p> : null}
-        {!loading && !main.length && <p className="pv2-hint">{inMeeting ? 'Write what you want this year to hold.' : `Nothing on ${year}’s plan yet. That’s fine.`}</p>}
+        {!loading && !main.length && <p className="pv2-hint ds-empty-body">{inMeeting ? 'Write what you want this year to hold.' : `Nothing on ${year}’s plan yet. That’s fine.`}</p>}
         <ul className="pv2-list pv2-brain">{main.map(row)}</ul>
         {/* Always open, as on every horizon: the review is not a gate on writing. */}
         <form className="pv2-write" onSubmit={(e) => { e.preventDefault(); const v = draft.trim(); if (v) { void addLine(v); setDraft('') } }}>
@@ -185,8 +199,11 @@ function Inner() {
     <div className="pv2-page">
       <MastheadCard variant="page" numeral={String(year)} title={`Jan – Dec ${year}`}
         eyebrow={<PeriodNavEyebrow label="Year" onPrev={() => goTo(year - 1)} onNext={() => goTo(year + 1)} prevLabel={String(year - 1)} nextLabel={String(year + 1)} />}
-        // Desktop: the page's controls sit in the control row, as on every
-        // horizon (Scott, 2026-09-30); the masthead corner stays clear.
+        // Desktop folds the control row into the masthead (layout system,
+        // 2026-10-01): status as the subline, views and "Plan <year>" at the
+        // title's right. Phones keep the row.
+        subline={folded ? <PlanToolbarStatus {...toolbar} /> : undefined}
+        controls={folded ? <PlanToolbarControls {...toolbar} /> : undefined}
         />
       {inMeeting ? (
         <PlanMeetingBar period={String(year)} prevName={String(year - 1)} step={meeting!.step} lookBack={meeting!.candidateIds.length > 0}
@@ -195,15 +212,7 @@ function Inner() {
           onStep={(step) => setMeeting({ ...meeting!, step })}
           viewSwitch={meeting!.step === 2 && meeting!.candidateIds.length === 0 ? viewSwitch : undefined}
           onLeave={() => void endMeeting(false)} onSave={() => void endMeeting(true)} saveLabel={`Mark ${year} planned`} />
-      ) : (
-        <PlanToolbar period={String(year)} saved={session.saved} loading={session.loading} error={!!session.error} agreedBy={agreedBy}
-          reviewDue={reviewDue} onPlan={startMeeting} onRetry={session.reload} viewSwitch={viewSwitch}
-          justSaved={justSaved && {
-            detail: justSaved.detail,
-            next: { label: nextStep.label, onClick: () => { writePlanView('season', 'ref'); navigate(nextStep.to) } },
-            onDone: () => setJustSaved(null),
-          }} />
-      )}
+      ) : folded ? <GuideAnchor /> : <PlanToolbar {...toolbar} />}
       {body}
     </div>
   )

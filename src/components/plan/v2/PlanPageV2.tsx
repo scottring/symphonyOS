@@ -42,7 +42,8 @@ import { useMobile } from '@/hooks/useMobile'
 import { readCadenceConfig, weekStartAnchor } from '@/lib/cadence/config'
 import { weekOfYear } from '@/lib/planning/horizonNumerals'
 import { FocusDeck, CloseOut, type CloseDecision } from './FocusDeck'
-import { PlanMeetingBar, PlanToolbar } from './PlanStatus'
+import { PlanMeetingBar, PlanToolbar, PlanToolbarControls, PlanToolbarStatus, type PlanToolbarProps } from './PlanStatus'
+import { GuideAnchor } from '@/components/guide/GuideBar'
 import { EMPTY_TALLY, addToTally, lookBackWhy, nextAfterSave, tallySentence, type Tally } from '@/lib/planning/v2/planTally'
 import { FromPaper } from './FromPaper'
 import { ViewSwitch } from './ViewSwitch'
@@ -436,7 +437,7 @@ function Inner({ level }: { level: Level }) {
           arrived. */}
       {tasksLoadFailed && <LoadFailedNotice variant="inline" className="pv2-hint" buttonClassName="pv2-link"
         title="Your plan didn’t load." onRetry={() => { void refetchTasks() }} />}
-      {!loading && !tasksLoadFailed && !main.length && <p className="pv2-hint">{inMeeting ? 'Nothing yet. Write whatever comes up — no types, no dates needed.' : `Nothing on ${name}’s plan yet. Add a line below, or choose “Plan ${name}” to write it with ${aboveName} beside you.`}</p>}
+      {!loading && !tasksLoadFailed && !main.length && <p className="pv2-hint ds-empty-body">{inMeeting ? 'Nothing yet. Write whatever comes up — no types, no dates needed.' : `Nothing on ${name}’s plan yet. Add a line below, or choose “Plan ${name}” to write it with ${aboveName} beside you.`}</p>}
       {childFor && <ul className="pv2-list"><DraftLine key={childFor.id} parentTitle={childFor.title} isGoal={childFor.isGoal}
         placeholder={childFor.isGoal ? `${name}’s part of it` : `A step for ${name}`}
         onAdd={(t) => void addFromAbove(childFor, t)} onCancel={() => setChildFor(null)} /></ul>}
@@ -481,7 +482,7 @@ function Inner({ level }: { level: Level }) {
             </span>
           </li>
         ))}</ul>
-      ) : <p className="pv2-hint">Nothing written for {aboveName}. That’s fine.</p>}
+      ) : <p className="pv2-hint ds-empty-body">Nothing written for {aboveName}. That’s fine.</p>}
       {/* What the Shelves held for a month or season, folded in here. */}
       <div className="pv2-refshelves"><PeriodRefRoutines level={level} start={bounds.start} end={bounds.end} noun={NOUN[level].toLowerCase()} /></div>
     </aside>
@@ -493,6 +494,18 @@ function Inner({ level }: { level: Level }) {
   ) : null
 
   const viewSwitch = <ViewSwitch view={view} onChange={setView} aboveName={aboveName} />
+  const toolbar: PlanToolbarProps = {
+    period: name, saved: session.saved, loading: session.loading, error: !!session.error, agreedBy,
+    reviewDue, onPlan: startMeeting, onRetry: session.reload, viewSwitch,
+    justSaved: justSaved && {
+      detail: justSaved.detail,
+      // The next page opens with this one's level above beside it.
+      next: { label: nextStep.label, onClick: () => { writePlanView(level === 'season' ? 'month' : 'week', 'ref'); navigate(nextStep.to) } },
+      onDone: () => setJustSaved(null),
+    },
+  }
+  // Desktop: the control row folds into the masthead; a meeting keeps its bar.
+  const folded = !mobile && !inMeeting
 
   let body: ReactElement
   if (meeting?.step === 1) {
@@ -524,9 +537,11 @@ function Inner({ level }: { level: Level }) {
             <button type="button" onClick={() => goTo(today)} aria-label={`Back to ${nameOf(periodBounds(level, today, seasons))}`}
               className="period-return ml-1 inline-flex shrink-0 items-center gap-1 rounded-full border border-primary-100 bg-primary-50 px-2 py-0.5 text-[11px] font-semibold text-primary-600 transition-colors hover:bg-primary-100">Back to {nameOf(periodBounds(level, today, seasons))}</button>
           )} />}
-
-        // Desktop: the page's controls sit in the control row, as on every
-        // horizon (Scott, 2026-09-30); the masthead corner stays clear.
+        // Desktop folds the control row into the masthead (layout system,
+        // 2026-10-01): the plan's status is the subline, the views and
+        // "Plan <period>" sit at the title's right. Phones keep the row.
+        subline={folded ? <PlanToolbarStatus {...toolbar} /> : undefined}
+        controls={folded ? <PlanToolbarControls {...toolbar} /> : undefined}
         />
 
       {inMeeting ? (
@@ -536,16 +551,7 @@ function Inner({ level }: { level: Level }) {
           onStep={(step) => setMeeting({ ...meeting!, step })}
           viewSwitch={meeting!.step === 2 && meeting!.candidateIds.length === 0 ? viewSwitch : undefined}
           onLeave={() => void endMeeting(false)} onSave={() => void endMeeting(true)} saveLabel={`Mark ${name} planned`} />
-      ) : (
-        <PlanToolbar period={name} saved={session.saved} loading={session.loading} error={!!session.error} agreedBy={agreedBy}
-          reviewDue={reviewDue} onPlan={startMeeting} onRetry={session.reload} viewSwitch={viewSwitch}
-          justSaved={justSaved && {
-            detail: justSaved.detail,
-            // The next page opens with this one's level above beside it.
-            next: { label: nextStep.label, onClick: () => { writePlanView(level === 'season' ? 'month' : 'week', 'ref'); navigate(nextStep.to) } },
-            onDone: () => setJustSaved(null),
-          }} />
-      )}
+      ) : folded ? <GuideAnchor /> : <PlanToolbar {...toolbar} />}
 
       {dragOn && meeting?.step !== 1 && view !== 'focus' ? (
         <DndContext sensors={sensors} collisionDetection={pointerWithin}

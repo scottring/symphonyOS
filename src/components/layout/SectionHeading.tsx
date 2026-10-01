@@ -29,7 +29,7 @@ export function GroupLabel({ children, aside, className = '', as: Tag = 'h3' }: 
   /** A muted count or hint after the label, in sentence case. */
   aside?: ReactNode
   className?: string
-  as?: 'h3' | 'h4' | 'div'
+  as?: 'h2' | 'h3' | 'h4' | 'div'
 }) {
   return (
     <Tag className={`ds-group-label ${className}`}>

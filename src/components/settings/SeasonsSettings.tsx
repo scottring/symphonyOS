@@ -9,6 +9,7 @@ import { useState } from 'react'
 import { useHouseholdSeasons } from '@/hooks/useHouseholdSeasons'
 import { MONTH_NAMES } from '@/lib/cadence/periods'
 import { seasonLabel, type SeasonBoundary, type Seasons } from '@/lib/cadence/seasons'
+import { SectionHeading } from '@/components/layout/SectionHeading'
 
 const DAYS = Array.from({ length: 31 }, (_, i) => i + 1)
 
@@ -36,7 +37,7 @@ export function SeasonsSettings() {
 
   return (
     <section>
-      <h2 className="text-lg font-semibold text-neutral-700 mb-2">Seasons</h2>
+      <SectionHeading>Seasons</SectionHeading>
       <p className="text-sm text-neutral-500 mb-4">
         Your household's own groupings for seasonal planning. Each season runs from its start date to the next one's.
       </p>

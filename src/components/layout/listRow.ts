@@ -9,11 +9,12 @@
 //   0      64 76
 //   │ lane │gap│ title · meta under it                     trailing │
 //
-// Phones get a 40px lane; everything else is the same.
+// Phones get a 40px lane; everything else is the same. The explicit width
+// makes a <button> row (inline-block, sized to content) bleed like a block one.
 
 /** The row box + grid. Apply to the row's clickable root (a, button, div). */
 export const LIST_ROW =
-  'group grid grid-cols-[40px_minmax(0,1fr)_auto] md:grid-cols-[64px_minmax(0,1fr)_auto] items-center gap-x-3 -mx-3 px-3 py-2.5 rounded-xl border border-transparent text-left transition-colors hover:bg-primary-50/50 hover:border-primary-100'
+  'group grid w-[calc(100%+1.5rem)] grid-cols-[40px_minmax(0,1fr)_auto] md:grid-cols-[64px_minmax(0,1fr)_auto] items-center gap-x-3 -mx-3 px-3 py-2.5 rounded-xl border border-transparent text-left transition-colors hover:bg-primary-50/50 hover:border-primary-100'
 
 /** The lane cell: an icon or avatar at its left, or a small date/time. */
 export const LIST_ROW_LANE = 'flex items-center min-w-0 text-[12px] leading-tight text-neutral-500 tabular-nums'

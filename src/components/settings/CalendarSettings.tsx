@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useGoogleCalendar, type GoogleCalendarInfo } from '@/hooks/useGoogleCalendar'
 import { CalendarSetupWizard } from '@/components/calendar/CalendarSetupWizard'
+import { SectionHeading } from '@/components/layout/SectionHeading'
 
 /**
  * Resolve which Google account a connection belongs to from its calendar list.
@@ -140,7 +141,7 @@ export function CalendarSettings() {
     return (
       <div className="space-y-6">
         <section>
-          <h2 className="text-lg font-semibold text-neutral-700 mb-2">Google Calendar</h2>
+          <SectionHeading>Google Calendar</SectionHeading>
           <div className="animate-pulse space-y-4">
             <div className="h-4 bg-neutral-200 rounded w-2/3" />
             <div className="h-20 bg-neutral-100 rounded" />
@@ -153,7 +154,7 @@ export function CalendarSettings() {
   return (
     <div className="space-y-6">
       <section data-testid="google-card">
-        <h2 className="text-lg font-semibold text-neutral-700 mb-2">Google Calendar</h2>
+        <SectionHeading>Google Calendar</SectionHeading>
         <p className="text-sm text-neutral-500 mb-6">
           Connect your Google Calendar to see events alongside your tasks and routines.
         </p>
@@ -275,7 +276,7 @@ export function CalendarSettings() {
       </section>
 
       <section data-testid="outlook-card">
-        <h2 className="text-lg font-semibold text-neutral-700 mb-2">Outlook Calendar</h2>
+        <SectionHeading>Outlook Calendar</SectionHeading>
         <p className="text-sm text-neutral-500 mb-6">
           Connect an Outlook or Microsoft 365 calendar. Its events show alongside everything else; editing stays in Outlook.
         </p>

@@ -17,16 +17,17 @@
 // Long-form thinking still belongs in the Obsidian vault. Nothing here writes
 // there — see the type='general' note on the composer below.
 //
-// THE SHAPE (2026-09-11): a ruled journal, not a stack of cards. Every other
-// Library page is a list of objects you manage; these are jottings, and a card
-// around each one implies filing work that this surface exists to refuse. So:
-// a date margin down the left, one hairline rule, entries hanging off it, and
-// the origin of each entry as a mark in the gutter rather than a chip on its
-// own line. The rule is the only furniture on the page.
+// THE SHAPE (2026-09-11, re-set on the layout system 2026-10-01): a journal,
+// not a stack of cards. These are jottings, and a card around each one implies
+// filing work that this surface exists to refuse. Each stretch of days is a
+// group label that stays put while its entries scroll; each entry is the
+// library row — the origin of the entry as a mark in the margin lane (the
+// tick, in select mode), the heading and its excerpt, and its own date
+// trailing.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { CheckSquare, PenLine, ScanLine, Search, Square, SquareCheck, Trash2 } from 'lucide-react'
+import { CheckSquare, PenLine, ScanLine, Square, SquareCheck, Trash2 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { useNotes } from '@/hooks/useNotes'
 import type { DeletedNotes } from '@/hooks/useNotes'
@@ -36,7 +37,11 @@ import { useNoteTopics } from '@/hooks/useNoteTopics'
 import { NoteModal } from '@/components/notes/NoteModal'
 import { QuietAction } from '@/components/layout/PageMasthead'
 import { MastheadCard } from '@/components/layout/MastheadCard'
-import { PAGE_COLUMN_WIDE } from '@/components/layout/pageLayout'
+import { PAGE_COLUMN } from '@/components/layout/pageLayout'
+import { GroupLabel } from '@/components/layout/SectionHeading'
+import { EmptyState } from '@/components/layout/EmptyState'
+import { PageSearch } from '@/components/layout/PageSearch'
+import { LIST_ROW, LIST_ROW_LANE, LIST_ROW_BODY, LIST_ROW_TITLE, LIST_ROW_TRAIL } from '@/components/layout/listRow'
 import { stripHtml } from '@/lib/htmlUtils'
 import { noteHeading, noteExcerpt } from '@/lib/noteHeading'
 import { pickNotes } from './selection'
@@ -58,7 +63,7 @@ function excerptFor(note: DisplayNote): string {
  *  reader can tell them apart at a glance: typed here, read off a paper page,
  *  or written against something you have to do. */
 const ORIGINS: Record<string, { icon: LucideIcon; label: string; tone: string }> = {
-  import: { icon: ScanLine, label: 'From a page', tone: 'text-amber-600' },
+  import: { icon: ScanLine, label: 'From a page', tone: 'text-warning-600' },
   task: { icon: SquareCheck, label: 'On a task', tone: 'text-primary-600' },
   manual: { icon: PenLine, label: 'Written here', tone: 'text-neutral-400' },
 }
@@ -223,7 +228,7 @@ export function NotesApp() {
 
   return (
     <div className="h-full overflow-auto">
-      <div className={PAGE_COLUMN_WIDE}>
+      <div className={PAGE_COLUMN}>
         <MastheadCard
           variant="page"
           title="Notes"
@@ -247,16 +252,7 @@ export function NotesApp() {
                 onClick={() => setSelecting(true)}
               />
             )}
-            <label className="relative block">
-              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400 pointer-events-none" />
-              <input
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder="Search notes…"
-                aria-label="Search notes"
-                className="w-36 sm:w-44 sm:focus:w-60 transition-[width] pl-8 pr-3 py-2 text-[14px] rounded-lg bg-transparent border border-neutral-200 placeholder:text-neutral-400 focus:outline-none focus:border-primary-400 focus:bg-white/70"
-              />
-            </label>
+            <PageSearch value={query} onChange={setQuery} placeholder="Search notes…" ariaLabel="Search notes" />
             </>
           }
         />
@@ -305,9 +301,11 @@ export function NotesApp() {
         <>
         {/* Composer — one line on ruled paper, Enter saves. Anything longer is
             written in the note itself once it's open; asking for a title up
-            front is the friction that sent these notes elsewhere. */}
+            front is the friction that sent these notes elsewhere. The pen
+            stands in the margin lane, so what you type starts where every
+            note's heading below starts. */}
         <div className="mb-8">
-          <div className="flex items-center gap-3 border-b border-neutral-300 focus-within:border-primary-500 transition-colors pb-2">
+          <div className="grid grid-cols-[40px_minmax(0,1fr)_auto] md:grid-cols-[64px_minmax(0,1fr)_auto] items-center gap-x-3 border-b border-neutral-300 focus-within:border-primary-500 transition-colors pb-2">
             <PenLine className="w-[18px] h-[18px] text-neutral-400 shrink-0" />
             <input
               value={draft}
@@ -320,7 +318,7 @@ export function NotesApp() {
               }}
               placeholder="Write a note…"
               aria-label="Write a note"
-              className="flex-1 bg-transparent border-0 p-0 text-[19px] font-display text-neutral-900 placeholder:text-neutral-400 placeholder:font-normal focus:outline-none focus:ring-0"
+              className="min-w-0 bg-transparent border-0 p-0 text-[19px] font-display text-neutral-900 placeholder:text-neutral-400 placeholder:font-normal focus:outline-none focus:ring-0"
             />
             <span
               className={`text-[11px] uppercase tracking-[0.1em] text-neutral-400 shrink-0 transition-opacity ${draft.trim() ? 'opacity-100' : 'opacity-0'}`}
@@ -334,85 +332,85 @@ export function NotesApp() {
         )}
 
         {loading && groups.length === 0 && (
-          <p className="text-[15px] text-neutral-400">Loading…</p>
+          <p className="py-4 text-[14px] text-neutral-400">Loading…</p>
         )}
 
         {!loading && groups.length === 0 && (
-          <p className="text-[15px] text-neutral-400">
-            {query ? 'No notes match that.' : "Nothing here yet — write one above."}
-          </p>
+          query ? (
+            <EmptyState title="No notes match that.">Try another word, or clear the search.</EmptyState>
+          ) : (
+            <EmptyState title="Nothing here yet — write one above.">
+              Typed here, attached to a task, or read off a paper page: every note lands in one place.
+            </EmptyState>
+          )
         )}
 
         {groups.map((group) => (
-          <section key={group.date} className="sm:grid sm:grid-cols-[7rem_1fr]">
-            {/* The date margin. It stays put while its own entries scroll, so
-                you always know which stretch of days you are reading. */}
-            <h2 className="sm:sticky sm:top-6 self-start h-fit py-2 text-[12px] font-display uppercase tracking-[0.14em] text-neutral-400">
+          <section key={group.date} className="mb-6">
+            {/* The stretch of days stays put while its own entries scroll, so
+                you always know which part of the stream you are reading. A
+                thin wash of the page colour keeps rows from showing through. */}
+            <GroupLabel className="md:sticky md:top-0 md:z-10 md:bg-bg-base/85 md:py-1.5 md:backdrop-blur-sm">
               {group.label}
-            </h2>
+            </GroupLabel>
 
-            <div className="border-l border-neutral-200 pl-4 sm:pl-6 pb-6">
-              {group.notes.map((note) => {
-                const origin = originOf(note)
-                const excerpt = excerptFor(note)
-                // In select mode the origin mark makes way for the tick —
-                // same 18px gutter, so nothing shifts when the mode changes.
-                const pickable = selecting && isDeletable(note)
-                const picked = selected.has(note.id)
-                const Glyph = selecting
-                  ? (pickable ? (picked ? CheckSquare : Square) : SquareCheck)
-                  : origin.icon
-                const tone = selecting
-                  ? (picked ? 'text-primary-600' : 'text-neutral-300')
-                  : origin.tone
-                return (
-                  <button
-                    key={note.id}
-                    type="button"
-                    onClick={(e) => onRowClick(note, e.shiftKey)}
-                    disabled={selecting && !pickable}
-                    aria-pressed={pickable ? picked : undefined}
-                    className={`group w-full text-left grid grid-cols-[18px_1fr] gap-x-3 py-3 -ml-[1.05rem] sm:-ml-[1.55rem] pl-[1.05rem] sm:pl-[1.55rem] pr-3 rounded-r-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/40 transition-colors ${
-                      selecting && !pickable
-                        ? 'opacity-40 cursor-default'
-                        : picked
-                          ? 'bg-primary-50/70'
-                          : 'hover:bg-bg-elevated'
-                    }`}
-                  >
-                    <Glyph
-                      className={`w-[18px] h-[18px] mt-[3px] shrink-0 ${tone}`}
-                      aria-hidden="true"
-                    />
-                    <div className="min-w-0">
-                      {/* The mark is the label for everyone who can see it;
-                          spell it out for everyone who can't — except where
-                          it is already written beside the date. */}
-                      {note.source !== 'import' && <span className="sr-only">{origin.label}. </span>}
-                      {selecting && !isDeletable(note) && (
-                        <span className="sr-only">Lives on its task — delete it there. </span>
+            {group.notes.map((note) => {
+              const origin = originOf(note)
+              const excerpt = excerptFor(note)
+              // In select mode the origin mark makes way for the tick — the
+              // same place in the lane, so nothing shifts when the mode changes.
+              const pickable = selecting && isDeletable(note)
+              const picked = selected.has(note.id)
+              const Glyph = selecting
+                ? (pickable ? (picked ? CheckSquare : Square) : SquareCheck)
+                : origin.icon
+              const tone = selecting
+                ? (picked ? 'text-primary-600' : 'text-neutral-300')
+                : origin.tone
+              return (
+                <button
+                  key={note.id}
+                  type="button"
+                  onClick={(e) => onRowClick(note, e.shiftKey)}
+                  disabled={selecting && !pickable}
+                  aria-pressed={pickable ? picked : undefined}
+                  className={`${LIST_ROW} focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/40 ${
+                    selecting && !pickable
+                      ? 'opacity-40 cursor-default disabled:hover:bg-transparent disabled:hover:border-transparent'
+                      : picked
+                        ? 'bg-primary-50/70'
+                        : ''
+                  }`}
+                >
+                  <span className={`${LIST_ROW_LANE} self-start pt-0.5`}>
+                    <Glyph className={`h-[18px] w-[18px] shrink-0 ${tone}`} aria-hidden="true" />
+                  </span>
+                  <span className={`${LIST_ROW_BODY} self-start`}>
+                    {/* The mark is the label for everyone who can see it;
+                        spell it out for everyone who can't — except where it
+                        is already written beside the date. */}
+                    {note.source !== 'import' && <span className="sr-only">{origin.label}. </span>}
+                    {selecting && !isDeletable(note) && (
+                      <span className="sr-only">Lives on its task — delete it there. </span>
+                    )}
+                    <h3 className={LIST_ROW_TITLE}>{headingFor(note)}</h3>
+                    {excerpt && (
+                      <p className="mt-0.5 line-clamp-2 text-[14px] leading-relaxed text-neutral-500">
+                        {excerpt}
+                      </p>
+                    )}
+                  </span>
+                  <span className={`${LIST_ROW_TRAIL} self-start pt-1`}>
+                    <span className="tabular-nums text-neutral-400">
+                      {note.source === 'import' && (
+                        <span className="text-warning-600">From a page · </span>
                       )}
-                      <div className="flex items-baseline gap-3">
-                        <h3 className="flex-1 min-w-0 truncate text-[16px] font-display text-neutral-900 group-hover:text-primary-800 transition-colors">
-                          {headingFor(note)}
-                        </h3>
-                        <span className="shrink-0 text-[12px] text-neutral-400 tabular-nums">
-                          {note.source === 'import' && (
-                            <span className="text-amber-600/90">From a page · </span>
-                          )}
-                          {stamp(note.updatedAt)}
-                        </span>
-                      </div>
-                      {excerpt && (
-                        <p className="mt-1 text-[14px] leading-relaxed text-neutral-500 line-clamp-2">
-                          {excerpt}
-                        </p>
-                      )}
-                    </div>
-                  </button>
-                )
-              })}
-            </div>
+                      {stamp(note.updatedAt)}
+                    </span>
+                  </span>
+                </button>
+              )
+            })}
           </section>
         ))}
 
