@@ -2028,8 +2028,6 @@ html.desktop-shell a {
 }
 .desktop-ground > * { pointer-events: auto; }
 .desktop-ground .desktop-footer { margin-inline: auto; padding-top: 8px; padding-bottom: 16px; }
-.desktop-ground .place-band.is-ground { margin-top: 0; height: 72px; margin-inline: auto; display: block; pointer-events: none; }
-.desktop-ground .place-band.is-ground .place-band-scene { height: 72px; }
 .desktop-workspace-dock { grid-area: dock; align-self: stretch; min-width: 0; }
 /* References stay in the desktop workspace across route changes. */
 .desktop-workspace.has-references {
@@ -2323,10 +2321,7 @@ html.desktop-shell a {
 .plan-page-tools.is-rail { position: sticky; top: 0; z-index: 14; padding-top: 6px; padding-bottom: 6px; background: var(--color-bg-base); transition: box-shadow .15s; }
 .plan-page-tools.is-rail.is-stuck { box-shadow: 0 1px 0 var(--color-neutral-200), 0 8px 16px -14px rgb(0 0 0 / .18); }
 .plan-rail-sentinel { height: 1px; margin-bottom: -1px; }
-/* While the rail is pinned, the footer's scene steps down a little. */
-.desktop-ground .place-band.is-ground, .desktop-ground .place-band.is-ground .place-band-scene { transition: height .2s ease; }
-html.rail-stuck .desktop-ground .place-band.is-ground, html.rail-stuck .desktop-ground .place-band.is-ground .place-band-scene { height: 52px; }
-@media (prefers-reduced-motion: reduce) { .plan-page-tools.is-rail, .desktop-ground .place-band.is-ground, .desktop-ground .place-band.is-ground .place-band-scene { transition: none; } }
+@media (prefers-reduced-motion: reduce) { .plan-page-tools.is-rail { transition: none; } }
 /* The top bar: icon buttons one size (2026-09-29). */
 .page-navigation-icon { position: relative; display: inline-grid; place-items: center; width: 34px; height: 34px; border-radius: 9px; color: var(--color-neutral-600); }
 .page-navigation-icon:hover { background: var(--color-neutral-100); color: var(--color-neutral-900); }
@@ -2759,42 +2754,72 @@ div.chooser-action-group { overflow: visible !important; }
   border-right: 1px solid color-mix(in srgb, var(--color-primary-300) 35%, var(--color-neutral-200));
   box-shadow: none;
 }
-/* Your place across the top of the app (PlaceBand.tsx): a shallow window onto
-   the scene's horizon behind the navigation, fading at both ends and into the
-   page so labels stay readable. Same height as the navigation band. */
-.place-band {
-  position: absolute; left: 0; right: 0; top: 0; height: 88px;
-  overflow: hidden; pointer-events: none;
-  -webkit-mask-image: linear-gradient(to bottom, black 60%, transparent);
-  mask-image: linear-gradient(to bottom, black 60%, transparent);
+/* Your place BEHIND the page (PlaceScenery.tsx, Scott 2026-09-30): the scene
+   stands in the two bottom corners of the window, the centre clear, and takes
+   no layout space — the page gets the whole viewport. A paper veil over the
+   art thickens over the first 150px of scroll (--scenery-progress, written by
+   sceneryVeil.ts), so the place shows in unused space at the top of the page
+   and recedes once the page is being worked in. */
+.place-scenery {
+  position: fixed; top: 0; bottom: 0; left: 0; /* right: the side pane, inline */
+  overflow: hidden; pointer-events: none; user-select: none;
+  container-type: inline-size;
+  /* The scene's shallow middle is this tall; the corners rise from it. */
+  --scenery-band: 15vh;
+  /* What it stands on: the desktop footer, or the phone's tab bar (inline). */
+  --scenery-floor: 60px;
+  /* Paper over the art at the top of the page, and once scrolled. */
+  --scenery-rest: 0.88;
+  --scenery-max: 0.97;
+  --scenery-progress: 0;
 }
-/* Two layers in the place's own colour: a paler range behind, the town or
-   trees in front. The front layer is solid (mixed into the page colour, not
-   see-through) so the hills sit behind the buildings instead of showing
-   through them (Scott, 2026-09-28). */
-.place-skyline-far { fill: var(--color-primary-300); opacity: 0.45; }
-.place-skyline-near { fill: color-mix(in srgb, var(--color-primary-400) 62%, var(--color-bg-base)); }
-/* The place as GROUND under the page (Scott, 2026-09-28: "move the scenes
-   down to the bottom to anchor the page visually") — standing on the footer,
-   fading up into the page instead of down from the navigation. */
-.place-band.is-ground {
-  position: relative; top: auto; height: 96px; margin-top: 48px;
-  width: 100%; max-width: 1152px; justify-self: center; padding-inline: 56px; box-sizing: border-box;
-  -webkit-mask-image: linear-gradient(to top, black 55%, transparent);
-  mask-image: linear-gradient(to top, black 55%, transparent);
+/* A page whose content column wears paper (.place-paper, usePagePaper) keeps
+   its own text off the art, so the scene may show fully where the page is
+   empty. Every other page gets the quiet scene above. */
+html.has-place-paper .place-scenery { --scenery-rest: 0; }
+.place-scenery-ground { position: absolute; left: 0; right: 0; bottom: var(--scenery-floor); }
+/* One scale for both corners — px per source px — from the band height, or
+   from the width when two corners at that scale would not fit side by side
+   (phones: smaller art, meeting in the middle). */
+.place-scenery-art {
+  --scenery-unit: min(calc(var(--scenery-band) / 168), calc(50cqw / 514));
+  position: absolute; bottom: 0;
+  height: calc(var(--scenery-unit) * var(--scenery-rise)); width: auto; max-width: 50cqw;
+  /* The corners may rise above the band, but not up into the page. */
+  max-height: 36vh;
+  opacity: 0.92;
 }
-/* Out to the ends of the footer's line, fading as it gets there. */
-.place-band.is-ground .place-band-scene {
-  position: relative; left: auto; top: auto; transform: none; width: 100%; height: 96px;
-  -webkit-mask-image: linear-gradient(to right, transparent, black 22%, black 78%, transparent);
-  mask-image: linear-gradient(to right, transparent, black 22%, black 78%, transparent);
+.place-scenery-art.is-left { left: 0; }
+.place-scenery-art.is-right { right: 0; }
+.place-scenery-veil {
+  position: absolute; inset: 0;
+  background: var(--color-bg-base);
+  opacity: calc(var(--scenery-rest) + (var(--scenery-max) - var(--scenery-rest)) * var(--scenery-progress));
+  /* A little of the place stays visible in the outer margins even when
+     scrolled, where no page content reaches. */
+  -webkit-mask-image: linear-gradient(to right, rgb(0 0 0 / 0.5), #000 96px, #000 calc(100% - 96px), rgb(0 0 0 / 0.5));
+  mask-image: linear-gradient(to right, rgb(0 0 0 / 0.5), #000 96px, #000 calc(100% - 96px), rgb(0 0 0 / 0.5));
 }
-@media (max-width: 1023px) { .place-band.is-ground { padding-inline: 40px; } }
-.place-band-scene {
-  position: absolute; left: 50%; top: 0; width: 640px; height: 88px;
-  transform: translateX(-50%);
-  -webkit-mask-image: linear-gradient(to right, transparent, black 32%, black 68%, transparent);
-  mask-image: linear-gradient(to right, transparent, black 32%, black 68%, transparent);
+/* Short windows and phones: smaller art and more paper from the start, so
+   the page reads without scrolling first. */
+@media (max-height: 720px) {
+  .place-scenery { --scenery-band: 12vh; }
+  html.has-place-paper .place-scenery { --scenery-rest: 0.25; }
+}
+@media (max-width: 767px) {
+  html.has-place-paper .place-scenery { --scenery-rest: 0.3; }
+}
+/* Reduced motion: nothing changes on scroll; one steady, stronger veil. */
+@media (prefers-reduced-motion: reduce) {
+  .place-scenery-veil { opacity: max(var(--scenery-rest), 0.55); }
+}
+/* The paper a page's content column wears over the scenery: the page's own
+   colour, feathered past the column's edges so the art fades out behind the
+   work instead of stopping at a line. Background and shadow only — no
+   positioning, no stacking context, nothing that could trap a menu. */
+.place-paper {
+  background-color: var(--color-bg-base);
+  box-shadow: 0 0 56px var(--color-bg-base);
 }
 
 /* =============================================================================

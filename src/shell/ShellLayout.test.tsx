@@ -309,6 +309,37 @@ describe('Centred desktop workspace and footer', () => {
   })
 })
 
+// The place's scenery used to be a band in the footer's grid row, taking
+// height from the page. It now sits behind the page and must stay out of the
+// page's layout and scroll — on desktop and on phones.
+describe('Place scenery behind the page', () => {
+  beforeEach(() => { selectionState.selection = null })
+  afterEach(() => { mobileState.isMobile = false })
+
+  for (const phone of [false, true]) {
+    it(`lives outside the page scroller, hidden from assistive tech (${phone ? 'phone' : 'desktop'})`, () => {
+      mobileState.isMobile = phone
+      renderAt('/today')
+      const scenery = document.querySelector('[data-place-scenery]') as HTMLElement
+      const page = screen.getByTestId('app-content')
+      expect(scenery).toHaveAttribute('aria-hidden', 'true')
+      // Not inside the page: it can add no height and scroll nowhere.
+      expect(scenery).not.toContainElement(page)
+      expect(page.closest('[data-place-scenery]')).toBeNull()
+      // Painted first: the page's scroller follows it and covers it.
+      expect(scenery.nextElementSibling).toContainElement(page)
+      expect(document.querySelectorAll('[data-place-scenery]')).toHaveLength(1)
+    })
+  }
+
+  it('leaves the footer as the only thing in its grid row', () => {
+    renderAt('/today')
+    const ground = screen.getByRole('contentinfo').parentElement as HTMLElement
+    expect(ground).toHaveClass('desktop-ground')
+    expect(ground.children).toHaveLength(1)
+  })
+})
+
 describe('Grouped More menu and desktop capture', () => {
   beforeEach(() => { mobileState.isMobile = false; selectionState.selection = null; sessionStorage.clear(); localStorage.removeItem('symphony-plan-period') })
 

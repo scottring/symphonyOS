@@ -38,7 +38,7 @@ import { MOBILE_TAB_BAR_HEIGHT } from './mobileChrome';
 import { SideColumn, SIDE_COLUMN_WIDTH, type SidePane } from './SideColumn';
 import { PhonePaneSwitch } from './PhonePaneSwitch';
 import { NoteViewer } from '@/components/chat/NoteViewer';
-import { PlaceBand } from '@/components/place/PlaceBand';
+import { PlaceScenery } from '@/components/place/PlaceScenery';
 import { planV2Enabled } from '@/lib/planning/v2/planV2';
 import { onQuickAddRequest } from '@/lib/quickAddSignal';
 import { GuideProvider } from '@/hooks/useGuidedPlan';
@@ -147,6 +147,9 @@ function ShellLayoutInner({ children }: Props) {
   const [desktopCenter, setDesktopCenter] = useState<HTMLDivElement | null>(null);
   const [mobilePlanControls, setMobilePlanControls] = useState<HTMLDivElement | null>(null);
   const [desktopFooterAction, setDesktopFooterAction] = useState<HTMLDivElement | null>(null);
+  // The element that scrolls the page — the content frame, on desktop and
+  // phone alike. Its scroll drives the scenery's paper veil.
+  const [pageScroller, setPageScroller] = useState<HTMLDivElement | null>(null);
 
   const references = useReferenceLists();
   const activeView = useMemo(() => deriveActiveView(location.pathname), [location.pathname]);
@@ -264,9 +267,18 @@ function ShellLayoutInner({ children }: Props) {
           deployed while this tab stayed open (stale-tab guard). */}
       <NewVersionBanner />
 
+      {/* Your place, behind the page: fixed, out of layout, painted before the
+          content frame so the frame (positioned, no z-index) covers it. */}
+      <PlaceScenery
+        scroller={pageScroller}
+        right={isMobile ? 0 : paneWidth}
+        floor={isMobile ? `calc(${MOBILE_TAB_BAR_HEIGHT} + env(safe-area-inset-bottom, 0px))` : undefined}
+      />
+
       {/* Content frame — uses <div> (not <main>) because individual apps render
           their own <main>. Avoids invalid nested-main HTML. */}
       <div
+        ref={setPageScroller}
         className={`relative flex-1 overflow-auto overflow-x-hidden ${isMobile ? '' : 'transition-all duration-300 ease-in-out'}`}
         style={
           isMobile
@@ -374,11 +386,9 @@ function ShellLayoutInner({ children }: Props) {
               </SideColumn>
             </div>
             {referencesVisible && <div className="desktop-workspace-dock"><ReferenceListsDock /></div>}
-            {/* Your place, as ground under the page — it anchors the bottom
-                rather than crowding the navigation — and it stays put: the
-                page scrolls, the ground and footer do not (Scott, 2026-09-28). */}
+            {/* The footer stays put while the page scrolls (Scott, 2026-09-28);
+                the place's scene stands on it from behind (PlaceScenery). */}
             <div className="desktop-ground">
-              <PlaceBand ground />
               <DesktopFooter actionRef={setDesktopFooterAction} />
             </div>
           </div>
