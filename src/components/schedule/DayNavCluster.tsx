@@ -86,7 +86,7 @@ export function DayNavCluster({ viewedDate, onDateChange, today = new Date(), va
           type="button"
           aria-label="Previous day"
           onClick={() => onDateChange(shift(viewedDate, -1))}
-          className="rounded-lg p-1.5 text-neutral-300 transition-colors hover:bg-neutral-100 hover:text-neutral-700"
+          className="rounded-lg p-1.5 text-neutral-500 transition-colors hover:bg-neutral-100 hover:text-neutral-800"
         >
           <ChevronLeft className="h-4 w-4" />
         </button>
@@ -103,7 +103,7 @@ export function DayNavCluster({ viewedDate, onDateChange, today = new Date(), va
             {label ?? `${weekdayLong} · ${dateMedium}`}
           </span>
           <ChevronDown
-            className={`h-3.5 w-3.5 shrink-0 text-neutral-300 transition-all group-hover:text-neutral-500 ${pickerOpen ? 'rotate-180' : ''}`}
+            className={`h-3.5 w-3.5 shrink-0 text-neutral-400 transition-all group-hover:text-neutral-600 ${pickerOpen ? 'rotate-180' : ''}`}
           />
         </button>
 
@@ -111,7 +111,7 @@ export function DayNavCluster({ viewedDate, onDateChange, today = new Date(), va
           type="button"
           aria-label="Next day"
           onClick={() => onDateChange(shift(viewedDate, 1))}
-          className="rounded-lg p-1.5 text-neutral-300 transition-colors hover:bg-neutral-100 hover:text-neutral-700"
+          className="rounded-lg p-1.5 text-neutral-500 transition-colors hover:bg-neutral-100 hover:text-neutral-800"
         >
           <ChevronRight className="h-4 w-4" />
         </button>
@@ -145,7 +145,7 @@ export function DayNavCluster({ viewedDate, onDateChange, today = new Date(), va
           type="button"
           aria-label="Previous day"
           onClick={() => onDateChange(shift(viewedDate, -1))}
-          className="p-1 rounded-lg text-neutral-300 hover:text-neutral-700 hover:bg-neutral-100 transition-colors shrink-0"
+          className="p-1 rounded-lg text-neutral-500 hover:text-neutral-800 hover:bg-neutral-100 transition-colors shrink-0"
         >
           <ChevronLeft className="w-5 h-5" />
         </button>
@@ -162,7 +162,7 @@ export function DayNavCluster({ viewedDate, onDateChange, today = new Date(), va
             <span className="hidden md:inline">{dateLong}</span>
           </h1>
           <ChevronDown
-            className={`w-4 h-4 shrink-0 text-neutral-300 group-hover:text-neutral-500 transition-all ${pickerOpen ? 'rotate-180' : ''}`}
+            className={`w-4 h-4 shrink-0 text-neutral-400 group-hover:text-neutral-600 transition-all ${pickerOpen ? 'rotate-180' : ''}`}
           />
         </button>
 
@@ -170,7 +170,7 @@ export function DayNavCluster({ viewedDate, onDateChange, today = new Date(), va
           type="button"
           aria-label="Next day"
           onClick={() => onDateChange(shift(viewedDate, 1))}
-          className="p-1 rounded-lg text-neutral-300 hover:text-neutral-700 hover:bg-neutral-100 transition-colors shrink-0"
+          className="p-1 rounded-lg text-neutral-500 hover:text-neutral-800 hover:bg-neutral-100 transition-colors shrink-0"
         >
           <ChevronRight className="w-5 h-5" />
         </button>
