@@ -76,6 +76,8 @@ export function RoutineForm({ routine, contacts = [], familyMembers = [], onBack
     }
     if (recurrenceType === 'monthly') {
       if ((recurrencePattern.day_of_month || 1) !== (orig.day_of_month || 1)) return true
+      if ((recurrencePattern.week_of_month ?? null) !== (orig.week_of_month ?? null)) return true
+      if ((recurrencePattern.day_of_week ?? null) !== (orig.day_of_week ?? null)) return true
     }
     if (recurrenceType === 'since_last') {
       const originalInterval = orig.type === 'since_last' ? (orig.interval || 1) : 1

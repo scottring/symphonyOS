@@ -12,9 +12,12 @@
 // incoming pattern, so it works equally for deferred-save (RoutineForm builds the
 // pattern then saves on a button) and live-save (panel writes immediately).
 
-import type { RecurrencePattern, RecurrenceType, RecurrenceUnit } from '@/types/actionable'
+import { CalendarCheck } from 'lucide-react'
+import type { MonthDayOfWeek, MonthWeek, RecurrencePattern, RecurrenceType, RecurrenceUnit } from '@/types/actionable'
 import { TIME_INPUT_LARGE_CLASS } from '@/lib/inputStyles'
 import { isEverydayRoutine } from '@/lib/routineUtils'
+import { hasMonthlyPosition, MONTH_WEEKS, MONTH_DAYS_OF_WEEK, monthWeekWord, monthDayWord } from '@/lib/cadence/monthlyPosition'
+import { scheduleReadback } from '@/lib/routineReadback'
 
 const DAYS = [
   { key: 'sun', label: 'Sun' },
@@ -60,7 +63,12 @@ function patternForType(type: RecurrenceType, prev: RecurrencePattern): Recurren
     }
   }
   if (type === 'monthly') {
-    next.day_of_month = prev.day_of_month ?? 1
+    if (hasMonthlyPosition(prev)) {
+      next.week_of_month = prev.week_of_month
+      next.day_of_week = prev.day_of_week
+    } else {
+      next.day_of_month = prev.day_of_month ?? 1
+    }
   }
   if (type === 'since_last') {
     next.interval = prev.interval ?? 1
@@ -81,11 +89,28 @@ export function RoutineScheduleEditor({
   const weeklyInterval = p.interval ?? 1
   const startDate = p.start_date ?? ''
   const dayOfMonth = p.day_of_month ?? 1
+  const byPosition = hasMonthlyPosition(p)
+  const weekOfMonth: MonthWeek = byPosition ? p.week_of_month : 1
+  const dayOfWeek: MonthDayOfWeek = byPosition ? p.day_of_week : 'weekend'
   const sinceLastInterval = type === 'since_last' ? (p.interval ?? 1) : 1
   const sinceLastUnit: RecurrenceUnit = type === 'since_last' ? (p.unit ?? 'weeks') : 'weeks'
 
   const emit = (next: RecurrencePattern, nextTime: string = timeOfDay) => {
     onChange({ recurrencePattern: next, timeOfDay: nextTime })
+  }
+
+  // Monthly is by date OR by position — never both, so the saved rule can't
+  // carry a stale day_of_month that a reader might still believe.
+  const setMonthlyByDate = (day: number) => {
+    const next: RecurrencePattern = { ...p, day_of_month: day }
+    delete next.week_of_month
+    delete next.day_of_week
+    emit(next)
+  }
+  const setMonthlyByPosition = (week: MonthWeek, dow: MonthDayOfWeek) => {
+    const next: RecurrencePattern = { ...p, week_of_month: week, day_of_week: dow }
+    delete next.day_of_month
+    emit(next)
   }
 
   const setType = (t: RecurrenceType) => emit(patternForType(t, p))
@@ -263,24 +288,83 @@ export function RoutineScheduleEditor({
         </div>
       )}
 
-      {/* monthly: day of month */}
+      {/* monthly: a date ("the 15th") or a position ("the first weekend") */}
       {type === 'monthly' && (
         <div>
-          <label className={label}>On day</label>
-          <select
-            value={dayOfMonth}
-            onChange={(e) => emit({ ...p, day_of_month: Number(e.target.value) })}
-            className="w-full px-4 py-3 rounded-xl border border-neutral-200 bg-white text-neutral-800 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent"
-          >
-            {Array.from({ length: 31 }, (_, i) => i + 1).map((day) => (
-              <option key={day} value={day}>
-                {day}{day === 1 ? 'st' : day === 2 ? 'nd' : day === 3 ? 'rd' : 'th'} of the month
-              </option>
-            ))}
-          </select>
-          <p className="text-xs text-neutral-500 mt-2">
-            For months with fewer days, the routine occurs on the last day.
-          </p>
+          <label className={label}>On</label>
+          <div className="flex flex-wrap gap-2 mb-3" role="group" aria-label="Monthly by">
+            {([
+              { by: 'date', l: 'A date' },
+              { by: 'position', l: 'A weekend or weekday' },
+            ] as const).map(({ by, l }) => {
+              const active = by === 'position' ? byPosition : !byPosition
+              return (
+                <button
+                  key={by}
+                  type="button"
+                  aria-pressed={active}
+                  onClick={() => (by === 'position' ? setMonthlyByPosition(weekOfMonth, dayOfWeek) : setMonthlyByDate(dayOfMonth))}
+                  className={`${typeBtn} rounded-lg font-medium transition-colors ${
+                    active ? 'bg-amber-100 text-amber-700' : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200'
+                  }`}
+                >
+                  {l}
+                </button>
+              )
+            })}
+          </div>
+          {byPosition ? (
+            <>
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-sm text-neutral-600">The</span>
+                <select
+                  aria-label="Which one in the month"
+                  value={String(weekOfMonth)}
+                  onChange={(e) => setMonthlyByPosition(Number(e.target.value) as MonthWeek, dayOfWeek)}
+                  className="px-3 py-2 rounded-lg border border-neutral-200 bg-white text-neutral-800 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                >
+                  {MONTH_WEEKS.map((w) => (
+                    <option key={w} value={String(w)}>{monthWeekWord(w)}</option>
+                  ))}
+                </select>
+                <select
+                  aria-label="Weekend or day of the week"
+                  value={dayOfWeek}
+                  onChange={(e) => setMonthlyByPosition(weekOfMonth, e.target.value as MonthDayOfWeek)}
+                  className="px-3 py-2 rounded-lg border border-neutral-200 bg-white text-neutral-800 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                >
+                  {MONTH_DAYS_OF_WEEK.map((d) => (
+                    <option key={d} value={d}>{monthDayWord(d)}</option>
+                  ))}
+                </select>
+                <span className="text-sm text-neutral-600">of the month</span>
+              </div>
+              {dayOfWeek === 'weekend' && (
+                <p className="text-xs text-neutral-500 mt-2">
+                  That month&rsquo;s {monthWeekWord(weekOfMonth)} Saturday and the Sunday after — once, either day.
+                  Ticking it on one day settles it for the other.
+                </p>
+              )}
+            </>
+          ) : (
+            <>
+              <select
+                aria-label="Day of the month"
+                value={dayOfMonth}
+                onChange={(e) => setMonthlyByDate(Number(e.target.value))}
+                className="w-full px-4 py-3 rounded-xl border border-neutral-200 bg-white text-neutral-800 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+              >
+                {Array.from({ length: 31 }, (_, i) => i + 1).map((day) => (
+                  <option key={day} value={day}>
+                    {day}{day === 1 || day === 21 || day === 31 ? 'st' : day === 2 || day === 22 ? 'nd' : day === 3 || day === 23 ? 'rd' : 'th'} of the month
+                  </option>
+                ))}
+              </select>
+              <p className="text-xs text-neutral-500 mt-2">
+                For months with fewer days, the routine occurs on the last day.
+              </p>
+            </>
+          )}
         </div>
       )}
 
@@ -306,6 +390,18 @@ export function RoutineScheduleEditor({
           </button>
         )}
       </div>
+
+      {/* The rule read back, with the next day it actually comes up — so a
+          rule that says something other than what was meant is visible
+          before it is saved (Wash comforters sat on Quarterly unnoticed). */}
+      <p
+        data-testid="schedule-readback"
+        aria-live="polite"
+        className="flex items-start gap-2 rounded-lg bg-amber-50 px-3 py-2 text-sm text-neutral-700"
+      >
+        <CalendarCheck className="w-4 h-4 mt-0.5 shrink-0 text-amber-600" aria-hidden />
+        <span>{scheduleReadback(p, timeOfDay || null)}</span>
+      </p>
     </div>
   )
 }

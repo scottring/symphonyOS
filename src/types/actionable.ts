@@ -16,10 +16,22 @@ export type RecurrenceType = 'daily' | 'weekly' | 'monthly' | 'quarterly' | 'yea
 
 export type RecurrenceUnit = 'days' | 'weeks' | 'months'
 
+/** Which one in the month: 1st–4th, or -1 for the last. */
+export type MonthWeek = 1 | 2 | 3 | 4 | -1
+
+/** A weekday key ('sun'…'sat', as `days` stores them), or 'weekend' — the
+ *  Saturday and the Sunday after it, once across the two (the `weekend`
+ *  recurrence's window, anchored on that month's nth Saturday). */
+export type MonthDayOfWeek = 'weekend' | 'sun' | 'mon' | 'tue' | 'wed' | 'thu' | 'fri' | 'sat'
+
 export interface RecurrencePattern {
   type: RecurrenceType
   days?: string[] // For weekly: ['mon', 'wed', 'fri']
   day_of_month?: number // For monthly: 1-31
+  // Monthly by position instead of by date ("first weekend", "last Friday").
+  // Both set = position wins; day_of_month is ignored. See lib/cadence/monthlyPosition.
+  week_of_month?: MonthWeek
+  day_of_week?: MonthDayOfWeek
   month_of_year?: number // For yearly: 1-12
   dates?: string[] // For specific_days: ['2025-01-01', '2025-07-04']
   interval?: number // Every N days/weeks/months (e.g., 2 = every other; for since_last: N units after completion)

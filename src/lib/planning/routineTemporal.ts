@@ -3,6 +3,7 @@
 // appearance in the planning pool's Routines tab ("Weekly · Sat · no set
 // time" explains exactly what a drop onto the grid would pin down).
 import type { Routine } from '@/types/actionable'
+import { hasMonthlyPosition, describeMonthlyPosition } from '@/lib/cadence/monthlyPosition'
 
 const DAY_LABELS: Record<string, string> = {
   sun: 'Sun', mon: 'Mon', tue: 'Tue', wed: 'Wed', thu: 'Thu', fri: 'Fri', sat: 'Sat',
@@ -32,7 +33,8 @@ export function routineTemporalLabel(routine: Routine): string {
       break
     case 'monthly':
       parts.push(interval ? `Every ${interval} months` : 'Monthly')
-      if (p.day_of_month) parts.push(`day ${p.day_of_month}`)
+      if (hasMonthlyPosition(p)) parts.push(describeMonthlyPosition(p))
+      else if (p.day_of_month) parts.push(`day ${p.day_of_month}`)
       break
     case 'quarterly':
       parts.push('Quarterly')

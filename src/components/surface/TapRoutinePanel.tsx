@@ -23,13 +23,13 @@ import { AssistDrawer } from '@/components/assist/AssistDrawer'
 import { useThreadUnread } from '@/hooks/useThreadUnread'
 import { useAttachments } from '@/hooks/useAttachments'
 import { useRoutineStepChecklist } from '@/hooks/useRoutineStepChecklist'
+import { scheduleReadback } from '@/lib/routineReadback'
 
+/** The rule in words plus the next day it comes up ("Monthly, first weekend
+ *  (either day) · next: Sat–Sun, Nov 7–8") — the old summary printed the raw
+ *  type ("quarterly"), which is how a wrong rule went unnoticed. */
 function recurrenceSummary(r: Routine): string {
-  const p = r.recurrence_pattern
-  const time = r.time_of_day ? ` · ${r.time_of_day.slice(0, 5)}` : ''
-  if (p.type === 'weekly' && p.days?.length) return `Weekly · ${p.days.join(', ')}${time}`
-  if (p.type === 'daily') return `Daily${time}`
-  return `${p.type}${time}`
+  return scheduleReadback(r.recurrence_pattern, r.time_of_day ? r.time_of_day.slice(0, 5) : null)
 }
 
 interface TapRoutinePanelProps {
@@ -268,10 +268,10 @@ export function TapRoutinePanel(props: TapRoutinePanelProps) {
             ) : (
               <button
                 onClick={() => { setScheduleDraft({ recurrencePattern: routine.recurrence_pattern, timeOfDay: (routine.time_of_day ?? '').slice(0, 5) }); setScheduleError(false); setEditingSchedule(true) }}
-                className="flex items-center justify-between w-full px-3 py-2 rounded-lg bg-neutral-100 text-[15px] text-neutral-700 hover:bg-neutral-200 transition-colors"
+                className="flex items-center justify-between gap-3 w-full px-3 py-2 rounded-lg bg-neutral-100 text-left text-[15px] text-neutral-700 hover:bg-neutral-200 transition-colors"
               >
                 <span>{recurrenceSummary(routine)}</span>
-                <span className="text-xs text-neutral-500">Edit schedule</span>
+                <span className="shrink-0 text-xs text-neutral-500">Edit schedule</span>
               </button>
             )}
           </div>

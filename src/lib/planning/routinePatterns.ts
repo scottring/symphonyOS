@@ -12,6 +12,7 @@ import type { Routine } from '@/types/actionable'
 import type { Layer } from '@/lib/domains'
 import { resolveRoutineEligible, resolveRoutine } from '@/lib/routineUtils'
 import { describeRecurrence } from '@/lib/quickRecurrence'
+import { leavesMonthDayOpen } from '@/lib/cadence/monthlyPosition'
 
 export interface RoutinePattern {
   id: string
@@ -41,7 +42,7 @@ function belongsToHorizon(r: Routine, horizon: RoutineHorizon, layers: ReadonlyS
   // their cadence visible without inventing an occurrence.
   if (p.type === 'since_last') return true
   // Flexible monthly/quarterly patterns have no particular day to match.
-  if ((p.type === 'monthly' || p.type === 'quarterly') && !p.day_of_month) return true
+  if (leavesMonthDayOpen(p)) return true
   for (const date = new Date(horizon.start); date < horizon.end; date.setDate(date.getDate() + 1)) {
     if (resolveRoutine(r, { date, prefs: { hideRoutines: false, layers } }).shows) return true
   }
@@ -93,7 +94,7 @@ export function untimedRoutines(
       if (h !== null && h !== horizon.level) return false
       const p = r.recurrence_pattern
       // No particular day to match: a flexible month, a relative rhythm.
-      if (p.type === 'since_last' || ((p.type === 'monthly' || p.type === 'quarterly') && !p.day_of_month)) return h === horizon.level
+      if (p.type === 'since_last' || leavesMonthDayOpen(p)) return h === horizon.level
       for (const date = new Date(horizon.start); date < horizon.end; date.setDate(date.getDate() + 1)) {
         if (resolveRoutine(r, { date, prefs: { hideRoutines: false, layers } }).shows) return true
       }
