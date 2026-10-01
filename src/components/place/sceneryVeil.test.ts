@@ -125,14 +125,21 @@ describe('attachSceneryVeil', () => {
     expect(progress()).toBe('0')
   })
 
-  it('on a long day, steps back the ground strip under the content and keeps the corners in the margins', () => {
-    const { scroller, target, content, scene } = withContent(1400)
-    // A wide window: the column's text starts well clear of both corners.
+  it('keeps the corners on a long day when the text starts clear of them', () => {
+    const { scroller, target, progress, content, scene } = withContent(1400)
+    // A wide window: the column's text starts beyond both corners' slopes.
     content.getBoundingClientRect = rect(400, 100, 1040, 1400)
     scroller.appendChild(content)
     attachSceneryVeil(scroller, target, scene)
-    expect(target.style.getPropertyValue('--scenery-strip-cover')).toBe('1')
-    expect(target.style.getPropertyValue('--scenery-progress')).toBe('0')
+    expect(progress()).toBe('0')
+  })
+
+  it('writes the same veil to every layer of the scene', () => {
+    const { scroller, target } = setup(300)
+    const strip = document.createElement('div')
+    attachSceneryVeil(scroller, [target, strip])
+    expect(target.style.getPropertyValue('--scenery-progress')).toBe('1')
+    expect(strip.style.getPropertyValue('--scenery-progress')).toBe('1')
   })
 
   it('ignores spacers: empty page below the last row is not content', () => {

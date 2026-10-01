@@ -38,7 +38,7 @@ import { MOBILE_TAB_BAR_HEIGHT } from './mobileChrome';
 import { SideColumn, SIDE_COLUMN_WIDTH, type SidePane } from './SideColumn';
 import { PhonePaneSwitch } from './PhonePaneSwitch';
 import { NoteViewer } from '@/components/chat/NoteViewer';
-import { PlaceScenery } from '@/components/place/PlaceScenery';
+import { PlaceGroundStrip, PlaceScenery } from '@/components/place/PlaceScenery';
 import { planV2Enabled } from '@/lib/planning/v2/planV2';
 import { onQuickAddRequest } from '@/lib/quickAddSignal';
 import { GuideProvider } from '@/hooks/useGuidedPlan';
@@ -150,6 +150,8 @@ function ShellLayoutInner({ children }: Props) {
   // The element that scrolls the page — the content frame, on desktop and
   // phone alike. Its scroll drives the scenery's paper veil.
   const [pageScroller, setPageScroller] = useState<HTMLDivElement | null>(null);
+  const [groundStrip, setGroundStrip] = useState<HTMLDivElement | null>(null);
+  const sceneryFloor = isMobile ? `calc(${MOBILE_TAB_BAR_HEIGHT} + env(safe-area-inset-bottom, 0px))` : undefined;
 
   const references = useReferenceLists();
   const activeView = useMemo(() => deriveActiveView(location.pathname), [location.pathname]);
@@ -269,11 +271,7 @@ function ShellLayoutInner({ children }: Props) {
 
       {/* Your place, behind the page: fixed, out of layout, painted before the
           content frame so the frame (positioned, no z-index) covers it. */}
-      <PlaceScenery
-        scroller={pageScroller}
-        right={isMobile ? 0 : paneWidth}
-        floor={isMobile ? `calc(${MOBILE_TAB_BAR_HEIGHT} + env(safe-area-inset-bottom, 0px))` : undefined}
-      />
+      <PlaceScenery scroller={pageScroller} ground={groundStrip} right={isMobile ? 0 : paneWidth} floor={sceneryFloor} />
 
       {/* Content frame — uses <div> (not <main>) because individual apps render
           their own <main>. Avoids invalid nested-main HTML. */}
@@ -395,6 +393,9 @@ function ShellLayoutInner({ children }: Props) {
           </>
         )}
       </div>
+
+      {/* The scene's low ground, in front of the page: rows scroll behind it. */}
+      <PlaceGroundStrip stripRef={setGroundStrip} right={isMobile ? 0 : paneWidth} floor={sceneryFloor} />
 
       {/* QuickCapture FAB — all routes except the agent view (which has its own input) */}
       {activeView !== 'agent' && (

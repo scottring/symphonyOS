@@ -327,8 +327,15 @@ describe('Place scenery behind the page', () => {
       expect(scenery).not.toContainElement(page)
       expect(page.closest('[data-place-scenery]')).toBeNull()
       // Painted first: the page's scroller follows it and covers it.
-      expect(scenery.nextElementSibling).toContainElement(page)
+      const scroller = scenery.nextElementSibling as HTMLElement
+      expect(scroller).toContainElement(page)
       expect(document.querySelectorAll('[data-place-scenery]')).toHaveLength(1)
+      // The low ground is painted after the page (rows pass behind it), and
+      // is just as much outside it.
+      const strip = document.querySelector('.place-ground-strip') as HTMLElement
+      expect(strip).toHaveAttribute('aria-hidden', 'true')
+      expect(scroller.compareDocumentPosition(strip) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+      expect(scroller).not.toContainElement(strip)
     })
   }
 

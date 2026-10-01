@@ -2761,9 +2761,8 @@ div.chooser-action-group { overflow: visible !important; }
    art thickens over the first 150px of scroll (--scenery-progress, written by
    sceneryVeil.ts), so the place shows in unused space at the top of the page
    and recedes once the page is being worked in. */
-.place-scenery {
-  position: fixed; top: 0; bottom: 0; left: 0; /* right: the side pane, inline */
-  overflow: hidden; pointer-events: none; user-select: none;
+.place-scenery,
+.place-ground-strip {
   container-type: inline-size;
   /* The tallest the scene may stand at its sides; the middle stays low. */
   --scenery-height: min(30vh, 270px);
@@ -2777,6 +2776,10 @@ div.chooser-action-group { overflow: visible !important; }
   --scenery-unit: min(0.72px, calc(max(96px, var(--scenery-text-edge)) / 514), calc(50cqw / 514));
   /* What it stands on: the desktop footer, or the phone's tab bar (inline). */
   --scenery-floor: 60px;
+}
+.place-scenery {
+  position: fixed; top: 0; bottom: 0; left: 0; /* right: the side pane, inline */
+  overflow: hidden; pointer-events: none; user-select: none;
   /* Paper over the art at the top of the page, and once scrolled. */
   --scenery-rest: 0.88;
   --scenery-max: 0.97;
@@ -2788,17 +2791,9 @@ div.chooser-action-group { overflow: visible !important; }
 html.has-scenery-content .place-scenery { --scenery-rest: 0; }
 /* Taller at both sides, dipping in the middle (Scott, 2026-10-01): each half
    of the scene stands in its corner, and between them runs a low strip of
-   the scene's own ground, so the art under the page's content is only ever
-   that strip. */
+   the scene's own ground — drawn in front of the page (.place-ground-strip
+   below), so rows pass behind it, never over art. */
 .place-scenery-ground { position: absolute; left: 0; right: 0; bottom: var(--scenery-floor); height: var(--scenery-height); }
-.place-scenery-strip {
-  position: absolute; left: 0; right: 0; bottom: 0;
-  height: calc(var(--scenery-ground-rise) * var(--scenery-unit));
-  background: var(--scenery-ground) center bottom / auto 100% repeat-x;
-  /* The strip runs under the page's content: it steps back on its own once
-     the content reaches down to it (sceneryVeil.ts), leaving the corners. */
-  opacity: calc(1 - var(--scenery-strip-cover, 0));
-}
 .place-scenery-corner {
   position: absolute; bottom: 0;
   width: calc(514 * var(--scenery-unit));
@@ -2819,6 +2814,35 @@ html.has-scenery-content .place-scenery { --scenery-rest: 0; }
      scrolled, where no page content reaches. */
   -webkit-mask-image: linear-gradient(to right, rgb(0 0 0 / 0.5), #000 96px, #000 calc(100% - 96px), rgb(0 0 0 / 0.5));
   mask-image: linear-gradient(to right, rgb(0 0 0 / 0.5), #000 96px, #000 calc(100% - 96px), rgb(0 0 0 / 0.5));
+}
+/* The low ground across the middle, IN FRONT of the page (PlaceGroundStrip):
+   a short band of the place's own ground, a paper fade above it so rows
+   slip behind it softly, and ends that fade into the corners' slopes. It
+   paints over the page's rows (z-index 1) but under every menu, the side
+   pane and the footer, and takes no pointer. As the page scrolls it turns to
+   paper with the rest of the scene. */
+.place-ground-strip {
+  position: fixed; left: 0; bottom: var(--scenery-floor); height: 56px; /* right: inline */
+  z-index: 1; pointer-events: none;
+  --scenery-strip-height: min(30px, calc(var(--scenery-ground-rise) * var(--scenery-unit)));
+}
+.place-ground-strip-band {
+  position: absolute; top: 0; bottom: 0;
+  left: calc(514 * var(--scenery-unit) * 0.55);
+  right: calc(514 * var(--scenery-unit) * 0.55);
+  background:
+    var(--scenery-ground) center bottom / auto var(--scenery-strip-height) repeat-x,
+    linear-gradient(to bottom, transparent, var(--color-bg-base) calc(100% - var(--scenery-strip-height) * 0.5));
+  -webkit-mask-image: linear-gradient(to right, transparent, #000 14%, #000 86%, transparent);
+  mask-image: linear-gradient(to right, transparent, #000 14%, #000 86%, transparent);
+}
+.place-ground-strip-band::after {
+  content: ""; position: absolute; inset: 0;
+  background: var(--color-bg-base);
+  opacity: calc(var(--scenery-progress, 0) * var(--scenery-max, 0.97));
+}
+@media (prefers-reduced-motion: reduce) {
+  .place-ground-strip-band::after { opacity: 0.85; }
 }
 /* Short windows and phones: smaller art and more paper from the start, so
    the page reads without scrolling first. */

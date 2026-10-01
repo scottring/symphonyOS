@@ -6,10 +6,9 @@
 //
 //  - scrolling: over the first SCENERY_VEIL_DISTANCE px the art recedes, once
 //    the page is being worked in;
-//  - the page's own content reaching down into the scene's tall corners: no
-//    row may sit over the art. (The low ground strip between the corners
-//    runs under the content; it steps back on its own, --scenery-strip-cover,
-//    so a long day still keeps the corners in the margins.)
+//  - the page's own content reaching up into the corners' rise: no row may
+//    sit over the art. (The low ground between the corners is drawn in front
+//    of the page, so rows pass behind it, never over it.)
 //
 // The veil's opacity is worked out in CSS from --scenery-progress (0 → 1);
 // this file only writes that number — at most once a frame, never through
@@ -18,6 +17,11 @@
 export const SCENERY_VEIL_DISTANCE = 150
 /** How far content may run into the scene before the art is fully veiled. */
 export const SCENERY_CONTENT_DISTANCE = 96
+
+/** How tall the ground in front of the page stands (index.css,
+ *  .place-ground-strip-band): rows reaching no higher into a corner than
+ *  this pass behind that ground, not over the corner's art. */
+export const GROUND_ALLOWANCE = 30
 
 /** The element a page marks as its content (see useSceneryContent). */
 export const SCENERY_CONTENT_SELECTOR = '[data-scenery-content]'
@@ -56,10 +60,10 @@ export function contentProgress(contentBottom: number, sceneTop: number, distanc
  * and with how far the page's marked content reaches into `scene` (the art's
  * bounding box). Returns the cleanup.
  */
-export function attachSceneryVeil(scroller: HTMLElement, target: HTMLElement, scene: HTMLElement | null = null): () => void {
+export function attachSceneryVeil(scroller: HTMLElement, target: HTMLElement | HTMLElement[], scene: HTMLElement | null = null): () => void {
+  const targets = Array.isArray(target) ? target : [target]
   let frame = 0
   let written = -1
-  let writtenStrip = -1
   let content: Element | null = null
   // Content grows and shrinks without scrolling (a task added, a section
   // folded): watch its size too.
@@ -94,11 +98,10 @@ export function attachSceneryVeil(scroller: HTMLElement, target: HTMLElement, sc
       const edge = isLeft ? left - c.left : c.right - right
       rise = Math.max(rise, c.height * cornerRise(edge / c.width))
     }
-    // A corner's last, ground-level reach toward the middle is the same low
-    // ground as the strip, and steps back with it; only what rises above
-    // the strip needs the whole scene veiled.
-    const strip = sceneEl.querySelector('.place-scenery-strip')?.getBoundingClientRect()
-    if (strip) rise -= strip.height
+    // A corner's last, ground-level reach toward the middle is low ground
+    // like the strip in front of the page, which hides the rows passing over
+    // it; only what rises above that needs the whole scene veiled.
+    rise -= GROUND_ALLOWANCE
     return rise > 0 ? ground.bottom - rise : Infinity
   }
 
@@ -111,23 +114,14 @@ export function attachSceneryVeil(scroller: HTMLElement, target: HTMLElement, sc
       if (content) resize?.observe(content)
     }
     let progress = veilProgress(scroller.scrollTop)
-    let stripCover = 0
     if (content && scene) {
-      const bottom = contentBottom(content)
-      progress = Math.max(progress, contentProgress(bottom, cornerTopUnder(content, scene)))
-      // The low ground strip between the corners sits under the content
-      // itself: it alone steps back when the content reaches it.
-      const strip = scene.querySelector('.place-scenery-strip')?.getBoundingClientRect()
-      if (strip) stripCover = contentProgress(bottom, strip.top, Math.max(strip.height, 1))
+      progress = Math.max(progress, contentProgress(contentBottom(content), cornerTopUnder(content, scene)))
     }
     // Hundredths: finer steps are invisible and would only cost style work.
     progress = Math.round(progress * 100) / 100
-    stripCover = Math.round(stripCover * 100) / 100
-    if (progress === written && stripCover === writtenStrip) return
+    if (progress === written) return
     written = progress
-    writtenStrip = stripCover
-    target.style.setProperty('--scenery-progress', String(progress))
-    target.style.setProperty('--scenery-strip-cover', String(stripCover))
+    for (const t of targets) t.style.setProperty('--scenery-progress', String(progress))
   }
   function schedule() {
     if (!frame) frame = requestAnimationFrame(write)
@@ -143,7 +137,6 @@ export function attachSceneryVeil(scroller: HTMLElement, target: HTMLElement, sc
     window.removeEventListener(SCENERY_CONTENT_EVENT, schedule)
     resize?.disconnect()
     if (frame) cancelAnimationFrame(frame)
-    target.style.removeProperty('--scenery-progress')
-    target.style.removeProperty('--scenery-strip-cover')
+    for (const t of targets) t.style.removeProperty('--scenery-progress')
   }
 }

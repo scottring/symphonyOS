@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
 import { render } from '@testing-library/react'
-import { PlaceScenery } from './PlaceScenery'
+import { PlaceGroundStrip, PlaceScenery } from './PlaceScenery'
 import { useSceneryContent } from './useSceneryContent'
 
 function scrollerAt(top: number) {
@@ -62,6 +62,16 @@ describe('PlaceScenery', () => {
     const { unmount } = render(<PlaceScenery scroller={scroller} />)
     unmount()
     expect(remove).toHaveBeenCalledWith('scroll', expect.any(Function))
+  })
+})
+
+describe('PlaceGroundStrip', () => {
+  it('is decoration only, like the scene behind the page', () => {
+    const { container } = render(<PlaceGroundStrip />)
+    const strip = container.querySelector('.place-ground-strip') as HTMLElement
+    expect(strip).toHaveAttribute('aria-hidden', 'true')
+    expect(strip.textContent).toBe('')
+    expect(strip.querySelectorAll('button, a, input, [tabindex]')).toHaveLength(0)
   })
 })
 
