@@ -948,6 +948,10 @@ export function TodayView({
               `Moved "${before?.title}"`,
               ctx.onRegisterUndo,
             )
+          } else if (intent.itemId.startsWith('routine-collection-')) {
+            // The whole routine moves for this day: a one-day time on the
+            // routine itself, never on each step.
+            onPushRoutine?.(intent.itemId.slice('routine-collection-'.length), intent.when)
           } else if (intent.itemId.startsWith('routine-')) {
             const { routineId, slot } = parseRoutineTimelineId(intent.itemId)
             // Dosed steps are refused upstream; this is belt-and-braces.

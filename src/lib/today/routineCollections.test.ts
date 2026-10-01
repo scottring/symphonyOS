@@ -45,6 +45,35 @@ describe('groupRoutineSteps', () => {
 })
 
 describe('buildCollectionItem', () => {
+  it('a one-day time on the routine itself moves the row (drag on Today)', () => {
+    const viewed = new Date(2026, 9, 1)
+    const collection = {
+      ...r({ id: 'c1', name: 'Tidy bedrooms', time_of_day: null }),
+      steps: [r({ id: 's1', name: 'Tidy bedrooms', parent_routine_id: 'c1', step_order: 0 })],
+    }
+    const moved = new Date(2026, 9, 1, 14, 30)
+    const status = new Map<string, ActionableInstance>([['c1', {
+      id: 'i1', user_id: 'u', entity_type: 'routine', entity_id: 'c1', date: '2026-10-01',
+      status: 'pending', deferred_to: moved.toISOString(),
+    } as ActionableInstance]])
+    const item = buildCollectionItem(collection as any, viewed, status)
+    expect(item.startTime?.getHours()).toBe(14)
+    expect(item.startTime?.getMinutes()).toBe(30)
+  })
+
+  it("the one-day time beats the routine's usual hour", () => {
+    const viewed = new Date(2026, 9, 1)
+    const collection = {
+      ...r({ id: 'c1', name: 'Bedtime', time_of_day: '19:00:00' }),
+      steps: [r({ id: 's1', name: 'Brush teeth', parent_routine_id: 'c1', step_order: 0 })],
+    }
+    const status = new Map<string, ActionableInstance>([['c1', {
+      id: 'i1', user_id: 'u', entity_type: 'routine', entity_id: 'c1', date: '2026-10-01',
+      status: 'pending', deferred_to: new Date(2026, 9, 1, 20, 15).toISOString(),
+    } as ActionableInstance]])
+    expect(buildCollectionItem(collection as any, viewed, status).startTime?.getHours()).toBe(20)
+  })
+
   const date = new Date('2026-06-24T00:00:00')
   it('one collapsed item; progress counts doses; next-up is earliest incomplete', () => {
     const collection = {

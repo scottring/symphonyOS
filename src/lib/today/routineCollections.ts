@@ -2,6 +2,7 @@ import type { Routine, RoutineWithSteps, ActionableInstance } from '@/types/acti
 import type { TimelineItem, CollectionDose, CollectionStepGroup } from '@/types/timeline'
 import { expandRoutineDoses, routineStatusKey } from './doseExpansion'
 import { stepAppliesOnDate } from './stepSchedule'
+import { resolveRoutineTime } from './routineTime'
 
 function stepSort(a: Routine, b: Routine): number {
   const ao = a.step_order, bo = b.step_order
@@ -84,12 +85,17 @@ export function buildCollectionItem(
   // Steps carry no time of their own in the common shape — the COLLECTION
   // does ("Kids bedtime routine, 7pm"). Without this fallback a parent-timed
   // collection had no time on the day and read as untimed work.
-  const anchor = nextUp?.time ?? earliest?.time ?? (collection.time_of_day ? collection.time_of_day.slice(0, 5) : null)
+  const doseAnchor = nextUp?.time ?? earliest?.time ?? null
   let startTime: Date | null = null
-  if (anchor) {
-    const [h, m] = anchor.split(':').map(Number)
+  if (doseAnchor) {
+    const [h, m] = doseAnchor.split(':').map(Number)
     startTime = new Date(viewedDate)
     startTime.setHours(h, m, 0, 0)
+  } else {
+    // The routine holds the hour, so a one-day move (a drag on Today writes a
+    // deferred_to on the ROUTINE's own instance) is read through the same
+    // resolver a single routine and the week grid use.
+    startTime = resolveRoutineTime(collection, routineStatusMap.get(collection.id), viewedDate)
   }
 
   return {
