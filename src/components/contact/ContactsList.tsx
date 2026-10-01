@@ -1,8 +1,12 @@
 import { useState, useMemo } from 'react'
-import { PAGE_COLUMN_WIDE } from '@/components/layout/pageLayout'
+import { PAGE_COLUMN } from '@/components/layout/pageLayout'
+import { GroupLabel } from '@/components/layout/SectionHeading'
+import { EmptyState } from '@/components/layout/EmptyState'
+import { PageSearch } from '@/components/layout/PageSearch'
+import { LIST_ROW, LIST_ROW_LANE, LIST_ROW_BODY, LIST_ROW_TITLE, LIST_ROW_META, LIST_ROW_TRAIL } from '@/components/layout/listRow'
 import { QuietAction } from '@/components/layout/PageMasthead'
 import { MastheadCard } from '@/components/layout/MastheadCard'
-import { Plus } from 'lucide-react'
+import { Plus, ChevronRight } from 'lucide-react'
 import type { Contact, ContactCategory } from '@/types/contact'
 
 interface ContactsListProps {
@@ -61,7 +65,7 @@ export function ContactsList({ contacts, onSelectContact, onAddContact }: Contac
   }
 
   return (
-    <div className={PAGE_COLUMN_WIDE}>
+    <div className={PAGE_COLUMN}>
       {/* Header — shared Library masthead (design-unification 2026-09-01).
           The back arrow died with it: Contacts is a page, not a drill-in. */}
       <MastheadCard
@@ -69,7 +73,14 @@ export function ContactsList({ contacts, onSelectContact, onAddContact }: Contac
         title="Contacts"
         motif="contacts"
         subline={`${contacts.length} people and places the household calls on`}
-        footer={<QuietAction icon={Plus} label="Add" ariaLabel="Add a contact" onClick={() => setAdding(true)} />}
+        footer={
+          <>
+            <QuietAction icon={Plus} label="Add" ariaLabel="Add a contact" onClick={() => setAdding(true)} />
+            {/* The page's search sits with its action in the masthead's tools
+                row — the same compact field Notes and the recipe shelf use. */}
+            <PageSearch value={search} onChange={setSearch} placeholder="Search contacts…" ariaLabel="Search contacts" />
+          </>
+        }
       />
 
       {/* Add form */}
@@ -88,56 +99,45 @@ export function ContactsList({ contacts, onSelectContact, onAddContact }: Contac
         </div>
       )}
 
-      {/* Search */}
-      <div className="relative mb-5">
-        <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" viewBox="0 0 20 20" fill="currentColor">
-          <path fillRule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clipRule="evenodd" />
-        </svg>
-        <input
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-          placeholder="Search contacts..."
-          className="pl-9 pr-3 w-full rounded-md border border-neutral-300 bg-bg-elevated py-2.5 text-[15px] text-neutral-800 placeholder:text-neutral-400 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
-        />
-      </div>
-
-      {/* Contact groups */}
+      {/* Contact groups — groups within one list; the avatar stands in the
+          margin lane (layout system). */}
       {filtered.length === 0 ? (
-        <div className="py-12 text-center text-[15px] text-neutral-400">
-          {search ? 'No contacts match your search' : 'No contacts yet'}
-        </div>
+        search ? (
+          <EmptyState title="No contacts match your search">
+            Try part of a name, or clear the search to see everyone.
+          </EmptyState>
+        ) : (
+          <EmptyState title="No contacts yet">
+            The people and places the household calls on — a dentist, a coach, the plumber.
+          </EmptyState>
+        )
       ) : (
-        <div className="space-y-6">
+        <div>
           {CATEGORY_ORDER.filter(cat => grouped[cat]?.length).map(cat => (
-            <div key={cat}>
-              <h2 className="mb-2 px-1 text-[12px] font-semibold uppercase tracking-[0.08em] text-neutral-400">
-                {CATEGORY_LABELS[cat] || cat}
-              </h2>
-              <div className="border-t border-neutral-300">
-                {grouped[cat].map(contact => (
-                  <button
-                    key={contact.id}
-                    onClick={() => onSelectContact(contact.id)}
-                    className="flex w-full items-center justify-between border-b border-neutral-200 px-4 py-3.5 text-left transition-colors hover:bg-neutral-50"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary-100 text-[15px] font-medium text-primary-700">
-                        {contact.name.charAt(0).toUpperCase()}
-                      </div>
-                      <div>
-                        <div className="text-[16px] leading-snug text-neutral-800">{contact.name}</div>
-                        {contact.phone && (
-                          <div className="text-[12px] text-neutral-400">{contact.phone}</div>
-                        )}
-                      </div>
-                    </div>
-                    <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 text-neutral-300" viewBox="0 0 20 20" fill="currentColor">
-                      <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
-                    </svg>
-                  </button>
-                ))}
-              </div>
-            </div>
+            <section key={cat} className="mb-6">
+              <GroupLabel>{CATEGORY_LABELS[cat] || cat}</GroupLabel>
+              {grouped[cat].map(contact => (
+                <button
+                  key={contact.id}
+                  type="button"
+                  onClick={() => onSelectContact(contact.id)}
+                  className={`${LIST_ROW}`}
+                >
+                  <span className={LIST_ROW_LANE}>
+                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary-100 text-[15px] font-medium text-primary-700">
+                      {contact.name.charAt(0).toUpperCase()}
+                    </span>
+                  </span>
+                  <span className={LIST_ROW_BODY}>
+                    <span className={LIST_ROW_TITLE}>{contact.name}</span>
+                    {contact.phone && <span className={LIST_ROW_META}>{contact.phone}</span>}
+                  </span>
+                  <span className={LIST_ROW_TRAIL}>
+                    <ChevronRight className="h-4 w-4 text-neutral-300" aria-hidden="true" />
+                  </span>
+                </button>
+              ))}
+            </section>
           ))}
         </div>
       )}

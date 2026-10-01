@@ -158,7 +158,8 @@ describe('RowActionRail', () => {
     it('reserves the full avatar-stack width and right-aligns it', () => {
       const { container } = renderRail({ type: 'task' })
       const who = slots(container)[WHO]
-      expect(who.className).toContain('w-[4.5rem]')
+      // 3 initials + "+N" at 24px with -4px overlap = 84px (layout system).
+      expect(who.className).toContain('w-[5.25rem]')
       expect(who.className).toContain('justify-end')
     })
 

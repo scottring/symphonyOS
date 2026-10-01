@@ -2,8 +2,11 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { scopeForDomain } from '@/lib/scope'
 import { useEscapeKey } from '@/hooks/useEscapeKey'
 import { MastheadCard } from '@/components/layout/MastheadCard'
+import { PAGE_COLUMN } from '@/components/layout/pageLayout'
+import { EmptyState } from '@/components/layout/EmptyState'
+import { QuietAction } from '@/components/layout/PageMasthead'
 import { useFamilyMembers } from '@/hooks/useFamilyMembers'
-import { Plus, Search, Sparkles, RefreshCw, Wrench, ChevronRight, ChevronDown } from 'lucide-react'
+import { Plus, Search, Sparkles, Wrench, ChevronRight, ChevronDown } from 'lucide-react'
 import type { RecurrencePattern, Routine } from '@/types/actionable'
 import type { Contact } from '@/types/contact'
 import type { FamilyMember } from '@/types/family'
@@ -258,10 +261,11 @@ export function RhythmPage(props: RhythmPageProps) {
     : closePanel)
 
   return (
-    <div className="h-full overflow-auto bg-[var(--color-bg-base)]">
-      {/* Full-width canvas (keeps the shared gutter, drops the 940px cap) —
-          the staggered timeline needs the room; approved deviation from PAGE_COLUMN. */}
-      <div className="relative w-full px-4 md:px-10 lg:px-14 pt-3 pb-8 md:py-8">
+    // No page background of its own: the place's painted scenery is the page.
+    <div className="h-full overflow-auto">
+      {/* The one column (layout system, 2026-10-01). The full-width canvas
+          was for the staggered timeline, which the cadence bands replaced. */}
+      <div className={`relative ${PAGE_COLUMN}`}>
         {/* The shared masthead card — the same anchor every other page wears. */}
         <MastheadCard
           variant="page"
@@ -335,40 +339,33 @@ export function RhythmPage(props: RhythmPageProps) {
         )}
 
         {loading && routines.length === 0 && (
-          <p className="py-16 text-center text-[15px] text-neutral-400">Loading your week…</p>
+          <EmptyState title="Loading your week…" />
         )}
 
         {!loading && routines.length === 0 && hiddenByFilter && (
-          <div className="py-16 text-center">
-            <h2 className="mb-2 font-display text-[24px] text-neutral-800">No routines in the areas you're viewing</h2>
-            <p className="mx-auto mb-6 max-w-sm text-[15px] text-neutral-500">
-              Your other routines are hidden by the domain filter.
-            </p>
-            {onShowAllDomains && (
+          <EmptyState
+            title="No routines in the areas you're viewing"
+            action={onShowAllDomains ? (
               <button
+                type="button"
                 onClick={onShowAllDomains}
-                className="inline-flex items-center gap-2 rounded-md border border-primary-200 bg-primary-50 px-5 py-2.5 text-[15px] font-medium text-primary-800 hover:bg-primary-100">
+                className="rounded-md px-3 py-2 text-[14px] text-primary-700 transition-colors hover:bg-primary-50"
+              >
                 Show all domains
               </button>
-            )}
-          </div>
+            ) : undefined}
+          >
+            Your other routines are hidden by the domain filter.
+          </EmptyState>
         )}
 
         {!loading && routines.length === 0 && !hiddenByFilter && (
-          <div className="py-16 text-center">
-            <RefreshCw aria-hidden="true" className="mx-auto mb-5 h-8 w-8 text-primary-400" />
-            <h2 className="mb-2 font-display text-[24px] text-neutral-800">No routines yet</h2>
-            <p className="mx-auto mb-6 max-w-sm text-[15px] text-neutral-500">
-              Capture your first routine and Symphony will start painting your week.
-            </p>
-            <button
-              onClick={startNewRoutine}
-              className="inline-flex items-center gap-2 rounded-md bg-primary-700 px-5 py-2.5 text-[15px] font-medium text-white
-                         transition-colors hover:bg-primary-800">
-              <Plus className="h-5 w-5" />
-              Create your first routine
-            </button>
-          </div>
+          <EmptyState
+            title="No routines yet"
+            action={<QuietAction icon={Plus} label="Create your first routine" onClick={startNewRoutine} />}
+          >
+            Capture your first routine and Symphony will start painting your week.
+          </EmptyState>
         )}
 
         {/* Every rung the same shape — name · when · who · a way in. The arc
@@ -376,7 +373,7 @@ export function RhythmPage(props: RhythmPageProps) {
             "every day" and "once a season" looked like different kinds of
             thing, and a Tue/Thu/Sat routine appeared three times (Scott,
             2026-09-13). */}
-        <div className="flex max-w-[860px] flex-col gap-7">
+        <div className="flex flex-col gap-[var(--ds-section-gap)]">
           <CadenceBand
             heading="Daily" hint="A little, every day"
             routines={model.daily} familyMembers={familyMembers} stepCounts={model.stepCounts}

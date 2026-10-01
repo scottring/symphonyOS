@@ -16,6 +16,7 @@ import { MealChatRail } from '../chat/MealChatRail'
 import { MealChatSheet } from '../chat/MealChatSheet'
 import { MastheadCard, PeriodNavEyebrow } from '@/components/layout/MastheadCard'
 import { MealsTabs } from '../MealsTabs'
+import { PAGE_COLUMN } from '@/components/layout/pageLayout'
 import { MOBILE_TAB_BAR_HEIGHT } from '@/shell/mobileChrome'
 import { SendToGroceriesModalV2 } from '../groceries-v2/SendToGroceriesModalV2'
 import type { MealPlanEntry, MealSlot } from '@/types/meal-planner'
@@ -163,7 +164,7 @@ export function PlanPage() {
   const weekLabel = formatDateMonthDay(weekStart)
 
   return (
-    <div className="px-6 md:px-10 lg:px-14 py-6 max-w-7xl mr-auto">
+    <div className={PAGE_COLUMN}>
       {/* The shared masthead card. Meals is a WEEK, so the week nav rides the
           eyebrow the way /week and /month do, and the week itself is the
           title — the page's headline never changed, only what holds it. */}
@@ -212,11 +213,14 @@ export function PlanPage() {
         }
       />
 
-      {loading && <div className="text-[12px] uppercase tracking-widest text-neutral-400">Loading…</div>}
+      {loading && <p className="py-4 text-[14px] text-neutral-400">Loading…</p>}
       {error && <div className="text-accent-500">{error}</div>}
 
       {!loading && !error && (
-        <div className="flex items-start gap-6">
+        // The one column (880px) can't hold the week AND a 380px chat side by
+        // side without crushing the day cards, so the chat sits under the
+        // week until the screen is wide enough (xl) to give it 320px beside.
+        <div className="flex flex-col gap-6 xl:flex-row xl:items-start">
           <WeekGrid
             weekStart={weekStart}
             activeRange={activeRange}
@@ -234,10 +238,7 @@ export function PlanPage() {
           />
 
           {!isMobile && (
-            <div
-              className="sticky top-6 w-[380px] shrink-0 border-l border-neutral-200 pl-4"
-              style={{ height: 'calc(100vh - 8rem)' }}
-            >
+            <div className="h-[32rem] w-full shrink-0 border-t border-neutral-200 pt-4 xl:sticky xl:top-6 xl:h-[calc(100vh-8rem)] xl:w-[320px] xl:border-l xl:border-t-0 xl:pl-4 xl:pt-0">
               <MealChatRail
                 messages={chat.messages}
                 busy={chat.busy}

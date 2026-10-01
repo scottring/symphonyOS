@@ -1,0 +1,190 @@
+/* ==========================================================================
+   LAYOUT SYSTEM (2026-10-01) — docs/design-system/LAYOUT-SYSTEM.md
+
+   One column, one margin lane, one masthead, one section heading, one row,
+   one empty state, on every page. Loaded AFTER index.css (main.tsx) so these
+   rules settle the shared shapes without hunting down every older rule.
+
+   Rules that restyle an EXISTING class are desktop-only (md+, 768px): phones
+   keep their own presentation, anchored to the native iPhone app. Classes
+   that are new here (.ds-*) apply at every width.
+   ========================================================================== */
+
+:root {
+  /* The column: 880px of content (PAGE_COLUMN in pageLayout.ts). */
+  --ds-content: 880px;
+  /* The margin lane — the column's left margin, like a paper daybook's:
+     the date numeral, times, dates, a page's stamp. */
+  --ds-lane: 64px;
+  --ds-lane-gap: 12px;
+  /* Where the body starts: checks, titles under a masthead. */
+  --ds-body: calc(var(--ds-lane) + var(--ds-lane-gap));
+
+  /* Type scale — seven sizes. Faces: Crimson Pro (display), DM Sans. */
+  --ds-text-label: 11px;    /* caps group labels */
+  --ds-text-meta: 12px;     /* the line under a row's title */
+  --ds-text-body: 14px;     /* sentences: empty states, sublines, notes */
+  --ds-text-row: 16px;      /* a row's title */
+  --ds-text-section: 21px;  /* serif section heading */
+  --ds-text-title: 34px;    /* serif page title */
+
+  /* Rhythm. */
+  --ds-section-gap: 32px;
+}
+
+/* --- SectionHeading ------------------------------------------------------ */
+.ds-section-heading {
+  display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 6px 16px;
+  border-bottom: 1px solid var(--color-neutral-300);
+  padding-bottom: 8px; margin-bottom: 6px;
+}
+.ds-section-heading > :is(h2, h3) {
+  margin: 0; font-family: var(--font-family-display); font-weight: 500;
+  font-size: var(--ds-text-section); line-height: 1.2; letter-spacing: -0.01em;
+  color: var(--color-neutral-950);
+}
+.ds-section-heading-aside {
+  display: flex; align-items: baseline; gap: 12px;
+  font-size: 13px; color: var(--color-neutral-500);
+}
+
+/* --- GroupLabel ---------------------------------------------------------- */
+.ds-group-label {
+  margin: 14px 0 4px;
+  font-family: var(--font-family-sans); font-size: var(--ds-text-label); font-weight: 600;
+  letter-spacing: 0.08em; text-transform: uppercase; line-height: 1.4;
+  color: var(--color-neutral-500);
+}
+.ds-group-label:first-child { margin-top: 4px; }
+.ds-group-label-aside {
+  margin-left: 6px; font-weight: 400; letter-spacing: 0; text-transform: none;
+}
+
+/* --- EmptyState ---------------------------------------------------------- */
+.ds-empty { padding: 16px 0 8px; max-width: 34rem; }
+.ds-empty-title { margin: 0; font-family: var(--font-family-display); font-size: 20px; line-height: 1.3; color: var(--color-neutral-700); }
+.ds-empty-body { margin: 4px 0 0; font-size: var(--ds-text-body); line-height: 1.55; color: var(--color-neutral-500); }
+.ds-empty-action { margin-top: 10px; margin-left: -12px; }
+
+/* --- Desktop: the shared shapes on existing classes ---------------------- */
+@media (min-width: 768px) {
+  /* One section heading: Today's journal sections wear it. */
+  .daybook-journal-heading h2 { font-size: var(--ds-text-section); letter-spacing: -0.01em; }
+  .daybook-journal-section + .daybook-journal-section { margin-top: var(--ds-section-gap); }
+
+  /* One title size on every page: Today's date matches every other page. */
+  .daybook-title,
+  .daybook-masthead-page .daybook-title { font-size: clamp(28px, 2.4vw, var(--ds-text-title)); }
+
+  /* Today's date numeral stands in the margin lane, so the title, its
+     subline and every check circle below start at one edge (--ds-body). */
+  .daybook-masthead:not(.daybook-masthead-page) .masthead-numeral {
+    /* The masthead row's flex gap (16px) is part of the lane. */
+    width: calc(var(--ds-body) - 16px); margin-right: 0; font-size: 60px; overflow: visible;
+  }
+
+  /* A library page's stamp stands in the lane too, so every library title
+     starts at the body edge, with or without an icon beside it. */
+  .daybook-masthead-page .daybook-stamp { margin-right: calc(var(--ds-body) - 38px - 16px); }
+  .daybook-masthead:not(.daybook-masthead-page) .daybook-masthead-row { align-items: flex-end; }
+  .daybook-masthead:not(.daybook-masthead-page) .daybook-masthead-controls { align-self: flex-end; padding-bottom: 4px; }
+  .daybook-masthead:not(.daybook-masthead-page) .daybook-masthead-inner { padding-bottom: 12px; }
+
+  /* For today keeps the lane — empty — so its circles sit in Schedule's
+     circle column instead of 76px further left. */
+  .today-focus-card .schedule-time-column,
+  .today-focus-card .schedule-empty-time { display: block; visibility: hidden; }
+}
+
+/* --- Planning pages (Week/Month/Season/Year) --- */
+/* The control row folded into the masthead (PlanToolbarStatus / Controls):
+   the plan's status as the subline, the views and "Plan <period>" at the
+   title's right. Rendered on desktop only, so these apply at every width. */
+.pv2-mstatus { margin-right: 0; flex-wrap: wrap; font-size: var(--ds-text-body); color: var(--color-neutral-500); }
+.pv2-mstatus .pv2-hint { font-size: inherit; }
+.pv2-mslot:empty { display: none; }
+.pv2-mcontrols { display: flex; align-items: center; gap: 8px; }
+.pv2-mcontrols button:disabled { opacity: .5; cursor: not-allowed; }
+.daybook-masthead-controls:has(.pv2-mcontrols) { align-self: flex-end; padding-bottom: 2px; }
+.guide-slot:has(.guide-bar) ~ * .pv2-mcontrols > .pv2-btn { background: var(--color-bg-elevated); color: var(--color-neutral-700); border: 1px solid var(--color-neutral-200); box-shadow: none; }
+
+/* Phones keep the planning pages' quiet hint where the empty sentence is
+   (.ds-empty-body) — the native app anchors phone type. */
+@media (max-width: 767px) {
+  .pv2-hint.ds-empty-body { margin: 0; font-size: 12.5px; line-height: inherit; }
+}
+
+@media (min-width: 768px) {
+  /* One section heading: every column's heading is SectionHeading's. */
+  :is(.pv2-week, .pv2-page) .pv2-colh,
+  .week-days-heading {
+    display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 6px 16px;
+    min-height: 0; margin: 0 0 6px; padding-bottom: 8px;
+    border-bottom: 1px solid var(--color-neutral-300);
+    font-family: var(--font-family-display); font-weight: 500;
+    font-size: var(--ds-text-section); line-height: 1.2; letter-spacing: -0.01em;
+    color: var(--color-neutral-950);
+  }
+  :is(.pv2-week, .pv2-page) .pv2-colh small,
+  :is(.pv2-week, .pv2-page) .pv2-colh .pv2-paper { font-size: 13px; letter-spacing: 0; color: var(--color-neutral-500); }
+  :is(.pv2-week, .pv2-page) .pv2-colh .pv2-paper:hover { color: var(--color-primary-700); }
+
+  /* One group label: groups inside a section ("Any day", "Carried to …",
+     "Someday") are GroupLabel's small caps, no rule. */
+  :is(.pv2-week, .pv2-page) :is(.pv2-wl-h, .pv2-sect) {
+    margin: 14px 0 4px;
+    font: 600 var(--ds-text-label)/1.4 var(--font-family-sans);
+    letter-spacing: 0.08em; text-transform: uppercase; font-style: normal;
+    color: var(--color-neutral-500);
+  }
+  .pv2-week .pv2-wl .pv2-wl-h:first-of-type { margin-top: 4px; }
+
+  /* One row: 16px titles, 12px meta, 7–8px vertical padding, no rules
+     between rows, the hover tint every row wears. The box bleeds 12px past
+     the column (1px of it the border) so the words sit on the column's
+     edge; in these multi-column pages there is no margin lane. */
+  :is(.pv2-week, .pv2-page) .pv2-line-main {
+    margin: 0 -12px; padding: 6px 11px; border: 1px solid transparent; border-radius: 12px;
+    transition: background-color .12s, border-color .12s;
+  }
+  :is(.pv2-week, .pv2-page) .pv2-line-main:hover,
+  :is(.pv2-week, .pv2-page) .pv2-line.is-open > .pv2-line-main {
+    background: color-mix(in srgb, var(--color-primary-50) 50%, transparent);
+    border-color: var(--color-primary-100);
+  }
+  :is(.pv2-week, .pv2-page) .pv2-line.is-draft > .pv2-line-main { border: 1px dashed var(--color-primary-300); background: var(--color-bg-elevated); }
+  /* The grip keeps its place beside the words (the box grew 4px). */
+  :is(.pv2-week, .pv2-page) .pv2-linegrip { left: -10px; }
+  /* A goal keeps its serif line (18px): it is the outcome, not a row. */
+  :is(.pv2-week, .pv2-page) .pv2-line-text:not(.is-goal) { font-size: var(--ds-text-row); line-height: 1.4; }
+  :is(.pv2-week, .pv2-page) :is(.pv2-line-draft, .pv2-wl-draft, .pv2-write input) { font-size: var(--ds-text-row); }
+  :is(.pv2-week, .pv2-page) .pv2-line-parent { font-size: var(--ds-text-meta); }
+
+  /* The week's list: a 20px completion circle, 16px titles. Rows that
+     can't be dragged are plain rows; the cards — the things you move onto a
+     day — keep their raised box. */
+  .pv2-week .pv2-wl-check { width: 20px; height: 20px; margin-top: 1px; }
+  .pv2-week .pv2-wl-title { font-size: var(--ds-text-row); line-height: 1.4; }
+  .pv2-week .pv2-wl-row:not(.is-card) {
+    margin: 0 -12px; padding: 7px 11px; border: 1px solid transparent; border-radius: 12px;
+    transition: background-color .12s, border-color .12s;
+  }
+  .pv2-week .pv2-wl-row:not(.is-card):hover {
+    background: color-mix(in srgb, var(--color-primary-50) 50%, transparent);
+    border-color: var(--color-primary-100);
+  }
+  .pv2-week :is(.pv2-wl-parent, .pv2-wl-goal) { font-size: var(--ds-text-meta); }
+}
+
+/* Three panes (Week or Month with the level above beside it) are a split,
+   like Today with its week column: they take PAGE_COLUMN_SPLIT's width so
+   the middle list isn't squeezed to ~250px. One page, one width at a time;
+   the left edge never moves. */
+@media (min-width: 768px) {
+  :root:has(.pv2-wgrid.is-ref, .pv2-grid3) :is(.pv2-page, .week-column) { max-width: 1152px; }
+}
+
+/* The page scroller always reserves its scrollbar, so a page long enough to
+   scroll doesn't start 5px left of a short one (measured 2026-10-01: 341 vs
+   346px). The left edge is a constant of the app. */
+.scenery-scroll { scrollbar-gutter: stable; }

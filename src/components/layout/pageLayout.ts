@@ -24,13 +24,22 @@ export const PAGE_GUTTER_X = 'px-4 md:px-10 lg:px-14'
 
 const PAGE_GUTTER = `${PAGE_GUTTER_X} pt-3 pb-8 md:py-8`
 
-/** Default column — rhythm views + library lists. */
-export const PAGE_COLUMN = `w-full max-w-[940px] mr-auto ${PAGE_GUTTER}`
+/** THE column (layout system, 2026-10-01): every page, 880px of content at
+ *  desktop width (992 = 880 + the 56px gutter either side). One width is what
+ *  makes pages read as one app, and it keeps a row's people and actions within
+ *  reach of its title instead of across an empty middle (Scott: "less white
+ *  space in the center"). See docs/design-system/LAYOUT-SYSTEM.md. */
+export const PAGE_COLUMN = `w-full max-w-[992px] mr-auto ${PAGE_GUTTER}`
 
-/** Wide column — detail pages that need more room (e.g. project detail). */
-export const PAGE_COLUMN_WIDE = `w-full max-w-[1152px] mr-auto ${PAGE_GUTTER}`
+/** Kept as a name so old call sites read sensibly; it IS the one column now.
+ *  A page that needs more room is a canvas (PAGE_COLUMN_FULL) or a two-pane
+ *  split (PAGE_COLUMN_SPLIT), never a slightly wider column. */
+export const PAGE_COLUMN_WIDE = PAGE_COLUMN
 
-/** Full-bleed column — hands-on WORK pages (e.g. /season) where a narrow column
- *  cramps a two-pane grid and wastes the right half of a wide screen. No
- *  max-width: fills the available width (minus gutter and any open pane). */
+/** Two panes side by side — Today with its week column beside the day. */
+export const PAGE_COLUMN_SPLIT = `w-full max-w-[1152px] mr-auto ${PAGE_GUTTER}`
+
+/** Full-bleed CANVAS — a grid you work on rather than read (Week's hourly
+ *  grid, the people river). No max-width: fills the available width (minus
+ *  gutter and any open pane). */
 export const PAGE_COLUMN_FULL = `w-full ${PAGE_GUTTER}`

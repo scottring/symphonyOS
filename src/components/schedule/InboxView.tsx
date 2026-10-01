@@ -1,8 +1,9 @@
 // src/components/schedule/InboxView.tsx
 import { useMemo, useCallback, useState, useRef, useEffect } from 'react'
 import { LoadFailedNotice } from '@/components/common/LoadFailedNotice'
-import { PAGE_COLUMN_WIDE } from '@/components/layout/pageLayout'
+import { PAGE_COLUMN } from '@/components/layout/pageLayout'
 import { MastheadCard } from '@/components/layout/MastheadCard'
+import { EmptyState } from '@/components/layout/EmptyState'
 import { X, CornerDownRight, CalendarDays, Sun } from 'lucide-react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import type { Task, TaskContext } from '@/types/task'
@@ -758,7 +759,7 @@ export function InboxView({
             type="button"
             onClick={() => void handleMergeCapture(task, suggestedTarget)}
             disabled={mergingCaptureId === task.id}
-            className="mt-1 ml-8 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-primary-50 text-primary-700 border border-primary-100 text-xs font-medium hover:bg-primary-100 disabled:opacity-60 transition-colors"
+            className="mt-1 ml-[52px] md:ml-[var(--ds-body)] inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-primary-50 text-primary-700 border border-primary-100 text-xs font-medium hover:bg-primary-100 disabled:opacity-60 transition-colors"
           >
             <CornerDownRight className="w-3 h-3 shrink-0" />
             <span className="truncate max-w-[320px]">
@@ -782,13 +783,14 @@ export function InboxView({
 
   return (
     <div className="h-full overflow-y-auto">
-      <div className={PAGE_COLUMN_WIDE}>
+      <div className={PAGE_COLUMN}>
       {/* The same open masthead the rest of the top group wears (Today, This
           Week, the period pages). No eyebrow — the inbox has no period to step
           through. Its own controls ride along the foot, as Today's do. */}
       <MastheadCard
         variant="page"
         title="Inbox"
+        motif="documents"
         subline={
           totalCount === 0
             ? (loading ? 'Loading your inbox…' : loadFailed ? 'Didn’t load' : hiddenByFilter ? 'Filtered — nothing in this view' : 'All clear — nothing to triage')
@@ -826,54 +828,55 @@ export function InboxView({
       <RefileStrip rows={refileRows} onFile={(t, context) => onUpdateTask?.(t.id, { context })} />
 
       {totalCount === 0 && loading ? (
-        <div className="text-center py-16">
-          <p className="font-display text-xl text-neutral-700">Loading your inbox…</p>
-        </div>
+        <EmptyState title="Loading your inbox…" />
       ) : totalCount === 0 && loadFailed && onRetryLoad ? (
         <LoadFailedNotice
-          className="mx-auto max-w-xl py-16 text-center"
+          className="py-4"
           title="Your Inbox didn’t load."
           body="Your captures are safe — this is a connection problem."
           onRetry={onRetryLoad}
         />
       ) : hiddenByFilter ? (
-        <div className="mx-auto max-w-xl py-16 text-center">
-          <p className="mb-2 font-display text-[24px] text-neutral-800">Nothing matches these filters</p>
-          <p className="text-[15px] text-neutral-500">Captures in other domains or for other people are hidden right now.</p>
-          <button
-            type="button"
-            onClick={() => { showAllDomains(); setSelectedAssignees([]) }}
-            className="mt-5 inline-flex items-center gap-2 rounded-lg border border-primary-200 bg-primary-50 px-3 py-2 text-sm font-medium text-primary-800 hover:bg-primary-100 transition-colors"
-          >
-            Show everything
-          </button>
-        </div>
+        <EmptyState
+          title="Nothing matches these filters"
+          action={
+            <button
+              type="button"
+              onClick={() => { showAllDomains(); setSelectedAssignees([]) }}
+              className="rounded-md px-3 py-2 text-[14px] text-primary-700 transition-colors hover:bg-primary-50"
+            >
+              Show everything
+            </button>
+          }
+        >
+          Captures in other domains or for other people are hidden right now.
+        </EmptyState>
       ) : totalCount === 0 ? (
-        <div className="mx-auto max-w-xl py-16 text-center">
-          <svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" className="mx-auto mb-5 h-8 w-8 text-primary-400" viewBox="0 0 20 20" fill="currentColor">
-            <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-          </svg>
-          <p className="mb-2 font-display text-[24px] text-neutral-800">Inbox zero</p>
-          <p className="text-[15px] text-neutral-500">Nothing is waiting for a decision.</p>
-          <div className="mt-5 flex flex-wrap justify-center gap-2">
-            <button
-              type="button"
-              onClick={() => navigate('/today')}
-              className="inline-flex items-center gap-2 rounded-lg border border-primary-200 bg-primary-50 px-3 py-2 text-sm font-medium text-primary-800 hover:bg-primary-100 transition-colors"
-            >
-              <Sun className="h-4 w-4" />
-              Open today
-            </button>
-            <button
-              type="button"
-              onClick={() => navigate('/week')}
-              className="inline-flex items-center gap-2 rounded-lg border border-neutral-200 bg-white px-3 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-50 transition-colors"
-            >
-              <CalendarDays className="h-4 w-4" />
-              Plan week
-            </button>
-          </div>
-        </div>
+        <EmptyState
+          title="Inbox zero"
+          action={
+            <div className="flex flex-wrap items-center">
+              <button
+                type="button"
+                onClick={() => navigate('/today')}
+                className="inline-flex items-center gap-1.5 rounded-md px-3 py-2 text-[14px] text-primary-700 transition-colors hover:bg-primary-50"
+              >
+                <Sun className="h-4 w-4" aria-hidden="true" />
+                Open today
+              </button>
+              <button
+                type="button"
+                onClick={() => navigate('/week')}
+                className="inline-flex items-center gap-1.5 rounded-md px-3 py-2 text-[14px] text-primary-700 transition-colors hover:bg-primary-50"
+              >
+                <CalendarDays className="h-4 w-4" aria-hidden="true" />
+                Plan week
+              </button>
+            </div>
+          }
+        >
+          Nothing is waiting for a decision.
+        </EmptyState>
       ) : mode === 'focus' ? (
         <FocusInboxCard
           tasks={inboxTasks}
@@ -888,7 +891,7 @@ export function InboxView({
           sending={sendingTaskId !== null}
         />
       ) : (
-        <div className="border-t border-neutral-300">
+        <div>
           {inboxTasks.map(renderRow)}
         </div>
       )}

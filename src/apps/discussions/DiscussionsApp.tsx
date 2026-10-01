@@ -1,6 +1,8 @@
 // src/apps/discussions/DiscussionsApp.tsx
 import { MastheadCard } from '@/components/layout/MastheadCard'
-import { PAGE_COLUMN_WIDE } from '@/components/layout/pageLayout'
+import { PAGE_COLUMN } from '@/components/layout/pageLayout'
+import { EmptyState } from '@/components/layout/EmptyState'
+import { LIST_ROW, LIST_ROW_LANE, LIST_ROW_BODY, LIST_ROW_TITLE, LIST_ROW_META, LIST_ROW_TRAIL } from '@/components/layout/listRow'
 //
 // The Discussions inbox: every item conversation you can see with activity,
 // newest first. This is what makes item threads feel like messaging — a
@@ -31,7 +33,7 @@ export function DiscussionsApp() {
   const { rows, loading } = useDiscussionInbox()
 
   return (
-    <div className={PAGE_COLUMN_WIDE}>
+    <div className={PAGE_COLUMN}>
       {/* The same masthead card the rest of the top group wears. */}
       <MastheadCard
         variant="page"
@@ -42,43 +44,49 @@ export function DiscussionsApp() {
       />
 
       {loading && rows.length === 0 && (
-        <p className="text-[15px] text-neutral-400">Loading…</p>
+        <p className="py-4 text-[14px] text-neutral-400">Loading…</p>
       )}
 
       {!loading && rows.length === 0 && (
-        <p className="text-[15px] text-neutral-400">
-          Nothing to talk about yet. Open any item and start a Discussion.
-        </p>
+        <EmptyState title="Nothing to talk about yet.">
+          Open any item and start a Discussion — it lands here, newest first.
+        </EmptyState>
       )}
 
-      <div className="border-t border-neutral-300">
+      {/* The library row (layout system): the item's kind in the margin
+          lane, the last message under the title, when it was said trailing. */}
+      <div>
         {rows.map((row) => (
           <button
             key={row.sessionId}
             type="button"
             onClick={() => navigate(discussionHref(row))}
-            className="w-full border-b border-neutral-200 px-4 py-3.5 text-left transition-colors hover:bg-neutral-50"
+            className={`${LIST_ROW}`}
           >
-            <div className="flex items-start gap-3">
-              <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-neutral-100 text-neutral-500">
+            <span className={LIST_ROW_LANE}>
+              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-neutral-100 text-neutral-500">
                 <ConceptIcon name={KIND_ICON[row.entityType]} size={15} decorative />
               </span>
-              <span className="min-w-0 flex-1">
-                <span className="flex items-baseline gap-2">
-                  <span className={`flex-1 truncate text-[16px] leading-snug ${row.unread ? 'font-semibold text-neutral-900' : 'text-neutral-800'}`}>
-                    {row.title}
-                  </span>
-                  <span className="shrink-0 text-[12px] text-neutral-400">{formatRelativeTime(row.lastAt)}</span>
-                </span>
-                <span className="mt-0.5 block truncate text-[13px] text-neutral-500">
-                  <span className={row.lastAuthor === 'Symphony' ? 'text-primary-700' : 'text-neutral-600'}>{row.lastAuthor}:</span>{' '}
-                  {row.lastText}
-                </span>
+            </span>
+            <span className={LIST_ROW_BODY}>
+              <span className={`${LIST_ROW_TITLE} ${row.unread ? 'font-semibold' : ''}`}>
+                {row.title}
               </span>
-              {row.unread && (
-                <span className="mt-2 h-2 w-2 shrink-0 rounded-full bg-primary-500" aria-label="Unread" />
-              )}
-            </div>
+              <span className={LIST_ROW_META}>
+                <span className={row.lastAuthor === 'Symphony' ? 'text-primary-700' : 'text-neutral-600'}>{row.lastAuthor}:</span>{' '}
+                {row.lastText}
+              </span>
+            </span>
+            <span className={LIST_ROW_TRAIL}>
+              <span className="tabular-nums text-neutral-400">{formatRelativeTime(row.lastAt)}</span>
+              {/* The dot keeps its place whether or not it is lit, so the
+                  times line up down the page. */}
+              <span className="flex w-2 justify-center">
+                {row.unread && (
+                  <span className="h-2 w-2 rounded-full bg-primary-500" aria-label="Unread" />
+                )}
+              </span>
+            </span>
           </button>
         ))}
       </div>

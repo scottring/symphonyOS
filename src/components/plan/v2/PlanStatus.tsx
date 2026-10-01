@@ -13,7 +13,7 @@ export interface NextStep { label: string; onClick: () => void }
 
 const cap = (s: string) => s.replace(/^./, (c) => c.toUpperCase())
 
-export function PlanToolbar({ period, saved, loading, error, agreedBy, reviewDue, onPlan, onRetry, viewSwitch, tools, justSaved }: {
+export interface PlanToolbarProps {
   /** "week 40", "October", "Fall", "2026" */
   period: string
   saved: { at: Date } | null
@@ -31,9 +31,37 @@ export function PlanToolbar({ period, saved, loading, error, agreedBy, reviewDue
    *  next step in place of the Plan button (Scott, 2026-09-30: the saved
    *  card and the status row said one thing twice). */
   justSaved?: { detail: string; next?: NextStep | null; onDone: () => void } | null
-}) {
+}
+
+/** Where the plan stands — "Week 40 isn't planned yet", "October planned ·
+ *  …". The inside of the toolbar's status, or the masthead's subline. */
+function statusText({ period, saved, loading, error, agreedBy, onRetry, justSaved }: PlanToolbarProps) {
   const day = (d: Date) => d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
+  return error
+    ? <span className="pv2-noplan"><span className="pv2-hint">Couldn’t check whether {period} is planned.</span>
+      <button type="button" className="pv2-link" onClick={onRetry}>Try again</button></span>
+    : saved
+      ? <><span className="pv2-seal" aria-hidden="true" /><span><b>{cap(period)} planned</b> · {day(saved.at)} · {agreedBy}{justSaved?.detail ? <> · {justSaved.detail}</> : null}</span></>
+      : loading ? null : <span className="pv2-hint">{`${cap(period)} isn’t planned yet`}</span>
+}
+
+/** The page's tools, the view icons and the one "Plan <period>" verb (or,
+ *  just saved, the next step and "Done for now"). */
+function controlsOf({ period, saved, loading, error, reviewDue, onPlan, viewSwitch, tools, justSaved }: PlanToolbarProps, guided: boolean) {
   const prominent = !error && !loading && (!saved || reviewDue)
+  return <>
+    {tools}
+    {viewSwitch}
+    {guided ? null : justSaved
+      ? <>
+          {justSaved.next && <button type="button" className="pv2-btn" onClick={justSaved.next.onClick}>{justSaved.next.label}</button>}
+          <button type="button" className="pv2-link pv2-quiet" onClick={justSaved.onDone}>Done for now</button>
+        </>
+      : <button type="button" className={prominent ? 'pv2-btn' : 'pv2-qbtn'} onClick={onPlan} disabled={error}>Plan {period}</button>}
+  </>
+}
+
+export function PlanToolbar(props: PlanToolbarProps) {
   // While a guided plan runs, the guide asks the question and marks the
   // period planned; the page's own status and "Plan …" button said the same
   // thing a second time (walkthrough 2026-09-30). The views stay.
@@ -41,27 +69,33 @@ export function PlanToolbar({ period, saved, loading, error, agreedBy, reviewDue
   return (
     <>
     <GuideAnchor />
-    <div className={`pv2-toolbar${guided ? ' is-guided' : ''}`} role={justSaved ? 'status' : undefined}>
-      {guided ? <div className="pv2-status" /> : <div className="pv2-status">
-        {error
-          ? <span className="pv2-noplan"><span className="pv2-hint">Couldn’t check whether {period} is planned.</span>
-            <button type="button" className="pv2-link" onClick={onRetry}>Try again</button></span>
-          : saved
-            ? <><span className="pv2-seal" aria-hidden="true" /><span><b>{cap(period)} planned</b> · {day(saved.at)} · {agreedBy}{justSaved?.detail ? <> · {justSaved.detail}</> : null}</span></>
-            : loading ? null : <span className="pv2-hint">{`${cap(period)} isn’t planned yet`}</span>}
-      </div>}
-      {tools}
-      {viewSwitch}
-      {guided ? null : justSaved
-        ? <>
-            {justSaved.next && <button type="button" className="pv2-btn" onClick={justSaved.next.onClick}>{justSaved.next.label}</button>}
-            <button type="button" className="pv2-link pv2-quiet" onClick={justSaved.onDone}>Done for now</button>
-          </>
-        : <button type="button" className={prominent ? 'pv2-btn' : 'pv2-qbtn'} onClick={onPlan} disabled={error}>Plan {period}</button>}
+    <div className={`pv2-toolbar${guided ? ' is-guided' : ''}`} role={props.justSaved ? 'status' : undefined}>
+      {guided ? <div className="pv2-status" /> : <div className="pv2-status">{statusText(props)}</div>}
+      {controlsOf(props, guided)}
     </div>
     </>
   )
 }
+
+// Desktop folds the control row into the masthead (layout system,
+// 2026-10-01; docs/design-system/LAYOUT-SYSTEM.md §3): the status becomes
+// the masthead's subline and the controls sit at the title's right. Phones
+// keep the row (PlanToolbar). The page still mounts <GuideAnchor /> where
+// the row stood, so a guided plan opens under the heading as before.
+
+/** The toolbar's status, as the masthead's subline. */
+export function PlanToolbarStatus(props: PlanToolbarProps) {
+  const guided = useGuideRunning()
+  if (guided) return null
+  return <div className="pv2-status pv2-mstatus" role={props.justSaved ? 'status' : undefined}>{statusText(props)}</div>
+}
+
+/** The toolbar's controls, in the masthead's controls slot. */
+export function PlanToolbarControls(props: PlanToolbarProps) {
+  const guided = useGuideRunning()
+  return <div className={`pv2-mcontrols${guided ? ' is-guided' : ''}`}>{controlsOf(props, guided)}</div>
+}
+
 
 export function PlanMeetingBar({ period, prevName, step, lookBack, why, onStep, viewSwitch, tools, onLeave, onSave, saveLabel }: {
   period: string

@@ -73,7 +73,7 @@ export function WeekListV2({ title, lines, weekStart, members, actions, timingCo
     <section ref={dropRef} aria-label="This week's list" className={`pv2-wl${isOver ? ' is-over' : ''}`}>
       <div className="pv2-colh">{title}{headerAction}</div>
       {draftChild && onDraftChild && <DraftChild key={draftChild.id} parent={draftChild} onAdd={onDraftChild} onCancel={() => onCancelChild?.()} />}
-      {!open.length && !done.length && !draftChild && <p className="pv2-hint">{emptyHint ?? 'Nothing on this week’s list yet. Add below.'}</p>}
+      {!open.length && !done.length && !draftChild && <p className="pv2-hint ds-empty-body">{emptyHint ?? 'Nothing on this week’s list yet. Add below.'}</p>}
       {groups.map((g) => (
         <section key={g.title} aria-label={g.title}>
           <div className="pv2-wl-h">{g.title}</div>

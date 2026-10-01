@@ -6,6 +6,7 @@ import { PLACES } from '@/config/places'
 import { usePlace } from '@/hooks/usePlace'
 import { PANORAMAS } from '@/components/place/panoramas'
 import { nextAutomaticChange, useSceneryPreferences, type SceneryLightingChoice } from '@/hooks/useSceneryPreferences'
+import { SectionHeading } from '@/components/layout/SectionHeading'
 
 const LIGHTING_LABEL = { 'daytime': 'Daytime', 'dusk-dawn': 'Dusk / Dawn', 'nighttime': 'Nighttime' } as const
 
@@ -16,7 +17,7 @@ export function PlacePicker() {
 
   return (
     <section>
-      <h2 className="mb-2 font-display text-[22px] text-neutral-900">Your place</h2>
+      <SectionHeading>Your place</SectionHeading>
       <p className="text-sm text-neutral-500 mb-6">
         Your place is Symphony's theme: its scenery and sky, and the accent colour on
         selected tabs, buttons and links. It applies instantly and follows you

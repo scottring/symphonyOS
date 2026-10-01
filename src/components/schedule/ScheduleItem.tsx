@@ -11,6 +11,7 @@ import { Video, Check, Pencil, Hourglass, ListChecks, ChevronUp, ChevronDown, Me
 import { requestDiscussionOpen } from '@/lib/discussions/openIntent'
 import { ScheduleItemItems } from './ScheduleItemItems'
 import { RowActionRail } from './RowActionRail'
+import { ROW_SHELL, ROW_GRID, LANE, MARK, UNDER_TITLE, BULK_BOX_X } from './todayRowGrid'
 import { useMobile } from '@/hooks/useMobile'
 import { TaskCheckbox } from './TaskCheckbox'
 import { ExpandingPanel } from './ExpandingPanel'
@@ -549,8 +550,8 @@ export const ScheduleItem = memo(function ScheduleItem({
       className={`
         group relative cursor-pointer transition-all duration-200 rounded-xl border
         ${variant === 'minimal'
-          ? `px-3 py-1 md:py-0.5 border-transparent hover:bg-neutral-50/60 ${selected ? 'bg-neutral-50 ring-1 ring-neutral-200' : ''}`
-          : `px-3 py-2 md:py-1 ${selected
+          ? `px-3 py-1 md:py-0.5 md:-mx-[13px] border-transparent hover:bg-neutral-50/60 ${selected ? 'bg-neutral-50 ring-1 ring-neutral-200' : ''}`
+          : `${ROW_SHELL} ${selected
               ? 'bg-primary-50 border-primary-200 shadow-md ring-1 ring-primary-200'
               : 'border-transparent hover:bg-primary-50/50 hover:border-primary-100'
             }`
@@ -568,7 +569,7 @@ export const ScheduleItem = memo(function ScheduleItem({
           onClick={(e) => { e.stopPropagation(); onToggleBulkSelect?.() }}
           aria-label={bulkSelected ? 'Deselect item' : 'Select item'}
           aria-pressed={!!bulkSelected}
-          className={`absolute left-1.5 top-1/2 -translate-y-1/2 z-[2] grid place-items-center w-4 h-4 rounded-[4px] border-2 transition-all ${
+          className={`absolute ${BULK_BOX_X} top-1/2 -translate-y-1/2 z-[2] grid place-items-center w-4 h-4 rounded-[4px] border-2 transition-all ${
             bulkSelected
               ? 'opacity-100 bg-primary-600 border-primary-600 text-white'
               : `border-neutral-300 text-transparent ${showBulkAffordance ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`
@@ -585,15 +586,15 @@ export const ScheduleItem = memo(function ScheduleItem({
           the check circle out from under the cursor) and WITHOUT overlapping the
           time (which the gutterless version did). Every Today row is
           bulk-selectable, so they all reserve the gutter and stay aligned. */}
-      <div className={`relative flex items-center gap-3 ${bulkSelectable ? 'pl-5' : ''}`}>
+      <div className={bulkSelectable ? ROW_GRID : 'relative flex items-center gap-3'}>
         <TimelineSpine above={spineAbove} below={spineBelow} hasBulkGutter={!!bulkSelectable} />
 
         {/* Time column - fixed width for alignment */}
         {hideTime ? (
-          <div className="schedule-empty-time w-16 shrink-0" />
+          <div className={`schedule-empty-time ${LANE}`} />
         ) : (isTask && onSchedule) || ((isRoutine || item.type === 'event') && onPush) ? (
           <div
-            className="schedule-time-column w-16 shrink-0 relative"
+            className={`schedule-time-column ${LANE} relative`}
             onClick={(e) => e.stopPropagation()}
           >
             <SchedulePopover
@@ -643,7 +644,7 @@ export const ScheduleItem = memo(function ScheduleItem({
             />
           </div>
         ) : (
-          <div className="schedule-time-column w-16 shrink-0 text-xs font-medium tabular-nums">
+          <div className={`schedule-time-column ${LANE} text-xs font-medium tabular-nums`}>
             {isOverdue && overdueLabel ? (
               <span style={{ color: overdueColors.warning600 }}>
                 {overdueLabel}
@@ -672,7 +673,7 @@ export const ScheduleItem = memo(function ScheduleItem({
             of the row — which IS the title's first line, the title column being
             the tallest child — with a nudge to centre it on that line's box. */}
         {!(isMobile && isOverdue) && (
-          <div className={`w-5 shrink-0 flex items-center justify-center relative z-[1] ${
+          <div className={`${MARK} flex items-center justify-center relative z-[1] ${
             hasBelowTitleContent ? `self-start ${variant === 'minimal' ? '' : 'mt-0.5'}` : ''
           }`}>
             {/* Chosen for today: a small dot beside the circle, and a label a
@@ -885,7 +886,7 @@ export const ScheduleItem = memo(function ScheduleItem({
       {(item.location || hasContactChip || parentTaskName || isFree) && (() => {
         const onlyLocation = !hasContactChip && !parentTaskName && !isFree && !travelLabel
         const metadataContent = (
-          <div className={`flex items-center gap-2 ml-[5.75rem] flex-wrap ${onlyLocation ? 'pt-1' : 'mt-1'}`}>
+          <div className={`flex items-center gap-2 ${UNDER_TITLE} flex-wrap ${onlyLocation ? 'pt-1' : 'mt-1'}`}>
             {/* Free chip — informational-only: no prep/handoff expected. */}
             {isFree && (
               <span className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500 bg-neutral-100 rounded px-1.5 py-0.5">

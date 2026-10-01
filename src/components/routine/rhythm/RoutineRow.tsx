@@ -15,6 +15,7 @@ import type { Routine } from '@/types/actionable'
 import type { FamilyMember } from '@/types/family'
 import { describeRecurrence } from '@/lib/quickRecurrence'
 import { memberIdsOf } from './rhythmModel'
+import { LIST_ROW, LIST_ROW_BODY, LIST_ROW_LANE, LIST_ROW_META, LIST_ROW_TRAIL } from '@/components/layout/listRow'
 
 const DAY_KEYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'] as const
 const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
@@ -86,65 +87,86 @@ function ordinal(n: number): string {
   return `${n}${s[(v - 20) % 10] ?? s[v] ?? s[0]}`
 }
 
+/** The library row's split of the when: a clock time is short enough for the
+ *  margin lane; the days (or the rest of the pattern) go under the title. */
+function laneAndMeta(routine: Routine, override: string | null | undefined): { lane: string | null; when: string | null } {
+  // An override (a resting routine's wake date) is the whole answer.
+  if (override !== undefined) return { lane: null, when: override }
+  const at = timeLabel(routine.time_of_day)
+  if (!at) return { lane: null, when: whenLabel(routine) }
+  const p = routine.recurrence_pattern
+  if (p.type === 'daily') return { lane: at, when: null }
+  if (p.type === 'weekly') return { lane: at, when: whenLabel({ ...routine, time_of_day: null }) }
+  // Past the week the pattern doesn't say a time, so neither does the lane.
+  return { lane: null, when: whenLabel(routine) }
+}
+
 export function RoutineRow({ routine, familyMembers, steps = 0, dimmed = false, when, detail, onOpen }: {
   routine: Routine
   familyMembers: FamilyMember[]
   steps?: number
   /** Search highlighting: true dims a row that doesn't match the query. */
   dimmed?: boolean
-  /** Overrides the when column. A resting routine's most useful answer is not
-   *  its pattern but when it wakes. */
+  /** Overrides the when. A resting routine's most useful answer is not its
+   *  pattern but when it wakes. */
   when?: string | null
   /** An extra line under the name when expanded. */
   detail?: string | null
   onOpen: (r: Routine) => void
 }) {
   const [expanded, setExpanded] = useState(false)
-  const whenText = when ?? whenLabel(routine)
+  const { lane, when: whenText } = laneAndMeta(routine, when)
   const owners = memberIdsOf(routine)
     .map((id) => familyMembers.find((m) => m.id === id)?.name)
     .filter((name): name is string => !!name)
 
+  // The library row (layout system, 2026-10-01): a clock time in the margin
+  // lane, the name at the body edge with when · who under it, the chevron
+  // trailing. The when/who used to sit in fixed 160/112px columns that
+  // vanished on a phone; under the title they read at every width.
   return (
-    <li className={`border-b border-neutral-200 ${dimmed ? 'opacity-40' : ''}`}>
-      <div className="flex items-start gap-3 px-4 py-3.5">
+    <li className={`${LIST_ROW} items-start! ${dimmed ? 'opacity-40' : ''}`}>
+      <span className={`${LIST_ROW_LANE} whitespace-nowrap pt-[3px]`}>{lane}</span>
+
+      <div className={LIST_ROW_BODY}>
         <button
           type="button"
           onClick={() => onOpen(routine)}
-          className="min-w-0 flex-1 text-left text-[16px] leading-snug text-neutral-800 hover:text-primary-700 transition-colors"
+          className="block w-full min-w-0 text-left text-[16px] leading-snug text-neutral-900 hover:text-primary-700 transition-colors"
         >
           {routine.name}
-          {steps > 0 && <span className="text-[13px] text-neutral-400"> · {steps} steps</span>}
+          {steps > 0 && <span className="text-[12px] text-neutral-500"> · {steps} steps</span>}
         </button>
-        <span className="hidden w-40 shrink-0 text-[13px] leading-snug text-neutral-500 sm:block">
-          {whenText}
-        </span>
-        <span className="hidden w-28 shrink-0 text-[13px] leading-snug text-neutral-500 sm:block">
-          {owners.join(', ')}
-        </span>
+        {(whenText || owners.length > 0) && (
+          <p className={`${LIST_ROW_META} whitespace-normal`}>
+            {whenText && <span>{whenText}</span>}
+            {whenText && owners.length > 0 && <span aria-hidden="true"> · </span>}
+            {owners.length > 0 && <span>{owners.join(', ')}</span>}
+          </p>
+        )}
+
+        {expanded && (
+          <div className="mt-1 text-[12px] leading-snug text-neutral-500">
+            <p>
+              <span className="font-medium text-neutral-600">{describeRecurrence(routine.recurrence_pattern)}</span>
+              {detail && <span> · {detail}</span>}
+            </p>
+            {routine.description && <p className="mt-1">{routine.description}</p>}
+          </div>
+        )}
+      </div>
+
+      <div className={LIST_ROW_TRAIL}>
         <button
           type="button"
           aria-expanded={expanded}
           aria-label={`${expanded ? 'Hide' : 'Show'} details for ${routine.name}`}
           onClick={() => setExpanded((v) => !v)}
-          className="mt-0.5 shrink-0 rounded p-0.5 text-neutral-300 transition-colors hover:bg-neutral-100 hover:text-neutral-600"
+          className="shrink-0 rounded p-0.5 text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-neutral-600"
         >
           {expanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
         </button>
       </div>
-
-      {expanded && (
-        <div className="px-4 pb-3 text-[13px] leading-snug text-neutral-500">
-          {/* On a narrow screen the columns are hidden, so the pattern and the
-              people live here instead of nowhere. */}
-          <p className="sm:hidden">{whenText}{owners.length > 0 && ` · ${owners.join(', ')}`}</p>
-          <p>
-            <span className="font-medium text-neutral-600">{describeRecurrence(routine.recurrence_pattern)}</span>
-            {detail && <span> · {detail}</span>}
-          </p>
-          {routine.description && <p className="mt-1">{routine.description}</p>}
-        </div>
-      )}
     </li>
   )
 }
