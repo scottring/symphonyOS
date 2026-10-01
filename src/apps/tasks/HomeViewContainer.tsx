@@ -821,6 +821,7 @@ export function HomeViewContainer({ fixedView }: { fixedView?: 'today' | 'week' 
       onCompleteRoutine: scheduleActions.onCompleteRoutine,
       onSkipRoutine: scheduleActions.onSkipRoutine,
       onPushRoutine: scheduleActions.onPushRoutine,
+      onMoveRoutineToDay: scheduleActions.onMoveRoutineToDay,
       onDeleteRoutine: scheduleActions.onDeleteRoutine,
       onUpdateRoutine: updateRoutine,
 

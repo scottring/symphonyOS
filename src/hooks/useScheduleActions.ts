@@ -19,7 +19,7 @@ interface UseScheduleActionsDeps {
   markDone: (entityType: 'routine' | 'calendar_event', entityId: string, date: Date, completedAt?: Date) => Promise<boolean>
   undoDone: (entityType: 'routine' | 'calendar_event', entityId: string, date: Date) => Promise<boolean>
   skip: (entityType: 'routine' | 'calendar_event', entityId: string, date: Date) => Promise<boolean>
-  reschedule: (entityType: 'routine' | 'calendar_event', entityId: string, fromDate: Date, toDate: Date) => Promise<RescheduleResult | null>
+  reschedule: (entityType: 'routine' | 'calendar_event', entityId: string, fromDate: Date, toDate: Date, opts?: { dayOnly?: boolean }) => Promise<RescheduleResult | null>
   undoReschedule: (previous: RescheduleResult) => Promise<boolean>
   refreshDateInstances: () => void
   pushAction: (message: string, undoFn: () => void) => void
@@ -153,6 +153,33 @@ export function useScheduleActions({
     refreshDateInstances()
   }, [allRoutines, viewedDate, reschedule, undoReschedule, refreshDateInstances, pushAction])
 
+  /**
+   * Move ONE occurrence to another day — the routine row's Move button
+   * (Tomorrow / weekend / next week / a date). The rule is untouched. A timed
+   * routine keeps its hour on the new day; an untimed one (Wash comforters)
+   * lands untimed rather than at midnight. Returns whether the write landed.
+   */
+  const onMoveRoutineToDay = useCallback(async (routineId: string, day: Date): Promise<boolean> => {
+    const bareId = routineId.split('#')[0]
+    const routine = allRoutines.find(r => r.id === bareId)
+    const routineName = routine?.name || 'Routine'
+
+    const target = new Date(day)
+    const [h, m] = (routine?.time_of_day ?? '').split(':').map(Number)
+    const timed = Number.isFinite(h) && Number.isFinite(m)
+    target.setHours(timed ? h : 0, timed ? m : 0, 0, 0)
+
+    const previous = await reschedule('routine', routineId, viewedDate, target, { dayOnly: !timed })
+    if (!previous) return false
+    const label = target.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
+    pushAction(`Moved "${routineName}" to ${label}`, async () => {
+      await undoReschedule(previous)
+      refreshDateInstances()
+    })
+    refreshDateInstances()
+    return true
+  }, [allRoutines, viewedDate, reschedule, undoReschedule, refreshDateInstances, pushAction])
+
   const onDeleteRoutine = useCallback(async (routineId: string) => {
     await deleteRoutine(routineId)
   }, [deleteRoutine])
@@ -213,6 +240,7 @@ export function useScheduleActions({
     onAssignRoutine,
     onAssignRoutineAll,
     onCompleteRoutine,
+    onMoveRoutineToDay,
     onSkipRoutine,
     onPushRoutine,
     onDeleteRoutine,

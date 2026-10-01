@@ -173,7 +173,16 @@ Everything funnels through `updateTask` (`useSupabaseTasks.ts:1209`).
 
 Routine occurrences never rewrite the rule. Choosing, completing, skipping,
 deferring and rescheduling all write to the one `actionable_instances` row for
-that date.
+that date. The row's **Move** button moves one occurrence to another day: a
+timed routine keeps its hour; an untimed one is a *day-only move* — `status
+'deferred'`, `deferred_to` at that day's local midnight, and `planned_on` the
+same day (`isDayOnlyMove`), which every time reader treats as untimed.
+
+**Waiting on someone** (task Reschedule popover, or the ⋯ menu) sets
+`is_waiting` + `waiting_for` and, with a check-back day, dates the task all-day
+on that day — it leaves Today and returns then. Every open wait is listed in the
+Inbox's *Waiting on* section (overdue check-backs first); waits are excluded
+from *Expired* so a row has one home.
 
 ---
 

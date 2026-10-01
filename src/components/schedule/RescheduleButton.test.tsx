@@ -86,4 +86,20 @@ describe('RescheduleButton', () => {
     fireEvent.click(screen.getByText('Set date (all day)'))
     expect(onUpdateTask).toHaveBeenCalledWith('7', expect.objectContaining({ bucket: 'timed', isAllDay: true }))
   })
+
+  // "Did my part, waiting to hear back" (Scott, 2026-10-01): the same popover
+  // offers a wait with a check-back day, which moves the task to that day.
+  it('Waiting on someone… saves the wait and its check-back day', () => {
+    const onUpdateTask = vi.fn()
+    renderBtn({ onUpdateTask })
+    fireEvent.click(screen.getByLabelText('Reschedule'))
+    fireEvent.click(screen.getByText('Waiting on someone…'))
+    fireEvent.change(screen.getByPlaceholderText(/Guy/), { target: { value: 'Goodman to call back' } })
+    fireEvent.click(screen.getByText('Tomorrow'))
+    fireEvent.click(screen.getByText('Save'))
+    expect(onUpdateTask).toHaveBeenCalledWith('7', expect.objectContaining({
+      isWaiting: true, waitingFor: 'Goodman to call back', bucket: 'timed', isAllDay: true,
+      scheduledFor: expect.any(Date),
+    }))
+  })
 })

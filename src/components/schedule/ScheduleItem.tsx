@@ -11,6 +11,7 @@ import { Video, Check, Pencil, Hourglass, ListChecks, ChevronUp, ChevronDown, Me
 import { requestDiscussionOpen } from '@/lib/discussions/openIntent'
 import { ScheduleItemItems } from './ScheduleItemItems'
 import { RowActionRail } from './RowActionRail'
+import { RoutineMoveButton } from './RoutineMoveButton'
 import { ROW_SHELL, ROW_GRID, LANE, MARK, UNDER_TITLE, BULK_BOX_X } from './todayRowGrid'
 import { useMobile } from '@/hooks/useMobile'
 import { TaskCheckbox } from './TaskCheckbox'
@@ -506,6 +507,12 @@ export const ScheduleItem = memo(function ScheduleItem({
             >
               <AlertCircle className="w-4 h-4 text-amber-500" />
             </button>
+          )}
+          {/* A routine's one triage verb — move this time or skip it. The
+              desktop rail carries it; without it here a phone could only
+              swipe a routine done or open it (Scott, 2026-10-01). */}
+          {item.type === 'routine' && !item.completed && !item.skipped && (
+            <RoutineMoveButton item={item} />
           )}
           {/* Initials only when the row involves someone else; your own work
               says nothing about who. The sheet still assigns. */}

@@ -52,12 +52,15 @@ function renderRow(overrides: Partial<TimelineItem> = {}) {
   )
 }
 
-describe('ScheduleItem — inline Skip button (routines)', () => {
+// The routine verb is now "Move or skip" (2026-10-01): one button whose
+// popover moves this occurrence to another day or skips it. Skip stays reachable
+// on every variant, including the minimal one TodayView uses.
+describe('ScheduleItem — inline Move-or-skip button (routines)', () => {
   beforeEach(() => vi.clearAllMocks())
 
   it('renders a visible Skip control on an active routine row', () => {
     const { queryByRole } = renderRow()
-    expect(queryByRole('button', { name: /skip today/i })).not.toBeNull()
+    expect(queryByRole('button', { name: /move or skip/i })).not.toBeNull()
   })
 
   it('skips the single instance for the day on click, without opening the panel', () => {
@@ -65,7 +68,8 @@ describe('ScheduleItem — inline Skip button (routines)', () => {
     const { getByRole } = render(
       <ScheduleItem item={baseRoutine} onSelect={onSelect} onToggleComplete={vi.fn()} />,
     )
-    fireEvent.click(getByRole('button', { name: /skip today/i }))
+    fireEvent.click(getByRole('button', { name: /move or skip/i }))
+    fireEvent.click(getByRole('menuitem', { name: /skip this time/i }))
     expect(onSkipRoutine).toHaveBeenCalledTimes(1)
     expect(onSkipRoutine).toHaveBeenCalledWith('abc') // id minus the 'routine-' prefix
     expect(onSelect).not.toHaveBeenCalled() // click is stopped from selecting the row
@@ -73,17 +77,17 @@ describe('ScheduleItem — inline Skip button (routines)', () => {
 
   it('hides the Skip control once the routine is completed', () => {
     const { queryByRole } = renderRow({ completed: true })
-    expect(queryByRole('button', { name: /skip today/i })).toBeNull()
+    expect(queryByRole('button', { name: /move or skip/i })).toBeNull()
   })
 
   it('hides the Skip control once the routine is already skipped', () => {
     const { queryByRole } = renderRow({ skipped: true })
-    expect(queryByRole('button', { name: /skip today/i })).toBeNull()
+    expect(queryByRole('button', { name: /move or skip/i })).toBeNull()
   })
 
   it('does not show the Skip control on task rows', () => {
     const { queryByRole } = renderRow({ id: 'task-1', type: 'task', category: 'task' })
-    expect(queryByRole('button', { name: /skip today/i })).toBeNull()
+    expect(queryByRole('button', { name: /move or skip/i })).toBeNull()
   })
 
   it('shows the Skip control on the minimal variant (how TodayView renders routines)', () => {
@@ -98,6 +102,6 @@ describe('ScheduleItem — inline Skip button (routines)', () => {
         onToggleComplete={vi.fn()}
       />,
     )
-    expect(queryByRole('button', { name: /skip today/i })).not.toBeNull()
+    expect(queryByRole('button', { name: /move or skip/i })).not.toBeNull()
   })
 })

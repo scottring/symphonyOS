@@ -45,6 +45,8 @@ import { selectRefileRows } from '@/lib/today/refile'
 import { selectExpired } from '@/lib/today/expired'
 import { RefileStrip } from './RefileStrip'
 import { ExpiredSection } from './ExpiredSection'
+import { WaitingSection } from './WaitingSection'
+import { selectWaiting } from '@/lib/today/waiting'
 
 const INBOX_ACTIONS: QuickAction[] = [
   { kind: 'today' }, { kind: 'week' }, { kind: 'month' }, { kind: 'someday' }, { kind: 'note' }, { kind: 'delete' }
@@ -455,7 +457,15 @@ export function InboxView({
   // rendering carried-over rows and Review shows five at a time, so 26 open
   // past-dated tasks were reachable from no screen at all. Its own collapsed
   // section below the captures, never mixed into the triage list above.
-  const expiredRows = useMemo(() => selectExpired(filteredTasks), [filteredTasks])
+  // A wait past its check-back day lists under Waiting on (as a follow-up),
+  // not here too — one row, one home.
+  const expiredRows = useMemo(
+    () => selectExpired(filteredTasks).filter((r) => !r.task.isWaiting),
+    [filteredTasks],
+  )
+  // Waits leave Today until their check-back day; this is where all of them
+  // stay reachable (Scott, 2026-10-01).
+  const waitingRows = useMemo(() => selectWaiting(filteredTasks), [filteredTasks])
 
   const [leavingIds, setLeavingIds] = useState<Set<string>>(new Set())
 
@@ -895,6 +905,13 @@ export function InboxView({
           {inboxTasks.map(renderRow)}
         </div>
       )}
+
+      <WaitingSection
+        rows={waitingRows}
+        onUpdateTask={(id, updates) => onUpdateTask?.(id, updates)}
+        onCompleteTask={onToggleTask}
+        onSelect={handleSelect}
+      />
 
       {/* #expired: the Planning panel's "older unfinished work" line lands
           here open, on the list, not on a fold to find. */}

@@ -20,6 +20,8 @@ export interface RescheduleResult {
   instanceId: string
   previousStatus: ActionableStatus
   previousDeferredTo: string | null
+  /** Restored too, because a day-only move stamps it (see isDayOnlyMove). */
+  previousPlannedOn?: string | null
 }
 
 // Helper to format date as YYYY-MM-DD in local timezone
@@ -499,7 +501,11 @@ export function useActionableInstances() {
     entityType: EntityType,
     entityId: string,
     fromDate: Date,
-    toDateTime: Date
+    toDateTime: Date,
+    /** Move to the DAY of `toDateTime` with no time — an untimed routine
+     *  going to Saturday. Stamps `planned_on` beside a midnight `deferred_to`
+     *  (the isDayOnlyMove marker) so no reader draws it at 12:00 AM. */
+    opts?: { dayOnly?: boolean }
   ): Promise<RescheduleResult | null> => {
     setIsLoading(true)
     setError(null)
@@ -543,13 +549,26 @@ export function useActionableInstances() {
         instanceId: instance.id,
         previousStatus: instance.status,
         previousDeferredTo: instance.deferred_to,
+        previousPlannedOn: instance.planned_on ?? null,
       }
 
       // Determine if we're moving back to the instance's original date
       const toDateStr = toDateString(toDateTime)
       const originalDateStr = instance.date as string
 
-      if (originalDateStr === toDateStr) {
+      if (opts?.dayOnly) {
+        const midnight = new Date(toDateTime)
+        midnight.setHours(0, 0, 0, 0)
+        // Back onto its own day: no override left to carry — it is simply due.
+        const back = originalDateStr === toDateStr
+        const { error: updateError } = await supabase
+          .from('actionable_instances')
+          .update(back
+            ? { status: 'pending' as ActionableStatus, deferred_to: null, planned_on: null }
+            : { status: 'deferred' as ActionableStatus, deferred_to: midnight.toISOString(), planned_on: toDateStr })
+          .eq('id', instance.id)
+        if (updateError) throw updateError
+      } else if (originalDateStr === toDateStr) {
         // Moving back to original date — reset to pending with time override
         const { error: updateError } = await supabase
           .from('actionable_instances')
@@ -594,6 +613,7 @@ export function useActionableInstances() {
         .update({
           status: previous.previousStatus,
           deferred_to: previous.previousDeferredTo,
+          ...(previous.previousPlannedOn !== undefined ? { planned_on: previous.previousPlannedOn } : {}),
         })
         .eq('id', previous.instanceId)
 

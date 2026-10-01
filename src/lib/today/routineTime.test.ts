@@ -84,4 +84,24 @@ describe('resolveRoutineTime', () => {
     expect(resolveRoutineTime({ time_of_day: '19:30:00' }, undefined, viewedDate))
       .toEqual(at(19, 30))
   })
+
+  // "Move → Saturday" on an untimed routine (Wash comforters, 2026-10-01): the
+  // midnight deferral plus planned_on is a DAY, not 12:00 AM.
+  describe('a day-only move', () => {
+    const saturday = new Date(2026, 7, 8)
+    const moved = (over: Partial<ActionableInstance> = {}) => instance({
+      status: 'deferred', deferred_to: saturday.toISOString(), planned_on: '2026-08-08', ...over,
+    })
+    it('is untimed on the day it landed', () => {
+      expect(resolveRoutineTime({ time_of_day: null }, moved(), saturday)).toBeNull()
+    })
+    it('stays untimed once ticked there', () => {
+      expect(resolveRoutineTime({ time_of_day: null }, moved({ status: 'completed' }), saturday)).toBeNull()
+    })
+    it('a real time on the same chosen day is still a time', () => {
+      const three = new Date(2026, 7, 8, 15)
+      const i = moved({ deferred_to: three.toISOString() })
+      expect(resolveRoutineTime({ time_of_day: null }, i, saturday)).toEqual(three)
+    })
+  })
 })

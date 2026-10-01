@@ -6,6 +6,8 @@ import { isSameDay } from '@/lib/dateUtils'
 import { taskDayRemoval } from '@/lib/planning/planActions'
 import { DiscussionPopover } from '@/components/triage'
 import { WaitingForPopover } from './WaitingForPopover'
+import { waitingUpdates, CLEAR_WAITING, checkBackLabel } from '@/lib/today/waiting'
+import { showToast } from '@/hooks/useToast'
 
 /** Roughly the tallest the menu gets; below this much room it opens upward. */
 const MENU_MAX_HEIGHT = 280
@@ -36,26 +38,16 @@ export function ScheduleItemActionsMenu({ item, onOpenDetail, onUpdateDiscussion
 
   const taskId = item.originalTask?.id
 
-  const saveWaitingFor = useCallback((waitingFor: string) => {
+  const saveWaitingFor = useCallback((waitingFor: string, checkBack?: Date) => {
     if (!taskId) return
-    ctx.onUpdateTask?.(taskId, {
-      isWaiting: true,
-      waitingFor,
-      // Starting a NEW wait stamps the clock; editing the sentence on an
-      // existing wait must not reset it, or the wait never ages and the
-      // assistant never surfaces it.
-      ...(item.isWaiting ? {} : { waitingSince: new Date() }),
-    })
+    ctx.onUpdateTask?.(taskId, waitingUpdates(item, waitingFor, checkBack))
+    if (checkBack) showToast(`Waiting — back ${checkBackLabel(checkBack)}`, 'success')
     setWaitingOpen(false)
-  }, [ctx, taskId, item.isWaiting])
+  }, [ctx, taskId, item])
 
   const clearWaiting = useCallback(() => {
     if (!taskId) return
-    ctx.onUpdateTask?.(taskId, {
-      isWaiting: false,
-      waitingFor: undefined,
-      waitingSince: undefined,
-    })
+    ctx.onUpdateTask?.(taskId, CLEAR_WAITING)
     setWaitingOpen(false)
   }, [ctx, taskId])
 

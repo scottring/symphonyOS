@@ -7,7 +7,7 @@
 
 import { useState, useRef, useCallback, useLayoutEffect } from 'react'
 import { createPortal } from 'react-dom'
-import { CalendarClock } from 'lucide-react'
+import { CalendarClock, Hourglass } from 'lucide-react'
 import type { TimelineItem } from '@/types/timeline'
 import { useScheduleActionsContext } from '@/contexts/ScheduleActionsContext'
 import { applyTriageWhen, describeTriageWhen } from '@/lib/triage/applyWhen'
@@ -16,13 +16,20 @@ import { showToast } from '@/hooks/useToast'
 import type { TriageWhen } from './TriageWhenMenu'
 import { RescheduleGrid } from './RescheduleGrid'
 import { usePopoverFocus } from '@/hooks/usePopoverFocus'
+import { WaitingForPopover } from './WaitingForPopover'
+import { waitingUpdates, CLEAR_WAITING, checkBackLabel } from '@/lib/today/waiting'
 
 export function RescheduleButton({ item }: { item: TimelineItem }) {
   const ctx = useScheduleActionsContext()
   const [open, setOpen] = useState(false)
+  // The same popover's second page: "I did my part — now I'm waiting on
+  // someone." Lives beside the dates because it is the same question (when
+  // does this come back?), and ticking was the only other way to say "not
+  // mine to move right now" (Scott, 2026-10-01).
+  const [waiting, setWaiting] = useState(false)
   const triggerRef = useRef<HTMLButtonElement>(null)
   const panelRef = useRef<HTMLDivElement>(null)
-  const close = useCallback(() => setOpen(false), [])
+  const close = useCallback(() => { setOpen(false); setWaiting(false) }, [])
   usePopoverFocus(open, triggerRef, panelRef, close)
 
   // Portal + fixed positioning (the PushDropdown/TaskFateMenu pattern). An
@@ -82,6 +89,24 @@ export function RescheduleButton({ item }: { item: TimelineItem }) {
     setOpen(false)
   }, [item.originalTask, ctx])
 
+  const saveWaiting = useCallback((waitingFor: string, checkBack?: Date) => {
+    const taskId = item.originalTask?.id
+    if (taskId) {
+      void (async () => {
+        const result = await ctx.onUpdateTask?.(taskId, waitingUpdates(item, waitingFor, checkBack))
+        if (result === false) return
+        showToast(checkBack ? `Waiting — back ${checkBackLabel(checkBack)}` : 'Marked waiting', 'success')
+      })()
+    }
+    close()
+  }, [item, ctx, close])
+
+  const clearWaiting = useCallback(() => {
+    const taskId = item.originalTask?.id
+    if (taskId) void ctx.onUpdateTask?.(taskId, CLEAR_WAITING)
+    close()
+  }, [item.originalTask, ctx, close])
+
   return (
     <div className="relative shrink-0" onClick={(e) => e.stopPropagation()}>
       <button
@@ -91,7 +116,7 @@ export function RescheduleButton({ item }: { item: TimelineItem }) {
         title="Reschedule"
         aria-haspopup="dialog"
         aria-expanded={open}
-        onClick={(e) => { e.stopPropagation(); setOpen((o) => !o) }}
+        onClick={(e) => { e.stopPropagation(); setWaiting(false); setOpen((o) => !o) }}
         className="shrink-0 p-1.5 rounded-lg text-neutral-400 hover:text-primary-600 hover:bg-primary-50 transition-colors"
       >
         <CalendarClock className="w-4 h-4" />
@@ -104,7 +129,7 @@ export function RescheduleButton({ item }: { item: TimelineItem }) {
             aria-hidden
             tabIndex={-1}
             className="fixed inset-0 z-[99] cursor-default"
-            onClick={(e) => { e.stopPropagation(); setOpen(false) }}
+            onClick={(e) => { e.stopPropagation(); close() }}
           />
           <div
             ref={panelRef}
@@ -114,8 +139,35 @@ export function RescheduleButton({ item }: { item: TimelineItem }) {
             className="fixed z-[100] w-80 p-2 bg-white rounded-xl border border-neutral-200 shadow-lg"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="px-1 pb-2 text-[11px] uppercase tracking-wider text-neutral-400">Reschedule to</div>
-            <RescheduleGrid onPick={reschedule} onPickDate={rescheduleToDate} />
+            {waiting ? (
+              <div className="p-1">
+                <WaitingForPopover
+                  inline
+                  initialValue={item.waitingFor}
+                  taskId={item.originalTask?.id}
+                  onSave={saveWaiting}
+                  onClear={item.isWaiting ? clearWaiting : undefined}
+                  onCancel={() => setWaiting(false)}
+                />
+              </div>
+            ) : (
+              <>
+                <div className="px-1 pb-2 text-[11px] uppercase tracking-wider text-neutral-400">Reschedule to</div>
+                <RescheduleGrid onPick={reschedule} onPickDate={rescheduleToDate} />
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={(e) => { e.stopPropagation(); setWaiting(true) }}
+                  className="mt-2 flex w-full items-center gap-2 px-2.5 py-2.5 rounded-lg text-sm font-medium text-neutral-700 bg-amber-50/60 hover:bg-amber-50 transition-colors"
+                >
+                  <Hourglass className="w-4 h-4 shrink-0 text-amber-500" />
+                  <span className="flex flex-col items-start leading-tight">
+                    <span>{item.isWaiting ? 'Edit what you’re waiting on' : 'Waiting on someone…'}</span>
+                    <span className="text-[11px] font-normal text-neutral-400">Did your part — check back later</span>
+                  </span>
+                </button>
+              </>
+            )}
           </div>
         </>,
         document.body,
