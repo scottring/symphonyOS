@@ -134,6 +134,16 @@ describe('attachSceneryVeil', () => {
     expect(progress()).toBe('0')
   })
 
+  it('protects text even at the low inner edge of a corner', () => {
+    const { scroller, target, progress, content, scene } = withContent(840)
+    // Only ~23px of artwork rises here. There is no foreground strip to
+    // hide these rows: the paper must shield even this shallow overlap.
+    content.getBoundingClientRect = rect(340, 100, 1100, 840)
+    scroller.appendChild(content)
+    attachSceneryVeil(scroller, target, scene)
+    expect(Number(progress())).toBeGreaterThan(0)
+  })
+
   it('writes the same veil to every layer of the scene', () => {
     const { scroller, target } = setup(300)
     const strip = document.createElement('div')

@@ -1,0 +1,167 @@
+{
+  "urban-daytime": {
+    "source_rows": [
+      645,
+      998
+    ],
+    "size": [
+      1506,
+      423
+    ],
+    "center_skyline": 0.5245
+  },
+  "urban-dusk-dawn": {
+    "source_rows": [
+      634,
+      1000
+    ],
+    "size": [
+      1506,
+      436
+    ],
+    "center_skyline": 0.5256
+  },
+  "urban-nighttime": {
+    "source_rows": [
+      641,
+      999
+    ],
+    "size": [
+      1506,
+      428
+    ],
+    "center_skyline": 0.5181
+  },
+  "small-city-daytime": {
+    "source_rows": [
+      724,
+      1001
+    ],
+    "size": [
+      1506,
+      347
+    ],
+    "center_skyline": 0.4378
+  },
+  "small-city-dusk-dawn": {
+    "source_rows": [
+      720,
+      1001
+    ],
+    "size": [
+      1506,
+      351
+    ],
+    "center_skyline": 0.4432
+  },
+  "small-city-nighttime": {
+    "source_rows": [
+      682,
+      1045
+    ],
+    "size": [
+      1506,
+      433
+    ],
+    "center_skyline": 0.3647
+  },
+  "mountain-town-daytime": {
+    "source_rows": [
+      690,
+      1001
+    ],
+    "size": [
+      1506,
+      381
+    ],
+    "center_skyline": 0.3297
+  },
+  "mountain-town-dusk-dawn": {
+    "source_rows": [
+      685,
+      1045
+    ],
+    "size": [
+      1506,
+      430
+    ],
+    "center_skyline": 0.299
+  },
+  "mountain-town-nighttime": {
+    "source_rows": [
+      650,
+      969
+    ],
+    "size": [
+      1506,
+      389
+    ],
+    "center_skyline": 0.3308
+  },
+  "cabin-daytime": {
+    "source_rows": [
+      659,
+      1001
+    ],
+    "size": [
+      1506,
+      412
+    ],
+    "center_skyline": 0.4218
+  },
+  "cabin-dusk-dawn": {
+    "source_rows": [
+      658,
+      1001
+    ],
+    "size": [
+      1506,
+      413
+    ],
+    "center_skyline": 0.4231
+  },
+  "cabin-nighttime": {
+    "source_rows": [
+      649,
+      998
+    ],
+    "size": [
+      1506,
+      419
+    ],
+    "center_skyline": 0.4298
+  },
+  "farm-daytime": {
+    "source_rows": [
+      704,
+      1001
+    ],
+    "size": [
+      1506,
+      367
+    ],
+    "center_skyline": 0.3665
+  },
+  "farm-dusk-dawn": {
+    "source_rows": [
+      703,
+      999
+    ],
+    "size": [
+      1506,
+      366
+    ],
+    "center_skyline": 0.3662
+  },
+  "farm-nighttime": {
+    "source_rows": [
+      703,
+      999
+    ],
+    "size": [
+      1506,
+      366
+    ],
+    "center_skyline": 0.3667
+  }
+}

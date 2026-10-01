@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/hooks/useAuth'
 import { weatherCondition } from '@/lib/weatherIcon'
+import { WEATHER_COORDS_KEY } from '@/components/place/sceneryLighting'
 
 export interface WeatherData {
   currentTemp: number
@@ -23,7 +24,8 @@ export interface DayForecast {
 }
 
 const REFRESH_INTERVAL = 30 * 60 * 1000 // 30 minutes
-const COORDS_CACHE_KEY = 'symphony-weather-coords'
+// Shared with automatic scenery lighting, which reads the same location.
+const COORDS_CACHE_KEY = WEATHER_COORDS_KEY
 
 function getCachedCoords(): { lat: number; lng: number } | null {
   try {

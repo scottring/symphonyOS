@@ -7,8 +7,7 @@
 //  - scrolling: over the first SCENERY_VEIL_DISTANCE px the art recedes, once
 //    the page is being worked in;
 //  - the page's own content reaching up into the corners' rise: no row may
-//    sit over the art. (The low ground between the corners is drawn in front
-//    of the page, so rows pass behind it, never over it.)
+//    sit over the art. Every decorative layer stays behind the page.
 //
 // The veil's opacity is worked out in CSS from --scenery-progress (0 → 1);
 // this file only writes that number — at most once a frame, never through
@@ -17,11 +16,6 @@
 export const SCENERY_VEIL_DISTANCE = 150
 /** How far content may run into the scene before the art is fully veiled. */
 export const SCENERY_CONTENT_DISTANCE = 96
-
-/** How tall the ground in front of the page stands (index.css,
- *  .place-ground-strip-band): rows reaching no higher into a corner than
- *  this pass behind that ground, not over the corner's art. */
-export const GROUND_ALLOWANCE = 30
 
 /** The element a page marks as its content (see useSceneryContent). */
 export const SCENERY_CONTENT_SELECTOR = '[data-scenery-content]'
@@ -98,10 +92,6 @@ export function attachSceneryVeil(scroller: HTMLElement, target: HTMLElement | H
       const edge = isLeft ? left - c.left : c.right - right
       rise = Math.max(rise, c.height * cornerRise(edge / c.width))
     }
-    // A corner's last, ground-level reach toward the middle is low ground
-    // like the strip in front of the page, which hides the rows passing over
-    // it; only what rises above that needs the whole scene veiled.
-    rise -= GROUND_ALLOWANCE
     return rise > 0 ? ground.bottom - rise : Infinity
   }
 

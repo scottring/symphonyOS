@@ -1,87 +1,75 @@
-import { describe, it, expect, vi, afterEach } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { render } from '@testing-library/react'
-import { PlaceGroundStrip, PlaceScenery } from './PlaceScenery'
-import { useSceneryContent } from './useSceneryContent'
+import { PlaceScenery } from './PlaceScenery'
+import { keepFocusAboveScenery } from './sceneryFocus'
 
-function scrollerAt(top: number) {
-  const el = document.createElement('div')
-  Object.defineProperty(el, 'scrollTop', { value: top, writable: true, configurable: true })
-  return el
-}
-
-function mockReducedMotion(reduce: boolean) {
-  const original = window.matchMedia
-  window.matchMedia = ((query: string) => ({
-    matches: reduce && query.includes('prefers-reduced-motion'),
-    media: query, onchange: null,
-    addListener: () => {}, removeListener: () => {},
-    addEventListener: () => {}, removeEventListener: () => {}, dispatchEvent: () => false,
-  })) as typeof window.matchMedia
-  return () => { window.matchMedia = original }
-}
-
-describe('PlaceScenery', () => {
-  let restore: (() => void) | null = null
-  afterEach(() => { restore?.(); restore = null })
-
-  it('is decoration only: hidden from assistive tech, with no text and nothing to focus', () => {
+describe('foreground scenery', () => {
+  it('contains only decorative art, not focusable controls', () => {
     const { container } = render(<PlaceScenery scroller={null} />)
-    const scenery = container.querySelector('[data-place-scenery]') as HTMLElement
+    const scenery = container.querySelector('[data-place-scenery]')!
     expect(scenery).toHaveAttribute('aria-hidden', 'true')
-    expect(scenery.textContent).toBe('')
     expect(scenery.querySelectorAll('button, a, input, [tabindex]')).toHaveLength(0)
-    // Both sides draw, as images with empty alt text.
-    const art = scenery.querySelectorAll('img')
-    expect(art).toHaveLength(2)
-    art.forEach((img) => expect(img).toHaveAttribute('alt', ''))
+    expect(scenery.querySelectorAll('img')).toHaveLength(1)
+    expect(scenery).toHaveAttribute('data-place-scenery', 'cabin')
   })
-
-  it('wears the default place outside the provider', () => {
-    const { container } = render(<PlaceScenery scroller={null} />)
-    expect(container.querySelector('[data-place-scenery]')).toHaveAttribute('data-place-scenery', 'cabin')
+  it('scrolls a keyboard-focused control out of the concealed bottom region', () => {
+    const scroller = document.createElement('div')
+    const input = document.createElement('input')
+    scroller.append(input)
+    scroller.getBoundingClientRect = () => ({bottom:900} as DOMRect)
+    input.getBoundingClientRect = () => ({bottom:840} as DOMRect)
+    const detach = keepFocusAboveScenery(scroller, 180)
+    input.dispatchEvent(new FocusEvent('focusin', {bubbles:true}))
+    expect(scroller.scrollTop).toBe(136)
+    detach()
+    input.dispatchEvent(new FocusEvent('focusin', {bubbles:true}))
+    expect(scroller.scrollTop).toBe(136)
   })
-
-  it("follows the page scroller's position", () => {
-    const scroller = scrollerAt(200)
-    const { container } = render(<PlaceScenery scroller={scroller} />)
-    const scenery = container.querySelector('[data-place-scenery]') as HTMLElement
-    expect(scenery.style.getPropertyValue('--scenery-progress')).toBe('1')
+  it('does not move content that is already above the fade', () => {
+    const scroller = document.createElement('div')
+    const input = document.createElement('input')
+    scroller.append(input)
+    scroller.getBoundingClientRect = () => ({bottom:900} as DOMRect)
+    input.getBoundingClientRect = () => ({bottom:400} as DOMRect)
+    const detach = keepFocusAboveScenery(scroller, 180)
+    input.dispatchEvent(new FocusEvent('focusin', {bubbles:true}))
+    expect(scroller.scrollTop).toBe(0)
+    detach()
   })
-
-  it('leaves the veil steady for reduced motion', () => {
-    restore = mockReducedMotion(true)
-    const scroller = scrollerAt(200)
-    const { container } = render(<PlaceScenery scroller={scroller} />)
-    const scenery = container.querySelector('[data-place-scenery]') as HTMLElement
-    expect(scenery.style.getPropertyValue('--scenery-progress')).toBe('')
+  it('reads a measured clearance at focus time', () => {
+    const scroller = document.createElement('div')
+    const input = document.createElement('input')
+    scroller.append(input)
+    scroller.getBoundingClientRect = () => ({bottom:900} as DOMRect)
+    input.getBoundingClientRect = () => ({bottom:700} as DOMRect)
+    let covered = 100
+    const detach = keepFocusAboveScenery(scroller, () => covered)
+    input.dispatchEvent(new FocusEvent('focusin', {bubbles:true}))
+    expect(scroller.scrollTop).toBe(0)
+    covered = 300
+    input.dispatchEvent(new FocusEvent('focusin', {bubbles:true}))
+    expect(scroller.scrollTop).toBe(116)
+    detach()
   })
-
-  it('stops following the scroller when it unmounts', () => {
-    const scroller = scrollerAt(0)
-    const remove = vi.spyOn(scroller, 'removeEventListener')
+  it('gives the scroller its clearance and takes it back when hidden', () => {
+    const scroller = document.createElement('div')
     const { unmount } = render(<PlaceScenery scroller={scroller} />)
+    expect(scroller.style.getPropertyValue('--scenery-clearance')).toMatch(/^\d+px$/)
     unmount()
-    expect(remove).toHaveBeenCalledWith('scroll', expect.any(Function))
+    expect(scroller.style.getPropertyValue('--scenery-clearance')).toBe('')
   })
-})
-
-describe('PlaceGroundStrip', () => {
-  it('is decoration only, like the scene behind the page', () => {
-    const { container } = render(<PlaceGroundStrip />)
-    const strip = container.querySelector('.place-ground-strip') as HTMLElement
-    expect(strip).toHaveAttribute('aria-hidden', 'true')
-    expect(strip.textContent).toBe('')
-    expect(strip.querySelectorAll('button, a, input, [tabindex]')).toHaveLength(0)
+  it('shows the chosen lighting of the painted landscape', () => {
+    localStorage.setItem('symphony-scenery-lighting', 'dusk-dawn')
+    const { container } = render(<PlaceScenery scroller={null} />)
+    expect(container.querySelector('[data-place-scenery]')).toHaveAttribute('data-lighting', 'dusk-dawn')
+    expect(container.querySelector('img')!.getAttribute('src')).toContain('painted/cabin-dusk-dawn')
+    localStorage.removeItem('symphony-scenery-lighting')
   })
-})
-
-describe('useSceneryContent', () => {
-  function Page() { useSceneryContent(); return null }
-
-  it('marks the document while a page with marked content is mounted, and only then', () => {
-    const { unmount } = render(<Page />)
-    expect(document.documentElement).toHaveClass('has-scenery-content')
+  it('detaches the focus listener on unmount', () => {
+    const scroller=document.createElement('div')
+    const remove=vi.spyOn(scroller,'removeEventListener')
+    const {unmount}=render(<PlaceScenery scroller={scroller}/>)
     unmount()
-    expect(document.documentElement).not.toHaveClass('has-scenery-content')
+    expect(remove).toHaveBeenCalledWith('focusin', expect.any(Function))
   })
 })
