@@ -2767,9 +2767,14 @@ div.chooser-action-group { overflow: visible !important; }
   container-type: inline-size;
   /* The tallest the scene may stand at its sides; the middle stays low. */
   --scenery-height: min(30vh, 270px);
-  /* px per source px: the scene drawn small, or smaller still when the two
-     halves (514 source px each) would not fit side by side. */
-  --scenery-unit: min(0.72px, calc(50cqw / 514));
+  /* Where the page's text begins, measured in from the window's edge: the
+     page column is at most 1152px wide, centred, with 56px of padding. */
+  --scenery-text-edge: max(56px, calc(50cqw - 520px));
+  /* px per source px. Each corner (514 source px wide) is sized to the margin
+     beside the page, so its tall part stands in the empty margin and its
+     slope reaches the ground just as the text begins (Scott, 2026-10-01) —
+     never larger than the small drawing. */
+  --scenery-unit: min(0.72px, calc(max(96px, var(--scenery-text-edge)) / 514), calc(50cqw / 514));
   /* What it stands on: the desktop footer, or the phone's tab bar (inline). */
   --scenery-floor: 60px;
   /* Paper over the art at the top of the page, and once scrolled. */
@@ -2790,6 +2795,9 @@ html.has-scenery-content .place-scenery { --scenery-rest: 0; }
   position: absolute; left: 0; right: 0; bottom: 0;
   height: calc(var(--scenery-ground-rise) * var(--scenery-unit));
   background: var(--scenery-ground) center bottom / auto 100% repeat-x;
+  /* The strip runs under the page's content: it steps back on its own once
+     the content reaches down to it (sceneryVeil.ts), leaving the corners. */
+  opacity: calc(1 - var(--scenery-strip-cover, 0));
 }
 .place-scenery-corner {
   position: absolute; bottom: 0;

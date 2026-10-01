@@ -75,7 +75,7 @@ describe('attachSceneryVeil', () => {
     }
     expect(frames).toHaveLength(1)
     flush()
-    expect(setProperty).toHaveBeenCalledTimes(1)
+    expect(setProperty.mock.calls.filter(([name]) => name === '--scenery-progress')).toHaveLength(1)
     expect(progress()).toBe('0.5')
 
     scroller.scrollTop = 180
@@ -125,6 +125,16 @@ describe('attachSceneryVeil', () => {
     expect(progress()).toBe('0')
   })
 
+  it('on a long day, steps back the ground strip under the content and keeps the corners in the margins', () => {
+    const { scroller, target, content, scene } = withContent(1400)
+    // A wide window: the column's text starts well clear of both corners.
+    content.getBoundingClientRect = rect(400, 100, 1040, 1400)
+    scroller.appendChild(content)
+    attachSceneryVeil(scroller, target, scene)
+    expect(target.style.getPropertyValue('--scenery-strip-cover')).toBe('1')
+    expect(target.style.getPropertyValue('--scenery-progress')).toBe('0')
+  })
+
   it('ignores spacers: empty page below the last row is not content', () => {
     const { scroller, target, progress, content, scene } = withContent(500)
     scroller.appendChild(content)
@@ -140,6 +150,7 @@ describe('attachSceneryVeil', () => {
   })
 
   it('veils the scene, before any scroll, when a long day runs down into it', () => {
+    // The column's text starts at 200, inside the left corner's tall part.
     const { scroller, target, progress, content, scene } = withContent(1400)
     scroller.appendChild(content)
     attachSceneryVeil(scroller, target, scene)
