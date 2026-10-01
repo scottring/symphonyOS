@@ -3,6 +3,8 @@ import { parseRoutine, parsedRoutineToDb, isValidParsedRoutine } from '@/lib/par
 import { SemanticRoutine } from './SemanticRoutine'
 import type { Contact } from '@/types/contact'
 import type { CreateRoutineInput } from '@/hooks/useRoutines'
+import type { MonthDayOfWeek, MonthWeek } from '@/types/actionable'
+import { monthWeekWord, monthDayWord } from '@/lib/cadence/monthlyPosition'
 
 interface RoutineInputProps {
   contacts: Contact[]
@@ -159,7 +161,7 @@ export function RoutineInput({ contacts, onSave, onCancel, initialValue = '' }: 
   )
 }
 
-function getRecurrenceText(recurrence: { type: string; days?: number[]; interval?: number }): string {
+function getRecurrenceText(recurrence: { type: string; days?: number[]; interval?: number; weekOfMonth?: MonthWeek; dayOfWeek?: MonthDayOfWeek }): string {
   switch (recurrence.type) {
     case 'daily':
       if (recurrence.interval === 2) return 'Every other day'
@@ -186,7 +188,9 @@ function getRecurrenceText(recurrence: { type: string; days?: number[]; interval
       return `Every ${days.map(d => dayNames[d]).join(', ')}`
     }
     case 'monthly':
-      return 'Monthly'
+      return recurrence.weekOfMonth && recurrence.dayOfWeek
+        ? `Monthly, ${monthWeekWord(recurrence.weekOfMonth)} ${monthDayWord(recurrence.dayOfWeek)}`
+        : 'Monthly'
     case 'quarterly':
       return 'Quarterly'
     case 'yearly':

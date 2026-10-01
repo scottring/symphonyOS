@@ -1,6 +1,7 @@
 // Natural Language Routine Parser
 
 import type { Contact } from '@/types/contact'
+import type { MonthDayOfWeek, MonthWeek } from '@/types/actionable'
 
 export interface SemanticToken {
   text: string
@@ -20,6 +21,8 @@ export interface ParsedRoutine {
     days?: number[]             // 0=Sun, 1=Mon, etc. for weekly
     interval?: number           // e.g., 2 for "every other"
     dayOfMonth?: number         // For monthly: 1-31
+    weekOfMonth?: MonthWeek     // For monthly by position: 1-4, -1 = last
+    dayOfWeek?: MonthDayOfWeek  // For monthly by position: 'weekend' or 'sun'…'sat'
   }
   timeOfDay: 'morning' | 'afternoon' | 'evening' | null
   time: string | null           // HH:MM format
@@ -192,7 +195,40 @@ export function parseRoutine(input: string, contacts: Contact[] = []): ParsedRou
   ]
 
   let recurrenceFound = false
-  for (const { regex, result } of recurrencePatterns) {
+
+  // Monthly by position: "first weekend of the month", "monthly on the last
+  // friday", "the 2nd tuesday of every month". Checked first — otherwise the
+  // bare weekday falls through to a weekly rule ("first saturday" → every
+  // Saturday), and "every month" to a monthly one with no day at all.
+  {
+    const ORD = '(first|1st|second|2nd|third|3rd|fourth|4th|last)'
+    const DOW = '(weekend|sun(?:day)?|mon(?:day)?|tues?(?:day)?|wed(?:nes)?(?:day)?|thurs?(?:day)?|fri(?:day)?|sat(?:urday)?)'
+    const positionPatterns = [
+      new RegExp(`\\b(?:on\\s+)?(?:the\\s+)?${ORD}\\s+${DOW}\\s+(?:of|in)\\s+(?:the|each|every)\\s+month\\b`, 'i'),
+      new RegExp(`\\b(?:monthly|every\\s+month)\\s*,?\\s*(?:on\\s+)?(?:the\\s+)?${ORD}\\s+${DOW}\\b`, 'i'),
+      new RegExp(`\\b(?:on\\s+)?(?:the\\s+)?${ORD}\\s+${DOW}\\s*,?\\s*(?:monthly|every\\s+month)\\b`, 'i'),
+    ]
+    const ORD_VALUE: Record<string, MonthWeek> = { first: 1, '1st': 1, second: 2, '2nd': 2, third: 3, '3rd': 3, fourth: 4, '4th': 4, last: -1 }
+    for (const regex of positionPatterns) {
+      const match = normalized.match(regex)
+      if (!match || match.index === undefined) continue
+      const word = match[2].toLowerCase()
+      const dayOfWeek: MonthDayOfWeek = word === 'weekend'
+        ? 'weekend'
+        : (['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'] as const)[DAY_NAMES[word.slice(0, 3)]]
+      recurrence = { type: 'monthly', weekOfMonth: ORD_VALUE[match[1].toLowerCase()], dayOfWeek }
+      extractedRanges.push({
+        start: match.index,
+        end: match.index + match[0].length,
+        type: 'day-pattern',
+        text: getRecurrenceDisplay(recurrence),
+      })
+      recurrenceFound = true
+      break
+    }
+  }
+
+  for (const { regex, result } of recurrenceFound ? [] : recurrencePatterns) {
     const match = normalized.match(regex)
     if (match && match.index !== undefined) {
       recurrence = result
@@ -306,7 +342,7 @@ export function parseRoutine(input: string, contacts: Contact[] = []): ParsedRou
   }
 
   // Check for monthly patterns with day numbers: "monthly on the 10th", "every month on the 15th"
-  if (!recurrenceFound || recurrence.type === 'monthly') {
+  if (!recurrenceFound || (recurrence.type === 'monthly' && !recurrence.weekOfMonth)) {
     const monthlyDayPatterns = [
       // "monthly on the 10th", "every month on the 15th"
       /\b(?:monthly|every\s+month)\s+on\s+the\s+(\d{1,2})(?:st|nd|rd|th)?\b/i,
@@ -530,6 +566,11 @@ function getRecurrenceDisplay(recurrence: ParsedRoutine['recurrence']): string {
       return days.map(d => dayNames[d]).join(', ')
     }
     case 'monthly':
+      if (recurrence.weekOfMonth && recurrence.dayOfWeek) {
+        const ord = { '1': 'FIRST', '2': 'SECOND', '3': 'THIRD', '4': 'FOURTH', '-1': 'LAST' }[String(recurrence.weekOfMonth)]
+        const day = recurrence.dayOfWeek === 'weekend' ? 'WEEKEND' : recurrence.dayOfWeek.toUpperCase()
+        return `MONTHLY (${ord} ${day})`
+      }
       if (recurrence.dayOfMonth) {
         const day = recurrence.dayOfMonth
         const suffix = day === 1 ? 'ST' : day === 2 ? 'ND' : day === 3 ? 'RD' : day === 21 ? 'ST' : day === 22 ? 'ND' : day === 23 ? 'RD' : day === 31 ? 'ST' : 'TH'
@@ -545,19 +586,24 @@ function getRecurrenceDisplay(recurrence: ParsedRoutine['recurrence']): string {
   }
 }
 
+type DbRecurrence = {
+  type: string; days?: string[]; interval?: number; start_date?: string; day_of_month?: number
+  week_of_month?: MonthWeek; day_of_week?: MonthDayOfWeek
+}
+
 /**
  * Convert parsed routine to database format
  */
 export function parsedRoutineToDb(parsed: ParsedRoutine): {
   name: string
-  recurrence_pattern: { type: string; days?: string[]; interval?: number; start_date?: string; day_of_month?: number }
+  recurrence_pattern: DbRecurrence
   time_of_day: string | null
   default_assignee: string | null
   raw_input: string
 } {
   // Convert recurrence to DB format
   const dayMap = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat']
-  let dbRecurrence: { type: string; days?: string[]; interval?: number; start_date?: string; day_of_month?: number }
+  let dbRecurrence: DbRecurrence
   const today = new Date().toISOString().split('T')[0] // YYYY-MM-DD
 
   switch (parsed.recurrence.type) {
@@ -596,7 +642,10 @@ export function parsedRoutineToDb(parsed: ParsedRoutine): {
       break
     case 'monthly':
       dbRecurrence = { type: 'monthly' }
-      if (parsed.recurrence.dayOfMonth) {
+      if (parsed.recurrence.weekOfMonth && parsed.recurrence.dayOfWeek) {
+        dbRecurrence.week_of_month = parsed.recurrence.weekOfMonth
+        dbRecurrence.day_of_week = parsed.recurrence.dayOfWeek
+      } else if (parsed.recurrence.dayOfMonth) {
         dbRecurrence.day_of_month = parsed.recurrence.dayOfMonth
       }
       break

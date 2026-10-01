@@ -12,6 +12,7 @@
 
 import { parseRoutine, parsedRoutineToDb } from './parseRoutine'
 import type { RecurrencePattern } from '@/types/actionable'
+import { hasMonthlyPosition, nextMonthlyPositionWindow, describeMonthlyPosition } from './cadence/monthlyPosition'
 
 export interface DetectedRecurrence {
   pattern: RecurrencePattern
@@ -37,6 +38,9 @@ const EVERY_RE = new RegExp(
 )
 // Bare adverbs.
 const ADVERB_RE = /\b(daily|weekly|monthly|quarterly|yearly|weekdays|weekends)\b/i
+// "…the first weekend of each month" — "of each month" can only mean a rule.
+// ("of the month" stays out: "dentist the first friday of the month" is a date.)
+const EACH_MONTH_RE = /\b(?:first|1st|second|2nd|third|3rd|fourth|4th|last)\s+\w+\s+(?:of|in)\s+each\s+month\b/i
 // Plural weekdays, with or without "on": "tuesdays", "on tuesdays and thursdays".
 const PLURAL_DAYS_RE = new RegExp(`\\b(?:on\\s+)?${DAY}days(?:\\s*(?:,|and|&)\\s*${DAY}days)*\\b`, 'i')
 
@@ -94,8 +98,9 @@ const RRULE_DAYS: Record<string, string> = { sun: 'SU', mon: 'MO', tue: 'TU', we
 export function detectRecurrence(input: string, now: Date = new Date()): DetectedRecurrence | null {
   const every = input.match(EVERY_RE)
   const adverb = every ? null : input.match(ADVERB_RE)
-  const plural = every || adverb ? null : input.match(PLURAL_DAYS_RE)
-  const cue = every ?? adverb ?? plural
+  const eachMonth = every || adverb ? null : input.match(EACH_MONTH_RE)
+  const plural = every || adverb || eachMonth ? null : input.match(PLURAL_DAYS_RE)
+  const cue = every ?? adverb ?? eachMonth ?? plural
   if (!cue) return null
 
   // A range goes first: parseRoutine reads one clock time, and its patterns
@@ -140,6 +145,11 @@ export function recurrenceToRRule(pattern: RecurrencePattern): string[] | null {
       return [`RRULE:FREQ=WEEKLY${interval}${byDay}`]
     }
     case 'monthly': {
+      // A calendar has no window: a weekend position is its Saturday.
+      if (hasMonthlyPosition(pattern)) {
+        const day = pattern.day_of_week === 'weekend' ? 'SA' : RRULE_DAYS[pattern.day_of_week]
+        return [`RRULE:FREQ=MONTHLY${interval};BYDAY=${pattern.week_of_month}${day}`]
+      }
       const byMonthDay = pattern.day_of_month ? `;BYMONTHDAY=${pattern.day_of_month}` : ''
       return [`RRULE:FREQ=MONTHLY${interval}${byMonthDay}`]
     }
@@ -194,6 +204,22 @@ export function nextOccurrence(pattern: RecurrencePattern, time: string | null, 
       const candidate = atTime(day, time)
       if (offset > 0 || stillAhead(candidate)) return candidate
     }
+  }
+
+  if (hasMonthlyPosition(pattern)) {
+    // The first day of the next window still ahead — or today, inside one.
+    let window = nextMonthlyPositionWindow(pattern, today)
+    let first = window.find((d) => d.getTime() >= today.getTime())!
+    if (first.getTime() === today.getTime() && !stillAhead(atTime(first, time))) {
+      const rest = window.filter((d) => d.getTime() > today.getTime())
+      if (rest.length === 0) {
+        window = nextMonthlyPositionWindow(pattern, new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1))
+        first = window[0]
+      } else {
+        first = rest[0]
+      }
+    }
+    return atTime(first, time)
   }
 
   if (pattern.type === 'monthly' && pattern.day_of_month) {
@@ -274,6 +300,7 @@ export function describeRecurrence(pattern: RecurrencePattern): string {
       return `${every} ${labels.join(', ')}`
     }
     case 'monthly':
+      if (hasMonthlyPosition(pattern)) return `Monthly, ${describeMonthlyPosition(pattern)}`
       return pattern.day_of_month ? `Monthly on the ${ordinal(pattern.day_of_month)}` : 'Every month'
     case 'quarterly':
       return 'Every quarter'

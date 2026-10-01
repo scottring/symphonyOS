@@ -3,6 +3,7 @@ import { matchesLayers } from '@/lib/today/domainFilter'
 import type { Layer } from '@/lib/domains'
 import type { AssigneeFilter } from '@/lib/today/types'
 import { isWeekendWindowDay, weekendWindowKeys } from '@/lib/cadence/weekendWindow'
+import { hasMonthlyPosition, monthlyPositionWindowFor } from '@/lib/cadence/monthlyPosition'
 
 const WEEKDAYS = ['mon', 'tue', 'wed', 'thu', 'fri'] as const
 
@@ -50,6 +51,9 @@ export function isTimelineObligation(routine: Pick<Routine, 'pin_to_timeline'>):
  * the weekend window.
  */
 export function namesDueDays(p: RecurrencePattern | null | undefined): boolean {
+  // "First weekend of the month" is the weekend window again, once a month:
+  // either day, so it names none. "Last Friday" names its day.
+  if (hasMonthlyPosition(p)) return p.day_of_week !== 'weekend'
   switch (p?.type) {
     case 'daily':
     case 'monthly':
@@ -248,8 +252,24 @@ export function matchesRecurrenceForDate(
       if (doneOn === dateStr) return true
       return !weekendWindowKeys(date).includes(doneOn)
     }
-    case 'monthly':
-      return pattern.day_of_month === dayOfMonth
+    case 'monthly': {
+      // By position ("first weekend", "last Friday"). A weekend position is
+      // a window like `weekend` above: done on one of its days, the others
+      // go quiet.
+      if (hasMonthlyPosition(pattern)) {
+        const window = monthlyPositionWindowFor(date, pattern)
+        if (!window) return false
+        if (window.length === 1 || !lastCompletedAt) return true
+        const doneOn = formatDateString(lastCompletedAt)
+        if (doneOn === dateStr) return true
+        return !window.map(formatDateString).includes(doneOn)
+      }
+      if (!pattern.day_of_month) return false
+      // The editor promises "for months with fewer days, the routine occurs
+      // on the last day" — a 31st rule is due Sep 30, not never.
+      const lastDay = new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate()
+      return Math.min(pattern.day_of_month, lastDay) === dayOfMonth
+    }
     case 'quarterly': {
       const quarterMonths = [1, 4, 7, 10]
       if (!quarterMonths.includes(month)) return false

@@ -9,6 +9,7 @@ import type { Note } from '@/types/note'
 import { getCategoryLabel } from '@/types/list'
 import { parseFieldIntent } from '@/lib/search/fieldIntent'
 import { noteHeading } from '@/lib/noteHeading'
+import { hasMonthlyPosition, describeMonthlyPosition } from '@/lib/cadence/monthlyPosition'
 
 export type SearchResultType = 'task' | 'project' | 'contact' | 'routine' | 'list' | 'note'
 
@@ -200,7 +201,7 @@ export function useSearch({ tasks, projects, contacts, routines, lists = [], not
         }
         return `Weekly${time}`
       case 'monthly':
-        return `Monthly${time}`
+        return hasMonthlyPosition(pattern) ? `Monthly, ${describeMonthlyPosition(pattern)}${time}` : `Monthly${time}`
       case 'quarterly':
         return `Quarterly${time}`
       case 'yearly':

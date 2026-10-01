@@ -16,6 +16,7 @@ import type { FamilyMember } from '@/types/family'
 import { describeRecurrence } from '@/lib/quickRecurrence'
 import { memberIdsOf } from './rhythmModel'
 import { LIST_ROW, LIST_ROW_BODY, LIST_ROW_LANE, LIST_ROW_META, LIST_ROW_TRAIL } from '@/components/layout/listRow'
+import { hasMonthlyPosition, describeMonthlyPosition } from '@/lib/cadence/monthlyPosition'
 
 const DAY_KEYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'] as const
 const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
@@ -68,8 +69,13 @@ export function whenLabel(routine: Routine): string {
       if (days) return days
       return at ? `Flexible day · ${at}` : 'Flexible day'
     }
-    case 'monthly':
+    case 'monthly': {
+      if (hasMonthlyPosition(p)) {
+        const pos = describeMonthlyPosition(p)
+        return `${pos.charAt(0).toUpperCase()}${pos.slice(1)} of the month`
+      }
       return p.day_of_month ? `On the ${ordinal(p.day_of_month)}` : 'Flexible day of the month'
+    }
     case 'quarterly':
       return 'Once a season'
     case 'yearly':
