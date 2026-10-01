@@ -35,7 +35,8 @@ import farmRight from '@/assets/scenery/farm-right.webp'
 // Each place's two corners, cut from the approved theme concepts
 // (scripts/scenery/extract.py). `height` is the source height in px; both
 // halves share it and are 514px wide, so one scale keeps the ground lines
-// level between the corners.
+// level between the corners. Each corner shows the lower part of its half;
+// anything taller fades out (index.css, .place-scenery-corner).
 const SCENERY: Record<PlaceId, { left: string; right: string; height: number }> = {
   urban: { left: urbanLeft, right: urbanRight, height: 470 },
   'small-city': { left: smallCityLeft, right: smallCityRight, height: 402 },
@@ -87,8 +88,12 @@ export function PlaceScenery({ scroller, right = 0, floor }: {
   return (
     <div ref={ref} aria-hidden="true" className="place-scenery" data-place-scenery={place} style={style}>
       <div className="place-scenery-ground">
-        <img className="place-scenery-art is-left" src={art.left} alt="" decoding="async" draggable={false} />
-        <img className="place-scenery-art is-right" src={art.right} alt="" decoding="async" draggable={false} />
+        <div className="place-scenery-corner is-left">
+          <img className="place-scenery-art" src={art.left} alt="" decoding="async" draggable={false} />
+        </div>
+        <div className="place-scenery-corner is-right">
+          <img className="place-scenery-art" src={art.right} alt="" decoding="async" draggable={false} />
+        </div>
       </div>
       <div className="place-scenery-veil" />
     </div>

@@ -2764,8 +2764,10 @@ div.chooser-action-group { overflow: visible !important; }
   position: fixed; top: 0; bottom: 0; left: 0; /* right: the side pane, inline */
   overflow: hidden; pointer-events: none; user-select: none;
   container-type: inline-size;
-  /* The scene's shallow middle is this tall; the corners rise from it. */
-  --scenery-band: 15vh;
+  /* How tall each corner stands — small and low, a vignette rather than a
+     backdrop (Scott, 2026-10-01: "smaller, like the left side" of the
+     reference). */
+  --scenery-height: min(20vh, 190px);
   /* What it stands on: the desktop footer, or the phone's tab bar (inline). */
   --scenery-floor: 60px;
   /* Paper over the art at the top of the page, and once scrolled. */
@@ -2778,19 +2780,23 @@ div.chooser-action-group { overflow: visible !important; }
    empty. Every other page gets the quiet scene above. */
 html.has-place-paper .place-scenery { --scenery-rest: 0; }
 .place-scenery-ground { position: absolute; left: 0; right: 0; bottom: var(--scenery-floor); }
-/* One scale for both corners — px per source px — from the band height, or
-   from the width when two corners at that scale would not fit side by side
-   (phones: smaller art, meeting in the middle). */
-.place-scenery-art {
-  --scenery-unit: min(calc(var(--scenery-band) / 168), calc(50cqw / 514));
+/* Each corner is a wide, low window onto its half of the scene: shown at one
+   scale (so the two ground lines stay level), cut to the corner's height,
+   with whatever rises above it — the tallest trees and towers — fading into
+   the sky rather than shrinking the whole scene to fit. Each half is 514
+   source px wide; on a narrow screen the scale drops until both fit. */
+.place-scenery-corner {
+  --scenery-unit: min(0.72px, calc(50cqw / 514));
   position: absolute; bottom: 0;
-  height: calc(var(--scenery-unit) * var(--scenery-rise)); width: auto; max-width: 50cqw;
-  /* The corners may rise above the band, but not up into the page. */
-  max-height: 36vh;
-  opacity: 0.92;
+  width: calc(514 * var(--scenery-unit));
+  height: min(var(--scenery-height), calc(var(--scenery-rise) * var(--scenery-unit)));
+  overflow: hidden;
+  -webkit-mask-image: linear-gradient(to bottom, transparent, #000 40%);
+  mask-image: linear-gradient(to bottom, transparent, #000 40%);
 }
-.place-scenery-art.is-left { left: 0; }
-.place-scenery-art.is-right { right: 0; }
+.place-scenery-corner.is-left { left: 0; }
+.place-scenery-corner.is-right { right: 0; }
+.place-scenery-art { position: absolute; bottom: 0; left: 0; width: 100%; height: auto; }
 .place-scenery-veil {
   position: absolute; inset: 0;
   background: var(--color-bg-base);
@@ -2803,7 +2809,7 @@ html.has-place-paper .place-scenery { --scenery-rest: 0; }
 /* Short windows and phones: smaller art and more paper from the start, so
    the page reads without scrolling first. */
 @media (max-height: 720px) {
-  .place-scenery { --scenery-band: 12vh; }
+  .place-scenery { --scenery-height: 17vh; }
   html.has-place-paper .place-scenery { --scenery-rest: 0.25; }
 }
 @media (max-width: 767px) {
