@@ -30,7 +30,7 @@ describe('PlacePicker', () => {
       await user.selectOptions(screen.getByRole('combobox', { name: 'Lighting' }), lighting)
       const card = screen.getByRole('button', { name: /Densely Urban/ })
       const preview = card.querySelector('img')!
-      expect(preview.src).toContain(`painted/urban-${lighting}`)
+      expect(preview.src).toContain(`woodblock/urban-${lighting}`)
       // The card's sky wears its own place's hue in the chosen light.
       const sky = card.querySelector('.place-theme-preview')!
       expect(sky).toHaveAttribute('data-sky-place', 'urban')
