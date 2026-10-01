@@ -53,3 +53,8 @@ apple/**/.build/
 
 # Claude Code runtime lock (session-local, never share)
 .claude/scheduled_tasks.lock
+
+# Local scratch output from agent sessions (screenshots, renders, briefs)
+/output/
+/outputs/
+/tmp/
