@@ -81,7 +81,20 @@ Prefer these over new arbitrary sizes.
 
 ## Scenery
 
-Pages sit on the place's painted sky with no cards behind text (#104). Use
+Pages sit on the place's painted sky with no cards behind text (#104).
+Settings › Your place › Style picks **Painted** (landscape + a CSS sky tinted
+to the place) or **Woodblock** (prints that keep their own painted sky; see
+`src/components/place/panoramas.ts` `WOODBLOCK`). A place or lighting with no
+woodblock print falls back to the whole painted scene.
+
+Adding a woodblock print: save the concept (same 1506×1045 template as the
+originals) as `<place>-<daytime|dusk-dawn|nighttime>.png` in a folder, then
+run `scripts/scenery/extract_landscapes.py` (landscape + veil + skyline in
+`bands.json`) and `scripts/scenery/extract_sky.py` (the sky with the sample
+UI painted out) on it, convert to WebP with `cwebp`, put the files in
+`src/assets/scenery/woodblock/`, and add an entry to `WOODBLOCK`.
+
+Use
 colour tokens (`--color-neutral-*`, `--color-primary-*`), never literal
 colours, so Night lighting's light-on-dark remap reaches every page.
 

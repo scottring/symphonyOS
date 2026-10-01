@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react'
 import type { CSSProperties } from 'react'
 import { usePlaceOrDefault } from '@/hooks/usePlace'
-import { PANORAMAS } from './panoramas'
+import { sceneryArt } from './panoramas'
 import { useSceneryPreferences } from '@/hooks/useSceneryPreferences'
 import { keepFocusAboveScenery } from './sceneryFocus'
 
@@ -25,8 +25,8 @@ export function PlaceScenery({ scroller, right = 0, floor }: {
   floor?: string
 }) {
   const place = usePlaceOrDefault()
-  const { showScenery, sceneryLighting } = useSceneryPreferences()
-  const art = PANORAMAS[place][sceneryLighting]
+  const { showScenery, sceneryLighting, sceneryStyle } = useSceneryPreferences()
+  const { art, style } = sceneryArt(sceneryStyle, place, sceneryLighting)
   const box = useRef<HTMLDivElement>(null)
   const catcher = useRef<HTMLDivElement>(null)
   // How much of the window's bottom the scene conceals (over the text
@@ -98,14 +98,14 @@ export function PlaceScenery({ scroller, right = 0, floor }: {
   }, [scroller, showScenery])
 
   if (!showScenery) return null
-  const style = {
+  const css = {
     right,
     '--scenery-veil': `url(${art.veil})`,
     '--scenery-art': `url(${art.src})`,
     ...(floor ? { '--scenery-floor': floor } : {}),
   } as CSSProperties
   return (
-    <div ref={box} aria-hidden="true" className="place-scenery" data-place-scenery={place} data-lighting={sceneryLighting} style={style}>
+    <div ref={box} aria-hidden="true" className="place-scenery" data-place-scenery={place} data-lighting={sceneryLighting} data-style={style} style={css}>
       <div className="place-scenery-veil" />
       <img className="place-scenery-panorama" src={art.src} alt="" decoding="async" draggable={false} />
       <div className="place-scenery-haze" />

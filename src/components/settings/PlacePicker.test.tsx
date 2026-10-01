@@ -58,4 +58,19 @@ describe('PlacePicker', () => {
     expect(['daytime', 'dusk-dawn', 'nighttime']).toContain(lighting)
     for (const sky of container.querySelectorAll('.place-theme-preview')) expect(sky).toHaveAttribute('data-scenery-lighting', lighting)
   })
+
+  it('Style switches the scenery to woodblock where prints exist, falls back elsewhere, and is saved', async () => {
+    const { user, container } = render(<><PlacePicker /><PlaceScenery scroller={null} /></>)
+    await user.click(screen.getByRole('button', { name: /Small Mountain Town/ }))
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Lighting' }), 'daytime')
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Style' }), 'woodblock')
+    expect(localStorage.getItem('symphony-scenery-style')).toBe('woodblock')
+    const scenery = container.querySelector('[data-place-scenery]')!
+    expect(scenery).toHaveAttribute('data-style', 'woodblock')
+    // No woodblock night print yet: the whole painted scene, not a mix.
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Lighting' }), 'nighttime')
+    expect(container.querySelector('[data-place-scenery]')).toHaveAttribute('data-style', 'painted')
+    // Places without prints say so on their card.
+    expect(screen.getAllByText('Woodblock coming').length).toBe(4)
+  })
 })

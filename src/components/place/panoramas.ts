@@ -1,5 +1,5 @@
 import type { PlaceId } from '@/config/places'
-import type { SceneryLighting } from '@/hooks/useSceneryPreferences'
+import type { SceneryLighting, SceneryStyle } from '@/hooks/useSceneryPreferences'
 import urban_daytime from '@/assets/scenery/painted/urban-daytime.webp'
 import urban_daytime_veil from '@/assets/scenery/painted/urban-daytime-veil.webp'
 import urban_dusk_dawn from '@/assets/scenery/painted/urban-dusk-dawn.webp'
@@ -30,6 +30,9 @@ import farm_dusk_dawn from '@/assets/scenery/painted/farm-dusk-dawn.webp'
 import farm_dusk_dawn_veil from '@/assets/scenery/painted/farm-dusk-dawn-veil.webp'
 import farm_nighttime from '@/assets/scenery/painted/farm-nighttime.webp'
 import farm_nighttime_veil from '@/assets/scenery/painted/farm-nighttime-veil.webp'
+import woodblock_mountain_town_daytime from '@/assets/scenery/woodblock/mountain-town-daytime.webp'
+import woodblock_mountain_town_daytime_veil from '@/assets/scenery/woodblock/mountain-town-daytime-veil.webp'
+import woodblock_mountain_town_daytime_sky from '@/assets/scenery/woodblock/mountain-town-daytime-sky.webp'
 
 export interface Panorama {
   /** The landscape, its painted sky keyed out. */
@@ -39,6 +42,13 @@ export interface Panorama {
   /** How far down the art (0–1) its skyline sits under the page's text
    *  column; below it the art stands in front of every row. */
   skyline: number
+  /** The style's own painted sky (scripts/scenery/extract_sky.py), drawn as
+   *  the page background instead of the place-tinted gradient. Absent, the
+   *  app draws its sky in CSS (the painted style). */
+  sky?: string
+  /** The sky's colour at its top edge — what shows above the plate when the
+   *  window is taller than the painting. */
+  skyTop?: string
 }
 
 // The low landscape of each approved scene concept, cut out by
@@ -70,4 +80,27 @@ export const PANORAMAS: Record<PlaceId, Record<SceneryLighting, Panorama>> = {
     'dusk-dawn': { src: farm_dusk_dawn, veil: farm_dusk_dawn_veil, skyline: 0.3662 },
     'nighttime': { src: farm_nighttime, veil: farm_nighttime_veil, skyline: 0.3667 },
   },
+}
+
+// The woodblock style (2026-10-01): Scott's woodblock-print concepts, cut by
+// the same script (skyline: woodblock-bands.json) with their own painted sky
+// kept (extract_sky.py). The set arrives a place and a light at a time, so
+// it is partial; sceneryArt falls back to the painted art for anything
+// missing rather than mixing a woodblock sky with a painted landscape.
+export const WOODBLOCK: Partial<Record<PlaceId, Partial<Record<SceneryLighting, Panorama>>>> = {
+  'mountain-town': {
+    'daytime': { src: woodblock_mountain_town_daytime, veil: woodblock_mountain_town_daytime_veil, skyline: 0.3074, sky: woodblock_mountain_town_daytime_sky, skyTop: '#4a7da6' },
+  },
+}
+
+/** The art to draw for a place in a light, in the chosen style — and the
+ *  style actually drawn (painted, when the chosen style has no art for it). */
+export function sceneryArt(style: SceneryStyle, place: PlaceId, lighting: SceneryLighting): { art: Panorama; style: SceneryStyle } {
+  const woodblock = style === 'woodblock' ? WOODBLOCK[place]?.[lighting] : undefined
+  return woodblock ? { art: woodblock, style: 'woodblock' } : { art: PANORAMAS[place][lighting], style: 'painted' }
+}
+
+/** Whether a style has any art for a place yet (Settings marks the rest). */
+export function hasStyleArt(style: SceneryStyle, place: PlaceId): boolean {
+  return style === 'painted' || !!WOODBLOCK[place] && Object.keys(WOODBLOCK[place]!).length > 0
 }

@@ -145,7 +145,12 @@ def veil_for(alpha):
 report = {}
 for place in PLACES:
     for light in LIGHTS:
-        img = Image.open(SRC / f'{place}-{light}.png').convert('RGB')
+        src = SRC / f'{place}-{light}.png'
+        if not src.exists():
+            # A style can arrive a place at a time (the woodblock set, 2026-10-01);
+            # the app falls back to the painted art for anything missing.
+            continue
+        img = Image.open(src).convert('RGB')
         if img.size != (W, H):
             img = img.resize((W, H), Image.LANCZOS)
         rgb = np.asarray(img).astype(float)
