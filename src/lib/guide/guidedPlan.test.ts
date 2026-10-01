@@ -117,7 +117,8 @@ describe('pick up where you are', () => {
 
   it('the storyboard account: look back at September, plan October, week, today; year and Fall in place', () => {
     const rows = pickUpRows(facts(), periods, oct1, seasons, wk)
-    expect(rows.filter((r) => r.inPath && r.on).map((r) => r.name)).toEqual(['Look back at September', 'October', 'Week 40', 'Today'])
+    expect(rows.filter((r) => r.inPath && r.on).map((r) => r.name)).toEqual(['September', 'October', 'Week 40', 'Today'])
+    expect(rows.find((r) => r.step === 'month-review')!.detail).toBe('Ended with 3 still open')
     expect(rows.filter((r) => !r.inPath).map((r) => `${r.name}: ${r.detail}`)).toEqual(['2026: 4 goals', 'Fall: 6 priorities'])
     expect(rows.find((r) => r.step === 'month-review')!.why).toBe('3 open. Carry each one into October, mark it done, keep it for someday, or let it go.')
     expect(rows.find((r) => r.step === 'month')!.why).toBe('Nothing on it yet. Fall sits beside the list.')
@@ -147,12 +148,12 @@ describe('pick up where you are', () => {
     expect(rows.some((r) => r.step === 'month-review')).toBe(false)
     // Planning ahead on Sep 29: October is next, so September's open lines are asked about.
     const ahead = pickUpRows(facts(), pickUpPeriods(sep29, seasons, SAT), sep29, seasons, wk)
-    expect(ahead.find((r) => r.step === 'month-review')?.name).toBe('Look back at September')
+    expect(ahead.find((r) => r.step === 'month-review')).toMatchObject({ name: 'September', detail: 'Has 3 still open' })
   })
 
   it('a season look-back closes out Summer on Fall’s page', () => {
     const rows = pickUpRows(facts({ season: { open: 6, planned: false, review: 2 } }), periods, oct1, seasons, wk)
-    expect(rows.find((r) => r.step === 'season-review')).toMatchObject({ name: 'Look back at Summer', inPath: true, on: true })
+    expect(rows.find((r) => r.step === 'season-review')).toMatchObject({ name: 'Summer', inPath: true, on: true })
   })
 
   it('a new account has nothing to pick up', () => {

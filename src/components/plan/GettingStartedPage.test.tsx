@@ -100,7 +100,7 @@ describe('Plan with guidance', () => {
       expect(screen.getByText('12 captures in your Inbox aren’t sorted yet.')).toBeTruthy()
       expect(screen.getByRole('link', { name: 'Sort them first' })).toHaveAttribute('href', '/inbox')
       expect(screen.getByText('6 priorities')).toBeTruthy()
-      expect(screen.getByText('3 lines still open')).toBeTruthy()
+      expect(screen.getByText('Ended with 3 still open')).toBeTruthy()
     })
 
     it('suggests only the steps that need attention, and any can be left out', async () => {

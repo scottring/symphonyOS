@@ -91,7 +91,11 @@ function Inner() {
           </div>
         )}
 
-        {!showFinish && stage === 'path' && (
+        {/* Wait for the reading, so the choice doesn't jump to "pick up"
+            under someone's cursor once their plans load. */}
+        {!showFinish && stage === 'path' && !pick.loaded && <p className="text-[13px] text-neutral-500" role="status">Reading your plans…</p>}
+
+        {!showFinish && stage === 'path' && pick.loaded && (
           <>
             {pick.offer && pick.inbox > 0 && (
               <p className="guide-inbox-line">
@@ -281,7 +285,7 @@ function PickUpPath({ pick, onBack, onStart, savedIn }: {
             <label>
               <input type="checkbox" checked={!!on[r.step]} onChange={(e) => setOn((x) => ({ ...x, [r.step]: e.target.checked }))} />
               <span>
-                <span className="guide-step-name">{r.step === 'today' ? 'Choose today' : r.step === 'week' ? `Check ${r.name.toLowerCase()}` : isReview(r.step) ? r.name : `Plan ${r.name}`}</span>
+                <span className="guide-step-name">{r.step === 'today' ? 'Choose today' : r.step === 'week' ? `Check ${r.name.toLowerCase()}` : isReview(r.step) ? `Look back at ${r.name}` : `Plan ${r.name}`}</span>
                 <span className="guide-step-why">{r.why}</span>
               </span>
             </label>

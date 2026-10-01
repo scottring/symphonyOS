@@ -326,7 +326,7 @@ export interface PickUpFacts {
 
 export interface PickUpRow {
   step: GuideStep
-  /** "October", "Look back at September", "Week 40". */
+  /** "October", "Week 40" — for a look-back, the period looked back at ("September"). */
   name: string
   /** The short reading: "6 priorities", "Nothing yet". */
   detail: string
@@ -379,8 +379,9 @@ export function pickUpRows(f: PickUpFacts, periods: Record<GuideStep, string>, t
     const here = name(lvl)
     if (facts.review > 0 && young(periods[lvl])) {
       const prev = reviewedName(review, run, seasons)
+      const ended = parseYmd(periods[lvl]).getTime() <= t.getTime()
       rows.push({
-        step: review, name: `Look back at ${prev}`, detail: `${plural(facts.review, 'line')} still open`,
+        step: review, name: prev, detail: `${ended ? 'Ended with' : 'Has'} ${facts.review} still open`,
         why: `${facts.review} open. Carry each one into ${here}, mark it done, keep it for someday, or let it go.`,
         chip: 'Look back', inPath: true, on: true,
       })
