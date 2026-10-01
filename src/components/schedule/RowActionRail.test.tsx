@@ -96,9 +96,9 @@ describe('RowActionRail', () => {
       expect(slots(container)[VERB].querySelector('[aria-label="Reschedule"]')).toBeTruthy()
     })
 
-    it('holds Skip today for an open routine', () => {
+    it('holds Move or skip for an open routine', () => {
       const { container } = renderRail({ type: 'routine', id: 'routine-1' })
-      expect(slots(container)[VERB].querySelector('[aria-label="Skip today"]')).toBeTruthy()
+      expect(slots(container)[VERB].querySelector('[aria-label="Move or skip"]')).toBeTruthy()
     })
 
     it('holds Start meeting for a timed event', () => {

@@ -1,4 +1,5 @@
 import type { ActionableInstance } from '@/types/actionable'
+import { isDayOnlyMove } from './deferredRoutines'
 
 /**
  * The time a routine actually occupies on a given day, or null if it has none.
@@ -20,6 +21,10 @@ export function resolveRoutineTime(
   instance: ActionableInstance | undefined,
   viewedDate: Date,
 ): Date | null {
+  // Moved to a day without a time: untimed wherever it is, including the day
+  // it landed on (whose midnight `deferred_to` is a day, not 12:00 AM).
+  if (isDayOnlyMove(instance)) return null
+
   // Moved to another day: it is not on THIS day at all, so the rule time must
   // not stand in as a fallback — that would leave a ghost on the day it left.
   if (instance?.status === 'deferred' && instance.deferred_to) {

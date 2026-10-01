@@ -108,6 +108,8 @@ export interface ScheduleActionsValue {
   onCompleteRoutine?: (routineId: string, completed: boolean, completedAt?: Date) => void
   onSkipRoutine?: (routineId: string) => void
   onPushRoutine?: (routineId: string, date: Date, fromDate?: Date) => void
+  /** One occurrence to another DAY, keeping its time (or none) — the row's Move. */
+  onMoveRoutineToDay?: (routineId: string, day: Date) => Promise<boolean>
   onUpdateRoutine?: (id: string, updates: Partial<Routine>) => void
   onDeleteRoutine?: (routineId: string) => void
 

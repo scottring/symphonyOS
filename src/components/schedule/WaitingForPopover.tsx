@@ -1,4 +1,7 @@
-// "Waiting for…" capture — a sentence, not a flag.
+// "Waiting for…" capture — a sentence, not a flag, and a day to check back.
+//
+// The check-back day moves the task to that day (all-day), so it leaves Today
+// now and returns when you said you'd follow up — see lib/today/waiting.ts.
 //
 // Opens anchored to the row's ellipsis rather than navigating away, so setting a
 // wait never costs you your place on Today. Free text on purpose: typing "Guy"
@@ -7,20 +10,29 @@
 import { useState, useCallback, useRef, useEffect } from 'react'
 import { Hourglass, X, Sparkles, Loader2 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
+import { CHECK_BACK_CHOICES, checkBackLabel } from '@/lib/today/waiting'
 
 interface Props {
   /** Existing sentence, when editing an already-waiting task. */
   initialValue?: string
   /** Task the wait belongs to — used to ground the AI suggestions. */
   taskId?: string
-  onSave: (waitingFor: string) => void
+  /** `checkBack` is undefined when the reader left the date alone. */
+  onSave: (waitingFor: string, checkBack?: Date) => void
   /** Clears the wait entirely. Only offered when already waiting. */
   onClear?: () => void
   onCancel: () => void
+  /** Render in place (inside another popover) instead of anchored under the
+   *  row's ellipsis. */
+  inline?: boolean
 }
 
-export function WaitingForPopover({ initialValue, taskId, onSave, onClear, onCancel }: Props) {
+const localYmd = (d: Date) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+
+export function WaitingForPopover({ initialValue, taskId, onSave, onClear, onCancel, inline = false }: Props) {
   const [value, setValue] = useState(initialValue ?? '')
+  const [checkBack, setCheckBack] = useState<Date | undefined>(undefined)
   const [suggestions, setSuggestions] = useState<string[] | null>(null)
   const [loadingSuggestions, setLoadingSuggestions] = useState(false)
   const inputRef = useRef<HTMLTextAreaElement>(null)
@@ -68,8 +80,8 @@ export function WaitingForPopover({ initialValue, taskId, onSave, onClear, onCan
       else onCancel()
       return
     }
-    onSave(trimmed)
-  }, [value, onSave, onClear, onCancel])
+    onSave(trimmed, checkBack)
+  }, [value, checkBack, onSave, onClear, onCancel])
 
   const onKeyDown = useCallback((e: React.KeyboardEvent) => {
     // Enter saves; Shift+Enter allows a longer sentence to wrap.
@@ -85,7 +97,9 @@ export function WaitingForPopover({ initialValue, taskId, onSave, onClear, onCan
 
   return (
     <div
-      className="absolute right-0 top-full mt-1 z-50 w-[min(22rem,calc(100vw-2rem))] p-3 bg-white rounded-xl border border-neutral-200 shadow-lg"
+      className={inline
+        ? 'w-full'
+        : 'absolute right-0 top-full mt-1 z-50 w-[min(22rem,calc(100vw-2rem))] p-3 bg-white rounded-xl border border-neutral-200 shadow-lg'}
       onClick={(e) => e.stopPropagation()}
     >
       <div className="flex items-center gap-2 mb-2">
@@ -148,7 +162,48 @@ export function WaitingForPopover({ initialValue, taskId, onSave, onClear, onCan
         </div>
       )}
 
-      <div className="flex items-center gap-2 mt-2">
+      {/* Check back — when this comes back to Today. Optional: leaving it
+          unset keeps the task's date as it is. */}
+      <div className="mt-3">
+        <div className="text-[11px] uppercase tracking-wider text-neutral-400 mb-1.5">Check back</div>
+        <div className="flex flex-wrap gap-1.5" role="group" aria-label="Check back">
+          {CHECK_BACK_CHOICES.map((c) => {
+            const d = c.date()
+            const on = !!checkBack && localYmd(checkBack) === localYmd(d)
+            return (
+              <button
+                key={c.key}
+                type="button"
+                aria-pressed={on}
+                title={checkBackLabel(d)}
+                onClick={() => setCheckBack(on ? undefined : d)}
+                className={`text-xs px-2.5 py-1.5 rounded-lg transition-colors ${on
+                  ? 'bg-primary-600 text-white'
+                  : 'bg-neutral-50 text-neutral-700 hover:bg-primary-50 hover:text-primary-700'}`}
+              >
+                {c.label}
+              </button>
+            )
+          })}
+          <input
+            type="date"
+            aria-label="Check back on"
+            value={checkBack && !CHECK_BACK_CHOICES.some((c) => localYmd(c.date()) === localYmd(checkBack)) ? localYmd(checkBack) : ''}
+            onChange={(e) => {
+              const v = e.target.value
+              if (!v) { setCheckBack(undefined); return }
+              const [y, m, d] = v.split('-').map(Number)
+              setCheckBack(new Date(y, m - 1, d))
+            }}
+            className="text-xs px-2 py-1 rounded-lg border border-neutral-200 text-neutral-600 focus:outline-none focus:ring-2 focus:ring-primary-500/30"
+          />
+        </div>
+        {checkBack && (
+          <p className="mt-1.5 text-[11px] text-neutral-500">Leaves Today and comes back {checkBackLabel(checkBack)}.</p>
+        )}
+      </div>
+
+      <div className="flex items-center gap-2 mt-3">
         <button
           type="button"
           onClick={save}

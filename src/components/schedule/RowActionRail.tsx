@@ -1,4 +1,4 @@
-import { Video, CircleSlash } from 'lucide-react'
+import { Video } from 'lucide-react'
 import type { TimelineItem } from '@/types/timeline'
 import type { TaskContext } from '@/types/task'
 import type { FamilyMember } from '@/types/family'
@@ -6,6 +6,7 @@ import { useScheduleActionsContext } from '@/contexts/ScheduleActionsContext'
 import { ContextPicker } from '@/components/triage'
 import { AssigneeDropdown, MultiAssigneeDropdown } from '@/components/family'
 import { RescheduleButton } from './RescheduleButton'
+import { RoutineMoveButton } from './RoutineMoveButton'
 import { ScheduleItemActionsMenu } from './ScheduleItemActionsMenu'
 import { RAIL, RAIL_SLOT, RAIL_WHO } from './todayRowGrid'
 
@@ -96,34 +97,6 @@ function StartMeetingButton({ item }: { item: TimelineItem }) {
   )
 }
 
-// Skip-today button — routines only. Surfaces the "Skip today" action that
-// otherwise hides in the '...' menu, so skipping a single instance is one tap.
-// Reads onSkipRoutine from context (same handler the menu uses; it fires the
-// undo toast) to avoid prop-drilling. The instance is skipped for the viewed
-// day only; the routine returns on its next scheduled occurrence.
-function SkipRoutineButton({ item }: { item: TimelineItem }) {
-  const ctx = useScheduleActionsContext()
-  const onSkipRoutine = ctx.onSkipRoutine
-
-  if (!onSkipRoutine) return null
-
-  const handleClick = (e: React.MouseEvent) => {
-    e.stopPropagation()
-    onSkipRoutine(item.id.replace('routine-', ''))
-  }
-
-  return (
-    <button
-      onClick={handleClick}
-      className="p-1.5 rounded-lg text-neutral-400 hover:text-neutral-700 hover:bg-neutral-100 transition-colors"
-      title="Skip today"
-      aria-label="Skip today"
-    >
-      <CircleSlash className="w-4 h-4" />
-    </button>
-  )
-}
-
 /**
  * The row's trailing controls, as a FIXED four-cell rail.
  *
@@ -135,7 +108,8 @@ function SkipRoutineButton({ item }: { item: TimelineItem }) {
  * down the page lined up. Reserve the shape and the columns hold.
  *
  * Slot order is fixed: assignee | context | verb | overflow. Exactly one verb
- * exists per row type — a task reschedules, a routine skips, a timed event
+ * exists per row type — a task reschedules, a routine moves or skips this
+ * occurrence, a timed event
  * starts — so they share one slot without ever competing for it. That is what
  * lets the rail be four cells wide instead of six.
  *
@@ -170,7 +144,7 @@ export function RowActionRail({
 
   const verb =
     isTask && !item.completed && variant !== 'minimal' ? <RescheduleButton item={item} />
-    : isRoutine && isLive ? <SkipRoutineButton item={item} />
+    : isRoutine && isLive ? <RoutineMoveButton item={item} />
     : isEvent && isLive && !item.allDay ? <StartMeetingButton item={item} />
     : null
 

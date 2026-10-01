@@ -14,6 +14,20 @@ export function chosenUntimedOn(instance: ActionableInstance, day: Date): boolea
 }
 
 /**
+ * Moved to a DAY, not a time: "Move → Saturday" on an untimed routine (Wash
+ * comforters has no hour) writes `deferred_to` at that day's local midnight and
+ * stamps `planned_on` with the same day. The pair is the marker — a midnight
+ * deferral alone would read as "at 12:00 AM", and `planned_on` alone is the
+ * existing All Day choice. Readers that resolve a time must treat this as
+ * untimed on that day (2026-10-01).
+ */
+export function isDayOnlyMove(instance: ActionableInstance | undefined): boolean {
+  if (!instance?.deferred_to || !instance.planned_on) return false
+  const at = new Date(instance.deferred_to)
+  return at.getHours() === 0 && at.getMinutes() === 0 && localYmd(at) === instance.planned_on
+}
+
+/**
  * Routine ids that were placed onto `viewedDate` by a cross-day deferral.
  *
  * Dragging a routine onto another day writes a one-day `deferred_to`
