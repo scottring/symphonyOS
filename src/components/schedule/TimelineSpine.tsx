@@ -1,3 +1,4 @@
+import { SPINE_X } from './todayRowGrid'
 /**
  * The timeline spine — a hairline through the marker column joining each timed
  * row to the next, so the day reads as one continuous thing rather than a
@@ -44,7 +45,7 @@ export function TimelineSpine({ above, below, hasBulkGutter = true }: TimelineSp
     <span
       aria-hidden
       data-testid="row-spine"
-      className={`absolute ${hasBulkGutter ? 'left-[106px]' : 'left-[86px]'} w-px bg-neutral-200 ${
+      className={`absolute ${hasBulkGutter ? SPINE_X : 'left-[86px]'} w-px bg-neutral-200 ${
         above ? '-top-2' : 'top-1/2'
       } ${below ? '-bottom-2' : 'bottom-1/2'}`}
     />

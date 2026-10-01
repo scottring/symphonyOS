@@ -453,6 +453,7 @@ export function TodayView({
   // The column's own rule (DayPlanPanel's "Still to place"), so the count
   // and the list beside it agree.
   const stillToPlace = data.dayPlan.chooserTasks.filter((e) => !e.completed && !alreadyPlaced(e, viewedDate)).length
+  const weekLine = `Week ${weekNo} · ${stillToPlace === 0 ? 'nothing still to place' : `${stillToPlace} still to place`}`
   const [agendaDropOver, setAgendaDropOver] = useState(false)
   const agendaDrop = planDropHandlers((payload) => {
     void planActions.drop(payload, { type: 'day', day: viewedDate }, { chooseOnly: true })
@@ -468,6 +469,9 @@ export function TodayView({
   const { getCurrentUserMember } = useFamilyMembers()
   const meId = getCurrentUserMember()?.id ?? null
   const desktopControls = useContext(DesktopControlsContext)
+  // In the desktop Shell the control row folds into the masthead; phones and
+  // standalone mounts keep it as its own row.
+  const foldedControls = !!desktopControls && !isMobile
   const desktopLead = useContext(DesktopLeadContext)
   // In the desktop shell the day's review lives in the page footer, so the
   // ⋯ menu drops its copy there (phones keep the menu entry).
@@ -1356,7 +1360,9 @@ export function TodayView({
     // (no ancestor declared one, so the old decision rail never went beside).
     // data-scenery-content: how far the day reaches down the window, so no
     // row, however long the day, is ever set over the place's scenery.
-    <div data-scenery-content className="@container w-full max-w-[1152px] mr-auto px-0 py-2 md:px-10 lg:px-14 md:pt-2 md:pb-8">
+    // Width: the one page column (PAGE_COLUMN, 880px of content) — or the
+    // two-pane split when the week column sits beside the day.
+    <div data-scenery-content className={`@container w-full ${showWeek ? 'max-w-[1152px]' : 'max-w-[992px]'} mr-auto px-0 py-2 md:px-10 lg:px-14 md:pt-2 md:pb-8`}>
       {/* Today's filter and ⋯ live in its heading beside the lens and the
           assistant, as every horizon's page controls do — the top bar is the
           same on every page (2026-09-29). */}
@@ -1419,12 +1425,19 @@ export function TodayView({
         // "Next: …" is the Up next marker's job now, inside Schedule. The
         // line stays only when it says something the list can't: a clear day
         // looking forward, or another day's opener.
-        subline={data.isToday && upNext ? undefined : heroLine}
+        // Desktop folds the control row into the masthead (layout system,
+        // 2026-10-01): the week line becomes the subline and the view
+        // controls sit at the title's right, as on every horizon page.
+        subline={foldedControls
+          ? <>{weekLine}{!(data.isToday && upNext) && heroLine ? <> · {heroLine}</> : null}</>
+          : data.isToday && upNext ? undefined : heroLine}
         // Domain chooser + assistant toggle, in the card's corner.
         // Desktop: the page's controls sit in the control row below, as on
         // every horizon (Scott, 2026-09-30). The masthead keeps them only where
         // there is no control row to hold them.
-        controls={desktopControls && !isMobile ? undefined : headerControls}
+        controls={foldedControls
+          ? <div className="flex items-center gap-1">{desktopToolbar}<ViewSwitch view={todayView} onChange={setTodayView} aboveName={`week ${weekNo}`} withFocus={false} /></div>
+          : headerControls}
         // The masthead's ear: today's weather, one quiet line. The feed only
         // knows today, so another day's page says nothing rather than
         // showing today's sky over Saturday. In the desktop Shell it sits in
@@ -1442,11 +1455,12 @@ export function TodayView({
       {/* The same control row every horizon has: what the column beside is,
           and the view icons (list, or with the level above). */}
       <GuideAnchor />
-      <div className="pv2-toolbar today-toolbar px-4 md:px-0">
-        <div className="pv2-status"><span className="pv2-hint">Week {weekNo} · {stillToPlace === 0 ? 'nothing still to place' : `${stillToPlace} still to place`}</span></div>
-        {desktopControls && !isMobile && <div className="pv2-rowcontrols hidden md:flex">{desktopToolbar}</div>}
-        <ViewSwitch view={todayView} onChange={setTodayView} aboveName={`week ${weekNo}`} withFocus={false} />
-      </div>
+      {!foldedControls && (
+        <div className="pv2-toolbar today-toolbar px-4 md:px-0">
+          <div className="pv2-status"><span className="pv2-hint">{weekLine}</span></div>
+          <ViewSwitch view={todayView} onChange={setTodayView} aboveName={`week ${weekNo}`} withFocus={false} />
+        </div>
+      )}
       {/* The column beside the day: the week (and anything needing a
           decision). The day gets the full width only when there is none. */}
       <div className={`px-4 md:px-0 ${showWeek ? '@[48rem]:grid @[48rem]:grid-cols-[minmax(0,1fr)_280px] @[48rem]:items-start @[48rem]:gap-9' : ''}`}>

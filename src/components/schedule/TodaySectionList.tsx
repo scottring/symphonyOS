@@ -39,6 +39,7 @@ import { effectiveStartTime } from '@/lib/timeUtils'
 import { OpenSpaceLine } from './OpenSpaceLine'
 import { TimelineSpine } from './TimelineSpine'
 import { countRoutineRowUnits } from '@/lib/today/routineCollections'
+import { ROW_SHELL, ROW_GRID, LANE, MARK } from './todayRowGrid'
 
 // ─── Meal detection ────────────────────────────────────────────────────────────
 
@@ -63,8 +64,10 @@ function UpNextMarker({ status }: { status?: string }) {
   )
 }
 
-/** Row tint for the up-next commitment — subtle, no layout shift. */
-const UP_NEXT_ROW_CLASS = 'rounded-r-md border-l-2 border-primary-600 bg-primary-50/40'
+/** Row tint for the up-next commitment — subtle, no layout shift. On desktop
+ *  the time sits on the column's edge (layout system), so the marker moves
+ *  out into the page gutter instead of drawing over the time. */
+const UP_NEXT_ROW_CLASS = 'relative rounded-r-md border-l-2 border-primary-600 bg-primary-50/40 md:rounded-none md:border-l-0 md:bg-transparent md:before:absolute md:before:-left-[17px] md:before:inset-y-1 md:before:w-0.5 md:before:rounded-full md:before:bg-primary-600'
 
 /** Locate a rendered timeline item by id across every section. */
 export function findTimelineItem(
@@ -414,14 +417,14 @@ export function TodaySectionList({
                             tabIndex={0}
                             onClick={() => onSelectItem(item.id)}
                             onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelectItem(item.id) } }}
-                            className={`group cursor-pointer rounded-xl border border-transparent px-3 py-2 md:py-1 transition-all duration-200 hover:bg-primary-50/50 hover:border-primary-100 ${selectedItemId === item.id ? 'bg-primary-50 border-primary-200 shadow-md ring-1 ring-primary-200' : ''}`}
+                            className={`group cursor-pointer ${ROW_SHELL} border-transparent transition-all duration-200 hover:bg-primary-50/50 hover:border-primary-100 ${selectedItemId === item.id ? 'bg-primary-50 border-primary-200 shadow-md ring-1 ring-primary-200' : ''}`}
                           >
-                            <div className="relative flex items-center gap-3 pl-5">
+                            <div className={ROW_GRID}>
                               <TimelineSpine above={spineSegments?.above} below={spineSegments?.below} />
-                              <div className="w-16 shrink-0 text-xs font-medium tabular-nums text-neutral-500">
+                              <div className={`${LANE} text-xs font-medium tabular-nums text-neutral-500`}>
                                 {timeLabel}
                               </div>
-                              <div className="w-5 shrink-0 flex items-center justify-center relative z-[1]">
+                              <div className={`${MARK} flex items-center justify-center relative z-[1]`}>
                                 <span
                                   aria-hidden
                                   className="w-5 h-5 rounded-full border-2 border-neutral-300 bg-bg-base"

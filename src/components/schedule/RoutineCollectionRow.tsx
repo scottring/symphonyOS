@@ -5,6 +5,7 @@ import { TaskCheckbox } from './TaskCheckbox'
 import type { FamilyMember } from '@/types/family'
 import { MultiAssigneeDropdown } from '@/components/family'
 import { routineOwners } from '@/lib/routineUtils'
+import { ROW_SHELL, ROW_GRID, LANE, MARK, RAIL, RAIL_SLOT } from './todayRowGrid'
 
 interface Props {
   item: TimelineItem // type === 'routine-collection'
@@ -111,22 +112,22 @@ export function RoutineCollectionRow({ item, onSelect, onSelectStep, onCompleteS
     // Same wrapper a task/event row uses (px-3 + 1px transparent border), so
     // the columns below line up with them to the pixel and the row picks up the
     // identical hover tint instead of announcing itself with a card.
-    <div className="group rounded-xl border border-transparent px-3 py-2 md:py-1 transition-all duration-200 hover:bg-primary-50/50 hover:border-primary-100">
+    <div className={`group ${ROW_SHELL} border-transparent transition-all duration-200 hover:bg-primary-50/50 hover:border-primary-100`}>
       {/* Collapsed: a plain agenda row, not a card. The column widths mirror
           ScheduleItem (pl-5 bulk gutter, w-16 time, w-5 control) so a routine
           lines up with the tasks and events around it. */}
-      <div className="flex items-center gap-3 pl-5 min-w-0">
+      <div className={`${ROW_GRID} min-w-0`}>
         {/* The same column classes a task row uses, so "For today" (which
             hides the time column) drops it here too — without them the block
             sat 64px right of the tasks above it and read as nested under
             the last one (Scott, 2026-09-28). */}
-        <div className={`${gutterLabel ? 'schedule-time-column' : 'schedule-empty-time'} w-16 shrink-0 text-xs font-medium tabular-nums text-neutral-500`}>
+        <div className={`${gutterLabel ? 'schedule-time-column' : 'schedule-empty-time'} ${LANE} text-xs font-medium tabular-nums text-neutral-500`}>
           {gutterLabel || <span className="text-neutral-300">—</span>}
         </div>
         {/* The block's own check circle, in the column every task's circle
             sits in (Scott, 2026-09-28): a tap completes every open step, and
             a done block taps back to open. */}
-        <div className="w-5 shrink-0 flex items-center justify-center">
+        <div className={`${MARK} flex items-center justify-center`}>
           <TaskCheckbox
             completed={allDone}
             onToggleComplete={toggleAll}
@@ -170,15 +171,21 @@ export function RoutineCollectionRow({ item, onSelect, onSelectStep, onCompleteS
         </button>
         {/* Who: shown when someone is on it, and on hover when no one is —
             the task rows' rule. */}
-        {onAssignAll && familyMembers.length > 0 && (
-          <div className={`shrink-0 transition-opacity ${owners.length ? '' : 'md:opacity-0 md:group-hover:opacity-100 md:group-focus-within:opacity-100'}`}>
+        {/* The same four-cell rail a task row draws (who · context · verb ·
+            ⋯), so a routine's people sit in the task rows' people column
+            instead of wherever its name happened to end. */}
+        <div className={RAIL}>
+        <div className={`shrink-0 md:w-[5.25rem] md:h-7 md:flex md:items-center md:justify-end transition-opacity ${owners.length ? '' : 'md:opacity-0 md:group-hover:opacity-100 md:group-focus-within:opacity-100'}`}>
+          {onAssignAll && familyMembers.length > 0 && (
             <MultiAssigneeDropdown members={familyMembers} selectedIds={owners} onSelect={onAssignAll} size="sm"
               label="Who's responsible?" triggerLabel={`Assign people to ${item.title}`} />
-          </div>
-        )}
+          )}
+        </div>
+        <div className={`hidden md:flex ${RAIL_SLOT}`} aria-hidden />
+        <div className={`hidden md:flex ${RAIL_SLOT}`} aria-hidden />
         {/* Management menu: hide-for-today / edit / archive, mirroring task
             rows — and like theirs, quiet until you reach for it on desktop. */}
-        <div className="relative shrink-0 pr-2 transition-opacity md:opacity-0 md:group-hover:opacity-100 md:group-focus-within:opacity-100">
+        <div className={`relative ${RAIL_SLOT} transition-opacity md:opacity-0 md:group-hover:opacity-100 md:group-focus-within:opacity-100`}>
           <button
             aria-label="Routine options"
             onClick={() => setMgmtOpen(o => !o)}
@@ -232,6 +239,7 @@ export function RoutineCollectionRow({ item, onSelect, onSelectStep, onCompleteS
             </>
           )}
         </div>
+        </div>
       </div>
       {/* Expanded steps start under the name (Scott, 2026-09-28: the old
           list sat a card's width to the right and a bulk-action line below
@@ -241,9 +249,9 @@ export function RoutineCollectionRow({ item, onSelect, onSelectStep, onCompleteS
           trail the name as pills. Completing or skipping everything lives on
           the block's own circle and its ⋯ menu. */}
       {open && expandable && (
-        <div className="flex gap-3 pl-5">
-          <div className="schedule-empty-time w-16 shrink-0" />
-          <div className="w-5 shrink-0" />
+        <div className="flex gap-3 pl-5 md:pl-0">
+          <div className={`schedule-empty-time ${LANE}`} />
+          <div className={MARK} />
           <ul className="flex-1 min-w-0 space-y-1.5 pb-1.5">
           {groups.map(group => {
             const stepDone = group.progress.done === group.progress.total && group.progress.total > 0

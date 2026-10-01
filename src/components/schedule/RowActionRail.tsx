@@ -7,6 +7,7 @@ import { ContextPicker } from '@/components/triage'
 import { AssigneeDropdown, MultiAssigneeDropdown } from '@/components/family'
 import { RescheduleButton } from './RescheduleButton'
 import { ScheduleItemActionsMenu } from './ScheduleItemActionsMenu'
+import { RAIL, RAIL_SLOT, RAIL_WHO } from './todayRowGrid'
 
 interface RowActionRailProps {
   item: TimelineItem
@@ -27,12 +28,13 @@ interface RowActionRailProps {
 }
 
 /** An icon cell — 28px, on every row, always. */
-const SLOT = 'w-7 h-7 flex items-center justify-center'
+const SLOT = RAIL_SLOT
 
 /**
  * The assignee cell is wider than an icon cell because the avatar stack grows
  * with the number of people: MultiAssigneeDropdown draws up to four 24px
- * circles at -8px overlap, so 24px for one and 72px for four. Reserving the
+ * circles at -4px overlap (enough to read every initial), so 24px for one
+ * and 84px for four. Reserving the
  * maximum is what stops that growth shoving its neighbours around as the
  * assignees change — the exact bug this rail exists to kill. Because EVERY
  * cell is a reserved fixed width, the slot order below is free: it is a
@@ -43,7 +45,7 @@ const SLOT = 'w-7 h-7 flex items-center justify-center'
  * whitespace on the cell's LEFT, where it merges with the title column's own
  * slack and reads as the gap before the rail rather than a hole inside it.
  */
-const WHO_SLOT = 'w-[4.5rem] h-7 flex items-center justify-end'
+const WHO_SLOT = RAIL_WHO
 
 /**
  * Controls are quiet until you reach for them.
@@ -235,7 +237,7 @@ export function RowActionRail({
   ]
 
   return (
-    <div className="shrink-0 flex items-center gap-1">
+    <div className={RAIL}>
       {cells.map((cell, i) => (
         <div key={i} data-rail-slot className={`${cell.className}${cell.quiet ? ` ${QUIET}` : ''}`}>
           {cell.node}

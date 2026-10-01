@@ -15,7 +15,9 @@ interface MultiAssigneeDropdownProps {
 }
 
 const sizeClasses = {
-  sm: 'w-6 h-6 text-xs',
+  // 10px initials at -4px overlap: every letter stays readable ("KA", not
+  // "(A", under its neighbour — layout system, 2026-10-01).
+  sm: 'w-6 h-6 text-[10px]',
   md: 'w-8 h-8 text-sm',
   lg: 'w-10 h-10 text-base',
 }
@@ -236,7 +238,7 @@ export function MultiAssigneeDropdown({
         title={triggerLabel}
         onClick={(e) => { e.stopPropagation(); setIsOpen(!isOpen) }}
         className={`
-          flex items-center -space-x-2 cursor-pointer hover:opacity-80 transition-opacity
+          flex items-center ${size === 'sm' ? '-space-x-1' : '-space-x-2'} cursor-pointer hover:opacity-80 transition-opacity
           ${selectedMembers.length === 0 ? 'opacity-50' : ''}
         `}
         aria-label={triggerLabel
