@@ -122,7 +122,7 @@ export type CloseDecision = 'carried' | 'done' | 'someday' | 'dropped' | 'left'
  * candidate list is fixed when the close-out opens, so a decided card does not
  * slide out from under the reader — it wears its stamp, then the next arrives.
  */
-export function CloseOut({ lines, candidateIds, members, actions, prevName, nextName, onDecide, onFinish }: {
+export function CloseOut({ lines, candidateIds, members, actions, prevName, nextName, onDecide, onFinish, finishLabel }: {
   /** Every line on the last period, so a decided card can still be shown. */
   lines: LineVM[]
   /** The unfinished lines, fixed by the caller when the close-out opened. */
@@ -133,6 +133,8 @@ export function CloseOut({ lines, candidateIds, members, actions, prevName, next
   nextName: string
   onDecide: (vm: LineVM, d: CloseDecision) => Promise<void> | void
   onFinish: () => void
+  /** The last card's button, when it leads somewhere other than writing the next period. */
+  finishLabel?: string
 }) {
   const [ids] = useState(() => candidateIds)
   const [k, setK] = useState(0)
@@ -150,7 +152,7 @@ export function CloseOut({ lines, candidateIds, members, actions, prevName, next
         <div className="pv2-eyebrow">{prevName} is closed</div>
         <div className="pv2-summary">{parts.join(' · ') || 'Nothing was left to decide'}</div>
         <p className="pv2-hint">Nothing is deleted. {prevName}’s plan keeps its history.</p>
-        <div className="pv2-acts"><button type="button" className="pv2-btn" onClick={onFinish}>Write {nextName} →</button></div>
+        <div className="pv2-acts"><button type="button" className="pv2-btn" onClick={onFinish}>{finishLabel ?? `Write ${nextName} →`}</button></div>
       </div></div>
     )
   }

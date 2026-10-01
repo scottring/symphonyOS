@@ -3496,6 +3496,24 @@ div.chooser-action-group { overflow: visible !important; }
 .guide-choice-body { font-size: 13.5px; color: var(--color-neutral-600); }
 .guide-choice-path { font-size: 12px; color: var(--color-neutral-500); }
 .guide-choice:focus-within { outline: 2px solid var(--color-primary-500); outline-offset: -2px; }
+/* Pick up where you are (2026-10-01): what each level holds, then the steps. */
+.guide-inbox-line { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; margin: 4px 0 0; padding: 8px 12px; border-radius: 10px; background: var(--color-neutral-50, #f7f7f5); font-size: 13.5px; color: var(--color-neutral-600); }
+.guide-reading { display: flex; flex-direction: column; margin-top: 8px; border-top: 1px solid var(--color-neutral-200); }
+.guide-reading-row { display: grid; grid-template-columns: minmax(80px, 110px) minmax(0, 1fr) auto; align-items: baseline; gap: 10px; padding: 5px 0; border-bottom: 1px solid var(--color-neutral-200); font-size: 13.5px; }
+.guide-reading-name { font-family: var(--font-family-display); font-size: 1.05rem; color: var(--color-neutral-900); }
+.guide-reading-detail { color: var(--color-neutral-600); min-width: 0; }
+.guide-chip { white-space: nowrap; border-radius: 999px; padding: 1px 8px; font-size: 11px; font-weight: 600; }
+.guide-chip.is-ok { color: var(--color-neutral-500); border: 1px solid var(--color-neutral-200); }
+.guide-chip.is-go { color: var(--color-primary-700); background: var(--color-primary-100); }
+.guide-chip.is-back { color: var(--color-warning-600); background: var(--color-warning-50); }
+.guide-steps { margin: 4px 0 12px; padding: 0; list-style: none; border-top: 1px solid var(--color-neutral-200); }
+.guide-steps li { border-bottom: 1px solid var(--color-neutral-200); }
+.guide-steps label { display: grid; grid-template-columns: 22px minmax(0, 1fr); column-gap: 12px; padding: 10px 8px; cursor: pointer; }
+.guide-steps input { margin-top: 4px; accent-color: var(--color-primary-600); width: 16px; height: 16px; }
+.guide-steps label:focus-within { outline: 2px solid var(--color-primary-500); outline-offset: -2px; }
+.guide-step-name { display: block; font-weight: 600; color: var(--color-neutral-900); }
+.guide-step-why { display: block; font-size: 13.5px; color: var(--color-neutral-600); }
+.guide-steps input:not(:checked) + span .guide-step-name, .guide-steps input:not(:checked) + span .guide-step-why { color: var(--color-neutral-400); }
 .guide-example { margin: 0 0 16px; padding-left: 12px; border-left: 2px solid var(--color-neutral-200); font-size: 13.5px; color: var(--color-neutral-600); }
 .guide-example summary { cursor: pointer; color: var(--color-primary-700); }
 .guide-example ol { margin: 6px 0; padding-left: 18px; }

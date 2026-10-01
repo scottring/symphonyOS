@@ -15,7 +15,7 @@ import { weekOfYear } from '@/lib/planning/horizonNumerals'
 import { writePlanView } from '@/lib/planning/v2/planV2'
 import { showToast } from '@/hooks/useToast'
 import {
-  advance, back, currentStep, finishHere, onStepPage, parseYmd, pause, resume, stepIdeas, stepPath, stepShortName, stepTitle,
+  advance, back, currentStep, finishHere, isReview, onStepPage, pageOf, parseYmd, pause, resume, stepIdeas, stepPath, stepShortName, stepTitle,
   STEP_QUESTION, STEP_WHY, type GuideState, type GuideStep,
 } from '@/lib/guide/guidedPlan'
 
@@ -38,10 +38,11 @@ export function useGuideRunning(): boolean {
   return state?.status === 'active'
 }
 
-const HORIZON: Record<Exclude<GuideStep, 'today'>, SessionHorizon> = { year: 'annual', season: 'seasonal', month: 'monthly', week: 'weekly' }
+const HORIZON: Record<'year' | 'season' | 'month' | 'week', SessionHorizon> = { year: 'annual', season: 'seasonal', month: 'monthly', week: 'weekly' }
 
-function tokenFor(step: GuideStep, s: GuideState): { horizon: SessionHorizon; token: string } {
-  const start = s.periods[step] ? parseYmd(s.periods[step]!) : new Date()
+function tokenFor(at: GuideStep, s: GuideState): { horizon: SessionHorizon; token: string } {
+  const start = s.periods[at] ? parseYmd(s.periods[at]!) : new Date()
+  const step = pageOf(at)
   if (step === 'year') return { horizon: 'annual', token: yearToken(start.getFullYear()) }
   if (step === 'season') return { horizon: 'seasonal', token: seasonToken(start, readSeasons()) }
   if (step === 'month') return { horizon: 'monthly', token: monthToken(start) }
@@ -53,6 +54,23 @@ function tokenFor(step: GuideStep, s: GuideState): { horizon: SessionHorizon; to
 /** Open a step's page with the level above beside the list. */
 function prepareView(step: GuideStep) {
   if (step === 'week' || step === 'month' || step === 'season') writePlanView(step, 'ref')
+}
+
+/**
+ * Move a run on from a step that has nothing to save — a look-back, whose
+ * close-out card ends with the same "continue" the bar offers.
+ */
+export function useGuideNext(): (state: GuideState) => Promise<void> {
+  const { set } = useGuidedPlan()
+  const navigate = useNavigate()
+  return async (state) => {
+    const next = advance(state)
+    await set(next)
+    if (next.status === 'finished') { navigate('/start?done=1'); return }
+    const st = currentStep(next)
+    prepareView(st)
+    navigate(stepPath(st, next))
+  }
 }
 
 export function GuideBar({ host = null }: { host?: HTMLElement | null }) {
@@ -67,6 +85,7 @@ function GuideBarInner(): ReactNode {
   const step = state ? currentStep(state) : 'today'
   const { horizon, token } = state ? tokenFor(step, state) : { horizon: 'weekly' as SessionHorizon, token: '' }
   const session = usePlanningSession(horizon, token)
+  const next = useGuideNext()
   // /start is where a run is chosen and resumed; it says so itself.
   if (!state || state.status === 'finished' || pathname === '/start') return null
 
@@ -91,22 +110,22 @@ function GuideBarInner(): ReactNode {
   const last = i >= n - 1
   const here = onStepPage(step, state, pathname, search)
   const short = stepShortName(step, state, seasons, weekNo)
+  // A look-back saves nothing of its own: its decisions are written as they're made.
+  const review = isReview(step)
+  const nextShort = last ? '' : stepShortName(state.steps[i + 1], state, seasons, weekNo)
   const go = (next: GuideState) => { const st = currentStep(next); prepareView(st); navigate(stepPath(st, next)) }
 
   const onContinue = async () => {
     // Moving on agrees this period's plan — the same record "This is our …
     // plan" writes, so the page reads as planned afterwards.
-    if (step !== 'today') {
+    if (step !== 'today' && !review) {
       const ok = await session.save({ wentWell: session.mine?.wentWell ?? '', didnt: session.mine?.didnt ?? '' })
       if (!ok) { showToast(`Couldn’t save the ${short} plan — check your connection and try again.`, 'error', 6000); return }
     }
-    const next = advance(state)
-    await set(next)
-    if (next.status === 'finished') navigate('/start?done=1')
-    else go(next)
+    await next(state)
   }
   const onFinishHere = async () => {
-    if (step !== 'today' && here) {
+    if (step !== 'today' && !review && here) {
       const ok = await session.save({ wentWell: session.mine?.wentWell ?? '', didnt: session.mine?.didnt ?? '' })
       if (!ok) { showToast(`Couldn’t save the ${short} plan — try again.`, 'error', 6000); return }
     }
@@ -130,7 +149,7 @@ function GuideBarInner(): ReactNode {
       </ol>
       <h2 className="guide-q">{STEP_QUESTION[step]}</h2>
       <p className="guide-why">{STEP_WHY[step]} Changes save as you make them.</p>
-      {(() => { const ideas = stepIdeas(step, state, seasons, weekNo); return (
+      {(() => { const ideas = stepIdeas(step, state, seasons, weekNo); return ideas && (
         <details className="guide-ideas" key={step}>
           <summary>Not sure what to write?</summary>
           <p>{ideas.prompt}</p>
@@ -144,9 +163,10 @@ function GuideBarInner(): ReactNode {
         {!last && <button type="button" className="pv2-link pv2-quiet" onClick={() => void onFinishHere()}>Finish here</button>}
         {here
           ? <button type="button" className="pv2-btn" onClick={() => void onContinue()}>
-              {last ? (step === 'today' ? 'Finish' : `Mark ${short} planned and finish`) : step === 'today' ? 'Continue' : `Mark ${short} planned and continue`}
+              {review ? (last ? 'Finish' : `Continue to ${nextShort}`)
+                : last ? (step === 'today' ? 'Finish' : `Mark ${short} planned and finish`) : step === 'today' ? 'Continue' : `Mark ${short} planned and continue`}
             </button>
-          : <button type="button" className="pv2-btn" onClick={() => go(state)}>Go to {short}</button>}
+          : <button type="button" className="pv2-btn" onClick={() => go(state)}>Go to {review ? stepShortName(pageOf(step), state, seasons, weekNo) : short}</button>}
       </div>
     </section>
   )

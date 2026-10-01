@@ -54,6 +54,9 @@ import { useActionableInstances } from '@/hooks/useActionableInstances'
 import { goalToTaskConversion } from '@/lib/planning/goalConversion'
 import { removeOutcomeToast } from '@/lib/planning/existingActions'
 import { LoadFailedNotice } from '@/components/common/LoadFailedNotice'
+import { useGuidedPlan } from '@/hooks/useGuidedPlan'
+import { useGuideNext } from '@/components/guide/GuideBar'
+import { currentStep, stepShortName } from '@/lib/guide/guidedPlan'
 
 type Level = 'month' | 'season'
 const NOUN: Record<Level, string> = { month: 'Month', season: 'Season' }
@@ -188,6 +191,33 @@ function Inner({ level }: { level: Level }) {
   // agreed, or the last one leaving undecided lines — and is quiet after.
   const reviewIds = closeOutCandidates(prevLines.map((l) => l.task), level, prevBounds.start, prevBounds.end).map((t) => t.id)
   const reviewDue = !session.saved || reviewIds.length > 0
+  // A guided look-back runs here, on the page it hands to ("pick up where you
+  // are", 2026-10-01): the close-out, then the guide moves on. The page's own
+  // Plan button steps aside under the guide, so without this a guided run
+  // never asked about last period's open lines.
+  const { state: guide } = useGuidedPlan()
+  const guideNext = useGuideNext()
+  const guideStep = guide?.status === 'active' ? currentStep(guide) : null
+  const guidedReview = !!guide && guideStep === `${level}-review` && guide.periods[guideStep] === localYmd(bounds.start)
+  // Fixed when the look-back opens, so a decided line keeps its card.
+  const [reviewSnap, setReviewSnap] = useState<string[] | null>(null)
+  if (!guidedReview && reviewSnap !== null) setReviewSnap(null)
+  if (guidedReview && !loading && reviewSnap === null) setReviewSnap(reviewIds)
+  // Look-back done, the guide's next step is this same page: open it with the
+  // level above beside the list, as the guide does for any step.
+  const [seenStep, setSeenStep] = useState(guideStep)
+  if (seenStep !== guideStep) {
+    setSeenStep(guideStep)
+    if (guideStep === level) setViewState(readPlanView(level))
+  }
+  const reviewFinish = (() => {
+    if (!guide || !guidedReview) return undefined
+    const after = guide.steps[guide.current + 1]
+    if (!after) return 'Finish'
+    if (after === level) return undefined
+    const wso = readCadenceConfig().weekStartsOn
+    return `Continue to ${stepShortName(after, guide, seasons, (d) => weekOfYear(d, wso))} →`
+  })()
   const [tally, setTally] = useState<Tally>(EMPTY_TALLY)
   const [justSaved, setJustSaved] = useState<null | { detail: string }>(null)
   // After a save, the next level down: a season hands work to its month (the
@@ -508,7 +538,10 @@ function Inner({ level }: { level: Level }) {
   const folded = !mobile && !inMeeting
 
   let body: ReactElement
-  if (meeting?.step === 1) {
+  if (guidedReview && reviewSnap) {
+    body = <CloseOut lines={prevLines} candidateIds={reviewSnap} members={members} actions={actions} prevName={prevName} nextName={name}
+      onDecide={decide} onFinish={() => void guideNext(guide!)} finishLabel={reviewFinish} />
+  } else if (meeting?.step === 1) {
     body = <CloseOut lines={prevLines} candidateIds={meeting.candidateIds} members={members} actions={actions} prevName={prevName} nextName={name}
       onDecide={decide} onFinish={() => setMeeting({ ...meeting, step: 2 })} />
   } else if (view === 'focus') {
@@ -553,7 +586,7 @@ function Inner({ level }: { level: Level }) {
           onLeave={() => void endMeeting(false)} onSave={() => void endMeeting(true)} saveLabel={`Mark ${name} planned`} />
       ) : folded ? <GuideAnchor /> : <PlanToolbar {...toolbar} />}
 
-      {dragOn && meeting?.step !== 1 && view !== 'focus' ? (
+      {dragOn && meeting?.step !== 1 && !guidedReview && view !== 'focus' ? (
         <DndContext sensors={sensors} collisionDetection={pointerWithin}
           onDragStart={(e: DragStartEvent) => setDragId(String(e.active.id))} onDragEnd={(e) => void onDragEnd(e)} onDragCancel={() => setDragId(null)}>
           {body}

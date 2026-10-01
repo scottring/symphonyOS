@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { advance, back, finishHere, firstStepChoices, onStepPage, parseGuideState, pause, planPeriods, startGuide, stepIdeas, stepPath } from './guidedPlan'
+import { advance, back, finishHere, firstStepChoices, hasPlans, onStepPage, parseGuideState, pause, pickUpPeriods, pickUpRows, planPeriods, startGuide, startPickUp, stepIdeas, stepPath, stepShortName, stepTitle, type PickUpFacts } from './guidedPlan'
 import type { Seasons } from '@/lib/cadence/seasons'
 
 // Scott's household: custom seasons, Fall = Oct 1 – Dec 31; Saturday weeks.
@@ -95,5 +95,82 @@ describe('stepIdeas — help for a blank step', () => {
   it('a month-ahead run has no season: it still reads', () => {
     const m = startGuide('month', '2026-10-01', sep29, seasons, SAT)
     expect(stepIdeas('month', m, seasons, wk).prompt).toContain('each season line')
+  })
+})
+
+describe('pick up where you are', () => {
+  const oct1 = new Date(2026, 9, 1, 9)
+  const wk = () => 40
+  const facts = (over: Partial<PickUpFacts> = {}): PickUpFacts => ({
+    yearGoals: 4,
+    season: { open: 6, planned: false, review: 0 },
+    month: { open: 0, planned: false, review: 3 },
+    week: { open: 2, done: 0 },
+    todayChosen: 1,
+    ...over,
+  })
+  const periods = pickUpPeriods(oct1, seasons, SAT)
+
+  it('plans this year, Fall, October, week 40 and today on Oct 1', () => {
+    expect(periods).toMatchObject({ year: '2026-01-01', season: '2026-10-01', month: '2026-10-01', 'month-review': '2026-10-01', week: '2026-09-26', today: '2026-10-01' })
+  })
+
+  it('the storyboard account: look back at September, plan October, week, today; year and Fall in place', () => {
+    const rows = pickUpRows(facts(), periods, oct1, seasons, wk)
+    expect(rows.filter((r) => r.inPath && r.on).map((r) => r.name)).toEqual(['Look back at September', 'October', 'Week 40', 'Today'])
+    expect(rows.filter((r) => !r.inPath).map((r) => `${r.name}: ${r.detail}`)).toEqual(['2026: 4 goals', 'Fall: 6 priorities'])
+    expect(rows.find((r) => r.step === 'month-review')!.why).toBe('3 open. Carry each one into October, mark it done, keep it for someday, or let it go.')
+    expect(rows.find((r) => r.step === 'month')!.why).toBe('Nothing on it yet. Fall sits beside the list.')
+    expect(rows.find((r) => r.step === 'week')!.why).toBe('2 steps so far. It ends tomorrow, so keep it short.')
+  })
+
+  it('everything planned: only the week and today', () => {
+    const rows = pickUpRows(facts({ month: { open: 3, planned: true, review: 0 }, week: { open: 3, done: 2 } }), periods, oct1, seasons, wk)
+    expect(rows.filter((r) => r.inPath).map((r) => r.step)).toEqual(['week', 'today'])
+    expect(rows.find((r) => r.step === 'week')!.detail).toBe('5 steps, 2 done')
+  })
+
+  it('a month marked planned with nothing on it is in place', () => {
+    const rows = pickUpRows(facts({ month: { open: 0, planned: true, review: 0 } }), periods, oct1, seasons, wk)
+    expect(rows.find((r) => r.step === 'month')).toMatchObject({ inPath: false, detail: 'Marked planned' })
+  })
+
+  it('an empty year and season are offered unchecked', () => {
+    const rows = pickUpRows(facts({ yearGoals: 0, season: { open: 0, planned: false, review: 0 } }), periods, oct1, seasons, wk)
+    expect(rows.find((r) => r.step === 'year')).toMatchObject({ inPath: true, on: false, chip: 'Optional' })
+    expect(rows.find((r) => r.step === 'season')).toMatchObject({ inPath: true, on: false, chip: 'Optional' })
+  })
+
+  it('a look-back is offered only while the new period is young', () => {
+    const oct20 = new Date(2026, 9, 20)
+    const rows = pickUpRows(facts(), pickUpPeriods(oct20, seasons, SAT), oct20, seasons, wk)
+    expect(rows.some((r) => r.step === 'month-review')).toBe(false)
+    // Planning ahead on Sep 29: October is next, so September's open lines are asked about.
+    const ahead = pickUpRows(facts(), pickUpPeriods(sep29, seasons, SAT), sep29, seasons, wk)
+    expect(ahead.find((r) => r.step === 'month-review')?.name).toBe('Look back at September')
+  })
+
+  it('a season look-back closes out Summer on Fall’s page', () => {
+    const rows = pickUpRows(facts({ season: { open: 6, planned: false, review: 2 } }), periods, oct1, seasons, wk)
+    expect(rows.find((r) => r.step === 'season-review')).toMatchObject({ name: 'Look back at Summer', inPath: true, on: true })
+  })
+
+  it('a new account has nothing to pick up', () => {
+    const none = facts({ yearGoals: 0, season: { open: 0, planned: false, review: 0 }, month: { open: 0, planned: false, review: 0 }, week: { open: 0, done: 0 }, todayChosen: 0 })
+    expect(hasPlans(none)).toBe(false)
+    expect(hasPlans(facts())).toBe(true)
+  })
+
+  it('the run keeps the rows’ order; a look-back runs on the page it hands to', () => {
+    const s = startPickUp(['today', 'month', 'month-review', 'week'], periods)
+    expect(s.steps).toEqual(['month-review', 'month', 'week', 'today'])
+    expect(stepPath('month-review', s)).toBe('/month?start=2026-10-01')
+    expect(onStepPage('month-review', s, '/month', '?start=2026-10-01')).toBe(true)
+    expect(stepTitle('month-review', s, seasons, wk)).toBe('Look back at September')
+    expect(stepShortName('month-review', s, seasons, wk)).toBe('look back at September')
+    expect(stepIdeas('month-review', s, seasons, wk)).toBeNull()
+    // The rail still knows the run's season and year.
+    expect(s.periods).toMatchObject({ year: '2026-01-01', season: '2026-10-01' })
+    expect(parseGuideState(JSON.parse(JSON.stringify(s)))).toEqual(s)
   })
 })
