@@ -111,7 +111,7 @@ export function PeriodNavEyebrow({ label, onPrev, onNext, prevLabel, nextLabel, 
         type="button"
         aria-label={prevLabel}
         onClick={onPrev}
-        className="rounded-lg p-1.5 text-neutral-300 transition-colors hover:bg-neutral-100 hover:text-neutral-700"
+        className="rounded-lg p-1.5 text-neutral-500 transition-colors hover:bg-neutral-100 hover:text-neutral-800"
       >
         <ChevronLeft className="h-4 w-4" />
       </button>
@@ -122,7 +122,7 @@ export function PeriodNavEyebrow({ label, onPrev, onNext, prevLabel, nextLabel, 
         type="button"
         aria-label={nextLabel}
         onClick={onNext}
-        className="rounded-lg p-1.5 text-neutral-300 transition-colors hover:bg-neutral-100 hover:text-neutral-700"
+        className="rounded-lg p-1.5 text-neutral-500 transition-colors hover:bg-neutral-100 hover:text-neutral-800"
       >
         <ChevronRight className="h-4 w-4" />
       </button>
