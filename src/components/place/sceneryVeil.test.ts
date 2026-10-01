@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { attachSceneryVeil, veilProgress, SCENERY_VEIL_DISTANCE } from './sceneryVeil'
+import { attachSceneryVeil, contentProgress, cornerRise, veilProgress, SCENERY_CONTENT_EVENT, SCENERY_VEIL_DISTANCE } from './sceneryVeil'
 
 describe('veilProgress', () => {
   it('is 0 at the top, rises with scroll, and holds at 1 past the distance', () => {
@@ -14,6 +14,27 @@ describe('veilProgress', () => {
     expect(veilProgress(-40)).toBe(0)
     expect(veilProgress(Number.NaN)).toBe(0)
     expect(veilProgress(50, 0)).toBe(0)
+  })
+})
+
+describe('contentProgress', () => {
+  it('is 0 while the content ends above the scene, and 1 once it runs well into it', () => {
+    expect(contentProgress(500, 600)).toBe(0)
+    expect(contentProgress(600, 600)).toBe(0)
+    expect(contentProgress(648, 600)).toBeCloseTo(0.5)
+    expect(contentProgress(2000, 600)).toBe(1)
+  })
+})
+
+describe('cornerRise', () => {
+  it('stands full height at the outer edge and settles to nothing toward the middle', () => {
+    expect(cornerRise(0)).toBe(1)
+    expect(cornerRise(0.5)).toBe(1)
+    const mid = cornerRise(0.75)
+    expect(mid).toBeGreaterThan(0)
+    expect(mid).toBeLessThan(1)
+    expect(cornerRise(0.9)).toBeLessThan(mid)
+    expect(cornerRise(1)).toBe(0)
   })
 })
 
@@ -59,6 +80,78 @@ describe('attachSceneryVeil', () => {
 
     scroller.scrollTop = 180
     scroller.dispatchEvent(new Event('scroll'))
+    flush()
+    expect(progress()).toBe('1')
+  })
+
+  const rect = (left: number, top: number, right: number, bottom: number) =>
+    () => ({ left, top, right, bottom, width: right - left, height: bottom - top } as DOMRect)
+
+  // A 1440-wide window: the scene stands 840 → 570 at the corners (370 wide),
+  // with a 40px ground strip between them; the content column runs 200–1240.
+  function withContent(bottom: number) {
+    const { scroller, target, progress } = setup()
+    const content = document.createElement('div')
+    content.setAttribute('data-scenery-content', '')
+    content.getBoundingClientRect = rect(200, 100, 1240, bottom)
+    const row = document.createElement('div')
+    row.getBoundingClientRect = rect(200, 100, 1240, bottom)
+    content.appendChild(row)
+    const spacer = document.createElement('div')
+    spacer.setAttribute('aria-hidden', 'true')
+    spacer.getBoundingClientRect = rect(200, bottom, 1240, bottom + 400)
+    content.appendChild(spacer)
+    const scene = document.createElement('div')
+    scene.getBoundingClientRect = rect(0, 570, 1440, 840)
+    const strip = document.createElement('div')
+    strip.className = 'place-scenery-strip'
+    strip.getBoundingClientRect = rect(0, 800, 1440, 840)
+    const left = document.createElement('div')
+    left.className = 'place-scenery-corner'
+    left.getBoundingClientRect = rect(0, 570, 370, 840)
+    const right = document.createElement('div')
+    right.className = 'place-scenery-corner'
+    right.getBoundingClientRect = rect(1070, 570, 1440, 840)
+    scene.append(strip, left, right)
+    return { scroller, target, progress, content, scene }
+  }
+
+  it('lets content run past the corners\' tops where the corners have already settled', () => {
+    // 600 is below the corners' full height (570) but above where they stand
+    // under the column's edges (~608).
+    const { scroller, target, progress, content, scene } = withContent(600)
+    scroller.appendChild(content)
+    attachSceneryVeil(scroller, target, scene)
+    expect(progress()).toBe('0')
+  })
+
+  it('ignores spacers: empty page below the last row is not content', () => {
+    const { scroller, target, progress, content, scene } = withContent(500)
+    scroller.appendChild(content)
+    attachSceneryVeil(scroller, target, scene)
+    expect(progress()).toBe('0')
+  })
+
+  it('leaves the scene open when the page content ends above it', () => {
+    const { scroller, target, progress, content, scene } = withContent(420)
+    scroller.appendChild(content)
+    attachSceneryVeil(scroller, target, scene)
+    expect(progress()).toBe('0')
+  })
+
+  it('veils the scene, before any scroll, when a long day runs down into it', () => {
+    const { scroller, target, progress, content, scene } = withContent(1400)
+    scroller.appendChild(content)
+    attachSceneryVeil(scroller, target, scene)
+    expect(progress()).toBe('1')
+  })
+
+  it('re-checks when page content mounts after the scenery', () => {
+    const { scroller, target, progress, content, scene } = withContent(1400)
+    attachSceneryVeil(scroller, target, scene)
+    expect(progress()).toBe('0')
+    scroller.appendChild(content)
+    window.dispatchEvent(new Event(SCENERY_CONTENT_EVENT))
     flush()
     expect(progress()).toBe('1')
   })

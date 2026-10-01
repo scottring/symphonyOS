@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
 import { render } from '@testing-library/react'
 import { PlaceScenery } from './PlaceScenery'
-import { usePagePaper } from './usePagePaper'
+import { useSceneryContent } from './useSceneryContent'
 
 function scrollerAt(top: number) {
   const el = document.createElement('div')
@@ -65,13 +65,13 @@ describe('PlaceScenery', () => {
   })
 })
 
-describe('usePagePaper', () => {
-  function Page() { usePagePaper(); return null }
+describe('useSceneryContent', () => {
+  function Page() { useSceneryContent(); return null }
 
-  it('marks the document while a paper-wearing page is mounted, and only then', () => {
+  it('marks the document while a page with marked content is mounted, and only then', () => {
     const { unmount } = render(<Page />)
-    expect(document.documentElement).toHaveClass('has-place-paper')
+    expect(document.documentElement).toHaveClass('has-scenery-content')
     unmount()
-    expect(document.documentElement).not.toHaveClass('has-place-paper')
+    expect(document.documentElement).not.toHaveClass('has-scenery-content')
   })
 })

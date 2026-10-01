@@ -70,9 +70,17 @@ def key_paper(rgb):
 
 
 
-def inner_fade(w, side, start=0.72):
-    x = np.linspace(0, 1, w)
-    t = np.clip(((x if side == 'left' else 1 - x) - start) / (1 - start), 0, 1)
+def inner_fade(h, w, side):
+    """Fade each half toward the middle along a slope, not a straight line:
+    the top of the half gives out well before its inner edge, the bottom
+    runs on nearly to it, so the scene settles like a hillside onto the
+    ground strip between the corners."""
+    x = np.linspace(0, 1, w)[None, :]
+    if side == 'right':
+        x = 1 - x
+    y = np.linspace(0, 1, h)[:, None]
+    start = 0.42 + 0.46 * y ** 1.6   # where the fade begins, by row
+    t = np.clip((x - start) / 0.2, 0, 1)
     return 1 - t * t * (3 - 2 * t)
 
 
@@ -124,7 +132,7 @@ for theme in ['urban', 'small-city', 'mountain-town', 'cabin', 'farm']:
     h, w = alpha.shape
     half = w // 2
     for side, sl in (('left', slice(0, half)), ('right', slice(w - half, w))):
-        a = alpha[:, sl] * inner_fade(half, side)[None, :]
+        a = alpha[:, sl] * inner_fade(h, half, side)
         rgba = np.dstack([color[:, sl], a * 255]).astype(np.uint8)
         Image.fromarray(rgba, 'RGBA').save(OUT / f'{theme}-{side}.webp', 'WEBP', quality=84, method=6, exact=False)
     print(theme, {'height': h, 'halfWidth': half, 'ground': ground_tile(theme)[:2]})

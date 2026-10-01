@@ -2777,10 +2777,10 @@ div.chooser-action-group { overflow: visible !important; }
   --scenery-max: 0.97;
   --scenery-progress: 0;
 }
-/* A page whose content column wears paper (.place-paper, usePagePaper) keeps
-   its own text off the art, so the scene may show fully where the page is
-   empty. Every other page gets the quiet scene above. */
-html.has-place-paper .place-scenery { --scenery-rest: 0; }
+/* A page that marks its content (useSceneryContent) has the veil thicken as
+   soon as that content reaches down into the art, so the scene may show
+   fully where the page is empty. Every other page gets the quiet scene above. */
+html.has-scenery-content .place-scenery { --scenery-rest: 0; }
 /* Taller at both sides, dipping in the middle (Scott, 2026-10-01): each half
    of the scene stands in its corner, and between them runs a low strip of
    the scene's own ground, so the art under the page's content is only ever
@@ -2816,23 +2816,17 @@ html.has-place-paper .place-scenery { --scenery-rest: 0; }
    the page reads without scrolling first. */
 @media (max-height: 720px) {
   .place-scenery { --scenery-height: 24vh; }
-  html.has-place-paper .place-scenery { --scenery-rest: 0.25; }
+  html.has-scenery-content .place-scenery { --scenery-rest: 0.25; }
 }
 @media (max-width: 767px) {
-  html.has-place-paper .place-scenery { --scenery-rest: 0.3; }
+  html.has-scenery-content .place-scenery { --scenery-rest: 0.3; }
 }
-/* Reduced motion: nothing changes on scroll; one steady, stronger veil. */
+/* Reduced motion: nothing changes on scroll; one steady veil, strong enough
+   that text may run over the art. */
 @media (prefers-reduced-motion: reduce) {
-  .place-scenery-veil { opacity: max(var(--scenery-rest), 0.55); }
+  .place-scenery-veil { opacity: max(var(--scenery-rest), 0.85); }
 }
-/* The paper a page's content column wears over the scenery: the page's own
-   colour, feathered past the column's edges so the art fades out behind the
-   work instead of stopping at a line. Background and shadow only — no
-   positioning, no stacking context, nothing that could trap a menu. */
-.place-paper {
-  background-color: var(--color-bg-base);
-  box-shadow: 0 0 56px var(--color-bg-base);
-}
+
 
 /* =============================================================================
    PHONE CHROME — the native dock (MainView.swift SymphonyDock) and floating

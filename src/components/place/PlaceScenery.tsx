@@ -27,9 +27,9 @@ import farmGround from '@/assets/scenery/farm-ground.webp'
  *
  * The art is decoration only. It is fixed behind the page scroller, takes no
  * layout space (no band, no spacer), is aria-hidden and never takes a pointer.
- * A paper veil over it thickens as the page scrolls (sceneryVeil.ts), and the
- * page's own content column wears paper too (usePagePaper.ts), so text is never
- * set over the art at any scroll position.
+ * A paper veil over it thickens as the page scrolls, and as soon as the page's
+ * marked content (useSceneryContent.ts) reaches down into the art
+ * (sceneryVeil.ts), so text is never set over it at any scroll position.
  *
  * Render it as a sibling BEFORE the page scroller, with no z-index on either:
  * the scroller is positioned, so it paints after the scenery in DOM order and
@@ -67,6 +67,7 @@ export function PlaceScenery({ scroller, right = 0, floor }: {
   const place = usePlaceOrDefault()
   const art = SCENERY[place]
   const ref = useRef<HTMLDivElement>(null)
+  const groundRef = useRef<HTMLDivElement>(null)
   const [reducedMotion, setReducedMotion] = useState(prefersReducedMotion)
 
   useEffect(() => {
@@ -80,9 +81,9 @@ export function PlaceScenery({ scroller, right = 0, floor }: {
   useEffect(() => {
     const el = ref.current
     // Reduced motion: no scroll-linked change at all — CSS holds the veil at
-    // one steady, stronger coverage instead.
+    // one steady coverage strong enough for text over the art.
     if (!el || !scroller || reducedMotion) return
-    return attachSceneryVeil(scroller, el)
+    return attachSceneryVeil(scroller, el, groundRef.current)
   }, [scroller, reducedMotion])
 
   const style = {
@@ -95,7 +96,7 @@ export function PlaceScenery({ scroller, right = 0, floor }: {
 
   return (
     <div ref={ref} aria-hidden="true" className="place-scenery" data-place-scenery={place} style={style}>
-      <div className="place-scenery-ground">
+      <div ref={groundRef} className="place-scenery-ground">
         <div className="place-scenery-strip" />
         <div className="place-scenery-corner is-left">
           <img className="place-scenery-art" src={art.left} alt="" decoding="async" draggable={false} />
