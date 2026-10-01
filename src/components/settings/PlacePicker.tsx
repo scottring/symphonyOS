@@ -1,23 +1,50 @@
-// Settings → Appearance: pick your place. Five illustrated medallions;
-// tapping one applies instantly (sidebar art + accent re-tint, no reload)
-// and syncs to your profile so it follows you across devices.
+// Settings → Appearance: pick your place. Five previews of each place's sky
+// and landscape in the chosen lighting; tapping one applies instantly
+// (scenery + accent re-tint, no reload) and syncs to your profile so it
+// follows you across devices. Show scenery and Lighting are device-local.
 import { PLACES } from '@/config/places'
 import { usePlace } from '@/hooks/usePlace'
-import { PlaceMedallion } from '@/components/place/PlaceMedallion'
+import { PANORAMAS } from '@/components/place/panoramas'
+import { nextAutomaticChange, useSceneryPreferences, type SceneryLightingChoice } from '@/hooks/useSceneryPreferences'
+
+const LIGHTING_LABEL = { 'daytime': 'Daytime', 'dusk-dawn': 'Dusk / Dawn', 'nighttime': 'Nighttime' } as const
 
 export function PlacePicker() {
   const { place, setPlace } = usePlace()
+  const { showScenery, setShowScenery, sceneryLighting, lightingChoice, setSceneryLighting } = useSceneryPreferences()
+  const next = lightingChoice === 'auto' ? nextAutomaticChange() : null
 
   return (
     <section>
       <h2 className="mb-2 font-display text-[22px] text-neutral-900">Your place</h2>
       <p className="text-sm text-neutral-500 mb-6">
-        Your place is Symphony's theme: its artwork, and the accent colour on
+        Your place is Symphony's theme: its scenery and sky, and the accent colour on
         selected tabs, buttons and links. It applies instantly and follows you
         across devices.
       </p>
 
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+      <div className="place-display-options">
+        <label className="place-scenery-setting">
+          <input type="checkbox" checked={showScenery} onChange={e => setShowScenery(e.target.checked)} />
+          <span><strong>Show scenery</strong><small>Turn off for more content space. Your theme colours stay.</small></span>
+        </label>
+        <label className="place-art-setting">Lighting
+          <select value={lightingChoice} onChange={e => setSceneryLighting(e.target.value as SceneryLightingChoice)}>
+            <option value="auto">Automatic</option>
+            <option value="daytime">Daytime</option>
+            <option value="dusk-dawn">Dusk / Dawn</option>
+            <option value="nighttime">Nighttime</option>
+          </select>
+        </label>
+      </div>
+      <p className="text-xs text-neutral-500 mb-4">
+        {lightingChoice === 'auto' && (
+          <>Automatic follows sunrise and sunset: now {LIGHTING_LABEL[sceneryLighting]}
+            {next ? `, changing at ${new Date(next).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}` : ''}. </>
+        )}
+        Scenery visibility and lighting are saved on this device.
+      </p>
+      <div className="place-theme-grid">
         {PLACES.map((p) => {
           const active = p.id === place
           return (
@@ -33,7 +60,11 @@ export function PlacePicker() {
                   : 'border-neutral-200 bg-white hover:border-neutral-300 hover:shadow-sm'}
               `}
             >
-              <PlaceMedallion place={p.id} className="w-full aspect-square mb-2" />
+              {/* The place's own sky and landscape, in the chosen light —
+                  the same artwork and hue the page wears. */}
+              <span className="place-theme-preview" data-sky-place={p.id} data-scenery-lighting={sceneryLighting} aria-hidden="true">
+                <img src={PANORAMAS[p.id][sceneryLighting].src} alt="" loading="lazy" />
+              </span>
               <div className="flex items-center gap-1.5">
                 {/* The colour this place gives the app. */}
                 <span className="shrink-0 w-3 h-3 rounded-full" style={{ background: p.swatch }} aria-hidden="true" />

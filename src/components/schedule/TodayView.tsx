@@ -1,4 +1,5 @@
 import { publishViewedDay } from '@/lib/viewedDaySignal'
+import { useSceneryContent } from '@/components/place/useSceneryContent'
 import { DesktopControlsContext, DesktopLeadContext } from '@/components/layout/DesktopNavigation'
 import { createPortal } from 'react-dom'
 import { DesktopFooterAction, DesktopFooterActionContext } from '@/components/layout/DesktopFooter'
@@ -226,6 +227,10 @@ export function TodayView({
 }: TodayViewProps) {
   useLayoutEffect(() => { publishViewedDay(viewedDate) }, [viewedDate])
   useLayoutEffect(() => () => publishViewedDay(null), [])
+  // The day's column is marked as the page's content (below): the place's
+  // scenery shows fully in the space the day leaves empty and recedes as soon
+  // as the day runs down into it.
+  useSceneryContent()
   // ── Context ──────────────────────────────────────────────────────────────────
   const isMobile = useMobile()
   const [editionPreview, hideEditionPreview] = useEditionPreview()
@@ -1349,7 +1354,9 @@ export function TodayView({
   return (
     // @container: the day and its week column split on the page's own width
     // (no ancestor declared one, so the old decision rail never went beside).
-    <div className="@container w-full max-w-[1152px] mr-auto px-0 py-2 md:px-10 lg:px-14 md:pt-2 md:pb-8">
+    // data-scenery-content: how far the day reaches down the window, so no
+    // row, however long the day, is ever set over the place's scenery.
+    <div data-scenery-content className="@container w-full max-w-[1152px] mr-auto px-0 py-2 md:px-10 lg:px-14 md:pt-2 md:pb-8">
       {/* Today's filter and ⋯ live in its heading beside the lens and the
           assistant, as every horizon's page controls do — the top bar is the
           same on every page (2026-09-29). */}

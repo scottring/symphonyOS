@@ -309,6 +309,60 @@ describe('Centred desktop workspace and footer', () => {
   })
 })
 
+// Immersive scenery (Scott, 2026-10-01): the shell wears the place's sky in
+// the chosen light, the landscape stands in front of the page's rows, and
+// Show scenery off removes all of it while the place's colours stay.
+describe('Place scenery', () => {
+  beforeEach(() => { selectionState.selection = null; localStorage.removeItem('symphony-show-scenery'); localStorage.removeItem('symphony-scenery-lighting') })
+  afterEach(() => { mobileState.isMobile = false })
+
+  for (const phone of [false, true]) {
+    it(`stands in the scroller, outside the page, hidden from assistive tech (${phone ? 'phone' : 'desktop'})`, () => {
+      mobileState.isMobile = phone
+      renderAt('/today')
+      const scenery = document.querySelector('[data-place-scenery]') as HTMLElement
+      const page = screen.getByTestId('app-content')
+      expect(scenery).toHaveAttribute('aria-hidden', 'true')
+      expect(scenery.querySelectorAll('button, a, input, [tabindex]')).toHaveLength(0)
+      expect(scenery).not.toContainElement(page)
+      // Inside the scroller, so wheel and touch over it still scroll the page.
+      const scroller = scenery.parentElement as HTMLElement
+      expect(scroller).toContainElement(page)
+      expect(scroller).toHaveClass('scenery-scroll')
+      expect(document.querySelectorAll('[data-place-scenery]')).toHaveLength(1)
+      // The page's own regions carry the sky's text colours.
+      expect(page.closest('.scenery-page')).not.toBeNull()
+    })
+  }
+
+  it('the shell wears the chosen lighting; the side pane is not a page region', () => {
+    localStorage.setItem('symphony-scenery-lighting', 'nighttime')
+    selectionState.selection = { kind: 'task', id: 't1' } as never
+    renderAt('/today')
+    const shell = document.querySelector('[data-scenery-lighting]') as HTMLElement
+    expect(shell).toHaveAttribute('data-scenery-lighting', 'nighttime')
+    expect(shell).toHaveClass('scenery-sky')
+    const pane = document.querySelector('.side-column') as HTMLElement | null
+    if (pane) expect(pane.closest('.scenery-page')).toBeNull()
+  })
+
+  it('Show scenery off removes the sky, landscape, fade and clearance', () => {
+    localStorage.setItem('symphony-show-scenery', 'false')
+    mobileState.isMobile = true
+    renderAt('/today')
+    expect(document.querySelector('[data-place-scenery]')).toBeNull()
+    expect(document.querySelector('[data-scenery-lighting]')).toBeNull()
+    expect(document.querySelector('.scenery-sky, .scenery-scroll, .scenery-end-clearance')).toBeNull()
+  })
+
+  it('leaves the footer as the only thing in its grid row', () => {
+    renderAt('/today')
+    const ground = screen.getByRole('contentinfo').parentElement as HTMLElement
+    expect(ground).toHaveClass('desktop-ground')
+    expect(ground.children).toHaveLength(1)
+  })
+})
+
 describe('Grouped More menu and desktop capture', () => {
   beforeEach(() => { mobileState.isMobile = false; selectionState.selection = null; sessionStorage.clear(); localStorage.removeItem('symphony-plan-period') })
 

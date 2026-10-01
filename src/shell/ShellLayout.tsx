@@ -38,7 +38,8 @@ import { MOBILE_TAB_BAR_HEIGHT } from './mobileChrome';
 import { SideColumn, SIDE_COLUMN_WIDTH, type SidePane } from './SideColumn';
 import { PhonePaneSwitch } from './PhonePaneSwitch';
 import { NoteViewer } from '@/components/chat/NoteViewer';
-import { PlaceBand } from '@/components/place/PlaceBand';
+import { useSceneryPreferences } from '@/hooks/useSceneryPreferences';
+import { PlaceScenery } from '@/components/place/PlaceScenery';
 import { planV2Enabled } from '@/lib/planning/v2/planV2';
 import { onQuickAddRequest } from '@/lib/quickAddSignal';
 import { GuideProvider } from '@/hooks/useGuidedPlan';
@@ -147,6 +148,11 @@ function ShellLayoutInner({ children }: Props) {
   const [desktopCenter, setDesktopCenter] = useState<HTMLDivElement | null>(null);
   const [mobilePlanControls, setMobilePlanControls] = useState<HTMLDivElement | null>(null);
   const [desktopFooterAction, setDesktopFooterAction] = useState<HTMLDivElement | null>(null);
+  // The element that scrolls the page — the content frame, on desktop and
+  // phone alike. Focused controls must clear the scenery foreground.
+  const [pageScroller, setPageScroller] = useState<HTMLDivElement | null>(null);
+  const { showScenery, sceneryLighting } = useSceneryPreferences();
+  const sceneryFloor = isMobile ? `calc(${MOBILE_TAB_BAR_HEIGHT} + env(safe-area-inset-bottom, 0px))` : undefined;
 
   const references = useReferenceLists();
   const activeView = useMemo(() => deriveActiveView(location.pathname), [location.pathname]);
@@ -259,7 +265,13 @@ function ShellLayoutInner({ children }: Props) {
     <MobilePlanControlsContext.Provider value={mobilePlanControls}>
     <DesktopFooterActionContext.Provider value={desktopFooterAction}>
     <GuideHostContext.Provider value={setGuideHost}>
-    <div className="h-screen flex overflow-hidden overflow-x-hidden bg-bg-base w-full max-w-[100vw]">
+    {/* With scenery on, the shell wears the place's sky in the chosen light
+        (index.css, IMMERSIVE SCENERY); page regions marked .scenery-page
+        take its text colours. */}
+    <div
+      className={`${showScenery ? 'scenery-sky ' : ''}h-screen flex overflow-hidden overflow-x-hidden bg-bg-base w-full max-w-[100vw]`}
+      data-scenery-lighting={showScenery ? sceneryLighting : undefined}
+    >
       {/* "New version available — reload" banner: shows when a newer build
           deployed while this tab stayed open (stale-tab guard). */}
       <NewVersionBanner />
@@ -267,7 +279,8 @@ function ShellLayoutInner({ children }: Props) {
       {/* Content frame — uses <div> (not <main>) because individual apps render
           their own <main>. Avoids invalid nested-main HTML. */}
       <div
-        className={`relative flex-1 overflow-auto overflow-x-hidden ${isMobile ? '' : 'transition-all duration-300 ease-in-out'}`}
+        ref={setPageScroller}
+        className={`${showScenery ? 'scenery-scroll' : ''} relative flex-1 overflow-auto overflow-x-hidden ${isMobile ? '' : 'transition-all duration-300 ease-in-out'}`}
         style={
           isMobile
             ? {
@@ -295,7 +308,7 @@ function ShellLayoutInner({ children }: Props) {
           // Rides in the top-right corner, level with the page title, rather
           // than spending a row of its own above it.
           <header
-            className="phone-page-lens absolute right-0 top-0 z-10 px-4 pt-2"
+            className="phone-page-lens scenery-page absolute right-0 top-0 z-10 px-4 pt-2"
             style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 8px)' }}
           >
             <DomainSwitcher />
@@ -303,7 +316,7 @@ function ShellLayoutInner({ children }: Props) {
         )}
 
         {isMobile ? (
-          <div>
+          <div className="scenery-page">
             <PlanNavigation mobile mobileControlsRef={setMobilePlanControls} />
             {/* Off the planner the area lens rides top-right; the guide sits below it. */}
             <div className={`guide-slot${planPeriodForPath(location.pathname) ? '' : ' has-lens'}`}><GuideBar host={guideHost} /></div>
@@ -315,7 +328,7 @@ function ShellLayoutInner({ children }: Props) {
           // the pinned reference lists.
           <>
           <div className={`desktop-workspace relative${referencesVisible ? ' has-references' : ''}`}>
-            <div className="desktop-workspace-nav">
+            <div className="desktop-workspace-nav scenery-page">
         <DesktopNavigation inboxCount={inboxCount} discussionsUnread={discussionsUnread}
           onSearch={() => setQuickAddOpen(true)} onSignOut={signOut}
           userName={user?.user_metadata?.name ?? user?.email}
@@ -368,22 +381,24 @@ function ShellLayoutInner({ children }: Props) {
                   />
                 }
               >
-                {/* Guided planning rides above the page it is guiding. */}
-                <div className="guide-slot"><GuideBar host={guideHost} /></div>
-                {children}
+                <div className="scenery-page scenery-page-contents">
+                  {/* Guided planning rides above the page it is guiding. */}
+                  <div className="guide-slot"><GuideBar host={guideHost} /></div>
+                  {children}
+                </div>
               </SideColumn>
             </div>
             {referencesVisible && <div className="desktop-workspace-dock"><ReferenceListsDock /></div>}
-            {/* Your place, as ground under the page — it anchors the bottom
-                rather than crowding the navigation — and it stays put: the
-                page scrolls, the ground and footer do not (Scott, 2026-09-28). */}
-            <div className="desktop-ground">
-              <PlaceBand ground />
+            {/* The footer stays put while the page scrolls (Scott, 2026-09-28);
+                with scenery on it floats on the landscape (PlaceScenery). */}
+            <div className="desktop-ground scenery-page">
               <DesktopFooter actionRef={setDesktopFooterAction} />
             </div>
           </div>
           </>
         )}
+        {showScenery && isMobile && <div className="scenery-end-clearance" aria-hidden="true" />}
+        <PlaceScenery scroller={pageScroller} right={isMobile ? 0 : paneWidth} floor={sceneryFloor} />
       </div>
 
       {/* QuickCapture FAB — all routes except the agent view (which has its own input) */}
@@ -453,7 +468,7 @@ function ShellLayoutInner({ children }: Props) {
           field has focus the keyboard owns the bottom edge, so the dock steps
           aside and the capture bar sits on the keyboard (as on iOS). */}
       {isMobile && !typing && (
-        <nav className="phone-dock" aria-label="Main">
+        <nav className="phone-dock scenery-page" aria-label="Main">
           <div className="phone-dock-row">
             <button
               type="button"

@@ -2028,8 +2028,6 @@ html.desktop-shell a {
 }
 .desktop-ground > * { pointer-events: auto; }
 .desktop-ground .desktop-footer { margin-inline: auto; padding-top: 8px; padding-bottom: 16px; }
-.desktop-ground .place-band.is-ground { margin-top: 0; height: 72px; margin-inline: auto; display: block; pointer-events: none; }
-.desktop-ground .place-band.is-ground .place-band-scene { height: 72px; }
 .desktop-workspace-dock { grid-area: dock; align-self: stretch; min-width: 0; }
 /* References stay in the desktop workspace across route changes. */
 .desktop-workspace.has-references {
@@ -2323,10 +2321,7 @@ html.desktop-shell a {
 .plan-page-tools.is-rail { position: sticky; top: 0; z-index: 14; padding-top: 6px; padding-bottom: 6px; background: var(--color-bg-base); transition: box-shadow .15s; }
 .plan-page-tools.is-rail.is-stuck { box-shadow: 0 1px 0 var(--color-neutral-200), 0 8px 16px -14px rgb(0 0 0 / .18); }
 .plan-rail-sentinel { height: 1px; margin-bottom: -1px; }
-/* While the rail is pinned, the footer's scene steps down a little. */
-.desktop-ground .place-band.is-ground, .desktop-ground .place-band.is-ground .place-band-scene { transition: height .2s ease; }
-html.rail-stuck .desktop-ground .place-band.is-ground, html.rail-stuck .desktop-ground .place-band.is-ground .place-band-scene { height: 52px; }
-@media (prefers-reduced-motion: reduce) { .plan-page-tools.is-rail, .desktop-ground .place-band.is-ground, .desktop-ground .place-band.is-ground .place-band-scene { transition: none; } }
+@media (prefers-reduced-motion: reduce) { .plan-page-tools.is-rail { transition: none; } }
 /* The top bar: icon buttons one size (2026-09-29). */
 .page-navigation-icon { position: relative; display: inline-grid; place-items: center; width: 34px; height: 34px; border-radius: 9px; color: var(--color-neutral-600); }
 .page-navigation-icon:hover { background: var(--color-neutral-100); color: var(--color-neutral-900); }
@@ -2759,43 +2754,180 @@ div.chooser-action-group { overflow: visible !important; }
   border-right: 1px solid color-mix(in srgb, var(--color-primary-300) 35%, var(--color-neutral-200));
   box-shadow: none;
 }
-/* Your place across the top of the app (PlaceBand.tsx): a shallow window onto
-   the scene's horizon behind the navigation, fading at both ends and into the
-   page so labels stay readable. Same height as the navigation band. */
-.place-band {
-  position: absolute; left: 0; right: 0; top: 0; height: 88px;
-  overflow: hidden; pointer-events: none;
-  -webkit-mask-image: linear-gradient(to bottom, black 60%, transparent);
-  mask-image: linear-gradient(to bottom, black 60%, transparent);
+/* =============================================================================
+   IMMERSIVE SCENERY (Settings → Your place; Scott approved 2026-10-01).
+   An open, painted sky runs behind the whole page in the place's own hue,
+   and one continuous landscape stands along the bottom of the window. Page
+   content stays real, opaque DOM: it sits on the sky, softened behind it by a
+   light wash, and slips behind a sky-coloured fade above the landscape as it
+   scrolls. Lighting (Daytime, Dusk / Dawn, Nighttime) and the Show scenery
+   switch are device-local (useSceneryPreferences); off, the page is plain
+   paper in the place's tint and nothing below applies.
+   ============================================================================= */
+
+/* Each place's sky hue, from its accent (places.ts): muted, never the
+   saturated accent itself. [data-sky-place] lets a picker preview wear a
+   place other than the current one. */
+:root, [data-sky-place='cabin'] { --sky-h: 150; --sky-s: 22%; }
+:root[data-place='urban'], [data-sky-place='urban'] { --sky-h: 215; --sky-s: 30%; }
+:root[data-place='small-city'], [data-sky-place='small-city'] { --sky-h: 315; --sky-s: 24%; }
+:root[data-place='mountain-town'], [data-sky-place='mountain-town'] { --sky-h: 203; --sky-s: 42%; }
+:root[data-place='farm'], [data-sky-place='farm'] { --sky-h: 6; --sky-s: 34%; }
+
+/* The sky for each lighting: pale by day; dusk and dawn mix the place's hue
+   with lavender above and peach at the horizon; night is deep. The wash
+   (15–20%) calms the sky behind the content column and tapers away before
+   the landscape. */
+[data-scenery-lighting] {
+  --scenery-sky: linear-gradient(to bottom, var(--sky-top), var(--sky-mid) 45%, var(--sky-low) 78%);
+  --scenery-sky-layers:
+    radial-gradient(ellipse 64% 72% at 50% 24%, var(--scenery-wash), var(--scenery-wash) 42%, transparent 100%),
+    var(--scenery-sky);
 }
-/* Two layers in the place's own colour: a paler range behind, the town or
-   trees in front. The front layer is solid (mixed into the page colour, not
-   see-through) so the hills sit behind the buildings instead of showing
-   through them (Scott, 2026-09-28). */
-.place-skyline-far { fill: var(--color-primary-300); opacity: 0.45; }
-.place-skyline-near { fill: color-mix(in srgb, var(--color-primary-400) 62%, var(--color-bg-base)); }
-/* The place as GROUND under the page (Scott, 2026-09-28: "move the scenes
-   down to the bottom to anchor the page visually") — standing on the footer,
-   fading up into the page instead of down from the navigation. */
-.place-band.is-ground {
-  position: relative; top: auto; height: 96px; margin-top: 48px;
-  width: 100%; max-width: 1152px; justify-self: center; padding-inline: 56px; box-sizing: border-box;
-  -webkit-mask-image: linear-gradient(to top, black 55%, transparent);
-  mask-image: linear-gradient(to top, black 55%, transparent);
+[data-scenery-lighting='daytime'] {
+  --sky-top: hsl(var(--sky-h) calc(var(--sky-s) * 1.15) 82%);
+  --sky-mid: hsl(var(--sky-h) calc(var(--sky-s) * 0.9) 88%);
+  --sky-low: hsl(var(--sky-h) calc(var(--sky-s) * 0.6) 93%);
+  --scenery-wash: rgb(253 251 246 / 0.2);
+  --scenery-haze: 0.35;
 }
-/* Out to the ends of the footer's line, fading as it gets there. */
-.place-band.is-ground .place-band-scene {
-  position: relative; left: auto; top: auto; transform: none; width: 100%; height: 96px;
-  -webkit-mask-image: linear-gradient(to right, transparent, black 22%, black 78%, transparent);
-  mask-image: linear-gradient(to right, transparent, black 22%, black 78%, transparent);
+[data-scenery-lighting='dusk-dawn'] {
+  --sky-top: color-mix(in oklab, hsl(var(--sky-h) var(--sky-s) 74%) 70%, hsl(258 30% 74%));
+  --sky-mid: color-mix(in oklab, hsl(var(--sky-h) var(--sky-s) 82%) 45%, hsl(282 32% 84%));
+  --sky-low: color-mix(in oklab, hsl(var(--sky-h) var(--sky-s) 86%) 30%, hsl(24 78% 85%));
+  --scenery-wash: rgb(253 249 244 / 0.2);
+  --scenery-haze: 0.4;
 }
-@media (max-width: 1023px) { .place-band.is-ground { padding-inline: 40px; } }
-.place-band-scene {
-  position: absolute; left: 50%; top: 0; width: 640px; height: 88px;
-  transform: translateX(-50%);
-  -webkit-mask-image: linear-gradient(to right, transparent, black 32%, black 68%, transparent);
-  mask-image: linear-gradient(to right, transparent, black 32%, black 68%, transparent);
+[data-scenery-lighting='nighttime'] {
+  --sky-top: hsl(var(--sky-h) var(--sky-s) 10%);
+  --sky-mid: hsl(var(--sky-h) var(--sky-s) 15%);
+  --sky-low: hsl(var(--sky-h) calc(var(--sky-s) * 0.85) 23%);
+  --scenery-wash: hsl(var(--sky-h) 30% 6% / 0.2);
+  --scenery-haze: 0.55;
 }
+/* The shell wears the sky; it never scrolls, so neither does the sky. */
+.scenery-sky { background: var(--scenery-sky-layers); background-attachment: fixed; }
+
+/* Sticky bars that hide the rows scrolling under them wear the same fixed
+   sky, so they conceal content without drawing a band of paper across it. */
+.scenery-sky :is(.desktop-workspace-nav:has(.page-navigation-center:not(:empty)), .plan-page-tools.is-rail) {
+  background: var(--scenery-sky-layers); background-attachment: fixed;
+}
+
+/* Text on the sky stays strong: by day and at dusk the quiet greys deepen a
+   step; at night the page's own text and surfaces turn light-on-dark. Only
+   page regions (.scenery-page) change — the side pane, reference lists,
+   dialogs and menus portalled to <body> keep their paper colours. */
+[data-scenery-lighting]:not([data-scenery-lighting='nighttime']) .scenery-page {
+  --color-neutral-400: #60605c;
+  --color-neutral-500: #4c4c49;
+}
+[data-scenery-lighting='nighttime'] .scenery-page {
+  color-scheme: dark;
+  color: var(--color-neutral-900);
+  --color-neutral-50: hsl(var(--sky-h) 22% 17%);
+  --color-neutral-100: hsl(var(--sky-h) 18% 21%);
+  --color-neutral-200: hsl(var(--sky-h) 14% 31%);
+  --color-neutral-300: hsl(var(--sky-h) 10% 43%);
+  --color-neutral-400: hsl(var(--sky-h) 8% 66%);
+  --color-neutral-500: hsl(var(--sky-h) 8% 77%);
+  --color-neutral-600: hsl(var(--sky-h) 8% 83%);
+  --color-neutral-700: hsl(var(--sky-h) 8% 88%);
+  --color-neutral-800: hsl(var(--sky-h) 8% 92%);
+  --color-neutral-900: hsl(var(--sky-h) 10% 95%);
+  --color-neutral-950: hsl(var(--sky-h) 10% 98%);
+  --color-bg-base: hsl(var(--sky-h) 26% 12%);
+  --color-bg-elevated: hsl(var(--sky-h) 24% 15%);
+  --color-primary-50: color-mix(in oklab, var(--color-primary-500) 26%, hsl(var(--sky-h) 25% 13%));
+  --color-primary-100: color-mix(in oklab, var(--color-primary-500) 36%, hsl(var(--sky-h) 25% 13%));
+  --color-primary-200: color-mix(in oklab, var(--color-primary-500) 50%, hsl(var(--sky-h) 25% 20%));
+  --color-primary-700: color-mix(in oklab, var(--color-primary-300) 80%, #fff);
+  --color-primary-800: color-mix(in oklab, var(--color-primary-300) 60%, #fff);
+  --color-primary-900: color-mix(in oklab, var(--color-primary-300) 40%, #fff);
+  --color-primary-950: color-mix(in oklab, var(--color-primary-300) 20%, #fff);
+  --color-accent-50: color-mix(in oklab, var(--color-accent-500) 26%, hsl(var(--sky-h) 25% 13%));
+  --color-accent-100: color-mix(in oklab, var(--color-accent-500) 36%, hsl(var(--sky-h) 25% 13%));
+  --color-accent-200: color-mix(in oklab, var(--color-accent-500) 50%, hsl(var(--sky-h) 25% 20%));
+  --color-accent-700: color-mix(in oklab, var(--color-accent-300) 80%, #fff);
+  --shadow-card: 0 0 0 1px hsl(var(--sky-h) 14% 27%), 0 2px 8px rgb(0 0 0 / 0.25);
+  --shadow-elevated: 0 0 0 1px hsl(var(--sky-h) 14% 27%), 0 8px 24px -4px rgb(0 0 0 / 0.35);
+}
+/* White cards and the place's mid accents used as text, at night. */
+[data-scenery-lighting='nighttime'] .scenery-page :is(.bg-white, [class*='bg-white/']) { background-color: var(--color-bg-elevated); }
+[data-scenery-lighting='nighttime'] .scenery-page :is(.text-primary-500, .text-primary-600, .text-accent-500, .text-accent-600, .horizon-rail a.is-current .horizon-rail-n, .pv2-tick, .pv2-stamp-done) { color: var(--color-primary-300); }
+/* A layout-neutral wrapper that only carries the page tokens above. */
+.scenery-page-contents { display: contents; }
+
+/* The landscape, IN FRONT of the page: more of the same fixed sky, shown
+   through the painting's veil (opaque under the skyline, fading in a little
+   above it — so rows slip out of sight just as they reach the hills, and the
+   open sky in the middle stays usable), then the one painting, full width at
+   its own proportions: never stretched, cropped at the skyline or repeated.
+   Menus, the footer and the side pane stay above it. Only the part under the
+   skyline (.place-scenery-catch) takes the pointer: concealed rows cannot be
+   clicked, and PlaceScenery forwards wheel and touch scrolling from it. */
+.place-scenery {
+  position: fixed; left: 0; bottom: var(--scenery-floor, 0px); /* right: the side pane, inline */
+  z-index: 14; pointer-events: none; user-select: none;
+}
+.place-scenery-veil {
+  position: absolute; inset: 0;
+  background: var(--scenery-sky-layers); background-attachment: fixed;
+  -webkit-mask: var(--scenery-veil) 0 0 / 100% 100% no-repeat;
+  mask: var(--scenery-veil) 0 0 / 100% 100% no-repeat;
+}
+.place-scenery-panorama { position: relative; display: block; width: 100%; height: auto; -webkit-user-drag: none; }
+/* Atmospheric perspective: the far hills take on the sky's own hue, fading
+   out before the foreground, so each place's sky and its land agree. */
+.place-scenery-haze {
+  position: absolute; inset: 0;
+  background: var(--sky-low); opacity: var(--scenery-haze, 0.35);
+  -webkit-mask: var(--scenery-art) 0 0 / 100% 100% no-repeat, linear-gradient(#000 25%, transparent 68%);
+  -webkit-mask-composite: source-in;
+  mask: var(--scenery-art) 0 0 / 100% 100% no-repeat, linear-gradient(#000 25%, transparent 68%);
+  mask-composite: intersect;
+}
+.place-scenery-catch { position: absolute; left: 0; right: 0; bottom: 0; pointer-events: auto; }
+
+/* Room at the end of the page so every last row can be scrolled clear of the
+   landscape (--scenery-clearance: the landscape's measured height, written by
+   PlaceScenery). Desktop puts it above the sticky footer, which floats on the
+   painting; phones add it after the page, above the dock it stands on. */
+.scenery-scroll { scroll-padding-bottom: calc(var(--scenery-clearance, 240px) + 16px); }
+.scenery-scroll .desktop-workspace-page { padding-bottom: max(0px, calc(var(--scenery-clearance, 240px) - 56px)); }
+.scenery-end-clearance { height: var(--scenery-clearance, 120px); flex-shrink: 0; pointer-events: none; }
+/* The phone's capture bar floats on the painting too: the landscape's veil
+   already hides the rows beneath it, so its paper fade would only draw a
+   band across the scene. */
+.scenery-scroll .phone-capture-bar::before { display: none; }
+/* The footer floats on the painting, light on a soft shade like the approved
+   concepts, instead of on a band of paper. */
+.scenery-scroll .desktop-ground {
+  background: linear-gradient(to bottom, transparent, rgb(12 14 18 / 0.32));
+}
+.scenery-scroll .desktop-ground .desktop-footer { color: #fff; text-shadow: 0 1px 3px rgb(0 0 0 / 0.65); }
+.scenery-scroll .desktop-ground .desktop-footer-rule { border-top-color: transparent; }
+.scenery-scroll .desktop-ground .desktop-footer-signature { color: #fff; }
+.scenery-scroll .desktop-ground .desktop-footer button:hover { color: #fff; text-decoration: underline; }
+.scenery-scroll .desktop-ground .desktop-footer button:focus-visible { outline-color: #fff; }
+
+/* Settings → Your place */
+.place-display-options { display: flex; gap: 24px; align-items: center; justify-content: space-between; flex-wrap: wrap; margin-bottom: 12px; }
+.place-scenery-setting { display: flex; gap: 12px; align-items: center; cursor: pointer; }
+.place-scenery-setting input { width: 20px; height: 20px; accent-color: var(--color-primary-500); }
+.place-scenery-setting strong { display: block; font-size: 15px; }
+.place-scenery-setting small { display: block; color: var(--color-neutral-500); font-size: 13px; margin-top: 3px; }
+.place-art-setting { display: flex; align-items: center; gap: 10px; font-size: 14px; }
+.place-art-setting select { border: 1px solid var(--color-neutral-200); border-radius: 8px; padding: 8px 10px; background: var(--color-bg-elevated); color: inherit; }
+.place-theme-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 14px; }
+/* Each card shows its place's real sky and landscape in the chosen light. */
+.place-theme-preview {
+  position: relative; display: block; width: 100%; aspect-ratio: 2 / 1; overflow: hidden;
+  border-radius: 10px; margin-bottom: 12px; background: var(--scenery-sky-layers);
+}
+.place-theme-preview img { position: absolute; left: 0; bottom: 0; width: 100%; height: auto; }
+@media (min-width: 1000px) { .place-theme-grid { grid-template-columns: repeat(3,minmax(0,1fr)); } }
+@media (max-width: 480px) { .place-theme-grid { grid-template-columns: 1fr; } }
 
 /* =============================================================================
    PHONE CHROME — the native dock (MainView.swift SymphonyDock) and floating
