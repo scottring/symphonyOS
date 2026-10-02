@@ -190,33 +190,46 @@
 .scenery-scroll { scrollbar-gutter: stable; }
 
 /* Side-by-side planning columns scroll on their own (Scott, 2026-10-02):
-   the days, the list and the level above each fill the room from the grid's
-   top to the landscape (--pv2-col-h, useColumnsFitWindow), so one long
-   column no longer drags the others off screen. Each column's heading stays
-   at its top, wearing the page's own background like the other sticky bars.
-   Stacked columns (phones, narrow windows) keep the one page scroll. */
-.pv2-wgrid.is-colscroll { --pv2-colh-bg: var(--color-bg-base); }
-.scenery-sky .pv2-wgrid.is-colscroll { --pv2-colh-bg: var(--scenery-sky-layers); }
+   the days or dates, the list and the level above each fill the room from
+   the grid's top to the landscape (--pv2-col-h, useColumnsFitWindow), so one
+   long column no longer drags the others off screen. Each column's heading
+   stays at its top, wearing the page's own background like the other sticky
+   bars. Week (.pv2-wgrid), Month (.pv2-grid3, .pv2-grid2.is-cal-first) and
+   Season (.pv2-grid2.is-ref). Stacked columns (phones, narrow windows) keep
+   the one page scroll. */
+.is-colscroll { --pv2-colh-bg: var(--color-bg-base); }
+.scenery-sky .is-colscroll { --pv2-colh-bg: var(--scenery-sky-layers); }
 @media (min-width: 861px) {
-  .pv2-wgrid.is-colscroll { align-items: stretch; }
-  .pv2-wgrid.is-colscroll > :is(.pv2-days, .pv2-wside) {
+  .is-colscroll { align-items: stretch; }
+  /* The columns end above the landscape themselves; the page's trailing
+     room (there for one long page scroll) would only add a scroll. */
+  .pv2-page:has(> .is-colscroll) { padding-bottom: 0; }
+  :is(.pv2-wgrid.is-colscroll > :is(.pv2-days, .pv2-wside),
+      :is(.pv2-grid2, .pv2-grid3).is-colscroll > :is(.pv2-dropcol, .pv2-ref)) {
     /* Relative, so absolutely placed bits inside (drag announcements, row
        actions) are clipped by the column instead of stretching the page. */
     position: relative; top: auto; max-height: var(--pv2-col-h, none);
     overflow-y: auto; scrollbar-width: thin;
-    /* Room for the row boxes that bleed 12px past the column. */
-    margin: 0 -14px; padding: 0 14px;
+    /* Room for the row boxes that bleed 12px past the column, and on the
+       left for the drag grip that stands 22px out (clipped at 14px, it
+       couldn't be grabbed). 14 + 22 is the narrowest gap (36px), so
+       neighbouring columns never overlap. */
+    margin: 0 -14px 0 -22px; padding: 0 14px 0 22px;
   }
-  .pv2-wgrid.is-colscroll > :is(.pv2-days, .pv2-wside) .pv2-colh {
+  .is-colscroll > :is(.pv2-days, .pv2-wside, .pv2-dropcol) .pv2-colh,
+  :is(.pv2-grid2, .pv2-grid3).is-colscroll > .pv2-ref :is(.pv2-refsec > .pv2-colh, .pv2-refshelf > summary) {
     position: sticky; top: 0; z-index: 2;
     background: var(--pv2-colh-bg); background-attachment: fixed;
   }
+  :is(.pv2-grid2, .pv2-grid3).is-colscroll > .pv2-ref .pv2-refshelf > summary { padding: 4px 0 6px; }
+  /* The drop outline hugs the list, inside the column's scroll box. */
+  .is-colscroll > .pv2-dropcol.is-over { outline-offset: -4px; }
 }
 @media (min-width: 1061px) {
   .pv2-wgrid.is-colscroll > .pv2-ref {
     position: relative; top: auto; max-height: var(--pv2-col-h, none);
     overflow-y: auto; scrollbar-width: thin;
-    margin: 0 -14px; padding: 0 14px;
+    margin: 0 -14px 0 -22px; padding: 0 14px 0 22px;
   }
   /* Each section's heading — a month, then the shelves below ("Earlier, not
      done", routines) — holds the top until its own list ends, and the next

@@ -1,12 +1,10 @@
 import { describe, it, expect, afterEach, vi } from 'vitest'
 import { render, cleanup } from '@testing-library/react'
-import { useRef } from 'react'
 import { useColumnsFitWindow } from './useColumnsFitWindow'
 
-function Grid() {
-  const ref = useRef<HTMLDivElement>(null)
-  useColumnsFitWindow(ref)
-  return <div ref={ref} data-testid="grid" />
+function Grid({ shown = true }: { shown?: boolean }) {
+  const ref = useColumnsFitWindow()
+  return shown ? <div ref={ref} data-testid="grid" /> : <p>Nothing on this week yet.</p>
 }
 
 function mount({ wide }: { wide: boolean }) {
@@ -20,9 +18,9 @@ function mount({ wide }: { wide: boolean }) {
   Object.defineProperty(scroller, 'clientHeight', { value: 1000 })
   scroller.getBoundingClientRect = () => ({ top: 0 }) as DOMRect
   document.body.appendChild(scroller)
-  const { getByTestId } = render(<Grid />, { container: scroller })
-  const grid = getByTestId('grid')
-  return { scroller, grid }
+  const view = render(<Grid />, { container: scroller })
+  const grid = view.getByTestId('grid')
+  return { scroller, grid, view }
 }
 
 afterEach(() => { cleanup(); vi.restoreAllMocks(); document.body.innerHTML = '' })
@@ -44,6 +42,15 @@ describe('useColumnsFitWindow', () => {
     scroller.style.setProperty('--scenery-clearance', '300px')
     await new Promise((r) => setTimeout(r, 0))
     expect(grid.style.getPropertyValue('--pv2-col-h')).toBe('360px')
+  })
+
+  it('measures a grid that appears after the page did', () => {
+    const { scroller, view } = mount({ wide: true })
+    view.rerender(<Grid shown={false} />)
+    scroller.style.setProperty('--scenery-clearance', '300px')
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({ top: 200 } as DOMRect)
+    view.rerender(<Grid />)
+    expect(view.getByTestId('grid').style.getPropertyValue('--pv2-col-h')).toBe('488px')
   })
 
   it('leaves stacked columns to the page scroll', () => {

@@ -53,6 +53,7 @@ import { useAssigneeFilter } from '@/hooks/useAssigneeFilter'
 import { planPeopleLens } from '@/lib/planning/peopleLens'
 import { makePlanActions, timingRemoval } from '@/lib/planning/planActions'
 import { useActionableInstances } from '@/hooks/useActionableInstances'
+import { useColumnsFitWindow } from '@/hooks/useColumnsFitWindow'
 import { goalToTaskConversion } from '@/lib/planning/goalConversion'
 import { removeOutcomeToast } from '@/lib/planning/existingActions'
 import { LoadFailedNotice } from '@/components/common/LoadFailedNotice'
@@ -565,6 +566,9 @@ function Inner({ level }: { level: Level }) {
   )
   const refColumn = (
     <aside className="pv2-ref" aria-label={`${aboveName}, for reference`}>
+      {/* A section, so its heading hands off to the shelves' below when the
+          columns scroll on their own (layout system §8). */}
+      <div className="pv2-refsec">
       <div className="pv2-colh">{aboveName} <small>(for reference)</small></div>
       {aboveRows.length ? (
         <ul className="pv2-list">{aboveRows.map((r) => (
@@ -585,6 +589,7 @@ function Inner({ level }: { level: Level }) {
           </li>
         ))}</ul>
       ) : <p className="pv2-hint ds-empty-body">Nothing written for {aboveName}. That’s fine.</p>}
+      </div>
       {/* What the Shelves held for a month or season, folded in here. */}
       <div className="pv2-refshelves"><PeriodRefRoutines level={level} start={bounds.start} end={bounds.end} noun={NOUN[level].toLowerCase()} /></div>
     </aside>
@@ -610,6 +615,9 @@ function Inner({ level }: { level: Level }) {
   // Desktop: the control row folds into the masthead; a meeting keeps its bar.
   const folded = !mobile && !inMeeting
 
+  // Side-by-side columns scroll on their own, as on Week (layout system §8);
+  // the ref follows whichever grid is on screen.
+  const grid = useColumnsFitWindow()
   let body: ReactElement
   if (guidedReview && reviewSnap) {
     body = <CloseOut lines={prevLines} candidateIds={reviewSnap} members={members} actions={actions} prevName={prevName} nextName={name}
@@ -625,9 +633,11 @@ function Inner({ level }: { level: Level }) {
     // to be consistent"): the period's own time on the left (the Month's
     // dates, as the Week's days), its list in the middle, the level above on
     // the right — as on Week and Today.
-    body = <div className={level === 'month' ? 'pv2-grid3' : 'pv2-grid2 is-ref'}>{calendar}{listColumn}{refColumn}</div>
+    body = <div ref={grid} className={`${level === 'month' ? 'pv2-grid3' : 'pv2-grid2 is-ref'} is-colscroll`}>{calendar}{listColumn}{refColumn}</div>
+  } else if (level === 'month') {
+    body = <div ref={grid} className="pv2-grid2 is-cal-first is-colscroll">{calendar}{listColumn}</div>
   } else {
-    body = level === 'month' ? <div className="pv2-grid2 is-cal-first">{calendar}{listColumn}</div> : listColumn
+    body = listColumn
   }
 
   return (

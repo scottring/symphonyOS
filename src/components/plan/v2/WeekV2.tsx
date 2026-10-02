@@ -8,7 +8,7 @@
 // It is chrome AROUND the existing week: the journal, the list, drag and drop,
 // add-to-day and the week's planning session are WeekViewV2's, unchanged.
 
-import { useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useSupabaseTasks } from '@/hooks/useSupabaseTasks'
@@ -257,9 +257,8 @@ export function WeekV2({ tasks, weekStart, meId, isCurrent, days, onSelectTask, 
   // HomeHeader's masthead, when it offers a place for the folded row
   // (desktop only; HomeView decides).
   const slots = useContext(PlanMastheadSlotsContext)
-  const grid = useRef<HTMLDivElement>(null)
   const columnsShown = meeting?.step !== 1 && view !== 'focus'
-  useColumnsFitWindow(grid, columnsShown)
+  const grid = useColumnsFitWindow(columnsShown)
 
   return (
     <div className="pv2-week" data-week={localYmd(weekStart)}>
