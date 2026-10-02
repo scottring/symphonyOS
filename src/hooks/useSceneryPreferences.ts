@@ -4,8 +4,8 @@ import { lightingAt, readCachedCoords } from '@/components/place/sceneryLighting
 export type SceneryLighting = 'daytime' | 'dusk-dawn' | 'nighttime'
 /** What the person chose: one lighting, or 'auto' to follow the sun. */
 export type SceneryLightingChoice = SceneryLighting | 'auto'
-/** How the scenery is drawn: the painted landscapes (with a sky tinted to
- *  the place), or woodblock prints that keep their own painted sky. */
+/** How the landscape is drawn: painted, or as woodblock prints. Both stand
+ *  under the same sky, tinted to the place. */
 export type SceneryStyle = 'painted' | 'woodblock'
 const EVENT = 'symphony:scenery-preferences'
 const SHOW_KEY = 'symphony-show-scenery'

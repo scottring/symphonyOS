@@ -1,0 +1,122 @@
+{
+  "mountain-town-daytime": {
+    "width": 2172,
+    "height": 724,
+    "skyline": 0.6346,
+    "bytes": 280358,
+    "src": "mountain-town-daytime.webp",
+    "veil": "mountain-town-daytime-veil.webp"
+  },
+  "urban-daytime": {
+    "width": 2171,
+    "height": 724,
+    "skyline": 0.6705,
+    "bytes": 272882,
+    "src": "urban-daytime.webp",
+    "veil": "urban-daytime-veil.webp"
+  },
+  "cabin-daytime": {
+    "width": 2172,
+    "height": 724,
+    "skyline": 0.668,
+    "bytes": 282396,
+    "src": "cabin-daytime.webp",
+    "veil": "cabin-daytime-veil.webp"
+  },
+  "small-city-daytime": {
+    "width": 2172,
+    "height": 724,
+    "skyline": 0.6675,
+    "bytes": 298694,
+    "src": "small-city-daytime.webp",
+    "veil": "small-city-daytime-veil.webp"
+  },
+  "farm-daytime": {
+    "width": 2172,
+    "height": 724,
+    "skyline": 0.6709,
+    "bytes": 252668,
+    "src": "farm-daytime.webp",
+    "veil": "farm-daytime-veil.webp"
+  },
+  "mountain-town-dusk-dawn": {
+    "width": 2172,
+    "height": 724,
+    "skyline": 0.6309,
+    "bytes": 241214,
+    "src": "mountain-town-dusk-dawn.webp",
+    "veil": "mountain-town-dusk-dawn-veil.webp"
+  },
+  "mountain-town-nighttime": {
+    "width": 2172,
+    "height": 724,
+    "skyline": 0.6318,
+    "bytes": 227100,
+    "src": "mountain-town-nighttime.webp",
+    "veil": "mountain-town-nighttime-veil.webp"
+  },
+  "urban-dusk-dawn": {
+    "width": 2172,
+    "height": 724,
+    "skyline": 0.6646,
+    "bytes": 246532,
+    "src": "urban-dusk-dawn.webp",
+    "veil": "urban-dusk-dawn-veil.webp"
+  },
+  "urban-nighttime": {
+    "width": 2172,
+    "height": 724,
+    "skyline": 0.6653,
+    "bytes": 238544,
+    "src": "urban-nighttime.webp",
+    "veil": "urban-nighttime-veil.webp"
+  },
+  "small-city-dusk-dawn": {
+    "width": 2172,
+    "height": 724,
+    "skyline": 0.6641,
+    "bytes": 271030,
+    "src": "small-city-dusk-dawn.webp",
+    "veil": "small-city-dusk-dawn-veil.webp"
+  },
+  "small-city-nighttime": {
+    "width": 2172,
+    "height": 724,
+    "skyline": 0.6643,
+    "bytes": 239670,
+    "src": "small-city-nighttime.webp",
+    "veil": "small-city-nighttime-veil.webp"
+  },
+  "cabin-dusk-dawn": {
+    "width": 2172,
+    "height": 724,
+    "skyline": 0.6626,
+    "bytes": 254934,
+    "src": "cabin-dusk-dawn.webp",
+    "veil": "cabin-dusk-dawn-veil.webp"
+  },
+  "cabin-nighttime": {
+    "width": 2172,
+    "height": 724,
+    "skyline": 0.6639,
+    "bytes": 231210,
+    "src": "cabin-nighttime.webp",
+    "veil": "cabin-nighttime-veil.webp"
+  },
+  "farm-dusk-dawn": {
+    "width": 2172,
+    "height": 724,
+    "skyline": 0.6681,
+    "bytes": 238364,
+    "src": "farm-dusk-dawn.webp",
+    "veil": "farm-dusk-dawn-veil.webp"
+  },
+  "farm-nighttime": {
+    "width": 2172,
+    "height": 724,
+    "skyline": 0.6669,
+    "bytes": 225092,
+    "src": "farm-nighttime.webp",
+    "veil": "farm-nighttime-veil.webp"
+  }
+}

@@ -2805,15 +2805,6 @@ div.chooser-action-group { overflow: visible !important; }
   --scenery-wash: hsl(var(--sky-h) 30% 6% / 0.2);
   --scenery-haze: 0.55;
 }
-/* The woodblock style keeps its print's own sky (Prussian-blue band, banded
-   clouds, paper): the plate covers the window from its bottom edge, so a tall
-   window never shows a flat strip above the print. The landscape's edges are
-   keyed against their own sky, so they sit cleanly on any part of it. No
-   atmospheric haze — the print has its own. */
-[data-scenery-lighting][data-scenery-style='woodblock'] {
-  --scenery-sky: var(--scenery-sky-plate) center bottom / cover no-repeat var(--scenery-sky-fill);
-  --scenery-haze: 0;
-}
 /* The shell wears the sky; it never scrolls, so neither does the sky. */
 .scenery-sky { background: var(--scenery-sky-layers); background-attachment: fixed; }
 

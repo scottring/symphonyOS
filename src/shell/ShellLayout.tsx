@@ -6,7 +6,7 @@ import { ReferenceListsDock } from '@/components/reference/ReferenceLists';
 import { pinIsOnPage } from '@/components/reference/periodsOnPage';
 import { DesktopFooter, DesktopFooterActionContext } from '@/components/layout/DesktopFooter';
 // src/shell/ShellLayout.tsx
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Sparkles, Repeat, CalendarRange, Inbox as InboxIcon, MoreHorizontal, Plus } from 'lucide-react';
 import { useTextEntryActive } from '@/hooks/useKeyboardInset';
@@ -40,8 +40,6 @@ import { PhonePaneSwitch } from './PhonePaneSwitch';
 import { NoteViewer } from '@/components/chat/NoteViewer';
 import { useSceneryPreferences } from '@/hooks/useSceneryPreferences';
 import { PlaceScenery } from '@/components/place/PlaceScenery';
-import { sceneryArt } from '@/components/place/panoramas';
-import { usePlaceOrDefault } from '@/hooks/usePlace';
 import { planV2Enabled } from '@/lib/planning/v2/planV2';
 import { onQuickAddRequest } from '@/lib/quickAddSignal';
 import { GuideProvider } from '@/hooks/useGuidedPlan';
@@ -153,14 +151,7 @@ function ShellLayoutInner({ children }: Props) {
   // The element that scrolls the page — the content frame, on desktop and
   // phone alike. Focused controls must clear the scenery foreground.
   const [pageScroller, setPageScroller] = useState<HTMLDivElement | null>(null);
-  const { showScenery, sceneryLighting, sceneryStyle } = useSceneryPreferences();
-  // A style with its own painted sky (woodblock) hands it to the shell as the
-  // page background; the painted style draws its sky in CSS.
-  const scenePlace = usePlaceOrDefault();
-  const scene = showScenery ? sceneryArt(sceneryStyle, scenePlace, sceneryLighting) : null;
-  const sceneSky = scene?.art.sky
-    ? ({ '--scenery-sky-plate': `url(${scene.art.sky})`, '--scenery-sky-fill': scene.art.skyTop ?? 'transparent' } as CSSProperties)
-    : undefined;
+  const { showScenery, sceneryLighting } = useSceneryPreferences();
   const sceneryFloor = isMobile ? `calc(${MOBILE_TAB_BAR_HEIGHT} + env(safe-area-inset-bottom, 0px))` : undefined;
 
   const references = useReferenceLists();
@@ -280,8 +271,6 @@ function ShellLayoutInner({ children }: Props) {
     <div
       className={`${showScenery ? 'scenery-sky ' : ''}h-screen flex overflow-hidden overflow-x-hidden bg-bg-base w-full max-w-[100vw]`}
       data-scenery-lighting={showScenery ? sceneryLighting : undefined}
-      data-scenery-style={scene?.style}
-      style={sceneSky}
     >
       {/* "New version available — reload" banner: shows when a newer build
           deployed while this tab stayed open (stale-tab guard). */}

@@ -3,6 +3,7 @@ import { render, screen } from '@/test/test-utils'
 import { PlacePicker } from './PlacePicker'
 import { PLACES } from '@/config/places'
 import { PlaceScenery } from '@/components/place/PlaceScenery'
+import { PANORAMAS, WOODBLOCK } from '@/components/place/panoramas'
 
 describe('PlacePicker', () => {
   beforeEach(() => localStorage.clear())
@@ -59,18 +60,22 @@ describe('PlacePicker', () => {
     for (const sky of container.querySelectorAll('.place-theme-preview')) expect(sky).toHaveAttribute('data-scenery-lighting', lighting)
   })
 
-  it('Style switches the scenery to woodblock where prints exist, falls back elsewhere, and is saved', async () => {
+  it('Style switches the page and every chooser card to the woodblock prints, and is saved', async () => {
     const { user, container } = render(<><PlacePicker /><PlaceScenery scroller={null} /></>)
     await user.click(screen.getByRole('button', { name: /Small Mountain Town/ }))
-    await user.selectOptions(screen.getByRole('combobox', { name: 'Lighting' }), 'daytime')
     await user.selectOptions(screen.getByRole('combobox', { name: 'Style' }), 'woodblock')
     expect(localStorage.getItem('symphony-scenery-style')).toBe('woodblock')
-    const scenery = container.querySelector('[data-place-scenery]')!
-    expect(scenery).toHaveAttribute('data-style', 'woodblock')
-    // No woodblock night print yet: the whole painted scene, not a mix.
-    await user.selectOptions(screen.getByRole('combobox', { name: 'Lighting' }), 'nighttime')
-    expect(container.querySelector('[data-place-scenery]')).toHaveAttribute('data-style', 'painted')
-    // Places without prints say so on their card.
-    expect(screen.getAllByText('Woodblock coming').length).toBe(4)
+    for (const lighting of ['daytime', 'dusk-dawn', 'nighttime'] as const) {
+      await user.selectOptions(screen.getByRole('combobox', { name: 'Lighting' }), lighting)
+      const scenery = container.querySelector('[data-place-scenery]')!
+      expect(scenery).toHaveAttribute('data-style', 'woodblock')
+      expect(scenery.querySelector('img')).toHaveAttribute('src', WOODBLOCK['mountain-town'][lighting].src)
+      // Each card previews its own place in the same style and light.
+      const cards = [...container.querySelectorAll('.place-theme-preview img')].map(img => img.getAttribute('src'))
+      expect(cards).toEqual(PLACES.map(p => WOODBLOCK[p.id][lighting].src))
+    }
+    // Back to Painted: the original art, untouched.
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Style' }), 'painted')
+    expect(container.querySelector('[data-place-scenery] img')).toHaveAttribute('src', PANORAMAS['mountain-town'].nighttime.src)
   })
 })

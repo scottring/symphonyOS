@@ -4,8 +4,7 @@
 // follows you across devices. Show scenery and Lighting are device-local.
 import { PLACES } from '@/config/places'
 import { usePlace } from '@/hooks/usePlace'
-import type { CSSProperties } from 'react'
-import { hasStyleArt, sceneryArt } from '@/components/place/panoramas'
+import { sceneryArt } from '@/components/place/panoramas'
 import { nextAutomaticChange, useSceneryPreferences, type SceneryLightingChoice, type SceneryStyle } from '@/hooks/useSceneryPreferences'
 import { SectionHeading } from '@/components/layout/SectionHeading'
 
@@ -31,8 +30,7 @@ export function PlacePicker() {
           <span><strong>Show scenery</strong><small>Turn off for more content space. Your theme colours stay.</small></span>
         </label>
         <div className="flex flex-wrap items-center gap-4">
-        {/* Painted landscapes, or woodblock prints with their own sky. A
-            place without woodblock art yet keeps its painted scene. */}
+        {/* Painted landscapes or woodblock prints, under the same sky. */}
         <label className="place-art-setting">Style
           <select value={sceneryStyle} onChange={e => setSceneryStyle(e.target.value as SceneryStyle)}>
             <option value="painted">Painted</option>
@@ -54,7 +52,6 @@ export function PlacePicker() {
           <>Automatic follows sunrise and sunset: now {LIGHTING_LABEL[sceneryLighting]}
             {next ? `, changing at ${new Date(next).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}` : ''}. </>
         )}
-        {sceneryStyle === 'woodblock' && 'Woodblock prints are arriving a place and a light at a time; anything not ready yet shows its painted scene. '}
         Scenery visibility, style and lighting are saved on this device.
       </p>
       <div className="place-theme-grid">
@@ -75,24 +72,15 @@ export function PlacePicker() {
             >
               {/* The place's own sky and landscape, in the chosen light —
                   the same artwork and hue the page wears. */}
-              {(() => {
-                const { art, style } = sceneryArt(sceneryStyle, p.id, sceneryLighting)
-                const sky = art.sky ? { '--scenery-sky-plate': `url(${art.sky})`, '--scenery-sky-fill': art.skyTop ?? 'transparent' } as CSSProperties : undefined
-                return (
-                  <span className="place-theme-preview" data-sky-place={p.id} data-scenery-lighting={sceneryLighting} data-scenery-style={style} style={sky} aria-hidden="true">
-                    <img src={art.src} alt="" loading="lazy" />
-                  </span>
-                )
-              })()}
+              <span className="place-theme-preview" data-sky-place={p.id} data-scenery-lighting={sceneryLighting} aria-hidden="true">
+                <img src={sceneryArt(sceneryStyle, p.id, sceneryLighting).src} alt="" loading="lazy" />
+              </span>
               <div className="flex items-center gap-1.5">
                 {/* The colour this place gives the app. */}
                 <span className="shrink-0 w-3 h-3 rounded-full" style={{ background: p.swatch }} aria-hidden="true" />
                 <span className="text-sm font-semibold text-neutral-800 leading-tight">{p.name}</span>
               </div>
               <p className="text-xs text-neutral-500 mt-0.5 leading-snug">{p.tagline}</p>
-              {sceneryStyle === 'woodblock' && !hasStyleArt('woodblock', p.id) && (
-                <p className="text-xs text-neutral-400 mt-1">Woodblock coming</p>
-              )}
             </button>
           )
         })}

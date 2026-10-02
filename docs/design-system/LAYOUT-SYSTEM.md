@@ -82,17 +82,17 @@ Prefer these over new arbitrary sizes.
 ## Scenery
 
 Pages sit on the place's painted sky with no cards behind text (#104).
-Settings › Your place › Style picks **Painted** (landscape + a CSS sky tinted
-to the place) or **Woodblock** (prints that keep their own painted sky; see
-`src/components/place/panoramas.ts` `WOODBLOCK`). A place or lighting with no
-woodblock print falls back to the whole painted scene.
+Settings › Your place › Style picks **Painted** or **Woodblock**
+(Hiroshige-inspired prints, 2026-10-01): two landscape sets for the same five
+places and three lights, both under the same CSS sky tinted to the place. The
+page and the chooser cards draw from `sceneryArt()` in
+`src/components/place/panoramas.ts`.
 
-Adding a woodblock print: save the concept (same 1506×1045 template as the
-originals) as `<place>-<daytime|dusk-dawn|nighttime>.png` in a folder, then
-run `scripts/scenery/extract_landscapes.py` (landscape + veil + skyline in
-`bands.json`) and `scripts/scenery/extract_sky.py` (the sky with the sample
-UI painted out) on it, convert to WebP with `cwebp`, put the files in
-`src/assets/scenery/woodblock/`, and add an entry to `WOODBLOCK`.
+The woodblock files arrived already cut (2172×724, transparent above the
+land, each with its veil mask; skylines in
+`scripts/scenery/woodblock-manifest.json`). Do not run the extract scripts on
+them, crop their transparent padding, or show a veil as an image. The extract
+scripts are only for the painted set's full-page concepts.
 
 Use
 colour tokens (`--color-neutral-*`, `--color-primary-*`), never literal

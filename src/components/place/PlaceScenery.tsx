@@ -15,7 +15,8 @@ import { keepFocusAboveScenery } from './sceneryFocus'
  * every final row and focused control can be brought clear of it.
  */
 /** Source px the veil fades over above the skyline, in the art's 1506px
- * width (scripts/scenery/extract_landscapes.py, FADE). */
+ * width (scripts/scenery/extract_landscapes.py, FADE). Only the ratio
+ * matters: the woodblock veils fade over the same share of their width. */
 const VEIL_FADE = 64
 const ART_WIDTH = 1506
 
@@ -26,7 +27,7 @@ export function PlaceScenery({ scroller, right = 0, floor }: {
 }) {
   const place = usePlaceOrDefault()
   const { showScenery, sceneryLighting, sceneryStyle } = useSceneryPreferences()
-  const { art, style } = sceneryArt(sceneryStyle, place, sceneryLighting)
+  const art = sceneryArt(sceneryStyle, place, sceneryLighting)
   const box = useRef<HTMLDivElement>(null)
   const catcher = useRef<HTMLDivElement>(null)
   // How much of the window's bottom the scene conceals (over the text
@@ -105,7 +106,7 @@ export function PlaceScenery({ scroller, right = 0, floor }: {
     ...(floor ? { '--scenery-floor': floor } : {}),
   } as CSSProperties
   return (
-    <div ref={box} aria-hidden="true" className="place-scenery" data-place-scenery={place} data-lighting={sceneryLighting} data-style={style} style={css}>
+    <div ref={box} aria-hidden="true" className="place-scenery" data-place-scenery={place} data-lighting={sceneryLighting} data-style={sceneryStyle} style={css}>
       <div className="place-scenery-veil" />
       <img className="place-scenery-panorama" src={art.src} alt="" decoding="async" draggable={false} />
       <div className="place-scenery-haze" />
