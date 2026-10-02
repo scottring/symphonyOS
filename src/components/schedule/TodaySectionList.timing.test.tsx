@@ -69,11 +69,17 @@ describe('the day row carries the shared timing control', () => {
   })
 
   it('a timed row on its own day reads only its time', async () => {
-    const at = new Date(TODAY); at.setHours(11, 45, 0, 0)
-    renderView({ tasks: [{ ...dayTask()[0], isAllDay: false, scheduledFor: at }] as never })
-    await screen.findByText('Research games dates and tickets')
-    const control = screen.getByRole('button', { name: /Choose a week or a day for Research games dates and tickets/ })
-    expect(control).toHaveTextContent(/^11:45 AM/)
+    // The clock sits before 11:45: past that hour the row reads as past and
+    // the test would rot with the wall clock (it passed at 10am, failed at 2pm).
+    const morning = new Date(TODAY); morning.setHours(8, 0, 0, 0)
+    vi.useFakeTimers({ toFake: ['Date'] }); vi.setSystemTime(morning)
+    try {
+      const at = new Date(TODAY); at.setHours(11, 45, 0, 0)
+      renderView({ tasks: [{ ...dayTask()[0], isAllDay: false, scheduledFor: at }] as never })
+      await screen.findByText('Research games dates and tickets')
+      const control = screen.getByRole('button', { name: /Choose a week or a day for Research games dates and tickets/ })
+      expect(control).toHaveTextContent(/^11:45 AM/)
+    } finally { vi.useRealTimers() }
   })
 
   it('offers to remove the day, naming what survives, before it is pressed', async () => {

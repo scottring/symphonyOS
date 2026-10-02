@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, within } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 
@@ -16,6 +16,11 @@ vi.mock('./RefShelves', () => ({ WeekRefShelves: () => null }))
 
 import { WeekV2 } from './WeekV2'
 import { PlanMastheadSlotsContext } from './planMastheadSlots'
+
+// A fixed Tuesday: the week's own last day changes what the toolbar offers
+// (it hands to next week), so these tests must not ride the wall clock.
+beforeEach(() => { vi.useFakeTimers({ toFake: ['Date'] }); vi.setSystemTime(new Date(2026, 8, 29, 12)) })
+afterEach(() => { vi.useRealTimers() })
 
 const renderWeek = () => render(
   <MemoryRouter>
