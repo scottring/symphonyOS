@@ -19,6 +19,7 @@ import { useMobile } from '@/hooks/useMobile'
 import { useUndo } from '@/hooks/useUndo'
 import { useDomain } from '@/hooks/useDomain'
 import { useAssigneeFilter } from '@/hooks/useAssigneeFilter'
+import { makeAssigneeFilter } from '@/lib/today/assigneeFilter'
 import { WeekView } from './WeekView'
 import { WeekViewV2, type WeekMode } from './week/WeekViewV2'
 import { MonthView } from './MonthView'
@@ -182,6 +183,18 @@ export function HomeView({
   const handleViewChange = useCallback((view: typeof currentView) => {
     setCurrentView(view)
   }, [setCurrentView])
+
+  // The week draws events through the same people filter as Today (an event's
+  // people live on its note). Tasks are narrowed inside the week, which also
+  // needs the whole list for lookups.
+  const weekEvents = useMemo(() => {
+    if (selectedAssignees.length === 0) return filteredEvents
+    const match = makeAssigneeFilter(selectedAssignees)
+    return filteredEvents.filter((event) => {
+      const note = ctx.eventNotesMap?.get(event.google_event_id || event.id)
+      return match(note?.assignedTo, note?.assignedToAll)
+    })
+  }, [filteredEvents, selectedAssignees, ctx.eventNotesMap])
 
   const selectedAssigneeForSchedule = useMemo(() => {
     if (selectedAssignees.length === 0) return null
@@ -417,7 +430,7 @@ export function HomeView({
         <>
           <WeekViewV2
             tasks={filteredTasks}
-            events={filteredEvents}
+            events={weekEvents}
             // Unfiltered, for the tiles' universal counts only.
             densityTasks={tasks}
             densityEvents={events}
@@ -464,7 +477,7 @@ export function HomeView({
         <>
           <WeekViewV2
             tasks={filteredTasks}
-            events={filteredEvents}
+            events={weekEvents}
             // Unfiltered, for the tiles' universal counts only.
             densityTasks={tasks}
             densityEvents={events}

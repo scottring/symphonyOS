@@ -1,4 +1,5 @@
 import { useState, useMemo, useRef, useEffect, useCallback } from 'react'
+import { useMobile } from '@/hooks/useMobile'
 import type { Task } from '@/types/task'
 import type { Contact } from '@/types/contact'
 import type { Project } from '@/types/project'
@@ -575,6 +576,7 @@ export function CascadingRiverView({
   onCompleteRoutine,
   onCompleteEvent,
 }: CascadingRiverViewProps) {
+  const isMobile = useMobile()
   const svgRef = useRef<SVGSVGElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const [svgWidth, setSvgWidth] = useState(800)
@@ -936,8 +938,9 @@ export function CascadingRiverView({
             <DateNavigator date={viewedDate} onDateChange={onDateChange} showTodayButton={!isToday} />
           </div>
           {/* Who-picker — surfaced so you can drop back to a single person (which
-              exits the multi-person river). Without this the picker is hidden. */}
-          {onSelectAssignees && (
+              exits the multi-person river). Desktop has it in the top bar
+              (HeaderPeopleFilter); a phone's river has no other way out. */}
+          {onSelectAssignees && isMobile && (
             <AssigneeFilter
               selectedAssignees={selectedAssignees}
               onSelectAssignees={onSelectAssignees}
