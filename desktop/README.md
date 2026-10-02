@@ -15,8 +15,10 @@ launch — never bundle the frontend here.
 
 ## Features
 
-- **⌘⇧Space** anywhere → floating quick-capture palette (adds to Inbox;
-  Enter submits, Esc or click-away dismisses)
+- **⌃⌥Space** anywhere → Symphony comes forward with its full ⌘K open (dates,
+  repeats, areas, search). Add or Esc hands focus back to the app you were in;
+  opening a search result keeps Symphony up. (Until 2026-10-02 this was ⌘⇧Space
+  and a separate Inbox-only palette at `/capture`.)
 - Native menu bar: **⌘N** new task, **⌘1–7** Today / Week / Month / Season /
   Year / Inbox / Routines, real Edit menu (⌘C/⌘V work)
 - Menu-bar extra: today's remaining count + task list, live via Supabase
@@ -46,8 +48,8 @@ behavior. See "Known limitations" below.
 ## How the shell talks to the web app
 
 Event contract (see `src/lib/desktop.ts` and `src/desktop/` in the web repo):
-`shell:navigate`, `shell:quick-capture`, `shell:tray-update`,
-`capture:shown`, `capture:close`. The remote origin is granted event access in
+`shell:navigate`, `shell:quick-capture`, `shell:quick-add-global`,
+`shell:hide-app`, `shell:tray-update`. The remote origin is granted event access in
 `src-tauri/capabilities/remote.json`; the site CSP allows Tauri IPC
 (`ipc:` in connect-src, vercel.json).
 
