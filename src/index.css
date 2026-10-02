@@ -3582,7 +3582,7 @@ html.rail-stuck .desktop-workspace-nav:has(.page-navigation-center:not(:empty)) 
    the page edge, as the right-hand icons end on it; the footer's left item
    hangs with it, so header and footer share their outer edges. */
 .page-navigation-brand, .desktop-footer-action { margin-left: -52px; }
-@media (max-width: 1023px) { .page-navigation-brand, .desktop-footer-action { margin-left: -36px; } }
+@media (max-width: 1023px) { .page-navigation-brand, .desktop-footer-action { margin-left: -24px; } }
 /* At night the ink would sink into the dark band; lift it a step. */
 [data-scenery-lighting='nighttime'] :is(.page-navigation-brand, .desktop-footer-logo) img { filter: brightness(1.6) saturate(1.15); }
 .plan-page-tools.is-rail-extras { justify-content: flex-end; padding-top: 0; }
