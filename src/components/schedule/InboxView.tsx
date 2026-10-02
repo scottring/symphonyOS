@@ -17,7 +17,7 @@ import { useNotes } from '@/hooks/useNotes'
 import { useSupabaseTasks } from '@/hooks/useSupabaseTasks'
 import { useSendToCalendar } from '@/hooks/useSendToCalendar'
 import { showToast } from '@/hooks/useToast'
-import { AssigneeFilter } from '@/components/home/AssigneeFilter'
+import { useAssigneeFilter } from '@/hooks/useAssigneeFilter'
 import { HomeNeedsDetailsSection } from '@/apps/home/inbox/HomeNeedsDetailsSection'
 import { SupernotePagesSection } from '@/components/capture/SupernotePagesSection'
 import { NotePicker, type NotePickerSelection } from '@/components/notes/NotePicker'
@@ -402,18 +402,14 @@ export function InboxView({
   // selections, so picking "Iris + Unassigned" silently showed ONLY the
   // unassigned items and dropped Iris's. makeAssigneeFilter ORs the pseudo-id
   // in with the rest, which is what the chips imply.
-  const [selectedAssignees, setSelectedAssignees] = useState<string[]>([])
+  // The top bar's one persisted lens (HeaderPeopleFilter), shared with Today
+  // and the horizons — a second, local Inbox filter could disagree with it.
+  const [selectedAssignees, setSelectedAssignees] = useAssigneeFilter()
 
   const filteredTasks = useMemo(() => {
     const match = makeAssigneeFilter(selectedAssignees)
     return filteredByDomain.filter((t) => match(t.assignedTo, t.assignedToAll))
   }, [filteredByDomain, selectedAssignees])
-
-  const hasUnassignedTasks = useMemo(() => {
-    return filteredByDomain.some(
-      (t) => !t.completed && !t.assignedTo && (!t.assignedToAll || t.assignedToAll.length === 0),
-    )
-  }, [filteredByDomain])
 
   // "To buy" routing, offered in the inbox as well as on Today.
   //
@@ -807,7 +803,7 @@ export function InboxView({
             : `${totalCount} item${totalCount !== 1 ? 's' : ''} to triage`
         }
         controls={undefined /* area + assistant: the top bar (2026-09-30) */}
-        footer={(totalCount > 0 || familyMembers.length > 0) ? (
+        footer={totalCount > 0 ? (
           <div className="flex flex-wrap items-center gap-3">
             {totalCount > 0 && (
               <button
@@ -819,14 +815,6 @@ export function InboxView({
               </button>
             )}
             {totalCount > 0 && <InboxModeToggle mode={mode} onChange={setMode} />}
-            {familyMembers.length > 0 && (
-              <AssigneeFilter
-                selectedAssignees={selectedAssignees}
-                onSelectAssignees={setSelectedAssignees}
-                assigneesWithTasks={familyMembers}
-                hasUnassignedTasks={hasUnassignedTasks}
-              />
-            )}
           </div>
         ) : undefined}
       />

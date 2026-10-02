@@ -162,12 +162,11 @@ describe('TodayView', () => {
     expect(screen.getByRole('button', { name: /hide daily|show daily/i })).toBeInTheDocument()
   })
 
-  it('shows the assignee filter directly in the controls strip, not behind the overflow', () => {
-    // Scott reaches for assignee filtering far more than "Plan today" — it's the
-    // one visible control now; "Plan today" moved into the overflow instead.
+  it('leaves the people filter to the top bar, not Today’s heading', () => {
+    // 2026-10-02: the filter is one lens for every horizon, so it moved into
+    // the top bar (HeaderPeopleFilter); a heading copy read as Today's alone.
     renderView({ assigneesWithTasks: [{ id: 'm1', name: 'Iris' } as never], hasUnassignedTasks: true, onSelectAssignees: vi.fn() })
-    // jsdom draws both the desktop strip and the phone masthead; each holds one.
-    expect(screen.getAllByRole('button', { name: /filter by assignee/i }).length).toBeGreaterThan(0)
+    expect(screen.queryByRole('button', { name: /people filter/i })).not.toBeInTheDocument()
   })
 
   it('offers no "Plan today" anywhere (guided sessions left with the analog-planning pivot)', async () => {

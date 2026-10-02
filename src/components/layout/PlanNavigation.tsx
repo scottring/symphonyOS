@@ -7,6 +7,7 @@ import { readSeasons } from '@/lib/cadence/seasons'
 import { useReferenceLists } from '@/components/reference/ReferenceListsContext'
 import { PlanningSheet } from '@/components/reference/PlanningSheet'
 import { DomainSwitcher } from '@/components/domain/DomainSwitcher'
+import { HeaderPeopleFilter } from './HeaderPeopleFilter'
 import { DesktopCenterContext } from '@/components/layout/DesktopNavigation'
 import { railEntries } from '@/lib/planning/horizonNumerals'
 import { readCadenceConfig } from '@/lib/cadence/config'
@@ -209,7 +210,7 @@ export function PlanNavigation({ mobile = false, paused = false, mobileControlsR
     </div>}
     {/* Phone: the life-area lens rides on this row (Today folds it into
         its Filters control instead). */}
-    {period && mobile && period !== 'today' && <DomainSwitcher />}
+    {period && mobile && period !== 'today' && <><HeaderPeopleFilter /><DomainSwitcher /></>}
     {period && mobile && <div ref={mobileControlsRef} className="plan-mobile-controls" />}
     {mobile && showChooser && <PlanningSheet open={sheetOpen} onClose={() => setSheetPath(null)} periodShelves={broaderPeriod} />}
   </div>

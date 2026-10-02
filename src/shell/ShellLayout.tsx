@@ -15,6 +15,7 @@ import { QuickCapture } from '@/components/layout/QuickCapture';
 import { NewVersionBanner } from '@/components/layout/NewVersionBanner';
 import { OmniboxResults } from '@/components/omnibox/OmniboxResults';
 import { DomainSwitcher } from '@/components/domain/DomainSwitcher';
+import { HeaderPeopleFilter } from '@/components/layout/HeaderPeopleFilter';
 import { Toast, ConfirmationToast, ToastLiveRegion } from '@/components/toast';
 import { ChatPanel } from '@/components/chat/ChatPanel';
 import { NotesProvider } from '@/contexts/NotesContext';
@@ -305,9 +306,10 @@ function ShellLayoutInner({ children }: Props) {
           // Rides in the top-right corner, level with the page title, rather
           // than spending a row of its own above it.
           <header
-            className="phone-page-lens scenery-page absolute right-0 top-0 z-10 px-4 pt-2"
+            className="phone-page-lens scenery-page absolute right-0 top-0 z-10 flex items-center gap-1 px-4 pt-2"
             style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 8px)' }}
           >
+            <HeaderPeopleFilter />
             <DomainSwitcher />
           </header>
         )}
@@ -336,6 +338,7 @@ function ShellLayoutInner({ children }: Props) {
           // Plain icons like Inbox, search and you — no circles (Scott,
           // 2026-09-30); one even gap across the group.
           <div className="contents">
+            <HeaderPeopleFilter />
             <DomainSwitcher />
             <button
               onClick={() => setAiHidden(aiOpen)}

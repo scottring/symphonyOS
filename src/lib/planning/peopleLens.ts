@@ -2,9 +2,9 @@ import { makeAssigneeFilter } from '@/lib/today/assigneeFilter'
 import type { AssigneeFilter } from '@/lib/today/types'
 
 /**
- * The people filter on a planning page (Week, Month, Season, Year) — the same
- * persisted lens Today wears (useAssigneeFilter), so choosing Ella on one
- * horizon is choosing Ella on all of them.
+ * The people filter on a planning page (Week, Month, Season, Year) — the top
+ * bar's one persisted lens (useAssigneeFilter, HeaderPeopleFilter), so choosing
+ * Ella on one horizon is choosing Ella on all of them.
  *
  * With nobody chosen a plan list keeps its own scope: unassigned and mine, plus
  * a shared goal's steps (`doableBy` / `staysOnSharedPlan`). Choosing people

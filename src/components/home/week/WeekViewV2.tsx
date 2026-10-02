@@ -60,7 +60,6 @@ import { publishViewedWeek } from '@/lib/viewedWeekSignal'
 import { useMediaQuery } from '@/hooks/useMediaQuery'
 import type { AssigneeFilter } from '@/lib/today/types'
 import { makeAssigneeFilter } from '@/lib/today/assigneeFilter'
-import { PeopleFilter } from '@/components/plan/v2/PeopleFilter'
 import type { Layer } from '@/lib/domains'
 import { WeekPlanHost } from './WeekPlanHost'
 import { WeekV2 } from '@/components/plan/v2/WeekV2'
@@ -396,7 +395,7 @@ export function WeekViewV2(props: WeekViewV2Props) {
 
   const inWeek = (d: Date) => d >= weekStart && d < weekEnd
 
-  // What the days draw, narrowed by the people filter (the toolbar's, shared
+  // What the days draw, narrowed by the people filter (the top bar's, shared
   // with Today). `tasks` stays whole for lookups — a drag, a goal's title.
   const drawnTasks = useMemo(() => {
     const match = makeAssigneeFilter(selectedAssignees)
@@ -1034,7 +1033,6 @@ export function WeekViewV2(props: WeekViewV2Props) {
       <div className={planV2Enabled() ? '' : 'mr-auto'}><WeekModeSwitch mode={mode} onChange={props.onModeChange ?? setOwnMode} /></div>
     )}
     <RoutinesToggle hidden={hideRoutines} onToggle={() => writeHideRoutines(!hideRoutines)} />
-    <PeopleFilter />
   </>
   // v2 draws these in its one toolbar, not on a row of their own.
   const v2Page = planV2Enabled() && (narrow || !showSchedule)

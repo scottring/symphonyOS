@@ -97,7 +97,7 @@ export function WeekV2({ tasks, weekStart, meId, isCurrent, days, onSelectTask, 
     return { start, name, rows }
   }), [tasks, weekStart, monthStart, isCurrent, meId])
   const monthName = refMonths.map((m) => m.name).join(' and ')
-  // The people filter (in the week's tools) narrows the week's list; the
+  // The people filter (in the top bar) narrows the week's list; the
   // month beside it and last week's look-back keep their own scope.
   const [people] = useAssigneeFilter()
   const lens = useMemo(() => planPeopleLens(people, meId), [people, meId])

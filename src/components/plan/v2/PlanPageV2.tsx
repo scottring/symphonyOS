@@ -49,7 +49,6 @@ import { FromPaper } from './FromPaper'
 import { ViewSwitch } from './ViewSwitch'
 import { PeriodRefRoutines } from './RefShelves'
 import { useAddArea } from './AddArea'
-import { PeopleFilter } from './PeopleFilter'
 import { useAssigneeFilter } from '@/hooks/useAssigneeFilter'
 import { planPeopleLens } from '@/lib/planning/peopleLens'
 import { makePlanActions, timingRemoval } from '@/lib/planning/planActions'
@@ -533,7 +532,7 @@ function Inner({ level }: { level: Level }) {
   const viewSwitch = <ViewSwitch view={view} onChange={setView} aboveName={aboveName} />
   const toolbar: PlanToolbarProps = {
     period: name, saved: session.saved, loading: session.loading, error: !!session.error, agreedBy,
-    reviewDue, onPlan: startMeeting, onRetry: session.reload, viewSwitch, tools: <PeopleFilter />,
+    reviewDue, onPlan: startMeeting, onRetry: session.reload, viewSwitch,
     justSaved: justSaved && {
       detail: justSaved.detail,
       // The next page opens with this one's level above beside it.

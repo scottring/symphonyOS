@@ -8,6 +8,8 @@ interface AssigneeFilterProps {
   onSelectAssignees: (ids: string[]) => void
   assigneesWithTasks: FamilyMember[] // only those with tasks in current view
   hasUnassignedTasks: boolean
+  /** 'header': a plain top-bar icon like Inbox, search and Areas. */
+  variant?: 'header'
 }
 
 // Filter icon
@@ -24,6 +26,7 @@ export function AssigneeFilter({
   onSelectAssignees,
   assigneesWithTasks,
   hasUnassignedTasks,
+  variant,
 }: AssigneeFilterProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [menuPosition, setMenuPosition] = useState({ top: 0, right: 0 })
@@ -165,7 +168,7 @@ export function AssigneeFilter({
     }
 
     // Default: all/none selected
-    return <FilterIcon className="w-5 h-5" />
+    return <FilterIcon className={variant === 'header' ? 'w-[18px] h-[18px]' : 'w-5 h-5'} />
   }
 
   const menuContent = isOpen ? (
@@ -179,7 +182,7 @@ export function AssigneeFilter({
     >
       {/* Header with instructions */}
       <div className="px-3 py-1.5 text-xs text-neutral-500 border-b border-neutral-100 mb-1">
-        Click to toggle • Select 2+ for river view
+        Applies on every page · Click to toggle
       </div>
 
       {/* All option */}
@@ -300,9 +303,11 @@ export function AssigneeFilter({
       <button
         ref={triggerRef}
         onClick={() => setIsOpen(!isOpen)}
-        title="Filter by assignee"
-        aria-label="Filter by assignee"
-        className={`
+        title={isFiltered ? `People: ${selectedMembers.map((m) => m.name).concat(isUnassignedSelected ? ['Unassigned'] : []).join(', ')}` : 'People: everyone'}
+        aria-label={isFiltered ? 'People filter, on' : 'People filter'}
+        aria-haspopup="menu"
+        aria-expanded={isOpen}
+        className={variant === 'header' ? `page-navigation-icon${isFiltered ? ' is-on' : ''}` : `
           relative p-2 rounded-md
           transition-all duration-200 ease-out
           ${isFiltered

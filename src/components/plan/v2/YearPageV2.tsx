@@ -31,7 +31,6 @@ import { readSeasons } from '@/lib/cadence/seasons'
 import { FromPaper } from './FromPaper'
 import { ViewSwitch } from './ViewSwitch'
 import { useAddArea } from './AddArea'
-import { PeopleFilter } from './PeopleFilter'
 import { useAssigneeFilter } from '@/hooks/useAssigneeFilter'
 import { planPeopleLens } from '@/lib/planning/peopleLens'
 
@@ -163,7 +162,7 @@ function Inner() {
   const viewSwitch = <ViewSwitch view={view} onChange={setView} withRef={false} />
   const toolbar: PlanToolbarProps = {
     period: String(year), saved: session.saved, loading: session.loading, error: !!session.error, agreedBy,
-    reviewDue, onPlan: startMeeting, onRetry: session.reload, viewSwitch, tools: <PeopleFilter />,
+    reviewDue, onPlan: startMeeting, onRetry: session.reload, viewSwitch,
     justSaved: justSaved && {
       detail: justSaved.detail,
       next: { label: nextStep.label, onClick: () => { writePlanView('season', 'ref'); navigate(nextStep.to) } },

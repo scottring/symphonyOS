@@ -59,7 +59,6 @@ import { TaskTimingMenu } from '@/components/plan/TaskTimingMenu'
 import { useNavigate } from 'react-router-dom'
 import { useGoogleCalendar } from '@/hooks/useGoogleCalendar'
 import { ALL_LAYERS } from '@/lib/domains'
-import { AssigneeFilter } from '@/components/home/AssigneeFilter'
 
 import { NeededTodayNote } from './NeededTodayNote'
 import { TodayAddInput } from './TodayAddInput'
@@ -1245,14 +1244,8 @@ export function TodayView({
                 onCompleteTask={onToggleTask}
               />}
 
-              {onSelectAssignees && ((assigneesWithTasks?.length ?? 0) > 0 || hasUnassignedTasks) && (
-                <AssigneeFilter
-                  selectedAssignees={selectedAssignees ?? []}
-                  onSelectAssignees={onSelectAssignees}
-                  assigneesWithTasks={assigneesWithTasks ?? []}
-                  hasUnassignedTasks={!!hasUnassignedTasks}
-                />
-              )}
+              {/* People: the top bar's (HeaderPeopleFilter), one lens for
+                  every page; phones fold it into the Filters control below. */}
 
               {!isMobile && overflowMenu}
             </div>
