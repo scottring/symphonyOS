@@ -23,9 +23,21 @@ export function tallySentence(t: Tally, prevName: string): string {
   return parts.length ? `${parts.join(', ')}.` : ''
 }
 
-/** Step 1's sentence: what looking back decides, and that nothing is lost. */
-export function lookBackWhy(prevName: string, name: string, open: number): string {
-  return `${prevName} left ${open} open. For each: carry it into ${name}, mark it done, keep it for someday, or let it go. Nothing is deleted.`
+/** What a save leaves to say about the look-back, in words, not counts
+ *  ("October's open work is decided."), or '' when there was none. */
+export function decidedSentence(t: Tally, prevName: string): string {
+  const decided = t.carried + t.done + t.someday + t.dropped
+  return decided ? `${prevName}’s open work is decided.` : ''
+}
+
+/** Step 1's sentence: what looking back decides, and that nothing is lost —
+ *  then, once every card is decided, that it is (the bar kept asking after
+ *  the last decision, walkthrough 2026-10-02 #30). No counts: a plan is not
+ *  a scoreboard. */
+export function lookBackWhy(prevName: string, name: string, remaining: number): string {
+  return remaining > 0
+    ? `${prevName} left work open. For each: carry it into ${name}, mark it done, keep it for someday, or let it go. Nothing is deleted.`
+    : `${prevName}’s open work is decided. Next, write ${name}.`
 }
 
 /**
@@ -41,16 +53,19 @@ export function planWhy(level: 'season' | 'month', name: string, aboveName: stri
       : `Look at ${aboveName} and the calendar, then write what ${name} is for. A quiet month is fine.`
   }
   return lines
-    ? `Check ${name}’s list against ${aboveName}: keep what still matters, cut what doesn’t, add what’s missing. “+ Add to ${name}” beside a ${aboveName} goal keeps the new line linked to it.`
-    : `${name}’s list is empty. Beside each ${aboveName} goal, use “+ Add to ${name}” to write ${name}’s part. A few lines is plenty.`
+    ? `Check ${name}’s list against ${aboveName}: keep what still matters, cut what doesn’t, add what’s missing. “+ ${name}’s part” beside a ${aboveName} goal keeps the new line linked to it.`
+    : `${name}’s list is empty. Beside each ${aboveName} goal, use “+ ${name}’s part” to write it. A few lines is plenty.`
 }
 
 /**
  * Where a saved plan hands on to, one level down. A season → its month (the
  * current month while the season is running, else its first month: Fall
  * saved on Sep 29 hands to October, never September). A month → its week (the
- * current week, else the week holding the month's first day). A year → the
- * current season in that year, else the year's first.
+ * current week, else the week holding the month's first day) — but on a
+ * week's last day, the next one: a week ending today has nothing left to
+ * plan (walkthrough 2026-10-02 #18). A year → the current season in that
+ * year, else the year's first. One phrasing on every rung: "Choose what X
+ * takes on" (#32).
  */
 export function nextAfterSave(
   level: 'year' | 'season' | 'month',
@@ -73,6 +88,9 @@ export function nextAfterSave(
     const m = new Date(from.getFullYear(), from.getMonth(), 1)
     return { label: `Choose what ${m.toLocaleDateString('en-US', { month: 'long' })} takes on`, to: `/month?start=${ymd(m)}` }
   }
-  const w = helpers.weekStartOf(isCurrent ? today : periodStart)
-  return { label: `Choose steps for week ${helpers.weekNumber(w)}`, to: `/week?start=${ymd(w)}` }
+  const w0 = helpers.weekStartOf(isCurrent ? today : periodStart)
+  const lastDay = new Date(w0.getFullYear(), w0.getMonth(), w0.getDate() + 6)
+  const endsToday = isCurrent && ymd(lastDay) === ymd(today)
+  const w = endsToday ? new Date(w0.getFullYear(), w0.getMonth(), w0.getDate() + 7) : w0
+  return { label: `Choose what week ${helpers.weekNumber(w)} takes on`, to: `/week?start=${ymd(w)}` }
 }

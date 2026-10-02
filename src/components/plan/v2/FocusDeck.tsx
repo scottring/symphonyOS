@@ -54,12 +54,13 @@ function Facts({ vm, actions, members }: { vm: LineVM; actions: LineActions; mem
       </div>
       {members.length > 0 && (
         <div className="pv2-fact"><span className="pv2-k">Who</span>
+          {assigneesOf(vm.task).length === 0 && <span className="pv2-hint">No one yet ·</span>}
           <MultiAssigneeDropdown members={members} selectedIds={assigneesOf(vm.task)} onSelect={(ids) => actions.assign(vm.task, ids)} size="sm" triggerLabel={`Assign people to ${vm.task.title}`} />
         </div>
       )}
       {!vm.task.isGoal && <div className="pv2-fact"><span className="pv2-k">Now</span><span>{vm.where ?? <span className="pv2-hint">Not in a week yet</span>}</span></div>}
       {vm.task.isGoal ? <>
-        <div className="pv2-fact"><span className="pv2-k">Means</span>{vm.task.notes?.trim() ? <span className="pv2-notes">{vm.task.notes.trim()}</span> : <span className="pv2-hint">Blank for now.</span>}</div>
+        <div className="pv2-fact"><span className="pv2-k">Notes</span>{vm.task.notes?.trim() ? <span className="pv2-notes">{vm.task.notes.trim()}</span> : <span className="pv2-hint">None yet — add some in its details.</span>}</div>
         <div className="pv2-fact"><span className="pv2-k">Work</span>{vm.steps?.length ? <ul className="pv2-steps-list">{vm.steps.map((st) => (
           <li key={st.id}><span className={`pv2-step${st.done ? ' is-done' : ''}`}>{st.title}</span>{st.where && <span className="pv2-hint"> · {st.where}</span>}</li>
         ))}</ul> : <span className="pv2-hint">No possible work written yet.</span>}</div>
@@ -144,9 +145,10 @@ export function CloseOut({ lines, candidateIds, members, actions, prevName, next
   const reduced = typeof matchMedia !== 'undefined' && matchMedia('(prefers-reduced-motion: reduce)').matches
 
   if (k >= ids.length) {
-    const count = (d: CloseDecision) => Object.values(log).filter((x) => x === d).length
-    const parts = ([['carried', `carried to ${nextName}`], ['done', 'done'], ['someday', 'someday'], ['dropped', 'dropped'], ['left', `left in ${prevName}`]] as const)
-      .filter(([d]) => count(d)).map(([d, l]) => `${count(d)} ${l}`)
+    // What was decided, in words — not "1 carried to November" (#30).
+    const decided = new Set(Object.values(log))
+    const parts = ([['carried', `Carried to ${nextName}`], ['done', 'Marked done'], ['someday', 'Kept for someday'], ['dropped', 'Let go'], ['left', `Left in ${prevName}`]] as const)
+      .filter(([d]) => decided.has(d)).map(([, l]) => l)
     return (
       <div className="pv2-focus"><div className="pv2-card">
         <div className="pv2-eyebrow">{prevName} is closed</div>

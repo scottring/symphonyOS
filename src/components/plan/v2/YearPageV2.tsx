@@ -17,15 +17,15 @@ import { useAuth } from '@/hooks/useAuth'
 import { MastheadCard, PeriodNavEyebrow } from '@/components/layout/MastheadCard'
 import { showToast } from '@/hooks/useToast'
 import { filterTasksForLayers, matchesLayers } from '@/lib/today/domainFilter'
-import { readPlanView, writePlanView, type PlanView } from '@/lib/planning/v2/planV2'
+import { readPlanView, writePlanView, lookBackOpen, type PlanView } from '@/lib/planning/v2/planV2'
 import type { Goal } from '@/types/goal'
 import type { Task } from '@/types/task'
 import { PlanLine, type LineActions, type LineVM } from './PlanLine'
 import { FocusDeck, CloseOut, type CloseDecision } from './FocusDeck'
-import { PlanMeetingBar, PlanToolbar, PlanToolbarControls, PlanToolbarStatus, type PlanToolbarProps } from './PlanStatus'
+import { PlanMeetingBar, PlanSavedLine, PlanToolbar, PlanToolbarControls, PlanToolbarStatus, type PlanToolbarProps } from './PlanStatus'
 import { GuideAnchor } from '@/components/guide/GuideBar'
 import { useMobile } from '@/hooks/useMobile'
-import { EMPTY_TALLY, addToTally, lookBackWhy, nextAfterSave, tallySentence, type Tally } from '@/lib/planning/v2/planTally'
+import { EMPTY_TALLY, addToTally, decidedSentence, lookBackWhy, nextAfterSave, type Tally } from '@/lib/planning/v2/planTally'
 import { periodBounds } from '@/lib/planning/periodPage'
 import { readSeasons } from '@/lib/cadence/seasons'
 import { FromPaper } from './FromPaper'
@@ -125,7 +125,9 @@ function Inner() {
     await addGoal(areaId, name, addAreaChoice.area, { year })
   }
   // The year's review (see PlanPageV2): prominent only while one is due.
-  const reviewIds = prevLines.filter((l) => l.fate === 'open').map((l) => l.task.id)
+  const reviewIds = lookBackOpen('year', new Date(year, 0, 1), new Date())
+    ? prevLines.filter((l) => l.fate === 'open').map((l) => l.task.id)
+    : []
   const reviewDue = !session.saved || reviewIds.length > 0
   const startMeeting = () => {
     const candidateIds = reviewIds
@@ -137,9 +139,7 @@ function Inner() {
   const endMeeting = async (keep: boolean) => {
     if (keep) {
       if (!(await session.save({ wentWell: session.mine?.wentWell ?? '', didnt: session.mine?.didnt ?? '' }))) { showToast('Couldn’t save the plan — try again.', 'error', 5000); return }
-      const open = lines.filter((l) => l.fate === 'open').length
-      const done = lines.filter((l) => l.fate === 'done').length
-      setJustSaved({ detail: [`${open} open${done ? `, ${done} done` : ''}.`, tallySentence(tally, String(year - 1))].filter(Boolean).join(' ') })
+      setJustSaved({ detail: decidedSentence(tally, String(year - 1)) })
     }
     setMeeting(null)
   }
@@ -163,9 +163,10 @@ function Inner() {
   const toolbar: PlanToolbarProps = {
     period: String(year), saved: session.saved, loading: session.loading, error: !!session.error, agreedBy,
     reviewDue, onPlan: startMeeting, onRetry: session.reload, viewSwitch,
+    lookBack: reviewIds.length ? String(year - 1) : null, onMark: () => void endMeeting(true), hasLines: main.length > 0,
     justSaved: justSaved && {
       detail: justSaved.detail,
-      next: { label: nextStep.label, onClick: () => { writePlanView('season', 'ref'); navigate(nextStep.to) } },
+      next: { label: nextStep.label, onClick: () => { writePlanView('season', 'ref'); navigate(nextStep.to, { state: { write: true } }) } },
       onDone: () => setJustSaved(null),
     },
   }
@@ -213,12 +214,12 @@ function Inner() {
         />
       {inMeeting ? (
         <PlanMeetingBar period={String(year)} prevName={String(year - 1)} step={meeting!.step} lookBack={meeting!.candidateIds.length > 0}
-          why={meeting!.step === 1 ? lookBackWhy(String(year - 1), String(year), meeting!.candidateIds.length)
+          why={meeting!.step === 1 ? lookBackWhy(String(year - 1), String(year), meeting!.candidateIds.length - (tally.carried + tally.done + tally.someday + tally.dropped + tally.left))
             : 'Write what this year is for. A few lines is plenty; each can hold smaller plans later.'}
           onStep={(step) => setMeeting({ ...meeting!, step })}
           viewSwitch={meeting!.step === 2 && meeting!.candidateIds.length === 0 ? viewSwitch : undefined}
           onLeave={() => void endMeeting(false)} onSave={() => void endMeeting(true)} saveLabel={`Mark ${year} planned`} />
-      ) : folded ? <GuideAnchor /> : <PlanToolbar {...toolbar} />}
+      ) : folded ? <><GuideAnchor /><PlanSavedLine period={String(year)} justSaved={toolbar.justSaved} /></> : <PlanToolbar {...toolbar} />}
       {body}
     </div>
   )

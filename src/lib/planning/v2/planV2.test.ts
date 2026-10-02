@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { lineFate, lineDropUpdates, endedIn, closeOutCandidates, landmarksIn, planV2Enabled } from './planV2'
+import { lineFate, lineDropUpdates, endedIn, closeOutCandidates, landmarksIn, planV2Enabled, lookBackOpen, renamedForPeriod, dayNamedIn } from './planV2'
 import type { Task } from '@/types/task'
 import { planPlacement } from '@/lib/placement/intentions'
 import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
@@ -123,5 +123,45 @@ describe('lineDropUpdates (a month line put down on its calendar)', () => {
     expect(u.scheduledFor).toBeUndefined()
     expect(ops(t, u)).toContain('remove week 27')
     expect(ops(t, u)).not.toContain('remove month 1')
+  })
+})
+
+describe('lookBackOpen (walkthrough 2026-10-02 #34)', () => {
+  const octEnd = new Date(2026, 10, 1) // October's exclusive end
+  it('a month is not closed out with weeks still to run', () => {
+    expect(lookBackOpen('month', octEnd, new Date(2026, 9, 2))).toBe(false)
+  })
+  it('a month opens its look-back in its last week, and after', () => {
+    expect(lookBackOpen('month', octEnd, new Date(2026, 9, 25))).toBe(true)
+    expect(lookBackOpen('month', octEnd, new Date(2026, 10, 3))).toBe(true)
+  })
+  it('a week opens on its last day', () => {
+    const wkEnd = new Date(2026, 9, 3) // week Sep 26 – Oct 2
+    expect(lookBackOpen('week', wkEnd, new Date(2026, 9, 1))).toBe(false)
+    expect(lookBackOpen('week', wkEnd, new Date(2026, 9, 2, 18))).toBe(true)
+  })
+})
+
+describe('renamedForPeriod', () => {
+  it('swaps the old period’s name for the new one', () => {
+    expect(renamedForPeriod('Come up with October business plan', 'October', 'November')).toBe('Come up with November business plan')
+  })
+  it('leaves a title that does not name it', () => {
+    expect(renamedForPeriod('Talk to Tim', 'October', 'November')).toBeNull()
+  })
+})
+
+describe('dayNamedIn (walkthrough 2026-10-02 #20)', () => {
+  const wk41 = new Date(2026, 9, 3) // Sat Oct 3 – Fri Oct 9
+  const fri2 = new Date(2026, 9, 2)
+  it('reads a weekday in the line as that day of the week being planned', () => {
+    expect(dayNamedIn('Talk to Tim on Monday', wk41, fri2)).toEqual(new Date(2026, 9, 5))
+  })
+  it('ignores a line with no weekday, and abbreviations', () => {
+    expect(dayNamedIn('Sat down with the budget', wk41, fri2)).toBeNull()
+    expect(dayNamedIn('Call the bank', wk41, fri2)).toBeNull()
+  })
+  it('ignores a day already past', () => {
+    expect(dayNamedIn('Call Tim Monday', wk41, new Date(2026, 9, 7))).toBeNull()
   })
 })

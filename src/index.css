@@ -3200,6 +3200,10 @@ div.chooser-action-group { overflow: visible !important; }
 .pv2-wl-row:hover .pv2-wl-parent, .pv2-wl-row:focus-within .pv2-wl-parent, .pv2-wl-parent.is-shown { display: inline-flex; }
 @media (hover: none) { .pv2-wl-parent { display: inline-flex; } }
 .pv2-wl-row.is-draft { border-style: dashed; border-color: var(--color-primary-300); }
+/* A list line that already has a day: quiet, naming the day (#21). */
+.pv2-wl-placed { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; padding: 4px 0 4px 2px; }
+.pv2-wl-placed .pv2-wl-title { color: var(--color-neutral-500); }
+.pv2-endsweek { margin-bottom: 18px; }
 .pv2-wl-draft { width: 100%; background: transparent; font-size: 15px; color: var(--color-neutral-900); outline: none; }
 .pv2-rrow.is-linked { background: color-mix(in srgb, var(--color-primary-100) 70%, transparent); box-shadow: -8px 0 0 color-mix(in srgb, var(--color-primary-100) 70%, transparent), 8px 0 0 color-mix(in srgb, var(--color-primary-100) 70%, transparent); border-radius: 2px; }
 .pv2-rrow.is-flash { animation: pv2-flash 1.2s ease-out; }
@@ -3444,6 +3448,22 @@ div.chooser-action-group { overflow: visible !important; }
 .pv2-line-parent { display: none; align-items: center; gap: 4px; margin: -2px 0 4px 26px; min-width: 0; max-width: calc(100% - 26px); font-size: 12px; color: var(--color-neutral-500); text-align: left; }
 .pv2-line-parent:hover { color: var(--color-primary-700); }
 .pv2-line:hover > .pv2-line-parent, .pv2-line:focus-within > .pv2-line-parent, .pv2-line-parent.is-shown { display: flex; }
+/* At rest, not on hover: a line says which goal it serves (walkthrough
+   2026-10-02 #13 — the link showed only under the pointer). */
+.pv2-line-parent { display: flex; }
+/* A plan list read under the goals one rung up it serves (#14). */
+.pv2-pgroup { break-inside: avoid; margin: 0 0 18px; }
+.pv2-pgroup-h { display: flex; align-items: center; gap: 8px; margin: 0 0 4px; padding: 0; font: 600 12px/1.4 var(--font-family-sans); letter-spacing: .02em; color: var(--color-neutral-500); text-align: left; }
+button.pv2-pgroup-h:hover { color: var(--color-primary-700); }
+.pv2-pgroup-h.is-loose { font-weight: 500; font-style: italic; }
+.pv2-pgroup > .pv2-list { padding-left: 4px; border-left: 1px solid var(--color-neutral-150, var(--color-neutral-200)); margin-left: 3px; }
+.pv2-brain.is-groups { columns: 2; column-gap: 48px; }
+@media (max-width: 767px) { .pv2-brain.is-groups { columns: 1; } }
+/* A reference row's action on its own line beneath the words, at rest — it
+   neither hides until hover nor covers the goal's title (#13). */
+:is(.pv2-week, .pv2-page) .pv2-ref .pv2-rrow.is-stacked { flex-wrap: wrap; }
+:is(.pv2-week, .pv2-page) .pv2-ref .pv2-rrow.is-stacked .pv2-refacts { position: static; flex-basis: 100%; padding: 0 0 0 18px; opacity: .8; pointer-events: auto; background: none; }
+:is(.pv2-week, .pv2-page) .pv2-ref .pv2-rrow.is-stacked:hover .pv2-refacts, :is(.pv2-week, .pv2-page) .pv2-ref .pv2-rrow.is-stacked:focus-within .pv2-refacts { opacity: 1; }
 .pv2-line.is-draft > .pv2-line-main { border: 1px dashed var(--color-primary-300); background: var(--color-bg-elevated); }
 .pv2-line-draft { flex: 1; min-width: 0; background: transparent; font-size: 15px; outline: none; padding: 1px 0; }
 /* The add row's area picker is a choice, not a warning: no "untagged" ring. */

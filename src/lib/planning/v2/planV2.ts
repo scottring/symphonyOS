@@ -185,3 +185,49 @@ export function lineDropUpdates(task: Task, target: { kind: 'day' | 'week'; at: 
   if (target.kind === 'week') return { ...(task.scheduledFor ? timingRemoval(task, 'day').updates : {}), bucket: 'week', weekStart: target.at }
   return timingRemoval(task, 'all').updates
 }
+
+/**
+ * Whether the period before is ready to be closed out. A look-back decides a
+ * period's open work for good, so it waits until that period is in its last
+ * stretch — a week's last day, a month's last week, a season's last two
+ * weeks, a year's December — or over. Planning November on Oct 2 had carried
+ * October's work out of October with three weeks still to run (walkthrough
+ * 2026-10-02 #34). `prevEnd` is the period's exclusive end.
+ */
+export function lookBackOpen(level: 'week' | 'month' | 'season' | 'year', prevEnd: Date, today: Date): boolean {
+  const window = { week: 1, month: 7, season: 14, year: 31 }[level]
+  const start = new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime()
+  return prevEnd.getTime() - start <= window * 86_400_000
+}
+
+/**
+ * A carried line whose words name the period it came from ("Come up with
+ * October business plan", carried to November) — the same words with the new
+ * period's name, offered as a rename; null when the title doesn't name it.
+ */
+export function renamedForPeriod(title: string, from: string, to: string): string | null {
+  const re = new RegExp(`\\b${from.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`)
+  return from && from !== to && re.test(title) ? title.replace(re, to) : null
+}
+
+const WEEKDAYS = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday']
+
+/**
+ * The day a week-list line names ("Talk to Tim on Monday"), inside the week
+ * being planned — or null when it names none, or names a day already past.
+ * Whole weekday names only, so "Sat down with…" isn't a Saturday. The words
+ * stay in the title; only the day is read from them (walkthrough 2026-10-02
+ * #20: the line landed under "Any day").
+ */
+export function dayNamedIn(title: string, weekStart: Date, today: Date): Date | null {
+  const m = title.toLowerCase().match(new RegExp(`\\b(${WEEKDAYS.join('|')})\\b`))
+  if (!m) return null
+  const want = WEEKDAYS.indexOf(m[1])
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate() + i)
+    if (d.getDay() !== want) continue
+    const day0 = new Date(today.getFullYear(), today.getMonth(), today.getDate())
+    return d < day0 ? null : d
+  }
+  return null
+}

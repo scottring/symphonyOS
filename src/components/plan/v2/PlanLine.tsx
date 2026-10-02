@@ -137,7 +137,7 @@ export function LineMenu({ vm, actions, nextLabel }: { vm: LineVM; actions: Line
   )
 }
 
-export function PlanLine({ vm, actions, members, nextLabel, open, onToggle, editable, draggable = false, onHoverPartOf, onShowPartOf }: {
+export function PlanLine({ vm, actions, members, nextLabel, open, onToggle, editable, draggable = false, onHoverPartOf, onShowPartOf, hideParent = false }: {
   vm: LineVM
   actions: LineActions
   members: FamilyMember[]
@@ -152,6 +152,8 @@ export function PlanLine({ vm, actions, members, nextLabel, open, onToggle, edit
    *  its "↳ Part of …" shows it there (the week list's rule). */
   onHoverPartOf?: (id: string | null) => void
   onShowPartOf?: (link: SupportLink) => void
+  /** The list already draws this line under its goal's heading. */
+  hideParent?: boolean
 }) {
   const t = vm.task
   const who = assigneesOf(t)
@@ -187,7 +189,7 @@ export function PlanLine({ vm, actions, members, nextLabel, open, onToggle, edit
           <LineMenu vm={vm} actions={actions} nextLabel={nextLabel} />
         </span>
       </div>
-      {vm.partOf && !open && (
+      {vm.partOf && !open && !hideParent && (
         <button type="button" className="pv2-line-parent" onClick={() => (onShowPartOf ?? actions.openPartOf)(vm.partOf!)}
           aria-label={`Part of ${vm.partOf.title} — show it`}>
           <CornerDownRight className="h-3 w-3 shrink-0" aria-hidden="true" /><span className="truncate">Part of “{vm.partOf.title}”</span>
@@ -213,8 +215,8 @@ export function PlanLine({ vm, actions, members, nextLabel, open, onToggle, edit
             {/* A goal says what it means and holds its possible work — the Fall
                 page Scott liked (prototype, 2026-09-28). Both are the goal's own
                 records: its notes and its steps. */}
-            <div className="pv2-fact"><span className="pv2-k">Means</span>
-              {t.notes?.trim() ? <span className="pv2-notes">{t.notes.trim()}</span> : <span className="pv2-hint">Blank for now.</span>}</div>
+            <div className="pv2-fact"><span className="pv2-k">Notes</span>
+              {t.notes?.trim() ? <span className="pv2-notes">{t.notes.trim()}</span> : <span className="pv2-hint">None yet — add some in its details.</span>}</div>
             <div className="pv2-fact"><span className="pv2-k">Work</span>
               {vm.steps?.length ? <ul className="pv2-steps-list">{vm.steps.map((s) => (
                 <li key={s.id}><button type="button" className={`pv2-step${s.done ? ' is-done' : ''}`} onClick={() => actions.details({ ...t, id: s.id })}>{s.title}</button>

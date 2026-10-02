@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { EMPTY_TALLY, addToTally, lookBackWhy, nextAfterSave, planWhy, tallySentence } from './planTally'
+import { EMPTY_TALLY, addToTally, decidedSentence, lookBackWhy, nextAfterSave, planWhy, tallySentence } from './planTally'
 
 describe('planTally', () => {
   it('says what a look-back decided, in order, skipping zeros', () => {
@@ -10,8 +10,16 @@ describe('planTally', () => {
   it('says nothing when nothing was decided', () => {
     expect(tallySentence(EMPTY_TALLY, 'Summer')).toBe('')
   })
-  it('the look-back step says nothing is deleted', () => {
-    expect(lookBackWhy('Summer', 'Fall', 6)).toMatch(/^Summer left 6 open\..*Nothing is deleted\.$/)
+  it('the look-back step says nothing is deleted, without counting', () => {
+    expect(lookBackWhy('Summer', 'Fall', 6)).toMatch(/^Summer left work open\..*Nothing is deleted\.$/)
+    expect(lookBackWhy('Summer', 'Fall', 6)).not.toMatch(/\d/)
+  })
+  it('once every card is decided, the bar says so (walkthrough 2026-10-02 #30)', () => {
+    expect(lookBackWhy('October', 'November', 0)).toBe('October’s open work is decided. Next, write November.')
+  })
+  it('a save says the look-back is decided in words, not counts', () => {
+    expect(decidedSentence(addToTally(EMPTY_TALLY, 'carried'), 'October')).toBe('October’s open work is decided.')
+    expect(decidedSentence(EMPTY_TALLY, 'October')).toBe('')
   })
 })
 
@@ -19,7 +27,7 @@ describe('planWhy', () => {
   it('a season with lines is checked against the year, not written from scratch', () => {
     const why = planWhy('season', 'Fall', '2026', 14)
     expect(why).toMatch(/^Check Fall’s list against 2026: keep what still matters, cut what doesn’t, add what’s missing\./)
-    expect(why).toContain('“+ Add to Fall”')
+    expect(why).toContain('“+ Fall’s part”')
     expect(why).not.toMatch(/write what/)
   })
   it('an empty season is written from the year’s goals', () => {
@@ -45,7 +53,11 @@ describe('nextAfterSave', () => {
     expect(nextAfterSave('month', new Date(2026, 8, 1), true, sep29, helpers).to).toBe('/week?start=2026-09-26')
   })
   it('October planned ahead hands to the week holding Oct 1', () => {
-    expect(nextAfterSave('month', new Date(2026, 9, 1), false, sep29, helpers)).toEqual({ label: 'Choose steps for week 40', to: '/week?start=2026-09-26' })
+    expect(nextAfterSave('month', new Date(2026, 9, 1), false, sep29, helpers)).toEqual({ label: 'Choose what week 40 takes on', to: '/week?start=2026-09-26' })
+  })
+  it('on a week’s last day a running month hands to NEXT week (walkthrough 2026-10-02 #18)', () => {
+    const fri = new Date(2026, 9, 2) // last day of the Saturday week Sep 26 – Oct 2
+    expect(nextAfterSave('month', new Date(2026, 9, 1), true, fri, helpers).to).toBe('/week?start=2026-10-03')
   })
   it('a year hands to a season', () => {
     expect(nextAfterSave('year', new Date(2026, 0, 1), true, sep29, helpers).label).toBe('Choose what Fall takes on')

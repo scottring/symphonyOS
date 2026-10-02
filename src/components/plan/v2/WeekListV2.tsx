@@ -9,7 +9,7 @@
 // beneath, its controls: life area, people, when (the week's own timing
 // control), and ⋯ for next week / Someday / Drop / All details.
 
-import { useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { useDraggable, useDroppable } from '@dnd-kit/core'
 import { Check, CornerDownRight, GripVertical } from 'lucide-react'
 import type { Task, TaskContext } from '@/types/task'
@@ -22,7 +22,7 @@ import { LineMenu, type LineActions, type LineVM } from './PlanLine'
 
 type Parent = { id: string; title: string; isGoal: boolean }
 
-export function WeekListV2({ title, lines, weekStart, members, actions, timingControl, onContext, onAdd, parentOf, onHoverParent, onShowParent, draftChild, onDraftChild, onCancelChild, dragEnabled = true, headerAction, addPicker, emptyHint }: {
+export function WeekListV2({ title, lines, weekStart, members, actions, timingControl, onContext, onAdd, parentOf, onHoverParent, onShowParent, draftChild, onDraftChild, onCancelChild, dragEnabled = true, headerAction, addPicker, emptyHint, focusAdd = false }: {
   title: string
   lines: LineVM[]
   weekStart: Date
@@ -49,8 +49,12 @@ export function WeekListV2({ title, lines, weekStart, members, actions, timingCo
   addPicker?: ReactNode
   /** The empty list's hint. */
   emptyHint?: string
+  /** Open with the cursor in the add row (arriving to write). */
+  focusAdd?: boolean
 }) {
   const [draft, setDraft] = useState('')
+  const addRef = useRef<HTMLInputElement>(null)
+  useEffect(() => { if (focusAdd) addRef.current?.focus() }, [focusAdd])
   const [showDone, setShowDone] = useState(false)
   const first = localYmd(weekStart)
   const last = localYmd(new Date(weekStart.getTime() + 6 * 86_400_000))
@@ -80,15 +84,34 @@ export function WeekListV2({ title, lines, weekStart, members, actions, timingCo
           <ul className="pv2-list">{g.rows.map(row)}</ul>
         </section>
       ))}
-      {onDays.length > 0 && <p className="pv2-hint">{onDays.length} {onDays.length === 1 ? 'is' : 'are'} on a day this week — under {onDays.length === 1 ? 'its day' : 'their days'}.</p>}
+      {/* What has a day stays on the list, quiet, saying which — not "1 is
+          on a day this week", which read as an empty list (#21). */}
+      {onDays.length > 0 && (
+        <section aria-label="On a day">
+          <div className="pv2-wl-h">On a day</div>
+          <ul className="pv2-list">{onDays.map((vm) => (
+            <li key={vm.task.id} className="pv2-wl-placed">
+              <button type="button" className="pv2-wl-title" onClick={() => actions.details(vm.task)}>{vm.task.title}</button>
+              <span className="pv2-hint">→ {placedLabel(vm.task)}</span>
+            </li>
+          ))}</ul>
+        </section>
+      )}
       {done.length > 0 && <button type="button" className="pv2-link pv2-quiet" aria-expanded={showDone} onClick={() => setShowDone((s) => !s)}>{showDone ? 'Hide completed' : `Completed · ${done.length}`}</button>}
       <form className="pv2-write" onSubmit={(e) => { e.preventDefault(); const v = draft.trim(); if (v) { void onAdd(v); setDraft('') } }}>
         <span className="pv2-wl-check" aria-hidden="true" />
-        <input value={draft} onChange={(e) => setDraft(e.target.value)} placeholder="Add something for this week" aria-label="Add to this week" />
+        <input ref={addRef} value={draft} onChange={(e) => setDraft(e.target.value)} placeholder="Add something for this week" aria-label="Add to this week" />
         {addPicker}
       </form>
     </section>
   )
+}
+
+/** "Mon 11:45 AM", or "Mon" for an all-day line. */
+function placedLabel(t: Task): string {
+  const d = t.scheduledFor!
+  const day = d.toLocaleDateString('en-US', { weekday: 'short' })
+  return t.isAllDay ? day : `${day} ${d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`
 }
 
 // A card drags onto a day with the week's own chip protocol ('pool:<id>',
