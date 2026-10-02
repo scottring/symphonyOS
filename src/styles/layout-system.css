@@ -210,8 +210,11 @@
        actions) are clipped by the column instead of stretching the page. */
     position: relative; top: auto; max-height: var(--pv2-col-h, none);
     overflow-y: auto; scrollbar-width: thin;
-    /* Room for the row boxes that bleed 12px past the column. */
-    margin: 0 -14px; padding: 0 14px;
+    /* Room for the row boxes that bleed 12px past the column, and on the
+       left for the drag grip that stands 22px out (clipped at 14px, it
+       couldn't be grabbed). 14 + 22 is the narrowest gap (36px), so
+       neighbouring columns never overlap. */
+    margin: 0 -14px 0 -22px; padding: 0 14px 0 22px;
   }
   .is-colscroll > :is(.pv2-days, .pv2-wside, .pv2-dropcol) .pv2-colh,
   :is(.pv2-grid2, .pv2-grid3).is-colscroll > .pv2-ref :is(.pv2-refsec > .pv2-colh, .pv2-refshelf > summary) {
@@ -226,7 +229,7 @@
   .pv2-wgrid.is-colscroll > .pv2-ref {
     position: relative; top: auto; max-height: var(--pv2-col-h, none);
     overflow-y: auto; scrollbar-width: thin;
-    margin: 0 -14px; padding: 0 14px;
+    margin: 0 -14px 0 -22px; padding: 0 14px 0 22px;
   }
   /* Each section's heading — a month, then the shelves below ("Earlier, not
      done", routines) — holds the top until its own list ends, and the next
