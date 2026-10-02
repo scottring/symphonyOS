@@ -10,13 +10,15 @@ masthead, one section heading, one row, one empty state.
 ## 1. One column
 
 - Every page: the shared left gutter (16 / 40 / 56px) and **880px of content**
-  (`PAGE_COLUMN`, `max-w-[992px]` with the gutter), left-aligned.
+  (`PAGE_COLUMN`, `max-w-[992px]` with the gutter), centred in the 1152px
+  frame beneath the header (Scott, 2026-10-02; it was left-aligned).
 - `PAGE_COLUMN_WIDE` is now the same column (kept as a name).
 - `PAGE_COLUMN_SPLIT` (1152px) only for two panes side by side: Today with
   its week column.
 - `PAGE_COLUMN_FULL` only for canvases you work on: Week's hourly grid, the
   people river.
-- Never `mx-auto` or `margin: 0 auto` on a page column.
+- Columns are `mx-auto` (`PAGE_COLUMN`, `PAGE_COLUMN_SPLIT`); don't hand-roll
+  `mr-auto` or a different max-width.
 
 ## 2. The margin lane
 
@@ -64,6 +66,28 @@ right). Phones keep their control row.
 `EmptyState` (`src/components/layout/EmptyState.tsx`): a serif 20px line,
 one 14px sentence saying what goes here, at most one quiet action.
 Left-aligned in the column, not a centred icon poster.
+
+## 7. Header band, no footer bar
+
+Agreed with Scott 2026-10-02.
+
+- **The band.** The top bar is the page's header: edge to edge across the
+  workspace, a paper wash 40% strong over the page colour or the fixed sky,
+  a hairline under it. It pins as a whole.
+- **The ends overhang evenly.** At the left, the tree mark and the
+  SYMPHONY wordmark (10.5px tracked capitals; links to Today); at the right,
+  the area, assistant, Inbox, search and account icons. Both ends sit the
+  same distance in from the frame's edges (32px past the page gutter at
+  desktop width, 24px below 1024px), and the page column is centred beneath
+  them, so the header overhangs the content equally on both sides.
+- **The wordmark** shows only when the header band is at least 1240px wide
+  (a container query, so an open side pane counts); below that the mark
+  stands alone. The mark is `public/symphony-logo.png` (transparent, no
+  ring), lifted a step at night so it does not sink into the dark band.
+- **No footer bar.** The painted landscape at the foot of the page stays
+  clear. Keyboard shortcuts and Help live at the bottom of the ☰ menu;
+  Today's "Review today" closes the day's list on desktop (phones keep it
+  in the ⋯ menu).
 
 ## Type scale
 

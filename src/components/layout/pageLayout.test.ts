@@ -12,10 +12,12 @@ describe('the page column starts in the same place on every page', () => {
     expect(cls).toContain(PAGE_GUTTER_X)
   })
 
-  it.each(Object.entries(columns))('%s is not centered', (_name, cls) => {
-    // mx-auto splits the leftover space, which makes the left edge a function
-    // of the column's max-width — the whole defect.
-    expect(cls).not.toContain('mx-auto')
+  it.each(Object.entries({ PAGE_COLUMN, PAGE_COLUMN_SPLIT }))('%s is centred under the header (2026-10-02)', (_name, cls) => {
+    // The header's ends overhang the page evenly; the column sits centred
+    // beneath them. Every reading page shares the one width, so it shares
+    // the one left edge too.
+    expect(cls).toContain('mx-auto')
+    expect(cls).not.toContain('mr-auto')
   })
 
   it('one reading width for every page; only canvases and splits differ', () => {

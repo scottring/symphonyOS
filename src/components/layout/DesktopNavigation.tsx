@@ -5,6 +5,7 @@ import { ChevronDown, Inbox, Menu, Search, UserRound } from 'lucide-react'
 import { requestPlanFromPaper } from '@/lib/planFromPaperSignal'
 import { appRegistry } from '@/shell/appRegistry'
 import { MORE_GROUPS, isDestinationActive } from './moreDestinations'
+import { HelpDialogs } from './HelpDialogs'
 
 export const DesktopControlsContext = createContext<HTMLElement | null>(null)
 export function DesktopPageControls({ children }: { children: ReactNode }) {
@@ -26,6 +27,7 @@ export function DesktopNavigation({ inboxCount, discussionsUnread, onSearch, onS
   const navigate = useNavigate()
   const { pathname } = useLocation()
   const [open, setOpen] = useState<string | null>(null)
+  const [dialog, setDialog] = useState<{ kind: 'shortcuts' | 'help'; from: HTMLElement | null } | null>(null)
   const root = useRef<HTMLElement>(null)
   const trigger = useRef<HTMLButtonElement | null>(null)
   useEffect(() => { setOpen(null) }, [pathname])
@@ -59,6 +61,10 @@ export function DesktopNavigation({ inboxCount, discussionsUnread, onSearch, onS
         Inbox, search and you — page controls live in the page heading. No Add
         button (Scott, 2026-09-29): the round + and ⌘K already add. */}
     <div className="page-navigation-left">
+    {/* The app's mark anchors the bar's corner (Scott, 2026-10-02); it goes Today. */}
+    <NavLink to="/today" className="page-navigation-brand" aria-label="Symphony, go to Today" title="Today">
+      <img src="/symphony-logo.png" alt="" width={32} height={32} /><span className="page-navigation-wordmark">Symphony</span>
+    </NavLink>
     {menu('more', <><Menu size={18} aria-hidden="true" />{discussionsUnread > 0 && <span className="navigation-count">{discussionsUnread}</span>}</>, <div className="page-navigation-more">
       <div className="page-navigation-groups">
         {groups.map(([group, items]) => <div key={group} role="group" aria-labelledby={`navigation-group-${group}`} className="page-navigation-group">
@@ -72,6 +78,12 @@ export function DesktopNavigation({ inboxCount, discussionsUnread, onSearch, onS
       <div className="page-navigation-more-action">
         <button onClick={() => { setOpen(null); if (!requestPlanFromPaper()) navigate('/today') }}>Plan from paper</button>
         <span>Photograph a paper page into your plan</span>
+      </div>
+      {/* Shortcuts and Help moved here from the footer (Scott, 2026-10-02),
+          so the landscape at the foot of the page stays clear. */}
+      <div className="page-navigation-more-help">
+        <button onClick={() => { setOpen(null); setDialog({ kind: 'shortcuts', from: trigger.current }) }}>Keyboard shortcuts</button>
+        <button onClick={() => { setOpen(null); setDialog({ kind: 'help', from: trigger.current }) }}>Help</button>
       </div>
     </div>, destinations.some(([, route]) => isDestinationActive(route, pathname)),
       { ariaLabel: discussionsUnread > 0 ? `More, ${discussionsUnread} unread discussions` : 'More', chevron: false, className: 'is-hamburger' })}
@@ -90,5 +102,6 @@ export function DesktopNavigation({ inboxCount, discussionsUnread, onSearch, onS
         {userName && <p>{userName}</p>}<button onClick={() => go('/settings')}>Settings</button><button onClick={() => { setOpen(null); onSignOut() }}>Sign out</button>
       </>, false, { chevron: false, className: 'is-account' })}
     </div>
+    <HelpDialogs open={dialog?.kind ?? null} onClose={() => setDialog(null)} returnFocus={dialog?.from} />
   </nav>
 }

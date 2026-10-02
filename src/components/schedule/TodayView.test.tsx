@@ -5,7 +5,7 @@ import { render } from '@/test/test-utils'
 import { ScheduleActionsProvider } from '@/contexts/ScheduleActionsContext'
 import { createMockRoutine } from '@/test/mocks/factories'
 import { TodayView } from './TodayView'
-import { DesktopFooterActionContext } from '@/components/layout/DesktopFooter'
+import { DesktopControlsContext } from '@/components/layout/DesktopNavigation'
 
 // File-wide mock: every test in this file renders TodayView's mobile branch.
 // This affects the EveningMealCard branch (TodayView.tsx ~line 651) and WHERE
@@ -726,14 +726,16 @@ describe('TodayView — the day card carries the date nav', () => {
   })
 })
 
-describe('TodayView — desktop footer review', () => {
+describe('TodayView — desktop review closes the list (2026-10-02)', () => {
   afterEach(() => { mockUseMobile.mockReturnValue(true) })
 
-  function renderWithFooter(props: Record<string, unknown> = {}) {
+  // The desktop shell supplies the top bar's controls slot; that is what
+  // marks a desktop-shell mount.
+  function renderInShell(props: Record<string, unknown> = {}) {
     const host = document.createElement('div')
     document.body.appendChild(host)
     const result = render(
-      <DesktopFooterActionContext.Provider value={host}>
+      <DesktopControlsContext.Provider value={host}>
         <ScheduleActionsProvider value={ctxValue as never}>
           <TodayView
             tasks={[]} events={[]} routines={[]} dateInstances={[]}
@@ -742,15 +744,15 @@ describe('TodayView — desktop footer review', () => {
             viewedDate={TODAY} onDateChange={vi.fn()} projects={[]} {...props}
           />
         </ScheduleActionsProvider>
-      </DesktopFooterActionContext.Provider>,
+      </DesktopControlsContext.Provider>,
     )
     return { ...result, host }
   }
 
-  it('moves the day review into the footer, once, and opens the existing review', async () => {
+  it('ends the day list with Review today, once, and opens the existing review', async () => {
     mockUseMobile.mockReturnValue(false)
-    const { user, host } = renderWithFooter()
-    const review = within(host).getByRole('button', { name: 'Review today' })
+    const { user, host } = renderInShell()
+    const review = screen.getByRole('button', { name: 'Review today' })
     await openOverflow(user)
     expect(screen.queryByRole('button', { name: /End of day review/i })).not.toBeInTheDocument()
     await user.click(review)
@@ -758,17 +760,17 @@ describe('TodayView — desktop footer review', () => {
     host.remove()
   })
 
-  it('offers no footer review on another day', () => {
+  it('offers no review on another day', () => {
     mockUseMobile.mockReturnValue(false)
     const yesterday = new Date(TODAY); yesterday.setDate(yesterday.getDate() - 1)
-    const { host } = renderWithFooter({ viewedDate: yesterday })
-    expect(within(host).queryByRole('button', { name: 'Review today' })).not.toBeInTheDocument()
+    const { host } = renderInShell({ viewedDate: yesterday })
+    expect(screen.queryByRole('button', { name: 'Review today' })).not.toBeInTheDocument()
     host.remove()
   })
 
   it('keeps the ⋯ menu entry on phones', async () => {
-    const { user, host } = renderWithFooter()
-    expect(within(host).queryByRole('button', { name: 'Review today' })).not.toBeInTheDocument()
+    const { user, host } = renderInShell()
+    expect(screen.queryByRole('button', { name: 'Review today' })).not.toBeInTheDocument()
     await openOverflow(user)
     expect(screen.getByRole('button', { name: /End of day review/i })).toBeInTheDocument()
     host.remove()

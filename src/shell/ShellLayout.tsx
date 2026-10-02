@@ -4,7 +4,6 @@ import { DesktopNavigation, DesktopControlsContext, DesktopLeadContext, DesktopC
 import { ReferenceListsProvider, useReferenceLists } from '@/components/reference/ReferenceListsContext';
 import { ReferenceListsDock } from '@/components/reference/ReferenceLists';
 import { pinIsOnPage } from '@/components/reference/periodsOnPage';
-import { DesktopFooter, DesktopFooterActionContext } from '@/components/layout/DesktopFooter';
 // src/shell/ShellLayout.tsx
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
@@ -147,7 +146,6 @@ function ShellLayoutInner({ children }: Props) {
   const [desktopLead, setDesktopLead] = useState<HTMLDivElement | null>(null);
   const [desktopCenter, setDesktopCenter] = useState<HTMLDivElement | null>(null);
   const [mobilePlanControls, setMobilePlanControls] = useState<HTMLDivElement | null>(null);
-  const [desktopFooterAction, setDesktopFooterAction] = useState<HTMLDivElement | null>(null);
   // The element that scrolls the page — the content frame, on desktop and
   // phone alike. Focused controls must clear the scenery foreground.
   const [pageScroller, setPageScroller] = useState<HTMLDivElement | null>(null);
@@ -263,7 +261,6 @@ function ShellLayoutInner({ children }: Props) {
     <DesktopLeadContext.Provider value={desktopLead}>
     <DesktopCenterContext.Provider value={desktopCenter}>
     <MobilePlanControlsContext.Provider value={mobilePlanControls}>
-    <DesktopFooterActionContext.Provider value={desktopFooterAction}>
     <GuideHostContext.Provider value={setGuideHost}>
     {/* With scenery on, the shell wears the place's sky in the chosen light
         (index.css, IMMERSIVE SCENERY); page regions marked .scenery-page
@@ -323,7 +320,7 @@ function ShellLayoutInner({ children }: Props) {
             <div className="min-w-0">{children}</div>
           </div>
         ) : (
-          // Desktop: navigation, page, and footer share one centred column —
+          // Desktop: navigation and page share one centred column —
           // centred in the window, or in the space left beside a side pane or
           // the pinned reference lists.
           <>
@@ -389,11 +386,9 @@ function ShellLayoutInner({ children }: Props) {
               </SideColumn>
             </div>
             {referencesVisible && <div className="desktop-workspace-dock"><ReferenceListsDock /></div>}
-            {/* The footer stays put while the page scrolls (Scott, 2026-09-28);
-                with scenery on it floats on the landscape (PlaceScenery). */}
-            <div className="desktop-ground scenery-page">
-              <DesktopFooter actionRef={setDesktopFooterAction} />
-            </div>
+            {/* No footer bar (Scott, 2026-10-02): the landscape at the foot of
+                the page stays clear. Shortcuts and Help are in the ☰ menu;
+                Today's review closes its own list. */}
           </div>
           </>
         )}
@@ -556,7 +551,6 @@ function ShellLayoutInner({ children }: Props) {
       )}
     </div>
     </GuideHostContext.Provider>
-    </DesktopFooterActionContext.Provider>
     </MobilePlanControlsContext.Provider>
     </DesktopCenterContext.Provider>
     </DesktopLeadContext.Provider>

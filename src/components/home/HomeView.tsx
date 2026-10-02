@@ -252,7 +252,7 @@ export function HomeView({
   // its hourly grid is a canvas and keeps the full width (lg+, where it is
   // drawn — below lg the journal stands in for it).
   const weekColumn = (currentView === 'week' || currentView === 'workweek') && isWeekV2Enabled()
-    ? ` week-column w-full max-w-[992px] mr-auto${weekMode === 'schedule' ? ' lg:max-w-none' : ''}`
+    ? ` week-column w-full max-w-[992px] mx-auto${weekMode === 'schedule' ? ' lg:max-w-none' : ''}`
     : ''
   // Set by goToWeek and onRangeChange: the run they just wrote into the URL is
   // already on screen, so re-deriving it would only undo the Schedule/Journal

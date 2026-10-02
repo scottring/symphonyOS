@@ -1998,19 +1998,18 @@ html.desktop-shell a {
   box-shadow: none;
 }
 
-/* Desktop workspace: navigation, page, and footer share one readable column,
+/* Desktop workspace: navigation and page share one readable column,
    centred in whatever width the side panes and reference lists leave. The
    shell only renders this on desktop, so phones never see these rules. */
 .desktop-workspace {
   display: grid;
   min-height: 100%;
   grid-template-columns: minmax(0, 1fr);
-  grid-template-rows: auto 1fr auto;
-  grid-template-areas: "nav" "page" "footer";
+  grid-template-rows: auto 1fr;
+  grid-template-areas: "nav" "page";
 }
 .desktop-workspace-nav,
-.desktop-workspace-page,
-.desktop-footer {
+.desktop-workspace-page {
   width: 100%;
   max-width: 1152px;
   justify-self: center;
@@ -2018,21 +2017,11 @@ html.desktop-shell a {
 }
 .desktop-workspace-nav { grid-area: nav; }
 .desktop-workspace-page { grid-area: page; }
-.desktop-footer { grid-area: footer; }
-.desktop-ground {
-  grid-area: footer; position: sticky; bottom: 0; z-index: 15; min-width: 0;
-  /* The page scrolls BEHIND the ground: solid page colour under the scene
-     and footer, fading in above them so rows slip out of sight softly. */
-  background: linear-gradient(to bottom, color-mix(in srgb, var(--color-bg-base) 0%, transparent), var(--color-bg-base) 36px);
-  pointer-events: none;
-}
-.desktop-ground > * { pointer-events: auto; }
-.desktop-ground .desktop-footer { margin-inline: auto; padding-top: 8px; padding-bottom: 16px; }
 .desktop-workspace-dock { grid-area: dock; align-self: stretch; min-width: 0; }
 /* References stay in the desktop workspace across route changes. */
 .desktop-workspace.has-references {
   grid-template-columns: auto minmax(0, 1fr);
-  grid-template-areas: "dock nav" "dock page" "dock footer";
+  grid-template-areas: "dock nav" "dock page";
 }
 .reference-dock {
   position: sticky;
@@ -2068,8 +2057,8 @@ html.desktop-shell a {
 @media (max-width: 1100px) {
   .desktop-workspace.has-references {
     grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: auto 1fr auto auto;
-    grid-template-areas: "nav" "page" "dock" "footer";
+    grid-template-rows: auto 1fr auto;
+    grid-template-areas: "nav" "page" "dock";
   }
   .reference-dock, .reference-dock.is-wide { position: static; width: auto; max-height: none; border-right: 0; border-top: 1px solid var(--color-neutral-200); }
 }
@@ -2184,23 +2173,8 @@ html.desktop-shell a {
 .navigation-pin { color: var(--color-accent-500); }
 @media (max-width: 1023px) { .page-navigation { padding-inline: 40px; gap: 6px 14px; } }
 
-/* Quiet desktop footer: the page's own action at left, help at right. */
-.desktop-footer { padding: 24px 56px 32px; font-size: 13px; color: var(--color-neutral-500); }
-.desktop-footer-rule {
-  display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 16px;
-  border-top: 1px solid var(--color-neutral-200); padding-top: 14px;
-}
-.desktop-footer-signature {
-  display: flex; align-items: center; gap: 8px;
-  font-size: 10.5px; font-weight: 600; letter-spacing: 0.2em; text-transform: uppercase; color: var(--color-neutral-500);
-}
-.desktop-footer-logo { width: 28px; height: 28px; border-radius: 50%; overflow: hidden; flex-shrink: 0; }
-.desktop-footer-logo img { display: block; width: 138%; height: 138%; max-width: none; margin: -19%; }
-.desktop-footer-action, .desktop-footer-links { display: flex; align-items: center; gap: 20px; }
-.desktop-footer-links { justify-self: end; }
-.desktop-footer button { padding: 4px 0; cursor: pointer; }
-.desktop-footer button:hover { color: var(--color-neutral-950); }
-.desktop-footer button:focus-visible, .desktop-footer-dialog button:focus-visible {
+/* Keyboard shortcuts and Help: dialogs opened from the ☰ menu. */
+.desktop-footer-dialog button:focus-visible {
   outline: 2px solid var(--color-primary-600); outline-offset: 2px;
 }
 .desktop-footer-backdrop {
@@ -2221,7 +2195,6 @@ html.desktop-shell a {
 .desktop-footer-shortcuts dt { width: 72px; flex-shrink: 0; }
 .desktop-footer-shortcuts kbd { font-family: inherit; font-size: 12px; color: var(--color-neutral-950); }
 .desktop-footer-help { margin-top: 12px; display: grid; gap: 10px; }
-@media (max-width: 1023px) { .desktop-footer { padding-inline: 40px; } }
 
 /* More: three short labelled columns, with the one verb on its own line. */
 .page-navigation-popover:has(.page-navigation-more) { width: min(560px, calc(100vw - 32px)); padding: 16px 8px 12px; }
@@ -2240,6 +2213,12 @@ html.desktop-shell a {
 .page-navigation-popover .page-navigation-more-action button { display: inline; width: auto; padding: 0; font-weight: 600; color: var(--color-neutral-950); }
 .page-navigation-popover .page-navigation-more-action button:hover { background: none; text-decoration: underline; }
 .page-navigation-more-action span { color: var(--color-neutral-400); }
+/* Today's review closes the day's list on desktop (it was the footer's). */
+.today-review-close { display: inline-flex; align-items: center; gap: 8px; margin-top: 28px; padding: 6px 0; font-size: 14px; color: var(--color-neutral-600); cursor: pointer; }
+.today-review-close:hover { color: var(--color-neutral-950); text-decoration: underline; }
+.page-navigation-more-help { display: flex; gap: 20px; margin: 8px 4px 0; padding: 0 8px; font-size: 13px; }
+.page-navigation-popover .page-navigation-more-help button { display: inline; width: auto; padding: 2px 0; color: var(--color-neutral-600); }
+.page-navigation-popover .page-navigation-more-help button:hover { background: none; color: var(--color-neutral-950); text-decoration: underline; }
 
 /* Review drawer on desktop: a paper sheet in ink. Phones keep their sheet. */
 @media (min-width: 768px) {
@@ -2863,7 +2842,7 @@ div.chooser-action-group { overflow: visible !important; }
    above it — so rows slip out of sight just as they reach the hills, and the
    open sky in the middle stays usable), then the one painting, full width at
    its own proportions: never stretched, cropped at the skyline or repeated.
-   Menus, the footer and the side pane stay above it. Only the part under the
+   Menus and the side pane stay above it. Only the part under the
    skyline (.place-scenery-catch) takes the pointer: concealed rows cannot be
    clicked, and PlaceScenery forwards wheel and touch scrolling from it. */
 .place-scenery {
@@ -2891,25 +2870,15 @@ div.chooser-action-group { overflow: visible !important; }
 
 /* Room at the end of the page so every last row can be scrolled clear of the
    landscape (--scenery-clearance: the landscape's measured height, written by
-   PlaceScenery). Desktop puts it above the sticky footer, which floats on the
-   painting; phones add it after the page, above the dock it stands on. */
+   PlaceScenery). Desktop pads the page by it; phones add it after the page,
+   above the dock it stands on. */
 .scenery-scroll { scroll-padding-bottom: calc(var(--scenery-clearance, 240px) + 16px); }
-.scenery-scroll .desktop-workspace-page { padding-bottom: max(0px, calc(var(--scenery-clearance, 240px) - 56px)); }
+.scenery-scroll .desktop-workspace-page { padding-bottom: var(--scenery-clearance, 240px); }
 .scenery-end-clearance { height: var(--scenery-clearance, 120px); flex-shrink: 0; pointer-events: none; }
 /* The phone's capture bar floats on the painting too: the landscape's veil
    already hides the rows beneath it, so its paper fade would only draw a
    band across the scene. */
 .scenery-scroll .phone-capture-bar::before { display: none; }
-/* The footer floats on the painting, light on a soft shade like the approved
-   concepts, instead of on a band of paper. */
-.scenery-scroll .desktop-ground {
-  background: linear-gradient(to bottom, transparent, rgb(12 14 18 / 0.32));
-}
-.scenery-scroll .desktop-ground .desktop-footer { color: #fff; text-shadow: 0 1px 3px rgb(0 0 0 / 0.65); }
-.scenery-scroll .desktop-ground .desktop-footer-rule { border-top-color: transparent; }
-.scenery-scroll .desktop-ground .desktop-footer-signature { color: #fff; }
-.scenery-scroll .desktop-ground .desktop-footer button:hover { color: #fff; text-decoration: underline; }
-.scenery-scroll .desktop-ground .desktop-footer button:focus-visible { outline-color: #fff; }
 
 /* Settings → Your place */
 .place-display-options { display: flex; gap: 24px; align-items: center; justify-content: space-between; flex-wrap: wrap; margin-bottom: 12px; }
@@ -3559,6 +3528,44 @@ div.chooser-action-group { overflow: visible !important; }
 .page-navigation-center:empty { display: none; }
 .desktop-workspace-nav:has(.page-navigation-center:not(:empty)) { position: sticky; top: 0; z-index: 14; background: var(--color-bg-base); transition: box-shadow .15s; }
 html.rail-stuck .desktop-workspace-nav:has(.page-navigation-center:not(:empty)) { box-shadow: 0 1px 0 var(--color-neutral-200), 0 8px 16px -14px rgb(0 0 0 / .18); }
+/* The bar is the page's header (Scott, 2026-10-02): the mark at its corner
+   and a fuller band behind the row, edge to edge across the workspace, so
+   every page starts from an anchor. The band is a paper wash over whatever
+   is behind it — the page colour, or the fixed sky — so the sky still reads
+   through it, and at night the wash is the night paper. */
+.desktop-workspace-nav { --header-wash: color-mix(in srgb, var(--color-bg-elevated) 40%, transparent); max-width: none; justify-self: stretch; }
+.desktop-workspace-nav .page-navigation { margin-inline: auto; }
+.desktop-workspace-nav, .desktop-workspace-nav:has(.page-navigation-center:not(:empty)) {
+  background: linear-gradient(var(--header-wash), var(--header-wash)), var(--color-bg-base);
+  border-bottom: 1px solid var(--color-neutral-200);
+}
+.scenery-sky :is(.desktop-workspace-nav, .desktop-workspace-nav:has(.page-navigation-center:not(:empty))) {
+  background: linear-gradient(var(--header-wash), var(--header-wash)), var(--scenery-sky-layers); background-attachment: fixed;
+}
+@media (min-width: 768px) { .desktop-workspace-nav .page-navigation { padding-top: 10px; padding-bottom: 10px; } }
+.page-navigation-brand { display: inline-flex; align-items: center; gap: 10px; flex-shrink: 0; text-decoration: none; }
+.page-navigation-brand img { display: block; width: 32px; height: 32px; }
+/* The wordmark matches the old footer signature: small tracked capitals. */
+.page-navigation .page-navigation-brand, .page-navigation .page-navigation-brand[aria-current="page"] { color: var(--color-neutral-800); font-weight: 600; }
+.page-navigation-wordmark { font-size: 10.5px; letter-spacing: 0.16em; text-transform: uppercase; }
+/* The wordmark needs the bar's full width beside the rail: it goes when the
+   header itself is narrow (a side pane open counts, not just the window). */
+.desktop-workspace-nav { container: header-band / inline-size; }
+.desktop-workspace-nav .page-navigation-left { gap: 12px; }
+.page-navigation-brand { gap: 8px; }
+@container header-band (max-width: 1240px) { .page-navigation-wordmark { display: none; } }
+/* At night the ink would sink into the dark band; lift it a step. */
+[data-scenery-lighting='nighttime'] .page-navigation-brand img { filter: brightness(1.6) saturate(1.15); }
+/* The header's ends overhang the page evenly (Scott, 2026-10-02): the mark
+   at the left and the last icon at the right sit the same distance in from
+   the frame's edges, and the page column is centred beneath them. (The
+   right-hand icons draw 8px inside their 34px buttons, hence 40 vs 32.) */
+.page-navigation-brand { margin-left: -32px; }
+.page-navigation-utilities { margin-right: -40px; }
+@media (max-width: 1023px) {
+  .page-navigation-brand { margin-left: -24px; }
+  .page-navigation-utilities { margin-right: -32px; }
+}
 .plan-page-tools.is-rail-extras { justify-content: flex-end; padding-top: 0; }
 /* The weather stays one line beside the ☰: icon, temperature, high/low —
    the condition word is the icon's (and the button's label), since the bar
