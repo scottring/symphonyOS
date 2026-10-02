@@ -63,7 +63,7 @@ export function DesktopNavigation({ inboxCount, discussionsUnread, onSearch, onS
     <div className="page-navigation-left">
     {/* The app's mark anchors the bar's corner (Scott, 2026-10-02); it goes Today. */}
     <NavLink to="/today" className="page-navigation-brand" aria-label="Symphony, go to Today" title="Today">
-      <img src="/symphony-logo.png" alt="" width={32} height={32} />
+      <img src="/symphony-logo.png" alt="" width={32} height={32} /><span className="page-navigation-wordmark">Symphony</span>
     </NavLink>
     {menu('more', <><Menu size={18} aria-hidden="true" />{discussionsUnread > 0 && <span className="navigation-count">{discussionsUnread}</span>}</>, <div className="page-navigation-more">
       <div className="page-navigation-groups">

@@ -3543,15 +3543,29 @@ html.rail-stuck .desktop-workspace-nav:has(.page-navigation-center:not(:empty)) 
   background: linear-gradient(var(--header-wash), var(--header-wash)), var(--scenery-sky-layers); background-attachment: fixed;
 }
 @media (min-width: 768px) { .desktop-workspace-nav .page-navigation { padding-top: 10px; padding-bottom: 10px; } }
-.page-navigation-brand { display: inline-flex; flex-shrink: 0; }
+.page-navigation-brand { display: inline-flex; align-items: center; gap: 10px; flex-shrink: 0; text-decoration: none; }
 .page-navigation-brand img { display: block; width: 32px; height: 32px; }
-/* The mark hangs in the left margin (Scott, 2026-10-02), with a little room
-   to its left, so the bar's ends sit out past the page as the right-hand
-   icons do. */
-.page-navigation-brand { margin-left: -40px; }
-@media (max-width: 1023px) { .page-navigation-brand { margin-left: -16px; } }
+/* The wordmark matches the old footer signature: small tracked capitals. */
+.page-navigation .page-navigation-brand, .page-navigation .page-navigation-brand[aria-current="page"] { color: var(--color-neutral-800); font-weight: 600; }
+.page-navigation-wordmark { font-size: 10.5px; letter-spacing: 0.16em; text-transform: uppercase; }
+/* The wordmark needs the bar's full width beside the rail: it goes when the
+   header itself is narrow (a side pane open counts, not just the window). */
+.desktop-workspace-nav { container: header-band / inline-size; }
+.desktop-workspace-nav .page-navigation-left { gap: 12px; }
+.page-navigation-brand { gap: 8px; }
+@container header-band (max-width: 1240px) { .page-navigation-wordmark { display: none; } }
 /* At night the ink would sink into the dark band; lift it a step. */
 [data-scenery-lighting='nighttime'] .page-navigation-brand img { filter: brightness(1.6) saturate(1.15); }
+/* The header's ends overhang the page evenly (Scott, 2026-10-02): the mark
+   at the left and the last icon at the right sit the same distance in from
+   the frame's edges, and the page column is centred beneath them. (The
+   right-hand icons draw 8px inside their 34px buttons, hence 40 vs 32.) */
+.page-navigation-brand { margin-left: -32px; }
+.page-navigation-utilities { margin-right: -40px; }
+@media (max-width: 1023px) {
+  .page-navigation-brand { margin-left: -24px; }
+  .page-navigation-utilities { margin-right: -32px; }
+}
 .plan-page-tools.is-rail-extras { justify-content: flex-end; padding-top: 0; }
 /* The weather stays one line beside the ☰: icon, temperature, high/low —
    the condition word is the icon's (and the button's label), since the bar
