@@ -68,7 +68,7 @@ Left-aligned in the column, not a centred icon poster.
 ## 7. Header band, no footer bar
 
 Added 2026-10-02 (Scott): the top bar is the page's header — the tree mark
-hanging in the left margin so the ☰ starts on the page edge (links to
+hanging in the left margin, with a little room to its left (links to
 Today), on a paper wash 40% strong laid over the page colour or the fixed
 sky, edge to edge with a hairline under it. The mark is
 `public/symphony-logo.png` (transparent, no ring); at night it is lifted a
