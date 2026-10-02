@@ -1,4 +1,4 @@
-import { useLayoutEffect, type RefObject } from 'react'
+import { useLayoutEffect, useState } from 'react'
 
 /** Below this the columns stack and the page scrolls as one (index.css,
  * `.pv2-wgrid` at max-width 860px). */
@@ -21,10 +21,12 @@ function scrollParent(el: HTMLElement): HTMLElement | null {
  * grid gets `--pv2-col-h`, the room from its top to the bottom of the window,
  * less the landscape that stands there (--scenery-clearance). The heading and
  * masthead stay put above it. Re-measured when the window or anything above
- * the grid changes size. */
-export function useColumnsFitWindow(grid: RefObject<HTMLElement | null>, enabled = true) {
+ * the grid changes size. Returns the ref to put on the grid: a callback, so a
+ * grid that mounts later (an empty week's first line, Month's list ↔ reference
+ * views) is measured too. */
+export function useColumnsFitWindow(enabled = true): (el: HTMLElement | null) => void {
+  const [el, setEl] = useState<HTMLElement | null>(null)
   useLayoutEffect(() => {
-    const el = grid.current
     if (!el || !enabled) return
     const scroller = scrollParent(el)
     const wide = window.matchMedia(SIDE_BY_SIDE)
@@ -39,8 +41,17 @@ export function useColumnsFitWindow(grid: RefObject<HTMLElement | null>, enabled
     const observer = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(measure) : null
     if (scroller) {
       observer?.observe(scroller)
-      // Whatever sits above the grid (masthead, guide bar) moving its top.
-      if (scroller.firstElementChild) observer?.observe(scroller.firstElementChild)
+      // Whatever sits above the grid (nav, masthead, guide bar) moving its
+      // top: the grid's ancestors and everything before them. A masthead that
+      // grows once the plan loads changes no ancestor's size while the page
+      // is shorter than the window, so the siblings are watched too.
+      for (let n: HTMLElement | null = el.parentElement; n && n !== scroller; n = n.parentElement) {
+        observer?.observe(n)
+        for (let sib = n.firstElementChild; sib; sib = sib.nextElementSibling) {
+          if (sib.contains(el)) break
+          observer?.observe(sib)
+        }
+      }
     }
     // The landscape writes its height (--scenery-clearance) onto the scroller's
     // style after it lays out, and again when the place or light changes.
@@ -53,5 +64,6 @@ export function useColumnsFitWindow(grid: RefObject<HTMLElement | null>, enabled
       wide.removeEventListener('change', measure)
       el.style.removeProperty('--pv2-col-h')
     }
-  }, [grid, enabled])
+  }, [el, enabled])
+  return setEl
 }

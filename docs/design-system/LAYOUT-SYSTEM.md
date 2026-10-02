@@ -94,20 +94,24 @@ Agreed with Scott 2026-10-02.
 
 ## 8. Columns scroll on their own
 
-Agreed with Scott 2026-10-02 (Week page).
+Agreed with Scott 2026-10-02 (Week page; Month and Season followed).
 
-- **Side by side, each column scrolls.** On the Week page the days, the
-  week's list and the month reference each fill the room from the column
-  headings down to the landscape and scroll independently; the page itself
-  does not scroll. `useColumnsFitWindow` measures that room into
-  `--pv2-col-h` (window height − grid top − `--scenery-clearance`, at least
-  360px).
+- **Side by side, each column scrolls.** On Week (days, list, month
+  reference), Month (dates, list, season reference) and Season (list, year
+  reference) each column fills the room from the column headings down to the
+  landscape and scrolls independently; the page itself does not scroll.
+  Mark the grid `is-colscroll` and give it the ref `useColumnsFitWindow()`
+  returns; it measures that room into `--pv2-col-h` (window height − grid
+  top − `--scenery-clearance`, at least 360px). Year is one column and keeps
+  the page scroll.
 - **Headings hold the top.** Each column's heading pins at its top. In the
-  reference column every section heading (each month, "Earlier, not done",
-  routines) holds until its own list ends, then the next pushes it off.
-  Pinned headings wear the page's own background (the fixed sky).
-- **Stacked columns keep one page scroll** (below 861px; the month column
-  joins in from 1061px, when it stands beside the others).
+  reference column every section heading (each month, the level above,
+  "Earlier, not done", routines) holds until its own list ends, then the
+  next pushes it off. Pinned headings wear the page's own background (the
+  fixed sky).
+- **Stacked columns keep one page scroll** (below 861px). On Week the month
+  column joins in from 1061px; on Month the dates sit under the list and
+  reference between 861 and 1060px, reached by the page scroll.
 
 ## Type scale
 
