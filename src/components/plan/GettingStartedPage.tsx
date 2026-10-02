@@ -1,7 +1,8 @@
 // src/components/plan/GettingStartedPage.tsx
 //
 // Plan with guidance (/start): choose what to plan — the bigger picture, the
-// month ahead, this week, or just today — then plan on the ordinary pages
+// month ahead, this week, or just today; or, for an account that already has
+// plans, "pick up where you are" — then plan on the ordinary pages
 // with a guide bar on top. Also where a paused run resumes and a finished one
 // says what is ready. Reachable any time from Help and ☰ → Plan with
 // guidance; it opens by itself only after first-run setup. Nothing here is a
@@ -12,6 +13,8 @@ import { ArrowUpRight } from 'lucide-react'
 import { MastheadCard } from '@/components/layout/MastheadCard'
 import { PAGE_COLUMN } from '@/components/layout/pageLayout'
 import { useGuidedPlan } from '@/hooks/useGuidedPlan'
+import { usePickUpFacts, type PickUp } from '@/hooks/usePickUpFacts'
+import { GoalsProvider } from '@/contexts/GoalsContext'
 import { useSupabaseTasks } from '@/hooks/useSupabaseTasks'
 import { useFamilyMembers } from '@/hooks/useFamilyMembers'
 import { readSeasons } from '@/lib/cadence/seasons'
@@ -19,26 +22,44 @@ import { readCadenceConfig, weekStartAnchor } from '@/lib/cadence/config'
 import { weekOfYear } from '@/lib/planning/horizonNumerals'
 import { writePlanView } from '@/lib/planning/v2/planV2'
 import { isCurrentPeriod, periodBounds, selectPeriodTasks } from '@/lib/planning/periodPage'
+import { closeOutCandidates } from '@/lib/planning/v2/planV2'
 import { weekListTasks } from '@/lib/planning/weekList'
 import { requestPlanFromPaper } from '@/lib/planFromPaperSignal'
 import {
-  ROUTE_CHOICES, ROUTE_STEPS, currentStep, firstStepChoices, parseYmd, resume, startGuide, stepPath, stepShortName, stepTitle,
-  type GuideRoute, type GuideState, type GuideStep,
+  ROUTE_CHOICES, ROUTE_STEPS, currentStep, firstStepChoices, isReview, pageOf, parseYmd, resume, startGuide, startPickUp, stepPath, stepShortName, stepTitle,
+  type GuideRoute, type GuideState, type GuideStep, type PickUpRow,
 } from '@/lib/guide/guidedPlan'
 
+/** Year goals are read for "pick up where you are"; the page mounts their provider. */
 export function GettingStartedPage() {
+  return <GoalsProvider><Inner /></GoalsProvider>
+}
+
+function Inner() {
   const { state, set, savedIn } = useGuidedPlan()
   const navigate = useNavigate()
   const [params] = useSearchParams()
-  const [route, setRoute] = useState<GuideRoute>('month')
+  const today = useMemo(() => new Date(), [])
+  const pick = usePickUpFacts(today)
+  // An account with plans starts on "pick up where you are"; a new one on the
+  // month ahead. A choice the person makes sticks.
+  const [chosenRoute, setRoute] = useState<GuideRoute | null>(null)
+  const route: GuideRoute = chosenRoute ?? (pick.offer ? 'pickup' : 'month')
   const [stage, setStage] = useState<'path' | 'source'>('path')
   const seasons = readSeasons()
   const wso = readCadenceConfig().weekStartsOn
-  const today = useMemo(() => new Date(), [])
   const first = ROUTE_STEPS[route][0]
   const choices = useMemo(() => firstStepChoices(first, today, seasons, wso), [first, today, seasons, wso])
   const [periodStart, setPeriodStart] = useState<string | null>(null)
   const chosenStart = periodStart && choices.some((c) => c.start === periodStart) ? periodStart : choices[0].start
+
+  const beginPickUp = async (steps: GuideStep[]) => {
+    const s = startPickUp(steps, pick.periods)
+    await set(s)
+    const step = currentStep(s)
+    if (step === 'week' || step === 'month' || step === 'season') writePlanView(step, 'ref')
+    navigate(stepPath(step, s))
+  }
 
   const begin = async (withPaper: boolean) => {
     const s = startGuide(route, chosenStart, today, seasons, wso)
@@ -64,21 +85,33 @@ export function GettingStartedPage() {
 
         {!showFinish && running && (
           <div className="guide-pause" role="status">
-            <span>You’re partway through <b>{ROUTE_CHOICES.find((c) => c.id === running.route)!.title.toLowerCase()}</b>: step {running.current + 1} of {running.steps.length}, {stepShortName(currentStep(running), running, seasons, (d) => weekOfYear(d, wso))}.</span>
+            <span>You’re partway through <b>{running.route === 'pickup' ? 'catching up' : ROUTE_CHOICES.find((c) => c.id === running.route)!.title.toLowerCase()}</b>: step {running.current + 1} of {running.steps.length}, {stepShortName(currentStep(running), running, seasons, (d) => weekOfYear(d, wso))}.</span>
             <button type="button" className="pv2-link" onClick={() => { const r = resume(running); void set(r); navigate(stepPath(currentStep(r), r)) }}>Resume</button>
             <button type="button" className="pv2-link pv2-quiet" onClick={() => void set(null)}>Start over</button>
           </div>
         )}
 
-        {!showFinish && stage === 'path' && (
+        {/* Wait for the reading, so the choice doesn't jump to "pick up"
+            under someone's cursor once their plans load. */}
+        {!showFinish && stage === 'path' && !pick.loaded && <p className="text-[13px] text-neutral-500" role="status">Reading your plans…</p>}
+
+        {!showFinish && stage === 'path' && pick.loaded && (
           <>
+            {pick.offer && pick.inbox > 0 && (
+              <p className="guide-inbox-line">
+                <span>{pick.inbox === 1 ? '1 capture in your Inbox isn’t sorted yet.' : `${pick.inbox} captures in your Inbox aren’t sorted yet.`}</span>
+                <Link to="/inbox" className="getting-started-link">Sort them first</Link>
+              </p>
+            )}
             <div className="guide-choices" role="radiogroup" aria-label="What would you like to plan?">
-              {ROUTE_CHOICES.map((c) => (
+              {ROUTE_CHOICES.filter((c) => c.id !== 'pickup' || pick.offer).map((c) => (
                 <label key={c.id} className={`guide-choice${route === c.id ? ' is-selected' : ''}`}>
                   <input type="radio" name="guide-route" value={c.id} checked={route === c.id} onChange={() => { setRoute(c.id); setPeriodStart(null) }} />
                   <span className="guide-choice-title">{c.title}</span>
                   <span className="guide-choice-body">{c.body}</span>
-                  <span className="guide-choice-path">{c.path}</span>
+                  {c.id === 'pickup'
+                    ? route === 'pickup' && <PickUpReading rows={pick.rows} />
+                    : <span className="guide-choice-path">{c.path}</span>}
                 </label>
               ))}
             </div>
@@ -100,7 +133,11 @@ export function GettingStartedPage() {
           </>
         )}
 
-        {!showFinish && stage === 'source' && (
+        {!showFinish && stage === 'source' && route === 'pickup' && (
+          <PickUpPath pick={pick} onBack={() => setStage('path')} onStart={(steps) => void beginPickUp(steps)} savedIn={savedIn} />
+        )}
+
+        {!showFinish && stage === 'source' && route !== 'pickup' && (
           <>
             <h2>{first === 'today' ? 'Today' : `Which ${first} are you planning?`}</h2>
             {choices.length > 1 && (
@@ -164,6 +201,13 @@ function FinishSummary({ state, onKeepPlanning }: { state: GuideState; onKeepPla
   const weekNo = (d: Date) => weekOfYear(d, wso)
   const line = (step: GuideStep): string => {
     const start = state.periods[step] ? parseYmd(state.periods[step]!) : now
+    if (isReview(step)) {
+      // What the look-back left: the same lines the page would still ask about.
+      const level = pageOf(step) as 'month' | 'season'
+      const prev = periodBounds(level, periodBounds(level, start, seasons).prev, seasons)
+      const left = closeOutCandidates(selectPeriodTasks(tasks, level, prev.start, isCurrentPeriod(prev, now), meId, seasons), level, prev.start, prev.end).length
+      return left ? `${left} still open` : 'Everything decided'
+    }
     if (step === 'month' || step === 'season') {
       const b = periodBounds(step, start, seasons)
       const open = selectPeriodTasks(tasks, step, start, isCurrentPeriod(b, now), meId, seasons).filter((t) => !t.completed).length
@@ -200,5 +244,67 @@ function FinishSummary({ state, onKeepPlanning }: { state: GuideState; onKeepPla
         <button type="button" className="pv2-link pv2-quiet" onClick={onKeepPlanning}>Keep planning</button>
       </div>
     </div>
+  )
+}
+
+const CHIP_CLASS: Record<PickUpRow['chip'], string> = {
+  'In place': 'is-ok', 'Look back': 'is-back', 'Plan it': 'is-go', Optional: 'is-ok', 'Check it': 'is-go', Choose: 'is-go',
+}
+
+/** What each level holds now — the reading the suggested steps come from. */
+function PickUpReading({ rows }: { rows: PickUpRow[] }) {
+  return (
+    <span className="guide-reading">
+      {rows.map((r) => (
+        <span key={r.step} className="guide-reading-row">
+          <span className="guide-reading-name">{r.name}</span>
+          <span className="guide-reading-detail">{r.detail}</span>
+          <span className={`guide-chip ${CHIP_CLASS[r.chip]}`}>{r.chip}</span>
+        </span>
+      ))}
+    </span>
+  )
+}
+
+/** The suggested path: each step with its reason, any of them can be left out. */
+function PickUpPath({ pick, onBack, onStart, savedIn }: {
+  pick: PickUp; onBack: () => void; onStart: (steps: GuideStep[]) => void; savedIn: 'account' | 'device'
+}) {
+  const offered = pick.rows.filter((r) => r.inPath)
+  const kept = pick.rows.filter((r) => !r.inPath)
+  const [on, setOn] = useState<Partial<Record<GuideStep, boolean>>>(() => Object.fromEntries(offered.map((r) => [r.step, r.on])))
+  const steps = offered.filter((r) => on[r.step]).map((r) => r.step)
+  const words = ['', 'One step', 'Two steps', 'Three steps', 'Four steps', 'Five steps', 'Six steps', 'Seven steps']
+  return (
+    <>
+      <h2>Here’s what needs you</h2>
+      <p>{steps.length ? `${words[steps.length]}.` : 'No steps chosen.'} Uncheck any you’d rather skip.</p>
+      <ul className="guide-steps">
+        {offered.map((r) => (
+          <li key={r.step}>
+            <label>
+              <input type="checkbox" checked={!!on[r.step]} onChange={(e) => setOn((x) => ({ ...x, [r.step]: e.target.checked }))} />
+              <span>
+                <span className="guide-step-name">{r.step === 'today' ? 'Choose today' : r.step === 'week' ? `Check ${r.name.toLowerCase()}` : isReview(r.step) ? `Look back at ${r.name}` : `Plan ${r.name}`}</span>
+                <span className="guide-step-why">{r.why}</span>
+              </span>
+            </label>
+          </li>
+        ))}
+      </ul>
+      {kept.length > 0 && (
+        <p className="text-[13px] text-neutral-500">
+          Already in place, so no step is needed: {kept.map((r) => `${r.name} (${r.detail.toLowerCase()})`).join(', ')}.
+        </p>
+      )}
+      <div className="guide-acts">
+        <button type="button" className="pv2-link pv2-quiet" onClick={onBack}>Back</button>
+        <span className="flex-1" />
+        <button type="button" className="pv2-btn" disabled={!steps.length} onClick={() => onStart(steps)}>Start</button>
+      </div>
+      <p className="text-[12px] text-neutral-500">
+        {savedIn === 'account' ? 'Your progress is saved to your account, so you can stop and resume on any device.' : 'Your progress is saved in this browser.'}
+      </p>
+    </>
   )
 }

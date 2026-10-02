@@ -53,6 +53,18 @@ describe('GuideBar', () => {
     expect(screen.getByTestId('where').textContent).toBe('/month?start=2026-10-01')
   })
 
+  it('a look-back step (pick up where you are): on October’s page, no save, continues to October', async () => {
+    guide.state = { v: 1, route: 'pickup', steps: ['month-review', 'month', 'today'], periods: { 'month-review': '2026-10-01', month: '2026-10-01', today: '2026-10-01' }, current: 0, done: [], status: 'active', updatedAt: '' }
+    show('/month?start=2026-10-01')
+    expect(screen.getByText(/Step 1 of 3 · Look back at September/)).toBeTruthy()
+    expect(screen.getByRole('heading', { name: 'What happens to what’s still open?' })).toBeTruthy()
+    expect(screen.queryByText('Not sure what to write?')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Continue to October' }))
+    await waitFor(() => expect(guide.set).toHaveBeenLastCalledWith(expect.objectContaining({ current: 1, done: ['month-review'] })))
+    expect(session.save).not.toHaveBeenCalled()
+    expect(screen.getByTestId('where').textContent).toBe('/month?start=2026-10-01')
+  })
+
   it('stays off /start, which offers Resume itself', () => {
     guide.state = monthRun()
     show('/start')

@@ -2,7 +2,9 @@
 //
 // Guided planning: an optional path through the ordinary planning pages —
 // the bigger picture (Year → Season → Month → Week → Today), the month ahead
-// (Month → Week → Today), this week (Week → Today) or just today. It is not a
+// (Month → Week → Today), this week (Week → Today), just today — or, for
+// someone already using Symphony, "pick up where you are": only the steps the
+// account's own plans leave open (Scott, 2026-10-01). It is not a
 // second planner: every step is the real page, with a guide bar on top, and
 // what you write is the plan itself. Beta walkthrough 2026-09-29 + Codex
 // build brief (onboarding suite).
@@ -13,17 +15,26 @@ import { periodBounds } from '@/lib/planning/periodPage'
 import { weekStartAnchor, type WeekStart } from '@/lib/cadence/config'
 import type { Seasons } from '@/lib/cadence/seasons'
 
-export type GuideRoute = 'bigger' | 'month' | 'week' | 'today'
-export type GuideStep = 'year' | 'season' | 'month' | 'week' | 'today'
+export type GuideRoute = 'pickup' | 'bigger' | 'month' | 'week' | 'today'
+/** A look-back ('month-review') runs on the page of the period it hands to:
+ *  October's page closes out what September left open. */
+export type ReviewStep = 'season-review' | 'month-review'
+export type GuideStep = 'year' | 'season' | 'month' | 'week' | 'today' | ReviewStep
 
 export const ROUTE_STEPS: Record<GuideRoute, GuideStep[]> = {
+  pickup: ['year', 'season-review', 'season', 'month-review', 'month', 'week', 'today'],
   bigger: ['year', 'season', 'month', 'week', 'today'],
   month: ['month', 'week', 'today'],
   week: ['week', 'today'],
   today: ['today'],
 }
 
+export const isReview = (s: GuideStep): s is ReviewStep => s === 'season-review' || s === 'month-review'
+/** The page a step runs on: a look-back runs on its level's page. */
+export const pageOf = (s: GuideStep): Exclude<GuideStep, ReviewStep> => (s === 'season-review' ? 'season' : s === 'month-review' ? 'month' : s)
+
 export const ROUTE_CHOICES: { id: GuideRoute; title: string; body: string; path: string }[] = [
+  { id: 'pickup', title: 'Pick up where you are', body: 'Keep what’s already planned and fill in only what’s missing.', path: 'Only the steps that need you' },
   { id: 'bigger', title: 'The bigger picture', body: 'Connect the year ahead with what you can do next.', path: 'Year · Season · Month · Week · Today' },
   { id: 'month', title: 'The month ahead', body: 'Choose priorities for the month and steps for this week.', path: 'Month · Week · Today' },
   { id: 'week', title: 'This week', body: 'Work out what fits this week and what to do today.', path: 'Week · Today' },
@@ -170,15 +181,23 @@ export function finishHere(s: GuideState): GuideState {
 export function stepPath(step: GuideStep, s: GuideState): string {
   const start = s.periods[step]
   if (step === 'today') return '/today'
-  return start ? `/${step}?start=${start}` : `/${step}`
+  return start ? `/${pageOf(step)}?start=${start}` : `/${pageOf(step)}`
 }
 
 /** Does the page on screen show this step's period? */
 export function onStepPage(step: GuideStep, s: GuideState, pathname: string, search: string): boolean {
   if (step === 'today') return pathname === '/today' || pathname === '/'
-  if (pathname !== `/${step}`) return false
+  if (pathname !== `/${pageOf(step)}`) return false
   const start = new URLSearchParams(search).get('start')
   return !start || start === s.periods[step]
+}
+
+/** The period a look-back closes out — the one before the step's period. */
+function reviewedName(step: ReviewStep, s: GuideState, seasons: Seasons): string {
+  const level = pageOf(step) as 'month' | 'season'
+  const start = s.periods[step] ? parseYmd(s.periods[step]!) : new Date()
+  const prev = periodBounds(level, periodBounds(level, start, seasons).prev, seasons)
+  return level === 'month' ? prev.start.toLocaleDateString('en-US', { month: 'long' }) : prev.label.replace(/\s+\d{4}$/, '')
 }
 
 function fmtRange(a: Date, b: Date): string {
@@ -189,6 +208,7 @@ function fmtRange(a: Date, b: Date): string {
 
 /** The step's name as the bar says it: "October", "Week 40 · Sat Sep 26 – Fri Oct 2", "Today, Tue Sep 29". */
 export function stepTitle(step: GuideStep, s: GuideState, seasons: Seasons, weekNumber: (d: Date) => number): string {
+  if (isReview(step)) return `Look back at ${reviewedName(step, s, seasons)}`
   const start = s.periods[step] ? parseYmd(s.periods[step]!) : new Date()
   if (step === 'year') return String(start.getFullYear())
   if (step === 'season') { const b = periodBounds('season', start, seasons); return `${b.label.replace(/\s+\d{4}$/, '')} · ${fmtRange(b.start, new Date(b.end.getTime() - DAY))}` }
@@ -199,6 +219,7 @@ export function stepTitle(step: GuideStep, s: GuideState, seasons: Seasons, week
 
 /** Short name for the path and buttons: "October", "week 40", "Fall", "2026", "today". */
 export function stepShortName(step: GuideStep, s: GuideState, seasons: Seasons, weekNumber: (d: Date) => number): string {
+  if (isReview(step)) return `look back at ${reviewedName(step, s, seasons)}`
   const start = s.periods[step] ? parseYmd(s.periods[step]!) : new Date()
   if (step === 'year') return String(start.getFullYear())
   if (step === 'season') return periodBounds('season', start, seasons).label.replace(/\s+\d{4}$/, '')
@@ -213,6 +234,8 @@ export const STEP_QUESTION: Record<GuideStep, string> = {
   month: 'What do you want to move forward this month?',
   week: 'What are a few next steps you can take this week?',
   today: 'What deserves your attention today?',
+  'season-review': 'What happens to what’s still open?',
+  'month-review': 'What happens to what’s still open?',
 }
 
 export const STEP_WHY: Record<GuideStep, string> = {
@@ -221,6 +244,8 @@ export const STEP_WHY: Record<GuideStep, string> = {
   month: 'Keep what still matters and add anything missing. One or two is plenty; a quiet month is fine too.',
   week: 'Pick next steps from the month plans beside the list, or write your own. A step keeps its link to the goal it serves. Nothing needs a day yet.',
   today: 'Choose a few things from this week for today. Appointments are already here. A time is optional.',
+  'season-review': 'Carry each one into the new season, mark it done, keep it for someday, or let it go. Nothing is deleted.',
+  'month-review': 'Carry each one into the new month, mark it done, keep it for someday, or let it go. Nothing is deleted.',
 }
 
 /** The step above this one on the calendar — what sits beside the list. */
@@ -234,7 +259,9 @@ export interface StepIdeas { prompt: string; patterns: string[] }
  * each line beside the list, and a few shapes an answer can take. Words only —
  * nothing here is written to the plan.
  */
-export function stepIdeas(step: GuideStep, s: GuideState, seasons: Seasons, weekNumber: (d: Date) => number): StepIdeas {
+export function stepIdeas(step: GuideStep, s: GuideState, seasons: Seasons, weekNumber: (d: Date) => number): StepIdeas | null {
+  // A look-back asks about lines already written; there is nothing to write.
+  if (isReview(step)) return null
   const name = (st: GuideStep) => {
     const n = stepShortName(st, s, seasons, weekNumber)
     return st === 'week' ? n.replace(/^w/, 'W') : n
@@ -269,4 +296,131 @@ export function stepIdeas(step: GuideStep, s: GuideState, seasons: Seasons, week
         patterns: ['Something with a deadline', 'One step on something that matters', 'Something small that clears the way'],
       }
   }
+}
+
+// ── Pick up where you are ─────────────────────────────────────────────────
+//
+// For an account that already has plans: read what each level holds and offer
+// only the steps that need attention, each with its reason. A level already
+// planned is left alone and named as in place. Week and Today are always
+// offered, so the path is never empty. Empty Year and Season are offered but
+// start unchecked — someone partway through usually wants to get back on
+// track, not rethink the year (Scott, 2026-10-01).
+
+/** A look-back is offered while the period it hands to is still young (or
+ *  not yet begun, when planning ahead). */
+const REVIEW_WINDOW_DAYS = 14
+
+/** What the account holds for the periods pickUpPeriods() names, counted from
+ *  the same lists the pages show. */
+export interface PickUpFacts {
+  /** Active year goals this year. */
+  yearGoals: number
+  /** `open`: open lines on the period's plan. `planned`: someone marked it
+   *  planned. `review`: lines the period before it left with no decision. */
+  season: { open: number; planned: boolean; review: number }
+  month: { open: number; planned: boolean; review: number }
+  week: { open: number; done: number }
+  todayChosen: number
+}
+
+export interface PickUpRow {
+  step: GuideStep
+  /** "October", "Week 40" — for a look-back, the period looked back at ("September"). */
+  name: string
+  /** The short reading: "6 priorities", "Nothing yet". */
+  detail: string
+  /** Why it's a step, said on the path: "Nothing on it yet. Fall's … beside the list." */
+  why: string
+  chip: 'In place' | 'Look back' | 'Plan it' | 'Optional' | 'Check it' | 'Choose'
+  /** Offered as a step (else listed as in place). */
+  inPath: boolean
+  /** Checked to start with. */
+  on: boolean
+}
+
+/** The periods a pick-up run plans: this year; the season and month the other
+ *  paths would recommend (the next one near the end); this week; today. */
+export function pickUpPeriods(today: Date, seasons: Seasons, weekStartsOn: WeekStart): Record<GuideStep, string> {
+  const t = startOfDay(today)
+  const season = firstStepChoices('season', t, seasons, weekStartsOn)[0].start
+  const month = firstStepChoices('month', t, seasons, weekStartsOn)[0].start
+  return {
+    year: `${t.getFullYear()}-01-01`,
+    'season-review': season, season,
+    'month-review': month, month,
+    week: ymd(weekStartAnchor(t, weekStartsOn)),
+    today: ymd(t),
+  }
+}
+
+/** Is there anything here to pick up? A new account sees the four plain paths. */
+export function hasPlans(f: PickUpFacts): boolean {
+  return f.yearGoals + f.season.open + f.month.open + f.week.open + f.week.done + f.todayChosen + f.season.review + f.month.review > 0
+    || f.season.planned || f.month.planned
+}
+
+const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`
+
+export function pickUpRows(f: PickUpFacts, periods: Record<GuideStep, string>, today: Date, seasons: Seasons, weekNumber: (d: Date) => number): PickUpRow[] {
+  const t = startOfDay(today)
+  const run: GuideState = { v: 1, route: 'pickup', steps: [], periods, current: 0, done: [], status: 'active', updatedAt: '' }
+  const name = (s: GuideStep) => stepShortName(s, run, seasons, weekNumber).replace(/^./, (c) => c.toUpperCase())
+  const young = (start: string) => (t.getTime() - parseYmd(start).getTime()) / DAY <= REVIEW_WINDOW_DAYS
+  const rows: PickUpRow[] = []
+
+  rows.push(f.yearGoals > 0
+    ? { step: 'year', name: name('year'), detail: plural(f.yearGoals, 'goal'), why: '', chip: 'In place', inPath: false, on: false }
+    : { step: 'year', name: name('year'), detail: 'Nothing yet', why: 'Optional. You can add the bigger picture later.', chip: 'Optional', inPath: true, on: false })
+
+  const level = (lvl: 'season' | 'month', noun: string, above: string) => {
+    const review: ReviewStep = lvl === 'season' ? 'season-review' : 'month-review'
+    const facts = f[lvl]
+    const here = name(lvl)
+    if (facts.review > 0 && young(periods[lvl])) {
+      const prev = reviewedName(review, run, seasons)
+      const ended = parseYmd(periods[lvl]).getTime() <= t.getTime()
+      rows.push({
+        step: review, name: prev, detail: `${ended ? 'Ended with' : 'Has'} ${facts.review} still open`,
+        why: `${facts.review} open. Carry each one into ${here}, mark it done, keep it for someday, or let it go.`,
+        chip: 'Look back', inPath: true, on: true,
+      })
+    }
+    if (facts.open > 0 || facts.planned) {
+      rows.push({ step: lvl, name: here, detail: facts.open ? plural(facts.open, noun, `${noun.replace(/y$/, 'ie')}s`) : 'Marked planned', why: '', chip: 'In place', inPath: false, on: false })
+    } else if (lvl === 'season') {
+      rows.push({ step: lvl, name: here, detail: 'Nothing yet', why: 'Optional. Nothing on it yet; a season can stay unwritten.', chip: 'Optional', inPath: true, on: false })
+    } else {
+      rows.push({ step: lvl, name: here, detail: 'Nothing yet', why: `Nothing on it yet. ${above} sits beside the list.`, chip: 'Plan it', inPath: true, on: true })
+    }
+  }
+  level('season', 'priority', `${name('year')}’s goals`)
+  level('month', 'priority', `${name('season')}`)
+
+  const weekStart = parseYmd(periods.week)
+  const left = Math.round((weekStart.getTime() + 7 * DAY - t.getTime()) / DAY) - 1
+  const ends = left <= 0 ? 'It ends today, so keep it short.' : left === 1 ? 'It ends tomorrow, so keep it short.' : `${left} days left.`
+  const wk = f.week.open + f.week.done
+  rows.push({
+    step: 'week', name: name('week'),
+    detail: wk ? `${plural(wk, 'step')}${f.week.done ? `, ${f.week.done} done` : ''}` : 'Nothing yet',
+    why: `${wk ? `${plural(wk, 'step')} so far.` : 'No steps yet.'} ${ends}`, chip: 'Check it', inPath: true, on: true,
+  })
+  rows.push({
+    step: 'today', name: 'Today', detail: f.todayChosen ? `${plural(f.todayChosen, 'thing')} chosen` : 'Nothing chosen',
+    why: `${f.todayChosen ? `${plural(f.todayChosen, 'thing')} chosen.` : 'Nothing chosen yet.'} Your appointments are already there.`,
+    chip: 'Choose', inPath: true, on: true,
+  })
+  return rows
+}
+
+/** A pick-up run over the chosen steps, in the order the rows list them. */
+export function startPickUp(steps: GuideStep[], periods: Record<GuideStep, string>): GuideState {
+  const order = ROUTE_STEPS.pickup
+  const chosen = order.filter((s) => steps.includes(s))
+  const picked: Partial<Record<GuideStep, string>> = {}
+  for (const s of chosen) picked[s] = periods[s]
+  // The rail follows the run's periods even for levels it skips.
+  for (const s of ['year', 'season', 'month', 'week'] as const) picked[s] ??= periods[s]
+  return { v: 1, route: 'pickup', steps: chosen, periods: picked, current: 0, done: [], status: 'active', updatedAt: new Date().toISOString() }
 }
