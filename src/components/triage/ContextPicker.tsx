@@ -96,6 +96,7 @@ export function ContextPicker({ value, onChange, size = 'md' }: ContextPickerPro
         {CONTEXTS.map(({ value: ctxValue, label, color }) => (
           <button
             key={ctxValue}
+            type="button"
             onClick={() => handleSelect(ctxValue)}
             className={`w-full px-3 py-1.5 text-sm text-left rounded-lg flex items-center gap-2 ${
               value === ctxValue
@@ -111,6 +112,7 @@ export function ContextPicker({ value, onChange, size = 'md' }: ContextPickerPro
           <>
             <div className="border-t border-neutral-100 my-1" />
             <button
+              type="button"
               onClick={() => handleSelect(undefined)}
               className="w-full px-3 py-1.5 text-sm text-left rounded-lg hover:bg-red-50 text-red-600"
             >
@@ -124,7 +126,11 @@ export function ContextPicker({ value, onChange, size = 'md' }: ContextPickerPro
 
   return (
     <div ref={triggerRef} className="relative">
+      {/* type="button": inside an add row's form, a default (submit) button
+          is the one Enter "clicks" — the year's add row opened this menu
+          on every Enter (walkthrough 2026-10-02, #4). */}
       <button
+        type="button"
         onClick={(e) => { e.stopPropagation(); setIsOpen(!isOpen) }}
         className={`${padClass} rounded-lg transition-colors hover:bg-neutral-100 ${hasValue ? '' : 'tag-needs-context'}`}
         aria-label="Set context"

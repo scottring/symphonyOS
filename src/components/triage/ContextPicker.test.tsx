@@ -284,4 +284,22 @@ describe('ContextPicker', () => {
       expect(screen.getByRole('button', { name: /Personal/i })).toBeInTheDocument()
     })
   })
+
+  // Walkthrough 2026-10-02 #4: on a plan page's add row the picker sits in a
+  // <form>. Enter in the input "clicked" the first submit button — the
+  // picker's trigger — so the menu opened under the line just added.
+  describe('inside an add row form', () => {
+    it('Enter submits the form without opening the menu', async () => {
+      const onSubmit = vi.fn((e: React.FormEvent) => e.preventDefault())
+      render(
+        <form onSubmit={onSubmit}>
+          <input aria-label="Add to 2026" />
+          <ContextPicker onChange={mockOnChange} />
+        </form>,
+      )
+      await userEvent.type(screen.getByRole('textbox', { name: 'Add to 2026' }), 'Get healthy again{Enter}')
+      expect(onSubmit).toHaveBeenCalledTimes(1)
+      expect(screen.queryByText('Work')).not.toBeInTheDocument()
+    })
+  })
 })
