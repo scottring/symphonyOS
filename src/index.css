@@ -3206,6 +3206,7 @@ div.chooser-action-group { overflow: visible !important; }
 /* A list line that already has a day: quiet, naming the day (#21). */
 .pv2-wl-placed { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; padding: 4px 0 4px 2px; }
 .pv2-wl-placed .pv2-wl-title { color: var(--color-neutral-500); }
+.pv2-wl-placed > .pv2-hint { white-space: nowrap; flex: none; }
 .pv2-endsweek { margin-bottom: 18px; }
 .pv2-wl-draft { width: 100%; background: transparent; font-size: 15px; color: var(--color-neutral-900); outline: none; }
 .pv2-rrow.is-linked { background: color-mix(in srgb, var(--color-primary-100) 70%, transparent); box-shadow: -8px 0 0 color-mix(in srgb, var(--color-primary-100) 70%, transparent), 8px 0 0 color-mix(in srgb, var(--color-primary-100) 70%, transparent); border-radius: 2px; }
@@ -3460,6 +3461,7 @@ div.chooser-action-group { overflow: visible !important; }
 .pv2-pgroup-h { display: flex; align-items: center; gap: 8px; margin: 0 0 4px; padding: 0; font: 600 12px/1.4 var(--font-family-sans); letter-spacing: .02em; color: var(--color-neutral-500); text-align: left; }
 button.pv2-pgroup-h:hover { color: var(--color-primary-700); }
 .pv2-pgroup-h.is-loose { font-weight: 500; font-style: italic; }
+.pv2-pgroup-h > .pv2-goal { margin: 0; flex: none; }
 .pv2-pgroup > .pv2-list { padding-left: 4px; border-left: 1px solid var(--color-neutral-150, var(--color-neutral-200)); margin-left: 3px; }
 .pv2-brain.is-groups { columns: 2; column-gap: 48px; }
 @media (max-width: 767px) { .pv2-brain.is-groups { columns: 1; } }

@@ -238,7 +238,10 @@ export function WeekV2({ tasks, weekStart, meId, isCurrent, days, onSelectTask, 
   const toolbar: PlanToolbarProps = {
     period: `week ${weekNo}`, saved: session.saved, loading: session.loading, error: !!session.error, agreedBy,
     reviewDue, onPlan: startMeeting, onRetry: session.reload, viewSwitch,
-    lookBack: reviewIds.length ? 'last week' : null, onMark: () => void endMeeting(true), hasLines: lines.length > 0,
+    // On its last day the week offers the next one instead (the line under
+    // the masthead); marking a finished week planned would be a second
+    // primary beside it.
+    lookBack: reviewIds.length ? 'last week' : null, onMark: endsToday ? undefined : () => void endMeeting(true), hasLines: lines.length > 0,
     tools: tools && <div className="pv2-wtools">{tools}</div>,
     justSaved: justSaved && {
       detail: justSaved.detail,
