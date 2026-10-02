@@ -44,33 +44,33 @@ The planning chain — Steps 4 to 8, year to today — is the guided path; every
 
 **Where you are:** `/year`.
 **Why it exists:** A goal is an outcome you want by the end of the year, not a task. The year page holds those outcomes so the shorter periods can draw from them.
-**Do this:** Press **Plan 2026** in the status row — the button plans the year the page is showing. Write one goal you want true by December, then **Save 2026**. An empty goals list offers the same session: "Nothing yet. Plan 2026 →".
-**You'll see:** "Planned Sep 21" where "Not planned yet" was, the goal on the year page, and the line "2026 is planned. When you're ready, plan the season with 2026 beside you. Plan the season → optional". "Not now" puts that line away, and once the year is saved the button reads "Review the plan".
-**Status:** needs R3-#4–#9 (run 3, 2026-10-02: Enter opens the area menu; "Plan 2026" opens a session that repeats the page; the same screen three times; the saved header is cramped). Earlier: reads cleanly (Phase 3)
+**Do this:** Write one goal you want true by December in "Add a goal for the year" and press Enter (the goal saves as you type). When the list looks right, press **Mark 2026 planned** — one tap, right there. If last year left goals open (from December on), the button reads **Look back at 2025** instead and walks each one first.
+**You'll see:** "2026 isn't marked planned yet" while you write; after the tap, "2026 planned Oct 2" under the title and, on its own line beneath, "2026 is planned. Choose what Fall takes on → · Not now".
+**Status:** pending — rebuilt after run 3 (R3-#4–#9: Enter no longer opens the area menu; no separate planning screen without a look-back; the saved line sits under the masthead). Walk again on the new build.
 
 ## Step 5 · Season
 
 **Where you are:** `/season`.
 **Why it exists:** A year is too far away to act on. A season is the stretch where you commit to a few goals under the year's, and the tasks that move them.
-**Do this:** Press **Plan Fall 2026**. The session runs "Look back at Summer 2026 · Plan Fall 2026 · Save". If last season had a list, give each open row a verdict: a goal offers **Keep**, **Keep, and add a next action**, **Someday** or **Drop**; a task offers **Keep**, **Done**, **Someday** or **Drop**. Then add a season goal, choosing the year goal it is "for", and a task "toward" it. **Save Fall 2026**.
-**You'll see:** The goal and the task on the season page, and the year's goals in the column beside the session while you write. A hint says once: "Goals are what this period should add up to. They stay on this list; you look at them when you plan a week or a day." **Close · keep my draft** leaves the session without losing what you wrote.
-**Status:** needs R3-#10–#15 (run 3, 2026-10-02: the handoff lands on another Plan button; "+ Add to Fall" should read "Fall's part"; the link to the year goal shows only on hover; the saved header is cramped). Earlier: reads cleanly (Phase 3)
+**Do this:** Arrive from the year's "Choose what Fall takes on" (the cursor is already in "Add to Fall"), or open `/season`. Beside a 2026 goal in the right column, press **+ Fall's part** and write what Fall does for it. Then **Mark Fall planned**. From Summer's last two weeks on, the button reads **Look back at Summer** and decides Summer's open rows first: **Carry to Fall**, **It's done**, **Someday**, **Drop it**, or **Leave it in Summer**.
+**You'll see:** Fall's list grouped under the 2026 goals it serves, each goal a small heading; the 2026 goal in the right column marked "In Fall's plan".
+**Status:** pending — rebuilt after run 3 (R3-#10–#15). Walk again on the new build.
 
 ## Step 6 · Month
 
 **Where you are:** `/month`.
 **Why it exists:** The month pulls from the season. Choosing what to carry into this month is a deliberate decision, not an automatic cascade.
-**Do this:** Press **Plan October**. Look back at September and give its rows their verdicts — goals take **Keep** / **Keep, and add a next action** / **Someday** / **Drop**, tasks take **Keep** / **Done** / **Someday** / **Drop**; then, in the column beside you, press **+ Add to October** on a season task, or type a task of your own. **Save October**.
-**You'll see:** "Planned Sep 21" in the status row; the save summary saying the season task 'stays on Fall 2026, marked "in October"'; and afterwards "October is planned. When you're ready, plan the week with October beside you. Plan the week → optional".
-**Status:** needs R3-#16, #17 (run 3, 2026-10-02: the handoff lands on another Plan button; "+ Add to October" and the flat list repeat R3-#12, #14). The look-back a month later reads cleanly (R3-#29–#31). Earlier: reads cleanly (Phase 1)
+**Do this:** From Fall's "Choose what October takes on", write October's part of a Fall goal with **+ October's part**, or type a line of your own. Then **Mark October planned**. In September's last week and after, the button reads **Look back at September** and walks its open rows first; a carried row whose name says "September" offers a rename.
+**You'll see:** October's list under the Fall goals it serves, the dates you can't move on the left, and "October is planned. Choose what week 41 takes on →".
+**Status:** pending — rebuilt after run 3 (R3-#16, #17, #29–#32, #34). Walk again on the new build.
 
 ## Step 7 · Week
 
 **Where you are:** `/week`.
 **Why it exists:** The week is where the plan meets real days. The week has a list of its own, and the days pick from it.
-**Do this:** Press **Plan this week**. Look back at last week's list — each open row offers **Keep**, **Done**, **Someday** or **Drop** — then press **+ Add to this week** on an October task. Give a time-sensitive task a day with the day menu ("Any day" until you choose one). **Save this week**.
-**You'll see:** "This week's list" above the days at every width, each row saying where it came from ("from October", "kept from last week"), and "The week is planned. Each day, pick from this list. Go to Today → optional". A hint says once: "Adding a month task here puts it on this week's list too. The month keeps it and shows 'on this week'."
-**Status:** needs R3-#18–#20, #22, #23, #33 (run 3, 2026-10-02: on the week's last day the Week link opens a finished week; "on Monday" sets no day; the session repeats the page; no way on after saving a future week; the weekly look-back misses dated work). The week's list and its links read cleanly (R3-#27). Earlier: reads cleanly (Phase 2; the week has its own list). An empty list reads "Nothing on this week's list yet. Plan this week →".
+**Do this:** From October's "Choose what week N takes on" (on a week's last day, the month and the week page both offer the NEXT week), press **+ Week N's part** beside an October goal, or type a line — a weekday in it ("Talk to Tim on Monday") puts it on that day. Then **Mark week N planned**. From last week's final day on, the button reads **Look back at last week**, and its open rows — dated ones included — come first.
+**You'll see:** "This week's list", each row saying what it's a step toward; rows with a day listed under "On a day" as "→ Mon 11:45"; the October goal marked "In this week's list"; after saving, "Pick something for today →" (or "Back to Today →" for a week planned ahead).
+**Status:** pending — rebuilt after run 3 (R3-#18–#23, #33). The week's list and its links read cleanly (R3-#27).
 
 ## Step 8 · Today
 
@@ -94,7 +94,7 @@ The planning chain — Steps 4 to 8, year to today — is the guided path; every
 **Why it exists:** Some work needs a time, not just a day. The schedule is where a task becomes a block on the calendar.
 **Do this:** Drag a task onto a day and time, or open its time picker and choose one.
 **You'll see:** The task drawn as a block at that time, beside your calendar events.
-**Status:** needs B15–B18; run 3 (2026-10-02): drag to a day and time works, the list then reads "1 is on a day this week" (R3-#21)
+**Status:** needs B15–B18; run 3: drag to a day and time works; the list now keeps the row under "On a day" (R3-#21 fixed)
 **Known gaps:** B15–B18 (a drag to a time works; the focus row stays on the old day; the panel never says when the task is).
 
 ## Step 9 · Routines
