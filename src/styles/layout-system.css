@@ -218,8 +218,12 @@
     overflow-y: auto; scrollbar-width: thin;
     margin: 0 -14px; padding: 0 14px;
   }
-  .pv2-wgrid.is-colscroll > .pv2-ref .pv2-refmonth .pv2-colh {
+  /* Each section's heading — a month, then the shelves below ("Earlier, not
+     done", routines) — holds the top until its own list ends, and the next
+     heading pushes it off: sticky inside its own section. */
+  .pv2-wgrid.is-colscroll > .pv2-ref :is(.pv2-refmonth .pv2-colh, .pv2-refshelf > summary) {
     position: sticky; top: 0; z-index: 2;
     background: var(--pv2-colh-bg); background-attachment: fixed;
   }
+  .pv2-wgrid.is-colscroll > .pv2-ref .pv2-refshelf > summary { padding: 4px 0 6px; }
 }
