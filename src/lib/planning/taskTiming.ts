@@ -153,10 +153,16 @@ const dayLabel = (d: Date) => d.toLocaleDateString('en-US', { weekday: 'short', 
 const offWeek = (t: TaskTiming) => !!t.day && !!t.week && !dayIsInCommittedWeek(t)
   && !(t.weekend && inTaskWeekend({ weekendStart: t.weekend }, t.day))
 
-export function timingLabel(t: TaskTiming): string {
+export function timingLabel(t: TaskTiming, opts: { relativeTo?: Date } = {}): string {
   // A weekend says so until a day is chosen — never silently "Saturday".
   if (!t.day && t.weekend) return `Weekend · ${weekendRangeLabel(t.weekend)} · either day`
-  if (t.day) return `${dayLabel(t.day)} · ${t.timed ? t.day.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) : 'any time'}${offWeek(t) ? ` · still on ${formatWeekRangeShort(t.week!)}` : ''}`
+  const time = t.day && t.timed ? t.day.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) : null
+  const still = offWeek(t) ? ` · still on ${formatWeekRangeShort(t.week!)}` : ''
+  // On the day's own page the date is the page's title: the row says only
+  // the part of the answer the page doesn't (walkthrough 2026-10-02, #25:
+  // "Fri, Oct 2 · any time" on Fri, Oct 2).
+  if (t.day && opts.relativeTo && localYmd(t.day) === localYmd(opts.relativeTo)) return `${time ?? 'Any time'}${still}`
+  if (t.day) return `${dayLabel(t.day)} · ${time ?? 'any time'}${still}`
   if (t.week) return `${formatWeekRangeShort(t.week)} · any day`
   return 'Choose when'
 }

@@ -47,7 +47,7 @@ function weekLabel(start: Date): string {
 export function PlanWeekMenu({
   title, periodStart, periodLabel, currentWeekStart, timing, onPickWeek, onClearWeek, onRemoveDay, onPickDay,
   dayChoices, dayChoicesLabel, size = 'md',
-  weekends, onPickWeekend, onPickWeekendDay,
+  weekends, onPickWeekend, onPickWeekendDay, labelRelativeTo,
 }: {
   title: string
   /** Any day inside the period whose weeks should be offered — the month being
@@ -92,6 +92,9 @@ export function PlanWeekMenu({
   onPickWeekend?: (saturday: Date) => void
   /** One of the weekend's two days, keeping the weekend. */
   onPickWeekendDay?: (saturday: Date, day: Date) => void
+  /** The day the page itself is about (Today): a row dated that day says only
+   *  "Any time" or its time. Other pages leave it unset. */
+  labelRelativeTo?: Date
 }) {
   const [open, setOpen] = useState(false)
   const wrapRef = useRef<HTMLDivElement>(null)
@@ -153,7 +156,7 @@ export function PlanWeekMenu({
 
   // What the trigger says. With no task to read it keeps the old verb, so a
   // caller that has not been converted still renders something sensible.
-  const label = timing ? timingLabel(timing) : 'Plan'
+  const label = timing ? timingLabel(timing, { relativeTo: labelRelativeTo }) : 'Plan'
   const chosen = !!timing && (!!timing.day || !!timing.week || !!timing.weekend)
 
   const choose = (fn: () => void) => () => { setOpen(false); fn() }

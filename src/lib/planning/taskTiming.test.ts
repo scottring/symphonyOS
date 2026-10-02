@@ -106,6 +106,16 @@ describe('committedWeekOf — the records/legacy contract', () => {
     expect(timingLabel(taskTiming(task({ bucket: 'timed', scheduledFor: at2, isAllDay: false })))).toBe('Tue, Oct 6 · 2:00 PM')
   })
 
+  // Walkthrough 2026-10-02 (#25): on its own day's page the date is the title.
+  it('relative to the page’s own day, says only "Any time" or the time', () => {
+    const allDay = taskTiming(task({ bucket: 'timed', scheduledFor: OCT6, isAllDay: true }))
+    expect(timingLabel(allDay, { relativeTo: new Date(2026, 9, 6, 9, 0) })).toBe('Any time')
+    const at2 = taskTiming(task({ bucket: 'timed', scheduledFor: new Date(2026, 9, 6, 14, 0), isAllDay: false }))
+    expect(timingLabel(at2, { relativeTo: OCT6 })).toBe('2:00 PM')
+    // Any other day keeps its date.
+    expect(timingLabel(allDay, { relativeTo: new Date(2026, 9, 7) })).toBe('Tue, Oct 6 · any time')
+  })
+
   // A date is not a week commitment. The week it falls in is reported
   // separately so removal can be truthful, never as a chosen week.
   it('a dated task with no week commitment claims no week', () => {
