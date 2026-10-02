@@ -6,6 +6,7 @@
 // period, so the page lands where you were looking.
 
 import { useState } from 'react'
+import { createPortal } from 'react-dom'
 import { Camera } from 'lucide-react'
 import { PageFromPaperFlow } from '@/components/capture/PageFromPaperFlow'
 import { useFamilyMembers } from '@/hooks/useFamilyMembers'
@@ -29,7 +30,12 @@ export function FromPaper({ altitude, periodStart, tasks, label = 'Add from pape
       <button type="button" className="pv2-paper" onClick={() => { setRun((n) => n + 1); setOpen(true) }}>
         <Camera className="w-3.5 h-3.5" aria-hidden="true" />{label}
       </button>
-      {open && (
+      {/* At the body, not where the button sits: the button lives in a
+          column's sticky heading (z-index 2), and a fixed sheet inside it
+          painted under the scenery and the next column's heading — the
+          review's bottom and its buttons were unreachable (2026-10-02, after
+          the month's columns began to scroll). */}
+      {open && createPortal(
         <PageFromPaperFlow
           key={run}
           members={members}
@@ -37,7 +43,8 @@ export function FromPaper({ altitude, periodStart, tasks, label = 'Add from pape
           existingTasks={tasks.filter((t) => !t.completed).map((t) => ({ id: t.id, title: t.title }))}
           initialAltitude={altitude}
           today={periodStart}
-        />
+        />,
+        document.body,
       )}
     </>
   )
