@@ -3318,6 +3318,12 @@ div.chooser-action-group { overflow: visible !important; }
 .pv2-line.is-dragging { opacity: .4; }
 .pv2-dragpill { display: inline-block; max-width: 280px; padding: 6px 12px; border-radius: 999px; background: var(--color-bg-elevated); border: 1px solid var(--color-neutral-300); box-shadow: 0 10px 24px -12px rgb(0 0 0 / .4); font-size: 14px; color: var(--color-neutral-800); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: grabbing; }
 .pv2-wkgo { position: absolute; right: 6px; bottom: 6px; font: 500 10px var(--pv2-num); letter-spacing: .1em; text-transform: uppercase; color: var(--color-primary-700); }
+/* Hover on a day or a date: what it is, in a small card under it. */
+.pv2-peek { position: absolute; z-index: 30; pointer-events: none; padding: 10px 12px; display: grid; gap: 3px; background: var(--color-bg-elevated); border: 1px solid var(--color-neutral-200); border-radius: 10px; box-shadow: 0 14px 34px -18px rgb(0 0 0 / .35); font-size: 13px; color: var(--color-neutral-800); }
+.pv2-peek .pv2-when { margin-bottom: 2px; }
+.pv2-peek-k { margin-top: 4px; font: 500 10.5px var(--font-family-sans); letter-spacing: .08em; text-transform: uppercase; color: var(--color-neutral-500); }
+.pv2-peek-fixed { padding-left: 8px; border-left: 2.5px solid var(--pv2-slate); line-height: 1.35; }
+.pv2-peek-ours { padding-left: 8px; border-left: 2.5px solid var(--color-primary-500); line-height: 1.35; }
 .pv2-lmcard { margin-top: 14px; padding: 14px 16px; display: grid; gap: 8px; background: var(--color-bg-elevated); border: 1px solid var(--color-neutral-200); border-left: 3px solid var(--pv2-slate); border-radius: 10px; }
 .pv2-when { font: 500 10.5px var(--pv2-num); letter-spacing: .12em; text-transform: uppercase; color: var(--pv2-slate); }
 .pv2-lmttl { font: 500 18px var(--font-family-display); }
@@ -3377,13 +3383,14 @@ div.chooser-action-group { overflow: visible !important; }
 }
 @media (max-width: 1060px) {
   .pv2-grid3 { grid-template-columns: minmax(0, 1fr) 220px; }
-  .pv2-grid3 .pv2-cal { grid-column: 1 / -1; order: 3; position: static; }
+  .pv2-grid3 .pv2-cal { grid-column: 1 / -1; order: 3; position: relative; }
 }
 @media (max-width: 860px) {
   .pv2-grid2, .pv2-grid2.is-ref, .pv2-grid2.is-cal-first, .pv2-grid3, .pv2-wgrid, .pv2-wgrid.is-ref { grid-template-columns: 1fr; gap: 26px; }
   .pv2-wside { position: static; order: -1; }
   .pv2-wgrid.is-ref .pv2-ref { grid-column: auto; }
   .pv2-cal, .pv2-ref { position: static; max-height: none; }
+  .pv2-cal { position: relative; } /* not sticky, but still the hover card's frame */
   .pv2-brain { columns: 1; }
   /* One column: the plan first, the level above after it (as on the week). */
   .pv2-grid3 > .pv2-ref, .pv2-grid2.is-ref > .pv2-ref { order: 3; }

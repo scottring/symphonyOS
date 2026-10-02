@@ -104,16 +104,46 @@ function readTime(raw: string | undefined): Date | null {
   return Number.isNaN(d.getTime()) ? null : d
 }
 
+/** The school's specials rotation ("Specials — Ella: PE · Kaleb: Music"): a
+ *  reminder for the bag, read on the wall and the week, never a fixed date. */
+const SPECIALS = /^specials?\s*[—–:-]/i
+
+/** All-day series that come round every week or more often ("Trash day"):
+ *  the rhythm of the week, not a date in it. A monthly or yearly series
+ *  (tuition due, a birthday) stays. */
+function weeklySeries(events: readonly CalendarEvent[]): Set<string> {
+  const days = new Map<string, number[]>()
+  for (const e of events) {
+    const series = e.recurring_event_id ?? e.recurringEventId
+    const raw = e.start_time ?? e.startTime
+    if (!series || !raw) continue
+    const t = parseLocalYmd(raw.slice(0, 10)).getTime()
+    if (!Number.isNaN(t)) days.set(series, [...(days.get(series) ?? []), t])
+  }
+  const out = new Set<string>()
+  for (const [series, ts] of days) {
+    const sorted = [...new Set(ts)].sort((a, b) => a - b)
+    if (sorted.some((t, i) => i > 0 && t - sorted[i - 1] <= 7.5 * 86_400_000)) out.add(series)
+  }
+  return out
+}
+
 /**
  * The fixed shape of a period: closures, deadlines, stretches — all-day events,
  * and timed events that run 20 hours or more. An ordinary appointment is not a
  * landmark; it stays on Week and Today (the brief: "don't flood monthly
- * planning with the entire calendar").
+ * planning with the entire calendar"). Nor is a reminder that comes round
+ * every week or every school day — the specials rotation, a weekly all-day
+ * series (Scott, 2026-10-02: Ella's and Kaleb's specials filled October).
  */
 export function landmarksIn(events: readonly CalendarEvent[], start: Date, end: Date): Landmark[] {
   const out: Landmark[] = []
   const seen = new Set<string>()
+  const weekly = weeklySeries(events)
   for (const e of events) {
+    if (SPECIALS.test((e.title ?? '').trim())) continue
+    const series = e.recurring_event_id ?? e.recurringEventId
+    if (series && weekly.has(series)) continue
     const allDay = !!(e.all_day ?? e.allDay)
     // An all-day entry names a calendar DATE. Read as a timestamp it is UTC
     // midnight — the evening before in any US zone — and Election Day drew
