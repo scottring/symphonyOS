@@ -8,10 +8,14 @@ import type { Task } from '@/types/task'
 import { isDesktopShell, onDesktopEvent, desktopEmit } from '@/lib/desktop'
 import { buildTrayPayload } from './trayPayload'
 
+// Projects is hidden in the app; an older shell's "projects" item now no-ops.
 const VIEW_PATHS: Record<string, string> = {
   today: '/',
+  week: '/week',
+  month: '/month',
+  season: '/season',
+  year: '/year',
   inbox: '/inbox',
-  projects: '/projects',
   routines: '/routines',
 }
 
