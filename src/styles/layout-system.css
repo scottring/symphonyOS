@@ -188,3 +188,38 @@
    scroll doesn't start 5px left of a short one (measured 2026-10-01: 341 vs
    346px). The left edge is a constant of the app. */
 .scenery-scroll { scrollbar-gutter: stable; }
+
+/* Side-by-side planning columns scroll on their own (Scott, 2026-10-02):
+   the days, the list and the level above each fill the room from the grid's
+   top to the landscape (--pv2-col-h, useColumnsFitWindow), so one long
+   column no longer drags the others off screen. Each column's heading stays
+   at its top, wearing the page's own background like the other sticky bars.
+   Stacked columns (phones, narrow windows) keep the one page scroll. */
+.pv2-wgrid.is-colscroll { --pv2-colh-bg: var(--color-bg-base); }
+.scenery-sky .pv2-wgrid.is-colscroll { --pv2-colh-bg: var(--scenery-sky-layers); }
+@media (min-width: 861px) {
+  .pv2-wgrid.is-colscroll { align-items: stretch; }
+  .pv2-wgrid.is-colscroll > :is(.pv2-days, .pv2-wside) {
+    /* Relative, so absolutely placed bits inside (drag announcements, row
+       actions) are clipped by the column instead of stretching the page. */
+    position: relative; top: auto; max-height: var(--pv2-col-h, none);
+    overflow-y: auto; scrollbar-width: thin;
+    /* Room for the row boxes that bleed 12px past the column. */
+    margin: 0 -14px; padding: 0 14px;
+  }
+  .pv2-wgrid.is-colscroll > :is(.pv2-days, .pv2-wside) .pv2-colh {
+    position: sticky; top: 0; z-index: 2;
+    background: var(--pv2-colh-bg); background-attachment: fixed;
+  }
+}
+@media (min-width: 1061px) {
+  .pv2-wgrid.is-colscroll > .pv2-ref {
+    position: relative; top: auto; max-height: var(--pv2-col-h, none);
+    overflow-y: auto; scrollbar-width: thin;
+    margin: 0 -14px; padding: 0 14px;
+  }
+  .pv2-wgrid.is-colscroll > .pv2-ref .pv2-refmonth .pv2-colh {
+    position: sticky; top: 0; z-index: 2;
+    background: var(--pv2-colh-bg); background-attachment: fixed;
+  }
+}

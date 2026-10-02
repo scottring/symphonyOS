@@ -8,7 +8,7 @@
 // It is chrome AROUND the existing week: the journal, the list, drag and drop,
 // add-to-day and the week's planning session are WeekViewV2's, unchanged.
 
-import { useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import { useSupabaseTasks } from '@/hooks/useSupabaseTasks'
@@ -42,6 +42,7 @@ import { useAssigneeFilter } from '@/hooks/useAssigneeFilter'
 import { planPeopleLens } from '@/lib/planning/peopleLens'
 import { makePlanActions, timingRemoval } from '@/lib/planning/planActions'
 import { useActionableInstances } from '@/hooks/useActionableInstances'
+import { useColumnsFitWindow } from '@/hooks/useColumnsFitWindow'
 import type { TaskContext } from '@/types/task'
 
 const DAY = 86_400_000
@@ -236,6 +237,9 @@ export function WeekV2({ tasks, weekStart, meId, isCurrent, days, onSelectTask, 
   // HomeHeader's masthead, when it offers a place for the folded row
   // (desktop only; HomeView decides).
   const slots = useContext(PlanMastheadSlotsContext)
+  const grid = useRef<HTMLDivElement>(null)
+  const columnsShown = meeting?.step !== 1 && view !== 'focus'
+  useColumnsFitWindow(grid, columnsShown)
 
   return (
     <div className="pv2-week" data-week={localYmd(weekStart)}>
@@ -264,7 +268,7 @@ export function WeekV2({ tasks, weekStart, meId, isCurrent, days, onSelectTask, 
             ? `Nothing on this week yet. Choose next steps from ${monthName}’s plan, or add your own.`
             : `Nothing on this week yet. Add to the list, or choose “Plan week ${weekNo}” to pick from ${monthName}’s plan.`} />
       ) : (
-        <div className={`pv2-wgrid${view === 'ref' ? ' is-ref' : ''}`}>
+        <div ref={grid} className={`pv2-wgrid is-colscroll${view === 'ref' ? ' is-ref' : ''}`}>
           {/* One spread: three columns, one heading line across them, no
               boxes (Scott, 2026-09-29: "a bunch of stuff randomly put down"). */}
           <section className="pv2-days" aria-label="The days"><div className="pv2-colh">The days</div>{days}</section>
