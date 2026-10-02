@@ -81,7 +81,20 @@ Prefer these over new arbitrary sizes.
 
 ## Scenery
 
-Pages sit on the place's painted sky with no cards behind text (#104). Use
+Pages sit on the place's painted sky with no cards behind text (#104).
+Settings › Your place › Style picks **Painted** or **Woodblock**
+(Hiroshige-inspired prints, 2026-10-01): two landscape sets for the same five
+places and three lights, both under the same CSS sky tinted to the place. The
+page and the chooser cards draw from `sceneryArt()` in
+`src/components/place/panoramas.ts`.
+
+The woodblock files arrived already cut (2172×724, transparent above the
+land, each with its veil mask; skylines in
+`scripts/scenery/woodblock-manifest.json`). Do not run the extract scripts on
+them, crop their transparent padding, or show a veil as an image. The extract
+scripts are only for the painted set's full-page concepts.
+
+Use
 colour tokens (`--color-neutral-*`, `--color-primary-*`), never literal
 colours, so Night lighting's light-on-dark remap reaches every page.
 

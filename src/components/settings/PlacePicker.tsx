@@ -4,15 +4,15 @@
 // follows you across devices. Show scenery and Lighting are device-local.
 import { PLACES } from '@/config/places'
 import { usePlace } from '@/hooks/usePlace'
-import { PANORAMAS } from '@/components/place/panoramas'
-import { nextAutomaticChange, useSceneryPreferences, type SceneryLightingChoice } from '@/hooks/useSceneryPreferences'
+import { sceneryArt } from '@/components/place/panoramas'
+import { nextAutomaticChange, useSceneryPreferences, type SceneryLightingChoice, type SceneryStyle } from '@/hooks/useSceneryPreferences'
 import { SectionHeading } from '@/components/layout/SectionHeading'
 
 const LIGHTING_LABEL = { 'daytime': 'Daytime', 'dusk-dawn': 'Dusk / Dawn', 'nighttime': 'Nighttime' } as const
 
 export function PlacePicker() {
   const { place, setPlace } = usePlace()
-  const { showScenery, setShowScenery, sceneryLighting, lightingChoice, setSceneryLighting } = useSceneryPreferences()
+  const { showScenery, setShowScenery, sceneryLighting, lightingChoice, setSceneryLighting, sceneryStyle, setSceneryStyle } = useSceneryPreferences()
   const next = lightingChoice === 'auto' ? nextAutomaticChange() : null
 
   return (
@@ -29,6 +29,14 @@ export function PlacePicker() {
           <input type="checkbox" checked={showScenery} onChange={e => setShowScenery(e.target.checked)} />
           <span><strong>Show scenery</strong><small>Turn off for more content space. Your theme colours stay.</small></span>
         </label>
+        <div className="flex flex-wrap items-center gap-4">
+        {/* Painted landscapes or woodblock prints, under the same sky. */}
+        <label className="place-art-setting">Style
+          <select value={sceneryStyle} onChange={e => setSceneryStyle(e.target.value as SceneryStyle)}>
+            <option value="painted">Painted</option>
+            <option value="woodblock">Woodblock</option>
+          </select>
+        </label>
         <label className="place-art-setting">Lighting
           <select value={lightingChoice} onChange={e => setSceneryLighting(e.target.value as SceneryLightingChoice)}>
             <option value="auto">Automatic</option>
@@ -37,13 +45,14 @@ export function PlacePicker() {
             <option value="nighttime">Nighttime</option>
           </select>
         </label>
+        </div>
       </div>
       <p className="text-xs text-neutral-500 mb-4">
         {lightingChoice === 'auto' && (
           <>Automatic follows sunrise and sunset: now {LIGHTING_LABEL[sceneryLighting]}
             {next ? `, changing at ${new Date(next).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}` : ''}. </>
         )}
-        Scenery visibility and lighting are saved on this device.
+        Scenery visibility, style and lighting are saved on this device.
       </p>
       <div className="place-theme-grid">
         {PLACES.map((p) => {
@@ -64,7 +73,7 @@ export function PlacePicker() {
               {/* The place's own sky and landscape, in the chosen light —
                   the same artwork and hue the page wears. */}
               <span className="place-theme-preview" data-sky-place={p.id} data-scenery-lighting={sceneryLighting} aria-hidden="true">
-                <img src={PANORAMAS[p.id][sceneryLighting].src} alt="" loading="lazy" />
+                <img src={sceneryArt(sceneryStyle, p.id, sceneryLighting).src} alt="" loading="lazy" />
               </span>
               <div className="flex items-center gap-1.5">
                 {/* The colour this place gives the app. */}

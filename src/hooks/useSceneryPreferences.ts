@@ -4,9 +4,13 @@ import { lightingAt, readCachedCoords } from '@/components/place/sceneryLighting
 export type SceneryLighting = 'daytime' | 'dusk-dawn' | 'nighttime'
 /** What the person chose: one lighting, or 'auto' to follow the sun. */
 export type SceneryLightingChoice = SceneryLighting | 'auto'
+/** How the landscape is drawn: painted, or as woodblock prints. Both stand
+ *  under the same sky, tinted to the place. */
+export type SceneryStyle = 'painted' | 'woodblock'
 const EVENT = 'symphony:scenery-preferences'
 const SHOW_KEY = 'symphony-show-scenery'
 const LIGHTING_KEY = 'symphony-scenery-lighting'
+const STYLE_KEY = 'symphony-scenery-style'
 /** Automatic lighting is re-read this often (and when the tab returns). */
 const CLOCK_MS = 60_000
 const fallback = new Map<string, string>()
@@ -53,17 +57,20 @@ const getLighting = (): SceneryLighting => {
   const choice = getChoice()
   return choice === 'auto' ? lightingAt(Date.now(), readCachedCoords()).lighting : choice
 }
+const getStyle = (): SceneryStyle => read(STYLE_KEY) === 'woodblock' ? 'woodblock' : 'painted'
 const setShowScenery = (show: boolean) => write(SHOW_KEY, String(show))
+const setSceneryStyle = (style: SceneryStyle) => write(STYLE_KEY, style)
 const setSceneryLighting = (choice: SceneryLightingChoice) => write(LIGHTING_KEY, choice)
 
-/** Device-local display choices. The selected place still uses profile sync.
+/** Device-local display choices (show, lighting, style). The selected place still uses profile sync.
  *  `sceneryLighting` is what to show now — with Automatic, it follows sunrise
  *  and sunset; `lightingChoice` is what was picked. */
 export function useSceneryPreferences() {
   const showScenery = useSyncExternalStore(subscribe, getShown, () => true)
   const lightingChoice = useSyncExternalStore(subscribe, getChoice, () => 'daytime' as const)
   const sceneryLighting = useSyncExternalStore(subscribe, getLighting, () => 'daytime' as const)
-  return { showScenery, setShowScenery, sceneryLighting, lightingChoice, setSceneryLighting }
+  const sceneryStyle = useSyncExternalStore(subscribe, getStyle, () => 'painted' as const)
+  return { showScenery, setShowScenery, sceneryLighting, lightingChoice, setSceneryLighting, sceneryStyle, setSceneryStyle }
 }
 
 /** When Automatic lighting next changes, for the chooser's hint. */
