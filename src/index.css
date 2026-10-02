@@ -3159,6 +3159,9 @@ div.chooser-action-group { overflow: visible !important; }
 .pv2-saved { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; margin: 0 0 22px; padding: 12px 14px; border-radius: 12px; background: var(--color-primary-50); border: 1px solid var(--color-primary-100); font-size: 13.5px; color: var(--color-neutral-700); }
 .pv2-saved-text { flex: 1 1 260px; min-width: 0; }
 .pv2-saved-text b { color: var(--color-neutral-900); font-weight: 600; }
+/* The next step's name can be long ("Choose what October takes on"): it wraps
+   inside the line on a phone instead of running past it. */
+.pv2-saved .pv2-btn { white-space: normal; max-width: 100%; text-align: left; }
 .pv2-toolbar button:disabled { opacity: .5; cursor: not-allowed; }
 .pv2-foot { margin-top: 48px; font-size: 12.5px; color: var(--color-neutral-500); }
 
@@ -3447,6 +3450,7 @@ div.chooser-action-group { overflow: visible !important; }
 /* A plan line's "↳ Part of …", on hover (the week list's parent line). */
 .pv2-line-parent { display: none; align-items: center; gap: 4px; margin: -2px 0 4px 26px; min-width: 0; max-width: calc(100% - 26px); font-size: 12px; color: var(--color-neutral-500); text-align: left; }
 .pv2-line-parent:hover { color: var(--color-primary-700); }
+.pv2-line-from { display: block; margin: -2px 0 2px 26px; font-size: 12px; font-style: italic; color: var(--color-neutral-500); }
 .pv2-line:hover > .pv2-line-parent, .pv2-line:focus-within > .pv2-line-parent, .pv2-line-parent.is-shown { display: flex; }
 /* At rest, not on hover: a line says which goal it serves (walkthrough
    2026-10-02 #13 — the link showed only under the pointer). */

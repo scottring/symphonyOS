@@ -79,4 +79,15 @@ describe('PlanPageV2 — one screen per rung', () => {
     expect(screen.getByRole('button', { name: 'Mark November planned' }).className).toBe('pv2-qbtn')
     expect(screen.getByText(/^October left work open\./)).toBeTruthy()
   })
+
+  it('a line carried in by the look-back says where it came from (#31)', () => {
+    vi.useFakeTimers({ toFake: ['Date'] }); vi.setSystemTime(new Date(2026, 10, 3, 10))
+    const nov = new Date(2026, 10, 1)
+    tasksHook.tasks = [{
+      id: 't1', title: 'Come up with a business plan', completed: false, bucket: 'month', monthStart: nov, createdAt: oct, updatedAt: nov,
+      commitments: [{ level: 'month', periodStart: oct, status: 'carried', carriedTo: nov }, { level: 'month', periodStart: nov, status: 'open' }],
+    }]
+    renderAt('2026-11-01')
+    expect(screen.getByText('carried from October')).toBeTruthy()
+  })
 })

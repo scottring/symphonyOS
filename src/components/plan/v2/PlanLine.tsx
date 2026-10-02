@@ -28,6 +28,8 @@ export interface LineVM {
   steps?: { id: string; title: string; done: boolean; where: string | null }[]
   /** Drawn beneath its goal on the same list. */
   nested?: boolean
+  /** Brought in by a look-back: "carried from October" (#31). */
+  carriedFrom?: string
 }
 
 export interface LineActions {
@@ -189,6 +191,7 @@ export function PlanLine({ vm, actions, members, nextLabel, open, onToggle, edit
           <LineMenu vm={vm} actions={actions} nextLabel={nextLabel} />
         </span>
       </div>
+      {vm.carriedFrom && !open && <span className="pv2-line-from">carried from {vm.carriedFrom}</span>}
       {vm.partOf && !open && !hideParent && (
         <button type="button" className="pv2-line-parent" onClick={() => (onShowPartOf ?? actions.openPartOf)(vm.partOf!)}
           aria-label={`Part of ${vm.partOf.title} — show it`}>

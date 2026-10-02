@@ -134,8 +134,12 @@ function Inner({ level }: { level: Level }) {
       const lp = x.completed ? null : lowerPlacement(x, level, b.start)
       return { id: x.id, title: x.title, done: !!x.completed, where: x.completed ? 'done' : lp ? lp.label : null }
     }) : undefined
-    return { task: t, fate, partOf: partOf(t), where, steps }
-  }, [level, partOf, layered])
+    // Brought in from the period before by its look-back: say so at rest.
+    const prevStart = periodBounds(level, b.prev, seasons).start.getTime()
+    const carriedIn = (t.commitments ?? []).some((c) => c.level === level && c.status === 'carried' && c.periodStart.getTime() === prevStart)
+    const carriedFrom = carriedIn ? (level === 'month' ? monthName(b.prev) : periodBounds(level, b.prev, seasons).label.replace(/\s+\d{4}$/, '')) : undefined
+    return { task: t, fate, partOf: partOf(t), where, steps, carriedFrom }
+  }, [level, partOf, layered, seasons])
 
   // The people filter narrows the plan drawn here; the look-back below and
   // the level above (reference) keep their own scope, as Today's pools do.
