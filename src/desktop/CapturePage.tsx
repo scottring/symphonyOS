@@ -1,4 +1,6 @@
-// Frameless quick-capture window for the Mac shell (global hotkey ⌘⇧Space).
+// Frameless quick-capture window used by Mac shells built before 2026-10-02
+// (global hotkey ⌘⇧Space). Newer shells open the main window's ⌘K on ⌃⌥Space
+// instead (useGlobalQuickAdd); this stays until every installed shell is rebuilt.
 // Loaded at /capture in a transparent, always-on-top Tauri window that stays
 // alive hidden — so keep this page idle-cheap: no task hooks, no subscriptions.
 import { useEffect, useRef, useState } from 'react'

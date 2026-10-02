@@ -1,7 +1,7 @@
 {
   "identifier": "remote-symphony",
   "description": "Symphony web app (remote-loaded) may use the Tauri event system",
-  "windows": ["main", "capture"],
+  "windows": ["main"],
   "remote": {
     "urls": ["https://app.symphony-os.com", "https://app.symphony-os.com/*"]
   },

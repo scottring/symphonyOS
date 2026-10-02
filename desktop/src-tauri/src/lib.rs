@@ -3,11 +3,9 @@ use tauri::menu::{
     AboutMetadata, CheckMenuItemBuilder, Menu, MenuBuilder, MenuItemBuilder, SubmenuBuilder,
 };
 use tauri::tray::TrayIconBuilder;
-use tauri::{AppHandle, Emitter, Listener, Manager, WebviewUrl, WebviewWindowBuilder};
+use tauri::{AppHandle, Emitter, Listener, Manager};
 use tauri_plugin_autostart::ManagerExt;
 use tauri_plugin_global_shortcut::ShortcutState;
-
-const APP_URL: &str = "https://app.symphony-os.com";
 
 // Schemes macOS owns and WKWebView silently drops. Kept in sync with the
 // SYSTEM_SCHEMES list inside EXTERNAL_LINKS_JS below.
@@ -211,33 +209,20 @@ fn show_main(app: &AppHandle) {
     }
 }
 
-fn create_capture_window(app: &AppHandle) -> tauri::Result<()> {
-    let url: tauri::Url = format!("{APP_URL}/capture").parse().expect("valid capture url");
-    WebviewWindowBuilder::new(app, "capture", WebviewUrl::External(url))
-        .title("Quick Capture")
-        .inner_size(560.0, 120.0)
-        .decorations(false)
-        .transparent(true)
-        .always_on_top(true)
-        .resizable(false)
-        .skip_taskbar(true)
-        .visible(false)
-        .center()
-        .build()?;
-    Ok(())
-}
-
-fn toggle_capture(app: &AppHandle) {
-    let Some(win) = app.get_webview_window("capture") else {
-        return;
-    };
-    if win.is_visible().unwrap_or(false) {
-        let _ = win.hide();
-    } else {
-        let _ = win.show();
-        let _ = win.set_focus();
-        let _ = app.emit_to("capture", "capture:shown", ());
+/// ⌃⌥Space from any app: Symphony comes forward with its own ⌘K open — the
+/// real unibox (dates, repeats, areas, search), not a second, thinner copy.
+/// The payload tells the page whether to hand focus back when it closes: only
+/// when Symphony was NOT already the window you were in.
+fn global_quick_add(app: &AppHandle) {
+    let was_front = app
+        .get_webview_window("main")
+        .map(|w| w.is_visible().unwrap_or(false) && w.is_focused().unwrap_or(false))
+        .unwrap_or(false);
+    if let Some(win) = app.get_webview_window("main") {
+        let _ = win.unminimize();
     }
+    show_main(app);
+    let _ = app.emit_to("main", "shell:quick-add-global", !was_front);
 }
 
 // Shape emitted by the web bridge (src/desktop/trayPayload.ts) — keep in sync.
@@ -279,8 +264,8 @@ fn tray_menu(app: &AppHandle, payload: &TrayPayload) -> tauri::Result<Menu<tauri
         .separator()
         .item(&MenuItemBuilder::with_id("tray-open", "Open Symphony").build(app)?)
         .item(
-            &MenuItemBuilder::with_id("tray-capture", "Quick Capture")
-                .accelerator("Cmd+Shift+Space")
+            &MenuItemBuilder::with_id("tray-capture", "Quick Add")
+                .accelerator("Ctrl+Alt+Space")
                 .build(app)?,
         )
         .separator()
@@ -403,7 +388,7 @@ fn handle_menu_event(app: &AppHandle, id: &str) {
         return;
     }
     if id == "tray-capture" {
-        toggle_capture(app);
+        global_quick_add(app);
         return;
     }
     if id == "launch-login" {
@@ -444,11 +429,11 @@ pub fn run() {
         .plugin(system_scheme_plugin())
         .plugin(
             tauri_plugin_global_shortcut::Builder::new()
-                .with_shortcuts(["cmd+shift+space"])
+                .with_shortcuts(["ctrl+alt+space"])
                 .expect("valid shortcut")
                 .with_handler(|app, _shortcut, event| {
                     if event.state() == ShortcutState::Pressed {
-                        toggle_capture(app);
+                        global_quick_add(app);
                     }
                 })
                 .build(),
@@ -461,7 +446,6 @@ pub fn run() {
             let autostart_enabled = app.autolaunch().is_enabled().unwrap_or(false);
             let menu = build_menu(app.handle(), autostart_enabled)?;
             app.set_menu(menu)?;
-            create_capture_window(app.handle())?;
             build_tray(app.handle())?;
             // Today's remaining tasks stream in from the web bridge.
             let tray_handle = app.handle().clone();
@@ -470,12 +454,11 @@ pub fn run() {
                     update_tray(&tray_handle, &payload);
                 }
             });
-            // The web page asks us to hide it (Enter-submitted or Esc).
-            let handle = app.handle().clone();
-            app.listen_any("capture:close", move |_| {
-                if let Some(win) = handle.get_webview_window("capture") {
-                    let _ = win.hide();
-                }
+            // A ⌃⌥Space add is done (added or Esc): hide Symphony so macOS
+            // returns focus to the app you were in.
+            let hide_handle = app.handle().clone();
+            app.listen_any("shell:hide-app", move |_| {
+                let _ = hide_handle.hide();
             });
             // The page asks AppKit to print (see PRINT_BRIDGE_JS).
             let print_handle = app.handle().clone();
@@ -502,12 +485,6 @@ pub fn run() {
                 if let tauri::WindowEvent::CloseRequested { api, .. } = event {
                     let _ = window.hide();
                     api.prevent_close();
-                }
-            }
-            // Click-away dismisses the capture palette, like Spotlight.
-            if window.label() == "capture" {
-                if let tauri::WindowEvent::Focused(false) = event {
-                    let _ = window.hide();
                 }
             }
         })

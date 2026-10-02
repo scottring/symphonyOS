@@ -42,6 +42,7 @@ import { useSceneryPreferences } from '@/hooks/useSceneryPreferences';
 import { PlaceScenery } from '@/components/place/PlaceScenery';
 import { planV2Enabled } from '@/lib/planning/v2/planV2';
 import { onQuickAddRequest } from '@/lib/quickAddSignal';
+import { useGlobalQuickAdd } from '@/desktop/useGlobalQuickAdd';
 import { GuideProvider } from '@/hooks/useGuidedPlan';
 import { GuideBar, GuideHostContext } from '@/components/guide/GuideBar';
 
@@ -189,6 +190,10 @@ function ShellLayoutInner({ children }: Props) {
   // "Add task" from the Planning panel (dock or sheet) asks the shell to open
   // the same unibox ⌘K opens — one add box, wherever it is asked for.
   useEffect(() => onQuickAddRequest(() => setQuickAddOpen(true)), []);
+
+  // ⌃⌥Space from any app (Mac shell) opens this same unibox and hands focus
+  // back when it closes (useGlobalQuickAdd).
+  const { closeQuickAdd, stayInSymphony, tracked } = useGlobalQuickAdd(quickAddOpen, setQuickAddOpen);
 
   // Global keyboard shortcuts: ⌘K opens the unibox (Quick Add + search + Ask
   // Symphony); ⌘/ is a legacy alias. Both work anywhere.
@@ -408,21 +413,21 @@ function ShellLayoutInner({ children }: Props) {
           // ⌘K add box as the shortcut. Phones add
           // through the dock's + (and the capture bar) instead.
           showFab={!isMobile}
-          onAdd={chrome.onQuickAdd}
-          onAddRich={chrome.onQuickAddRich}
+          onAdd={tracked(chrome.onQuickAdd)}
+          onAddRich={tracked(chrome.onQuickAddRich)}
           // useShellChrome confirms every capture once its write lands.
           confirmsAfterWrite
-          onAddNote={chrome.onQuickAddNote}
+          onAddNote={tracked(chrome.onQuickAddNote)}
           eventCalendarName={chrome.eventCalendarName}
-          onPlanFromPaper={() => { if (!requestPlanFromPaper()) navigate('/today') }}
+          onPlanFromPaper={() => { stayInSymphony(); if (!requestPlanFromPaper()) navigate('/today') }}
           projects={chrome.quickAddProjects}
           contacts={chrome.quickAddContacts}
           familyMembers={chrome.quickAddFamilyMembers}
           isOpen={quickAddOpen}
           onOpen={() => setQuickAddOpen(true)}
-          onClose={() => setQuickAddOpen(false)}
-          resultsSlot={(query, close) => <OmniboxResults query={query} onNavigate={close} />}
-          onAskSymphony={(text) => openAssistant({ message: text, autoSend: true })}
+          onClose={closeQuickAdd}
+          resultsSlot={(query, close) => <OmniboxResults query={query} onNavigate={() => { stayInSymphony(); close() }} />}
+          onAskSymphony={(text) => { stayInSymphony(); openAssistant({ message: text, autoSend: true }) }}
         />
       )}
 
