@@ -126,7 +126,7 @@ export function PlanMeetingBar({ period, prevName, step, lookBack, why, onStep, 
       {viewSwitch}
       <button type="button" className="pv2-link pv2-quiet" onClick={onLeave}>Leave for now</button>
       <button type="button" className="pv2-btn" onClick={onSave}>{saveLabel}</button>
-      <p className="pv2-sbar-why" aria-live="polite">{why}{step === 2 ? ` Your changes are already saved; “${saveLabel}” records that ${period} is planned.` : ''}</p>
+      <p className="pv2-sbar-why" aria-live="polite">{why}{step === 2 ? ` Edits save as you go. When it looks right, choose “${saveLabel}.”` : ''}</p>
     </div>
   )
 }
