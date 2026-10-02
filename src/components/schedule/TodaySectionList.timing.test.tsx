@@ -60,7 +60,20 @@ describe('the day row carries the shared timing control', () => {
     renderView({ tasks: dayTask() as never })
     await screen.findByText('Research games dates and tickets')
     const control = screen.getByRole('button', { name: /Choose a week or a day for Research games dates and tickets/ })
-    expect(control).toHaveTextContent('· any time')
+    // On the day's own page the date is the title: the chip says only "Any
+    // time" (walkthrough 2026-10-02, #25: "Fri, Oct 2 · any time" on Oct 2).
+    expect(control).toHaveTextContent(/^Any time/)
+    expect(control.textContent).not.toMatch(/\w{3}, \w{3} \d+/)
+    // The accessible description still names the date.
+    expect(control).toHaveAccessibleName(/Chosen for \w{3}, \w{3} \d+, any time/)
+  })
+
+  it('a timed row on its own day reads only its time', async () => {
+    const at = new Date(TODAY); at.setHours(11, 45, 0, 0)
+    renderView({ tasks: [{ ...dayTask()[0], isAllDay: false, scheduledFor: at }] as never })
+    await screen.findByText('Research games dates and tickets')
+    const control = screen.getByRole('button', { name: /Choose a week or a day for Research games dates and tickets/ })
+    expect(control).toHaveTextContent(/^11:45 AM/)
   })
 
   it('offers to remove the day, naming what survives, before it is pressed', async () => {

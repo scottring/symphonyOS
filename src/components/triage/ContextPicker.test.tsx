@@ -44,6 +44,12 @@ describe('ContextPicker', () => {
       expect(tagged).not.toHaveClass('tag-needs-context')
     })
 
+    // Walkthrough 2026-10-02: the tag in task details was an unlabeled mark.
+    it('names its life area on hover once one is set', () => {
+      render(<ContextPicker value="work" onChange={mockOnChange} />)
+      expect(screen.getByRole('button', { name: 'Set context' })).toHaveAttribute('title', 'Life area: Work')
+    })
+
     it('does not show dropdown initially', () => {
       render(<ContextPicker onChange={mockOnChange} />)
 

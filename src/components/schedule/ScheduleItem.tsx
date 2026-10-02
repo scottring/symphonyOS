@@ -94,6 +94,11 @@ interface ScheduleItemProps {
    * `ml-[6.5rem]` default was tuned for one layout and was wrong everywhere else.
    */
   belowTitleAccessory?: React.ReactNode
+  /** What this task serves — "↳ Step toward “goal”" or "↳ From “line”" —
+   *  drawn at rest under the title, on phones too. When given it replaces the
+   *  bare goal-name line (it says the same thing, and also reaches a line the
+   *  task was copied down from). Today supplies it; other hosts don't. */
+  servesLine?: React.ReactNode
   /** The signed-in member. Initials are household INFORMATION only when they
    *  say something the reader doesn't know — someone else's work. Work that
    *  is yours carries none (Today, 2026-09-21). */
@@ -145,6 +150,7 @@ export const ScheduleItem = memo(function ScheduleItem({
   spineAbove,
   spineBelow,
   belowTitleAccessory,
+  servesLine,
   currentMemberId = null,
 }: ScheduleItemProps) {
   const isMobile = useMobile()
@@ -195,6 +201,7 @@ export const ScheduleItem = memo(function ScheduleItem({
   /** Anything rendering beneath the title makes the title column taller — the
    *  leading columns then need pinning to the title's first line. */
   const hasBelowTitleContent = !!belowTitleAccessory
+    || !!servesLine
     || !!(item.goalLabel && !item.completed)
     || !!(item.isWaiting && item.waitingFor && !item.completed)
     || hasPerPersonItems
@@ -383,7 +390,7 @@ export const ScheduleItem = memo(function ScheduleItem({
         {/* Completing is not opening: the checkbox's click stays out of the card's tap. */}
         <div className="w-12 h-12 -ml-3 shrink-0 flex items-center justify-center relative" onClick={(e) => e.stopPropagation()}>
           {item.focused && (
-            <span aria-hidden="true" title="You chose this for today" className="row-focus-dot absolute left-1 top-1/2 -translate-y-1/2 h-1.5 w-1.5 rounded-full bg-sage-500" />
+            <span aria-hidden="true" title="Chosen for today" className="row-focus-dot absolute left-1 top-1/2 -translate-y-1/2 h-1.5 w-1.5 rounded-full bg-sage-500" />
           )}
           {isActionable ? (
             <TaskCheckbox
@@ -432,7 +439,7 @@ export const ScheduleItem = memo(function ScheduleItem({
           )}
           {/* What this step is for, on the phone too — a phone has no hover to
               reveal it, so the commitment has to be on the row itself. */}
-          {item.goalLabel && !item.completed && (
+          {servesLine ? <div className="mt-0.5 min-w-0">{servesLine}</div> : item.goalLabel && !item.completed && (
             <div className="flex items-center gap-1.5 text-[12px] text-neutral-500 mt-0.5 min-w-0">
               <Target className="w-3 h-3 shrink-0" aria-hidden />
               <span className="truncate">{item.goalLabel}</span>
@@ -688,8 +695,12 @@ export const ScheduleItem = memo(function ScheduleItem({
                 the page because you chose it. */}
             {item.focused && (
               <>
-                <span aria-hidden="true" title="You chose this for today" className="absolute -left-3 top-1/2 -translate-y-1/2 h-1.5 w-1.5 rounded-full bg-sage-500" />
-                <span className="sr-only">Chosen for today</span>
+                {/* Named, not decoration (walkthrough 2026-10-02, #25: "an
+                    unexplained small green dot"): a tooltip on hover and
+                    the same words for a screen reader. */}
+                <span role="img" aria-label="Chosen for today" title="Chosen for today" className="today-chosen-dot absolute -left-[15px] top-1/2 -translate-y-1/2 flex h-3 w-3 items-center justify-center">
+                  <span className="h-1.5 w-1.5 rounded-full bg-sage-500" />
+                </span>
               </>
             )}
             {isEvent && isFree ? (
@@ -817,7 +828,7 @@ export const ScheduleItem = memo(function ScheduleItem({
           {/* What this step is FOR. A commitment made at the month's altitude
               should still be legible on the day you act on it. No count and no
               progress — just the goal's name. */}
-          {item.goalLabel && !item.completed && (
+          {servesLine ? <div className="mt-0.5 min-w-0">{servesLine}</div> : item.goalLabel && !item.completed && (
             <div className="flex items-baseline gap-1.5 text-[12px] text-neutral-500 leading-tight mt-0.5 min-w-0">
               <Target className="w-3 h-3 shrink-0 translate-y-[1px]" aria-hidden />
               <span className="truncate" title={item.goalLabel}>{item.goalLabel}</span>

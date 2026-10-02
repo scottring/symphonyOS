@@ -235,7 +235,9 @@ export function MultiAssigneeDropdown({
         type="button"
         aria-haspopup="menu"
         aria-expanded={isOpen}
-        title={triggerLabel}
+        // The initials name who they are on hover (walkthrough 2026-10-02:
+        // an unexplained "DS" in task details).
+        title={triggerLabel ?? (selectedMembers.length > 0 ? `Assigned to ${selectedMembers.map((m) => m.name).join(', ')}` : 'No one assigned')}
         onClick={(e) => { e.stopPropagation(); setIsOpen(!isOpen) }}
         className={`
           flex items-center ${size === 'sm' ? '-space-x-1' : '-space-x-2'} cursor-pointer hover:opacity-80 transition-opacity
@@ -243,7 +245,9 @@ export function MultiAssigneeDropdown({
         `}
         aria-label={triggerLabel
           ? `${triggerLabel}. ${selectedMembers.length > 0 ? `Assigned: ${selectedMembers.map((m) => m.name).join(', ')}` : 'No one assigned'}`
-          : `${selectedMembers.length} assigned. Click to change.`}
+          : selectedMembers.length > 0
+            ? `Assigned to ${selectedMembers.map((m) => m.name).join(', ')}. Change people`
+            : 'No one assigned. Assign people'}
       >
         {selectedMembers.length > 0 ? (
           <>

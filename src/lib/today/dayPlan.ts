@@ -189,6 +189,25 @@ export function weekListEntries(tasks: Task[], match: Match, weekStart: Date, ym
 }
 
 /**
+ * NEXT week's open list, for Today's reference column on the last day of a
+ * week (walkthrough 2026-10-02, #24/#18: the plan made for next week was
+ * nowhere on Today). The same definition the Week page reads
+ * (weekListTasks), as a week that is not the current one, through the same
+ * assignee lens the chooser uses. `tasks` must be the caller's layer-filtered
+ * list, as everywhere else in this module.
+ */
+export function nextWeekEntries(tasks: Task[], selectedAssignee: AssigneeFilter, weekStart: Date, ymd: string, userId?: string | null): DayPlanEntry[] {
+  const match = makeAssigneeFilter(selectedAssignee)
+  return weekListTasks(tasks, weekStart, null, { isCurrent: false })
+    .filter((t) => !t.completed && match(t.assignedTo, t.assignedToAll))
+    .map((t) => ({
+      key: `task:${t.id}`, kind: 'task' as const, id: t.id, title: t.title, completed: false,
+      planned: false, group: 'week' as const, task: t,
+      context: weekRowNoteText({ ...weekRowNote(t, weekStart, userId, ymd), pickedToday: false }),
+    }))
+}
+
+/**
  * The week's list (Scott, 2026-09-21, Phase 2). It stays WHOLE: a row picked
  * for today stays, marked planned (the panel shows "Planned today" + Undo);
  * a ticked row stays, struck; a row given a day this week stays, with its

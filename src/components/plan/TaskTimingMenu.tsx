@@ -31,9 +31,12 @@ interface Props {
   /** Day tiles, when the host counts them. */
   dayChoices?: DayChoices
   size?: 'sm' | 'md'
+  /** The page's own day (Today): a row dated that day reads "Any time" or its
+   *  time, not the date again. Unset everywhere else. */
+  labelRelativeTo?: Date
 }
 
-export function TaskTimingMenu({ task, onUpdateTask, periodStart, fallbackWeekStart, dayChoices, size = 'sm' }: Props) {
+export function TaskTimingMenu({ task, onUpdateTask, periodStart, fallbackWeekStart, dayChoices, size = 'sm', labelRelativeTo }: Props) {
   const t = taskTiming(task)
   const broader = broaderCommitment(task)
   const removeTiming = (scope: 'day' | 'all') => {
@@ -53,6 +56,7 @@ export function TaskTimingMenu({ task, onUpdateTask, periodStart, fallbackWeekSt
   return (
     <PlanWeekMenu
       size={size}
+      labelRelativeTo={labelRelativeTo}
       title={task.title}
       periodStart={periodStart}
       periodLabel={broader?.label ?? undefined}

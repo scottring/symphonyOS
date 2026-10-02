@@ -44,7 +44,10 @@ import { Eye, EyeOff, Binoculars, Printer, GripVertical, Moon, Sparkles, Chevron
 import { splitTodayJournal, splitCompletedFocus } from '@/lib/today/journalSplit'
 import { panelActionsFor } from '@/components/reference/DayPlanPanel'
 import { TodayWeekColumn } from './TodayWeekColumn'
-import { alreadyPlaced } from '@/lib/today/dayPlan'
+import { TodayComingUp } from './TodayComingUp'
+import { ServesLine } from './ServesLine'
+import { parentLinkOf } from '@/lib/planning/parentLink'
+import { alreadyPlaced, nextWeekEntries } from '@/lib/today/dayPlan'
 import { unhomedRoutines } from '@/lib/week/unhomedRoutines'
 import { useWeekInstances } from '@/components/home/week/useWeekInstances'
 import { useDayChoices } from '@/hooks/useDayChoices'
@@ -69,7 +72,7 @@ import { TodayDragProvider } from './TodayDragProvider'
 import { resolveDrop, writeMoveAndRegisterUndo, type DropIntent } from '@/lib/today/todayDrop'
 import { useCalendarPermissions } from '@/hooks/useCalendarPermissions'
 import { selectUpNext, formatUpNextStatus } from '@/lib/today/upNext'
-import { forwardLook, forwardLine } from '@/lib/today/forwardLook'
+import { forwardLook, forwardLine, comingUp } from '@/lib/today/forwardLook'
 import { NeedsYourOK } from './NeedsYourOK'
 import { ClarityCurtain } from '@/components/clarity/ClarityCurtain'
 import { computeClaritySteps, type ClarityStepId } from '@/lib/clarity/claritySteps'
@@ -447,6 +450,25 @@ export function TodayView({
   // and the list beside it agree.
   const stillToPlace = data.dayPlan.chooserTasks.filter((e) => !e.completed && !alreadyPlaced(e, viewedDate)).length
   const weekLine = `Week ${weekNo} · ${stillToPlace === 0 ? 'nothing still to place' : `${stillToPlace} still to place`}`
+  // On the week's last day the column also shows the week still ahead
+  // (walkthrough 2026-10-02, #24/#18). Same rows the Week page lists, through
+  // the same filters this page applies: `tasks` arrives layer-filtered, and
+  // the people filter is applied here exactly as the chooser applies it.
+  const nextWeek = useMemo(() => {
+    const wso = readCadenceConfig().weekStartsOn
+    const start = weekStartAnchor(viewedDate, wso)
+    const last = new Date(start); last.setDate(last.getDate() + 6)
+    if (localYmd(last) !== localYmd(viewedDate)) return null
+    const next = new Date(start); next.setDate(next.getDate() + 7)
+    return { weekNo: weekOfYear(next, wso), weekStart: next, entries: nextWeekEntries(tasks, selectedAssignees ?? [], next, localYmd(viewedDate), userId) }
+  }, [tasks, selectedAssignees, viewedDate, userId])
+  // "Coming up" under Schedule: open work dated in the seven days after this
+  // one (walkthrough 2026-10-02, #28). The page's own filtered tasks, through
+  // the same people filter as every row on it — never an unfiltered list.
+  const comingUpItems = useMemo(() => {
+    const match = makeAssigneeFilter(selectedAssignees ?? [])
+    return comingUp(tasks.filter((t) => match(t.assignedTo, t.assignedToAll)), viewedDate)
+  }, [tasks, selectedAssignees, viewedDate])
   const [agendaDropOver, setAgendaDropOver] = useState(false)
   const agendaDrop = planDropHandlers((payload) => {
     void planActions.drop(payload, { type: 'day', day: viewedDate }, { chooseOnly: true })
@@ -1309,11 +1331,23 @@ export function TodayView({
       periodStart={viewedDate}
       fallbackWeekStart={currentWeekStart}
       dayChoices={dayChoices}
+      // On the day's own page the date is the title: the chip says "Any
+      // time" or the time (walkthrough 2026-10-02, #25).
+      labelRelativeTo={viewedDate}
     />
   ), [ctx, viewedDate, dayChoices, currentWeekStart])
+  // What each row serves, at rest — the Week list's "↳ Step toward …" /
+  // "↳ From …" line (walkthrough 2026-10-02, #24). Read from this page's own
+  // filtered tasks, so a parent outside the reader's view is never named.
+  const servesFor = useCallback((task: Task) => {
+    if (task.completed) return undefined
+    const parent = parentLinkOf(task, (id) => tasksMap.get(id))
+    return parent ? <ServesLine parent={parent} onOpen={(id) => handleSelectItem(`task-${id}`)} /> : undefined
+  }, [tasksMap, handleSelectItem])
 
   const listProps = {
     timingFor: dayTimingControl,
+    servesFor,
     isReadOnlyEvent,
     viewedDate,
     isMobile,
@@ -1655,6 +1689,9 @@ export function TodayView({
               </div>
             )}
           </section>
+          {/* What is dated in the days after this one — quiet, and silent
+              when there is nothing (walkthrough 2026-10-02, #28). */}
+          <TodayComingUp items={comingUpItems} onOpen={(id) => handleSelectItem(`task-${id}`)} />
           {/* Below the schedule, not above the date: the one planning
               reminder Today carries (2026-09-22). */}
           {data.isToday && afterSchedule}
@@ -1711,7 +1748,8 @@ export function TodayView({
         <aside className="today-aside mt-6 @[48rem]:mt-0">
           {showWeek && (
             <TodayWeekColumn plan={data.dayPlan} day={viewedDate} weekNo={weekNo}
-              weekStart={weekStartAnchor(viewedDate, readCadenceConfig().weekStartsOn)} actions={planPanelActions} />
+              weekStart={weekStartAnchor(viewedDate, readCadenceConfig().weekStartsOn)} actions={planPanelActions}
+              nextWeek={nextWeek} />
           )}
         </aside>
         )}

@@ -131,3 +131,30 @@ export function goalsSupporting(goal: Task, tasks: readonly Task[]): SupportLink
 function byCreation(a: Task, b: Task) {
   return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
 }
+
+export interface GoalChoice { id: string; title: string; period?: string }
+export interface GoalChoiceGroup { label: string; goals: GoalChoice[] }
+
+/**
+ * The goals a task could be part of (`goal_task_id`), grouped by the period
+ * they sit on — for task details' "Part of…" (walkthrough 2026-10-02, #26:
+ * the panel offered "Make it a goal" but no way to say which goal a task
+ * serves). Open goal TASKS only, never the task itself. `tasks` is the
+ * caller's list, already narrowed to the life areas in view.
+ */
+export function goalChoices(task: Pick<Task, 'id'>, tasks: readonly Task[], seasons: Seasons): GoalChoiceGroup[] {
+  const open = tasks.filter((t) => t.isGoal === true && !t.completed && t.id !== task.id)
+  const byStart = (start: (t: Task) => Date | undefined) => (a: Task, b: Task) =>
+    ((start(a)?.getTime() ?? 0) - (start(b)?.getTime() ?? 0)) || byCreation(a, b)
+  const seasonGoals = open.filter(isSeasonGoal).sort(byStart((t) => t.seasonStart))
+    .map((t) => ({ id: t.id, title: t.title, period: t.seasonStart ? seasonLabel(t.seasonStart, seasons) : undefined }))
+  const monthGoals = open.filter(isMonthGoal).sort(byStart((t) => t.monthStart))
+    .map((t) => ({ id: t.id, title: t.title, period: monthName(t.monthStart) }))
+  const otherGoals = open.filter((t) => !isSeasonGoal(t) && !isMonthGoal(t)).sort(byCreation)
+    .map((t) => ({ id: t.id, title: t.title }))
+  return [
+    { label: 'Season goals', goals: seasonGoals },
+    { label: 'Month goals', goals: monthGoals },
+    { label: 'Other goals', goals: otherGoals },
+  ].filter((g) => g.goals.length > 0)
+}
