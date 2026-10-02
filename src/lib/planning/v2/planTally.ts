@@ -29,6 +29,23 @@ export function lookBackWhy(prevName: string, name: string, open: number): strin
 }
 
 /**
+ * What the "Plan <period>" step asks, in a sentence. A list that already has
+ * lines is checked against the level above, not written from scratch: "write
+ * what Fall is for" over a 14-line list didn't say what to do (Scott,
+ * 2026-10-02).
+ */
+export function planWhy(level: 'season' | 'month', name: string, aboveName: string, lines: number): string {
+  if (level === 'month') {
+    return lines
+      ? `Check ${name}’s list against ${aboveName} and the calendar: keep what still matters, cut what doesn’t, add what’s missing. A quiet month is fine.`
+      : `Look at ${aboveName} and the calendar, then write what ${name} is for. A quiet month is fine.`
+  }
+  return lines
+    ? `Check ${name}’s list against ${aboveName}: keep what still matters, cut what doesn’t, add what’s missing. “+ Add to ${name}” beside a ${aboveName} goal keeps the new line linked to it.`
+    : `${name}’s list is empty. Beside each ${aboveName} goal, use “+ Add to ${name}” to write ${name}’s part. A few lines is plenty.`
+}
+
+/**
  * Where a saved plan hands on to, one level down. A season → its month (the
  * current month while the season is running, else its first month: Fall
  * saved on Sep 29 hands to October, never September). A month → its week (the

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { EMPTY_TALLY, addToTally, lookBackWhy, nextAfterSave, tallySentence } from './planTally'
+import { EMPTY_TALLY, addToTally, lookBackWhy, nextAfterSave, planWhy, tallySentence } from './planTally'
 
 describe('planTally', () => {
   it('says what a look-back decided, in order, skipping zeros', () => {
@@ -12,6 +12,22 @@ describe('planTally', () => {
   })
   it('the look-back step says nothing is deleted', () => {
     expect(lookBackWhy('Summer', 'Fall', 6)).toMatch(/^Summer left 6 open\..*Nothing is deleted\.$/)
+  })
+})
+
+describe('planWhy', () => {
+  it('a season with lines is checked against the year, not written from scratch', () => {
+    const why = planWhy('season', 'Fall', '2026', 14)
+    expect(why).toMatch(/^Check Fall’s list against 2026: keep what still matters, cut what doesn’t, add what’s missing\./)
+    expect(why).toContain('“+ Add to Fall”')
+    expect(why).not.toMatch(/write what/)
+  })
+  it('an empty season is written from the year’s goals', () => {
+    expect(planWhy('season', 'Fall', '2026', 0)).toMatch(/^Fall’s list is empty\./)
+  })
+  it('a month checks against its season and the calendar', () => {
+    expect(planWhy('month', 'October', 'Fall', 3)).toMatch(/^Check October’s list against Fall and the calendar.*A quiet month is fine\.$/)
+    expect(planWhy('month', 'October', 'Fall', 0)).toBe('Look at Fall and the calendar, then write what October is for. A quiet month is fine.')
   })
 })
 

@@ -44,7 +44,7 @@ import { weekOfYear } from '@/lib/planning/horizonNumerals'
 import { FocusDeck, CloseOut, type CloseDecision } from './FocusDeck'
 import { PlanMeetingBar, PlanToolbar, PlanToolbarControls, PlanToolbarStatus, type PlanToolbarProps } from './PlanStatus'
 import { GuideAnchor } from '@/components/guide/GuideBar'
-import { EMPTY_TALLY, addToTally, lookBackWhy, nextAfterSave, tallySentence, type Tally } from '@/lib/planning/v2/planTally'
+import { EMPTY_TALLY, addToTally, lookBackWhy, planWhy, nextAfterSave, tallySentence, type Tally } from '@/lib/planning/v2/planTally'
 import { FromPaper } from './FromPaper'
 import { ViewSwitch } from './ViewSwitch'
 import { PeriodRefRoutines } from './RefShelves'
@@ -586,7 +586,7 @@ function Inner({ level }: { level: Level }) {
       {inMeeting ? (
         <PlanMeetingBar period={name} prevName={prevName} step={meeting!.step} lookBack={meeting!.candidateIds.length > 0}
           why={meeting!.step === 1 ? lookBackWhy(prevName, name, meeting!.candidateIds.length)
-            : `Look at ${aboveName}${level === 'month' ? ' and the calendar' : ''} beside the list, then write what ${name} is for. ${level === 'month' ? 'A quiet month is fine.' : 'A few lines is plenty.'}`}
+            : planWhy(level, name, aboveName, mainAll.length)}
           onStep={(step) => setMeeting({ ...meeting!, step })}
           viewSwitch={meeting!.step === 2 && meeting!.candidateIds.length === 0 ? viewSwitch : undefined}
           onLeave={() => void endMeeting(false)} onSave={() => void endMeeting(true)} saveLabel={`Mark ${name} planned`} />
