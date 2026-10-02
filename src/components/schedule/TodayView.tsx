@@ -1,7 +1,6 @@
 import { publishViewedDay } from '@/lib/viewedDaySignal'
 import { DesktopControlsContext, DesktopLeadContext } from '@/components/layout/DesktopNavigation'
 import { createPortal } from 'react-dom'
-import { DesktopFooterAction, DesktopFooterActionContext } from '@/components/layout/DesktopFooter'
 /**
  * TodayView — editorial Today shell.
  *
@@ -468,9 +467,10 @@ export function TodayView({
   // standalone mounts keep it as its own row.
   const foldedControls = !!desktopControls && !isMobile
   const desktopLead = useContext(DesktopLeadContext)
-  // In the desktop shell the day's review lives in the page footer, so the
-  // ⋯ menu drops its copy there (phones keep the menu entry).
-  const reviewInFooter = !!useContext(DesktopFooterActionContext) && !isMobile
+  // In the desktop shell the day's review closes the day's list (Scott,
+  // 2026-10-02 — it was the footer's), so the ⋯ menu drops its copy there
+  // (phones keep the menu entry).
+  const reviewAtEnd = foldedControls
   const poolMatchMine = useMemo(
     () => (assignedTo: string | null | undefined, assignedToAll?: readonly string[] | null) =>
       !meId || doableBy({ assignedTo: assignedTo ?? undefined, assignedToAll: assignedToAll ? [...assignedToAll] : undefined }, meId),
@@ -1168,7 +1168,7 @@ export function TodayView({
           <span>Review carried-over work</span>
         </button>
       )}
-      {data.isToday && !reviewInFooter && (
+      {data.isToday && !reviewAtEnd && (
         <button
           type="button"
           onClick={() => setReviewMode('evening')}
@@ -1359,13 +1359,6 @@ export function TodayView({
       {/* Today's filter and ⋯ live in its heading beside the lens and the
           assistant, as every horizon's page controls do — the top bar is the
           same on every page (2026-09-29). */}
-      {reviewInFooter && data.isToday && (
-        <DesktopFooterAction>
-          <button type="button" onClick={() => setReviewMode('evening')} title="Reflect, prep for tomorrow, and close the day">
-            Review today
-          </button>
-        </DesktopFooterAction>
-      )}
       {/* Mounted only while printing. Keeping it permanently in the DOM would
           duplicate every title — invisible to the eye (CSS-hidden) but very
           real to screen readers and to any getByText. */}
@@ -1697,6 +1690,11 @@ export function TodayView({
           <TodayBacklogFooter
             onReviewEmail={emailCaptures.length > 0 ? () => setEmailReviewOpen(true) : undefined}
           />
+        )}
+        {reviewAtEnd && data.isToday && (
+          <button type="button" className="today-review-close" onClick={() => setReviewMode('evening')} title="Reflect, prep for tomorrow, and close the day">
+            <Moon className="w-4 h-4" aria-hidden="true" /> Review today
+          </button>
         )}
 
         {/* Undo window for a dismissed email row. Letting the toast go — by

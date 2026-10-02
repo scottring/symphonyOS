@@ -5,7 +5,6 @@ import type { ReactNode } from 'react'
 import { DomainProvider } from '@/hooks/useDomain'
 import { DomainGateProvider } from '@/components/domain/DomainGate'
 import { DesktopPageControls } from '@/components/layout/DesktopNavigation'
-import { DesktopFooterAction } from '@/components/layout/DesktopFooter'
 import { deriveActiveView, pageOwnsFilterChrome, ShellLayout } from './ShellLayout'
 
 // Regression test for the House sidebar link: it navigated to '/home' but
@@ -266,35 +265,32 @@ describe('Centred desktop workspace and footer', () => {
     sessionStorage.setItem('symphony-reference-lists:anonymous', JSON.stringify([{ kind: 'week', date: new Date().toISOString() }]))
     const today = renderAt('/today')
     // The footer rides in the sticky ground block (2026-09-28), one level down.
-    const workspace = screen.getByRole('contentinfo').closest('.desktop-workspace') as HTMLElement
+    const workspace = screen.getByRole('navigation', { name: 'Main navigation' }).closest('.desktop-workspace') as HTMLElement
     expect(workspace).toHaveClass('desktop-workspace', 'has-references')
     expect(workspace).toContainElement(screen.getByRole('navigation', { name: 'Main navigation' }))
     expect(workspace).toContainElement(screen.getByTestId('app-content'))
     today.unmount()
     // /week already shows the week list, so no empty dock column is reserved.
     renderAt('/week')
-    expect(screen.getByRole('contentinfo').closest('.desktop-workspace')).not.toHaveClass('has-references')
+    expect(screen.getByRole('navigation', { name: 'Main navigation' }).closest('.desktop-workspace')).not.toHaveClass('has-references')
   })
 
-  it('carries only the page-supplied action at left, so other routes offer no review', () => {
-    const today = renderAt('/today', <DesktopFooterAction><button>Review today</button></DesktopFooterAction>)
-    expect(screen.getByRole('contentinfo')).toContainElement(screen.getByRole('button', { name: 'Review today' }))
-    expect(screen.getAllByRole('button', { name: 'Review today' })).toHaveLength(1)
-    expect(screen.getByRole('contentinfo')).toHaveTextContent('Symphony')
-    today.unmount()
-    renderAt('/routines')
-    expect(screen.queryByRole('button', { name: /Review/ })).not.toBeInTheDocument()
+  it('has no footer bar: the landscape at the foot of the page stays clear (2026-10-02)', () => {
+    renderAt('/today')
+    expect(screen.queryByRole('contentinfo')).not.toBeInTheDocument()
+    expect(document.querySelector('.desktop-ground')).toBeNull()
   })
 
-  it('opens keyboard shortcuts and help as dialogs that close with Escape and return focus', () => {
+  it('opens keyboard shortcuts and help from the ☰ menu; Escape closes and focus returns to ☰', () => {
     renderAt('/routines')
-    const shortcuts = screen.getByRole('button', { name: 'Keyboard shortcuts' })
-    shortcuts.focus()
-    fireEvent.click(shortcuts)
+    const more = screen.getByRole('button', { name: 'More' })
+    fireEvent.click(more)
+    fireEvent.click(screen.getByRole('button', { name: 'Keyboard shortcuts' }))
     expect(screen.getByRole('dialog', { name: 'Keyboard shortcuts' })).toHaveTextContent('⌘K')
     fireEvent.keyDown(document, { key: 'Escape' })
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
-    expect(shortcuts).toHaveFocus()
+    expect(more).toHaveFocus()
+    fireEvent.click(more)
     fireEvent.click(screen.getByRole('button', { name: 'Help' }))
     expect(screen.getByRole('dialog', { name: 'Help' })).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Close' }))
@@ -353,13 +349,6 @@ describe('Place scenery', () => {
     expect(document.querySelector('[data-place-scenery]')).toBeNull()
     expect(document.querySelector('[data-scenery-lighting]')).toBeNull()
     expect(document.querySelector('.scenery-sky, .scenery-scroll, .scenery-end-clearance')).toBeNull()
-  })
-
-  it('leaves the footer as the only thing in its grid row', () => {
-    renderAt('/today')
-    const ground = screen.getByRole('contentinfo').parentElement as HTMLElement
-    expect(ground).toHaveClass('desktop-ground')
-    expect(ground.children).toHaveLength(1)
   })
 })
 

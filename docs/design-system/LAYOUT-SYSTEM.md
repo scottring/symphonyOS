@@ -65,16 +65,19 @@ right). Phones keep their control row.
 one 14px sentence saying what goes here, at most one quiet action.
 Left-aligned in the column, not a centred icon poster.
 
-## 7. Header and footer bands
+## 7. Header band, no footer bar
 
 Added 2026-10-02 (Scott): the top bar is the page's header — the tree mark
 hanging in the left margin so the ☰ starts on the page edge (links to
-Today); the footer's left item hangs with it — on a paper wash 40% strong laid over
-the page colour or the fixed sky, edge to edge with a hairline under it.
-The desktop footer, which floats on the painted landscape, sits on a
-matching frosted band with ordinary page text, so it stays readable over a
-busy scene. The mark is `public/symphony-logo.png` (transparent, no ring);
-at night it is lifted a step so it does not sink into the dark band.
+Today), on a paper wash 40% strong laid over the page colour or the fixed
+sky, edge to edge with a hairline under it. The mark is
+`public/symphony-logo.png` (transparent, no ring); at night it is lifted a
+step so it does not sink into the dark band.
+
+There is no desktop footer bar: the painted landscape at the foot of the
+page stays clear. Keyboard shortcuts and Help live at the bottom of the ☰
+menu; Today's "Review today" closes the day's list on desktop (phones keep
+it in the ⋯ menu).
 
 ## Type scale
 

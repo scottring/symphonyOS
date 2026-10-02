@@ -5,6 +5,7 @@ import { ChevronDown, Inbox, Menu, Search, UserRound } from 'lucide-react'
 import { requestPlanFromPaper } from '@/lib/planFromPaperSignal'
 import { appRegistry } from '@/shell/appRegistry'
 import { MORE_GROUPS, isDestinationActive } from './moreDestinations'
+import { HelpDialogs } from './HelpDialogs'
 
 export const DesktopControlsContext = createContext<HTMLElement | null>(null)
 export function DesktopPageControls({ children }: { children: ReactNode }) {
@@ -26,6 +27,7 @@ export function DesktopNavigation({ inboxCount, discussionsUnread, onSearch, onS
   const navigate = useNavigate()
   const { pathname } = useLocation()
   const [open, setOpen] = useState<string | null>(null)
+  const [dialog, setDialog] = useState<{ kind: 'shortcuts' | 'help'; from: HTMLElement | null } | null>(null)
   const root = useRef<HTMLElement>(null)
   const trigger = useRef<HTMLButtonElement | null>(null)
   useEffect(() => { setOpen(null) }, [pathname])
@@ -77,6 +79,12 @@ export function DesktopNavigation({ inboxCount, discussionsUnread, onSearch, onS
         <button onClick={() => { setOpen(null); if (!requestPlanFromPaper()) navigate('/today') }}>Plan from paper</button>
         <span>Photograph a paper page into your plan</span>
       </div>
+      {/* Shortcuts and Help moved here from the footer (Scott, 2026-10-02),
+          so the landscape at the foot of the page stays clear. */}
+      <div className="page-navigation-more-help">
+        <button onClick={() => { setOpen(null); setDialog({ kind: 'shortcuts', from: trigger.current }) }}>Keyboard shortcuts</button>
+        <button onClick={() => { setOpen(null); setDialog({ kind: 'help', from: trigger.current }) }}>Help</button>
+      </div>
     </div>, destinations.some(([, route]) => isDestinationActive(route, pathname)),
       { ariaLabel: discussionsUnread > 0 ? `More, ${discussionsUnread} unread discussions` : 'More', chevron: false, className: 'is-hamburger' })}
     {leadRef && <div ref={leadRef} className="page-navigation-lead" />}
@@ -94,5 +102,6 @@ export function DesktopNavigation({ inboxCount, discussionsUnread, onSearch, onS
         {userName && <p>{userName}</p>}<button onClick={() => go('/settings')}>Settings</button><button onClick={() => { setOpen(null); onSignOut() }}>Sign out</button>
       </>, false, { chevron: false, className: 'is-account' })}
     </div>
+    <HelpDialogs open={dialog?.kind ?? null} onClose={() => setDialog(null)} returnFocus={dialog?.from} />
   </nav>
 }
