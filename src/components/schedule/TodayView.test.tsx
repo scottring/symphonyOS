@@ -760,6 +760,13 @@ describe('TodayView — desktop review closes the list (2026-10-02)', () => {
     host.remove()
   })
 
+  it('waits for the day to load before offering the review', () => {
+    mockUseMobile.mockReturnValue(false)
+    const { host } = renderInShell({ loading: true })
+    expect(screen.queryByRole('button', { name: 'Review today' })).not.toBeInTheDocument()
+    host.remove()
+  })
+
   it('offers no review on another day', () => {
     mockUseMobile.mockReturnValue(false)
     const yesterday = new Date(TODAY); yesterday.setDate(yesterday.getDate() - 1)

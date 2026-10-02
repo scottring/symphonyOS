@@ -2874,6 +2874,10 @@ div.chooser-action-group { overflow: visible !important; }
    above the dock it stands on. */
 .scenery-scroll { scroll-padding-bottom: calc(var(--scenery-clearance, 240px) + 16px); }
 .scenery-scroll .desktop-workspace-page { padding-bottom: var(--scenery-clearance, 240px); }
+/* A little room between the header and every page's heading (Scott,
+   2026-10-02). Tried: lowering short pages further by their leftover room —
+   Scott preferred the page staying put, so this is a fixed step. */
+.desktop-workspace-page { padding-top: 16px; }
 .scenery-end-clearance { height: var(--scenery-clearance, 120px); flex-shrink: 0; pointer-events: none; }
 /* The phone's capture bar floats on the painting too: the landscape's veil
    already hides the rows beneath it, so its paper fade would only draw a

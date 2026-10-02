@@ -1690,7 +1690,8 @@ export function TodayView({
             onReviewEmail={emailCaptures.length > 0 ? () => setEmailReviewOpen(true) : undefined}
           />
         )}
-        {reviewAtEnd && data.isToday && (
+        {/* Not under "Loading your day…": the review closes a list that is there. */}
+        {reviewAtEnd && data.isToday && !(loading && data.counts.totalItems === 0) && (
           <button type="button" className="today-review-close" onClick={() => setReviewMode('evening')} title="Reflect, prep for tomorrow, and close the day">
             <Moon className="w-4 h-4" aria-hidden="true" /> Review today
           </button>
