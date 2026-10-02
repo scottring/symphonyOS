@@ -128,7 +128,9 @@ export function ContextPicker({ value, onChange, size = 'md' }: ContextPickerPro
         onClick={(e) => { e.stopPropagation(); setIsOpen(!isOpen) }}
         className={`${padClass} rounded-lg transition-colors hover:bg-neutral-100 ${hasValue ? '' : 'tag-needs-context'}`}
         aria-label="Set context"
-        title={hasValue ? undefined : 'Untagged — tap to set Work / Family / Personal'}
+        // The tag names its life area on hover (walkthrough 2026-10-02: an
+        // unlabeled mark in task details).
+        title={selectedContext ? `Life area: ${selectedContext.label}` : hasValue ? undefined : 'Untagged — tap to set Work / Family / Personal'}
       >
         <svg
           className={`${iconClass} transition-colors`}

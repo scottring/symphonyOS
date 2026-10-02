@@ -41,6 +41,13 @@ describe('MultiAssigneeDropdown click containment', () => {
 })
 
 describe('MultiAssigneeDropdown from the keyboard and a screen reader', () => {
+  // Walkthrough 2026-10-02: a bare "DS" in task details said nothing.
+  it('without a row label, the initials still name who they are', () => {
+    render(<MultiAssigneeDropdown members={members} selectedIds={['m1']} onSelect={vi.fn()} />)
+    const trigger = screen.getByRole('button', { name: 'Assigned to Scott. Change people' })
+    expect(trigger).toHaveAttribute('title', 'Assigned to Scott')
+  })
+
   it('names the trigger for its row and says who is assigned', () => {
     render(<MultiAssigneeDropdown members={members} selectedIds={['m2']} onSelect={vi.fn()} triggerLabel="Assign people to Research" />)
     const trigger = screen.getByRole('button', { name: 'Assign people to Research. Assigned: Iris' })

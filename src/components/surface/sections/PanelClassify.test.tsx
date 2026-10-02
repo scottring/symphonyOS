@@ -50,9 +50,10 @@ describe('PanelClassify', () => {
         onAssigneesChange={vi.fn()}
       />,
     )
-    // MultiAssigneeDropdown trigger aria-label reports count of selected members
+    // The trigger names who is assigned, not a count (walkthrough
+    // 2026-10-02: the "DS" avatar in task details said nothing).
     expect(
-      screen.getByRole('button', { name: /1 assigned/i }),
-    ).toBeInTheDocument()
+      screen.getByRole('button', { name: /Assigned to Iris/ }),
+    ).toHaveAttribute('title', 'Assigned to Iris')
   })
 })

@@ -38,7 +38,9 @@ import { useContacts } from '@/hooks/useContacts';
 import { useProjects } from '@/hooks/useProjects';
 import { TaskTimingMenu } from '@/components/plan/TaskTimingMenu';
 import { MakeGoalControl } from '@/components/plan/MakeGoalControl';
-import { goalOfTask } from '@/lib/planning/goalSupport';
+import { PartOfGoalControl } from '@/components/plan/PartOfGoalControl';
+import { useDomain } from '@/hooks/useDomain';
+import { filterTasksForLayers } from '@/lib/today/domainFilter';
 import { useHouseholdSeasons } from '@/hooks/useHouseholdSeasons';
 import { weekStartAnchor, readCadenceConfig } from '@/lib/cadence/config';
 import { useGoogleCalendar, CalendarReconnectError, type GoogleCalendarInfo, type CalendarEvent } from '@/hooks/useGoogleCalendar';
@@ -204,7 +206,11 @@ function TaskPanelBody({ id }: { id: string }) {
   const { clearSelection } = useSelection();
   const navigate = useNavigate();
 
-  const { tasks, addTask, addSubtask, deleteTask, toggleTask, updateTask: rawUpdateTask, updateTasksBulk, pushTask, setBucket, setGoal, refetch } = useSupabaseTasks();
+  const { tasks, addTask, addSubtask, deleteTask, toggleTask, updateTask: rawUpdateTask, updateTasksBulk, pushTask, setBucket, setGoal, setGoalLink, refetch } = useSupabaseTasks();
+  // "Part of…" offers the goals in the life areas in view — the same lens
+  // every list applies (useDomain layers).
+  const { layers } = useDomain();
+  const goalCandidates = useMemo(() => filterTasksForLayers(tasks, layers), [tasks, layers]);
   const { contacts, addContact, searchContacts } = useContacts();
   // The "To buy" conversion the row's strip used to offer on Today. The task
   // is deleted when it moves (an item lives in one place), so the panel
@@ -279,26 +285,23 @@ function TaskPanelBody({ id }: { id: string }) {
       // onSaveNoteToVault intentionally omitted (vault integration removed)
       onToggleComplete={() => toggleTask(task.id)}
       // What the task is FOR, first — the connected-planning contract: details
-      // lead with the goal it serves, then its when. A task under no goal
-      // shows nothing rather than a prompt.
-      purpose={(() => {
-        const goal = goalOfTask(task, tasks, seasons);
-        // "Make it a goal" sits with what the task is FOR: it changes the
-        // same row into a goal, and says why when it cannot (Scott, 2026-09-25).
-        const toGoal = <MakeGoalControl task={task} tasks={tasks} setGoal={setGoal} />;
-        return goal ? (
-          <>
-            <p className="text-[13px] text-neutral-500">
-              <span className="text-neutral-400">For</span>{' '}
-              <button type="button" onClick={() => navigate(`/task/${goal.id}`)} className="text-left text-neutral-700 hover:underline">
-                {goal.title}
-              </button>
-              {goal.period && <span className="text-neutral-400"> · {goal.period}</span>}
-            </p>
-            {toGoal}
-          </>
-        ) : toGoal;
-      })()}
+      // lead with the goal it serves, then its when. "Part of…" says which
+      // goal and changes it (walkthrough 2026-10-02, #26); "Make it a goal"
+      // beside it changes the same row into a goal, and says why when it
+      // cannot (Scott, 2026-09-25).
+      purpose={task.isGoal ? undefined : (
+        <div className="flex flex-wrap items-start gap-x-4">
+          <PartOfGoalControl
+            task={task}
+            tasks={tasks}
+            choiceTasks={goalCandidates}
+            seasons={seasons}
+            setGoalLink={setGoalLink}
+            onOpenGoal={(gid) => navigate(`/task/${gid}`)}
+          />
+          <MakeGoalControl task={task} tasks={tasks} setGoal={setGoal} />
+        </div>
+      )}
       // A goal is not scheduled, so it gets no timing control.
       timingControl={task.isGoal ? undefined : (
         <TaskTimingMenu
