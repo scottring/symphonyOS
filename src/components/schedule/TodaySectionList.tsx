@@ -111,6 +111,8 @@ export interface TodaySectionListProps {
    *  so this list stays presentational; Day is an execution view of the same
    *  work, so it must be the same control the period pages use. */
   timingFor?: (task: Task) => React.ReactNode
+  /** What a task row serves (ServesLine), drawn at rest under its title. */
+  servesFor?: (task: Task) => React.ReactNode
   shareNudgeByEventId: Map<string, { eventId: string; context: string }>
   parserContext: ParserContext
   insert: ReturnType<typeof useTimelineInsert>
@@ -165,6 +167,7 @@ export function TodaySectionList({
   onToggleBulkSelect,
   tasksMap,
   timingFor,
+  servesFor,
   shareNudgeByEventId,
   parserContext,
   insert,
@@ -554,6 +557,11 @@ export function TodaySectionList({
                       belowTitleAccessory={
                         item.type === 'task' && taskId && timingFor
                           ? (() => { const t = tasksMap.get(taskId); return t ? timingFor(t) : undefined })()
+                          : undefined
+                      }
+                      servesLine={
+                        item.type === 'task' && taskId && servesFor
+                          ? (() => { const t = tasksMap.get(taskId); return t ? servesFor(t) : undefined })()
                           : undefined
                       }
                       spineAbove={spineSegments?.above}
