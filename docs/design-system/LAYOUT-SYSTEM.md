@@ -84,6 +84,9 @@ Agreed with Scott 2026-10-02.
   (a container query, so an open side pane counts); below that the mark
   stands alone. The mark is `public/symphony-logo.png` (transparent, no
   ring), lifted a step at night so it does not sink into the dark band.
+- **Room under the header.** Every desktop page starts 16px below the band
+  (`.desktop-workspace-page` padding). It is fixed: a short page is not
+  pushed further down (tried and declined, 2026-10-02).
 - **No footer bar.** The painted landscape at the foot of the page stays
   clear. Keyboard shortcuts and Help live at the bottom of the ☰ menu;
   Today's "Review today" closes the day's list on desktop (phones keep it
