@@ -62,6 +62,24 @@ describe('landmarksIn', () => {
     const a = { title: 'No school', start_time: '2026-09-21', all_day: true }
     expect(landmarksIn([ev(a), ev(a)], SEP, OCT)).toHaveLength(1)
   })
+  it('leaves out the school specials rotation — a daily reminder, not a date', () => {
+    const out = landmarksIn([
+      ev({ title: 'Specials — Ella: PE · Kaleb: Music', start_time: '2026-10-01', end_time: '2026-10-02', all_day: true }),
+      ev({ title: 'Specials: Ella: Art · Kaleb: PE', start_time: '2026-10-02', end_time: '2026-10-03', all_day: true }),
+      ev({ title: 'No School', start_time: '2026-10-16', end_time: '2026-10-17', all_day: true }),
+      ev({ title: 'Special Olympics', start_time: '2026-10-17', end_time: '2026-10-18', all_day: true }),
+    ], OCT, NOV)
+    expect(out.map((l) => l.title)).toEqual(['No School', 'Special Olympics'])
+  })
+  it('leaves out an all-day series that repeats weekly or more often; keeps a monthly one', () => {
+    const day = (ymd: string, title: string, series: string) => ev({ title, start_time: ymd, all_day: true, recurring_event_id: series })
+    const out = landmarksIn([
+      day('2026-10-06', 'Trash day', 'trash'), day('2026-10-13', 'Trash day', 'trash'), day('2026-10-20', 'Trash day', 'trash'),
+      day('2026-10-10', 'Tuition due', 'tuition'), day('2026-11-10', 'Tuition due', 'tuition'),
+      day('2026-10-22', 'Mom’s birthday', 'bday'),
+    ], OCT, new Date(2026, 11, 1))
+    expect(out.map((l) => l.title)).toEqual(['Tuition due', 'Mom’s birthday', 'Tuition due'])
+  })
 })
 
 describe('planV2Enabled', () => {
