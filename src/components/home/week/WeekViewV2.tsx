@@ -59,6 +59,8 @@ import { localYmd } from '@/lib/cadence/config'
 import { publishViewedWeek } from '@/lib/viewedWeekSignal'
 import { useMediaQuery } from '@/hooks/useMediaQuery'
 import type { AssigneeFilter } from '@/lib/today/types'
+import { makeAssigneeFilter } from '@/lib/today/assigneeFilter'
+import { PeopleFilter } from '@/components/plan/v2/PeopleFilter'
 import type { Layer } from '@/lib/domains'
 import { WeekPlanHost } from './WeekPlanHost'
 import { WeekV2 } from '@/components/plan/v2/WeekV2'
@@ -394,14 +396,21 @@ export function WeekViewV2(props: WeekViewV2Props) {
 
   const inWeek = (d: Date) => d >= weekStart && d < weekEnd
 
+  // What the days draw, narrowed by the people filter (the toolbar's, shared
+  // with Today). `tasks` stays whole for lookups — a drag, a goal's title.
+  const drawnTasks = useMemo(() => {
+    const match = makeAssigneeFilter(selectedAssignees)
+    return tasks.filter((t) => match(t.assignedTo, t.assignedToAll))
+  }, [tasks, selectedAssignees])
+
   // Tasks that have a specific start time AND fall at/after the grid's first
   // hour go into the time grid. Anything earlier is too early to place without
   // being clamped onto FIRST_HOUR — it renders in the all-day lane's Earlier
   // row instead (see earlyTasksByDay).
   const scheduledTasks = useMemo(
-    () => tasks.filter((t) => t.scheduledFor && inWeek(t.scheduledFor) && !t.isAllDay && !isEarlyTask(t.scheduledFor)),
+    () => drawnTasks.filter((t) => t.scheduledFor && inWeek(t.scheduledFor) && !t.isAllDay && !isEarlyTask(t.scheduledFor)),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [tasks, weekStart],
+    [drawnTasks, weekStart],
   )
 
   // All-day tasks, grouped by day so each renders in the grid's all-day row
@@ -409,7 +418,7 @@ export function WeekViewV2(props: WeekViewV2Props) {
   // elsewhere (Today, detail panel) removes its chip here.
   const allDayByDay = useMemo(() => {
     const map = new Map<string, Task[]>()
-    for (const t of tasks) {
+    for (const t of drawnTasks) {
       if (!t.scheduledFor || !t.isAllDay || t.completed) continue
       if (!inWeek(t.scheduledFor)) continue
       const key = dayKey(t.scheduledFor)
@@ -419,12 +428,12 @@ export function WeekViewV2(props: WeekViewV2Props) {
     }
     return map
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tasks, weekStart])
+  }, [drawnTasks, weekStart])
 
   // Timed tasks too early for the grid ("Earlier" row) — see scheduledTasks.
   const earlyTasksByDay = useMemo(() => {
     const map = new Map<string, Task[]>()
-    for (const t of tasks) {
+    for (const t of drawnTasks) {
       if (!t.scheduledFor || t.isAllDay || t.completed) continue
       if (!inWeek(t.scheduledFor)) continue
       if (!isEarlyTask(t.scheduledFor)) continue
@@ -435,7 +444,7 @@ export function WeekViewV2(props: WeekViewV2Props) {
     }
     return map
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tasks, weekStart])
+  }, [drawnTasks, weekStart])
 
   // In-week calendar events, split into timed (grid material) and all-day
   // (all-day lane). A holiday used to reach the timed grid and get clamped to
@@ -632,7 +641,7 @@ export function WeekViewV2(props: WeekViewV2Props) {
     // to, or the day they were CHOSEN for (a week-list task chosen for
     // Thursday keeps its list but is Thursday's work).
     const seen = new Set<string>()
-    for (const t of tasks) {
+    for (const t of drawnTasks) {
       const entry = (time?: Date): JournalEntry => ({
         id: `task-${t.id}`, kind: 'task', time, title: t.title, subtitle: labelFor(t), completed: t.completed, task: t,
       })
@@ -699,7 +708,7 @@ export function WeekViewV2(props: WeekViewV2Props) {
       d.entries = [...t, ...u]
     }
     return days
-  }, [tasks, userId, events, eventItems, extras, routineItems, weekInstances, weekStart, dayCount, labelFor])
+  }, [drawnTasks, userId, events, eventItems, extras, routineItems, weekInstances, weekStart, dayCount, labelFor])
 
   /**
    * How much is already on each day of the week being VIEWED, for the timing
@@ -1025,6 +1034,7 @@ export function WeekViewV2(props: WeekViewV2Props) {
       <div className={planV2Enabled() ? '' : 'mr-auto'}><WeekModeSwitch mode={mode} onChange={props.onModeChange ?? setOwnMode} /></div>
     )}
     <RoutinesToggle hidden={hideRoutines} onToggle={() => writeHideRoutines(!hideRoutines)} />
+    <PeopleFilter />
   </>
   // v2 draws these in its one toolbar, not on a row of their own.
   const v2Page = planV2Enabled() && (narrow || !showSchedule)

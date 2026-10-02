@@ -38,6 +38,8 @@ import { ViewSwitch } from './ViewSwitch'
 import { WeekListV2 } from './WeekListV2'
 import { WeekRefShelves } from './RefShelves'
 import { useAddArea } from './AddArea'
+import { useAssigneeFilter } from '@/hooks/useAssigneeFilter'
+import { planPeopleLens } from '@/lib/planning/peopleLens'
 import { makePlanActions, timingRemoval } from '@/lib/planning/planActions'
 import { useActionableInstances } from '@/hooks/useActionableInstances'
 import type { TaskContext } from '@/types/task'
@@ -95,7 +97,11 @@ export function WeekV2({ tasks, weekStart, meId, isCurrent, days, onSelectTask, 
     return { start, name, rows }
   }), [tasks, weekStart, monthStart, isCurrent, meId])
   const monthName = refMonths.map((m) => m.name).join(' and ')
-  const weekTasks = useMemo(() => weekListTasks(tasks, weekStart, meId, { isCurrent }), [tasks, weekStart, meId, isCurrent])
+  // The people filter (in the week's tools) narrows the week's list; the
+  // month beside it and last week's look-back keep their own scope.
+  const [people] = useAssigneeFilter()
+  const lens = useMemo(() => planPeopleLens(people, meId), [people, meId])
+  const weekTasks = useMemo(() => weekListTasks(tasks, weekStart, lens.scopeId, { isCurrent }).filter(lens.keep), [tasks, weekStart, lens, isCurrent])
   const nextWeek = useMemo(() => new Date(weekStart.getTime() + 7 * DAY), [weekStart])
   const prevWeek = useMemo(() => new Date(weekStart.getTime() - 7 * DAY), [weekStart])
   const prevTasks = useMemo(() => weekListTasks(tasks, prevWeek, meId, { isCurrent: false }), [tasks, prevWeek, meId])

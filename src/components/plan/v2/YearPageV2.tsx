@@ -31,6 +31,9 @@ import { readSeasons } from '@/lib/cadence/seasons'
 import { FromPaper } from './FromPaper'
 import { ViewSwitch } from './ViewSwitch'
 import { useAddArea } from './AddArea'
+import { PeopleFilter } from './PeopleFilter'
+import { useAssigneeFilter } from '@/hooks/useAssigneeFilter'
+import { planPeopleLens } from '@/lib/planning/peopleLens'
 
 
 /** A goal row in the task shape the shared line and card draw. */
@@ -59,6 +62,10 @@ function Inner() {
 
   const layered = useMemo(() => filterTasksForLayers(tasks, layers), [tasks, layers])
   const visible = useCallback((g: Goal) => matchesLayers(g.context, layers), [layers])
+  // The people filter narrows the year drawn here; last year's look-back
+  // keeps every goal, so a review never skips one.
+  const [people] = useAssigneeFilter()
+  const lens = useMemo(() => planPeopleLens(people, null), [people])
   const toVM = useCallback((g: Goal): LineVM => {
     const carried = goals.some((x) => x.carriedFrom === g.id)
     const fate = g.status === 'completed' ? 'done' : g.status === 'archived' ? 'dropped' : carried ? 'carried' : 'open'
@@ -66,7 +73,7 @@ function Inner() {
       .map((t) => ({ id: t.id, title: t.title, done: !!t.completed, where: t.seasonStart ? t.seasonStart.toLocaleDateString('en-US', { month: 'short' }) + ' season' : null }))
     return { task: asLine(g), fate, partOf: null, where: null, steps: seasonWork }
   }, [goals, layered])
-  const lines = useMemo(() => goals.filter((g) => g.year === year && visible(g)).map(toVM), [goals, year, visible, toVM])
+  const lines = useMemo(() => goals.filter((g) => g.year === year && visible(g) && lens.keep(g)).map(toVM), [goals, year, visible, lens, toVM])
   const prevLines = useMemo(() => goals.filter((g) => g.year === year - 1 && visible(g)).map(toVM), [goals, year, visible, toVM])
 
   const session = usePlanningSession('annual', yearToken(year))
@@ -156,7 +163,7 @@ function Inner() {
   const viewSwitch = <ViewSwitch view={view} onChange={setView} withRef={false} />
   const toolbar: PlanToolbarProps = {
     period: String(year), saved: session.saved, loading: session.loading, error: !!session.error, agreedBy,
-    reviewDue, onPlan: startMeeting, onRetry: session.reload, viewSwitch,
+    reviewDue, onPlan: startMeeting, onRetry: session.reload, viewSwitch, tools: <PeopleFilter />,
     justSaved: justSaved && {
       detail: justSaved.detail,
       next: { label: nextStep.label, onClick: () => { writePlanView('season', 'ref'); navigate(nextStep.to) } },

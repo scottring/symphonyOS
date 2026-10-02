@@ -49,6 +49,9 @@ import { FromPaper } from './FromPaper'
 import { ViewSwitch } from './ViewSwitch'
 import { PeriodRefRoutines } from './RefShelves'
 import { useAddArea } from './AddArea'
+import { PeopleFilter } from './PeopleFilter'
+import { useAssigneeFilter } from '@/hooks/useAssigneeFilter'
+import { planPeopleLens } from '@/lib/planning/peopleLens'
 import { makePlanActions, timingRemoval } from '@/lib/planning/planActions'
 import { useActionableInstances } from '@/hooks/useActionableInstances'
 import { goalToTaskConversion } from '@/lib/planning/goalConversion'
@@ -78,6 +81,8 @@ function Inner({ level }: { level: Level }) {
   const { layers, soleDomain } = useDomain()
   const { members, getCurrentUserMember } = useFamilyMembers()
   const meId = getCurrentUserMember()?.id ?? null
+  const [people] = useAssigneeFilter()
+  const lens = useMemo(() => planPeopleLens(people, meId), [people, meId])
   const { seasons } = useHouseholdSeasons()
   const { goals } = useGoalsContext()
   const selection = useSelectionOptional()
@@ -133,12 +138,14 @@ function Inner({ level }: { level: Level }) {
     return { task: t, fate, partOf: partOf(t), where, steps }
   }, [level, partOf, layered])
 
+  // The people filter narrows the plan drawn here; the look-back below and
+  // the level above (reference) keep their own scope, as Today's pools do.
   const lines = useMemo(() => {
-    const listed = selectPeriodTasks(layered, level, bounds.start, isCurrent, meId, seasons)
+    const listed = selectPeriodTasks(layered, level, bounds.start, isCurrent, lens.scopeId, seasons)
     const ids = new Set(listed.map((t) => t.id))
     const gone = endedIn(layered, level, bounds.start, bounds.end).filter((t) => !ids.has(t.id))
-    return [...listed, ...gone].map((t) => toVM(t, bounds))
-  }, [layered, level, bounds, isCurrent, meId, seasons, toVM])
+    return [...listed, ...gone].filter(lens.keep).map((t) => toVM(t, bounds))
+  }, [layered, level, bounds, isCurrent, lens, seasons, toVM])
   const prevLines = useMemo(() => (
     selectPeriodTasks(layered, level, prevBounds.start, isCurrentPeriod(prevBounds, today), meId, seasons).map((t) => toVM(t, prevBounds))
   ), [layered, level, prevBounds, today, meId, seasons, toVM])
@@ -526,7 +533,7 @@ function Inner({ level }: { level: Level }) {
   const viewSwitch = <ViewSwitch view={view} onChange={setView} aboveName={aboveName} />
   const toolbar: PlanToolbarProps = {
     period: name, saved: session.saved, loading: session.loading, error: !!session.error, agreedBy,
-    reviewDue, onPlan: startMeeting, onRetry: session.reload, viewSwitch,
+    reviewDue, onPlan: startMeeting, onRetry: session.reload, viewSwitch, tools: <PeopleFilter />,
     justSaved: justSaved && {
       detail: justSaved.detail,
       // The next page opens with this one's level above beside it.
