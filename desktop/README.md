@@ -17,8 +17,8 @@ launch — never bundle the frontend here.
 
 - **⌘⇧Space** anywhere → floating quick-capture palette (adds to Inbox;
   Enter submits, Esc or click-away dismisses)
-- Native menu bar: **⌘N** new task, **⌘1–4** Today / Inbox / Projects /
-  Routines, real Edit menu (⌘C/⌘V work)
+- Native menu bar: **⌘N** new task, **⌘1–7** Today / Week / Month / Season /
+  Year / Inbox / Routines, real Edit menu (⌘C/⌘V work)
 - Menu-bar extra: today's remaining count + task list, live via Supabase
   realtime → web bridge → tray
 - Launch at Login (Symphony menu), close-to-hide, Dock reopen

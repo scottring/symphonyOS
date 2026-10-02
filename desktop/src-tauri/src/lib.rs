@@ -192,10 +192,15 @@ const PRINT_BRIDGE_JS: &str = r#"
 })();
 "#;
 
-const NAV_EVENTS: [(&str, &str); 4] = [
+// The horizon rail (Today → Year) is the app's main navigation; Inbox and
+// Routines follow it. Each id maps to a view the page resolves to a route.
+const NAV_EVENTS: [(&str, &str); 7] = [
     ("nav-today", "today"),
+    ("nav-week", "week"),
+    ("nav-month", "month"),
+    ("nav-season", "season"),
+    ("nav-year", "year"),
     ("nav-inbox", "inbox"),
-    ("nav-projects", "projects"),
     ("nav-routines", "routines"),
 ];
 
@@ -358,13 +363,19 @@ fn build_menu(app: &AppHandle, autostart_enabled: bool) -> tauri::Result<Menu<ta
     let mut view_menu = SubmenuBuilder::new(app, "View");
     for (i, (id, label)) in [
         ("nav-today", "Today"),
+        ("nav-week", "Week"),
+        ("nav-month", "Month"),
+        ("nav-season", "Season"),
+        ("nav-year", "Year"),
         ("nav-inbox", "Inbox"),
-        ("nav-projects", "Projects"),
         ("nav-routines", "Routines"),
     ]
     .iter()
     .enumerate()
     {
+        if i == 5 {
+            view_menu = view_menu.separator();
+        }
         view_menu = view_menu.item(
             &MenuItemBuilder::with_id(*id, *label)
                 .accelerator(format!("Cmd+{}", i + 1))
