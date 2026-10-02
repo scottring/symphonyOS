@@ -68,7 +68,8 @@ Left-aligned in the column, not a centred icon poster.
 ## 7. Header and footer bands
 
 Added 2026-10-02 (Scott): the top bar is the page's header — the tree mark
-at its left corner (links to Today), on a paper wash 40% strong laid over
+hanging in the left margin so the ☰ starts on the page edge (links to
+Today); the footer's left item hangs with it — on a paper wash 40% strong laid over
 the page colour or the fixed sky, edge to edge with a hairline under it.
 The desktop footer, which floats on the painted landscape, sits on a
 matching frosted band with ordinary page text, so it stays readable over a
