@@ -92,6 +92,23 @@ Agreed with Scott 2026-10-02.
   Today's "Review today" closes the day's list on desktop (phones keep it
   in the ⋯ menu).
 
+## 8. Columns scroll on their own
+
+Agreed with Scott 2026-10-02 (Week page).
+
+- **Side by side, each column scrolls.** On the Week page the days, the
+  week's list and the month reference each fill the room from the column
+  headings down to the landscape and scroll independently; the page itself
+  does not scroll. `useColumnsFitWindow` measures that room into
+  `--pv2-col-h` (window height − grid top − `--scenery-clearance`, at least
+  360px).
+- **Headings hold the top.** Each column's heading pins at its top. In the
+  reference column every section heading (each month, "Earlier, not done",
+  routines) holds until its own list ends, then the next pushes it off.
+  Pinned headings wear the page's own background (the fixed sky).
+- **Stacked columns keep one page scroll** (below 861px; the month column
+  joins in from 1061px, when it stands beside the others).
+
 ## Type scale
 
 | Token | Size | Use |

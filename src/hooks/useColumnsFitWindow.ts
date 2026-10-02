@@ -31,7 +31,7 @@ export function useColumnsFitWindow(grid: RefObject<HTMLElement | null>, enabled
     const measure = () => {
       if (!wide.matches || !scroller) { el.style.removeProperty('--pv2-col-h'); return }
       const top = el.getBoundingClientRect().top - scroller.getBoundingClientRect().top + scroller.scrollTop
-      const clearance = parseFloat(getComputedStyle(el).getPropertyValue('--scenery-clearance')) || 0
+      const clearance = parseFloat(getComputedStyle(scroller).getPropertyValue('--scenery-clearance')) || 0
       const room = scroller.clientHeight - top - clearance - GAP
       el.style.setProperty('--pv2-col-h', `${Math.max(MIN_HEIGHT, Math.round(room))}px`)
     }
