@@ -56,7 +56,7 @@ export function DesktopFooter({ actionRef }: { actionRef: (node: HTMLDivElement 
       <div ref={actionRef} className="desktop-footer-action" />
       {/* The one place the brand appears in the app: a quiet signature. */}
       <div className="desktop-footer-signature">
-        <span className="desktop-footer-logo"><img src="/symphony-logo.jpg" alt="" /></span>
+        <span className="desktop-footer-logo"><img src="/symphony-logo.png" alt="" /></span>
         <span>Symphony</span>
       </div>
       <div className="desktop-footer-links">

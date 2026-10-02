@@ -65,6 +65,16 @@ right). Phones keep their control row.
 one 14px sentence saying what goes here, at most one quiet action.
 Left-aligned in the column, not a centred icon poster.
 
+## 7. Header and footer bands
+
+Added 2026-10-02 (Scott): the top bar is the page's header — the tree mark
+at its left corner (links to Today), on a paper wash 40% strong laid over
+the page colour or the fixed sky, edge to edge with a hairline under it.
+The desktop footer, which floats on the painted landscape, sits on a
+matching frosted band with ordinary page text, so it stays readable over a
+busy scene. The mark is `public/symphony-logo.png` (transparent, no ring);
+at night it is lifted a step so it does not sink into the dark band.
+
 ## Type scale
 
 | Token | Size | Use |

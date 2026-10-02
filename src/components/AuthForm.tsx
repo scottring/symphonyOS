@@ -79,9 +79,9 @@ export function AuthForm({ message }: AuthFormProps = {}) {
         <div className="text-center mb-8">
           <div className="flex items-center justify-center gap-3 mb-2">
             <img
-              src="/symphony-logo.jpg"
+              src="/symphony-logo.png"
               alt="Symphony Logo"
-              className="w-12 h-12 rounded-full object-cover"
+              className="w-12 h-12"
             />
             <h1 className="font-display text-3xl text-neutral-900">
               Symphony
