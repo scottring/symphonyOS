@@ -374,3 +374,8 @@ p.wk-dayhint { margin: 8px 0 0; }
    reach a header whose first word is a label (Sometime this weekend). */
 .pv2-days [data-testid="week-journal"] .wk-dayhead > .wk-dayname { font: 500 11px var(--font-family-sans); letter-spacing: .1em; }
 .wk-glyph.is-event, .wk-glyph.is-line { height: 1px; }
+/* Fixed points (a planning step) leaves "Sometime" out: the weekend's two
+   days share the band rather than leave an empty third. */
+@media (min-width: 861px) {
+  .wk-weekend-cells:not(:has(.wk-sometime)) { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}

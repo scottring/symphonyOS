@@ -330,7 +330,7 @@ export function WeekV2({ tasks, weekStart, meId, isCurrent, days, renderDays, on
         // full width — what this step is about, and nothing else.
         <div className="wk-page">
           <section className="pv2-days wk-days" aria-label="The days">
-            <div className="pv2-colh">{meeting.step === 'fixed' ? 'What can’t move this week' : `Week ${weekNo}, planned`}</div>
+            <div className="pv2-colh">{meeting.step === 'fixed' ? 'What can’t move this week' : `Week ${weekNo} at a glance`}</div>
             {daysFor(meeting.step === 'fixed' ? { show: 'fixed' } : { readOnly: true })}
           </section>
         </div>
