@@ -77,7 +77,7 @@ describe('TapRoutinePanel', () => {
       <TapRoutinePanel routine={routine} onClose={vi.fn()} onNotesChange={vi.fn()} onContextChange={vi.fn()}
         onVisibilityChange={vi.fn()} onShowOnTodayChange={onShowOnTodayChange} />,
     )
-    const sw = screen.getByRole('switch', { name: /^on today$/i })
+    const sw = screen.getByRole('switch', { name: /^show in today and planning$/i })
     expect(sw).toHaveAttribute('aria-checked', 'true')
     fireEvent.click(sw)
     expect(onShowOnTodayChange).toHaveBeenCalledWith(false)
@@ -88,8 +88,11 @@ describe('TapRoutinePanel', () => {
       <TapRoutinePanel routine={{ ...routine, show_on_timeline: false }} onClose={vi.fn()} onNotesChange={vi.fn()}
         onContextChange={vi.fn()} onVisibilityChange={vi.fn()} onShowOnTodayChange={vi.fn()} />,
     )
-    expect(screen.getByRole('switch', { name: /^on today$/i })).toHaveAttribute('aria-checked', 'false')
+    expect(screen.getByRole('switch', { name: /^show in today and planning$/i })).toHaveAttribute('aria-checked', 'false')
     expect(screen.getByText(/still on the kitchen wall/i)).toBeInTheDocument()
+    // Says where to find it again (Scott, 2026-10-03).
+    expect(screen.getByText('Hidden from Today and planning')).toBeInTheDocument()
+    expect(screen.getByText(/Routines page/)).toBeInTheDocument()
   })
 
   it('On Today says what it will actually do: at its time, on its day, or offered to choose', () => {
@@ -114,7 +117,7 @@ describe('TapRoutinePanel', () => {
       <TapRoutinePanel routine={{ ...routine, visibility: 'reference' }} onClose={vi.fn()} onNotesChange={vi.fn()}
         onContextChange={vi.fn()} onVisibilityChange={vi.fn()} onShowOnTodayChange={vi.fn()} />,
     )
-    expect(screen.queryByRole('switch', { name: /^on today$/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('switch', { name: /^show in today and planning$/i })).not.toBeInTheDocument()
   })
 
   it('renders the assignee picker when members + onAssignChange are provided', () => {

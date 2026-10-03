@@ -78,6 +78,18 @@ describe('RoutineRow', () => {
     expect(screen.getByText('Scott, Iris')).toBeInTheDocument()
   })
 
+  // Scott, 2026-10-03: a routine hidden from Today and planning in its
+  // panel is found again here.
+  it('marks a routine hidden from Today and planning, and only that one', () => {
+    const { rerender } = render(<RoutineRow routine={mk({ name: 'Yard weeding', show_on_timeline: false })} familyMembers={[]} onOpen={vi.fn()} />)
+    expect(screen.getByText('Hidden from Today and planning')).toBeInTheDocument()
+    rerender(<RoutineRow routine={mk({ name: 'Yard weeding', show_on_timeline: true })} familyMembers={[]} onOpen={vi.fn()} />)
+    expect(screen.queryByText('Hidden from Today and planning')).not.toBeInTheDocument()
+    // Resting is its own state, said elsewhere on the page.
+    rerender(<RoutineRow routine={mk({ name: 'Yard weeding', show_on_timeline: false, visibility: 'reference' })} familyMembers={[]} onOpen={vi.fn()} />)
+    expect(screen.queryByText('Hidden from Today and planning')).not.toBeInTheDocument()
+  })
+
   it('expands in place to state the pattern in full', () => {
     render(
       <RoutineRow

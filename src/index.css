@@ -2867,6 +2867,14 @@ div.chooser-action-group { overflow: visible !important; }
   mask-composite: intersect;
 }
 .place-scenery-catch { position: absolute; left: 0; right: 0; bottom: 0; pointer-events: auto; }
+/* A short desktop window (PlaceScenery's FAINT_SCENERY_QUERY): the scene
+   stands faint BEHIND the page, so content runs to the bottom of the window
+   and every row there can be clicked. The sky's own layer isolates, so the
+   scene paints over the sky and under the page. */
+.scenery-sky:has(.place-scenery.is-faint) { isolation: isolate; }
+.place-scenery.is-faint { z-index: -1; opacity: .1; }
+.place-scenery.is-faint .place-scenery-veil { display: none; }
+.place-scenery.is-faint .place-scenery-catch { pointer-events: none; }
 
 /* Room at the end of the page so every last row can be scrolled clear of the
    landscape (--scenery-clearance: the landscape's measured height, written by

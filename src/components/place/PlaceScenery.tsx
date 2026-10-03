@@ -4,6 +4,7 @@ import { usePlaceOrDefault } from '@/hooks/usePlace'
 import { sceneryArt } from './panoramas'
 import { useSceneryPreferences } from '@/hooks/useSceneryPreferences'
 import { keepFocusAboveScenery } from './sceneryFocus'
+import { useMediaQuery } from '@/hooks/useMediaQuery'
 
 /** The place's landscape, standing along the bottom of the window in front of
  * the page (index.css, IMMERSIVE SCENERY). The sky itself is the shell's
@@ -19,6 +20,13 @@ import { keepFocusAboveScenery } from './sceneryFocus'
  * matters: the woodblock veils fade over the same share of their width. */
 const VEIL_FADE = 64
 const ART_WIDTH = 1506
+/** A short desktop window (a laptop): the landscape took a quarter of the
+ * height, so planning ran out of room (Scott, 2026-10-03: "an automatic
+ * high-transparency view on a smaller screen, so that the content goes all
+ * the way to the bottom"). There it stands faint BEHIND the page, takes no
+ * pointer and holds back only a small margin. Phones keep the full scene. */
+export const FAINT_SCENERY_QUERY = '(min-width: 768px) and (max-height: 1000px)'
+const FAINT_CLEARANCE = 16
 
 export function PlaceScenery({ scroller, right = 0, floor }: {
   scroller: HTMLElement | null
@@ -33,6 +41,7 @@ export function PlaceScenery({ scroller, right = 0, floor }: {
   // How much of the window's bottom the scene conceals (over the text
   // column), kept outside React state: it follows the window's width.
   const height = useRef(0)
+  const faint = useMediaQuery(FAINT_SCENERY_QUERY)
 
   useEffect(() => {
     const el = box.current
@@ -40,7 +49,7 @@ export function PlaceScenery({ scroller, right = 0, floor }: {
     if (!el || !below || !scroller || !showScenery) return
     const write = () => {
       const width = el.getBoundingClientRect().width
-      height.current = below.getBoundingClientRect().height + VEIL_FADE * width / ART_WIDTH
+      height.current = faint ? FAINT_CLEARANCE : below.getBoundingClientRect().height + VEIL_FADE * width / ART_WIDTH
       scroller.style.setProperty('--scenery-clearance', `${Math.round(height.current)}px`)
     }
     write()
@@ -50,7 +59,7 @@ export function PlaceScenery({ scroller, right = 0, floor }: {
       observer?.disconnect()
       scroller.style.removeProperty('--scenery-clearance')
     }
-  }, [scroller, showScenery, art])
+  }, [scroller, showScenery, art, faint])
 
   useEffect(() => {
     if (!scroller || !showScenery) return
@@ -106,7 +115,7 @@ export function PlaceScenery({ scroller, right = 0, floor }: {
     ...(floor ? { '--scenery-floor': floor } : {}),
   } as CSSProperties
   return (
-    <div ref={box} aria-hidden="true" className="place-scenery" data-place-scenery={place} data-lighting={sceneryLighting} data-style={sceneryStyle} style={css}>
+    <div ref={box} aria-hidden="true" className={`place-scenery${faint ? ' is-faint' : ''}`} data-place-scenery={place} data-lighting={sceneryLighting} data-style={sceneryStyle} style={css}>
       <div className="place-scenery-veil" />
       <img className="place-scenery-panorama" src={art.src} alt="" decoding="async" draggable={false} />
       <div className="place-scenery-haze" />

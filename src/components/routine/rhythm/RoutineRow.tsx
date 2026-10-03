@@ -9,7 +9,7 @@
 // A row expands in place to say its pattern in full, which is the one thing a
 // list loses next to a canvas.
 
-import { ChevronRight, ChevronDown } from 'lucide-react'
+import { ChevronRight, ChevronDown, EyeOff } from 'lucide-react'
 import { useState } from 'react'
 import type { Routine } from '@/types/actionable'
 import type { FamilyMember } from '@/types/family'
@@ -122,6 +122,9 @@ export function RoutineRow({ routine, familyMembers, steps = 0, dimmed = false, 
 }) {
   const [expanded, setExpanded] = useState(false)
   const { lane, when: whenText } = laneAndMeta(routine, when)
+  // Hidden from Today and planning in its panel: this page is where it can
+  // be found again (Scott, 2026-10-03).
+  const hidden = routine.show_on_timeline === false && routine.visibility === 'active'
   const owners = memberIdsOf(routine)
     .map((id) => familyMembers.find((m) => m.id === id)?.name)
     .filter((name): name is string => !!name)
@@ -143,11 +146,17 @@ export function RoutineRow({ routine, familyMembers, steps = 0, dimmed = false, 
           {routine.name}
           {steps > 0 && <span className="text-[12px] text-neutral-500"> · {steps} steps</span>}
         </button>
-        {(whenText || owners.length > 0) && (
+        {(whenText || owners.length > 0 || hidden) && (
           <p className={`${LIST_ROW_META} whitespace-normal`}>
             {whenText && <span>{whenText}</span>}
             {whenText && owners.length > 0 && <span aria-hidden="true"> · </span>}
             {owners.length > 0 && <span>{owners.join(', ')}</span>}
+            {hidden && (whenText || owners.length > 0) && <span aria-hidden="true"> · </span>}
+            {hidden && (
+              <span className="inline-flex items-center gap-1 align-[-1px]">
+                <EyeOff className="h-3 w-3" aria-hidden="true" />Hidden from Today and planning
+              </span>
+            )}
           </p>
         )}
 
