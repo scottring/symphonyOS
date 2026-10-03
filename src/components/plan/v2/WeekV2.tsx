@@ -50,7 +50,14 @@ import type { TaskContext } from '@/types/task'
 
 const DAY = 86_400_000
 
-export function WeekV2({ tasks, weekStart, meId, isCurrent, days, onSelectTask, timingControl, dragEnabled = true, tools }: {
+/** What the days are asked to show at each planning step (WeekJournal). */
+export interface DaysOptions { show?: 'all' | 'fixed'; routinesOpen?: boolean; readOnly?: boolean }
+/** The week's planning session, in steps (Scott, 2026-10-03: "more
+ *  obviously sequential"): look back, the fixed points, fill the week, the
+ *  finished plan. */
+type WeekStep = 'lookback' | 'fixed' | 'fill' | 'plan'
+
+export function WeekV2({ tasks, weekStart, meId, isCurrent, days, renderDays, onSelectTask, timingControl, dragEnabled = true, tools }: {
   /** Layer-filtered tasks, as the week receives them. */
   tasks: Task[]
   weekStart: Date
@@ -66,8 +73,10 @@ export function WeekV2({ tasks, weekStart, meId, isCurrent, days, onSelectTask, 
   dragEnabled?: boolean
   /** The week's display toggles (Routines), drawn in this toolbar. */
   tools?: ReactNode
-  /** The journal of days, as WeekViewV2 builds it. */
-  days: ReactNode
+  /** The journal of days, as WeekViewV2 builds it (a fixed node — tests). */
+  days?: ReactNode
+  /** The days, asked for what a planning step needs. Preferred over `days`. */
+  renderDays?: (opts: DaysOptions) => ReactNode
   onSelectTask: (id: string) => void
 }) {
   const navigate = useNavigate()
@@ -118,7 +127,8 @@ export function WeekV2({ tasks, weekStart, meId, isCurrent, days, onSelectTask, 
   const nextWeek = useMemo(() => new Date(weekStart.getTime() + 7 * DAY), [weekStart])
   const prevWeek = useMemo(() => new Date(weekStart.getTime() - 7 * DAY), [weekStart])
   const prevTasks = useMemo(() => weekListTasks(tasks, prevWeek, meId, { isCurrent: false }), [tasks, prevWeek, meId])
-  const [meeting, setMeeting] = useState<null | { step: 1 | 2; candidateIds: string[] }>(null)
+  const [meeting, setMeeting] = useState<null | { step: WeekStep; candidateIds: string[] }>(null)
+  const daysFor = (opts: DaysOptions) => (renderDays ? renderDays(opts) : days)
 
   const toVM = (t: Task, anyDay: string): LineVM => ({
     task: t, fate: t.completed ? 'done' : 'open', partOf: goalOfTask(t, tasks, readSeasons()),
@@ -187,7 +197,7 @@ export function WeekV2({ tasks, weekStart, meId, isCurrent, days, onSelectTask, 
     const candidateIds = reviewIds
     setTally(EMPTY_TALLY)
     setJustSaved(null)
-    setMeeting({ step: candidateIds.length ? 1 : 2, candidateIds })
+    setMeeting({ step: candidateIds.length ? 'lookback' : 'fixed', candidateIds })
     // A meeting always opens with the month beside the week: choosing from it
     // is the meeting's job (it had opened in the last-used view, and "One at a
     // time" showed an empty week with nothing to choose from).
@@ -281,12 +291,17 @@ export function WeekV2({ tasks, weekStart, meId, isCurrent, days, onSelectTask, 
   return (
     <div className="pv2-week" data-week={localYmd(weekStart)}>
       {meeting ? (
-        <PlanMeetingBar period={`week ${weekNo}`} prevName="last week" step={meeting.step} lookBack={meeting.candidateIds.length > 0}
-          why={meeting.step === 1 ? lookBackWhy(earlierLines.length ? 'Earlier weeks' : 'Last week', 'this week', meeting.candidateIds.length - (tally.carried + tally.done + tally.someday + tally.dropped + tally.left))
-            : lines.length
-              ? `Check this week’s list against ${monthName}: keep what still matters, add what’s missing.`
-              : `Choose next steps from ${monthName}’s plan beside the list, or write your own. Nothing needs a day yet.`}
-          onStep={(step) => setMeeting({ ...meeting, step })} viewSwitch={meeting.step === 2 ? viewSwitch : undefined}
+        <PlanMeetingBar period={`week ${weekNo}`} prevName="last week" step={meeting.step === 'lookback' ? 1 : 2} lookBack={meeting.candidateIds.length > 0}
+          steps={[
+            ...(meeting.candidateIds.length ? [{ key: 'lookback', label: 'Look back' }] : []),
+            { key: 'fixed', label: 'Fixed points' }, { key: 'fill', label: 'Fill the week' }, { key: 'plan', label: 'The plan' },
+          ]}
+          stepKey={meeting.step} onStepKey={(step) => setMeeting({ ...meeting, step: step as WeekStep })}
+          why={meeting.step === 'lookback' ? lookBackWhy(earlierLines.length ? 'Earlier weeks' : 'Last week', 'this week', meeting.candidateIds.length - (tally.carried + tally.done + tally.someday + tally.dropped + tally.left))
+            : meeting.step === 'fixed' ? 'These can’t move: appointments, events and timed work. Add anything that’s missing, then plan around them.'
+            : meeting.step === 'fill' ? `Pull this week’s work from ${monthName}, then drag work and routines onto the days. Weekend chores can stay “sometime”.`
+            : `This is your week. Mark it planned when it looks right — edits saved as you went.`}
+          onStep={(step) => setMeeting({ ...meeting, step: step === 1 ? 'lookback' : 'fixed' })} viewSwitch={meeting.step === 'fill' ? viewSwitch : undefined}
           onLeave={() => void endMeeting(false)} onSave={() => void endMeeting(true)} saveLabel={`Mark week ${weekNo} planned`} />
       ) : slots?.subline && slots.controls ? (
         // Desktop: the control row folds into the week's masthead (HomeHeader
@@ -307,10 +322,19 @@ export function WeekV2({ tasks, weekStart, meId, isCurrent, days, onSelectTask, 
           <button type="button" className="pv2-btn" onClick={() => { writePlanView('week', 'ref'); navigate(`/week?start=${localYmd(nextWeek)}`, { state: { write: true } }) }}>Plan week {weekOfYear(nextWeek, readCadenceConfig().weekStartsOn)} →</button>
         </div>
       )}
-      {meeting?.step === 1 ? (
+      {meeting?.step === 'lookback' ? (
         <CloseOut lines={[...prevLines, ...earlierLines]} candidateIds={meeting.candidateIds} members={members} actions={actions} prevName="last week" nextName="this week"
-          onDecide={decide} onFinish={() => setMeeting({ ...meeting, step: 2 })} />
-      ) : view === 'focus' ? (
+          onDecide={decide} onFinish={() => setMeeting({ ...meeting, step: 'fixed' })} />
+      ) : meeting?.step === 'fixed' || meeting?.step === 'plan' ? (
+        // The fixed points, and the finished plan: the days alone, each the
+        // full width — what this step is about, and nothing else.
+        <div className="wk-page">
+          <section className="pv2-days wk-days" aria-label="The days">
+            <div className="pv2-colh">{meeting.step === 'fixed' ? 'What can’t move this week' : `Week ${weekNo}, planned`}</div>
+            {daysFor(meeting.step === 'fixed' ? { show: 'fixed' } : { readOnly: true })}
+          </section>
+        </div>
+      ) : view === 'focus' && !meeting ? (
         <FocusDeck lines={lines} actions={actions} members={members} nextLabel="next week" context={`Week ${weekNo}`} label={`Week ${weekNo}`}
           empty={meeting
             ? `Nothing on this week yet. Choose next steps from ${monthName}’s plan, or add your own.`
@@ -376,7 +400,7 @@ export function WeekV2({ tasks, weekStart, meId, isCurrent, days, onSelectTask, 
             </div>
           </div>
           </div>
-          <section className="pv2-days wk-days" aria-label="The days"><div className="pv2-colh">The days</div>{days}</section>
+          <section className="pv2-days wk-days" aria-label="The days"><div className="pv2-colh">The days</div>{daysFor(meeting?.step === 'fill' ? { routinesOpen: true } : {})}</section>
         </div>
       )}
     </div>
