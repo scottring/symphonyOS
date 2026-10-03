@@ -11,7 +11,7 @@ vi.mock('@/hooks/useFamilyMembers', () => ({ useFamilyMembers: () => ({ members:
 vi.mock('@/hooks/useActionableInstances', () => ({ useActionableInstances: () => ({ setPlanned: vi.fn(), reschedule: vi.fn() }) }))
 vi.mock('./AddArea', () => ({ useAddArea: () => ({ area: undefined, picker: null }) }))
 vi.mock('./FromPaper', () => ({ FromPaper: () => null }))
-vi.mock('./RefShelves', () => ({ WeekRefShelves: () => null }))
+vi.mock('@/hooks/useDayPlan', () => ({ useDayPlan: () => ({ plan: null, loading: false, error: false }) }))
 
 import { WeekV2 } from './WeekV2'
 

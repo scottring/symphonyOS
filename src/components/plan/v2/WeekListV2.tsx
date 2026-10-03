@@ -61,7 +61,10 @@ export function WeekListV2({ title, lines, weekStart, members, actions, timingCo
   const inWeek = (t: Task) => !!t.scheduledFor && localYmd(t.scheduledFor) >= first && localYmd(t.scheduledFor) <= last
   const open = lines.filter((l) => !l.task.completed)
   const done = lines.filter((l) => l.task.completed)
-  const onDays = open.filter((l) => inWeek(l.task))
+  // A line with a day this week is on that day, beside the list; the list
+  // holds only what is still waiting for one (Scott, 2026-10-03: "it's
+  // duplicated").
+  const allPlaced = open.length > 0 && open.every((l) => inWeek(l.task))
   const groups = [
     { title: 'Any day', rows: open.filter((l) => !l.task.scheduledFor) },
     { title: 'Scheduled outside this week', rows: open.filter((l) => l.task.scheduledFor && !inWeek(l.task)) },
@@ -78,25 +81,13 @@ export function WeekListV2({ title, lines, weekStart, members, actions, timingCo
       <div className="pv2-colh">{title}{headerAction}</div>
       {draftChild && onDraftChild && <DraftChild key={draftChild.id} parent={draftChild} onAdd={onDraftChild} onCancel={() => onCancelChild?.()} />}
       {!open.length && !done.length && !draftChild && <p className="pv2-hint ds-empty-body">{emptyHint ?? 'Nothing on this week’s list yet. Add below.'}</p>}
+      {allPlaced && <p className="pv2-hint">Everything on this week’s list has a day.</p>}
       {groups.map((g) => (
         <section key={g.title} aria-label={g.title}>
           <div className="pv2-wl-h">{g.title}</div>
           <ul className="pv2-list">{g.rows.map(row)}</ul>
         </section>
       ))}
-      {/* What has a day stays on the list, quiet, saying which — not "1 is
-          on a day this week", which read as an empty list (#21). */}
-      {onDays.length > 0 && (
-        <section aria-label="On a day">
-          <div className="pv2-wl-h">On a day</div>
-          <ul className="pv2-list">{onDays.map((vm) => (
-            <li key={vm.task.id} className="pv2-wl-placed">
-              <button type="button" className="pv2-wl-title" onClick={() => actions.details(vm.task)}>{vm.task.title}</button>
-              <span className="pv2-hint">→ {placedLabel(vm.task)}</span>
-            </li>
-          ))}</ul>
-        </section>
-      )}
       {done.length > 0 && <button type="button" className="pv2-link pv2-quiet" aria-expanded={showDone} onClick={() => setShowDone((s) => !s)}>{showDone ? 'Hide completed' : `Completed · ${done.length}`}</button>}
       <form className="pv2-write" onSubmit={(e) => { e.preventDefault(); const v = draft.trim(); if (v) { void onAdd(v); setDraft('') } }}>
         <span className="pv2-wl-check" aria-hidden="true" />
@@ -105,13 +96,6 @@ export function WeekListV2({ title, lines, weekStart, members, actions, timingCo
       </form>
     </section>
   )
-}
-
-/** "Mon 11:45 AM", or "Mon" for an all-day line. */
-function placedLabel(t: Task): string {
-  const d = t.scheduledFor!
-  const day = d.toLocaleDateString('en-US', { weekday: 'short' })
-  return t.isAllDay ? day : `${day} ${d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`
 }
 
 // A card drags onto a day with the week's own chip protocol ('pool:<id>',

@@ -47,7 +47,6 @@ import { GuideAnchor } from '@/components/guide/GuideBar'
 import { EMPTY_TALLY, addToTally, decidedSentence, lookBackWhy, planWhy, nextAfterSave, type Tally } from '@/lib/planning/v2/planTally'
 import { FromPaper } from './FromPaper'
 import { ViewSwitch } from './ViewSwitch'
-import { PeriodRefRoutines } from './RefShelves'
 import { useAddArea } from './AddArea'
 import { useAssigneeFilter } from '@/hooks/useAssigneeFilter'
 import { planPeopleLens } from '@/lib/planning/peopleLens'
@@ -590,8 +589,6 @@ function Inner({ level }: { level: Level }) {
         ))}</ul>
       ) : <p className="pv2-hint ds-empty-body">Nothing written for {aboveName}. That’s fine.</p>}
       </div>
-      {/* What the Shelves held for a month or season, folded in here. */}
-      <div className="pv2-refshelves"><PeriodRefRoutines level={level} start={bounds.start} end={bounds.end} noun={NOUN[level].toLowerCase()} /></div>
     </aside>
   )
   const calendar = level === 'month' ? (
@@ -630,12 +627,13 @@ function Inner({ level }: { level: Level }) {
       empty={`Nothing on ${name}’s plan yet. Switch to the list to write the first line.`} />
   } else if (view === 'ref') {
     // One shape on every horizon (Scott, 2026-09-30: "above all else, it has
-    // to be consistent"): the period's own time on the left (the Month's
-    // dates, as the Week's days), its list in the middle, the level above on
-    // the right — as on Week and Today.
-    body = <div ref={grid} className={`${level === 'month' ? 'pv2-grid3' : 'pv2-grid2 is-ref'} is-colscroll`}>{calendar}{listColumn}{refColumn}</div>
+    // to be consistent"), read left to right as planning moves (Scott,
+    // 2026-10-03: "source list first"): the level above, this period's list,
+    // then its own time (the Month's dates, as the Week's days). The level
+    // above holds only its own lines.
+    body = <div ref={grid} className={`${level === 'month' ? 'pv2-grid3' : 'pv2-grid2 is-ref'} is-colscroll`}>{refColumn}{listColumn}{calendar}</div>
   } else if (level === 'month') {
-    body = <div ref={grid} className="pv2-grid2 is-cal-first is-colscroll">{calendar}{listColumn}</div>
+    body = <div ref={grid} className="pv2-grid2 is-cal-last is-colscroll">{listColumn}{calendar}</div>
   } else {
     body = listColumn
   }

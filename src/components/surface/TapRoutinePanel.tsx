@@ -202,20 +202,22 @@ export function TapRoutinePanel(props: TapRoutinePanelProps) {
           )}
         </div>
 
-        {/* On Today — a running routine that doesn't need a row read back to
-            you. Separate from Active/Resting on purpose: this one keeps
-            running. */}
+        {/* On Today and planning — a running routine that doesn't need a row
+            read back to you. Separate from Active/Resting on purpose: this one
+            keeps running. One switch for Today and the planning pages (Scott,
+            2026-10-03: "an easy way in the detail pane to hide a repeating
+            item from the planning views and the today view"). */}
         {onTimeline && props.onShowOnTodayChange && (
           <div>
             <div className="flex items-center justify-between gap-3">
               <span className="text-[15px] font-medium text-neutral-700">
-                {onToday ? 'On Today' : 'Off Today'}
+                {onToday ? 'Shown in Today and planning' : 'Hidden from Today and planning'}
               </span>
               <button
                 type="button"
                 role="switch"
                 aria-checked={onToday}
-                aria-label="On Today"
+                aria-label="Show in Today and planning"
                 onClick={() => props.onShowOnTodayChange!(!onToday)}
                 className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${
                   onToday ? 'bg-primary-600' : 'bg-neutral-300'
@@ -234,7 +236,7 @@ export function TapRoutinePanel(props: TapRoutinePanelProps) {
                   rule that leaves the day open (the weekend window, "since
                   last") is offered on Today to choose. */}
               {!onToday
-                ? "Still runs, still on the kitchen wall — it just doesn't take a row on Today or the week grid."
+                ? 'Still runs, and still on the kitchen wall. Find it on the Routines page to show it again.'
                 : routine.time_of_day
                   ? 'Takes a row on Today and the week grid at its time.'
                   : namesDueDays(routine.recurrence_pattern)

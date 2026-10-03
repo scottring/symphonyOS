@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest'
 import { render } from '@testing-library/react'
-import { PlaceScenery } from './PlaceScenery'
+import { PlaceScenery, FAINT_SCENERY_QUERY } from './PlaceScenery'
 import { keepFocusAboveScenery } from './sceneryFocus'
 
 describe('foreground scenery', () => {
@@ -71,5 +71,29 @@ describe('foreground scenery', () => {
     const {unmount}=render(<PlaceScenery scroller={scroller}/>)
     unmount()
     expect(remove).toHaveBeenCalledWith('focusin', expect.any(Function))
+  })
+  // Scott, 2026-10-03: on a laptop the landscape took a quarter of the
+  // window; there it stands faint behind the page and holds back only a margin.
+  it('on a short desktop window stands faint and holds back only a small margin', () => {
+    const original = window.matchMedia
+    window.matchMedia = ((q: string) => ({ matches: q === FAINT_SCENERY_QUERY, media: q, addEventListener: () => {}, removeEventListener: () => {} })) as unknown as typeof window.matchMedia
+    const scroller = document.createElement('div')
+    const { container, unmount } = render(<PlaceScenery scroller={scroller} />)
+    expect(container.querySelector('[data-place-scenery]')).toHaveClass('is-faint')
+    expect(scroller.style.getPropertyValue('--scenery-clearance')).toBe('16px')
+    unmount()
+    window.matchMedia = original
+  })
+  // Scott, 2026-10-03: "I may like the higher transparency, low opacity
+  // look better than the default" — faint is the default; full is a choice.
+  it('is faint by default, and full when chosen on a tall window', () => {
+    const { container, unmount } = render(<PlaceScenery scroller={null} />)
+    expect(container.querySelector('[data-place-scenery]')).toHaveClass('is-faint')
+    unmount()
+    localStorage.setItem('symphony-scenery-scene', 'full')
+    const full = render(<PlaceScenery scroller={null} />)
+    expect(full.container.querySelector('[data-place-scenery]')).not.toHaveClass('is-faint')
+    full.unmount()
+    localStorage.removeItem('symphony-scenery-scene')
   })
 })

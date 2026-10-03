@@ -30,6 +30,9 @@ export interface LineVM {
   nested?: boolean
   /** Brought in by a look-back: "carried from October" (#31). */
   carriedFrom?: string
+  /** Unfinished work from before last week, in the week's look-back: where it
+   *  was meant to happen — "Originally Wednesday", "Planned for Sep 6–12". */
+  origin?: string
 }
 
 export interface LineActions {

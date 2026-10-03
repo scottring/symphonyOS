@@ -87,6 +87,11 @@ const ALLOWED = new Map<string, string>([
   ['components/detail/DetailPanelRedesign.tsx', 'the detail panel that toggles the flags'],
   ['components/surface/TapRoutinePanel.tsx', 'the tap panel that toggles the flags'],
   [
+    'apps/tasks/TaskDetailPanel.tsx',
+    "the shared detail pane WRITES the flag from TapRoutinePanel's \"Show in " +
+      'Today and planning" switch. Write path only (Scott, 2026-10-03).',
+  ],
+  [
     'components/schedule/ScheduleItemActionsMenu.tsx',
     "the row's ⋯ menu WRITES the flag (\"Not on Today\") and reads it once — " +
       'to decide whether to offer that verb on a routine already off Today. ' +
@@ -101,6 +106,12 @@ const ALLOWED = new Map<string, string>([
       'reads a primitive to decide what shows.',
   ],
   ['components/routine/RhythmPage.tsx', 'Tend deliberately shows RESTING routines — opted out, see the comment there'],
+  [
+    'components/routine/rhythm/RoutineRow.tsx',
+    'LABELS a routine hidden from Today and planning, never filters it: the ' +
+      'Routines page lists every routine, and the row says which are off so ' +
+      'they can be found and shown again (Scott, 2026-10-03).',
+  ],
   ['components/routine/rhythm/tendHeuristics.ts', 'same opt-out as RhythmPage'],
   [
     'components/routine/rhythm/rhythmModel.ts',

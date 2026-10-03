@@ -487,6 +487,7 @@ function RoutinePanelBody({ id }: { id: string }) {
       onNotesChange={(n) => updateRoutine(routine.id, { description: n })}
       onContextChange={(ctx) => updateRoutine(routine.id, { context: ctx ?? null })}
       onVisibilityChange={(v) => updateRoutine(routine.id, { visibility: v })}
+      onShowOnTodayChange={(next) => updateRoutine(routine.id, { show_on_timeline: next })}
       onAssignChange={(ids) => updateRoutine(routine.id, { assigned_to_all: ids })}
       onTargetChange={(t) => updateRoutine(routine.id, { target_amount: t?.amount ?? null, target_unit: t?.unit ?? null })}
       onScheduleChange={(pattern, timeOfDay) =>
