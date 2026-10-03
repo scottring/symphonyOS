@@ -328,6 +328,10 @@ export function WeekViewV2(props: WeekViewV2Props) {
     pushAction,
     onPushRoutine,
     onRoutinePlaceRequest: setRoutinePlace,
+    // One drag rule (2026-10-03): read at drop time, after the page's own
+    // writers below exist.
+    onTakeIn: (taskId) => takeIntoWeek(taskId),
+    onRoutineToDay: (routineId, fromIso, toIso, title) => { void moveRoutineToDay(routineId, fromIso, toIso, title) },
   })
 
   // Sensor with activation constraint — disambiguates click vs drag.
@@ -672,7 +676,7 @@ export function WeekViewV2(props: WeekViewV2Props) {
   // second toggle would read a stale snapshot — HomeView's rule). A routine
   // ticks its OCCURRENCE — that day's instance — so Today, the pin and this
   // page show the same completion.
-  const { markDone, undoDone, setPlanned, reschedule: rescheduleInstance } = useActionableInstances()
+  const { markDone, undoDone, setPlanned, reschedule: rescheduleInstance, undoReschedule } = useActionableInstances()
   const handleJournalToggle = useCallback((entry: JournalEntry, day: JournalDay) => {
     if (entry.task) {
       const task = entry.task
@@ -706,6 +710,35 @@ export function WeekViewV2(props: WeekViewV2Props) {
     pushAction,
     notify: (m) => showToast(m, 'warning'),
   }), [tasks, onUpdateTask, gated, setPlanned, rescheduleInstance, pushAction])
+  // A month line dragged onto the week's list: the same write as its
+  // "+ This week" (it stays on the month's plan too).
+  const takeIntoWeek = useCallback((taskId: string) => {
+    const task = tasks.find((t) => t.id === taskId)
+    if (!task) return
+    const prev = { bucket: task.bucket, weekStart: task.weekStart as Date }
+    void onUpdateTask(taskId, { bucket: 'week', weekStart: weekAnchor })
+    pushAction?.(`“${task.title}” → this week`, () => { void onUpdateTask(taskId, prev) })
+  }, [tasks, onUpdateTask, weekAnchor, pushAction])
+  // A routine occurrence dragged to another day moves as THAT occurrence; a
+  // "Sometime this weekend" routine dragged onto Saturday or Sunday is given
+  // that day (planned there). The rule itself is never rewritten by a drag.
+  const moveRoutineToDay = useCallback(async (routineId: string, fromIso: string, toIso: string, title: string) => {
+    const [ty, tm, td] = toIso.split('-').map(Number)
+    const toDay = new Date(ty, tm - 1, td)
+    if (journalWeekend?.sometime.some((e) => e.routineId === routineId)) {
+      await planActions.chooseRoutine(routineId, toDay, true, title)
+      return
+    }
+    const [fy, fm, fd] = fromIso.split('-').map(Number)
+    const fromDay = new Date(fy, fm - 1, fd)
+    const rule = routines.find((r) => r.id === routineId)
+    const [hh, mm] = (rule?.time_of_day ?? '').split(':').map(Number)
+    const timed = Number.isFinite(hh)
+    const when = timed ? new Date(ty, tm - 1, td, hh, mm || 0) : toDay
+    const previous = await rescheduleInstance('routine', routineId, fromDay, when, timed ? undefined : { dayOnly: true })
+    if (previous) pushAction?.(`Moved "${title}" to ${toDay.toLocaleDateString('en-US', { weekday: 'long' })}`, () => { void undoReschedule(previous) })
+  }, [journalWeekend, planActions, routines, rescheduleInstance, undoReschedule, pushAction])
+
   // "+ Add" on a journal day: a dated, all-day task on that day, assigned to
   // me. Captures never inherit the view's lens, so it lands Unsorted — and
   // when the current filter would then hide it, the toast says so rather
