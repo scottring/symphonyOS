@@ -19,7 +19,7 @@
 // and undo included) and a native drop for rows dragged out of the Today pin.
 import { createElement, useState, type ReactNode } from 'react'
 import { useDroppable } from '@dnd-kit/core'
-import { Plus } from 'lucide-react'
+import { ChevronRight, Plus } from 'lucide-react'
 import type { Task } from '@/types/task'
 import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
 import { isMissedPlacement } from '@/lib/week/missedPlacement'
@@ -50,6 +50,9 @@ interface WeekJournalProps {
   dragEnabled?: boolean
   /** Narrow screens: the margin tightens; the layout is the same. */
   narrow?: boolean
+  /** 'grid' (desktop Week, 2026-10-03): the weekend as one band, the
+   *  weekdays across; 'rows' (default): one day under another. */
+  layout?: 'rows' | 'grid'
   /**
    * The same in-place timing control the week's list and the period pages
    * wear, supplied by the host. Without it a task that moved out of "Any day"
@@ -247,9 +250,161 @@ function DayRow({ day, onSelectItem, onToggleEntry, onPlanDrop, onAddToDay, drag
   )
 }
 
-export function WeekJournal({ days, spans, onSelectItem, onToggleEntry, onPlanDrop, onAddToDay, dragEnabled = true, narrow = false, timingControl, forecast }: WeekJournalProps) {
+// ── The grid (spec 2026-10-03-week-grid-design §1, §5, §6) ──────────────
+
+/** A day's untimed routines behind one line, remembered open or shut per day
+ *  on this device (Scott, 2026-10-03: the long routine lists were "mind-
+ *  numbing"). */
+function RoutineFold({ day, onSelect, onToggle, dragEnabled }: {
+  day: JournalDay
+  onSelect: (id: string) => void
+  onToggle: WeekJournalProps['onToggleEntry']
+  dragEnabled: boolean
+}) {
+  const key = `symphony-week-fold:${day.key}`
+  const [open, setOpen] = useState(() => { try { return localStorage.getItem(key) === 'open' } catch { return false } })
+  if (!day.foldedRoutines.length) return null
+  const allDone = day.foldedRoutines.every((e) => e.completed)
+  const toggle = () => {
+    setOpen((o) => { try { localStorage.setItem(key, o ? 'shut' : 'open') } catch { /* this session only */ } return !o })
+  }
   return (
-    <div data-testid="week-journal" className="border-y border-neutral-300">
+    <div className="wk-fold">
+      <button type="button" className="wk-fold-btn" aria-expanded={open} onClick={toggle}>
+        <ChevronRight className={`h-3.5 w-3.5 transition-transform ${open ? 'rotate-90' : ''}`} aria-hidden="true" />
+        Routines · {allDone ? 'done' : day.foldedRoutines.length}
+      </button>
+      {open && (
+        <ul className="wk-rows" aria-label={`Routines, ${day.date.toLocaleDateString('en-US', { weekday: 'long' })}`}>
+          {day.foldedRoutines.map((entry) => <Entry key={entry.id} entry={entry} day={day} onSelect={onSelect} onToggle={onToggle} dragEnabled={dragEnabled} dense />)}
+        </ul>
+      )}
+    </div>
+  )
+}
+
+function DayCell({ day, onSelectItem, onToggleEntry, onPlanDrop, onAddToDay, dragEnabled, timingControl, weather }: {
+  day: JournalDay
+  weather?: DayForecast
+  onSelectItem: (id: string) => void
+  onToggleEntry: WeekJournalProps['onToggleEntry']
+  onPlanDrop?: WeekJournalProps['onPlanDrop']
+  onAddToDay?: WeekJournalProps['onAddToDay']
+  dragEnabled: boolean
+  timingControl?: WeekJournalProps['timingControl']
+}) {
+  const { setNodeRef, isOver: dndOver } = useDroppable({ id: `journal-day:${day.key}`, data: { kind: 'allDay', dayIso: day.key } })
+  const [planOver, setPlanOver] = useState(false)
+  const planProps = onPlanDrop ? planDropHandlers((p) => onPlanDrop(day, p), setPlanOver) : {}
+  const today = isToday(day.date)
+  return (
+    <section ref={setNodeRef} {...planProps} data-testid={`journal-day-${day.key}`}
+      aria-label={day.date.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
+      className={`wk-cell group/day${dndOver || planOver ? ' is-over' : ''}${today ? ' is-today' : ''}`}>
+      <header className="wk-dayhead">
+        <span className="wk-daynum">{day.date.getDate()}</span>
+        <span className="wk-dayname">{day.date.toLocaleDateString('en-US', { weekday: 'short' })}</span>
+        {today && <span className="sr-only">(today)</span>}
+        {weather && <DayWeather weather={weather} narrow={false} />}
+      </header>
+      {day.notes.length > 0 && (
+        <p className="wk-notes">{day.notes.map((ev, i) => (
+          <span key={ev.google_event_id || ev.id}>{i > 0 && ' · '}
+            <button type="button" onClick={() => onSelectItem(eventId(ev))} className="italic hover:text-neutral-900">{ev.title}</button>
+          </span>
+        ))}</p>
+      )}
+      {day.entries.length > 0 && (
+        <ul className="wk-rows" aria-label={`${day.date.toLocaleDateString('en-US', { weekday: 'long' })} entries`}>
+          {day.entries.map((entry) => <Entry key={entry.id} entry={entry} day={day} onSelect={onSelectItem} onToggle={onToggleEntry} dragEnabled={dragEnabled} timingControl={timingControl} dense />)}
+        </ul>
+      )}
+      <RoutineFold day={day} onSelect={onSelectItem} onToggle={onToggleEntry} dragEnabled={dragEnabled} />
+      {day.dinners.length > 0 && (
+        <p className="wk-dinner"><span className="text-neutral-400">Dinner </span>
+          {day.dinners.map(({ event, label }, i) => (
+            <span key={event.google_event_id || event.id}>{i > 0 && ' · '}
+              <button type="button" onClick={() => onSelectItem(eventId(event))} className="hover:text-neutral-800 hover:underline">{label}</button>
+            </span>
+          ))}
+        </p>
+      )}
+      {onAddToDay && <AddToDay day={day} onAdd={onAddToDay} />}
+    </section>
+  )
+}
+
+/** "Sometime this weekend": the weekend's window work, once for both days.
+ *  Ticked here, it is done for the weekend; dragged onto Saturday or Sunday,
+ *  it is given that day. */
+function SometimeCell({ weekend, days, onSelectItem, onToggleEntry, dragEnabled }: {
+  weekend: JournalWeekend
+  days: JournalDay[]
+  onSelectItem: (id: string) => void
+  onToggleEntry: WeekJournalProps['onToggleEntry']
+  dragEnabled: boolean
+}) {
+  const sat = days[weekend.satIndex]
+  const sun = weekend.sunIndex !== null ? days[weekend.sunIndex] : null
+  // Done on the day it is done: today when today is the weekend, else Saturday.
+  const tickDay = sun && isToday(sun.date) ? sun : sat
+  return (
+    <section className="wk-cell wk-sometime" data-testid="weekend-sometime" aria-label="Sometime this weekend">
+      <header className="wk-dayhead"><span className="wk-dayname">Sometime this weekend</span><span className="wk-dayhint">once for both days</span></header>
+      {weekend.sometime.length ? (
+        <ul className="wk-rows" aria-label="Sometime this weekend entries">
+          {weekend.sometime.map((entry) => <Entry key={entry.id} entry={entry} day={tickDay} onSelect={onSelectItem} onToggle={onToggleEntry} dragEnabled={dragEnabled} dense />)}
+        </ul>
+      ) : <p className="wk-empty">Nothing waiting for the weekend.</p>}
+      {weekend.sometime.length > 0 && <p className="wk-dayhint">Drag one onto {sun ? 'Saturday or Sunday' : 'Saturday'} to give it a day.</p>}
+    </section>
+  )
+}
+
+function WeekGridDays({ days, weekend, forecast, ...cell }: {
+  days: JournalDay[]
+  weekend: JournalWeekend | null
+  forecast?: Record<string, DayForecast>
+  onSelectItem: (id: string) => void
+  onToggleEntry: WeekJournalProps['onToggleEntry']
+  onPlanDrop?: WeekJournalProps['onPlanDrop']
+  onAddToDay?: WeekJournalProps['onAddToDay']
+  dragEnabled: boolean
+  timingControl?: WeekJournalProps['timingControl']
+}) {
+  // In day order: runs of weekdays as one row, the weekend as its band.
+  const blocks: ({ kind: 'weekdays'; days: JournalDay[] } | { kind: 'weekend' })[] = []
+  days.forEach((d, i) => {
+    if (weekend && i === weekend.satIndex) { blocks.push({ kind: 'weekend' }); return }
+    if (weekend && i === weekend.sunIndex) return
+    const last = blocks[blocks.length - 1]
+    if (last?.kind === 'weekdays') last.days.push(d)
+    else blocks.push({ kind: 'weekdays', days: [d] })
+  })
+  const dayCell = (d: JournalDay) => <DayCell key={d.key} day={d} weather={forecast?.[d.key]} {...cell} />
+  return (
+    <div className="wk-grid">
+      {blocks.map((b, i) => b.kind === 'weekend' && weekend ? (
+        <section key="weekend" className="wk-weekend" aria-label={`The weekend, ${days[weekend.satIndex].date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`}>
+          <div className="wk-weekend-head">The weekend</div>
+          <div className="wk-weekend-cells">
+            {dayCell(days[weekend.satIndex])}
+            {weekend.sunIndex !== null && dayCell(days[weekend.sunIndex])}
+            <SometimeCell weekend={weekend} days={days} onSelectItem={cell.onSelectItem} onToggleEntry={cell.onToggleEntry} dragEnabled={cell.dragEnabled} />
+          </div>
+        </section>
+      ) : b.kind === 'weekdays' ? (
+        <section key={`wd${i}`} className="wk-weekdays" aria-label="Weekdays" style={{ ['--wk-days' as string]: b.days.length }}>
+          {b.days.map(dayCell)}
+        </section>
+      ) : null)}
+    </div>
+  )
+}
+
+export function WeekJournal({ days, weekend = null, spans, onSelectItem, onToggleEntry, onPlanDrop, onAddToDay, dragEnabled = true, narrow = false, layout = 'rows', timingControl, forecast }: WeekJournalProps) {
+  return (
+    <div data-testid="week-journal" className={layout === 'grid' ? 'wk-journal-grid' : 'border-y border-neutral-300'}>
       {spans.length > 0 && (
         <ul aria-label="Across these days" className="flex flex-col gap-1 border-b border-neutral-300 py-2 text-[13px]">
           {spans.map((s) => (
@@ -271,7 +426,10 @@ export function WeekJournal({ days, spans, onSelectItem, onToggleEntry, onPlanDr
           ))}
         </ul>
       )}
-      {days.map((day) => (
+      {layout === 'grid' ? (
+        <WeekGridDays days={days} weekend={weekend} forecast={forecast} onSelectItem={onSelectItem} onToggleEntry={onToggleEntry}
+          onPlanDrop={onPlanDrop} onAddToDay={onAddToDay} dragEnabled={dragEnabled} timingControl={timingControl} />
+      ) : days.map((day) => (
         <DayRow key={day.key} day={day} onSelectItem={onSelectItem} onToggleEntry={onToggleEntry}
           onPlanDrop={onPlanDrop} onAddToDay={onAddToDay} dragEnabled={dragEnabled} narrow={narrow}
           timingControl={timingControl} weather={forecast?.[day.key]} />

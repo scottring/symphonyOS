@@ -36,20 +36,23 @@ const renderWeek = (tasks: Task[] = []) => render(
 // Scott, 2026-10-03: planning moves from the source to the list to a day, so
 // the page reads that way — and the month's column holds only its own lines.
 describe('WeekV2 — source first', () => {
-  it('reads the month, then this week’s list, then the days', () => {
+  // 2026-10-03, the grid: the sources on top (the month, then this week's
+  // list), the days across the full width below.
+  it('puts the month and this week’s list on top, the days below', () => {
     const { container } = renderWeek([task({ id: 'o1', title: 'Plan Thanksgiving', bucket: 'month', monthStart: new Date(2026, 9, 1) })])
     fireEvent.click(screen.getByRole('button', { name: /^With / }))
-    const cols = [...container.querySelector('.pv2-wgrid')!.children].map((c) => c.getAttribute('aria-label'))
-    expect(cols).toEqual(['October, for reference', null, 'The days'])
-    expect(container.querySelector('.pv2-wgrid > .pv2-wside')).toBe(container.querySelector('.pv2-wgrid')!.children[1])
+    const page = container.querySelector('.wk-page')!
+    expect([...page.children].map((c) => c.className)).toEqual(['wk-sources', 'pv2-days wk-days'])
+    const sources = [...page.querySelector('.wk-sources')!.children].map((c) => c.getAttribute('aria-label') ?? c.className)
+    expect(sources).toEqual(['October, for reference', 'pv2-wside'])
   })
 
-  it('the List view keeps the same direction: the list, then the days', () => {
+  it('the List view keeps the list over the days, with no month', () => {
     const { container } = renderWeek()
     fireEvent.click(screen.getByRole('button', { name: 'List' }))
-    const grid = container.querySelector('.pv2-wgrid')!
-    expect(grid.children[0].className).toBe('pv2-wside')
-    expect(grid.children[1].getAttribute('aria-label')).toBe('The days')
+    const sources = container.querySelector('.wk-sources')!
+    expect([...sources.children].map((c) => c.className)).toEqual(['pv2-wside'])
+    expect(container.querySelector('.wk-days')!.getAttribute('aria-label')).toBe('The days')
   })
 
   it('the month column lists no earlier work and no routines', () => {

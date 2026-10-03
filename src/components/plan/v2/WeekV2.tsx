@@ -44,7 +44,6 @@ import { useAssigneeFilter } from '@/hooks/useAssigneeFilter'
 import { planPeopleLens } from '@/lib/planning/peopleLens'
 import { makePlanActions, timingRemoval } from '@/lib/planning/planActions'
 import { useActionableInstances } from '@/hooks/useActionableInstances'
-import { useColumnsFitWindow } from '@/hooks/useColumnsFitWindow'
 import { useDayPlan } from '@/hooks/useDayPlan'
 import { committedTo } from '@/lib/placement/model'
 import type { TaskContext } from '@/types/task'
@@ -109,7 +108,13 @@ export function WeekV2({ tasks, weekStart, meId, isCurrent, days, onSelectTask, 
   // month beside it and last week's look-back keep their own scope.
   const [people] = useAssigneeFilter()
   const lens = useMemo(() => planPeopleLens(people, meId), [people, meId])
-  const weekTasks = useMemo(() => weekListTasks(tasks, weekStart, lens.scopeId, { isCurrent }).filter(lens.keep), [tasks, weekStart, lens, isCurrent])
+  // A task planned for this week's weekend with no day of its own stands in
+  // the days' "Sometime this weekend", not on the list (spec §5).
+  const weekTasks = useMemo(() => {
+    const end = weekStart.getTime() + 7 * DAY
+    const inWeekend = (t: Task) => !!t.weekendStart && !t.scheduledFor && t.weekendStart.getTime() >= weekStart.getTime() && t.weekendStart.getTime() < end
+    return weekListTasks(tasks, weekStart, lens.scopeId, { isCurrent }).filter(lens.keep).filter((t) => !inWeekend(t))
+  }, [tasks, weekStart, lens, isCurrent])
   const nextWeek = useMemo(() => new Date(weekStart.getTime() + 7 * DAY), [weekStart])
   const prevWeek = useMemo(() => new Date(weekStart.getTime() - 7 * DAY), [weekStart])
   const prevTasks = useMemo(() => weekListTasks(tasks, prevWeek, meId, { isCurrent: false }), [tasks, prevWeek, meId])
@@ -272,8 +277,6 @@ export function WeekV2({ tasks, weekStart, meId, isCurrent, days, onSelectTask, 
   // HomeHeader's masthead, when it offers a place for the folded row
   // (desktop only; HomeView decides).
   const slots = useContext(PlanMastheadSlotsContext)
-  const columnsShown = meeting?.step !== 1 && view !== 'focus'
-  const grid = useColumnsFitWindow(columnsShown)
 
   return (
     <div className="pv2-week" data-week={localYmd(weekStart)}>
@@ -313,14 +316,14 @@ export function WeekV2({ tasks, weekStart, meId, isCurrent, days, onSelectTask, 
             ? `Nothing on this week yet. Choose next steps from ${monthName}’s plan, or add your own.`
             : `Nothing on this week yet. Switch to the list to add the first line.`} />
       ) : (
-        <div ref={grid} className={`pv2-wgrid is-colscroll${view === 'ref' ? ' is-ref' : ''}`}>
-          {/* One spread, read left to right as planning moves (Scott,
-              2026-10-03): the month's plan, this week's list, the days. One
-              heading line across them, no boxes (Scott, 2026-09-29: "a bunch
-              of stuff randomly put down"). Only the month's own lines stand
-              in its column — each day already shows its routines. */}
+        <div className={`wk-page${view === 'ref' ? ' is-ref' : ''}`}>
+          <div className="wk-sources">
+          {/* The sources on top — the month's plan, this week's list — and the
+              days across the full width below (Scott, 2026-10-03: "wasted
+              space … maybe in a grid?"). Planning still moves source → list →
+              day; the days are the biggest list, so they get the most room. */}
           {view === 'ref' && (
-            <aside className="pv2-ref" aria-label={`${monthName}, for reference`}>
+            <aside className="pv2-ref wk-sources-month" aria-label={`${monthName}, for reference`}>
               {refMonths.map((m) => (
                 <div key={m.name} className="pv2-refmonth">
                   <div className="pv2-colh">{m.name} <small>(for reference)</small></div>
@@ -372,7 +375,8 @@ export function WeekV2({ tasks, weekStart, meId, isCurrent, days, onSelectTask, 
                   : `Nothing on this week’s list yet. Add below, or take a step from ${monthName}’s plan beside it.`} />
             </div>
           </div>
-          <section className="pv2-days" aria-label="The days"><div className="pv2-colh">The days</div>{days}</section>
+          </div>
+          <section className="pv2-days wk-days" aria-label="The days"><div className="pv2-colh">The days</div>{days}</section>
         </div>
       )}
     </div>

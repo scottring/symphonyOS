@@ -301,3 +301,70 @@
 .wk-row.is-linked { background: color-mix(in srgb, var(--color-primary-100) 70%, transparent); border-color: var(--color-primary-100); }
 .wk-row.is-flash { animation: pv2-flash 1.2s ease-out; }
 @media (prefers-reduced-motion: reduce) { .wk-row.is-flash { animation: none; } }
+
+/* ── The Week page as a grid (2026-10-03) ─────────────────────────────────
+   The sources on top — the month's plan (two columns) beside this week's
+   list, each capped at about nine rows and scrolling inside itself — and the
+   days across the full width below: the weekend as one band (Saturday ·
+   Sunday · Sometime this weekend), the weekdays side by side. Scott: "this
+   screams out to me: wasted space … maybe in a grid?" */
+.wk-page { display: flex; flex-direction: column; gap: 28px; }
+.wk-sources { display: grid; grid-template-columns: minmax(0, 1fr); gap: 40px; align-items: start; --pv2-colh-bg: var(--color-bg-base); }
+.scenery-sky .wk-sources { --pv2-colh-bg: var(--scenery-sky-layers); }
+.wk-page.is-ref .wk-sources { grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); }
+.wk-page:not(.is-ref) .wk-sources > .pv2-wside { max-width: 640px; }
+.wk-sources > * {
+  position: relative; max-height: 24rem; overflow-y: auto; scrollbar-width: thin;
+  margin: 0 -14px 0 -22px; padding: 0 14px 0 22px;
+}
+.wk-sources .pv2-wside { position: relative; top: auto; }
+.wk-sources .pv2-colh { position: sticky; top: 0; z-index: 2; background: var(--pv2-colh-bg); background-attachment: fixed; }
+.wk-sources-month .pv2-list { columns: 2; column-gap: 40px; }
+.wk-sources-month .wk-row { break-inside: avoid; }
+
+.wk-grid { display: flex; flex-direction: column; gap: 18px; }
+.wk-weekend {
+  border: 1px solid var(--color-neutral-300); border-radius: 14px; padding: 2px 14px 8px;
+  background: color-mix(in srgb, var(--color-bg-elevated) 40%, transparent);
+}
+.wk-weekend-head { padding: 10px 0 0; font: 400 19px/1.2 var(--font-family-display); color: var(--color-neutral-900); }
+.wk-weekend-cells { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.wk-weekdays { display: grid; grid-template-columns: repeat(var(--wk-days, 5), minmax(0, 1fr)); }
+.wk-cell { min-width: 0; padding: 10px 14px 12px; border-left: 1px solid var(--color-neutral-200); }
+.wk-cell:first-child { border-left: 0; }
+.wk-cell.is-over { background: color-mix(in srgb, var(--color-primary-50) 60%, transparent); border-radius: 10px; }
+.wk-dayhead { display: flex; align-items: baseline; gap: 8px; min-height: 34px; padding-bottom: 6px; margin-bottom: 4px; border-bottom: 1px solid var(--color-neutral-200); }
+.wk-daynum { font: 200 30px/1 var(--pv2-num, 'Jost'), sans-serif; color: var(--color-neutral-900); }
+.wk-cell.is-today .wk-daynum, .wk-cell.is-today .wk-dayname { color: var(--color-primary-700); }
+.wk-dayname { font: 500 11px var(--font-family-sans); letter-spacing: .1em; text-transform: uppercase; color: var(--color-neutral-600); }
+.wk-dayhead [role="img"] { margin: 0 0 0 auto; }
+.wk-dayhint { margin-left: auto; font-size: 12px; color: var(--color-neutral-500); }
+p.wk-dayhint { margin: 8px 0 0; }
+.wk-rows { display: flex; flex-direction: column; gap: 1px; margin: 0; padding: 0; }
+.wk-notes { margin: 2px 0 4px; font-size: 13px; line-height: 1.35; color: var(--color-neutral-600); }
+.wk-dinner { margin: 6px 0 0; font-size: 12.5px; color: var(--color-neutral-500); }
+.wk-empty { margin: 4px 0 0; font-size: 13px; color: var(--color-neutral-500); }
+.wk-fold-btn { display: inline-flex; align-items: center; gap: 4px; margin-top: 4px; padding: 4px 0; font-size: 12.5px; font-weight: 500; color: var(--color-neutral-700); }
+.wk-fold-btn:hover { color: var(--color-neutral-950); }
+
+@media (max-width: 1060px) {
+  .wk-page.is-ref .wk-sources { grid-template-columns: minmax(0, 1fr); }
+  .wk-sources > .pv2-wside { order: -1; }
+  .wk-weekdays { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+@media (max-width: 860px) {
+  /* One column: this week's list, the weekend, the weekdays, the month. */
+  .wk-sources { display: contents; }
+  .wk-sources > * { max-height: none; overflow: visible; margin: 0; padding: 0; }
+  .wk-sources > .pv2-wside { order: 1; }
+  .wk-page > .wk-days { order: 2; }
+  .wk-sources > .wk-sources-month { order: 3; }
+  .wk-sources-month .pv2-list { columns: 1; }
+  .wk-weekend-cells, .wk-weekdays { grid-template-columns: minmax(0, 1fr); }
+  .wk-cell { border-left: 0; border-top: 1px solid var(--color-neutral-200); padding: 10px 0 12px; }
+  .wk-cell:first-child { border-top: 0; }
+}
+/* The journal's big day numeral rule (header > span:first-child) must not
+   reach a header whose first word is a label (Sometime this weekend). */
+.pv2-days [data-testid="week-journal"] .wk-dayhead > .wk-dayname { font: 500 11px var(--font-family-sans); letter-spacing: .1em; }
+.wk-glyph.is-event, .wk-glyph.is-line { height: 1px; }
