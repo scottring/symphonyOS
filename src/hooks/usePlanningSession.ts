@@ -15,14 +15,17 @@ export function weekToken(weekStart: Date): string { return `${weekStart.getFull
  *  seasonToken() in lib/cadence/seasons — one definition, not two. */
 export function yearToken(year: number): string { return String(year) }
 
-type Saved = { at: Date; authorId: string; notes: { wentWell?: string; didnt?: string } }
+/** The session's notes. `focus` is the week's one line — "This week is
+ *  for…" (Scott, 2026-10-03) — kept in the same notes jsonb, no migration. */
+export type SessionNotes = { wentWell: string; didnt: string; focus?: string }
+type Saved = { at: Date; authorId: string; notes: { wentWell?: string; didnt?: string; focus?: string } }
 
 export type SessionHorizon = 'weekly' | 'monthly' | 'seasonal' | 'annual'
 
 export function usePlanningSession(horizon: SessionHorizon, token: string) {
   const { user } = useAuth()
   const [saved, setSaved] = useState<Saved | null>(null)
-  const [mine, setMine] = useState<{ wentWell: string; didnt: string } | null>(null)
+  const [mine, setMine] = useState<SessionNotes | null>(null)
   const [loading, setLoading] = useState(true)
   const [loadedToken, setLoadedToken] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -52,18 +55,18 @@ export function usePlanningSession(horizon: SessionHorizon, token: string) {
       return
     }
     const row = (data ?? []).find((r: { notes?: { savedAt?: string } }) => !!r.notes?.savedAt) as
-      { author_id: string; updated_at: string; notes: { wentWell?: string; didnt?: string; savedAt: string } } | undefined
+      { author_id: string; updated_at: string; notes: { wentWell?: string; didnt?: string; focus?: string; savedAt: string } } | undefined
     setSaved(row ? { at: new Date(row.notes.savedAt), authorId: row.author_id, notes: row.notes } : null)
     const own = (data ?? []).find((r: { author_id: string; notes?: { savedAt?: string } }) => r.author_id === user?.id && !!r.notes?.savedAt) as
-      { notes: { wentWell?: string; didnt?: string } } | undefined
-    setMine(own ? { wentWell: own.notes.wentWell ?? '', didnt: own.notes.didnt ?? '' } : null)
+      { notes: { wentWell?: string; didnt?: string; focus?: string } } | undefined
+    setMine(own ? { wentWell: own.notes.wentWell ?? '', didnt: own.notes.didnt ?? '', ...(own.notes.focus ? { focus: own.notes.focus } : {}) } : null)
     setLoadedToken(token)
     setLoading(false)
   }, [horizon, token, user?.id])
 
   useEffect(() => { void load() }, [load])
 
-  const save = useCallback(async (notes: { wentWell: string; didnt: string }): Promise<boolean> => {
+  const save = useCallback(async (notes: SessionNotes): Promise<boolean> => {
     if (!user?.id) return false
     const savedAt = new Date().toISOString()
     const { error } = await supabase.from('planning_sessions').upsert(
