@@ -125,6 +125,14 @@ became a grid on 2026-10-03.
   side. Each day's untimed routines fold to one line ("Routines · N"); timed
   ones stay on the day. Phones stack it: the list, the weekend, the weekdays,
   the month.
+- **Planning a week, in steps** (Scott, 2026-10-03: "more obviously
+  sequential"). The session is a guide over the same page: **Look back**
+  (last week's leftovers, one card at a time; skipped when there are none) ·
+  **Fixed points** (the days alone, only what can't move — events, timed
+  work, specials) · **Fill the week** (the month and this week's list over the
+  days, routines unfolded; everything drags) · **The plan** (the days alone,
+  read-only, then Mark planned). The bar numbers the steps with Back / Next
+  (`PlanMeetingBar` `steps`); Month and Season keep their two steps.
 - **The weekend band.** "Sometime this weekend" holds the weekend's window
   work once: Weekend-rule routines nobody has given a day, and tasks planned
   for the weekend with no day. A Sunday-start week has no band (its Saturday

@@ -3574,9 +3574,11 @@ button.pv2-pgroup-h:hover { color: var(--color-primary-700); }
 
 /* One top bar (Scott, 2026-09-30): ☰ and the weather at left, the horizon
    rail centred, Inbox · search · you at right. The bar pins as a whole. */
-.page-navigation:has(> .page-navigation-center) { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 12px; }
+.page-navigation:has(> .page-navigation-mid) { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 12px; }
+/* ☰ immediately left of the rail, the two centred together (2026-10-03). */
+.page-navigation-mid { display: flex; align-items: center; justify-content: center; gap: 6px; min-width: 0; }
 .page-navigation-left { display: flex; align-items: center; gap: 20px; min-width: 0; }
-.page-navigation:has(> .page-navigation-center) .page-navigation-utilities { justify-self: end; margin-left: 0; }
+.page-navigation:has(> .page-navigation-mid) .page-navigation-utilities { justify-self: end; margin-left: 0; }
 .page-navigation-center { display: flex; justify-content: center; min-width: 0; }
 .page-navigation-center:empty { display: none; }
 .desktop-workspace-nav:has(.page-navigation-center:not(:empty)) { position: sticky; top: 0; z-index: 14; background: var(--color-bg-base); transition: box-shadow .15s; }
@@ -3625,6 +3627,13 @@ html.rail-stuck .desktop-workspace-nav:has(.page-navigation-center:not(:empty)) 
    never grows wide enough for it beside the rail. */
 .page-navigation-lead .daybook-weather-line { white-space: nowrap; flex-wrap: nowrap; }
 .page-navigation-lead .daybook-weather-line > span:not([class]):not([data-testid]) { display: none; }
+/* The forecast cue ("Clear from 11 AM") made the line wider than its side of
+   the bar, and it ran over the rail (Scott, 2026-10-03). The header keeps
+   the temperature and high/low; the cue stays in the hourly popover and on
+   Today's masthead. Whatever the line holds, it never leaves its slot. */
+.page-navigation-lead [data-testid="weather-cue"], .page-navigation-lead .daybook-weather-range .daybook-weather-sep { display: none; }
+.page-navigation-lead { min-width: 0; flex-shrink: 1; }
+.page-navigation-lead .daybook-weather-line { max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
 /* Narrower windows: the rail keeps its numbers (the words stay in each
    step's tooltip) and the weather keeps its icon and temperature. */
 @media (max-width: 1180px) {

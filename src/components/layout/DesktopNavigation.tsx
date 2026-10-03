@@ -65,6 +65,11 @@ export function DesktopNavigation({ inboxCount, discussionsUnread, onSearch, onS
     <NavLink to="/today" className="page-navigation-brand" aria-label="Symphony, go to Today" title="Today">
       <img src="/symphony-logo.png" alt="" width={32} height={32} /><span className="page-navigation-wordmark">Symphony</span>
     </NavLink>
+    {leadRef && <div ref={leadRef} className="page-navigation-lead" />}
+    </div>
+    {/* The menu sits immediately left of the horizon rail, in the bar's
+        centre (Scott, 2026-10-03). */}
+    <div className="page-navigation-mid">
     {menu('more', <><Menu size={18} aria-hidden="true" />{discussionsUnread > 0 && <span className="navigation-count">{discussionsUnread}</span>}</>, <div className="page-navigation-more">
       <div className="page-navigation-groups">
         {groups.map(([group, items]) => <div key={group} role="group" aria-labelledby={`navigation-group-${group}`} className="page-navigation-group">
@@ -87,9 +92,8 @@ export function DesktopNavigation({ inboxCount, discussionsUnread, onSearch, onS
       </div>
     </div>, destinations.some(([, route]) => isDestinationActive(route, pathname)),
       { ariaLabel: discussionsUnread > 0 ? `More, ${discussionsUnread} unread discussions` : 'More', chevron: false, className: 'is-hamburger' })}
-    {leadRef && <div ref={leadRef} className="page-navigation-lead" />}
-    </div>
     {centerRef && <div ref={centerRef} className="page-navigation-center" />}
+    </div>
     <div className="page-navigation-utilities">
       {auxiliaryControls}
       <div ref={controlsRef} className="page-navigation-page-controls" />

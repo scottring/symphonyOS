@@ -123,5 +123,15 @@ describe('usePlanningSession', () => {
     expect(result.current.saved).toBeNull()
     expect(result.current.mine).toBeNull()
   })
-})
 
+  // Scott, 2026-10-03: "This week is for…" — one line, saved with the plan.
+  it('saves and reads back the week’s focus line', async () => {
+    rows.push({ author_id: 'u1', updated_at: '2026-10-03', notes: { wentWell: '', didnt: '', focus: 'Keep Monday light', savedAt: '2026-10-03T10:00:00Z' } })
+    const h = renderHook(() => usePlanningSession('weekly', '2026-10-3'))
+    await waitFor(() => expect(h.result.current.loading).toBe(false))
+    expect(h.result.current.saved?.notes.focus).toBe('Keep Monday light')
+    expect(h.result.current.mine?.focus).toBe('Keep Monday light')
+    await act(async () => { await h.result.current.save({ wentWell: '', didnt: '', focus: 'Yard and laundry reset' }) })
+    expect(upsert).toHaveBeenCalledWith(expect.objectContaining({ notes: expect.objectContaining({ focus: 'Yard and laundry reset' }) }), expect.anything())
+  })
+})

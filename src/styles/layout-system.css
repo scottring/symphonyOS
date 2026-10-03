@@ -374,3 +374,83 @@ p.wk-dayhint { margin: 8px 0 0; }
    reach a header whose first word is a label (Sometime this weekend). */
 .pv2-days [data-testid="week-journal"] .wk-dayhead > .wk-dayname { font: 500 11px var(--font-family-sans); letter-spacing: .1em; }
 .wk-glyph.is-event, .wk-glyph.is-line { height: 1px; }
+/* Fixed points (a planning step) leaves "Sometime" out: the weekend's two
+   days share the band rather than leave an empty third. */
+@media (min-width: 861px) {
+  .wk-weekend-cells:not(:has(.wk-sometime)) { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+/* ── Planning a week, in steps (2026-10-03) ─────────────────────────────
+   A step's own list at the left, the week filling up at the right (the
+   strip); the last step shows the week's shape — free time and who
+   carries what. */
+.wk-step { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr); gap: 36px; align-items: start; }
+.wk-step-main { min-width: 0; }
+.wk-step-side { position: sticky; top: 76px; min-width: 0; }
+.wk-step-title { margin: 0 0 2px; font: 400 26px/1.2 var(--font-family-display); color: var(--color-neutral-900); }
+.wk-step-ask { margin: 0 0 14px; font-size: 14px; color: var(--color-neutral-600); }
+.wk-group { padding: 14px 0 16px; border-top: 1px solid var(--color-neutral-200); }
+.wk-group-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.wk-group-title { font: 500 19px var(--font-family-display); color: var(--color-neutral-900); }
+.wk-group-meta { font-size: 11px; font-weight: 500; letter-spacing: .08em; text-transform: uppercase; color: var(--color-neutral-500); }
+.wk-group-ask { margin: 2px 0 8px; font-size: 13.5px; color: var(--color-neutral-600); }
+.wk-item { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 6px 0; font-size: 15px; color: var(--color-neutral-900); }
+.wk-item small { display: block; font-size: 12px; color: var(--color-neutral-500); }
+.wk-item-title { text-align: left; color: inherit; }
+.wk-item-title:hover { color: var(--color-neutral-950); text-decoration: underline; }
+.wk-acts { display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end; }
+.wk-act { border: 1px solid var(--color-neutral-300); background: var(--color-bg-elevated); border-radius: 8px; padding: 5px 10px; font-size: 12.5px; font-weight: 500; color: var(--color-neutral-800); cursor: pointer; }
+.wk-act:hover { border-color: var(--color-neutral-400); }
+.wk-act.is-on { background: var(--color-primary-700); border-color: var(--color-primary-700); color: #fff; }
+.wk-act-link { border: 0; background: none; padding: 0; font-size: 12.5px; font-weight: 500; color: var(--color-primary-700); cursor: pointer; }
+.wk-seg { display: inline-flex; border: 1px solid var(--color-neutral-300); border-radius: 8px; overflow: hidden; }
+.wk-seg button { border: 0; border-left: 1px solid var(--color-neutral-200); background: var(--color-bg-elevated); padding: 5px 9px; font-size: 12.5px; font-weight: 500; color: var(--color-neutral-700); cursor: pointer; }
+.wk-seg button:first-child { border-left: 0; }
+.wk-seg button.is-on { background: var(--color-primary-700); color: #fff; }
+.wk-none { margin: 2px 0; font: italic 400 14px var(--font-family-display); color: var(--color-neutral-500); }
+.wk-is-skipped { opacity: .45; }
+
+.wk-strip { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); border: 1px solid var(--color-neutral-300); border-radius: 12px; background: color-mix(in srgb, var(--color-bg-elevated) 45%, transparent); }
+.wk-strip-day { min-width: 0; padding: 10px 9px 12px; border-left: 1px solid var(--color-neutral-200); }
+.wk-strip-day:first-child { border-left: 0; }
+.wk-strip-day header, .wk-shape-day header { display: flex; align-items: baseline; gap: 4px; }
+.wk-strip-num { font: 200 24px/1 var(--pv2-num, 'Jost'), sans-serif; color: var(--color-neutral-900); }
+.wk-strip-name { font-size: 10.5px; font-weight: 500; letter-spacing: .1em; text-transform: uppercase; color: var(--color-neutral-600); }
+.wk-strip-day ul, .wk-shape-day ul { margin: 6px 0 0; padding: 0; list-style: none; }
+.wk-strip-day li button { display: block; width: 100%; padding: 2px 0; text-align: left; font-size: 12.5px; line-height: 1.3; color: var(--color-neutral-800); overflow-wrap: anywhere; }
+.wk-strip-day li.is-done button { color: var(--color-neutral-400); text-decoration: line-through; }
+.wk-strip-time { margin-right: 4px; color: var(--color-neutral-500); font-variant-numeric: tabular-nums; }
+.wk-strip-more { margin: 4px 0 0; font-size: 12px; color: var(--color-neutral-500); }
+.wk-strip-free, .wk-shape-free { margin: 6px 0 0; font-size: 11.5px; font-weight: 500; line-height: 1.35; color: hsl(150 40% 28%); }
+
+.wk-focus { display: block; margin: 0 0 18px; }
+.wk-focus span { display: block; margin-bottom: 6px; font: 400 24px var(--font-family-display); color: var(--color-neutral-900); }
+.wk-focus input { box-sizing: border-box; width: 100%; max-width: 760px; padding: 10px 12px; border: 1px solid var(--color-neutral-300); border-radius: 10px; background: var(--color-bg-elevated); font-size: 16px; color: var(--color-neutral-900); }
+.wk-people-pick { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 10px; }
+.wk-chip { border: 1px solid var(--color-neutral-300); background: var(--color-bg-elevated); border-radius: 999px; padding: 6px 12px; font-size: 12.5px; font-weight: 500; color: var(--color-neutral-700); cursor: pointer; }
+.wk-chip.is-on { background: var(--color-primary-700); border-color: var(--color-primary-700); color: #fff; }
+.wk-shape { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); border: 1px solid var(--color-neutral-300); border-radius: 12px; background: color-mix(in srgb, var(--color-bg-elevated) 45%, transparent); }
+.wk-shape-day { min-width: 0; padding: 10px 11px 14px; border-left: 1px solid var(--color-neutral-200); }
+.wk-shape-day:first-child { border-left: 0; }
+.wk-shape-note { margin: 4px 0 0; font: italic 400 13px/1.3 var(--font-family-display); color: var(--color-neutral-700); }
+.wk-shape-track { position: relative; height: 12px; margin: 10px 0 3px; border-radius: 6px; background: hsl(150 30% 90%); overflow: hidden; }
+.wk-shape-track span { position: absolute; top: 0; height: 12px; border-radius: 3px; background: var(--color-primary-700); opacity: .85; }
+.wk-shape-ticks { display: flex; justify-content: space-between; font-size: 10px; color: var(--color-neutral-500); }
+.wk-shape-day li { display: grid; grid-template-columns: 34px minmax(0, 1fr) auto; gap: 4px; align-items: start; padding: 3px 0; font-size: 13px; line-height: 1.3; }
+.wk-shape-day li button { text-align: left; color: var(--color-neutral-900); overflow-wrap: anywhere; }
+.wk-shape-day li.is-dim { opacity: .28; }
+.wk-shape-day li.is-done button { color: var(--color-neutral-400); text-decoration: line-through; }
+.wk-shape-time { font-size: 11.5px; color: var(--color-neutral-500); padding-top: 1px; font-variant-numeric: tabular-nums; }
+.wk-shape-people { display: flex; gap: 1px; }
+@media (max-width: 1060px) {
+  .wk-step { grid-template-columns: minmax(0, 1fr); }
+  .wk-step-side { position: static; }
+  .wk-strip, .wk-shape { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+@media (max-width: 860px) {
+  .wk-strip, .wk-shape { grid-template-columns: minmax(0, 1fr); }
+  .wk-strip-day, .wk-shape-day { border-left: 0; border-top: 1px solid var(--color-neutral-200); }
+  .wk-strip-day:first-child, .wk-shape-day:first-child { border-top: 0; }
+}
+.wk-focus-line { margin: 0 0 14px; font: 400 19px/1.3 var(--font-family-display); color: var(--color-neutral-900); }
+.wk-focus-line span { margin-right: 6px; font: 500 11px var(--font-family-sans); letter-spacing: .08em; text-transform: uppercase; color: var(--color-neutral-500); }
