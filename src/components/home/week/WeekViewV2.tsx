@@ -1197,8 +1197,20 @@ export function WeekViewV2(props: WeekViewV2Props) {
                     </div>
                   )
                 }
-                if (drag.activeDragId.startsWith('poolroutine:')) {
-                  const routine = routines.find((r) => r.id === drag.activeDragId!.slice('poolroutine:'.length))
+                // One drag rule (2026-10-03): a month line ('ref:<taskId>') and a
+                // routine occurrence ('occ:<routineId>:<day>') carry their pill too.
+                if (drag.activeDragId.startsWith('ref:')) {
+                  const task = tasks.find((t) => t.id === drag.activeDragId!.slice('ref:'.length))
+                  if (!task) return null
+                  return (
+                    <div className="pointer-events-none max-w-[260px] rounded-lg border border-primary-300 bg-white px-2 py-1.5 text-[13px] text-neutral-800 shadow-lg">
+                      {task.title}
+                    </div>
+                  )
+                }
+                if (drag.activeDragId.startsWith('poolroutine:') || drag.activeDragId.startsWith('occ:')) {
+                  const id = drag.activeDragId.startsWith('occ:') ? drag.activeDragId.split(':')[1] : drag.activeDragId.slice('poolroutine:'.length)
+                  const routine = routines.find((r) => r.id === id)
                   if (!routine) return null
                   return (
                     <div className="pointer-events-none max-w-[260px] rounded-lg border border-primary-200 bg-primary-50 px-2 py-1.5 text-[12.5px] font-semibold text-primary-800 shadow-lg">

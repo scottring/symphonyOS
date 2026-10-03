@@ -244,3 +244,60 @@
   }
   .pv2-wgrid.is-colscroll > .pv2-ref .pv2-refshelf > summary { padding: 4px 0 6px; }
 }
+
+/* ── The Week row (WeekRow, 2026-10-03) ─────────────────────────────────
+   One row in every column of the Week page: lane · mark · title · people ·
+   trailing. No white cards and no rules between rows; the shared hover tint
+   marks the row under your hand, and a grip shows at its left edge when it
+   can move (Scott: "if it can go somewhere else, it drags"). The box bleeds
+   12px past the column so its words sit on the column's edge. */
+.wk-row {
+  position: relative; display: grid; grid-template-columns: 20px minmax(0, 1fr) auto auto;
+  column-gap: 10px; align-items: start; margin: 0 -12px; padding: 6px 11px;
+  border: 1px solid transparent; border-radius: 12px; list-style: none;
+  font-size: var(--ds-text-row, 16px); line-height: 1.4; color: var(--color-neutral-900);
+  transition: background-color .12s, border-color .12s;
+}
+.wk-row.has-lane { grid-template-columns: 38px 20px minmax(0, 1fr) auto auto; }
+.wk-row.is-dense { font-size: 14.5px; padding: 5px 11px; column-gap: 8px; }
+.wk-row.is-dense.has-lane { grid-template-columns: 34px 18px minmax(0, 1fr) auto auto; }
+.wk-row:hover, .wk-row:focus-within {
+  background: color-mix(in srgb, var(--color-primary-50) 50%, transparent);
+  border-color: var(--color-primary-100);
+}
+.wk-row[data-movable="true"] { cursor: grab; touch-action: none; }
+.wk-row.is-dragging { opacity: .4; }
+.wk-row.is-missed { opacity: .5; }
+.wk-grip { position: absolute; left: -6px; top: 9px; color: var(--color-neutral-400); opacity: 0; transition: opacity .12s; pointer-events: none; }
+.wk-row:hover .wk-grip { opacity: 1; }
+.wk-lane { font-size: 12px; line-height: 22px; color: var(--color-neutral-500); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.wk-mark { display: flex; justify-content: center; padding-top: 2px; }
+.wk-check {
+  display: grid; place-items: center; width: 18px; height: 18px; border-radius: 9999px;
+  border: 1.5px solid var(--color-neutral-400); color: transparent; cursor: pointer;
+}
+.wk-row.is-dense .wk-check { width: 16px; height: 16px; }
+.wk-check.is-on { border-color: var(--color-primary-600); background: var(--color-primary-600); color: #fff; }
+.wk-glyph.is-event, .wk-glyph.is-line { width: 12px; height: 1.5px; margin-top: 9px; background: var(--color-neutral-400); }
+.wk-glyph.is-goal { width: 9px; height: 9px; margin-top: 5px; transform: rotate(45deg); background: var(--color-primary-700); }
+.wk-titleline { display: inline; }
+.wk-title { text-align: left; color: inherit; overflow-wrap: anywhere; }
+.wk-title:hover { color: var(--color-neutral-950); }
+.wk-row[data-mark="routine"] .wk-title, .wk-row[data-mark="line"] .wk-title { color: var(--color-neutral-700); }
+.wk-row[data-done="true"] .wk-title { color: var(--color-neutral-400); text-decoration: line-through; }
+.wk-repeat { display: inline-block; width: 12px; height: 12px; margin-left: 6px; vertical-align: -1px; color: var(--color-neutral-400); }
+.wk-meta { margin-top: 1px; font-size: var(--ds-text-meta, 12px); line-height: 1.35; color: var(--color-neutral-500); }
+.wk-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 4px; }
+.wk-people { display: flex; gap: 2px; padding-top: 1px; }
+.wk-trailing { display: flex; align-items: flex-start; gap: 6px; }
+@media (hover: hover) {
+  /* Pickers and month-line actions come up with the pointer or focus. */
+  .wk-row .wk-tools, .wk-row .pv2-refacts { display: none; }
+  .wk-row:hover .wk-tools, .wk-row:focus-within .wk-tools,
+  .wk-row:hover .pv2-refacts, .wk-row:focus-within .pv2-refacts, .wk-row.is-linked .pv2-refacts { display: flex; }
+}
+.wk-row .pv2-refacts { position: static; opacity: 1; padding: 0; background: none; gap: 8px; pointer-events: auto; }
+/* A month line lit by the week row it fed (hover), and flashed when shown. */
+.wk-row.is-linked { background: color-mix(in srgb, var(--color-primary-100) 70%, transparent); border-color: var(--color-primary-100); }
+.wk-row.is-flash { animation: pv2-flash 1.2s ease-out; }
+@media (prefers-reduced-motion: reduce) { .wk-row.is-flash { animation: none; } }

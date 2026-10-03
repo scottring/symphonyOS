@@ -18,14 +18,14 @@
 // week's own list ({kind:'allDay', dayIso} → useWeekDragDrop, past-day refusal
 // and undo included) and a native drop for rows dragged out of the Today pin.
 import { createElement, useState, type ReactNode } from 'react'
-import { useDraggable, useDroppable } from '@dnd-kit/core'
-import { Check, Plus } from 'lucide-react'
+import { useDroppable } from '@dnd-kit/core'
+import { Plus } from 'lucide-react'
 import type { Task } from '@/types/task'
 import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
 import { isMissedPlacement } from '@/lib/week/missedPlacement'
 import { journalTime, type ContextSpan } from '@/lib/week/journalSpread'
 import { planDropHandlers, type PlanDragPayload } from '@/lib/planning/planDrag'
-import { useMobile } from '@/hooks/useMobile'
+import { WeekRow } from '@/components/plan/v2/WeekRow'
 import type { DayForecast } from '@/hooks/useWeather'
 import { weatherCondition, weatherIcon } from '@/lib/weatherIcon'
 
@@ -82,85 +82,39 @@ function isToday(d: Date): boolean {
   return d.getFullYear() === n.getFullYear() && d.getMonth() === n.getMonth() && d.getDate() === n.getDate()
 }
 
-function Box({ entry, onToggle }: { entry: JournalEntry; onToggle: () => void }) {
-  return (
-    <button
-      type="button"
-      aria-label={entry.completed ? `Mark ${entry.title} not done` : `Complete ${entry.title}`}
-      onPointerDown={(e) => e.stopPropagation()}
-      onClick={(e) => { e.stopPropagation(); onToggle() }}
-      className="journal-check shrink-0"
-    >
-      <span aria-hidden="true" className={`grid h-4 w-4 place-items-center rounded-full border-[1.5px] ${entry.completed ? 'border-primary-600 bg-primary-600 text-white' : 'border-neutral-400 text-transparent'}`}>
-      <Check className="h-2.5 w-2.5" strokeWidth={3} /></span>
-    </button>
-  )
-}
-
-function Entry({ entry, day, onSelect, onToggle, dragEnabled, timingControl }: {
+function Entry({ entry, day, onSelect, onToggle, dragEnabled, timingControl, dense = false }: {
   entry: JournalEntry
   day: JournalDay
   onSelect: (id: string) => void
   onToggle: (entry: JournalEntry, day: JournalDay) => void
   dragEnabled: boolean
   timingControl?: WeekJournalProps['timingControl']
+  dense?: boolean
 }) {
-  // An untimed task drags to another day with the chip protocol (a different
-  // id from the grid chip's, so the two surfaces never share a registration).
-  const movable = dragEnabled && entry.kind === 'task' && !entry.time && !entry.completed && !!entry.task
-  const { listeners, setNodeRef, isDragging } = useDraggable({
-    id: `journal:${entry.task?.id ?? entry.id}`,
-    data: { kind: 'chip', taskId: entry.task?.id },
-    disabled: !movable,
-  })
+  // One drag rule (Scott, 2026-10-03): a task moves to another day — a timed
+  // one keeping its time — and a routine moves as that one occurrence. An
+  // event never moves; a done row stays where it was done.
+  const drag = !dragEnabled || entry.completed || entry.kind === 'event' ? null
+    : entry.kind === 'task' && entry.task ? { id: `journal:${entry.task.id}`, data: { kind: 'chip', taskId: entry.task.id, ...(entry.time ? { keepTime: true } : {}) } }
+    : entry.kind === 'routine' && entry.routineId ? { id: `occ:${entry.routineId}:${day.key}`, data: { kind: 'routineOcc', routineId: entry.routineId, fromIso: day.key, title: entry.title } }
+    : null
   // Its day passed without a tick — the live copy is back on the list; what
   // stays here is the record, faded.
   const missed = entry.task && !entry.time ? isMissedPlacement(entry.task.scheduledFor, entry.task.completed, new Date()) : false
-  // On a phone the timing chip takes its own line under the title; trailing
-  // it left the title ~30px wide (390px check, 2026-09-25).
-  const mobile = useMobile()
   return (
-    <li
-      ref={setNodeRef}
-      // Listeners only: the row stays a list item (dnd-kit's attributes would
-      // make it a role="button" tab stop, and this grid has no keyboard
-      // sensor — the pin and ⋯ menus are the keyboard path).
-      {...(movable ? listeners : {})}
-      className={`flex min-w-0 items-start gap-2 ${mobile ? 'flex-wrap' : ''} ${movable ? 'cursor-grab touch-none' : ''} ${isDragging ? 'opacity-40' : ''} ${missed ? 'opacity-50' : ''}`}
-    >
-      {entry.kind === 'event'
-        ? <span aria-hidden="true" className="mt-[9px] h-px w-3.5 shrink-0 bg-neutral-400" />
-        : <Box entry={entry} onToggle={() => onToggle(entry, day)} />}
-      <button
-        type="button"
-        onClick={() => onSelect(entry.id)}
-        title={missed ? `${entry.title} — didn't happen` : entry.title}
-        className="journal-entry-title min-w-0 flex-1 text-left leading-snug hover:text-neutral-950"
-      >
-        {entry.time && (
-          <time dateTime={entry.time.toISOString()} className="mr-1.5 text-[12px] tabular-nums text-neutral-400">
-            {journalTime(entry.time)}
-          </time>
-        )}
-        <span className={`break-words ${entry.completed ? 'text-neutral-400 line-through' : entry.kind === 'routine' ? 'text-neutral-600' : 'text-neutral-800'}`}>
-          {entry.title}
-        </span>
-        {entry.subtitle && (
-          <span className="journal-entry-sub ml-1.5 text-[12px] text-neutral-500 break-words">{entry.subtitle}</span>
-        )}
-      </button>
-      {timingControl && entry.task && !entry.completed && (
-        // The row itself carries the drag listeners, so the control swallows
-        // the pointer before they see it — the same guard the checkbox uses.
-        <span
-          className={`journal-entry-when ${mobile ? 'basis-full pl-7' : 'shrink-0'}`}
-          onPointerDown={(e) => e.stopPropagation()}
-          onClick={(e) => e.stopPropagation()}
-        >
-          {timingControl(entry.task)}
-        </span>
-      )}
-    </li>
+    <WeekRow
+      mark={entry.kind}
+      title={entry.title}
+      lane={entry.time ? journalTime(entry.time) : ''}
+      completed={entry.completed}
+      onToggle={entry.kind === 'event' ? undefined : () => onToggle(entry, day)}
+      onOpen={() => onSelect(entry.id)}
+      meta={entry.subtitle ? <span className="journal-entry-sub">{entry.subtitle}</span> : undefined}
+      trailing={timingControl && entry.task && !entry.completed ? <span className="journal-entry-when">{timingControl(entry.task)}</span> : undefined}
+      drag={drag}
+      dense={dense}
+      rowProps={{ className: missed ? 'is-missed' : undefined, title: missed ? `${entry.title} — didn't happen` : undefined }}
+    />
   )
 }
 

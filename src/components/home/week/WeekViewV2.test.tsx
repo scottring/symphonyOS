@@ -216,7 +216,8 @@ describe('WeekViewV2 journal spread', () => {
     const entries = [...within(monday.getByRole('list', { name: 'Schedule entries' })).getAllByRole('listitem'), ...within(monday.getByRole('list', { name: 'Any time entries' })).getAllByRole('listitem')]
     // The title only: a task row also wears the shared timing control, which
     // is asserted separately below.
-    expect(entries.map((li) => li.querySelector('.journal-entry-title')?.textContent)).toEqual([
+    // The time sits in the row's margin lane (WeekRow, 2026-10-03).
+    expect(entries.map((li) => `${li.querySelector('.wk-lane')?.textContent ?? ''}${li.querySelector('.wk-title')?.textContent}`)).toEqual([
       '6:50aGutter quotes',
       '10aPT appointment',
       '2:30pCall the bank',

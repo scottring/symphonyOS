@@ -38,6 +38,7 @@ import { FocusDeck, CloseOut, type CloseDecision } from './FocusDeck'
 import { FromPaper } from './FromPaper'
 import { ViewSwitch } from './ViewSwitch'
 import { WeekListV2 } from './WeekListV2'
+import { WeekRow } from './WeekRow'
 import { useAddArea } from './AddArea'
 import { useAssigneeFilter } from '@/hooks/useAssigneeFilter'
 import { planPeopleLens } from '@/lib/planning/peopleLens'
@@ -325,11 +326,15 @@ export function WeekV2({ tasks, weekStart, meId, isCurrent, days, onSelectTask, 
                   <div className="pv2-colh">{m.name} <small>(for reference)</small></div>
                   {m.rows.length ? (
                     <ul className="pv2-list">{m.rows.map((t) => (
-                      <li key={t.id} data-ref-id={t.id} className={`pv2-rrow pv2-rrow-sans is-stacked${litParent === t.id || childOf?.id === t.id ? ' is-linked' : ''}`}>
-                        {t.isGoal ? <span className="pv2-goal is-small" aria-hidden="true" /> : <span className="pv2-dash" style={{ marginTop: 10 }} aria-hidden="true" />}
-                        <button type="button" className="flex-1 text-left" onClick={() => onSelectTask(t.id)}>{t.title}
-                          {stepsThisWeek(t.id) > 0 && <span className="pv2-stepcount block">In this week’s list</span>}</button>
-                        <span className="pv2-refacts">
+                      // The same row every column draws; a month line drags onto
+                      // the list or straight onto a day (one drag rule,
+                      // 2026-10-03). A goal stays on its month: its next step
+                      // is what comes into the week.
+                      <WeekRow key={t.id} mark={t.isGoal ? 'goal' : 'line'} title={t.title} onOpen={() => onSelectTask(t.id)}
+                        drag={dragEnabled && !t.isGoal ? { id: `ref:${t.id}`, data: { kind: 'refLine', taskId: t.id } } : null}
+                        meta={stepsThisWeek(t.id) > 0 ? <span className="pv2-stepcount">In this week’s list</span> : undefined}
+                        rowProps={{ 'data-ref-id': t.id, className: litParent === t.id || childOf?.id === t.id ? 'is-linked' : undefined }}
+                        trailing={<span className="pv2-refacts">
                           {!t.isGoal && <button type="button" className="pv2-addbtn" onClick={() => void takeIn(t, m.name)} aria-label={`Add ${t.title} to this week`}>+ This week</button>}
                           {/* The same words the Month and Season pages use beside a
                               goal (walkthrough 2026-09-30: "+ Next step" here,
@@ -337,8 +342,7 @@ export function WeekV2({ tasks, weekStart, meId, isCurrent, days, onSelectTask, 
                           <button type="button" className="pv2-addbtn" onClick={() => setChildOf(t)}
                             title={t.isGoal ? `Add week ${weekNo}’s next step for “${t.title}” — it stays linked to that goal` : `Add a step of “${t.title}” to week ${weekNo}`}
                             aria-label={`Add a ${t.isGoal ? 'next step' : 'step'} for ${t.title} to this week`}>{t.isGoal ? `+ Week ${weekNo}’s part` : '+ Step'}</button>
-                        </span>
-                      </li>
+                        </span>} />
                     ))}</ul>
                   ) : <p className={`pv2-hint${tasksLoading ? '' : ' ds-empty-body'}`}>{tasksLoading ? 'Loading…' : `Nothing open on ${m.name}’s plan.`}</p>}
                   <button type="button" className="pv2-link" style={{ marginTop: 8 }} onClick={() => navigate(`/month?start=${localYmd(m.start)}`)}>Open {m.name} →</button>
