@@ -4,12 +4,16 @@ import { MemoryRouter } from 'react-router-dom'
 import { DesktopNavigation } from './DesktopNavigation'
 
 describe('DesktopNavigation — one bar on every page (2026-09-29)', () => {
-  it('the menu at the left; Inbox (a count, no word), search and the account at the right — no Add', () => {
+  // Scott, 2026-10-03: the menu immediately left of the rail, in the centre.
+  it('the menu just before the rail; Inbox (a count, no word), search and the account at the right — no Add', () => {
     render(<MemoryRouter initialEntries={['/week']}>
-      <DesktopNavigation inboxCount={3} discussionsUnread={0} onSearch={vi.fn()} onSignOut={vi.fn()} paused={false} controlsRef={() => {}} />
+      <DesktopNavigation inboxCount={3} discussionsUnread={0} onSearch={vi.fn()} onSignOut={vi.fn()} paused={false} controlsRef={() => {}} centerRef={() => {}} />
     </MemoryRouter>)
     const nav = screen.getByRole('navigation', { name: 'Main navigation' })
-    expect(nav.firstElementChild).toContainElement(screen.getByRole('button', { name: 'More' }))
+    const mid = nav.querySelector('.page-navigation-mid') as HTMLElement
+    expect(mid).toContainElement(screen.getByRole('button', { name: 'More' }))
+    expect(mid.lastElementChild?.className).toBe('page-navigation-center')
+    expect(nav.querySelector('.page-navigation-left')).not.toContainElement(screen.getByRole('button', { name: 'More' }))
     const right = nav.querySelector('.page-navigation-utilities') as HTMLElement
     const inbox = within(right).getByRole('link', { name: 'Inbox, 3 items' })
     expect(inbox.textContent).toBe('3')
