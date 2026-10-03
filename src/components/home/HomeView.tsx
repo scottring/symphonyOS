@@ -43,6 +43,7 @@ import { UndoToast } from '@/components/undo/UndoToast'
 import { HomeHeader } from '@/components/home/HomeHeader'
 import { PlanMastheadSlotsContext } from '@/components/plan/v2/planMastheadSlots'
 import { CalendarReconnectBanner } from '@/components/home/CalendarReconnectBanner'
+import { PLANNING_PAGE_CLASS } from '@/components/layout/pageLayout'
 
 interface HomeViewProps {
   tasks: Task[]
@@ -261,11 +262,11 @@ export function HomeView({
   const planSlots = useMemo(
     () => (planSlotsOn && planSublineHost && planControlsHost ? { subline: planSublineHost, controls: planControlsHost } : null),
     [planSlotsOn, planSublineHost, planControlsHost])
-  // Week reads in the one column (880px, PAGE_COLUMN's width, left-aligned);
-  // its hourly grid is a canvas and keeps the full width (lg+, where it is
-  // drawn — below lg the journal stands in for it).
+  // Week is a planning page: it fills the screen up to 1600px of content
+  // (Scott, 2026-10-03); its hourly grid is a canvas and keeps the full width
+  // (lg+, where it is drawn — below lg the journal stands in for it).
   const weekColumn = (currentView === 'week' || currentView === 'workweek') && isWeekV2Enabled()
-    ? ` week-column w-full max-w-[992px] mx-auto${weekMode === 'schedule' ? ' lg:max-w-none' : ''}`
+    ? ` week-column w-full max-w-[1712px] mx-auto ${PLANNING_PAGE_CLASS}${weekMode === 'schedule' ? ' lg:max-w-none' : ''}`
     : ''
   // Set by goToWeek and onRangeChange: the run they just wrote into the URL is
   // already on screen, so re-deriving it would only undo the Schedule/Journal

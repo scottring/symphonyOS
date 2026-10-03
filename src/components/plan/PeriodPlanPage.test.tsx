@@ -1012,7 +1012,7 @@ describe('PeriodPlanPage masthead', () => {
     expect(within(eyebrow).getByLabelText('Previous month')).toBeInTheDocument()
     expect(within(eyebrow).getByLabelText('Next month')).toBeInTheDocument()
     // The one page column (layout system), so the cards line up page to page.
-    expect(card.parentElement?.className).toMatch(/max-w-\[992px\]/)
+    expect(card.parentElement?.className).toMatch(/max-w-\[1152px\]/)
   })
 })
 

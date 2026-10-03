@@ -181,7 +181,11 @@
    the middle list isn't squeezed to ~250px. One page, one width at a time;
    the left edge never moves. */
 @media (min-width: 768px) {
-  :root:has(.pv2-wgrid.is-ref, .pv2-grid3) :is(.pv2-page, .week-column) { max-width: 1152px; }
+  /* A planning page fills the screen (Scott, 2026-10-03): its root carries
+     .planning-page (PLANNING_PAGE_CLASS), and the shell's frame — header,
+     page, guide — widens with it. */
+  :root:has(.planning-page) { --frame-max: 1712px; }
+  .pv2-page.planning-page { max-width: 1712px; }
 }
 
 /* The page scroller always reserves its scrollbar, so a page long enough to
