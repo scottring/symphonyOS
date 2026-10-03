@@ -16,6 +16,7 @@ import { focusDays } from '@/lib/placement/model'
 import { eventDays, isMultiDayEvent } from '@/lib/week/journalSpread'
 import { routineDayIndex, routineDayState, routineIdOf } from '@/lib/planning/weekDensity'
 import { weekendBand, sometimeThisWeekend } from '@/lib/week/weekendBand'
+import { assigneesOf } from '@/lib/planning/v2/planV2'
 
 export interface JournalEntry {
   /** Selectable id — 'task-<uuid>', 'event-<id>', 'routine-<id>'. */
@@ -23,6 +24,8 @@ export interface JournalEntry {
   kind: 'event' | 'task' | 'routine'
   /** Present when the entry has a time. */
   time?: Date
+  /** When it ends, when known (the day's shape; a time alone takes 30 min). */
+  end?: Date
   title: string
   subtitle?: string
   completed: boolean
@@ -30,6 +33,8 @@ export interface JournalEntry {
   task?: Task
   /** Routines: the occurrence's routine id, for completion. */
   routineId?: string
+  /** Who carries it (family member ids); none for a calendar event. */
+  people?: string[]
 }
 
 export interface JournalDay {
@@ -87,7 +92,7 @@ export function buildJournalDays(a: BuildJournalDaysArgs): { days: JournalDay[];
   const seen = new Set<string>()
   for (const t of a.tasks) {
     const entry = (time?: Date): JournalEntry => ({
-      id: `task-${t.id}`, kind: 'task', time, title: t.title, subtitle: a.labelFor(t), completed: t.completed, task: t,
+      id: `task-${t.id}`, kind: 'task', time, end: time ? (t as Task & { endTime?: Date }).endTime : undefined, title: t.title, subtitle: a.labelFor(t), completed: t.completed, task: t, people: assigneesOf(t),
     })
     if (t.scheduledFor) {
       const key = localYmd(t.scheduledFor)
@@ -115,7 +120,7 @@ export function buildJournalDays(a: BuildJournalDaysArgs): { days: JournalDay[];
     // A multi-day timed event (on call Mon 9am → Fri 5pm) is listed once
     // above the days, not as an entry on its first day.
     if (source && isMultiDayEvent(source)) continue
-    timed.get(key)!.push({ id: item.id, kind: 'event', time: item.startTime, title: item.title, subtitle: item.subtitle, completed: false })
+    timed.get(key)!.push({ id: item.id, kind: 'event', time: item.startTime, end: item.endTime ?? undefined, title: item.title, subtitle: item.subtitle, completed: false })
   }
 
   for (const ev of a.events) {
@@ -151,7 +156,7 @@ export function buildJournalDays(a: BuildJournalDaysArgs): { days: JournalDay[];
       continue
     }
     const entry: JournalEntry = {
-      id: r.id, kind: 'routine', time: r.startTime ?? undefined, title: r.title, completed, routineId,
+      id: r.id, kind: 'routine', time: r.startTime ?? undefined, end: r.startTime ? r.endTime ?? undefined : undefined, title: r.title, completed, routineId, people: routinePeople(r),
     }
     if (r.startTime) timed.get(day.key)!.push(entry)
     else if (planned || pinned || dayBound || completed) day.foldedRoutines.push(entry)
@@ -180,11 +185,11 @@ export function buildJournalDays(a: BuildJournalDaysArgs): { days: JournalDay[];
       sometime: [
         ...kept.map((routine): JournalEntry => {
           const r = firstItem.get(routine.id)!
-          return { id: r.id, kind: 'routine', time: r.startTime ?? undefined, title: r.title, completed: false, routineId: routine.id }
+          return { id: r.id, kind: 'routine', time: r.startTime ?? undefined, title: r.title, completed: false, routineId: routine.id, people: routinePeople(r) }
         }),
         ...(a.weekendTasks ?? [])
           .filter((t) => !t.completed && !t.scheduledFor && t.weekendStart && localYmd(t.weekendStart) === satKey)
-          .map((t): JournalEntry => ({ id: `task-${t.id}`, kind: 'task', title: t.title, subtitle: a.labelFor(t), completed: false, task: t })),
+          .map((t): JournalEntry => ({ id: `task-${t.id}`, kind: 'task', title: t.title, subtitle: a.labelFor(t), completed: false, task: t, people: assigneesOf(t) })),
       ],
     }
   }
@@ -196,4 +201,11 @@ export function buildJournalDays(a: BuildJournalDaysArgs): { days: JournalDay[];
     d.foldedRoutines.sort((x, y) => Number(x.completed) - Number(y.completed))
   }
   return { days, weekend }
+}
+
+/** A routine's people: its members, or its one legacy assignee. */
+function routinePeople(r: TimelineItem): string[] {
+  const routine = r.originalRoutine
+  if (!routine) return []
+  return routine.assigned_to_all ?? (routine.assigned_to ? [routine.assigned_to] : [])
 }

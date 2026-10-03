@@ -26,6 +26,8 @@ import { isMissedPlacement } from '@/lib/week/missedPlacement'
 import { journalTime, type ContextSpan } from '@/lib/week/journalSpread'
 import { planDropHandlers, type PlanDragPayload } from '@/lib/planning/planDrag'
 import { WeekRow } from '@/components/plan/v2/WeekRow'
+import { WeekStrip, WeekShape } from './WeekViews'
+import type { FamilyMember } from '@/types/family'
 import type { DayForecast } from '@/hooks/useWeather'
 import { weatherCondition, weatherIcon } from '@/lib/weatherIcon'
 
@@ -60,6 +62,12 @@ interface WeekJournalProps {
   show?: 'all' | 'fixed'
   routinesOpen?: boolean
   readOnly?: boolean
+  /** A compact view for planning in steps: the week beside a step, or the
+   *  finished week's shape (WeekViews). */
+  variant?: 'strip' | 'shape'
+  /** The shape's person: their things in full, others' faded. */
+  person?: string
+  members?: FamilyMember[]
   /**
    * The same in-place timing control the week's list and the period pages
    * wear, supplied by the host. Without it a task that moved out of "Any day"
@@ -419,7 +427,9 @@ function WeekGridDays({ days, weekend, forecast, fixedOnly = false, ...cell }: {
   )
 }
 
-export function WeekJournal({ days, weekend = null, spans, onSelectItem, onToggleEntry, onPlanDrop, onAddToDay: addToDay, dragEnabled: canDrag = true, narrow = false, layout = 'rows', timingControl: timing, forecast, show = 'all', routinesOpen = false, readOnly = false }: WeekJournalProps) {
+export function WeekJournal({ days, weekend = null, spans, onSelectItem, onToggleEntry, onPlanDrop, onAddToDay: addToDay, dragEnabled: canDrag = true, narrow = false, layout = 'rows', timingControl: timing, forecast, show = 'all', routinesOpen = false, readOnly = false, variant, person, members = [] }: WeekJournalProps) {
+  if (variant === 'strip') return <WeekStrip days={days} onSelectItem={onSelectItem} />
+  if (variant === 'shape') return <WeekShape days={days} members={members} person={person} onSelectItem={onSelectItem} />
   // The finished plan is read: nothing moves, nothing is added or retimed.
   const dragEnabled = canDrag && !readOnly
   const onAddToDay = readOnly ? undefined : addToDay
