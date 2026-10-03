@@ -314,12 +314,18 @@
 .wk-page.is-ref .wk-sources { grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); }
 .wk-page:not(.is-ref) .wk-sources > .pv2-wside { max-width: 640px; }
 .wk-sources > * {
-  position: relative; max-height: 24rem; overflow-y: auto; scrollbar-width: thin;
+  /* About nine rows, less on a short window (a laptop) so the days start
+     near the top. */
+  position: relative; max-height: min(24rem, 30vh); overflow-y: auto; overflow-x: hidden; scrollbar-width: thin;
   margin: 0 -14px 0 -22px; padding: 0 14px 0 22px;
 }
 .wk-sources .pv2-wside { position: relative; top: auto; }
+/* The reference column's own rule (index.css: .pv2-week .pv2-ref, no cap)
+   is more specific; the band's cap must win. */
+.pv2-week .wk-sources > .pv2-ref { max-height: min(24rem, 30vh); overflow-y: auto; overflow-x: hidden; }
+@media (max-width: 860px) { .pv2-week .wk-sources > .pv2-ref { max-height: none; overflow: visible; } }
 .wk-sources .pv2-colh { position: sticky; top: 0; z-index: 2; background: var(--pv2-colh-bg); background-attachment: fixed; }
-.wk-sources-month .pv2-list { columns: 2; column-gap: 40px; }
+.wk-sources-month .pv2-list { columns: 240px 3; column-gap: 40px; }
 .wk-sources-month .wk-row { break-inside: avoid; }
 
 .wk-grid { display: flex; flex-direction: column; gap: 18px; }
