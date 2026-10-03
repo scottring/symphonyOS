@@ -124,7 +124,10 @@ export function PlanToolbarControls(props: PlanToolbarProps) {
 }
 
 
-export function PlanMeetingBar({ period, prevName, step, lookBack, why, onStep, viewSwitch, tools, onLeave, onSave, saveLabel }: {
+/** One step of a planning session (Week's four, 2026-10-03). */
+export interface MeetingStep { key: string; label: string }
+
+export function PlanMeetingBar({ period, prevName, step, lookBack, why, onStep, viewSwitch, tools, onLeave, onSave, saveLabel, steps, stepKey, onStepKey }: {
   period: string
   prevName: string
   step: 1 | 2
@@ -139,7 +142,35 @@ export function PlanMeetingBar({ period, prevName, step, lookBack, why, onStep, 
   onLeave: () => void
   onSave: () => void
   saveLabel: string
+  /** A session in named steps (Scott, 2026-10-03: "more obviously
+   *  sequential"). Without it, the two-step look back / plan bar. */
+  steps?: MeetingStep[]
+  stepKey?: string
+  onStepKey?: (key: string) => void
 }) {
+  if (steps && stepKey && onStepKey) {
+    const i = Math.max(0, steps.findIndex((s) => s.key === stepKey))
+    const last = i === steps.length - 1
+    return (
+      <div className="pv2-sbar" role="region" aria-label={`Planning ${period}`}>
+        <span className="pv2-st">Planning<small>{period}</small></span>
+        <div className="pv2-steps">
+          {steps.map((s, n) => (
+            <button key={s.key} type="button" aria-current={n === i ? 'step' : undefined} onClick={() => onStepKey(s.key)}><b>{n + 1}</b>{s.label}</button>
+          ))}
+        </div>
+        {tools}
+        {viewSwitch}
+        <button type="button" className="pv2-link pv2-quiet" onClick={onLeave}>Leave for now</button>
+        {i > 0 && <button type="button" className="pv2-qbtn" onClick={() => onStepKey(steps[i - 1].key)}>← Back</button>}
+        {!last && <button type="button" className="pv2-btn" onClick={() => onStepKey(steps[i + 1].key)}>Next: {steps[i + 1].label} →</button>}
+        {/* Marking planned stays reachable on every step, and is the last
+            step's own verb. */}
+        <button type="button" className={last ? 'pv2-btn' : 'pv2-qbtn'} onClick={onSave}>{saveLabel}</button>
+        <p className="pv2-sbar-why" aria-live="polite">{why}</p>
+      </div>
+    )
+  }
   return (
     <div className="pv2-sbar" role="region" aria-label={`Planning ${period}`}>
       <span className="pv2-st">Planning<small>{period}</small></span>
