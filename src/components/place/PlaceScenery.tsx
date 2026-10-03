@@ -20,11 +20,12 @@ import { useMediaQuery } from '@/hooks/useMediaQuery'
  * matters: the woodblock veils fade over the same share of their width. */
 const VEIL_FADE = 64
 const ART_WIDTH = 1506
-/** A short desktop window (a laptop): the landscape took a quarter of the
- * height, so planning ran out of room (Scott, 2026-10-03: "an automatic
- * high-transparency view on a smaller screen, so that the content goes all
- * the way to the bottom"). There it stands faint BEHIND the page, takes no
- * pointer and holds back only a small margin. Phones keep the full scene. */
+/** Faint: the scene stands BEHIND the page at a tenth of its strength, takes
+ * no pointer and holds back only a small margin, so content runs to the
+ * bottom of the window. It is the default (Scott, 2026-10-03: "I may like the
+ * higher transparency, low opacity look better than the default"); a person
+ * who chose the full scene still gets faint on a short desktop window (a
+ * laptop), where the landscape took a quarter of the height. */
 export const FAINT_SCENERY_QUERY = '(min-width: 768px) and (max-height: 1000px)'
 const FAINT_CLEARANCE = 16
 
@@ -34,14 +35,15 @@ export function PlaceScenery({ scroller, right = 0, floor }: {
   floor?: string
 }) {
   const place = usePlaceOrDefault()
-  const { showScenery, sceneryLighting, sceneryStyle } = useSceneryPreferences()
+  const { showScenery, sceneryLighting, sceneryStyle, sceneryScene } = useSceneryPreferences()
   const art = sceneryArt(sceneryStyle, place, sceneryLighting)
   const box = useRef<HTMLDivElement>(null)
   const catcher = useRef<HTMLDivElement>(null)
   // How much of the window's bottom the scene conceals (over the text
   // column), kept outside React state: it follows the window's width.
   const height = useRef(0)
-  const faint = useMediaQuery(FAINT_SCENERY_QUERY)
+  const shortWindow = useMediaQuery(FAINT_SCENERY_QUERY)
+  const faint = sceneryScene === 'faint' || shortWindow
 
   useEffect(() => {
     const el = box.current

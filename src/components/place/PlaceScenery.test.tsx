@@ -84,8 +84,16 @@ describe('foreground scenery', () => {
     unmount()
     window.matchMedia = original
   })
-  it('a tall window keeps the full scene', () => {
-    const { container } = render(<PlaceScenery scroller={null} />)
-    expect(container.querySelector('[data-place-scenery]')).not.toHaveClass('is-faint')
+  // Scott, 2026-10-03: "I may like the higher transparency, low opacity
+  // look better than the default" — faint is the default; full is a choice.
+  it('is faint by default, and full when chosen on a tall window', () => {
+    const { container, unmount } = render(<PlaceScenery scroller={null} />)
+    expect(container.querySelector('[data-place-scenery]')).toHaveClass('is-faint')
+    unmount()
+    localStorage.setItem('symphony-scenery-scene', 'full')
+    const full = render(<PlaceScenery scroller={null} />)
+    expect(full.container.querySelector('[data-place-scenery]')).not.toHaveClass('is-faint')
+    full.unmount()
+    localStorage.removeItem('symphony-scenery-scene')
   })
 })

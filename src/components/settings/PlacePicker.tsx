@@ -5,14 +5,14 @@
 import { PLACES } from '@/config/places'
 import { usePlace } from '@/hooks/usePlace'
 import { sceneryArt } from '@/components/place/panoramas'
-import { nextAutomaticChange, useSceneryPreferences, type SceneryLightingChoice, type SceneryStyle } from '@/hooks/useSceneryPreferences'
+import { nextAutomaticChange, useSceneryPreferences, type SceneryLightingChoice, type SceneryScene, type SceneryStyle } from '@/hooks/useSceneryPreferences'
 import { SectionHeading } from '@/components/layout/SectionHeading'
 
 const LIGHTING_LABEL = { 'daytime': 'Daytime', 'dusk-dawn': 'Dusk / Dawn', 'nighttime': 'Nighttime' } as const
 
 export function PlacePicker() {
   const { place, setPlace } = usePlace()
-  const { showScenery, setShowScenery, sceneryLighting, lightingChoice, setSceneryLighting, sceneryStyle, setSceneryStyle } = useSceneryPreferences()
+  const { showScenery, setShowScenery, sceneryLighting, lightingChoice, setSceneryLighting, sceneryStyle, setSceneryStyle, sceneryScene, setSceneryScene } = useSceneryPreferences()
   const next = lightingChoice === 'auto' ? nextAutomaticChange() : null
 
   return (
@@ -30,6 +30,14 @@ export function PlacePicker() {
           <span><strong>Show scenery</strong><small>Turn off for more content space. Your theme colours stay.</small></span>
         </label>
         <div className="flex flex-wrap items-center gap-4">
+        {/* Faint behind the page (the default), or the full scene in front at
+            the foot of the window. */}
+        <label className="place-art-setting">Scene
+          <select value={sceneryScene} onChange={e => setSceneryScene(e.target.value as SceneryScene)}>
+            <option value="faint">Faint, behind the page</option>
+            <option value="full">Full, at the foot of the page</option>
+          </select>
+        </label>
         {/* Painted landscapes or woodblock prints, under the same sky. */}
         <label className="place-art-setting">Style
           <select value={sceneryStyle} onChange={e => setSceneryStyle(e.target.value as SceneryStyle)}>
@@ -52,7 +60,7 @@ export function PlacePicker() {
           <>Automatic follows sunrise and sunset: now {LIGHTING_LABEL[sceneryLighting]}
             {next ? `, changing at ${new Date(next).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}` : ''}. </>
         )}
-        Scenery visibility, style and lighting are saved on this device.
+        Scenery visibility, scene, style and lighting are saved on this device. Short windows always get the faint scene.
       </p>
       <div className="place-theme-grid">
         {PLACES.map((p) => {
