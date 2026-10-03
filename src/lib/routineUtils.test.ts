@@ -246,3 +246,19 @@ describe('matchesRecurrenceForDate — weekend', () => {
     expect(matchesRecurrenceForDate(routine, laborMon, laborSat)).toBe(false)
   })
 })
+
+// Scott's "Weed the backyard" (2026-10-03): every OTHER weekend, done once.
+describe('matchesRecurrenceForDate — weekend, every other weekend', () => {
+  const routine = { recurrence_pattern: { type: 'weekend', interval: 2, start_date: '2026-09-05' } } as never
+  it('offers it on both days of an on-weekend', () => {
+    expect(matchesRecurrenceForDate(routine, new Date(2026, 9, 3), null)).toBe(true)
+    expect(matchesRecurrenceForDate(routine, new Date(2026, 9, 4), null)).toBe(true)
+  })
+  it('stays quiet on the weekend in between', () => {
+    expect(matchesRecurrenceForDate(routine, new Date(2026, 9, 10), null)).toBe(false)
+    expect(matchesRecurrenceForDate(routine, new Date(2026, 9, 11), null)).toBe(false)
+  })
+  it('not before it starts', () => {
+    expect(matchesRecurrenceForDate(routine, new Date(2026, 7, 22), null)).toBe(false)
+  })
+})
