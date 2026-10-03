@@ -96,17 +96,21 @@ Agreed with Scott 2026-10-02.
 
 Agreed with Scott 2026-10-02 (Week page; Month and Season followed).
 
-- **Side by side, each column scrolls.** On Week (days, list, month
-  reference), Month (dates, list, season reference) and Season (list, year
-  reference) each column fills the room from the column headings down to the
+- **Source first.** Side-by-side columns read left to right as planning
+  moves (Scott, 2026-10-03): the level above, the period's list, then its
+  own time. Week: month · list · days (List view: list · days). Month:
+  season · list · dates (List view: list · dates). Season: year · list.
+- **Side by side, each column scrolls.** On Week (month reference, list,
+  days), Month (season reference, list, dates) and Season (year reference,
+  list) each column fills the room from the column headings down to the
   landscape and scrolls independently; the page itself does not scroll.
   Mark the grid `is-colscroll` and give it the ref `useColumnsFitWindow()`
   returns; it measures that room into `--pv2-col-h` (window height − grid
   top − `--scenery-clearance`, at least 360px). Year is one column and keeps
   the page scroll.
 - **Headings hold the top.** Each column's heading pins at its top. In the
-  reference column every section heading (each month, the level above,
-  "Earlier, not done", routines) holds until its own list ends, then the
+  reference column every section heading (each month of a week that
+  crosses a month end) holds until its own list ends, then the
   next pushes it off. Pinned headings wear the page's own background (the
   fixed sky).
 - **Stacked columns keep one page scroll** (below 861px). On Week the month

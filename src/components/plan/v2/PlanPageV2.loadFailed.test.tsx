@@ -34,7 +34,6 @@ vi.mock('@/contexts/GoalsContext', () => ({
 }))
 vi.mock('./AddArea', () => ({ useAddArea: () => ({ area: undefined, picker: null }) }))
 vi.mock('./FromPaper', () => ({ FromPaper: () => null }))
-vi.mock('./RefShelves', () => ({ PeriodRefRoutines: () => null }))
 vi.mock('@/components/domain/DomainSwitcher', () => ({ DomainSwitcher: () => null }))
 
 import { PlanPageV2 } from './PlanPageV2'

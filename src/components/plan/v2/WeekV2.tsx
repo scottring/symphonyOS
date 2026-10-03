@@ -1,9 +1,11 @@
 // src/components/plan/v2/WeekV2.tsx
 //
-// Week, v2 (docs/planning/2026-09-28-planning-v2.md): the day column on the
-// left — the part of the prototype Scott called "basically perfect" — and the
-// week's list on the right, under the same toolbar the month wears (plan
-// status · List / With <month> / One at a time · Plan this week).
+// Week, v2 (docs/planning/2026-09-28-planning-v2.md): the week's list and the
+// day column — the part of the prototype Scott called "basically perfect" —
+// under the same toolbar the month wears (plan status · List / With <month> /
+// One at a time · Plan this week). Planning reads left to right (Scott,
+// 2026-10-03: "source list first"): the month's plan, this week's list, then
+// the days.
 //
 // It is chrome AROUND the existing week: the journal, the list, drag and drop,
 // add-to-day and the week's planning session are WeekViewV2's, unchanged.
@@ -36,13 +38,14 @@ import { FocusDeck, CloseOut, type CloseDecision } from './FocusDeck'
 import { FromPaper } from './FromPaper'
 import { ViewSwitch } from './ViewSwitch'
 import { WeekListV2 } from './WeekListV2'
-import { WeekRefShelves } from './RefShelves'
 import { useAddArea } from './AddArea'
 import { useAssigneeFilter } from '@/hooks/useAssigneeFilter'
 import { planPeopleLens } from '@/lib/planning/peopleLens'
 import { makePlanActions, timingRemoval } from '@/lib/planning/planActions'
 import { useActionableInstances } from '@/hooks/useActionableInstances'
 import { useColumnsFitWindow } from '@/hooks/useColumnsFitWindow'
+import { useDayPlan } from '@/hooks/useDayPlan'
+import { committedTo } from '@/lib/placement/model'
 import type { TaskContext } from '@/types/task'
 
 const DAY = 86_400_000
@@ -117,6 +120,17 @@ export function WeekV2({ tasks, weekStart, meId, isCurrent, days, onSelectTask, 
   })
   const lines: LineVM[] = weekTasks.map((t) => toVM(t, 'Any day this week'))
   const prevLines: LineVM[] = prevTasks.map((t) => toVM(t, 'Any day last week'))
+  // Unfinished work from earlier — days missed inside the 14-day window, lists
+  // older weeks left behind — is decided in the look-back, after last week's
+  // own lines (Scott, 2026-10-03: "move earlier into look back"). Listed under
+  // the month it buried the plan the column is there to show.
+  const now = useMemo(() => new Date(), [])
+  const { plan: dayPlan } = useDayPlan(now, weekStart)
+  const onLastWeek = new Set(prevTasks.map((t) => t.id))
+  const earlierLines: LineVM[] = (dayPlan?.unfinished ?? []).flatMap((e) =>
+    e.task && !e.completed && !onLastWeek.has(e.task.id) && !committedTo(e.task, 'week', weekStart, { isCurrent })
+      ? [{ ...toVM(e.task, 'Not in a week yet'), origin: e.context ?? 'Unfinished' }]
+      : [])
   const actions: LineActions = {
     done: async (t) => { if ((await toggleTask(t.id)) !== false) showToast(t.completed ? `Reopened “${t.title}”.` : `Done — “${t.title}”.`, 'success', 5000, { label: 'Undo', onClick: () => { void toggleTask(t.id) } }) },
     carry: async (t) => { if (await keepForward(t.id, { weekStart: nextWeek }, weekStart)) showToast(`“${t.title}” moved to next week.`, 'success', 5000) },
@@ -134,7 +148,13 @@ export function WeekV2({ tasks, weekStart, meId, isCurrent, days, onSelectTask, 
   const decide = async (vm: LineVM, d: CloseDecision) => {
     const t = vm.task
     setTally((x) => addToTally(x, d))
-    if (d === 'carried') {
+    if (vm.origin && (d === 'carried' || d === 'dropped')) {
+      // Earlier work isn't on last week's list: it comes in as this week's,
+      // any day, or lets go of its old day and week (to the Inbox, or the
+      // month it still belongs to).
+      await gated.updateTask(t.id, d === 'carried' ? lineDropUpdates(t, { kind: 'week', at: weekStart }) : timingRemoval(t, 'all').updates)
+    }
+    else if (d === 'carried') {
       await keepForward(t.id, { weekStart }, prevWeek)
       // A row that had a day last week comes into this week as "any day",
       // not still pinned to a past Monday.
@@ -154,7 +174,7 @@ export function WeekV2({ tasks, weekStart, meId, isCurrent, days, onSelectTask, 
   // Monday" surfaced only as a footnote (walkthrough 2026-10-02 #33). Open
   // only from that week's last day on (#34).
   const reviewIds = lookBackOpen('week', weekStart, new Date())
-    ? prevTasks.filter((t) => !t.completed && (!t.scheduledFor || t.scheduledFor < weekStart)).map((t) => t.id)
+    ? [...prevTasks.filter((t) => !t.completed && (!t.scheduledFor || t.scheduledFor < weekStart)).map((t) => t.id), ...earlierLines.map((l) => l.task.id)]
     : []
   const reviewDue = !session.saved || reviewIds.length > 0
   const startMeeting = () => {
@@ -203,7 +223,6 @@ export function WeekV2({ tasks, weekStart, meId, isCurrent, days, onSelectTask, 
     el.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
     el.classList.remove('is-flash'); void el.offsetWidth; el.classList.add('is-flash')
   }
-  const openRef = useCallback((_kind: 'task' | 'routine', id: string) => onSelectTask(id), [onSelectTask])
   // A child of a month line, into this week (Scott, 2026-09-28: "spawn a child
   // task which then creates a new list item in this week's list"). Under a
   // goal it is the goal's next step (goal_task_id). Under a plain line it is a
@@ -216,11 +235,6 @@ export function WeekV2({ tasks, weekStart, meId, isCurrent, days, onSelectTask, 
     if (!id) return
     setChildOf(null)
     showToast(parent.isGoal ? `“${title}” → this week, as a step toward “${parent.title}”.` : `“${title}” → this week, from “${parent.title}”.`, 'success', 5000)
-  }
-  const takeInEarlier = async (t: Task) => {
-    const undo = timingRemoval(t, 'all').previous
-    if ((await gated.updateTask(t.id, lineDropUpdates(t, { kind: 'week', at: weekStart }))) === false) return
-    showToast(`“${t.title}” → this week, any day.`, 'success', 5000, { label: 'Undo', onClick: () => { void gated.updateTask(t.id, undo) } })
   }
   const takeIn = async (t: Task, month: string) => {
     await gated.updateTask(t.id, { bucket: 'week', weekStart })
@@ -264,7 +278,7 @@ export function WeekV2({ tasks, weekStart, meId, isCurrent, days, onSelectTask, 
     <div className="pv2-week" data-week={localYmd(weekStart)}>
       {meeting ? (
         <PlanMeetingBar period={`week ${weekNo}`} prevName="last week" step={meeting.step} lookBack={meeting.candidateIds.length > 0}
-          why={meeting.step === 1 ? lookBackWhy('Last week', 'this week', meeting.candidateIds.length - (tally.carried + tally.done + tally.someday + tally.dropped + tally.left))
+          why={meeting.step === 1 ? lookBackWhy(earlierLines.length ? 'Earlier weeks' : 'Last week', 'this week', meeting.candidateIds.length - (tally.carried + tally.done + tally.someday + tally.dropped + tally.left))
             : lines.length
               ? `Check this week’s list against ${monthName}: keep what still matters, add what’s missing.`
               : `Choose next steps from ${monthName}’s plan beside the list, or write your own. Nothing needs a day yet.`}
@@ -290,7 +304,7 @@ export function WeekV2({ tasks, weekStart, meId, isCurrent, days, onSelectTask, 
         </div>
       )}
       {meeting?.step === 1 ? (
-        <CloseOut lines={prevLines} candidateIds={meeting.candidateIds} members={members} actions={actions} prevName="last week" nextName="this week"
+        <CloseOut lines={[...prevLines, ...earlierLines]} candidateIds={meeting.candidateIds} members={members} actions={actions} prevName="last week" nextName="this week"
           onDecide={decide} onFinish={() => setMeeting({ ...meeting, step: 2 })} />
       ) : view === 'focus' ? (
         <FocusDeck lines={lines} actions={actions} members={members} nextLabel="next week" context={`Week ${weekNo}`} label={`Week ${weekNo}`}
@@ -299,31 +313,11 @@ export function WeekV2({ tasks, weekStart, meId, isCurrent, days, onSelectTask, 
             : `Nothing on this week yet. Switch to the list to add the first line.`} />
       ) : (
         <div ref={grid} className={`pv2-wgrid is-colscroll${view === 'ref' ? ' is-ref' : ''}`}>
-          {/* One spread: three columns, one heading line across them, no
-              boxes (Scott, 2026-09-29: "a bunch of stuff randomly put down"). */}
-          <section className="pv2-days" aria-label="The days"><div className="pv2-colh">The days</div>{days}</section>
-          <div className="pv2-wside">
-            <div>
-              <WeekListV2 title={isCurrent ? 'This week’s list' : `List for the week of ${weekStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`}
-                lines={lines} weekStart={weekStart} members={members} actions={actions} timingControl={timingControl}
-                onContext={(t, c: TaskContext | undefined) => { void gated.updateTask(t.id, { context: c }) }}
-                onAdd={async (title) => {
-                  // "Talk to Tim on Monday" lands on Monday, in one write.
-                  const day = dayNamedIn(title, weekStart, new Date())
-                  const id = await addTask(title, undefined, undefined, day ?? undefined, { bucket: 'week', weekStart, assignedTo: meId ?? undefined, context: addArea.area, ...(day ? { isAllDay: true } : {}) })
-                  if (id && day) showToast(`“${title}” → ${day.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}, any time.`, 'success', 5000)
-                }}
-                focusAdd={arrivedToWrite}
-                addPicker={addArea.picker}
-                parentOf={parentOf} onHoverParent={setLitParent} onShowParent={showParent}
-                draftChild={childOf ? { id: childOf.id, title: childOf.title, isGoal: !!childOf.isGoal } : null}
-                onDraftChild={(title) => { if (childOf) void addStep(childOf, title) }} onCancelChild={() => setChildOf(null)}
-                dragEnabled={dragEnabled} headerAction={<FromPaper altitude="week" periodStart={weekStart} tasks={tasks} />}
-                emptyHint={meeting
-                  ? `Nothing on this week’s list yet. Choose next steps from ${monthName}’s plan beside it, or add your own below.`
-                  : `Nothing on this week’s list yet. Add below, or take a step from ${monthName}’s plan beside it.`} />
-            </div>
-          </div>
+          {/* One spread, read left to right as planning moves (Scott,
+              2026-10-03): the month's plan, this week's list, the days. One
+              heading line across them, no boxes (Scott, 2026-09-29: "a bunch
+              of stuff randomly put down"). Only the month's own lines stand
+              in its column — each day already shows its routines. */}
           {view === 'ref' && (
             <aside className="pv2-ref" aria-label={`${monthName}, for reference`}>
               {refMonths.map((m) => (
@@ -350,9 +344,31 @@ export function WeekV2({ tasks, weekStart, meId, isCurrent, days, onSelectTask, 
                   <button type="button" className="pv2-link" style={{ marginTop: 8 }} onClick={() => navigate(`/month?start=${localYmd(m.start)}`)}>Open {m.name} →</button>
                 </div>
               ))}
-              <WeekRefShelves weekStart={weekStart} isCurrent={isCurrent} onOpen={openRef} onTakeIn={(t) => void takeInEarlier(t)} />
             </aside>
           )}
+          <div className="pv2-wside">
+            <div>
+              <WeekListV2 title={isCurrent ? 'This week’s list' : `List for the week of ${weekStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`}
+                lines={lines} weekStart={weekStart} members={members} actions={actions} timingControl={timingControl}
+                onContext={(t, c: TaskContext | undefined) => { void gated.updateTask(t.id, { context: c }) }}
+                onAdd={async (title) => {
+                  // "Talk to Tim on Monday" lands on Monday, in one write.
+                  const day = dayNamedIn(title, weekStart, new Date())
+                  const id = await addTask(title, undefined, undefined, day ?? undefined, { bucket: 'week', weekStart, assignedTo: meId ?? undefined, context: addArea.area, ...(day ? { isAllDay: true } : {}) })
+                  if (id && day) showToast(`“${title}” → ${day.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}, any time.`, 'success', 5000)
+                }}
+                focusAdd={arrivedToWrite}
+                addPicker={addArea.picker}
+                parentOf={parentOf} onHoverParent={setLitParent} onShowParent={showParent}
+                draftChild={childOf ? { id: childOf.id, title: childOf.title, isGoal: !!childOf.isGoal } : null}
+                onDraftChild={(title) => { if (childOf) void addStep(childOf, title) }} onCancelChild={() => setChildOf(null)}
+                dragEnabled={dragEnabled} headerAction={<FromPaper altitude="week" periodStart={weekStart} tasks={tasks} />}
+                emptyHint={meeting
+                  ? `Nothing on this week’s list yet. Choose next steps from ${monthName}’s plan beside it, or add your own below.`
+                  : `Nothing on this week’s list yet. Add below, or take a step from ${monthName}’s plan beside it.`} />
+            </div>
+          </div>
+          <section className="pv2-days" aria-label="The days"><div className="pv2-colh">The days</div>{days}</section>
         </div>
       )}
     </div>

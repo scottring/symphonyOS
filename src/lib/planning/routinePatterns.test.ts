@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { routinePatterns, untimedRoutines } from './routinePatterns'
+import { routinePatterns } from './routinePatterns'
 import type { Routine } from '@/types/actionable'
 import type { Layer } from '@/lib/domains'
 
@@ -91,36 +91,5 @@ describe('horizon shelves', () => {
     const rows = [routine({ recurrence_pattern: { type: 'specific_days', dates: ['2026-10-01'] } })]
     expect(routinePatterns(rows, ALL, { level: 'month', start: new Date(2026, 8, 1), end: new Date(2026, 9, 1) })).toHaveLength(0)
     expect(routinePatterns(rows, ALL, { level: 'month', start: new Date(2026, 9, 1), end: new Date(2026, 10, 1) })).toHaveLength(1)
-  })
-})
-
-describe('untimedRoutines (a horizon\'s reference column)', () => {
-  const WEEK = { level: 'week' as const, start: new Date(2026, 8, 27), end: new Date(2026, 9, 4) }
-  const MONTH = { level: 'month' as const, start: new Date(2026, 8, 1), end: new Date(2026, 9, 1) }
-  const names = (rows: { name: string }[]) => rows.map((r) => r.name)
-
-  it('a weekly Sunday routine with no time is the week’s; with a time it is not listed', () => {
-    const tidy = routine({ name: 'Kids tidy rooms', recurrence_pattern: { type: 'weekly', days: ['sun'] }, time_of_day: null })
-    const piano = routine({ name: 'Piano', recurrence_pattern: { type: 'weekly', days: ['sun'] }, time_of_day: '16:00:00' })
-    expect(names(untimedRoutines([tidy, piano], ALL, WEEK))).toEqual(['Kids tidy rooms'])
-  })
-
-  it('each routine is listed on its own horizon only; daily ones never', () => {
-    const rs = [
-      routine({ name: 'Weekly', recurrence_pattern: { type: 'weekly', days: ['sun'] }, time_of_day: null }),
-      routine({ name: 'Monthly', recurrence_pattern: { type: 'monthly', day_of_month: 15 }, time_of_day: null }),
-      routine({ name: 'Daily', recurrence_pattern: { type: 'daily' }, time_of_day: null }),
-    ]
-    expect(names(untimedRoutines(rs, ALL, WEEK))).toEqual(['Weekly'])
-    expect(names(untimedRoutines(rs, ALL, MONTH))).toEqual(['Monthly'])
-  })
-
-  it('a collection’s steps are never listed on their own; the lens still filters', () => {
-    const rs = [
-      routine({ name: 'Bedtime', recurrence_pattern: { type: 'weekly', days: ['sun'] }, time_of_day: null }),
-      routine({ name: 'Brush teeth', parent_routine_id: 'x', recurrence_pattern: { type: 'weekly', days: ['sun'] }, time_of_day: null }),
-      routine({ name: 'Invoices', context: 'work', recurrence_pattern: { type: 'weekly', days: ['sun'] }, time_of_day: null }),
-    ]
-    expect(names(untimedRoutines(rs, new Set<Layer>(['family']), WEEK))).toEqual(['Bedtime'])
   })
 })

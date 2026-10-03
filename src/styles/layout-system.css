@@ -194,7 +194,7 @@
    the grid's top to the landscape (--pv2-col-h, useColumnsFitWindow), so one
    long column no longer drags the others off screen. Each column's heading
    stays at its top, wearing the page's own background like the other sticky
-   bars. Week (.pv2-wgrid), Month (.pv2-grid3, .pv2-grid2.is-cal-first) and
+   bars. Week (.pv2-wgrid), Month (.pv2-grid3, .pv2-grid2.is-cal-last) and
    Season (.pv2-grid2.is-ref). Stacked columns (phones, narrow windows) keep
    the one page scroll. */
 .is-colscroll { --pv2-colh-bg: var(--color-bg-base); }

@@ -58,7 +58,9 @@ function Facts({ vm, actions, members }: { vm: LineVM; actions: LineActions; mem
           <MultiAssigneeDropdown members={members} selectedIds={assigneesOf(vm.task)} onSelect={(ids) => actions.assign(vm.task, ids)} size="sm" triggerLabel={`Assign people to ${vm.task.title}`} />
         </div>
       )}
-      {!vm.task.isGoal && <div className="pv2-fact"><span className="pv2-k">Now</span><span>{vm.where ?? <span className="pv2-hint">Not in a week yet</span>}</span></div>}
+      {vm.origin
+        ? <div className="pv2-fact"><span className="pv2-k">Earlier</span><span>{vm.origin}</span></div>
+        : !vm.task.isGoal && <div className="pv2-fact"><span className="pv2-k">Now</span><span>{vm.where ?? <span className="pv2-hint">Not in a week yet</span>}</span></div>}
       {vm.task.isGoal ? <>
         <div className="pv2-fact"><span className="pv2-k">Notes</span>{vm.task.notes?.trim() ? <span className="pv2-notes">{vm.task.notes.trim()}</span> : <span className="pv2-hint">None yet — add some in its details.</span>}</div>
         <div className="pv2-fact"><span className="pv2-k">Work</span>{vm.steps?.length ? <ul className="pv2-steps-list">{vm.steps.map((st) => (
@@ -175,14 +177,14 @@ export function CloseOut({ lines, candidateIds, members, actions, prevName, next
     <div className="pv2-focus">
       <div className="pv2-fnav"><span className="pv2-pos">Close out {prevName} · {k + 1} of {ids.length}</span><span className="pv2-hint">Decide each one, or leave it open</span></div>
       <div className="pv2-bar"><i style={{ width: `${(k / ids.length) * 100}%` }} /></div>
-      <Card vm={shown} context={`${prevName} plan`} carryTo={nextName} fresh={!!flash}>
+      <Card vm={shown} context={vm.origin ? 'earlier' : `${prevName} plan`} carryTo={nextName} fresh={!!flash}>
         <Facts vm={vm} actions={actions} members={members} />
         <div className="pv2-fates">
           <button type="button" className="pv2-btn" disabled={!!flash} onClick={() => void decide('carried')}>Carry to {nextName}</button>
           <button type="button" className="pv2-qbtn" disabled={!!flash} onClick={() => void decide('done')}>It’s done</button>
           {actions.someday && <button type="button" className="pv2-qbtn" disabled={!!flash} onClick={() => void decide('someday')}>Someday</button>}
           <button type="button" className="pv2-qbtn" disabled={!!flash} onClick={() => void decide('dropped')}>Drop it</button>
-          <button type="button" className="pv2-link pv2-quiet" disabled={!!flash} onClick={() => void decide('left')}>Leave it in {prevName}</button>
+          <button type="button" className="pv2-link pv2-quiet" disabled={!!flash} onClick={() => void decide('left')}>{vm.origin ? 'Leave it for now' : `Leave it in ${prevName}`}</button>
         </div>
       </Card>
       <div className="pv2-fnav2"><button type="button" className="pv2-qbtn" disabled={k === 0 || !!flash} onClick={() => setK(k - 1)}>← Previous</button><span /></div>
