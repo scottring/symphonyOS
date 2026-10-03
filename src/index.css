@@ -3625,6 +3625,13 @@ html.rail-stuck .desktop-workspace-nav:has(.page-navigation-center:not(:empty)) 
    never grows wide enough for it beside the rail. */
 .page-navigation-lead .daybook-weather-line { white-space: nowrap; flex-wrap: nowrap; }
 .page-navigation-lead .daybook-weather-line > span:not([class]):not([data-testid]) { display: none; }
+/* The forecast cue ("Clear from 11 AM") made the line wider than its side of
+   the bar, and it ran over the rail (Scott, 2026-10-03). The header keeps
+   the temperature and high/low; the cue stays in the hourly popover and on
+   Today's masthead. Whatever the line holds, it never leaves its slot. */
+.page-navigation-lead [data-testid="weather-cue"], .page-navigation-lead .daybook-weather-range .daybook-weather-sep { display: none; }
+.page-navigation-lead { min-width: 0; flex-shrink: 1; }
+.page-navigation-lead .daybook-weather-line { max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
 /* Narrower windows: the rail keeps its numbers (the words stay in each
    step's tooltip) and the weather keeps its icon and temperature. */
 @media (max-width: 1180px) {
