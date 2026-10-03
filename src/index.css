@@ -3206,7 +3206,9 @@ div.chooser-action-group { overflow: visible !important; }
   :root.plan-v2 .journal-entry-when { opacity: 0; pointer-events: none; transition: opacity .12s; }
   :root.plan-v2 .journal-entry-when .plan-timing-trigger { padding: 3px 4px; }
   :root.plan-v2 .journal-entry-when .plan-timing-trigger > span { display: none; }
-  :root.plan-v2 li:hover > .journal-entry-when, :root.plan-v2 li:focus-within > .journal-entry-when { opacity: 1; pointer-events: auto; }
+  /* WeekRow wraps the control in .wk-trailing, so not a direct child (final
+     review, 2026-10-03: the control was unreachable on desktop). */
+  :root.plan-v2 li:hover .journal-entry-when, :root.plan-v2 li:focus-within .journal-entry-when { opacity: 1; pointer-events: auto; }
 }
 /* A week row's month line, on hover; the line itself lights in the column. */
 /* Always shown (walkthrough 2026-09-30): a step says which goal it serves. */

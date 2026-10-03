@@ -61,6 +61,14 @@ describe('useWeekDragDrop — one drag rule', () => {
     expect(onRoutineToDay).toHaveBeenCalledWith('r1', '2026-10-05', '2026-10-06', 'Yard weeding')
   })
 
+  // Final review 2026-10-03: a Sometime row carries Saturday as its day, so
+  // the same-day guard swallowed a drop onto Saturday.
+  it('a Sometime-this-weekend routine dropped on Saturday is given Saturday', async () => {
+    const { drop, onRoutineToDay } = setup()
+    await drop({ kind: 'routineOcc', routineId: 'r1', fromIso: '2026-10-10', title: 'Yard weeding', fromSometime: true }, { kind: 'allDay', dayIso: '2026-10-10' })
+    expect(onRoutineToDay).toHaveBeenCalledWith('r1', '2026-10-10', '2026-10-10', 'Yard weeding')
+  })
+
   it('a routine occurrence dropped on its own day does nothing', async () => {
     const { drop, onRoutineToDay } = setup()
     await drop({ kind: 'routineOcc', routineId: 'r1', fromIso: '2026-10-06', title: 'Yard weeding' }, { kind: 'allDay', dayIso: '2026-10-06' })

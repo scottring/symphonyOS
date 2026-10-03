@@ -85,7 +85,7 @@ function isToday(d: Date): boolean {
   return d.getFullYear() === n.getFullYear() && d.getMonth() === n.getMonth() && d.getDate() === n.getDate()
 }
 
-function Entry({ entry, day, onSelect, onToggle, dragEnabled, timingControl, dense = false }: {
+function Entry({ entry, day, onSelect, onToggle, dragEnabled, timingControl, dense = false, fromSometime = false }: {
   entry: JournalEntry
   day: JournalDay
   onSelect: (id: string) => void
@@ -93,13 +93,15 @@ function Entry({ entry, day, onSelect, onToggle, dragEnabled, timingControl, den
   dragEnabled: boolean
   timingControl?: WeekJournalProps['timingControl']
   dense?: boolean
+  /** Drawn in "Sometime this weekend": a drop onto its own day still counts. */
+  fromSometime?: boolean
 }) {
   // One drag rule (Scott, 2026-10-03): a task moves to another day — a timed
   // one keeping its time — and a routine moves as that one occurrence. An
   // event never moves; a done row stays where it was done.
   const drag = !dragEnabled || entry.completed || entry.kind === 'event' ? null
     : entry.kind === 'task' && entry.task ? { id: `journal:${entry.task.id}`, data: { kind: 'chip', taskId: entry.task.id, ...(entry.time ? { keepTime: true } : {}) } }
-    : entry.kind === 'routine' && entry.routineId ? { id: `occ:${entry.routineId}:${day.key}`, data: { kind: 'routineOcc', routineId: entry.routineId, fromIso: day.key, title: entry.title } }
+    : entry.kind === 'routine' && entry.routineId ? { id: `occ:${entry.routineId}:${day.key}`, data: { kind: 'routineOcc', routineId: entry.routineId, fromIso: day.key, title: entry.title, ...(fromSometime ? { fromSometime: true } : {}) } }
     : null
   // Its day passed without a tick — the live copy is back on the list; what
   // stays here is the record, faded.
@@ -353,7 +355,7 @@ function SometimeCell({ weekend, days, onSelectItem, onToggleEntry, dragEnabled 
       <header className="wk-dayhead"><span className="wk-dayname">Sometime this weekend</span><span className="wk-dayhint">once for both days</span></header>
       {weekend.sometime.length ? (
         <ul className="wk-rows" aria-label="Sometime this weekend entries">
-          {weekend.sometime.map((entry) => <Entry key={entry.id} entry={entry} day={tickDay} onSelect={onSelectItem} onToggle={onToggleEntry} dragEnabled={dragEnabled} dense />)}
+          {weekend.sometime.map((entry) => <Entry key={entry.id} entry={entry} day={tickDay} onSelect={onSelectItem} onToggle={onToggleEntry} dragEnabled={dragEnabled} dense fromSometime />)}
         </ul>
       ) : <p className="wk-empty">Nothing waiting for the weekend.</p>}
       {weekend.sometime.length > 0 && <p className="wk-dayhint">Drag one onto {sun ? 'Saturday or Sunday' : 'Saturday'} to give it a day.</p>}

@@ -43,6 +43,7 @@ import { useWeekInstances } from './useWeekInstances'
 import { edgeForPointer } from './edgeAdvance'
 import { WeekJournal } from './WeekJournal'
 import { buildJournalDays, type JournalDay, type JournalEntry } from '@/lib/week/journalDays'
+import { routineMoveKind } from '@/lib/week/routineMove'
 import type { DensitySources } from '@/lib/planning/dayDensity'
 import { formatWeekRange } from '@/lib/dateHelpers'
 import { WeekList } from './WeekList'
@@ -624,7 +625,8 @@ export function WeekViewV2(props: WeekViewV2Props) {
   )
   // Tasks planned for a weekend with no day of their own: "Sometime this
   // weekend" holds them (buildJournalDays).
-  const weekendTasks = useMemo(() => tasks.filter((t) => t.weekendStart && !t.scheduledFor && !t.completed), [tasks])
+  // The people filter applies here as on the days (final review, 2026-10-03).
+  const weekendTasks = useMemo(() => drawnTasks.filter((t) => t.weekendStart && !t.scheduledFor && !t.completed), [drawnTasks])
   const journal = useMemo(() => buildJournalDays({
     weekStart, dayCount, tasks: drawnTasks, weekendTasks, userId, eventItems, events,
     dinnersByDay: extras.dinnersByDay, routineItems, instances: weekInstances, labelFor,
@@ -725,19 +727,26 @@ export function WeekViewV2(props: WeekViewV2Props) {
   const moveRoutineToDay = useCallback(async (routineId: string, fromIso: string, toIso: string, title: string) => {
     const [ty, tm, td] = toIso.split('-').map(Number)
     const toDay = new Date(ty, tm - 1, td)
-    if (journalWeekend?.sometime.some((e) => e.routineId === routineId)) {
-      await planActions.chooseRoutine(routineId, toDay, true, title)
-      return
-    }
+    const rule = routines.find((r) => r.id === routineId)
+    const weekendKeys = journalWeekend ? [journalWeekend.satIndex, journalWeekend.sunIndex].flatMap((i) => (i === null ? [] : [journalDays[i].key])) : []
     const [fy, fm, fd] = fromIso.split('-').map(Number)
     const fromDay = new Date(fy, fm - 1, fd)
-    const rule = routines.find((r) => r.id === routineId)
+    const kind = routineMoveKind({ patternType: rule?.recurrence_pattern.type, fromIso, toIso, weekendKeys, inSometime: !!journalWeekend?.sometime.some((e) => e.routineId === routineId) })
+    if (kind === 'plan') { await planActions.chooseRoutine(routineId, toDay, true, title); return }
+    if (kind === 'replan') {
+      // Off the old weekend day, onto the new one; one Undo puts it back.
+      const ok = (await setPlanned('routine', routineId, fromDay, false)) && (await setPlanned('routine', routineId, toDay, true))
+      if (ok) pushAction?.(`Moved "${title}" to ${toDay.toLocaleDateString('en-US', { weekday: 'long' })}`, () => {
+        void setPlanned('routine', routineId, toDay, false).then(() => setPlanned('routine', routineId, fromDay, true))
+      })
+      return
+    }
     const [hh, mm] = (rule?.time_of_day ?? '').split(':').map(Number)
     const timed = Number.isFinite(hh)
     const when = timed ? new Date(ty, tm - 1, td, hh, mm || 0) : toDay
     const previous = await rescheduleInstance('routine', routineId, fromDay, when, timed ? undefined : { dayOnly: true })
     if (previous) pushAction?.(`Moved "${title}" to ${toDay.toLocaleDateString('en-US', { weekday: 'long' })}`, () => { void undoReschedule(previous) })
-  }, [journalWeekend, planActions, routines, rescheduleInstance, undoReschedule, pushAction])
+  }, [journalWeekend, journalDays, planActions, routines, setPlanned, rescheduleInstance, undoReschedule, pushAction])
 
   // "+ Add" on a journal day: a dated, all-day task on that day, assigned to
   // me. Captures never inherit the view's lens, so it lands Unsorted — and

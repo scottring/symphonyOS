@@ -515,3 +515,19 @@ describe('WeekViewV2 — Journal and Schedule agree', () => {
     expect(cell.queryByText('Kids clean rooms')).toBeNull()
   })
 })
+
+// Final review 2026-10-03: "Sometime this weekend" must follow the people
+// filter like everything else the days draw.
+describe('WeekViewV2 — Sometime this weekend follows the people filter', () => {
+  it('leaves out a weekend task that belongs to someone not selected', () => {
+    const sat = new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + 5)
+    const tasks = [
+      createMockTask({ id: 'mine', title: 'Clean the grill', weekendStart: sat, assignedTo: 'scott', bucket: 'week' }),
+      createMockTask({ id: 'hers', title: 'Pot the ferns', weekendStart: sat, assignedTo: 'iris', bucket: 'week' }),
+    ]
+    render(<WeekViewV2 {...defaultProps} routines={[]} tasks={tasks} selectedAssignees={['scott']} />)
+    const sometime = within(screen.getByTestId('weekend-sometime'))
+    expect(sometime.getByText('Clean the grill')).toBeInTheDocument()
+    expect(sometime.queryByText('Pot the ferns')).toBeNull()
+  })
+})

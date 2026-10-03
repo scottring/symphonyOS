@@ -99,7 +99,7 @@ export function useWeekDragDrop(args: UseWeekDragDropArgs): UseWeekDragDropResul
     if (!e.over) return
 
     const activeData = e.active.data.current as
-      | { kind?: string; taskId?: string; itemId?: string; routineId?: string; keepTime?: boolean; fromIso?: string; title?: string }
+      | { kind?: string; taskId?: string; itemId?: string; routineId?: string; keepTime?: boolean; fromIso?: string; title?: string; fromSometime?: boolean }
       | undefined
     const overData = e.over.data.current as
       | { kind?: string; dayIso?: string; hour?: number; minute?: number }
@@ -126,7 +126,9 @@ export function useWeekDragDrop(args: UseWeekDragDropArgs): UseWeekDragDropResul
         showToast('Routines repeat on their own schedule — they aren’t added to a list', 'warning')
         return
       }
-      if (overData.kind === 'allDay' && overData.dayIso && overData.dayIso !== activeData.fromIso) {
+      // A Sometime row carries Saturday as its day; a drop onto Saturday still
+      // gives it Saturday (final review, 2026-10-03).
+      if (overData.kind === 'allDay' && overData.dayIso && (activeData.fromSometime || overData.dayIso !== activeData.fromIso)) {
         a.onRoutineToDay?.(activeData.routineId, activeData.fromIso, overData.dayIso, activeData.title ?? 'routine')
       }
       return
