@@ -31,30 +31,29 @@ import { useWeekDragDrop } from './useWeekDragDrop'
 import { useGridCreate } from './useGridCreate'
 import { SlotQuickCreatePopover, type CreateType } from './SlotQuickCreatePopover'
 import { RoutinePlacePopover } from './RoutinePlacePopover'
-import { RoutinesToggle } from './RoutinesToggle'
 import { useFamilyMembers } from '@/hooks/useFamilyMembers'
 import { suggestSlots, type BusyInterval } from '@/lib/planning/dropSmarts'
 import { FIRST_HOUR, LAST_HOUR } from './WeekGrid'
-import { readHideRoutines, writeHideRoutines, onHideRoutinesChange } from '@/lib/hideRoutinesSignal'
 import { useGatedTaskActions } from '@/hooks/useGatedTaskActions'
 import { weekStartAnchor, readCadenceConfig } from '@/lib/cadence/config'
 import { partitionWeekExtras } from '@/lib/week/weekExtras'
 import { buildWeekRoutineItems } from './weekRoutineItems'
-import { routineDayIndex, routineDayState, routineIdOf } from '@/lib/planning/weekDensity'
 import { useDayChoices } from '@/hooks/useDayChoices'
 import { useWeekInstances } from './useWeekInstances'
 import { edgeForPointer } from './edgeAdvance'
-import { WeekJournal, type JournalDay, type JournalEntry } from './WeekJournal'
+import { WeekJournal } from './WeekJournal'
+import { buildJournalDays, type JournalDay, type JournalEntry } from '@/lib/week/journalDays'
+import { routineMoveKind } from '@/lib/week/routineMove'
 import type { DensitySources } from '@/lib/planning/dayDensity'
 import { formatWeekRange } from '@/lib/dateHelpers'
 import { WeekList } from './WeekList'
 import { monthStartOf } from '@/lib/planning/periodPlacement'
 import { makePlanActions } from '@/lib/planning/planActions'
-import { focusDays, sameDay } from '@/lib/placement/model'
+import { sameDay } from '@/lib/placement/model'
 import type { PlanDragPayload } from '@/lib/planning/planDrag'
 import { useActionableInstances } from '@/hooks/useActionableInstances'
 import { showToast } from '@/hooks/useToast'
-import { eventDays, isMultiDayEvent, layoutContextSpans } from '@/lib/week/journalSpread'
+import { layoutContextSpans } from '@/lib/week/journalSpread'
 import { localYmd } from '@/lib/cadence/config'
 import { publishViewedWeek } from '@/lib/viewedWeekSignal'
 import { useMediaQuery } from '@/hooks/useMediaQuery'
@@ -330,6 +329,10 @@ export function WeekViewV2(props: WeekViewV2Props) {
     pushAction,
     onPushRoutine,
     onRoutinePlaceRequest: setRoutinePlace,
+    // One drag rule (2026-10-03): read at drop time, after the page's own
+    // writers below exist.
+    onTakeIn: (taskId) => takeIntoWeek(taskId),
+    onRoutineToDay: (routineId, fromIso, toIso, title) => { void moveRoutineToDay(routineId, fromIso, toIso, title) },
   })
 
   // Sensor with activation constraint — disambiguates click vs drag.
@@ -471,12 +474,6 @@ export function WeekViewV2(props: WeekViewV2Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [events, weekStart])
 
-  // Respect the app-wide 'Hide daily activities' toggle (same localStorage key
-  // TodayView uses). When true, routines are omitted from the grid; tasks and
-  // events still render. Reactive via in-tab custom event + cross-tab storage event.
-  const [hideRoutines, setHideRoutines] = useState<boolean>(() => readHideRoutines())
-
-  useEffect(() => onHideRoutinesChange(setHideRoutines), [])
 
   // Journal is the week; Schedule is the hourly grid, a switch away. The grid
   // needs desk width to read — below lg the spread stacks and is the only mode.
@@ -530,12 +527,12 @@ export function WeekViewV2(props: WeekViewV2Props) {
     return items
   }, [extras])
 
-  // The switch says "Routines", so off means NONE: it used to run only the
-  // daily sweep, which left a Sunday-only routine in the journal's Available
-  // line with the switch off (Scott, 2026-09-20). The Today page keeps its
-  // own reading of the preference.
+  // Routines are always on the week, a day's untimed ones folded behind one
+  // line (Scott, 2026-10-03). The toolbar's Routines switch that hid them all
+  // is retired here; a routine is hidden one at a time ("Show in Today and
+  // planning"), and Today keeps its own "hide daily" choice.
   const routineItems = useMemo(
-    () => hideRoutines ? [] : buildWeekRoutineItems({
+    () => buildWeekRoutineItems({
       routines,
       weekStart,
       dayCount,
@@ -543,7 +540,7 @@ export function WeekViewV2(props: WeekViewV2Props) {
       member: selectedAssignees,
       prefs: { hideRoutines: false, layers },
     }),
-    [routines, weekStart, dayCount, weekInstances, selectedAssignees, hideRoutines, layers],
+    [routines, weekStart, dayCount, weekInstances, selectedAssignees, layers],
   )
 
   const allItems = useMemo(() => {
@@ -626,88 +623,16 @@ export function WeekViewV2(props: WeekViewV2Props) {
     () => Object.fromEntries((weather?.dailyForecast ?? []).map((d) => [d.date, d])),
     [weather],
   )
-  const journalDays = useMemo<JournalDay[]>(() => {
-    const days: JournalDay[] = Array.from({ length: dayCount }, (_, i) => {
-      const date = new Date(weekStart)
-      date.setDate(date.getDate() + i)
-      return { date, key: localYmd(date), notes: [], entries: [], available: [], dinners: [] }
-    })
-    const byKey = new Map(days.map((d) => [d.key, d]))
-    const timed = new Map(days.map((d) => [d.key, [] as JournalEntry[]]))
-    const untimed = new Map(days.map((d) => [d.key, [] as JournalEntry[]]))
-
-    // Tasks: timed ones at their time; untimed ones on the day they are dated
-    // to, or the day they were CHOSEN for (a week-list task chosen for
-    // Thursday keeps its list but is Thursday's work).
-    const seen = new Set<string>()
-    for (const t of drawnTasks) {
-      const entry = (time?: Date): JournalEntry => ({
-        id: `task-${t.id}`, kind: 'task', time, title: t.title, subtitle: labelFor(t), completed: t.completed, task: t,
-      })
-      if (t.scheduledFor) {
-        const key = localYmd(t.scheduledFor)
-        if (byKey.has(key)) {
-          seen.add(t.id)
-          if (t.isAllDay) untimed.get(key)!.push(entry())
-          else timed.get(key)!.push(entry(t.scheduledFor))
-          continue
-        }
-      }
-      // Chosen for a day (this person's focus; legacy planned_on when the row
-      // has no focus rows) — drawn on that day, untimed.
-      if (!seen.has(t.id)) {
-        for (const key of focusDays(t, userId)) {
-          if (byKey.has(key)) { untimed.get(key)!.push(entry()); break }
-        }
-      }
-    }
-
-    for (const item of eventItems) {
-      if (!item.startTime) continue
-      const key = localYmd(item.startTime)
-      if (!byKey.has(key)) continue
-      const source = item.originalEvent as CalendarEvent | undefined
-      // A multi-day timed event (on call Mon 9am → Fri 5pm) is listed once
-      // above the days, not as an entry on its first day.
-      if (source && isMultiDayEvent(source)) continue
-      timed.get(key)!.push({ id: item.id, kind: 'event', time: item.startTime, title: item.title, subtitle: item.subtitle, completed: false })
-    }
-
-    for (const ev of events) {
-      const span = eventDays(ev)
-      if (!span || !span.allDay || span.first !== span.last) continue
-      byKey.get(span.first)?.notes.push(ev)
-    }
-
-    for (const [key, entries] of extras.dinnersByDay) byKey.get(key)?.dinners.push(...entries)
-
-    // Routine occurrences: with a time, chosen for the day, or due on it with
-    // Show in Today on, they are the day's entries (untimed ones in the day's
-    // untimed list, and Schedule's all-day cell via plannedAllDay); one whose
-    // rule leaves the day open and nobody chose is only available — the same
-    // split Today and its pin make (dayPlan.ts).
-    for (const r of routineItems) {
-      const day = days[routineDayIndex(r.id)]
-      if (!day) continue
-      const routineId = routineIdOf(r.id)
-      // The same three facts the day tiles read, from the same place — the
-      // journal and the tiles must not disagree about a Tuesday.
-      const { completed, planned, pinned, dayBound } = routineDayState(routineId, day.key, r, weekInstances)
-      const entry: JournalEntry = {
-        id: r.id, kind: 'routine', time: r.startTime ?? undefined, title: r.title, completed, routineId,
-      }
-      if (r.startTime) timed.get(day.key)!.push(entry)
-      else if (planned || pinned || dayBound || completed) untimed.get(day.key)!.push(entry)
-      else day.available.push({ ...r, completed })
-    }
-
-    for (const d of days) {
-      const t = timed.get(d.key)!.sort((a, b) => a.time!.getTime() - b.time!.getTime())
-      const u = untimed.get(d.key)!.sort((a, b) => Number(a.completed) - Number(b.completed))
-      d.entries = [...t, ...u]
-    }
-    return days
-  }, [drawnTasks, userId, events, eventItems, extras, routineItems, weekInstances, weekStart, dayCount, labelFor])
+  // Tasks planned for a weekend with no day of their own: "Sometime this
+  // weekend" holds them (buildJournalDays).
+  // The people filter applies here as on the days (final review, 2026-10-03).
+  const weekendTasks = useMemo(() => drawnTasks.filter((t) => t.weekendStart && !t.scheduledFor && !t.completed), [drawnTasks])
+  const journal = useMemo(() => buildJournalDays({
+    weekStart, dayCount, tasks: drawnTasks, weekendTasks, userId, eventItems, events,
+    dinnersByDay: extras.dinnersByDay, routineItems, instances: weekInstances, labelFor,
+  }), [drawnTasks, weekendTasks, userId, events, eventItems, extras, routineItems, weekInstances, weekStart, dayCount, labelFor])
+  const journalDays = journal.days
+  const journalWeekend = journal.weekend
 
   /**
    * How much is already on each day of the week being VIEWED, for the timing
@@ -753,7 +678,7 @@ export function WeekViewV2(props: WeekViewV2Props) {
   // second toggle would read a stale snapshot — HomeView's rule). A routine
   // ticks its OCCURRENCE — that day's instance — so Today, the pin and this
   // page show the same completion.
-  const { markDone, undoDone, setPlanned, reschedule: rescheduleInstance } = useActionableInstances()
+  const { markDone, undoDone, setPlanned, reschedule: rescheduleInstance, undoReschedule } = useActionableInstances()
   const handleJournalToggle = useCallback((entry: JournalEntry, day: JournalDay) => {
     if (entry.task) {
       const task = entry.task
@@ -787,6 +712,42 @@ export function WeekViewV2(props: WeekViewV2Props) {
     pushAction,
     notify: (m) => showToast(m, 'warning'),
   }), [tasks, onUpdateTask, gated, setPlanned, rescheduleInstance, pushAction])
+  // A month line dragged onto the week's list: the same write as its
+  // "+ This week" (it stays on the month's plan too).
+  const takeIntoWeek = useCallback((taskId: string) => {
+    const task = tasks.find((t) => t.id === taskId)
+    if (!task) return
+    const prev = { bucket: task.bucket, weekStart: task.weekStart as Date }
+    void onUpdateTask(taskId, { bucket: 'week', weekStart: weekAnchor })
+    pushAction?.(`“${task.title}” → this week`, () => { void onUpdateTask(taskId, prev) })
+  }, [tasks, onUpdateTask, weekAnchor, pushAction])
+  // A routine occurrence dragged to another day moves as THAT occurrence; a
+  // "Sometime this weekend" routine dragged onto Saturday or Sunday is given
+  // that day (planned there). The rule itself is never rewritten by a drag.
+  const moveRoutineToDay = useCallback(async (routineId: string, fromIso: string, toIso: string, title: string) => {
+    const [ty, tm, td] = toIso.split('-').map(Number)
+    const toDay = new Date(ty, tm - 1, td)
+    const rule = routines.find((r) => r.id === routineId)
+    const weekendKeys = journalWeekend ? [journalWeekend.satIndex, journalWeekend.sunIndex].flatMap((i) => (i === null ? [] : [journalDays[i].key])) : []
+    const [fy, fm, fd] = fromIso.split('-').map(Number)
+    const fromDay = new Date(fy, fm - 1, fd)
+    const kind = routineMoveKind({ patternType: rule?.recurrence_pattern.type, fromIso, toIso, weekendKeys, inSometime: !!journalWeekend?.sometime.some((e) => e.routineId === routineId) })
+    if (kind === 'plan') { await planActions.chooseRoutine(routineId, toDay, true, title); return }
+    if (kind === 'replan') {
+      // Off the old weekend day, onto the new one; one Undo puts it back.
+      const ok = (await setPlanned('routine', routineId, fromDay, false)) && (await setPlanned('routine', routineId, toDay, true))
+      if (ok) pushAction?.(`Moved "${title}" to ${toDay.toLocaleDateString('en-US', { weekday: 'long' })}`, () => {
+        void setPlanned('routine', routineId, toDay, false).then(() => setPlanned('routine', routineId, fromDay, true))
+      })
+      return
+    }
+    const [hh, mm] = (rule?.time_of_day ?? '').split(':').map(Number)
+    const timed = Number.isFinite(hh)
+    const when = timed ? new Date(ty, tm - 1, td, hh, mm || 0) : toDay
+    const previous = await rescheduleInstance('routine', routineId, fromDay, when, timed ? undefined : { dayOnly: true })
+    if (previous) pushAction?.(`Moved "${title}" to ${toDay.toLocaleDateString('en-US', { weekday: 'long' })}`, () => { void undoReschedule(previous) })
+  }, [journalWeekend, journalDays, planActions, routines, setPlanned, rescheduleInstance, undoReschedule, pushAction])
+
   // "+ Add" on a journal day: a dated, all-day task on that day, assigned to
   // me. Captures never inherit the view's lens, so it lands Unsorted — and
   // when the current filter would then hide it, the toast says so rather
@@ -830,7 +791,7 @@ export function WeekViewV2(props: WeekViewV2Props) {
   const plannedAllDay = useMemo(() => {
     const map = new Map<string, JournalEntry[]>()
     for (const d of journalDays) {
-      const extra = d.entries.filter((e) =>
+      const extra = [...d.entries, ...d.foldedRoutines].filter((e) =>
         !e.time && (e.kind === 'routine' || (e.task && !(e.task.scheduledFor && localYmd(e.task.scheduledFor) === d.key))))
       if (extra.length) map.set(d.key, extra)
     }
@@ -1032,7 +993,6 @@ export function WeekViewV2(props: WeekViewV2Props) {
     {!narrow && (props.mode === undefined || props.onModeChange) && (
       <div className={planV2Enabled() ? '' : 'mr-auto'}><WeekModeSwitch mode={mode} onChange={props.onModeChange ?? setOwnMode} /></div>
     )}
-    <RoutinesToggle hidden={hideRoutines} onToggle={() => writeHideRoutines(!hideRoutines)} />
   </>
   // v2 draws these in its one toolbar, not on a row of their own.
   const v2Page = planV2Enabled() && (narrow || !showSchedule)
@@ -1061,12 +1021,12 @@ export function WeekViewV2(props: WeekViewV2Props) {
           <WeekV2 tasks={tasks} weekStart={weekAnchor} meId={meId} isCurrent={weekIsCurrent} dragEnabled={false} tools={weekTools}
             onSelectTask={(id) => onSelectItem(`task-${id}`)}
             timingControl={weekTimingControl}
-            days={<WeekJournal days={journalDays} spans={journalSpans} onSelectItem={onSelectItem} onToggleEntry={handleJournalToggle} onPlanDrop={handlePlanDropOnDay} onAddToDay={handleAddToDay} narrow dragEnabled={false} timingControl={weekTimingControl} forecast={forecast} />} />
+            days={<WeekJournal layout="grid" days={journalDays} weekend={journalWeekend} spans={journalSpans} onSelectItem={onSelectItem} onToggleEntry={handleJournalToggle} onPlanDrop={handlePlanDropOnDay} onAddToDay={handleAddToDay} narrow dragEnabled={false} timingControl={weekTimingControl} forecast={forecast} />} />
         ) : narrow ? (
           <div className="flex flex-col gap-4">
             {weekListFor(openSession)}
             <h2 className="week-days-heading">The days</h2>
-            <WeekJournal days={journalDays} spans={journalSpans} onSelectItem={onSelectItem} onToggleEntry={handleJournalToggle} onPlanDrop={handlePlanDropOnDay} onAddToDay={handleAddToDay} narrow dragEnabled={false} timingControl={weekTimingControl} forecast={forecast} />
+            <WeekJournal days={journalDays} weekend={journalWeekend} spans={journalSpans} onSelectItem={onSelectItem} onToggleEntry={handleJournalToggle} onPlanDrop={handlePlanDropOnDay} onAddToDay={handleAddToDay} narrow dragEnabled={false} timingControl={weekTimingControl} forecast={forecast} />
           </div>
         ) : (
         <div className="flex items-start gap-4">
@@ -1078,12 +1038,12 @@ export function WeekViewV2(props: WeekViewV2Props) {
           <WeekV2 tasks={tasks} weekStart={weekAnchor} meId={meId} isCurrent={weekIsCurrent} onPlan={openSession} tools={weekTools}
             onSelectTask={(id) => onSelectItem(`task-${id}`)}
             timingControl={weekTimingControl}
-            days={<WeekJournal days={journalDays} spans={journalSpans} onSelectItem={onSelectItem} onToggleEntry={handleJournalToggle} onPlanDrop={handlePlanDropOnDay} onAddToDay={handleAddToDay} timingControl={weekTimingControl} forecast={forecast} />} />
+            days={<WeekJournal layout="grid" days={journalDays} weekend={journalWeekend} spans={journalSpans} onSelectItem={onSelectItem} onToggleEntry={handleJournalToggle} onPlanDrop={handlePlanDropOnDay} onAddToDay={handleAddToDay} timingControl={weekTimingControl} forecast={forecast} />} />
         ) : !showSchedule ? (
           <>
             {weekListFor(openSession)}
             <h2 className="week-days-heading">The days</h2>
-            <WeekJournal days={journalDays} spans={journalSpans} onSelectItem={onSelectItem} onToggleEntry={handleJournalToggle} onPlanDrop={handlePlanDropOnDay} onAddToDay={handleAddToDay} timingControl={weekTimingControl} forecast={forecast} />
+            <WeekJournal days={journalDays} weekend={journalWeekend} spans={journalSpans} onSelectItem={onSelectItem} onToggleEntry={handleJournalToggle} onPlanDrop={handlePlanDropOnDay} onAddToDay={handleAddToDay} timingControl={weekTimingControl} forecast={forecast} />
           </>
         ) : (
         <>
@@ -1246,8 +1206,20 @@ export function WeekViewV2(props: WeekViewV2Props) {
                     </div>
                   )
                 }
-                if (drag.activeDragId.startsWith('poolroutine:')) {
-                  const routine = routines.find((r) => r.id === drag.activeDragId!.slice('poolroutine:'.length))
+                // One drag rule (2026-10-03): a month line ('ref:<taskId>') and a
+                // routine occurrence ('occ:<routineId>:<day>') carry their pill too.
+                if (drag.activeDragId.startsWith('ref:')) {
+                  const task = tasks.find((t) => t.id === drag.activeDragId!.slice('ref:'.length))
+                  if (!task) return null
+                  return (
+                    <div className="pointer-events-none max-w-[260px] rounded-lg border border-primary-300 bg-white px-2 py-1.5 text-[13px] text-neutral-800 shadow-lg">
+                      {task.title}
+                    </div>
+                  )
+                }
+                if (drag.activeDragId.startsWith('poolroutine:') || drag.activeDragId.startsWith('occ:')) {
+                  const id = drag.activeDragId.startsWith('occ:') ? drag.activeDragId.split(':')[1] : drag.activeDragId.slice('poolroutine:'.length)
+                  const routine = routines.find((r) => r.id === id)
                   if (!routine) return null
                   return (
                     <div className="pointer-events-none max-w-[260px] rounded-lg border border-primary-200 bg-primary-50 px-2 py-1.5 text-[12.5px] font-semibold text-primary-800 shadow-lg">

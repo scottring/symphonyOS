@@ -8,7 +8,7 @@ import { WeekJournal, type JournalDay } from './WeekJournal'
 // without one (the past, or past the forecast's reach) says nothing.
 function day(d: Date): JournalDay {
   const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-  return { date: d, key, notes: [], entries: [], available: [], dinners: [] }
+  return { date: d, key, notes: [], entries: [], foldedRoutines: [], available: [], dinners: [] }
 }
 
 describe('WeekJournal — the forecast under each day', () => {

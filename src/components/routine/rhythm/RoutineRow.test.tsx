@@ -32,7 +32,7 @@ describe('whenLabel', () => {
   it('a weekly routine names its days — once, however many there are', () => {
     expect(whenLabel(mk({ recurrence_pattern: { type: 'weekly', days: ['sun'] } }))).toBe('Sunday')
     expect(whenLabel(mk({ recurrence_pattern: { type: 'weekly', days: ['mon', 'wed'] } }))).toBe('Monday and Wednesday')
-    expect(whenLabel(mk({ recurrence_pattern: { type: 'weekly', days: ['sat', 'sun'] } }))).toBe('Weekends')
+    expect(whenLabel(mk({ recurrence_pattern: { type: 'weekly', days: ['sat', 'sun'] } }))).toBe('Sat and Sun')
     expect(whenLabel(mk({ recurrence_pattern: { type: 'weekly', days: ['tue', 'thu', 'sat'] } })))
       .toBe('Tuesday, Thursday, Saturday')
     expect(whenLabel(mk({ recurrence_pattern: { type: 'weekly', days: ['mon', 'tue', 'wed', 'thu', 'fri'] } })))

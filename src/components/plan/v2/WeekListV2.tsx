@@ -10,8 +10,8 @@
 // control), and ⋯ for next week / Someday / Drop / All details.
 
 import { useEffect, useRef, useState, type ReactNode } from 'react'
-import { useDraggable, useDroppable } from '@dnd-kit/core'
-import { Check, CornerDownRight, GripVertical } from 'lucide-react'
+import { useDroppable } from '@dnd-kit/core'
+import { CornerDownRight } from 'lucide-react'
 import type { Task, TaskContext } from '@/types/task'
 import type { FamilyMember } from '@/types/family'
 import { ContextPicker } from '@/components/triage/ContextPicker'
@@ -19,6 +19,7 @@ import { MultiAssigneeDropdown } from '@/components/family'
 import { assigneesOf } from '@/lib/planning/v2/planV2'
 import { localYmd } from '@/lib/cadence/config'
 import { LineMenu, type LineActions, type LineVM } from './PlanLine'
+import { WeekRow } from './WeekRow'
 
 type Parent = { id: string; title: string; isGoal: boolean }
 
@@ -98,9 +99,10 @@ export function WeekListV2({ title, lines, weekStart, members, actions, timingCo
   )
 }
 
-// A card drags onto a day with the week's own chip protocol ('pool:<id>',
+// A row drags onto a day with the week's own chip protocol ('pool:<id>',
 // {kind:'chip'} → useWeekDragDrop: an all-day date on that day, past days
-// refused, Undo offered; WeekViewV2 already draws its floating pill).
+// refused, Undo offered). The same row every column draws (WeekRow,
+// 2026-10-03) — no white card; the grip says it moves.
 function Card({ vm, actions, members, timingControl, onContext, parent, onHoverParent, onShowParent, dragEnabled }: {
   vm: LineVM; actions: LineActions; members: FamilyMember[]
   timingControl?: (task: Task) => ReactNode
@@ -112,38 +114,35 @@ function Card({ vm, actions, members, timingControl, onContext, parent, onHoverP
 }) {
   const t = vm.task
   const movable = dragEnabled && !t.completed
-  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: `pool:${t.id}`, data: { kind: 'chip', taskId: t.id }, disabled: !movable })
+  const people = members.filter((m) => assigneesOf(t).includes(m.id))
   return (
-    <li ref={setNodeRef} className={`pv2-wl-row${t.completed ? ' is-done' : ''}${movable ? ' is-card' : ''}${isDragging ? ' is-dragging' : ''}`}
-      onMouseEnter={parent ? () => onHoverParent?.(parent.id) : undefined} onMouseLeave={parent ? () => onHoverParent?.(null) : undefined}>
-      {movable && <span className="pv2-grip" {...listeners} {...attributes} aria-label={`Drag ${t.title} onto a day`} title="Drag onto a day"><GripVertical className="h-3.5 w-3.5" /></span>}
-      <button type="button" className={`pv2-wl-check${t.completed ? ' is-on' : ''}`} onClick={() => actions.done(t)}
-        aria-label={t.completed ? `Mark ${t.title} not done` : `Complete ${t.title}`}>
-        {t.completed && <Check className="h-2.5 w-2.5" strokeWidth={3} aria-hidden="true" />}
-      </button>
-      {/* Just the words (Scott, 2026-09-28: "perhaps just the title is
-          warranted"). What it serves is its tooltip; life area, people and
-          when come up on hover or focus, beside ⋯. */}
-      <div className="min-w-0 flex-1">
-        <div className="flex items-start gap-2">
-          <button type="button" className="pv2-wl-title" onClick={() => actions.details(t)}>{t.title}</button>
-          <LineMenu vm={vm} actions={actions} nextLabel="next week" />
-        </div>
-        {/* On hover: the month line it came from — lit in the month column,
-            and a click shows it there. */}
-        {parent && (
-          <button type="button" className="pv2-wl-parent" onClick={() => onShowParent?.(parent.id)}
-            aria-label={`${parent.isGoal ? 'Step toward' : 'From'} ${parent.title} — show it in the month`}>
-            <CornerDownRight className="h-3 w-3 shrink-0" aria-hidden="true" /><span className="truncate">{parent.isGoal ? 'Step toward' : 'From'} “{parent.title}”</span>
-          </button>
-        )}
-        <div className="pv2-wl-tools">
-          <ContextPicker size="sm" value={t.context ?? null} onChange={(c) => onContext(t, c)} />
-          {members.length > 0 && <MultiAssigneeDropdown members={members} selectedIds={assigneesOf(t)} onSelect={(ids) => actions.assign(t, ids)} size="sm" triggerLabel={`Assign people to ${t.title}`} />}
-          {timingControl && <span className="min-w-0">{timingControl(t)}</span>}
-        </div>
-      </div>
-    </li>
+    <WeekRow
+      mark="task"
+      title={t.title}
+      completed={t.completed}
+      onToggle={() => actions.done(t)}
+      onOpen={() => actions.details(t)}
+      drag={movable ? { id: `pool:${t.id}`, data: { kind: 'chip', taskId: t.id } } : null}
+      people={people}
+      // What it serves, always shown (walkthrough 2026-09-30); a click shows
+      // the month line in its column.
+      meta={parent ? (
+        <button type="button" className="pv2-wl-parent is-shown" onClick={() => onShowParent?.(parent.id)}
+          aria-label={`${parent.isGoal ? 'Step toward' : 'From'} ${parent.title} — show it in the month`}>
+          <CornerDownRight className="h-3 w-3 shrink-0" aria-hidden="true" /><span className="truncate">{parent.isGoal ? 'Step toward' : 'From'} “{parent.title}”</span>
+        </button>
+      ) : undefined}
+      tools={<>
+        <ContextPicker size="sm" value={t.context ?? null} onChange={(c) => onContext(t, c)} />
+        {members.length > 0 && <MultiAssigneeDropdown members={members} selectedIds={assigneesOf(t)} onSelect={(ids) => actions.assign(t, ids)} size="sm" triggerLabel={`Assign people to ${t.title}`} />}
+        {timingControl && <span className="min-w-0">{timingControl(t)}</span>}
+      </>}
+      trailing={<LineMenu vm={vm} actions={actions} nextLabel="next week" />}
+      rowProps={{
+        onMouseEnter: parent ? () => onHoverParent?.(parent.id) : undefined,
+        onMouseLeave: parent ? () => onHoverParent?.(null) : undefined,
+      }}
+    />
   )
 }
 

@@ -1,20 +1,30 @@
 # Symphony layout system
 
 Approved by Scott, 2026-10-01 (preview: https://claude.ai/artifact/KxVQah2N5nYS9YJHvraWrP).
+Amended 2026-10-03: two widths, the narrow-column row, movement, the weekend
+band, faint scenery (spec `docs/superpowers/specs/2026-10-03-week-grid-design.md`).
 Supersedes the layout parts of the older files in this folder; colours, faces
 and the place themes are unchanged (`src/index.css`, painted scenery #104).
 
 The aim: every page reads as one app. One column, one margin lane, one
 masthead, one section heading, one row, one empty state.
 
-## 1. One column
+## 1. Two widths
 
-- Every page: the shared left gutter (16 / 40 / 56px) and **880px of content**
-  (`PAGE_COLUMN`, `max-w-[992px]` with the gutter), centred in the 1152px
-  frame beneath the header (Scott, 2026-10-02; it was left-aligned).
-- `PAGE_COLUMN_WIDE` is now the same column (kept as a name).
-- `PAGE_COLUMN_SPLIT` (1152px) only for two panes side by side: Today with
-  its week column.
+Scott, 2026-10-03: "widen the content space to fit a landscape screen". The
+880px column left half a landscape screen empty.
+
+- **Reading pages** (Inbox, Lists, Notes, Routines, Settings, Contacts, Today
+  on its own): the shared left gutter (16 / 40 / 56px) and **1040px of
+  content** (`PAGE_COLUMN`, `max-w-[1152px]` with the gutter), centred in the
+  1152px frame beneath the header.
+- **Planning pages** (Week, Month, Season, Today with its week column) fill
+  the screen: up to **1600px of content** (`PAGE_PLANNING`,
+  `max-w-[1712px]`). Their root carries `.planning-page`
+  (`PLANNING_PAGE_CLASS`), which raises the shell's frame (`--frame-max`) —
+  header, page and guide widen together.
+- `PAGE_COLUMN_WIDE` is the reading column (kept as a name);
+  `PAGE_COLUMN_SPLIT` is now `PAGE_PLANNING`.
 - `PAGE_COLUMN_FULL` only for canvases you work on: Week's hourly grid, the
   people river.
 - Columns are `mx-auto` (`PAGE_COLUMN`, `PAGE_COLUMN_SPLIT`); don't hand-roll
@@ -60,6 +70,17 @@ right). Phones keep their control row.
   `bg-primary-50/50` with a `primary-100` border. The row box bleeds 12–13px
   past the column so its content sits on the column edge.
 - Initials: 24px circles, 10px text, -4px overlap — every letter readable.
+- **The narrow-column row** (Week, 2026-10-03): `WeekRow`
+  (`src/components/plan/v2/WeekRow.tsx`, styles `.wk-row` in
+  `layout-system.css`) — lane (a time, or empty) · mark · title + meta ·
+  people · trailing, 16px (14.5px in the grid's day cells). Every column on
+  Week draws it; no white cards.
+- **Marks:** ○ task · ○ + ↻ routine · — calendar event · ◆ goal · – a month
+  line.
+- **Movement:** a row that can move shows a grip on hover, and anything that
+  can go somewhere else drags there (Scott: "if it can go somewhere else, it
+  drags"). A timed task keeps its time on a new day; a routine moves one
+  occurrence; a calendar event never moves; nothing lands on a past day.
 
 ## 6. One empty state
 
@@ -92,17 +113,28 @@ Agreed with Scott 2026-10-02.
   Today's "Review today" closes the day's list on desktop (phones keep it
   in the ⋯ menu).
 
-## 8. Columns scroll on their own
+## 8. Columns, and the Week grid
 
-Agreed with Scott 2026-10-02 (Week page; Month and Season followed).
+Agreed with Scott 2026-10-02 (Week page; Month and Season followed). Week
+became a grid on 2026-10-03.
 
+- **Week is a grid.** The sources on top — the month's plan in two columns
+  beside this week's list, each capped at about nine rows and scrolling
+  inside itself — and the days across the full width below: the weekend as
+  one band (Saturday · Sunday · Sometime this weekend), the weekdays side by
+  side. Each day's untimed routines fold to one line ("Routines · N"); timed
+  ones stay on the day. Phones stack it: the list, the weekend, the weekdays,
+  the month.
+- **The weekend band.** "Sometime this weekend" holds the weekend's window
+  work once: Weekend-rule routines nobody has given a day, and tasks planned
+  for the weekend with no day. A Sunday-start week has no band (its Saturday
+  and Sunday are different weekends).
 - **Source first.** Side-by-side columns read left to right as planning
   moves (Scott, 2026-10-03): the level above, the period's list, then its
   own time. Week: month · list · days (List view: list · days). Month:
   season · list · dates (List view: list · dates). Season: year · list.
-- **Side by side, each column scrolls.** On Week (month reference, list,
-  days), Month (season reference, list, dates) and Season (year reference,
-  list) each column fills the room from the column headings down to the
+- **Side by side, each column scrolls.** On Month (season reference, list,
+  dates) and Season (year reference, list) each column fills the room from the column headings down to the
   landscape and scrolls independently; the page itself does not scroll.
   Mark the grid `is-colscroll` and give it the ref `useColumnsFitWindow()`
   returns; it measures that room into `--pv2-col-h` (window height − grid
@@ -113,9 +145,9 @@ Agreed with Scott 2026-10-02 (Week page; Month and Season followed).
   crosses a month end) holds until its own list ends, then the
   next pushes it off. Pinned headings wear the page's own background (the
   fixed sky).
-- **Stacked columns keep one page scroll** (below 861px). On Week the month
-  column joins in from 1061px; on Month the dates sit under the list and
-  reference between 861 and 1060px, reached by the page scroll.
+- **Stacked columns keep one page scroll** (below 861px). On Month the dates
+  sit under the list and reference between 861 and 1060px, reached by the
+  page scroll.
 
 ## Type scale
 
@@ -133,7 +165,11 @@ Prefer these over new arbitrary sizes.
 
 ## Scenery
 
-Pages sit on the place's painted sky with no cards behind text (#104).
+Pages sit on the place's painted sky with no cards behind text (#104). The
+scene is **faint by default** — behind the page at a tenth of its strength,
+so content runs to the bottom of the window — and **Full** (in front, at the
+foot of the page) is a choice in Settings › Your place › Scene; short desktop
+windows stay faint either way (2026-10-03).
 Settings › Your place › Style picks **Painted** or **Woodblock**
 (Hiroshige-inspired prints, 2026-10-01): two landscape sets for the same five
 places and three lights, both under the same CSS sky tinted to the place. The

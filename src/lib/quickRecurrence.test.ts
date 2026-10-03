@@ -198,4 +198,9 @@ describe('weekend recurrence', () => {
   it('is described as Weekends', () => {
     expect(describeRecurrence({ type: 'weekend' })).toBe('Weekends')
   })
+  // Scott, 2026-10-03: a weekly Sat + Sun rule read "Weekends" too, which hid
+  // that it is two commitments, each needing its own tick.
+  it('a weekly Saturday-and-Sunday rule says both days', () => {
+    expect(describeRecurrence({ type: 'weekly', days: ['sat', 'sun'] })).toBe('Sat and Sun')
+  })
 })

@@ -31,12 +31,21 @@ export const PAGE_GUTTER_X = 'px-4 md:px-10 lg:px-14'
 
 const PAGE_GUTTER = `${PAGE_GUTTER_X} pt-3 pb-8 md:py-8`
 
-/** THE column (layout system, 2026-10-01): every page, 880px of content at
- *  desktop width (992 = 880 + the 56px gutter either side). One width is what
- *  makes pages read as one app, and it keeps a row's people and actions within
- *  reach of its title instead of across an empty middle (Scott: "less white
- *  space in the center"). See docs/design-system/LAYOUT-SYSTEM.md. */
-export const PAGE_COLUMN = `w-full max-w-[992px] mx-auto ${PAGE_GUTTER}`
+/** THE reading column (layout system, 2026-10-01; widened 2026-10-03): every
+ *  reading page, 1040px of content at desktop width (1152 = 1040 + the 56px
+ *  gutter either side). One width is what makes pages read as one app, and it
+ *  keeps a row's people and actions within reach of its title (Scott: "less
+ *  white space in the center"); 880px left a landscape screen half empty
+ *  (Scott, 2026-10-03: "widen the content space to fit a landscape screen").
+ *  See docs/design-system/LAYOUT-SYSTEM.md. */
+export const PAGE_COLUMN = `w-full max-w-[1152px] mx-auto ${PAGE_GUTTER}`
+
+/** A PLANNING page — Week, Month, Season, Today with its week beside it —
+ *  fills the screen: up to 1600px of content (1712 with the gutter). Its root
+ *  also carries PLANNING_PAGE_CLASS, which widens the shell's frame to match
+ *  (layout-system.css). */
+export const PLANNING_PAGE_CLASS = 'planning-page'
+export const PAGE_PLANNING = `w-full max-w-[1712px] mx-auto ${PLANNING_PAGE_CLASS} ${PAGE_GUTTER}`
 
 /** Kept as a name so old call sites read sensibly; it IS the one column now.
  *  A page that needs more room is a canvas (PAGE_COLUMN_FULL) or a two-pane
@@ -44,7 +53,7 @@ export const PAGE_COLUMN = `w-full max-w-[992px] mx-auto ${PAGE_GUTTER}`
 export const PAGE_COLUMN_WIDE = PAGE_COLUMN
 
 /** Two panes side by side — Today with its week column beside the day. */
-export const PAGE_COLUMN_SPLIT = `w-full max-w-[1152px] mx-auto ${PAGE_GUTTER}`
+export const PAGE_COLUMN_SPLIT = PAGE_PLANNING
 
 /** Full-bleed CANVAS — a grid you work on rather than read (Week's hourly
  *  grid, the people river). No max-width: fills the available width (minus

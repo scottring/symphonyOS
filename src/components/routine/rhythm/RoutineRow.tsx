@@ -39,7 +39,8 @@ function dayNames(days: readonly string[]): string {
   if (sorted.length === 0) return ''
   const key = sorted.join(',')
   if (key === '1,2,3,4,5') return 'Weekdays'
-  if (key === '0,6') return 'Weekends'
+  // Both days, two commitments — not the Weekend rule's once (2026-10-03).
+  if (key === '0,6') return 'Sat and Sun'
   if (sorted.length === 7) return 'Every day'
   if (sorted.length === 2) return `${DAY_NAMES[sorted[0]]} and ${DAY_NAMES[sorted[1]]}`
   return sorted.map((i) => DAY_NAMES[i]).join(', ')

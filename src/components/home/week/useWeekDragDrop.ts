@@ -42,6 +42,11 @@ interface UseWeekDragDropArgs {
    *  the host opens the place-scope popover ("every Thursday" vs "just this
    *  Thursday"). The hook never writes routines on this path itself. */
   onRoutinePlaceRequest?: (req: { routineId: string; when: Date }) => void
+  /** A month line dropped on the week's list: the week's own "+ This week". */
+  onTakeIn?: (taskId: string) => void
+  /** A routine occurrence (or a "Sometime this weekend" routine) dropped on a
+   *  day: the host moves THAT occurrence, never the rule. */
+  onRoutineToDay?: (routineId: string, fromIso: string, toIso: string, title: string) => void
 }
 
 interface UseWeekDragDropResult {
@@ -94,7 +99,7 @@ export function useWeekDragDrop(args: UseWeekDragDropArgs): UseWeekDragDropResul
     if (!e.over) return
 
     const activeData = e.active.data.current as
-      | { kind?: string; taskId?: string; itemId?: string; routineId?: string }
+      | { kind?: string; taskId?: string; itemId?: string; routineId?: string; keepTime?: boolean; fromIso?: string; title?: string; fromSometime?: boolean }
       | undefined
     const overData = e.over.data.current as
       | { kind?: string; dayIso?: string; hour?: number; minute?: number }
@@ -108,8 +113,37 @@ export function useWeekDragDrop(args: UseWeekDragDropArgs): UseWeekDragDropResul
     // walkthrough 2026-09-04: a fresh "this week" task dragged onto the
     // current week's Sunday read as "slid 5d" everywhere.) Refuse the drop
     // and say why; a block already on the grid may still be moved anywhere.
-    if (activeData.kind === 'chip' && overData.dayIso && isPastDay(overData.dayIso)) {
+    if ((activeData.kind === 'chip' || activeData.kind === 'refLine' || activeData.kind === 'routineOcc') && overData.dayIso && isPastDay(overData.dayIso)) {
       showToast('That day has passed — drop it on today or later', 'warning')
+      return
+    }
+
+    // One drag rule (Scott, 2026-10-03): anything that can go somewhere else
+    // drags there. A routine occurrence moves as that one occurrence — the
+    // rule is never rewritten by a drag.
+    if (activeData.kind === 'routineOcc' && activeData.routineId && activeData.fromIso) {
+      if (overData.kind === 'weekList') {
+        showToast('Routines repeat on their own schedule — they aren’t added to a list', 'warning')
+        return
+      }
+      // A Sometime row carries Saturday as its day; a drop onto Saturday still
+      // gives it Saturday (final review, 2026-10-03).
+      if (overData.kind === 'allDay' && overData.dayIso && (activeData.fromSometime || overData.dayIso !== activeData.fromIso)) {
+        a.onRoutineToDay?.(activeData.routineId, activeData.fromIso, overData.dayIso, activeData.title ?? 'routine')
+      }
+      return
+    }
+
+    // A month line: onto the list is the week's "+ This week"; onto a day,
+    // it is this week's, on that day, any time.
+    if (activeData.kind === 'refLine' && activeData.taskId) {
+      const task = tasks.find((t) => t.id === activeData.taskId)
+      if (overData.kind === 'weekList') { a.onTakeIn?.(activeData.taskId); return }
+      if (overData.kind === 'allDay' && overData.dayIso && task) {
+        const prev = { bucket: task.bucket, isAllDay: task.isAllDay ?? false, scheduledFor: task.scheduledFor as Date, weekStart: task.weekStart as Date }
+        void onUpdateTask(task.id, { bucket: 'timed', isAllDay: true, scheduledFor: parseSlotTime(overData.dayIso, 0, 0), weekStart: a.weekStart })
+        a.pushAction?.(`“${task.title}” → ${parseSlotTime(overData.dayIso, 0, 0).toLocaleDateString('en-US', { weekday: 'long' })}`, () => { void onUpdateTask(task.id, prev) })
+      }
       return
     }
 
@@ -145,8 +179,21 @@ export function useWeekDragDrop(args: UseWeekDragDropArgs): UseWeekDragDropResul
           ? activeData.itemId.slice('task-'.length)
           : undefined
       if (!taskId) return
-      const newDay = parseSlotTime(overData.dayIso, 0, 0)
       const task = tasks.find((t) => t.id === taskId)
+      // A timed task keeps its clock time on its new day, and its length
+      // (one drag rule, 2026-10-03); untimed work lands any time.
+      if (activeData.keepTime && task?.scheduledFor && !task.isAllDay) {
+        const from = task.scheduledFor
+        const to = parseSlotTime(overData.dayIso, from.getHours(), from.getMinutes())
+        const shift = to.getTime() - from.getTime()
+        const prevEnd = task.endTime
+        void onUpdateTask(taskId, { isAllDay: false, scheduledFor: to, bucket: 'timed', ...(prevEnd ? { endTime: new Date(prevEnd.getTime() + shift) } : {}) })
+        a.pushAction?.(`Moved "${task.title}"`, () => {
+          void onUpdateTask(taskId, { isAllDay: false, scheduledFor: from, bucket: task.bucket, ...(prevEnd ? { endTime: prevEnd } : {}) })
+        })
+        return
+      }
+      const newDay = parseSlotTime(overData.dayIso, 0, 0)
       const prevScheduledFor = task?.scheduledFor ?? null
       const prevIsAllDay = task?.isAllDay ?? false
       const prevEndTime = task?.endTime

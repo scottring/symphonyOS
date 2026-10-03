@@ -38,12 +38,12 @@ import { FocusDeck, CloseOut, type CloseDecision } from './FocusDeck'
 import { FromPaper } from './FromPaper'
 import { ViewSwitch } from './ViewSwitch'
 import { WeekListV2 } from './WeekListV2'
+import { WeekRow } from './WeekRow'
 import { useAddArea } from './AddArea'
 import { useAssigneeFilter } from '@/hooks/useAssigneeFilter'
 import { planPeopleLens } from '@/lib/planning/peopleLens'
 import { makePlanActions, timingRemoval } from '@/lib/planning/planActions'
 import { useActionableInstances } from '@/hooks/useActionableInstances'
-import { useColumnsFitWindow } from '@/hooks/useColumnsFitWindow'
 import { useDayPlan } from '@/hooks/useDayPlan'
 import { committedTo } from '@/lib/placement/model'
 import type { TaskContext } from '@/types/task'
@@ -108,7 +108,13 @@ export function WeekV2({ tasks, weekStart, meId, isCurrent, days, onSelectTask, 
   // month beside it and last week's look-back keep their own scope.
   const [people] = useAssigneeFilter()
   const lens = useMemo(() => planPeopleLens(people, meId), [people, meId])
-  const weekTasks = useMemo(() => weekListTasks(tasks, weekStart, lens.scopeId, { isCurrent }).filter(lens.keep), [tasks, weekStart, lens, isCurrent])
+  // A task planned for this week's weekend with no day of its own stands in
+  // the days' "Sometime this weekend", not on the list (spec §5).
+  const weekTasks = useMemo(() => {
+    const end = weekStart.getTime() + 7 * DAY
+    const inWeekend = (t: Task) => !!t.weekendStart && !t.scheduledFor && t.weekendStart.getTime() >= weekStart.getTime() && t.weekendStart.getTime() < end
+    return weekListTasks(tasks, weekStart, lens.scopeId, { isCurrent }).filter(lens.keep).filter((t) => !inWeekend(t))
+  }, [tasks, weekStart, lens, isCurrent])
   const nextWeek = useMemo(() => new Date(weekStart.getTime() + 7 * DAY), [weekStart])
   const prevWeek = useMemo(() => new Date(weekStart.getTime() - 7 * DAY), [weekStart])
   const prevTasks = useMemo(() => weekListTasks(tasks, prevWeek, meId, { isCurrent: false }), [tasks, prevWeek, meId])
@@ -271,8 +277,6 @@ export function WeekV2({ tasks, weekStart, meId, isCurrent, days, onSelectTask, 
   // HomeHeader's masthead, when it offers a place for the folded row
   // (desktop only; HomeView decides).
   const slots = useContext(PlanMastheadSlotsContext)
-  const columnsShown = meeting?.step !== 1 && view !== 'focus'
-  const grid = useColumnsFitWindow(columnsShown)
 
   return (
     <div className="pv2-week" data-week={localYmd(weekStart)}>
@@ -312,24 +316,28 @@ export function WeekV2({ tasks, weekStart, meId, isCurrent, days, onSelectTask, 
             ? `Nothing on this week yet. Choose next steps from ${monthName}’s plan, or add your own.`
             : `Nothing on this week yet. Switch to the list to add the first line.`} />
       ) : (
-        <div ref={grid} className={`pv2-wgrid is-colscroll${view === 'ref' ? ' is-ref' : ''}`}>
-          {/* One spread, read left to right as planning moves (Scott,
-              2026-10-03): the month's plan, this week's list, the days. One
-              heading line across them, no boxes (Scott, 2026-09-29: "a bunch
-              of stuff randomly put down"). Only the month's own lines stand
-              in its column — each day already shows its routines. */}
+        <div className={`wk-page${view === 'ref' ? ' is-ref' : ''}`}>
+          <div className="wk-sources">
+          {/* The sources on top — the month's plan, this week's list — and the
+              days across the full width below (Scott, 2026-10-03: "wasted
+              space … maybe in a grid?"). Planning still moves source → list →
+              day; the days are the biggest list, so they get the most room. */}
           {view === 'ref' && (
-            <aside className="pv2-ref" aria-label={`${monthName}, for reference`}>
+            <aside className="pv2-ref wk-sources-month" aria-label={`${monthName}, for reference`}>
               {refMonths.map((m) => (
                 <div key={m.name} className="pv2-refmonth">
                   <div className="pv2-colh">{m.name} <small>(for reference)</small></div>
                   {m.rows.length ? (
                     <ul className="pv2-list">{m.rows.map((t) => (
-                      <li key={t.id} data-ref-id={t.id} className={`pv2-rrow pv2-rrow-sans is-stacked${litParent === t.id || childOf?.id === t.id ? ' is-linked' : ''}`}>
-                        {t.isGoal ? <span className="pv2-goal is-small" aria-hidden="true" /> : <span className="pv2-dash" style={{ marginTop: 10 }} aria-hidden="true" />}
-                        <button type="button" className="flex-1 text-left" onClick={() => onSelectTask(t.id)}>{t.title}
-                          {stepsThisWeek(t.id) > 0 && <span className="pv2-stepcount block">In this week’s list</span>}</button>
-                        <span className="pv2-refacts">
+                      // The same row every column draws; a month line drags onto
+                      // the list or straight onto a day (one drag rule,
+                      // 2026-10-03). A goal stays on its month: its next step
+                      // is what comes into the week.
+                      <WeekRow key={t.id} mark={t.isGoal ? 'goal' : 'line'} title={t.title} onOpen={() => onSelectTask(t.id)}
+                        drag={dragEnabled && !t.isGoal ? { id: `ref:${t.id}`, data: { kind: 'refLine', taskId: t.id } } : null}
+                        meta={stepsThisWeek(t.id) > 0 ? <span className="pv2-stepcount">In this week’s list</span> : undefined}
+                        rowProps={{ 'data-ref-id': t.id, className: litParent === t.id || childOf?.id === t.id ? 'is-linked' : undefined }}
+                        trailing={<span className="pv2-refacts">
                           {!t.isGoal && <button type="button" className="pv2-addbtn" onClick={() => void takeIn(t, m.name)} aria-label={`Add ${t.title} to this week`}>+ This week</button>}
                           {/* The same words the Month and Season pages use beside a
                               goal (walkthrough 2026-09-30: "+ Next step" here,
@@ -337,8 +345,7 @@ export function WeekV2({ tasks, weekStart, meId, isCurrent, days, onSelectTask, 
                           <button type="button" className="pv2-addbtn" onClick={() => setChildOf(t)}
                             title={t.isGoal ? `Add week ${weekNo}’s next step for “${t.title}” — it stays linked to that goal` : `Add a step of “${t.title}” to week ${weekNo}`}
                             aria-label={`Add a ${t.isGoal ? 'next step' : 'step'} for ${t.title} to this week`}>{t.isGoal ? `+ Week ${weekNo}’s part` : '+ Step'}</button>
-                        </span>
-                      </li>
+                        </span>} />
                     ))}</ul>
                   ) : <p className={`pv2-hint${tasksLoading ? '' : ' ds-empty-body'}`}>{tasksLoading ? 'Loading…' : `Nothing open on ${m.name}’s plan.`}</p>}
                   <button type="button" className="pv2-link" style={{ marginTop: 8 }} onClick={() => navigate(`/month?start=${localYmd(m.start)}`)}>Open {m.name} →</button>
@@ -368,7 +375,8 @@ export function WeekV2({ tasks, weekStart, meId, isCurrent, days, onSelectTask, 
                   : `Nothing on this week’s list yet. Add below, or take a step from ${monthName}’s plan beside it.`} />
             </div>
           </div>
-          <section className="pv2-days" aria-label="The days"><div className="pv2-colh">The days</div>{days}</section>
+          </div>
+          <section className="pv2-days wk-days" aria-label="The days"><div className="pv2-colh">The days</div>{days}</section>
         </div>
       )}
     </div>

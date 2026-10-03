@@ -59,6 +59,7 @@ import { LoadFailedNotice } from '@/components/common/LoadFailedNotice'
 import { useGuidedPlan } from '@/hooks/useGuidedPlan'
 import { useGuideNext } from '@/components/guide/GuideBar'
 import { currentStep, stepShortName } from '@/lib/guide/guidedPlan'
+import { PLANNING_PAGE_CLASS } from '@/components/layout/pageLayout'
 
 type Level = 'month' | 'season'
 const NOUN: Record<Level, string> = { month: 'Month', season: 'Season' }
@@ -639,7 +640,7 @@ function Inner({ level }: { level: Level }) {
   }
 
   return (
-    <div className="pv2-page">
+    <div className={`pv2-page ${PLANNING_PAGE_CLASS}`}>
       {/* The masthead every horizon wears (Week and Today's MastheadCard):
           the numeral in the margin, "‹ MONTH ›" above the name. A line under
           it only while the review is saying what to do next. */}

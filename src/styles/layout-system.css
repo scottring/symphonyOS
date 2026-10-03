@@ -181,7 +181,11 @@
    the middle list isn't squeezed to ~250px. One page, one width at a time;
    the left edge never moves. */
 @media (min-width: 768px) {
-  :root:has(.pv2-wgrid.is-ref, .pv2-grid3) :is(.pv2-page, .week-column) { max-width: 1152px; }
+  /* A planning page fills the screen (Scott, 2026-10-03): its root carries
+     .planning-page (PLANNING_PAGE_CLASS), and the shell's frame — header,
+     page, guide — widens with it. */
+  :root:has(.planning-page) { --frame-max: 1712px; }
+  .pv2-page.planning-page { max-width: 1712px; }
 }
 
 /* The page scroller always reserves its scrollbar, so a page long enough to
@@ -240,3 +244,133 @@
   }
   .pv2-wgrid.is-colscroll > .pv2-ref .pv2-refshelf > summary { padding: 4px 0 6px; }
 }
+
+/* ── The Week row (WeekRow, 2026-10-03) ─────────────────────────────────
+   One row in every column of the Week page: lane · mark · title · people ·
+   trailing. No white cards and no rules between rows; the shared hover tint
+   marks the row under your hand, and a grip shows at its left edge when it
+   can move (Scott: "if it can go somewhere else, it drags"). The box bleeds
+   12px past the column so its words sit on the column's edge. */
+.wk-row {
+  position: relative; display: grid; grid-template-columns: 20px minmax(0, 1fr) auto auto;
+  column-gap: 10px; align-items: start; margin: 0 -12px; padding: 6px 11px;
+  border: 1px solid transparent; border-radius: 12px; list-style: none;
+  font-size: var(--ds-text-row, 16px); line-height: 1.4; color: var(--color-neutral-900);
+  transition: background-color .12s, border-color .12s;
+}
+.wk-row.has-lane { grid-template-columns: 38px 20px minmax(0, 1fr) auto auto; }
+.wk-row.is-dense { font-size: 14.5px; padding: 5px 11px; column-gap: 8px; }
+.wk-row.is-dense.has-lane { grid-template-columns: 34px 18px minmax(0, 1fr) auto auto; }
+.wk-row:hover, .wk-row:focus-within {
+  background: color-mix(in srgb, var(--color-primary-50) 50%, transparent);
+  border-color: var(--color-primary-100);
+}
+.wk-row[data-movable="true"] { cursor: grab; touch-action: none; }
+.wk-row.is-dragging { opacity: .4; }
+.wk-row.is-missed { opacity: .5; }
+.wk-grip { position: absolute; left: -6px; top: 9px; color: var(--color-neutral-400); opacity: 0; transition: opacity .12s; pointer-events: none; }
+.wk-row:hover .wk-grip { opacity: 1; }
+.wk-lane { font-size: 12px; line-height: 22px; color: var(--color-neutral-500); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.wk-mark { display: flex; justify-content: center; padding-top: 2px; }
+.wk-check {
+  display: grid; place-items: center; width: 18px; height: 18px; border-radius: 9999px;
+  border: 1.5px solid var(--color-neutral-400); color: transparent; cursor: pointer;
+}
+.wk-row.is-dense .wk-check { width: 16px; height: 16px; }
+.wk-check.is-on { border-color: var(--color-primary-600); background: var(--color-primary-600); color: #fff; }
+.wk-glyph.is-event, .wk-glyph.is-line { width: 12px; height: 1.5px; margin-top: 9px; background: var(--color-neutral-400); }
+.wk-glyph.is-goal { width: 9px; height: 9px; margin-top: 5px; transform: rotate(45deg); background: var(--color-primary-700); }
+.wk-titleline { display: inline; }
+.wk-title { text-align: left; color: inherit; overflow-wrap: anywhere; }
+.wk-title:hover { color: var(--color-neutral-950); }
+.wk-row[data-mark="routine"] .wk-title, .wk-row[data-mark="line"] .wk-title { color: var(--color-neutral-700); }
+.wk-row[data-done="true"] .wk-title { color: var(--color-neutral-400); text-decoration: line-through; }
+.wk-repeat { display: inline-block; width: 12px; height: 12px; margin-left: 6px; vertical-align: -1px; color: var(--color-neutral-400); }
+.wk-meta { margin-top: 1px; font-size: var(--ds-text-meta, 12px); line-height: 1.35; color: var(--color-neutral-500); }
+.wk-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 4px; }
+.wk-people { display: flex; gap: 2px; padding-top: 1px; }
+.wk-trailing { display: flex; align-items: flex-start; gap: 6px; }
+@media (hover: hover) {
+  /* Pickers and month-line actions come up with the pointer or focus. */
+  .wk-row .wk-tools, .wk-row .pv2-refacts { display: none; }
+  .wk-row:hover .wk-tools, .wk-row:focus-within .wk-tools,
+  .wk-row:hover .pv2-refacts, .wk-row:focus-within .pv2-refacts, .wk-row.is-linked .pv2-refacts { display: flex; }
+}
+.wk-row .pv2-refacts { position: static; opacity: 1; padding: 0; background: none; gap: 8px; pointer-events: auto; }
+/* A month line lit by the week row it fed (hover), and flashed when shown. */
+.wk-row.is-linked { background: color-mix(in srgb, var(--color-primary-100) 70%, transparent); border-color: var(--color-primary-100); }
+.wk-row.is-flash { animation: pv2-flash 1.2s ease-out; }
+@media (prefers-reduced-motion: reduce) { .wk-row.is-flash { animation: none; } }
+
+/* ── The Week page as a grid (2026-10-03) ─────────────────────────────────
+   The sources on top — the month's plan (two columns) beside this week's
+   list, each capped at about nine rows and scrolling inside itself — and the
+   days across the full width below: the weekend as one band (Saturday ·
+   Sunday · Sometime this weekend), the weekdays side by side. Scott: "this
+   screams out to me: wasted space … maybe in a grid?" */
+.wk-page { display: flex; flex-direction: column; gap: 28px; }
+.wk-sources { display: grid; grid-template-columns: minmax(0, 1fr); gap: 40px; align-items: start; --pv2-colh-bg: var(--color-bg-base); }
+.scenery-sky .wk-sources { --pv2-colh-bg: var(--scenery-sky-layers); }
+.wk-page.is-ref .wk-sources { grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); }
+.wk-page:not(.is-ref) .wk-sources > .pv2-wside { max-width: 640px; }
+.wk-sources > * {
+  /* About nine rows, less on a short window (a laptop) so the days start
+     near the top. */
+  position: relative; max-height: min(24rem, 30vh); overflow-y: auto; overflow-x: hidden; scrollbar-width: thin;
+  margin: 0 -14px 0 -22px; padding: 0 14px 0 22px;
+}
+.wk-sources .pv2-wside { position: relative; top: auto; }
+/* The reference column's own rule (index.css: .pv2-week .pv2-ref, no cap)
+   is more specific; the band's cap must win. */
+.pv2-week .wk-sources > .pv2-ref { max-height: min(24rem, 30vh); overflow-y: auto; overflow-x: hidden; }
+@media (max-width: 860px) { .pv2-week .wk-sources > .pv2-ref { max-height: none; overflow: visible; } }
+.wk-sources .pv2-colh { position: sticky; top: 0; z-index: 2; background: var(--pv2-colh-bg); background-attachment: fixed; }
+.wk-sources-month .pv2-list { columns: 240px 3; column-gap: 40px; }
+.wk-sources-month .wk-row { break-inside: avoid; }
+
+.wk-grid { display: flex; flex-direction: column; gap: 18px; }
+.wk-weekend {
+  border: 1px solid var(--color-neutral-300); border-radius: 14px; padding: 2px 14px 8px;
+  background: color-mix(in srgb, var(--color-bg-elevated) 40%, transparent);
+}
+.wk-weekend-head { padding: 10px 0 0; font: 400 19px/1.2 var(--font-family-display); color: var(--color-neutral-900); }
+.wk-weekend-cells { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.wk-weekdays { display: grid; grid-template-columns: repeat(var(--wk-days, 5), minmax(0, 1fr)); }
+.wk-cell { min-width: 0; padding: 10px 14px 12px; border-left: 1px solid var(--color-neutral-200); }
+.wk-cell:first-child { border-left: 0; }
+.wk-cell.is-over { background: color-mix(in srgb, var(--color-primary-50) 60%, transparent); border-radius: 10px; }
+.wk-dayhead { display: flex; align-items: baseline; gap: 8px; min-height: 34px; padding-bottom: 6px; margin-bottom: 4px; border-bottom: 1px solid var(--color-neutral-200); }
+.wk-daynum { font: 200 30px/1 var(--pv2-num, 'Jost'), sans-serif; color: var(--color-neutral-900); }
+.wk-cell.is-today .wk-daynum, .wk-cell.is-today .wk-dayname { color: var(--color-primary-700); }
+.wk-dayname { font: 500 11px var(--font-family-sans); letter-spacing: .1em; text-transform: uppercase; color: var(--color-neutral-600); }
+.wk-dayhead [role="img"] { margin: 0 0 0 auto; }
+.wk-dayhint { margin-left: auto; font-size: 12px; color: var(--color-neutral-500); }
+p.wk-dayhint { margin: 8px 0 0; }
+.wk-rows { display: flex; flex-direction: column; gap: 1px; margin: 0; padding: 0; }
+.wk-notes { margin: 2px 0 4px; font-size: 13px; line-height: 1.35; color: var(--color-neutral-600); }
+.wk-dinner { margin: 6px 0 0; font-size: 12.5px; color: var(--color-neutral-500); }
+.wk-empty { margin: 4px 0 0; font-size: 13px; color: var(--color-neutral-500); }
+.wk-fold-btn { display: inline-flex; align-items: center; gap: 4px; margin-top: 4px; padding: 4px 0; font-size: 12.5px; font-weight: 500; color: var(--color-neutral-700); }
+.wk-fold-btn:hover { color: var(--color-neutral-950); }
+
+@media (max-width: 1060px) {
+  .wk-page.is-ref .wk-sources { grid-template-columns: minmax(0, 1fr); }
+  .wk-sources > .pv2-wside { order: -1; }
+  .wk-weekdays { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+@media (max-width: 860px) {
+  /* One column: this week's list, the weekend, the weekdays, the month. */
+  .wk-sources { display: contents; }
+  .wk-sources > * { max-height: none; overflow: visible; margin: 0; padding: 0; }
+  .wk-sources > .pv2-wside { order: 1; }
+  .wk-page > .wk-days { order: 2; }
+  .wk-sources > .wk-sources-month { order: 3; }
+  .wk-sources-month .pv2-list { columns: 1; }
+  .wk-weekend-cells, .wk-weekdays { grid-template-columns: minmax(0, 1fr); }
+  .wk-cell { border-left: 0; border-top: 1px solid var(--color-neutral-200); padding: 10px 0 12px; }
+  .wk-cell:first-child { border-top: 0; }
+}
+/* The journal's big day numeral rule (header > span:first-child) must not
+   reach a header whose first word is a label (Sometime this weekend). */
+.pv2-days [data-testid="week-journal"] .wk-dayhead > .wk-dayname { font: 500 11px var(--font-family-sans); letter-spacing: .1em; }
+.wk-glyph.is-event, .wk-glyph.is-line { height: 1px; }

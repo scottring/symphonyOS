@@ -247,6 +247,20 @@ export function matchesRecurrenceForDate(
     // other days of that window go quiet.
     case 'weekend': {
       if (!isWeekendWindowDay(date)) return false
+      // Every other (or Nth) weekend, counted from the weekend it started on
+      // (2026-10-03: "Weed the backyard", every other weekend, done once).
+      if (pattern.interval && pattern.interval > 1 && pattern.start_date) {
+        const saturdayOf = (d: Date) => {
+          const key = weekendWindowKeys(d).find((k) => { const [y, m, dd] = k.split('-').map(Number); return new Date(y, m - 1, dd).getDay() === 6 })
+          const [y, m, dd] = (key ?? formatDateString(d)).split('-').map(Number)
+          return new Date(y, m - 1, dd)
+        }
+        const [sy, sm, sd] = pattern.start_date.slice(0, 10).split('-').map(Number)
+        const start = new Date(sy, sm - 1, sd)
+        const startSat = new Date(start.getFullYear(), start.getMonth(), start.getDate() + ((6 - start.getDay() + 7) % 7))
+        const weeks = Math.round((saturdayOf(date).getTime() - startSat.getTime()) / (7 * 86_400_000))
+        if (weeks < 0 || weeks % pattern.interval !== 0) return false
+      }
       if (!lastCompletedAt) return true
       const doneOn = formatDateString(lastCompletedAt)
       if (doneOn === dateStr) return true
