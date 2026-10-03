@@ -22,7 +22,6 @@ import { useDraggable, useDroppable } from '@dnd-kit/core'
 import { Check, Plus } from 'lucide-react'
 import type { Task } from '@/types/task'
 import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
-import type { TimelineItem } from '@/types/timeline'
 import { isMissedPlacement } from '@/lib/week/missedPlacement'
 import { journalTime, type ContextSpan } from '@/lib/week/journalSpread'
 import { planDropHandlers, type PlanDragPayload } from '@/lib/planning/planDrag'
@@ -30,36 +29,13 @@ import { useMobile } from '@/hooks/useMobile'
 import type { DayForecast } from '@/hooks/useWeather'
 import { weatherCondition, weatherIcon } from '@/lib/weatherIcon'
 
-export interface JournalEntry {
-  /** Selectable id — 'task-<uuid>', 'event-<id>', 'routine-<id>'. */
-  id: string
-  kind: 'event' | 'task' | 'routine'
-  /** Present when the entry has a time. */
-  time?: Date
-  title: string
-  subtitle?: string
-  completed: boolean
-  /** Tasks: the row. Drags between days (untimed only). */
-  task?: Task
-  /** Routines: the occurrence's routine id, for completion. */
-  routineId?: string
-}
-
-export interface JournalDay {
-  date: Date
-  /** Local YYYY-MM-DD. */
-  key: string
-  /** Single-day all-day calendar events (a holiday, "no school"). */
-  notes: CalendarEvent[]
-  /** Timed entries in time order, then untimed ones. */
-  entries: JournalEntry[]
-  /** Untimed routine occurrences not chosen for the day. */
-  available: TimelineItem[]
-  dinners: { event: CalendarEvent; label: string }[]
-}
+import type { JournalDay, JournalEntry, JournalWeekend } from '@/lib/week/journalDays'
+export type { JournalDay, JournalEntry, JournalWeekend } from '@/lib/week/journalDays'
 
 interface WeekJournalProps {
   days: JournalDay[]
+  /** The weekend in this week and its "Sometime this weekend" work. */
+  weekend?: JournalWeekend | null
   spans: ContextSpan[]
   onSelectItem: (id: string) => void
   onToggleEntry: (entry: JournalEntry, day: JournalDay) => void
@@ -248,7 +224,7 @@ function DayRow({ day, onSelectItem, onToggleEntry, onPlanDrop, onAddToDay, drag
   const [planOver, setPlanOver] = useState(false)
   const planProps = onPlanDrop ? planDropHandlers((p) => onPlanDrop(day, p), setPlanOver) : {}
   const today = isToday(day.date)
-  const empty = day.notes.length + day.entries.length + day.dinners.length === 0
+  const empty = day.notes.length + day.entries.length + day.foldedRoutines.length + day.dinners.length === 0
 
   return (
     <section
@@ -285,9 +261,9 @@ function DayRow({ day, onSelectItem, onToggleEntry, onPlanDrop, onAddToDay, drag
           </ul>
         )}
 
-        {day.entries.length > 0 && <div className="journal-day-groups">
+        {day.entries.length + day.foldedRoutines.length > 0 && <div className="journal-day-groups">
           {[{ label: 'Schedule', entries: day.entries.filter(entry => entry.time) },
-            { label: 'Any time', entries: day.entries.filter(entry => !entry.time) }].filter(group => group.entries.length).map(group =>
+            { label: 'Any time', entries: [...day.entries.filter(entry => !entry.time), ...day.foldedRoutines] }].filter(group => group.entries.length).map(group =>
             <section key={group.label} aria-label={group.label}>
               <h3>{group.label}</h3>
               <ul className="flex flex-col gap-2" aria-label={group.label + ' entries'}>

@@ -7,7 +7,7 @@ import { WeekJournal, type JournalDay } from './WeekJournal'
 // a day on week." Each day now has its own add, like Today's.
 function day(d: Date): JournalDay {
   const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-  return { date: d, key, notes: [], entries: [], available: [], dinners: [] }
+  return { date: d, key, notes: [], entries: [], foldedRoutines: [], available: [], dinners: [] }
 }
 
 describe('WeekJournal — add straight to a day', () => {

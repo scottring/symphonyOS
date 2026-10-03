@@ -404,31 +404,19 @@ describe('WeekViewV2 journal spread', () => {
     toggleResult.ok = true
   })
 
-  it('keeps routines quiet and honours the Routines switch', () => {
+  // Scott, 2026-10-03: routines are always on the week (folded per day); the
+  // toolbar switch that hid them all is retired — one routine is hidden with
+  // its own "Show in Today and planning".
+  it('always shows routines, with no Routines switch', () => {
     const routines = [createMockRoutine({ name: 'Morning stretch' })]
     render(<WeekViewV2 {...defaultProps} routines={routines} weekStart={sunday} />)
     expect(screen.getAllByText('Morning stretch').length).toBeGreaterThan(0)
-    fireEvent.click(screen.getByRole('switch', { name: 'Routines' }))
-    expect(screen.queryByText('Morning stretch')).toBeNull()
-    fireEvent.click(screen.getByRole('switch', { name: 'Routines' }))
-  })
-
-  // The switch used to run only the daily sweep, so a Sunday-only routine
-  // stayed in the journal's "Available" line with routines switched off
-  // (Scott, 2026-09-20). Off means none.
-  it('the Routines switch also hides an untimed weekly routine from the Available line', () => {
-    // Show in Today not positively set: available, not an entry.
-    const routines = [createMockRoutine({ name: 'Take out garbage', time_of_day: null, recurrence_pattern: { type: 'weekly', days: ['sun'] } as RecurrencePattern, show_on_timeline: null as unknown as boolean })]
-    render(<WeekViewV2 {...defaultProps} routines={routines} weekStart={sunday} />)
-    expect(screen.queryByText('Take out garbage')).toBeNull()
-    fireEvent.click(screen.getByRole('switch', { name: 'Routines' }))
-    expect(screen.queryByText('Take out garbage')).toBeNull()
-    fireEvent.click(screen.getByRole('switch', { name: 'Routines' }))
+    expect(screen.queryByRole('switch', { name: 'Routines' })).toBeNull()
   })
 
   // Scott, 2026-09-27: Show in Today ON + due = on the day, untimed, in the
-  // journal AND Schedule's all-day cell — as on Today. Off means none.
-  it('a due routine with Show in Today on is a Sunday entry in both modes, untimed, and the switch still hides it', () => {
+  // journal AND Schedule's all-day cell — as on Today.
+  it('a due routine with Show in Today on is a Sunday entry in both modes, untimed', () => {
     const routines = [createMockRoutine({ id: 'wp', name: 'Water houseplants', time_of_day: null, recurrence_pattern: { type: 'weekly', days: ['sun'] } as RecurrencePattern, show_on_timeline: true })]
     render(<WeekViewV2 {...defaultProps} routines={routines} weekStart={sunday} />)
     const sun = within(screen.getByTestId('journal-day-2026-09-13'))
@@ -437,10 +425,6 @@ describe('WeekViewV2 journal spread', () => {
     fireEvent.click(screen.getByRole('radio', { name: 'Schedule' }))
     expect(within(screen.getByTestId('allday-2026-09-13')).getByText('Water houseplants')).toBeInTheDocument()
     expect(within(screen.getByTestId('allday-2026-09-14')).queryByText('Water houseplants')).toBeNull()
-    fireEvent.click(screen.getByRole('radio', { name: 'Journal' }))
-    fireEvent.click(screen.getByRole('switch', { name: 'Routines' }))
-    expect(screen.queryByText('Water houseplants')).toBeNull()
-    fireEvent.click(screen.getByRole('switch', { name: 'Routines' }))
   })
 
   describe('on a narrow screen', () => {
