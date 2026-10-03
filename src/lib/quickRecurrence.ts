@@ -292,7 +292,8 @@ export function describeRecurrence(pattern: RecurrencePattern): string {
       const key = [...days].sort((a, b) => DAY_KEYS.indexOf(a as never) - DAY_KEYS.indexOf(b as never)).join(',')
       if (!pattern.interval || pattern.interval === 1) {
         if (key === 'mon,tue,wed,thu,fri') return 'Weekdays'
-        if (key === 'sun,sat') return 'Weekends'
+        // Both days, two commitments — not the Weekend rule's once (2026-10-03).
+        if (key === 'sun,sat') return 'Sat and Sun'
         if (days.length === 7) return 'Every day'
       }
       if (days.length === 0) return pattern.interval && pattern.interval > 1 ? `${every} weeks` : 'Every week'

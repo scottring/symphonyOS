@@ -34,7 +34,7 @@ const RECURRENCE_TYPES: { value: RecurrenceType; label: string }[] = [
   { value: 'weekly', label: 'Weekly' },
   // Not a day — a window. Sits beside Weekly because that is where someone
   // goes looking after ticking Sat and Sun and being asked twice.
-  { value: 'weekend', label: 'Weekend' },
+  { value: 'weekend', label: 'Weekend (once)' },
   { value: 'monthly', label: 'Monthly' },
   { value: 'quarterly', label: 'Quarterly' },
   { value: 'since_last', label: 'After completion' },
@@ -211,6 +211,14 @@ export function RoutineScheduleEditor({
           {selectedDays.length === 0 && (
             <p className="text-sm text-neutral-600 mt-2">
               No day chosen, so it's a flexible day — once a week, on whichever day you give it.
+            </p>
+          )}
+          {/* Saturday and Sunday ticked: two commitments, each its own tick —
+              not the Weekend rule's once (Scott, 2026-10-03: weekend chores on
+              both days were "mind-numbing"). */}
+          {selectedDays.length === 2 && selectedDays.includes('sat') && selectedDays.includes('sun') && (
+            <p className="text-sm text-neutral-600 mt-2">
+              Both Saturday and Sunday — each day needs its own tick. For once, sometime over the weekend, choose Weekend (once).
             </p>
           )}
           {/* Seven days every week IS Daily — say so rather than leave two
