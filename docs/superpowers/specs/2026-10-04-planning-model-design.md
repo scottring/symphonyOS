@@ -91,6 +91,22 @@ move · Look ahead · Routines · **Write the week** · The week.
 - Year: "2026's list", a plain list. No one-at-a-time view.
 - After a save the next step reads "Write October's list" / "Plan week 41".
 
+## Season and Year, drawn (2026-10-04, mockups Season/Year.dc.html)
+
+- **Season:** under the masthead, the season band — its months (from the
+  household's seasons), the part already lived shaded, a "today" line, and
+  landmarks pinned below. The list is a board of large cards (22px serif): a
+  box to tick by hand, the words, ⋯, and under each what the months wrote for
+  it ("OCT  Make a budget").
+- **Year:** a ribbon of twelve months tinted by season, the season names
+  above, "today". The year's list in large type (26px), two columns; under
+  each line, what the seasons wrote for it.
+- "Written for" counts any link a row carries: source_id, goal_task_id,
+  supports_goal_task_id, or goal_id (a season line under a year goal).
+- Week items can be written "for" a month line (optional, one way); the month
+  line shows what the weeks did, on the Week page's October list and the
+  October page. Month lines are ticked by hand, never by their week items.
+
 ## Not changed
 
 Data model, Today, drag rules on the days, routines' own pages, the weekend

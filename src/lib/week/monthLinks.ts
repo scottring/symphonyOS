@@ -38,3 +38,22 @@ export function didFor(lineId: string, tasks: readonly Task[], weekStart: Date):
     .sort((a, b) => at(a) - at(b))
     .map((t) => ({ id: t.id, title: t.title, done: !!t.completed, when: when(t) }))
 }
+
+export interface WrittenGroup { label: string; items: { id: string; title: string; done: boolean }[] }
+
+/** What the level below wrote for a line one level up (a month for a season
+ *  line, a season for a year line), grouped by its own period in date order.
+ *  Any of the links a row can carry counts: written from it (source_id), a
+ *  step of it (goal_task_id), its part (supports_goal_task_id), or — a season
+ *  line under a year goal — goal_id. */
+export function writtenFor(lineId: string, tasks: readonly Task[], labelOf: (t: Task) => string): WrittenGroup[] {
+  const linked = (t: Task) => t.id !== lineId && (t.sourceId === lineId || t.goalTaskId === lineId || t.supportsGoalTaskId === lineId || t.goalId === lineId)
+  const at = (t: Task) => (t.monthStart ?? t.seasonStart ?? t.weekStart ?? t.scheduledFor ?? t.createdAt).getTime()
+  const groups: WrittenGroup[] = []
+  for (const t of tasks.filter(linked).sort((a, b) => at(a) - at(b))) {
+    const label = labelOf(t)
+    const g = groups.find((x) => x.label === label) ?? (groups.push({ label, items: [] }), groups[groups.length - 1])
+    g.items.push({ id: t.id, title: t.title, done: !!t.completed })
+  }
+  return groups
+}

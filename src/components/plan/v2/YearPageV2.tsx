@@ -28,6 +28,9 @@ import { useMobile } from '@/hooks/useMobile'
 import { EMPTY_TALLY, addToTally, decidedSentence, lookBackWhy, nextAfterSave, type Tally } from '@/lib/planning/v2/planTally'
 import { periodBounds } from '@/lib/planning/periodPage'
 import { readSeasons } from '@/lib/cadence/seasons'
+import { writtenFor } from '@/lib/week/monthLinks'
+import { YearRibbon } from './PeriodShape'
+import { LineCard } from './LineCard'
 import { FromPaper } from './FromPaper'
 import { useAddArea } from './AddArea'
 import { useAssigneeFilter } from '@/hooks/useAssigneeFilter'
@@ -181,7 +184,12 @@ function Inner() {
         <div className="pv2-colh">{`${year}’s list`}<FromPaper altitude="year" periodStart={new Date(year, 0, 1)} tasks={layered} /></div>
         {loading && !main.length ? <p className="pv2-hint">Loading…</p> : null}
         {!loading && !main.length && <p className="pv2-hint ds-empty-body">{inMeeting ? 'Write what you want this year to hold.' : `Nothing on ${year}’s plan yet. That’s fine.`}</p>}
-        <ul className="pv2-list pv2-brain">{main.map(row)}</ul>
+        {/* The year's list in large type; under each line, what the seasons
+            wrote for it (2026-10-04). */}
+        <ul className="ps-yearlist">{main.map((vm) => (
+          <LineCard key={vm.task.id} variant="row" vm={vm} actions={actions} nextLabel={String(year + 1)}
+            did={writtenFor(vm.task.id, layered, (t) => periodBounds('season', t.seasonStart ?? t.monthStart ?? t.createdAt, seasons).label.replace(/\s+\d{4}$/, ''))} />
+        ))}</ul>
         {/* Always open, as on every horizon: the review is not a gate on writing. */}
         <form className="pv2-write" onSubmit={(e) => { e.preventDefault(); const v = draft.trim(); if (v) { void addLine(v); setDraft('') } }}>
           <span className="pv2-dash" aria-hidden="true" />
@@ -199,7 +207,7 @@ function Inner() {
   }
 
   return (
-    <div className="pv2-page">
+    <div className="pv2-page is-year">
       <MastheadCard variant="page" numeral={String(year)} title={`Jan – Dec ${year}`}
         eyebrow={<PeriodNavEyebrow label="Year" onPrev={() => goTo(year - 1)} onNext={() => goTo(year + 1)} prevLabel={String(year - 1)} nextLabel={String(year + 1)} />}
         // Desktop folds the control row into the masthead (layout system,
@@ -215,6 +223,7 @@ function Inner() {
           onStep={(step) => setMeeting({ ...meeting!, step })}
           onLeave={() => void endMeeting(false)} onSave={() => void endMeeting(true)} saveLabel={`Mark ${year} planned`} />
       ) : folded ? <><GuideAnchor /><PlanSavedLine period={String(year)} justSaved={toolbar.justSaved} /></> : <PlanToolbar {...toolbar} />}
+      {meeting?.step !== 1 && <YearRibbon year={year} seasons={seasons} today={new Date()} />}
       {body}
     </div>
   )

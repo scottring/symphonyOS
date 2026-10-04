@@ -30,3 +30,19 @@ describe('monthLinks', () => {
     ])
   })
 })
+
+describe('writtenFor', () => {
+  it('groups what the level below wrote for a line, by its own period', async () => {
+    const { writtenFor } = await import('./monthLinks')
+    const tasks = [
+      task({ id: 'a', title: 'Make a budget', monthStart: new Date(2026, 9, 1), sourceId: 'fall1' }),
+      task({ id: 'b', title: 'Open a savings account', monthStart: new Date(2026, 10, 1), supportsGoalTaskId: 'fall1' }),
+      task({ id: 'c', title: 'Unrelated', monthStart: new Date(2026, 9, 1) }),
+    ]
+    const groups = writtenFor('fall1', tasks, (t) => t.monthStart!.toLocaleDateString('en-US', { month: 'short' }))
+    expect(groups).toEqual([
+      { label: 'Oct', items: [{ id: 'a', title: 'Make a budget', done: false }] },
+      { label: 'Nov', items: [{ id: 'b', title: 'Open a savings account', done: false }] },
+    ])
+  })
+})

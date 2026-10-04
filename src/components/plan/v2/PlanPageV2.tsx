@@ -62,7 +62,9 @@ import { useGuidedPlan } from '@/hooks/useGuidedPlan'
 import { useGuideNext } from '@/components/guide/GuideBar'
 import { currentStep, stepShortName } from '@/lib/guide/guidedPlan'
 import { PLANNING_PAGE_CLASS } from '@/components/layout/pageLayout'
-import { didFor } from '@/lib/week/monthLinks'
+import { didFor, writtenFor } from '@/lib/week/monthLinks'
+import { SeasonBand } from './PeriodShape'
+import { LineCard } from './LineCard'
 
 type Level = 'month' | 'season'
 const NOUN: Record<Level, string> = { month: 'Month', season: 'Season' }
@@ -175,7 +177,8 @@ function Inner({ level }: { level: Level }) {
   const aboveName = level === 'month' ? periodBounds('season', bounds.start, seasons).label.replace(/\s+\d{4}$/, '') : String(bounds.start.getFullYear())
 
   // ── Dates we can't move ────────────────────────────────────────────────
-  const { events, available, loading: eventsLoading } = useDayLoadEvents(level === 'month')
+  // The month's calendar, and the season band's landmarks.
+  const { events, available, loading: eventsLoading } = useDayLoadEvents(true)
   const landmarks = useMemo(() => landmarksIn(events, bounds.start, bounds.end), [events, bounds.start, bounds.end])
   const [openLm, setOpenLm] = useState<string | null>(null)
   const plannedOn = useCallback((l: Landmark) => layered
@@ -422,7 +425,14 @@ function Inner({ level }: { level: Level }) {
       {!loading && !tasksLoadFailed && !main.length && <p className="pv2-hint ds-empty-body">{inMeeting ? 'Nothing yet. Write whatever comes up — no types, no dates needed.'
         : level === 'season' ? `Nothing on ${name}’s list yet. Write everything you’d like ${name} to hold — no types, no dates.`
         : `Nothing on ${name}’s list yet. Add a line below.`}</p>}
-      <ul className={`pv2-list${level === 'season' && !refOpen && !inMeeting ? ' pv2-brain' : ''}`}>{lineGroups(main, false)}</ul>
+      {level === 'season' ? (
+        // The season's brainstorm, as a board of large lines (2026-10-04);
+        // under each, what the months wrote for it.
+        <ul className={`ps-board${refOpen ? ' is-narrow' : ''}`}>{main.map((vm) => (
+          <LineCard key={vm.task.id} vm={vm} actions={actions} nextLabel={nextName}
+            did={writtenFor(vm.task.id, layered, (t) => (t.monthStart ?? t.weekStart ?? t.scheduledFor ?? t.createdAt).toLocaleDateString('en-US', { month: 'short' }))} />
+        ))}</ul>
+      ) : <ul className="pv2-list">{lineGroups(main, false)}</ul>}
       {/* Always open (Scott, 2026-09-29: "why is it not possible to add items
           directly to the month list?") — the review is for closing out and
           agreeing, not a gate on writing. */}
@@ -501,7 +511,7 @@ function Inner({ level }: { level: Level }) {
   }
 
   return (
-    <div className={`pv2-page ${PLANNING_PAGE_CLASS}`}>
+    <div className={`pv2-page ${PLANNING_PAGE_CLASS} is-${level}`}>
       {/* The masthead every horizon wears (Week and Today's MastheadCard):
           the numeral in the margin, "‹ MONTH ›" above the name. A line under
           it only while the review is saying what to do next. */}
@@ -528,6 +538,11 @@ function Inner({ level }: { level: Level }) {
           onLeave={() => void endMeeting(false)} onSave={() => void endMeeting(true)} saveLabel={`Mark ${name} planned`} />
       ) : folded ? <><GuideAnchor /><PlanSavedLine period={name} justSaved={toolbar.justSaved} /></> : <PlanToolbar {...toolbar} />}
 
+      {level === 'season' && meeting?.step !== 1 && !guidedReview && (
+        // The season's shape: its months, today, its landmarks.
+        <SeasonBand start={bounds.start} end={bounds.end} today={today} name={name}
+          marks={landmarks.map((l) => ({ id: l.id, title: l.title, at: l.start }))} />
+      )}
       {dragOn && meeting?.step !== 1 && !guidedReview ? (
         <DndContext sensors={sensors} collisionDetection={pointerWithin}
           onDragStart={(e: DragStartEvent) => setDragId(String(e.active.id))} onDragEnd={(e) => void onDragEnd(e)} onDragCancel={() => setDragId(null)}>
