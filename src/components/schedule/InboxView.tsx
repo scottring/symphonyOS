@@ -744,6 +744,7 @@ export function InboxView({
               onSetArea={(context) => onUpdateTask?.(task.id, { context })}
               onDelete={() => applyTriage(task, { kind: 'delete' })}
               loads={dayLoads}
+              area={task.context ?? null}
             />
           }
           onToggleComplete={() => onToggleTask?.(task.id)}

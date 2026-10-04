@@ -74,7 +74,9 @@ describe('Inbox row triage', () => {
 
   it('sets the life area from More', () => {
     const { actions } = renderInbox([capture('t1', 'Fix gate', { context: null })])
-    fromMore('Family')
+    // A row of chips now (2026-10-04), one of them marked.
+    fireEvent.click(screen.getAllByRole('button', { name: /^More actions for/ })[0])
+    fireEvent.click(screen.getByRole('menuitemradio', { name: 'Family' }))
     expect(actions.onUpdateTask).toHaveBeenCalledWith('t1', { context: 'family' })
   })
 
