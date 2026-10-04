@@ -39,6 +39,7 @@ export interface MealDayRecipe {
   ingredients: string[]
   instructions: string[]
   sourceUrl?: string
+  imageUrl?: string
 }
 
 /** How many days either side of the anchor day the viewer can page to. */
@@ -144,6 +145,7 @@ export function buildMealDayRecipes(params: {
       ingredients,
       instructions,
       sourceUrl,
+      imageUrl: recipe?.imageUrl ?? undefined,
     })
   }
   return out

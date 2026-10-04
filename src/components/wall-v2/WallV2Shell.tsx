@@ -682,7 +682,7 @@ export function WallV2Shell() {
   const nextMeal = useMemo(() => {
     if (moment === 'evening') {
       const t = dinnerDays.find((d) => d.dateKey === tomorrowKey)
-      return t ? { label: 'Dinner tomorrow', title: t.title, imageUrl: null } : null
+      return t ? { label: 'Dinner tomorrow', title: t.title, imageUrl: t.imageUrl ?? null } : null
     }
     if (moment === 'dinner' || !dinnerEvent) return null;
     return { label: dinnerStartDate ? `Dinner at ${dinnerStartDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}` : 'Dinner tonight', title: dinner.mealName, imageUrl: dinner.recipe?.imageUrl ?? null };
