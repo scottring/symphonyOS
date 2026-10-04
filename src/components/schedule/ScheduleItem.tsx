@@ -151,7 +151,6 @@ export const ScheduleItem = memo(function ScheduleItem({
   spineBelow,
   belowTitleAccessory,
   servesLine,
-  currentMemberId = null,
 }: ScheduleItemProps) {
   const isMobile = useMobile()
   // Needed-today mark: STATE, so it lives with the title chips. The '...' menu
@@ -206,12 +205,9 @@ export const ScheduleItem = memo(function ScheduleItem({
     || !!(item.isWaiting && item.waitingFor && !item.completed)
     || hasPerPersonItems
     || fromEmail
-  /** Who this involves, other than you. Empty for your own work — and for an
-   *  unassigned row, which is everyone's and no one's. */
-  const others = Array.from(new Set([assignedTo, ...assignedToAll].filter(
-    (id): id is string => !!id && id !== currentMemberId,
-  )))
-  const involvesOthers = others.length > 0
+  /** Anyone assigned, you included: their avatars show at rest (Scott,
+   *  2026-10-04). An unassigned row is everyone's and no one's. */
+  const assigned = [assignedTo, ...assignedToAll].some((id) => !!id)
 
   const handleCheckboxClick = (e: React.MouseEvent) => {
     e.stopPropagation()
@@ -521,9 +517,9 @@ export const ScheduleItem = memo(function ScheduleItem({
           {item.type === 'routine' && !item.completed && !item.skipped && (
             <RoutineMoveButton item={item} />
           )}
-          {/* Initials only when the row involves someone else; your own work
-              says nothing about who. The sheet still assigns. */}
-          {!involvesOthers ? null : familyMembers.length > 0 && onAssignAll ? (
+          {/* Initials whenever someone is assigned, you included. The sheet
+              still assigns an unassigned row. */}
+          {!assigned ? null : familyMembers.length > 0 && onAssignAll ? (
             <div onClick={(e) => e.stopPropagation()}>
               <MultiAssigneeDropdown
                 members={familyMembers}
@@ -896,7 +892,7 @@ export const ScheduleItem = memo(function ScheduleItem({
           familyMembers={familyMembers}
           assignedTo={assignedTo}
           assignedToAll={assignedToAll}
-          involvesOthers={involvesOthers}
+          assigned={assigned}
         />
       </div>
 
