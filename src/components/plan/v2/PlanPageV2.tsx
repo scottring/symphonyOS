@@ -62,6 +62,7 @@ import { useGuidedPlan } from '@/hooks/useGuidedPlan'
 import { useGuideNext } from '@/components/guide/GuideBar'
 import { currentStep, stepShortName } from '@/lib/guide/guidedPlan'
 import { PLANNING_PAGE_CLASS } from '@/components/layout/pageLayout'
+import { didFor } from '@/lib/week/monthLinks'
 
 type Level = 'month' | 'season'
 const NOUN: Record<Level, string> = { month: 'Month', season: 'Season' }
@@ -134,8 +135,10 @@ function Inner({ level }: { level: Level }) {
     const prevStart = periodBounds(level, b.prev, seasons).start.getTime()
     const carriedIn = (t.commitments ?? []).some((c) => c.level === level && c.status === 'carried' && c.periodStart.getTime() === prevStart)
     const carriedFrom = carriedIn ? (level === 'month' ? monthName(b.prev) : periodBounds(level, b.prev, seasons).label.replace(/\s+\d{4}$/, '')) : undefined
-    return { task: t, fate, partOf: null, where, carriedFrom }
-  }, [level, seasons])
+    // What the weeks did for the line (Scott, 2026-10-04).
+    const did = didFor(t.id, layered, weekStartAnchor(new Date(), readCadenceConfig().weekStartsOn))
+    return { task: t, fate, partOf: null, where, carriedFrom, did }
+  }, [level, seasons, layered])
 
   // The people filter narrows the plan drawn here; the look-back below and
   // the level above (reference) keep their own scope, as Today's pools do.

@@ -16,10 +16,11 @@ import { ContextPicker } from '@/components/triage/ContextPicker'
 import { MultiAssigneeDropdown } from '@/components/family'
 import { assigneesOf } from '@/lib/planning/v2/planV2'
 import { localYmd } from '@/lib/cadence/config'
+import { isMissedPlacement } from '@/lib/week/missedPlacement'
 import { LineMenu, type LineActions, type LineVM } from './PlanLine'
 import { WeekRow } from './WeekRow'
 
-export function WeekListV2({ title, lines, weekStart, members, actions, timingControl, onContext, onAdd, dragEnabled = true, headerAction, addPicker, emptyHint, focusAdd = false, hint }: {
+export function WeekListV2({ title, lines, weekStart, members, actions, timingControl, onContext, onAdd, dragEnabled = true, headerAction, addPicker, emptyHint, focusAdd = false, hint, forLine, forOptions }: {
   title: string
   lines: LineVM[]
   weekStart: Date
@@ -28,7 +29,12 @@ export function WeekListV2({ title, lines, weekStart, members, actions, timingCo
   /** The week's own "when" control (TaskTimingMenu), as WeekViewV2 builds it. */
   timingControl?: (task: Task) => ReactNode
   onContext: (task: Task, context: TaskContext | undefined) => void
-  onAdd: (title: string) => Promise<void>
+  /** `forId`: the month line it is written for, when one was chosen. */
+  onAdd: (title: string, forId?: string) => Promise<void>
+  /** The month line a row was written for (Scott, 2026-10-04). */
+  forLine?: (task: Task) => { id: string; title: string; month: string } | null
+  /** The month's open lines, offered (optionally) when adding. */
+  forOptions?: { month: string; lines: { id: string; title: string }[] }
   dragEnabled?: boolean
   /** Drawn at the right of the heading (Add from paper). */
   headerAction?: ReactNode
@@ -42,6 +48,7 @@ export function WeekListV2({ title, lines, weekStart, members, actions, timingCo
   hint?: string
 }) {
   const [draft, setDraft] = useState('')
+  const [forId, setForId] = useState('')
   const addRef = useRef<HTMLInputElement>(null)
   useEffect(() => { if (focusAdd) addRef.current?.focus() }, [focusAdd])
   const [showDone, setShowDone] = useState(false)
@@ -50,13 +57,18 @@ export function WeekListV2({ title, lines, weekStart, members, actions, timingCo
   const inWeek = (t: Task) => !!t.scheduledFor && localYmd(t.scheduledFor) >= first && localYmd(t.scheduledFor) <= last
   const open = lines.filter((l) => !l.task.completed)
   const done = lines.filter((l) => l.task.completed)
+  // Its day came and went undone: back on the list, asking for another day.
+  const now = new Date()
+  const missed = open.filter((l) => isMissedPlacement(l.task.scheduledFor, false, now))
   // A line with a day this week is on that day, beside the list; the list
   // holds only what is still waiting for one (Scott, 2026-10-03: "it's
   // duplicated").
-  const allPlaced = open.length > 0 && open.every((l) => inWeek(l.task))
+  const allPlaced = open.length > 0 && open.every((l) => inWeek(l.task)) && !missed.length
+  const missedIds = new Set(missed.map((l) => l.task.id))
   const groups = [
+    { title: 'Its day passed', rows: missed },
     { title: 'Any day', rows: open.filter((l) => !l.task.scheduledFor) },
-    { title: 'Scheduled outside this week', rows: open.filter((l) => l.task.scheduledFor && !inWeek(l.task)) },
+    { title: 'Scheduled outside this week', rows: open.filter((l) => l.task.scheduledFor && !inWeek(l.task) && !missedIds.has(l.task.id)) },
     { title: 'Completed', rows: showDone ? done : [] },
   ].filter((g) => g.rows.length)
 
@@ -64,7 +76,8 @@ export function WeekListV2({ title, lines, weekStart, members, actions, timingCo
   // stays this week (useWeekDragDrop, kind 'weekList').
   const { setNodeRef: dropRef, isOver } = useDroppable({ id: 'week-list', data: { kind: 'weekList' }, disabled: !dragEnabled })
   const row = (vm: LineVM) => <Card key={vm.task.id} vm={vm} actions={actions} members={members} timingControl={timingControl}
-    onContext={onContext} dragEnabled={dragEnabled} />
+    onContext={onContext} dragEnabled={dragEnabled} forLine={forLine?.(vm.task) ?? null}
+    passed={missedIds.has(vm.task.id) ? vm.task.scheduledFor!.toLocaleDateString('en-US', { weekday: 'long' }) : null} />
   return (
     <section ref={dropRef} aria-label="This week's list" className={`pv2-wl${isOver ? ' is-over' : ''}`}>
       <div className="pv2-colh">{title}{headerAction}</div>
@@ -78,11 +91,21 @@ export function WeekListV2({ title, lines, weekStart, members, actions, timingCo
         </section>
       ))}
       {done.length > 0 && <button type="button" className="pv2-link pv2-quiet" aria-expanded={showDone} onClick={() => setShowDone((s) => !s)}>{showDone ? 'Hide done' : 'Show done'}</button>}
-      <form className="pv2-write" onSubmit={(e) => { e.preventDefault(); const v = draft.trim(); if (v) { void onAdd(v); setDraft('') } }}>
+      <form className="pv2-write" onSubmit={(e) => { e.preventDefault(); const v = draft.trim(); if (v) { if (forId) void onAdd(v, forId); else void onAdd(v); setDraft(''); setForId('') } }}>
         <span className="pv2-wl-check" aria-hidden="true" />
         <input ref={addRef} value={draft} onChange={(e) => setDraft(e.target.value)} placeholder="Add something for this week" aria-label="Add to this week" />
         {addPicker}
       </form>
+      {forOptions && forOptions.lines.length > 0 && (
+        // Optional: which month line this is for. Nothing asks you to choose.
+        <label className="wk-forpick">
+          <span>for</span>
+          <select aria-label={`For an ${forOptions.month} line`} value={forId} onChange={(e) => setForId(e.target.value)}>
+            <option value="">no {forOptions.month} line</option>
+            {forOptions.lines.map((l) => <option key={l.id} value={l.id}>{l.title}</option>)}
+          </select>
+        </label>
+      )}
     </section>
   )
 }
@@ -91,7 +114,10 @@ export function WeekListV2({ title, lines, weekStart, members, actions, timingCo
 // {kind:'chip'} → useWeekDragDrop: an all-day date on that day, past days
 // refused, Undo offered). The same row every column draws (WeekRow,
 // 2026-10-03) — no white card; the grip says it moves.
-function Card({ vm, actions, members, timingControl, onContext, dragEnabled }: {
+function Card({ vm, actions, members, timingControl, onContext, dragEnabled, forLine, passed }: {
+  forLine: { id: string; title: string; month: string } | null
+  /** The weekday its day was, when it passed undone. */
+  passed: string | null
   vm: LineVM; actions: LineActions; members: FamilyMember[]
   timingControl?: (task: Task) => ReactNode
   onContext: (task: Task, context: TaskContext | undefined) => void
@@ -109,6 +135,10 @@ function Card({ vm, actions, members, timingControl, onContext, dragEnabled }: {
       onOpen={() => actions.details(t)}
       drag={movable ? { id: `pool:${t.id}`, data: { kind: 'chip', taskId: t.id } } : null}
       people={people}
+      meta={forLine || passed ? <>
+        {passed && <span className="wk-passed">{passed} passed — give it another day?</span>}
+        {forLine && <span className="wk-for"><span aria-hidden="true">↳ </span>for {forLine.month}: {forLine.title}</span>}
+      </> : undefined}
       tools={<>
         <ContextPicker size="sm" value={t.context ?? null} onChange={(c) => onContext(t, c)} />
         {members.length > 0 && <MultiAssigneeDropdown members={members} selectedIds={assigneesOf(t)} onSelect={(ids) => actions.assign(t, ids)} size="sm" triggerLabel={`Assign people to ${t.title}`} />}

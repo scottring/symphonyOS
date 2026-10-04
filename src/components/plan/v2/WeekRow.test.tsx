@@ -47,6 +47,15 @@ describe('WeekRow', () => {
     expect(screen.queryByRole('button', { name: /Complete Jury duty/ })).toBeNull()
   })
 
+  // Scott, 2026-10-04: "should we be able to mark items in the month list on
+  // the week page as completed?" — by hand, yes.
+  it('a month line given a toggle can be ticked done', () => {
+    const onToggle = vi.fn()
+    inDnd(<WeekRow mark="line" title="Toss umbrella" onOpen={vi.fn()} onToggle={onToggle} drag={null} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Complete Toss umbrella' }))
+    expect(onToggle).toHaveBeenCalled()
+  })
+
   it('a month line and a goal draw their own marks and no check', () => {
     inDnd(<><WeekRow mark="line" title="fix up the porch" onOpen={vi.fn()} drag={null} /><WeekRow mark="goal" title="Plan sabbatical" onOpen={vi.fn()} drag={null} /></>)
     const [line, goal] = screen.getAllByRole('listitem')

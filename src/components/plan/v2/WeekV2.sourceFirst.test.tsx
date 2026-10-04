@@ -7,13 +7,13 @@ const h = vi.hoisted(() => ({
   gatedUpdate: vi.fn(),
   dayPlan: null as null | { unfinished: unknown[] },
 }))
-const session = { saved: null, mine: null, loading: false, loadedToken: '', error: null, reload: vi.fn(), save: vi.fn() }
+const session = { saved: null as null | { at: Date; authorId: string; notes?: { focus?: string } }, mine: null, loading: false, loadedToken: '', error: null, reload: vi.fn(), save: vi.fn() }
 
 vi.mock('@/hooks/usePlanningSession', () => ({ usePlanningSession: () => session, weekToken: () => '2026-10-3' }))
 vi.mock('@/hooks/useAuth', () => ({ useAuth: () => ({ user: { id: 'me' } }) }))
 vi.mock('@/hooks/useSupabaseTasks', () => ({ useSupabaseTasks: () => ({ toggleTask: vi.fn(), updateTask: vi.fn(), pushTask: vi.fn(), updateTasksBulk: vi.fn(), keepForward: vi.fn(), dropCommitment: vi.fn(), addTask: vi.fn() }) }))
 vi.mock('@/hooks/useGatedTaskActions', () => ({ useGatedTaskActions: () => ({ updateTask: h.gatedUpdate, pushTask: vi.fn() }) }))
-vi.mock('@/hooks/useFamilyMembers', () => ({ useFamilyMembers: () => ({ members: [] }) }))
+vi.mock('@/hooks/useFamilyMembers', () => ({ useFamilyMembers: () => ({ members: [{ id: 'sk', name: 'Scott', initials: 'S', color: 'blue' }, { id: 'ir', name: 'Iris', initials: 'I', color: 'purple' }] }) }))
 vi.mock('@/hooks/useActionableInstances', () => ({ useActionableInstances: () => ({ setPlanned: vi.fn(), reschedule: vi.fn() }) }))
 vi.mock('./AddArea', () => ({ useAddArea: () => ({ area: undefined, picker: null }) }))
 vi.mock('./FromPaper', () => ({ FromPaper: () => null }))
@@ -42,14 +42,15 @@ describe('WeekV2 — the week at rest', () => {
     const { container } = renderWeek([task({ id: 'o1', title: 'Plan Thanksgiving', bucket: 'month', monthStart: new Date(2026, 9, 1) })])
     const page = container.querySelector('.wk-page')!
     expect([...page.children].map((c) => c.className)).toEqual(['wk-listcol', 'pv2-days wk-days'])
-    expect(screen.queryByText('Plan Thanksgiving')).toBeNull()
+    const ref = () => screen.queryByRole('complementary', { name: 'October, for reference' })
+    expect(ref()).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: /October list/ }))
     expect([...page.children].map((c) => c.getAttribute('aria-label') ?? c.className)).toEqual(['October, for reference', 'wk-listcol', 'The days'])
-    expect(screen.getByText('Plan Thanksgiving')).toBeInTheDocument()
+    expect(within(ref()!).getByText('Plan Thanksgiving')).toBeInTheDocument()
     // Remembered, and hidden again from its own heading.
     expect(localStorage.getItem('symphony-week-ref')).toBe('open')
     fireEvent.click(screen.getByRole('button', { name: 'Hide October' }))
-    expect(screen.queryByText('Plan Thanksgiving')).toBeNull()
+    expect(ref()).toBeNull()
   })
 
   it('the month is a plain list: no goal marks, no steps, and it stays whole', () => {
@@ -129,5 +130,36 @@ describe('WeekV2 — the days’ own controls', () => {
     expect(key.getByText(/Event/)).toBeInTheDocument()
     expect(key.getByText(/Task/)).toBeInTheDocument()
     expect(key.getByText(/Routine/)).toBeInTheDocument()
+  })
+})
+
+// The week after planning (Scott, 2026-10-04: "the goal of this page should
+// be to commit to items for the week"; mockup Planned.dc.html).
+describe('WeekV2 — the planned week', () => {
+  afterEach(() => { session.saved = null })
+
+  it('says what was committed, and offers to change the plan', () => {
+    session.saved = { at: new Date(2026, 9, 3), authorId: 'me', notes: { focus: 'the porch, before the rain' } }
+    renderWeek()
+    expect(screen.getByRole('region', { name: "This week's list" })).toHaveTextContent('Any day this week')
+    expect(screen.getByText('Committed, no day of their own.')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Change the plan' })).toBeInTheDocument()
+    expect(screen.getByText('the porch, before the rain')).toBeInTheDocument()
+  })
+
+  it('person buttons narrow the week to one person, the same lens as the top bar', () => {
+    renderWeek()
+    const who = within(screen.getByRole('group', { name: 'Whose week' }))
+    expect(who.getByRole('button', { name: 'Everyone' })).toHaveAttribute('aria-pressed', 'true')
+  })
+
+  it('October lines can be ticked done, and show what the weeks did for them', () => {
+    localStorage.setItem('symphony-week-ref', 'open')
+    const line = task({ id: 'm1', title: 'Plan Thanksgiving', bucket: 'month', monthStart: new Date(2026, 9, 1) })
+    const did = task({ id: 'w1', title: 'Book flights', bucket: 'week', weekStart: WEEK, sourceId: 'm1' })
+    renderWeek([line, did])
+    const ref = within(screen.getByRole('complementary', { name: 'October, for reference' }))
+    expect(ref.getByRole('button', { name: 'Complete Plan Thanksgiving' })).toBeInTheDocument()
+    expect(ref.getByText(/Book flights/)).toBeInTheDocument()
   })
 })

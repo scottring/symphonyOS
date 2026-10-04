@@ -61,10 +61,10 @@ export function WeekRow({ mark, title, lane, completed = false, onToggle, onOpen
       {movable && <span className="wk-grip" aria-hidden="true"><GripVertical className="h-3.5 w-3.5" /></span>}
       {lane !== undefined && <span className="wk-lane">{lane}</span>}
       <span className="wk-mark">
-        {onToggle && (mark === 'task' || mark === 'routine') ? (
+        {onToggle && (mark === 'task' || mark === 'routine' || mark === 'line') ? (
           <button
             type="button"
-            className={`wk-check${mark === 'routine' ? ' is-routine' : ''}${completed ? ' is-on' : ''}`}
+            className={`wk-check${mark === 'routine' ? ' is-routine' : mark === 'line' ? ' is-line' : ''}${completed ? ' is-on' : ''}`}
             aria-label={completed ? `Mark ${title} not done` : `Complete ${title}`}
             onPointerDown={(e) => e.stopPropagation()}
             onClick={(e) => { e.stopPropagation(); onToggle() }}

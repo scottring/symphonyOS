@@ -68,10 +68,10 @@ describe('WeekV2 toolbar — one verb', () => {
     expect(await screen.findByRole('button', { name: 'Back to Today →' })).toBeTruthy()
   })
 
-  it('a planned week can be planned again, quietly', () => {
+  it('a planned week can be changed, quietly', () => {
     session.saved = { authorId: 'me', at: new Date(2026, 8, 27) }
     renderWeek()
-    expect(screen.getByRole('button', { name: 'Plan again' }).className).toBe('pv2-qbtn')
+    expect(screen.getByRole('button', { name: 'Change the plan' }).className).toBe('pv2-qbtn')
   })
 })
 

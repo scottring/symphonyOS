@@ -17,6 +17,7 @@ import type { LineFate } from '@/lib/planning/v2/planV2'
 import { MultiAssigneeDropdown } from '@/components/family'
 import { assigneesOf } from '@/lib/planning/v2/planV2'
 import { notesAsText } from '@/lib/htmlUtils'
+import type { DidItem } from '@/lib/week/monthLinks'
 
 export interface LineVM {
   task: Task
@@ -31,6 +32,8 @@ export interface LineVM {
   nested?: boolean
   /** Brought in by a look-back: "carried from October" (#31). */
   carriedFrom?: string
+  /** What the weeks did for this line — items written "for" it (2026-10-04). */
+  did?: DidItem[]
   /** Unfinished work from before last week, in the week's look-back: where it
    *  was meant to happen — "Originally Wednesday", "Planned for Sep 6–12". */
   origin?: string
@@ -197,6 +200,11 @@ export function PlanLine({ vm, actions, members, nextLabel, open, onToggle, edit
         </span>
       </div>
       {vm.carriedFrom && !open && <span className="pv2-line-from">carried from {vm.carriedFrom}</span>}
+      {vm.did && vm.did.length > 0 && !open && (
+        <span className="pv2-line-did wk-did">{vm.did.map((d, i) => (
+          <span key={d.id}>{i > 0 && ' · '}<span className={d.done ? 'is-done' : undefined}>{d.title}</span>{d.when && ` (${d.when})`}</span>
+        ))}</span>
+      )}
       {vm.partOf && !open && !hideParent && (
         <button type="button" className="pv2-line-parent" onClick={() => (onShowPartOf ?? actions.openPartOf)(vm.partOf!)}
           aria-label={`Part of ${vm.partOf.title} — show it`}>

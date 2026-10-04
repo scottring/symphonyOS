@@ -351,6 +351,19 @@
 .wk-daily button:first-of-type { border-radius: 8px 0 0 8px; }
 .wk-daily button:last-of-type { border-left: 0; border-radius: 0 8px 8px 0; }
 .wk-daily button.is-on { background: var(--color-primary-700); border-color: var(--color-primary-700); color: #fff; }
+.wk-for { display: block; margin-top: 2px; font-size: 12px; line-height: 1.35; color: hsl(150 32% 30%); }
+.wk-passed { display: block; margin: 2px 0; font-size: 12px; color: hsl(35 70% 32%); }
+.wk-did { display: block; margin-top: 2px; font-size: 12px; line-height: 1.4; color: hsl(150 32% 30%); }
+.pv2-line-did { padding-left: 22px; }
+.wk-did .is-done { color: var(--color-neutral-400); text-decoration: line-through; }
+.wk-check.is-line { border-radius: 4px; border-color: var(--color-neutral-400); }
+.wk-forpick { display: flex; align-items: center; gap: 6px; margin: 2px 0 0 30px; font-size: 12px; color: var(--color-neutral-500); }
+.wk-forpick select { max-width: 100%; min-width: 0; padding: 2px 4px; border: 1px dashed var(--color-neutral-300); border-radius: 6px; background: transparent; font-size: 12px; color: var(--color-neutral-700); }
+.wk-who { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 16px; }
+.wk-who button { height: 30px; padding: 0 12px; border: 1px solid var(--color-neutral-300); border-radius: 999px; background: var(--color-bg-elevated); font-size: 12.5px; font-weight: 500; color: var(--color-neutral-700); }
+.wk-who button.is-on { background: var(--color-primary-700); border-color: var(--color-primary-700); color: #fff; }
+.wk-cell.is-past { opacity: .62; }
+.wk-cell.is-today { background: color-mix(in srgb, var(--color-primary-50) 70%, transparent); border-radius: 10px; }
 .wk-free { margin: 8px 0 0; padding-top: 6px; border-top: 1px dashed var(--color-neutral-200); font-size: 11.5px; font-weight: 500; line-height: 1.35; color: hsl(150 40% 28%); }
 
 .wk-grid { display: flex; flex-direction: column; gap: 18px; }
@@ -481,5 +494,6 @@ p.wk-dayhint { margin: 8px 0 0; }
   .wk-strip-day, .wk-shape-day { border-left: 0; border-top: 1px solid var(--color-neutral-200); }
   .wk-strip-day:first-child, .wk-shape-day:first-child { border-top: 0; }
 }
-.wk-focus-line { margin: 0 0 14px; font: 400 19px/1.3 var(--font-family-display); color: var(--color-neutral-900); }
+.wk-focus-line { margin: 0 0 16px; font: 400 22px/1.3 var(--font-family-display); color: var(--color-neutral-900); }
+.wk-focus-line em { font-style: italic; }
 .wk-focus-line span { margin-right: 6px; font: 500 11px var(--font-family-sans); letter-spacing: .08em; text-transform: uppercase; color: var(--color-neutral-500); }

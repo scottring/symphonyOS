@@ -66,7 +66,7 @@ function statusText({ period, saved, loading, error, agreedBy, onRetry, hasLines
  *  it is. A just-saved period's next step is PlanSavedLine's, not this row's. */
 function controlsOf({ period, saved, loading, error, onPlan, onMark, lookBack, viewSwitch, tools, justSaved, planLabel }: PlanToolbarProps, guided: boolean) {
   const verb = guided || justSaved || loading || error ? null
-    : planLabel ? <button type="button" className={saved ? 'pv2-qbtn' : 'pv2-btn'} onClick={onPlan}>{saved ? 'Plan again' : planLabel}</button>
+    : planLabel ? <button type="button" className={saved ? 'pv2-qbtn' : 'pv2-btn'} onClick={onPlan}>{saved ? 'Change the plan' : planLabel}</button>
     : lookBack ? <button type="button" className="pv2-btn" onClick={onPlan}>Look back at {lookBack}</button>
       : !saved && onMark ? <button type="button" className="pv2-btn" onClick={onMark}>Mark {period} planned</button>
         : null

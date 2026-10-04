@@ -35,4 +35,29 @@ describe('WeekListV2 — the week’s own list', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Show done' }))
     expect(screen.getByText('Toss umbrella')).toBeInTheDocument()
   })
+
+  it('a row written for a month line says so', () => {
+    const t = task({ id: 'w', title: 'Book Thanksgiving flights' })
+    render(<WeekListV2 {...base} lines={[{ task: t, fate: 'open', partOf: null, where: null }]} forLine={() => ({ id: 'm', title: 'Plan Thanksgiving', month: 'October' })} />)
+    expect(screen.getByText('for October: Plan Thanksgiving')).toBeInTheDocument()
+  })
+
+  it('a new line can be written for an October line, optionally', () => {
+    const onAdd = vi.fn().mockResolvedValue(undefined)
+    render(<WeekListV2 {...base} onAdd={onAdd} lines={[]} forOptions={{ month: 'October', lines: [{ id: 'm', title: 'Plan Thanksgiving' }] }} />)
+    fireEvent.change(screen.getByLabelText('For an October line'), { target: { value: 'm' } })
+    const input = screen.getByLabelText('Add to this week')
+    fireEvent.change(input, { target: { value: 'Book flights' } })
+    fireEvent.submit(input.closest('form')!)
+    expect(onAdd).toHaveBeenCalledWith('Book flights', 'm')
+  })
+
+  it('a thing whose day passed undone comes back, asking for another day', () => {
+    const t = task({ id: 'p', title: 'Return library books', scheduledFor: new Date(2026, 8, 28), isAllDay: true })
+    vi.useFakeTimers({ toFake: ['Date'] }); vi.setSystemTime(new Date(2026, 9, 1, 9))
+    render(<WeekListV2 {...base} lines={[{ task: t, fate: 'open', partOf: null, where: null }]} />)
+    vi.useRealTimers()
+    expect(screen.getByText('Return library books')).toBeInTheDocument()
+    expect(screen.getByText('Monday passed — give it another day?')).toBeInTheDocument()
+  })
 })
