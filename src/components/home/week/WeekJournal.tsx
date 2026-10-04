@@ -30,7 +30,7 @@ import { WeekStrip, WeekShape } from './WeekViews'
 import type { FamilyMember } from '@/types/family'
 import type { DayForecast } from '@/hooks/useWeather'
 import { weatherCondition, weatherIcon } from '@/lib/weatherIcon'
-import { weekRhythm, type WeekRhythm } from '@/lib/week/weekRhythm'
+import { weekRhythm } from '@/lib/week/weekRhythm'
 import { busyBlocks, freeWindows, formatFree } from '@/lib/week/dayShape'
 
 import type { JournalDay, JournalEntry, JournalWeekend } from '@/lib/week/journalDays'
@@ -280,31 +280,6 @@ function dayFree(day: JournalDay): string {
   return formatFree(freeWindows(busyBlocks(timed.map((e) => ({ start: e.time!, end: e.end }))), 1))
 }
 
-/** The week's rhythm, written once above the days (Scott, 2026-10-04): what
- *  happens every day, and every weekday. Each opens its routine. */
-function RhythmBand({ rhythm, onSelectItem }: { rhythm: WeekRhythm; onSelectItem: (id: string) => void }) {
-  const rows = ([['Every day', rhythm.everyDay], ['Weekdays', rhythm.weekdays]] as const).filter(([, items]) => items.length)
-  if (!rows.length) return null
-  return (
-    <section className="wk-rhythm" aria-label="Every week">
-      {rows.map(([label, items]) => (
-        <div key={label} className="wk-rhythm-row">
-          <span className="wk-rhythm-label">{label}</span>
-          <ul aria-label={label}>
-            {items.map((r) => (
-              <li key={r.routineId}>
-                <button type="button" onClick={() => onSelectItem(r.openId)}>
-                  {r.time && <span className="wk-rhythm-time">{journalTime(r.time)}</span>}{r.title}
-                </button>
-              </li>
-            ))}
-          </ul>
-        </div>
-      ))}
-    </section>
-  )
-}
-
 function DayCell({ day, onSelectItem, onToggleEntry, onPlanDrop, onAddToDay, dragEnabled, timingControl, weather, fixedOnly = false, free }: {
   fixedOnly?: boolean
   routinesOpen?: boolean
@@ -445,9 +420,10 @@ export function WeekJournal({ days, weekend = null, spans, onSelectItem, onToggl
   const timingControl = readOnly ? undefined : timing
   // The grid writes the every-day and every-weekday routines once, above.
   const fixedOnly = show === 'fixed'
-  const full = layout === 'grid' ? weekRhythm(days) : { everyDay: [], weekdays: [], days }
-  // "Can't move" asks only what has a time.
-  const rhythm = fixedOnly ? { ...full, everyDay: full.everyDay.filter((r) => r.time), weekdays: full.weekdays.filter((r) => r.time) } : full
+  // Every-day and every-weekday routines are the same every week and are
+  // ticked on Today: the week doesn't show them (Scott, 2026-10-04: "take it
+  // out"). They still count as time taken in each day's free time.
+  const rhythm = layout === 'grid' ? weekRhythm(days) : { everyDay: [], weekdays: [], days }
   // Free time is planning information: today and the days ahead.
   const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0)
   const free = layout === 'grid' ? Object.fromEntries(days.filter((d) => d.date >= todayStart).map((d) => [d.key, dayFree(d)])) : undefined
@@ -476,7 +452,6 @@ export function WeekJournal({ days, weekend = null, spans, onSelectItem, onToggl
       )}
       {layout === 'grid' ? (
         <>
-          <RhythmBand rhythm={rhythm} onSelectItem={onSelectItem} />
           <WeekGridDays days={rhythm.days} weekend={weekend} forecast={forecast} onSelectItem={onSelectItem} onToggleEntry={onToggleEntry}
             onPlanDrop={readOnly ? undefined : onPlanDrop} onAddToDay={onAddToDay} dragEnabled={dragEnabled} timingControl={timingControl}
             fixedOnly={fixedOnly} routinesOpen={routinesOpen} free={free} />

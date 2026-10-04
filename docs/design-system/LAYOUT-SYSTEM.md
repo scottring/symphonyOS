@@ -120,9 +120,9 @@ became a grid on 2026-10-03.
 
 - **Week is the week's list beside its days** (2026-10-04; spec
   `docs/superpowers/specs/2026-10-04-planning-model-design.md`). Left: "This
-  week", the work that waits for a day. Right: the days — above them the
-  **rhythm**, what happens every day and every weekday written once
-  (`weekRhythm`); then the weekend band and the weekdays, each day holding
+  week", the work that waits for a day. Right: the days. Routines that happen every
+  day or every weekday are not drawn (`weekRhythm` lifts them; they are ticked
+  on Today and only count as time taken); then the weekend band and the weekdays, each day holding
   only what is particular to it (no fold, no count) and its free time (an
   hour or more, 7a–9p). The month's list is one link away ("October list"),
   plain, at the left when open; remembered per device. No view toggles.

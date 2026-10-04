@@ -42,9 +42,9 @@ planning page and step is checked against it.
 - Under it: **October list · for reference** opens the month's list at the
   far left (remembered per device; Hide in its heading). Plain rows; "Add to
   this week" appears on hover only.
-- Right: the days. Above them the **rhythm**: routines that happen every day,
-  then every weekday, written once ("Every day · 6p Feed Jax · 6p Walk Jax ·
-  7p Kids Bedtime routine · Eat breakfast …"). Each day holds only what is
+- Right: the days. Routines that happen every day or every weekday are not
+  drawn at all (Scott, 2026-10-04: the box that listed them "once" had no job
+  here — they are ticked on Today); they still count as time taken. Each day holds only what is
   particular to it — events (a dash, no check), tasks and routines (a check),
   no ↻, no "Routines · N" fold — and ends with its free time ("Free 7:30a–6p ·
   7:30–9p", an hour or more between 7a and 9p).

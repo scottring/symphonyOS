@@ -121,9 +121,12 @@ describe('WeekViewV2 routine visibility', () => {
     // `member: selectedAssignees` into resolveRoutine's ctx — the exact bug
     // this task fixed — Iris's routine would render again on the grid
     // regardless of the selection, and this test would fail.
+    // On some days, not every day: every-day routines aren't drawn on the
+    // week (2026-10-04), so the filter is seen on a day's own routine.
+    const someDays = { type: 'weekly', days: ['mon', 'wed'] } as RecurrencePattern
     const routines = [
-      createMockRoutine({ name: 'Scott Routine', assigned_to: 'scott' }),
-      createMockRoutine({ name: 'Iris Routine', assigned_to: 'iris' }),
+      createMockRoutine({ name: 'Scott Routine', assigned_to: 'scott', recurrence_pattern: someDays }),
+      createMockRoutine({ name: 'Iris Routine', assigned_to: 'iris', recurrence_pattern: someDays }),
     ]
 
     render(
@@ -410,7 +413,7 @@ describe('WeekViewV2 journal spread', () => {
   // toolbar switch that hid them all is retired — one routine is hidden with
   // its own "Show in Today and planning".
   it('always shows routines, with no Routines switch', () => {
-    const routines = [createMockRoutine({ name: 'Morning stretch' })]
+    const routines = [createMockRoutine({ name: 'Morning stretch', recurrence_pattern: { type: 'weekly', days: ['mon', 'wed'] } as RecurrencePattern })]
     render(<WeekViewV2 {...defaultProps} routines={routines} weekStart={sunday} />)
     expect(screen.getAllByText('Morning stretch').length).toBeGreaterThan(0)
     expect(screen.queryByRole('switch', { name: 'Routines' })).toBeNull()

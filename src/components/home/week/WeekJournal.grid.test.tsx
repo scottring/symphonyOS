@@ -44,18 +44,16 @@ describe('WeekJournal — the grid', () => {
     expect(sat.queryByRole('button', { name: /Routines ·/ })).toBeNull()
   })
 
-  it('writes an every-day routine once, above the days, and opens it from there', () => {
+  // Scott, 2026-10-04: the every-day box had no job here — "take it out".
+  it('leaves every-day routines off the week; they still take their time', () => {
     const days = week(new Date(2026, 9, 3))
-    days.forEach((d) => d.entries.push({ id: `routine-jax-${d.key}`, kind: 'routine', title: 'Walk Jax', completed: false, routineId: 'jax', time: new Date(d.date.getFullYear(), d.date.getMonth(), d.date.getDate(), 18) }))
-    const onSelectItem = vi.fn()
-    vi.useFakeTimers({ toFake: ['Date'] }); vi.setSystemTime(new Date(2026, 9, 6, 9))
-    render(<DndContext><WeekJournal layout="grid" days={days} weekend={{ satIndex: 0, sunIndex: 1, sometime: [] }} spans={[]} onSelectItem={onSelectItem} onToggleEntry={vi.fn()} /></DndContext>)
+    days.forEach((d) => d.entries.push({ id: `routine-jax-${d.key}`, kind: 'routine', title: 'Walk Jax', completed: false, routineId: 'jax', time: new Date(d.date.getFullYear(), d.date.getMonth(), d.date.getDate(), 18), end: new Date(d.date.getFullYear(), d.date.getMonth(), d.date.getDate(), 19) }))
+    vi.useFakeTimers({ toFake: ['Date'] }); vi.setSystemTime(new Date(2026, 9, 3, 9))
+    renderGrid(days, { satIndex: 0, sunIndex: 1, sometime: [] })
     vi.useRealTimers()
-    const band = within(screen.getByRole('list', { name: 'Every day' }))
-    fireEvent.click(band.getByRole('button', { name: /Walk Jax/ }))
-    // Today's occurrence (Tuesday), not Saturday's.
-    expect(onSelectItem).toHaveBeenCalledWith('routine-jax-2026-10-06')
-    expect(screen.getAllByText('Walk Jax')).toHaveLength(1)
+    expect(screen.queryByText('Walk Jax')).toBeNull()
+    expect(screen.queryByRole('region', { name: 'Every week' })).toBeNull()
+    expect(within(screen.getByTestId('journal-day-2026-10-05')).getByText('Free 7a–6p · 7–9p')).toBeInTheDocument()
   })
 
   it('says how much of each day is free', () => {
@@ -72,18 +70,6 @@ describe('WeekJournal — the grid', () => {
     expect(within(band).getAllByTestId(/^(journal-day-|weekend-sometime)/).map((el) => el.getAttribute('data-testid')))
       .toEqual(['journal-day-2026-10-10', 'weekend-sometime'])
     expect(within(screen.getAllByRole('region', { name: 'Weekdays' })[0]).getAllByTestId(/^journal-day-/)).toHaveLength(6)
-  })
-
-  it('on “Can’t move” the rhythm shows only what has a time', () => {
-    const days = week(new Date(2026, 9, 3))
-    days.forEach((d) => {
-      d.entries.push({ id: `routine-jax-${d.key}`, kind: 'routine', title: 'Walk Jax', completed: false, routineId: 'jax', time: new Date(d.date.getFullYear(), d.date.getMonth(), d.date.getDate(), 18) })
-      d.foldedRoutines.push({ id: `routine-read-${d.key}`, kind: 'routine', title: 'Read', completed: false, routineId: 'read' })
-    })
-    render(<DndContext><WeekJournal layout="grid" show="fixed" days={days} weekend={{ satIndex: 0, sunIndex: 1, sometime: [] }} spans={[]} onSelectItem={vi.fn()} onToggleEntry={vi.fn()} /></DndContext>)
-    const band = within(screen.getByRole('list', { name: 'Every day' }))
-    expect(band.getByText('Walk Jax')).toBeInTheDocument()
-    expect(band.queryByText('Read')).toBeNull()
   })
 
   it('a done timed thing still took its time; a past day says nothing about free time', () => {
