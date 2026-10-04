@@ -13,7 +13,7 @@
 // `/wall-design` preview (see `wallV2Mock.ts`).
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Sun, Plus, MessagesSquare, ClipboardList, Settings } from 'lucide-react';
+import { Sun, Plus, MessagesSquare, ClipboardList, Settings, Phone, ChefHat } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { useActionableInstances } from '@/hooks/useActionableInstances';
 import { useBuildAutoReload } from '@/hooks/useBuildAutoReload';
@@ -24,20 +24,14 @@ import {
   writeHideRoutines,
   onHideRoutinesChange,
 } from '@/lib/hideRoutinesSignal';
-import { TINTS } from './tints';
 import { WallV2StaleBanner } from './WallV2StaleBanner';
 import { computeFreshness } from './wallFreshness';
 import { useDailyDiscussionPrompt } from '@/hooks/useDailyDiscussionPrompt';
-import { WallV2Gantt } from './WallV2Gantt';
-import { WallV2Weekend } from './WallV2Weekend';
-import { adaptWeekendBoard, isWeekendBoardDay } from './wallWeekend';
-import { adaptGanttBoard, titleForBlockId, TRACK_PX } from './wallGantt';
 import { KidDayView } from './KidDayView';
 import { WallV2WhoSheet } from './WallV2WhoSheet';
 import { WallV2QuestionSheet } from './WallV2QuestionSheet';
 import { openHandoffQuestions, type HandoffQuestion } from './wallQuestions';
 import { assignWallEvent } from '@/lib/wall/eventAssign';
-import { HOUSEHOLD_ID } from './wallEventAttribution';
 import { readReadingTimer, readingTimerKey, elapsedMinutes, isTimerRunning } from '@/lib/wall/readingScreenTime';
 import { localYmd } from '@/lib/cadence/config';
 
@@ -47,9 +41,7 @@ const safeStorage = (): Storage | null => {
 import { emptySections } from '@/lib/today/types';
 import type { TimelineItem } from '@/types/timeline';
 import type { FamilyMember } from '@/types/family';
-import { WallV2Header } from './WallV2Header';
-import { WallV2Strip } from './WallV2Strip';
-import { adaptMealRows, adaptDueRows, adaptComingUpRows } from './wallStrip';
+import { adaptComingUpRows } from './wallStrip';
 import { WallV2ListSheetContainer } from './WallV2ListSheetContainer';
 import { useLists } from '@/hooks/useLists';
 import { scopeForDomain } from '@/lib/scope';
@@ -63,7 +55,6 @@ import { WallV2UtilitySheet } from './WallV2UtilitySheet';
 import { CallerIdTakeover } from './CallerIdTakeover';
 import { WallV2PhoneScreen } from './WallV2PhoneScreen';
 import { adaptTimelineSections, adaptWeather } from './wallV2Adapter';
-import { adaptAtAGlanceRollup } from './wallV2Rollups';
 import { WALL } from './wallTheme';
 import { useWallData } from '@/hooks/useWallData';
 import { useWeather } from '@/hooks/useWeather';
@@ -82,6 +73,14 @@ import { useRecipe } from '@/hooks/useRecipe';
 import { WallDiscussionOverlay } from '@/components/wall/WallDiscussionOverlay';
 import { useFamilyDiscussionItems, type DiscussionItem } from '@/hooks/useFamilyDiscussionItems';
 import { QuickCapture } from '@/components/layout/QuickCapture';
+import { WallMoments, type MomentKid } from './moments/WallMoments';
+import { wallMoment } from '@/lib/wall/wallMoment';
+import { wallTodayRows, specialsWeek, checklistFor } from '@/lib/wall/wallMomentsModel';
+import { buildMemberDayModel, type KidRow } from '@/lib/wall/kidDayModel';
+import { memberShape } from '@/lib/wall/memberPageModel';
+import { useMemberInstanceHistory } from './useMemberInstanceHistory';
+import { scaleIngredient } from '@/lib/wall/scaleIngredient';
+import { findToBuyList } from '@/lib/lists/toBuy';
 import { useAuth } from '@/hooks/useAuth';
 import { AuthForm } from '@/components/AuthForm';
 import { supabase } from '@/lib/supabase';
@@ -183,8 +182,8 @@ function useMealCardData(event: CalendarEvent | null, fallbackName: string) {
     };
   }, [recipe]);
   return useMemo(
-    () => ({ mealName, recipeUrl, recipeContent }),
-    [mealName, recipeUrl, recipeContent],
+    () => ({ mealName, recipeUrl, recipeContent, recipe }),
+    [mealName, recipeUrl, recipeContent, recipe],
   );
 }
 
@@ -320,6 +319,10 @@ export function WallV2Shell() {
   // and the recipe viewer, so tapping a paged card opens that same day.
   // null = today.
   const [mealDayKey, setMealDayKey] = useState<string | null>(null);
+  // The dinner card's ×1 / ×2 / ×3 and the ingredients ticked as "have it";
+  // both reset with the day.
+  const [dinnerScale, setDinnerScale] = useState(1);
+  const [haveIngredients, setHaveIngredients] = useState<Set<number>>(() => new Set());
   const [showDiscussion, setShowDiscussion] = useState(false);
   const [showQuickCapture, setShowQuickCapture] = useState(false);
   const [showListSheet, setShowListSheet] = useState(false);
@@ -464,13 +467,20 @@ export function WallV2Shell() {
       };
     }
     if (!viewerMeal.recipeUrl && !viewerMeal.recipeContent) return null;
+    // Tonight's dinner, at the wall's ×2 / ×3 (Scott, 2026-10-04: the wall
+    // showed the base recipe while the plan called for it tripled). A stored
+    // recipe opens in place of its link so the scaled amounts are what shows.
+    const scaled = recipeViewerMeal === 'dinner' && dinnerScale !== 1 && viewerMeal.recipeContent
+      ? { ...viewerMeal.recipeContent, title: `${viewerMeal.recipeContent.title} ×${dinnerScale}`, ingredients: viewerMeal.recipeContent.ingredients.map((l) => scaleIngredient(l, dinnerScale)) }
+      : null;
+    if (scaled) return { url: undefined, content: scaled, mealName: viewerMeal.mealName, mealIcon: viewerEvent ? getMealIcon(viewerEvent.title) : '🍽️' };
     return {
       url: viewerMeal.recipeUrl ?? undefined,
       content: !viewerMeal.recipeUrl ? (viewerMeal.recipeContent ?? undefined) : undefined,
       mealName: viewerMeal.mealName,
       mealIcon: viewerEvent ? getMealIcon(viewerEvent.title) : '🍽️',
     };
-  }, [recipeViewerMeal, selectedPlannedDay, viewerMeal, viewerEvent]);
+  }, [recipeViewerMeal, selectedPlannedDay, viewerMeal, viewerEvent, dinnerScale]);
 
   // Tonight's question — a deterministic daily rotation, dismissable, and the
   // one thing on this wall that is not a schedule.
@@ -485,74 +495,14 @@ export function WallV2Shell() {
   // touch and tonight's question was gone for the day (Scott, 2026-09-03).
   const [showQuestionSheet, setShowQuestionSheet] = useState(false);
 
-  // ─── Timeline board ───
-  // Today only, from days[0] — a time axis across several days is a calendar,
-  // and the wall already has one of those. No new queries: same days array the
-  // lanes read.
-  const ganttBoard = useMemo(
-    // Today only. Carried-over work was fed in here briefly and taken back
-    // out (Scott, 2026-08-25): the board is the day, and a wall that mixes
-    // Sunday's unfinished prep into Tuesday stops describing Tuesday. The
-    // backlog belongs to Review, not to the kitchen wall.
-    //
-    // Homework rides along: open, any date, on the assignee's row until it
-    // is checked off. That is not "carrying over" — a form due Friday IS
-    // Tuesday's business.
-    () => {
-      const board = adaptGanttBoard(wallData.familyMembers, wallData.days, now, TRACK_PX, wallData.homeworkTasks);
-      // A reading timer left running on a kid's page (it auto-closes after two
-      // idle minutes) shows on their row, so a parent can see it from the
-      // kitchen and the kid can find it again.
-      const ymd = localYmd(now);
-      for (const t of board.tracks) {
-        const timer = readReadingTimer(safeStorage(), readingTimerKey(t.memberId, ymd));
-        if (timer) t.live = `${isTimerRunning(timer) ? 'Reading' : 'Reading paused'} · ${elapsedMinutes(timer, now)} min`;
-      }
-      return board;
-    },
-    [wallData.familyMembers, wallData.days, now, wallData.homeworkTasks],
-  );
-
-  // ─── Weekend board ───
-  // On Saturday and Sunday the day board is replaced by three DAY columns —
-  // today plus the next two. The reasoning is Scott's own paper page (a ruled
-  // sheet headed SAT / SUN / MON, written Saturday morning and spent by
-  // Monday): on a weekend morning the weekend IS the day's context, so a
-  // board showing only today describes less than the sheet on the counter.
-  //
-  // This reverses, for two days a week, the note on the Gantt above — "a time
-  // axis across several days is a calendar". What makes it a board and not a
-  // calendar is that it has NO axis: three short written lists, the same
-  // `routineEarnsTheWall` filter, no new queries.
-  const weekendBoard = useMemo(
-    () => adaptWeekendBoard(wallData.familyMembers, wallData.days, now, wallData.homeworkTasks),
-    [wallData.familyMembers, wallData.days, now, wallData.homeworkTasks],
-  );
-  // Derived from `now`, which the shell already ticks, so the board swaps
-  // itself at midnight without a reload — the Pi runs for weeks at a time.
-  const showWeekend = isWeekendBoardDay(now) && weekendBoard.columns.length > 0;
-
   // ─── Bottom strip ───
   // Three cheap projections over data the wall already holds: no new queries,
   // which matters on a display that polls all day (see the egress incident).
-  const mealRows = useMemo(
-    () => adaptMealRows(dinnerDays, todayKey),
-    [dinnerDays, todayKey],
-  );
-  // Untimed tasks have no place on the board's clock; the strip lists them.
-  const dueRows = useMemo(
-    () => adaptDueRows(wallData.days.find((d) => d.isToday) ?? wallData.days[0], wallData.familyMembers),
-    [wallData.days, wallData.familyMembers],
-  );
   const comingUpRows = useMemo(
     () => adaptComingUpRows(wallData.days, wallData.familyMembers),
     [wallData.days, wallData.familyMembers],
   );
 
-  const glanceRows = useMemo(
-    () => adaptAtAGlanceRollup(todayData, dinnerStartDate, dinnerEvent ? dinner.mealName : null, now),
-    [todayData, dinnerStartDate, dinnerEvent, dinner.mealName, now],
-  );
   const handleMarkDiscussed = useCallback(async (item: DiscussionItem) => {
     if (item.kind === 'task') {
       await updateTask(item.id, { needsDiscussion: false, discussionNote: undefined });
@@ -627,23 +577,6 @@ export function WallV2Shell() {
   // hint is the honest input here. It fails closed — a null hint reads as 0 and
   // never interrupts.
 
-  // Tapping a lane opens the same action sheet the timeline used, so marking a
-  // thing done didn't leave the wall with the timeline. Timeline events carry
-  // the raw TimelineItem id, so the lane's itemId matches directly.
-  //
-  // A lane that has fallen forward to a later day has no match here — today's
-  // timeline doesn't contain it — so it flashes instead of dead-tapping. That's
-  // correct: you can't tick off Friday's dentist on Wednesday.
-  const handleTapLane = useCallback((itemId: string | null, label: string | null) => {
-    if (!itemId) return;
-    const tapped = timeline.flatMap((s) => s.events).find((e) => e.id === itemId);
-    if (tapped && (tapped.kind === 'routine' || tapped.kind === 'event' || tapped.kind === 'task')) {
-      setActionSheetItem(tapped);
-      return;
-    }
-    if (label) showFlash(label);
-  }, [timeline, showFlash]);
-
   // A bar on the board opens the same action sheet the lane did — tapping a
   // commitment should do one thing on this wall, whatever is drawing it.
   // The label is belt-and-braces: `timeline`'s ids should always match the
@@ -679,17 +612,6 @@ export function WallV2Shell() {
     if (handoffQuestions.length <= 1) setShowWhoSheet(false);
   }, [user, showFlash, wallData, handoffQuestions.length]);
 
-  const handleTapGanttItem = useCallback((itemId: string) => {
-    // An unclaimed handoff on the Everyone row IS the question; tapping the
-    // bar answers it, same as tapping the strip card.
-    const household = ganttBoard.tracks.find((t) => t.memberId === HOUSEHOLD_ID);
-    if (household?.blocks.some((b) => b.id === itemId && b.openHandoff)) {
-      setShowWhoSheet(true);
-      return;
-    }
-    handleTapLane(itemId, titleForBlockId(ganttBoard, itemId));
-  }, [handleTapLane, ganttBoard]);
-
   // Portrait tap opens the member's full-screen day page. Both handlers are
   // memoized: KidDayView's idle-close effect depends on `onClose`, and an
   // unstable identity here would restart that timer on every Shell re-render.
@@ -711,6 +633,120 @@ export function WallV2Shell() {
     if (dinner.recipeUrl || dinner.recipeContent) setRecipeViewerMeal('dinner');
     else showFlash(`Tonight: ${dinner.mealName}`);
   }, [selectedDinnerDay, dinner, showFlash]);
+
+  // ─── The wall, by time of day (Scott, 2026-10-04) ───
+  // Everything below projects data the wall already holds; no new queries.
+  const { history: instanceHistory, refresh: refreshHistory } = useMemberInstanceHistory();
+  const kids = useMemo(() => wallData.familyMembers.filter((m) => memberShape(m) === 'kid'), [wallData.familyMembers]);
+  const todayItems = useMemo(() => todayData?.items ?? emptySections<TimelineItem>(), [todayData]);
+  const tomorrowData = useMemo(() => wallData.days.find((d) => !d.isToday && d.date > now) ?? wallData.days[1], [wallData.days, now]);
+  const specials = useMemo(() => specialsWeek(wallData.days, kids, now), [wallData.days, kids, now]);
+  const schoolToday = useMemo(
+    () => specials.some((s) => s.isToday) || Object.values(todayItems).flat().some((i) => /^school\b/i.test(i.title)),
+    [specials, todayItems],
+  );
+  const moment = useMemo(
+    () => wallMoment(now, { schoolDay: schoolToday, dinnerAt: dinnerStartDate ? { h: dinnerStartDate.getHours(), m: dinnerStartDate.getMinutes() } : undefined }),
+    [now, schoolToday, dinnerStartDate],
+  );
+  const todayRows = useMemo(() => wallTodayRows(todayItems, wallData.familyMembers, now), [todayItems, wallData.familyMembers, now]);
+  const kidModels = useMemo(() => kids.map((member) => ({
+    member,
+    model: buildMemberDayModel({
+      member, date: now, now, routines: wallData.routines, todayItems, tomorrowItems: tomorrowData?.items,
+      members: wallData.familyMembers, neededTasks: wallData.neededTasks, homeworkTasks: wallData.homeworkTasks,
+      notices: wallData.notices, history: instanceHistory,
+    }),
+  })), [kids, now, wallData.routines, todayItems, tomorrowData, wallData.familyMembers, wallData.neededTasks, wallData.homeworkTasks, wallData.notices, instanceHistory]);
+  const adultIds = useMemo(() => new Set(adults.map((a) => a.id)), [adults]);
+  const kidsNow: MomentKid[] = useMemo(() => kidModels.map(({ member, model }) => {
+    const evening = moment === 'evening';
+    return {
+      member,
+      special: evening ? (model.school?.tomorrowSpecial ?? null) : (model.school?.special ?? null),
+      hint: evening ? null : (model.school?.hint ?? null),
+      needed: model.needed.filter((n) => n.tomorrow === evening).map((n) => n.title),
+      homeworkDue: model.homework.filter((h) => h.due === (evening ? 'Tomorrow' : 'Today') || h.late).map((h) => h.title),
+    };
+  }), [kidModels, moment]);
+  const focusRows = useMemo(() => {
+    if (moment === 'morning') return todayRows.filter((r) => !r.past && r.owners.some((id) => adultIds.has(id)) && parseInt(r.time, 10) < 12 && r.time.endsWith('a'));
+    if (moment === 'after') return todayRows.filter((r) => !r.past && !(dinnerStartDate && r.title === dinnerEvent?.title)).slice(0, 5);
+    if (moment === 'evening' && tomorrowData) {
+      const tomorrowStart = new Date(tomorrowData.date); tomorrowStart.setHours(0, 0, 0, 0);
+      return wallTodayRows(tomorrowData.items, wallData.familyMembers, tomorrowStart).filter((r) => r.time.endsWith('a')).slice(0, 4);
+    }
+    return [];
+  }, [moment, todayRows, adultIds, dinnerStartDate, dinnerEvent, tomorrowData, wallData.familyMembers]);
+  const tomorrowKey = useMemo(() => (tomorrowData ? localDateKey(tomorrowData.date) : null), [tomorrowData]);
+  const nextMeal = useMemo(() => {
+    if (moment === 'evening') {
+      const t = dinnerDays.find((d) => d.dateKey === tomorrowKey)
+      return t ? { label: 'Dinner tomorrow', title: t.title, imageUrl: null } : null
+    }
+    if (moment === 'dinner' || !dinnerEvent) return null;
+    return { label: dinnerStartDate ? `Dinner at ${dinnerStartDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}` : 'Dinner tonight', title: dinner.mealName, imageUrl: dinner.recipe?.imageUrl ?? null };
+  }, [moment, dinnerDays, tomorrowKey, dinnerEvent, dinnerStartDate, dinner]);
+  // A new day starts the dinner card fresh.
+  useEffect(() => { setDinnerScale(1); setHaveIngredients(new Set()); }, [todayKey]);
+  const dinnerIngredients = useMemo(
+    () => (dinner.recipe?.ingredients ?? []).filter((l) => l.trim() && l !== l.toUpperCase()).map((l) => scaleIngredient(l, dinnerScale)),
+    [dinner.recipe, dinnerScale],
+  );
+  const handleAddMissing = useCallback(async () => {
+    if (!user) return;
+    const missing = dinnerIngredients.filter((_, i) => !haveIngredients.has(i));
+    if (!missing.length) { showFlash('Nothing missing'); return; }
+    const list = familyLists.find((l) => l.title.trim().toLowerCase() === 'groceries') ?? findToBuyList(familyLists);
+    if (!list) { showFlash('No family grocery list to add to'); return; }
+    const { error } = await supabase.from('list_items').insert(
+      missing.map((text, i) => ({ list_id: list.id, user_id: user.id, text, sort_order: 10_000 + i, completed: false })),
+    );
+    showFlash(error ? 'Could not add — try again' : `Added ${missing.length === 1 ? missing[0] : 'the missing ingredients'} to ${list.title}`);
+  }, [user, dinnerIngredients, haveIngredients, familyLists, showFlash]);
+  const momentDinner = useMemo(() => {
+    if (!dinnerEvent) return null;
+    const notes = dinnerEvent.mealNotes?.trim() || null;
+    return {
+      title: dinner.mealName,
+      imageUrl: dinner.recipe?.imageUrl ?? null,
+      minutes: dinner.recipe?.prepMinutes ?? null,
+      cue: notes ? notes.split(/(?<=[.!])\s/)[0] : null,
+      ingredients: dinnerIngredients,
+      hasRecipe: !!(dinner.recipeUrl || dinner.recipeContent),
+      scale: dinnerScale,
+      onScale: setDinnerScale,
+      onCook: handleTapDinnerCard,
+      have: haveIngredients,
+      onToggleHave: (i: number) => setHaveIngredients((s) => { const n = new Set(s); if (n.has(i)) n.delete(i); else n.add(i); return n }),
+      onAddMissing: () => { void handleAddMissing() },
+    };
+  }, [dinnerEvent, dinner, dinnerIngredients, dinnerScale, haveIngredients, handleTapDinnerCard, handleAddMissing]);
+  const checklists = useMemo(() => kidModels.map(({ member, model }) => {
+    // A reading timer left running on a kid's page shows on their card, so a
+    // parent sees it from the kitchen and the kid can find it again.
+    const timer = readReadingTimer(safeStorage(), readingTimerKey(member.id, localYmd(now)));
+    const live = timer ? `${isTimerRunning(timer) ? 'Reading' : 'Reading paused'} · ${elapsedMinutes(timer, now)} min` : null;
+    return { member, list: checklistFor(model, moment), live };
+  }), [kidModels, moment, now]);
+  const handleTick = useCallback((member: FamilyMember, row: KidRow) => {
+    void (async () => {
+      if (row.entityType === 'task') await updateTask(row.id, { completed: !row.done });
+      else await (row.done ? undoDone('routine', row.id, now) : markDone('routine', row.id, now));
+      await Promise.all([refreshHistory(), wallData.refetch()]);
+    })();
+    if (!row.done) showFlash(`${member.name} · ${row.title}`);
+  }, [updateTask, undoDone, markDone, now, refreshHistory, wallData, showFlash]);
+  const momentHandoffs = useMemo(
+    () => handoffQuestions.filter((q) => q.when === 'today').map((q) => ({ key: q.eventKey, time: q.time, prompt: q.prompt })),
+    [handoffQuestions],
+  );
+  const handleTapRow = useCallback((id: string) => {
+    const tapped = timeline.flatMap((s) => s.events).find((e) => e.id === id);
+    if (tapped && (tapped.kind === 'routine' || tapped.kind === 'event' || tapped.kind === 'task')) { setActionSheetItem(tapped); return; }
+    const row = todayRows.find((r) => r.id === id);
+    if (row) showFlash(row.title);
+  }, [timeline, todayRows, showFlash]);
 
   const handleWallSkip = useCallback(async (id: string, kind: 'event' | 'routine') => {
     const entityType = kind === 'routine' ? 'routine' : 'calendar_event';
@@ -797,61 +833,51 @@ export function WallV2Shell() {
           the lanes absorb whatever is left rather than the other way round.
           Nothing scrolls: this display has no wheel and no scrollbar, so
           anything past the fold is unreachable, not merely awkward. */}
-      <div className="flex-1 min-h-0 flex flex-col gap-3">
-        <WallV2Header
-          weekday={weekday}
-          fullDate={fullDate}
-          time={clock}
-          weatherIcon={weatherData.icon ?? Sun}
-          weatherTint={{ bg: TINTS.honey.bg, fg: TINTS.honey.fg }}
-          temp={weatherData.temp}
-          condition={weatherData.condition}
-          high={weatherData.high}
-          low={weatherData.low}
-          freshness={freshness}
-          glance={glanceRows[0]?.text ?? null}
+      {/* The wall, by time of day (Scott, 2026-10-04): Today · the moment ·
+          specials and coming up · the question and the kids' lists. */}
+      <div className="flex-1 min-h-0 -m-4 mt-0">
+        <WallMoments
+          moment={moment}
+          dateLabel={now.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
+          clock={clock}
+          weather={liveWeather ? { icon: weatherData.icon ?? Sun, temp: weatherData.temp, condition: weatherData.condition } : null}
           actions={
-            <div className="flex gap-2">
+            <div className="flex items-center gap-2">
+              {/* SymphonyBell — the kids' phone. Its own labelled button, never a
+                  tap deeper (a kid's call to Grandma must not get harder). */}
+              <button type="button" onClick={() => setShowPhone(true)} aria-label="SymphonyBell — call"
+                className="inline-flex min-h-[56px] items-center gap-2 rounded-2xl bg-[#f2b65a] px-5 text-[1.15rem] font-semibold text-[#1b1406]">
+                <Phone className="h-6 w-6" aria-hidden="true" />SymphonyBell
+              </button>
+              <button type="button" onClick={() => setShowRecipePicker(true)} aria-label="Recipes"
+                className="grid h-14 w-14 place-items-center rounded-2xl border border-[#2d3d50] bg-[#1c2733]">
+                <ChefHat className="h-6 w-6 text-[#a9b7c6]" aria-hidden="true" />
+              </button>
               {RAIL_ACTIONS.map(({ id, label, icon: Icon }) => (
-                <button
-                  key={id}
-                  aria-label={label}
-                  onClick={() => handleDockAction(id)}
-                  className={`${WALL.cardInset} w-14 h-14 grid place-items-center active:scale-95 transition-transform`}
-                >
-                  <Icon className={`w-6 h-6 ${WALL.muted}`} />
+                <button key={id} type="button" aria-label={label} onClick={() => handleDockAction(id)}
+                  className="grid h-14 w-14 place-items-center rounded-2xl border border-[#2d3d50] bg-[#1c2733] active:scale-95 transition-transform">
+                  <Icon className="h-6 w-6 text-[#a9b7c6]" />
                 </button>
               ))}
             </div>
           }
-        />
-
-        {/* The board takes the FULL width. The right column's dinner hero and
-            question moved into the strip to make that possible: with a 248px
-            column the track was ~540px, a one-hour bar was 90px, and every
-            label clipped to five characters. Pinned lists keep their one-tap
-            route through the header's list action. */}
-        <div className="flex-1 min-h-0 min-w-0 flex flex-col gap-3">
-          {showWeekend ? (
-            <WallV2Weekend board={weekendBoard} onTapItem={handleTapGanttItem} />
-          ) : (
-            <WallV2Gantt board={ganttBoard} onTapItem={handleTapGanttItem} onTapMember={handleTapGanttMember} />
-          )}
-        </div>
-
-        <WallV2Strip
-          tonight={selectedDinnerDay ? selectedDinnerDay.title : (dinnerEvent ? dinner.mealName : null)}
-          meals={mealRows}
-          due={dueRows}
+          members={wallData.familyMembers}
+          kids={kids}
+          today={todayRows}
+          specials={specials}
           comingUp={comingUpRows}
-          question={discussionDismissed ? null : discussionPrompt}
-          handoff={handoffAsk}
-          onCall={() => setShowPhone(true)}
-          onTapDinner={handleTapDinnerCard}
-          onBrowseRecipes={() => setShowRecipePicker(true)}
-          onSelectDinnerDay={(key) => setMealDayKey(key === todayKey ? null : key)}
-          onTapQuestion={() => setShowQuestionSheet(true)}
-          onTapHandoff={() => setShowWhoSheet(true)}
+          kidsNow={kidsNow}
+          focusRows={focusRows}
+          handoffs={momentHandoffs}
+          dinner={momentDinner}
+          nextMeal={nextMeal}
+          question={handoffAsk ? { text: handoffAsk.prompt, isHandoff: true } : (discussionDismissed || !discussionPrompt ? null : { text: discussionPrompt, isHandoff: false })}
+          checklists={checklists}
+          onTapRow={handleTapRow}
+          onClaim={() => setShowWhoSheet(true)}
+          onTapQuestion={() => (handoffAsk ? setShowWhoSheet(true) : setShowQuestionSheet(true))}
+          onTick={handleTick}
+          onOpenKid={setKidViewMember}
         />
       </div>
 
@@ -1045,7 +1071,7 @@ export function WallV2Shell() {
         />
       )}
 
-      {/* Caller-ID takeover — full-screen when the kid phone has a live call. */}
+      {/* Caller-ID takeover — full-screen when SymphonyBell has a live call. */}
       <CallerIdTakeover />
     </div>
   );
