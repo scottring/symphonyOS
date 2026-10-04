@@ -15,6 +15,20 @@ describe('SeasonBand', () => {
     expect(band.getByText('Halloween')).toBeInTheDocument()
   })
 
+  // Scott, 2026-10-04: "overlapping labels on the graph" — Halloween,
+  // Daylight Saving and Election Day a few days apart wrote over each other.
+  it('stacks landmarks that fall close together onto their own rows', () => {
+    render(<SeasonBand start={new Date(2026, 8, 1)} end={new Date(2026, 11, 1)} today={new Date(2026, 9, 4)} marks={[
+      { id: 'h', title: 'Halloween', at: new Date(2026, 9, 31) },
+      { id: 'd', title: 'Daylight Saving Time ends', at: new Date(2026, 10, 1) },
+      { id: 'e', title: 'Election Day', at: new Date(2026, 10, 3) },
+      { id: 'v', title: 'Veterans Day', at: new Date(2026, 10, 11) },
+    ]} />)
+    const row = (t: string) => screen.getByText(t).closest('[data-row]')!.getAttribute('data-row')
+    expect(new Set([row('Halloween'), row('Daylight Saving Time ends'), row('Election Day')]).size).toBe(3)
+    expect(row('Veterans Day')).toBe('0')
+  })
+
   it('has no today mark outside the season', () => {
     render(<SeasonBand start={new Date(2026, 11, 1)} end={new Date(2027, 2, 1)} today={new Date(2026, 9, 4)} marks={[]} />)
     expect(screen.queryByText('today')).toBeNull()

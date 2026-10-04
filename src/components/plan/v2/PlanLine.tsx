@@ -58,6 +58,8 @@ export interface LineActions {
   today?: (t: Task) => void
   /** Only the link to its goal goes. */
   unlink?: (t: Task) => void
+  /** A freeform note, written in place on a season or year line (2026-10-04). */
+  setNotes?: (t: Task, notes: string) => void
   /** Life area (Work / Family / Personal), through the gated update. */
   setContext?: (t: Task, c: TaskContext | undefined) => void
   /** Tie a line already on the plan to a goal one rung up — "Link to a Fall

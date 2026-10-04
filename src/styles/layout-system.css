@@ -506,8 +506,8 @@ p.wk-dayhint { margin: 8px 0 0; }
 .ps-lived { position: absolute; left: 0; top: 0; bottom: 0; background: rgba(31, 39, 51, .09); pointer-events: none; }
 .ps-today { position: absolute; top: 0; bottom: 0; width: 2px; background: var(--color-neutral-800); }
 .ps-today span { position: absolute; left: 6px; bottom: 8px; font: 600 11px var(--font-family-sans); color: var(--color-neutral-800); white-space: nowrap; }
-.ps-pins { position: relative; height: 34px; margin-top: 8px; }
-.ps-pin { position: absolute; top: 0; display: flex; flex-direction: column; align-items: center; transform: translateX(-50%); font-size: 12px; color: var(--color-neutral-700); white-space: nowrap; }
+.ps-pins { position: relative; margin-top: 8px; }
+.ps-pin { position: absolute; display: flex; flex-direction: column; align-items: center; transform: translateX(-50%); font-size: 12px; color: var(--color-neutral-700); white-space: nowrap; }
 .ps-pin i { width: 8px; height: 8px; margin-bottom: 4px; border-radius: 50%; background: hsl(22 55% 50%); }
 .ps-ribbon { margin: 6px 0 30px; }
 .ps-ribbon-seasons { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); margin-bottom: 6px; }
@@ -530,7 +530,14 @@ p.wk-dayhint { margin: 8px 0 0; }
 .ps-line-title:hover { color: var(--color-neutral-950); text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 4px; }
 .ps-line.is-done .ps-line-title { color: var(--color-neutral-400); text-decoration: line-through; }
 .ps-line.is-muted { opacity: .6; }
+.ps-line-tools { display: flex; align-items: center; gap: 6px; padding-top: 2px; }
 .ps-line-menu { opacity: .35; transition: opacity .12s; }
+.ps-note { display: block; margin: 0 0 0 32px; padding: 0; text-align: left; white-space: pre-line; font-size: 14px; line-height: 1.45; color: var(--color-neutral-700); display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; }
+.ps-note:hover { color: var(--color-neutral-900); }
+.ps-note-add { align-self: flex-start; margin-left: 32px; padding: 0; font-size: 13px; color: var(--color-neutral-500); opacity: 0; transition: opacity .12s; }
+.ps-line:hover .ps-note-add, .ps-note-add:focus-visible { opacity: 1; }
+@media (hover: none) { .ps-note-add { opacity: 1; } }
+.ps-note-edit { box-sizing: border-box; width: calc(100% - 32px); margin-left: 32px; padding: 6px 8px; border: 1px solid var(--color-neutral-300); border-radius: 8px; background: var(--color-bg-elevated); font: 14px/1.45 var(--font-family-sans); color: var(--color-neutral-900); resize: vertical; }
 .ps-line:hover .ps-line-menu, .ps-line:focus-within .ps-line-menu { opacity: 1; }
 .ps-line-from { margin: 0 0 0 32px; font-size: 12px; color: var(--color-neutral-500); }
 .ps-did { display: flex; flex-direction: column; gap: 2px; margin: 0 0 0 32px; font-size: 12.5px; line-height: 1.45; color: hsl(150 32% 30%); }
@@ -546,3 +553,6 @@ p.wk-dayhint { margin: 8px 0 0; }
 }
 /* The ribbon's month names sit at the bottom; its "today" reads at the top. */
 .ps-ribbon-track .ps-today span { top: 6px; bottom: auto; }
+/* The band's month names sit at the top; its "today" line starts below them,
+   so it never runs through a name (2026-10-04: "OCTO|BER"). */
+.ps-band-track .ps-today { top: 30px; }
