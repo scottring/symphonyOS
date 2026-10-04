@@ -32,13 +32,30 @@ const renderView = (props: Partial<Parameters<typeof WeekJournal>[0]>) => render
 // finished week's shape: what's taken, what's free, who carries what.
 describe('WeekJournal — the strip beside a step', () => {
   it('seven compact days, each with its things and its free time', () => {
+    vi.useFakeTimers({ toFake: ['Date'] }); vi.setSystemTime(new Date(2026, 9, 3, 9))
     renderView({ variant: 'strip' })
+    vi.useRealTimers()
     const days = screen.getAllByTestId(/^strip-day-/)
     expect(days).toHaveLength(7)
     const mon = within(screen.getByTestId('strip-day-2026-10-05'))
     expect(mon.getByText('Jury duty')).toBeInTheDocument()
-    expect(mon.getByText('+ 1 routine')).toBeInTheDocument()
     expect(mon.getByText(/^Free /)).toBeInTheDocument()
+  })
+
+  // Scott, 2026-10-04: "the week so far is basically unreadable … no
+  // hierarchy, same font for everything". The strip follows the page's rules.
+  it('reads like the Week page: kinds marked, time apart, no counts, no daily routines', () => {
+    const days = fill()
+    days.forEach((d) => d.entries.push({ id: `routine-jax-${d.key}`, kind: 'routine', title: 'Walk Jax', completed: false, routineId: 'jax', time: new Date(d.date.getFullYear(), d.date.getMonth(), d.date.getDate(), 18) }))
+    render(<DndContext><WeekJournal variant="strip" days={days} spans={[]} onSelectItem={vi.fn()} onToggleEntry={vi.fn()} members={members} /></DndContext>)
+    const mon = within(screen.getByTestId('strip-day-2026-10-05'))
+    expect(screen.queryByText('Walk Jax')).toBeNull()
+    expect(mon.queryByText(/routines?$/)).toBeNull()
+    expect(mon.getByText('Pack lunches')).toBeInTheDocument()
+    expect(mon.getByText('Bedtime').closest('li')?.dataset.mark).toBe('event')
+    expect(mon.getByText('Pack lunches').closest('li')?.dataset.mark).toBe('routine')
+    expect(mon.getByText('Gift shopping').closest('li')?.dataset.mark).toBe('task')
+    expect(mon.getByText('7p')).toHaveClass('wk-strip-time')
   })
 })
 

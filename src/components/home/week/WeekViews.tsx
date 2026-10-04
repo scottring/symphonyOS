@@ -12,38 +12,51 @@ import { AssigneeAvatar } from '@/components/family/AssigneeAvatar'
 import { journalTime } from '@/lib/week/journalSpread'
 import { busyBlocks, freeWindows, formatFree, DAY_START, DAY_END } from '@/lib/week/dayShape'
 import type { JournalDay, JournalEntry } from '@/lib/week/journalDays'
+import { weekRhythm } from '@/lib/week/weekRhythm'
 
 const weekday = (d: Date) => d.toLocaleDateString('en-US', { weekday: 'short' })
 
 /** Whose this is: a thing with no people (a calendar event) is everyone's. */
 const carries = (e: JournalEntry, person: string) => person === 'all' || !e.people?.length || e.people.includes(person)
 
-function dayFree(day: JournalDay, person: string) {
+function dayFree(day: JournalDay, person: string, minGap?: number) {
   const timed = day.entries.filter((e) => e.time && !e.completed && carries(e, person))
   const busy = busyBlocks(timed.map((e) => ({ start: e.time!, end: e.end })))
-  return { busy, text: formatFree(freeWindows(busy)) }
+  return { busy, text: formatFree(freeWindows(busy, minGap)) }
 }
 
+/** The week beside a planning step, by the Week page's rules (Scott,
+ *  2026-10-04: "no hierarchy, same font for everything"): every-day routines
+ *  left out, each thing marked by its kind, its time on its own small line,
+ *  no counts, and free time (an hour or more) from today on. */
 export function WeekStrip({ days, onSelectItem }: { days: JournalDay[]; onSelectItem: (id: string) => void }) {
+  const shown = weekRhythm(days).days
+  const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0)
   return (
     <div className="wk-strip" role="list" aria-label="The week so far">
-      {days.map((day) => (
-        <section key={day.key} role="listitem" className="wk-strip-day" data-testid={`strip-day-${day.key}`}
-          aria-label={day.date.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}>
-          <header><span className="wk-strip-num">{day.date.getDate()}</span><span className="wk-strip-name">{weekday(day.date)}</span></header>
-          <ul>
-            {day.entries.map((e) => (
-              <li key={e.id} className={e.completed ? 'is-done' : undefined}>
-                <button type="button" onClick={() => onSelectItem(e.id)}>
-                  {e.time && <span className="wk-strip-time">{journalTime(e.time)}</span>}{e.title}
-                </button>
-              </li>
-            ))}
-          </ul>
-          {day.foldedRoutines.length > 0 && <p className="wk-strip-more">+ {day.foldedRoutines.length} routine{day.foldedRoutines.length === 1 ? '' : 's'}</p>}
-          <p className="wk-strip-free">{dayFree(day, 'all').text}</p>
-        </section>
-      ))}
+      {shown.map((day, i) => {
+        const full = days[i]
+        const items = [...day.entries, ...day.foldedRoutines]
+        return (
+          <section key={day.key} role="listitem" className={`wk-strip-day${day.date.getTime() === todayStart.getTime() ? ' is-today' : ''}`} data-testid={`strip-day-${day.key}`}
+            aria-label={day.date.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}>
+            <header><span className="wk-strip-num">{day.date.getDate()}</span><span className="wk-strip-name">{weekday(day.date)}</span></header>
+            {day.notes.length > 0 && <p className="wk-strip-note">{day.notes.map((n) => n.title).join(' · ')}</p>}
+            <ul>
+              {items.map((e) => (
+                <li key={e.id} data-mark={e.kind} className={e.completed ? 'is-done' : undefined}>
+                  <span className={`wk-strip-mark is-${e.kind}`} aria-hidden="true" />
+                  <button type="button" onClick={() => onSelectItem(e.id)}>
+                    {e.time && <span className="wk-strip-time">{journalTime(e.time)}</span>}
+                    <span className="wk-strip-title">{e.title}</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+            {full.date >= todayStart && <p className="wk-strip-free">{dayFree(full, 'all', 1).text}</p>}
+          </section>
+        )
+      })}
     </div>
   )
 }
