@@ -68,7 +68,9 @@ describe('the day row carries the shared timing control', () => {
     expect(control).toHaveAccessibleName(/Chosen for \w{3}, \w{3} \d+, any time/)
   })
 
-  it('a timed row on its own day reads only its time', async () => {
+  // Scott, 2026-10-04: "we don't need the time chips for items in a time
+  // slot" — the slot already says when; the row opens to change it.
+  it('a row in a time slot carries no timing chip', async () => {
     // The clock sits before 11:45: past that hour the row reads as past and
     // the test would rot with the wall clock (it passed at 10am, failed at 2pm).
     const morning = new Date(TODAY); morning.setHours(8, 0, 0, 0)
@@ -77,8 +79,7 @@ describe('the day row carries the shared timing control', () => {
       const at = new Date(TODAY); at.setHours(11, 45, 0, 0)
       renderView({ tasks: [{ ...dayTask()[0], isAllDay: false, scheduledFor: at }] as never })
       await screen.findByText('Research games dates and tickets')
-      const control = screen.getByRole('button', { name: /Choose a week or a day for Research games dates and tickets/ })
-      expect(control).toHaveTextContent(/^11:45 AM/)
+      expect(screen.queryByRole('button', { name: /Choose a week or a day for Research games dates and tickets/ })).toBeNull()
     } finally { vi.useRealTimers() }
   })
 
