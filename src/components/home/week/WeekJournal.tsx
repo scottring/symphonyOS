@@ -274,7 +274,8 @@ function DayRow({ day, onSelectItem, onToggleEntry, onPlanDrop, onAddToDay, drag
 /** A day's free time between 7a and 9p, from everything timed on it —
  *  the every-day routines included, though they are written above. */
 function dayFree(day: JournalDay): string {
-  const timed = day.entries.filter((e) => e.time && !e.completed)
+  // Done or not, a timed thing took its time.
+  const timed = day.entries.filter((e) => e.time)
   // An hour or more counts; the half hour between dinner and bedtime doesn't.
   return formatFree(freeWindows(busyBlocks(timed.map((e) => ({ start: e.time!, end: e.end }))), 1))
 }
@@ -443,8 +444,13 @@ export function WeekJournal({ days, weekend = null, spans, onSelectItem, onToggl
   const onAddToDay = readOnly ? undefined : addToDay
   const timingControl = readOnly ? undefined : timing
   // The grid writes the every-day and every-weekday routines once, above.
-  const rhythm = layout === 'grid' ? weekRhythm(days) : { everyDay: [], weekdays: [], days }
-  const free = layout === 'grid' ? Object.fromEntries(days.map((d) => [d.key, dayFree(d)])) : undefined
+  const fixedOnly = show === 'fixed'
+  const full = layout === 'grid' ? weekRhythm(days) : { everyDay: [], weekdays: [], days }
+  // "Can't move" asks only what has a time.
+  const rhythm = fixedOnly ? { ...full, everyDay: full.everyDay.filter((r) => r.time), weekdays: full.weekdays.filter((r) => r.time) } : full
+  // Free time is planning information: today and the days ahead.
+  const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0)
+  const free = layout === 'grid' ? Object.fromEntries(days.filter((d) => d.date >= todayStart).map((d) => [d.key, dayFree(d)])) : undefined
   return (
     <div data-testid="week-journal" className={layout === 'grid' ? 'wk-journal-grid' : 'border-y border-neutral-300'}>
       {spans.length > 0 && (
@@ -473,7 +479,7 @@ export function WeekJournal({ days, weekend = null, spans, onSelectItem, onToggl
           <RhythmBand rhythm={rhythm} onSelectItem={onSelectItem} />
           <WeekGridDays days={rhythm.days} weekend={weekend} forecast={forecast} onSelectItem={onSelectItem} onToggleEntry={onToggleEntry}
             onPlanDrop={readOnly ? undefined : onPlanDrop} onAddToDay={onAddToDay} dragEnabled={dragEnabled} timingControl={timingControl}
-            fixedOnly={show === 'fixed'} routinesOpen={routinesOpen} free={free} />
+            fixedOnly={fixedOnly} routinesOpen={routinesOpen} free={free} />
         </>
       ) : days.map((day) => (
         <DayRow key={day.key} day={day} onSelectItem={onSelectItem} onToggleEntry={onToggleEntry}

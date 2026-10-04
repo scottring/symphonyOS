@@ -8,12 +8,14 @@ const c = (level: 'week' | 'month', periodStart: Date, status: 'open' | 'done' |
   ({ level, periodStart, status, carriedTo })
 
 describe('weekListTasks', () => {
-  it('is every task committed to the week, done rows included, goals excluded, in creation order', () => {
+  // 2026-10-04: no goal/task split above the week — a line once marked a goal
+  // that is given this week is on the week's list like any other.
+  it('is every task committed to the week, done rows and old goal lines included, in creation order', () => {
     const a = createMockTask({ id: 'a', title: 'A', bucket: 'week', weekStart: WEEK, createdAt: new Date(2026, 9, 1), commitments: [c('week', WEEK)] })
     const done = createMockTask({ id: 'd', title: 'D', bucket: 'week', weekStart: WEEK, completed: true, createdAt: new Date(2026, 8, 30), commitments: [c('week', WEEK, 'done')] })
     const goal = createMockTask({ id: 'g', title: 'G', isGoal: true, bucket: 'week', weekStart: WEEK, commitments: [c('week', WEEK)] })
     const other = createMockTask({ id: 'o', title: 'O', bucket: 'week', weekStart: LAST, commitments: [c('week', LAST)] })
-    expect(weekListTasks([a, done, goal, other], WEEK, null).map((t) => t.id)).toEqual(['d', 'a'])
+    expect(weekListTasks([a, done, goal, other], WEEK, null).map((t) => t.id).sort()).toEqual(['a', 'd', 'g'])
   })
 
   it('keeps a row that was picked for today (dated + focused) and a row given a day', () => {

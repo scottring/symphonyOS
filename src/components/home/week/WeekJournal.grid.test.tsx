@@ -48,10 +48,13 @@ describe('WeekJournal — the grid', () => {
     const days = week(new Date(2026, 9, 3))
     days.forEach((d) => d.entries.push({ id: `routine-jax-${d.key}`, kind: 'routine', title: 'Walk Jax', completed: false, routineId: 'jax', time: new Date(d.date.getFullYear(), d.date.getMonth(), d.date.getDate(), 18) }))
     const onSelectItem = vi.fn()
+    vi.useFakeTimers({ toFake: ['Date'] }); vi.setSystemTime(new Date(2026, 9, 6, 9))
     render(<DndContext><WeekJournal layout="grid" days={days} weekend={{ satIndex: 0, sunIndex: 1, sometime: [] }} spans={[]} onSelectItem={onSelectItem} onToggleEntry={vi.fn()} /></DndContext>)
+    vi.useRealTimers()
     const band = within(screen.getByRole('list', { name: 'Every day' }))
     fireEvent.click(band.getByRole('button', { name: /Walk Jax/ }))
-    expect(onSelectItem).toHaveBeenCalledWith('routine-jax-2026-10-03')
+    // Today's occurrence (Tuesday), not Saturday's.
+    expect(onSelectItem).toHaveBeenCalledWith('routine-jax-2026-10-06')
     expect(screen.getAllByText('Walk Jax')).toHaveLength(1)
   })
 
@@ -69,5 +72,28 @@ describe('WeekJournal — the grid', () => {
     expect(within(band).getAllByTestId(/^(journal-day-|weekend-sometime)/).map((el) => el.getAttribute('data-testid')))
       .toEqual(['journal-day-2026-10-10', 'weekend-sometime'])
     expect(within(screen.getAllByRole('region', { name: 'Weekdays' })[0]).getAllByTestId(/^journal-day-/)).toHaveLength(6)
+  })
+
+  it('on “Can’t move” the rhythm shows only what has a time', () => {
+    const days = week(new Date(2026, 9, 3))
+    days.forEach((d) => {
+      d.entries.push({ id: `routine-jax-${d.key}`, kind: 'routine', title: 'Walk Jax', completed: false, routineId: 'jax', time: new Date(d.date.getFullYear(), d.date.getMonth(), d.date.getDate(), 18) })
+      d.foldedRoutines.push({ id: `routine-read-${d.key}`, kind: 'routine', title: 'Read', completed: false, routineId: 'read' })
+    })
+    render(<DndContext><WeekJournal layout="grid" show="fixed" days={days} weekend={{ satIndex: 0, sunIndex: 1, sometime: [] }} spans={[]} onSelectItem={vi.fn()} onToggleEntry={vi.fn()} /></DndContext>)
+    const band = within(screen.getByRole('list', { name: 'Every day' }))
+    expect(band.getByText('Walk Jax')).toBeInTheDocument()
+    expect(band.queryByText('Read')).toBeNull()
+  })
+
+  it('a done timed thing still took its time; a past day says nothing about free time', () => {
+    vi.useFakeTimers({ toFake: ['Date'] }); vi.setSystemTime(new Date(2026, 9, 5, 12))
+    const days = week(new Date(2026, 9, 3))
+    days[2].entries.push({ id: 'task-x', kind: 'task', title: 'Dentist', completed: true, time: new Date(2026, 9, 5, 9), end: new Date(2026, 9, 5, 17) })
+    days[0].entries.push({ id: 'task-y', kind: 'task', title: 'Porch', completed: false })
+    renderGrid(days, { satIndex: 0, sunIndex: 1, sometime: [] })
+    expect(within(screen.getByTestId('journal-day-2026-10-05')).getByText('Free 7–9a · 5–9p')).toBeInTheDocument()
+    expect(within(screen.getByTestId('journal-day-2026-10-03')).queryByText(/^Free|No free time/)).toBeNull()
+    vi.useRealTimers()
   })
 })

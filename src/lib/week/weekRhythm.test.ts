@@ -53,4 +53,22 @@ describe('weekRhythm', () => {
     days.forEach((d) => d.entries.push(occ('jax', 'Walk Jax', d)))
     expect(weekRhythm(days).everyDay).toEqual([])
   })
+
+  // Review 2026-10-04: a one-day change is particular to that day.
+  it('keeps a day whose occurrence has another time in that day', () => {
+    const days = week()
+    days.forEach((d, i) => d.entries.push(occ('jax', 'Walk Jax', d, new Date(d.date.getFullYear(), d.date.getMonth(), d.date.getDate(), i === 3 ? 20 : 18))))
+    const r = weekRhythm(days)
+    expect(r.everyDay.map((x) => x.time?.getHours())).toEqual([18])
+    expect(r.days[3].entries.map((e) => e.title)).toEqual(['Walk Jax'])
+    expect(r.days[2].entries).toEqual([])
+  })
+
+  it('opens today’s occurrence, not a past one', () => {
+    const days = week()
+    days.forEach((d) => d.foldedRoutines.push(occ('read', 'Read', d)))
+    expect(weekRhythm(days, '2026-10-06').everyDay[0].openId).toBe('routine-read-2026-10-06')
+    expect(weekRhythm(days, '2026-09-01').everyDay[0].openId).toBe('routine-read-2026-10-03')
+    expect(weekRhythm(days, '2026-12-01').everyDay[0].openId).toBe('routine-read-2026-10-09')
+  })
 })

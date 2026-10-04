@@ -163,6 +163,7 @@ export function PlanLine({ vm, actions, members, nextLabel, open, onToggle, edit
 }) {
   const t = vm.task
   const who = assigneesOf(t)
+  const notes = open ? notesAsText(t.notes) : ''
   const muted = vm.fate !== 'open'
   const movable = draggable && vm.fate === 'open' && !t.completed
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: `line:${t.id}`, data: { kind: 'line', taskId: t.id }, disabled: !movable })
@@ -218,7 +219,7 @@ export function PlanLine({ vm, actions, members, nextLabel, open, onToggle, edit
             </div>
           )}
           {vm.where && <div className="pv2-fact"><span className="pv2-k">Now</span><span>{vm.where}</span></div>}
-          {notesAsText(t.notes) && <div className="pv2-fact"><span className="pv2-k">Notes</span><span className="pv2-notes">{notesAsText(t.notes).split('\n')[0]}</span></div>}
+          {notes && <div className="pv2-fact"><span className="pv2-k">Notes</span><span className="pv2-notes">{notes.split('\n')[0]}</span></div>}
           <div className="pv2-acts">
             <button type="button" className="pv2-qbtn" onClick={() => actions.details(t)}>All details →</button>
             <button type="button" className="pv2-link" onClick={onToggle}>Close</button>

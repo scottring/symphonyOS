@@ -246,7 +246,9 @@ export function WeekV2({ tasks, weekStart, meId, isCurrent, days, renderDays, on
   const endsToday = isCurrent && localYmd(new Date(weekStart.getTime() + 6 * DAY)) === localYmd(new Date())
   const toolbar: PlanToolbarProps = {
     period: `week ${weekNo}`, saved: session.saved, loading: session.loading, error: !!session.error, agreedBy,
-    reviewDue, onPlan: startMeeting, onRetry: session.reload, planLabel: 'Plan the week',
+    reviewDue, onPlan: startMeeting, onRetry: session.reload,
+    // On its last day the week offers the next one instead (one primary).
+    planLabel: endsToday ? undefined : 'Plan the week',
     // On its last day the week offers the next one instead (the line under
     // the masthead); marking a finished week planned would be a second
     // primary beside it.

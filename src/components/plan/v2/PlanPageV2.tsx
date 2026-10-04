@@ -78,7 +78,7 @@ function DropZone({ id, data, className, children }: { id: string; data: Record<
 
 function Inner({ level }: { level: Level }) {
   const navigate = useNavigate()
-  const { tasks, loading, error: tasksError, refetch: refetchTasks, toggleTask, updateTask, addTask, deleteTask, pushTask, keepForward, dropCommitment, updateTasksBulk } = useSupabaseTasks()
+  const { tasks, loading, error: tasksError, refetch: refetchTasks, toggleTask, updateTask, addTask, pushTask, keepForward, dropCommitment, updateTasksBulk } = useSupabaseTasks()
   const gated = useGatedTaskActions({ updateTask, pushTask, updateTasksBulk }, (id) => tasks.find((t) => t.id === id))
   const { layers } = useDomain()
   const { members, getCurrentUserMember } = useFamilyMembers()
@@ -373,14 +373,7 @@ function Inner({ level }: { level: Level }) {
     if (isDay ? ymd < localYmd(today) : ymd < thisWeekYmd) { showToast(`That ${isDay ? 'day' : 'week'} has passed — put it on today or later.`, 'warning'); return }
     const at = parseLocalYmd(ymd)
     const label = isDay ? shortDay(at) : `week ${weekOfYear(at, weekStartsOn)}`
-    if (task.isGoal) {
-      const id = await addTask(task.title, undefined, undefined, isDay ? at : undefined, {
-        ...(isDay ? { isAllDay: true } : { bucket: 'week' as const, weekStart: at }),
-        goalTaskId: task.id, context: task.context ?? undefined, assignedTo: meId ?? undefined,
-      })
-      if (id) showToast(`A next step for “${task.title}” is on ${label}. Rename it in its details.`, 'success', 7000, { label: 'Undo', onClick: () => { void deleteTask(id) } })
-      return
-    }
+    // Every line moves the same way, an old goal line too (2026-10-04).
     const ok = await gated.updateTask(task.id, lineDropUpdates(task, { kind: isDay ? 'day' : 'week', at }))
     if (ok === false) return
     showToast(`“${task.title}” → ${label} · still on ${name}’s plan.`, 'success', 6000, { label: 'Undo', onClick: undo })
