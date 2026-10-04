@@ -141,7 +141,8 @@ export function WeekV2({ tasks, weekStart, meId, isCurrent, days, renderDays, on
   const monthName = refMonths.map((m) => m.name).join(' and ')
   // The people filter (in the top bar) narrows the week's list; the
   // month beside it and last week's look-back keep their own scope.
-  const [people, setPeople] = useAssigneeFilter()
+  // One people lens: the top bar's (Scott, 2026-10-04: no second set of buttons).
+  const [people] = useAssigneeFilter()
   const lens = useMemo(() => planPeopleLens(people, meId), [people, meId])
   // A task planned for this week's weekend with no day of its own stands in
   // the days' "Sometime this weekend", not on the list (spec §5).
@@ -447,16 +448,6 @@ export function WeekV2({ tasks, weekStart, meId, isCurrent, days, renderDays, on
       ) : (
         // At rest: the week's list beside its days; the month one click away.
         <>
-        {members.length > 1 && (
-          // Whose week: the same lens as the top bar's people filter.
-          <div className="wk-who" role="group" aria-label="Whose week">
-            <button type="button" aria-pressed={people.length === 0} className={people.length === 0 ? 'is-on' : undefined} onClick={() => setPeople([])}>Everyone</button>
-            {members.map((m) => {
-              const on = people.length === 1 && people[0] === m.id
-              return <button key={m.id} type="button" aria-pressed={on} className={on ? 'is-on' : undefined} onClick={() => setPeople([m.id])}>{m.name}</button>
-            })}
-          </div>
-        )}
         <div className={`wk-page wk-clear${refOpen ? ' has-ref' : ''}`}>
           {refOpen && monthRef(() => setRefOpen(false))}
           <div className="wk-listcol">

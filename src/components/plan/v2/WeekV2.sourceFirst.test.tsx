@@ -147,10 +147,9 @@ describe('WeekV2 — the planned week', () => {
     expect(screen.getByText('the porch, before the rain')).toBeInTheDocument()
   })
 
-  it('person buttons narrow the week to one person, the same lens as the top bar', () => {
+  it('has no second set of person buttons — the top bar’s people filter is the one lens', () => {
     renderWeek()
-    const who = within(screen.getByRole('group', { name: 'Whose week' }))
-    expect(who.getByRole('button', { name: 'Everyone' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.queryByRole('group', { name: 'Whose week' })).toBeNull()
   })
 
   it('October lines can be ticked done, and show what the weeks did for them', () => {
