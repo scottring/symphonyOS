@@ -64,7 +64,7 @@ export function WeekRow({ mark, title, lane, completed = false, onToggle, onOpen
         {onToggle && (mark === 'task' || mark === 'routine') ? (
           <button
             type="button"
-            className={`wk-check${completed ? ' is-on' : ''}`}
+            className={`wk-check${mark === 'routine' ? ' is-routine' : ''}${completed ? ' is-on' : ''}`}
             aria-label={completed ? `Mark ${title} not done` : `Complete ${title}`}
             onPointerDown={(e) => e.stopPropagation()}
             onClick={(e) => { e.stopPropagation(); onToggle() }}

@@ -53,6 +53,8 @@ const DAY = 86_400_000
 export interface DaysOptions {
   show?: 'all' | 'fixed'; routinesOpen?: boolean; readOnly?: boolean
   variant?: 'strip' | 'shape'; person?: string; members?: FamilyMember[]
+  /** Every-day routines in the days (the page's Hide / Show). */
+  dailyRoutines?: boolean
 }
 /** The week's planning session, in steps (Scott, 2026-10-03: "more
  *  obviously sequential"): look back, the fixed points, fill the week, the
@@ -70,6 +72,9 @@ const WEEK_STEPS: { key: WeekStep; label: string }[] = [
 /** Whether the month's list stands beside the week, remembered per device. */
 const REF_KEY = 'symphony-week-ref'
 const readRefOpen = () => { try { return localStorage.getItem(REF_KEY) === 'open' } catch { return false } }
+/** Whether the days show every-day routines, remembered per device. */
+const DAILY_KEY = 'symphony-week-daily'
+const readDaily = () => { try { return localStorage.getItem(DAILY_KEY) === 'shown' } catch { return false } }
 
 export function WeekV2({ tasks, weekStart, meId, isCurrent, days, renderDays, onSelectTask, timingControl, dragEnabled = true, tools }: {
   /** Layer-filtered tasks, as the week receives them. */
@@ -114,6 +119,8 @@ export function WeekV2({ tasks, weekStart, meId, isCurrent, days, renderDays, on
   const session = usePlanningSession('weekly', weekToken(weekStart))
   const [refOpen, setRefOpenState] = useState(readRefOpen)
   const setRefOpen = (open: boolean) => { setRefOpenState(open); try { localStorage.setItem(REF_KEY, open ? 'open' : 'shut') } catch { /* this visit only */ } }
+  const [daily, setDailyState] = useState(readDaily)
+  const setDaily = (shown: boolean) => { setDailyState(shown); try { localStorage.setItem(DAILY_KEY, shown ? 'shown' : 'hidden') } catch { /* this visit only */ } }
 
   // The week's own month (its middle day) names it; the reference shows every
   // month the week touches, so a week across a month end shows both plans.
@@ -144,7 +151,8 @@ export function WeekV2({ tasks, weekStart, meId, isCurrent, days, renderDays, on
   const prevWeek = useMemo(() => new Date(weekStart.getTime() - 7 * DAY), [weekStart])
   const prevTasks = useMemo(() => weekListTasks(tasks, prevWeek, meId, { isCurrent: false }), [tasks, prevWeek, meId])
   const [meeting, setMeeting] = useState<null | { step: WeekStep; candidateIds: string[] }>(null)
-  const daysFor = (opts: DaysOptions) => (renderDays ? renderDays(opts) : days)
+  // The days always know the household, so each row shows who carries it.
+  const daysFor = (opts: DaysOptions) => (renderDays ? renderDays({ members, ...opts }) : days)
   // The steps' own material, read only while a session is open.
   const [focus, setFocus] = useState('')
   const [person, setPerson] = useState('all')
@@ -293,7 +301,7 @@ export function WeekV2({ tasks, weekStart, meId, isCurrent, days, renderDays, on
       {refMonths.map((m) => (
         <div key={m.name} className="pv2-refmonth">
           <div className="pv2-colh">{m.name} <small>for reference</small>
-            {onHide && <button type="button" className="pv2-link pv2-quiet wk-refhide" onClick={onHide}>Hide</button>}
+            {onHide && <button type="button" className="pv2-link pv2-quiet wk-refhide" aria-label={`Hide ${m.name}`} onClick={onHide}>Hide</button>}
           </div>
           {m.rows.length ? (
             <ul className="pv2-list">{m.rows.map((t) => {
@@ -411,7 +419,22 @@ export function WeekV2({ tasks, weekStart, meId, isCurrent, days, renderDays, on
               </button>
             )}
           </div>
-          <section className="pv2-days wk-days" aria-label="The days">{daysFor({})}</section>
+          <section className="pv2-days wk-days" aria-label="The days">
+            <div className="wk-daysbar">
+              {/* Three kinds, told apart (Scott, 2026-10-04). */}
+              <ul className="wk-key" aria-label="What the marks mean">
+                <li><span className="wk-glyph is-event" aria-hidden="true" />Event — on the calendar</li>
+                <li><span className="wk-check" aria-hidden="true" />Task — do once</li>
+                <li><span className="wk-check is-routine" aria-hidden="true" />Routine — repeats</li>
+              </ul>
+              <div className="wk-daily" role="group" aria-label="Daily routines">
+                <span>Daily routines</span>
+                <button type="button" aria-pressed={!daily} className={!daily ? 'is-on' : undefined} onClick={() => setDaily(false)}>Hide</button>
+                <button type="button" aria-pressed={daily} className={daily ? 'is-on' : undefined} onClick={() => setDaily(true)}>Show</button>
+              </div>
+            </div>
+            {daysFor({ dailyRoutines: daily })}
+          </section>
         </div>
       )}
     </div>

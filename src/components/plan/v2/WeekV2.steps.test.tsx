@@ -51,7 +51,7 @@ describe('WeekV2 — planning in steps', () => {
     const renderDays = renderWeek()
     startSession()
     goTo('Can’t move')
-    expect(renderDays).toHaveBeenLastCalledWith({ show: 'fixed' })
+    expect(renderDays).toHaveBeenLastCalledWith(expect.objectContaining({ show: 'fixed' }))
   })
 
   // Scott, 2026-10-04: "the actual actions are on week and day" — write the
@@ -95,6 +95,6 @@ describe('WeekV2 — planning in steps', () => {
     startSession()
     fireEvent.click(screen.getByRole('button', { name: 'Leave for now' }))
     expect(screen.queryByRole('region', { name: /Planning week/ })).toBeNull()
-    expect(renderDays).toHaveBeenLastCalledWith({})
+    expect(renderDays).toHaveBeenLastCalledWith(expect.objectContaining({ dailyRoutines: false }))
   })
 })

@@ -41,6 +41,18 @@ describe('AheadStep', () => {
   })
 })
 
+describe('AheadStep — acting on what’s coming', () => {
+  it('a dated task opens, and can be started this week', () => {
+    const onOpen = vi.fn(), onStart = vi.fn()
+    const t = createMockTask({ id: 'd', title: 'Coppermine signup closes', scheduledFor: new Date(2026, 9, 11), isAllDay: true })
+    render(<AheadStep from={new Date(2026, 9, 10)} landmarks={[]} dated={[t]} onOpen={onOpen} onStart={onStart} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Coppermine signup closes' }))
+    expect(onOpen).toHaveBeenCalledWith(t)
+    fireEvent.click(screen.getByRole('button', { name: 'Start Coppermine signup closes this week' }))
+    expect(onStart).toHaveBeenCalledWith(t)
+  })
+})
+
 describe('dayList', () => {
   it('says a routine’s days the short way', () => {
     expect(dayList(['2026-10-03'], WEEK)).toBe('Sat')

@@ -34,10 +34,17 @@ describe('WeekRow', () => {
 
   // Scott, 2026-10-04: a ↻ on every routine row was noise; a routine is
   // something to do, like a task.
-  it('a routine is a thing to do: a check, and no repeat mark', () => {
-    inDnd(<WeekRow mark="routine" title="Yard weeding" onOpen={vi.fn()} onToggle={vi.fn()} drag={null} />)
-    expect(screen.getByRole('button', { name: 'Complete Yard weeding' })).toBeInTheDocument()
-    expect(screen.queryByLabelText('repeats')).toBeNull()
+  // Scott, 2026-10-04: "make sure the different types of items - routines,
+  // tasks, events - are clearly differentiated".
+  it('a routine’s check is its own shape; a task’s is round; an event has none', () => {
+    inDnd(<>
+      <WeekRow mark="routine" title="Yard weeding" onOpen={vi.fn()} onToggle={vi.fn()} drag={null} />
+      <WeekRow mark="task" title="Call the plumber" onOpen={vi.fn()} onToggle={vi.fn()} drag={null} />
+      <WeekRow mark="event" title="Jury duty" onOpen={vi.fn()} onToggle={vi.fn()} drag={null} />
+    </>)
+    expect(screen.getByRole('button', { name: 'Complete Yard weeding' }).className).toMatch(/is-routine/)
+    expect(screen.getByRole('button', { name: 'Complete Call the plumber' }).className).not.toMatch(/is-routine/)
+    expect(screen.queryByRole('button', { name: /Complete Jury duty/ })).toBeNull()
   })
 
   it('a month line and a goal draw their own marks and no check', () => {

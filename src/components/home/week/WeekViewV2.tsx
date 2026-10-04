@@ -752,10 +752,13 @@ export function WeekViewV2(props: WeekViewV2Props) {
   // me. Captures never inherit the view's lens, so it lands Unsorted — and
   // when the current filter would then hide it, the toast says so rather
   // than letting the row vanish (the walkthrough's silent-filter trap).
-  const handleAddToDay = useCallback(async (day: JournalDay, title: string) => {
-    const id = await addTask(title, undefined, undefined, day.date, { isAllDay: true, assignedTo: meId ?? undefined })
+  const handleAddToDay = useCallback(async (day: JournalDay, title: string, time?: string) => {
+    // With a time ("Can't move": an appointment), at that time; else any time that day.
+    const [h, m] = time ? time.split(':').map(Number) : [NaN, NaN]
+    const at = Number.isFinite(h) ? new Date(day.date.getFullYear(), day.date.getMonth(), day.date.getDate(), h, m || 0) : day.date
+    const id = await addTask(title, undefined, undefined, at, { isAllDay: !Number.isFinite(h), assignedTo: meId ?? undefined })
     if (!id) return
-    const when = day.date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
+    const when = `${day.date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}${Number.isFinite(h) ? `, ${at.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}` : ''}`
     const hidden = !layers.has('unsorted')
     showToast(`Added to ${when} · Unsorted · only you${hidden ? ' · hidden by your current view' : ''}`, hidden ? 'warning' : 'success', hidden ? 8000 : undefined)
     pushAction?.(`Added "${title}"`, () => { void deleteTask(id) })

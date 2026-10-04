@@ -78,10 +78,16 @@ export function BetweenStep({ waiting, threads, onOpenTask, onOpenThread }: {
 }
 
 // ── Look ahead ─────────────────────────────────────────────────────────────
-export function AheadStep({ from, landmarks, dated }: { from: Date; landmarks: Landmark[]; dated: Task[] }) {
-  const rows = [
+export function AheadStep({ from, landmarks, dated, onOpen, onStart }: {
+  from: Date; landmarks: Landmark[]; dated: Task[]
+  /** A dated task opens in its details. */
+  onOpen?: (t: Task) => void
+  /** "Start this week": on this week's list, its date kept. */
+  onStart?: (t: Task) => void
+}) {
+  const rows: { key: string; at: Date; title: string; what: string; task?: Task }[] = [
     ...landmarks.map((l) => ({ key: `l-${l.id}`, at: l.start, title: l.title, what: l.end.getTime() !== l.start.getTime() ? `through ${short(l.end)}` : 'all day' })),
-    ...dated.map((t) => ({ key: `t-${t.id}`, at: t.scheduledFor!, title: t.title, what: 'due' })),
+    ...dated.map((t) => ({ key: `t-${t.id}`, at: t.scheduledFor!, title: t.title, what: 'due', task: t })),
   ].sort((a, b) => a.at.getTime() - b.at.getTime())
   return (
     <section aria-label="Look ahead">
@@ -89,7 +95,10 @@ export function AheadStep({ from, landmarks, dated }: { from: Date; landmarks: L
       {rows.length ? (
         <ul style={{ margin: 0, padding: 0, listStyle: 'none' }}>
           {rows.map((r) => (
-            <li key={r.key} className="wk-item"><div>{r.title}<small>{short(r.at)} · {r.what}</small></div><span /></li>
+            <li key={r.key} className="wk-item">
+              <div>{r.task && onOpen ? <button type="button" className="wk-item-title" onClick={() => onOpen(r.task!)}>{r.title}</button> : r.title}<small>{short(r.at)} · {r.what}</small></div>
+              {r.task && onStart ? <div className="wk-acts"><button type="button" className="wk-act" aria-label={`Start ${r.title} this week`} onClick={() => onStart(r.task!)}>Start this week</button></div> : <span />}
+            </li>
           ))}
         </ul>
       ) : <p className="wk-none">Nothing fixed in the next three weeks.</p>}

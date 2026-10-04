@@ -82,4 +82,33 @@ describe('WeekJournal — the grid', () => {
     expect(within(screen.getByTestId('journal-day-2026-10-03')).queryByText(/^Free|No free time/)).toBeNull()
     vi.useRealTimers()
   })
+
+  // Scott, 2026-10-04: "a way to hide daily routines … and show them".
+  it('shows every-day routines in their days when asked', () => {
+    const days = week(new Date(2026, 9, 3))
+    days.forEach((d) => d.entries.push({ id: `routine-jax-${d.key}`, kind: 'routine', title: 'Walk Jax', completed: false, routineId: 'jax', time: new Date(d.date.getFullYear(), d.date.getMonth(), d.date.getDate(), 18) }))
+    render(<DndContext><WeekJournal layout="grid" dailyRoutines days={days} weekend={{ satIndex: 0, sunIndex: 1, sometime: [] }} spans={[]} onSelectItem={vi.fn()} onToggleEntry={vi.fn()} /></DndContext>)
+    expect(screen.getAllByText('Walk Jax')).toHaveLength(7)
+  })
+
+  // The page's job (2026-10-04): who carries what.
+  it('shows who carries each row', () => {
+    const days = week(new Date(2026, 9, 3))
+    days[2].entries.push({ id: 'routine-math-x', kind: 'routine', title: 'Math time', completed: false, routineId: 'math', people: ['ella'] })
+    const members = [{ id: 'ella', name: 'Ella', initials: 'E', color: 'amber' }] as never
+    render(<DndContext><WeekJournal layout="grid" members={members} days={days} weekend={{ satIndex: 0, sunIndex: 1, sometime: [] }} spans={[]} onSelectItem={vi.fn()} onToggleEntry={vi.fn()} /></DndContext>)
+    expect(within(screen.getByTestId('journal-day-2026-10-05')).getByLabelText('Ella')).toBeInTheDocument()
+  })
+
+  // "Can't move": add the missing appointment with its time.
+  it('on Can’t move, adding to a day asks for a time', () => {
+    const onAddToDay = vi.fn()
+    render(<DndContext><WeekJournal layout="grid" show="fixed" days={week(new Date(2026, 9, 3))} weekend={{ satIndex: 0, sunIndex: 1, sometime: [] }} spans={[]} onSelectItem={vi.fn()} onToggleEntry={vi.fn()} onAddToDay={onAddToDay} /></DndContext>)
+    const mon = within(screen.getByTestId('journal-day-2026-10-05'))
+    fireEvent.click(mon.getByRole('button', { name: 'Add to Monday' }))
+    fireEvent.change(mon.getByLabelText('New task for Monday'), { target: { value: 'Dentist' } })
+    fireEvent.change(mon.getByLabelText('Time on Monday'), { target: { value: '15:00' } })
+    fireEvent.submit(mon.getByLabelText('New task for Monday').closest('form')!)
+    expect(onAddToDay).toHaveBeenCalledWith(expect.objectContaining({ key: '2026-10-05' }), 'Dentist', '15:00')
+  })
 })

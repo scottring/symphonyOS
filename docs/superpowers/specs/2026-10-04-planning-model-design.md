@@ -50,6 +50,25 @@ planning page and step is checked against it.
   7:30–9p", an hour or more between 7a and 9p).
 - The weekend band and "Sometime this weekend" are unchanged.
 
+## Additions after the first walk (2026-10-04)
+
+The page's job, written first (vault `briefs/2026-10-04-page-jobs.md`):
+know what's fixed each day, what we mean to do, who carries what, whether
+there's room; do add, give a day or time, move, assign, tick.
+
+- **Daily routines: Hide / Show** above the days (hidden by default,
+  remembered per device). Shown, they sit in each day; any routine opens to be
+  changed. Hidden, they still count as time taken.
+- **Three kinds, told apart**, with a key above the days: event = blue bar on
+  a tinted row, no check; task = round check; routine = rounded-square check
+  in sage; a list line above the week = dash.
+- **People on the day rows** (under the title in a day's narrow cell).
+- **Can't move** adds with a time; **Look ahead** rows open, and a dated task
+  can be started this week.
+- "Show done" instead of "Completed · N".
+- Considered and dropped: a tabbed column on the Week page (Inbox, Between
+  us…). Those belong to planning, which walks them in order.
+
 ## Planning the week (the session)
 
 Eight steps, one kind of thing each: Last week · Inbox · Between us · Can't

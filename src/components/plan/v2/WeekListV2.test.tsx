@@ -27,4 +27,12 @@ describe('WeekListV2 — the week’s own list', () => {
     fireEvent.submit(input.closest('form')!)
     expect(onAdd).toHaveBeenCalledWith('Fix the porch step')
   })
+
+  it('done rows sit behind “Show done”, with no count', () => {
+    const done = task({ id: 'd', title: 'Toss umbrella', completed: true })
+    render(<WeekListV2 {...base} lines={[{ task: done, fate: 'done', partOf: null, where: null }]} />)
+    expect(screen.queryByText(/Completed ·/)).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Show done' }))
+    expect(screen.getByText('Toss umbrella')).toBeInTheDocument()
+  })
 })

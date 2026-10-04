@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import type { Task } from '@/types/task'
 
@@ -29,8 +29,9 @@ beforeEach(() => {
 afterEach(() => { vi.useRealTimers(); localStorage.clear() })
 
 const task = (o: Partial<Task>) => ({ completed: false, createdAt: new Date(2026, 8, 1), assignedTo: 'me', ...o }) as Task
+const renderDays = vi.fn((o: Record<string, unknown>) => <p>days {JSON.stringify({ ...o, members: undefined })}</p>)
 const renderWeek = (tasks: Task[] = []) => render(
-  <MemoryRouter><WeekV2 tasks={tasks} weekStart={WEEK} meId="me" isCurrent days={<p>days</p>} onSelectTask={vi.fn()} /></MemoryRouter>,
+  <MemoryRouter><WeekV2 tasks={tasks} weekStart={WEEK} meId="me" isCurrent renderDays={renderDays} onSelectTask={vi.fn()} /></MemoryRouter>,
 )
 
 // Scott, 2026-10-04: "lists above the week are for looking; the week and the
@@ -47,7 +48,7 @@ describe('WeekV2 — the week at rest', () => {
     expect(screen.getByText('Plan Thanksgiving')).toBeInTheDocument()
     // Remembered, and hidden again from its own heading.
     expect(localStorage.getItem('symphony-week-ref')).toBe('open')
-    fireEvent.click(screen.getByRole('button', { name: 'Hide' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Hide October' }))
     expect(screen.queryByText('Plan Thanksgiving')).toBeNull()
   })
 
@@ -106,5 +107,27 @@ describe('WeekV2 — earlier work is decided in the look-back', () => {
     const [id, updates] = h.gatedUpdate.mock.calls[0]
     expect(id).toBe('e1')
     expect('scheduledFor' in updates && updates.scheduledFor === undefined).toBe(true)
+  })
+})
+
+// Scott, 2026-10-04: "a way to hide daily routines … and show them", and
+// "make sure the different types of items … are clearly differentiated".
+describe('WeekV2 — the days’ own controls', () => {
+  it('daily routines are hidden until shown, and the choice is remembered', () => {
+    renderWeek()
+    expect(renderDays).toHaveBeenLastCalledWith(expect.objectContaining({ dailyRoutines: false }))
+    const group = within(screen.getByRole('group', { name: 'Daily routines' }))
+    expect(group.getByRole('button', { name: 'Hide' })).toHaveAttribute('aria-pressed', 'true')
+    fireEvent.click(group.getByRole('button', { name: 'Show' }))
+    expect(renderDays).toHaveBeenLastCalledWith(expect.objectContaining({ dailyRoutines: true }))
+    expect(localStorage.getItem('symphony-week-daily')).toBe('shown')
+  })
+
+  it('a key says which mark is which', () => {
+    renderWeek()
+    const key = within(screen.getByRole('list', { name: 'What the marks mean' }))
+    expect(key.getByText(/Event/)).toBeInTheDocument()
+    expect(key.getByText(/Task/)).toBeInTheDocument()
+    expect(key.getByText(/Routine/)).toBeInTheDocument()
   })
 })

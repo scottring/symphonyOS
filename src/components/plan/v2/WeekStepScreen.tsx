@@ -58,7 +58,7 @@ export function WeekStepMain({ step, tasks, weekStart, onSelectTask, onThisWeek,
     const to = new Date(weekEnd.getTime() + 21 * DAY)
     const landmarks = landmarksIn(events, weekEnd, new Date(to.getTime() - DAY))
     const dated = tasks.filter((t) => !t.completed && t.scheduledFor && t.scheduledFor >= weekEnd && t.scheduledFor < to)
-    return <AheadStep from={weekEnd} landmarks={landmarks} dated={dated} />
+    return <AheadStep from={weekEnd} landmarks={landmarks} dated={dated} onOpen={(t) => onSelectTask(t.id)} onStart={onThisWeek} />
   }
   const groups = routineGroups({ routines: activeRoutines, weekStart, dayCount: 7, instances, layers })
   const skipRow = (row: RoutineRow) => { for (const k of row.dayKeys.filter((k) => !row.skippedKeys.includes(k))) void skip('routine', row.routine.id, dateOf(k)) }
