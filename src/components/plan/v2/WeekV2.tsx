@@ -103,7 +103,7 @@ export function WeekV2({ tasks, weekStart, meId, isCurrent, days, renderDays, on
   // Arriving from the month's "Choose what week N takes on": ready to write.
   const arrivedToWrite = !!(location.state as { write?: boolean } | null)?.write
   const { user } = useAuth()
-  const { toggleTask, updateTask, pushTask, updateTasksBulk, keepForward, dropCommitment, addTask, loading: tasksLoading } = useSupabaseTasks()
+  const { toggleTask, updateTask, pushTask, updateTasksBulk, keepForward, dropCommitment, addTask, deleteTask, loading: tasksLoading } = useSupabaseTasks()
   const gated = useGatedTaskActions({ updateTask, pushTask, updateTasksBulk }, (id) => tasks.find((t) => t.id === id))
   const { members } = useFamilyMembers()
   const addArea = useAddArea()
@@ -155,6 +155,18 @@ export function WeekV2({ tasks, weekStart, meId, isCurrent, days, renderDays, on
   const daysFor = (opts: DaysOptions) => (renderDays ? renderDays({ members, ...opts }) : days)
   // The steps' own material, read only while a session is open.
   const [focus, setFocus] = useState('')
+  // An Inbox capture thrown away during planning hides at once and is deleted
+  // when its Undo closes — the Inbox page's rule, so Undo brings back the same row.
+  const [trashed, setTrashed] = useState<Set<string>>(() => new Set())
+  const trash = (t: Task) => {
+    setTrashed((s) => new Set(s).add(t.id))
+    let undone = false
+    const timer = window.setTimeout(() => { if (!undone) void deleteTask(t.id) }, 6000)
+    showToast(`Deleted “${t.title}”.`, 'success', 6000, { label: 'Undo', onClick: () => {
+      undone = true; window.clearTimeout(timer)
+      setTrashed((s) => { const n = new Set(s); n.delete(t.id); return n })
+    } })
+  }
   const [person, setPerson] = useState('all')
 
   const toVM = (t: Task, anyDay: string): LineVM => ({
@@ -369,7 +381,8 @@ export function WeekV2({ tasks, weekStart, meId, isCurrent, days, renderDays, on
         // One kind of thing at the left, the week filling up at the right.
         <div className="wk-step">
           <div className="wk-step-main">
-            <WeekStepMain step={meeting.step as PanelStep} tasks={tasks} weekStart={weekStart} onSelectTask={onSelectTask}
+            <WeekStepMain step={meeting.step as PanelStep} tasks={trashed.size ? tasks.filter((t) => !trashed.has(t.id)) : tasks} weekStart={weekStart} onSelectTask={onSelectTask}
+              onDelete={trash}
               onDone={(t) => void actions.done(t)} onSomeday={(t) => void actions.someday?.(t)}
               onThisWeek={(t) => { void gated.updateTask(t.id, { bucket: 'week', weekStart }); showToast(`“${t.title}” → this week.`, 'success', 4000) }} />
           </div>

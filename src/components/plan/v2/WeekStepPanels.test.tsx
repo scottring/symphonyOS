@@ -19,6 +19,17 @@ describe('InboxStep', () => {
   })
 })
 
+describe('InboxStep — trash', () => {
+  // Scott, 2026-10-04: "we also need a trash button for inbox items".
+  it('each capture can be thrown away', () => {
+    const onDelete = vi.fn()
+    const t = createMockTask({ id: 'c1', title: 'event: FedEx Delivery', bucket: 'inbox' })
+    render(<InboxStep tasks={[t]} onThisWeek={vi.fn()} onSomeday={vi.fn()} onDone={vi.fn()} onOpen={vi.fn()} onDelete={onDelete} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Delete event: FedEx Delivery' }))
+    expect(onDelete).toHaveBeenCalledWith(t)
+  })
+})
+
 describe('BetweenStep', () => {
   it('shows what you’re waiting on and the threads to talk through', () => {
     const t = createMockTask({ id: 'w1', title: 'Plumber quote', isWaiting: true, waitingFor: 'Joe' })

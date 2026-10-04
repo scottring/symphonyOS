@@ -4,6 +4,7 @@
 // fills up beside it (WeekStrip). The panels only draw and report: WeekV2
 // owns the data and the writes.
 import { useState } from 'react'
+import { Trash2 } from 'lucide-react'
 import type { Task } from '@/types/task'
 import type { WaitingRow } from '@/lib/today/waiting'
 import { checkBackLabel } from '@/lib/today/waiting'
@@ -19,12 +20,14 @@ function StepHead({ title, ask }: { title: string; ask: string }) {
 }
 
 // ── Inbox ──────────────────────────────────────────────────────────────────
-export function InboxStep({ tasks, onThisWeek, onSomeday, onDone, onOpen }: {
+export function InboxStep({ tasks, onThisWeek, onSomeday, onDone, onOpen, onDelete }: {
   tasks: Task[]
   onThisWeek: (t: Task) => void
   onSomeday: (t: Task) => void
   onDone: (t: Task) => void
   onOpen: (t: Task) => void
+  /** Throw it away (Scott, 2026-10-04); the host offers Undo. */
+  onDelete?: (t: Task) => void
 }) {
   return (
     <section aria-label="Inbox">
@@ -36,6 +39,9 @@ export function InboxStep({ tasks, onThisWeek, onSomeday, onDone, onOpen }: {
             <button type="button" className="wk-act" aria-label={`This week: ${t.title}`} onClick={() => onThisWeek(t)}>This week</button>
             <button type="button" className="wk-act" aria-label={`Someday: ${t.title}`} onClick={() => onSomeday(t)}>Someday</button>
             <button type="button" className="wk-act" aria-label={`Done: ${t.title}`} onClick={() => onDone(t)}>Done</button>
+            {onDelete && <button type="button" className="wk-act wk-act-icon" aria-label={`Delete ${t.title}`} title="Delete" onClick={() => onDelete(t)}>
+              <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
+            </button>}
           </div>
         </div>
       )) : <p className="wk-none">Your Inbox is empty.</p>}

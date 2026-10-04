@@ -22,7 +22,8 @@ export type PanelStep = 'inbox' | 'between' | 'ahead' | 'routines'
 const DAY = 86_400_000
 const dateOf = (key: string) => { const [y, m, d] = key.split('-').map(Number); return new Date(y, m - 1, d) }
 
-export function WeekStepMain({ step, tasks, weekStart, onSelectTask, onThisWeek, onSomeday, onDone }: {
+export function WeekStepMain({ step, tasks, weekStart, onSelectTask, onThisWeek, onSomeday, onDone, onDelete }: {
+  onDelete?: (t: Task) => void
   step: PanelStep
   tasks: Task[]
   weekStart: Date
@@ -46,7 +47,7 @@ export function WeekStepMain({ step, tasks, weekStart, onSelectTask, onThisWeek,
 
   if (step === 'inbox') {
     const inbox = tasks.filter((t) => !t.completed && t.bucket === 'inbox')
-    return <InboxStep tasks={inbox} onOpen={(t) => onSelectTask(t.id)} onThisWeek={onThisWeek} onSomeday={onSomeday} onDone={onDone} />
+    return <InboxStep tasks={inbox} onOpen={(t) => onSelectTask(t.id)} onThisWeek={onThisWeek} onSomeday={onSomeday} onDone={onDone} onDelete={onDelete} />
   }
   if (step === 'between') {
     const waiting = selectWaiting(tasks).filter((r) => !r.checkBack || r.checkBack < weekEnd)
