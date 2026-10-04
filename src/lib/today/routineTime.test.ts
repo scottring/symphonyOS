@@ -15,6 +15,16 @@ function instance(over: Partial<ActionableInstance> = {}): ActionableInstance {
 }
 
 describe('resolveRoutineTime', () => {
+  // Scott, 2026-10-04: Saturday's untimed routines moved to Sunday showed at
+  // "12a". A move written at local midnight without the day-only marker is a
+  // day, not 12:00 AM — unless the routine's own time is midnight.
+  it('a move to a day at midnight, unmarked, is untimed on that day', () => {
+    const sun = new Date(2026, 7, 2)
+    const moved = instance({ date: '2026-08-01', status: 'deferred', deferred_to: new Date(2026, 7, 2, 0, 0).toISOString() })
+    expect(resolveRoutineTime({ time_of_day: null }, moved, sun)).toBeNull()
+    expect(resolveRoutineTime({ time_of_day: '00:00:00' }, moved, sun)).toEqual(new Date(2026, 7, 2, 0, 0))
+  })
+
   it('does not apply a pending override from another day', () => {
     const stale = instance({ deferred_to: at(21).toISOString() })
     const next = new Date(2026, 7, 2)

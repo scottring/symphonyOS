@@ -369,6 +369,19 @@ describe('useActionableInstances', () => {
     })
   })
 
+  // Scott, 2026-10-04: Saturday's untimed routines moved to Sunday showed at
+  // "12a" — a push menu handed reschedule a bare date (local midnight).
+  describe('reschedule to a bare date', () => {
+    it('writes a day-only move, never a 12:00 AM time', async () => {
+      mockFetchResult = createMockActionableInstance({ id: 'inst-1', date: '2026-10-03', status: 'pending' })
+      const { result } = renderHook(() => useActionableInstances())
+      await act(async () => {
+        await result.current.reschedule('routine', 'routine-1', new Date(2026, 9, 3), new Date(2026, 9, 4, 0, 0, 0, 0))
+      })
+      expect(mockUpdate).toHaveBeenCalledWith(expect.objectContaining({ status: 'deferred', planned_on: '2026-10-04' }))
+    })
+  })
+
   describe('markDone', () => {
     it('marks instance as completed', async () => {
       const mockInstance = createMockActionableInstance({ id: 'inst-1' })

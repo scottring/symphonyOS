@@ -66,8 +66,12 @@ export function routineDayState(
   instances: readonly ActionableInstance[],
 ): { completed: boolean; planned: boolean; pinned: boolean; dayBound: boolean; counts: boolean } {
   const instance = instances.find((i) => i.entity_type === 'routine' && i.entity_id === routineId && i.date === dayKey)
-  const completed = instance?.status === 'completed'
-  const planned = instance?.planned_on === dayKey
+  // Moved here from another day (Saturday's routine moved to Sunday): its
+  // instance keeps its own date, so look for the deferral too (2026-10-04).
+  const landed = instances.find((i) => i.entity_type === 'routine' && i.entity_id === routineId && i.status !== 'skipped'
+    && !!i.deferred_to && i.date !== dayKey && localYmd(new Date(i.deferred_to)) === dayKey)
+  const completed = instance?.status === 'completed' || landed?.status === 'completed'
+  const planned = instance?.planned_on === dayKey || !!landed
   // Through the shared resolver, never by reading the column here.
   const pinned = !!item.originalRoutine && isTimelineObligation(item.originalRoutine)
   // Show in Today on, and its rule names this day: one of the day's entries,

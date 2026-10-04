@@ -556,7 +556,12 @@ export function useActionableInstances() {
       const toDateStr = toDateString(toDateTime)
       const originalDateStr = instance.date as string
 
-      if (opts?.dayOnly) {
+      // A move to ANOTHER day at a bare date (local midnight, from a push menu
+      // or a bulk All-day schedule) is a day, not 12:00 AM (2026-10-04:
+      // Saturday's routines drew at "12a" on Sunday). A midnight on the
+      // occurrence's own day is a time someone placed on the grid.
+      const atMidnight = toDateTime.getHours() === 0 && toDateTime.getMinutes() === 0 && toDateTime.getSeconds() === 0
+      if (opts?.dayOnly ?? (entityType === 'routine' && atMidnight && toDateStr !== originalDateStr)) {
         const midnight = new Date(toDateTime)
         midnight.setHours(0, 0, 0, 0)
         // Back onto its own day: no override left to carry — it is simply due.
