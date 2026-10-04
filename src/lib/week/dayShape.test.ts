@@ -10,6 +10,9 @@ describe('freeWindows', () => {
   it('merges overlaps and ignores gaps under half an hour', () => {
     expect(freeWindows([{ s: 9, e: 10 }, { s: 9.5, e: 10.5 }, { s: 10.75, e: 20.75 }])).toEqual([{ s: 7, e: 9 }])
   })
+  it('can ask for longer gaps — the Week page counts an hour or more', () => {
+    expect(freeWindows([{ s: 18, e: 18.5 }, { s: 19, e: 19.5 }], 1)).toEqual([{ s: 7, e: 18 }, { s: 19.5, e: 21 }])
+  })
   it('a day with nothing taken is free from 7a to 9p', () => {
     expect(freeWindows([])).toEqual([{ s: 7, e: 21 }])
   })

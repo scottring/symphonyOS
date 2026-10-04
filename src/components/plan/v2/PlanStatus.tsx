@@ -34,6 +34,9 @@ export interface PlanToolbarProps {
   lookBack?: string | null
   /** Mark the period planned in place. */
   onMark?: () => void
+  /** A period planned in steps (Week, 2026-10-04): one button that opens the
+   *  session — "Plan the week" — the look-back being its first step. */
+  planLabel?: string
   /** The list already has lines: "not marked planned yet", not "not planned". */
   hasLines?: boolean
   viewSwitch?: ReactNode
@@ -61,8 +64,9 @@ function statusText({ period, saved, loading, error, agreedBy, onRetry, hasLines
 /** The page's tools, the view icons and one verb: "Look back at <prev>"
  *  while the last period left open work, else "Mark <period> planned" until
  *  it is. A just-saved period's next step is PlanSavedLine's, not this row's. */
-function controlsOf({ period, saved, loading, error, onPlan, onMark, lookBack, viewSwitch, tools, justSaved }: PlanToolbarProps, guided: boolean) {
+function controlsOf({ period, saved, loading, error, onPlan, onMark, lookBack, viewSwitch, tools, justSaved, planLabel }: PlanToolbarProps, guided: boolean) {
   const verb = guided || justSaved || loading || error ? null
+    : planLabel ? <button type="button" className={saved ? 'pv2-qbtn' : 'pv2-btn'} onClick={onPlan}>{saved ? 'Plan again' : planLabel}</button>
     : lookBack ? <button type="button" className="pv2-btn" onClick={onPlan}>Look back at {lookBack}</button>
       : !saved && onMark ? <button type="button" className="pv2-btn" onClick={onMark}>Mark {period} planned</button>
         : null
@@ -163,10 +167,10 @@ export function PlanMeetingBar({ period, prevName, step, lookBack, why, onStep, 
         {viewSwitch}
         <button type="button" className="pv2-link pv2-quiet" onClick={onLeave}>Leave for now</button>
         {i > 0 && <button type="button" className="pv2-qbtn" onClick={() => onStepKey(steps[i - 1].key)}>← Back</button>}
+        {/* One primary at a time (walkthrough 2026-10-04 #6): Next on every
+            step, marking planned only on the last. */}
         {!last && <button type="button" className="pv2-btn" onClick={() => onStepKey(steps[i + 1].key)}>Next: {steps[i + 1].label} →</button>}
-        {/* Marking planned stays reachable on every step, and is the last
-            step's own verb. */}
-        <button type="button" className={last ? 'pv2-btn' : 'pv2-qbtn'} onClick={onSave}>{saveLabel}</button>
+        {last && <button type="button" className="pv2-btn" onClick={onSave}>{saveLabel}</button>}
         <p className="pv2-sbar-why" aria-live="polite">{why}</p>
       </div>
     )

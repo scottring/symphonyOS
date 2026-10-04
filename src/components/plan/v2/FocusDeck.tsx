@@ -10,6 +10,7 @@ import { MultiAssigneeDropdown } from '@/components/family'
 import { Stamp, type StampKind } from './Stamp'
 import type { LineActions, LineVM } from './PlanLine'
 import { assigneesOf } from '@/lib/planning/v2/planV2'
+import { notesAsText } from '@/lib/htmlUtils'
 
 function stampFor(vm: LineVM): StampKind | null {
   if (vm.task.completed) return 'done'
@@ -36,7 +37,7 @@ function Card({ vm, context, carryTo, children, fresh }: { vm: LineVM; context: 
     <article className={`pv2-card${kind ? ' is-stamped' : ''}`}>
       {kind && <Stamp kind={kind} context={kind === 'carried' ? `to ${carryTo}` : context} on={kind === 'done' ? vm.task.completedAt ?? null : null} fresh={fresh} />}
       <h2 className="pv2-card-title">
-        {vm.task.isGoal ? <span className="pv2-goal" aria-hidden="true" /> : <span className="pv2-dash" aria-hidden="true" />}
+        <span className="pv2-dash" aria-hidden="true" />
         <span>{vm.task.title}</span>
       </h2>
       {children}
@@ -44,14 +45,12 @@ function Card({ vm, context, carryTo, children, fresh }: { vm: LineVM; context: 
   )
 }
 
+// No "Part of" and no goal-only facts: a list above the week is a plain list
+// (Scott, 2026-10-04: "they're just lists").
 function Facts({ vm, actions, members }: { vm: LineVM; actions: LineActions; members: FamilyMember[] }) {
+  const notes = notesAsText(vm.task.notes)
   return (
     <>
-      <div className="pv2-fact"><span className="pv2-k">Part of</span>
-        {vm.partOf
-          ? <span><button type="button" className="pv2-link" onClick={() => actions.openPartOf(vm.partOf!)}>{vm.partOf.title}</button>{vm.partOf.period && <span className="pv2-hint"> · {vm.partOf.period}</span>}</span>
-          : <span className="pv2-hint">Not tied to a goal</span>}
-      </div>
       {members.length > 0 && (
         <div className="pv2-fact"><span className="pv2-k">Who</span>
           {assigneesOf(vm.task).length === 0 && <span className="pv2-hint">No one yet ·</span>}
@@ -60,13 +59,8 @@ function Facts({ vm, actions, members }: { vm: LineVM; actions: LineActions; mem
       )}
       {vm.origin
         ? <div className="pv2-fact"><span className="pv2-k">Earlier</span><span>{vm.origin}</span></div>
-        : !vm.task.isGoal && <div className="pv2-fact"><span className="pv2-k">Now</span><span>{vm.where ?? <span className="pv2-hint">Not in a week yet</span>}</span></div>}
-      {vm.task.isGoal ? <>
-        <div className="pv2-fact"><span className="pv2-k">Notes</span>{vm.task.notes?.trim() ? <span className="pv2-notes">{vm.task.notes.trim()}</span> : <span className="pv2-hint">None yet — add some in its details.</span>}</div>
-        <div className="pv2-fact"><span className="pv2-k">Work</span>{vm.steps?.length ? <ul className="pv2-steps-list">{vm.steps.map((st) => (
-          <li key={st.id}><span className={`pv2-step${st.done ? ' is-done' : ''}`}>{st.title}</span>{st.where && <span className="pv2-hint"> · {st.where}</span>}</li>
-        ))}</ul> : <span className="pv2-hint">No possible work written yet.</span>}</div>
-      </> : vm.task.notes?.trim() && <div className="pv2-fact"><span className="pv2-k">Notes</span><span className="pv2-notes">{vm.task.notes.trim()}</span></div>}
+        : <div className="pv2-fact"><span className="pv2-k">Now</span><span>{vm.where ?? <span className="pv2-hint">Not in a week yet</span>}</span></div>}
+      {notes && <div className="pv2-fact"><span className="pv2-k">Notes</span><span className="pv2-notes">{notes}</span></div>}
     </>
   )
 }

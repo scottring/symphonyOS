@@ -33,34 +33,42 @@ const renderWeek = (tasks: Task[] = []) => render(
   <MemoryRouter><WeekV2 tasks={tasks} weekStart={WEEK} meId="me" isCurrent days={<p>days</p>} onSelectTask={vi.fn()} /></MemoryRouter>,
 )
 
-// Scott, 2026-10-03: planning moves from the source to the list to a day, so
-// the page reads that way — and the month's column holds only its own lines.
-describe('WeekV2 — source first', () => {
-  // 2026-10-03, the grid: the sources on top (the month, then this week's
-  // list), the days across the full width below.
-  it('puts the month and this week’s list on top, the days below', () => {
+// Scott, 2026-10-04: "lists above the week are for looking; the week and the
+// day are for doing". The page is the week's list beside its days; the month
+// is one click away, plain, and nothing on it has to come down.
+describe('WeekV2 — the week at rest', () => {
+  it('is the week’s list beside the days, the month behind one link', () => {
     const { container } = renderWeek([task({ id: 'o1', title: 'Plan Thanksgiving', bucket: 'month', monthStart: new Date(2026, 9, 1) })])
-    fireEvent.click(screen.getByRole('button', { name: /^With / }))
     const page = container.querySelector('.wk-page')!
-    expect([...page.children].map((c) => c.className)).toEqual(['wk-sources', 'pv2-days wk-days'])
-    const sources = [...page.querySelector('.wk-sources')!.children].map((c) => c.getAttribute('aria-label') ?? c.className)
-    expect(sources).toEqual(['October, for reference', 'pv2-wside'])
+    expect([...page.children].map((c) => c.className)).toEqual(['wk-listcol', 'pv2-days wk-days'])
+    expect(screen.queryByText('Plan Thanksgiving')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: /October list/ }))
+    expect([...page.children].map((c) => c.getAttribute('aria-label') ?? c.className)).toEqual(['October, for reference', 'wk-listcol', 'The days'])
+    expect(screen.getByText('Plan Thanksgiving')).toBeInTheDocument()
+    // Remembered, and hidden again from its own heading.
+    expect(localStorage.getItem('symphony-week-ref')).toBe('open')
+    fireEvent.click(screen.getByRole('button', { name: 'Hide' }))
+    expect(screen.queryByText('Plan Thanksgiving')).toBeNull()
   })
 
-  it('the List view keeps the list over the days, with no month', () => {
-    const { container } = renderWeek()
-    fireEvent.click(screen.getByRole('button', { name: 'List' }))
-    const sources = container.querySelector('.wk-sources')!
-    expect([...sources.children].map((c) => c.className)).toEqual(['pv2-wside'])
-    expect(container.querySelector('.wk-days')!.getAttribute('aria-label')).toBe('The days')
+  it('the month is a plain list: no goal marks, no steps, and it stays whole', () => {
+    localStorage.setItem('symphony-week-ref', 'open')
+    renderWeek([
+      task({ id: 'g1', title: 'Plan sabbatical', bucket: 'month', monthStart: new Date(2026, 9, 1), isGoal: true }),
+      task({ id: 'o2', title: 'Toss umbrella', bucket: 'month', monthStart: new Date(2026, 9, 1), completed: true }),
+    ])
+    const ref = screen.getByRole('complementary', { name: 'October, for reference' })
+    expect(ref.querySelector('[data-mark="goal"]')).toBeNull()
+    expect(screen.queryByRole('button', { name: /\+ Step|Week 41’s part/ })).toBeNull()
+    expect(screen.getByText('Toss umbrella')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Add Plan sabbatical to this week' })).toBeInTheDocument()
   })
 
-  it('the month column lists no earlier work and no routines', () => {
+  it('the month lists no earlier work and no routines', () => {
+    localStorage.setItem('symphony-week-ref', 'open')
     h.dayPlan = { unfinished: [{ key: 'task:e1', kind: 'task', id: 'e1', title: 'Transfer plants', completed: false, task: task({ id: 'e1', title: 'Transfer plants', scheduledFor: new Date(2026, 8, 30), isAllDay: true }), context: 'Originally Wednesday' }] }
     renderWeek()
-    fireEvent.click(screen.getByRole('button', { name: /^With / }))
     expect(screen.queryByText('Earlier, not done')).toBeNull()
-    expect(screen.queryByText('Routines with no set time')).toBeNull()
     expect(screen.queryByText('Transfer plants')).toBeNull()
   })
 })
@@ -74,7 +82,7 @@ describe('WeekV2 — earlier work is decided in the look-back', () => {
 
   it('offers the look-back, and shows where the work was meant to happen', () => {
     renderWeek([earlier])
-    fireEvent.click(screen.getByRole('button', { name: 'Look back at last week' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Plan the week' }))
     expect(screen.getByRole('heading', { name: /Transfer plants/ })).toBeTruthy()
     expect(screen.getByText('Originally Wednesday')).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Leave it for now' })).toBeTruthy()
@@ -82,7 +90,7 @@ describe('WeekV2 — earlier work is decided in the look-back', () => {
 
   it('"Carry to this week" puts it on this week’s list, any day', async () => {
     renderWeek([earlier])
-    fireEvent.click(screen.getByRole('button', { name: 'Look back at last week' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Plan the week' }))
     fireEvent.click(screen.getByRole('button', { name: 'Carry to this week' }))
     await waitFor(() => expect(h.gatedUpdate).toHaveBeenCalled())
     const [id, updates] = h.gatedUpdate.mock.calls[0]
@@ -92,7 +100,7 @@ describe('WeekV2 — earlier work is decided in the look-back', () => {
 
   it('"Drop it" lets go of its old day', async () => {
     renderWeek([earlier])
-    fireEvent.click(screen.getByRole('button', { name: 'Look back at last week' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Plan the week' }))
     fireEvent.click(screen.getByRole('button', { name: 'Drop it' }))
     await waitFor(() => expect(h.gatedUpdate).toHaveBeenCalled())
     const [id, updates] = h.gatedUpdate.mock.calls[0]

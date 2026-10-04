@@ -43,3 +43,10 @@ export function htmlToPlainText(html: string): string {
     .replace(/[ \t]+/g, ' ') // Normalize spaces but keep newlines
     .trim()
 }
+
+/** A task's notes as text: the editor stores HTML, older notes are plain.
+ *  (Walkthrough 2026-10-04: a planning card showed "<ul><li><p>Called…".) */
+export function notesAsText(notes: string | undefined | null): string {
+  if (!notes?.trim()) return ''
+  return (/<[a-z][\s\S]*>/i.test(notes) ? htmlToPlainText(notes) : notes).trim()
+}

@@ -32,9 +32,12 @@ describe('WeekRow', () => {
     expect(onOpen).toHaveBeenCalledTimes(1)
   })
 
-  it('a routine says so beside its title', () => {
+  // Scott, 2026-10-04: a ↻ on every routine row was noise; a routine is
+  // something to do, like a task.
+  it('a routine is a thing to do: a check, and no repeat mark', () => {
     inDnd(<WeekRow mark="routine" title="Yard weeding" onOpen={vi.fn()} onToggle={vi.fn()} drag={null} />)
-    expect(screen.getByLabelText('repeats')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Complete Yard weeding' })).toBeInTheDocument()
+    expect(screen.queryByLabelText('repeats')).toBeNull()
   })
 
   it('a month line and a goal draw their own marks and no check', () => {

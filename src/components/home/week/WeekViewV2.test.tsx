@@ -422,9 +422,8 @@ describe('WeekViewV2 journal spread', () => {
     const routines = [createMockRoutine({ id: 'wp', name: 'Water houseplants', time_of_day: null, recurrence_pattern: { type: 'weekly', days: ['sun'] } as RecurrencePattern, show_on_timeline: true })]
     render(<WeekViewV2 {...defaultProps} routines={routines} weekStart={sunday} />)
     const sun = within(screen.getByTestId('journal-day-2026-09-13'))
-    // Untimed routines fold behind one line (2026-10-03).
-    fireEvent.click(sun.getByRole('button', { name: /Routines · 1/ }))
-    expect(within(sun.getByRole('list', { name: 'Routines, Sunday' })).getByText('Water houseplants')).toBeInTheDocument()
+    // A day's own routines read in the day — no fold, no count (2026-10-04).
+    expect(within(sun.getByRole('list', { name: 'Sunday entries' })).getByText('Water houseplants')).toBeInTheDocument()
     expect(screen.getAllByText('Water houseplants')).toHaveLength(1)
     fireEvent.click(screen.getByRole('radio', { name: 'Schedule' }))
     expect(within(screen.getByTestId('allday-2026-09-13')).getByText('Water houseplants')).toBeInTheDocument()
@@ -478,14 +477,12 @@ describe('WeekViewV2 — Journal and Schedule agree', () => {
     }]
     render(<WeekViewV2 {...defaultProps} routines={[createMockRoutine({ id: 'read', name: 'Read', time_of_day: null, recurrence_pattern: { type: 'weekly', days: ['sat'] } })]} weekStart={sunday} />)
     const saturday = within(screen.getByTestId('journal-day-2026-09-19'))
-    // Folded with the day's other untimed routines, and the fold says done.
-    fireEvent.click(await saturday.findByRole('button', { name: /Routines · done/ }))
-    expect(saturday.getByText('Read')).toBeInTheDocument()
+    // In the day, struck: done stays on the page.
+    expect(await saturday.findByText('Read')).toBeInTheDocument()
+    expect(saturday.getByText('Read').closest('li')?.dataset.done).toBe('true')
   })
 
   it('a routine occurrence chosen for Saturday (no time) is an entry in both; one nobody chose is only "available"', async () => {
-    // The fold remembers itself per day on this device; start shut.
-    localStorage.removeItem('symphony-week-fold:2026-09-19')
     instancesMock.rows = [{
       id: 'i1', user_id: 'u', entity_type: 'routine', entity_id: 'chosen', date: '2026-09-19', status: 'pending',
       assignee: null, assigned_to_override: null, deferred_to: null, planned_on: '2026-09-19',
@@ -498,8 +495,7 @@ describe('WeekViewV2 — Journal and Schedule agree', () => {
     ]
     render(<WeekViewV2 {...defaultProps} routines={routines} weekStart={sunday} />)
     const saturday = within(screen.getByTestId('journal-day-2026-09-19'))
-    fireEvent.click(await saturday.findByRole('button', { name: /Routines · 1/ }))
-    const entries = saturday.getByRole('list', { name: 'Routines, Saturday' })
+    const entries = await saturday.findByRole('list', { name: 'Saturday entries' })
     expect(within(entries).getByText('Family reading time')).toBeInTheDocument()
     expect(within(entries).queryByText('Kids clean rooms')).toBeNull()
     expect(saturday.queryByLabelText('Available')).toBeNull()

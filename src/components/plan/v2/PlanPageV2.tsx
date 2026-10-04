@@ -2,6 +2,12 @@
 //
 // The v2 month and season pages (docs/planning/2026-09-28-planning-v2.md).
 //
+// Lists above the week are for looking (docs/superpowers/specs/
+// 2026-10-04-planning-model-design.md): a season is a brainstorm list, a
+// month a plain list written with its season beside it. No goals vs tasks,
+// no steps or pulls from the level above — it is there to read, and it can be
+// hidden. Only a month line may come into a week, quietly, from its menu.
+//
 // Each horizon has its OWN planning meeting and its own plan (Scott and Iris,
 // 2026-09-28). So the page opens on "our plan" — calm, read-only, one toolbar —
 // and the meeting is an explicit mode with its own stopping point. The next
@@ -29,32 +35,28 @@ import { filterTasksForLayers, matchesLayers } from '@/lib/today/domainFilter'
 import { seasonToken } from '@/lib/cadence/seasons'
 import { parseLocalYmd, localYmd } from '@/lib/cadence/config'
 import { lowerPlacement } from '@/lib/placement/model'
-import { supportedGoal, goalOfTask, type SupportLink } from '@/lib/planning/goalSupport'
 import { periodBounds, isCurrentPeriod, selectPeriodTasks } from '@/lib/planning/periodPage'
 import {
-  lineFate, lineDropUpdates, endedIn, closeOutCandidates, landmarksIn, readPlanView, writePlanView, lookBackOpen, renamedForPeriod,
-  type PlanView, type Landmark,
+  lineFate, lineDropUpdates, endedIn, closeOutCandidates, landmarksIn, writePlanView, lookBackOpen, renamedForPeriod,
+  type Landmark,
 } from '@/lib/planning/v2/planV2'
 import type { Task } from '@/types/task'
-import { PlanLine, DraftLine, type LineActions, type LineVM } from './PlanLine'
+import { PlanLine, type LineActions, type LineVM } from './PlanLine'
 import { DatesCalendar, type CalMark } from './DatesCalendar'
 import { useMobile } from '@/hooks/useMobile'
 import { readCadenceConfig, weekStartAnchor } from '@/lib/cadence/config'
 import { weekOfYear } from '@/lib/planning/horizonNumerals'
-import { FocusDeck, CloseOut, type CloseDecision } from './FocusDeck'
+import { CloseOut, type CloseDecision } from './FocusDeck'
 import { PlanMeetingBar, PlanSavedLine, PlanToolbar, PlanToolbarControls, PlanToolbarStatus, type PlanToolbarProps } from './PlanStatus'
 import { GuideAnchor } from '@/components/guide/GuideBar'
 import { EMPTY_TALLY, addToTally, decidedSentence, lookBackWhy, planWhy, nextAfterSave, type Tally } from '@/lib/planning/v2/planTally'
 import { FromPaper } from './FromPaper'
-import { ViewSwitch } from './ViewSwitch'
 import { useAddArea } from './AddArea'
 import { useAssigneeFilter } from '@/hooks/useAssigneeFilter'
 import { planPeopleLens } from '@/lib/planning/peopleLens'
 import { makePlanActions, timingRemoval } from '@/lib/planning/planActions'
 import { useActionableInstances } from '@/hooks/useActionableInstances'
 import { useColumnsFitWindow } from '@/hooks/useColumnsFitWindow'
-import { goalToTaskConversion } from '@/lib/planning/goalConversion'
-import { removeOutcomeToast } from '@/lib/planning/existingActions'
 import { LoadFailedNotice } from '@/components/common/LoadFailedNotice'
 import { useGuidedPlan } from '@/hooks/useGuidedPlan'
 import { useGuideNext } from '@/components/guide/GuideBar'
@@ -76,9 +78,9 @@ function DropZone({ id, data, className, children }: { id: string; data: Record<
 
 function Inner({ level }: { level: Level }) {
   const navigate = useNavigate()
-  const { tasks, loading, error: tasksError, refetch: refetchTasks, toggleTask, updateTask, addTask, deleteTask, pushTask, keepForward, dropCommitment, updateTasksBulk, setGoal, setGoalLink } = useSupabaseTasks()
+  const { tasks, loading, error: tasksError, refetch: refetchTasks, toggleTask, updateTask, addTask, deleteTask, pushTask, keepForward, dropCommitment, updateTasksBulk } = useSupabaseTasks()
   const gated = useGatedTaskActions({ updateTask, pushTask, updateTasksBulk }, (id) => tasks.find((t) => t.id === id))
-  const { layers, soleDomain } = useDomain()
+  const { layers } = useDomain()
   const { members, getCurrentUserMember } = useFamilyMembers()
   const meId = getCurrentUserMember()?.id ?? null
   const [people] = useAssigneeFilter()
@@ -122,25 +124,18 @@ function Inner({ level }: { level: Level }) {
 
   // ── The lines ──────────────────────────────────────────────────────────
   const layered = useMemo(() => filterTasksForLayers(tasks, layers), [tasks, layers])
-  const partOf = useCallback((t: Task): SupportLink | null => (
-    t.isGoal ? supportedGoal(t, layered, goals, seasons) : goalOfTask(t, layered, seasons)
-  ), [layered, goals, seasons])
   const toVM = useCallback((t: Task, b: typeof bounds): LineVM => {
     const fate = lineFate(t, level, b.start, b.end)
     const lower = t.completed ? null : lowerPlacement(t, level, b.start)
     const where = t.completed
       ? `Done${t.completedAt ? ` ${shortDay(t.completedAt)}` : ''}`
       : lower ? lower.label.replace(/^./, (c) => c.toUpperCase()) : null
-    const steps = t.isGoal ? layered.filter((x) => x.goalTaskId === t.id).map((x) => {
-      const lp = x.completed ? null : lowerPlacement(x, level, b.start)
-      return { id: x.id, title: x.title, done: !!x.completed, where: x.completed ? 'done' : lp ? lp.label : null }
-    }) : undefined
     // Brought in from the period before by its look-back: say so at rest.
     const prevStart = periodBounds(level, b.prev, seasons).start.getTime()
     const carriedIn = (t.commitments ?? []).some((c) => c.level === level && c.status === 'carried' && c.periodStart.getTime() === prevStart)
     const carriedFrom = carriedIn ? (level === 'month' ? monthName(b.prev) : periodBounds(level, b.prev, seasons).label.replace(/\s+\d{4}$/, '')) : undefined
-    return { task: t, fate, partOf: partOf(t), where, steps, carriedFrom }
-  }, [level, partOf, layered, seasons])
+    return { task: t, fate, partOf: null, where, carriedFrom }
+  }, [level, seasons])
 
   // The people filter narrows the plan drawn here; the look-back below and
   // the level above (reference) keep their own scope, as Today's pools do.
@@ -154,14 +149,9 @@ function Inner({ level }: { level: Level }) {
     selectPeriodTasks(layered, level, prevBounds.start, isCurrentPeriod(prevBounds, today), meId, seasons).map((t) => toVM(t, prevBounds))
   ), [layered, level, prevBounds, today, meId, seasons, toVM])
 
-  // A goal's steps on the same list read beneath it, not twice (v1 nests them too).
+  // One flat list: nothing nests under a goal (Scott, 2026-10-04).
   const mainAll = lines.filter((l) => l.fate === 'open' || l.fate === 'done')
-  const goalIds = new Set(mainAll.filter((l) => l.task.isGoal).map((l) => l.task.id))
-  const main = mainAll.flatMap((l) => {
-    if (l.task.goalTaskId && goalIds.has(l.task.goalTaskId)) return []
-    if (!l.task.isGoal) return [l]
-    return [l, ...mainAll.filter((s) => s.task.goalTaskId === l.task.id).map((s) => ({ ...s, nested: true }))]
-  })
+  const main = mainAll
   const carried = lines.filter((l) => l.fate === 'carried')
   const someday = lines.filter((l) => l.fate === 'someday')
   const dropped = lines.filter((l) => l.fate === 'dropped')
@@ -170,13 +160,14 @@ function Inner({ level }: { level: Level }) {
   const aboveRows = useMemo(() => {
     if (level === 'month') {
       const b = periodBounds('season', bounds.start, seasons)
+      // The whole list, done lines struck at the end: it keeps its own review.
       return selectPeriodTasks(layered, 'season', b.start, isCurrentPeriod(b, today), meId, seasons)
-        .filter((t) => !t.completed)
-        .map((t) => ({ id: t.id, title: t.title, isGoal: !!t.isGoal, task: t as Task | undefined, goal: undefined as undefined | typeof goals[number] }))
+        .sort((a, c) => Number(a.completed) - Number(c.completed))
+        .map((t) => ({ id: t.id, title: t.title, done: !!t.completed, task: t as Task | undefined }))
     }
     const year = bounds.start.getFullYear()
     return goals.filter((g) => g.year === year && g.status === 'active' && matchesLayers(g.context, layers))
-      .map((g) => ({ id: g.id, title: g.name, isGoal: true, task: undefined as Task | undefined, goal: g }))
+      .map((g) => ({ id: g.id, title: g.name, done: false, task: undefined as Task | undefined }))
   }, [level, bounds.start, seasons, layered, today, meId, goals, layers])
   const aboveName = level === 'month' ? periodBounds('season', bounds.start, seasons).label.replace(/\s+\d{4}$/, '') : String(bounds.start.getFullYear())
 
@@ -193,8 +184,14 @@ function Inner({ level }: { level: Level }) {
   const token = level === 'month' ? monthToken(bounds.start) : seasonToken(bounds.start, seasons)
   const session = usePlanningSession(horizon, token)
   const [meeting, setMeeting] = useState<null | { step: 1 | 2; candidateIds: string[] }>(null)
-  const [view, setViewState] = useState<PlanView>(() => readPlanView(level))
-  const setView = (v: PlanView) => { setViewState(v); writePlanView(level, v) }
+  // The level above beside the list: the season beside a month by default;
+  // the year beside a season only when asked for — it is reference (Scott,
+  // 2026-10-04: "doesn't need to show by default"). Remembered per device.
+  const refKey = `symphony-${level}-ref`
+  const [refOpen, setRefOpenState] = useState(() => {
+    try { const v = localStorage.getItem(refKey); return v ? v === 'open' : level === 'month' } catch { return level === 'month' }
+  })
+  const setRefOpen = (open: boolean) => { setRefOpenState(open); try { localStorage.setItem(refKey, open ? 'open' : 'shut') } catch { /* this visit only */ } }
   // "Plan this week" read as a gate you had to pass before adding anything
   // (Scott, 2026-09-29). It is the REVIEW: close out what the last period
   // left, write this one with the level above beside it, agree it. It asks
@@ -221,7 +218,6 @@ function Inner({ level }: { level: Level }) {
   const [seenStep, setSeenStep] = useState(guideStep)
   if (seenStep !== guideStep) {
     setSeenStep(guideStep)
-    if (guideStep === level) setViewState(readPlanView(level))
   }
   const reviewFinish = (() => {
     if (!guide || !guidedReview) return undefined
@@ -247,8 +243,6 @@ function Inner({ level }: { level: Level }) {
     setTally(EMPTY_TALLY)
     setJustSaved(null)
     setMeeting({ step: candidateIds.length ? 1 : 2, candidateIds })
-    // The level above sits beside the list for the whole meeting.
-    setViewState('ref')
     window.scrollTo({ top: 0 })
   }
   const endMeeting = async (keep: boolean) => {
@@ -258,7 +252,6 @@ function Inner({ level }: { level: Level }) {
       setJustSaved({ detail: decidedSentence(tally, prevName) })
     }
     setMeeting(null)
-    setViewState(readPlanView(level))
   }
   const agreedBy = session.saved
     ? (session.saved.authorId === user?.id ? 'you'
@@ -280,10 +273,6 @@ function Inner({ level }: { level: Level }) {
     rescheduleRoutine: (id, from, when) => rescheduleInstance('routine', id, from, when),
     notify: (m) => showToast(m, 'warning'),
   }), [tasks, gated, setPlanned, rescheduleInstance])
-  // A season names the month it hands work to (v1's lowerMonth, S3-01).
-  const lowerMonth = level === 'season'
-    ? (isCurrent ? new Date(today.getFullYear(), today.getMonth(), 1) : new Date(bounds.start.getFullYear(), bounds.start.getMonth(), 1))
-    : null
   const periodPatch = (b: typeof bounds) => (level === 'month' ? { monthStart: b.start } : { seasonStart: b.start })
   const actions: LineActions = {
     done: async (t) => {
@@ -312,42 +301,16 @@ function Inner({ level }: { level: Level }) {
     details: (t) => openTask(t.id),
     rename: (t, title) => { void updateTask(t.id, { title }) },
     openPartOf: (link) => navigate(link.rung === 'year' ? `/goals/${link.id}` : `/task/${link.id}`),
+    // Only a month line comes down, and only into the week, from its menu
+    // (Scott, 2026-10-04: "probably only very rarely … from the month list").
     setContext: (t, c) => { void gated.updateTask(t.id, { context: c }) },
     today: async (t) => {
       if (!(await planActions.chooseTaskDay(t.id, new Date()))) return
       showToast(`“${t.title}” is on today — any time. ${name}’s plan keeps it.`, 'success', 5000, { label: 'Open Today', onClick: () => navigate('/today') })
     },
     intoLower: level === 'month'
-      ? (isCurrent ? { label: 'Into this week', run: async (t) => { await gated.pushTask(t.id, 'week'); showToast(`“${t.title}” → this week · still on ${name}’s plan.`, 'success', 5000, { label: 'Open week', onClick: () => navigate('/week') }) } } : undefined)
-      : lowerMonth ? { label: `Into ${monthName(lowerMonth)}`, run: async (t) => { await gated.updateTask(t.id, { bucket: 'month', monthStart: lowerMonth }); showToast(`“${t.title}” → ${monthName(lowerMonth)} · still on ${name}’s plan.`, 'success', 5000) } } : undefined,
-    toggleGoal: async (t) => {
-      if (!t.isGoal) { await setGoal(t.id, true); showToast(`“${t.title}” is a goal now.`, 'success', 5000, { label: 'Undo', onClick: () => { void updateTask(t.id, { isGoal: false }) } }); return }
-      const check = goalToTaskConversion(t, tasks)
-      if (!check.ok) { showToast(`“${t.title}” stays a goal. ${check.reason}`, 'info', 8000); return }
-      if ((await updateTask(t.id, { isGoal: false })) === false) { showToast(`Couldn’t change “${t.title}”.`, 'error', 5000); return }
-      showToast(`“${t.title}” is a single action again.`, 'success', 5000, { label: 'Undo', onClick: () => { void updateTask(t.id, { isGoal: true }) } })
-    },
-    unlink: async (t) => {
-      const [msg, kind] = removeOutcomeToast(t.title, await setGoalLink(t.id, null, t.goalTaskId ?? null))
-      showToast(msg, kind, 6000)
-    },
-    // The links "+ Add to …" writes, for a line already here. On a month: a
-    // goal SUPPORTS a season goal; a plain task is one of its steps. On a
-    // season: a goal supports a year goal. A plain season task has no link
-    // up that the page can show, so it isn't offered one.
-    linkUp: {
-      rung: aboveName,
-      goals: aboveRows.filter((r) => r.isGoal).map((r) => ({ id: r.id, title: r.title })),
-      applies: (t) => level === 'month' || !!t.isGoal,
-      run: async (t, goalId) => {
-        const goal = aboveRows.find((r) => r.id === goalId)
-        let ok: boolean
-        if (level === 'season') ok = (await gated.updateTask(t.id, { goalId })) !== false
-        else if (t.isGoal) ok = (await gated.updateTask(t.id, { supportsGoalTaskId: goalId })) !== false
-        else ok = (await setGoalLink(t.id, goalId, t.goalTaskId ?? null)).status === 'ok'
-        showToast(ok ? `“${t.title}” is part of “${goal?.title ?? 'that goal'}” now.` : `Couldn’t link “${t.title}” — try again.`, ok ? 'success' : 'error', 5000)
-      },
-    },
+      ? (isCurrent ? { label: 'Into this week', run: async (t) => { await gated.pushTask(t.id, 'week'); showToast(`“${t.title}” → this week · still on ${name}’s list.`, 'success', 5000, { label: 'Open week', onClick: () => navigate('/week') }) } } : undefined)
+      : undefined,
   }
   const decide = async (vm: LineVM, d: CloseDecision) => {
     const t = vm.task
@@ -369,39 +332,6 @@ function Inner({ level }: { level: Level }) {
       bucket: level === 'month' ? 'month' : 'quarter', ...periodPatch(bounds), context: addArea.area,
     })
   }
-  // A season task taken into the month is the SAME task, now also on the month.
-  const takeIn = async (task: Task) => {
-    await gated.updateTask(task.id, { bucket: 'month', monthStart: bounds.start })
-    showToast(`“${task.title}” is on ${name}’s plan too.`, 'success', 4000)
-  }
-  // A child of a line one rung up, written on this period (the week's "+ Step",
-  // Scott 2026-09-28). Under a plain season task it is a new month task that
-  // remembers where it came from (source_id); under a goal, this period's part
-  // of it — a month goal serving a season goal, a season goal under a year goal.
-  const addFromAbove = async (row: typeof aboveRows[number], title: string) => {
-    if (row.task && !row.isGoal) {
-      await addTask(title, undefined, undefined, undefined, {
-        bucket: 'month', monthStart: bounds.start, sourceId: row.task.id, goalId: row.task.goalId,
-        context: row.task.context ?? soleDomain ?? undefined, assignedTo: meId ?? undefined,
-      })
-    } else if (row.task) {
-      await addTask(title, undefined, undefined, undefined, {
-        bucket: 'month', monthStart: bounds.start, isGoal: true, supportsGoalTaskId: row.task.id,
-        goalId: row.task.goalId, context: row.task.context ?? soleDomain ?? undefined,
-      })
-    } else if (row.goal) {
-      await addTask(title, undefined, undefined, undefined, {
-        bucket: 'quarter', seasonStart: bounds.start, isGoal: true, goalId: row.goal.id, context: row.goal.context ?? soleDomain ?? undefined,
-      })
-    }
-    setChildFor(null)
-    showToast(`“${title}” added to ${name}, as part of “${row.title}”.`, 'success', 4000)
-  }
-  // "+ Add" / "+ Step" open the new line on THIS period's list, naming its
-  // parent — the week's rule (Scott, 2026-09-29), not a form under the line.
-  const [childFor, setChildFor] = useState<typeof aboveRows[number] | null>(null)
-  const [litParent, setLitParent] = useState<string | null>(null)
-  const servedIds = useMemo(() => new Set(mainAll.flatMap((l) => (l.partOf ? [l.partOf.id] : []))), [mainAll])
   // Arriving from the level above's "Choose what … takes on", the page opens
   // ready to write: the cursor in "Add to …", not another button to press
   // (walkthrough 2026-10-02 #11/#16).
@@ -409,12 +339,6 @@ function Inner({ level }: { level: Level }) {
   const location = useLocation()
   const arrivedToWrite = !!(location.state as { write?: boolean } | null)?.write
   useEffect(() => { if (arrivedToWrite && !loading) addRef.current?.focus() }, [arrivedToWrite, loading])
-  const showPartOf = (link: SupportLink) => {
-    const el = document.querySelector<HTMLElement>(`[data-ref-id="${link.id}"]`)
-    if (!el) { actions.openPartOf(link); return }
-    el.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
-    el.classList.remove('is-flash'); void el.offsetWidth; el.classList.add('is-flash')
-  }
 
   // ── The month's calendar takes its lines (the week's drag, one rung up) ──
   // A line dropped on a DAY is dated that day; on a WEEK's number it is given
@@ -426,11 +350,7 @@ function Inner({ level }: { level: Level }) {
   const [dragId, setDragId] = useState<string | null>(null)
   const weekStartsOn = readCadenceConfig().weekStartsOn
   const thisWeekYmd = localYmd(weekStartAnchor(today, weekStartsOn))
-  const monthIds = useMemo(() => {
-    const ids = new Set(main.map((l) => l.task.id))
-    for (const l of main) if (l.task.isGoal) for (const s of l.steps ?? []) ids.add(s.id)
-    return ids
-  }, [main])
+  const monthIds = useMemo(() => new Set(main.map((l) => l.task.id)), [main])
   const placed = useMemo(() => layered.filter((t) => monthIds.has(t.id) && !t.completed), [layered, monthIds])
   const dayMarks = useCallback((ymd: string): CalMark[] => placed.filter((t) => t.scheduledFor && localYmd(t.scheduledFor) === ymd).map((t) => ({ id: t.id, title: t.title })), [placed])
   const weekMarks = useCallback((ymd: string): CalMark[] => placed.filter((t) => !t.scheduledFor && t.weekStart && localYmd(t.weekStart) === ymd && !t.isGoal).map((t) => ({ id: t.id, title: t.title })), [placed])
@@ -480,38 +400,22 @@ function Inner({ level }: { level: Level }) {
   const row = (vm: LineVM, grouped = false) => (
     <PlanLine key={vm.task.id} vm={vm} actions={actions} members={members} nextLabel={nextName}
       open={openLine === vm.task.id} onToggle={() => setOpenLine((o) => (o === vm.task.id ? null : vm.task.id))} editable={inMeeting} draggable={dragOn}
-      onHoverPartOf={view === 'ref' || inMeeting ? setLitParent : undefined} onShowPartOf={showPartOf} hideParent={grouped} />
+      hideParent={grouped} />
   )
   // A goal and its steps are one group, so two columns never split them.
   const lineGroups = (vms: LineVM[], grouped: boolean) =>
     vms.reduce<LineVM[][]>((groups, l) => { if (l.nested && groups.length) groups[groups.length - 1].push(l); else groups.push([l]); return groups }, [])
       .map((g) => g.length === 1 ? row(g[0], grouped) : <li key={`g-${g[0].task.id}`} className="pv2-group"><ul className="pv2-list">{g.map((v) => row(v, grouped))}</ul></li>)
-  // The list reads under the goals one rung up it serves — the year goal a
-  // heading, Fall's part beneath it (Scott, 2026-10-02 #14: "Part of Get
-  // Stacks Data… should be the goal and Plan with Tim and AI should be the
-  // child"). Lines tied to nothing up there come last. Flat while nothing
-  // on the list is tied to a goal above.
-  const parentGroups = (() => {
-    const tops = main.filter((l) => !l.nested)
-    if (!tops.some((l) => l.partOf)) return null
-    const order = new Map(aboveRows.map((r, i) => [r.id, i]))
-    const byParent = new Map<string, { title: string; vms: LineVM[] }>()
-    const loose: LineVM[] = []
-    for (const l of main) {
-      const top = l.nested ? main.find((x) => x.task.id === l.task.goalTaskId) ?? l : l
-      const p = top.partOf
-      if (!p) { loose.push(l); continue }
-      const g = byParent.get(p.id) ?? { title: p.title, vms: [] }
-      g.vms.push(l); byParent.set(p.id, g)
-    }
-    const groups = [...byParent.entries()].sort(([a], [b]) => (order.get(a) ?? 999) - (order.get(b) ?? 999))
-    return { groups, loose }
-  })()
   const section = (label: string, vms: LineVM[]) => vms.length ? <><div className="pv2-sect">{label}</div><ul className="pv2-list">{vms.map((v) => row(v))}</ul></> : null
   const listColumn = (
     <DropZone id="mlist" data={{ kind: 'mlist' }} className="pv2-dropcol">
     <section aria-label={`${name} plan`}>
-      <div className="pv2-colh">{inMeeting ? `${name}’s list` : 'Our plan'}<FromPaper altitude={level} periodStart={bounds.start} tasks={layered} /></div>
+      <div className="pv2-colh">{inMeeting ? `${name}’s list` : level === 'season' ? `${name}: everything we want in it` : `${name}’s list`}<FromPaper altitude={level} periodStart={bounds.start} tasks={layered} /></div>
+      {!refOpen && (
+        <button type="button" className="wk-reflink is-inline" onClick={() => setRefOpen(true)}>
+          <span>{aboveName} list</span><small>for reference</small>
+        </button>
+      )}
       {loading && !main.length ? <p className="pv2-hint">Loading…</p> : null}
       {/* A failed read is not an empty plan: "Nothing on October's plan
           yet" over a list that didn't load invites re-writing it. The hook's
@@ -520,32 +424,9 @@ function Inner({ level }: { level: Level }) {
       {tasksLoadFailed && <LoadFailedNotice variant="inline" className="pv2-hint" buttonClassName="pv2-link"
         title="Your plan didn’t load." onRetry={() => { void refetchTasks() }} />}
       {!loading && !tasksLoadFailed && !main.length && <p className="pv2-hint ds-empty-body">{inMeeting ? 'Nothing yet. Write whatever comes up — no types, no dates needed.'
-        : view === 'ref' && aboveRows.length ? `Nothing on ${name}’s plan yet. Add a line below, or use “+ ${name}’s part” beside a ${aboveName} goal.`
-        : `Nothing on ${name}’s plan yet. Add a line below.`}</p>}
-      {childFor && <ul className="pv2-list"><DraftLine key={childFor.id} parentTitle={childFor.title} isGoal={childFor.isGoal}
-        placeholder={childFor.isGoal ? `${name}’s part of it` : `A step for ${name}`}
-        onAdd={(t) => void addFromAbove(childFor, t)} onCancel={() => setChildFor(null)} /></ul>}
-      {/* A goal and its steps are one group, so two columns never split them. */}
-      {parentGroups ? (
-        <div className={level === 'season' && view === 'list' && !inMeeting ? 'pv2-brain is-groups' : undefined}>
-          {parentGroups.groups.map(([id, g]) => (
-            <section key={id} className="pv2-pgroup" aria-label={`Part of ${g.title}`}>
-              <button type="button" className="pv2-pgroup-h" onClick={() => { const r = aboveRows.find((x) => x.id === id); if (r) { if (r.task) openTask(r.task.id); else navigate(`/goals/${id}`) } }}>
-                <span className="pv2-goal is-small" aria-hidden="true" />{g.title}
-              </button>
-              <ul className="pv2-list">{lineGroups(g.vms, true)}</ul>
-            </section>
-          ))}
-          {parentGroups.loose.length > 0 && (
-            <section className="pv2-pgroup" aria-label={`Not tied to a ${aboveName} goal`}>
-              <div className="pv2-pgroup-h is-loose">Not tied to a {aboveName} goal</div>
-              <ul className="pv2-list">{lineGroups(parentGroups.loose, false)}</ul>
-            </section>
-          )}
-        </div>
-      ) : (
-        <ul className={`pv2-list${level === 'season' && view === 'list' && !inMeeting ? ' pv2-brain' : ''}`}>{lineGroups(main, false)}</ul>
-      )}
+        : level === 'season' ? `Nothing on ${name}’s list yet. Write everything you’d like ${name} to hold — no types, no dates.`
+        : `Nothing on ${name}’s list yet. Add a line below.`}</p>}
+      <ul className={`pv2-list${level === 'season' && !refOpen && !inMeeting ? ' pv2-brain' : ''}`}>{lineGroups(main, false)}</ul>
       {/* Always open (Scott, 2026-09-29: "why is it not possible to add items
           directly to the month list?") — the review is for closing out and
           agreeing, not a gate on writing. */}
@@ -564,28 +445,19 @@ function Inner({ level }: { level: Level }) {
     </section>
     </DropZone>
   )
+  // The level above, plain, to read (Scott, 2026-10-04: "they're just
+  // lists"): no goal marks, no "+ Step" or "+ This month".
   const refColumn = (
     <aside className="pv2-ref" aria-label={`${aboveName}, for reference`}>
-      {/* A section, so its heading hands off to the shelves' below when the
-          columns scroll on their own (layout system §8). */}
       <div className="pv2-refsec">
-      <div className="pv2-colh">{aboveName} <small>(for reference)</small></div>
+      <div className="pv2-colh">{aboveName} <small>for reference</small>
+        <button type="button" className="pv2-link pv2-quiet wk-refhide" onClick={() => setRefOpen(false)}>Hide</button>
+      </div>
       {aboveRows.length ? (
         <ul className="pv2-list">{aboveRows.map((r) => (
-          <li key={r.id} data-ref-id={r.id} className={`pv2-rrow pv2-rrow-sans is-stacked${litParent === r.id || childFor?.id === r.id ? ' is-linked' : ''}`}>
-            {r.isGoal ? <span className="pv2-goal is-small" aria-hidden="true" /> : <span className="pv2-dash" style={{ marginTop: 10 }} aria-hidden="true" />}
-            <button type="button" className="flex-1 text-left" onClick={() => (r.task ? openTask(r.task.id) : navigate(`/goals/${r.id}`))}>{r.title}
-              {/* The parent says this period took it on, as the week's month
-                  column does — in words, not a count (#13, #31). */}
-              {servedIds.has(r.id) && <span className="pv2-stepcount block">In {name}’s plan</span>}</button>
-            <span className="pv2-refacts">
-              {r.task && !r.isGoal && <button type="button" className="pv2-addbtn" onClick={() => void takeIn(r.task!)} aria-label={`Add ${r.title} to ${name}`}>+ {level === 'month' ? 'This month' : name}</button>}
-              {/* Says where the new line goes (walkthrough 2026-09-30: "+ Add"
-                  beside a Fall goal didn't say to what). */}
-              <button type="button" className="pv2-addbtn" onClick={() => setChildFor(r)}
-                title={r.isGoal ? `Add ${name}’s part of “${r.title}” — it stays linked to that goal` : `Add a step of “${r.title}” to ${name}`}
-                aria-label={`Add ${name}’s part of ${r.title}`}>{r.isGoal ? `+ ${name}’s part` : '+ Step'}</button>
-            </span>
+          <li key={r.id} data-ref-id={r.id} className="pv2-rrow pv2-rrow-sans is-stacked">
+            <span className="pv2-dash" style={{ marginTop: 10 }} aria-hidden="true" />
+            <button type="button" className={`flex-1 text-left${r.done ? ' line-through text-neutral-400' : ''}`} onClick={() => (r.task ? openTask(r.task.id) : navigate(`/goals/${r.id}`))}>{r.title}</button>
           </li>
         ))}</ul>
       ) : <p className="pv2-hint ds-empty-body">Nothing written for {aboveName}. That’s fine.</p>}
@@ -598,10 +470,9 @@ function Inner({ level }: { level: Level }) {
       dayMarks={dayMarks} weekMarks={weekMarks} />
   ) : null
 
-  const viewSwitch = <ViewSwitch view={view} onChange={setView} aboveName={aboveName} />
   const toolbar: PlanToolbarProps = {
     period: name, saved: session.saved, loading: session.loading, error: !!session.error, agreedBy,
-    reviewDue, onPlan: startMeeting, onRetry: session.reload, viewSwitch,
+    reviewDue, onPlan: startMeeting, onRetry: session.reload,
     lookBack: reviewIds.length ? prevName : null, onMark: () => void endMeeting(true), hasLines: mainAll.length > 0,
     justSaved: justSaved && {
       detail: justSaved.detail,
@@ -623,20 +494,14 @@ function Inner({ level }: { level: Level }) {
   } else if (meeting?.step === 1) {
     body = <CloseOut lines={prevLines} candidateIds={meeting.candidateIds} members={members} actions={actions} prevName={prevName} nextName={name}
       onDecide={decide} onFinish={() => setMeeting({ ...meeting, step: 2 })} />
-  } else if (view === 'focus') {
-    body = <FocusDeck lines={lines} actions={actions} members={members} nextLabel={nextName} context={`${name} plan`} label={`${name}’s plan`}
-      empty={`Nothing on ${name}’s plan yet. Switch to the list to write the first line.`} />
-  } else if (view === 'ref') {
-    // One shape on every horizon (Scott, 2026-09-30: "above all else, it has
-    // to be consistent"), read left to right as planning moves (Scott,
-    // 2026-10-03: "source list first"): the level above, this period's list,
-    // then its own time (the Month's dates, as the Week's days). The level
-    // above holds only its own lines.
-    body = <div ref={grid} className={`${level === 'month' ? 'pv2-grid3' : 'pv2-grid2 is-ref'} is-colscroll`}>{refColumn}{listColumn}{calendar}</div>
   } else if (level === 'month') {
-    body = <div ref={grid} className="pv2-grid2 is-cal-last is-colscroll">{listColumn}{calendar}</div>
+    // October written with Fall beside it, then its dates (Scott,
+    // 2026-10-04). The level above can be hidden.
+    body = refOpen
+      ? <div ref={grid} className="pv2-grid3 is-colscroll">{refColumn}{listColumn}{calendar}</div>
+      : <div ref={grid} className="pv2-grid2 is-cal-last is-colscroll">{listColumn}{calendar}</div>
   } else {
-    body = listColumn
+    body = refOpen ? <div ref={grid} className="pv2-grid2 is-ref is-colscroll">{refColumn}{listColumn}</div> : listColumn
   }
 
   return (
@@ -664,11 +529,10 @@ function Inner({ level }: { level: Level }) {
           why={meeting!.step === 1 ? lookBackWhy(prevName, name, meeting!.candidateIds.length - (tally.carried + tally.done + tally.someday + tally.dropped + tally.left))
             : planWhy(level, name, aboveName, mainAll.length)}
           onStep={(step) => setMeeting({ ...meeting!, step })}
-          viewSwitch={meeting!.step === 2 && meeting!.candidateIds.length === 0 ? viewSwitch : undefined}
           onLeave={() => void endMeeting(false)} onSave={() => void endMeeting(true)} saveLabel={`Mark ${name} planned`} />
       ) : folded ? <><GuideAnchor /><PlanSavedLine period={name} justSaved={toolbar.justSaved} /></> : <PlanToolbar {...toolbar} />}
 
-      {dragOn && meeting?.step !== 1 && !guidedReview && view !== 'focus' ? (
+      {dragOn && meeting?.step !== 1 && !guidedReview ? (
         <DndContext sensors={sensors} collisionDetection={pointerWithin}
           onDragStart={(e: DragStartEvent) => setDragId(String(e.active.id))} onDragEnd={(e) => void onDragEnd(e)} onDragCancel={() => setDragId(null)}>
           {body}

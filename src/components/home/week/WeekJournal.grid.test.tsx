@@ -33,23 +33,34 @@ describe('WeekJournal — the grid', () => {
     expect(within(weekdays).getAllByTestId(/^journal-day-/)).toHaveLength(5)
   })
 
-  it('a day’s untimed routines fold to one line, and open on a click', () => {
+  // Scott, 2026-10-04: no fold and no count — the every-day routines are
+  // written once above, so a day's own routines read in the day.
+  it('a day’s own routines read in the day, with no fold and no count', () => {
     const days = week(new Date(2026, 9, 3))
     days[0].foldedRoutines = ['Paper mail', 'Kids clean rooms', 'Shower night'].map((t, i) => routine(`r${i}`, t))
     renderGrid(days, { satIndex: 0, sunIndex: 1, sometime: [] })
     const sat = within(screen.getByTestId('journal-day-2026-10-03'))
-    const fold = sat.getByRole('button', { name: /Routines · 3/ })
-    expect(fold).toHaveAttribute('aria-expanded', 'false')
-    expect(sat.queryByText('Paper mail')).toBeNull()
-    fireEvent.click(fold)
     expect(sat.getByText('Paper mail')).toBeInTheDocument()
+    expect(sat.queryByRole('button', { name: /Routines ·/ })).toBeNull()
   })
 
-  it('reads “Routines · done” when every one is ticked', () => {
+  it('writes an every-day routine once, above the days, and opens it from there', () => {
     const days = week(new Date(2026, 9, 3))
-    days[2].foldedRoutines = [routine('a', 'Pack lunches', true), routine('b', 'Take Home Folder', true)]
+    days.forEach((d) => d.entries.push({ id: `routine-jax-${d.key}`, kind: 'routine', title: 'Walk Jax', completed: false, routineId: 'jax', time: new Date(d.date.getFullYear(), d.date.getMonth(), d.date.getDate(), 18) }))
+    const onSelectItem = vi.fn()
+    render(<DndContext><WeekJournal layout="grid" days={days} weekend={{ satIndex: 0, sunIndex: 1, sometime: [] }} spans={[]} onSelectItem={onSelectItem} onToggleEntry={vi.fn()} /></DndContext>)
+    const band = within(screen.getByRole('list', { name: 'Every day' }))
+    fireEvent.click(band.getByRole('button', { name: /Walk Jax/ }))
+    expect(onSelectItem).toHaveBeenCalledWith('routine-jax-2026-10-03')
+    expect(screen.getAllByText('Walk Jax')).toHaveLength(1)
+  })
+
+  it('says how much of each day is free', () => {
+    const days = week(new Date(2026, 9, 3))
+    days[2].entries.push({ id: 'event-x', kind: 'event', title: 'Jury duty', completed: false, time: new Date(2026, 9, 5, 9), end: new Date(2026, 9, 5, 17) })
     renderGrid(days, { satIndex: 0, sunIndex: 1, sometime: [] })
-    expect(within(screen.getByTestId('journal-day-2026-10-05')).getByRole('button', { name: /Routines · done/ })).toBeInTheDocument()
+    expect(within(screen.getByTestId('journal-day-2026-10-05')).getByText('Free 7–9a · 5–9p')).toBeInTheDocument()
+    expect(within(screen.getByTestId('journal-day-2026-10-06')).getByText('Free all day')).toBeInTheDocument()
   })
 
   it('a Sunday-start week has no band; Sometime stands after Saturday', () => {

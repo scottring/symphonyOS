@@ -285,7 +285,6 @@
 .wk-title:hover { color: var(--color-neutral-950); }
 .wk-row[data-mark="routine"] .wk-title, .wk-row[data-mark="line"] .wk-title { color: var(--color-neutral-700); }
 .wk-row[data-done="true"] .wk-title { color: var(--color-neutral-400); text-decoration: line-through; }
-.wk-repeat { display: inline-block; width: 12px; height: 12px; margin-left: 6px; vertical-align: -1px; color: var(--color-neutral-400); }
 .wk-meta { margin-top: 1px; font-size: var(--ds-text-meta, 12px); line-height: 1.35; color: var(--color-neutral-500); }
 .wk-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 4px; }
 .wk-people { display: flex; gap: 2px; padding-top: 1px; }
@@ -302,31 +301,35 @@
 .wk-row.is-flash { animation: pv2-flash 1.2s ease-out; }
 @media (prefers-reduced-motion: reduce) { .wk-row.is-flash { animation: none; } }
 
-/* ── The Week page as a grid (2026-10-03) ─────────────────────────────────
-   The sources on top — the month's plan (two columns) beside this week's
-   list, each capped at about nine rows and scrolling inside itself — and the
-   days across the full width below: the weekend as one band (Saturday ·
-   Sunday · Sometime this weekend), the weekdays side by side. Scott: "this
-   screams out to me: wasted space … maybe in a grid?" */
+/* ── The Week page (2026-10-04) ──────────────────────────────────────────
+   Lists above the week are for looking; the week and the day are for doing.
+   The week's list beside its days; the month's list one click away, plain,
+   at the left when it is open. Above the days, what happens every day is
+   written once (the rhythm); each day keeps only what is particular to it,
+   and says how much of it is free. */
 .wk-page { display: flex; flex-direction: column; gap: 28px; }
-.wk-sources { display: grid; grid-template-columns: minmax(0, 1fr); gap: 40px; align-items: start; --pv2-colh-bg: var(--color-bg-base); }
-.scenery-sky .wk-sources { --pv2-colh-bg: var(--scenery-sky-layers); }
-.wk-page.is-ref .wk-sources { grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); }
-.wk-page:not(.is-ref) .wk-sources > .pv2-wside { max-width: 640px; }
-.wk-sources > * {
-  /* About nine rows, less on a short window (a laptop) so the days start
-     near the top. */
-  position: relative; max-height: min(24rem, 30vh); overflow-y: auto; overflow-x: hidden; scrollbar-width: thin;
-  margin: 0 -14px 0 -22px; padding: 0 14px 0 22px;
-}
-.wk-sources .pv2-wside { position: relative; top: auto; }
-/* The reference column's own rule (index.css: .pv2-week .pv2-ref, no cap)
-   is more specific; the band's cap must win. */
-.pv2-week .wk-sources > .pv2-ref { max-height: min(24rem, 30vh); overflow-y: auto; overflow-x: hidden; }
-@media (max-width: 860px) { .pv2-week .wk-sources > .pv2-ref { max-height: none; overflow: visible; } }
-.wk-sources .pv2-colh { position: sticky; top: 0; z-index: 2; background: var(--pv2-colh-bg); background-attachment: fixed; }
-.wk-sources-month .pv2-list { columns: 240px 3; column-gap: 40px; }
-.wk-sources-month .wk-row { break-inside: avoid; }
+.wk-clear { display: grid; flex-direction: initial; grid-template-columns: minmax(250px, 300px) minmax(0, 1fr); gap: 28px; align-items: start; }
+.wk-clear.has-ref { grid-template-columns: minmax(210px, 260px) minmax(250px, 300px) minmax(0, 1fr); }
+.wk-listcol { position: sticky; top: 76px; display: flex; flex-direction: column; gap: 14px; min-width: 0; max-height: calc(100vh - 100px); overflow-y: auto; overflow-x: hidden; scrollbar-width: thin; }
+.pv2-week .wk-ref { position: sticky; top: 76px; min-width: 0; max-height: calc(100vh - 100px); overflow-y: auto; overflow-x: hidden; scrollbar-width: thin; }
+.pv2-week .wk-ref .wk-row[data-done="true"] .wk-title { color: var(--color-neutral-400); }
+.wk-listhint { margin: -2px 0 10px; font-size: 13px; line-height: 1.4; color: var(--color-neutral-500); }
+.wk-reflink { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; width: 100%; padding: 10px 0 0; border-top: 1px solid var(--color-neutral-200); font-size: 13.5px; font-weight: 500; color: var(--color-primary-700); text-align: left; }
+.wk-reflink small { font-size: 12px; font-weight: 400; color: var(--color-neutral-500); }
+.wk-reflink:hover span { text-decoration: underline; }
+.wk-reflink.is-inline { width: auto; justify-content: flex-start; padding: 0 0 10px; border-top: 0; }
+.wk-refhide { margin-left: auto; font: 500 12.5px var(--font-family-sans); letter-spacing: 0; text-transform: none; }
+.wk-days { min-width: 0; }
+.wk-write { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(260px, 1fr); gap: 44px; align-items: start; max-width: 1240px; }
+
+.wk-rhythm { display: flex; flex-direction: column; gap: 6px; margin: 0 0 14px; padding: 10px 14px; border: 1px solid var(--color-neutral-200); border-radius: 12px; background: color-mix(in srgb, var(--color-bg-elevated) 55%, transparent); }
+.wk-rhythm-row { display: grid; grid-template-columns: 84px minmax(0, 1fr); gap: 10px; align-items: baseline; }
+.wk-rhythm-label { font: 600 11px var(--font-family-sans); letter-spacing: .08em; text-transform: uppercase; color: var(--color-neutral-500); }
+.wk-rhythm ul { display: flex; flex-wrap: wrap; gap: 2px 16px; margin: 0; padding: 0; list-style: none; }
+.wk-rhythm li button { font-size: 13.5px; line-height: 1.5; color: var(--color-neutral-800); text-align: left; }
+.wk-rhythm li button:hover { color: var(--color-neutral-950); text-decoration: underline; }
+.wk-rhythm-time { margin-right: 4px; font-size: 12px; color: var(--color-neutral-500); font-variant-numeric: tabular-nums; }
+.wk-free { margin: 8px 0 0; padding-top: 6px; border-top: 1px dashed var(--color-neutral-200); font-size: 11.5px; font-weight: 500; line-height: 1.35; color: hsl(150 40% 28%); }
 
 .wk-grid { display: flex; flex-direction: column; gap: 18px; }
 .wk-weekend {
@@ -350,25 +353,18 @@ p.wk-dayhint { margin: 8px 0 0; }
 .wk-notes { margin: 2px 0 4px; font-size: 13px; line-height: 1.35; color: var(--color-neutral-600); }
 .wk-dinner { margin: 6px 0 0; font-size: 12.5px; color: var(--color-neutral-500); }
 .wk-empty { margin: 4px 0 0; font-size: 13px; color: var(--color-neutral-500); }
-.wk-fold-btn { display: inline-flex; align-items: center; gap: 4px; margin-top: 4px; padding: 4px 0; font-size: 12.5px; font-weight: 500; color: var(--color-neutral-700); }
-.wk-fold-btn:hover { color: var(--color-neutral-950); }
 
-@media (max-width: 1060px) {
-  .wk-page.is-ref .wk-sources { grid-template-columns: minmax(0, 1fr); }
-  .wk-sources > .pv2-wside { order: -1; }
+@media (max-width: 1100px) {
+  .wk-clear, .wk-clear.has-ref, .wk-write { grid-template-columns: minmax(0, 1fr); }
+  .wk-listcol, .pv2-week .wk-ref { position: static; max-height: none; overflow: visible; }
   .wk-weekdays { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
 @media (max-width: 860px) {
-  /* One column: this week's list, the weekend, the weekdays, the month. */
-  .wk-sources { display: contents; }
-  .wk-sources > * { max-height: none; overflow: visible; margin: 0; padding: 0; }
-  .wk-sources > .pv2-wside { order: 1; }
-  .wk-page > .wk-days { order: 2; }
-  .wk-sources > .wk-sources-month { order: 3; }
-  .wk-sources-month .pv2-list { columns: 1; }
+  /* One column: this week's list, the rhythm, the weekend, the weekdays. */
   .wk-weekend-cells, .wk-weekdays { grid-template-columns: minmax(0, 1fr); }
   .wk-cell { border-left: 0; border-top: 1px solid var(--color-neutral-200); padding: 10px 0 12px; }
   .wk-cell:first-child { border-top: 0; }
+  .wk-rhythm-row { grid-template-columns: minmax(0, 1fr); gap: 2px; }
 }
 /* The journal's big day numeral rule (header > span:first-child) must not
    reach a header whose first word is a label (Sometime this weekend). */
