@@ -4,7 +4,7 @@
 // delete) sits behind one More menu. The row used to carry nine controls.
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react'
 import { createPortal } from 'react-dom'
-import { MoreHorizontal } from 'lucide-react'
+import { MoreHorizontal, CalendarRange, Leaf, NotebookPen, CalendarPlus, Trash2, type LucideIcon } from 'lucide-react'
 import { usePopoverFocus } from '@/hooks/usePopoverFocus'
 import { SchedulePopover } from '@/components/triage/SchedulePopover'
 import { RescheduleGrid } from './RescheduleGrid'
@@ -18,9 +18,9 @@ import type { DayLoad } from '@/lib/today/dayLoad'
 // and a specific date — now comes from `RescheduleGrid`, the same icon grid the
 // reschedule button and the detail panel use, so the Inbox stops being the one
 // place that triages from a plain text list (walk finding S1-09).
-const INBOX_EXTRA_WHEN: { when: TriageWhen; label: string }[] = [
-  { when: 'next-month', label: 'Next month' },
-  { when: 'this-season', label: 'This season' },
+const INBOX_EXTRA_WHEN: { when: TriageWhen; label: string; icon: LucideIcon }[] = [
+  { when: 'next-month', label: 'Next month', icon: CalendarRange },
+  { when: 'this-season', label: 'This season', icon: Leaf },
 ]
 
 const AREAS: { label: string; value: TaskContext | null }[] = [
@@ -42,13 +42,18 @@ interface InboxTriageActionsProps {
   calendarBusy?: boolean
   onSetArea: (context: TaskContext | null) => void
   onDelete: () => void
+  /** The capture's life area now, marked among the chips. */
+  area?: TaskContext | null
 }
 
-const itemClass = 'block w-full rounded-md px-3 py-1.5 text-left text-sm text-neutral-700 hover:bg-primary-50 hover:text-primary-700 disabled:opacity-50'
-const headingClass = 'px-3 pb-0.5 pt-2 text-[10px] font-semibold uppercase tracking-wider text-neutral-400'
+// The whole menu wears RescheduleGrid's tiles (Scott, 2026-10-04: "the top
+// half is beautifully formatted, the bottom half not so much").
+const tileClass = 'flex items-center gap-2 px-2.5 py-2.5 rounded-lg text-sm font-medium whitespace-nowrap text-neutral-700 bg-neutral-50 hover:bg-primary-50 hover:text-primary-700 transition-all duration-150 disabled:opacity-50'
+const headingClass = 'px-3 pb-1 pt-3 text-[10px] font-semibold uppercase tracking-wider text-neutral-400'
+const chipClass = 'flex-1 rounded-full px-2 py-1.5 text-[13px] font-medium transition-colors'
 
 export function InboxTriageActions({
-  title, onPick, onPickDate, onNote, onSendToCalendar, calendarBusy, onSetArea, onDelete, loads,
+  title, onPick, onPickDate, onNote, onSendToCalendar, calendarBusy, onSetArea, onDelete, loads, area,
 }: InboxTriageActionsProps) {
   const [menu, setMenu] = useState<null | 'menu'>(null)
   const [calendarOpen, setCalendarOpen] = useState(false)
@@ -122,19 +127,39 @@ export function InboxTriageActions({
               loads={loads}
             />
           </div>
-          {INBOX_EXTRA_WHEN.map(({ when, label }) => (
-            <button key={when} type="button" role="menuitem" className={itemClass} onClick={choose(() => onPick(when))}>{label}</button>
-          ))}
+          <div className="grid grid-cols-2 gap-2 px-2 pb-1">
+            {INBOX_EXTRA_WHEN.map(({ when, label, icon: Icon }) => (
+              <button key={when} type="button" role="menuitem" data-tile="true" className={tileClass} onClick={choose(() => onPick(when))}>
+                <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />{label}
+              </button>
+            ))}
+          </div>
           <p className={headingClass} aria-hidden="true">Send</p>
-          <button type="button" role="menuitem" className={itemClass} onClick={choose(onNote)}>To a note…</button>
-          <button type="button" role="menuitem" className={itemClass} disabled={calendarBusy}
-            onClick={choose(() => setCalendarOpen(true))}>To calendar…</button>
+          <div className="grid grid-cols-2 gap-2 px-2 pb-1">
+            <button type="button" role="menuitem" data-tile="true" className={tileClass} onClick={choose(onNote)}>
+              <NotebookPen className="h-4 w-4 shrink-0" aria-hidden="true" />To a note…
+            </button>
+            <button type="button" role="menuitem" data-tile="true" className={tileClass} disabled={calendarBusy}
+              onClick={choose(() => setCalendarOpen(true))}>
+              <CalendarPlus className="h-4 w-4 shrink-0" aria-hidden="true" />To calendar…
+            </button>
+          </div>
           <p className={headingClass} aria-hidden="true">Life area</p>
-          {AREAS.map(({ label, value }) => (
-            <button key={label} type="button" role="menuitem" className={itemClass} onClick={choose(() => onSetArea(value))}>{label}</button>
-          ))}
-          <div className="my-1 border-t border-neutral-100" />
-          <button type="button" role="menuitem" className={`${itemClass} text-rose-600 hover:bg-rose-50 hover:text-rose-700`} onClick={choose(onDelete)}>Delete</button>
+          <div role="group" aria-label="Life area" className="mx-2 mb-1 flex gap-1 rounded-full bg-neutral-50 p-1">
+            {AREAS.map(({ label, value }) => {
+              const on = area !== undefined && (area ?? null) === value
+              return (
+                <button key={label} type="button" role="menuitemradio" aria-checked={on}
+                  className={`${chipClass} ${on ? 'bg-white text-primary-700 shadow-sm' : 'text-neutral-600 hover:bg-white hover:text-primary-700'}`}
+                  onClick={choose(() => onSetArea(value))}>{label}</button>
+              )
+            })}
+          </div>
+          <div className="px-2 pb-1 pt-2">
+            <button type="button" role="menuitem" data-tile="true" className={`${tileClass} w-full bg-rose-50 text-rose-700 hover:bg-rose-100 hover:text-rose-800`} onClick={choose(onDelete)}>
+              <Trash2 className="h-4 w-4 shrink-0" aria-hidden="true" />Delete
+            </button>
+          </div>
         </div>,
         document.body,
       )}

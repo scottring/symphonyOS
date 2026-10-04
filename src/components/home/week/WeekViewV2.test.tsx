@@ -419,6 +419,17 @@ describe('WeekViewV2 journal spread', () => {
     expect(screen.queryByRole('switch', { name: 'Routines' })).toBeNull()
   })
 
+  // Scott, 2026-10-04: "details pane not loading when i click on … sometime
+  // this weekend items". A routine's row id carries its day ('-day0'); the
+  // details pane needs the routine's own id.
+  it('a routine clicked in the days opens its details by the routine’s own id', () => {
+    const onSelectItem = vi.fn()
+    const routines = [createMockRoutine({ id: 'wp', name: 'Water houseplants', time_of_day: null, recurrence_pattern: { type: 'weekly', days: ['sun'] } as RecurrencePattern, show_on_timeline: true })]
+    render(<WeekViewV2 {...defaultProps} onSelectItem={onSelectItem} routines={routines} weekStart={sunday} />)
+    fireEvent.click(within(screen.getByTestId('journal-day-2026-09-13')).getByRole('button', { name: 'Water houseplants' }))
+    expect(onSelectItem).toHaveBeenLastCalledWith('routine-wp')
+  })
+
   // Scott, 2026-09-27: Show in Today ON + due = on the day, untimed, in the
   // journal AND Schedule's all-day cell — as on Today.
   it('a due routine with Show in Today on is a Sunday entry in both modes, untimed', () => {

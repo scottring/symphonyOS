@@ -100,15 +100,31 @@ describe('WeekJournal — the grid', () => {
     expect(within(screen.getByTestId('journal-day-2026-10-05')).getByLabelText('Ella')).toBeInTheDocument()
   })
 
-  // "Can't move": add the missing appointment with its time.
-  it('on Can’t move, adding to a day asks for a time', () => {
-    const onAddToDay = vi.fn()
-    render(<DndContext><WeekJournal layout="grid" show="fixed" days={week(new Date(2026, 9, 3))} weekend={{ satIndex: 0, sunIndex: 1, sometime: [] }} spans={[]} onSelectItem={vi.fn()} onToggleEntry={vi.fn()} onAddToDay={onAddToDay} /></DndContext>)
+  // Scott, 2026-10-04: "can't move should be calendared events only".
+  it('on Can’t move, shows only what is on the calendar', () => {
+    const days = week(new Date(2026, 9, 3))
+    days[2].entries.push(
+      { id: 'event-j', kind: 'event', title: 'Jury duty', time: new Date(2026, 9, 5, 8, 30), completed: false },
+      { id: 'routine-m', kind: 'routine', title: 'Math time', time: new Date(2026, 9, 5, 17, 30), completed: false, routineId: 'm' },
+      { id: 'task-t', kind: 'task', title: 'Call the plumber', time: new Date(2026, 9, 5, 10), completed: false },
+    )
+    render(<DndContext><WeekJournal layout="grid" show="fixed" days={days} weekend={{ satIndex: 0, sunIndex: 1, sometime: [] }} spans={[]} onSelectItem={vi.fn()} onToggleEntry={vi.fn()} /></DndContext>)
     const mon = within(screen.getByTestId('journal-day-2026-10-05'))
-    fireEvent.click(mon.getByRole('button', { name: 'Add to Monday' }))
-    fireEvent.change(mon.getByLabelText('New task for Monday'), { target: { value: 'Dentist' } })
-    fireEvent.change(mon.getByLabelText('Time on Monday'), { target: { value: '15:00' } })
-    fireEvent.submit(mon.getByLabelText('New task for Monday').closest('form')!)
-    expect(onAddToDay).toHaveBeenCalledWith(expect.objectContaining({ key: '2026-10-05' }), 'Dentist', '15:00')
+    expect(mon.getByText('Jury duty')).toBeInTheDocument()
+    expect(mon.queryByText('Math time')).toBeNull()
+    expect(mon.queryByText('Call the plumber')).toBeNull()
   })
+
+  it('on Can’t move, adding to a day puts an event on the calendar, at its time', () => {
+    const onAddEvent = vi.fn(); const onAddToDay = vi.fn()
+    render(<DndContext><WeekJournal layout="grid" show="fixed" days={week(new Date(2026, 9, 3))} weekend={{ satIndex: 0, sunIndex: 1, sometime: [] }} spans={[]} onSelectItem={vi.fn()} onToggleEntry={vi.fn()} onAddToDay={onAddToDay} onAddEvent={onAddEvent} /></DndContext>)
+    const mon = within(screen.getByTestId('journal-day-2026-10-05'))
+    fireEvent.click(mon.getByRole('button', { name: 'Add an event to Monday' }))
+    fireEvent.change(mon.getByLabelText('New event on Monday'), { target: { value: 'Dentist' } })
+    fireEvent.change(mon.getByLabelText('Time on Monday'), { target: { value: '15:00' } })
+    fireEvent.submit(mon.getByLabelText('New event on Monday').closest('form')!)
+    expect(onAddEvent).toHaveBeenCalledWith(expect.objectContaining({ key: '2026-10-05' }), 'Dentist', '15:00')
+    expect(onAddToDay).not.toHaveBeenCalled()
+  })
+
 })

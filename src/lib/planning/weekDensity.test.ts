@@ -156,6 +156,15 @@ describe('the pieces the week journal shares with the tiles', () => {
     expect(routineDayState('w', '2026-10-05', window, [])).toMatchObject({ dayBound: false, counts: false })
   })
 
+  // 2026-10-04: Saturday's routine moved to Sunday is Sunday's — planned
+  // there — though its instance is still dated Saturday.
+  it('an occurrence moved onto the day counts as planned there', () => {
+    const state = routineDayState('r', '2026-10-06', routineItem('r', 1, null), [
+      instance({ entity_id: 'r', date: '2026-10-05', status: 'deferred', deferred_to: new Date(2026, 9, 6, 0, 0).toISOString() } as never),
+    ])
+    expect(state).toMatchObject({ planned: true, counts: true })
+  })
+
   it('reports the three facts the journal lanes are built from', () => {
     const state = routineDayState('r', '2026-10-05', routineItem('r', 0, null), [
       instance({ entity_id: 'r', date: '2026-10-05', status: 'completed', planned_on: '2026-10-05' } as never),

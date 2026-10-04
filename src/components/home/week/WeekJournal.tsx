@@ -49,6 +49,9 @@ interface WeekJournalProps {
    *  (Walkthrough 2026-09-20: "there's no way in the UI to add a task
    *  straight to a day on week" — only ⌘K-with-a-date and the hourly grid.) */
   onAddToDay?: (day: JournalDay, title: string, time?: string) => void
+  /** "Can't move": a calendar event on that day at that time (HH:MM). Omitted
+   *  (no calendar connected) = nothing to add there. */
+  onAddEvent?: (day: JournalDay, title: string, time: string) => void
   /** Rows can be picked up. Off on touch-width layouts, where a drag handle
    *  would swallow the scroll. */
   dragEnabled?: boolean
@@ -155,14 +158,14 @@ function Entry({ entry, day, onSelect, onToggle, dragEnabled, timingControl, den
   )
 }
 
-function AddToDay({ day, onAdd, withTime = false }: { day: JournalDay; onAdd: NonNullable<WeekJournalProps['onAddToDay']>; withTime?: boolean }) {
+function AddToDay({ day, onAdd, withTime = false, event = false }: { day: JournalDay; onAdd: NonNullable<WeekJournalProps['onAddToDay']>; withTime?: boolean; event?: boolean }) {
   const [open, setOpen] = useState(false)
   const [draft, setDraft] = useState('')
   const [time, setTime] = useState('')
   const weekday = day.date.toLocaleDateString('en-US', { weekday: 'long' })
   if (!open) {
     return (
-      <button type="button" onClick={() => setOpen(true)} aria-label={`Add to ${weekday}`}
+      <button type="button" onClick={() => setOpen(true)} aria-label={event ? `Add an event to ${weekday}` : `Add to ${weekday}`}
         className="mt-1 inline-flex items-center gap-1 self-start text-[12.5px] text-neutral-400 opacity-0 transition-opacity hover:text-neutral-700 focus-visible:opacity-100 group-hover/day:opacity-100">
         <Plus className="h-3.5 w-3.5" aria-hidden="true" />Add
       </button>
@@ -175,16 +178,16 @@ function AddToDay({ day, onAdd, withTime = false }: { day: JournalDay; onAdd: No
     >
       <input
         autoFocus
-        aria-label={`New task for ${weekday}`}
+        aria-label={event ? `New event on ${weekday}` : `New task for ${weekday}`}
         value={draft}
         onChange={(e) => setDraft(e.target.value)}
         onKeyDown={(e) => { if (e.key === 'Escape') { setDraft(''); setOpen(false) } }}
         onBlur={(e) => { if (!draft.trim() && !e.currentTarget.form?.contains(e.relatedTarget as Node)) setOpen(false) }}
-        placeholder={`Add to ${weekday}…`}
+        placeholder={event ? `An event on ${weekday}…` : `Add to ${weekday}…`}
         className="min-w-0 flex-1 bg-transparent py-0.5 text-[14px] text-neutral-800 placeholder:text-neutral-400 focus:outline-none"
       />
       {/* "Can't move": an appointment has a time (2026-10-04). */}
-      {withTime && <input type="time" aria-label={`Time on ${weekday}`} value={time} onChange={(e) => setTime(e.target.value)}
+      {withTime && <input type="time" aria-label={`Time on ${weekday}`} value={time} required={event} onChange={(e) => setTime(e.target.value)}
         className="w-[6.5rem] shrink-0 rounded border border-neutral-200 bg-transparent px-1 py-0.5 text-[13px] text-neutral-800" />}
     </form>
   )
@@ -299,7 +302,8 @@ function dayFree(day: JournalDay): string {
   return formatFree(freeWindows(busyBlocks(timed.map((e) => ({ start: e.time!, end: e.end }))), 1))
 }
 
-function DayCell({ day, onSelectItem, onToggleEntry, onPlanDrop, onAddToDay, dragEnabled, timingControl, weather, fixedOnly = false, free, memberById, forLabel }: {
+function DayCell({ day, onSelectItem, onToggleEntry, onPlanDrop, onAddToDay, onAddEvent, dragEnabled, timingControl, weather, fixedOnly = false, free, memberById, forLabel }: {
+  onAddEvent?: WeekJournalProps['onAddEvent']
   memberById?: Map<string, FamilyMember>
   forLabel?: WeekJournalProps['forLabel']
   fixedOnly?: boolean
@@ -320,10 +324,11 @@ function DayCell({ day, onSelectItem, onToggleEntry, onPlanDrop, onAddToDay, dra
   const planProps = onPlanDrop ? planDropHandlers((p) => onPlanDrop(day, p), setPlanOver) : {}
   const today = isToday(day.date)
   const past = !today && day.date.getTime() < new Date().setHours(0, 0, 0, 0)
-  // Fixed points: what can't move — events and anything with a time.
+  // "Can't move": what is on the calendar, nothing else (Scott, 2026-10-04:
+  // "should be calendared events only").
   // What is particular to the day — its routines too, now the every-day
   // ones are written once above (no fold, no count).
-  const shown = fixedOnly ? day.entries.filter((e) => e.kind === 'event' || !!e.time) : [...day.entries, ...day.foldedRoutines]
+  const shown = fixedOnly ? day.entries.filter((e) => e.kind === 'event') : [...day.entries, ...day.foldedRoutines]
   return (
     <section ref={setNodeRef} {...planProps} data-testid={`journal-day-${day.key}`}
       aria-label={day.date.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
@@ -355,7 +360,9 @@ function DayCell({ day, onSelectItem, onToggleEntry, onPlanDrop, onAddToDay, dra
           ))}
         </p>
       )}
-      {onAddToDay && <AddToDay day={day} onAdd={onAddToDay} withTime={fixedOnly} />}
+      {fixedOnly
+        ? onAddEvent && <AddToDay day={day} onAdd={(d, title, time) => onAddEvent(d, title, time ?? '09:00')} withTime event />
+        : onAddToDay && <AddToDay day={day} onAdd={onAddToDay} />}
       {free && <p className="wk-free">{free}</p>}
     </section>
   )
@@ -390,6 +397,7 @@ function SometimeCell({ weekend, days, onSelectItem, onToggleEntry, dragEnabled,
 }
 
 function WeekGridDays({ days, weekend, forecast, fixedOnly = false, free, ...cell }: {
+  onAddEvent?: WeekJournalProps['onAddEvent']
   memberById?: Map<string, FamilyMember>
   forLabel?: WeekJournalProps['forLabel']
   fixedOnly?: boolean
@@ -436,7 +444,7 @@ function WeekGridDays({ days, weekend, forecast, fixedOnly = false, free, ...cel
   )
 }
 
-export function WeekJournal({ days, weekend = null, spans, onSelectItem, onToggleEntry, onPlanDrop, onAddToDay: addToDay, dragEnabled: canDrag = true, narrow = false, layout = 'rows', timingControl: timing, forecast, show = 'all', routinesOpen = false, readOnly = false, variant, person, members = [], dailyRoutines = false, forLabel }: WeekJournalProps) {
+export function WeekJournal({ days, weekend = null, spans, onSelectItem, onToggleEntry, onPlanDrop, onAddToDay: addToDay, onAddEvent: addEvent, dragEnabled: canDrag = true, narrow = false, layout = 'rows', timingControl: timing, forecast, show = 'all', routinesOpen = false, readOnly = false, variant, person, members = [], dailyRoutines = false, forLabel }: WeekJournalProps) {
   if (variant === 'strip') return <WeekStrip days={days} onSelectItem={onSelectItem} />
   if (variant === 'shape') return <WeekShape days={days} members={members} person={person} onSelectItem={onSelectItem} />
   // The finished plan is read: nothing moves, nothing is added or retimed.
@@ -479,7 +487,7 @@ export function WeekJournal({ days, weekend = null, spans, onSelectItem, onToggl
       {layout === 'grid' ? (
         <>
           <WeekGridDays days={rhythm.days} weekend={weekend} forecast={forecast} onSelectItem={onSelectItem} onToggleEntry={onToggleEntry}
-            onPlanDrop={readOnly ? undefined : onPlanDrop} onAddToDay={onAddToDay} dragEnabled={dragEnabled} timingControl={timingControl}
+            onPlanDrop={readOnly ? undefined : onPlanDrop} onAddToDay={onAddToDay} onAddEvent={readOnly ? undefined : addEvent} dragEnabled={dragEnabled} timingControl={timingControl}
             fixedOnly={fixedOnly} routinesOpen={routinesOpen} free={free} memberById={memberById} forLabel={forLabel} />
         </>
       ) : days.map((day) => (

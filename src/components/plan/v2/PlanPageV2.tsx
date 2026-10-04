@@ -310,6 +310,7 @@ function Inner({ level }: { level: Level }) {
     // Only a month line comes down, and only into the week, from its menu
     // (Scott, 2026-10-04: "probably only very rarely … from the month list").
     setContext: (t, c) => { void gated.updateTask(t.id, { context: c }) },
+    setNotes: (t, notes) => { void gated.updateTask(t.id, { notes }) },
     today: async (t) => {
       if (!(await planActions.chooseTaskDay(t.id, new Date()))) return
       showToast(`“${t.title}” is on today — any time. ${name}’s plan keeps it.`, 'success', 5000, { label: 'Open Today', onClick: () => navigate('/today') })
@@ -429,7 +430,7 @@ function Inner({ level }: { level: Level }) {
         // The season's brainstorm, as a board of large lines (2026-10-04);
         // under each, what the months wrote for it.
         <ul className={`ps-board${refOpen ? ' is-narrow' : ''}`}>{main.map((vm) => (
-          <LineCard key={vm.task.id} vm={vm} actions={actions} nextLabel={nextName}
+          <LineCard key={vm.task.id} vm={vm} actions={actions} nextLabel={nextName} members={members}
             did={writtenFor(vm.task.id, layered, (t) => (t.monthStart ?? t.weekStart ?? t.scheduledFor ?? t.createdAt).toLocaleDateString('en-US', { month: 'short' }))} />
         ))}</ul>
       ) : <ul className="pv2-list">{lineGroups(main, false)}</ul>}

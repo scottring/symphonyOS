@@ -35,7 +35,19 @@ export function SeasonBand({ start, end, today, marks, name }: {
   }
   const t = (today.getTime() - start.getTime()) / span
   const inside = t >= 0 && t < 1
-  const shown = marks.filter((m) => m.at >= start && m.at < end)
+  // Landmarks a few days apart would write over each other (Scott,
+  // 2026-10-04): each takes the first row where its label clears the last
+  // one, judged against a ~1100px band.
+  const BAND_PX = 1100
+  const rowEnds: number[] = []
+  const shown = marks.filter((m) => m.at >= start && m.at < end).sort((a, b) => a.at.getTime() - b.at.getTime()).map((m) => {
+    const at = (m.at.getTime() - start.getTime() + DAY / 2) / span
+    const half = ((m.title.length * 6.6 + 16) / BAND_PX) / 2
+    let row = rowEnds.findIndex((endAt) => at - half > endAt)
+    if (row === -1) { row = rowEnds.length; rowEnds.push(0) }
+    rowEnds[row] = at + half
+    return { ...m, pos: at, row }
+  })
   const tint = seasonTint(name ?? '')
   return (
     <div className="ps-band" role="img" aria-label={`${name ?? 'The season'}: ${months.map((m) => m.label).join(', ')}`}>
@@ -50,9 +62,11 @@ export function SeasonBand({ start, end, today, marks, name }: {
         </>}
       </div>
       {shown.length > 0 && (
-        <div className="ps-pins">
+        <div className="ps-pins" style={{ height: `${rowEnds.length * 30 + 6}px` }}>
           {shown.map((m) => (
-            <span key={m.id} className="ps-pin" style={{ left: pct((m.at.getTime() - start.getTime() + DAY / 2) / span) }}><i aria-hidden="true" />{m.title}</span>
+            <span key={m.id} data-row={m.row} className="ps-pin" style={{ left: pct(m.pos), top: `${m.row * 30}px` }}>
+              <i aria-hidden="true" />{m.title}
+            </span>
           ))}
         </div>
       )}

@@ -101,6 +101,9 @@ function Inner() {
     details: (t) => navigate(`/goals/${t.id}`),
     rename: (t, title) => { void updateGoal(t.id, { name: title }) },
     openPartOf: () => {},
+    // The line shows a goal's strategy when it has one, else its notes; the
+    // note written here goes back to the field it came from.
+    setNotes: (t, notes) => { const g = byId(t.id); void updateGoal(t.id, g?.strategy?.trim() ? { strategy: notes } : { notes }) },
     setContext: async (t, c) => {
       // Re-tagging moves who may read it; the database refuses a partner who
       // would make the owner's shared goal private (two-account check,
@@ -187,7 +190,7 @@ function Inner() {
         {/* The year's list in large type; under each line, what the seasons
             wrote for it (2026-10-04). */}
         <ul className="ps-yearlist">{main.map((vm) => (
-          <LineCard key={vm.task.id} variant="row" vm={vm} actions={actions} nextLabel={String(year + 1)}
+          <LineCard key={vm.task.id} variant="row" vm={vm} actions={actions} nextLabel={String(year + 1)} members={members}
             did={writtenFor(vm.task.id, layered, (t) => periodBounds('season', t.seasonStart ?? t.monthStart ?? t.createdAt, seasons).label.replace(/\s+\d{4}$/, ''))} />
         ))}</ul>
         {/* Always open, as on every horizon: the review is not a gate on writing. */}
