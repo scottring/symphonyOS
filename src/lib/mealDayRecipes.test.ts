@@ -71,6 +71,17 @@ describe('buildMealDayRecipes', () => {
     expect(days[0].instructions).toEqual(['Sear the chicken.', 'Add lemon.'])
   })
 
+  // The wall's evening card shows tomorrow's dinner with its photo (2026-10-04).
+  it('carries the recipe photo', () => {
+    const days = buildMealDayRecipes({
+      plans: [plan({ weekStartIso: THIS_WEEK, entries: [entry({ id: 'e1', dayOfWeek: 2, recipeId: 'r9' })] })],
+      recipes: [recipe('r9', 'Salmon', { imageUrl: 'https://img.example/salmon.jpg' })],
+      centerDate: WED,
+      slot: 'dinner',
+    })
+    expect(days[0].imageUrl).toBe('https://img.example/salmon.jpg')
+  })
+
   it('crosses the week boundary using the neighbouring plans', () => {
     const days = buildMealDayRecipes({
       plans: [

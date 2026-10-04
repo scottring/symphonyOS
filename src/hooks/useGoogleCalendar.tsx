@@ -77,6 +77,9 @@ export interface CalendarEvent {
   // Set on synthetic meal events (from the meal plan) so the wall can open the
   // linked recipe's stored ingredients/instructions, not just a source URL.
   recipeId?: string | null
+  /** Synthetic meal events: the plan entry's notes ("Roast double sweet
+   *  potatoes — half for Wednesday"), for the wall's dinner cue. */
+  mealNotes?: string | null
   /** Which account the event came from. Absent on cached/synthetic events = Google. */
   provider?: CalendarProvider
 }
