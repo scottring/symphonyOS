@@ -27,15 +27,19 @@ const renderDays = (props: Partial<Parameters<typeof WeekJournal>[0]>) => render
 
 // Scott, 2026-10-03: planning in steps — the days show what each step needs.
 describe('WeekJournal — what each planning step shows', () => {
-  it('Fixed points: only what can’t move; an empty day still shows its date and + Add', () => {
-    renderDays({ show: 'fixed' })
+  it('Fixed points: only what’s on the calendar; an empty day still shows its date and adds an event', () => {
+    renderDays({ show: 'fixed', onAddEvent: vi.fn() })
     const mon = within(screen.getByTestId('journal-day-2026-10-05'))
     expect(mon.getByText('Boxing')).toBeInTheDocument()
     expect(mon.queryByText('Buy a helmet')).toBeNull()
     expect(mon.queryByRole('button', { name: /Routines ·/ })).toBeNull()
     expect(screen.queryByTestId('weekend-sometime')).toBeNull()
     const tue = within(screen.getByTestId('journal-day-2026-10-06'))
-    expect(tue.getByRole('button', { name: 'Add to Tuesday' })).toBeInTheDocument()
+    expect(tue.getByRole('button', { name: 'Add an event to Tuesday' })).toBeInTheDocument()
+  })
+  it('Fixed points with no calendar connected: nothing to add there', () => {
+    renderDays({ show: 'fixed' })
+    expect(within(screen.getByTestId('journal-day-2026-10-06')).queryByRole('button', { name: /^Add/ })).toBeNull()
   })
   it('Fill the week: each day’s routines are open', () => {
     renderDays({ routinesOpen: true })

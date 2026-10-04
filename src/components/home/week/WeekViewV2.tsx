@@ -206,7 +206,7 @@ export function WeekViewV2(props: WeekViewV2Props) {
   // The rail plans MY week — scope it to the current member, as the strip does.
   const { getCurrentUserMember } = useFamilyMembers()
   const meId = getCurrentUserMember()?.id ?? null
-  const { createEvent, deleteEvent } = useGoogleCalendar()
+  const { createEvent, deleteEvent, isConnected: calendarConnected } = useGoogleCalendar()
   // createEvent never updates the held events; without a refetch a
   // quick-created event only showed up after a reload.
   const refetchEvents = useOptionalScheduleActionsContext()?.onRefetchEvents
@@ -764,6 +764,18 @@ export function WeekViewV2(props: WeekViewV2Props) {
     pushAction?.(`Added "${title}"`, () => { void deleteTask(id) })
   }, [addTask, deleteTask, meId, layers, pushAction])
 
+  // "Can't move" adds a real calendar event (Scott, 2026-10-04: "calendared
+  // events only"): an hour at the time given, with Undo, then the range
+  // re-read so it shows at once.
+  const handleAddEvent = useCallback(async (day: JournalDay, title: string, time: string) => {
+    const [h, m] = time.split(':').map(Number)
+    const startTime = new Date(day.date.getFullYear(), day.date.getMonth(), day.date.getDate(), h || 9, m || 0)
+    const result = await createEvent({ title, startTime, endTime: new Date(startTime.getTime() + 60 * 60 * 1000) })
+    if (!result?.id) { showToast(`Couldn’t add “${title}” to the calendar.`, 'error', 6000); return }
+    pushAction?.(`Added "${title}" to the calendar`, () => { void deleteEvent({ eventId: result.id }) })
+    await refetchEvents?.()
+  }, [createEvent, deleteEvent, refetchEvents, pushAction])
+
   const handlePlanDropOnDay = useCallback((day: JournalDay, payload: PlanDragPayload) => {
     void planActions.drop(payload, { type: 'day', day: day.date })
   }, [planActions])
@@ -1026,7 +1038,7 @@ export function WeekViewV2(props: WeekViewV2Props) {
           <WeekV2 tasks={tasks} weekStart={weekAnchor} meId={meId} isCurrent={weekIsCurrent} dragEnabled={false} tools={weekTools}
             onSelectTask={(id) => onSelectItem(`task-${id}`)}
             timingControl={weekTimingControl}
-            renderDays={(o) => <WeekJournal layout="grid" days={journalDays} weekend={journalWeekend} spans={journalSpans} onSelectItem={handleSelectBlock} onToggleEntry={handleJournalToggle} onPlanDrop={handlePlanDropOnDay} onAddToDay={handleAddToDay} narrow dragEnabled={false} timingControl={weekTimingControl} forecast={forecast} {...o} />} />
+            renderDays={(o) => <WeekJournal layout="grid" days={journalDays} weekend={journalWeekend} spans={journalSpans} onSelectItem={handleSelectBlock} onToggleEntry={handleJournalToggle} onPlanDrop={handlePlanDropOnDay} onAddToDay={handleAddToDay} onAddEvent={calendarConnected ? handleAddEvent : undefined} narrow dragEnabled={false} timingControl={weekTimingControl} forecast={forecast} {...o} />} />
         ) : narrow ? (
           <div className="flex flex-col gap-4">
             {weekListFor(openSession)}
@@ -1043,7 +1055,7 @@ export function WeekViewV2(props: WeekViewV2Props) {
           <WeekV2 tasks={tasks} weekStart={weekAnchor} meId={meId} isCurrent={weekIsCurrent} onPlan={openSession} tools={weekTools}
             onSelectTask={(id) => onSelectItem(`task-${id}`)}
             timingControl={weekTimingControl}
-            renderDays={(o) => <WeekJournal layout="grid" days={journalDays} weekend={journalWeekend} spans={journalSpans} onSelectItem={handleSelectBlock} onToggleEntry={handleJournalToggle} onPlanDrop={handlePlanDropOnDay} onAddToDay={handleAddToDay} timingControl={weekTimingControl} forecast={forecast} {...o} />} />
+            renderDays={(o) => <WeekJournal layout="grid" days={journalDays} weekend={journalWeekend} spans={journalSpans} onSelectItem={handleSelectBlock} onToggleEntry={handleJournalToggle} onPlanDrop={handlePlanDropOnDay} onAddToDay={handleAddToDay} onAddEvent={calendarConnected ? handleAddEvent : undefined} timingControl={weekTimingControl} forecast={forecast} {...o} />} />
         ) : !showSchedule ? (
           <>
             {weekListFor(openSession)}

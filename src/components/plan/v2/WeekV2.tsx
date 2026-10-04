@@ -369,7 +369,7 @@ export function WeekV2({ tasks, weekStart, meId, isCurrent, days, renderDays, on
           why={meeting.step === 'lookback' ? lookBackWhy(earlierLines.length ? 'Earlier weeks' : 'Last week', 'this week', meeting.candidateIds.length - (tally.carried + tally.done + tally.someday + tally.dropped + tally.left))
             : meeting.step === 'inbox' ? 'Sort what was captured: into this week, kept for someday, or done.'
             : meeting.step === 'between' ? 'What you’re waiting on, and what to talk through together.'
-            : meeting.step === 'fixed' ? 'These can’t move: appointments, events and timed work. Add anything that’s missing, then plan around them.'
+            : meeting.step === 'fixed' ? 'What’s on the calendar: appointments and events. Add anything missing to the calendar, then plan around it.'
             : meeting.step === 'ahead' ? 'The next three weeks: anything coming that needs a start this week?'
             : meeting.step === 'routines' ? 'Routines, one kind at a time. Each group asks only what it needs.'
             : meeting.step === 'write' ? `Write what you mean to get done this week; give a day only to what needs one. ${monthName} is beside you for reference — nothing on it has to come down.`
@@ -420,7 +420,7 @@ export function WeekV2({ tasks, weekStart, meId, isCurrent, days, renderDays, on
         // The fixed points: the days alone, only what can't move.
         <div className="wk-page">
           <section className="pv2-days wk-days" aria-label="The days">
-            <div className="pv2-colh">What can’t move this week</div>
+            <div className="pv2-colh">On the calendar this week</div>
             {daysFor({ show: 'fixed' })}
           </section>
         </div>
