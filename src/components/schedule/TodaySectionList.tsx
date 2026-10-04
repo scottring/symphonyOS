@@ -554,8 +554,11 @@ export function TodaySectionList({
                       return (
                         <>
                     <ScheduleItem
+                      // A row already in a time slot says when in its lane; the
+                      // chip only repeated it (Scott, 2026-10-04). Untimed rows
+                      // keep it — it is how they get a time.
                       belowTitleAccessory={
-                        item.type === 'task' && taskId && timingFor
+                        item.type === 'task' && taskId && timingFor && !effectiveStartTime(item)
                           ? (() => { const t = tasksMap.get(taskId); return t ? timingFor(t) : undefined })()
                           : undefined
                       }
