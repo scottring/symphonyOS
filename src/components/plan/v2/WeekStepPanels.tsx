@@ -4,6 +4,7 @@
 // fills up beside it (WeekStrip). The panels only draw and report: WeekV2
 // owns the data and the writes.
 import { useState } from 'react'
+import { Trash2 } from 'lucide-react'
 import type { Task } from '@/types/task'
 import type { WaitingRow } from '@/lib/today/waiting'
 import { checkBackLabel } from '@/lib/today/waiting'
@@ -19,12 +20,14 @@ function StepHead({ title, ask }: { title: string; ask: string }) {
 }
 
 // ── Inbox ──────────────────────────────────────────────────────────────────
-export function InboxStep({ tasks, onThisWeek, onSomeday, onDone, onOpen }: {
+export function InboxStep({ tasks, onThisWeek, onSomeday, onDone, onOpen, onDelete }: {
   tasks: Task[]
   onThisWeek: (t: Task) => void
   onSomeday: (t: Task) => void
   onDone: (t: Task) => void
   onOpen: (t: Task) => void
+  /** Throw it away (Scott, 2026-10-04); the host offers Undo. */
+  onDelete?: (t: Task) => void
 }) {
   return (
     <section aria-label="Inbox">
@@ -36,6 +39,9 @@ export function InboxStep({ tasks, onThisWeek, onSomeday, onDone, onOpen }: {
             <button type="button" className="wk-act" aria-label={`This week: ${t.title}`} onClick={() => onThisWeek(t)}>This week</button>
             <button type="button" className="wk-act" aria-label={`Someday: ${t.title}`} onClick={() => onSomeday(t)}>Someday</button>
             <button type="button" className="wk-act" aria-label={`Done: ${t.title}`} onClick={() => onDone(t)}>Done</button>
+            {onDelete && <button type="button" className="wk-act wk-act-icon" aria-label={`Delete ${t.title}`} title="Delete" onClick={() => onDelete(t)}>
+              <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
+            </button>}
           </div>
         </div>
       )) : <p className="wk-none">Your Inbox is empty.</p>}
@@ -78,10 +84,16 @@ export function BetweenStep({ waiting, threads, onOpenTask, onOpenThread }: {
 }
 
 // ── Look ahead ─────────────────────────────────────────────────────────────
-export function AheadStep({ from, landmarks, dated }: { from: Date; landmarks: Landmark[]; dated: Task[] }) {
-  const rows = [
+export function AheadStep({ from, landmarks, dated, onOpen, onStart }: {
+  from: Date; landmarks: Landmark[]; dated: Task[]
+  /** A dated task opens in its details. */
+  onOpen?: (t: Task) => void
+  /** "Start this week": on this week's list, its date kept. */
+  onStart?: (t: Task) => void
+}) {
+  const rows: { key: string; at: Date; title: string; what: string; task?: Task }[] = [
     ...landmarks.map((l) => ({ key: `l-${l.id}`, at: l.start, title: l.title, what: l.end.getTime() !== l.start.getTime() ? `through ${short(l.end)}` : 'all day' })),
-    ...dated.map((t) => ({ key: `t-${t.id}`, at: t.scheduledFor!, title: t.title, what: 'due' })),
+    ...dated.map((t) => ({ key: `t-${t.id}`, at: t.scheduledFor!, title: t.title, what: 'due', task: t })),
   ].sort((a, b) => a.at.getTime() - b.at.getTime())
   return (
     <section aria-label="Look ahead">
@@ -89,7 +101,10 @@ export function AheadStep({ from, landmarks, dated }: { from: Date; landmarks: L
       {rows.length ? (
         <ul style={{ margin: 0, padding: 0, listStyle: 'none' }}>
           {rows.map((r) => (
-            <li key={r.key} className="wk-item"><div>{r.title}<small>{short(r.at)} · {r.what}</small></div><span /></li>
+            <li key={r.key} className="wk-item">
+              <div>{r.task && onOpen ? <button type="button" className="wk-item-title" onClick={() => onOpen(r.task!)}>{r.title}</button> : r.title}<small>{short(r.at)} · {r.what}</small></div>
+              {r.task && onStart ? <div className="wk-acts"><button type="button" className="wk-act" aria-label={`Start ${r.title} this week`} onClick={() => onStart(r.task!)}>Start this week</button></div> : <span />}
+            </li>
           ))}
         </ul>
       ) : <p className="wk-none">Nothing fixed in the next three weeks.</p>}

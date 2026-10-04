@@ -37,12 +37,12 @@ const goTo = (label: string) => fireEvent.click(screen.getAllByRole('button').fi
 
 // Scott, 2026-10-03: "present it stepwise, in an organized way" — one kind of
 // thing at a time, the week filling up beside it.
-describe('WeekV2 — planning in nine steps', () => {
+describe('WeekV2 — planning in steps', () => {
   it('with nothing to look back on, opens on the Inbox, the week beside it', () => {
     const renderDays = renderWeek()
     startSession()
     const bar = within(screen.getByRole('region', { name: /Planning week/ }))
-    expect(bar.getAllByRole('button', { name: /^\d/ }).map((b) => b.textContent)).toEqual(['1Inbox', '2Between us', '3Can’t move', '4Look ahead', '5Routines', '6Already on', '7New tasks', '8The week'])
+    expect(bar.getAllByRole('button', { name: /^\d/ }).map((b) => b.textContent)).toEqual(['1Inbox', '2Between us', '3Can’t move', '4Look ahead', '5Routines', '6Write the week', '7The week'])
     expect(screen.getByRole('region', { name: 'Inbox' })).toHaveTextContent('Call the dentist')
     expect(renderDays).toHaveBeenLastCalledWith(expect.objectContaining({ variant: 'strip' }))
   })
@@ -51,16 +51,28 @@ describe('WeekV2 — planning in nine steps', () => {
     const renderDays = renderWeek()
     startSession()
     goTo('Can’t move')
-    expect(renderDays).toHaveBeenLastCalledWith({ show: 'fixed' })
+    expect(renderDays).toHaveBeenLastCalledWith(expect.objectContaining({ show: 'fixed' }))
   })
 
-  it('Already on: the list and the days, no month', () => {
+  // Scott, 2026-10-04: "the actual actions are on week and day" — write the
+  // week, with the month beside it for reference.
+  it('Write the week: the week’s list, the month beside it', () => {
     renderWeek()
     startSession()
-    goTo('Already on')
-    expect(screen.queryByRole('complementary', { name: /October/ })).toBeNull()
-    goTo('New tasks')
-    expect(screen.getByRole('complementary', { name: /October/ })).toBeInTheDocument()
+    goTo('Write the week')
+    expect(screen.getByRole('region', { name: 'This week\'s list' })).toBeInTheDocument()
+    expect(screen.getByRole('complementary', { name: /October/ })).toHaveTextContent('Plan Thanksgiving')
+  })
+
+  it('one primary at a time: Next on every step, Mark planned only on the last', () => {
+    renderWeek()
+    startSession()
+    const bar = () => within(screen.getByRole('region', { name: /Planning week/ }))
+    expect(bar().queryByRole('button', { name: /^Mark week \d+ planned$/ })).toBeNull()
+    expect(bar().getByRole('button', { name: /^Next: Between us/ })).toBeInTheDocument()
+    goTo('The week')
+    expect(bar().getByRole('button', { name: /^Mark week \d+ planned$/ })).toBeInTheDocument()
+    expect(bar().queryByRole('button', { name: /^Next:/ })).toBeNull()
   })
 
   it('The week: what it’s for, whose week, and each day’s shape — saved with the plan', async () => {
@@ -83,6 +95,6 @@ describe('WeekV2 — planning in nine steps', () => {
     startSession()
     fireEvent.click(screen.getByRole('button', { name: 'Leave for now' }))
     expect(screen.queryByRole('region', { name: /Planning week/ })).toBeNull()
-    expect(renderDays).toHaveBeenLastCalledWith({})
+    expect(renderDays).toHaveBeenLastCalledWith(expect.objectContaining({ dailyRoutines: false }))
   })
 })

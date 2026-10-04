@@ -261,6 +261,10 @@
 .wk-row.has-lane { grid-template-columns: 38px 20px minmax(0, 1fr) auto auto; }
 .wk-row.is-dense { font-size: 14.5px; padding: 5px 11px; column-gap: 8px; }
 .wk-row.is-dense.has-lane { grid-template-columns: 34px 18px minmax(0, 1fr) auto auto; }
+/* In a day's narrow cell the people sit under the title, so the title keeps
+   the width (2026-10-04: "Bedti me routin e"). */
+.wk-row.is-dense.has-lane .wk-people { grid-column: 3; grid-row: 2; padding-top: 3px; }
+.wk-row.is-dense:not(.has-lane) .wk-people { grid-column: 2; grid-row: 2; padding-top: 3px; }
 .wk-row:hover, .wk-row:focus-within {
   background: color-mix(in srgb, var(--color-primary-50) 50%, transparent);
   border-color: var(--color-primary-100);
@@ -278,14 +282,21 @@
 }
 .wk-row.is-dense .wk-check { width: 16px; height: 16px; }
 .wk-check.is-on { border-color: var(--color-primary-600); background: var(--color-primary-600); color: #fff; }
-.wk-glyph.is-event, .wk-glyph.is-line { width: 12px; height: 1.5px; margin-top: 9px; background: var(--color-neutral-400); }
+/* Three kinds, told apart (Scott, 2026-10-04): an event is a blue bar on a
+   tinted row and has no check; a task's check is round; a routine's is a
+   rounded square in sage. A line on a list above the week is a dash. */
+.wk-check.is-routine { border-radius: 5px; border-color: var(--color-sage-500); background: var(--color-sage-50); }
+.wk-check.is-routine.is-on { border-color: var(--color-sage-600); background: var(--color-sage-600); color: #fff; }
+.wk-glyph.is-event { display: block; width: 4px; height: 16px; margin-top: 1px; border-radius: 2px; background: hsl(214 50% 47%); }
+.wk-row[data-mark="event"] { background: hsl(214 45% 95%); }
+.wk-row[data-mark="event"]:hover { background: hsl(214 45% 92%); }
+.wk-glyph.is-line { width: 12px; height: 1.5px; margin-top: 9px; background: var(--color-neutral-400); }
 .wk-glyph.is-goal { width: 9px; height: 9px; margin-top: 5px; transform: rotate(45deg); background: var(--color-primary-700); }
 .wk-titleline { display: inline; }
 .wk-title { text-align: left; color: inherit; overflow-wrap: anywhere; }
 .wk-title:hover { color: var(--color-neutral-950); }
 .wk-row[data-mark="routine"] .wk-title, .wk-row[data-mark="line"] .wk-title { color: var(--color-neutral-700); }
 .wk-row[data-done="true"] .wk-title { color: var(--color-neutral-400); text-decoration: line-through; }
-.wk-repeat { display: inline-block; width: 12px; height: 12px; margin-left: 6px; vertical-align: -1px; color: var(--color-neutral-400); }
 .wk-meta { margin-top: 1px; font-size: var(--ds-text-meta, 12px); line-height: 1.35; color: var(--color-neutral-500); }
 .wk-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 4px; }
 .wk-people { display: flex; gap: 2px; padding-top: 1px; }
@@ -302,31 +313,55 @@
 .wk-row.is-flash { animation: pv2-flash 1.2s ease-out; }
 @media (prefers-reduced-motion: reduce) { .wk-row.is-flash { animation: none; } }
 
-/* ── The Week page as a grid (2026-10-03) ─────────────────────────────────
-   The sources on top — the month's plan (two columns) beside this week's
-   list, each capped at about nine rows and scrolling inside itself — and the
-   days across the full width below: the weekend as one band (Saturday ·
-   Sunday · Sometime this weekend), the weekdays side by side. Scott: "this
-   screams out to me: wasted space … maybe in a grid?" */
+/* ── The Week page (2026-10-04) ──────────────────────────────────────────
+   Lists above the week are for looking; the week and the day are for doing.
+   The week's list beside its days; the month's list one click away, plain,
+   at the left when it is open. Above the days, what happens every day is
+   written once (the rhythm); each day keeps only what is particular to it,
+   and says how much of it is free. */
 .wk-page { display: flex; flex-direction: column; gap: 28px; }
-.wk-sources { display: grid; grid-template-columns: minmax(0, 1fr); gap: 40px; align-items: start; --pv2-colh-bg: var(--color-bg-base); }
-.scenery-sky .wk-sources { --pv2-colh-bg: var(--scenery-sky-layers); }
-.wk-page.is-ref .wk-sources { grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); }
-.wk-page:not(.is-ref) .wk-sources > .pv2-wside { max-width: 640px; }
-.wk-sources > * {
-  /* About nine rows, less on a short window (a laptop) so the days start
-     near the top. */
-  position: relative; max-height: min(24rem, 30vh); overflow-y: auto; overflow-x: hidden; scrollbar-width: thin;
-  margin: 0 -14px 0 -22px; padding: 0 14px 0 22px;
-}
-.wk-sources .pv2-wside { position: relative; top: auto; }
-/* The reference column's own rule (index.css: .pv2-week .pv2-ref, no cap)
-   is more specific; the band's cap must win. */
-.pv2-week .wk-sources > .pv2-ref { max-height: min(24rem, 30vh); overflow-y: auto; overflow-x: hidden; }
-@media (max-width: 860px) { .pv2-week .wk-sources > .pv2-ref { max-height: none; overflow: visible; } }
-.wk-sources .pv2-colh { position: sticky; top: 0; z-index: 2; background: var(--pv2-colh-bg); background-attachment: fixed; }
-.wk-sources-month .pv2-list { columns: 240px 3; column-gap: 40px; }
-.wk-sources-month .wk-row { break-inside: avoid; }
+.wk-clear { display: grid; flex-direction: initial; grid-template-columns: minmax(250px, 300px) minmax(0, 1fr); gap: 28px; align-items: start; }
+.wk-clear.has-ref { grid-template-columns: minmax(210px, 260px) minmax(250px, 300px) minmax(0, 1fr); }
+.wk-listcol { position: sticky; top: 76px; display: flex; flex-direction: column; gap: 14px; min-width: 0; max-height: calc(100vh - 100px); overflow-y: auto; overflow-x: hidden; scrollbar-width: thin; }
+.pv2-week .wk-ref { position: sticky; top: 76px; min-width: 0; max-height: calc(100vh - 100px); overflow-y: auto; overflow-x: hidden; scrollbar-width: thin; }
+.pv2-week .wk-ref .wk-row[data-done="true"] .wk-title { color: var(--color-neutral-400); }
+.wk-listhint { margin: -2px 0 10px; font-size: 13px; line-height: 1.4; color: var(--color-neutral-500); }
+.wk-reflink { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; width: 100%; padding: 10px 0 0; border-top: 1px solid var(--color-neutral-200); font-size: 13.5px; font-weight: 500; color: var(--color-primary-700); text-align: left; }
+.wk-reflink small { font-size: 12px; font-weight: 400; color: var(--color-neutral-500); }
+.wk-reflink:hover span { text-decoration: underline; }
+.wk-reflink.is-inline { width: auto; justify-content: flex-start; padding: 0 0 10px; border-top: 0; }
+.wk-refhide { margin-left: auto; font: 500 12.5px var(--font-family-sans); letter-spacing: 0; text-transform: none; }
+.wk-days { min-width: 0; }
+.wk-write { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(260px, 1fr); gap: 44px; align-items: start; max-width: 1240px; }
+
+.wk-rhythm { display: flex; flex-direction: column; gap: 6px; margin: 0 0 14px; padding: 10px 14px; border: 1px solid var(--color-neutral-200); border-radius: 12px; background: color-mix(in srgb, var(--color-bg-elevated) 55%, transparent); }
+.wk-rhythm-row { display: grid; grid-template-columns: 84px minmax(0, 1fr); gap: 10px; align-items: baseline; }
+.wk-rhythm-label { font: 600 11px var(--font-family-sans); letter-spacing: .08em; text-transform: uppercase; color: var(--color-neutral-500); }
+.wk-rhythm ul { display: flex; flex-wrap: wrap; gap: 2px 16px; margin: 0; padding: 0; list-style: none; }
+.wk-rhythm li button { font-size: 13.5px; line-height: 1.5; color: var(--color-neutral-800); text-align: left; }
+.wk-rhythm li button:hover { color: var(--color-neutral-950); text-decoration: underline; }
+.wk-rhythm-time { margin-right: 4px; font-size: 12px; color: var(--color-neutral-500); font-variant-numeric: tabular-nums; }
+.wk-daysbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 16px; margin: 0 0 12px; }
+.wk-key { display: flex; flex-wrap: wrap; gap: 6px 18px; margin: 0; padding: 0; list-style: none; font-size: 12.5px; color: var(--color-neutral-600); }
+.wk-key li { display: inline-flex; align-items: center; gap: 7px; }
+.wk-key .wk-check { width: 15px; height: 15px; cursor: default; }
+.wk-key .wk-glyph.is-event { margin: 0; height: 14px; }
+.wk-daily { display: inline-flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--color-neutral-700); }
+.wk-daily button { height: 30px; padding: 0 12px; border: 1px solid var(--color-neutral-300); background: var(--color-bg-elevated); font-size: 12.5px; font-weight: 500; color: var(--color-neutral-700); }
+.wk-daily button:first-of-type { border-radius: 8px 0 0 8px; }
+.wk-daily button:last-of-type { border-left: 0; border-radius: 0 8px 8px 0; }
+.wk-daily button.is-on { background: var(--color-primary-700); border-color: var(--color-primary-700); color: #fff; }
+.wk-for { display: block; margin-top: 2px; font-size: 12px; line-height: 1.35; color: hsl(150 32% 30%); }
+.wk-passed { display: block; margin: 2px 0; font-size: 12px; color: hsl(35 70% 32%); }
+.wk-did { display: block; margin-top: 2px; font-size: 12px; line-height: 1.4; color: hsl(150 32% 30%); }
+.pv2-line-did { padding-left: 22px; }
+.wk-did .is-done { color: var(--color-neutral-400); text-decoration: line-through; }
+.wk-check.is-line { border-radius: 4px; border-color: var(--color-neutral-400); }
+.wk-forpick { display: flex; align-items: center; gap: 6px; margin: 2px 0 0 30px; font-size: 12px; color: var(--color-neutral-500); }
+.wk-forpick select { max-width: 100%; min-width: 0; padding: 2px 4px; border: 1px dashed var(--color-neutral-300); border-radius: 6px; background: transparent; font-size: 12px; color: var(--color-neutral-700); }
+.wk-cell.is-past { opacity: .62; }
+.wk-cell.is-today { background: color-mix(in srgb, var(--color-primary-50) 70%, transparent); border-radius: 10px; }
+.wk-free { margin: 8px 0 0; padding-top: 6px; border-top: 1px dashed var(--color-neutral-200); font-size: 11.5px; font-weight: 500; line-height: 1.35; color: hsl(150 40% 28%); }
 
 .wk-grid { display: flex; flex-direction: column; gap: 18px; }
 .wk-weekend {
@@ -350,30 +385,23 @@ p.wk-dayhint { margin: 8px 0 0; }
 .wk-notes { margin: 2px 0 4px; font-size: 13px; line-height: 1.35; color: var(--color-neutral-600); }
 .wk-dinner { margin: 6px 0 0; font-size: 12.5px; color: var(--color-neutral-500); }
 .wk-empty { margin: 4px 0 0; font-size: 13px; color: var(--color-neutral-500); }
-.wk-fold-btn { display: inline-flex; align-items: center; gap: 4px; margin-top: 4px; padding: 4px 0; font-size: 12.5px; font-weight: 500; color: var(--color-neutral-700); }
-.wk-fold-btn:hover { color: var(--color-neutral-950); }
 
-@media (max-width: 1060px) {
-  .wk-page.is-ref .wk-sources { grid-template-columns: minmax(0, 1fr); }
-  .wk-sources > .pv2-wside { order: -1; }
+@media (max-width: 1100px) {
+  .wk-clear, .wk-clear.has-ref, .wk-write { grid-template-columns: minmax(0, 1fr); }
+  .wk-listcol, .pv2-week .wk-ref { position: static; max-height: none; overflow: visible; }
   .wk-weekdays { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
 @media (max-width: 860px) {
-  /* One column: this week's list, the weekend, the weekdays, the month. */
-  .wk-sources { display: contents; }
-  .wk-sources > * { max-height: none; overflow: visible; margin: 0; padding: 0; }
-  .wk-sources > .pv2-wside { order: 1; }
-  .wk-page > .wk-days { order: 2; }
-  .wk-sources > .wk-sources-month { order: 3; }
-  .wk-sources-month .pv2-list { columns: 1; }
+  /* One column: this week's list, the rhythm, the weekend, the weekdays. */
   .wk-weekend-cells, .wk-weekdays { grid-template-columns: minmax(0, 1fr); }
   .wk-cell { border-left: 0; border-top: 1px solid var(--color-neutral-200); padding: 10px 0 12px; }
   .wk-cell:first-child { border-top: 0; }
+  .wk-rhythm-row { grid-template-columns: minmax(0, 1fr); gap: 2px; }
 }
 /* The journal's big day numeral rule (header > span:first-child) must not
    reach a header whose first word is a label (Sometime this weekend). */
 .pv2-days [data-testid="week-journal"] .wk-dayhead > .wk-dayname { font: 500 11px var(--font-family-sans); letter-spacing: .1em; }
-.wk-glyph.is-event, .wk-glyph.is-line { height: 1px; }
+.wk-glyph.is-line { height: 1px; }
 /* Fixed points (a planning step) leaves "Sometime" out: the weekend's two
    days share the band rather than leave an empty third. */
 @media (min-width: 861px) {
@@ -401,6 +429,8 @@ p.wk-dayhint { margin: 8px 0 0; }
 .wk-acts { display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end; }
 .wk-act { border: 1px solid var(--color-neutral-300); background: var(--color-bg-elevated); border-radius: 8px; padding: 5px 10px; font-size: 12.5px; font-weight: 500; color: var(--color-neutral-800); cursor: pointer; }
 .wk-act:hover { border-color: var(--color-neutral-400); }
+.wk-act-icon { display: inline-grid; place-items: center; padding: 5px 8px; color: var(--color-neutral-600); }
+.wk-act-icon:hover { color: var(--color-danger-600); border-color: var(--color-danger-500); }
 .wk-act.is-on { background: var(--color-primary-700); border-color: var(--color-primary-700); color: #fff; }
 .wk-act-link { border: 0; background: none; padding: 0; font-size: 12.5px; font-weight: 500; color: var(--color-primary-700); cursor: pointer; }
 .wk-seg { display: inline-flex; border: 1px solid var(--color-neutral-300); border-radius: 8px; overflow: hidden; }
@@ -417,10 +447,19 @@ p.wk-dayhint { margin: 8px 0 0; }
 .wk-strip-num { font: 200 24px/1 var(--pv2-num, 'Jost'), sans-serif; color: var(--color-neutral-900); }
 .wk-strip-name { font-size: 10.5px; font-weight: 500; letter-spacing: .1em; text-transform: uppercase; color: var(--color-neutral-600); }
 .wk-strip-day ul, .wk-shape-day ul { margin: 6px 0 0; padding: 0; list-style: none; }
-.wk-strip-day li button { display: block; width: 100%; padding: 2px 0; text-align: left; font-size: 12.5px; line-height: 1.3; color: var(--color-neutral-800); overflow-wrap: anywhere; }
-.wk-strip-day li.is-done button { color: var(--color-neutral-400); text-decoration: line-through; }
-.wk-strip-time { margin-right: 4px; color: var(--color-neutral-500); font-variant-numeric: tabular-nums; }
-.wk-strip-more { margin: 4px 0 0; font-size: 12px; color: var(--color-neutral-500); }
+.wk-strip-day.is-today .wk-strip-num, .wk-strip-day.is-today .wk-strip-name { color: var(--color-primary-700); font-weight: 600; }
+.wk-strip-note { margin: 4px 0 0; font: italic 400 12px/1.3 var(--font-family-sans); color: var(--color-neutral-600); }
+.wk-strip-day li { display: grid; grid-template-columns: 10px minmax(0, 1fr); column-gap: 5px; align-items: start; padding: 3px 0; }
+.wk-strip-day li[data-mark="event"] { margin: 1px -4px; padding: 3px 4px; border-radius: 5px; background: hsl(214 45% 95%); }
+.wk-strip-mark { margin-top: 3px; width: 9px; height: 9px; box-sizing: border-box; }
+.wk-strip-mark.is-task { border: 1.5px solid var(--color-neutral-400); border-radius: 50%; }
+.wk-strip-mark.is-routine { border: 1.5px solid var(--color-sage-500); border-radius: 3px; background: var(--color-sage-50); }
+.wk-strip-mark.is-event { width: 3px; height: 13px; margin: 1px 0 0 3px; border-radius: 2px; background: hsl(214 50% 47%); }
+.wk-strip-day li button { display: block; min-width: 0; text-align: left; overflow-wrap: anywhere; }
+.wk-strip-time { display: block; font-size: 10.5px; line-height: 1.2; color: var(--color-neutral-500); font-variant-numeric: tabular-nums; }
+.wk-strip-title { display: block; font-size: 12.5px; line-height: 1.3; color: var(--color-neutral-900); }
+.wk-strip-day li[data-mark="routine"] .wk-strip-title { color: var(--color-neutral-700); }
+.wk-strip-day li.is-done .wk-strip-title { color: var(--color-neutral-400); text-decoration: line-through; }
 .wk-strip-free, .wk-shape-free { margin: 6px 0 0; font-size: 11.5px; font-weight: 500; line-height: 1.35; color: hsl(150 40% 28%); }
 
 .wk-focus { display: block; margin: 0 0 18px; }
@@ -452,5 +491,58 @@ p.wk-dayhint { margin: 8px 0 0; }
   .wk-strip-day, .wk-shape-day { border-left: 0; border-top: 1px solid var(--color-neutral-200); }
   .wk-strip-day:first-child, .wk-shape-day:first-child { border-top: 0; }
 }
-.wk-focus-line { margin: 0 0 14px; font: 400 19px/1.3 var(--font-family-display); color: var(--color-neutral-900); }
+.wk-focus-line { margin: 0 0 16px; font: 400 22px/1.3 var(--font-family-display); color: var(--color-neutral-900); }
+.wk-focus-line em { font-style: italic; }
 .wk-focus-line span { margin-right: 6px; font: 500 11px var(--font-family-sans); letter-spacing: .08em; text-transform: uppercase; color: var(--color-neutral-500); }
+
+/* ── Season and Year, drawn (2026-10-04) ─────────────────────────────────
+   Scott: "larger fonts and maybe some graphical components for the season
+   and year pages". The season's months as a band, the year as a ribbon of
+   seasons, and the lists in large type with what the level below wrote. */
+.ps-band { margin: 6px 0 28px; }
+.ps-band-track, .ps-ribbon-track { position: relative; height: 84px; border-radius: 14px; overflow: hidden; background: var(--color-neutral-100); }
+.ps-band-month { position: absolute; top: 0; height: 100%; box-sizing: border-box; padding: 10px 12px; border-left: 1px solid rgba(255, 255, 255, .7); font: 600 11px var(--font-family-sans); letter-spacing: .12em; text-transform: uppercase; color: hsl(28 30% 30%); }
+.ps-band-month:first-child { border-left: 0; }
+.ps-lived { position: absolute; left: 0; top: 0; bottom: 0; background: rgba(31, 39, 51, .09); pointer-events: none; }
+.ps-today { position: absolute; top: 0; bottom: 0; width: 2px; background: var(--color-neutral-800); }
+.ps-today span { position: absolute; left: 6px; bottom: 8px; font: 600 11px var(--font-family-sans); color: var(--color-neutral-800); white-space: nowrap; }
+.ps-pins { position: relative; height: 34px; margin-top: 8px; }
+.ps-pin { position: absolute; top: 0; display: flex; flex-direction: column; align-items: center; transform: translateX(-50%); font-size: 12px; color: var(--color-neutral-700); white-space: nowrap; }
+.ps-pin i { width: 8px; height: 8px; margin-bottom: 4px; border-radius: 50%; background: hsl(22 55% 50%); }
+.ps-ribbon { margin: 6px 0 30px; }
+.ps-ribbon-seasons { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); margin-bottom: 6px; }
+.ps-ribbon-seasons span { padding: 0 8px; font: 600 11px var(--font-family-sans); letter-spacing: .12em; text-transform: uppercase; color: var(--color-neutral-600); }
+.ps-ribbon-track { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); height: 64px; }
+.ps-ribbon-month { display: flex; align-items: flex-end; padding: 8px; border-left: 1px solid rgba(255, 255, 255, .7); font: 500 12px var(--font-family-sans); color: var(--color-neutral-700); }
+.ps-ribbon-month:first-child { border-left: 0; }
+.ps-ribbon-month.is-now { font-weight: 700; color: var(--color-neutral-900); }
+
+.ps-board { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; margin: 4px 0 14px; padding: 0; list-style: none; }
+.ps-board.is-narrow { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.ps-yearlist { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 56px; margin: 0 0 14px; padding: 0; list-style: none; }
+.ps-line.is-card { display: flex; flex-direction: column; gap: 8px; min-height: 84px; padding: 16px 16px 14px; border: 1px solid var(--color-neutral-200); border-radius: 14px; background: var(--color-bg-elevated); }
+.ps-line.is-row { padding: 14px 0; border-bottom: 1px solid var(--color-neutral-200); }
+.ps-line-main { display: grid; grid-template-columns: 20px minmax(0, 1fr) auto; column-gap: 12px; align-items: start; }
+.ps-tick { display: grid; place-items: center; width: 20px; height: 20px; margin-top: 4px; border: 1.5px solid var(--color-neutral-400); border-radius: 5px; background: var(--color-bg-elevated); color: transparent; cursor: pointer; }
+.ps-tick.is-on { border-color: var(--color-neutral-600); background: var(--color-neutral-600); color: #fff; }
+.ps-line-title { text-align: left; font: 400 22px/1.22 var(--font-family-display); color: var(--color-neutral-900); overflow-wrap: anywhere; }
+.ps-line.is-row .ps-line-title { font-size: 26px; }
+.ps-line-title:hover { color: var(--color-neutral-950); text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 4px; }
+.ps-line.is-done .ps-line-title { color: var(--color-neutral-400); text-decoration: line-through; }
+.ps-line.is-muted { opacity: .6; }
+.ps-line-menu { opacity: .35; transition: opacity .12s; }
+.ps-line:hover .ps-line-menu, .ps-line:focus-within .ps-line-menu { opacity: 1; }
+.ps-line-from { margin: 0 0 0 32px; font-size: 12px; color: var(--color-neutral-500); }
+.ps-did { display: flex; flex-direction: column; gap: 2px; margin: 0 0 0 32px; font-size: 12.5px; line-height: 1.45; color: hsl(150 32% 30%); }
+.ps-did b { margin-right: 8px; font-size: 10.5px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: hsl(30 50% 36%); }
+.ps-did .is-done { color: var(--color-neutral-400); text-decoration: line-through; }
+.pv2-page:is(.is-season, .is-year) .pv2-write input { font: 400 20px var(--font-family-display); }
+@media (max-width: 1100px) { .ps-board { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 760px) {
+  .ps-board, .ps-board.is-narrow, .ps-yearlist { grid-template-columns: minmax(0, 1fr); }
+  .ps-band-track { height: 64px; }
+  .ps-ribbon-month { font-size: 10px; padding: 6px 3px; }
+  .ps-ribbon-seasons span { font-size: 9.5px; padding: 0 3px; }
+}
+/* The ribbon's month names sit at the bottom; its "today" reads at the top. */
+.ps-ribbon-track .ps-today span { top: 6px; bottom: auto; }

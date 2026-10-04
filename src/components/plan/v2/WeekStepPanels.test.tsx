@@ -19,6 +19,17 @@ describe('InboxStep', () => {
   })
 })
 
+describe('InboxStep — trash', () => {
+  // Scott, 2026-10-04: "we also need a trash button for inbox items".
+  it('each capture can be thrown away', () => {
+    const onDelete = vi.fn()
+    const t = createMockTask({ id: 'c1', title: 'event: FedEx Delivery', bucket: 'inbox' })
+    render(<InboxStep tasks={[t]} onThisWeek={vi.fn()} onSomeday={vi.fn()} onDone={vi.fn()} onOpen={vi.fn()} onDelete={onDelete} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Delete event: FedEx Delivery' }))
+    expect(onDelete).toHaveBeenCalledWith(t)
+  })
+})
+
 describe('BetweenStep', () => {
   it('shows what you’re waiting on and the threads to talk through', () => {
     const t = createMockTask({ id: 'w1', title: 'Plumber quote', isWaiting: true, waitingFor: 'Joe' })
@@ -38,6 +49,18 @@ describe('AheadStep', () => {
     const rows = screen.getAllByRole('listitem').map((li) => li.textContent)
     expect(rows[0]).toMatch(/Coppermine signup closes/)
     expect(rows[1]).toMatch(/No school/)
+  })
+})
+
+describe('AheadStep — acting on what’s coming', () => {
+  it('a dated task opens, and can be started this week', () => {
+    const onOpen = vi.fn(), onStart = vi.fn()
+    const t = createMockTask({ id: 'd', title: 'Coppermine signup closes', scheduledFor: new Date(2026, 9, 11), isAllDay: true })
+    render(<AheadStep from={new Date(2026, 9, 10)} landmarks={[]} dated={[t]} onOpen={onOpen} onStart={onStart} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Coppermine signup closes' }))
+    expect(onOpen).toHaveBeenCalledWith(t)
+    fireEvent.click(screen.getByRole('button', { name: 'Start Coppermine signup closes this week' }))
+    expect(onStart).toHaveBeenCalledWith(t)
   })
 })
 

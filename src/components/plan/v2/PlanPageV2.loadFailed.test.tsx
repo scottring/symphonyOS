@@ -58,7 +58,7 @@ describe('PlanPageV2 — the plan list after a failed load', () => {
     const list = screen.getByRole('region', { name: /plan$/ })
     const notice = within(list).getByRole('alert')
     expect(notice).toHaveTextContent('Your plan didn’t load. It’s safe — this is a connection problem.')
-    expect(within(list).queryByText(/Nothing on .*’s plan yet/)).toBeNull()
+    expect(within(list).queryByText(/Nothing on .*’s list yet/)).toBeNull()
     fireEvent.click(within(notice).getByRole('button', { name: 'Try again' }))
     expect(tasksHook.refetch).toHaveBeenCalledOnce()
   })
@@ -66,7 +66,7 @@ describe('PlanPageV2 — the plan list after a failed load', () => {
   it('an empty plan that did load keeps its empty copy', () => {
     renderMonth()
     const list = screen.getByRole('region', { name: /plan$/ })
-    expect(within(list).getByText(/Nothing on .*’s plan yet/)).toBeInTheDocument()
+    expect(within(list).getByText(/Nothing on .*’s list yet/)).toBeInTheDocument()
     expect(within(list).queryByRole('alert')).toBeNull()
   })
 })

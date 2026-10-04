@@ -33,23 +33,35 @@ describe('WeekJournal — the grid', () => {
     expect(within(weekdays).getAllByTestId(/^journal-day-/)).toHaveLength(5)
   })
 
-  it('a day’s untimed routines fold to one line, and open on a click', () => {
+  // Scott, 2026-10-04: no fold and no count — the every-day routines are
+  // written once above, so a day's own routines read in the day.
+  it('a day’s own routines read in the day, with no fold and no count', () => {
     const days = week(new Date(2026, 9, 3))
     days[0].foldedRoutines = ['Paper mail', 'Kids clean rooms', 'Shower night'].map((t, i) => routine(`r${i}`, t))
     renderGrid(days, { satIndex: 0, sunIndex: 1, sometime: [] })
     const sat = within(screen.getByTestId('journal-day-2026-10-03'))
-    const fold = sat.getByRole('button', { name: /Routines · 3/ })
-    expect(fold).toHaveAttribute('aria-expanded', 'false')
-    expect(sat.queryByText('Paper mail')).toBeNull()
-    fireEvent.click(fold)
     expect(sat.getByText('Paper mail')).toBeInTheDocument()
+    expect(sat.queryByRole('button', { name: /Routines ·/ })).toBeNull()
   })
 
-  it('reads “Routines · done” when every one is ticked', () => {
+  // Scott, 2026-10-04: the every-day box had no job here — "take it out".
+  it('leaves every-day routines off the week; they still take their time', () => {
     const days = week(new Date(2026, 9, 3))
-    days[2].foldedRoutines = [routine('a', 'Pack lunches', true), routine('b', 'Take Home Folder', true)]
+    days.forEach((d) => d.entries.push({ id: `routine-jax-${d.key}`, kind: 'routine', title: 'Walk Jax', completed: false, routineId: 'jax', time: new Date(d.date.getFullYear(), d.date.getMonth(), d.date.getDate(), 18), end: new Date(d.date.getFullYear(), d.date.getMonth(), d.date.getDate(), 19) }))
+    vi.useFakeTimers({ toFake: ['Date'] }); vi.setSystemTime(new Date(2026, 9, 3, 9))
     renderGrid(days, { satIndex: 0, sunIndex: 1, sometime: [] })
-    expect(within(screen.getByTestId('journal-day-2026-10-05')).getByRole('button', { name: /Routines · done/ })).toBeInTheDocument()
+    vi.useRealTimers()
+    expect(screen.queryByText('Walk Jax')).toBeNull()
+    expect(screen.queryByRole('region', { name: 'Every week' })).toBeNull()
+    expect(within(screen.getByTestId('journal-day-2026-10-05')).getByText('Free 7a–6p · 7–9p')).toBeInTheDocument()
+  })
+
+  it('says how much of each day is free', () => {
+    const days = week(new Date(2026, 9, 3))
+    days[2].entries.push({ id: 'event-x', kind: 'event', title: 'Jury duty', completed: false, time: new Date(2026, 9, 5, 9), end: new Date(2026, 9, 5, 17) })
+    renderGrid(days, { satIndex: 0, sunIndex: 1, sometime: [] })
+    expect(within(screen.getByTestId('journal-day-2026-10-05')).getByText('Free 7–9a · 5–9p')).toBeInTheDocument()
+    expect(within(screen.getByTestId('journal-day-2026-10-06')).getByText('Free all day')).toBeInTheDocument()
   })
 
   it('a Sunday-start week has no band; Sometime stands after Saturday', () => {
@@ -58,5 +70,45 @@ describe('WeekJournal — the grid', () => {
     expect(within(band).getAllByTestId(/^(journal-day-|weekend-sometime)/).map((el) => el.getAttribute('data-testid')))
       .toEqual(['journal-day-2026-10-10', 'weekend-sometime'])
     expect(within(screen.getAllByRole('region', { name: 'Weekdays' })[0]).getAllByTestId(/^journal-day-/)).toHaveLength(6)
+  })
+
+  it('a done timed thing still took its time; a past day says nothing about free time', () => {
+    vi.useFakeTimers({ toFake: ['Date'] }); vi.setSystemTime(new Date(2026, 9, 5, 12))
+    const days = week(new Date(2026, 9, 3))
+    days[2].entries.push({ id: 'task-x', kind: 'task', title: 'Dentist', completed: true, time: new Date(2026, 9, 5, 9), end: new Date(2026, 9, 5, 17) })
+    days[0].entries.push({ id: 'task-y', kind: 'task', title: 'Porch', completed: false })
+    renderGrid(days, { satIndex: 0, sunIndex: 1, sometime: [] })
+    expect(within(screen.getByTestId('journal-day-2026-10-05')).getByText('Free 7–9a · 5–9p')).toBeInTheDocument()
+    expect(within(screen.getByTestId('journal-day-2026-10-03')).queryByText(/^Free|No free time/)).toBeNull()
+    vi.useRealTimers()
+  })
+
+  // Scott, 2026-10-04: "a way to hide daily routines … and show them".
+  it('shows every-day routines in their days when asked', () => {
+    const days = week(new Date(2026, 9, 3))
+    days.forEach((d) => d.entries.push({ id: `routine-jax-${d.key}`, kind: 'routine', title: 'Walk Jax', completed: false, routineId: 'jax', time: new Date(d.date.getFullYear(), d.date.getMonth(), d.date.getDate(), 18) }))
+    render(<DndContext><WeekJournal layout="grid" dailyRoutines days={days} weekend={{ satIndex: 0, sunIndex: 1, sometime: [] }} spans={[]} onSelectItem={vi.fn()} onToggleEntry={vi.fn()} /></DndContext>)
+    expect(screen.getAllByText('Walk Jax')).toHaveLength(7)
+  })
+
+  // The page's job (2026-10-04): who carries what.
+  it('shows who carries each row', () => {
+    const days = week(new Date(2026, 9, 3))
+    days[2].entries.push({ id: 'routine-math-x', kind: 'routine', title: 'Math time', completed: false, routineId: 'math', people: ['ella'] })
+    const members = [{ id: 'ella', name: 'Ella', initials: 'E', color: 'amber' }] as never
+    render(<DndContext><WeekJournal layout="grid" members={members} days={days} weekend={{ satIndex: 0, sunIndex: 1, sometime: [] }} spans={[]} onSelectItem={vi.fn()} onToggleEntry={vi.fn()} /></DndContext>)
+    expect(within(screen.getByTestId('journal-day-2026-10-05')).getByLabelText('Ella')).toBeInTheDocument()
+  })
+
+  // "Can't move": add the missing appointment with its time.
+  it('on Can’t move, adding to a day asks for a time', () => {
+    const onAddToDay = vi.fn()
+    render(<DndContext><WeekJournal layout="grid" show="fixed" days={week(new Date(2026, 9, 3))} weekend={{ satIndex: 0, sunIndex: 1, sometime: [] }} spans={[]} onSelectItem={vi.fn()} onToggleEntry={vi.fn()} onAddToDay={onAddToDay} /></DndContext>)
+    const mon = within(screen.getByTestId('journal-day-2026-10-05'))
+    fireEvent.click(mon.getByRole('button', { name: 'Add to Monday' }))
+    fireEvent.change(mon.getByLabelText('New task for Monday'), { target: { value: 'Dentist' } })
+    fireEvent.change(mon.getByLabelText('Time on Monday'), { target: { value: '15:00' } })
+    fireEvent.submit(mon.getByLabelText('New task for Monday').closest('form')!)
+    expect(onAddToDay).toHaveBeenCalledWith(expect.objectContaining({ key: '2026-10-05' }), 'Dentist', '15:00')
   })
 })

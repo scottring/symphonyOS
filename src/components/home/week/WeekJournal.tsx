@@ -19,7 +19,7 @@
 // and undo included) and a native drop for rows dragged out of the Today pin.
 import { createElement, useState, type ReactNode } from 'react'
 import { useDroppable } from '@dnd-kit/core'
-import { ChevronRight, Plus } from 'lucide-react'
+import { Plus } from 'lucide-react'
 import type { Task } from '@/types/task'
 import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
 import { isMissedPlacement } from '@/lib/week/missedPlacement'
@@ -30,6 +30,8 @@ import { WeekStrip, WeekShape } from './WeekViews'
 import type { FamilyMember } from '@/types/family'
 import type { DayForecast } from '@/hooks/useWeather'
 import { weatherCondition, weatherIcon } from '@/lib/weatherIcon'
+import { weekRhythm } from '@/lib/week/weekRhythm'
+import { busyBlocks, freeWindows, formatFree } from '@/lib/week/dayShape'
 
 import type { JournalDay, JournalEntry, JournalWeekend } from '@/lib/week/journalDays'
 export type { JournalDay, JournalEntry, JournalWeekend } from '@/lib/week/journalDays'
@@ -46,7 +48,7 @@ interface WeekJournalProps {
   /** "+ Add" on a day: a task straight onto that day. Omitted = no control.
    *  (Walkthrough 2026-09-20: "there's no way in the UI to add a task
    *  straight to a day on week" — only ⌘K-with-a-date and the hourly grid.) */
-  onAddToDay?: (day: JournalDay, title: string) => void
+  onAddToDay?: (day: JournalDay, title: string, time?: string) => void
   /** Rows can be picked up. Off on touch-width layouts, where a drag handle
    *  would swallow the scroll. */
   dragEnabled?: boolean
@@ -67,7 +69,13 @@ interface WeekJournalProps {
   variant?: 'strip' | 'shape'
   /** The shape's person: their things in full, others' faded. */
   person?: string
+  /** The household: who carries each row is drawn on it. */
   members?: FamilyMember[]
+  /** Show every-day and every-weekday routines in the days (hidden by
+   *  default: the same every week, ticked on Today — Scott, 2026-10-04). */
+  dailyRoutines?: boolean
+  /** "for October: Plan Thanksgiving" — the month line a task was written for. */
+  forLabel?: (task: Task) => string | null
   /**
    * The same in-place timing control the week's list and the period pages
    * wear, supplied by the host. Without it a task that moved out of "Any day"
@@ -100,7 +108,9 @@ function isToday(d: Date): boolean {
   return d.getFullYear() === n.getFullYear() && d.getMonth() === n.getMonth() && d.getDate() === n.getDate()
 }
 
-function Entry({ entry, day, onSelect, onToggle, dragEnabled, timingControl, dense = false, fromSometime = false }: {
+function Entry({ entry, day, onSelect, onToggle, dragEnabled, timingControl, dense = false, fromSometime = false, memberById, forLabel }: {
+  memberById?: Map<string, FamilyMember>
+  forLabel?: WeekJournalProps['forLabel']
   entry: JournalEntry
   day: JournalDay
   onSelect: (id: string) => void
@@ -127,9 +137,16 @@ function Entry({ entry, day, onSelect, onToggle, dragEnabled, timingControl, den
       title={entry.title}
       lane={entry.time ? journalTime(entry.time) : ''}
       completed={entry.completed}
+      people={memberById ? (entry.people ?? []).flatMap((id) => { const m = memberById.get(id); return m ? [m] : [] }) : undefined}
       onToggle={entry.kind === 'event' ? undefined : () => onToggle(entry, day)}
       onOpen={() => onSelect(entry.id)}
-      meta={entry.subtitle ? <span className="journal-entry-sub">{entry.subtitle}</span> : undefined}
+      meta={(() => {
+        const f = entry.task && forLabel ? forLabel(entry.task) : null
+        return entry.subtitle || f ? <>
+          {entry.subtitle && <span className="journal-entry-sub">{entry.subtitle}</span>}
+          {f && <span className="wk-for"><span aria-hidden="true">↳ </span>{f}</span>}
+        </> : undefined
+      })()}
       trailing={timingControl && entry.task && !entry.completed ? <span className="journal-entry-when">{timingControl(entry.task)}</span> : undefined}
       drag={drag}
       dense={dense}
@@ -138,9 +155,10 @@ function Entry({ entry, day, onSelect, onToggle, dragEnabled, timingControl, den
   )
 }
 
-function AddToDay({ day, onAdd }: { day: JournalDay; onAdd: NonNullable<WeekJournalProps['onAddToDay']> }) {
+function AddToDay({ day, onAdd, withTime = false }: { day: JournalDay; onAdd: NonNullable<WeekJournalProps['onAddToDay']>; withTime?: boolean }) {
   const [open, setOpen] = useState(false)
   const [draft, setDraft] = useState('')
+  const [time, setTime] = useState('')
   const weekday = day.date.toLocaleDateString('en-US', { weekday: 'long' })
   if (!open) {
     return (
@@ -153,7 +171,7 @@ function AddToDay({ day, onAdd }: { day: JournalDay; onAdd: NonNullable<WeekJour
   return (
     <form
       className="mt-1 flex items-center gap-2"
-      onSubmit={(e) => { e.preventDefault(); const t = draft.trim(); if (!t) return; onAdd(day, t); setDraft(''); setOpen(false) }}
+      onSubmit={(e) => { e.preventDefault(); const t = draft.trim(); if (!t) return; if (withTime && time) onAdd(day, t, time); else onAdd(day, t); setDraft(''); setTime(''); setOpen(false) }}
     >
       <input
         autoFocus
@@ -161,10 +179,13 @@ function AddToDay({ day, onAdd }: { day: JournalDay; onAdd: NonNullable<WeekJour
         value={draft}
         onChange={(e) => setDraft(e.target.value)}
         onKeyDown={(e) => { if (e.key === 'Escape') { setDraft(''); setOpen(false) } }}
-        onBlur={() => { if (!draft.trim()) setOpen(false) }}
+        onBlur={(e) => { if (!draft.trim() && !e.currentTarget.form?.contains(e.relatedTarget as Node)) setOpen(false) }}
         placeholder={`Add to ${weekday}…`}
         className="min-w-0 flex-1 bg-transparent py-0.5 text-[14px] text-neutral-800 placeholder:text-neutral-400 focus:outline-none"
       />
+      {/* "Can't move": an appointment has a time (2026-10-04). */}
+      {withTime && <input type="time" aria-label={`Time on ${weekday}`} value={time} onChange={(e) => setTime(e.target.value)}
+        className="w-[6.5rem] shrink-0 rounded border border-neutral-200 bg-transparent px-1 py-0.5 text-[13px] text-neutral-800" />}
     </form>
   )
 }
@@ -269,42 +290,22 @@ function DayRow({ day, onSelectItem, onToggleEntry, onPlanDrop, onAddToDay, drag
 
 // ── The grid (spec 2026-10-03-week-grid-design §1, §5, §6) ──────────────
 
-/** A day's untimed routines behind one line, remembered open or shut per day
- *  on this device (Scott, 2026-10-03: the long routine lists were "mind-
- *  numbing"). */
-function RoutineFold({ day, onSelect, onToggle, dragEnabled, forceOpen = false }: {
-  forceOpen?: boolean
-  day: JournalDay
-  onSelect: (id: string) => void
-  onToggle: WeekJournalProps['onToggleEntry']
-  dragEnabled: boolean
-}) {
-  const key = `symphony-week-fold:${day.key}`
-  const [remembered, setOpen] = useState(() => { try { return localStorage.getItem(key) === 'open' } catch { return false } })
-  const open = forceOpen || remembered
-  if (!day.foldedRoutines.length) return null
-  const allDone = day.foldedRoutines.every((e) => e.completed)
-  const toggle = () => {
-    setOpen((o) => { try { localStorage.setItem(key, o ? 'shut' : 'open') } catch { /* this session only */ } return !o })
-  }
-  return (
-    <div className="wk-fold">
-      <button type="button" className="wk-fold-btn" aria-expanded={open} onClick={toggle}>
-        <ChevronRight className={`h-3.5 w-3.5 transition-transform ${open ? 'rotate-90' : ''}`} aria-hidden="true" />
-        Routines · {allDone ? 'done' : day.foldedRoutines.length}
-      </button>
-      {open && (
-        <ul className="wk-rows" aria-label={`Routines, ${day.date.toLocaleDateString('en-US', { weekday: 'long' })}`}>
-          {day.foldedRoutines.map((entry) => <Entry key={entry.id} entry={entry} day={day} onSelect={onSelect} onToggle={onToggle} dragEnabled={dragEnabled} dense />)}
-        </ul>
-      )}
-    </div>
-  )
+/** A day's free time between 7a and 9p, from everything timed on it —
+ *  the every-day routines included, though they are written above. */
+function dayFree(day: JournalDay): string {
+  // Done or not, a timed thing took its time.
+  const timed = day.entries.filter((e) => e.time)
+  // An hour or more counts; the half hour between dinner and bedtime doesn't.
+  return formatFree(freeWindows(busyBlocks(timed.map((e) => ({ start: e.time!, end: e.end }))), 1))
 }
 
-function DayCell({ day, onSelectItem, onToggleEntry, onPlanDrop, onAddToDay, dragEnabled, timingControl, weather, fixedOnly = false, routinesOpen = false }: {
+function DayCell({ day, onSelectItem, onToggleEntry, onPlanDrop, onAddToDay, dragEnabled, timingControl, weather, fixedOnly = false, free, memberById, forLabel }: {
+  memberById?: Map<string, FamilyMember>
+  forLabel?: WeekJournalProps['forLabel']
   fixedOnly?: boolean
   routinesOpen?: boolean
+  /** "Free 9a–5p", from the whole day (rhythm included). */
+  free?: string
   day: JournalDay
   weather?: DayForecast
   onSelectItem: (id: string) => void
@@ -318,12 +319,15 @@ function DayCell({ day, onSelectItem, onToggleEntry, onPlanDrop, onAddToDay, dra
   const [planOver, setPlanOver] = useState(false)
   const planProps = onPlanDrop ? planDropHandlers((p) => onPlanDrop(day, p), setPlanOver) : {}
   const today = isToday(day.date)
+  const past = !today && day.date.getTime() < new Date().setHours(0, 0, 0, 0)
   // Fixed points: what can't move — events and anything with a time.
-  const shown = fixedOnly ? day.entries.filter((e) => e.kind === 'event' || !!e.time) : day.entries
+  // What is particular to the day — its routines too, now the every-day
+  // ones are written once above (no fold, no count).
+  const shown = fixedOnly ? day.entries.filter((e) => e.kind === 'event' || !!e.time) : [...day.entries, ...day.foldedRoutines]
   return (
     <section ref={setNodeRef} {...planProps} data-testid={`journal-day-${day.key}`}
       aria-label={day.date.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
-      className={`wk-cell group/day${dndOver || planOver ? ' is-over' : ''}${today ? ' is-today' : ''}`}>
+      className={`wk-cell group/day${dndOver || planOver ? ' is-over' : ''}${today ? ' is-today' : ''}${past ? ' is-past' : ''}`}>
       <header className="wk-dayhead">
         <span className="wk-daynum">{day.date.getDate()}</span>
         <span className="wk-dayname">{day.date.toLocaleDateString('en-US', { weekday: 'short' })}</span>
@@ -339,10 +343,9 @@ function DayCell({ day, onSelectItem, onToggleEntry, onPlanDrop, onAddToDay, dra
       )}
       {shown.length > 0 && (
         <ul className="wk-rows" aria-label={`${day.date.toLocaleDateString('en-US', { weekday: 'long' })} entries`}>
-          {shown.map((entry) => <Entry key={entry.id} entry={entry} day={day} onSelect={onSelectItem} onToggle={onToggleEntry} dragEnabled={dragEnabled} timingControl={timingControl} dense />)}
+          {shown.map((entry) => <Entry key={entry.id} entry={entry} day={day} onSelect={onSelectItem} onToggle={onToggleEntry} dragEnabled={dragEnabled} timingControl={timingControl} dense memberById={memberById} forLabel={forLabel} />)}
         </ul>
       )}
-      {!fixedOnly && <RoutineFold day={day} onSelect={onSelectItem} onToggle={onToggleEntry} dragEnabled={dragEnabled} forceOpen={routinesOpen} />}
       {day.dinners.length > 0 && (
         <p className="wk-dinner"><span className="text-neutral-400">Dinner </span>
           {day.dinners.map(({ event, label }, i) => (
@@ -352,7 +355,8 @@ function DayCell({ day, onSelectItem, onToggleEntry, onPlanDrop, onAddToDay, dra
           ))}
         </p>
       )}
-      {onAddToDay && <AddToDay day={day} onAdd={onAddToDay} />}
+      {onAddToDay && <AddToDay day={day} onAdd={onAddToDay} withTime={fixedOnly} />}
+      {free && <p className="wk-free">{free}</p>}
     </section>
   )
 }
@@ -360,7 +364,8 @@ function DayCell({ day, onSelectItem, onToggleEntry, onPlanDrop, onAddToDay, dra
 /** "Sometime this weekend": the weekend's window work, once for both days.
  *  Ticked here, it is done for the weekend; dragged onto Saturday or Sunday,
  *  it is given that day. */
-function SometimeCell({ weekend, days, onSelectItem, onToggleEntry, dragEnabled }: {
+function SometimeCell({ weekend, days, onSelectItem, onToggleEntry, dragEnabled, memberById }: {
+  memberById?: Map<string, FamilyMember>
   weekend: JournalWeekend
   days: JournalDay[]
   onSelectItem: (id: string) => void
@@ -376,7 +381,7 @@ function SometimeCell({ weekend, days, onSelectItem, onToggleEntry, dragEnabled 
       <header className="wk-dayhead"><span className="wk-dayname">Sometime this weekend</span><span className="wk-dayhint">once for both days</span></header>
       {weekend.sometime.length ? (
         <ul className="wk-rows" aria-label="Sometime this weekend entries">
-          {weekend.sometime.map((entry) => <Entry key={entry.id} entry={entry} day={tickDay} onSelect={onSelectItem} onToggle={onToggleEntry} dragEnabled={dragEnabled} dense fromSometime />)}
+          {weekend.sometime.map((entry) => <Entry key={entry.id} entry={entry} day={tickDay} onSelect={onSelectItem} onToggle={onToggleEntry} dragEnabled={dragEnabled} dense fromSometime memberById={memberById} />)}
         </ul>
       ) : <p className="wk-empty">Nothing waiting for the weekend.</p>}
       {weekend.sometime.length > 0 && <p className="wk-dayhint">Drag one onto {sun ? 'Saturday or Sunday' : 'Saturday'} to give it a day.</p>}
@@ -384,8 +389,12 @@ function SometimeCell({ weekend, days, onSelectItem, onToggleEntry, dragEnabled 
   )
 }
 
-function WeekGridDays({ days, weekend, forecast, fixedOnly = false, ...cell }: {
+function WeekGridDays({ days, weekend, forecast, fixedOnly = false, free, ...cell }: {
+  memberById?: Map<string, FamilyMember>
+  forLabel?: WeekJournalProps['forLabel']
   fixedOnly?: boolean
+  /** Each day's free time, by key. */
+  free?: Record<string, string>
   routinesOpen?: boolean
   days: JournalDay[]
   weekend: JournalWeekend | null
@@ -406,7 +415,7 @@ function WeekGridDays({ days, weekend, forecast, fixedOnly = false, ...cell }: {
     if (last?.kind === 'weekdays') last.days.push(d)
     else blocks.push({ kind: 'weekdays', days: [d] })
   })
-  const dayCell = (d: JournalDay) => <DayCell key={d.key} day={d} weather={forecast?.[d.key]} fixedOnly={fixedOnly} {...cell} />
+  const dayCell = (d: JournalDay) => <DayCell key={d.key} day={d} weather={forecast?.[d.key]} fixedOnly={fixedOnly} free={free?.[d.key]} {...cell} />
   return (
     <div className="wk-grid">
       {blocks.map((b, i) => b.kind === 'weekend' && weekend ? (
@@ -415,7 +424,7 @@ function WeekGridDays({ days, weekend, forecast, fixedOnly = false, ...cell }: {
           <div className="wk-weekend-cells">
             {dayCell(days[weekend.satIndex])}
             {weekend.sunIndex !== null && dayCell(days[weekend.sunIndex])}
-            {!fixedOnly && <SometimeCell weekend={weekend} days={days} onSelectItem={cell.onSelectItem} onToggleEntry={cell.onToggleEntry} dragEnabled={cell.dragEnabled} />}
+            {!fixedOnly && <SometimeCell weekend={weekend} days={days} onSelectItem={cell.onSelectItem} onToggleEntry={cell.onToggleEntry} dragEnabled={cell.dragEnabled} memberById={cell.memberById} />}
           </div>
         </section>
       ) : b.kind === 'weekdays' ? (
@@ -427,13 +436,23 @@ function WeekGridDays({ days, weekend, forecast, fixedOnly = false, ...cell }: {
   )
 }
 
-export function WeekJournal({ days, weekend = null, spans, onSelectItem, onToggleEntry, onPlanDrop, onAddToDay: addToDay, dragEnabled: canDrag = true, narrow = false, layout = 'rows', timingControl: timing, forecast, show = 'all', routinesOpen = false, readOnly = false, variant, person, members = [] }: WeekJournalProps) {
+export function WeekJournal({ days, weekend = null, spans, onSelectItem, onToggleEntry, onPlanDrop, onAddToDay: addToDay, dragEnabled: canDrag = true, narrow = false, layout = 'rows', timingControl: timing, forecast, show = 'all', routinesOpen = false, readOnly = false, variant, person, members = [], dailyRoutines = false, forLabel }: WeekJournalProps) {
   if (variant === 'strip') return <WeekStrip days={days} onSelectItem={onSelectItem} />
   if (variant === 'shape') return <WeekShape days={days} members={members} person={person} onSelectItem={onSelectItem} />
   // The finished plan is read: nothing moves, nothing is added or retimed.
   const dragEnabled = canDrag && !readOnly
   const onAddToDay = readOnly ? undefined : addToDay
   const timingControl = readOnly ? undefined : timing
+  // The grid writes the every-day and every-weekday routines once, above.
+  const fixedOnly = show === 'fixed'
+  // Every-day and every-weekday routines are the same every week and are
+  // ticked on Today: the week hides them unless asked to show them (Scott,
+  // 2026-10-04). Either way they count as time taken in each day's free time.
+  const rhythm = layout === 'grid' && !dailyRoutines ? weekRhythm(days) : { everyDay: [], weekdays: [], days }
+  const memberById = members.length ? new Map(members.map((m) => [m.id, m])) : undefined
+  // Free time is planning information: today and the days ahead.
+  const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0)
+  const free = layout === 'grid' ? Object.fromEntries(days.filter((d) => d.date >= todayStart).map((d) => [d.key, dayFree(d)])) : undefined
   return (
     <div data-testid="week-journal" className={layout === 'grid' ? 'wk-journal-grid' : 'border-y border-neutral-300'}>
       {spans.length > 0 && (
@@ -458,9 +477,11 @@ export function WeekJournal({ days, weekend = null, spans, onSelectItem, onToggl
         </ul>
       )}
       {layout === 'grid' ? (
-        <WeekGridDays days={days} weekend={weekend} forecast={forecast} onSelectItem={onSelectItem} onToggleEntry={onToggleEntry}
-          onPlanDrop={readOnly ? undefined : onPlanDrop} onAddToDay={onAddToDay} dragEnabled={dragEnabled} timingControl={timingControl}
-          fixedOnly={show === 'fixed'} routinesOpen={routinesOpen} />
+        <>
+          <WeekGridDays days={rhythm.days} weekend={weekend} forecast={forecast} onSelectItem={onSelectItem} onToggleEntry={onToggleEntry}
+            onPlanDrop={readOnly ? undefined : onPlanDrop} onAddToDay={onAddToDay} dragEnabled={dragEnabled} timingControl={timingControl}
+            fixedOnly={fixedOnly} routinesOpen={routinesOpen} free={free} memberById={memberById} forLabel={forLabel} />
+        </>
       ) : days.map((day) => (
         <DayRow key={day.key} day={day} onSelectItem={onSelectItem} onToggleEntry={onToggleEntry}
           onPlanDrop={onPlanDrop} onAddToDay={onAddToDay} dragEnabled={dragEnabled} narrow={narrow}

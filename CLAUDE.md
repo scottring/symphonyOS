@@ -34,7 +34,9 @@ Planning connects year, custom season, month, week, and Today.
 Users can capture urgent work directly; the cascade is not mandatory.
 
 - Inbox is for unprocessed captures.
-- Goals describe desired outcomes; tasks describe concrete actions.
+- Lists above the week are for looking; the week and the day are for doing.
+  Year is reference, a season is a brainstorm list, a month is a plain list
+  written with its season beside it. No goal/task split above the week.
 - Planning a task for today should preserve its broader commitments.
 - Weeks and other periods have explicit dates.
 - Routines are repeating patterns; occurrences are individual commitments.

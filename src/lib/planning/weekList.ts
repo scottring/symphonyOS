@@ -3,8 +3,9 @@
 // the Week page, the Choose tasks panel and the week session, so no two
 // surfaces disagree about what is on a week. Records-aware (committedTo): a
 // row picked for today (dated + focused) or given a day is STILL on the list —
-// the list stays whole all week (Scott, 2026-09-21). Tasks only; a goal lives
-// on its month, season or year and is never on a week.
+// the list stays whole all week (Scott, 2026-09-21). A line once marked a
+// goal is a line like any other (2026-10-04: no goal/task split): given this
+// week, it is on the week's list.
 
 import { weekendLabel } from './weekend'
 import type { Task } from '@/types/task'
@@ -15,7 +16,6 @@ import { localYmd } from '@/lib/cadence/config'
 export function weekListTasks(tasks: readonly Task[], weekStart: Date, meId: string | null, opts: { isCurrent?: boolean } = {}): Task[] {
   const out: Task[] = []
   for (const t of tasks) {
-    if (t.isGoal) continue
     if (meId && !doableBy(t, meId)) continue
     const c = committedTo(t, 'week', weekStart, { isCurrent: opts.isCurrent ?? true })
     if (!c) continue

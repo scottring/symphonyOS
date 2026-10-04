@@ -7,10 +7,12 @@
 //
 //   [grip] lane · mark · title ↻ / meta / tools · people · trailing
 //
-// Marks: ○ task · ○ + ↻ routine · — event · ◆ goal · – a month line.
+// Marks: ○ task or routine (something to do) · — event (on the calendar) ·
+// – a line on a list above the week. Whether a thing repeats is the routine's
+// business, not the week's (Scott, 2026-10-04: no ↻ on every row).
 import type { HTMLAttributes, ReactNode } from 'react'
 import { useDraggable } from '@dnd-kit/core'
-import { Check, GripVertical, Repeat } from 'lucide-react'
+import { Check, GripVertical } from 'lucide-react'
 import type { FamilyMember } from '@/types/family'
 import { AssigneeAvatar } from '@/components/family/AssigneeAvatar'
 
@@ -59,10 +61,10 @@ export function WeekRow({ mark, title, lane, completed = false, onToggle, onOpen
       {movable && <span className="wk-grip" aria-hidden="true"><GripVertical className="h-3.5 w-3.5" /></span>}
       {lane !== undefined && <span className="wk-lane">{lane}</span>}
       <span className="wk-mark">
-        {onToggle && (mark === 'task' || mark === 'routine') ? (
+        {onToggle && (mark === 'task' || mark === 'routine' || mark === 'line') ? (
           <button
             type="button"
-            className={`wk-check${completed ? ' is-on' : ''}`}
+            className={`wk-check${mark === 'routine' ? ' is-routine' : mark === 'line' ? ' is-line' : ''}${completed ? ' is-on' : ''}`}
             aria-label={completed ? `Mark ${title} not done` : `Complete ${title}`}
             onPointerDown={(e) => e.stopPropagation()}
             onClick={(e) => { e.stopPropagation(); onToggle() }}
@@ -75,7 +77,6 @@ export function WeekRow({ mark, title, lane, completed = false, onToggle, onOpen
         <span className="wk-titleline">
           {/* Done stays on the page, struck, the way a paper week keeps it. */}
           <button type="button" className={`wk-title${completed ? ' line-through text-neutral-400' : ''}`} onClick={onOpen}>{title}</button>
-          {mark === 'routine' && <Repeat className="wk-repeat" aria-label="repeats" role="img" />}
         </span>
         {meta && <div className="wk-meta">{meta}</div>}
         {tools && <div className="wk-tools" onPointerDown={(e) => e.stopPropagation()}>{tools}</div>}

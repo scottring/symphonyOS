@@ -52,9 +52,11 @@ export function planWhy(level: 'season' | 'month', name: string, aboveName: stri
       ? `Check ${name}’s list against ${aboveName} and the calendar: keep what still matters, cut what doesn’t, add what’s missing. A quiet month is fine.`
       : `Look at ${aboveName} and the calendar, then write what ${name} is for. A quiet month is fine.`
   }
+  // A season is a brainstorm list (Scott, 2026-10-04): everything we want in
+  // it, with the year to look at if it helps.
   return lines
-    ? `Check ${name}’s list against ${aboveName}: keep what still matters, cut what doesn’t, add what’s missing. “+ ${name}’s part” beside a ${aboveName} goal keeps the new line linked to it.`
-    : `${name}’s list is empty. Beside each ${aboveName} goal, use “+ ${name}’s part” to write it. A few lines is plenty.`
+    ? `Read ${name}’s list again: keep what still matters, cut what doesn’t, add what’s missing.`
+    : `Write everything you’d like ${name} to hold. No types, no dates — ${aboveName} is there to look at if it helps.`
 }
 
 /**
@@ -64,8 +66,8 @@ export function planWhy(level: 'season' | 'month', name: string, aboveName: stri
  * current week, else the week holding the month's first day) — but on a
  * week's last day, the next one: a week ending today has nothing left to
  * plan (walkthrough 2026-10-02 #18). A year → the current season in that
- * year, else the year's first. One phrasing on every rung: "Choose what X
- * takes on" (#32).
+ * year, else the year's first. Each rung says what you do there: "Write
+ * October's list", "Plan week 41" (2026-10-04; was "Choose what X takes on", #32).
  */
 export function nextAfterSave(
   level: 'year' | 'season' | 'month',
@@ -81,16 +83,16 @@ export function nextAfterSave(
   const ymd = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
   if (level === 'year') {
     const s = helpers.seasonOf(today.getFullYear() === periodStart.getFullYear() ? today : periodStart)
-    return { label: `Choose what ${s.name} takes on`, to: `/season?start=${ymd(s.start)}` }
+    return { label: `Write ${s.name}’s list`, to: `/season?start=${ymd(s.start)}` }
   }
   if (level === 'season') {
     const from = isCurrent ? today : periodStart
     const m = new Date(from.getFullYear(), from.getMonth(), 1)
-    return { label: `Choose what ${m.toLocaleDateString('en-US', { month: 'long' })} takes on`, to: `/month?start=${ymd(m)}` }
+    return { label: `Write ${m.toLocaleDateString('en-US', { month: 'long' })}’s list`, to: `/month?start=${ymd(m)}` }
   }
   const w0 = helpers.weekStartOf(isCurrent ? today : periodStart)
   const lastDay = new Date(w0.getFullYear(), w0.getMonth(), w0.getDate() + 6)
   const endsToday = isCurrent && ymd(lastDay) === ymd(today)
   const w = endsToday ? new Date(w0.getFullYear(), w0.getMonth(), w0.getDate() + 7) : w0
-  return { label: `Choose what week ${helpers.weekNumber(w)} takes on`, to: `/week?start=${ymd(w)}` }
+  return { label: `Plan week ${helpers.weekNumber(w)}`, to: `/week?start=${ymd(w)}` }
 }

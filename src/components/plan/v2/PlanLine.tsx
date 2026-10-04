@@ -16,6 +16,8 @@ import type { SupportLink } from '@/lib/planning/goalSupport'
 import type { LineFate } from '@/lib/planning/v2/planV2'
 import { MultiAssigneeDropdown } from '@/components/family'
 import { assigneesOf } from '@/lib/planning/v2/planV2'
+import { notesAsText } from '@/lib/htmlUtils'
+import type { DidItem } from '@/lib/week/monthLinks'
 
 export interface LineVM {
   task: Task
@@ -30,6 +32,8 @@ export interface LineVM {
   nested?: boolean
   /** Brought in by a look-back: "carried from October" (#31). */
   carriedFrom?: string
+  /** What the weeks did for this line — items written "for" it (2026-10-04). */
+  did?: DidItem[]
   /** Unfinished work from before last week, in the week's look-back: where it
    *  was meant to happen — "Originally Wednesday", "Planned for Sep 6–12". */
   origin?: string
@@ -127,8 +131,8 @@ export function LineMenu({ vm, actions, nextLabel }: { vm: LineVM; actions: Line
           {!t.completed && vm.fate !== 'someday' && actions.someday && <button role="menuitem" type="button" onClick={pick(actions.someday)}><Moon className="w-3.5 h-3.5" />Someday</button>}
           {!t.completed && <button role="menuitem" type="button" onClick={pick(actions.drop)}><X className="w-3.5 h-3.5" />Drop it</button>}
           {(actions.intoLower || actions.today || actions.toggleGoal || (actions.unlink && t.goalTaskId)) && !t.completed && <div className="pv2-msep" />}
-          {actions.intoLower && !t.completed && !t.isGoal && <button role="menuitem" type="button" onClick={pick(actions.intoLower.run)}><ArrowDownRight className="w-3.5 h-3.5" />{actions.intoLower.label}</button>}
-          {actions.today && !t.completed && !t.isGoal && <button role="menuitem" type="button" onClick={pick(actions.today)}><Sun className="w-3.5 h-3.5" />Do it today</button>}
+          {actions.intoLower && !t.completed && <button role="menuitem" type="button" onClick={pick(actions.intoLower.run)}><ArrowDownRight className="w-3.5 h-3.5" />{actions.intoLower.label}</button>}
+          {actions.today && !t.completed && <button role="menuitem" type="button" onClick={pick(actions.today)}><Sun className="w-3.5 h-3.5" />Do it today</button>}
           {actions.toggleGoal && !t.completed && <button role="menuitem" type="button" onClick={pick(actions.toggleGoal)}><Target className="w-3.5 h-3.5" />{t.isGoal ? 'Make it a single action' : 'Make it a goal'}</button>}
           {actions.unlink && t.goalTaskId && <button role="menuitem" type="button" onClick={pick(actions.unlink)}><Unlink className="w-3.5 h-3.5" />Remove from goal</button>}
           {linkUp && <button role="menuitem" type="button" onClick={() => setLinking(true)}><Link2 className="w-3.5 h-3.5" />{vm.partOf ? `Change ${linkUp.rung} goal…` : `Link to a ${linkUp.rung} goal…`}</button>}
@@ -162,6 +166,7 @@ export function PlanLine({ vm, actions, members, nextLabel, open, onToggle, edit
 }) {
   const t = vm.task
   const who = assigneesOf(t)
+  const notes = open ? notesAsText(t.notes) : ''
   const muted = vm.fate !== 'open'
   const movable = draggable && vm.fate === 'open' && !t.completed
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: `line:${t.id}`, data: { kind: 'line', taskId: t.id }, disabled: !movable })
@@ -170,10 +175,10 @@ export function PlanLine({ vm, actions, members, nextLabel, open, onToggle, edit
       onMouseLeave={vm.partOf && onHoverPartOf ? () => onHoverPartOf(null) : undefined} className={`pv2-line${vm.nested ? ' is-nested' : ''}${open ? ' is-open' : ''}${muted ? ' is-muted' : ''}${vm.fate === 'dropped' ? ' is-dropped' : ''}${t.completed ? ' is-done' : ''}${isDragging ? ' is-dragging' : ''}`}>
       <div className="pv2-line-main">
         {movable && <span className="pv2-grip pv2-linegrip pv2-hov" {...listeners} {...attributes} aria-label={`Drag ${t.title} onto a week or a day`} title="Drag onto a week or a day"><GripVertical className="h-3.5 w-3.5" /></span>}
-        <span className="pv2-mark" aria-hidden="true">
-          {t.isGoal ? <span className="pv2-goal" /> : <span className="pv2-dash" />}
-        </span>
-        <button type="button" className={`pv2-line-text${t.isGoal ? ' is-goal' : ''}`} aria-expanded={open} onClick={onToggle}>
+        {/* One mark for every line: a list above the week is a plain list
+            (Scott, 2026-10-04: "they're just lists"). */}
+        <span className="pv2-mark" aria-hidden="true"><span className="pv2-dash" /></span>
+        <button type="button" className="pv2-line-text" aria-expanded={open} onClick={onToggle}>
           {t.title}
           {t.completed && <Check className="pv2-tick" aria-label="done" />}
         </button>
@@ -195,6 +200,11 @@ export function PlanLine({ vm, actions, members, nextLabel, open, onToggle, edit
         </span>
       </div>
       {vm.carriedFrom && !open && <span className="pv2-line-from">carried from {vm.carriedFrom}</span>}
+      {vm.did && vm.did.length > 0 && !open && (
+        <span className="pv2-line-did wk-did">{vm.did.map((d, i) => (
+          <span key={d.id}>{i > 0 && ' · '}<span className={d.done ? 'is-done' : undefined}>{d.title}</span>{d.when && ` (${d.when})`}</span>
+        ))}</span>
+      )}
       {vm.partOf && !open && !hideParent && (
         <button type="button" className="pv2-line-parent" onClick={() => (onShowPartOf ?? actions.openPartOf)(vm.partOf!)}
           aria-label={`Part of ${vm.partOf.title} — show it`}>
@@ -217,49 +227,13 @@ export function PlanLine({ vm, actions, members, nextLabel, open, onToggle, edit
             </div>
           )}
           {vm.where && <div className="pv2-fact"><span className="pv2-k">Now</span><span>{vm.where}</span></div>}
-          {t.isGoal ? <>
-            {/* A goal says what it means and holds its possible work — the Fall
-                page Scott liked (prototype, 2026-09-28). Both are the goal's own
-                records: its notes and its steps. */}
-            <div className="pv2-fact"><span className="pv2-k">Notes</span>
-              {t.notes?.trim() ? <span className="pv2-notes">{t.notes.trim()}</span> : <span className="pv2-hint">None yet — add some in its details.</span>}</div>
-            <div className="pv2-fact"><span className="pv2-k">Work</span>
-              {vm.steps?.length ? <ul className="pv2-steps-list">{vm.steps.map((s) => (
-                <li key={s.id}><button type="button" className={`pv2-step${s.done ? ' is-done' : ''}`} onClick={() => actions.details({ ...t, id: s.id })}>{s.title}</button>
-                  {s.where && <span className="pv2-hint"> · {s.where}</span>}</li>
-              ))}</ul> : <span className="pv2-hint">No possible work written yet.</span>}</div>
-          </> : t.notes?.trim() && <div className="pv2-fact"><span className="pv2-k">Notes</span><span className="pv2-notes">{t.notes.trim().split('\n')[0]}</span></div>}
+          {notes && <div className="pv2-fact"><span className="pv2-k">Notes</span><span className="pv2-notes">{notes.split('\n')[0]}</span></div>}
           <div className="pv2-acts">
             <button type="button" className="pv2-qbtn" onClick={() => actions.details(t)}>All details →</button>
             <button type="button" className="pv2-link" onClick={onToggle}>Close</button>
           </div>
         </div>
       )}
-    </li>
-  )
-}
-
-
-/** A line being named on the list it will join, opened from the level above
- *  ("+ Add" / "+ Step" in the reference column): it says whose part it is.
- *  Enter adds; Escape, or leaving it empty, lets it go. */
-export function DraftLine({ parentTitle, isGoal, placeholder, onAdd, onCancel }: {
-  parentTitle: string
-  isGoal: boolean
-  placeholder: string
-  onAdd: (title: string) => void
-  onCancel: () => void
-}) {
-  const [v, setV] = useState('')
-  return (
-    <li className="pv2-line is-draft">
-      <form className="pv2-line-main" onSubmit={(e) => { e.preventDefault(); const t = v.trim(); if (t) onAdd(t) }}>
-        <span className="pv2-mark" aria-hidden="true">{isGoal ? <span className="pv2-goal" /> : <span className="pv2-dash" />}</span>
-        <input autoFocus className="pv2-line-draft" value={v} onChange={(e) => setV(e.target.value)} placeholder={placeholder}
-          aria-label={`${placeholder} — part of ${parentTitle}`}
-          onKeyDown={(e) => { if (e.key === 'Escape') onCancel() }} onBlur={() => { if (!v.trim()) onCancel() }} />
-      </form>
-      <span className="pv2-line-parent is-shown"><CornerDownRight className="h-3 w-3 shrink-0" aria-hidden="true" /><span className="truncate">Part of “{parentTitle}” · Enter to add</span></span>
     </li>
   )
 }

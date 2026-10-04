@@ -1,11 +1,16 @@
+/** Notes as a parsed body that never runs scripts or loads images. */
+function inertBody(html: string): HTMLElement {
+  return new DOMParser().parseFromString(html, 'text/html').body
+}
+
 /**
  * Strips HTML tags and decodes HTML entities from a string
  * Used for displaying HTML content as plain text in notes
  */
 export function stripHtml(html: string): string {
-  // Create a temporary div to parse HTML
-  const temp = document.createElement('div')
-  temp.innerHTML = html
+  // Parse in an inert document: a live-document element would load <img>
+  // and run its onerror (review 2026-10-04).
+  const temp = inertBody(html)
 
   // Get text content (this handles HTML entity decoding automatically)
   const text = temp.textContent || temp.innerText || ''
@@ -19,9 +24,7 @@ export function stripHtml(html: string): string {
  * Replaces block elements with newlines for better formatting
  */
 export function htmlToPlainText(html: string): string {
-  // Create a temporary div to parse HTML
-  const temp = document.createElement('div')
-  temp.innerHTML = html
+  const temp = inertBody(html)
 
   // Replace block-level elements with newlines before getting text
   const blockElements = temp.querySelectorAll('p, div, br, li, h1, h2, h3, h4, h5, h6')
@@ -42,4 +45,11 @@ export function htmlToPlainText(html: string): string {
     .replace(/\n{3,}/g, '\n\n')
     .replace(/[ \t]+/g, ' ') // Normalize spaces but keep newlines
     .trim()
+}
+
+/** A task's notes as text: the editor stores HTML, older notes are plain.
+ *  (Walkthrough 2026-10-04: a planning card showed "<ul><li><p>Called…".) */
+export function notesAsText(notes: string | undefined | null): string {
+  if (!notes?.trim()) return ''
+  return (/<[a-z][\s\S]*>/i.test(notes) ? htmlToPlainText(notes) : notes).trim()
 }

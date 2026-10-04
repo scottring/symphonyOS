@@ -118,29 +118,28 @@ Agreed with Scott 2026-10-02.
 Agreed with Scott 2026-10-02 (Week page; Month and Season followed). Week
 became a grid on 2026-10-03.
 
-- **Week is a grid.** The sources on top — the month's plan in two columns
-  beside this week's list, each capped at about nine rows and scrolling
-  inside itself — and the days across the full width below: the weekend as
-  one band (Saturday · Sunday · Sometime this weekend), the weekdays side by
-  side. Each day's untimed routines fold to one line ("Routines · N"); timed
-  ones stay on the day. Phones stack it: the list, the weekend, the weekdays,
-  the month.
-- **Planning a week, in steps** (Scott, 2026-10-03: "more obviously
-  sequential"). The session is a guide over the same page: **Look back**
-  (last week's leftovers, one card at a time; skipped when there are none) ·
-  **Fixed points** (the days alone, only what can't move — events, timed
-  work, specials) · **Fill the week** (the month and this week's list over the
-  days, routines unfolded; everything drags) · **The plan** (the days alone,
-  read-only, then Mark planned). The bar numbers the steps with Back / Next
-  (`PlanMeetingBar` `steps`); Month and Season keep their two steps.
+- **Week is the week's list beside its days** (2026-10-04; spec
+  `docs/superpowers/specs/2026-10-04-planning-model-design.md`). Left: "This
+  week", the work that waits for a day. Right: the days. Routines that happen every
+  day or every weekday are not drawn (`weekRhythm` lifts them; they are ticked
+  on Today and only count as time taken); then the weekend band and the weekdays, each day holding
+  only what is particular to it (no fold, no count) and its free time (an
+  hour or more, 7a–9p). The month's list is one link away ("October list"),
+  plain, at the left when open; remembered per device. No view toggles.
+- **Planning a week, in steps.** "Plan the week" opens the session: Last
+  week · Inbox · Between us · Can't move · Look ahead · Routines · Write the
+  week (the month beside it, for reference) · The week (what it's for, free
+  time, who carries what). One primary at a time: Next on each step, Mark
+  planned only on the last (`PlanMeetingBar` `steps`).
 - **The weekend band.** "Sometime this weekend" holds the weekend's window
   work once: Weekend-rule routines nobody has given a day, and tasks planned
   for the weekend with no day. A Sunday-start week has no band (its Saturday
   and Sunday are different weekends).
-- **Source first.** Side-by-side columns read left to right as planning
-  moves (Scott, 2026-10-03): the level above, the period's list, then its
-  own time. Week: month · list · days (List view: list · days). Month:
-  season · list · dates (List view: list · dates). Season: year · list.
+- **The level above is for looking.** Month: season · list · dates, the
+  season shown by default and hideable. Season: list alone, the year behind
+  a link ("2026 list"). Plain rows, no goal marks, no "+ Step" or pulls; only
+  a month line may come into a week (its ⋯ menu, or quietly from the week's
+  reference).
 - **Side by side, each column scrolls.** On Month (season reference, list,
   dates) and Season (year reference, list) each column fills the room from the column headings down to the
   landscape and scrolls independently; the page itself does not scroll.

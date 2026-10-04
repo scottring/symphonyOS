@@ -306,9 +306,11 @@ describe('toPlan — the week list stays whole (guided planning, Phase 2)', () =
     expect(plan.chooserTasks.map((e) => e.id)).toEqual(['cur', 'w2'])
   })
 
-  it('a goal is never on the week list', () => {
+  // 2026-10-04: no goal/task split — an old goal line given this week is on
+  // the week's list like any other line.
+  it('an old goal line given this week is on the week list', () => {
     const g = onWeek({ id: 'g', isGoal: true })
-    expect(selectDayPlan(input({ tasks: [g] })).toPlan).toEqual([])
+    expect(selectDayPlan(input({ tasks: [g] })).toPlan.map((e) => e.id)).toEqual(['g'])
   })
 })
 

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import type { Task } from '@/types/task'
 
@@ -7,13 +7,13 @@ const h = vi.hoisted(() => ({
   gatedUpdate: vi.fn(),
   dayPlan: null as null | { unfinished: unknown[] },
 }))
-const session = { saved: null, mine: null, loading: false, loadedToken: '', error: null, reload: vi.fn(), save: vi.fn() }
+const session = { saved: null as null | { at: Date; authorId: string; notes?: { focus?: string } }, mine: null, loading: false, loadedToken: '', error: null, reload: vi.fn(), save: vi.fn() }
 
 vi.mock('@/hooks/usePlanningSession', () => ({ usePlanningSession: () => session, weekToken: () => '2026-10-3' }))
 vi.mock('@/hooks/useAuth', () => ({ useAuth: () => ({ user: { id: 'me' } }) }))
 vi.mock('@/hooks/useSupabaseTasks', () => ({ useSupabaseTasks: () => ({ toggleTask: vi.fn(), updateTask: vi.fn(), pushTask: vi.fn(), updateTasksBulk: vi.fn(), keepForward: vi.fn(), dropCommitment: vi.fn(), addTask: vi.fn() }) }))
 vi.mock('@/hooks/useGatedTaskActions', () => ({ useGatedTaskActions: () => ({ updateTask: h.gatedUpdate, pushTask: vi.fn() }) }))
-vi.mock('@/hooks/useFamilyMembers', () => ({ useFamilyMembers: () => ({ members: [] }) }))
+vi.mock('@/hooks/useFamilyMembers', () => ({ useFamilyMembers: () => ({ members: [{ id: 'sk', name: 'Scott', initials: 'S', color: 'blue' }, { id: 'ir', name: 'Iris', initials: 'I', color: 'purple' }] }) }))
 vi.mock('@/hooks/useActionableInstances', () => ({ useActionableInstances: () => ({ setPlanned: vi.fn(), reschedule: vi.fn() }) }))
 vi.mock('./AddArea', () => ({ useAddArea: () => ({ area: undefined, picker: null }) }))
 vi.mock('./FromPaper', () => ({ FromPaper: () => null }))
@@ -29,38 +29,48 @@ beforeEach(() => {
 afterEach(() => { vi.useRealTimers(); localStorage.clear() })
 
 const task = (o: Partial<Task>) => ({ completed: false, createdAt: new Date(2026, 8, 1), assignedTo: 'me', ...o }) as Task
+const renderDays = vi.fn((o: Record<string, unknown>) => <p>days {JSON.stringify({ ...o, members: undefined })}</p>)
 const renderWeek = (tasks: Task[] = []) => render(
-  <MemoryRouter><WeekV2 tasks={tasks} weekStart={WEEK} meId="me" isCurrent days={<p>days</p>} onSelectTask={vi.fn()} /></MemoryRouter>,
+  <MemoryRouter><WeekV2 tasks={tasks} weekStart={WEEK} meId="me" isCurrent renderDays={renderDays} onSelectTask={vi.fn()} /></MemoryRouter>,
 )
 
-// Scott, 2026-10-03: planning moves from the source to the list to a day, so
-// the page reads that way — and the month's column holds only its own lines.
-describe('WeekV2 — source first', () => {
-  // 2026-10-03, the grid: the sources on top (the month, then this week's
-  // list), the days across the full width below.
-  it('puts the month and this week’s list on top, the days below', () => {
+// Scott, 2026-10-04: "lists above the week are for looking; the week and the
+// day are for doing". The page is the week's list beside its days; the month
+// is one click away, plain, and nothing on it has to come down.
+describe('WeekV2 — the week at rest', () => {
+  it('is the week’s list beside the days, the month behind one link', () => {
     const { container } = renderWeek([task({ id: 'o1', title: 'Plan Thanksgiving', bucket: 'month', monthStart: new Date(2026, 9, 1) })])
-    fireEvent.click(screen.getByRole('button', { name: /^With / }))
     const page = container.querySelector('.wk-page')!
-    expect([...page.children].map((c) => c.className)).toEqual(['wk-sources', 'pv2-days wk-days'])
-    const sources = [...page.querySelector('.wk-sources')!.children].map((c) => c.getAttribute('aria-label') ?? c.className)
-    expect(sources).toEqual(['October, for reference', 'pv2-wside'])
+    expect([...page.children].map((c) => c.className)).toEqual(['wk-listcol', 'pv2-days wk-days'])
+    const ref = () => screen.queryByRole('complementary', { name: 'October, for reference' })
+    expect(ref()).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: /October list/ }))
+    expect([...page.children].map((c) => c.getAttribute('aria-label') ?? c.className)).toEqual(['October, for reference', 'wk-listcol', 'The days'])
+    expect(within(ref()!).getByText('Plan Thanksgiving')).toBeInTheDocument()
+    // Remembered, and hidden again from its own heading.
+    expect(localStorage.getItem('symphony-week-ref')).toBe('open')
+    fireEvent.click(screen.getByRole('button', { name: 'Hide October' }))
+    expect(ref()).toBeNull()
   })
 
-  it('the List view keeps the list over the days, with no month', () => {
-    const { container } = renderWeek()
-    fireEvent.click(screen.getByRole('button', { name: 'List' }))
-    const sources = container.querySelector('.wk-sources')!
-    expect([...sources.children].map((c) => c.className)).toEqual(['pv2-wside'])
-    expect(container.querySelector('.wk-days')!.getAttribute('aria-label')).toBe('The days')
+  it('the month is a plain list: no goal marks, no steps, and it stays whole', () => {
+    localStorage.setItem('symphony-week-ref', 'open')
+    renderWeek([
+      task({ id: 'g1', title: 'Plan sabbatical', bucket: 'month', monthStart: new Date(2026, 9, 1), isGoal: true }),
+      task({ id: 'o2', title: 'Toss umbrella', bucket: 'month', monthStart: new Date(2026, 9, 1), completed: true }),
+    ])
+    const ref = screen.getByRole('complementary', { name: 'October, for reference' })
+    expect(ref.querySelector('[data-mark="goal"]')).toBeNull()
+    expect(screen.queryByRole('button', { name: /\+ Step|Week 41’s part/ })).toBeNull()
+    expect(screen.getByText('Toss umbrella')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Add Plan sabbatical to this week' })).toBeInTheDocument()
   })
 
-  it('the month column lists no earlier work and no routines', () => {
+  it('the month lists no earlier work and no routines', () => {
+    localStorage.setItem('symphony-week-ref', 'open')
     h.dayPlan = { unfinished: [{ key: 'task:e1', kind: 'task', id: 'e1', title: 'Transfer plants', completed: false, task: task({ id: 'e1', title: 'Transfer plants', scheduledFor: new Date(2026, 8, 30), isAllDay: true }), context: 'Originally Wednesday' }] }
     renderWeek()
-    fireEvent.click(screen.getByRole('button', { name: /^With / }))
     expect(screen.queryByText('Earlier, not done')).toBeNull()
-    expect(screen.queryByText('Routines with no set time')).toBeNull()
     expect(screen.queryByText('Transfer plants')).toBeNull()
   })
 })
@@ -74,7 +84,7 @@ describe('WeekV2 — earlier work is decided in the look-back', () => {
 
   it('offers the look-back, and shows where the work was meant to happen', () => {
     renderWeek([earlier])
-    fireEvent.click(screen.getByRole('button', { name: 'Look back at last week' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Plan the week' }))
     expect(screen.getByRole('heading', { name: /Transfer plants/ })).toBeTruthy()
     expect(screen.getByText('Originally Wednesday')).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Leave it for now' })).toBeTruthy()
@@ -82,7 +92,7 @@ describe('WeekV2 — earlier work is decided in the look-back', () => {
 
   it('"Carry to this week" puts it on this week’s list, any day', async () => {
     renderWeek([earlier])
-    fireEvent.click(screen.getByRole('button', { name: 'Look back at last week' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Plan the week' }))
     fireEvent.click(screen.getByRole('button', { name: 'Carry to this week' }))
     await waitFor(() => expect(h.gatedUpdate).toHaveBeenCalled())
     const [id, updates] = h.gatedUpdate.mock.calls[0]
@@ -92,11 +102,63 @@ describe('WeekV2 — earlier work is decided in the look-back', () => {
 
   it('"Drop it" lets go of its old day', async () => {
     renderWeek([earlier])
-    fireEvent.click(screen.getByRole('button', { name: 'Look back at last week' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Plan the week' }))
     fireEvent.click(screen.getByRole('button', { name: 'Drop it' }))
     await waitFor(() => expect(h.gatedUpdate).toHaveBeenCalled())
     const [id, updates] = h.gatedUpdate.mock.calls[0]
     expect(id).toBe('e1')
     expect('scheduledFor' in updates && updates.scheduledFor === undefined).toBe(true)
+  })
+})
+
+// Scott, 2026-10-04: "a way to hide daily routines … and show them", and
+// "make sure the different types of items … are clearly differentiated".
+describe('WeekV2 — the days’ own controls', () => {
+  it('daily routines are hidden until shown, and the choice is remembered', () => {
+    renderWeek()
+    expect(renderDays).toHaveBeenLastCalledWith(expect.objectContaining({ dailyRoutines: false }))
+    const group = within(screen.getByRole('group', { name: 'Daily routines' }))
+    expect(group.getByRole('button', { name: 'Hide' })).toHaveAttribute('aria-pressed', 'true')
+    fireEvent.click(group.getByRole('button', { name: 'Show' }))
+    expect(renderDays).toHaveBeenLastCalledWith(expect.objectContaining({ dailyRoutines: true }))
+    expect(localStorage.getItem('symphony-week-daily')).toBe('shown')
+  })
+
+  it('a key says which mark is which', () => {
+    renderWeek()
+    const key = within(screen.getByRole('list', { name: 'What the marks mean' }))
+    expect(key.getByText(/Event/)).toBeInTheDocument()
+    expect(key.getByText(/Task/)).toBeInTheDocument()
+    expect(key.getByText(/Routine/)).toBeInTheDocument()
+  })
+})
+
+// The week after planning (Scott, 2026-10-04: "the goal of this page should
+// be to commit to items for the week"; mockup Planned.dc.html).
+describe('WeekV2 — the planned week', () => {
+  afterEach(() => { session.saved = null })
+
+  it('says what was committed, and offers to change the plan', () => {
+    session.saved = { at: new Date(2026, 9, 3), authorId: 'me', notes: { focus: 'the porch, before the rain' } }
+    renderWeek()
+    expect(screen.getByRole('region', { name: "This week's list" })).toHaveTextContent('Any day this week')
+    expect(screen.getByText('Committed, no day of their own.')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Change the plan' })).toBeInTheDocument()
+    expect(screen.getByText('the porch, before the rain')).toBeInTheDocument()
+  })
+
+  it('has no second set of person buttons — the top bar’s people filter is the one lens', () => {
+    renderWeek()
+    expect(screen.queryByRole('group', { name: 'Whose week' })).toBeNull()
+  })
+
+  it('October lines can be ticked done, and show what the weeks did for them', () => {
+    localStorage.setItem('symphony-week-ref', 'open')
+    const line = task({ id: 'm1', title: 'Plan Thanksgiving', bucket: 'month', monthStart: new Date(2026, 9, 1) })
+    const did = task({ id: 'w1', title: 'Book flights', bucket: 'week', weekStart: WEEK, sourceId: 'm1' })
+    renderWeek([line, did])
+    const ref = within(screen.getByRole('complementary', { name: 'October, for reference' }))
+    expect(ref.getByRole('button', { name: 'Complete Plan Thanksgiving' })).toBeInTheDocument()
+    expect(ref.getByText(/Book flights/)).toBeInTheDocument()
   })
 })

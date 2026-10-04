@@ -20,16 +20,17 @@ export function busyBlocks(items: { start: Date; end?: Date }[]): Span[] {
   })
 }
 
-/** The gaps between taken time, half an hour or longer. */
-export function freeWindows(busy: Span[]): Span[] {
+/** The gaps between taken time, half an hour or longer (or `minGap` hours —
+ *  the Week page's days count only an hour or more as free). */
+export function freeWindows(busy: Span[], minGap = MIN_GAP): Span[] {
   const sorted = [...busy].sort((a, b) => a.s - b.s)
   const out: Span[] = []
   let cursor = DAY_START
   for (const b of sorted) {
-    if (b.s - cursor >= MIN_GAP) out.push({ s: cursor, e: b.s })
+    if (b.s - cursor >= minGap) out.push({ s: cursor, e: b.s })
     cursor = Math.max(cursor, b.e)
   }
-  if (DAY_END - cursor >= MIN_GAP) out.push({ s: cursor, e: DAY_END })
+  if (DAY_END - cursor >= minGap) out.push({ s: cursor, e: DAY_END })
   return out
 }
 

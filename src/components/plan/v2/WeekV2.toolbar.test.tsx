@@ -12,6 +12,7 @@ vi.mock('@/hooks/useFamilyMembers', () => ({ useFamilyMembers: () => ({ members:
 vi.mock('@/hooks/useActionableInstances', () => ({ useActionableInstances: () => ({ setPlanned: vi.fn(), reschedule: vi.fn() }) }))
 vi.mock('./AddArea', () => ({ useAddArea: () => ({ area: undefined, picker: null }) }))
 vi.mock('./FromPaper', () => ({ FromPaper: () => null }))
+vi.mock('./WeekStepScreen', () => ({ WeekStepMain: () => null }))
 vi.mock('@/hooks/useDayPlan', () => ({ useDayPlan: () => ({ plan: null, loading: false, error: false }) }))
 
 import { WeekV2 } from './WeekV2'
@@ -20,7 +21,7 @@ import { PlanMastheadSlotsContext } from './planMastheadSlots'
 // A fixed Tuesday: the week's own last day changes what the toolbar offers
 // (it hands to next week), so these tests must not ride the wall clock.
 beforeEach(() => { vi.useFakeTimers({ toFake: ['Date'] }); vi.setSystemTime(new Date(2026, 8, 29, 12)) })
-afterEach(() => { vi.useRealTimers() })
+afterEach(() => { vi.useRealTimers(); localStorage.clear() })
 
 const renderWeek = () => render(
   <MemoryRouter>
@@ -28,53 +29,28 @@ const renderWeek = () => render(
   </MemoryRouter>,
 )
 
-// Walkthrough 2026-10-02 (#7, #9, #22): "Plan week N" opened the same page
-// under a white bar when there was nothing to look back on. Now the one verb
-// is "Mark week N planned" in place, unless last week left open work — then
-// "Look back at last week" opens the look-back.
+// 2026-10-04: one verb, "Plan the week", opens the session in steps (the
+// look-back its first step when last week left open work); marking planned
+// is the session's last step.
+const toLastStep = () => fireEvent.click(screen.getAllByRole('button').find((b) => b.textContent?.endsWith('The week') && b.closest('.pv2-steps'))!)
 describe('WeekV2 toolbar — one verb', () => {
   beforeEach(() => { session.saved = null; session.loading = false; session.error = null; session.save.mockReset() })
 
-  it('an unplanned week with nothing to look back on is marked planned in one tap', async () => {
-    session.save.mockResolvedValue(true)
+  it('an unplanned week offers “Plan the week”, which opens the steps', () => {
     renderWeek()
     expect(screen.getByText(/Week \d+ isn’t planned yet/)).toBeTruthy()
-    expect(screen.queryByRole('button', { name: /^Plan week \d+$/ })).toBeNull()
-    const mark = screen.getByRole('button', { name: /^Mark week \d+ planned$/ })
-    expect(mark.className).toBe('pv2-btn')
-    fireEvent.click(mark)
-    expect(session.save).toHaveBeenCalled()
-    // No planning screen opened: no "Planning week N" bar.
-    expect(screen.queryByRole('region', { name: /Planning week \d+/ })).toBeNull()
-  })
-
-  it('an agreed week shows its status and no verb', () => {
-    session.saved = { authorId: 'me', at: new Date(2026, 8, 26) }
-    renderWeek()
-    expect(screen.getByText(/Week \d+ planned/)).toBeTruthy()
-    // "· you" read as a stray word.
-    expect(screen.queryByText(/· you/)).toBeNull()
+    const plan = screen.getByRole('button', { name: 'Plan the week' })
+    expect(plan.className).toBe('pv2-btn')
     expect(screen.queryByRole('button', { name: /^Mark week \d+ planned$/ })).toBeNull()
-  })
-
-  it('no "no plan" claim while the session is still loading', () => {
-    session.loading = true
-    renderWeek()
-    expect(screen.queryByText(/Week \d+ isn’t planned yet/)).toBeNull()
-  })
-
-  it('a failed read says so, offers Try again, and offers no save that would overwrite', () => {
-    session.error = 'network'
-    renderWeek()
-    expect(screen.queryByText(/Week \d+ isn’t planned yet/)).toBeNull()
-    fireEvent.click(screen.getByRole('button', { name: 'Try again' }))
-    expect(session.reload).toHaveBeenCalled()
-    expect(screen.queryByRole('button', { name: /^Mark week \d+ planned$/ })).toBeNull()
+    fireEvent.click(plan)
+    expect(screen.getByRole('region', { name: /Planning week \d+/ })).toBeTruthy()
   })
 
   it('saving leaves its own line with the next step — Today for this week', async () => {
     session.save.mockResolvedValue(true)
     renderWeek()
+    fireEvent.click(screen.getByRole('button', { name: 'Plan the week' }))
+    toLastStep()
     fireEvent.click(screen.getByRole('button', { name: /^Mark week \d+ planned$/ }))
     expect(await screen.findByRole('button', { name: 'Not now' })).toBeTruthy()
     expect(screen.getByText(/Week \d+ is planned\./)).toBeTruthy()
@@ -86,8 +62,16 @@ describe('WeekV2 toolbar — one verb', () => {
   it('a week planned ahead hands back to Today, not a dead end (#23)', async () => {
     session.save.mockResolvedValue(true)
     render(<MemoryRouter><WeekV2 tasks={[]} weekStart={new Date(2026, 9, 3)} meId="me" isCurrent={false} days={null} onSelectTask={vi.fn()} /></MemoryRouter>)
+    fireEvent.click(screen.getByRole('button', { name: 'Plan the week' }))
+    toLastStep()
     fireEvent.click(screen.getByRole('button', { name: /^Mark week \d+ planned$/ }))
     expect(await screen.findByRole('button', { name: 'Back to Today →' })).toBeTruthy()
+  })
+
+  it('a planned week can be changed, quietly', () => {
+    session.saved = { authorId: 'me', at: new Date(2026, 8, 27) }
+    renderWeek()
+    expect(screen.getByRole('button', { name: 'Change the plan' }).className).toBe('pv2-qbtn')
   })
 })
 
@@ -108,8 +92,8 @@ describe('WeekV2 toolbar — folded into the masthead', () => {
     )
     expect(container.querySelector('.pv2-toolbar')).toBeNull()
     expect(subline.textContent).toMatch(/Week \d+ isn’t planned yet/)
-    expect(within(controls).getByRole('button', { name: /^Mark week \d+ planned$/ })).toBeTruthy()
-    expect(within(controls).getByRole('group', { name: 'View' })).toBeTruthy()
+    expect(within(controls).getByRole('button', { name: 'Plan the week' })).toBeTruthy()
+    expect(within(controls).queryByRole('group', { name: 'View' })).toBeNull()
     subline.remove(); controls.remove()
   })
 })
@@ -122,25 +106,24 @@ describe('WeekV2 reference — a week across a month end shows both months', () 
     id, title, completed, isGoal: true, bucket: 'month', monthStart: month, createdAt: new Date(2026, 8, 29), assignedTo: 'me',
   }) as unknown as import('@/types/task').Task
 
-  it('lists September and October, each with its own open items', () => {
+  it('lists September and October, each whole: done lines stay, struck', () => {
     const tasks = [goal('s1', 'Finish the garden', new Date(2026, 8, 1), true), goal('o1', 'Book flu shots', new Date(2026, 9, 1))]
     render(<MemoryRouter><WeekV2 tasks={tasks} weekStart={new Date(2026, 8, 26)} meId="me" isCurrent days={null} onSelectTask={vi.fn()} /></MemoryRouter>)
-    fireEvent.click(screen.getByRole('button', { name: /^With / }))
-    expect(screen.getByText('Nothing open on September’s plan.')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: /September and October list/ }))
+    expect(screen.getByRole('button', { name: 'Finish the garden' }).closest('li')?.dataset.done).toBe('true')
     expect(screen.getByRole('button', { name: 'Book flu shots' })).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Open October →' })).toBeTruthy()
   })
 
-  it('the empty list points at the months beside it, not at a review to start', () => {
+  it('the empty list asks for the week’s own work, not a review to start', () => {
     render(<MemoryRouter><WeekV2 tasks={[]} weekStart={new Date(2026, 8, 26)} meId="me" isCurrent days={null} onSelectTask={vi.fn()} /></MemoryRouter>)
-    fireEvent.click(screen.getByRole('button', { name: /^With / }))
     expect(screen.queryByText(/start the weekly review/)).toBeNull()
-    expect(screen.getByText(/take a step from September and October’s plan beside it/)).toBeTruthy()
+    expect(screen.getByText('Nothing on this week yet. Add the first thing below.')).toBeTruthy()
   })
 
   it('a week inside one month shows one month', () => {
     render(<MemoryRouter><WeekV2 tasks={[]} weekStart={new Date(2026, 9, 3)} meId="me" isCurrent days={null} onSelectTask={vi.fn()} /></MemoryRouter>)
-    fireEvent.click(screen.getByRole('button', { name: /^With / }))
+    fireEvent.click(screen.getByRole('button', { name: /^October list/ }))
     expect(screen.getByRole('button', { name: 'Open October →' })).toBeTruthy()
     expect(screen.queryByRole('button', { name: 'Open September →' })).toBeNull()
   })
@@ -154,22 +137,24 @@ describe('WeekV2 reference while tasks load', () => {
     vi.doMock('@/hooks/useSupabaseTasks', () => ({ useSupabaseTasks: () => ({ loading: true, toggleTask: vi.fn(), updateTask: vi.fn(), pushTask: vi.fn(), updateTasksBulk: vi.fn(), keepForward: vi.fn(), dropCommitment: vi.fn(), addTask: vi.fn() }) }))
     const { WeekV2: Fresh } = await import('./WeekV2')
     render(<MemoryRouter><Fresh tasks={[]} weekStart={new Date(2026, 8, 26)} meId="me" isCurrent days={null} onSelectTask={vi.fn()} /></MemoryRouter>)
-    fireEvent.click(screen.getByRole('button', { name: /^With / }))
+    fireEvent.click(screen.getByRole('button', { name: /September and October list/ }))
     expect(screen.getAllByText('Loading…').length).toBe(2)
-    expect(screen.queryByText(/Nothing open on/)).toBeNull()
+    expect(screen.queryByText(/Nothing written for/)).toBeNull()
     vi.doUnmock('@/hooks/useSupabaseTasks')
   })
 })
 
-// Walkthrough 2026-09-30: nothing said "Hang porch plants" had a step this week.
-// 2026-10-02: in words, not a count.
-describe('WeekV2 — a month goal says this week took it on', () => {
-  beforeEach(() => { session.saved = null; session.loading = false; session.error = null })
-  it('marks the goal a week step serves', () => {
-    const goal = { id: 'g1', title: 'Hang porch plants', completed: false, isGoal: true, bucket: 'month', monthStart: new Date(2026, 9, 1), createdAt: new Date(2026, 8, 29), assignedTo: 'me' }
-    const step = { id: 's1', title: 'Buy porch plant hooks', completed: false, bucket: 'week', weekStart: new Date(2026, 8, 26), goalTaskId: 'g1', createdAt: new Date(2026, 8, 30), assignedTo: 'me' }
-    render(<MemoryRouter><WeekV2 tasks={[goal, step] as never} weekStart={new Date(2026, 8, 26)} meId="me" isCurrent days={null} onSelectTask={vi.fn()} /></MemoryRouter>)
-    fireEvent.click(screen.getByRole('button', { name: /^With / }))
-    expect(screen.getByText('In this week’s list')).toBeTruthy()
+// Walkthrough 2026-09-30: nothing said a month line had come into the week.
+// 2026-10-04: the month stays whole; a line that is on the week says so.
+describe('WeekV2 — a month line on this week says so', () => {
+  beforeEach(() => { session.saved = null; session.loading = false; session.error = null; localStorage.clear() })
+  it('marks it “On this week”, and offers no second copy', () => {
+    const line = { id: 'g1', title: 'Hang porch plants', completed: false, bucket: 'week', monthStart: new Date(2026, 9, 1), weekStart: new Date(2026, 9, 3), createdAt: new Date(2026, 8, 29), assignedTo: 'me',
+      commitments: [{ level: 'month', periodStart: new Date(2026, 9, 1), status: 'open' }, { level: 'week', periodStart: new Date(2026, 9, 3), status: 'open' }] }
+    render(<MemoryRouter><WeekV2 tasks={[line] as never} weekStart={new Date(2026, 9, 3)} meId="me" isCurrent days={null} onSelectTask={vi.fn()} /></MemoryRouter>)
+    fireEvent.click(screen.getByRole('button', { name: /^October list/ }))
+    const ref = within(screen.getByRole('complementary', { name: 'October, for reference' }))
+    expect(ref.getByText('On this week')).toBeTruthy()
+    expect(ref.queryByRole('button', { name: /Add Hang porch plants to this week/ })).toBeNull()
   })
 })

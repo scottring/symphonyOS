@@ -1,0 +1,120 @@
+# The planning model, and a Week page that shows it — 2026-10-04
+
+Scott approved the model on 2026-10-04 ("yes, write the spec and build it, but
+we need a crystal clear, intuitive, easy to understand interface as the
+central piece"). Mockup: https://claude.ai/artifact/Tp1kyQmrbJMG2fvN7A3dfn.
+
+## Why
+
+Since July the way horizons connect flipped five times: look-don't-link
+(07-08), paper only (08-17), goal-first cascade (09-26), source-first pull
+(10-03), and back to look-don't-link (10-04, Best Laid Plans). Each build
+fixed screens on whichever model was current. This spec is the model; every
+planning page and step is checked against it.
+
+## The rule
+
+**Lists above the week are for looking. The week and the day are for doing.**
+
+| Horizon | What it is | Beside it while writing | What moves down |
+| --- | --- | --- | --- |
+| Year | reference list | — | nothing; hidden unless opened |
+| Season (Fall) | brainstorm list: everything we want in Fall | the year, behind a link | nothing |
+| Month (October) | plain list | the season, shown, hideable | rarely: one line into a week |
+| Week | the week's list, its days, routines, calendar | the month, behind a link | — |
+| Day (Today) | the work and what you need to do it | the week | — |
+
+- No goals vs tasks above the week: no diamonds, "Part of", "+ Step",
+  "+ This week", "+ Week N's part", "Make it a goal", goal links.
+- Upper lists stay whole for their own review: done lines stay, struck; a
+  line that came into a week says "On this week". Lines are ticked by hand.
+- Urgent work goes straight to Today; nothing climbs the ladder.
+- Data stays (is_goal, goal_task_id, source_id, support links); the UI stops
+  showing or writing them. No migration.
+
+## The Week page (at rest)
+
+- Masthead: week number and dates, the plan's status, one button: **Plan
+  the week** (Plan again, quiet, once planned). No List / With / One-at-a-time
+  toggles. The Journal/Schedule switch stays (hours are a different tool).
+- Left: **This week** — "What we mean to get done. Give it a day only if it
+  needs one." The work waiting for a day; a day's work is in its day.
+- Under it: **October list · for reference** opens the month's list at the
+  far left (remembered per device; Hide in its heading). Plain rows; "Add to
+  this week" appears on hover only.
+- Right: the days. Routines that happen every day or every weekday are not
+  drawn at all (Scott, 2026-10-04: the box that listed them "once" had no job
+  here — they are ticked on Today); they still count as time taken. Each day holds only what is
+  particular to it — events (a dash, no check), tasks and routines (a check),
+  no ↻, no "Routines · N" fold — and ends with its free time ("Free 7:30a–6p ·
+  7:30–9p", an hour or more between 7a and 9p).
+- The weekend band and "Sometime this weekend" are unchanged.
+
+## Additions after the first walk (2026-10-04)
+
+The page's job, written first (vault `briefs/2026-10-04-page-jobs.md`):
+know what's fixed each day, what we mean to do, who carries what, whether
+there's room; do add, give a day or time, move, assign, tick.
+
+- **Daily routines: Hide / Show** above the days (hidden by default,
+  remembered per device). Shown, they sit in each day; any routine opens to be
+  changed. Hidden, they still count as time taken.
+- **Three kinds, told apart**, with a key above the days: event = blue bar on
+  a tinted row, no check; task = round check; routine = rounded-square check
+  in sage; a list line above the week = dash.
+- **People on the day rows** (under the title in a day's narrow cell).
+- **Can't move** adds with a time; **Look ahead** rows open, and a dated task
+  can be started this week.
+- "Show done" instead of "Completed · N".
+- Considered and dropped: a tabbed column on the Week page (Inbox, Between
+  us…). Those belong to planning, which walks them in order.
+
+## Planning the week (the session)
+
+Eight steps, one kind of thing each: Last week · Inbox · Between us · Can't
+move · Look ahead · Routines · **Write the week** · The week.
+
+- *Write the week* replaces "Already on" and "New tasks": the week's list,
+  with the month beside it for reference — "nothing on it has to come down."
+- One primary at a time: **Next** on every step; **Mark week N planned** only
+  on the last.
+- The look-back card shows notes as text, never HTML, and no "Part of".
+
+## Month, Season, Year
+
+- Month: season · October's list · dates. The season column is shown by
+  default, hideable, plain; no "+ This month" / "+ Step". A month line's ⋯
+  menu keeps "Into this week" (the one way down) and "Do it today".
+- Season: the list alone ("Fall: everything we want in it", brainstorm
+  columns); "2026 list · for reference" opens the year beside it. No
+  "Into October".
+- Year: "2026's list", a plain list. No one-at-a-time view.
+- After a save the next step reads "Write October's list" / "Plan week 41".
+
+## Season and Year, drawn (2026-10-04, mockups Season/Year.dc.html)
+
+- **Season:** under the masthead, the season band — its months (from the
+  household's seasons), the part already lived shaded, a "today" line, and
+  landmarks pinned below. The list is a board of large cards (22px serif): a
+  box to tick by hand, the words, ⋯, and under each what the months wrote for
+  it ("OCT  Make a budget").
+- **Year:** a ribbon of twelve months tinted by season, the season names
+  above, "today". The year's list in large type (26px), two columns; under
+  each line, what the seasons wrote for it.
+- "Written for" counts any link a row carries: source_id, goal_task_id,
+  supports_goal_task_id, or goal_id (a season line under a year goal).
+- Week items can be written "for" a month line (optional, one way); the month
+  line shows what the weeks did, on the Week page's October list and the
+  October page. Month lines are ticked by hand, never by their week items.
+
+## Not changed
+
+Data model, Today, drag rules on the days, routines' own pages, the weekend
+band, the guide. The month calendar's drag of a line onto a day/week stays.
+
+## Verification
+
+Unit tests for `weekRhythm`, the free-time gap, the grid (rhythm once, no
+fold, free time), WeekV2 (rest layout, reference toggle, steps, one primary),
+Month/Season/Year copy. Visual check on a component harness with the demo
+account's routines at desktop and 390px (the local build had no session).

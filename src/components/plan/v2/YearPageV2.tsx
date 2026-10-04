@@ -17,19 +17,21 @@ import { useAuth } from '@/hooks/useAuth'
 import { MastheadCard, PeriodNavEyebrow } from '@/components/layout/MastheadCard'
 import { showToast } from '@/hooks/useToast'
 import { filterTasksForLayers, matchesLayers } from '@/lib/today/domainFilter'
-import { readPlanView, writePlanView, lookBackOpen, type PlanView } from '@/lib/planning/v2/planV2'
+import { writePlanView, lookBackOpen } from '@/lib/planning/v2/planV2'
 import type { Goal } from '@/types/goal'
 import type { Task } from '@/types/task'
 import { PlanLine, type LineActions, type LineVM } from './PlanLine'
-import { FocusDeck, CloseOut, type CloseDecision } from './FocusDeck'
+import { CloseOut, type CloseDecision } from './FocusDeck'
 import { PlanMeetingBar, PlanSavedLine, PlanToolbar, PlanToolbarControls, PlanToolbarStatus, type PlanToolbarProps } from './PlanStatus'
 import { GuideAnchor } from '@/components/guide/GuideBar'
 import { useMobile } from '@/hooks/useMobile'
 import { EMPTY_TALLY, addToTally, decidedSentence, lookBackWhy, nextAfterSave, type Tally } from '@/lib/planning/v2/planTally'
 import { periodBounds } from '@/lib/planning/periodPage'
 import { readSeasons } from '@/lib/cadence/seasons'
+import { writtenFor } from '@/lib/week/monthLinks'
+import { YearRibbon } from './PeriodShape'
+import { LineCard } from './LineCard'
 import { FromPaper } from './FromPaper'
-import { ViewSwitch } from './ViewSwitch'
 import { useAddArea } from './AddArea'
 import { useAssigneeFilter } from '@/hooks/useAssigneeFilter'
 import { planPeopleLens } from '@/lib/planning/peopleLens'
@@ -77,8 +79,6 @@ function Inner() {
 
   const session = usePlanningSession('annual', yearToken(year))
   const [meeting, setMeeting] = useState<null | { step: 1 | 2; candidateIds: string[] }>(null)
-  const [view, setViewState] = useState<PlanView>(() => { const v = readPlanView('year'); return v === 'ref' ? 'list' : v })
-  const setView = (v: PlanView) => { setViewState(v); writePlanView('year', v) }
   const [openLine, setOpenLine] = useState<string | null>(null)
   const [draft, setDraft] = useState('')
   const [showDropped, setShowDropped] = useState(false)
@@ -159,10 +159,9 @@ function Inner() {
   const dropped = lines.filter((l) => l.fate === 'dropped')
   const row = (vm: LineVM) => <PlanLine key={vm.task.id} vm={vm} actions={actions} members={members} nextLabel={String(year + 1)}
     open={openLine === vm.task.id} onToggle={() => setOpenLine((o) => (o === vm.task.id ? null : vm.task.id))} editable={inMeeting} />
-  const viewSwitch = <ViewSwitch view={view} onChange={setView} withRef={false} />
   const toolbar: PlanToolbarProps = {
     period: String(year), saved: session.saved, loading: session.loading, error: !!session.error, agreedBy,
-    reviewDue, onPlan: startMeeting, onRetry: session.reload, viewSwitch,
+    reviewDue, onPlan: startMeeting, onRetry: session.reload,
     lookBack: reviewIds.length ? String(year - 1) : null, onMark: () => void endMeeting(true), hasLines: main.length > 0,
     justSaved: justSaved && {
       detail: justSaved.detail,
@@ -177,19 +176,24 @@ function Inner() {
   if (meeting?.step === 1) {
     body = <CloseOut lines={prevLines} candidateIds={meeting.candidateIds} members={members} actions={actions} prevName={String(year - 1)} nextName={String(year)}
       onDecide={decide} onFinish={() => setMeeting({ ...meeting, step: 2 })} />
-  } else if (view === 'focus') {
-    body = <FocusDeck lines={lines} actions={actions} members={members} nextLabel={String(year + 1)} context={`${year} plan`} label={`${year}’s plan`} />
   } else {
     body = (
       <section aria-label={`${year} plan`}>
-        <div className="pv2-colh">{inMeeting ? `${year}’s goals` : 'Our plan'}<FromPaper altitude="year" periodStart={new Date(year, 0, 1)} tasks={layered} /></div>
+        {/* The year is reference (Scott, 2026-10-04): a plain list, read
+            when a season is written. */}
+        <div className="pv2-colh">{`${year}’s list`}<FromPaper altitude="year" periodStart={new Date(year, 0, 1)} tasks={layered} /></div>
         {loading && !main.length ? <p className="pv2-hint">Loading…</p> : null}
         {!loading && !main.length && <p className="pv2-hint ds-empty-body">{inMeeting ? 'Write what you want this year to hold.' : `Nothing on ${year}’s plan yet. That’s fine.`}</p>}
-        <ul className="pv2-list pv2-brain">{main.map(row)}</ul>
+        {/* The year's list in large type; under each line, what the seasons
+            wrote for it (2026-10-04). */}
+        <ul className="ps-yearlist">{main.map((vm) => (
+          <LineCard key={vm.task.id} variant="row" vm={vm} actions={actions} nextLabel={String(year + 1)}
+            did={writtenFor(vm.task.id, layered, (t) => periodBounds('season', t.seasonStart ?? t.monthStart ?? t.createdAt, seasons).label.replace(/\s+\d{4}$/, ''))} />
+        ))}</ul>
         {/* Always open, as on every horizon: the review is not a gate on writing. */}
         <form className="pv2-write" onSubmit={(e) => { e.preventDefault(); const v = draft.trim(); if (v) { void addLine(v); setDraft('') } }}>
-          <span className="pv2-goal" aria-hidden="true" />
-          <input value={draft} onChange={(e) => setDraft(e.target.value)} placeholder="Add a goal for the year" aria-label={`Add to ${year}`} />
+          <span className="pv2-dash" aria-hidden="true" />
+          <input value={draft} onChange={(e) => setDraft(e.target.value)} placeholder={`Add to ${year}`} aria-label={`Add to ${year}`} />
           {addAreaChoice.picker}
         </form>
         {carried.length > 0 && <><div className="pv2-sect">Carried to {year + 1}</div><ul className="pv2-list">{carried.map(row)}</ul></>}
@@ -203,7 +207,7 @@ function Inner() {
   }
 
   return (
-    <div className="pv2-page">
+    <div className="pv2-page is-year">
       <MastheadCard variant="page" numeral={String(year)} title={`Jan – Dec ${year}`}
         eyebrow={<PeriodNavEyebrow label="Year" onPrev={() => goTo(year - 1)} onNext={() => goTo(year + 1)} prevLabel={String(year - 1)} nextLabel={String(year + 1)} />}
         // Desktop folds the control row into the masthead (layout system,
@@ -217,9 +221,9 @@ function Inner() {
           why={meeting!.step === 1 ? lookBackWhy(String(year - 1), String(year), meeting!.candidateIds.length - (tally.carried + tally.done + tally.someday + tally.dropped + tally.left))
             : 'Write what this year is for. A few lines is plenty; each can hold smaller plans later.'}
           onStep={(step) => setMeeting({ ...meeting!, step })}
-          viewSwitch={meeting!.step === 2 && meeting!.candidateIds.length === 0 ? viewSwitch : undefined}
           onLeave={() => void endMeeting(false)} onSave={() => void endMeeting(true)} saveLabel={`Mark ${year} planned`} />
       ) : folded ? <><GuideAnchor /><PlanSavedLine period={String(year)} justSaved={toolbar.justSaved} /></> : <PlanToolbar {...toolbar} />}
+      {meeting?.step !== 1 && <YearRibbon year={year} seasons={seasons} today={new Date()} />}
       {body}
     </div>
   )
