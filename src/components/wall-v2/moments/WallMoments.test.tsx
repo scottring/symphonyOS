@@ -82,4 +82,22 @@ describe('WallMoments', () => {
     expect(within(screen.getByRole('region', { name: 'Specials this week' })).getByText('Wed').closest('tr')).toHaveClass('bg-[#243245]')
     expect(screen.getByText('Sweet potato tacos')).toBeInTheDocument()
   })
+
+  // Scott, 2026-10-05: "the kiosk meal no longer taps to the recipe".
+  it('tapping the meal line opens its recipe', () => {
+    const onOpen = vi.fn()
+    render(<WallMoments {...base({ moment: 'after', nextMeal: { label: 'Dinner at 6:30 PM', title: 'Maple-Dijon salmon', imageUrl: null, onOpen } })} />)
+    fireEvent.click(screen.getByRole('button', { name: /Maple-Dijon salmon\. Open the recipe/ }))
+    expect(onOpen).toHaveBeenCalled()
+  })
+
+  it('at dinner, tapping the photo opens the recipe too', () => {
+    const onCook = vi.fn()
+    render(<WallMoments {...base({
+      moment: 'dinner',
+      dinner: { title: 'Salmon', imageUrl: null, minutes: null, cue: null, ingredients: [], hasRecipe: true, scale: 1, onScale: vi.fn(), onCook, have: new Set(), onToggleHave: vi.fn(), onAddMissing: vi.fn() },
+    })} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Salmon: open the recipe' }))
+    expect(onCook).toHaveBeenCalled()
+  })
 })

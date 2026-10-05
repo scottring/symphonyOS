@@ -62,7 +62,7 @@ export interface WallMomentsProps {
   handoffs: MomentHandoff[]
   dinner: MomentDinner | null
   /** Morning/after: tonight's dinner in a line. Evening: tomorrow's. */
-  nextMeal: { label: string; title: string; imageUrl: string | null } | null
+  nextMeal: { label: string; title: string; imageUrl: string | null; onOpen?: () => void } | null
   question: { text: string; isHandoff: boolean } | null
   checklists: { member: FamilyMember; list: WallChecklist | null; live?: string | null }[]
   onTapRow: (id: string) => void
@@ -176,12 +176,21 @@ function KidBring({ kids, t, label }: { kids: MomentKid[]; t: ReturnType<typeof 
   )
 }
 
+// Tapping the meal opens its recipe, as the wall's dinner card always did
+// (lost in the time-of-day rebuild; Scott, 2026-10-05).
 function NextMeal({ meal }: { meal: NonNullable<WallMomentsProps['nextMeal']> }) {
-  return (
-    <div className="mt-auto flex items-center gap-4 rounded-2xl bg-[#1d2835] p-4">
+  const body = (
+    <>
       <Photo url={meal.imageUrl} className="h-[84px] w-[132px] shrink-0 rounded-xl" />
-      <div className="min-w-0"><div className={kicker}>{meal.label}</div><div className="mt-1 truncate font-display text-[1.7rem] text-white">{meal.title}</div></div>
-    </div>
+      <div className="min-w-0 flex-1"><div className={kicker}>{meal.label}</div><div className="mt-1 truncate font-display text-[1.7rem] text-white">{meal.title}</div></div>
+    </>
+  )
+  if (!meal.onOpen) return <div className="mt-auto flex items-center gap-4 rounded-2xl bg-[#1d2835] p-4">{body}</div>
+  return (
+    <button type="button" onClick={meal.onOpen} aria-label={`${meal.label}: ${meal.title}. Open the recipe`}
+      className="mt-auto flex w-full items-center gap-4 rounded-2xl bg-[#1d2835] p-4 text-left active:bg-[#243245]">
+      {body}<ChevronRight className="h-7 w-7 shrink-0 text-[#8d9cad]" />
+    </button>
   )
 }
 
@@ -189,7 +198,9 @@ function DinnerCard({ d }: { d: MomentDinner }) {
   return (
     <>
       <div className="relative h-[34%] min-h-[220px] overflow-hidden rounded-[18px]">
-        <Photo url={d.imageUrl} className="absolute inset-0 h-full w-full" />
+        {d.hasRecipe
+          ? <button type="button" onClick={d.onCook} aria-label={`${d.title}: open the recipe`} className="absolute inset-0"><Photo url={d.imageUrl} className="h-full w-full" /></button>
+          : <Photo url={d.imageUrl} className="absolute inset-0 h-full w-full" />}
         <div className="absolute inset-x-0 bottom-0 flex items-end justify-between gap-4 bg-gradient-to-t from-black/85 to-transparent px-6 pb-5 pt-16">
           <div className="min-w-0">
             <div className="font-display text-[2.6rem] leading-[1.05] text-white">{d.title}</div>
