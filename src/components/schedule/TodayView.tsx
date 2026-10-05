@@ -43,6 +43,7 @@ import { PhoneFilterControl } from '@/components/layout/PhoneFilterControl'
 import { Eye, EyeOff, Binoculars, Printer, GripVertical, Moon, Sparkles, ChevronDown, ChevronRight, Plus, History } from 'lucide-react'
 import { splitTodayJournal, splitCompletedFocus } from '@/lib/today/journalSplit'
 import { panelActionsFor } from '@/components/reference/DayPlanPanel'
+import { useColumnsFitWindow } from '@/hooks/useColumnsFitWindow'
 import { TodayWeekColumn } from './TodayWeekColumn'
 import { TodayComingUp } from './TodayComingUp'
 import { ServesLine } from './ServesLine'
@@ -441,6 +442,7 @@ export function TodayView({
   const guideOnToday = guide?.status === 'active' && currentStep(guide) === 'today'
   useEffect(() => { if (guideOnToday) setTodayViewState('ref') }, [guideOnToday])
   const showWeek = todayView === 'ref'
+  const splitRef = useColumnsFitWindow(showWeek)
   const weekNo = weekOfYear(viewedDate, readCadenceConfig().weekStartsOn)
   // The dock's Today pin showed this same list beside the page; the column
   // holds it now, so the page never shows it twice.
@@ -1382,7 +1384,7 @@ export function TodayView({
     // (no ancestor declared one, so the old decision rail never went beside).
     // Width: the reading column (PAGE_COLUMN, 1040px of content) — or, with
     // the week column beside the day, a planning page that fills the screen.
-    <div className={`@container w-full ${showWeek ? `max-w-[1712px] ${PLANNING_PAGE_CLASS}` : 'max-w-[1152px]'} mx-auto px-0 py-2 md:px-10 lg:px-14 md:pt-2 md:pb-8`}>
+    <div className={`today-page @container w-full ${showWeek ? `max-w-[1712px] ${PLANNING_PAGE_CLASS}` : 'max-w-[1152px]'} mx-auto px-0 py-2 md:px-10 lg:px-14 md:pt-2 md:pb-8`}>
       {/* Today's filter and ⋯ live in its heading beside the lens and the
           assistant, as every horizon's page controls do — the top bar is the
           same on every page (2026-09-29). */}
@@ -1476,7 +1478,10 @@ export function TodayView({
       )}
       {/* The column beside the day: the week (and anything needing a
           decision). The day gets the full width only when there is none. */}
-      <div className={`px-4 md:px-0 ${showWeek ? '@[48rem]:grid @[48rem]:grid-cols-[minmax(0,1fr)_280px] @[48rem]:items-start @[48rem]:gap-9' : ''}`}>
+      {/* With the week beside it, the day and the week each scroll on their
+          own (Scott, 2026-10-05), as Week and Month do: useColumnsFitWindow
+          sizes them to the window, layout-system.css scrolls them. */}
+      <div ref={splitRef} className={`px-4 md:px-0 ${showWeek ? 'today-split is-colscroll @[48rem]:grid @[48rem]:grid-cols-[minmax(0,1fr)_280px] @[48rem]:items-start @[48rem]:gap-9' : ''}`}>
         <main className="min-w-0">
           {/* The "N need a decision" banner that stood here at narrow widths
               is gone (Scott, 2026-09-21): a count on Today is a scoreboard,

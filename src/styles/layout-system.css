@@ -245,6 +245,28 @@
   .pv2-wgrid.is-colscroll > .pv2-ref .pv2-refshelf > summary { padding: 4px 0 6px; }
 }
 
+/* Today with its week beside it (Scott, 2026-10-05): the day and the week
+   column scroll on their own, like Week and Month above. Only while the two
+   sit side by side — the split is a container query on Today's page
+   (@[48rem]), so the rule is too; stacked, the page scrolls as one. */
+@media (min-width: 861px) {
+  /* The columns end above the landscape; the page's trailing room would
+     only add a page scroll. */
+  .today-page:has(.today-split.is-colscroll) { padding-bottom: 0; }
+  @container (min-width: 48rem) {
+    .today-split.is-colscroll { align-items: stretch; }
+    .today-split.is-colscroll > :is(main, .today-aside) {
+      position: relative; top: auto; max-height: var(--pv2-col-h, none);
+      overflow-y: auto; scrollbar-width: thin;
+      margin: 0 -14px 0 -22px; padding: 0 14px 0 22px;
+    }
+    .today-split.is-colscroll > .today-aside .pv2-colh {
+      position: sticky; top: 0; z-index: 2;
+      background: var(--pv2-colh-bg); background-attachment: fixed;
+    }
+  }
+}
+
 /* ── The Week row (WeekRow, 2026-10-03) ─────────────────────────────────
    One row in every column of the Week page: lane · mark · title · people ·
    trailing. No white cards and no rules between rows; the shared hover tint
