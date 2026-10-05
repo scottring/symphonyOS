@@ -1,6 +1,6 @@
 // src/components/wall-v2/WallV2PhoneScreen.tsx
 //
-// SymphonyBell (the kids' phone, named 2026-10-04): its full-screen phone book on the wall. Big photo buttons (favorites first,
+// kidsPhone (named 2026-10-04): its full-screen phone book on the wall. Big photo buttons (favorites first,
 // then all allowed contacts). Tap a face → confirm → the callee is parked for
 // the in-house handset (placeCall with source:'kiosk'). If the receiver is
 // already up, the warmline connects it within ~2s; if not, pick up the phone
@@ -78,7 +78,7 @@ export function WallV2PhoneScreen({ onClose }: { onClose: () => void }) {
     <div className={`fixed inset-0 z-40 overflow-auto ${WALL.root}`}>
       <div className="sticky top-0 flex items-center justify-between px-8 py-6 bg-inherit">
         <h1 className={`flex items-center gap-3 text-3xl font-extrabold ${WALL.inkStrong}`}>
-          <Phone className="w-8 h-8" /> SymphonyBell · call someone
+          <Phone className="w-8 h-8" /> kidsPhone · call someone
         </h1>
         {offHook && (
           <p className={`text-xl font-bold ${WALL.muted}`}>You&rsquo;re holding the phone — pick someone.</p>
