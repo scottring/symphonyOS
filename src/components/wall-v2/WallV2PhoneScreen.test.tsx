@@ -22,6 +22,12 @@ import { WallV2PhoneScreen } from './WallV2PhoneScreen';
 describe('WallV2PhoneScreen', () => {
   beforeEach(() => { placeCall.mockClear(); handset.offHook = false; });
 
+  // Scott, 2026-10-04: the kids' phone is called kidsPhone (not SymphonyBell).
+  it('is called kidsPhone', () => {
+    render(<WallV2PhoneScreen onClose={() => {}} />);
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('kidsPhone');
+  });
+
   it('requires a confirm before placing the call', async () => {
     render(<WallV2PhoneScreen onClose={() => {}} />);
     fireEvent.click(screen.getByRole('button', { name: /Grandma/ }));

@@ -843,11 +843,11 @@ export function WallV2Shell() {
           weather={liveWeather ? { icon: weatherData.icon ?? Sun, temp: weatherData.temp, condition: weatherData.condition } : null}
           actions={
             <div className="flex items-center gap-2">
-              {/* SymphonyBell — the kids' phone. Its own labelled button, never a
+              {/* kidsPhone. Its own labelled button, never a
                   tap deeper (a kid's call to Grandma must not get harder). */}
-              <button type="button" onClick={() => setShowPhone(true)} aria-label="SymphonyBell — call"
+              <button type="button" onClick={() => setShowPhone(true)} aria-label="kidsPhone — call"
                 className="inline-flex min-h-[56px] items-center gap-2 rounded-2xl bg-[#f2b65a] px-5 text-[1.15rem] font-semibold text-[#1b1406]">
-                <Phone className="h-6 w-6" aria-hidden="true" />SymphonyBell
+                <Phone className="h-6 w-6" aria-hidden="true" />kidsPhone
               </button>
               <button type="button" onClick={() => setShowRecipePicker(true)} aria-label="Recipes"
                 className="grid h-14 w-14 place-items-center rounded-2xl border border-[#2d3d50] bg-[#1c2733]">
@@ -1071,7 +1071,7 @@ export function WallV2Shell() {
         />
       )}
 
-      {/* Caller-ID takeover — full-screen when SymphonyBell has a live call. */}
+      {/* Caller-ID takeover — full-screen when kidsPhone has a live call. */}
       <CallerIdTakeover />
     </div>
   );
