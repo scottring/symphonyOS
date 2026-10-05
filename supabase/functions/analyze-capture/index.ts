@@ -6,6 +6,7 @@
 // task already marked done is a no-op. Auth: user JWT (same pattern as
 // symphony-agent).
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { parseCaptureFacets, reachFromFacets, type CaptureLink } from '../_shared/captureReach.ts'
 
 const MODEL = 'claude-sonnet-4-6'
 
@@ -21,6 +22,8 @@ interface AnalysisResult {
   title: string
   note: string
   suggested_task_id: string | null
+  /** Raw facets from the model; validated by parseCaptureFacets. */
+  facets: unknown
 }
 
 function buildPrompt(openTasks: { id: string; title: string }[]): string {
@@ -34,8 +37,17 @@ Analyze the photo and respond with ONLY a JSON object (no markdown fences, no pr
 {
   "title": "Short task-card title identifying the thing and the likely action, e.g. 'Replacement bulb — T8 18W 4-pin fluorescent'",
   "note": "Plain-text note the user will read on their phone in a store. Use short labeled lines separated by newlines, no markdown syntax. Cover, when applicable:\nWhat it is: <common name of the item>\nSpecs: <size, wattage, model, base/fitting, dimensions — everything visible or inferable>\nWhere to buy: <typical stores or online>\nAt the store, say: <one sentence the user can say to an employee>\nNotes: <anything else useful — compatibility caveats, quantity guess, uncertainty>",
-  "suggested_task_id": "id of ONE task from the list below if this photo clearly belongs to it, else null"
+  "suggested_task_id": "id of ONE task from the list below if this photo clearly belongs to it, else null",
+  "facets": [ the facts the user will ACT on, each one of:
+    {"type":"phone","label":"what the call is for, and when","number":"as printed"}
+    {"type":"link","label":"what the site is for, and when","url":"as printed"}
+    {"type":"datetime","label":"Report to court","iso":"2026-10-05T08:00:00"}
+    {"type":"location","label":"Report to","address":"full address, complete enough to navigate to"}
+    {"type":"access_code","label":"Juror ID","code":"exactly as printed"}
+  ]
 }
+
+Facets: list EVERY phone number and website the photo gives for doing something — confirming, registering, paying, rescheduling, checking status, asking a question. Label each with its purpose and timing exactly as the photo states it (e.g. "Confirm service — call after 5 PM the night before"), so the user can tap it without rereading the photo. The same number listed for two purposes is one facet whose label names both. Add a datetime for each appointment or deadline, a location for each place to go, and an access_code for reference numbers the user will be asked for. Only facts printed in the photo — never invent. Use [] for a part or product photo with nothing to call or visit.
 
 The user's open tasks (id: title):
 ${taskList}
@@ -53,6 +65,7 @@ function parseAnalysis(text: string): AnalysisResult {
     title: parsed.title.slice(0, 200),
     note: parsed.note,
     suggested_task_id: typeof parsed.suggested_task_id === 'string' ? parsed.suggested_task_id : null,
+    facets: parsed.facets,
   }
 }
 
@@ -62,7 +75,7 @@ async function callVision(imageUrl: string, prompt: string, apiKey: string): Pro
     headers: { 'content-type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
     body: JSON.stringify({
       model: MODEL,
-      max_tokens: 1500,
+      max_tokens: 2500,
       messages: [
         {
           role: 'user',
@@ -117,7 +130,7 @@ Deno.serve(async (req) => {
 
   const { data: task, error: taskErr } = await db
     .from('tasks')
-    .select('id, title, notes, capture_meta')
+    .select('id, title, notes, capture_meta, phone_number, links')
     .eq('id', taskId)
     .maybeSingle()
   if (taskErr) return json({ error: `Task lookup failed: ${taskErr.message}` }, 500)
@@ -155,6 +168,12 @@ Deno.serve(async (req) => {
 
     const raw = await callVision(signed.signedUrl, buildPrompt(candidates), apiKey)
     const analysis = parseAnalysis(raw)
+    const facets = parseCaptureFacets(analysis.facets)
+    // The number to call and the sites to visit, tappable on the task itself.
+    const reach = reachFromFacets(facets, {
+      phone_number: (task.phone_number as string | null) ?? null,
+      links: Array.isArray(task.links) ? (task.links as (CaptureLink | string)[]) : null,
+    })
 
     // Only trust suggestions that point at a real candidate id.
     const suggestedId = analysis.suggested_task_id && candidates.some((c) => c.id === analysis.suggested_task_id)
@@ -166,6 +185,7 @@ Deno.serve(async (req) => {
       .update({
         title: analysis.title,
         notes: analysis.note,
+        ...reach,
         capture_meta: {
           status: 'done',
           storage_path: storagePath,
@@ -193,6 +213,10 @@ Deno.serve(async (req) => {
         file_type: body.fileType ?? 'image/jpeg',
         file_size: body.fileSize ?? 0,
         storage_path: storagePath,
+        // Read in the same vision call, so the photo shows its labelled
+        // call / visit / when chips without a second analysis.
+        facets,
+        analyzed_at: new Date().toISOString(),
       })
       if (attachErr) console.error('attachments insert failed:', attachErr.message)
     }
