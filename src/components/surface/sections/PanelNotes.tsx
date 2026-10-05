@@ -150,7 +150,7 @@ export function PanelNotes({
     <>
       <div
         className="panel-notes-read text-[15px] text-neutral-600 border-l-2 border-neutral-300 pl-3 py-1"
-        dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(notesToHtml(notes)) }}
+        dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(notesToHtml(notes), { ADD_ATTR: ['target'] }) }}
       />
       {/* The editor carries its own spacing; the read-only branch has to say it
           again or an agent's headings and bullets run together here. */}

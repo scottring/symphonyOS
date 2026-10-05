@@ -106,8 +106,10 @@ describe('notesToHtml', () => {
     )
   })
 
-  it('leaves a bare URL as text', () => {
-    expect(notesToHtml('See https://example.com/x')).toBe('<p>See https://example.com/x</p>')
+  // Was "leaves a bare URL as text", written when the editor was believed to
+  // drop links. StarterKit 3 ships Link; see TiptapEditor.test.tsx.
+  it('links a bare URL', () => {
+    expect(notesToHtml('See https://example.com/x')).toBe('<p>See <a href="https://example.com/x" target="_blank" rel="noopener noreferrer">https://example.com/x</a></p>')
   })
 
   it('escapes markup written as text', () => {
@@ -164,5 +166,30 @@ describe('notesToHtml', () => {
       const once = notesToHtml(input)
       expect(notesToHtml(once)).toBe(once)
     }
+  })
+})
+
+// Scott, 2026-10-04: a jury summons note read "Call 410-333-1555 or visit
+// www.baltimorecitycourt.org after 5:00 PM" — both dead text.
+describe('notesToHtml — numbers and websites you can tap', () => {
+  it('links a website, with or without its scheme, and leaves the sentence alone', () => {
+    expect(notesToHtml('Visit www.baltimorecitycourt.org after 5:00 PM.')).toBe(
+      '<p>Visit <a href="https://www.baltimorecitycourt.org" target="_blank" rel="noopener noreferrer">www.baltimorecitycourt.org</a> after 5:00 PM.</p>',
+    )
+    expect(notesToHtml('Form: https://ejury.mdcourts.gov/part_b_form_')).toBe(
+      '<p>Form: <a href="https://ejury.mdcourts.gov/part_b_form_" target="_blank" rel="noopener noreferrer">https://ejury.mdcourts.gov/part_b_form_</a></p>',
+    )
+  })
+
+  it('links a phone number to call', () => {
+    expect(notesToHtml('Call 410-333-1555 or (410) 333.1556')).toBe(
+      '<p>Call <a href="tel:+14103331555">410-333-1555</a> or <a href="tel:+14103331556">(410) 333.1556</a></p>',
+    )
+  })
+
+  it('leaves ids, dates and code alone', () => {
+    expect(notesToHtml('Juror ID: 52587920 · 2026-10-05 · `www.example.com`')).toBe(
+      '<p>Juror ID: 52587920 · 2026-10-05 · <code>www.example.com</code></p>',
+    )
   })
 })

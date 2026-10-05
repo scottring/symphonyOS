@@ -13,7 +13,7 @@ export interface CaptureLink { url: string; title?: string }
 
 /** A printed web address ("www.court.org", "ejury.mdcourts.gov/form") is a
  *  link even without a scheme; the facet validator wants one. */
-function withScheme(url: unknown): unknown {
+export function withScheme(url: unknown): unknown {
   if (typeof url !== 'string') return url
   const u = url.trim()
   if (/^https?:\/\//i.test(u)) return u

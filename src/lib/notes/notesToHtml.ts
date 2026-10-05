@@ -28,20 +28,47 @@ function escapeHtml(text: string): string {
   return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 }
 
+// A website ("https://…", or printed as "www.…") and a North American phone
+// number with its separators — "410-333-1555", "(410) 333.1555", "+1 410 333
+// 1555". Separators are required so ids and dates ("52587920", "2026-10-05")
+// stay text. Run on escaped text, so `&` inside a URL is already `&amp;`.
+const WEB = /\b(?:https?:\/\/|www\.)[^\s<]+/gi
+const PHONE = /(?<![\w+])(?:\+?1[\s.-]?)?(?:\(\d{3}\)\s?|\d{3}[\s.-])\d{3}[\s.-]\d{4}(?![\w-])/g
+
+function trimTrailing(url: string): [string, string] {
+  const tail = /[.,;:!?)]+$/.exec(url)?.[0] ?? ''
+  return [url.slice(0, url.length - tail.length), tail]
+}
+
 /**
- * Bold, italic and code, applied to already-escaped text.
+ * Bold, italic and code, applied to already-escaped text — and, for notes,
+ * websites and phone numbers as links (Scott, 2026-10-04: a jury summons note
+ * held the number to call the night before as dead text). StarterKit 3 ships
+ * the Link extension and allows tel:, so the editor keeps these <a>s.
  *
- * Code spans are lifted out behind a sentinel first so markdown punctuation
- * inside them survives. There is deliberately no link rule: StarterKit ships no
- * Link extension, so a generated <a> would be dropped on parse and its text
- * lost with it — a bare URL stays plain text.
+ * Code spans and links are lifted out behind sentinels first, so markdown
+ * punctuation inside them survives ("_form_" in a URL is not emphasis).
  */
-function inlineMarkdown(escaped: string): string {
+function inlineMarkdown(escaped: string, links = false): string {
   const codes: string[] = []
   let out = escaped.replace(/`([^`\n]+)`/g, (_m, code: string) => {
     codes.push(code)
     return `@@SYMPHONY_CODE_${codes.length - 1}@@`
   })
+
+  const anchors: string[] = []
+  const lift = (html: string) => {
+    anchors.push(html)
+    return `@@SYMPHONY_LINK_${anchors.length - 1}@@`
+  }
+  if (links) {
+    out = out.replace(WEB, (m) => {
+      const [url, tail] = trimTrailing(m)
+      const href = /^www\./i.test(url) ? `https://${url}` : url
+      return lift(`<a href="${href}" target="_blank" rel="noopener noreferrer">${url}</a>`) + tail
+    })
+    out = out.replace(PHONE, (m) => lift(`<a href="tel:+1${m.replace(/\D/g, '').replace(/^1(?=\d{10}$)/, '')}">${m}</a>`))
+  }
 
   out = out.replace(/\*\*(?=\S)([\s\S]*?\S)\*\*/g, '<strong>$1</strong>')
   out = out.replace(/__(?=\S)([\s\S]*?\S)__/g, '<strong>$1</strong>')
@@ -50,10 +77,9 @@ function inlineMarkdown(escaped: string): string {
   out = out.replace(/(^|[^*\w])\*(?=\S)([^*\n]*?\S)\*(?!\w)/g, '$1<em>$2</em>')
   out = out.replace(/(^|[^_\w])_(?=\S)([^_\n]*?\S)_(?!\w)/g, '$1<em>$2</em>')
 
-  return out.replace(
-    /@@SYMPHONY_CODE_(\d+)@@/g,
-    (_m, index: string) => `<code>${codes[Number(index)]}</code>`,
-  )
+  return out
+    .replace(/@@SYMPHONY_LINK_(\d+)@@/g, (_m, index: string) => anchors[Number(index)])
+    .replace(/@@SYMPHONY_CODE_(\d+)@@/g, (_m, index: string) => `<code>${codes[Number(index)]}</code>`)
 }
 
 /** A line that reads as a section header even though nobody typed a "#". */
@@ -106,7 +132,7 @@ function classify(raw: string): Line {
 }
 
 function renderRun(run: Line[]): string {
-  const body = (line: Line) => inlineMarkdown(escapeHtml(line.text))
+  const body = (line: Line) => inlineMarkdown(escapeHtml(line.text), true)
 
   switch (run[0].kind) {
     case 'heading':

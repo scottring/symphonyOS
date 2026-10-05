@@ -7,6 +7,7 @@
 // symphony-agent).
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { parseCaptureFacets, reachFromFacets, type CaptureLink } from '../_shared/captureReach.ts'
+import { parseReminders, reminderRows } from '../_shared/captureReminders.ts'
 
 const MODEL = 'claude-sonnet-4-6'
 
@@ -24,9 +25,11 @@ interface AnalysisResult {
   suggested_task_id: string | null
   /** Raw facets from the model; validated by parseCaptureFacets. */
   facets: unknown
+  /** Raw timed instructions; validated by parseReminders. */
+  reminders: unknown
 }
 
-function buildPrompt(openTasks: { id: string; title: string }[]): string {
+function buildPrompt(openTasks: { id: string; title: string }[], today: string | null): string {
   const taskList = openTasks.length
     ? openTasks.map((t) => `- ${t.id}: ${t.title}`).join('\n')
     : '(none)'
@@ -44,8 +47,13 @@ Analyze the photo and respond with ONLY a JSON object (no markdown fences, no pr
     {"type":"datetime","label":"Report to court","iso":"2026-10-05T08:00:00"}
     {"type":"location","label":"Report to","address":"full address, complete enough to navigate to"}
     {"type":"access_code","label":"Juror ID","code":"exactly as printed"}
+  ],
+  "reminders": [ things the photo tells the user to DO at a specific time other than the main appointment, each:
+    {"title":"verb first, e.g. 'Call to confirm jury service'","when":"YYYY-MM-DDTHH:MM local time, or YYYY-MM-DD when no time is given","phone":"number to call, if any","url":"site to visit, if any"}
   ]
 }
+
+Reminders: only instructions with timing — "call after 5 PM the night before", "complete the form within 10 days of receipt", "RSVP by Oct 12", "bring forms two days before". Work the date out from the dates printed in the photo${today ? ` (today is ${today})` : ''}; "after 5 PM" means 17:00. Never a reminder for the appointment itself — that is a datetime facet. Use [] when the photo gives no timed instruction.
 
 Facets: list EVERY phone number and website the photo gives for doing something — confirming, registering, paying, rescheduling, checking status, asking a question. Label each with its purpose and timing exactly as the photo states it (e.g. "Confirm service — call after 5 PM the night before"), so the user can tap it without rereading the photo. The same number listed for two purposes is one facet whose label names both. Add a datetime for each appointment or deadline, a location for each place to go, and an access_code for reference numbers the user will be asked for. Only facts printed in the photo — never invent. Use [] for a part or product photo with nothing to call or visit.
 
@@ -66,6 +74,7 @@ function parseAnalysis(text: string): AnalysisResult {
     note: parsed.note,
     suggested_task_id: typeof parsed.suggested_task_id === 'string' ? parsed.suggested_task_id : null,
     facets: parsed.facets,
+    reminders: parsed.reminders,
   }
 }
 
@@ -118,7 +127,7 @@ Deno.serve(async (req) => {
   // User-scoped client: every table op below is RLS-enforced as the caller.
   const db = createClient(url, anon, { global: { headers: { Authorization: authHeader } } })
 
-  let body: { taskId?: string; storagePath?: string; fileName?: string; fileType?: string; fileSize?: number }
+  let body: { taskId?: string; storagePath?: string; fileName?: string; fileType?: string; fileSize?: number; timeZone?: string }
   try {
     body = await req.json()
   } catch {
@@ -130,7 +139,7 @@ Deno.serve(async (req) => {
 
   const { data: task, error: taskErr } = await db
     .from('tasks')
-    .select('id, title, notes, capture_meta, phone_number, links')
+    .select('id, title, notes, capture_meta, phone_number, links, context, scope')
     .eq('id', taskId)
     .maybeSingle()
   if (taskErr) return json({ error: `Task lookup failed: ${taskErr.message}` }, 500)
@@ -166,7 +175,17 @@ Deno.serve(async (req) => {
       .filter((t) => (t.capture_meta as { status?: string } | null)?.status !== 'pending')
       .map((t) => ({ id: t.id as string, title: t.title as string }))
 
-    const raw = await callVision(signed.signedUrl, buildPrompt(candidates), apiKey)
+    // Reminders need the user's clock; an older client that sends no zone
+    // gets facets and links but no timed tasks rather than wrong times.
+    let timeZone: string | null = null
+    try {
+      if (body.timeZone) { new Intl.DateTimeFormat('en-US', { timeZone: body.timeZone }); timeZone = body.timeZone }
+    } catch { /* unknown zone → no reminders */ }
+    const today = timeZone
+      ? new Intl.DateTimeFormat('en-US', { timeZone, weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }).format(new Date())
+      : null
+
+    const raw = await callVision(signed.signedUrl, buildPrompt(candidates, today), apiKey)
     const analysis = parseAnalysis(raw)
     const facets = parseCaptureFacets(analysis.facets)
     // The number to call and the sites to visit, tappable on the task itself.
@@ -197,6 +216,20 @@ Deno.serve(async (req) => {
       .eq('id', taskId)
     if (updateErr) throw new Error(`Task update failed: ${updateErr.message}`)
 
+    // Each timed instruction becomes its own task at that moment.
+    let remindersAdded = 0
+    if (timeZone) {
+      const rows = reminderRows(parseReminders(analysis.reminders), {
+        userId: user.id, timeZone, context: task.context, scope: task.scope,
+        captureTitle: analysis.title, now: new Date(),
+      })
+      if (rows.length) {
+        const { error: remErr } = await db.from('tasks').insert(rows)
+        if (remErr) console.error('reminder insert failed:', remErr.message)
+        else remindersAdded = rows.length
+      }
+    }
+
     // File the photo as a task attachment (visible in web detail panel + iOS).
     // Skip if a row for this storage path already exists (retry safety).
     const { data: existing } = await db
@@ -221,7 +254,7 @@ Deno.serve(async (req) => {
       if (attachErr) console.error('attachments insert failed:', attachErr.message)
     }
 
-    return json({ ok: true, title: analysis.title, suggested_task_id: suggestedId })
+    return json({ ok: true, title: analysis.title, suggested_task_id: suggestedId, reminders: remindersAdded })
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e)
     console.error('analyze-capture failed:', message)

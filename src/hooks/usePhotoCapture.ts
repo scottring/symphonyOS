@@ -81,6 +81,8 @@ export function usePhotoCapture() {
           fileName: file.name || 'capture.jpg',
           fileType: 'image/jpeg',
           fileSize: jpeg.size,
+          // So "call after 5 PM the night before" lands at 5 PM here.
+          timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
         },
       })
       if (fnErr) console.error('analyze-capture invoke failed (task stays pending):', fnErr)
