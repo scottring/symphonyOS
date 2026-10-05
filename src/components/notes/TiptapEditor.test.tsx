@@ -68,3 +68,15 @@ describe('TiptapEditor renders unformatted notes as structure', () => {
     expect(onChange).not.toHaveBeenCalled()
   })
 })
+
+// Scott, 2026-10-04: the number to call the night before was dead text.
+describe('TiptapEditor keeps the links a note was given', () => {
+  it('a website and a phone number in a plain-text note are links you can tap', async () => {
+    render(<TiptapEditor content={'Night before: call 410-333-1555 or visit www.baltimorecitycourt.org'} onChange={vi.fn()} />)
+    await mounted()
+    await waitFor(() => {
+      const hrefs = Array.from(document.querySelectorAll('.ProseMirror a')).map((a) => a.getAttribute('href'))
+      expect(hrefs).toEqual(['tel:+14103331555', 'https://www.baltimorecitycourt.org'])
+    })
+  })
+})
