@@ -682,11 +682,13 @@ export function WallV2Shell() {
   const nextMeal = useMemo(() => {
     if (moment === 'evening') {
       const t = dinnerDays.find((d) => d.dateKey === tomorrowKey)
-      return t ? { label: 'Dinner tomorrow', title: t.title, imageUrl: t.imageUrl ?? null } : null
+      // Tomorrow's planned dinner always has a body or a source URL
+      // (buildMealDayRecipes drops the ones that don't), so it opens.
+      return t ? { label: 'Dinner tomorrow', title: t.title, imageUrl: t.imageUrl ?? null, onOpen: () => { setMealDayKey(t.dateKey); setRecipeViewerMeal('dinner'); } } : null
     }
     if (moment === 'dinner' || !dinnerEvent) return null;
-    return { label: dinnerStartDate ? `Dinner at ${dinnerStartDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}` : 'Dinner tonight', title: dinner.mealName, imageUrl: dinner.recipe?.imageUrl ?? null };
-  }, [moment, dinnerDays, tomorrowKey, dinnerEvent, dinnerStartDate, dinner]);
+    return { label: dinnerStartDate ? `Dinner at ${dinnerStartDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}` : 'Dinner tonight', title: dinner.mealName, imageUrl: dinner.recipe?.imageUrl ?? null, onOpen: handleTapDinnerCard };
+  }, [moment, dinnerDays, tomorrowKey, dinnerEvent, dinnerStartDate, dinner, handleTapDinnerCard]);
   // A new day starts the dinner card fresh.
   useEffect(() => { setDinnerScale(1); setHaveIngredients(new Set()); }, [todayKey]);
   const dinnerIngredients = useMemo(
