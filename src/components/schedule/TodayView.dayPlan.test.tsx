@@ -104,6 +104,17 @@ describe('Today — the way to Planning', () => {
     expect(onToggleTask).not.toHaveBeenCalled()
   })
 
+  // Scott, 2026-10-05: "add independent scrolling to Today page columns".
+  it('with the week beside it, the day and the week scroll on their own', () => {
+    renderView()
+    expect(document.querySelector('.today-split.is-colscroll')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: /^With week \d+$/ }))
+    const split = document.querySelector('.today-split.is-colscroll')
+    expect(split).not.toBeNull()
+    expect(split!.querySelector(':scope > main')).not.toBeNull()
+    expect(split!.querySelector(':scope > .today-aside')).toContainElement(screen.getByRole('region', { name: /for reference$/ }))
+  })
+
   it('the same view icons as every horizon: List hides the week, With week N brings it back', () => {
     mobile.value = false
     renderView()
