@@ -396,6 +396,48 @@ function SometimeCell({ weekend, days, onSelectItem, onToggleEntry, dragEnabled,
   )
 }
 
+/** Was the weekend's choice to stay open remembered? Per weekend (by its
+ *  Saturday), in this browser only. */
+const weekendOpenKey = (satKey: string) => `symphony-week-weekend-open:${satKey}`
+function readWeekendOpen(satKey: string): boolean {
+  try { return localStorage.getItem(weekendOpenKey(satKey)) === '1' } catch { return false }
+}
+function writeWeekendOpen(satKey: string, open: boolean) {
+  try { if (open) localStorage.setItem(weekendOpenKey(satKey), '1'); else localStorage.removeItem(weekendOpenKey(satKey)) } catch { /* the choice just isn't kept */ }
+}
+
+/** A weekend that is over, in the week still being lived (a Saturday-start
+ *  week from Monday on). Scott, 2026-10-05: the expanded weekend at the top
+ *  of the page "doesn't make sense when it's past the weekend". A past week
+ *  stays whole — looking back is why you're there. */
+function weekendIsBehind(days: JournalDay[], weekend: JournalWeekend, now = new Date()): boolean {
+  const last = days[weekend.sunIndex ?? weekend.satIndex].date
+  const todayStart = new Date(now); todayStart.setHours(0, 0, 0, 0)
+  const inThisWeek = days.some((d) => d.date.getFullYear() === now.getFullYear() && d.date.getMonth() === now.getMonth() && d.date.getDate() === now.getDate())
+  return inThisWeek && last.getTime() < todayStart.getTime()
+}
+
+/** The past weekend, folded to one line: when it was and what happened.
+ *  What's left of it is already elsewhere — an unticked task is back on the
+ *  week's list (missedPlacement), and weekend chores wait for the next one. */
+function WeekendFoldLine({ days, weekend, onOpen }: { days: JournalDay[]; weekend: JournalWeekend; onOpen: () => void }) {
+  const sat = days[weekend.satIndex]
+  const sun = weekend.sunIndex !== null ? days[weekend.sunIndex] : null
+  const month = sat.date.toLocaleDateString('en-US', { month: 'short' })
+  const when = sun ? `Sat ${sat.date.getDate()} – Sun ${sun.date.getDate()}` : `Sat ${sat.date.getDate()}`
+  const events = [sat, ...(sun ? [sun] : [])].flatMap((d) => [...d.notes.map((n) => n.title), ...d.entries.filter((e) => e.kind === 'event').map((e) => e.title)])
+    .map((t) => t.trim()).filter((t, i, all) => t && all.indexOf(t) === i).slice(0, 4)
+  return (
+    <button type="button" className="wk-weekend-fold" data-testid="weekend-folded" aria-expanded={false}
+      aria-label={`Show the weekend, ${month} ${sat.date.getDate()}${sun ? `–${sun.date.getDate()}` : ''}`} onClick={onOpen}>
+      <span className="wk-weekend-fold-title">The weekend</span>
+      <span className="wk-weekend-fold-when">{when}</span>
+      {events.length > 0 && <span className="wk-weekend-fold-events">{events.map((t) => <span key={t}>{t}</span>)}</span>}
+      <span className="wk-weekend-fold-open">Show the weekend ›</span>
+    </button>
+  )
+}
+
 function WeekGridDays({ days, weekend, forecast, fixedOnly = false, free, ...cell }: {
   onAddEvent?: WeekJournalProps['onAddEvent']
   memberById?: Map<string, FamilyMember>
@@ -424,11 +466,22 @@ function WeekGridDays({ days, weekend, forecast, fixedOnly = false, free, ...cel
     else blocks.push({ kind: 'weekdays', days: [d] })
   })
   const dayCell = (d: JournalDay) => <DayCell key={d.key} day={d} weather={forecast?.[d.key]} fixedOnly={fixedOnly} free={free?.[d.key]} {...cell} />
+  // Once the weekend is behind you it folds to a line, so the days still
+  // ahead lead the page. Opening it is remembered for that weekend.
+  const satKey = weekend ? days[weekend.satIndex].key : ''
+  const behind = !!weekend && !fixedOnly && weekendIsBehind(days, weekend)
+  const [openFor, setOpenFor] = useState<Record<string, boolean>>({})
+  const open = behind && (openFor[satKey] ?? readWeekendOpen(satKey))
+  const setOpen = (next: boolean) => { writeWeekendOpen(satKey, next); setOpenFor((m) => ({ ...m, [satKey]: next })) }
   return (
     <div className="wk-grid">
-      {blocks.map((b, i) => b.kind === 'weekend' && weekend ? (
-        <section key="weekend" className="wk-weekend" aria-label={`The weekend, ${days[weekend.satIndex].date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`}>
-          <div className="wk-weekend-head">The weekend</div>
+      {blocks.map((b, i) => b.kind === 'weekend' && weekend && behind && !open ? (
+        <WeekendFoldLine key="weekend" days={days} weekend={weekend} onOpen={() => setOpen(true)} />
+      ) : b.kind === 'weekend' && weekend ? (
+        <section key="weekend" className={`wk-weekend${behind ? ' is-past' : ''}`} aria-label={`The weekend, ${days[weekend.satIndex].date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`}>
+          <div className="wk-weekend-head">The weekend
+            {behind && <button type="button" className="wk-weekend-fold-close" aria-expanded onClick={() => setOpen(false)}>Fold it ‹</button>}
+          </div>
           <div className="wk-weekend-cells">
             {dayCell(days[weekend.satIndex])}
             {weekend.sunIndex !== null && dayCell(days[weekend.sunIndex])}
