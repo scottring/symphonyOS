@@ -99,8 +99,11 @@ vi.mock('@/hooks/usePlanningSession', () => ({
 }))
 vi.mock('@/hooks/useAuth', () => ({ useAuth: () => ({ user: { id: 'u1' } }) }))
 // The day tiles' two sources, held flat so a case can make one unavailable.
+// The range is read from the PINNED clock (`now`), never the wall clock: read
+// from Date.now() it slid past this file's week once the real date passed
+// Oct 5, and Sunday the 6th fell outside it (2026-10-06).
 const dayLoad = { events: [] as unknown[], available: true, loading: false, failed: false,
-  range: { start: Date.now() - 30 * 86_400_000, end: Date.now() + 90 * 86_400_000 } }
+  range: { start: now.getTime() - 30 * 86_400_000, end: now.getTime() + 90 * 86_400_000 } }
 vi.mock('@/hooks/useDayLoadEvents', () => ({
   DAY_LOAD_RANGE_DAYS: 45,
   DAY_LOAD_BACK_DAYS: 7,
