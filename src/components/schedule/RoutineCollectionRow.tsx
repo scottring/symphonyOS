@@ -150,7 +150,7 @@ export function RoutineCollectionRow({ item, onSelect, onSelectStep, onCompleteS
               `max-w-[50%]` rendered "Kids Bedtime routine" as "K.." (2026-09-19).
               The chevron trails the name, and only when there are steps to
               show — a block whose one step is itself has nothing to open. */}
-          <span className={`min-w-0 line-clamp-2 break-words text-[16px] leading-snug font-medium ${allDone ? 'text-neutral-400 line-through' : 'text-neutral-800'}`}>
+          <span className={`row-title min-w-0 line-clamp-2 break-words text-[16px] leading-snug font-medium ${allDone ? 'text-neutral-400 line-through' : 'text-neutral-800'}`}>
             {item.title}
             {expandable && (open
               ? <ChevronDown aria-hidden className="inline-block w-4 h-4 ml-1 -mt-0.5 text-neutral-400" />

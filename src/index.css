@@ -2074,6 +2074,14 @@ html.desktop-shell a {
 .today-cols .daybook-add-task { padding-block: 0; }
 /* What follows the two columns (Coming up) keeps the usual section gap; the
    day's last hour line is the column's own foot, not the next heading's rule. */
+/* For today beside the day: its rows have no time (the day column holds the
+   times), so no empty time lane to indent them, and a title reads in full
+   rather than stopping at two lines in the narrower column. Beats
+   layout-system.css, which keeps the lane to line up with a Schedule list
+   that no longer exists. */
+.today-cols .today-focus-card .schedule-time-column,
+.today-cols .today-focus-card .schedule-empty-time { display: none; }
+.today-cols .today-focus-card .row-title { display: block; -webkit-line-clamp: unset; line-clamp: none; overflow: visible; overflow-wrap: anywhere; }
 .today-cols + .daybook-journal-section { margin-top: var(--ds-section-gap, 36px); }
 .today-scale { margin-bottom: 8px; }
 @container (min-width: 50rem) {
