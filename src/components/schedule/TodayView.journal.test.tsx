@@ -124,23 +124,25 @@ describe('Today as a daily journal', () => {
     expect(screen.queryByText(/good (morning|afternoon|evening)/i)).toBeNull()
   })
 
-  it('Tasks holds what was chosen; Schedule holds the rest of the timed day', () => {
+  it('For today holds what was chosen; The day draws the timed day', () => {
     renderView()
     const focus = screen.getByRole('region', { name: 'For today' })
-    const ahead = screen.getByRole('region', { name: 'Schedule' })
+    const ahead = screen.getByRole('region', { name: 'The day' })
     expect(within(focus).getByText('Check dryer duct')).toBeInTheDocument()
     expect(within(ahead).getByText('Food planning')).toBeInTheDocument()
     expect(within(ahead).queryByText('Check dryer duct')).toBeNull()
   })
 
-  it('folds what is over into Earlier today, saying what is still not done — and opens it', () => {
+  // Drawn to scale (2026-10-06): what is over stays where it fell, faded,
+  // with its check still there — nothing folds away.
+  it('keeps what is over on the day, faded, still asking for a tick if undone', () => {
     renderView()
-    expect(screen.queryByText('Figure out washing machine mold')).toBeNull()
-    const fold = screen.getByRole('button', { name: /Earlier today · 2 · 1 not done/ })
-    expect(fold).toHaveAttribute('aria-expanded', 'false')
-    fireEvent.click(fold)
-    expect(screen.getByText('Figure out washing machine mold')).toBeInTheDocument()
-    expect(screen.getByText('Do kids laundry')).toBeInTheDocument()
+    const day = screen.getByRole('region', { name: 'The day' })
+    const mold = within(day).getByText('Figure out washing machine mold').closest('.today-scale-item')!
+    expect(mold).toHaveClass('is-past')
+    expect(within(mold as HTMLElement).getByRole('button', { name: /^Done: / })).toBeInTheDocument()
+    expect(within(day).getByText('Do kids laundry')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Earlier today/ })).toBeNull()
   })
 
   it('an empty focus offers the week to choose from — a control you can see', () => {
@@ -201,10 +203,12 @@ describe('Today as a daily journal', () => {
     expect(screen.queryByRole('region', { name: /for reference$/ })).toBeNull()
   })
 
-  it('another day reads as one Schedule, with nothing folded', () => {
+  it('another day draws its day with no now line and nothing past', () => {
     renderView({ viewedDate: new Date(2026, 8, 20), tasks: [createMockTask({ id: 'sun', title: 'Sunday run', bucket: 'timed', isAllDay: false, scheduledFor: new Date(2026, 8, 20, 8) })] })
-    expect(screen.getByRole('region', { name: 'Schedule' })).toHaveTextContent('Sunday run')
-    expect(screen.queryByRole('button', { name: /Earlier today/ })).toBeNull()
+    const day = screen.getByRole('region', { name: 'The day' })
+    expect(day).toHaveTextContent('Sunday run')
+    expect(day.querySelector('.today-scale-now')).toBeNull()
+    expect(day.querySelector('.is-past')).toBeNull()
   })
 })
 

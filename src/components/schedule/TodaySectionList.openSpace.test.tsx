@@ -61,6 +61,8 @@ function event(o: { id: string; title: string; start: string; end: string; allDa
   }
 }
 
+// The day is drawn to scale now (2026-10-06, option B): free time is a green
+// stretch on the day column, named in hours.
 describe('open space on Today', () => {
   beforeEach(() => {
     vi.useFakeTimers({ shouldAdvanceTime: true })
@@ -76,18 +78,20 @@ describe('open space on Today', () => {
       ] as never,
     })
     await screen.findByText('School')
-    expect(await screen.findByText('4 hr 35 min free until 6:45 PM')).toBeInTheDocument()
+    // 2:10 PM to 6:45 PM, to the quarter hour.
+    expect(await screen.findByText('4½ hours free')).toBeInTheDocument()
   })
 
-  it('says nothing when the day has no room to speak of', async () => {
+  it('says nothing of a gap under an hour', async () => {
     renderView({
       events: [
         event({ id: 'a', title: 'A', start: isoAt(9, 0), end: isoAt(10, 0) }),
-        event({ id: 'b', title: 'B', start: isoAt(11, 0), end: isoAt(12, 0) }),
+        event({ id: 'b', title: 'B', start: isoAt(10, 30), end: isoAt(12, 0) }),
       ] as never,
     })
     await screen.findByText('A')
-    expect(screen.queryByTestId('open-space-line')).not.toBeInTheDocument()
+    // Only the morning before A and the stretch after B: nothing for 10–10:30.
+    expect(screen.getAllByText(/hours? free$/).map((el) => el.textContent)).toEqual(['3 hours free', '9 hours free'])
   })
 
   it('closes the afternoon at an all-day dinner, at its inferred hour', async () => {
@@ -100,8 +104,8 @@ describe('open space on Today', () => {
       ] as never,
     })
     await screen.findByText('School')
-    expect(await screen.findByText('4 hr 20 min free until dinner')).toBeInTheDocument()
-    // ...and the card it closes reads its inferred time, not its stored one.
-    expect(screen.getByText(/6:30 PM/)).toBeInTheDocument()
+    expect(await screen.findByText('4¼ hours free')).toBeInTheDocument()
+    // ...and the dinner sits at its inferred time, not its stored one.
+    expect(screen.getByRole('button', { name: /^Dinner: bread, salad, 6:30 PM$/ })).toBeInTheDocument()
   })
 })

@@ -4,7 +4,7 @@ import { emptySections } from '@/lib/today/types'
 import {
   resolveDrop, refusalFor, computeBandDropTime,
   bandDropId, gapDropId, rowDropId, NEW_GROUP_NAME,
-  writeMoveAndRegisterUndo,
+  writeMoveAndRegisterUndo, SCALE_DROP_ID,
   type DropContext,
 } from './todayDrop'
 
@@ -576,5 +576,39 @@ describe('a multi-step routine on Today', () => {
     sections.morning = [t, { ...coll, startTime: new Date(2026, 6, 25, 9) }]
     const out = resolveDrop(ctx({ activeId: 'task-t1', overId: rowDropId(coll.id), sections }))
     expect(out).toEqual([{ kind: 'refuse', reason: expect.stringMatching(/group/i) }])
+  })
+})
+
+// The day drawn to scale (2026-10-06): a drop on it sets the time it landed at.
+describe('resolveDrop — the day, to scale', () => {
+  const at = new Date(2026, 6, 25, 14, 30)
+
+  it('gives an untimed task the time it landed at', () => {
+    const sections = emptySections<TimelineItem>()
+    sections.allday = [item({ id: 'task-a', allDay: true })]
+    expect(resolveDrop(ctx({ overId: SCALE_DROP_ID, sections, scaleTime: at })))
+      .toEqual([{ kind: 'set-time', itemId: 'task-a', when: at }])
+  })
+
+  it('takes a step out of its group as it gets its own time', () => {
+    const sections = emptySections<TimelineItem>()
+    sections.allday = [item({ id: 'task-a', isSubtask: true, parentTaskId: 'p' })]
+    expect(resolveDrop(ctx({ overId: SCALE_DROP_ID, sections, scaleTime: at }))).toEqual([
+      { kind: 'remove-from-group', taskId: 'a' },
+      { kind: 'set-time', itemId: 'task-a', when: at },
+    ])
+  })
+
+  it('writes nothing when it lands where it already starts', () => {
+    const sections = emptySections<TimelineItem>()
+    sections.afternoon = [item({ id: 'task-a', startTime: new Date(at) })]
+    expect(resolveDrop(ctx({ overId: SCALE_DROP_ID, sections, scaleTime: at }))).toEqual([])
+  })
+
+  it('still refuses what cannot move, out loud', () => {
+    const sections = emptySections<TimelineItem>()
+    sections.morning = [item({ id: 'event-e', type: 'event', startTime: new Date(2026, 6, 25, 9) })]
+    const out = resolveDrop(ctx({ activeId: 'event-e', overId: SCALE_DROP_ID, sections, scaleTime: at, isReadOnlyEvent: () => true }))
+    expect(out[0].kind).toBe('refuse')
   })
 })

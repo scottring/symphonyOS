@@ -18,6 +18,8 @@ import { wasWritten } from '@/hooks/useGatedTaskActions'
  *   today-band-<section>        → give the item a TIME (or make it all-day)
  *   today-gap-<section>:<index> → REORDER to that position
  *   today-row-<itemId>          → GROUP with that item
+ *   today-scale                 → the day drawn to scale: give it the TIME
+ *                                 it was dropped at (`scaleTime`)
  *
  * A row cannot mean both "reorder here" and "group with me", so the gap decides.
  * The alternative — hovering a row for ~600ms to switch modes — needs a timer,
@@ -27,6 +29,8 @@ import { wasWritten } from '@/hooks/useGatedTaskActions'
 export const BAND_PREFIX = 'today-band-'
 export const GAP_PREFIX = 'today-gap-'
 export const ROW_PREFIX = 'today-row-'
+/** The day column (TodayDayScale): a drop there sets the time it landed at. */
+export const SCALE_DROP_ID = 'today-scale'
 
 /**
  * The name a drag-created group starts with. It is a placeholder, not a guess:
@@ -87,6 +91,8 @@ export interface DropContext {
   isReadOnlyEvent: (item: TimelineItem) => boolean
   /** The wrapper's CURRENT group_members, read fresh at drop time (residual 4). */
   groupMembersOf: (wrapperRawId: string) => GroupMemberRef[]
+  /** A drop on the day column: the time it landed at, already on the viewed day. */
+  scaleTime?: Date | null
 }
 
 /** Raw entity id for a timeline id (`task-abc` → `abc`, `routine-r1#2` → `r1#2`). */
@@ -228,6 +234,14 @@ export function resolveDrop(ctx: DropContext): DropIntent[] {
     active.isSubtask && active.parentTaskId && active.type === 'task'
       ? [{ kind: 'remove-from-group', taskId: rawId(active.id) }]
       : []
+
+  // ── The day, to scale: the time it landed at ────────────────────────────
+  if (ctx.overId === SCALE_DROP_ID) {
+    if (!ctx.scaleTime) return []
+    // Dropped back where it already starts: nothing to write.
+    if (active.startTime && !active.allDay && active.startTime.getTime() === ctx.scaleTime.getTime()) return []
+    return [...leavingGroup, { kind: 'set-time', itemId: active.id, when: ctx.scaleTime }]
+  }
 
   // ── Band: give it a time ────────────────────────────────────────────────
   const band = parseBand(ctx.overId)

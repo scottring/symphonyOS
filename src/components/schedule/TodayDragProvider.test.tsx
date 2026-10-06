@@ -57,7 +57,7 @@ describe('TodayDragProvider', () => {
         active: { id: 'task-a' }, over: { id: bandDropId('allday') },
       } as DragEndEvent)
     })
-    expect(resolve).toHaveBeenCalledWith('task-a', bandDropId('allday'))
+    expect(resolve).toHaveBeenCalledWith('task-a', bandDropId('allday'), null)
     expect(onIntents).toHaveBeenCalledWith([{ kind: 'make-all-day', itemId: 'task-a' }])
   })
 
