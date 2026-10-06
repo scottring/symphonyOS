@@ -63,7 +63,7 @@ describe('ScheduleItem — travel time', () => {
 
   it('shows the drive time for a row with an address', async () => {
     renderRow()
-    expect(await screen.findByText('18 min drive')).toBeInTheDocument()
+    expect(await screen.findByText(/18 min drive/)).toBeInTheDocument()
   })
 
   it('shows nothing for a video meeting', async () => {

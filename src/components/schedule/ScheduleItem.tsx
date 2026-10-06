@@ -7,7 +7,7 @@ import { isSameDay } from '@/lib/dateUtils'
 import { SchedulePopover, type ScheduleContextItem } from '@/components/triage'
 import { useScheduleActionsContext } from '@/contexts/ScheduleActionsContext'
 import { AssigneeDropdown, MultiAssigneeDropdown } from '@/components/family'
-import { Video, Check, Pencil, Hourglass, ListChecks, ChevronUp, ChevronDown, MessageCircle, AlertCircle, Mail, Car, Target } from 'lucide-react'
+import { Video, Check, Pencil, Hourglass, ListChecks, ChevronUp, ChevronDown, ChevronRight, MessageCircle, AlertCircle, Mail, Car, Target } from 'lucide-react'
 import { requestDiscussionOpen } from '@/lib/discussions/openIntent'
 import { ScheduleItemItems } from './ScheduleItemItems'
 import { RowActionRail } from './RowActionRail'
@@ -185,7 +185,11 @@ export const ScheduleItem = memo(function ScheduleItem({
    * so they render inline, always, at every width. Completed ones drop out:
    * what is left is what still has to happen.
    */
-  const isPerPerson = (s: Task) => !!s.assignedTo || fromEmail
+  // A step given to the person who already carries the row names no one new:
+  // it is an ordinary step and folds behind the disclosure (Scott, 2026-10-06
+  // — five "SK" steps under Scott's own task held the page open).
+  const rowPeople = new Set([assignedTo, ...assignedToAll].filter(Boolean))
+  const isPerPerson = (s: Task) => fromEmail || (!!s.assignedTo && !rowPeople.has(s.assignedTo))
   const perPersonItems = (item.originalTask?.subtasks ?? []).filter(
     (s) => !s.completed && isPerPerson(s),
   )
@@ -199,15 +203,16 @@ export const ScheduleItem = memo(function ScheduleItem({
   const plainSubtasks = (item.originalTask?.subtasks ?? []).filter((s) => !isPerPerson(s))
   /** Anything rendering beneath the title makes the title column taller — the
    *  leading columns then need pinning to the title's first line. */
-  const hasBelowTitleContent = !!belowTitleAccessory
-    || !!servesLine
+  const hasBelowTitleContent = !!servesLine
     || !!(item.goalLabel && !item.completed)
     || !!(item.isWaiting && item.waitingFor && !item.completed)
     || hasPerPersonItems
     || fromEmail
   /** Anyone assigned, you included: their avatars show at rest (Scott,
    *  2026-10-04). An unassigned row is everyone's and no one's. */
-  const assigned = [assignedTo, ...assignedToAll].some((id) => !!id)
+  // Only someone the household knows: an id with no member behind it drew a
+  // blank grey people icon at rest (Boxing, Marta — 2026-10-06).
+  const assigned = [assignedTo, ...assignedToAll].some((id) => !!id && (familyMembers.length === 0 || familyMembers.some((m) => m.id === id)))
 
   const handleCheckboxClick = (e: React.MouseEvent) => {
     e.stopPropagation()
@@ -547,6 +552,7 @@ export const ScheduleItem = memo(function ScheduleItem({
   return (
     <div
       data-selectable
+      data-row-kind={item.type}
       onClick={() => {
         // Always select this item (switches panel to show this item's details)
         onSelect()
@@ -639,10 +645,8 @@ export const ScheduleItem = memo(function ScheduleItem({
                       // an all-day event still says so.
                       <span className={isTask ? 'sr-only' : 'text-neutral-400'}>All day</span>
                     ) : timeDisplay.type === 'range' ? (
-                      <div className="leading-tight text-neutral-400">
-                        <div>{timeDisplay.start}</div>
-                        <div className="text-neutral-300">{timeDisplay.end}</div>
-                      </div>
+                      // One time in the lane; "until …" sits under the title.
+                      <span className="text-neutral-500">{timeDisplay.start}</span>
                     ) : (
                       <span className="text-neutral-500">{timeDisplay.time}</span>
                     )
@@ -663,10 +667,7 @@ export const ScheduleItem = memo(function ScheduleItem({
               timeDisplay.type === 'allday' ? (
                 <span className={isTask ? 'sr-only' : 'text-neutral-400'}>All day</span>
               ) : timeDisplay.type === 'range' ? (
-                <div className="leading-tight text-neutral-400">
-                  <div>{timeDisplay.start}</div>
-                  <div className="text-neutral-300">{timeDisplay.end}</div>
-                </div>
+                <span className="text-neutral-500">{timeDisplay.start}</span>
               ) : (
                 <span className="text-neutral-500">{timeDisplay.time}</span>
               )
@@ -684,7 +685,7 @@ export const ScheduleItem = memo(function ScheduleItem({
             the tallest child — with a nudge to centre it on that line's box. */}
         {!(isMobile && isOverdue) && (
           <div className={`${MARK} flex items-center justify-center relative z-[1] ${
-            hasBelowTitleContent ? `self-start ${variant === 'minimal' ? '' : 'mt-0.5'}` : ''
+            hasBelowTitleContent || hasSubtasks ? `self-start ${variant === 'minimal' ? '' : 'mt-0.5'}` : ''
           }`}>
             {/* Chosen for today: a small dot beside the circle, and a label a
                 screen reader hears. Nothing louder — the row is already on
@@ -788,27 +789,37 @@ export const ScheduleItem = memo(function ScheduleItem({
                 Today
               </button>
             )}
-            {/* Subtask indicator — desktop only. A disclosure, not a label:
-                steps no longer earn their own Today rows (they used to inherit
-                the parent's date and produce N competing rows), so this is the
-                only way to see them without leaving the page. Collapsed by
-                default — the parent holds the slot, the steps are detail. */}
-            {hasSubtasks && (
-              <button
-                type="button"
-                aria-expanded={stepsOpen}
-                aria-label={`${stepsTotal} steps`}
-                onClick={(e) => { e.stopPropagation(); setStepsOpen((v) => !v) }}
-                className="hidden md:inline-flex shrink-0 items-center gap-1 text-xs text-neutral-400 hover:text-neutral-600 transition-colors"
-              >
-                <ListChecks className="w-3 h-3" />
-                {stepsDone}/{stepsTotal}
-                {stepsOpen
-                  ? <ChevronUp className="w-3 h-3" />
-                  : <ChevronDown className="w-3 h-3" />}
-              </button>
+            {/* "Any time" — the timing control — waits on the title line
+                until the row is hovered or focused: at rest it only said the
+                default (Scott, 2026-10-06). On the line, not under it, so
+                showing it never moves the rows below. */}
+            {belowTitleAccessory && (
+              <div className="hidden md:block shrink-0 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100" onClick={(e) => e.stopPropagation()}>
+                {belowTitleAccessory}
+              </div>
             )}
           </div>
+          {/* Steps fold to their next one (2026-10-06): "Next: … · 5 steps".
+              A disclosure, not a label — steps don't earn their own Today
+              rows, so this is the way to see them without leaving the page. */}
+          {hasSubtasks && (() => {
+            const next = !stepsOpen ? plainSubtasks.find((st) => !st.completed) : undefined
+            return (
+              <div className="hidden md:flex items-baseline gap-1.5 min-w-0 text-[12.5px] leading-tight mt-0.5">
+                {next && <span className="truncate text-neutral-500" title={next.title}>Next: {next.title}</span>}
+                {next && <span aria-hidden className="text-neutral-300">·</span>}
+                <button
+                  type="button"
+                  aria-expanded={stepsOpen}
+                  onClick={(e) => { e.stopPropagation(); setStepsOpen((v) => !v) }}
+                  className="inline-flex shrink-0 items-center gap-0.5 font-medium text-primary-700 hover:text-primary-800"
+                >
+                  {stepsTotal} {stepsTotal === 1 ? 'step' : 'steps'}
+                  {stepsOpen ? <ChevronUp className="w-3 h-3" aria-hidden /> : <ChevronRight className="w-3 h-3" aria-hidden />}
+                </button>
+              </div>
+            )
+          })()}
           {/* What the wait is ON — its own line beneath the title, never a
               replacement for it. Replacing the title would break scanning: two
               months from now "Guy's response about pizza" won't tell you which
@@ -835,7 +846,8 @@ export const ScheduleItem = memo(function ScheduleItem({
               "From an email" shows at every width, so a row carrying it is not
               wrapped in `hidden md:block`. */}
           {(() => {
-            const subtitle = rowSubtitle(item)
+            const until = timeDisplay?.type === 'range' ? timeDisplay.end : undefined
+            const subtitle = [rowSubtitle(item, { until }), travelLabel].filter(Boolean).join(' · ')
             if (!subtitle && !fromEmail) return null
             if (!fromEmail) {
               return (
@@ -873,8 +885,6 @@ export const ScheduleItem = memo(function ScheduleItem({
               ))}
             </ul>
           ) : null}
-          {/* Suggestion chip — under the title, left-aligned WITH the title. */}
-          {belowTitleAccessory && <div className="mt-1">{belowTitleAccessory}</div>}
         </div>
 
         {/* Trailing controls — a FIXED four-slot rail, not a run of conditional
@@ -898,7 +908,7 @@ export const ScheduleItem = memo(function ScheduleItem({
 
       {/* Metadata row — location on hover, contact/parentTask/Free always compact */}
       {(item.location || hasContactChip || parentTaskName || isFree) && (() => {
-        const onlyLocation = !hasContactChip && !parentTaskName && !isFree && !travelLabel
+        const onlyLocation = !hasContactChip && !parentTaskName && !isFree
         const metadataContent = (
           <div className={`flex items-center gap-2 ${UNDER_TITLE} flex-wrap ${onlyLocation ? 'pt-1' : 'mt-1'}`}>
             {/* Free chip — informational-only: no prep/handoff expected. */}
@@ -947,18 +957,8 @@ export const ScheduleItem = memo(function ScheduleItem({
               )
             })()}
 
-            {/* Travel estimate — unlike the address, this stays visible at
-                rest: knowing the place is 18 minutes away is what makes the
-                row plannable. */}
-            {travelLabel && (
-              <span
-                className="inline-flex items-center gap-1 text-[11px] text-neutral-500"
-                title={`Estimated ${travelLabel} from your home address`}
-              >
-                <Car className="w-3 h-3 shrink-0" aria-hidden />
-                {travelLabel}
-              </span>
-            )}
+            {/* The travel estimate moved up beside "until …" (2026-10-06):
+                still visible at rest, now on the line that says when. */}
 
             {/* Contact chip - desktop only */}
             {hasContactChip && (

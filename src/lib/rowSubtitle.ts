@@ -18,9 +18,11 @@ import { formatDurationMinutes } from '@/lib/timeUtils'
  *   - a 6h40m school day       → "6 hr 40 min"
  *   - routine, event, task     → ""
  */
-export function rowSubtitle(item: TimelineItem): string {
+export function rowSubtitle(item: TimelineItem, opts: { until?: string } = {}): string {
   const label = categoryLabel(item)
-  const duration = durationLabel(item)
+  // Today's rows show one time in their lane; when the thing ends goes here,
+  // "until 10:15 AM", in place of how long it runs (2026-10-06).
+  const duration = opts.until ? `until ${opts.until}` : durationLabel(item)
 
   if (label && duration) return `${label} · ${duration}`
   return label || duration || ''
