@@ -2049,6 +2049,17 @@ html.desktop-shell a {
 .daybook-journal-allday { display: flex; flex-direction: column; gap: 2px; padding: 6px 0 8px; }
 .daybook-journal-allday button { text-align: left; font-style: italic; font-size: 14px; color: var(--color-neutral-600); }
 .daybook-journal-allday button:hover { color: var(--color-neutral-900); }
+/* ── Today, calmer (2026-10-06) ─────────────────────────────────────────
+   One reading measure: the day's sections stop at 54rem so who carries a row
+   sits a glance from its title, not across the page. The masthead keeps the
+   shared page width so every horizon's date still lines up. */
+.today-page:not(.planning-page) .daybook-journal-section { max-width: 54rem; }
+/* A calendar event wears the Week page's blue, quietly, at rest. */
+.today-page [data-row-kind="event"]:not(:hover):not(.ring-1) { background-color: hsl(214 45% 96% / .8); }
+/* The kids' specials, one chip per kid. */
+.daybook-journal-allday .today-specials { display: inline-flex; flex-wrap: wrap; gap: 6px; font-style: normal; }
+.today-special-chip { display: inline-flex; align-items: baseline; gap: 6px; padding: 3px 11px; border-radius: 999px; background: hsl(38 85% 94%); color: hsl(33 70% 28%); font-size: 13px; font-weight: 500; }
+.today-special-chip > span { font-weight: 600; }
 /* A row from the Today pin hovering over Today's agenda: drop to choose it. */
 .daybook-agenda-drop { outline: 2px dashed var(--color-primary-300); outline-offset: 8px; border-radius: 4px; }
 /* A row from the Today pin hovering over a list it can be committed to. */

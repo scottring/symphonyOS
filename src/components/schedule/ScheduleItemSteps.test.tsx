@@ -51,23 +51,32 @@ describe('ScheduleItem subtask steps', () => {
     expect(queryByText('Talk with Iris about the trip')).toBeNull()
   })
 
-  it('shows the progress count on the toggle', () => {
-    const { getByRole } = renderRow()
-    expect(getByRole('button', { name: /3 steps/i })).toHaveTextContent('1/3')
+  // "Today, calmer" (2026-10-06): steps fold to their next one.
+  it('shows the next open step beside the toggle', () => {
+    const { getByRole, getByText } = renderRow()
+    expect(getByText('Next: Everyone writes down 2-3 ideas')).toBeInTheDocument()
+    expect(getByRole('button', { name: /^3 steps$/i })).toBeInTheDocument()
+  })
+
+  it('a step given to the row’s own person folds with the others', () => {
+    const own = { ...withSteps, assignedTo: 'm-scott', originalTask: { subtasks: withSteps.originalTask!.subtasks!.map((st) => ({ ...st, assignedTo: 'm-scott' })) } } as unknown as TimelineItem
+    const { queryByText, getByRole } = render(<ScheduleItem item={own} assignedTo="m-scott" onSelect={vi.fn()} onToggleComplete={vi.fn()} />)
+    expect(queryByText('Research top 3 destinations')).toBeNull()
+    expect(getByRole('button', { name: /^3 steps$/i })).toBeInTheDocument()
   })
 
   it('expands and collapses the step list', () => {
     const { getByRole, getByText, queryByText } = renderRow()
-    fireEvent.click(getByRole('button', { name: /3 steps/i }))
+    fireEvent.click(getByRole('button', { name: /^3 steps$/i }))
     expect(getByText('Talk with Iris about the trip')).toBeInTheDocument()
     expect(getByText('Research top 3 destinations')).toBeInTheDocument()
-    fireEvent.click(getByRole('button', { name: /3 steps/i }))
+    fireEvent.click(getByRole('button', { name: /^3 steps$/i }))
     expect(queryByText('Talk with Iris about the trip')).toBeNull()
   })
 
   it('expanding does not also open the detail panel', () => {
     const { getByRole, onSelect } = renderRow()
-    fireEvent.click(getByRole('button', { name: /3 steps/i }))
+    fireEvent.click(getByRole('button', { name: /^3 steps$/i }))
     expect(onSelect).not.toHaveBeenCalled()
   })
 
@@ -143,8 +152,7 @@ describe('ScheduleItem per-person items (desktop)', () => {
     expect(getByText('Wear a collared shirt')).toBeInTheDocument()
 
     // The chip counts the REMAINING plain steps, not all three subtasks.
-    const chip = getByRole('button', { name: /2 steps/i })
-    expect(chip).toHaveTextContent('0/2')
+    const chip = getByRole('button', { name: /^2 steps$/i })
     expect(queryByText('Print the permission slip')).toBeNull()
 
     fireEvent.click(chip)

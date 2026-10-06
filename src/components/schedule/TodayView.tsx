@@ -1,6 +1,5 @@
 import { publishViewedDay } from '@/lib/viewedDaySignal'
-import { DesktopControlsContext, DesktopLeadContext } from '@/components/layout/DesktopNavigation'
-import { createPortal } from 'react-dom'
+import { DesktopControlsContext } from '@/components/layout/DesktopNavigation'
 /**
  * TodayView — editorial Today shell.
  *
@@ -99,6 +98,7 @@ import { currentStep } from '@/lib/guide/guidedPlan'
 import { ViewSwitch } from '@/components/plan/v2/ViewSwitch'
 import { weekOfYear } from '@/lib/planning/horizonNumerals'
 import { WeatherChip } from './WeatherChip'
+import { parseSpecials } from '@/lib/today/specials'
 import { TodayBacklogFooter } from './TodayBacklogFooter'
 import { EmailReviewSheet } from './EmailReviewSheet'
 import { useUnreviewedCaptures } from '@/hooks/useUnreviewedCaptures'
@@ -452,7 +452,9 @@ export function TodayView({
   // The column's own rule (DayPlanPanel's "Still to place"), so the count
   // and the list beside it agree.
   const stillToPlace = data.dayPlan.chooserTasks.filter((e) => !e.completed && !alreadyPlaced(e, viewedDate)).length
-  const weekLine = `Week ${weekNo} · ${stillToPlace === 0 ? 'nothing still to place' : `${stillToPlace} still to place`}`
+  // No count on Today (Scott, 2026-10-06, "Today, calmer"): the week's
+  // number places the day; how much is left to place is the column's job.
+  const weekLine = `Week ${weekNo}`
   // On the week's last day the column also shows the week still ahead
   // (walkthrough 2026-10-02, #24/#18). Same rows the Week page lists, through
   // the same filters this page applies: `tasks` arrives layer-filtered, and
@@ -490,7 +492,6 @@ export function TodayView({
   // In the desktop Shell the control row folds into the masthead; phones and
   // standalone mounts keep it as its own row.
   const foldedControls = !!desktopControls && !isMobile
-  const desktopLead = useContext(DesktopLeadContext)
   // In the desktop shell the day's review closes the day's list (Scott,
   // 2026-10-02 — it was the footer's), so the ⋯ menu drops its copy there
   // (phones keep the menu entry).
@@ -1423,7 +1424,6 @@ export function TodayView({
         </div>
       )}
 
-      {data.isToday && desktopLead && !isMobile && createPortal(<WeatherChip now={nowForDisplay} />, desktopLead)}
 
       {/* An open masthead and continuous agenda give Today the shape of a daybook. */}
       <MastheadCard
@@ -1444,7 +1444,7 @@ export function TodayView({
         // 2026-10-01): the week line becomes the subline and the view
         // controls sit at the title's right, as on every horizon page.
         subline={foldedControls
-          ? <>{weekLine}{!(data.isToday && upNext) && heroLine ? <> · {heroLine}</> : null}</>
+          ? <>{weekLine}{data.isToday && <> · <WeatherChip now={nowForDisplay} /></>}{!(data.isToday && upNext) && heroLine ? <> · {heroLine}</> : null}</>
           : data.isToday && upNext ? undefined : heroLine}
         // Domain chooser + assistant toggle, in the card's corner.
         // Desktop: the page's controls sit in the control row below, as on
@@ -1455,9 +1455,10 @@ export function TodayView({
           : headerControls}
         // The masthead's ear: today's weather, one quiet line. The feed only
         // knows today, so another day's page says nothing rather than
-        // showing today's sky over Saturday. In the desktop Shell it sits in
-        // the top bar beside the ☰ instead (Scott, 2026-09-30).
-        aside={data.isToday && !(desktopLead && !isMobile) ? <WeatherChip now={nowForDisplay} /> : undefined}
+        // showing today's sky over Saturday. With the controls folded into
+        // the masthead it sits in the subline beside the week, next to the day
+        // it describes (2026-10-06; it had moved to the top bar 2026-09-30).
+        aside={data.isToday && !foldedControls ? <WeatherChip now={nowForDisplay} /> : undefined}
         // Shell desktop controls live in the page navigation; standalone
         // mounts retain the footer controls as a fallback.
         // Standalone mounts keep their controls along the foot; in the Shell
@@ -1639,11 +1640,21 @@ export function TodayView({
             </div>
             {journal.allDayEvents.length > 0 && (
               <ul className="daybook-journal-allday" aria-label="All day">
-                {journal.allDayEvents.map((ev) => (
-                  <li key={ev.id}>
-                    <button type="button" onClick={() => handleSelectItem(ev.id)}>{ev.title}</button>
-                  </li>
-                ))}
+                {journal.allDayEvents.map((ev) => {
+                  // The kids' specials as chips, one per kid (2026-10-06).
+                  const specials = parseSpecials(ev.title)
+                  return (
+                    <li key={ev.id}>
+                      {specials ? (
+                        <button type="button" className="today-specials" aria-label={ev.title} onClick={() => handleSelectItem(ev.id)}>
+                          {specials.map((sp) => <span key={sp.who} className="today-special-chip"><span>{sp.who}</span>{sp.special}</span>)}
+                        </button>
+                      ) : (
+                        <button type="button" onClick={() => handleSelectItem(ev.id)}>{ev.title}</button>
+                      )}
+                    </li>
+                  )
+                })}
               </ul>
             )}
             <TodaySectionList
