@@ -98,8 +98,6 @@ import { currentStep } from '@/lib/guide/guidedPlan'
 import { ViewSwitch } from '@/components/plan/v2/ViewSwitch'
 import { weekOfYear } from '@/lib/planning/horizonNumerals'
 import { WeatherChip } from './WeatherChip'
-import { TodayDayStrip } from './TodayDayStrip'
-import type { StripInput } from '@/lib/today/dayStrip'
 import { parseSpecials } from '@/lib/today/specials'
 import { TodayBacklogFooter } from './TodayBacklogFooter'
 import { EmailReviewSheet } from './EmailReviewSheet'
@@ -1284,12 +1282,6 @@ export function TodayView({
     () => splitTodayJournal(data.grouped, { isToday: data.isToday, now: new Date(nowTick), upNextId }),
     [data.grouped, data.isToday, nowTick, upNextId],
   )
-  // The strip under the date draws every timed thing of the day, earlier
-  // and ahead — the same rows the Schedule lists.
-  const stripItems = useMemo<StripInput[]>(() => [...Object.values(journal.earlier), ...Object.values(journal.ahead)].flat()
-    .filter((i) => i.startTime && !i.allDay)
-    .map((i) => ({ id: i.id, title: i.title, kind: i.type === 'event' ? 'event' : i.type === 'routine' ? 'routine' : 'task', start: i.startTime!, end: i.endTime ?? undefined })),
-  [journal])
   // Earlier today folds by default, per day: unfolding it is about this
   // reading of this day, not a standing preference.
   const focusWork = useMemo(() => splitCompletedFocus(journal.focus), [journal.focus])
@@ -1567,8 +1559,6 @@ export function TodayView({
               commitments; Today is where you settle into a few of them. The
               same rows, the same actions — read as what you chose, what is
               still ahead, and what is already behind you. */}
-          {/* The day, drawn: a picture of the Schedule below (2026-10-06). */}
-          <TodayDayStrip items={stripItems} now={data.isToday ? new Date(nowTick) : null} onSelect={handleSelectItem} />
           <section aria-labelledby="today-focus-heading" className="daybook-journal-section today-focus-card">
             <div className="daybook-journal-heading">
               {/* "For today" holds the page's two verbs (approved white

@@ -2053,29 +2053,7 @@ html.desktop-shell a {
    One reading measure: the day's sections stop at 54rem so who carries a row
    sits a glance from its title, not across the page. The masthead keeps the
    shared page width so every horizon's date still lines up. */
-.today-page:not(.planning-page) .daybook-journal-section,
-.today-page:not(.planning-page) .today-day-strip { max-width: 54rem; }
-/* The day, drawn: 7a–9p, events blue, timed work green, free named. */
-.today-day-strip { margin: 4px 0 30px; display: flex; flex-direction: column; gap: 6px; }
-.today-day-strip-track { position: relative; height: 46px; border-radius: 12px; background: var(--color-primary-50); overflow: hidden; }
-.today-day-strip-free { position: absolute; top: 0; bottom: 0; display: grid; place-items: center; font-size: 11.5px; font-weight: 500; color: var(--color-primary-700); white-space: nowrap; overflow: hidden; }
-.today-day-strip-block {
-  position: absolute; top: 6px; bottom: 6px; min-width: 6px; padding: 0 6px; border-radius: 6px; text-align: left;
-  font-size: 11.5px; line-height: 1.2; color: var(--color-neutral-900); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-  background: hsl(214 45% 86%); border-left: 3px solid hsl(214 50% 47%);
-}
-.today-day-strip-block::after { content: attr(data-title); display: block; overflow: hidden; text-overflow: ellipsis; }
-.today-day-strip-free::after { content: attr(data-label); }
-.today-day-strip-block[data-kind="task"], .today-day-strip-block[data-kind="routine"] { background: var(--color-bg-elevated, #fff); border-left-color: var(--color-primary-600); }
-.today-day-strip-block.is-upper { bottom: 24px; }
-.today-day-strip-block.is-lower { top: 24px; }
-.today-day-strip-block:hover { filter: brightness(.97); }
-.today-day-strip-block:focus-visible { outline: 2px solid var(--color-primary-500); outline-offset: 1px; }
-.today-day-strip-now { position: absolute; top: 0; bottom: 0; width: 2px; margin-left: -1px; background: var(--color-neutral-900); }
-.today-day-strip-ticks { position: relative; height: 14px; font: 400 11px/14px var(--pv2-num, 'Jost'), sans-serif; color: var(--color-neutral-500); }
-.today-day-strip-ticks > span { position: absolute; transform: translateX(-50%); }
-.today-day-strip-ticks > span:first-child { transform: none; }
-.today-day-strip-ticks > span:last-child { transform: translateX(-100%); }
+.today-page:not(.planning-page) .daybook-journal-section { max-width: 54rem; }
 /* A calendar event wears the Week page's blue, quietly, at rest. */
 .today-page [data-row-kind="event"]:not(:hover):not(.ring-1) { background-color: hsl(214 45% 96% / .8); }
 /* The kids' specials, one chip per kid. */
