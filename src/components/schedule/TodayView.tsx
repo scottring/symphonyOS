@@ -41,6 +41,7 @@ import { PhoneFilterControl } from '@/components/layout/PhoneFilterControl'
 
 import { Eye, EyeOff, Binoculars, Printer, GripVertical, Moon, Sparkles, ChevronDown, ChevronRight, Plus, History } from 'lucide-react'
 import { splitTodayJournal, splitCompletedFocus } from '@/lib/today/journalSplit'
+import { emptySections } from '@/lib/today/types'
 import { panelActionsFor } from '@/components/reference/DayPlanPanel'
 import { useColumnsFitWindow } from '@/hooks/useColumnsFitWindow'
 import { TodayWeekColumn } from './TodayWeekColumn'
@@ -69,7 +70,8 @@ import { PhoneCaptureBar } from '@/components/layout/PhoneCaptureBar'
 import { DailyEditionPreview, useEditionPreview } from './DailyEditionPreview'
 import { TodaySectionList, findTimelineItem } from './TodaySectionList'
 import { TodayDragProvider } from './TodayDragProvider'
-import { resolveDrop, writeMoveAndRegisterUndo, type DropIntent } from '@/lib/today/todayDrop'
+import { TodayDayScale, type DayScaleHandle } from './TodayDayScale'
+import { resolveDrop, writeMoveAndRegisterUndo, SCALE_DROP_ID, type DropIntent } from '@/lib/today/todayDrop'
 import { useCalendarPermissions } from '@/hooks/useCalendarPermissions'
 import { selectUpNext, formatUpNextStatus } from '@/lib/today/upNext'
 import { forwardLook, forwardLine, comingUp } from '@/lib/today/forwardLook'
@@ -192,7 +194,7 @@ interface TodayViewProps {
 
 /** Tasks: the day's untimed work — every task dated today plus what was chosen (chosen rows lead); then untimed occurrences. */
 const FOCUS_SECTIONS: DaySection[] = ['allday', 'unscheduled']
-/** Still ahead / Earlier today: the timed day, in order. */
+/** The timed day, drawn to scale (TodayDayScale). */
 const TIMED_SECTIONS: DaySection[] = ['earlyMorning', 'morning', 'afternoon', 'evening', 'night']
 
 export function TodayView({
@@ -926,9 +928,12 @@ export function TodayView({
     }
   }, [tasks, viewedDate])
 
-  const resolve = useCallback((activeId: string, overId: string) => resolveDrop({
+  // The day column reads the time a drop landed at from its own geometry.
+  const scaleRef = useRef<DayScaleHandle>(null)
+  const resolve = useCallback((activeId: string, overId: string, landedTop: number | null) => resolveDrop({
     activeId,
     overId,
+    scaleTime: overId === SCALE_DROP_ID && landedTop !== null ? scaleRef.current?.timeAt(landedTop) ?? null : null,
     sections: data.grouped,
     fullOrderIds: { allday: untimedOrder.ids },
     orders: untimedOrder.orders,
@@ -1285,6 +1290,27 @@ export function TodayView({
   // Earlier today folds by default, per day: unfolding it is about this
   // reading of this day, not a standing preference.
   const focusWork = useMemo(() => splitCompletedFocus(journal.focus), [journal.focus])
+  // The untimed routines get their own small heading under the tasks, as long
+  // as that is all they are.
+  const focusRoutinesOnly = (focusWork.active.unscheduled ?? []).length > 0 &&
+    (focusWork.active.unscheduled ?? []).every((i) => i.type === 'routine' || i.type === 'routine-collection')
+  // The timed day, all of it — past rows included: the column shows them
+  // where they fell, faded, instead of folding them away.
+  const timedItems = useMemo(
+    () => TIMED_SECTIONS.flatMap((section) => data.grouped[section] ?? []),
+    [data.grouped],
+  )
+  // Who carries each thing on the day column — the same people the list's
+  // avatars show, and nothing for an id the household doesn't know.
+  const peopleOf = useCallback((item: TimelineItem) => {
+    const ids = item.type === 'event'
+      ? ctx.eventNotesMap?.get(item.id.replace('event-', ''))?.assignedToAll ?? []
+      : item.type === 'task'
+        ? item.originalTask?.assignedToAll ?? []
+        : item.owners ?? item.originalRoutine?.assigned_to_all ?? []
+    const all = [...(item.assignedTo ? [item.assignedTo] : []), ...ids]
+    return [...new Set(all)].flatMap((id) => familyMembers.find((m) => m.id === id) ?? [])
+  }, [ctx.eventNotesMap, familyMembers])
   const filtersNarrowing = layers.size < ALL_LAYERS.size || (selectedAssignees?.length ?? 0) > 0
   const showEverything = useCallback(() => {
     showAllDomains()
@@ -1292,8 +1318,6 @@ export function TodayView({
   }, [showAllDomains, onSelectAssignees])
   const [completedOpenDay, setCompletedOpenDay] = useState<string | null>(null)
   const completedOpen = completedOpenDay === localYmd(viewedDate)
-  const [earlierOpenDay, setEarlierOpenDay] = useState<string | null>(null)
-  const earlierOpen = earlierOpenDay === localYmd(viewedDate)
   // "Add task" beside the date opens the add box at the head of Tasks; the
   // box unmounts when it closes itself. Keyed by day so a day change closes it.
   const [addOpenDay, setAddOpenDay] = useState<string | null>(null)
@@ -1555,17 +1579,22 @@ export function TodayView({
               ) : null
             }}
           >
-          {/* Today as a daily journal (2026-09-19): Week arranges the
-              commitments; Today is where you settle into a few of them. The
-              same rows, the same actions — read as what you chose, what is
-              still ahead, and what is already behind you. */}
+          {/* The day, to scale (Scott, 2026-10-06, option B): the timed day
+              drawn as hours beside what you chose for it. Week arranges the
+              commitments; Today is where you settle into a few of them and
+              see where they fit. For today comes first in the page's order
+              (and on a phone); on a wide page the day sits on the left. */}
+          <div className="today-cols">
+          <div className="today-cols-grid">
           <section aria-labelledby="today-focus-heading" className="daybook-journal-section today-focus-card">
             <div className="daybook-journal-heading">
-              {/* "For today" holds the page's two verbs (approved white
-                  journal, 2026-09-22): Choose opens and closes the chooser —
-                  the dock beside the page, or the sheet on a phone — and Add
-                  task opens the add box at the head of this list. */}
-              <h2 id="today-focus-heading">{data.isToday ? 'For today' : 'For this day'}</h2>
+              {/* "For today" holds the page's verb (approved white journal,
+                  2026-09-22): Add task opens the add box at the head of
+                  this list. */}
+              <div className="flex items-baseline">
+                <h2 id="today-focus-heading">{data.isToday ? 'For today' : 'For this day'}</h2>
+                {focusWork.activeCount > 0 && <span className="daybook-heading-note">fits in the green</span>}
+              </div>
               <div className="daybook-heading-actions">
                 {addTaskButton}
               </div>
@@ -1589,15 +1618,26 @@ export function TodayView({
               <LoadFailedNotice title="Today didn’t load." body="Your tasks are safe — this is a connection problem." onRetry={onRetryTasks} />
             )}
             {focusWork.activeCount > 0 ? (
-              <TodaySectionList
-                {...listProps}
-                sectionsOrder={FOCUS_SECTIONS}
-                grouped={focusWork.active}
-                // A filtered list cannot use full-day gap indices. Direct
-                // entry stays on Add task; timed scheduling keeps its gaps.
-                dropTargets={false}
-                anytimeHeader={false}
-              />
+              <>
+                {/* A filtered list cannot use full-day gap indices. Direct
+                    entry stays on Add task; a time comes from the day. */}
+                <TodaySectionList
+                  {...listProps}
+                  sectionsOrder={['allday']}
+                  grouped={focusWork.active}
+                  dropTargets={false}
+                  anytimeHeader={false}
+                />
+                {focusRoutinesOnly && <div className="today-subhead">Routines today</div>}
+                <TodaySectionList
+                  {...listProps}
+                  sectionsOrder={['unscheduled']}
+                  grouped={focusWork.active}
+                  dropTargets={false}
+                  anytimeHeader={false}
+                />
+                {!isMobile && <p className="today-drag-hint">Drag a task onto the day to give it a time.</p>}
+              </>
             ) : tasksLoadFailed && onRetryTasks ? null : (
               // One door to the chooser (the labelled Shelves button),
               // one to adding (Add task by the date) — the empty list says
@@ -1631,12 +1671,9 @@ export function TodayView({
             </div>}
           </section>
 
-          {/* Unfinished work from earlier has ONE entrance: the Planning
-              panel's fold. The quiet line that used to sit here was a second
-              door (2026-09-21). */}
-          <section aria-labelledby="today-ahead-heading" className="daybook-journal-section">
+          <section aria-labelledby="today-day-heading" className="daybook-journal-section today-day-section">
             <div className="daybook-journal-heading">
-              <h2 id="today-ahead-heading">Schedule</h2>
+              <h2 id="today-day-heading">The day</h2>
             </div>
             {journal.allDayEvents.length > 0 && (
               <ul className="daybook-journal-allday" aria-label="All day">
@@ -1657,55 +1694,43 @@ export function TodayView({
                 })}
               </ul>
             )}
-            <TodaySectionList
-              {...listProps}
-              sectionsOrder={TIMED_SECTIONS}
-              grouped={journal.ahead}
-              gapOffset={journal.earlierCount}
+            <TodayDayScale
+              items={timedItems}
+              viewedDate={viewedDate}
+              now={data.isToday ? nowForDisplay : null}
+              isMobile={isMobile}
+              selectedItemId={selectedItemId}
+              upNextId={upNextId}
+              peopleOf={peopleOf}
+              isReadOnlyEvent={isReadOnlyEvent}
+              onToggleTask={onToggleTask}
+              onCompleteRoutine={onCompleteRoutine}
+              renderRow={(item) => {
+                // The row as the list drew it, with a group's children under it.
+                const raw = item.id.replace('task-', '')
+                const one = emptySections<TimelineItem>()
+                one.morning = [item, ...(item.type === 'task' ? timedItems.filter((i) => i.isSubtask && i.parentTaskId === raw) : [])]
+                return <TodaySectionList {...listProps} sectionsOrder={['morning']} grouped={one} dropTargets={false} openSpace={false} />
+              }}
+              handleRef={scaleRef}
             />
-            {journal.aheadCount === 0 && (
-              <p className="py-3 text-[15px] text-neutral-500">
-                {/* A connected calendar with nothing on it must not read like a
-                    disconnected one (the calendar status line above covers the
-                    other states). */}
+            {timedItems.length === 0 && (
+              <p className="today-scale-note">
                 {/* "Clear" is a claim: connected, synced, and no layer filtered
                     out. Otherwise say only what is shown — a hidden Personal
                     calendar under a Family filter is not a clear day. */}
                 {data.isToday
                   ? (calendarConnected && !calendarError && layers.size === ALL_LAYERS.size
-                      ? 'Nothing else with a time today. Your calendar is clear.'
+                      ? 'Nothing with a time today. Your calendar is clear.'
                       : calendarConnected
-                        ? 'Nothing else with a time today. No events shown for your current view.'
-                        : 'Nothing else with a time today.')
+                        ? 'Nothing with a time today. No events shown for your current view.'
+                        : 'Nothing with a time today.')
                   : 'Nothing with a time on this day.'}
               </p>
             )}
-            {journal.earlierSummary.rows > 0 && (
-              <div className="mt-4">
-                <button
-                  type="button"
-                  aria-expanded={earlierOpen}
-                  onClick={() => setEarlierOpenDay(earlierOpen ? null : localYmd(viewedDate))}
-                  className="inline-flex items-center gap-1 text-[13px] text-neutral-500 hover:text-neutral-800"
-                >
-                  {earlierOpen ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
-                  Earlier today · {journal.earlierSummary.rows}
-                  {journal.earlierSummary.notDone > 0 && ` · ${journal.earlierSummary.notDone} not done`}
-                </button>
-                {earlierOpen && (
-                  <div className="mt-1 opacity-90">
-                    <TodaySectionList
-                      {...listProps}
-                      sectionsOrder={TIMED_SECTIONS}
-                      grouped={journal.earlier}
-                      dropTargets={false}
-                      upNextId={undefined}
-                    />
-                  </div>
-                )}
-              </div>
-            )}
           </section>
+          </div>
+          </div>
           {/* What is dated in the days after this one — quiet, and silent
               when there is nothing (walkthrough 2026-10-02, #28). */}
           <TodayComingUp items={comingUpItems} onOpen={(id) => handleSelectItem(`task-${id}`)} />

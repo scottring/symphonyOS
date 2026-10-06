@@ -81,7 +81,8 @@ describe('taking a routine off Today', () => {
     const onRegisterUndo = vi.fn()
     renderToday({ onUpdateRoutine, onRegisterUndo })
 
-    await screen.findByText('Kids Bedtime routine')
+    // Timed, so it sits on the day column: a click lifts its row out.
+    fireEvent.click(await screen.findByRole('button', { name: /^Kids Bedtime routine, 7:00 PM/ }))
     fireEvent.click(screen.getByLabelText('Routine options'))
     fireEvent.click(screen.getByText('Remove from Today'))
 
@@ -97,7 +98,8 @@ describe('taking a routine off Today', () => {
     const onUpdateRoutine = vi.fn()
     renderToday({ onUpdateRoutine })
 
-    await screen.findByText('Kids Bedtime routine')
+    // Timed, so it sits on the day column: a click lifts its row out.
+    fireEvent.click(await screen.findByRole('button', { name: /^Kids Bedtime routine, 7:00 PM/ }))
     fireEvent.click(screen.getByLabelText('Routine options'))
     fireEvent.click(screen.getByText('Hide for today'))
 

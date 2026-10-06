@@ -2060,6 +2060,65 @@ html.desktop-shell a {
 .daybook-journal-allday .today-specials { display: inline-flex; flex-wrap: wrap; gap: 6px; font-style: normal; }
 .today-special-chip { display: inline-flex; align-items: baseline; gap: 6px; padding: 3px 11px; border-radius: 999px; background: hsl(38 85% 94%); color: hsl(33 70% 28%); font-size: 13px; font-weight: 500; }
 .today-special-chip > span { font-weight: 600; }
+/* ── The day, to scale (2026-10-06, option B) ───────────────────────────
+   Two columns: the day drawn as hours on the left, For today on the right.
+   The columns split on the agenda's own width, so the week beside the page
+   can take its share first; narrower, For today comes first and the day
+   follows. */
+.today-cols { container-type: inline-size; }
+.today-cols-grid { display: flex; flex-direction: column; gap: 32px; }
+/* Side by side, neither section is "after" the other: no section gap
+   (layout-system.css adds one to the second, which pushed the day down), and
+   Add task adds no height, so the two headings' rules line up. */
+.today-cols .today-cols-grid > .daybook-journal-section { margin-top: 0; max-width: none; }
+.today-cols .daybook-add-task { padding-block: 0; }
+/* What follows the two columns (Coming up) keeps the usual section gap; the
+   day's last hour line is the column's own foot, not the next heading's rule. */
+.today-cols + .daybook-journal-section { margin-top: var(--ds-section-gap, 36px); }
+.today-scale { margin-bottom: 8px; }
+@container (min-width: 50rem) {
+  .today-cols-grid { display: grid; grid-template-columns: minmax(320px, 5fr) minmax(0, 6fr); column-gap: 40px; align-items: start; }
+  .today-cols-grid > .today-day-section { grid-column: 1; grid-row: 1; }
+  .today-cols-grid > .today-focus-card { grid-column: 2; grid-row: 1; }
+}
+.daybook-heading-note { margin-left: 10px; font-family: var(--font-family-sans, inherit); font-size: 13px; font-weight: 400; color: var(--color-neutral-500); }
+.today-subhead { margin: 16px 0 4px; padding-left: 4px; font-size: 10.5px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: var(--color-neutral-500); }
+.today-drag-hint { margin: 16px 0 0; padding-left: 4px; font-size: 13px; color: var(--color-neutral-500); }
+.today-scale { --scale-gutter: 44px; position: relative; margin-top: 14px; }
+.today-scale.is-over { outline: 2px dashed var(--color-primary-300); outline-offset: 6px; border-radius: 6px; }
+.today-scale-hour { position: absolute; left: 0; right: 0; border-top: 1px solid var(--color-neutral-200); }
+.today-scale-hour > span { position: absolute; left: 0; top: -8px; padding-right: 6px; background: var(--color-bg-base); font-size: 11px; line-height: 1.2; color: var(--color-neutral-400); }
+.today-scale-free { position: absolute; left: var(--scale-gutter); right: 0; display: grid; place-items: center; border-radius: 10px; background: hsl(146 30% 87% / .75); color: hsl(150 40% 24%); font-size: 13.5px; font-weight: 500; text-align: center; padding: 0 8px; }
+.today-scale-item { position: absolute; box-sizing: border-box; display: flex; align-items: flex-start; gap: 8px; padding: 5px 8px; border-radius: 8px; overflow: hidden; font-size: 13px; line-height: 1.25; cursor: grab; touch-action: manipulation; }
+.today-scale-item[data-kind="event"] { background: hsl(214 50% 91%); box-shadow: inset 3px 0 0 hsl(214 50% 47%); padding-left: 11px; }
+.today-scale-item[data-kind="work"] { background: var(--color-bg-elevated); border: 1px solid hsl(150 22% 82%); box-shadow: inset 3px 0 0 hsl(150 34% 30%); padding-left: 10px; }
+.today-scale-item.is-compact { align-items: center; padding-top: 0; padding-bottom: 0; }
+.today-scale-item.is-past { opacity: .55; }
+.today-scale-item.is-done .today-scale-title, .today-scale-item.is-done .today-scale-line { text-decoration: line-through; color: var(--color-neutral-500); }
+.today-scale-item.is-next { outline: 2px solid hsl(150 34% 30% / .55); outline-offset: 1px; }
+.today-scale-item.is-selected { outline: 2px solid var(--color-primary-500); outline-offset: 1px; }
+.today-scale-item.is-dragging { opacity: .35; }
+.today-scale-item:hover { filter: brightness(.98); }
+.today-scale-open { flex: 1; min-width: 0; align-self: stretch; margin: -5px 0; padding: 5px 0; display: flex; flex-direction: column; align-items: flex-start; justify-content: flex-start; gap: 1px; text-align: left; color: var(--color-neutral-900); }
+.today-scale-item.is-compact .today-scale-open { flex-direction: row; align-items: center; margin: 0; padding: 0; }
+.today-scale-title { font-weight: 600; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.today-scale-time { color: var(--color-neutral-700); }
+.today-scale-line { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.today-scale-check { flex: none; width: 16px; height: 16px; margin-top: 1px; border-radius: 50%; border: 1.5px solid var(--color-neutral-400); background: transparent; }
+.today-scale-check.is-routine { border-radius: 4px; }
+.today-scale-check[aria-pressed="true"] { background: hsl(150 34% 30%); border-color: hsl(150 34% 30%); }
+.today-scale-item.is-compact .today-scale-check { margin-top: 0; }
+.today-scale-people { flex: none; display: inline-flex; align-self: center; }
+.today-scale-avatar { display: inline-grid; place-items: center; width: 18px; height: 18px; margin-left: -5px; border-radius: 50%; border: 1.5px solid var(--color-bg-elevated); font-size: 8px; font-weight: 600; line-height: 1; }
+.today-scale-avatar:first-child { margin-left: 0; }
+.today-scale-drive { position: absolute; display: flex; align-items: flex-end; padding-left: 6px; border-left: 2px dotted hsl(214 50% 47%); font-size: 11px; line-height: 1.1; color: var(--color-neutral-500); white-space: nowrap; pointer-events: none; }
+.today-scale-now { position: absolute; left: var(--scale-gutter); right: 0; border-top: 2px solid var(--color-neutral-900); z-index: 3; pointer-events: none; }
+.today-scale-now::before { content: ''; position: absolute; left: -5px; top: -5px; width: 8px; height: 8px; border-radius: 50%; background: var(--color-neutral-900); }
+.today-scale-now > span { position: absolute; right: 0; top: -18px; font-size: 11px; font-weight: 600; color: var(--color-neutral-900); background: var(--color-bg-base); padding-left: 4px; }
+.today-scale-landing { position: absolute; left: var(--scale-gutter); right: 0; border-top: 2px dashed var(--color-primary-500); z-index: 4; pointer-events: none; }
+.today-scale-landing > span { position: absolute; left: 4px; top: -20px; padding: 1px 6px; border-radius: 6px; background: var(--color-primary-600); color: #fff; font-size: 11px; font-weight: 600; }
+.today-scale-note { margin: 10px 0 0; font-size: 13px; color: var(--color-neutral-500); }
+.today-scale-card { position: absolute; left: calc(var(--scale-gutter) - 8px); right: -8px; z-index: 6; padding: 6px 4px; border-radius: 14px; background: var(--color-bg-elevated); border: 1px solid var(--color-neutral-200); box-shadow: 0 12px 32px -12px rgb(0 0 0 / .25); }
 /* A row from the Today pin hovering over Today's agenda: drop to choose it. */
 .daybook-agenda-drop { outline: 2px dashed var(--color-primary-300); outline-offset: 8px; border-radius: 4px; }
 /* A row from the Today pin hovering over a list it can be committed to. */

@@ -117,7 +117,7 @@ describe('TodayView', () => {
     renderView()
     // The journal's two empty states: nothing chosen, nothing with a time.
     expect(screen.getByText(/nothing chosen yet/i)).toBeInTheDocument()
-    expect(screen.getByText(/nothing else with a time today/i)).toBeInTheDocument()
+    expect(screen.getByText(/nothing with a time today/i)).toBeInTheDocument()
   })
   it('renders NO Day/Week/Month control inside TodayView (HomeViewSwitcher owns it)', () => {
     renderView()
@@ -273,42 +273,6 @@ describe('TodayView', () => {
     expect(screen.getAllByText('Overdue task title').length).toBeGreaterThanOrEqual(1)
   })
 
-  it('renders timeline insert (+) slots when create-at handlers are available', () => {
-    renderView(
-      {
-        tasks: [
-          {
-            id: 'task-1',
-            title: 'Test task',
-            completed: false,
-            createdAt: TODAY,
-            updatedAt: TODAY,
-            bucket: 'timed' as const,
-            scheduledFor: TODAY,
-          },
-          // Second task at the same time: the Up Next hero lifts the first
-          // candidate out of its section, this one keeps the section rendered.
-          {
-            id: 'task-2',
-            title: 'Second test task',
-            completed: false,
-            createdAt: TODAY,
-            updatedAt: TODAY,
-            bucket: 'timed' as const,
-            scheduledFor: TODAY,
-          },
-        ],
-      } as never,
-      {
-        onCreateTaskAt: vi.fn(),
-        onCreateEventAt: vi.fn(),
-        onCreateRoutineAt: vi.fn(),
-      },
-    )
-    // TimelineInsertPoint renders a button with aria-label "Add between items"
-    expect(screen.getAllByRole('button', { name: /add between items/i }).length).toBeGreaterThan(0)
-  })
-
   it('renders TimelineNoteComposer when insert.noteComposer is set', () => {
     // Activate the note composer by setting the module-level mock state
     mockNoteComposer = { anchor: new Date('2026-05-19T10:00:00') }
@@ -412,20 +376,17 @@ describe('TodayView', () => {
         ],
       } as never)
 
-      // The commitment stays IN the timeline; the marker line above the row
-      // is the entire treatment. Lifting it into a hero card left its home
-      // section rendering an empty "· up next" heading.
+      // The commitment stays IN the day, marked where it falls (the day is
+      // drawn to scale, 2026-10-06). No hero card.
       expect(screen.queryByTestId('up-next-hero')).toBeNull()
-      const marker = screen.getByTestId('up-next-marker')
-      expect(marker).toHaveTextContent(/up next/i)
-      expect(marker).toHaveTextContent(/since|starts in|starting now/i)
+      expect(screen.getByRole('button', { name: /^Call the pediatrician, .*up next$/ })).toBeInTheDocument()
       // Exactly one rendering of the item — nothing lifted, nothing doubled.
       expect(screen.getAllByText('Call the pediatrician')).toHaveLength(1)
     })
 
     it('renders no marker when nothing qualifies', () => {
       renderView()
-      expect(screen.queryByTestId('up-next-marker')).toBeNull()
+      expect(screen.queryByRole('button', { name: /up next$/ })).toBeNull()
     })
 
     // One-tap Reschedule on the up-next row needs no test here: the row is an
@@ -507,10 +468,10 @@ describe('TodayView', () => {
     } as never)
 
     expect(screen.getByText('Afternoon task, already done')).toBeInTheDocument()
-    // No "Afternoon" section toggle — the only such button is the row's own
-    // title (the phone row's keyboard way into the detail).
+    // No "Afternoon" section toggle — the only such buttons are the item's
+    // own (its block on the day, and its check).
     expect(screen.queryAllByRole('button', { name: /afternoon/i })
-      .filter((b) => b.textContent !== 'Afternoon task, already done')).toHaveLength(0)
+      .filter((b) => !b.getAttribute('aria-label')?.includes('Afternoon task, already done'))).toHaveLength(0)
 
     localStorage.clear()
   })
@@ -687,9 +648,9 @@ describe('TodayView — no scoreboard', () => {
         createdAt: TODAY, updatedAt: TODAY, bucket: 'timed' as const, scheduledFor: soon,
       }],
     } as never)
-    // Named in place, in Still ahead, by the Up next marker — the masthead no
-    // longer repeats it as a "Next: …" line.
-    expect(screen.getByTestId('up-next-marker')).toBeInTheDocument()
+    // Named in place, on the day, as up next — the masthead no longer
+    // repeats it as a "Next: …" line.
+    expect(screen.getByRole('button', { name: /^Pick up Mia from climbing, .*up next$/ })).toBeInTheDocument()
     expect(screen.getAllByText('Pick up Mia from climbing')).toHaveLength(1)
     expect(screen.queryByText(/^Next: /)).not.toBeInTheDocument()
     expect(screen.queryByText(/marked in the timeline/i)).not.toBeInTheDocument()

@@ -10,10 +10,14 @@ Every page that lists the things in a day (Today, Week, the wall, planning steps
 | Steps | Folded to their next one: "Next: … · 5 steps ›". Only a step for someone *other* than the row's person stays open | `ScheduleItem` |
 | People | Avatars a glance from the title (a 54rem reading measure on Today); your own included; nothing shown for an id the household doesn't know | `RowActionRail`, `ScheduleItem` |
 | Defaults | A control showing the default ("Any time") waits for hover or focus, on the title line so nothing moves | `ScheduleItem` |
-| Free time | Named, in green, in the row grid. An hour or more counts on a Week day; the gap between rows on Today | `lib/week/dayShape.ts`, `OpenSpaceLine` |
+| Free time | Named, in green. An hour or more counts, on a Week day and on Today's day column ("4½ hours free", "Evening open") | `lib/week/dayShape.ts`, `lib/today/dayScale.ts` |
 | Specials | One chip per kid, from the "Specials — Ella: Library · Kaleb: Art" event | `lib/today/specials.ts` |
 | Counts | None on Today or between people. A thing's own steps ("5 steps") are fine; tallies of what's undone are not | |
 
 When a page needs one of these, reuse the helper named here rather than restyling it. When a rule changes, change it here and on every page in the same PR.
 
-No separate picture of the day above a list that already shows it (Scott, 2026-10-06: a time strip over Today's schedule was "redundant to the schedule below").
+## Today: the day, to scale (2026-10-06, option B)
+
+Today draws its timed day once, as a column of hours ("The day", `TodayDayScale`), beside what was chosen for it ("For today"). Events are blue blocks, timed work is a line with its check and people, free time is green, and today has a now line. A click lifts the thing's own row into a card, with all its actions; dragging moves it, and a row from For today dropped on the day gets the time it landed at. There is no separate timed list.
+
+Still no second picture of the day: the column replaced the Schedule list rather than sitting above it (Scott, 2026-10-06: a time strip over the list was "redundant to the schedule below").

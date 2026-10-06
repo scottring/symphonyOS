@@ -143,6 +143,9 @@ export interface TodaySectionListProps {
   /** The unscheduled section's "Anytime · M of N done" fold. My focus lists
    *  chosen untimed work plainly, so it turns this off. Default true. */
   anytimeHeader?: boolean
+  /** Name the free stretches between rows. Off for one row lifted out of the
+   *  day (TodayDayScale), where the day column already shows them. */
+  openSpace?: boolean
 }
 
 /** No drop zone: the slice renders its rows plainly. */
@@ -184,6 +187,7 @@ export function TodaySectionList({
   dropTargets = true,
   gapOffset,
   anytimeHeader = true,
+  openSpace = true,
 }: TodaySectionListProps) {
   const Band = dropTargets ? TodayBandDropZone : Plain
   const Gap = dropTargets ? TodayGapDropZone : Plain
@@ -351,7 +355,7 @@ export function TodaySectionList({
                   const showInsert = !isGroupChild && dropTargets
 
                   // The free run that ends where this item begins, if any.
-                  const openSpan = openSpans.get(item.id)
+                  const openSpan = openSpace ? openSpans.get(item.id) : undefined
                   const spineSegments = spine.get(item.id)
 
                   // Insert point before this item
