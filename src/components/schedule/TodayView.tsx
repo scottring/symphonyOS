@@ -1640,6 +1640,12 @@ export function TodayView({
                 />
                 {!isMobile && <p className="today-drag-hint">Drag a task onto the day to give it a time.</p>}
               </>
+            ) : loading ? (
+              // The tasks are still on their way even though the calendar has
+              // arrived (the page shows once anything has): an empty list
+              // here would say "Nothing chosen yet" over a day that has work
+              // (2026-10-07, seen on prod during a slow load).
+              <p className="py-4 text-[15px] text-neutral-500">Loading your list…</p>
             ) : tasksLoadFailed && onRetryTasks ? null : (
               // One door to the chooser (the labelled Shelves button),
               // one to adding (Add task by the date) — the empty list says

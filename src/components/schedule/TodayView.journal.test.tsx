@@ -166,6 +166,15 @@ describe('Today as a daily journal', () => {
     domainMock.layers = ALL_LAYERS
   })
 
+  // 2026-10-07 on prod: the calendar arrived before the tasks, so the page
+  // drew — and For today said "Nothing chosen yet." over a day with work.
+  it('while the tasks are still loading, For today says so instead of "Nothing chosen yet"', () => {
+    const event = { id: 'e1', google_event_id: 'e1', title: 'Boxing', start_time: new Date(2026, 8, 19, 18).toISOString(), end_time: new Date(2026, 8, 19, 19).toISOString(), all_day: false }
+    renderView({ tasks: [], events: [event], loading: true })
+    expect(screen.queryByText('Nothing chosen yet.')).toBeNull()
+    expect(screen.getByText('Loading your list…')).toBeInTheDocument()
+  })
+
   it('an unfiltered empty list does not mention filters', () => {
     renderView({ tasks: [] })
     expect(screen.getByText('Nothing chosen yet.')).toBeInTheDocument()
