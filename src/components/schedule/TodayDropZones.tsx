@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 import { useDroppable } from '@dnd-kit/core'
 import type { DaySection } from '@/lib/timeUtils'
-import { bandDropId, gapDropId } from '@/lib/today/todayDrop'
+import { bandDropId, gapDropId, FOR_TODAY_DROP_ID } from '@/lib/today/todayDrop'
 import { useTodayDragState } from './TodayDragProvider'
 
 /** A whole day band — dropping here gives the item a time (or makes it all-day). */
@@ -52,6 +52,17 @@ export function TodayGapDropZone({
           }`}
         />
       )}
+      {children}
+    </div>
+  )
+}
+
+/** For today as a whole: a task dragged here off the day column keeps the
+ *  day and gives up its time. */
+export function ForTodayDropZone({ children }: { children: ReactNode }) {
+  const { setNodeRef, isOver } = useDroppable({ id: FOR_TODAY_DROP_ID })
+  return (
+    <div ref={setNodeRef} data-testid={FOR_TODAY_DROP_ID} className={isOver ? 'today-for-today-over' : undefined}>
       {children}
     </div>
   )

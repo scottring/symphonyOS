@@ -70,6 +70,7 @@ import { DailyEditionPreview, useEditionPreview } from './DailyEditionPreview'
 import { TodaySectionList, findTimelineItem } from './TodaySectionList'
 import { TodayDragProvider } from './TodayDragProvider'
 import { TodayDayScale, type DayScaleHandle } from './TodayDayScale'
+import { ForTodayDropZone } from './TodayDropZones'
 import { resolveDrop, writeMoveAndRegisterUndo, SCALE_DROP_ID, type DropIntent } from '@/lib/today/todayDrop'
 import { useCalendarPermissions } from '@/hooks/useCalendarPermissions'
 import { selectUpNext, formatUpNextStatus } from '@/lib/today/upNext'
@@ -1024,7 +1025,7 @@ export function TodayView({
             allDayId,
             { bucket: 'timed', scheduledFor: midnight, isAllDay: true },
             wasTimed && { bucket: wasTimed.bucket, scheduledFor: wasTimed.scheduledFor, isAllDay: wasTimed.isAllDay },
-            `Moved "${wasTimed?.title}" to All day`,
+            `Moved "${wasTimed?.title}" to For today`,
             ctx.onRegisterUndo,
           )
           break
@@ -1586,6 +1587,8 @@ export function TodayView({
           <div className="today-cols">
           <div className="today-cols-grid">
           <section aria-labelledby="today-focus-heading" className="daybook-journal-section today-focus-card">
+          {/* A task dragged here off the day keeps the day, loses its time. */}
+          <ForTodayDropZone>
             <div className="daybook-journal-heading">
               {/* "For today" holds the page's verb (approved white journal,
                   2026-09-22): Add task opens the add box at the head of
@@ -1668,6 +1671,7 @@ export function TodayView({
               </button>
               {completedOpen && <TodaySectionList {...listProps} sectionsOrder={FOCUS_SECTIONS} grouped={focusWork.completed} anytimeHeader={false} dropTargets={false} />}
             </div>}
+          </ForTodayDropZone>
           </section>
 
           <section aria-labelledby="today-day-heading" className="daybook-journal-section today-day-section">
