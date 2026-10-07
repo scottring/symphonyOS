@@ -1,4 +1,4 @@
-import type { MouseEvent } from 'react'
+import { createElement, type MouseEvent } from 'react'
 import { Check } from 'lucide-react'
 import { taskIconFor, type TaskIconInput } from '@/lib/taskIcon'
 
@@ -17,13 +17,12 @@ export function TaskIconCheck({ task, done, size = 'card', onToggle, disabled }:
   onToggle?: () => void
   disabled?: boolean
 }) {
-  const Icon = taskIconFor(task)
   const px = size === 'card' ? 22 : 14
   const isEvent = task.type === 'event'
   if (isEvent || !onToggle) {
     return (
       <span aria-hidden="true" className={`sym-tile sym-tile-${size}${isEvent ? ' is-event' : ''}${done ? ' is-done' : ''}`}>
-        {done ? <Check size={px} strokeWidth={2.6} /> : <Icon size={px} strokeWidth={1.8} />}
+        {done ? <Check size={px} strokeWidth={2.6} /> : createElement(taskIconFor(task), { size: px, strokeWidth: 1.8 })}
       </span>
     )
   }
@@ -38,7 +37,7 @@ export function TaskIconCheck({ task, done, size = 'card', onToggle, disabled }:
       onClick={(e: MouseEvent) => { e.stopPropagation(); onToggle() }}
       onPointerDown={(e) => e.stopPropagation()}
     >
-      {done ? <Check size={px} strokeWidth={2.6} /> : <Icon size={px} strokeWidth={1.8} />}
+      {done ? <Check size={px} strokeWidth={2.6} /> : createElement(taskIconFor(task), { size: px, strokeWidth: 1.8 })}
     </button>
   )
 }
