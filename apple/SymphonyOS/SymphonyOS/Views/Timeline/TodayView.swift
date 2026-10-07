@@ -15,6 +15,7 @@ struct TodayView: View {
     @Environment(\.modelContext) private var modelContext
     @State private var viewModel = TimelineViewModel()
     @State private var calendar = GoogleCalendarService.shared
+    @State private var dinners = DinnerService.shared
     @State private var showSearch = false
     @State private var searchText = ""
     @State private var showChooser = false
@@ -37,8 +38,17 @@ struct TodayView: View {
                      instances: instances, userId: auth.currentUser?.id, domain: appState.domainFilter.contextValue)
     }
 
+    /// The night's planned dinner, when the view includes family (meals are
+    /// the household's; a Work or Personal view leaves them out).
+    private var dinner: Dinner? {
+        let context = appState.domainFilter.contextValue
+        guard context == nil || context == "family" else { return nil }
+        return dinners.dinner(on: date)
+    }
+
     var body: some View {
         let plan = plan
+        let dinner = dinner
         let offerTasks = plan.chooserTasks(on: date).count
         let offerRoutines = plan.chooserRoutines(on: date).filter { !$0.chosen }.count
 
@@ -79,6 +89,15 @@ struct TodayView: View {
                         }
                     }
 
+                    // Tonight's dinner, after what you chose and before the
+                    // timed day (Scott, 2026-10-07).
+                    if let dinner {
+                        Eyebrow(text: appState.isToday ? "Dinner tonight" : "Dinner")
+                        DinnerCard(dinner: dinner)
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 3)
+                    }
+
                     ForEach(TimelineViewModel.TimeSection.allCases, id: \.self) { section in
                         let items = viewModel.schedule.filter { viewModel.section(for: $0) == section }
                         if !items.isEmpty {
@@ -97,7 +116,7 @@ struct TodayView: View {
                     }
 
                     if viewModel.timelineItems.isEmpty && viewModel.carriedOverTasks.isEmpty
-                        && offerTasks + offerRoutines == 0 && !eventsPending {
+                        && offerTasks + offerRoutines == 0 && !eventsPending && dinner == nil {
                         emptyState.padding(.top, 60).frame(maxWidth: .infinity)
                     }
                 }
@@ -136,9 +155,11 @@ struct TodayView: View {
         // then refresh the day in the background.
         .onAppear { rebuildTimeline() }
         .task { await calendar.refresh(date, maxAge: 60) }
+        .task { await dinners.refresh(date) }
         .onChange(of: appState.selectedDate) { _, _ in
             rebuildTimeline()
             Task { await calendar.refresh(appState.selectedDate, maxAge: 60) }
+            Task { await dinners.refresh(appState.selectedDate) }
         }
         .onChange(of: appState.domainFilter) { _, _ in rebuildTimeline() }
         .onChange(of: tasksRevision) { _, _ in rebuildTimeline() }

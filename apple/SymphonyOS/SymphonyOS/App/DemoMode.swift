@@ -31,6 +31,15 @@ enum DemoMode {
 
     @MainActor static let sharedContainer: ModelContainer = container(for: types)
 
+    /// A sample dinner every night: a recipe to cook from, with a cue.
+    static func dinner(on date: Date) -> Dinner? {
+        Dinner(id: UUID(), title: "Sheet-Pan Salmon with Sweet Potatoes and Green Beans",
+               notes: "Roast double sweet potatoes — half for Wednesday. Kids: plain salmon.",
+               imageURL: nil, prepMinutes: 45, sourceURL: URL(string: "https://example.com/salmon"),
+               ingredients: ["1 1/4 lb salmon", "4 small sweet potatoes, cubed", "12 oz green beans", "2 tbsp Dijon", "2 tbsp maple syrup"],
+               instructions: ["Heat the oven to 425°F.", "Roast the sweet potatoes 15 minutes.", "Add the salmon and beans; roast 12–15 minutes more."])
+    }
+
     /// Sample calendar events: school drop-off on weekdays, a Monday dentist
     /// visit, Saturday soccer.
     static func events(on date: Date) -> [TimelineItem] {
