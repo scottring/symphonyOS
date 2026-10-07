@@ -75,7 +75,7 @@ import { useFamilyDiscussionItems, type DiscussionItem } from '@/hooks/useFamily
 import { QuickCapture } from '@/components/layout/QuickCapture';
 import { WallMoments, type MomentKid } from './moments/WallMoments';
 import { wallMoment } from '@/lib/wall/wallMoment';
-import { wallTodayRows, specialsWeek, checklistFor } from '@/lib/wall/wallMomentsModel';
+import { wallTodayRows, specialsWeek, checklistFor, afterSchoolRows } from '@/lib/wall/wallMomentsModel';
 import { buildMemberDayModel, type KidRow } from '@/lib/wall/kidDayModel';
 import { memberShape } from '@/lib/wall/memberPageModel';
 import { useMemberInstanceHistory } from './useMemberInstanceHistory';
@@ -499,7 +499,8 @@ export function WallV2Shell() {
   // Three cheap projections over data the wall already holds: no new queries,
   // which matters on a display that polls all day (see the egress incident).
   const comingUpRows = useMemo(
-    () => adaptComingUpRows(wallData.days, wallData.familyMembers),
+    // The specials are the Specials card's; Coming up is everything else.
+    () => adaptComingUpRows(wallData.days, wallData.familyMembers, undefined, undefined, true),
     [wallData.days, wallData.familyMembers],
   );
 
@@ -658,7 +659,6 @@ export function WallV2Shell() {
       notices: wallData.notices, history: instanceHistory,
     }),
   })), [kids, now, wallData.routines, todayItems, tomorrowData, wallData.familyMembers, wallData.neededTasks, wallData.homeworkTasks, wallData.notices, instanceHistory]);
-  const adultIds = useMemo(() => new Set(adults.map((a) => a.id)), [adults]);
   const kidsNow: MomentKid[] = useMemo(() => kidModels.map(({ member, model }) => {
     const evening = moment === 'evening';
     return {
@@ -667,17 +667,26 @@ export function WallV2Shell() {
       hint: evening ? null : (model.school?.hint ?? null),
       needed: model.needed.filter((n) => n.tomorrow === evening).map((n) => n.title),
       homeworkDue: model.homework.filter((h) => h.due === (evening ? 'Tomorrow' : 'Today') || h.late).map((h) => h.title),
+      afterSchool: moment === 'after' ? afterSchoolRows(model) : [],
     };
   }), [kidModels, moment]);
+  // In the afternoon, homework and practice are After school's — a timed
+  // "math time" leaves Today's list rather than sitting in both.
+  const todayForMoment = useMemo(() => {
+    if (moment !== 'after') return todayRows
+    const taken = new Set(kidsNow.flatMap((k) => k.afterSchool.map((r) => `${r.entityType}-${r.id}`)))
+    return todayRows.filter((r) => !taken.has(r.id))
+  }, [moment, todayRows, kidsNow]);
+  // Only the evening lists rows in the centre (tomorrow's morning): in the
+  // morning and afternoon those rows are Today's, and the wall says each
+  // thing once (2026-10-07).
   const focusRows = useMemo(() => {
-    if (moment === 'morning') return todayRows.filter((r) => !r.past && r.owners.some((id) => adultIds.has(id)) && parseInt(r.time, 10) < 12 && r.time.endsWith('a'));
-    if (moment === 'after') return todayRows.filter((r) => !r.past && !(dinnerStartDate && r.title === dinnerEvent?.title)).slice(0, 5);
     if (moment === 'evening' && tomorrowData) {
       const tomorrowStart = new Date(tomorrowData.date); tomorrowStart.setHours(0, 0, 0, 0);
       return wallTodayRows(tomorrowData.items, wallData.familyMembers, tomorrowStart).filter((r) => r.time.endsWith('a')).slice(0, 4);
     }
     return [];
-  }, [moment, todayRows, adultIds, dinnerStartDate, dinnerEvent, tomorrowData, wallData.familyMembers]);
+  }, [moment, tomorrowData, wallData.familyMembers]);
   const tomorrowKey = useMemo(() => (tomorrowData ? localDateKey(tomorrowData.date) : null), [tomorrowData]);
   const nextMeal = useMemo(() => {
     if (moment === 'evening') {
@@ -729,7 +738,12 @@ export function WallV2Shell() {
     // parent sees it from the kitchen and the kid can find it again.
     const timer = readReadingTimer(safeStorage(), readingTimerKey(member.id, localYmd(now)));
     const live = timer ? `${isTimerRunning(timer) ? 'Reading' : 'Reading paused'} · ${elapsedMinutes(timer, now)} min` : null;
-    return { member, list: checklistFor(model, moment), live };
+    // In the afternoon, homework and practice are After school's; the card
+    // keeps the rest so nothing is listed twice.
+    const list = checklistFor(model, moment)
+    const shown = new Set(moment === 'after' ? afterSchoolRows(model).map((r) => `${r.entityType}:${r.id}`) : [])
+    const rows = list?.rows.filter((r) => !shown.has(`${r.entityType}:${r.id}`)) ?? []
+    return { member, list: list && rows.length ? { ...list, rows } : null, live };
   }), [kidModels, moment, now]);
   const handleTick = useCallback((member: FamilyMember, row: KidRow) => {
     void (async () => {
@@ -865,7 +879,7 @@ export function WallV2Shell() {
           }
           members={wallData.familyMembers}
           kids={kids}
-          today={todayRows}
+          today={todayForMoment}
           specials={specials}
           comingUp={comingUpRows}
           kidsNow={kidsNow}

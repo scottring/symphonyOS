@@ -9,6 +9,7 @@ import { routineEarnsTheWall } from '@/lib/routineUtils'
 import { boardOwnersOf } from '@/components/wall-v2/wallGantt'
 import { titleForMember, HOUSEHOLD_ID } from '@/components/wall-v2/wallEventAttribution'
 import { bandForTime, type MemberDayModel, type KidRow } from './kidDayModel'
+import { memberShape } from './memberPageModel'
 import type { WallMoment } from './wallMoment'
 
 /** "7:30a", "2:10p", "12p". */
@@ -36,17 +37,35 @@ export interface WallTodayRow {
 /**
  * Today's timed things in order. A routine that runs most days is the week's
  * shape, not news, and stays off (the board's rule, routineEarnsTheWall); a
- * collection step never stands alone.
+ * collection step never stands alone, and neither does a task's step: it
+ * folds into its task's row as "3 steps" (2026-10-07 — a task and its three
+ * steps were four rows at 8:30). And it is the family's screen: a task that
+ * is one adult's alone stays off it (Scott, 2026-10-07: "only relevant to
+ * me — we should be more focused on shared tasks and stuff involving the
+ * kids"). A task kept: shared by two or more, any kid's, or nobody's in
+ * particular (the household's). Events stay — they say who is where.
  */
 export function wallTodayRows(items: Record<string, TimelineItem[]>, members: FamilyMember[], now: Date): WallTodayRow[] {
   const all = Object.values(items).flat()
+  const ids = new Set(all.map((it) => it.id))
+  const kidIds = new Set(members.filter((m) => memberShape(m) === 'kid').map((m) => m.id))
+  const steps = new Map<string, number>()
+  for (const it of all) {
+    if (it.isSubtask && it.parentTaskId && ids.has(`task-${it.parentTaskId}`) && !it.completed) {
+      steps.set(`task-${it.parentTaskId}`, (steps.get(`task-${it.parentTaskId}`) ?? 0) + 1)
+    }
+  }
   const seen = new Set<string>()
   const rows: (WallTodayRow & { at: number })[] = []
   for (const it of all) {
     if (!it.startTime || it.allDay || seen.has(it.id)) continue
+    if (it.isSubtask && it.parentTaskId && ids.has(`task-${it.parentTaskId}`)) continue
     if (it.type === 'routine' && (it.originalRoutine?.parent_routine_id != null || !routineEarnsTheWall(it.recurrencePattern))) continue
     if (it.completed && it.type !== 'event') continue
+    const owners = boardOwnersOf(it, members).filter((id) => id !== HOUSEHOLD_ID)
+    if (it.type === 'task' && owners.length === 1 && !kidIds.has(owners[0])) continue
     seen.add(it.id)
+    const stepCount = steps.get(it.id) ?? 0
     const start = new Date(it.startTime)
     const end = it.endTime ? new Date(it.endTime) : null
     const endsAt = (end ?? new Date(start.getTime() + 30 * 60_000)).getTime()
@@ -57,8 +76,9 @@ export function wallTodayRows(items: Record<string, TimelineItem[]>, members: Fa
       time: wallClock(start),
       end: end && end.getTime() - start.getTime() >= 45 * 60_000 ? wallClock(end) : null,
       title: it.title,
-      sub: (it as TimelineItem & { location?: string | null }).location?.split(',')[0] ?? null,
-      owners: boardOwnersOf(it, members).filter((id) => id !== HOUSEHOLD_ID),
+      sub: (it as TimelineItem & { location?: string | null }).location?.split(',')[0]
+        ?? (stepCount ? `${stepCount} ${stepCount === 1 ? 'step' : 'steps'}` : null),
+      owners,
       past: endsAt <= now.getTime(),
       now: start.getTime() <= now.getTime() + 45 * 60_000 && endsAt > now.getTime(),
     })
@@ -114,4 +134,34 @@ export function checklistFor(model: MemberDayModel, moment: WallMoment): WallChe
   if (collection) return { title: collection.title, rows: collection.rows }
   const rows = model.bands[band] ?? []
   return rows.length ? { title: BAND_TITLE[band], rows } : null
+}
+
+/** Work a child does after school: practice and homework, by name. */
+const PRACTICE = /\b(math|maths|reading|read|practice|homework|spelling|study|studying)\b/i
+
+/**
+ * A kid's after-school work, once each (Scott, 2026-10-07: "the day's
+ * homework and math/reading practice … in the afternoon"): homework due by
+ * the next school day (or late), then today's practice routines — the reading
+ * target and any routine or collection step named for math, reading,
+ * spelling or homework. Every row ticks off where it stands.
+ */
+export function afterSchoolRows(model: MemberDayModel): KidRow[] {
+  const out: KidRow[] = []
+  const seen = new Set<string>()
+  const add = (r: KidRow) => {
+    const key = `${r.entityType}:${r.id}`
+    if (seen.has(key)) return
+    seen.add(key)
+    out.push(r)
+  }
+  for (const h of model.homework) {
+    if (!(h.late || h.due === null || h.due === 'Today' || h.due === 'Tomorrow')) continue
+    const when = h.late ? 'late' : h.due === 'Tomorrow' ? 'due tomorrow' : null
+    add({ entityType: 'task', id: h.id, title: when ? `${h.title} · ${when}` : h.title, done: false, timeOfDay: null, target: null })
+  }
+  if (model.reading) add(model.reading)
+  const routineRows = [...Object.values(model.bands).flat(), ...model.collections.flatMap((c) => c.rows)]
+  for (const r of routineRows) if (PRACTICE.test(r.title)) add(r)
+  return out
 }

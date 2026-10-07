@@ -108,10 +108,11 @@ const BACKGROUND_MIN_DAYS = 3;
 const JOIN = ' • ';
 
 /** The day's candidate lines, deduped, in section order. */
-function titlesOf(day: WallDayData, members: FamilyMember[]): string[] {
+function titlesOf(day: WallDayData, members: FamilyMember[], skipSpecials = false): string[] {
   const seen = new Set<string>();
   for (const it of Object.values(day.items).flat()) {
     if (it.completed || it.type === 'routine') continue;
+    if (skipSpecials && /^specials\b/i.test(it.title.trim())) continue;
     const title = withoutKindPrefix(it.title.trim(), members);
     if (title) seen.add(title);
   }
@@ -137,9 +138,11 @@ export function adaptComingUpRows(
   members: FamilyMember[] = [],
   limit = STRIP_ROWS,
   perDay = 2,
+  /** Leave the school specials out — the wall's Specials card has them. */
+  skipSpecials = false,
 ): ComingUpRow[] {
   const upcoming = days.filter((d) => !d.isToday).slice(0, limit);
-  const perDayTitles = upcoming.map((d) => titlesOf(d, members));
+  const perDayTitles = upcoming.map((d) => titlesOf(d, members, skipSpecials));
 
   const runs = new Map<string, number>();
   for (const titles of perDayTitles) {
