@@ -311,3 +311,32 @@ struct TimelineItem: Identifiable {
         return formatter.string(from: time)
     }
 }
+
+// MARK: - Steps, folded to their next one
+
+/// Web parity (ScheduleItem.tsx, "Today, calmer" 2026-10-06): a row's steps
+/// fold to "Next: … · 5 steps". Only a PER-PERSON step stays open — one for
+/// someone the row doesn't already name, or any open step of a row that came
+/// from an email ("Picture Day" means nothing without "Liam: collared shirt").
+/// A step given to the row's own person is an ordinary step.
+extension TimelineItem {
+    func isPerPerson(_ step: ChildItem) -> Bool {
+        if source == .email { return true }
+        guard let who = step.assignedTo.first else { return false }
+        return !assignedTo.contains(who)
+    }
+
+    /// Open per-person steps — always shown, under the title.
+    var perPersonSteps: [ChildItem] { children.filter { !$0.completed && isPerPerson($0) } }
+
+    /// Everything else — behind the "N steps" disclosure. Split on the
+    /// predicate, not the shown list, so a finished per-person step doesn't
+    /// reappear here as a plain one.
+    var plainSteps: [ChildItem] { children.filter { !isPerPerson($0) } }
+
+    /// The first open plain step: the "Next: …" line.
+    var nextStep: ChildItem? { plainSteps.first { !$0.completed } }
+
+    /// The disclosure's count, as the web counts it.
+    var stepsTotal: Int { perPersonSteps.isEmpty ? children.count : plainSteps.count }
+}

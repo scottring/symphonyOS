@@ -14,6 +14,8 @@ struct TimelineItemCard: View {
     @State private var showContextPicker = false
     @State private var showDetail = false
     @State private var showEventDetail = false
+    /// The row's plain steps, unfolded. Per-person steps never fold.
+    @State private var stepsOpen = false
     @Query private var familyMembers: [FamilyMember]
 
     init(item: TimelineItem, modelContext: ModelContext, userId: UUID, date: Date = Date()) {
@@ -272,17 +274,24 @@ struct TimelineItemCard: View {
                         .lineLimit(2)
                 }
 
-                // Subtasks stay inside their card, each with its own circle.
-                if !item.children.isEmpty {
+                // Steps fold to their next one; a step for someone else stays
+                // open (web parity, 2026-10-06). Each keeps its own circle.
+                if !item.perPersonSteps.isEmpty || (stepsOpen && !item.plainSteps.isEmpty) {
                     VStack(alignment: .leading, spacing: 8) {
-                        ForEach(item.children) { child in
+                        ForEach(item.perPersonSteps) { child in
                             ChildRow(child: child, members: familyMembers) { toggleChild(child) }
+                        }
+                        if stepsOpen {
+                            ForEach(item.plainSteps) { child in
+                                ChildRow(child: child, members: familyMembers) { toggleChild(child) }
+                            }
                         }
                     }
                     .padding(.top, 8)
                     .overlay(alignment: .top) { Rectangle().fill(Color.cardBorder).frame(height: 1) }
                     .padding(.top, 2)
                 }
+                if item.stepsTotal > 0 && !item.plainSteps.isEmpty { stepsDisclosure }
 
                 if hasContextRow { contextRow.padding(.top, 2) }
             }
@@ -295,6 +304,37 @@ struct TimelineItemCard: View {
         .shadow(color: Color.cardShadow, radius: 8, x: 0, y: 2)
         .opacity(item.isFree ? 0.6 : (isCompleted ? 0.7 : 1.0))
         .sheet(item: $safariURL) { url in SafariView(url: url) }
+    }
+
+    /// "Next: Talk with Iris about the trip · 5 steps ›" — tap to open them.
+    private var stepsDisclosure: some View {
+        let next = stepsOpen ? nil : item.nextStep
+        let count = item.stepsTotal
+        return Button {
+            withAnimation(.easeInOut(duration: 0.2)) { stepsOpen.toggle() }
+        } label: {
+            HStack(spacing: 4) {
+                if let next {
+                    Text("Next: \(next.title)")
+                        .foregroundStyle(Color.textSecondary)
+                        .lineLimit(1)
+                    Text("·").foregroundStyle(Color.textLight)
+                }
+                Text("\(count) \(count == 1 ? "step" : "steps")")
+                    .font(.captionBold)
+                    .foregroundStyle(Color.amberStrong)
+                    .fixedSize()
+                Image(systemName: stepsOpen ? "chevron.up" : "chevron.right")
+                    .font(.system(size: 9, weight: .semibold))
+                    .foregroundStyle(Color.amberStrong)
+            }
+            .font(.bodySmall)
+            .frame(minHeight: 28)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(stepsOpen ? "Hide steps" : "\(count) \(count == 1 ? "step" : "steps")\(next.map { ", next: \($0.title)" } ?? "")")
+        .accessibilityHint(stepsOpen ? "" : "Shows every step")
     }
 
     private var hasContextRow: Bool {
