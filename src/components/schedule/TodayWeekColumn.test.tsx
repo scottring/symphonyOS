@@ -19,4 +19,12 @@ describe('TodayWeekColumn', () => {
     fireEvent.dragStart(row, { dataTransfer: { setData: (k: string, v: string) => { set[k] = v }, effectAllowed: '' } })
     expect(JSON.parse(set[PLAN_MIME])).toEqual({ kind: 'task', id: 't1', date: '2026-10-07', title: 'Call the bank' })
   })
+
+  // Scott, 2026-10-07: check off a week item from Today without choosing it first.
+  it('checks a week row off from Today, through the same writer the chooser uses', () => {
+    const complete = vi.fn()
+    render(<MemoryRouter><TodayWeekColumn plan={plan} day={day} weekNo={41} weekStart={day} actions={{ choose: vi.fn(), complete } as never} /></MemoryRouter>)
+    fireEvent.click(screen.getByRole('button', { name: 'Complete Call the bank' }))
+    expect(complete).toHaveBeenCalledWith(entry)
+  })
 })

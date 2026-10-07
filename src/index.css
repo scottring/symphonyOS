@@ -2931,6 +2931,15 @@ div.chooser-action-group { overflow: visible !important; }
   background-color: hsl(var(--sky-h, 215) 20% 22%);
   box-shadow: 0 0 0 1px hsl(var(--sky-h, 215) 16% 32%), 0 8px 24px -4px rgb(0 0 0 / .45);
 }
+/* Readable over the scenery's sky (2026-10-07): the two lightest greys
+   measured ~3.3:1 on the daytime sky — captions, hints, the period lists'
+   reference column. Darkened only where the sky is behind the page, so the
+   plain page keeps its lighter hierarchy. ≥4.8:1 across every place's sky
+   (its 82–93% lightness gradient). */
+:is([data-scenery-lighting='daytime'], [data-scenery-lighting='dusk-dawn']) .scenery-page {
+  --color-neutral-400: #52524d;
+  --color-neutral-500: #45453f;
+}
 /* White cards and the place's mid accents used as text, at night. */
 [data-scenery-lighting='nighttime'] .scenery-page :is(.bg-white, [class*='bg-white/']) { background-color: var(--color-bg-elevated); }
 [data-scenery-lighting='nighttime'] .scenery-page :is(.text-primary-500, .text-primary-600, .text-accent-500, .text-accent-600, .pv2-tick, .pv2-stamp-done) { color: var(--color-primary-300); }
