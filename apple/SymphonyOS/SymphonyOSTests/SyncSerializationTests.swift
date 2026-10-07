@@ -295,4 +295,22 @@ struct SyncSerializationTests {
         let updateRow = try #require(SyncEngine.serializeRow(table: "tasks", id: task.id, context: context))
         #expect(updateRow["scope"]?.stringValue == "couple")
     }
+
+    /// A wait is set on the web (#115); the phone only reads it. A task push
+    /// must never carry the waiting columns, or a row pulled before the wait
+    /// was set would clear it.
+    @Test func taskPushNeverCarriesTheWait() throws {
+        let context = try makeContext()
+        let task = SymphonyTask(userId: UUID(), title: "Call the bank")
+        task.isWaiting = true
+        task.waitingFor = "Jennifer's callback"
+        context.insert(task)
+        try context.save()
+
+        for row in [try #require(SyncEngine.serializeRow(table: "tasks", id: task.id, context: context))] {
+            #expect(row["is_waiting"] == nil)
+            #expect(row["waiting_for"] == nil)
+            #expect(row["waiting_since"] == nil)
+        }
+    }
 }

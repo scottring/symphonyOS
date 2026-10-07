@@ -108,7 +108,9 @@ final class TimelineViewModel {
                 locationPlaceId: task.locationPlaceId,
                 source: Self.source(type: .task, captureId: task.captureId, scope: task.scope),
                 children: kids,
-                isFocused: chosen || plan.isFocused(task, on: date)
+                isFocused: chosen || plan.isFocused(task, on: date),
+                isWaiting: task.isWaiting,
+                waitingFor: task.waitingFor
             ))
         }
 
@@ -256,6 +258,9 @@ struct TimelineItem: Identifiable {
     var isFree: Bool = false
     /// Chosen for this day (my task_focus row, or a chosen routine occurrence).
     var isFocused: Bool = false
+    /// Waiting on someone else (web #115) — and on what, in your words.
+    var isWaiting: Bool = false
+    var waitingFor: String? = nil
 
     enum ItemType: String {
         case task

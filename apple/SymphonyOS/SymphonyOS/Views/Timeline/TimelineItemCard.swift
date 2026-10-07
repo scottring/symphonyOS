@@ -163,12 +163,33 @@ struct TimelineItemCard: View {
     @Environment(\.dynamicTypeSize) private var typeSize
 
     private var titleText: some View {
-        Text(item.title)
-            .font(.bodyMedium)
-            .foregroundStyle(isCompleted ? Color.textTertiary : (item.type == .event ? Color.textSecondary : Color.textPrimary))
-            .strikethrough(isCompleted)
-            .fixedSize(horizontal: false, vertical: true)
-            .frame(maxWidth: .infinity, alignment: .leading)
+        VStack(alignment: .leading, spacing: 2) {
+            Text(item.title)
+                .font(.bodyMedium)
+                .foregroundStyle(isCompleted ? Color.textTertiary : (item.type == .event ? Color.textSecondary : Color.textPrimary))
+                .strikethrough(isCompleted)
+                .fixedSize(horizontal: false, vertical: true)
+            waitingLine
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    /// What the wait is ON, beneath the title — never in its place: two
+    /// months on, "Guy's response about pizza" won't say which task it was
+    /// (web ScheduleItem). Nothing once it's done.
+    @ViewBuilder
+    private var waitingLine: some View {
+        if item.isWaiting && !isCompleted {
+            Label {
+                Text(item.waitingFor.map { "Waiting on \($0)" } ?? "Waiting")
+                    .lineLimit(1)
+            } icon: {
+                Image(systemName: "hourglass")
+            }
+            .font(.bodySmall)
+            .foregroundStyle(Color.amberStrong)
+            .accessibilityElement(children: .combine)
+        }
     }
 
     @ViewBuilder
@@ -266,6 +287,8 @@ struct TimelineItemCard: View {
                 }
                 .contentShape(Rectangle())
                 .onTapGesture { openDetail() }
+
+                waitingLine
 
                 if let line = item.noteLine {
                     Text(line)

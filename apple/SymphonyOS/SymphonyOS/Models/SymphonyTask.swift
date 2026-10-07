@@ -38,6 +38,15 @@ final class SymphonyTask {
     var completedAt: Date? = nil
     var completedAtDirty: Bool = false
 
+    /// Waiting on someone (web #115): what the wait is on, and since when.
+    /// The check-back day is the task's own date — dated then, it leaves
+    /// Today and comes back. READ-ONLY on the phone: the push never sends
+    /// these columns, so a wait set on the web can't be cleared from here by
+    /// a stale row. Inline defaults for SwiftData's lightweight migration.
+    var isWaiting: Bool = false
+    var waitingFor: String? = nil
+    var waitingSince: Date? = nil
+
     // Scheduling
     var scheduledFor: Date?
     var deferredUntil: Date?
