@@ -60,6 +60,17 @@ describe('buildDayScale', () => {
     expect(buildDayScale([], { now: at(10) }).free.map((f) => f.label)).toEqual(['The rest of the day is open'])
   })
 
+  it('still names the evening after two short things stacked at 5:30 (Scott’s screenshot, 2026-10-07)', () => {
+    const s = buildDayScale([
+      { id: 'folder', start: at(17, 30) },
+      { id: 'math', start: at(17, 30) },
+    ])
+    const lowest = Math.max(...s.blocks.map((b) => b.top + b.height))
+    const evening = s.free.find((f) => f.label === 'Evening open')
+    expect(evening).toBeDefined()
+    expect(evening!.top).toBeGreaterThanOrEqual(lowest)
+  })
+
   it('keeps a free stretch clear of a block drawn taller than its time', () => {
     const s = buildDayScale([
       { id: 'a', start: at(12) },

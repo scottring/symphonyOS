@@ -160,14 +160,17 @@ export function buildDayScale(
 
   const free: ScaleFree[] = []
   for (const w of windows) {
-    // Kept clear of any block drawn into it (a chip pushed down, a minimum height).
+    // Kept clear of any block drawn into it (a chip pushed down, a minimum
+    // height), taken top to bottom: a block that starts too near the top to
+    // leave room above it pushes the stretch down; one further in ends it.
+    // (In placement order, a second chip stacked under the first ended the
+    // evening before it began — 2026-10-07.)
     let top = y(w.s)
     let bottom = y(w.e)
-    for (const b of placed) {
-      if (b.top < bottom && b.top + b.height > top) {
-        if (b.top <= top) top = b.top + b.height
-        else bottom = b.top
-      }
+    for (const b of [...placed].sort((p, q) => p.top - q.top)) {
+      if (b.top >= bottom || b.top + b.height <= top) continue
+      if (b.top < top + MIN_FREE_PX) top = Math.max(top, b.top + b.height)
+      else bottom = Math.min(bottom, b.top)
     }
     top += FREE_INSET
     bottom -= FREE_INSET
