@@ -1,7 +1,8 @@
 // SCHOOL-DIGEST — takes a day's worth of school/parent-group transcripts from
 // the connectors worker, asks Claude for a short digest, and emails it from
-// the user's own Gmail to the household. Nothing is written to Symphony —
-// no tasks, no notes, no captures. The email IS the product.
+// the user's own Gmail to the household. The email is the product; the one
+// thing written to Symphony is the kids' WORK (lib/homework.ts, 2026-10-07):
+// homework tasks per child, which the wall draws. No notes, events or to-dos.
 //
 // Auth: shared secret (x-capture-secret), same as capture-to-inbox — the
 // caller is the Fly worker, which already holds it.
@@ -17,6 +18,8 @@ import {
   buildDigestPrompt, parseDigestResponse, renderDigestHtml, renderDigestText, digestDateLabel,
   type DigestSource,
 } from './lib/digest.ts'
+import { buildHomeworkPrompt, parseHomework, planHomework, type ExistingHomework } from './lib/homework.ts'
+import type { Member } from '../extract-email/lib/types.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -133,6 +136,68 @@ async function sendGmail(accessToken: string, mime: string): Promise<string> {
   return data.id as string
 }
 
+// ── The kids' work ─────────────────────────────────────────────────────
+
+/** Today's YYYY-MM-DD and weekday on the household's wall clock. */
+function todayIn(tz: string): { ymd: string; weekday: string } {
+  const now = new Date()
+  const p = new Intl.DateTimeFormat('en-CA', { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(now)
+  const g = (t: string) => p.find((x) => x.type === t)?.value
+  return { ymd: `${g('year')}-${g('month')}-${g('day')}`, weekday: now.toLocaleDateString('en-US', { timeZone: tz, weekday: 'long' }) }
+}
+
+/**
+ * Pull the children's work out of today's transcripts and write it as
+ * homework, once per child, skipping what is already open. Runs after the
+ * email has gone, and never fails the digest: a bad extraction costs the
+ * wall a day, not the family their 5pm email.
+ */
+// deno-lint-ignore no-explicit-any -- the client is untyped here, as elsewhere in this file
+type Db = any
+interface RosterRow { id: string; name: string; role_label: string | null; is_full_user: boolean | null }
+
+async function postKidsWork(
+  supabase: Db, userId: string, sources: DigestSource[], apiKey: string,
+): Promise<{ written: number; skipped?: string }> {
+  // The household this user belongs to, its clock and its roster — read the
+  // way extract-email reads them.
+  const { data: mine } = await supabase.from('household_members').select('household_id').eq('user_id', userId).eq('status', 'active').limit(1)
+  const householdId = mine?.[0]?.household_id
+  if (!householdId) return { written: 0, skipped: 'no household' }
+  const { data: hh } = await supabase.from('households').select('timezone').eq('id', householdId).single()
+  const today = todayIn(hh?.timezone ?? 'America/New_York')
+  const { data: hm, error: hmError } = await supabase.from('household_members').select('user_id').eq('household_id', householdId).eq('status', 'active')
+  if (hmError) throw new Error(`household_members read failed: ${hmError.message}`)
+  const userIds = ((hm ?? []) as { user_id: string }[]).map((m) => m.user_id)
+  const { data: fm, error: fmError } = await supabase
+    .from('family_members').select('id, name, role_label, member_type, display_order, is_full_user')
+    .in('user_id', userIds).eq('member_type', 'core').order('display_order', { ascending: true })
+  if (fmError) throw new Error(`family_members read failed: ${fmError.message}`)
+  const seen = new Set<string>()
+  const members: Member[] = ((fm ?? []) as RosterRow[]).flatMap((m) => {
+    const key = m.name.trim().toLowerCase()
+    if (seen.has(key)) return []
+    seen.add(key)
+    const isChild = m.role_label === 'child' ? true : m.role_label === 'parent' ? false : !m.is_full_user
+    return [{ id: m.id, name: m.name, isChild }]
+  })
+  if (!members.some((m) => m.isChild)) return { written: 0, skipped: 'no children in the household' }
+
+  const items = parseHomework(await callClaude(buildHomeworkPrompt(sources, members, today.ymd, today.weekday), apiKey))
+  if (items.length === 0) return { written: 0 }
+
+  // Open homework anyone in the household already has, for the dedupe.
+  const { data: open, error: openError } = await supabase
+    .from('tasks').select('title, assigned_to, assigned_to_all')
+    .in('user_id', userIds).eq('category', 'homework').eq('completed', false).limit(500)
+  if (openError) throw new Error(`homework read failed: ${openError.message}`)
+  const rows = planHomework({ items, members, userId, todayYmd: today.ymd, existing: (open ?? []) as ExistingHomework[] })
+  if (rows.length === 0) return { written: 0 }
+  const { error } = await supabase.from('tasks').insert(rows)
+  if (error) throw new Error(`homework insert failed: ${error.message}`)
+  return { written: rows.length }
+}
+
 // ── Handler ────────────────────────────────────────────────────────────
 
 interface Body {
@@ -180,7 +245,15 @@ Deno.serve(async (req: Request) => {
       text: renderDigestText(digest, dateLabel),
       html: renderDigestHtml(digest, dateLabel),
     }))
-    return json({ ok: true, messageId: id, to, sections: digest.sections.length, toDo })
+    // The kids' work onto the wall — after the email, and never at its cost.
+    let kidsWork: { written: number; skipped?: string } | { error: string }
+    try {
+      kidsWork = await postKidsWork(supabase, userId, sources, Deno.env.get('ANTHROPIC_API_KEY')!)
+    } catch (e) {
+      console.error('school-digest: kids\' work failed:', e)
+      kidsWork = { error: String(e) }
+    }
+    return json({ ok: true, messageId: id, to, sections: digest.sections.length, toDo, kidsWork })
   } catch (e) {
     console.error('school-digest failed:', e)
     return json({ error: String(e) }, 500)
