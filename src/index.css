@@ -2055,7 +2055,7 @@ html.desktop-shell a {
    shared page width so every horizon's date still lines up. */
 .today-page:not(.planning-page) .daybook-journal-section { max-width: 54rem; }
 /* A calendar event wears the Week page's blue, quietly, at rest. */
-.today-page [data-row-kind="event"]:not(:hover):not(.ring-1) { background-color: hsl(214 45% 96% / .8); }
+.today-page [data-row-kind="event"]:not(:hover):not(.ring-1) { background-color: var(--event-tint); }
 /* The kids' specials, one chip per kid. */
 .daybook-journal-allday .today-specials { display: inline-flex; flex-wrap: wrap; gap: 6px; font-style: normal; }
 .today-special-chip { display: inline-flex; align-items: baseline; gap: 6px; padding: 3px 11px; border-radius: 999px; background: hsl(38 85% 94%); color: hsl(33 70% 28%); font-size: 13px; font-weight: 500; }
@@ -2747,6 +2747,8 @@ div.chooser-action-group { overflow: visible !important; }
    columns read as one app; a hairline border divides them (Scott,
    2026-09-23). Fields inside stay a step lighter still, for reading. */
 :root { --color-bg-panel: color-mix(in srgb, var(--color-bg-base) 45%, #ffffff); }
+/* A calendar event's quiet blue (Week rows, the Week strip, Today rows). */
+:root { --event-tint: hsl(214 45% 95%); --event-tint-hover: hsl(214 45% 92%); }
 .side-column, .reference-dock {
   --color-bg-elevated: var(--color-bg-panel);
   background: var(--color-bg-panel);
@@ -2879,6 +2881,10 @@ div.chooser-action-group { overflow: visible !important; }
   --color-neutral-500: #4c4c49;
 }
 [data-scenery-lighting='nighttime'] .scenery-page {
+  /* A calendar event's quiet blue, dark at night: its text turns light, so a
+     light fill made it unreadable (Scott, 2026-10-07, the Week page). */
+  --event-tint: hsl(214 32% 24%);
+  --event-tint-hover: hsl(214 32% 29%);
   color-scheme: dark;
   color: var(--color-neutral-900);
   --color-neutral-50: hsl(var(--sky-h) 22% 17%);
@@ -2907,6 +2913,12 @@ div.chooser-action-group { overflow: visible !important; }
   --color-accent-700: color-mix(in oklab, var(--color-accent-300) 80%, #fff);
   --shadow-card: 0 0 0 1px hsl(var(--sky-h) 14% 27%), 0 2px 8px rgb(0 0 0 / 0.25);
   --shadow-elevated: 0 0 0 1px hsl(var(--sky-h) 14% 27%), 0 8px 24px -4px rgb(0 0 0 / 0.35);
+}
+/* The day column at night: a firmer fill from the place's darker primary,
+   so the light text reads on it. */
+[data-scenery-lighting='nighttime'] .scenery-page .today-scale {
+  --scale-item-bg: color-mix(in srgb, var(--color-primary-500) 45%, var(--color-bg-elevated));
+  --scale-item-bar: var(--color-primary-300);
 }
 /* White cards and the place's mid accents used as text, at night. */
 [data-scenery-lighting='nighttime'] .scenery-page :is(.bg-white, [class*='bg-white/']) { background-color: var(--color-bg-elevated); }
