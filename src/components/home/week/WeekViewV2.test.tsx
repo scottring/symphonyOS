@@ -220,8 +220,8 @@ describe('WeekViewV2 journal spread', () => {
     const entries = within(monday.getByRole('list', { name: 'Monday entries' })).getAllByRole('listitem')
     // The title only: a task row also wears the shared timing control, which
     // is asserted separately below.
-    // The time sits in the row's margin lane (WeekRow, 2026-10-03).
-    expect(entries.map((li) => `${li.querySelector('.wk-lane')?.textContent ?? ''}${li.querySelector('.wk-title')?.textContent}`)).toEqual([
+    // The time sits small above the title (the card language, 2026-10-07).
+    expect(entries.map((li) => `${li.querySelector('.wk-time')?.textContent ?? ''}${li.querySelector('.wk-title')?.textContent}`)).toEqual([
       '6:50aGutter quotes',
       '10aPT appointment',
       '2:30pCall the bank',
@@ -392,7 +392,7 @@ describe('WeekViewV2 journal spread', () => {
     const onUpdateTask = vi.fn()
     const tasks = [createMockTask({ id: 'day', title: 'Return library books', scheduledFor: new Date(2026, 8, 14), isAllDay: true })]
     render(<WeekViewV2 {...defaultProps} onUpdateTask={onUpdateTask} pushAction={pushAction} routines={[]} weekStart={sunday} tasks={tasks} />)
-    fireEvent.click(within(screen.getByTestId('journal-day-2026-09-14')).getByRole('button', { name: 'Complete Return library books' }))
+    fireEvent.click(within(screen.getByTestId('journal-day-2026-09-14')).getByRole('button', { name: 'Done: Return library books' }))
     await waitFor(() => expect(pushAction).toHaveBeenCalledWith('Task completed', expect.any(Function)))
     pushAction.mock.calls[0][1]()
     expect(onUpdateTask).toHaveBeenCalledWith('day', { completed: false })
@@ -403,7 +403,7 @@ describe('WeekViewV2 journal spread', () => {
     const pushAction = vi.fn()
     const tasks = [createMockTask({ id: 'day', title: 'Return library books', scheduledFor: new Date(2026, 8, 14), isAllDay: true })]
     render(<WeekViewV2 {...defaultProps} pushAction={pushAction} routines={[]} weekStart={sunday} tasks={tasks} />)
-    fireEvent.click(within(screen.getByTestId('journal-day-2026-09-14')).getByRole('button', { name: 'Complete Return library books' }))
+    fireEvent.click(within(screen.getByTestId('journal-day-2026-09-14')).getByRole('button', { name: 'Done: Return library books' }))
     await new Promise((r) => setTimeout(r, 0))
     expect(pushAction).not.toHaveBeenCalled()
     toggleResult.ok = true
@@ -516,7 +516,7 @@ describe('WeekViewV2 — Journal and Schedule agree', () => {
     expect(saturday.queryByText('Kids clean rooms')).toBeNull()
 
     // Ticking the entry completes THAT occurrence — Saturday's instance.
-    fireEvent.click(saturday.getByRole('button', { name: 'Complete Family reading time' }))
+    fireEvent.click(saturday.getByRole('button', { name: 'Done: Family reading time' }))
     expect(instancesMock.markDone).toHaveBeenCalledWith('routine', 'chosen', new Date(2026, 8, 19))
 
     fireEvent.click(screen.getByRole('radio', { name: 'Schedule' }))

@@ -7,22 +7,28 @@
 //
 //   [grip] lane · mark · title ↻ / meta / tools · people · trailing
 //
-// Marks: ○ task or routine (something to do) · — event (on the calendar) ·
-// – a line on a list above the week. Whether a thing repeats is the routine's
-// business, not the week's (Scott, 2026-10-04: no ↻ on every row).
+// Marks: a task or routine wears its icon tile, which is also its check
+// (the card language, design B, 2026-10-07 — row size); an event wears a quiet
+// calendar tile that is not a control; a line on a list above the week keeps
+// its dash. Whether a thing repeats is the routine's business, not the week's
+// (Scott, 2026-10-04: no ↻ on every row).
 import type { HTMLAttributes, ReactNode } from 'react'
 import { useDraggable } from '@dnd-kit/core'
 import { Check, GripVertical } from 'lucide-react'
 import type { FamilyMember } from '@/types/family'
 import { AssigneeAvatar } from '@/components/family/AssigneeAvatar'
+import { TaskIconCheck } from '@/components/common/TaskIconCheck'
+import type { TaskIconInput } from '@/lib/taskIcon'
 
 export type WeekRowMark = 'task' | 'routine' | 'event' | 'goal' | 'line'
 
 export interface WeekRowProps {
   mark: WeekRowMark
   title: string
-  /** A time in the margin lane ('7a'); omitted = no lane. */
+  /** A time ('7a'), drawn small above the title; omitted or '' = none. */
   lane?: string | null
+  /** What the icon tile is chosen from (taskIconFor); defaults to the title. */
+  icon?: TaskIconInput
   completed?: boolean
   /** Tasks and routines: the completion circle. */
   onToggle?: () => void
@@ -41,7 +47,7 @@ export interface WeekRowProps {
   rowProps?: HTMLAttributes<HTMLLIElement> & Record<`data-${string}`, string | undefined>
 }
 
-export function WeekRow({ mark, title, lane, completed = false, onToggle, onOpen, meta, tools, people, trailing, drag, dense = false, rowProps }: WeekRowProps) {
+export function WeekRow({ mark, title, lane, icon, completed = false, onToggle, onOpen, meta, tools, people, trailing, drag, dense = false, rowProps }: WeekRowProps) {
   const movable = !!drag && mark !== 'event'
   const { listeners, setNodeRef, isDragging } = useDraggable({ id: drag?.id ?? `wk-static:${title}`, data: drag?.data, disabled: !movable })
   const { className: extraClass, ...rest } = rowProps ?? {}
@@ -56,15 +62,19 @@ export function WeekRow({ mark, title, lane, completed = false, onToggle, onOpen
       data-mark={mark}
       data-movable={String(movable)}
       data-done={String(completed)}
-      className={`wk-row${lane !== undefined ? ' has-lane' : ''}${dense ? ' is-dense' : ''}${isDragging ? ' is-dragging' : ''}${extraClass ? ` ${extraClass}` : ''}`}
+      className={`wk-row${dense ? ' is-dense' : ''}${isDragging ? ' is-dragging' : ''}${extraClass ? ` ${extraClass}` : ''}`}
     >
       {movable && <span className="wk-grip" aria-hidden="true"><GripVertical className="h-3.5 w-3.5" /></span>}
-      {lane !== undefined && <span className="wk-lane">{lane}</span>}
       <span className="wk-mark">
-        {onToggle && (mark === 'task' || mark === 'routine' || mark === 'line') ? (
+        {mark === 'task' || mark === 'routine' || mark === 'event' ? (
+          // The tile is the check (an event's is a mark, never a control).
+          <TaskIconCheck size="row" done={completed}
+            task={{ ...(icon ?? {}), title: icon?.title ?? title, type: mark }}
+            onToggle={mark === 'event' ? undefined : onToggle} />
+        ) : onToggle && mark === 'line' ? (
           <button
             type="button"
-            className={`wk-check${mark === 'routine' ? ' is-routine' : mark === 'line' ? ' is-line' : ''}${completed ? ' is-on' : ''}`}
+            className={`wk-check is-line${completed ? ' is-on' : ''}`}
             aria-label={completed ? `Mark ${title} not done` : `Complete ${title}`}
             onPointerDown={(e) => e.stopPropagation()}
             onClick={(e) => { e.stopPropagation(); onToggle() }}
@@ -74,6 +84,7 @@ export function WeekRow({ mark, title, lane, completed = false, onToggle, onOpen
         ) : <span className={`wk-glyph is-${mark}`} aria-hidden="true" />}
       </span>
       <div className="wk-body">
+        {lane ? <span className="wk-time">{lane}</span> : null}
         <span className="wk-titleline">
           {/* Done stays on the page, struck, the way a paper week keeps it. */}
           <button type="button" className={`wk-title${completed ? ' line-through text-neutral-400' : ''}`} onClick={onOpen}>{title}</button>

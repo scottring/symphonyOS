@@ -128,8 +128,8 @@ describe('WeekV2 — the days’ own controls', () => {
     renderWeek()
     const key = within(screen.getByRole('list', { name: 'What the marks mean' }))
     expect(key.getByText(/Event/)).toBeInTheDocument()
-    expect(key.getByText(/Task/)).toBeInTheDocument()
-    expect(key.getByText(/Routine/)).toBeInTheDocument()
+    // Tasks and routines share the icon tile that is their check (2026-10-07).
+    expect(key.getByText(/To do — tap its icon when done/)).toBeInTheDocument()
   })
 })
 
