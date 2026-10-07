@@ -3355,7 +3355,7 @@ div.chooser-action-group { overflow: visible !important; }
 .pv2-group > .pv2-list { margin: 0; }
 .pv2-line-main { position: relative; display: flex; align-items: flex-start; gap: 10px; padding: 5px 8px; margin: 0 -8px; border-radius: 8px; }
 .pv2-line-main:hover, .pv2-line.is-open > .pv2-line-main { background: var(--color-neutral-50); }
-.pv2-mark { width: 18px; height: 22px; display: inline-grid; place-items: center; flex: none; }
+.pv2-mark { width: 26px; min-height: 26px; display: inline-grid; place-items: center; flex: none; }
 .pv2-dash { display: inline-block; width: 9px; height: 1.5px; background: var(--color-neutral-300); border-radius: 1px; }
 .pv2-goal { display: inline-block; width: 8px; height: 8px; background: var(--color-primary-500); transform: rotate(45deg); border-radius: 1px; flex: none; }
 .pv2-goal.is-small { width: 6px; height: 6px; margin-top: 7px; }

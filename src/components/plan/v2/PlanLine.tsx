@@ -17,6 +17,7 @@ import type { LineFate } from '@/lib/planning/v2/planV2'
 import { MultiAssigneeDropdown } from '@/components/family'
 import { assigneesOf } from '@/lib/planning/v2/planV2'
 import { notesAsText } from '@/lib/htmlUtils'
+import { TaskIconCheck } from '@/components/common/TaskIconCheck'
 import type { DidItem } from '@/lib/week/monthLinks'
 
 export interface LineVM {
@@ -177,17 +178,14 @@ export function PlanLine({ vm, actions, members, nextLabel, open, onToggle, edit
       onMouseLeave={vm.partOf && onHoverPartOf ? () => onHoverPartOf(null) : undefined} className={`pv2-line${vm.nested ? ' is-nested' : ''}${open ? ' is-open' : ''}${muted ? ' is-muted' : ''}${vm.fate === 'dropped' ? ' is-dropped' : ''}${t.completed ? ' is-done' : ''}${isDragging ? ' is-dragging' : ''}`}>
       <div className="pv2-line-main">
         {movable && <span className="pv2-grip pv2-linegrip pv2-hov" {...listeners} {...attributes} aria-label={`Drag ${t.title} onto a week or a day`} title="Drag onto a week or a day"><GripVertical className="h-3.5 w-3.5" /></span>}
-        {/* One mark for every line: a list above the week is a plain list
-            (Scott, 2026-10-04: "they're just lists"). */}
-        <span className="pv2-mark" aria-hidden="true"><span className="pv2-dash" /></span>
+        {/* The card language's row (2026-10-07): the task's icon, which is
+            also its check — the same mark every page uses. Still a plain list
+            (Scott, 2026-10-04: "they're just lists"): no notes, one line. */}
+        <span className="pv2-mark"><TaskIconCheck size="row" task={t} done={!!t.completed} onToggle={() => actions.done(t)} /></span>
         <button type="button" className="pv2-line-text" aria-expanded={open} onClick={onToggle}>
           {t.title}
-          {t.completed && <Check className="pv2-tick" aria-label="done" />}
         </button>
         <span className="pv2-rail">
-          <button type="button" className="pv2-rb pv2-hov" aria-label={t.completed ? `Reopen ${t.title}` : `Mark ${t.title} done`} title={t.completed ? 'Reopen' : 'Done'} onClick={() => actions.done(t)}>
-            <Check className="w-4 h-4" />
-          </button>
           {actions.setContext && (
             <span className="pv2-hov">
               <ContextPicker size="sm" value={t.context ?? null} onChange={(c) => actions.setContext!(t, c)} />
