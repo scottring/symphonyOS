@@ -34,7 +34,10 @@ const TITLE_RULES: [RegExp, LucideIcon][] = [
   [/\b(winter break|december|christmas|snow|ski)\b/i, Snowflake],
   [/\b(thanksgiving|dinner|lunch|breakfast|meal|cook|recipe|bake)\b/i, Utensils],
   [/\b(groceries|grocery|costco|trader joe'?s?|market)\b/i, ShoppingCart],
-  [/\b(buy|order|amazon|shop|return)\b/i, ShoppingBag],
+  // A form to sign, a slip to send back: paperwork, not shopping ("sign and
+  // return the field trip form" wore a shopping bag — 2026-10-07).
+  [/\b(sign|signed|permission slip|slip|forms?)\b/i, Folder],
+  [/\b(buy|order|amazon|shop|returns?)\b/i, ShoppingBag],
   [/\b(fedex|ups|usps|package|delivery|ship)\b/i, Package],
   [/\b(laundry|clothes|closet|shirt|uniform|outfit|wear)\b/i, Shirt],
   [/\b(tidy|clean|declutter|organi[sz]e|vacuum|dust)\b/i, Sparkles],

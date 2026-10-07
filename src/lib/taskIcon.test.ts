@@ -15,6 +15,7 @@ describe('taskIconFor', () => {
     expect(taskIconFor({ title: 'Scott early school pickup' })).toBe(Car)
     expect(taskIconFor({ title: 'Plan Thanksgiving' })).toBe(Utensils)
     expect(taskIconFor({ title: 'Walgreens appointment' })).toBe(Stethoscope)
+    expect(taskIconFor({ title: 'Sign and return the field trip form' })).toBe(Folder)
   })
 
   it('then what is attached', () => {
