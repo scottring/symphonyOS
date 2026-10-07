@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { wallTodayRows, specialsWeek, checklistFor } from './wallMomentsModel'
+import { wallTodayRows, specialsWeek, checklistFor, afterSchoolRows } from './wallMomentsModel'
 import type { TimelineItem } from '@/types/timeline'
 import type { FamilyMember } from '@/types/family'
 import type { MemberDayModel } from './kidDayModel'
@@ -67,5 +67,45 @@ describe('checklistFor', () => {
     expect(checklistFor(model, 'morning')?.title).toBe('Out the door')
     expect(checklistFor(model, 'evening')?.rows[0].title).toBe('Brush teeth')
     expect(checklistFor(model, 'after')).toMatchObject({ title: 'This afternoon', rows: [{ title: 'Reading' }] })
+  })
+})
+
+// Scott, 2026-10-07: "a bunch of redundancies on the wall".
+describe('wallTodayRows — a task’s steps fold into it', () => {
+  it('shows a task with three steps at 8:30 as one row saying "3 steps"', () => {
+    const parent = item({ id: 'task-p', type: 'task', title: 'Brainstorm vacation ideas', startTime: at(8, 30) })
+    const step = (n: number) => item({ id: `task-s${n}`, type: 'task', title: `Step ${n}`, startTime: at(8, 30), isSubtask: true, parentTaskId: 'p' })
+    const rows = wallTodayRows({ morning: [parent, step(1), step(2), step(3)] }, members, at(7))
+    expect(rows.map((r) => r.title)).toEqual(['Brainstorm vacation ideas'])
+    expect(rows[0].sub).toBe('3 steps')
+  })
+
+  it('keeps a step whose task is not on the day', () => {
+    const rows = wallTodayRows({ morning: [item({ id: 'task-s1', type: 'task', title: 'Lone step', startTime: at(9), isSubtask: true, parentTaskId: 'elsewhere' })] }, members, at(7))
+    expect(rows.map((r) => r.title)).toEqual(['Lone step'])
+  })
+})
+
+describe('afterSchoolRows', () => {
+  const row = (id: string, title: string) => ({ entityType: 'routine' as const, id, title, done: false, timeOfDay: '16:30', target: null })
+  const model = {
+    homework: [
+      { id: 'h1', title: 'Reading log', due: 'Tomorrow', late: false, notes: null },
+      { id: 'h2', title: 'Science poster', due: 'Fri', late: false, notes: null },
+      { id: 'h3', title: 'Spelling sheet', due: 'Mon', late: true, notes: null },
+    ],
+    reading: { ...row('read', 'Read'), target: { amount: 20, unit: 'minutes', progress: 0, streak: 0 } },
+    bands: { morning: [row('shoes', 'Shoes')], afternoon: [row('math', 'Ella & Kaleb math time')], evening: [row('bath', 'Bath')], anytime: [] },
+    collections: [{ id: 'c', title: 'Homework time', timeOfDay: '16:00', rows: [row('spell', 'Spelling practice'), row('math', 'Ella & Kaleb math time')] }],
+  } as unknown as MemberDayModel
+
+  it('lists homework due by tomorrow or late, then reading and math practice, once each', () => {
+    expect(afterSchoolRows(model).map((r) => r.title)).toEqual([
+      'Reading log · due tomorrow', 'Spelling sheet · late', 'Read', 'Ella & Kaleb math time', 'Spelling practice',
+    ])
+  })
+
+  it('makes homework a task row the wall can tick off', () => {
+    expect(afterSchoolRows(model)[0]).toMatchObject({ entityType: 'task', id: 'h1', done: false })
   })
 })

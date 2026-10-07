@@ -17,7 +17,7 @@ const base = (o: Partial<WallMomentsProps> = {}): WallMomentsProps => ({
   today: [{ id: 'event-school', kind: 'event', time: '7:30a', end: '2:10p', title: 'School', sub: 'Hampden Elementary', owners: ['el', 'ka'], past: false, now: true }],
   specials: [{ key: '2026-10-6', day: 'Tue', isToday: true, isTomorrow: false, cells: [{ memberId: 'el', text: 'Library' }, { memberId: 'ka', text: 'Art' }] }],
   comingUp: [{ dateKey: '2026-10-9', dayLabel: 'Fri', summary: 'Grandpappa picks up Ella & Kaleb' }],
-  kidsNow: [{ member: kids[0], special: 'Library', hint: 'library books', needed: [], homeworkDue: [] }, { member: kids[1], special: 'Art', hint: null, needed: [], homeworkDue: [] }],
+  kidsNow: [{ member: kids[0], special: 'Library', hint: 'Return her library book.', needed: [], homeworkDue: [], afterSchool: [] }, { member: kids[1], special: 'Art', hint: null, needed: [], homeworkDue: [], afterSchool: [] }],
   focusRows: [], handoffs: [], dinner: null, nextMeal: { label: 'Dinner at 6:30 PM', title: 'Maple-Dijon salmon', imageUrl: null },
   question: { text: 'If our family had a flag, what would be on it?', isHandoff: false },
   checklists: [{ member: kids[0], list: { title: 'Out the door', rows: [{ entityType: 'routine', id: 'r1', title: 'Shoes', done: false, timeOfDay: null, target: null }] } }],
@@ -32,7 +32,12 @@ describe('WallMoments', () => {
     expect(screen.getByRole('heading', { name: 'Good morning' })).toBeInTheDocument()
     expect(within(screen.getByRole('region', { name: 'Today' })).getByText('Ella · Library')).toBeInTheDocument()
     expect(within(screen.getByRole('region', { name: 'Now' })).getByRole('heading', { name: 'Out the door' })).toBeInTheDocument()
-    expect(screen.getByText('Library today — library books')).toBeInTheDocument()
+    // Only the reminder: the special itself is in Today and Specials, and a
+    // special with nothing to do ("Art") says nothing here (2026-10-07).
+    const now = within(screen.getByRole('region', { name: 'Now' }))
+    expect(now.getByText('Return her library book.')).toBeInTheDocument()
+    expect(now.queryByText(/Library today|Art today/)).toBeNull()
+    expect(now.queryByText('Kaleb')).toBeNull()
     expect(screen.getByText('If our family had a flag, what would be on it?')).toBeInTheDocument()
     expect(within(screen.getByRole('region', { name: 'Specials this week' })).getByText('Tue').closest('tr')).toHaveClass('bg-[#243245]')
   })
@@ -74,7 +79,7 @@ describe('WallMoments', () => {
         { key: '2026-10-6', day: 'Tue', isToday: true, isTomorrow: false, cells: [{ memberId: 'el', text: 'Library' }, { memberId: 'ka', text: 'Art' }] },
         { key: '2026-10-7', day: 'Wed', isToday: false, isTomorrow: true, cells: [{ memberId: 'el', text: 'Music' }, { memberId: 'ka', text: 'Library' }] },
       ],
-      kidsNow: [{ member: kids[1], special: 'Library', hint: null, needed: ['library books'], homeworkDue: [] }],
+      kidsNow: [{ member: kids[1], special: 'Library', hint: null, needed: ['library books'], homeworkDue: [], afterSchool: [] }],
       nextMeal: { label: 'Dinner tomorrow', title: 'Sweet potato tacos', imageUrl: null },
     })} />)
     expect(screen.getByRole('heading', { name: 'Tomorrow' })).toBeInTheDocument()
@@ -99,5 +104,31 @@ describe('WallMoments', () => {
     })} />)
     fireEvent.click(screen.getByRole('button', { name: 'Salmon: open the recipe' }))
     expect(onCook).toHaveBeenCalled()
+  })
+
+  // Scott, 2026-10-07: "the day's homework and math/reading practice … in the
+  // afternoon", once each, by child, ticked off where it stands.
+  it('after school: each kid’s homework and practice, ticked off in place — and not Today’s rows again', () => {
+    const onTick = vi.fn()
+    const math = { entityType: 'routine' as const, id: 'm1', title: 'Math practice', done: false, timeOfDay: '16:30', target: null }
+    render(<WallMoments {...base({
+      moment: 'after', onTick,
+      focusRows: [],
+      kidsNow: [
+        { member: kids[0], special: null, hint: null, needed: [], homeworkDue: [], afterSchool: [{ entityType: 'task', id: 'h1', title: 'Reading log · due tomorrow', done: false, timeOfDay: null, target: null }] },
+        { member: kids[1], special: null, hint: null, needed: [], homeworkDue: [], afterSchool: [math] },
+      ],
+    })} />)
+    const now = within(screen.getByRole('region', { name: 'Now' }))
+    expect(now.getByRole('heading', { name: 'After school' })).toBeInTheDocument()
+    expect(now.getByText('Reading log · due tomorrow')).toBeInTheDocument()
+    expect(now.queryByText('School')).toBeNull()
+    fireEvent.click(now.getByRole('button', { name: 'Math practice' }))
+    expect(onTick).toHaveBeenCalledWith(kids[1], math)
+  })
+
+  it('after school with nothing to do says so', () => {
+    render(<WallMoments {...base({ moment: 'after' })} />)
+    expect(screen.getByText('No homework or practice today.')).toBeInTheDocument()
   })
 })

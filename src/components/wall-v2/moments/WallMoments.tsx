@@ -4,6 +4,11 @@
 //   header   greeting for the part of the day, the date, the clock, weather
 //   left     Today — today's timed things, past ones faded, today's specials
 //   centre   the moment: out the door · after school · dinner · tomorrow
+//
+// Each thing has ONE place (Scott, 2026-10-07: "a bunch of redundancies"):
+// Today is the day's schedule; Out the door only what to act on; After
+// school each kid's homework and practice; Specials the week's school
+// schedule; Coming up the events and deadlines beyond it.
 //   right    this week's school specials per kid, and what's coming up
 //   bottom   the question of the day, and each kid's checklist for now
 //
@@ -24,6 +29,8 @@ export interface MomentKid {
   /** Things to bring / needed (today in the morning, tomorrow in the evening). */
   needed: string[]
   homeworkDue: string[]
+  /** Afternoon: homework and math/reading practice, each ticked off here. */
+  afterSchool: KidRow[]
 }
 
 export interface MomentHandoff { key: string; time: string; prompt: string }
@@ -57,7 +64,7 @@ export interface WallMomentsProps {
   comingUp: ComingUpRow[]
   /** Morning and evening: each kid's specials, things to bring. */
   kidsNow: MomentKid[]
-  /** Morning: the adults' morning. After: the rest of the afternoon. Evening: tomorrow's morning. */
+  /** Evening: tomorrow's morning. (Morning and afternoon: none — Today has them.) */
   focusRows: WallTodayRow[]
   handoffs: MomentHandoff[]
   dinner: MomentDinner | null
@@ -259,7 +266,8 @@ function Center(p: WallMomentsProps & { t: ReturnType<typeof useTint> }) {
       <>
         <h2 className={h2} style={{ fontSize: '2.7rem' }}>Tomorrow</h2>
         <KidBring kids={p.kidsNow} t={t} label={(k) => [
-          ...(k.special ? [`${k.special} tomorrow${k.hint ? ` — ${k.hint}` : ''}`] : []),
+          // The special itself is lit in Specials; only its reminder here.
+          ...(k.hint ? [k.hint] : []),
           ...k.needed.map((n) => `Bring: ${n}`),
           ...k.homeworkDue.map((h) => `Homework: ${h}`),
         ]} />
@@ -269,26 +277,32 @@ function Center(p: WallMomentsProps & { t: ReturnType<typeof useTint> }) {
     )
   }
   if (moment === 'morning') {
+    // Only what to act on: a special's reminder ("return his book"), things to
+    // bring, homework due. The special itself is in Today and Specials, and
+    // the morning's tasks are in Today.
+    const outTheDoor = (k: MomentKid) => [
+      ...(k.hint ? [k.hint] : []),
+      ...k.needed.map((n) => `Bring: ${n}`),
+      ...k.homeworkDue.map((h) => `Homework due: ${h}`),
+    ]
     return (
       <>
         <h2 className={h2} style={{ fontSize: '2.7rem' }}>Out the door</h2>
-        <KidBring kids={p.kidsNow} t={t} label={(k) => [
-          ...(k.special ? [`${k.special} today${k.hint ? ` — ${k.hint}` : ''}`] : []),
-          ...k.needed.map((n) => `Bring: ${n}`),
-          ...k.homeworkDue.map((h) => `Homework due: ${h}`),
-        ]} />
-        {p.focusRows.length > 0 && <div className="flex flex-col gap-2"><div className={kicker}>This morning</div><RowList rows={p.focusRows} t={t} onTapRow={p.onTapRow} /></div>}
-        {p.kidsNow.every((k) => !k.special && !k.needed.length && !k.homeworkDue.length) && p.focusRows.length === 0 && (
-          <p className="font-display text-[1.6rem] italic text-[#8d9cad]">A quiet morning.</p>
+        <KidBring kids={p.kidsNow} t={t} label={outTheDoor} />
+        {p.kidsNow.every((k) => outTheDoor(k).length === 0) && (
+          <p className="font-display text-[1.6rem] italic text-[#8d9cad]">Nothing to remember this morning.</p>
         )}
         {p.nextMeal && <NextMeal meal={p.nextMeal} />}
       </>
     )
   }
-  // After school (and any daytime hour that isn't dinner yet).
+  // After school (and any daytime hour that isn't dinner yet): each kid's
+  // homework and practice, ticked off here. The afternoon's schedule is in
+  // Today.
+  const working = p.kidsNow.filter((k) => k.afterSchool.length > 0)
   return (
     <>
-      <h2 className={h2} style={{ fontSize: '2.7rem' }}>{p.handoffs.length || p.focusRows.length ? 'This afternoon' : 'The rest of today'}</h2>
+      <h2 className={h2} style={{ fontSize: '2.7rem' }}>After school</h2>
       {p.handoffs.map((h) => (
         <div key={h.key} className="grid grid-cols-[96px_minmax(0,1fr)_auto] items-center gap-4 rounded-2xl border border-[#5a4520] bg-[#2a2316] px-5 py-3.5">
           <span className="text-[1.3rem] tabular-nums text-[#ffd894]">{h.time}</span>
@@ -296,8 +310,27 @@ function Center(p: WallMomentsProps & { t: ReturnType<typeof useTint> }) {
           <button type="button" onClick={p.onClaim} className="min-h-[60px] rounded-2xl bg-[#f2b65a] px-6 text-[1.2rem] font-semibold text-[#1b1406]">Who’s got it?</button>
         </div>
       ))}
-      {p.focusRows.length > 0 ? <RowList rows={p.focusRows} t={t} onTapRow={p.onTapRow} />
-        : !p.handoffs.length && <p className="font-display text-[1.6rem] italic text-[#8d9cad]">Nothing more on the clock before dinner.</p>}
+      {working.length > 0 && (
+        <div className={`grid min-h-0 gap-4 ${working.length > 1 ? 'grid-cols-2' : 'grid-cols-1'}`}>
+          {working.map((k) => (
+            <div key={k.member.id} className="min-h-0 overflow-hidden rounded-2xl bg-[#1d2835] px-5 py-4">
+              <div className="mb-2 flex items-center gap-3"><Chip id={k.member.id} t={t} /><span className="text-[1.5rem] font-semibold">{k.member.name}</span></div>
+              <ul className="flex flex-col gap-1">
+                {k.afterSchool.map((r) => (
+                  <li key={`${r.entityType}:${r.id}`}>
+                    <button type="button" aria-pressed={r.done} onClick={() => p.onTick(k.member, r)}
+                      className="flex min-h-[56px] w-full items-center gap-3 py-1 text-left">
+                      <span className={`grid h-8 w-8 shrink-0 place-items-center rounded-full border-2 ${r.done ? 'border-[#5fbf8b] bg-[#5fbf8b]' : 'border-[#5d6f83]'}`}>{r.done && <Check className="h-5 w-5 text-[#0e151d]" strokeWidth={3} />}</span>
+                      <span className={`min-w-0 text-[1.3rem] leading-snug ${r.done ? 'text-[#7f8fa1] line-through' : 'text-[#dfe7ef]'}`}>{r.title}</span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
+        </div>
+      )}
+      {working.length === 0 && !p.handoffs.length && <p className="font-display text-[1.6rem] italic text-[#8d9cad]">No homework or practice today.</p>}
       {p.nextMeal && <NextMeal meal={p.nextMeal} />}
     </>
   )
