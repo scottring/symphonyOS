@@ -92,7 +92,17 @@ function HorizonSwitcher({ period }: { period: typeof PERIODS[number] }) {
 // desktop now runs the same way as the phone's horizon menu.
 const RAIL_ORDER = ['today', 'week', 'month', 'season', 'year'] as const
 
-/** Desktop: "30 Today — 40 Week — 09 September — 09–11 Fall — 2026 Year". */
+/** The period a rail step opens, in words: "Week 41", "October", "Fall 2026". */
+function railTitle(value: typeof RAIL_ORDER[number], step: { n: string; label: string }): string {
+  if (value === 'today') return 'Today'
+  if (value === 'week') return `Week ${step.n}`
+  if (value === 'year') return step.n
+  return step.label
+}
+
+/** Desktop: "Today — Week — Month — Season — Year" (Scott, 2026-10-07: the
+ *  numbers came out; each page's masthead carries its own). The period a step
+ *  opens — week 41, October, Fall — is in its tooltip. */
 function HorizonRail({ period }: { period?: typeof PERIODS[number] }) {
   const { search } = useLocation()
   // The rail wears the period being SHOWN, big to small — October's page
@@ -111,8 +121,8 @@ function HorizonRail({ period }: { period?: typeof PERIODS[number] }) {
     {RAIL_ORDER.map((value, k) => <span key={value} className="horizon-rail-step">
       {k > 0 && <span className="horizon-rail-join" aria-hidden="true" />}
       <NavLink to={steps[value].to} aria-current={period === value ? 'page' : undefined} className={period === value ? 'is-current' : ''}
-        aria-label={HORIZON_NAMES[value]} title={`${HORIZON_NAMES[value]} · ${steps[value].label}`}>
-        <span className="horizon-rail-n">{steps[value].n}</span><span className="horizon-rail-l">{steps[value].label}</span>
+        aria-label={HORIZON_NAMES[value]} title={railTitle(value, steps[value])}>
+        <span className="horizon-rail-l">{HORIZON_NAMES[value]}</span>
       </NavLink>
     </span>)}
   </nav>

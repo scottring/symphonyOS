@@ -135,12 +135,12 @@ describe('Today as a daily journal', () => {
 
   // Drawn to scale (2026-10-06): what is over stays where it fell, faded,
   // with its check still there — nothing folds away.
-  it('keeps what is over on the day, faded, still asking for a tick if undone', () => {
+  it('keeps what is over on the day, faded, and says which of it is done', () => {
     renderView()
     const day = screen.getByRole('region', { name: 'The day' })
     const mold = within(day).getByText('Figure out washing machine mold').closest('.today-scale-item')!
     expect(mold).toHaveClass('is-past')
-    expect(within(mold as HTMLElement).getByRole('button', { name: /^Done: / })).toBeInTheDocument()
+    expect(within(mold as HTMLElement).getByRole('button').getAttribute('aria-label')).not.toMatch(/, done/)
     expect(within(day).getByText('Do kids laundry')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /Earlier today/ })).toBeNull()
   })

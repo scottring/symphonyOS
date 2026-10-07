@@ -18,6 +18,6 @@ When a page needs one of these, reuse the helper named here rather than restylin
 
 ## Today: the day, to scale (2026-10-06, option B)
 
-Today draws its timed day once, as a column of hours ("The day", `TodayDayScale`), beside what was chosen for it ("For today"). Events are blue blocks, timed work is a line with its check and people, free time is green, and today has a now line. A click lifts the thing's own row into a card, with all its actions; dragging moves it, and a row from For today dropped on the day gets the time it landed at. There is no separate timed list.
+Today draws its timed day once, as a column of hours ("The day", `TodayDayScale`), beside what was chosen for it ("For today"). The column wears the chosen place's colours (2026-10-07). Free time is the lightest wash; everything on the day (events, tasks, routines) is one block, drawn one way: "9:00–10:15 · Boxing" and who carries it (Scott, 2026-10-07: three styles side by side "looks stupid"). No checks on the column: a click opens the details pane, where a thing is ticked off or its time fine-tuned. Dragging moves a thing; a drop lands on the quarter hour under the pointer, from For today, the week column, or the day itself. There is no separate timed list.
 
 Still no second picture of the day: the column replaced the Schedule list rather than sitting above it (Scott, 2026-10-06: a time strip over the list was "redundant to the schedule below").

@@ -43,7 +43,9 @@ const BEDTIME = [
   // Weekly-on-today, not daily: an everyday routine is the one the "Show
   // daily" preference can hide, which has nothing to do with what is under
   // test here.
-  routine({ id: 'bed', name: 'Kids Bedtime routine', time_of_day: '19:00:00', recurrence_pattern: { type: 'weekly', days: ['mon'] } }),
+  // Untimed, so its row (and its ⋯ menu) sits in For today; a timed one is a
+  // block on the day column, whose details pane carries "show on Today".
+  routine({ id: 'bed', name: 'Kids Bedtime routine', time_of_day: null, recurrence_pattern: { type: 'weekly', days: ['mon'] } }),
   routine({ id: 's1', name: 'Brush teeth', parent_routine_id: 'bed', step_order: 0 }),
   routine({ id: 's2', name: 'Lights out', parent_routine_id: 'bed', step_order: 1 }),
 ]
@@ -81,8 +83,7 @@ describe('taking a routine off Today', () => {
     const onRegisterUndo = vi.fn()
     renderToday({ onUpdateRoutine, onRegisterUndo })
 
-    // Timed, so it sits on the day column: a click lifts its row out.
-    fireEvent.click(await screen.findByRole('button', { name: /^Kids Bedtime routine, 7:00 PM/ }))
+    await screen.findByText('Kids Bedtime routine')
     fireEvent.click(screen.getByLabelText('Routine options'))
     fireEvent.click(screen.getByText('Remove from Today'))
 
@@ -98,8 +99,7 @@ describe('taking a routine off Today', () => {
     const onUpdateRoutine = vi.fn()
     renderToday({ onUpdateRoutine })
 
-    // Timed, so it sits on the day column: a click lifts its row out.
-    fireEvent.click(await screen.findByRole('button', { name: /^Kids Bedtime routine, 7:00 PM/ }))
+    await screen.findByText('Kids Bedtime routine')
     fireEvent.click(screen.getByLabelText('Routine options'))
     fireEvent.click(screen.getByText('Hide for today'))
 

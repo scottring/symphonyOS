@@ -41,7 +41,6 @@ import { PhoneFilterControl } from '@/components/layout/PhoneFilterControl'
 
 import { Eye, EyeOff, Binoculars, Printer, GripVertical, Moon, Sparkles, ChevronDown, ChevronRight, Plus, History } from 'lucide-react'
 import { splitTodayJournal, splitCompletedFocus } from '@/lib/today/journalSplit'
-import { emptySections } from '@/lib/today/types'
 import { panelActionsFor } from '@/components/reference/DayPlanPanel'
 import { useColumnsFitWindow } from '@/hooks/useColumnsFitWindow'
 import { TodayWeekColumn } from './TodayWeekColumn'
@@ -930,10 +929,10 @@ export function TodayView({
 
   // The day column reads the time a drop landed at from its own geometry.
   const scaleRef = useRef<DayScaleHandle>(null)
-  const resolve = useCallback((activeId: string, overId: string, landedTop: number | null) => resolveDrop({
+  const resolve = useCallback((activeId: string, overId: string, pointerY: number | null) => resolveDrop({
     activeId,
     overId,
-    scaleTime: overId === SCALE_DROP_ID && landedTop !== null ? scaleRef.current?.timeAt(landedTop) ?? null : null,
+    scaleTime: overId === SCALE_DROP_ID && pointerY !== null ? scaleRef.current?.timeAt(pointerY) ?? null : null,
     sections: data.grouped,
     fullOrderIds: { allday: untimedOrder.ids },
     orders: untimedOrder.orders,
@@ -1703,15 +1702,8 @@ export function TodayView({
               upNextId={upNextId}
               peopleOf={peopleOf}
               isReadOnlyEvent={isReadOnlyEvent}
-              onToggleTask={onToggleTask}
-              onCompleteRoutine={onCompleteRoutine}
-              renderRow={(item) => {
-                // The row as the list drew it, with a group's children under it.
-                const raw = item.id.replace('task-', '')
-                const one = emptySections<TimelineItem>()
-                one.morning = [item, ...(item.type === 'task' ? timedItems.filter((i) => i.isSubtask && i.parentTaskId === raw) : [])]
-                return <TodaySectionList {...listProps} sectionsOrder={['morning']} grouped={one} dropTargets={false} openSpace={false} />
-              }}
+              onSelect={handleSelectItem}
+              onPlanDrop={(payload, when) => { void planActions.drop(payload, { type: 'time', when }) }}
               handleRef={scaleRef}
             />
             {timedItems.length === 0 && (
