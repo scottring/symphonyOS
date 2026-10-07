@@ -138,6 +138,7 @@ function Entry({ entry, day, onSelect, onToggle, dragEnabled, timingControl, den
     <WeekRow
       mark={entry.kind}
       title={entry.title}
+      icon={entry.task}
       lane={entry.time ? journalTime(entry.time) : ''}
       completed={entry.completed}
       people={memberById ? (entry.people ?? []).flatMap((id) => { const m = memberById.get(id); return m ? [m] : [] }) : undefined}
@@ -336,8 +337,9 @@ function DayCell({ day, onSelectItem, onToggleEntry, onPlanDrop, onAddToDay, onA
       <header className="wk-dayhead">
         <span className="wk-daynum">{day.date.getDate()}</span>
         <span className="wk-dayname">{day.date.toLocaleDateString('en-US', { weekday: 'short' })}</span>
-        {today && <span className="sr-only">(today)</span>}
         {weather && <DayWeather weather={weather} narrow={false} />}
+        {/* Today is a small tag on a solid card (the card language, 2026-10-07). */}
+        {today && <span className="sym-tag wk-todaytag">Today</span>}
       </header>
       {day.notes.length > 0 && (
         <p className="wk-notes">{day.notes.map((ev, i) => (
@@ -363,7 +365,8 @@ function DayCell({ day, onSelectItem, onToggleEntry, onPlanDrop, onAddToDay, onA
       {fixedOnly
         ? onAddEvent && <AddToDay day={day} onAdd={(d, title, time) => onAddEvent(d, title, time ?? '09:00')} withTime event />
         : onAddToDay && <AddToDay day={day} onAdd={onAddToDay} />}
-      {free && <p className="wk-free">{free}</p>}
+      {/* Free time: one pill in the same warm wash as Today's free stretches. */}
+      {free && <p className="wk-free"><span className="sym-free">{free}</span></p>}
     </section>
   )
 }

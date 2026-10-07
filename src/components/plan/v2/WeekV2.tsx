@@ -10,6 +10,8 @@
 // add-to-day and the week's planning session are WeekViewV2's, unchanged.
 
 import { useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { TaskIconCheck } from '@/components/common/TaskIconCheck'
+import '@/styles/cards-week.css'
 import { createPortal } from 'react-dom'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useSupabaseTasks } from '@/hooks/useSupabaseTasks'
@@ -460,11 +462,11 @@ export function WeekV2({ tasks, weekStart, meId, isCurrent, days, renderDays, on
           </div>
           <section className="pv2-days wk-days" aria-label="The days">
             <div className="wk-daysbar">
-              {/* Three kinds, told apart (Scott, 2026-10-04). */}
+              {/* Two kinds, told apart (the card language, 2026-10-07): what is on
+                  the calendar, and what is yours to do — its icon is its check. */}
               <ul className="wk-key" aria-label="What the marks mean">
-                <li><span className="wk-glyph is-event" aria-hidden="true" />Event — on the calendar</li>
-                <li><span className="wk-check" aria-hidden="true" />Task — do once</li>
-                <li><span className="wk-check is-routine" aria-hidden="true" />Routine — repeats</li>
+                <li><TaskIconCheck size="row" done={false} task={{ title: 'Event', type: 'event' }} />Event — on the calendar</li>
+                <li><TaskIconCheck size="row" done={false} task={{ title: 'To do', type: 'task', context: 'family' }} />To do — tap its icon when done</li>
               </ul>
               <div className="wk-daily" role="group" aria-label="Daily routines">
                 <span>Daily routines</span>
