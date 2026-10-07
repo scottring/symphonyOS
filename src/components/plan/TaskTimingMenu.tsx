@@ -38,7 +38,10 @@ interface Props {
 
 export function TaskTimingMenu({ task, onUpdateTask, periodStart, fallbackWeekStart, dayChoices, size = 'sm', labelRelativeTo }: Props) {
   const t = taskTiming(task)
-  const broader = broaderCommitment(task)
+  // Named as it will be after a removal: a past month is carried into the
+  // day's month (timingRemoval), so the menu says October, not July.
+  const afterRemoval = timingRemoval(task, 'day').updates.commitments
+  const broader = afterRemoval ? broaderCommitment({ commitments: afterRemoval }) : broaderCommitment(task)
   const removeTiming = (scope: 'day' | 'all') => {
     const { updates, previous } = timingRemoval(task, scope)
     const kept = scope === 'day' ? removeDayOutcome(t, broader?.label ?? null) : removeAllOutcome(t, broader?.label ?? null)

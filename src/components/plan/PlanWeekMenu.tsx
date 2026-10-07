@@ -33,6 +33,7 @@ import { timingLabel, timingDescription, removeDayOutcome, removeAllOutcome, has
 import { densityScale, type DayDensity } from '@/lib/planning/dayDensity'
 import { DayDensityTiles, WeekendChoices, type DayChoice, type WeekendChoice } from './DayDensityTiles'
 import { weekendRangeLabel } from '@/lib/planning/weekend'
+import { weekOfYear } from '@/lib/planning/horizonNumerals'
 
 /** "Oct 4 – 10" for a week anchor, matching the listed weeks' labels. */
 function weekLabel(start: Date): string {
@@ -189,29 +190,43 @@ export function PlanWeekMenu({
           aria-label={`Plan ${title} for a week`}
           style={position}
           className={`fixed z-[60] overflow-y-auto rounded-lg border border-neutral-200 bg-white py-1 shadow-lg ${
-            (dayChoices && dayChoices.length > 0) || (onPickWeekend && weekends && weekends.length > 0) ? 'w-72' : 'w-56'
+            'w-72'
           }`}
         >
-          <p className="px-3 pb-0.5 pt-2 text-[10px] font-semibold uppercase tracking-wider text-neutral-400" aria-hidden="true">
-            A week in {weeksMonthLabel}
-          </p>
-          {weeks.map((w) => {
-            // A weekend sits inside its week; the weekend is the choice that
-            // was made, so it is the one marked, not the week around it.
-            const isCurrent = currentKey === localYmd(w.start) && !timing?.weekend
-            return (
-              <button
-                key={w.label}
-                type="button"
-                role="menuitemradio"
-                aria-checked={isCurrent}
-                className={`${itemClass} ${isCurrent ? 'font-semibold text-primary-700' : ''}`}
-                onClick={choose(() => onPickWeek(w.start))}
-              >
-                {w.label}
-              </button>
-            )
-          })}
+          {/* Tiles, like the day tiles below (Scott, 2026-10-07: the weeks
+              were the one unstyled list in the menu). */}
+          <div className="px-2 pb-1">
+            <p className="px-1 pb-1 pt-1 text-[10px] font-semibold uppercase tracking-wider text-neutral-400" aria-hidden="true">
+              A week in {weeksMonthLabel}
+            </p>
+            <div className="grid grid-cols-2 gap-1.5">
+              {weeks.map((w) => {
+                // A weekend sits inside its week; the weekend is the choice
+                // that was made, so it is the one marked, not the week around it.
+                const isCurrent = currentKey === localYmd(w.start) && !timing?.weekend
+                return (
+                  <button
+                    key={w.label}
+                    type="button"
+                    role="menuitemradio"
+                    aria-checked={isCurrent}
+                    onClick={choose(() => onPickWeek(w.start))}
+                    className={`flex flex-col rounded-lg px-2 py-1.5 text-left transition-colors ${
+                      isCurrent
+                        ? 'bg-primary-50 text-primary-700 ring-1 ring-primary-200'
+                        : 'bg-neutral-50 text-neutral-700 hover:bg-primary-50 hover:text-primary-700'
+                    }`}
+                  >
+                    <span className="flex items-center gap-1.5">
+                      <CalendarRange className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                      <span className="truncate text-[13px] font-medium">{w.label}</span>
+                    </span>
+                    <span className="pl-5 text-[11px] text-neutral-400">Week {weekOfYear(w.start, weekStartsOn)}</span>
+                  </button>
+                )
+              })}
+            </div>
+          </div>
           {onPickWeekend && weekends && weekends.length > 0 && (() => {
             const savedWeekend = timing?.weekend ? localYmd(timing.weekend) : null
             const savedDay = timing?.day ? localYmd(timing.day) : null

@@ -184,3 +184,40 @@ describe('a season row taken into the month BEFORE its season', () => {
     expect(after.assignedToAll).toEqual(['m1'])
   })
 })
+
+// Scott, 2026-10-07: "Remove Wed, Oct 7 — Keeps it in July". A month that
+// ended before the day is carried into the day's month, recorded as carried.
+describe('timingRemoval — a past month is carried, not kept', () => {
+  const JUL1 = new Date(2026, 6, 1)
+  const OCT7 = new Date(2026, 9, 7)
+  const stale = () => recorded(
+    [{ level: 'month', periodStart: JUL1, status: 'open' }, { level: 'week', periodStart: OCT4, status: 'open' }],
+    { scheduledFor: OCT7 },
+  )
+
+  it('removing the day lands the task in October and records July as carried there', () => {
+    const t = stale()
+    const { updates, previous } = timingRemoval(t, 'day')
+    const after = applied(t, updates)
+    expect(openCommitment(after, 'month')?.periodStart).toEqual(OCT1)
+    const july = (after.commitments ?? []).find((c) => c.level === 'month' && c.periodStart.getTime() === JUL1.getTime())
+    expect(july).toMatchObject({ status: 'carried', carriedTo: OCT1 })
+    // The week stays when only the day goes.
+    expect(openCommitment(after, 'week')?.periodStart).toEqual(OCT4)
+    // Undo puts July back as the open month.
+    const undone = applied(after, previous)
+    expect(openCommitment(undone, 'month')?.periodStart).toEqual(JUL1)
+  })
+
+  it('removing day and week does the same, and the week goes', () => {
+    const t = stale()
+    const after = applied(t, timingRemoval(t, 'all').updates)
+    expect(openCommitment(after, 'month')?.periodStart).toEqual(OCT1)
+    expect(openCommitment(after, 'week')).toBeUndefined()
+  })
+
+  it('leaves a current month alone', () => {
+    const t = recorded([{ level: 'month', periodStart: OCT1, status: 'open' }], { scheduledFor: OCT7 })
+    expect('commitments' in timingRemoval(t, 'day').updates).toBe(false)
+  })
+})

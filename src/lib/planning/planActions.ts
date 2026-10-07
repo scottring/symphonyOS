@@ -26,7 +26,9 @@ import type { Task } from '@/types/task'
 import type { Routine } from '@/types/actionable'
 import type { PlanDragPayload, PlanTarget } from './planDrag'
 import { localYmd } from '@/lib/cadence/config'
-import { focusSnapshot, liveCommitments } from '@/lib/placement/model'
+import { focusSnapshot, liveCommitments, openCommitment } from '@/lib/placement/model'
+import { monthStartOf } from '@/lib/planning/periodPlacement'
+import type { TaskCommitment } from '@/types/task'
 import { bootstrapCommitments } from '@/lib/placement/intentions'
 
 export interface PlanActionDeps {
@@ -88,31 +90,51 @@ export function timingRemoval(
   // placement module bootstraps it, so the removal releases what is really
   // there and the Undo puts back the state that really existed.
   const live = liveCommitments({ commitments: bootstrapCommitments(task) })
+  // A month that ended before the day (or week) being let go would leave the
+  // task on a past month's list nobody reads — "Keeps it in July" under an
+  // October day (Scott, 2026-10-07). It is carried into the month the day was
+  // in, with the old month recorded as carried there, as carry-forward does.
+  const kept = carryStaleMonth(task, live)
   const previous: Partial<Task> = {
     focus: focusSnapshot(task),
     scheduledFor: task.scheduledFor,
     isAllDay: task.isAllDay,
-    ...(scope === 'all' ? { commitments: live, weekendStart: task.weekendStart } : {}),
+    ...(scope === 'all' || kept !== live ? { commitments: live } : {}),
+    ...(scope === 'all' ? { weekendStart: task.weekendStart } : {}),
   }
   const clearedDay: Partial<Task> = {
     focus: task.scheduledFor ? focusSnapshot(task).filter((f) => localYmd(f.date) !== localYmd(task.scheduledFor!)) : focusSnapshot(task),
     scheduledFor: undefined,
     isAllDay: undefined,
   }
-  if (scope === 'day') return { updates: clearedDay, previous }
+  if (scope === 'day') return { updates: kept === live ? clearedDay : { ...clearedDay, commitments: kept }, previous }
   return {
     updates: {
       ...clearedDay,
       // The week commitment goes. Everything above it stays open, and the
       // row's bucket follows from what is left, so a task with nothing
       // broader lands in the Inbox instead of a month nobody chose.
-      commitments: live.filter((c) => !(c.level === 'week' && c.status === 'open')),
+      commitments: kept.filter((c) => !(c.level === 'week' && c.status === 'open')),
       // A weekend is a week commitment with a preference inside it; with the
       // week gone, the preference would name a weekend nothing holds.
       weekendStart: undefined,
     },
     previous,
   }
+}
+
+/** `live` with a past month carried into the day's (or week's) month; `live`
+ *  itself, unchanged, when there is nothing stale to carry. */
+function carryStaleMonth(task: Task, live: TaskCommitment[]): TaskCommitment[] {
+  const anchor = task.scheduledFor ?? openCommitment({ commitments: live }, 'week')?.periodStart ?? task.weekendStart
+  const month = openCommitment({ commitments: live }, 'month')
+  if (!anchor || !month) return live
+  const into = monthStartOf(anchor)
+  if (month.periodStart >= into) return live
+  return [
+    ...live.map((c) => (c === month ? { ...c, status: 'carried' as const, carriedTo: into } : c)),
+    { level: 'month', periodStart: into, status: 'open' },
+  ]
 }
 
 export function taskDayRemoval(task: Task, day: Date): Partial<Task> {

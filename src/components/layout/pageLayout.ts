@@ -29,7 +29,9 @@
  *  (the week grid's header + grid) but must share the app's left edge. */
 export const PAGE_GUTTER_X = 'px-4 md:px-10 lg:px-14'
 
-const PAGE_GUTTER = `${PAGE_GUTTER_X} pt-3 pb-8 md:py-8`
+// Top padding matches Today's 8px on every page (Scott, 2026-10-07: less
+// room above the header).
+const PAGE_GUTTER = `${PAGE_GUTTER_X} pt-2 pb-8 md:pb-8`
 
 /** THE reading column (layout system, 2026-10-01; widened 2026-10-03): every
  *  reading page, 1040px of content at desktop width (1152 = 1040 + the 56px
