@@ -1,0 +1,74 @@
+/* ── Week in the card language (2026-10-07, design B, row size) ───────────
+   The shared pieces (tile, tag, free pill, buttons, night tokens) are in
+   cards.css; this sheet is the Week page's own layout. Scoped to the Week
+   page (.pv2-week, and .week-column for its masthead) so the other horizons
+   are untouched. Overrides layout-system.css's .wk-* rules where they meet. */
+
+/* The row: icon tile · body (time above title) · people on one line · tools */
+.pv2-week .wk-row,
+.pv2-week .wk-row.is-dense { grid-template-columns: 26px minmax(0, 1fr) auto auto; column-gap: 9px; }
+.pv2-week .wk-row .wk-mark { padding-top: 0; }
+.pv2-week .wk-row .wk-body { padding-top: 3px; }
+.pv2-week .wk-row .wk-time {
+  display: block; font-size: 11.5px; font-weight: 500; line-height: 1.2;
+  color: var(--color-neutral-600); font-variant-numeric: tabular-nums;
+}
+.pv2-week .wk-row.is-dense .wk-title { font-size: 14.5px; }
+/* People sit right of the title on one line (they used to wrap under it). */
+.pv2-week .wk-row.is-dense:not(.has-lane) .wk-people,
+.pv2-week .wk-row .wk-people { grid-column: auto; grid-row: auto; padding-top: 3px; gap: 0; }
+.pv2-week .wk-people > * { width: 22px; height: 22px; font-size: 9px; box-shadow: 0 0 0 2px var(--sym-card-bg); }
+.pv2-week .wk-people > * + * { margin-left: -6px; }
+
+/* The legend draws the two kinds with the real tiles. */
+.pv2-week .wk-key .sym-tile { cursor: default; }
+
+/* Day columns: soft frosted cards; today is the solid one with its tag. */
+.pv2-week .wk-weekdays,
+.pv2-week .wk-weekend-cells { gap: 12px; align-items: start; }
+.pv2-week .wk-cell {
+  border-left: 0; border-radius: 16px; padding: 12px 14px;
+  background: rgb(255 255 255 / .55); border: 1px solid rgb(255 255 255 / .7);
+  -webkit-backdrop-filter: blur(4px); backdrop-filter: blur(4px);
+}
+.pv2-week .wk-cell:first-child { border-left: 1px solid rgb(255 255 255 / .7); }
+.pv2-week .wk-cell.is-today {
+  background: var(--sym-card-bg); border-color: var(--sym-card-border); box-shadow: var(--sym-card-shadow);
+}
+.pv2-week .wk-cell.is-today .wk-daynum { color: var(--color-neutral-900); }
+.pv2-week .wk-cell.is-today .wk-dayname { color: var(--color-neutral-700); }
+.pv2-week .wk-cell.is-over { background: color-mix(in srgb, var(--color-primary-50) 80%, transparent); }
+.pv2-week .wk-dayhead { flex-wrap: wrap; border-bottom-color: rgb(44 37 32 / .10); }
+.pv2-week .wk-todaytag { margin-left: auto; padding: 2px 8px; font-size: 11px; }
+.pv2-week .wk-dayhead [role="img"] + .wk-todaytag { margin-left: 8px; }
+
+/* Free time: one warm pill at the foot of the day. */
+.pv2-week .wk-free { margin: 10px 0 0; padding: 0; border-top: 0; }
+.pv2-week .wk-free .sym-free { border-radius: 12px; line-height: 1.3; }
+
+/* Readable captions over the faint scenery (4.5:1 on the day sky). */
+.pv2-week .wk-notes, .pv2-week .wk-listhint, .pv2-week .wk-key, .pv2-week .wk-dinner { color: var(--color-neutral-700); }
+.pv2-week .wk-row .wk-meta { color: var(--color-neutral-600); }
+
+/* Buttons: one outlined kind, one dark primary (cards.css .sym-btn). */
+.week-column .pv2-qbtn,
+.pv2-week .wk-daily button {
+  height: auto; border-radius: 12px; padding: 7px 14px; font-size: 13.5px; font-weight: 500;
+  border: 1px solid var(--sym-card-border); background: var(--sym-card-bg); color: var(--sym-title); box-shadow: none;
+}
+.week-column .pv2-btn { border-radius: 12px; background: var(--sym-title); border-color: var(--sym-title); color: #fff; }
+/* Hide | Show reads as one segmented control: the chosen half is the warm tile. */
+.pv2-week .wk-daily button:first-of-type { border-radius: 12px 0 0 12px; }
+.pv2-week .wk-daily button:last-of-type { border-radius: 0 12px 12px 0; border-left: 0; }
+.pv2-week .wk-daily button.is-on { background: var(--sym-tile-bg); border-color: var(--sym-card-border); color: var(--sym-title); box-shadow: inset 0 0 0 1.5px var(--sym-tile-ring); }
+.pv2-week .wk-weekend-fold { border-radius: 16px; border-color: var(--sym-card-border); background: var(--sym-card-bg); }
+
+/* Night: the frosted columns go dark glass; the tokens do the rest. */
+[data-scenery-lighting='nighttime'] .scenery-page .pv2-week .wk-cell {
+  background: rgb(255 255 255 / .05); border-color: rgb(255 255 255 / .10);
+}
+[data-scenery-lighting='nighttime'] .scenery-page .pv2-week .wk-cell.is-today {
+  background: var(--sym-card-bg); border-color: var(--sym-card-border);
+}
+[data-scenery-lighting='nighttime'] .scenery-page .pv2-week .wk-dayhead { border-bottom-color: rgb(255 255 255 / .10); }
+[data-scenery-lighting='nighttime'] .scenery-page .week-column .pv2-btn { background: #EEF2F6; border-color: #EEF2F6; color: #18212d; }

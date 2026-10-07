@@ -130,6 +130,7 @@ function Card({ vm, actions, members, timingControl, onContext, dragEnabled, for
     <WeekRow
       mark="task"
       title={t.title}
+      icon={t}
       completed={t.completed}
       onToggle={() => actions.done(t)}
       onOpen={() => actions.details(t)}
