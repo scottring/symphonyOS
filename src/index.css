@@ -2747,6 +2747,10 @@ div.chooser-action-group { overflow: visible !important; }
    columns read as one app; a hairline border divides them (Scott,
    2026-09-23). Fields inside stay a step lighter still, for reading. */
 :root { --color-bg-panel: color-mix(in srgb, var(--color-bg-base) 45%, #ffffff); }
+/* The period chooser ("‹ WEEK ⌄ ›") sits on its title: its buttons keep a
+   full tap height, but the words are small, so the height read as a gap above
+   the title (Scott, 2026-10-07). */
+.daybook-masthead [data-testid="masthead-eyebrow"] { margin-bottom: -8px; }
 /* A calendar event's quiet blue (Week rows, the Week strip, Today rows). */
 :root { --event-tint: hsl(214 45% 95%); --event-tint-hover: hsl(214 45% 92%); }
 .side-column, .reference-dock {
@@ -2919,6 +2923,13 @@ div.chooser-action-group { overflow: visible !important; }
 [data-scenery-lighting='nighttime'] .scenery-page .today-scale {
   --scale-item-bg: color-mix(in srgb, var(--color-primary-500) 45%, var(--color-bg-elevated));
   --scale-item-bar: var(--color-primary-300);
+}
+/* Dark-grey surfaces with white text — toasts ("Moved … · Undo"), tooltips —
+   stay dark at night. They are drawn with the neutral scale, which the night
+   flips to light, so the white text vanished (Scott, 2026-10-07). */
+[data-scenery-lighting='nighttime'] :is(.bg-neutral-800, .bg-neutral-900, .bg-neutral-950) {
+  background-color: hsl(var(--sky-h, 215) 20% 22%);
+  box-shadow: 0 0 0 1px hsl(var(--sky-h, 215) 16% 32%), 0 8px 24px -4px rgb(0 0 0 / .45);
 }
 /* White cards and the place's mid accents used as text, at night. */
 [data-scenery-lighting='nighttime'] .scenery-page :is(.bg-white, [class*='bg-white/']) { background-color: var(--color-bg-elevated); }

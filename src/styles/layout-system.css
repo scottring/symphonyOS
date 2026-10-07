@@ -344,7 +344,12 @@
 .wk-page { display: flex; flex-direction: column; gap: 28px; }
 .wk-clear { display: grid; flex-direction: initial; grid-template-columns: minmax(250px, 300px) minmax(0, 1fr); gap: 28px; align-items: start; }
 .wk-clear.has-ref { grid-template-columns: minmax(210px, 260px) minmax(250px, 300px) minmax(0, 1fr); }
-.wk-listcol { position: sticky; top: 76px; display: flex; flex-direction: column; gap: 14px; min-width: 0; max-height: calc(100vh - 100px); overflow-y: auto; overflow-x: hidden; scrollbar-width: thin; }
+.wk-listcol { position: sticky; top: 76px; display: flex; flex-direction: column; gap: 14px; min-width: 0; max-height: calc(100vh - 100px); overflow-y: auto; overflow-x: hidden; scrollbar-width: thin;
+  /* Its rows bleed 12px (their grip 17px) past the column's edge; room for
+     that inside the column, so nothing overflows it — a hidden overflow still
+     scrolls sideways when a row takes focus, and the column's left edge was
+     cut off (Scott, 2026-10-07). */
+  margin-inline: -18px; padding-inline: 18px; }
 .pv2-week .wk-ref { position: sticky; top: 76px; min-width: 0; max-height: calc(100vh - 100px); overflow-y: auto; overflow-x: hidden; scrollbar-width: thin; }
 .pv2-week .wk-ref .wk-row[data-done="true"] .wk-title { color: var(--color-neutral-400); }
 .wk-listhint { margin: -2px 0 10px; font-size: 13px; line-height: 1.4; color: var(--color-neutral-500); }
@@ -427,6 +432,8 @@ p.wk-dayhint { margin: 8px 0 0; }
 @media (max-width: 1100px) {
   .wk-clear, .wk-clear.has-ref, .wk-write { grid-template-columns: minmax(0, 1fr); }
   .wk-listcol, .pv2-week .wk-ref { position: static; max-height: none; overflow: visible; }
+  /* Not scrolling on its own here, so no overflow to make room for. */
+  .wk-listcol { margin-inline: 0; padding-inline: 0; }
   .wk-weekdays { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
 @media (max-width: 860px) {

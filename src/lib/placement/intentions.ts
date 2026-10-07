@@ -217,7 +217,12 @@ export function planPlacement(input: Task, updates: Partial<Task>, ctx: Placemen
     for (const c of task.commitments ?? []) {
       if (c.status !== 'open') continue
       if (!want.some((w) => w.level === c.level && sameDay(w.periodStart, c.periodStart))) {
-        commitmentOps.push({ op: 'remove', level: c.level, periodStart: c.periodStart })
+        // Stated as carried (a past month carried on, planActions.timingRemoval):
+        // recorded as carried to where it went, not as removed.
+        const carried = (updates.commitments ?? []).find((w) => w.status === 'carried' && w.carriedTo && w.level === c.level && sameDay(w.periodStart, c.periodStart))
+        commitmentOps.push(carried
+          ? { op: 'carry', level: c.level, periodStart: c.periodStart, to: carried.carriedTo! }
+          : { op: 'remove', level: c.level, periodStart: c.periodStart })
       }
     }
     for (const w of want) commitmentOps.push({ op: 'ensure', level: w.level, periodStart: w.periodStart })

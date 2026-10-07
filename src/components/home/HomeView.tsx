@@ -605,7 +605,7 @@ export function HomeView({
       {/* Week keeps its masthead on a phone too: it is the only way to step
           to another week or pick a shorter run there. */}
       {(!isMobile || currentView === 'week') && currentView !== 'today' && (
-        <div className={`${PAGE_GUTTER_X} pt-4${weekColumn}`}>
+        <div className={`${PAGE_GUTTER_X} pt-2${weekColumn}`}>
           <HomeHeader
             currentView={currentView}
             onViewChange={handleViewChange}
