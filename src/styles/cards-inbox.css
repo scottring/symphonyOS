@@ -1,0 +1,75 @@
+/* ── The Inbox in the card language (design B, 2026-10-07; canvas "Web Today
+   in the iOS style", board "Inbox") ──────────────────────────────────────────
+   Each capture, each wait and Inbox zero is a card: the icon tile (also the
+   check) | the serif title, its note, its actions | where it came from and
+   who carries it. Shared pieces (tile, card, tag, buttons, night tokens) are
+   in cards.css; this is only the Inbox's layout. */
+
+.inbox-cards { display: flex; flex-direction: column; gap: 12px; margin: 0; padding: 0; list-style: none; }
+
+.inbox-card {
+  display: grid; grid-template-columns: 46px minmax(0, 1fr) auto; gap: 16px;
+  align-items: start; padding: 18px 20px;
+  transition: opacity .2s, transform .2s;
+}
+.inbox-card.is-selected { box-shadow: 0 0 0 2px var(--color-primary-400), var(--sym-card-shadow); }
+.inbox-card.is-leaving { opacity: 0; transform: translateX(8px); }
+.inbox-card-lead { display: flex; }
+.inbox-card-select {
+  width: 46px; height: 46px; border-radius: 12px; display: grid; place-items: center;
+  border: 2px solid var(--sym-tile-ring); background: var(--sym-tile-bg); color: transparent;
+}
+.inbox-card-select.is-on { background: var(--color-primary-500); border-color: var(--color-primary-500); color: #fff; }
+.sym-tile.is-waiting { background: var(--sym-tag-bg); color: var(--sym-tag-fg); box-shadow: none; }
+
+.inbox-card-body { min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.inbox-card-open { text-align: left; padding: 0; background: none; border: 0; cursor: pointer; display: flex; flex-direction: column; gap: 2px; }
+.inbox-card-open:hover .sym-card-title { text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 3px; }
+.inbox-card .sym-card-title.is-done { color: var(--sym-note); text-decoration: line-through; }
+.inbox-card-lineage { font-size: 12.5px; color: var(--sym-note); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.inbox-card-wait { margin: 2px 0 0; display: flex; align-items: center; gap: 8px; font-size: 15px; font-weight: 500; color: var(--sym-tag-fg); }
+.inbox-card-wait .is-due { font-weight: 600; }
+.inbox-card-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 8px; }
+
+.inbox-card-trail { display: flex; flex-direction: column; align-items: flex-end; gap: 10px; }
+.inbox-card-who { display: inline-flex; align-items: center; gap: 8px; }
+.inbox-card-area { width: 9px; height: 9px; border-radius: 50%; flex: none; }
+.inbox-avatar { box-shadow: 0 0 0 2px var(--sym-card-bg); margin-left: -6px; }
+.inbox-avatar:first-child { margin-left: 0; }
+.inbox-tag-source { background: var(--sym-tile-event-bg); color: var(--sym-tile-event-fg); }
+
+/* Small buttons under a card's title; the split "This week ▾" stays one piece. */
+.sym-btn.sym-btn-sm { padding: 6px 12px; font-size: 13px; border-radius: 10px; }
+.sym-btn.sym-btn-sm.is-lead { border-color: var(--sym-tile-fg); color: var(--sym-tile-fg); }
+.sym-btn.sym-btn-icon { padding: 6px 8px; }
+.sym-btn.is-open { filter: brightness(.95); }
+.inbox-triage .sym-btn.rounded-r-none { border-top-right-radius: 0; border-bottom-right-radius: 0; }
+.inbox-triage .sym-btn.sym-btn-caret { border-top-left-radius: 0; border-bottom-left-radius: 0; border-left-width: 0; padding-inline: 6px; }
+.inbox-btn-sub { margin-left: 4px; color: var(--sym-note); font-weight: 400; }
+
+/* The Waiting on section: a fold whose label reads on the scenery's sky. */
+.inbox-waiting { margin: 28px 0 16px; }
+.inbox-section-toggle {
+  display: flex; align-items: center; gap: 8px; width: 100%; padding: 4px 0 10px;
+  background: none; border: 0; cursor: pointer; text-align: left; color: var(--color-neutral-700);
+}
+.inbox-eyebrow { font-size: 12px; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; white-space: nowrap; color: var(--color-neutral-700); }
+.inbox-section-hint { font-size: 13px; color: var(--color-neutral-600); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Inbox zero. */
+.inbox-zero { display: flex; flex-wrap: wrap; align-items: center; gap: 18px; padding: 22px 24px; margin-top: 8px; }
+.inbox-zero-text { flex: 1 1 220px; min-width: 0; }
+.inbox-zero .sym-card-title { margin: 0; font-size: 24px; }
+.inbox-zero-sub { margin: 4px 0 0; font-size: 15px; color: var(--sym-note); }
+.inbox-zero-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+
+/* The masthead's mark: the inbox tile in place of the motif stamp. */
+.inbox-stamp {
+  display: grid; place-items: center; flex: none; width: 64px; height: 64px; border-radius: 16px;
+  background: var(--sym-tile-event-bg); color: var(--sym-tile-event-fg);
+}
+
+@media (max-width: 640px) {
+  .inbox-card { grid-template-columns: 46px minmax(0, 1fr); padding: 16px; gap: 14px; }
+  .inbox-card-trail { grid-column: 2; flex-direction: row; align-items: center; justify-content: flex-start; }
+}

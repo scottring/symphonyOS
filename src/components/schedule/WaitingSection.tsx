@@ -1,6 +1,10 @@
 import { useState } from 'react'
-import { ChevronRight, Hourglass, Check } from 'lucide-react'
+import { ChevronRight, Hourglass } from 'lucide-react'
 import type { Task } from '@/types/task'
+import type { FamilyMember } from '@/types/family'
+import { AssigneeAvatar } from '@/components/family'
+import { TaskIconCheck } from '@/components/common/TaskIconCheck'
+import { cardNotePreview } from '@/lib/cardNotePreview'
 import { type WaitingRow, CHECK_BACK_CHOICES, CLEAR_WAITING, checkBackLabel, waitingUpdates } from '@/lib/today/waiting'
 
 /**
@@ -13,15 +17,20 @@ import { type WaitingRow, CHECK_BACK_CHOICES, CLEAR_WAITING, checkBackLabel, wai
  * 2026-10-01. Like Expired, it lives on the page you open on purpose, not as a
  * count on Today. Follow-ups that are due sort first and say so.
  *
- * Open by default when something is due, folded otherwise.
+ * Each wait is a card in the card language (design B, 2026-10-07): its icon
+ * tile is its check, the amber line says who it waits on and when to check
+ * back, then what the notes say. Open by default when something is due,
+ * folded otherwise.
  */
 export function WaitingSection({
-  rows, onUpdateTask, onCompleteTask, onSelect,
+  rows, onUpdateTask, onCompleteTask, onSelect, members = [],
 }: {
   rows: WaitingRow[]
   onUpdateTask: (id: string, updates: Partial<Task>) => void | Promise<void | boolean>
   onCompleteTask?: (id: string) => void
   onSelect?: (id: string) => void
+  /** The household, for the avatars of whoever carries each wait. */
+  members?: FamilyMember[]
 }) {
   const dueCount = rows.filter((r) => r.due).length
   const [open, setOpen] = useState(dueCount > 0)
@@ -30,95 +39,100 @@ export function WaitingSection({
   if (rows.length === 0) return null
 
   return (
-    <section aria-label="Waiting on" className="card p-4 mb-4">
+    <section aria-label="Waiting on" className="inbox-waiting">
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
         aria-expanded={open}
-        className="w-full flex items-center gap-2 text-left"
+        className="inbox-section-toggle"
       >
-        <ChevronRight className={`w-4 h-4 shrink-0 text-neutral-400 transition-transform ${open ? 'rotate-90' : ''}`} />
-        <span className="shrink-0 whitespace-nowrap text-sm font-medium text-neutral-700">Waiting on · {rows.length}</span>
-        <span className="min-w-0 truncate text-xs text-neutral-400">
+        <ChevronRight className={`h-4 w-4 shrink-0 transition-transform ${open ? 'rotate-90' : ''}`} aria-hidden="true" />
+        <span className="inbox-eyebrow">Waiting on · {rows.length}</span>
+        <span className="inbox-section-hint">
           {dueCount > 0 ? `${dueCount} to follow up` : 'did your part, waiting to hear'}
         </span>
       </button>
 
       {open && (
-        <ul className="mt-3 space-y-1.5">
-          {rows.map(({ task, checkBack, due }) => (
-            <li key={task.id} className="rounded-lg px-2.5 py-2 hover:bg-neutral-50">
-              {/* Phones stack the actions under the text; three buttons
-                  beside a title leave it no room at 390px. */}
-              <div className="flex flex-col gap-1.5 sm:flex-row sm:items-start sm:gap-2.5">
-                <div className="flex min-w-0 flex-1 items-start gap-2.5">
-                <Hourglass className="w-4 h-4 mt-0.5 shrink-0 text-amber-500" aria-hidden />
-                <button
-                  type="button"
-                  onClick={() => onSelect?.(task.id)}
-                  className="flex-1 min-w-0 text-left"
-                >
-                  <span className="block text-sm text-neutral-800 truncate">{task.title}</span>
-                  <span className="block text-xs text-neutral-500 sm:truncate">
-                    {task.waitingFor ? `On ${task.waitingFor}` : 'Waiting'}
-                    {' · '}
-                    <span className={due ? 'text-amber-700 font-medium' : undefined}>
-                      {checkBack
-                        ? (due ? `follow up — was ${checkBackLabel(checkBack)}` : `check back ${checkBackLabel(checkBack)}`)
-                        : 'no check-back day'}
-                    </span>
-                  </span>
-                </button>
+        <ul className="inbox-cards">
+          {rows.map(({ task, checkBack, due }) => {
+            const preview = cardNotePreview(task.notes)
+            const people = [...new Set([task.assignedTo, ...(task.assignedToAll ?? [])].filter(Boolean) as string[])]
+              .flatMap((id) => members.find((m) => m.id === id) ?? [])
+            const shared = task.scope === 'couple' || task.scope === 'compound'
+            return (
+              <li key={task.id} className="sym-card inbox-card">
+                <div className="inbox-card-lead">
+                  <TaskIconCheck
+                    task={{ title: task.title, category: task.category, phoneNumber: task.phoneNumber, location: task.location, links: task.links, context: task.context }}
+                    done={task.completed}
+                    onToggle={onCompleteTask ? () => onCompleteTask(task.id) : undefined}
+                  />
                 </div>
-                <div className="ml-6 flex shrink-0 items-center gap-1 sm:ml-0">
-                  <button
-                    type="button"
-                    onClick={() => setRescheduling((id) => (id === task.id ? null : task.id))}
-                    aria-expanded={rescheduling === task.id}
-                    className="text-xs px-2 py-1 rounded-md text-neutral-500 hover:text-primary-700 hover:bg-primary-50"
-                  >
-                    Check back…
+                <div className="inbox-card-body">
+                  <button type="button" onClick={() => onSelect?.(task.id)} className="inbox-card-open">
+                    <span className="sym-card-title">{task.title}</span>
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => void onUpdateTask(task.id, CLEAR_WAITING)}
-                    className="text-xs px-2 py-1 rounded-md text-neutral-500 hover:text-neutral-800 hover:bg-neutral-100"
-                    title="It's back in your hands"
-                  >
-                    Not waiting
-                  </button>
-                  {onCompleteTask && (
+                  <p className="inbox-card-wait">
+                    <Hourglass className="h-4 w-4 shrink-0" aria-hidden="true" />
+                    <span>
+                      {task.waitingFor ? `Waiting on ${task.waitingFor}` : 'Waiting'}
+                      {' · '}
+                      <span className={due ? 'is-due' : undefined}>
+                        {checkBack
+                          ? (due ? `follow up — was ${checkBackLabel(checkBack)}` : `check back ${checkBackLabel(checkBack)}`)
+                          : 'no check-back day'}
+                      </span>
+                    </span>
+                  </p>
+                  {preview && <p className="sym-card-note">{preview}</p>}
+                  <div className="inbox-card-actions">
                     <button
                       type="button"
-                      onClick={() => onCompleteTask(task.id)}
-                      aria-label={`Done: ${task.title}`}
-                      title="Done"
-                      className="p-1 rounded-md text-neutral-400 hover:text-primary-700 hover:bg-primary-50"
+                      onClick={() => setRescheduling((id) => (id === task.id ? null : task.id))}
+                      aria-expanded={rescheduling === task.id}
+                      className="sym-btn sym-btn-sm"
                     >
-                      <Check className="w-4 h-4" />
+                      Check back…
                     </button>
+                    <button
+                      type="button"
+                      onClick={() => void onUpdateTask(task.id, CLEAR_WAITING)}
+                      className="sym-btn sym-btn-sm"
+                      title="It's back in your hands"
+                    >
+                      Not waiting
+                    </button>
+                  </div>
+                  {rescheduling === task.id && (
+                    <div className="inbox-card-actions" role="group" aria-label="Check back">
+                      {CHECK_BACK_CHOICES.map((c) => (
+                        <button
+                          key={c.key}
+                          type="button"
+                          onClick={() => {
+                            setRescheduling(null)
+                            void onUpdateTask(task.id, waitingUpdates(task, task.waitingFor ?? '', c.date()))
+                          }}
+                          className="sym-btn sym-btn-sm"
+                        >
+                          {c.label} <span className="inbox-btn-sub">{checkBackLabel(c.date())}</span>
+                        </button>
+                      ))}
+                    </div>
                   )}
                 </div>
-              </div>
-              {rescheduling === task.id && (
-                <div className="mt-2 ml-6 flex flex-wrap gap-1.5" role="group" aria-label="Check back">
-                  {CHECK_BACK_CHOICES.map((c) => (
-                    <button
-                      key={c.key}
-                      type="button"
-                      onClick={() => {
-                        setRescheduling(null)
-                        void onUpdateTask(task.id, waitingUpdates(task, task.waitingFor ?? '', c.date()))
-                      }}
-                      className="text-xs px-2.5 py-1.5 rounded-lg bg-neutral-50 text-neutral-700 hover:bg-primary-50 hover:text-primary-700"
-                    >
-                      {c.label} <span className="text-neutral-400">{checkBackLabel(c.date())}</span>
-                    </button>
-                  ))}
+                <div className="inbox-card-trail">
+                  {shared && <span className="sym-tag">Shared</span>}
+                  {people.length > 0 && (
+                    <span className="inbox-card-who">
+                      {people.slice(0, 3).map((m) => <AssigneeAvatar key={m.id} member={m} size="sm" className="inbox-avatar" />)}
+                    </span>
+                  )}
                 </div>
-              )}
-            </li>
-          ))}
+              </li>
+            )
+          })}
         </ul>
       )}
     </section>
