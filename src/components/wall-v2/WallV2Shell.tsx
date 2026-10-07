@@ -13,7 +13,7 @@
 // `/wall-design` preview (see `wallV2Mock.ts`).
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Sun, Plus, MessagesSquare, ClipboardList, Settings, Phone, ChefHat } from 'lucide-react';
+import { Sun, Plus, ClipboardList, Settings, Phone, ChefHat } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { useActionableInstances } from '@/hooks/useActionableInstances';
 import { useBuildAutoReload } from '@/hooks/useBuildAutoReload';
@@ -70,7 +70,9 @@ import { WallRecipeViewer } from '@/components/wall/WallRecipeViewer';
 import { WallV2RecipeSheet } from './WallV2RecipeSheet';
 import { useWallRecipeIndex } from '@/hooks/useWallRecipeIndex';
 import { useRecipe } from '@/hooks/useRecipe';
-import { WallDiscussionOverlay } from '@/components/wall/WallDiscussionOverlay';
+import { WallV2ScratchpadSheet } from './WallV2ScratchpadSheet';
+import { useScratchpad } from '@/hooks/useScratchpad';
+import { openScratchpadRows, recentlySorted, rowByline, type ScratchpadRow } from '@/lib/wall/scratchpad';
 import { useFamilyDiscussionItems, type DiscussionItem } from '@/hooks/useFamilyDiscussionItems';
 import { QuickCapture } from '@/components/layout/QuickCapture';
 import { WallMoments, type MomentKid } from './moments/WallMoments';
@@ -147,7 +149,6 @@ function formatDate(d: Date): { weekday: string; fullDate: string } {
 // to Grandma one tap deeper is the one regression this redesign must not make.
 const RAIL_ACTIONS: { id: WallDockActionId; label: string; icon: LucideIcon }[] = [
   { id: 'task', label: 'Add a task', icon: Plus },
-  { id: 'discuss', label: 'Discuss', icon: MessagesSquare },
   { id: 'list', label: 'Lists', icon: ClipboardList },
   { id: 'utilities', label: 'Utilities', icon: Settings },
 ];
@@ -323,7 +324,9 @@ export function WallV2Shell() {
   // both reset with the day.
   const [dinnerScale, setDinnerScale] = useState(1);
   const [haveIngredients, setHaveIngredients] = useState<Set<number>>(() => new Set());
-  const [showDiscussion, setShowDiscussion] = useState(false);
+  // The scratchpad sheet, opened at the input or (from the face) at one note.
+  const [showScratchpad, setShowScratchpad] = useState(false);
+  const [scratchpadFocus, setScratchpadFocus] = useState<string | null>(null);
   const [showQuickCapture, setShowQuickCapture] = useState(false);
   const [showListSheet, setShowListSheet] = useState(false);
   const [sheetListId, setSheetListId] = useState<string | null>(null);
@@ -512,6 +515,40 @@ export function WallV2Shell() {
     }
   }, [updateTask, unflagEvent]);
 
+  // The scratchpad (Scott, 2026-10-07): notes jotted here or posted from the
+  // app, plus what was flagged "Bring up" — it replaced the For Discussion
+  // overlay and took the Specials box's place on the face.
+  const scratchpad = useScratchpad(user?.id ?? null);
+  const scratchRows = useMemo(() => openScratchpadRows(
+    scratchpad.notes,
+    discussionItems.map((d) => ({ kind: d.kind, id: d.id, title: d.title, note: d.note ?? null })),
+  ), [scratchpad.notes, discussionItems]);
+  const scratchSorted = useMemo(() => recentlySorted(scratchpad.notes, now), [scratchpad.notes, now]);
+  const memberName = useCallback(
+    (id: string) => wallData.familyMembers.find((m) => m.id === id)?.name,
+    [wallData.familyMembers],
+  );
+  const momentScratchpad = useMemo(() => ({
+    rows: scratchRows.map((r) => ({
+      key: r.key, text: r.text, sub: rowByline(r, memberName, now),
+      icon: r.source === 'note' ? r.kind : r.source, authorId: r.authorMemberId,
+    })),
+    onOpen: (key: string | null) => { setScratchpadFocus(key); setShowScratchpad(true); },
+  }), [scratchRows, memberName, now]);
+  const handleScratchDone = useCallback(async (row: ScratchpadRow, resolution: string) => {
+    if (row.source === 'note') {
+      if (!(await scratchpad.markDone(row.id, resolution))) showFlash('Could not save — try again');
+      return;
+    }
+    const item = discussionItems.find((d) => d.kind === row.source && d.id === row.id);
+    if (item) await handleMarkDiscussed(item);
+  }, [scratchpad, discussionItems, handleMarkDiscussed, showFlash]);
+  const handleScratchSend = useCallback(async (row: ScratchpadRow, memberId: string) => {
+    const ok = await scratchpad.sendToInbox({ id: row.id, body: row.text }, memberId);
+    const name = memberName(memberId);
+    showFlash(!ok ? 'Could not send — try again' : name ? `Sent to ${name}’s Inbox` : 'Sent to the Inbox');
+  }, [scratchpad, memberName, showFlash]);
+
   // Tap-to-complete from the wall. Timeline ids are prefixed (task-/routine-/
   // event-); tasks toggle their completed flag, routines/events write a
   // completed (or undone) actionable_instance for today. Refetch to refresh.
@@ -562,15 +599,12 @@ export function WallV2Shell() {
   const handleDockAction = useCallback((id: WallDockActionId) => {
     switch (id) {
       case 'task': setShowQuickCapture(true); break;
-      case 'discuss':
-        if (discussionItems.length > 0) setShowDiscussion(true);
-        else showFlash('Nothing flagged for discussion right now');
-        break;
+      case 'discuss': setScratchpadFocus(null); setShowScratchpad(true); break;
       case 'list': setSheetListId(null); setShowListSheet(true); break;
       case 'phone': setShowPhone(true); break;
       case 'utilities': setShowUtilities(true); break;
     }
-  }, [discussionItems.length, showFlash]);
+  }, []);
 
   // ── Unprompted tier ────────────────────────────────────────────────────────
   // The wall does NOT pass a facts resolver: useWallData narrows its task columns
@@ -807,7 +841,6 @@ export function WallV2Shell() {
 
   // Derive the discussion-overlay visibility so it auto-hides when the queue
   // drains (without an effect that lint flags for cascading renders).
-  const discussionVisible = showDiscussion && discussionItems.length > 0;
 
   // Lightweight {id,name} projections so the QuickCapture parser keeps working
   // when launched from the wall. Slim shapes avoid pulling the full contact
@@ -887,6 +920,7 @@ export function WallV2Shell() {
           handoffs={momentHandoffs}
           dinner={momentDinner}
           nextMeal={nextMeal}
+          scratchpad={momentScratchpad}
           question={handoffAsk ? { text: handoffAsk.prompt, isHandoff: true } : (discussionDismissed || !discussionPrompt ? null : { text: discussionPrompt, isHandoff: false })}
           checklists={checklists}
           onTapRow={handleTapRow}
@@ -1038,11 +1072,21 @@ export function WallV2Shell() {
         />
       )}
 
-      {discussionVisible && (
-        <WallDiscussionOverlay
-          items={discussionItems}
-          onMarkDiscussed={handleMarkDiscussed}
-          onClose={() => setShowDiscussion(false)}
+      {showScratchpad && (
+        <WallV2ScratchpadSheet
+          rows={scratchRows}
+          sorted={scratchSorted}
+          members={wallData.familyMembers}
+          inboxPeople={adults}
+          now={now}
+          focusKey={scratchpadFocus}
+          onAdd={scratchpad.add}
+          onDone={(row, res) => { void handleScratchDone(row, res); }}
+          onSendToInbox={(row, id) => { void handleScratchSend(row, id); }}
+          onEdit={(row, body) => { void scratchpad.edit(row.id, body); }}
+          onDelete={(row) => { void scratchpad.remove(row.id); }}
+          onReopen={(id) => { void scratchpad.reopen(id); }}
+          onClose={() => setShowScratchpad(false)}
         />
       )}
 

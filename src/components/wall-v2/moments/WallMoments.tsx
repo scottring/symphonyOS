@@ -4,13 +4,15 @@
 //   header   greeting for the part of the day, the date, the clock, weather
 //   left     Today — today's timed things, past ones faded, today's specials
 //   centre   the moment: out the door · after school · dinner · tomorrow
+//   right    the scratchpad (it took the Specials box's place, 2026-10-07 —
+//            today's specials sit on Today, tomorrow's on the evening card),
+//            and what's coming up
+//   bottom   the question of the day, and each kid's checklist for now
 //
 // Each thing has ONE place (Scott, 2026-10-07: "a bunch of redundancies"):
 // Today is the day's schedule; Out the door only what to act on; After
-// school each kid's homework and practice; Specials the week's school
-// schedule; Coming up the events and deadlines beyond it.
-//   right    this week's school specials per kid, and what's coming up
-//   bottom   the question of the day, and each kid's checklist for now
+// school each kid's homework and practice; Coming up the events and
+// deadlines beyond the day.
 //
 // Data-free: the Shell hands everything in, already projected.
 import type { ReactNode } from 'react'
@@ -21,6 +23,8 @@ import type { WallMoment } from '@/lib/wall/wallMoment'
 import type { WallTodayRow, SpecialsDay, WallChecklist } from '@/lib/wall/wallMomentsModel'
 import type { KidRow } from '@/lib/wall/kidDayModel'
 import type { ComingUpRow } from '../wallStrip'
+import { useTint, Chip } from './tint'
+import { ScratchpadCard, type MomentScratchpad } from './ScratchpadCard'
 
 export interface MomentKid {
   member: FamilyMember
@@ -70,6 +74,8 @@ export interface WallMomentsProps {
   dinner: MomentDinner | null
   /** Morning/after: tonight's dinner in a line. Evening: tomorrow's. */
   nextMeal: { label: string; title: string; imageUrl: string | null; onOpen?: () => void } | null
+  /** Quick notes and things to talk about, jotted at the wall. */
+  scratchpad: MomentScratchpad
   question: { text: string; isHandoff: boolean } | null
   checklists: { member: FamilyMember; list: WallChecklist | null; live?: string | null }[]
   onTapRow: (id: string) => void
@@ -81,34 +87,9 @@ export interface WallMomentsProps {
 
 const GREETING: Record<WallMoment, string> = { morning: 'Good morning', after: 'Good afternoon', dinner: 'Good evening', evening: 'Good evening' }
 
-// Person tints: hue and lightness both differ, so the chips read apart.
-const TINTS = ['bg-[#2b4a7a] text-[#d8e6ff]', 'bg-[#53347a] text-[#efdcff]', 'bg-[#7a2f4b] text-[#ffdbe7]', 'bg-[#24603f] text-[#d6f5e3]', 'bg-[#6b4a14] text-[#ffe9bf]', 'bg-[#1f5a63] text-[#d3f3f7]']
-const BARS = ['#4f86d9', '#9c6bd9', '#d9668d', '#4fb37f', '#d9a24f', '#4fb3c2']
-
-function useTint(members: FamilyMember[]) {
-  const idx = new Map(members.map((m, i) => [m.id, i % TINTS.length]))
-  return {
-    chip: (id: string) => TINTS[idx.get(id) ?? 0],
-    bar: (ids: string[]) => (ids.length === 1 ? BARS[idx.get(ids[0]) ?? 0] : ids.length > 1 ? '#8a6bd1' : '#6c7c8f'),
-    initial: (id: string) => {
-      const m = members.find((x) => x.id === id)
-      return (m?.initials || m?.name?.[0] || '?').slice(0, 2).toUpperCase()
-    },
-    name: (id: string) => members.find((x) => x.id === id)?.name ?? '',
-  }
-}
-
 const card = 'rounded-[22px] border border-[#273444] bg-[#17212c]'
 const h2 = 'font-display text-[2.2rem] leading-[1.1] font-medium text-[#f3f5f8] m-0'
 const kicker = 'text-[0.95rem] font-semibold uppercase tracking-[0.12em] text-[#93a3b5]'
-
-function Chip({ id, t, size = 'md' }: { id: string; t: ReturnType<typeof useTint>; size?: 'sm' | 'md' }) {
-  return (
-    <span aria-label={t.name(id)} className={`inline-flex shrink-0 items-center justify-center rounded-full font-bold ${size === 'sm' ? 'h-8 w-8 text-[0.8rem]' : 'h-10 w-10 text-[0.9rem]'} ${t.chip(id)}`}>
-      {t.initial(id)}
-    </span>
-  )
-}
 
 function Photo({ url, className = '' }: { url: string | null; className?: string }) {
   return url
@@ -266,7 +247,8 @@ function Center(p: WallMomentsProps & { t: ReturnType<typeof useTint> }) {
       <>
         <h2 className={h2} style={{ fontSize: '2.7rem' }}>Tomorrow</h2>
         <KidBring kids={p.kidsNow} t={t} label={(k) => [
-          // The special itself is lit in Specials; only its reminder here.
+          // Tomorrow's special lives here now the Specials box is gone.
+          ...(k.special ? [`${k.special} tomorrow`] : []),
           ...(k.hint ? [k.hint] : []),
           ...k.needed.map((n) => `Bring: ${n}`),
           ...k.homeworkDue.map((h) => `Homework: ${h}`),
@@ -339,7 +321,6 @@ function Center(p: WallMomentsProps & { t: ReturnType<typeof useTint> }) {
 export function WallMoments(p: WallMomentsProps) {
   const t = useTint(p.members)
   const todaySpecials = p.specials.find((s) => s.isToday) ?? null
-  const lit = p.moment === 'evening' ? (p.specials.find((s) => s.isTomorrow)?.key ?? null) : todaySpecials?.key ?? null
   const W = p.weather
   return (
     <div className="flex h-full min-h-0 flex-col gap-5 px-9 pb-6 pt-7 font-sans text-[#e8edf2]"
@@ -365,22 +346,7 @@ export function WallMoments(p: WallMomentsProps) {
         </section>
 
         <div className="flex min-h-0 flex-col gap-5">
-          {p.specials.length > 0 && (
-            <section aria-label="Specials this week" className={`${card} px-6 py-5`}>
-              <div className="mb-2 flex items-baseline justify-between"><h2 className={h2} style={{ fontSize: '1.9rem' }}>Specials</h2><span className="text-[1rem] text-[#93a3b5]">this week</span></div>
-              <table className="w-full border-separate border-spacing-y-0.5 text-[1.15rem]">
-                <thead><tr><th className="w-14" />{p.kids.map((k) => <th key={k.id} className="px-2 py-1 text-left text-[1rem] font-semibold text-[#c9d4df]">{k.name}</th>)}</tr></thead>
-                <tbody>
-                  {p.specials.map((s) => (
-                    <tr key={s.key} className={s.key === lit ? 'bg-[#243245] text-white' : 'text-[#cdd7e1]'}>
-                      <td className="rounded-l-lg px-2 py-1.5 font-semibold">{s.day}</td>
-                      {s.cells.map((c, i) => <td key={c.memberId} className={`px-2 py-1.5 ${i === s.cells.length - 1 ? 'rounded-r-lg' : ''}`}>{c.text}</td>)}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </section>
-          )}
+          <ScratchpadCard pad={p.scratchpad} t={t} />
           <section aria-label="Coming up" className={`${card} min-h-0 flex-1 overflow-hidden px-6 py-5`}>
             <h2 className={h2} style={{ fontSize: '1.9rem' }}>Coming up</h2>
             <ul className="mt-1">

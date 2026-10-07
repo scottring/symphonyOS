@@ -40,6 +40,32 @@ describe('QuickCapture', () => {
     })
   })
 
+  // Scott, 2026-10-07: "post scratchpad notes from our phones/desktops/web".
+  describe('The wall’s scratchpad', () => {
+    it('posts the text as a talk-about instead of adding a task, then closes', async () => {
+      const onAdd = vi.fn()
+      const onAddToScratchpad = vi.fn(async () => true)
+      const onClose = vi.fn()
+      const { user } = render(<QuickCapture onAdd={onAdd} isOpen showFab={false} onClose={onClose} onAddToScratchpad={onAddToScratchpad} />)
+      expect(screen.queryByText('Put on the wall’s scratchpad')).toBeNull()
+      await user.type(screen.getByPlaceholderText('Try "call the vet tomorrow 2pm"'), 'Fence quote')
+      await user.click(screen.getByRole('button', { name: 'Talk about' }))
+      expect(onAddToScratchpad).toHaveBeenCalledWith('Fence quote', 'talk')
+      expect(onAdd).not.toHaveBeenCalled()
+      await waitFor(() => expect(onClose).toHaveBeenCalled())
+    })
+
+    it('keeps the text when the post fails', async () => {
+      const onClose = vi.fn()
+      const { user } = render(<QuickCapture onAdd={vi.fn()} isOpen showFab={false} onClose={onClose} onAddToScratchpad={vi.fn(async () => false)} />)
+      const input = screen.getByPlaceholderText('Try "call the vet tomorrow 2pm"')
+      await user.type(input, 'Batteries')
+      await user.click(screen.getByRole('button', { name: 'Note' }))
+      expect(input).toHaveValue('Batteries')
+      expect(onClose).not.toHaveBeenCalled()
+    })
+  })
+
   describe('Modal', () => {
     it('renders modal when isOpen=true', () => {
       render(<QuickCapture onAdd={vi.fn()} isOpen={true} showFab={false} />)

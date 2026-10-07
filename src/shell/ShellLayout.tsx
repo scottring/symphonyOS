@@ -33,6 +33,7 @@ import { useSymphonyAssistant } from '@/hooks/useSymphonyAssistant';
 import { useScratchpadHidden } from '@/hooks/useScratchpadHidden';
 import { useAssistantLaunchRequests, useAssistantLauncher } from '@/contexts/AssistantLaunchContext';
 import { useShellChrome } from './useShellChrome';
+import { addScratchpadNote, ownMemberId } from '@/lib/wall/addScratchpadNote';
 import { useSelection } from './providers/SelectionProvider';
 import { MOBILE_TAB_BAR_HEIGHT } from './mobileChrome';
 import { SideColumn, SIDE_COLUMN_WIDTH, type SidePane } from './SideColumn';
@@ -428,6 +429,7 @@ function ShellLayoutInner({ children }: Props) {
           onClose={closeQuickAdd}
           resultsSlot={(query, close) => <OmniboxResults query={query} onNavigate={() => { stayInSymphony(); close() }} />}
           onAskSymphony={(text) => { stayInSymphony(); openAssistant({ message: text, autoSend: true }) }}
+          onAddToScratchpad={user ? async (text, kind) => addScratchpadNote(user.id, text, kind, await ownMemberId(user.id)) : undefined}
         />
       )}
 
