@@ -1712,6 +1712,7 @@ export function TodayView({
                 one.morning = [item, ...(item.type === 'task' ? timedItems.filter((i) => i.isSubtask && i.parentTaskId === raw) : [])]
                 return <TodaySectionList {...listProps} sectionsOrder={['morning']} grouped={one} dropTargets={false} openSpace={false} />
               }}
+              onPlanDrop={(payload, when) => { void planActions.drop(payload, { type: 'time', when }) }}
               handleRef={scaleRef}
             />
             {timedItems.length === 0 && (

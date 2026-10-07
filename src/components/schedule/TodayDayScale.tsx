@@ -5,6 +5,7 @@ import type { FamilyMember, FamilyMemberColor } from '@/types/family'
 import { FAMILY_COLORS } from '@/types/family'
 import { buildDayScale, timeAtOffset, type DayScale, type ScaleBlock } from '@/lib/today/dayScale'
 import { SCALE_DROP_ID, refusalFor } from '@/lib/today/todayDrop'
+import { isPlanDrag, readPlanDrag, type PlanDragPayload } from '@/lib/planning/planDrag'
 import { useTravelTime } from '@/hooks/useTravelTime'
 import { effectiveStartTime, formatTimeLong } from '@/lib/timeUtils'
 
@@ -152,6 +153,7 @@ export function TodayDayScale({
   onToggleTask,
   onCompleteRoutine,
   renderRow,
+  onPlanDrop,
   handleRef,
 }: {
   /** The day's timed rows (a group's children ride with their parent). */
@@ -168,6 +170,9 @@ export function TodayDayScale({
   onCompleteRoutine?: (routineEntityId: string, completed: boolean) => void
   /** The item's own Today row, lifted into a card when its block is clicked. */
   renderRow: (item: TimelineItem) => ReactNode
+  /** A row dragged in from the week column (native drag), with the time it
+   *  was dropped at. */
+  onPlanDrop?: (payload: PlanDragPayload, when: Date) => void
   handleRef?: Ref<DayScaleHandle>
 }) {
   // When each thing runs. An all-day "Dinner: …" event sits at its meal's
@@ -211,6 +216,36 @@ export function TodayDayScale({
     onDragCancel() { setLanding(null) },
   })
 
+  // The week column's rows travel by native drag (they live outside this
+  // page's dnd-kit context): the same landing line, read from the pointer.
+  const landAt = (clientY: number) => {
+    const when = timeAt(clientY)
+    if (!when) return null
+    const h = when.getHours() + when.getMinutes() / 60
+    setLanding({ top: (h - scale.startHour) * scale.pxPerHour, label: formatTimeLong(when) })
+    return when
+  }
+  const planDrop = onPlanDrop ? {
+    onDragOver: (e: React.DragEvent) => {
+      if (!isPlanDrag(e.dataTransfer)) return
+      e.preventDefault()
+      e.dataTransfer.dropEffect = 'move'
+      landAt(e.clientY)
+    },
+    onDragLeave: (e: React.DragEvent) => {
+      if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setLanding(null)
+    },
+    onDrop: (e: React.DragEvent) => {
+      const payload = readPlanDrag(e.dataTransfer)
+      setLanding(null)
+      if (!payload) return
+      e.preventDefault()
+      e.stopPropagation()
+      const when = timeAt(e.clientY)
+      if (when) onPlanDrop(payload, when)
+    },
+  } : {}
+
   const byId = useMemo(() => new Map(timed.map((t) => [t.item.id, t])), [timed])
 
   // The lifted row: one at a time; Escape or a click elsewhere puts it back.
@@ -245,6 +280,7 @@ export function TodayDayScale({
       className={`today-scale${isOver ? ' is-over' : ''}`}
       style={{ height: scale.height }}
       data-testid="today-day-scale"
+      {...planDrop}
     >
       {scale.ticks.map((t) => (
         <div key={t.label} className="today-scale-hour" style={{ top: t.top }} aria-hidden="true"><span>{t.label}</span></div>

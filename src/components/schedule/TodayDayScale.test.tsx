@@ -1,8 +1,9 @@
 import { describe, it, expect, vi } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen, fireEvent, createEvent } from '@testing-library/react'
 import { DndContext } from '@dnd-kit/core'
 import type { TimelineItem } from '@/types/timeline'
 import { TodayDayScale } from './TodayDayScale'
+import { PLAN_MIME } from '@/lib/planning/planDrag'
 
 vi.mock('@/hooks/useTravelTime', () => ({ useTravelTime: () => null }))
 
@@ -55,5 +56,24 @@ describe('TodayDayScale', () => {
       item({ id: 'task-c', title: 'Lunch box', startTime: at(8), isSubtask: true, parentTaskId: 'p' }),
     ])
     expect(screen.queryByText('Lunch box')).toBeNull()
+  })
+
+  it('takes a week row dropped on it, at the time it was dropped', () => {
+    const onPlanDrop = vi.fn()
+    renderScale([], { onPlanDrop })
+    const track = screen.getByTestId('today-day-scale')
+    // jsdom lays nothing out: pin the column's top so a y reads as a time.
+    track.getBoundingClientRect = () => ({ top: 100, left: 0, right: 400, bottom: 800, width: 400, height: 700, x: 0, y: 100, toJSON: () => ({}) })
+    const payload = { kind: 'task', id: 't1', date: '2026-10-06', title: 'Call the bank' }
+    const dataTransfer = { types: [PLAN_MIME], getData: (k: string) => (k === PLAN_MIME ? JSON.stringify(payload) : ''), dropEffect: 'none' }
+    // 7a at the top, 48px an hour: 100 + 7 × 48 is 2:00 PM.
+    // jsdom has no DragEvent, so the pointer's y is set by hand.
+    const drop = createEvent.drop(track, { dataTransfer })
+    Object.defineProperty(drop, 'clientY', { value: 100 + 7 * 48 })
+    fireEvent(track, drop)
+    expect(onPlanDrop).toHaveBeenCalledOnce()
+    const [got, when] = onPlanDrop.mock.calls[0]
+    expect(got).toEqual(payload)
+    expect([when.getHours(), when.getMinutes()]).toEqual([14, 0])
   })
 })

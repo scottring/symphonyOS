@@ -14,6 +14,7 @@ import type { DayPlan, DayPlanEntry } from '@/lib/today/dayPlan'
 import { alreadyPlaced } from '@/lib/today/dayPlan'
 import type { DayPlanPanelActions } from '@/components/reference/DayPlanPanel'
 import { localYmd } from '@/lib/cadence/config'
+import { writePlanDrag } from '@/lib/planning/planDrag'
 
 export interface TodayNextWeek { weekNo: number; weekStart: Date; entries: DayPlanEntry[] }
 
@@ -40,8 +41,11 @@ export function TodayWeekColumn({ plan, day, weekNo, weekStart, actions, nextWee
       {e.context && <span className="block text-[12px] text-neutral-500">{e.context}</span>}
     </span>
   )
+  // A row drags onto the day (Scott, 2026-10-07): dropped on the day column
+  // it gets the time it lands at; dropped on For today it is chosen, no time.
   const row = (e: DayPlanEntry) => (
-    <li key={e.key} className="pv2-rrow pv2-rrow-sans">
+    <li key={e.key} className="pv2-rrow pv2-rrow-sans today-ref-row" draggable
+      onDragStart={(ev) => writePlanDrag(ev.dataTransfer, { kind: e.kind, id: e.id, date: localYmd(day), title: e.title })}>
       <span className="pv2-dash" style={{ marginTop: 10 }} aria-hidden="true" />
       {title(e)}
       <span className="pv2-refacts">
