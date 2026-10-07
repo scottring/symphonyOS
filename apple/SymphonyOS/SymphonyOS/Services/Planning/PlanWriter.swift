@@ -217,19 +217,16 @@ struct PlanWriter {
     // MARK: Routines
 
     /// Choose a routine occurrence for `date` (web: `update {planned_on}` on
-    /// the day's instance). A flexible weekly routine — no day of its own —
-    /// also gets "given this day" (`deferred_to`, the web's placeRoutineOnce),
-    /// which is what gives it a home for the week. The repeating rule itself
-    /// is never touched.
+    /// the day's instance — chooseRoutine, the All Day choice). For a flexible
+    /// weekly routine that `planned_on` alone is its home for the week
+    /// (placedInWeek counts it); no time is invented. The phone used to write
+    /// a noon `deferred_to` here, which the web drew as a 12:00 PM item. The
+    /// repeating rule itself is never touched.
     func chooseRoutine(_ routine: Routine, on date: Date, flexible: Bool) {
         let day = PlanCalendar.day(date)
         let i = instance(for: routine, on: day)
         i.plannedOn = day
-        if flexible {
-            i.status = "pending"
-            // Local noon: the same calendar day in any US zone, even read as UTC.
-            i.deferredTo = PlanCalendar.calendar.date(bySettingHour: 12, minute: 0, second: 0, of: day)
-        }
+        if flexible { i.status = "pending" }
         i.updatedAt = Date()
         i.syncStatus = .pending
         queueInstance(i)
@@ -240,6 +237,7 @@ struct PlanWriter {
         let day = PlanCalendar.day(date)
         let i = instance(for: routine, on: day)
         i.plannedOn = nil
+        // Clears an older phone build's noon placement on this day, too.
         if flexible, PlanCalendar.sameDay(i.deferredTo, day) { i.deferredTo = nil }
         i.updatedAt = Date()
         i.syncStatus = .pending

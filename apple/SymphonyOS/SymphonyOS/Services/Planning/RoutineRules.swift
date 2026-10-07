@@ -159,8 +159,8 @@ enum RoutineRules {
     /// `resolveRoutine` for one date. `date == nil` asks the date-agnostic
     /// question (skips only the recurrence rung). The owner rung is not
     /// ported: the phone has no member lens.
-    static func shows(_ r: Routine, on date: Date?, _ ctx: Context) -> Bool {
-        guard r.visibility == "active" else { return false }
+    static func shows(_ r: Routine, on date: Date?, _ ctx: Context, now: Date = Date()) -> Bool {
+        guard isActive(r, now: now) else { return false }
         if let date, !ctx.deferredInto.contains(r.id),
            !matches(r.recurrencePattern, on: date, lastCompletedAt: ctx.lastCompletedAt[r.id]) {
             return false
@@ -170,6 +170,63 @@ enum RoutineRules {
         if r.parentRoutineId != nil { return false }
         if ctx.hideEveryday && isEveryday(r.recurrencePattern) && !r.pinToTimeline { return false }
         return true
+    }
+
+    /// Active, or resting with a wake date that has passed. The web wakes
+    /// those on its next load (useRoutines' auto-resume, which writes
+    /// `visibility: 'active'`); the phone reads them as awake without writing,
+    /// so "Hide for today" never hides a routine for good on a phone-only day.
+    static func isActive(_ r: Routine, now: Date = Date()) -> Bool {
+        if r.visibility == "active" { return true }
+        guard r.visibility == "reference", let wake = r.pausedUntil else { return false }
+        return wake <= now
+    }
+
+    // MARK: One occurrence's day and time (port of lib/today/routineTime.ts
+    // and lib/today/deferredRoutines.ts)
+
+    /// `isDayOnlyMove`: moved to a DAY with no time — a midnight `deferred_to`
+    /// stamped with the same day's `planned_on`.
+    static func isDayOnlyMove(_ i: ActionableInstance?) -> Bool {
+        guard let i, let to = i.deferredTo, let planned = i.plannedOn else { return false }
+        let cal = PlanCalendar.calendar
+        return cal.component(.hour, from: to) == 0 && cal.component(.minute, from: to) == 0
+            && PlanCalendar.sameDay(to, planned)
+    }
+
+    /// Dated on its own day but moved to another: it is not on its own day.
+    static func movedAway(_ i: ActionableInstance?, from date: Date) -> Bool {
+        guard let i, i.status == "deferred", let to = i.deferredTo else { return false }
+        return !PlanCalendar.sameDay(to, date)
+    }
+
+    private static func ruleTime(_ timeOfDay: String?, on date: Date) -> Date? {
+        guard let timeOfDay else { return nil }
+        let parts = timeOfDay.split(separator: ":").compactMap { Int($0) }
+        guard parts.count >= 2 else { return nil }
+        return PlanCalendar.calendar.date(bySettingHour: parts[0], minute: parts[1], second: 0, of: PlanCalendar.day(date))
+    }
+
+    /// `resolveRoutineTime`: the time a routine occupies on `date`, or nil for
+    /// untimed. `instance` is the occurrence on (or moved onto) that day. A
+    /// drag writes a one-day override (`deferred_to`) rather than touching the
+    /// rule, so the rule's time is the fallback, never the answer alone.
+    static func time(timeOfDay: String?, instance i: ActionableInstance?, on date: Date) -> Date? {
+        if isDayOnlyMove(i) { return nil }
+        let cal = PlanCalendar.calendar
+        if let i, i.status == "deferred", let to = i.deferredTo {
+            let midnight = cal.component(.hour, from: to) == 0 && cal.component(.minute, from: to) == 0
+            let ruleAtMidnight = ruleTime(timeOfDay, on: date).map { cal.component(.hour, from: $0) == 0 && cal.component(.minute, from: $0) == 0 } ?? false
+            // A bare date moved to ANOTHER day is a day, not 12:00 AM.
+            if midnight && !PlanCalendar.sameDay(to, i.date) && !ruleAtMidnight { return nil }
+            // Moved: only on the day it went to, never a ghost on the day it left.
+            return PlanCalendar.sameDay(to, date) ? to : nil
+        }
+        if let i, let to = i.deferredTo, i.status == "pending", PlanCalendar.sameDay(to, date) { return to }
+        // An untimed routine placed at a time keeps that place once done or skipped.
+        if timeOfDay == nil, let i, let to = i.deferredTo, i.status == "completed" || i.status == "skipped",
+           PlanCalendar.sameDay(to, date) { return to }
+        return ruleTime(timeOfDay, on: date)
     }
 
     /// Routine ids placed onto `date` by a deferral ("Give it a day").
@@ -200,6 +257,9 @@ enum RoutineRules {
             guard i.entityType == "routine", i.entityId.lowercased() == routineId.uuidString.lowercased(),
                   i.status != "skipped" else { return false }
             if let to = i.deferredTo, inWeek(to) { return true }
+            // Chosen for a day of this week without a time: placed for the
+            // week, though its rule still names no day.
+            if i.deferredTo == nil, let planned = i.plannedOn, inWeek(planned) { return true }
             return i.status == "completed" && inWeek(i.date)
         }
     }

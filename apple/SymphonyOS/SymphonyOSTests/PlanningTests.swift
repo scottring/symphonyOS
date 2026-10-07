@@ -405,7 +405,8 @@ struct PlanWriterTests {
 
         let i = try #require(try ctx.fetch(FetchDescriptor<ActionableInstance>()).first)
         #expect(PlanCalendar.sameDay(i.plannedOn, wed))
-        #expect(PlanCalendar.sameDay(i.deferredTo, wed))
+        // A day, not a time: no noon deferred_to for the web to draw at 12 PM.
+        #expect(i.deferredTo == nil)
         #expect(i.entityId == r.id.uuidString.lowercased())
         #expect(r.recurrencePattern.days == [])
         #expect(!pending(ctx).contains { $0.tableName == "routines" })

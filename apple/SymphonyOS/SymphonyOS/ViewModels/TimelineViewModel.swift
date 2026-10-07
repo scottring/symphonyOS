@@ -120,12 +120,8 @@ final class TimelineViewModel {
             // uuids, so compare case-insensitively.
             let instanceStatus = plan.instance(for: routine, on: date)?.status
 
-            let startTime: Date? = {
-                guard let timeStr = routine.timeOfDay else { return nil }
-                let parts = timeStr.split(separator: ":").compactMap { Int($0) }
-                guard parts.count >= 2 else { return nil }
-                return cal.date(bySettingHour: parts[0], minute: parts[1], second: 0, of: startOfDay)
-            }()
+            // A move or a same-day retime wins over the rule's time.
+            let startTime = plan.time(of: routine, on: startOfDay)
 
             items.append(TimelineItem(
                 id: "routine-\(routine.id.uuidString)",

@@ -114,9 +114,30 @@ struct PlanSnapshot {
         }
     }
 
-    /// Is this routine's occurrence chosen for `date`?
+    /// The occurrence MOVED onto `date` from another day, if any.
+    func instanceMovedIn(for routine: Routine, on date: Date) -> ActionableInstance? {
+        instances.first {
+            $0.entityType == "routine" && $0.entityId.lowercased() == routine.id.uuidString.lowercased()
+                && $0.status == "deferred" && PlanCalendar.sameDay($0.deferredTo, date) && !PlanCalendar.sameDay($0.date, date)
+        }
+    }
+
+    /// The time this routine holds on `date` (web resolveRoutineTime): a move
+    /// or same-day retime wins over the rule; nil is untimed.
+    func time(of routine: Routine, on date: Date) -> Date? {
+        let i = instanceMovedIn(for: routine, on: date) ?? instance(for: routine, on: date)
+        return RoutineRules.time(timeOfDay: routine.timeOfDay, instance: i, on: date)
+    }
+
+    /// Is this routine's occurrence chosen for `date`? Any occurrence whose
+    /// `planned_on` is that day counts — one moved there as a day, too — but
+    /// not a skipped one (web chosenUntimedOn).
     func isChosen(_ routine: Routine, on date: Date) -> Bool {
-        PlanCalendar.sameDay(instance(for: routine, on: date)?.plannedOn, date)
+        instances.contains {
+            $0.entityType == "routine" && $0.entityId.lowercased() == routine.id.uuidString.lowercased()
+                && $0.status != "skipped" && PlanCalendar.sameDay($0.plannedOn, date)
+                && ($0.deferredTo == nil || PlanCalendar.sameDay($0.deferredTo, date))
+        }
     }
 
     /// Does the routine keep a row on the day without being chosen?
@@ -127,8 +148,11 @@ struct PlanSnapshot {
     func dayRoutines(on date: Date) -> [Routine] {
         let ctx = routineContext(on: date)
         return routines.filter { r in
-            if isChosen(r, on: date) { return r.visibility == "active" && (domain == nil || r.context == domain) }
-            return Self.isAnchored(r) && RoutineRules.shows(r, on: date, ctx)
+            // Moved to another day: not on this one (web routinesForDate).
+            if RoutineRules.movedAway(instance(for: r, on: date), from: date) { return false }
+            if isChosen(r, on: date) { return RoutineRules.isActive(r) && (domain == nil || r.context == domain) }
+            // Timed by its rule, pinned, or placed at a time on this day.
+            return (Self.isAnchored(r) || time(of: r, on: date) != nil) && RoutineRules.shows(r, on: date, ctx)
         }
     }
 
