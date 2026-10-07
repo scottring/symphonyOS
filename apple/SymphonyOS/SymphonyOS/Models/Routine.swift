@@ -12,6 +12,11 @@ struct RecurrencePattern: Codable, Hashable {
     /// Weekday keys, "sun"…"sat" (older rows may spell them out).
     var days: [String]?
     var dayOfMonth: Int?
+    /// Monthly by position ("first weekend", "last Friday"): 1…4, or -1 for
+    /// the last. With `dayOfWeek` set it wins over `dayOfMonth`.
+    var weekOfMonth: Int?
+    /// "weekend" | "sun"…"sat", for a monthly-by-position rule.
+    var dayOfWeek: String?
     var monthOfYear: Int?
     /// YYYY-MM-DD dates for `specific_days`.
     var dates: [String]?
@@ -30,6 +35,8 @@ struct RecurrencePattern: Codable, Hashable {
     private enum CodingKeys: String, CodingKey {
         case type, days, dates, interval, unit
         case dayOfMonth = "day_of_month"
+        case weekOfMonth = "week_of_month"
+        case dayOfWeek = "day_of_week"
         case monthOfYear = "month_of_year"
         case startDate = "start_date"
         case legacyDayOfMonth = "dayOfMonth"
@@ -42,6 +49,8 @@ struct RecurrencePattern: Codable, Hashable {
         // Older phone builds wrote camelCase; the web writes day_of_month.
         dayOfMonth = try c.decodeIfPresent(Int.self, forKey: .dayOfMonth)
             ?? c.decodeIfPresent(Int.self, forKey: .legacyDayOfMonth)
+        weekOfMonth = try c.decodeIfPresent(Int.self, forKey: .weekOfMonth)
+        dayOfWeek = try c.decodeIfPresent(String.self, forKey: .dayOfWeek)
         monthOfYear = try c.decodeIfPresent(Int.self, forKey: .monthOfYear)
         dates = try c.decodeIfPresent([String].self, forKey: .dates)
         interval = try c.decodeIfPresent(Int.self, forKey: .interval)
@@ -54,6 +63,8 @@ struct RecurrencePattern: Codable, Hashable {
         try c.encode(type, forKey: .type)
         try c.encodeIfPresent(days, forKey: .days)
         try c.encodeIfPresent(dayOfMonth, forKey: .dayOfMonth)
+        try c.encodeIfPresent(weekOfMonth, forKey: .weekOfMonth)
+        try c.encodeIfPresent(dayOfWeek, forKey: .dayOfWeek)
         try c.encodeIfPresent(monthOfYear, forKey: .monthOfYear)
         try c.encodeIfPresent(dates, forKey: .dates)
         try c.encodeIfPresent(interval, forKey: .interval)

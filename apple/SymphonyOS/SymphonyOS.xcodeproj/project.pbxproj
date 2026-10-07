@@ -83,6 +83,7 @@
 		BAC9271B1175D9367F5C5D30 /* AuthView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3DD1BE1E7E379CBBA6DD1A49 /* AuthView.swift */; };
 		BD1C632779C103B02CA58E49 /* PlanSelectors.swift in Sources */ = {isa = PBXBuildFile; fileRef = D9E9788163FF0C909D5FD21E /* PlanSelectors.swift */; };
 		BD3079E109CD5F885473EFC7 /* PlanCalendar.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAEC2212D6BF83452FC75F4B /* PlanCalendar.swift */; };
+		BD782E62D9ADFC3814E41900 /* MonthlyPositionTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 217B2A6BEE77F0C6CE19306F /* MonthlyPositionTests.swift */; };
 		BF88A69DE3576ADBEA6AC909 /* InboxView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1A8120C9CE4FA0B9EF5ED68 /* InboxView.swift */; };
 		C32F7D0A51A46659926AD3F6 /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = F9595773CA7713C5157B3B01 /* AppState.swift */; };
 		CD119D61EA774D4915017DF0 /* AuthService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B9226E1CF4B413ACEF22DDCA /* AuthService.swift */; };
@@ -143,6 +144,7 @@
 		1A3E9139010E51C7040394A0 /* Routine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Routine.swift; sourceTree = "<group>"; };
 		1D08C8E525AA8CAF264A73A1 /* SupabaseClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SupabaseClient.swift; sourceTree = "<group>"; };
 		1D73CE19B7F2E740A74F4192 /* ScopeRuleTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScopeRuleTests.swift; sourceTree = "<group>"; };
+		217B2A6BEE77F0C6CE19306F /* MonthlyPositionTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MonthlyPositionTests.swift; sourceTree = "<group>"; };
 		23C9315FE094AD463C763A78 /* RowMapper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RowMapper.swift; sourceTree = "<group>"; };
 		27058614DEA3A0A75E46BF59 /* DomainFilter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DomainFilter.swift; sourceTree = "<group>"; };
 		2A262D445DAE6081A4A96C82 /* CrimsonPro-SemiBold.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "CrimsonPro-SemiBold.ttf"; sourceTree = "<group>"; };
@@ -542,6 +544,7 @@
 				A9AE2E825DD3974AD3BF7833 /* CarriedOverTests.swift */,
 				FDA21FA32A236A44EDB99EE6 /* DesignSystemTests.swift */,
 				E7A9598FAC1528BAE33CC441 /* DinnerPickTests.swift */,
+				217B2A6BEE77F0C6CE19306F /* MonthlyPositionTests.swift */,
 				6B165E6B770010DB9EC2731C /* NotesHTMLTests.swift */,
 				E835A0EB2F2BE8C29B990F52 /* PageIngestTests.swift */,
 				2B66CBCA35142878EF0695A6 /* PageParseTests.swift */,
@@ -734,6 +737,7 @@
 				3BD45BCD6DC5749F4AA19BC0 /* CarriedOverTests.swift in Sources */,
 				6FA7A8C0F8DCA3F3F9D2293F /* DesignSystemTests.swift in Sources */,
 				1A33ACD19D55C2BC2F3E4BAA /* DinnerPickTests.swift in Sources */,
+				BD782E62D9ADFC3814E41900 /* MonthlyPositionTests.swift in Sources */,
 				F9A19E455568DEDDF7B3CCCA /* NotesHTMLTests.swift in Sources */,
 				E57C504F359B868F330F8AD7 /* PageIngestTests.swift in Sources */,
 				03A332C11095EAD4D374B404 /* PageParseTests.swift in Sources */,

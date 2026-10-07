@@ -49,7 +49,19 @@ enum RoutineRules {
             let window = PlanCalendar.weekendWindow(for: d) ?? []
             return !window.contains { PlanCalendar.sameDay(done, $0) }
         case "monthly":
-            return pattern.dayOfMonth == dayOfMonth
+            // By position ("first weekend", "last Friday"). A weekend position
+            // is a window like `weekend` above: done on one of its days, the
+            // others go quiet.
+            if let window = monthlyPositionWindow(containing: d, pattern) {
+                guard window.count > 1, let done = lastCompletedAt else { return true }
+                if PlanCalendar.sameDay(done, d) { return true }
+                return !window.contains { PlanCalendar.sameDay(done, $0) }
+            }
+            if hasMonthlyPosition(pattern) { return false }
+            guard let target = pattern.dayOfMonth else { return false }
+            // A 31st rule is due on the month's last day when it is shorter.
+            let lastDay = cal.range(of: .day, in: .month, for: d)?.count ?? 31
+            return min(target, lastDay) == dayOfMonth
         case "quarterly":
             guard [1, 4, 7, 10].contains(month) else { return false }
             return dayOfMonth == (pattern.dayOfMonth ?? 1)
@@ -70,6 +82,56 @@ enum RoutineRules {
         default:
             return false
         }
+    }
+
+    // MARK: Monthly by position (port of lib/cadence/monthlyPosition.ts)
+
+    static let monthWeeks: Set<Int> = [1, 2, 3, 4, -1]
+    static let monthDaysOfWeek: Set<String> = ["weekend", "sun", "mon", "tue", "wed", "thu", "fri", "sat"]
+
+    /// `hasMonthlyPosition`: a monthly rule set by position.
+    static func hasMonthlyPosition(_ p: RecurrencePattern) -> Bool {
+        guard p.type == "monthly", let w = p.weekOfMonth, let d = p.dayOfWeek else { return false }
+        return monthWeeks.contains(w) && monthDaysOfWeek.contains(d)
+    }
+
+    /// The nth weekday (0 = Sunday) of a month; n = -1 is the last. Month may overflow.
+    static func nthWeekdayInMonth(year: Int, month: Int, weekday: Int, n: Int) -> Date {
+        let cal = PlanCalendar.calendar
+        let first = cal.date(from: DateComponents(year: year, month: month, day: 1))!
+        if n == -1 {
+            let next = cal.date(byAdding: .month, value: 1, to: first)!
+            let last = PlanCalendar.addDays(next, -1)
+            let back = ((cal.component(.weekday, from: last) - 1) - weekday + 7) % 7
+            return PlanCalendar.addDays(last, -back)
+        }
+        let forward = (weekday - (cal.component(.weekday, from: first) - 1) + 7) % 7
+        return PlanCalendar.addDays(first, forward + (n - 1) * 7)
+    }
+
+    /// `monthlyPositionDays`: the day, or the weekend window anchored on that
+    /// month's nth Saturday, earliest first. `month` is 1-based and may overflow.
+    static func monthlyPositionDays(year: Int, month: Int, _ p: RecurrencePattern) -> [Date] {
+        guard let n = p.weekOfMonth, let key = p.dayOfWeek else { return [] }
+        if key == "weekend" {
+            let saturday = nthWeekdayInMonth(year: year, month: month, weekday: 6, n: n)
+            return PlanCalendar.weekendWindow(for: saturday) ?? [saturday, PlanCalendar.addDays(saturday, 1)]
+        }
+        guard let weekday = weekdayKeys.firstIndex(of: key) else { return [] }
+        return [nthWeekdayInMonth(year: year, month: month, weekday: weekday, n: n)]
+    }
+
+    /// `monthlyPositionWindowFor`: the occurrence containing `date`, or nil.
+    static func monthlyPositionWindow(containing date: Date, _ p: RecurrencePattern) -> [Date]? {
+        guard hasMonthlyPosition(p) else { return nil }
+        let cal = PlanCalendar.calendar
+        let y = cal.component(.year, from: date), m = cal.component(.month, from: date)
+        // A window can spill a day or two across a month boundary either way.
+        for offset in [0, -1, 1] {
+            let days = monthlyPositionDays(year: y, month: m + offset, p)
+            if days.contains(where: { PlanCalendar.sameDay($0, date) }) { return days }
+        }
+        return nil
     }
 
     /// `isEverydayRoutine`: recurs at least every weekday.
