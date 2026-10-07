@@ -26,7 +26,9 @@ describe('PlanNavigation', () => {
     render(<MemoryRouter initialEntries={['/month?start=2026-10-01']}><PlanNavigation /></MemoryRouter>)
     const rail = screen.getByRole('navigation', { name: 'Planning period' })
     const month = rail.querySelector('a[aria-current="page"]')!
-    expect(month.textContent).toContain('October')
+    // Words only on the rail (2026-10-07); the period it opens is in the tooltip.
+    expect(month.textContent).toBe('Month')
+    expect(month.getAttribute('title')).toBe('October')
     expect(month.getAttribute('href')).toBe('/month?start=2026-10-01')
     // The other steps follow the period on screen (decision D, 2026-09-29):
     // the week holding October 1, not the clock's week. Today stays today.

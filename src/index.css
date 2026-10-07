@@ -2092,18 +2092,29 @@ html.desktop-shell a {
 .daybook-heading-note { margin-left: 10px; font-family: var(--font-family-sans, inherit); font-size: 13px; font-weight: 400; color: var(--color-neutral-500); }
 .today-subhead { margin: 16px 0 4px; padding-left: 4px; font-size: 10.5px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: var(--color-neutral-500); }
 .today-drag-hint { margin: 16px 0 0; padding-left: 4px; font-size: 13px; color: var(--color-neutral-500); }
-.today-scale { --scale-gutter: 44px; position: relative; margin-top: 14px; }
+.today-scale {
+  --scale-gutter: 44px; position: relative; margin-top: 14px;
+  /* The day wears the chosen place's colours (Scott, 2026-10-07), told apart
+     by lightness: free time the lightest wash, an event a firmer fill with a
+     dark bar, timed work a white card. */
+  --scale-free-bg: color-mix(in srgb, var(--color-primary-200) 40%, transparent);
+  --scale-free-fg: var(--color-primary-700);
+  --scale-event-bg: color-mix(in srgb, var(--color-primary-300) 62%, var(--color-bg-elevated));
+  --scale-event-bar: var(--color-primary-600);
+  --scale-work-border: var(--color-primary-200);
+  --scale-work-bar: var(--color-primary-500);
+}
 .today-scale.is-over { outline: 2px dashed var(--color-primary-300); outline-offset: 6px; border-radius: 6px; }
 .today-scale-hour { position: absolute; left: 0; right: 0; border-top: 1px solid var(--color-neutral-200); }
 .today-scale-hour > span { position: absolute; left: 0; top: -8px; padding-right: 6px; background: var(--color-bg-base); font-size: 11px; line-height: 1.2; color: var(--color-neutral-400); }
-.today-scale-free { position: absolute; left: var(--scale-gutter); right: 0; display: grid; place-items: center; border-radius: 10px; background: hsl(146 30% 87% / .75); color: hsl(150 40% 24%); font-size: 13.5px; font-weight: 500; text-align: center; padding: 0 8px; }
+.today-scale-free { position: absolute; left: var(--scale-gutter); right: 0; display: grid; place-items: center; border-radius: 10px; background: var(--scale-free-bg); color: var(--scale-free-fg); font-size: 13.5px; font-weight: 500; text-align: center; padding: 0 8px; }
 .today-scale-item { position: absolute; box-sizing: border-box; display: flex; align-items: flex-start; gap: 8px; padding: 5px 8px; border-radius: 8px; overflow: hidden; font-size: 13px; line-height: 1.25; cursor: grab; touch-action: manipulation; }
-.today-scale-item[data-kind="event"] { background: hsl(214 50% 91%); box-shadow: inset 3px 0 0 hsl(214 50% 47%); padding-left: 11px; }
-.today-scale-item[data-kind="work"] { background: var(--color-bg-elevated); border: 1px solid hsl(150 22% 82%); box-shadow: inset 3px 0 0 hsl(150 34% 30%); padding-left: 10px; }
+.today-scale-item[data-kind="event"] { background: var(--scale-event-bg); box-shadow: inset 3px 0 0 var(--scale-event-bar); padding-left: 11px; }
+.today-scale-item[data-kind="work"] { background: var(--color-bg-elevated); border: 1px solid var(--scale-work-border); box-shadow: inset 3px 0 0 var(--scale-work-bar); padding-left: 10px; }
 .today-scale-item.is-compact { align-items: center; padding-top: 0; padding-bottom: 0; }
 .today-scale-item.is-past { opacity: .55; }
 .today-scale-item.is-done .today-scale-title, .today-scale-item.is-done .today-scale-line { text-decoration: line-through; color: var(--color-neutral-500); }
-.today-scale-item.is-next { outline: 2px solid hsl(150 34% 30% / .55); outline-offset: 1px; }
+.today-scale-item.is-next { outline: 2px solid color-mix(in srgb, var(--color-primary-500) 55%, transparent); outline-offset: 1px; }
 .today-scale-item.is-selected { outline: 2px solid var(--color-primary-500); outline-offset: 1px; }
 .today-scale-item.is-dragging { opacity: .35; }
 .today-scale-item:hover { filter: brightness(.98); }
@@ -2114,12 +2125,12 @@ html.desktop-shell a {
 .today-scale-line { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 .today-scale-check { flex: none; width: 16px; height: 16px; margin-top: 1px; border-radius: 50%; border: 1.5px solid var(--color-neutral-400); background: transparent; }
 .today-scale-check.is-routine { border-radius: 4px; }
-.today-scale-check[aria-pressed="true"] { background: hsl(150 34% 30%); border-color: hsl(150 34% 30%); }
+.today-scale-check[aria-pressed="true"] { background: var(--color-primary-500); border-color: var(--color-primary-500); }
 .today-scale-item.is-compact .today-scale-check { margin-top: 0; }
 .today-scale-people { flex: none; display: inline-flex; align-self: center; }
 .today-scale-avatar { display: inline-grid; place-items: center; width: 18px; height: 18px; margin-left: -5px; border-radius: 50%; border: 1.5px solid var(--color-bg-elevated); font-size: 8px; font-weight: 600; line-height: 1; }
 .today-scale-avatar:first-child { margin-left: 0; }
-.today-scale-drive { position: absolute; display: flex; align-items: flex-end; padding-left: 6px; border-left: 2px dotted hsl(214 50% 47%); font-size: 11px; line-height: 1.1; color: var(--color-neutral-500); white-space: nowrap; pointer-events: none; }
+.today-scale-drive { position: absolute; display: flex; align-items: flex-end; padding-left: 6px; border-left: 2px dotted var(--scale-event-bar); font-size: 11px; line-height: 1.1; color: var(--color-neutral-500); white-space: nowrap; pointer-events: none; }
 .today-scale-now { position: absolute; left: var(--scale-gutter); right: 0; border-top: 2px solid var(--color-neutral-900); z-index: 3; pointer-events: none; }
 .today-scale-now::before { content: ''; position: absolute; left: -5px; top: -5px; width: 8px; height: 8px; border-radius: 50%; background: var(--color-neutral-900); }
 .today-scale-now > span { position: absolute; right: 0; top: -18px; font-size: 11px; font-weight: 600; color: var(--color-neutral-900); background: var(--color-bg-base); padding-left: 4px; }
@@ -2407,10 +2418,8 @@ html.desktop-shell a {
 .horizon-rail-join { width: 16px; height: 1px; background: var(--color-neutral-300); flex: none; }
 .horizon-rail a { display: flex; align-items: baseline; gap: 6px; padding: 6px 10px; border-radius: 8px; color: var(--color-neutral-500); white-space: nowrap; }
 .horizon-rail a:hover { color: var(--color-neutral-900); }
-.horizon-rail-n { font: 300 17px 'Jost', var(--font-family-sans); }
-.horizon-rail-l { font-size: 13px; }
+.horizon-rail-l { font-size: 13.5px; }
 .horizon-rail a.is-current { color: var(--color-neutral-900); }
-.horizon-rail a.is-current .horizon-rail-n { color: var(--color-primary-600); font-weight: 400; }
 .horizon-rail a.is-current .horizon-rail-l { font-weight: 600; }
 
 .plan-range-control { display: flex; align-items: center; font-size: 12px; color: var(--color-neutral-500); }
@@ -2913,7 +2922,7 @@ div.chooser-action-group { overflow: visible !important; }
 }
 /* White cards and the place's mid accents used as text, at night. */
 [data-scenery-lighting='nighttime'] .scenery-page :is(.bg-white, [class*='bg-white/']) { background-color: var(--color-bg-elevated); }
-[data-scenery-lighting='nighttime'] .scenery-page :is(.text-primary-500, .text-primary-600, .text-accent-500, .text-accent-600, .horizon-rail a.is-current .horizon-rail-n, .pv2-tick, .pv2-stamp-done) { color: var(--color-primary-300); }
+[data-scenery-lighting='nighttime'] .scenery-page :is(.text-primary-500, .text-primary-600, .text-accent-500, .text-accent-600, .pv2-tick, .pv2-stamp-done) { color: var(--color-primary-300); }
 /* A layout-neutral wrapper that only carries the page tokens above. */
 .scenery-page-contents { display: contents; }
 
@@ -3712,10 +3721,9 @@ html.rail-stuck .desktop-workspace-nav:has(.page-navigation-center:not(:empty)) 
 .page-navigation-lead [data-testid="weather-cue"], .page-navigation-lead .daybook-weather-range .daybook-weather-sep { display: none; }
 .page-navigation-lead { min-width: 0; flex-shrink: 1; }
 .page-navigation-lead .daybook-weather-line { max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
-/* Narrower windows: the rail keeps its numbers (the words stay in each
-   step's tooltip) and the weather keeps its icon and temperature. */
+/* Narrower windows: the rail tightens (its words are short) and the weather
+   keeps its icon and temperature. */
 @media (max-width: 1180px) {
-  .page-navigation-center .horizon-rail-l { display: none; }
   .page-navigation-center .horizon-rail a { padding-inline: 7px; }
   .page-navigation-center .horizon-rail-join { width: 10px; }
   .page-navigation-lead .daybook-weather-line > span:not(.daybook-weather-temp) { display: none; }
