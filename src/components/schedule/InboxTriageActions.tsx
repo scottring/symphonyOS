@@ -92,16 +92,18 @@ export function InboxTriageActions({
   }, [menu])
   const choose = (fn: () => void) => () => { close(); fn() }
 
-  const direct = 'text-xs px-2.5 py-1 rounded-md font-medium transition-colors'
+  // The card language's buttons (cards.css; design B, 2026-10-07): the
+  // same outlined button as every page, small, under the card's title.
+  const direct = 'sym-btn sym-btn-sm'
   return (
-    <div ref={wrapRef} className="inbox-triage relative flex flex-wrap items-center gap-1">
-      <button type="button" onClick={() => onPick('today')} className={`${direct} bg-primary-50 text-primary-700 hover:bg-primary-100`}>
+    <div ref={wrapRef} className="inbox-triage relative flex flex-wrap items-center gap-1.5">
+      <button type="button" onClick={() => onPick('today')} className={`${direct} is-lead`}>
         Today
       </button>
       <WeekChoiceChip label="This week" title={title} onThisWeek={() => onPick('this-week')} onPick={onPick}
-        className={`${direct} bg-neutral-50 text-neutral-600 hover:bg-neutral-100`}
-        caretClassName="rounded-md bg-neutral-50 text-neutral-500 hover:bg-neutral-100 hover:text-neutral-800" />
-      <button type="button" onClick={() => onPick('someday')} className={`${direct} bg-neutral-50 text-neutral-600 hover:bg-neutral-100`}>
+        className={direct}
+        caretClassName={`${direct} sym-btn-caret`} />
+      <button type="button" onClick={() => onPick('someday')} className={direct}>
         Someday
       </button>
       <button
@@ -111,7 +113,7 @@ export function InboxTriageActions({
         aria-haspopup="menu"
         aria-expanded={menu !== null}
         onClick={() => setMenu(menu ? null : 'menu')}
-        className={`rounded-md p-1.5 text-neutral-500 hover:bg-neutral-100 ${menu ? 'bg-neutral-100' : ''}`}
+        className={`${direct} sym-btn-icon${menu ? ' is-open' : ''}`}
       >
         <MoreHorizontal className="h-4 w-4" aria-hidden="true" />
       </button>

@@ -4,7 +4,9 @@ import { LoadFailedNotice } from '@/components/common/LoadFailedNotice'
 import { PAGE_COLUMN } from '@/components/layout/pageLayout'
 import { MastheadCard } from '@/components/layout/MastheadCard'
 import { EmptyState } from '@/components/layout/EmptyState'
-import { X, CornerDownRight, CalendarDays, Sun } from 'lucide-react'
+import { X, CornerDownRight, CalendarDays, Sun, Inbox as InboxIcon, Check } from 'lucide-react'
+// The card language, Inbox's own layout (shared pieces: styles/cards.css).
+import '@/styles/cards-inbox.css'
 import { useNavigate, useLocation } from 'react-router-dom'
 import type { Task, TaskContext } from '@/types/task'
 import { mergeCaptureIntoTask } from '@/lib/captureMerge'
@@ -733,6 +735,7 @@ export function InboxView({
             applyTriage(task, action)
           }}
           contextControl="readonly"
+          look="card"
           triageMenu={
             <InboxTriageActions
               title={task.title}
@@ -798,6 +801,7 @@ export function InboxView({
         variant="page"
         title="Inbox"
         motif="documents"
+        stamp={<span className="inbox-stamp"><InboxIcon size={30} strokeWidth={1.6} /></span>}
         subline={
           totalCount === 0
             ? (loading ? 'Loading your inbox…' : loadFailed ? 'Didn’t load' : hiddenByFilter ? 'Filtered — nothing in this view' : 'All clear — nothing to triage')
@@ -851,31 +855,25 @@ export function InboxView({
           Captures in other domains or for other people are hidden right now.
         </EmptyState>
       ) : totalCount === 0 ? (
-        <EmptyState
-          title="Inbox zero"
-          action={
-            <div className="flex flex-wrap items-center">
-              <button
-                type="button"
-                onClick={() => navigate('/today')}
-                className="inline-flex items-center gap-1.5 rounded-md px-3 py-2 text-[14px] text-primary-700 transition-colors hover:bg-primary-50"
-              >
-                <Sun className="h-4 w-4" aria-hidden="true" />
-                Open today
-              </button>
-              <button
-                type="button"
-                onClick={() => navigate('/week')}
-                className="inline-flex items-center gap-1.5 rounded-md px-3 py-2 text-[14px] text-primary-700 transition-colors hover:bg-primary-50"
-              >
-                <CalendarDays className="h-4 w-4" aria-hidden="true" />
-                Plan week
-              </button>
-            </div>
-          }
-        >
-          Nothing is waiting for a decision.
-        </EmptyState>
+        // Inbox zero is a card of its own (design B, 2026-10-07): a green
+        // done tile, what it means, and the two ways on.
+        <div className="sym-card inbox-zero">
+          <span className="sym-tile sym-tile-card is-done" aria-hidden="true"><Check size={22} strokeWidth={2.6} /></span>
+          <div className="inbox-zero-text">
+            <p className="sym-card-title">Inbox zero</p>
+            <p className="inbox-zero-sub">Nothing is waiting for a decision.</p>
+          </div>
+          <div className="inbox-zero-actions">
+            <button type="button" onClick={() => navigate('/today')} className="sym-btn">
+              <Sun className="h-4 w-4" aria-hidden="true" />
+              Open today
+            </button>
+            <button type="button" onClick={() => navigate('/week')} className="sym-btn sym-btn-primary">
+              <CalendarDays className="h-4 w-4" aria-hidden="true" />
+              Plan week
+            </button>
+          </div>
+        </div>
       ) : mode === 'focus' ? (
         <FocusInboxCard
           tasks={inboxTasks}
@@ -890,13 +888,14 @@ export function InboxView({
           sending={sendingTaskId !== null}
         />
       ) : (
-        <div>
+        <div className="inbox-cards">
           {inboxTasks.map(renderRow)}
         </div>
       )}
 
       <WaitingSection
         rows={waitingRows}
+        members={familyMembers}
         onUpdateTask={(id, updates) => onUpdateTask?.(id, updates)}
         onCompleteTask={onToggleTask}
         onSelect={handleSelect}

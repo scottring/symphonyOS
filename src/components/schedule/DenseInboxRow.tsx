@@ -1,5 +1,8 @@
-import { memo, useState, useCallback } from 'react'
-import { Trash2, Check, Tag, Star, GripVertical } from 'lucide-react'
+import { memo, useState, useCallback, createElement } from 'react'
+import { Trash2, Check, Tag, Star, GripVertical, Hourglass } from 'lucide-react'
+import { useLongPress } from '@/hooks/useLongPress'
+import { taskIconFor } from '@/lib/taskIcon'
+import { cardNotePreview } from '@/lib/cardNotePreview'
 import { ConceptIcon } from '@/lib/conceptIcons'
 import type { Task, TaskContext } from '@/types/task'
 import type { FamilyMember } from '@/types/family'
@@ -68,6 +71,10 @@ interface DenseInboxRowProps {
   /** 'readonly': show the life area as a small dot (only when set) instead of
    *  the tag picker — the Inbox edits it from its More menu. Default 'picker'. */
   contextControl?: 'picker' | 'readonly'
+  /** 'card' (the Inbox, design B 2026-10-07): a white card — the icon tile
+   *  that is also the check, a serif title, a note preview, where it came
+   *  from, and its triage actions under the title. Default 'row'. */
+  look?: 'row' | 'card'
 }
 
 const CONTEXT_OPTIONS: Array<{ value: TaskContext | null; label: string }> = [
@@ -96,6 +103,7 @@ export const DenseInboxRow = memo(function DenseInboxRow({
   lineage,
   draggable = false,
   contextControl = 'picker',
+  look = 'row',
 }: DenseInboxRowProps) {
   const [contextOpen, setContextOpen] = useState(false)
 
@@ -104,6 +112,26 @@ export const DenseInboxRow = memo(function DenseInboxRow({
   const handleToggleWaiting = useCallback(() => {
     onUpdate({ isWaiting: !task.isWaiting })
   }, [onUpdate, task.isWaiting])
+
+  if (look === 'card') {
+    return (
+      <InboxCard
+        task={task}
+        familyMembers={familyMembers}
+        contextColor={contextColor}
+        isLeaving={isLeaving}
+        selectionMode={selectionMode}
+        isSelected={isSelected}
+        onToggleSelection={onToggleSelection}
+        onToggleComplete={onToggleComplete}
+        onToggleWaiting={handleToggleWaiting}
+        onSelect={onSelect}
+        onAssign={onAssign}
+        lineage={lineage}
+        actions={triageMenu}
+      />
+    )
+  }
 
   return (
     <div
@@ -336,3 +364,98 @@ export const DenseInboxRow = memo(function DenseInboxRow({
     </div>
   )
 })
+
+/**
+ * The Inbox's card (design B, 2026-10-07; canvas "Web Today in the iOS
+ * style", board "Inbox"). The tile is the task's icon and its check — a tap
+ * finishes it, a long hold marks it waiting, as the row's circle did.
+ */
+function InboxCard({
+  task, familyMembers, contextColor, isLeaving, selectionMode, isSelected, onToggleSelection,
+  onToggleComplete, onToggleWaiting, onSelect, onAssign, lineage, actions,
+}: {
+  task: Task
+  familyMembers: FamilyMember[]
+  contextColor?: string
+  isLeaving?: boolean
+  selectionMode: boolean
+  isSelected: boolean
+  onToggleSelection?: () => void
+  onToggleComplete: () => void
+  onToggleWaiting: () => void
+  onSelect: () => void
+  onAssign?: (memberIds: string[]) => void
+  lineage?: string | null
+  actions?: React.ReactNode
+}) {
+  const { pressing, handlers } = useLongPress({ threshold: 1500, onLongPress: onToggleWaiting, onPress: onToggleComplete })
+  const icon = taskIconFor({ title: task.title, category: task.category, phoneNumber: task.phoneNumber, location: task.location, links: task.links, context: task.context })
+  const preview = cardNotePreview(task.notes)
+  const area = CONTEXT_OPTIONS.find((o) => o.value === task.context)?.label
+  const tileLabel = task.completed
+    ? `Mark not done: ${task.title}`
+    : task.isWaiting
+      ? `Waiting — tap to finish ${task.title}, hold to stop waiting`
+      : `Done: ${task.title} (hold to mark waiting)`
+  return (
+    <div
+      data-row
+      data-task-id={task.id}
+      className={`sym-card inbox-card${isSelected ? ' is-selected' : ''}${isLeaving ? ' is-leaving' : ''}`}
+    >
+      <div className="inbox-card-lead" onClick={(e) => e.stopPropagation()}>
+        {selectionMode ? (
+          <button
+            type="button"
+            role="checkbox"
+            aria-checked={isSelected}
+            aria-label={`Select ${task.title}`}
+            onClick={onToggleSelection}
+            className={`inbox-card-select${isSelected ? ' is-on' : ''}`}
+          >
+            <Check className="h-5 w-5" strokeWidth={3} />
+          </button>
+        ) : (
+          <button
+            {...handlers}
+            type="button"
+            aria-label={tileLabel}
+            aria-pressed={task.completed}
+            // Mouse and touch finish through the press handlers; a keyboard
+            // click (Enter/Space, detail 0) has no press, so it finishes here.
+            onClick={(e) => { e.stopPropagation(); if (e.detail === 0) onToggleComplete() }}
+            className={`sym-tile sym-tile-card${task.completed ? ' is-done' : ''}${task.isWaiting && !task.completed ? ' is-waiting' : ''}${pressing ? ' long-press-ring' : ''}`}
+          >
+            {task.completed ? <Check size={22} strokeWidth={2.6} /> : task.isWaiting ? <Hourglass size={20} strokeWidth={1.8} /> : createElement(icon, { size: 22, strokeWidth: 1.8 })}
+          </button>
+        )}
+      </div>
+
+      <div className="inbox-card-body">
+        <button type="button" onClick={onSelect} className="inbox-card-open">
+          <span className={`sym-card-title${task.completed ? ' is-done' : ''}`}>{task.title}</span>
+          {lineage && <span className="inbox-card-lineage">{lineage}</span>}
+        </button>
+        {task.isWaiting && !task.completed && (
+          <p className="inbox-card-wait"><Hourglass className="h-4 w-4 shrink-0" aria-hidden="true" />{task.waitingFor ? `Waiting on ${task.waitingFor}` : 'Waiting'}</p>
+        )}
+        {preview && <p className="sym-card-note">{preview}</p>}
+        {!selectionMode && actions && <div className="inbox-card-actions">{actions}</div>}
+      </div>
+
+      <div className="inbox-card-trail">
+        {task.captureId && <span className="sym-tag inbox-tag-source">From an email</span>}
+        <span className="inbox-card-who">
+          {contextColor && (
+            <span role="img" aria-label={`Life area: ${area ?? ''}`} title={area} className="inbox-card-area" style={{ background: contextColor }} />
+          )}
+          {familyMembers.length > 0 && onAssign && (
+            <span className="hidden md:block" onClick={(e) => e.stopPropagation()}>
+              <MultiAssigneeDropdown members={familyMembers} selectedIds={task.assignedToAll ?? []} onSelect={onAssign} size="sm" />
+            </span>
+          )}
+        </span>
+      </div>
+    </div>
+  )
+}
