@@ -140,7 +140,9 @@ describe('Today as a daily journal', () => {
     const day = screen.getByRole('region', { name: 'The day' })
     const mold = within(day).getByText('Figure out washing machine mold').closest('.today-scale-item')!
     expect(mold).toHaveClass('is-past')
-    expect(within(mold as HTMLElement).getByRole('button').getAttribute('aria-label')).not.toMatch(/, done/)
+    expect(within(mold as HTMLElement).getByRole('button', { name: /^Figure out washing machine mold,/ }).getAttribute('aria-label')).not.toMatch(/, done/)
+    // Its icon tile finishes it from the day (design B, 2026-10-07).
+    expect(within(mold as HTMLElement).getByRole('button', { name: 'Done: Figure out washing machine mold' })).toBeInTheDocument()
     expect(within(day).getByText('Do kids laundry')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /Earlier today/ })).toBeNull()
   })
@@ -255,3 +257,27 @@ it('folds completed untimed work without hiding the ability to reopen and undo i
   expect(screen.getByText('Finished today task')).toBeInTheDocument()
   expect(screen.getByRole('button', { name: 'Completed · 1' })).toHaveAttribute('aria-expanded', 'true')
 })
+
+// Design B (2026-10-07): tonight's dinner under For today — family content,
+// tonight's plan, so only on today and only where Family shows.
+describe('Dinner tonight on Today', () => {
+  const dinner = { id: 'event-meal:e1', title: 'Sweet Potato and Black Bean Tacos', time: '6:30 PM', minutes: 20, cue: 'Uses Tuesday’s extra sweet potatoes.', imageUrl: null }
+  it('shows tonight’s dinner, and opens the meal on a tap', () => {
+    const onSelectItem = vi.fn()
+    renderView({ dinner, onSelectItem })
+    fireEvent.click(screen.getByRole('button', { name: /Dinner tonight: Sweet Potato and Black Bean Tacos/ }))
+    expect(onSelectItem).toHaveBeenCalledWith('event-meal:e1')
+    expect(screen.getByText('6:30 PM · 20 min · Uses Tuesday’s extra sweet potatoes.')).toBeInTheDocument()
+  })
+
+  it('stays off another day, and off a view without Family', () => {
+    const { unmount } = renderView({ dinner, viewedDate: new Date(2026, 8, 20) })
+    expect(screen.queryByRole('region', { name: 'Dinner tonight' })).toBeNull()
+    unmount()
+    domainMock.layers = new Set(['work'])
+    renderView({ dinner })
+    expect(screen.queryByRole('region', { name: 'Dinner tonight' })).toBeNull()
+    domainMock.layers = ALL_LAYERS
+  })
+})
+

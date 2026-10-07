@@ -143,6 +143,8 @@ export interface TodaySectionListProps {
   /** The unscheduled section's "Anytime · M of N done" fold. My focus lists
    *  chosen untimed work plainly, so it turns this off. Default true. */
   anytimeHeader?: boolean
+  /** 'card': For today's cards (design B, 2026-10-07). Default: rows. */
+  look?: 'row' | 'card'
 }
 
 /** No drop zone: the slice renders its rows plainly. */
@@ -184,6 +186,7 @@ export function TodaySectionList({
   dropTargets = true,
   gapOffset,
   anytimeHeader = true,
+  look = 'row',
 }: TodaySectionListProps) {
   const Band = dropTargets ? TodayBandDropZone : Plain
   const Gap = dropTargets ? TodayGapDropZone : Plain
@@ -462,6 +465,7 @@ export function TodaySectionList({
                         <div className={isUpNext ? UP_NEXT_ROW_CLASS : undefined}>
                         <RoutineCollectionRow
                           item={item}
+                          look={look}
                           familyMembers={familyMembers}
                           onAssignAll={onAssignRoutineAll ? (memberIds) => onAssignRoutineAll(item.id.replace('routine-collection-', ''), memberIds) : undefined}
                           onSelect={() => onSelectItem(item.id)}
@@ -671,7 +675,8 @@ export function TodaySectionList({
                       }
                       panelOpen={panelOpen}
                       onClosePanel={onClosePanel}
-                      variant={item.type === 'routine' ? 'minimal' : 'full'}
+                      variant={item.type === 'routine' && look !== 'card' ? 'minimal' : 'full'}
+                      look={look}
                       currentMemberId={currentMemberId}
                     />
                     {item.type === 'event' && (() => {

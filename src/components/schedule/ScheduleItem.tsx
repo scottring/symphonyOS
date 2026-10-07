@@ -21,6 +21,8 @@ import { rowSubtitle } from '@/lib/rowSubtitle'
 import { TimelineSpine } from './TimelineSpine'
 import { locationLink } from '@/lib/locationLink'
 import { useTravelTime } from '@/hooks/useTravelTime'
+import { TaskIconCheck } from '@/components/common/TaskIconCheck'
+import { notePreview } from '@/lib/today/notePreview'
 
 
 interface ScheduleItemProps {
@@ -76,6 +78,13 @@ interface ScheduleItemProps {
   hasCoaching?: boolean
   // Visual weight variant
   variant?: 'full' | 'minimal'
+  /**
+   * 'card' (For today, design B — 2026-10-07): a card with the task's icon as
+   * its check, a serif title, a two-line note preview when the note says
+   * something, and "Shared" when the household can see it. Every other host
+   * keeps the row.
+   */
+  look?: 'row' | 'card'
   // Hide time label (for same-time grouping) — preserves column space
   hideTime?: boolean
   /** Draw the timeline spine reaching UP from this row's marker to the row above. */
@@ -146,6 +155,7 @@ export const ScheduleItem = memo(function ScheduleItem({
   onClosePanel,
   hasCoaching,
   variant = 'full',
+  look = 'row',
   hideTime,
   spineAbove,
   spineBelow,
@@ -213,6 +223,16 @@ export const ScheduleItem = memo(function ScheduleItem({
   // Only someone the household knows: an id with no member behind it drew a
   // blank grey people icon at rest (Boxing, Marta — 2026-10-06).
   const assigned = [assignedTo, ...assignedToAll].some((id) => !!id && (familyMembers.length === 0 || familyMembers.some((m) => m.id === id)))
+
+  // The card look (For today, design B).
+  const isCard = look === 'card'
+  const preview = isCard && !item.completed ? notePreview(item.notes) : null
+  // "Shared": the household can see it — the iOS app's rule (scope couple or
+  // compound), so the two apps say it of the same tasks.
+  const rowScope = item.originalTask?.scope ?? item.originalRoutine?.scope
+  const isShared = isCard && (rowScope === 'couple' || rowScope === 'compound')
+  const iconTask = { title: item.title, type: item.type, category: item.category, phoneNumber: item.phoneNumber, location: item.location, links: item.links, context: item.context }
+  const sharedTag = isShared ? <span className="sym-tag">Shared</span> : null
 
   const handleCheckboxClick = (e: React.MouseEvent) => {
     e.stopPropagation()
@@ -393,7 +413,14 @@ export const ScheduleItem = memo(function ScheduleItem({
           {item.focused && (
             <span aria-hidden="true" title="Chosen for today" className="row-focus-dot absolute left-1 top-1/2 -translate-y-1/2 h-1.5 w-1.5 rounded-full bg-sage-500" />
           )}
-          {isActionable ? (
+          {isCard ? (
+            <TaskIconCheck
+              task={iconTask}
+              done={item.completed}
+              size="card"
+              onToggle={isActionable ? () => handleCheckboxClick({ stopPropagation: () => {} } as React.MouseEvent) : undefined}
+            />
+          ) : isActionable ? (
             <TaskCheckbox
               completed={item.completed}
               isWaiting={isTask ? item.isWaiting : undefined}
@@ -438,6 +465,7 @@ export const ScheduleItem = memo(function ScheduleItem({
           {fromEmail && (
             <div className="text-[12px] text-neutral-500 mt-0.5">{emailBadge}</div>
           )}
+          {preview && <p className="sym-card-note mt-1">{preview}</p>}
           {/* What this step is for, on the phone too — a phone has no hover to
               reveal it, so the commitment has to be on the row itself. */}
           {servesLine ? <div className="mt-0.5 min-w-0">{servesLine}</div> : item.goalLabel && !item.completed && (
@@ -499,6 +527,7 @@ export const ScheduleItem = memo(function ScheduleItem({
             definition of "marked" as the desktop chip/menu — bare truthiness
             of item.neededOn was a bug already fixed once there. */}
         <div className="flex items-center gap-1 shrink-0">
+          {sharedTag}
           {/* The needed-today mark is STATE: it shows when set (and clears on
               tap), never as a grey control on every row. Setting it lives in
               the row's detail sheet. `!item.completed` matches the desktop
@@ -563,7 +592,12 @@ export const ScheduleItem = memo(function ScheduleItem({
       tabIndex={0}
       role="button"
       aria-pressed={selected}
-      className={`
+      data-look={isCard ? 'card' : undefined}
+      className={isCard ? `
+        today-card sym-card group relative cursor-pointer transition-all duration-200
+        ${selected ? 'is-selected' : ''}
+        ${item.completed || item.skipped || isFree ? 'is-done' : ''}
+      ` : `
         group relative cursor-pointer transition-all duration-200 rounded-xl border
         ${variant === 'minimal'
           ? `px-3 py-1 md:py-0.5 md:-mx-[13px] border-transparent hover:bg-neutral-50/60 ${selected ? 'bg-neutral-50 ring-1 ring-neutral-200' : ''}`
@@ -684,8 +718,8 @@ export const ScheduleItem = memo(function ScheduleItem({
             of the row — which IS the title's first line, the title column being
             the tallest child — with a nudge to centre it on that line's box. */}
         {!(isMobile && isOverdue) && (
-          <div className={`${MARK} flex items-center justify-center relative z-[1] ${
-            hasBelowTitleContent || hasSubtasks ? `self-start ${variant === 'minimal' ? '' : 'mt-0.5'}` : ''
+          <div className={`${isCard ? 'today-card-mark' : MARK} flex items-center justify-center relative z-[1] ${
+            hasBelowTitleContent || hasSubtasks || preview ? `self-start ${variant === 'minimal' || isCard ? '' : 'mt-0.5'}` : ''
           }`}>
             {/* Chosen for today: a small dot beside the circle, and a label a
                 screen reader hears. Nothing louder — the row is already on
@@ -700,7 +734,15 @@ export const ScheduleItem = memo(function ScheduleItem({
                 </span>
               </>
             )}
-            {isEvent && isFree ? (
+            {isCard ? (
+              // The task's icon is its check (design B).
+              <TaskIconCheck
+                task={iconTask}
+                done={item.completed}
+                size="card"
+                onToggle={isActionable ? () => handleCheckboxClick({ stopPropagation: () => {} } as React.MouseEvent) : undefined}
+              />
+            ) : isEvent && isFree ? (
               // Free events carry no check circle — nothing for a parent to do.
               null
             ) : isActionable ? (
@@ -832,6 +874,7 @@ export const ScheduleItem = memo(function ScheduleItem({
               </span>
             </div>
           )}
+          {preview && <p className="sym-card-note today-card-note">{preview}</p>}
           {/* What this step is FOR. A commitment made at the month's altitude
               should still be legible on the day you act on it. No count and no
               progress — just the goal's name. */}
@@ -891,6 +934,7 @@ export const ScheduleItem = memo(function ScheduleItem({
             siblings. See RowActionRail for why: the old version rendered six
             controls on a task, five on an event, three on a routine, so nothing
             formed a column down the page. */}
+        {sharedTag && <span className="today-card-shared">{sharedTag}</span>}
         <RowActionRail
           item={item}
           variant={variant}

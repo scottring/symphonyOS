@@ -42,7 +42,7 @@ export const DEFAULT_START = 7
 export const DEFAULT_END = 21
 const DEFAULT_MINUTES = 30
 /** The shortest a block is drawn: one line of text. */
-export const MIN_BLOCK = 26
+export const MIN_BLOCK = 30
 /** Below this a block is a one-line chip. */
 const COMPACT_BELOW = 40
 /** Between two chips stacked because they start close together. */
