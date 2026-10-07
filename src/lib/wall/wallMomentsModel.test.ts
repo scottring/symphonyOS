@@ -109,3 +109,19 @@ describe('afterSchoolRows', () => {
     expect(afterSchoolRows(model)[0]).toMatchObject({ entityType: 'task', id: 'h1', done: false })
   })
 })
+
+// Scott, 2026-10-07: "the individual tasks … are only relevant to me — we
+// should be more focused on shared tasks and stuff involving the kids".
+describe('wallTodayRows — the family’s screen', () => {
+  const task = (id: string, o: Partial<TimelineItem>) => item({ id, type: 'task', title: id, startTime: at(8, 30), ...o })
+  it('leaves one adult’s own task off, and keeps shared, kids’ and household tasks and every event', () => {
+    const rows = wallTodayRows({ morning: [
+      task('task-mine', { assignedTo: 'sk' }),
+      task('task-shared', { originalTask: { assignedToAll: ['sk', 'el'] } as never, assignedTo: null }),
+      task('task-ella', { assignedTo: 'el' }),
+      task('task-house', {}),
+      item({ id: 'event-jury', title: 'Jury duty', startTime: at(8), assignedTo: 'sk' }),
+    ] }, members, at(7))
+    expect(rows.map((r) => r.id).sort()).toEqual(['event-jury', 'task-ella', 'task-house', 'task-shared'])
+  })
+})
