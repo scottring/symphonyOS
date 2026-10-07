@@ -277,6 +277,52 @@ struct PlanWriter {
         save()
     }
 
+    /// Move ONE occurrence of a routine to another day — the rule is never
+    /// touched (web `onMoveRoutineToDay` → `useActionableInstances.reschedule`,
+    /// #115). Writes exactly what the web writes:
+    /// • the occurrence is the instance dated `viewed`, else one already
+    ///   deferred TO `viewed` (moved there earlier), else a new one;
+    /// • a timed routine keeps its time on the new day: `deferred` with
+    ///   `deferred_to` at that time (back on its own day: `pending` + time);
+    /// • an untimed one is a day-only move: `deferred`, a midnight
+    ///   `deferred_to` and `planned_on` (the marker no reader draws at 12 AM);
+    ///   moved back onto its own day it is simply due again.
+    func moveRoutine(_ routine: Routine, from viewed: Date, to day: Date) {
+        let fromDay = PlanCalendar.day(viewed)
+        let key = routine.id.uuidString.lowercased()
+        let all = (try? context.fetch(FetchDescriptor<ActionableInstance>())) ?? []
+        let mine = all.filter { $0.entityType == "routine" && $0.entityId.lowercased() == key }
+        let i = mine.first { PlanCalendar.sameDay($0.date, fromDay) }
+            ?? mine.first { $0.status == "deferred" && PlanCalendar.sameDay($0.deferredTo, fromDay) }
+            ?? instance(for: routine, on: fromDay)
+
+        let target = PlanWriter.moveTarget(for: routine, on: day)
+        let backHome = PlanCalendar.sameDay(i.date, target.when)
+        if target.dayOnly {
+            i.status = backHome ? "pending" : "deferred"
+            i.deferredTo = backHome ? nil : target.when
+            i.plannedOn = backHome ? nil : PlanCalendar.day(target.when)
+        } else {
+            i.status = backHome ? "pending" : "deferred"
+            i.deferredTo = target.when
+        }
+        i.updatedAt = Date()
+        i.syncStatus = .pending
+        queueInstance(i)
+        save()
+    }
+
+    /// Where a moved occurrence lands: the routine's own time on that day, or
+    /// the day alone (midnight) when the routine has no time.
+    static func moveTarget(for routine: Routine, on day: Date) -> (when: Date, dayOnly: Bool) {
+        let parts = (routine.timeOfDay ?? "").split(separator: ":").compactMap { Int($0) }
+        let midnight = PlanCalendar.day(day)
+        guard parts.count >= 2,
+              let timed = PlanCalendar.calendar.date(bySettingHour: parts[0], minute: parts[1], second: 0, of: midnight)
+        else { return (midnight, true) }
+        return (timed, false)
+    }
+
     private func instance(for routine: Routine, on day: Date) -> ActionableInstance {
         let key = routine.id.uuidString
         let all = (try? context.fetch(FetchDescriptor<ActionableInstance>())) ?? []

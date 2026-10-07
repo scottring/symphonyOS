@@ -16,6 +16,7 @@ struct TimelineItemCard: View {
     @State private var showEventDetail = false
     /// The row's plain steps, unfolded. Per-person steps never fold.
     @State private var stepsOpen = false
+    @State private var showRoutine = false
     @Query private var familyMembers: [FamilyMember]
 
     init(item: TimelineItem, modelContext: ModelContext, userId: UUID, date: Date = Date()) {
@@ -66,6 +67,12 @@ struct TimelineItemCard: View {
                 .presentationDetents([.large, .medium])
             }
         }
+        .sheet(isPresented: $showRoutine) {
+            if let routine = fetchRoutine() {
+                RoutineOccurrenceSheet(routine: routine, date: date, completed: isCompleted)
+                    .presentationDetents([.medium, .large])
+            }
+        }
         .sheet(isPresented: $showEventDetail) {
             if let key = item.eventKey {
                 NavigationStack {
@@ -109,6 +116,10 @@ struct TimelineItemCard: View {
             ]
         case .routine:
             return [
+                // Move this occurrence to another day (web #115); the rule stays.
+                SlideAction(label: "Move", systemImage: "calendar", tint: Color.amberStrong) {
+                    showRoutine = true
+                },
                 SlideAction(label: "Skip", systemImage: "arrow.uturn.forward", tint: Color.textSecondary) {
                     setInstanceStatus(entityType: "routine", entityId: item.entityId.uuidString.lowercased(), status: "skipped")
                 },
@@ -126,6 +137,11 @@ struct TimelineItemCard: View {
         default:
             return []
         }
+    }
+
+    private func fetchRoutine() -> Routine? {
+        guard item.type == .routine else { return nil }
+        return (try? modelContext.fetch(FetchDescriptor<Routine>()))?.first { $0.id == item.entityId }
     }
 
     private func fetchTask() -> SymphonyTask? {
@@ -250,7 +266,7 @@ struct TimelineItemCard: View {
         switch item.type {
         case .task: showDetail = true
         case .event: if item.eventKey != nil { showEventDetail = true }
-        case .routine: break
+        case .routine: showRoutine = true
         }
     }
 
