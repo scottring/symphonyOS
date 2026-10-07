@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useMemo, type ReactNode } from 'react'
-import { Sparkles, Camera, NotebookPen } from 'lucide-react'
+import { Sparkles, Camera, NotebookPen, StickyNote } from 'lucide-react'
 import { usePhotoCapture } from '@/hooks/usePhotoCapture'
 import { CameraCaptureModal } from '@/components/capture/CameraCaptureModal'
 import { hasParsedFields, allDayFromParse } from '@/lib/quickInputParser'
@@ -66,6 +66,9 @@ interface QuickCaptureProps {
    * capture (S3-12), and it stays quiet.
    */
   confirmsAfterWrite?: boolean
+  /** Post the text to the kitchen wall's scratchpad instead — a note or a
+   *  thing to talk about. Resolves true once it is saved. */
+  onAddToScratchpad?: (text: string, kind: 'note' | 'talk') => Promise<boolean>
 }
 
 export function QuickCapture({
@@ -84,6 +87,7 @@ export function QuickCapture({
   eventCalendarName,
   onPlanFromPaper,
   confirmsAfterWrite = false,
+  onAddToScratchpad,
 }: QuickCaptureProps) {
   // Support both controlled and uncontrolled modes
   const [internalIsOpen, setInternalIsOpen] = useState(false)
@@ -324,6 +328,18 @@ export function QuickCapture({
     resetOverrides()
     if (stickyContext) applyContext(stickyContext)
     inputRef.current?.focus()
+  }
+
+  const handleScratchpad = async (kind: 'note' | 'talk') => {
+    const trimmed = title.trim()
+    if (!trimmed || !onAddToScratchpad) return
+    const ok = await onAddToScratchpad(trimmed, kind)
+    if (ok) {
+      showToast(kind === 'talk' ? 'On the wall to talk about' : 'On the wall’s scratchpad', 'success')
+      handleClose()
+    } else {
+      showToast('Couldn’t reach the wall’s scratchpad — try again', 'error')
+    }
   }
 
   const handleAskSymphony = () => {
@@ -650,6 +666,23 @@ export function QuickCapture({
                   <span className="flex-1 text-left truncate">Ask Symphony to set this up: “{title.trim()}”</span>
                   <kbd className="hidden md:inline px-1.5 py-0.5 bg-white/70 text-primary-500 rounded text-xs font-mono">⌘↵</kbd>
                 </button>
+              )}
+
+              {/* The kitchen wall's scratchpad: a note, or something to talk
+                  about together (Scott, 2026-10-07). */}
+              {onAddToScratchpad && title.trim() && (
+                <div className="flex items-center gap-2 rounded-xl border border-neutral-200 bg-neutral-50 px-4 py-2.5 text-sm text-neutral-600">
+                  <StickyNote className="w-4 h-4 shrink-0 text-primary-600" />
+                  <span className="flex-1 min-w-0">Put on the wall’s scratchpad</span>
+                  <button type="button" onClick={() => void handleScratchpad('note')}
+                    className="touch-target rounded-lg border border-neutral-200 bg-white px-3 py-1.5 font-medium text-neutral-700 hover:bg-neutral-100">
+                    Note
+                  </button>
+                  <button type="button" onClick={() => void handleScratchpad('talk')}
+                    className="touch-target rounded-lg border border-neutral-200 bg-white px-3 py-1.5 font-medium text-neutral-700 hover:bg-neutral-100">
+                    Talk about
+                  </button>
+                </div>
               )}
 
               {/* Buttons */}

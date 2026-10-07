@@ -19,6 +19,7 @@ const base = (o: Partial<WallMomentsProps> = {}): WallMomentsProps => ({
   comingUp: [{ dateKey: '2026-10-9', dayLabel: 'Fri', summary: 'Grandpappa picks up Ella & Kaleb' }],
   kidsNow: [{ member: kids[0], special: 'Library', hint: 'Return her library book.', needed: [], homeworkDue: [], afterSchool: [] }, { member: kids[1], special: 'Art', hint: null, needed: [], homeworkDue: [], afterSchool: [] }],
   focusRows: [], handoffs: [], dinner: null, nextMeal: { label: 'Dinner at 6:30 PM', title: 'Maple-Dijon salmon', imageUrl: null },
+  scratchpad: { rows: [], onOpen: vi.fn() },
   question: { text: 'If our family had a flag, what would be on it?', isHandoff: false },
   checklists: [{ member: kids[0], list: { title: 'Out the door', rows: [{ entityType: 'routine', id: 'r1', title: 'Shoes', done: false, timeOfDay: null, target: null }] } }],
   onTapRow: vi.fn(), onClaim: vi.fn(), onTapQuestion: vi.fn(), onTick: vi.fn(), onOpenKid: vi.fn(),
@@ -39,7 +40,8 @@ describe('WallMoments', () => {
     expect(now.queryByText(/Library today|Art today/)).toBeNull()
     expect(now.queryByText('Kaleb')).toBeNull()
     expect(screen.getByText('If our family had a flag, what would be on it?')).toBeInTheDocument()
-    expect(within(screen.getByRole('region', { name: 'Specials this week' })).getByText('Tue').closest('tr')).toHaveClass('bg-[#243245]')
+    // The Specials box gave its place to the scratchpad (2026-10-07).
+    expect(screen.queryByRole('region', { name: 'Specials this week' })).toBeNull()
   })
 
   it('a kid ticks a step on their list', () => {
@@ -72,7 +74,7 @@ describe('WallMoments', () => {
     expect(screen.getByRole('button', { name: '1 1/4 lb salmon' })).toHaveAttribute('aria-pressed', 'true')
   })
 
-  it('evening: tomorrow’s heads-up, tomorrow’s specials lit', () => {
+  it('evening: tomorrow’s heads-up, with tomorrow’s special on the kid’s card', () => {
     render(<WallMoments {...base({
       moment: 'evening',
       specials: [
@@ -84,7 +86,8 @@ describe('WallMoments', () => {
     })} />)
     expect(screen.getByRole('heading', { name: 'Tomorrow' })).toBeInTheDocument()
     expect(screen.getByText('Bring: library books')).toBeInTheDocument()
-    expect(within(screen.getByRole('region', { name: 'Specials this week' })).getByText('Wed').closest('tr')).toHaveClass('bg-[#243245]')
+    // The Specials box is gone, so tomorrow's special is said here.
+    expect(within(screen.getByRole('region', { name: 'Now' })).getByText('Library tomorrow')).toBeInTheDocument()
     expect(screen.getByText('Sweet potato tacos')).toBeInTheDocument()
   })
 
@@ -130,5 +133,23 @@ describe('WallMoments', () => {
   it('after school with nothing to do says so', () => {
     render(<WallMoments {...base({ moment: 'after' })} />)
     expect(screen.getByText('No homework or practice today.')).toBeInTheDocument()
+  })
+
+  // Scott, 2026-10-07: a scratchpad where the Specials box was.
+  it('the scratchpad shows the newest notes and opens the sheet, at a note or at the input', () => {
+    const onOpen = vi.fn()
+    const rows = ['a', 'b', 'c', 'd', 'e'].map((k) => ({ key: `note:${k}`, text: `Note ${k}`, sub: 'Note', icon: 'note' as const, authorId: null }))
+    rows[0] = { ...rows[0], icon: 'talk' as const, authorId: 'sk', sub: 'Talk about · Scott' }
+    render(<WallMoments {...base({ scratchpad: { rows, onOpen } })} />)
+    const pad = within(screen.getByRole('region', { name: 'Scratchpad' }))
+    expect(pad.getByText('5 open')).toBeInTheDocument()
+    expect(pad.getByText('Note a')).toBeInTheDocument()
+    expect(pad.queryByText('Note d')).toBeNull()
+    fireEvent.click(pad.getByRole('button', { name: /Note b/ }))
+    expect(onOpen).toHaveBeenLastCalledWith('note:b')
+    fireEvent.click(pad.getByRole('button', { name: /Jot a note/ }))
+    expect(onOpen).toHaveBeenLastCalledWith(null)
+    fireEvent.click(pad.getByRole('button', { name: '+ 2 more' }))
+    expect(onOpen).toHaveBeenLastCalledWith(null)
   })
 })
