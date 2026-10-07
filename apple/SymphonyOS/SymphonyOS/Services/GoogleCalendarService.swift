@@ -152,6 +152,9 @@ struct GoogleCalendarEvent: Decodable {
     let googleEventId: String
     let title: String
     let startTime: String
+    /// When it ends — the day column draws it to scale. Nil for an all-day
+    /// event or an older cached payload.
+    let endTime: String?
     let allDay: Bool?
     let location: String?
     /// The series id for a recurring instance — where the "Free" flag lives
@@ -163,6 +166,7 @@ struct GoogleCalendarEvent: Decodable {
         case googleEventId = "google_event_id"
         case title
         case startTime = "start_time"
+        case endTime = "end_time"
         case allDay = "all_day"
         case location
         case recurringEventId = "recurring_event_id"
@@ -182,7 +186,8 @@ struct GoogleCalendarEvent: Decodable {
             entityId: UUID(),          // Google events have no Symphony UUID
             location: location,
             eventKey: googleEventId,
-            recurringEventId: recurringEventId
+            recurringEventId: recurringEventId,
+            endTime: isAllDay ? nil : endTime.flatMap(Self.parseISO)
         )
     }
 

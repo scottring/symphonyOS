@@ -3,9 +3,10 @@ import SwiftData
 import UserNotifications
 
 /// The Planner's Today: the displayed date's untimed work ("For today"), the
-/// way into this week's shelf ("Choose from this week"), then the timed
-/// schedule. Unfinished work is one calm line to review deliberately —
-/// nothing carries forward on its own.
+/// way into this week's shelf ("Choose from this week"), tonight's dinner,
+/// then the day drawn to scale ("The day", as on the web since 2026-10-06).
+/// Unfinished work is one calm line to review deliberately — nothing carries
+/// forward on its own.
 struct TodayView: View {
     /// Opens the horizon switcher (the title is its button).
     var onTitle: () -> Void = {}
@@ -20,6 +21,9 @@ struct TodayView: View {
     @State private var searchText = ""
     @State private var showChooser = false
     @State private var showUnfinished = false
+    /// A thing tapped on the day column, opened in its details.
+    @State private var opened: TimelineItem?
+    @Query private var familyMembers: [FamilyMember]
     @FocusState private var searchFocused: Bool
     @Environment(\.dynamicTypeSize) private var typeSize
 
@@ -98,13 +102,13 @@ struct TodayView: View {
                             .padding(.vertical, 3)
                     }
 
-                    ForEach(TimelineViewModel.TimeSection.allCases, id: \.self) { section in
-                        let items = viewModel.schedule.filter { viewModel.section(for: $0) == section }
-                        if !items.isEmpty {
-                            Eyebrow(text: section.rawValue)
-                            ForEach(items) { item in card(item) }
-                        }
-                    }
+                    // The day, to scale — every timed thing where it falls,
+                    // free time named. Always drawn: an empty day says so.
+                    Eyebrow(text: "The day")
+                    TodayDayColumn(items: viewModel.schedule, isToday: appState.isToday,
+                                   members: familyMembers) { opened = $0 }
+                        .padding(.horizontal, 16)
+                        .padding(.top, 6)
 
                     // First visit to a day: say the calendar is coming instead
                     // of showing an empty schedule that then fills in.
@@ -113,11 +117,6 @@ struct TodayView: View {
                         CalendarLoadingRow()
                             .padding(.horizontal, 20)
                             .padding(.top, 18)
-                    }
-
-                    if viewModel.timelineItems.isEmpty && viewModel.carriedOverTasks.isEmpty
-                        && offerTasks + offerRoutines == 0 && !eventsPending && dinner == nil {
-                        emptyState.padding(.top, 60).frame(maxWidth: .infinity)
                     }
                 }
             }
@@ -146,6 +145,7 @@ struct TodayView: View {
                 .presentationDetents([.large])
                 .presentationDragIndicator(.visible)
         }
+        .sheet(item: $opened) { item in openedDetail(item) }
         .sheet(isPresented: $showUnfinished) {
             UnfinishedSheet(tasks: viewModel.carriedOverTasks)
                 .presentationDetents(typeSize.isAccessibilitySize ? [.large] : [.medium, .large])
@@ -167,6 +167,37 @@ struct TodayView: View {
         .onChange(of: focusRows.count) { _, _ in rebuildTimeline() }
         .onChange(of: eventNotesRevision) { _, _ in rebuildTimeline() }
         .onChange(of: eventsRevision) { _, _ in rebuildTimeline() }
+    }
+
+    /// What a tap on the day column opens: a task's details, an event's, or
+    /// the routine occurrence (Done / Move / Skip / Edit routine).
+    @ViewBuilder
+    private func openedDetail(_ item: TimelineItem) -> some View {
+        switch item.type {
+        case .task:
+            if let task = allTasks.first(where: { $0.id == item.entityId }) {
+                NavigationStack {
+                    TaskDetailView(task: task)
+                        .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { opened = nil } } }
+                }
+                .presentationDetents([.large, .medium])
+            }
+        case .routine:
+            if let routine = routines.first(where: { $0.id == item.entityId }) {
+                RoutineOccurrenceSheet(routine: routine, date: date, completed: item.completed)
+                    .presentationDetents([.medium, .large])
+            }
+        case .event:
+            if let key = item.eventKey {
+                NavigationStack {
+                    EventDetailView(googleEventId: key, eventTitle: item.title, eventStart: item.startTime,
+                                    eventLocation: item.location, recurringEventId: item.recurringEventId,
+                                    date: date, userId: userId)
+                        .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { opened = nil } } }
+                }
+                .presentationDetents([.large, .medium])
+            }
+        }
     }
 
     private func card(_ item: TimelineItem) -> some View {
@@ -282,30 +313,6 @@ struct TodayView: View {
                     .padding(.horizontal, 16)
                     .padding(.vertical, 3)
             }
-        }
-    }
-
-    // MARK: - Empty State
-
-    private var emptyState: some View {
-        VStack(spacing: 16) {
-            RoundedRectangle(cornerRadius: 16)
-                .fill(Color.bgSurface)
-                .frame(width: 64, height: 64)
-                .overlay(
-                    Image(systemName: "sun.max")
-                        .font(.system(size: 28))
-                        .foregroundStyle(Color.textTertiary)
-                )
-                .accessibilityHidden(true)
-
-            Text("Your day is clear")
-                .font(.displayMedium)
-                .foregroundStyle(Color.textSecondary)
-
-            Text("Add a task below to get started")
-                .font(.bodySmall)
-                .foregroundStyle(Color.textTertiary)
         }
     }
 

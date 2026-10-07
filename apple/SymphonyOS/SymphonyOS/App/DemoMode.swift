@@ -46,16 +46,20 @@ enum DemoMode {
         let cal = PlanCalendar.calendar
         let day = PlanCalendar.day(date)
         let weekday = cal.component(.weekday, from: day)   // 1 Sun … 7 Sat
-        func event(_ title: String, _ h: Int, _ m: Int) -> TimelineItem {
-            TimelineItem(id: "demo-\(title)-\(PlanCalendar.ymd(day))", type: .event, title: title,
-                         startTime: cal.date(bySettingHour: h, minute: m, second: 0, of: day),
-                         isAllDay: false, completed: false, context: nil, entityId: UUID(),
-                         eventKey: "demo-\(title)-\(PlanCalendar.ymd(day))")
+        func event(_ title: String, _ h: Int, _ m: Int, minutes: Int = 30) -> TimelineItem {
+            let start = cal.date(bySettingHour: h, minute: m, second: 0, of: day)
+            return TimelineItem(id: "demo-\(title)-\(PlanCalendar.ymd(day))", type: .event, title: title,
+                                startTime: start,
+                                isAllDay: false, completed: false, context: nil, entityId: UUID(),
+                                eventKey: "demo-\(title)-\(PlanCalendar.ymd(day))",
+                                endTime: start?.addingTimeInterval(Double(minutes) * 60))
         }
         var out: [TimelineItem] = []
-        if (2...6).contains(weekday) { out.append(event("School drop-off", 8, 0)) }
-        if weekday == 2 { out.append(event("Dentist — Mia", 15, 30)) }
-        if weekday == 7 { out.append(event("Soccer — Liam", 9, 0)) }
+        if (2...6).contains(weekday) { out.append(event("School drop-off", 8, 0, minutes: 20)) }
+        if (2...6).contains(weekday) { out.append(event("Boxing", 9, 0, minutes: 75)) }
+        if (2...6).contains(weekday) { out.append(event("Marta", 9, 30, minutes: 120)) }
+        if weekday == 2 { out.append(event("Dentist — Mia", 15, 30, minutes: 45)) }
+        if weekday == 7 { out.append(event("Soccer — Liam", 9, 0, minutes: 90)) }
         return out
     }
 

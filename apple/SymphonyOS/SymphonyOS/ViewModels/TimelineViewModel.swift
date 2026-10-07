@@ -17,14 +17,6 @@ final class TimelineViewModel {
     /// different work. Two days covers a weekend of slippage.
     static let graceDays = 2
 
-    // Order mirrors the web app's section order (all-day first, then by time of day).
-    enum TimeSection: String, CaseIterable {
-        case allDay = "All Day"
-        case morning = "Morning"
-        case afternoon = "Afternoon"
-        case evening = "Evening"
-    }
-
     /// Untimed work for the day: all-day/untimed tasks, tasks I chose for it,
     /// and chosen or pinned untimed routine occurrences. Chosen first.
     var forToday: [TimelineItem] {
@@ -136,7 +128,8 @@ final class TimelineViewModel {
                 completed: instanceStatus == "completed" || instanceStatus == "skipped",
                 context: routine.context,
                 entityId: routine.id,
-                assignedTo: routine.assignedTo.map { [$0] } ?? [],
+                // Everyone who carries it, as the web's avatars show.
+                assignedTo: routine.assignedToAll ?? (routine.assignedTo.map { [$0] } ?? []),
                 isFocused: plan.isChosen(routine, on: date)
             ))
         }
@@ -197,15 +190,6 @@ final class TimelineViewModel {
         return nil
     }
 
-    func section(for item: TimelineItem) -> TimeSection {
-        guard !item.isAllDay else { return .allDay }
-        guard let time = item.startTime else { return .morning }
-        let hour = Calendar.current.component(.hour, from: time)
-        if hour < 12 { return .morning }
-        if hour < 18 { return .afternoon }   // web uses an 18:00 afternoon/evening cutoff
-        return .evening
-    }
-
     /// True when a routine effectively recurs every weekday (>=5×/week):
     /// `daily`, or `weekly`/`specific_days` whose days cover all of Mon–Fri.
     /// Ported from the web app's `isEverydayRoutine` (lib/routineUtils.ts).
@@ -261,6 +245,9 @@ struct TimelineItem: Identifiable {
     /// Waiting on someone else (web #115) — and on what, in your words.
     var isWaiting: Bool = false
     var waitingFor: String? = nil
+    /// When a calendar event ends, for the day drawn to scale. Tasks and
+    /// routines have none (they take half an hour there, as on the web).
+    var endTime: Date? = nil
 
     enum ItemType: String {
         case task
