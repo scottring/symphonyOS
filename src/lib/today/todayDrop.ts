@@ -20,6 +20,8 @@ import { wasWritten } from '@/hooks/useGatedTaskActions'
  *   today-row-<itemId>          → GROUP with that item
  *   today-scale                 → the day drawn to scale: give it the TIME
  *                                 it was dropped at (`scaleTime`)
+ *   today-for-today             → For today: a timed task gives up its time
+ *                                 and stays on the day
  *
  * A row cannot mean both "reorder here" and "group with me", so the gap decides.
  * The alternative — hovering a row for ~600ms to switch modes — needs a timer,
@@ -31,6 +33,8 @@ export const GAP_PREFIX = 'today-gap-'
 export const ROW_PREFIX = 'today-row-'
 /** The day column (TodayDayScale): a drop there sets the time it landed at. */
 export const SCALE_DROP_ID = 'today-scale'
+/** For today, beside the day: a timed task dropped here keeps the day, loses the time. */
+export const FOR_TODAY_DROP_ID = 'today-for-today'
 
 /**
  * The name a drag-created group starts with. It is a placeholder, not a guess:
@@ -221,6 +225,8 @@ function parseGap(overId: string): { section: DaySection; index: number } | null
 }
 
 const TIMED = new Set<DaySection>(DAY_SECTION_BOUNDS.map((b) => b.section))
+/** For today's sections: the day's work with no time. */
+const UNTIMED = new Set<DaySection>(['allday', 'unscheduled'])
 
 /** Resolve one drop into the writes it implies. An empty array means do nothing. */
 export function resolveDrop(ctx: DropContext): DropIntent[] {
@@ -241,6 +247,21 @@ export function resolveDrop(ctx: DropContext): DropIntent[] {
     // Dropped back where it already starts: nothing to write.
     if (active.startTime && !active.allDay && active.startTime.getTime() === ctx.scaleTime.getTime()) return []
     return [...leavingGroup, { kind: 'set-time', itemId: active.id, when: ctx.scaleTime }]
+  }
+
+  // ── For today: back off the clock ───────────────────────────────────────
+  // Dropped on For today — or on one of its rows, which from the day column
+  // means the list, not "group with this" (Scott, 2026-10-07).
+  const activeSection = sectionOf(ctx.sections, active.id)
+  const fromTheDay = !!activeSection && TIMED.has(activeSection)
+  const onForTodayRow = ctx.overId.startsWith(ROW_PREFIX) &&
+    UNTIMED.has(sectionOf(ctx.sections, ctx.overId.slice(ROW_PREFIX.length)) ?? 'morning')
+  if (ctx.overId === FOR_TODAY_DROP_ID || (fromTheDay && onForTodayRow)) {
+    if (!fromTheDay) return []
+    if (active.type !== 'task') {
+      return [{ kind: 'refuse', reason: 'Only a task goes back to For today — open it to change its time.' }]
+    }
+    return [...leavingGroup, { kind: 'make-all-day', itemId: active.id }]
   }
 
   // ── Band: give it a time ────────────────────────────────────────────────

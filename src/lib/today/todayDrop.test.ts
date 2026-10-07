@@ -4,7 +4,7 @@ import { emptySections } from '@/lib/today/types'
 import {
   resolveDrop, refusalFor, computeBandDropTime,
   bandDropId, gapDropId, rowDropId, NEW_GROUP_NAME,
-  writeMoveAndRegisterUndo, SCALE_DROP_ID,
+  writeMoveAndRegisterUndo, SCALE_DROP_ID, FOR_TODAY_DROP_ID,
   type DropContext,
 } from './todayDrop'
 
@@ -610,5 +610,36 @@ describe('resolveDrop — the day, to scale', () => {
     sections.morning = [item({ id: 'event-e', type: 'event', startTime: new Date(2026, 6, 25, 9) })]
     const out = resolveDrop(ctx({ activeId: 'event-e', overId: SCALE_DROP_ID, sections, scaleTime: at, isReadOnlyEvent: () => true }))
     expect(out[0].kind).toBe('refuse')
+  })
+})
+
+// Scott, 2026-10-07: a task on the day drags back into For today.
+describe('resolveDrop — back to For today', () => {
+  const timedTask = item({ id: 'task-a', startTime: new Date(2026, 6, 25, 14, 30) })
+  const listed = item({ id: 'task-b', allDay: true })
+
+  it('takes a timed task off the clock, keeping the day', () => {
+    const sections = emptySections<TimelineItem>()
+    sections.afternoon = [timedTask]
+    expect(resolveDrop(ctx({ overId: FOR_TODAY_DROP_ID, sections }))).toEqual([{ kind: 'make-all-day', itemId: 'task-a' }])
+  })
+
+  it('reads a drop on one of For today’s rows as the list, not as "group with this"', () => {
+    const sections = emptySections<TimelineItem>()
+    sections.afternoon = [timedTask]
+    sections.allday = [listed]
+    expect(resolveDrop(ctx({ overId: rowDropId('task-b'), sections }))).toEqual([{ kind: 'make-all-day', itemId: 'task-a' }])
+  })
+
+  it('still groups two rows dragged within For today', () => {
+    const sections = emptySections<TimelineItem>()
+    sections.allday = [item({ id: 'task-a', allDay: true }), listed]
+    expect(resolveDrop(ctx({ overId: rowDropId('task-b'), sections }))[0].kind).toBe('create-group')
+  })
+
+  it('says why an event or routine stays on the clock', () => {
+    const sections = emptySections<TimelineItem>()
+    sections.morning = [item({ id: 'event-e', type: 'event', startTime: new Date(2026, 6, 25, 9) })]
+    expect(resolveDrop(ctx({ activeId: 'event-e', overId: FOR_TODAY_DROP_ID, sections }))[0].kind).toBe('refuse')
   })
 })
