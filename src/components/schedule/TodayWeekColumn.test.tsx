@@ -27,4 +27,13 @@ describe('TodayWeekColumn', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Complete Call the bank' }))
     expect(complete).toHaveBeenCalledWith(entry)
   })
+
+  // Review, 2026-10-07: the week competes with the day once you're working.
+  it('folds itself away from its own header, and says what the check does', () => {
+    const onHide = vi.fn()
+    render(<MemoryRouter><TodayWeekColumn plan={plan} day={day} weekNo={41} weekStart={day} actions={{ choose: vi.fn() } as never} onHide={onHide} /></MemoryRouter>)
+    fireEvent.click(screen.getByRole('button', { name: 'Hide week 41' }))
+    expect(onHide).toHaveBeenCalled()
+    expect(screen.getByRole('button', { name: 'Complete Call the bank' })).toHaveAttribute('title', 'Mark done')
+  })
 })

@@ -20,6 +20,19 @@ describe('buildDayScale', () => {
     expect(s.now).toBeCloseTo((10 / 60) * 48)
   })
 
+  it('hides the earlier hours: opens at fromHour, drops what ended, clips what runs across it', () => {
+    const s = buildDayScale([
+      { id: 'breakfast', start: at(8), end: at(9) },
+      { id: 'workshop', start: at(14), end: at(16) },
+      { id: 'shower', start: at(16, 30) },
+    ], { now: at(16, 14), fromHour: 15 })
+    expect(s.startHour).toBe(15)
+    expect(s.blocks.map((b) => b.id)).toEqual(['workshop', 'shower'])
+    expect(s.blocks[0]).toMatchObject({ top: 0, height: 48 })
+    expect(s.ticks[0].label).toBe('3p')
+    expect(s.now).toBeCloseTo((1 + 14 / 60) * 48)
+  })
+
   it('puts two meetings that overlap side by side (Boxing 9–10:15, Marta 9:30–11:30)', () => {
     const s = buildDayScale([
       { id: 'boxing', start: at(9), end: at(10, 15) },

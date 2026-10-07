@@ -10,6 +10,7 @@
 // 2026-10-02, #24/#18: a plan made for next week was nowhere on Today). Its
 // rows are for reading — a details click, never "+ Today".
 import { useNavigate } from 'react-router-dom'
+import { Check, PanelRightClose } from 'lucide-react'
 import type { DayPlan, DayPlanEntry } from '@/lib/today/dayPlan'
 import { alreadyPlaced } from '@/lib/today/dayPlan'
 import type { DayPlanPanelActions } from '@/components/reference/DayPlanPanel'
@@ -18,7 +19,7 @@ import { writePlanDrag } from '@/lib/planning/planDrag'
 
 export interface TodayNextWeek { weekNo: number; weekStart: Date; entries: DayPlanEntry[] }
 
-export function TodayWeekColumn({ plan, day, weekNo, weekStart, actions, nextWeek }: {
+export function TodayWeekColumn({ plan, day, weekNo, weekStart, actions, nextWeek, onHide }: {
   plan: DayPlan
   day: Date
   weekNo: number
@@ -26,6 +27,9 @@ export function TodayWeekColumn({ plan, day, weekNo, weekStart, actions, nextWee
   actions: DayPlanPanelActions
   /** Next week's open list — passed only on the week's last day. */
   nextWeek?: TodayNextWeek | null
+  /** Folds the column away once the day is chosen (the header's view icons
+   *  bring it back). */
+  onHide?: () => void
 }) {
   const navigate = useNavigate()
   const tasks = plan.chooserTasks.filter((e) => !e.completed && !alreadyPlaced(e, day))
@@ -49,13 +53,17 @@ export function TodayWeekColumn({ plan, day, weekNo, weekStart, actions, nextWee
       {/* Done from here too (Scott, 2026-10-07): a week task finished without
           first choosing it for today. Same check, and the same writer (with
           Undo), as the Shelves chooser's. */}
-      <button type="button" aria-label={`Complete ${e.title}`} onClick={() => actions.complete(e)}
-        className="today-ref-check mt-[3px] flex h-6 w-6 shrink-0 items-center justify-center text-primary-700">
-        <span className="h-4 w-4 shrink-0 rounded-full border border-neutral-400 transition-colors hover:border-primary-600 hover:bg-primary-50" aria-hidden="true" />
+      {/* Two different verbs, drawn differently (review, 2026-10-07: the
+          circle and "+ Today" read as two ways to select): the circle is a
+          check that shows its tick on hover and says "Mark done"; "+ Today"
+          is a button. */}
+      <button type="button" aria-label={`Complete ${e.title}`} title="Mark done" onClick={() => actions.complete(e)}
+        className="today-ref-check mt-[3px] flex h-6 w-6 shrink-0 items-center justify-center">
+        <span className="today-ref-check-ring" aria-hidden="true"><Check size={11} strokeWidth={3} /></span>
       </button>
       {title(e)}
       <span className="pv2-refacts">
-        <button type="button" className="pv2-addbtn" onClick={() => toToday(e)} aria-label={`Add ${e.title} to today`}>+ Today</button>
+        <button type="button" className="pv2-addbtn today-ref-add" onClick={() => toToday(e)} aria-label={`Add ${e.title} to today`}><span>+ Today</span></button>
       </span>
     </li>
   )
@@ -67,7 +75,14 @@ export function TodayWeekColumn({ plan, day, weekNo, weekStart, actions, nextWee
   )
   return (
     <section className="pv2-ref today-ref" aria-label={`Week ${weekNo}, for reference`}>
-      <div className="pv2-colh">Week {weekNo} <small>(for reference)</small></div>
+      <div className="pv2-colh">
+        Week {weekNo} <small>(for reference)</small>
+        {onHide && (
+          <button type="button" className="today-ref-hide" onClick={onHide} aria-label={`Hide week ${weekNo}`} title={`Hide week ${weekNo}`}>
+            <PanelRightClose size={16} aria-hidden="true" />
+          </button>
+        )}
+      </div>
       {tasks.length ? <ul className="pv2-list">{tasks.map(row)}</ul> : <p className="pv2-hint">Nothing still to place this week.</p>}
       {routines.length > 0 && (
         <>

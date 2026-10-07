@@ -2124,6 +2124,18 @@ html.desktop-shell a {
 .today-scale-landing { position: absolute; left: var(--scale-gutter); right: 0; border-top: 2px dashed var(--color-primary-500); z-index: 4; pointer-events: none; }
 .today-scale-landing > span { position: absolute; left: 4px; top: -20px; padding: 1px 6px; border-radius: 6px; background: var(--color-primary-600); color: #fff; font-size: 11px; font-weight: 600; }
 .today-ref-row[draggable="true"] { cursor: grab; }
+/* The week column's check: a ring whose tick shows on hover — done, not
+   "select" — and "+ Today" a bordered button beside it. */
+.today-ref-check-ring { display: inline-grid; place-items: center; width: 16px; height: 16px; border-radius: 50%; border: 1.5px solid var(--color-neutral-400); color: transparent; transition: border-color .15s, background-color .15s, color .15s; }
+.today-ref-check:hover .today-ref-check-ring, .today-ref-check:focus-visible .today-ref-check-ring { border-color: var(--color-primary-600); background: var(--color-primary-600); color: #fff; }
+/* The outline is on the label, so a phone's taller touch target keeps it a
+   small pill. */
+.today-ref-add > span { display: inline-block; padding: 2px 8px; border: 1px solid color-mix(in srgb, var(--color-primary-600) 35%, transparent); border-radius: 999px; background: var(--color-bg-elevated); font-weight: 500; line-height: 1.35; }
+.today-ref-add:hover > span { border-color: var(--color-primary-600); background: var(--color-primary-50); }
+.today-ref-hide { display: inline-grid; place-items: center; width: 26px; height: 26px; margin-left: 4px; border-radius: 6px; color: var(--color-neutral-500); align-self: center; }
+.today-ref-hide:hover { color: var(--color-neutral-900); background: var(--color-neutral-100); }
+.today-scale-toggle { font-size: 12.5px; color: var(--color-neutral-600); font-family: var(--font-family-sans); }
+.today-scale-toggle:hover { color: var(--color-primary-700); text-decoration: underline; text-underline-offset: 2px; }
 .today-for-today-over { outline: 2px dashed var(--color-primary-300); outline-offset: 6px; border-radius: 6px; }
 .today-scale-note { margin: 10px 0 0; font-size: 13px; color: var(--color-neutral-500); }
 /* A row from the Today pin hovering over Today's agenda: drop to choose it. */
@@ -2843,9 +2855,15 @@ div.chooser-action-group { overflow: visible !important; }
 [data-scenery-lighting] {
   --scenery-sky: linear-gradient(to bottom, var(--sky-top), var(--sky-mid) 45%, var(--sky-low) 78%);
   --scenery-sky-layers:
+    linear-gradient(var(--scenery-reading), var(--scenery-reading)),
     radial-gradient(ellipse 64% 72% at 50% 24%, var(--scenery-wash), var(--scenery-wash) 42%, transparent 100%),
     var(--scenery-sky);
+  --scenery-reading: transparent;
 }
+/* The reading area by day and at dusk is nearly white (review, 2026-10-07:
+   the tinted sky cut contrast, worst in the week list); the sky keeps only a
+   hint of the place's hue and the landscape carries the colour. */
+:is([data-scenery-lighting='daytime'], [data-scenery-lighting='dusk-dawn']) { --scenery-reading: rgb(255 255 255 / 0.72); }
 [data-scenery-lighting='daytime'] {
   --sky-top: hsl(var(--sky-h) calc(var(--sky-s) * 1.15) 82%);
   --sky-mid: hsl(var(--sky-h) calc(var(--sky-s) * 0.9) 88%);
@@ -2976,12 +2994,17 @@ div.chooser-action-group { overflow: visible !important; }
   mask-composite: intersect;
 }
 .place-scenery-catch { position: absolute; left: 0; right: 0; bottom: 0; pointer-events: auto; }
-/* A short desktop window (PlaceScenery's FAINT_SCENERY_QUERY): the scene
-   stands faint BEHIND the page, so content runs to the bottom of the window
-   and every row there can be clicked. The sky's own layer isolates, so the
-   scene paints over the sky and under the page. */
-.scenery-sky:has(.place-scenery.is-faint) { isolation: isolate; }
-.place-scenery.is-faint { z-index: -1; opacity: .1; }
+/* Faint (the default, and any short desktop window — PlaceScenery's
+   FAINT_SCENERY_QUERY): the scene stands at the END of the page, below the
+   content rather than behind it (review, 2026-10-07: "Coming up" and the week
+   list faded into the art). The scroller becomes a column so a short page
+   still sets the scene on the window's bottom edge; a long one scrolls to it. */
+.scenery-scroll:has(> .place-scenery.is-faint) { display: flex; flex-direction: column; }
+.scenery-scroll:has(> .place-scenery.is-faint) > * { flex-shrink: 0; }
+/* The page takes the room the scene leaves (its own min-height: 100% would
+   push the scene below the window on every short page). */
+.scenery-scroll:has(> .place-scenery.is-faint) > :is(.desktop-workspace, .scenery-page) { flex-grow: 1; min-height: 0; }
+.place-scenery.is-faint { position: relative; left: auto; bottom: auto; right: auto !important; z-index: 0; margin-top: auto; opacity: .45; }
 .place-scenery.is-faint .place-scenery-veil { display: none; }
 .place-scenery.is-faint .place-scenery-catch { pointer-events: none; }
 

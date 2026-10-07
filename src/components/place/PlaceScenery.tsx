@@ -20,9 +20,9 @@ import { useMediaQuery } from '@/hooks/useMediaQuery'
  * matters: the woodblock veils fade over the same share of their width. */
 const VEIL_FADE = 64
 const ART_WIDTH = 1506
-/** Faint: the scene stands BEHIND the page at a tenth of its strength, takes
- * no pointer and holds back only a small margin, so content runs to the
- * bottom of the window. It is the default (Scott, 2026-10-03: "I may like the
+/** Faint: the scene stands at the END of the page, below the content (never
+ * behind it — review, 2026-10-07), softened, taking no pointer; a short page
+ * still sets it on the window's bottom edge (index.css). It is the default (Scott, 2026-10-03: "I may like the
  * higher transparency, low opacity look better than the default"); a person
  * who chose the full scene still gets faint on a short desktop window (a
  * laptop), where the landscape took a quarter of the height. */

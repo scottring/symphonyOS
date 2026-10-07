@@ -1,6 +1,6 @@
 // The day, to scale (Scott, 2026-10-06, option B): Today's timed day drawn
 // as a column of hours — events and timed work where they fall, the free
-// stretches named in green, a "now" line. It replaces the Schedule list, so
+// stretches named, a "now" line. It replaces the Schedule list, so
 // it is the one picture of the day, not a second one above a list.
 //
 // Pure: positions in px from the top of the column. Hours are decimals
@@ -81,20 +81,24 @@ export function timeAtOffset(scale: Pick<DayScale, 'startHour' | 'endHour' | 'px
 
 export function buildDayScale(
   items: ScaleInput[],
-  opts: { now?: Date | null; pxPerHour?: number } = {},
+  /** fromHour: "Hide earlier hours" — the column opens at this hour; what
+   *  ended before it is left off, and what runs across it starts there. */
+  opts: { now?: Date | null; pxPerHour?: number; fromHour?: number | null } = {},
 ): DayScale {
   const pph = opts.pxPerHour ?? 48
-  const spans = items.map((i) => {
+  const from0 = opts.fromHour ?? null
+  const spans = items.flatMap((i) => {
     const s = hourOf(i.start)
     const rawEnd = i.end ? hourOf(i.end) : s + DEFAULT_MINUTES / 60
     // An end on the next day (or before the start) runs to midnight.
-    const e = i.end && (i.end.getDate() !== i.start.getDate() || rawEnd <= s) ? 24 : rawEnd
-    return { id: i.id, s, e: Math.max(e, s + 0.25) }
+    const e = Math.max(i.end && (i.end.getDate() !== i.start.getDate() || rawEnd <= s) ? 24 : rawEnd, s + 0.25)
+    if (from0 !== null && e <= from0) return []
+    return [{ id: i.id, s: from0 !== null ? Math.max(s, from0) : s, e }]
   })
   const nowH = opts.now ? hourOf(opts.now) : null
 
   // The column runs 7a–9p, stretched to hold everything on it and the now line.
-  let startHour = DEFAULT_START
+  let startHour = from0 ?? DEFAULT_START
   let endHour = DEFAULT_END
   for (const sp of spans) {
     startHour = Math.min(startHour, Math.floor(sp.s))
