@@ -71,6 +71,8 @@ await import('./index.css')
 // The layout system's shared shapes, after index.css so they settle it
 // (docs/design-system/LAYOUT-SYSTEM.md).
 await import('./styles/layout-system.css')
+// The card language: one task anatomy on every page (src/styles/cards.css).
+await import('./styles/cards.css')
 
 // Apply the cached place theme before first paint so there's no color flash;
 // PlaceProvider owns it (and syncs with the DB) once React mounts.

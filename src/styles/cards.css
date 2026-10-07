@@ -1,0 +1,89 @@
+/* ── The card language (Scott, 2026-10-07; design "B", approved on the canvas
+   "Web Today in the iOS style") ─────────────────────────────────────────────
+   One task anatomy on every page, in two sizes:
+     card  For today, Inbox — a white card, serif title, a note preview, the
+           46px icon tile that is also the check
+     row   Week, the period lists — the same order, a 26px tile, no note
+   Shared here: the tile, the card, the tag, the free-time pill and the two
+   button kinds. Each page's own layout lives in its own sheet. Night versions
+   at the bottom, under the scenery's nighttime lighting. */
+
+:root {
+  --sym-card-bg: rgb(255 255 255 / .94);
+  --sym-card-border: #E8E0D8;
+  --sym-card-shadow: 0 6px 20px rgb(30 40 60 / .10);
+  --sym-tile-bg: #F5EFE7;
+  --sym-tile-fg: #9A6B3A;
+  --sym-tile-ring: #E3D7C9;
+  --sym-tile-done-bg: #D1FAE5;
+  --sym-tile-done-fg: #047857;
+  --sym-tile-event-bg: #E3ECF8;
+  --sym-tile-event-fg: #3F5E96;
+  --sym-title: #2C2520;
+  --sym-note: #6B5E54;
+  --sym-tag-bg: #FEF3C7;
+  --sym-tag-fg: #B45309;
+  --sym-free-bg: rgb(255 255 255 / .55);
+  --sym-free-border: rgb(154 107 58 / .35);
+  --sym-free-fg: #7a5a32;
+}
+
+.sym-tile {
+  display: inline-grid; place-items: center; flex: none; border: 0; padding: 0;
+  background: var(--sym-tile-bg); color: var(--sym-tile-fg);
+  box-shadow: inset 0 0 0 1.5px var(--sym-tile-ring);
+  transition: background-color .15s, color .15s, transform .1s;
+}
+button.sym-tile { cursor: pointer; }
+button.sym-tile:hover { filter: brightness(.97); }
+button.sym-tile:active { transform: scale(.94); }
+button.sym-tile:focus-visible { outline: 2px solid var(--color-primary-500); outline-offset: 2px; }
+.sym-tile-card { width: 46px; height: 46px; border-radius: 12px; }
+.sym-tile-row { width: 26px; height: 26px; border-radius: 8px; }
+.sym-tile.is-done { background: var(--sym-tile-done-bg); color: var(--sym-tile-done-fg); box-shadow: none; }
+.sym-tile.is-event { background: var(--sym-tile-event-bg); color: var(--sym-tile-event-fg); box-shadow: none; }
+
+.sym-card {
+  background: var(--sym-card-bg); border: 1px solid var(--sym-card-border);
+  border-radius: 16px; box-shadow: var(--sym-card-shadow);
+}
+.sym-card-title { font-family: var(--font-family-display); font-weight: 600; font-size: 21px; line-height: 1.25; color: var(--sym-title); }
+.sym-card-note {
+  font-family: var(--font-family-display); font-style: italic; font-size: 16px; line-height: 1.4; color: var(--sym-note);
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+.sym-tag { display: inline-flex; align-items: center; border-radius: 8px; padding: 3px 10px; font-size: 12.5px; font-weight: 500; white-space: nowrap; background: var(--sym-tag-bg); color: var(--sym-tag-fg); }
+.sym-free {
+  display: inline-flex; align-items: center; gap: 6px; border-radius: 999px; padding: 4px 12px;
+  background: var(--sym-free-bg); border: 1px dashed var(--sym-free-border);
+  font-family: var(--font-family-display); font-style: italic; font-size: 14px; color: var(--sym-free-fg);
+}
+.sym-btn {
+  display: inline-flex; align-items: center; gap: 8px; border-radius: 12px; padding: 9px 16px;
+  font-size: 14px; font-weight: 500; cursor: pointer;
+  border: 1px solid var(--sym-card-border); background: var(--sym-card-bg); color: var(--sym-title);
+}
+.sym-btn:hover { filter: brightness(.98); }
+.sym-btn-primary { background: var(--sym-title); border-color: var(--sym-title); color: #fff; }
+
+/* At night the scenery's tokens flip the neutrals; the card language follows. */
+[data-scenery-lighting='nighttime'] .scenery-page {
+  --sym-card-bg: rgb(24 33 45 / .94);
+  --sym-card-border: hsl(215 16% 27%);
+  --sym-card-shadow: 0 6px 24px rgb(0 0 0 / .35);
+  --sym-tile-bg: hsl(215 22% 22%);
+  --sym-tile-fg: #E9C38A;
+  --sym-tile-ring: hsl(215 18% 32%);
+  --sym-tile-done-bg: #1d3a2b;
+  --sym-tile-done-fg: #9fd8b5;
+  --sym-tile-event-bg: hsl(214 32% 24%);
+  --sym-tile-event-fg: #b9cdf0;
+  --sym-title: #EEF2F6;
+  --sym-note: #AEBACA;
+  --sym-tag-bg: #3a2c12;
+  --sym-tag-fg: #FFD894;
+  --sym-free-bg: rgb(255 255 255 / .06);
+  --sym-free-border: rgb(255 255 255 / .14);
+  --sym-free-fg: #E9C38A;
+}
+[data-scenery-lighting='nighttime'] .scenery-page .sym-btn-primary { background: #EEF2F6; border-color: #EEF2F6; color: #18212d; }
