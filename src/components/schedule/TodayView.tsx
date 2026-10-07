@@ -71,6 +71,8 @@ import { TodaySectionList, findTimelineItem } from './TodaySectionList'
 import { TodayDragProvider } from './TodayDragProvider'
 import { TodayDayScale, type DayScaleHandle } from './TodayDayScale'
 import { ForTodayDropZone } from './TodayDropZones'
+import { TodayDinnerCard, type TodayDinner } from './TodayDinnerCard'
+import '@/styles/cards-today.css'
 import { resolveDrop, writeMoveAndRegisterUndo, SCALE_DROP_ID, type DropIntent } from '@/lib/today/todayDrop'
 import { useCalendarPermissions } from '@/hooks/useCalendarPermissions'
 import { selectUpNext, formatUpNextStatus } from '@/lib/today/upNext'
@@ -151,6 +153,8 @@ interface TodayViewProps {
   tasksLoadFailed?: boolean
   /** Reload the tasks (the tasks hook's refetch). */
   onRetryTasks?: () => void
+  /** Tonight's planned dinner (Today's dinner card), or null. */
+  dinner?: TodayDinner | null
   viewedDate: Date
   onDateChange: (date: Date) => void
   // Undo-wrapped handlers from HomeView
@@ -214,6 +218,7 @@ export function TodayView({
   loading,
   tasksLoadFailed = false,
   onRetryTasks,
+  dinner = null,
   viewedDate,
   onDateChange,
   selectedAssignees,
@@ -1629,6 +1634,7 @@ export function TodayView({
                   grouped={focusWork.active}
                   dropTargets={false}
                   anytimeHeader={false}
+                  look="card"
                 />
                 {focusRoutinesOnly && <div className="today-subhead">Routines today</div>}
                 <TodaySectionList
@@ -1637,6 +1643,7 @@ export function TodayView({
                   grouped={focusWork.active}
                   dropTargets={false}
                   anytimeHeader={false}
+                  look="card"
                 />
                 {!isMobile && <p className="today-drag-hint">Drag a task onto the day to give it a time.</p>}
               </>
@@ -1675,8 +1682,11 @@ export function TodayView({
               <button type="button" aria-expanded={completedOpen} onClick={() => setCompletedOpenDay(completedOpen ? null : localYmd(viewedDate))}>
                 {completedOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}Completed · {focusWork.completedCount}
               </button>
-              {completedOpen && <TodaySectionList {...listProps} sectionsOrder={FOCUS_SECTIONS} grouped={focusWork.completed} anytimeHeader={false} dropTargets={false} />}
+              {completedOpen && <TodaySectionList {...listProps} sectionsOrder={FOCUS_SECTIONS} grouped={focusWork.completed} anytimeHeader={false} dropTargets={false} look="card" />}
             </div>}
+            {/* Dinner tonight — family content, so only where Family shows, and
+                only on today (the plan is tonight's). */}
+            {data.isToday && dinner && layers.has('family') && <TodayDinnerCard dinner={dinner} onOpen={handleSelectItem} />}
           </ForTodayDropZone>
           </section>
 
@@ -1713,6 +1723,8 @@ export function TodayView({
               peopleOf={peopleOf}
               isReadOnlyEvent={isReadOnlyEvent}
               onSelect={handleSelectItem}
+              onToggleTask={onToggleTask}
+              onCompleteRoutine={onCompleteRoutine}
               onPlanDrop={(payload, when) => { void planActions.drop(payload, { type: 'time', when }) }}
               handleRef={scaleRef}
             />

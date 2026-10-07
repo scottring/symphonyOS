@@ -9,6 +9,7 @@ import { dragPointerY } from '@/lib/today/dragPointer'
 import { isPlanDrag, readPlanDrag, type PlanDragPayload } from '@/lib/planning/planDrag'
 import { useTravelTime } from '@/hooks/useTravelTime'
 import { effectiveStartTime, formatTimeLong } from '@/lib/timeUtils'
+import { TaskIconCheck } from '@/components/common/TaskIconCheck'
 
 /**
  * The day, to scale (Scott, 2026-10-06, option B): Today's timed day as a
@@ -64,13 +65,15 @@ interface BlockProps {
   past: boolean
   refused: boolean
   onSelect: (id: string) => void
+  /** Finishes it from the day (its icon tile); absent → the tile is a mark. */
+  onToggle?: () => void
 }
 
 /** Every thing on the day is drawn one way (Scott, 2026-10-07: three styles
- *  side by side "looks stupid"): "9:00–10:15 · Boxing" and who carries it.
- *  No check here — a click opens its details, where it is ticked off or its
- *  time fine-tuned. */
-function ScaleItem({ item, start, end, hasEnd, block, pxPerHour, people, selected, upNext, past, refused, onSelect }: BlockProps) {
+ *  side by side "looks stupid"): its icon tile, "9:00–10:15 · Boxing" and who
+ *  carries it — the card language's row (design B), where the icon is the
+ *  check and an event's is a calendar mark. A click opens its details. */
+function ScaleItem({ item, start, end, hasEnd, block, pxPerHour, people, selected, upNext, past, refused, onSelect, onToggle }: BlockProps) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: item.id, disabled: refused })
   const isEvent = item.type === 'event'
   // How far away it is, drawn above it as the time it takes to get there.
@@ -111,6 +114,12 @@ function ScaleItem({ item, start, end, hasEnd, block, pxPerHour, people, selecte
         ].filter(Boolean).join(' ')}
         style={pos}
       >
+        <TaskIconCheck
+          task={{ title: item.title, type: item.type, category: item.category, phoneNumber: item.phoneNumber, location: item.location, links: item.links, context: item.context }}
+          done={done}
+          size="row"
+          onToggle={onToggle}
+        />
         <button type="button" className="today-scale-open" aria-label={label} onClick={() => onSelect(item.id)}>
           <span className="today-scale-line"><span className="tabular-nums">{time}</span> · <span>{item.title}</span></span>
         </button>
@@ -132,6 +141,8 @@ export function TodayDayScale({
   peopleOf,
   isReadOnlyEvent,
   onSelect,
+  onToggleTask,
+  onCompleteRoutine,
   onPlanDrop,
   handleRef,
 }: {
@@ -147,6 +158,9 @@ export function TodayDayScale({
   isReadOnlyEvent: (item: TimelineItem) => boolean
   /** Opens the thing's details pane, as a row's click does. */
   onSelect: (id: string) => void
+  /** Finish a task or a routine from its tile on the day. */
+  onToggleTask?: (taskId: string) => void
+  onCompleteRoutine?: (routineEntityId: string, completed: boolean) => void
   /** A row dragged in from the week column (native drag), with the time it
    *  was dropped at. */
   onPlanDrop?: (payload: PlanDragPayload, when: Date) => void
@@ -247,6 +261,10 @@ export function TodayDayScale({
         if (!entry) return null
         const { item, start, end, hasEnd } = entry
         const past = nowMs !== null && end.getTime() <= nowMs
+        const toggle = item.isFree ? undefined
+          : item.type === 'task' && onToggleTask ? () => onToggleTask(item.id.replace('task-', ''))
+            : item.type === 'routine' && onCompleteRoutine ? () => onCompleteRoutine(item.id.replace(/^routine-/, ''), !item.completed)
+              : undefined
         return (
           <ScaleItem
             key={b.id}
@@ -262,6 +280,7 @@ export function TodayDayScale({
             past={past}
             refused={!!refusalFor(item, isReadOnlyEvent)}
             onSelect={onSelect}
+            onToggle={toggle}
           />
         )
       })}

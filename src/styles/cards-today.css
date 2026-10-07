@@ -1,0 +1,66 @@
+/* ── Today in the card language (design B, 2026-10-07) ─────────────────────
+   Today's own layout on top of the shared pieces in cards.css: For today's
+   rows become cards (ScheduleItem / RoutineCollectionRow with look="card"),
+   the day column's blocks become small white cards with the row-size tile,
+   and Today's captions are darkened to read over the scenery. */
+
+/* For today: one card per task or routine. */
+.today-card { padding: 14px 16px 14px 14px; margin-bottom: 10px; }
+.today-card:hover { box-shadow: 0 10px 28px rgb(30 40 60 / .14); }
+.today-card.is-selected { outline: 2px solid var(--color-primary-400); outline-offset: 1px; }
+.today-card.is-done { opacity: .7; }
+.today-card > div { gap: 14px; }
+.today-card-mark { width: 46px; flex: none; }
+.today-card .row-title { font-family: var(--font-family-display); font-weight: 600; font-size: 20px; line-height: 1.25; }
+.today-card-note { margin: 4px 0 0; }
+.today-card-shared { align-self: flex-start; margin-top: 2px; flex: none; }
+/* The row's bulk-select box sits inside the card's corner, not off its edge. */
+.today-card > button[aria-pressed]:first-child { left: 4px; top: 6px; transform: none; }
+/* The action rail on a card: who stays in line and takes only its width; the
+   hover-only controls (do-verb, ⋯) float in the bottom-right corner instead
+   of holding ~120px of the title's room open while hidden. */
+.today-card [data-rail-slot]:first-child { width: auto; min-width: 28px; }
+.today-card [data-rail-slot]:empty,
+.today-card [aria-hidden="true"]:empty { display: none; }
+.today-card [data-rail-slot]:nth-child(3),
+.today-card [data-rail-slot]:nth-child(4) {
+  position: absolute; bottom: -6px; background: var(--sym-card-bg); border-radius: 8px;
+}
+/* …with room kept clear for them, so they never sit on text. (Offsets are from
+   the card's inner grid, which is the positioned box.) */
+.today-card > div > .flex-1.min-w-0 { padding-right: 40px; }
+.today-card [data-rail-slot]:nth-child(3) { right: 24px; }
+.today-card [data-rail-slot]:nth-child(4) { right: -8px; }
+/* No timeline spine through cards. */
+.today-card [data-testid="row-spine"] { display: none; }
+
+/* The day column: white blocks with the row-size icon tile, the warm wash for
+   free time, hour labels that read over the sky. */
+.today-scale-item {
+  background: var(--sym-card-bg); border: 1px solid var(--sym-card-border);
+  box-shadow: 0 2px 6px rgb(30 40 60 / .07); padding: 0 8px 0 5px; gap: 8px; align-items: center;
+}
+.today-scale-item .sym-tile-row { width: 22px; height: 22px; border-radius: 7px; }
+.today-scale-item .today-scale-open { padding-top: 0; align-items: center; }
+.today-scale-item .today-scale-people { margin-top: 0; }
+.today-scale-free {
+  background: var(--sym-free-bg); border: 1px dashed var(--sym-free-border); color: var(--sym-free-fg);
+  font-family: var(--font-family-display); font-style: italic; font-weight: 400; font-size: 16px;
+}
+.today-scale-hour > span { background: transparent; color: var(--color-neutral-600); font-weight: 500; }
+
+/* Today's captions over the scenery: 4.5:1 on the faint sky. */
+.today-page .daybook-heading-note,
+.today-page .today-subhead,
+.today-page .today-drag-hint,
+.today-page .today-scale-note,
+.today-page .daybook-masthead .max-w-2xl { color: var(--color-neutral-600); }
+
+/* Dinner tonight, under For today. */
+.today-dinner { display: grid; grid-template-columns: 132px minmax(0, 1fr) auto; gap: 16px; align-items: center; width: 100%; padding: 12px; text-align: left; cursor: pointer; }
+.today-dinner:hover { box-shadow: 0 10px 28px rgb(30 40 60 / .14); }
+.today-dinner-photo { width: 132px; height: 88px; border-radius: 12px; object-fit: cover; display: block; }
+.today-dinner-photo.is-empty { display: grid; place-items: center; background: var(--sym-tile-bg); color: var(--sym-tile-fg); }
+.today-dinner-title { font-family: var(--font-family-display); font-size: 20px; font-weight: 600; line-height: 1.3; color: var(--sym-title); }
+.today-dinner-meta { margin-top: 4px; font-size: 13.5px; color: var(--sym-note); }
+.today-dinner-eyebrow { margin: 22px 0 8px; padding-left: 4px; font-size: 10.5px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: var(--color-neutral-600); }
