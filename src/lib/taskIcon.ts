@@ -22,6 +22,9 @@ const TITLE_RULES: [RegExp, LucideIcon][] = [
   [/\b(call|phone|ring|voicemail)\b/i, Phone],
   [/\b(text|message|whats ?app|dm)\b/i, MessageCircle],
   [/\b(e-?mail|inbox|reply)\b/i, Mail],
+  // A form to sign, a slip to send back: paperwork — not shopping, and not the trip it is for ("sign and
+  // return the field trip form" wore a shopping bag — 2026-10-07).
+  [/\b(sign|signed|permission slip|slip|forms?)\b/i, Folder],
   [/\b(bank|cashier'?s check|deposit|atm|loan|mortgage)\b/i, Landmark],
   [/\b(pay|bill|invoice|venmo|tuition)\b/i, CreditCard],
   [/\b(tax|taxes|receipt|reimburse|budget|financial|finances?)\b/i, Receipt],
@@ -34,9 +37,6 @@ const TITLE_RULES: [RegExp, LucideIcon][] = [
   [/\b(winter break|december|christmas|snow|ski)\b/i, Snowflake],
   [/\b(thanksgiving|dinner|lunch|breakfast|meal|cook|recipe|bake)\b/i, Utensils],
   [/\b(groceries|grocery|costco|trader joe'?s?|market)\b/i, ShoppingCart],
-  // A form to sign, a slip to send back: paperwork, not shopping ("sign and
-  // return the field trip form" wore a shopping bag — 2026-10-07).
-  [/\b(sign|signed|permission slip|slip|forms?)\b/i, Folder],
   [/\b(buy|order|amazon|shop|returns?)\b/i, ShoppingBag],
   [/\b(fedex|ups|usps|package|delivery|ship)\b/i, Package],
   [/\b(laundry|clothes|closet|shirt|uniform|outfit|wear)\b/i, Shirt],
