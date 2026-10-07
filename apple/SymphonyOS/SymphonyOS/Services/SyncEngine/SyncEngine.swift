@@ -155,6 +155,7 @@ actor SyncEngine {
                        let task = (try? context.fetch(FetchDescriptor<SymphonyTask>()))?.first(where: { $0.id == change.recordId }) {
                         task.scopeDirty = false
                         task.placementDirty = false
+                        task.completedAtDirty = false
                     }
                     if change.tableName == "routines",
                        let routine = (try? context.fetch(FetchDescriptor<Routine>()))?.first(where: { $0.id == change.recordId }) {
@@ -539,6 +540,11 @@ actor SyncEngine {
         // on an UPDATE the phone itself just changed.
         if (forInsert || t.scopeDirty), let scope = t.scope {
             row["scope"] = .string(scope)
+        }
+        // Only when the phone itself completed or reopened it (see
+        // SymphonyTask.completedAt) — never a stale nil over the web's stamp.
+        if forInsert || t.completedAtDirty {
+            row["completed_at"] = d(t.completedAt)
         }
         return row
     }

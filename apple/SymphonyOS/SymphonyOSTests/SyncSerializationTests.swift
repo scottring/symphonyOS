@@ -238,6 +238,30 @@ struct SyncSerializationTests {
         #expect(row["capture_id"] == nil)
     }
 
+    @Test func completingATaskStampsAndSendsCompletedAt() throws {
+        // The web's "Done Tue" reads completed_at; the phone sent only
+        // `completed`, so a phone tick had no date and a reopen kept the old one.
+        let context = try makeContext()
+        let task = SymphonyTask(userId: UUID(), title: "Call Fulton Bank")
+        context.insert(task)
+        try context.save()
+
+        // A plain edit never sends completed_at (a stale nil can't wipe the web's stamp).
+        let plain = try #require(SyncEngine.serializeRow(table: "tasks", id: task.id, context: context))
+        #expect(plain["completed_at"] == nil)
+
+        let when = Date(timeIntervalSince1970: 1_791_000_000)
+        task.setCompleted(true, at: when)
+        let done = try #require(SyncEngine.serializeRow(table: "tasks", id: task.id, context: context))
+        #expect(done["completed"] == .bool(true))
+        #expect(done["completed_at"]?.stringValue != nil)
+
+        task.setCompleted(false)
+        let reopened = try #require(SyncEngine.serializeRow(table: "tasks", id: task.id, context: context))
+        #expect(task.completedAt == nil)
+        #expect(reopened["completed_at"] == .null)
+    }
+
     @Test func taskRowSendsScopeOnInsertOnlyNotOnUpdate() throws {
         // F1: a page item assigned to another household member must share as
         // "couple" — but only on the INSERT that creates the row. Sending scope

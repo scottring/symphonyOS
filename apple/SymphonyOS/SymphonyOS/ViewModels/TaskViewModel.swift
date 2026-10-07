@@ -48,7 +48,7 @@ final class TaskViewModel {
     // MARK: - Update
 
     func toggleComplete(_ task: SymphonyTask) {
-        task.completed.toggle()
+        task.setCompleted(!task.completed)
         task.updatedAt = Date()
         task.syncStatus = .pending
         queueChange(tableName: "tasks", recordId: task.id, type: "update")

@@ -44,7 +44,7 @@ struct TaskDetailView: View {
 
                 // Completion toggle
                 Button {
-                    task.completed.toggle()
+                    task.setCompleted(!task.completed)
                     markDirty()
                     #if os(iOS)
                     UIImpactFeedbackGenerator(style: .medium).impactOccurred()

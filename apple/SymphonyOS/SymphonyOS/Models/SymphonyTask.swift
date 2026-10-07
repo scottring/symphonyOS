@@ -30,6 +30,13 @@ final class SymphonyTask {
     var userId: UUID
     var title: String
     var completed: Bool
+    /// When it was done (web: "Done Tue"); nil while open. Set and cleared
+    /// only through `setCompleted`, which flags `completedAtDirty` so the
+    /// push sends it — an UPDATE otherwise leaves the column alone, so a row
+    /// pulled before the phone read this column can't wipe the web's stamp.
+    /// Inline defaults for SwiftData's lightweight migration.
+    var completedAt: Date? = nil
+    var completedAtDirty: Bool = false
 
     // Scheduling
     var scheduledFor: Date?
@@ -203,4 +210,14 @@ extension SymphonyTask {
         "createdAt": "created_at",
         "updatedAt": "updated_at",
     ]
+}
+
+extension SymphonyTask {
+    /// Complete or reopen, stamping `completed_at` the way the web does
+    /// (now on complete, cleared on reopen). Does not save or queue.
+    func setCompleted(_ done: Bool, at now: Date = Date()) {
+        completed = done
+        completedAt = done ? now : nil
+        completedAtDirty = true
+    }
 }

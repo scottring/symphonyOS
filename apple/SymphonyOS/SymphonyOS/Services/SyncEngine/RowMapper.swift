@@ -53,6 +53,7 @@ enum RowMapper {
 
         let task = SymphonyTask(id: id, userId: userId, title: title, syncStatus: .synced)
         task.completed = row.bool("completed") ?? false
+        task.completedAt = row.date("completed_at")
         task.scheduledFor = row.date("scheduled_for")
         task.deferredUntil = row.date("deferred_until")
         task.deferCount = row.int("defer_count") ?? 0
