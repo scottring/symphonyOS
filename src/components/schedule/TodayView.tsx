@@ -101,6 +101,7 @@ import { ViewSwitch } from '@/components/plan/v2/ViewSwitch'
 import { weekOfYear } from '@/lib/planning/horizonNumerals'
 import { WeatherChip } from './WeatherChip'
 import { parseSpecials } from '@/lib/today/specials'
+import { DEFAULT_START } from '@/lib/today/dayScale'
 import { TodayBacklogFooter } from './TodayBacklogFooter'
 import { EmailReviewSheet } from './EmailReviewSheet'
 import { useUnreviewedCaptures } from '@/hooks/useUnreviewedCaptures'
@@ -196,6 +197,15 @@ interface TodayViewProps {
 const FOCUS_SECTIONS: DaySection[] = ['allday', 'unscheduled']
 /** The timed day, drawn to scale (TodayDayScale). */
 const TIMED_SECTIONS: DaySection[] = ['earlyMorning', 'morning', 'afternoon', 'evening', 'night']
+
+
+const HIDE_EARLIER_KEY = 'symphony-today-hide-earlier'
+function readHideEarlier(): boolean {
+  try { return localStorage.getItem(HIDE_EARLIER_KEY) === '1' } catch { return false }
+}
+function writeHideEarlier(v: boolean) {
+  try { if (v) localStorage.setItem(HIDE_EARLIER_KEY, '1'); else localStorage.removeItem(HIDE_EARLIER_KEY) } catch { /* private window */ }
+}
 
 export function TodayView({
   tasks,
@@ -822,6 +832,12 @@ export function TodayView({
   })
 
   const nowForDisplay = useMemo(() => new Date(nowTick), [nowTick])
+  // "Hide earlier hours" on today's day column: it then opens an hour
+  // before now. Offered once there are at least two spent hours to fold.
+  const earlierCutoff = nowForDisplay.getHours() - 1
+  const canHideEarlier = data.isToday && earlierCutoff >= DEFAULT_START + 2
+  const [hideEarlier, setHideEarlierState] = useState(readHideEarlier)
+  const setHideEarlier = (v: boolean) => { setHideEarlierState(v); writeHideEarlier(v) }
   const dayName = useMemo(
     () => viewedDate.toLocaleDateString('en-US', { weekday: 'long' }),
     [viewedDate],
@@ -1593,10 +1609,7 @@ export function TodayView({
               {/* "For today" holds the page's verb (approved white journal,
                   2026-09-22): Add task opens the add box at the head of
                   this list. */}
-              <div className="flex items-baseline">
-                <h2 id="today-focus-heading">{data.isToday ? 'For today' : 'For this day'}</h2>
-                {focusWork.activeCount > 0 && <span className="daybook-heading-note">fits in the green</span>}
-              </div>
+              <h2 id="today-focus-heading">{data.isToday ? 'For today' : 'For this day'}</h2>
               <div className="daybook-heading-actions">
                 {addTaskButton}
               </div>
@@ -1683,6 +1696,16 @@ export function TodayView({
           <section aria-labelledby="today-day-heading" className="daybook-journal-section today-day-section">
             <div className="daybook-journal-heading">
               <h2 id="today-day-heading">The day</h2>
+              {/* Late in the day the spent morning took most of the column
+                  (review, 2026-10-07): the rest of the day can take it, the
+                  whole day one click back. Remembered on this device. */}
+              {canHideEarlier && (
+                <div className="daybook-heading-actions">
+                  <button type="button" className="today-scale-toggle" aria-pressed={hideEarlier} onClick={() => setHideEarlier(!hideEarlier)}>
+                    {hideEarlier ? 'Show the whole day' : 'Hide earlier hours'}
+                  </button>
+                </div>
+              )}
             </div>
             {journal.allDayEvents.length > 0 && (
               <ul className="daybook-journal-allday" aria-label="All day">
@@ -1714,6 +1737,7 @@ export function TodayView({
               isReadOnlyEvent={isReadOnlyEvent}
               onSelect={handleSelectItem}
               onPlanDrop={(payload, when) => { void planActions.drop(payload, { type: 'time', when }) }}
+              fromHour={canHideEarlier && hideEarlier ? earlierCutoff : null}
               handleRef={scaleRef}
             />
             {timedItems.length === 0 && (
@@ -1793,7 +1817,7 @@ export function TodayView({
           {showWeek && (
             <TodayWeekColumn plan={data.dayPlan} day={viewedDate} weekNo={weekNo}
               weekStart={weekStartAnchor(viewedDate, readCadenceConfig().weekStartsOn)} actions={planPanelActions}
-              nextWeek={nextWeek} />
+              nextWeek={nextWeek} onHide={() => setTodayView('list')} />
           )}
         </aside>
         )}

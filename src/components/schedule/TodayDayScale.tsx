@@ -133,6 +133,7 @@ export function TodayDayScale({
   isReadOnlyEvent,
   onSelect,
   onPlanDrop,
+  fromHour = null,
   handleRef,
 }: {
   /** The day's timed rows (a group's children ride with their parent). */
@@ -150,6 +151,8 @@ export function TodayDayScale({
   /** A row dragged in from the week column (native drag), with the time it
    *  was dropped at. */
   onPlanDrop?: (payload: PlanDragPayload, when: Date) => void
+  /** "Hide earlier hours": the column opens at this hour. */
+  fromHour?: number | null
   handleRef?: Ref<DayScaleHandle>
 }) {
   // When each thing runs. An all-day "Dinner: …" event sits at its meal's
@@ -164,9 +167,9 @@ export function TodayDayScale({
   const scale: DayScale = useMemo(
     () => buildDayScale(
       timed.map((t) => ({ id: t.item.id, start: t.start, end: t.hasEnd ? t.end : null })),
-      { now, pxPerHour: isMobile ? 40 : 48 },
+      { now, pxPerHour: isMobile ? 40 : 48, fromHour },
     ),
-    [timed, now, isMobile],
+    [timed, now, isMobile, fromHour],
   )
   const trackRef = useRef<HTMLDivElement | null>(null)
   const { setNodeRef, isOver } = useDroppable({ id: SCALE_DROP_ID })
