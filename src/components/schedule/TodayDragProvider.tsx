@@ -10,6 +10,7 @@ import {
 } from '@dnd-kit/core'
 import type { DropIntent } from '@/lib/today/todayDrop'
 import { ROW_PREFIX } from '@/lib/today/todayDrop'
+import { dragPointerY } from '@/lib/today/dragPointer'
 
 export interface TodayDragState {
   activeId: string | null
@@ -45,9 +46,9 @@ export function TodayDragProvider({
   children,
   __testHandlers,
 }: {
-  /** `landedTop`: where the top of the dragged thing ended up (viewport px) —
-   *  the day column reads a time from it. */
-  resolve: (activeId: string, overId: string, landedTop: number | null) => DropIntent[]
+  /** `pointerY`: where the pointer let go (viewport px) — the day column
+   *  reads a time from it. */
+  resolve: (activeId: string, overId: string, pointerY: number | null) => DropIntent[]
   onIntents: (intents: DropIntent[]) => void
   renderOverlay: (activeId: string) => ReactNode
   children: ReactNode
@@ -107,8 +108,7 @@ export function TodayDragProvider({
   const onDragEnd = useCallback((e: DragEndEvent) => {
     reset()
     if (!e.over) return
-    const landedTop = e.active.rect?.current?.translated?.top ?? null
-    const intents = resolve(String(e.active.id), String(e.over.id), landedTop)
+    const intents = resolve(String(e.active.id), String(e.over.id), dragPointerY(e))
     if (intents.length > 0) onIntents(intents)
   }, [resolve, onIntents, reset])
 
