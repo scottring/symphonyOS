@@ -56,6 +56,10 @@ import { useResolutionLearning } from '@/hooks/useResolutionLearning';
 import { HomeView } from '@/components/home';
 import { useSelection } from '@/shell/providers/SelectionProvider';
 import { useMealEventsForDate } from '@/shell/providers/MealEventsProvider';
+import { SHOW_PLANNED_MEALS_ON_TIMELINE } from '@/lib/mealsVisibility';
+import { useRecipe } from '@/hooks/useRecipe';
+import { formatTimeLong } from '@/lib/timeUtils';
+import { firstSentence, type TodayDinner } from '@/components/schedule/TodayDinnerCard';
 import { FirstWeekCard } from '@/components/schedule/FirstWeekCard';
 import { PlanningNudge } from '@/components/plan/PlanningNudge';
 import { useFirstWeekSignals } from '@/hooks/useFirstWeekSignals';
@@ -366,8 +370,27 @@ export function HomeViewContainer({ fixedView }: { fixedView?: 'today' | 'week' 
   // ── Meal-plan entries synthesized as CalendarEvent objects ──
   // Sourced from <MealEventsProvider> mounted in Shell. Legacy App.tsx still
   // has its own copy of this synthesis; that becomes dead code post-cutover.
-  const mealEvents = useMealEventsForDate(viewedDate);
+  // Forced, so tonight's dinner is known even while planned meals stay off the
+  // timeline (the timeline still gets them only when the flag allows).
+  const allMealEvents = useMealEventsForDate(viewedDate, { force: true });
+  const mealEvents = useMemo(() => (SHOW_PLANNED_MEALS_ON_TIMELINE ? allMealEvents : []), [allMealEvents]);
   const eventsWithMeals = useMemo(() => [...events, ...mealEvents], [events, mealEvents]);
+  // Today's dinner card (design B, 2026-10-07): the plan's dinner, its
+  // recipe's photo and time, the plan's first note.
+  const dinnerEvent = useMemo(() => allMealEvents.find((e) => /^Dinner\b/i.test(e.title)) ?? null, [allMealEvents]);
+  const { recipe: dinnerRecipe } = useRecipe(dinnerEvent?.recipeId ?? null);
+  const tonightsDinner = useMemo<TodayDinner | null>(() => {
+    if (!dinnerEvent) return null;
+    const start = dinnerEvent.start_time || dinnerEvent.startTime;
+    return {
+      id: `event-${dinnerEvent.id}`,
+      title: dinnerEvent.title.replace(/^Dinner\s*·\s*/i, ''),
+      time: start ? formatTimeLong(new Date(start)) : null,
+      minutes: dinnerRecipe?.prepMinutes ?? null,
+      cue: firstSentence(dinnerEvent.mealNotes),
+      imageUrl: dinnerRecipe?.imageUrl ?? null,
+    };
+  }, [dinnerEvent, dinnerRecipe]);
 
   // Plan-from-paper's day-fact check ("dentist 10am" already on the calendar)
   // needs every synced event's title, by day — not just the viewed date.
@@ -922,6 +945,7 @@ export function HomeViewContainer({ fixedView }: { fixedView?: 'today' | 'week' 
         loading={tasksLoading || routinesLoading}
         tasksLoadFailed={tasksLoadFailed}
         onRetryTasks={retryTasks}
+        dinner={tonightsDinner}
         viewedDate={viewedDate}
         onDateChange={changeViewedDate}
         fixedView={fixedView}

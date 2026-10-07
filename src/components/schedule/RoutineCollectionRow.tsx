@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { ChevronDown, ChevronRight, Check, SkipForward, Clock, MoreHorizontal, EyeOff, Pencil, CalendarOff } from 'lucide-react'
 import type { TimelineItem, CollectionDose } from '@/types/timeline'
 import { TaskCheckbox } from './TaskCheckbox'
+import { TaskIconCheck } from '@/components/common/TaskIconCheck'
 import type { FamilyMember } from '@/types/family'
 import { MultiAssigneeDropdown } from '@/components/family'
 import { routineOwners } from '@/lib/routineUtils'
@@ -25,6 +26,8 @@ interface Props {
    *  from Today). */
   familyMembers?: FamilyMember[]
   onAssignAll?: (memberIds: string[]) => void
+  /** 'card' (For today, design B): the routine's icon is its check, on a card. */
+  look?: 'row' | 'card'
 }
 
 function fmt(t: string | null): string {
@@ -49,7 +52,9 @@ function fmtShort(t: string | null): string {
   return m === 0 ? `${hr}${ampm}` : `${hr}:${String(m).padStart(2, '0')}${ampm}`
 }
 
-export function RoutineCollectionRow({ item, onSelect, onSelectStep, onCompleteStep, onSkipStep, onCompleteStepAt, onHideToday, onRemove, familyMembers = [], onAssignAll }: Props) {
+export function RoutineCollectionRow({ item, onSelect, onSelectStep, onCompleteStep, onSkipStep, onCompleteStepAt, onHideToday, onRemove, familyMembers = [], onAssignAll, look = 'row' }: Props) {
+  const isCard = look === 'card'
+  const isShared = isCard && (item.originalRoutine?.scope === 'couple' || item.originalRoutine?.scope === 'compound')
   const owners = item.originalRoutine ? routineOwners(item.originalRoutine) : []
   const [open, setOpen] = useState(false)
   const [mgmtOpen, setMgmtOpen] = useState(false)
@@ -112,7 +117,7 @@ export function RoutineCollectionRow({ item, onSelect, onSelectStep, onCompleteS
     // Same wrapper a task/event row uses (px-3 + 1px transparent border), so
     // the columns below line up with them to the pixel and the row picks up the
     // identical hover tint instead of announcing itself with a card.
-    <div className={`group ${ROW_SHELL} border-transparent transition-all duration-200 hover:bg-primary-50/50 hover:border-primary-100`}>
+    <div data-look={isCard ? 'card' : undefined} className={isCard ? 'today-card sym-card group relative transition-all duration-200' : `group ${ROW_SHELL} border-transparent transition-all duration-200 hover:bg-primary-50/50 hover:border-primary-100`}>
       {/* Collapsed: a plain agenda row, not a card. The column widths mirror
           ScheduleItem (pl-5 bulk gutter, w-16 time, w-5 control) so a routine
           lines up with the tasks and events around it. */}
@@ -127,14 +132,19 @@ export function RoutineCollectionRow({ item, onSelect, onSelectStep, onCompleteS
         {/* The block's own check circle, in the column every task's circle
             sits in (Scott, 2026-09-28): a tap completes every open step, and
             a done block taps back to open. */}
-        <div className={`${MARK} flex items-center justify-center`}>
-          <TaskCheckbox
-            completed={allDone}
-            onToggleComplete={toggleAll}
-            onToggleWaiting={() => {}}
-            shape="circle"
-            label={allDone ? `Mark ${item.title} not done` : `Mark all of ${item.title} done`}
-          />
+        <div className={`${isCard ? 'today-card-mark self-start' : MARK} flex items-center justify-center`}>
+          {isCard ? (
+            // The routine's icon is its check: a tap finishes every open step.
+            <TaskIconCheck task={{ title: item.title, type: 'routine-collection', context: item.context }} done={allDone} size="card" onToggle={toggleAll} />
+          ) : (
+            <TaskCheckbox
+              completed={allDone}
+              onToggleComplete={toggleAll}
+              onToggleWaiting={() => {}}
+              shape="circle"
+              label={allDone ? `Mark ${item.title} not done` : `Mark all of ${item.title} done`}
+            />
+          )}
         </div>
         {/* Inline padding: a phone-wide rule pads every button 25px a side for
             touch, which left this name 42px of its 93px column (2026-09-21).
@@ -174,6 +184,7 @@ export function RoutineCollectionRow({ item, onSelect, onSelectStep, onCompleteS
         {/* The same four-cell rail a task row draws (who · context · verb ·
             ⋯), so a routine's people sit in the task rows' people column
             instead of wherever its name happened to end. */}
+        {isShared && <span className="today-card-shared"><span className="sym-tag">Shared</span></span>}
         <div className={RAIL}>
         <div className={`shrink-0 md:w-[5.25rem] md:h-7 md:flex md:items-center md:justify-end transition-opacity ${owners.length ? '' : 'md:opacity-0 md:group-hover:opacity-100 md:group-focus-within:opacity-100'}`}>
           {onAssignAll && familyMembers.length > 0 && (

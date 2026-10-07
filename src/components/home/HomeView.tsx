@@ -1,3 +1,4 @@
+import type { TodayDinner } from '@/components/schedule/TodayDinnerCard'
 import { keepsWeekView } from '@/lib/week/keepsWeekView'
 import { weekRangeFromParams, weekStartParam } from '@/lib/week/weekStartParam'
 import { useLocation, useSearchParams } from 'react-router-dom'
@@ -65,6 +66,8 @@ interface HomeViewProps {
   tasksLoadFailed?: boolean
   /** The tasks hook's refetch, for Try again. */
   onRetryTasks?: () => void
+  /** Tonight's planned dinner for Today's dinner card, or null. */
+  dinner?: TodayDinner | null
   viewedDate: Date
   onDateChange: (date: Date) => void
   bothPanelsOpen?: boolean
@@ -103,6 +106,7 @@ export function HomeView({
   loading,
   tasksLoadFailed,
   onRetryTasks,
+  dinner,
   viewedDate,
   onDateChange,
   bothPanelsOpen,
@@ -576,6 +580,7 @@ export function HomeView({
         loading={loading}
         tasksLoadFailed={tasksLoadFailed}
         onRetryTasks={onRetryTasks}
+        dinner={dinner}
         viewedDate={viewedDate}
         onDateChange={onDateChange}
         projects={filteredProjects}
