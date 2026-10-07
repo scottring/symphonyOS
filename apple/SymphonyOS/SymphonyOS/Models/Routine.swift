@@ -93,6 +93,15 @@ final class Routine {
     /// Set on a collection's Step — the collection renders it, not the day.
     var parentRoutineId: UUID? = nil
     var pausedUntil: Date? = nil
+    /// Every assignee (read from the row; the phone edits only `assignedTo`).
+    /// Counts toward `scope` like the web's `[assigned_to, ...assigned_to_all]`.
+    var assignedToAll: [UUID]? = nil
+    /// Who can SEE it — the only column routines RLS reads. Derived, never
+    /// chosen (ScopeRule.derive(for routine:)): pushed on INSERT, and on
+    /// UPDATE only when `scopeDirty`, exactly as for tasks. Inline defaults so
+    /// SwiftData's lightweight migration can add them to an existing store.
+    var scope: String? = nil
+    var scopeDirty: Bool = false
 
     // Sync
     var syncStatus: SyncStatus

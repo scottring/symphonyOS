@@ -218,6 +218,8 @@ struct NewRoutineSheet: View {
         if !timeOfDay.isEmpty {
             routine.timeOfDay = timeOfDay
         }
+        // Who can see it rides on the insert (no area or assignee yet: just you).
+        routine.scope = ScopeRule.derive(for: routine, members: [])
         modelContext.insert(routine)
         modelContext.queueSync(table: "routines", recordId: routine.id, type: "insert")
         try? modelContext.save()

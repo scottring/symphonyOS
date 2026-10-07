@@ -93,7 +93,7 @@ struct RoutineDetailView: View {
                 if !familyMembers.isEmpty {
                     Picker("Assigned To", selection: Binding(
                         get: { routine.assignedTo },
-                        set: { routine.assignedTo = $0; markDirty() }
+                        set: { routine.assignedTo = $0; ScopeRule.reconcile(routine, members: familyMembers); markDirty() }
                     )) {
                         Text("None").tag(Optional<UUID>.none)
                         ForEach(familyMembers, id: \.id) { member in
@@ -123,6 +123,7 @@ struct RoutineDetailView: View {
     private func contextChip(_ label: String, value: String, color: Color) -> some View {
         Button {
             routine.context = routine.context == value ? nil : value
+            ScopeRule.reconcile(routine, members: familyMembers)
             markDirty()
         } label: {
             Text(label)

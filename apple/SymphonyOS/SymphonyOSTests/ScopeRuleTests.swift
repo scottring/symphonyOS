@@ -175,4 +175,46 @@ struct ScopeRuleTests {
         let member = FamilyMember(userId: UUID(), name: "Scott", initials: "S", color: "blue")
         #expect(ScopeRule.memberForAuthUser(in: [member], authUserId: nil) == nil)
     }
+
+    // MARK: - routines (twin of useRoutines' scope derivation)
+
+    @Test func aFamilyRoutineIsSharedWithTheHousehold() {
+        let owner = UUID()
+        let r = Routine(userId: owner, name: "Tidy bedrooms")
+        r.context = "family"
+        ScopeRule.reconcile(r, members: [])
+        #expect(r.scope == "compound")
+        #expect(r.scopeDirty)
+    }
+
+    @Test func familyToPersonalWalksTheShareBack() {
+        let owner = UUID()
+        let me = FamilyMember(userId: owner, name: "Scott", initials: "S", color: "blue")
+        let r = Routine(userId: owner, name: "Run")
+        r.context = "family"
+        r.scope = "compound"
+        r.context = "personal"
+        r.assignedTo = me.id
+        ScopeRule.reconcile(r, members: [me])
+        #expect(r.scope == "individual")
+    }
+
+    @Test func everyAssigneeCountsNotJustTheFirst() {
+        let owner = UUID()
+        let me = FamilyMember(userId: owner, name: "Scott", initials: "S", color: "blue")
+        let iris = UUID()
+        let r = Routine(userId: owner, name: "Laundry")
+        r.context = "personal"
+        r.assignedTo = me.id
+        r.assignedToAll = [me.id, iris]
+        #expect(ScopeRule.derive(for: r, members: [me]) == "couple")
+    }
+
+    @Test func anUnchangedScopeIsNotPushedAgain() {
+        let r = Routine(userId: UUID(), name: "Water plants")
+        r.scope = "individual"
+        ScopeRule.reconcile(r, members: [])
+        #expect(!r.scopeDirty)
+    }
 }
+

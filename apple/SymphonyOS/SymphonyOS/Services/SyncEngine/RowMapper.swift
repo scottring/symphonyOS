@@ -129,6 +129,8 @@ enum RowMapper {
         routine.pinToTimeline = row.bool("pin_to_timeline") ?? false
         routine.parentRoutineId = row.uuid("parent_routine_id")
         routine.pausedUntil = row.date("paused_until")
+        routine.assignedToAll = row.uuidArray("assigned_to_all")
+        routine.scope = row.string("scope")
         routine.lastSyncedAt = Date()
         routine.createdAt = row.date("created_at") ?? Date()
         routine.updatedAt = row.date("updated_at") ?? Date()

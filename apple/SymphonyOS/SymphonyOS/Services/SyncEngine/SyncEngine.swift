@@ -156,6 +156,10 @@ actor SyncEngine {
                         task.scopeDirty = false
                         task.placementDirty = false
                     }
+                    if change.tableName == "routines",
+                       let routine = (try? context.fetch(FetchDescriptor<Routine>()))?.first(where: { $0.id == change.recordId }) {
+                        routine.scopeDirty = false
+                    }
                 } catch {
                     change.attempts += 1
                     change.lastAttemptAt = Date()
@@ -419,7 +423,7 @@ actor SyncEngine {
             return taskRow(t, forInsert: forInsert)
         case "routines":
             guard let r = find(Routine.self) else { return nil }
-            return routineRow(r)
+            return routineRow(r, forInsert: forInsert)
         case "projects":
             guard let p = find(Project.self) else { return nil }
             return projectRow(p)
@@ -544,8 +548,8 @@ actor SyncEngine {
     // whole row (the "phantom columns" incident), and omitted server-only
     // columns (e.g. routines.times_per_day) are left untouched by UPDATE.
 
-    private static func routineRow(_ r: Routine) -> [String: AnyJSON] {
-        [
+    private static func routineRow(_ r: Routine, forInsert: Bool = false) -> [String: AnyJSON] {
+        var row: [String: AnyJSON] = [
             "id": .string(r.id.uuidString),
             "user_id": .string(r.userId.uuidString),
             "name": .string(r.name),
@@ -558,6 +562,12 @@ actor SyncEngine {
             "created_at": .string(isoOut.string(from: r.createdAt)),
             "updated_at": .string(isoOut.string(from: Date())),
         ]
+        // Like tasks: on INSERT, or an UPDATE whose context/assignee edit
+        // recomputed it — otherwise a web-side change is never echoed back.
+        if (forInsert || r.scopeDirty), let scope = r.scope {
+            row["scope"] = .string(scope)
+        }
+        return row
     }
 
     private static func listRow(_ l: SymphonyList) -> [String: AnyJSON] {

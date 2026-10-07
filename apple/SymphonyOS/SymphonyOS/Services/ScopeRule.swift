@@ -67,4 +67,25 @@ enum ScopeRule {
         }
         return scopeForDomain(context: domain, assignees: assignees, selfMemberId: selfMember?.id)
     }
+
+    /// Twin of useRoutines' scope derivation (create and the context/assignee
+    /// update path): every assignee counts, and `self` is the routine's OWNER.
+    /// Without it a family routine made or re-tagged on the phone stayed
+    /// readable only by its owner, and Family → Personal left it shared.
+    static func derive(for routine: Routine, members: [FamilyMember]) -> String {
+        let selfMember = memberForAuthUser(in: members, authUserId: routine.userId)
+        return scopeForDomain(context: routine.context,
+                              assignees: [routine.assignedTo] + (routine.assignedToAll ?? []).map { Optional($0) },
+                              selfMemberId: selfMember?.id)
+    }
+
+    /// Recompute a routine's scope after a context/assignee edit; flags it
+    /// for the next push only when it changed. Does not save.
+    static func reconcile(_ routine: Routine, members: [FamilyMember]) {
+        let next = derive(for: routine, members: members)
+        if routine.scope != next {
+            routine.scope = next
+            routine.scopeDirty = true
+        }
+    }
 }
