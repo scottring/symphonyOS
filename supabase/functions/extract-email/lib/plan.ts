@@ -79,7 +79,7 @@ export function titlesMatch(a: string, b: string): boolean {
 // Mirror of src/lib/scope.ts scopeForDomain — the app's single scope rule.
 // (Deno; an edge function cannot import from src/.) Scope is DERIVED from what
 // the row IS plus who it was handed to. Nothing may write a literal scope.
-function scopeFor(
+export function scopeFor(
   context: string | null | undefined,
   assignees: (string | null | undefined)[],
   self: string | null,

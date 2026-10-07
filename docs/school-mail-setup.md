@@ -68,3 +68,19 @@ To test the real path, forward any email to the household address and watch `npx
 | Nothing arrives | `wrangler tail` shows whether the Worker ran. A non-token recipient is dropped by design. A 404 from `inbound-email` means the token does not match any household. |
 | Event landed in Inbox instead of on its day | Confidence below 0.75, or the date was in the past. The row's notes say which. |
 | A child's item is unassigned | The email used a name that is not a household member's first name, or two members share the first name. The name is kept in the item text. |
+
+## The kids' work from the 5pm school digest (2026-10-07)
+
+The connectors worker (Fly `symphony-connectors`) sends the day's ClassDojo
+posts and school WhatsApp messages to the `school-digest` edge function, which
+emails the digest to the parents. After the email goes out, the same function
+makes one narrow pass over those transcripts (`school-digest/lib/homework.ts`):
+only work a CHILD does or hands in. Each piece becomes one open `homework` task
+for its child (class-wide work: one row on every child), dated the day it is
+due, skipping anything already open for that child. The wall draws these on
+each kid's card and page; Today shows them on their due day.
+
+Nothing else is written — no notes, events or parent to-dos (the automatic
+digest-to-Symphony feed was turned off on 2026-09-12 for cluttering notes).
+A failure here is logged and returned as `kidsWork.error`; it never stops the
+email.
