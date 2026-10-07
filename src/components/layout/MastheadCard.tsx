@@ -25,7 +25,7 @@ import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { PlaceWash } from '@/components/place/PlaceWash'
 import { PageMotif, type MotifId } from '@/components/place/motifs/PageMotif'
 
-export function MastheadCard({ eyebrow, title, subline, controls, aside, footer, motif, variant = 'card', date, className = '', action, numeral }: {
+export function MastheadCard({ eyebrow, title, subline, controls, aside, footer, motif, stamp, variant = 'card', date, className = '', action, numeral }: {
   eyebrow?: ReactNode
   title: ReactNode
   /** The page's one primary action, beside the title at every width —
@@ -41,6 +41,9 @@ export function MastheadCard({ eyebrow, title, subline, controls, aside, footer,
    *  place — they are one continuous stretch of the same life, not different
    *  kinds of thing. */
   motif?: MotifId
+  /** A page's own mark in place of the motif stamp (the Inbox's tile in the
+   *  card language, 2026-10-07). Decorative, like the motif. */
+  stamp?: ReactNode
   /** Today uses an open daybook masthead; other surfaces keep their card. */
   variant?: 'card' | 'daybook' | 'page'
   date?: Date
@@ -68,7 +71,8 @@ export function MastheadCard({ eyebrow, title, subline, controls, aside, footer,
           )}
           {/* The motif keeps the page's identity without the wash it used to
               sit behind: one small stamp, at full strength, beside the name. */}
-          {variant === 'page' && motif && (
+          {variant === 'page' && stamp && <span aria-hidden="true" className="contents">{stamp}</span>}
+          {variant === 'page' && motif && !stamp && (
             /* Decorative: the heading beside it already names the page, so the
                motif's own label would just be read out twice. */
             <span aria-hidden="true" className="contents"><PageMotif motif={motif} className="daybook-stamp" /></span>
