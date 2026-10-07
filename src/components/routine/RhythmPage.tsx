@@ -286,17 +286,14 @@ export function RhythmPage(props: RhythmPageProps) {
               />
             </div>
             {onBuildWithAI && (
-              <button onClick={onBuildWithAI}
-                className="flex items-center gap-2 rounded-md border border-neutral-300 bg-bg-elevated px-4 py-2.5
-                           text-[14px] font-medium text-neutral-700 transition-colors hover:border-primary-400">
+              <button onClick={onBuildWithAI} className="sym-btn">
                 <Sparkles className="w-4 h-4 text-accent-500" />
                 Build with AI
               </button>
             )}
             <button
               onClick={() => setTendOpen(true)}
-              className="relative flex items-center gap-2 rounded-md border border-neutral-300 bg-bg-elevated px-4 py-2.5
-                         text-[14px] font-medium text-neutral-700 transition-colors hover:border-primary-400"
+              className="sym-btn relative"
             >
               <Wrench className="w-4 h-4 text-primary-600" />
               Tend
@@ -308,9 +305,8 @@ export function RhythmPage(props: RhythmPageProps) {
             </button>
             <button
               onClick={startNewRoutine}
-              className="flex items-center gap-2 rounded-md bg-primary-700 px-4 py-2.5 text-[14px] font-medium text-white
-                         transition-colors hover:bg-primary-800 active:bg-primary-900">
-              <Plus className="w-5 h-5" />
+              className="sym-btn sym-btn-primary">
+              <Plus className="w-4 h-4" />
               New routine
             </button>
           </div>
