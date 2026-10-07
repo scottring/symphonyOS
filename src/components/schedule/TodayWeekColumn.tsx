@@ -46,7 +46,13 @@ export function TodayWeekColumn({ plan, day, weekNo, weekStart, actions, nextWee
   const row = (e: DayPlanEntry) => (
     <li key={e.key} className="pv2-rrow pv2-rrow-sans today-ref-row" draggable
       onDragStart={(ev) => writePlanDrag(ev.dataTransfer, { kind: e.kind, id: e.id, date: localYmd(day), title: e.title })}>
-      <span className="pv2-dash" style={{ marginTop: 10 }} aria-hidden="true" />
+      {/* Done from here too (Scott, 2026-10-07): a week task finished without
+          first choosing it for today. Same check, and the same writer (with
+          Undo), as the Shelves chooser's. */}
+      <button type="button" aria-label={`Complete ${e.title}`} onClick={() => actions.complete(e)}
+        className="today-ref-check mt-[3px] flex h-6 w-6 shrink-0 items-center justify-center text-primary-700">
+        <span className="h-4 w-4 shrink-0 rounded-full border border-neutral-400 transition-colors hover:border-primary-600 hover:bg-primary-50" aria-hidden="true" />
+      </button>
       {title(e)}
       <span className="pv2-refacts">
         <button type="button" className="pv2-addbtn" onClick={() => toToday(e)} aria-label={`Add ${e.title} to today`}>+ Today</button>
