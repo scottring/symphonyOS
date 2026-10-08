@@ -84,6 +84,11 @@ export function GuideProvider({ children }: { children: ReactNode }) {
   // only reported as 'account' when nothing newer has happened since.
   const version = useRef(0)
   const synced = useRef(-1)
+  // This browser's current copy, held in memory. Browser storage is only a
+  // best-effort backup for the next visit: a full or blocked storage must
+  // never make a flush send (or reconcile compare) an older copy than the one
+  // on screen.
+  const latest = useRef<Stored | null>(null)
   const queue = useRef<Promise<void>>(Promise.resolve())
   const enqueue = useCallback((op: () => Promise<void>) => {
     const run = queue.current.then(op)
@@ -96,7 +101,7 @@ export function GuideProvider({ children }: { children: ReactNode }) {
     if (current.current !== forUid) return
     const v = version.current
     if (synced.current === v) { setSavedIn('account'); return }
-    const local = readLocal(forUid)
+    const local = latest.current
     if (!local) return
     const ok = await writeRemote(forUid, local)
     if (current.current !== forUid) return
@@ -113,8 +118,9 @@ export function GuideProvider({ children }: { children: ReactNode }) {
   const reconcile = useCallback(async (forUid: string) => {
     const { data, error } = await readRemote(forUid)
     if (current.current !== forUid) return
-    // Read local after the fetch: a set() made while it was in flight counts.
-    const local = readLocal(forUid)
+    // Take this browser's copy after the fetch: a set() made while it was in
+    // flight counts.
+    const local = latest.current
     if (error) {
       setState(shown(local)); setSavedIn('device'); setLoaded(true)
       return
@@ -124,6 +130,7 @@ export function GuideProvider({ children }: { children: ReactNode }) {
     if (winner && local && winner.updatedAt === local.updatedAt) {
       // Same change on both sides (or this browser's is newer): keep ours.
     } else if (winner !== local) {
+      latest.current = winner
       writeLocal(forUid, winner)
       version.current++
       setState(shown(winner))
@@ -139,9 +146,10 @@ export function GuideProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     setState(null); setLoaded(false); setSavedIn('device')
-    version.current = 0; synced.current = -1
+    version.current = 0; synced.current = -1; latest.current = null
     if (!uid) return
-    setState(shown(readLocal(uid)))
+    latest.current = readLocal(uid)
+    setState(shown(latest.current))
     void enqueue(() => reconcile(uid))
     const again = () => { if (document.visibilityState === 'visible') void enqueue(() => reconcile(uid)) }
     window.addEventListener('online', again)
@@ -156,6 +164,7 @@ export function GuideProvider({ children }: { children: ReactNode }) {
     if (!uid) return
     const stored: Stored = next ?? { v: 1, cleared: true, updatedAt: new Date().toISOString() }
     setState(next)
+    latest.current = stored
     writeLocal(uid, stored)
     version.current++
     setSavedIn('device')

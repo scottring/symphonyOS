@@ -259,3 +259,70 @@ describe('GuideProvider overlapping saves', () => {
     expect(api.savedIn).toBe('account')
   })
 })
+
+// Independent review of #160 (v2): the queue sent whatever browser storage
+// held, so a full or blocked storage made it upload the previous step and
+// report it as saved. The copy on screen lives in memory; storage is a backup.
+describe('GuideProvider with browser storage unavailable', () => {
+  const blockStorage = () => vi.spyOn(localStorage, 'setItem').mockImplementation(() => {
+    throw new DOMException('Full', 'QuotaExceededError')
+  })
+
+  it('saves the step on screen, not the older one in storage', async () => {
+    h.db.remote = guide('2026-10-01T10:00:00Z', 0)
+    mount()
+    await screen.findByText('loaded step=0 in=account')
+    const block = blockStorage()
+    try {
+      await act(() => api.set(guide('2026-10-08T10:00:00Z', 1)))
+      expect(api.state?.current).toBe(1)
+      expect(h.db.remote).toMatchObject({ current: 1 })
+      expect(api.savedIn).toBe('account')
+    } finally { block.mockRestore() }
+  })
+
+  it('Stop guiding reaches the account even when storage cannot record it', async () => {
+    h.db.remote = guide('2026-10-01T10:00:00Z', 1)
+    mount()
+    await screen.findByText('loaded step=1 in=account')
+    const block = blockStorage()
+    try {
+      await act(() => api.set(null))
+      expect(h.db.remote).toMatchObject({ cleared: true })
+      expect(api.state).toBeNull()
+    } finally { block.mockRestore() }
+  })
+
+  it('a tab-return check compares against the step on screen and does not revert it', async () => {
+    h.db.remote = guide('2026-10-01T10:00:00Z', 0)
+    mount()
+    await screen.findByText('loaded step=0 in=account')
+    const block = blockStorage()
+    try {
+      h.db.writeError = { message: 'offline' }
+      await act(() => api.set(guide('2026-10-08T10:00:00Z', 2)))
+      expect(api.savedIn).toBe('device')
+      h.db.writeError = null
+      await act(async () => { document.dispatchEvent(new Event('visibilitychange')) })
+      await screen.findByText('loaded step=2 in=account')
+      expect(h.db.remote).toMatchObject({ current: 2 })
+    } finally { block.mockRestore() }
+  })
+
+  it('a newer copy adopted from the account is the one later saves build on', async () => {
+    h.db.remote = guide('2026-10-01T10:00:00Z', 0)
+    mount()
+    await screen.findByText('loaded step=0 in=account')
+    const block = blockStorage()
+    try {
+      h.db.remote = guide('2026-10-05T10:00:00Z', 3)       // another device moved on
+      await act(async () => { document.dispatchEvent(new Event('visibilitychange')) })
+      await screen.findByText('loaded step=3 in=account')
+      const before = h.upserts.length
+      await act(async () => { window.dispatchEvent(new Event('online')) })
+      await screen.findByText('loaded step=3 in=account')
+      expect(h.upserts.length).toBe(before)                // nothing older sent back
+      expect(h.db.remote).toMatchObject({ current: 3 })
+    } finally { block.mockRestore() }
+  })
+})
