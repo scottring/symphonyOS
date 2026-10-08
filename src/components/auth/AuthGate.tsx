@@ -4,6 +4,11 @@ import { useAuth } from '@/hooks/useAuth'
 import { AuthForm } from '@/components/lazy'
 import { LoadingFallback } from '@/components/layout/LoadingFallback'
 import type { User } from '@supabase/supabase-js'
+import {
+  readAuthCallbackError,
+  stripAuthCallbackErrorFromLocation,
+  type AuthCallbackError,
+} from '@/lib/authCallback'
 
 const SESSION_ENDED_MESSAGE = 'Your session ended. Sign in to continue where you were.'
 const RETURN_TO_KEY = 'symphony.returnTo'
@@ -95,6 +100,32 @@ export function AuthGate({ children }: { children: (auth: AuthedContext) => Reac
   // read once and never cleared).
   const [hasReturnHint, setHasReturnHint] = useState(false)
 
+  // An email link that came back broken (expired, already used, or some other
+  // provider error) arrives as error params in the URL. Read them once, on
+  // mount, so the sign-in card can explain what happened. Reading is safe at
+  // any time; REMOVING them waits until auth has finished loading, because
+  // supabase-js reads the same URL during its own start-up and must see it.
+  const [callbackError, setCallbackError] = useState<AuthCallbackError | null>(() => {
+    try {
+      return readAuthCallbackError(window.location.href)
+    } catch {
+      return null
+    }
+  })
+
+  const pendingStripRef = useRef(callbackError !== null)
+  useEffect(() => {
+    if (!authLoading && pendingStripRef.current) {
+      pendingStripRef.current = false
+      stripAuthCallbackErrorFromLocation()
+    }
+  }, [authLoading])
+
+  // Once someone is signed in, the broken-link explanation has served its
+  // purpose; a later sign-out must show the ordinary sign-in card. Adjusted
+  // during render (not in an effect) so it never flashes back.
+  if (user && callbackError) setCallbackError(null)
+
   useEffect(() => {
     try {
       const ret = new URLSearchParams(window.location.search).get('return')
@@ -145,7 +176,10 @@ export function AuthGate({ children }: { children: (auth: AuthedContext) => Reac
   if (!user) {
     return (
       <Suspense fallback={<LoadingFallback />}>
-        <AuthForm message={sessionLost || hasReturnHint ? SESSION_ENDED_MESSAGE : undefined} />
+        <AuthForm
+          message={sessionLost || hasReturnHint ? SESSION_ENDED_MESSAGE : undefined}
+          callbackError={callbackError ?? undefined}
+        />
       </Suspense>
     )
   }
