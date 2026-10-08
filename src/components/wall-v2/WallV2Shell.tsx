@@ -13,7 +13,7 @@
 // `/wall-design` preview (see `wallV2Mock.ts`).
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Sun, Plus, ClipboardList, Settings, Phone, ChefHat } from 'lucide-react';
+import { Sun, Plus, ClipboardList, Settings, Phone, ChefHat, ShoppingCart } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { useActionableInstances } from '@/hooks/useActionableInstances';
 import { useBuildAutoReload } from '@/hooks/useBuildAutoReload';
@@ -738,17 +738,22 @@ export function WallV2Shell() {
     () => (dinner.recipe?.ingredients ?? []).filter((l) => l.trim() && l !== l.toUpperCase()).map((l) => scaleIngredient(l, dinnerScale)),
     [dinner.recipe, dinnerScale],
   );
+  // The family's grocery list: "Groceries" by name, else the To-buy list.
+  const groceryList = useMemo(
+    () => familyLists.find((l) => l.title.trim().toLowerCase() === 'groceries') ?? findToBuyList(familyLists) ?? null,
+    [familyLists],
+  );
   const handleAddMissing = useCallback(async () => {
     if (!user) return;
     const missing = dinnerIngredients.filter((_, i) => !haveIngredients.has(i));
     if (!missing.length) { showFlash('Nothing missing'); return; }
-    const list = familyLists.find((l) => l.title.trim().toLowerCase() === 'groceries') ?? findToBuyList(familyLists);
+    const list = groceryList;
     if (!list) { showFlash('No family grocery list to add to'); return; }
     const { error } = await supabase.from('list_items').insert(
       missing.map((text, i) => ({ list_id: list.id, user_id: user.id, text, sort_order: 10_000 + i, completed: false })),
     );
     showFlash(error ? 'Could not add — try again' : `Added ${missing.length === 1 ? missing[0] : 'the missing ingredients'} to ${list.title}`);
-  }, [user, dinnerIngredients, haveIngredients, familyLists, showFlash]);
+  }, [user, dinnerIngredients, haveIngredients, groceryList, showFlash]);
   const momentDinner = useMemo(() => {
     if (!dinnerEvent) return null;
     const notes = dinnerEvent.mealNotes?.trim() || null;
@@ -897,6 +902,16 @@ export function WallV2Shell() {
               <button type="button" onClick={() => setShowPhone(true)} aria-label="kidsPhone — call"
                 className="inline-flex min-h-[56px] items-center gap-2 rounded-2xl bg-[#f2b65a] px-5 text-[1.15rem] font-semibold text-[#1b1406]">
                 <Phone className="h-6 w-6" aria-hidden="true" />kidsPhone
+              </button>
+              {/* Groceries, one tap from the face (Scott, 2026-10-08): the
+                  list sheet opens on it with the cursor in its add field. */}
+              <button type="button" aria-label="Groceries — add to the list"
+                onClick={() => {
+                  if (!groceryList) { showFlash('No family grocery list yet'); return; }
+                  setSheetListId(groceryList.id); setShowListSheet(true);
+                }}
+                className="inline-flex min-h-[56px] items-center gap-2 rounded-2xl border border-[#2d3d50] bg-[#1c2733] px-5 text-[1.15rem] font-semibold text-[#e6edf4] active:scale-95 transition-transform">
+                <ShoppingCart className="h-6 w-6 text-[#a9b7c6]" aria-hidden="true" />Groceries
               </button>
               <button type="button" onClick={() => setShowRecipePicker(true)} aria-label="Recipes"
                 className="grid h-14 w-14 place-items-center rounded-2xl border border-[#2d3d50] bg-[#1c2733]">
