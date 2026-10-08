@@ -75,6 +75,8 @@ vi.mock('react-router-dom', async (importOriginal) => {
 })
 
 import { PageFromPaperFlow } from './PageFromPaperFlow'
+import { PaperImportNext } from './PaperImportNext'
+import { __resetPaperImportStore } from '@/lib/paperPlan/importNextStore'
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -83,7 +85,8 @@ beforeEach(() => {
   mocks.altitude = 'week'
   mocks.tasks = []
   mocks.readDraft.mockReturnValue(null)
-  mocks.commitPage.mockResolvedValue({ route: '/week', createdTaskIds: [], createdNoteIds: [] })
+  mocks.commitPage.mockResolvedValue({ route: '/week', periodStart: new Date(2026, 9, 4), tasksCreated: 0, goalsCreated: 0, notesCreated: 0, routinesCreated: 0, failures: 0, periodLabel: 'this week', createdTaskIds: [], createdNoteIds: [] })
+  __resetPaperImportStore()
 })
 
 const task = (title: string): PlanItem => ({
@@ -189,5 +192,31 @@ describe('PageFromPaperFlow', () => {
       await userEvent.click(screen.getByRole('button', { name: /Next month/i }))
       await waitFor(() => expect(screen.queryByRole('button', { name: addToDraft })).not.toBeInTheDocument())
     })
+  })
+
+  // Friends-and-family beta, 2026-10-08: "Add 3 items" on the Month page
+  // closed the review on a brief toast with no next step.
+  it('after a save, a panel stays on the page naming the period and the count, with the next step', async () => {
+    mocks.status = 'ready'
+    mocks.altitude = 'month'
+    const onMonth = (title: string): PlanItem => ({ ...task(title), placement: { kind: 'month' } })
+    mocks.items = [onMonth('Bring a picnic blanket'), onMonth('Buy sunscreen'), onMonth('Pack the cooler')]
+    mocks.commitPage.mockResolvedValue({
+      route: '/month?start=2026-10-01', periodStart: new Date(2026, 9, 1), periodLabel: 'October',
+      tasksCreated: 3, goalsCreated: 0, notesCreated: 0, routinesCreated: 0, failures: 0, createdTaskIds: ['a', 'b', 'c'], createdNoteIds: [],
+    })
+    const onClose = vi.fn()
+    render(<><PageFromPaperFlow members={[]} onClose={onClose} today={new Date(2026, 9, 1)} /><PaperImportNext /></>)
+
+    await userEvent.click(await screen.findByRole('button', { name: /add 3 items/i }))
+
+    // The panel says it, not a toast.
+    expect(mocks.commitPage.mock.calls[0][1]).toEqual({ successToast: false })
+    const panel = await screen.findByRole('status')
+    expect(panel).toHaveTextContent('Your October list is saved — 3 items.')
+    expect(panel).toHaveTextContent(/Next, choose what you want to work on (this week|in week \d+)\./)
+    expect(screen.getByRole('button', { name: 'Continue planning' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Done for now' })).toBeInTheDocument()
+    expect(onClose).toHaveBeenCalled()
   })
 })

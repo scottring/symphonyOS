@@ -13,23 +13,27 @@ const META: Record<PaperItemType, { Icon: typeof Circle; className: string }> = 
 }
 
 /** A row's one "What is this?" answer, as a native select: keyboard, screen
- *  reader and the phone's own picker all come with it. */
-export function ItemTypeSelect({ value, title, onChange }: {
+ *  reader and the phone's own picker all come with it. `options` narrows the
+ *  answers (a list page's kinds); `quiet` draws it as a secondary control. */
+export function ItemTypeSelect({ value, title, onChange, options = PAPER_ITEM_TYPES, ariaLabel, quiet = false }: {
   value: PaperItemType
   title: string
   onChange: (type: PaperItemType) => void
+  options?: readonly { id: PaperItemType; label: string }[]
+  ariaLabel?: string
+  quiet?: boolean
 }) {
   const { Icon, className } = META[value]
   return (
-    <span className={`relative inline-flex shrink-0 items-center rounded-md border ${className}`}>
+    <span className={`relative inline-flex shrink-0 items-center rounded-md border ${quiet ? 'border-neutral-200 bg-white text-neutral-500' : className}`}>
       <Icon className="pointer-events-none absolute left-1.5 h-3 w-3" aria-hidden="true" />
       <select
         value={value}
         onChange={(e) => onChange(e.target.value as PaperItemType)}
-        aria-label={`What is "${title}"?`}
-        className="appearance-none bg-transparent py-1 pl-[1.9em] pr-[1.7em] text-[11px] font-semibold leading-none text-inherit focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-400 rounded-md cursor-pointer"
+        aria-label={ariaLabel ?? `What is "${title}"?`}
+        className={`appearance-none bg-transparent py-1 pl-[1.9em] pr-[1.7em] ${quiet ? 'text-[12px] font-medium' : 'text-[11px] font-semibold'} leading-none text-inherit focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-400 rounded-md cursor-pointer`}
       >
-        {PAPER_ITEM_TYPES.map((t) => (
+        {options.map((t) => (
           <option key={t.id} value={t.id}>{t.label}</option>
         ))}
       </select>

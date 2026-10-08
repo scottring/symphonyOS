@@ -9,6 +9,7 @@ import { useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Camera } from 'lucide-react'
 import { PageFromPaperFlow } from '@/components/capture/PageFromPaperFlow'
+import { PaperImportNext } from '@/components/capture/PaperImportNext'
 import { useFamilyMembers } from '@/hooks/useFamilyMembers'
 import type { PageAltitude } from '@/lib/planParse'
 import type { Task } from '@/types/task'
@@ -46,6 +47,9 @@ export function FromPaper({ altitude, periodStart, tasks, label = 'Add from pape
         />,
         document.body,
       )}
+      {/* Once a page is saved: what was saved and the next planning step,
+          kept on screen until answered. */}
+      <PaperImportNext />
     </>
   )
 }

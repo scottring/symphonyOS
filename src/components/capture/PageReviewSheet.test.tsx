@@ -143,10 +143,14 @@ describe('PageReviewSheet — altitudes', () => {
     expect(onCommit.mock.calls[0][0].items[0].placement).toEqual({ kind: 'month' })
   })
 
-  it('on a year page, lines read as goals are Goal or project, count as goals, and can still be made actions', async () => {
+  // 2026-10-08: above the week there is no goal/task split — a year line
+  // starts on the year's list (its goals rows), and where it goes is the
+  // one choice; its kind is optional.
+  it('on a year page, every line starts on the year’s list as a plain list item, and can be moved off it', async () => {
     const user = userEvent.setup()
     const { onCommit } = renderSheet({
       altitude: 'year',
+      today: new Date(2026, 9, 8),
       windowDates: [],
       notes: [],
       items: [
@@ -154,19 +158,23 @@ describe('PageReviewSheet — altitudes', () => {
         { title: 'Book Iceland flights', placement: { kind: 'season' }, time: null, assigneeId: null, note: null, dateHint: null, kind: 'task' as const, recurring: null, phone: null, contactMemberId: null },
       ],
     })
-    expect(screen.getByRole('combobox', { name: 'What is "Half marathon"?' })).toHaveValue('goal')
-    expect(screen.getByText(/read as a year page/i)).toBeInTheDocument()
-    expect(screen.getByText(/1 goal or project \/ 1 action/)).toBeInTheDocument()
-    // Year goals take people (#64): the goal row has its own Assignee select too.
+    expect(screen.queryByRole('combobox', { name: /What is/ })).toBeNull()
+    const where = screen.getByRole('combobox', { name: 'Where "Half marathon" goes' })
+    expect(where).toHaveValue('goal')
+    expect(where.querySelector('option[value="goal"]')).toHaveTextContent('2026’s list')
+    expect(screen.getByRole('combobox', { name: 'Kind of "Half marathon" (optional)' })).toHaveValue('task')
+    expect(screen.getByText(/Check these — Symphony read them from your photo/)).toBeInTheDocument()
+    expect(screen.getByText(/Ready to add:/).parentElement).toHaveTextContent('1 on 2026’s list')
+    // Year lines take people (#64): every row has its own Assignee select.
     expect(screen.getAllByRole('combobox', { name: /assignee/i })).toHaveLength(2)
-    expect(screen.getByRole('combobox', { name: 'Assignee for "Half marathon"' })).toBeInTheDocument()
-    await user.selectOptions(screen.getByRole('combobox', { name: 'What is "Half marathon"?' }), 'task')
+    await user.selectOptions(where, 'someday')
+    expect(screen.getByText('Kept for someday, off the lists for now.')).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: /add 2 items/i }))
     expect(onCommit.mock.calls[0][0].items.map((i: { placement: unknown }) => i.placement)).toEqual([{ kind: 'someday' }, { kind: 'season' }])
   })
 
-  // Step 5: a month page says which month it is for, one tap to fix; a goal
-  // line is a goal on that list and can be toggled before commit.
+  // Step 5: a month page says which month it is for, one tap to fix. Since
+  // 2026-10-08 a line on it is a plain list item (no goal/task split).
   describe('month and season pages', () => {
     it('shows the month the page is for and commits the chosen month', async () => {
       const user = userEvent.setup()
@@ -201,35 +209,46 @@ describe('PageReviewSheet — altitudes', () => {
       expect(onCommit.mock.calls[0][0].seasonStart).toEqual(new Date(2026, 5, 1))
     })
 
-    it('a goal line reads Goal or project, is chosen in the same control, and commits as a goal on the month', async () => {
+    // Beta walkthrough 2026-10-08: "Bring a picnic blanket" came back
+    // "Goal or project" beside two errands read as actions. Above the week a
+    // line is a plain list item — whatever the reader called it.
+    it('a line the reader called a goal starts as a plain list item on the month — no goal/task choice to make', async () => {
       const user = userEvent.setup()
       const { onCommit } = renderSheet({
         altitude: 'month', today: new Date(2026, 8, 5),
         items: [
-          { title: 'Read more', placement: { kind: 'month' }, time: null, assigneeId: null, note: null, goal: true, dateHint: null, kind: 'task' as const, recurring: null, phone: null, contactMemberId: null },
-          { title: 'Repaint the porch', placement: { kind: 'month' }, time: null, assigneeId: null, note: null, dateHint: null, kind: 'task' as const, recurring: null, phone: null, contactMemberId: null },
+          { title: 'Bring a picnic blanket', placement: { kind: 'month' }, time: null, assigneeId: null, note: null, goal: true, dateHint: null, kind: 'task' as const, recurring: null, phone: null, contactMemberId: null },
+          { title: 'Buy sunscreen', placement: { kind: 'month' }, time: null, assigneeId: null, note: null, dateHint: null, kind: 'task' as const, recurring: null, phone: null, contactMemberId: null },
         ],
         notes: [],
       })
-      expect(screen.getByText(/1 goal or project \/ 1 action/)).toBeInTheDocument()
-      expect(screen.getByRole('combobox', { name: 'What is "Read more"?' })).toHaveValue('goal')
-      await user.selectOptions(screen.getByRole('combobox', { name: 'What is "Repaint the porch"?' }), 'goal')
-      expect(screen.getByText(/2 goals or projects/)).toBeInTheDocument()
+      expect(screen.queryByRole('combobox', { name: /What is/ })).toBeNull()
+      expect(screen.queryByText(/goal or project/i)).toBeNull()
+      expect(screen.getByText(/Ready to add:/).parentElement).toHaveTextContent('2 on September’s list')
+      expect(screen.getByText(/Each line goes on/)).toHaveTextContent('Each line goes on September’s list — something to keep in view. To make one a step you can put on a day, change where it goes.')
+      const kind = screen.getByRole('combobox', { name: 'Kind of "Bring a picnic blanket" (optional)' })
+      expect(kind).toHaveValue('task')
+      expect(Array.from(kind.querySelectorAll('option')).map((o) => o.textContent)).toEqual(['List item', 'Appointment', 'Activity', 'Routine'])
       await user.click(screen.getByRole('button', { name: /add 2 items/i }))
-      expect(onCommit.mock.calls[0][0].items.map((i: { goal?: boolean }) => !!i.goal)).toEqual([true, true])
+      expect(onCommit.mock.calls[0][0].items.map((i: { goal?: boolean; placement: unknown }) => [!!i.goal, i.placement])).toEqual([[false, { kind: 'month' }], [false, { kind: 'month' }]])
     })
 
-    it('a goal has no day to pick — only which list it is for; an action made from it may take a day', async () => {
+    it('a list line can become a step on a day, and the sheet says what that means', async () => {
       const user = userEvent.setup()
       const { onCommit } = renderSheet({
         altitude: 'month', today: new Date(2026, 8, 5),
         items: [{ title: 'Read more', placement: { kind: 'month' }, time: null, assigneeId: null, note: null, goal: true, dateHint: null, kind: 'task' as const, recurring: null, phone: null, contactMemberId: null }],
         notes: [],
       })
-      expect(screen.queryByRole('combobox', { name: /when/i })).toBeNull()
-      expect(screen.getByRole('combobox', { name: 'Goal for "Read more"' })).toHaveValue('month')
-      await user.selectOptions(screen.getByRole('combobox', { name: 'What is "Read more"?' }), 'task')
-      await user.selectOptions(screen.getByRole('combobox', { name: /when/i }), '2026-09-18')
+      const where = screen.getByRole('combobox', { name: 'Where "Read more" goes' })
+      expect(where).toHaveValue('month')
+      // The default needs no words of its own: the sentence over the rows says it.
+      expect(screen.queryByText(/^A step/)).toBeNull()
+      await user.selectOptions(where, '2026-09-18')
+      expect(screen.getByText('A step on Fri, Sep 18.')).toBeInTheDocument()
+      await user.selectOptions(where, 'week')
+      expect(screen.getByText(/A step for this week — you can put it on a day/)).toBeInTheDocument()
+      await user.selectOptions(where, '2026-09-18')
       await user.click(screen.getByRole('button', { name: /add 1 item/i }))
       expect(onCommit.mock.calls[0][0].items[0]).toMatchObject({ goal: false, placement: { kind: 'date', date: '2026-09-18' } })
     })
@@ -298,15 +317,15 @@ describe('PageReviewSheet — domain, page title, duplicates', () => {
       items: [{ ...base, title: 'Recital', placement: { kind: 'season' }, dateHint: '2026-12-12' }],
     })
     // Fall runs Sep 1 – Nov 30 here, so Dec 12 is out of the window.
-    expect(screen.getByRole('combobox', { name: 'When' })).toHaveValue('season')
+    expect(screen.getByRole('combobox', { name: 'Where "Recital" goes' })).toHaveValue('season')
     expect(screen.getByText('Fall 2026')).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Next season' }))
     // The chip must NAME the season it re-windowed onto, not just window on it.
     expect(screen.getByText('Winter 2026')).toBeInTheDocument()
-    expect(screen.getByRole('combobox', { name: 'When' })).toHaveValue('2026-12-12')
+    expect(screen.getByRole('combobox', { name: 'Where "Recital" goes' })).toHaveValue('2026-12-12')
     await user.click(screen.getByRole('button', { name: 'Previous season' }))
     expect(screen.getByText('Fall 2026')).toBeInTheDocument()
-    expect(screen.getByRole('combobox', { name: 'When' })).toHaveValue('season')
+    expect(screen.getByRole('combobox', { name: 'Where "Recital" goes' })).toHaveValue('season')
   })
 
   it('a day-fact already on the calendar is listed apart and not committed', async () => {
@@ -358,12 +377,14 @@ describe('PageReviewSheet — domain, page title, duplicates', () => {
     expect(onCommit.mock.calls[0][0].items[0].sourceId).toBeUndefined()
   })
 
-  it('goal or action is one labelled choice on the left — no separate goal button', () => {
+  it('above the week there is no goal or action choice — only where a line goes, and an optional kind after it', () => {
     renderSheet({
       altitude: 'month', today: new Date(2026, 8, 5), notes: [],
       items: [{ ...base, title: 'Read a book', placement: { kind: 'month' } }],
     })
-    expect(screen.getByRole('combobox', { name: 'What is "Read a book"?' })).toHaveValue('task')
+    expect(screen.queryByRole('combobox', { name: 'What is "Read a book"?' })).toBeNull()
+    expect(screen.getByRole('combobox', { name: 'Where "Read a book" goes' })).toHaveValue('month')
+    expect(screen.getByRole('combobox', { name: 'Kind of "Read a book" (optional)' })).toHaveValue('task')
     expect(screen.queryByRole('button', { name: /a goal$/ })).toBeNull()
   })
 
@@ -391,33 +412,32 @@ describe('PageReviewSheet — linked lines and Year goals (Codex review, 2026-09
     })
     // A word-for-word repeat starts linked (2026-09-29).
     expect(screen.getByRole('status')).toHaveTextContent(/already on your plan, exactly as it is — nothing new is saved for this line, and it is not put under a goal/)
-    // No type, no when: the line IS the existing item.
-    expect(screen.queryByRole('combobox', { name: /when/i })).toBeNull()
-    expect(screen.queryByRole('combobox', { name: 'What is "Renew the passports"?' })).toBeNull()
+    // No kind, no where: the line IS the existing item.
+    expect(screen.queryByRole('combobox', { name: /goes$/i })).toBeNull()
+    expect(screen.queryByRole('combobox', { name: /Kind of/ })).toBeNull()
     expect(screen.getByText('Existing item')).toBeInTheDocument()
     expect(screen.getByRole('combobox', { name: 'Assignee for "Renew the passports"' })).toBeDisabled()
     expect(screen.getByRole('textbox', { name: 'Task title' })).toHaveAttribute('readonly')
     await user.click(screen.getByRole('button', { name: 'Don’t use it' }))
-    expect(screen.getByRole('combobox', { name: /when/i })).not.toBeDisabled()
-    expect(screen.getByRole('combobox', { name: 'What is "Renew the passports"?' })).toHaveValue('task')
+    expect(screen.getByRole('combobox', { name: 'Where "Renew the passports" goes' })).not.toBeDisabled()
+    expect(screen.getByRole('combobox', { name: 'Kind of "Renew the passports" (optional)' })).toHaveValue('task')
     await user.click(screen.getByRole('button', { name: /add 1 item/i }))
     expect(onCommit.mock.calls[0][0].items[0].sourceId).toBeUndefined()
   })
 
-  it('a wrongly classified Year goal becomes an action, an appointment or a routine, and back — note and person kept', async () => {
+  it('a Year line becomes an appointment or a routine and back onto the year’s list — note and person kept', async () => {
     const user = userEvent.setup()
     const { onCommit } = renderSheet({
       altitude: 'year', windowDates: [], notes: [],
       items: [{ ...base, title: 'Renew the passports', placement: { kind: 'goal' }, note: 'Both expire in March', assigneeId: 'm-iris' }],
     })
-    const type = screen.getByRole('combobox', { name: 'What is "Renew the passports"?' })
-    expect(type).toHaveValue('goal')
-    await user.selectOptions(type, 'task')
-    await user.selectOptions(screen.getByRole('combobox', { name: /when/i }), 'season')   // → an action on the season's list
-    await user.selectOptions(type, 'appointment')
-    await user.selectOptions(type, 'routine')
-    await user.selectOptions(type, 'goal')                                                 // → back to a Year goal
-    expect(screen.getByRole('combobox', { name: 'Goal for "Renew the passports"' })).toHaveValue('goal')
+    const kind = screen.getByRole('combobox', { name: 'Kind of "Renew the passports" (optional)' })
+    expect(kind).toHaveValue('task')
+    expect(screen.getByRole('combobox', { name: 'Where "Renew the passports" goes' })).toHaveValue('goal')
+    await user.selectOptions(kind, 'appointment')
+    await user.selectOptions(kind, 'routine')
+    await user.selectOptions(kind, 'task')                                                 // → back onto the year's list
+    expect(screen.getByRole('combobox', { name: 'Where "Renew the passports" goes' })).toHaveValue('goal')
     expect(screen.getByText('Both expire in March')).toBeInTheDocument()
     expect(screen.getByRole('combobox', { name: 'Assignee for "Renew the passports"' })).toHaveValue('m-iris')
     await user.click(screen.getByRole('button', { name: /add 1 item/i }))

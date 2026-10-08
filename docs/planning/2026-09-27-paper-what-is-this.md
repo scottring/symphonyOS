@@ -1,5 +1,16 @@
 # Plan from paper: one "What is this?" per line (2026-09-27)
 
+> **Superseded above the week (2026-10-08, branch `claude/ff-paper-next`).** On Month, Season and
+> Year pages there is no goal/task choice any more (planning model: lists above the week are for
+> looking). Every line starts as a plain item on the page's list (a year's list is its `goals` rows);
+> the row's one choice is **Where it goes** (the page's list first, This week, a day, Someday, Inbox),
+> and an optional, secondary **Kind** (List item · Appointment · Activity · Routine). A line moved off
+> the list says what that means ("A step on Tue, Oct 14."). A month or season "goal" from the reader
+> is saved as a plain line (`is_goal` false); an undated appointment or a routine with no days starts
+> as a plain line so nothing blocks the save. The Week page keeps the five-way control below. After a
+> save, a panel stays on the page (`PaperImportNext`) naming the period and count, with
+> "Continue planning" and "Done for now".
+
 Branch `claude/paper-type-selector`, from main `a0307f2e`. Local only — not pushed, merged or deployed.
 
 ## What changed

@@ -23,6 +23,9 @@ function renderSheet(items: PlanItem[], over: Partial<Parameters<typeof PageRevi
   return { onCommit }
 }
 const typeOf = (title: string) => screen.getByRole('combobox', { name: `What is "${title}"?` })
+/** Above the week: the optional kind, and where the line goes. */
+const kindOf = (title: string) => screen.getByRole('combobox', { name: `Kind of "${title}" (optional)` })
+const whereOf = (title: string) => screen.getByRole('combobox', { name: `Where "${title}" goes` })
 
 describe('PageReviewSheet — item types', () => {
   it('shows the guessed type as a selector, and saves that guess — not a plain task', async () => {
@@ -104,8 +107,8 @@ describe('PageReviewSheet — item types', () => {
   })
 
 
-  it('offers exactly the five answers, and no separate goal toggle anywhere', () => {
-    renderSheet([line('Paint the shed', { placement: { kind: 'month' }, goal: true }), line('Buy paint', { placement: { kind: 'month' } })], { altitude: 'month', today: new Date(2026, 9, 2) })
+  it('a week page offers exactly the five answers, and no separate goal toggle anywhere', () => {
+    renderSheet([line('Paint the shed', { placement: { kind: 'month' }, goal: true }), line('Buy paint', { placement: { kind: 'month' } })], { today: new Date(2026, 9, 2) })
     expect(Array.from(typeOf('Paint the shed').querySelectorAll('option')).map((o) => o.textContent))
       .toEqual(['Goal or project', 'Action / task', 'Appointment', 'Activity', 'Routine'])
     expect(typeOf('Paint the shed')).toHaveValue('goal')
@@ -116,7 +119,7 @@ describe('PageReviewSheet — item types', () => {
 
   it('switching back and forth keeps every other edit, and each type its own details', async () => {
     const user = userEvent.setup()
-    const { onCommit } = renderSheet([line('Swim', { placement: { kind: 'date', date: '2026-10-07' }, time: '16:30', note: 'Goggles', assigneeId: 'm-iris' }), line('Other')], { altitude: 'month', today: new Date(2026, 9, 2) })
+    const { onCommit } = renderSheet([line('Swim', { placement: { kind: 'date', date: '2026-10-07' }, time: '16:30', note: 'Goggles', assigneeId: 'm-iris' }), line('Other')], { today: new Date(2026, 9, 2) })
     // Edits that are not the type's: title, person, inclusion of another row.
     const title = screen.getByDisplayValue('Swim')
     await user.clear(title); await user.type(title, 'Swim lesson')
@@ -144,13 +147,14 @@ describe('PageReviewSheet — item types', () => {
   it('an appointment needs a day: its day input shows, save is blocked until set, and any day may be chosen', async () => {
     const user = userEvent.setup()
     const { onCommit } = renderSheet([line('Vet', { placement: { kind: 'month' } })], { altitude: 'month', today: new Date(2026, 9, 2) })
-    await user.selectOptions(typeOf('Vet'), 'appointment')
-    expect(screen.queryByRole('combobox', { name: 'When' })).toBeNull()
+    await user.selectOptions(kindOf('Vet'), 'appointment')
+    expect(screen.queryByRole('combobox', { name: 'Where "Vet" goes' })).toBeNull()
     expect(screen.getByRole('alert')).toHaveTextContent(/1 appointment needs its day/i)
     expect(screen.getByRole('button', { name: /add 1 item/i })).toBeDisabled()
     const day = screen.getByLabelText('Day of "Vet"')
     await user.type(day, '2026-12-03')
     expect(screen.queryByRole('alert')).toBeNull()
+    expect(screen.getByText('An appointment on Thu, Dec 3.')).toBeInTheDocument()
     await user.type(screen.getByLabelText('Time for "Vet"'), '09:15')
     await user.click(screen.getByRole('button', { name: /add 1 item/i }))
     expect(onCommit.mock.calls[0][0].items[0]).toMatchObject({ category: 'event', placement: { kind: 'date', date: '2026-12-03' }, time: '09:15', goal: false })
@@ -168,33 +172,42 @@ describe('PageReviewSheet — item types', () => {
     expect(onCommit.mock.calls[0][0].items[0]).toMatchObject({ kind: 'task', goal: true, placement: { kind: 'month' }, time: null, recurring: null })
   })
 
-  it('a year page’s goals are year goals; one can become an action and back', async () => {
+  it('a year page’s lines are on the year’s list; one can become an activity and back', async () => {
     const user = userEvent.setup()
-    const { onCommit } = renderSheet([line('Run a half', { placement: { kind: 'goal' } }), line('No school', { kind: 'dayfact', placement: { kind: 'date', date: '2026-10-06' } })], { altitude: 'year', windowDates: [] })
-    expect(typeOf('Run a half')).toHaveValue('goal')
-    expect(screen.getByRole('combobox', { name: 'Goal for "Run a half"' })).toHaveValue('goal')
+    const { onCommit } = renderSheet([line('Run a half', { placement: { kind: 'goal' } }), line('No school', { kind: 'dayfact', placement: { kind: 'date', date: '2026-10-06' } })], { altitude: 'year', windowDates: [], today: new Date(2026, 9, 2) })
+    expect(kindOf('Run a half')).toHaveValue('task')
+    expect(whereOf('Run a half')).toHaveValue('goal')
     expect(screen.getByText('Day')).toBeInTheDocument()
-    await user.selectOptions(typeOf('Run a half'), 'task')
-    expect(screen.getByRole('combobox', { name: 'When' })).toHaveValue('someday')
-    await user.selectOptions(typeOf('Run a half'), 'goal')
+    await user.selectOptions(kindOf('Run a half'), 'activity')
+    expect(whereOf('Run a half')).toHaveValue('someday')
+    await user.selectOptions(kindOf('Run a half'), 'task')
+    expect(whereOf('Run a half')).toHaveValue('goal')
     await user.click(screen.getByRole('button', { name: /add 2 items/i }))
     const saved = onCommit.mock.calls[0][0].items[0]
     expect(saved.placement).toEqual({ kind: 'goal' })
     expect(saved).not.toHaveProperty('goal')
   })
 
-  it('the ready-to-add summary counts each selected type, and linked lines apart', async () => {
+  it('above the week, the ready-to-add summary says where the lines go, and linked lines apart', async () => {
     const user = userEvent.setup()
     renderSheet([
       line('Finish the patio', { placement: { kind: 'season' }, goal: true }),
       line('Buy stain', { placement: { kind: 'season' } }),
       line('Change the furnace filter', { placement: { kind: 'season' } }),
     ], { altitude: 'season', today: new Date(2026, 8, 2), existingTasks: [{ id: 't-1', title: 'Change the furnace filters' }] })
-    expect(screen.getByText(/Ready to add:/).parentElement).toHaveTextContent('1 goal or project / 2 actions')
+    const summary = () => screen.getByText(/Ready to add:/).parentElement!
+    expect(summary()).toHaveTextContent(/Ready to add: 3 on \w+’s list$/)
     await user.click(screen.getByRole('button', { name: 'Use existing item' }))
-    expect(screen.getByText(/Ready to add:/).parentElement).toHaveTextContent('1 goal or project / 1 action / 1 already on your plan')
-    await user.selectOptions(typeOf('Buy stain'), 'activity')
-    expect(screen.getByText(/Ready to add:/).parentElement).toHaveTextContent('1 goal or project / 1 activity / 1 already on your plan')
+    expect(summary()).toHaveTextContent(/Ready to add: 2 on \w+’s list \/ 1 already on your plan/)
+    await user.selectOptions(kindOf('Buy stain'), 'activity')
+    expect(summary()).toHaveTextContent(/Ready to add: 2 on \w+’s list \/ 1 already on your plan/)
+    await user.selectOptions(whereOf('Buy stain'), 'week')
+    expect(summary()).toHaveTextContent(/Ready to add: 1 on \w+’s list \/ 1 on this week’s list \/ 1 already on your plan/)
+  })
+
+  it('a week page’s summary still counts each selected type', () => {
+    renderSheet([line('Fix gate'), line('Swim', { category: 'activity' })])
+    expect(screen.getByText(/Ready to add:/).parentElement).toHaveTextContent('1 action / 1 activity')
   })
 
   it('a linked line has no type to change: it says Linked, saves nothing new, and unlinking returns its own type', async () => {
@@ -207,15 +220,16 @@ describe('PageReviewSheet — item types', () => {
     await user.click(screen.getByRole('button', { name: /add 1 item/i }))
     expect(onCommit.mock.calls[0][0].items[0]).toMatchObject({ sourceId: 't-1' })
     await user.click(screen.getByRole('button', { name: 'Don’t use it' }))
-    expect(typeOf('Change the furnace filter')).toHaveValue('goal')
+    // Its own kind back: a plain list item (a month line is never a goal).
+    expect(kindOf('Change the furnace filter')).toHaveValue('task')
   })
 
-  it('on a month draft, this month’s goals join it; a goal for the season is saved directly', async () => {
+  it('on a month draft, list items join it; an activity or routine is saved directly', async () => {
     const user = userEvent.setup()
     renderSheet([line('Read more', { placement: { kind: 'month' }, goal: true })], { altitude: 'month', today: new Date(2026, 9, 2), draftLabelFor: () => 'October', onAddToDraft: vi.fn() })
     expect(screen.queryByText(/saved directly/i)).toBeNull()
-    await user.selectOptions(screen.getByRole('combobox', { name: 'Goal for "Read more"' }), 'season')
-    expect(screen.getByText(/saved directly/i)).toBeInTheDocument()
+    await user.selectOptions(kindOf('Read more'), 'activity')
+    expect(screen.getByText('Appointments, activities and routines are saved directly. List items join the plan you’re writing.')).toBeInTheDocument()
   })
 })
 

@@ -59,6 +59,9 @@ export interface CommitPageResult {
   route: string
   /** Human label for that period, for the success toast ("this week", "September", "Fall 2026", "2026"). */
   periodLabel: string
+  /** First day of that period: the week's start, the month's 1st, the
+   *  season's start, or Jan 1 — what the after-import panel names. */
+  periodStart: Date
   /** Ids of every task actually inserted, in commit order. Lets a caller that
    *  knows these rows are throwaway (the first-week sample page) track and
    *  later delete exactly what it created — there's no `capture_meta` column
@@ -91,7 +94,9 @@ export function useCommitPage() {
   const { areas, addGoal } = useGoalsContext()
   const { getCurrentUserMember } = useFamilyMembers()
 
-  const commitPage = useCallback(async ({ items: pageItems, notes, storagePath, monthStart, seasonStart, domain, altitude }: CommitPagePayload): Promise<CommitPageResult> => {
+  /** `successToast: false` — the caller says what was saved itself (the
+   *  after-import panel). Failures always toast. */
+  const commitPage = useCallback(async ({ items: pageItems, notes, storagePath, monthStart, seasonStart, domain, altitude }: CommitPagePayload, { successToast = true }: { successToast?: boolean } = {}): Promise<CommitPageResult> => {
     // A committed page writes the page's own domain everywhere it lands.
     const context = domain
     const now = new Date()
@@ -253,6 +258,8 @@ export function useCommitPage() {
         'error',
         6000,
       )
+    } else if (!successToast) {
+      // The caller reports success in its own words.
     } else if (parts.length) {
       const linkedNote = tasksLinked ? `. ${tasksLinked} already on your plan, left as ${tasksLinked === 1 ? 'it is' : 'they are'}` : ''
       showToast(`Added ${parts.join(', ')} to ${periodLabel}${linkedNote}`, 'success', 4000)
@@ -262,7 +269,12 @@ export function useCommitPage() {
       showToast(`Nothing new to add — ${tasksLinked === 1 ? 'that item is' : `all ${tasksLinked} items are`} already on your plan, left as ${tasksLinked === 1 ? 'it is' : 'they are'}.`, 'success', 5000)
     }
 
-    return { tasksCreated, ...(tasksLinked ? { tasksLinked } : {}), goalsCreated, notesCreated, routinesCreated, failures, route, periodLabel, createdTaskIds, createdNoteIds }
+    const periodStart = altitude === 'year' ? new Date(now.getFullYear(), 0, 1)
+      : altitude === 'season' ? commitCtx.seasonStart
+      : altitude === 'month' ? commitCtx.monthStart
+      : commitCtx.currentWeekStart
+
+    return { tasksCreated, ...(tasksLinked ? { tasksLinked } : {}), goalsCreated, notesCreated, routinesCreated, failures, route, periodLabel, periodStart, createdTaskIds, createdNoteIds }
   }, [addTask, addNote, addRoutine, areas, addGoal, getCurrentUserMember])
 
   return { commitPage }
