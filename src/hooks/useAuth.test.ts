@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { renderHook, waitFor, act } from '@testing-library/react'
 import { useAuth } from './useAuth'
+import { readAuthEmailFlow } from '@/lib/authCallback'
 import { createMockUser, createMockSession } from '@/test/mocks/factories'
 import * as Sentry from '@sentry/react'
 import { INVITE_ONLY_MESSAGE, SIGNUP_FAILED_MESSAGE } from '@/lib/signupGate'
@@ -58,6 +59,7 @@ vi.mock('@/lib/supabase', () => ({
         })
       }),
       resend: vi.fn(() => Promise.resolve({ data: {}, error: mockResendError })),
+      resetPasswordForEmail: vi.fn(() => Promise.resolve({ data: {}, error: null })),
       signOut: vi.fn(() => {
         if (mockSignOutError) {
           return Promise.resolve({ error: mockSignOutError })
@@ -559,6 +561,31 @@ describe('useAuth', () => {
       })
 
       expect(out?.error).toEqual(mockResendError)
+    })
+  })
+
+  // Review, 2026-10-08: an expired reset link and an expired confirmation link
+  // both arrive as otp_expired; remembering which one this browser asked for
+  // lets the broken-link screen start on the right recovery.
+  describe('remembering which email was asked for', () => {
+    beforeEach(() => localStorage.clear())
+
+    it('a reset request is remembered as a password reset', async () => {
+      const { result } = renderHook(() => useAuth())
+      await waitFor(() => expect(result.current.loading).toBe(false))
+      await act(async () => { await result.current.resetPassword('sam@example.com') })
+      expect(readAuthEmailFlow()).toBe('recovery')
+    })
+
+    it('a confirmation resend is remembered as confirming an account, but not when it failed', async () => {
+      const { result } = renderHook(() => useAuth())
+      await waitFor(() => expect(result.current.loading).toBe(false))
+      mockResendError = { message: 'rate limited', status: 429 }
+      await act(async () => { await result.current.resendConfirmation('sam@example.com') })
+      expect(readAuthEmailFlow()).toBeNull()
+      mockResendError = null
+      await act(async () => { await result.current.resendConfirmation('sam@example.com') })
+      expect(readAuthEmailFlow()).toBe('signup')
     })
   })
 

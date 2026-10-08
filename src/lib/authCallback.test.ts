@@ -1,9 +1,11 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, beforeEach } from 'vitest'
 import {
   readAuthCallbackError,
   withoutAuthCallbackError,
   describeResendError,
   SUPPORT_EMAIL,
+  rememberAuthEmailFlow,
+  readAuthEmailFlow,
 } from './authCallback'
 
 const ORIGIN = 'https://app.symphony-os.com'
@@ -100,5 +102,25 @@ describe('describeResendError', () => {
     const text = describeResendError({ message: 'pq: relation "x" does not exist', status: 500 })
     expect(text).toContain(SUPPORT_EMAIL)
     expect(text).not.toContain('relation')
+  })
+})
+
+describe('remembered email flow', () => {
+  beforeEach(() => localStorage.clear())
+
+  it('remembers which kind of email this browser last asked for', () => {
+    rememberAuthEmailFlow('recovery', 1000)
+    expect(readAuthEmailFlow(2000)).toBe('recovery')
+    rememberAuthEmailFlow('signup', 3000)
+    expect(readAuthEmailFlow(4000)).toBe('signup')
+  })
+
+  it('forgets after two days, and ignores anything malformed', () => {
+    rememberAuthEmailFlow('recovery', 0)
+    expect(readAuthEmailFlow(2 * 24 * 60 * 60 * 1000 + 1)).toBeNull()
+    localStorage.setItem('symphony.authEmailFlow', '{"flow":"magic","at":1}')
+    expect(readAuthEmailFlow(2)).toBeNull()
+    localStorage.setItem('symphony.authEmailFlow', 'not json')
+    expect(readAuthEmailFlow(2)).toBeNull()
   })
 })

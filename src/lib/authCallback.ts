@@ -158,3 +158,32 @@ export function describeResendError(error: {
   }
   return `We couldn't send a new link just now. Try again in a minute, or email ${SUPPORT_EMAIL}.`
 }
+
+/**
+ * What an email link was for. Supabase reports an expired confirmation link
+ * and an expired password-reset link with the same `otp_expired`, so the
+ * broken-link screen can't tell them apart from the URL. This browser
+ * remembers which kind of email it last asked for, so the screen can start on
+ * the right recovery; the person can always switch (review, 2026-10-08).
+ */
+export type AuthEmailFlow = 'signup' | 'recovery'
+
+const FLOW_KEY = 'symphony.authEmailFlow'
+/** Longer than any link stays valid; after that the hint is noise. */
+const FLOW_TTL_MS = 2 * 24 * 60 * 60 * 1000
+
+export function rememberAuthEmailFlow(flow: AuthEmailFlow, now: number = Date.now()): void {
+  try { localStorage.setItem(FLOW_KEY, JSON.stringify({ flow, at: now })) } catch { /* private mode: no hint */ }
+}
+
+export function readAuthEmailFlow(now: number = Date.now()): AuthEmailFlow | null {
+  try {
+    const raw = localStorage.getItem(FLOW_KEY)
+    if (!raw) return null
+    const { flow, at } = JSON.parse(raw) as { flow?: unknown; at?: unknown }
+    if ((flow !== 'signup' && flow !== 'recovery') || typeof at !== 'number' || now - at > FLOW_TTL_MS) return null
+    return flow
+  } catch {
+    return null
+  }
+}

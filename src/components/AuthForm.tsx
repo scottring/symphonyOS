@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useAuth } from '@/hooks/useAuth'
 import { WAITLIST_URL } from '@/lib/signupGate'
-import { SUPPORT_EMAIL, type AuthCallbackError } from '@/lib/authCallback'
+import { SUPPORT_EMAIL, readAuthEmailFlow, type AuthCallbackError } from '@/lib/authCallback'
 import { EmailLinkProblem } from '@/components/auth/EmailLinkProblem'
 
 interface AuthFormProps {
@@ -36,6 +36,9 @@ export function AuthForm({ message, callbackError }: AuthFormProps = {}) {
   const [loading, setLoading] = useState(false)
   // The broken-link explanation, until the user moves on to sign in.
   const [linkProblem, setLinkProblem] = useState<AuthCallbackError | null>(callbackError ?? null)
+  // Which kind of email this browser last asked for (confirmation or reset):
+  // an expired link of either kind arrives as the same otp_expired.
+  const [linkFlow] = useState(() => readAuthEmailFlow())
   const emailRef = useRef<HTMLInputElement>(null)
   const focusEmailRef = useRef(false)
   const { signInWithEmail, signUpWithEmail, resetPassword, resendConfirmation } = useAuth()
@@ -128,6 +131,8 @@ export function AuthForm({ message, callbackError }: AuthFormProps = {}) {
               email={email}
               onEmailChange={setEmail}
               onResend={resendConfirmation}
+              onSendReset={resetPassword}
+              initialFlow={linkFlow}
               onSignIn={leaveLinkProblem}
             />
           ) : (<>

@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
 import type { User } from '@supabase/supabase-js'
 import * as Sentry from '@sentry/react'
+import { rememberAuthEmailFlow } from '@/lib/authCallback'
 import {
   INVITE_ONLY_MESSAGE,
   SIGNUP_FAILED_MESSAGE,
@@ -182,6 +183,7 @@ export function useAuth() {
       })
       return { error: { message: SIGNUP_FAILED_MESSAGE, unexpected: true } }
     }
+    if (!error) rememberAuthEmailFlow('signup')
     return { error }
   }
 
@@ -194,6 +196,7 @@ export function useAuth() {
       email,
       options: { emailRedirectTo: `${window.location.origin}` },
     })
+    if (!error) rememberAuthEmailFlow('signup')
     return { error }
   }
 
@@ -201,6 +204,9 @@ export function useAuth() {
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
       redirectTo: `${window.location.origin}`,
     })
+    // A reset link that later comes back expired should open on "send a new
+    // reset link", not on account confirmation.
+    if (!error) rememberAuthEmailFlow('recovery')
     return { error }
   }
 

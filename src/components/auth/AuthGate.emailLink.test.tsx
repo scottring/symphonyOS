@@ -11,11 +11,12 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, waitFor, within } from '@/test/test-utils'
 import userEvent from '@testing-library/user-event'
 import { AuthGate } from './AuthGate'
+import { rememberAuthEmailFlow } from '@/lib/authCallback'
 
 const EXPIRED_HASH =
   '#error=access_denied&error_code=otp_expired&error_description=Email+link+is+invalid+or+has+expired'
 
-const { authState, mockResend } = vi.hoisted(() => ({
+const { authState, mockResend, mockReset } = vi.hoisted(() => ({
   authState: {
     user: null as { id: string; email: string } | null,
     loading: false,
@@ -23,6 +24,7 @@ const { authState, mockResend } = vi.hoisted(() => ({
     sessionLost: false,
   },
   mockResend: vi.fn(),
+  mockReset: vi.fn(),
 }))
 
 vi.mock('@/hooks/useAuth', () => ({
@@ -32,7 +34,7 @@ vi.mock('@/hooks/useAuth', () => ({
     updatePassword: vi.fn(async () => ({ error: null })),
     signInWithEmail: vi.fn(async () => ({ error: null })),
     signUpWithEmail: vi.fn(async () => ({ error: null })),
-    resetPassword: vi.fn(async () => ({ error: null })),
+    resetPassword: mockReset,
     resendConfirmation: mockResend,
   }),
 }))
@@ -58,7 +60,10 @@ beforeEach(() => {
   authState.sessionLost = false
   mockResend.mockReset()
   mockResend.mockResolvedValue({ error: null })
+  mockReset.mockReset()
+  mockReset.mockResolvedValue({ error: null })
   sessionStorage.clear()
+  localStorage.clear()
   window.history.replaceState({}, '', '/')
   for (const method of ['log', 'info', 'warn', 'error', 'debug'] as const) {
     consoleSpies.push(vi.spyOn(console, method))
@@ -197,6 +202,53 @@ describe('AuthGate — an expired or already-used email link', () => {
     rerender(gate())
     expect(await screen.findByRole('heading', { name: 'Sign In' })).toBeInTheDocument()
     expect(screen.queryByText(/expired or was already used/)).not.toBeInTheDocument()
+  })
+})
+
+// Review, 2026-10-08: Supabase reports an expired PASSWORD-RESET link with the
+// same otp_expired. A confirmation-only resend would trap those people.
+describe('AuthGate — an expired password-reset link', () => {
+  it('lets someone say it was a reset link and sends a new reset link, not a confirmation', async () => {
+    window.history.replaceState({}, '', `/${EXPIRED_HASH}`)
+    const user = userEvent.setup()
+    render(gate())
+
+    await screen.findByRole('heading', { name: 'This link has expired or was already used' })
+    expect(screen.getByRole('radio', { name: 'Confirming a new account' })).toBeChecked()
+    await user.click(screen.getByRole('radio', { name: 'Resetting my password' }))
+    await user.type(screen.getByLabelText('Email'), 'sam@example.com')
+    await user.click(screen.getByRole('button', { name: 'Send a new reset link' }))
+
+    await waitFor(() => expect(mockReset).toHaveBeenCalledWith('sam@example.com'))
+    expect(mockResend).not.toHaveBeenCalled()
+    expect(await screen.findByText(/a new password reset link is on its way/)).toBeInTheDocument()
+    expect(screen.getByText(/Remember your password\?/)).toBeInTheDocument()
+    expect(screen.queryByText(/works only after your email is confirmed/)).not.toBeInTheDocument()
+  })
+
+  it('starts on password reset when this browser last asked for a reset link', async () => {
+    rememberAuthEmailFlow('recovery')
+    window.history.replaceState({}, '', `/${EXPIRED_HASH}`)
+    const user = userEvent.setup()
+    render(gate())
+
+    expect(await screen.findByRole('radio', { name: 'Resetting my password' })).toBeChecked()
+    await user.type(screen.getByLabelText('Email'), 'sam@example.com{Enter}')
+    await waitFor(() => expect(mockReset).toHaveBeenCalledWith('sam@example.com'))
+    expect(mockResend).not.toHaveBeenCalled()
+  })
+
+  it('can switch back to confirming an account', async () => {
+    rememberAuthEmailFlow('recovery')
+    window.history.replaceState({}, '', `/${EXPIRED_HASH}`)
+    const user = userEvent.setup()
+    render(gate())
+
+    await user.click(await screen.findByRole('radio', { name: 'Confirming a new account' }))
+    await user.type(screen.getByLabelText('Email'), 'sam@example.com')
+    await user.click(screen.getByRole('button', { name: 'Send a new confirmation email' }))
+    await waitFor(() => expect(mockResend).toHaveBeenCalledWith('sam@example.com'))
+    expect(mockReset).not.toHaveBeenCalled()
   })
 })
 
