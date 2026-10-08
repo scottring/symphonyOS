@@ -64,7 +64,8 @@ import { useGoogleCalendar } from '@/hooks/useGoogleCalendar'
 import { ALL_LAYERS } from '@/lib/domains'
 
 import { NeededTodayNote } from './NeededTodayNote'
-import { TodayAddInput } from './TodayAddInput'
+import { TodayAddInput, type TodayCaptureResult } from './TodayAddInput'
+import { useHiddenAfterAdd } from '@/hooks/useHiddenAfterAdd'
 import { PhoneCaptureBar } from '@/components/layout/PhoneCaptureBar'
 import { DailyEditionPreview, useEditionPreview } from './DailyEditionPreview'
 import { TodaySectionList, findTimelineItem } from './TodaySectionList'
@@ -1344,6 +1345,25 @@ export function TodayView({
   }, [viewedDate])
   const addOpen = addOpenDay === localYmd(viewedDate)
   const canAdd = data.isToday && !!(ctx.onCreateTaskParsed ?? ctx.onCreateTask)
+  // A task the people or area filter hides says so, at the head of the list
+  // (or above the phone's capture bar) — the same lens this page draws with.
+  const afterAdd = useHiddenAfterAdd(familyMembers, { people: selectedAssignees ?? [], setPeople: onSelectAssignees })
+  const createTaskParsed = ctx.onCreateTaskParsed
+  const reportAdded = afterAdd.report
+  const addForToday = useCallback(async (r: TodayCaptureResult) => {
+    if (!createTaskParsed) return false
+    const saved = await createTaskParsed(r)
+    // Only what lands on today's list: the Inbox and Notes are other places,
+    // and a named other day is not on today's list whatever the filter.
+    const today = new Date()
+    const forToday = (r.destination ?? 'today') === 'today' && (!r.scheduledFor || localYmd(r.scheduledFor) === localYmd(today))
+    if (saved !== false && forToday) {
+      // The container's defaults (HomeViewContainer.onCreateTaskParsed): the
+      // first named person, else me; the area only from an explicit #tag.
+      reportAdded({ context: r.context ?? null, assignedTo: r.assignedMemberIds?.[0] ?? meId, assignedToAll: r.assignedMemberIds }, 'today')
+    }
+    return saved
+  }, [createTaskParsed, reportAdded, meId])
   // The page's two controls sit on the "For today" heading (approved white
   // journal, 2026-09-22): one Choose, one Add task. Nothing by the date.
   // Phones add through the floating capture bar instead (native layout).
@@ -1623,13 +1643,14 @@ export function TodayView({
                   key={localYmd(viewedDate)}
                   defaultExpanded
                   onCollapse={() => setAddOpenDay(null)}
-                  onAdd={ctx.onCreateTaskParsed!}
+                  onAdd={addForToday}
                   parserContext={ctx.parserContext!}
                   resolver={ctx.resolverContext!}
                   getRecentTaskForContact={ctx.getRecentTaskForContact}
                 />
               </div>
             )}
+            {!isMobile && afterAdd.notice && <div className="mt-2 mb-1">{afterAdd.notice}</div>}
             {tasksLoadFailed && onRetryTasks && (
               <LoadFailedNotice title="Today didn’t load." body="Your tasks are safe — this is a connection problem." onRetry={onRetryTasks} />
             )}
@@ -1899,10 +1920,11 @@ export function TodayView({
       {/* Phone: the floating capture bar above the dock (native TodayView). */}
       {isMobile && canAdd && (
         <PhoneCaptureBar>
+          {afterAdd.notice && <div className="mb-2">{afterAdd.notice}</div>}
           <div data-guide-target="today-add">
             <TodayAddInput
               variant="bar"
-              onAdd={ctx.onCreateTaskParsed!}
+              onAdd={addForToday}
               parserContext={ctx.parserContext!}
               resolver={ctx.resolverContext!}
               getRecentTaskForContact={ctx.getRecentTaskForContact}

@@ -20,7 +20,7 @@ import { isMissedPlacement } from '@/lib/week/missedPlacement'
 import { LineMenu, type LineActions, type LineVM } from './PlanLine'
 import { WeekRow } from './WeekRow'
 
-export function WeekListV2({ title, lines, weekStart, members, actions, timingControl, onContext, onAdd, dragEnabled = true, headerAction, addPicker, emptyHint, focusAdd = false, hint, forLine, forOptions }: {
+export function WeekListV2({ title, lines, weekStart, members, actions, timingControl, onContext, onAdd, dragEnabled = true, headerAction, addPicker, emptyHint, focusAdd = false, hint, forLine, forOptions, viewLine, addNotice }: {
   title: string
   lines: LineVM[]
   weekStart: Date
@@ -46,6 +46,10 @@ export function WeekListV2({ title, lines, weekStart, members, actions, timingCo
   focusAdd?: boolean
   /** A line under the heading saying what the list is for. */
   hint?: string
+  /** The narrowed view, said plainly (ActiveViewLine). */
+  viewLine?: ReactNode
+  /** After an add the view hides: why, and Show it (useHiddenAfterAdd). */
+  addNotice?: ReactNode
 }) {
   const [draft, setDraft] = useState('')
   const [forId, setForId] = useState('')
@@ -82,6 +86,7 @@ export function WeekListV2({ title, lines, weekStart, members, actions, timingCo
     <section ref={dropRef} aria-label="This week's list" className={`pv2-wl${isOver ? ' is-over' : ''}`}>
       <div className="pv2-colh">{title}{headerAction}</div>
       {hint && <p className="wk-listhint">{hint}</p>}
+      {viewLine}
       {!open.length && !done.length && <p className="pv2-hint ds-empty-body">{emptyHint ?? 'Nothing on this week’s list yet. Add below.'}</p>}
       {allPlaced && <p className="pv2-hint">Everything on this week’s list has a day.</p>}
       {groups.map((g) => (
@@ -96,6 +101,7 @@ export function WeekListV2({ title, lines, weekStart, members, actions, timingCo
         <input ref={addRef} value={draft} onChange={(e) => setDraft(e.target.value)} placeholder="Add something for this week" aria-label="Add to this week" />
         {addPicker}
       </form>
+      {addNotice && <div className="mb-2">{addNotice}</div>}
       {forOptions && forOptions.lines.length > 0 && (
         // Optional: which month line this is for. Nothing asks you to choose.
         <label className="wk-forpick">

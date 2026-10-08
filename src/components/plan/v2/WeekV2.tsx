@@ -39,6 +39,8 @@ import { WeekRow } from './WeekRow'
 import { useAddArea } from './AddArea'
 import { useAssigneeFilter } from '@/hooks/useAssigneeFilter'
 import { planPeopleLens } from '@/lib/planning/peopleLens'
+import { useHiddenAfterAdd } from '@/hooks/useHiddenAfterAdd'
+import { ActiveViewLine } from '@/components/common/ViewFilterNotice'
 import { makePlanActions, timingRemoval } from '@/lib/planning/planActions'
 import { useActionableInstances } from '@/hooks/useActionableInstances'
 import { useDayPlan } from '@/hooks/useDayPlan'
@@ -144,6 +146,8 @@ export function WeekV2({ tasks, weekStart, meId, isCurrent, days, renderDays, on
   // One people lens: the top bar's (Scott, 2026-10-04: no second set of buttons).
   const [people] = useAssigneeFilter()
   const lens = useMemo(() => planPeopleLens(people, meId), [people, meId])
+  // A line the people or area filter hides says so, beside the add row.
+  const afterAdd = useHiddenAfterAdd(members)
   // A task planned for this week's weekend with no day of its own stands in
   // the days' "Sometime this weekend", not on the list (spec §5).
   const weekTasks = useMemo(() => {
@@ -315,7 +319,11 @@ export function WeekV2({ tasks, weekStart, meId, isCurrent, days, renderDays, on
         const day = dayNamedIn(title, weekStart, new Date())
         const id = await addTask(title, undefined, undefined, day ?? undefined, { bucket: 'week', weekStart, assignedTo: meId ?? undefined, context: addArea.area, ...(day ? { isAllDay: true } : {}), ...(forId ? { sourceId: forId } : {}) })
         if (id && day) showToast(`“${title}” → ${day.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}, any time.`, 'success', 5000)
+        // Mine, in the add row's area: the same facts the insert carries.
+        if (id) afterAdd.report({ context: addArea.area ?? null, assignedTo: meId }, day ? day.toLocaleDateString('en-US', { weekday: 'long' }) : isCurrent ? 'this week' : `week ${weekNo}`)
       }}
+      viewLine={<ActiveViewLine members={members} className="mb-2" />}
+      addNotice={afterAdd.notice}
       focusAdd={focus}
       addPicker={addArea.picker}
       dragEnabled={dragEnabled} headerAction={<FromPaper altitude="week" periodStart={weekStart} tasks={tasks} />}

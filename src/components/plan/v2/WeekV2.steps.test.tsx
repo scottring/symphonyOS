@@ -13,7 +13,10 @@ vi.mock('@/hooks/useFamilyMembers', () => ({ useFamilyMembers: () => ({ members:
 vi.mock('@/hooks/useActionableInstances', () => ({ useActionableInstances: () => ({ setPlanned: vi.fn(), reschedule: vi.fn(), skip: vi.fn(), undoDone: vi.fn(), getInstancesForRange: vi.fn(async () => []) }) }))
 vi.mock('@/components/home/week/useWeekInstances', () => ({ useWeekInstances: () => [] }))
 vi.mock('@/hooks/useRoutines', () => ({ useRoutines: () => ({ activeRoutines: [] }) }))
-vi.mock('@/hooks/useDomain', () => ({ useDomain: () => ({ layers: new Set(['family', 'personal', 'work', 'unsorted']) }) }))
+vi.mock('@/hooks/useDomain', () => {
+  const lens = { layers: new Set(['family', 'personal', 'work', 'unsorted']) }
+  return { useDomain: () => lens, useDomainOptional: () => lens }
+})
 vi.mock('@/hooks/useDiscussionInbox', () => ({ useDiscussionInbox: () => ({ rows: [], unreadCount: 0, loading: false, reload: vi.fn() }) }))
 vi.mock('@/hooks/useDayLoadEvents', () => ({ useDayLoadEvents: () => ({ events: [], available: true, loading: false, range: null, failed: false }) }))
 vi.mock('./AddArea', () => ({ useAddArea: () => ({ area: undefined, picker: null }) }))
