@@ -29,8 +29,9 @@ import { useToast } from '@/hooks/useToast';
 import { useSelection } from './providers/SelectionProvider';
 import { useNavigate } from 'react-router-dom';
 import { useDomain } from '@/hooks/useDomain';
-import { layerOf } from '@/lib/domains';
+import { useAssigneeFilter } from '@/hooks/useAssigneeFilter';
 import { audienceLabel, captureConfirmation, contextLabel, hiddenByView } from '@/lib/capture/destination';
+import { hiddenBy, hiddenSentence, widenedView, type ItemFacts } from '@/lib/filters/viewVisibility';
 import type { TaskContext } from '@/types/task';
 import { useDesktopBridge } from '@/desktop/useDesktopBridge';
 import type { PinnableEntityType } from '@/types/pin';
@@ -73,7 +74,24 @@ export function useShellChrome() {
   const { toast, showToast, dismissToast } = useToast();
   const { setSelection } = useSelection();
   const navigate = useNavigate();
-  const { layers, toggle: toggleLayer } = useDomain();
+  const { layers, setLayers } = useDomain();
+  // The people filter hides a capture as surely as the area layers do.
+  const [people, setPeople] = useAssigneeFilter();
+  // Why the current view hides a new task, and the view-only widening that
+  // shows it — never a change to the task (lib/filters/viewVisibility).
+  const hiddenNow = useCallback((facts: ItemFacts) => {
+    const view = { layers, people };
+    const hidden = hiddenBy(facts, view);
+    if (!hidden) return null;
+    return {
+      sentence: hiddenSentence(facts, view, hidden, familyMembers),
+      showIt: () => {
+        const next = widenedView(facts, view, hidden);
+        if (hidden.people) setPeople([...next.people]);
+        if (hidden.area) setLayers(next.layers);
+      },
+    };
+  }, [layers, people, familyMembers, setPeople, setLayers]);
 
   // ── Capture confirmation: an inbox capture is otherwise silent, which reads
   // as "did that even save?". Confirm it landed and offer one-tap scheduling
@@ -92,7 +110,8 @@ export function useShellChrome() {
   // explicit "Show" that widens the filter. Never a silent filter or privacy
   // change (Scott + outside review, 2026-09-20).
   const showCaptureConfirmation = useCallback(
-    (taskId: string, context: TaskContext | null | undefined) => {
+    (taskId: string, facts: ItemFacts) => {
+      const context = facts.context ?? null;
       if (confirmTimerRef.current) clearTimeout(confirmTimerRef.current);
       const scheduleFor = (daysFromNow: number) => {
         const d = new Date();
@@ -101,34 +120,34 @@ export function useShellChrome() {
         void pushTask(taskId, d);
         showToast(daysFromNow === 0 ? 'Scheduled for today' : 'Scheduled for tomorrow', 'success');
       };
-      const hidden = hiddenByView(context, layers);
-      const layer = layerOf(context);
+      const hidden = hiddenNow(facts);
       setConfirmationToast({
         id: taskId,
         message: `Added to Inbox · ${contextLabel(context)} · ${audienceLabel(context)}`,
-        hint: hidden ? `Hidden by your current view (${contextLabel(context)} is unchecked).` : 'All set — or schedule it now:',
+        hint: hidden ? hidden.sentence : 'All set — or schedule it now:',
         actions: [
           // S1-07: say where it went AND link there — from any page.
           { label: 'Go to inbox', onClick: () => { dismissConfirmationToast(); navigate('/inbox'); } },
           { label: 'View', onClick: () => { dismissConfirmationToast(); navigate(`/task/${taskId}`); } },
-          ...(hidden ? [{ label: `Show ${contextLabel(context)}`, onClick: () => { toggleLayer(layer); dismissConfirmationToast(); } }] : []),
+          ...(hidden ? [{ label: 'Show it', onClick: () => { hidden.showIt(); dismissConfirmationToast(); } }] : []),
           { label: 'Today', onClick: () => scheduleFor(0) },
           { label: 'Tomorrow', onClick: () => scheduleFor(1) },
         ],
       });
       confirmTimerRef.current = setTimeout(() => setConfirmationToast(null), 10000);
     },
-    [pushTask, showToast, layers, toggleLayer, navigate, dismissConfirmationToast],
+    [pushTask, showToast, hiddenNow, navigate, dismissConfirmationToast],
   );
 
   // ── QuickCapture handlers (mirror App.tsx) ──
   const onQuickAdd = useCallback(
     async (title: string) => {
+      const assignedTo = getCurrentUserMember()?.id;
       const taskId = await addTask(title, undefined, undefined, undefined, {
-        assignedTo: getCurrentUserMember()?.id,
+        assignedTo,
         context: undefined,
       });
-      if (taskId) showCaptureConfirmation(taskId, null);
+      if (taskId) showCaptureConfirmation(taskId, { context: null, assignedTo });
     },
     [addTask, getCurrentUserMember, showCaptureConfirmation],
   );
@@ -210,32 +229,39 @@ export function useShellChrome() {
       const explicitAssignment = data.assignedMemberIds?.length
         ? data.assignedMemberIds[0]
         : getCurrentUserMember()?.id;
+      const assignedToAll =
+        data.assignedMemberIds?.length && data.assignedMemberIds.length > 1
+          ? data.assignedMemberIds
+          : undefined;
+      // What the filters read off the new row — the same values the insert carries.
+      const facts: ItemFacts = { context: data.context ?? null, assignedTo: explicitAssignment, assignedToAll };
       const taskId = await addTask(data.title, data.contactId, data.projectId, data.scheduledFor, {
         assignedTo: explicitAssignment,
-        assignedToAll:
-          data.assignedMemberIds?.length && data.assignedMemberIds.length > 1
-            ? data.assignedMemberIds
-            : undefined,
+        assignedToAll,
         category: data.category,
         context: data.context,
         isAllDay: data.isAllDay,
       });
       if (taskId) {
         if (data.scheduledFor) {
-          const hidden = hiddenByView(data.context ?? null, layers);
+          const hidden = hiddenNow(facts);
           const when = data.scheduledFor.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
           // S1-07's link, now that this is the only confirmation (S3-12).
           const there = captureConfirmation({ kind: 'dated', context: data.context ?? null, when: data.scheduledFor, isToday: data.scheduledFor.toDateString() === new Date().toDateString() });
+          // Hidden by the view: say why, and the one action widens the view
+          // (never the task) before going there.
           showToast(
-            `Scheduled for ${when} · ${contextLabel(data.context ?? null)} · ${audienceLabel(data.context ?? null)}${hidden ? ' · hidden by your current view' : ''}`,
+            `Scheduled for ${when} · ${contextLabel(data.context ?? null)} · ${audienceLabel(data.context ?? null)}${hidden ? `. ${hidden.sentence}` : ''}`,
             hidden ? 'warning' : 'success',
-            hidden ? 8000 : 5000,
-            { label: there.linkLabel, onClick: () => { navigate(there.route); } },
+            hidden ? 10000 : 5000,
+            hidden
+              ? { label: 'Show it', onClick: () => { hidden.showIt(); navigate(there.route); } }
+              : { label: there.linkLabel, onClick: () => { navigate(there.route); } },
           );
-        } else showCaptureConfirmation(taskId, data.context ?? null);
+        } else showCaptureConfirmation(taskId, facts);
       }
     },
-    [addTask, addRoutine, isConnected, createEvent, fetchEvents, defaultCalendarId, getCalendarForDomain, getDomainForCalendar, getCurrentUserMember, showToast, showCaptureConfirmation, layers, navigate],
+    [addTask, addRoutine, isConnected, createEvent, fetchEvents, defaultCalendarId, getCalendarForDomain, getDomainForCalendar, getCurrentUserMember, showToast, showCaptureConfirmation, hiddenNow, layers, navigate],
   );
 
   const onQuickAddNote = useCallback(

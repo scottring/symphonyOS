@@ -65,6 +65,8 @@ import { PLANNING_PAGE_CLASS } from '@/components/layout/pageLayout'
 import { didFor, writtenFor } from '@/lib/week/monthLinks'
 import { SeasonBand } from './PeriodShape'
 import { LineCard } from './LineCard'
+import { useHiddenAfterAdd } from '@/hooks/useHiddenAfterAdd'
+import { ActiveViewLine } from '@/components/common/ViewFilterNotice'
 
 type Level = 'month' | 'season'
 const NOUN: Record<Level, string> = { month: 'Month', season: 'Season' }
@@ -334,10 +336,14 @@ function Inner({ level }: { level: Level }) {
     else if (d === 'dropped') await dropCommitment(t.id, level, prevBounds.start)
   }
   const addArea = useAddArea()
+  // A line the people or area filter hides says so, beside the add row.
+  const afterAdd = useHiddenAfterAdd(members)
   const addLine = async (title: string) => {
-    await addTask(title, undefined, undefined, undefined, {
+    const id = await addTask(title, undefined, undefined, undefined, {
       bucket: level === 'month' ? 'month' : 'quarter', ...periodPatch(bounds), context: addArea.area,
     })
+    // Written unassigned, in the add row's area: the same facts the insert carries.
+    if (id) afterAdd.report({ context: addArea.area ?? null }, name)
   }
   // Arriving from the level above's "Choose what … takes on", the page opens
   // ready to write: the cursor in "Add to …", not another button to press
@@ -416,6 +422,7 @@ function Inner({ level }: { level: Level }) {
           <span>{aboveName} list</span><small>for reference</small>
         </button>
       )}
+      <ActiveViewLine members={members} className="mb-2" />
       {loading && !main.length ? <p className="pv2-hint">Loading…</p> : null}
       {/* A failed read is not an empty plan: "Nothing on October's plan
           yet" over a list that didn't load invites re-writing it. The hook's
@@ -442,6 +449,7 @@ function Inner({ level }: { level: Level }) {
         <input ref={addRef} value={draft} onChange={(e) => setDraft(e.target.value)} placeholder={`Add to ${name}`} aria-label={`Add to ${name}`} />
         {addArea.picker}
       </form>
+      {afterAdd.notice && <div className="mb-2">{afterAdd.notice}</div>}
       {section(`Carried to ${nextName}`, carried)}
       {section('Someday', someday)}
       {dropped.length > 0 && <>
