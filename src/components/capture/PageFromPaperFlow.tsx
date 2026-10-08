@@ -158,21 +158,21 @@ export function PageFromPaperFlow({ members, onClose, existingTasks, calendarTit
   const handleCommit = useCallback(async (payload: PageReviewPayload) => {
     setCommitting(true)
     try {
+      // Whoever is signed in as the save begins owns what it says afterwards,
+      // even if the tab changes accounts while it is in flight.
+      const { data: { user: initiator } } = await getAuthUser()
       // The sheet asks which layer the page belongs to; the payload carries it.
       // The panel left on the page says what was saved; no success toast.
       const committed = await commitPage({ ...payload, storagePath: result.storagePath, altitude: result.altitude }, { successToast: false })
       const { route, createdTaskIds, createdNoteIds } = committed
-      if (sample && (createdTaskIds.length || createdNoteIds.length)) {
-        const { data: { user } } = await getAuthUser()
-        if (user) {
-          const existing = readSampleIds(user.id)
-          writeSampleIds(user.id, {
-            taskIds: [...existing.taskIds, ...createdTaskIds],
-            noteIds: [...existing.noteIds, ...createdNoteIds],
-          })
-        }
+      if (sample && initiator && (createdTaskIds.length || createdNoteIds.length)) {
+        const existing = readSampleIds(initiator.id)
+        writeSampleIds(initiator.id, {
+          taskIds: [...existing.taskIds, ...createdTaskIds],
+          noteIds: [...existing.noteIds, ...createdNoteIds],
+        })
       }
-      announcePaperImport(savedImportOf(payload, committed, result.altitude))
+      if (initiator) announcePaperImport(initiator.id, savedImportOf(payload, committed, result.altitude))
       reset()
       onClose()
       navigate(route)

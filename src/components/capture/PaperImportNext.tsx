@@ -14,6 +14,7 @@ import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'reac
 import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import { Check } from 'lucide-react'
+import { useAuth } from '@/hooks/useAuth'
 import { useGuidedPlan } from '@/hooks/useGuidedPlan'
 import { useGuideNext } from '@/components/guide/GuideBar'
 import { currentStep, pageOf, stepPath, stepShortName, isReview } from '@/lib/guide/guidedPlan'
@@ -47,13 +48,17 @@ function useFirstHost(): boolean {
 }
 
 export function PaperImportNext() {
-  const saved = usePaperImport()
+  // Only the signed-in person's own import: a tab that changed accounts
+  // must not show (or steer by) the last account's.
+  const { user } = useAuth()
+  const owner = user?.id ?? null
+  const saved = usePaperImport(owner)
   const first = useFirstHost()
-  if (!saved || !first) return null
-  return createPortal(<Panel key={saved.id} saved={saved} />, document.body)
+  if (!owner || !saved || !first) return null
+  return createPortal(<Panel key={`${owner}:${saved.id}`} owner={owner} saved={saved} />, document.body)
 }
 
-function Panel({ saved }: { saved: SavedImport }) {
+function Panel({ owner, saved }: { owner: string; saved: SavedImport }) {
   const navigate = useNavigate()
   const { state: guide } = useGuidedPlan()
   const guideNext = useGuideNext()
@@ -61,8 +66,8 @@ function Panel({ saved }: { saved: SavedImport }) {
   // Announced just now, as the review closed: take focus once, so the next
   // Tab is "Continue planning" (a panel restored after a reload does not).
   useEffect(() => {
-    if (takeFresh(saved.id)) ref.current?.focus({ preventScroll: true })
-  }, [saved.id])
+    if (takeFresh(owner, saved.id)) ref.current?.focus({ preventScroll: true })
+  }, [owner, saved.id])
 
   const { headline, detail } = savedHeadline(saved)
   const next = useMemo(() => {
@@ -108,7 +113,7 @@ function Panel({ saved }: { saved: SavedImport }) {
 
   const onContinue = () => {
     // The week opens with this month beside it, the imported lines marked.
-    if (next.weekFocus) setPaperWeekFocus({ monthStart: saved.periodStart, taskIds: saved.taskIds })
+    if (next.weekFocus) setPaperWeekFocus(owner, { monthStart: saved.periodStart, taskIds: saved.taskIds })
     clearPaperImport()
     next.go()
   }
