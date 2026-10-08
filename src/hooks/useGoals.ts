@@ -78,6 +78,16 @@ function dbActionToAction(db: DbGoalAction): GoalAction {
   }
 }
 
+// Same-tab announcement of a goal that was saved: read-only, for observers
+// such as the guide's "Show me" coach (GuideCoach) that need to know a year
+// line landed without holding their own copy of the goals.
+const goalWrites = new EventTarget()
+export function onGoalAdded(listener: (goal: Goal) => void): () => void {
+  const fn = (e: Event) => listener((e as CustomEvent<Goal>).detail)
+  goalWrites.addEventListener('added', fn)
+  return () => goalWrites.removeEventListener('added', fn)
+}
+
 // ============================================================================
 // Hook
 // ============================================================================
@@ -324,6 +334,7 @@ export function useGoals() {
 
     const real = dbGoalToGoal(data as DbGoal, [], [])
     setGoals(prev => prev.map(g => g.id === tempId ? real : g))
+    goalWrites.dispatchEvent(new CustomEvent<Goal>('added', { detail: real }))
     return real
   }, [user, currentYear, goals])
 

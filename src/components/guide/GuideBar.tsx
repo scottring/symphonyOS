@@ -4,10 +4,13 @@
 // ordinary page saying where you are on your chosen path, the one question
 // this step asks, and how to move on. The page under it is the real planner —
 // what you write there IS the plan. Paused, it shrinks to one line on Today.
-import { createContext, useContext, type ReactNode } from 'react'
+import { createContext, useCallback, useContext, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { useNavigate, useLocation } from 'react-router-dom'
+import { LocateFixed } from 'lucide-react'
 import { useGuidedPlan } from '@/hooks/useGuidedPlan'
+import { useMobile } from '@/hooks/useMobile'
+import { GuideCoach } from './GuideCoach'
 import { usePlanningSession, monthToken, weekToken, yearToken, type SessionHorizon } from '@/hooks/usePlanningSession'
 import { readSeasons, seasonToken } from '@/lib/cadence/seasons'
 import { readCadenceConfig } from '@/lib/cadence/config'
@@ -15,8 +18,8 @@ import { weekOfYear } from '@/lib/planning/horizonNumerals'
 import { writePlanView } from '@/lib/planning/v2/planV2'
 import { showToast } from '@/hooks/useToast'
 import {
-  advance, back, currentStep, finishHere, isReview, onStepPage, pageOf, parseYmd, pause, resume, stepIdeas, stepPath, stepShortName, stepTitle,
-  STEP_QUESTION, STEP_WHY, type GuideState, type GuideStep,
+  advance, back, currentStep, finishHere, isReview, onStepPage, pageOf, parseYmd, pause, recordCoach, resume, stepIdeas, stepPath, stepShortName, stepTitle, withCoach,
+  STEP_QUESTION, STEP_WHY, type CoachSaw, type GuideState, type GuideStep,
 } from '@/lib/guide/guidedPlan'
 
 /**
@@ -86,6 +89,13 @@ function GuideBarInner(): ReactNode {
   const { horizon, token } = state ? tokenFor(step, state) : { horizon: 'weekly' as SessionHorizon, token: '' }
   const session = usePlanningSession(horizon, token)
   const next = useGuideNext()
+  const mobile = useMobile()
+  // Esc (or ✕) puts the coach out of sight for this step only; the toggle
+  // or the next step brings it back. Never saved: it is not a preference.
+  const [hiddenAt, setHiddenAt] = useState<string | null>(null)
+  const stepKey = state ? `${state.current}:${step}` : ''
+  const hideCoach = useCallback(() => setHiddenAt(stepKey), [stepKey])
+  const recordSaw = useCallback((saw: CoachSaw) => { if (state) void set(recordCoach(state, step, saw)) }, [state, step, set])
   // /start is where a run is chosen and resumed; it says so itself.
   if (!state || state.status === 'finished' || pathname === '/start') return null
 
@@ -114,6 +124,27 @@ function GuideBarInner(): ReactNode {
   const review = isReview(step)
   const nextShort = last ? '' : stepShortName(state.steps[i + 1], state, seasons, weekNo)
   const go = (next: GuideState) => { const st = currentStep(next); prepareView(st); navigate(stepPath(st, next)) }
+  const continueLabel = review ? (last ? 'Finish' : `Continue to ${nextShort}`)
+    : last ? (step === 'today' ? 'Finish' : `Mark ${short} planned and finish`) : step === 'today' ? 'Continue' : `Mark ${short} planned and continue`
+  // "Show me where things go": chosen at the start, switchable here.
+  const coachOn = !!state.coach
+  const coachHidden = hiddenAt === stepKey
+  const coachShown = coachOn && !coachHidden
+  const toggleCoach = () => {
+    if (coachOn && coachHidden) { setHiddenAt(null); return }
+    setHiddenAt(null)
+    void set(withCoach(state, !coachOn))
+  }
+  const weekName = state.periods.week ? stepShortName('week', state, seasons, weekNo).replace(/^w/, 'W') : undefined
+  const coachNames = {
+    here: step === 'week' ? weekName ?? short : step === 'today' ? 'Today' : short,
+    above: step === 'week' && state.periods.month ? stepShortName('month', state, seasons, weekNo)
+      // The month the week's page sets beside it: the one holding its middle.
+      : step === 'week' && state.periods.week ? new Date(parseYmd(state.periods.week).getTime() + 3 * 86400000).toLocaleDateString('en-US', { month: 'long' })
+      : step === 'today' ? weekName ?? 'this week' : undefined,
+    week: weekName,
+    weekStart: state.periods.week,
+  }
 
   const onContinue = async () => {
     // Moving on agrees this period's plan — the same record "This is our …
@@ -158,16 +189,21 @@ function GuideBarInner(): ReactNode {
       ) })()}
       <div className="guide-acts">
         {i > 0 && <button type="button" className="pv2-link pv2-quiet" onClick={() => { const b = back(state); void set(b); go(b) }}>Back</button>}
+        <button type="button" className={`pv2-link pv2-quiet guide-showme${coachShown ? ' is-on' : ''}`} aria-pressed={coachShown} onClick={toggleCoach}
+          title="Point to the control to use on each page, and say where things are saved">
+          <LocateFixed size={14} aria-hidden="true" />Show me where things go
+        </button>
         <span className="flex-1" />
         <button type="button" className="pv2-link pv2-quiet" onClick={() => void onLeave()}>Save and leave</button>
         {!last && <button type="button" className="pv2-link pv2-quiet" onClick={() => void onFinishHere()}>Finish here</button>}
         {here
-          ? <button type="button" className="pv2-btn" onClick={() => void onContinue()}>
-              {review ? (last ? 'Finish' : `Continue to ${nextShort}`)
-                : last ? (step === 'today' ? 'Finish' : `Mark ${short} planned and finish`) : step === 'today' ? 'Continue' : `Mark ${short} planned and continue`}
-            </button>
+          ? <button type="button" className="pv2-btn" data-guide-target="guide-continue" onClick={() => void onContinue()}>{continueLabel}</button>
           : <button type="button" className="pv2-btn" onClick={() => go(state)}>Go to {review ? stepShortName(pageOf(step), state, seasons, weekNo) : short}</button>}
       </div>
+      {coachOn && here && (
+        <GuideCoach key={stepKey} state={state} step={step} names={coachNames} mobile={mobile}
+          hidden={coachHidden} onHide={hideCoach} onRecord={recordSaw} continueLabel={continueLabel} />
+      )}
     </section>
   )
 }

@@ -63,7 +63,7 @@ export function TodayWeekColumn({ plan, day, weekNo, weekStart, actions, nextWee
       </button>
       {title(e)}
       <span className="pv2-refacts">
-        <button type="button" className="pv2-addbtn today-ref-add" onClick={() => toToday(e)} aria-label={`Add ${e.title} to today`}><span>+ Today</span></button>
+        <button type="button" className="pv2-addbtn today-ref-add" data-guide-target={e.kind === 'task' ? 'today-choose' : undefined} data-guide-id={e.id} onClick={() => toToday(e)} aria-label={`Add ${e.title} to today`}><span>+ Today</span></button>
       </span>
     </li>
   )
