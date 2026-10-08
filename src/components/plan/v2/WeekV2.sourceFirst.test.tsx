@@ -63,7 +63,10 @@ describe('WeekV2 — the week at rest', () => {
     expect(ref.querySelector('[data-mark="goal"]')).toBeNull()
     expect(screen.queryByRole('button', { name: /\+ Step|Week 41’s part/ })).toBeNull()
     expect(screen.getByText('Toss umbrella')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Add Plan sabbatical to this week' })).toBeInTheDocument()
+    // The month line's own action is writing weekly actions for it; taking
+    // the line itself into the week stays, quieter (2026-10-08).
+    expect(screen.getByRole('button', { name: 'Add a weekly action for Plan sabbatical' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Put Plan sabbatical itself on this week' })).toBeInTheDocument()
   })
 
   it('the month lists no earlier work and no routines', () => {

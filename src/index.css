@@ -3814,3 +3814,9 @@ html.rail-stuck .desktop-workspace-nav:has(.page-navigation-center:not(:empty)) 
   :is(.pv2-week, .pv2-page) .pv2-ref .pv2-rrow:focus-within .pv2-refacts,
   :is(.pv2-week, .pv2-page) .pv2-ref .pv2-rrow.is-linked .pv2-refacts { opacity: 1; pointer-events: auto; }
 }
+
+/* Beneath a season's or month's whole list: the next horizon (2026-10-08). */
+.pv2-onward { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; margin: 18px 0 6px; padding: 12px 14px; border-radius: 12px; background: var(--color-primary-50); border: 1px solid var(--color-primary-100); }
+.pv2-onward-why { flex: 1 1 18rem; margin: 0; font-size: 13.5px; line-height: 1.45; color: var(--color-neutral-700); }
+.pv2-onward .pv2-btn { white-space: normal; text-align: left; }
+.pv2-decidefail { margin: 8px 0 0; color: var(--color-danger-600); }

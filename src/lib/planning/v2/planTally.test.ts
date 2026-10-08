@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { EMPTY_TALLY, addToTally, decidedSentence, lookBackWhy, nextAfterSave, planWhy, tallySentence } from './planTally'
+import { EMPTY_TALLY, addToTally, decidedSentence, lookBackWhy, nextAfterSave, onwardStep, planWhy, tallySentence } from './planTally'
 
 describe('planTally', () => {
   it('says what a look-back decided, in order, skipping zeros', () => {
@@ -61,5 +61,34 @@ describe('nextAfterSave', () => {
   })
   it('a year hands to a season', () => {
     expect(nextAfterSave('year', new Date(2026, 0, 1), true, sep29, helpers).label).toBe('Write Fall’s list')
+  })
+})
+
+describe('onwardStep — the next horizon offered beneath a list at rest (2026-10-08)', () => {
+  const helpers = {
+    weekStartOf: (d: Date) => { const x = new Date(d); x.setDate(x.getDate() - ((x.getDay() - 6 + 7) % 7)); return x }, // Saturday weeks
+    weekNumber: () => 41,
+    seasonOf: () => ({ start: new Date(2026, 8, 1), name: 'Fall' }),
+  }
+  const oct8 = new Date(2026, 9, 8)
+  it('a running season names the month it is in, and keeps the season beside it', () => {
+    expect(onwardStep('season', new Date(2026, 8, 1), 'Fall', true, oct8, helpers)).toEqual({
+      label: 'Continue to October', to: '/month?start=2026-10-01',
+      why: 'Choose what you want to move forward in October. Fall’s list stays beside it.',
+    })
+  })
+  it('a season ahead names its own first month', () => {
+    expect(onwardStep('season', new Date(2026, 11, 1), 'Winter', false, oct8, helpers).label).toBe('Continue to December')
+  })
+  it('a running month names this dated week and says not every priority needs a step', () => {
+    const o = onwardStep('month', new Date(2026, 9, 1), 'October', true, oct8, helpers)
+    expect(o.label).toBe('Plan week 41 · Oct 3 – Oct 9')
+    expect(o.to).toBe('/week?start=2026-10-03')
+    expect(o.why).toMatch(/Not every priority needs something every week/)
+  })
+  it('the same destination as after a save', () => {
+    for (const [lvl, start, cur] of [['season', new Date(2026, 8, 1), true], ['month', new Date(2026, 10, 1), false]] as const) {
+      expect(onwardStep(lvl, start, 'X', cur, oct8, helpers).to).toBe(nextAfterSave(lvl, start, cur, oct8, helpers).to)
+    }
   })
 })

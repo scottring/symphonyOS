@@ -49,7 +49,7 @@ import { weekOfYear } from '@/lib/planning/horizonNumerals'
 import { CloseOut, type CloseDecision } from './FocusDeck'
 import { PlanMeetingBar, PlanSavedLine, PlanToolbar, PlanToolbarControls, PlanToolbarStatus, type PlanToolbarProps } from './PlanStatus'
 import { GuideAnchor } from '@/components/guide/GuideBar'
-import { EMPTY_TALLY, addToTally, decidedSentence, lookBackWhy, planWhy, nextAfterSave, type Tally } from '@/lib/planning/v2/planTally'
+import { EMPTY_TALLY, addToTally, decidedSentence, lookBackWhy, planWhy, nextAfterSave, onwardStep, type Tally } from '@/lib/planning/v2/planTally'
 import { FromPaper } from './FromPaper'
 import { useAddArea } from './AddArea'
 import { useAssigneeFilter } from '@/hooks/useAssigneeFilter'
@@ -64,6 +64,12 @@ import { currentStep, stepShortName } from '@/lib/guide/guidedPlan'
 import { PLANNING_PAGE_CLASS } from '@/components/layout/pageLayout'
 import { didFor, writtenFor } from '@/lib/week/monthLinks'
 import { SeasonBand } from './PeriodShape'
+import { OpenJournal, PlanLayoutSwitch, type JournalSection } from './OpenJournal'
+import { MonthLink } from './MonthLink'
+import { useSafeAdd } from './useSafeAdd'
+import { groupByParent, parentOf, relinkUpdates, untouchedCount, MONTH_TO_SEASON } from '@/lib/planning/journalGroups'
+import { anOrA } from '@/lib/week/monthLinks'
+import { readPlanLayout, writePlanLayout, type PlanLayout } from '@/lib/planning/v2/planLayout'
 import { LineCard } from './LineCard'
 
 type Level = 'month' | 'season'
@@ -244,6 +250,20 @@ function Inner({ level }: { level: Level }) {
       seasonOf: (d) => { const b = periodBounds('season', d, seasons); return { start: b.start, name: b.label.replace(/\s+\d{4}$/, '') } },
     })
   }, [level, isCurrent, today, bounds.start, seasons])
+  // The same hand-on, offered beneath the list at rest (2026-10-08).
+  const onward = useMemo(() => {
+    const wso = readCadenceConfig().weekStartsOn
+    return onwardStep(level, bounds.start, name, isCurrent, today, {
+      weekStartOf: (d) => weekStartAnchor(d, wso), weekNumber: (d) => weekOfYear(d, wso),
+      seasonOf: (d) => { const b = periodBounds('season', d, seasons); return { start: b.start, name: b.label.replace(/\s+\d{4}$/, '') } },
+    })
+  }, [level, bounds.start, name, isCurrent, today, seasons])
+  // One onward step for the whole page. In the journal, the next page opens
+  // in the journal too — it carries the context, never any of the lines.
+  const goOnward = () => {
+    writePlanView(level === 'season' ? 'month' : 'week', 'ref')
+    navigate(onward.to, { state: { write: true, ref: true, ...(journalOn ? { journal: true } : {}) } })
+  }
   const startMeeting = () => {
     const candidateIds = reviewIds
     setTally(EMPTY_TALLY)
@@ -319,25 +339,35 @@ function Inner({ level }: { level: Level }) {
       ? (isCurrent ? { label: 'Into this week', run: async (t) => { await gated.pushTask(t.id, 'week'); showToast(`“${t.title}” → this week · still on ${name}’s list.`, 'success', 5000, { label: 'Open week', onClick: () => navigate('/week') }) } } : undefined)
       : undefined,
   }
-  const decide = async (vm: LineVM, d: CloseDecision) => {
+  // Only a decision that saved is counted; a failed one leaves its card (2026-10-08 review).
+  const decide = async (vm: LineVM, d: CloseDecision): Promise<boolean> => {
     const t = vm.task
-    setTally((x) => addToTally(x, d))
+    // Each writer's own contract: keepForward resolves the id (undefined on
+    // failure); the rest resolve true when stored.
+    let ok = true
     if (d === 'carried') {
-      await keepForward(t.id, periodPatch(bounds), prevBounds.start)
+      ok = !!(await keepForward(t.id, periodPatch(bounds), prevBounds.start))
+      if (!ok) return false
       // "Come up with October business plan", now November's: offer the
       // new name rather than keep a title that names the wrong month (#29).
       const renamed = renamedForPeriod(t.title, prevName, name)
       if (renamed) showToast(`“${t.title}” carried to ${name}.`, 'success', 9000, { label: `Rename to “${renamed}”`, onClick: () => { void updateTask(t.id, { title: renamed }) } })
     }
-    else if (d === 'done') { if (!t.completed) await toggleTask(t.id) }
-    else if (d === 'someday') await gated.updateTask(t.id, { bucket: 'someday', scheduledFor: undefined, isAllDay: undefined })
-    else if (d === 'dropped') await dropCommitment(t.id, level, prevBounds.start)
+    else if (d === 'done') { if (!t.completed) ok = (await toggleTask(t.id)) === true }
+    else if (d === 'someday') ok = (await gated.updateTask(t.id, { bucket: 'someday', scheduledFor: undefined, isAllDay: undefined })) === true
+    else if (d === 'dropped') ok = (await dropCommitment(t.id, level, prevBounds.start)) === true
+    if (ok) setTally((x) => addToTally(x, d))
+    return ok
   }
   const addArea = useAddArea()
-  const addLine = async (title: string) => {
-    await addTask(title, undefined, undefined, undefined, {
-      bucket: level === 'month' ? 'month' : 'quarter', ...periodPatch(bounds), context: addArea.area,
+  // Resolves true only once stored, so the box keeps its words otherwise
+  // (2026-10-08 review: the result was dropped and the box cleared at once).
+  // `forId`: the Fall line it is written for — source_id, never goal_task_id.
+  const addLine = async (title: string, forId?: string): Promise<boolean> => {
+    const id = await addTask(title, undefined, undefined, undefined, {
+      bucket: level === 'month' ? 'month' : 'quarter', ...periodPatch(bounds), context: addArea.area, ...(forId ? { sourceId: forId } : {}),
     })
+    return !!id
   }
   // Arriving from the level above's "Choose what … takes on", the page opens
   // ready to write: the cursor in "Add to …", not another button to press
@@ -345,6 +375,11 @@ function Inner({ level }: { level: Level }) {
   const addRef = useRef<HTMLInputElement>(null)
   const location = useLocation()
   const arrivedToWrite = !!(location.state as { write?: boolean } | null)?.write
+  // Lists or Open journal (month only): this device's choice; arriving from
+  // an onward step taken in the journal opens it for this visit (2026-10-08).
+  const [layout, setLayoutState] = useState<PlanLayout>(() => (level === 'month' && (location.state as { journal?: boolean } | null)?.journal ? 'journal' : level === 'month' ? readPlanLayout('month') : 'lists'))
+  const setLayout = (v: PlanLayout) => { setLayoutState(v); writePlanLayout('month', v) }
+  const journalOn = level === 'month' && layout === 'journal'
   useEffect(() => { if (arrivedToWrite && !loading) addRef.current?.focus() }, [arrivedToWrite, loading])
 
   // ── The month's calendar takes its lines (the week's drag, one rung up) ──
@@ -390,7 +425,7 @@ function Inner({ level }: { level: Level }) {
   // ── Rendering ──────────────────────────────────────────────────────────
   const [openLine, setOpenLine] = useState<string | null>(null)
   const [showDropped, setShowDropped] = useState(false)
-  const [draft, setDraft] = useState('')
+  const listBox = useSafeAdd((v) => addLine(v), addRef, localYmd(bounds.start))
   const inMeeting = !!meeting
   const tasksLoadFailed = !loading && !!tasksError && tasks.length === 0
   const numeral = level === 'month'
@@ -437,11 +472,23 @@ function Inner({ level }: { level: Level }) {
       {/* Always open (Scott, 2026-09-29: "why is it not possible to add items
           directly to the month list?") — the review is for closing out and
           agreeing, not a gate on writing. */}
-      <form className="pv2-write" onSubmit={(e) => { e.preventDefault(); const v = draft.trim(); if (v) { void addLine(v); setDraft('') } }}>
+      <form className="pv2-write" onSubmit={(e) => { e.preventDefault(); void listBox.submit() }}>
         <span className="pv2-dash" aria-hidden="true" />
-        <input ref={addRef} value={draft} onChange={(e) => setDraft(e.target.value)} placeholder={`Add to ${name}`} aria-label={`Add to ${name}`} />
+        <input ref={addRef} value={listBox.draft} onChange={(e) => listBox.setDraft(e.target.value)} placeholder={`Add to ${name}`} aria-label={`Add to ${name}`} aria-busy={listBox.saving || undefined} />
         {addArea.picker}
       </form>
+      {listBox.failed && <p className="wk-addfail" role="alert">That didn’t save — your words are still in the box. Press Enter to try again.</p>}
+      {!inMeeting && !guidedReview && main.some((l) => !l.task.completed) && (
+        // Beneath the whole list, when there is one: the next horizon, with
+        // this list kept beside it. Nothing moves on by itself — write as many
+        // lines as you like first (walkthrough 2026-10-08).
+        <div className="pv2-onward" role="group" aria-label="Next step">
+          <p className="pv2-onward-why">When {name}’s list looks right: {onward.why}</p>
+          <button type="button" className="pv2-btn" onClick={goOnward}>
+            {onward.label} →
+          </button>
+        </div>
+      )}
       {section(`Carried to ${nextName}`, carried)}
       {section('Someday', someday)}
       {dropped.length > 0 && <>
@@ -471,6 +518,80 @@ function Inner({ level }: { level: Level }) {
       </div>
     </aside>
   )
+  // ── Open journal (month): each Fall line beside what October writes for it ──
+  // The Fall lines are the reference this page already shows (the reader's
+  // own scope); an October line for anything else stands in "Everything
+  // else", with no title or group for a line the reader can't see here.
+  const seasonParents = aboveRows.flatMap((r) => (r.task ? [{ id: r.id, task: r.task }] : []))
+  const visibleSeason = new Set(seasonParents.map((p) => p.id))
+  const seasonOptions = { month: aboveName, lines: seasonParents.filter((p) => !p.task.completed).map((p) => ({ id: p.id, title: p.task.title })) }
+  const setSeasonLink = async (t: Task, lineId: string | null) => {
+    const { updates, revealed } = relinkUpdates(t, lineId, MONTH_TO_SEASON, visibleSeason)
+    if (!Object.keys(updates).length) return
+    const before = Object.fromEntries(Object.keys(updates).map((k) => [k, t[k as keyof Task]])) as Partial<Task>
+    if ((await updateTask(t.id, updates)) === false) return
+    const line = lineId ? seasonParents.find((p) => p.id === lineId)?.task : null
+    const still = revealed ? seasonParents.find((p) => p.id === revealed)?.task : null
+    showToast(line ? `“${t.title}” is for ${aboveName}: ${line.title}.` : still ? `“${t.title}” is no longer written for that line; it still shows under “${still.title}”.` : `“${t.title}” is no longer tied to ${anOrA(aboveName)} ${aboveName} line.`,
+      'success', 6000, { label: 'Undo', onClick: () => { void updateTask(t.id, before) } })
+  }
+  const journalColumn = () => {
+    const { groups, general } = groupByParent(seasonParents, mainAll.map((v) => v.task), MONTH_TO_SEASON)
+    const vmById = new Map(mainAll.map((v) => [v.task.id, v]))
+    const shownFor = (t: Task) => {
+      const p = parentOf(t, MONTH_TO_SEASON, visibleSeason)
+      const pt = p ? seasonParents.find((x) => x.id === p.id) : undefined
+      return pt ? { id: pt.id, title: pt.task.title, month: aboveName } : null
+    }
+    const jrow = (t: Task, itself = false) => {
+      const vm = vmById.get(t.id)!
+      return <PlanLine key={t.id} vm={vm} actions={actions} members={members} nextLabel={nextName}
+        open={openLine === t.id} onToggle={() => setOpenLine((o) => (o === t.id ? null : t.id))} editable={false} draggable={dragOn}
+        extra={itself ? <span className="wk-itself">This {aboveName} line itself is on {name}’s list</span>
+          : !t.completed ? <MonthLink title={t.title} current={shownFor(t)} options={seasonOptions} onChange={(id) => void setSeasonLink(t, id)} /> : undefined} />
+    }
+    const shown = groups.filter((g) => !g.parent.task.completed || g.entries.length)
+    const sections: JournalSection[] = shown.map((g) => ({
+      key: g.parent.id, eyebrow: `This ${aboveName}`, title: g.parent.task.title, done: !!g.parent.task.completed,
+      rows: g.entries.map((t) => jrow(t, g.itself && t.id === g.parent.id)),
+      empty: `Nothing for ${name} yet — leave it for later if it can wait.`,
+      composer: { label: `What would move this forward in ${name}?`, placeholder: `Add ${anOrA(name)} ${name} line`, onAdd: (title) => addLine(title, g.parent.id) },
+    }))
+    const untouched = untouchedCount(shown.filter((g) => !g.parent.task.completed), (t) => !t.completed)
+    const seasonStart = periodBounds('season', bounds.start, seasons).start
+    return (
+      <div className="pv2-dropcol">
+        <OpenJournal label={`${name}, by ${aboveName} line`} periodKey={localYmd(bounds.start)}
+          intro={<div className="oj-intro">
+            <p className="oj-lede">Each {aboveName} line, with what {name} does for it. Leave any of them for later.</p>
+            <div className="oj-intro-tools">
+              <span className="oj-area">New lines go in {addArea.picker}</span>
+              <FromPaper altitude={level} periodStart={bounds.start} tasks={layered} />
+              <button type="button" className="pv2-link" onClick={() => navigate(`/season?start=${localYmd(seasonStart)}`, { state: { write: true } })}>Add to {aboveName}’s list →</button>
+            </div>
+          </div>}
+          sections={sections}
+          general={{
+            key: 'general', eyebrow: 'Everything else', title: `Not tied to ${anOrA(aboveName)} ${aboveName} line`,
+            rows: general.map((t) => jrow(t)), empty: `Nothing else on ${name}’s list.`,
+            composer: { label: `Something else for ${name}`, placeholder: `Add to ${name}`, onAdd: (title) => addLine(title) },
+          }}
+          footer={<>
+            {shown.length > 0 && <p className="oj-untouched">{untouched === 0 ? `Each ${aboveName} line has something in ${name}.`
+              : `${untouched} ${aboveName} ${untouched === 1 ? 'line has' : 'lines have'} nothing in ${name} yet — you can leave ${untouched === 1 ? 'it' : 'them'} for later.`}</p>}
+            {!guidedReview && main.some((l) => !l.task.completed) && (
+              <div className="pv2-onward" role="group" aria-label="Next step">
+                <p className="pv2-onward-why">When {name}’s plan looks right: {onward.why}</p>
+                <button type="button" className="pv2-btn" onClick={goOnward}>{onward.label} →</button>
+              </div>
+            )}
+          </>} />
+        {section(`Carried to ${nextName}`, carried)}
+        {section('Someday', someday)}
+      </div>
+    )
+  }
+
   const calendar = level === 'month' ? (
     <DatesCalendar start={bounds.start} end={bounds.end} landmarks={landmarks} today={today} selected={openLm} onSelect={setOpenLm}
       onOpenWeek={(ws) => navigate(`/week?start=${localYmd(ws)}`)} available={available || eventsLoading} planned={plannedOn}
@@ -501,6 +622,9 @@ function Inner({ level }: { level: Level }) {
   } else if (meeting?.step === 1) {
     body = <CloseOut lines={prevLines} candidateIds={meeting.candidateIds} members={members} actions={actions} prevName={prevName} nextName={name}
       onDecide={decide} onFinish={() => setMeeting({ ...meeting, step: 2 })} />
+  } else if (journalOn && !inMeeting) {
+    // Open journal: the Fall lines with October beside each, then its dates.
+    body = <div ref={grid} className="pv2-grid2 is-cal-last is-colscroll pv2-journalgrid">{journalColumn()}{calendar}</div>
   } else if (level === 'month') {
     // October written with Fall beside it, then its dates (Scott,
     // 2026-10-04). The level above can be hidden.
@@ -539,6 +663,7 @@ function Inner({ level }: { level: Level }) {
           onLeave={() => void endMeeting(false)} onSave={() => void endMeeting(true)} saveLabel={`Mark ${name} planned`} />
       ) : folded ? <><GuideAnchor /><PlanSavedLine period={name} justSaved={toolbar.justSaved} /></> : <PlanToolbar {...toolbar} />}
 
+      {level === 'month' && !inMeeting && !guidedReview && <PlanLayoutSwitch value={layout} onChange={setLayout} />}
       {level === 'season' && meeting?.step !== 1 && !guidedReview && (
         // The season's shape: its months, today, its landmarks.
         <SeasonBand start={bounds.start} end={bounds.end} today={today} name={name}

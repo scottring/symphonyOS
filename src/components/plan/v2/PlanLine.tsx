@@ -5,7 +5,7 @@
 // rail on the right holds ACTIONS, fading in on hover. A click on the words
 // folds the line open where it is; "All details" is the existing Details pane.
 
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { useDraggable } from '@dnd-kit/core'
 import { Check, CornerDownRight, GripVertical, MoreHorizontal, ArrowRight, Moon, X, PanelRight, Target, Sun, ArrowDownRight, Unlink, Link2 } from 'lucide-react'
@@ -18,6 +18,7 @@ import { MultiAssigneeDropdown } from '@/components/family'
 import { assigneesOf } from '@/lib/planning/v2/planV2'
 import { notesAsText } from '@/lib/htmlUtils'
 import type { DidItem } from '@/lib/week/monthLinks'
+import { placeMenu, type MenuPlace } from '@/lib/ui/menuPlacement'
 
 export interface LineVM {
   task: Task
@@ -66,6 +67,9 @@ export interface LineActions {
    *  goal…" (walkthrough 2026-09-30: October's lines, carried from
    *  September, had no way to say which Fall goal they serve). */
   linkUp?: { rung: string; goals: { id: string; title: string }[]; applies: (t: Task) => boolean; run: (t: Task, goalId: string) => void }
+  /** A week item's month line — set, change or remove it on the same row
+   *  (walkthrough 2026-10-08). `current` is the line it is for now. */
+  monthLine?: { month: string; lines: { id: string; title: string }[]; current: (t: Task) => { id: string; title: string } | null; run: (t: Task, lineId: string | null) => void }
 }
 
 
@@ -108,7 +112,23 @@ export function LineMenu({ vm, actions, nextLabel }: { vm: LineVM; actions: Line
   const t = vm.task
   const pick = (fn: (t: Task) => void) => () => { setOpen(false); fn(t) }
   const [linking, setLinking] = useState(false)
-  useEffect(() => { if (!open) setLinking(false) }, [open])
+  const [forMonth, setForMonth] = useState(false)
+  useEffect(() => { if (!open) { setLinking(false); setForMonth(false) } }, [open])
+  const monthLine = actions.monthLine && (actions.monthLine.lines.length > 0 || actions.monthLine.current(t)) ? actions.monthLine : null
+  const forNow = monthLine?.current(t) ?? null
+  // The month lines can be long: that list is placed from its measured size,
+  // right edge under ⋯, held inside the screen (as MonthLink's own menu).
+  const [fit, setFit] = useState<MenuPlace | null>(null)
+  // Measured before paint each time the list shows; ignored otherwise.
+  useLayoutEffect(() => {
+    if (!open || !forMonth || !pos) return
+    const fitNow = () => {
+      const r = ref.current?.getBoundingClientRect()
+      const m = menuRef.current
+      if (r && m) setFit(placeMenu(r, { width: m.offsetWidth, height: m.scrollHeight }, { width: window.innerWidth, height: window.innerHeight }, 'end'))
+    }
+    fitNow()
+  }, [open, forMonth, pos])
   const linkUp = actions.linkUp && !t.completed && actions.linkUp.applies(t) && actions.linkUp.goals.some((g) => g.id !== t.id) ? actions.linkUp : null
   return (
     <div ref={ref} className="relative">
@@ -116,8 +136,22 @@ export function LineMenu({ vm, actions, nextLabel }: { vm: LineVM; actions: Line
         <MoreHorizontal className="w-4 h-4" />
       </button>
       {open && pos && createPortal(
-        <div ref={menuRef} role="menu" className="pv2-menu is-floating" style={{ top: pos.top, bottom: pos.bottom, right: pos.right }}>
-          {linking && linkUp ? <>
+        <div ref={menuRef} role="menu" className={`pv2-menu is-floating${forMonth ? ' wk-formenu' : ''}`}
+          style={forMonth ? (fit ? { top: fit.top, left: fit.left, maxHeight: fit.maxHeight } : { top: 0, left: 0, visibility: 'hidden' }) : { top: pos.top, bottom: pos.bottom, right: pos.right }}>
+          {forMonth && monthLine ? <>
+            <div className="pv2-mhead">Which {monthLine.month} line is this for?</div>
+            {monthLine.lines.map((l) => (
+              <button key={l.id} role="menuitemradio" aria-checked={forNow?.id === l.id} type="button"
+                onClick={() => { setOpen(false); if (forNow?.id !== l.id) monthLine.run(t, l.id) }}>
+                <span className="wk-formenu-label">{l.title}</span>{forNow?.id === l.id && <Check className="wk-formenu-tick w-3.5 h-3.5" />}
+              </button>
+            ))}
+            <div className="pv2-msep" />
+            <button role="menuitemradio" aria-checked={!forNow} type="button" onClick={() => { setOpen(false); if (forNow) monthLine.run(t, null) }}>
+              <span className="wk-formenu-label">{forNow ? `Remove the ${monthLine.month} link` : `No ${monthLine.month} line`}</span>
+            </button>
+            <button role="menuitem" type="button" onClick={() => setForMonth(false)}>Back</button>
+          </> : linking && linkUp ? <>
             <div className="pv2-mhead">Part of which {linkUp.rung} goal?</div>
             {linkUp.goals.filter((g) => g.id !== t.id).map((g) => (
               <button key={g.id} role="menuitemradio" aria-checked={vm.partOf?.id === g.id} type="button"
@@ -137,6 +171,7 @@ export function LineMenu({ vm, actions, nextLabel }: { vm: LineVM; actions: Line
           {actions.today && !t.completed && <button role="menuitem" type="button" onClick={pick(actions.today)}><Sun className="w-3.5 h-3.5" />Do it today</button>}
           {actions.toggleGoal && !t.completed && <button role="menuitem" type="button" onClick={pick(actions.toggleGoal)}><Target className="w-3.5 h-3.5" />{t.isGoal ? 'Make it a single action' : 'Make it a goal'}</button>}
           {actions.unlink && t.goalTaskId && <button role="menuitem" type="button" onClick={pick(actions.unlink)}><Unlink className="w-3.5 h-3.5" />Remove from goal</button>}
+          {monthLine && <button role="menuitem" type="button" onClick={() => setForMonth(true)}><Link2 className="w-3.5 h-3.5" />{forNow ? `Change ${monthLine.month} line…` : `Link to ${/^[aeiou]/i.test(monthLine.month) ? 'an' : 'a'} ${monthLine.month} line…`}</button>}
           {linkUp && <button role="menuitem" type="button" onClick={() => setLinking(true)}><Link2 className="w-3.5 h-3.5" />{vm.partOf ? `Change ${linkUp.rung} goal…` : `Link to a ${linkUp.rung} goal…`}</button>}
           <div className="pv2-msep" />
           <button role="menuitem" type="button" onClick={pick(actions.details)}><PanelRight className="w-3.5 h-3.5" />All details</button>
@@ -148,7 +183,9 @@ export function LineMenu({ vm, actions, nextLabel }: { vm: LineVM; actions: Line
   )
 }
 
-export function PlanLine({ vm, actions, members, nextLabel, open, onToggle, editable, draggable = false, onHoverPartOf, onShowPartOf, hideParent = false }: {
+export function PlanLine({ vm, actions, members, nextLabel, open, onToggle, editable, draggable = false, onHoverPartOf, onShowPartOf, hideParent = false, extra }: {
+  /** Under the line at rest (Open journal: which Fall line it is for). */
+  extra?: ReactNode
   vm: LineVM
   actions: LineActions
   members: FamilyMember[]
@@ -201,6 +238,7 @@ export function PlanLine({ vm, actions, members, nextLabel, open, onToggle, edit
           <LineMenu vm={vm} actions={actions} nextLabel={nextLabel} />
         </span>
       </div>
+      {extra && !open && <div className="pv2-line-extra">{extra}</div>}
       {vm.carriedFrom && !open && <span className="pv2-line-from">carried from {vm.carriedFrom}</span>}
       {vm.did && vm.did.length > 0 && !open && (
         <span className="pv2-line-did wk-did">{vm.did.map((d, i) => (

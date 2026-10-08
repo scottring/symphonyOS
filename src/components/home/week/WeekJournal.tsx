@@ -79,6 +79,9 @@ interface WeekJournalProps {
   dailyRoutines?: boolean
   /** "for October: Plan Thanksgiving" — the month line a task was written for. */
   forLabel?: (task: Task) => string | null
+  /** The month line as a control for a week item (Week page); null = none.
+   *  Drawn instead of the forLabel words when it returns something. */
+  forControl?: (task: Task) => ReactNode
   /**
    * The same in-place timing control the week's list and the period pages
    * wear, supplied by the host. Without it a task that moved out of "Any day"
@@ -111,9 +114,10 @@ function isToday(d: Date): boolean {
   return d.getFullYear() === n.getFullYear() && d.getMonth() === n.getMonth() && d.getDate() === n.getDate()
 }
 
-function Entry({ entry, day, onSelect, onToggle, dragEnabled, timingControl, dense = false, fromSometime = false, memberById, forLabel }: {
+function Entry({ entry, day, onSelect, onToggle, dragEnabled, timingControl, dense = false, fromSometime = false, memberById, forLabel, forControl }: {
   memberById?: Map<string, FamilyMember>
   forLabel?: WeekJournalProps['forLabel']
+  forControl?: WeekJournalProps['forControl']
   entry: JournalEntry
   day: JournalDay
   onSelect: (id: string) => void
@@ -145,9 +149,12 @@ function Entry({ entry, day, onSelect, onToggle, dragEnabled, timingControl, den
       onOpen={() => onSelect(entry.id)}
       meta={(() => {
         const f = entry.task && forLabel ? forLabel(entry.task) : null
-        return entry.subtitle || f ? <>
+        const control = entry.task && forControl ? forControl(entry.task) : null
+        // In a day's narrow cell the month line is one line, cut short; its
+        // full words stay in the label and on hover (2026-10-08).
+        return entry.subtitle || f || control ? <>
           {entry.subtitle && <span className="journal-entry-sub">{entry.subtitle}</span>}
-          {f && <span className="wk-for"><span aria-hidden="true">↳ </span>{f}</span>}
+          {control ?? (f && <span className="wk-for is-compact" title={f}><span aria-hidden="true">↳ </span>{f}</span>)}
         </> : undefined
       })()}
       trailing={timingControl && entry.task && !entry.completed ? <span className="journal-entry-when">{timingControl(entry.task)}</span> : undefined}
@@ -302,10 +309,11 @@ function dayFree(day: JournalDay): string {
   return formatFree(freeWindows(busyBlocks(timed.map((e) => ({ start: e.time!, end: e.end }))), 1))
 }
 
-function DayCell({ day, onSelectItem, onToggleEntry, onPlanDrop, onAddToDay, onAddEvent, dragEnabled, timingControl, weather, fixedOnly = false, free, memberById, forLabel }: {
+function DayCell({ day, onSelectItem, onToggleEntry, onPlanDrop, onAddToDay, onAddEvent, dragEnabled, timingControl, weather, fixedOnly = false, free, memberById, forLabel, forControl }: {
   onAddEvent?: WeekJournalProps['onAddEvent']
   memberById?: Map<string, FamilyMember>
   forLabel?: WeekJournalProps['forLabel']
+  forControl?: WeekJournalProps['forControl']
   fixedOnly?: boolean
   routinesOpen?: boolean
   /** "Free 9a–5p", from the whole day (rhythm included). */
@@ -348,7 +356,7 @@ function DayCell({ day, onSelectItem, onToggleEntry, onPlanDrop, onAddToDay, onA
       )}
       {shown.length > 0 && (
         <ul className="wk-rows" aria-label={`${day.date.toLocaleDateString('en-US', { weekday: 'long' })} entries`}>
-          {shown.map((entry) => <Entry key={entry.id} entry={entry} day={day} onSelect={onSelectItem} onToggle={onToggleEntry} dragEnabled={dragEnabled} timingControl={timingControl} dense memberById={memberById} forLabel={forLabel} />)}
+          {shown.map((entry) => <Entry key={entry.id} entry={entry} day={day} onSelect={onSelectItem} onToggle={onToggleEntry} dragEnabled={dragEnabled} timingControl={timingControl} dense memberById={memberById} forLabel={forLabel} forControl={forControl} />)}
         </ul>
       )}
       {day.dinners.length > 0 && (
@@ -385,7 +393,9 @@ function SometimeCell({ weekend, days, onSelectItem, onToggleEntry, dragEnabled,
   const tickDay = sun && isToday(sun.date) ? sun : sat
   return (
     <section className="wk-cell wk-sometime" data-testid="weekend-sometime" aria-label="Sometime this weekend">
-      <header className="wk-dayhead"><span className="wk-dayname">Sometime this weekend</span><span className="wk-dayhint">once for both days</span></header>
+      {/* "Both days" only when both are in this week: a Sunday-start week
+          shows Saturday alone, its Sunday opening next week (2026-10-08). */}
+      <header className="wk-dayhead"><span className="wk-dayname">Sometime this weekend</span><span className="wk-dayhint">{sun ? 'once for both days' : 'once for the weekend'}</span></header>
       {weekend.sometime.length ? (
         <ul className="wk-rows" aria-label="Sometime this weekend entries">
           {weekend.sometime.map((entry) => <Entry key={entry.id} entry={entry} day={tickDay} onSelect={onSelectItem} onToggle={onToggleEntry} dragEnabled={dragEnabled} dense fromSometime memberById={memberById} />)}
@@ -417,6 +427,15 @@ function weekendIsBehind(days: JournalDay[], weekend: JournalWeekend, now = new 
   return inThisWeek && last.getTime() < todayStart.getTime()
 }
 
+/** A weekend split by the week's edge (a Sunday-start week): Saturday is
+ *  this week's last day, and the Sunday after it begins the next week — it
+ *  is never pulled back here, and the Sunday at the top of this week belongs
+ *  to the weekend before. Said once, in the band, with its date. */
+function splitSundayNote(sat: Date): string {
+  const sun = new Date(sat.getFullYear(), sat.getMonth(), sat.getDate() + 1)
+  return `Sunday ${sun.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} is in next week`
+}
+
 /** The past weekend, folded to one line: when it was and what happened.
  *  What's left of it is already elsewhere — an unticked task is back on the
  *  week's list (missedPlacement), and weekend chores wait for the next one. */
@@ -442,6 +461,7 @@ function WeekGridDays({ days, weekend, forecast, fixedOnly = false, free, ...cel
   onAddEvent?: WeekJournalProps['onAddEvent']
   memberById?: Map<string, FamilyMember>
   forLabel?: WeekJournalProps['forLabel']
+  forControl?: WeekJournalProps['forControl']
   fixedOnly?: boolean
   /** Each day's free time, by key. */
   free?: Record<string, string>
@@ -480,6 +500,7 @@ function WeekGridDays({ days, weekend, forecast, fixedOnly = false, free, ...cel
       ) : b.kind === 'weekend' && weekend ? (
         <section key="weekend" className={`wk-weekend${behind ? ' is-past' : ''}`} aria-label={`The weekend, ${days[weekend.satIndex].date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`}>
           <div className="wk-weekend-head">The weekend
+            {weekend.sunIndex === null && <span className="wk-weekend-split" data-testid="weekend-split">{splitSundayNote(days[weekend.satIndex].date)}</span>}
             {behind && <button type="button" className="wk-weekend-fold-close" aria-expanded onClick={() => setOpen(false)}>Fold it ‹</button>}
           </div>
           <div className="wk-weekend-cells">
@@ -497,7 +518,7 @@ function WeekGridDays({ days, weekend, forecast, fixedOnly = false, free, ...cel
   )
 }
 
-export function WeekJournal({ days, weekend = null, spans, onSelectItem, onToggleEntry, onPlanDrop, onAddToDay: addToDay, onAddEvent: addEvent, dragEnabled: canDrag = true, narrow = false, layout = 'rows', timingControl: timing, forecast, show = 'all', routinesOpen = false, readOnly = false, variant, person, members = [], dailyRoutines = false, forLabel }: WeekJournalProps) {
+export function WeekJournal({ days, weekend = null, spans, onSelectItem, onToggleEntry, onPlanDrop, onAddToDay: addToDay, onAddEvent: addEvent, dragEnabled: canDrag = true, narrow = false, layout = 'rows', timingControl: timing, forecast, show = 'all', routinesOpen = false, readOnly = false, variant, person, members = [], dailyRoutines = false, forLabel, forControl }: WeekJournalProps) {
   if (variant === 'strip') return <WeekStrip days={days} onSelectItem={onSelectItem} />
   if (variant === 'shape') return <WeekShape days={days} members={members} person={person} onSelectItem={onSelectItem} />
   // The finished plan is read: nothing moves, nothing is added or retimed.
@@ -541,7 +562,7 @@ export function WeekJournal({ days, weekend = null, spans, onSelectItem, onToggl
         <>
           <WeekGridDays days={rhythm.days} weekend={weekend} forecast={forecast} onSelectItem={onSelectItem} onToggleEntry={onToggleEntry}
             onPlanDrop={readOnly ? undefined : onPlanDrop} onAddToDay={onAddToDay} onAddEvent={readOnly ? undefined : addEvent} dragEnabled={dragEnabled} timingControl={timingControl}
-            fixedOnly={fixedOnly} routinesOpen={routinesOpen} free={free} memberById={memberById} forLabel={forLabel} />
+            fixedOnly={fixedOnly} routinesOpen={routinesOpen} free={free} memberById={memberById} forLabel={forLabel} forControl={readOnly ? undefined : forControl} />
         </>
       ) : days.map((day) => (
         <DayRow key={day.key} day={day} onSelectItem={onSelectItem} onToggleEntry={onToggleEntry}

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { linkedLine, didFor } from './monthLinks'
+import { linkedLine, didFor, monthLinkRestore, monthLinkUpdates } from './monthLinks'
 import type { Task } from '@/types/task'
 
 const task = (o: Partial<Task>) => ({ completed: false, createdAt: new Date(2026, 8, 1), ...o }) as Task
@@ -44,5 +44,42 @@ describe('writtenFor', () => {
       { label: 'Oct', items: [{ id: 'a', title: 'Make a budget', done: false }] },
       { label: 'Nov', items: [{ id: 'b', title: 'Open a savings account', done: false }] },
     ])
+  })
+})
+
+// Walkthrough 2026-10-08: changing an existing week item's month line.
+const t = (o: Partial<Task>) => ({ id: 'w', title: 'Week item', completed: false, createdAt: new Date(), ...o }) as Task
+
+describe('monthLinkUpdates — the link shown is the link changed', () => {
+  it('sets or changes the link through source_id only', () => {
+    expect(monthLinkUpdates(t({}), 'm1')).toEqual({ updates: { sourceId: 'm1' }, revealed: null })
+    expect(monthLinkUpdates(t({ sourceId: 'm1', goalTaskId: 'g' }), 'm2')).toEqual({ updates: { sourceId: 'm2' }, revealed: null })
+  })
+  it('removes a source_id link and leaves a separate goal relation alone, naming it', () => {
+    expect(monthLinkUpdates(t({ sourceId: 'm1' }), null)).toEqual({ updates: { sourceId: undefined }, revealed: null })
+    expect(monthLinkUpdates(t({ sourceId: 'm1', goalTaskId: 'g' }), null)).toEqual({ updates: { sourceId: undefined }, revealed: 'g' })
+  })
+  it('both fields naming the same line are one link: Remove clears both, so it is really gone', () => {
+    const row = t({ sourceId: 'm1', goalTaskId: 'm1' })
+    const { updates, revealed } = monthLinkUpdates(row, null)
+    expect(updates).toEqual({ sourceId: undefined, goalTaskId: undefined })
+    expect(revealed).toBeNull()
+    expect(linkedLine({ ...row, ...updates }, [t({ id: 'm1' })])).toBeNull()
+    expect(monthLinkRestore(row, updates)).toEqual({ sourceId: 'm1', goalTaskId: 'm1' })
+  })
+  it('removes an older row’s goal_task_id link wherever its line lives', () => {
+    const row = t({ goalTaskId: 'sept-line' })
+    const { updates } = monthLinkUpdates(row, null)
+    expect(updates).toEqual({ goalTaskId: undefined })
+    expect(linkedLine({ ...row, ...updates }, [t({ id: 'sept-line' })])).toBeNull()
+  })
+  it('a row linked to itself or to nothing writes nothing', () => {
+    expect(monthLinkUpdates(t({}), null).updates).toEqual({})
+    expect(monthLinkUpdates(t({ sourceId: 'w' }), null).updates).toEqual({})
+  })
+  it('undo writes back exactly the fields it wrote', () => {
+    const row = t({ sourceId: 'm1', goalTaskId: 'g' })
+    expect(monthLinkRestore(row, { sourceId: 'm2' })).toEqual({ sourceId: 'm1' })
+    expect(monthLinkRestore(t({ goalTaskId: 'old' }), { goalTaskId: undefined })).toEqual({ goalTaskId: 'old' })
   })
 })

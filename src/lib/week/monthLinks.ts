@@ -5,6 +5,9 @@
 // goal_task_id). The month line then shows what the weeks did for it, so a
 // line with nothing under it stands out when the month is reviewed.
 import type { Task } from '@/types/task'
+
+/** "an October line", "a September line". */
+export const anOrA = (word: string) => (/^[aeiou]/i.test(word) ? 'an' : 'a')
 import { localYmd } from '@/lib/cadence/config'
 
 /** The month line this item was written for; never the item itself. */
@@ -56,4 +59,38 @@ export function writtenFor(lineId: string, tasks: readonly Task[], labelOf: (t: 
     g.items.push({ id: t.id, title: t.title, done: !!t.completed })
   }
   return groups
+}
+
+/**
+ * The writes that set, change or remove which month line a week item is for
+ * — on the same row, so its id, day, people and done state stay as they are
+ * (walkthrough 2026-10-08: an item added without a month line had no way to
+ * get one afterwards).
+ *
+ * The link shown is linkedLine's: source_id, else (older rows) goal_task_id.
+ * Remove clears exactly that one, wherever its line lives — so an older row
+ * whose shown link is its goal_task_id really comes unlinked. A row carrying
+ * BOTH (written for one line, a step of another goal) loses only source_id;
+ * its goal stays, and `revealed` names it, because it is what linkedLine shows
+ * next and the page must say so rather than look as if nothing happened. Both
+ * fields naming the SAME line are one link, and both are cleared.
+ */
+export function monthLinkUpdates(t: Task, lineId: string | null): { updates: Partial<Pick<Task, 'sourceId' | 'goalTaskId'>>; revealed: string | null } {
+  if (lineId) return { updates: { sourceId: lineId }, revealed: null }
+  const source = t.sourceId && t.sourceId !== t.id ? t.sourceId : undefined
+  const goal = t.goalTaskId && t.goalTaskId !== t.id ? t.goalTaskId : undefined
+  // Both fields naming the same line are one link: clear both, or the
+  // fallback would show the very link just removed.
+  if (source && goal === source) return { updates: { sourceId: undefined, goalTaskId: undefined }, revealed: null }
+  if (source) return { updates: { sourceId: undefined }, revealed: goal ?? null }
+  if (goal) return { updates: { goalTaskId: undefined }, revealed: null }
+  return { updates: {}, revealed: null }
+}
+
+/** What to write back to undo a monthLinkUpdates write: each field it wrote, as it was. */
+export function monthLinkRestore(t: Task, written: Partial<Task>): Partial<Task> {
+  return {
+    ...('sourceId' in written ? { sourceId: t.sourceId } : {}),
+    ...('goalTaskId' in written ? { goalTaskId: t.goalTaskId } : {}),
+  }
 }

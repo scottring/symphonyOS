@@ -303,6 +303,16 @@
   border: 1.5px solid var(--color-neutral-400); color: transparent; cursor: pointer;
 }
 .wk-row.is-dense .wk-check { width: 16px; height: 16px; }
+/* Phones: the base layer gives every labelled button a 44px minimum, which
+   grew the visible circle into the title (2026-10-08 review). The circle stays
+   its size; an invisible area around it takes the touch. */
+@media (max-width: 768px) {
+  .wk-check { position: relative; min-width: 0; min-height: 0; }
+  .wk-check::before { content: ""; position: absolute; inset: -12px -6px -12px -14px; }
+  .wk-forbtn { min-width: 0; min-height: 0; padding: 5px 0; }
+  .wk-addaction { min-height: 32px; min-width: 0; }
+  .wk-takein { min-height: 32px; min-width: 0; }
+}
 .wk-check.is-on { border-color: var(--color-primary-600); background: var(--color-primary-600); color: #fff; }
 /* Three kinds, told apart (Scott, 2026-10-04): an event is a blue bar on a
    tinted row and has no check; a task's check is round; a routine's is a
@@ -358,7 +368,7 @@
 .wk-reflink:hover span { text-decoration: underline; }
 .wk-reflink.is-inline { width: auto; justify-content: flex-start; padding: 0 0 10px; border-top: 0; }
 .wk-refhide { margin-left: auto; font: 500 12.5px var(--font-family-sans); letter-spacing: 0; text-transform: none; }
-.wk-days { min-width: 0; }
+.wk-days { min-width: 0; container: wk-days / inline-size; }
 .wk-write { display: grid; grid-template-columns: minmax(0, 1.3fr) minmax(260px, 1fr); gap: 44px; align-items: start; max-width: 1240px; }
 
 .wk-rhythm { display: flex; flex-direction: column; gap: 6px; margin: 0 0 14px; padding: 10px 14px; border: 1px solid var(--color-neutral-200); border-radius: 12px; background: color-mix(in srgb, var(--color-bg-elevated) 55%, transparent); }
@@ -384,8 +394,61 @@
 .pv2-line-did { padding-left: 22px; }
 .wk-did .is-done { color: var(--color-neutral-400); text-decoration: line-through; }
 .wk-check.is-line { border-radius: 4px; border-color: var(--color-neutral-400); }
-.wk-forpick { display: flex; align-items: center; gap: 6px; margin: 2px 0 0 30px; font-size: 12px; color: var(--color-neutral-500); }
-.wk-forpick select { max-width: 100%; min-width: 0; padding: 2px 4px; border: 1px dashed var(--color-neutral-300); border-radius: 6px; background: transparent; font-size: 12px; color: var(--color-neutral-700); }
+/* Under the add box: which month line new actions are for. Once chosen it
+   stays — shown in words, its source row lit in the month beside — so a run
+   of actions for one line is type, Enter, type, Enter (2026-10-08). */
+.wk-forpick { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; margin: 4px 0 0 30px; font-size: 12.5px; color: var(--color-neutral-600); }
+.wk-forpick.is-set { padding: 5px 8px; margin-left: 22px; border-radius: 8px; background: color-mix(in srgb, var(--color-primary-50) 80%, transparent); border: 1px solid var(--color-primary-100); }
+.wk-foractive { flex: 1 1 100%; min-width: 0; line-height: 1.4; }
+.wk-foractive b { font-weight: 600; color: hsl(150 32% 24%); }
+.wk-forpick select { max-width: 100%; min-width: 0; flex: 1 1 10rem; padding: 3px 6px; border: 1px dashed var(--color-neutral-300); border-radius: 6px; background: transparent; font-size: 12.5px; color: var(--color-neutral-700); }
+.wk-addsaving { margin: 2px 0 0 30px; font-size: 12px; color: var(--color-neutral-500); }
+.wk-addfail { margin: 4px 0 0 30px; font-size: 12.5px; color: var(--color-danger-600); }
+/* The month line a week item is for, as a control: tap it to change or
+   remove it; an item with none offers the link on hover or focus. */
+.wk-forbtn { display: block; max-width: 100%; padding: 0; text-align: left; background: none; border: 0; cursor: pointer; }
+.wk-forbtn:hover, .wk-forbtn:focus-visible { text-decoration: underline; }
+.wk-forbtn:focus-visible { outline: 2px solid var(--color-primary-500); outline-offset: 2px; border-radius: 3px; }
+.wk-forbtn.is-empty { color: var(--color-neutral-500); }
+@media (hover: hover) {
+  .wk-row .wk-forbtn.is-empty { opacity: 0; }
+  .wk-row:hover .wk-forbtn.is-empty, .wk-row:focus-within .wk-forbtn.is-empty { opacity: 1; }
+}
+/* In a day's cell: one line, cut short; the whole text is its label and title. */
+.wk-for.is-compact { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* The month-line menu: as wide as its longest line, up to a comfortable
+   30rem, never wider than the screen less 8px a side; long lines WRAP — the
+   one column and each item shrink to it (minmax(0,1fr), min-width: 0), so
+   nothing scrolls sideways and nothing is cut (2026-10-08 review). It scrolls
+   up and down only, inside the height menuPlacement gives it. */
+.pv2-menu.is-floating.wk-formenu {
+  width: max-content; min-width: min(17rem, calc(100vw - 16px)); max-width: min(30rem, calc(100vw - 16px));
+  grid-template-columns: minmax(0, 1fr); overflow-x: visible; overflow-y: auto; overscroll-behavior: contain;
+}
+.wk-formenu > * { min-width: 0; }
+.pv2-menu.wk-formenu > button { align-items: flex-start; width: 100%; min-width: 0; white-space: normal; line-height: 1.35; }
+.wk-formenu-label { flex: 1 1 auto; min-width: 0; white-space: normal; overflow-wrap: anywhere; }
+.wk-formenu-tick { flex: none; margin-top: 2px; margin-left: auto; }
+.wk-formenu .pv2-mhead { white-space: normal; }
+/* A month line's own action: write the weekly actions that move it. Always
+   shown (it is the planning task); "put it on the week as is" stays quiet. */
+.wk-refacts { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; margin-top: 5px; }
+.wk-addaction { padding: 3px 9px; border: 1px solid var(--color-primary-200); border-radius: 999px; font-size: 12px; font-weight: 500; color: var(--color-primary-700); white-space: nowrap; background: var(--color-bg-elevated); }
+.wk-addaction:hover { background: var(--color-primary-50); }
+.wk-addaction:focus-visible { outline: 2px solid var(--color-primary-500); outline-offset: 2px; }
+.wk-addaction.is-on { background: var(--color-primary-700); border-color: var(--color-primary-700); color: #fff; }
+.wk-takein { font-size: 11.5px; white-space: nowrap; }
+@media (hover: hover) {
+  .wk-row .wk-takein { display: none; }
+  .wk-row:hover .wk-takein, .wk-row:focus-within .wk-takein { display: inline; }
+}
+.wk-row.is-chosen { background: color-mix(in srgb, var(--color-primary-50) 90%, transparent); border-color: var(--color-primary-200); box-shadow: inset 3px 0 0 var(--color-primary-600); }
+/* What happens to unfinished work, and the next step (2026-10-08). */
+.wk-openwork { display: flex; flex-direction: column; gap: 8px; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--color-neutral-200); font-size: 13px; line-height: 1.45; color: var(--color-neutral-600); }
+.wk-openwork-due { display: flex; flex-wrap: wrap; gap: 4px 10px; margin: 0; padding: 8px 10px; border-radius: 8px; background: color-mix(in srgb, hsl(35 90% 92%) 70%, transparent); color: hsl(35 60% 24%); }
+.wk-openwork-more summary { cursor: pointer; font-weight: 500; color: var(--color-neutral-700); }
+.wk-openwork-more p { margin: 6px 0 0; }
+.wk-onward { align-self: flex-start; font-weight: 500; }
 .wk-cell.is-past { opacity: .62; }
 .wk-cell.is-today { background: color-mix(in srgb, var(--color-primary-50) 70%, transparent); border-radius: 10px; }
 .wk-free { margin: 8px 0 0; padding-top: 6px; border-top: 1px dashed var(--color-neutral-200); font-size: 11.5px; font-weight: 500; line-height: 1.35; color: hsl(150 40% 28%); }
@@ -409,11 +472,32 @@
 .wk-weekend-fold-events > span::before { content: ""; display: inline-block; width: 2px; height: 11px; margin-right: 6px; border-radius: 1px; background: hsl(214 50% 47%); vertical-align: -1px; }
 .wk-weekend-fold-open { margin-left: auto; font-size: 12.5px; font-weight: 500; color: var(--color-neutral-600); white-space: nowrap; }
 .wk-weekend-head:has(.wk-weekend-fold-close) { display: flex; align-items: baseline; }
+/* A Sunday-start week's weekend: Saturday alone, with where its Sunday is. */
+.wk-weekend-head:has(.wk-weekend-split) { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 12px; }
+.wk-weekend-split { font: 400 12.5px var(--font-family-sans); color: var(--color-neutral-500); }
 .wk-weekend-fold-close { margin-left: auto; font: 500 12.5px var(--font-family-sans); color: var(--color-neutral-600); }
 .wk-weekend-fold-close:hover { color: var(--color-neutral-900); }
 .wk-weekend.is-past .wk-sometime { opacity: .62; }
 .wk-weekend-cells { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .wk-weekdays { display: grid; grid-template-columns: repeat(var(--wk-days, 5), minmax(0, 1fr)); }
+/* The days get a readable width (2026-10-08: with the month and the list
+   open at ~1720px, Thursday wrapped to a word a line). The breakpoints follow
+   the width the DAYS have, not the window: five across only when each can
+   hold ~14rem; three across below that; one, as an agenda, below ~44rem. */
+@container wk-days (max-width: 74rem) {
+  .wk-weekdays { grid-template-columns: repeat(min(3, var(--wk-days, 5)), minmax(0, 1fr)); row-gap: 8px; }
+  .wk-weekdays > .wk-cell:nth-child(3n + 1) { border-left: 0; }
+}
+/* Six weekdays (a Saturday week) need more room than five to stay readable. */
+@container wk-days (min-width: 44.0625rem) and (max-width: 90rem) {
+  .wk-weekdays:has(> .wk-cell:nth-child(6)) { grid-template-columns: repeat(3, minmax(0, 1fr)); row-gap: 8px; }
+  .wk-weekdays:has(> .wk-cell:nth-child(6)) > .wk-cell:nth-child(3n + 1) { border-left: 0; }
+}
+@container wk-days (max-width: 44rem) {
+  .wk-weekdays, .wk-weekend-cells { grid-template-columns: minmax(0, 1fr); row-gap: 0; }
+  .wk-weekdays > .wk-cell, .wk-weekend-cells > .wk-cell { border-left: 0; border-top: 1px solid var(--color-neutral-200); padding: 10px 0 12px; }
+  .wk-weekdays > .wk-cell:first-child, .wk-weekend-cells > .wk-cell:first-child { border-top: 0; }
+}
 .wk-cell { min-width: 0; padding: 10px 14px 12px; border-left: 1px solid var(--color-neutral-200); }
 .wk-cell:first-child { border-left: 0; }
 .wk-cell.is-over { background: color-mix(in srgb, var(--color-primary-50) 60%, transparent); border-radius: 10px; }
@@ -434,7 +518,6 @@ p.wk-dayhint { margin: 8px 0 0; }
   .wk-listcol, .pv2-week .wk-ref { position: static; max-height: none; overflow: visible; }
   /* Not scrolling on its own here, so no overflow to make room for. */
   .wk-listcol { margin-inline: 0; padding-inline: 0; }
-  .wk-weekdays { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
 @media (max-width: 860px) {
   /* One column: this week's list, the rhythm, the weekend, the weekdays. */
@@ -601,3 +684,67 @@ p.wk-dayhint { margin: 8px 0 0; }
 /* The band's month names sit at the top; its "today" line starts below them,
    so it never runs through a name (2026-10-04: "OCTO|BER"). */
 .ps-band-track .ps-today { top: 30px; }
+
+/* ── Open journal (2026-10-08) ─────────────────────────────────────────────
+   Each line of the period above on the left, what this period writes for it
+   on the right, its own add box under it. Quiet rules between sections, the
+   serif for the line above, a warm eyebrow. Phones: the line above stands
+   over its entries. */
+.oj { min-width: 0; }
+.oj-intro { display: flex; flex-direction: column; gap: 8px; padding: 0 0 14px; border-bottom: 1px solid var(--color-neutral-200); }
+.oj-lede { margin: 0; font-size: 14px; line-height: 1.5; color: var(--color-neutral-600); max-width: 46em; }
+.oj-intro-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 16px; font-size: 13px; color: var(--color-neutral-600); }
+.oj-area { display: inline-flex; align-items: center; gap: 6px; }
+.oj-section { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.65fr); gap: 0 28px; padding: 22px 0; border-bottom: 1px solid var(--color-neutral-200); }
+.oj-section.is-general .oj-title { color: var(--color-neutral-700); }
+.oj-parent { min-width: 0; }
+.oj-eyebrow { font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--color-review-600); }
+.oj-title { margin: 6px 0 8px; font: 400 21px/1.3 var(--font-family-display); color: var(--color-neutral-900); overflow-wrap: anywhere; }
+.oj-section.is-done .oj-title { color: var(--color-neutral-500); text-decoration: line-through; text-decoration-thickness: 1px; }
+.oj-done { margin-left: 8px; font: 500 12px var(--font-family-sans); color: var(--color-neutral-500); text-decoration: none; display: inline-block; }
+.oj-parentcheck { font-size: 12.5px; color: var(--color-neutral-500); padding: 2px 0; text-align: left; }
+.oj-parentcheck:hover { color: var(--color-neutral-900); text-decoration: underline; }
+.oj-linked { min-width: 0; padding-left: 24px; border-left: 1px solid var(--color-neutral-200); }
+.oj-rows { margin: 0 0 4px; }
+.oj-empty { margin: 4px 0 6px; font-size: 13.5px; font-style: italic; color: var(--color-neutral-500); }
+.oj-compose { margin-top: 10px; }
+.oj-compose-label { display: block; margin: 0 0 6px; font-size: 13px; color: var(--color-neutral-600); }
+.oj-compose-row { display: flex; gap: 8px; align-items: center; }
+.oj-compose-row input { flex: 1 1 auto; min-width: 0; padding: 10px 12px; border: 1px solid var(--color-neutral-300); border-radius: 10px; background: var(--color-bg-elevated); font-size: 15px; color: var(--color-neutral-900); }
+.oj-compose-row input:focus { outline: none; border-color: var(--color-primary-500); box-shadow: 0 0 0 3px var(--color-primary-100); }
+.oj-compose-row input::placeholder { color: var(--color-neutral-400); }
+.oj-add { display: inline-flex; align-items: center; gap: 4px; flex: none; min-height: 42px; padding: 0 14px; border: 1px solid var(--color-primary-300); border-radius: 10px; background: var(--color-bg-elevated); font-size: 14px; font-weight: 500; color: var(--color-primary-700); }
+.oj-add:hover { background: var(--color-primary-50); }
+.oj-add:focus-visible { outline: 2px solid var(--color-primary-500); outline-offset: 2px; }
+.oj-add[aria-busy="true"] { color: var(--color-neutral-500); border-color: var(--color-neutral-300); }
+.oj-compose-note { margin: 6px 0 0; font-size: 12px; color: var(--color-neutral-500); }
+.oj-compose-fail { margin: 6px 0 0; font-size: 12.5px; color: var(--color-danger-600); }
+.oj-footer { display: flex; flex-direction: column; gap: 12px; padding: 18px 0 4px; }
+.oj-untouched { margin: 0; font-size: 13.5px; color: var(--color-neutral-600); }
+.oj-switch { display: inline-flex; align-items: center; gap: 0; margin: 0 0 14px; font-size: 12.5px; color: var(--color-neutral-600); }
+.oj-switch > span { margin-right: 8px; }
+.oj-switch button { height: 30px; padding: 0 12px; border: 1px solid var(--color-neutral-300); background: var(--color-bg-elevated); font-weight: 500; color: var(--color-neutral-700); }
+.oj-switch button:first-of-type { border-radius: 8px 0 0 8px; }
+.oj-switch button:last-of-type { border-left: 0; border-radius: 0 8px 8px 0; }
+.oj-switch button.is-on { background: var(--color-primary-700); border-color: var(--color-primary-700); color: #fff; }
+.pv2-line-extra { padding-left: 22px; margin-top: 1px; }
+.wk-itself { display: block; margin-top: 2px; font-size: 12px; color: var(--color-review-600); }
+.wk-journal-page { display: flex; flex-direction: column; gap: 28px; }
+/* A line's words wrap, a long unbroken one too, in the lists and in an open
+   line's fold — never running under the row's controls (2026-10-08 review:
+   a 466px token in a 147px box on a phone). */
+.pv2-line-text, .pv2-fold, .pv2-fact { overflow-wrap: anywhere; }
+.pv2-line-main > * { min-width: 0; }
+.pv2-line-main > .pv2-rail { flex: none; }
+@media (max-width: 760px) {
+  /* In the journal's narrow column the row keeps inside its column: no bleed. */
+  .oj :is(.pv2-week, .pv2-page) .pv2-line-main, :is(.pv2-week, .pv2-page) .oj .pv2-line-main { margin-inline: 0; padding-inline: 4px; }
+  .oj .pv2-line-extra { padding-left: 18px; }
+  .oj-section { grid-template-columns: minmax(0, 1fr); padding: 18px 0; }
+  .oj-linked { padding-left: 14px; margin-left: 2px; }
+  .oj-title { font-size: 19px; margin-bottom: 10px; }
+}
+@media (max-width: 768px) {
+  .oj-add { min-height: 44px; }
+  .oj-switch button { min-height: 36px; height: auto; }
+}
