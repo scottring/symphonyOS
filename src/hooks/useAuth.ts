@@ -2,11 +2,18 @@ import { useState, useEffect, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
 import type { User } from '@supabase/supabase-js'
 import * as Sentry from '@sentry/react'
-import { INVITE_ONLY_MESSAGE, isInviteGateFailure } from '@/lib/signupGate'
+import {
+  INVITE_ONLY_MESSAGE,
+  SIGNUP_FAILED_MESSAGE,
+  classifySignupError,
+  type GateAnswer,
+} from '@/lib/signupGate'
 
 /** A sign-up that failed. `inviteOnly` marks the invite gate, which is not a
- *  fault the user can fix by retrying — the form offers the waitlist instead. */
-export type SignUpFailure = { message: string; inviteOnly?: boolean }
+ *  fault the user can fix by retrying — the form offers the waitlist instead.
+ *  `unexpected` marks a failure whose cause we can't see — the form offers
+ *  support instead of guessing. */
+export type SignUpFailure = { message: string; inviteOnly?: boolean; unexpected?: boolean }
 
 export function useAuth() {
   const [user, setUser] = useState<User | null>(null)
@@ -147,7 +154,9 @@ export function useAuth() {
     const { data: allowed, error: gateError } = await supabase.rpc('signup_allowed', {
       p_email: email,
     })
-    if (!gateError && allowed === false) {
+    const gate: GateAnswer =
+      gateError ? 'unknown' : allowed === false ? 'refused' : allowed === true ? 'allowed' : 'unknown'
+    if (gate === 'refused') {
       return { error: { message: INVITE_ONLY_MESSAGE, inviteOnly: true } }
     }
 
@@ -155,11 +164,36 @@ export function useAuth() {
       email,
       password,
     })
-    // Belt and braces: the gate may have raced (an invite revoked between the
-    // question and the answer), or the question may have failed above.
-    if (isInviteGateFailure(error)) {
+    // GoTrue reports the trigger's refusal and every other fault in the
+    // new-user path with the same opaque "Database error saving new user".
+    // The gate just said this address was allowed (or couldn't be asked), so
+    // that message is NOT evidence of the invite gate — calling it one would
+    // send an invited person to the waitlist. Say something went wrong, point
+    // at support, and report it so a real fault doesn't hide.
+    const kind = classifySignupError(error, gate)
+    if (kind === 'invite-only') {
       return { error: { message: INVITE_ONLY_MESSAGE, inviteOnly: true } }
     }
+    if (kind === 'unexpected') {
+      Sentry.captureEvent({
+        message: 'auth.signup_unexpected_failure',
+        level: 'error',
+        extra: { gate, status: (error as { status?: number } | null)?.status },
+      })
+      return { error: { message: SIGNUP_FAILED_MESSAGE, unexpected: true } }
+    }
+    return { error }
+  }
+
+  /** Send a fresh sign-up confirmation email — for someone whose link expired
+   *  or was already used. Supabase answers success for unknown or already
+   *  confirmed addresses too, so the caller must not claim a mail went out. */
+  const resendConfirmation = async (email: string) => {
+    const { error } = await supabase.auth.resend({
+      type: 'signup',
+      email,
+      options: { emailRedirectTo: `${window.location.origin}` },
+    })
     return { error }
   }
 
@@ -205,6 +239,7 @@ export function useAuth() {
     sessionLost,
     signInWithEmail,
     signUpWithEmail,
+    resendConfirmation,
     signOut,
     resetPassword,
     updatePassword,

@@ -1,12 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor, act, within } from '@testing-library/react'
 import { AuthForm } from './AuthForm'
-import { INVITE_ONLY_MESSAGE, WAITLIST_URL } from '@/lib/signupGate'
+import { INVITE_ONLY_MESSAGE, SIGNUP_FAILED_MESSAGE, WAITLIST_URL } from '@/lib/signupGate'
 
-const { mockSignInWithEmail, mockSignUpWithEmail, mockResetPassword } = vi.hoisted(() => ({
+const { mockSignInWithEmail, mockSignUpWithEmail, mockResetPassword, mockResendConfirmation } = vi.hoisted(() => ({
   mockSignInWithEmail: vi.fn(),
   mockSignUpWithEmail: vi.fn(),
   mockResetPassword: vi.fn(),
+  mockResendConfirmation: vi.fn(),
 }))
 
 // Mock the useAuth hook
@@ -15,6 +16,7 @@ vi.mock('@/hooks/useAuth', () => ({
     signInWithEmail: mockSignInWithEmail,
     signUpWithEmail: mockSignUpWithEmail,
     resetPassword: mockResetPassword,
+    resendConfirmation: mockResendConfirmation,
   }),
 }))
 
@@ -344,6 +346,21 @@ describe('AuthForm', () => {
         expect(message.closest('div')).toHaveClass('bg-danger-50')
       })
       expect(screen.queryByRole('link', { name: 'Request an invite' })).not.toBeInTheDocument()
+    })
+
+    it('shows an unexplained sign-up failure as a failure with the support address, not the invite story', async () => {
+      mockSignUpWithEmail.mockImplementation(() =>
+        Promise.resolve({ error: { message: SIGNUP_FAILED_MESSAGE, unexpected: true } })
+      )
+
+      await submitSignUp()
+
+      const alert = await screen.findByRole('alert')
+      expect(alert).toHaveTextContent(SIGNUP_FAILED_MESSAGE)
+      expect(within(alert).getByRole('link', { name: 'Email hello@symphony-os.com' }))
+        .toHaveAttribute('href', 'mailto:hello@symphony-os.com')
+      expect(screen.queryByRole('link', { name: 'Request an invite' })).not.toBeInTheDocument()
+      expect(screen.queryByText(INVITE_ONLY_MESSAGE)).not.toBeInTheDocument()
     })
 
     it('clears the invite notice when the user submits again', async () => {
