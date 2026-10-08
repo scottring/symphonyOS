@@ -1,36 +1,57 @@
 import { describe, it, expect } from 'vitest'
-import { isInviteGateFailure, INVITE_ONLY_MESSAGE } from './signupGate'
+import { classifySignupError, INVITE_ONLY_MESSAGE, SIGNUP_FAILED_MESSAGE } from './signupGate'
+import { SUPPORT_EMAIL } from './authCallback'
 
-describe('isInviteGateFailure', () => {
-  it('recognises the message GoTrue substitutes for the trigger', () => {
-    // This is verbatim what a blocked sign-up actually returned on 2026-09-11.
-    expect(isInviteGateFailure({ message: 'Database error saving new user' })).toBe(true)
+// Verbatim what a blocked sign-up returned on 2026-09-11 — and what ANY other
+// fault in GoTrue's new-user path returns too.
+const OPAQUE = { message: 'Database error saving new user' }
+
+describe('classifySignupError', () => {
+  it('treats the opaque message as the invite gate only when the gate already refused', () => {
+    expect(classifySignupError(OPAQUE, 'refused')).toBe('invite-only')
+  })
+
+  it('does not call the opaque message an invite refusal when the gate said allowed', () => {
+    // The readiness-audit case: an invited person hitting a real fault was
+    // told to request an invite.
+    expect(classifySignupError(OPAQUE, 'allowed')).toBe('unexpected')
+  })
+
+  it('does not guess when the gate could not be asked', () => {
+    expect(classifySignupError(OPAQUE, 'unknown')).toBe('unexpected')
   })
 
   it('is case insensitive', () => {
-    expect(isInviteGateFailure({ message: 'DATABASE ERROR SAVING NEW USER' })).toBe(true)
+    expect(classifySignupError({ message: 'DATABASE ERROR SAVING NEW USER' }, 'allowed')).toBe('unexpected')
   })
 
-  it("recognises the trigger's own wording, should GoTrue ever pass it through", () => {
-    expect(
-      isInviteGateFailure({
-        message: 'ERROR: Signups are currently restricted. Contact the administrator.',
-      })
-    ).toBe(true)
+  it("recognises the trigger's own wording as a refusal whatever the gate said", () => {
+    const own = { message: 'ERROR: Signups are currently restricted. Contact the administrator.' }
+    expect(classifySignupError(own, 'allowed')).toBe('invite-only')
+    expect(classifySignupError(own, 'unknown')).toBe('invite-only')
   })
 
   it('leaves real sign-up errors alone', () => {
-    expect(isInviteGateFailure({ message: 'User already registered' })).toBe(false)
-    expect(isInviteGateFailure({ message: 'Password should be at least 6 characters' })).toBe(false)
-    expect(isInviteGateFailure({ message: 'Unable to validate email address' })).toBe(false)
+    expect(classifySignupError({ message: 'User already registered' }, 'allowed')).toBeNull()
+    expect(classifySignupError({ message: 'Password should be at least 6 characters' }, 'unknown')).toBeNull()
+    expect(classifySignupError({ message: 'Unable to validate email address' }, 'allowed')).toBeNull()
   })
 
   it('treats an absent error as no failure', () => {
-    expect(isInviteGateFailure(null)).toBe(false)
-    expect(isInviteGateFailure(undefined)).toBe(false)
-    expect(isInviteGateFailure({})).toBe(false)
-    expect(isInviteGateFailure({ message: '' })).toBe(false)
-    expect(isInviteGateFailure({ message: null })).toBe(false)
+    expect(classifySignupError(null, 'allowed')).toBeNull()
+    expect(classifySignupError(undefined, 'unknown')).toBeNull()
+    expect(classifySignupError({}, 'allowed')).toBeNull()
+    expect(classifySignupError({ message: '' }, 'allowed')).toBeNull()
+    expect(classifySignupError({ message: null }, 'allowed')).toBeNull()
+  })
+})
+
+describe('SIGNUP_FAILED_MESSAGE', () => {
+  it('is actionable and names the support address, without the raw error or the invite story', () => {
+    expect(SIGNUP_FAILED_MESSAGE).toMatch(/try again/i)
+    expect(SIGNUP_FAILED_MESSAGE).toContain(SUPPORT_EMAIL)
+    expect(SIGNUP_FAILED_MESSAGE.toLowerCase()).not.toContain('database error')
+    expect(SIGNUP_FAILED_MESSAGE.toLowerCase()).not.toContain('invite')
   })
 })
 
