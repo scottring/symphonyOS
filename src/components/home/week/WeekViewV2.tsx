@@ -32,6 +32,7 @@ import { useGridCreate } from './useGridCreate'
 import { SlotQuickCreatePopover, type CreateType } from './SlotQuickCreatePopover'
 import { RoutinePlacePopover } from './RoutinePlacePopover'
 import { useFamilyMembers } from '@/hooks/useFamilyMembers'
+import { hiddenBy, hiddenSentence } from '@/lib/filters/viewVisibility'
 import { suggestSlots, type BusyInterval } from '@/lib/planning/dropSmarts'
 import { FIRST_HOUR, LAST_HOUR } from './WeekGrid'
 import { useGatedTaskActions } from '@/hooks/useGatedTaskActions'
@@ -204,7 +205,7 @@ export function WeekViewV2(props: WeekViewV2Props) {
   const navigate = useNavigate()
   const { addTask, deleteTask, toggleTask, updateTask, updateTasksBulk, pushTask, userId } = useSupabaseTasks()
   // The rail plans MY week — scope it to the current member, as the strip does.
-  const { getCurrentUserMember } = useFamilyMembers()
+  const { members: householdMembers, getCurrentUserMember } = useFamilyMembers()
   const meId = getCurrentUserMember()?.id ?? null
   const { createEvent, deleteEvent, isConnected: calendarConnected } = useGoogleCalendar()
   // createEvent never updates the held events; without a refetch a
@@ -759,10 +760,13 @@ export function WeekViewV2(props: WeekViewV2Props) {
     const id = await addTask(title, undefined, undefined, at, { isAllDay: !Number.isFinite(h), assignedTo: meId ?? undefined })
     if (!id) return
     const when = `${day.date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}${Number.isFinite(h) ? `, ${at.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}` : ''}`
-    const hidden = !layers.has('unsorted')
-    showToast(`Added to ${when} · Unsorted · only you${hidden ? ' · hidden by your current view' : ''}`, hidden ? 'warning' : 'success', hidden ? 8000 : undefined)
+    // The days draw through the area layers and the people filter alike.
+    const facts = { context: null, assignedTo: meId }
+    const view = { layers, people: selectedAssignees == null ? [] : Array.isArray(selectedAssignees) ? selectedAssignees : [selectedAssignees as string] }
+    const hidden = hiddenBy(facts, view)
+    showToast(`Added to ${when} · Unsorted · only you${hidden ? `. ${hiddenSentence(facts, view, hidden, householdMembers)}` : ''}`, hidden ? 'warning' : 'success', hidden ? 8000 : undefined)
     pushAction?.(`Added "${title}"`, () => { void deleteTask(id) })
-  }, [addTask, deleteTask, meId, layers, pushAction])
+  }, [addTask, deleteTask, meId, layers, selectedAssignees, householdMembers, pushAction])
 
   // "Can't move" adds a real calendar event (Scott, 2026-10-04: "calendared
   // events only"): an hour at the time given, with Undo, then the range

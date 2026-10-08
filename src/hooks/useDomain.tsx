@@ -72,4 +72,10 @@ export function useDomain() {
   return context
 }
 
+/** The area lens where a provider exists, else null (a component rendered on
+ *  its own, as some tests do). For readers that can do without it. */
+export function useDomainOptional(): DomainContextType | null {
+  return useContext(DomainContext) ?? null
+}
+
 export { UNSORTED }

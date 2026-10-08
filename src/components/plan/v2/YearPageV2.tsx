@@ -35,6 +35,8 @@ import { FromPaper } from './FromPaper'
 import { useAddArea } from './AddArea'
 import { useAssigneeFilter } from '@/hooks/useAssigneeFilter'
 import { planPeopleLens } from '@/lib/planning/peopleLens'
+import { useHiddenAfterAdd } from '@/hooks/useHiddenAfterAdd'
+import { ActiveViewLine } from '@/components/common/ViewFilterNotice'
 
 
 /** A goal row in the task shape the shared line and card draw. */
@@ -123,9 +125,12 @@ function Inner() {
     else if (d === 'dropped') await updateGoal(g.id, { status: 'archived' })
   }
   const addAreaChoice = useAddArea()
+  // A goal the people or area filter hides says so, beside the add row.
+  const afterAdd = useHiddenAfterAdd(members)
   const addLine = async (name: string) => {
     const areaId = areas[0]?.id ?? (await addArea('General'))?.id ?? null
-    await addGoal(areaId, name, addAreaChoice.area, { year })
+    const goal = await addGoal(areaId, name, addAreaChoice.area, { year })
+    if (goal) afterAdd.report({ context: goal.context ?? null, assignedToAll: goal.assignedToAll }, String(year))
   }
   // The year's review (see PlanPageV2): prominent only while one is due.
   const reviewIds = lookBackOpen('year', new Date(year, 0, 1), new Date())
@@ -185,6 +190,7 @@ function Inner() {
         {/* The year is reference (Scott, 2026-10-04): a plain list, read
             when a season is written. */}
         <div className="pv2-colh">{`${year}’s list`}<FromPaper altitude="year" periodStart={new Date(year, 0, 1)} tasks={layered} /></div>
+        <ActiveViewLine members={members} className="mb-2" />
         {loading && !main.length ? <p className="pv2-hint">Loading…</p> : null}
         {!loading && !main.length && <p className="pv2-hint ds-empty-body">{inMeeting ? 'Write what you want this year to hold.' : `Nothing on ${year}’s plan yet. That’s fine.`}</p>}
         {/* The year's list in large type; under each line, what the seasons
@@ -199,6 +205,7 @@ function Inner() {
           <input value={draft} onChange={(e) => setDraft(e.target.value)} placeholder={`Add to ${year}`} aria-label={`Add to ${year}`} />
           {addAreaChoice.picker}
         </form>
+        {afterAdd.notice && <div className="mb-2">{afterAdd.notice}</div>}
         {carried.length > 0 && <><div className="pv2-sect">Carried to {year + 1}</div><ul className="pv2-list">{carried.map(row)}</ul></>}
         {dropped.length > 0 && <>
           <div className="pv2-sect">Dropped</div>
