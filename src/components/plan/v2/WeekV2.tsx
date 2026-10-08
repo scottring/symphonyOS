@@ -9,7 +9,7 @@
 // It is chrome AROUND the existing week: the journal, the list, drag and drop,
 // add-to-day and the week's planning session are WeekViewV2's, unchanged.
 
-import { useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useSupabaseTasks } from '@/hooks/useSupabaseTasks'
@@ -49,6 +49,7 @@ import type { TaskContext } from '@/types/task'
 import type { FamilyMember } from '@/types/family'
 import { WeekStepMain, type PanelStep } from './WeekStepScreen'
 import { linkedLine, didFor } from '@/lib/week/monthLinks'
+import { clearPaperWeekFocus, peekPaperWeekFocus } from '@/lib/paperPlan/importNextStore'
 
 const DAY = 86_400_000
 
@@ -122,7 +123,19 @@ export function WeekV2({ tasks, weekStart, meId, isCurrent, days, renderDays, on
     notify: (m) => showToast(m, 'warning'),
   }), [tasks, gated, setPlanned, rescheduleInstance])
   const session = usePlanningSession('weekly', weekToken(weekStart))
-  const [refOpen, setRefOpenState] = useState(readRefOpen)
+  // Arriving by "Continue planning" after a month's page was imported
+  // (PaperImportNext): the month opens beside the week with the imported
+  // lines marked and "Add to this week" pointed at. Used once.
+  const [paperFocus] = useState(() => peekPaperWeekFocus(monthsOfWeek(weekStart).map(localYmd)))
+  useEffect(() => { if (paperFocus) clearPaperWeekFocus() }, [paperFocus])
+  const fromPaper = useMemo(() => new Set(paperFocus?.taskIds ?? []), [paperFocus])
+  const paperHintRef = useRef<HTMLParagraphElement>(null)
+  useEffect(() => {
+    if (!paperFocus) return
+    paperHintRef.current?.focus({ preventScroll: true })
+    paperHintRef.current?.scrollIntoView?.({ block: 'nearest' })
+  }, [paperFocus])
+  const [refOpen, setRefOpenState] = useState(() => readRefOpen() || !!paperFocus)
   const setRefOpen = (open: boolean) => { setRefOpenState(open); try { localStorage.setItem(REF_KEY, open ? 'open' : 'shut') } catch { /* this visit only */ } }
   const [daily, setDailyState] = useState(readDaily)
   const setDaily = (shown: boolean) => { setDailyState(shown); try { localStorage.setItem(DAILY_KEY, shown ? 'shown' : 'hidden') } catch { /* this visit only */ } }
@@ -339,6 +352,11 @@ export function WeekV2({ tasks, weekStart, meId, isCurrent, days, renderDays, on
           <div className="pv2-colh">{m.name} <small>for reference</small>
             {onHide && <button type="button" className="pv2-link pv2-quiet wk-refhide" aria-label={`Hide ${m.name}`} onClick={onHide}>Hide</button>}
           </div>
+          {paperFocus?.monthStart === localYmd(m.start) && (
+            <p ref={paperHintRef} tabIndex={-1} id="wk-paper-hint" className="pv2-hint wk-paperhint" role="note">
+              From your page: choose what this week takes on — <b>Add to this week</b> on a line. It stays on {m.name}’s list either way.
+            </p>
+          )}
           {m.rows.length ? (
             <ul className="pv2-list">{m.rows.map((t) => {
               const lower = t.completed ? null : lowerPlacement(t, 'month', m.start)
@@ -349,7 +367,8 @@ export function WeekV2({ tasks, weekStart, meId, isCurrent, days, renderDays, on
                   // Ticked by hand (Scott, 2026-10-04), never by its week items.
                   onToggle={() => void actions.done(t)}
                   drag={dragEnabled && !t.completed && !lower ? { id: `ref:${t.id}`, data: { kind: 'refLine', taskId: t.id } } : null}
-                  meta={lower || did.length ? <>
+                  meta={lower || did.length || fromPaper.has(t.id) ? <>
+                    {fromPaper.has(t.id) && <span className="pv2-stepcount">From your page</span>}
                     {lower && <span className="pv2-stepcount">{lower.kind === 'week' && localYmd(lower.weekStart) === localYmd(weekStart) ? 'On this week'
                       : lower.kind === 'carried' ? lower.label.replace(/^./, (c) => c.toUpperCase()) : `On ${lower.label}`}</span>}
                     {did.length > 0 && <span className="wk-did">{did.map((d, i) => (
@@ -357,7 +376,8 @@ export function WeekV2({ tasks, weekStart, meId, isCurrent, days, renderDays, on
                     ))}</span>}
                   </> : undefined}
                   trailing={!t.completed && !lower ? <span className="pv2-refacts">
-                    <button type="button" className="pv2-addbtn" data-guide-target="week-choose" data-guide-id={t.id} onClick={() => void takeIn(t, m.name)} aria-label={`Add ${t.title} to this week`}>Add to this week</button>
+                    <button type="button" className="pv2-addbtn" data-guide-target="week-choose" data-guide-id={t.id} onClick={() => void takeIn(t, m.name)} aria-label={`Add ${t.title} to this week`}
+                      aria-describedby={fromPaper.has(t.id) ? 'wk-paper-hint' : undefined}>Add to this week</button>
                   </span> : undefined} />
               )
             })}</ul>

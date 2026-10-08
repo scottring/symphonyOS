@@ -4,7 +4,12 @@ import { Loader2, LogIn, RotateCcw, X } from 'lucide-react'
 import { CameraCaptureModal } from '@/components/capture/CameraCaptureModal'
 import { PageReviewSheet, type PageReviewPayload } from '@/components/capture/PageReviewSheet'
 import { usePageFromPaper } from '@/hooks/usePageFromPaper'
-import { useCommitPage } from '@/hooks/useCommitPage'
+import { useCommitPage, type CommitPageResult } from '@/hooks/useCommitPage'
+import { landingsOf, type SavedImport } from '@/lib/paperPlan/importNext'
+import { announcePaperImport } from '@/lib/paperPlan/importNextStore'
+import { localYmd } from '@/lib/cadence/config'
+import { readSeasons, seasonLabel } from '@/lib/cadence/seasons'
+import { pageMonthStart, pageSeasonStart } from '@/lib/planParse'
 import { isSessionExpired } from '@/lib/authErrors'
 import { getAuthUser } from '@/lib/supabase'
 import { readSampleIds, writeSampleIds } from '@/lib/firstWeek'
@@ -21,6 +26,32 @@ import type { ExistingTask } from '@/lib/planDuplicates'
 import type { DomainId } from '@/lib/domains'
 import type { FamilyMember } from '@/types/family'
 import type { PageAltitude } from '@/lib/planParse'
+
+/** What the after-import panel says about a commit: the period it filled,
+ *  by name, what was written, and where each line went. */
+function savedImportOf(payload: PageReviewPayload, committed: CommitPageResult, altitude: PageAltitude): SavedImport {
+  const now = new Date()
+  const seasons = readSeasons()
+  const monthStart = altitude === 'month' ? committed.periodStart : pageMonthStart(now)
+  const seasonStart = altitude === 'season' ? committed.periodStart : pageSeasonStart(now, seasons)
+  const names = {
+    month: monthStart.toLocaleDateString('en-US', { month: 'long' }),
+    season: seasonLabel(seasonStart, seasons).replace(/\s+\d{4}$/, ''),
+    year: String(committed.periodStart.getFullYear()),
+  }
+  return {
+    id: `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`,
+    altitude,
+    periodStart: localYmd(committed.periodStart),
+    names,
+    saved: committed.tasksCreated + committed.goalsCreated + committed.routinesCreated + committed.notesCreated,
+    linked: committed.tasksLinked ?? 0,
+    failed: committed.failures,
+    landings: landingsOf(payload.items, payload.notes.length, altitude, names, now),
+    taskIds: committed.createdTaskIds,
+    at: Date.now(),
+  }
+}
 
 function rememberedDomain(altitude: PageAltitude): DomainId | undefined {
   try {
@@ -128,7 +159,9 @@ export function PageFromPaperFlow({ members, onClose, existingTasks, calendarTit
     setCommitting(true)
     try {
       // The sheet asks which layer the page belongs to; the payload carries it.
-      const { route, createdTaskIds, createdNoteIds } = await commitPage({ ...payload, storagePath: result.storagePath, altitude: result.altitude })
+      // The panel left on the page says what was saved; no success toast.
+      const committed = await commitPage({ ...payload, storagePath: result.storagePath, altitude: result.altitude }, { successToast: false })
+      const { route, createdTaskIds, createdNoteIds } = committed
       if (sample && (createdTaskIds.length || createdNoteIds.length)) {
         const { data: { user } } = await getAuthUser()
         if (user) {
@@ -139,6 +172,7 @@ export function PageFromPaperFlow({ members, onClose, existingTasks, calendarTit
           })
         }
       }
+      announcePaperImport(savedImportOf(payload, committed, result.altitude))
       reset()
       onClose()
       navigate(route)
