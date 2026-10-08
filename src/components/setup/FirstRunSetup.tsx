@@ -10,7 +10,9 @@ interface Props {
 }
 
 interface OtherRow {
-  key: number
+  /** The person's row id, fixed when the row is added so a retry after a
+   *  partial save updates this person rather than adding or skipping one. */
+  id: string
   name: string
   role: HouseholdRole
 }
@@ -31,17 +33,22 @@ function guessName(user: User): string {
 export function FirstRunSetup({ user, onDone }: Props) {
   const [householdName, setHouseholdName] = useState('')
   const [yourName, setYourName] = useState(() => guessName(user))
-  const [others, setOthers] = useState<OtherRow[]>([{ key: 1, name: '', role: 'parent' }])
+  const [others, setOthers] = useState<OtherRow[]>(() => [{ id: crypto.randomUUID(), name: '', role: 'parent' }])
+  // Rows taken out of the form; a retry deletes any of them a partial save kept.
+  const [removedIds, setRemovedIds] = useState<string[]>([])
   const [homeQuery, setHomeQuery] = useState('')
   const [home, setHome] = useState<GeocodedPlace | null>(null)
   const [homeStatus, setHomeStatus] = useState<'idle' | 'looking' | 'notfound'>('idle')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const addOther = () => setOthers((rows) => [...rows, { key: Date.now(), name: '', role: 'child' }])
-  const removeOther = (key: number) => setOthers((rows) => rows.filter((r) => r.key !== key))
-  const patchOther = (key: number, patch: Partial<OtherRow>) =>
-    setOthers((rows) => rows.map((r) => (r.key === key ? { ...r, ...patch } : r)))
+  const addOther = () => setOthers((rows) => [...rows, { id: crypto.randomUUID(), name: '', role: 'child' }])
+  const removeOther = (id: string) => {
+    setOthers((rows) => rows.filter((r) => r.id !== id))
+    setRemovedIds((ids) => [...ids, id])
+  }
+  const patchOther = (id: string, patch: Partial<OtherRow>) =>
+    setOthers((rows) => rows.map((r) => (r.id === id ? { ...r, ...patch } : r)))
 
   const resolveHome = async () => {
     const q = homeQuery.trim()
@@ -73,7 +80,9 @@ export function FirstRunSetup({ user, onDone }: Props) {
       await saveFirstRunSetup(user.id, {
         householdName,
         yourName,
-        others: others.filter((r) => r.name.trim()).map(({ name, role }) => ({ name, role })),
+        others: others.filter((r) => r.name.trim()).map(({ id, name, role }) => ({ id, name, role })),
+        // A row blanked after a partial save counts as removed.
+        removedIds: [...removedIds, ...others.filter((r) => !r.name.trim()).map((r) => r.id)],
         home: resolvedHome,
       })
       onDone()
@@ -86,12 +95,14 @@ export function FirstRunSetup({ user, onDone }: Props) {
   const handleSkip = async () => {
     if (saving) return
     setSaving(true)
+    setError(null)
     try {
       await skipFirstRunSetup(user.id)
+      onDone()
     } catch (err) {
-      console.warn('[first-run] skip failed:', err)
+      setError(err instanceof Error ? err.message : 'Could not save. Try again.')
+      setSaving(false)
     }
-    onDone()
   }
 
   return (
@@ -143,12 +154,12 @@ export function FirstRunSetup({ user, onDone }: Props) {
               <div className="space-y-2">
                 {/* input-base is unlayered CSS (width: 100%), so size via wrappers */}
                 {others.map((row, i) => (
-                  <div key={row.key} className="flex items-center gap-2">
+                  <div key={row.id} className="flex items-center gap-2">
                     <div className="flex-1 min-w-0">
                       <input
                         type="text"
                         value={row.name}
-                        onChange={(e) => patchOther(row.key, { name: e.target.value })}
+                        onChange={(e) => patchOther(row.id, { name: e.target.value })}
                         className="input-base"
                         placeholder={row.role === 'child' ? 'Child’s name' : 'Partner’s name'}
                         aria-label={`Person ${i + 1} name`}
@@ -158,7 +169,7 @@ export function FirstRunSetup({ user, onDone }: Props) {
                     <div className="w-28 shrink-0">
                       <select
                         value={row.role}
-                        onChange={(e) => patchOther(row.key, { role: e.target.value as HouseholdRole })}
+                        onChange={(e) => patchOther(row.id, { role: e.target.value as HouseholdRole })}
                         className="input-base"
                         aria-label={`Person ${i + 1} role`}
                       >
@@ -168,7 +179,7 @@ export function FirstRunSetup({ user, onDone }: Props) {
                     </div>
                     <button
                       type="button"
-                      onClick={() => removeOther(row.key)}
+                      onClick={() => removeOther(row.id)}
                       className="p-2 text-neutral-400 hover:text-neutral-700"
                       aria-label={`Remove person ${i + 1}`}
                     >
