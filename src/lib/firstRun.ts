@@ -78,9 +78,11 @@ const OTHER_COLORS: FamilyMemberColor[] = ['purple', 'green', 'orange', 'pink', 
 
 /** A required part of setup did not save. The message is for the person. */
 export class FirstRunSaveError extends Error {
-  constructor(message: string, readonly detail?: string) {
+  readonly detail?: string
+  constructor(message: string, detail?: string) {
     super(message)
     this.name = 'FirstRunSaveError'
+    this.detail = detail
   }
 }
 
