@@ -78,6 +78,34 @@ describe('WeekJournal — the grid', () => {
     expect(within(screen.getAllByRole('region', { name: 'Weekdays' })[0]).getAllByTestId(/^journal-day-/)).toHaveLength(6)
   })
 
+  // Walkthrough follow-up 2026-10-08: a split weekend says so, and says
+  // where its Sunday is; a whole one keeps "once for both days".
+  it('a Sunday-start week: Saturday alone, its Sunday named as next week’s, and no “both days”', () => {
+    renderGrid(week(new Date(2026, 9, 4)), { satIndex: 6, sunIndex: null, sometime: [routine('w', 'Yard weeding')] })
+    const band = screen.getByRole('region', { name: /The weekend/ })
+    expect(within(band).getByTestId('weekend-split')).toHaveTextContent('Sunday Oct 11 is in next week')
+    expect(within(band).getByText('once for the weekend')).toBeInTheDocument()
+    expect(screen.queryByText('once for both days')).toBeNull()
+    expect(within(band).getByText('Drag one onto Saturday to give it a day.')).toBeInTheDocument()
+    // This week's own Sunday leads the weekdays, in date order — not moved to the weekend.
+    const weekdays = screen.getAllByRole('region', { name: 'Weekdays' })[0]
+    expect(within(weekdays).getAllByTestId(/^journal-day-/).map((el) => el.getAttribute('data-testid'))).toEqual([
+      'journal-day-2026-10-04', 'journal-day-2026-10-05', 'journal-day-2026-10-06', 'journal-day-2026-10-07', 'journal-day-2026-10-08', 'journal-day-2026-10-09',
+    ])
+  })
+
+  it.each([
+    ['Saturday', new Date(2026, 9, 3), 0, 1, ['journal-day-2026-10-03', 'journal-day-2026-10-04']],
+    ['Monday', new Date(2026, 9, 5), 5, 6, ['journal-day-2026-10-10', 'journal-day-2026-10-11']],
+  ] as const)('a %s-start week: Saturday and Sunday side by side, “once for both days”, no split note', (_n, start, sat, sun, cells) => {
+    vi.useFakeTimers({ toFake: ['Date'] }); vi.setSystemTime(new Date(start.getFullYear(), start.getMonth(), start.getDate(), 9))
+    renderGrid(week(start), { satIndex: sat, sunIndex: sun, sometime: [routine('w', 'Yard weeding')] })
+    const band = screen.getByRole('region', { name: /The weekend/ })
+    expect(within(band).getAllByTestId(/^journal-day-/).map((el) => el.getAttribute('data-testid'))).toEqual(cells)
+    expect(within(band).getByText('once for both days')).toBeInTheDocument()
+    expect(within(band).queryByTestId('weekend-split')).toBeNull()
+  })
+
   it('a done timed thing still took its time; a past day says nothing about free time', () => {
     // Sunday: Saturday is past, and the weekend is still open to read.
     vi.useFakeTimers({ toFake: ['Date'] }); vi.setSystemTime(new Date(2026, 9, 4, 12))

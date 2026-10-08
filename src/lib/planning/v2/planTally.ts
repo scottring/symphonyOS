@@ -96,3 +96,33 @@ export function nextAfterSave(
   const w = endsToday ? new Date(w0.getFullYear(), w0.getMonth(), w0.getDate() + 7) : w0
   return { label: `Plan week ${helpers.weekNumber(w)}`, to: `/week?start=${ymd(w)}` }
 }
+
+/**
+ * The step after a horizon's list, offered beneath the whole list at rest —
+ * not only after "Mark planned" (walkthrough 2026-10-08: after writing a Fall
+ * milestone there was nothing in the page saying what came next). The same
+ * destination as after a save (nextAfterSave), named for a button and
+ * explained in a line. Never automatic: the list stays open for more.
+ */
+export function onwardStep(
+  level: 'season' | 'month',
+  periodStart: Date,
+  periodName: string,
+  isCurrent: boolean,
+  today: Date,
+  helpers: Parameters<typeof nextAfterSave>[4],
+): { label: string; to: string; why: string } {
+  const next = nextAfterSave(level, periodStart, isCurrent, today, helpers)
+  const at = new Date(`${next.to.split('start=')[1]}T00:00:00`)
+  if (level === 'season') {
+    const month = at.toLocaleDateString('en-US', { month: 'long' })
+    return { label: `Continue to ${month}`, to: next.to, why: `Choose what you want to move forward in ${month}. ${periodName}’s list stays beside it.` }
+  }
+  const end = new Date(at.getFullYear(), at.getMonth(), at.getDate() + 6)
+  const md = (d: Date) => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+  return {
+    label: `Plan week ${helpers.weekNumber(at)} · ${md(at)} – ${md(end)}`,
+    to: next.to,
+    why: `Choose a few doable actions for that week from ${periodName}’s priorities. Not every priority needs something every week; ${periodName} stays beside the week.`,
+  }
+}

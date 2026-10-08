@@ -84,3 +84,44 @@ describe('buildJournalDays — the weekend, once', () => {
     expect(weekend?.sometime.map((e) => e.title)).toEqual(['Yard weeding'])
   })
 })
+
+// Walkthrough follow-up 2026-10-08: each week start the app offers keeps its
+// days in date order, and a weekend is paired only when Saturday and Sunday
+// are both inside the week — never Sunday-at-the-top with Saturday-at-the-end.
+describe('buildJournalDays — the weekend for each week start', () => {
+  const forWeek = (weekStart: Date, extra: Partial<Parameters<typeof buildJournalDays>[0]> = {}) => buildJournalDays({
+    weekStart, dayCount: 7, tasks: [], userId: 'me', eventItems: [], events: [], dinnersByDay: new Map(),
+    routineItems: [], instances: [], labelFor: () => undefined, ...extra,
+  })
+  const consecutive = (days: { date: Date }[]) => days.every((d, i) => i === 0 || d.date.getTime() - days[i - 1].date.getTime() === 86_400_000 || Math.abs(d.date.getTime() - days[i - 1].date.getTime() - 86_400_000) <= 3_600_000)
+
+  it.each([
+    ['Saturday', new Date(2026, 9, 3), 0, 1, '2026-10-03', '2026-10-09'],
+    ['Monday', new Date(2026, 9, 5), 5, 6, '2026-10-05', '2026-10-11'],
+    ['Sunday', new Date(2026, 9, 4), 6, null, '2026-10-04', '2026-10-10'],
+  ] as const)('a %s-start week: seven days in order, weekend at %s/%s', (_name, start, sat, sun, first, last) => {
+    const { days, weekend } = forWeek(start)
+    expect(days).toHaveLength(7)
+    expect(consecutive(days)).toBe(true)
+    expect([days[0].key, days[6].key]).toEqual([first, last])
+    expect([weekend?.satIndex, weekend?.sunIndex]).toEqual([sat, sun])
+    if (sun !== null) expect(days[sun].date.getTime() - days[sat].date.getTime()).toBeLessThanOrEqual(25 * 3_600_000)
+  })
+
+  it('a Sunday-start week never pulls in the Sunday after its Saturday, and its own Sunday stays first', () => {
+    const start = new Date(2026, 9, 4)
+    const nextSunday = createMockTask({ id: 'n', title: 'Call the grandparents', scheduledFor: new Date(2026, 9, 11), isAllDay: true })
+    const thisSunday = createMockTask({ id: 't', title: 'Long walk', scheduledFor: new Date(2026, 9, 4), isAllDay: true })
+    const { days, weekend } = forWeek(start, { tasks: [nextSunday, thisSunday] })
+    expect(days.map((d) => d.key)).not.toContain('2026-10-11')
+    expect(days.flatMap((d) => d.entries.map((e) => e.title))).not.toContain('Call the grandparents')
+    expect(days[0].entries.map((e) => e.title)).toEqual(['Long walk'])
+    expect(weekend?.sunIndex).toBeNull()
+  })
+
+  it('a split weekend still holds its weekend task once, by its Saturday', () => {
+    const wash = createMockTask({ id: 'w', title: 'Wash the car', weekendStart: new Date(2026, 9, 10) })
+    const { weekend } = forWeek(new Date(2026, 9, 4), { weekendTasks: [wash] })
+    expect(weekend?.sometime.map((e) => e.title)).toEqual(['Wash the car'])
+  })
+})

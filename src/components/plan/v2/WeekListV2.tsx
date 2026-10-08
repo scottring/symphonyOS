@@ -8,7 +8,7 @@
 // Each line: done · the words (open the Details pane); beneath, its controls: life area, people, when (the week's own timing
 // control), and ⋯ for next week / Someday / Drop / All details.
 
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useId, useRef, useState, type ReactNode, type RefObject } from 'react'
 import { useDroppable } from '@dnd-kit/core'
 import type { Task, TaskContext } from '@/types/task'
 import type { FamilyMember } from '@/types/family'
@@ -19,8 +19,11 @@ import { localYmd } from '@/lib/cadence/config'
 import { isMissedPlacement } from '@/lib/week/missedPlacement'
 import { LineMenu, type LineActions, type LineVM } from './PlanLine'
 import { WeekRow } from './WeekRow'
+import { MonthLink } from './MonthLink'
+import { useSafeAdd } from './useSafeAdd'
+import { anOrA } from '@/lib/week/monthLinks'
 
-export function WeekListV2({ title, lines, weekStart, members, actions, timingControl, onContext, onAdd, dragEnabled = true, headerAction, addPicker, emptyHint, focusAdd = false, hint, forLine, forOptions }: {
+export function WeekListV2({ title, lines, weekStart, members, actions, timingControl, onContext, onAdd, dragEnabled = true, headerAction, addPicker, emptyHint, focusAdd = false, hint, forLine, forOptions, onForLine, forId: forIdProp, onForId, inputRef, footer }: {
   title: string
   lines: LineVM[]
   weekStart: Date
@@ -29,12 +32,23 @@ export function WeekListV2({ title, lines, weekStart, members, actions, timingCo
   /** The week's own "when" control (TaskTimingMenu), as WeekViewV2 builds it. */
   timingControl?: (task: Task) => ReactNode
   onContext: (task: Task, context: TaskContext | undefined) => void
-  /** `forId`: the month line it is written for, when one was chosen. */
-  onAdd: (title: string, forId?: string) => Promise<void>
+  /** `forId`: the month line it is written for, when one was chosen.
+   *  Resolves true once stored; on false the words stay in the box. */
+  onAdd: (title: string, forId?: string) => Promise<boolean | void>
   /** The month line a row was written for (Scott, 2026-10-04). */
   forLine?: (task: Task) => { id: string; title: string; month: string } | null
   /** The month's open lines, offered (optionally) when adding. */
   forOptions?: { month: string; lines: { id: string; title: string }[] }
+  /** Set, change or remove a row's month line after it was written. */
+  onForLine?: (task: Task, lineId: string | null) => void
+  /** The month line new actions are for, held by the page so the month's
+   *  "Add a weekly action" can choose it (rapid entry, 2026-10-08). */
+  forId?: string
+  onForId?: (id: string) => void
+  /** The add box, so the page can put the cursor in it. */
+  inputRef?: RefObject<HTMLInputElement | null>
+  /** Under the add row: what happens to unfinished work, the next step. */
+  footer?: ReactNode
   dragEnabled?: boolean
   /** Drawn at the right of the heading (Add from paper). */
   headerAction?: ReactNode
@@ -47,10 +61,19 @@ export function WeekListV2({ title, lines, weekStart, members, actions, timingCo
   /** A line under the heading saying what the list is for. */
   hint?: string
 }) {
-  const [draft, setDraft] = useState('')
-  const [forId, setForId] = useState('')
-  const addRef = useRef<HTMLInputElement>(null)
-  useEffect(() => { if (focusAdd) addRef.current?.focus() }, [focusAdd])
+  // The page may hold the chosen month line; without it, this list does.
+  const [ownForId, setOwnForId] = useState('')
+  const forId = forIdProp ?? ownForId
+  const setForId = onForId ?? setOwnForId
+  const ownRef = useRef<HTMLInputElement>(null)
+  const addRef = inputRef ?? ownRef
+  const forDescId = useId()
+  const chosen = forOptions?.lines.find((l) => l.id === forId) ?? null
+  // One write at a time; on success only the words sent clear and the month
+  // line stays chosen for the next one; on failure the words stay (useSafeAdd).
+  const box = useSafeAdd((v) => (chosen ? onAdd(v, chosen.id) : onAdd(v)), addRef, localYmd(weekStart))
+  const { draft, saving, failed, submit } = box
+  useEffect(() => { if (focusAdd) addRef.current?.focus() }, [focusAdd, addRef])
   const [showDone, setShowDone] = useState(false)
   const first = localYmd(weekStart)
   const last = localYmd(new Date(weekStart.getTime() + 6 * 86_400_000))
@@ -75,8 +98,9 @@ export function WeekListV2({ title, lines, weekStart, members, actions, timingCo
   // The list takes things back: a day's task dropped here loses its day and
   // stays this week (useWeekDragDrop, kind 'weekList').
   const { setNodeRef: dropRef, isOver } = useDroppable({ id: 'week-list', data: { kind: 'weekList' }, disabled: !dragEnabled })
-  const row = (vm: LineVM) => <Card key={vm.task.id} vm={vm} actions={actions} members={members} timingControl={timingControl}
+  const row = (vm: LineVM) => <WeekCard key={vm.task.id} vm={vm} actions={actions} members={members} timingControl={timingControl}
     onContext={onContext} dragEnabled={dragEnabled} forLine={forLine?.(vm.task) ?? null}
+    forControl={onForLine && forOptions ? (cur) => <MonthLink title={vm.task.title} current={cur} options={forOptions} onChange={(id) => onForLine(vm.task, id)} /> : undefined}
     passed={missedIds.has(vm.task.id) ? vm.task.scheduledFor!.toLocaleDateString('en-US', { weekday: 'long' }) : null} />
   return (
     <section ref={dropRef} aria-label="This week's list" className={`pv2-wl${isOver ? ' is-over' : ''}`}>
@@ -91,21 +115,30 @@ export function WeekListV2({ title, lines, weekStart, members, actions, timingCo
         </section>
       ))}
       {done.length > 0 && <button type="button" className="pv2-link pv2-quiet" aria-expanded={showDone} onClick={() => setShowDone((s) => !s)}>{showDone ? 'Hide done' : 'Show done'}</button>}
-      <form className="pv2-write" onSubmit={(e) => { e.preventDefault(); const v = draft.trim(); if (v) { if (forId) void onAdd(v, forId); else void onAdd(v); setDraft(''); setForId('') } }}>
+      <form className="pv2-write" onSubmit={(e) => { e.preventDefault(); void submit() }}>
         <span className="pv2-wl-check" aria-hidden="true" />
-        <input ref={addRef} value={draft} onChange={(e) => setDraft(e.target.value)} placeholder="Add something for this week" aria-label="Add to this week" />
+        <input ref={addRef} value={draft} onChange={(e) => box.setDraft(e.target.value)}
+          placeholder={chosen ? `A weekly action for “${chosen.title}”` : 'Add something for this week'} aria-label="Add to this week"
+          aria-describedby={forOptions && forOptions.lines.length > 0 ? forDescId : undefined} aria-busy={saving || undefined} />
         {addPicker}
       </form>
+      {saving && <p className="wk-addsaving" role="status">Saving…</p>}
+      {failed && <p className="wk-addfail" role="alert">That didn’t save — your words are still in the box. Press Enter to try again.</p>}
       {forOptions && forOptions.lines.length > 0 && (
-        // Optional: which month line this is for. Nothing asks you to choose.
-        <label className="wk-forpick">
-          <span>for</span>
-          <select aria-label={`For an ${forOptions.month} line`} value={forId} onChange={(e) => setForId(e.target.value)}>
-            <option value="">no {forOptions.month} line</option>
+        // Optional: which month line new actions are for. Nothing asks you to
+        // choose; once chosen it stays for the next one until changed.
+        <div className={`wk-forpick${chosen ? ' is-set' : ''}`} role="group" aria-label={`Which ${forOptions.month} line new actions are for`}>
+          <span id={forDescId} aria-live="polite" className="wk-foractive">
+            {chosen ? <>Adding for {forOptions.month}: <b>{chosen.title}</b></> : <>Not tied to {anOrA(forOptions.month)} {forOptions.month} line</>}
+          </span>
+          <select aria-label={`For ${anOrA(forOptions.month)} ${forOptions.month} line`} value={chosen?.id ?? ''} onChange={(e) => setForId(e.target.value)}>
+            <option value="">No {forOptions.month} line</option>
             {forOptions.lines.map((l) => <option key={l.id} value={l.id}>{l.title}</option>)}
           </select>
-        </label>
+          {chosen && <button type="button" className="pv2-link pv2-quiet" onClick={() => { setForId(''); addRef.current?.focus() }}>Clear</button>}
+        </div>
       )}
+      {footer}
     </section>
   )
 }
@@ -114,8 +147,12 @@ export function WeekListV2({ title, lines, weekStart, members, actions, timingCo
 // {kind:'chip'} → useWeekDragDrop: an all-day date on that day, past days
 // refused, Undo offered). The same row every column draws (WeekRow,
 // 2026-10-03) — no white card; the grip says it moves.
-function Card({ vm, actions, members, timingControl, onContext, dragEnabled, forLine, passed }: {
+export function WeekCard({ vm, actions, members, timingControl, onContext, dragEnabled, forLine, forControl, passed, note }: {
+  /** A line under the title saying what the row is (Open journal: "This October line itself is on the week"). */
+  note?: string
   forLine: { id: string; title: string; month: string } | null
+  /** The month line as a control (change / remove / link). */
+  forControl?: (current: { id: string; title: string; month: string } | null) => ReactNode
   /** The weekday its day was, when it passed undone. */
   passed: string | null
   vm: LineVM; actions: LineActions; members: FamilyMember[]
@@ -135,9 +172,11 @@ function Card({ vm, actions, members, timingControl, onContext, dragEnabled, for
       onOpen={() => actions.details(t)}
       drag={movable ? { id: `pool:${t.id}`, data: { kind: 'chip', taskId: t.id } } : null}
       people={people}
-      meta={forLine || passed ? <>
+      meta={forLine || passed || note || (forControl && !t.completed) ? <>
+        {note && <span className="wk-itself">{note}</span>}
         {passed && <span className="wk-passed">{passed} passed — give it another day?</span>}
-        {forLine && <span className="wk-for"><span aria-hidden="true">↳ </span>for {forLine.month}: {forLine.title}</span>}
+        {forControl && !t.completed ? forControl(forLine)
+          : forLine && <span className="wk-for"><span aria-hidden="true">↳ </span>for {forLine.month}: {forLine.title}</span>}
       </> : undefined}
       tools={<>
         <ContextPicker size="sm" value={t.context ?? null} onChange={(c) => onContext(t, c)} />

@@ -128,7 +128,9 @@ export function CloseOut({ lines, candidateIds, members, actions, prevName, next
   actions: LineActions
   prevName: string
   nextName: string
-  onDecide: (vm: LineVM, d: CloseDecision) => Promise<void> | void
+  /** Resolves false when the decision did not save: the card stays, says
+   *  so, and can be decided again (2026-10-08 review). */
+  onDecide: (vm: LineVM, d: CloseDecision) => Promise<boolean | void> | boolean | void
   onFinish: () => void
   /** The last card's button, when it leads somewhere other than writing the next period. */
   finishLabel?: string
@@ -137,7 +139,13 @@ export function CloseOut({ lines, candidateIds, members, actions, prevName, next
   const [k, setK] = useState(0)
   const [log, setLog] = useState<Record<string, CloseDecision>>({})
   const [flash, setFlash] = useState<StampKind | null>(null)
+  const [pending, setPending] = useState(false)
+  const [failedOn, setFailedOn] = useState<string | null>(null)
   const byId = new Map(lines.map((l) => [l.task.id, l]))
+  // Each card as it was when the close-out opened: a write that half-landed
+  // (carried, but its old day not cleared) can drop the row from the
+  // caller's list, and the card must still be there to try again.
+  const [snap] = useState(() => new Map(lines.filter((l) => candidateIds.includes(l.task.id)).map((l) => [l.task.id, l])))
   const reduced = typeof matchMedia !== 'undefined' && matchMedia('(prefers-reduced-motion: reduce)').matches
 
   if (k >= ids.length) {
@@ -154,14 +162,20 @@ export function CloseOut({ lines, candidateIds, members, actions, prevName, next
       </div></div>
     )
   }
-  const vm = byId.get(ids[k])
+  const vm = byId.get(ids[k]) ?? (failedOn === ids[k] ? snap.get(ids[k]) : undefined)
   if (!vm) {
     return <div className="pv2-focus"><div className="pv2-card"><p className="pv2-hint">This line is no longer on {prevName}’s plan.</p>
       <div className="pv2-acts"><button type="button" className="pv2-qbtn" onClick={() => setK(k + 1)}>Next →</button></div></div></div>
   }
   const decide = async (d: CloseDecision) => {
+    if (pending) return
+    setPending(true)
+    let ok = true
+    try { ok = (await onDecide(vm, d)) !== false } catch { ok = false } finally { setPending(false) }
+    // Not saved: no stamp, no tally, the same card — still open, still yours to decide.
+    if (!ok) { setFailedOn(vm.task.id); return }
+    setFailedOn(null)
     setLog((x) => ({ ...x, [vm.task.id]: d }))
-    await onDecide(vm, d)
     if (d === 'left') { setK(k + 1); return }
     setFlash(d)
     window.setTimeout(() => { setFlash(null); setK((x) => x + 1) }, reduced ? 250 : 750)
@@ -173,15 +187,16 @@ export function CloseOut({ lines, candidateIds, members, actions, prevName, next
       <div className="pv2-bar"><i style={{ width: `${(k / ids.length) * 100}%` }} /></div>
       <Card vm={shown} context={vm.origin ? 'earlier' : `${prevName} plan`} carryTo={nextName} fresh={!!flash}>
         <Facts vm={vm} actions={actions} members={members} />
+        {failedOn === vm.task.id && <p className="pv2-hint pv2-decidefail" role="alert">That didn’t fully save, so it isn’t counted as decided. The card stays here — try again.</p>}
         <div className="pv2-fates">
-          <button type="button" className="pv2-btn" disabled={!!flash} onClick={() => void decide('carried')}>Carry to {nextName}</button>
-          <button type="button" className="pv2-qbtn" disabled={!!flash} onClick={() => void decide('done')}>It’s done</button>
-          {actions.someday && <button type="button" className="pv2-qbtn" disabled={!!flash} onClick={() => void decide('someday')}>Someday</button>}
-          <button type="button" className="pv2-qbtn" disabled={!!flash} onClick={() => void decide('dropped')}>Drop it</button>
-          <button type="button" className="pv2-link pv2-quiet" disabled={!!flash} onClick={() => void decide('left')}>{vm.origin ? 'Leave it for now' : `Leave it in ${prevName}`}</button>
+          <button type="button" className="pv2-btn" disabled={!!flash || pending} onClick={() => void decide('carried')}>Carry to {nextName}</button>
+          <button type="button" className="pv2-qbtn" disabled={!!flash || pending} onClick={() => void decide('done')}>It’s done</button>
+          {actions.someday && <button type="button" className="pv2-qbtn" disabled={!!flash || pending} onClick={() => void decide('someday')}>Someday</button>}
+          <button type="button" className="pv2-qbtn" disabled={!!flash || pending} onClick={() => void decide('dropped')}>Drop it</button>
+          <button type="button" className="pv2-link pv2-quiet" disabled={!!flash || pending} onClick={() => void decide('left')}>{vm.origin ? 'Leave it for now' : `Leave it in ${prevName}`}</button>
         </div>
       </Card>
-      <div className="pv2-fnav2"><button type="button" className="pv2-qbtn" disabled={k === 0 || !!flash} onClick={() => setK(k - 1)}>← Previous</button><span /></div>
+      <div className="pv2-fnav2"><button type="button" className="pv2-qbtn" disabled={k === 0 || !!flash || pending} onClick={() => setK(k - 1)}>← Previous</button><span /></div>
     </div>
   )
 }
