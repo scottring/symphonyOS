@@ -1,3 +1,4 @@
+import { readSampleIds } from '@/lib/firstWeek'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, waitFor } from '@/test/test-utils'
 import { screen } from '@testing-library/react'
@@ -227,13 +228,13 @@ describe('PageFromPaperFlow', () => {
   })
 
   // Friends-and-family review, 2026-10-08: the panel's record had no account.
-  it('a save that finishes after the tab changed accounts belongs to the account that started it', async () => {
+  it.each([false, true])('a save that finishes after the tab changed accounts belongs to its initiator (sample=%s)', async (sample) => {
     mocks.status = 'ready'
     mocks.altitude = 'month'
     mocks.items = [{ ...task('Bring a picnic blanket'), placement: { kind: 'month' } }]
     let finish!: (v: unknown) => void
     mocks.commitPage.mockReturnValue(new Promise((resolve) => { finish = resolve }))
-    const ui = () => <><PageFromPaperFlow members={[]} onClose={vi.fn()} today={new Date(2026, 9, 1)} /><PaperImportNext /></>
+    const ui = () => <><PageFromPaperFlow sample={sample} members={[]} onClose={vi.fn()} today={new Date(2026, 9, 1)} /><PaperImportNext /></>
     const { rerender } = render(ui())
 
     await userEvent.click(await screen.findByRole('button', { name: /add 1 item/i }))
@@ -247,6 +248,8 @@ describe('PageFromPaperFlow', () => {
       tasksCreated: 1, goalsCreated: 0, notesCreated: 0, routinesCreated: 0, failures: 0, createdTaskIds: ['a'], createdNoteIds: [],
     })
     await waitFor(() => expect(mocks.reset).toHaveBeenCalled())
+    expect(readSampleIds('u2').taskIds).toEqual([])
+    expect(readSampleIds('u1').taskIds).toEqual(sample ? ['a'] : [])
     expect(screen.queryByRole('status')).toBeNull()
 
     mocks.authUserId = 'u1'

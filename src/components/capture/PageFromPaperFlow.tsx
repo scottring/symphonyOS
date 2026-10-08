@@ -165,15 +165,12 @@ export function PageFromPaperFlow({ members, onClose, existingTasks, calendarTit
       // The panel left on the page says what was saved; no success toast.
       const committed = await commitPage({ ...payload, storagePath: result.storagePath, altitude: result.altitude }, { successToast: false })
       const { route, createdTaskIds, createdNoteIds } = committed
-      if (sample && (createdTaskIds.length || createdNoteIds.length)) {
-        const { data: { user } } = await getAuthUser()
-        if (user) {
-          const existing = readSampleIds(user.id)
-          writeSampleIds(user.id, {
-            taskIds: [...existing.taskIds, ...createdTaskIds],
-            noteIds: [...existing.noteIds, ...createdNoteIds],
-          })
-        }
+      if (sample && initiator && (createdTaskIds.length || createdNoteIds.length)) {
+        const existing = readSampleIds(initiator.id)
+        writeSampleIds(initiator.id, {
+          taskIds: [...existing.taskIds, ...createdTaskIds],
+          noteIds: [...existing.noteIds, ...createdNoteIds],
+        })
       }
       if (initiator) announcePaperImport(initiator.id, savedImportOf(payload, committed, result.altitude))
       reset()
