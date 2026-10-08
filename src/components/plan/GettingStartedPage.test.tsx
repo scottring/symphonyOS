@@ -65,6 +65,38 @@ describe('Plan with guidance', () => {
     expect(guide.set).toHaveBeenCalledWith(expect.objectContaining({ route: 'month', steps: ['month', 'week', 'today'], status: 'active' }))
   })
 
+  it('“Show me where things go” is offered, off unless chosen', async () => {
+    show()
+    fireEvent.click(screen.getByRole('button', { name: 'Continue' }))
+    const box = screen.getByRole('checkbox', { name: /Show me where things go/ }) as HTMLInputElement
+    expect(box.checked).toBe(false)
+    fireEvent.click(screen.getByRole('button', { name: 'Start planning' }))
+    await waitFor(() => expect(guide.set).toHaveBeenCalled())
+    expect((guide.set.mock.calls.at(-1) as unknown as [GuideState])[0].coach).toBeUndefined()
+  })
+
+  it('chosen, the run starts with the coach on', async () => {
+    show()
+    fireEvent.click(screen.getByRole('button', { name: 'Continue' }))
+    fireEvent.click(screen.getByRole('checkbox', { name: /Show me where things go/ }))
+    fireEvent.click(screen.getByRole('button', { name: 'Start planning' }))
+    await waitFor(() => expect(guide.set).toHaveBeenCalledWith(expect.objectContaining({ route: 'month', coach: true, status: 'active' })))
+  })
+
+  it('the finish says where each coached thing was saved', () => {
+    guide.state = {
+      v: 1, route: 'week', steps: ['week', 'today'], periods: { week: '2026-09-26', today: '2026-09-29' }, current: 1, done: ['week', 'today'], status: 'finished', updatedAt: '',
+      coach: true, coachDone: {
+        week: { id: 'w1', title: 'Email two piano teachers', saved: 'Saved to Week 40.', at: '' },
+        today: { id: 'w1', title: 'Email two piano teachers', saved: 'Saved to Today.', also: 'It’s still on Week 40.', at: '' },
+      },
+    }
+    show('/start?done=1')
+    const where = screen.getByRole('region', { name: 'Where things went' })
+    expect(where.textContent).toContain('“Email two piano teachers” Saved to Week 40.')
+    expect(where.textContent).toContain('Saved to Today. It’s still on Week 40.')
+  })
+
   it('can start from a paper plan', async () => {
     show()
     fireEvent.click(screen.getByRole('button', { name: 'Continue' }))

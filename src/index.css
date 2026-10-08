@@ -3798,6 +3798,68 @@ html.rail-stuck .desktop-workspace-nav:has(.page-navigation-center:not(:empty)) 
 .guide-ideas summary { cursor: pointer; width: fit-content; color: var(--color-primary-700); font-weight: 500; }
 .guide-ideas p { margin: 6px 0 4px; line-height: 1.5; }
 .guide-ideas ul { margin: 0; padding-left: 18px; list-style: disc; line-height: 1.6; }
+
+/* "Show me where things go" — the guide's optional coach (GuideCoach.tsx).
+   One quiet note under the guide's actions; the real control it names wears
+   a soft ring. On a phone it is a compact card above the dock. */
+.guide-showme { display: inline-flex; align-items: center; gap: 5px; }
+.guide-showme.is-on { color: var(--color-primary-700); }
+.guide-showme-choice { margin: 4px 0 14px; border: 1px solid var(--color-neutral-200); border-radius: 12px; }
+.guide-coach {
+  position: relative; display: grid; grid-template-columns: 22px minmax(0, 1fr) 24px; column-gap: 10px; align-items: start;
+  margin-top: 4px; padding: 11px 12px 11px 14px; border-radius: 12px;
+  background: var(--color-bg-elevated); border: 1px solid var(--color-primary-100);
+  font-size: 13.5px; line-height: 1.5; color: var(--color-neutral-700);
+}
+.guide-coach.is-saved { border-color: var(--color-sage-200); }
+.guide-coach-icon { display: grid; place-items: center; width: 22px; height: 22px; margin-top: 1px; border-radius: 999px; background: var(--color-primary-50); color: var(--color-primary-600); }
+.guide-coach.is-saved .guide-coach-icon { background: var(--color-sage-100); color: var(--color-sage-600); }
+.guide-coach-main { min-width: 0; }
+.guide-coach-title { margin: 0; font-weight: 600; color: var(--color-neutral-900); }
+.guide-coach-body { margin: 1px 0 0; max-width: 68ch; }
+.guide-coach-alt { margin: 3px 0 0; font-size: 12.5px; color: var(--color-neutral-500); }
+.guide-coach-live:empty { display: none; }
+.guide-coach-acts { display: flex; flex-wrap: wrap; gap: 4px 16px; margin-top: 6px; }
+.guide-coach-acts:empty { display: none; }
+.guide-coach-hide {
+  display: grid; place-items: center; width: 24px; height: 24px; border-radius: 999px;
+  color: var(--color-neutral-500); background: none;
+}
+.guide-coach-hide:hover { background: var(--color-neutral-100); color: var(--color-neutral-800); }
+.guide-coach :is(button):focus-visible { outline: 2px solid var(--color-primary-500); outline-offset: 2px; }
+/* The real control the coach names: a soft ring, one slow breath. */
+[data-guide-coach] {
+  outline: 2px solid var(--color-primary-400); outline-offset: 3px; border-radius: 10px;
+  scroll-margin: 96px 0 calc(var(--guide-coach-room, 0px) + 16px);
+  animation: guide-coach-ring 1.6s ease-out 2;
+}
+[data-guide-coach='next'] { outline-style: dashed; animation: none; }
+@keyframes guide-coach-ring {
+  0% { box-shadow: 0 0 0 0 color-mix(in oklab, var(--color-primary-400) 45%, transparent); }
+  100% { box-shadow: 0 0 0 10px color-mix(in oklab, var(--color-primary-400) 0%, transparent); }
+}
+@media (prefers-reduced-motion: reduce) { [data-guide-coach] { animation: none; } }
+/* Phone: a compact card above the dock (and above Today's add bar), with room
+   left at the page's foot so nothing ends up underneath it. */
+@media (max-width: 767px) {
+  .guide-coach.is-sheet {
+    position: fixed; left: 12px; right: 12px; z-index: 36; margin: 0;
+    bottom: calc(67px + env(safe-area-inset-bottom, 0px) + 10px);
+    padding: 10px 10px 10px 12px; font-size: 13px;
+    box-shadow: 0 6px 22px rgb(35 35 34 / 0.14);
+  }
+  body:has(.phone-capture-bar) .guide-coach.is-sheet { bottom: calc(67px + env(safe-area-inset-bottom, 0px) + 72px); }
+  .guide-coach.is-sheet .guide-coach-alt { display: none; }
+  .guide-coach.is-sheet.is-saved .guide-coach-alt { display: block; }
+  /* Typing: out of the way, but still heard (aria-live stays mounted). */
+  .guide-coach.is-sheet.is-quiet {
+    clip-path: inset(50%); width: 1px; height: 1px; overflow: hidden; padding: 0; border: 0; box-shadow: none;
+  }
+  .scenery-page:has(> .guide-slot)::after { content: ""; display: block; height: var(--guide-coach-room, 0px); }
+}
+.guide-placed h2 { margin: 4px 0 6px; font-size: 14px; font-weight: 600; color: var(--color-neutral-800); }
+.guide-placed ul { margin: 0; padding: 0; list-style: none; display: grid; gap: 6px; font-size: 14px; color: var(--color-neutral-700); }
+.guide-placed b { font-weight: 600; color: var(--color-neutral-900); }
 /* A goal picker inside a line's ⋯ menu: long lists scroll, long names clip. */
 .pv2-menu.is-floating { max-height: min(70vh, 460px); overflow-y: auto; max-width: 320px; }
 .pv2-mhead { padding: 6px 10px 4px; font-size: 12px; color: var(--color-neutral-500); }
