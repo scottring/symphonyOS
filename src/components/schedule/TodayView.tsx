@@ -39,7 +39,7 @@ import { useDomain } from '@/hooks/useDomain'
 import { MobilePlanControls } from '@/components/layout/PlanNavigation'
 import { PhoneFilterControl } from '@/components/layout/PhoneFilterControl'
 
-import { Eye, EyeOff, Binoculars, Printer, GripVertical, Moon, Sparkles, ChevronDown, ChevronRight, Plus, History } from 'lucide-react'
+import { Eye, EyeOff, Binoculars, Printer, GripVertical, Moon, Sparkles, ChevronDown, ChevronRight, Plus, History, Check } from 'lucide-react'
 import { splitTodayJournal, splitCompletedFocus } from '@/lib/today/journalSplit'
 import { panelActionsFor } from '@/components/reference/DayPlanPanel'
 import { useColumnsFitWindow } from '@/hooks/useColumnsFitWindow'
@@ -90,6 +90,7 @@ import { weekStartAnchor, readCadenceConfig } from '@/lib/cadence/config'
 import { resolveRoutine, isDraggableRoutine } from '@/lib/routineUtils'
 import { TodayOverflowMenu } from './TodayOverflowMenu'
 import { ReviewDrawer, type ReviewMode } from './ReviewDrawer'
+import { useEveningReflection } from '@/hooks/useEveningReflection'
 import { HorizonPoolDropdown } from './HorizonPoolDropdown'
 import { DayNavCluster } from './DayNavCluster'
 import { MastheadCard } from '@/components/layout/MastheadCard'
@@ -269,6 +270,9 @@ export function TodayView({
   // Review drawer — one body, two entries: the backlog footer's "Review"
   // opens the morning flavor; the ⋯ menu's "End of day review" the evening.
   const [reviewMode, setReviewMode] = useState<ReviewMode | null>(null)
+  // The day's reflection: the review writes it, and its row is what lets
+  // Today say "Reviewed" for this date, on any device (2026-10-08).
+  const reflection = useEveningReflection(viewedDate)
   const clearBulkSelection = useCallback(() => setSelectedKeys(new Set()), [])
   const toggleBulkSelect = useCallback((key: string) => {
     setSelectedKeys((prev) => {
@@ -1788,8 +1792,17 @@ export function TodayView({
             onReviewEmail={emailCaptures.length > 0 ? () => setEmailReviewOpen(true) : undefined}
           />
         )}
-        {/* Not under "Loading your day…": the review closes a list that is there. */}
-        {reviewAtEnd && data.isToday && !(loading && data.counts.totalItems === 0) && (
+        {/* A closed day says so, quietly, for as long as it is on screen —
+            any device: the reflection row is the record. */}
+        {reflection.reviewed ? (
+          <p className="today-reviewed">
+            <Check className="w-4 h-4" aria-hidden="true" /> <span>Reviewed</span>
+            {data.isToday && (
+              <button type="button" className="today-reviewed-again" onClick={() => setReviewMode('evening')}>Look again</button>
+            )}
+          </p>
+        ) : reviewAtEnd && data.isToday && !(loading && data.counts.totalItems === 0) && (
+          /* Not under "Loading your day…": the review closes a list that is there. */
           <button type="button" className="today-review-close" onClick={() => setReviewMode('evening')} title="Reflect, prep for tomorrow, and close the day">
             <Moon className="w-4 h-4" aria-hidden="true" /> Review today
           </button>
@@ -1838,6 +1851,13 @@ export function TodayView({
         onUpdateTask={(id, u) => onUpdateTask?.(id, u)}
         onPushTask={ctx.onPushTask}
         onDeleteTask={ctx.onDeleteTask}
+        reflection={reflection}
+        onLookAtTomorrow={() => {
+          setReviewMode(null)
+          const next = new Date(viewedDate)
+          next.setDate(next.getDate() + 1)
+          onDateChange(next)
+        }}
       />
 
       {/* What arrived from a forwarded email and nobody has looked at yet. */}

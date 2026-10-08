@@ -40,6 +40,18 @@ vi.mock('@/hooks/useDomain.tsx', async (importOriginal) => {
   return { ...actual, useDomain: () => ({ currentDomain: 'universal', layers: ALL_LAYERS, setDomain: vi.fn() }) }
 })
 
+// The day's reflection row: `reviewed` is what Today's "Reviewed" line reads;
+// closeDay writes the row, so it flips the flag as the real hook does.
+const reflection = vi.hoisted(() => ({ reviewed: false, ok: true }))
+vi.mock('@/hooks/useEveningReflection', () => ({
+  useEveningReflection: () => ({
+    highlight: 'Bike ride', setHighlight: () => {}, notes: '', setNotes: () => {},
+    save: async () => true,
+    closeDay: async () => { if (reflection.ok) reflection.reviewed = true; return reflection.ok },
+    reviewed: reflection.reviewed, loading: false,
+  }),
+}))
+
 // Mutable state for useTimelineInsert so individual tests can override noteComposer
 let mockNoteComposer: { anchor: Date | null } | null = null
 const mockCloseNoteComposer = vi.fn()
@@ -741,6 +753,65 @@ describe('TodayView — desktop review closes the list (2026-10-02)', () => {
     await openOverflow(user)
     expect(screen.getByRole('button', { name: /End of day review/i })).toBeInTheDocument()
     host.remove()
+  })
+})
+
+// Friends-and-family walk, 2026-10-08: "Close the day" saved and vanished,
+// leaving a Today that looked the same as before. It now says it saved, what
+// closing changed, offers a next step — and Today keeps a "Reviewed" line.
+describe('TodayView — a closed day says so', () => {
+  afterEach(() => { mockUseMobile.mockReturnValue(true); reflection.reviewed = false; reflection.ok = true })
+
+  function renderDesktop(props: Record<string, unknown> = {}) {
+    mockUseMobile.mockReturnValue(false)
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const result = render(
+      <DesktopControlsContext.Provider value={host}>
+        <ScheduleActionsProvider value={ctxValue as never}>
+          <TodayView
+            tasks={[]} events={[]} routines={[]} dateInstances={[]}
+            selectedItemId={null} onSelectItem={vi.fn()} onToggleTask={vi.fn()}
+            onCompleteRoutine={vi.fn()} onCompleteEvent={vi.fn()} loading={false}
+            viewedDate={TODAY} onDateChange={vi.fn()} projects={[]} {...props}
+          />
+        </ScheduleActionsProvider>
+      </DesktopControlsContext.Provider>,
+    )
+    return { ...result, host }
+  }
+
+  it('Close the day confirms the save, says what changed, then Today shows Reviewed', async () => {
+    const { user, host } = renderDesktop()
+    await user.click(screen.getByRole('button', { name: 'Review today' }))
+    await user.click(screen.getByRole('button', { name: 'Close the day' }))
+    const status = await within(screen.getByRole('dialog')).findByRole('status')
+    expect(status).toHaveTextContent('Your reflection is saved.')
+    expect(status).toHaveTextContent('Today now shows as reviewed. Anything you moved or ticked off was saved as you went; the rest stays where it was.')
+    expect(screen.getByRole('button', { name: /Look at tomorrow/ })).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Done' }))
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(screen.getByText('Reviewed')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Review today' })).not.toBeInTheDocument()
+    host.remove()
+  })
+
+  it('Look at tomorrow moves the page to the next day', async () => {
+    const onDateChange = vi.fn()
+    const { user, host } = renderDesktop({ onDateChange })
+    await user.click(screen.getByRole('button', { name: 'Review today' }))
+    await user.click(screen.getByRole('button', { name: 'Close the day' }))
+    await user.click(await screen.findByRole('button', { name: /Look at tomorrow/ }))
+    expect((onDateChange.mock.calls[0][0] as Date).toDateString()).toBe(TOMORROW.toDateString())
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    host.remove()
+  })
+
+  it('a day already reviewed shows the line on any visit, phones too', () => {
+    reflection.reviewed = true
+    renderView()
+    expect(screen.getByText('Reviewed')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Look again' })).toBeInTheDocument()
   })
 })
 

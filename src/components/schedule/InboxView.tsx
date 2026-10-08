@@ -42,7 +42,7 @@ import { isBuyish, isToBuyNudgeDismissed, dismissToBuyNudge } from '@/lib/lists/
 import { ToBuyNudge } from './ToBuyNudge'
 import { makeAssigneeFilter } from '@/lib/today/assigneeFilter'
 import { selectRefileRows } from '@/lib/today/refile'
-import { selectExpired } from '@/lib/today/expired'
+import { selectInboxExpired } from '@/lib/today/expired'
 import { RefileStrip } from './RefileStrip'
 import { ExpiredSection } from './ExpiredSection'
 import { WaitingSection } from './WaitingSection'
@@ -456,7 +456,7 @@ export function InboxView({
   // A wait past its check-back day lists under Waiting on (as a follow-up),
   // not here too — one row, one home.
   const expiredRows = useMemo(
-    () => selectExpired(filteredTasks).filter((r) => !r.task.isWaiting),
+    () => selectInboxExpired(filteredTasks),
     [filteredTasks],
   )
   // Waits leave Today until their check-back day; this is where all of them

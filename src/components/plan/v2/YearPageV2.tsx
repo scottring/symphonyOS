@@ -31,6 +31,7 @@ import { readSeasons } from '@/lib/cadence/seasons'
 import { writtenFor } from '@/lib/week/monthLinks'
 import { YearRibbon } from './PeriodShape'
 import { LineCard } from './LineCard'
+import { PlanPurpose, SavedToNote, emptyPrompt, purposeLine } from './PlanPurpose'
 import { FromPaper } from './FromPaper'
 import { useAddArea } from './AddArea'
 import { useAssigneeFilter } from '@/hooks/useAssigneeFilter'
@@ -123,9 +124,12 @@ function Inner() {
     else if (d === 'dropped') await updateGoal(g.id, { status: 'archived' })
   }
   const addAreaChoice = useAddArea()
+  // "Saved to 2026": the add field says the line is stored (2026-10-08).
+  const [savedTo, setSavedTo] = useState<null | { to: string; title: string }>(null)
   const addLine = async (name: string) => {
     const areaId = areas[0]?.id ?? (await addArea('General'))?.id ?? null
-    await addGoal(areaId, name, addAreaChoice.area, { year })
+    const goal = await addGoal(areaId, name, addAreaChoice.area, { year })
+    if (goal) setSavedTo({ to: String(year), title: name })
   }
   // The year's review (see PlanPageV2): prominent only while one is due.
   const reviewIds = lookBackOpen('year', new Date(year, 0, 1), new Date())
@@ -186,7 +190,7 @@ function Inner() {
             when a season is written. */}
         <div className="pv2-colh">{`${year}’s list`}<FromPaper altitude="year" periodStart={new Date(year, 0, 1)} tasks={layered} /></div>
         {loading && !main.length ? <p className="pv2-hint">Loading…</p> : null}
-        {!loading && !main.length && <p className="pv2-hint ds-empty-body">{inMeeting ? 'Write what you want this year to hold.' : `Nothing on ${year}’s plan yet. That’s fine.`}</p>}
+        {!loading && !main.length && <p className="pv2-hint ds-empty-body">{inMeeting ? 'Write what you want this year to hold.' : emptyPrompt('year', String(year))}</p>}
         {/* The year's list in large type; under each line, what the seasons
             wrote for it (2026-10-04). */}
         <ul className="ps-yearlist">{main.map((vm) => (
@@ -199,6 +203,7 @@ function Inner() {
           <input value={draft} onChange={(e) => setDraft(e.target.value)} placeholder={`Add to ${year}`} aria-label={`Add to ${year}`} />
           {addAreaChoice.picker}
         </form>
+        <SavedToNote saved={savedTo?.to === String(year) ? savedTo : null} />
         {carried.length > 0 && <><div className="pv2-sect">Carried to {year + 1}</div><ul className="pv2-list">{carried.map(row)}</ul></>}
         {dropped.length > 0 && <>
           <div className="pv2-sect">Dropped</div>
@@ -226,6 +231,11 @@ function Inner() {
           onStep={(step) => setMeeting({ ...meeting!, step })}
           onLeave={() => void endMeeting(false)} onSave={() => void endMeeting(true)} saveLabel={`Mark ${year} planned`} />
       ) : folded ? <><GuideAnchor /><PlanSavedLine period={String(year)} justSaved={toolbar.justSaved} /></> : <PlanToolbar {...toolbar} />}
+      {/* What the year is for, and the season it leads to (2026-10-08). */}
+      {!inMeeting && (
+        <PlanPurpose text={purposeLine('year', String(year), { isCurrent: year === new Date().getFullYear() })}
+          onward={justSaved ? null : { label: nextStep.label.replace(/^./, (c) => c.toLowerCase()), to: nextStep.to, view: 'season' }} />
+      )}
       {meeting?.step !== 1 && <YearRibbon year={year} seasons={seasons} today={new Date()} />}
       {body}
     </div>
