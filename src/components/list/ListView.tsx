@@ -3,6 +3,7 @@ import type { List, ListItem, ListCategory, ListVisibility } from '@/types/list'
 import { getCategoryLabel, getCategoryIcon, LIST_CATEGORIES } from '@/types/list'
 import { ListItemRow } from './ListItemRow'
 import { PinButton } from '@/components/pins'
+import { readShowChecked, writeShowChecked } from '@/lib/lists/showChecked'
 
 interface ListViewProps {
   list: List
@@ -43,6 +44,23 @@ export function ListView({
   const [editVisibility, setEditVisibility] = useState<ListVisibility>('self')
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [newItemText, setNewItemText] = useState('')
+
+  // Checked items hide unless shown (remembered per list). Anything open
+  // while this list is on screen stays visible, crossed out, once checked —
+  // a mis-tap mid-shop is undone in place, not hunted for (2026-10-08).
+  const [checkedPref, setCheckedPref] = useState(() => ({ listId: list.id, show: readShowChecked(list.id) }))
+  if (checkedPref.listId !== list.id) setCheckedPref({ listId: list.id, show: readShowChecked(list.id) })
+  const showChecked = checkedPref.listId === list.id ? checkedPref.show : readShowChecked(list.id)
+  const [seen, setSeen] = useState<{ listId: string; ids: Set<string> }>(() => ({ listId: list.id, ids: new Set() }))
+  const base = seen.listId === list.id ? seen.ids : new Set<string>()
+  const newlyOpen = items.filter((i) => !i.completed && !base.has(i.id))
+  const openIds = newlyOpen.length ? new Set([...base, ...newlyOpen.map((i) => i.id)]) : base
+  if (seen.listId !== list.id || newlyOpen.length) setSeen({ listId: list.id, ids: openIds })
+  const toggleChecked = () => { const next = !showChecked; setCheckedPref({ listId: list.id, show: next }); writeShowChecked(list.id, next) }
+  const topLevel = items.filter((i) => !i.parentItemId)
+  const checkedCount = topLevel.filter((i) => i.completed).length
+  const hiddenIds = new Set(topLevel.filter((i) => i.completed && !openIds.has(i.id)).map((i) => i.id))
+  const shownItems = showChecked ? topLevel : topLevel.filter((i) => !hiddenIds.has(i.id))
 
   const handleEdit = () => {
     setEditTitle(list.title)
@@ -205,13 +223,13 @@ export function ListView({
             </div>
           ) : (
             <div className="flex items-start justify-between">
-              <div className="flex items-start gap-3">
+              <div className="flex min-w-0 items-start gap-3">
                 <div className="w-12 h-12 rounded-full bg-primary-100 flex items-center justify-center text-2xl flex-shrink-0">
                   {list.icon || getCategoryIcon(list.category)}
                 </div>
-                <div>
+                <div className="min-w-0">
                   <h1 className="text-xl font-semibold text-neutral-800">{list.title}</h1>
-                  <div className="flex items-center gap-2 mt-1">
+                  <div className="flex flex-wrap items-center gap-x-2 gap-y-1 mt-1">
                     <span className="inline-flex items-center px-2 py-0.5 text-xs font-medium rounded-full bg-primary-100 text-primary-700">
                       {getCategoryLabel(list.category)}
                     </span>
@@ -223,22 +241,14 @@ export function ListView({
                         Shared
                       </span>
                     )}
-                    <span className="text-sm text-neutral-500">
-                      {items.length} item{items.length !== 1 ? 's' : ''}
+                    <span className="whitespace-nowrap text-sm text-neutral-500">
+                      {topLevel.length - checkedCount} item{topLevel.length - checkedCount !== 1 ? 's' : ''}
+                      {checkedCount > 0 && ` · ${checkedCount} checked`}
                     </span>
                   </div>
                 </div>
               </div>
-              <div className="flex items-center gap-1">
-                {onClearCompleted && items.some((i) => i.completed) && (
-                  <button
-                    onClick={onClearCompleted}
-                    className="px-2.5 py-1.5 mr-1 text-xs font-medium text-neutral-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors whitespace-nowrap"
-                    aria-label="Clear checked items"
-                  >
-                    Clear checked
-                  </button>
-                )}
+              <div className="flex shrink-0 items-center gap-1">
                 {onPin && onUnpin && (
                   <PinButton
                     entityType="list"
@@ -335,7 +345,10 @@ export function ListView({
             </div>
           ) : (
             <div className="space-y-2">
-              {items.filter((i) => !i.parentItemId).map((item) => (
+              {shownItems.length === 0 && (
+                <p className="py-6 text-center text-neutral-500">Everything is checked off.</p>
+              )}
+              {shownItems.map((item) => (
                 <ListItemRow
                   key={item.id}
                   item={item}
@@ -347,6 +360,31 @@ export function ListView({
                   onAddSubitem={onAddItem ? (text) => onAddItem({ text, parentItemId: item.id }) : undefined}
                 />
               ))}
+              {/* The checked items' controls, together: show or hide them,
+                  or clear them for good. */}
+              {(hiddenIds.size > 0 || (showChecked && checkedCount > 0) || (onClearCompleted && items.some((i) => i.completed))) && (
+                <div className="flex items-center justify-between gap-3 py-1">
+                  {(hiddenIds.size > 0 || (showChecked && checkedCount > 0)) ? (
+                    <button
+                      type="button"
+                      onClick={toggleChecked}
+                      className="py-2 text-sm font-medium text-neutral-500 hover:text-neutral-700 transition-colors"
+                    >
+                      {showChecked ? 'Hide checked' : `Show checked (${hiddenIds.size})`}
+                    </button>
+                  ) : <span />}
+                  {onClearCompleted && items.some((i) => i.completed) && (
+                    <button
+                      type="button"
+                      onClick={onClearCompleted}
+                      className="px-2.5 py-1.5 text-xs font-medium text-neutral-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors whitespace-nowrap"
+                      aria-label="Clear checked items"
+                    >
+                      Clear checked
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
           )}
         </div>
