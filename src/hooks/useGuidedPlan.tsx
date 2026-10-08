@@ -43,10 +43,18 @@ function writeLocal(uid: string, s: Stored | null) {
 }
 
 async function writeRemote(uid: string, s: Stored): Promise<boolean> {
-  const { error } = await supabase.from('user_profiles').upsert(
-    { user_id: uid, guided_plan: s, updated_at: new Date().toISOString() }, { onConflict: 'user_id' },
-  )
-  return !error
+  try {
+    const { error } = await supabase.from('user_profiles').upsert(
+      { user_id: uid, guided_plan: s, updated_at: new Date().toISOString() }, { onConflict: 'user_id' },
+    )
+    return !error
+  } catch { return false }
+}
+
+async function readRemote(uid: string): Promise<{ data: unknown; error: unknown }> {
+  try {
+    return await supabase.from('user_profiles').select('guided_plan').eq('user_id', uid).maybeSingle()
+  } catch (error) { return { data: null, error } }
 }
 
 interface GuideApi {
@@ -69,14 +77,43 @@ export function GuideProvider({ children }: { children: ReactNode }) {
   const current = useRef<string | null>(uid)
   useEffect(() => { current.current = uid }, [uid])
 
+  // Every change to this browser's copy bumps `version`. `synced` is the
+  // version last confirmed in the account. All account reads-then-writes run
+  // one at a time on `queue`, and a write always sends this browser's CURRENT
+  // copy, so an older save can never land after a newer one, and a success is
+  // only reported as 'account' when nothing newer has happened since.
+  const version = useRef(0)
+  const synced = useRef(-1)
+  const queue = useRef<Promise<void>>(Promise.resolve())
+  const enqueue = useCallback((op: () => Promise<void>) => {
+    const run = queue.current.then(op)
+    queue.current = run.catch(() => { /* a failed op must not stall the queue */ })
+    return run
+  }, [])
+
+  /** Send this browser's copy to the account (skipped if already there). */
+  const flush = useCallback(async (forUid: string) => {
+    if (current.current !== forUid) return
+    const v = version.current
+    if (synced.current === v) { setSavedIn('account'); return }
+    const local = readLocal(forUid)
+    if (!local) return
+    const ok = await writeRemote(forUid, local)
+    if (current.current !== forUid) return
+    if (ok && synced.current < v) synced.current = v
+    // A newer change made during the write has its own flush queued behind
+    // this one; until it lands, the shown copy is only in this browser.
+    setSavedIn(ok && version.current === v ? 'account' : 'device')
+  }, [])
+
   // Bring this browser and the account to the same, newest copy: read the
   // account, keep whichever is newer, and write it to whichever side is behind.
   // Runs on sign-in, and again on reconnect or returning to the tab, so a
   // failed write is retried and another device's change is picked up.
   const reconcile = useCallback(async (forUid: string) => {
-    const { data, error } = await supabase.from('user_profiles').select('guided_plan').eq('user_id', forUid).maybeSingle()
+    const { data, error } = await readRemote(forUid)
     if (current.current !== forUid) return
-    // Read local after the fetch: a set() made while it was in flight wins.
+    // Read local after the fetch: a set() made while it was in flight counts.
     const local = readLocal(forUid)
     if (error) {
       setState(shown(local)); setSavedIn('device'); setLoaded(true)
@@ -84,36 +121,46 @@ export function GuideProvider({ children }: { children: ReactNode }) {
     }
     const remote = parseStored((data as { guided_plan?: unknown } | null)?.guided_plan ?? null)
     const winner = newerOf(remote, local)
-    if (winner !== local) writeLocal(forUid, winner)
-    setState(shown(winner))
+    if (winner && local && winner.updatedAt === local.updatedAt) {
+      // Same change on both sides (or this browser's is newer): keep ours.
+    } else if (winner !== local) {
+      writeLocal(forUid, winner)
+      version.current++
+      setState(shown(winner))
+    }
     setLoaded(true)
-    if (!winner || winner === remote) { setSavedIn('account'); return }
-    const ok = await writeRemote(forUid, winner)
-    if (current.current === forUid) setSavedIn(ok ? 'account' : 'device')
-  }, [])
+    if (!winner || (remote && winner.updatedAt === remote.updatedAt)) {
+      synced.current = version.current
+      setSavedIn('account')
+      return
+    }
+    await flush(forUid)
+  }, [flush])
 
   useEffect(() => {
     setState(null); setLoaded(false); setSavedIn('device')
+    version.current = 0; synced.current = -1
     if (!uid) return
     setState(shown(readLocal(uid)))
-    void reconcile(uid)
-    const again = () => { if (document.visibilityState === 'visible') void reconcile(uid) }
+    void enqueue(() => reconcile(uid))
+    const again = () => { if (document.visibilityState === 'visible') void enqueue(() => reconcile(uid)) }
     window.addEventListener('online', again)
     document.addEventListener('visibilitychange', again)
     return () => {
       window.removeEventListener('online', again)
       document.removeEventListener('visibilitychange', again)
     }
-  }, [uid, reconcile])
+  }, [uid, reconcile, enqueue])
 
   const set = useCallback(async (next: GuideState | null) => {
     if (!uid) return
     const stored: Stored = next ?? { v: 1, cleared: true, updatedAt: new Date().toISOString() }
     setState(next)
     writeLocal(uid, stored)
-    const ok = await writeRemote(uid, stored)
-    if (current.current === uid) setSavedIn(ok ? 'account' : 'device')
-  }, [uid])
+    version.current++
+    setSavedIn('device')
+    await enqueue(() => flush(uid))
+  }, [uid, enqueue, flush])
 
   const api = useMemo(() => ({ state, loaded, savedIn, set }), [state, loaded, savedIn, set])
   return <GuideContext.Provider value={api}>{children}</GuideContext.Provider>
