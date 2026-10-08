@@ -194,7 +194,7 @@ function Inner() {
             did={writtenFor(vm.task.id, layered, (t) => periodBounds('season', t.seasonStart ?? t.monthStart ?? t.createdAt, seasons).label.replace(/\s+\d{4}$/, ''))} />
         ))}</ul>
         {/* Always open, as on every horizon: the review is not a gate on writing. */}
-        <form className="pv2-write" onSubmit={(e) => { e.preventDefault(); const v = draft.trim(); if (v) { void addLine(v); setDraft('') } }}>
+        <form className="pv2-write" data-guide-target="period-add" onSubmit={(e) => { e.preventDefault(); const v = draft.trim(); if (v) { void addLine(v); setDraft('') } }}>
           <span className="pv2-dash" aria-hidden="true" />
           <input value={draft} onChange={(e) => setDraft(e.target.value)} placeholder={`Add to ${year}`} aria-label={`Add to ${year}`} />
           {addAreaChoice.picker}

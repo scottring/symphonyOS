@@ -54,13 +54,63 @@ export interface GuideState {
   done: GuideStep[]
   status: 'active' | 'paused' | 'finished'
   updatedAt: string
+  /** "Show me where things go": on each step, point to the one control to
+   *  use and say where the result was saved. Optional and off unless chosen;
+   *  absent on runs saved before it existed. */
+  coach?: boolean
+  /** What the coach saw done on each step, so a resumed run (on any device)
+   *  acknowledges it rather than asking again. Observed only — the coach
+   *  never writes the plan. */
+  coachDone?: Partial<Record<GuideStep, CoachSaw>>
+}
+
+/** One step's coached action: what was saved and where — or skipped. */
+export type CoachSaw =
+  | { id: string; title: string; saved: string; also?: string; at: string }
+  | { skipped: true; at: string }
+
+export const isSkipped = (c: CoachSaw | undefined): c is { skipped: true; at: string } => !!c && 'skipped' in c
+
+const STEP_NAMES: GuideStep[] = ['year', 'season', 'month', 'week', 'today', 'season-review', 'month-review']
+
+/** Only well-formed coach records survive a read; anything else is dropped,
+ *  never trusted (an older or newer client may have written it). */
+function parseCoachDone(raw: unknown): GuideState['coachDone'] | undefined {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return undefined
+  const out: Partial<Record<GuideStep, CoachSaw>> = {}
+  for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
+    if (!STEP_NAMES.includes(k as GuideStep) || !v || typeof v !== 'object') continue
+    const c = v as Record<string, unknown>
+    const at = typeof c.at === 'string' ? c.at : ''
+    if (c.skipped === true) out[k as GuideStep] = { skipped: true, at }
+    else if (typeof c.id === 'string' && typeof c.title === 'string' && typeof c.saved === 'string') {
+      out[k as GuideStep] = { id: c.id, title: c.title, saved: c.saved, ...(typeof c.also === 'string' ? { also: c.also } : {}), at }
+    }
+  }
+  return Object.keys(out).length ? out : undefined
 }
 
 export function parseGuideState(raw: unknown): GuideState | null {
   const s = raw as Partial<GuideState> | null
   if (!s || s.v !== 1 || !s.route || !(s.route in ROUTE_STEPS) || !Array.isArray(s.steps) || typeof s.current !== 'number') return null
   if (s.status !== 'active' && s.status !== 'paused' && s.status !== 'finished') return null
-  return { ...s, periods: s.periods ?? {}, done: Array.isArray(s.done) ? s.done : [] } as GuideState
+  const { coach, coachDone, ...rest } = s
+  const parsedDone = parseCoachDone(coachDone)
+  return {
+    ...rest, periods: s.periods ?? {}, done: Array.isArray(s.done) ? s.done : [],
+    ...(typeof coach === 'boolean' ? { coach } : {}),
+    ...(parsedDone ? { coachDone: parsedDone } : {}),
+  } as GuideState
+}
+
+/** Turn "Show me where things go" on or off for the rest of the run. */
+export function withCoach(s: GuideState, on: boolean): GuideState {
+  return { ...s, coach: on, updatedAt: new Date().toISOString() }
+}
+
+/** Keep what the coach saw on a step (or that it was skipped). */
+export function recordCoach(s: GuideState, step: GuideStep, saw: CoachSaw): GuideState {
+  return { ...s, coachDone: { ...s.coachDone, [step]: saw }, updatedAt: new Date().toISOString() }
 }
 
 const DAY = 86400000

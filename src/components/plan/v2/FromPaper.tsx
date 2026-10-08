@@ -27,7 +27,7 @@ export function FromPaper({ altitude, periodStart, tasks, label = 'Add from pape
   const { members } = useFamilyMembers()
   return (
     <>
-      <button type="button" className="pv2-paper" onClick={() => { setRun((n) => n + 1); setOpen(true) }}>
+      <button type="button" className="pv2-paper" data-guide-target="paper-import" onClick={() => { setRun((n) => n + 1); setOpen(true) }}>
         <Camera className="w-3.5 h-3.5" aria-hidden="true" />{label}
       </button>
       {/* At the body, not where the button sits: the button lives in a

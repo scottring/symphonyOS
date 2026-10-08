@@ -349,7 +349,7 @@ export function WeekV2({ tasks, weekStart, meId, isCurrent, days, renderDays, on
                     ))}</span>}
                   </> : undefined}
                   trailing={!t.completed && !lower ? <span className="pv2-refacts">
-                    <button type="button" className="pv2-addbtn" onClick={() => void takeIn(t, m.name)} aria-label={`Add ${t.title} to this week`}>Add to this week</button>
+                    <button type="button" className="pv2-addbtn" data-guide-target="week-choose" data-guide-id={t.id} onClick={() => void takeIn(t, m.name)} aria-label={`Add ${t.title} to this week`}>Add to this week</button>
                   </span> : undefined} />
               )
             })}</ul>

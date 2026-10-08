@@ -437,7 +437,7 @@ function Inner({ level }: { level: Level }) {
       {/* Always open (Scott, 2026-09-29: "why is it not possible to add items
           directly to the month list?") — the review is for closing out and
           agreeing, not a gate on writing. */}
-      <form className="pv2-write" onSubmit={(e) => { e.preventDefault(); const v = draft.trim(); if (v) { void addLine(v); setDraft('') } }}>
+      <form className="pv2-write" data-guide-target="period-add" onSubmit={(e) => { e.preventDefault(); const v = draft.trim(); if (v) { void addLine(v); setDraft('') } }}>
         <span className="pv2-dash" aria-hidden="true" />
         <input ref={addRef} value={draft} onChange={(e) => setDraft(e.target.value)} placeholder={`Add to ${name}`} aria-label={`Add to ${name}`} />
         {addArea.picker}

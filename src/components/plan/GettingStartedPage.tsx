@@ -7,9 +7,9 @@
 // says what is ready. Reachable any time from Help and ☰ → Plan with
 // guidance; it opens by itself only after first-run setup. Nothing here is a
 // gate: "Explore on my own" goes straight to Today.
-import { useMemo, useState } from 'react'
+import { useMemo, useState, type ReactNode } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
-import { ArrowUpRight } from 'lucide-react'
+import { ArrowUpRight, LocateFixed } from 'lucide-react'
 import { MastheadCard } from '@/components/layout/MastheadCard'
 import { PAGE_COLUMN } from '@/components/layout/pageLayout'
 import { useGuidedPlan } from '@/hooks/useGuidedPlan'
@@ -26,7 +26,7 @@ import { closeOutCandidates } from '@/lib/planning/v2/planV2'
 import { weekListTasks } from '@/lib/planning/weekList'
 import { requestPlanFromPaper } from '@/lib/planFromPaperSignal'
 import {
-  ROUTE_CHOICES, ROUTE_STEPS, currentStep, firstStepChoices, isReview, pageOf, parseYmd, resume, startGuide, startPickUp, stepPath, stepShortName, stepTitle,
+  ROUTE_CHOICES, ROUTE_STEPS, currentStep, firstStepChoices, isReview, isSkipped, pageOf, parseYmd, resume, startGuide, startPickUp, stepPath, stepShortName, stepTitle, withCoach,
   type GuideRoute, type GuideState, type GuideStep, type PickUpRow,
 } from '@/lib/guide/guidedPlan'
 
@@ -52,9 +52,12 @@ function Inner() {
   const choices = useMemo(() => firstStepChoices(first, today, seasons, wso), [first, today, seasons, wso])
   const [periodStart, setPeriodStart] = useState<string | null>(null)
   const chosenStart = periodStart && choices.some((c) => c.start === periodStart) ? periodStart : choices[0].start
+  // "Show me where things go": off unless chosen (live walkthrough 2026-10-08).
+  const [showMe, setShowMe] = useState(false)
+  const coached = (s: GuideState) => (showMe ? withCoach(s, true) : s)
 
   const beginPickUp = async (steps: GuideStep[]) => {
-    const s = startPickUp(steps, pick.periods)
+    const s = coached(startPickUp(steps, pick.periods))
     await set(s)
     const step = currentStep(s)
     if (step === 'week' || step === 'month' || step === 'season') writePlanView(step, 'ref')
@@ -62,7 +65,7 @@ function Inner() {
   }
 
   const begin = async (withPaper: boolean) => {
-    const s = startGuide(route, chosenStart, today, seasons, wso)
+    const s = coached(startGuide(route, chosenStart, today, seasons, wso))
     await set(s)
     const step = currentStep(s)
     if (step === 'week' || step === 'month' || step === 'season') writePlanView(step, 'ref')
@@ -134,7 +137,8 @@ function Inner() {
         )}
 
         {!showFinish && stage === 'source' && route === 'pickup' && (
-          <PickUpPath pick={pick} onBack={() => setStage('path')} onStart={(steps) => void beginPickUp(steps)} savedIn={savedIn} />
+          <PickUpPath pick={pick} onBack={() => setStage('path')} onStart={(steps) => void beginPickUp(steps)} savedIn={savedIn}
+            showMe={<ShowMeChoice on={showMe} onChange={setShowMe} />} />
         )}
 
         {!showFinish && stage === 'source' && route !== 'pickup' && (
@@ -153,6 +157,7 @@ function Inner() {
             )}
             {choices.length === 1 && <p>{choices[0].label}.</p>}
             <p>Start from what you already have. Anything already on the plan stays; you can add to it on the page.</p>
+            <ShowMeChoice on={showMe} onChange={setShowMe} />
             <div className="guide-acts">
               <button type="button" className="pv2-link pv2-quiet" onClick={() => setStage('path')}>Back</button>
               <span className="flex-1" />
@@ -174,6 +179,17 @@ function Inner() {
         )}
       </section>
     </div>
+  )
+}
+
+/** The coach, offered as a plain on/off when a run starts. */
+function ShowMeChoice({ on, onChange }: { on: boolean; onChange: (on: boolean) => void }) {
+  return (
+    <label className={`guide-choice guide-showme-choice${on ? ' is-selected' : ''}`}>
+      <input type="checkbox" checked={on} onChange={(e) => onChange(e.target.checked)} />
+      <span className="guide-choice-title"><LocateFixed size={14} aria-hidden="true" className="mr-1.5 inline align-[-2px]" />Show me where things go</span>
+      <span className="guide-choice-body">On each page, point to the one control to use, then say where it was saved. You can turn it off from the guide at any time.</span>
+    </label>
   )
 }
 
@@ -227,6 +243,8 @@ function FinishSummary({ state, onKeepPlanning }: { state: GuideState; onKeepPla
     return 'Saved'
   }
   const reached = state.steps.filter((s) => state.done.includes(s))
+  // What the coach saw saved on each step, in the run's order.
+  const placed = state.steps.flatMap((s) => { const c = state.coachDone?.[s]; return c && !isSkipped(c) ? [{ step: s, ...c }] : [] })
   const endsOnToday = reached.includes('today')
   const last = reached[reached.length - 1]
   return (
@@ -236,6 +254,12 @@ function FinishSummary({ state, onKeepPlanning }: { state: GuideState; onKeepPla
           <div key={s}><dt>{stepTitle(s, state, seasons, weekNo).split(' · ')[0]}</dt><dd>{line(s)}</dd></div>
         ))}
       </dl>
+      {placed.length > 0 && (
+        <section className="guide-placed" aria-label="Where things went">
+          <h2>Where things went</h2>
+          <ul>{placed.map((c) => <li key={c.step}><b>“{c.title}”</b> {c.saved}{c.also ? ` ${c.also}` : ''}</li>)}</ul>
+        </section>
+      )}
       <p className="text-[13px] text-neutral-500">Everything above is on its page and stays there. Bigger plans aren’t marked done when a step is.</p>
       <div className="guide-acts">
         {endsOnToday
@@ -267,8 +291,8 @@ function PickUpReading({ rows }: { rows: PickUpRow[] }) {
 }
 
 /** The suggested path: each step with its reason, any of them can be left out. */
-function PickUpPath({ pick, onBack, onStart, savedIn }: {
-  pick: PickUp; onBack: () => void; onStart: (steps: GuideStep[]) => void; savedIn: 'account' | 'device'
+function PickUpPath({ pick, onBack, onStart, savedIn, showMe }: {
+  pick: PickUp; onBack: () => void; onStart: (steps: GuideStep[]) => void; savedIn: 'account' | 'device'; showMe: ReactNode
 }) {
   const offered = pick.rows.filter((r) => r.inPath)
   const kept = pick.rows.filter((r) => !r.inPath)
@@ -297,6 +321,7 @@ function PickUpPath({ pick, onBack, onStart, savedIn }: {
           Already in place, so no step is needed: {kept.map((r) => `${r.name} (${r.detail.toLowerCase()})`).join(', ')}.
         </p>
       )}
+      {showMe}
       <div className="guide-acts">
         <button type="button" className="pv2-link pv2-quiet" onClick={onBack}>Back</button>
         <span className="flex-1" />
