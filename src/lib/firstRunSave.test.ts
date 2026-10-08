@@ -10,7 +10,7 @@ const h = vi.hoisted(() => {
   const make = (table: string) => {
     const b: Record<string, unknown> = {}
     let first: string | null = null
-    const ops = ['select', 'insert', 'update', 'upsert', 'eq', 'is', 'limit', 'maybeSingle']
+    const ops = ['select', 'insert', 'update', 'upsert', 'delete', 'eq', 'in', 'is', 'limit', 'maybeSingle']
     for (const op of ops) {
       b[op] = (...args: unknown[]) => { calls.push({ table, op, args }); first ??= op; return b }
     }
@@ -108,20 +108,90 @@ describe('saveFirstRunSetup', () => {
     expect(stamped()).toBe(false)
   })
 
-  it('retries after a partial save without duplicating anyone', async () => {
-    // First try: self saved, Sam saved, then the profile stamp failed.
+  // Retries after a partial save. The form gives each person a row id that
+  // survives retries; these tests replay what the account holds after the
+  // first attempt (self row + the people it saved) and check the retry leaves
+  // exactly what the form shows. Independent review of #160: matching by name
+  // skipped an edited role and duplicated a renamed person.
+  const opsOn = (op: string) => h.calls.filter((c) => c.table === 'family_members' && c.op === op)
+  const withIds = { householdName: 'The Riveras', yourName: 'Jess', others: [{ id: 'p-sam', name: 'Sam', role: 'parent' as const }, { id: 'p-liam', name: 'Liam', role: 'child' as const }], home: null }
+  const firstTryStampFails = async (f: Parameters<typeof saveFirstRunSetup>[1]) => {
     h.results['user_profiles.upsert'] = [fail('network')]
-    await expect(saveFirstRunSetup('u1', form)).rejects.toThrow(/couldn't save your setup/i)
-
-    // Retry: self row now exists (renamed, not re-inserted), Sam is already saved.
+    await expect(saveFirstRunSetup('u1', f)).rejects.toThrow(/couldn't save your setup/i)
     h.calls.length = 0
-    h.results['family_members.select'] = [{ data: { id: 'fm-self' }, error: null }, { data: [{ name: 'sam ' }], error: null }]
-    await saveFirstRunSetup('u1', form)
-    const inserts = insertsFor('family_members') as Array<Array<Record<string, unknown>>>
-    expect(inserts).toHaveLength(1)
-    expect(inserts[0].map((r) => r.name)).toEqual(['Liam'])
-    expect(h.calls.some((c) => c.table === 'family_members' && c.op === 'update')).toBe(true)
+  }
+  const accountHolds = (people: Array<{ id: string; name: string }>) => {
+    h.results['family_members.select'] = [{ data: { id: 'fm-self' }, error: null }, { data: people, error: null }]
+  }
+
+  it('first try sends each person with the id the form gave them', async () => {
+    await saveFirstRunSetup('u1', withIds)
+    const [, people] = insertsFor('family_members') as Array<Array<Record<string, unknown>>>
+    expect(people.map((r) => [r.id, r.name])).toEqual([['p-sam', 'Sam'], ['p-liam', 'Liam']])
+  })
+
+  it('retry with nothing changed updates the same people and adds nobody', async () => {
+    await firstTryStampFails(withIds)
+    accountHolds([{ id: 'p-sam', name: 'Sam' }, { id: 'p-liam', name: 'Liam' }])
+    await saveFirstRunSetup('u1', withIds)
+    expect(insertsFor('family_members')).toHaveLength(0)
+    expect(opsOn('delete')).toHaveLength(0)
     expect(stamped()).toBe(true)
+  })
+
+  it('retry keeps an edited role (Jordan saved as child, retried as partner)', async () => {
+    const f = { ...withIds, others: [{ id: 'p-jordan', name: 'Jordan', role: 'child' as const }] }
+    await firstTryStampFails(f)
+    accountHolds([{ id: 'p-jordan', name: 'Jordan' }])
+    await saveFirstRunSetup('u1', { ...f, others: [{ id: 'p-jordan', name: 'Jordan', role: 'parent' }] })
+    expect(opsOn('update').map((c) => c.args[0])).toContainEqual(expect.objectContaining({ name: 'Jordan', role_label: 'parent' }))
+    expect(insertsFor('family_members')).toHaveLength(0)
+    expect(stamped()).toBe(true)
+  })
+
+  it('retry renames an edited name instead of adding a second person', async () => {
+    await firstTryStampFails(withIds)
+    accountHolds([{ id: 'p-sam', name: 'Sam' }, { id: 'p-liam', name: 'Liam' }])
+    await saveFirstRunSetup('u1', { ...withIds, others: [{ id: 'p-sam', name: 'Samantha', role: 'parent' }, withIds.others[1]] })
+    expect(insertsFor('family_members')).toHaveLength(0)
+    const samUpdate = h.calls.findIndex((c) => c.op === 'update' && (c.args[0] as Record<string, unknown>).name === 'Samantha')
+    expect(samUpdate).toBeGreaterThan(-1)
+    expect(h.calls[samUpdate + 1]).toMatchObject({ op: 'eq', args: ['id', 'p-sam'] })
+  })
+
+  it('retry deletes only the people removed from the form', async () => {
+    await firstTryStampFails(withIds)
+    accountHolds([{ id: 'p-sam', name: 'Sam' }, { id: 'p-liam', name: 'Liam' }])
+    await saveFirstRunSetup('u1', { ...withIds, others: [withIds.others[0]], removedIds: ['p-liam', 'never-saved'] })
+    const del = opsOn('delete')
+    expect(del).toHaveLength(1)
+    const chain = h.calls.slice(h.calls.indexOf(del[0]) + 1, h.calls.indexOf(del[0]) + 4)
+    expect(chain).toEqual([
+      expect.objectContaining({ op: 'eq', args: ['user_id', 'u1'] }),
+      expect.objectContaining({ op: 'eq', args: ['is_full_user', false] }),
+      expect.objectContaining({ op: 'in', args: ['id', ['p-liam']] }),
+    ])
+    expect(insertsFor('family_members')).toHaveLength(0)
+    expect(stamped()).toBe(true)
+  })
+
+  it('retry adds a person who never saved, with their form id', async () => {
+    h.results['family_members.insert'] = [{ data: null, error: null }, fail('network')]
+    await expect(saveFirstRunSetup('u1', withIds)).rejects.toThrow(/people in your household/i)
+    h.calls.length = 0
+    accountHolds([])
+    await saveFirstRunSetup('u1', withIds)
+    const [people] = insertsFor('family_members') as Array<Array<Record<string, unknown>>>
+    expect(people.map((r) => r.id)).toEqual(['p-sam', 'p-liam'])
+  })
+
+  it('without form ids, a retry matches by name and still keeps an edited role', async () => {
+    const f = { householdName: 'Test', yourName: 'Taylor', others: [{ name: 'Jordan', role: 'child' as const }], home: null }
+    await firstTryStampFails(f)
+    accountHolds([{ id: 'jordan', name: 'Jordan' }])
+    await saveFirstRunSetup('u1', { ...f, others: [{ name: 'Jordan', role: 'parent' }] })
+    expect(opsOn('update').map((c) => c.args[0])).toContainEqual(expect.objectContaining({ name: 'Jordan', role_label: 'parent' }))
+    expect(insertsFor('family_members')).toHaveLength(0)
   })
 })
 

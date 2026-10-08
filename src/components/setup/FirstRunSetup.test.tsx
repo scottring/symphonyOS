@@ -43,9 +43,38 @@ describe('FirstRunSetup', () => {
     expect(h.save).toHaveBeenCalledWith('u1', {
       householdName: 'The Riveras',
       yourName: 'Jess',
-      others: [{ name: 'Sam', role: 'parent' }, { name: 'Liam', role: 'child' }],
+      others: [{ id: expect.any(String), name: 'Sam', role: 'parent' }, { id: expect.any(String), name: 'Liam', role: 'child' }],
+      removedIds: [],
       home: { lat: 39.29, lng: -76.61, label: 'Baltimore, Maryland' },
     })
+  })
+
+  // Independent review of #160: a retry must update the same people the
+  // failed attempt saved, so each row keeps its id between attempts.
+  it('retries with the same person ids, the edited role, and removed rows listed', async () => {
+    h.save.mockRejectedValueOnce(new Error("We couldn't save your setup."))
+    const { user: u } = render(<FirstRunSetup user={user} onDone={vi.fn()} />)
+    await u.type(screen.getByLabelText('Person 1 name'), 'Jordan')
+    await u.click(screen.getByText('Add someone'))
+    await u.type(screen.getByLabelText('Person 2 name'), 'Liam')
+    await u.click(screen.getByText('Add someone'))
+    await u.type(screen.getByLabelText('Person 3 name'), 'Mia')
+    await u.selectOptions(screen.getByLabelText('Person 1 role'), 'child')
+    await u.click(screen.getByRole('button', { name: 'Set up my household' }))
+    await screen.findByText("We couldn't save your setup.")
+    const first = h.save.mock.calls[0][1]
+    const [jordan, liam, mia] = first.others.map((o: { id: string }) => o.id)
+    expect(new Set([jordan, liam, mia]).size).toBe(3)
+
+    // Edit after the failure: Jordan becomes a partner, Liam is removed, Mia is blanked.
+    await u.selectOptions(screen.getByLabelText('Person 1 role'), 'parent')
+    await u.click(screen.getByLabelText('Remove person 2'))
+    await u.clear(screen.getByLabelText('Person 2 name'))
+    await u.click(screen.getByRole('button', { name: 'Set up my household' }))
+    await waitFor(() => expect(h.save).toHaveBeenCalledTimes(2))
+    const retry = h.save.mock.calls[1][1]
+    expect(retry.others).toEqual([{ id: jordan, name: 'Jordan', role: 'parent' }])
+    expect(retry.removedIds).toEqual(expect.arrayContaining([liam, mia]))
   })
 
   it('drops blank people rows and saves without a home', async () => {

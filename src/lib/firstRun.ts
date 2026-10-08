@@ -65,7 +65,13 @@ export type HouseholdRole = 'parent' | 'child'
 export interface FirstRunForm {
   householdName: string
   yourName: string
-  others: Array<{ name: string; role: HouseholdRole }>
+  /** `id` is this person's row id, made when the form row is added and kept
+   *  across retries, so a retry updates the same person instead of adding or
+   *  skipping one. */
+  others: Array<{ id?: string; name: string; role: HouseholdRole }>
+  /** Rows this form added earlier and has since removed or blanked: a retry
+   *  after a partial save deletes these (and only these). */
+  removedIds?: string[]
   home: GeocodedPlace | null
 }
 
@@ -144,32 +150,54 @@ export async function saveFirstRunSetup(userId: string, form: FirstRunForm): Pro
     required(error, 'your name')
   }
 
-  // 3. Everyone else, minus anyone an earlier attempt already saved. Partners
-  //    get a login later via Settings → Invite partner.
-  const others = form.others.map((o) => o.name.trim() && o).filter(Boolean) as FirstRunForm['others']
-  if (others.length > 0) {
+  // 3. Everyone else. Partners get a login later via Settings → Invite partner.
+  //    A retry after a partial save must leave exactly what the form shows:
+  //    rows are matched by the id the form gave them (so an edited name or
+  //    role updates that person), people removed from the form are deleted,
+  //    and only rows that never saved are inserted. Rows without an id fall
+  //    back to matching by name. Nobody else is touched: at first run the only
+  //    other people this account owns are ones this form saved.
+  const others = form.others.filter((o) => o.name.trim())
+  const removedIds = form.removedIds ?? []
+  if (others.length > 0 || removedIds.length > 0) {
     const existing = await supabase
       .from('family_members')
-      .select('name')
+      .select('id, name')
       .eq('user_id', userId)
       .eq('is_full_user', false)
     required(existing.error, 'the people in your household')
-    const saved = new Set(((existing.data as Array<{ name: string }> | null) ?? []).map((m) => m.name.trim().toLowerCase()))
-    const rows = others
-      .map((o, i) => ({
-        user_id: userId,
+    const saved = (existing.data as Array<{ id: string; name: string }> | null) ?? []
+    const byId = new Map(saved.map((m) => [m.id, m]))
+    const byName = new Map(saved.map((m) => [m.name.trim().toLowerCase(), m]))
+    const claimed = new Set<string>()
+
+    const gone = removedIds.filter((id) => byId.has(id))
+    if (gone.length > 0) {
+      const { error } = await supabase.from('family_members').delete()
+        .eq('user_id', userId).eq('is_full_user', false).in('id', gone)
+      required(error, 'the people in your household')
+    }
+
+    const inserts: Array<Record<string, unknown>> = []
+    for (const [i, o] of others.entries()) {
+      const fields = {
         name: o.name.trim(),
         initials: initialsFor(o.name),
         color: OTHER_COLORS[i % OTHER_COLORS.length],
-        is_full_user: false,
         display_order: i + 1,
-        avatar_url: null,
-        member_type: 'core',
         role_label: o.role,
-      }))
-      .filter((r) => !saved.has(r.name.toLowerCase()))
-    if (rows.length > 0) {
-      const { error } = await supabase.from('family_members').insert(rows)
+      }
+      const match = o.id ? byId.get(o.id) : byName.get(fields.name.toLowerCase())
+      if (match && !claimed.has(match.id)) {
+        claimed.add(match.id)
+        const { error } = await supabase.from('family_members').update(fields).eq('id', match.id).eq('user_id', userId)
+        required(error, 'the people in your household')
+      } else {
+        inserts.push({ ...(o.id ? { id: o.id } : {}), ...fields, user_id: userId, is_full_user: false, avatar_url: null, member_type: 'core' })
+      }
+    }
+    if (inserts.length > 0) {
+      const { error } = await supabase.from('family_members').insert(inserts)
       required(error, 'the people in your household')
     }
   }
