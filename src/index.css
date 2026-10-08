@@ -2307,6 +2307,11 @@ html.desktop-shell a {
 /* Today's review closes the day's list on desktop (it was the footer's). */
 .today-review-close { display: inline-flex; align-items: center; gap: 8px; margin-top: 28px; padding: 6px 0; font-size: 14px; color: var(--color-neutral-600); cursor: pointer; }
 .today-review-close:hover { color: var(--color-neutral-950); text-decoration: underline; }
+/* The day was closed: one quiet line where the review would be. */
+.today-reviewed { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; margin-top: 28px; padding: 6px 0; font-size: 14px; color: var(--color-neutral-600); }
+.today-reviewed > svg { color: var(--color-primary-600); flex: none; }
+.today-reviewed-again { margin-left: 8px; font-size: 13px; color: var(--color-neutral-500); cursor: pointer; }
+.today-reviewed-again:hover { color: var(--color-neutral-950); text-decoration: underline; }
 .page-navigation-more-help { display: flex; gap: 20px; margin: 8px 4px 0; padding: 0 8px; font-size: 13px; }
 .page-navigation-popover .page-navigation-more-help button { display: inline; width: auto; padding: 2px 0; color: var(--color-neutral-600); }
 .page-navigation-popover .page-navigation-more-help button:hover { background: none; color: var(--color-neutral-950); text-decoration: underline; }
@@ -3302,6 +3307,16 @@ div.chooser-action-group { overflow: visible !important; }
 /* The next step's name can be long ("Choose what October takes on"): it wraps
    inside the line on a phone instead of running past it. */
 .pv2-saved .pv2-btn { white-space: normal; max-width: 100%; text-align: left; }
+/* What an ordinary Year/Season/Month page is for, and where it leads: one
+   quiet line, then two small links (2026-10-08). Never a card. */
+.plan-purpose { margin: 0 0 20px; font-size: 13.5px; line-height: 1.45; color: var(--color-neutral-600); }
+.plan-purpose-line { margin: 0; max-width: 62ch; }
+.plan-purpose-acts { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 18px; margin-top: 4px; }
+.plan-purpose-acts > * { font-size: 13px; }
+/* "Saved to Fall — …" under the add field; empty until something saves. */
+.plan-saved-note { display: flex; align-items: center; gap: 6px; min-height: 18px; margin: 4px 0 0; font-size: 12.5px; color: var(--color-primary-700); overflow-wrap: anywhere; }
+.plan-saved-note:empty { min-height: 0; margin: 0; }
+.plan-saved-note svg { flex: none; }
 .pv2-toolbar button:disabled { opacity: .5; cursor: not-allowed; }
 .pv2-foot { margin-top: 48px; font-size: 12.5px; color: var(--color-neutral-500); }
 

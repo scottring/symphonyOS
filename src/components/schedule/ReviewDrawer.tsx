@@ -4,7 +4,8 @@ import { Sparkles, Check, ArrowRight, Moon, Sun, X } from 'lucide-react'
 import type { Task } from '@/types/task'
 import type { AttentionItem } from '@/lib/today/attention'
 import { daysBetween } from '@/lib/today/taskPools'
-import { useEveningReflection } from '@/hooks/useEveningReflection'
+import type { EveningReflection } from '@/hooks/useEveningReflection'
+import { backlogHomes, backlogWhereabouts, type BacklogReason } from '@/lib/today/backlogHomes'
 import { TriageRow, applyTriageVerdict, type Verdict } from './TriageRow'
 
 /**
@@ -19,7 +20,8 @@ import { TriageRow, applyTriageVerdict, type Verdict } from './TriageRow'
  * BACKLOG_SESSION_CAP NEWEST per session so it drains without any session
  * becoming a slog. Each item gets a one-tap fate: Today / Tomorrow /
  * This week / Someday / Delete. Leaving an item alone is also a verdict —
- * nothing is forced. Everything past the cap is scannable in full in the
+ * nothing is forced. Past the cap, the drawer says where each part of the
+ * backlog lives in full (backlogHomes) — only past-DATED work is in the
  * Inbox's Expired section; this drawer is the paced ritual, not the list.
  *
  * The week and month pools are NOT here. Scott, 2026-08-19: they must never
@@ -53,6 +55,11 @@ interface ReviewDrawerProps {
    *  ticked off; without this the only fates were reschedule or delete, and
    *  delete throws away that it happened. */
   onCompleteTask?: (id: string) => void
+  /** The day's reflection (useEveningReflection), owned by the page so Today
+   *  can say the day was reviewed. */
+  reflection: EveningReflection
+  /** "Look at tomorrow" after closing the day; absent = no such offer. */
+  onLookAtTomorrow?: () => void
 }
 
 function sameDay(a: Date | undefined, b: Date): boolean {
@@ -63,9 +70,22 @@ function sameDay(a: Date | undefined, b: Date): boolean {
 
 export function ReviewDrawer({
   isOpen, mode, onClose, tasks, attentionItems, overdueTasks,
-  viewedDate, onUpdateTask, onPushTask, onDeleteTask, onCompleteTask,
+  viewedDate, onUpdateTask, onPushTask, onDeleteTask, onCompleteTask, reflection, onLookAtTomorrow,
 }: ReviewDrawerProps) {
-  const { highlight, setHighlight, notes, setNotes, save } = useEveningReflection(viewedDate)
+  const { highlight, setHighlight, notes, setNotes, save, closeDay } = reflection
+  // After "Close the day": the review says it is saved, what closing changed,
+  // and offers a next step, instead of vanishing (2026-10-08). Reset on each
+  // opening.
+  const [closed, setClosed] = useState<null | { reflected: boolean }>(null)
+  const [closeFailed, setCloseFailed] = useState(false)
+  const [wasOpen, setWasOpen] = useState(isOpen)
+  if (wasOpen !== isOpen) {
+    setWasOpen(isOpen)
+    if (isOpen) { setClosed(null); setCloseFailed(false) }
+  }
+  const doneRef = useRef<HTMLButtonElement>(null)
+  // The pressed "Close the day" is gone: put focus on what stands in its place.
+  useEffect(() => { if (closed) doneRef.current?.focus({ preventScroll: true }) }, [closed])
   const [movedIds, setMovedIds] = useState<Set<string>>(() => new Set())
   // taskId → verdict label, for the resolved-state row rendering.
   const [verdicts, setVerdicts] = useState<Map<string, Verdict>>(() => new Map())
@@ -95,7 +115,7 @@ export function ReviewDrawer({
   // list, the Inbox's Expired section (selectExpired), where the whole thing
   // is scannable and killable in one pass instead of rationed five a morning.
   const backlog = useMemo(() => {
-    const byId = new Map<string, { task: Task; ageDays: number }>()
+    const byId = new Map<string, { task: Task; ageDays: number; reason: BacklogReason }>()
     for (const t of overdueTasks) {
       if (t.completed) continue
       // daysBetween, not a raw instant subtraction: what expired is the DAY.
@@ -105,16 +125,23 @@ export function ReviewDrawer({
       // "yesterday". One definition, or the two surfaces disagree about the
       // same row.
       const age = t.scheduledFor ? Math.max(0, daysBetween(t.scheduledFor, viewedDate)) : 0
-      byId.set(t.id, { task: t, ageDays: age })
+      byId.set(t.id, { task: t, ageDays: age, reason: 'carried' })
     }
     for (const a of attentionItems) {
       const existing = byId.get(a.task.id)
-      if (!existing || a.ageDays > existing.ageDays) byId.set(a.task.id, { task: a.task, ageDays: a.ageDays })
+      if (!existing || a.ageDays > existing.ageDays) byId.set(a.task.id, { task: a.task, ageDays: a.ageDays, reason: a.reason })
     }
     return [...byId.values()].sort((x, y) => x.ageDays - y.ageDays)
   }, [overdueTasks, attentionItems, viewedDate])
 
-  const close = useCallback(async () => { if (mode === 'evening') await save(); onClose() }, [mode, save, onClose])
+  // Dismissing (X, Escape, the backdrop) keeps what was written; once the day
+  // is closed there is nothing left to save.
+  const close = useCallback(async () => { if (mode === 'evening' && !closed) await save(); onClose() }, [mode, closed, save, onClose])
+  const closeTheDay = async () => {
+    setCloseFailed(false)
+    if (!(await closeDay())) { setCloseFailed(true); return }
+    setClosed({ reflected: !!(highlight.trim() || notes.trim()) })
+  }
   useEffect(() => {
     if (!isOpen) return
     const escape = (event: KeyboardEvent) => { if (event.key === 'Escape' && !event.defaultPrevented) { event.preventDefault(); void close() } }
@@ -163,6 +190,7 @@ export function ReviewDrawer({
 
   const backlogSlice = backlog.slice(0, BACKLOG_SESSION_CAP)
   const backlogRest = backlog.length - backlogSlice.length
+  const isToday = sameDay(new Date(), viewedDate)
 
   return (
     <div
@@ -196,6 +224,31 @@ export function ReviewDrawer({
           </button>
         </div>
 
+        {closed ? (
+          <div className="px-6 pb-6 space-y-5">
+            <div role="status" className="space-y-1.5">
+              <p className="inline-flex items-center gap-2 text-base font-medium text-neutral-800">
+                <Check className="w-4 h-4 text-primary-600" strokeWidth={3} aria-hidden="true" />
+                {closed.reflected ? 'Your reflection is saved.' : `${isToday ? 'Today' : 'The day'} is closed.`}
+              </p>
+              <p className="text-sm text-neutral-600 leading-relaxed">
+                {isToday ? 'Today' : viewedDate.toLocaleDateString('en-US', { weekday: 'long' })} now shows as reviewed. Anything you moved or ticked off was saved as you went; the rest stays where it was.
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              {onLookAtTomorrow && (
+                <button type="button" onClick={onLookAtTomorrow}
+                  className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-medium text-primary-700 bg-primary-50 hover:bg-primary-100 transition-colors">
+                  Look at tomorrow <ArrowRight className="w-4 h-4" aria-hidden="true" />
+                </button>
+              )}
+              <button ref={doneRef} type="button" onClick={onClose}
+                className="px-4 py-2.5 rounded-xl text-sm font-medium text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100 transition-colors">
+                Done
+              </button>
+            </div>
+          </div>
+        ) : (
         <div className="px-6 pb-6 space-y-6">
           {mode === 'evening' && (
             <>
@@ -312,10 +365,13 @@ export function ReviewDrawer({
                   />
                 ))}
               </ul>
+              {/* Only past-DATED work is in the Inbox's Expired list; the rest
+                  of the backlog has no date. Say where each part is, in this
+                  review's own numbers, so nothing here contradicts the Inbox
+                  (2026-10-08: "+5 older" pointed at "Expired · 1"). */}
               {backlogRest > 0 && (
-                <p className="text-xs text-neutral-400">
-                  +{backlogRest} older waiting — five a session keeps it honest. The whole
-                  list lives in the Inbox, under Expired.
+                <p className="text-xs text-neutral-500 leading-relaxed">
+                  +{backlogRest} older waiting — five a session keeps it honest. {backlogWhereabouts(backlogHomes(backlog))}
                 </p>
               )}
             </section>
@@ -325,12 +381,16 @@ export function ReviewDrawer({
             <p className="text-sm text-neutral-500">Nothing waiting. Go live the day.</p>
           )}
 
+          {closeFailed && (
+            <p role="alert" className="text-sm text-danger-600">Couldn’t save the review — check your connection and try again.</p>
+          )}
           {/* Close */}
-          <button type="button" onClick={close}
+          <button type="button" onClick={mode === 'evening' ? () => void closeTheDay() : close}
             className="review-close w-full inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-gradient-to-r from-primary-500 to-primary-600 text-white font-medium hover:from-primary-600 hover:to-primary-700 transition-all shadow-sm">
             <Sparkles className="w-4 h-4" /> {mode === 'evening' ? 'Close the day' : 'Start the day'}
           </button>
         </div>
+        )}
       </div>
     </div>
   )
