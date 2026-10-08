@@ -91,7 +91,7 @@ export function WeekListV2({ title, lines, weekStart, members, actions, timingCo
         </section>
       ))}
       {done.length > 0 && <button type="button" className="pv2-link pv2-quiet" aria-expanded={showDone} onClick={() => setShowDone((s) => !s)}>{showDone ? 'Hide done' : 'Show done'}</button>}
-      <form className="pv2-write" onSubmit={(e) => { e.preventDefault(); const v = draft.trim(); if (v) { if (forId) void onAdd(v, forId); else void onAdd(v); setDraft(''); setForId('') } }}>
+      <form className="pv2-write" data-guide-target="period-add" onSubmit={(e) => { e.preventDefault(); const v = draft.trim(); if (v) { if (forId) void onAdd(v, forId); else void onAdd(v); setDraft(''); setForId('') } }}>
         <span className="pv2-wl-check" aria-hidden="true" />
         <input ref={addRef} value={draft} onChange={(e) => setDraft(e.target.value)} placeholder="Add something for this week" aria-label="Add to this week" />
         {addPicker}

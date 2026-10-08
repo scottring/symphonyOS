@@ -1352,6 +1352,7 @@ export function TodayView({
       type="button"
       onClick={() => setAddOpenDay(addOpen ? null : localYmd(viewedDate))}
       aria-expanded={addOpen}
+      data-guide-target="today-add"
       className="daybook-add-task inline-flex items-center gap-1 py-1.5 text-[13px] font-medium text-primary-600 transition-colors hover:text-primary-700"
     >
       <Plus className="h-3.5 w-3.5" aria-hidden="true" />
@@ -1898,13 +1899,15 @@ export function TodayView({
       {/* Phone: the floating capture bar above the dock (native TodayView). */}
       {isMobile && canAdd && (
         <PhoneCaptureBar>
-          <TodayAddInput
-            variant="bar"
-            onAdd={ctx.onCreateTaskParsed!}
-            parserContext={ctx.parserContext!}
-            resolver={ctx.resolverContext!}
-            getRecentTaskForContact={ctx.getRecentTaskForContact}
-          />
+          <div data-guide-target="today-add">
+            <TodayAddInput
+              variant="bar"
+              onAdd={ctx.onCreateTaskParsed!}
+              parserContext={ctx.parserContext!}
+              resolver={ctx.resolverContext!}
+              getRecentTaskForContact={ctx.getRecentTaskForContact}
+            />
+          </div>
         </PhoneCaptureBar>
       )}
 
