@@ -9,9 +9,10 @@ import { DOMAINS, type DomainId } from '@/lib/domains'
 import type { TitlePeriod } from '@/lib/planTitle'
 import type { PageNote } from '@/lib/pageParse'
 import type { FamilyMember } from '@/types/family'
-import { hasItemType, inferredCategory, isGoalRow, itemTypeOf, itemTypeProblem, normalizeForSave, withItemType, PAPER_ITEM_TYPES, type PaperItemType, type TypeDrafts } from '@/lib/paperItemType'
+import { hasItemType, inferredCategory, isGoalRow, itemTypeOf, itemTypeProblem, normalizeForSave, withItemType, LIST_ITEM_KINDS, PAPER_ITEM_TYPES, type PaperItemType, type TypeDrafts } from '@/lib/paperItemType'
 import { goalJoinsDraft } from '@/lib/planning/paperIntoDraft'
 import { ItemTypeSelect, RoutineDaysPicker } from './ItemTypeControls'
+import { landingsOf } from '@/lib/paperPlan/importNext'
 import { assigneeOptions, initialAssignee, UNASSIGNED } from '@/lib/paperAssignee'
 
 // The payload's shape lives with the rest of the page-from-paper model.
@@ -97,11 +98,37 @@ const HORIZON_OPTIONS: { value: PlanPlacement['kind']; label: string }[] = [
   { value: 'someday', label: 'Someday' },
 ]
 
-const ALTITUDE_BLURB: Record<PageAltitude, string> = {
-  week: 'Check what Symphony read before it changes the week.',
-  month: "Read as a month page — undated lines go on the month's list.",
-  season: "Read as a season page — undated lines go on the season's list.",
-  year: 'Read as a year page — outcomes and projects are goals for the year; set anything else to what it is.',
+/** Not every reading is right (friends-and-family beta, 2026-10-08): the
+ *  sheet says so, every time, before anything is saved. */
+const CHECK_THESE = 'Check these — Symphony read them from your photo and can misread handwriting. Change anything before you save.'
+
+/** The list a page of this altitude fills: above the week, every line starts
+ *  there as a plain list item (a year's list is its `goals` rows). */
+function listPlacement(altitude: Exclude<PageAltitude, 'week'>): PlanPlacement {
+  return altitude === 'year' ? { kind: 'goal' } : { kind: altitude }
+}
+
+/**
+ * Above the week, a line starts as a plain item on the page's list: no
+ * goal/task split (planning model, 2026-10-04), and nothing that has to be
+ * answered before the list can be saved (beta walkthrough, 2026-10-08: one of
+ * three similar errands came back "Goal or project"). A dated line keeps its
+ * day; a repeating line whose days were read stays a routine. Everything
+ * stays editable.
+ */
+function plainListItem(item: PlanItem, altitude: Exclude<PageAltitude, 'week'>): PlanItem {
+  if (item.kind === 'dayfact') return item
+  // A repeating line with no days read would block the save on a question.
+  if (item.kind === 'recurring') {
+    return item.recurring?.days.length ? item : { ...item, kind: 'task', category: 'task', recurring: null, time: null, goal: false }
+  }
+  // A month's or season's "goal" is just a line on its list (a year's list
+  // IS its goals, so a year line keeps its place).
+  const goal = altitude === 'year' ? item.goal : false
+  // An appointment with no day would block the save too: it starts as a
+  // plain line, one change away from being an appointment again.
+  const category = item.placement.kind !== 'date' && item.category === 'event' ? 'task' : item.category
+  return { ...item, goal, ...(category ? { category } : {}) }
 }
 
 /** Where a row goes when its day is cleared: the page's own list (a year
@@ -181,11 +208,12 @@ export function PageReviewSheet({
       .filter((i) => !onCalendar(i, calendarTitlesByDay))
       // The type the badge used to only show is stamped on the row, so the
       // one on screen is the one saved.
-      .map((i) => {
+      .map((parsed) => {
+        const typed = parsed.kind === 'task' && !isGoalRow(parsed) && !parsed.category ? { ...parsed, category: inferredCategory(parsed) } : parsed
+        const i = altitude === 'week' ? typed : plainListItem(typed, altitude)
         const dup = findLikelyDuplicate(i.title, existingTasks)
         return {
           ...i,
-          ...(i.kind === 'task' && !isGoalRow(i) && !i.category ? { category: inferredCategory(i) } : {}),
           assigneeId: initialAssignee(i, memberIds, meId),
           assigneeDefaulted: !(i.assigneeId && memberIds.has(i.assigneeId)),
           included: true,
@@ -301,9 +329,19 @@ export function PageReviewSheet({
 
   const updateItem = (index: number, patch: Partial<ItemRow>) =>
     setItemRows((prev) => prev.map((r, i) => (i === index ? { ...r, ...patch } : r)))
+  // Above the week the kind is optional and never a goal: "List item" on a
+  // year's list row (a goal row) is what it already is, and a month's or
+  // season's line never turns into one.
+  const retype = (r: ItemRow, type: PaperItemType): ItemRow => {
+    if (altitude === 'week') return withItemType(r, type, altitude)
+    if (type === 'task' && isGoalRow(r)) return r
+    if (type === 'task' && altitude === 'year' && r.typeDrafts?.goal) return withItemType(r, 'goal', altitude)
+    const next = withItemType(r, type, altitude)
+    return altitude !== 'year' && next.goal ? { ...next, goal: false } : next
+  }
   // A linked row IS the existing item: it has no type of its own to change.
   const changeType = (index: number, type: PaperItemType) =>
-    setItemRows((prev) => prev.map((r, i) => (i !== index || r.sourceId ? r : withItemType(r, type, altitude))))
+    setItemRows((prev) => prev.map((r, i) => (i !== index || r.sourceId ? r : retype(r, type))))
 
   // Several lines at once (Scott, 2026-09-28: "select, and reclassify in bulk
   // — all selected items → goal or project"). Selecting is its own mode, so
@@ -314,7 +352,7 @@ export function PageReviewSheet({
   const retypable = (r: ItemRow) => !r.sourceId && r.kind !== 'dayfact'
   const toggleSelected = (i: number) => setSelected((prev) => { const next = new Set(prev); if (next.has(i)) next.delete(i); else next.add(i); return next })
   const bulkType = (type: PaperItemType) =>
-    setItemRows((prev) => prev.map((r, i) => (selected.has(i) && retypable(r) ? withItemType(r, type, altitude) : r)))
+    setItemRows((prev) => prev.map((r, i) => (selected.has(i) && retypable(r) ? retype(r, type) : r)))
   const bulkInclude = (included: boolean) =>
     setItemRows((prev) => prev.map((r, i) => (selected.has(i) ? { ...r, included } : r)))
   const endSelecting = () => { setSelecting(false); setSelected(new Set()) }
@@ -322,7 +360,7 @@ export function PageReviewSheet({
     setNoteRows((prev) => prev.map((r, i) => (i === index ? { ...r, ...patch } : r)))
 
   const promoteToTask = (line: string) => {
-    setItemRows((prev) => [...prev, { title: line, placement: { kind: 'inbox' }, time: null, assigneeId: meId, assigneeDefaulted: true, note: null, dateHint: null, kind: 'task', category: 'task', recurring: null, phone: null, contactMemberId: null, included: true, dup: findLikelyDuplicate(line, existingTasks) }])
+    setItemRows((prev) => [...prev, { title: line, placement: altitude === 'week' ? { kind: 'inbox' } : listPlacement(altitude), time: null, assigneeId: meId, assigneeDefaulted: true, note: null, dateHint: null, kind: 'task', category: 'task', recurring: null, phone: null, contactMemberId: null, included: true, dup: findLikelyDuplicate(line, existingTasks) }])
     setUnread((prev) => prev.filter((l) => l !== line))
   }
   const promoteToNote = (line: string) => {
@@ -360,6 +398,49 @@ export function PageReviewSheet({
   const monthName = monthStart.toLocaleDateString('en-US', { month: 'long', ...(monthStart.getFullYear() !== today.getFullYear() ? { year: 'numeric' } : {}) })
   const seasonName = seasonLabel(seasonStart, seasonsOrdered)
 
+  // Above the week: every line starts on the page's own list, named plainly.
+  const aboveWeek = altitude !== 'week'
+  const seasonShort = seasonName.replace(/\s+\d{4}$/, '')
+  const yearName = String(today.getFullYear())
+  const ownList = altitude === 'month' ? monthName : altitude === 'season' ? seasonShort : yearName
+  const listLabel = (kind: 'goal' | 'month' | 'season') => `${kind === 'goal' ? yearName : kind === 'month' ? monthName : seasonShort}’s list`
+  // The Where answers, the page's own list first.
+  const listOptions: { value: string; label: string }[] = altitude === 'year'
+    ? [{ value: 'goal', label: listLabel('goal') }, { value: 'season', label: listLabel('season') }, { value: 'month', label: listLabel('month') }]
+    : altitude === 'season'
+      ? [{ value: 'season', label: listLabel('season') }, { value: 'month', label: listLabel('month') }]
+      : [{ value: 'month', label: listLabel('month') }, { value: 'season', label: listLabel('season') }]
+  const whereOptions = [...listOptions, { value: 'week', label: 'This week' }, { value: 'someday', label: 'Someday' }, { value: 'inbox', label: 'Inbox' }]
+  // "Ready to add", said as where the lines go: "3 on October’s list / 1 on Tue, Oct 14".
+  const listSummary = aboveWeek
+    ? (() => {
+      const included = itemRows.filter((r) => r.included && r.title.trim())
+      const landings = landingsOf(included, noteRows.filter((r) => r.included).length, altitude, { month: monthName, season: seasonShort, year: yearName }, today)
+      return [
+        ...(landings.length ? landings.map((l) => `${l.count} ${l.label}`) : ['nothing new']),
+        linkedCount > 0 ? `${linkedCount} already on your plan` : null,
+        unread.length > 0 ? `${unread.length} unclear` : null,
+      ].filter(Boolean).join(' / ')
+    })()
+    : null
+  /** What a changed line will be, in one line. The page's own list needs no
+   *  words: the sentence over the rows says it. */
+  const consequence = (row: ItemRow): string | null => {
+    if (!aboveWeek || row.sourceId || row.kind === 'dayfact') return null
+    const type = itemTypeOf(row)
+    if (type === 'routine') return 'A routine — it repeats on the days you pick.'
+    if (type === 'appointment') return row.placement.kind === 'date' ? `An appointment on ${dateLabel(row.placement.date)}.` : null
+    const p = row.placement
+    if (p.kind === listPlacement(altitude as Exclude<PageAltitude, 'week'>).kind) return null
+    switch (p.kind) {
+      case 'goal': case 'month': case 'season': return `Kept in view on ${listLabel(p.kind)} instead.`
+      case 'week': return 'A step for this week — you can put it on a day when you plan the week.'
+      case 'date': return `A step on ${dateLabel(p.date)}.`
+      case 'inbox': return 'Waits in your Inbox to sort later.'
+      case 'someday': return 'Kept for someday, off the lists for now.'
+    }
+  }
+
   // The period chip: ‹ September › / ‹ Fall 2026 › — which list this page fills.
   const periodChip = (altitude === 'month' || altitude === 'season') && (
     <span className="inline-flex items-center gap-0.5 rounded-lg bg-neutral-100 px-1 py-0.5 text-[13px] font-medium text-neutral-700">
@@ -396,7 +477,7 @@ export function PageReviewSheet({
             <NotebookPen className="w-5 h-5 text-primary-600" />
             <div>
               <h3 className="font-display text-xl text-neutral-900">From your page</h3>
-              {!isEmpty && <p className="mt-0.5 text-[13px] text-neutral-500">{ALTITUDE_BLURB[altitude]}</p>}
+              {!isEmpty && <p className="mt-0.5 text-[13px] text-neutral-500">{CHECK_THESE}</p>}
               {pageTitle && titlePeriod && (
                 <p className="mt-0.5 text-[12px] text-neutral-500">Your page says <b className="font-semibold text-neutral-700">{pageTitle}</b></p>
               )}
@@ -441,9 +522,9 @@ export function PageReviewSheet({
           </div>
         ) : (
           <div className="flex-1 overflow-y-auto px-5 py-3 space-y-4">
-            {summary && (
+            {(aboveWeek ? listSummary : summary) && (
               <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-primary-100 bg-primary-50/50 px-3 py-2 text-[13px] text-primary-800">
-                <span><span className="font-semibold">Ready to add:</span> {summary}</span>
+                <span><span className="font-semibold">Ready to add:</span> {aboveWeek ? listSummary : summary}</span>
                 {itemRows.some(retypable) && !selecting && (
                   <button type="button" onClick={() => setSelecting(true)} className="shrink-0 font-medium text-primary-700 hover:underline">Select several</button>
                 )}
@@ -455,7 +536,7 @@ export function PageReviewSheet({
                 <button type="button" className="text-primary-700 hover:underline" onClick={() => setSelected(new Set(itemRows.map((_, i) => i)))}>Select all</button>
                 <span className="text-neutral-300" aria-hidden="true">·</span>
                 <span className="text-neutral-500">Make them:</span>
-                {PAPER_ITEM_TYPES.map((t) => (
+                {(aboveWeek ? LIST_ITEM_KINDS : PAPER_ITEM_TYPES).map((t) => (
                   <button key={t.id} type="button" disabled={!selected.size} onClick={() => bulkType(t.id)}
                     className="rounded-md border border-neutral-200 bg-white px-2 py-1 text-neutral-700 hover:border-neutral-300 hover:text-neutral-950 disabled:opacity-40">
                     {t.label}
@@ -466,6 +547,13 @@ export function PageReviewSheet({
                 <button type="button" disabled={!selected.size} onClick={() => bulkInclude(true)} className="text-neutral-600 hover:underline disabled:opacity-40">Add</button>
                 <button type="button" onClick={endSelecting} className="ml-auto font-medium text-primary-700 hover:underline">Done</button>
               </div>
+            )}
+            {aboveWeek && itemRows.length > 0 && (
+              // The one choice a list line has, and what each answer means.
+              <p className="text-[13px] text-neutral-600">
+                Each line goes on <b className="font-semibold text-neutral-800">{ownList}’s list</b> — something to keep in view.
+                To make one a step you can put on a day, change where it goes.
+              </p>
             )}
             {itemRows.length > 0 && (
               <div className="space-y-2">
@@ -495,7 +583,7 @@ export function PageReviewSheet({
                             ? <span className="inline-flex shrink-0 items-center rounded-md border border-neutral-200 bg-neutral-50 px-1.5 py-0.5 text-[10px] font-semibold leading-none text-neutral-500">Day</span>
                             : row.sourceId
                               ? <span className="inline-flex shrink-0 items-center gap-1 rounded-md border border-neutral-200 bg-neutral-50 px-1.5 py-1 text-[11px] font-semibold leading-none text-neutral-600"><Link2 className="w-3 h-3" aria-hidden="true" />Existing item</span>
-                              : <ItemTypeSelect value={itemTypeOf(row)} title={row.title} onChange={(t) => changeType(i, t)} />}
+                              : aboveWeek ? null : <ItemTypeSelect value={itemTypeOf(row)} title={row.title} onChange={(t) => changeType(i, t)} />}
                           <input
                             value={row.title}
                             readOnly={!!row.sourceId}
@@ -505,6 +593,7 @@ export function PageReviewSheet({
                           />
                         </div>
                         {row.note && <p className="mt-1 text-[13px] text-neutral-500 line-clamp-2">{row.note}</p>}
+                        {consequence(row) && <p className="mt-1 text-[12px] text-neutral-500">{consequence(row)}</p>}
                         {/* A routine's pattern is its when: the days it repeats. */}
                         {row.kind === 'recurring' && !row.sourceId && (
                           <RoutineDaysPicker
@@ -562,6 +651,26 @@ export function PageReviewSheet({
                       {!row.sourceId && (() => {
                         const type = itemTypeOf(row)
                         if (row.kind === 'dayfact') return null
+                        // Above the week: one Where, the page's list first —
+                        // a year's list line (a goal row) included.
+                        if (aboveWeek && (type === 'task' || type === 'activity' || type === 'goal')) return (
+                          <select
+                            value={placementValue(row.placement)}
+                            onChange={(e) => {
+                              const placement = placementFromValue(e.target.value)
+                              // Never a goal above the week; a time only on a day.
+                              updateItem(i, { placement, goal: false, ...(placement.kind === 'date' ? {} : { time: null }) })
+                            }}
+                            aria-label={`Where "${row.title}" goes`}
+                            className="text-[13px] text-neutral-700 bg-neutral-100 rounded-lg px-2 py-1.5 shrink-0 max-w-full"
+                          >
+                            {whereOptions.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                            {row.placement.kind === 'date' && !windowNow.includes(row.placement.date) && (
+                              <option value={row.placement.date}>{dateLabel(row.placement.date)}</option>
+                            )}
+                            {windowNow.map((d) => <option key={d} value={d}>{dateLabel(d)}</option>)}
+                          </select>
+                        )
                         // A goal sits on a list, never on a day.
                         if (type === 'goal') return (
                           <select
@@ -642,6 +751,18 @@ export function PageReviewSheet({
                           <option key={o.value} value={o.value}>{o.label}</option>
                         ))}
                       </select>}
+                      {/* Above the week the kind is optional and secondary:
+                          a list item unless it is something more. */}
+                      {aboveWeek && !row.sourceId && row.kind !== 'dayfact' && (
+                        <ItemTypeSelect
+                          quiet
+                          value={itemTypeOf(row) === 'goal' ? 'task' : itemTypeOf(row)}
+                          title={row.title}
+                          options={LIST_ITEM_KINDS}
+                          ariaLabel={`Kind of "${row.title}" (optional)`}
+                          onChange={(t) => changeType(i, t)}
+                        />
+                      )}
                     </div>
                   </div>
                 ))}
@@ -655,7 +776,7 @@ export function PageReviewSheet({
                 {draftLabel && onAddToDraft && savedDirectly > 0 && (
                   <p>{altitude === 'week'
                     ? 'Appointments, activities, routines and goals are saved directly. Actions join the plan you’re writing.'
-                    : 'Appointments, activities, routines and goals for another period are saved directly. Actions and this period’s goals join the plan you’re writing.'}</p>
+                    : 'Appointments, activities and routines are saved directly. List items join the plan you’re writing.'}</p>
                 )}
               </div>
             )}
@@ -719,10 +840,10 @@ export function PageReviewSheet({
                     <button
                       type="button"
                       onClick={() => promoteToTask(line)}
-                      aria-label={`Make "${line}" a task`}
+                      aria-label={aboveWeek ? `Add "${line}" to ${ownList}’s list` : `Make "${line}" a task`}
                       className="text-[13px] px-2.5 py-1 rounded-lg text-neutral-700 bg-neutral-100 hover:bg-neutral-200 transition-colors shrink-0"
                     >
-                      Task
+                      {aboveWeek ? 'List item' : 'Task'}
                     </button>
                     <button
                       type="button"

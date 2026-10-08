@@ -3302,6 +3302,19 @@ div.chooser-action-group { overflow: visible !important; }
 /* The next step's name can be long ("Choose what October takes on"): it wraps
    inside the line on a phone instead of running past it. */
 .pv2-saved .pv2-btn { white-space: normal; max-width: 100%; text-align: left; }
+/* After a paper import (2026-10-08): the same saved line, held on screen
+   until it is answered — "Continue planning" or "Done for now". Below the
+   import's own dialogs (z 60); on a phone, above the dock and capture bar. */
+.paper-next { position: fixed; z-index: 50; left: 16px; right: 16px; bottom: calc(24px + env(safe-area-inset-bottom, 0px)); max-width: 40rem; margin: 0 auto; box-shadow: 0 12px 32px rgb(0 0 0 / .14); }
+.paper-next:focus:not(:focus-visible) { outline: none; }
+.paper-next-icon { width: 18px; height: 18px; flex: none; color: var(--color-primary-600); }
+.paper-next-acts { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; }
+@media (max-width: 767px) {
+  .paper-next { bottom: calc(139px + env(safe-area-inset-bottom, 0px)); }
+}
+/* The week, arrived at from that panel: which month lines came off the page. */
+.wk-paperhint { margin: 2px 0 10px; padding: 8px 10px; border-radius: 9px; background: var(--color-primary-50); color: var(--color-neutral-700); font-size: 13px; line-height: 1.45; }
+.wk-paperhint:focus:not(:focus-visible) { outline: none; }
 .pv2-toolbar button:disabled { opacity: .5; cursor: not-allowed; }
 .pv2-foot { margin-top: 48px; font-size: 12.5px; color: var(--color-neutral-500); }
 

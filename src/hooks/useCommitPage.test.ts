@@ -165,7 +165,7 @@ describe('useCommitPage', () => {
 
     const result = await commit()({ items: [ITEM, ITEM], notes: [], domain: 'family', storagePath: null, altitude: 'week' })
 
-    expect(result).toEqual({ tasksCreated: 0, goalsCreated: 0, notesCreated: 0, routinesCreated: 0, failures: 2, route: '/week', periodLabel: 'this week', createdTaskIds: [], createdNoteIds: [] })
+    expect(result).toEqual({ tasksCreated: 0, goalsCreated: 0, notesCreated: 0, routinesCreated: 0, failures: 2, route: '/week', periodLabel: 'this week', periodStart: expect.any(Date), createdTaskIds: [], createdNoteIds: [] })
     expect(successToasts()).toHaveLength(0)
     expect(errorToasts()[0][0]).toMatch(/could not be saved/i)
   })
@@ -181,7 +181,7 @@ describe('useCommitPage', () => {
       altitude: 'week',
     })
 
-    expect(result).toEqual({ tasksCreated: 1, goalsCreated: 0, notesCreated: 0, routinesCreated: 0, failures: 1, route: '/week', periodLabel: 'this week', createdTaskIds: ['task-1'], createdNoteIds: [] })
+    expect(result).toEqual({ tasksCreated: 1, goalsCreated: 0, notesCreated: 0, routinesCreated: 0, failures: 1, route: '/week', periodLabel: 'this week', periodStart: expect.any(Date), createdTaskIds: ['task-1'], createdNoteIds: [] })
     expect(errorToasts()[0][0]).toMatch(/Added 1 task, but 1 item could not be saved/)
   })
 
@@ -194,8 +194,21 @@ describe('useCommitPage', () => {
       altitude: 'week',
     })
 
-    expect(result).toEqual({ tasksCreated: 1, goalsCreated: 0, notesCreated: 1, routinesCreated: 0, failures: 0, route: '/week', periodLabel: 'this week', createdTaskIds: ['task-1'], createdNoteIds: ['note-1'] })
+    expect(result).toEqual({ tasksCreated: 1, goalsCreated: 0, notesCreated: 1, routinesCreated: 0, failures: 0, route: '/week', periodLabel: 'this week', periodStart: expect.any(Date), createdTaskIds: ['task-1'], createdNoteIds: ['note-1'] })
     expect(successToasts()[0][0]).toBe('Added 1 task, 1 note to this week')
+  })
+
+  // 2026-10-08: the review's own panel says what was saved; the toast would
+  // say it twice. A failure still toasts.
+  it('leaves success to the caller when asked, still toasts a failure, and names the period it filled', async () => {
+    const result = await commit()({ items: [ITEM], notes: [], domain: 'family', storagePath: null, altitude: 'month', monthStart: new Date(2026, 9, 1) }, { successToast: false })
+    expect(successToasts()).toHaveLength(0)
+    expect(result.periodStart).toEqual(new Date(2026, 9, 1))
+    expect(result.route).toBe('/month?start=2026-10-01')
+
+    mocks.addTask.mockResolvedValue(undefined)
+    await commit()({ items: [ITEM], notes: [], domain: 'family', storagePath: null, altitude: 'month' }, { successToast: false })
+    expect(errorToasts()[0][0]).toMatch(/could not be saved/i)
   })
 
   it('collects every created task and note id, in commit order, skipping failures — for the first-week sample cleanup', async () => {
@@ -338,7 +351,7 @@ describe('useCommitPage — goals', () => {
     expect(mocks.addGoal).toHaveBeenCalledWith('area-1', 'Run a half marathon', 'family', { notes: null, scope: 'compound', assignedToAll: [] })
     expect(mocks.addArea).not.toHaveBeenCalled()
     expect(mocks.addTask).toHaveBeenCalledTimes(1)
-    expect(result).toEqual({ tasksCreated: 1, goalsCreated: 1, notesCreated: 0, routinesCreated: 0, failures: 0, route: '/week', periodLabel: 'this week', createdTaskIds: ['task-1'], createdNoteIds: [] })
+    expect(result).toEqual({ tasksCreated: 1, goalsCreated: 1, notesCreated: 0, routinesCreated: 0, failures: 0, route: '/week', periodLabel: 'this week', periodStart: expect.any(Date), createdTaskIds: ['task-1'], createdNoteIds: [] })
     expect(successToasts()[0][0]).toMatch(/1 task.*1 goal/)
   })
 

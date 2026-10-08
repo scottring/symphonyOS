@@ -119,7 +119,7 @@ Respond with ONLY a JSON object (no markdown fences, no prose):
 {
   "items": [
     {
-      "title": "Short imperative task title, cleaned up from the handwriting",
+      "title": "The line in the user's own words, as written",
       "day": "one of the placements described above: a YYYY-MM-DD date${altitude !== 'week' ? ', \\"goal\\"' : ''}, \\"week\\", \\"month\\", \\"season\\", \\"someday\\", or \\"inbox\\"",
       "date_hint": "if the line names a real date that falls outside the calendar above, that date as YYYY-MM-DD; otherwise null",
       "time": "\\"HH:MM\\" in 24-hour form if the line names a clock time (\\"2pm\\" -> \\"14:00\\", \\"7:30\\" -> \\"19:30\\"), otherwise null",
@@ -139,6 +139,7 @@ Respond with ONLY a JSON object (no markdown fences, no prose):
 
 Rules:
 - A line naming an action — something to do, obtain, decide, or contact — is an ITEM. One item per distinct action. Do not invent, do not merge.
+- Keep each item's title in the user's own words, in their order. Do not shorten, summarize, reword, or turn it into a command, and keep any leading word or label ("Walkthrough: bring a picnic blanket" stays "Walkthrough: bring a picnic blanket"). Fix only an obvious misspelling. The only things to leave out of a title are a clock time or a date you put in its own field; the one rewording allowed is the errand-for-a-child rule above.
 - A clock time on an item line ("Dentist 2pm", "soccer 6", "movie night 7pm") goes in "time", NOT in "note" and NOT left in the title. A time written on paper is the appointment; burying it in a note turns a 2pm appointment into an all-day reminder.
 - A bare hour with no am/pm on a household page means the EVENING when it is 1 through 6 ("soccer 6" -> "18:00"). 7 and above, and anything with am/pm written, take the hour as written.
 - An item with a time must also have a "day". If the line names a time but no day, use today's date from the calendar above.

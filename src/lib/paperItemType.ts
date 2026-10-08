@@ -26,6 +26,16 @@ export const PAPER_ITEM_TYPES: { id: PaperItemType; label: string }[] = [
   { id: 'routine', label: 'Routine' },
 ]
 
+/** Above the week there is no goal/task split (planning model, 2026-10-04):
+ *  a line is a plain list item unless it is an appointment, an activity or a
+ *  routine — and saying so is optional (review sheet, 2026-10-08). */
+export const LIST_ITEM_KINDS: { id: Exclude<PaperItemType, 'goal'>; label: string }[] = [
+  { id: 'task', label: 'List item' },
+  { id: 'appointment', label: 'Appointment' },
+  { id: 'activity', label: 'Activity' },
+  { id: 'routine', label: 'Routine' },
+]
+
 const CATEGORY_OF: Record<'task' | 'appointment' | 'activity', PaperTaskCategory> = {
   task: 'task',
   appointment: 'event',
