@@ -86,12 +86,14 @@ export function FirstRunSetup({ user, onDone }: Props) {
   const handleSkip = async () => {
     if (saving) return
     setSaving(true)
+    setError(null)
     try {
       await skipFirstRunSetup(user.id)
+      onDone()
     } catch (err) {
-      console.warn('[first-run] skip failed:', err)
+      setError(err instanceof Error ? err.message : 'Could not save. Try again.')
+      setSaving(false)
     }
-    onDone()
   }
 
   return (

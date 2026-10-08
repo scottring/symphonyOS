@@ -74,4 +74,14 @@ describe('FirstRunSetup', () => {
     expect(h.skip).toHaveBeenCalledWith('u1')
     expect(h.save).not.toHaveBeenCalled()
   })
+
+  it('stays on setup with a retry message when skip cannot create the household', async () => {
+    h.skip.mockRejectedValueOnce(new Error("We couldn't save your household. Check your connection and try again."))
+    const onDone = vi.fn()
+    const { user: u } = render(<FirstRunSetup user={user} onDone={onDone} />)
+    await u.click(screen.getByText('Skip for now'))
+    expect(await screen.findByText(/couldn't save your household/)).toBeInTheDocument()
+    expect(onDone).not.toHaveBeenCalled()
+    expect(screen.getByText('Skip for now')).not.toBeDisabled()
+  })
 })
