@@ -56,7 +56,7 @@ import { useResolutionLearning } from '@/hooks/useResolutionLearning';
 import { HomeView } from '@/components/home';
 import { useSelection } from '@/shell/providers/SelectionProvider';
 import { useMealEventsForDate } from '@/shell/providers/MealEventsProvider';
-import { FirstWeekCard } from '@/components/schedule/FirstWeekCard';
+import { TodayStartPanel } from '@/components/schedule/TodayStartPanel';
 import { PlanningNudge } from '@/components/plan/PlanningNudge';
 import { useFirstWeekSignals } from '@/hooks/useFirstWeekSignals';
 import { firstWeekSteps, shouldOpenFirstWeek, FIRST_WEEK_HIDE_KEY, hasSampleIds, readSampleIds, clearSampleIdsRecord, deleteSampleRows } from '@/lib/firstWeek';
@@ -880,19 +880,22 @@ export function HomeViewContainer({ fixedView }: { fixedView?: 'today' | 'week' 
 
   return (
     <ScheduleActionsProvider value={scheduleActionsValue}>
-      {fixedView !== 'week' && firstWeekUid && showFirstWeek && (
-        // The SAME column the Today masthead draws in (TodayView's
-        // max-w-[1152px] + md:px-10 lg:px-14), so the card sits directly above
-        // the day card on the same left and right edges. Without it the card
-        // spanned the full content width and hung out past the page.
-        <div className="w-full max-w-[1152px] mr-auto px-0 pt-2 md:px-10 md:pt-8 lg:px-14">
-          <FirstWeekCard
-            steps={firstWeekStepsList}
-            onHide={handleHideFirstWeek}
-            onSamplePage={handleSamplePage}
-            onClearSample={hasSample ? handleClearSample : undefined}
-          />
-        </div>
+      {fixedView !== 'week' && firstWeekUid && (
+        // "Where would you like to start?" while the planner is empty, then a
+        // one-line "your first thing is on Today" with optional next steps.
+        // Keyed by uid so a different account reads its own record.
+        <TodayStartPanel
+          key={firstWeekUid}
+          uid={firstWeekUid}
+          tasks={tasks}
+          tasksReady={!tasksLoading && !tasksError}
+          startOpen={showFirstWeek}
+          startHidden={firstWeekHiddenAt !== null}
+          steps={firstWeekStepsList}
+          onHide={handleHideFirstWeek}
+          onSamplePage={handleSamplePage}
+          onClearSample={hasSample ? handleClearSample : undefined}
+        />
       )}
 
       <HomeView
