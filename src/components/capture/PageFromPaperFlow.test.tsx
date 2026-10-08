@@ -19,7 +19,11 @@ const mocks = vi.hoisted(() => ({
   commitPage: vi.fn(),
   readDraft: vi.fn(),
   writeDraft: vi.fn(),
+  // Who getAuthUser() says is signed in, and who useAuth() renders for.
+  userId: 'u1' as string | null,
+  authUserId: 'u1' as string | null,
 }))
+vi.mock('@/hooks/useAuth', () => ({ useAuth: () => ({ user: mocks.authUserId ? { id: mocks.authUserId } : null }) }))
 
 vi.mock('@/hooks/usePageFromPaper', () => ({
   usePageFromPaper: () => ({
@@ -66,7 +70,7 @@ vi.mock('@/lib/supabase', () => {
   }
   return {
     supabase: { from: vi.fn(() => chain) },
-    getAuthUser: () => Promise.resolve({ data: { user: { id: 'u1' } }, error: null }),
+    getAuthUser: () => Promise.resolve({ data: { user: mocks.userId ? { id: mocks.userId } : null }, error: null }),
   }
 })
 vi.mock('react-router-dom', async (importOriginal) => {
@@ -84,6 +88,8 @@ beforeEach(() => {
   mocks.items = []
   mocks.altitude = 'week'
   mocks.tasks = []
+  mocks.userId = 'u1'
+  mocks.authUserId = 'u1'
   mocks.readDraft.mockReturnValue(null)
   mocks.commitPage.mockResolvedValue({ route: '/week', periodStart: new Date(2026, 9, 4), tasksCreated: 0, goalsCreated: 0, notesCreated: 0, routinesCreated: 0, failures: 0, periodLabel: 'this week', createdTaskIds: [], createdNoteIds: [] })
   __resetPaperImportStore()
@@ -218,5 +224,33 @@ describe('PageFromPaperFlow', () => {
     expect(screen.getByRole('button', { name: 'Continue planning' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Done for now' })).toBeInTheDocument()
     expect(onClose).toHaveBeenCalled()
+  })
+
+  // Friends-and-family review, 2026-10-08: the panel's record had no account.
+  it('a save that finishes after the tab changed accounts belongs to the account that started it', async () => {
+    mocks.status = 'ready'
+    mocks.altitude = 'month'
+    mocks.items = [{ ...task('Bring a picnic blanket'), placement: { kind: 'month' } }]
+    let finish!: (v: unknown) => void
+    mocks.commitPage.mockReturnValue(new Promise((resolve) => { finish = resolve }))
+    const ui = () => <><PageFromPaperFlow members={[]} onClose={vi.fn()} today={new Date(2026, 9, 1)} /><PaperImportNext /></>
+    const { rerender } = render(ui())
+
+    await userEvent.click(await screen.findByRole('button', { name: /add 1 item/i }))
+    await waitFor(() => expect(mocks.commitPage).toHaveBeenCalled())
+    // A signs out and B signs in while the save is still in flight.
+    mocks.userId = 'u2'
+    mocks.authUserId = 'u2'
+    rerender(ui())
+    finish({
+      route: '/month?start=2026-10-01', periodStart: new Date(2026, 9, 1), periodLabel: 'October',
+      tasksCreated: 1, goalsCreated: 0, notesCreated: 0, routinesCreated: 0, failures: 0, createdTaskIds: ['a'], createdNoteIds: [],
+    })
+    await waitFor(() => expect(mocks.reset).toHaveBeenCalled())
+    expect(screen.queryByRole('status')).toBeNull()
+
+    mocks.authUserId = 'u1'
+    rerender(ui())
+    expect(await screen.findByRole('status')).toHaveTextContent('Your October list is saved — 1 item.')
   })
 })

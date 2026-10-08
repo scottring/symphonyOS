@@ -49,7 +49,7 @@ import type { TaskContext } from '@/types/task'
 import type { FamilyMember } from '@/types/family'
 import { WeekStepMain, type PanelStep } from './WeekStepScreen'
 import { linkedLine, didFor } from '@/lib/week/monthLinks'
-import { clearPaperWeekFocus, peekPaperWeekFocus } from '@/lib/paperPlan/importNextStore'
+import { clearPaperWeekFocus, peekPaperWeekFocus, type WeekFocus } from '@/lib/paperPlan/importNextStore'
 
 const DAY = 86_400_000
 
@@ -126,8 +126,26 @@ export function WeekV2({ tasks, weekStart, meId, isCurrent, days, renderDays, on
   // Arriving by "Continue planning" after a month's page was imported
   // (PaperImportNext): the month opens beside the week with the imported
   // lines marked and "Add to this week" pointed at. Used once.
-  const [paperFocus] = useState(() => peekPaperWeekFocus(monthsOfWeek(weekStart).map(localYmd)))
-  useEffect(() => { if (paperFocus) clearPaperWeekFocus() }, [paperFocus])
+  const [refOpen, setRefOpenState] = useState(readRefOpen)
+  const setRefOpen = (open: boolean) => { setRefOpenState(open); try { localStorage.setItem(REF_KEY, open ? 'open' : 'shut') } catch { /* this visit only */ } }
+  // The pointer is the signed-in person's own (it is read once they are
+  // known, and never shown to another account the tab changes to).
+  const userId = user?.id ?? null
+  const weekMonths = monthsOfWeek(weekStart).map(localYmd).join(',')
+  const [paperFocusOf, setPaperFocusOf] = useState<{ owner: string; focus: WeekFocus } | null>(null)
+  useEffect(() => {
+    if (!userId) return
+    const focus = peekPaperWeekFocus(userId, weekMonths.split(','))
+    if (!focus) return
+    clearPaperWeekFocus()
+    // Taken from the tab's storage once the account is known (useAuth
+    // resolves after the first render), so it cannot be a lazy initial state.
+    /* eslint-disable react-hooks/set-state-in-effect */
+    setPaperFocusOf({ owner: userId, focus })
+    setRefOpenState(true)
+    /* eslint-enable react-hooks/set-state-in-effect */
+  }, [userId, weekMonths])
+  const paperFocus = paperFocusOf && paperFocusOf.owner === userId ? paperFocusOf.focus : null
   const fromPaper = useMemo(() => new Set(paperFocus?.taskIds ?? []), [paperFocus])
   const paperHintRef = useRef<HTMLParagraphElement>(null)
   useEffect(() => {
@@ -135,8 +153,6 @@ export function WeekV2({ tasks, weekStart, meId, isCurrent, days, renderDays, on
     paperHintRef.current?.focus({ preventScroll: true })
     paperHintRef.current?.scrollIntoView?.({ block: 'nearest' })
   }, [paperFocus])
-  const [refOpen, setRefOpenState] = useState(() => readRefOpen() || !!paperFocus)
-  const setRefOpen = (open: boolean) => { setRefOpenState(open); try { localStorage.setItem(REF_KEY, open ? 'open' : 'shut') } catch { /* this visit only */ } }
   const [daily, setDailyState] = useState(readDaily)
   const setDaily = (shown: boolean) => { setDailyState(shown); try { localStorage.setItem(DAILY_KEY, shown ? 'shown' : 'hidden') } catch { /* this visit only */ } }
 
