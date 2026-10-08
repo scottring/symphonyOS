@@ -124,7 +124,11 @@ describe('Month · Open journal', () => {
     expect(input.value).toBe('Charge phones in the hall')
   })
 
-  it('Lists stays the default; its own add box now also clears only once the line is stored', async () => {
+  it('Open journal is the default; with Lists chosen, its own add box clears only once the line is stored', async () => {
+    const first = renderMonth(null)
+    expect(screen.getByRole('region', { name: /October, by Fall line/ })).toBeInTheDocument()
+    first.unmount()
+    localStorage.setItem('symphony-plan-layout.month', 'lists')
     w.addTask.mockResolvedValueOnce(undefined)
     renderMonth(null)
     expect(screen.queryByRole('region', { name: /October, by Fall line/ })).toBeNull()
@@ -177,6 +181,7 @@ describe('Month · Open journal', () => {
   })
 
   it('in Lists too, a draft and a failure belong to their month', async () => {
+    localStorage.setItem('symphony-plan-layout.month', 'lists')
     w.addTask.mockResolvedValueOnce(undefined)
     renderMonth(null)
     const input = () => screen.getByRole('textbox', { name: /^Add to / }) as HTMLInputElement

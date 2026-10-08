@@ -21,6 +21,11 @@ vi.mock('@/hooks/useDayPlan', () => ({ useDayPlan: () => ({ plan: h.dayPlan, loa
 
 import { WeekV2 } from './WeekV2'
 
+// These tests cover the Lists view; Open journal is the default since
+// 2026-10-08, so they make the device's choice explicit.
+beforeEach(() => { localStorage.setItem('symphony-plan-layout.week', 'lists'); localStorage.setItem('symphony-plan-layout.month', 'lists') })
+
+
 const WEEK = new Date(2026, 9, 3) // Sat Oct 3 – Fri Oct 9
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ['Date'] }); vi.setSystemTime(new Date(2026, 9, 3, 12))

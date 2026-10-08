@@ -39,6 +39,7 @@ import { OpenJournal, PlanLayoutSwitch, type JournalSection } from './OpenJourna
 import { groupByParent, untouchedCount, WEEK_TO_MONTH } from '@/lib/planning/journalGroups'
 import { readPlanLayout, writePlanLayout, type PlanLayout } from '@/lib/planning/v2/planLayout'
 import { isMissedPlacement } from '@/lib/week/missedPlacement'
+import { useColumnsFitWindow } from '@/hooks/useColumnsFitWindow'
 import { WeekRow } from './WeekRow'
 import { useAddArea } from './AddArea'
 import { useAssigneeFilter } from '@/hooks/useAssigneeFilter'
@@ -168,6 +169,9 @@ export function WeekV2({ tasks, weekStart, meId, isCurrent, days, renderDays, on
   const prevWeek = useMemo(() => new Date(weekStart.getTime() - 7 * DAY), [weekStart])
   const prevTasks = useMemo(() => weekListTasks(tasks, prevWeek, meId, { isCurrent: false }), [tasks, prevWeek, meId])
   const [meeting, setMeeting] = useState<null | { step: WeekStep; candidateIds: string[] }>(null)
+  // The journal and the days fill the room to the landscape and scroll on
+  // their own, as Week's lists do (useColumnsFitWindow).
+  const journalGrid = useColumnsFitWindow(layout === 'journal' && !meeting)
   // The days always know the household, so each row shows who carries it.
   const daysFor = (opts: DaysOptions) => (renderDays ? renderDays({
     members, forLabel: (t: Task) => { const f = forLine(t); return f ? `for ${f.month}: ${f.title}` : null },
@@ -596,13 +600,19 @@ export function WeekV2({ tasks, weekStart, meId, isCurrent, days, renderDays, on
       ) : layout === 'journal' ? (
         // At rest, Open journal: the month's lines with the week's actions,
         // then the days — the same days, drag and "when" as the lists.
-        <div className="wk-page wk-journal-page">
-          <PlanLayoutSwitch value={layout} onChange={setLayout} />
-          {journal()}
-          <section className="pv2-days wk-days" aria-label="The days">
+        // On a wide screen the two stand side by side, each scrolling on its
+        // own (keyboard: each is a focusable region); narrower, one page.
+        <>
+        <PlanLayoutSwitch value={layout} onChange={setLayout} />
+        <div ref={journalGrid} className="wk-page wk-journal-page is-colscroll">
+          <div className="wk-journal-col" tabIndex={0} role="region" aria-label="Priorities and this week’s actions">
+            {journal()}
+          </div>
+          <section className="pv2-days wk-days wk-journal-days" tabIndex={0} aria-label="The days">
             {daysFor({ dailyRoutines: daily })}
           </section>
         </div>
+        </>
       ) : (
         // At rest: the week's list beside its days; the month one click away.
         <>

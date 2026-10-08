@@ -39,6 +39,11 @@ vi.mock('@/components/domain/DomainSwitcher', () => ({ DomainSwitcher: () => nul
 import { PlanPageV2 } from './PlanPageV2'
 import { DomainProvider } from '@/hooks/useDomain'
 
+// These tests cover the Lists view; Open journal is the default since
+// 2026-10-08, so they make the device's choice explicit.
+beforeEach(() => { localStorage.setItem('symphony-plan-layout.week', 'lists'); localStorage.setItem('symphony-plan-layout.month', 'lists') })
+
+
 const renderMonth = () => render(
   <MemoryRouter initialEntries={['/month?start=2026-10-01']}>
     <DomainProvider><PlanPageV2 level="month" /></DomainProvider>

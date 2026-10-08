@@ -18,6 +18,7 @@ import { goalsAppDef } from '@/apps/goals';
 import { monthPlanAppDef, seasonPlanAppDef, yearPlanAppDef } from '@/apps/plan';
 import { guideAppDef } from '@/apps/guide';
 import { gettingStartedAppDef } from '@/apps/start';
+import { planAloudAppDef } from '@/apps/plan-aloud';
 import { familyAppDef } from '@/apps/family';
 import { agentAppDef } from '@/apps/agent';
 
@@ -90,6 +91,7 @@ export const appRegistry: AppRegistry = createRegistry([
   yearPlanAppDef,
   guideAppDef,
   gettingStartedAppDef,
+  planAloudAppDef,
   familyAppDef,
   agentAppDef,
 ]);

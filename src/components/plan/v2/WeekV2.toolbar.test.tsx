@@ -18,6 +18,11 @@ vi.mock('@/hooks/useDayPlan', () => ({ useDayPlan: () => ({ plan: null, loading:
 import { WeekV2 } from './WeekV2'
 import { PlanMastheadSlotsContext } from './planMastheadSlots'
 
+// These tests cover the Lists view; Open journal is the default since
+// 2026-10-08, so they make the device's choice explicit.
+beforeEach(() => { localStorage.setItem('symphony-plan-layout.week', 'lists'); localStorage.setItem('symphony-plan-layout.month', 'lists') })
+
+
 // A fixed Tuesday: the week's own last day changes what the toolbar offers
 // (it hands to next week), so these tests must not ride the wall clock.
 beforeEach(() => { vi.useFakeTimers({ toFake: ['Date'] }); vi.setSystemTime(new Date(2026, 8, 29, 12)) })
@@ -147,7 +152,7 @@ describe('WeekV2 reference while tasks load', () => {
 // Walkthrough 2026-09-30: nothing said a month line had come into the week.
 // 2026-10-04: the month stays whole; a line that is on the week says so.
 describe('WeekV2 — a month line on this week says so', () => {
-  beforeEach(() => { session.saved = null; session.loading = false; session.error = null; localStorage.clear() })
+  beforeEach(() => { session.saved = null; session.loading = false; session.error = null; localStorage.clear(); localStorage.setItem('symphony-plan-layout.week', 'lists') })
   it('marks it “On this week”, and offers no second copy', () => {
     const line = { id: 'g1', title: 'Hang porch plants', completed: false, bucket: 'week', monthStart: new Date(2026, 9, 1), weekStart: new Date(2026, 9, 3), createdAt: new Date(2026, 8, 29), assignedTo: 'me',
       commitments: [{ level: 'month', periodStart: new Date(2026, 9, 1), status: 'open' }, { level: 'week', periodStart: new Date(2026, 9, 3), status: 'open' }] }

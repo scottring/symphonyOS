@@ -560,7 +560,7 @@ function Inner({ level }: { level: Level }) {
     const untouched = untouchedCount(shown.filter((g) => !g.parent.task.completed), (t) => !t.completed)
     const seasonStart = periodBounds('season', bounds.start, seasons).start
     return (
-      <div className="pv2-dropcol">
+      <div className="pv2-dropcol" tabIndex={0} role="region" aria-label="Open journal column">
         <OpenJournal label={`${name}, by ${aboveName} line`} periodKey={localYmd(bounds.start)}
           intro={<div className="oj-intro">
             <p className="oj-lede">Each {aboveName} line, with what {name} does for it. Leave any of them for later.</p>

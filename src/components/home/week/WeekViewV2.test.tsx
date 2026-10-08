@@ -8,6 +8,11 @@ import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
 import { ALL_LAYERS } from '@/lib/domains'
 import { weekStartAnchor, readCadenceConfig } from '@/lib/cadence/config'
 
+// These tests cover the Lists view; Open journal is the default since
+// 2026-10-08, so they make the device's choice explicit.
+beforeEach(() => { localStorage.setItem('symphony-plan-layout.week', 'lists'); localStorage.setItem('symphony-plan-layout.month', 'lists') })
+
+
 // The Planning sheet (narrow screens) computes its own plan from the shared
 // sources; these tests are about the week's viewport, so the sources are
 // stubbed rather than mounted.

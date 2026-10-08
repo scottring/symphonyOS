@@ -126,6 +126,10 @@ function Inner() {
               </ol>
               <p>Bigger plans stay in place while smaller steps move them forward. Finishing a step doesn’t finish the plan above it, and you never have to fill in every level — a task can go straight on Today.</p>
             </details>
+            <p className="guide-inbox-line">
+              <span>Rather be asked, one horizon at a time across all your goals?</span>
+              <Link to="/plan-aloud" className="getting-started-link">Plan with guidance</Link>
+            </p>
             <div className="guide-acts">
               <button type="button" className="pv2-btn" onClick={() => setStage('source')}>Continue</button>
               <button type="button" className="pv2-link pv2-quiet" onClick={() => navigate('/today')}>Explore on my own</button>
