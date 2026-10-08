@@ -49,6 +49,35 @@ final class ReconcilerTests: XCTestCase {
         XCTAssertEqual(ops, [])
     }
 
+    // Regression (2026-10-07): every write stamps the receiving side "now", so
+    // a timestamp-only rule copied all 366 Groceries items back and forth every
+    // minute (~500k writes/day) and could replay stale state over a real edit.
+    // Identical content is already converged, whatever the timestamps say.
+    func testAppleNewerButSameContentIsNoOp() {
+        let apple = [AppleItem(externalId: "a1", title: "milk", isCompleted: true, lastModified: t1)]
+        let s = SymphonyItem(id: UUID(), listId: listId, text: "milk", completed: true, updatedAt: t0, externalId: "a1")
+
+        XCTAssertEqual(Reconciler.reconcile(apple: apple, symphony: [s], mapping: mapping), [])
+    }
+
+    func testSymphonyNewerButSameContentIsNoOp() {
+        let apple = [AppleItem(externalId: "a1", title: "milk", isCompleted: false, lastModified: t0)]
+        let s = SymphonyItem(id: UUID(), listId: listId, text: "milk", completed: false, updatedAt: t1, externalId: "a1")
+
+        XCTAssertEqual(Reconciler.reconcile(apple: apple, symphony: [s], mapping: mapping), [])
+    }
+
+    func testAPassThenItsEchoConverges() {
+        // Symphony checked "milk" off; the bridge pushes it to Apple, which
+        // stamps Apple newer. The next tick must do nothing.
+        let s = SymphonyItem(id: UUID(), listId: listId, text: "milk", completed: true, updatedAt: t0, externalId: "a1")
+        let staleApple = AppleItem(externalId: "a1", title: "milk", isCompleted: false, lastModified: t0.addingTimeInterval(-60))
+        XCTAssertEqual(Reconciler.reconcile(apple: [staleApple], symphony: [s], mapping: mapping),
+                       [.updateApple(externalId: "a1", fromSymphony: s)])
+        let echoed = AppleItem(externalId: "a1", title: "milk", isCompleted: true, lastModified: t1)
+        XCTAssertEqual(Reconciler.reconcile(apple: [echoed], symphony: [s], mapping: mapping), [])
+    }
+
     // MARK: - Symphony -> Apple (new items added on kiosk)
 
     func testSymphonyOnlyWithoutExternalIdInsertsToApple() {

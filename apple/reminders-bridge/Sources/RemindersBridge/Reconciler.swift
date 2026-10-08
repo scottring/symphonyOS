@@ -9,7 +9,8 @@ public enum Reconciler {
     /// - Apple-only: insertSymphony.
     /// - Symphony-only with externalId: deleteSymphony (Apple deleted it).
     /// - Symphony-only without externalId: insertApple (kiosk created it).
-    /// - Both: newer updatedAt wins; equal timestamps = no-op.
+    /// - Both, same title and completion: no-op (already converged).
+    /// - Both, content differs: newer updatedAt wins; equal timestamps = no-op.
     ///
     /// Preconditions (caller responsibility):
     /// - All `apple` items came from the Apple list named `mapping.appleListName`.
@@ -44,6 +45,10 @@ public enum Reconciler {
         for a in apple {
             seenExt.insert(a.externalId)
             if let s = symphonyByExt[a.externalId] {
+                // Same words and same done state: already converged. Each write
+                // stamps the receiving side "now", so comparing timestamps alone
+                // copied every item back and forth forever (2026-10-07).
+                if a.title == s.text && a.isCompleted == s.completed { continue }
                 if a.lastModified > s.updatedAt {
                     ops.append(.updateSymphony(symphonyId: s.id, fromApple: a))
                 } else if s.updatedAt > a.lastModified {
