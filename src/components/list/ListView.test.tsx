@@ -371,4 +371,56 @@ describe('ListView', () => {
       expect(screen.getByText('⭐')).toBeInTheDocument()
     })
   })
+
+  // Scott, 2026-10-08: "we need a way to hide checked items (as opposed to
+  // clearing them)". On a Reminders-synced list a cleared item comes back.
+  describe('checked items', () => {
+    const shopping: ListItem[] = [
+      createMockListItem({ id: 'o1', listId: 'list-1', text: 'milk' }),
+      createMockListItem({ id: 'o2', listId: 'list-1', text: 'eggs' }),
+      createMockListItem({ id: 'c1', listId: 'list-1', text: 'bread', completed: true }),
+      createMockListItem({ id: 'c2', listId: 'list-1', text: 'salsa', completed: true }),
+    ]
+    beforeEach(() => { try { localStorage.clear() } catch { /* ignore */ } })
+
+    it('are hidden by default, behind a "Show checked (N)" row, and the count says so', async () => {
+      const { user } = render(<ListView {...defaultProps} items={shopping} />)
+      expect(screen.getByText('milk')).toBeInTheDocument()
+      expect(screen.queryByText('bread')).not.toBeInTheDocument()
+      expect(screen.getByText('2 items · 2 checked')).toBeInTheDocument()
+      await user.click(screen.getByRole('button', { name: 'Show checked (2)' }))
+      expect(screen.getByText('bread')).toBeInTheDocument()
+      await user.click(screen.getByRole('button', { name: 'Hide checked' }))
+      expect(screen.queryByText('salsa')).not.toBeInTheDocument()
+    })
+
+    it('remembers showing them, per list', async () => {
+      const { user, unmount } = render(<ListView {...defaultProps} items={shopping} />)
+      await user.click(screen.getByRole('button', { name: 'Show checked (2)' }))
+      unmount()
+      render(<ListView {...defaultProps} items={shopping} />)
+      expect(screen.getByText('bread')).toBeInTheDocument()
+      render(<ListView {...defaultProps} list={createMockList({ ...mockList, id: 'list-2' })} items={shopping.map((i) => ({ ...i, id: `b-${i.id}` }))} />)
+      expect(screen.getAllByText('bread')).toHaveLength(1)
+    })
+
+    it('something checked while the list is open stays, crossed out, until you leave', () => {
+      const { rerender } = render(<ListView {...defaultProps} items={shopping} />)
+      rerender(<ListView {...defaultProps} items={shopping.map((i) => (i.id === 'o1' ? { ...i, completed: true } : i))} />)
+      expect(screen.getByText('milk')).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Show checked (2)' })).toBeInTheDocument()
+    })
+
+    it('says so when everything is checked off', () => {
+      render(<ListView {...defaultProps} items={shopping.filter((i) => i.completed)} />)
+      expect(screen.getByText('Everything is checked off.')).toBeInTheDocument()
+    })
+
+    it('Clear checked still clears', async () => {
+      const onClearCompleted = vi.fn()
+      const { user } = render(<ListView {...defaultProps} items={shopping} onClearCompleted={onClearCompleted} />)
+      await user.click(screen.getByRole('button', { name: 'Clear checked items' }))
+      expect(onClearCompleted).toHaveBeenCalled()
+    })
+  })
 })
