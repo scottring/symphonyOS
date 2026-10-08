@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { advance, back, finishHere, firstStepChoices, hasPlans, onStepPage, parseGuideState, pause, pickUpPeriods, pickUpRows, planPeriods, startGuide, startPickUp, stepIdeas, stepPath, stepShortName, stepTitle, type PickUpFacts } from './guidedPlan'
+import { advance, back, finishHere, recordCoach, withCoach, firstStepChoices, hasPlans, onStepPage, parseGuideState, pause, pickUpPeriods, pickUpRows, planPeriods, startGuide, startPickUp, stepIdeas, stepPath, stepShortName, stepTitle, type PickUpFacts } from './guidedPlan'
 import type { Seasons } from '@/lib/cadence/seasons'
 
 // Scott's household: custom seasons, Fall = Oct 1 – Dec 31; Saturday weeks.
@@ -76,6 +76,29 @@ describe('moving through a run', () => {
     expect(parseGuideState(null)).toBeNull()
     const s = startGuide('today', '2026-09-29', sep29, seasons, SAT)
     expect(parseGuideState(JSON.parse(JSON.stringify(s)))).toEqual(s)
+  })
+  it('reads a run saved before the coach existed, adding no coach fields', () => {
+    const old = { v: 1, route: 'month', steps: ['month', 'week', 'today'], periods: { month: '2026-10-01' }, current: 1, done: ['month'], status: 'paused', updatedAt: '2026-10-01T10:00:00Z' }
+    const parsed = parseGuideState(JSON.parse(JSON.stringify(old)))!
+    expect(parsed).toStrictEqual(old)
+    expect('coach' in parsed).toBe(false)
+    expect('coachDone' in parsed).toBe(false)
+  })
+  it('keeps the coach choice and its progress, and drops a malformed record', () => {
+    const s = recordCoach(recordCoach(withCoach(startGuide('month', '2026-10-01', sep29, seasons, SAT), true),
+      'month', { id: 't1', title: 'Finish the patio', saved: 'Saved to October.', also: 'It stays on October’s list as you plan the weeks.', at: 'x' }),
+      'week', { skipped: true, at: 'y' })
+    const back = parseGuideState(JSON.parse(JSON.stringify(s)))!
+    expect(back.coach).toBe(true)
+    expect(back.coachDone).toEqual(s.coachDone)
+    const odd = parseGuideState({ ...JSON.parse(JSON.stringify(s)), coach: 'yes', coachDone: { month: { title: 3 }, nope: { skipped: true } } })!
+    expect('coach' in odd).toBe(false)
+    expect('coachDone' in odd).toBe(false)
+  })
+  it('moving through a run keeps the coach fields', () => {
+    const s = withCoach(startGuide('month', '2026-10-01', sep29, seasons, SAT), true)
+    expect(back(advance(s)).coach).toBe(true)
+    expect(pause(s).coach).toBe(true)
   })
 })
 
