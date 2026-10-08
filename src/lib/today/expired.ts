@@ -39,3 +39,13 @@ export function selectExpired(tasks: Task[], now: Date = new Date()): ExpiredRow
     .map((task) => ({ task, ageDays: daysBetween(task.scheduledFor as Date, now) }))
     .sort((a, b) => a.ageDays - b.ageDays)
 }
+
+/**
+ * The Inbox's Expired section, exactly: past-dated open work, minus waits
+ * (a wait past its check-back day lists under Waiting on — one row, one home).
+ * Shared so anything that tells you what the Inbox's Expired list holds — the
+ * review's "where the rest lives" line — reads the same rows it renders.
+ */
+export function selectInboxExpired(tasks: Task[], now: Date = new Date()): ExpiredRow[] {
+  return selectExpired(tasks, now).filter((r) => !r.task.isWaiting)
+}

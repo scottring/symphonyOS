@@ -5,12 +5,12 @@ import { ReviewDrawer, BACKLOG_SESSION_CAP } from './ReviewDrawer'
 import type { Task } from '@/types/task'
 import type { AttentionItem } from '@/lib/today/attention'
 
-vi.mock('@/hooks/useEveningReflection', () => ({
-  useEveningReflection: () => ({
-    highlight: '', setHighlight: vi.fn(), notes: '', setNotes: vi.fn(),
-    save: vi.fn().mockResolvedValue(undefined), loading: false,
-  }),
-}))
+// The page owns the reflection (TodayView); the drawer is handed it.
+const reflection = (over: Record<string, unknown> = {}) => ({
+  highlight: '', setHighlight: vi.fn(), notes: '', setNotes: vi.fn(),
+  save: vi.fn().mockResolvedValue(true), closeDay: vi.fn().mockResolvedValue(true),
+  reviewed: false, loading: false, ...over,
+})
 
 const today = new Date()
 
@@ -26,6 +26,7 @@ const base = {
   tasks: [] as Task[],
   attentionItems: [] as AttentionItem[],
   overdueTasks: [] as Task[],
+  reflection: reflection(),
 }
 
 describe('ReviewDrawer — evening keeps the end-of-day ritual', () => {
@@ -89,6 +90,27 @@ describe('ReviewDrawer — morning goes straight to triage', () => {
     expect(screen.getByText('Slipped 0')).toBeInTheDocument()
     expect(screen.queryByText(`Slipped ${BACKLOG_SESSION_CAP + 2}`)).not.toBeInTheDocument()
     expect(screen.getByText(/\+3 older waiting/)).toBeInTheDocument()
+  })
+
+  // Friends-and-family walk, 2026-10-08: the review said "+5 older waiting …
+  // the whole list lives in the Inbox, under Expired" while the Inbox said
+  // "Expired · 1". Expired holds only past-DATED work; most of the backlog
+  // had no date at all. The line now names each part in the review's own
+  // numbers, and only sends past-dated work to Expired.
+  it('names where each part of the backlog lives, in numbers that add up', () => {
+    const yesterday = new Date(today); yesterday.setDate(yesterday.getDate() - 1)
+    const item = (id: string, reason: AttentionItem['reason'], ageDays: number) =>
+      ({ task: task({ id, title: id }), reason, ageDays } as AttentionItem)
+    render(<ReviewDrawer {...base} mode="morning"
+      overdueTasks={[task({ id: 'carried', title: 'carried', scheduledFor: yesterday })]}
+      attentionItems={[
+        item('w1', 'stranded-week', 20), item('w2', 'stranded-week', 21), item('w3', 'stranded-week', 22), item('w4', 'stranded-week', 23),
+        item('m1', 'aging-month', 50), item('m2', 'aging-month', 60), item('m3', 'aging-month', 70),
+        item('i1', 'aging-inbox', 30), item('i2', 'aging-inbox', 40),
+      ]} />)
+    const line = screen.getByText(/older waiting/)
+    expect(line).toHaveTextContent('+5 older waiting — five a session keeps it honest. Of the 10 here: 1 past its date — in the Inbox under Expired; 9 with no date that sat a while (4 on a week that has passed, 3 on a month list for 45+ days, 2 in the Inbox for 2+ weeks).')
+    expect(line).not.toHaveTextContent(/whole list/i)
   })
 
   // The reported bug: Review was the only door to a carried-over task, and
@@ -166,6 +188,54 @@ describe('ReviewDrawer — morning goes straight to triage', () => {
     rerender(<ReviewDrawer {...base} mode="morning" onDeleteTask={vi.fn()}
       attentionItems={[attn(task({ id: 's', title: 'Old thing' }), 9)]} />)
     expect(screen.getByRole('button', { name: /Delete "Old thing"/ })).toBeInTheDocument()
+  })
+})
+
+// Friends-and-family walk, 2026-10-08: "Close the day" saved and dismissed,
+// back to an unchanged Today — no "saved", no lasting status, no next step.
+describe('ReviewDrawer — closing the day says what happened', () => {
+  it('confirms the save, says truthfully what closing changed, and offers a next step', async () => {
+    const r = reflection({ highlight: 'Bike ride' })
+    const onClose = vi.fn(); const onLookAtTomorrow = vi.fn()
+    const { user } = render(<ReviewDrawer {...base} mode="evening" reflection={r} onClose={onClose} onLookAtTomorrow={onLookAtTomorrow} />)
+    await user.click(screen.getByRole('button', { name: 'Close the day' }))
+    expect(r.closeDay).toHaveBeenCalledOnce()
+    const status = await screen.findByRole('status')
+    expect(status).toHaveTextContent('Your reflection is saved.')
+    expect(status).toHaveTextContent('Today now shows as reviewed. Anything you moved or ticked off was saved as you went; the rest stays where it was.')
+    // It does not dismiss itself: the next step is the person's choice.
+    expect(onClose).not.toHaveBeenCalled()
+    expect(screen.getByRole('button', { name: 'Done' })).toHaveFocus()
+    await user.click(screen.getByRole('button', { name: /Look at tomorrow/ }))
+    expect(onLookAtTomorrow).toHaveBeenCalledOnce()
+    await user.click(screen.getByRole('button', { name: 'Done' }))
+    expect(onClose).toHaveBeenCalledOnce()
+  })
+
+  it('a blank reflection still closes the day, without claiming a reflection was saved', async () => {
+    const { user } = render(<ReviewDrawer {...base} mode="evening" />)
+    await user.click(screen.getByRole('button', { name: 'Close the day' }))
+    const status = await screen.findByRole('status')
+    expect(status).toHaveTextContent('Today is closed.')
+    expect(status).not.toHaveTextContent('reflection is saved')
+  })
+
+  it('a failed save keeps the review open and says so', async () => {
+    const r = reflection({ closeDay: vi.fn().mockResolvedValue(false) })
+    const onClose = vi.fn()
+    const { user } = render(<ReviewDrawer {...base} mode="evening" reflection={r} onClose={onClose} />)
+    await user.click(screen.getByRole('button', { name: 'Close the day' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('Couldn’t save the review')
+    expect(screen.queryByRole('status')).not.toBeInTheDocument()
+    expect(onClose).not.toHaveBeenCalled()
+  })
+
+  it('the morning review still just starts the day', async () => {
+    const r = reflection(); const onClose = vi.fn()
+    const { user } = render(<ReviewDrawer {...base} mode="morning" reflection={r} onClose={onClose} />)
+    await user.click(screen.getByRole('button', { name: 'Start the day' }))
+    expect(onClose).toHaveBeenCalledOnce()
+    expect(r.closeDay).not.toHaveBeenCalled()
   })
 })
 

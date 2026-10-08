@@ -67,6 +67,7 @@ import { SeasonBand } from './PeriodShape'
 import { LineCard } from './LineCard'
 import { useHiddenAfterAdd } from '@/hooks/useHiddenAfterAdd'
 import { ActiveViewLine } from '@/components/common/ViewFilterNotice'
+import { PlanPurpose, SavedToNote, emptyPrompt, purposeLine, type Onward } from './PlanPurpose'
 
 type Level = 'month' | 'season'
 const NOUN: Record<Level, string> = { month: 'Month', season: 'Season' }
@@ -338,12 +339,15 @@ function Inner({ level }: { level: Level }) {
   const addArea = useAddArea()
   // A line the people or area filter hides says so, beside the add row.
   const afterAdd = useHiddenAfterAdd(members)
+  // "Saved to Fall": the add field says the line is stored (2026-10-08).
+  const [savedTo, setSavedTo] = useState<null | { to: string; title: string }>(null)
   const addLine = async (title: string) => {
     const id = await addTask(title, undefined, undefined, undefined, {
       bucket: level === 'month' ? 'month' : 'quarter', ...periodPatch(bounds), context: addArea.area,
     })
-    // Written unassigned, in the add row's area: the same facts the insert carries.
-    if (id) afterAdd.report({ context: addArea.area ?? null }, name)
+    // A line the filters hide gets the filter notice (which names where it
+    // was saved); otherwise the quiet "Saved to …" line.
+    if (id) { afterAdd.report({ context: addArea.area ?? null }, name); setSavedTo({ to: name, title }) }
   }
   // Arriving from the level above's "Choose what … takes on", the page opens
   // ready to write: the cursor in "Add to …", not another button to press
@@ -431,8 +435,7 @@ function Inner({ level }: { level: Level }) {
       {tasksLoadFailed && <LoadFailedNotice variant="inline" className="pv2-hint" buttonClassName="pv2-link"
         title="Your plan didn’t load." onRetry={() => { void refetchTasks() }} />}
       {!loading && !tasksLoadFailed && !main.length && <p className="pv2-hint ds-empty-body">{inMeeting ? 'Nothing yet. Write whatever comes up — no types, no dates needed.'
-        : level === 'season' ? `Nothing on ${name}’s list yet. Write everything you’d like ${name} to hold — no types, no dates.`
-        : `Nothing on ${name}’s list yet. Add a line below.`}</p>}
+        : emptyPrompt(level, name)}</p>}
       {level === 'season' ? (
         // The season's brainstorm, as a board of large lines (2026-10-04);
         // under each, what the months wrote for it.
@@ -449,7 +452,9 @@ function Inner({ level }: { level: Level }) {
         <input ref={addRef} value={draft} onChange={(e) => setDraft(e.target.value)} placeholder={`Add to ${name}`} aria-label={`Add to ${name}`} />
         {addArea.picker}
       </form>
-      {afterAdd.notice && <div className="mb-2">{afterAdd.notice}</div>}
+      {afterAdd.notice
+        ? <div className="mb-2">{afterAdd.notice}</div>
+        : <SavedToNote saved={savedTo?.to === name ? savedTo : null} />}
       {section(`Carried to ${nextName}`, carried)}
       {section('Someday', someday)}
       {dropped.length > 0 && <>
@@ -498,6 +503,11 @@ function Inner({ level }: { level: Level }) {
   }
   // Desktop: the control row folds into the masthead; a meeting keeps its bar.
   const folded = !mobile && !inMeeting
+  // Where this list leads (2026-10-08): a season to its month, a month to its
+  // week. The just-saved line already offers it, so it waits until that goes.
+  const onward: Onward | null = justSaved ? null : level === 'season'
+    ? { label: `choose a few things for ${monthName(isCurrent ? today : bounds.start)}`, to: nextStep.to, view: 'month' }
+    : { label: nextStep.to === `/week?start=${thisWeekYmd}` ? 'choose this week’s steps' : `choose steps for ${nextStep.label.replace(/^Plan /, '')}`, to: nextStep.to, view: 'week' }
 
   // Side-by-side columns scroll on their own, as on Week (layout system §8);
   // the ref follows whichever grid is on screen.
@@ -546,6 +556,9 @@ function Inner({ level }: { level: Level }) {
           onStep={(step) => setMeeting({ ...meeting!, step })}
           onLeave={() => void endMeeting(false)} onSave={() => void endMeeting(true)} saveLabel={`Mark ${name} planned`} />
       ) : folded ? <><GuideAnchor /><PlanSavedLine period={name} justSaved={toolbar.justSaved} /></> : <PlanToolbar {...toolbar} />}
+      {!inMeeting && !guidedReview && (
+        <PlanPurpose text={purposeLine(level, name, { isCurrent, above: level === 'month' ? aboveName : undefined })} onward={onward} />
+      )}
 
       {level === 'season' && meeting?.step !== 1 && !guidedReview && (
         // The season's shape: its months, today, its landmarks.
