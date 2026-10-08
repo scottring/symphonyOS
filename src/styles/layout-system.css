@@ -730,6 +730,19 @@ p.wk-dayhint { margin: 8px 0 0; }
 .pv2-line-extra { padding-left: 22px; margin-top: 1px; }
 .wk-itself { display: block; margin-top: 2px; font-size: 12px; color: var(--color-review-600); }
 .wk-journal-page { display: flex; flex-direction: column; gap: 28px; }
+/* Wide screens: the journal and the days side by side, each scrolling on its
+   own to the landscape (--pv2-col-h, useColumnsFitWindow), each a readable
+   width — the journal never under ~26rem; the days take the rest and lay
+   themselves out by their own width. Narrower: one page, journal first. */
+@media (min-width: 1100px) {
+  .wk-journal-page.is-colscroll { display: grid; grid-template-columns: minmax(26rem, 0.95fr) minmax(0, 1.05fr); gap: 0 40px; align-items: stretch; }
+  .wk-journal-page.is-colscroll > :is(.wk-journal-col, .wk-journal-days) {
+    position: relative; min-width: 0; max-height: var(--pv2-col-h, none); overflow-y: auto; scrollbar-width: thin; overscroll-behavior: contain;
+    margin: 0 -14px 0 -22px; padding: 0 14px 0 22px;
+  }
+  .pv2-page:has(.wk-journal-page.is-colscroll), .pv2-week:has(.wk-journal-page.is-colscroll) { padding-bottom: 0; }
+}
+:is(.wk-journal-col, .wk-journal-days, .pv2-journalgrid > .pv2-dropcol):focus-visible { outline: 2px solid var(--color-primary-400); outline-offset: 2px; border-radius: 8px; }
 /* A line's words wrap, a long unbroken one too, in the lists and in an open
    line's fold — never running under the row's controls (2026-10-08 review:
    a 466px token in a 147px box on a phone). */

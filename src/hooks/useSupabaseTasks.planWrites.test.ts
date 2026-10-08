@@ -5,6 +5,8 @@ import { localYmd } from '@/lib/cadence/config'
 import type { Task } from '@/types/task'
 import { applySession, type SessionWriters } from '@/lib/planning/applySession'
 import { emptyDraft, lookBackRows, summarize, type SessionDraft } from '@/lib/planning/session'
+import { saveRows, type PlanRow, type SaveResult } from '@/lib/voiceOnboarding/savePlan'
+import { appWriters } from '@/lib/voiceOnboarding/appWriters'
 
 // Planning writes must report what actually happened (guided planning, phase 1).
 // The harness is the one in useSupabaseTasks.oneRow.test.ts, grown into a small
@@ -1226,5 +1228,50 @@ describe('goal conversion and its Undo preserve the row', () => {
     await act(async () => { await h.result.current.setGoal('t1', true) })
     expect(db.writeLog()).toEqual([])
     expect(db.rows('tasks').find((r) => r.id === 't1')!.is_goal).toBe(false)
+  })
+})
+
+// Guided planning's "for today" (2026-10-08 review): addTask's own plannedOn
+// writes the focus row best-effort — it returns the id even when that write
+// failed — so the onboarding save creates the task, then chooses it for today
+// through updateTask and checks that. A failed choice is reported and retried
+// by itself, against the same row.
+describe('guided planning: a new task chosen for today', () => {
+  const week = new Date(2026, 9, 3)
+  const today = new Date(2026, 9, 8)
+  const periods = { year: 2026, seasonStart: '2026-09-01', monthStart: '2026-10-01', weekStart: '2026-10-03', today: '2026-10-08' }
+  const id = '33333333-3333-4333-8333-333333333333'
+  const rows: PlanRow[] = [
+    { id, level: 'week', title: 'Measure the corner', context: 'personal' },
+    { id: `today:${id}`, level: 'today', title: 'Measure the corner', existingId: id, after: id, context: 'personal' },
+  ]
+  const writersFor = (h: () => ReturnType<typeof useSupabaseTasks>) =>
+    appWriters(async () => null, (...a) => h().addTask(...a), (tid, u) => h().updateTask(tid, u))
+
+  it('addTask’s own plannedOn returns the id even though the focus write failed (why it is not used)', async () => {
+    const { result } = await mountWith([])
+    db.failOnce('task_focus', 'upsert', { message: 'boom', code: 'XX000' })
+    let made: string | undefined
+    await act(async () => { made = await result.current.addTask('X', undefined, undefined, undefined, { id, bucket: 'week', weekStart: week, plannedOn: today }) })
+    expect(made).toBe(id)
+    expect(db.rows('task_focus').filter((f) => f.task_id === id)).toHaveLength(0)
+  })
+
+  it('a failed today choice is reported; the retry chooses it without writing the task again', async () => {
+    const hook = await mountWith([])
+    const w = writersFor(() => hook.result.current)
+    db.failOnce('task_focus', 'upsert', { message: 'boom', code: 'XX000' })
+    let first: SaveResult | undefined
+    await act(async () => { first = await saveRows(rows, w, [], periods) })
+    expect(first!.saved).toEqual([id])
+    expect(first!.failed).toEqual([expect.objectContaining({ id: `today:${id}`, level: 'today', reason: 'write_failed' })])
+    expect(db.rows('task_focus').filter((f) => f.task_id === id)).toHaveLength(0)
+
+    let second: SaveResult | undefined
+    await act(async () => { second = await saveRows(rows, w, first!.saved, periods) })
+    expect(second!.ok).toBe(true)
+    expect(db.insertedIds('tasks').filter((x) => x === id)).toHaveLength(1)       // never a second row
+    expect(db.rows('task_focus').filter((f) => f.task_id === id)).toEqual([expect.objectContaining({ date: '2026-10-08' })])
+    expect(db.rows('task_commitments').find((c) => c.task_id === id && c.level === 'week')).toMatchObject({ period_start: '2026-10-03', status: 'open' })
   })
 })

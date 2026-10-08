@@ -88,16 +88,16 @@ describe('Week · Open journal — mapping and filtering', () => {
     expect(within(section(/^For October: Clear out the shed/)).getByRole('button', { name: 'when: Call the plumber' })).toBeInTheDocument()
   })
 
-  it('the view switch is this device’s choice only; arriving without it opens Lists', () => {
+  it('Open journal is the default; choosing Lists is this device’s choice and is kept', () => {
     const { unmount } = render(ui(FIXTURE, null))
-    expect(screen.queryByRole('region', { name: /This week, by October priority/ })).toBeNull()
-    fireEvent.click(screen.getByRole('button', { name: 'Open journal' }))
     expect(screen.getByRole('region', { name: /This week, by October priority/ })).toBeInTheDocument()
-    expect(localStorage.getItem('symphony-plan-layout.week')).toBe('journal')
+    fireEvent.click(screen.getByRole('button', { name: 'Lists' }))
+    expect(screen.queryByRole('region', { name: /This week, by October priority/ })).toBeNull()
+    expect(localStorage.getItem('symphony-plan-layout.week')).toBe('lists')
     expect(Object.keys(localStorage).filter((k) => !k.startsWith('symphony-plan-layout.') && k !== 'symphony-week-ref')).toEqual([])
     unmount()
     render(ui(FIXTURE, null))
-    expect(screen.getByRole('region', { name: /This week, by October priority/ })).toBeInTheDocument()
+    expect(screen.queryByRole('region', { name: /This week, by October priority/ })).toBeNull() // Lists, as chosen
   })
 })
 

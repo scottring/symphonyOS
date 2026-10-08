@@ -44,6 +44,11 @@ vi.mock('@/hooks/useGuidedPlan', () => ({ useGuidedPlan: () => guide }))
 import { PlanPageV2 } from './PlanPageV2'
 import { DomainProvider } from '@/hooks/useDomain'
 
+// These tests cover the Lists view; Open journal is the default since
+// 2026-10-08, so they make the device's choice explicit.
+beforeEach(() => { localStorage.setItem('symphony-plan-layout.week', 'lists'); localStorage.setItem('symphony-plan-layout.month', 'lists') })
+
+
 const line = (id: string, title: string, o: Record<string, unknown>) => ({ id, title, completed: false, createdAt: new Date(2026, 8, 1), updatedAt: new Date(2026, 8, 1), ...o })
 const fall = new Date(2026, 8, 1)
 const oct = new Date(2026, 9, 1)
