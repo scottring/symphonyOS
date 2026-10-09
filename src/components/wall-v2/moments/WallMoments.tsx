@@ -182,7 +182,7 @@ function NextMeal({ meal }: { meal: NonNullable<WallMomentsProps['nextMeal']> })
   )
 }
 
-function DinnerCard({ d }: { d: MomentDinner }) {
+export function WallDinnerPreparation({ d }: { d: MomentDinner }) {
   return (
     <>
       <div className="relative h-[34%] min-h-[220px] overflow-hidden rounded-[18px]">
@@ -237,10 +237,10 @@ function DinnerCard({ d }: { d: MomentDinner }) {
   )
 }
 
-function Center(p: WallMomentsProps & { t: ReturnType<typeof useTint> }) {
+export function WallMomentContent(p: WallMomentsProps & { t: ReturnType<typeof useTint> }) {
   const { moment, t } = p
   if (moment === 'dinner' && p.dinner) {
-    return <><h2 className={h2} style={{ fontSize: '2.7rem' }}>Dinner tonight</h2><DinnerCard d={p.dinner} /></>
+    return <><h2 className={h2} style={{ fontSize: '2.7rem' }}>Dinner tonight</h2><WallDinnerPreparation d={p.dinner} /></>
   }
   if (moment === 'evening') {
     return (
@@ -342,7 +342,7 @@ export function WallMoments(p: WallMomentsProps) {
         <TodayColumn rows={p.today} specials={todaySpecials} kids={p.kids} t={t} onTapRow={p.onTapRow} />
 
         <section aria-label="Now" className={`${card} flex min-h-0 flex-col gap-4 overflow-hidden px-8 py-6`}>
-          <Center {...p} t={t} />
+          <WallMomentContent {...p} t={t} />
         </section>
 
         <div className="flex min-h-0 flex-col gap-5">

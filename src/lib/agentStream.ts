@@ -1,8 +1,10 @@
+import type { WorkspaceContext } from '@/lib/workspace/context'
 import { supabase } from '@/lib/supabase'
 
 export interface AgentSourceNote { id: string; title: string; vaultPath?: string }
 
 export type AgentStreamEvent =
+  | { type: 'workspace'; page: string; date?: string }
   | { type: 'session'; sessionId: string }
   | { type: 'text'; text: string }
   | { type: 'tool'; name: string }
@@ -70,6 +72,8 @@ export interface AssistantSessionContext {
 }
 
 export interface StreamHandlers {
+  onWorkspace?: (page:string,date?:string)=>void
+  workspaceContext?: WorkspaceContext
   onText?: (text: string) => void
   onTool?: (name: string) => void
   onSession?: (sessionId: string) => void
@@ -122,6 +126,7 @@ export async function streamSymphonyAgent(
       },
       body: JSON.stringify({
         messages,
+        ...(handlers.workspaceContext ? { workspaceContext: handlers.workspaceContext } : {}),
         ...(handlers.attachment ? { attachment: handlers.attachment } : {}),
         ...(handlers.currentMemberId ? { currentMemberId: handlers.currentMemberId } : {}),
         ...(handlers.taskContext ? { taskContext: handlers.taskContext } : {}),
@@ -146,7 +151,8 @@ export async function streamSymphonyAgent(
     const { events, rest } = parseSSEChunk(buffer)
     buffer = rest
     for (const ev of events) {
-      if (ev.type === 'text') handlers.onText?.(ev.text)
+      if (ev.type === 'workspace') handlers.onWorkspace?.(ev.page,ev.date)
+      else if (ev.type === 'text') handlers.onText?.(ev.text)
       else if (ev.type === 'tool') handlers.onTool?.(ev.name)
       else if (ev.type === 'session') handlers.onSession?.(ev.sessionId)
       else if (ev.type === 'done') handlers.onDone?.(ev.reply, ev.sessionId, ev.sources)

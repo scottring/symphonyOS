@@ -1,4 +1,4 @@
-export type Node={id:string;parent:string|null;level:number;text:string;color:string}
+export type Node={id:string;parent:string|null;level:number;text:string;color:string;date?:string|null;done?:boolean}
 export const initial:Node[]=[
 {id:'family',parent:null,level:0,text:'Make time together',color:'#ca8469'},
 {id:'health',parent:null,level:0,text:'Feel stronger',color:'#729877'},
@@ -13,10 +13,11 @@ export const initial:Node[]=[
 {id:'dinner',parent:'evenings',level:2,text:'Choose an evening to cook together',color:'#ca8469'},
 {id:'setup',parent:'rhythm',level:2,text:'Get my training setup ready',color:'#729877'},
 {id:'conversations',parent:'chapter',level:2,text:'Have two conversations',color:'#758fa8'},
-{id:'date',parent:'picnic',level:3,text:'Choose a picnic day',color:'#ca8469'},
+{id:'date',parent:'picnic',level:3,text:'Get ready for the family picnic',color:'#ca8469'},
 {id:'place',parent:'picnic',level:3,text:'Choose a picnic spot',color:'#ca8469'},
 {id:'film',parent:'movies',level:3,text:'Ask everyone for a film choice',color:'#ca8469'},
 {id:'fixtures',parent:'baseball',level:3,text:'Check the home-game schedule',color:'#ca8469'},
+{id:'packing',parent:'date',level:4,text:'Write the picnic packing list',color:'#ca8469'},
 {id:'weather',parent:'date',level:4,text:'Check the weekend weather',color:'#ca8469'}]
 export function add(nodes:Node[],node:Node):Node[]{
  if(nodes.some(n=>n.id===node.id)||!node.text.trim()||node.level<0||node.level>4)return nodes
@@ -26,3 +27,12 @@ export function add(nodes:Node[],node:Node):Node[]{
  return [...nodes,{...node,text:node.text.trim(),color:parent?.color||node.color}]
 }
 export function descendants(nodes:Node[],id:string):Node[]{return nodes.filter(n=>n.parent===id).flatMap(n=>[n,...descendants(nodes,n.id)])}
+export const terms=['Intention','Goal','Milestone','Action','Task']
+export const sampleDays=['2026-10-12','2026-10-13','2026-10-14']
+export function schedule(nodes:Node[],id:string,date:string|null):Node[]{
+ if(date!==null&&!sampleDays.includes(date))return nodes
+ return nodes.map(n=>n.id===id&&n.level>=3?{...n,date}:n)
+}
+export function complete(nodes:Node[],id:string):Node[]{
+ return nodes.map(n=>n.id===id&&n.level>=3?{...n,done:!n.done}:n)
+}

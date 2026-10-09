@@ -92,6 +92,8 @@ export function useGoals() {
   /** Only the default for a goal created without an explicit year. */
   const currentYear = new Date().getFullYear()
 
+  const [revision,setRevision] = useState(0)
+  useEffect(()=>{const refresh=()=>setRevision(v=>v+1);window.addEventListener('symphony-plan-updated',refresh);return ()=>window.removeEventListener('symphony-plan-updated',refresh)},[])
   const [areas, setAreas] = useState<GoalArea[]>([])
   const [goals, setGoals] = useState<Goal[]>([])
   const [allActions, setAllActions] = useState<GoalAction[]>([])
@@ -154,7 +156,7 @@ export function useGoals() {
     }
 
     fetchAll()
-  }, [user])
+  }, [user, revision])
 
   // Rebuild goals when allActions/allMilestones changes (to keep in sync)
   const goalsWithData = useMemo(() => {

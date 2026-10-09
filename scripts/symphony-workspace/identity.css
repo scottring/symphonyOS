@@ -1,0 +1,42 @@
+@import url('https://fonts.googleapis.com/css2?family=Marcellus&display=swap');
+/* Identity only: layout, spacing, hierarchy and responsive behavior stay in style.css. */
+:root{font-family:var(--font-family-sans);color:var(--color-neutral-900);background:var(--color-bg-base)}
+.app{background:var(--color-bg-base)}
+h1,h2,h3{font-family:var(--font-family-display);color:var(--color-neutral-900)}
+.brand{font-family:var(--font-family-brand);color:var(--color-neutral-900)}.brand img{object-fit:contain}
+header,.section-bar,.event,.task,.paired,.checkpoint,footer,.search,.grocery,.detail-body details{border-color:var(--color-neutral-200)}
+button,input,textarea{border-color:var(--color-neutral-300)}
+button:hover{background:var(--color-primary-100)}
+button:focus-visible,input:focus-visible,textarea:focus-visible,summary:focus-visible{outline-color:var(--color-primary-600)}
+small,.eyebrow,.intro,.breadcrumb,.muted,.time,.prototype,.section-bar>span,.week-choices>p:not(.eyebrow),.task-open small,.checkpoint p,footer>span,.day details{color:var(--color-neutral-500)}
+input,textarea,.reply{background:var(--color-bg-elevated)}
+.companion,.device-phone .companion,.week-choices,.routine-card{background:var(--color-bg-elevated);border-color:var(--color-neutral-200)}
+nav [aria-current],.pane-tabs [aria-pressed=true],.metadata span,.horizons [aria-pressed=true]{background:var(--color-primary-100);color:var(--color-primary-700)}
+.primary,.prototype [aria-pressed=true]{background:var(--color-primary-600);border-color:var(--color-primary-600);color:white}
+.primary:hover{background:var(--color-primary-700)}
+.check{border-color:var(--color-primary-300)}
+.grocery input{accent-color:var(--color-primary-600)}
+.meal,.recipe-tile,footer button,.empty,.loading div,.horizons button{background:var(--color-primary-50)}
+.meal p,.meal small,.empty svg{color:var(--color-neutral-600)}
+.area span{color:var(--color-primary-500)}
+.plan-card{background:color-mix(in srgb,var(--color-primary-200) 38%,var(--color-bg-elevated))}
+.plan-card.tint-1{background:color-mix(in srgb,var(--color-primary-100) 65%,var(--color-bg-elevated))}
+.plan-card.tint-2{background:var(--color-bg-elevated);border:1px solid var(--color-primary-200)}
+.orbit{border-color:var(--color-primary-200)}.orbit i:first-child,.orbit i:last-child,.tint-1 .orbit i,.tint-2 .orbit i{background:var(--color-primary-400)}
+.paired>div:first-child{border-left-color:var(--color-primary-300)}
+.breathing{color:var(--color-neutral-400)}.breathing span{background:var(--color-neutral-200)}
+.notice{background:var(--color-warning-50);color:var(--color-neutral-700)}
+.cook{background:var(--color-bg-base)}
+@media(max-width:700px){.companion,.pane-tabs{background:var(--color-bg-elevated)}}
+/* Existing artwork follows the content in normal flow: no obscured controls. */
+.place-landscape{position:relative;height:clamp(100px,16vw,240px);overflow:hidden;pointer-events:none;margin:22px 0 0;width:100%;opacity:.65}
+.place-landscape img{position:absolute;bottom:0;left:0;width:100%;height:auto;display:block}
+.device-kiosk .place-landscape{height:clamp(150px,20vw,300px);opacity:.85}
+.device-phone .place-landscape{height:95px;opacity:.5;margin-left:auto;margin-right:auto}
+.prototype{flex-wrap:wrap}.prototype>div{flex-wrap:wrap}
+@media(max-width:700px){.place-landscape,.device-kiosk .place-landscape{height:95px;opacity:.5;margin-left:auto;margin-right:auto}}
+
+.device-phone .place-landscape{max-width:410px}
+/* The scenery is a screen-wide footer, outside the constrained workspace. */
+.app{min-height:0}
+.place-landscape{height:clamp(140px,25vw,420px);mask-image:linear-gradient(to bottom,transparent,#000 18%)}

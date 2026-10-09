@@ -1,3 +1,4 @@
+import { AlongsideDay } from '@/components/plan/constellation/AlongsideDay';
 // src/apps/tasks/HomeViewContainer.tsx
 //
 // During P4 the legacy /today path keeps using App.tsx -> ViewRouter -> HomeView
@@ -895,6 +896,7 @@ export function HomeViewContainer({ fixedView }: { fixedView?: 'today' | 'week' 
         </div>
       )}
 
+      <AlongsideDayBridge onSelect={id=>handleSelectItem(`task-${id}`)} enabled={searchParams.get('view') === 'alongside'} tasks={tasks} date={viewedDate} update={gated.updateTask} loading={tasksLoading} error={tasksLoadFailed} retry={retryTasks} weekView={fixedView === 'week'}>
       <HomeView
         registerUndo={undo.pushAction}
         // The week reminder is Today's, below its schedule (2026-09-22): a
@@ -926,6 +928,7 @@ export function HomeViewContainer({ fixedView }: { fixedView?: 'today' | 'week' 
         onDateChange={changeViewedDate}
         fixedView={fixedView}
       />
+      </AlongsideDayBridge>
 
       {/* Plan from paper: a real page goes through the conversational review
           (PaperPlanFlow); the bundled sample keeps the quick week-page sheet. */}
@@ -959,3 +962,5 @@ export function HomeViewContainer({ fixedView }: { fixedView?: 'today' | 'week' 
     </ScheduleActionsProvider>
   );
 }
+
+function AlongsideDayBridge({enabled,...props}: React.ComponentProps<typeof AlongsideDay> & {enabled:boolean}) { return enabled ? <AlongsideDay {...props}/> : <>{props.children}</> }

@@ -1,25 +1,27 @@
+import { useId } from 'react'
 /** Densely Urban — steel towers, an elevated train, streetlight amber.
  *  Flat-vector medallion in the place-theme style. Decorative. */
 export function DenselyUrbanVignette({ className = '' }: { className?: string }) {
+  const instance = useId()
   return (
     <svg viewBox="0 0 200 200" className={className} role="img"
       aria-label="A dense city with towers and an elevated train" xmlns="http://www.w3.org/2000/svg">
       <defs>
-        <clipPath id="du-clip"><circle cx="100" cy="100" r="96" /></clipPath>
-        <pattern id="du-win-lt" width="7" height="9" patternUnits="userSpaceOnUse">
+        <clipPath id={`${instance}-du-clip`}><circle cx="100" cy="100" r="96" /></clipPath>
+        <pattern id={`${instance}-du-win-lt`} width="7" height="9" patternUnits="userSpaceOnUse">
           <rect width="7" height="9" fill="hsl(216 22% 70%)" />
           <rect x="1.5" y="2" width="3" height="4" fill="hsl(214 30% 82%)" />
         </pattern>
-        <pattern id="du-win-md" width="8" height="10" patternUnits="userSpaceOnUse">
+        <pattern id={`${instance}-du-win-md`} width="8" height="10" patternUnits="userSpaceOnUse">
           <rect width="8" height="10" fill="hsl(217 26% 52%)" />
           <rect x="2" y="2.5" width="3.5" height="4.5" fill="hsl(212 35% 78%)" />
         </pattern>
-        <pattern id="du-win-dk" width="9" height="11" patternUnits="userSpaceOnUse">
+        <pattern id={`${instance}-du-win-dk`} width="9" height="11" patternUnits="userSpaceOnUse">
           <rect width="9" height="11" fill="hsl(219 32% 32%)" />
           <rect x="2" y="2.5" width="4" height="5" fill="hsl(45 80% 72%)" opacity="0.9" />
         </pattern>
       </defs>
-      <g clipPath="url(#du-clip)">
+      <g clipPath={`url(#${instance}-du-clip)`}>
         {/* sky */}
         <rect width="200" height="200" fill="hsl(213 35% 88%)" />
         {/* far skyline */}
@@ -35,28 +37,28 @@ export function DenselyUrbanVignette({ className = '' }: { className?: string })
         </g>
         {/* mid towers with windows */}
         <g>
-          <rect x="16" y="64" width="24" height="72" fill="url(#du-win-md)" />
+          <rect x="16" y="64" width="24" height="72" fill={`url(#${instance}-du-win-md)`} />
           <rect x="16" y="60" width="24" height="5" fill="hsl(217 26% 46%)" />
-          <rect x="46" y="50" width="28" height="86" fill="url(#du-win-md)" />
+          <rect x="46" y="50" width="28" height="86" fill={`url(#${instance}-du-win-md)`} />
           <rect x="46" y="46" width="28" height="5" fill="hsl(217 26% 46%)" />
           <rect x="58" y="38" width="4" height="9" fill="hsl(217 26% 46%)" />
-          <rect x="132" y="56" width="26" height="80" fill="url(#du-win-md)" />
+          <rect x="132" y="56" width="26" height="80" fill={`url(#${instance}-du-win-md)`} />
           <rect x="132" y="52" width="26" height="5" fill="hsl(217 26% 46%)" />
-          <rect x="164" y="66" width="24" height="70" fill="url(#du-win-md)" />
+          <rect x="164" y="66" width="24" height="70" fill={`url(#${instance}-du-win-md)`} />
           <rect x="164" y="62" width="24" height="5" fill="hsl(217 26% 46%)" />
-          <rect x="84" y="42" width="34" height="94" fill="url(#du-win-lt)" />
+          <rect x="84" y="42" width="34" height="94" fill={`url(#${instance}-du-win-lt)`} />
           <rect x="84" y="38" width="34" height="5" fill="hsl(216 22% 62%)" />
           <rect x="98" y="28" width="5" height="11" fill="hsl(216 22% 62%)" />
         </g>
         {/* foreground blocks, lit windows */}
         <g>
-          <rect x="2" y="88" width="30" height="52" fill="url(#du-win-dk)" />
+          <rect x="2" y="88" width="30" height="52" fill={`url(#${instance}-du-win-dk)`} />
           <rect x="2" y="84" width="30" height="5" fill="hsl(219 34% 24%)" />
-          <rect x="120" y="92" width="34" height="48" fill="url(#du-win-dk)" />
+          <rect x="120" y="92" width="34" height="48" fill={`url(#${instance}-du-win-dk)`} />
           <rect x="120" y="88" width="34" height="5" fill="hsl(219 34% 24%)" />
-          <rect x="160" y="98" width="38" height="42" fill="url(#du-win-dk)" />
+          <rect x="160" y="98" width="38" height="42" fill={`url(#${instance}-du-win-dk)`} />
           <rect x="160" y="94" width="38" height="5" fill="hsl(219 34% 24%)" />
-          <rect x="40" y="96" width="42" height="44" fill="url(#du-win-dk)" />
+          <rect x="40" y="96" width="42" height="44" fill={`url(#${instance}-du-win-dk)`} />
           <rect x="40" y="92" width="42" height="5" fill="hsl(219 34% 24%)" />
         </g>
         {/* elevated rail */}

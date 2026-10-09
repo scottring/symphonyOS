@@ -12,6 +12,8 @@
 // design-payload mock. The design payload now lives only in the dev-only
 // `/wall-design` preview (see `wallV2Mock.ts`).
 
+import { useLocation } from 'react-router-dom';
+import { ConnectedWall } from './moments/ConnectedWall';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Sun, Plus, ClipboardList, Settings, Phone, ChefHat, ShoppingCart } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
@@ -189,6 +191,9 @@ function useMealCardData(event: CalendarEvent | null, fallbackName: string) {
 }
 
 export function WallV2Shell() {
+  const location = useLocation();
+  const workspaceView = new URLSearchParams(location.search).get('view') === 'workspace';
+  const WallSurface = workspaceView ? ConnectedWall : WallMoments;
   const { user, loading: authLoading } = useAuth();
 
   // The chromeless Pi kiosk can't reload itself to pick up a new deploy, so a
@@ -869,12 +874,12 @@ export function WallV2Shell() {
 
   return (
     <div className={`${isDark ? 'dark ' : ''}wall-touch-root relative h-screen w-screen overflow-hidden transition-colors ${WALL.root}`}>
-      <img
+      {!workspaceView && <img
         src="/wall/treeline.svg"
         alt=""
         aria-hidden
         className="absolute top-0 right-0 w-[340px] h-[110px] opacity-30 dark:opacity-15 pointer-events-none"
-      />
+      />}
       {/* flex column so the stale banner can claim height without the fixed grid
           clipping — the grid below simply shrinks when the banner appears. */}
       <div className="h-full w-full p-4 flex flex-col">
@@ -890,7 +895,8 @@ export function WallV2Shell() {
       {/* The wall, by time of day (Scott, 2026-10-04): Today · the moment ·
           specials and coming up · the question and the kids' lists. */}
       <div className="flex-1 min-h-0 -m-4 mt-0">
-        <WallMoments
+        <WallSurface
+          isDark={isDark}
           moment={moment}
           dateLabel={now.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
           clock={clock}

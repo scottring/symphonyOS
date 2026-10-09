@@ -19,6 +19,8 @@ export type SidePane = 'details' | 'ai';
 interface SlotValue {
   /** A SideColumn is mounted above (desktop Shell). */
   hosted: boolean;
+  /** Whether the shared companion currently occupies desktop space. */
+  open?: boolean;
   /** Where the detail panel draws on desktop; null on phones/tests. */
   detailsSlot: HTMLElement | null;
   /** False while the AI pane covers Details — Escape must not close it. */
@@ -59,7 +61,7 @@ export function SideColumn({ hasSelection, aiOpen, pane, onPaneChange, onCloseDe
   const showAi = front === 'ai';
 
   return (
-    <SideColumnSlotContext.Provider value={{ hosted: true, detailsSlot: slot, detailsVisible: open && !showAi }}>
+    <SideColumnSlotContext.Provider value={{ hosted: true, open, detailsSlot: slot, detailsVisible: open && !showAi }}>
       {children}
       {open && (
         <aside

@@ -1,3 +1,4 @@
+import type { WorkspaceContext } from '@/lib/workspace/context'
 import { useState, useCallback, useEffect, useRef } from 'react'
 import { supabase, getAuthUser } from '@/lib/supabase'
 import type { AgentApiMessage, AssistantTaskContext, AgentSourceNote } from '@/lib/agentStream'
@@ -9,6 +10,8 @@ import { useFamilyMembers } from '@/hooks/useFamilyMembers'
 const SESSIONS_LIMIT = 20
 
 export interface UseSymphonyAssistantOptions {
+  onWorkspace?: (page:string,date?:string)=>void
+  workspaceContext?: WorkspaceContext
   /** Called after a turn in which the agent wrote data, so the caller can
    *  refetch (the task list is not realtime for external writes). */
   onMutate?: () => void
@@ -54,9 +57,10 @@ function hydrateMessages(raw: unknown, sessionId: string): ChatMessage[] {
  * chat_sessions so conversations survive reloads (history dropdown).
  */
 export function useSymphonyAssistant(options?: UseSymphonyAssistantOptions) {
-  const { onMutate, taskContext, persistKey, persistEntityId } = options ?? {}
+  const { onWorkspace, onMutate, taskContext, workspaceContext, persistKey, persistEntityId } = options ?? {}
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [loading, setLoading] = useState(false)
+  const sending = useRef(false)
   const [error, setError] = useState<string | null>(null)
   const [toolActivity, setToolActivity] = useState<string[]>([])
   const [sessions, setSessions] = useState<ChatSession[]>([])
@@ -110,10 +114,11 @@ export function useSymphonyAssistant(options?: UseSymphonyAssistantOptions) {
       const stored = serializeMessages(finalMessages)
       if (stored.length === 0) return
       if (sessionIdRef.current) {
-        await supabase
+        const { error: saveError } = await supabase
           .from('chat_sessions')
           .update({ messages: stored, updated_at: new Date().toISOString() })
           .eq('id', sessionIdRef.current)
+        if (saveError) throw saveError
         setSessions((prev) => prev.map((s) =>
           s.id === sessionIdRef.current
             ? { ...s, messages: finalMessages, updatedAt: new Date() }
@@ -122,11 +127,12 @@ export function useSymphonyAssistant(options?: UseSymphonyAssistantOptions) {
         const { data: { user } } = await getAuthUser()
         if (!user) return
         const title = stored.find((m) => m.role === 'user')?.content.slice(0, 80) ?? 'Chat'
-        const { data } = await supabase
+        const { data, error: saveError } = await supabase
           .from('chat_sessions')
           .insert({ user_id: user.id, title, entity_type: persistKey, entity_id: persistEntityId ?? null, mode: 'chat', messages: stored })
           .select()
           .single()
+        if (saveError || !data?.id) throw saveError ?? new Error('Conversation not saved')
         if (data?.id) {
           sessionIdRef.current = data.id
           setActiveSessionId(data.id)
@@ -143,12 +149,13 @@ export function useSymphonyAssistant(options?: UseSymphonyAssistantOptions) {
         }
       }
     } catch {
-      // Persistence is best-effort; the live conversation is unaffected.
+      setError('Your plan changes are separate, but this conversation could not be saved. Keep this page open; your next message will retry saving the conversation.')
     }
   }, [persistKey, persistEntityId])
 
   const sendMessage = useCallback(async (text: string, attachment?: ChatAttachment) => {
-    if ((!text.trim() && !attachment) || loading) return
+    if ((!text.trim() && !attachment) || sending.current) return
+    sending.current = true
 
     // Build the content for this turn: blocks array if there's an attachment, plain string otherwise.
     const content: AgentApiMessage['content'] = attachment
@@ -218,21 +225,25 @@ export function useSymphonyAssistant(options?: UseSymphonyAssistantOptions) {
       attachment: attachmentMeta,
       currentMemberId: getCurrentUserMember()?.id,
       taskContext,
+      workspaceContext,
+      onWorkspace,
     })
 
     const assistantSources: AgentSourceNote[] | undefined = turn.sources
 
     if (turn.didWrite) onMutate?.()
-    setLoading(false)
-
-    void persistTurn([
+    await persistTurn([
       ...messages,
       userMsg,
       { id: assistantId, role: 'assistant', content: turn.text, sources: assistantSources, timestamp: new Date() },
     ])
-  }, [loading, messages, onMutate, taskContext, getCurrentUserMember, persistTurn])
+    setLoading(false)
+    sending.current = false
+    return turn.error ? `The request failed: ${turn.error}. ${turn.text}` : turn.text
+  }, [onWorkspace, workspaceContext, loading, messages, onMutate, taskContext, getCurrentUserMember, persistTurn])
 
   const resetSession = useCallback(() => {
+    if (sending.current) return
     setMessages([])
     setError(null)
     setToolActivity([])
@@ -242,6 +253,7 @@ export function useSymphonyAssistant(options?: UseSymphonyAssistantOptions) {
 
   /** Restore a persisted conversation into the pane. */
   const loadSession = useCallback((session: ChatSession) => {
+    if (sending.current) return
     setMessages(session.messages)
     setError(null)
     setToolActivity([])
@@ -250,6 +262,7 @@ export function useSymphonyAssistant(options?: UseSymphonyAssistantOptions) {
   }, [])
 
   const deleteSession = useCallback(async (id: string) => {
+    if (sending.current) return
     setSessions((prev) => prev.filter((s) => s.id !== id))
     if (sessionIdRef.current === id) resetSession()
     try {

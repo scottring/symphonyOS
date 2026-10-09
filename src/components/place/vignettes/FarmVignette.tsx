@@ -1,13 +1,15 @@
+import { useId } from 'react'
 /** Farm — barn red, wheat gold, rows to the horizon.
  *  Flat-vector medallion in the place-theme style. Decorative. */
 export function FarmVignette({ className = '' }: { className?: string }) {
+  const instance = useId()
   return (
     <svg viewBox="0 0 200 200" className={className} role="img"
       aria-label="A farm with a red barn, silo, windmill, and fields" xmlns="http://www.w3.org/2000/svg">
       <defs>
-        <clipPath id="fm-clip"><circle cx="100" cy="100" r="96" /></clipPath>
+        <clipPath id={`${instance}-fm-clip`}><circle cx="100" cy="100" r="96" /></clipPath>
       </defs>
-      <g clipPath="url(#fm-clip)">
+      <g clipPath={`url(#${instance}-fm-clip)`}>
         {/* sky + clouds */}
         <rect width="200" height="200" fill="hsl(205 60% 83%)" />
         <g fill="hsl(40 30% 97%)">

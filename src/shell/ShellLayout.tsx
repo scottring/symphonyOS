@@ -1,3 +1,14 @@
+import { useCadenceConfig } from '@/lib/cadence/config';
+import { useGoals } from '@/hooks/useGoals';
+import { useAssigneeFilter } from '@/hooks/useAssigneeFilter';
+import { planPeopleLens } from '@/lib/planning/peopleLens';
+import { workspaceContext, workspaceDestination } from '@/lib/workspace/context';
+import { useWorkspaceVoiceAccess } from '@/hooks/useWorkspaceVoiceAccess';
+import { useWorkspaceVoice } from '@/hooks/useWorkspaceVoice';
+import { WorkspaceVoiceControls } from '@/components/chat/WorkspaceVoiceControls';
+import './connected-workspace.css';
+import { useDialogFocus } from '@/hooks/useDialogFocus';
+import { assistantSelection } from './assistantSelection';
 import { PlanNavigation, usePlanDestination, planPeriodForPath, MobilePlanControlsContext } from '@/components/layout/PlanNavigation';
 import { requestPlanFromPaper } from '@/lib/planFromPaperSignal';
 import { DesktopNavigation, DesktopControlsContext, DesktopLeadContext, DesktopCenterContext } from '@/components/layout/DesktopNavigation';
@@ -128,6 +139,8 @@ interface Props {
 function ShellLayoutInner({ children }: Props) {
   const navigate = useNavigate();
   const location = useLocation();
+  const connectedView = new URLSearchParams(location.search).get('view');
+  const connectedWorkspace = connectedView === 'alongside' || connectedView === 'constellation' || new URLSearchParams(location.search).get('workspace') === '1';
   // Planning v2 dresses the whole shell (headings, the day numeral) while it
   // is on for this device (docs/planning/2026-09-28-planning-v2.md).
   useEffect(() => { document.documentElement.classList.toggle('plan-v2', planV2Enabled()); }, [location.search]);
@@ -142,6 +155,7 @@ function ShellLayoutInner({ children }: Props) {
   // The household's week start (Saturday for a Friday planning session), for
   // every device in it — read once here, mirrored into the cadence config.
   useHouseholdWeekStart();
+  const {config: cadenceConfig} = useCadenceConfig();
 
   const [desktopControls, setDesktopControls] = useState<HTMLDivElement | null>(null);
   // The spot under a planning page's heading where the guide sits (GuideAnchor).
@@ -158,7 +172,11 @@ function ShellLayoutInner({ children }: Props) {
   const references = useReferenceLists();
   const activeView = useMemo(() => deriveActiveView(location.pathname), [location.pathname]);
 
-  const { tasks } = useSupabaseTasks();
+  const { tasks, refetch } = useSupabaseTasks();
+  const { goals } = useGoals();
+  const [planningPeople] = useAssigneeFilter();
+  const scopedTasks = useMemo(()=>tasks.filter(planPeopleLens(planningPeople,null).keep),[tasks,planningPeople]);
+  const scopedGoals = useMemo(()=>goals.filter(planPeopleLens(planningPeople,null).keep),[goals,planningPeople]);
   const { unreadCount: discussionsUnread } = useDiscussionInbox();
   // The badge MUST mirror what the Inbox actually renders. It used to count
   // every inbox task regardless of the active domain layers, so an item in an
@@ -216,9 +234,23 @@ function ShellLayoutInner({ children }: Props) {
   // phone overlay show the same conversation. On desktop its visibility is
   // the persisted rail preference (useScratchpadHidden — the masthead's AI
   // button toggles the same state); phones open it per launch.
-  const assistant = useSymphonyAssistant({ persistKey: 'symphony_rail' });
+  const conversationContext = useMemo(() => assistantSelection(scopedTasks, selection, layers), [scopedTasks, selection, layers]);
+  const screenContext = useMemo(() => workspaceContext(scopedTasks, location.pathname, location.search, layers, selection?.kind === 'task' ? selection.id : null, new Date(), scopedGoals), [scopedTasks, scopedGoals, location.pathname, location.search, layers, selection, cadenceConfig.weekStartsOn]);
+  const assistant = useSymphonyAssistant({ persistKey: 'symphony_rail', onWorkspace: (page,date) => { if (connectedWorkspace) { const url=workspaceDestination(page,date); if(url) navigate(url); } }, taskContext: conversationContext.taskContext, workspaceContext: connectedWorkspace ? screenContext : undefined, onMutate: () => { void refetch(); window.dispatchEvent(new Event('symphony-plan-updated')); } });
+  const voiceAccess = useWorkspaceVoiceAccess(user?.id ?? null, connectedWorkspace);
+  const voiceEnabled = connectedWorkspace && voiceAccess;
+  const voice = useWorkspaceVoice(screenContext, assistant.sendMessage, (url) => navigate(import.meta.env.DEV && new URLSearchParams(location.search).get('voice') === '1' ? `${url}&voice=1` : url), voiceEnabled, user?.id ?? null);
+  const sendConversation = (text: string, attachment?: Parameters<typeof assistant.sendMessage>[1]) => {
+    if (voice.active && !attachment && voice.sendText(text)) return;
+    if (voice.active) voice.stop();
+    void assistant.sendMessage(text, attachment);
+  };
+  const resetConversation = () => { voice.stop(); assistant.resetSession(); };
+
   const { hidden: aiHidden, setHidden: setAiHidden } = useScratchpadHidden();
   const [phoneChatOpen, setPhoneChatOpen] = useState(false);
+  const phoneChatRef = useRef<HTMLDivElement>(null);
+  useDialogFocus(phoneChatOpen && isMobile, phoneChatRef, () => setPhoneChatOpen(false));
   const [pane, setPane] = useState<SidePane>('details');
   const [activeNoteId, setActiveNoteId] = useState<string | null>(null);
   const aiOpen = !isMobile && !aiHidden;
@@ -273,17 +305,19 @@ function ShellLayoutInner({ children }: Props) {
         (index.css, IMMERSIVE SCENERY); page regions marked .scenery-page
         take its text colours. */}
     <div
-      className={`${showScenery ? 'scenery-sky ' : ''}h-screen flex overflow-hidden overflow-x-hidden bg-bg-base w-full max-w-[100vw]`}
+      className={`${connectedWorkspace ? 'connected-workspace ' : ''}${showScenery ? 'scenery-sky ' : ''}h-screen flex overflow-hidden overflow-x-hidden bg-bg-base w-full max-w-[100vw]`}
       data-scenery-lighting={showScenery ? sceneryLighting : undefined}
     >
       {/* "New version available — reload" banner: shows when a newer build
           deployed while this tab stayed open (stale-tab guard). */}
       <NewVersionBanner />
+      {voice.active && !(isMobile ? phoneChatOpen : aiOpen && pane === 'ai') && <div className="workspace-voice-floating" role="status"><span>{voice.status === 'muted' ? 'Voice muted' : 'Voice active'}</span><button onClick={voice.mute}>{voice.status === 'muted' ? 'Unmute' : 'Mute'}</button><button onClick={voice.stop}>End voice</button></div>}
 
       {/* Content frame — uses <div> (not <main>) because individual apps render
           their own <main>. Avoids invalid nested-main HTML. */}
       <div
         ref={setPageScroller}
+        inert={phoneChatOpen && isMobile}
         className={`${showScenery ? 'scenery-scroll' : ''} relative flex-1 overflow-auto overflow-x-hidden ${isMobile ? '' : 'transition-all duration-300 ease-in-out'}`}
         style={
           isMobile
@@ -368,20 +402,21 @@ function ShellLayoutInner({ children }: Props) {
                 onCloseAi={() => setAiHidden(true)}
                 ai={
                   <ChatPanel
+                    voiceControls={voiceEnabled ? <WorkspaceVoiceControls voice={voice}/> : undefined}
                     messages={assistant.messages}
                     loading={assistant.loading}
                     error={assistant.error}
-                    entityContext={null}
+                    entityContext={conversationContext.entityContext}
                     mode="chat"
-                    onSend={assistant.sendMessage}
-                    onClear={assistant.resetSession}
-                    onClose={() => setAiHidden(true)}
-                    onNewChat={assistant.resetSession}
+                    onSend={sendConversation}
+                    onClear={resetConversation}
+                    onClose={() => { voice.stop(); setAiHidden(true); }}
+                    onNewChat={resetConversation}
                     onSourceClick={setActiveNoteId}
                     toolActivity={assistant.toolActivity}
                     sessions={assistant.sessions}
                     sessionsLoading={assistant.sessionsLoading}
-                    onLoadSession={assistant.loadSession}
+                    onLoadSession={session => { voice.stop(); assistant.loadSession(session); }}
                     onDeleteSession={assistant.deleteSession}
                     activeSessionId={assistant.activeSessionId}
                   />
@@ -434,12 +469,25 @@ function ShellLayoutInner({ children }: Props) {
       )}
 
       {/* Mobile AI rail — full-screen overlay */}
-      {phoneChatOpen && isMobile && (
+      {isMobile && (
         <div
           className="fixed inset-0 z-50 flex flex-col bg-bg-elevated"
+          ref={phoneChatRef}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Symphony conversation"
+          onKeyDown={event => {
+            if (event.key !== 'Tab') return;
+            const controls = Array.from(event.currentTarget.querySelectorAll<HTMLElement>('button:not([disabled]), input:not([disabled]), textarea:not([disabled]), select:not([disabled]), [href], [tabindex="0"]')).filter(el => el.getClientRects().length > 0);
+            const first = controls[0], last = controls.at(-1);
+            if (!first || !last) return;
+            if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+            else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+          }}
           // Taps in here are not a tap "outside" the Details panel beneath.
           data-panel-keepalive
           style={{
+            display: phoneChatOpen ? undefined : 'none',
             paddingTop: 'env(safe-area-inset-top, 0px)',
             paddingBottom: 'env(safe-area-inset-bottom, 0px)',
           }}
@@ -449,19 +497,20 @@ function ShellLayoutInner({ children }: Props) {
           {selection && <PhonePaneSwitch active="ai" onChange={(p) => { if (p === 'details') setPhoneChatOpen(false); }} />}
           <div className="min-h-0 flex-1">
           <ChatPanel
+                    voiceControls={voiceEnabled ? <WorkspaceVoiceControls voice={voice}/> : undefined}
             messages={assistant.messages}
             loading={assistant.loading}
             error={assistant.error}
-            entityContext={null}
+            entityContext={conversationContext.entityContext}
             mode="chat"
-            onSend={assistant.sendMessage}
-            onClear={assistant.resetSession}
-            onClose={() => setPhoneChatOpen(false)}
-            onNewChat={assistant.resetSession}
+            onSend={sendConversation}
+            onClear={resetConversation}
+            onClose={() => { voice.stop(); setPhoneChatOpen(false); }}
+            onNewChat={resetConversation}
             toolActivity={assistant.toolActivity}
             sessions={assistant.sessions}
             sessionsLoading={assistant.sessionsLoading}
-            onLoadSession={assistant.loadSession}
+            onLoadSession={session => { voice.stop(); assistant.loadSession(session); }}
             onDeleteSession={assistant.deleteSession}
             activeSessionId={assistant.activeSessionId}
           />

@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import { useRef, useEffect, useCallback, useState } from 'react'
 import { PlaceMedallion } from '@/components/place/PlaceMedallion'
 import { ChatMessage } from './ChatMessage'
@@ -8,6 +9,7 @@ import type { FamilyMember } from '@/types/family'
 import type { ChatAttachment } from './ChatAttachment'
 
 interface ChatPanelProps {
+  voiceControls?: ReactNode
   messages: ChatMessageType[]
   loading: boolean
   error: string | null
@@ -60,6 +62,7 @@ function formatSessionDate(date: Date): string {
 }
 
 export function ChatPanel({
+  voiceControls,
   messages,
   loading,
   error,
@@ -115,6 +118,8 @@ export function ChatPanel({
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (e.key === 'Escape') {
+      e.preventDefault()
+      e.stopPropagation()
       if (showHistory) {
         setShowHistory(false)
       } else {
@@ -280,6 +285,7 @@ export function ChatPanel({
         </div>
       </div>
 
+      {voiceControls}
       {/* Messages area */}
       <div ref={scrollRef} className="relative flex-1 overflow-y-auto px-4 py-4">
         {messages.length === 0 ? (
@@ -288,7 +294,7 @@ export function ChatPanel({
                 the one place the Place didn't reach: a generic question-mark
                 glyph over an empty white column. The user's own medallion says
                 the same "nothing here yet" and belongs to the room it's in. */}
-            <div className="mb-4 h-20 w-20 overflow-hidden rounded-full shadow-sm ring-1 ring-neutral-200/70">
+            <div className="chat-place-medallion mb-4 h-20 w-20 overflow-hidden rounded-full shadow-sm ring-1 ring-neutral-200/70">
               <PlaceMedallion className="h-full w-full" />
             </div>
             <p className="text-sm text-neutral-500 mb-1">

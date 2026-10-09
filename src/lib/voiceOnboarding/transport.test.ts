@@ -250,3 +250,31 @@ describe('RealtimeTransport', () => {
     expect(errorForStatus(400, '')).toBe('network')
   })
 })
+
+describe('workspace voice tools',()=>{
+ it('awaits the saved result and deduplicates tool calls',async()=>{
+  let resolve!:(v:unknown)=>void
+  const handleTool=vi.fn(()=>new Promise(r=>{resolve=r}))
+  const {t,peer}=setup({handleTool})
+  await t.start(ctx)
+  const event={type:'response.done',response:{output:[{type:'function_call',name:'ask_symphony',call_id:'one',arguments:'{"request":"Plan it today"}'}]}}
+  serverEvent(peer,event);serverEvent(peer,event)
+  expect(handleTool).toHaveBeenCalledTimes(1)
+  expect(peer.channel.sent.filter((e:any)=>e.item?.type==='function_call_output')).toHaveLength(0)
+  resolve({saved:true});await Promise.resolve();await Promise.resolve()
+  expect(peer.channel.sent).toContainEqual(expect.objectContaining({item:expect.objectContaining({type:'function_call_output',output:'{"saved":true}'})}))
+ })
+ it('never emits stale tool results after ending voice',async()=>{
+  let resolve!:(v:unknown)=>void
+  const {t,peer}=setup({handleTool:()=>new Promise(r=>{resolve=r})})
+  await t.start(ctx)
+  serverEvent(peer,{type:'response.done',response:{output:[{type:'function_call',name:'ask_symphony',call_id:'one',arguments:'{}'}]}})
+  t.stop();resolve({saved:true});await Promise.resolve();await Promise.resolve()
+  expect(peer.channel.sent.filter((e:any)=>e.item?.type==='function_call_output')).toHaveLength(0)
+ })
+ it('keeps typed turns in the same live conversation',async()=>{
+  const {t,peer}=setup();expect(t.sendText('hello')).toBe(false)
+  await t.start(ctx);expect(t.sendText('show my week')).toBe(true)
+  expect(peer.channel.sent).toContainEqual(expect.objectContaining({item:expect.objectContaining({content:[{type:'input_text',text:'show my week'}]})}))
+ })
+})

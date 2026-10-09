@@ -1,0 +1,71 @@
+/* Opt-in connected redesign. Existing panel contents and interactions remain intact. */
+.connected-workspace .side-column{background:var(--color-bg-panel);border-left:1px solid var(--color-neutral-200)}
+.connected-workspace .side-column-bar{padding:20px 24px 14px;border-bottom:1px solid var(--color-neutral-200)}
+.connected-workspace .side-column-switch{background:transparent;gap:6px}
+.connected-workspace .side-column-switch>button{border-radius:18px;padding:9px 16px;font-size:12px}
+.connected-workspace .side-column-switch>button[aria-selected=true]{background:var(--color-primary-100);color:var(--color-primary-800);box-shadow:none}
+.connected-workspace .panel-shell{background:var(--color-bg-panel)}
+.connected-workspace .panel-field{border-radius:10px;border-color:var(--color-neutral-200)}
+.connected-workspace .side-column button:focus-visible{outline:2px solid var(--color-primary-600);outline-offset:3px}
+.connected-workspace .oj-section{padding-block:28px;border-color:var(--color-neutral-200)}
+.connected-workspace .oj-title{font-family:var(--font-family-display);font-weight:400;line-height:1.25}
+.connected-workspace .oj-parent{border-color:var(--color-primary-200)}
+.connected-workspace .oj-compose-row input{border-color:var(--color-neutral-200);background:var(--color-bg-elevated)}
+.connected-workspace .oj-add{border-radius:20px}
+.workspace-voice{padding:12px 18px;border-bottom:1px solid var(--color-neutral-200);font-size:13px}.workspace-voice>div:first-child{display:flex;gap:10px;align-items:center;flex-wrap:wrap}.workspace-voice button{border:1px solid var(--color-neutral-300);border-radius:18px;padding:8px 12px;min-height:40px}.workspace-voice button:first-child{background:var(--color-primary-700);color:white}.workspace-voice-transcript{max-height:150px;overflow:auto}.workspace-voice-transcript p{margin-top:10px}.workspace-voice-transcript small{display:block;opacity:.65}.workspace-voice [role=alert]{margin-top:10px}
+.workspace-voice-floating{position:fixed;bottom:calc(80px + env(safe-area-inset-bottom,0px));left:50%;transform:translateX(-50%);z-index:60;display:flex;gap:12px;align-items:center;padding:10px 16px;border-radius:24px;background:var(--color-bg-elevated);border:1px solid var(--color-primary-300);box-shadow:0 3px 20px #0002;font-size:13px;white-space:nowrap}.workspace-voice-floating button{min-height:40px;text-decoration:underline}
+/* The assistant narrows the main pane; reserve actual space for utilities
+   instead of centering the horizon rail over an undersized grid track. */
+.connected-workspace .page-navigation:has(> .page-navigation-mid){grid-template-columns:auto minmax(0,1fr) auto;gap:8px}
+.connected-workspace .page-navigation-mid{justify-content:flex-start}
+.connected-workspace .page-navigation-center .horizon-rail a{padding-inline:6px}
+.connected-workspace .page-navigation-center .horizon-rail-join{width:8px}
+/* Week is a working spread: short headers and full-width action rows keep
+   more of the plan visible without reducing reading or touch-target size. */
+.connected-workspace:has(.pv2-week) .week-column{padding-inline:28px}
+.connected-workspace:has(.pv2-week) .daybook-masthead{margin-bottom:12px}
+.connected-workspace:has(.pv2-week) .daybook-date{font-size:60px;line-height:1}
+.connected-workspace:has(.pv2-week) .daybook-masthead-inner{padding-top:0;padding-bottom:6px}
+.connected-workspace .pv2-week .oj-section{grid-template-columns:minmax(0,1fr);gap:8px;padding:14px 0}
+.connected-workspace .pv2-week .oj-parent{display:grid;grid-template-columns:minmax(0,1fr) auto;column-gap:12px;align-items:baseline}
+.connected-workspace .pv2-week .oj-eyebrow{grid-column:1/-1;margin-bottom:3px;font-size:10px}
+.connected-workspace .pv2-week .oj-title{font-size:18px;line-height:1.3;margin:0}
+.connected-workspace .pv2-week .oj-linked{border-left:0;padding-left:0;margin-left:0}
+.connected-workspace .pv2-week .oj-compose{margin-top:6px}
+.connected-workspace .pv2-week .oj-compose-label{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}
+.connected-workspace .pv2-week .oj-compose-row input{padding:7px 10px;font-size:14px}
+.connected-workspace .pv2-week .oj-compose-note{display:none}
+.connected-workspace .pv2-week .oj-compose:focus-within .oj-compose-note,
+.connected-workspace .pv2-week .oj-compose:has([aria-busy=true]) .oj-compose-note{display:block}
+.connected-workspace .pv2-week .oj-empty{font-size:12px;margin:2px 0}
+.connected-workspace .pv2-week .wk-row{padding-block:5px}
+.connected-workspace .pv2-week .wk-title{font-size:14px;line-height:1.4}
+.connected-workspace .pv2-week .wk-for{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px}
+.connected-workspace .pv2-week .wk-cell{padding-block:6px}
+.connected-workspace .pv2-week .wk-dayhead{min-height:26px;padding-bottom:3px;margin-bottom:2px}
+.connected-workspace .pv2-week .wk-daynum{font-size:23px}
+.connected-workspace .pv2-week .wk-journal-page{gap:24px}
+.connected-workspace .pv2-week .oj-switch{margin-bottom:8px}
+@media(min-width:1100px){
+ .connected-workspace .wk-journal-page.is-colscroll{grid-template-columns:minmax(20rem,1fr) minmax(0,1.1fr);gap:24px}
+}
+@media(max-width:767px){
+ .connected-workspace:has(.pv2-week) .week-column{padding-inline:16px}
+ .connected-workspace .pv2-week .oj-title{font-size:18px}
+ .connected-workspace .pv2-week .oj-compose-row input{min-height:44px}
+ .connected-workspace .pv2-week .oj-add{min-height:44px}
+}
+.connected-workspace .ad-shell:has(.pv2-week){padding-top:0}
+.connected-workspace:has(.pv2-week) .masthead-numeral{font-size:60px;line-height:1}
+:root.plan-v2 .connected-workspace:has(.pv2-week) .daybook-masthead-inner{padding-top:0}
+.connected-workspace .pv2-week .wk-dayhead .wk-daynum{font-size:23px;line-height:1}
+.connected-workspace .pv2-week .wk-cell:not(:has(.wk-rows)){position:relative;min-height:42px;padding-block:4px}
+.connected-workspace .pv2-week .wk-cell:not(:has(.wk-rows))>button{position:absolute;right:0;top:7px;margin:0}
+.connected-workspace .pv2-week .wk-cell:not(:has(.wk-rows)) .wk-dayhead{padding-right:26px}
+.connected-workspace .pv2-week .wk-free{margin-top:3px;padding-top:3px}
+.connected-workspace:has(.pv2-week) .calendar-connection-banner{padding:6px 10px;margin-bottom:8px;gap:8px;border-radius:10px}
+.connected-workspace:has(.pv2-week) .calendar-connection-banner p{font-size:12px}
+@media(max-width:767px){
+ .connected-workspace:has(.pv2-week) .calendar-connection-banner p{display:none}
+ .connected-workspace:has(.pv2-week) .calendar-connection-banner{justify-content:space-between}
+}

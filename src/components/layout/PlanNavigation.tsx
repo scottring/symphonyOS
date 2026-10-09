@@ -1,3 +1,4 @@
+import { connectedDestination } from '@/lib/planning/connectedDestination'
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { NavLink, useLocation, useNavigate } from 'react-router-dom'
@@ -43,8 +44,8 @@ export function planPeriodForPath(path: string) {
  * sit on the page for everything else.
  */
 export function usePlanDestination() {
-  const { pathname } = useLocation()
-  return `/${planPeriodForPath(pathname) ?? 'today'}`
+  const { pathname, search } = useLocation()
+  return connectedDestination(`/${planPeriodForPath(pathname) ?? 'today'}`, search)
 }
 
 const HORIZON_NAMES: Record<typeof PERIODS[number], string> = {
@@ -61,6 +62,7 @@ function horizonSubtitle(period: typeof PERIODS[number], now: Date): string {
 /** Phone: one horizon at a time, switched from a compact title menu rather
  *  than a row of five tabs (native PlannerView; mockup review 2026-09-23). */
 function HorizonSwitcher({ period }: { period: typeof PERIODS[number] }) {
+  const {search} = useLocation()
   const [open, setOpen] = useState(false)
   const navigate = useNavigate()
   const now = new Date()
@@ -79,7 +81,7 @@ function HorizonSwitcher({ period }: { period: typeof PERIODS[number] }) {
       <button type="button" className="horizon-switcher-scrim" aria-label="Close" onClick={() => setOpen(false)} />
       <div role="menu" aria-label="Planning horizon" className="horizon-switcher-menu">
         {PERIODS.map(value => <button key={value} type="button" role="menuitemradio" aria-checked={period === value}
-          onClick={() => { setOpen(false); navigate(`/${value}`) }}>
+          onClick={() => { setOpen(false); navigate(connectedDestination(`/${value}`, search)) }}>
           <span><strong>{HORIZON_NAMES[value]}</strong><small>{horizonSubtitle(value, now)}</small></span>
           {period === value && <Check aria-hidden="true" />}
         </button>)}
@@ -120,7 +122,7 @@ function HorizonRail({ period }: { period?: typeof PERIODS[number] }) {
   return <nav aria-label="Planning period" className="horizon-rail">
     {RAIL_ORDER.map((value, k) => <span key={value} className="horizon-rail-step">
       {k > 0 && <span className="horizon-rail-join" aria-hidden="true" />}
-      <NavLink to={steps[value].to} aria-current={period === value ? 'page' : undefined} className={period === value ? 'is-current' : ''}
+      <NavLink to={connectedDestination(steps[value].to, search)} aria-current={period === value ? 'page' : undefined} className={period === value ? 'is-current' : ''}
         aria-label={HORIZON_NAMES[value]} title={railTitle(value, steps[value])}>
         <span className="horizon-rail-l">{HORIZON_NAMES[value]}</span>
       </NavLink>

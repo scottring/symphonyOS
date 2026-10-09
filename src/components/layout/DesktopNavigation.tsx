@@ -1,3 +1,4 @@
+import { connectedDestination } from '@/lib/planning/connectedDestination'
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { NavLink, useLocation, useNavigate } from 'react-router-dom'
@@ -25,7 +26,7 @@ export function DesktopNavigation({ inboxCount, discussionsUnread, onSearch, onS
   centerRef?: (node: HTMLDivElement | null) => void
 }) {
   const navigate = useNavigate()
-  const { pathname } = useLocation()
+  const { pathname, search } = useLocation()
   const [open, setOpen] = useState<string | null>(null)
   const [dialog, setDialog] = useState<{ kind: 'shortcuts' | 'help'; from: HTMLElement | null } | null>(null)
   const root = useRef<HTMLElement>(null)
@@ -46,7 +47,7 @@ export function DesktopNavigation({ inboxCount, discussionsUnread, onSearch, onS
       {open === id && <div id={`navigation-${id}`} className="page-navigation-popover">{content}</div>}
     </div>
   }
-  const go = (path: string) => { setOpen(null); navigate(path) }
+  const go = (path: string) => { setOpen(null); navigate(connectedDestination(path, search)) }
   // Short labelled columns rather than one tall list. Registry apps join Reference.
   const groups: [string, [string, string][]][] = MORE_GROUPS.map(([group, items]): [string, [string, string][]] => [group, [
     ...items.map(({ label, route }): [string, string] => [label, route]),
@@ -62,7 +63,7 @@ export function DesktopNavigation({ inboxCount, discussionsUnread, onSearch, onS
         button (Scott, 2026-09-29): the round + and ⌘K already add. */}
     <div className="page-navigation-left">
     {/* The app's mark anchors the bar's corner (Scott, 2026-10-02); it goes Today. */}
-    <NavLink to="/today" className="page-navigation-brand" aria-label="Symphony, go to Today" title="Today">
+    <NavLink to={connectedDestination('/today', search)} className="page-navigation-brand" aria-label="Symphony, go to Today" title="Today">
       <img src="/symphony-logo.png" alt="" width={32} height={32} /><span className="page-navigation-wordmark">Symphony</span>
     </NavLink>
     {leadRef && <div ref={leadRef} className="page-navigation-lead" />}
@@ -81,7 +82,7 @@ export function DesktopNavigation({ inboxCount, discussionsUnread, onSearch, onS
         </div>)}
       </div>
       <div className="page-navigation-more-action">
-        <button onClick={() => { setOpen(null); if (!requestPlanFromPaper()) navigate('/today') }}>Plan from paper</button>
+        <button onClick={() => { setOpen(null); if (!requestPlanFromPaper()) navigate(connectedDestination('/today', search)) }}>Plan from paper</button>
         <span>Photograph a paper page into your plan</span>
       </div>
       {/* Shortcuts and Help moved here from the footer (Scott, 2026-10-02),
@@ -97,7 +98,7 @@ export function DesktopNavigation({ inboxCount, discussionsUnread, onSearch, onS
     <div className="page-navigation-utilities">
       {auxiliaryControls}
       <div ref={controlsRef} className="page-navigation-page-controls" />
-      <NavLink to="/inbox" className="page-navigation-icon" title="Inbox"
+      <NavLink to={connectedDestination('/inbox', search)} className="page-navigation-icon" title="Inbox"
         aria-label={`Inbox${inboxCount ? `, ${inboxCount} ${inboxCount === 1 ? 'item' : 'items'}` : ''}`}>
         <Inbox size={17} aria-hidden="true" />{inboxCount > 0 && <span className="navigation-count">{inboxCount}</span>}
       </NavLink>

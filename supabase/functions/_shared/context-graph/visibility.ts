@@ -55,13 +55,13 @@ export async function resolveVisibleOwners(client: SupabaseClient, userId: strin
  *
  *  With no co-members this collapses to a plain owner-only `.eq`, which keeps the common
  *  single-user case on the same query plan it had before. */
-export function applyScopeVisibility<T extends {
-  eq(column: string, value: unknown): T
-  or(filter: string): T
-}>(query: T, userId: string, owners: string[]): T {
+// Infer the builder without recursively comparing the entire Supabase fluent
+// type. Runtime filtering and the concrete return type remain unchanged.
+export function applyScopeVisibility<T>(query: T, userId: string, owners: string[]): T {
+  const filters = query as T & { eq(column:string,value:unknown):T; or(filter:string):T }
   const peers = owners.filter(id => id !== userId)
-  if (peers.length === 0) return query.eq('user_id', userId)
-  return query.or(
+  if (peers.length === 0) return filters.eq('user_id', userId)
+  return filters.or(
     `user_id.eq.${userId},and(scope.in.(${SHARED_SCOPES.join(',')}),user_id.in.(${peers.join(',')}))`
   )
 }

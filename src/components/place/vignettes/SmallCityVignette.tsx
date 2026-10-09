@@ -1,23 +1,25 @@
+import { useId } from 'react'
 /** Small City — a river, a clock tower, dusk coming on.
  *  Flat-vector medallion in the place-theme style. Decorative. */
 export function SmallCityVignette({ className = '' }: { className?: string }) {
+  const instance = useId()
   return (
     <svg viewBox="0 0 200 200" className={className} role="img"
       aria-label="A small city at dusk with a clock tower and a bridge" xmlns="http://www.w3.org/2000/svg">
       <defs>
-        <clipPath id="sc-clip"><circle cx="100" cy="100" r="96" /></clipPath>
-        <linearGradient id="sc-sky" x1="0" y1="0" x2="0" y2="1">
+        <clipPath id={`${instance}-sc-clip`}><circle cx="100" cy="100" r="96" /></clipPath>
+        <linearGradient id={`${instance}-sc-sky`} x1="0" y1="0" x2="0" y2="1">
           <stop offset="0" stopColor="hsl(268 40% 78%)" />
           <stop offset="0.55" stopColor="hsl(300 35% 82%)" />
           <stop offset="1" stopColor="hsl(25 75% 84%)" />
         </linearGradient>
-        <linearGradient id="sc-river" x1="0" y1="0" x2="0" y2="1">
+        <linearGradient id={`${instance}-sc-river`} x1="0" y1="0" x2="0" y2="1">
           <stop offset="0" stopColor="hsl(255 35% 48%)" />
           <stop offset="1" stopColor="hsl(250 40% 36%)" />
         </linearGradient>
       </defs>
-      <g clipPath="url(#sc-clip)">
-        <rect width="200" height="200" fill="url(#sc-sky)" />
+      <g clipPath={`url(#${instance}-sc-clip)`}>
+        <rect width="200" height="200" fill={`url(#${instance}-sc-sky)`} />
         {/* distant hills + skyline */}
         <path d="M0 84 L30 62 L58 82 L96 56 L134 80 L168 60 L200 78 V120 H0 Z" fill="hsl(266 28% 70%)" />
         <g fill="hsl(264 24% 60%)">
@@ -82,7 +84,7 @@ export function SmallCityVignette({ className = '' }: { className?: string }) {
           <rect x="0" y="126" width="200" height="3.5" fill="hsl(270 22% 72%)" />
         </g>
         {/* river with reflections */}
-        <rect x="0" y="142" width="200" height="58" fill="url(#sc-river)" />
+        <rect x="0" y="142" width="200" height="58" fill={`url(#${instance}-sc-river)`} />
         <g stroke="hsl(280 40% 72%)" strokeWidth="1.6" strokeLinecap="round" opacity="0.7">
           <path d="M28 152 h18 M60 160 h14 M120 154 h18 M156 164 h14 M84 170 h20 M40 176 h14 M132 178 h16" />
         </g>

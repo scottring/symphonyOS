@@ -90,7 +90,7 @@ vi.mock('@/hooks/useDayPlan', () => ({ useDayPlan: () => ({ loading: false, erro
 vi.mock('@/hooks/usePlanActions', () => ({ usePlanActions: () => ({}) }))
 vi.mock('@/components/layout/NewVersionBanner', () => ({ NewVersionBanner: () => null }))
 vi.mock('@/components/omnibox/OmniboxResults', () => ({ OmniboxResults: () => null }))
-vi.mock('@/components/chat/ChatPanel', () => ({ ChatPanel: () => null }))
+vi.mock('@/components/chat/ChatPanel', () => ({ ChatPanel: () => <textarea aria-label="Conversation draft" /> }))
 vi.mock('@/components/toast', () => ({ Toast: () => null, ConfirmationToast: () => null, ToastLiveRegion: () => null }))
 
 function renderAt(path: string, children: ReactNode = <div data-testid="app-content" />) {
@@ -207,6 +207,20 @@ describe('Phone AI beside Details', () => {
     fireEvent.click(screen.getByRole('button', { name: 'More' }))
     fireEvent.click(screen.getByRole('button', { name: 'Ask Symphony' }))
     expect(screen.queryByRole('tablist', { name: 'Side panel' })).not.toBeInTheDocument()
+  })
+
+  it('retains an unsent message when switching back to details and reopening', () => {
+    mobileState.isMobile = true
+    selectionState.selection = { kind: 'task', id: 't1' }
+    renderAt('/today?view=alongside')
+    const open = () => { fireEvent.click(screen.getByRole('button', {name:'More'})); fireEvent.click(screen.getByRole('button', {name:'Ask Symphony'})) }
+    open()
+    fireEvent.change(screen.getByRole('textbox', {name:'Conversation draft'}), {target:{value:'Keep this wording'}})
+    expect(screen.getByTestId('app-content').closest('[inert]')).not.toBeNull()
+    fireEvent.click(screen.getByRole('tab', {name:'Details'}))
+    expect(screen.getByTestId('app-content').closest('[inert]')).toBeNull()
+    open()
+    expect(screen.getByRole('textbox', {name:'Conversation draft'})).toHaveValue('Keep this wording')
   })
 
   it('switches back to the item, which stays open underneath', () => {

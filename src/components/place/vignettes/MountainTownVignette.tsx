@@ -1,13 +1,15 @@
+import { useId } from 'react'
 /** Small Mountain Town — one road in, peaks over every rooftop.
  *  Flat-vector medallion in the place-theme style. Decorative. */
 export function MountainTownVignette({ className = '' }: { className?: string }) {
+  const instance = useId()
   return (
     <svg viewBox="0 0 200 200" className={className} role="img"
       aria-label="A small mountain town with peaks, a church, and a winding road" xmlns="http://www.w3.org/2000/svg">
       <defs>
-        <clipPath id="mt-clip"><circle cx="100" cy="100" r="96" /></clipPath>
+        <clipPath id={`${instance}-mt-clip`}><circle cx="100" cy="100" r="96" /></clipPath>
       </defs>
-      <g clipPath="url(#mt-clip)">
+      <g clipPath={`url(#${instance}-mt-clip)`}>
         {/* sky */}
         <rect width="200" height="200" fill="hsl(208 55% 80%)" />
         {/* far peaks */}

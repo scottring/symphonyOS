@@ -7,6 +7,7 @@ export interface GoalsContextValue {
   areas: GoalArea[]
   goals: Goal[]
   loading: boolean
+  error?: string | null
   addArea: (name: string) => Promise<GoalArea | null>
   updateArea: (id: string, updates: { name?: string; sortOrder?: number }) => Promise<void>
   deleteArea: (id: string) => Promise<void>
@@ -29,6 +30,7 @@ export function GoalsProvider({ children }: { children: ReactNode }) {
     areas,
     goals,
     loading,
+    error,
     addArea,
     updateArea,
     deleteArea,
@@ -45,6 +47,7 @@ export function GoalsProvider({ children }: { children: ReactNode }) {
         areas,
         goals,
         loading,
+        error,
         addArea,
         updateArea,
         deleteArea,

@@ -16,6 +16,7 @@ import { Emitter, VOICE_ERROR_COPY, isHorizon, type ConversationContext, type Tr
 import { MAX_LINE } from './flow'
 
 export interface RealtimeDeps {
+  handleTool?: (name: string, args: unknown) => Promise<unknown>
   /** The edge function URL that answers an SDP offer. */
   endpoint: string
   /** The person's Supabase access token, or null when signed out. */
@@ -46,6 +47,9 @@ export class RealtimeTransport implements VoiceTransport {
   private assistantText = ''
   /** Bumped by stop(): a start() still awaiting the network must not resurrect anything. */
   private generation = 0
+  private calls = new Set<string>()
+  private latestContext: ConversationContext | null = null
+  private abort: AbortController | null = null
 
   private deps: RealtimeDeps
 
@@ -69,6 +73,8 @@ export class RealtimeTransport implements VoiceTransport {
   async start(ctx: ConversationContext): Promise<void> {
     if (this.status === 'connecting' || this.status === 'live' || this.status === 'muted') return
     const gen = ++this.generation
+    this.latestContext = ctx
+    this.calls.clear()
     const gum = this.deps.getUserMedia ?? (typeof navigator !== 'undefined' && navigator.mediaDevices?.getUserMedia
       ? (c: MediaStreamConstraints) => navigator.mediaDevices.getUserMedia(c) : undefined)
     const createPeer = this.deps.createPeer ?? (typeof RTCPeerConnection !== 'undefined' ? () => new RTCPeerConnection() : undefined)
@@ -80,12 +86,14 @@ export class RealtimeTransport implements VoiceTransport {
     if (!token) { this.fail('not_signed_in'); return }
 
     try {
-      this.stream = await gum({ audio: { echoCancellation: true, noiseSuppression: true } })
+      const stream = await gum({ audio: { echoCancellation: true, noiseSuppression: true } })
+      if (gen !== this.generation) { for (const track of stream.getTracks()) track.stop(); return }
+      this.stream = stream
     } catch {
       if (gen === this.generation) this.fail('mic_denied')
       return
     }
-    if (gen !== this.generation) { this.release(); return }
+    if (gen !== this.generation) return
 
     try {
       const pc = createPeer()
@@ -105,12 +113,15 @@ export class RealtimeTransport implements VoiceTransport {
       const dc = pc.createDataChannel('oai-events')
       this.dc = dc
       dc.onmessage = (m) => this.onServerEvent(m.data)
-      dc.onopen = () => this.sync(ctx, true)
+      dc.onopen = () => this.sync(this.latestContext ?? ctx, true)
 
       const offer = await pc.createOffer()
       await pc.setLocalDescription(offer)
+      if (gen !== this.generation) return
+      this.abort = new AbortController()
       const res = await (this.deps.fetch ?? fetch)(this.deps.endpoint, {
         method: 'POST',
+        signal: this.abort.signal,
         headers: {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/sdp',
@@ -118,13 +129,14 @@ export class RealtimeTransport implements VoiceTransport {
         },
         body: offer.sdp ?? '',
       })
-      if (gen !== this.generation) { this.release(); return }
+      if (gen !== this.generation) return
       if (!res.ok) { this.fail(errorForStatus(res.status, await res.text().catch(() => ''))); return }
       const answer = await res.text()
-      if (gen !== this.generation) { this.release(); return }
+      if (gen !== this.generation) return
       await pc.setRemoteDescription({ type: 'answer', sdp: answer })
+      if (gen !== this.generation) return
 
-      const maxSeconds = Number(res.headers.get('x-voice-max-seconds')) || DEFAULT_MAX_SECONDS
+      const maxSeconds = Math.max(1, Math.min(DEFAULT_MAX_SECONDS, Number(res.headers.get('x-voice-max-seconds')) || DEFAULT_MAX_SECONDS))
       this.timer = (this.deps.setTimer ?? ((f, ms) => setTimeout(f, ms)))(() => this.end('time_limit'), maxSeconds * 1000)
       this.set('live')
     } catch {
@@ -149,6 +161,7 @@ export class RealtimeTransport implements VoiceTransport {
 
   /** Every resource let go: mic tracks stopped, channel and peer closed, audio detached. */
   private release() {
+    this.abort?.abort(); this.abort = null
     if (this.timer !== null) { (this.deps.clearTimer ?? ((t) => clearTimeout(t as ReturnType<typeof setTimeout>)))(this.timer); this.timer = null }
     for (const t of this.stream?.getTracks() ?? []) t.stop()
     this.stream = null
@@ -165,7 +178,15 @@ export class RealtimeTransport implements VoiceTransport {
     if (this.audio) { this.audio.pause?.(); this.audio.srcObject = null; this.audio = null }
   }
 
+  sendText(text: string) {
+    if (!this.dc || this.dc.readyState !== 'open' || !text.trim()) return false
+    send(this.dc, {type:'conversation.item.create',item:{type:'message',role:'user',content:[{type:'input_text',text:text.trim()}]}})
+    send(this.dc, {type:'response.create'})
+    return true
+  }
+
   sync(ctx: ConversationContext, opening = false) {
+    this.latestContext = ctx
     const dc = this.dc
     if (!dc || dc.readyState !== 'open') return
     // App context, not the person's words: where the screen is and the plan
@@ -207,7 +228,7 @@ export class RealtimeTransport implements VoiceTransport {
         if (typeof e.transcript === 'string' && e.transcript.trim()) this.em.emit({ type: 'user', text: e.transcript.trim() })
         break
       case 'response.done':
-        this.onResponseDone(e.response)
+        void this.onResponseDone(e.response)
         break
       case 'error':
         // Reported, not fatal: the connection may carry on.
@@ -216,13 +237,22 @@ export class RealtimeTransport implements VoiceTransport {
     }
   }
 
-  private onResponseDone(response: unknown) {
+  private async onResponseDone(response: unknown) {
+    const generation = this.generation
     const output = (response as { output?: unknown[] } | undefined)?.output
     if (!Array.isArray(output) || !this.dc) return
     let answered = false
     for (const item of output as { type?: string; name?: string; call_id?: string; arguments?: string }[]) {
       if (item?.type !== 'function_call' || !item.call_id) continue
-      const result = item.name === 'propose_plan_card' ? this.propose(item.arguments) : { shown: false, error: 'unknown tool' }
+      if (this.calls.has(item.call_id)) continue
+      this.calls.add(item.call_id)
+      let result: unknown
+      try {
+        result = this.deps.handleTool
+          ? await this.deps.handleTool(item.name ?? '', JSON.parse(item.arguments ?? '{}'))
+          : item.name === 'propose_plan_card' ? this.propose(item.arguments) : { shown: false, error: 'unknown tool' }
+      } catch { result = {error: 'The action failed. Do not claim it saved. Ask the person to retry.'} }
+      if (generation !== this.generation || !this.dc) return
       send(this.dc, { type: 'conversation.item.create', item: { type: 'function_call_output', call_id: item.call_id, output: JSON.stringify(result) } })
       answered = true
     }

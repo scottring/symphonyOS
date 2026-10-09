@@ -145,7 +145,7 @@ async function loadLineage(client: SupabaseClient, row: EntityRow, ref: EntityRe
     // goals RLS is owner-only (046_goals.sql:59-61) and goals never got a scope column, so a
     // shared task hanging off a peer's goal resolves to no goal rather than leaking its title.
     row.goal_id
-      ? client.from('goals').select('id, title').eq('id', row.goal_id).eq('user_id', ref.userId).maybeSingle()
+      ? client.from('goals').select('id, title:name').eq('id', row.goal_id).eq('user_id', ref.userId).maybeSingle()
       : Promise.resolve({ data: null, error: null }),
   ])
 

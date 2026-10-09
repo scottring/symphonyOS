@@ -4124,3 +4124,6 @@ button.domain-switcher-trigger[data-filtered="true"] { color: var(--color-primar
 @media (prefers-reduced-motion: reduce) {
   .area-filter-pulse::after { animation: none; }
 }
+
+/* An illustration is not a touch icon: keep its requested canvas size. */
+.chat-place-medallion > svg { width: 100%; height: 100%; }

@@ -72,3 +72,20 @@ describe('runAgentTurn', () => {
     expect(turn.text).toBe('Looking.\n\nFound it.')
   })
 })
+
+it('forwards canvas navigation without treating it as a data write',async()=>{
+ const onWorkspace=vi.fn()
+ vi.mocked(streamSymphonyAgent).mockImplementation(async(_messages,h)=>{
+  h.onWorkspace?.('month','2026-10-01');h.onDone?.('Opening October.',null)
+ })
+ const result=await runAgentTurn([],{onWorkspace})
+ expect(onWorkspace).toHaveBeenCalledWith('month','2026-10-01')
+ expect(result.didWrite).toBe(false)
+})
+
+it('refreshes the workspace after linking an existing plan item',async()=>{
+ vi.mocked(streamSymphonyAgent).mockImplementation(async(_messages,h)=>{
+  h.onTool?.('symphony_link_plan_item');h.onDone?.('Linked.',null)
+ })
+ expect((await runAgentTurn([])).didWrite).toBe(true)
+})

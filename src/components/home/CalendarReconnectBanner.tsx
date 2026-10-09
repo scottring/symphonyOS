@@ -25,11 +25,11 @@ export function CalendarReconnectBanner() {
 
   if (needsReconnect) {
     return (
-      <div role="alert" className="mb-4 flex items-center gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
+      <div role="alert" className="mb-4 flex flex-wrap items-center gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
         <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-amber-100">
           <AlertTriangle className="h-4 w-4 text-amber-600" aria-hidden="true" />
         </span>
-        <p className="flex-1 text-sm text-amber-900">
+        <p className="min-w-[160px] flex-1 text-sm text-amber-900">
           Google Calendar disconnected — your events aren’t showing.
         </p>
         <button type="button" onClick={() => void connect()}
@@ -42,11 +42,11 @@ export function CalendarReconnectBanner() {
 
   if (!isConnected) {
     return (
-      <div role="status" className="mb-4 flex items-center gap-3 rounded-xl border border-neutral-200 bg-neutral-50 px-4 py-3">
+      <div role="status" className="calendar-connection-banner mb-4 flex flex-wrap items-center gap-3 rounded-xl border border-neutral-200 bg-neutral-50 px-4 py-3">
         <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white">
           <CalendarDays className="h-4 w-4 text-neutral-500" aria-hidden="true" />
         </span>
-        <p className="flex-1 text-sm text-neutral-700">
+        <p className="min-w-[160px] flex-1 text-sm text-neutral-700">
           No calendar connected. Your events give the day its shape.
         </p>
         <button type="button" onClick={() => void connect()}
@@ -59,11 +59,11 @@ export function CalendarReconnectBanner() {
 
   if (error) {
     return (
-      <div role="alert" className="mb-4 flex items-center gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
+      <div role="alert" className="mb-4 flex flex-wrap items-center gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
         <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-amber-100">
           <AlertTriangle className="h-4 w-4 text-amber-600" aria-hidden="true" />
         </span>
-        <p className="flex-1 text-sm text-amber-900">
+        <p className="min-w-[160px] flex-1 text-sm text-amber-900">
           Calendar didn’t sync — {error}
         </p>
         <button type="button" onClick={() => void fetchWeekEvents()}

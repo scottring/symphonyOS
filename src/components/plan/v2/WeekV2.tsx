@@ -351,8 +351,8 @@ export function WeekV2({ tasks, weekStart, meId, isCurrent, days, renderDays, on
       // week planned ahead hands back to Today too, rather than leave only
       // "Done for now" (walkthrough 2026-10-02 #23).
       next: isCurrent
-        ? { label: 'Pick something for today', onClick: () => { writePlanView('today', 'ref'); navigate('/today') } }
-        : { label: 'Back to Today', onClick: () => navigate('/today') },
+        ? { label: 'Pick something for today', onClick: () => { writePlanView('today', 'ref'); navigate(new URLSearchParams(location.search).get('view') === 'alongside' ? '/today?view=alongside' : '/today') } }
+        : { label: 'Back to Today', onClick: () => navigate(new URLSearchParams(location.search).get('view') === 'alongside' ? '/today?view=alongside' : '/today') },
       onDone: () => setJustSaved(null),
     },
   }
@@ -391,7 +391,7 @@ export function WeekV2({ tasks, weekStart, meId, isCurrent, days, renderDays, on
     // The look-back was a quiet step inside "Plan the week" with nothing on
     // the page saying it was waiting (reviewDue was never read) — so say it.
     lastWeekOpen={reviewIds.length} onLookBack={startMeeting}
-    onToday={isCurrent ? () => { writePlanView('today', 'ref'); navigate('/today') } : undefined} />
+    onToday={isCurrent ? () => { writePlanView('today', 'ref'); navigate(new URLSearchParams(location.search).get('view') === 'alongside' ? '/today?view=alongside' : '/today') } : undefined} />
 
   // ── Open journal: each month line beside the week's actions for it ──────
   // The month lines are the reference the page already shows (the reader's

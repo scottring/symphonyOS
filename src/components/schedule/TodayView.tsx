@@ -1,3 +1,4 @@
+import { useAlongsideWorkspace } from '@/components/plan/constellation/AlongsideContext'
 import { publishViewedDay } from '@/lib/viewedDaySignal'
 import { DesktopControlsContext } from '@/components/layout/DesktopNavigation'
 /**
@@ -445,15 +446,16 @@ export function TodayView({
   // this replaces made Today the one page that hid what you choose from.
   // Hidden unless chosen (Scott, 2026-09-30: Today's default stays the day
   // alone); "Pick something for today" opens it with the week showing.
+  const alongsideWorkspace = useAlongsideWorkspace()
   const [todayView, setTodayViewState] = useState<PlanView>(() => readPlanView('today') === 'ref' ? 'ref' : 'list')
-  const setTodayView = (v: PlanView) => { setTodayViewState(v); writePlanView('today', v) }
+  const setTodayView = (v: PlanView) => { if (alongsideWorkspace) { if (v === 'ref') alongsideWorkspace.showWeek(); return } setTodayViewState(v); writePlanView('today', v) }
   // The guide's Today step asks you to choose from the week, so the week is
   // beside the day for it — without changing the view you keep afterwards
   // (walkthrough 2026-09-30: the step opened on the day alone).
   const { state: guide } = useGuidedPlan()
   const guideOnToday = guide?.status === 'active' && currentStep(guide) === 'today'
-  useEffect(() => { if (guideOnToday) setTodayViewState('ref') }, [guideOnToday])
-  const showWeek = todayView === 'ref'
+  useEffect(() => { if (guideOnToday) { if (alongsideWorkspace) alongsideWorkspace.showWeek(); else setTodayViewState('ref') } }, [guideOnToday, alongsideWorkspace])
+  const showWeek = !alongsideWorkspace && todayView === 'ref'
   const splitRef = useColumnsFitWindow(showWeek)
   const weekNo = weekOfYear(viewedDate, readCadenceConfig().weekStartsOn)
   // The dock's Today pin showed this same list beside the page; the column
@@ -1491,7 +1493,7 @@ export function TodayView({
         // every horizon (Scott, 2026-09-30). The masthead keeps them only where
         // there is no control row to hold them.
         controls={foldedControls
-          ? <div className="flex items-center gap-1">{desktopToolbar}<ViewSwitch view={todayView} onChange={setTodayView} aboveName={`week ${weekNo}`} withFocus={false} /></div>
+          ? <div className="flex items-center gap-1">{desktopToolbar}{!alongsideWorkspace && <ViewSwitch view={todayView} onChange={setTodayView} aboveName={`week ${weekNo}`} withFocus={false} />}</div>
           : headerControls}
         // The masthead's ear: today's weather, one quiet line. The feed only
         // knows today, so another day's page says nothing rather than
@@ -1514,7 +1516,7 @@ export function TodayView({
       {!foldedControls && (
         <div className="pv2-toolbar today-toolbar px-4 md:px-0">
           <div className="pv2-status"><span className="pv2-hint">{weekLine}</span></div>
-          <ViewSwitch view={todayView} onChange={setTodayView} aboveName={`week ${weekNo}`} withFocus={false} />
+          {!alongsideWorkspace && <ViewSwitch view={todayView} onChange={setTodayView} aboveName={`week ${weekNo}`} withFocus={false} />}
         </div>
       )}
       {/* The column beside the day: the week (and anything needing a

@@ -1,13 +1,15 @@
+import { useId } from 'react'
 /** Woodsy Cabin — pines, a stream, smoke from the chimney.
  *  Flat-vector medallion in the place-theme style. Decorative. */
 export function WoodsyCabinVignette({ className = '' }: { className?: string }) {
+  const instance = useId()
   return (
     <svg viewBox="0 0 200 200" className={className} role="img"
       aria-label="A log cabin among pines beside a stream" xmlns="http://www.w3.org/2000/svg">
       <defs>
-        <clipPath id="wc-clip"><circle cx="100" cy="100" r="96" /></clipPath>
+        <clipPath id={`${instance}-wc-clip`}><circle cx="100" cy="100" r="96" /></clipPath>
       </defs>
-      <g clipPath="url(#wc-clip)">
+      <g clipPath={`url(#${instance}-wc-clip)`}>
         {/* sky + far ridge */}
         <rect width="200" height="200" fill="hsl(205 45% 82%)" />
         <path d="M0 88 L44 52 L84 84 L128 46 L172 82 L200 66 V130 H0 Z" fill="hsl(210 30% 62%)" />

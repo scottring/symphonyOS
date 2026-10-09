@@ -1,3 +1,4 @@
+import {AlongsideContext} from '@/components/plan/constellation/AlongsideContext'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { ALL_LAYERS } from '@/lib/domains'
 import { screen, fireEvent, within } from '@testing-library/react'
@@ -51,10 +52,10 @@ function PinsProbe() {
   return <p data-testid="pins">{ref?.pins.map((p) => p.kind).join(',')}</p>
 }
 
-function renderView(props: Record<string, unknown> = {}) {
+function renderView(props: Record<string, unknown> = {}, workspace: {showWeek:()=>void}|null = null) {
   const onToggleTask = vi.fn()
   const view = render(
-    <ReferenceListsProvider userId="u1">
+    <AlongsideContext.Provider value={workspace}><ReferenceListsProvider userId="u1">
       <ScheduleActionsProvider value={ctxValue as never}>
         <TodayView
           tasks={[datedOnly, chosen]} events={[]} routines={[chore]} dateInstances={[]}
@@ -65,7 +66,7 @@ function renderView(props: Record<string, unknown> = {}) {
         />
         <PinsProbe />
       </ScheduleActionsProvider>
-    </ReferenceListsProvider>,
+    </ReferenceListsProvider></AlongsideContext.Provider>,
   )
   return { ...view, onToggleTask }
 }
@@ -129,3 +130,9 @@ describe('Today — the way to Planning', () => {
     expect(ctxValue.onUpdateTask).not.toHaveBeenCalled()
   })
 })
+
+ it('does not show a second weekly-view switch inside the connected workspace',()=>{
+   renderView({}, {showWeek:vi.fn()})
+   expect(screen.queryByRole('group',{name:'View'})).not.toBeInTheDocument()
+   expect(screen.getByText('Call the bank')).toBeInTheDocument()
+ })

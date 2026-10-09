@@ -1,3 +1,4 @@
+import type { WorkspaceContext } from '@/lib/workspace/context'
 // src/lib/agentTurn.ts
 //
 // One turn of the Symphony agent, minus the React. Extracted from
@@ -11,6 +12,9 @@ import { streamSymphonyAgent, type AgentApiMessage, type AgentSourceNote, type A
 /** Tools that mutate task/project data. When the agent uses one, the app needs
  *  to refresh so the change shows without a page reload. */
 export const WRITE_TOOLS = new Set([
+  'symphony_create_plan_item',
+  'symphony_link_plan_item',
+  'symphony_update_intention',
   'symphony_create_task',
   'symphony_create_calendar_event',
   'symphony_update_task',
@@ -26,6 +30,8 @@ export const WRITE_TOOLS = new Set([
 ])
 
 export interface AgentTurnHandlers {
+  onWorkspace?: (page:string,date?:string)=>void
+  workspaceContext?: WorkspaceContext
   /** A streamed text delta. */
   onText?: (chunk: string) => void
   /** Every tool the agent used, write or read. */
@@ -107,6 +113,8 @@ export async function runAgentTurn(
         streamError = message
         handlers.onError?.(message)
       },
+      workspaceContext: handlers.workspaceContext,
+      onWorkspace: handlers.onWorkspace,
       attachment: handlers.attachment,
       currentMemberId: handlers.currentMemberId,
       taskContext: handlers.taskContext,

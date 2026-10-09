@@ -1,0 +1,37 @@
+.ad-shell{max-width:1500px;margin:auto;padding:12px 20px}.ad-nav{display:flex;flex-wrap:wrap;gap:20px;align-items:center;padding:12px 8px;color:#506d59;font-size:13px}.ad-nav button{margin-left:auto;border:1px solid #b9c9ba;border-radius:20px;padding:8px 14px}.ad-layout{display:grid;grid-template-columns:minmax(0,1fr);gap:24px}.ad-open{grid-template-columns:minmax(0,1fr) 300px}.ad-day{min-width:0}.ad-layout aside{background:#edf0e6;border-radius:22px;padding:22px;align-self:start}.ad-layout aside h2{font:25px Georgia,serif;color:#344f41}.ad-layout aside p{font-size:13px;line-height:1.6;color:#60715f;margin:12px 0 20px}.ad-layout article{background:#fffdf7;border:1px solid #dce2d4;border-radius:14px;padding:16px;margin:12px 0;overflow-wrap:anywhere}.ad-layout h3{font:20px/1.4 Georgia,serif;color:#344f41}.ad-layout small{display:block;font-size:12px;color:#667760;margin:8px 0}.ad-layout article button{font-size:12px;color:#365c43;border:1px solid #bbcdb9;border-radius:16px;padding:7px 12px;margin-top:12px}.ad-status{font-size:13px;color:#526b49;margin:0 8px 10px}.ad-shell button:focus-visible,.ad-shell a:focus-visible{outline:2px solid #567b5b;outline-offset:3px}@media(max-width:1000px){.ad-open{grid-template-columns:minmax(0,1fr) 250px}.ad-shell{padding:8px}}@media(max-width:760px){.ad-open{grid-template-columns:1fr}.ad-nav{gap:12px}.ad-layout aside{grid-row:1}.ad-nav button{margin-left:0}}
+
+/* Connected workspace: use Symphony's place tokens and keep the day quiet. */
+.ad-shell{max-width:1440px;padding:16px 32px 32px;color:var(--color-neutral-800)}
+.ad-nav{font-size:12px;color:var(--color-primary-700);padding:8px 0 22px;gap:24px;border-bottom:1px solid var(--color-neutral-200);margin-bottom:24px}
+.ad-nav button{border-color:var(--color-neutral-200);background:var(--color-bg-elevated)}
+.ad-nav button:disabled{opacity:.65;cursor:default}
+.ad-layout{gap:32px}
+.ad-open{grid-template-columns:minmax(0,1fr) 280px}
+.ad-day .today-page{padding-left:0;padding-right:0}
+.ad-layout aside{background:color-mix(in srgb,var(--color-primary-100) 35%,var(--color-bg-base));border-radius:18px;padding:24px}
+.ad-layout aside h2{font-family:var(--font-family-display);font-size:28px;color:var(--color-neutral-800)}
+.ad-layout aside p,.ad-layout small{color:var(--color-neutral-600)}
+.ad-layout article{background:transparent;border:0;border-bottom:1px solid var(--color-neutral-200);border-radius:0;padding:18px 0;margin:0}
+.ad-layout h3{font-family:var(--font-family-display);font-size:22px;color:var(--color-neutral-800)}
+.ad-layout article button{color:var(--color-primary-700);border-color:var(--color-neutral-300);background:var(--color-bg-elevated)}
+.ad-status{color:var(--color-primary-700)}
+.ad-status:empty{display:none}
+.ad-shell button:focus-visible,.ad-shell a:focus-visible{outline-color:var(--color-primary-600)}
+@media(max-width:1000px){.ad-shell{padding:12px 20px}.ad-open{grid-template-columns:minmax(0,1fr) 240px}.ad-layout{gap:24px}}
+@media(max-width:760px){.ad-shell{padding:8px 16px 24px}.ad-open{grid-template-columns:1fr}.ad-nav{gap:12px;padding-bottom:16px}.ad-layout aside{padding:20px}}
+.ad-day .daybook-masthead{margin:0 0 28px;border-bottom-color:var(--color-neutral-200)}
+.ad-day .daybook-title{font-size:clamp(30px,3vw,42px)}
+.ad-day .today-cols-grid{gap:36px}
+.ad-day .daybook-journal-heading{padding-bottom:14px;border-color:var(--color-neutral-200)}
+.ad-layout article .ad-title{font:inherit;color:inherit;border:0;background:transparent;padding:0;margin:0;text-align:left;border-radius:3px;overflow-wrap:anywhere}
+.ad-layout article .ad-title:hover{text-decoration:underline;text-underline-offset:4px}
+/* Adapt to the space left by the companion, not the browser's outer width. */
+.ad-day{container-type:inline-size;container-name:working-day}
+@container working-day (max-width:920px){
+ .ad-day .today-cols-grid{display:flex;flex-direction:column;gap:28px}
+ .ad-day .today-cols-grid>.daybook-journal-section{width:100%;margin-top:0}
+}
+.ad-open .today-cols-grid{display:flex;flex-direction:column;gap:28px}
+.ad-open .today-cols-grid>.daybook-journal-section{width:100%;margin-top:0}
+.ad-layout aside{max-height:calc(100dvh - 180px);overflow-y:auto;overscroll-behavior:contain;scrollbar-gutter:stable}
+@media(max-width:760px){.ad-layout aside{max-height:none;overflow:visible}}

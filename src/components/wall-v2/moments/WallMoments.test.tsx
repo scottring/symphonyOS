@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen, fireEvent, within } from '@testing-library/react'
+import { ConnectedWall } from './ConnectedWall'
 import { Sun } from 'lucide-react'
 import { WallMoments, type WallMomentsProps } from './WallMoments'
 import type { FamilyMember } from '@/types/family'
@@ -151,5 +152,47 @@ describe('WallMoments', () => {
     expect(onOpen).toHaveBeenLastCalledWith(null)
     fireEvent.click(pad.getByRole('button', { name: '+ 2 more' }))
     expect(onOpen).toHaveBeenLastCalledWith(null)
+  })
+})
+
+
+describe('ConnectedWall preserves real wall actions', () => {
+  it('opens notes, returns home, and retains routine callbacks', () => {
+    const props = base()
+    render(<ConnectedWall {...props} />)
+    fireEvent.click(screen.getByRole('button', {name:'Notes & coming up'}))
+    expect(screen.getByRole('heading', {name:'Notes & coming up'})).toHaveFocus()
+    fireEvent.click(screen.getByRole('button', {name:'Add a note'}))
+    expect(props.scratchpad.onOpen).toHaveBeenCalledWith(null)
+    expect(screen.getByText(/Grandpappa picks up/)).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', {name:'Back to Today'}))
+    fireEvent.click(screen.getByRole('button', {name:/Shoes/}))
+    expect(props.onOpenKid).toHaveBeenCalledWith(kids[0])
+  })
+  it('keeps dinner preparation actions behind the compact dinner card', () => {
+    const onScale=vi.fn(), onCook=vi.fn(), onToggleHave=vi.fn(), onAddMissing=vi.fn()
+    const props=base({moment:'dinner',dinner:{title:'Pasta',imageUrl:null,minutes:20,cue:null,ingredients:['Lemon'],hasRecipe:true,scale:1,onScale,onCook,have:new Set(),onToggleHave,onAddMissing}})
+    render(<ConnectedWall {...props}/>)
+    fireEvent.click(screen.getByRole('button',{name:'Ingredients & portions'}))
+    fireEvent.click(screen.getByRole('button',{name:'Lemon'}))
+    fireEvent.click(screen.getByRole('button',{name:'×2'}))
+    fireEvent.click(screen.getByRole('button',{name:/Add missing to shopping/}))
+    fireEvent.click(screen.getByRole('button',{name:'Cook from the recipe'}))
+    expect(onToggleHave).toHaveBeenCalledWith(0)
+    expect(onScale).toHaveBeenCalledWith(2)
+    expect(onAddMissing).toHaveBeenCalledOnce()
+    expect(onCook).toHaveBeenCalledOnce()
+  })
+
+  it('makes schedule overflow reachable and clamps the page after data shrinks', () => {
+    const props = base()
+    const today = Array.from({length:6},(_,i)=>({...props.today[0],id:`item-${i}`,title:`Item ${i}`}))
+    const {rerender} = render(<ConnectedWall {...props} today={today} />)
+    expect(screen.queryByText('Item 4')).toBeNull()
+    fireEvent.click(screen.getByRole('button', {name:'Later'}))
+    fireEvent.click(screen.getByRole('button', {name:/Item 4/}))
+    expect(props.onTapRow).toHaveBeenCalledWith('item-4')
+    rerender(<ConnectedWall {...props} today={today.slice(0,1)} />)
+    expect(screen.getByText('Item 0')).toBeInTheDocument()
   })
 })
