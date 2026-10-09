@@ -15,3 +15,23 @@ export function planNodes(goals: Goal[], periods: Task[][]): PlanNode[] {
  })
  return out
 }
+
+/** Keep the selected appearance, its ancestors and every descendant; never siblings. */
+export function branchKeys(nodes: PlanNode[], selected: string | null): Set<string> {
+ const keys = new Set<string>()
+ const node = nodes.find(n => n.key === selected)
+ if (!node) return keys
+ keys.add(node.key)
+ let parent = nodes.find(n => n.key === node.parent)
+ while (parent && !keys.has(parent.key)) {
+  keys.add(parent.key)
+  parent = nodes.find(n => n.key === parent?.parent)
+ }
+ const visit = (key: string) => {
+  for (const child of nodes.filter(n => n.parent === key)) {
+   if (!keys.has(child.key)) { keys.add(child.key); visit(child.key) }
+  }
+ }
+ visit(node.key)
+ return keys
+}

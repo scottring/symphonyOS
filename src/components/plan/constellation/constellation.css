@@ -32,3 +32,22 @@ dialog.cp-editor{top:50%;bottom:auto;transform:translate(-50%,-50%);margin:0;col
 .hz-detail { scroll-margin-top: 76px; }
 
 .hz-lineage { font-size: 13px; line-height: 1.5; color: var(--color-neutral-600); margin: 8px 0; overflow-wrap: anywhere; }
+
+/* Horizon headers stay put while each card list scrolls independently. */
+.hz-focus-bar{display:flex;align-items:center;justify-content:space-between;gap:16px;margin:0 0 12px;font-size:13px}
+.hz-focus-bar button{padding:10px 16px;border:1px solid var(--color-neutral-300);border-radius:24px;background:var(--color-bg-elevated);flex-shrink:0}
+.hz-column-body{min-width:0}
+.hz-column-body:focus-visible{outline:2px solid var(--color-primary-600);outline-offset:3px;border-radius:8px}
+@media(min-width:851px){
+ .hz-grid{align-items:stretch;height:clamp(320px,calc(100dvh - 380px),760px)}
+ .hz-zone{display:flex;flex-direction:column;min-height:0}
+ .hz-zone>header{flex-shrink:0;margin-bottom:10px}
+ .hz-column-body{flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;overscroll-behavior:contain;scrollbar-gutter:stable;padding-right:4px}
+ .hz-column-body>.hz-item:first-child{margin-top:0}
+}
+@media(max-width:850px){.hz-focus-bar{align-items:flex-start}.hz-column-body{overflow:visible}}
+
+@media(min-width:851px){
+ .hz-grid.is-focused{height:auto;align-items:start}
+ .hz-grid.is-focused .hz-zone{max-height:clamp(320px,calc(100dvh - 380px),760px)}
+}

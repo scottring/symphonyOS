@@ -3,7 +3,7 @@ import {MemoryRouter} from 'react-router-dom'
 import {beforeEach,describe,it,expect,vi} from 'vitest'
 import {ConstellationPage} from './ConstellationPage'
 const api=vi.hoisted(()=>({addGoal:vi.fn(),updateGoal:vi.fn(),addTask:vi.fn(),updateTask:vi.fn(),refetch:vi.fn()}))
-vi.mock('@/contexts/GoalsContext',()=>({GoalsProvider:({children}:any)=>children,useGoalsContext:()=>({goals:[{id:'g',name:'Together',year:2026,status:'active',context:'personal'}],loading:false,...api})}))
+vi.mock('@/contexts/GoalsContext',()=>({GoalsProvider:({children}:any)=>children,useGoalsContext:()=>({goals:[{id:'g',name:'Together',year:2026,status:'active',context:'personal'},{id:'other',name:'Health',year:2026,status:'active',context:'personal'}],loading:false,...api})}))
 vi.mock('@/hooks/useSupabaseTasks',()=>({useSupabaseTasks:()=>({tasks:[],loading:false,error:null,...api})}))
 vi.mock('@/hooks/useDomain',()=>({useDomain:()=>({layers:[],soleDomain:'personal'})}))
 vi.mock('@/hooks/useAssigneeFilter',()=>({useAssigneeFilter:()=>[[]]}))
@@ -13,7 +13,7 @@ vi.mock('@/lib/today/domainFilter',()=>({filterTasksForLayers:(t:any)=>t,matches
 vi.mock('@/lib/planning/peopleLens',()=>({planPeopleLens:()=>({keep:()=>true,scopeId:null})}))
 vi.mock('../v2/AddArea',()=>({useAddArea:()=>({area:'personal',picker:null})}))
 function open(){render(<MemoryRouter initialEntries={['/year?view=constellation&start=2026-10-09']}><ConstellationPage/></MemoryRouter>)}
-beforeEach(()=>{vi.clearAllMocks();HTMLDialogElement.prototype.showModal=function(){this.setAttribute('open','')};HTMLDialogElement.prototype.close=function(){this.removeAttribute('open')}})
+beforeEach(()=>{vi.clearAllMocks();HTMLElement.prototype.scrollIntoView=vi.fn();HTMLDialogElement.prototype.showModal=function(){this.setAttribute('open','')};HTMLDialogElement.prototype.close=function(){this.removeAttribute('open')}})
 describe('connected Constellation saves',()=>{
  it('retains wording on failed create and locks period while composing',async()=>{
  api.addGoal.mockResolvedValue(null);open();fireEvent.click(screen.getByText('+ Add an independent yearly intention'))
@@ -41,4 +41,15 @@ it('selects the saved intention from the conversation and refreshes later saves'
  expect(screen.getByRole('region',{name:'Selected plan item'})).toHaveTextContent('Together')
  fireEvent(window,new Event('symphony-plan-updated'))
  expect(api.refetch).toHaveBeenCalledTimes(1)
+})
+
+it('focuses a clicked branch and restores unrelated plans without changing data',()=>{
+ open()
+ fireEvent.click(screen.getByRole('button',{name:/Together/,pressed:false}))
+ expect(screen.queryByRole('button',{name:/Health/})).not.toBeInTheDocument()
+ expect(screen.getByText(/1 hidden/)).toBeInTheDocument()
+ fireEvent.click(screen.getByRole('button',{name:'Show all plans'}))
+ expect(screen.getByRole('button',{name:/Health/})).toBeInTheDocument()
+ expect(api.updateTask).not.toHaveBeenCalled()
+ expect(api.updateGoal).not.toHaveBeenCalled()
 })
