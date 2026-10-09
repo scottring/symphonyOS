@@ -2,7 +2,7 @@ import {render,screen,fireEvent,waitFor} from '@testing-library/react'
 import {MemoryRouter} from 'react-router-dom'
 import {beforeEach,describe,it,expect,vi} from 'vitest'
 import {ConstellationPage} from './ConstellationPage'
-const api=vi.hoisted(()=>({addGoal:vi.fn(),updateGoal:vi.fn(),addTask:vi.fn(),updateTask:vi.fn()}))
+const api=vi.hoisted(()=>({addGoal:vi.fn(),updateGoal:vi.fn(),addTask:vi.fn(),updateTask:vi.fn(),refetch:vi.fn()}))
 vi.mock('@/contexts/GoalsContext',()=>({GoalsProvider:({children}:any)=>children,useGoalsContext:()=>({goals:[{id:'g',name:'Together',year:2026,status:'active',context:'personal'}],loading:false,...api})}))
 vi.mock('@/hooks/useSupabaseTasks',()=>({useSupabaseTasks:()=>({tasks:[],loading:false,error:null,...api})}))
 vi.mock('@/hooks/useDomain',()=>({useDomain:()=>({layers:[],soleDomain:'personal'})}))
@@ -32,4 +32,13 @@ describe('connected Constellation saves',()=>{
  fireEvent.click(screen.getByRole('button',{name:'Save',exact:true}));await screen.findByText('Saved to your plan.')
  expect(api.addTask).toHaveBeenCalledWith('Unhurried weekends',undefined,undefined,undefined,expect.objectContaining({bucket:'quarter',goalId:'g',context:'personal',seasonStart:new Date(2026,8,1)}))
  })
+})
+
+it('selects the saved intention from the conversation and refreshes later saves',()=>{
+ HTMLElement.prototype.scrollIntoView=vi.fn()
+ render(<MemoryRouter initialEntries={['/year?view=constellation&start=2026-10-09&focus=0:g']}><ConstellationPage/></MemoryRouter>)
+ expect(screen.getByRole('button',{name:/Together Saved to your plan/,pressed:true})).toBeInTheDocument()
+ expect(screen.getByRole('region',{name:'Selected plan item'})).toHaveTextContent('Together')
+ fireEvent(window,new Event('symphony-plan-updated'))
+ expect(api.refetch).toHaveBeenCalledTimes(1)
 })

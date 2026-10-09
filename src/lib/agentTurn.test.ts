@@ -89,3 +89,15 @@ it('refreshes the workspace after linking an existing plan item',async()=>{
  })
  expect((await runAgentTurn([])).didWrite).toBe(true)
 })
+
+it('delivers saved nodes before the reply finishes, even when the connection later drops', async () => {
+ const onPlanSaved=vi.fn()
+ vi.mocked(streamSymphonyAgent).mockImplementation(async (_messages,h)=>{
+   h.onPlanSaved?.({id:'new-milestone',level:2,date:'2026-10-01'})
+   expect(onPlanSaved).toHaveBeenCalledWith({id:'new-milestone',level:2,date:'2026-10-01'})
+   throw new Error('disconnected after save')
+ })
+ const result=await runAgentTurn([],{onPlanSaved})
+ expect(result.error).toBe('Connection dropped')
+ expect(onPlanSaved).toHaveBeenCalledTimes(1)
+})

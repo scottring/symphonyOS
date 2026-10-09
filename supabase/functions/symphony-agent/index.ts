@@ -1,3 +1,4 @@
+import { planSaved } from './planSaved.ts'
 import { planningRow, validatePlanningParent, planningWeekStart } from './planning.ts'
 import { createClient, SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { buildDraftPayload, clampMaxResults } from '../_shared/gmail-tools.ts'
@@ -67,7 +68,8 @@ Grounding and verification (important):
 - Only state facts you have actually read from a tool result. Never assert a prior value, schedule, date, or history you have not looked up. If you are not sure, look it up or say you don't know. Do not invent.
 - Scott has a large knowledge base of notes synced from his vault. When he asks what he knows about a topic, wants background or prep on something (an interview, a person, a project, a decision), or asks you to gather relevant material, call symphony_search_notes BEFORE concluding there is nothing. Do not say "nothing exists" or "I have no information on X" about any topic without searching notes first. When you use a note, name its title so he can find it. The notes you find are shown to the user as clickable chips they can open in-app, so you do not need to print file paths, ".md" filenames, or links.
 - The user's data spans tasks, routines, projects, contacts, lists, notes, and calendar events. Before acting on "X", check the right entity type: a recurring item like "Feed Jax dinner" is a routine (symphony_list_routines), not a task. Look it up before assuming it doesn't exist.
-- A dated occasion someone ATTENDS (a show, appointment, party, pickup, reservation) belongs on the real calendar: use symphony_create_calendar_event, never symphony_create_task, for it. Tasks are to-dos someone DOES. Family occasions go on the family calendar (domain "family").
+- A dated occasion someone ATTENDS (a show, appointment, party, pickup, reservation) normally belongs on the calendar. However, when the user explicitly asks for a timed task, honor that using a task with scheduled_for and is_all_day=false; do not require a calendar connection. Tasks are to-dos someone DOES. Family occasions go on the family calendar (domain "family").
+- Keep the IDs returned by writes and reuse them in this conversation instead of repeatedly searching. Create linked weekly work with symphony_create_plan_item and parent_id, then schedule that same ID. If linking fails, repair the existing item; never create a replacement that leaves a duplicate. After a connection failure, check existing items before retrying a creation.
 - After ANY write (create / update / complete / delete / add / check), VERIFY before you claim success: read the affected item back with the matching list_/get_ tool and confirm the fields you intended actually changed. If the change did not take or a value looks wrong, say so and retry or ask. Never report a change you have not verified.
 - When updating an item, change only the fields the user asked about. Do not modify unrelated fields (schedule, time, name, context) as a side effect.
 
@@ -460,7 +462,7 @@ const TOOLS = [
   {
     name: 'symphony_create_calendar_event',
     description:
-      "Create a REAL Google Calendar event on the user's calendar. Use this — NOT symphony_create_task — for anything that belongs on a calendar: a show, appointment, party, reservation, or any occasion with a fixed date and time. Times without a UTC offset are read as the user's LOCAL time (US Eastern).",
+      "Create a REAL Google Calendar event on the user's calendar. Use this for calendar events. If the user explicitly requests a timed task, use a scheduled task instead, even when it has a fixed date and time. Times without a UTC offset are read as the user's LOCAL time (US Eastern).",
     input_schema: {
       type: 'object',
       properties: {
@@ -1463,6 +1465,8 @@ Deno.serve(async (req) => {
                   result=JSON.stringify({navigationRequested:true,page})
                 } else result=JSON.stringify({error:'Workspace navigation unavailable or invalid'})
               } else result = await runTool(db, user.id, block.name, block.input ?? {}, attachment, currentMemberId, authHeader, sourceNotes)
+              const saved = body.workspaceContext ? planSaved(block.name, block.input ?? {}, result) : null
+              if (saved) send(saved)
               toolResults.push({ type: 'tool_result', tool_use_id: block.id, content: result })
             }
           }

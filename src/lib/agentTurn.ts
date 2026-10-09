@@ -30,6 +30,7 @@ export const WRITE_TOOLS = new Set([
 ])
 
 export interface AgentTurnHandlers {
+  onPlanSaved?: (saved: { id: string; level: number; date: string }) => void
   onWorkspace?: (page:string,date?:string)=>void
   workspaceContext?: WorkspaceContext
   /** A streamed text delta. */
@@ -115,6 +116,7 @@ export async function runAgentTurn(
       },
       workspaceContext: handlers.workspaceContext,
       onWorkspace: handlers.onWorkspace,
+      onPlanSaved: handlers.onPlanSaved,
       attachment: handlers.attachment,
       currentMemberId: handlers.currentMemberId,
       taskContext: handlers.taskContext,

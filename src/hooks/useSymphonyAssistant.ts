@@ -10,6 +10,7 @@ import { useFamilyMembers } from '@/hooks/useFamilyMembers'
 const SESSIONS_LIMIT = 20
 
 export interface UseSymphonyAssistantOptions {
+  onPlanSaved?: (saved: { id: string; level: number; date: string }) => void
   onWorkspace?: (page:string,date?:string)=>void
   workspaceContext?: WorkspaceContext
   /** Called after a turn in which the agent wrote data, so the caller can
@@ -57,7 +58,7 @@ function hydrateMessages(raw: unknown, sessionId: string): ChatMessage[] {
  * chat_sessions so conversations survive reloads (history dropdown).
  */
 export function useSymphonyAssistant(options?: UseSymphonyAssistantOptions) {
-  const { onWorkspace, onMutate, taskContext, workspaceContext, persistKey, persistEntityId } = options ?? {}
+  const { onPlanSaved, onWorkspace, onMutate, taskContext, workspaceContext, persistKey, persistEntityId } = options ?? {}
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [loading, setLoading] = useState(false)
   const sending = useRef(false)
@@ -227,6 +228,7 @@ export function useSymphonyAssistant(options?: UseSymphonyAssistantOptions) {
       taskContext,
       workspaceContext,
       onWorkspace,
+      onPlanSaved,
     })
 
     const assistantSources: AgentSourceNote[] | undefined = turn.sources
@@ -240,7 +242,7 @@ export function useSymphonyAssistant(options?: UseSymphonyAssistantOptions) {
     setLoading(false)
     sending.current = false
     return turn.error ? `The request failed: ${turn.error}. ${turn.text}` : turn.text
-  }, [onWorkspace, workspaceContext, loading, messages, onMutate, taskContext, getCurrentUserMember, persistTurn])
+  }, [onPlanSaved, onWorkspace, workspaceContext, loading, messages, onMutate, taskContext, getCurrentUserMember, persistTurn])
 
   const resetSession = useCallback(() => {
     if (sending.current) return

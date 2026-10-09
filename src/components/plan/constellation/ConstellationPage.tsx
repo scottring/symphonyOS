@@ -35,7 +35,11 @@ function Inner(){
   selectPeriodTasks(visible,'month',month.start,isCurrentPeriod(month,new Date()),lens.scopeId,seasons),
   visible.filter(t=>committedTo(t,'week',week,{isCurrent:localYmd(week)===localYmd(weekStartAnchor(new Date(),readCadenceConfig().weekStartsOn))})!==undefined),
  ])
- const [selected,setSelected]=useState<string|null>(null)
+ const savedHeading=useRef<HTMLElement>(null)
+ const [selected,setSelected]=useState<string|null>(params.get('focus'))
+ const savedFocus=params.get('focus')
+ useEffect(()=>{ if(savedFocus) setSelected(savedFocus) },[savedFocus])
+ useEffect(()=>{ const refresh=()=>{void refetch()}; window.addEventListener('symphony-plan-updated',refresh); return ()=>window.removeEventListener('symphony-plan-updated',refresh) },[refetch])
  const [editor,setEditor]=useState<{node?:PlanNode;parent?:PlanNode;level:number;createId?:string;context?:'work'|'family'|'personal'|null}|null>(null)
  const dialog=useRef<HTMLDialogElement>(null)
  useEffect(()=>{if(editor)dialog.current?.showModal();else dialog.current?.close()},[editor])
@@ -62,6 +66,8 @@ function Inner(){
  }
  const periodLabels=[String(safeAnchor.getFullYear()),season.label,month.label,`Week of ${week.toLocaleDateString()}`]
  const focus=nodes.find(n=>n.key===selected)
+ const visibleSavedKey=nodes.find(n=>n.key===savedFocus)?.key
+ useEffect(()=>{if(visibleSavedKey&&!editor)savedHeading.current?.scrollIntoView({block:'start',behavior:'auto'})},[visibleSavedKey,editor])
  const related=new Set<string>()
  if(focus){
   related.add(focus.key)
@@ -71,10 +77,10 @@ function Inner(){
   visit(focus.key)
  }
  return <main className="cp-page"><p className="cp-caption">YOUR PLANNING MAP</p><h1>{periodLabels[level]}</h1><p>Build each horizon across your plans. Select an item to see its connections and add what comes next. Current filters apply.</p><div className="cp-nav"><label>Planning date <input type="date" value={localYmd(safeAnchor)} disabled={!!editor} onChange={e=>{if(e.target.value){const p=new URLSearchParams(params);p.set('start',e.target.value);setParams(p);setSelected(null)}}}/></label>{tabs.map((t,i)=><button key={t} disabled={!!editor} aria-current={level===i?'page':undefined} onClick={()=>{const p=new URLSearchParams(params);p.set('horizon',String(i));setParams(p);document.getElementById(`horizon-${i}`)?.scrollIntoView({block:'nearest',behavior:'smooth'})}}>{t}</button>)}<button onClick={()=>navigate('/today?view=alongside')} disabled={!!editor}>Today →</button></div>
- {(loading||goalsLoading)&&<p role="status">Loading your plans…</p>}{(error||goalsError)?<p role="alert">Plans could not load. <button onClick={()=>{if(goalsError)window.location.reload();else void refetch()}}>Retry</button></p>:<> {focus&&<section className="hz-detail" aria-label="Selected plan item"><div><small>{terms[focus.level]} · {periodLabels[focus.level]}</small><h2>{focus.title}</h2></div><button className="cp-edit" disabled={!!editor} onClick={()=>edit(focus)}>Edit<span className="sr-only"> {focus.title}</span></button>{focus.task&&selection&&<button className="cp-edit" onClick={()=>selection.setSelection({kind:'task',id:focus.id})}>Open details</button>}{focus.level<3?<button className="cp-add" disabled={!!editor} onClick={()=>add(focus.level+1,focus)}>+ Add a {terms[focus.level+1]}</button>:<button className="cp-add" onClick={()=>navigate(`/week?view=alongside&start=${localYmd(week)}`)}>Schedule or complete in Week →</button>}</section>}<div className="hz-grid">{tabs.map((tab,i)=><section id={`horizon-${i}`} key={tab} className={`hz-zone hz-zone-${i} ${level===i?'hz-active':''}`} aria-label={`${tab} plans`}>
+ {(loading||goalsLoading)&&<p role="status">Loading your plans…</p>}{(error||goalsError)?<p role="alert">Plans could not load. <button onClick={()=>{if(goalsError)window.location.reload();else void refetch()}}>Retry</button></p>:<> {focus&&<section ref={savedHeading} className="hz-detail" aria-label="Selected plan item"><div><small>{terms[focus.level]} · {periodLabels[focus.level]}</small><h2>{focus.title}</h2>{savedFocus===focus.key&&<><p className="hz-lineage">{nodes.filter(n=>related.has(n.key)&&n.level<focus.level).sort((a,b)=>a.level-b.level).map(n=>n.title).join(' → ')}</p><small className="hz-saved">Saved{focus.task?.scheduledFor?` · ${focus.task.scheduledFor.toLocaleDateString()}${!focus.task.isAllDay?' at '+focus.task.scheduledFor.toLocaleTimeString([], {hour:'numeric',minute:'2-digit'}):''}`:' to your plan'}</small></>}</div><button className="cp-edit" disabled={!!editor} onClick={()=>edit(focus)}>Edit<span className="sr-only"> {focus.title}</span></button>{focus.task&&selection&&<button className="cp-edit" onClick={()=>selection.setSelection({kind:'task',id:focus.id})}>Open details</button>}{focus.level<3?<button className="cp-add" disabled={!!editor} onClick={()=>add(focus.level+1,focus)}>+ Add a {terms[focus.level+1]}</button>:<button className="cp-add" onClick={()=>navigate(`/week?view=alongside&start=${localYmd(week)}`)}>Schedule or complete in Week →</button>}</section>}<div className="hz-grid">{tabs.map((tab,i)=><section id={`horizon-${i}`} key={tab} className={`hz-zone hz-zone-${i} ${level===i?'hz-active':''}`} aria-label={`${tab} plans`}>
  <header><h2>{tab}</h2><p>{terms[i]}s · {periodLabels[i]}</p></header>
- {nodes.filter(n=>n.level===i).map(n=><button key={n.key} className={`hz-item ${selected===n.key?'hz-selected':related.has(n.key)?'hz-related':''}`} aria-pressed={selected===n.key} disabled={!!editor} onClick={()=>setSelected(n.key)}>
- <span>{n.title}</span><small>{n.parent?nodes.find(p=>p.key===n.parent)?.title:'Independent '+terms[i]}</small>{n.task?.completed&&<small>Completed</small>}{n.task?.scheduledFor&&<small>Scheduled {n.task.scheduledFor.toLocaleDateString()}</small>}
+ {nodes.filter(n=>n.level===i).sort((a,b)=>{if(!savedFocus||!focus)return 0;const near=(n:PlanNode)=>related.has(n.key)||(!!focus.parent&&n.parent===focus.parent);return Number(near(b))-Number(near(a))}).map(n=><button key={n.key} className={`hz-item ${selected===n.key?'hz-selected':related.has(n.key)?'hz-related':''}`} aria-pressed={selected===n.key} disabled={!!editor} onClick={()=>setSelected(n.key)}>
+ <span>{n.title}</span>{savedFocus===n.key&&<small className="hz-saved" role="status">Saved to your plan</small>}<small>{n.parent?nodes.find(p=>p.key===n.parent)?.title:'Independent '+terms[i]}</small>{n.task?.completed&&<small>Completed</small>}{n.task?.scheduledFor&&<small>Scheduled {n.task.scheduledFor.toLocaleDateString()}{!n.task.isAllDay&&` · ${n.task.scheduledFor.toLocaleTimeString([], {hour:'numeric',minute:'2-digit'})}`}</small>}
  </button>)}
  {!nodes.some(n=>n.level===i)&&!loading&&!goalsLoading&&<p className="cp-empty">Nothing here for this period and filter yet.</p>}
  <button className="cp-add" disabled={!!editor||loading||goalsLoading} onClick={()=>add(i)}>+ Add an independent {terms[i]}</button>

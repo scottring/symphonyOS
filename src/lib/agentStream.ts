@@ -4,6 +4,7 @@ import { supabase } from '@/lib/supabase'
 export interface AgentSourceNote { id: string; title: string; vaultPath?: string }
 
 export type AgentStreamEvent =
+  | { type: 'plan_saved'; id: string; level: number; date: string }
   | { type: 'workspace'; page: string; date?: string }
   | { type: 'session'; sessionId: string }
   | { type: 'text'; text: string }
@@ -72,6 +73,7 @@ export interface AssistantSessionContext {
 }
 
 export interface StreamHandlers {
+  onPlanSaved?: (saved: { id: string; level: number; date: string }) => void
   onWorkspace?: (page:string,date?:string)=>void
   workspaceContext?: WorkspaceContext
   onText?: (text: string) => void
@@ -151,7 +153,8 @@ export async function streamSymphonyAgent(
     const { events, rest } = parseSSEChunk(buffer)
     buffer = rest
     for (const ev of events) {
-      if (ev.type === 'workspace') handlers.onWorkspace?.(ev.page,ev.date)
+      if (ev.type === 'plan_saved') handlers.onPlanSaved?.(ev)
+      else if (ev.type === 'workspace') handlers.onWorkspace?.(ev.page,ev.date)
       else if (ev.type === 'text') handlers.onText?.(ev.text)
       else if (ev.type === 'tool') handlers.onTool?.(ev.name)
       else if (ev.type === 'session') handlers.onSession?.(ev.sessionId)

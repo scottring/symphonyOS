@@ -236,7 +236,14 @@ function ShellLayoutInner({ children }: Props) {
   // button toggles the same state); phones open it per launch.
   const conversationContext = useMemo(() => assistantSelection(scopedTasks, selection, layers), [scopedTasks, selection, layers]);
   const screenContext = useMemo(() => workspaceContext(scopedTasks, location.pathname, location.search, layers, selection?.kind === 'task' ? selection.id : null, new Date(), scopedGoals), [scopedTasks, scopedGoals, location.pathname, location.search, layers, selection, cadenceConfig.weekStartsOn]);
-  const assistant = useSymphonyAssistant({ persistKey: 'symphony_rail', onWorkspace: (page,date) => { if (connectedWorkspace) { const url=workspaceDestination(page,date); if(url) navigate(url); } }, taskContext: conversationContext.taskContext, workspaceContext: connectedWorkspace ? screenContext : undefined, onMutate: () => { void refetch(); window.dispatchEvent(new Event('symphony-plan-updated')); } });
+  const assistant = useSymphonyAssistant({ persistKey: 'symphony_rail', onPlanSaved: (saved) => {
+    void refetch();
+    window.dispatchEvent(new Event('symphony-plan-updated'));
+    if (connectedWorkspace && !document.querySelector('dialog[open]') && Number.isInteger(saved.level) && saved.level >= 0 && saved.level <= 3 && /^\d{4}-\d{2}-\d{2}$/.test(saved.date)) {
+      const query = new URLSearchParams({ view: 'constellation', start: saved.date, horizon: String(saved.level), focus: `${saved.level}:${saved.id}` });
+      navigate(`/year?${query}`, { replace: true });
+    }
+  }, onWorkspace: (page,date) => { if (connectedWorkspace) { const url=workspaceDestination(page,date); if(url) navigate(url); } }, taskContext: conversationContext.taskContext, workspaceContext: connectedWorkspace ? screenContext : undefined, onMutate: () => { void refetch(); window.dispatchEvent(new Event('symphony-plan-updated')); } });
   const voiceAccess = useWorkspaceVoiceAccess(user?.id ?? null, connectedWorkspace);
   const voiceEnabled = connectedWorkspace && voiceAccess;
   const voice = useWorkspaceVoice(screenContext, assistant.sendMessage, (url) => navigate(import.meta.env.DEV && new URLSearchParams(location.search).get('voice') === '1' ? `${url}&voice=1` : url), voiceEnabled, user?.id ?? null);
