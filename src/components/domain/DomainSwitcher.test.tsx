@@ -64,3 +64,25 @@ describe('DomainSwitcher', () => {
     expect(screen.queryByRole('menu')).not.toBeInTheDocument()
   })
 })
+
+describe('visible saved filter state', () => {
+  beforeEach(() => localStorage.clear())
+  it('labels a restored filter and pulses on arrival without a banner', async () => {
+    localStorage.setItem(LAYERS_KEY, JSON.stringify(['personal']))
+    renderSwitcher()
+    const trigger = screen.getByRole('button', { name: 'Areas: Personal' })
+    expect(trigger).toHaveTextContent('Personal only')
+    expect(trigger).toHaveClass('area-filter-pulse')
+    await userEvent.click(trigger)
+    await userEvent.click(screen.getByRole('button', { name: 'All', exact: true }))
+    expect(screen.getByRole('button', { name: 'Areas: All' })).toHaveTextContent('All areas')
+  })
+  it('does not pulse an unfiltered page and labels mixed selections', () => {
+    const view = renderSwitcher()
+    expect(screen.getByRole('button', { name: 'Areas: All' })).not.toHaveClass('area-filter-pulse')
+    view.unmount()
+    localStorage.setItem(LAYERS_KEY, JSON.stringify(['work', 'family']))
+    renderSwitcher()
+    expect(screen.getByRole('button', { name: 'Areas: Work, Family' })).toHaveTextContent('2 of 4 areas')
+  })
+})
