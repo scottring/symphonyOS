@@ -437,3 +437,20 @@ describe('Capture and the Today pin from every desktop page', () => {
     expect(screen.getAllByRole('link', { name: 'Today' })).toHaveLength(1)
   })
 })
+
+// A persisted filter must be visible even on phones, where the header icon
+// can be absent. Clearing it should update the existing lens, not any data.
+describe('visible area filter across planning pages', () => {
+  afterEach(() => localStorage.clear())
+  it.each([false, true])('shows one notice on each horizon (mobile=%s)', (mobile) => {
+    mobileState.isMobile = mobile
+    for (const path of ['/today', '/week', '/month', '/season', '/year', '/inbox']) {
+      localStorage.setItem('symphony-layers', JSON.stringify(['personal']))
+      const view = renderAt(path)
+      expect(screen.getAllByText('Showing Personal only')).toHaveLength(1)
+      fireEvent.click(screen.getByRole('button', { name: 'Show all areas' }))
+      expect(screen.queryByText('Showing Personal only')).not.toBeInTheDocument()
+      view.unmount()
+    }
+  })
+})
