@@ -1,3 +1,4 @@
+import { defaultPlanningDestination } from '@/lib/planning/connectedDestination';
 import { useCadenceConfig } from '@/lib/cadence/config';
 import { useGoals } from '@/hooks/useGoals';
 import { useAssigneeFilter } from '@/hooks/useAssigneeFilter';
@@ -139,6 +140,10 @@ interface Props {
 function ShellLayoutInner({ children }: Props) {
   const navigate = useNavigate();
   const location = useLocation();
+  useEffect(() => {
+    const destination = defaultPlanningDestination(location.pathname, location.search);
+    if (destination) navigate(destination + location.hash, { replace: true });
+  }, [location.pathname, location.search, location.hash, navigate]);
   const connectedView = new URLSearchParams(location.search).get('view');
   const connectedWorkspace = connectedView === 'alongside' || connectedView === 'constellation' || new URLSearchParams(location.search).get('workspace') === '1';
   // Planning v2 dresses the whole shell (headings, the day numeral) while it

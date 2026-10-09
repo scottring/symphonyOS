@@ -29,11 +29,11 @@ describe('PlanNavigation', () => {
     // Words only on the rail (2026-10-07); the period it opens is in the tooltip.
     expect(month.textContent).toBe('Month')
     expect(month.getAttribute('title')).toBe('October')
-    expect(month.getAttribute('href')).toBe('/month?start=2026-10-01')
+    expect(month.getAttribute('href')).toBe('/month?start=2026-10-01&view=constellation&horizon=2')
     // The other steps follow the period on screen (decision D, 2026-09-29):
     // the week holding October 1, not the clock's week. Today stays today.
     expect(rail.querySelector('a[href^="/week?start="]')).toBeTruthy()
-    expect(rail.querySelector('a[href="/today"]')).toBeTruthy()
+    expect(rail.querySelector('a[href="/today?view=alongside"]')).toBeTruthy()
   })
 
   // Scott, 2026-09-30: ascending, Today first — the same order as the phone's menu.

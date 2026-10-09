@@ -897,7 +897,6 @@ export function HomeViewContainer({ fixedView }: { fixedView?: 'today' | 'week' 
       )}
 
       {fixedView === 'week' && <div className="flex flex-wrap gap-4 px-4 py-2 text-sm">
-        {searchParams.get('view') !== 'alongside' && <button className="underline" onClick={() => { const p = new URLSearchParams(searchParams); p.set('view', 'alongside'); navigate(`/week?${p}`); }}>Open redesigned workspace</button>}
         <button className="underline" onClick={() => navigate(`/year?view=constellation&horizon=3&start=${localYmd(viewedDate)}`)}>Open planning map</button>
       </div>}
 

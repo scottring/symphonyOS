@@ -27,7 +27,7 @@ describe('DesktopNavigation — one bar on every page (2026-09-29)', () => {
     </MemoryRouter>)
     const nav = screen.getByRole('navigation', { name: 'Main navigation' })
     const mark = within(nav).getByRole('link', { name: 'Symphony, go to Today' })
-    expect(mark).toHaveAttribute('href', '/today')
+    expect(mark).toHaveAttribute('href', '/today?view=alongside')
     expect(nav.querySelector('.page-navigation-left')?.firstElementChild).toBe(mark)
   })
 })

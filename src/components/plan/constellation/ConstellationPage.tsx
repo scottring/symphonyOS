@@ -85,6 +85,6 @@ function Inner(){
  <div className="cp-new">{area.picker}<span className="cp-caption">Life area for new independent entries</span></div></>}
 
  <dialog ref={dialog} className="cp-editor" aria-label="Plan wording" onCancel={e=>{if(busy)e.preventDefault();else setEditor(null)}} onClose={()=>{if(!busy)setEditor(null)}}>{editor&&<form aria-label={editor.node?'Edit plan item':'Add plan item'} onSubmit={e=>{e.preventDefault();void save()}}><h2>{editor.node?'Edit':'Add'} {terms[editor.level]}</h2><p>{periodLabels[editor.level]}{editor.parent?` · Under ${editor.parent.title}`:''}</p><label>Wording<input autoFocus value={draft} disabled={busy} onChange={e=>setDraft(e.target.value)}/></label><button disabled={busy||!draft.trim()}>{busy?'Saving…':'Save'}</button><button type="button" disabled={busy} onClick={()=>setEditor(null)}>Cancel</button><p role="status">{message}</p></form>}</dialog>
- {!editor&&<p role="status">{message}</p>}<button className="cp-add" disabled={!!editor} onClick={()=>navigate(`/year?start=${safeAnchor.getFullYear()}-01-01`)}>Return to standard planning view</button></main>
+ {!editor&&<p role="status">{message}</p>}</main>
 }
 export function ConstellationPage(){return <GoalsProvider><Inner/></GoalsProvider>}
