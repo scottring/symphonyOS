@@ -41,3 +41,7 @@ Next work: review the feel of this rehearsal, then connect one complete live con
 - Model tests cover view-only transitions, all-goal continuity, new intentions, return context, immutable saved snapshot, Today selection, and unknown phrases.
 - Compact desktop-width simulation checked; actual phone/device testing remains outstanding.
 - Evidence: `living-canvas-evidence/welcome.jpg`, `dinner.jpg`, `summary.jpg`, `compact.jpg`.
+
+## Resting-view extension
+
+Added a stable sample home, explicit context selector, Family-only wall composition, routine occurrence versus standing-pattern choices, a suggested connection with an independent alternative, and a simulated contact call. Continue conversation restores the conversation canvas; returning to rest preserves the local example state. Context changes return to the appropriate home rather than retaining a contact from another context. These are local interaction examples, not permission enforcement or telephony integration. Surface selection is illustrative; full device-specific layouts remain to develop. TypeScript and seven existing model tests pass; those tests do not cover the new local routine/calling controls. Desktop visual inspected.

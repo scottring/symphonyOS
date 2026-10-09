@@ -22,7 +22,7 @@ export const responses: Record<Scene,string> = {
  cooking:'Let’s bring the recipe forward. Ingredients on the left, steps on the right. Check things off as you go.',
 }
 export const initialState: State = {scene:'welcome',returnTo:'year',draft:{threads,today:['health'],other:[]},saved:null,checkedIngredients:[],done:[],reply:responses.welcome,heard:'',revision:0}
-export type Action = {type:'say';text:string}|{type:'edit';id:string;field:'year'|'season'|'month'|'week';value:string}|{type:'selectToday';id:string}|{type:'ingredient';name:string}|{type:'save'}|{type:'add';title:string;period:PlanScene}|{type:'complete';id:string}
+export type Action = {type:'show';scene:Scene}|{type:'say';text:string}|{type:'edit';id:string;field:'year'|'season'|'month'|'week';value:string}|{type:'selectToday';id:string}|{type:'ingredient';name:string}|{type:'save'}|{type:'add';title:string;period:PlanScene}|{type:'complete';id:string}
 export function interpret(text:string): Scene|'back'|'save'|'unknown' {
  const s=text.toLowerCase().replace(/[’']/g,'').trim()
  if (/back to.*plan|return to.*plan|back to.*conversation|where were we/.test(s)) return 'back'
@@ -39,6 +39,8 @@ export function interpret(text:string): Scene|'back'|'save'|'unknown' {
 }
 export function reducer(state:State,action:Action):State {
  switch(action.type){
+ case 'show':return {...state,scene:action.scene,returnTo:sequence.includes(action.scene as PlanScene)?action.scene as PlanScene:state.returnTo}
+
  case 'say': {const intent=interpret(action.text);if(intent==='unknown')return {...state,heard:action.text,reply:'This is a scripted rehearsal, so I can’t interpret that freely yet. Try a suggested phrase below, or edit any item directly.'};if(intent==='save')return {...state,heard:action.text,reply:'Use “Save sample plan” to confirm. Looking at an idea does not save it.'};const scene=intent==='back'?state.returnTo:intent;return {...state,scene,heard:action.text,reply:responses[scene],returnTo:sequence.includes(scene as PlanScene)?scene as PlanScene:state.returnTo}}
  case 'edit': return {...state,revision:state.revision+1,draft:{...state.draft,threads:state.draft.threads.map(t=>t.id===action.id?{...t,[action.field]:action.value}:t)},reply:'Updated in your draft. The connection to the rest of your plan stays intact.'}
  case 'selectToday': return {...state,revision:state.revision+1,draft:{...state.draft,today:state.draft.today.includes(action.id)?state.draft.today.filter(id=>id!==action.id):[...state.draft.today,action.id]}}
