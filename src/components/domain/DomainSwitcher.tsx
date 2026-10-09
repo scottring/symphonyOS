@@ -28,6 +28,7 @@ function triggerLabel(layers: ReadonlySet<Layer>): string {
 
 export function DomainSwitcher() {
   const { layers, toggle, only, all } = useDomain()
+  const [pulseOnLoad] = useState(() => triggerLabel(layers) !== 'All')
   const [isOpen, setIsOpen] = useState(false)
   const [menuPosition, setMenuPosition] = useState<{ top?: number; bottom?: number; right: number }>({ top: 0, right: 0 })
   const triggerRef = useRef<HTMLButtonElement>(null)
@@ -133,7 +134,8 @@ export function DomainSwitcher() {
         aria-expanded={isOpen}
         aria-label={`Areas: ${label}`}
         title={`Areas: ${label}`}
-        className={`domain-switcher-trigger inline-flex h-9 min-w-9 items-center justify-center gap-1.5 px-2 rounded-full bg-bg-elevated/90 backdrop-blur-sm border transition-colors ${isOpen ? 'border-primary-300 bg-neutral-50' : 'border-neutral-200 hover:bg-neutral-50/50'}`}
+        data-filtered={!isAll}
+        className={`domain-switcher-trigger ${pulseOnLoad ? 'area-filter-pulse' : ''} inline-flex h-9 min-w-9 items-center justify-center gap-1.5 px-2 rounded-full bg-bg-elevated/90 backdrop-blur-sm border transition-colors ${isOpen ? 'border-primary-300 bg-neutral-50' : 'border-neutral-200 hover:bg-neutral-50/50'}`}
         style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04), inset 0 1px 0 rgba(255,255,255,0.4)' }}
       >
         {isAll ? (
@@ -154,6 +156,7 @@ export function DomainSwitcher() {
             ))}
           </span>
         )}
+        <span className="area-filter-label">{isAll ? 'All areas' : checked.length === 1 ? `${label} only` : `${checked.length} of ${LAYER_ROWS.length} areas`}</span>
       </button>
       {menu && createPortal(menu, document.body)}
     </>

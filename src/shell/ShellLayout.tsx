@@ -14,7 +14,6 @@ import { MoreSheet } from '@/components/layout/MoreSheet';
 import { QuickCapture } from '@/components/layout/QuickCapture';
 import { NewVersionBanner } from '@/components/layout/NewVersionBanner';
 import { OmniboxResults } from '@/components/omnibox/OmniboxResults';
-import { ActiveAreaFilter } from '@/components/domain/ActiveAreaFilter';
 import { DomainSwitcher } from '@/components/domain/DomainSwitcher';
 import { HeaderPeopleFilter } from '@/components/layout/HeaderPeopleFilter';
 import { Toast, ConfirmationToast, ToastLiveRegion } from '@/components/toast';
@@ -326,7 +325,6 @@ function ShellLayoutInner({ children }: Props) {
             <PlanNavigation mobile mobileControlsRef={setMobilePlanControls} />
             {/* Off the planner the area lens rides top-right; the guide sits below it. */}
             <div className={`guide-slot${planPeriodForPath(location.pathname) ? '' : ' has-lens'}`}><GuideBar host={guideHost} /></div>
-            <ActiveAreaFilter />
             <div className="min-w-0">{children}</div>
           </div>
         ) : (
@@ -392,7 +390,6 @@ function ShellLayoutInner({ children }: Props) {
                 <div className="scenery-page scenery-page-contents">
                   {/* Guided planning rides above the page it is guiding. */}
                   <div className="guide-slot"><GuideBar host={guideHost} /></div>
-                  <ActiveAreaFilter />
                   {children}
                 </div>
               </SideColumn>
