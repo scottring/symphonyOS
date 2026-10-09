@@ -51,3 +51,5 @@ dialog.cp-editor{top:50%;bottom:auto;transform:translate(-50%,-50%);margin:0;col
  .hz-grid.is-focused{height:auto;align-items:start}
  .hz-grid.is-focused .hz-zone{max-height:clamp(320px,calc(100dvh - 380px),760px)}
 }
+
+.cp-editor select{display:block;width:100%;max-width:100%;padding:12px;border:1px solid var(--color-neutral-300);border-radius:10px;background:var(--color-bg-base);color:var(--color-neutral-900);margin-top:8px}

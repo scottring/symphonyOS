@@ -2,9 +2,9 @@ import {render,screen,fireEvent,waitFor} from '@testing-library/react'
 import {MemoryRouter} from 'react-router-dom'
 import {beforeEach,describe,it,expect,vi} from 'vitest'
 import {ConstellationPage} from './ConstellationPage'
-const api=vi.hoisted(()=>({addGoal:vi.fn(),updateGoal:vi.fn(),addTask:vi.fn(),updateTask:vi.fn(),refetch:vi.fn()}))
+const api=vi.hoisted(()=>({addGoal:vi.fn(),updateGoal:vi.fn(),addTask:vi.fn(),updateTask:vi.fn(),refetch:vi.fn(),tasks:[] as any[]}))
 vi.mock('@/contexts/GoalsContext',()=>({GoalsProvider:({children}:any)=>children,useGoalsContext:()=>({goals:[{id:'g',name:'Together',year:2026,status:'active',context:'personal'},{id:'other',name:'Health',year:2026,status:'active',context:'personal'}],loading:false,...api})}))
-vi.mock('@/hooks/useSupabaseTasks',()=>({useSupabaseTasks:()=>({tasks:[],loading:false,error:null,...api})}))
+vi.mock('@/hooks/useSupabaseTasks',()=>({useSupabaseTasks:()=>({tasks:api.tasks,loading:false,error:null,...api})}))
 vi.mock('@/hooks/useDomain',()=>({useDomain:()=>({layers:[],soleDomain:'personal'})}))
 vi.mock('@/hooks/useAssigneeFilter',()=>({useAssigneeFilter:()=>[[]]}))
 vi.mock('@/hooks/useFamilyMembers',()=>({useFamilyMembers:()=>({getCurrentUserMember:()=>null})}))
@@ -12,8 +12,10 @@ vi.mock('@/hooks/useHouseholdSeasons',()=>({useHouseholdSeasons:()=>({seasons:[{
 vi.mock('@/lib/today/domainFilter',()=>({filterTasksForLayers:(t:any)=>t,matchesLayers:()=>true}))
 vi.mock('@/lib/planning/peopleLens',()=>({planPeopleLens:()=>({keep:()=>true,scopeId:null})}))
 vi.mock('../v2/AddArea',()=>({useAddArea:()=>({area:'personal',picker:null})}))
+vi.mock('@/lib/planning/periodPage',async(importOriginal)=>({...await importOriginal<any>(),selectPeriodTasks:(tasks:any[],level:string)=>tasks.filter(t=>t.bucket===(level==='season'?'quarter':'month'))}))
+vi.mock('@/lib/placement/model',async(importOriginal)=>({...await importOriginal<any>(),committedTo:(t:any)=>t.bucket==='week'?{}:undefined}))
 function open(){render(<MemoryRouter initialEntries={['/year?view=constellation&start=2026-10-09']}><ConstellationPage/></MemoryRouter>)}
-beforeEach(()=>{vi.clearAllMocks();HTMLElement.prototype.scrollIntoView=vi.fn();HTMLDialogElement.prototype.showModal=function(){this.setAttribute('open','')};HTMLDialogElement.prototype.close=function(){this.removeAttribute('open')}})
+beforeEach(()=>{vi.clearAllMocks();api.tasks=[];HTMLElement.prototype.scrollIntoView=vi.fn();HTMLDialogElement.prototype.showModal=function(){this.setAttribute('open','')};HTMLDialogElement.prototype.close=function(){this.removeAttribute('open')}})
 describe('connected Constellation saves',()=>{
  it('retains wording on failed create and locks period while composing',async()=>{
  api.addGoal.mockResolvedValue(null);open();fireEvent.click(screen.getByText('+ Add an independent yearly intention'))
@@ -52,4 +54,42 @@ it('focuses a clicked branch and restores unrelated plans without changing data'
  expect(screen.getByRole('button',{name:/Health/})).toBeInTheDocument()
  expect(api.updateTask).not.toHaveBeenCalled()
  expect(api.updateGoal).not.toHaveBeenCalled()
+})
+
+
+it('links an existing milestone and preserves selection on failed save',async()=>{
+ api.tasks=[{id:'s',title:'Autumn outings',bucket:'quarter'},{id:'m',title:'Picnic',bucket:'month'}]
+ api.updateTask.mockResolvedValue(false)
+ open();fireEvent.click(screen.getByRole('button',{name:/Picnic Independent/,pressed:false}))
+ fireEvent.click(screen.getByRole('button',{name:'Link or change parent'}))
+ fireEvent.change(screen.getByRole('combobox'),{target:{value:'1:s'}})
+ fireEvent.click(screen.getByRole('button',{name:'Save',exact:true}))
+ await screen.findByText('Could not save. Your wording is still here; try again.')
+ expect(screen.getByRole('combobox')).toHaveValue('1:s')
+ expect(api.updateTask).toHaveBeenLastCalledWith('m',{sourceId:'s'})
+ api.updateTask.mockResolvedValue(true)
+ fireEvent.click(screen.getByRole('button',{name:'Save',exact:true}))
+ await waitFor(()=>expect(screen.queryByRole('combobox')).not.toBeInTheDocument())
+ expect(api.addTask).not.toHaveBeenCalled()
+})
+
+it('removes a weekly parent including duplicated legacy fallback links',async()=>{
+ api.tasks=[{id:'m',title:'Picnic',bucket:'month'},{id:'w',title:'Pack basket',bucket:'week',sourceId:'m',goalTaskId:'m'}]
+ api.updateTask.mockResolvedValue(true)
+ open();fireEvent.click(screen.getByRole('button',{name:/Pack basket/,pressed:false}))
+ fireEvent.click(screen.getByRole('button',{name:'Link or change parent'}))
+ fireEvent.change(screen.getByRole('combobox'),{target:{value:''}})
+ fireEvent.click(screen.getByRole('button',{name:'Save',exact:true}))
+ await screen.findByText('Saved to your plan.')
+ expect(api.updateTask).toHaveBeenCalledWith('w',{sourceId:undefined,goalTaskId:undefined})
+})
+
+it('links an existing season goal to a yearly intention',async()=>{
+ api.tasks=[{id:'s',title:'Autumn outings',bucket:'quarter'}];api.updateTask.mockResolvedValue(true)
+ open();fireEvent.click(screen.getByRole('button',{name:/Autumn outings/,pressed:false}))
+ fireEvent.click(screen.getByRole('button',{name:'Link or change parent'}))
+ fireEvent.change(screen.getByRole('combobox'),{target:{value:'0:g'}})
+ fireEvent.click(screen.getByRole('button',{name:'Save',exact:true}))
+ await screen.findByText('Saved to your plan.')
+ expect(api.updateTask).toHaveBeenCalledWith('s',{goalId:'g'})
 })

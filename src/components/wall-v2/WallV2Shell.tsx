@@ -12,7 +12,6 @@
 // design-payload mock. The design payload now lives only in the dev-only
 // `/wall-design` preview (see `wallV2Mock.ts`).
 
-import { useLocation } from 'react-router-dom';
 import { ConnectedWall } from './moments/ConnectedWall';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Sun, Plus, ClipboardList, Settings, Phone, ChefHat, ShoppingCart } from 'lucide-react';
@@ -77,7 +76,7 @@ import { useScratchpad } from '@/hooks/useScratchpad';
 import { openScratchpadRows, recentlySorted, rowByline, type ScratchpadRow } from '@/lib/wall/scratchpad';
 import { useFamilyDiscussionItems, type DiscussionItem } from '@/hooks/useFamilyDiscussionItems';
 import { QuickCapture } from '@/components/layout/QuickCapture';
-import { WallMoments, type MomentKid } from './moments/WallMoments';
+import { type MomentKid } from './moments/WallMoments';
 import { wallMoment } from '@/lib/wall/wallMoment';
 import { wallTodayRows, specialsWeek, checklistFor, afterSchoolRows } from '@/lib/wall/wallMomentsModel';
 import { buildMemberDayModel, type KidRow } from '@/lib/wall/kidDayModel';
@@ -191,9 +190,7 @@ function useMealCardData(event: CalendarEvent | null, fallbackName: string) {
 }
 
 export function WallV2Shell() {
-  const location = useLocation();
-  const workspaceView = new URLSearchParams(location.search).get('view') === 'workspace';
-  const WallSurface = workspaceView ? ConnectedWall : WallMoments;
+  const WallSurface = ConnectedWall;
   const { user, loading: authLoading } = useAuth();
 
   // The chromeless Pi kiosk can't reload itself to pick up a new deploy, so a
@@ -874,12 +871,6 @@ export function WallV2Shell() {
 
   return (
     <div className={`${isDark ? 'dark ' : ''}wall-touch-root relative h-screen w-screen overflow-hidden transition-colors ${WALL.root}`}>
-      {!workspaceView && <img
-        src="/wall/treeline.svg"
-        alt=""
-        aria-hidden
-        className="absolute top-0 right-0 w-[340px] h-[110px] opacity-30 dark:opacity-15 pointer-events-none"
-      />}
       {/* flex column so the stale banner can claim height without the fixed grid
           clipping — the grid below simply shrinks when the banner appears. */}
       <div className="h-full w-full p-4 flex flex-col">

@@ -9,3 +9,9 @@ The production screenshot was /week, which still uses standard Open journal. The
 Validation: branch model tests cover ancestors, multiple descendants, unrelated siblings, and missing/filtered parents. UI test restores hidden plans without writes. Browser verification: scrolling Month changed only its scrollTop (1173px); other horizon columns stayed at zero. Selecting the sample seasonal baking goal retained both milestones and its weekly action (4 cards total), hiding 20 unrelated cards. Build passed.
 
 Shipped: e4dec575. Mandatory pre-push checks passed: 806 files, 8,332 tests, 3 skipped. Vercel deployment dpl_GJ6hWPKbR11PwkFwyVsiv5UfDRN4 Ready and aliased to app.symphony-os.com. Production browser check confirmed the new Week entry links and all four map card regions with independent overflow:auto. Desktop/phone focus checks passed; screenshots /private/tmp/symphony-focused-desktop.png and /private/tmp/symphony-focused-phone.png. Only presentation controls exercised; no user plan records changed.
+
+## Default navigation release
+
+Shipped 1edf3cbe: main navigation now targets connected views, plain/legacy planning URLs upgrade while preserving query state, and the return-to-standard control is removed. Today/Week use alongside; Month/Season/Year use the planning map. Existing Week journal/schedule functionality remains inside the connected workspace, with Open planning map available. No data migration.
+
+Validation: 8,333 tests passed, 3 skipped; build and pre-push typecheck passed. Local plain Week upgraded, Season navigation rendered map, Today rendered alongside. Vercel dpl_5crFGwdwyWF65BEXNsq6zLqrAhur Ready with app.symphony-os.com alias. Production plain /season upgraded to /season?view=constellation&horizon=1 and loaded. Screenshot /private/tmp/symphony-default-production.png.
