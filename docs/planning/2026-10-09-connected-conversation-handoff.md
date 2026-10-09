@@ -32,3 +32,11 @@ Conversation persistence failures are visible. Switching sessions is guarded dur
 Natural voice is available only to `symphonygoals+onboarding1008@gmail.com`. Starts are limited to 12 per account per UTC day; failed handshakes consume a start. The client ends at 300 seconds. This is not a server-enforced duration or dollar cap. A real spoken test of latency, interruption, mute/end and touch-to-voice correction remains required before wider access. The existing local voice demo on port 5257 was left intact.
 
 Generic Realtime small talk is not separately persisted; substantive agent requests are. Context is bounded, not a complete historical memory. Voice is not yet integrated into the wall surface; the accepted functional wall display remains. Supporting destinations keep established functional pages rather than bespoke rewrites. These boundaries must not be described as complete general-availability conversational onboarding.
+
+## Production verification
+
+Published commit `679d10a12838a4e9c836e53a0957603b75da79e8` to main. Mandatory pre-push typecheck and full suite passed: 805 files, 8,323 tests, 3 skipped. Production build and lab TypeScript pass; inbound-mail adds 12 passing tests. Lint's two errors were fixed (remaining findings are warnings).
+
+Vercel deployment `dpl_3nB55tcC6H3WF4KjUNV48v2X3qQF` is Ready and owns `app.symphony-os.com`; deployment URL: https://symphony-rebuild-l9x9d5ro4-scottrings-projects.vercel.app. Browser opened the real signed-in Week route, confirmed connected layout, single full-width priority headers and zero horizontal overflow. This production check was read-only. Live URL: https://app.symphony-os.com/week?view=alongside.
+
+Voice pilot availability was verified in the disposable local account against the deployed backend. Real microphone latency/interruptions and kiosk voice remain outside the verified release, as detailed above. No claim that all conversational-product ambitions are complete.
