@@ -4,6 +4,8 @@ October 9, 2026 · local design study · not a release
 
 Preview: `http://127.0.0.1:5245/scripts/symphony-design-study/index.html`
 
+> Direction update: the subsequent [Living Canvas rehearsal](2026-10-09-living-canvas.md) makes conversation the primary interface. This study remains a reference for existing features and surface differences; its chat-alongside-pages concept is superseded.
+
 ## Recommendation
 
 Evolve Symphony's existing surfaces. Keep the planning model, saved entities, familiar controls, and useful household integrations. Introduce conversation as another way to operate that system, with a stable place on each surface.

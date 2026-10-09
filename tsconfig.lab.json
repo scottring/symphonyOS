@@ -4,7 +4,8 @@
     "scripts/conversation-lab/main.tsx",
     "src/vite-env.d.ts",
     "scripts/canvas-lab/main.tsx",
-    "scripts/symphony-design-study/main.tsx"
+    "scripts/symphony-design-study/main.tsx",
+    "scripts/living-canvas/main.tsx"
   ],
   "compilerOptions": {
     "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.lab.tsbuildinfo"
