@@ -162,3 +162,38 @@
 @media (max-width: 767px) {
   .plan-item-menu > span > button, .plan-item-menu button[aria-haspopup] { width: 44px; height: 44px; }
 }
+
+/* ---- Prepared to act: "What you'll need" ----------------------------------- */
+.prep { display: flex; flex-direction: column; gap: 6px; font-family: var(--font-family-sans); }
+.prep-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.prep-title { margin: 0; font-size: 11px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--color-neutral-500); }
+.prep-ask { font-size: 12.5px; }
+.prep-list { list-style: none; margin: 0; padding: 0; }
+.prep-row { align-items: center; margin: 0; padding: 4px 0; min-height: 30px; font-size: 14px; }
+.prep-row .canvas-item-title { overflow-wrap: anywhere; }
+.prep-icon { flex: none; color: var(--color-neutral-500); }
+.prep-tools { display: inline-flex; align-items: center; gap: 2px; flex: none; }
+.prep-tools .canvas-link { font-size: 12.5px; }
+.prep-notes { white-space: pre-line; color: var(--color-neutral-700); }
+.prep-steps { list-style: none; margin: 0 0 2px 23px; padding: 0; }
+.prep-steps label { display: flex; align-items: flex-start; gap: 8px; padding: 3px 0; font-size: 13.5px; color: var(--color-neutral-800); cursor: pointer; }
+.prep-steps label input { margin-top: 3px; accent-color: var(--color-primary-600); }
+.prep-steps label.is-done span { color: var(--color-neutral-500); text-decoration: line-through; }
+.prep-add { display: flex; flex-wrap: wrap; gap: 6px; }
+.prep-add .canvas-chip { color: var(--color-neutral-600); }
+.prep-from { margin-top: 4px; padding-top: 6px; border-top: 1px dashed var(--color-neutral-200); }
+.prep-from-head { margin: 0 0 2px; font-size: 12px; color: var(--color-neutral-500); }
+.prep-from-head .canvas-link { font-size: 12px; padding: 0 2px; }
+.prep-list.is-inherited .prep-row { font-size: 13.5px; color: var(--color-neutral-700); min-height: 26px; }
+
+/* Readiness at a glance on a row */
+.prep-icons { display: inline-flex; align-items: center; gap: 6px; flex: none; color: var(--color-neutral-400); }
+.prep-icons-one { display: inline-flex; align-items: center; gap: 1px; }
+.prep-icons-one small { font-size: 11px; color: var(--color-neutral-500); }
+.prep-summary { flex-basis: 100%; display: flex; flex-direction: column; align-items: flex-start; gap: 2px; }
+.prep-summary-from { color: var(--color-neutral-500); }
+
+@media (max-width: 767px) {
+  .prep-tools .canvas-link, .prep-ask, .prep-add .canvas-chip { min-height: 44px; }
+  .prep-steps label { min-height: 40px; align-items: center; }
+}

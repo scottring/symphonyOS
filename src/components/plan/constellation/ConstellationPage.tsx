@@ -37,6 +37,7 @@ import { horizonGroups, focusedGroupKeys, childCount, isDone, periodRange, UNLIN
 import { PlanItemRow } from '@/components/canvas/plan/PlanItemRow'
 import { ProposalRow } from '@/components/canvas/plan/ProposalRow'
 import { InlineComposer } from '@/components/canvas/plan/InlineComposer'
+import { readinessOf, type ReadinessLookup } from '@/lib/prep/readiness'
 
 const TERMS = ['yearly intention', 'seasonal goal', 'monthly milestone', 'weekly action'] as const
 const HORIZONS = ['Year', 'Season', 'Month'] as const
@@ -288,6 +289,11 @@ function Inner() {
   const groupTitle = (g: PlanGroup) => g.kind === 'unlinked' ? 'Unlinked' : g.kind === 'intentions' ? `Yearly intentions` : g.parent!.title
   const addLabel = (g: PlanGroup) => g.kind === 'unlinked' ? `Add an independent ${term}` : g.kind === 'intentions' ? `Add a ${term}` : `Add a ${term} under ${g.parent!.title}`
 
+  // Readiness reads only rows this reader already has, under the same filters.
+  const visibleById = new Map(visible.map((t) => [t.id, t]))
+  const goalsById = new Map(allNodes.filter((n) => n.goal).map((n) => [n.id, n.goal!]))
+  const prepLookup: ReadinessLookup = { task: (id) => visibleById.get(id), goal: (id) => goalsById.get(id) }
+
   const renderItem = (node: PlanNode) => {
     const canMove = level > 0 && !!node.task && !allNodes.some((n) => n.level === level - 1 && n.id === node.id)
     const moveParents = canMove ? eligibleParents(allNodes, node).filter((p) => !isDone(p) || p.key === node.parent) : []
@@ -305,6 +311,8 @@ function Inner() {
       onCancelEdit={() => setComposer(null)}
       move={canMove ? { parents: moveParents, parentTerm: parentTerm!, onPick: (p) => moveUnder(node, p) } : undefined}
       actions={(verbs) => actionsFor(node, verbs)} more={more}
+      readiness={node.task ? readinessOf(node.task, prepLookup) : undefined}
+      onPrepare={node.task && selection ? () => selection.setSelection({ kind: 'task', id: node.id }) : undefined}
       meta={scheduled ? `Scheduled ${scheduled.toLocaleDateString()}${!node.task?.isAllDay ? ` · ${scheduled.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}` : ''}` : null}
       onDragStart={canMove ? (e) => { e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', node.key); setDragKey(node.key) } : undefined}
       onDragEnd={() => { setDragKey(null); setDropKey(null) }} />

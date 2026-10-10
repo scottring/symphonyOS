@@ -34,6 +34,9 @@ import { useThreadUnread } from '@/hooks/useThreadUnread'
 import { useFamilyMembers } from '@/hooks/useFamilyMembers'
 import { scopeForDomain } from '@/lib/scope'
 import type { MightBeRelevantItem } from './types'
+import type { Goal } from '@/types/goal'
+import type { Attachment } from '@/lib/taskAttachments'
+import { ReadinessSection, type PrepField } from '@/components/canvas/prep/ReadinessSection'
 
 interface TapContextPanelProps {
   /**
@@ -53,6 +56,8 @@ interface TapContextPanelProps {
   familyMembers: FamilyMember[]
   siblingTaskCandidates: Task[]
   allTasks: Task[]
+  /** Yearly intentions, so "What you'll need" can show what the plan above carries. */
+  goals?: Goal[]
   /** Optional why-chain (Task → Project → Goal), rendered under the title. */
   whyChain?: ReactNode
   /** Optional creator name for the meta row + footer. */
@@ -141,6 +146,7 @@ export function TapContextPanel(props: TapContextPanelProps) {
   // Attachments are fetched inside PanelPhotos; it reports up so the Add row
   // knows whether to offer "Photo".
   const [photosHaveContent, setPhotosHaveContent] = useState(false)
+  const [files, setFiles] = useState<Attachment[]>([])
   const reveal = useCallback((field: AddableField) => {
     setRevealed((prev) => new Set(prev).add(field))
   }, [])
@@ -154,6 +160,7 @@ export function TapContextPanel(props: TapContextPanelProps) {
     setAssistOpen(false)
     setRevealed(new Set())
     setPhotosHaveContent(false)
+    setFiles([])
   }
 
   const linked = useLinkedEntities(task, {
@@ -181,13 +188,27 @@ export function TapContextPanel(props: TapContextPanelProps) {
     photo: photosHaveContent,
   }
   const show = (field: AddableField): boolean => has[field] || revealed.has(field)
-  const addable = (['phone', 'email', 'location', 'notes', 'photo', 'subtask', 'link', 'person'] as const)
-    .filter((f) => !show(f))
+  // "What you'll need" offers the rest of the fields at the top; this row
+  // keeps only how to reach whoever the task needs.
+  const addable = (['phone', 'email'] as const).filter((f) => !show(f))
 
   // The whole panel accepts file drops, not just the Photos & files section
   // — that section was 16% of the panel, and a miss navigated the tab to
   // the file instead of attaching it.
   const panelRef = useRef<HTMLElement>(null)
+
+  // A readiness chip opens the field's existing editor and brings it into view.
+  const focusField = useCallback((field: AddableField | 'directions') => {
+    requestAnimationFrame(() => {
+      const host = panelRef.current?.querySelector<HTMLElement>(`[data-prep-field="${field === 'directions' ? 'location' : field}"]`)
+      if (!host) return
+      host.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' })
+      if (field === 'directions') return
+      const target = host.querySelector<HTMLElement>('textarea, input:not([type="hidden"]):not([type="file"]), [contenteditable="true"]')
+      target?.focus({ preventScroll: true })
+    })
+  }, [])
+  const addPrep = useCallback((field: PrepField) => { reveal(field); focusField(field) }, [reveal, focusField])
 
   const dayLoads = useDayLoads({ tasks: allTasks, enabled: true })
 
@@ -270,6 +291,18 @@ export function TapContextPanel(props: TapContextPanelProps) {
               />
             }
           />
+          <ReadinessSection
+            task={task}
+            allTasks={allTasks}
+            goals={props.goals}
+            contacts={props.contacts}
+            files={files}
+            onToggleStep={props.onToggleSubtask}
+            onOpenTask={props.onOpenTask}
+            onDirections={() => { setShowDirections(true); focusField('directions') }}
+            onAdd={addPrep}
+            opened={revealed}
+          />
           <PanelAssistant taskId={task.id} />
           {props.onSendToBuy && (
             <PanelToBuySuggestion
@@ -310,7 +343,7 @@ export function TapContextPanel(props: TapContextPanelProps) {
               autoFocus={revealed.has('email')}
             />
           )}
-          {show('location') && (
+          {show('location') && (<div data-prep-field="location" className="empty:hidden">
             <PanelLocation
               location={task.location}
               locationPlaceId={task.locationPlaceId}
@@ -321,8 +354,8 @@ export function TapContextPanel(props: TapContextPanelProps) {
               directions={task.directions}
               onDirectionsChange={props.onDirectionsChange}
             />
-          )}
-          {show('notes') && (
+          </div>)}
+          {show('notes') && (<div data-prep-field="notes" className="empty:hidden">
             <PanelNotes
               key={task.id}
               label="Notes"
@@ -330,13 +363,14 @@ export function TapContextPanel(props: TapContextPanelProps) {
               onChange={props.onNotesChange}
               onSaveToVault={props.onSaveNoteToVault}
             />
-          )}
+          </div>)}
           {/* Where this row came from. Only an extracted row carries a capture,
               so the section is absent for everything typed by hand. */}
           {task.captureId && <PanelSource captureId={task.captureId} />}
-          <PanelPhotos
+          <div data-prep-field="photo" className="empty:hidden"><PanelPhotos
             hideWhenEmpty={!revealed.has('photo')}
             onContentChange={setPhotosHaveContent}
+            onAttachmentsChange={setFiles}
             entityType="task"
             entityId={task.id}
             dropZoneRef={panelRef}
@@ -346,9 +380,9 @@ export function TapContextPanel(props: TapContextPanelProps) {
               onAddLink: props.onAddLink,
               onUseLocation: (address) => props.onUpdateLocation(address),
             }}
-          />
+          /></div>
           <PanelConversations taskId={task.id} />
-          {show('subtask') && (
+          {show('subtask') && (<div data-prep-field="subtask" className="empty:hidden">
             <PanelSubtasks
               subtasks={task.subtasks ?? []}
               onToggleSubtask={props.onToggleSubtask}
@@ -358,8 +392,8 @@ export function TapContextPanel(props: TapContextPanelProps) {
               onRescheduleSubtask={props.onRescheduleSubtask}
               onScheduleSubtask={props.onScheduleSubtask}
             />
-          )}
-          {show('person') && (
+          </div>)}
+          {show('person') && (<div data-prep-field="person" className="empty:hidden">
             <PanelPeople
               contact={linked.contact}
               onOpenContact={props.onOpenContact}
@@ -368,8 +402,8 @@ export function TapContextPanel(props: TapContextPanelProps) {
               onSearchContacts={props.onSearchContacts}
               onAddContact={props.onAddContact}
             />
-          )}
-          {show('link') && <PanelLinks links={task.links} onAddLink={props.onAddLink} />}
+          </div>)}
+          {show('link') && <div data-prep-field="link" className="empty:hidden"><PanelLinks links={task.links} onAddLink={props.onAddLink} /></div>}
           {/* The tail of the details list, not a zone of its own: every field
               the task doesn't carry yet, as one quiet row. */}
           <PanelAddRow fields={addable} onReveal={reveal} />

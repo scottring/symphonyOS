@@ -280,3 +280,14 @@ describe('done items and triage',()=>{
   expect(api.updateTask).toHaveBeenLastCalledWith('m',{title:'Picnic'})
  })
 })
+
+describe('prepared to act on plan rows',()=>{
+ it('marks what an item carries and summarises it, with the plan above, when opened',()=>{
+  api.tasks=[{id:'s',title:'Back to school',bucket:'quarter',links:[{url:'https://supplies.test'}]},{id:'m',title:'Call Cami',bucket:'month',sourceId:'s',contactId:'cami',subtasks:[{id:'q1',title:'Pickup?'},{id:'q2',title:'Forms?',completed:true}]}]
+  month()
+  const row=screen.getByText('Call Cami').closest('li')!
+  expect(within(row).getByRole('img',{name:'Has contact, steps 1 of 2'})).toBeInTheDocument()
+  fireEvent.click(within(row).getByRole('button',{name:'Call Cami'}))
+  expect(within(row).getByText('From Back to school: 1 link')).toBeInTheDocument()
+ })
+})
