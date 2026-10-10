@@ -73,7 +73,7 @@ export function MastheadCard({ eyebrow, title, subline, controls, aside, footer,
                motif's own label would just be read out twice. */
             <span aria-hidden="true" className="contents"><PageMotif motif={motif} className="daybook-stamp" /></span>
           )}
-          {numeral && <div aria-hidden="true" className="masthead-numeral">{numeral}</div>}
+          {numeral && <div aria-hidden="true" className="masthead-numeral" data-len={numeral.length}>{numeral}</div>}
           <div className="daybook-masthead-text min-w-0 flex-1">
             {eyebrow && <div data-testid="masthead-eyebrow" className="mb-1 -ml-1.5">{eyebrow}</div>}
             <div className={action ? 'daybook-title-row' : undefined}>
