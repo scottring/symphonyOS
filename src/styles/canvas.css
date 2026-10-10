@@ -148,3 +148,15 @@
   .canvas-state::before, .canvas-mic.is-on svg { animation: none !important; }
   .canvas-item { transition: none; }
 }
+
+/* One page shape: the off-planner Shelves launcher rides in the page's top
+   corner instead of taking a row above the masthead. */
+@media (min-width: 768px) {
+  .desktop-workspace-page { position: relative; }
+  .desktop-workspace-page > .plan-page-tools.is-rail-extras {
+    position: absolute; top: 8px; right: 2.5rem; z-index: 5; padding: 0; max-width: none;
+  }
+}
+@media (min-width: 1024px) {
+  .desktop-workspace-page > .plan-page-tools.is-rail-extras { right: 3.5rem; }
+}
