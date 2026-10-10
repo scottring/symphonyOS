@@ -25,7 +25,9 @@ export type TaskRestorable = typeof TASK_RESTORABLE[number]
 
 export const GOAL_RESTORABLE = ['name', 'notes', 'status'] as const
 
-export const ROUTINE_RESTORABLE = ['name', 'visibility', 'paused_until', 'show_on_timeline', 'time_of_day', 'parent_routine_id', 'step_order'] as const
+// Visibility flags are left out on purpose: they are the resolver's to read
+// (routineVisibilityCoverage.test.ts), so a turn that changes one offers no Undo.
+export const ROUTINE_RESTORABLE = ['name', 'paused_until', 'time_of_day', 'parent_routine_id', 'step_order'] as const
 export type GoalRestorable = typeof GOAL_RESTORABLE[number]
 
 export interface CanvasChange {
