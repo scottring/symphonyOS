@@ -109,7 +109,6 @@ export function deriveActiveView(pathname: string): ViewType {
   if (pathname === '/contacts') return 'contacts';
   if (pathname.startsWith('/contacts/')) return 'contact-detail';
   if (pathname.startsWith('/meals')) return 'meals';
-  if (pathname.startsWith('/agent')) return 'agent';
   if (pathname === '/inbox' || pathname.endsWith('/tasks-new/inbox')) return 'inbox';
   if (pathname.startsWith('/home')) return 'home-app';
   // /, /today, /tasks-new/today, /tasks-new and /task/:id all live under "today"
@@ -175,7 +174,6 @@ function ShellLayoutInner({ children }: Props) {
   const sceneryFloor = isMobile ? `calc(${MOBILE_TAB_BAR_HEIGHT} + env(safe-area-inset-bottom, 0px))` : undefined;
 
   const references = useReferenceLists();
-  const activeView = useMemo(() => deriveActiveView(location.pathname), [location.pathname]);
 
   const { tasks, refetch } = useSupabaseTasks();
   const { goals } = useGoals();
@@ -452,8 +450,8 @@ function ShellLayoutInner({ children }: Props) {
         <PlaceScenery scroller={pageScroller} right={isMobile ? 0 : paneWidth} floor={sceneryFloor} />
       </div>
 
-      {/* QuickCapture FAB — all routes except the agent view (which has its own input) */}
-      {activeView !== 'agent' && (
+      {/* QuickCapture FAB — every route */}
+      {(
         <QuickCapture
           // Desktop keeps its round + at the bottom right (Scott, 2026-09-26:
           // "desktop has ALWAYS had a round circle + button" — it did until

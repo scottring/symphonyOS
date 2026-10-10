@@ -177,7 +177,8 @@ createRoot(document.getElementById('root')!).render(
               <Route path="/meds/*" element={<Navigate to="/today" replace />} />
               <Route path="/contacts/*" element={cutoverShell} />
               <Route path="/family/*" element={cutoverShell} />
-              <Route path="/agent/*" element={cutoverShell} />
+              {/* The Michael agent page went with Open Brain (2026-10-10). */}
+              <Route path="/agent/*" element={<Navigate to="/today" replace />} />
               {/* The legacy /wall app is deleted; with no app registered the
                   shell rendered chrome around an empty body. Send stale kiosk
                   bookmarks to the current board instead. */}

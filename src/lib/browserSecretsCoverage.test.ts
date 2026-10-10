@@ -1,7 +1,7 @@
 // Guard: no secret may be a VITE_ variable. Vite inlines every
 // import.meta.env.VITE_* value into the public bundle, readable by anyone who
-// loads the site. VITE_OPEN_BRAIN_API_KEY shipped that way until 2026-10-10;
-// Open Brain is now reached only through the open-brain-proxy edge function.
+// loads the site. VITE_OPEN_BRAIN_API_KEY shipped that way until 2026-10-10
+// (Open Brain has since been removed from Symphony).
 //
 // Allowed by design: the Supabase URL and anon key (RLS is the gate), the
 // Sentry DSN, and the Google Maps browser key (restricted to the site's
@@ -32,11 +32,5 @@ describe('browser bundle secrets', () => {
       }
     }
     expect(offenders).toEqual([])
-  })
-
-  it('sends nothing to Open Brain but the relay', () => {
-    const client = readFileSync('src/lib/openBrain.ts', 'utf8')
-    expect(client).not.toMatch(/X-Api-Key/i)
-    expect(client).toMatch(/functions\/v1\/open-brain-proxy/)
   })
 })

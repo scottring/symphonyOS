@@ -20,7 +20,6 @@ import { guideAppDef } from '@/apps/guide';
 import { gettingStartedAppDef } from '@/apps/start';
 import { planAloudAppDef } from '@/apps/plan-aloud';
 import { familyAppDef } from '@/apps/family';
-import { agentAppDef } from '@/apps/agent';
 
 export type AppRegistry = ReadonlyArray<AppDef>;
 
@@ -93,5 +92,4 @@ export const appRegistry: AppRegistry = createRegistry([
   gettingStartedAppDef,
   planAloudAppDef,
   familyAppDef,
-  agentAppDef,
 ]);
