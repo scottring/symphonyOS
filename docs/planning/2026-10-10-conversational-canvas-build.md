@@ -65,3 +65,9 @@ Out-of-scope findings to report (not changed here): `VITE_OPEN_BRAIN_API_KEY` is
 
 - 2026-10-10, preview :5289, disposable account symphonygoals+onboarding1008: typed "Add a task for today called Canvas check: buy kite string" with the deployed agent → strip Working → Saved with change chip + Undo; item appeared in For today; Undo removed it; reload confirmed removal.
 - 2026-10-10, same: Season Move under… moved "Canvas validation: learn bread baking" under "enjoy creative weekends" (Saved + Undo), reload confirmed; Move under → No parent restored it, reload confirmed.
+- 2026-10-10, conversation "Create a family routine called Canvas test: bedtime …" (disposable data): routine + 3 steps saved, shown on the Routines board (Evening band, chips, steps) and on Today's day scale at 8:00. Found and fixed a false "Didn't save" receipt (routines were not in change detection) — 248e0e0d.
+- 2026-10-10, Week (abf2036f): Give it a day → Sun 11 saved with Undo; Undo returned it to its milestone card; reload confirmed.
+- 2026-10-10, task details: What you'll need renders on a real task; + Link opens the existing Links editor (no write made).
+- 2026-10-10, phone harness (390px iframes, signed in): Today, Plan (Season), Routines render with phone chrome.
+- 2026-10-10, kiosk fixture scenes at 1920×1080 (/kiosk-preview, dev only): dinner (light), cooking (dark), home evening (light) match their approved boards.
+- 2026-10-10, committed snapshot d40dd175: full suite 826/827 files, 8,598 tests pass, 3 skipped; the one failing file is connectors/whatsapp (its separate package deps are not installed in fresh worktrees — known, unrelated). npm run build passes; npm run lint 0 errors (430 warnings, baseline to compare).
