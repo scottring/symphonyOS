@@ -116,7 +116,11 @@ export function HomeHeader(props: HomeHeaderProps) {
     const lastDay = addDays(weekStart, rangeDays - 1)
     const shortStr = rangeDays === 1
       ? weekStart.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
-      : `${formatDayShort(weekStart)} – ${formatDayShort(lastDay)}`
+      // "Oct 5 – 11": the month once when both ends share it (approved week
+      // composition, 2026-10-10).
+      : lastDay.getMonth() === weekStart.getMonth()
+        ? `${formatDayShort(weekStart)} – ${lastDay.getDate()}`
+        : `${formatDayShort(weekStart)} – ${formatDayShort(lastDay)}`
     label = { short: shortStr, long: shortStr }
     onPrev = () => { onWeekChange(addDays(weekStart, -rangeDays)) }
     onNext = () => { onWeekChange(addDays(weekStart, rangeDays)) }

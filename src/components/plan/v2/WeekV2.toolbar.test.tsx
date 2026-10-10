@@ -163,3 +163,21 @@ describe('WeekV2 — a month line on this week says so', () => {
     expect(ref.queryByRole('button', { name: /Add Hang porch plants to this week/ })).toBeNull()
   })
 })
+
+// Approved week composition (2026-10-10): at rest the week is the canvas
+// WeekViewV2 builds — no Lists / Open journal switch — and "Plan the week"
+// still opens the session in its place.
+describe('WeekV2 — the week canvas at rest', () => {
+  beforeEach(() => { session.saved = null; session.loading = false; session.error = null })
+
+  it('draws the canvas instead of the layout switch, and Plan the week still opens the steps', () => {
+    render(<MemoryRouter><WeekV2 tasks={[]} weekStart={new Date(2026, 8, 27)} meId="me" isCurrent days={null} onSelectTask={vi.fn()}
+      canvas={<section aria-label="Still to place">canvas</section>} /></MemoryRouter>)
+    expect(screen.getByRole('region', { name: 'Still to place' })).toBeTruthy()
+    expect(screen.queryByRole('group', { name: 'Planning view' })).toBeNull()
+    expect(screen.queryByRole('region', { name: "This week's list" })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Plan the week' }))
+    expect(screen.getByRole('region', { name: /Planning week \d+/ })).toBeTruthy()
+    expect(screen.queryByRole('region', { name: 'Still to place' })).toBeNull()
+  })
+})

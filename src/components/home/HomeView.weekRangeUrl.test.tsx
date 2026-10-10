@@ -83,17 +83,17 @@ describe('/week restores the run it was showing', () => {
 
   it('a weekend paged forward reopens on the days paged to, not this weekend', () => {
     const view = load('/week?range=weekend')
-    expect(screen.getByRole('heading', { name: 'Sep 26 – Sep 27' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Sep 26 – 27' })).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Later' }))
-    expect(screen.getByRole('heading', { name: 'Sep 28 – Sep 29' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Sep 28 – 29' })).toBeInTheDocument()
     reload(view)
-    expect(screen.getByRole('heading', { name: 'Sep 28 – Sep 29' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Sep 28 – 29' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /2 days/ })).toBeInTheDocument()
   })
 
   it('a later weekend in the URL opens as that weekend', () => {
     load('/week?range=weekend&start=2026-10-03&days=2')
-    expect(screen.getByRole('heading', { name: 'Oct 3 – Oct 4' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Oct 3 – 4' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Weekend/ })).toBeInTheDocument()
   })
 
@@ -109,7 +109,7 @@ describe('/week restores the run it was showing', () => {
 
   it('a custom seven-day run from Thursday stays Thursday-first', () => {
     load('/week?range=custom&start=2026-10-01&days=7')
-    expect(screen.getByRole('heading', { name: 'Oct 1 – Oct 7' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Oct 1 – 7' })).toBeInTheDocument()
   })
 
   // Unchanged: `start` alone is still the calendar week around it.

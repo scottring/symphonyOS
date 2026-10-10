@@ -99,3 +99,145 @@
   .wk-weekdays > .wk-cell.is-empty, .wk-weekend-cells > .wk-cell.is-empty { padding: 6px 0; }
   .wk-cell.is-empty .wk-dayhead { min-height: 0; border-bottom: 0; margin-bottom: 0; padding-bottom: 0; }
 }
+
+/* ---- The week canvas (approved week composition, 2026-10-10) ----------- */
+/* Days | Hours: a small secondary segmented toggle beside "Plan the week". */
+.wc-seg { display: inline-flex; gap: 2px; padding: 3px; border-radius: var(--radius-lg); background: var(--color-neutral-100); }
+.wc-seg button {
+  min-height: 28px; padding: 0 12px; border: 0; border-radius: var(--radius-md); background: none;
+  font-family: var(--font-family-sans); font-size: 12.5px; font-weight: 600; color: var(--color-neutral-600);
+}
+.wc-seg button[aria-checked="true"] { background: var(--color-bg-elevated); color: var(--color-neutral-900); box-shadow: var(--shadow-sm); }
+.wc-seg button:focus-visible { outline: 2px solid var(--color-primary-600); outline-offset: 2px; }
+
+.wc { display: flex; flex-direction: column; gap: 28px; padding-bottom: 24px; }
+.wc-subtitle { font-family: var(--font-family-sans); font-size: 13px; color: var(--color-neutral-600); }
+.wc-subtitle.is-inline { margin: 0; }
+.wc-label { margin: 0; font-family: var(--font-family-display); font-size: 21px; font-weight: 500; line-height: 1.2; color: var(--color-neutral-900); }
+.wc-hint { margin: 0; font-family: var(--font-family-sans); font-size: 13px; color: var(--color-neutral-600); }
+
+/* Still to place: a masonry of milestone cards. */
+.wc-shelf { border-radius: var(--radius-xl); transition: background-color var(--transition-base); }
+.wc-shelf.is-over { background: var(--color-primary-50); outline: 2px dashed var(--color-primary-400); outline-offset: 6px; }
+.wc-shelf-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 14px; margin-bottom: 12px; }
+.wc-masonry { columns: 15rem; column-gap: 14px; }
+.wc-masonry > .wc-group { break-inside: avoid; display: inline-block; width: 100%; margin: 0 0 14px; }
+.wc-group-head { position: relative; align-items: center; }
+.wc-group-head .canvas-group-title { flex: 1; font-size: 13px; color: var(--color-neutral-800); }
+.wc-group.is-source { border-color: var(--color-primary-400); box-shadow: 0 0 0 2px var(--color-primary-100); }
+.wc-group.is-source .canvas-group-head { color: var(--color-primary-800); }
+.wc-routines .canvas-group-title { color: var(--color-primary-800); }
+.wc-group-foot { margin-top: 2px; }
+.wc-add { padding-left: 0; font-weight: 500; font-size: 12.5px; color: var(--color-neutral-600); text-decoration: none; }
+.wc-add:hover { color: var(--color-primary-700); text-decoration: underline; }
+.wc-composer input {
+  width: 100%; min-height: 32px; padding: 4px 8px; border: 1px solid var(--color-neutral-300); border-radius: var(--radius-md);
+  background: var(--color-bg-elevated); font-family: var(--font-family-sans); font-size: 13.5px; color: var(--color-neutral-900);
+}
+.wc-composer input:focus { outline: 2px solid var(--color-primary-500); outline-offset: 1px; }
+.cw-row.has-picker, .wc-dayrow { position: relative; }
+.cw-row.is-routine .cw-title { color: var(--color-primary-800); }
+
+/* ⋯ menus and the day picker float under their row. */
+.wc-more-wrap { position: relative; flex: none; display: inline-flex; }
+.wc-more { width: 26px; height: 26px; }
+.cw-menu, .cw-giveday:not(.is-inline) {
+  position: absolute; z-index: 40; right: 0; top: calc(100% + 4px);
+  background: var(--color-bg-elevated); border: 1px solid var(--color-neutral-200); border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg); padding: 6px;
+}
+.cw-menu { display: flex; flex-direction: column; min-width: 190px; }
+.cw-menu button {
+  text-align: left; padding: 7px 10px; border: 0; border-radius: var(--radius-md); background: none;
+  font-family: var(--font-family-sans); font-size: 13.5px; color: var(--color-neutral-800);
+}
+.cw-menu button:hover, .cw-menu button:focus-visible { background: var(--color-neutral-100); outline: none; }
+.cw-giveday:not(.is-inline) { width: max-content; max-width: min(320px, 90vw); }
+.cw-giveday-head { padding: 2px 4px 6px; font-family: var(--font-family-sans); font-size: 12px; font-weight: 600; color: var(--color-neutral-600); }
+.cw-giveday-days { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; }
+.cw-giveday.is-inline { flex-basis: 100%; width: 100%; margin: 6px 0 2px; }
+.cw-giveday.is-inline .cw-giveday-days { grid-template-columns: repeat(7, minmax(0, 1fr)); }
+.cw-daychip {
+  min-height: 32px; padding: 4px 8px; border: 1px solid var(--color-neutral-300); border-radius: var(--radius-md);
+  background: var(--color-bg-elevated); font-family: var(--font-family-sans); font-size: 12.5px; font-weight: 500; color: var(--color-neutral-800); white-space: nowrap;
+}
+.cw-daychip:hover:not(:disabled) { border-color: var(--color-primary-400); background: var(--color-primary-50); }
+.cw-daychip.is-today { border-color: var(--color-primary-500); color: var(--color-primary-800); }
+.cw-daychip[aria-pressed="true"] { background: var(--color-primary-100); border-color: var(--color-primary-500); }
+.cw-daychip:disabled { opacity: .45; cursor: default; }
+.cw-daychip:focus-visible { outline: 2px solid var(--color-primary-600); outline-offset: 1px; }
+.cw-row.has-picker { flex-wrap: wrap; }
+.cw-meta { align-self: center; }
+
+/* The days: seven equal columns in the household's week order. */
+.wc-days-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
+.wc-done { font-size: 12.5px; }
+.wc-spans { list-style: none; margin: 0 0 10px; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.wc-span, .wc-rhythm-item {
+  border: 0; background: none; padding: 0; text-align: left; font-family: var(--font-family-sans); font-size: 13px; color: var(--color-neutral-700);
+}
+.wc-span:hover, .wc-rhythm-item:hover { color: var(--color-neutral-950); text-decoration: underline; text-underline-offset: 3px; }
+.wc-span-when, .wc-rhythm-label, .wc-dinner-label { color: var(--color-neutral-500); }
+.wc-rhythm { margin: 0 0 10px; font-family: var(--font-family-sans); font-size: 13px; }
+.wc-rhythm p { margin: 0 0 2px; }
+.wc-strip { display: grid; grid-template-columns: repeat(var(--wc-days, 7), minmax(0, 1fr)); gap: 10px; align-items: start; }
+.wc-day {
+  min-width: 0; padding: 8px 10px 10px; border: 1px solid var(--color-neutral-200); border-radius: var(--radius-lg);
+  background: var(--color-bg-elevated); transition: border-color var(--transition-base), background-color var(--transition-base);
+}
+.wc-day.is-today { border-color: var(--color-primary-300); box-shadow: inset 0 3px 0 var(--color-primary-600); }
+.wc-day.is-empty { padding-bottom: 6px; }
+.wc-day.is-over { border: 1.5px dashed var(--color-primary-500); background: var(--color-primary-50); }
+.wc-dayhead { display: flex; align-items: baseline; gap: 6px; padding-bottom: 6px; margin-bottom: 6px; border-bottom: 1px solid var(--color-neutral-100); }
+.wc-day.is-empty .wc-dayhead { border-bottom: 0; margin-bottom: 0; padding-bottom: 0; }
+.wc-dayname { font-family: var(--font-family-sans); font-size: 11.5px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--color-neutral-600); }
+.wc-daynum { font-family: var(--font-family-display); font-size: 22px; line-height: 1; color: var(--color-neutral-900); }
+.wc-day.is-today .wc-dayname, .wc-day.is-today .wc-daynum { color: var(--color-primary-700); }
+.wc-drop-hint { margin: 0 0 6px; font-family: var(--font-family-sans); font-size: 12px; font-weight: 600; color: var(--color-primary-800); }
+.wc-events { list-style: none; margin: 0 0 6px; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.wc-event {
+  display: flex; gap: 6px; width: 100%; padding: 4px 8px; border: 0; border-radius: var(--radius-md); text-align: left;
+  background: var(--color-primary-100); color: var(--color-primary-900);
+  font-family: var(--font-family-sans); font-size: 12.5px; line-height: 1.3;
+}
+.wc-event:hover { background: var(--color-primary-200); }
+.wc-event:focus-visible, .wc-span:focus-visible, .wc-rhythm-item:focus-visible, .wc-daychip:focus-visible { outline: 2px solid var(--color-primary-600); outline-offset: 2px; }
+.wc-event-time { flex: none; font-weight: 600; }
+.wc-event-title { min-width: 0; overflow-wrap: anywhere; }
+.wc-event-sub { display: block; font-size: 11.5px; opacity: .8; }
+.wc-items .cw-row { font-size: 13px; border-color: var(--color-neutral-200); margin: 3px 0; padding-left: 2px; }
+.wc-items .cw-row.is-routine { border-style: dashed; }
+.wc-dinner { margin: 6px 0 0; font-family: var(--font-family-sans); font-size: 12px; }
+.wc-sometime { margin-top: 8px; padding-top: 6px; border-top: 1px dashed var(--color-neutral-200); }
+.wc-sometime-label { font-family: var(--font-family-sans); font-size: 11.5px; font-weight: 600; color: var(--color-neutral-500); }
+.wc.is-dragging .wc-day:not(.is-over) { border-style: dashed; }
+
+/* Narrower desks: the days wrap rather than crush (four across). */
+@media (min-width: 768px) and (max-width: 1100px) {
+  .wc-strip { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+
+/* Phone: day chips, the chosen day, then the shelf in one column. */
+.wc-phone { display: flex; flex-direction: column; gap: 14px; padding-bottom: 24px; }
+.wc-daychips { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; }
+.wc-daychip {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 48px; padding: 4px 0;
+  border: 1px solid var(--color-neutral-200); border-radius: var(--radius-lg); background: var(--color-bg-elevated);
+  font-family: var(--font-family-sans); color: var(--color-neutral-700);
+}
+.wc-daychip-name { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; }
+.wc-daychip-num { font-family: var(--font-family-display); font-size: 18px; line-height: 1.1; }
+.wc-daychip.is-today { background: var(--color-primary-700); border-color: var(--color-primary-700); color: #fff; }
+.wc-daychip[aria-pressed="true"]:not(.is-today) { border-color: var(--color-primary-500); box-shadow: 0 0 0 2px var(--color-primary-100); }
+.wc-daychip.is-today[aria-pressed="true"] { box-shadow: 0 0 0 2px var(--color-primary-200); }
+.wc-done-row { display: flex; justify-content: flex-end; }
+@media (max-width: 767px) {
+  .wc-masonry { columns: 1; }
+  .wc-group-head { position: sticky; top: 0; z-index: 2; background: var(--color-bg-elevated); }
+  .wc-more, .cw-daychip { min-width: 44px; min-height: 44px; }
+  .wc-add, .wc-done { min-height: 44px; }
+  .cw-giveday.is-inline .cw-giveday-days { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .wc-shelf, .wc-day { transition: none; }
+}

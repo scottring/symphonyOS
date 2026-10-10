@@ -37,3 +37,8 @@ export function dayWordFor(day: Date, now = new Date()): { word: string; tag: st
   const name = day.toLocaleDateString('en-US', { weekday: 'long' })
   return { word: name, tag: name }
 }
+
+/** "Tue 13": a day of the week as a chip names it. */
+export function dayChipLabel(d: Date): string {
+  return `${d.toLocaleDateString('en-US', { weekday: 'short' })} ${d.getDate()}`
+}

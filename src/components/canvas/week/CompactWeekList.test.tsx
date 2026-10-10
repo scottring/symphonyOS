@@ -54,7 +54,7 @@ describe('CompactWeekList', () => {
     expect(within(li).getByText('Today 2p')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Add Row a to today' })).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: 'Add Row c to today' }))
-    expect(onAdd).toHaveBeenCalledWith('c')
+    expect(onAdd).toHaveBeenCalledWith('c', expect.anything())
   })
 
   it('hides done rows until “Show done” is pressed', () => {

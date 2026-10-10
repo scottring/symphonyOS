@@ -40,6 +40,8 @@ export interface CompactRow<T> {
   onDay?: string | null
   /** For reading only: no check, no add, no drag. */
   readOnly?: boolean
+  /** A small note on the row's line ("from Fri", "2p"). */
+  meta?: string | null
 }
 
 export interface CompactWeekListProps<T> {
@@ -50,7 +52,7 @@ export interface CompactWeekListProps<T> {
   addLabel?: (title: string) => string
   /** Group rows under their parents (default). Off: one plain list. */
   grouped?: boolean
-  onAdd?: (item: T) => void
+  onAdd?: (item: T, button: HTMLButtonElement) => void
   onComplete?: (item: T) => void
   onOpen?: (item: T) => void
   onOpenParent?: (parentId: string) => void
@@ -117,14 +119,38 @@ export function CompactWeekList<T>(props: CompactWeekListProps<T>) {
   )
 }
 
-function CompactWeekRow<T>({ row, suffix, onAdd, onComplete, onOpen, onDragStart, addLabel, busyKey, disabled }: CompactWeekListProps<T> & { row: CompactRow<T>; suffix?: string }) {
+export interface CompactWeekRowProps<T> {
+  row: CompactRow<T>
+  /** A lone row's parent, written after its title. */
+  suffix?: string
+  addLabel?: (title: string) => string
+  /** The + button; it is handed the button so a caller can anchor a picker. */
+  onAdd?: (item: T, button: HTMLButtonElement) => void
+  /** The + button controls a picker that is open now. */
+  addExpanded?: boolean
+  onComplete?: (item: T) => void
+  onOpen?: (item: T) => void
+  onDragStart?: (item: T, ev: DragEvent<HTMLLIElement>) => void
+  onDragEnd?: (item: T) => void
+  busyKey?: string | null
+  disabled?: boolean
+  /** In place of the + button (a day's ⋯ menu). */
+  trailing?: ReactNode
+  /** Drawn inside the row, after it (a picker). */
+  children?: ReactNode
+  className?: string
+}
+
+/** One compact row: check, wrapping title, small meta, and + (or a menu). */
+export function CompactWeekRow<T>({ row, suffix, onAdd, addExpanded, onComplete, onOpen, onDragStart, onDragEnd, addLabel, busyKey, disabled, trailing, children, className }: CompactWeekRowProps<T>) {
   const arrived = useArrived(row.id)
   const done = !!row.completed
   const movable = !!onDragStart && !row.readOnly && !row.onDay && !done && !disabled
   const busy = busyKey === row.key
-  const cls = ['canvas-item', 'cw-row', row.onDay ? 'is-on-today' : '', done ? 'is-done' : '', row.readOnly ? 'is-read' : '', arrived ? 'is-arrived' : ''].filter(Boolean).join(' ')
+  const cls = ['canvas-item', 'cw-row', row.onDay ? 'is-on-today' : '', done ? 'is-done' : '', row.readOnly ? 'is-read' : '', arrived ? 'is-arrived' : '', className ?? ''].filter(Boolean).join(' ')
   return (
-    <li className={cls} draggable={movable} onDragStart={movable ? (ev) => onDragStart!(row.item, ev) : undefined}>
+    <li className={cls} draggable={movable} onDragStart={movable ? (ev) => onDragStart!(row.item, ev) : undefined}
+      onDragEnd={movable && onDragEnd ? () => onDragEnd(row.item) : undefined}>
       {row.readOnly || !onComplete
         ? <span className="cw-dash" aria-hidden="true" />
         : (
@@ -140,15 +166,17 @@ function CompactWeekRow<T>({ row, suffix, onAdd, onComplete, onOpen, onDragStart
         {suffix && <span className="cw-parent"><span aria-hidden="true"> · </span><span className="sr-only">, for </span>{suffix}</span>}
         {row.context && <span className="cw-context">{row.context}</span>}
       </span>
+      {row.meta && <span className="canvas-item-meta cw-meta">{row.meta}</span>}
       {row.onDay
         ? <span className="canvas-tag">{row.onDay}</span>
-        : onAdd && !row.readOnly && !done && (
-          <button type="button" className="canvas-icon cw-add" onClick={() => onAdd(row.item)} disabled={disabled}
-            aria-busy={busy || undefined} aria-label={addLabel ? addLabel(row.title) : `Add ${row.title} to today`} title={busy ? 'Saving…' : 'Add to the day'}>
+        : trailing ?? (onAdd && !row.readOnly && !done && (
+          <button type="button" className="canvas-icon cw-add" onClick={(e) => onAdd(row.item, e.currentTarget)} disabled={disabled}
+            aria-busy={busy || undefined} aria-expanded={addExpanded}
+            aria-label={addLabel ? addLabel(row.title) : `Add ${row.title} to today`} title={busy ? 'Saving…' : 'Add to the day'}>
             <Plus size={16} strokeWidth={2.25} aria-hidden="true" />
           </button>
-        )}
+        ))}
+      {children}
     </li>
   )
 }
-

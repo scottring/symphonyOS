@@ -88,7 +88,11 @@ const readRefOpen = () => { try { return localStorage.getItem(REF_KEY) === 'open
 const DAILY_KEY = 'symphony-week-daily'
 const readDaily = () => { try { return localStorage.getItem(DAILY_KEY) === 'shown' } catch { return false } }
 
-export function WeekV2({ tasks, weekStart, meId, isCurrent, days, renderDays, onSelectTask, timingControl, dragEnabled = true, tools }: {
+export function WeekV2({ tasks, weekStart, meId, isCurrent, days, renderDays, onSelectTask, timingControl, dragEnabled = true, tools, canvas }: {
+  /** The week at rest, as approved (2026-10-10): WeekViewV2's week canvas —
+   *  Still to place above the days. Replaces the Lists / Open journal
+   *  layouts at rest; the planning session keeps its own steps. */
+  canvas?: ReactNode
   /** Layer-filtered tasks, as the week receives them. */
   tasks: Task[]
   weekStart: Date
@@ -597,6 +601,8 @@ export function WeekV2({ tasks, weekStart, meId, isCurrent, days, renderDays, on
             </div>
           )}
         </>
+      ) : canvas ? (
+        <div className="wk-canvas">{canvas}</div>
       ) : layout === 'journal' ? (
         // At rest, Open journal: the month's lines with the week's actions,
         // then the days — the same days, drag and "when" as the lists.
