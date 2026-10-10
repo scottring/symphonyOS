@@ -22,14 +22,22 @@ export function writeCachedContacts(store: Pick<Storage, 'setItem'>, contacts: K
   }
 }
 
+/** A contact the kid-phone allowlist has switched off can't be called, so it
+ *  never shows in the phone book. The feed's `enabled` flag is the source of
+ *  truth; a contact missing the flag (older cache) is treated as enabled. */
+export function callableContacts(contacts: KidPhoneContact[]): KidPhoneContact[] {
+  return contacts.filter((c) => c.enabled !== false)
+}
+
 export function partitionContacts(contacts: KidPhoneContact[]): {
   favorites: KidPhoneContact[]
   others: KidPhoneContact[]
 } {
   const byName = (a: KidPhoneContact, b: KidPhoneContact) => a.name.localeCompare(b.name)
+  const callable = callableContacts(contacts)
   return {
-    favorites: contacts.filter((c) => c.favorite).sort(byName),
-    others: contacts.filter((c) => !c.favorite).sort(byName),
+    favorites: callable.filter((c) => c.favorite).sort(byName),
+    others: callable.filter((c) => !c.favorite).sort(byName),
   }
 }
 

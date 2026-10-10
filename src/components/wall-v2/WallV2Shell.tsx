@@ -12,9 +12,8 @@
 // design-payload mock. The design payload now lives only in the dev-only
 // `/wall-design` preview (see `wallV2Mock.ts`).
 
-import { ConnectedWall } from './moments/ConnectedWall';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Sun, Plus, ClipboardList, Settings, Phone, ChefHat, ShoppingCart } from 'lucide-react';
+import { Sun, Plus, ClipboardList, Settings, Phone, ChefHat, ShoppingCart, StickyNote } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { useActionableInstances } from '@/hooks/useActionableInstances';
 import { useBuildAutoReload } from '@/hooks/useBuildAutoReload';
@@ -54,7 +53,6 @@ import {
 import type { WallDockActionId } from './WallV2FamilyStrip';
 import { WallV2UtilitySheet } from './WallV2UtilitySheet';
 import { CallerIdTakeover } from './CallerIdTakeover';
-import { WallV2PhoneScreen } from './WallV2PhoneScreen';
 import { adaptTimelineSections, adaptWeather } from './wallV2Adapter';
 import { WALL } from './wallTheme';
 import { useWallData } from '@/hooks/useWallData';
@@ -77,6 +75,14 @@ import { openScratchpadRows, recentlySorted, rowByline, type ScratchpadRow } fro
 import { useFamilyDiscussionItems, type DiscussionItem } from '@/hooks/useFamilyDiscussionItems';
 import { QuickCapture } from '@/components/layout/QuickCapture';
 import { type MomentKid } from './moments/WallMoments';
+import { KioskCanvas } from './activity/KioskCanvas';
+import { useKioskActivity } from './activity/useKioskActivity';
+import { supabaseGroceryIO } from './activity/groceryIO';
+import type { KioskDinner } from './activity/KioskStages';
+import { currentStage, servesFactor, DEFAULT_BASE_SERVES } from '@/lib/wall/activity/kioskActivity';
+import { saveGroceryLines, type GroceryLine } from '@/lib/wall/activity/groceryProposal';
+import { buildBedtimeGrid } from '@/lib/wall/activity/kioskRoutines';
+import { isIngredientLine } from '@/lib/wall/activity/cookingModel';
 import { wallMoment } from '@/lib/wall/wallMoment';
 import { wallTodayRows, specialsWeek, checklistFor, afterSchoolRows } from '@/lib/wall/wallMomentsModel';
 import { buildMemberDayModel, type KidRow } from '@/lib/wall/kidDayModel';
@@ -190,7 +196,6 @@ function useMealCardData(event: CalendarEvent | null, fallbackName: string) {
 }
 
 export function WallV2Shell() {
-  const WallSurface = ConnectedWall;
   const { user, loading: authLoading } = useAuth();
 
   // The chromeless Pi kiosk can't reload itself to pick up a new deploy, so a
@@ -299,33 +304,50 @@ export function WallV2Shell() {
     temp: 0, high: 0, low: 0, condition: 'Loading', rainChance: 0, icon: Sun,
   };
 
+  // ─── The kiosk's activity (conversational canvas, 2026-10-10) ───
+  // One stage at a time inside a stable frame: home, dinner, groceries,
+  // cooking, leaving, bedtime, calling, a person's page, a recipe. Cooking
+  // and timers are held across stage changes and persisted for the day.
+  const todayKey = useMemo(() => localDateKey(now), [now]);
+  const kiosk = useKioskActivity(todayKey);
+  const { dispatch: kioskDispatch } = kiosk;
+  const stage = currentStage(kiosk.state);
+
   // ─── Overlay state ───
   // Guest mode: a privacy cover for when company's over — hides all content
   // behind a full-screen ambient clock/weather screen.
   const [guestMode, setGuestMode] = useState(false);
-  const [recipeViewerMeal, setRecipeViewerMeal] = useState<'dinner' | 'breakfast' | null>(null);
+  // The recipe viewer is the kiosk's 'recipe' stage now.
+  const recipeViewerMeal = (stage.kind === 'recipe' && stage.source === 'dinner' ? 'dinner' : null) as 'dinner' | 'breakfast' | null;
+  const setRecipeViewerMeal = useCallback((meal: 'dinner' | null) => {
+    kioskDispatch(meal ? { type: 'OPEN', stage: { kind: 'recipe', source: 'dinner' } } : { type: 'BACK' });
+  }, [kioskDispatch]);
   // Cooking something that was never on the plan: the picker, and the one
   // recipe it hands over (Scott, 2026-09-07). The index stays loaded while the
   // viewer is open so Back lands on the shelf instantly instead of re-querying.
   const [showRecipePicker, setShowRecipePicker] = useState(false);
   const [recipeQuery, setRecipeQuery] = useState('');
   const [pickedRecipeId, setPickedRecipeId] = useState<string | null>(null);
-  const recipeIndex = useWallRecipeIndex(showRecipePicker || pickedRecipeId !== null);
-  const { recipe: pickedRecipe } = useRecipe(pickedRecipeId);
-  // Portrait tap on the board — a member's full-screen day page. Wrapped
+  const pickedOpen = stage.kind === 'recipe' && stage.source === 'picked';
+  const recipeIndex = useWallRecipeIndex(showRecipePicker || pickedOpen);
+  const { recipe: pickedRecipe } = useRecipe(pickedOpen ? pickedRecipeId : null);
+  // A member's full-screen day page is the kiosk's 'person' stage. Wrapped
   // handlers below (useCallback) so a parent re-render doesn't recreate
   // onClose/onTapMember and restart KidDayView's idle-close timer.
-  const [kidViewMember, setKidViewMember] = useState<FamilyMember | null>(null);
+  const kidViewMember: FamilyMember | null = stage.kind === 'person'
+    ? wallData.familyMembers.find((m) => m.id === stage.memberId) ?? null
+    : null;
   // "Who's on?" — the sheet that answers an unclaimed handoff with a face.
   const [showWhoSheet, setShowWhoSheet] = useState(false);
   // Which dinner day the wall is looking at — shared by the face's dinner card
   // and the recipe viewer, so tapping a paged card opens that same day.
   // null = today.
   const [mealDayKey, setMealDayKey] = useState<string | null>(null);
-  // The dinner card's ×1 / ×2 / ×3 and the ingredients ticked as "have it";
-  // both reset with the day.
-  const [dinnerScale, setDinnerScale] = useState(1);
-  const [haveIngredients, setHaveIngredients] = useState<Set<number>>(() => new Set());
+  // Tonight's servings live in the kiosk state (reset with the day). Recipes
+  // don't store a yield, so the base is DEFAULT_BASE_SERVES and the wall
+  // says so beside the stepper.
+  const dinnerServes = kiosk.state.serves ?? DEFAULT_BASE_SERVES;
+  const dinnerFactor = servesFactor(dinnerServes, DEFAULT_BASE_SERVES);
   // The scratchpad sheet, opened at the input or (from the face) at one note.
   const [showScratchpad, setShowScratchpad] = useState(false);
   const [scratchpadFocus, setScratchpadFocus] = useState<string | null>(null);
@@ -348,7 +370,6 @@ export function WallV2Shell() {
     [lists],
   );
 
-  const [showPhone, setShowPhone] = useState(false);
   const [showUtilities, setShowUtilities] = useState(false);
   const [flashMessage, setFlashMessage] = useState<string | null>(null);
   const flashTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -373,7 +394,6 @@ export function WallV2Shell() {
   // ─── Recipe viewer: paging to the previous / next planned day ───
   // `now` ticks every minute; the day list must not, so everything below keys
   // off the date only.
-  const todayKey = useMemo(() => localDateKey(now), [now]);
   const anchorDate = useMemo(() => {
     const d = new Date(now);
     d.setHours(0, 0, 0, 0);
@@ -475,8 +495,8 @@ export function WallV2Shell() {
     // Tonight's dinner, at the wall's ×2 / ×3 (Scott, 2026-10-04: the wall
     // showed the base recipe while the plan called for it tripled). A stored
     // recipe opens in place of its link so the scaled amounts are what shows.
-    const scaled = recipeViewerMeal === 'dinner' && dinnerScale !== 1 && viewerMeal.recipeContent
-      ? { ...viewerMeal.recipeContent, title: `${viewerMeal.recipeContent.title} ×${dinnerScale}`, ingredients: viewerMeal.recipeContent.ingredients.map((l) => scaleIngredient(l, dinnerScale)) }
+    const scaled = recipeViewerMeal === 'dinner' && dinnerFactor !== 1 && viewerMeal.recipeContent
+      ? { ...viewerMeal.recipeContent, title: `${viewerMeal.recipeContent.title} · for ${dinnerServes}`, ingredients: viewerMeal.recipeContent.ingredients.map((l) => scaleIngredient(l, dinnerFactor)) }
       : null;
     if (scaled) return { url: undefined, content: scaled, mealName: viewerMeal.mealName, mealIcon: viewerEvent ? getMealIcon(viewerEvent.title) : '🍽️' };
     return {
@@ -485,7 +505,43 @@ export function WallV2Shell() {
       mealName: viewerMeal.mealName,
       mealIcon: viewerEvent ? getMealIcon(viewerEvent.title) : '🍽️',
     };
-  }, [recipeViewerMeal, selectedPlannedDay, viewerMeal, viewerEvent, dinnerScale]);
+  }, [recipeViewerMeal, selectedPlannedDay, viewerMeal, viewerEvent, dinnerFactor, dinnerServes]);
+
+  // The recipe stage: tonight's (or a paged day's) recipe, or one picked from
+  // the shelf. Rendered inside the kiosk stage so the frame stays put.
+  const recipePage = useMemo(() => {
+    if (stage.kind !== 'recipe') return null;
+    if (stage.source === 'picked') {
+      if (!pickedRecipe) return <div className="kc-empty"><p>Loading the recipe…</p></div>;
+      return (
+        <WallRecipeViewer
+          content={{ title: pickedRecipe.title, ingredients: pickedRecipe.ingredients, instructions: pickedRecipe.instructions }}
+          url={pickedRecipe.ingredients.length === 0 && pickedRecipe.instructions.length === 0 ? pickedRecipe.sourceUrl : undefined}
+          mealName={pickedRecipe.title}
+          mealIcon={getMealIcon(pickedRecipe.title)}
+          onClose={() => { kioskDispatch({ type: 'BACK' }); setPickedRecipeId(null); setShowRecipePicker(true); }}
+        />
+      );
+    }
+    if (!viewerPayload) return <div className="kc-empty"><p>No recipe saved for this meal.</p></div>;
+    return (
+      <WallRecipeViewer
+        url={viewerPayload.url}
+        content={viewerPayload.content}
+        mealName={viewerPayload.mealName}
+        mealIcon={viewerPayload.mealIcon}
+        dayLabel={navDays.length > 1 ? mealDayLabel(selectedPlannedDay?.date ?? anchorDate, viewerSlot, todayKey) : undefined}
+        prevDay={toNeighbor(prevNavDay)}
+        nextDay={toNeighbor(nextNavDay)}
+        onPrevDay={goToDay(prevNavDay)}
+        onNextDay={goToDay(nextNavDay)}
+        onClose={() => setRecipeViewerMeal(null)}
+      />
+    );
+  }, [stage, pickedRecipe, viewerPayload, navDays.length, selectedPlannedDay, anchorDate, viewerSlot, todayKey, toNeighbor, prevNavDay, nextNavDay, goToDay, kioskDispatch, setRecipeViewerMeal]);
+  const recipeTitle = stage.kind === 'recipe'
+    ? (stage.source === 'picked' ? pickedRecipe?.title ?? null : viewerPayload?.mealName ?? null)
+    : null;
 
   // Tonight's question — a deterministic daily rotation, dismissable, and the
   // one thing on this wall that is not a schedule.
@@ -603,10 +659,10 @@ export function WallV2Shell() {
       case 'task': setShowQuickCapture(true); break;
       case 'discuss': setScratchpadFocus(null); setShowScratchpad(true); break;
       case 'list': setSheetListId(null); setShowListSheet(true); break;
-      case 'phone': setShowPhone(true); break;
+      case 'phone': kioskDispatch({ type: 'OPEN', stage: { kind: 'calling' } }); break;
       case 'utilities': setShowUtilities(true); break;
     }
-  }, []);
+  }, [kioskDispatch]);
 
   // ── Unprompted tier ────────────────────────────────────────────────────────
   // The wall does NOT pass a facts resolver: useWallData narrows its task columns
@@ -653,23 +709,25 @@ export function WallV2Shell() {
   // memoized: KidDayView's idle-close effect depends on `onClose`, and an
   // unstable identity here would restart that timer on every Shell re-render.
   const handleTapGanttMember = useCallback((id: string) => {
-    const m = wallData.familyMembers.find((fm) => fm.id === id);
-    if (m) setKidViewMember(m);
-  }, [wallData.familyMembers]);
+    if (wallData.familyMembers.some((fm) => fm.id === id)) kioskDispatch({ type: 'OPEN', stage: { kind: 'person', memberId: id } });
+  }, [wallData.familyMembers, kioskDispatch]);
 
   const handleCloseKidView = useCallback(() => {
-    setKidViewMember(null);
+    kioskDispatch({ type: 'BACK' });
     void wallData.refetch();
-  }, [wallData.refetch]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [wallData.refetch, kioskDispatch]);
 
   // The face's dinner card opens whatever day it's currently showing. A paged
   // day always has a body or a source URL (buildMealDayRecipes drops the ones
   // that don't), so it can open without the tonight-only recipe check.
+  // Tonight's dinner opens the kiosk's dinner activity (servings, what's
+  // missing, cooking); a paged day opens its recipe.
   const handleTapDinnerCard = useCallback(() => {
     if (selectedDinnerDay) { setRecipeViewerMeal('dinner'); return; }
-    if (dinner.recipeUrl || dinner.recipeContent) setRecipeViewerMeal('dinner');
+    if (dinnerEvent) kioskDispatch({ type: 'OPEN', stage: { kind: 'dinner' } });
     else showFlash(`Tonight: ${dinner.mealName}`);
-  }, [selectedDinnerDay, dinner, showFlash]);
+  }, [selectedDinnerDay, dinnerEvent, dinner, showFlash, setRecipeViewerMeal, kioskDispatch]);
 
   // ─── The wall, by time of day (Scott, 2026-10-04) ───
   // Everything below projects data the wall already holds; no new queries.
@@ -733,47 +791,39 @@ export function WallV2Shell() {
     }
     if (moment === 'dinner' || !dinnerEvent) return null;
     return { label: dinnerStartDate ? `Dinner at ${dinnerStartDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}` : 'Dinner tonight', title: dinner.mealName, imageUrl: dinner.recipe?.imageUrl ?? null, onOpen: handleTapDinnerCard };
-  }, [moment, dinnerDays, tomorrowKey, dinnerEvent, dinnerStartDate, dinner, handleTapDinnerCard]);
-  // A new day starts the dinner card fresh.
-  useEffect(() => { setDinnerScale(1); setHaveIngredients(new Set()); }, [todayKey]);
-  const dinnerIngredients = useMemo(
-    () => (dinner.recipe?.ingredients ?? []).filter((l) => l.trim() && l !== l.toUpperCase()).map((l) => scaleIngredient(l, dinnerScale)),
-    [dinner.recipe, dinnerScale],
-  );
+  }, [moment, dinnerDays, tomorrowKey, dinnerEvent, dinnerStartDate, dinner, handleTapDinnerCard, setRecipeViewerMeal]);
   // The family's grocery list: "Groceries" by name, else the To-buy list.
   const groceryList = useMemo(
     () => familyLists.find((l) => l.title.trim().toLowerCase() === 'groceries') ?? findToBuyList(familyLists) ?? null,
     [familyLists],
   );
-  const handleAddMissing = useCallback(async () => {
-    if (!user) return;
-    const missing = dinnerIngredients.filter((_, i) => !haveIngredients.has(i));
-    if (!missing.length) { showFlash('Nothing missing'); return; }
-    const list = groceryList;
-    if (!list) { showFlash('No family grocery list to add to'); return; }
-    const { error } = await supabase.from('list_items').insert(
-      missing.map((text, i) => ({ list_id: list.id, user_id: user.id, text, sort_order: 10_000 + i, completed: false })),
-    );
-    showFlash(error ? 'Could not add — try again' : `Added ${missing.length === 1 ? missing[0] : 'the missing ingredients'} to ${list.title}`);
-  }, [user, dinnerIngredients, haveIngredients, groceryList, showFlash]);
-  const momentDinner = useMemo(() => {
+  // "Add what's missing" is a per-line proposal now (KioskCanvas): each line
+  // saves on its own, Retry touches only failures, and lines already open on
+  // the list are never inserted twice (saveGroceryLines).
+  const saveGroceries = useCallback(async (lines: GroceryLine[]) => {
+    if (!user || !groceryList) return lines.map((l) => ({ key: l.key, ok: false }));
+    return saveGroceryLines(lines, supabaseGroceryIO(groceryList.id, user.id));
+  }, [user, groceryList]);
+  const kioskDinner: KioskDinner | null = useMemo(() => {
     if (!dinnerEvent) return null;
     const notes = dinnerEvent.mealNotes?.trim() || null;
+    const r = dinner.recipe;
+    // Cooking mode reads the same content the recipe viewer shows: the stored
+    // recipe when it has steps, else the recipe's page.
+    const source = r && r.instructions.length > 0 ? { recipeId: r.id } : dinner.recipeUrl ? { url: dinner.recipeUrl } : null;
     return {
+      key: source?.recipeId ?? (source?.url ? `url:${source.url}` : null),
       title: dinner.mealName,
-      imageUrl: dinner.recipe?.imageUrl ?? null,
-      minutes: dinner.recipe?.prepMinutes ?? null,
+      imageUrl: r?.imageUrl ?? null,
+      timeLabel: dinnerStartDate ? `Dinner at ${dinnerStartDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}` : 'Dinner tonight',
+      minutes: r?.prepMinutes ?? null,
       cue: notes ? notes.split(/(?<=[.!])\s/)[0] : null,
-      ingredients: dinnerIngredients,
+      ingredients: (r?.ingredients ?? []).filter(isIngredientLine),
+      source,
       hasRecipe: !!(dinner.recipeUrl || dinner.recipeContent),
-      scale: dinnerScale,
-      onScale: setDinnerScale,
-      onCook: handleTapDinnerCard,
-      have: haveIngredients,
-      onToggleHave: (i: number) => setHaveIngredients((s) => { const n = new Set(s); if (n.has(i)) n.delete(i); else n.add(i); return n }),
-      onAddMissing: () => { void handleAddMissing() },
+      baseServes: DEFAULT_BASE_SERVES,
     };
-  }, [dinnerEvent, dinner, dinnerIngredients, dinnerScale, haveIngredients, handleTapDinnerCard, handleAddMissing]);
+  }, [dinnerEvent, dinner, dinnerStartDate]);
   const checklists = useMemo(() => kidModels.map(({ member, model }) => {
     // A reading timer left running on a kid's page shows on their card, so a
     // parent sees it from the kitchen and the kid can find it again.
@@ -786,6 +836,11 @@ export function WallV2Shell() {
     const rows = list?.rows.filter((r) => !shown.has(`${r.entityType}:${r.id}`)) ?? []
     return { member, list: list && rows.length ? { ...list, rows } : null, live };
   }), [kidModels, moment, now]);
+  // Tonight's bedtime: each kid's evening routine, steps × people.
+  const bedtimeGrid = useMemo(
+    () => buildBedtimeGrid(kidModels.map(({ member, model }) => ({ member, list: checklistFor(model, 'evening') }))),
+    [kidModels],
+  );
   const handleTick = useCallback((member: FamilyMember, row: KidRow) => {
     void (async () => {
       if (row.entityType === 'task') await updateTask(row.id, { completed: !row.done });
@@ -886,19 +941,21 @@ export function WallV2Shell() {
       {/* The wall, by time of day (Scott, 2026-10-04): Today · the moment ·
           specials and coming up · the question and the kids' lists. */}
       <div className="flex-1 min-h-0 -m-4 mt-0">
-        <WallSurface
+        <KioskCanvas
           isDark={isDark}
+          activity={kiosk}
+          now={now}
           moment={moment}
           dateLabel={now.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
           clock={clock}
           weather={liveWeather ? { icon: weatherData.icon ?? Sun, temp: weatherData.temp, condition: weatherData.condition } : null}
-          actions={
-            <div className="flex items-center gap-2">
+          tools={
+            <>
               {/* kidsPhone. Its own labelled button, never a
                   tap deeper (a kid's call to Grandma must not get harder). */}
-              <button type="button" onClick={() => setShowPhone(true)} aria-label="kidsPhone — call"
-                className="inline-flex min-h-[56px] items-center gap-2 rounded-2xl bg-[#f2b65a] px-5 text-[1.15rem] font-semibold text-[#1b1406]">
-                <Phone className="h-6 w-6" aria-hidden="true" />kidsPhone
+              <button type="button" onClick={() => kioskDispatch({ type: 'OPEN', stage: { kind: 'calling' } })} aria-label="kidsPhone — call"
+                className="kc-btn kc-tool is-primary">
+                <Phone aria-hidden="true" />kidsPhone
               </button>
               {/* Groceries, one tap from the face (Scott, 2026-10-08): the
                   list sheet opens on it with the cursor in its add field. */}
@@ -907,39 +964,65 @@ export function WallV2Shell() {
                   if (!groceryList) { showFlash('No family grocery list yet'); return; }
                   setSheetListId(groceryList.id); setShowListSheet(true);
                 }}
-                className="inline-flex min-h-[56px] items-center gap-2 rounded-2xl border border-[#2d3d50] bg-[#1c2733] px-5 text-[1.15rem] font-semibold text-[#e6edf4] active:scale-95 transition-transform">
-                <ShoppingCart className="h-6 w-6 text-[#a9b7c6]" aria-hidden="true" />Groceries
+                className="kc-btn kc-tool">
+                <ShoppingCart aria-hidden="true" />Groceries
               </button>
-              <button type="button" onClick={() => setShowRecipePicker(true)} aria-label="Recipes"
-                className="grid h-14 w-14 place-items-center rounded-2xl border border-[#2d3d50] bg-[#1c2733]">
-                <ChefHat className="h-6 w-6 text-[#a9b7c6]" aria-hidden="true" />
+              <button type="button" onClick={() => { setScratchpadFocus(null); setShowScratchpad(true); }} aria-label="Notes" className="kc-btn kc-tool kc-icon-btn">
+                <StickyNote aria-hidden="true" />
+              </button>
+              <button type="button" onClick={() => setShowRecipePicker(true)} aria-label="Recipes" className="kc-btn kc-tool kc-icon-btn">
+                <ChefHat aria-hidden="true" />
               </button>
               {RAIL_ACTIONS.map(({ id, label, icon: Icon }) => (
-                <button key={id} type="button" aria-label={label} onClick={() => handleDockAction(id)}
-                  className="grid h-14 w-14 place-items-center rounded-2xl border border-[#2d3d50] bg-[#1c2733] active:scale-95 transition-transform">
-                  <Icon className="h-6 w-6 text-[#a9b7c6]" />
+                <button key={id} type="button" aria-label={label} onClick={() => handleDockAction(id)} className="kc-btn kc-tool kc-icon-btn">
+                  <Icon aria-hidden="true" />
                 </button>
               ))}
-            </div>
+            </>
           }
           members={wallData.familyMembers}
-          kids={kids}
-          today={todayForMoment}
-          specials={specials}
-          comingUp={comingUpRows}
+          rows={todayRows}
+          homeRows={todayForMoment}
           kidsNow={kidsNow}
           focusRows={focusRows}
           handoffs={momentHandoffs}
-          dinner={momentDinner}
+          checklists={checklists}
+          bedtime={bedtimeGrid}
+          dinner={kioskDinner}
           nextMeal={nextMeal}
+          comingUp={comingUpRows}
           scratchpad={momentScratchpad}
           question={handoffAsk ? { text: handoffAsk.prompt, isHandoff: true } : (discussionDismissed || !discussionPrompt ? null : { text: discussionPrompt, isHandoff: false })}
-          checklists={checklists}
+          groceryListTitle={groceryList?.title ?? null}
+          saveGroceries={saveGroceries}
+          personPage={kidViewMember && (
+            <KidDayView
+              member={kidViewMember}
+              routines={wallData.routines}
+              todayItems={(wallData.days.find((d) => d.isToday) ?? wallData.days[0])?.items ?? emptySections<TimelineItem>()}
+              tomorrowItems={wallData.days[1]?.items}
+              members={wallData.familyMembers}
+              screenTime={wallData.screenTimeSummaries.find((s) => s.familyMemberId === kidViewMember.id) ?? null}
+              weather={weather}
+              neededTasks={wallData.neededTasks}
+              homeworkTasks={wallData.homeworkTasks}
+              notices={wallData.notices}
+              onToggleTask={handleToggleComplete}
+              onClose={handleCloseKidView}
+              days={wallData.days}
+              tonight={selectedDinnerDay ? selectedDinnerDay.title : (dinnerEvent ? dinner.mealName : null)}
+              onOpenDinner={handleTapDinnerCard}
+              onOpenMember={handleTapGanttMember}
+            />
+          )}
+          recipePage={recipePage}
+          recipeTitle={recipeTitle}
+          onOpenRecipe={() => { setMealDayKey(null); setRecipeViewerMeal('dinner'); }}
           onTapRow={handleTapRow}
+          onTick={handleTick}
           onClaim={() => setShowWhoSheet(true)}
           onTapQuestion={() => (handoffAsk ? setShowWhoSheet(true) : setShowQuestionSheet(true))}
-          onTick={handleTick}
-          onOpenKid={setKidViewMember}
+          flash={showFlash}
         />
       </div>
 
@@ -950,7 +1033,7 @@ export function WallV2Shell() {
       {flashMessage && (
         <div
           role="status"
-          className="animate-fade-in-up fixed bottom-6 left-1/2 z-[60] -translate-x-1/2 px-4 py-2 rounded-full bg-stone-800/90 dark:bg-stone-200/90 text-white dark:text-stone-900 text-[0.85rem] font-bold shadow-lg backdrop-blur-md whitespace-nowrap"
+          className="animate-fade-in-up fixed bottom-[124px] left-1/2 z-[60] -translate-x-1/2 px-4 py-2 rounded-full bg-stone-800/90 dark:bg-stone-200/90 text-white dark:text-stone-900 text-[0.85rem] font-bold shadow-lg backdrop-blur-md whitespace-nowrap"
         >
           {flashMessage}
         </div>
@@ -991,75 +1074,16 @@ export function WallV2Shell() {
         />
       )}
 
-      {viewerPayload && (
-        <WallRecipeViewer
-          url={viewerPayload.url}
-          content={viewerPayload.content}
-          mealName={viewerPayload.mealName}
-          mealIcon={viewerPayload.mealIcon}
-          dayLabel={
-            navDays.length > 1
-              ? mealDayLabel(selectedPlannedDay?.date ?? anchorDate, viewerSlot, todayKey)
-              : undefined
-          }
-          prevDay={toNeighbor(prevNavDay)}
-          nextDay={toNeighbor(nextNavDay)}
-          onPrevDay={goToDay(prevNavDay)}
-          onNextDay={goToDay(nextNavDay)}
-          onClose={() => setRecipeViewerMeal(null)}
-        />
-      )}
-
       {showRecipePicker && (
         <WallV2RecipeSheet
           recipes={recipeIndex.recipes}
           loading={recipeIndex.loading}
           query={recipeQuery}
           onQueryChange={setRecipeQuery}
-          onPick={(r) => { setPickedRecipeId(r.id); setShowRecipePicker(false); }}
+          onPick={(r) => { setPickedRecipeId(r.id); setShowRecipePicker(false); kioskDispatch({ type: 'OPEN', stage: { kind: 'recipe', source: 'picked' } }); }}
           // Closing the shelf outright is done searching; Back from a recipe
           // (below) is not, and keeps the query.
           onClose={() => { setShowRecipePicker(false); setRecipeQuery(''); }}
-        />
-      )}
-
-      {/* A picked recipe cooks in the same full-screen view tonight's dinner
-          uses — no day rails, because a recipe reached by name has no
-          neighbouring night; closing goes back to the shelf you came from. */}
-      {pickedRecipeId && pickedRecipe && (
-        <WallRecipeViewer
-          content={{
-            title: pickedRecipe.title,
-            ingredients: pickedRecipe.ingredients,
-            instructions: pickedRecipe.instructions,
-          }}
-          url={pickedRecipe.ingredients.length === 0 && pickedRecipe.instructions.length === 0
-            ? pickedRecipe.sourceUrl
-            : undefined}
-          mealName={pickedRecipe.title}
-          mealIcon={getMealIcon(pickedRecipe.title)}
-          onClose={() => { setPickedRecipeId(null); setShowRecipePicker(true); }}
-        />
-      )}
-
-      {kidViewMember && (
-        <KidDayView
-          member={kidViewMember}
-          routines={wallData.routines}
-          todayItems={(wallData.days.find((d) => d.isToday) ?? wallData.days[0])?.items ?? emptySections<TimelineItem>()}
-          tomorrowItems={wallData.days[1]?.items}
-          members={wallData.familyMembers}
-          screenTime={wallData.screenTimeSummaries.find((s) => s.familyMemberId === kidViewMember.id) ?? null}
-          weather={weather}
-          neededTasks={wallData.neededTasks}
-          homeworkTasks={wallData.homeworkTasks}
-          notices={wallData.notices}
-          onToggleTask={handleToggleComplete}
-          onClose={handleCloseKidView}
-          days={wallData.days}
-          tonight={selectedDinnerDay ? selectedDinnerDay.title : (dinnerEvent ? dinner.mealName : null)}
-          onOpenDinner={handleTapDinnerCard}
-          onOpenMember={handleTapGanttMember}
         />
       )}
 
@@ -1129,8 +1153,6 @@ export function WallV2Shell() {
           onExit={() => setGuestMode(false)}
         />
       )}
-
-      {showPhone && <WallV2PhoneScreen onClose={() => setShowPhone(false)} />}
 
       {showListSheet && (
         <WallV2ListSheetContainer
