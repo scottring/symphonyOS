@@ -184,3 +184,4 @@
   .routine-fold-toggle { min-height: 44px; }
   .routine-header-tools { width: 100%; }
 }
+.routine-header-controls { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; justify-content: flex-end; }

@@ -1427,7 +1427,9 @@ export function TodayView({
     // (no ancestor declared one, so the old decision rail never went beside).
     // Width: the reading column (PAGE_COLUMN, 1040px of content) — or, with
     // the week column beside the day, a planning page that fills the screen.
-    <div className={`today-page @container w-full ${showWeek ? `max-w-[1712px] ${PLANNING_PAGE_CLASS}` : 'max-w-[1152px]'} mx-auto px-0 py-2 md:px-10 lg:px-14 md:pt-2 md:pb-8`}>
+    // In the connected workspace Today always shares the planning frame, so
+    // Today, Week, Plan and Routines have one shape (Scott, 2026-10-10).
+    <div className={`today-page @container w-full ${showWeek || alongsideWorkspace ? `max-w-[1712px] ${PLANNING_PAGE_CLASS}` : 'max-w-[1152px]'} mx-auto px-0 py-2 md:px-10 lg:px-14 md:pt-2 md:pb-8`}>
       {/* Today's filter and ⋯ live in its heading beside the lens and the
           assistant, as every horizon's page controls do — the top bar is the
           same on every page (2026-09-29). */}

@@ -6,7 +6,7 @@
  */
 
 .plan-canvas {
-  max-width: 1180px; margin: 0 auto; padding: 24px 32px 40px;
+  padding-bottom: 40px;
   color: var(--color-neutral-800); background: transparent;
   font-family: var(--font-family-sans);
 }
@@ -196,4 +196,13 @@
 @media (max-width: 767px) {
   .prep-tools .canvas-link, .prep-ask, .prep-add .canvas-chip { min-height: 44px; }
   .prep-steps label { min-height: 40px; align-items: center; }
+}
+
+/* Header in the shared masthead: stepper + walk sit in the controls slot on
+   desktop and under the masthead on phones. */
+.plan-head-controls { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; justify-content: flex-end; }
+.plan-head-mobile { display: none; }
+.plan-toolbar { display: flex; justify-content: flex-end; gap: 12px; min-height: 8px; margin: -8px 12px 8px; }
+@media (max-width: 767px) {
+  .plan-head-mobile { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; margin: 0 12px 12px; }
 }

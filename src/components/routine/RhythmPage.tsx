@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { scopeForDomain } from '@/lib/scope'
 import { useEscapeKey } from '@/hooks/useEscapeKey'
 import { MastheadCard } from '@/components/layout/MastheadCard'
+import { useMobile } from '@/hooks/useMobile'
 import { PAGE_PLANNING } from '@/components/layout/pageLayout'
 import { EmptyState } from '@/components/layout/EmptyState'
 import { useFamilyMembers } from '@/hooks/useFamilyMembers'
@@ -71,6 +72,7 @@ interface RhythmPageProps {
 }
 
 export function RhythmPage(props: RhythmPageProps) {
+  const isMobile = useMobile()
   const {
     routines, loading = false, familyMembers = [], hiddenByFilter = false, onShowAllDomains,
     onUpdateRoutine, onDelete, onBuildWithAI, onCreateCollection,
@@ -280,9 +282,30 @@ export function RhythmPage(props: RhythmPageProps) {
           title="Routines"
           motif="routines"
           subline={`How your household runs — ${subtitle}`}
+          // Same shape as every destination: modes and the primary action at
+          // the right; finding and building along the foot.
+          controls={isMobile ? undefined :
+          <div className="routine-header-controls">
+            {segmented('Arrange routines', ARRANGEMENTS, arrangement, (id) => setArrangement(id as Arrangement))}
+            <button
+              type="button"
+              onClick={startNewRoutine}
+              className="flex items-center gap-2 rounded-md bg-primary-700 px-4 py-2.5 text-[14px] font-medium text-white
+                         transition-colors hover:bg-primary-800 active:bg-primary-900">
+              <Plus className="w-5 h-5" />
+              New routine
+            </button>
+          </div>
+          }
           footer={
           <div className="routine-header-tools">
-            {segmented('Arrange routines', ARRANGEMENTS, arrangement, (id) => setArrangement(id as Arrangement))}
+            {isMobile && segmented('Arrange routines', ARRANGEMENTS, arrangement, (id) => setArrangement(id as Arrangement))}
+            {isMobile && (
+              <button type="button" onClick={startNewRoutine}
+                className="flex items-center gap-2 rounded-md bg-primary-700 px-4 py-2.5 text-[14px] font-medium text-white">
+                <Plus className="w-5 h-5" /> New routine
+              </button>
+            )}
             <div className="flex min-w-[12rem] flex-1 items-center gap-2 rounded-md border border-neutral-300 bg-bg-elevated px-3 py-2 focus-within:border-primary-500 md:flex-none">
               <Search className="w-4 h-4 text-neutral-400" />
               <input
@@ -302,14 +325,6 @@ export function RhythmPage(props: RhythmPageProps) {
                 Build with Symphony
               </button>
             )}
-            <button
-              type="button"
-              onClick={startNewRoutine}
-              className="flex items-center gap-2 rounded-md bg-primary-700 px-4 py-2.5 text-[14px] font-medium text-white
-                         transition-colors hover:bg-primary-800 active:bg-primary-900">
-              <Plus className="w-5 h-5" />
-              New routine
-            </button>
           </div>
           }
         />

@@ -97,7 +97,14 @@
   background: var(--color-bg-elevated); border: 1px solid var(--color-neutral-200);
   border-radius: var(--radius-xl); box-shadow: var(--shadow-lg); padding: 8px 10px 8px 14px;
 }
-.connected-workspace .canvas-strip { max-width: min(1180px, 100%); }
+/* Desktop: the strip spans the page frame inside the same gutters as the page
+   (PAGE_GUTTER_X: px-10, lg:px-14), so every destination has one shape. */
+@media (min-width: 768px) {
+  .desktop-workspace-page .canvas-strip { max-width: none; margin: 24px 2.5rem 12px; }
+}
+@media (min-width: 1024px) {
+  .desktop-workspace-page .canvas-strip { margin-inline: 3.5rem; }
+}
 .canvas-strip.is-listening { border-color: var(--color-primary-400); box-shadow: 0 0 0 3px var(--color-primary-100), var(--shadow-lg); }
 .canvas-receipt, .canvas-proposals-line {
   display: flex; align-items: center; gap: 8px; flex-wrap: wrap; min-width: 0;

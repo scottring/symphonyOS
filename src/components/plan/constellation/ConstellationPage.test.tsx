@@ -46,9 +46,11 @@ describe('horizon stepper and URL',()=>{
  it('opens the horizon its route names, with the period and its dates',()=>{
   month()
   expect(screen.getByRole('button',{name:'Month'})).toHaveAttribute('aria-current','step')
-  expect(screen.getByRole('heading',{level:1})).toHaveTextContent('October · Oct 1 – 31')
+  expect(screen.getByRole('heading',{level:1})).toHaveTextContent('October')
+  expect(screen.getByText(/Oct 1 – 31 · grouped under Fall goals/)).toBeInTheDocument()
   open('/season?view=constellation&start=2026-10-09')
-  expect(screen.getAllByRole('heading',{level:1})[1]).toHaveTextContent('Fall · Sep 1 – Nov 30')
+  expect(screen.getAllByRole('heading',{level:1})[1]).toHaveTextContent('Fall')
+  expect(screen.getByText(/Sep 1 – Nov 30 · grouped under this year's intentions/)).toBeInTheDocument()
  })
  it('switches horizon in the URL, steps periods, and links on to Week',()=>{
   open()

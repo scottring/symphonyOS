@@ -38,9 +38,13 @@ import { PlanItemRow } from '@/components/canvas/plan/PlanItemRow'
 import { ProposalRow } from '@/components/canvas/plan/ProposalRow'
 import { InlineComposer } from '@/components/canvas/plan/InlineComposer'
 import { readinessOf, type ReadinessLookup } from '@/lib/prep/readiness'
+import { MastheadCard, PeriodNavEyebrow } from '@/components/layout/MastheadCard'
+import { PAGE_PLANNING } from '@/components/layout/pageLayout'
+import { useMobile } from '@/hooks/useMobile'
 
 const TERMS = ['yearly intention', 'seasonal goal', 'monthly milestone', 'weekly action'] as const
 const HORIZONS = ['Year', 'Season', 'Month'] as const
+const periodWordOf = (b: { label: string }) => b.label.replace(/\s\d{4}$/, '')
 const PERIODS = ['year', 'season', 'month'] as const
 const ROUTE_LEVEL: Record<string, number> = { '/year': 0, '/season': 1, '/month': 2 }
 
@@ -64,6 +68,7 @@ function releaseFocus(setParams: SetURLSearchParams, main: RefObject<HTMLElement
 type Composer = { kind: 'add'; group: string; parent: PlanNode | null } | { kind: 'edit'; key: string }
 
 function Inner() {
+  const isMobile = useMobile()
   const selection = useSelectionOptional()
   const { goals, loading: goalsLoading, error: goalsError, addGoal, updateGoal, deleteGoal } = useGoalsContext()
   const { tasks, loading, error, addTask, updateTask, refetch, pushTask, setBucket, updateTasksBulk, toggleTask, deleteTask, keepForward, dropCommitment } = useSupabaseTasks()
@@ -362,29 +367,36 @@ function Inner() {
     </li>
   }
 
-  return <main ref={mainRef} className="plan-canvas" data-horizon={level}>
-    <header className="plan-head">
-      <nav className="plan-stepper" aria-label="Planning horizon">
-        {HORIZONS.map((h, i) => <button key={h} type="button" aria-current={i === level ? 'step' : undefined} onClick={() => setHorizon(i)}>{h}</button>)}
-        <Link to={weekHref} className="plan-stepper-week">Week →</Link>
-      </nav>
-      <div className="plan-period">
-        <button type="button" className="canvas-icon" aria-label={`Previous ${PERIODS[level]}`} onClick={() => setStart(bounds.prev)}>‹</button>
-        <h1>
-          <span className="plan-period-name">{level === 0 ? periodTitle : periodWord}</span>
-          {level > 0 && <span className="plan-period-range"> · {periodRange(bounds.start, bounds.end)}</span>}
-        </h1>
-        <button type="button" className="canvas-icon" aria-label={`Next ${PERIODS[level]}`} onClick={() => setStart(bounds.next)}>›</button>
-        {!current && <button type="button" className="canvas-link" onClick={() => setStart(null)}>This {PERIODS[level]}</button>}
-      </div>
-      <div className="plan-head-actions">
-        <button type="button" className="plan-walk" onClick={() => openAssistant({ message: walkMessage, autoSend: true })}>Plan {periodTitle} with Symphony</button>
-        {proposals.length > 0 && <button type="button" className="canvas-link" onClick={() => { void keepAll() }}>Keep all ({proposals.length})</button>}
-        {(doneCount > 0 || showDone) && <button type="button" className="canvas-link" aria-pressed={showDone} onClick={() => setShowDone((s) => !s)}>
-          {showDone ? `Hide done (${doneCount})` : `Show done (${doneCount})`}
-        </button>}
-      </div>
-    </header>
+  // One page shape on every destination (Scott, 2026-10-10: the wireframes'
+  // consistent bounds): the shared masthead — numeral, period nav, title,
+  // dated subline, controls at the right — on the shared planning frame.
+  const two = (n: number) => String(n).padStart(2, '0')
+  const lastDay = new Date(bounds.end.getTime() - 86400000)
+  const numeral = level === 0 ? String(bounds.start.getFullYear())
+    : level === 1 ? `${two(bounds.start.getMonth() + 1)}–${two(lastDay.getMonth() + 1)}`
+    : two(bounds.start.getMonth() + 1)
+  const stepper = <nav className="plan-stepper" aria-label="Planning horizon">
+    {HORIZONS.map((h, i) => <button key={h} type="button" aria-current={i === level ? 'step' : undefined} onClick={() => setHorizon(i)}>{h}</button>)}
+    <Link to={weekHref} className="plan-stepper-week">Week →</Link>
+  </nav>
+  const walk = <button type="button" className="plan-walk" onClick={() => openAssistant({ message: walkMessage, autoSend: true })}>Plan {periodTitle} with Symphony</button>
+  return <main ref={mainRef} className={`plan-canvas ${PAGE_PLANNING}`} data-horizon={level}>
+    <MastheadCard variant="page" numeral={numeral}
+      title={<span className="plan-period-name">{level === 0 ? periodTitle : periodWord}</span>}
+      eyebrow={<PeriodNavEyebrow label={HORIZONS[level]} onPrev={() => setStart(bounds.prev)} onNext={() => setStart(bounds.next)}
+        prevLabel={`Previous ${PERIODS[level]}`} nextLabel={`Next ${PERIODS[level]}`}
+        trailing={current ? undefined : <button type="button" className="period-return canvas-link" onClick={() => setStart(null)}>This {PERIODS[level]}</button>} />}
+      subline={level > 0
+        ? <span className="plan-period-range">{periodRange(bounds.start, bounds.end)} · grouped under {level === 1 ? "this year's intentions" : `${periodWordOf(seasonB)} goals`}</span>
+        : <span className="plan-period-range">This year's intentions</span>}
+      controls={isMobile ? undefined : <div className="plan-head-controls">{stepper}{walk}</div>} />
+    {isMobile && <div className="plan-head-mobile">{stepper}{walk}</div>}
+    <div className="plan-toolbar">
+      {proposals.length > 0 && <button type="button" className="canvas-link" onClick={() => { void keepAll() }}>Keep all ({proposals.length})</button>}
+      {(doneCount > 0 || showDone) && <button type="button" className="canvas-link" aria-pressed={showDone} onClick={() => setShowDone((s) => !s)}>
+        {showDone ? `Hide done (${doneCount})` : `Show done (${doneCount})`}
+      </button>}
+    </div>
 
     {!dataReady && <p className="plan-status" role="status">Loading your plans…</p>}
     {(error || goalsError)
