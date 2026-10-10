@@ -233,6 +233,8 @@ export function KioskCanvas(p: KioskCanvasProps) {
   const scenery = useSceneryPreferences()
   const art = sceneryArt(scenery.sceneryStyle, placeId, p.isDark && scenery.lightingChoice === 'auto' ? 'nighttime' : scenery.sceneryLighting)
 
+  const sceneryBand = scenery.showScenery && stage.kind === 'home' && comp.part !== 'quiet'
+
   let content: ReactNode
   switch (stage.kind) {
     case 'home':
@@ -321,11 +323,14 @@ export function KioskCanvas(p: KioskCanvasProps) {
 
       <div className={`kc-stage ${showHeld ? 'is-held' : ''}`}>
         {showHeld && <HeldColumn session={state.cooking} recipe={recipe} timers={state.timers} nowMs={nowMs} dispatch={dispatch} />}
-        <main className={`kc-main is-${stage.kind} ${stage.kind === 'home' ? `part-${comp.part}` : ''}`}>
+        <main className={`kc-main is-${stage.kind} ${stage.kind === 'home' ? `part-${comp.part}` : ''} ${sceneryBand ? 'has-band' : ''}`}>
           {scenery.showScenery && stage.kind === 'home' && comp.part === 'quiet' && (
             <div className="kc-scenery" aria-hidden="true"><img src={art.src} alt="" /></div>
           )}
           <div className="kc-main-inner">{content}</div>
+          {/* Idle home screens keep a low band of the place's scenery under
+              the cards, so the kiosk always reads as this place (2026-10-10). */}
+          {sceneryBand && <div className="kc-scenery-band" aria-hidden="true"><img src={art.src} alt="" /></div>}
         </main>
       </div>
 
