@@ -236,7 +236,7 @@ export function CanvasActivityProvider({ children, snapshot, writers, refetch, r
     setReceipt((r) => r && r.key === key ? { ...r, state: 'saving', summary: 'Undoing…', undoable: false } : r)
     try {
       const ok = await fn()
-      setReceipt((r) => r && r.key === key ? { ...r, state: ok === false ? 'failed' : 'saved', summary: ok === false ? "Couldn't undo. Nothing changed." : 'Undone' } : r)
+      setReceipt((r) => r && r.key === key ? { ...r, state: ok === false ? 'failed' : 'saved', summary: ok === false ? "Couldn't undo. Nothing changed." : 'Undone', changes: ok === false ? r.changes : [] } : r)
       void refetch()
     } catch {
       setReceipt((r) => r && r.key === key ? { ...r, state: 'failed', summary: "Couldn't undo. Nothing changed." } : r)

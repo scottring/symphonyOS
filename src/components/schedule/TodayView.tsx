@@ -1819,7 +1819,10 @@ export function TodayView({
           {showWeek && (
             <TodayWeekColumn plan={data.dayPlan} day={viewedDate} weekNo={weekNo}
               weekStart={weekStartAnchor(viewedDate, readCadenceConfig().weekStartsOn)} actions={planPanelActions}
-              nextWeek={nextWeek} onHide={() => setTodayView('list')} />
+              nextWeek={nextWeek} onHide={() => setTodayView('list')}
+              findTask={(id) => tasksMap.get(id)} openTask={(id) => handleSelectItem(`task-${id}`)}
+              chooseTask={(id) => planActions.chooseTaskDay(id, viewedDate)}
+              restoreTask={(id, prev) => ctx.onUpdateTask?.(id, prev)} />
           )}
         </aside>
         )}

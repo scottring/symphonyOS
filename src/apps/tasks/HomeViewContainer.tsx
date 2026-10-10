@@ -900,7 +900,7 @@ export function HomeViewContainer({ fixedView }: { fixedView?: 'today' | 'week' 
         <button className="underline" onClick={() => navigate(`/year?view=constellation&horizon=3&start=${localYmd(viewedDate)}`)}>Open planning map</button>
       </div>}
 
-      <AlongsideDayBridge onSelect={id=>handleSelectItem(`task-${id}`)} enabled={searchParams.get('view') === 'alongside'} tasks={tasks} date={viewedDate} update={gated.updateTask} loading={tasksLoading} error={tasksLoadFailed} retry={retryTasks} weekView={fixedView === 'week'}>
+      <AlongsideDayBridge onSelect={id=>handleSelectItem(`task-${id}`)} enabled={searchParams.get('view') === 'alongside'} tasks={tasks} date={viewedDate} update={gated.updateTask} complete={toggleTask} loading={tasksLoading} error={tasksLoadFailed} retry={retryTasks} weekView={fixedView === 'week'}>
       <HomeView
         registerUndo={undo.pushAction}
         // The week reminder is Today's, below its schedule (2026-09-22): a

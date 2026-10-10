@@ -238,7 +238,7 @@ function DayRow({ day, onSelectItem, onToggleEntry, onPlanDrop, onAddToDay, drag
       aria-label={day.date.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
       data-testid={`journal-day-${day.key}`}
       className={`group/day grid min-w-0 border-t border-neutral-300 py-3 text-[14px] transition-colors first:border-t-0 ${
-        narrow ? 'grid-cols-[2.75rem_minmax(0,1fr)] gap-3' : 'grid-cols-[4rem_minmax(0,1fr)] gap-5 min-h-[5.5rem]'
+        narrow ? 'grid-cols-[2.75rem_minmax(0,1fr)] gap-3' : `grid-cols-[4rem_minmax(0,1fr)] gap-5 ${empty ? '' : 'min-h-[5.5rem]'}`
       } ${dndOver || planOver ? 'bg-primary-50/60' : ''}`}
     >
       <header className="pt-0.5">
@@ -340,7 +340,7 @@ function DayCell({ day, onSelectItem, onToggleEntry, onPlanDrop, onAddToDay, onA
   return (
     <section ref={setNodeRef} {...planProps} data-testid={`journal-day-${day.key}`}
       aria-label={day.date.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
-      className={`wk-cell group/day${dndOver || planOver ? ' is-over' : ''}${today ? ' is-today' : ''}${past ? ' is-past' : ''}`}>
+      className={`wk-cell group/day${dndOver || planOver ? ' is-over' : ''}${today ? ' is-today' : ''}${past ? ' is-past' : ''}${!shown.length && !day.notes.length && !day.dinners.length ? ' is-empty' : ''}`}>
       <header className="wk-dayhead">
         <span className="wk-daynum">{day.date.getDate()}</span>
         <span className="wk-dayname">{day.date.toLocaleDateString('en-US', { weekday: 'short' })}</span>

@@ -1,1 +1,101 @@
-/* src/styles/canvas-today.css — conversational canvas: today slice. Existing theme tokens only. */
+/* src/styles/canvas-today.css — conversational canvas: today slice. Existing theme tokens only.
+ *
+ * The compact week list (components/canvas/week/CompactWeekList) beside the
+ * day — in Today's classic column and the connected workspace's aside — and
+ * the Week page's density pass. Built on canvas.css's item/group forms. */
+
+/* ---- The compact week list ------------------------------------------- */
+.cw-list { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
+.cw-rows { list-style: none; margin: 0; padding: 0; }
+.cw-group { padding: 6px 10px 4px; }
+.cw-group .canvas-group-head { font-size: 12px; padding-bottom: 4px; }
+.cw-group-title {
+  border: 0; background: none; padding: 0; text-align: left; font: inherit; color: inherit;
+  text-decoration: underline transparent; text-underline-offset: 3px;
+}
+.cw-group-title:hover { color: var(--color-neutral-900); text-decoration-color: currentColor; }
+
+.cw-row { font-size: 14px; gap: 6px; align-items: flex-start; padding-top: 3px; padding-bottom: 3px; }
+.cw-row[draggable="true"] { cursor: grab; }
+.cw-row > .canvas-item-title { padding-top: 4px; }
+.cw-title {
+  border: 0; background: none; padding: 0; margin: 0; text-align: left; font: inherit; color: inherit;
+  overflow-wrap: anywhere; border-radius: 3px;
+}
+.cw-title:hover { text-decoration: underline; text-underline-offset: 3px; }
+.cw-parent { color: var(--color-neutral-500); font-size: 12.5px; }
+.cw-context { display: block; font-size: 12px; line-height: 1.35; color: var(--color-neutral-500); }
+.cw-row.is-done .cw-title { color: var(--color-neutral-400); text-decoration: line-through; }
+.cw-row.is-on-today .cw-title { color: var(--color-neutral-600); }
+.cw-row .canvas-tag { margin-top: 6px; }
+.cw-row.is-read .cw-title { color: var(--color-neutral-700); }
+
+/* The check: a ring that shows its tick on hover/focus, filled when done. */
+.cw-check {
+  display: inline-grid; place-items: center; flex: none; width: 28px; height: 28px; margin: 0 -2px;
+  border: 0; background: none; border-radius: var(--radius-full);
+}
+.cw-check-ring {
+  display: inline-grid; place-items: center; width: 16px; height: 16px; border-radius: 50%;
+  border: 1.5px solid var(--color-neutral-400); color: transparent;
+  transition: border-color var(--transition-base), background-color var(--transition-base), color var(--transition-base);
+}
+.cw-check:hover .cw-check-ring, .cw-check:focus-visible .cw-check-ring, .cw-check.is-on .cw-check-ring {
+  border-color: var(--color-primary-600); background: var(--color-primary-600); color: #fff;
+}
+.cw-dash { flex: none; width: 10px; height: 1.5px; margin: 13px 9px 0; background: var(--color-neutral-300); }
+
+/* Add to the day: a small icon, visible at rest. */
+.cw-add { flex: none; width: 28px; height: 28px; color: var(--color-primary-700); border: 1px solid var(--color-primary-200); }
+.cw-add:hover { color: var(--color-primary-800); background: var(--color-primary-50); border-color: var(--color-primary-400); }
+.cw-add:disabled { opacity: .5; cursor: default; }
+.cw-add[aria-busy="true"] { opacity: 1; animation: canvas-pulse 1s ease-in-out infinite; }
+
+.cw-check:focus-visible, .cw-title:focus-visible, .cw-group-title:focus-visible, .cw-fold:focus-visible, .cw-done-toggle:focus-visible {
+  outline: 2px solid var(--color-primary-600); outline-offset: 2px;
+}
+
+.cw-done-toggle { align-self: flex-start; font-weight: 500; font-size: 12.5px; color: var(--color-neutral-600); }
+.cw-open { margin-top: 10px; padding-left: 0; }
+
+/* Routines today: one line that opens in place. */
+.cw-fold-wrap { margin-top: 14px; }
+.cw-fold {
+  display: inline-flex; align-items: center; gap: 4px; min-height: 32px; padding: 0; border: 0; background: none;
+  font-family: var(--font-family-sans); font-size: 13px; font-weight: 600; color: var(--color-neutral-700);
+}
+.cw-fold:hover { color: var(--color-neutral-900); }
+.cw-fold-icon { transition: transform var(--transition-base); }
+.cw-fold[aria-expanded="true"] .cw-fold-icon { transform: rotate(90deg); }
+
+/* The connected workspace's aside: the compact list, not cards. */
+.ad-week.cw-column .ad-week-hint { margin: 6px 0 4px; }
+.ad-week.cw-column .cw-list { margin-top: 10px; }
+.ad-layout aside.ad-week { padding: 20px 18px; }
+
+/* Phone: the list stacks below the day; every control is a full touch target. */
+@media (max-width: 767px) {
+  .cw-check, .cw-add { min-width: 44px; min-height: 44px; margin: -8px -6px; }
+  .cw-row > .canvas-item-title { padding-top: 5px; }
+  .cw-fold { min-height: 44px; }
+  .cw-done-toggle { min-height: 44px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cw-add[aria-busy="true"] { animation: none; }
+  .cw-fold-icon, .cw-check-ring { transition: none; }
+}
+
+/* ---- Week page density -------------------------------------------------- */
+/* The week's list grouped by month line (WeekListV2). */
+.pv2-wl .cw-wl-group { margin: 8px 0; }
+.pv2-wl .cw-wl-group .pv2-list { margin: 0; }
+.pv2-wl .cw-wl-group .canvas-group-head small { margin-left: auto; font-weight: 500; color: var(--color-neutral-500); }
+.pv2-wl .cw-wl-group .canvas-group-title { overflow-wrap: anywhere; }
+.pv2-wl .wk-row .wk-title { overflow-wrap: anywhere; }
+/* A day with nothing on it takes a line, not a block. */
+.wk-cell.is-empty { padding-bottom: 6px; }
+@container wk-days (max-width: 44rem) {
+  .wk-weekdays > .wk-cell.is-empty, .wk-weekend-cells > .wk-cell.is-empty { padding: 6px 0; }
+  .wk-cell.is-empty .wk-dayhead { min-height: 0; border-bottom: 0; margin-bottom: 0; padding-bottom: 0; }
+}
