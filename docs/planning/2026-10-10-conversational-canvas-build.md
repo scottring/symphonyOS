@@ -35,6 +35,7 @@ Status words: **proposed** (designed only) · **implemented** (code on this bran
 | 6 | Conversation → canvas: commands with save states, proposals, partial failure retry, idempotent retries, Undo | proposed | |
 | 7 | Kiosk: frame, dayparts, dinner→groceries→cooking→timers, interruption/return, departure, bedtime, calling via kidsPhone (confirm first) | proposed | |
 | 8 | Routines: where/why it shows, hide-today/rest/off, conversational + manual build/edit | proposed | |
+| 10 | Prepared to act (Scott, 2026-10-10): "What will you need when you come to do this?" during planning; resources on a goal/milestone reachable from its actions without duplication; opening a task brings its contact, place, links, files, supplies/steps and notes with their tools | in progress | agent prompt + update_task fields (links/location/phone/email) committed; readiness panel in progress |
 | 9 | Validation: desktop/phone/kiosk visuals in existing themes, keyboard/focus/reduced motion, disposable-account persistence, voice parity, regression suite, build, lint | proposed | |
 
 ## Inventory notes (2026-10-10, source-read)
@@ -54,4 +55,13 @@ Out-of-scope findings to report (not changed here): `VITE_OPEN_BRAIN_API_KEY` is
 
 ## Decisions and limitations
 
-(filled in as work proceeds)
+- Fidelity rule (Scott, 2026-10-10): the approved wireframes' layout and interaction structure are requirements; existing code supports them, it does not set the layout. Any necessary deviation is shown to Scott as a comparison before it is treated as settled. Secondary actions live in one visible ⋯ menu per row; primary actions stay obvious.
+- Proposed secondary views awaiting Scott's call: Week "Days | Hours" (Days = approved default; Hours = existing timed grid) and Routines "Board | Timeline" (Board = approved default; Timeline = existing drag canvas).
+- Agent edge function changes (tool_result events, turn-id de-duplication, propose tool, preparation fields) are committed but NOT deployed; the client works without them by diffing refetched rows.
+- Kiosk speech is off unless opted in; Chrome's built-in recognition sends audio to Google; room audio untested on the EMEET M0 Plus. Recipes don't store servings, so scaling assumes 4 and says so.
+- kidsPhone: no test calls placed. Cancel exists only before dialing; after dialing the screen says the call continues on the handset (hang-up is not supported by the service).
+
+## Verification log
+
+- 2026-10-10, preview :5289, disposable account symphonygoals+onboarding1008: typed "Add a task for today called Canvas check: buy kite string" with the deployed agent → strip Working → Saved with change chip + Undo; item appeared in For today; Undo removed it; reload confirmed removal.
+- 2026-10-10, same: Season Move under… moved "Canvas validation: learn bread baking" under "enjoy creative weekends" (Saved + Undo), reload confirmed; Move under → No parent restored it, reload confirmed.

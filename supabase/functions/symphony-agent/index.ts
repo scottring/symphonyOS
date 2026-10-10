@@ -1,4 +1,5 @@
 import { planSaved } from './planSaved.ts'
+import { contactFieldError, mergeLinks } from './prep.ts'
 import { IDEMPOTENT_CREATES, PROPOSE_TOOL, proposalItems, stableRowId, toolOutcome } from './canvasEvents.ts'
 import { planningRow, validatePlanningParent, planningWeekStart } from './planning.ts'
 import { createClient, SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2'
@@ -97,6 +98,11 @@ Routines vs tasks:
 
 Keep replies tight. Summary first, offer to expand.
 
+Preparing to act:
+- Planning should leave the person ready to act, not just holding a list. When an action becomes concrete (a weekly action, or a task given a day), ask once, briefly: "What will you need when you come to do this?" Skip it for small self-explanatory tasks, and never turn it into a checklist interview.
+- Capture what they say onto the task: instructions or questions in notes, the person to reach as contact_id (find or create the contact), phone_number or email, location, websites or documents with add_links, and supplies or prerequisite steps as subtasks (symphony_create_task with parent_task_id).
+- When a resource serves several actions (a supply list for the whole class, the venue for every planning step), put it once on the milestone or goal they share, and say so; the actions reach it from there. Don't copy it onto every child.
+
 Doing versus suggesting:
 - When the person says what they want ("add X", "my goals are A and B", "book a consultation"), do it with the write tools; the screen shows each save as it lands and offers Undo, so do not ask them to confirm every explicit instruction.
 - When YOU think of something they did not say (a missing milestone, a next action), offer it with symphony_propose_plan_items instead of creating it. Suggestions show dashed until the person keeps them. Never invent goals or intentions; suggestions must follow from what they said.
@@ -193,6 +199,10 @@ const TOOLS = [
         is_waiting: { type: 'boolean' },
         needs_discussion: { type: 'boolean', description: 'Flag that the real next step is a conversation with someone, not solo work' },
         discussion_note: { type: ['string', 'null'], description: 'Who to talk to and what to decide, e.g. "Ask Iris which clothes and where to donate"' },
+        location: { type: ['string', 'null'], description: 'Where this happens (address or place name), for directions when doing it' },
+        phone_number: { type: ['string', 'null'], description: 'Number to call when doing this task' },
+        email: { type: ['string', 'null'], description: 'Address to write to when doing this task' },
+        add_links: { type: 'array', items: { type: 'object', properties: { url: { type: 'string' }, title: { type: 'string' } }, required: ['url'] }, description: 'Websites or documents needed to do this; appended to existing links' },
       },
       required: ['id'],
     },
@@ -768,6 +778,14 @@ async function runTool(
           } else {
             updates.bucket = (updates.bucket as string) ?? 'inbox'
           }
+        }
+        const fieldError = contactFieldError(updates)
+        if (fieldError) return `Error: ${fieldError}`
+        if ('add_links' in updates) {
+          const { data: current, error: readError } = await db.from('tasks').select('links').eq('id', id).single()
+          if (readError) throw readError
+          updates.links = mergeLinks(current?.links ?? [], updates.add_links)
+          delete updates.add_links
         }
         const { data, error } = await db.from('tasks')
           .update({ ...updates, ...('completed' in updates ? { completed_at: updates.completed ? now() : null } : {}), updated_at: now() }).eq('id', id).select().single()
