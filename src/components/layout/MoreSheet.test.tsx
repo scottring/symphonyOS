@@ -18,12 +18,13 @@ describe('Phone secondary destinations', () => {
       expect(close).toHaveBeenCalledOnce()
     })
 
-  it('offers every desktop More destination on the phone — except Routines, which the dock carries', () => {
+  it('offers every desktop More destination on the phone, with Inbox and Routines first', () => {
     renderSheet()
-    for (const [, items] of MORE_GROUPS) for (const { label, route } of items) {
-      if (route === '/routines') expect(screen.queryByRole('button', { name: label })).not.toBeInTheDocument()
-      else expect(screen.getByRole('button', { name: label })).toBeInTheDocument()
+    for (const [, items] of MORE_GROUPS) for (const { label } of items) {
+      expect(screen.getAllByRole('button', { name: label })).toHaveLength(1)
     }
+    const everyday = screen.getByRole('heading', { name: 'Everyday' }).parentElement!
+    expect([...everyday.querySelectorAll('button')].map((b) => b.textContent)).toEqual(['Inbox', 'Routines'])
   })
 
   it('is a labelled dialog that takes focus and closes on Escape', () => {

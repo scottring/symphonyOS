@@ -1,4 +1,4 @@
-import { defaultPlanningDestination } from '@/lib/planning/connectedDestination';
+import { connectedDestination, defaultPlanningDestination } from '@/lib/planning/connectedDestination';
 import { useCadenceConfig } from '@/lib/cadence/config';
 import { useGoals } from '@/hooks/useGoals';
 import { useAssigneeFilter } from '@/hooks/useAssigneeFilter';
@@ -10,7 +10,7 @@ import { WorkspaceVoiceControls } from '@/components/chat/WorkspaceVoiceControls
 import './connected-workspace.css';
 import { useDialogFocus } from '@/hooks/useDialogFocus';
 import { assistantSelection } from './assistantSelection';
-import { PlanNavigation, usePlanDestination, planPeriodForPath, MobilePlanControlsContext } from '@/components/layout/PlanNavigation';
+import { PlanNavigation, planPeriodForPath, MobilePlanControlsContext } from '@/components/layout/PlanNavigation';
 import { requestPlanFromPaper } from '@/lib/planFromPaperSignal';
 import { DesktopNavigation, DesktopControlsContext, DesktopLeadContext, DesktopCenterContext } from '@/components/layout/DesktopNavigation';
 import { ReferenceListsProvider, useReferenceLists } from '@/components/reference/ReferenceListsContext';
@@ -19,7 +19,7 @@ import { pinIsOnPage } from '@/components/reference/periodsOnPage';
 // src/shell/ShellLayout.tsx
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Sparkles, Repeat, CalendarRange, Inbox as InboxIcon, MoreHorizontal, Plus } from 'lucide-react';
+import { Sparkles, CalendarRange, MoreHorizontal, Plus, Sun, Map } from 'lucide-react';
 import { useTextEntryActive } from '@/hooks/useKeyboardInset';
 import { type ViewType } from '@/components/layout/Sidebar';
 import { MoreSheet } from '@/components/layout/MoreSheet';
@@ -152,7 +152,6 @@ function ShellLayoutInner({ children }: Props) {
   useEffect(() => { document.documentElement.classList.toggle('plan-v2', planV2Enabled()); }, [location.search]);
   const isMobile = useMobile();
   const typing = useTextEntryActive();
-  const planDestination = usePlanDestination();
   const { user, signOut } = useAuth();
   // Module caches that are not components — the planning calendar behind the
   // day tiles — key their data on who is signed in. The shell is the one
@@ -556,29 +555,21 @@ function ShellLayoutInner({ children }: Props) {
           aside and the capture bar sits on the keyboard (as on iOS). */}
       {isMobile && !typing && (
         <nav className="phone-dock scenery-page" aria-label="Main">
+          {/* The three destinations, as on every surface (approved phone
+              boards, 2026-10-10): Today · Week · Plan, with + to add and More
+              for Inbox, Routines and the rest. */}
           <div className="phone-dock-row">
-            <button
-              type="button"
-              className="phone-dock-tab"
-              onClick={() => navigate(planDestination)}
-              aria-current={planPeriodForPath(location.pathname) ? 'page' : undefined}
-            >
-              <CalendarRange aria-hidden="true" />
-              <span>Planner</span>
-            </button>
-            <button
-              type="button"
-              className="phone-dock-tab"
-              onClick={() => navigate('/inbox')}
-              aria-current={location.pathname.startsWith('/inbox') ? 'page' : undefined}
-              aria-label={`Inbox${inboxCount ? `, ${inboxCount} ${inboxCount === 1 ? 'item' : 'items'}` : ''}`}
-            >
-              <InboxIcon aria-hidden="true" />
-              <span>Inbox</span>
-              {inboxCount > 0 && (
-                <span className="phone-dock-badge" aria-hidden="true">{inboxCount > 99 ? '99+' : inboxCount}</span>
-              )}
-            </button>
+            {([
+              ['today', 'Today', Sun],
+              ['week', 'Week', CalendarRange],
+            ] as const).map(([period, label, Icon]) => (
+              <button key={period} type="button" className="phone-dock-tab"
+                onClick={() => navigate(connectedDestination(`/${period}`, ''))}
+                aria-current={planPeriodForPath(location.pathname) === period ? 'page' : undefined}>
+                <Icon aria-hidden="true" />
+                <span>{label}</span>
+              </button>
+            ))}
             <div className="phone-dock-add-slot">
               <button type="button" className="phone-dock-add" onClick={() => setQuickAddOpen(true)} aria-label="Add">
                 <Plus aria-hidden="true" />
@@ -587,11 +578,11 @@ function ShellLayoutInner({ children }: Props) {
             <button
               type="button"
               className="phone-dock-tab"
-              onClick={() => navigate('/routines')}
-              aria-current={location.pathname.startsWith('/routines') ? 'page' : undefined}
+              onClick={() => navigate(connectedDestination('/month', ''))}
+              aria-current={['month', 'season', 'year'].includes(planPeriodForPath(location.pathname) ?? '') ? 'page' : undefined}
             >
-              <Repeat aria-hidden="true" />
-              <span>Routines</span>
+              <Map aria-hidden="true" />
+              <span>Plan</span>
             </button>
             <button
               type="button"
@@ -600,9 +591,13 @@ function ShellLayoutInner({ children }: Props) {
               onClick={() => setMoreSheetOpen(true)}
               aria-haspopup="dialog"
               aria-expanded={moreSheetOpen}
+              aria-label={`More${inboxCount ? `, ${inboxCount} in Inbox` : ''}`}
             >
               <MoreHorizontal aria-hidden="true" />
               <span>More</span>
+              {inboxCount > 0 && (
+                <span className="phone-dock-badge" aria-hidden="true">{inboxCount > 99 ? '99+' : inboxCount}</span>
+              )}
             </button>
           </div>
         </nav>
@@ -614,6 +609,7 @@ function ShellLayoutInner({ children }: Props) {
           isOpen={moreSheetOpen}
           onClose={closeMoreSheet}
           discussionsUnread={discussionsUnread}
+          inboxCount={inboxCount}
           // Opens the conversation without sending anything.
           onAskSymphony={() => { setMoreSheetOpen(false); setPhoneChatOpen(true); }}
         />
