@@ -45,6 +45,7 @@ import { splitTodayJournal, splitCompletedFocus } from '@/lib/today/journalSplit
 import { panelActionsFor } from '@/components/reference/DayPlanPanel'
 import { useColumnsFitWindow } from '@/hooks/useColumnsFitWindow'
 import { TodayWeekColumn } from './TodayWeekColumn'
+import { CalendarReconnectBanner } from '@/components/home/CalendarReconnectBanner'
 import { TodayComingUp } from './TodayComingUp'
 import { ServesLine } from './ServesLine'
 import { parentLinkOf } from '@/lib/planning/parentLink'
@@ -1510,6 +1511,8 @@ export function TodayView({
         footer={!desktopControls ? desktopToolbar : undefined}
 
       />
+      {/* Notices sit under the heading on every destination (one page shape). */}
+      <div className="px-4 md:px-0 empty:hidden"><CalendarReconnectBanner /></div>
 
 
       {/* The same control row every horizon has: what the column beside is,
