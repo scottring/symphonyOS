@@ -17,7 +17,7 @@ import { ReferenceListsProvider, useReferenceLists } from '@/components/referenc
 import { ReferenceListsDock } from '@/components/reference/ReferenceLists';
 import { pinIsOnPage } from '@/components/reference/periodsOnPage';
 // src/shell/ShellLayout.tsx
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Sparkles, CalendarRange, MoreHorizontal, Plus, Sun, Map } from 'lucide-react';
 import { useTextEntryActive } from '@/hooks/useKeyboardInset';
@@ -45,6 +45,7 @@ import { useDiscussionInbox } from '@/hooks/useDiscussionInbox';
 import { useSymphonyAssistant, type AssistantTurnObserver } from '@/hooks/useSymphonyAssistant';
 import { CanvasActivityProvider, useCanvasActivity, type CanvasActivity } from '@/contexts/CanvasActivityContext';
 import { ConversationStrip } from '@/components/canvas/ConversationStrip';
+import { conversationStripPath } from '@/lib/canvas/stripPaths';
 import { useScratchpadHidden } from '@/hooks/useScratchpadHidden';
 import { useAssistantLaunchRequests, useAssistantLauncher } from '@/contexts/AssistantLaunchContext';
 import { useShellChrome } from './useShellChrome';
@@ -184,6 +185,7 @@ function ShellLayoutInner({ children }: Props) {
   // The canvas activity provider sits inside this component's tree, but the
   // assistant hook runs above it: a ref bridges each turn's events across.
   const canvasRef = useRef<CanvasActivity | null>(null);
+  const setCanvasActivity = useCallback((activity: CanvasActivity) => { canvasRef.current = activity; }, []);
   const turnObserver = useMemo<AssistantTurnObserver>(() => ({
     start: ({ text, retry }) => canvasRef.current?.turnStarted(text, retry),
     tool: (name) => canvasRef.current?.toolUsed(name),
@@ -333,7 +335,7 @@ function ShellLayoutInner({ children }: Props) {
 
   return (
     <CanvasActivityProvider snapshot={canvasSnapshot} writers={canvasWriters} refetch={canvasRefetch} retryTurn={() => { void assistant.retryLast(); }}>
-    <CanvasBridge target={canvasRef} />
+    <CanvasBridge onActivity={setCanvasActivity} />
     <DesktopControlsContext.Provider value={desktopControls}>
     <DesktopLeadContext.Provider value={desktopLead}>
     <DesktopCenterContext.Provider value={desktopCenter}>
@@ -655,15 +657,10 @@ function ShellLayoutInner({ children }: Props) {
   );
 }
 
-/** Pages that carry the docked conversation: the three destinations and Routines. */
-export function conversationStripPath(pathname: string): boolean {
-  return pathname === '/' || ['/today', '/week', '/month', '/season', '/year', '/routines'].some((p) => pathname === p || pathname.startsWith(`${p}/`));
-}
-
 /** Hands the canvas activity to code that runs above its provider. */
-function CanvasBridge({ target }: { target: { current: CanvasActivity | null } }) {
+function CanvasBridge({ onActivity }: { onActivity: (activity: CanvasActivity) => void }) {
   const activity = useCanvasActivity();
-  target.current = activity;
+  useLayoutEffect(() => { onActivity(activity); }, [onActivity, activity]);
   return null;
 }
 

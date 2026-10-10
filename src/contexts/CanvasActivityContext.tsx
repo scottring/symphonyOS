@@ -13,7 +13,7 @@
 // A save is reported only after the data shows it (refetch + diff for agent
 // turns, the writer's own result for manual commands).
 
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import type { Task } from '@/types/task'
 import type { Goal } from '@/types/goal'
 import type { Routine } from '@/types/routine'
@@ -114,9 +114,10 @@ export function CanvasActivityProvider({ children, snapshot, writers, refetch, r
   const [listening, setListening] = useState(false)
   const keyRef = useRef(0)
   const snapshotRef = useRef(snapshot)
-  snapshotRef.current = snapshot
   const writersRef = useRef(writers)
-  writersRef.current = writers
+  // Latest snapshot and writers for callbacks that outlive a render. Layout
+  // effects run before any effect that reads them (finishDiff below).
+  useLayoutEffect(() => { snapshotRef.current = snapshot; writersRef.current = writers })
   const undoRef = useRef<(() => Promise<boolean | void>) | null>(null)
   const retryRef = useRef<(() => void) | null>(null)
 

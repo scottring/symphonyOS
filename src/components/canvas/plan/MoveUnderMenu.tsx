@@ -33,9 +33,13 @@ export function MoveUnderMenu({ item, parents, parentTerm, disabled, onPick, ope
   const wrap = useRef<HTMLSpanElement>(null)
   const id = useId()
   usePopoverFocus(open, trigger, panel, () => setOpen(false))
+  // Outside clicks close it; read through a ref so the listener isn't
+  // re-registered on every render.
+  const closeRef = useRef(() => setOpen(false))
+  useEffect(() => { closeRef.current = () => setOpen(false) })
   useEffect(() => {
     if (!open) return
-    const onDown = (e: MouseEvent) => { if (!wrap.current?.contains(e.target as Node)) setOpen(false) }
+    const onDown = (e: MouseEvent) => { if (!wrap.current?.contains(e.target as Node)) closeRef.current() }
     document.addEventListener('mousedown', onDown)
     return () => document.removeEventListener('mousedown', onDown)
   }, [open])
