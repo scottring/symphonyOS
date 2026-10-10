@@ -115,6 +115,7 @@ const PhonePaperPage = lazy(() => import('./components/capture/PhonePaperPage').
 // Design preview for the person-lane wall. Ungated like the kiosk routes so it
 // can be opened on the Pi without a session; carries no live data.
 const WallV2LanePreview = lazy(() => import('./components/wall-v2/WallV2LanePreview').then((m) => ({ default: m.WallV2LanePreview })))
+const KioskScenePreview = lazy(() => import('./components/wall-v2/activity/KioskScenePreviewRoute'))
 // Design preview of "Plan out loud" (guided planning): simulated voice, an
 // example account, no session, writes nothing. DEV builds only.
 const VoicePlannerPreview = import.meta.env.DEV
@@ -191,6 +192,9 @@ createRoot(document.getElementById('root')!).render(
               <Route path="/wall/*" element={<Navigate to="/wall-v2" replace />} />
               <Route path="/wall-v2/*" element={<Shell />} />
               <Route path="/wall-lanes" element={<Suspense fallback={null}><WallV2LanePreview /></Suspense>} />
+              {/* Dev only: every approved kiosk board with fixed data — no reads,
+                  writes or calls — for design review screenshots. */}
+              {import.meta.env.DEV && <Route path="/kiosk-preview" element={<Suspense fallback={null}><KioskScenePreview /></Suspense>} />}
               {VoicePlannerPreview && <Route path="/plan-aloud-preview" element={<Suspense fallback={null}><VoicePlannerPreview /></Suspense>} />}
               {/* /jobs and /us retired (pare-down 2026-09-01): the job pipeline
                   moved out of Symphony (the vault owns job search) and the Us
