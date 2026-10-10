@@ -1,9 +1,17 @@
-import {render,screen,fireEvent,waitFor} from '@testing-library/react'
-import {MemoryRouter} from 'react-router-dom'
+import {render,screen,fireEvent,waitFor,within} from '@testing-library/react'
+import {MemoryRouter,Routes,Route,useLocation} from 'react-router-dom'
 import {beforeEach,describe,it,expect,vi} from 'vitest'
 import {ConstellationPage} from './ConstellationPage'
-const api=vi.hoisted(()=>({addGoal:vi.fn(),updateGoal:vi.fn(),addTask:vi.fn(),updateTask:vi.fn(),refetch:vi.fn(),pushTask:vi.fn(),setBucket:vi.fn(),updateTasksBulk:vi.fn(),toggleTask:vi.fn(),deleteTask:vi.fn(),keepForward:vi.fn(),dropCommitment:vi.fn(),tasks:[] as any[]}))
-vi.mock('@/contexts/GoalsContext',()=>({GoalsProvider:({children}:any)=>children,useGoalsContext:()=>({goals:[{id:'g',name:'Together',year:2026,status:'active',context:'personal'},{id:'other',name:'Health',year:2026,status:'active',context:'personal'}],loading:false,...api})}))
+const api=vi.hoisted(()=>({addGoal:vi.fn(),updateGoal:vi.fn(),deleteGoal:vi.fn(),addTask:vi.fn(),updateTask:vi.fn(),refetch:vi.fn(),pushTask:vi.fn(),setBucket:vi.fn(),updateTasksBulk:vi.fn(),toggleTask:vi.fn(),deleteTask:vi.fn(),keepForward:vi.fn(),dropCommitment:vi.fn(),tasks:[] as any[],goals:[] as any[]}))
+const activity=vi.hoisted(()=>({calls:[] as {label:string;ok:boolean;opts:any}[],proposals:[] as any[],setProposalState:vi.fn(),removeProposal:vi.fn()}))
+const launcher=vi.hoisted(()=>({openAssistant:vi.fn()}))
+vi.mock('@/contexts/GoalsContext',()=>({GoalsProvider:({children}:any)=>children,useGoalsContext:()=>({goals:api.goals,loading:false,...api})}))
+vi.mock('@/contexts/CanvasActivityContext',()=>({
+ useCanvasActivity:()=>({proposals:activity.proposals,setProposalState:activity.setProposalState,removeProposal:activity.removeProposal,
+  run:async(label:string,cmd:()=>Promise<unknown>,opts:any)=>{let ok=false;try{ok=(await cmd())!==false}catch{ok=false};activity.calls.push({label,ok,opts});return ok}}),
+ useArrived:()=>false,
+}))
+vi.mock('@/contexts/AssistantLaunchContext',()=>({useAssistantLauncher:()=>launcher}))
 vi.mock('@/hooks/useSupabaseTasks',()=>({useSupabaseTasks:()=>({tasks:api.tasks,loading:false,error:null,...api})}))
 vi.mock('@/hooks/useDomain',()=>({useDomain:()=>({layers:[],soleDomain:'personal'})}))
 vi.mock('@/hooks/useAssigneeFilter',()=>({useAssigneeFilter:()=>[[]]}))
@@ -15,199 +23,273 @@ vi.mock('../v2/AddArea',()=>({useAddArea:()=>({area:'personal',picker:null})}))
 vi.mock('@/lib/planning/periodPage',async(importOriginal)=>({...await importOriginal<any>(),selectPeriodTasks:(tasks:any[],level:string)=>tasks.filter(t=>t.bucket===(level==='season'?'quarter':'month'))}))
 vi.mock('@/lib/placement/model',async(importOriginal)=>({...await importOriginal<any>(),committedTo:(t:any)=>t.bucket==='week'?{}:undefined}))
 vi.mock('@/components/domain/DomainGate',()=>({useDomainGate:()=>({requireDomain:vi.fn().mockResolvedValue('personal')})}))
-function open(){render(<MemoryRouter initialEntries={['/year?view=constellation&start=2026-10-09']}><ConstellationPage/></MemoryRouter>)}
-beforeEach(()=>{vi.clearAllMocks();api.tasks=[];HTMLElement.prototype.scrollIntoView=vi.fn();HTMLDialogElement.prototype.showModal=function(){this.setAttribute('open','')};HTMLDialogElement.prototype.close=function(){this.removeAttribute('open')}})
-describe('connected Constellation saves',()=>{
- it('retains wording on failed create and locks period while composing',async()=>{
- api.addGoal.mockResolvedValue(null);open();fireEvent.click(screen.getByText('+ Add an independent yearly intention'))
- fireEvent.change(screen.getByLabelText('Wording'),{target:{value:'A meaningful year'}})
- expect(screen.getByLabelText('Planning date')).toBeDisabled()
- fireEvent.click(screen.getByRole('button',{name:'Save',exact:true}))
- await screen.findByText('Could not save. Your wording is still here; try again.')
- expect(screen.getByLabelText('Wording')).toHaveValue('A meaningful year')
- api.addGoal.mockResolvedValue({id:'new'});fireEvent.click(screen.getByRole('button',{name:'Save',exact:true}))
- await waitFor(()=>expect(screen.queryByLabelText('Wording')).not.toBeInTheDocument())
- expect(api.addGoal).toHaveBeenLastCalledWith(null,'A meaningful year','personal',expect.objectContaining({year:2026,id:expect.any(String)}))
- })
- it('creates seasonal child in one write with annual link and context',async()=>{
- api.addTask.mockResolvedValue('new');open();fireEvent.click(screen.getByRole('button',{name:/Together/,pressed:false}))
- fireEvent.click(screen.getByText('+ Add a seasonal goal'));fireEvent.change(screen.getByLabelText('Wording'),{target:{value:'Unhurried weekends'}})
- fireEvent.click(screen.getByRole('button',{name:'Save',exact:true}));await screen.findByText('Saved to your plan.')
- expect(api.addTask).toHaveBeenCalledWith('Unhurried weekends',undefined,undefined,undefined,expect.objectContaining({bucket:'quarter',goalId:'g',context:'personal',seasonStart:new Date(2026,8,1)}))
- })
-})
 
-it('selects the saved intention from the conversation and refreshes later saves',()=>{
- HTMLElement.prototype.scrollIntoView=vi.fn()
- render(<MemoryRouter initialEntries={['/year?view=constellation&start=2026-10-09&focus=0:g']}><ConstellationPage/></MemoryRouter>)
- expect(screen.getByRole('button',{name:/Together Saved to your plan/,pressed:true})).toBeInTheDocument()
- expect(screen.getByRole('region',{name:'Selected plan item'})).toHaveTextContent('Together')
- fireEvent(window,new Event('symphony-plan-updated'))
- expect(api.refetch).toHaveBeenCalledTimes(1)
-})
-
-it('focuses a clicked branch and restores unrelated plans without changing data',()=>{
- open()
- fireEvent.click(screen.getByRole('button',{name:/Together/,pressed:false}))
- expect(screen.queryByRole('button',{name:/Health/,pressed:false})).not.toBeInTheDocument()
- expect(screen.getByText(/1 hidden/)).toBeInTheDocument()
- fireEvent.click(screen.getByRole('button',{name:'Show all plans'}))
- expect(screen.getByRole('button',{name:/Health/,pressed:false})).toBeInTheDocument()
- expect(api.updateTask).not.toHaveBeenCalled()
- expect(api.updateGoal).not.toHaveBeenCalled()
-})
-
-
-it('links an existing milestone and preserves selection on failed save',async()=>{
- api.tasks=[{id:'s',title:'Autumn outings',bucket:'quarter'},{id:'m',title:'Picnic',bucket:'month'}]
- api.updateTask.mockResolvedValue(false)
- open();fireEvent.click(screen.getByRole('button',{name:/Picnic Independent/,pressed:false}))
- fireEvent.click(screen.getByRole('button',{name:'Link or change parent'}))
- fireEvent.change(screen.getByRole('combobox'),{target:{value:'1:s'}})
- fireEvent.click(screen.getByRole('button',{name:'Save',exact:true}))
- await screen.findByText('Could not save. Your wording is still here; try again.')
- expect(screen.getByRole('combobox')).toHaveValue('1:s')
- expect(api.updateTask).toHaveBeenLastCalledWith('m',{sourceId:'s'})
- api.updateTask.mockResolvedValue(true)
- fireEvent.click(screen.getByRole('button',{name:'Save',exact:true}))
- await waitFor(()=>expect(screen.queryByRole('combobox')).not.toBeInTheDocument())
- expect(api.addTask).not.toHaveBeenCalled()
-})
-
-it('removes a weekly parent including duplicated legacy fallback links',async()=>{
- api.tasks=[{id:'m',title:'Picnic',bucket:'month'},{id:'w',title:'Pack basket',bucket:'week',sourceId:'m',goalTaskId:'m'}]
- api.updateTask.mockResolvedValue(true)
- open();fireEvent.click(screen.getByRole('button',{name:/Pack basket/,pressed:false}))
- fireEvent.click(screen.getByRole('button',{name:'Link or change parent'}))
- fireEvent.change(screen.getByRole('combobox'),{target:{value:''}})
- fireEvent.click(screen.getByRole('button',{name:'Save',exact:true}))
- await screen.findByText('Saved to your plan.')
- expect(api.updateTask).toHaveBeenCalledWith('w',{sourceId:undefined,goalTaskId:undefined})
-})
-
-it('links an existing season goal to a yearly intention',async()=>{
- api.tasks=[{id:'s',title:'Autumn outings',bucket:'quarter'}];api.updateTask.mockResolvedValue(true)
- open();fireEvent.click(screen.getByRole('button',{name:/Autumn outings/,pressed:false}))
- fireEvent.click(screen.getByRole('button',{name:'Link or change parent'}))
- fireEvent.change(screen.getByRole('combobox'),{target:{value:'0:g'}})
- fireEvent.click(screen.getByRole('button',{name:'Save',exact:true}))
- await screen.findByText('Saved to your plan.')
- expect(api.updateTask).toHaveBeenCalledWith('s',{goalId:'g'})
-})
-
-
-function dragConnect(from:string,to:string){
- const target=screen.getByRole('button',{name:to,exact:true}).closest('[data-plan-key]')!
- Object.defineProperty(document,'elementFromPoint',{configurable:true,value:()=>target})
- const port=screen.getByRole('button',{name:'Connect '+from,exact:true})
- fireEvent.pointerDown(port,{button:0,pointerId:1,clientX:10,clientY:10})
- fireEvent.pointerMove(window,{pointerId:1,clientX:150,clientY:100})
- fireEvent.pointerUp(window,{pointerId:1,clientX:150,clientY:100})
+const GOALS=[{id:'g',name:'Together',year:2026,status:'active',context:'personal'},{id:'other',name:'Health',year:2026,status:'active',context:'personal'}]
+function Where(){const l=useLocation();return <output data-testid="where">{l.pathname+l.search}</output>}
+function open(url='/year?view=constellation&start=2026-10-09'){
+ render(<MemoryRouter initialEntries={[url]}><Routes>
+  {['/year','/season','/month'].map(p=><Route key={p} path={p} element={<><ConstellationPage/><Where/></>}/>)}
+  <Route path="/week" element={<><p>Week page</p><Where/></>}/>
+ </Routes></MemoryRouter>)
 }
-it('drag saves one link and Undo restores just the previous parent',async()=>{
- // jsdom needs pointer coordinates for real drag handlers.
- vi.stubGlobal('PointerEvent',MouseEvent)
- api.tasks=[{id:'s',title:'Autumn outings',bucket:'quarter'},{id:'m',title:'Picnic',bucket:'month',sourceId:'old'}]
- api.updateTask.mockImplementation(async(id,patch)=>{Object.assign(api.tasks.find(t=>t.id===id),patch);return true})
- open();dragConnect('Picnic','Autumn outings Independent seasonal goal')
- await screen.findByText('Connected “Picnic” to “Autumn outings”.')
- expect(api.updateTask).toHaveBeenCalledTimes(1)
- expect(api.updateTask).toHaveBeenLastCalledWith('m',{sourceId:'s'})
- fireEvent.click(screen.getByRole('button',{name:'Undo connection'}))
- await screen.findByText('Connection restored.')
- expect(api.updateTask).toHaveBeenLastCalledWith('m',{sourceId:'old'})
- vi.unstubAllGlobals()
-})
-it('failed drag saves do not offer Undo, and Escape cancels without writing',async()=>{
- vi.stubGlobal('PointerEvent',MouseEvent)
- api.tasks=[{id:'s',title:'Autumn outings',bucket:'quarter'},{id:'m',title:'Picnic',bucket:'month'}]
- api.updateTask.mockResolvedValue(false)
- open();dragConnect('Picnic','Autumn outings Independent seasonal goal')
- await screen.findByText('Could not save the connection. Try dragging again.')
- expect(screen.queryByRole('button',{name:'Undo connection'})).not.toBeInTheDocument()
- api.updateTask.mockClear()
- fireEvent.pointerDown(screen.getByRole('button',{name:'Connect Picnic'}),{button:0,pointerId:1,clientX:10,clientY:10})
- fireEvent.keyDown(window,{key:'Escape'})
- fireEvent.pointerUp(window,{pointerId:1,clientX:150,clientY:100})
- expect(api.updateTask).not.toHaveBeenCalled()
- vi.unstubAllGlobals()
+const season=(focus='')=>open('/season?view=constellation&horizon=1&start=2026-10-09'+focus)
+const month=(focus='')=>open('/month?view=constellation&horizon=2&start=2026-10-09'+focus)
+const group=(name:string)=>screen.getByRole('region',{name})
+const lastRun=()=>activity.calls[activity.calls.length-1]
+beforeEach(()=>{
+ vi.clearAllMocks();api.tasks=[];api.goals=GOALS.map(g=>({...g}));activity.calls=[];activity.proposals=[]
+ HTMLElement.prototype.scrollIntoView=vi.fn()
+ api.updateTask.mockResolvedValue(true);api.addTask.mockResolvedValue('new');api.addGoal.mockResolvedValue({id:'new'});api.updateGoal.mockResolvedValue(true)
 })
 
-it('temporarily reveals eligible parents from a focused branch and cancels cleanly',()=>{
- vi.stubGlobal('PointerEvent',MouseEvent)
- api.tasks=[{id:'s',title:'Autumn outings',bucket:'quarter',goalId:'g'}]
- open();fireEvent.click(screen.getByRole('button',{name:/Autumn outings Together/,pressed:false}))
- expect(screen.queryByRole('button',{name:/Health/,pressed:false})).not.toBeInTheDocument()
- fireEvent.pointerDown(screen.getByRole('button',{name:'Connect Autumn outings'}),{button:0,pointerId:1,clientX:10,clientY:10})
- expect(screen.getByRole('button',{name:/Health/,pressed:false})).toBeInTheDocument()
- fireEvent.keyDown(window,{key:'Escape'})
- expect(screen.queryByRole('button',{name:/Health/,pressed:false})).not.toBeInTheDocument()
- expect(api.updateTask).not.toHaveBeenCalled()
- vi.unstubAllGlobals()
+describe('horizon stepper and URL',()=>{
+ it('opens the horizon its route names, with the period and its dates',()=>{
+  month()
+  expect(screen.getByRole('button',{name:'Month'})).toHaveAttribute('aria-current','step')
+  expect(screen.getByRole('heading',{level:1})).toHaveTextContent('October')
+  expect(screen.getByText(/Oct 1 – 31 · grouped under Fall goals/)).toBeInTheDocument()
+  open('/season?view=constellation&start=2026-10-09')
+  expect(screen.getAllByRole('heading',{level:1})[1]).toHaveTextContent('Fall')
+  expect(screen.getByText(/Sep 1 – Nov 30 · grouped under this year's intentions/)).toBeInTheDocument()
+ })
+ it('switches horizon in the URL, steps periods, and links on to Week',()=>{
+  open()
+  expect(screen.getByRole('button',{name:'Year'})).toHaveAttribute('aria-current','step')
+  fireEvent.click(screen.getByRole('button',{name:'Season'}))
+  expect(screen.getByTestId('where').textContent).toContain('horizon=1')
+  expect(screen.getByRole('button',{name:'Season'})).toHaveAttribute('aria-current','step')
+  fireEvent.click(screen.getByRole('button',{name:'Next season'}))
+  expect(screen.getByTestId('where').textContent).toContain('start=2026-12-01')
+  expect(screen.getByRole('heading',{level:1})).toHaveTextContent('Winter')
+  expect(screen.getByRole('link',{name:'Week →'})).toHaveAttribute('href',expect.stringContaining('/week?view=alongside'))
+ })
+ it('hands the week horizon over to the Week page',()=>{
+  open('/year?view=constellation&start=2026-10-09&horizon=3&focus=3:w')
+  expect(screen.getByText('Week page')).toBeInTheDocument()
+  expect(screen.getByTestId('where').textContent).toMatch(/^\/week\?view=alongside&date=2026-10-09/)
+ })
+ it('shows a conversation-saved item in its group and refreshes on later saves',()=>{
+  api.tasks=[{id:'s',title:'Autumn outings',bucket:'quarter',goalId:'g'}]
+  open('/year?view=constellation&start=2026-10-09&horizon=1&focus=1:s')
+  const row=within(group('Under Together')).getByText('Autumn outings').closest('li')!
+  expect(within(row).getByText('Saved')).toBeInTheDocument()
+  expect(group('Under Health')).toBeInTheDocument()
+  fireEvent(window,new Event('symphony-plan-updated'))
+  expect(api.refetch).toHaveBeenCalledTimes(1)
+ })
+ it('opens a horizon-wide planning conversation and offers the next horizon',()=>{
+  api.tasks=[{id:'s',title:'Autumn outings',bucket:'quarter',goalId:'g'}]
+  season()
+  fireEvent.click(screen.getByRole('button',{name:'Plan Fall 2026 with Symphony'}))
+  expect(launcher.openAssistant).toHaveBeenCalledWith(expect.objectContaining({message:expect.stringContaining('Fall 2026 across all my yearly intentions, one at a time')}))
+  fireEvent.click(screen.getByRole('button',{name:'Next: Month →'}))
+  expect(screen.getByRole('button',{name:'Month'})).toHaveAttribute('aria-current','step')
+ })
 })
 
-it('offers triage without changing branch focus and reports failed carry-forward',async()=>{
- api.tasks=[{id:'m',title:'Picnic',bucket:'month',context:'personal'}]
- api.keepForward.mockResolvedValue(undefined);open()
- fireEvent.click(screen.getByRole('button',{name:'Triage Picnic'}))
- expect(screen.getByRole('button',{name:/Health/,pressed:false})).toBeInTheDocument()
- fireEvent.click(screen.getByText('Carry to next month'))
- await screen.findByText('No change was saved. You can try again.')
- expect(api.keepForward).toHaveBeenCalledWith('m',{monthStart:new Date(2026,10,1)},new Date(2026,9,1))
-})
-it('removes only the viewed period and can reopen completed cards',async()=>{
- api.tasks=[{id:'m',title:'Picnic',bucket:'month',context:'personal',completed:true}]
- api.dropCommitment.mockResolvedValue(true);api.toggleTask.mockResolvedValue(true);open()
- fireEvent.click(screen.getByRole('checkbox',{name:/Show completed/}))
- fireEvent.click(screen.getByRole('button',{name:'Triage Picnic'}))
- fireEvent.click(screen.getByText('Reopen'));await screen.findByText('Reopened.')
- expect(api.toggleTask).toHaveBeenCalledWith('m')
- fireEvent.click(screen.getByRole('button',{name:'Triage Picnic'}))
- fireEvent.click(screen.getByText('Remove from this month'));await screen.findByText('Removed from this month.')
- expect(api.dropCommitment).toHaveBeenCalledWith('m','month',new Date(2026,9,1))
-})
-it('triages intentions through their own status rather than task scheduling',async()=>{
- api.updateGoal.mockResolvedValue(true);open()
- fireEvent.click(screen.getByRole('button',{name:'Triage Together'}))
- expect(screen.queryByText('Someday')).not.toBeInTheDocument()
- fireEvent.click(screen.getByText('Archive intention'));await screen.findByText('Intention archived.')
- expect(api.updateGoal).toHaveBeenCalledWith('g',{status:'archived'})
-})
-it('uses the shared scheduling action and does not claim success after failure',async()=>{
- api.tasks=[{id:'m',title:'Picnic',bucket:'month',context:'personal'}]
- api.setBucket.mockResolvedValue(false);open()
- fireEvent.click(screen.getByRole('button',{name:'Triage Picnic'}))
- fireEvent.click(screen.getByRole('button',{name:'Someday'}))
- await screen.findByText('No change was saved. You can try again.')
- expect(api.setBucket).toHaveBeenCalledWith('m','someday',undefined,undefined)
+describe('grouped under parent',()=>{
+ it('at Year the intentions are the items, and a new one keeps its wording when the save fails',async()=>{
+  api.addGoal.mockResolvedValueOnce(null);open()
+  expect(within(group('Yearly intentions')).getByText('Together')).toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button',{name:'Add a yearly intention'}))
+  fireEvent.change(screen.getByLabelText('New yearly intention'),{target:{value:'A meaningful year'}})
+  fireEvent.click(screen.getByRole('button',{name:'Add'}))
+  await screen.findByText(/Your wording is still here/)
+  expect(screen.getByLabelText('New yearly intention')).toHaveValue('A meaningful year')
+  fireEvent.click(screen.getByRole('button',{name:'Add'}))
+  await waitFor(()=>expect(screen.queryByLabelText('New yearly intention')).not.toBeInTheDocument())
+  expect(api.addGoal).toHaveBeenLastCalledWith(null,'A meaningful year','personal',expect.objectContaining({year:2026,id:expect.any(String)}))
+  expect(lastRun().opts.ids).toEqual([api.addGoal.mock.calls[1][3].id])
+ })
+ it('at Season groups goals under each intention once, empty intentions calm, Unlinked last',()=>{
+  api.tasks=[{id:'a',title:'Unhurried weekends',bucket:'quarter',goalId:'g'},{id:'b',title:'Autumn outings',bucket:'quarter',goalId:'g'},{id:'c',title:'Fix the gate',bucket:'quarter'},{id:'m',title:'Picnic',bucket:'month',sourceId:'b'}]
+  season()
+  const together=group('Under Together')
+  expect(within(together).getAllByRole('listitem').map(li=>li.querySelector('.plan-item-title')?.textContent)).toEqual(['Unhurried weekends','Autumn outings'])
+  expect(screen.getAllByText('Together')).toHaveLength(1)
+  expect(within(together).getByLabelText('1 monthly milestone below')).toHaveTextContent('1')
+  expect(within(group('Under Health')).getByText('Nothing for Fall yet.')).toBeInTheDocument()
+  const regions=screen.getAllByRole('region').map(r=>r.getAttribute('aria-label'))
+  expect(regions[regions.length-1]).toBe('Unlinked')
+  expect(within(group('Unlinked')).getByText('Fix the gate')).toBeInTheDocument()
+ })
+ it('at Month groups milestones under seasonal goals with the intention as a crumb',()=>{
+  api.tasks=[{id:'s',title:'Autumn outings',bucket:'quarter',goalId:'g'},{id:'m',title:'Picnic',bucket:'month',sourceId:'s'},{id:'x',title:'Taxes',bucket:'month'}]
+  month()
+  const outings=group('Under Autumn outings')
+  expect(within(outings).getByText('Picnic')).toBeInTheDocument()
+  expect(within(outings).getByText('Together')).toHaveClass('plan-group-crumb')
+  expect(within(group('Unlinked')).getByText('Taxes')).toBeInTheDocument()
+ })
+ it('adds from an empty group as a linked child in one write',async()=>{
+  season()
+  fireEvent.click(within(group('Under Health')).getByRole('button',{name:'Add a seasonal goal under Health'}))
+  fireEvent.change(screen.getByLabelText('New seasonal goal under Health'),{target:{value:'Walk daily'}})
+  fireEvent.submit(screen.getByLabelText('New seasonal goal under Health').closest('form')!)
+  await waitFor(()=>expect(api.addTask).toHaveBeenCalledTimes(1))
+  expect(api.addTask).toHaveBeenCalledWith('Walk daily',undefined,undefined,undefined,expect.objectContaining({bucket:'quarter',goalId:'other',context:'personal',seasonStart:new Date(2026,8,1)}))
+ })
+ it('adds an independent item from Unlinked and a month child carries its intention',async()=>{
+  api.tasks=[{id:'s',title:'Autumn outings',bucket:'quarter',goalId:'g'}]
+  month()
+  fireEvent.click(screen.getByRole('button',{name:'Add a monthly milestone under Autumn outings'}))
+  fireEvent.change(screen.getByLabelText('New monthly milestone under Autumn outings'),{target:{value:'Picnic'}})
+  fireEvent.click(screen.getByRole('button',{name:'Add'}))
+  await waitFor(()=>expect(api.addTask).toHaveBeenCalledWith('Picnic',undefined,undefined,undefined,expect.objectContaining({bucket:'month',sourceId:'s',goalId:'g',monthStart:new Date(2026,9,1)})))
+  fireEvent.click(screen.getByRole('button',{name:'Add an independent monthly milestone'}))
+  fireEvent.change(screen.getByLabelText('New monthly milestone'),{target:{value:'Taxes'}})
+  fireEvent.click(screen.getByRole('button',{name:'Add'}))
+  await waitFor(()=>expect(api.addTask).toHaveBeenLastCalledWith('Taxes',undefined,undefined,undefined,expect.not.objectContaining({sourceId:expect.anything()})))
+ })
 })
 
-it('hides completed cards by default while retaining open children and their context',()=>{
- api.tasks=[{id:'s',title:'Finished season',bucket:'quarter',completed:true},{id:'m',title:'Still open',bucket:'month',sourceId:'s'}]
- open()
- expect(screen.queryByRole('button',{name:'Triage Finished season'})).not.toBeInTheDocument()
- expect(screen.getByRole('button',{name:/Still open Finished season/})).toBeInTheDocument()
- fireEvent.click(screen.getByRole('checkbox',{name:/Show completed/}))
- expect(screen.getByRole('button',{name:'Triage Finished season'})).toBeInTheDocument()
- fireEvent.click(screen.getByRole('checkbox',{name:/Show completed/}))
- expect(screen.queryByRole('button',{name:'Triage Finished season'})).not.toBeInTheDocument()
+describe('focus',()=>{
+ it('narrows to a group, folds the others in place, and Esc or Show all returns',()=>{
+  api.tasks=[{id:'a',title:'Unhurried weekends',bucket:'quarter',goalId:'g'},{id:'h',title:'Run a 10k',bucket:'quarter',goalId:'other'}]
+  season()
+  fireEvent.click(screen.getByRole('button',{name:'Focus on Together'}))
+  expect(screen.getByTestId('where').textContent).toContain('focus=0%3Ag')
+  expect(screen.getByRole('button',{name:'Focus on Together'})).toHaveAttribute('aria-pressed','true')
+  expect(screen.queryByText('Run a 10k')).not.toBeInTheDocument()
+  expect(screen.getByRole('button',{name:'Focus on Health'})).toHaveClass('is-quiet')
+  fireEvent.keyDown(window,{key:'Escape'})
+  expect(screen.getByText('Run a 10k')).toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button',{name:'Focus on Health'}))
+  expect(screen.queryByText('Unhurried weekends')).not.toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button',{name:'Show all · Esc'}))
+  expect(screen.getByText('Unhurried weekends')).toBeInTheDocument()
+  expect(api.updateTask).not.toHaveBeenCalled()
+ })
+ it('keeps add available while focused, and a grandparent focus narrows to its groups',()=>{
+  api.tasks=[{id:'s',title:'Autumn outings',bucket:'quarter',goalId:'g'},{id:'t',title:'Strength',bucket:'quarter',goalId:'other'}]
+  month('&focus=0:g')
+  expect(group('Under Autumn outings')).toBeInTheDocument()
+  expect(screen.queryByRole('region',{name:'Under Strength'})).not.toBeInTheDocument()
+  expect(screen.getByRole('button',{name:'Add a monthly milestone under Autumn outings'})).toBeEnabled()
+ })
 })
-it('keeps add controls available while focused and creates a child from its card',()=>{
- open();fireEvent.click(screen.getByRole('button',{name:/Together/,pressed:false}))
- expect(screen.getByRole('button',{name:'+ Add an independent monthly milestone'})).toBeEnabled()
- fireEvent.click(screen.getByRole('button',{name:'Add seasonal goal under Together'}))
- expect(screen.getByRole('dialog')).toHaveTextContent('Under Together')
+
+describe('Move under…',()=>{
+ it('moves a milestone to another seasonal goal, keeping its intention and clearing the old legacy link; Undo restores',async()=>{
+  api.tasks=[{id:'s1',title:'Autumn outings',bucket:'quarter',goalId:'g'},{id:'s2',title:'Strength',bucket:'quarter',goalId:'other'},{id:'m',title:'Picnic',bucket:'month',sourceId:'s1',goalTaskId:'s1',goalId:'g'}]
+  month()
+  fireEvent.click(screen.getByRole('button',{name:'Actions for Picnic'}));fireEvent.click(screen.getByText('Move under…'))
+  const menu=screen.getByRole('menu',{name:'Move Picnic under a seasonal goal'})
+  expect(within(menu).getByRole('menuitemradio',{name:'Autumn outings'})).toHaveAttribute('aria-checked','true')
+  fireEvent.click(within(menu).getByRole('menuitemradio',{name:'Strength'}))
+  await waitFor(()=>expect(api.updateTask).toHaveBeenCalledTimes(1))
+  expect(api.updateTask.mock.calls[0]).toStrictEqual(['m',{sourceId:'s2',goalTaskId:undefined,goalId:'other'}])
+  expect(lastRun().label).toBe('Move “Picnic” under “Strength”')
+  await lastRun().opts.undo()
+  expect(api.updateTask).toHaveBeenLastCalledWith('m',{sourceId:'s1',goalTaskId:'s1',goalId:'g'})
+ })
+ it('unlinks every field that shows the parent',async()=>{
+  api.tasks=[{id:'s1',title:'Autumn outings',bucket:'quarter'},{id:'m',title:'Picnic',bucket:'month',sourceId:'s1',supportsGoalTaskId:'s1'}]
+  month()
+  fireEvent.click(screen.getByRole('button',{name:'Actions for Picnic'}));fireEvent.click(screen.getByText('Move under…'))
+  fireEvent.click(screen.getByRole('menuitemradio',{name:'No parent (Unlinked)'}))
+  await waitFor(()=>expect(api.updateTask).toHaveBeenCalledTimes(1))
+  expect(api.updateTask.mock.calls[0][1]).toStrictEqual({sourceId:undefined,supportsGoalTaskId:undefined})
+  expect(lastRun().label).toBe('Unlink “Picnic”')
+ })
+ it('links a seasonal goal to an intention; a failed save offers Retry and no Undo',async()=>{
+  api.tasks=[{id:'s',title:'Autumn outings',bucket:'quarter'}];api.updateTask.mockResolvedValueOnce(false)
+  season()
+  fireEvent.click(screen.getByRole('button',{name:'Actions for Autumn outings'}));fireEvent.click(screen.getByText('Move under…'))
+  fireEvent.click(screen.getByRole('menuitemradio',{name:'Together'}))
+  await waitFor(()=>expect(api.updateTask).toHaveBeenCalledWith('s',{goalId:'g'}))
+  expect(lastRun().ok).toBe(false)
+  lastRun().opts.retry()
+  await waitFor(()=>expect(api.updateTask).toHaveBeenCalledTimes(2))
+  expect(lastRun().ok).toBe(true)
+ })
+ it('drag onto a group header moves the item there',async()=>{
+  api.tasks=[{id:'s1',title:'Autumn outings',bucket:'quarter'},{id:'s2',title:'Strength',bucket:'quarter'},{id:'m',title:'Picnic',bucket:'month',sourceId:'s1'}]
+  month()
+  const row=screen.getByText('Picnic').closest('li')!
+  fireEvent.dragStart(row,{dataTransfer:{setData:vi.fn(),effectAllowed:''}})
+  fireEvent.dragOver(group('Under Strength'))
+  fireEvent.drop(group('Under Strength'))
+  await waitFor(()=>expect(api.updateTask).toHaveBeenCalledWith('m',{sourceId:'s2'}))
+ })
 })
-it('exposes direct edit and removal without selecting the branch',async()=>{
- api.tasks=[{id:'m',title:'Picnic',bucket:'month',context:'personal'}]
- api.dropCommitment.mockResolvedValue(false)
- const confirm=vi.spyOn(window,'confirm').mockReturnValue(true)
- open();fireEvent.click(screen.getByRole('button',{name:'Edit Picnic'}))
- expect(screen.getByLabelText('Wording')).toHaveValue('Picnic')
- fireEvent.click(screen.getByRole('button',{name:'Cancel'}))
- fireEvent.click(screen.getByRole('button',{name:'Remove Picnic'}))
- await screen.findByText('No change was saved. You can try again.')
- expect(api.dropCommitment).toHaveBeenCalledWith('m','month',new Date(2026,9,1))
- expect(screen.getByRole('button',{name:'Edit Picnic'})).toBeInTheDocument()
- confirm.mockRestore()
+
+describe('proposals',()=>{
+ it('shows suggestions in their parent group or Unlinked, keeps through the create path, and leaves out without writing',async()=>{
+  activity.proposals=[{key:'p1',title:'Visit Mom',level:1,parentId:'g',state:'proposed',reason:'You mentioned it'},{key:'p2',title:'Garden',level:1,state:'proposed'},{key:'p3',title:'Not now',level:2,state:'proposed'}]
+  season()
+  expect(within(group('Under Together')).getByText('Visit Mom').closest('.canvas-item')).toHaveClass('is-proposed')
+  expect(within(group('Unlinked')).getByText('Garden')).toBeInTheDocument()
+  expect(screen.queryByText('Not now')).not.toBeInTheDocument()
+  expect(screen.getByRole('button',{name:'Keep all (2)'})).toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button',{name:'Keep Visit Mom'}))
+  await waitFor(()=>expect(activity.removeProposal).toHaveBeenCalledWith('p1'))
+  expect(activity.setProposalState).toHaveBeenCalledWith('p1','saving')
+  expect(api.addTask).toHaveBeenCalledWith('Visit Mom',undefined,undefined,undefined,expect.objectContaining({bucket:'quarter',goalId:'g'}))
+  fireEvent.click(screen.getByRole('button',{name:'Leave out Garden'}))
+  expect(activity.removeProposal).toHaveBeenCalledWith('p2')
+  expect(api.addTask).toHaveBeenCalledTimes(1)
+ })
+ it('marks a failed keep and offers Retry',async()=>{
+  api.addTask.mockResolvedValue(undefined)
+  activity.proposals=[{key:'p1',title:'Visit Mom',level:1,parentId:'g',state:'proposed'}]
+  season()
+  fireEvent.click(screen.getByRole('button',{name:'Keep Visit Mom'}))
+  await waitFor(()=>expect(activity.setProposalState).toHaveBeenLastCalledWith('p1','failed'))
+  expect(activity.removeProposal).not.toHaveBeenCalled()
+ })
+})
+
+describe('done items and triage',()=>{
+ it('hides completed items by default while a finished parent keeps its open children',()=>{
+  api.tasks=[{id:'s',title:'Finished season',bucket:'quarter',completed:true},{id:'m',title:'Still open',bucket:'month',sourceId:'s'},{id:'d',title:'Done milestone',bucket:'month',completed:true}]
+  month()
+  expect(within(group('Under Finished season')).getByText('Still open')).toBeInTheDocument()
+  expect(screen.queryByText('Done milestone')).not.toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button',{name:'Show done (1)'}))
+  expect(screen.getByText('Done milestone')).toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button',{name:'Hide done (1)'}))
+  expect(screen.queryByText('Done milestone')).not.toBeInTheDocument()
+ })
+ it('carries forward and removes only the viewed period through the shared writers',async()=>{
+  api.tasks=[{id:'m',title:'Picnic',bucket:'month',context:'personal'}]
+  api.keepForward.mockResolvedValue(undefined);api.dropCommitment.mockResolvedValue(true);month()
+  fireEvent.click(screen.getByRole('button',{name:'Actions for Picnic'}))
+  fireEvent.click(screen.getByText('Carry to next month'))
+  await waitFor(()=>expect(api.keepForward).toHaveBeenCalledWith('m',{monthStart:new Date(2026,10,1)},new Date(2026,9,1)))
+  expect(lastRun().ok).toBe(false)
+  fireEvent.click(screen.getByRole('button',{name:'Actions for Picnic'}))
+  fireEvent.click(screen.getByText('Remove from this month'))
+  await waitFor(()=>expect(api.dropCommitment).toHaveBeenCalledWith('m','month',new Date(2026,9,1)))
+  expect(lastRun().ok).toBe(true)
+ })
+ it('triages intentions through their status, with Undo restoring it',async()=>{
+  open()
+  fireEvent.click(screen.getByRole('button',{name:'Actions for Together'}))
+  expect(screen.queryByText('Someday')).not.toBeInTheDocument()
+  fireEvent.click(screen.getByText('Archive intention'))
+  await waitFor(()=>expect(api.updateGoal).toHaveBeenCalledWith('g',{status:'archived'}))
+  await lastRun().opts.undo()
+  expect(api.updateGoal).toHaveBeenLastCalledWith('g',{status:'active'})
+ })
+ it('edits wording in place with Undo',async()=>{
+  api.tasks=[{id:'m',title:'Picnic',bucket:'month'}];month()
+  fireEvent.click(screen.getByRole('button',{name:'Actions for Picnic'}));fireEvent.click(screen.getByText('Edit wording'))
+  const field=screen.getByLabelText('Wording for Picnic');expect(field).toHaveValue('Picnic')
+  fireEvent.change(field,{target:{value:'Park picnic'}});fireEvent.click(screen.getByRole('button',{name:'Save'}))
+  await waitFor(()=>expect(api.updateTask).toHaveBeenCalledWith('m',{title:'Park picnic'}))
+  await lastRun().opts.undo()
+  expect(api.updateTask).toHaveBeenLastCalledWith('m',{title:'Picnic'})
+ })
+})
+
+describe('prepared to act on plan rows',()=>{
+ it('marks what an item carries and summarises it, with the plan above, when opened',()=>{
+  api.tasks=[{id:'s',title:'Back to school',bucket:'quarter',links:[{url:'https://supplies.test'}]},{id:'m',title:'Call Cami',bucket:'month',sourceId:'s',contactId:'cami',subtasks:[{id:'q1',title:'Pickup?'},{id:'q2',title:'Forms?',completed:true}]}]
+  month()
+  const row=screen.getByText('Call Cami').closest('li')!
+  expect(within(row).getByRole('img',{name:'Has contact, steps 1 of 2'})).toBeInTheDocument()
+  fireEvent.click(within(row).getByRole('button',{name:'Call Cami'}))
+  expect(within(row).getByText('From Back to school: 1 link')).toBeInTheDocument()
+ })
 })

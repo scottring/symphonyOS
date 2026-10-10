@@ -36,6 +36,22 @@ describe('PlanNavigation', () => {
     expect(rail.querySelector('a[href="/today?view=alongside"]')).toBeTruthy()
   })
 
+  it('marks Plan as the one active destination on Year, Season and Month, and keeps the horizon on screen', () => {
+    for (const path of ['/year', '/season', '/month']) {
+      render(<MemoryRouter initialEntries={[`${path}?view=constellation&horizon=1&start=2026-10-01&focus=0:g`]}><PlanNavigation /></MemoryRouter>)
+      const rail = screen.getByRole('navigation', { name: 'Planning period' })
+      const current = [...rail.querySelectorAll('a[aria-current="page"]')]
+      expect(current.map((a) => a.getAttribute('aria-label'))).toEqual(['Plan'])
+      // "You are here": same horizon and period, focus released.
+      expect(current[0].getAttribute('href')).toBe(`${path}?view=constellation&horizon=1&start=2026-10-01`)
+      cleanup()
+    }
+    render(<MemoryRouter initialEntries={['/week?view=alongside']}><PlanNavigation /></MemoryRouter>)
+    const rail = screen.getByRole('navigation', { name: 'Planning period' })
+    expect([...rail.querySelectorAll('a[aria-current="page"]')].map((a) => a.getAttribute('aria-label'))).toEqual(['Week'])
+    expect(rail.querySelector('a[aria-label="Plan"]')?.getAttribute('href')).toMatch(/^\/month\?(.*&)?view=constellation&horizon=2$/)
+  })
+
   // Scott, 2026-09-30: ascending, Today first — the same order as the phone's menu.
   it('runs Today → Week → Month → Season → Year on desktop', () => {
     render(<MemoryRouter initialEntries={['/week']}><PlanNavigation /></MemoryRouter>)

@@ -30,6 +30,9 @@ import {
   elapsedLabel, minutesToLog, type ReadingTimer,
 } from '@/lib/wall/readingScreenTime'
 import { whatToWear } from '@/lib/wall/whatToWear'
+import { checklistFor } from '@/lib/wall/wallMomentsModel'
+import { wallMoment } from '@/lib/wall/wallMoment'
+import { kidViewHoldsOpen } from '@/lib/wall/activity/kioskRoutines'
 import { localYmd } from '@/lib/cadence/config'
 import type { Routine } from '@/types/actionable'
 import type { FamilyMember } from '@/types/family'
@@ -175,12 +178,24 @@ export function KidDayView({
   const kids = useMemo(() => kidsFor(member, roster, todayItems), [member, roster, todayItems])
   const comingUp = useMemo(() => adaptMemberComingUpRows(days, member, roster), [days, member, roster])
 
-  const resetIdleTimer = useIdleClose(onClose)
-
   // ── The reading timer ─────────────────────────────────────────────
   const ymd = localYmd(new Date())
   const timerKey = readingTimerKey(member.id, ymd)
   const [timer, setTimer] = useState<ReadingTimer | null>(() => readReadingTimer(storage(), timerKey))
+
+  // Idle auto-close returns an untouched page to the wall — but never while
+  // something is under way (conversational canvas, 2026-10-10): a running
+  // reading timer, or this part of the day's checklist started and not
+  // finished. A kid who walks off mid-"Out the door" finds the same page.
+  const holdOpen = useMemo(() => {
+    const clock = now ?? new Date()
+    const current = checklistFor(model, wallMoment(clock, { schoolDay: !!model.school }))
+    return kidViewHoldsOpen({
+      checklistRows: (current?.rows ?? []).map((r) => ({ done: doneOverlay.get(overlayKey(r)) ?? r.done })),
+      readingTimerRunning: !!timer && isTimerRunning(timer),
+    })
+  }, [model, now, doneOverlay, timer])
+  const resetIdleTimer = useIdleClose(onClose, holdOpen)
   const [tick, setTick] = useState(() => new Date())
   useEffect(() => {
     if (!timer || !isTimerRunning(timer)) return
@@ -743,14 +758,15 @@ export function KidDayView({
 }
 
 /** Idle auto-close: resets on any pointerdown inside the container (capture
- *  phase, wired via onPointerDownCapture on the root). */
-function useIdleClose(onClose: () => void): () => void {
+ *  phase, wired via onPointerDownCapture on the root). Suspended entirely
+ *  while `hold` is true (see kidViewHoldsOpen). */
+function useIdleClose(onClose: () => void, hold: boolean): () => void {
   const [timerVersion, setTimerVersion] = useState(0)
   useEffect(() => {
+    if (hold) return
     const timer = setTimeout(onClose, KID_VIEW_IDLE_MS)
     return () => clearTimeout(timer)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [onClose, timerVersion])
+  }, [onClose, timerVersion, hold])
   return useCallback(() => setTimerVersion((v) => v + 1), [])
 }
 

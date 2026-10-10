@@ -100,6 +100,8 @@ describe('Today — the way to Planning', () => {
     const column = screen.getByRole('region', { name: /^Week \d+, for reference$/ })
     // The dated task is on the page, not in the column; the chore waits here.
     expect(within(column).queryByText('Pick up foot meds')).not.toBeInTheDocument()
+    // The day's routines fold to one line that opens in place (canvas, 2026-10-10).
+    fireEvent.click(within(column).getByRole('button', { name: /^Routines today/ }))
     expect(within(column).getByText('Kids clean rooms')).toBeInTheDocument()
     expect(within(column).getByRole('button', { name: 'Add Kids clean rooms to today' })).toBeInTheDocument()
     expect(onToggleTask).not.toHaveBeenCalled()

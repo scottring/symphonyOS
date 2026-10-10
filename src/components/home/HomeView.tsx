@@ -642,9 +642,13 @@ export function HomeView({
         {/* Surfaces an expired/revoked calendar connection so the empty event
             state isn't silent. Wrapper collapses (empty:hidden) when the banner
             renders null, so it adds no padding while connected. */}
-        <div className={`${PAGE_GUTTER_X} pt-4 empty:hidden`}>
-          <CalendarReconnectBanner />
-        </div>
+        {/* Today draws it under its own masthead, so every destination shows
+            the heading first and notices beneath it (one page shape). */}
+        {currentView !== 'today' && (
+          <div className={`${PAGE_GUTTER_X} pt-4 empty:hidden`}>
+            <CalendarReconnectBanner />
+          </div>
+        )}
         {currentView === 'today' || showRiverView
           ? renderContent()
           : (

@@ -20,12 +20,8 @@
 .connected-workspace .page-navigation-mid{justify-content:flex-start}
 .connected-workspace .page-navigation-center .horizon-rail a{padding-inline:6px}
 .connected-workspace .page-navigation-center .horizon-rail-join{width:8px}
-/* Week is a working spread: short headers and full-width action rows keep
-   more of the plan visible without reducing reading or touch-target size. */
-.connected-workspace:has(.pv2-week) .week-column{padding-inline:28px}
-.connected-workspace:has(.pv2-week) .daybook-masthead{margin-bottom:12px}
-.connected-workspace:has(.pv2-week) .daybook-date{font-size:60px;line-height:1}
-.connected-workspace:has(.pv2-week) .daybook-masthead-inner{padding-top:0;padding-bottom:6px}
+/* Week keeps the shared masthead and gutter (one page shape, 2026-10-10);
+   these compact its older journal rows where they still appear. */
 .connected-workspace .pv2-week .oj-section{grid-template-columns:minmax(0,1fr);gap:8px;padding:14px 0}
 .connected-workspace .pv2-week .oj-parent{display:grid;grid-template-columns:minmax(0,1fr) auto;column-gap:12px;align-items:baseline}
 .connected-workspace .pv2-week .oj-eyebrow{grid-column:1/-1;margin-bottom:3px;font-size:10px}
@@ -50,14 +46,12 @@
  .connected-workspace .wk-journal-page.is-colscroll{grid-template-columns:minmax(20rem,1fr) minmax(0,1.1fr);gap:24px}
 }
 @media(max-width:767px){
- .connected-workspace:has(.pv2-week) .week-column{padding-inline:16px}
  .connected-workspace .pv2-week .oj-title{font-size:18px}
  .connected-workspace .pv2-week .oj-compose-row input{min-height:44px}
  .connected-workspace .pv2-week .oj-add{min-height:44px}
 }
 .connected-workspace .ad-shell:has(.pv2-week){padding-top:0}
-.connected-workspace:has(.pv2-week) .masthead-numeral{font-size:60px;line-height:1}
-:root.plan-v2 .connected-workspace:has(.pv2-week) .daybook-masthead-inner{padding-top:0}
+
 .connected-workspace .pv2-week .wk-dayhead .wk-daynum{font-size:23px;line-height:1}
 .connected-workspace .pv2-week .wk-cell:not(:has(.wk-rows)){position:relative;min-height:42px;padding-block:4px}
 .connected-workspace .pv2-week .wk-cell:not(:has(.wk-rows))>button{position:absolute;right:0;top:7px;margin:0}

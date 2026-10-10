@@ -464,3 +464,39 @@ describe('the kid page keeps its furniture', () => {
     expect(screen.queryByText('Appointments')).toBeNull()
   })
 })
+
+// Conversational canvas (2026-10-10): activities in progress never time out.
+describe('idle auto-close never interrupts something under way', () => {
+  const MORNING = new Date(2026, 9, 10, 7, 30)
+  afterEach(() => { vi.useRealTimers(); localStorage.clear() })
+
+  function morningRoutines() {
+    return [routine({ name: 'Shoes', time_of_day: '07:00' }), routine({ name: 'Backpack', time_of_day: '07:05' })]
+  }
+
+  it('closes an untouched page after the idle timeout', () => {
+    vi.useFakeTimers({ now: MORNING })
+    const onClose = vi.fn()
+    renderView({ routines: morningRoutines(), onClose })
+    vi.advanceTimersByTime(120_000)
+    expect(onClose).toHaveBeenCalledTimes(1)
+  })
+
+  it('stays open while this morning’s checklist is started but not finished', () => {
+    vi.useFakeTimers({ now: MORNING })
+    const onClose = vi.fn()
+    const rs = morningRoutines()
+    renderView({ routines: rs, onClose, history: [inst({ entity_id: rs[0].id, date: dateStr(MORNING), status: 'completed', completed_at: MORNING.toISOString() })] })
+    vi.advanceTimersByTime(30 * 60_000)
+    expect(onClose).not.toHaveBeenCalled()
+  })
+
+  it('stays open while a reading timer runs', () => {
+    vi.useFakeTimers({ now: MORNING })
+    const onClose = vi.fn()
+    renderView({ routines: [routine({ name: 'Read', target_amount: 20, target_unit: 'minutes' })], onClose })
+    fireEvent.click(screen.getByRole('button', { name: 'Start reading' }))
+    vi.advanceTimersByTime(30 * 60_000)
+    expect(onClose).not.toHaveBeenCalled()
+  })
+})

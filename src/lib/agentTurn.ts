@@ -7,7 +7,7 @@ import type { WorkspaceContext } from '@/lib/workspace/context'
 // never-leave-the-bubble-empty rule — without a second copy of the streaming
 // code drifting away from the first.
 
-import { streamSymphonyAgent, type AgentApiMessage, type AgentSourceNote, type AssistantTaskContext, type AttachmentMeta } from '@/lib/agentStream'
+import { streamSymphonyAgent, type AgentApiMessage, type AgentProposalItem, type AgentSourceNote, type AssistantTaskContext, type AttachmentMeta } from '@/lib/agentStream'
 
 /** Tools that mutate task/project data. When the agent uses one, the app needs
  *  to refresh so the change shows without a page reload. */
@@ -37,6 +37,12 @@ export interface AgentTurnHandlers {
   onText?: (chunk: string) => void
   /** Every tool the agent used, write or read. */
   onTool?: (name: string) => void
+  /** A write tool's reported outcome (only from agent builds that send it). */
+  onToolResult?: (result: { name: string; ok: boolean; ids?: string[]; error?: string }) => void
+  /** Suggestions to show as proposals, never written until kept. */
+  onProposal?: (items: AgentProposalItem[]) => void
+  /** Reused when the same message is retried, for server-side de-duplication. */
+  turnId?: string
   /** The authoritative final reply, only when nothing streamed. */
   onReplyFallback?: (reply: string) => void
   /** Note sources cited by this turn. */
@@ -114,6 +120,9 @@ export async function runAgentTurn(
         streamError = message
         handlers.onError?.(message)
       },
+      onToolResult: handlers.onToolResult,
+      onProposal: handlers.onProposal,
+      turnId: handlers.turnId,
       workspaceContext: handlers.workspaceContext,
       onWorkspace: handlers.onWorkspace,
       onPlanSaved: handlers.onPlanSaved,

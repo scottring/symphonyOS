@@ -1,6 +1,27 @@
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen, fireEvent, within, waitFor } from '@testing-library/react'
 import { describe, it, expect, vi } from 'vitest'
 import { TapRoutinePanel } from './TapRoutinePanel'
+import { CanvasActivityProvider, useCanvasActivity } from '@/contexts/CanvasActivityContext'
+
+/** Tuesday 2026-10-13 / Wednesday 2026-10-14 — fixed so the suite never rots. */
+const TUE = new Date(2026, 9, 13)
+const WED = new Date(2026, 9, 14)
+
+// Hide for today writes through the instance writer; its own test covers the
+// write and Undo. Here we see what the panel asks of it.
+const { hide, skippedOn } = vi.hoisted(() => ({
+  hide: { hideForToday: vi.fn(async () => true), showToday: vi.fn(async () => true) },
+  skippedOn: vi.fn(() => false as boolean | null),
+}))
+vi.mock('@/components/routine/useHideForToday', () => ({
+  useHideForToday: () => hide,
+  useSkippedOn: () => skippedOn(),
+}))
+
+function UndoButton() {
+  const { receipt, undo } = useCanvasActivity()
+  return receipt?.undoable ? <button type="button" onClick={() => { void undo() }}>Undo</button> : null
+}
 import type { Routine } from '@/types/actionable'
 import type { FamilyMember } from '@/types/family'
 
@@ -53,46 +74,125 @@ describe('TapRoutinePanel', () => {
     expect(await screen.findByText('Take bins to curb')).toBeInTheDocument()
   })
 
-  it('renders visibility as a labelled on/off switch (checked when active)', () => {
-    render(<TapRoutinePanel routine={routine} onClose={vi.fn()} onNotesChange={vi.fn()} onContextChange={vi.fn()} onVisibilityChange={vi.fn()} />)
-    const sw = screen.getByRole('switch', { name: /^active$/i })
-    expect(sw).toBeInTheDocument()
-    expect(sw).toHaveAttribute('aria-checked', 'true')
-    expect(screen.getByText(/appears on Today at its scheduled time/i)).toBeInTheDocument()
+  it('opens with "Where it shows": Today, Week and Kiosk, each with its reason', () => {
+    render(<TapRoutinePanel routine={routine} onClose={vi.fn()} onNotesChange={vi.fn()} onContextChange={vi.fn()} onVisibilityChange={vi.fn()} viewedDate={TUE} />)
+    const where = screen.getByRole('region', { name: 'Where it shows' })
+    expect(within(where).getByText('Today')).toBeInTheDocument()
+    expect(within(where).getByText('Week')).toBeInTheDocument()
+    expect(within(where).getByText('Kiosk')).toBeInTheDocument()
+    expect(within(where).getByText('On Today at 8:00 PM')).toBeInTheDocument()
+    expect(within(where).getByText('On the kitchen kiosk at 8:00 PM')).toBeInTheDocument()
   })
 
-  it('toggling the switch off reports a reference visibility change', () => {
+  it('explains a day it is not on', () => {
+    render(<TapRoutinePanel routine={routine} onClose={vi.fn()} onNotesChange={vi.fn()} onContextChange={vi.fn()} onVisibilityChange={vi.fn()} viewedDate={WED} />)
+    const where = screen.getByRole('region', { name: 'Where it shows' })
+    expect(within(where).getAllByText('Not on Wednesdays — runs Tue')).toHaveLength(2) // Today and the kiosk
+    expect(within(where).getByText('On the week on Tue at 8:00 PM')).toBeInTheDocument()
+  })
+
+  it('offers three distinct controls: Hide for today, Rest until…, Off', () => {
+    render(
+      <TapRoutinePanel routine={routine} onClose={vi.fn()} onNotesChange={vi.fn()} onContextChange={vi.fn()}
+        onVisibilityChange={vi.fn()} onShowOnTodayChange={vi.fn()} onRestUntilChange={vi.fn()} viewedDate={TUE} />,
+    )
+    const controls = screen.getByRole('region', { name: 'Hide it' })
+    expect(within(controls).getByRole('button', { name: 'Hide for today' })).toBeInTheDocument()
+    expect(within(controls).getByText('Rest until…')).toBeInTheDocument()
+    expect(within(controls).getByLabelText('Rest until')).toBeInTheDocument()
+    expect(within(controls).getByRole('switch', { name: 'Off' })).toHaveAttribute('aria-checked', 'false')
+    // Each says how strong it is.
+    expect(within(controls).getByText(/Skips today’s occurrence only/)).toBeInTheDocument()
+    expect(within(controls).getByText(/Pauses it everywhere/)).toBeInTheDocument()
+  })
+
+  it('Hide for today skips the occurrence; it never rests the routine', async () => {
     const onVisibilityChange = vi.fn()
-    render(<TapRoutinePanel routine={routine} onClose={vi.fn()} onNotesChange={vi.fn()} onContextChange={vi.fn()} onVisibilityChange={onVisibilityChange} />)
-    fireEvent.click(screen.getByRole('switch', { name: /^active$/i }))
+    const onRestUntilChange = vi.fn()
+    render(
+      <TapRoutinePanel routine={routine} onClose={vi.fn()} onNotesChange={vi.fn()} onContextChange={vi.fn()}
+        onVisibilityChange={onVisibilityChange} onRestUntilChange={onRestUntilChange} viewedDate={TUE} />,
+    )
+    fireEvent.click(screen.getByRole('button', { name: 'Hide for today' }))
+    await waitFor(() => expect(hide.hideForToday).toHaveBeenCalledWith('r1', 'Trash night', TUE))
+    expect(onVisibilityChange).not.toHaveBeenCalled()
+    expect(onRestUntilChange).not.toHaveBeenCalled()
+  })
+
+  it('a skipped occurrence reads as skipped and offers to show it again', () => {
+    skippedOn.mockReturnValue(true)
+    render(<TapRoutinePanel routine={routine} onClose={vi.fn()} onNotesChange={vi.fn()} onContextChange={vi.fn()} onVisibilityChange={vi.fn()} viewedDate={TUE} />)
+    expect(screen.getByText('Skipped for today only — back next time it’s due')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Show today again' }))
+    expect(hide.showToday).toHaveBeenCalledWith('r1', 'Trash night', TUE)
+    skippedOn.mockReturnValue(false)
+  })
+
+  it('Rest until… rests with a wake date, and Undo restores what was there', async () => {
+    const onVisibilityChange = vi.fn()
+    const onRestUntilChange = vi.fn()
+    render(
+      <CanvasActivityProvider snapshot={{ tasks: [], goals: [] }} writers={{} as never} refetch={() => {}}>
+        <TapRoutinePanel routine={routine} onClose={vi.fn()} onNotesChange={vi.fn()} onContextChange={vi.fn()}
+          onVisibilityChange={onVisibilityChange} onRestUntilChange={onRestUntilChange} viewedDate={TUE} />
+        <UndoButton />
+      </CanvasActivityProvider>,
+    )
+    fireEvent.change(screen.getByLabelText('Rest until'), { target: { value: '2027-06-21' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Rest until Jun 21, 2027' }))
+    await waitFor(() => expect(onRestUntilChange).toHaveBeenCalled())
     expect(onVisibilityChange).toHaveBeenCalledWith('reference')
+    expect(onRestUntilChange.mock.calls[0][0]).toBe(new Date('2027-06-21T00:00:00').toISOString())
+    fireEvent.click(await screen.findByRole('button', { name: 'Undo' }))
+    await waitFor(() => expect(onVisibilityChange).toHaveBeenLastCalledWith('active'))
+    expect(onRestUntilChange).toHaveBeenLastCalledWith(null)
+  })
+
+  it('a resting routine says when it wakes and offers Wake now', async () => {
+    const onVisibilityChange = vi.fn()
+    render(<TapRoutinePanel routine={{ ...routine, visibility: 'reference', paused_until: '2027-06-21T04:00:00.000Z' }} onClose={vi.fn()} onNotesChange={vi.fn()} onContextChange={vi.fn()} onVisibilityChange={onVisibilityChange} viewedDate={TUE} />)
+    expect(screen.getByText(/Asleep everywhere until Jun 21, 2027/)).toBeInTheDocument()
+    expect(screen.getAllByText('Resting until Jun 21, 2027 — it wakes on its own').length).toBeGreaterThan(0)
+    expect(screen.queryByRole('button', { name: 'Hide for today' })).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Wake now' }))
+    await waitFor(() => expect(onVisibilityChange).toHaveBeenCalledWith('active'))
   })
 
   // Scott, 2026-09-07: "make it so you can choose not to show particular
-  // routines on the Today page." Separate from Active/Resting: this one keeps
-  // the routine running (and on the kitchen wall), it just stops the row.
-  it('offers an On Today switch beside Active, and reports turning it off', () => {
+  // routines on the Today page." Separate from Rest: Off keeps the routine
+  // running (and on the kitchen wall), it just stops the row.
+  it('Off is a switch, and reports hiding from Today and planning', async () => {
     const onShowOnTodayChange = vi.fn()
     render(
       <TapRoutinePanel routine={routine} onClose={vi.fn()} onNotesChange={vi.fn()} onContextChange={vi.fn()}
         onVisibilityChange={vi.fn()} onShowOnTodayChange={onShowOnTodayChange} />,
     )
-    const sw = screen.getByRole('switch', { name: /^show in today and planning$/i })
-    expect(sw).toHaveAttribute('aria-checked', 'true')
-    fireEvent.click(sw)
-    expect(onShowOnTodayChange).toHaveBeenCalledWith(false)
+    fireEvent.click(screen.getByRole('switch', { name: 'Off' }))
+    await waitFor(() => expect(onShowOnTodayChange).toHaveBeenCalledWith(false))
   })
 
-  it('says what an off-Today routine still does', () => {
+  it('says what an Off routine still does', () => {
     render(
       <TapRoutinePanel routine={{ ...routine, show_on_timeline: false }} onClose={vi.fn()} onNotesChange={vi.fn()}
-        onContextChange={vi.fn()} onVisibilityChange={vi.fn()} onShowOnTodayChange={vi.fn()} />,
+        onContextChange={vi.fn()} onVisibilityChange={vi.fn()} onShowOnTodayChange={vi.fn()} viewedDate={TUE} />,
     )
-    expect(screen.getByRole('switch', { name: /^show in today and planning$/i })).toHaveAttribute('aria-checked', 'false')
-    expect(screen.getByText(/still on the kitchen wall/i)).toBeInTheDocument()
-    // Says where to find it again (Scott, 2026-10-03).
-    expect(screen.getByText('Hidden from Today and planning')).toBeInTheDocument()
-    expect(screen.getByText(/Routines page/)).toBeInTheDocument()
+    expect(screen.getByRole('switch', { name: 'Off' })).toHaveAttribute('aria-checked', 'true')
+    expect(screen.getByText(/Still runs, and still on the kitchen kiosk/)).toBeInTheDocument()
+    expect(screen.getAllByText('Hidden from Today and planning (Off)')).toHaveLength(2) // Today and the week
+    expect(screen.getByText('Still on the kitchen kiosk — Off only clears Today and planning')).toBeInTheDocument()
+  })
+
+  it('a Personal routine is never on the shared kiosk', () => {
+    render(<TapRoutinePanel routine={{ ...routine, context: 'personal', assigned_to: 'iris' }} familyMembers={[{ ...members[0], is_full_user: true }]} onClose={vi.fn()} onNotesChange={vi.fn()} onContextChange={vi.fn()} onVisibilityChange={vi.fn()} viewedDate={TUE} />)
+    expect(screen.getByText('Private to Iris — never on the shared kiosk')).toBeInTheDocument()
+  })
+
+  it('explains live while the schedule is being edited', () => {
+    render(<TapRoutinePanel routine={routine} onClose={vi.fn()} onNotesChange={vi.fn()} onContextChange={vi.fn()} onVisibilityChange={vi.fn()} onScheduleChange={vi.fn()} viewedDate={WED} />)
+    expect(screen.getAllByText('Not on Wednesdays — runs Tue').length).toBeGreaterThan(0)
+    fireEvent.click(screen.getByRole('button', { name: /Edit schedule/i }))
+    fireEvent.click(screen.getByRole('button', { name: 'Wed' }))
+    expect(screen.getByText('On Today at 8:00 PM')).toBeInTheDocument()
   })
 
   it('On Today says what it will actually do: at its time, on its day, or offered to choose', () => {
@@ -112,12 +212,12 @@ describe('TapRoutinePanel', () => {
     expect(say({ ...routine, time_of_day: null, recurrence_pattern: { type: 'daily' } })).not.toMatch(/no set day/)
   })
 
-  it('says nothing about Today while the routine is resting off everything', () => {
+  it('offers no Off switch while the routine is resting off everything', () => {
     render(
       <TapRoutinePanel routine={{ ...routine, visibility: 'reference' }} onClose={vi.fn()} onNotesChange={vi.fn()}
         onContextChange={vi.fn()} onVisibilityChange={vi.fn()} onShowOnTodayChange={vi.fn()} />,
     )
-    expect(screen.queryByRole('switch', { name: /^show in today and planning$/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('switch', { name: 'Off' })).not.toBeInTheDocument()
   })
 
   it('renders the assignee picker when members + onAssignChange are provided', () => {

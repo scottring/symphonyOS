@@ -26,6 +26,7 @@ import { DaySectionHeader } from '@/components/schedule/DaySectionHeader'
 import { TimelineInsertPoint } from './TimelineInsertPoint'
 import { ScheduleItem } from './ScheduleItem'
 import { RoutineCollectionRow } from './RoutineCollectionRow'
+import { useHideForToday } from '@/components/routine/useHideForToday'
 import { ShareToFamilyNudge } from './ShareToFamilyNudge'
 import { TodayBandDropZone, TodayGapDropZone } from './TodayDropZones'
 import { TodayDraggableRow } from './TodayDraggableRow'
@@ -189,6 +190,9 @@ export function TodaySectionList({
   const Gap = dropTargets ? TodayGapDropZone : Plain
   const ctx = useScheduleActionsContext()
   const { dragging } = useTodayDragState()
+  // "Hide for today" skips this day's occurrence only (a 'skipped' instance),
+  // with Undo in the canvas strip — never Rest (visibility/paused_until).
+  const { hideForToday } = useHideForToday()
 
   // Which sections the user has expanded past the cap. Not persisted: a cap is
   // about this reading of the page, not a standing preference.
@@ -482,14 +486,14 @@ export function TodaySectionList({
                             const entityId = slot === null ? routineId : `${routineId}#${slot}`
                             onCompleteRoutine(entityId, true, completedAt)
                           } : undefined}
+                          // Offered where routines are editable (the same gate
+                          // as before), but the write is the instance writer's.
                           onHideToday={onUpdateRoutine ? () => {
-                            // Pause until tomorrow: reference + paused_until, so the
-                            // useRoutines auto-resume brings it back on the next day.
+                            // Skip the viewed day's occurrence of the whole
+                            // collection. The routine keeps running: back on
+                            // its next day, still on the week and the kiosk.
                             const parentId = item.id.replace('routine-collection-', '')
-                            const tomorrow = new Date()
-                            tomorrow.setHours(0, 0, 0, 0)
-                            tomorrow.setDate(tomorrow.getDate() + 1)
-                            onUpdateRoutine(parentId, { visibility: 'reference', paused_until: tomorrow.toISOString() })
+                            void hideForToday(parentId, item.title, viewedDate)
                           } : undefined}
                           // "Remove from Today" now does what it says: the
                           // routine keeps running (and keeps its place on the

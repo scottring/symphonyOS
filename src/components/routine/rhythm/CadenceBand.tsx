@@ -15,6 +15,7 @@ import { nextOccurrence } from '@/lib/quickRecurrence'
 import { SlotAdd, type CreateRoutineInSlot } from './SlotAdd'
 import { RoutineRow } from './RoutineRow'
 import { SectionHeading } from '@/components/layout/SectionHeading'
+import type { RoutineExplanation } from '@/lib/routines/explain'
 
 /** When this routine next lands, as a person would say it. A resting routine
  *  answers with its wake date instead — `paused_until` is stored at UTC
@@ -44,7 +45,7 @@ export function nextLabel(routine: Routine, now: Date, resting: boolean): string
 
 export function CadenceBand({
   heading, hint, routines, familyMembers, stepCounts, matches, now, resting = false,
-  onOpenRoutine, onCreateInSlot, createPattern, addLabel,
+  onOpenRoutine, onCreateInSlot, createPattern, addLabel, explain, whenFor,
 }: {
   heading: string
   /** One quiet line saying what this rung is for. */
@@ -61,6 +62,10 @@ export function CadenceBand({
   /** The recurrence this band's own "+" creates — the slot supplies it. */
   createPattern?: Routine['recurrence_pattern']
   addLabel?: string
+  /** Where each routine shows, for its row's chips. */
+  explain?: (r: Routine) => RoutineExplanation
+  /** Overrides a row's when (the Off band says what Off means instead). */
+  whenFor?: (r: Routine) => string | null
 }) {
   if (routines.length === 0 && !onCreateInSlot) return null
 
@@ -79,7 +84,8 @@ export function CadenceBand({
               familyMembers={familyMembers}
               steps={stepCounts[r.id] ?? 0}
               dimmed={matches ? !matches(r) : false}
-              when={resting ? nextLabel(r, now, true) : undefined}
+              when={whenFor ? whenFor(r) : resting ? nextLabel(r, now, true) : undefined}
+              explanation={explain?.(r)}
               detail={resting ? undefined : nextLabel(r, now, false)}
               onOpen={onOpenRoutine}
             />

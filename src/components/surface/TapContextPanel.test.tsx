@@ -78,7 +78,9 @@ describe('TapContextPanel', () => {
       contacts={[contact]} projects={[]} events={[]} familyMembers={[]} siblingTaskCandidates={[]} allTasks={[task]}
       {...baseHandlers}
     />)
-    expect(screen.getByText('Dr. Smith')).toBeInTheDocument()
+    // Named in "What you'll need" (with Call) and in the People section.
+    expect(screen.getAllByText('Dr. Smith').length).toBeGreaterThan(0)
+    expect(screen.getByRole('link', { name: 'Call Dr. Smith' })).toHaveAttribute('href', 'tel:5550107')
     expect(screen.getAllByText(/555-0107/).length).toBeGreaterThan(0)
   })
 
@@ -160,7 +162,7 @@ describe('TapContextPanel', () => {
       contacts={[]} projects={[]} events={[]} familyMembers={[]} siblingTaskCandidates={[]} allTasks={[task]}
       {...baseHandlers}
     />)
-    expect(screen.getByText('Sub one')).toBeInTheDocument()
+    expect(screen.getAllByText('Sub one').length).toBeGreaterThan(0)
   })
 
   it('lets you change the task context', () => {
@@ -237,12 +239,12 @@ describe('TapContextPanel', () => {
     expect(screen.queryByText(/^Photos & files$/i)).not.toBeInTheDocument()
     expect(screen.queryByText(/add a subtask/i)).not.toBeInTheDocument()
 
-    // Every one of them is still one tap away.
-    expect(screen.getByRole('button', { name: 'Location' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Notes' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Photo' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Subtask' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Link' })).toBeInTheDocument()
+    // Every one of them is still one tap away, from "What you'll need".
+    for (const name of ['+ Place', '+ Note', '+ File', '+ Supplies or steps', '+ Link', '+ Contact']) {
+      expect(screen.getByRole('button', { name })).toBeInTheDocument()
+    }
+    // The bottom Add row keeps only how to reach someone.
+    expect(screen.queryByRole('button', { name: 'Notes' })).not.toBeInTheDocument()
   })
 
   it('reveals a field when its Add chip is clicked, and drops the chip', async () => {
@@ -253,9 +255,9 @@ describe('TapContextPanel', () => {
       contacts={[]} projects={[]} events={[]} familyMembers={[]} siblingTaskCandidates={[]} allTasks={[task]}
       {...baseHandlers}
     />)
-    await user.click(screen.getByRole('button', { name: 'Notes' }))
+    await user.click(screen.getByRole('button', { name: '+ Note' }))
     expect(await screen.findByText(/add notes/i)).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Notes' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: '+ Note' })).not.toBeInTheDocument()
   })
 
   it('shows a field as a real section, and no chip, when it already has content', () => {
@@ -265,8 +267,8 @@ describe('TapContextPanel', () => {
       contacts={[]} projects={[]} events={[]} familyMembers={[]} siblingTaskCandidates={[]} allTasks={[task]}
       {...baseHandlers}
     />)
-    expect(screen.getByText(/measurements are 30x40/i)).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Notes' })).not.toBeInTheDocument()
+    expect(screen.getAllByText(/measurements are 30x40/i).length).toBeGreaterThan(0)
+    expect(screen.queryByRole('button', { name: '+ Note' })).not.toBeInTheDocument()
   })
 
   // ── Phone and email: how to reach whoever the task requires ───────────────
@@ -289,9 +291,11 @@ describe('TapContextPanel', () => {
       contacts={[]} projects={[]} events={[]} familyMembers={[]} siblingTaskCandidates={[]} allTasks={[task]}
       {...baseHandlers}
     />)
-    // The action bar owns the call button; the Phone section is the editor, so
-    // the number appears there as text rather than as a second tel: link.
-    expect(document.querySelectorAll('a[href^="tel:"]')).toHaveLength(1)
+    // The action bar and "What you'll need" carry the call; the Phone section
+    // is the editor, so the number appears there as text, not another tel: link.
+    const editor = screen.getByRole('button', { name: 'Remove phone' }).closest('section')!
+    expect(editor.querySelector('a[href^="tel:"]')).toBeNull()
+    expect(screen.getByRole('link', { name: 'Call (413) 555-0142' })).toHaveAttribute('href', 'tel:4135550142')
     expect(screen.getAllByText('(413) 555-0142').length).toBeGreaterThan(0)
     expect(screen.queryByRole('button', { name: 'Phone' })).not.toBeInTheDocument()
   })
@@ -321,5 +325,22 @@ describe('TapContextPanel', () => {
     await user.type(screen.getByLabelText('Phone'), '413-555-0142')
     await user.tab()
     expect(onPhoneChange).toHaveBeenCalledWith('413-555-0142')
+  })
+
+  // ── Prepared to act: "What you'll need" ──────────────────────────────────
+
+  it('leads the details with what you will need, and reads the plan above without copying it', () => {
+    const milestone = createMockTask({ id: 'm1', title: 'Classroom ready', links: [{ url: 'https://supplies.test', title: 'Supply list' }] })
+    const task = createMockTask({ id: 'w1', title: 'Shop for class supplies', sourceId: 'm1' })
+    render(<TapContextPanel
+      task={task}
+      contacts={[]} projects={[]} events={[]} familyMembers={[]} siblingTaskCandidates={[]} allTasks={[task, milestone]}
+      {...baseHandlers}
+    />)
+    const prep = screen.getByRole('region', { name: 'What you’ll need' })
+    expect(prep).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Open Supply list' })).toHaveAttribute('href', 'https://supplies.test')
+    expect(screen.getByRole('group', { name: 'From Classroom ready' })).toBeInTheDocument()
+    expect(task.links ?? []).toHaveLength(0)
   })
 })

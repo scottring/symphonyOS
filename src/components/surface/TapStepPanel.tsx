@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Link2Off, Trash2 } from 'lucide-react'
 import type { Routine, RecurrencePattern, TargetUnit } from '@/types/actionable'
 import { WEEKDAY_KEYS } from '@/lib/routineUtils'
@@ -7,10 +7,16 @@ import { PanelNotes } from './sections/PanelNotes'
 import { PanelAttachments } from './sections/PanelAttachments'
 import { DosePills } from './sections/DosePills'
 import { TargetSection } from './sections/TargetSection'
+import { explainRoutine } from '@/lib/routines/explain'
+import { WhereItShows } from '@/components/routine/WhereItShows'
+import { useRoutineExplainLens } from '@/components/routine/useRoutineExplainLens'
 
 interface TapStepPanelProps {
   step: Routine
   parentName: string
+  /** The collection this step belongs to — when given, "Where it shows"
+   *  explains the step through it (a step rides its routine). */
+  parent?: Routine
   onClose: () => void
   onRename: (name: string) => void
   onDosesChange: (times: string[]) => void
@@ -35,6 +41,13 @@ export function TapStepPanel(props: TapStepPanelProps) {
   const [overridden, setOverridden] = useState(initOverridden)
   const [days, setDays] = useState<string[]>(initOverridden ? rp!.days! : [])
 
+  const lens = useRoutineExplainLens()
+  const dayKey = new Date().toDateString()
+  const explanation = useMemo(
+    () => props.parent ? explainRoutine(step, { date: new Date(dayKey), prefs: lens.prefs, member: lens.member, parent: props.parent }) : null,
+    [step, props.parent, dayKey, lens],
+  )
+
   return (
     <article className="bg-bg-elevated rounded-2xl p-5 max-w-md w-full">
       <PanelHeader title={step.name} onTitleChange={props.onRename} onClose={props.onClose} />
@@ -42,6 +55,8 @@ export function TapStepPanel(props: TapStepPanelProps) {
       <p className="text-xs text-neutral-500 mb-4">
         Context and people are <span className="font-medium">inherited from {parentName}</span>.
       </p>
+
+      {explanation && <div className="mb-4"><WhereItShows explanation={explanation} /></div>}
 
       {props.onTimeChange && (
         <section className="pb-4 mb-4 border-b border-neutral-200">

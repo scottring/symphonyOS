@@ -32,6 +32,9 @@ export interface WallTodayRow {
   past: boolean
   /** Starting within the next 45 minutes, or under way. */
   now: boolean
+  /** Epoch ms of the start / end (the kiosk's lanes and NEXT slot). */
+  startsAt?: number
+  endsAt?: number
 }
 
 /**
@@ -81,6 +84,8 @@ export function wallTodayRows(items: Record<string, TimelineItem[]>, members: Fa
       owners,
       past: endsAt <= now.getTime(),
       now: start.getTime() <= now.getTime() + 45 * 60_000 && endsAt > now.getTime(),
+      startsAt: start.getTime(),
+      endsAt,
     })
   }
   return rows.sort((a, b) => a.at - b.at).map(({ at: _at, ...r }) => r)

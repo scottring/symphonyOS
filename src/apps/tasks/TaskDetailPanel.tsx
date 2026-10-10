@@ -50,6 +50,7 @@ import { isEventFree, freeKeyFor, seriesKey } from '@/lib/today/eventFree';
 import { useEventDiscussionFlags } from '@/hooks/useEventDiscussionFlags';
 import { useActionableInstances } from '@/hooks/useActionableInstances';
 import { useRoutines } from '@/hooks/useRoutines';
+import { useGoals } from '@/hooks/useGoals';
 import { useFamilyMembers } from '@/hooks/useFamilyMembers';
 import { useListsContext } from '@/contexts/ListsContext';
 import { useSendTaskToBuy } from '@/hooks/useSendTaskToBuy';
@@ -222,6 +223,8 @@ function TaskPanelBody({ id }: { id: string }) {
   const { members: familyMembers } = useFamilyMembers();
   const pinnedItems = usePinnedItems();
   const { seasons } = useHouseholdSeasons();
+  // Yearly intentions, so What you'll need can show resources from the top of the plan.
+  const { goals } = useGoals();
 
   // Iris's rule: any process on an Unsorted item has to involve giving it a
   // domain — this panel is the other global mutation surface besides
@@ -257,6 +260,7 @@ function TaskPanelBody({ id }: { id: string }) {
   return (
     <TapContextPanel
       task={task}
+      goals={goals}
       contacts={contacts}
       projects={projects}
       events={eventsWithMeals}

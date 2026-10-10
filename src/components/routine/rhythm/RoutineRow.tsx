@@ -17,6 +17,9 @@ import { describeRecurrence } from '@/lib/quickRecurrence'
 import { memberIdsOf } from './rhythmModel'
 import { LIST_ROW, LIST_ROW_BODY, LIST_ROW_LANE, LIST_ROW_META, LIST_ROW_TRAIL } from '@/components/layout/listRow'
 import { hasMonthlyPosition, describeMonthlyPosition } from '@/lib/cadence/monthlyPosition'
+import type { RoutineExplanation } from '@/lib/routines/explain'
+import { useArrived } from '@/contexts/CanvasActivityContext'
+import { ShowsOnChips } from '../WhereItShows'
 
 const DAY_KEYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'] as const
 const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
@@ -108,7 +111,7 @@ function laneAndMeta(routine: Routine, override: string | null | undefined): { l
   return { lane: null, when: whenLabel(routine) }
 }
 
-export function RoutineRow({ routine, familyMembers, steps = 0, dimmed = false, when, detail, onOpen }: {
+export function RoutineRow({ routine, familyMembers, steps = 0, dimmed = false, when, detail, explanation, onOpen }: {
   routine: Routine
   familyMembers: FamilyMember[]
   steps?: number
@@ -119,9 +122,14 @@ export function RoutineRow({ routine, familyMembers, steps = 0, dimmed = false, 
   when?: string | null
   /** An extra line under the name when expanded. */
   detail?: string | null
+  /** Where it shows (Today · Week · Kiosk) — drawn as compact chips that open
+   *  the routine, whose panel says why. */
+  explanation?: RoutineExplanation
   onOpen: (r: Routine) => void
 }) {
   const [expanded, setExpanded] = useState(false)
+  // Flash when a conversation turn or a command just made or changed it.
+  const arrived = useArrived(routine.id)
   const { lane, when: whenText } = laneAndMeta(routine, when)
   // Hidden from Today and planning in its panel: this page is where it can
   // be found again (Scott, 2026-10-03).
@@ -135,7 +143,7 @@ export function RoutineRow({ routine, familyMembers, steps = 0, dimmed = false, 
   // trailing. The when/who used to sit in fixed 160/112px columns that
   // vanished on a phone; under the title they read at every width.
   return (
-    <li className={`${LIST_ROW} items-start! ${dimmed ? 'opacity-40' : ''}`}>
+    <li className={`${LIST_ROW} items-start! ${dimmed ? 'opacity-40' : ''}${arrived ? ' canvas-arrived' : ''}`} data-routine-id={routine.id}>
       <span className={`${LIST_ROW_LANE} whitespace-nowrap pt-[3px]`}>{lane}</span>
 
       <div className={LIST_ROW_BODY}>
@@ -160,6 +168,8 @@ export function RoutineRow({ routine, familyMembers, steps = 0, dimmed = false, 
             )}
           </p>
         )}
+
+        {explanation && <ShowsOnChips routine={routine} explanation={explanation} onOpen={onOpen} />}
 
         {expanded && (
           <div className="mt-1 text-[12px] leading-snug text-neutral-500">

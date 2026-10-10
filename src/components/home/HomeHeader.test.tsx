@@ -43,14 +43,14 @@ describe('HomeHeader week range', () => {
   // that many; a preset or a custom start/end changes the VIEW, never a bucket.
   it('names a full week and steps by seven', () => {
     const { onWeekChange } = renderWeek()
-    expect(screen.getAllByText('Sep 6 – Sep 12').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('Sep 6 – 12').length).toBeGreaterThan(0)
     fireEvent.click(screen.getByLabelText('Next week'))
     expect(ymd(onWeekChange.mock.calls[0][0])).toBe('2026-9-13')
   })
 
   it('names a two-day range and steps by two', () => {
     const { onWeekChange } = renderWeek({ weekStart: new Date(2026, 8, 12), rangeDays: 2 })
-    expect(screen.getAllByText('Sep 12 – Sep 13').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('Sep 12 – 13').length).toBeGreaterThan(0)
     fireEvent.click(screen.getByLabelText('Later'))
     expect(ymd(onWeekChange.mock.calls[0][0])).toBe('2026-9-14')
   })
@@ -133,7 +133,7 @@ describe('HomeHeader week masthead card', () => {
   it('is the same card Today wears, with the week named in the eyebrow and the range as the title', () => {
     renderWeek()
     const card = screen.getByTestId('masthead-card')
-    expect(within(card).getByRole('heading', { level: 1, name: 'Sep 6 – Sep 12' })).toBeInTheDocument()
+    expect(within(card).getByRole('heading', { level: 1, name: 'Sep 6 – 12' })).toBeInTheDocument()
     expect(within(screen.getByTestId('masthead-eyebrow')).getByText('Week')).toBeInTheDocument()
   })
   it('names a shorter range by its length', () => {
@@ -184,8 +184,8 @@ describe('HomeHeader — Journal | Schedule sits by the dates', () => {
     const onWeekModeChange = vi.fn()
     renderWeek({ weekMode: 'journal', onWeekModeChange })
     const aside = screen.getByTestId('masthead-aside')
-    expect(within(aside).getByRole('radio', { name: 'Journal' })).toHaveAttribute('aria-checked', 'true')
-    fireEvent.click(within(aside).getByRole('radio', { name: 'Schedule' }))
+    expect(within(aside).getByRole('radio', { name: 'Days' })).toHaveAttribute('aria-checked', 'true')
+    fireEvent.click(within(aside).getByRole('radio', { name: 'Hours' }))
     expect(onWeekModeChange).toHaveBeenCalledWith('schedule')
     localStorage.removeItem('symphony-plan-v2')
   })
@@ -199,7 +199,7 @@ describe('HomeHeader — Journal | Schedule sits by the dates', () => {
     renderWeek({ weekMode: 'journal', onWeekModeChange })
     expect(screen.queryByTestId('masthead-aside')).toBeNull()
     const card = screen.getByTestId('masthead-card')
-    fireEvent.click(within(card).getByRole('radio', { name: 'Schedule' }))
+    fireEvent.click(within(card).getByRole('radio', { name: 'Hours' }))
     expect(onWeekModeChange).toHaveBeenCalledWith('schedule')
   })
 })

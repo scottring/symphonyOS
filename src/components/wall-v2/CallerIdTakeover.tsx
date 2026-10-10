@@ -5,7 +5,7 @@
 // outbound shows "Calling {name}…". Blocked calls are never published upstream,
 // so they never reach here. lucide-react icons only — no emoji (wall-v2 rule).
 
-import { PhoneIncoming, PhoneOff, PhoneOutgoing } from 'lucide-react';
+import { PhoneIncoming, PhoneOutgoing, X } from 'lucide-react';
 import { useCurrentCall, type CurrentCall } from '@/hooks/useCurrentCall';
 
 /** Direction-aware headline. Exported for unit testing. */
@@ -57,13 +57,15 @@ export function CallerIdTakeover() {
           <p className="font-body text-2xl text-white/70">{call.number}</p>
         )}
 
+        {/* The wall cannot hang up (place-call has no hang-up), so the button
+            says what it does: it clears this screen, on this wall, only. */}
+        <p className="font-body text-xl text-white/75">The call continues on the handset — put the phone down to end it.</p>
         <button
           type="button"
           onClick={dismiss}
-          aria-label="Hang up"
-          className="mt-4 flex items-center gap-3 rounded-full bg-red-500/90 px-8 py-4 text-xl font-bold text-white shadow-xl hover:bg-red-500 transition-colors"
+          className="mt-2 flex min-h-[80px] items-center gap-3 rounded-full bg-white/15 px-8 py-4 text-xl font-bold text-white shadow-xl hover:bg-white/25 transition-colors"
         >
-          <PhoneOff className="h-6 w-6" aria-hidden="true" /> Hang up
+          <X className="h-6 w-6" aria-hidden="true" /> Close this screen
         </button>
       </div>
     </div>

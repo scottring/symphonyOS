@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { fireEvent, render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, within } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import type { ReactNode } from 'react'
 import { DomainProvider } from '@/hooks/useDomain'
@@ -59,6 +59,7 @@ vi.mock('@/hooks/useSupabaseTasks', () => ({ useSupabaseTasks: () => ({
   tasks: [], loading: false, updateTask: vi.fn(), updateTasksBulk: vi.fn(), pushTask: vi.fn(), toggleTask: vi.fn(),
 }) }))
 vi.mock('@/hooks/useScratchpadHidden', () => ({ useScratchpadHidden: () => ({ hidden: true }) }))
+vi.mock('@/hooks/useRoutines', () => ({ useRoutines: () => ({ routines: [], deleteRoutine: vi.fn(), updateRoutine: vi.fn(), refetch: vi.fn(), addRoutine: vi.fn() }) }))
 vi.mock('@/hooks/useSymphonyAssistant', () => ({
   useSymphonyAssistant: () => ({
     messages: [], loading: false, error: null, sendMessage: vi.fn(), resetSession: vi.fn(),
@@ -164,21 +165,19 @@ describe('References and the side panels', () => {
 })
 
 describe('Phone execution chrome', () => {
-  it('opens Plan directly on a phone and keeps every period within Plan', () => {
+  it('carries Today, Week and Plan in the phone dock, with the current one marked', () => {
     mobileState.isMobile = true
     localStorage.removeItem('symphony-plan-period')
     renderAt('/today')
-    fireEvent.click(screen.getByRole('button', { name: 'Planner' }))
-    expect(screen.getByRole('button', { name: 'Planner' })).toHaveAttribute('aria-current', 'page')
-    // One horizon at a time, switched from the title menu (native PlannerView).
-    for (const label of ['Week', 'Plan']) {
-      fireEvent.click(screen.getByRole('button', { name: /Switch horizon/ }))
-      fireEvent.click(screen.getByRole('menuitemradio', { name: new RegExp(`^${label}`) }))
-      expect(screen.getByRole('button', { name: `${label}. Switch horizon` })).toBeInTheDocument()
-    }
-    fireEvent.click(screen.getByRole('button', { name: /Switch horizon/ }))
-    fireEvent.click(screen.getByRole('menuitemradio', { name: /^Today/ }))
-    fireEvent.click(screen.getByRole('button', { name: 'Planner' }))
+    const nav = screen.getByRole('navigation', { name: 'Main' })
+    expect(within(nav).getByRole('button', { name: 'Today' })).toHaveAttribute('aria-current', 'page')
+    fireEvent.click(within(nav).getByRole('button', { name: 'Week' }))
+    expect(screen.getByRole('button', { name: 'Week. Switch horizon' })).toBeInTheDocument()
+    expect(within(nav).getByRole('button', { name: 'Week' })).toHaveAttribute('aria-current', 'page')
+    fireEvent.click(within(nav).getByRole('button', { name: 'Plan' }))
+    expect(screen.getByRole('button', { name: 'Plan. Switch horizon' })).toBeInTheDocument()
+    expect(within(nav).getByRole('button', { name: 'Plan' })).toHaveAttribute('aria-current', 'page')
+    fireEvent.click(within(nav).getByRole('button', { name: 'Today' }))
     expect(screen.getByRole('button', { name: 'Today. Switch horizon' })).toBeInTheDocument()
   })
 
@@ -189,9 +188,7 @@ describe('Phone execution chrome', () => {
     expect(screen.queryByRole('complementary', { name: 'Pinned reference lists' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Pin month list' })).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Today. Switch horizon' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /^Inbox/ })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'More' })).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Week' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^More/ })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Month' })).not.toBeInTheDocument()
     sessionStorage.clear(); localStorage.removeItem('symphony-plan-period')
   })
@@ -390,7 +387,7 @@ describe('Grouped More menu and desktop capture', () => {
     expect(screen.getByTestId('quick-capture')).toHaveAttribute('data-fab', 'false')
     const nav = screen.getByRole('navigation', { name: 'Main' })
     expect([...nav.querySelectorAll('button')].map((b) => b.textContent || b.getAttribute('aria-label')))
-      .toEqual(['Planner', 'Inbox', 'Add', 'Routines', 'More'])
+      .toEqual(['Today', 'Week', 'Add', 'Plan', 'More'])
     fireEvent.click(screen.getByRole('button', { name: 'Add' }))
     expect(screen.getByTestId('quick-capture')).toHaveAttribute('data-open', 'true')
   })

@@ -81,10 +81,12 @@ describe('CallerIdTakeover', () => {
     expect(screen.getByText('G')).toBeInTheDocument()
   })
 
-  it('hang up calls dismiss so a stuck takeover can always be cleared', () => {
+  it('"Close this screen" calls dismiss so a stuck takeover can always be cleared — and never claims to hang up', () => {
     mockUseCurrentCall.mockReturnValue(mockResult({}))
     render(<CallerIdTakeover />)
-    fireEvent.click(screen.getByRole('button', { name: /hang up/i }))
+    expect(screen.queryByRole('button', { name: /hang up/i })).toBeNull()
+    expect(screen.getByText(/continues on the handset/)).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /close this screen/i }))
     expect(mockDismiss).toHaveBeenCalledTimes(1)
   })
 })

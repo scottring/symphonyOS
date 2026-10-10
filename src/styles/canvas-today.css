@@ -1,0 +1,270 @@
+/* src/styles/canvas-today.css — conversational canvas: today slice. Existing theme tokens only.
+ *
+ * The compact week list (components/canvas/week/CompactWeekList) beside the
+ * day — in Today's classic column and the connected workspace's aside — and
+ * the Week page's density pass. Built on canvas.css's item/group forms. */
+
+/* ---- The compact week list ------------------------------------------- */
+.cw-list { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
+.cw-rows { list-style: none; margin: 0; padding: 0; }
+.cw-group { padding: 6px 10px 4px; }
+.cw-group .canvas-group-head { font-size: 12px; padding-bottom: 4px; }
+.cw-group-title {
+  border: 0; background: none; padding: 0; text-align: left; font: inherit; color: inherit;
+  text-decoration: underline transparent; text-underline-offset: 3px;
+}
+.cw-group-title:hover { color: var(--color-neutral-900); text-decoration-color: currentColor; }
+
+.cw-row { font-size: 14px; gap: 6px; align-items: flex-start; padding-top: 3px; padding-bottom: 3px; }
+.cw-row[draggable="true"] { cursor: grab; }
+.cw-row > .canvas-item-title { padding-top: 4px; }
+.cw-title {
+  border: 0; background: none; padding: 0; margin: 0; text-align: left; font: inherit; color: inherit;
+  overflow-wrap: anywhere; border-radius: 3px;
+}
+.cw-title:hover { text-decoration: underline; text-underline-offset: 3px; }
+.cw-parent { color: var(--color-neutral-500); font-size: 12.5px; }
+.cw-context { display: block; font-size: 12px; line-height: 1.35; color: var(--color-neutral-500); }
+.cw-row.is-done .cw-title { color: var(--color-neutral-400); text-decoration: line-through; }
+.cw-row.is-on-today .cw-title { color: var(--color-neutral-600); }
+.cw-row .canvas-tag { margin-top: 6px; }
+.cw-row.is-read .cw-title { color: var(--color-neutral-700); }
+
+/* The check: a ring that shows its tick on hover/focus, filled when done. */
+.cw-check {
+  display: inline-grid; place-items: center; flex: none; width: 28px; height: 28px; margin: 0 -2px;
+  border: 0; background: none; border-radius: var(--radius-full);
+}
+.cw-check-ring {
+  display: inline-grid; place-items: center; width: 16px; height: 16px; border-radius: 50%;
+  border: 1.5px solid var(--color-neutral-400); color: transparent;
+  transition: border-color var(--transition-base), background-color var(--transition-base), color var(--transition-base);
+}
+.cw-check:hover .cw-check-ring, .cw-check:focus-visible .cw-check-ring, .cw-check.is-on .cw-check-ring {
+  border-color: var(--color-primary-600); background: var(--color-primary-600); color: #fff;
+}
+.cw-dash { flex: none; width: 10px; height: 1.5px; margin: 13px 9px 0; background: var(--color-neutral-300); }
+
+/* Add to the day: a small icon, visible at rest. */
+.cw-add { flex: none; width: 28px; height: 28px; color: var(--color-primary-700); border: 1px solid var(--color-primary-200); }
+.cw-add:hover { color: var(--color-primary-800); background: var(--color-primary-50); border-color: var(--color-primary-400); }
+.cw-add:disabled { opacity: .5; cursor: default; }
+.cw-add[aria-busy="true"] { opacity: 1; animation: canvas-pulse 1s ease-in-out infinite; }
+
+.cw-check:focus-visible, .cw-title:focus-visible, .cw-group-title:focus-visible, .cw-fold:focus-visible, .cw-done-toggle:focus-visible {
+  outline: 2px solid var(--color-primary-600); outline-offset: 2px;
+}
+
+.cw-done-toggle { align-self: flex-start; font-weight: 500; font-size: 12.5px; color: var(--color-neutral-600); }
+.cw-open { margin-top: 10px; padding-left: 0; }
+
+/* Routines today: one line that opens in place. */
+.cw-fold-wrap { margin-top: 14px; }
+.cw-fold {
+  display: inline-flex; align-items: center; gap: 4px; min-height: 32px; padding: 0; border: 0; background: none;
+  font-family: var(--font-family-sans); font-size: 13px; font-weight: 600; color: var(--color-neutral-700);
+}
+.cw-fold:hover { color: var(--color-neutral-900); }
+.cw-fold-icon { transition: transform var(--transition-base); }
+.cw-fold[aria-expanded="true"] .cw-fold-icon { transform: rotate(90deg); }
+
+/* The connected workspace's aside: the compact list, not cards. */
+.ad-week.cw-column .ad-week-hint { margin: 6px 0 4px; }
+.ad-week.cw-column .cw-list { margin-top: 10px; }
+.ad-layout aside.ad-week { padding: 20px 18px; }
+
+/* Phone: the list stacks below the day; every control is a full touch target. */
+@media (max-width: 767px) {
+  .cw-check, .cw-add { min-width: 44px; min-height: 44px; margin: -8px -6px; }
+  .cw-row > .canvas-item-title { padding-top: 5px; }
+  .cw-fold { min-height: 44px; }
+  .cw-done-toggle { min-height: 44px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cw-add[aria-busy="true"] { animation: none; }
+  .cw-fold-icon, .cw-check-ring { transition: none; }
+}
+
+/* ---- Week page density -------------------------------------------------- */
+/* The week's list grouped by month line (WeekListV2). */
+.pv2-wl .cw-wl-group { margin: 8px 0; }
+.pv2-wl .cw-wl-group .pv2-list { margin: 0; }
+.pv2-wl .cw-wl-group .canvas-group-head small { margin-left: auto; font-weight: 500; color: var(--color-neutral-500); }
+.pv2-wl .cw-wl-group .canvas-group-title { overflow-wrap: anywhere; }
+.pv2-wl .wk-row .wk-title { overflow-wrap: anywhere; }
+/* A day with nothing on it takes a line, not a block. */
+.wk-cell.is-empty { padding-bottom: 6px; }
+@container wk-days (max-width: 44rem) {
+  .wk-weekdays > .wk-cell.is-empty, .wk-weekend-cells > .wk-cell.is-empty { padding: 6px 0; }
+  .wk-cell.is-empty .wk-dayhead { min-height: 0; border-bottom: 0; margin-bottom: 0; padding-bottom: 0; }
+}
+
+/* ---- The week canvas (approved week composition, 2026-10-10) ----------- */
+/* Days | Hours: a small secondary segmented toggle beside "Plan the week". */
+.wc-seg { display: inline-flex; gap: 2px; padding: 3px; border-radius: var(--radius-lg); background: var(--color-neutral-100); }
+.wc-seg button {
+  min-height: 28px; padding: 0 12px; border: 0; border-radius: var(--radius-md); background: none;
+  font-family: var(--font-family-sans); font-size: 12.5px; font-weight: 600; color: var(--color-neutral-600);
+}
+.wc-seg button[aria-checked="true"] { background: var(--color-bg-elevated); color: var(--color-neutral-900); box-shadow: var(--shadow-sm); }
+.wc-seg button:focus-visible { outline: 2px solid var(--color-primary-600); outline-offset: 2px; }
+
+.wc { display: flex; flex-direction: column; gap: 28px; padding-bottom: 24px; }
+.wc-subtitle { font-family: var(--font-family-sans); font-size: 13px; color: var(--color-neutral-600); }
+.wc-subtitle.is-inline { margin: 0; }
+.wc-label { margin: 0; font-family: var(--font-family-display); font-size: 21px; font-weight: 500; line-height: 1.2; color: var(--color-neutral-900); }
+.wc-hint { margin: 0; font-family: var(--font-family-sans); font-size: 13px; color: var(--color-neutral-600); }
+
+/* Still to place: a masonry of milestone cards. */
+.wc-shelf { border-radius: var(--radius-xl); transition: background-color var(--transition-base); }
+.wc-shelf.is-over { background: var(--color-primary-50); outline: 2px dashed var(--color-primary-400); outline-offset: 6px; }
+.wc-shelf-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 14px; margin-bottom: 12px; }
+.wc-masonry { columns: 18rem; column-gap: 14px; }
+.wc-masonry > .wc-group { break-inside: avoid; display: inline-block; width: 100%; margin: 0 0 14px; }
+.wc-group-head { position: relative; align-items: center; }
+.wc-group-head .canvas-group-title { flex: 1; font-size: 13px; color: var(--color-neutral-800); }
+.wc-group.is-source { border-color: var(--color-primary-400); box-shadow: 0 0 0 2px var(--color-primary-100); }
+.wc-group.is-source .canvas-group-head { color: var(--color-primary-800); }
+.wc-routines .canvas-group-title { color: var(--color-primary-800); }
+.wc-group-foot { margin-top: 2px; }
+.wc-add { padding-left: 0; font-weight: 500; font-size: 12.5px; color: var(--color-neutral-600); text-decoration: none; }
+.wc-add:hover { color: var(--color-primary-700); text-decoration: underline; }
+.wc-composer input {
+  width: 100%; min-height: 32px; padding: 4px 8px; border: 1px solid var(--color-neutral-300); border-radius: var(--radius-md);
+  background: var(--color-bg-elevated); font-family: var(--font-family-sans); font-size: 13.5px; color: var(--color-neutral-900);
+}
+.wc-composer input:focus { outline: 2px solid var(--color-primary-500); outline-offset: 1px; }
+.cw-row.has-picker, .wc-dayrow { position: relative; }
+.cw-row.is-routine .cw-title { color: var(--color-primary-800); }
+
+/* ⋯ menus and the day picker float under their row. */
+.wc-more-wrap { position: relative; flex: none; display: inline-flex; }
+.wc-more { width: 26px; height: 26px; }
+.cw-menu, .cw-giveday:not(.is-inline) {
+  position: absolute; z-index: 40; right: 0; top: calc(100% + 4px);
+  background: var(--color-bg-elevated); border: 1px solid var(--color-neutral-200); border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg); padding: 6px;
+}
+.cw-menu { display: flex; flex-direction: column; min-width: 190px; }
+.cw-menu button {
+  text-align: left; padding: 7px 10px; border: 0; border-radius: var(--radius-md); background: none;
+  font-family: var(--font-family-sans); font-size: 13.5px; color: var(--color-neutral-800);
+}
+.cw-menu button:hover, .cw-menu button:focus-visible { background: var(--color-neutral-100); outline: none; }
+.cw-giveday:not(.is-inline) { width: max-content; max-width: min(320px, 90vw); }
+.cw-giveday-head { padding: 2px 4px 6px; font-family: var(--font-family-sans); font-size: 12px; font-weight: 600; color: var(--color-neutral-600); }
+.cw-giveday-days { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; }
+.cw-giveday.is-inline { flex-basis: 100%; width: 100%; margin: 6px 0 2px; }
+.cw-giveday.is-inline .cw-giveday-days { grid-template-columns: repeat(7, minmax(0, 1fr)); }
+.cw-daychip {
+  min-height: 32px; padding: 4px 8px; border: 1px solid var(--color-neutral-300); border-radius: var(--radius-md);
+  background: var(--color-bg-elevated); font-family: var(--font-family-sans); font-size: 12.5px; font-weight: 500; color: var(--color-neutral-800); white-space: nowrap;
+}
+.cw-daychip:hover:not(:disabled) { border-color: var(--color-primary-400); background: var(--color-primary-50); }
+.cw-daychip.is-today { border-color: var(--color-primary-500); color: var(--color-primary-800); }
+.cw-daychip[aria-pressed="true"] { background: var(--color-primary-100); border-color: var(--color-primary-500); }
+.cw-daychip:disabled { opacity: .45; cursor: default; }
+.cw-daychip:focus-visible { outline: 2px solid var(--color-primary-600); outline-offset: 1px; }
+.cw-row.has-picker { flex-wrap: wrap; }
+.cw-meta { align-self: center; }
+
+/* The days: seven equal columns in the household's week order. */
+.wc-days-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
+.wc-done { font-size: 12.5px; }
+.wc-spans { list-style: none; margin: 0 0 10px; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.wc-span, .wc-rhythm-item {
+  border: 0; background: none; padding: 0; text-align: left; font-family: var(--font-family-sans); font-size: 13px; color: var(--color-neutral-700);
+}
+.wc-span:hover, .wc-rhythm-item:hover { color: var(--color-neutral-950); text-decoration: underline; text-underline-offset: 3px; }
+.wc-span-when, .wc-rhythm-label, .wc-dinner-label { color: var(--color-neutral-500); }
+.wc-rhythm { margin: 0 0 10px; font-family: var(--font-family-sans); font-size: 13px; }
+.wc-rhythm p { margin: 0 0 2px; }
+.wc-strip { display: grid; grid-template-columns: repeat(var(--wc-days, 7), minmax(0, 1fr)); gap: 10px; align-items: start; }
+.wc-day {
+  min-width: 0; padding: 8px 10px 10px; border: 1px solid var(--color-neutral-200); border-radius: var(--radius-lg);
+  background: var(--color-bg-elevated); transition: border-color var(--transition-base), background-color var(--transition-base);
+}
+.wc-day.is-today { border-color: var(--color-primary-300); box-shadow: inset 0 3px 0 var(--color-primary-600); }
+.wc-day.is-empty { padding-bottom: 6px; }
+.wc-day.is-over { border: 1.5px dashed var(--color-primary-500); background: var(--color-primary-50); }
+.wc-dayhead { display: flex; align-items: baseline; gap: 6px; padding-bottom: 6px; margin-bottom: 6px; border-bottom: 1px solid var(--color-neutral-100); }
+.wc-day.is-empty .wc-dayhead { border-bottom: 0; margin-bottom: 0; padding-bottom: 0; }
+.wc-dayname { font-family: var(--font-family-sans); font-size: 11.5px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--color-neutral-600); }
+.wc-daynum { font-family: var(--font-family-display); font-size: 22px; line-height: 1; color: var(--color-neutral-900); }
+.wc-day.is-today .wc-dayname, .wc-day.is-today .wc-daynum { color: var(--color-primary-700); }
+.wc-drop-hint { margin: 0 0 6px; font-family: var(--font-family-sans); font-size: 12px; font-weight: 600; color: var(--color-primary-800); }
+.wc-events { list-style: none; margin: 0 0 6px; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.wc-event {
+  display: flex; gap: 6px; width: 100%; padding: 4px 8px; border: 0; border-radius: var(--radius-md); text-align: left;
+  background: var(--color-primary-100); color: var(--color-primary-900);
+  font-family: var(--font-family-sans); font-size: 12.5px; line-height: 1.3;
+}
+.wc-event:hover { background: var(--color-primary-200); }
+.wc-event:focus-visible, .wc-span:focus-visible, .wc-rhythm-item:focus-visible, .wc-daychip:focus-visible { outline: 2px solid var(--color-primary-600); outline-offset: 2px; }
+.wc-event-time { flex: none; font-weight: 600; }
+.wc-event-title { min-width: 0; overflow-wrap: anywhere; }
+.wc-event-sub { display: block; font-size: 11.5px; opacity: .8; }
+.wc-items .cw-row { font-size: 13px; border-color: var(--color-neutral-200); margin: 3px 0; padding-left: 2px; }
+.wc-items .cw-row.is-routine { border-style: dashed; }
+.wc-dinner { margin: 6px 0 0; font-family: var(--font-family-sans); font-size: 12px; }
+.wc-sometime { margin-top: 8px; padding-top: 6px; border-top: 1px dashed var(--color-neutral-200); }
+.wc-sometime-label { font-family: var(--font-family-sans); font-size: 11.5px; font-weight: 600; color: var(--color-neutral-500); }
+.wc.is-dragging .wc-day:not(.is-over) { border-style: dashed; }
+
+/* Narrower desks: the days wrap rather than crush (four across). */
+@media (min-width: 768px) and (max-width: 1100px) {
+  .wc-strip { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+
+/* Phone: day chips, the chosen day, then the shelf in one column. */
+.wc-phone { display: flex; flex-direction: column; gap: 14px; padding-bottom: 24px; }
+.wc-daychips { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; }
+.wc-daychip {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 48px; padding: 4px 0;
+  border: 1px solid var(--color-neutral-200); border-radius: var(--radius-lg); background: var(--color-bg-elevated);
+  font-family: var(--font-family-sans); color: var(--color-neutral-700);
+}
+.wc-daychip-name { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; }
+.wc-daychip-num { font-family: var(--font-family-display); font-size: 18px; line-height: 1.1; }
+.wc-daychip.is-today { background: var(--color-primary-700); border-color: var(--color-primary-700); color: #fff; }
+.wc-daychip[aria-pressed="true"]:not(.is-today) { border-color: var(--color-primary-500); box-shadow: 0 0 0 2px var(--color-primary-100); }
+.wc-daychip.is-today[aria-pressed="true"] { box-shadow: 0 0 0 2px var(--color-primary-200); }
+.wc-done-row { display: flex; justify-content: flex-end; }
+@media (max-width: 767px) {
+  .wc-masonry { columns: 1; }
+  .wc-group-head { position: sticky; top: 0; z-index: 2; background: var(--color-bg-elevated); }
+  .wc-more, .cw-daychip { min-width: 44px; min-height: 44px; }
+  .wc-add, .wc-done { min-height: 44px; }
+  .cw-giveday.is-inline .cw-giveday-days { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .wc-shelf, .wc-day { transition: none; }
+}
+
+/* Follow-up 2026-10-10: restored functions, inside the approved structure. */
+.wc-quiet-line { margin: 0 0 10px; font-family: var(--font-family-sans); font-size: 13px; color: var(--color-neutral-600); }
+.wc-quiet-link { padding: 0 2px; font-size: 13px; font-weight: 500; }
+.wc-weather { margin-left: auto; display: inline-flex; align-items: center; color: var(--color-neutral-500); }
+.wc-weather > [role="img"] { margin-top: 0; }
+.wc-composer { display: flex; align-items: center; gap: 6px; }
+.wc-composer input { flex: 1; min-width: 0; }
+.wc-composer-area { flex: none; display: inline-flex; }
+.cw-menu button[aria-checked="true"] { font-weight: 600; color: var(--color-primary-800); }
+.cw-menu button[aria-checked="true"]::before { content: '✓ '; }
+.cw-menu-none { margin: 4px 10px; font-family: var(--font-family-sans); font-size: 12.5px; color: var(--color-neutral-500); }
+.cw-row .plan-move { position: static; }
+.cw-row .plan-move-menu { left: auto; right: 0; }
+@media (max-width: 767px) {
+  .wc-quiet-link { min-height: 44px; }
+  .cw-menu button { min-height: 44px; }
+}
+
+/* Row anatomy: the title takes the width; parent and notes share one muted,
+   non-wrapping line beneath it (full text stays in the title attribute/details). */
+.cw-sub { display: flex; gap: 6px; min-width: 0; font-size: 12px; line-height: 1.35; color: var(--color-neutral-500); white-space: nowrap; overflow: hidden; }
+.cw-sub > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; flex: 0 1 auto; }
+.cw-sub > .cw-parent { flex: 1 1 auto; font-size: 12px; }
+.cw-sub > .cw-meta, .cw-sub > .cw-context { flex: none; display: inline; }
+.cw-sub > span + span::before { content: '·'; margin-right: 6px; color: var(--color-neutral-400); }
+.cw-row > .canvas-item-title { display: flex; flex-direction: column; min-width: 0; }

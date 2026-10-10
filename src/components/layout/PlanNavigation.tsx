@@ -80,7 +80,7 @@ function HorizonSwitcher({ period }: { period: typeof PERIODS[number] }) {
       <button type="button" className="horizon-switcher-scrim" aria-label="Close" onClick={() => setOpen(false)} />
       <div role="menu" aria-label="Planning horizon" className="horizon-switcher-menu">
         {RAIL_ORDER.map(value => <button key={value} type="button" role="menuitemradio" aria-checked={period === value || (value === 'month' && (period === 'season' || period === 'year'))}
-          onClick={() => { setOpen(false); navigate(connectedDestination(`/${value}`, search)) }}>
+          onClick={() => { setOpen(false); if (value === 'month' && isPlanPeriod(period)) return; navigate(connectedDestination(`/${value}`, search)) }}>
           <span><strong>{HORIZON_NAMES[value]}</strong><small>{horizonSubtitle(value, now)}</small></span>
           {(period === value || (value === 'month' && (period === 'season' || period === 'year'))) && <Check aria-hidden="true" />}
         </button>)}
@@ -101,8 +101,19 @@ function railTitle(value: typeof RAIL_ORDER[number], step: { n: string; label: s
 }
 
 /** Desktop and phone share Today, Week and the connected Plan map. */
+/** On Plan, the Plan link is "you are here": the horizon and period on screen,
+ *  without a narrowed focus. Elsewhere it opens Month for the period shown. */
+function planHere(pathname: string, search: string): string {
+  const params = new URLSearchParams(search)
+  params.delete('focus')
+  const query = params.toString()
+  return connectedDestination(query ? `${pathname}?${query}` : pathname, search)
+}
+
+const isPlanPeriod = (period?: typeof PERIODS[number]) => period === 'year' || period === 'season' || period === 'month'
+
 function HorizonRail({ period }: { period?: typeof PERIODS[number] }) {
-  const { search } = useLocation()
+  const { pathname, search } = useLocation()
   // The rail wears the period being SHOWN, big to small — October's page
   // says "10 October" and its week, not the clock's September. Today is
   // always today.
@@ -118,7 +129,7 @@ function HorizonRail({ period }: { period?: typeof PERIODS[number] }) {
   return <nav aria-label="Planning period" className="horizon-rail">
     {RAIL_ORDER.map((value, k) => <span key={value} className="horizon-rail-step">
       {k > 0 && <span className="horizon-rail-join" aria-hidden="true" />}
-      <NavLink to={connectedDestination(steps[value === 'month' && (period === 'year' || period === 'season') ? period : value].to, search)} aria-current={(period === value || (value === 'month' && (period === 'season' || period === 'year'))) ? 'page' : undefined} className={(period === value || (value === 'month' && (period === 'season' || period === 'year'))) ? 'is-current' : ''}
+      <NavLink to={value === 'month' && isPlanPeriod(period) ? planHere(pathname, search) : connectedDestination(steps[value].to, search)} aria-current={(period === value || (value === 'month' && isPlanPeriod(period))) ? 'page' : undefined} className={(period === value || (value === 'month' && isPlanPeriod(period))) ? 'is-current' : ''}
         aria-label={HORIZON_NAMES[value]} title={railTitle(value, steps[value])}>
         <span className="horizon-rail-l">{HORIZON_NAMES[value]}</span>
       </NavLink>

@@ -5,8 +5,8 @@ import { useLocation, useNavigate } from 'react-router-dom'
 // desktop More menu (moreDestinations.ts), plus Settings, which desktop keeps
 // in its account menu.
 import {
-  Archive, BookOpen, Compass, FileText, History, Home, ListChecks, MessageCircle, Printer,
-  Settings, Sparkles, StickyNote, UtensilsCrossed, Users,
+  Archive, BookOpen, Compass, FileText, History, Home, Inbox, ListChecks, MessageCircle, Printer,
+  Repeat, Settings, Sparkles, StickyNote, UtensilsCrossed, Users,
 } from 'lucide-react'
 import { MORE_GROUPS, isDestinationActive } from './moreDestinations'
 
@@ -17,6 +17,8 @@ interface MoreSheetProps {
   discussionsUnread?: number
   /** Open the assistant (phones have no AI pane beside the page). */
   onAskSymphony?: () => void
+  /** Unprocessed captures — shown as the badge on Inbox. */
+  inboxCount?: number
 }
 
 const ICONS: Record<string, ComponentType<{ className?: string }>> = {
@@ -33,15 +35,22 @@ const ICONS: Record<string, ComponentType<{ className?: string }>> = {
   'Plan with guidance': Compass,
   'Planning guide': Printer,
   Settings,
+  Inbox,
+  Routines: Repeat,
 }
 
-// The phone dock already carries Routines; only the desktop's More needs it.
-const GROUPS = MORE_GROUPS.map(([group, items]) => [
-  group,
-  group === 'Reference' ? [...items, { label: 'Settings', route: '/settings' }] : items.filter((i) => i.route !== '/routines'),
-] as const)
+// The phone dock carries the three destinations (Today, Week, Plan); Inbox
+// and Routines lead the sheet so they stay one tap from the dock's More.
+const EVERYDAY = [{ label: 'Inbox', route: '/inbox' }, { label: 'Routines', route: '/routines' }]
+const GROUPS = [
+  ['Everyday', EVERYDAY] as const,
+  ...MORE_GROUPS.map(([group, items]) => [
+    group,
+    (group === 'Reference' ? [...items, { label: 'Settings', route: '/settings' }] : [...items]).filter((i) => !EVERYDAY.some((e) => e.route === i.route)),
+  ] as const),
+]
 
-export function MoreSheet({ isOpen, onClose, discussionsUnread, onAskSymphony }: MoreSheetProps) {
+export function MoreSheet({ isOpen, onClose, discussionsUnread, onAskSymphony, inboxCount }: MoreSheetProps) {
   const navigate = useNavigate()
   const { pathname } = useLocation()
   const sheet = useRef<HTMLDivElement>(null)
@@ -111,7 +120,7 @@ export function MoreSheet({ isOpen, onClose, discussionsUnread, onAskSymphony }:
               {items.map(({ label, route }) => {
                 const Icon = ICONS[label] ?? Compass
                 const active = isDestinationActive(route, pathname)
-                const badge = label === 'Discussions' ? discussionsUnread : undefined
+                const badge = label === 'Discussions' ? discussionsUnread : label === 'Inbox' ? inboxCount : undefined
                 return (
                   <button
                     key={route}

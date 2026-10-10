@@ -22,6 +22,7 @@ import { WeekRow } from './WeekRow'
 import { MonthLink } from './MonthLink'
 import { useSafeAdd } from './useSafeAdd'
 import { anOrA } from '@/lib/week/monthLinks'
+import { groupByParent } from '@/components/canvas/week/compactWeek'
 
 export function WeekListV2({ title, lines, weekStart, members, actions, timingControl, onContext, onAdd, dragEnabled = true, headerAction, addPicker, emptyHint, focusAdd = false, hint, forLine, forOptions, onForLine, forId: forIdProp, onForId, inputRef, footer }: {
   title: string
@@ -88,32 +89,54 @@ export function WeekListV2({ title, lines, weekStart, members, actions, timingCo
   // duplicated").
   const allPlaced = open.length > 0 && open.every((l) => inWeek(l.task)) && !missed.length
   const missedIds = new Set(missed.map((l) => l.task.id))
-  const groups = [
-    { title: 'Its day passed', rows: missed },
-    { title: 'Any day', rows: open.filter((l) => !l.task.scheduledFor) },
-    { title: 'Scheduled outside this week', rows: open.filter((l) => l.task.scheduledFor && !inWeek(l.task) && !missedIds.has(l.task.id)) },
-    { title: 'Completed', rows: showDone ? done : [] },
-  ].filter((g) => g.rows.length)
-
+  // What still waits for a day — passed, undated, or dated outside this week —
+  // in the person's own order, under the month line each serves (the line
+  // written ONCE as a header; one row alone carries it as its own note).
+  // Rows that serve no line come last, together (canvas design 2026-10-10).
+  const waiting = open.filter((l) => missedIds.has(l.task.id) || !l.task.scheduledFor || !inWeek(l.task))
+  const parentGroups = groupByParent(waiting.map((l) => {
+    const f = forLine?.(l.task) ?? null
+    return { vm: l, line: f, parent: f ? { id: f.id, title: f.title } : null }
+  }))
+  const onlyUnlinked = parentGroups.length === 1 && !parentGroups[0].parent
   // The list takes things back: a day's task dropped here loses its day and
   // stays this week (useWeekDragDrop, kind 'weekList').
   const { setNodeRef: dropRef, isOver } = useDroppable({ id: 'week-list', data: { kind: 'weekList' }, disabled: !dragEnabled })
-  const row = (vm: LineVM) => <WeekCard key={vm.task.id} vm={vm} actions={actions} members={members} timingControl={timingControl}
-    onContext={onContext} dragEnabled={dragEnabled} forLine={forLine?.(vm.task) ?? null}
+  const outside = (t: Task) => t.scheduledFor && !inWeek(t) && !missedIds.has(t.id)
+    ? `Dated ${t.scheduledFor.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}, outside this week` : undefined
+  const row = (vm: LineVM, forLineOf: { id: string; title: string; month: string } | null, forPlacement: 'meta' | 'tools' = 'meta') => <WeekCard key={vm.task.id} vm={vm} actions={actions} members={members} timingControl={timingControl}
+    onContext={onContext} dragEnabled={dragEnabled} forLine={forLineOf} forPlacement={forPlacement} note={outside(vm.task)}
     forControl={onForLine && forOptions ? (cur) => <MonthLink title={vm.task.title} current={cur} options={forOptions} onChange={(id) => onForLine(vm.task, id)} /> : undefined}
     passed={missedIds.has(vm.task.id) ? vm.task.scheduledFor!.toLocaleDateString('en-US', { weekday: 'long' }) : null} />
+  const blocks: ReactNode[] = []
+  let loose: ReactNode[] = []
+  const flush = () => { if (loose.length) { blocks.push(<ul key={`loose-${blocks.length}`} className="pv2-list">{loose}</ul>); loose = [] } }
+  for (const g of parentGroups) {
+    if (onlyUnlinked || (g.parent && g.rows.length === 1)) { loose.push(...g.rows.map((r) => row(r.vm, r.line))); continue }
+    flush()
+    const month = g.rows[0].line?.month
+    const label = g.parent ? `for ${month}: ${g.parent.title}` : 'Unlinked'
+    blocks.push(
+      <section key={g.key} aria-label={label} className={`canvas-group cw-wl-group${g.parent ? '' : ' is-unlinked'}`}>
+        <div className="canvas-group-head"><span className="canvas-group-title">{g.parent ? g.parent.title : 'Unlinked'}</span>{g.parent && month && <small>{month}</small>}</div>
+        <ul className="pv2-list">{g.rows.map((r) => row(r.vm, r.line, 'tools'))}</ul>
+      </section>,
+    )
+  }
+  flush()
   return (
     <section ref={dropRef} aria-label="This week's list" className={`pv2-wl${isOver ? ' is-over' : ''}`}>
       <div className="pv2-colh">{title}{headerAction}</div>
       {hint && <p className="wk-listhint">{hint}</p>}
       {!open.length && !done.length && <p className="pv2-hint ds-empty-body">{emptyHint ?? 'Nothing on this week’s list yet. Add below.'}</p>}
       {allPlaced && <p className="pv2-hint">Everything on this week’s list has a day.</p>}
-      {groups.map((g) => (
-        <section key={g.title} aria-label={g.title}>
-          <div className="pv2-wl-h">{g.title}</div>
-          <ul className="pv2-list">{g.rows.map(row)}</ul>
+      {blocks}
+      {showDone && done.length > 0 && (
+        <section aria-label="Completed">
+          <div className="pv2-wl-h">Completed</div>
+          <ul className="pv2-list">{done.map((l) => row(l, forLine?.(l.task) ?? null))}</ul>
         </section>
-      ))}
+      )}
       {done.length > 0 && <button type="button" className="pv2-link pv2-quiet" aria-expanded={showDone} onClick={() => setShowDone((s) => !s)}>{showDone ? 'Hide done' : 'Show done'}</button>}
       <form className="pv2-write" onSubmit={(e) => { e.preventDefault(); void submit() }}>
         <span className="pv2-wl-check" aria-hidden="true" />
@@ -147,7 +170,10 @@ export function WeekListV2({ title, lines, weekStart, members, actions, timingCo
 // {kind:'chip'} → useWeekDragDrop: an all-day date on that day, past days
 // refused, Undo offered). The same row every column draws (WeekRow,
 // 2026-10-03) — no white card; the grip says it moves.
-export function WeekCard({ vm, actions, members, timingControl, onContext, dragEnabled, forLine, forControl, passed, note }: {
+export function WeekCard({ vm, actions, members, timingControl, onContext, dragEnabled, forLine, forControl, passed, note, forPlacement = 'meta' }: {
+  /** Where the month line goes: under the title ('meta'), or with the row's
+   *  hover tools when a group header already names it ('tools'). */
+  forPlacement?: 'meta' | 'tools'
   /** A line under the title saying what the row is (Open journal: "This October line itself is on the week"). */
   note?: string
   forLine: { id: string; title: string; month: string } | null
@@ -163,6 +189,7 @@ export function WeekCard({ vm, actions, members, timingControl, onContext, dragE
   const t = vm.task
   const movable = dragEnabled && !t.completed
   const people = members.filter((m) => assigneesOf(t).includes(m.id))
+  const forInMeta = forPlacement === 'meta'
   return (
     <WeekRow
       mark="task"
@@ -172,13 +199,14 @@ export function WeekCard({ vm, actions, members, timingControl, onContext, dragE
       onOpen={() => actions.details(t)}
       drag={movable ? { id: `pool:${t.id}`, data: { kind: 'chip', taskId: t.id } } : null}
       people={people}
-      meta={forLine || passed || note || (forControl && !t.completed) ? <>
+      meta={(forInMeta && (forLine || (forControl && !t.completed))) || passed || note ? <>
         {note && <span className="wk-itself">{note}</span>}
         {passed && <span className="wk-passed">{passed} passed — give it another day?</span>}
-        {forControl && !t.completed ? forControl(forLine)
-          : forLine && <span className="wk-for"><span aria-hidden="true">↳ </span>for {forLine.month}: {forLine.title}</span>}
+        {forInMeta && (forControl && !t.completed ? forControl(forLine)
+          : forLine && <span className="wk-for"><span aria-hidden="true">↳ </span>for {forLine.month}: {forLine.title}</span>)}
       </> : undefined}
       tools={<>
+        {!forInMeta && forControl && !t.completed && forControl(forLine)}
         <ContextPicker size="sm" value={t.context ?? null} onChange={(c) => onContext(t, c)} />
         {members.length > 0 && <MultiAssigneeDropdown members={members} selectedIds={assigneesOf(t)} onSelect={(ids) => actions.assign(t, ids)} size="sm" triggerLabel={`Assign people to ${t.title}`} />}
         {timingControl && <span className="min-w-0">{timingControl(t)}</span>}

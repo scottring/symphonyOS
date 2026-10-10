@@ -70,9 +70,12 @@ const show = (props: Partial<Parameters<typeof HomeView>[0]> = {}) =>
     </AppShellChromeContext.Provider>,
   )
 
+// The week canvas (2026-10-10): a day's row moves from its ⋯ menu, and the
+// day picker says what each day already holds.
 const openTiming = () => {
   const monday = within(screen.getByTestId('journal-day-2026-09-14'))
-  fireEvent.click(monday.getByRole('button', { name: /Choose a week or a day for List supplies to buy/ }))
+  fireEvent.click(monday.getByRole('button', { name: 'More for List supplies to buy' }))
+  fireEvent.click(screen.getByRole('menuitem', { name: 'Move to another day' }))
 }
 
 describe('HomeView hands the week its source status', () => {
@@ -94,7 +97,7 @@ describe('HomeView hands the week its source status', () => {
     expect(sources.events).toBe('stale')
     show({ densitySources: sources })
     openTiming()
-    const wed = screen.getByRole('menuitemradio', { name: /Wed, Sep 16/ })
+    const wed = screen.getByRole('button', { name: /Wednesday, September 16/ })
     expect(wed).toHaveAccessibleName(/still loading/)
     expect(wed).not.toHaveAccessibleName(/nothing on it yet/)
   })
@@ -107,7 +110,7 @@ describe('HomeView hands the week its source status', () => {
     })
     show({ densitySources: sources })
     openTiming()
-    const wed = screen.getByRole('menuitemradio', { name: /Wed, Sep 16/ })
+    const wed = screen.getByRole('button', { name: /Wednesday, September 16/ })
     expect(wed).toHaveAccessibleName(/nothing on it yet · no calendar connected/)
     expect(wed.getAttribute('aria-label')).not.toMatch(/error|couldn|fail|loading/i)
   })
@@ -120,7 +123,7 @@ describe('HomeView hands the week its source status', () => {
     })
     show({ densitySources: sources })
     openTiming()
-    expect(screen.getByRole('menuitemradio', { name: /Wed, Sep 16/ }))
+    expect(screen.getByRole('button', { name: /Wednesday, September 16/ }))
       .toHaveAccessibleName(/the calendar couldn’t be read/)
   })
 
@@ -128,7 +131,7 @@ describe('HomeView hands the week its source status', () => {
   it('with nothing passed, the days read as counted — the old, always-ready shape', () => {
     show()
     openTiming()
-    expect(screen.getByRole('menuitemradio', { name: /Wed, Sep 16/ })).toHaveAccessibleName(/nothing on it yet/)
-    expect(screen.getByRole('menuitemradio', { name: /Mon, Sep 14/ })).toHaveAccessibleName(/1 task already/)
+    expect(screen.getByRole('button', { name: /Wednesday, September 16/ })).toHaveAccessibleName(/nothing on it yet/)
+    expect(screen.getByRole('button', { name: /Monday, September 14/ })).toHaveAccessibleName(/1 task already/)
   })
 })

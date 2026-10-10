@@ -207,4 +207,15 @@ describe('buildRhythmModel person filter', () => {
     expect(all.daily).toHaveLength(1)
     expect(iris.daily).toHaveLength(0)
   })
+
+  it('gathers Off routines apart from their cadence band; resting wins over Off', () => {
+    const m = buildRhythmModel([
+      mk({ id: 'off', show_on_timeline: false }),
+      mk({ id: 'both', show_on_timeline: false, visibility: 'reference' }),
+      mk({ id: 'on' }),
+    ])
+    expect(m.off.map(r => r.id)).toEqual(['off'])
+    expect(m.resting.map(r => r.id)).toEqual(['both'])
+    expect(m.daily.map(r => r.id)).toEqual(['on'])
+  })
 })

@@ -1,4 +1,4 @@
-import { defaultPlanningDestination } from '@/lib/planning/connectedDestination';
+import { connectedDestination, defaultPlanningDestination } from '@/lib/planning/connectedDestination';
 import { useCadenceConfig } from '@/lib/cadence/config';
 import { useGoals } from '@/hooks/useGoals';
 import { useAssigneeFilter } from '@/hooks/useAssigneeFilter';
@@ -10,16 +10,16 @@ import { WorkspaceVoiceControls } from '@/components/chat/WorkspaceVoiceControls
 import './connected-workspace.css';
 import { useDialogFocus } from '@/hooks/useDialogFocus';
 import { assistantSelection } from './assistantSelection';
-import { PlanNavigation, usePlanDestination, planPeriodForPath, MobilePlanControlsContext } from '@/components/layout/PlanNavigation';
+import { PlanNavigation, planPeriodForPath, MobilePlanControlsContext } from '@/components/layout/PlanNavigation';
 import { requestPlanFromPaper } from '@/lib/planFromPaperSignal';
 import { DesktopNavigation, DesktopControlsContext, DesktopLeadContext, DesktopCenterContext } from '@/components/layout/DesktopNavigation';
 import { ReferenceListsProvider, useReferenceLists } from '@/components/reference/ReferenceListsContext';
 import { ReferenceListsDock } from '@/components/reference/ReferenceLists';
 import { pinIsOnPage } from '@/components/reference/periodsOnPage';
 // src/shell/ShellLayout.tsx
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Sparkles, Repeat, CalendarRange, Inbox as InboxIcon, MoreHorizontal, Plus } from 'lucide-react';
+import { Sparkles, CalendarRange, MoreHorizontal, Plus, Sun, Map } from 'lucide-react';
 import { useTextEntryActive } from '@/hooks/useKeyboardInset';
 import { type ViewType } from '@/components/layout/Sidebar';
 import { MoreSheet } from '@/components/layout/MoreSheet';
@@ -40,8 +40,12 @@ import { useMobile } from '@/hooks/useMobile';
 import { useDomain } from '@/hooks/useDomain';
 import { filterInboxTasksForLayers } from '@/lib/today/domainFilter';
 import { useSupabaseTasks } from '@/hooks/useSupabaseTasks';
+import { useRoutines } from '@/hooks/useRoutines';
 import { useDiscussionInbox } from '@/hooks/useDiscussionInbox';
-import { useSymphonyAssistant } from '@/hooks/useSymphonyAssistant';
+import { useSymphonyAssistant, type AssistantTurnObserver } from '@/hooks/useSymphonyAssistant';
+import { CanvasActivityProvider, useCanvasActivity, type CanvasActivity } from '@/contexts/CanvasActivityContext';
+import { ConversationStrip } from '@/components/canvas/ConversationStrip';
+import { conversationStripPath } from '@/lib/canvas/stripPaths';
 import { useScratchpadHidden } from '@/hooks/useScratchpadHidden';
 import { useAssistantLaunchRequests, useAssistantLauncher } from '@/contexts/AssistantLaunchContext';
 import { useShellChrome } from './useShellChrome';
@@ -150,7 +154,6 @@ function ShellLayoutInner({ children }: Props) {
   useEffect(() => { document.documentElement.classList.toggle('plan-v2', planV2Enabled()); }, [location.search]);
   const isMobile = useMobile();
   const typing = useTextEntryActive();
-  const planDestination = usePlanDestination();
   const { user, signOut } = useAuth();
   // Module caches that are not components — the planning calendar behind the
   // day tiles — key their data on who is signed in. The shell is the one
@@ -175,8 +178,21 @@ function ShellLayoutInner({ children }: Props) {
 
   const references = useReferenceLists();
 
-  const { tasks, refetch } = useSupabaseTasks();
-  const { goals } = useGoals();
+  const { tasks, refetch, deleteTask, updateTask } = useSupabaseTasks();
+  const { goals, deleteGoal, updateGoal } = useGoals();
+  // Held so routine writes from a conversation are seen (and undoable) too.
+  const { routines: canvasRoutines, deleteRoutine, updateRoutine, refetch: refetchRoutines } = useRoutines();
+  // The canvas activity provider sits inside this component's tree, but the
+  // assistant hook runs above it: a ref bridges each turn's events across.
+  const canvasRef = useRef<CanvasActivity | null>(null);
+  const setCanvasActivity = useCallback((activity: CanvasActivity) => { canvasRef.current = activity; }, []);
+  const turnObserver = useMemo<AssistantTurnObserver>(() => ({
+    start: ({ text, retry }) => canvasRef.current?.turnStarted(text, retry),
+    tool: (name) => canvasRef.current?.toolUsed(name),
+    toolResult: (result) => canvasRef.current?.toolResult(result),
+    proposal: (items) => canvasRef.current?.addProposals(items),
+    end: (turn) => canvasRef.current?.turnEnded(turn),
+  }), []);
   const [planningPeople] = useAssigneeFilter();
   const scopedTasks = useMemo(()=>tasks.filter(planPeopleLens(planningPeople,null).keep),[tasks,planningPeople]);
   const scopedGoals = useMemo(()=>goals.filter(planPeopleLens(planningPeople,null).keep),[goals,planningPeople]);
@@ -246,7 +262,7 @@ function ShellLayoutInner({ children }: Props) {
       const query = new URLSearchParams({ view: 'constellation', start: saved.date, horizon: String(saved.level), focus: `${saved.level}:${saved.id}` });
       navigate(`/year?${query}`, { replace: true });
     }
-  }, onWorkspace: (page,date) => { if (connectedWorkspace) { const url=workspaceDestination(page,date); if(url) navigate(url); } }, taskContext: conversationContext.taskContext, workspaceContext: connectedWorkspace ? screenContext : undefined, onMutate: () => { void refetch(); window.dispatchEvent(new Event('symphony-plan-updated')); } });
+  }, onWorkspace: (page,date) => { if (connectedWorkspace) { const url=workspaceDestination(page,date); if(url) navigate(url); } }, taskContext: conversationContext.taskContext, workspaceContext: connectedWorkspace ? screenContext : undefined, onMutate: () => { void refetch(); window.dispatchEvent(new Event('symphony-plan-updated')); }, turnObserver });
   const voiceAccess = useWorkspaceVoiceAccess(user?.id ?? null, connectedWorkspace);
   const voiceEnabled = connectedWorkspace && voiceAccess;
   const voice = useWorkspaceVoice(screenContext, assistant.sendMessage, (url) => navigate(import.meta.env.DEV && new URLSearchParams(location.search).get('voice') === '1' ? `${url}&voice=1` : url), voiceEnabled, user?.id ?? null);
@@ -305,7 +321,21 @@ function ShellLayoutInner({ children }: Props) {
   const referencesVisible = !isMobile && referencesFit
     && !!references?.pins.some((pin) => !pinIsOnPage(location.pathname, pin.kind));
 
+  const canvasSnapshot = useMemo(() => ({ tasks, goals, routines: canvasRoutines }), [tasks, goals, canvasRoutines]);
+  const canvasWriters = useMemo(() => ({
+    deleteTask, updateTask, deleteGoal,
+    updateGoal: updateGoal as (id: string, u: Partial<import('@/types/goal').Goal>) => Promise<unknown>,
+    deleteRoutine,
+    updateRoutine: updateRoutine as unknown as (id: string, u: Partial<import('@/types/routine').Routine>) => Promise<unknown>,
+  }), [deleteTask, updateTask, deleteGoal, updateGoal, deleteRoutine, updateRoutine]);
+  const canvasRefetch = useCallback(() => { window.dispatchEvent(new Event('symphony-plan-updated')); return Promise.all([refetch(), refetchRoutines()]); }, [refetch, refetchRoutines]);
+  const showStrip = conversationStripPath(location.pathname);
+  const stripVoice = { available: voiceEnabled, active: voice.active, status: voice.status, start: () => { void voice.start(); }, stop: voice.stop };
+  const openConversation = () => { if (isMobile) setPhoneChatOpen(true); else showPane('ai'); };
+
   return (
+    <CanvasActivityProvider snapshot={canvasSnapshot} writers={canvasWriters} refetch={canvasRefetch} retryTurn={() => { void assistant.retryLast(); }}>
+    <CanvasBridge onActivity={setCanvasActivity} />
     <DesktopControlsContext.Provider value={desktopControls}>
     <DesktopLeadContext.Provider value={desktopLead}>
     <DesktopCenterContext.Provider value={desktopCenter}>
@@ -370,6 +400,7 @@ function ShellLayoutInner({ children }: Props) {
             {/* Off the planner the area lens rides top-right; the guide sits below it. */}
             <div className={`guide-slot${planPeriodForPath(location.pathname) ? '' : ' has-lens'}`}><GuideBar host={guideHost} /></div>
             <div className="min-w-0">{children}</div>
+            {showStrip && <ConversationStrip compact receiptOnly onSend={(text) => sendConversation(text)} busy={assistant.loading} voice={stripVoice} onOpenConversation={openConversation} />}
           </div>
         ) : (
           // Desktop: navigation and page share one centred column —
@@ -436,6 +467,7 @@ function ShellLayoutInner({ children }: Props) {
                   {/* Guided planning rides above the page it is guiding. */}
                   <div className="guide-slot"><GuideBar host={guideHost} /></div>
                   {children}
+                  {showStrip && <ConversationStrip onSend={(text) => sendConversation(text)} busy={assistant.loading} voice={stripVoice} onOpenConversation={openConversation} />}
                 </div>
               </SideColumn>
             </div>
@@ -533,29 +565,21 @@ function ShellLayoutInner({ children }: Props) {
           aside and the capture bar sits on the keyboard (as on iOS). */}
       {isMobile && !typing && (
         <nav className="phone-dock scenery-page" aria-label="Main">
+          {/* The three destinations, as on every surface (approved phone
+              boards, 2026-10-10): Today · Week · Plan, with + to add and More
+              for Inbox, Routines and the rest. */}
           <div className="phone-dock-row">
-            <button
-              type="button"
-              className="phone-dock-tab"
-              onClick={() => navigate(planDestination)}
-              aria-current={planPeriodForPath(location.pathname) ? 'page' : undefined}
-            >
-              <CalendarRange aria-hidden="true" />
-              <span>Planner</span>
-            </button>
-            <button
-              type="button"
-              className="phone-dock-tab"
-              onClick={() => navigate('/inbox')}
-              aria-current={location.pathname.startsWith('/inbox') ? 'page' : undefined}
-              aria-label={`Inbox${inboxCount ? `, ${inboxCount} ${inboxCount === 1 ? 'item' : 'items'}` : ''}`}
-            >
-              <InboxIcon aria-hidden="true" />
-              <span>Inbox</span>
-              {inboxCount > 0 && (
-                <span className="phone-dock-badge" aria-hidden="true">{inboxCount > 99 ? '99+' : inboxCount}</span>
-              )}
-            </button>
+            {([
+              ['today', 'Today', Sun],
+              ['week', 'Week', CalendarRange],
+            ] as const).map(([period, label, Icon]) => (
+              <button key={period} type="button" className="phone-dock-tab"
+                onClick={() => navigate(connectedDestination(`/${period}`, ''))}
+                aria-current={planPeriodForPath(location.pathname) === period ? 'page' : undefined}>
+                <Icon aria-hidden="true" />
+                <span>{label}</span>
+              </button>
+            ))}
             <div className="phone-dock-add-slot">
               <button type="button" className="phone-dock-add" onClick={() => setQuickAddOpen(true)} aria-label="Add">
                 <Plus aria-hidden="true" />
@@ -564,11 +588,11 @@ function ShellLayoutInner({ children }: Props) {
             <button
               type="button"
               className="phone-dock-tab"
-              onClick={() => navigate('/routines')}
-              aria-current={location.pathname.startsWith('/routines') ? 'page' : undefined}
+              onClick={() => navigate(connectedDestination('/month', ''))}
+              aria-current={['month', 'season', 'year'].includes(planPeriodForPath(location.pathname) ?? '') ? 'page' : undefined}
             >
-              <Repeat aria-hidden="true" />
-              <span>Routines</span>
+              <Map aria-hidden="true" />
+              <span>Plan</span>
             </button>
             <button
               type="button"
@@ -577,9 +601,13 @@ function ShellLayoutInner({ children }: Props) {
               onClick={() => setMoreSheetOpen(true)}
               aria-haspopup="dialog"
               aria-expanded={moreSheetOpen}
+              aria-label={`More${inboxCount ? `, ${inboxCount} in Inbox` : ''}`}
             >
               <MoreHorizontal aria-hidden="true" />
               <span>More</span>
+              {inboxCount > 0 && (
+                <span className="phone-dock-badge" aria-hidden="true">{inboxCount > 99 ? '99+' : inboxCount}</span>
+              )}
             </button>
           </div>
         </nav>
@@ -591,6 +619,7 @@ function ShellLayoutInner({ children }: Props) {
           isOpen={moreSheetOpen}
           onClose={closeMoreSheet}
           discussionsUnread={discussionsUnread}
+          inboxCount={inboxCount}
           // Opens the conversation without sending anything.
           onAskSymphony={() => { setMoreSheetOpen(false); setPhoneChatOpen(true); }}
         />
@@ -624,7 +653,15 @@ function ShellLayoutInner({ children }: Props) {
     </DesktopCenterContext.Provider>
     </DesktopLeadContext.Provider>
     </DesktopControlsContext.Provider>
+    </CanvasActivityProvider>
   );
+}
+
+/** Hands the canvas activity to code that runs above its provider. */
+function CanvasBridge({ onActivity }: { onActivity: (activity: CanvasActivity) => void }) {
+  const activity = useCanvasActivity();
+  useLayoutEffect(() => { onActivity(activity); }, [onActivity, activity]);
+  return null;
 }
 
 export function ShellLayout({ children }: Props) {

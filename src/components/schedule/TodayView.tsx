@@ -45,6 +45,7 @@ import { splitTodayJournal, splitCompletedFocus } from '@/lib/today/journalSplit
 import { panelActionsFor } from '@/components/reference/DayPlanPanel'
 import { useColumnsFitWindow } from '@/hooks/useColumnsFitWindow'
 import { TodayWeekColumn } from './TodayWeekColumn'
+import { CalendarReconnectBanner } from '@/components/home/CalendarReconnectBanner'
 import { TodayComingUp } from './TodayComingUp'
 import { ServesLine } from './ServesLine'
 import { parentLinkOf } from '@/lib/planning/parentLink'
@@ -1427,7 +1428,9 @@ export function TodayView({
     // (no ancestor declared one, so the old decision rail never went beside).
     // Width: the reading column (PAGE_COLUMN, 1040px of content) — or, with
     // the week column beside the day, a planning page that fills the screen.
-    <div className={`today-page @container w-full ${showWeek ? `max-w-[1712px] ${PLANNING_PAGE_CLASS}` : 'max-w-[1152px]'} mx-auto px-0 py-2 md:px-10 lg:px-14 md:pt-2 md:pb-8`}>
+    // In the connected workspace Today always shares the planning frame, so
+    // Today, Week, Plan and Routines have one shape (Scott, 2026-10-10).
+    <div className={`today-page @container w-full ${showWeek || alongsideWorkspace ? `max-w-[1712px] ${PLANNING_PAGE_CLASS}` : 'max-w-[1152px]'} mx-auto px-0 py-2 md:px-10 lg:px-14 md:pt-2 md:pb-8`}>
       {/* Today's filter and ⋯ live in its heading beside the lens and the
           assistant, as every horizon's page controls do — the top bar is the
           same on every page (2026-09-29). */}
@@ -1508,6 +1511,8 @@ export function TodayView({
         footer={!desktopControls ? desktopToolbar : undefined}
 
       />
+      {/* Notices sit under the heading on every destination (one page shape). */}
+      <div className="px-4 md:px-0 empty:hidden"><CalendarReconnectBanner /></div>
 
 
       {/* The same control row every horizon has: what the column beside is,
@@ -1819,7 +1824,10 @@ export function TodayView({
           {showWeek && (
             <TodayWeekColumn plan={data.dayPlan} day={viewedDate} weekNo={weekNo}
               weekStart={weekStartAnchor(viewedDate, readCadenceConfig().weekStartsOn)} actions={planPanelActions}
-              nextWeek={nextWeek} onHide={() => setTodayView('list')} />
+              nextWeek={nextWeek} onHide={() => setTodayView('list')}
+              findTask={(id) => tasksMap.get(id)} openTask={(id) => handleSelectItem(`task-${id}`)}
+              chooseTask={(id) => planActions.chooseTaskDay(id, viewedDate)}
+              restoreTask={(id, prev) => ctx.onUpdateTask?.(id, prev)} />
           )}
         </aside>
         )}

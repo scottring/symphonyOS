@@ -42,6 +42,9 @@ interface PanelPhotosProps {
   /** Reports whether this entity has any attachments, so the panel's Add row
    *  knows whether to offer "Photo". */
   onContentChange?: (hasContent: boolean) => void
+  /** Reports the loaded attachments, so "What you'll need" can list them
+   *  with Open without fetching them a second time. */
+  onAttachmentsChange?: (attachments: Attachment[]) => void
 }
 
 /**
@@ -52,7 +55,7 @@ interface PanelPhotosProps {
  * render as thumbnails; documents as file chips. Hover (or touch) shows a ✕
  * to remove. Everything opens full size in a new tab.
  */
-export function PanelPhotos({ entityType, entityId, entityContext, promotions, dropZoneRef, hideWhenEmpty, onContentChange }: PanelPhotosProps) {
+export function PanelPhotos({ entityType, entityId, entityContext, promotions, dropZoneRef, hideWhenEmpty, onContentChange, onAttachmentsChange }: PanelPhotosProps) {
   const [attachments, setAttachments] = useState<Attachment[]>([])
   const [busy, setBusy] = useState(false)
   const [analyzingIds, setAnalyzingIds] = useState<Set<string>>(new Set())
@@ -77,6 +80,7 @@ export function PanelPhotos({ entityType, entityId, entityContext, promotions, d
 
   // Report emptiness up so the panel's Add row can offer "Photo".
   useEffect(() => { onContentChange?.(attachments.length > 0) }, [attachments.length, onContentChange])
+  useEffect(() => { onAttachmentsChange?.(attachments) }, [attachments, onAttachmentsChange])
 
   const attach = useCallback(async (blob: Blob, fileName?: string) => {
     setBusy(true)
