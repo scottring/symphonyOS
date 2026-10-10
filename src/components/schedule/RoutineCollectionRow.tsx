@@ -6,6 +6,8 @@ import type { FamilyMember } from '@/types/family'
 import { MultiAssigneeDropdown } from '@/components/family'
 import { routineOwners } from '@/lib/routineUtils'
 import { ROW_SHELL, ROW_GRID, LANE, MARK, RAIL, RAIL_SLOT } from './todayRowGrid'
+import { useArrived } from '@/contexts/CanvasActivityContext'
+import { ROUTINE_HIDE_LABELS } from '@/lib/routines/explain'
 
 interface Props {
   item: TimelineItem // type === 'routine-collection'
@@ -16,9 +18,9 @@ interface Props {
   onSkipStep?: (stepEntityId: string) => void
   /** Complete a dose recording when it was actually done ("did the 7am at 8:15"). */
   onCompleteStepAt?: (stepEntityId: string, completedAt: Date) => void
-  /** Pause the whole collection until tomorrow (auto-resumes). */
+  /** "Hide for today": skip today's occurrence only — back on its next day. */
   onHideToday?: () => void
-  /** Archive the whole collection to reference (reactivate on /routines). */
+  /** "Off": hidden from Today and planning; keeps running (and on the kiosk). */
   onRemove?: () => void
   /** Who does it — the same control a task or single routine row carries
    *  (Scott, 2026-09-30: "Ella & Kaleb math time" couldn't be given to them
@@ -51,6 +53,9 @@ function fmtShort(t: string | null): string {
 
 export function RoutineCollectionRow({ item, onSelect, onSelectStep, onCompleteStep, onSkipStep, onCompleteStepAt, onHideToday, onRemove, familyMembers = [], onAssignAll }: Props) {
   const owners = item.originalRoutine ? routineOwners(item.originalRoutine) : []
+  // Flash when the collection was just made or changed — by a conversation
+  // turn or a manual command (useCanvasActivity marks the routine's id).
+  const arrived = useArrived(item.originalRoutine?.id ?? item.id.replace('routine-collection-', ''))
   const [open, setOpen] = useState(false)
   const [mgmtOpen, setMgmtOpen] = useState(false)
   const [renderedAt] = useState(() => Date.now())
@@ -112,7 +117,7 @@ export function RoutineCollectionRow({ item, onSelect, onSelectStep, onCompleteS
     // Same wrapper a task/event row uses (px-3 + 1px transparent border), so
     // the columns below line up with them to the pixel and the row picks up the
     // identical hover tint instead of announcing itself with a card.
-    <div className={`group ${ROW_SHELL} border-transparent transition-all duration-200 hover:bg-primary-50/50 hover:border-primary-100`}>
+    <div className={`group ${ROW_SHELL} border-transparent transition-all duration-200 hover:bg-primary-50/50 hover:border-primary-100${arrived ? ' canvas-arrived' : ''}`}>
       {/* Collapsed: a plain agenda row, not a card. The column widths mirror
           ScheduleItem (pl-5 bulk gutter, w-16 time, w-5 control) so a routine
           lines up with the tasks and events around it. */}
@@ -183,8 +188,9 @@ export function RoutineCollectionRow({ item, onSelect, onSelectStep, onCompleteS
         </div>
         <div className={`hidden md:flex ${RAIL_SLOT}`} aria-hidden />
         <div className={`hidden md:flex ${RAIL_SLOT}`} aria-hidden />
-        {/* Management menu: hide-for-today / edit / archive, mirroring task
-            rows — and like theirs, quiet until you reach for it on desktop. */}
+        {/* Management menu: Hide for today / edit / Off, mirroring task rows —
+            and like theirs, quiet until you reach for it on desktop. Rest
+            until… (the strongest) lives in the routine's panel. */}
         <div className={`relative ${RAIL_SLOT} transition-opacity md:opacity-0 md:group-hover:opacity-100 md:group-focus-within:opacity-100`}>
           <button
             aria-label="Routine options"
@@ -198,7 +204,7 @@ export function RoutineCollectionRow({ item, onSelect, onSelectStep, onCompleteS
               <div className="fixed inset-0 z-10" aria-hidden onClick={() => setMgmtOpen(false)} />
               <div
                 role="menu"
-                className="absolute right-0 top-full z-20 mt-1 w-44 rounded-xl border border-neutral-200 bg-white py-1 shadow-lg"
+                className="absolute right-0 top-full z-20 mt-1 w-56 rounded-xl border border-neutral-200 bg-white py-1 shadow-lg"
                 onClick={(e) => e.stopPropagation()}
               >
                 {onHideToday && (
@@ -207,7 +213,11 @@ export function RoutineCollectionRow({ item, onSelect, onSelectStep, onCompleteS
                     onClick={() => { onHideToday(); setMgmtOpen(false) }}
                     className="w-full flex items-center gap-2 px-3 py-1.5 text-left text-sm text-neutral-700 hover:bg-neutral-50"
                   >
-                    <EyeOff className="w-4 h-4 text-neutral-400" /> Hide for today
+                    <EyeOff className="w-4 h-4 shrink-0 text-neutral-400" />
+                    <span className="routine-hide-option">
+                      <span>{ROUTINE_HIDE_LABELS.today}</span>
+                      <span className="routine-hide-option-hint">Skips today only — back next time</span>
+                    </span>
                   </button>
                 )}
                 <button
@@ -232,7 +242,11 @@ export function RoutineCollectionRow({ item, onSelect, onSelectStep, onCompleteS
                     onClick={() => { onRemove(); setMgmtOpen(false) }}
                     className="w-full flex items-center gap-2 px-3 py-1.5 text-left text-sm text-neutral-700 hover:bg-neutral-50"
                   >
-                    <CalendarOff className="w-4 h-4 text-neutral-400" /> Remove from Today
+                    <CalendarOff className="w-4 h-4 shrink-0 text-neutral-400" />
+                    <span className="routine-hide-option">
+                      <span>{ROUTINE_HIDE_LABELS.off}</span>
+                      <span className="routine-hide-option-hint">Hidden from Today and planning</span>
+                    </span>
                   </button>
                 )}
               </div>

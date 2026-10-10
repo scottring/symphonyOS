@@ -20,6 +20,12 @@ vi.mock('@/hooks/useDomain.tsx', async (importOriginal) => {
   const actual = await importOriginal() as Record<string, unknown>
   return { ...actual, useDomain: () => ({ currentDomain: 'universal', layers: ALL_LAYERS, setDomain: vi.fn() }) }
 })
+// "Hide for today" goes through the instance writer (useHideForToday) — the
+// hook's own test covers the write and its Undo; here we see what it is asked.
+const { hideForToday } = vi.hoisted(() => ({ hideForToday: vi.fn() }))
+vi.mock('@/components/routine/useHideForToday', () => ({
+  useHideForToday: () => ({ hideForToday, showToday: vi.fn() }),
+}))
 vi.mock('@/hooks/useTimelineInsert', () => ({
   useTimelineInsert: () => ({ handlePick: vi.fn(), noteComposer: null, closeNoteComposer: vi.fn() }),
 }))
@@ -85,7 +91,7 @@ describe('taking a routine off Today', () => {
 
     await screen.findByText('Kids Bedtime routine')
     fireEvent.click(screen.getByLabelText('Routine options'))
-    fireEvent.click(screen.getByText('Remove from Today'))
+    fireEvent.click(screen.getByRole('menuitem', { name: /^off/i }))
 
     // NOT visibility:'reference' — that is Resting, which stops the routine
     // everywhere including the kitchen wall.
@@ -95,16 +101,23 @@ describe('taking a routine off Today', () => {
     expect(onUpdateRoutine).toHaveBeenLastCalledWith('bed', { show_on_timeline: true })
   })
 
-  it('leaves "Hide for today" as the one-day mute it always was', async () => {
+  // Hide for today skips TODAY'S OCCURRENCE only. It used to write
+  // visibility:'reference' + paused_until tomorrow — Rest, which took the
+  // routine off the week and the kiosk too.
+  it('"Hide for today" skips the viewed day\'s occurrence, never rests the routine', async () => {
     const onUpdateRoutine = vi.fn()
+    hideForToday.mockClear()
     renderToday({ onUpdateRoutine })
 
     await screen.findByText('Kids Bedtime routine')
     fireEvent.click(screen.getByLabelText('Routine options'))
-    fireEvent.click(screen.getByText('Hide for today'))
+    fireEvent.click(screen.getByRole('menuitem', { name: /hide for today/i }))
 
-    const [, patch] = onUpdateRoutine.mock.calls[0]
-    expect(patch.visibility).toBe('reference')
-    expect(patch.paused_until).toBeTruthy() // wakes itself tomorrow
+    expect(hideForToday).toHaveBeenCalledTimes(1)
+    const [id, name, date] = hideForToday.mock.calls[0]
+    expect(id).toBe('bed')
+    expect(name).toBe('Kids Bedtime routine')
+    expect((date as Date).toDateString()).toBe(TODAY.toDateString())
+    expect(onUpdateRoutine).not.toHaveBeenCalled()
   })
 })

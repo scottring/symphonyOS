@@ -477,3 +477,49 @@ export function resolveRoutineEligible(
 ): RoutineResolution {
   return resolveRoutine(routine, { ...ctx, date: null })
 }
+
+// ── Explaining, not deciding ────────────────────────────────────────────────
+//
+// Additive helpers for surfaces that SAY where a routine shows (the routine
+// panel's "Where it shows", the Routines page chips — lib/routines/explain.ts).
+// None of them decides what renders; every renderer still asks resolveRoutine.
+
+/** The one layer the kitchen kiosk reads (useWallData's FAMILY_LAYER). */
+export const WALL_LAYERS: ReadonlySet<Layer> = new Set<Layer>(['family'])
+
+/**
+ * The kitchen kiosk's routine question, quoted from useWallData's one
+ * resolveRoutine call site so an explanation can repeat it word for word:
+ * rung 3 and rung 6 are overridden there (the kids' routines use the Today
+ * switch as a declutter workaround, and the board collapses Steps itself), the
+ * lens is the Family layer only, and the hide-daily sweep never runs.
+ *
+ * It does NOT replace that call site — the wall keeps its own copy. If the
+ * wall's overrides change, change this with them.
+ */
+export function resolveRoutineOnWall(
+  routine: Routine,
+  date: Date,
+  lastCompletedAt?: Date | null,
+): RoutineResolution {
+  return resolveRoutine(
+    { ...routine, show_on_timeline: true, parent_routine_id: null },
+    { date, prefs: { hideRoutines: false, layers: WALL_LAYERS }, lastCompletedAt: lastCompletedAt ?? null },
+  )
+}
+
+/**
+ * The routine's own switches, read to label a control or word an
+ * explanation — never to decide what renders (resolveRoutine does that).
+ *   active      running (not Resting — `visibility`)
+ *   off         "Off": hidden from Today and planning (`show_on_timeline`)
+ *   placedToday takes a main-list row on a due day without a time: a tracked
+ *               obligation or a rule that names its days (see dayPlan.ts)
+ */
+export function routineSwitches(routine: Routine): { active: boolean; off: boolean; placedToday: boolean } {
+  return {
+    active: routine.visibility === 'active',
+    off: routine.show_on_timeline === false,
+    placedToday: isTimelineObligation(routine) || isPinnedToTimeline(routine) || isDayBoundRoutine(routine),
+  }
+}

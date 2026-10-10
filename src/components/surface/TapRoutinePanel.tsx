@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { Trash2 } from 'lucide-react'
 import type { Routine, RoutineVisibility, RecurrencePattern } from '@/types/routine'
 import type { TargetUnit } from '@/types/actionable'
@@ -14,7 +14,12 @@ import { TargetSection } from './sections/TargetSection'
 import { ContextPicker } from '@/components/triage/ContextPicker'
 import { MultiAssigneeDropdown } from '@/components/family'
 import { RoutineScheduleEditor } from '@/components/routine/RoutineScheduleEditor'
-import { namesDueDays } from '@/lib/routineUtils'
+import { namesDueDays, routineSwitches } from '@/lib/routineUtils'
+import { explainRoutine, formatWake, wakeDate, ROUTINE_HIDE_LABELS, type ExplainCtx } from '@/lib/routines/explain'
+import { WhereItShows } from '@/components/routine/WhereItShows'
+import { useRoutineExplainLens } from '@/components/routine/useRoutineExplainLens'
+import { useHideForToday, useSkippedOn } from '@/components/routine/useHideForToday'
+import { useCanvasActivity } from '@/contexts/CanvasActivityContext'
 import { RoutineStepsSection } from './sections/RoutineStepsSection'
 import { PanelAttachments } from './sections/PanelAttachments'
 import { ExtractSteps } from '@/components/routine/ExtractSteps'
@@ -43,14 +48,19 @@ interface TapRoutinePanelProps {
   onRename?: (name: string) => void
   onNotesChange: (next: string) => void
   onContextChange: (context: TaskContext | undefined) => void
-  onVisibilityChange: (visibility: RoutineVisibility) => void
+  /** Rest (reference) or wake (active). May return false when the write failed. */
+  onVisibilityChange: (visibility: RoutineVisibility) => unknown
   /** Persist a wake date for a resting routine (paused_until; null = rest indefinitely). */
-  onRestUntilChange?: (pausedUntil: string | null) => void
+  onRestUntilChange?: (pausedUntil: string | null) => unknown
   /** Take the routine off Today (and the week/month grids) without stopping it:
    *  writes show_on_timeline, resolveRoutine's rung 3. Rendered only when
    *  provided, and only while the routine is Active — "off Today" says nothing
    *  about a routine that is resting off everything. */
-  onShowOnTodayChange?: (next: boolean) => void
+  onShowOnTodayChange?: (next: boolean) => unknown
+  /** The day "Where it shows" and "Hide for today" are about. Defaults to today. */
+  viewedDate?: Date
+  /** Extra context for the explanation (a Step's parent, a lens override). */
+  explainCtx?: Partial<ExplainCtx>
   onAssignChange?: (memberIds: string[]) => void
   /** Persist a recurrence/time-of-day change. time is '' (clear) or 'HH:MM'. */
   onScheduleChange?: (pattern: RecurrencePattern, timeOfDay: string) => void | boolean | Promise<void | boolean>
@@ -104,12 +114,74 @@ export function TapRoutinePanel(props: TapRoutinePanelProps) {
   const [assistOpen, setAssistOpen] = useState(props.autoOpenDiscussion === true)
   useEffect(() => { if (props.autoOpenDiscussion) setAssistOpen(true) }, [props.autoOpenDiscussion])
   const discussionUnread = useThreadUnread('routine', props.routine.id)
-  const onTimeline = routine.visibility === 'active'
   // Two different questions, and they were being answered by one switch: is
   // this routine running at all (Active/Resting), and does a running routine
   // want a row on Today. A bedtime routine everybody knows by heart is still
   // real — it just doesn't need reading back to you (Scott, 2026-09-07).
-  const onToday = routine.show_on_timeline !== false
+  const { active: onTimeline, off } = routineSwitches(routine)
+
+  // Where it shows, for the day being viewed — live against the schedule
+  // draft while it is open.
+  const dayKey = (props.viewedDate ?? new Date()).toDateString()
+  const viewedDate = useMemo(() => new Date(dayKey), [dayKey])
+  const skipped = useSkippedOn(props.unsaved ? null : routine.id, viewedDate)
+  const lens = useRoutineExplainLens()
+  const liveRoutine = useMemo<Routine>(() => editingSchedule
+    ? { ...routine, recurrence_pattern: scheduleDraft.recurrencePattern, time_of_day: scheduleDraft.timeOfDay ? scheduleDraft.timeOfDay : null }
+    : routine, [routine, editingSchedule, scheduleDraft])
+  const explanation = useMemo(() => explainRoutine(liveRoutine, {
+    date: viewedDate, prefs: lens.prefs, member: lens.member,
+    skippedToday: !!skipped, steps: props.steps, familyMembers,
+    ...props.explainCtx,
+  }), [liveRoutine, viewedDate, lens, skipped, props.steps, familyMembers, props.explainCtx])
+  const canHideToday = explanation.today.shows
+
+  // Every write goes through the canvas activity: saving / saved / didn't
+  // save, with Undo restoring what was there. The unsaved draft only patches
+  // itself, so it writes directly.
+  const { run } = useCanvasActivity()
+  const { hideForToday, showToday } = useHideForToday()
+  const [restDate, setRestDate] = useState('')
+  const write = async (fn: () => unknown) => (await fn()) !== false
+  const saveRest = (visibility: RoutineVisibility, pausedUntil: string | null) => async () => {
+    const a = await write(() => props.onVisibilityChange(visibility))
+    if (!a) return false
+    if (props.onRestUntilChange) return write(() => props.onRestUntilChange!(pausedUntil))
+    return true
+  }
+  const prior = { visibility: routine.visibility, pausedUntil: routine.paused_until ?? null }
+  const restUntil = async (ymd: string | null) => {
+    const iso = ymd ? new Date(`${ymd}T00:00:00`).toISOString() : null
+    if (props.unsaved) { await saveRest('reference', iso)(); return }
+    const wake = ymd ? wakeDate(ymd) : null
+    await run(wake ? `Rest "${routine.name}" until ${formatWake(wake)}` : `Rest "${routine.name}"`, saveRest('reference', iso), {
+      ids: [routine.id], undo: saveRest(prior.visibility, prior.pausedUntil),
+    })
+    setRestDate('')
+  }
+  const wakeNow = async () => {
+    if (props.unsaved) { await saveRest('active', null)(); return }
+    await run(`Wake "${routine.name}"`, saveRest('active', null), {
+      ids: [routine.id], undo: saveRest(prior.visibility, prior.pausedUntil),
+    })
+  }
+  const changeWake = async (ymd: string) => {
+    if (!props.onRestUntilChange) return
+    const iso = ymd ? new Date(`${ymd}T00:00:00`).toISOString() : null
+    if (props.unsaved) { props.onRestUntilChange(iso); return }
+    const wake = ymd ? wakeDate(ymd) : null
+    await run(wake ? `Wake "${routine.name}" on ${formatWake(wake)}` : `Rest "${routine.name}" with no wake date`,
+      () => write(() => props.onRestUntilChange!(iso)),
+      { ids: [routine.id], undo: () => write(() => props.onRestUntilChange!(prior.pausedUntil)) })
+  }
+  const setOff = async (next: boolean) => {
+    const fn = props.onShowOnTodayChange
+    if (!fn) return
+    if (props.unsaved) { fn(!next); return }
+    await run(next ? `Turn "${routine.name}" off` : `Show "${routine.name}" in Today and planning`,
+      () => write(() => fn(!next)),
+      { ids: [routine.id], undo: () => write(() => fn(next)) })
+  }
 
   // Today-completion checklist for the steps — same instance keys as the
   // Today collection row, so checking here updates its progress too.
@@ -136,6 +208,10 @@ export function TapRoutinePanel(props: TapRoutinePanelProps) {
       }
       act={
       <section className="flex flex-col gap-3">
+        {/* Where it shows, and why — Today, the week, the kiosk. Live while
+            the schedule is being edited, so a change says what it will do. */}
+        <WhereItShows explanation={explanation} live={editingSchedule || !!props.unsaved} />
+
         {/* Who does it + context + streak */}
         <div className="flex flex-wrap items-center gap-2">
           {familyMembers.length > 0 && props.onAssignChange && (
@@ -159,92 +235,117 @@ export function TapRoutinePanel(props: TapRoutinePanelProps) {
           )}
         </div>
 
-        {/* Active / Resting — off parks the routine on the Resting shelf
-            (visibility "reference"), optionally with an automatic wake date. */}
-        <div>
-          <div className="flex items-center justify-between gap-3">
-            <span className="text-[15px] font-medium text-neutral-700">
-              {onTimeline ? 'Active' : 'Resting'}
-            </span>
-            <button
-              type="button"
-              role="switch"
-              aria-checked={onTimeline}
-              aria-label="Active"
-              onClick={() => props.onVisibilityChange(onTimeline ? 'reference' : 'active')}
-              className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${
-                onTimeline ? 'bg-primary-600' : 'bg-neutral-300'
-              }`}
-            >
-              <span
-                className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform ${
-                  onTimeline ? 'translate-x-[22px]' : 'translate-x-0.5'
-                }`}
-              />
-            </button>
-          </div>
-          <p className="mt-1 text-xs text-neutral-400">
-            {onTimeline
-              ? "This routine appears on Today at its scheduled time."
-              : "Asleep — off Today and the week, parked on the Resting shelf."}
-          </p>
-          {!onTimeline && props.onRestUntilChange && (
-            <div className="mt-2 flex items-center gap-2">
-              <label htmlFor="wake-date" className="text-xs text-neutral-500">Wake automatically on</label>
-              <input
-                id="wake-date"
-                type="date"
-                value={routine.paused_until ? routine.paused_until.slice(0, 10) : ''}
-                onChange={e => props.onRestUntilChange!(e.target.value ? new Date(`${e.target.value}T00:00:00`).toISOString() : null)}
-                className="rounded-lg border border-neutral-200 px-2 py-1 text-xs text-neutral-600"
-              />
+        {/* Three strengths of "not showing", kept apart so the difference
+            is visible: Hide for today (this occurrence), Rest until… (the
+            whole routine, everywhere, wakes on a date), Off (keeps running
+            and stays on the kiosk; hidden from Today and planning). */}
+        <section aria-label="Hide it" className="routine-hide-controls">
+          {onTimeline && !props.unsaved && (
+            <div className="routine-hide-control">
+              <div className="routine-hide-control-text">
+                <span className="routine-hide-control-title">{ROUTINE_HIDE_LABELS.today}</span>
+                <span className="routine-hide-control-hint">
+                  {skipped
+                    ? 'Skipped for today only — the routine itself is unchanged.'
+                    : canHideToday
+                      ? 'Skips today’s occurrence only. Back next time it’s due.'
+                      : 'Not on Today today — nothing to hide.'}
+                </span>
+              </div>
+              <button
+                type="button"
+                className="canvas-chip"
+                disabled={!skipped && !canHideToday}
+                onClick={() => { void (skipped ? showToday(routine.id, routine.name, viewedDate) : hideForToday(routine.id, routine.name, viewedDate)) }}
+              >
+                {skipped ? 'Show today again' : ROUTINE_HIDE_LABELS.today}
+              </button>
             </div>
           )}
-        </div>
 
-        {/* On Today and planning — a running routine that doesn't need a row
-            read back to you. Separate from Active/Resting on purpose: this one
-            keeps running. One switch for Today and the planning pages (Scott,
-            2026-10-03: "an easy way in the detail pane to hide a repeating
-            item from the planning views and the today view"). */}
-        {onTimeline && props.onShowOnTodayChange && (
-          <div>
-            <div className="flex items-center justify-between gap-3">
-              <span className="text-[15px] font-medium text-neutral-700">
-                {onToday ? 'Shown in Today and planning' : 'Hidden from Today and planning'}
+          <div className="routine-hide-control">
+            <div className="routine-hide-control-text">
+              <span className="routine-hide-control-title">{onTimeline ? ROUTINE_HIDE_LABELS.rest : 'Resting'}</span>
+              <span className="routine-hide-control-hint">
+                {onTimeline
+                  ? 'Pauses it everywhere — Today, the week and the kiosk — and wakes it on the date.'
+                  : explanation.wakesOn
+                    ? `Asleep everywhere until ${formatWake(explanation.wakesOn)} — it wakes on its own.`
+                    : 'Asleep everywhere, with no wake date — parked on the Resting shelf.'}
               </span>
+            </div>
+            <div className="routine-hide-control-act">
+              {(onTimeline || props.onRestUntilChange) && (
+                <input
+                  type="date"
+                  aria-label={onTimeline ? 'Rest until' : 'Wake automatically on'}
+                  value={onTimeline ? restDate : (routine.paused_until ? routine.paused_until.slice(0, 10) : '')}
+                  onChange={e => {
+                    if (onTimeline) { setRestDate(e.target.value); return }
+                    void changeWake(e.target.value)
+                  }}
+                  className="rounded-lg border border-neutral-200 px-2 py-1 text-xs text-neutral-600"
+                />
+              )}
+              {onTimeline ? (
+                <button
+                  type="button"
+                  className="canvas-chip"
+                  onClick={() => { void restUntil(restDate || null) }}
+                  aria-label={restDate ? `Rest until ${formatWake(wakeDate(restDate)!)}` : 'Rest with no wake date'}
+                >
+                  {restDate ? 'Rest' : 'Rest, no date'}
+                </button>
+              ) : (
+                <button type="button" className="canvas-chip" onClick={() => { void wakeNow() }}>
+                  Wake now
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Off — a running routine that doesn't need a row read back to
+              you. One switch for Today and the planning pages (Scott,
+              2026-10-03); it keeps running and stays on the kitchen kiosk. */}
+          {onTimeline && props.onShowOnTodayChange && (
+            <div className="routine-hide-control">
+              <div className="routine-hide-control-text">
+                <span className="routine-hide-control-title">
+                  {ROUTINE_HIDE_LABELS.off}{off ? ' — hidden from Today and planning' : ''}
+                </span>
+                <span className="routine-hide-control-hint">
+                  {/* Said as it behaves (dayPlan.ts): a time puts it at that time;
+                      a rule naming its days puts it on each of them, untimed; a
+                      rule that leaves the day open (the weekend window, "since
+                      last") is offered on Today to choose. */}
+                  {off
+                    ? 'Still runs, and still on the kitchen kiosk. Turn Off back off to show it again.'
+                    : routine.time_of_day
+                      ? 'Takes a row on Today and the week grid at its time.'
+                      : namesDueDays(routine.recurrence_pattern)
+                        ? 'On Today and the week on each day it’s due — no time needed.'
+                        : 'Offered on Today to choose — it has no set day.'}
+                </span>
+              </div>
               <button
                 type="button"
                 role="switch"
-                aria-checked={onToday}
-                aria-label="Show in Today and planning"
-                onClick={() => props.onShowOnTodayChange!(!onToday)}
+                aria-checked={off}
+                aria-label="Off"
+                onClick={() => { void setOff(!off) }}
                 className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${
-                  onToday ? 'bg-primary-600' : 'bg-neutral-300'
+                  off ? 'bg-primary-600' : 'bg-neutral-300'
                 }`}
               >
                 <span
                   className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform ${
-                    onToday ? 'translate-x-[22px]' : 'translate-x-0.5'
+                    off ? 'translate-x-[22px]' : 'translate-x-0.5'
                   }`}
                 />
               </button>
             </div>
-            <p className="mt-1 text-xs text-neutral-400">
-              {/* Said as it behaves (dayPlan.ts): a time puts it at that time;
-                  a rule naming its days puts it on each of them, untimed; a
-                  rule that leaves the day open (the weekend window, "since
-                  last") is offered on Today to choose. */}
-              {!onToday
-                ? 'Still runs, and still on the kitchen wall. Find it on the Routines page to show it again.'
-                : routine.time_of_day
-                  ? 'Takes a row on Today and the week grid at its time.'
-                  : namesDueDays(routine.recurrence_pattern)
-                    ? 'On Today and the week on each day it’s due — no time needed.'
-                    : 'Offered on Today to choose — it has no set day.'}
-            </p>
-          </div>
-        )}
+          )}
+        </section>
 
         {/* Schedule (recurrence + time) — collapsed summary, expands to edit */}
         {props.onScheduleChange && (

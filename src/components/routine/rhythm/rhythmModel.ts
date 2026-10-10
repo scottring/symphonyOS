@@ -1,6 +1,7 @@
 import type { Routine, RecurrencePattern } from '@/types/actionable'
 import type { FamilyMember } from '@/types/family'
 import { groupRoutineSteps } from '@/lib/today/routineCollections'
+import { routineSwitches } from '@/lib/routineUtils'
 
 export type DayKey = 'sun' | 'mon' | 'tue' | 'wed' | 'thu' | 'fri' | 'sat'
 export const DAY_ORDER: DayKey[] = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat']
@@ -26,6 +27,10 @@ export interface RhythmModel {
   /** Rarer than once a year — every third spring, every five years. */
   rare: Routine[]
   resting: Routine[]
+  /** Running but Off — hidden from Today and planning. With the resting ones
+   *  they make the page's "Not showing" area, so a hidden routine is found
+   *  in one place instead of in its cadence band under a small label. */
+  off: Routine[]
   stepCounts: Record<string, number>
 }
 
@@ -125,13 +130,17 @@ export function buildRhythmModel(
   ]
 
   const model: RhythmModel = {
-    daily: [], week: [], month: [], season: [], year: [], rare: [], resting: [],
+    daily: [], week: [], month: [], season: [], year: [], rare: [], resting: [], off: [],
     stepCounts,
   }
 
   for (const { routine } of topLevel) {
     if (routine.visibility === 'reference') {
       model.resting.push(routine)
+      continue
+    }
+    if (routineSwitches(routine).off) {
+      model.off.push(routine)
       continue
     }
     const zone = zoneOf(routine.recurrence_pattern)

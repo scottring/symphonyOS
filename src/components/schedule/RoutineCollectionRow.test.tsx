@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { screen, fireEvent } from '@testing-library/react'
+import { screen, fireEvent, waitFor } from '@testing-library/react'
 import { render } from '@/test/test-utils'
 import { RoutineCollectionRow } from './RoutineCollectionRow'
 import type { TimelineItem } from '@/types/timeline'
@@ -251,7 +251,7 @@ describe('RoutineCollectionRow management menu', () => {
     fireEvent.click(screen.getByRole('button', { name: /routine options/i }))
     expect(screen.getByRole('menuitem', { name: /hide for today/i })).toBeInTheDocument()
     expect(screen.getByRole('menuitem', { name: /edit routine/i })).toBeInTheDocument()
-    expect(screen.getByRole('menuitem', { name: /remove from today/i })).toBeInTheDocument()
+    expect(screen.getByRole('menuitem', { name: /^off/i })).toBeInTheDocument()
   })
 
   it('Hide for today fires onHideToday and closes the menu', () => {
@@ -269,10 +269,13 @@ describe('RoutineCollectionRow management menu', () => {
     expect(handlers.onSelect).toHaveBeenCalledTimes(1)
   })
 
-  it('Remove from Today fires onRemove', () => {
+  // The three strengths are named the same everywhere: Hide for today
+  // (today's occurrence), Rest until… (the panel), Off (Today and planning).
+  it('Off fires onRemove, and says what it hides', () => {
     renderWithMenu()
     fireEvent.click(screen.getByRole('button', { name: /routine options/i }))
-    fireEvent.click(screen.getByRole('menuitem', { name: /remove from today/i }))
+    expect(screen.getByRole('menuitem', { name: /hide for today.*skips today only/i })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('menuitem', { name: /^off.*hidden from today and planning/i }))
     expect(mgmtHandlers.onRemove).toHaveBeenCalledTimes(1)
   })
 
@@ -315,5 +318,26 @@ describe('RoutineCollectionRow — who does it', () => {
   it('without an assign handler there is no control', () => {
     render(<RoutineCollectionRow item={collectionItem()} {...handlers} />)
     expect(screen.queryByTitle(/Assign people to/)).toBeNull()
+  })
+})
+
+// A routine made or changed by conversation (or a command) flashes where it
+// lands: the canvas marks its id as arrived for a few seconds.
+describe('RoutineCollectionRow arrival', () => {
+  it('flashes when its routine id has just arrived', async () => {
+    const { CanvasActivityProvider, useCanvasActivity } = await import('@/contexts/CanvasActivityContext')
+    function Probe() {
+      const { run } = useCanvasActivity()
+      return <button type="button" onClick={() => { void run('Update Shoulder HEP', async () => true, { ids: ['hep'] }) }}>change it</button>
+    }
+    const { container } = render(
+      <CanvasActivityProvider snapshot={{ tasks: [], goals: [] }} writers={{} as never} refetch={() => {}}>
+        <Probe />
+        <RoutineCollectionRow item={collectionItem()} onSelect={vi.fn()} onSelectStep={vi.fn()} onCompleteStep={vi.fn()} />
+      </CanvasActivityProvider>,
+    )
+    expect(container.querySelector('.canvas-arrived')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'change it' }))
+    await waitFor(() => expect(container.querySelector('.canvas-arrived')).not.toBeNull())
   })
 })

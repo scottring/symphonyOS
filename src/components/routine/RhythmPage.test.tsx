@@ -72,12 +72,53 @@ describe('RhythmPage', () => {
     expect(within(screen.getByRole('region', { name: 'Less often' })).getByText('Repaint the deck')).toBeInTheDocument()
     // A sleeper isn't a commitment — it waits behind a disclosure at the foot,
     // and says when it wakes.
-    fireEvent.click(screen.getByRole('button', { name: /Resting routines/ }))
+    fireEvent.click(screen.getByRole('button', { name: /Not showing/ }))
     const resting = screen.getByRole('region', { name: 'Resting' })
     expect(within(resting).getByText('Walk to school')).toBeInTheDocument()
     const wake = new Date()
     wake.setMonth(wake.getMonth() + 2)
     expect(resting.textContent).toContain(`wakes ${wake.toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}`)
+  })
+
+  // Resting (Rest until…) and Off are the two standing ways a routine stops
+  // showing; they gather in one "Not showing" area instead of hiding in their
+  // cadence bands. Each row's chips say where it shows, and open the panel
+  // that says why.
+  it('gathers Resting and Off routines under "Not showing", folded', () => {
+    render(
+      <RhythmPage {...noop} onUpdateRoutine={vi.fn()}
+        routines={[
+          mk('Walk Jax', { id: 'jax', time_of_day: '06:30:00' }),
+          mk('Yard weeding', { id: 'yard', show_on_timeline: false }),
+          mk('Camp mornings', { id: 'camp', visibility: 'reference', paused_until: wakeInMonths(8) }),
+        ]} />
+    )
+    // Off is no longer drawn in its cadence band.
+    expect(within(screen.getByRole('region', { name: 'Daily' })).queryByText('Yard weeding')).not.toBeInTheDocument()
+    expect(screen.queryByRole('region', { name: 'Off' })).not.toBeInTheDocument()
+
+    const toggle = screen.getByRole('button', { name: /Not showing/ })
+    expect(toggle).toHaveTextContent('1 resting, 1 off')
+    fireEvent.click(toggle)
+    expect(within(screen.getByRole('region', { name: 'Off' })).getByText('Yard weeding')).toBeInTheDocument()
+    expect(within(screen.getByRole('region', { name: 'Resting' })).getByText('Camp mornings')).toBeInTheDocument()
+  })
+
+  it('each row says where it shows; asking why opens the routine with the explanation', () => {
+    render(
+      <RhythmPage {...noop} onUpdateRoutine={vi.fn()}
+        routines={[mk('Yard weeding', { id: 'yard', show_on_timeline: false }), mk('Walk Jax', { id: 'jax', time_of_day: '06:30:00' })]} />
+    )
+    const jax = screen.getByRole('button', { name: /^Where Walk Jax shows/ })
+    expect(jax).toHaveTextContent('TodayWeekKiosk')
+    fireEvent.click(screen.getByRole('button', { name: /Not showing/ }))
+    const why = screen.getByRole('button', { name: /^Why isn't Yard weeding showing on Today or Week\?/ })
+    expect(why.getAttribute('aria-label')).toContain('Hidden from Today and planning (Off)')
+    expect(within(why).getByText('Kiosk').className).toContain('is-on')
+    expect(within(why).getByText('Today').className).toContain('is-off')
+    fireEvent.click(why)
+    const where = screen.getByRole('region', { name: 'Where it shows' })
+    expect(within(where).getAllByText('Hidden from Today and planning (Off)').length).toBeGreaterThan(0)
   })
 
   it('type-anywhere search dims non-matching routines', () => {

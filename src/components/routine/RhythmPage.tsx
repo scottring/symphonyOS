@@ -15,6 +15,12 @@ import { groupRoutineSteps } from '@/lib/today/routineCollections'
 import { TapRoutinePanel } from '@/components/surface/TapRoutinePanel'
 import { TapStepPanel } from '@/components/surface/TapStepPanel'
 import { buildRhythmModel } from './rhythm/rhythmModel'
+import { explainRoutine, type RoutineExplanation } from '@/lib/routines/explain'
+import { useRoutineExplainLens } from './useRoutineExplainLens'
+import { useActionableInstances } from '@/hooks/useActionableInstances'
+import { useDateInstances } from '@/hooks/useDateInstances'
+import { deferredInRoutineIds } from '@/lib/today/deferredRoutines'
+import { localYmd } from '@/lib/cadence/config'
 
 import { findTend, tendFindingKey } from './rhythm/tendHeuristics'
 import { CadenceBand } from './rhythm/CadenceBand'
@@ -109,7 +115,7 @@ export function RhythmPage(props: RhythmPageProps) {
     setNewDraft(null)
     return created
   }
-  const [restingOpen, setRestingOpen] = useState(false)
+  const [notShowingOpen, setNotShowingOpen] = useState(false)
   const [tendOpen, setTendOpen] = useState(false)
 
   // A slot created while a member lens is locked in shares only with those
@@ -177,6 +183,25 @@ export function RhythmPage(props: RhythmPageProps) {
   )
   const tendCount = findings.length
   const { collections } = useMemo(() => groupRoutineSteps(routines), [routines])
+
+  // Where each routine shows today — Today, the week, the kiosk — for the
+  // row chips. Today's own lens (areas, people) and today's occurrences, so a
+  // routine hidden for today reads as hidden for today.
+  const lens = useRoutineExplainLens()
+  const { getInstancesForDate } = useActionableInstances()
+  const { instances: todayInstances } = useDateInstances(dayStart, getInstancesForDate)
+  const explanations = useMemo(() => {
+    const instances = todayInstances ?? []
+    const skipped = new Set(instances.filter((i) => i.entity_type === 'routine' && i.status === 'skipped' && i.date === localYmd(dayStart)).map((i) => i.entity_id))
+    const deferredInto = deferredInRoutineIds(instances, dayStart)
+    const stepsOf = new Map(collections.map((c) => [c.id, c.steps]))
+    return new Map(routines.filter((r) => !r.parent_routine_id).map((r) => [r.id, explainRoutine(r, {
+      date: dayStart, prefs: lens.prefs, member: lens.member, familyMembers,
+      skippedToday: skipped.has(r.id), deferredInto, steps: stepsOf.get(r.id),
+    })] as const))
+  }, [routines, todayInstances, dayStart, collections, lens, familyMembers])
+  const explainFor = (r: Routine): RoutineExplanation =>
+    explanations.get(r.id) ?? explainRoutine(r, { date: dayStart, prefs: lens.prefs, member: lens.member, familyMembers })
   // Type-anywhere search
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -377,7 +402,7 @@ export function RhythmPage(props: RhythmPageProps) {
           <CadenceBand
             heading="Daily" hint="A little, every day"
             routines={model.daily} familyMembers={familyMembers} stepCounts={model.stepCounts}
-            matches={matches} now={dayStart} onOpenRoutine={openRoutine}
+            matches={matches} now={dayStart} onOpenRoutine={openRoutine} explain={explainFor}
             onCreateInSlot={createRoutineInSlot}
             createPattern={{ type: 'daily' }}
             addLabel="Add a daily routine"
@@ -385,7 +410,7 @@ export function RhythmPage(props: RhythmPageProps) {
           <CadenceBand
             heading="Weekly" hint="With a day, or whenever it fits"
             routines={model.week} familyMembers={familyMembers} stepCounts={model.stepCounts}
-            matches={matches} now={dayStart} onOpenRoutine={openRoutine}
+            matches={matches} now={dayStart} onOpenRoutine={openRoutine} explain={explainFor}
             onCreateInSlot={createRoutineInSlot}
             createPattern={{ type: 'weekly' }}
             addLabel="Add a weekly routine"
@@ -393,7 +418,7 @@ export function RhythmPage(props: RhythmPageProps) {
           <CadenceBand
             heading="Monthly" hint="Once a month"
             routines={model.month} familyMembers={familyMembers} stepCounts={model.stepCounts}
-            matches={matches} now={dayStart} onOpenRoutine={openRoutine}
+            matches={matches} now={dayStart} onOpenRoutine={openRoutine} explain={explainFor}
             onCreateInSlot={createRoutineInSlot}
             createPattern={{ type: 'monthly' }}
             addLabel="Add a monthly routine"
@@ -401,7 +426,7 @@ export function RhythmPage(props: RhythmPageProps) {
           <CadenceBand
             heading="Seasonal" hint="As the season changes"
             routines={model.season} familyMembers={familyMembers} stepCounts={model.stepCounts}
-            matches={matches} now={dayStart} onOpenRoutine={openRoutine}
+            matches={matches} now={dayStart} onOpenRoutine={openRoutine} explain={explainFor}
             onCreateInSlot={createRoutineInSlot}
             createPattern={{ type: 'quarterly' }}
             addLabel="Add a seasonal routine"
@@ -409,7 +434,7 @@ export function RhythmPage(props: RhythmPageProps) {
           <CadenceBand
             heading="Yearly" hint="Once a year, on its date"
             routines={model.year} familyMembers={familyMembers} stepCounts={model.stepCounts}
-            matches={matches} now={dayStart} onOpenRoutine={openRoutine}
+            matches={matches} now={dayStart} onOpenRoutine={openRoutine} explain={explainFor}
             onCreateInSlot={createRoutineInSlot}
             createPattern={{ type: 'yearly' }}
             addLabel="Add a yearly routine"
@@ -417,33 +442,47 @@ export function RhythmPage(props: RhythmPageProps) {
           <CadenceBand
             heading="Less often" hint="Rarer than once a year"
             routines={model.rare} familyMembers={familyMembers} stepCounts={model.stepCounts}
-            matches={matches} now={dayStart} onOpenRoutine={openRoutine}
+            matches={matches} now={dayStart} onOpenRoutine={openRoutine} explain={explainFor}
             onCreateInSlot={createRoutineInSlot}
             createPattern={{ type: 'yearly', interval: 2 }}
             addLabel="Add a rarer routine"
           />
 
-          {/* Resting is not a commitment — it waits behind a disclosure rather
+          {/* Not showing: Resting (asleep everywhere, with its wake date) and
+              Off (running, hidden from Today and planning). Neither is a
+              commitment right now, so they wait behind one disclosure rather
               than sitting among the things you actually do. */}
-          {model.resting.length > 0 && (
-            <div>
+          {(model.resting.length > 0 || model.off.length > 0) && (
+            <div className="routine-not-showing">
               <button
                 type="button"
-                aria-expanded={restingOpen}
-                onClick={() => setRestingOpen(v => !v)}
+                aria-expanded={notShowingOpen}
+                onClick={() => setNotShowingOpen(v => !v)}
                 className="flex items-center gap-1.5 text-[13px] font-medium text-neutral-500 transition-colors hover:text-neutral-700"
               >
-                {restingOpen ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
-                Resting routines
-                <span className="tabular-nums text-neutral-400">{model.resting.length}</span>
+                {notShowingOpen ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+                Not showing
+                <span className="tabular-nums text-neutral-400">{model.resting.length + model.off.length}</span>
+                <span className="font-normal text-neutral-400">
+                  · {[model.resting.length > 0 ? `${model.resting.length} resting` : null, model.off.length > 0 ? `${model.off.length} off` : null].filter(Boolean).join(', ')}
+                </span>
               </button>
-              {restingOpen && (
-                <div className="mt-2">
-                  <CadenceBand
-                    heading="Resting" hint="Not a commitment right now — it wakes on its own"
-                    routines={model.resting} familyMembers={familyMembers} stepCounts={model.stepCounts}
-                    matches={matches} now={dayStart} resting onOpenRoutine={openRoutine}
-                  />
+              {notShowingOpen && (
+                <div className="mt-2 flex flex-col gap-4">
+                  {model.resting.length > 0 && (
+                    <CadenceBand
+                      heading="Resting" hint="Rest until… — asleep everywhere; it wakes on its own"
+                      routines={model.resting} familyMembers={familyMembers} stepCounts={model.stepCounts}
+                      matches={matches} now={dayStart} resting onOpenRoutine={openRoutine} explain={explainFor}
+                    />
+                  )}
+                  {model.off.length > 0 && (
+                    <CadenceBand
+                      heading="Off" hint="Still runs and stays on the kiosk — hidden from Today and planning"
+                      routines={model.off} familyMembers={familyMembers} stepCounts={model.stepCounts}
+                      matches={matches} now={dayStart} onOpenRoutine={openRoutine} explain={explainFor}
+                    />
+                  )}
                 </div>
               )}
             </div>
@@ -549,6 +588,7 @@ export function RhythmPage(props: RhythmPageProps) {
                 key={openStep.id}
                 step={openStep}
                 parentName={parentOfOpenStep.name}
+                parent={parentOfOpenStep}
                 onClose={() => setOpen({ kind: 'routine', id: parentOfOpenStep.id })}
                 onRename={name => onUpdateRoutine(openStep.id, { name })}
                 onDosesChange={times => onUpdateRoutine(openStep.id, { times_per_day: times })}
