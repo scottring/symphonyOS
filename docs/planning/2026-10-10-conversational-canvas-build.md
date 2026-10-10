@@ -61,6 +61,10 @@ Out-of-scope findings to report (not changed here): `VITE_OPEN_BRAIN_API_KEY` is
 - Kiosk speech is off unless opted in; Chrome's built-in recognition sends audio to Google; room audio untested on the EMEET M0 Plus. Recipes don't store servings, so scaling assumes 4 and says so.
 - kidsPhone: no test calls placed. Cancel exists only before dialing; after dialing the screen says the call continues on the handset (hang-up is not supported by the service).
 
+## Later scope (noted, not in this build)
+
+- Kiosk play space for the kids (Scott, 2026-10-10): whimsy, fun and games in the kitchen, sandboxed so play can never change household content or interrupt held activities. The kiosk activity machine (src/lib/wall/activity/) can host a write-free Play activity reached from a kid-friendly button, with Home always returning.
+
 ## Verification log
 
 - 2026-10-10, preview :5289, disposable account symphonygoals+onboarding1008: typed "Add a task for today called Canvas check: buy kite string" with the deployed agent → strip Working → Saved with change chip + Undo; item appeared in For today; Undo removed it; reload confirmed removal.
