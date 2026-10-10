@@ -1,4 +1,5 @@
 import { planSaved } from './planSaved.ts'
+import { IDEMPOTENT_CREATES, PROPOSE_TOOL, proposalItems, stableRowId, toolOutcome } from './canvasEvents.ts'
 import { planningRow, validatePlanningParent, planningWeekStart } from './planning.ts'
 import { createClient, SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { buildDraftPayload, clampMaxResults } from '../_shared/gmail-tools.ts'
@@ -96,6 +97,11 @@ Routines vs tasks:
 
 Keep replies tight. Summary first, offer to expand.
 
+Doing versus suggesting:
+- When the person says what they want ("add X", "my goals are A and B", "book a consultation"), do it with the write tools; the screen shows each save as it lands and offers Undo, so do not ask them to confirm every explicit instruction.
+- When YOU think of something they did not say (a missing milestone, a next action), offer it with symphony_propose_plan_items instead of creating it. Suggestions show dashed until the person keeps them. Never invent goals or intentions; suggestions must follow from what they said.
+- Planning sessions go across, not down: all of the year's intentions first, then the season's goals across every intention, then the month's milestones across those goals, then one combined week. Do not take one intention all the way to today before returning to the next. Accept items with no parent; they sit in Unlinked.
+
 When the user attaches a document describing a recurring protocol (e.g. a physical-therapy home exercise program):
 - Read it. Extract each distinct item, its instructions, and how many times per day it is done.
 - Before creating anything, list what you found (item -> frequency) and ask the user to confirm. Only write after they confirm.
@@ -108,6 +114,7 @@ const CONTEXT_ENUM = ['work', 'family', 'personal']
 const BUCKET_ENUM = ['inbox', 'timed', 'week', 'month', 'quarter']
 
 const TOOLS = [
+  PROPOSE_TOOL,
   {name:'symphony_link_plan_item',description:'Connect an existing month milestone to a season goal or an existing weekly action to a month milestone. Preserves the existing item, dates and completion. Read both items first. Does not create a replacement or alter either life area.',input_schema:{type:'object',properties:{id:{type:'string'},parent_id:{type:'string'},level:{type:'string',enum:['month','week']}},required:['id','parent_id','level']}},
   { name: 'symphony_list_intentions', description: 'Read existing yearly intentions before planning or creating another. Returns up to 100 visible intentions.', input_schema: {type:'object',properties:{year:{type:'integer'},context:{type:'string',enum:CONTEXT_ENUM}}}},
   {name:'symphony_show_workspace',description:'Show a requested Symphony planning page. Available only with workspace context; changes the view, not data.',input_schema:{type:'object',properties:{page:{type:'string',enum:['today','week','month','season','year','inbox','routines','meals']},date:{type:'string',description:'Optional YYYY-MM-DD'}},required:['page']}},
@@ -592,7 +599,18 @@ async function runTool(
   // Structured side-channel: search_notes pushes the notes it found here so the
   // handler can surface them to the client as clickable source chips.
   sourceSink: Array<{ id: string; title: string; vaultPath?: string }>,
+  // The client's id for this user message. Creations derive their row id from
+  // it, so a resent turn recognises what it already saved.
+  turnId: string | null = null,
 ): Promise<string> {
+  const stableId = IDEMPOTENT_CREATES.has(name) ? await stableRowId(userId, turnId, name, input) : null
+  // A unique violation on a stable id means this creation already saved in an
+  // earlier attempt of the same turn: return that row instead of failing.
+  const alreadySaved = async (table: string) => {
+    if (!stableId) return null
+    const { data } = await db.from(table).select('*').eq('id', stableId).maybeSingle()
+    return data ? JSON.stringify({ ...data, already_saved: true }) : null
+  }
   const now = () => new Date().toISOString()
   try {
     switch (name) {
@@ -649,8 +667,9 @@ async function runTool(
           if(input.level==='season')insert.goal_id=parent.id
           else {insert.source_id=parent.id;if(parent.goal_id)insert.goal_id=parent.goal_id}
         }
+        if(stableId)insert.id=stableId
         const {data,error}=await db.from(table).insert(insert).select().single()
-        if(error)throw error
+        if(error){if(error.code==='23505'){const existing=await alreadySaved(table);if(existing)return existing}throw error}
         return JSON.stringify(data)
       }
       case 'symphony_list_tasks': {
@@ -703,10 +722,14 @@ async function runTool(
           [row.assigned_to as string | null, ...((row.assigned_to_all as string[] | null) ?? [])],
           currentMemberId,
         )
+        if (stableId) row.id = stableId
         const { data, error } = await db.from('tasks')
           .insert(row)
           .select().single()
-        if (error) throw error
+        if (error) {
+          if (error.code === '23505') { const existing = await alreadySaved('tasks'); if (existing) return existing }
+          throw error
+        }
         return JSON.stringify(data, null, 2)
       }
       case 'symphony_update_task': {
@@ -897,8 +920,12 @@ async function runTool(
           [row.assigned_to as string | null, ...((row.assigned_to_all as string[] | null) ?? [])],
           currentMemberId,
         )
+        if (stableId) row.id = stableId
         const { data, error } = await db.from('routines').insert(row).select().single()
-        if (error) throw error
+        if (error) {
+          if (error.code === '23505') { const existing = await alreadySaved('routines'); if (existing) return existing }
+          throw error
+        }
         return JSON.stringify(data, null, 2)
       }
       case 'symphony_list_routines': {
@@ -1320,6 +1347,8 @@ Deno.serve(async (req) => {
   const incoming = body.messages
   const attachment: AttachmentMeta | null = body.attachment ?? null
   const currentMemberId: string | null = typeof body.currentMemberId === 'string' ? body.currentMemberId : null
+  // The client's id for this message (reused when the same message is retried).
+  const turnId: string | null = typeof body.turnId === 'string' ? body.turnId : null
   // Optional item scoping: the client says which task/routine this conversation
   // is about, so the agent can help make it doable without the user re-typing it.
   const rawTaskContext = body.taskContext
@@ -1464,7 +1493,17 @@ Deno.serve(async (req) => {
                   send({type:'workspace',page,...(date?{date}:{})})
                   result=JSON.stringify({navigationRequested:true,page})
                 } else result=JSON.stringify({error:'Workspace navigation unavailable or invalid'})
-              } else result = await runTool(db, user.id, block.name, block.input ?? {}, attachment, currentMemberId, authHeader, sourceNotes)
+              } else if (block.name === PROPOSE_TOOL.name) {
+                // Suggestions are shown, never written here.
+                const proposal = proposalItems(block.input ?? {}, String(block.id ?? crypto.randomUUID()))
+                if ('error' in proposal) result = JSON.stringify({ error: proposal.error })
+                else {
+                  send({ type: 'proposal', items: proposal.items })
+                  result = JSON.stringify({ shown: proposal.items.length, saved: false, note: 'Shown as suggestions. Nothing is saved until the person keeps them.' })
+                }
+              } else result = await runTool(db, user.id, block.name, block.input ?? {}, attachment, currentMemberId, authHeader, sourceNotes, turnId)
+              const outcome = toolOutcome(block.name, result)
+              if (outcome) send({ ...outcome })
               const saved = body.workspaceContext ? planSaved(block.name, block.input ?? {}, result) : null
               if (saved) send(saved)
               toolResults.push({ type: 'tool_result', tool_use_id: block.id, content: result })
