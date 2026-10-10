@@ -8,7 +8,8 @@ export function connectedDestination(destination: string, _currentSearch: string
     return `${path}?${params}`
   }
   params.set('view', period === 'week' || period === 'today' ? 'alongside' : 'constellation')
-  if (period === 'year' || period === 'season' || period === 'month') params.set('horizon', String(['year','season','month'].indexOf(period)))
+  // A Plan link that already names its horizon keeps it (Season shown from /year).
+  if ((period === 'year' || period === 'season' || period === 'month') && !/^[0-2]$/.test(params.get('horizon') ?? '')) params.set('horizon', String(['year','season','month'].indexOf(period)))
   return `${path}?${params}`
 }
 

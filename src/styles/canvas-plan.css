@@ -1,1 +1,155 @@
-/* src/styles/canvas-plan.css — conversational canvas: plan slice. Existing theme tokens only. */
+/* src/styles/canvas-plan.css — conversational canvas: plan slice.
+ *
+ * Plan (Year / Season / Month), one horizon at a time, items grouped under
+ * their parent. Builds on canvas.css (.canvas-group, .canvas-item, …) and the
+ * existing theme tokens only.
+ */
+
+.plan-canvas {
+  max-width: 1180px; margin: 0 auto; padding: 24px 32px 40px;
+  color: var(--color-neutral-800); background: transparent;
+  font-family: var(--font-family-sans);
+}
+
+/* ---- Header: stepper, period, horizon actions ---------------------------- */
+.plan-head { display: flex; flex-direction: column; gap: 12px; margin-bottom: 20px; }
+.plan-stepper {
+  display: inline-flex; align-self: flex-start; align-items: center; gap: 2px; flex-wrap: wrap;
+  padding: 3px; border: 1px solid var(--color-neutral-200); border-radius: var(--radius-full);
+  background: var(--color-bg-elevated);
+}
+.plan-stepper > button, .plan-stepper-week {
+  min-height: 34px; padding: 0 16px; border: 0; border-radius: var(--radius-full); background: none;
+  font-size: 13.5px; font-weight: 600; color: var(--color-neutral-700); text-decoration: none;
+  display: inline-flex; align-items: center;
+}
+.plan-stepper > button:hover, .plan-stepper-week:hover { background: var(--color-neutral-100); color: var(--color-neutral-900); }
+.plan-stepper > button[aria-current] { background: var(--color-primary-700); color: #fff; }
+.plan-stepper-week { color: var(--color-primary-700); font-weight: 500; }
+
+.plan-period { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; min-width: 0; }
+.plan-period h1 {
+  margin: 0; min-width: 0; font-family: var(--font-family-display); font-weight: 400;
+  font-size: clamp(28px, 3vw, 40px); line-height: 1.15; color: var(--color-neutral-900);
+}
+.plan-period-range { font-size: .55em; color: var(--color-neutral-600); white-space: nowrap; }
+.plan-period .canvas-icon { font-size: 22px; line-height: 1; }
+
+.plan-head-actions { display: flex; align-items: center; gap: 8px 16px; flex-wrap: wrap; }
+.plan-walk, .plan-next {
+  display: inline-flex; align-items: center; min-height: 36px; padding: 0 16px;
+  border: 1.5px solid var(--color-primary-600); border-radius: var(--radius-full);
+  background: var(--color-bg-elevated); color: var(--color-primary-800);
+  font-size: 13.5px; font-weight: 600; text-decoration: none;
+}
+.plan-walk:hover, .plan-next:hover { background: var(--color-primary-50); }
+
+.plan-status { font-size: 14px; color: var(--color-neutral-600); margin: 8px 0 16px; }
+
+/* ---- Focus ---------------------------------------------------------------- */
+.plan-focus-bar {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  margin: 0 0 12px; font-size: 13px; color: var(--color-neutral-600);
+}
+
+/* ---- Groups ----------------------------------------------------------------- */
+.plan-groups {
+  list-style: none; margin: 0; padding: 0;
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 14px; align-items: start;
+}
+.plan-groups.is-year { grid-template-columns: minmax(0, 760px); }
+.plan-groups.is-focused { grid-template-columns: minmax(0, 1fr); gap: 8px; }
+.plan-group-slot { min-width: 0; }
+.plan-group { padding: 10px 14px 10px; }
+.plan-group .canvas-group-head { align-items: center; }
+.plan-group .canvas-group-title { margin: 0; flex: 1; font-family: var(--font-family-display); font-size: 19px; font-weight: 500; color: var(--color-neutral-900); line-height: 1.25; }
+.plan-group.is-unlinked .canvas-group-title { font-family: var(--font-family-sans); font-size: 13px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--color-neutral-600); }
+.plan-group-focus { all: unset; cursor: pointer; border-radius: var(--radius-sm); overflow-wrap: anywhere; }
+.plan-group-focus:hover { text-decoration: underline; text-underline-offset: 3px; }
+.plan-group-focus[aria-pressed="true"] { color: var(--color-primary-800); }
+.plan-group-crumb { margin: 0 0 2px; font-size: 11.5px; color: var(--color-neutral-500); overflow-wrap: anywhere; }
+.plan-group.is-drop-ok { border-color: var(--color-primary-300); }
+.plan-group.is-drop { border-color: var(--color-primary-600); box-shadow: 0 0 0 2px var(--color-primary-100); }
+
+.plan-group-folded {
+  display: flex; align-items: baseline; gap: 8px; width: 100%; text-align: left;
+  padding: 8px 14px; font-size: 14px; color: var(--color-neutral-700); cursor: pointer;
+}
+.plan-group-folded .canvas-group-title { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.plan-group-folded:hover { opacity: .85; }
+
+.plan-items { list-style: none; margin: 0; padding: 0; }
+.plan-empty { margin: 6px 0 2px; font-size: 13px; color: var(--color-neutral-500); }
+.plan-add { margin-top: 4px; }
+
+/* ---- Items ------------------------------------------------------------------ */
+.plan-item { padding: 4px 0 6px; border-bottom: 1px solid var(--color-neutral-100); }
+.plan-item:last-child { border-bottom: 0; }
+.plan-item[draggable="true"] > .canvas-item { cursor: grab; }
+.plan-item-title {
+  all: unset; cursor: pointer; flex: 1; min-width: 0; overflow-wrap: anywhere;
+  font-size: 15px; line-height: 1.35; color: var(--color-neutral-900);
+}
+.plan-item-title:hover { text-decoration: underline; text-underline-offset: 3px; }
+.canvas-item.is-selected { border-color: var(--color-primary-400); background: var(--color-primary-50); }
+.canvas-item.is-done .plan-item-title { color: var(--color-neutral-500); text-decoration: line-through; }
+.plan-item-tools { display: flex; align-items: center; flex-wrap: wrap; gap: 0 6px; margin: 0 0 0 -4px; }
+.plan-item-tools .canvas-link { font-size: 12.5px; min-height: 28px; }
+.plan-item-actions > span > button { display: inline-flex; align-items: center; gap: 4px; min-height: 28px; padding: 2px 4px; font-size: 12.5px; font-weight: 600; color: var(--color-primary-700); }
+.plan-item-more { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; padding: 4px 0 2px; }
+.plan-item-meta { margin: 0; flex-basis: 100%; font-size: 12.5px; color: var(--color-neutral-600); }
+.plan-proposal-reason { padding: 2px 0 0; }
+
+/* Move under… */
+.plan-move { position: relative; display: inline-flex; }
+.plan-move-menu {
+  position: absolute; z-index: 40; top: calc(100% + 4px); left: 0; min-width: 220px; max-width: min(320px, calc(100vw - 32px));
+  max-height: 50vh; overflow-y: auto; padding: 6px; display: flex; flex-direction: column;
+  background: var(--color-bg-elevated); border: 1px solid var(--color-neutral-200); border-radius: var(--radius-lg); box-shadow: var(--shadow-lg);
+}
+.plan-move-menu > button {
+  text-align: left; padding: 8px 10px; border: 0; border-radius: var(--radius-md); background: none;
+  font-size: 14px; color: var(--color-neutral-800); overflow-wrap: anywhere;
+}
+.plan-move-menu > button:hover, .plan-move-menu > button:focus-visible { background: var(--color-neutral-100); outline: none; }
+.plan-move-menu > button[aria-checked="true"] { font-weight: 600; color: var(--color-primary-800); }
+.plan-move-menu > button[aria-checked="true"]::before { content: '✓ '; }
+.plan-move-unlink { border-top: 1px solid var(--color-neutral-100) !important; border-radius: 0 0 var(--radius-md) var(--radius-md) !important; margin-top: 4px; }
+.plan-move-none { margin: 4px 10px; font-size: 12.5px; color: var(--color-neutral-500); }
+
+/* Inline add / edit */
+.plan-composer { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 6px; flex: 1; min-width: 0; padding: 4px 0; }
+.plan-composer input {
+  flex: 1 1 180px; min-width: 0; height: 36px; padding: 0 10px;
+  border: 1px solid var(--color-neutral-300); border-radius: var(--radius-md);
+  background: var(--color-bg-base); color: var(--color-neutral-900); font-size: 15px;
+}
+.plan-composer input:focus { outline: 2px solid var(--color-primary-500); outline-offset: 0; }
+.plan-composer.is-failed input { border-color: var(--color-warning-500); }
+.plan-composer-error { flex-basis: 100%; margin: 2px 0 0; font-size: 12.5px; color: var(--color-neutral-800); }
+
+/* ---- Footer ------------------------------------------------------------------- */
+.plan-foot { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-top: 20px; }
+.plan-area { display: inline-flex; align-items: center; gap: 8px; font-size: 12px; color: var(--color-neutral-600); }
+
+/* ---- Focus rings -------------------------------------------------------------- */
+.plan-canvas button:focus-visible, .plan-canvas a:focus-visible, .plan-group-focus:focus-visible, .plan-item-title:focus-visible {
+  outline: 2px solid var(--color-primary-600); outline-offset: 2px;
+}
+
+/* ---- Phone -------------------------------------------------------------------- */
+@media (max-width: 767px) {
+  .plan-canvas { padding: 16px 16px 32px; }
+  .plan-stepper { align-self: stretch; justify-content: space-between; }
+  .plan-stepper > button, .plan-stepper-week { min-height: 44px; padding: 0 12px; flex: 1; justify-content: center; }
+  .plan-groups, .plan-groups.is-year { grid-template-columns: minmax(0, 1fr); }
+  .plan-group .canvas-group-head { position: sticky; top: 0; z-index: 2; background: var(--color-bg-elevated); }
+  .plan-group.is-unlinked .canvas-group-head { background: var(--color-bg-base); }
+  .plan-item-tools .canvas-link, .plan-item-actions > span > button, .plan-add, .plan-group-folded { min-height: 44px; }
+  .plan-period .canvas-icon { min-width: 44px; min-height: 44px; }
+  .plan-move-menu > button { min-height: 44px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .plan-canvas * { scroll-behavior: auto !important; }
+}

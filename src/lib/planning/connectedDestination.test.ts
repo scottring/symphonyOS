@@ -20,3 +20,8 @@ it('upgrades old bookmarks, preserving date and other query parameters',()=>{
  expect(defaultPlanningDestination('/wall-v2','')).toBeNull()
  expect(defaultPlanningDestination('/settings','')).toBeNull()
 })
+
+it('keeps a horizon the Plan link already names',()=>{
+ expect(connectedDestination('/year?view=constellation&horizon=1&start=2026-10-01','')).toBe('/year?view=constellation&horizon=1&start=2026-10-01')
+ expect(connectedDestination('/year?horizon=7','')).toBe('/year?horizon=0&view=constellation')
+})
