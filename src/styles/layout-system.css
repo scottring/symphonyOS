@@ -770,3 +770,4 @@ p.wk-dayhint { margin: 8px 0 0; }
 .daybook-masthead .masthead-numeral[data-len="3"] { font-size: 46px; }
 .daybook-masthead .masthead-numeral[data-len="4"] { font-size: 34px; }
 .daybook-masthead .masthead-numeral[data-len="5"] { font-size: 27px; }
+.daybook-masthead .masthead-numeral { white-space: nowrap; }
