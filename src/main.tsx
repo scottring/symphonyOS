@@ -73,6 +73,10 @@ await import('./index.css')
 await import('./styles/layout-system.css')
 // The conversational canvas's shared forms, drawn on the same tokens.
 await import('./styles/canvas.css')
+await import('./styles/canvas-today.css')
+await import('./styles/canvas-plan.css')
+await import('./styles/canvas-kiosk.css')
+await import('./styles/canvas-routines.css')
 
 // Apply the cached place theme before first paint so there's no color flash;
 // PlaceProvider owns it (and syncs with the DB) once React mounts.
