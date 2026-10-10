@@ -382,13 +382,13 @@ function Inner() {
   const walk = <button type="button" className="plan-walk" onClick={() => openAssistant({ message: walkMessage, autoSend: true })}>Plan {periodTitle} with Symphony</button>
   return <main ref={mainRef} className={`plan-canvas ${PAGE_PLANNING}`} data-horizon={level}>
     <MastheadCard variant="page" numeral={numeral}
-      title={<span className="plan-period-name">{level === 0 ? periodTitle : periodWord}</span>}
+      title={<span className="plan-period-name">{level === 0 ? 'Intentions' : periodWord}</span>}
       eyebrow={<PeriodNavEyebrow label={HORIZONS[level]} onPrev={() => setStart(bounds.prev)} onNext={() => setStart(bounds.next)}
         prevLabel={`Previous ${PERIODS[level]}`} nextLabel={`Next ${PERIODS[level]}`}
         trailing={current ? undefined : <button type="button" className="period-return canvas-link" onClick={() => setStart(null)}>This {PERIODS[level]}</button>} />}
       subline={level > 0
         ? <span className="plan-period-range">{periodRange(bounds.start, bounds.end)} · grouped under {level === 1 ? "this year's intentions" : `${periodWordOf(seasonB)} goals`}</span>
-        : <span className="plan-period-range">This year's intentions</span>}
+        : <span className="plan-period-range">{periodRange(bounds.start, bounds.end)} · what {periodTitle} is for</span>}
       controls={isMobile ? undefined : <div className="plan-head-controls">{stepper}{walk}</div>} />
     {isMobile && <div className="plan-head-mobile">{stepper}{walk}</div>}
     <div className="plan-toolbar">
