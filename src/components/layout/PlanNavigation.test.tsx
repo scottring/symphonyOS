@@ -27,8 +27,8 @@ describe('PlanNavigation', () => {
     const rail = screen.getByRole('navigation', { name: 'Planning period' })
     const month = rail.querySelector('a[aria-current="page"]')!
     // Words only on the rail (2026-10-07); the period it opens is in the tooltip.
-    expect(month.textContent).toBe('Month')
-    expect(month.getAttribute('title')).toBe('October')
+    expect(month.textContent).toBe('Plan')
+    expect(month.getAttribute('title')).toBe('Plan across all horizons')
     expect(month.getAttribute('href')).toBe('/month?start=2026-10-01&view=constellation&horizon=2')
     // The other steps follow the period on screen (decision D, 2026-09-29):
     // the week holding October 1, not the clock's week. Today stays today.
@@ -40,17 +40,17 @@ describe('PlanNavigation', () => {
   it('runs Today → Week → Month → Season → Year on desktop', () => {
     render(<MemoryRouter initialEntries={['/week']}><PlanNavigation /></MemoryRouter>)
     const rail = screen.getByRole('navigation', { name: 'Planning period' })
-    expect([...rail.querySelectorAll('a')].map((a) => a.getAttribute('aria-label'))).toEqual(['Today', 'Week', 'Month', 'Season', 'Year'])
+    expect([...rail.querySelectorAll('a')].map((a) => a.getAttribute('aria-label'))).toEqual(['Today', 'Week', 'Plan'])
   })
 
   it('switches horizons on a phone from the title menu, one horizon at a time', () => {
     render(<MemoryRouter initialEntries={['/season']}><PlanNavigation mobile /></MemoryRouter>)
     expect(screen.queryByRole('navigation', { name: 'Planning period' })).not.toBeInTheDocument()
-    const title = screen.getByRole('button', { name: 'Season. Switch horizon' })
+    const title = screen.getByRole('button', { name: 'Plan. Switch horizon' })
     fireEvent.click(title)
     const items = screen.getAllByRole('menuitemradio')
-    expect(items.map((i) => i.textContent?.split(/(?=[A-Z])/)[0])).toEqual(['Today', 'Week', 'Month', 'Season', 'Year'])
-    expect(screen.getByRole('menuitemradio', { name: /^Season/ })).toHaveAttribute('aria-checked', 'true')
+    expect(items.map((i) => i.textContent?.split(/(?=[A-Z])/)[0])).toEqual(['Today', 'Week', 'Plan'])
+    expect(screen.getByRole('menuitemradio', { name: /^Plan/ })).toHaveAttribute('aria-checked', 'true')
     fireEvent.keyDown(window, { key: 'Escape' })
     expect(screen.queryByRole('menu')).not.toBeInTheDocument()
   })

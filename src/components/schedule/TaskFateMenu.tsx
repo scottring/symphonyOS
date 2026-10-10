@@ -22,6 +22,7 @@ import { TriageWhenMenu, type TriageWhen } from './TriageWhenMenu'
 import { usePopoverFocus } from '@/hooks/usePopoverFocus'
 
 export interface TaskFateMenuProps {
+  triggerText?: string
   label?: string
   disabled?: boolean
   showWhen?: boolean
@@ -43,7 +44,7 @@ export interface TaskFateMenuProps {
   }
 }
 
-export function TaskFateMenu({ onPickWhen, onPickDate, onComplete, onDelete, onOpen, extras, fileUnder, label = 'Task actions', disabled = false, showWhen = true }: TaskFateMenuProps) {
+export function TaskFateMenu({ onPickWhen, onPickDate, onComplete, onDelete, onOpen, extras, fileUnder, triggerText, label = 'Task actions', disabled = false, showWhen = true }: TaskFateMenuProps) {
   const [open, setOpen] = useState(false)
   const [picksOpen, setPicksOpen] = useState(false)
   const containerRef = useRef<HTMLSpanElement>(null)
@@ -115,7 +116,7 @@ export function TaskFateMenu({ onPickWhen, onPickDate, onComplete, onDelete, onO
         onClick={() => setOpen((v) => !v)}
         className="p-0.5 rounded text-neutral-400 hover:text-neutral-700"
       >
-        <MoreHorizontal className="w-4 h-4" />
+        <MoreHorizontal className="w-4 h-4" />{triggerText && <span>{triggerText}</span>}
       </button>
 
       {open && !disabled && createPortal(

@@ -75,3 +75,11 @@ dialog.cp-editor{top:50%;bottom:auto;transform:translate(-50%,-50%);margin:0;col
 .hz-card-menu{position:absolute;top:3px;right:3px}.hz-card-menu>span>button{min-width:28px;min-height:28px;display:grid;place-items:center}
 
 .hz-completed-toggle{display:flex;align-items:center;gap:8px;font-size:13px;margin:0 0 16px;color:var(--color-neutral-600)}
+
+.hz-card-tools{display:flex;align-items:center;flex-wrap:wrap;gap:4px 12px;padding:0 10px 10px;font-size:12px}
+.hz-card-tools button{min-height:32px;color:var(--color-primary-700)}
+.hz-card-tools>span>button{display:flex;align-items:center;gap:4px}
+.hz-card-tools .hz-child-add{flex-basis:100%;text-align:left}
+.hz-header-add{padding:8px 0 0}
+.hz-card-wrap{background:var(--color-bg-elevated);border-radius:12px;margin-bottom:12px}
+.hz-card-wrap .hz-item{margin-bottom:0}

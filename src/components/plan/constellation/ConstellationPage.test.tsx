@@ -192,3 +192,22 @@ it('hides completed cards by default while retaining open children and their con
  fireEvent.click(screen.getByRole('checkbox',{name:/Show completed/}))
  expect(screen.queryByRole('button',{name:'Triage Finished season'})).not.toBeInTheDocument()
 })
+it('keeps add controls available while focused and creates a child from its card',()=>{
+ open();fireEvent.click(screen.getByRole('button',{name:/Together/,pressed:false}))
+ expect(screen.getByRole('button',{name:'+ Add an independent monthly milestone'})).toBeEnabled()
+ fireEvent.click(screen.getByRole('button',{name:'Add seasonal goal under Together'}))
+ expect(screen.getByRole('dialog')).toHaveTextContent('Under Together')
+})
+it('exposes direct edit and removal without selecting the branch',async()=>{
+ api.tasks=[{id:'m',title:'Picnic',bucket:'month',context:'personal'}]
+ api.dropCommitment.mockResolvedValue(false)
+ const confirm=vi.spyOn(window,'confirm').mockReturnValue(true)
+ open();fireEvent.click(screen.getByRole('button',{name:'Edit Picnic'}))
+ expect(screen.getByLabelText('Wording')).toHaveValue('Picnic')
+ fireEvent.click(screen.getByRole('button',{name:'Cancel'}))
+ fireEvent.click(screen.getByRole('button',{name:'Remove Picnic'}))
+ await screen.findByText('No change was saved. You can try again.')
+ expect(api.dropCommitment).toHaveBeenCalledWith('m','month',new Date(2026,9,1))
+ expect(screen.getByRole('button',{name:'Edit Picnic'})).toBeInTheDocument()
+ confirm.mockRestore()
+})
