@@ -128,8 +128,8 @@
 .kc-main.is-person .kc-main-inner, .kc-main.is-recipe .kc-main-inner { overflow: hidden; }
 .kc-main.part-quiet { margin: calc(var(--kc-u) * -1.6) calc(var(--kc-pad-x) * -1); }
 .kc-scenery { position: absolute; inset: 0; z-index: 0; pointer-events: none; overflow: hidden; }
-.kc-scenery img { position: absolute; bottom: 0; left: 0; width: 100%; height: 100%; object-fit: cover; object-position: bottom; opacity: .92; }
-.dark .kc-scenery img { opacity: .6; filter: brightness(.72) saturate(.7); }
+.kc-scenery img { position: absolute; bottom: 0; left: 0; width: 100%; height: 100%; object-fit: cover; object-position: bottom; opacity: .14; }
+.dark .kc-scenery img { opacity: .1; filter: brightness(.72) saturate(.7); }
 
 /* ---- Frame: bottom bar --------------------------------------------------- */
 .kc-bar {
