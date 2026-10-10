@@ -34,7 +34,7 @@ const FEATURES = {
   lists: true,
 }
 
-export type ViewType = 'agent' | 'home' | 'home-app' | 'today' | 'inbox' | 'goals' | 'projects' | 'routines' | 'lists' | 'contacts' | 'history' | 'task-detail' | 'contact-detail' | 'settings' | 'meals' | 'weekly-planning' | 'family-member' | 'discussions'
+export type ViewType = 'home' | 'home-app' | 'today' | 'inbox' | 'goals' | 'projects' | 'routines' | 'lists' | 'contacts' | 'history' | 'task-detail' | 'contact-detail' | 'settings' | 'meals' | 'weekly-planning' | 'family-member' | 'discussions'
 
 interface SidebarProps {
   collapsed: boolean

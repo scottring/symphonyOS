@@ -4,7 +4,6 @@ import { shareInFlight } from '@/lib/sharedRequest'
 import { useAuth } from '@/hooks/useAuth'
 import { logger } from '@/lib/logger'
 import { scopeForDomain } from '@/lib/scope'
-import { captureToVault } from '@/lib/openBrain'
 import { showToast } from '@/hooks/useToast'
 import type {
   Note,
@@ -247,11 +246,6 @@ export function useNotes() {
       // Replace optimistic note with real one
       const realNote = mapDbNote(data as DbNote)
       setNotes((prev) => prev.map((n) => (n.id === tempId ? realNote : n)))
-
-      // Dual-write: also capture to vault via Open Brain (fire-and-forget)
-      if (realNote.type === 'quick_capture') {
-        captureToVault(realNote.content).catch(() => {})
-      }
 
       return realNote
     },
