@@ -11,3 +11,5 @@ Validation:
 - Desktop and 390px phone menu inspected; phone clipping fixed.
 - Screenshot: /private/tmp/symphony-planning-triage.png.
 - Permanent deletion was not exercised against account data.
+
+Released as 92b7f3c6. Full pre-push: 807 files, 8,345 passed, 3 skipped. Vercel dpl_u59ttGLoFZpCYK1h5PThsjpLoW4j Ready on app.symphony-os.com. Production reload and opening a monthly card menu verified; no production plan mutations during release verification.

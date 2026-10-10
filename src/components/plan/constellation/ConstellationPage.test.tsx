@@ -158,6 +158,7 @@ it('offers triage without changing branch focus and reports failed carry-forward
 it('removes only the viewed period and can reopen completed cards',async()=>{
  api.tasks=[{id:'m',title:'Picnic',bucket:'month',context:'personal',completed:true}]
  api.dropCommitment.mockResolvedValue(true);api.toggleTask.mockResolvedValue(true);open()
+ fireEvent.click(screen.getByRole('checkbox',{name:/Show completed/}))
  fireEvent.click(screen.getByRole('button',{name:'Triage Picnic'}))
  fireEvent.click(screen.getByText('Reopen'));await screen.findByText('Reopened.')
  expect(api.toggleTask).toHaveBeenCalledWith('m')
@@ -179,4 +180,15 @@ it('uses the shared scheduling action and does not claim success after failure',
  fireEvent.click(screen.getByRole('button',{name:'Someday'}))
  await screen.findByText('No change was saved. You can try again.')
  expect(api.setBucket).toHaveBeenCalledWith('m','someday',undefined,undefined)
+})
+
+it('hides completed cards by default while retaining open children and their context',()=>{
+ api.tasks=[{id:'s',title:'Finished season',bucket:'quarter',completed:true},{id:'m',title:'Still open',bucket:'month',sourceId:'s'}]
+ open()
+ expect(screen.queryByRole('button',{name:'Triage Finished season'})).not.toBeInTheDocument()
+ expect(screen.getByRole('button',{name:/Still open Finished season/})).toBeInTheDocument()
+ fireEvent.click(screen.getByRole('checkbox',{name:/Show completed/}))
+ expect(screen.getByRole('button',{name:'Triage Finished season'})).toBeInTheDocument()
+ fireEvent.click(screen.getByRole('checkbox',{name:/Show completed/}))
+ expect(screen.queryByRole('button',{name:'Triage Finished season'})).not.toBeInTheDocument()
 })

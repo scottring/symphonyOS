@@ -73,3 +73,5 @@ dialog.cp-editor{top:50%;bottom:auto;transform:translate(-50%,-50%);margin:0;col
 @media(max-width:850px){.is-linking .hz-wires{display:block}}
 
 .hz-card-menu{position:absolute;top:3px;right:3px}.hz-card-menu>span>button{min-width:28px;min-height:28px;display:grid;place-items:center}
+
+.hz-completed-toggle{display:flex;align-items:center;gap:8px;font-size:13px;margin:0 0 16px;color:var(--color-neutral-600)}
