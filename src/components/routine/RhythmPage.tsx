@@ -279,6 +279,9 @@ export function RhythmPage(props: RhythmPageProps) {
         {/* The shared masthead card — the same anchor every other page wears. */}
         <MastheadCard
           variant="page"
+          // The same eyebrow line every destination has (here a plain label,
+          // no period to step), so the title sits at one height everywhere.
+          eyebrow={<span className="inline-flex h-7 items-center px-1.5 text-[12px] font-semibold uppercase tracking-[0.08em] text-neutral-500">Everyday</span>}
           title="Routines"
           motif="routines"
           subline={`How your household runs — ${subtitle}`}
