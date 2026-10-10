@@ -1,0 +1,142 @@
+/* src/styles/canvas.css
+ *
+ * The conversational canvas's shared forms, drawn in Symphony's own theme:
+ * place colours (--color-primary-*), the pure neutrals, Crimson Pro headings
+ * and DM Sans rows, the existing radii and motion tokens. Night scenery
+ * remaps the same tokens, so nothing here picks its own palette.
+ *
+ * Forms: item row (.canvas-item), group headed by its parent (.canvas-group),
+ * save state (.canvas-state), arrived/proposed marks, the docked conversation
+ * strip (.canvas-strip) and its receipt.
+ */
+
+/* ---- Save state ------------------------------------------------------ */
+.canvas-state {
+  display: inline-flex; align-items: center; gap: 6px; flex: none;
+  font-family: var(--font-family-sans); font-size: 11.5px; font-weight: 600; letter-spacing: .02em;
+  padding: 2px 9px; border-radius: var(--radius-full); white-space: nowrap;
+  border: 1px solid var(--color-neutral-300); color: var(--color-neutral-700); background: var(--color-bg-elevated);
+}
+.canvas-state.is-working, .canvas-state.is-saving, .canvas-state.is-listening { border-color: var(--color-primary-300); color: var(--color-primary-800); }
+.canvas-state.is-working::before, .canvas-state.is-saving::before, .canvas-state.is-listening::before {
+  content: ''; width: 7px; height: 7px; border-radius: 50%; background: var(--color-primary-600);
+  animation: canvas-pulse 1s ease-in-out infinite;
+}
+.canvas-state.is-saved { border-color: var(--color-primary-300); color: var(--color-primary-800); background: var(--color-primary-50); }
+.canvas-state.is-saved::before { content: '✓'; font-weight: 700; }
+.canvas-state.is-partial, .canvas-state.is-failed {
+  border-color: var(--color-warning-500); color: var(--color-neutral-900);
+  background: repeating-linear-gradient(135deg, var(--color-bg-elevated) 0 6px, var(--color-warning-50) 6px 12px);
+}
+.canvas-state.is-proposed { border-style: dashed; border-color: var(--color-primary-500); color: var(--color-primary-800); }
+@keyframes canvas-pulse { 0%, 100% { opacity: 1 } 50% { opacity: .25 } }
+
+/* ---- Items and groups ------------------------------------------------ */
+.canvas-group {
+  background: var(--color-bg-elevated); border: 1px solid var(--color-neutral-200);
+  border-radius: var(--radius-lg); padding: 8px 12px 6px;
+}
+.canvas-group.is-unlinked { background: transparent; border-style: dashed; border-color: var(--color-neutral-300); }
+.canvas-group.is-quiet { opacity: .6; }
+.canvas-group-head {
+  display: flex; align-items: baseline; gap: 8px; min-width: 0;
+  font-family: var(--font-family-sans); font-size: 12.5px; font-weight: 600; color: var(--color-neutral-600);
+  padding: 2px 0 6px; border-bottom: 1px solid var(--color-neutral-100); margin-bottom: 2px;
+}
+.canvas-group-head > .canvas-group-title { min-width: 0; overflow-wrap: anywhere; }
+.canvas-item {
+  display: flex; align-items: flex-start; gap: 9px; min-height: 32px; padding: 5px 6px; margin: 1px -6px;
+  border: 1.5px solid transparent; border-radius: var(--radius-md);
+  font-family: var(--font-family-sans); font-size: 14.5px; line-height: 1.35; color: var(--color-neutral-900);
+  transition: background-color var(--transition-base), border-color var(--transition-base), opacity var(--transition-base);
+}
+.canvas-item > .canvas-item-title { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.canvas-item .canvas-item-meta { flex: none; font-size: 12px; color: var(--color-neutral-500); white-space: nowrap; }
+.canvas-item.is-proposed { border: 1.5px dashed var(--color-primary-500); background: var(--color-bg-elevated); }
+.canvas-item.is-failed { border-color: var(--color-warning-500); background: repeating-linear-gradient(135deg, transparent 0 8px, var(--color-warning-50) 8px 16px); }
+.canvas-item.is-on-today { color: var(--color-neutral-500); }
+.canvas-arrived, .canvas-item.is-arrived { animation: canvas-arrive 1.6s ease-out; }
+@keyframes canvas-arrive {
+  0% { background: var(--color-primary-100); box-shadow: 0 0 0 2px var(--color-primary-300); }
+  60% { background: var(--color-primary-50); box-shadow: 0 0 0 2px var(--color-primary-200); }
+  100% { background: transparent; box-shadow: 0 0 0 0 transparent; }
+}
+.canvas-tag {
+  flex: none; font-size: 11px; font-weight: 600; letter-spacing: .02em; color: var(--color-primary-800);
+  border: 1px solid var(--color-primary-300); border-radius: var(--radius-full); padding: 0 7px; line-height: 18px; white-space: nowrap;
+}
+
+/* ---- Small controls ---------------------------------------------------- */
+.canvas-chip {
+  font-family: var(--font-family-sans); font-size: 12.5px; color: var(--color-neutral-800);
+  border: 1px solid var(--color-neutral-300); background: var(--color-bg-elevated);
+  border-radius: var(--radius-full); padding: 2px 10px; max-width: 220px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.canvas-chip:hover { border-color: var(--color-primary-400); }
+.canvas-link {
+  display: inline-flex; align-items: center; gap: 4px; border: 0; background: none; padding: 2px 4px;
+  font-family: var(--font-family-sans); font-size: 13px; font-weight: 600; color: var(--color-primary-700);
+  text-decoration: underline; text-underline-offset: 3px;
+}
+.canvas-icon {
+  display: inline-grid; place-items: center; width: 32px; height: 32px; border-radius: var(--radius-full);
+  border: 0; background: none; color: var(--color-neutral-500);
+}
+.canvas-icon:hover { color: var(--color-neutral-800); background: var(--color-neutral-100); }
+.canvas-link:focus-visible, .canvas-icon:focus-visible, .canvas-chip:focus-visible, .canvas-mic:focus-visible, .canvas-send:focus-visible {
+  outline: 2px solid var(--color-primary-600); outline-offset: 2px;
+}
+
+/* ---- The docked conversation strip ------------------------------------ */
+.canvas-strip {
+  position: sticky; bottom: 12px; z-index: 20;
+  margin: 24px auto 12px; max-width: var(--ds-content, 880px);
+  display: flex; flex-direction: column; gap: 6px;
+  background: var(--color-bg-elevated); border: 1px solid var(--color-neutral-200);
+  border-radius: var(--radius-xl); box-shadow: var(--shadow-lg); padding: 8px 10px 8px 14px;
+}
+.connected-workspace .canvas-strip { max-width: min(1180px, 100%); }
+.canvas-strip.is-listening { border-color: var(--color-primary-400); box-shadow: 0 0 0 3px var(--color-primary-100), var(--shadow-lg); }
+.canvas-receipt, .canvas-proposals-line {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap; min-width: 0;
+  font-family: var(--font-family-sans); font-size: 13.5px; color: var(--color-neutral-700);
+  padding: 2px 0 6px; border-bottom: 1px solid var(--color-neutral-100);
+}
+.canvas-receipt-request { color: var(--color-neutral-600); max-width: 40ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.canvas-receipt-summary { color: var(--color-neutral-900); min-width: 0; }
+.canvas-receipt-changes { display: inline-flex; gap: 6px; flex-wrap: wrap; }
+.canvas-receipt-actions { margin-left: auto; display: inline-flex; align-items: center; gap: 4px; }
+.canvas-composer { display: flex; align-items: center; gap: 6px; }
+.canvas-composer-field {
+  flex: 1; min-width: 0; height: 40px; border: 0; background: transparent; outline: none;
+  font-family: var(--font-family-sans); font-size: 15px; color: var(--color-neutral-900);
+}
+.canvas-composer-field::placeholder { color: var(--color-neutral-500); }
+.canvas-composer:focus-within { box-shadow: inset 0 -2px 0 var(--color-primary-500); }
+.canvas-mic {
+  display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0 14px 0 11px;
+  border-radius: var(--radius-full); border: 1.5px solid var(--color-primary-600); background: var(--color-bg-elevated);
+  font-family: var(--font-family-sans); font-size: 13.5px; font-weight: 600; color: var(--color-primary-800);
+}
+.canvas-mic.is-on { background: var(--color-primary-700); border-color: var(--color-primary-700); color: #fff; }
+.canvas-mic.is-on svg { animation: canvas-pulse 1.2s ease-in-out infinite; }
+.canvas-send {
+  display: inline-grid; place-items: center; width: 36px; height: 36px; border-radius: var(--radius-full);
+  border: 0; background: var(--color-primary-600); color: #fff;
+}
+.canvas-send:disabled { background: var(--color-neutral-200); color: var(--color-neutral-500); }
+
+@media (max-width: 767px) {
+  .canvas-strip { margin: 12px 8px; bottom: calc(67px + env(safe-area-inset-bottom, 0px) + 8px); border-radius: var(--radius-lg); padding: 6px 8px 6px 12px; }
+  .canvas-receipt-request { max-width: 22ch; }
+  .canvas-strip .canvas-mic span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+  .canvas-strip .canvas-mic { padding: 0 10px; min-width: 44px; min-height: 44px; }
+  .canvas-send, .canvas-icon { min-width: 44px; min-height: 44px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .canvas-arrived, .canvas-item.is-arrived { animation: none; box-shadow: 0 0 0 2px var(--color-primary-300); }
+  .canvas-state::before, .canvas-mic.is-on svg { animation: none !important; }
+  .canvas-item { transition: none; }
+}

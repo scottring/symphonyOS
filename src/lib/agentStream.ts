@@ -3,12 +3,26 @@ import { supabase } from '@/lib/supabase'
 
 export interface AgentSourceNote { id: string; title: string; vaultPath?: string }
 
+/** Something Symphony suggests rather than does: shown dashed on the canvas
+ *  until the person keeps it. `level` is the planning horizon (0 year
+ *  intention … 3 week action); `parentId` an existing item it would sit under. */
+export interface AgentProposalItem {
+  key: string
+  title: string
+  level: 0 | 1 | 2 | 3
+  parentId?: string | null
+  periodStart?: string
+  reason?: string
+}
+
 export type AgentStreamEvent =
   | { type: 'plan_saved'; id: string; level: number; date: string }
   | { type: 'workspace'; page: string; date?: string }
   | { type: 'session'; sessionId: string }
   | { type: 'text'; text: string }
   | { type: 'tool'; name: string }
+  | { type: 'tool_result'; name: string; ok: boolean; ids?: string[]; error?: string }
+  | { type: 'proposal'; items: AgentProposalItem[] }
   | { type: 'done'; reply: string; sessionId: string | null; sources?: AgentSourceNote[] }
   | { type: 'error'; message: string }
 
@@ -78,6 +92,12 @@ export interface StreamHandlers {
   workspaceContext?: WorkspaceContext
   onText?: (text: string) => void
   onTool?: (name: string) => void
+  /** A write tool's outcome, when the server reports it (newer agent builds). */
+  onToolResult?: (result: { name: string; ok: boolean; ids?: string[]; error?: string }) => void
+  onProposal?: (items: AgentProposalItem[]) => void
+  /** Stable per user message. A resent turn reuses it so the server can
+   *  recognise writes it already made instead of making them twice. */
+  turnId?: string
   onSession?: (sessionId: string) => void
   onDone?: (reply: string, sessionId: string | null, sources?: AgentSourceNote[]) => void
   onError?: (message: string) => void
@@ -133,6 +153,7 @@ export async function streamSymphonyAgent(
         ...(handlers.currentMemberId ? { currentMemberId: handlers.currentMemberId } : {}),
         ...(handlers.taskContext ? { taskContext: handlers.taskContext } : {}),
         ...(handlers.sessionContext ? { sessionContext: handlers.sessionContext } : {}),
+        ...(handlers.turnId ? { turnId: handlers.turnId } : {}),
       }),
     },
   )
@@ -157,6 +178,8 @@ export async function streamSymphonyAgent(
       else if (ev.type === 'workspace') handlers.onWorkspace?.(ev.page,ev.date)
       else if (ev.type === 'text') handlers.onText?.(ev.text)
       else if (ev.type === 'tool') handlers.onTool?.(ev.name)
+      else if (ev.type === 'tool_result') handlers.onToolResult?.({ name: ev.name, ok: ev.ok, ids: ev.ids, error: ev.error })
+      else if (ev.type === 'proposal') handlers.onProposal?.(Array.isArray(ev.items) ? ev.items : [])
       else if (ev.type === 'session') handlers.onSession?.(ev.sessionId)
       else if (ev.type === 'done') handlers.onDone?.(ev.reply, ev.sessionId, ev.sources)
       else if (ev.type === 'error') handlers.onError?.(ev.message)

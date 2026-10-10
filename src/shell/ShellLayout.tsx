@@ -41,7 +41,9 @@ import { useDomain } from '@/hooks/useDomain';
 import { filterInboxTasksForLayers } from '@/lib/today/domainFilter';
 import { useSupabaseTasks } from '@/hooks/useSupabaseTasks';
 import { useDiscussionInbox } from '@/hooks/useDiscussionInbox';
-import { useSymphonyAssistant } from '@/hooks/useSymphonyAssistant';
+import { useSymphonyAssistant, type AssistantTurnObserver } from '@/hooks/useSymphonyAssistant';
+import { CanvasActivityProvider, useCanvasActivity, type CanvasActivity } from '@/contexts/CanvasActivityContext';
+import { ConversationStrip } from '@/components/canvas/ConversationStrip';
 import { useScratchpadHidden } from '@/hooks/useScratchpadHidden';
 import { useAssistantLaunchRequests, useAssistantLauncher } from '@/contexts/AssistantLaunchContext';
 import { useShellChrome } from './useShellChrome';
@@ -175,8 +177,18 @@ function ShellLayoutInner({ children }: Props) {
 
   const references = useReferenceLists();
 
-  const { tasks, refetch } = useSupabaseTasks();
-  const { goals } = useGoals();
+  const { tasks, refetch, deleteTask, updateTask } = useSupabaseTasks();
+  const { goals, deleteGoal, updateGoal } = useGoals();
+  // The canvas activity provider sits inside this component's tree, but the
+  // assistant hook runs above it: a ref bridges each turn's events across.
+  const canvasRef = useRef<CanvasActivity | null>(null);
+  const turnObserver = useMemo<AssistantTurnObserver>(() => ({
+    start: ({ text, retry }) => canvasRef.current?.turnStarted(text, retry),
+    tool: (name) => canvasRef.current?.toolUsed(name),
+    toolResult: (result) => canvasRef.current?.toolResult(result),
+    proposal: (items) => canvasRef.current?.addProposals(items),
+    end: (turn) => canvasRef.current?.turnEnded(turn),
+  }), []);
   const [planningPeople] = useAssigneeFilter();
   const scopedTasks = useMemo(()=>tasks.filter(planPeopleLens(planningPeople,null).keep),[tasks,planningPeople]);
   const scopedGoals = useMemo(()=>goals.filter(planPeopleLens(planningPeople,null).keep),[goals,planningPeople]);
@@ -246,7 +258,7 @@ function ShellLayoutInner({ children }: Props) {
       const query = new URLSearchParams({ view: 'constellation', start: saved.date, horizon: String(saved.level), focus: `${saved.level}:${saved.id}` });
       navigate(`/year?${query}`, { replace: true });
     }
-  }, onWorkspace: (page,date) => { if (connectedWorkspace) { const url=workspaceDestination(page,date); if(url) navigate(url); } }, taskContext: conversationContext.taskContext, workspaceContext: connectedWorkspace ? screenContext : undefined, onMutate: () => { void refetch(); window.dispatchEvent(new Event('symphony-plan-updated')); } });
+  }, onWorkspace: (page,date) => { if (connectedWorkspace) { const url=workspaceDestination(page,date); if(url) navigate(url); } }, taskContext: conversationContext.taskContext, workspaceContext: connectedWorkspace ? screenContext : undefined, onMutate: () => { void refetch(); window.dispatchEvent(new Event('symphony-plan-updated')); }, turnObserver });
   const voiceAccess = useWorkspaceVoiceAccess(user?.id ?? null, connectedWorkspace);
   const voiceEnabled = connectedWorkspace && voiceAccess;
   const voice = useWorkspaceVoice(screenContext, assistant.sendMessage, (url) => navigate(import.meta.env.DEV && new URLSearchParams(location.search).get('voice') === '1' ? `${url}&voice=1` : url), voiceEnabled, user?.id ?? null);
@@ -305,7 +317,16 @@ function ShellLayoutInner({ children }: Props) {
   const referencesVisible = !isMobile && referencesFit
     && !!references?.pins.some((pin) => !pinIsOnPage(location.pathname, pin.kind));
 
+  const canvasSnapshot = useMemo(() => ({ tasks, goals }), [tasks, goals]);
+  const canvasWriters = useMemo(() => ({ deleteTask, updateTask, deleteGoal, updateGoal: updateGoal as (id: string, u: Partial<import('@/types/goal').Goal>) => Promise<unknown> }), [deleteTask, updateTask, deleteGoal, updateGoal]);
+  const canvasRefetch = useCallback(() => { window.dispatchEvent(new Event('symphony-plan-updated')); return refetch(); }, [refetch]);
+  const showStrip = conversationStripPath(location.pathname);
+  const stripVoice = { available: voiceEnabled, active: voice.active, status: voice.status, start: () => { void voice.start(); }, stop: voice.stop };
+  const openConversation = () => { if (isMobile) setPhoneChatOpen(true); else showPane('ai'); };
+
   return (
+    <CanvasActivityProvider snapshot={canvasSnapshot} writers={canvasWriters} refetch={canvasRefetch} retryTurn={() => { void assistant.retryLast(); }}>
+    <CanvasBridge target={canvasRef} />
     <DesktopControlsContext.Provider value={desktopControls}>
     <DesktopLeadContext.Provider value={desktopLead}>
     <DesktopCenterContext.Provider value={desktopCenter}>
@@ -370,6 +391,7 @@ function ShellLayoutInner({ children }: Props) {
             {/* Off the planner the area lens rides top-right; the guide sits below it. */}
             <div className={`guide-slot${planPeriodForPath(location.pathname) ? '' : ' has-lens'}`}><GuideBar host={guideHost} /></div>
             <div className="min-w-0">{children}</div>
+            {showStrip && <ConversationStrip compact receiptOnly onSend={(text) => sendConversation(text)} busy={assistant.loading} voice={stripVoice} onOpenConversation={openConversation} />}
           </div>
         ) : (
           // Desktop: navigation and page share one centred column —
@@ -436,6 +458,7 @@ function ShellLayoutInner({ children }: Props) {
                   {/* Guided planning rides above the page it is guiding. */}
                   <div className="guide-slot"><GuideBar host={guideHost} /></div>
                   {children}
+                  {showStrip && <ConversationStrip onSend={(text) => sendConversation(text)} busy={assistant.loading} voice={stripVoice} onOpenConversation={openConversation} />}
                 </div>
               </SideColumn>
             </div>
@@ -624,7 +647,20 @@ function ShellLayoutInner({ children }: Props) {
     </DesktopCenterContext.Provider>
     </DesktopLeadContext.Provider>
     </DesktopControlsContext.Provider>
+    </CanvasActivityProvider>
   );
+}
+
+/** Pages that carry the docked conversation: the three destinations and Routines. */
+export function conversationStripPath(pathname: string): boolean {
+  return pathname === '/' || ['/today', '/week', '/month', '/season', '/year', '/routines'].some((p) => pathname === p || pathname.startsWith(`${p}/`));
+}
+
+/** Hands the canvas activity to code that runs above its provider. */
+function CanvasBridge({ target }: { target: { current: CanvasActivity | null } }) {
+  const activity = useCanvasActivity();
+  target.current = activity;
+  return null;
 }
 
 export function ShellLayout({ children }: Props) {

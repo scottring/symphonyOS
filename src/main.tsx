@@ -71,6 +71,8 @@ await import('./index.css')
 // The layout system's shared shapes, after index.css so they settle it
 // (docs/design-system/LAYOUT-SYSTEM.md).
 await import('./styles/layout-system.css')
+// The conversational canvas's shared forms, drawn on the same tokens.
+await import('./styles/canvas.css')
 
 // Apply the cached place theme before first paint so there's no color flash;
 // PlaceProvider owns it (and syncs with the DB) once React mounts.

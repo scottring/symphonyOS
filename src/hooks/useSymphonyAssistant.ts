@@ -1,7 +1,7 @@
 import type { WorkspaceContext } from '@/lib/workspace/context'
 import { useState, useCallback, useEffect, useRef } from 'react'
 import { supabase, getAuthUser } from '@/lib/supabase'
-import type { AgentApiMessage, AssistantTaskContext, AgentSourceNote } from '@/lib/agentStream'
+import type { AgentApiMessage, AgentProposalItem, AssistantTaskContext, AgentSourceNote } from '@/lib/agentStream'
 import { runAgentTurn } from '@/lib/agentTurn'
 import type { ChatMessage, ChatSession } from '@/types/chat'
 import type { ChatAttachment } from '@/components/chat/ChatAttachment'
@@ -24,6 +24,17 @@ export interface UseSymphonyAssistantOptions {
   /** Link persisted conversations to a specific entity (task/routine id) so
    *  they can be surfaced on that entity's panel later. */
   persistEntityId?: string
+  /** Follows each turn for the canvas: when it starts, each tool, reported
+   *  write outcomes, suggestions, and how it ended. */
+  turnObserver?: AssistantTurnObserver
+}
+
+export interface AssistantTurnObserver {
+  start?: (turn: { text: string; turnId: string; retry: boolean }) => void
+  tool?: (name: string) => void
+  toolResult?: (result: { name: string; ok: boolean; ids?: string[]; error?: string }) => void
+  proposal?: (items: AgentProposalItem[]) => void
+  end?: (turn: { turnId: string; didWrite: boolean; error: string | null; text: string }) => void
 }
 
 type StoredMessage = { role: 'user' | 'assistant'; content: string; timestamp?: string; sources?: AgentSourceNote[] }
@@ -58,7 +69,10 @@ function hydrateMessages(raw: unknown, sessionId: string): ChatMessage[] {
  * chat_sessions so conversations survive reloads (history dropdown).
  */
 export function useSymphonyAssistant(options?: UseSymphonyAssistantOptions) {
-  const { onPlanSaved, onWorkspace, onMutate, taskContext, workspaceContext, persistKey, persistEntityId } = options ?? {}
+  const { onPlanSaved, onWorkspace, onMutate, taskContext, workspaceContext, persistKey, persistEntityId, turnObserver } = options ?? {}
+  // The last message sent, so a failed turn can be retried with the same turn
+  // id (the server can then recognise writes it already made).
+  const lastTurn = useRef<{ text: string; turnId: string } | null>(null)
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [loading, setLoading] = useState(false)
   const sending = useRef(false)
@@ -154,9 +168,13 @@ export function useSymphonyAssistant(options?: UseSymphonyAssistantOptions) {
     }
   }, [persistKey, persistEntityId])
 
-  const sendMessage = useCallback(async (text: string, attachment?: ChatAttachment) => {
+  const sendMessage = useCallback(async (text: string, attachment?: ChatAttachment, opts?: { turnId?: string; retry?: boolean }) => {
     if ((!text.trim() && !attachment) || sending.current) return
     sending.current = true
+    const turnId = opts?.turnId ?? crypto.randomUUID()
+    const retry = !!opts?.retry
+    lastTurn.current = { text, turnId }
+    turnObserver?.start?.({ text: text.trim(), turnId, retry })
 
     // Build the content for this turn: blocks array if there's an attachment, plain string otherwise.
     const content: AgentApiMessage['content'] = attachment
@@ -209,7 +227,10 @@ export function useSymphonyAssistant(options?: UseSymphonyAssistantOptions) {
         setMessages((prev) => prev.map((m) =>
           m.id === assistantId ? { ...m, content: m.content + chunk } : m))
       },
-      onTool: (name) => setToolActivity((prev) => [...prev, name]),
+      onTool: (name) => { setToolActivity((prev) => [...prev, name]); turnObserver?.tool?.(name) },
+      onToolResult: (result) => turnObserver?.toolResult?.(result),
+      onProposal: (items) => turnObserver?.proposal?.(items),
+      turnId,
       onReplyFallback: (reply) => {
         setMessages((prev) => prev.map((m) =>
           m.id === assistantId && m.content.length === 0 ? { ...m, content: reply } : m))
@@ -234,6 +255,7 @@ export function useSymphonyAssistant(options?: UseSymphonyAssistantOptions) {
     const assistantSources: AgentSourceNote[] | undefined = turn.sources
 
     if (turn.didWrite) onMutate?.()
+    turnObserver?.end?.({ turnId, didWrite: turn.didWrite, error: turn.error, text: turn.text })
     await persistTurn([
       ...messages,
       userMsg,
@@ -242,7 +264,14 @@ export function useSymphonyAssistant(options?: UseSymphonyAssistantOptions) {
     setLoading(false)
     sending.current = false
     return turn.error ? `The request failed: ${turn.error}. ${turn.text}` : turn.text
-  }, [onPlanSaved, onWorkspace, workspaceContext, loading, messages, onMutate, taskContext, getCurrentUserMember, persistTurn])
+  }, [onPlanSaved, onWorkspace, workspaceContext, loading, messages, onMutate, taskContext, getCurrentUserMember, persistTurn, turnObserver])
+
+  /** Send the last message again with the same turn id. */
+  const retryLast = useCallback(async () => {
+    const last = lastTurn.current
+    if (!last || sending.current) return
+    return sendMessage(last.text, undefined, { turnId: last.turnId, retry: true })
+  }, [sendMessage])
 
   const resetSession = useCallback(() => {
     if (sending.current) return
@@ -275,7 +304,7 @@ export function useSymphonyAssistant(options?: UseSymphonyAssistantOptions) {
   }, [resetSession])
 
   return {
-    messages, loading, error, toolActivity, sendMessage, resetSession,
+    messages, loading, error, toolActivity, sendMessage, retryLast, resetSession,
     sessions, sessionsLoading, activeSessionId, loadSession, deleteSession,
   }
 }
