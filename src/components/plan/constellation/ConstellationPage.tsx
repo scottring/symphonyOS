@@ -214,15 +214,16 @@ function Inner() {
     else activity.setProposalState(p.key, 'failed')
   }
 
-  const actionsFor = (node: PlanNode) => {
+  const actionsFor = (node: PlanNode, rowVerbs: { label: string; onSelect: () => void }[] = []) => {
     const task = node.task
     const label = `Actions for ${node.title}`
     if (!task) {
       const status = node.goal?.status ?? 'active'
       const setStatus = (next: 'active' | 'completed' | 'archived', what: string) =>
         void act(what, () => updateGoal(node.id, { status: next }), { ids: [node.id], undo: async () => (await updateGoal(node.id, { status })) !== false })
-      return <TaskFateMenu triggerText="Actions" label={label} showWhen={false} onPickWhen={() => {}}
+      return <TaskFateMenu label={label} showWhen={false} onPickWhen={() => {}}
         extras={[
+          ...rowVerbs,
           status === 'completed'
             ? { label: 'Reopen intention', onSelect: () => setStatus('active', `Reopen “${node.title}”`) }
             : { label: 'Complete intention', onSelect: () => setStatus('completed', `Complete “${node.title}”`) },
@@ -234,13 +235,14 @@ function Inner() {
     const nextWeek = new Date(week); nextWeek.setDate(nextWeek.getDate() + 7)
     const next = node.level === 1 ? { seasonStart: seasonB.next } : node.level === 2 ? { monthStart: monthB.next } : { weekStart: nextWeek }
     const toggle = async () => (await toggleTask(node.id)) !== false
-    return <TaskFateMenu triggerText="Actions" label={label}
+    return <TaskFateMenu label={label}
       onOpen={selection ? () => selection.setSelection({ kind: 'task', id: node.id }) : undefined}
       onPickWhen={(when) => void act(`${describeTriageWhen(when)}: “${node.title}”`, () => applyTriageWhen(when, node.id, { onPushTask: gated.pushTask, onSetBucket: gated.setBucket!, onFocus: (id, day) => gated.updateTask(id, { plannedOn: day }) }), { ids: [node.id] })}
       onPickDate={(date, isAllDay) => void act(`Schedule “${node.title}”`, () => gated.setBucket!(node.id, 'timed', date, isAllDay), { ids: [node.id] })}
       onComplete={!task.completed ? () => void act(`Complete “${node.title}”`, toggle, { ids: [node.id], undo: toggle }) : undefined}
       onDelete={() => { if (window.confirm(`Delete “${node.title}”? This removes the item from all its planning periods.`)) void act(`Delete “${node.title}”`, async () => { await deleteTask(node.id) }) }}
       extras={[
+        ...rowVerbs,
         ...(task.completed ? [{ label: 'Reopen', onSelect: () => void act(`Reopen “${node.title}”`, toggle, { ids: [node.id], undo: toggle }) }] : []),
         { label: `Carry to next ${period}`, onSelect: () => void act(`Carry “${node.title}” to next ${period}`, async () => !!await keepForward(node.id, next, start), { ids: [node.id] }) },
         { label: `Remove from this ${period}`, onSelect: () => void act(`Remove “${node.title}” from this ${period}`, () => dropCommitment(node.id, period, start)) },
@@ -302,7 +304,7 @@ function Inner() {
       onSaveEdit={async (text) => { const ok = await rename(node, text); if (ok) setComposer(null); return ok }}
       onCancelEdit={() => setComposer(null)}
       move={canMove ? { parents: moveParents, parentTerm: parentTerm!, onPick: (p) => moveUnder(node, p) } : undefined}
-      actions={actionsFor(node)} more={more}
+      actions={(verbs) => actionsFor(node, verbs)} more={more}
       meta={scheduled ? `Scheduled ${scheduled.toLocaleDateString()}${!node.task?.isAllDay ? ` · ${scheduled.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}` : ''}` : null}
       onDragStart={canMove ? (e) => { e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', node.key); setDragKey(node.key) } : undefined}
       onDragEnd={() => { setDragKey(null); setDropKey(null) }} />

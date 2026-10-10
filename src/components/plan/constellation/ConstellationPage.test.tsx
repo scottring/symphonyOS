@@ -171,7 +171,7 @@ describe('Move under…',()=>{
  it('moves a milestone to another seasonal goal, keeping its intention and clearing the old legacy link; Undo restores',async()=>{
   api.tasks=[{id:'s1',title:'Autumn outings',bucket:'quarter',goalId:'g'},{id:'s2',title:'Strength',bucket:'quarter',goalId:'other'},{id:'m',title:'Picnic',bucket:'month',sourceId:'s1',goalTaskId:'s1',goalId:'g'}]
   month()
-  fireEvent.click(screen.getByRole('button',{name:'Move Picnic under…'}))
+  fireEvent.click(screen.getByRole('button',{name:'Actions for Picnic'}));fireEvent.click(screen.getByText('Move under…'))
   const menu=screen.getByRole('menu',{name:'Move Picnic under a seasonal goal'})
   expect(within(menu).getByRole('menuitemradio',{name:'Autumn outings'})).toHaveAttribute('aria-checked','true')
   fireEvent.click(within(menu).getByRole('menuitemradio',{name:'Strength'}))
@@ -184,7 +184,7 @@ describe('Move under…',()=>{
  it('unlinks every field that shows the parent',async()=>{
   api.tasks=[{id:'s1',title:'Autumn outings',bucket:'quarter'},{id:'m',title:'Picnic',bucket:'month',sourceId:'s1',supportsGoalTaskId:'s1'}]
   month()
-  fireEvent.click(screen.getByRole('button',{name:'Move Picnic under…'}))
+  fireEvent.click(screen.getByRole('button',{name:'Actions for Picnic'}));fireEvent.click(screen.getByText('Move under…'))
   fireEvent.click(screen.getByRole('menuitemradio',{name:'No parent (Unlinked)'}))
   await waitFor(()=>expect(api.updateTask).toHaveBeenCalledTimes(1))
   expect(api.updateTask.mock.calls[0][1]).toStrictEqual({sourceId:undefined,supportsGoalTaskId:undefined})
@@ -193,7 +193,7 @@ describe('Move under…',()=>{
  it('links a seasonal goal to an intention; a failed save offers Retry and no Undo',async()=>{
   api.tasks=[{id:'s',title:'Autumn outings',bucket:'quarter'}];api.updateTask.mockResolvedValueOnce(false)
   season()
-  fireEvent.click(screen.getByRole('button',{name:'Move Autumn outings under…'}))
+  fireEvent.click(screen.getByRole('button',{name:'Actions for Autumn outings'}));fireEvent.click(screen.getByText('Move under…'))
   fireEvent.click(screen.getByRole('menuitemradio',{name:'Together'}))
   await waitFor(()=>expect(api.updateTask).toHaveBeenCalledWith('s',{goalId:'g'}))
   expect(lastRun().ok).toBe(false)
@@ -272,7 +272,7 @@ describe('done items and triage',()=>{
  })
  it('edits wording in place with Undo',async()=>{
   api.tasks=[{id:'m',title:'Picnic',bucket:'month'}];month()
-  fireEvent.click(screen.getByRole('button',{name:'Edit Picnic'}))
+  fireEvent.click(screen.getByRole('button',{name:'Actions for Picnic'}));fireEvent.click(screen.getByText('Edit wording'))
   const field=screen.getByLabelText('Wording for Picnic');expect(field).toHaveValue('Picnic')
   fireEvent.change(field,{target:{value:'Park picnic'}});fireEvent.click(screen.getByRole('button',{name:'Save'}))
   await waitFor(()=>expect(api.updateTask).toHaveBeenCalledWith('m',{title:'Park picnic'}))

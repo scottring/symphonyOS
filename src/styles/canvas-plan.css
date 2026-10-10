@@ -93,9 +93,6 @@
 .plan-item-title:hover { text-decoration: underline; text-underline-offset: 3px; }
 .canvas-item.is-selected { border-color: var(--color-primary-400); background: var(--color-primary-50); }
 .canvas-item.is-done .plan-item-title { color: var(--color-neutral-500); text-decoration: line-through; }
-.plan-item-tools { display: flex; align-items: center; flex-wrap: wrap; gap: 0 6px; margin: 0 0 0 -4px; }
-.plan-item-tools .canvas-link { font-size: 12.5px; min-height: 28px; }
-.plan-item-actions > span > button { display: inline-flex; align-items: center; gap: 4px; min-height: 28px; padding: 2px 4px; font-size: 12.5px; font-weight: 600; color: var(--color-primary-700); }
 .plan-item-more { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; padding: 4px 0 2px; }
 .plan-item-meta { margin: 0; flex-basis: 100%; font-size: 12.5px; color: var(--color-neutral-600); }
 .plan-proposal-reason { padding: 2px 0 0; }
@@ -145,11 +142,23 @@
   .plan-groups, .plan-groups.is-year { grid-template-columns: minmax(0, 1fr); }
   .plan-group .canvas-group-head { position: sticky; top: 0; z-index: 2; background: var(--color-bg-elevated); }
   .plan-group.is-unlinked .canvas-group-head { background: var(--color-bg-base); }
-  .plan-item-tools .canvas-link, .plan-item-actions > span > button, .plan-add, .plan-group-folded { min-height: 44px; }
+  .plan-add, .plan-group-folded { min-height: 44px; }
   .plan-period .canvas-icon { min-width: 44px; min-height: 44px; }
   .plan-move-menu > button { min-height: 44px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .plan-canvas * { scroll-behavior: auto !important; }
+}
+
+/* One row anatomy: the ⋯ menu sits on the row's line, always visible. */
+.plan-item-menu { flex: none; display: inline-flex; align-items: center; margin-left: 2px; }
+.plan-item-menu > span > button, .plan-item-menu button[aria-haspopup] {
+  display: inline-grid; place-items: center; width: 28px; height: 28px; border-radius: var(--radius-full);
+  color: var(--color-neutral-500);
+}
+.plan-item-menu > span > button:hover, .plan-item-menu button[aria-haspopup]:hover { color: var(--color-neutral-800); background: var(--color-neutral-100); }
+.plan-item > .plan-move { display: block; position: relative; }
+@media (max-width: 767px) {
+  .plan-item-menu > span > button, .plan-item-menu button[aria-haspopup] { width: 44px; height: 44px; }
 }
