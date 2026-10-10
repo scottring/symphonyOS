@@ -86,9 +86,6 @@
     /* The masthead row's flex gap (16px) is part of the lane. */
     width: calc(var(--ds-body) - 16px); margin-right: 0; font-size: 60px; overflow: visible;
   }
-  .daybook-masthead .masthead-numeral[data-len="3"] { font-size: 46px; }
-  .daybook-masthead .masthead-numeral[data-len="4"] { font-size: 34px; }
-  .daybook-masthead .masthead-numeral[data-len="5"] { font-size: 27px; }
 
   /* A library page's stamp stands in the lane too, so every library title
      starts at the body edge, with or without an icon beside it. */
@@ -768,3 +765,8 @@ p.wk-dayhint { margin: 8px 0 0; }
   .oj-add { min-height: 44px; }
   .oj-switch button { min-height: 36px; height: auto; }
 }
+
+/* Longer numerals (2026, 09–11) shrink to the lane at every width. */
+.daybook-masthead .masthead-numeral[data-len="3"] { font-size: 46px; }
+.daybook-masthead .masthead-numeral[data-len="4"] { font-size: 34px; }
+.daybook-masthead .masthead-numeral[data-len="5"] { font-size: 27px; }

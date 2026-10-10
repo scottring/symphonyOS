@@ -205,4 +205,6 @@
 .plan-toolbar { display: flex; justify-content: flex-end; gap: 12px; min-height: 8px; margin: -8px 12px 8px; }
 @media (max-width: 767px) {
   .plan-head-mobile { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; margin: 0 12px 12px; }
+  .plan-head-mobile .plan-stepper { max-width: 100%; row-gap: 6px; }
+  .plan-head-mobile .plan-stepper > button, .plan-head-mobile .plan-stepper-week { padding: 0 12px; }
 }
