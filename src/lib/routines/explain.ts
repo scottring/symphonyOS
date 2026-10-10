@@ -318,9 +318,9 @@ export function explainRoutine(routine: Routine, ctx: ExplainCtx): RoutineExplan
   }
 }
 
-/** One line for a screen reader or a tooltip: "Today: … · Week: … · Kiosk: …". */
+/** One line for a screen reader or a tooltip: "Today: … · Kiosk: … · Week: …". */
 export function explanationSummary(e: RoutineExplanation): string {
-  return [e.today, e.week, e.kiosk]
+  return [e.today, e.kiosk, e.week]
     .map((s) => `${s.label}: ${s.shows ? 'shows' : 'not showing'} — ${s.reason}`)
     .join('. ')
 }

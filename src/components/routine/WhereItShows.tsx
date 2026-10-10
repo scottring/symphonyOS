@@ -30,15 +30,15 @@ export function WhereItShows({ explanation, live = false }: { explanation: Routi
       <h3 className="routine-where-title">Where it shows</h3>
       <ul>
         <SurfaceRow s={explanation.today} />
-        <SurfaceRow s={explanation.week} />
         <SurfaceRow s={explanation.kiosk} />
+        <SurfaceRow s={explanation.week} />
       </ul>
     </section>
   )
 }
 
 /**
- * Compact "shows on" chips for a Routines page row: Today · Week · Kiosk,
+ * Compact "shows on" chips for a Routines page row: Today · Kiosk · Week,
  * dashed and struck when it doesn't show there. One button — it opens the
  * routine, whose panel says why at length.
  */
@@ -47,7 +47,7 @@ export function ShowsOnChips({ routine, explanation, onOpen }: {
   explanation: RoutineExplanation
   onOpen: (r: Routine) => void
 }) {
-  const surfaces = [explanation.today, explanation.week, explanation.kiosk]
+  const surfaces = [explanation.today, explanation.kiosk, explanation.week]
   const hidden = surfaces.filter((s) => !s.shows)
   const label = hidden.length > 0
     ? `Why isn't ${routine.name} showing on ${hidden.map((s) => s.label).join(' or ')}? ${explanationSummary(explanation)}`

@@ -523,3 +523,9 @@ export function routineSwitches(routine: Routine): { active: boolean; off: boole
     placedToday: isTimelineObligation(routine) || isPinnedToTimeline(routine) || isDayBoundRoutine(routine),
   }
 }
+
+/** The write that turns "Off" on or off — hidden from Today and planning, or
+ *  shown again. Lives here so writers elsewhere never spell the column. */
+export function offSwitchPatch(off: boolean): { show_on_timeline: boolean } {
+  return { show_on_timeline: !off }
+}

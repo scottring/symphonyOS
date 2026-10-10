@@ -2,11 +2,10 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { scopeForDomain } from '@/lib/scope'
 import { useEscapeKey } from '@/hooks/useEscapeKey'
 import { MastheadCard } from '@/components/layout/MastheadCard'
-import { PAGE_COLUMN } from '@/components/layout/pageLayout'
+import { PAGE_PLANNING } from '@/components/layout/pageLayout'
 import { EmptyState } from '@/components/layout/EmptyState'
-import { QuietAction } from '@/components/layout/PageMasthead'
 import { useFamilyMembers } from '@/hooks/useFamilyMembers'
-import { Plus, Search, Sparkles, Wrench, ChevronRight, ChevronDown } from 'lucide-react'
+import { Plus, Search, Sparkles } from 'lucide-react'
 import type { RecurrencePattern, Routine } from '@/types/actionable'
 import type { Contact } from '@/types/contact'
 import type { FamilyMember } from '@/types/family'
@@ -15,7 +14,7 @@ import { groupRoutineSteps } from '@/lib/today/routineCollections'
 import { TapRoutinePanel } from '@/components/surface/TapRoutinePanel'
 import { TapStepPanel } from '@/components/surface/TapStepPanel'
 import { buildRhythmModel } from './rhythm/rhythmModel'
-import { explainRoutine, type RoutineExplanation } from '@/lib/routines/explain'
+import { explainRoutine } from '@/lib/routines/explain'
 import { useRoutineExplainLens } from './useRoutineExplainLens'
 import { useActionableInstances } from '@/hooks/useActionableInstances'
 import { useDateInstances } from '@/hooks/useDateInstances'
@@ -23,8 +22,11 @@ import { deferredInRoutineIds } from '@/lib/today/deferredRoutines'
 import { localYmd } from '@/lib/cadence/config'
 
 import { findTend, tendFindingKey } from './rhythm/tendHeuristics'
-import { CadenceBand } from './rhythm/CadenceBand'
 import { TendDrawer } from './rhythm/TendDrawer'
+import { RoutineBoard } from './board/RoutineBoard'
+import { NeedsALook } from './board/NeedsALook'
+import { ARRANGEMENTS, arrangeBoard, type Arrangement, type BoardRoutine } from './board/boardModel'
+import { useRoutineCommands } from './board/useRoutineCommands'
 import type { CreateRoutineInSlot } from './rhythm/SlotAdd'
 
 interface RhythmPageProps {
@@ -72,15 +74,12 @@ export function RhythmPage(props: RhythmPageProps) {
   const {
     routines, loading = false, familyMembers = [], hiddenByFilter = false, onShowAllDomains,
     onUpdateRoutine, onDelete, onBuildWithAI, onCreateCollection,
-    onAddToCollection, onCreateRoutineInSlot,
+    onAddToCollection,
   } = props
 
-  // "Whose week" holds a SET of people; empty is Everyone. One name behaves
-  // exactly as the old single lens did (Scott, 2026-09-07).
-  const [memberIds, setMemberIds] = useState<string[]>([])
-  const toggleMember = (id: string) =>
-    setMemberIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]))
-  // A focused Through-the-week day: the arc shows that day's full picture.
+  // How the board is arranged. Remembered per browser; a convenience only.
+  const [arrangement, setArrangementState] = useState<Arrangement>(() => readPref('routines-arrangement', ['time', 'person', 'where'], 'time'))
+  const setArrangement = (a: Arrangement) => { setArrangementState(a); writePref('routines-arrangement', a) }
   const [query, setQuery] = useState('')
   const [open, setOpen] = useState<{ kind: 'routine' | 'standalone-step' | 'step'; id: string } | null>(null)
   // "New routine" opens an UNSAVED routine: nothing is written until Save.
@@ -115,45 +114,10 @@ export function RhythmPage(props: RhythmPageProps) {
     setNewDraft(null)
     return created
   }
-  const [notShowingOpen, setNotShowingOpen] = useState(false)
   const [tendOpen, setTendOpen] = useState(false)
 
-  // A slot created while a member lens is locked in shares only with those
-  // people — the lens IS the "who" the user just clicked on. One name rides
-  // the legacy single column; several ride assigned_to_all, which is what the
-  // routine's own Who control writes.
-  const createRoutineInSlot = useMemo<CreateRoutineInSlot | undefined>(() => {
-    if (!onCreateRoutineInSlot) return undefined
-    return (draft) => onCreateRoutineInSlot({
-      ...draft,
-      assigned_to: memberIds.length === 1 ? memberIds[0] : undefined,
-      assigned_to_all: memberIds.length > 1 ? memberIds : undefined,
-    })
-  }, [onCreateRoutineInSlot, memberIds])
-
-  // "Whose week" narrows by assignee (buildRhythmModel's `keep`), which misses
-  // a routine YOU made but never explicitly assigned — under your own lens
-  // that unassigned routine should still be yours (demo run 2026-09-06:
-  // switching to your own pill hid your own routines). buildRhythmModel's
-  // `keep` only reads assigned_to/assigned_to_all, so rather than teach it a
-  // second identity (routine.user_id, an auth user id, vs. the family_member
-  // id it filters on) we stamp the match onto a copy of the routine list
-  // before it ever reaches the model builder.
   const selfMember = useFamilyMembers().getCurrentUserMember()
-  const routinesForModel = useMemo(() => {
-    const isSelfLens = !!selfMember && memberIds.includes(selfMember.id)
-    if (!isSelfLens) return routines
-    return routines.map((r) => {
-      const hasAssignee = !!r.assigned_to || (r.assigned_to_all && r.assigned_to_all.length > 0)
-      if (hasAssignee || r.user_id !== selfMember!.user_id) return r
-      return { ...r, assigned_to: selfMember!.id }
-    })
-  }, [routines, memberIds, selfMember])
-
-  const model = useMemo(
-    () => buildRhythmModel(routinesForModel, { memberIds }),
-    [routinesForModel, memberIds],
-  )
+  const model = useMemo(() => buildRhythmModel(routines), [routines])
   // Pinned to the day, so "next lands" doesn't recompute on every render and
   // a session left open overnight still rolls when the date changes.
   const today = new Date().toDateString()
@@ -161,6 +125,7 @@ export function RhythmPage(props: RhythmPageProps) {
   // A sleeper with no wake date is the one that needs a decision — the ribbon
   // used to collect these; Tend still asks about them.
   const sleepers = useMemo(() => model.resting.filter((r) => !r.paused_until), [model.resting])
+  const commands = useRoutineCommands({ onUpdateRoutine, onDelete, onAddToCollection })
 
   // Dismissed tend suggestions persist so a rejected grouping stays gone.
   const [dismissedTend, setDismissedTend] = useState<string[]>(() => {
@@ -181,7 +146,6 @@ export function RhythmPage(props: RhythmPageProps) {
     () => findTend(routines).filter(f => !dismissedTend.includes(tendFindingKey(f))),
     [routines, dismissedTend],
   )
-  const tendCount = findings.length
   const { collections } = useMemo(() => groupRoutineSteps(routines), [routines])
 
   // Where each routine shows today — Today, the week, the kiosk — for the
@@ -200,8 +164,18 @@ export function RhythmPage(props: RhythmPageProps) {
       skippedToday: skipped.has(r.id), deferredInto, steps: stepsOf.get(r.id),
     })] as const))
   }, [routines, todayInstances, dayStart, collections, lens, familyMembers])
-  const explainFor = (r: Routine): RoutineExplanation =>
-    explanations.get(r.id) ?? explainRoutine(r, { date: dayStart, prefs: lens.prefs, member: lens.member, familyMembers })
+
+  // The Board: every top-level routine with its Steps and where it shows,
+  // arranged into bands (board/boardModel.ts).
+  const board = useMemo(() => {
+    const stepsOf = new Map(collections.map((c) => [c.id, c.steps]))
+    const items: BoardRoutine[] = routines
+      .filter((r) => !r.parent_routine_id)
+      .map((r) => ({ routine: r, steps: stepsOf.get(r.id) ?? [], explanation: explanations.get(r.id)! }))
+      .filter((i) => !!i.explanation)
+    return arrangeBoard(items, arrangement, { members: familyMembers, self: selfMember })
+  }, [routines, collections, explanations, arrangement, familyMembers, selfMember])
+  const restingRoutines = model.resting
   // Type-anywhere search
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -285,20 +259,30 @@ export function RhythmPage(props: RhythmPageProps) {
     ? () => setOpen({ kind: 'routine', id: parentOfOpenStep.id })
     : closePanel)
 
+  const empty = !loading && routines.length === 0
+  const segmented = (label: string, options: { id: string; label: string }[], value: string, onPick: (id: string) => void) => (
+    <div role="group" aria-label={label} className="routine-segmented">
+      {options.map((o) => (
+        <button key={o.id} type="button" aria-pressed={value === o.id} onClick={() => onPick(o.id)}>{o.label}</button>
+      ))}
+    </div>
+  )
+
   return (
     // No page background of its own: the place's painted scenery is the page.
     <div className="h-full overflow-auto">
-      {/* The one column (layout system, 2026-10-01). The full-width canvas
-          was for the staggered timeline, which the cadence bands replaced. */}
-      <div className={`relative ${PAGE_COLUMN}`}>
+      {/* A board you work on, so it takes the planning frame's width: three
+          columns of bands and "Needs a look" beside them. */}
+      <div className={`relative ${PAGE_PLANNING}`}>
         {/* The shared masthead card — the same anchor every other page wears. */}
         <MastheadCard
           variant="page"
           title="Routines"
           motif="routines"
-          subline={`How your family runs — ${subtitle}`}
+          subline={`How your household runs — ${subtitle}`}
           footer={
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="routine-header-tools">
+            {segmented('Arrange routines', ARRANGEMENTS, arrangement, (id) => setArrangement(id as Arrangement))}
             <div className="flex min-w-[12rem] flex-1 items-center gap-2 rounded-md border border-neutral-300 bg-bg-elevated px-3 py-2 focus-within:border-primary-500 md:flex-none">
               <Search className="w-4 h-4 text-neutral-400" />
               <input
@@ -311,27 +295,15 @@ export function RhythmPage(props: RhythmPageProps) {
               />
             </div>
             {onBuildWithAI && (
-              <button onClick={onBuildWithAI}
+              <button type="button" onClick={onBuildWithAI}
                 className="flex items-center gap-2 rounded-md border border-neutral-300 bg-bg-elevated px-4 py-2.5
                            text-[14px] font-medium text-neutral-700 transition-colors hover:border-primary-400">
                 <Sparkles className="w-4 h-4 text-accent-500" />
-                Build with AI
+                Build with Symphony
               </button>
             )}
             <button
-              onClick={() => setTendOpen(true)}
-              className="relative flex items-center gap-2 rounded-md border border-neutral-300 bg-bg-elevated px-4 py-2.5
-                         text-[14px] font-medium text-neutral-700 transition-colors hover:border-primary-400"
-            >
-              <Wrench className="w-4 h-4 text-primary-600" />
-              Tend
-              {tendCount > 0 && (
-                <span className="ml-0.5 rounded-full bg-primary-700 px-1.5 py-0.5 text-[10px] font-bold text-white">
-                  {tendCount}
-                </span>
-              )}
-            </button>
-            <button
+              type="button"
               onClick={startNewRoutine}
               className="flex items-center gap-2 rounded-md bg-primary-700 px-4 py-2.5 text-[14px] font-medium text-white
                          transition-colors hover:bg-primary-800 active:bg-primary-900">
@@ -342,32 +314,11 @@ export function RhythmPage(props: RhythmPageProps) {
           }
         />
 
-        {/* People pills */}
-        {familyMembers.length > 0 && (
-          <div className="mb-6 flex items-center gap-1.5 flex-wrap">
-            <span className="mr-1 text-[11px] font-semibold uppercase tracking-wider text-neutral-400">Whose week</span>
-            <button onClick={() => setMemberIds([])} aria-pressed={memberIds.length === 0}
-              className={`rounded-full px-3 py-1 text-[14px] transition-colors ${
-                memberIds.length === 0 ? 'bg-primary-700 text-white' : 'border border-neutral-300 text-neutral-600'
-              }`}>
-              Everyone
-            </button>
-            {[...familyMembers].sort((a, b) => a.display_order - b.display_order).map(m => (
-              <button key={m.id} onClick={() => toggleMember(m.id)} aria-pressed={memberIds.includes(m.id)}
-                className={`rounded-full px-3 py-1 text-[14px] transition-colors ${
-                  memberIds.includes(m.id) ? 'bg-primary-700 text-white' : 'border border-neutral-300 text-neutral-600'
-                }`}>
-                {m.name}
-              </button>
-            ))}
-          </div>
-        )}
-
         {loading && routines.length === 0 && (
-          <EmptyState title="Loading your week…" />
+          <EmptyState title="Loading your routines…" />
         )}
 
-        {!loading && routines.length === 0 && hiddenByFilter && (
+        {empty && hiddenByFilter && (
           <EmptyState
             title="No routines in the areas you're viewing"
             action={onShowAllDomains ? (
@@ -384,110 +335,59 @@ export function RhythmPage(props: RhythmPageProps) {
           </EmptyState>
         )}
 
-        {!loading && routines.length === 0 && !hiddenByFilter && (
-          <EmptyState
-            title="No routines yet"
-            action={<QuietAction icon={Plus} label="Create your first routine" onClick={startNewRoutine} />}
-          >
-            Capture your first routine and Symphony will start painting your week.
-          </EmptyState>
-        )}
-
-        {/* Every rung the same shape — name · when · who · a way in. The arc
-            and the day strip drew the top two rungs as bespoke canvases, so
-            "every day" and "once a season" looked like different kinds of
-            thing, and a Tue/Thu/Sat routine appeared three times (Scott,
-            2026-09-13). */}
-        <div className="flex flex-col gap-[var(--ds-section-gap)]">
-          <CadenceBand
-            heading="Daily" hint="A little, every day"
-            routines={model.daily} familyMembers={familyMembers} stepCounts={model.stepCounts}
-            matches={matches} now={dayStart} onOpenRoutine={openRoutine} explain={explainFor}
-            onCreateInSlot={createRoutineInSlot}
-            createPattern={{ type: 'daily' }}
-            addLabel="Add a daily routine"
-          />
-          <CadenceBand
-            heading="Weekly" hint="With a day, or whenever it fits"
-            routines={model.week} familyMembers={familyMembers} stepCounts={model.stepCounts}
-            matches={matches} now={dayStart} onOpenRoutine={openRoutine} explain={explainFor}
-            onCreateInSlot={createRoutineInSlot}
-            createPattern={{ type: 'weekly' }}
-            addLabel="Add a weekly routine"
-          />
-          <CadenceBand
-            heading="Monthly" hint="Once a month"
-            routines={model.month} familyMembers={familyMembers} stepCounts={model.stepCounts}
-            matches={matches} now={dayStart} onOpenRoutine={openRoutine} explain={explainFor}
-            onCreateInSlot={createRoutineInSlot}
-            createPattern={{ type: 'monthly' }}
-            addLabel="Add a monthly routine"
-          />
-          <CadenceBand
-            heading="Seasonal" hint="As the season changes"
-            routines={model.season} familyMembers={familyMembers} stepCounts={model.stepCounts}
-            matches={matches} now={dayStart} onOpenRoutine={openRoutine} explain={explainFor}
-            onCreateInSlot={createRoutineInSlot}
-            createPattern={{ type: 'quarterly' }}
-            addLabel="Add a seasonal routine"
-          />
-          <CadenceBand
-            heading="Yearly" hint="Once a year, on its date"
-            routines={model.year} familyMembers={familyMembers} stepCounts={model.stepCounts}
-            matches={matches} now={dayStart} onOpenRoutine={openRoutine} explain={explainFor}
-            onCreateInSlot={createRoutineInSlot}
-            createPattern={{ type: 'yearly' }}
-            addLabel="Add a yearly routine"
-          />
-          <CadenceBand
-            heading="Less often" hint="Rarer than once a year"
-            routines={model.rare} familyMembers={familyMembers} stepCounts={model.stepCounts}
-            matches={matches} now={dayStart} onOpenRoutine={openRoutine} explain={explainFor}
-            onCreateInSlot={createRoutineInSlot}
-            createPattern={{ type: 'yearly', interval: 2 }}
-            addLabel="Add a rarer routine"
-          />
-
-          {/* Not showing: Resting (asleep everywhere, with its wake date) and
-              Off (running, hidden from Today and planning). Neither is a
-              commitment right now, so they wait behind one disclosure rather
-              than sitting among the things you actually do. */}
-          {(model.resting.length > 0 || model.off.length > 0) && (
-            <div className="routine-not-showing">
-              <button
-                type="button"
-                aria-expanded={notShowingOpen}
-                onClick={() => setNotShowingOpen(v => !v)}
-                className="flex items-center gap-1.5 text-[13px] font-medium text-neutral-500 transition-colors hover:text-neutral-700"
-              >
-                {notShowingOpen ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
-                Not showing
-                <span className="tabular-nums text-neutral-400">{model.resting.length + model.off.length}</span>
-                <span className="font-normal text-neutral-400">
-                  · {[model.resting.length > 0 ? `${model.resting.length} resting` : null, model.off.length > 0 ? `${model.off.length} off` : null].filter(Boolean).join(', ')}
-                </span>
+        {/* An empty account is one calm card — never a stack of empty bands. */}
+        {empty && !hiddenByFilter && (
+          <section aria-label="No routines yet" className="canvas-group routine-empty">
+            <h2 className="routine-empty-title">No routines yet</h2>
+            <p className="routine-empty-text">A routine is something your household does again and again — mornings, bedtime, the weekly reset. Make one, or tell Symphony how your days run.</p>
+            <div className="routine-empty-actions">
+              <button type="button" onClick={startNewRoutine}
+                className="flex items-center gap-2 rounded-md bg-primary-700 px-4 py-2.5 text-[14px] font-medium text-white transition-colors hover:bg-primary-800">
+                <Plus className="w-4 h-4" /> New routine
               </button>
-              {notShowingOpen && (
-                <div className="mt-2 flex flex-col gap-4">
-                  {model.resting.length > 0 && (
-                    <CadenceBand
-                      heading="Resting" hint="Rest until… — asleep everywhere; it wakes on its own"
-                      routines={model.resting} familyMembers={familyMembers} stepCounts={model.stepCounts}
-                      matches={matches} now={dayStart} resting onOpenRoutine={openRoutine} explain={explainFor}
-                    />
-                  )}
-                  {model.off.length > 0 && (
-                    <CadenceBand
-                      heading="Off" hint="Still runs and stays on the kiosk — hidden from Today and planning"
-                      routines={model.off} familyMembers={familyMembers} stepCounts={model.stepCounts}
-                      matches={matches} now={dayStart} onOpenRoutine={openRoutine} explain={explainFor}
-                    />
-                  )}
-                </div>
+              {onBuildWithAI && (
+                <button type="button" onClick={onBuildWithAI}
+                  className="flex items-center gap-2 rounded-md border border-neutral-300 bg-bg-elevated px-4 py-2.5 text-[14px] font-medium text-neutral-700 transition-colors hover:border-primary-400">
+                  <Sparkles className="w-4 h-4 text-accent-500" /> Build with Symphony
+                </button>
               )}
             </div>
-          )}
-        </div>
+          </section>
+        )}
+
+        {routines.length > 0 && (
+          <div className="routine-board">
+            <NeedsALook
+              findings={findings}
+              routines={routines}
+              resting={restingRoutines}
+              onMerge={handleMerge}
+              onDismiss={dismissTend}
+              onStampDomain={(id, context) => onUpdateRoutine(id, { context })}
+              onRename={(id, name) => onUpdateRoutine(id, { name })}
+              onLetGo={id => onDelete?.(id)}
+              onWake={(r) => { void commands.wake(r) }}
+              onOpenRoutine={openRoutine}
+              onSeeAll={() => setTendOpen(true)}
+            />
+            <div className="routine-board-main">
+              <RoutineBoard
+                  model={board}
+                  familyMembers={familyMembers}
+                  matches={matches}
+                  today={dayStart}
+                  commands={commands}
+                  canDelete={!!onDelete}
+                  onOpen={openRoutine}
+                  onOpenStep={(s) => setOpen({ kind: 'step', id: s.id })}
+                  onDropRoutine={onAddToCollection ? (draggedId, target) => {
+                    const dragged = routines.find((r) => r.id === draggedId)
+                    if (dragged) void commands.group(dragged, target)
+                  } : undefined}
+                />
+            </div>
+          </div>
+        )}
       </div>
 
       <TendDrawer
@@ -636,4 +536,15 @@ function createFieldsFromDraft(d: Routine): Omit<CreateRoutineInput, 'name'> {
     target_amount: d.target_amount ?? null,
     target_unit: d.target_unit ?? null,
   }
+}
+
+function readPref<T extends string>(key: string, allowed: readonly T[], fallback: T): T {
+  try {
+    const v = localStorage.getItem(key)
+    return v && (allowed as readonly string[]).includes(v) ? (v as T) : fallback
+  } catch { return fallback }
+}
+
+function writePref(key: string, value: string) {
+  try { localStorage.setItem(key, value) } catch { /* a convenience only */ }
 }
