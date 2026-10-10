@@ -241,3 +241,21 @@
 @media (prefers-reduced-motion: reduce) {
   .wc-shelf, .wc-day { transition: none; }
 }
+
+/* Follow-up 2026-10-10: restored functions, inside the approved structure. */
+.wc-quiet-line { margin: 0 0 10px; font-family: var(--font-family-sans); font-size: 13px; color: var(--color-neutral-600); }
+.wc-quiet-link { padding: 0 2px; font-size: 13px; font-weight: 500; }
+.wc-weather { margin-left: auto; display: inline-flex; align-items: center; color: var(--color-neutral-500); }
+.wc-weather > [role="img"] { margin-top: 0; }
+.wc-composer { display: flex; align-items: center; gap: 6px; }
+.wc-composer input { flex: 1; min-width: 0; }
+.wc-composer-area { flex: none; display: inline-flex; }
+.cw-menu button[aria-checked="true"] { font-weight: 600; color: var(--color-primary-800); }
+.cw-menu button[aria-checked="true"]::before { content: '✓ '; }
+.cw-menu-none { margin: 4px 10px; font-family: var(--font-family-sans); font-size: 12.5px; color: var(--color-neutral-500); }
+.cw-row .plan-move { position: static; }
+.cw-row .plan-move-menu { left: auto; right: 0; }
+@media (max-width: 767px) {
+  .wc-quiet-link { min-height: 44px; }
+  .cw-menu button { min-height: 44px; }
+}

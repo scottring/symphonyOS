@@ -25,14 +25,18 @@
 import { useContext, useState, type DragEvent, type FormEvent, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { MoreHorizontal } from 'lucide-react'
-import type { Task } from '@/types/task'
+import type { Task, TaskContext } from '@/types/task'
+import type { PlanNode } from '@/components/plan/constellation/model'
+import { MoveUnderMenu } from '@/components/canvas/plan/MoveUnderMenu'
+import { ContextPicker } from '@/components/triage/ContextPicker'
+import { assigneesOf } from '@/lib/planning/v2/planV2'
 import { localYmd } from '@/lib/cadence/config'
 import { formatTimeCompact } from '@/lib/dateHelpers'
 import { isPlanDrag, readPlanDrag, writePlanDrag, type PlanDragPayload } from '@/lib/planning/planDrag'
 import { useMediaQuery } from '@/hooks/useMediaQuery'
 import { PlanMastheadSlotsContext } from '@/components/plan/v2/planMastheadSlots'
 import { CompactWeekRow, type CompactRow } from './CompactWeekList'
-import { CanvasMenu, GiveItADay } from './GiveItADay'
+import { CanvasMenu, GiveItADay, PeoplePicker } from './GiveItADay'
 import { dayChipLabel } from './compactWeek'
 import type { ShelfGroup } from './weekShelf'
 
@@ -60,6 +64,8 @@ export interface CanvasDay {
   sometime?: CanvasDayItem[]
   /** The day's dinner, quietly ("Dinner Salmon + potatoes"). */
   dinners?: { id: string; label: string }[]
+  /** The day's forecast, small and muted in its header. */
+  weather?: ReactNode
 }
 
 /** A calendar event across several days, written once above them. */
@@ -76,8 +82,18 @@ export interface WeekCanvasWriters {
   placeRoutine: (routine: ShelfRoutine, day: Date) => void
   moveRoutine: (item: CanvasDayItem, fromKey: string, toDay: Date) => void
   /** Resolves true once stored; the composer keeps its words otherwise. */
-  addAction: (title: string, milestoneId?: string) => Promise<boolean>
+  addAction: (title: string, milestoneId?: string, area?: TaskContext) => Promise<boolean>
   milestoneDone: (milestoneId: string) => void
+  /** The milestone itself onto this week (it stays on the month's list). */
+  putOnWeek: (milestoneId: string) => void
+  /** People… — who carries it (assigned_to_all, the first as assigned_to). */
+  assign: (task: Task, ids: string[]) => void
+  /** Life area… */
+  setArea: (task: Task, area: TaskContext | undefined) => void
+  /** Move under… — the milestones it may serve, as Plan offers them. Null:
+   *  nothing to offer for this row. */
+  moveUnderOptions: (task: Task) => { item: PlanNode; parents: PlanNode[] } | null
+  moveUnder: (task: Task, parent: PlanNode | null) => void
   /** Opens the details pane for a selectable id. */
   open: (id: string) => void
   /** A plan row from elsewhere (the Today pin) dropped on a day. */
@@ -99,14 +115,30 @@ export interface WeekCanvasProps {
   /** What each day already holds, for the day picker's spoken label
    *  (densityDescription), keyed by local YYYY-MM-DD. */
   dayDescriptions?: Record<string, string>
+  /** The household, for People…. */
+  members?: { id: string; name: string }[]
+  /** Every-day routines in each day, or written once above (the page's
+   *  remembered choice). */
+  daily?: { shown: boolean; onToggle: () => void }
+  /** Last week's open work waiting for a decision, and the way to it. */
+  lookBack?: { count: number; onReview: () => void }
+  /** The life area a new Unlinked action starts in. */
+  defaultArea?: TaskContext
+  /** Open with the cursor in Unlinked's composer (arrived to write). */
+  focusAdd?: boolean
 }
+
+const AREAS: { value: TaskContext; label: string }[] = [
+  { value: 'work', label: 'Work' }, { value: 'family', label: 'Family' }, { value: 'personal', label: 'Personal' },
+]
+const isArea = (v: unknown): v is TaskContext => v === 'work' || v === 'family' || v === 'personal'
 
 type Drag = { kind: 'task' | 'routine' | 'occ'; id: string; groupKey?: string; fromKey?: string }
 type Picker = { key: string; mode: 'place' | 'move' } | null
 
 const longDay = (d: Date) => d.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
 
-export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [], monthName, isCurrent, writers, spans = [], dayDescriptions }: WeekCanvasProps) {
+export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [], monthName, isCurrent, writers, spans = [], dayDescriptions, members = [], daily, lookBack, defaultArea, focusAdd = false }: WeekCanvasProps) {
   const phone = useMediaQuery('(max-width: 767px)')
   const slots = useContext(PlanMastheadSlotsContext)
   const [showDone, setShowDone] = useState(false)
@@ -115,7 +147,9 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
   const [overShelf, setOverShelf] = useState(false)
   const [picker, setPicker] = useState<Picker>(null)
   const [menu, setMenu] = useState<string | null>(null)
-  const [composer, setComposer] = useState<string | null>(null)
+  const [composer, setComposer] = useState<string | null>(focusAdd ? 'unlinked' : null)
+  const [panel, setPanel] = useState<{ key: string; kind: 'people' | 'area' | 'move' } | null>(null)
+  const [quietOpen, setQuietOpen] = useState(false)
   const todayKey = localYmd(new Date())
   const [chosenDay, setChosenDay] = useState<string | null>(null)
   const selectedKey = chosenDay && days.some((d) => d.key === chosenDay) ? chosenDay : (days.find((d) => d.key === todayKey) ?? days[0])?.key
@@ -192,17 +226,48 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
     <GiveItADay title={title} days={dates} inline={phone} current={current} describe={dayDescriptions} label={picker.mode === 'move' ? 'Move to' : 'Give it a day'}
       onPick={(d) => { setPicker(null); onPick(d) }} onClose={() => setPicker(null)} />
   ))
+  // People…, Life area…, Move under… — the row's secondary actions, in its ⋯.
+  const taskMenuItems = (t: Task, key: string) => [
+    { label: 'People…', onSelect: () => setPanel({ key, kind: 'people' as const }) },
+    { label: 'Life area…', onSelect: () => setPanel({ key, kind: 'area' as const }) },
+    ...(writers.moveUnderOptions(t) ? [{ label: 'Move under…', onSelect: () => setPanel({ key, kind: 'move' as const }) }] : []),
+  ]
+  const taskPanel = (t: Task, key: string): ReactNode => {
+    if (panel?.key !== key) return null
+    const close = () => setPanel(null)
+    if (panel.kind === 'people') return <PeoplePicker title={t.title} members={members} selected={assigneesOf(t)} onChange={(ids) => writers.assign(t, ids)} onClose={close} />
+    if (panel.kind === 'area') {
+      return <CanvasMenu label={`Life area for ${t.title}`} onClose={close} items={[
+        ...AREAS.map((a) => ({ label: a.label, checked: t.context === a.value, onSelect: () => writers.setArea(t, a.value) })),
+        { label: 'No life area', checked: !t.context, onSelect: () => writers.setArea(t, undefined) },
+      ]} />
+    }
+    const o = writers.moveUnderOptions(t)
+    return o && <MoveUnderMenu item={o.item} parents={o.parents} parentTerm={`${monthName} milestone`} open
+      onOpenChange={(v) => { if (!v) close() }} onPick={(p) => { close(); writers.moveUnder(t, p) }} />
+  }
+  const moreButton = (title: string, key: string, items: { label: string; onSelect: () => void }[], size = 16) => (
+    <span className="wc-more-wrap">
+      <button type="button" className="canvas-icon wc-more" aria-label={`More for ${title}`} aria-haspopup="menu" aria-expanded={menu === key}
+        onClick={() => { setPicker(null); setPanel(null); setMenu(menu === key ? null : key) }}>
+        <MoreHorizontal size={size} aria-hidden="true" />
+      </button>
+      {menu === key && <CanvasMenu label={title} items={items} onClose={() => setMenu(null)} />}
+    </span>
+  )
   const shelfRow = (t: Task, meta: string | null, groupKey: string) => {
     const key = `task:${t.id}`
     const row: CompactRow<Task> = { key, id: t.id, title: t.title, item: t, completed: t.completed, meta }
     return (
-      <CompactWeekRow key={key} row={row} className={picker?.key === key ? 'has-picker' : undefined}
+      <CompactWeekRow key={key} row={row} className={picker?.key === key || panel?.key === key || menu === key ? 'has-picker' : undefined}
         addLabel={(title) => `Give ${title} a day`} addExpanded={picker?.key === key}
-        onAdd={() => { setMenu(null); setPicker(picker?.key === key ? null : { key, mode: 'place' }) }}
+        extra={!t.completed && moreButton(t.title, key, taskMenuItems(t, key), 15)}
+        onAdd={() => { setMenu(null); setPanel(null); setPicker(picker?.key === key ? null : { key, mode: 'place' }) }}
         onComplete={writers.toggleTask} onOpen={(x) => writers.open(`task-${x.id}`)}
         onDragStart={phone ? undefined : (x, ev) => startDrag(ev, { kind: 'task', id: x.id, date: localYmd(weekStart), title: x.title }, { kind: 'task', id: x.id, groupKey })}
         onDragEnd={endDrag}>
         {pick(key, t.title, (d) => writers.placeTask(t, d))}
+        {taskPanel(t, key)}
       </CompactWeekRow>
     )
   }
@@ -226,6 +291,7 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
                   { label: 'Mark done', onSelect: () => writers.milestoneDone(g.milestone!.id) },
                   { label: 'Open details', onSelect: () => writers.open(`task-${g.milestone!.id}`) },
                   { label: 'Add an action', onSelect: () => setComposer(g.key) },
+                  ...(g.milestone.onWeek ? [] : [{ label: 'Put on this week', onSelect: () => writers.putOnWeek(g.milestone!.id) }]),
                 ]} />
               )}
             </span>
@@ -233,13 +299,18 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
         </div>
         {rows.length > 0 && <ul className="cw-rows">{rows.map((r) => shelfRow(r.task, r.meta, g.key))}</ul>}
         <Composer open={composer === g.key} label={g.milestone ? `Add an action for ${title}` : 'Add something for this week'}
+          area={isArea(g.milestone?.context) ? g.milestone.context : g.milestone ? undefined : defaultArea}
           onOpen={() => setComposer(g.key)} onClose={() => setComposer(null)}
-          onAdd={(text) => writers.addAction(text, g.milestone?.id)} />
+          onAdd={(text, area) => writers.addAction(text, g.milestone?.id, area)} />
       </section>
     )
   }
   const unlinked = shelf.filter((g) => !g.milestone)
-  const linked = shelf.filter((g) => g.milestone)
+  // Milestones with nothing this week fold into one quiet line (2026-10-10:
+  // six empty cards crowded the shelf); shown, each keeps its + Add.
+  const hasItems = (g: ShelfGroup) => g.rows.length > 0 || (showDone && g.done.length > 0)
+  const linked = shelf.filter((g) => g.milestone && hasItems(g))
+  const quiet = shelf.filter((g) => g.milestone && !hasItems(g))
   const routinesCard = routinesToPlace.length > 0 && (
     <section key="routines" className={`canvas-group wc-group wc-routines${drag?.groupKey === 'routines' ? ' is-source' : ''}`} aria-label="Routines to place">
       <div className="canvas-group-head wc-group-head"><span className="canvas-group-title">Routines to place</span></div>
@@ -266,11 +337,28 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
         <h2 className="wc-label">Still to place</h2>
         <p className="wc-hint">{phone ? 'Press + to give it a day' : 'Drag onto a day, or press + to give it a day'}</p>
       </div>
+      {lookBack && lookBack.count > 0 && (
+        // Nothing moves by itself: last week's open work waits for a decision
+        // in Plan the week's look-back.
+        <p className="wc-quiet-line">
+          {lookBack.count === 1 ? 'One thing' : lookBack.count} from last week{' '}·{' '}
+          <button type="button" className="canvas-link wc-quiet-link" onClick={lookBack.onReview}>Review</button>
+        </p>
+      )}
       <div className="wc-masonry">
         {linked.map(groupCard)}
         {routinesCard}
         {unlinked.map(groupCard)}
       </div>
+      {quiet.length > 0 && (
+        <>
+          <p className="wc-quiet-line">
+            Also in {monthName}: {quiet.length === 1 ? 'one milestone' : `${quiet.length} milestones`} with nothing this week{' '}·{' '}
+            <button type="button" className="canvas-link wc-quiet-link" aria-expanded={quietOpen} onClick={() => setQuietOpen((o) => !o)}>{quietOpen ? 'Hide' : 'Show'}</button>
+          </p>
+          {quietOpen && <div className="wc-masonry">{quiet.map(groupCard)}</div>}
+        </>
+      )}
     </section>
   )
 
@@ -285,23 +373,19 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
       ...(isTask ? [{ label: 'Back to still to place', onSelect: () => writers.unplaceTask(it.task!) }] : []),
       { label: 'Open', onSelect: () => writers.open(it.id) },
       { label: it.completed ? 'Mark not done' : 'Complete', onSelect: () => (isTask ? writers.toggleTask(it.task!) : writers.toggleRoutine(it, day.date)) },
+      ...(isTask && !it.completed ? taskMenuItems(it.task!, key) : []),
     ]
     return (
-      <CompactWeekRow key={key} row={row} className={`wc-dayrow${it.kind === 'routine' ? ' is-routine' : ''}`}
+      <CompactWeekRow key={key} row={row} className={`wc-dayrow${it.kind === 'routine' ? ' is-routine' : ''}${panel?.key === key || picker?.key === key ? ' has-picker' : ''}`}
         onComplete={(x) => (x.task ? writers.toggleTask(x.task) : writers.toggleRoutine(x, day.date))}
         onOpen={(x) => writers.open(x.id)}
         onDragStart={phone ? undefined : (x, ev) => x.task
           ? startDrag(ev, { kind: 'task', id: x.task.id, date: day.key, title: x.title }, { kind: 'task', id: x.task.id, fromKey: day.key })
           : x.routineId ? startDrag(ev, { kind: 'routine', id: x.routineId, date: day.key, title: x.title }, { kind: 'occ', id: x.routineId, fromKey: day.key }) : undefined}
         onDragEnd={endDrag}
-        trailing={<span className="wc-more-wrap">
-          <button type="button" className="canvas-icon wc-more" aria-label={`More for ${it.title}`} aria-haspopup="menu" aria-expanded={menu === key}
-            onClick={() => { setPicker(null); setMenu(menu === key ? null : key) }}>
-            <MoreHorizontal size={15} aria-hidden="true" />
-          </button>
-          {menu === key && <CanvasMenu label={it.title} items={items} onClose={() => setMenu(null)} />}
-        </span>}>
+        trailing={moreButton(it.title, key, items, 15)}>
         {pick(key, it.title, (d) => (isTask ? writers.moveTask(it.task!, d) : writers.moveRoutine(it, day.key, d)), day.key)}
+        {isTask && taskPanel(it.task!, key)}
       </CompactWeekRow>
     )
   }
@@ -317,6 +401,7 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
           <span className="wc-dayname">{day.date.toLocaleDateString('en-US', { weekday: 'short' })}</span>
           <span className="wc-daynum">{day.date.getDate()}</span>
           {day.key === todayKey && <span className="sr-only">(today)</span>}
+          {day.weather && <span className="wc-weather">{day.weather}</span>}
         </header>
         {over && <p className="wc-drop-hint" aria-live="polite">Drop on {dayChipLabel(day.date)}</p>}
         {day.events.length > 0 && (
@@ -351,16 +436,25 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
       {showDone ? 'Hide done' : 'Show done'}
     </button>
   )
-  const rhythmNode = rhythm.filter((r) => r.items.length).length > 0 && (
+  // Routines that happen every day are written once above the days; the
+  // page's remembered choice puts them back in each day ("Show daily").
+  const shownLines = rhythm.filter((r) => r.items.length)
+  const dailyToggle = daily && (
+    <button type="button" className="canvas-link wc-quiet-link" aria-pressed={daily.shown} onClick={daily.onToggle}>
+      {daily.shown ? 'Hide daily' : 'Show daily'}
+    </button>
+  )
+  const rhythmNode = (shownLines.length > 0 || daily?.shown) && (
     <div className="wc-rhythm">
-      {rhythm.filter((r) => r.items.length).map((r) => (
+      {daily?.shown && <p><span className="wc-rhythm-label">Daily routines are in each day</span>{' · '}{dailyToggle}</p>}
+      {shownLines.map((r, li) => (
         <p key={r.label}><span className="wc-rhythm-label">{r.label}</span>{' '}
           {r.items.map((it, i) => <span key={it.openId}>{i > 0 && ' · '}<button type="button" className="wc-rhythm-item" onClick={() => writers.open(it.openId)}>{it.title}</button></span>)}
+          {li === 0 && !daily?.shown && dailyToggle && <>{' · '}{dailyToggle}</>}
         </p>
       ))}
     </div>
   )
-
   const subtitleNode = slots?.subline && !phone
     ? createPortal(<span className="wc-subtitle">{subtitle}</span>, slots.subline)
     : <p className="wc-subtitle is-inline">{subtitle}</p>
@@ -410,22 +504,25 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
   )
 }
 
-function Composer({ open, label, onOpen, onClose, onAdd }: {
+function Composer({ open, label, area: initialArea, onOpen, onClose, onAdd }: {
   open: boolean
   label: string
+  /** The life area a new entry starts in (the milestone's). */
+  area?: TaskContext
   onOpen: () => void
   onClose: () => void
-  onAdd: (title: string) => Promise<boolean>
+  onAdd: (title: string, area?: TaskContext) => Promise<boolean>
 }): ReactNode {
   const [text, setText] = useState('')
   const [saving, setSaving] = useState(false)
+  const [area, setArea] = useState<TaskContext | undefined>(initialArea)
   if (!open) return <div className="wc-group-foot"><button type="button" className="canvas-link wc-add" onClick={onOpen}>+ Add</button></div>
   const submit = async (e: FormEvent) => {
     e.preventDefault()
     const v = text.trim()
     if (!v || saving) return
     setSaving(true)
-    const ok = await onAdd(v).catch(() => false)
+    const ok = await onAdd(v, area).catch(() => false)
     setSaving(false)
     // Kept open for the next one; the words stay when the save failed.
     if (ok) setText('')
@@ -434,6 +531,7 @@ function Composer({ open, label, onOpen, onClose, onAdd }: {
     <form className="wc-group-foot wc-composer" onSubmit={(e) => void submit(e)}>
       <input autoFocus value={text} onChange={(e) => setText(e.target.value)} aria-label={label} placeholder={label} aria-busy={saving || undefined}
         onKeyDown={(e) => { if (e.key === 'Escape') { e.stopPropagation(); onClose() } }} />
+      <span className="wc-composer-area" title="Life area for what you add"><ContextPicker size="sm" value={area ?? null} onChange={setArea} /></span>
     </form>
   )
 }

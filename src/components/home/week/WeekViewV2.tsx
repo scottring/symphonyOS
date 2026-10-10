@@ -75,6 +75,13 @@ import { densityDescription } from '@/lib/planning/dayDensity'
 import { unhomedRoutines } from '@/lib/week/unhomedRoutines'
 import { buildShelf, type ShelfMilestone } from '@/components/canvas/week/weekShelf'
 import { WeekCanvas, type CanvasDay, type CanvasDayItem, type WeekCanvasWriters } from '@/components/canvas/week/WeekCanvas'
+import { DayWeather } from './WeekJournal'
+import { committedTo } from '@/lib/placement/model'
+import { parentOf, WEEK_TO_MONTH } from '@/lib/planning/journalGroups'
+import type { PlanNode } from '@/components/plan/constellation/model'
+import { eligibleParents, moveUnderPatch } from '@/components/plan/constellation/connections'
+import { useAddArea } from '@/components/plan/v2/AddArea'
+import type { WeekCanvasHost } from '@/components/plan/v2/WeekV2'
 
 /** Does this calendar event span the whole day? Explicit flags win; otherwise
  *  a full-day span (midnight start, 24h+ duration — how a holiday reads from
@@ -186,6 +193,9 @@ export function WeekModeSwitch({ mode, onChange }: { mode: WeekMode; onChange: (
   )
 }
 
+/** The week's every-day routines: in each day ('shown') or once above. */
+const DAILY_KEY = 'symphony-week-daily'
+
 const weekIsCurrentFor = (anchor: Date) => sameDay(anchor, weekStartAnchor(new Date(), readCadenceConfig().weekStartsOn))
 
 export function WeekViewV2(props: WeekViewV2Props) {
@@ -213,7 +223,7 @@ export function WeekViewV2(props: WeekViewV2Props) {
   const navigate = useNavigate()
   const { addTask, deleteTask, toggleTask, updateTask, updateTasksBulk, pushTask, userId } = useSupabaseTasks()
   // The rail plans MY week — scope it to the current member, as the strip does.
-  const { getCurrentUserMember } = useFamilyMembers()
+  const { getCurrentUserMember, members: familyMembers } = useFamilyMembers()
   const meId = getCurrentUserMember()?.id ?? null
   const { createEvent, deleteEvent, isConnected: calendarConnected } = useGoogleCalendar()
   // createEvent never updates the held events; without a refetch a
@@ -1040,13 +1050,22 @@ export function WeekViewV2(props: WeekViewV2Props) {
   })), [tasks, weekAnchor, meId])
   const shelf = useMemo(() => buildShelf({
     weekTasks: canvasWeekTasks, tasks, weekStart: weekAnchor,
-    milestones: canvasMonths.flatMap((m) => m.rows.map((t): ShelfMilestone => ({ id: t.id, title: t.title, completed: !!t.completed, month: m.name }))),
+    milestones: canvasMonths.flatMap((m) => m.rows.map((t): ShelfMilestone => ({ id: t.id, title: t.title, completed: !!t.completed, month: m.name, context: t.context ?? null, onWeek: !!committedTo(t, 'week', weekAnchor, { isCurrent: weekIsCurrentFor(weekAnchor) }) }))),
   }), [canvasWeekTasks, tasks, weekAnchor, canvasMonths])
   const routinesToPlace = useMemo(() => unhomedRoutines(routines, { member: selectedAssignees, prefs: { hideRoutines: false, layers } }, { weekStart: weekAnchor, instances: weekInstances })
     .map((r) => ({ id: r.id, title: r.name })), [routines, selectedAssignees, layers, weekAnchor, weekInstances])
+  // Every-day routines: written once above the days (default), or in each
+  // day — the page's remembered choice (the week's hide-daily preference).
+  const [dailyShown, setDailyShown] = useState(() => { try { return localStorage.getItem(DAILY_KEY) === 'shown' } catch { return false } })
+  const toggleDaily = useCallback(() => setDailyShown((was) => {
+    try { localStorage.setItem(DAILY_KEY, was ? 'hidden' : 'shown') } catch { /* this visit only */ }
+    return !was
+  }), [])
   const canvasDays = useMemo(() => {
     const onShelf = new Set(shelf.flatMap((g) => g.rows.map((r) => r.task.id)))
-    const rhythm = weekRhythm(journalDays)
+    const found = weekRhythm(journalDays)
+    const hasDaily = found.everyDay.length + found.weekdays.length > 0
+    const rhythm = dailyShown ? { everyDay: [], weekdays: [], days: journalDays } : found
     const toItem = (e: JournalEntry): CanvasDayItem => ({ id: e.id, kind: e.kind, title: e.title, subtitle: e.subtitle, time: e.time, completed: e.completed, task: e.task, routineId: e.routineId })
     const days: CanvasDay[] = rhythm.days.map((d, i) => ({
       date: d.date, key: d.key,
@@ -1057,14 +1076,26 @@ export function WeekViewV2(props: WeekViewV2Props) {
       items: [...d.entries.filter((e) => e.kind !== 'event'), ...d.foldedRoutines].filter((e) => !(e.task && onShelf.has(e.task.id))).map(toItem),
       sometime: journalWeekend && journalWeekend.satIndex === i ? journalWeekend.sometime.map(toItem) : undefined,
       dinners: d.dinners.map(({ event, label }) => ({ id: `event-${event.google_event_id || event.id}`, label })),
+      weather: forecast[d.key] ? <DayWeather weather={forecast[d.key]} narrow={false} /> : undefined,
     }))
     const lines = [
       { label: 'Every day', items: rhythm.everyDay.map((r) => ({ title: r.title, openId: r.openId })) },
       { label: 'Weekdays', items: rhythm.weekdays.map((r) => ({ title: r.title, openId: r.openId })) },
     ]
-    return { days, lines }
-  }, [journalDays, journalWeekend, shelf])
+    return { days, lines, hasDaily }
+  }, [journalDays, journalWeekend, shelf, dailyShown, forecast])
 
+  // Move under…: the month's milestones as Plan's nodes, so the link write and
+  // its goal_id consistency are Plan's own (moveUnderPatch).
+  const moveUnderFor = useCallback((t: Task) => {
+    const parents: PlanNode[] = canvasMonths.flatMap((m) => m.rows.filter((r) => !r.completed && r.id !== t.id))
+      .map((r) => ({ key: `2:${r.id}`, id: r.id, title: r.title, level: 2, parent: null, task: r }))
+    const current = parentOf(t, WEEK_TO_MONTH, new Set(parents.map((p) => p.id)))
+    const item: PlanNode = { key: `3:${t.id}`, id: t.id, title: t.title, level: 3, parent: current ? `2:${current.id}` : null, task: t }
+    const nodes = [...parents, item]
+    const eligible = eligibleParents(nodes, item)
+    return eligible.length || item.parent ? { item, parents: eligible, nodes } : null
+  }, [canvasMonths])
   const canvasWriters = useMemo<WeekCanvasWriters>(() => {
     const short = (d: Date) => d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
     const write = (label: string, t: Task, patch: Partial<Task>, previous?: Partial<Task>) => {
@@ -1113,13 +1144,13 @@ export function WeekViewV2(props: WeekViewV2Props) {
           return r.ok
         }, opts)
       },
-      addAction: async (title, milestoneId) => {
+      addAction: async (title, milestoneId, area) => {
         const line = milestoneId ? tasks.find((t) => t.id === milestoneId) : undefined
         const day = dayNamedIn(title, weekAnchor, new Date())
         const opts: { ids: string[]; undo?: () => Promise<boolean | void> } = { ids: [] }
         const ok = await activity.run(line ? `Add “${title}” for ${line.title}` : `Add “${title}” to the week`, async () => {
           const id = await addTask(title, undefined, undefined, day ?? undefined, {
-            bucket: 'week', weekStart: weekAnchor, assignedTo: meId ?? undefined, context: line?.context ?? undefined,
+            bucket: 'week', weekStart: weekAnchor, assignedTo: meId ?? undefined, context: area ?? line?.context ?? undefined,
             ...(day ? { isAllDay: true } : {}), ...(line ? { sourceId: line.id } : {}),
           })
           if (!id) return false
@@ -1127,7 +1158,8 @@ export function WeekViewV2(props: WeekViewV2Props) {
           opts.undo = async () => { await deleteTask(id) }
           return true
         }, opts)
-        if (ok && !(line?.context ? layers.has(line.context) : layers.has('unsorted'))) showToast('Added — hidden by your current view.', 'warning', 8000)
+        const landed = area ?? line?.context
+        if (ok && !(landed ? layers.has(landed) : layers.has('unsorted'))) showToast('Added — hidden by your current view.', 'warning', 8000)
         return ok
       },
       milestoneDone: (id) => {
@@ -1137,12 +1169,26 @@ export function WeekViewV2(props: WeekViewV2Props) {
           ids: [id], undo: async () => { await onUpdateTask(id, { completed: t.completed }) },
         })
       },
+      putOnWeek: (id) => {
+        const t = tasks.find((x) => x.id === id)
+        // The same write as the month's "put it on the week": it stays on the month's list.
+        if (t) write(`Put “${t.title}” on this week`, t, { bucket: 'week', weekStart: weekAnchor })
+      },
+      assign: (t, ids) => write(`People for “${t.title}”`, t, { assignedToAll: ids, assignedTo: ids[0] ?? undefined }),
+      setArea: (t, area) => write(`Life area for “${t.title}”`, t, { context: area }),
+      moveUnderOptions: (t) => moveUnderFor(t),
+      moveUnder: (t, parent) => {
+        const o = moveUnderFor(t)
+        const patch = o && moveUnderPatch(o.nodes, o.item, parent)
+        if (!patch) return
+        write(parent ? `Move “${t.title}” under “${parent.title}”` : `Unlink “${t.title}”`, t, patch.after as Partial<Task>, patch.before as Partial<Task>)
+      },
       open: (id) => handleSelectBlock(id),
       foreignDrop: (day, payload) => { void planActions.drop(payload, { type: 'day', day }) },
     }
     // handleSelectBlock is a plain function of onSelectItem.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activity, onUpdateTask, toggleTask, markDone, undoDone, setPlanned, moveRoutineToDay, tasks, weekAnchor, meId, addTask, deleteTask, layers, planActions, onSelectItem])
+  }, [activity, onUpdateTask, toggleTask, markDone, undoDone, setPlanned, moveRoutineToDay, tasks, weekAnchor, meId, addTask, deleteTask, layers, planActions, onSelectItem, moveUnderFor])
   const canvasMonthName = canvasMonths.map((m) => m.name).join(' and ')
   const canvasSpans = useMemo(() => {
     const ymdLabel = (ymd: string) => { const [y, m, d] = ymd.split('-').map(Number); const at = new Date(y, m - 1, d); return `${at.toLocaleDateString('en-US', { weekday: 'short' })} ${at.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}` }
@@ -1157,10 +1203,14 @@ export function WeekViewV2(props: WeekViewV2Props) {
   const canvasDayDescriptions = useMemo(() => Object.fromEntries((dayChoices ?? []).map((c) => [
     localYmd(c.date), densityDescription(c.density, c.date.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })),
   ])), [dayChoices])
-  const weekCanvas = (
+  const { area: addAreaDefault } = useAddArea()
+  const canvasMembers = useMemo(() => familyMembers.map((m) => ({ id: m.id, name: m.name })), [familyMembers])
+  const weekCanvas = (host: WeekCanvasHost) => (
     <WeekCanvas weekStart={weekAnchor} days={canvasDays.days} shelf={shelf} routinesToPlace={routinesToPlace}
       rhythm={canvasDays.lines} monthName={canvasMonthName} isCurrent={weekIsCurrentFor(weekAnchor)} writers={canvasWriters}
-      spans={canvasSpans} dayDescriptions={canvasDayDescriptions} />
+      spans={canvasSpans} dayDescriptions={canvasDayDescriptions} members={canvasMembers}
+      daily={canvasDays.hasDaily ? { shown: dailyShown, onToggle: toggleDaily } : undefined}
+      lookBack={{ count: host.lastWeekOpen, onReview: host.onLookBack }} defaultArea={addAreaDefault} focusAdd={host.arrivedToWrite} />
   )
 
   // A past week is a look-back, not a plan.
@@ -1172,7 +1222,7 @@ export function WeekViewV2(props: WeekViewV2Props) {
     )}
   </>
   // v2 draws these in its one toolbar, not on a row of their own.
-  const v2Page = planV2Enabled() && (narrow || !showSchedule)
+  const v2Page = planV2Enabled()
 
   return (
     <WeekPlanHost tasks={tasks} weekStart={weekAnchor} meId={meId} isPast={weekIsPast} tools={v2Page ? undefined : weekTools}>
@@ -1222,8 +1272,10 @@ export function WeekViewV2(props: WeekViewV2Props) {
             <h2 className="week-days-heading">The days</h2>
             <WeekJournal days={journalDays} weekend={journalWeekend} spans={journalSpans} onSelectItem={handleSelectBlock} onToggleEntry={handleJournalToggle} onPlanDrop={handlePlanDropOnDay} onAddToDay={handleAddToDay} timingControl={weekTimingControl} forecast={forecast} />
           </>
-        ) : (
-        <>
+        ) : (() => {
+        // Hours: the timed grid. "Plan the week" stays in the frame here too
+        // (WeekV2 draws the toolbar and runs the session around it).
+        const hours = (<>
         {weekListFor(openSession)}
         <WeekGrid
           weekStart={weekStart}
@@ -1307,8 +1359,14 @@ export function WeekViewV2(props: WeekViewV2Props) {
             />
           ))}
         </WeekGrid>
-        </>
-        )}
+        </>)
+        return planV2Enabled() ? (
+          <WeekV2 tasks={tasks} weekStart={weekAnchor} meId={meId} isCurrent={weekIsCurrent} onPlan={openSession} tools={weekTools} canvas={hours}
+            onSelectTask={(id) => onSelectItem(`task-${id}`)}
+            timingControl={weekTimingControl}
+            renderDays={(o) => <WeekJournal layout="grid" days={journalDays} weekend={journalWeekend} spans={journalSpans} onSelectItem={handleSelectBlock} onToggleEntry={handleJournalToggle} onPlanDrop={handlePlanDropOnDay} onAddToDay={handleAddToDay} onAddEvent={calendarConnected ? handleAddEvent : undefined} timingControl={weekTimingControl} forecast={forecast} {...o} />} />
+        ) : hours
+        })()}
         </div>
         </div>
         )}

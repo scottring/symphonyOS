@@ -25,6 +25,9 @@ vi.mock('@/hooks/useSupabaseTasks', async (importOriginal) => {
   return { ...actual, useSupabaseTasks: () => ({ ...actual.useSupabaseTasks(), toggleTask: async () => toggleResult.ok }) }
 })
 
+// The week's planning session, settled and unplanned: "Plan the week" is offered.
+vi.mock('@/hooks/usePlanningSession', () => ({ usePlanningSession: () => ({ saved: null, mine: null, loading: false, error: null, reload: vi.fn(), save: vi.fn() }), weekToken: () => 'w' }))
+
 vi.mock('@/hooks/useDayPlan', () => ({
   useDayPlan: () => ({
     loading: false, error: false,
@@ -524,5 +527,68 @@ describe('WeekViewV2 — Sometime this weekend follows the people filter', () =>
     const sometime = within(screen.getByTestId('weekend-sometime'))
     expect(sometime.getByText('Clean the grill')).toBeInTheDocument()
     expect(sometime.queryByText('Pot the ferns')).toBeNull()
+  })
+})
+
+// Follow-up 2026-10-10: the week page's earlier functions, inside the approved
+// composition, writing through the page's own writers.
+describe('WeekViewV2 — the week canvas keeps what the page could do', () => {
+  const sunday = new Date(2026, 8, 13)
+  const anchor = () => weekStartAnchor(sunday, readCadenceConfig().weekStartsOn)
+  const october = new Date(2026, 9, 1)
+  const september = new Date(2026, 8, 1)
+  const line = (id: string, title: string, o: Partial<Task> = {}) => createMockTask({ id, title, bucket: 'month', monthStart: september, commitments: [{ level: 'month', periodStart: september, status: 'open' }], ...o })
+  const action = (id: string, title: string, o: Partial<Task> = {}) => createMockTask({ id, title, bucket: 'week', weekStart: anchor(), commitments: [{ level: 'week', periodStart: anchor(), status: 'open' }], ...o })
+  void october
+  beforeEach(() => { vi.useFakeTimers({ toFake: ['Date'] }); vi.setSystemTime(new Date(2026, 8, 13, 9)) })
+  afterEach(() => { vi.useRealTimers(); localStorage.removeItem('symphony-week-daily') })
+
+  it('Hours keeps "Plan the week" in the frame', () => {
+    render(<WeekViewV2 {...defaultProps} routines={[]} weekStart={sunday} />)
+    const inDays = !!screen.queryByRole('button', { name: 'Plan the week' })
+    fireEvent.click(screen.getByRole('radio', { name: 'Hours' }))
+    expect(screen.getByTestId('allday-2026-09-13')).toBeInTheDocument()
+    expect(inDays).toBe(true)
+    expect(screen.getByRole('button', { name: 'Plan the week' })).toBeInTheDocument()
+  })
+
+  it('Move under… writes Plan’s link patch, goal_id following the new milestone', () => {
+    const onUpdateTask = vi.fn()
+    const trip = line('m1', 'Plan the autumn trip', { goalId: 'y1' })
+    const shed = line('m2', 'Clear out the shed', { goalId: 'y2' })
+    const cabin = action('w1', 'Book the cabin', { sourceId: 'm1', goalId: 'y1' })
+    render(<WeekViewV2 {...defaultProps} routines={[]} weekStart={sunday} tasks={[trip, shed, cabin]} onUpdateTask={onUpdateTask} />)
+    fireEvent.click(screen.getByRole('button', { name: 'More for Book the cabin' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Move under…' }))
+    fireEvent.click(screen.getByRole('menuitemradio', { name: 'Clear out the shed' }))
+    expect(onUpdateTask).toHaveBeenCalledWith('w1', { sourceId: 'm2', goalId: 'y2' })
+  })
+
+  it('Put on this week writes the month line onto the week, as the month page does', () => {
+    const onUpdateTask = vi.fn()
+    const trip = line('m1', 'Plan the autumn trip')
+    render(<WeekViewV2 {...defaultProps} routines={[]} weekStart={sunday} tasks={[trip, action('w1', 'Book the cabin', { sourceId: 'm1' })]} onUpdateTask={onUpdateTask} />)
+    fireEvent.click(screen.getByRole('button', { name: 'More for Plan the autumn trip' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Put on this week' }))
+    expect(onUpdateTask).toHaveBeenCalledWith('m1', { bucket: 'week', weekStart: anchor() })
+  })
+
+  it('People… and Life area… write the row’s own fields', () => {
+    const onUpdateTask = vi.fn()
+    render(<WeekViewV2 {...defaultProps} routines={[]} weekStart={sunday} tasks={[action('w1', 'Book the cabin')]} onUpdateTask={onUpdateTask} />)
+    fireEvent.click(screen.getByRole('button', { name: 'More for Book the cabin' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Life area…' }))
+    fireEvent.click(screen.getByRole('menuitemradio', { name: 'Family' }))
+    expect(onUpdateTask).toHaveBeenCalledWith('w1', { context: 'family' })
+  })
+
+  it('every-day routines are written once until "Show daily", which is remembered', () => {
+    const daily = createMockRoutine({ id: 'dog', name: 'Walk the dog', time_of_day: '07:00:00', recurrence_pattern: { type: 'daily' } as RecurrencePattern, show_on_timeline: true })
+    render(<WeekViewV2 {...defaultProps} routines={[daily]} weekStart={sunday} />)
+    expect(screen.getAllByText('Walk the dog')).toHaveLength(1)
+    fireEvent.click(screen.getByRole('button', { name: 'Show daily' }))
+    expect(localStorage.getItem('symphony-week-daily')).toBe('shown')
+    expect(screen.getAllByText('Walk the dog').length).toBeGreaterThan(1)
+    expect(screen.getByRole('button', { name: 'Hide daily' })).toBeInTheDocument()
   })
 })

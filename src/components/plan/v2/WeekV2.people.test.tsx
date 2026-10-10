@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, fireEvent } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { ASSIGNEE_FILTER_KEY } from '@/hooks/useAssigneeFilter'
 
@@ -11,6 +11,7 @@ vi.mock('@/hooks/useFamilyMembers', () => ({ useFamilyMembers: () => ({ members:
 vi.mock('@/hooks/useActionableInstances', () => ({ useActionableInstances: () => ({ setPlanned: vi.fn(), reschedule: vi.fn() }) }))
 vi.mock('./AddArea', () => ({ useAddArea: () => ({ area: undefined, picker: null }) }))
 vi.mock('./FromPaper', () => ({ FromPaper: () => null }))
+vi.mock('./WeekStepScreen', () => ({ WeekStepMain: () => null }))
 vi.mock('@/hooks/useDayPlan', () => ({ useDayPlan: () => ({ plan: null, loading: false, error: false }) }))
 
 import { WeekV2 } from './WeekV2'
@@ -23,7 +24,13 @@ const row = (id: string, title: string, assignedTo?: string) => ({
 })
 const tasks = [row('m', 'Mine', 'me'), row('i', 'Iris only', 'iris'), row('u', 'Nobody yet')] as never
 
-const renderWeek = () => render(<MemoryRouter><WeekV2 tasks={tasks} weekStart={week} meId="me" isCurrent days={null} onSelectTask={vi.fn()} /></MemoryRouter>)
+// The week's list is written in the session's "Write the week" (at rest the
+// week is WeekViewV2's canvas, whose shelf applies the same lens).
+const renderWeek = () => {
+  render(<MemoryRouter><WeekV2 tasks={tasks} weekStart={week} meId="me" isCurrent days={null} onSelectTask={vi.fn()} /></MemoryRouter>)
+  fireEvent.click(screen.getByRole('button', { name: 'Plan the week' }))
+  fireEvent.click(screen.getAllByRole('button').find((b) => b.textContent?.endsWith('Write the week') && b.closest('.pv2-steps'))!)
+}
 
 describe('WeekV2 — the people filter narrows the week’s list', () => {
   beforeEach(() => localStorage.removeItem(ASSIGNEE_FILTER_KEY))

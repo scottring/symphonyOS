@@ -21,7 +21,13 @@ import type { Task } from '@/types/task'
 import { localYmd } from '@/lib/cadence/config'
 import { isMissedPlacement } from '@/lib/week/missedPlacement'
 
-export interface ShelfMilestone { id: string; title: string; completed: boolean; month?: string }
+export interface ShelfMilestone {
+  id: string; title: string; completed: boolean; month?: string
+  /** Its life area: a new action written for it starts there. */
+  context?: string | null
+  /** The milestone itself is committed to this week. */
+  onWeek?: boolean
+}
 
 export interface ShelfRow {
   task: Task
@@ -87,13 +93,14 @@ export function buildShelf({ weekTasks, tasks, milestones, weekStart, now = new 
     // Placed on a day this week: it is on that day. Done work stays with its
     // day too, when it has one.
     if (placedInWeek(t, weekStart, now)) continue
-    const line = lineOf(t, byId)
+    // A milestone put on the week itself stands in its own card.
+    const line = known.has(t.id) ? t : lineOf(t, byId)
     let g = unlinked
     if (line) {
       g = groups.get(line.id) ?? { key: `m:${line.id}`, milestone: known.get(line.id) ?? { id: line.id, title: line.title, completed: !!line.completed }, rows: [], done: [] }
       groups.set(line.id, g)
     }
-    const row = { task: t, meta: t.completed ? null : shelfRowMeta(t, weekStart, now) }
+    const row = { task: t, meta: t.completed ? null : known.has(t.id) ? 'the milestone itself' : shelfRowMeta(t, weekStart, now) }
     if (t.completed) g.done.push(row)
     else g.rows.push(row)
   }

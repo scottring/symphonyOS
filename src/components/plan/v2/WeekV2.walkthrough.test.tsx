@@ -26,9 +26,10 @@ vi.mock('@/hooks/useActionableInstances', () => ({ useActionableInstances: () =>
 vi.mock('@/hooks/useToast', () => ({ showToast: h.toast }))
 vi.mock('./AddArea', () => ({ useAddArea: () => ({ area: undefined, picker: null }) }))
 vi.mock('./FromPaper', () => ({ FromPaper: () => null }))
+vi.mock('./WeekStepScreen', () => ({ WeekStepMain: () => null }))
 vi.mock('@/hooks/useDayPlan', () => ({ useDayPlan: () => ({ plan: null, loading: false, error: false }) }))
 
-import { WeekV2 } from './WeekV2'
+import { WeekV2, type WeekCanvasHost } from './WeekV2'
 
 // These tests cover the Lists view; Open journal is the default since
 // 2026-10-08, so they make the device's choice explicit.
@@ -55,7 +56,13 @@ const SHED = month('m2', 'Clear out the shed')
 
 let lastDays: Record<string, unknown> = {}
 const renderDays = (o: Record<string, unknown>) => { lastDays = o; return <p>days</p> }
-const ui = (tasks: Task[], weekStart = WEEK) => <MemoryRouter><WeekV2 tasks={tasks} weekStart={weekStart} meId="me" isCurrent={weekStart === WEEK} renderDays={renderDays} onSelectTask={vi.fn()} /></MemoryRouter>
+// At rest the week is WeekViewV2's canvas (2026-10-10); this stand-in
+// reads the host contract — last week's open work and the way to review it.
+const canvas = (host: WeekCanvasHost) => <button type="button" onClick={host.onLookBack}>{host.lastWeekOpen} from last week · Review</button>
+const ui = (tasks: Task[], weekStart = WEEK) => <MemoryRouter><WeekV2 tasks={tasks} weekStart={weekStart} meId="me" isCurrent={weekStart === WEEK} renderDays={renderDays} onSelectTask={vi.fn()} canvas={canvas} /></MemoryRouter>
+// The week's list and the month beside it are the session's "Write the week".
+const step = (name: string) => fireEvent.click(screen.getAllByRole('button').find((b) => b.textContent?.endsWith(name) && b.closest('.pv2-steps'))!)
+const toWrite = () => { fireEvent.click(screen.getByRole('button', { name: 'Plan the week' })); step('Write the week') }
 const input = () => screen.getByLabelText('Add to this week') as HTMLInputElement
 const type = (v: string) => fireEvent.change(input(), { target: { value: v } })
 const enter = () => fireEvent.submit(input().closest('form')!)
@@ -64,6 +71,7 @@ const deferred = <T,>() => { let resolve!: (v: T) => void; const promise = new P
 describe('rapid weekly actions for one month line', () => {
   it('“Add a weekly action” chooses the line, lights it, and puts the cursor in the box', () => {
     render(ui([TRIP, SHED]))
+    toWrite()
     fireEvent.click(screen.getByRole('button', { name: 'Add a weekly action for Plan the autumn trip' }))
     expect(document.activeElement).toBe(input())
     expect(screen.getByText(/Adding for October:/)).toHaveTextContent('Adding for October: Plan the autumn trip')
@@ -74,6 +82,7 @@ describe('rapid weekly actions for one month line', () => {
 
   it('several Enters in a row share the line, stay distinct, and keep the cursor in the box', async () => {
     render(ui([TRIP, SHED]))
+    toWrite()
     fireEvent.click(screen.getByRole('button', { name: 'Add a weekly action for Plan the autumn trip' }))
     for (const t of ['Book the cabin', 'Ask about time off']) {
       type(t); enter()
@@ -86,6 +95,7 @@ describe('rapid weekly actions for one month line', () => {
 
   it('switching the line changes only what comes next; Clear goes back to unlinked', async () => {
     render(ui([TRIP, SHED]))
+    toWrite()
     fireEvent.click(screen.getByRole('button', { name: 'Add a weekly action for Plan the autumn trip' }))
     type('Book the cabin'); enter(); await waitFor(() => expect(input().value).toBe(''))
     fireEvent.change(screen.getByLabelText('For an October line'), { target: { value: 'm2' } })
@@ -100,6 +110,7 @@ describe('rapid weekly actions for one month line', () => {
     const d = deferred<string>()
     h.addTask.mockReturnValueOnce(d.promise)
     render(ui([TRIP]))
+    toWrite()
     fireEvent.click(screen.getByRole('button', { name: 'Add a weekly action for Plan the autumn trip' }))
     type('Book the cabin'); enter()
     expect(screen.getByRole('status', { name: '' })).toHaveTextContent('Saving…')
@@ -114,6 +125,7 @@ describe('rapid weekly actions for one month line', () => {
   it('a failed save keeps the words and says so', async () => {
     h.addTask.mockResolvedValueOnce(undefined)
     render(ui([TRIP]))
+    toWrite()
     type('Book the cabin'); enter()
     expect(await screen.findByRole('alert')).toHaveTextContent('That didn’t save — your words are still in the box.')
     expect(input().value).toBe('Book the cabin')
@@ -121,6 +133,7 @@ describe('rapid weekly actions for one month line', () => {
 
   it('a chosen line that is no longer on offer (another week, a filter, done) is never reused', async () => {
     const { rerender } = render(ui([TRIP, SHED]))
+    toWrite()
     fireEvent.click(screen.getByRole('button', { name: 'Add a weekly action for Plan the autumn trip' }))
     rerender(ui([SHED]))
     expect(screen.getByText(/Not tied to an October line/)).toBeInTheDocument()
@@ -133,6 +146,7 @@ describe('rapid weekly actions for one month line', () => {
 
   it('a different week starts with nothing chosen', () => {
     const { rerender } = render(ui([TRIP]))
+    toWrite()
     fireEvent.click(screen.getByRole('button', { name: 'Add a weekly action for Plan the autumn trip' }))
     const next = new Date(2026, 9, 10)
     rerender(ui([TRIP], next))
@@ -144,6 +158,7 @@ describe('rapid weekly actions for one month line', () => {
 describe('changing an existing weekly action’s month line', () => {
   it('links an item written without one, on the same row — only the link is written', async () => {
     render(ui([TRIP, SHED, weekItem('w1', 'Go through the onboarding')]))
+    toWrite()
     fireEvent.click(screen.getByRole('button', { name: 'Link Go through the onboarding to an October line' }))
     fireEvent.click(screen.getByRole('menuitemradio', { name: 'Plan the autumn trip' }))
     await waitFor(() => expect(h.updateTask).toHaveBeenCalledWith('w1', { sourceId: 'm1' }))
@@ -155,6 +170,7 @@ describe('changing an existing weekly action’s month line', () => {
 
   it('changes and removes a link from the row’s ⋯ menu too', async () => {
     render(ui([TRIP, SHED, weekItem('w2', 'Book the cabin', { sourceId: 'm1' })]))
+    toWrite()
     fireEvent.click(screen.getByRole('button', { name: 'More for Book the cabin' }))
     fireEvent.click(screen.getByRole('menuitem', { name: /Change October line/ }))
     fireEvent.click(screen.getByRole('menuitemradio', { name: 'Clear out the shed' }))
@@ -167,6 +183,7 @@ describe('changing an existing weekly action’s month line', () => {
   it('removes an older row’s goal_task_id link even when that line is not on offer this month', async () => {
     const sept = task({ id: 'old', title: 'Sort the paperwork', bucket: 'month', monthStart: new Date(2026, 8, 1) })
     render(ui([TRIP, sept, weekItem('w3', 'File the receipts', { goalTaskId: 'old' })]))
+    toWrite()
     fireEvent.click(screen.getByRole('button', { name: /^For September: Sort the paperwork/ }))
     fireEvent.click(screen.getByRole('menuitemradio', { name: 'Remove the October link' }))
     await waitFor(() => expect(h.updateTask).toHaveBeenCalledWith('w3', { goalTaskId: undefined }))
@@ -175,6 +192,7 @@ describe('changing an existing weekly action’s month line', () => {
   it('a row written for one line and a step of another loses only the written link, and says what still shows', async () => {
     const goal = month('g9', 'Host the family dinner')
     render(ui([TRIP, goal, weekItem('w4', 'Buy candles', { sourceId: 'm1', goalTaskId: 'g9' })]))
+    toWrite()
     fireEvent.click(screen.getByRole('button', { name: /^For October: Plan the autumn trip/ }))
     fireEvent.click(screen.getByRole('menuitemradio', { name: 'Remove the October link' }))
     await waitFor(() => expect(h.updateTask).toHaveBeenCalledWith('w4', { sourceId: undefined }))
@@ -184,6 +202,8 @@ describe('changing an existing weekly action’s month line', () => {
   it('the days get the same control for week items only', () => {
     const item = weekItem('w5', 'Call the plumber', { scheduledFor: new Date(2026, 9, 8), isAllDay: true })
     render(ui([TRIP, item]))
+    fireEvent.click(screen.getByRole('button', { name: 'Plan the week' }))
+    step('Can’t move')
     const control = (lastDays.forControl as (t: Task) => ReactElement | null)
     expect(control(item)).not.toBeNull()
     expect(control(TRIP)).toBeNull()
@@ -196,13 +216,13 @@ describe('unfinished work: said truthfully, and resurfaced by the look-back', ()
 
   it('last week’s open item is not on this week’s list, and the page says it is waiting for a decision', () => {
     render(ui([left]))
-    expect(within(screen.getByRole('region', { name: "This week's list" })).queryByText('Talk through the holiday plans')).toBeNull()
-    expect(screen.getByText(/Last week left one thing open\. Nothing has moved on its own\./)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '1 from last week · Review' })).toBeInTheDocument()
+    expect(screen.queryByText('Talk through the holiday plans')).toBeNull()
   })
 
   it('the look-back carries it in with an explicit write', async () => {
     render(ui([left]))
-    fireEvent.click(screen.getByRole('button', { name: /Decide what happens to it/ }))
+    fireEvent.click(screen.getByRole('button', { name: '1 from last week · Review' }))
     expect(screen.getByText('Talk through the holiday plans')).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Carry to this week' }))
     await waitFor(() => expect(h.keepForward).toHaveBeenCalledWith('l1', { weekStart: WEEK }, PREV))
@@ -211,7 +231,7 @@ describe('unfinished work: said truthfully, and resurfaced by the look-back', ()
   it('a carry that fails (keepForward resolves undefined) stays on its card, uncounted, and can be tried again', async () => {
     h.keepForward.mockResolvedValueOnce(undefined)
     render(ui([left]))
-    fireEvent.click(screen.getByRole('button', { name: /Decide what happens to it/ }))
+    fireEvent.click(screen.getByRole('button', { name: '1 from last week · Review' }))
     fireEvent.click(screen.getByRole('button', { name: 'Carry to this week' }))
     expect(await screen.findByRole('alert')).toHaveTextContent('That didn’t fully save, so it isn’t counted as decided.')
     expect(screen.getByText('Talk through the holiday plans')).toBeInTheDocument()
@@ -225,7 +245,7 @@ describe('unfinished work: said truthfully, and resurfaced by the look-back', ()
     const dated = task({ ...left, scheduledFor: new Date(2026, 8, 29), isAllDay: true })
     h.gatedUpdate.mockResolvedValueOnce(false)
     const { rerender } = render(ui([dated]))
-    fireEvent.click(screen.getByRole('button', { name: /Decide what happens to it/ }))
+    fireEvent.click(screen.getByRole('button', { name: '1 from last week · Review' }))
     fireEvent.click(screen.getByRole('button', { name: 'Carry to this week' }))
     expect(await screen.findByRole('alert')).toHaveTextContent('didn’t fully save')
     expect(h.keepForward).toHaveBeenCalledTimes(1)
@@ -238,21 +258,5 @@ describe('unfinished work: said truthfully, and resurfaced by the look-back', ()
     await waitFor(() => expect(h.gatedUpdate).toHaveBeenCalledTimes(2))
     expect(h.keepForward).toHaveBeenCalledTimes(1) // not carried twice
     await waitFor(() => expect(screen.queryByRole('alert')).toBeNull())
-  })
-
-  it('explains what happens to this week’s open work without promising a silent roll-forward', () => {
-    render(ui([weekItem('w6', 'Ring the garage')]))
-    fireEvent.click(screen.getByText('Not finished by Friday?'))
-    const note = screen.getByRole('note', { name: 'What happens to unfinished work' })
-    expect(note).toHaveTextContent('nothing moves by itself')
-    expect(note).toHaveTextContent('Last week asks about each open one')
-    expect(note).toHaveTextContent('a day named in its title isn’t a scheduled day')
-    expect(note).not.toHaveTextContent(/automatically/i)
-  })
-
-  it('names the exception: an older item with no week of its own stays on the current week', () => {
-    render(ui([task({ id: 'u1', title: 'Fix the gate', bucket: 'week' })]))
-    fireEvent.click(screen.getByText('Not finished by Friday?'))
-    expect(screen.getByText(/One older item here has no week of its own/)).toBeInTheDocument()
   })
 })

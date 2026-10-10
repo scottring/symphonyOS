@@ -39,7 +39,6 @@ import { OpenJournal, PlanLayoutSwitch, type JournalSection } from './OpenJourna
 import { groupByParent, untouchedCount, WEEK_TO_MONTH } from '@/lib/planning/journalGroups'
 import { readPlanLayout, writePlanLayout, type PlanLayout } from '@/lib/planning/v2/planLayout'
 import { isMissedPlacement } from '@/lib/week/missedPlacement'
-import { useColumnsFitWindow } from '@/hooks/useColumnsFitWindow'
 import { WeekRow } from './WeekRow'
 import { useAddArea } from './AddArea'
 import { useAssigneeFilter } from '@/hooks/useAssigneeFilter'
@@ -81,18 +80,21 @@ const WEEK_STEPS: { key: WeekStep; label: string }[] = [
   { key: 'fixed', label: 'Can’t move' }, { key: 'ahead', label: 'Look ahead' }, { key: 'routines', label: 'Routines' },
   { key: 'write', label: 'Write the week' }, { key: 'plan', label: 'The week' },
 ]
-/** Whether the month's list stands beside the week, remembered per device. */
-const REF_KEY = 'symphony-week-ref'
-const readRefOpen = () => { try { return localStorage.getItem(REF_KEY) === 'open' } catch { return false } }
-/** Whether the days show every-day routines, remembered per device. */
-const DAILY_KEY = 'symphony-week-daily'
-const readDaily = () => { try { return localStorage.getItem(DAILY_KEY) === 'shown' } catch { return false } }
+/** What the week canvas needs from the session that only this page holds. */
+export interface WeekCanvasHost {
+  /** Last week's open work waiting for a deliberate decision. */
+  lastWeekOpen: number
+  /** Opens "Plan the week" on its look-back step. */
+  onLookBack: () => void
+  /** Arrived to write (the month's "Choose what week N takes on"). */
+  arrivedToWrite: boolean
+}
 
 export function WeekV2({ tasks, weekStart, meId, isCurrent, days, renderDays, onSelectTask, timingControl, dragEnabled = true, tools, canvas }: {
   /** The week at rest, as approved (2026-10-10): WeekViewV2's week canvas —
    *  Still to place above the days. Replaces the Lists / Open journal
    *  layouts at rest; the planning session keeps its own steps. */
-  canvas?: ReactNode
+  canvas?: ReactNode | ((host: WeekCanvasHost) => ReactNode)
   /** Layer-filtered tasks, as the week receives them. */
   tasks: Task[]
   weekStart: Date
@@ -138,10 +140,6 @@ export function WeekV2({ tasks, weekStart, meId, isCurrent, days, renderDays, on
   const [layout, setLayoutState] = useState<PlanLayout>(() => ((location.state as { journal?: boolean } | null)?.journal ? 'journal' : readPlanLayout('week')))
   const setLayout = (v: PlanLayout) => { setLayoutState(v); writePlanLayout('week', v) }
   // Arriving from the month's "Plan week N", the month stands beside the week.
-  const [refOpen, setRefOpenState] = useState(() => !!(location.state as { ref?: boolean } | null)?.ref || readRefOpen())
-  const setRefOpen = (open: boolean) => { setRefOpenState(open); try { localStorage.setItem(REF_KEY, open ? 'open' : 'shut') } catch { /* this visit only */ } }
-  const [daily, setDailyState] = useState(readDaily)
-  const setDaily = (shown: boolean) => { setDailyState(shown); try { localStorage.setItem(DAILY_KEY, shown ? 'shown' : 'hidden') } catch { /* this visit only */ } }
 
   // The week's own month (its middle day) names it; the reference shows every
   // month the week touches, so a week across a month end shows both plans.
@@ -173,9 +171,6 @@ export function WeekV2({ tasks, weekStart, meId, isCurrent, days, renderDays, on
   const prevWeek = useMemo(() => new Date(weekStart.getTime() - 7 * DAY), [weekStart])
   const prevTasks = useMemo(() => weekListTasks(tasks, prevWeek, meId, { isCurrent: false }), [tasks, prevWeek, meId])
   const [meeting, setMeeting] = useState<null | { step: WeekStep; candidateIds: string[] }>(null)
-  // The journal and the days fill the room to the landscape and scroll on
-  // their own, as Week's lists do (useColumnsFitWindow).
-  const journalGrid = useColumnsFitWindow(layout === 'journal' && !meeting)
   // The days always know the household, so each row shows who carries it.
   const daysFor = (opts: DaysOptions) => (renderDays ? renderDays({
     members, forLabel: (t: Task) => { const f = forLine(t); return f ? `for ${f.month}: ${f.title}` : null },
@@ -316,6 +311,7 @@ export function WeekV2({ tasks, weekStart, meId, isCurrent, days, renderDays, on
     setPerson('all')
     window.scrollTo({ top: 0 })
   }
+  const host: WeekCanvasHost = { lastWeekOpen: reviewIds.length, onLookBack: startMeeting, arrivedToWrite }
   const endMeeting = async (keep: boolean) => {
     if (keep) {
       if (!(await session.save({ wentWell: session.mine?.wentWell ?? '', didnt: session.mine?.didnt ?? '', focus: focus.trim() || undefined }))) { showToast('Couldn’t save the plan — try again.', 'error', 5000); return }
@@ -466,12 +462,11 @@ export function WeekV2({ tasks, weekStart, meId, isCurrent, days, renderDays, on
   // The month's list, plain, for reference (Scott, 2026-10-04: "they're just
   // lists"). No goals, no steps: a line can come into the week, quietly, and
   // stays on the month either way.
-  const monthRef = (onHide?: () => void) => (
+  const monthRef = () => (
     <aside className="pv2-ref wk-ref" aria-label={`${monthName}, for reference`}>
       {refMonths.map((m) => (
         <div key={m.name} className="pv2-refmonth">
           <div className="pv2-colh">{m.name} <small>for reference</small>
-            {onHide && <button type="button" className="pv2-link pv2-quiet wk-refhide" aria-label={`Hide ${m.name}`} onClick={onHide}>Hide</button>}
           </div>
           {m.rows.length ? (
             <ul className="pv2-list">{m.rows.map((t) => {
@@ -601,56 +596,10 @@ export function WeekV2({ tasks, weekStart, meId, isCurrent, days, renderDays, on
             </div>
           )}
         </>
-      ) : canvas ? (
-        <div className="wk-canvas">{canvas}</div>
-      ) : layout === 'journal' ? (
-        // At rest, Open journal: the month's lines with the week's actions,
-        // then the days — the same days, drag and "when" as the lists.
-        // On a wide screen the two stand side by side, each scrolling on its
-        // own (keyboard: each is a focusable region); narrower, one page.
-        <>
-        <PlanLayoutSwitch value={layout} onChange={setLayout} />
-        <div ref={journalGrid} className="wk-page wk-journal-page is-colscroll">
-          <div className="wk-journal-col" tabIndex={0} role="region" aria-label="Priorities and this week’s actions">
-            {journal()}
-          </div>
-          <section className="pv2-days wk-days wk-journal-days" tabIndex={0} aria-label="The days">
-            {daysFor({ dailyRoutines: daily })}
-          </section>
-        </div>
-        </>
       ) : (
-        // At rest: the week's list beside its days; the month one click away.
-        <>
-        <PlanLayoutSwitch value={layout} onChange={setLayout} />
-        <div className={`wk-page wk-clear${refOpen ? ' has-ref' : ''}`}>
-          {refOpen && monthRef(() => setRefOpen(false))}
-          <div className="wk-listcol">
-            {weekList({ focus: arrivedToWrite })}
-            {!refOpen && (
-              <button type="button" className="wk-reflink" onClick={() => setRefOpen(true)}>
-                <span>{monthName} list</span><small>for reference</small>
-              </button>
-            )}
-          </div>
-          <section className="pv2-days wk-days" aria-label="The days">
-            <div className="wk-daysbar">
-              {/* Three kinds, told apart (Scott, 2026-10-04). */}
-              <ul className="wk-key" aria-label="What the marks mean">
-                <li><span className="wk-glyph is-event" aria-hidden="true" />Event — on the calendar</li>
-                <li><span className="wk-check" aria-hidden="true" />Task — do once</li>
-                <li><span className="wk-check is-routine" aria-hidden="true" />Routine — repeats</li>
-              </ul>
-              <div className="wk-daily" role="group" aria-label="Daily routines">
-                <span>Daily routines</span>
-                <button type="button" aria-pressed={!daily} className={!daily ? 'is-on' : undefined} onClick={() => setDaily(false)}>Hide</button>
-                <button type="button" aria-pressed={daily} className={daily ? 'is-on' : undefined} onClick={() => setDaily(true)}>Show</button>
-              </div>
-            </div>
-            {daysFor({ dailyRoutines: daily })}
-          </section>
-        </div>
-        </>
+        // At rest: the week as approved (2026-10-10) — WeekViewV2's canvas,
+        // told what only the session knows (last week's open work).
+        <div className="wk-canvas">{typeof canvas === 'function' ? canvas(host) : canvas}</div>
       )}
     </div>
   )

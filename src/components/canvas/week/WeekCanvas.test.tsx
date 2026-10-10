@@ -24,6 +24,11 @@ const placed = task({ id: 'p', title: 'Pick up the keys', scheduledFor: dayOf(4)
 const writers = (): WeekCanvasWriters => ({
   placeTask: vi.fn(), moveTask: vi.fn(), unplaceTask: vi.fn(), toggleTask: vi.fn(), toggleRoutine: vi.fn(),
   placeRoutine: vi.fn(), moveRoutine: vi.fn(), addAction: vi.fn(async () => true), milestoneDone: vi.fn(), open: vi.fn(), foreignDrop: vi.fn(),
+  putOnWeek: vi.fn(), assign: vi.fn(), setArea: vi.fn(), moveUnder: vi.fn(),
+  moveUnderOptions: vi.fn((t: Task) => ({
+    item: { key: `3:${t.id}`, id: t.id, title: t.title, level: 3, parent: t.sourceId ? `2:${t.sourceId}` : null, task: t },
+    parents: [trip, paper].map((m) => ({ key: `2:${m.id}`, id: m.id, title: m.title, level: 2, parent: null, task: m })),
+  })),
 })
 
 function days(): CanvasDay[] {
@@ -31,6 +36,7 @@ function days(): CanvasDay[] {
     const d = dayOf(i)
     return {
       date: d, key: key(d),
+      weather: i === 0 ? <span role="img" aria-label="Sunny, high 64°, low 51°">64°</span> : undefined,
       events: i === 2 ? [{ id: 'event-e1', kind: 'event', title: 'Dentist', time: new Date(2026, 9, 5, 9), completed: false }] : [],
       items: i === 4 ? [
         { id: 'task-p', kind: 'task', title: placed.title, completed: false, task: placed },
@@ -43,7 +49,7 @@ function days(): CanvasDay[] {
 function shelf(): ShelfGroup[] {
   return buildShelf({
     weekTasks: [cabin, bank, car, maps, placed], tasks: [trip, paper, cabin, bank, car, maps, placed], weekStart,
-    milestones: [{ id: 'm1', title: trip.title, completed: false }, { id: 'm2', title: paper.title, completed: false }],
+    milestones: [{ id: 'm1', title: trip.title, completed: false, context: 'family' }, { id: 'm2', title: paper.title, completed: false }],
     now: new Date(2026, 9, 3, 9),
   })
 }
@@ -74,6 +80,13 @@ describe('weekShelf', () => {
     expect(g.flatMap((x) => x.rows).some((r) => r.task.id === 'p')).toBe(false)
   })
 
+  it('a milestone put on the week itself stands in its own card, said quietly', () => {
+    const itself = task({ ...trip, bucket: 'week' })
+    const g = buildShelf({ weekTasks: [itself], tasks: [itself], weekStart, milestones: [{ id: 'm1', title: trip.title, completed: false, onWeek: true }], now: new Date(2026, 9, 3, 9) })
+    expect(g[0].milestone?.id).toBe('m1')
+    expect(g[0].rows[0]).toMatchObject({ task: itself, meta: 'the milestone itself' })
+  })
+
   it('a day that passed undone comes back with a quiet “from Fri”', () => {
     const missed = task({ id: 'm', title: 'Return books', scheduledFor: new Date(2026, 9, 9), isAllDay: true })
     const g = buildShelf({ weekTasks: [missed], tasks: [missed], weekStart, milestones: [], now: new Date(2026, 9, 10, 9) })
@@ -87,7 +100,7 @@ describe('WeekCanvas — Still to place', () => {
     const region = screen.getByRole('region', { name: 'Still to place' })
     expect(within(region).getByText('Drag onto a day, or press + to give it a day')).toBeInTheDocument()
     const groups = within(region).getAllByRole('region').map((r) => r.getAttribute('aria-label'))
-    expect(groups).toEqual(['Plan the autumn trip', 'Get the paperwork in order', 'Routines to place', 'Unlinked'])
+    expect(groups).toEqual(['Plan the autumn trip', 'Routines to place', 'Unlinked'])
     const tripCard = within(screen.getByRole('region', { name: 'Plan the autumn trip' }))
     expect(tripCard.getAllByText('Plan the autumn trip')).toHaveLength(1)
     expect(tripCard.getByText('Book the cabin')).toBeInTheDocument()
@@ -138,7 +151,7 @@ describe('WeekCanvas — Still to place', () => {
     const box = head().getByRole('textbox', { name: 'Add an action for Plan the autumn trip' })
     fireEvent.change(box, { target: { value: 'Pack the tent' } })
     fireEvent.submit(box.closest('form')!)
-    expect(w.addAction).toHaveBeenCalledWith('Pack the tent', 'm1')
+    expect(w.addAction).toHaveBeenCalledWith('Pack the tent', 'm1', 'family')
   })
 
   it('Unlinked’s “+ Add” writes an action that serves nothing', () => {
@@ -147,7 +160,7 @@ describe('WeekCanvas — Still to place', () => {
     const box = screen.getByRole('textbox', { name: 'Add something for this week' })
     fireEvent.change(box, { target: { value: 'Fix the gate' } })
     fireEvent.submit(box.closest('form')!)
-    expect(w.addAction).toHaveBeenCalledWith('Fix the gate', undefined)
+    expect(w.addAction).toHaveBeenCalledWith('Fix the gate', undefined, undefined)
   })
 })
 
@@ -199,7 +212,7 @@ describe('WeekCanvas — the days', () => {
     expect(within(screen.getByTestId('journal-day-2026-10-05')).getByRole('button', { name: /Dentist/ })).toHaveTextContent('9aDentist')
     const wed = within(screen.getByTestId('journal-day-2026-10-07'))
     fireEvent.click(wed.getByRole('button', { name: 'More for Pick up the keys' }))
-    expect(screen.getAllByRole('menuitem').map((m) => m.textContent)).toEqual(['Move to another day', 'Back to still to place', 'Open', 'Complete'])
+    expect(screen.getAllByRole('menuitem').map((m) => m.textContent).slice(0, 4)).toEqual(['Move to another day', 'Back to still to place', 'Open', 'Complete'])
     fireEvent.click(screen.getByRole('menuitem', { name: 'Back to still to place' }))
     expect(w.unplaceTask).toHaveBeenCalledWith(placed)
   })
@@ -238,5 +251,110 @@ describe('WeekCanvas — phone', () => {
     expect(inline).toHaveClass('is-inline')
     fireEvent.click(within(inline).getByRole('button', { name: /Thursday, October 8/ }))
     expect(w.placeTask).toHaveBeenCalledWith(cabin, dayOf(5))
+  })
+})
+
+// Follow-up 2026-10-10: what the week page could do before, back inside the
+// approved structure — secondary actions in the ⋯ menus, no new rows.
+describe('WeekCanvas — restored functions', () => {
+  it('folds milestones with nothing this week into one quiet line that opens them in place', () => {
+    const w = show()
+    expect(screen.queryByRole('region', { name: 'Get the paperwork in order' })).toBeNull()
+    const line = screen.getByText(/Also in October: one milestone with nothing this week/)
+    fireEvent.click(within(line).getByRole('button', { name: 'Show' }))
+    const card = screen.getByRole('region', { name: 'Get the paperwork in order' })
+    fireEvent.click(within(card).getByRole('button', { name: '+ Add' }))
+    const box = within(card).getByRole('textbox', { name: 'Add an action for Get the paperwork in order' })
+    fireEvent.change(box, { target: { value: 'Find the passports' } })
+    fireEvent.submit(box.closest('form')!)
+    expect(w.addAction).toHaveBeenCalledWith('Find the passports', 'm2', undefined)
+  })
+
+  it('a card’s + Add starts in its milestone’s life area', () => {
+    const w = show()
+    const card = within(screen.getByRole('region', { name: 'Plan the autumn trip' }))
+    fireEvent.click(card.getByRole('button', { name: '+ Add' }))
+    const box = card.getByRole('textbox', { name: 'Add an action for Plan the autumn trip' })
+    expect(box.closest('form')!.querySelector('.wc-composer-area')).not.toBeNull()
+    fireEvent.change(box, { target: { value: 'Pack the tent' } })
+    fireEvent.submit(box.closest('form')!)
+    expect(w.addAction).toHaveBeenCalledWith('Pack the tent', 'm1', 'family')
+  })
+
+  it('Unlinked’s + Add starts in the page’s add area', () => {
+    const w = show(writers(), { defaultArea: 'work' })
+    fireEvent.click(within(screen.getByRole('region', { name: 'Unlinked' })).getByRole('button', { name: '+ Add' }))
+    const box = screen.getByRole('textbox', { name: 'Add something for this week' })
+    fireEvent.change(box, { target: { value: 'Fix the gate' } })
+    fireEvent.submit(box.closest('form')!)
+    expect(w.addAction).toHaveBeenCalledWith('Fix the gate', undefined, 'work')
+  })
+
+  it('a milestone not yet on the week can be put on it from its ⋯', () => {
+    const w = show()
+    fireEvent.click(screen.getByRole('button', { name: 'More for Plan the autumn trip' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Put on this week' }))
+    expect(w.putOnWeek).toHaveBeenCalledWith('m1')
+  })
+
+  it('a shelf row’s ⋯ sets its people, its life area, and the milestone it serves', () => {
+    const w = show(writers(), { members: [{ id: 'sk', name: 'Scott' }, { id: 'ir', name: 'Iris' }] })
+    const more = () => fireEvent.click(screen.getByRole('button', { name: 'More for Book the cabin' }))
+    more()
+    expect(screen.getAllByRole('menuitem').map((m) => m.textContent)).toEqual(['People…', 'Life area…', 'Move under…'])
+    fireEvent.click(screen.getByRole('menuitem', { name: 'People…' }))
+    fireEvent.click(screen.getByRole('menuitemcheckbox', { name: 'Iris' }))
+    expect(w.assign).toHaveBeenCalledWith(cabin, ['ir'])
+    fireEvent.keyDown(screen.getByRole('menu', { name: 'People for Book the cabin' }), { key: 'Escape' })
+    more()
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Life area…' }))
+    fireEvent.click(screen.getByRole('menuitemradio', { name: 'Work' }))
+    expect(w.setArea).toHaveBeenCalledWith(cabin, 'work')
+    more()
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Move under…' }))
+    const menu = within(screen.getByRole('menu', { name: /Move Book the cabin under/ }))
+    expect(menu.getByRole('menuitemradio', { name: 'Plan the autumn trip' })).toHaveAttribute('aria-checked', 'true')
+    fireEvent.click(menu.getByRole('menuitemradio', { name: 'Get the paperwork in order' }))
+    expect(w.moveUnder).toHaveBeenCalledWith(cabin, expect.objectContaining({ id: 'm2' }))
+  })
+
+  it('a day’s task carries the same secondary actions in its ⋯', () => {
+    show()
+    fireEvent.click(within(screen.getByTestId('journal-day-2026-10-07')).getByRole('button', { name: 'More for Pick up the keys' }))
+    expect(screen.getAllByRole('menuitem').map((m) => m.textContent)).toEqual(
+      ['Move to another day', 'Back to still to place', 'Open', 'Complete', 'People…', 'Life area…', 'Move under…'])
+  })
+
+  it('each day wears its forecast, small, in its header', () => {
+    show()
+    expect(within(screen.getByTestId('journal-day-2026-10-03')).getByRole('img', { name: /Sunny, high 64°/ })).toBeInTheDocument()
+  })
+
+  it('every-day routines are written once, with a quiet Show daily / Hide daily', () => {
+    const onToggle = vi.fn()
+    const { rerender } = render(<WeekCanvas weekStart={weekStart} days={days()} shelf={shelf()} routinesToPlace={[]} monthName="October" isCurrent writers={writers()}
+      rhythm={[{ label: 'Every day', items: [{ title: 'Walk the dog', openId: 'routine-r9-day0' }] }]} daily={{ shown: false, onToggle }} />)
+    expect(screen.getByText('Walk the dog')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Show daily' }))
+    expect(onToggle).toHaveBeenCalled()
+    rerender(<WeekCanvas weekStart={weekStart} days={days()} shelf={shelf()} routinesToPlace={[]} monthName="October" isCurrent writers={writers()}
+      rhythm={[{ label: 'Every day', items: [] }]} daily={{ shown: true, onToggle }} />)
+    expect(screen.getByText('Daily routines are in each day')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Hide daily' })).toHaveAttribute('aria-pressed', 'true')
+  })
+
+  it('last week’s open work is one quiet line that opens the deliberate review — nothing moves by itself', () => {
+    const onReview = vi.fn()
+    const w = show(writers(), { lookBack: { count: 3, onReview } })
+    const line = screen.getByText(/3 from last week/)
+    fireEvent.click(within(line).getByRole('button', { name: 'Review' }))
+    expect(onReview).toHaveBeenCalled()
+    expect(w.placeTask).not.toHaveBeenCalled()
+    expect(w.unplaceTask).not.toHaveBeenCalled()
+  })
+
+  it('arriving to write opens Unlinked’s box', () => {
+    show(writers(), { focusAdd: true })
+    expect(screen.getByRole('textbox', { name: 'Add something for this week' })).toBeInTheDocument()
   })
 })

@@ -896,10 +896,6 @@ export function HomeViewContainer({ fixedView }: { fixedView?: 'today' | 'week' 
         </div>
       )}
 
-      {fixedView === 'week' && <div className="flex flex-wrap gap-4 px-4 py-2 text-sm">
-        <button className="underline" onClick={() => navigate(`/year?view=constellation&horizon=3&start=${localYmd(viewedDate)}`)}>Open planning map</button>
-      </div>}
-
       <AlongsideDayBridge onSelect={id=>handleSelectItem(`task-${id}`)} enabled={searchParams.get('view') === 'alongside'} tasks={tasks} date={viewedDate} update={gated.updateTask} complete={toggleTask} loading={tasksLoading} error={tasksLoadFailed} retry={retryTasks} weekView={fixedView === 'week'}>
       <HomeView
         registerUndo={undo.pushAction}

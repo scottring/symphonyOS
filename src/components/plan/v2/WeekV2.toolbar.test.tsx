@@ -37,6 +37,12 @@ const renderWeek = () => render(
 // 2026-10-04: one verb, "Plan the week", opens the session in steps (the
 // look-back its first step when last week left open work); marking planned
 // is the session's last step.
+// The month beside the week's list is the session's "Write the week" — the
+// week at rest is WeekViewV2's canvas (2026-10-10).
+const toWrite = () => {
+  fireEvent.click(screen.getByRole('button', { name: 'Plan the week' }))
+  fireEvent.click(screen.getAllByRole('button').find((b) => b.textContent?.endsWith('Write the week') && b.closest('.pv2-steps'))!)
+}
 const toLastStep = () => fireEvent.click(screen.getAllByRole('button').find((b) => b.textContent?.endsWith('The week') && b.closest('.pv2-steps'))!)
 describe('WeekV2 toolbar — one verb', () => {
   beforeEach(() => { session.saved = null; session.loading = false; session.error = null; session.save.mockReset() })
@@ -114,7 +120,7 @@ describe('WeekV2 reference — a week across a month end shows both months', () 
   it('lists September and October, each whole: done lines stay, struck', () => {
     const tasks = [goal('s1', 'Finish the garden', new Date(2026, 8, 1), true), goal('o1', 'Book flu shots', new Date(2026, 9, 1))]
     render(<MemoryRouter><WeekV2 tasks={tasks} weekStart={new Date(2026, 8, 26)} meId="me" isCurrent days={null} onSelectTask={vi.fn()} /></MemoryRouter>)
-    fireEvent.click(screen.getByRole('button', { name: /September and October list/ }))
+    toWrite()
     expect(screen.getByRole('button', { name: 'Finish the garden' }).closest('li')?.dataset.done).toBe('true')
     expect(screen.getByRole('button', { name: 'Book flu shots' })).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Open October →' })).toBeTruthy()
@@ -122,13 +128,14 @@ describe('WeekV2 reference — a week across a month end shows both months', () 
 
   it('the empty list asks for the week’s own work, not a review to start', () => {
     render(<MemoryRouter><WeekV2 tasks={[]} weekStart={new Date(2026, 8, 26)} meId="me" isCurrent days={null} onSelectTask={vi.fn()} /></MemoryRouter>)
+    toWrite()
     expect(screen.queryByText(/start the weekly review/)).toBeNull()
     expect(screen.getByText('Nothing on this week yet. Add the first thing below.')).toBeTruthy()
   })
 
   it('a week inside one month shows one month', () => {
     render(<MemoryRouter><WeekV2 tasks={[]} weekStart={new Date(2026, 9, 3)} meId="me" isCurrent days={null} onSelectTask={vi.fn()} /></MemoryRouter>)
-    fireEvent.click(screen.getByRole('button', { name: /^October list/ }))
+    toWrite()
     expect(screen.getByRole('button', { name: 'Open October →' })).toBeTruthy()
     expect(screen.queryByRole('button', { name: 'Open September →' })).toBeNull()
   })
@@ -142,7 +149,7 @@ describe('WeekV2 reference while tasks load', () => {
     vi.doMock('@/hooks/useSupabaseTasks', () => ({ useSupabaseTasks: () => ({ loading: true, toggleTask: vi.fn(), updateTask: vi.fn(), pushTask: vi.fn(), updateTasksBulk: vi.fn(), keepForward: vi.fn(), dropCommitment: vi.fn(), addTask: vi.fn() }) }))
     const { WeekV2: Fresh } = await import('./WeekV2')
     render(<MemoryRouter><Fresh tasks={[]} weekStart={new Date(2026, 8, 26)} meId="me" isCurrent days={null} onSelectTask={vi.fn()} /></MemoryRouter>)
-    fireEvent.click(screen.getByRole('button', { name: /September and October list/ }))
+    toWrite()
     expect(screen.getAllByText('Loading…').length).toBe(2)
     expect(screen.queryByText(/Nothing written for/)).toBeNull()
     vi.doUnmock('@/hooks/useSupabaseTasks')
@@ -157,7 +164,7 @@ describe('WeekV2 — a month line on this week says so', () => {
     const line = { id: 'g1', title: 'Hang porch plants', completed: false, bucket: 'week', monthStart: new Date(2026, 9, 1), weekStart: new Date(2026, 9, 3), createdAt: new Date(2026, 8, 29), assignedTo: 'me',
       commitments: [{ level: 'month', periodStart: new Date(2026, 9, 1), status: 'open' }, { level: 'week', periodStart: new Date(2026, 9, 3), status: 'open' }] }
     render(<MemoryRouter><WeekV2 tasks={[line] as never} weekStart={new Date(2026, 9, 3)} meId="me" isCurrent days={null} onSelectTask={vi.fn()} /></MemoryRouter>)
-    fireEvent.click(screen.getByRole('button', { name: /^October list/ }))
+    toWrite()
     const ref = within(screen.getByRole('complementary', { name: 'October, for reference' }))
     expect(ref.getByText('On this week')).toBeTruthy()
     expect(ref.queryByRole('button', { name: /Add Hang porch plants to this week/ })).toBeNull()

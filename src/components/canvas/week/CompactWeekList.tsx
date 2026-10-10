@@ -136,13 +136,15 @@ export interface CompactWeekRowProps<T> {
   disabled?: boolean
   /** In place of the + button (a day's ⋯ menu). */
   trailing?: ReactNode
+  /** Before the + button (a shelf row's ⋯ menu). */
+  extra?: ReactNode
   /** Drawn inside the row, after it (a picker). */
   children?: ReactNode
   className?: string
 }
 
 /** One compact row: check, wrapping title, small meta, and + (or a menu). */
-export function CompactWeekRow<T>({ row, suffix, onAdd, addExpanded, onComplete, onOpen, onDragStart, onDragEnd, addLabel, busyKey, disabled, trailing, children, className }: CompactWeekRowProps<T>) {
+export function CompactWeekRow<T>({ row, suffix, onAdd, addExpanded, onComplete, onOpen, onDragStart, onDragEnd, addLabel, busyKey, disabled, trailing, extra, children, className }: CompactWeekRowProps<T>) {
   const arrived = useArrived(row.id)
   const done = !!row.completed
   const movable = !!onDragStart && !row.readOnly && !row.onDay && !done && !disabled
@@ -167,6 +169,7 @@ export function CompactWeekRow<T>({ row, suffix, onAdd, addExpanded, onComplete,
         {row.context && <span className="cw-context">{row.context}</span>}
       </span>
       {row.meta && <span className="canvas-item-meta cw-meta">{row.meta}</span>}
+      {extra}
       {row.onDay
         ? <span className="canvas-tag">{row.onDay}</span>
         : trailing ?? (onAdd && !row.readOnly && !done && (

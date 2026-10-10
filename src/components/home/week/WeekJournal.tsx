@@ -200,7 +200,7 @@ function AddToDay({ day, onAdd, withTime = false, event = false }: { day: Journa
   )
 }
 
-function DayWeather({ weather, narrow }: { weather: DayForecast; narrow: boolean }) {
+export function DayWeather({ weather, narrow }: { weather: DayForecast; narrow: boolean }) {
   const label = `${weatherCondition(weather.code)}, high ${weather.high}°, low ${weather.low}°`
   return (
     <span className="mt-1.5 flex items-center gap-1 text-[11px] tabular-nums text-neutral-500" title={label} aria-label={label} role="img">

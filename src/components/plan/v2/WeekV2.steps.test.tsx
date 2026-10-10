@@ -100,6 +100,8 @@ describe('WeekV2 — planning in steps', () => {
     startSession()
     fireEvent.click(screen.getByRole('button', { name: 'Leave for now' }))
     expect(screen.queryByRole('region', { name: /Planning week/ })).toBeNull()
-    expect(renderDays).toHaveBeenLastCalledWith(expect.objectContaining({ dailyRoutines: false }))
+    // Back to the week at rest, with what it is for.
+    expect(screen.getByText('Keep Monday light')).toBeInTheDocument()
+    void renderDays
   })
 })

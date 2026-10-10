@@ -67,7 +67,8 @@ export function GiveItADay({ title, days, current, onPick, onClose, inline = fal
 /** A small ⋯ menu: items as buttons, Escape and arrows inside. */
 export function CanvasMenu({ label, items, onClose }: {
   label: string
-  items: { label: string; onSelect: () => void }[]
+  /** `checked`: a choice among several (drawn as a radio item). */
+  items: { label: string; onSelect: () => void; checked?: boolean }[]
   onClose: () => void
 }) {
   const ref = useRef<HTMLDivElement>(null)
@@ -90,8 +91,49 @@ export function CanvasMenu({ label, items, onClose }: {
   return (
     <div ref={ref} role="menu" aria-label={label} className="cw-menu" onKeyDown={onKey}>
       {items.map((it) => (
-        <button key={it.label} type="button" role="menuitem" onClick={() => { onClose(); it.onSelect() }}>{it.label}</button>
+        <button key={it.label} type="button" role={it.checked === undefined ? 'menuitem' : 'menuitemradio'} aria-checked={it.checked}
+          onClick={() => { onClose(); it.onSelect() }}>{it.label}</button>
       ))}
+    </div>
+  )
+}
+
+/** "People…": the household as a checklist; each tap writes at once (the
+ *  assignee picker's rule), Escape or a click away closes it. */
+export function PeoplePicker({ title, members, selected, onChange, onClose }: {
+  title: string
+  members: { id: string; name: string }[]
+  selected: string[]
+  onChange: (ids: string[]) => void
+  onClose: () => void
+}) {
+  const ref = useRef<HTMLDivElement>(null)
+  const closeRef = useRef(onClose)
+  useEffect(() => { closeRef.current = onClose })
+  useEffect(() => {
+    ref.current?.querySelector<HTMLButtonElement>('button')?.focus()
+    const onDown = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) closeRef.current() }
+    document.addEventListener('mousedown', onDown)
+    return () => document.removeEventListener('mousedown', onDown)
+  }, [])
+  const onKey = (e: KeyboardEvent) => {
+    if (e.key === 'Escape') { e.stopPropagation(); onClose(); return }
+    if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return
+    const all = [...(ref.current?.querySelectorAll<HTMLButtonElement>('button') ?? [])]
+    const i = all.indexOf(document.activeElement as HTMLButtonElement)
+    all[(i + (e.key === 'ArrowDown' ? 1 : all.length - 1)) % all.length]?.focus()
+    e.preventDefault()
+  }
+  return (
+    <div ref={ref} role="menu" aria-label={`People for ${title}`} className="cw-menu" onKeyDown={onKey}>
+      {members.length === 0 && <p className="cw-menu-none">No one else in the household yet.</p>}
+      {members.map((m) => {
+        const on = selected.includes(m.id)
+        return (
+          <button key={m.id} type="button" role="menuitemcheckbox" aria-checked={on}
+            onClick={() => onChange(on ? selected.filter((x) => x !== m.id) : [...selected, m.id])}>{m.name}</button>
+        )
+      })}
     </div>
   )
 }
