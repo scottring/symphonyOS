@@ -1,15 +1,27 @@
 /**
  * Open Brain API client for Symphony OS.
  *
- * Calls Open Brain (Mac Mini via Cloudflare Tunnel) for knowledge operations.
- * Falls back to Supabase edge functions if Open Brain is unreachable.
+ * Open Brain (Mac Mini via Cloudflare Tunnel) is reached ONLY through the
+ * open-brain-proxy edge function, which holds the key server-side and lets
+ * through only the vault owner. The key used to be bundled here as
+ * VITE_OPEN_BRAIN_API_KEY, readable by anyone who loaded the site
+ * (2026-10-10); no Open Brain secret may be a VITE_ variable.
  */
+import { supabase } from '@/lib/supabase'
 
-const OPEN_BRAIN_URL = import.meta.env.VITE_OPEN_BRAIN_URL || ''
-const OPEN_BRAIN_API_KEY = import.meta.env.VITE_OPEN_BRAIN_API_KEY || ''
+/** VITE_OPEN_BRAIN_URL is now only the on-switch: the browser never calls it. */
+const ENABLED = Boolean(import.meta.env.VITE_OPEN_BRAIN_URL)
+const RELAY_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/open-brain-proxy`
 
-/** Whether Open Brain is configured (has a URL set) */
-export const isOpenBrainConfigured = Boolean(OPEN_BRAIN_URL)
+/** Whether Open Brain is switched on for this build */
+export const isOpenBrainConfigured = ENABLED
+
+/** The signed-in user's headers for the relay, or null when signed out. */
+async function relayAuth(): Promise<Record<string, string> | null> {
+  const { data: { session } } = await supabase.auth.getSession()
+  if (!session) return null
+  return { Authorization: `Bearer ${session.access_token}`, apikey: import.meta.env.VITE_SUPABASE_ANON_KEY }
+}
 
 interface OpenBrainRequestOptions extends Omit<RequestInit, 'signal'> {
   /** Timeout in milliseconds (default: 5000) */
@@ -24,19 +36,21 @@ export async function callOpenBrain<T = unknown>(
   path: string,
   options: OpenBrainRequestOptions = {},
 ): Promise<T | null> {
-  if (!OPEN_BRAIN_URL) return null
+  if (!ENABLED) return null
+  const auth = await relayAuth()
+  if (!auth) return null
 
   const { timeout = 5000, ...fetchOptions } = options
   const controller = new AbortController()
   const timeoutId = setTimeout(() => controller.abort(), timeout)
 
   try {
-    const res = await fetch(`${OPEN_BRAIN_URL}${path}`, {
+    const res = await fetch(`${RELAY_URL}${path}`, {
       ...fetchOptions,
       signal: controller.signal,
       headers: {
         'Content-Type': 'application/json',
-        'X-Api-Key': OPEN_BRAIN_API_KEY,
+        ...auth,
         ...fetchOptions.headers,
       },
     })
@@ -294,16 +308,18 @@ export interface BriefingData {
 
 /** Fetch structured briefing from Open Brain */
 export async function fetchBriefing(): Promise<BriefingData> {
-  if (!OPEN_BRAIN_URL) throw new Error('OPEN_BRAIN_URL not configured')
+  if (!ENABLED) throw new Error('OPEN_BRAIN_URL not configured')
+  const auth = await relayAuth()
+  if (!auth) throw new Error('Not signed in')
 
   const controller = new AbortController()
   const timeoutId = setTimeout(() => controller.abort(), 10000)
 
-  const res = await fetch(`${OPEN_BRAIN_URL}/api/briefing`, {
+  const res = await fetch(`${RELAY_URL}/api/briefing`, {
     signal: controller.signal,
     headers: {
       'Content-Type': 'application/json',
-      'X-Api-Key': OPEN_BRAIN_API_KEY,
+      ...auth,
     },
   })
 
@@ -332,8 +348,10 @@ export type TranscribeResult =
  * message (timeout vs. HTTP error vs. network drop) and log the cause.
  */
 export async function transcribeVoice(audioBlob: Blob): Promise<TranscribeResult> {
-  if (!OPEN_BRAIN_URL) return { ok: false, reason: 'not-configured' }
+  if (!ENABLED) return { ok: false, reason: 'not-configured' }
   if (audioBlob.size === 0) return { ok: false, reason: 'empty' }
+  const auth = await relayAuth()
+  if (!auth) return { ok: false, reason: 'http', detail: 'Not signed in' }
 
   const formData = new FormData()
   formData.append('audio', audioBlob, 'recording.webm')
@@ -342,12 +360,10 @@ export async function transcribeVoice(audioBlob: Blob): Promise<TranscribeResult
   const timeoutId = setTimeout(() => controller.abort(), 30000)
 
   try {
-    const res = await fetch(`${OPEN_BRAIN_URL}/api/voice/transcribe`, {
+    const res = await fetch(`${RELAY_URL}/api/voice/transcribe`, {
       method: 'POST',
       signal: controller.signal,
-      headers: {
-        'X-Api-Key': OPEN_BRAIN_API_KEY,
-      },
+      headers: auth,
       body: formData,
     })
 
@@ -387,7 +403,7 @@ export async function checkOpenBrainHealth(): Promise<{
   status?: string
   uptime?: number
 }> {
-  if (!OPEN_BRAIN_URL) return { available: false }
+  if (!ENABLED) return { available: false }
 
   const result = await callOpenBrain<{
     status: string
