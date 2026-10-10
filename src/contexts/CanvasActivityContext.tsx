@@ -16,12 +16,13 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import type { Task } from '@/types/task'
 import type { Goal } from '@/types/goal'
+import type { Routine } from '@/types/routine'
 import type { AgentProposalItem } from '@/lib/agentStream'
 import { WRITE_TOOLS } from '@/lib/agentTurn'
 import { canUndo, describeChanges, diffSnapshots, type CanvasChange, type Snapshot } from '@/lib/canvas/changeSet'
 import { toolSavingLabel } from '@/lib/canvas/toolLabels'
 
-export type SaveState = 'listening' | 'working' | 'saving' | 'saved' | 'partial' | 'failed' | 'answered'
+export type SaveState = 'listening' | 'working' | 'saving' | 'saved' | 'partial' | 'failed' | 'answered' | 'unverified'
 
 export interface CanvasReceipt {
   key: number
@@ -47,7 +48,16 @@ export interface CanvasWriters {
   updateTask: (id: string, updates: Partial<Task>) => Promise<unknown>
   deleteGoal: (id: string) => Promise<unknown>
   updateGoal: (id: string, updates: Partial<Goal>) => Promise<unknown>
+  deleteRoutine?: (id: string) => Promise<unknown>
+  updateRoutine?: (id: string, updates: Partial<Routine>) => Promise<unknown>
 }
+
+/** Writes whose rows the canvas holds and can check after a turn. */
+const TRACKED_TOOLS = new Set([
+  'symphony_create_plan_item', 'symphony_link_plan_item', 'symphony_update_intention',
+  'symphony_create_task', 'symphony_update_task', 'symphony_complete_task', 'symphony_delete_task',
+  'symphony_create_routine', 'symphony_update_routine', 'symphony_delete_routine',
+])
 
 interface CommandOptions {
   /** Ids the command touches, marked as arrived once it saves. */
@@ -113,7 +123,7 @@ export function CanvasActivityProvider({ children, snapshot, writers, refetch, r
   // The turn in flight.
   const turnRef = useRef<{
     key: number; request: string; before: Snapshot; startedAt: number
-    wrote: boolean; failures: string[]; reportedIds: string[]; awaitingDiff: boolean; ended?: { error: string | null; text: string }
+    wrote: boolean; trackedWrite: boolean; reportedOk: boolean; failures: string[]; reportedIds: string[]; awaitingDiff: boolean; ended?: { error: string | null; text: string }
   } | null>(null)
 
   const nextKey = () => { keyRef.current += 1; return keyRef.current }
@@ -141,7 +151,7 @@ export function CanvasActivityProvider({ children, snapshot, writers, refetch, r
 
   const turnStarted = useCallback((text: string, retry: boolean) => {
     const key = nextKey()
-    turnRef.current = { key, request: text, before: snapshotRef.current, startedAt: Date.now() - 2000, wrote: false, failures: [], reportedIds: [], awaitingDiff: false }
+    turnRef.current = { key, request: text, before: snapshotRef.current, startedAt: Date.now() - 2000, wrote: false, trackedWrite: false, reportedOk: false, failures: [], reportedIds: [], awaitingDiff: false }
     undoRef.current = null
     retryRef.current = retryTurn ?? null
     setReceipt({ key, source: 'conversation', state: 'working', request: text, summary: retry ? 'Trying again…' : 'Working on it…', changes: [], failures: [], undoable: false, canRetry: false })
@@ -151,13 +161,14 @@ export function CanvasActivityProvider({ children, snapshot, writers, refetch, r
     const turn = turnRef.current
     if (!turn || !WRITE_TOOLS.has(name)) return
     turn.wrote = true
+    if (TRACKED_TOOLS.has(name)) turn.trackedWrite = true
     setReceipt((r) => r && r.key === turn.key ? { ...r, state: 'saving', summary: toolSavingLabel(name) } : r)
   }, [])
 
   const toolResult = useCallback((result: { name: string; ok: boolean; ids?: string[]; error?: string }) => {
     const turn = turnRef.current
     if (!turn) return
-    if (result.ok) { turn.reportedIds.push(...(result.ids ?? [])); markArrived(result.ids ?? []) }
+    if (result.ok) { turn.reportedOk = true; turn.reportedIds.push(...(result.ids ?? [])); markArrived(result.ids ?? []) }
     else turn.failures.push(toolSavingLabel(result.name).replace(/…$/, ''))
   }, [markArrived])
 
@@ -169,11 +180,21 @@ export function CanvasActivityProvider({ children, snapshot, writers, refetch, r
     markArrived(changes.filter((c) => c.kind !== 'removed').map((c) => c.id))
     const error = turn.ended?.error ?? null
     const failed = turn.failures.length > 0 || !!error
-    const state: SaveState = !changes.length
-      ? (failed ? 'failed' : (turn.wrote ? 'failed' : 'answered'))
-      : (failed ? 'partial' : 'saved')
-    const undoable = changes.length > 0 && changes.every(canUndo)
-    const summary = state === 'answered' ? '' : state === 'failed'
+    // Nothing visible changed: a failure only when the write was one this
+    // canvas can see. A note, contact or event saved elsewhere is reported as
+    // saved when the server confirmed it, otherwise as not checked here.
+    const state: SaveState = changes.length
+      ? (failed ? 'partial' : 'saved')
+      : failed ? 'failed'
+        : turn.trackedWrite ? 'failed'
+          : turn.wrote ? (turn.reportedOk ? 'saved' : 'unverified')
+            : 'answered'
+    const routineUndo = !!writersRef.current.deleteRoutine && !!writersRef.current.updateRoutine
+    const undoable = changes.length > 0 && changes.every((c) => canUndo(c) && (c.entity !== 'routine' || routineUndo))
+    const summary = state === 'answered' ? ''
+      : state === 'unverified' ? "Symphony says it's done. It isn't shown on this page, so it wasn't checked here."
+      : state === 'saved' && !changes.length ? 'Saved'
+      : state === 'failed'
       ? (turn.wrote && !error && !turn.failures.length ? 'Nothing changed. The request may not have saved.' : "Didn't save. Nothing changed.")
       : state === 'partial'
         ? `${describeChanges(changes)}. Some of it didn't save.`
@@ -181,8 +202,15 @@ export function CanvasActivityProvider({ children, snapshot, writers, refetch, r
     undoRef.current = undoable ? async () => {
       const w = writersRef.current
       for (const c of [...changes].reverse()) {
-        if (c.kind === 'created') await (c.entity === 'task' ? w.deleteTask(c.id) : w.deleteGoal(c.id))
-        else if (c.kind === 'updated' && c.before) await (c.entity === 'task' ? w.updateTask(c.id, c.before as Partial<Task>) : w.updateGoal(c.id, c.before as Partial<Goal>))
+        if (c.kind === 'created') {
+          if (c.entity === 'task') await w.deleteTask(c.id)
+          else if (c.entity === 'goal') await w.deleteGoal(c.id)
+          else await w.deleteRoutine?.(c.id)
+        } else if (c.kind === 'updated' && c.before) {
+          if (c.entity === 'task') await w.updateTask(c.id, c.before as Partial<Task>)
+          else if (c.entity === 'goal') await w.updateGoal(c.id, c.before as Partial<Goal>)
+          else await w.updateRoutine?.(c.id, c.before as Partial<Routine>)
+        }
       }
     } : null
     setReceipt({ key: turn.key, source: 'conversation', state, request: turn.request, summary, changes, failures: turn.failures, undoable, canRetry: failed && !!retryRef.current })

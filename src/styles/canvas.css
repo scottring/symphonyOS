@@ -28,6 +28,7 @@
   border-color: var(--color-warning-500); color: var(--color-neutral-900);
   background: repeating-linear-gradient(135deg, var(--color-bg-elevated) 0 6px, var(--color-warning-50) 6px 12px);
 }
+.canvas-state.is-unverified { border-style: dashed; color: var(--color-neutral-700); }
 .canvas-state.is-proposed { border-style: dashed; border-color: var(--color-primary-500); color: var(--color-primary-800); }
 @keyframes canvas-pulse { 0%, 100% { opacity: 1 } 50% { opacity: .25 } }
 

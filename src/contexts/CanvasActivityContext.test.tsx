@@ -115,3 +115,44 @@ describe('CanvasActivityProvider', () => {
     expect(api.proposals).toHaveLength(0)
   })
 })
+
+describe('CanvasActivityProvider — writes the canvas does not hold', () => {
+  it('sees a routine created by a turn and offers Undo', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    let api!: CanvasActivity
+    const deleteRoutine = vi.fn().mockResolvedValue(true)
+    function RoutineHarness() {
+      const [routines, setRoutines] = useState<{ id: string; name: string }[]>([])
+      return (
+        <CanvasActivityProvider
+          snapshot={{ tasks: [], goals: [], routines: routines as never }}
+          writers={{ deleteTask: vi.fn(), updateTask: vi.fn(), deleteGoal: vi.fn(), updateGoal: vi.fn(), deleteRoutine, updateRoutine: vi.fn() }}
+          refetch={async () => { setRoutines([{ id: 'r1', name: 'Canvas test: bedtime' }]) }}
+        >
+          <Probe onReady={(a) => { api = a }} />
+        </CanvasActivityProvider>
+      )
+    }
+    render(<RoutineHarness />)
+    act(() => api.turnStarted('Create a bedtime routine', false))
+    act(() => api.toolUsed('symphony_create_routine'))
+    act(() => api.turnEnded({ didWrite: true, error: null, text: 'Done.' }))
+    await act(async () => { await vi.advanceTimersByTimeAsync(3000) })
+    await waitFor(() => expect(screen.getByTestId('state').textContent).toBe('saved|Added “Canvas test: bedtime”|undo|'))
+    await act(async () => { await api.undo() })
+    expect(deleteRoutine).toHaveBeenCalledWith('r1')
+    vi.useRealTimers()
+  })
+
+  it('does not call an untracked write (a note) a failure', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    let api!: CanvasActivity
+    render(<Harness initial={[]} after={[]} writers={{}} onReady={(a) => { api = a }} />)
+    act(() => api.turnStarted('Save a note about the picnic', false))
+    act(() => api.toolUsed('symphony_create_note'))
+    act(() => api.turnEnded({ didWrite: true, error: null, text: 'Saved.' }))
+    await act(async () => { await vi.advanceTimersByTimeAsync(3000) })
+    await waitFor(() => expect(screen.getByTestId('state').textContent).toMatch(/^unverified\|Symphony says it's done/))
+    vi.useRealTimers()
+  })
+})

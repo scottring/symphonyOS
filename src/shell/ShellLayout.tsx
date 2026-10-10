@@ -40,6 +40,7 @@ import { useMobile } from '@/hooks/useMobile';
 import { useDomain } from '@/hooks/useDomain';
 import { filterInboxTasksForLayers } from '@/lib/today/domainFilter';
 import { useSupabaseTasks } from '@/hooks/useSupabaseTasks';
+import { useRoutines } from '@/hooks/useRoutines';
 import { useDiscussionInbox } from '@/hooks/useDiscussionInbox';
 import { useSymphonyAssistant, type AssistantTurnObserver } from '@/hooks/useSymphonyAssistant';
 import { CanvasActivityProvider, useCanvasActivity, type CanvasActivity } from '@/contexts/CanvasActivityContext';
@@ -178,6 +179,8 @@ function ShellLayoutInner({ children }: Props) {
 
   const { tasks, refetch, deleteTask, updateTask } = useSupabaseTasks();
   const { goals, deleteGoal, updateGoal } = useGoals();
+  // Held so routine writes from a conversation are seen (and undoable) too.
+  const { routines: canvasRoutines, deleteRoutine, updateRoutine, refetch: refetchRoutines } = useRoutines();
   // The canvas activity provider sits inside this component's tree, but the
   // assistant hook runs above it: a ref bridges each turn's events across.
   const canvasRef = useRef<CanvasActivity | null>(null);
@@ -316,9 +319,14 @@ function ShellLayoutInner({ children }: Props) {
   const referencesVisible = !isMobile && referencesFit
     && !!references?.pins.some((pin) => !pinIsOnPage(location.pathname, pin.kind));
 
-  const canvasSnapshot = useMemo(() => ({ tasks, goals }), [tasks, goals]);
-  const canvasWriters = useMemo(() => ({ deleteTask, updateTask, deleteGoal, updateGoal: updateGoal as (id: string, u: Partial<import('@/types/goal').Goal>) => Promise<unknown> }), [deleteTask, updateTask, deleteGoal, updateGoal]);
-  const canvasRefetch = useCallback(() => { window.dispatchEvent(new Event('symphony-plan-updated')); return refetch(); }, [refetch]);
+  const canvasSnapshot = useMemo(() => ({ tasks, goals, routines: canvasRoutines }), [tasks, goals, canvasRoutines]);
+  const canvasWriters = useMemo(() => ({
+    deleteTask, updateTask, deleteGoal,
+    updateGoal: updateGoal as (id: string, u: Partial<import('@/types/goal').Goal>) => Promise<unknown>,
+    deleteRoutine,
+    updateRoutine: updateRoutine as unknown as (id: string, u: Partial<import('@/types/routine').Routine>) => Promise<unknown>,
+  }), [deleteTask, updateTask, deleteGoal, updateGoal, deleteRoutine, updateRoutine]);
+  const canvasRefetch = useCallback(() => { window.dispatchEvent(new Event('symphony-plan-updated')); return Promise.all([refetch(), refetchRoutines()]); }, [refetch, refetchRoutines]);
   const showStrip = conversationStripPath(location.pathname);
   const stripVoice = { available: voiceEnabled, active: voice.active, status: voice.status, start: () => { void voice.start(); }, stop: voice.stop };
   const openConversation = () => { if (isMobile) setPhoneChatOpen(true); else showPane('ai'); };

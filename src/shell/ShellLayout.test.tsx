@@ -59,6 +59,7 @@ vi.mock('@/hooks/useSupabaseTasks', () => ({ useSupabaseTasks: () => ({
   tasks: [], loading: false, updateTask: vi.fn(), updateTasksBulk: vi.fn(), pushTask: vi.fn(), toggleTask: vi.fn(),
 }) }))
 vi.mock('@/hooks/useScratchpadHidden', () => ({ useScratchpadHidden: () => ({ hidden: true }) }))
+vi.mock('@/hooks/useRoutines', () => ({ useRoutines: () => ({ routines: [], deleteRoutine: vi.fn(), updateRoutine: vi.fn(), refetch: vi.fn(), addRoutine: vi.fn() }) }))
 vi.mock('@/hooks/useSymphonyAssistant', () => ({
   useSymphonyAssistant: () => ({
     messages: [], loading: false, error: null, sendMessage: vi.fn(), resetSession: vi.fn(),

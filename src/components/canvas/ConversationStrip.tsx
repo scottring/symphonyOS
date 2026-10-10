@@ -36,7 +36,7 @@ interface Props {
 
 const STATE_LABEL: Record<CanvasReceipt['state'], string> = {
   listening: 'Listening', working: 'Working', saving: 'Saving', saved: 'Saved',
-  partial: 'Partly saved', failed: "Didn't save", answered: '',
+  partial: 'Partly saved', failed: "Didn't save", answered: '', unverified: 'Not checked here',
 }
 
 export function SaveStateBadge({ state }: { state: CanvasReceipt['state'] }) {

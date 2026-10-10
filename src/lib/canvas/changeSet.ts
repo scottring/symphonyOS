@@ -11,9 +11,10 @@
 
 import type { Task } from '@/types/task'
 import type { Goal } from '@/types/goal'
+import type { Routine } from '@/types/routine'
 
 export type ChangeKind = 'created' | 'updated' | 'removed'
-export type ChangeEntity = 'task' | 'goal'
+export type ChangeEntity = 'task' | 'goal' | 'routine'
 
 /** Fields a change may restore. Narrow on purpose: Undo only puts back what a
  *  plain edit can put back through the normal writers. */
@@ -23,6 +24,8 @@ export const TASK_RESTORABLE = [
 export type TaskRestorable = typeof TASK_RESTORABLE[number]
 
 export const GOAL_RESTORABLE = ['name', 'notes', 'status'] as const
+
+export const ROUTINE_RESTORABLE = ['name', 'visibility', 'paused_until', 'show_on_timeline', 'time_of_day', 'parent_routine_id', 'step_order'] as const
 export type GoalRestorable = typeof GOAL_RESTORABLE[number]
 
 export interface CanvasChange {
@@ -97,6 +100,8 @@ function diffRows<T extends { id: string }>(
 export interface Snapshot {
   tasks: readonly Task[]
   goals: readonly Goal[]
+  /** Optional: callers that hold routines include them so routine writes are seen. */
+  routines?: readonly Routine[]
 }
 
 /** Every task and intention a turn created, changed or removed. */
@@ -104,6 +109,9 @@ export function diffSnapshots(before: Snapshot, after: Snapshot, since?: number)
   return [
     ...diffRows('goal', before.goals, after.goals, (g) => g.name, GOAL_RESTORABLE, since),
     ...diffRows('task', before.tasks, after.tasks, (t) => t.title, TASK_RESTORABLE, since),
+    ...(before.routines && after.routines
+      ? diffRows('routine', before.routines, after.routines, (r) => r.name, ROUTINE_RESTORABLE, since)
+      : []),
   ]
 }
 
