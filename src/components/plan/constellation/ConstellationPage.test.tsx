@@ -2,7 +2,7 @@ import {render,screen,fireEvent,waitFor} from '@testing-library/react'
 import {MemoryRouter} from 'react-router-dom'
 import {beforeEach,describe,it,expect,vi} from 'vitest'
 import {ConstellationPage} from './ConstellationPage'
-const api=vi.hoisted(()=>({addGoal:vi.fn(),updateGoal:vi.fn(),addTask:vi.fn(),updateTask:vi.fn(),refetch:vi.fn(),tasks:[] as any[]}))
+const api=vi.hoisted(()=>({addGoal:vi.fn(),updateGoal:vi.fn(),addTask:vi.fn(),updateTask:vi.fn(),refetch:vi.fn(),pushTask:vi.fn(),setBucket:vi.fn(),updateTasksBulk:vi.fn(),toggleTask:vi.fn(),deleteTask:vi.fn(),keepForward:vi.fn(),dropCommitment:vi.fn(),tasks:[] as any[]}))
 vi.mock('@/contexts/GoalsContext',()=>({GoalsProvider:({children}:any)=>children,useGoalsContext:()=>({goals:[{id:'g',name:'Together',year:2026,status:'active',context:'personal'},{id:'other',name:'Health',year:2026,status:'active',context:'personal'}],loading:false,...api})}))
 vi.mock('@/hooks/useSupabaseTasks',()=>({useSupabaseTasks:()=>({tasks:api.tasks,loading:false,error:null,...api})}))
 vi.mock('@/hooks/useDomain',()=>({useDomain:()=>({layers:[],soleDomain:'personal'})}))
@@ -14,6 +14,7 @@ vi.mock('@/lib/planning/peopleLens',()=>({planPeopleLens:()=>({keep:()=>true,sco
 vi.mock('../v2/AddArea',()=>({useAddArea:()=>({area:'personal',picker:null})}))
 vi.mock('@/lib/planning/periodPage',async(importOriginal)=>({...await importOriginal<any>(),selectPeriodTasks:(tasks:any[],level:string)=>tasks.filter(t=>t.bucket===(level==='season'?'quarter':'month'))}))
 vi.mock('@/lib/placement/model',async(importOriginal)=>({...await importOriginal<any>(),committedTo:(t:any)=>t.bucket==='week'?{}:undefined}))
+vi.mock('@/components/domain/DomainGate',()=>({useDomainGate:()=>({requireDomain:vi.fn().mockResolvedValue('personal')})}))
 function open(){render(<MemoryRouter initialEntries={['/year?view=constellation&start=2026-10-09']}><ConstellationPage/></MemoryRouter>)}
 beforeEach(()=>{vi.clearAllMocks();api.tasks=[];HTMLElement.prototype.scrollIntoView=vi.fn();HTMLDialogElement.prototype.showModal=function(){this.setAttribute('open','')};HTMLDialogElement.prototype.close=function(){this.removeAttribute('open')}})
 describe('connected Constellation saves',()=>{
@@ -143,4 +144,39 @@ it('temporarily reveals eligible parents from a focused branch and cancels clean
  expect(screen.queryByRole('button',{name:/Health/,pressed:false})).not.toBeInTheDocument()
  expect(api.updateTask).not.toHaveBeenCalled()
  vi.unstubAllGlobals()
+})
+
+it('offers triage without changing branch focus and reports failed carry-forward',async()=>{
+ api.tasks=[{id:'m',title:'Picnic',bucket:'month',context:'personal'}]
+ api.keepForward.mockResolvedValue(undefined);open()
+ fireEvent.click(screen.getByRole('button',{name:'Triage Picnic'}))
+ expect(screen.getByRole('button',{name:/Health/,pressed:false})).toBeInTheDocument()
+ fireEvent.click(screen.getByText('Carry to next month'))
+ await screen.findByText('No change was saved. You can try again.')
+ expect(api.keepForward).toHaveBeenCalledWith('m',{monthStart:new Date(2026,10,1)},new Date(2026,9,1))
+})
+it('removes only the viewed period and can reopen completed cards',async()=>{
+ api.tasks=[{id:'m',title:'Picnic',bucket:'month',context:'personal',completed:true}]
+ api.dropCommitment.mockResolvedValue(true);api.toggleTask.mockResolvedValue(true);open()
+ fireEvent.click(screen.getByRole('button',{name:'Triage Picnic'}))
+ fireEvent.click(screen.getByText('Reopen'));await screen.findByText('Reopened.')
+ expect(api.toggleTask).toHaveBeenCalledWith('m')
+ fireEvent.click(screen.getByRole('button',{name:'Triage Picnic'}))
+ fireEvent.click(screen.getByText('Remove from this month'));await screen.findByText('Removed from this month.')
+ expect(api.dropCommitment).toHaveBeenCalledWith('m','month',new Date(2026,9,1))
+})
+it('triages intentions through their own status rather than task scheduling',async()=>{
+ api.updateGoal.mockResolvedValue(true);open()
+ fireEvent.click(screen.getByRole('button',{name:'Triage Together'}))
+ expect(screen.queryByText('Someday')).not.toBeInTheDocument()
+ fireEvent.click(screen.getByText('Archive intention'));await screen.findByText('Intention archived.')
+ expect(api.updateGoal).toHaveBeenCalledWith('g',{status:'archived'})
+})
+it('uses the shared scheduling action and does not claim success after failure',async()=>{
+ api.tasks=[{id:'m',title:'Picnic',bucket:'month',context:'personal'}]
+ api.setBucket.mockResolvedValue(false);open()
+ fireEvent.click(screen.getByRole('button',{name:'Triage Picnic'}))
+ fireEvent.click(screen.getByRole('button',{name:'Someday'}))
+ await screen.findByText('No change was saved. You can try again.')
+ expect(api.setBucket).toHaveBeenCalledWith('m','someday',undefined,undefined)
 })

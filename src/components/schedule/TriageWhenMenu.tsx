@@ -50,6 +50,7 @@ const GROUPS: WhenGroup[] = [
 ]
 
 interface TriageWhenMenuProps {
+  contained?: boolean
   onPick: (when: TriageWhen) => void
   /** When provided, renders a Delete (trash) action. */
   onDelete?: () => void
@@ -80,7 +81,7 @@ interface TriageWhenMenuProps {
 // that a menu you drifted past still tidies itself away.
 const HOVER_CLOSE_MS = 600
 
-export function TriageWhenMenu({ onPick, onDelete, onNote, onComplete, onPickDate, calendarAction }: TriageWhenMenuProps) {
+export function TriageWhenMenu({ onPick, onDelete, onNote, onComplete, onPickDate, calendarAction, contained = false }: TriageWhenMenuProps) {
   const [openGroup, setOpenGroup] = useState<string | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -132,7 +133,7 @@ export function TriageWhenMenu({ onPick, onDelete, onNote, onComplete, onPickDat
   }, [close, onPick])
 
   return (
-    <div ref={containerRef} className="flex items-center gap-1">
+    <div ref={containerRef} className={contained ? "flex flex-wrap items-start gap-1" : "flex items-center gap-1"}>
       {GROUPS.map((group) => {
         const single = group.options.length === 1
         const isOpen = openGroup === group.label
@@ -172,7 +173,7 @@ export function TriageWhenMenu({ onPick, onDelete, onNote, onComplete, onPickDat
 
             {!single && isOpen && (
               <div
-                className="absolute z-40 top-full right-0 pt-1"
+                className={contained ? "relative pt-1" : "absolute z-40 top-full right-0 pt-1"}
                 onMouseEnter={cancelClose}
                 onMouseLeave={scheduleClose}
               >
@@ -217,7 +218,7 @@ export function TriageWhenMenu({ onPick, onDelete, onNote, onComplete, onPickDat
           {openGroup === '__date__' && (
             <div
               role="menu"
-              className="absolute z-40 top-full right-0 mt-1 w-56 bg-white border border-neutral-200 rounded-lg shadow-lg p-2"
+              className={(contained ? "relative" : "absolute z-40 top-full right-0") + " mt-1 w-56 bg-white border border-neutral-200 rounded-lg shadow-lg p-2"}
               onMouseEnter={cancelClose}
               onMouseLeave={scheduleClose}
             >

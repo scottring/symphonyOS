@@ -22,6 +22,9 @@ import { TriageWhenMenu, type TriageWhen } from './TriageWhenMenu'
 import { usePopoverFocus } from '@/hooks/usePopoverFocus'
 
 export interface TaskFateMenuProps {
+  label?: string
+  disabled?: boolean
+  showWhen?: boolean
   /** Route to a when — callers map it through applyTriageWhen. */
   onPickWhen: (when: TriageWhen) => void
   onPickDate?: (date: Date, isAllDay: boolean) => void
@@ -40,7 +43,7 @@ export interface TaskFateMenuProps {
   }
 }
 
-export function TaskFateMenu({ onPickWhen, onPickDate, onComplete, onDelete, onOpen, extras, fileUnder }: TaskFateMenuProps) {
+export function TaskFateMenu({ onPickWhen, onPickDate, onComplete, onDelete, onOpen, extras, fileUnder, label = 'Task actions', disabled = false, showWhen = true }: TaskFateMenuProps) {
   const [open, setOpen] = useState(false)
   const [picksOpen, setPicksOpen] = useState(false)
   const containerRef = useRef<HTMLSpanElement>(null)
@@ -59,16 +62,22 @@ export function TaskFateMenu({ onPickWhen, onPickDate, onComplete, onDelete, onO
     const trigger = containerRef.current?.getBoundingClientRect()
     const panel = panelRef.current
     if (!trigger || !panel) return
-    const w = panel.offsetWidth
-    const h = panel.offsetHeight
-    const left = Math.max(8, Math.min(trigger.right - w, window.innerWidth - w - 8))
-    const below = trigger.bottom + 4
-    const top = below + h > window.innerHeight - 8 && trigger.top - h - 4 > 8
-      ? trigger.top - h - 4
-      : below
-    panel.style.top = `${top}px`
-    panel.style.left = `${left}px`
-    panel.style.visibility = 'visible'
+    const place = () => {
+      const w = panel.offsetWidth
+      const h = panel.offsetHeight
+      const left = Math.max(8, Math.min(trigger.right - w, window.innerWidth - w - 8))
+      const below = trigger.bottom + 4
+      const top = below + h > window.innerHeight - 8 && trigger.top - h - 4 > 8
+        ? trigger.top - h - 4
+        : below
+      panel.style.top = `${Math.max(8, Math.min(top, window.innerHeight - h - 8))}px`
+      panel.style.left = `${left}px`
+      panel.style.visibility = 'visible'
+    }
+    place()
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(place)
+    observer?.observe(panel)
+    return () => observer?.disconnect()
   })
 
   useEffect(() => {
@@ -99,7 +108,8 @@ export function TaskFateMenu({ onPickWhen, onPickDate, onComplete, onDelete, onO
       <button
         ref={triggerRef}
         type="button"
-        aria-label="Task actions"
+        aria-label={label}
+        disabled={disabled}
         aria-haspopup="menu"
         aria-expanded={open}
         onClick={() => setOpen((v) => !v)}
@@ -108,12 +118,12 @@ export function TaskFateMenu({ onPickWhen, onPickDate, onComplete, onDelete, onO
         <MoreHorizontal className="w-4 h-4" />
       </button>
 
-      {open && createPortal(
+      {open && !disabled && createPortal(
         <div
           ref={panelRef}
           role="menu"
           style={{ top: 0, left: 0, visibility: 'hidden' }}
-          className="fixed z-[100] w-max max-w-[26rem] rounded-xl border border-neutral-200 bg-white shadow-lg p-2"
+          className="fixed z-[100] w-max max-w-[calc(100vw-16px)] max-h-[80dvh] overflow-y-auto rounded-xl border border-neutral-200 bg-white shadow-lg p-2"
           onPointerDown={(e) => e.stopPropagation()}
           onMouseDown={(e) => e.stopPropagation()}
           onClick={(e) => e.stopPropagation()}
@@ -159,12 +169,12 @@ export function TaskFateMenu({ onPickWhen, onPickDate, onComplete, onDelete, onO
               )}
             </div>
           )}
-          <TriageWhenMenu
+          {showWhen && <TriageWhenMenu contained
             onPick={(when) => { close(); onPickWhen(when) }}
             onPickDate={onPickDate ? (date, isAllDay) => { close(); onPickDate(date, isAllDay) } : undefined}
             onComplete={onComplete ? () => { close(); onComplete() } : undefined}
             onDelete={onDelete ? () => { close(); onDelete() } : undefined}
-          />
+          />}
         </div>,
         document.body,
       )}

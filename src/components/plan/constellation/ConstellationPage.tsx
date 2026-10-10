@@ -1,3 +1,6 @@
+import { TaskFateMenu } from '@/components/schedule/TaskFateMenu'
+import { applyTriageWhen, describeTriageWhen } from '@/lib/triage/applyWhen'
+import { useGatedTaskActions } from '@/hooks/useGatedTaskActions'
 import { ConnectionCanvas } from './ConnectionCanvas'
 import { connectionPair, connectionPatch, priorConnection } from './connections'
 import type { Task } from '@/types/task'
@@ -24,7 +27,8 @@ const tabs=['Year','Season','Month','Week']
 function Inner(){
  const selection = useSelectionOptional()
  const {goals,loading:goalsLoading,error:goalsError,addGoal,updateGoal}=useGoalsContext()
- const {tasks,loading,error,addTask,updateTask,refetch}=useSupabaseTasks()
+ const {tasks,loading,error,addTask,updateTask,refetch,pushTask,setBucket,updateTasksBulk,toggleTask,deleteTask,keepForward,dropCommitment}=useSupabaseTasks()
+ const gated=useGatedTaskActions({updateTask,pushTask,setBucket,updateTasksBulk},id=>tasks.find(t=>t.id===id))
  const {layers}=useDomain(), [people]=useAssigneeFilter(), {getCurrentUserMember}=useFamilyMembers(), {seasons}=useHouseholdSeasons()
  const navigate=useNavigate(), [params,setParams]=useSearchParams(), area=useAddArea()
  const raw=params.get('start'), anchor=raw&&/^\d{4}-\d{2}-\d{2}$/.test(raw)?parseLocalYmd(raw):new Date()
@@ -78,6 +82,37 @@ function Inner(){
    setUndoLink(null);setMessage('Connection restored.');void refetch()
   }catch{setMessage('Could not undo. Try again.')}finally{writeLock.current=false;setBusy(false)}
  }
+ const triage=async(action:()=>Promise<boolean|void>,success:string)=>{
+  if(writeLock.current||busy||editor)return
+  writeLock.current=true;setBusy(true);setMessage('Saving…')
+  try{
+   const ok=await action()
+   if(ok===false){setMessage('No change was saved. You can try again.');return}
+   setMessage(success);setUndoLink(null);void refetch()
+  }catch{setMessage('Could not save this change. Please try again.')}finally{writeLock.current=false;setBusy(false)}
+ }
+ const triageMenu=(node:PlanNode)=>{
+  const task=node.task
+  const nextWeek=new Date(week);nextWeek.setDate(nextWeek.getDate()+7)
+  const start=node.level===1?season.start:node.level===2?month.start:week
+  const next=node.level===1?{seasonStart:season.next}:node.level===2?{monthStart:month.next}:{weekStart:nextWeek}
+  const period=node.level===1?'season':node.level===2?'month':'week'
+  return <TaskFateMenu label={'Triage '+node.title} disabled={busy||!!editor} showWhen={!!task}
+   onOpen={task&&selection?()=>selection.setSelection({kind:'task',id:node.id}):()=>edit(node)}
+   onPickWhen={when=>{if(task)void triage(()=>applyTriageWhen(when,node.id,{onPushTask:gated.pushTask,onSetBucket:gated.setBucket!,onFocus:(id,day)=>gated.updateTask(id,{plannedOn:day})}),describeTriageWhen(when))}}
+   onPickDate={task?(date,isAllDay)=>{void triage(()=>gated.setBucket!(node.id,'timed',date,isAllDay),'Scheduled for '+date.toLocaleString())}:undefined}
+   onComplete={task&&!task.completed?()=>{void triage(()=>toggleTask(node.id),'Marked complete.')}:undefined}
+   onDelete={task?()=>{if(window.confirm('Delete “'+node.title+'”? This removes the item from all its planning periods.'))void triage(async()=>{await deleteTask(node.id)},'')}:undefined}
+   extras={task?[
+    ...(task.completed?[{label:'Reopen',onSelect:()=>{void triage(()=>toggleTask(node.id),'Reopened.')}}]:[]),
+    {label:'Carry to next '+period,onSelect:()=>{void triage(async()=>!!await keepForward(node.id,next,start),'Carried to next '+period+'.')}},
+    {label:'Remove from this '+period,onSelect:()=>{void triage(()=>dropCommitment(node.id,period,start),'Removed from this '+period+'.')}},
+    {label:'Edit wording',onSelect:()=>edit(node)},
+   ]:[
+    {label:node.goal?.status==='completed'?'Reopen intention':'Complete intention',onSelect:()=>{void triage(()=>updateGoal(node.id,{status:node.goal?.status==='completed'?'active':'completed'}),'Intention updated.')}},
+    {label:'Archive intention',onSelect:()=>{void triage(()=>updateGoal(node.id,{status:'archived'}),'Intention archived.')}},
+   ]}/>
+ }
  const save=async()=>{
   if(!editor||busy||(!editor.link&&!draft.trim()))return
   setBusy(true);setMessage('')
@@ -116,7 +151,7 @@ function Inner(){
  <header><h2>{tab}</h2><p>{terms[i]}s · {periodLabels[i]}</p></header><div className="hz-column-body" role="region" aria-label={`${tab} cards`} tabIndex={0}>
  {(dragKey?nodes:shown).filter(n=>n.level===i).map(n=><div key={n.key} data-plan-key={n.key} className={`hz-card-wrap ${valid(n.key)?'hz-link-target':''} ${targetKey===n.key?'hz-link-over':''}`}><button className={`hz-item ${selected===n.key?'hz-selected':related.has(n.key)?'hz-related':''}`} aria-pressed={selected===n.key} disabled={!!editor||busy} onClick={()=>choose(n.key)}>
  <span>{n.title}</span>{savedFocus===n.key&&<small className="hz-saved" role="status">Saved to your plan</small>}<small>{n.parent?nodes.find(p=>p.key===n.parent)?.title:'Independent '+terms[i]}</small>{n.task?.completed&&<small>Completed</small>}{n.task?.scheduledFor&&<small>Scheduled {n.task.scheduledFor.toLocaleDateString()}{!n.task.isAllDay&&` · ${n.task.scheduledFor.toLocaleTimeString([], {hour:'numeric',minute:'2-digit'})}`}</small>}
- </button>{port(n)}</div>)}
+ </button><span className="hz-card-menu">{triageMenu(n)}</span>{port(n)}</div>)}
  {!shown.some(n=>n.level===i)&&!loading&&!goalsLoading&&<p className="cp-empty">{focus?'No connected items at this horizon.':'Nothing here for this period and filter yet.'}</p>}
  {!focus&&<button className="cp-add" disabled={!!editor||busy||loading||goalsLoading} onClick={()=>add(i)}>+ Add an independent {terms[i]}</button>}</div>
  </section>)}</div>}</ConnectionCanvas>
