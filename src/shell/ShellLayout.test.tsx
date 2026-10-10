@@ -171,7 +171,7 @@ describe('Phone execution chrome', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Planner' }))
     expect(screen.getByRole('button', { name: 'Planner' })).toHaveAttribute('aria-current', 'page')
     // One horizon at a time, switched from the title menu (native PlannerView).
-    for (const label of ['Week', 'Month', 'Season', 'Year']) {
+    for (const label of ['Week', 'Plan']) {
       fireEvent.click(screen.getByRole('button', { name: /Switch horizon/ }))
       fireEvent.click(screen.getByRole('menuitemradio', { name: new RegExp(`^${label}`) }))
       expect(screen.getByRole('button', { name: `${label}. Switch horizon` })).toBeInTheDocument()
@@ -248,8 +248,8 @@ describe('Consolidated desktop navigation', () => {
     expect(screen.queryByRole('link', { name: 'Planner' })).not.toBeInTheDocument()
     const rail = screen.getByRole('navigation', { name: 'Planning period' })
     expect(rail.querySelector('[aria-current="page"]')).toBeNull()
-    fireEvent.click(screen.getByRole('link', { name: 'Month' }))
-    expect(screen.getByRole('link', { name: 'Month' })).toHaveAttribute('aria-current', 'page')
+    fireEvent.click(screen.getByRole('link', { name: 'Plan' }))
+    expect(screen.getByRole('link', { name: 'Plan' })).toHaveAttribute('aria-current', 'page')
     fireEvent.click(screen.getByRole('link', { name: 'Today' }))
     expect(screen.getByRole('link', { name: 'Today' })).toHaveAttribute('aria-current', 'page')
     // Routines lives under More now.
