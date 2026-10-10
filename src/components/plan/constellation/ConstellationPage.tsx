@@ -1,3 +1,6 @@
+import { ConnectionCanvas } from './ConnectionCanvas'
+import { connectionPair, connectionPatch, priorConnection } from './connections'
+import type { Task } from '@/types/task'
 import { relinkUpdates, MONTH_TO_SEASON, WEEK_TO_MONTH } from '@/lib/planning/journalGroups'
 import { useSelectionOptional } from '@/shell/providers/SelectionProvider'
 import { useEffect, useRef, useState } from 'react'
@@ -48,6 +51,33 @@ function Inner(){
  const edit=(node:PlanNode)=>{setEditor({node,level:node.level});setDraft(node.title);setMessage('')}
  const add=(l:number,parent?:PlanNode)=>{setEditor({level:l,parent,createId:crypto.randomUUID(),context:parent?parent.goal?parent.goal.context:parent.task?.context:area.area});setDraft('');setMessage('')}
  const link=(node:PlanNode)=>{setEditor({node,level:node.level,link:true});setDraft(node.parent??'');setMessage('')}
+ const writeLock=useRef(false)
+ const [undoLink,setUndoLink]=useState<{key:string;id:string;before:Partial<Task>;after:Partial<Task>}|null>(null)
+ const connect=async(a:string,b:string)=>{
+  if(writeLock.current||busy||editor)return
+  const pair=connectionPair(nodes,a,b);if(!pair)return
+  const {child,parent}=pair
+  if(child.parent===parent.key)return
+  writeLock.current=true;setBusy(true);setMessage('Saving connection…')
+  const before=priorConnection(child),after=connectionPatch(child,parent)
+  try{
+   if(await updateTask(child.id,after)===false){setMessage('Could not save the connection. Try dragging again.');return}
+   setUndoLink({key:child.key,id:child.id,before,after})
+   setSelected(child.key);const p=new URLSearchParams(params);p.delete('focus');setParams(p,{replace:true})
+   setMessage('Connected “'+child.title+'” to “'+parent.title+'”.');void refetch()
+  }catch{setMessage('Could not save the connection. Try dragging again.')}finally{writeLock.current=false;setBusy(false)}
+ }
+ const undoConnection=async()=>{
+  if(!undoLink||busy||writeLock.current)return
+  const current=nodes.find(n=>n.key===undoLink.key)?.task
+  const field='goalId' in undoLink.after?'goalId':'sourceId'
+  if(!current||current[field]!==undoLink.after[field]){setUndoLink(null);setMessage('The connection has changed since this edit. Open the link picker to review it.');return}
+  writeLock.current=true;setBusy(true)
+  try{
+   if(await updateTask(undoLink.id,undoLink.before)===false){setMessage('Could not undo. Try again.');return}
+   setUndoLink(null);setMessage('Connection restored.');void refetch()
+  }catch{setMessage('Could not undo. Try again.')}finally{writeLock.current=false;setBusy(false)}
+ }
  const save=async()=>{
   if(!editor||busy||(!editor.link&&!draft.trim()))return
   setBusy(true);setMessage('')
@@ -81,19 +111,19 @@ function Inner(){
  const clearFocus=()=>{setSelected(null);const p=new URLSearchParams(params);p.delete('focus');setParams(p,{replace:true})}
  const choose=(key:string)=>{if(key===selected){clearFocus();return}setSelected(key);const p=new URLSearchParams(params);p.delete('focus');setParams(p,{replace:true})}
  const shown=focus?nodes.filter(n=>related.has(n.key)):nodes
- return <main className="cp-page"><p className="cp-caption">YOUR PLANNING MAP</p><h1>{periodLabels[level]}</h1><p>Build each horizon across your plans. Select a card to focus on its branch. Show all plans to return to the full picture. Current filters apply.</p><div className="cp-nav"><label>Planning date <input type="date" value={localYmd(safeAnchor)} disabled={!!editor} onChange={e=>{if(e.target.value){const p=new URLSearchParams(params);p.set('start',e.target.value);setParams(p);setSelected(null)}}}/></label>{tabs.map((t,i)=><button key={t} disabled={!!editor} aria-current={level===i?'page':undefined} onClick={()=>{const p=new URLSearchParams(params);p.set('horizon',String(i));setParams(p);document.getElementById(`horizon-${i}`)?.scrollIntoView({block:'nearest',behavior:'smooth'})}}>{t}</button>)}<button onClick={()=>navigate('/today?view=alongside')} disabled={!!editor}>Today →</button></div>
- {(loading||goalsLoading)&&<p role="status">Loading your plans…</p>}{(error||goalsError)?<p role="alert">Plans could not load. <button onClick={()=>{if(goalsError)window.location.reload();else void refetch()}}>Retry</button></p>:<> {focus&&<section ref={savedHeading} className="hz-detail" aria-label="Selected plan item"><div><small>{terms[focus.level]} · {periodLabels[focus.level]}</small><h2>{focus.title}</h2>{savedFocus===focus.key&&<><p className="hz-lineage">{nodes.filter(n=>related.has(n.key)&&n.level<focus.level).sort((a,b)=>a.level-b.level).map(n=>n.title).join(' → ')}</p><small className="hz-saved">Saved{focus.task?.scheduledFor?` · ${focus.task.scheduledFor.toLocaleDateString()}${!focus.task.isAllDay?' at '+focus.task.scheduledFor.toLocaleTimeString([], {hour:'numeric',minute:'2-digit'}):''}`:' to your plan'}</small></>}</div><button className="cp-edit" disabled={!!editor} onClick={()=>edit(focus)}>Edit<span className="sr-only"> {focus.title}</span></button>{focus.level>0&&!nodes.some(n=>n.level===focus.level-1&&n.id===focus.id)&&<button className="cp-edit" disabled={!!editor} onClick={()=>link(focus)}>Link or change parent</button>}{focus.task&&selection&&<button className="cp-edit" onClick={()=>selection.setSelection({kind:'task',id:focus.id})}>Open details</button>}{focus.level<3?<button className="cp-add" disabled={!!editor} onClick={()=>add(focus.level+1,focus)}>+ Add a {terms[focus.level+1]}</button>:<button className="cp-add" onClick={()=>navigate(`/week?view=alongside&start=${localYmd(week)}`)}>Schedule or complete in Week →</button>}</section>}{focus&&<div className="hz-focus-bar"><span role="status">Showing {shown.length} connected {shown.length===1?'item':'items'} · {nodes.length-shown.length} hidden</span><button type="button" disabled={!!editor} onClick={clearFocus}>Show all plans</button></div>}<div className={`hz-grid ${focus?'is-focused':''}`}>{tabs.map((tab,i)=><section id={`horizon-${i}`} key={tab} className={`hz-zone hz-zone-${i} ${level===i?'hz-active':''}`} aria-label={`${tab} plans`}>
+ return <main className="cp-page"><p className="cp-caption">YOUR PLANNING MAP</p><h1>{periodLabels[level]}</h1><p>Build each horizon across your plans. Select a card to focus on its branch. Show all plans to return to the full picture. Current filters apply.</p><div className="cp-nav"><label>Planning date <input type="date" value={localYmd(safeAnchor)} disabled={!!editor||busy} onChange={e=>{if(e.target.value){const p=new URLSearchParams(params);p.set('start',e.target.value);setParams(p);setSelected(null)}}}/></label>{tabs.map((t,i)=><button key={t} disabled={!!editor||busy} aria-current={level===i?'page':undefined} onClick={()=>{const p=new URLSearchParams(params);p.set('horizon',String(i));setParams(p);document.getElementById(`horizon-${i}`)?.scrollIntoView({block:'nearest',behavior:'smooth'})}}>{t}</button>)}<button onClick={()=>navigate('/today?view=alongside')} disabled={!!editor||busy}>Today →</button></div>
+ {(loading||goalsLoading)&&<p role="status">Loading your plans…</p>}{(error||goalsError)?<p role="alert">Plans could not load. <button onClick={()=>{if(goalsError)window.location.reload();else void refetch()}}>Retry</button></p>:<> {focus&&<section ref={savedHeading} className="hz-detail" aria-label="Selected plan item"><div><small>{terms[focus.level]} · {periodLabels[focus.level]}</small><h2>{focus.title}</h2>{savedFocus===focus.key&&<><p className="hz-lineage">{nodes.filter(n=>related.has(n.key)&&n.level<focus.level).sort((a,b)=>a.level-b.level).map(n=>n.title).join(' → ')}</p><small className="hz-saved">Saved{focus.task?.scheduledFor?` · ${focus.task.scheduledFor.toLocaleDateString()}${!focus.task.isAllDay?' at '+focus.task.scheduledFor.toLocaleTimeString([], {hour:'numeric',minute:'2-digit'}):''}`:' to your plan'}</small></>}</div><button className="cp-edit" disabled={!!editor||busy} onClick={()=>edit(focus)}>Edit<span className="sr-only"> {focus.title}</span></button>{focus.level>0&&!nodes.some(n=>n.level===focus.level-1&&n.id===focus.id)&&<button className="cp-edit" disabled={!!editor||busy} onClick={()=>link(focus)}>Link or change parent</button>}{focus.task&&selection&&<button className="cp-edit" onClick={()=>selection.setSelection({kind:'task',id:focus.id})}>Open details</button>}{focus.level<3?<button className="cp-add" disabled={!!editor||busy} onClick={()=>add(focus.level+1,focus)}>+ Add a {terms[focus.level+1]}</button>:<button className="cp-add" onClick={()=>navigate(`/week?view=alongside&start=${localYmd(week)}`)}>Schedule or complete in Week →</button>}</section>}{focus&&<div className="hz-focus-bar"><span role="status">Showing {shown.length} connected {shown.length===1?'item':'items'} · {nodes.length-shown.length} hidden</span><button type="button" disabled={!!editor||busy} onClick={clearFocus}>Show all plans</button></div>}<ConnectionCanvas nodes={nodes} selected={selected} disabled={!!editor||busy} onConnect={(a,b)=>{void connect(a,b)}} onPick={node=>{if(node.level===0){setSelected(node.key);setMessage('To connect an existing seasonal goal, select its card and choose Link or change parent.')}else if(nodes.some(n=>n.level===node.level-1&&n.id===node.id)){setMessage('This card is the same item in both periods; its shared connection stays intact.')}else link(node)}}>{({dragKey,targetKey,valid,port})=><div className={`hz-grid ${focus&&!dragKey?'is-focused':''}`}>{tabs.map((tab,i)=><section id={`horizon-${i}`} key={tab} className={`hz-zone hz-zone-${i} ${level===i?'hz-active':''}`} aria-label={`${tab} plans`}>
  <header><h2>{tab}</h2><p>{terms[i]}s · {periodLabels[i]}</p></header><div className="hz-column-body" role="region" aria-label={`${tab} cards`} tabIndex={0}>
- {shown.filter(n=>n.level===i).map(n=><button key={n.key} className={`hz-item ${selected===n.key?'hz-selected':related.has(n.key)?'hz-related':''}`} aria-pressed={selected===n.key} disabled={!!editor} onClick={()=>choose(n.key)}>
+ {(dragKey?nodes:shown).filter(n=>n.level===i).map(n=><div key={n.key} data-plan-key={n.key} className={`hz-card-wrap ${valid(n.key)?'hz-link-target':''} ${targetKey===n.key?'hz-link-over':''}`}><button className={`hz-item ${selected===n.key?'hz-selected':related.has(n.key)?'hz-related':''}`} aria-pressed={selected===n.key} disabled={!!editor||busy} onClick={()=>choose(n.key)}>
  <span>{n.title}</span>{savedFocus===n.key&&<small className="hz-saved" role="status">Saved to your plan</small>}<small>{n.parent?nodes.find(p=>p.key===n.parent)?.title:'Independent '+terms[i]}</small>{n.task?.completed&&<small>Completed</small>}{n.task?.scheduledFor&&<small>Scheduled {n.task.scheduledFor.toLocaleDateString()}{!n.task.isAllDay&&` · ${n.task.scheduledFor.toLocaleTimeString([], {hour:'numeric',minute:'2-digit'})}`}</small>}
- </button>)}
+ </button>{port(n)}</div>)}
  {!shown.some(n=>n.level===i)&&!loading&&!goalsLoading&&<p className="cp-empty">{focus?'No connected items at this horizon.':'Nothing here for this period and filter yet.'}</p>}
- {!focus&&<button className="cp-add" disabled={!!editor||loading||goalsLoading} onClick={()=>add(i)}>+ Add an independent {terms[i]}</button>}</div>
- </section>)}</div>
+ {!focus&&<button className="cp-add" disabled={!!editor||busy||loading||goalsLoading} onClick={()=>add(i)}>+ Add an independent {terms[i]}</button>}</div>
+ </section>)}</div>}</ConnectionCanvas>
 
  <div className="cp-new">{area.picker}<span className="cp-caption">Life area for new independent entries</span></div></>}
 
  <dialog ref={dialog} className="cp-editor" aria-label="Plan wording" onCancel={e=>{if(busy)e.preventDefault();else setEditor(null)}} onClose={()=>{if(!busy)setEditor(null)}}>{editor&&<form aria-label={editor.node?'Edit plan item':'Add plan item'} onSubmit={e=>{e.preventDefault();void save()}}><h2>{editor.link?'Link':editor.node?'Edit':'Add'} {terms[editor.level]}</h2><p>{periodLabels[editor.level]}{editor.parent?` · Under ${editor.parent.title}`:''}</p>{editor.link?<><p>{editor.node?.title}</p><label>Connect to a {terms[editor.level-1]}<select autoFocus value={draft} disabled={busy} onChange={e=>setDraft(e.target.value)}><option value="">No parent — keep independent</option>{nodes.filter(n=>n.level===editor.level-1&&n.id!==editor.node?.id).map(n=><option key={n.key} value={n.key}>{n.title}</option>)}</select></label><p>Choices follow the planning date and your current filters. This changes the connection, not the schedule.</p></>:<label>Wording<input autoFocus value={draft} disabled={busy} onChange={e=>setDraft(e.target.value)}/></label>}<button disabled={busy||(!editor.link&&!draft.trim())}>{busy?'Saving…':'Save'}</button><button type="button" disabled={busy} onClick={()=>setEditor(null)}>Cancel</button><p role="status">{message}</p></form>}</dialog>
- {!editor&&<p role="status">{message}</p>}</main>
+ {!editor&&<div className="hz-link-result"><p role="status">{message}</p>{undoLink&&<button disabled={busy} onClick={()=>{void undoConnection()}}>Undo connection</button>}</div>}</main>
 }
 export function ConstellationPage(){return <GoalsProvider><Inner/></GoalsProvider>}

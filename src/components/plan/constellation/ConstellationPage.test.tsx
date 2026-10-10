@@ -48,10 +48,10 @@ it('selects the saved intention from the conversation and refreshes later saves'
 it('focuses a clicked branch and restores unrelated plans without changing data',()=>{
  open()
  fireEvent.click(screen.getByRole('button',{name:/Together/,pressed:false}))
- expect(screen.queryByRole('button',{name:/Health/})).not.toBeInTheDocument()
+ expect(screen.queryByRole('button',{name:/Health/,pressed:false})).not.toBeInTheDocument()
  expect(screen.getByText(/1 hidden/)).toBeInTheDocument()
  fireEvent.click(screen.getByRole('button',{name:'Show all plans'}))
- expect(screen.getByRole('button',{name:/Health/})).toBeInTheDocument()
+ expect(screen.getByRole('button',{name:/Health/,pressed:false})).toBeInTheDocument()
  expect(api.updateTask).not.toHaveBeenCalled()
  expect(api.updateGoal).not.toHaveBeenCalled()
 })
@@ -92,4 +92,55 @@ it('links an existing season goal to a yearly intention',async()=>{
  fireEvent.click(screen.getByRole('button',{name:'Save',exact:true}))
  await screen.findByText('Saved to your plan.')
  expect(api.updateTask).toHaveBeenCalledWith('s',{goalId:'g'})
+})
+
+
+function dragConnect(from:string,to:string){
+ const target=screen.getByRole('button',{name:to,exact:true}).closest('[data-plan-key]')!
+ Object.defineProperty(document,'elementFromPoint',{configurable:true,value:()=>target})
+ const port=screen.getByRole('button',{name:'Connect '+from,exact:true})
+ fireEvent.pointerDown(port,{button:0,pointerId:1,clientX:10,clientY:10})
+ fireEvent.pointerMove(window,{pointerId:1,clientX:150,clientY:100})
+ fireEvent.pointerUp(window,{pointerId:1,clientX:150,clientY:100})
+}
+it('drag saves one link and Undo restores just the previous parent',async()=>{
+ // jsdom needs pointer coordinates for real drag handlers.
+ vi.stubGlobal('PointerEvent',MouseEvent)
+ api.tasks=[{id:'s',title:'Autumn outings',bucket:'quarter'},{id:'m',title:'Picnic',bucket:'month',sourceId:'old'}]
+ api.updateTask.mockImplementation(async(id,patch)=>{Object.assign(api.tasks.find(t=>t.id===id),patch);return true})
+ open();dragConnect('Picnic','Autumn outings Independent seasonal goal')
+ await screen.findByText('Connected “Picnic” to “Autumn outings”.')
+ expect(api.updateTask).toHaveBeenCalledTimes(1)
+ expect(api.updateTask).toHaveBeenLastCalledWith('m',{sourceId:'s'})
+ fireEvent.click(screen.getByRole('button',{name:'Undo connection'}))
+ await screen.findByText('Connection restored.')
+ expect(api.updateTask).toHaveBeenLastCalledWith('m',{sourceId:'old'})
+ vi.unstubAllGlobals()
+})
+it('failed drag saves do not offer Undo, and Escape cancels without writing',async()=>{
+ vi.stubGlobal('PointerEvent',MouseEvent)
+ api.tasks=[{id:'s',title:'Autumn outings',bucket:'quarter'},{id:'m',title:'Picnic',bucket:'month'}]
+ api.updateTask.mockResolvedValue(false)
+ open();dragConnect('Picnic','Autumn outings Independent seasonal goal')
+ await screen.findByText('Could not save the connection. Try dragging again.')
+ expect(screen.queryByRole('button',{name:'Undo connection'})).not.toBeInTheDocument()
+ api.updateTask.mockClear()
+ fireEvent.pointerDown(screen.getByRole('button',{name:'Connect Picnic'}),{button:0,pointerId:1,clientX:10,clientY:10})
+ fireEvent.keyDown(window,{key:'Escape'})
+ fireEvent.pointerUp(window,{pointerId:1,clientX:150,clientY:100})
+ expect(api.updateTask).not.toHaveBeenCalled()
+ vi.unstubAllGlobals()
+})
+
+it('temporarily reveals eligible parents from a focused branch and cancels cleanly',()=>{
+ vi.stubGlobal('PointerEvent',MouseEvent)
+ api.tasks=[{id:'s',title:'Autumn outings',bucket:'quarter',goalId:'g'}]
+ open();fireEvent.click(screen.getByRole('button',{name:/Autumn outings Together/,pressed:false}))
+ expect(screen.queryByRole('button',{name:/Health/,pressed:false})).not.toBeInTheDocument()
+ fireEvent.pointerDown(screen.getByRole('button',{name:'Connect Autumn outings'}),{button:0,pointerId:1,clientX:10,clientY:10})
+ expect(screen.getByRole('button',{name:/Health/,pressed:false})).toBeInTheDocument()
+ fireEvent.keyDown(window,{key:'Escape'})
+ expect(screen.queryByRole('button',{name:/Health/,pressed:false})).not.toBeInTheDocument()
+ expect(api.updateTask).not.toHaveBeenCalled()
+ vi.unstubAllGlobals()
 })

@@ -13,3 +13,5 @@ Validation before release:
 - Production build passed.
 - Signed-in disposable account: linked existing picnic seasonal card to “Constellation test: make time outdoors”; reloaded and confirmed persisted connection.
 - Plain local /wall-v2 shows approved household header, tools, schedule, family question and routines.
+
+Released b02506f3. Mandatory pre-push: 806 files, 8,336 tests passed, 3 skipped; typecheck passed. Vercel dpl_88xs6Ev1xbqZcanezuNeSy6vwRaT Ready and aliased to app.symphony-os.com. Browser verified plain production /wall-v2 renders approved household tools/layout, and existing seasonal card opens the parent picker; canceled without modifying that production record. Screenshot of tested linking UI: /private/tmp/symphony-card-link.png.
