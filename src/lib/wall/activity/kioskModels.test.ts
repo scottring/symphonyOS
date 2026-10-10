@@ -157,3 +157,12 @@ describe('cooking model', () => {
     expect(plainStep('Brown the **turkey**. ')).toBe('Brown the turkey.')
   })
 })
+
+describe('ingredientParts', () => {
+  it('puts the name left and the scaled quantity right, with what it was', async () => {
+    const { ingredientParts } = await import('./cookingModel')
+    expect(ingredientParts('2 lb ground turkey', 1.5)).toEqual({ name: 'Ground turkey', qty: '3 lb', was: '2 lb' })
+    expect(ingredientParts('2 lb ground turkey', 1)).toEqual({ name: 'Ground turkey', qty: '2 lb', was: null })
+    expect(ingredientParts('Salt and pepper', 2)).toEqual({ name: 'Salt and pepper', qty: '', was: null })
+  })
+})

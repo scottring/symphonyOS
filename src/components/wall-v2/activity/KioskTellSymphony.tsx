@@ -54,12 +54,14 @@ export function KioskTellSymphony({ onCommand }: KioskTellSymphonyProps) {
   const [open, setOpen] = useState(false)
   const [typed, setTyped] = useState('')
   const [feedback, setFeedback] = useState<string | null>(null)
+  const [heard, setHeard] = useState<string | null>(null)
   const [voiceOn, setVoiceOn] = useState(() => readVoiceOptIn(safeStorage()))
   const [listening, setListening] = useState(false)
   const supported = recognitionCtor() !== null
   const rec = useRef<RecognitionLike | null>(null)
 
-  const run = useCallback((c: KioskCommand) => {
+  const run = useCallback((c: KioskCommand, from: string | null = null) => {
+    setHeard(from)
     const said = onCommand(c)
     setFeedback(said || describeKioskCommand(c))
     setOpen(false)
@@ -68,7 +70,7 @@ export function KioskTellSymphony({ onCommand }: KioskTellSymphonyProps) {
   const runText = useCallback((text: string, heard: boolean) => {
     const c = parseKioskCommand(text)
     if (!c) { setFeedback(`${heard ? 'Heard' : 'Didn’t understand'} “${text.trim()}” — try a button below.`); setOpen(true); return }
-    run(c)
+    run(c, text.trim())
   }, [run])
 
   const stopListening = useCallback(() => {
@@ -80,7 +82,7 @@ export function KioskTellSymphony({ onCommand }: KioskTellSymphonyProps) {
   // The answer under the bar fades after a few seconds; inside the panel it stays.
   useEffect(() => {
     if (open || !feedback) return
-    const id = setTimeout(() => setFeedback(null), 4000)
+    const id = setTimeout(() => { setFeedback(null); setHeard(null) }, 6000)
     return () => clearTimeout(id)
   }, [open, feedback])
 
@@ -119,9 +121,12 @@ export function KioskTellSymphony({ onCommand }: KioskTellSymphonyProps) {
 
   return (
     <>
+      {/* The board's pill: always in the middle of the bar; the listening
+          state turns the whole pill dark. The last answer shows in it for a
+          few seconds ("Heard: …"). */}
       <button
         type="button"
-        className={`kc-btn kc-tell ${listening ? 'is-listening' : ''}`}
+        className={`kc-voice ${listening ? 'is-listening' : ''}`}
         aria-pressed={open || listening}
         aria-label={`Tell Symphony — ${stateLabel}`}
         onClick={() => {
@@ -130,8 +135,14 @@ export function KioskTellSymphony({ onCommand }: KioskTellSymphonyProps) {
           setOpen((o) => !o)
         }}
       >
-        <span className="kc-tell-icon" aria-hidden="true">{voiceOn && supported ? <Mic /> : <MicOff />}</span>
-        <span className="kc-tell-text"><strong>Tell Symphony</strong><small>{stateLabel}</small></span>
+        <span className="kc-voice-m" aria-hidden="true">{voiceOn && supported ? <Mic /> : <MicOff />}</span>
+        <span className="kc-voice-t">
+          {listening
+            ? <><i>Say a command · tap to stop</i><b>Listening…</b></>
+            : !open && feedback
+              ? <><i>{heard ? `Heard: “${heard}”` : 'Done'}</i><b>{feedback}</b></>
+              : <><i>{stateLabel}</i><b>Tell Symphony</b></>}
+        </span>
       </button>
 
       {open && (
@@ -169,7 +180,7 @@ export function KioskTellSymphony({ onCommand }: KioskTellSymphonyProps) {
           </div>
         </div>
       )}
-      {!open && feedback && <span className="kc-tell-toast" role="status">{feedback}</span>}
+      <span className="sr-only" role="status">{!open && feedback ? feedback : ''}</span>
     </>
   )
 }

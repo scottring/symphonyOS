@@ -13,8 +13,7 @@
 // `/wall-design` preview (see `wallV2Mock.ts`).
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Sun, Plus, ClipboardList, Settings, Phone, ChefHat, ShoppingCart, StickyNote } from 'lucide-react';
-import type { LucideIcon } from 'lucide-react';
+import { Sun, Moon, Plus, ClipboardList, Settings, StickyNote } from 'lucide-react';
 import { useActionableInstances } from '@/hooks/useActionableInstances';
 import { useBuildAutoReload } from '@/hooks/useBuildAutoReload';
 import { WallV2GuestScreen } from './WallV2GuestScreen';
@@ -44,6 +43,7 @@ import type { FamilyMember } from '@/types/family';
 import { adaptComingUpRows } from './wallStrip';
 import { WallV2ListSheetContainer } from './WallV2ListSheetContainer';
 import { useLists } from '@/hooks/useLists';
+import { useListItems } from '@/hooks/useListItems';
 import { scopeForDomain } from '@/lib/scope';
 import {
   readPinnedLists,
@@ -71,7 +71,7 @@ import { useWallRecipeIndex } from '@/hooks/useWallRecipeIndex';
 import { useRecipe } from '@/hooks/useRecipe';
 import { WallV2ScratchpadSheet } from './WallV2ScratchpadSheet';
 import { useScratchpad } from '@/hooks/useScratchpad';
-import { openScratchpadRows, recentlySorted, rowByline, type ScratchpadRow } from '@/lib/wall/scratchpad';
+import { openScratchpadRows, recentlySorted, type ScratchpadRow } from '@/lib/wall/scratchpad';
 import { useFamilyDiscussionItems, type DiscussionItem } from '@/hooks/useFamilyDiscussionItems';
 import { QuickCapture } from '@/components/layout/QuickCapture';
 import { type MomentKid } from './moments/WallMoments';
@@ -150,15 +150,6 @@ function formatDate(d: Date): { weekday: string; fullDate: string } {
   });
   return { weekday, fullDate };
 }
-
-// The dock, relocated to the rail and demoted. 'phone' is deliberately NOT in
-// here — it gets its own full-width button above, because burying a kid's call
-// to Grandma one tap deeper is the one regression this redesign must not make.
-const RAIL_ACTIONS: { id: WallDockActionId; label: string; icon: LucideIcon }[] = [
-  { id: 'task', label: 'Add a task', icon: Plus },
-  { id: 'list', label: 'Lists', icon: ClipboardList },
-  { id: 'utilities', label: 'Utilities', icon: Settings },
-];
 
 const THEME_KEY = 'symphony-wall-theme';
 
@@ -586,13 +577,6 @@ export function WallV2Shell() {
     (id: string) => wallData.familyMembers.find((m) => m.id === id)?.name,
     [wallData.familyMembers],
   );
-  const momentScratchpad = useMemo(() => ({
-    rows: scratchRows.map((r) => ({
-      key: r.key, text: r.text, sub: rowByline(r, memberName, now),
-      icon: r.source === 'note' ? r.kind : r.source, authorId: r.authorMemberId,
-    })),
-    onOpen: (key: string | null) => { setScratchpadFocus(key); setShowScratchpad(true); },
-  }), [scratchRows, memberName, now]);
   const handleScratchDone = useCallback(async (row: ScratchpadRow, resolution: string) => {
     if (row.source === 'note') {
       if (!(await scratchpad.markDone(row.id, resolution))) showFlash('Could not save — try again');
@@ -816,6 +800,7 @@ export function WallV2Shell() {
       title: dinner.mealName,
       imageUrl: r?.imageUrl ?? null,
       timeLabel: dinnerStartDate ? `Dinner at ${dinnerStartDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}` : 'Dinner tonight',
+      at: dinnerStartDate ? dinnerStartDate.getTime() : null,
       minutes: r?.prepMinutes ?? null,
       cue: notes ? notes.split(/(?<=[.!])\s/)[0] : null,
       ingredients: (r?.ingredients ?? []).filter(isIngredientLine),
@@ -914,6 +899,31 @@ export function WallV2Shell() {
     [wallData.familyMembers],
   );
 
+  // The kiosk's household tools (approved Kiosk-Frame): Call, Groceries and
+  // Recipes stay one tap away in the bottom bar; everything secondary —
+  // adding a task, lists, notes, the light/dark view, settings — sits in one
+  // labelled More sheet.
+  const kioskTools = useMemo(() => ({
+    onGroceries: () => {
+      if (!groceryList) { showFlash('No family grocery list yet'); return; }
+      setSheetListId(groceryList.id); setShowListSheet(true);
+    },
+    onRecipes: () => setShowRecipePicker(true),
+    more: [
+      { id: 'task', label: 'Add', sub: 'A task for the household', icon: Plus, onSelect: () => handleDockAction('task') },
+      { id: 'list', label: 'Lists', sub: 'Family lists', icon: ClipboardList, onSelect: () => handleDockAction('list') },
+      { id: 'notes', label: 'Notes', sub: scratchRows.length ? `${scratchRows.length} on the scratchpad` : 'The family scratchpad', icon: StickyNote, onSelect: () => { setScratchpadFocus(null); setShowScratchpad(true); } },
+      { id: 'theme', label: isDark ? 'Light view' : 'Dark view', sub: isDark ? 'Switch the wall to light' : 'Switch the wall to dark', icon: isDark ? Sun : Moon, onSelect: toggleTheme },
+      { id: 'settings', label: 'Settings', sub: 'Guest mode, refresh, routines', icon: Settings, onSelect: () => handleDockAction('utilities') },
+    ],
+  }), [groceryList, showFlash, handleDockAction, scratchRows.length, isDark, toggleTheme]);
+  // What's already on the grocery list, beside a proposal ("where they'll go").
+  const { items: groceryItems } = useListItems(stage.kind === 'groceries' ? groceryList?.id ?? null : null);
+  const groceryOpenItems = useMemo(
+    () => (stage.kind === 'groceries' ? groceryItems.filter((i) => !i.completed).map((i) => i.text) : null),
+    [stage.kind, groceryItems],
+  );
+
   // Chromeless kiosk recovery: the wall has no nav, so a lost session (e.g. it
   // sat through a Supabase outage and its token couldn't refresh) leaves every
   // data fetch no-op'ing on `!user` and the refresh spinner stuck forever, with
@@ -949,37 +959,8 @@ export function WallV2Shell() {
           dateLabel={now.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
           clock={clock}
           weather={liveWeather ? { icon: weatherData.icon ?? Sun, temp: weatherData.temp, condition: weatherData.condition } : null}
-          tools={
-            <>
-              {/* kidsPhone. Its own labelled button, never a
-                  tap deeper (a kid's call to Grandma must not get harder). */}
-              <button type="button" onClick={() => kioskDispatch({ type: 'OPEN', stage: { kind: 'calling' } })} aria-label="kidsPhone — call"
-                className="kc-btn kc-tool is-primary">
-                <Phone aria-hidden="true" />kidsPhone
-              </button>
-              {/* Groceries, one tap from the face (Scott, 2026-10-08): the
-                  list sheet opens on it with the cursor in its add field. */}
-              <button type="button" aria-label="Groceries — add to the list"
-                onClick={() => {
-                  if (!groceryList) { showFlash('No family grocery list yet'); return; }
-                  setSheetListId(groceryList.id); setShowListSheet(true);
-                }}
-                className="kc-btn kc-tool">
-                <ShoppingCart aria-hidden="true" />Groceries
-              </button>
-              <button type="button" onClick={() => { setScratchpadFocus(null); setShowScratchpad(true); }} aria-label="Notes" className="kc-btn kc-tool kc-icon-btn">
-                <StickyNote aria-hidden="true" />
-              </button>
-              <button type="button" onClick={() => setShowRecipePicker(true)} aria-label="Recipes" className="kc-btn kc-tool kc-icon-btn">
-                <ChefHat aria-hidden="true" />
-              </button>
-              {RAIL_ACTIONS.map(({ id, label, icon: Icon }) => (
-                <button key={id} type="button" aria-label={label} onClick={() => handleDockAction(id)} className="kc-btn kc-tool kc-icon-btn">
-                  <Icon aria-hidden="true" />
-                </button>
-              ))}
-            </>
-          }
+          tools={kioskTools}
+          groceryListItems={groceryOpenItems}
           members={wallData.familyMembers}
           rows={todayRows}
           homeRows={todayForMoment}
@@ -991,7 +972,6 @@ export function WallV2Shell() {
           dinner={kioskDinner}
           nextMeal={nextMeal}
           comingUp={comingUpRows}
-          scratchpad={momentScratchpad}
           question={handoffAsk ? { text: handoffAsk.prompt, isHandoff: true } : (discussionDismissed || !discussionPrompt ? null : { text: discussionPrompt, isHandoff: false })}
           groceryListTitle={groceryList?.title ?? null}
           saveGroceries={saveGroceries}

@@ -22,6 +22,7 @@ vi.mock('@/hooks/useKidPhoneContacts', () => ({
     error: undefined,
   }),
   callableContacts: (cs: { enabled?: boolean }[]) => cs.filter((c) => c.enabled !== false),
+  partitionContacts: (cs: { favorite: boolean }[]) => ({ favorites: cs.filter((c) => c.favorite), others: cs.filter((c) => !c.favorite) }),
 }));
 const handset = vi.hoisted(() => ({ offHook: false }));
 vi.mock('@/hooks/useHandsetState', () => ({
@@ -43,8 +44,8 @@ describe('WallV2PhoneScreen', () => {
 
   it('hides contacts the allowlist has disabled', () => {
     render(<WallV2PhoneScreen onClose={() => {}} />);
-    expect(screen.getByRole('button', { name: 'Call Grandma' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Call Iris' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Grandma' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Iris' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Old Number/ })).toBeNull();
     expect(screen.queryByRole('button', { name: /Switched Off/ })).toBeNull();
   });
@@ -53,10 +54,11 @@ describe('WallV2PhoneScreen', () => {
     render(<WallV2PhoneScreen onClose={() => {}} />);
     fireEvent.click(screen.getByRole('button', { name: /Grandma/ }));
     expect(placeCall).not.toHaveBeenCalled();            // confirm gates the call
-    const dialog = screen.getByRole('dialog', { name: 'Call Grandma?' });
-    expect(within(dialog).getByText('Call Grandma?')).toBeInTheDocument();
-    expect(within(dialog).getByText(/Rings the kidsPhone handset in the house/)).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: /^Call$/ }));
+    const panel = screen.getByRole('region', { name: 'Confirm call' });
+    expect(within(panel).getByRole('heading', { name: 'Call Grandma?' })).toBeInTheDocument();
+    expect(within(panel).getByText(/Rings the kidsPhone handset in the house/)).toBeInTheDocument();
+    expect(within(panel).getByText(/Nothing dials until you tap Call/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Call Grandma' }));
     await waitFor(() => expect(placeCall).toHaveBeenCalledWith({ contactId: 'g', source: 'kiosk' }));
     expect(placeCall).toHaveBeenCalledTimes(1);
   });
@@ -65,7 +67,7 @@ describe('WallV2PhoneScreen', () => {
     placeCall.mockResolvedValueOnce({ ok: false, reason: 'quiet_hours' });
     render(<WallV2PhoneScreen onClose={() => {}} />);
     fireEvent.click(screen.getByRole('button', { name: /Grandma/ }));
-    fireEvent.click(screen.getByRole('button', { name: /^Call$/ }));
+    fireEvent.click(screen.getByRole('button', { name: /^Call (Grandma|Iris)$/ }));
     await waitFor(() => expect(screen.getByText(/quiet hours/i)).toBeTruthy());
   });
 
@@ -81,7 +83,7 @@ describe('WallV2PhoneScreen', () => {
     const onClose = vi.fn();
     render(<WallV2PhoneScreen onClose={onClose} />);
     fireEvent.click(screen.getByRole('button', { name: /Grandma/ }));
-    fireEvent.click(screen.getByRole('button', { name: /^Call$/ }));
+    fireEvent.click(screen.getByRole('button', { name: /^Call (Grandma|Iris)$/ }));
     await waitFor(() => expect(screen.getByText('Calling Grandma…')).toBeInTheDocument());
     expect(screen.queryByRole('button', { name: /Cancel/ })).toBeNull();
     expect(screen.queryByRole('button', { name: /Hang up/i })).toBeNull();
@@ -96,7 +98,7 @@ describe('WallV2PhoneScreen', () => {
     const onClose = vi.fn();
     render(<WallV2PhoneScreen onClose={onClose} />);
     fireEvent.click(screen.getByRole('button', { name: /Grandma/ }));
-    fireEvent.click(screen.getByRole('button', { name: /^Call$/ }));
+    fireEvent.click(screen.getByRole('button', { name: /^Call (Grandma|Iris)$/ }));
     await waitFor(() => expect(screen.getByText(/Starting the call to Grandma/)).toBeInTheDocument());
     expect(screen.queryByRole('button', { name: /Cancel/ })).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Close this screen' }));
@@ -112,7 +114,7 @@ describe('WallV2PhoneScreen', () => {
       const onClose = vi.fn();
       render(<WallV2PhoneScreen onClose={onClose} embedded />);
       fireEvent.click(screen.getByRole('button', { name: /Grandma/ }));
-      fireEvent.click(screen.getByRole('button', { name: /^Call$/ }));
+      fireEvent.click(screen.getByRole('button', { name: /^Call (Grandma|Iris)$/ }));
       await vi.runAllTimersAsync();
       vi.advanceTimersByTime(10 * 60_000);
       expect(onClose).not.toHaveBeenCalled();
@@ -120,6 +122,13 @@ describe('WallV2PhoneScreen', () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it('a fixture shows fixed contacts, opens on the chosen one, and never dials', () => {
+    render(<WallV2PhoneScreen onClose={() => {}} embedded fixture={{ contacts: [{ contactId: 'p', name: 'Pat', favorite: true, enabled: true }], selectedId: 'p' }} />);
+    expect(screen.getByRole('heading', { name: 'Call Pat?' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Call Pat' }));
+    expect(placeCall).not.toHaveBeenCalled();
   });
 
   it('embedded in the kiosk frame it has no close X of its own', () => {
@@ -134,7 +143,7 @@ describe('WallV2PhoneScreen handset awareness', () => {
   it('tells you to pick up the phone when the receiver is down', async () => {
     render(<WallV2PhoneScreen onClose={() => {}} />);
     fireEvent.click(screen.getByRole('button', { name: /Grandma/ }));
-    fireEvent.click(screen.getByRole('button', { name: /^Call$/ }));
+    fireEvent.click(screen.getByRole('button', { name: /^Call (Grandma|Iris)$/ }));
     await waitFor(() => expect(screen.getByText(/now pick up the phone/i)).toBeTruthy());
   });
 
@@ -142,7 +151,7 @@ describe('WallV2PhoneScreen handset awareness', () => {
     handset.offHook = true;
     render(<WallV2PhoneScreen onClose={() => {}} />);
     fireEvent.click(screen.getByRole('button', { name: /Grandma/ }));
-    fireEvent.click(screen.getByRole('button', { name: /^Call$/ }));
+    fireEvent.click(screen.getByRole('button', { name: /^Call (Grandma|Iris)$/ }));
     await waitFor(() => expect(screen.getByText(/connecting to grandma/i)).toBeTruthy());
   });
 

@@ -63,3 +63,21 @@ export function plainStep(step: string): string {
 export function cookingSteps(instructions: string[] | null | undefined): string[] {
   return (instructions ?? []).map(plainStep).filter(Boolean)
 }
+
+export interface IngredientParts {
+  /** "Ground turkey" */
+  name: string
+  /** "3 lb" at the chosen servings ('' when the line has no amount). */
+  qty: string
+  /** The recipe's own amount when scaling changed it ("2 lb"), else null. */
+  was: string | null
+}
+
+/** Name on the left, quantity on the right (the approved ingredient row):
+ *  "2 lb ground turkey" ×1.5 → { name: 'Ground turkey', qty: '3 lb', was: '2 lb' }. */
+export function ingredientParts(line: string, factor: number): IngredientParts {
+  const scaled = formatIngredientNarrative(scaleIngredient(line, factor))
+  const orig = formatIngredientNarrative(line)
+  const name = scaled.name ? scaled.name.charAt(0).toUpperCase() + scaled.name.slice(1) : line
+  return { name, qty: scaled.amount, was: scaled.amount && scaled.amount !== orig.amount ? orig.amount : null }
+}

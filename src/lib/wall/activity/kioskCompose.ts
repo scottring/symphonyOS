@@ -149,7 +149,9 @@ export function buildPeopleLanes(
   const lanes: PeopleLane[] = members.map((m) => ({ memberId: m.id, name: m.name, blocks: [] }))
   const household: PeopleLane = { memberId: null, name: 'Household', blocks: [] }
   for (const r of rows) {
-    if (r.past) continue
+    // Lanes say who is where: events. Tasks and routines are Before dinner's
+    // and Tonight's.
+    if (r.past || r.kind !== 'event') continue
     const block = toBlock(r)
     if (!block) continue
     if (r.owners.length === 0) { household.blocks.push(block); continue }

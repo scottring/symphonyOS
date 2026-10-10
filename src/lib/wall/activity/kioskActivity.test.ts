@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import {
-  kioskReducer, initialKioskState, currentStage, stageHoldsOpen, heldChips, kioskPlace, servesFactor,
+  kioskReducer, initialKioskState, currentStage, stageHoldsOpen, heldChips, kioskPlace, kioskPlaceWithHold, showsHeldColumn, servesFactor,
   kitchenRecord, readKitchen, writeKitchen, readDeparture, writeDeparture, KITCHEN_KEY_PREFIX,
   type KioskEvent, type KioskState, type PlaceContext,
 } from './kioskActivity'
@@ -128,6 +128,7 @@ describe('kiosk activity: interruption and exact return', () => {
     let s = run([cook, { type: 'GO_STEP', step: 0 }])
     s = kioskReducer(s, { type: 'GROCERY_PROPOSE', proposal: proposeGroceries(['Cumin'], 'cooking', false) })
     expect(currentStage(s).kind).toBe('groceries')
+    expect(kioskPlace(s, ctx)).toBe('Cooking · out of something')
     expect(heldChips(s, T0, quiet)[0].kind).toBe('cooking')
     s = kioskReducer(s, { type: 'BACK' })
     expect(currentStage(s).kind).toBe('cooking')
@@ -204,6 +205,18 @@ describe('kiosk activity: place labels', () => {
     expect(kioskPlace(run([{ type: 'OPEN', stage: { kind: 'departure' } }]), ctx)).toBe('Leaving · school run')
     expect(kioskPlace(run([{ type: 'OPEN', stage: { kind: 'calling' } }]), ctx)).toBe('Calling')
     expect(kioskPlace(run([{ type: 'OPEN', stage: { kind: 'person', memberId: 'el' } }]), ctx)).toBe('Ella')
+    expect(kioskPlace(run([{ type: 'GROCERY_PROPOSE', proposal: proposeGroceries(['A'], 'dinner') }]), ctx)).toBe('Dinner · Groceries')
+  })
+
+  it('names a held cooking session beside any other activity, but not on Home', () => {
+    const calling = run([cook, { type: 'OPEN', stage: { kind: 'calling' } }])
+    expect(showsHeldColumn(calling)).toBe(true)
+    expect(kioskPlaceWithHold(calling, ctx)).toBe('Calling · cooking is held')
+    const home = kioskReducer(calling, { type: 'HOME' })
+    expect(showsHeldColumn(home)).toBe(false) // Home shows it as a chip only
+    expect(kioskPlaceWithHold(home, ctx)).toBe('Home · Evening')
+    expect(showsHeldColumn(run([cook]))).toBe(false)
+    expect(showsHeldColumn(run([{ type: 'START_TIMER', id: 't', label: 'x', minutes: 1, now: T0 }, { type: 'OPEN', stage: { kind: 'dinner' } }]))).toBe(true)
   })
 })
 

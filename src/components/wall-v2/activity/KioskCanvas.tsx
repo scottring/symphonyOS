@@ -1,17 +1,22 @@
 // The household kiosk as an activity canvas (conversational canvas, slice 7).
 //
-//   top band   clock · date · weather  |  PLACE (the activity)  |  Household
-//   stage      the one activity on screen; a held column beside it when
-//              cooking or timers are held behind another activity
-//   bottom bar Home · Back · held chips · Tell Symphony · NEXT
+//   top band   clock + date  |  YOU ARE IN · the activity  |  weather · Household
+//   stage      the one activity on screen; when cooking or timers are held
+//              behind another activity, the held column sits at its left
+//   bottom bar Home · Back · held chips · Call · Groceries · Recipes · More ·
+//              Tell Symphony · NEXT
+//
+// Layout follows the approved kiosk boards (Kiosk-Frame and the eleven
+// activity boards) in the wall's own themes: light by default, the warm dark
+// view when the wall is switched to it (More → Dark view).
 //
 // The band and bar never move; only the stage recomposes. Presentation and
 // orchestration only: the Shell owns data, permissions and writes, and hands
 // in rows that are already filtered for a shared display (family context;
 // one adult's own tasks dropped by wallTodayRows). Nothing here adds a query.
 
-import { useCallback, useEffect, useMemo, useRef, type ReactNode } from 'react'
-import { ArrowLeft, Home, Users, ChevronRight, Timer } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { ArrowLeft, Home, ChevronRight, Timer, Phone, ShoppingCart, ChefHat, MoreHorizontal, X } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import type { FamilyMember } from '@/types/family'
 import type { WallMoment } from '@/lib/wall/wallMoment'
@@ -19,12 +24,11 @@ import type { WallTodayRow, WallChecklist } from '@/lib/wall/wallMomentsModel'
 import type { KidRow } from '@/lib/wall/kidDayModel'
 import type { ComingUpRow } from '../wallStrip'
 import type { MomentKid, MomentHandoff } from '../moments/WallMoments'
-import type { MomentScratchpad } from '../moments/ScratchpadCard'
 import { usePlaceOrDefault } from '@/hooks/usePlace'
 import { useSceneryPreferences } from '@/hooks/useSceneryPreferences'
 import { sceneryArt } from '@/components/place/panoramas'
 import {
-  currentStage, heldChips, kioskPlace, servesFactor,
+  currentStage, heldChips, kioskPlaceWithHold, servesFactor, showsHeldColumn,
 } from '@/lib/wall/activity/kioskActivity'
 import { kioskComposition, nextCommitment } from '@/lib/wall/activity/kioskCompose'
 import { buildDeparture, type BedtimeGrid } from '@/lib/wall/activity/kioskRoutines'
@@ -39,7 +43,16 @@ import { KioskHome } from './KioskHome'
 import {
   BedtimeStage, CookingStage, DepartureStage, DinnerStage, GroceriesStage, HeldColumn, type KioskDinner,
 } from './KioskStages'
-import { WallV2PhoneScreen } from '../WallV2PhoneScreen'
+import { WallV2PhoneScreen, type PhoneFixture } from '../WallV2PhoneScreen'
+
+/** The household tools in the bottom bar. Call is the canvas's own (it opens
+ *  the Calling activity); the rest are the Shell's sheets. */
+export interface KioskTools {
+  onGroceries: () => void
+  onRecipes: () => void
+  /** Secondary actions, behind one labelled More button. */
+  more: { id: string; label: string; sub?: string; icon: LucideIcon; onSelect: () => void }[]
+}
 
 export interface KioskCanvasProps {
   isDark: boolean
@@ -50,8 +63,7 @@ export interface KioskCanvasProps {
   clock: string
   weather: { icon: LucideIcon; temp: number; condition: string } | null
   freshness?: ReactNode
-  /** Household tools for the Home stage: kidsPhone, Groceries, Recipes, … */
-  tools: ReactNode
+  tools: KioskTools
   members: FamilyMember[]
   /** Today's rows, already privacy-filtered (wallTodayRows). */
   rows: WallTodayRow[]
@@ -65,9 +77,12 @@ export interface KioskCanvasProps {
   dinner: KioskDinner | null
   nextMeal: { label: string; title: string; imageUrl: string | null; onOpen?: () => void } | null
   comingUp: ComingUpRow[]
-  scratchpad: MomentScratchpad
   question: { text: string; isHandoff: boolean } | null
   groceryListTitle: string | null
+  /** The grocery list's open items, shown beside a proposal ("where they'll go"). */
+  groceryListItems?: string[] | null
+  /** Fixed phone-book contacts for design previews (never dials). */
+  phoneFixture?: PhoneFixture
   /** Idempotent save of grocery lines (saveGroceryLines over the family list). */
   saveGroceries: (lines: GroceryLine[]) => Promise<GroceryLineResult[]>
   /** A person's day page (KidDayView) when the stage is a person. */
@@ -109,7 +124,7 @@ export function KioskCanvas(p: KioskCanvasProps) {
     [p.kidsNow, p.rows, nowMs, state.departure.checked],
   )
 
-  const place = kioskPlace(state, {
+  const place = kioskPlaceWithHold(state, {
     daypartLabel: comp.label,
     dinnerTitle: p.dinner?.title ?? null,
     recipeTitle: p.recipeTitle,
@@ -118,7 +133,8 @@ export function KioskCanvas(p: KioskCanvasProps) {
   })
   const chips = heldChips(state, nowMs, hold)
   const next = nextCommitment(p.rows, p.now)
-  const showHeld = stage.kind !== 'cooking' && (!!state.cooking || state.timers.length > 0)
+  const showHeld = showsHeldColumn(state)
+  const [moreOpen, setMoreOpen] = useState(false)
 
   // ─── Commands: buttons, typing and speech all land here ───
   const startCooking = useCallback((): string => {
@@ -224,8 +240,9 @@ export function KioskCanvas(p: KioskCanvasProps) {
         <KioskHome
           comp={comp} now={p.now} members={p.members} rows={p.homeRows} kidsNow={p.kidsNow} focusRows={p.focusRows}
           handoffs={p.handoffs} checklists={p.checklists} dinner={p.dinner} nextMeal={p.nextMeal} comingUp={p.comingUp}
-          scratchpad={p.scratchpad} question={p.question} bedtime={p.bedtime} tools={p.tools}
+          question={p.question} bedtime={p.bedtime} departure={departure} next={next}
           onTapRow={p.onTapRow} onTick={p.onTick} onClaim={p.onClaim} onTapQuestion={p.onTapQuestion}
+          onToggleDeparture={(key) => dispatch({ type: 'DEPARTURE_TOGGLE', key })}
           onOpenKid={(m) => dispatch({ type: 'OPEN', stage: { kind: 'person', memberId: m.id } })}
           onOpenDinner={() => dispatch({ type: 'OPEN', stage: { kind: 'dinner' } })}
           onStartCooking={() => { const said = startCooking(); if (said.startsWith('No')) p.flash(said) }}
@@ -236,34 +253,39 @@ export function KioskCanvas(p: KioskCanvasProps) {
       break
     case 'dinner':
       content = p.dinner
-        ? <DinnerStage d={p.dinner} state={state} dispatch={dispatch}
+        ? <DinnerStage d={p.dinner} state={state} nowMs={nowMs} dispatch={dispatch}
             onStartCooking={() => { const said = startCooking(); if (said.startsWith('No')) p.flash(said) }}
             onAddMissing={() => { const said = addMissing(); if (said === 'Nothing missing') p.flash(said) }}
             onOpenRecipe={p.onOpenRecipe} />
-        : <div className="kc-empty"><p>No dinner planned tonight.</p></div>
+        : <div className="kc-card kc-fill"><p className="kc-quiet-line">No dinner planned tonight.</p></div>
       break
-    case 'groceries':
-      content = state.groceries
-        ? <GroceriesStage proposal={state.groceries} listTitle={p.groceryListTitle} dispatch={dispatch}
-            onSave={() => { void save(linesToAdd(state.groceries!)) }}
-            onRetry={() => { void save(linesToRetry(state.groceries!)) }} />
-        : <div className="kc-empty"><p>Nothing to add.</p></div>
+    case 'groceries': {
+      const g = state.groceries
+      const ctx = g?.origin === 'cooking' && state.cooking
+        ? { title: state.cooking.title, imageUrl: p.dinner?.key === state.cooking.key ? p.dinner.imageUrl : null, sub: `For ${state.cooking.serves} · step ${state.cooking.step + 1}` }
+        : p.dinner ? { title: p.dinner.title, imageUrl: p.dinner.imageUrl, sub: [`For ${state.serves ?? p.dinner.baseServes}`, p.dinner.minutes ? `${p.dinner.minutes} min` : null].filter(Boolean).join(' · ') } : null
+      content = g
+        ? <GroceriesStage proposal={g} listTitle={p.groceryListTitle} listItems={p.groceryListItems ?? null} context={ctx} compact={showHeld} dispatch={dispatch}
+            onSave={() => { void save(linesToAdd(g)) }}
+            onRetry={() => { void save(linesToRetry(g)) }} />
+        : <div className="kc-card kc-fill"><p className="kc-quiet-line">Nothing to add.</p></div>
       break
+    }
     case 'cooking':
       content = state.cooking
         ? <CookingStage session={state.cooking} recipe={recipe} loading={loading} error={error} timers={state.timers} nowMs={nowMs}
             dispatch={dispatch} onStartTimer={startTimer} onOutOfSomething={outOfSomething}
             onOpenRecipe={p.onOpenRecipe} />
-        : <div className="kc-empty"><p>Nothing is cooking.</p></div>
+        : <div className="kc-card kc-fill"><p className="kc-quiet-line">Nothing is cooking.</p></div>
       break
     case 'departure':
-      content = <DepartureStage model={departure} nowMs={nowMs} dispatch={dispatch} />
+      content = <DepartureStage model={departure} nowMs={nowMs} dispatch={dispatch} onOpenPerson={(id) => dispatch({ type: 'OPEN', stage: { kind: 'person', memberId: id } })} />
       break
     case 'bedtime':
       content = <BedtimeStage grid={p.bedtime} onTick={(id, row) => { const m = memberById(id); if (m) p.onTick(m, row) }} />
       break
     case 'calling':
-      content = <WallV2PhoneScreen embedded onClose={() => dispatch({ type: 'BACK' })} />
+      content = <WallV2PhoneScreen embedded fixture={p.phoneFixture} onClose={() => dispatch({ type: 'BACK' })} />
       break
     case 'person':
       content = p.personPage
@@ -274,50 +296,82 @@ export function KioskCanvas(p: KioskCanvasProps) {
   }
 
   const W = p.weather
+  const bottomTool = (label: string, sub: string | null, Icon: LucideIcon, onClick: () => void, aria?: string, active = false) => (
+    <button type="button" className={`kc-tool ${active ? 'is-active' : ''}`} onClick={onClick} aria-label={aria ?? label} aria-current={active ? 'page' : undefined}>
+      <Icon aria-hidden="true" /><span>{label}</span>{sub && <small>{sub}</small>}
+    </button>
+  )
   return (
     <div className={`kiosk-canvas ${p.isDark ? 'is-dark' : ''}`} onPointerDownCapture={touched} data-stage={stage.kind}>
       <header className="kc-top">
         <div className="kc-time">
-          <span className="kc-clock">{p.clock}</span>
-          <span className="kc-date">{p.dateLabel}{W && <span className="kc-weather" title={W.condition}><W.icon aria-hidden="true" />{Math.round(W.temp)}°</span>}</span>
+          <img className="kc-mark" src="/symphony-logo.png" alt="Symphony" />
+          <div><b className="kc-clock">{p.clock}</b><span className="kc-date">{p.dateLabel}</span></div>
           {p.freshness}
         </div>
-        <h1 className="kc-place" ref={placeRef} tabIndex={-1} aria-live="polite">{place}</h1>
-        <span className="kc-context"><Users aria-hidden="true" />Household</span>
+        <div className="kc-place-wrap">
+          <small aria-hidden="true">YOU ARE IN</small>
+          <h1 className="kc-place" ref={placeRef} tabIndex={-1} aria-live="polite">{place}</h1>
+        </div>
+        <div className="kc-top-right">
+          {W && <span className="kc-weather" title={W.condition}><W.icon aria-hidden="true" />{Math.round(W.temp)}° · {W.condition.toLowerCase()}</span>}
+          <span className="kc-context"><Home aria-hidden="true" />Household</span>
+        </div>
       </header>
 
-      <div className="kc-stage" data-held={showHeld ? 'true' : 'false'}>
+      <div className={`kc-stage ${showHeld ? 'is-held' : ''}`}>
+        {showHeld && <HeldColumn session={state.cooking} recipe={recipe} timers={state.timers} nowMs={nowMs} dispatch={dispatch} />}
         <main className={`kc-main is-${stage.kind} ${stage.kind === 'home' ? `part-${comp.part}` : ''}`}>
-          {scenery.showScenery && stage.kind === 'home' && (
-            <div className={`kc-scenery ${comp.part === 'quiet' ? 'is-hero' : ''}`} aria-hidden="true"><img src={art.src} alt="" /></div>
+          {scenery.showScenery && stage.kind === 'home' && comp.part === 'quiet' && (
+            <div className="kc-scenery" aria-hidden="true"><img src={art.src} alt="" /></div>
           )}
           <div className="kc-main-inner">{content}</div>
         </main>
-        {showHeld && <HeldColumn session={state.cooking} recipe={recipe} timers={state.timers} nowMs={nowMs} dispatch={dispatch} />}
       </div>
 
       <nav className="kc-bar" aria-label="Kiosk">
-        <button type="button" className="kc-btn kc-nav" onClick={() => dispatch({ type: 'HOME' })} aria-current={stage.kind === 'home' ? 'page' : undefined}><Home aria-hidden="true" />Home</button>
-        <button type="button" className="kc-btn kc-nav" onClick={() => dispatch({ type: 'BACK' })} disabled={state.stack.length < 2}><ArrowLeft aria-hidden="true" />Back</button>
+        <button type="button" className="kc-nb" onClick={() => dispatch({ type: 'HOME' })} aria-current={stage.kind === 'home' ? 'page' : undefined}><Home aria-hidden="true" />Home</button>
+        <button type="button" className="kc-nb" onClick={() => dispatch({ type: 'BACK' })} disabled={state.stack.length < 2}><ArrowLeft aria-hidden="true" />Back</button>
         <div className="kc-chips-held" aria-label="Held activities">
           {chips.map((c) => {
-            const body = <>{c.timer && <Timer aria-hidden="true" />}<span>{c.label}{c.timer ? ` · ${c.timer}` : ''}</span></>
+            const body = <>{c.timer && <Timer aria-hidden="true" />}<span>{c.label}</span>{c.timer && <b>{c.timer}</b>}</>
             if (c.kind === 'timer') return <span key={c.kind} className={`kc-held-chip ${c.ringing ? 'is-ringing' : ''}`} role="status">{body}</span>
             const kind = c.kind
             const go = () => {
               if (kind === 'cooking') dispatch({ type: 'RESUME_COOKING' })
               else dispatch({ type: 'OPEN', stage: { kind } })
             }
-            return <button key={c.kind} type="button" className={`kc-held-chip ${c.ringing ? 'is-ringing' : ''}`} onClick={go}>{body}<ChevronRight aria-hidden="true" /></button>
+            return <button key={c.kind} type="button" className={`kc-held-chip ${c.ringing ? 'is-ringing' : ''}`} onClick={go} aria-label={`${c.label}${c.timer ? ` · ${c.timer}` : ''}`}>{body}<ChevronRight aria-hidden="true" /></button>
           })}
+        </div>
+        <div className="kc-tools" role="group" aria-label="Household tools">
+          {bottomTool('Call', 'kidsPhone', Phone, () => dispatch({ type: 'OPEN', stage: { kind: 'calling' } }), 'Call — kidsPhone', stage.kind === 'calling')}
+          {bottomTool('Groceries', null, ShoppingCart, p.tools.onGroceries)}
+          {bottomTool('Recipes', null, ChefHat, p.tools.onRecipes)}
+          {bottomTool('More', null, MoreHorizontal, () => setMoreOpen((o) => !o), 'More', moreOpen)}
         </div>
         <KioskTellSymphony onCommand={runCommand} />
         <div className="kc-next" aria-label="Next">
-          <small>Next</small>
+          <small>NEXT</small>
           {next
-            ? <strong>{next.time} {next.title}{next.owners.length ? ` · ${next.owners.map((id) => memberById(id)?.name).filter(Boolean).join(', ')}` : ''}</strong>
-            : <strong className="kc-muted">Nothing else today</strong>}
+            ? <b>{next.time} · {next.title}{next.owners.length ? ` · ${next.owners.map((id) => memberById(id)?.name).filter(Boolean).join(', ')}` : ''}</b>
+            : <b className="kc-muted">Nothing else today</b>}
         </div>
+        {moreOpen && (
+          <div className="kc-sheet" role="dialog" aria-label="More">
+            <div className="kc-sheet-head">
+              <h2>More</h2>
+              <button type="button" className="kc-btn kc-icon-btn" aria-label="Close More" onClick={() => setMoreOpen(false)}><X aria-hidden="true" /></button>
+            </div>
+            <div className="kc-sheet-grid">
+              {p.tools.more.map(({ id, label, sub, icon: Icon, onSelect }) => (
+                <button key={id} type="button" className="kc-sheet-btn" onClick={() => { setMoreOpen(false); onSelect() }}>
+                  <Icon aria-hidden="true" /><span><b>{label}</b>{sub && <small>{sub}</small>}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
       </nav>
     </div>
   )

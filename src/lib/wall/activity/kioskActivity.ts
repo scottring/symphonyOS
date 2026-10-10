@@ -311,7 +311,7 @@ export function kioskPlace(s: KioskState, ctx: PlaceContext): string {
     case 'dinner':
       return ctx.dinnerTitle ? `Dinner · ${ctx.dinnerTitle}` : 'Dinner'
     case 'groceries':
-      return s.groceries?.origin === 'cooking' ? 'Groceries · out of something' : 'Groceries'
+      return s.groceries?.origin === 'cooking' ? 'Cooking · out of something' : 'Dinner · Groceries'
     case 'cooking': {
       const c = s.cooking
       if (!c) return 'Cooking'
@@ -329,6 +329,22 @@ export function kioskPlace(s: KioskState, ctx: PlaceContext): string {
     case 'recipe':
       return ctx.recipeTitle ? `Recipe · ${ctx.recipeTitle}` : 'Recipe'
   }
+}
+
+/** Is a cooking session (or a lone timer) held behind another activity?
+ *  Home shows held work only as bottom-bar chips; any other activity gets
+ *  the held column beside it. */
+export function showsHeldColumn(s: KioskState): boolean {
+  const kind = currentStage(s).kind
+  if (kind === 'home' || kind === 'cooking') return false
+  return !!s.cooking || s.timers.length > 0
+}
+
+/** The place, with the held activity named when there is one: "Calling ·
+ *  cooking is held". */
+export function kioskPlaceWithHold(s: KioskState, ctx: PlaceContext): string {
+  const place = kioskPlace(s, ctx)
+  return showsHeldColumn(s) && s.cooking && !place.startsWith('Cooking') ? `${place} · cooking is held` : place
 }
 
 /** Scaling factor for the chosen servings. */

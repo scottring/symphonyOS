@@ -77,19 +77,29 @@ export interface KioskActivity {
   setHold: (ctx: HoldContext) => void
 }
 
-export function useKioskActivity(dateKey: string): KioskActivity {
-  const [state, dispatch] = useReducer(kioskReducer, dateKey, init)
+export interface KioskActivityOptions {
+  /** Start from this state instead of today's saved kitchen (fixtures). */
+  initial?: KioskState
+  /** Hold the clock still at this epoch ms (fixtures / screenshots). */
+  fixedNow?: number
+  /** Save to and read from localStorage. Default true. */
+  persist?: boolean
+}
+
+export function useKioskActivity(dateKey: string, opts: KioskActivityOptions = {}): KioskActivity {
+  const persist = opts.persist ?? true
+  const [state, dispatch] = useReducer(kioskReducer, dateKey, (k) => opts.initial ?? (persist ? init(k) : initialKioskState(k)))
 
   // Persist today's kitchen and departure whenever they change.
   const onCookingStage = currentStage(state).kind === 'cooking'
   useEffect(() => {
-    writeKitchen(safeStorage(), state.dateKey, kitchenRecord(state))
+    if (persist) writeKitchen(safeStorage(), state.dateKey, kitchenRecord(state))
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state.cooking, state.timers, onCookingStage, state.dateKey])
+  }, [state.cooking, state.timers, onCookingStage, state.dateKey, persist])
   useEffect(() => {
-    writeDeparture(safeStorage(), state.dateKey, state.departure)
-  }, [state.departure, state.dateKey])
-  useEffect(() => { pruneOtherDays(safeStorage(), dateKey) }, [dateKey])
+    if (persist) writeDeparture(safeStorage(), state.dateKey, state.departure)
+  }, [state.departure, state.dateKey, persist])
+  useEffect(() => { if (persist) pruneOtherDays(safeStorage(), dateKey) }, [dateKey, persist])
   useEffect(() => { dispatch({ type: 'NEW_DAY', dateKey }) }, [dateKey])
 
   // The clock.
@@ -102,7 +112,7 @@ export function useKioskActivity(dateKey: string): KioskActivity {
   }, [fast])
   // A timer started since the last tick reads from its own start, not from
   // the stale tick (a new 5-minute timer shows 5:00, never 5:01).
-  const shownNow = state.timers.reduce((n, t) => Math.max(n, t.endsAt - t.totalMs), nowMs)
+  const shownNow = opts.fixedNow ?? state.timers.reduce((n, t) => Math.max(n, t.endsAt - t.totalMs), nowMs)
 
   // A chime once per timer, the moment it finishes.
   const rung = useRef<Set<string>>(new Set())
