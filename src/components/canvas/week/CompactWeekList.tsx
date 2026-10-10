@@ -165,10 +165,16 @@ export function CompactWeekRow<T>({ row, suffix, onAdd, addExpanded, onComplete,
         {onOpen
           ? <button type="button" className="cw-title" onClick={() => onOpen(row.item)}>{row.title}</button>
           : <span className="cw-title">{row.title}</span>}
-        {suffix && <span className="cw-parent"><span aria-hidden="true"> · </span><span className="sr-only">, for </span>{suffix}</span>}
-        {row.context && <span className="cw-context">{row.context}</span>}
+        {/* One muted line under the title: what it serves, then its notes.
+            The title gets the row's width; this line never wraps. */}
+        {(suffix || row.meta || row.context) && (
+          <span className="cw-sub" title={[suffix, row.meta, row.context].filter(Boolean).join(" · ")}>
+            {suffix && <span className="cw-parent"><span className="sr-only">For </span>{suffix}</span>}
+            {row.meta && <span className="cw-meta">{row.meta}</span>}
+            {row.context && <span className="cw-context">{row.context}</span>}
+          </span>
+        )}
       </span>
-      {row.meta && <span className="canvas-item-meta cw-meta">{row.meta}</span>}
       {extra}
       {row.onDay
         ? <span className="canvas-tag">{row.onDay}</span>

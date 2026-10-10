@@ -120,7 +120,7 @@
 .wc-shelf { border-radius: var(--radius-xl); transition: background-color var(--transition-base); }
 .wc-shelf.is-over { background: var(--color-primary-50); outline: 2px dashed var(--color-primary-400); outline-offset: 6px; }
 .wc-shelf-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 14px; margin-bottom: 12px; }
-.wc-masonry { columns: 15rem; column-gap: 14px; }
+.wc-masonry { columns: 18rem; column-gap: 14px; }
 .wc-masonry > .wc-group { break-inside: avoid; display: inline-block; width: 100%; margin: 0 0 14px; }
 .wc-group-head { position: relative; align-items: center; }
 .wc-group-head .canvas-group-title { flex: 1; font-size: 13px; color: var(--color-neutral-800); }
@@ -259,3 +259,12 @@
   .wc-quiet-link { min-height: 44px; }
   .cw-menu button { min-height: 44px; }
 }
+
+/* Row anatomy: the title takes the width; parent and notes share one muted,
+   non-wrapping line beneath it (full text stays in the title attribute/details). */
+.cw-sub { display: flex; gap: 6px; min-width: 0; font-size: 12px; line-height: 1.35; color: var(--color-neutral-500); white-space: nowrap; overflow: hidden; }
+.cw-sub > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; flex: 0 1 auto; }
+.cw-sub > .cw-parent { flex: 1 1 auto; font-size: 12px; }
+.cw-sub > .cw-meta, .cw-sub > .cw-context { flex: none; display: inline; }
+.cw-sub > span + span::before { content: '·'; margin-right: 6px; color: var(--color-neutral-400); }
+.cw-row > .canvas-item-title { display: flex; flex-direction: column; min-width: 0; }
