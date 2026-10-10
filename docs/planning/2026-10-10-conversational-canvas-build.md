@@ -61,6 +61,13 @@ Out-of-scope findings to report (not changed here): `VITE_OPEN_BRAIN_API_KEY` is
 - Kiosk speech is off unless opted in; Chrome's built-in recognition sends audio to Google; room audio untested on the EMEET M0 Plus. Recipes don't store servings, so scaling assumes 4 and says so.
 - kidsPhone: no test calls placed. Cancel exists only before dialing; after dialing the screen says the call continues on the handset (hang-up is not supported by the service).
 
+- **One page shape (Scott, 2026-10-10).** Today, Week, Plan and Routines share the
+  planning frame (1712px), the page gutter, one masthead (eyebrow line, numeral
+  lane, title, dated subline, controls at the right), and a conversation strip
+  spanning the frame inside the gutters. Measured at 2560px: masthead 475–2075 and
+  title x=551 on all five pages (Today, Week, Season, Year, Routines). Phone (390px):
+  no horizontal overflow; Plan's stepper and Routines' controls drop under the masthead.
+
 ## Later scope (noted, not in this build)
 
 - Kiosk play space for the kids (Scott, 2026-10-10): whimsy, fun and games in the kitchen, sandboxed so play can never change household content or interrupt held activities. The kiosk activity machine (src/lib/wall/activity/) can host a write-free Play activity reached from a kid-friendly button, with Home always returning.
