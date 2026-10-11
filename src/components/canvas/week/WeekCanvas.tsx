@@ -24,10 +24,11 @@
 
 import { useContext, useState, type DragEvent, type FormEvent, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
-import { MoreHorizontal } from 'lucide-react'
+import { MoreHorizontal, PanelLeftOpen } from 'lucide-react'
 import type { Task, TaskContext } from '@/types/task'
 import type { PlanNode } from '@/components/plan/constellation/model'
 import { MoveUnderMenu } from '@/components/canvas/plan/MoveUnderMenu'
+import { UpstreamDrawer, useUpstreamDrawer } from '@/components/plan/constellation/UpstreamDrawer'
 import { ContextPicker } from '@/components/triage/ContextPicker'
 import { assigneesOf } from '@/lib/planning/v2/planV2'
 import { localYmd } from '@/lib/cadence/config'
@@ -150,6 +151,7 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
   const [composer, setComposer] = useState<string | null>(focusAdd ? 'unlinked' : null)
   const [panel, setPanel] = useState<{ key: string; kind: 'people' | 'area' | 'move' } | null>(null)
   const [quietOpen, setQuietOpen] = useState(false)
+  const drawerUi = useUpstreamDrawer()
   const todayKey = localYmd(new Date())
   const [chosenDay, setChosenDay] = useState<string | null>(null)
   const selectedKey = chosenDay && days.some((d) => d.key === chosenDay) ? chosenDay : (days.find((d) => d.key === todayKey) ?? days[0])?.key
@@ -305,6 +307,29 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
       </section>
     )
   }
+  // ── the month's goals, beside the shelf (2026-10-11) ───────────────────
+  // Drop a task on one to file it under it, as Move under… does.
+  const drawerShown = drawerUi.shown && !phone
+  const draggedTask = drag?.kind === 'task' ? shelfTasks.get(drag.id) ?? dayTask(drag.id)?.item.task : undefined
+  const fileTarget = (g: ShelfGroup) => {
+    if (!draggedTask || !g.milestone) return null
+    const o = writers.moveUnderOptions(draggedTask)
+    const parent = o?.parents.find((n) => n.id === g.milestone!.id)
+    return o && parent && o.item.parent !== parent.key ? parent : null
+  }
+  const goals = shelf.filter((g) => g.milestone && !g.milestone.completed).map((g) => ({ key: g.key, title: g.milestone!.title, group: g }))
+  const drawer = drawerShown && (
+    <UpstreamDrawer title={`${monthName} goals`} childTerm="task" parents={goals}
+      countOf={(x) => x.group.rows.length} dragging={!!draggedTask}
+      canDropOn={(x) => !!fileTarget(x.group)}
+      onDrop={(x) => { const parent = fileTarget(x.group); if (draggedTask && parent) writers.moveUnder(draggedTask, parent); endDrag() }}
+      // A goal with nothing this week is folded on the shelf: open it, ready to add.
+      onPick={(x) => { setQuietOpen(true); setMenu(null); setComposer(x.group.key) }}
+      pickLabel={(x) => `Add a task for ${x.title}`}
+      onClose={() => drawerUi.setOpen(false)}
+      empty={`No ${monthName} goals yet.`} />
+  )
+
   const unlinked = shelf.filter((g) => !g.milestone)
   // Milestones with nothing this week fold into one quiet line (2026-10-10:
   // six empty cards crowded the shelf); shown, each keeps its + Add.
@@ -336,6 +361,9 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
       <div className="wc-shelf-head">
         <h2 className="wc-label">Still to place</h2>
         <p className="wc-hint">{phone ? 'Press + to give it a day' : 'Drag onto a day, or press + to give it a day'}</p>
+        {!phone && drawerUi.available && !drawerUi.open && <button type="button" className="canvas-link plan-drawer-open" aria-expanded={false} onClick={() => drawerUi.setOpen(true)}>
+          <PanelLeftOpen size={15} aria-hidden="true" /> Show {monthName} goals
+        </button>}
       </div>
       {lookBack && lookBack.count > 0 && (
         // Nothing moves by itself: last week's open work waits for a decision
@@ -345,12 +373,12 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
           <button type="button" className="canvas-link wc-quiet-link" onClick={lookBack.onReview}>Review</button>
         </p>
       )}
+      {/* With the goals beside it, what serves no goal yet leads. */}
       <div className="wc-masonry">
-        {linked.map(groupCard)}
-        {routinesCard}
-        {unlinked.map(groupCard)}
+        {drawerShown ? <>{unlinked.map(groupCard)}{routinesCard}{linked.map(groupCard)}</> : <>{linked.map(groupCard)}{routinesCard}{unlinked.map(groupCard)}</>}
       </div>
-      {quiet.length > 0 && (
+      {quiet.length > 0 && drawerShown && quietOpen && <div className="wc-masonry">{quiet.map(groupCard)}</div>}
+      {quiet.length > 0 && !drawerShown && (
         <>
           <p className="wc-quiet-line">
             Also in {monthName}: {quiet.length === 1 ? 'one goal' : `${quiet.length} goals`} with nothing this week{' '}·{' '}
@@ -483,7 +511,7 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
   return (
     <div className={`wc${drag ? ' is-dragging' : ''}`}>
       {subtitleNode}
-      {shelfNode}
+      {drawer ? <div className="plan-body has-drawer wc-shelf-row"><div className="wc-drawer-cell">{drawer}</div><div className="plan-board">{shelfNode}</div></div> : shelfNode}
       <section className="wc-days" aria-label="The days">
         <div className="wc-days-head"><h2 className="wc-label">The days</h2>{doneToggle}</div>
         {spans.length > 0 && (

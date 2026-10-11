@@ -240,7 +240,7 @@
   background: var(--color-bg-elevated);
 }
 .plan-drawer-head { display: flex; align-items: center; gap: 8px; padding-right: 4px; }
-.plan-drawer-head h2 { flex: 1; margin: 0; font-size: 13px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--color-neutral-600); }
+.plan-drawer .plan-drawer-head h2 { flex: 1; margin: 0; font-family: var(--font-family-sans); font-size: 13px; line-height: 1.3; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--color-neutral-600); }
 .plan-drawer-close {
   display: inline-grid; place-items: center; width: 28px; height: 28px; border: 0; border-radius: var(--radius-full);
   background: none; color: var(--color-neutral-500);
@@ -260,6 +260,10 @@
 .plan-drawer-pick:hover { background: var(--color-neutral-50); }
 .plan-drawer-title { flex: 1; min-width: 0; overflow-wrap: anywhere; font-family: var(--font-family-display); font-size: 15px; line-height: 1.3; color: var(--color-neutral-900); }
 .plan-drawer-open { display: inline-flex; align-items: center; gap: 6px; }
+/* On Week the drawer keeps to the shelf's height, so the days stay where
+   they were; its list scrolls. */
+.wc-drawer-cell { position: relative; min-height: 320px; align-self: stretch; }
+.wc-drawer-cell > .plan-drawer { position: absolute; inset: 0; max-height: none; align-self: stretch; border-radius: var(--radius-lg); }
 /* Dragging needs a pointer and room; below this Move under… does the job. */
 @media (max-width: 1023px) {
   .plan-body.has-drawer { display: block; }

@@ -39,7 +39,7 @@ import { ProposalRow } from '@/components/canvas/plan/ProposalRow'
 import { InlineComposer } from '@/components/canvas/plan/InlineComposer'
 import { readinessOf, type ReadinessLookup } from '@/lib/prep/readiness'
 import { ChevronLeft, ChevronRight, PanelLeftOpen } from 'lucide-react'
-import { UpstreamDrawer } from './UpstreamDrawer'
+import { UpstreamDrawer, useUpstreamDrawer } from './UpstreamDrawer'
 import { useConversationWalk } from '@/components/canvas/conversationWalk'
 import { PAGE_PLANNING } from '@/components/layout/pageLayout'
 
@@ -65,11 +65,6 @@ function releaseFocus(setParams: SetURLSearchParams, main: RefObject<HTMLElement
   memo.current = null
   if (top !== null) requestAnimationFrame(() => scrollHost(main.current)?.scrollTo({ top }))
 }
-
-// The drawer of the horizon one up is open unless this person closed it.
-const DRAWER_KEY = 'symphony.plan.upstreamDrawer'
-const readDrawerOpen = () => { try { return localStorage.getItem(DRAWER_KEY) !== 'closed' } catch { return true } }
-const writeDrawerOpen = (open: boolean) => { try { localStorage.setItem(DRAWER_KEY, open ? 'open' : 'closed') } catch { /* private window */ } }
 
 type Composer = { kind: 'add'; group: string; parent: PlanNode | null } | { kind: 'edit'; key: string }
 
@@ -116,8 +111,8 @@ function Inner() {
   const [composer, setComposer] = useState<Composer | null>(null)
   const [dragKey, setDragKey] = useState<string | null>(null)
   const [dropKey, setDropKey] = useState<string | null>(null)
-  const [drawerOpen, setDrawerOpen] = useState(readDrawerOpen)
-  const toggleDrawer = (open: boolean) => { setDrawerOpen(open); writeDrawerOpen(open) }
+  const [showFiled, setShowFiled] = useState(false)
+  const drawerUi = useUpstreamDrawer()
   const mainRef = useRef<HTMLElement>(null)
   const scrollMemo = useRef<number | null>(null)
 
@@ -314,7 +309,8 @@ function Inner() {
 
   const hasItems = groups.some((g) => g.items.length > 0)
   // Below Year and outside a focus: what holds something first, empties folded.
-  const calm = level > 0 && !focused && hasItems ? calmGroups(groups, new Set(proposals.map(proposalGroup))) : null
+  const pending = new Set(proposals.map(proposalGroup))
+  const calm = level > 0 && !focused && hasItems ? calmGroups(groups, pending) : null
   const weekHref = `/week?view=alongside&date=${localYmd(anchor)}`
 
   const seasonWord = periodWordOf(seasonB)
@@ -327,15 +323,23 @@ function Inner() {
   // The drawer lists every open parent, even those folded for holding nothing.
   const upstream = level > 0 ? allNodes.filter((n) => n.level === level - 1 && !isDone(n)) : []
   const drawerTitle = level === 1 ? 'Year goals' : `${seasonWord} goals`
-  const drawer = level > 0 && drawerOpen && dataReady && !error && !goalsError
+  const drawer = level > 0 && drawerUi.shown && dataReady && !error && !goalsError
     ? <UpstreamDrawer title={drawerTitle} childTerm={term} parents={upstream}
         countOf={(n) => childCount(allNodes, n)} dragging={!!dragNode}
         canDropOn={canDropOn}
         onDrop={(parent) => { if (dragNode) void moveUnder(dragNode, parent); setDragKey(null); setDropKey(null) }}
-        onPick={(parent) => focusGroup(parent.key)}
-        onClose={() => toggleDrawer(false)}
+        onPick={(parent) => focusGroup(parent.key)} pickLabel={(parent) => `Show ${term}s under ${parent.title}`}
+        onClose={() => drawerUi.setOpen(false)}
         empty={<>No {parentName}s for {level === 1 ? anchor.getFullYear() : seasonWord} yet. <button type="button" className="canvas-link" onClick={() => setHorizon(level - 1)}>Add {parentName}s</button></>} />
     : null
+  // With the drawer open the board leads with what is not filed yet (Scott,
+  // 2026-10-11); what is filed folds to one line, and empty parents are in
+  // the drawer. A group showing suggestions stays open.
+  const pile = calm && drawer ? {
+    lead: [...groups.filter((g) => g.kind === 'unlinked'), ...calm.shown.filter((g) => g.kind === 'parent' && pending.has(g.key))],
+    filed: calm.shown.filter((g) => g.kind === 'parent' && !pending.has(g.key)),
+  } : null
+  const filedCount = pile ? pile.filed.reduce((n, g) => n + g.items.length, 0) : 0
 
   const visibleById = new Map(visible.map((t) => [t.id, t]))
   const goalsById = new Map(allNodes.filter((n) => n.goal).map((n) => [n.id, n.goal!]))
@@ -437,7 +441,7 @@ function Inner() {
       </div>
     </header>
     <div className="plan-toolbar">
-      {level > 0 && !drawerOpen && <button type="button" className="canvas-link plan-drawer-open" aria-expanded={false} onClick={() => toggleDrawer(true)}>
+      {level > 0 && drawerUi.available && !drawerUi.open && <button type="button" className="canvas-link plan-drawer-open" aria-expanded={false} onClick={() => drawerUi.setOpen(true)}>
         <PanelLeftOpen size={15} aria-hidden="true" /> Show {drawerTitle.toLowerCase()}
       </button>}
       {proposals.length > 0 && <button type="button" className="canvas-link" onClick={() => { void keepAll() }}>Keep all ({proposals.length})</button>}
@@ -455,9 +459,17 @@ function Inner() {
           <button type="button" className="canvas-link" onClick={clearFocus}>Show all · Esc</button>
         </div>}
         <ul className={`plan-groups${focused ? ' is-focused' : ''}${level === 0 ? ' is-year' : ''}`} aria-label={`${HORIZONS[level]} plan`}>
-          {(calm ? calm.shown : groups).map(renderGroup)}
+          {(pile ? pile.lead : calm ? calm.shown : groups).map(renderGroup)}
         </ul>
-        {calm && calm.empty.length > 0 && <>
+        {pile && pile.filed.length > 0 && <>
+          <button type="button" className="canvas-group is-quiet plan-empty-fold" aria-expanded={showFiled} aria-controls="plan-filed-goals" onClick={() => setShowFiled((v) => !v)}>
+            <b>{filedCount} {term}{filedCount === 1 ? '' : 's'} filed under {pile.filed.length} {parentName}{pile.filed.length === 1 ? '' : 's'}</b>
+            {!showFiled && <span className="plan-empty-fold-names">{pile.filed.slice(0, 4).map(groupTitle).join(' · ')}{pile.filed.length > 4 ? ` · and ${pile.filed.length - 4} more` : ''}</span>}
+            <span className="canvas-link">{showFiled ? 'Hide' : 'Show'}</span>
+          </button>
+          {showFiled && <ul id="plan-filed-goals" className="plan-groups" aria-label={`Filed under ${parentName}s`}>{pile.filed.map(renderGroup)}</ul>}
+        </>}
+        {calm && !pile && calm.empty.length > 0 && <>
           <button type="button" className="canvas-group is-quiet plan-empty-fold" aria-expanded={showEmpty} aria-controls="plan-empty-goals" onClick={() => setShowEmpty((v) => !v)}>
             <b>{calm.empty.length} {parentName}{calm.empty.length === 1 ? '' : 's'} with nothing in {periodWord}</b>
             {!showEmpty && <span className="plan-empty-fold-names">{calm.empty.slice(0, 4).map(groupTitle).join(' · ')}{calm.empty.length > 4 ? ` · and ${calm.empty.length - 4} more` : ''}</span>}

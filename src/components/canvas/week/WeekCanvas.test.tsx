@@ -202,6 +202,52 @@ describe('WeekCanvas — drag', () => {
   })
 })
 
+describe('WeekCanvas — the month’s goals beside the shelf', () => {
+  const original = window.matchMedia
+  beforeEach(() => {
+    try { localStorage.removeItem('symphony.plan.upstreamDrawer') } catch { /* none */ }
+    window.matchMedia = ((query: string) => ({ ...original(query), matches: query === '(min-width: 1024px)' })) as typeof window.matchMedia
+  })
+  afterEach(() => { window.matchMedia = original })
+  const drawer = () => within(screen.getByRole('complementary', { name: 'October goals' }))
+
+  it('lists every open goal, even one with nothing this week, and leads the shelf with Unlinked', () => {
+    show()
+    expect(drawer().getByText('Plan the autumn trip')).toBeInTheDocument()
+    expect(drawer().getByText('Get the paperwork in order')).toBeInTheDocument()
+    const cards = within(screen.getByRole('region', { name: 'Still to place' })).getAllByRole('region').map((r) => r.getAttribute('aria-label'))
+    expect(cards[0]).toBe('Unlinked')
+    expect(screen.queryByText(/with nothing this week/)).toBeNull()
+  })
+  it('a shelf row dropped on a goal is filed under it; its own goal is not a target', () => {
+    const w = show()
+    const d = dt()
+    fireEvent.dragStart(screen.getByText('Book the cabin').closest('li')!, { dataTransfer: d.t })
+    d.arm()
+    expect(drawer().getByText('Plan the autumn trip').closest('li')).not.toHaveClass('is-drop-ok')
+    const target = drawer().getByText('Get the paperwork in order').closest('li')!
+    expect(target).toHaveClass('is-drop-ok')
+    fireEvent.dragOver(target, { dataTransfer: d.t }); fireEvent.drop(target, { dataTransfer: d.t })
+    expect(w.moveUnder).toHaveBeenCalledWith(cabin, expect.objectContaining({ id: 'm2' }))
+    expect(w.placeTask).not.toHaveBeenCalled()
+  })
+  it('a day’s task dropped on a goal is filed, not taken off its day', () => {
+    const w = show()
+    const d = dt()
+    fireEvent.dragStart(screen.getByText('Pick up the keys').closest('li')!, { dataTransfer: d.t })
+    d.arm()
+    const target = drawer().getByText('Plan the autumn trip').closest('li')!
+    fireEvent.dragOver(target, { dataTransfer: d.t }); fireEvent.drop(target, { dataTransfer: d.t })
+    expect(w.moveUnder).toHaveBeenCalledWith(placed, expect.objectContaining({ id: 'm1' }))
+    expect(w.unplaceTask).not.toHaveBeenCalled()
+  })
+  it('picking a goal opens its card ready to add a task', () => {
+    show()
+    fireEvent.click(drawer().getByRole('button', { name: 'Add a task for Get the paperwork in order' }))
+    expect(screen.getByRole('textbox', { name: 'Add a task for Get the paperwork in order' })).toBeInTheDocument()
+  })
+})
+
 describe('WeekCanvas — the days', () => {
   it('draws seven equal days: events as chips with their time, placed work as rows with a ⋯ menu', () => {
     const w = show()
