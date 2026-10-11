@@ -37,6 +37,7 @@ describe('workspace voice handshake',()=>{
   const deps=setup();await handleWorkspaceVoice(request(),deps)
   const session=JSON.parse(((deps.fetch.mock.calls[0] as unknown as [string,RequestInit])[1].body as FormData).get('session') as string)
   expect(session.max_output_tokens).toBe(400)
+  expect(session.audio.output).toEqual({voice:'marin',speed:0.9})
   expect(session.instructions).toContain('Never suggest intentions, goals, milestones, tasks or activities they did not say')
   expect(session.instructions).toContain('One or two short sentences a turn')
  })
