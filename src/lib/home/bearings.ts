@@ -139,7 +139,8 @@ export function chooseNextStep(f: BearingsFacts, setAside: ReadonlySet<NextStepI
 
 export interface TimedItem { title: string; start: Date; end: Date }
 
-const clock = (d: Date) => d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }).replace(/:00(?=\s)/, '').replace(/\s?(AM|PM)$/i, '')
+/** "10:30", "2:00" — Today's own clock, no AM/PM. */
+const clock = (d: Date) => d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }).replace(/\s?(AM|PM)$/i, '')
 
 /** "in 20 minutes", "in an hour and a half", "in 3 hours". */
 export function inTime(from: Date, to: Date): string {
@@ -167,9 +168,9 @@ export function nextUp(events: readonly TimedItem[], now: Date): { lead: string;
     : { lead: 'Next up is', what: `${first.title} at ${clock(first.start)}`, rest: `, ${inTime(now, first.start)}.${rest}` }
 }
 
-/** "10:30–12:00" for a row's time column. */
+/** "10:30–12:00" for a row's time column; one time for a moment (a routine). */
 export function timeRange(start: Date, end: Date): string {
-  return `${clock(start)}–${clock(end)}`
+  return end.getTime() > start.getTime() ? `${clock(start)}–${clock(end)}` : clock(start)
 }
 
 /** "Showing Work only" / "Showing Work and Family" — null when every area is on. */

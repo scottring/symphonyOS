@@ -114,6 +114,10 @@ function HomeInner() {
         </div>
       </header>
 
+      {/* Nothing below speaks until everything it reads has arrived: an
+          unloaded month must not read "Nothing yet", nor an unloaded week
+          prompt "Plan the week". */}
+      {!b.loaded ? <p className="home-loading" role="status">Getting your bearings…</p> : <>
       <section className="home-next home-card" aria-labelledby="home-next-title">
         <div className="home-next-words">
           <p className="home-eyebrow">A good next step</p>
@@ -135,9 +139,11 @@ function HomeInner() {
           <p className="home-sentence">
             {up
               ? <>{up.lead} <strong>{up.what}</strong>{up.rest}</>
-              : b.calendarConnected
-                ? b.events.length ? 'Nothing else is on the calendar today.' : 'Nothing is on the calendar today.'
-                : 'Connect a calendar in Settings and your appointments will show here.'}
+              : b.events.length
+                ? 'Nothing else has a time today.'
+                : b.calendarConnected || b.calendarLoading
+                  ? 'Nothing has a time today.'
+                  : 'Nothing has a time today. Connect a calendar in Settings and your appointments will show here too.'}
           </p>
           {(b.events.length > 0 || b.allDay.length > 0 || b.chosen.length > 0) && (
             <ul className="home-day">
@@ -145,9 +151,10 @@ function HomeInner() {
                 <li key={`all-${title}`} className="home-day-row"><span className="home-day-when">All day</span><span className="home-day-what"><span className="home-event-bar" aria-hidden="true" />{title}</span></li>
               ))}
               {b.events.map((e) => (
-                <li key={e.id} className={`home-day-row${e.end <= now ? ' is-past' : ''}`}>
+                <li key={e.id} className={`home-day-row${e.end <= now || e.done ? ' is-past' : ''}`}>
                   <span className="home-day-when">{timeRange(e.start, e.end)}</span>
-                  <span className="home-day-what"><span className="home-event-bar" aria-hidden="true" />{e.title}</span>
+                  {/* Marked apart as on the Week page: events a bar, routines a square, tasks a ring. */}
+                  <span className="home-day-what"><span className={e.kind === 'event' ? 'home-event-bar' : e.kind === 'routine' ? 'home-routine-mark' : 'home-task-ring'} aria-hidden="true" />{e.title}</span>
                 </li>
               ))}
               {b.chosen.map((t, i) => (
@@ -191,6 +198,8 @@ function HomeInner() {
         </ol>
       </section>
 
+      </>}
+
       <section className="home-library" aria-labelledby="home-library-title">
         <div className="home-section-head"><h2 id="home-library-title">Everything else</h2></div>
         <ul>
@@ -213,9 +222,10 @@ function RungItem({ rung, to }: { rung: Rung; to: string }) {
   return (
     <li className={`home-rung${here ? ' is-here' : ''}${rung.attention ? ' needs-attention' : ''}`} aria-current={here ? 'step' : undefined}>
       <Link to={to}>
-        <span className="home-rung-mark" aria-hidden="true"><span className="home-rung-dot" /><span className="home-rung-line" /></span>
-        {here && <span className="home-rung-here">You are here</span>}
-        <span className="home-rung-name">{rung.name}</span>
+        {/* The mark row carries the label on the wide ladder, so every
+            step's name sits on one line; the phone's column puts it after the name. */}
+        <span className="home-rung-mark"><span className="home-rung-dot" aria-hidden="true" />{here ? <span className="home-rung-here">You are here</span> : <span className="home-rung-line" aria-hidden="true" />}</span>
+        <span className="home-rung-name">{rung.name}{here && <span className="home-rung-here is-inline" aria-hidden="true">You are here</span>}</span>
         <span className="home-rung-status">{rung.status}</span>
         {rung.sample && <span className="home-rung-sample">“{rung.sample}”</span>}
       </Link>

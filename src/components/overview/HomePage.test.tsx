@@ -31,7 +31,7 @@ function bearings(over: Partial<HomeBearings['facts']> = {}, rest: Partial<HomeB
       { level: 'today', name: 'Today', status: 'No events · one chosen', attention: false, sample: 'Call CVS', to: '/today' },
     ],
     events: [], allDay: [], chosen: [{ id: 't1', title: 'Call CVS', forLine: 'Get the prescriptions sorted' }],
-    discussions: [], calendarConnected: true, firstName: 'Scott',
+    discussions: [], calendarConnected: true, calendarLoading: false, firstName: 'Scott',
     ...rest,
   }
 }
@@ -82,9 +82,17 @@ describe('Home', () => {
     expect(screen.getByText('Showing Work only, for Iris')).toBeInTheDocument()
   })
 
+  it('holds its sentences back until everything has loaded', () => {
+    state.bearings = { ...bearings(), loaded: false }
+    renderHome()
+    expect(screen.getByRole('status')).toHaveTextContent('Getting your bearings…')
+    expect(screen.queryByRole('link', { name: 'Plan the week' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Where you are' })).not.toBeInTheDocument()
+  })
+
   it('marks where you are on the ladder', () => {
     renderHome()
-    const here = screen.getByText('You are here').closest('li')
+    const here = screen.getAllByText('You are here')[0].closest('li')
     expect(here).toHaveAttribute('aria-current', 'step')
     expect(here).toHaveTextContent('Today')
   })
@@ -95,5 +103,13 @@ describe('lensLine', () => {
     expect(lensLine(new Set(ALL_LAYERS), [])).toBeNull()
     expect(lensLine(new Set<Layer>(['work']), [])).toBe('Showing Work only')
     expect(lensLine(new Set<Layer>(['work', 'family']), ['Iris'])).toBe('Showing Work and Family, for Iris')
+  })
+})
+
+describe('Home is mounted', () => {
+  it('is in the live registry at /overview, so the Symphony mark lands on a page', async () => {
+    const { appRegistry } = await import('@/shell/appRegistry')
+    const app = appRegistry.find((a) => a.route === '/overview')
+    expect(app?.Component).toBe(HomePage)
   })
 })

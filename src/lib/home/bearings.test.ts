@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { chooseNextStep, count, greeting, inTime, nextSteps, nextUp, numberWord, type BearingsFacts } from './bearings'
+import { chooseNextStep, count, greeting, inTime, nextSteps, nextUp, numberWord, timeRange, type BearingsFacts } from './bearings'
 
 const level = (name: string, over: Partial<BearingsFacts['month']> = {}) => ({ name, open: 3, planned: true, review: 0, reviewName: 'September', ...over })
 const facts = (over: Partial<BearingsFacts> = {}): BearingsFacts => ({
@@ -69,6 +69,10 @@ describe('the day in a sentence', () => {
   })
   it('names what is on now', () => {
     expect(nextUp(day, at(13))?.what).toBe('Grampappa’s, until 4:30')
+  })
+  it('writes times as Today does, and a moment as one time', () => {
+    expect(timeRange(at(10, 30), at(12))).toBe('10:30–12:00')
+    expect(timeRange(at(14), at(14))).toBe('2:00')
   })
   it('is quiet when the timed day is over', () => {
     expect(nextUp(day, at(17))).toBeNull()

@@ -6,7 +6,7 @@
 // is the five lines on October's page in the same lens. Needs GoalsProvider
 // above it (year goals live in the goals table).
 
-import { useEffect, useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useSupabaseTasks } from '@/hooks/useSupabaseTasks'
 import { useDomain } from '@/hooks/useDomain'
 import { useFamilyMembers } from '@/hooks/useFamilyMembers'
@@ -19,9 +19,14 @@ import { useCalendarDomainMappings } from '@/hooks/useCalendarDomainMappings'
 import { useEventNotes } from '@/hooks/useEventNotes'
 import { useHiddenCalendarEvents } from '@/hooks/useHiddenCalendarEvents'
 import { useDiscussionInbox } from '@/hooks/useDiscussionInbox'
+import { useRoutines } from '@/hooks/useRoutines'
+import { useActionableInstances } from '@/hooks/useActionableInstances'
+import { useDateInstances } from '@/hooks/useDateInstances'
+import { routinesForViewedDate } from '@/lib/today/routinesForDate'
+import { computeTodayData } from '@/lib/today/computeTodayData'
+import { readHideRoutines } from '@/lib/hideRoutinesSignal'
 import { ALL_LAYERS } from '@/lib/domains'
 import { filterEventsForLayers, filterInboxTasksForLayers, filterTasksForLayers, matchesLayers } from '@/lib/today/domainFilter'
-import { makeAssigneeFilter } from '@/lib/today/assigneeFilter'
 import { withDefaultEventAssignees } from '@/components/home/eventAssigneeDefaults'
 import { dedupeCalendarEvents } from '@/lib/calendar/dedupeEvents'
 import { planPeopleLens } from '@/lib/planning/peopleLens'
@@ -53,7 +58,7 @@ export interface Rung {
   to: string
 }
 
-export interface TodayRow { id: string; title: string; start: Date; end: Date }
+export interface TodayRow { id: string; title: string; start: Date; end: Date; done: boolean; kind: 'event' | 'routine' | 'task' }
 export interface ChosenRow { id: string; title: string; forLine: string | null }
 
 export interface HomeBearings {
@@ -66,6 +71,8 @@ export interface HomeBearings {
   /** Discussions with something new for you, in the current lens. */
   discussions: InboxRow[]
   calendarConnected: boolean
+  /** The calendar is still answering — say nothing about it yet. */
+  calendarLoading: boolean
   firstName: string | null
 }
 
@@ -76,7 +83,7 @@ const sameDay = (a: Date | undefined, b: Date) => !!a && a.toDateString() === b.
 const ymd = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 
 export function useHomeBearings(now: Date): HomeBearings {
-  const { tasks, loading: tasksLoading } = useSupabaseTasks()
+  const { tasks, loading: tasksLoading, userId } = useSupabaseTasks()
   const { layers } = useDomain()
   const { getCurrentUserMember } = useFamilyMembers()
   const me = getCurrentUserMember()
@@ -97,14 +104,21 @@ export function useHomeBearings(now: Date): HomeBearings {
   const monthSession = usePlanningSession('monthly', monthToken(month.start))
   const seasonSession = usePlanningSession('seasonal', seasonToken(season.start, seasons))
 
-  // ── Calendar: today's events, through the area and people filters Today uses.
-  const { isConnected, events, fetchEvents } = useGoogleCalendar()
+  // ── Calendar: today's events (the shared calendar context holds whatever span was fetched last).
+  const { isConnected, events, fetchEvents, isLoading: calendarConnecting, isFetching: calendarFetching } = useGoogleCalendar()
+  const calendarLoading = calendarConnecting || calendarFetching
+  // The day whose events have come back (or failed): until then the page
+  // holds its sentences rather than call a full day empty.
+  const [eventsDay, setEventsDay] = useState<string | null>(null)
   useEffect(() => {
     if (!isConnected) return
+    let live = true
     const start = new Date(`${dayKey}T00:00:00`)
-    void fetchEvents(start, new Date(start.getTime() + DAY))
+    void fetchEvents(start, new Date(start.getTime() + DAY)).catch(() => undefined).finally(() => { if (live) setEventsDay(dayKey) })
+    return () => { live = false }
     // fetchEvents is stable per connection; the day key is the real input.
   }, [isConnected, dayKey]) // eslint-disable-line react-hooks/exhaustive-deps
+  const eventsReady = isConnected ? eventsDay === dayKey : !calendarConnecting
   const { getDomainForCalendar } = useCalendarDomainMappings()
   const { isHidden } = useHiddenCalendarEvents()
   const todaysEvents = useMemo(() => dedupeCalendarEvents(events.filter((e) => {
@@ -118,19 +132,45 @@ export function useHomeBearings(now: Date): HomeBearings {
   })), [events, dayKey, today])
   const eventIds = useMemo(() => todaysEvents.map((e) => e.google_event_id || e.id), [todaysEvents])
   const { notes: eventNotes } = useEventNotes(eventIds)
-  const visibleEvents = useMemo(() => {
+  const eventOverrides = useMemo(() => {
     const overrides = new Map<string, NonNullable<Task['context']>>()
     for (const [id, note] of eventNotes) if (note.context) overrides.set(id, note.context)
-    const notes = withDefaultEventAssignees(eventNotes, todaysEvents, meId)
-    const people = makeAssigneeFilter(selectedPeople)
-    return filterEventsForLayers(todaysEvents, layers, { eventContextOverrides: overrides, getDomainForCalendar, eventNotesMap: eventNotes })
-      .filter((e) => !isHidden(e.google_event_id || e.id))
+    return overrides
+  }, [eventNotes])
+
+  // ── The day itself, built by the same pure function Today draws from
+  // (computeTodayData), from the same inputs: layer-filtered events minus
+  // hidden, skipped and deferred ones; the day's routines (pattern +
+  // deferrals − skips); the day's instances; the people lens; hide-daily.
+  const { routines: allRoutines, getRoutinesForDate, loading: routinesLoading } = useRoutines()
+  const { getInstancesForDate } = useActionableInstances()
+  const { instances } = useDateInstances(today, getInstancesForDate)
+  const dayData = useMemo(() => {
+    if (!instances) return null
+    const eventStatus = new Map(instances.filter((i) => i.entity_type === 'calendar_event').map((i) => [i.entity_id, i.status]))
+    const dayEvents = filterEventsForLayers(todaysEvents, layers, { eventContextOverrides: eventOverrides, getDomainForCalendar, eventNotesMap: eventNotes })
       .filter((e) => {
-        if (selectedPeople.length === 0) return true
-        const note = notes.get(e.google_event_id || e.id)
-        return people(note?.assignedTo, note?.assignedToAll)
+        const id = e.google_event_id || e.id
+        const status = eventStatus.get(id)
+        return !isHidden(id) && status !== 'skipped' && status !== 'deferred'
       })
-  }, [todaysEvents, eventNotes, meId, selectedPeople, layers, getDomainForCalendar, isHidden])
+    return computeTodayData({
+      tasks,
+      events: dayEvents,
+      routines: routinesForViewedDate(getRoutinesForDate(today), allRoutines, instances, today),
+      dateInstances: instances,
+      viewedDate: today,
+      selectedAssignee: selectedPeople,
+      hideRoutines: readHideRoutines(),
+      layers,
+      weekStart,
+      userId,
+      eventNotesMap: withDefaultEventAssignees(eventNotes, todaysEvents, meId) as unknown as Map<string, { notes?: string; assignedTo?: string | null }>,
+      eventContextOverrides: eventOverrides,
+      getDomainForCalendar,
+    })
+  }, [instances, todaysEvents, layers, eventOverrides, getDomainForCalendar, eventNotes, isHidden, tasks, getRoutinesForDate, allRoutines,
+    today, selectedPeople, weekStart, userId, meId])
 
   // ── Tasks, in the area lens, then the people lens.
   const layered = useMemo(() => filterTasksForLayers(tasks, layers), [tasks, layers])
@@ -179,10 +219,21 @@ export function useHomeBearings(now: Date): HomeBearings {
     return threads.filter((r) => r.unread && (r.entityType === 'task' ? visible.has(r.entityId) : everything))
   }, [threads, layered, layers])
 
-  const timed: TodayRow[] = useMemo(() => visibleEvents.filter((e) => !isAllDay(e)).map((e) => ({
-    id: e.google_event_id || e.id, title: e.title, start: new Date(eventStart(e)!), end: new Date(eventEnd(e) ?? eventStart(e)!),
-  })).sort((a, b) => a.start.getTime() - b.start.getTime()), [visibleEvents])
-  const allDay = useMemo(() => visibleEvents.filter(isAllDay).map((e) => e.title), [visibleEvents])
+  // Everything on the day with a time — events, routines, timed tasks — in
+  // Today's order; all-day items by name.
+  const timed: TodayRow[] = useMemo(() => {
+    if (!dayData) return []
+    return dayData.sectionsOrder
+      .filter((section) => section !== 'allday' && section !== 'unscheduled')
+      .flatMap((section) => dayData.grouped[section])
+      .filter((item) => item.startTime && !item.skipped)
+      .map((item) => ({
+        id: item.id, title: item.title, start: item.startTime!, end: item.endTime ?? item.startTime!, done: item.completed,
+        kind: item.type === 'event' ? 'event' as const : item.type === 'task' ? 'task' as const : 'routine' as const,
+      }))
+      .sort((a, b) => a.start.getTime() - b.start.getTime())
+  }, [dayData])
+  const allDay = useMemo(() => (dayData?.grouped.allday ?? []).map((item) => item.title), [dayData])
 
   const facts: BearingsFacts = {
     now,
@@ -224,17 +275,18 @@ export function useHomeBearings(now: Date): HomeBearings {
     },
     {
       level: 'today', name: 'Today', to: '/today', attention: false,
-      status: `${timed.length + allDay.length ? capital(count(timed.length + allDay.length, 'event')) : 'No events'} · ${chosenTasks.length ? `${words(chosenTasks.length)} chosen` : 'nothing chosen'}`,
+      status: `${timed.length + allDay.length ? `${capital(count(timed.length + allDay.length, 'thing'))} on the day` : 'Nothing on the day'} · ${chosenTasks.length ? `${words(chosenTasks.length)} chosen` : 'nothing chosen'}`,
       sample: chosenTasks[0]?.title ?? null,
     },
   ]
 
-  const chosen: ChosenRow[] = chosenTasks.map((t) => {
+  const timedIds = new Set(timed.map((r) => r.id))
+  const chosen: ChosenRow[] = chosenTasks.filter((t) => !timedIds.has(t.id)).map((t) => {
     const line = linkedLine(t, tasks)
     return { id: t.id, title: t.title, forLine: line ? line.title : null }
   })
 
-  const loaded = !tasksLoading && !seasonsLoading && !goalsLoading && !weekSession.loading && !monthSession.loading && !seasonSession.loading
+  const loaded = eventsReady && !tasksLoading && !routinesLoading && !!dayData && !seasonsLoading && !goalsLoading && !weekSession.loading && !monthSession.loading && !seasonSession.loading
   const firstName = (me?.name ?? '').trim().split(/\s+/)[0] || null
-  return { loaded, facts, rungs, events: timed, allDay, chosen, discussions, calendarConnected: isConnected, firstName }
+  return { loaded, facts, rungs, events: timed, allDay, chosen, discussions, calendarConnected: isConnected, calendarLoading, firstName }
 }
