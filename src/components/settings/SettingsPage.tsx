@@ -17,6 +17,7 @@ import { SeasonsSettings } from './SeasonsSettings'
 import { DemoControls } from './DemoControls'
 import { SchoolMailCard } from './SchoolMailCard'
 import { SignOutSection } from './SignOutSection'
+import { TestAccountReset } from './TestAccountReset'
 import type { FamilyMember } from '@/types/family'
 
 interface SettingsPageProps {
@@ -752,6 +753,7 @@ export function SettingsPage({
           </div>
         )}
 
+        <TestAccountReset />
         <SignOutSection />
       </div>
 

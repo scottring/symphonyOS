@@ -44,4 +44,17 @@ describe('proposalItems', () => {
     expect('error' in proposalItems({ items: [] }, 'k')).toBe(true)
     expect('error' in proposalItems({ items: Array.from({ length: 13 }, () => ({ title: 'x', level: 'week' })) }, 'k')).toBe(true)
   })
+
+  it('suggests links for existing items: a parent is required and a month of them may go at once', () => {
+    const ITEM = '0b8e7c1a-2d3f-4a5b-8c6d-7e8f9a0b1c2d'
+    const ok = proposalItems({ items: [
+      { title: 'Make a budget', level: 'month', item_id: ITEM, parent_id: TURN },
+      { title: 'No parent', level: 'month', item_id: ITEM },
+      { title: 'Bad id', level: 'month', item_id: 'nope', parent_id: TURN },
+    ] }, 'k')
+    if ('error' in ok) throw new Error(ok.error)
+    expect(ok.items).toEqual([{ key: 'k:0', title: 'Make a budget', level: 2, parentId: TURN, itemId: ITEM }])
+    const many = Array.from({ length: 20 }, () => ({ title: 'x', level: 'month', item_id: ITEM, parent_id: TURN }))
+    expect('error' in proposalItems({ items: many }, 'k')).toBe(false)
+  })
 })

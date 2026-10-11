@@ -1,5 +1,5 @@
 import {describe,it,expect} from 'vitest'
-import {horizonGroups,focusedGroupKeys,childCount,UNLINKED,INTENTIONS} from './planGroups'
+import {horizonGroups,focusedGroupKeys,childCount,calmGroups,UNLINKED,INTENTIONS} from './planGroups'
 import {planNodes} from '@/components/plan/constellation/model'
 import type {Task} from '@/types/task'
 import type {Goal} from '@/types/goal'
@@ -36,5 +36,19 @@ describe('focusedGroupKeys',()=>{
   expect(focusedGroupKeys(groups,nodes,2,'2:m')).toBeNull()
   expect(focusedGroupKeys(groups,nodes,2,'1:missing')).toBeNull()
   expect(focusedGroupKeys(groups,nodes,2,null)).toBeNull()
+ })
+})
+describe('calmGroups',()=>{
+ const g=[task('one',{goalId:'g'}),task('two',{goalId:'g'}),task('three',{goalId:'g'})]
+ const month=planNodes(goals,[g,[task('x',{sourceId:'two'}),task('y',{sourceId:'three'}),task('z',{sourceId:'three'}),task('u')],[]])
+ it('puts the fullest parents first, the unparented after, and folds parents holding nothing',()=>{
+  const {shown,empty}=calmGroups(horizonGroups(month,2,false).groups)
+  expect(shown.map(x=>x.key)).toEqual(['1:three','1:two',UNLINKED])
+  expect(empty.map(x=>x.key)).toEqual(['1:one'])
+ })
+ it('a parent showing a suggestion is not folded',()=>{
+  const {shown,empty}=calmGroups(horizonGroups(month,2,false).groups,new Set(['1:one']))
+  expect(shown.map(x=>x.key)).toEqual(['1:three','1:two','1:one',UNLINKED])
+  expect(empty).toEqual([])
  })
 })

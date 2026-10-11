@@ -33,7 +33,7 @@ import type { TaskContext } from '@/types/task'
 import { useAddArea } from '../v2/AddArea'
 import { planNodes, type PlanNode } from './model'
 import { connectionPair, eligibleParents, moveUnderPatch } from './connections'
-import { horizonGroups, focusedGroupKeys, childCount, isDone, periodRange, UNLINKED, INTENTIONS, type PlanGroup } from '@/components/canvas/plan/planGroups'
+import { horizonGroups, calmGroups, focusedGroupKeys, childCount, isDone, periodRange, UNLINKED, INTENTIONS, type PlanGroup } from '@/components/canvas/plan/planGroups'
 import { PlanItemRow } from '@/components/canvas/plan/PlanItemRow'
 import { ProposalRow } from '@/components/canvas/plan/ProposalRow'
 import { InlineComposer } from '@/components/canvas/plan/InlineComposer'
@@ -105,6 +105,7 @@ function Inner() {
   ])
 
   const [showDone, setShowDone] = useState(false)
+  const [showEmpty, setShowEmpty] = useState(false)
   const [expanded, setExpanded] = useState<string | null>(null)
   const [composer, setComposer] = useState<Composer | null>(null)
   const [dragKey, setDragKey] = useState<string | null>(null)
@@ -201,21 +202,25 @@ function Inner() {
     return act(`Rename “${before}” to “${title}”`, () => write(title), { ids: [node.id], undo: async () => (await write(before)) !== false })
   }
 
-  const moveUnder = (node: PlanNode, parent: PlanNode | null) => {
+  const moveUnder = (node: PlanNode, parent: PlanNode | null): Promise<boolean> => {
     const patch = moveUnderPatch(allNodes, node, parent)
-    if (!patch) return
+    if (!patch) return Promise.resolve(false)
     const label = parent ? `Move “${node.title}” under “${parent.title}”` : `Unlink “${node.title}”`
-    void act(label, () => updateTask(node.id, patch.after), {
+    return act(label, () => updateTask(node.id, patch.after), {
       ids: [node.id],
       undo: async () => (await updateTask(node.id, patch.before)) !== false,
-      retry: () => moveUnder(node, parent),
+      retry: () => { void moveUnder(node, parent) },
     })
   }
 
   const keepProposal = async (p: CanvasProposal) => {
     const parent = level > 0 ? allNodes.find((n) => n.level === level - 1 && n.id === p.parentId) ?? null : null
+    // A suggested link moves the existing item; it never makes a copy.
+    const existing = p.itemId ? allNodes.find((n) => n.level === level && n.id === p.itemId) : undefined
+    if (p.itemId && (!existing || !parent)) { activity.setProposalState(p.key, 'failed'); return }
+    if (existing && parent && existing.parent === parent.key) { activity.removeProposal(p.key); return }
     activity.setProposalState(p.key, 'saving')
-    const ok = await runCreate(level, p.title, parent, `Keep “${p.title}”`)
+    const ok = existing ? await moveUnder(existing, parent) : await runCreate(level, p.title, parent, `Keep “${p.title}”`)
     if (ok) activity.removeProposal(p.key)
     else activity.setProposalState(p.key, 'failed')
   }
@@ -261,7 +266,11 @@ function Inner() {
     const d = parseLocalYmd(ymd)
     return d >= bounds.start && d < bounds.end
   }
-  const proposals = activity.proposals.filter((p) => p.level === level && inPeriod(p.periodStart))
+  // A suggested link names the item by its own title, never the model's wording.
+  const proposals = activity.proposals.filter((p) => p.level === level && inPeriod(p.periodStart)).map((p) => {
+    const existing = p.itemId ? allNodes.find((n) => n.level === level && n.id === p.itemId) : undefined
+    return existing ? { ...p, title: existing.title } : p
+  })
   const proposalGroup = (p: CanvasProposal) => {
     if (level === 0) return INTENTIONS
     const key = allNodes.find((n) => n.level === level - 1 && n.id === p.parentId)?.key
@@ -288,10 +297,14 @@ function Inner() {
     ? `Let's plan ${periodTitle}, one yearly intention at a time. Suggest; don't save anything until I keep it.`
     : `Let's plan ${periodTitle} across all my ${parentTerm}s, one at a time. Suggest ${term}s; don't save anything until I keep them.`
   const hasItems = groups.some((g) => g.items.length > 0)
+  // Below Year and outside a focus: what holds something first, empties folded.
+  const calm = level > 0 && !focused ? calmGroups(groups, new Set(proposals.map(proposalGroup))) : null
   const weekHref = `/week?view=alongside&date=${localYmd(anchor)}`
   const current = isCurrentPeriod(bounds, now)
 
-  const groupTitle = (g: PlanGroup) => g.kind === 'unlinked' ? 'Unlinked' : g.kind === 'intentions' ? `Yearly intentions` : g.parent!.title
+  const seasonWord = periodWordOf(seasonB)
+  const parentName = level === 1 ? 'yearly intention' : `${seasonWord.toLowerCase()} goal`
+  const groupTitle = (g: PlanGroup) => g.kind === 'unlinked' ? `Not under a ${parentName}` : g.kind === 'intentions' ? `Yearly intentions` : g.parent!.title
   const addLabel = (g: PlanGroup) => g.kind === 'unlinked' ? `Add an independent ${term}` : g.kind === 'intentions' ? `Add a ${term}` : `Add a ${term} under ${g.parent!.title}`
 
   // Readiness reads only rows this reader already has, under the same filters.
@@ -352,7 +365,9 @@ function Inner() {
           {g.items.map(renderItem)}
           {groupProposals.map((p) => <ProposalRow key={p.key} proposal={p} onKeep={() => { void keepProposal(p) }} onLeave={() => activity.removeProposal(p.key)} />)}
         </ul>
-        {empty && !adding && <p className="plan-empty">{g.kind === 'unlinked' ? `Nothing unlinked for ${periodWord}.` : `Nothing for ${periodWord} yet.`}</p>}
+        {empty && !adding && <p className="plan-empty">{g.kind === 'unlinked' ? `Everything for ${periodWord} is under a ${parentName}.` : `Nothing for ${periodWord} yet.`}</p>}
+        {g.kind === 'unlinked' && g.items.length > 0 && groups.some((x) => x.kind === 'parent') && <button type="button" className="canvas-link plan-suggest-links"
+          onClick={() => openAssistant({ message: `Which ${parentName} does each of my items under no ${parentName} for ${periodTitle} belong under? Suggest links; don't link anything until I keep them.`, autoSend: true })}>Suggest where these go</button>}
         {adding
           ? <InlineComposer label={`New ${term}${g.parent ? ` under ${g.parent.title}` : ''}`} saveLabel="Add"
               onSave={async (text) => {
@@ -407,8 +422,16 @@ function Inner() {
           <button type="button" className="canvas-link" onClick={clearFocus}>Show all · Esc</button>
         </div>}
         <ul className={`plan-groups${focused ? ' is-focused' : ''}${level === 0 ? ' is-year' : ''}`} aria-label={`${HORIZONS[level]} plan`}>
-          {groups.map(renderGroup)}
+          {(calm ? calm.shown : groups).map(renderGroup)}
         </ul>
+        {calm && calm.empty.length > 0 && <>
+          <button type="button" className="canvas-group is-quiet plan-empty-fold" aria-expanded={showEmpty} aria-controls="plan-empty-goals" onClick={() => setShowEmpty((v) => !v)}>
+            <b>{calm.empty.length} {parentName}{calm.empty.length === 1 ? '' : 's'} with nothing in {periodWord}</b>
+            {!showEmpty && <span className="plan-empty-fold-names">{calm.empty.slice(0, 4).map(groupTitle).join(' · ')}{calm.empty.length > 4 ? ` · and ${calm.empty.length - 4} more` : ''}</span>}
+            <span className="canvas-link">{showEmpty ? 'Hide' : 'Show'}</span>
+          </button>
+          {showEmpty && <ul id="plan-empty-goals" className="plan-groups" aria-label={`${parentName}s with nothing in ${periodWord}`}>{calm.empty.map(renderGroup)}</ul>}
+        </>}
         <footer className="plan-foot">
           {hasItems && (level < 2
             ? <button type="button" className="plan-next" onClick={() => setHorizon(level + 1)}>Next: {HORIZONS[level + 1]} →</button>
