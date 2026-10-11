@@ -90,11 +90,11 @@ describe('stepIdeas — help for a blank step', () => {
     expect(i.patterns.length).toBeGreaterThanOrEqual(3)
   })
   it('the month step names the season above and the month', () => {
-    expect(stepIdeas('month', s, seasons, wk).prompt).toMatch(/each Fall line .* October’s part/)
+    expect(stepIdeas('month', s, seasons, wk).prompt).toMatch(/each Fall goal .* October’s part/)
   })
   it('a month-ahead run has no season: it still reads', () => {
     const m = startGuide('month', '2026-10-01', sep29, seasons, SAT)
-    expect(stepIdeas('month', m, seasons, wk).prompt).toContain('each season line')
+    expect(stepIdeas('month', m, seasons, wk).prompt).toContain('each season goal')
   })
 })
 
@@ -119,7 +119,7 @@ describe('pick up where you are', () => {
     const rows = pickUpRows(facts(), periods, oct1, seasons, wk)
     expect(rows.filter((r) => r.inPath && r.on).map((r) => r.name)).toEqual(['September', 'October', 'Week 40', 'Today'])
     expect(rows.find((r) => r.step === 'month-review')!.detail).toBe('Ended with 3 still open')
-    expect(rows.filter((r) => !r.inPath).map((r) => `${r.name}: ${r.detail}`)).toEqual(['2026: 4 goals', 'Fall: 6 priorities'])
+    expect(rows.filter((r) => !r.inPath).map((r) => `${r.name}: ${r.detail}`)).toEqual(['2026: 4 goals', 'Fall: 6 goals'])
     expect(rows.find((r) => r.step === 'month-review')!.why).toBe('3 open. Carry each one into October, mark it done, keep it for someday, or let it go.')
     expect(rows.find((r) => r.step === 'month')!.why).toBe('Nothing on it yet. Fall sits beside the list.')
     expect(rows.find((r) => r.step === 'week')!.why).toBe('2 steps so far. It ends tomorrow, so keep it short.')

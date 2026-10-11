@@ -156,9 +156,9 @@ describe('WeekV2 reference while tasks load', () => {
   })
 })
 
-// Walkthrough 2026-09-30: nothing said a month line had come into the week.
+// Walkthrough 2026-09-30: nothing said a month goal had come into the week.
 // 2026-10-04: the month stays whole; a line that is on the week says so.
-describe('WeekV2 — a month line on this week says so', () => {
+describe('WeekV2 — a month goal on this week says so', () => {
   beforeEach(() => { session.saved = null; session.loading = false; session.error = null; localStorage.clear(); localStorage.setItem('symphony-plan-layout.week', 'lists') })
   it('marks it “On this week”, and offers no second copy', () => {
     const line = { id: 'g1', title: 'Hang porch plants', completed: false, bucket: 'week', monthStart: new Date(2026, 9, 1), weekStart: new Date(2026, 9, 3), createdAt: new Date(2026, 8, 29), assignedTo: 'me',

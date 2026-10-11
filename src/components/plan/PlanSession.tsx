@@ -57,7 +57,7 @@ export function PlanSession({ level, aboveLabel, dayOptions = [], periodLabel: P
       ? `This is ${Q}'s actual list. Keep what still matters; a ticked row is already done.`
       : year
       ? `This is ${Q}'s goals. Keep what still matters into ${P}; Done marks it finished; Drop archives it.`
-      : `This is ${Q}'s actual list. A next action is a new task toward the goal; the goal itself stays.`,
+      : `This is ${Q}'s actual list. A task here is new work toward the goal; the goal itself stays.`,
     finished: week ? `Finished ${Q}` : `Finished in ${Q}`,
     planHead: week ? `What will you get done ${P}?` : year ? `What will ${P} add up to?` : `What will ${P} add up to, and what will you do?`,
     planSub: week
@@ -65,15 +65,15 @@ export function PlanSession({ level, aboveLabel, dayOptions = [], periodLabel: P
       : year
       ? 'Goals only. Seasons and months plan the work.'
       : season
-      ? `Write ${P}'s goals and projects with ${aboveLabel} beside you. Goals stay on the season; their next actions are planned into weeks.`
-      : `Write ${P}'s goals and projects with the season beside you. Goals stay on the month; their next actions are planned into weeks.`,
+      ? `Write ${P}'s goals and projects with ${aboveLabel} beside you. Goals stay on the season; their tasks are planned into weeks.`
+      : `Write ${P}'s goals and projects with the season beside you. Goals stay on the month; their tasks are planned into weeks.`,
     saveHead: week ? 'Here\'s the week' : year ? `Here's ${P}` : `Here's ${P}'s plan`,
-    taskHead: week ? weekTaskListLabel(P) : 'Single actions and next actions',
+    taskHead: week ? weekTaskListLabel(P) : 'Tasks',
     marker: week ? `· on ${P}` : `· in ${P}`,
     aboveEmpty: season ? `${aboveLabel} has no goals yet.` : `${aboveLabel} has no list yet.`,
     goalForWord: season ? aboveLabel : 'season',
   }
-  // "Keep, and add a next action" with no action named would save as a plain
+  // "Keep, and add a task" with no action named would save as a plain
   // Keep and silently lose the action — so the session will not move on
   // until the row is named or switched to Keep.
   const unnamedActions = week ? [] : open.filter((t) => draft.verdicts[t.id] === 'keep-action' && !draft.actionTitles[t.id]?.trim()).map((t) => t.id)
@@ -114,7 +114,7 @@ export function PlanSession({ level, aboveLabel, dayOptions = [], periodLabel: P
   const savedTasks = current.filter((t) => !t.isGoal)
   // A task toward a goal belongs to the goal's domain; a loose one to the domain in view.
   // On a week the goals are the MONTH's (the rung above): a new week task
-  // written toward one is that goal's next action, with the goal kept whole
+  // written toward one is that goal's task, with the goal kept whole
   // on its month (horizon flows).
   const towardOptions = week
     ? aboveGoals.map((g) => ({ id: g.id, title: g.title, context: g.context ?? null }))
@@ -218,7 +218,7 @@ export function PlanSession({ level, aboveLabel, dayOptions = [], periodLabel: P
                       </div>
                     </div>
                     {draft.verdicts[t.id] === 'keep-action' && (
-                      <label className="mt-2 block pl-6 text-[12.5px] text-neutral-500">Next action for {t.title}
+                      <label className="mt-2 block pl-6 text-[12.5px] text-neutral-500">Task for {t.title}
                         <div className="mt-1">
                           <input className="input-base" value={draft.actionTitles[t.id] ?? ''}
                             aria-invalid={askForActions && unnamedActions.includes(t.id) ? true : undefined}
@@ -228,7 +228,7 @@ export function PlanSession({ level, aboveLabel, dayOptions = [], periodLabel: P
                       </label>
                     )}
                     {askForActions && unnamedActions.includes(t.id) && (
-                      <p role="alert" className="mt-1 pl-6 text-[12.5px] font-semibold text-accent-700">Name the next action, or choose Keep</p>
+                      <p role="alert" className="mt-1 pl-6 text-[12.5px] font-semibold text-accent-700">Name the task, or choose Keep</p>
                     )}
                   </li>))}</ul>
               </>
@@ -332,7 +332,7 @@ export function PlanSession({ level, aboveLabel, dayOptions = [], periodLabel: P
                 </li>
               ))}
               {open.filter((t) => draft.verdicts[t.id] === 'keep-action' && draft.actionTitles[t.id]?.trim()).map((g) => (
-                <li key={`a-${g.id}`} className="border-b border-neutral-100 py-2 text-sm">{draft.actionTitles[g.id]}<span className="block text-[12px] text-neutral-400">new next action toward {g.title}</span></li>))}
+                <li key={`a-${g.id}`} className="border-b border-neutral-100 py-2 text-sm">{draft.actionTitles[g.id]}<span className="block text-[12px] text-neutral-400">new task toward {g.title}</span></li>))}
               {draft.newTasks.map((x) => (
                 <li key={x.id} className="flex items-center gap-2 border-b border-neutral-100 py-2 text-sm">
                   <span className="flex-1">{x.title}{x.linkId && <span className="block text-[12px] text-neutral-400">toward {towardOptions.find((o) => o.id === x.linkId)?.title}</span>}{x.day && <span className="block text-[12px] text-neutral-400">on {dayOptions.find((o) => o.ymd === x.day)?.label ?? x.day}</span>}</span>
@@ -346,7 +346,7 @@ export function PlanSession({ level, aboveLabel, dayOptions = [], periodLabel: P
             </ul>
             {!week && !addingTask && draft.newTasks.length === 0 ? (
               <button type="button" onClick={() => setAddingTask(true)} className="mt-2 text-[13px] text-neutral-500 hover:text-primary-700">
-                + Add a single action or a next action
+                + Add a task
               </button>
             ) : (
             <form className="mt-2 flex flex-wrap gap-2" onSubmit={(e) => {
@@ -473,7 +473,7 @@ export function PlanSession({ level, aboveLabel, dayOptions = [], periodLabel: P
             {aboveGoals.map((g) => (
               <li key={g.id} className="border-t border-neutral-200 py-1.5 text-[13px] text-neutral-700">
                 <span className="flex items-center gap-1.5"><Target className="h-3.5 w-3.5 shrink-0 text-accent-600" />{g.title}</span>
-                {/* On the week, the goal's own next actions sit under it — the
+                {/* On the week, the goal's own tasks sit under it — the
                     parent in view while its actions are chosen. */}
                 {week && above.some((a) => a.goalTaskId === g.id) && (
                   <ul className="ml-5 mt-0.5">

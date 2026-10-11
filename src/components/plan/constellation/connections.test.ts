@@ -21,7 +21,7 @@ describe('link rules',()=>{
 })
 describe('moveUnderPatch',()=>{
  const year=[{id:'g',name:'Together'} as Goal,{id:'h',name:'Health'} as Goal]
- it('links a seasonal goal through goal_id and undoes to the previous value',()=>{
+ it('links a season goal through goal_id and undoes to the previous value',()=>{
   const n=planNodes(year,[[task('s',{goalId:'g'})],[],[]])
   expect(moveUnderPatch(n,n.find(x=>x.key==='1:s')!,n.find(x=>x.key==='0:h')!)).toStrictEqual({after:{goalId:'h'},before:{goalId:'g'}})
   expect(moveUnderPatch(n,n.find(x=>x.key==='1:s')!,null)).toStrictEqual({after:{goalId:undefined},before:{goalId:'g'}})

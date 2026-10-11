@@ -54,7 +54,7 @@ const HORIZON_NAMES: Record<typeof PERIODS[number], string> = {
 function horizonSubtitle(period: typeof PERIODS[number], now: Date): string {
   if (period === 'today') return now.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
   if (period === 'week') return "This week's list and days"
-  if (period === 'year' || period === 'month' || period === 'season') return 'Intentions, goals, milestones and actions'
+  if (period === 'year' || period === 'month' || period === 'season') return 'Year, season and month goals'
   return ''
 }
 

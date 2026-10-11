@@ -87,7 +87,7 @@ export function MonthLink({ title, current, options, onChange, compact = false }
     btnRef.current?.focus()
     if (id !== (current?.id ?? null)) onChange(id)
   }
-  const label = current ? `For ${current.month}: ${current.title}. Change or remove the ${options.month} line for ${title}` : `Link ${title} to ${anOrA(options.month)} ${options.month} line`
+  const label = current ? `For ${current.month}: ${current.title}. Change or remove the ${options.month} goal for ${title}` : `Link ${title} to ${anOrA(options.month)} ${options.month} goal`
   return (
     <>
       <button ref={btnRef} type="button" className={`wk-for wk-forbtn${current ? '' : ' is-empty'}${compact ? ' is-compact' : ''}`}
@@ -96,13 +96,13 @@ export function MonthLink({ title, current, options, onChange, compact = false }
         onClick={(e) => { e.stopPropagation(); if (open) close(); else setOpen(true) }}>
         {current
           ? <><span aria-hidden="true">↳ </span>for {current.month}: {current.title}</>
-          : <><Link2 className="inline h-3 w-3 align-[-2px]" aria-hidden="true" /> Link to {anOrA(options.month)} {options.month} line</>}
+          : <><Link2 className="inline h-3 w-3 align-[-2px]" aria-hidden="true" /> Link to {anOrA(options.month)} {options.month} goal</>}
       </button>
       {open && createPortal(
-        <div ref={menuRef} role="menu" aria-label={`Which ${options.month} line is “${title}” for?`} className="pv2-menu is-floating wk-formenu"
+        <div ref={menuRef} role="menu" aria-label={`Which ${options.month} goal is “${title}” for?`} className="pv2-menu is-floating wk-formenu"
           style={pos ? { top: pos.top, left: pos.left, maxHeight: pos.maxHeight } : { top: 0, left: 0, visibility: 'hidden' }}
           onPointerDown={stop} onMouseDown={stop} onTouchStart={stop} onClick={stop} onKeyDown={onMenuKey}>
-          <div className="pv2-mhead">Which {options.month} line is this for?</div>
+          <div className="pv2-mhead">Which {options.month} goal is this for?</div>
           {options.lines.map((l) => (
             <button key={l.id} type="button" role="menuitemradio" aria-checked={current?.id === l.id} onClick={() => choose(l.id)}>
               <span className="wk-formenu-label">{l.title}</span>{current?.id === l.id && <Check className="wk-formenu-tick h-3.5 w-3.5" aria-hidden="true" />}
@@ -116,7 +116,7 @@ export function MonthLink({ title, current, options, onChange, compact = false }
           )}
           <div className="pv2-msep" />
           <button type="button" role="menuitemradio" aria-checked={!current} onClick={() => choose(null)}>
-            <span className="wk-formenu-label">{current ? `Remove the ${options.month} link` : `No ${options.month} line`}</span>
+            <span className="wk-formenu-label">{current ? `Remove the ${options.month} link` : `No ${options.month} goal`}</span>
           </button>
         </div>,
         document.body,

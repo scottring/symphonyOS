@@ -41,13 +41,13 @@ export function goalConversion(
 }
 
 /**
- * Can this GOAL become a single action again — the same row, `is_goal` off?
+ * Can this GOAL become a single task again — the same row, `is_goal` off?
  *
  * Only while no relationship would be left pointing at a row that is no goal
  * (Codex review, 2026-09-27). The database's guard checks a link only when
  * the row carrying it changes, so it allows both of these; the app refuses
  * them and says why, and never unlinks anything silently:
- *   - next actions filed under it (`goal_task_id`);
+ *   - tasks filed under it (`goal_task_id`);
  *   - month goals that support it (their `supports_goal_task_id`);
  *   - its own link up to a season goal (`supports_goal_task_id`), which a
  *     task may not carry.
@@ -58,20 +58,20 @@ export function goalToTaskConversion(
   goal: Pick<Task, 'id' | 'isGoal' | 'completed' | 'supportsGoalTaskId'>,
   tasks: readonly Pick<Task, 'id' | 'title' | 'goalTaskId' | 'supportsGoalTaskId'>[],
 ): GoalConversion {
-  if (!goal.isGoal) return { ok: false, reason: 'It is already a single action.' }
+  if (!goal.isGoal) return { ok: false, reason: 'It is already a single task.' }
   if (goal.completed) return { ok: false, reason: 'It is finished. Reopen it first.' }
   const steps = tasks.filter((t) => t.goalTaskId === goal.id)
   if (steps.length) {
-    return { ok: false, reason: `It holds ${steps.length === 1 ? 'a next action' : `${steps.length} next actions`}. Move or remove ${steps.length === 1 ? 'it' : 'them'} first, so nothing is left under a single action.` }
+    return { ok: false, reason: `It holds ${steps.length === 1 ? 'a task' : `${steps.length} tasks`}. Move or remove ${steps.length === 1 ? 'it' : 'them'} first, so nothing is left under a single task.` }
   }
   const supporters = tasks.filter((t) => t.supportsGoalTaskId === goal.id && t.id !== goal.id)
   if (supporters.length) {
     const names = supporters.slice(0, 2).map((t) => `“${t.title}”`).join(' and ') + (supporters.length > 2 ? ` and ${supporters.length - 2} more` : '')
-    return { ok: false, reason: `${names} ${supporters.length === 1 ? 'supports' : 'support'} it. Unlink ${supporters.length === 1 ? 'that goal' : 'those goals'} first, so no link is left pointing at a single action.` }
+    return { ok: false, reason: `${names} ${supporters.length === 1 ? 'supports' : 'support'} it. Unlink ${supporters.length === 1 ? 'that goal' : 'those goals'} first, so no link is left pointing at a single task.` }
   }
   if (goal.supportsGoalTaskId) {
     const parent = tasks.find((t) => t.id === goal.supportsGoalTaskId)
-    return { ok: false, reason: `It supports ${parent ? `“${parent.title}”` : 'a season goal'}. Remove that link first (open it and choose “No linked goal”) — a single action can’t carry it.` }
+    return { ok: false, reason: `It supports ${parent ? `“${parent.title}”` : 'a season goal'}. Remove that link first (open it and choose “No linked goal”) — a single task can’t carry it.` }
   }
   return { ok: true }
 }

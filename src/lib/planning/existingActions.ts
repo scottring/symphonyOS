@@ -4,14 +4,14 @@
 // each is told apart from another with the same words, and what filing it
 // does and does not change. Pure, so the picker's rules are testable.
 //
-// The relationship is the one next actions already use — `tasks.goal_task_id`
+// The relationship is the one tasks already use — `tasks.goal_task_id`
 // on the ACTION, pointing at an is_goal task (goalSteps.ts). Filing an
 // existing action writes that one column and nothing else: its notes, people,
 // area, privacy, dates, week/month commitments, focus and completion stay as
 // they are. A column holds one goal, so an action already under another goal
 // is MOVED, and only after the person says so.
 //
-// Year goals (the `goals` table) have no next actions: `tasks.goal_id` is how
+// Year goals (the `goals` table) have no tasks: `tasks.goal_id` is how
 // a SEASON GOAL supports a year goal, not a step relationship, and nothing
 // lists tasks under a year goal. So this is offered on month and season goals
 // only.
@@ -200,7 +200,7 @@ export function linkOutcome(
 
 /** What to say after "Remove from goal", from what the database says happened. */
 export function removeOutcomeToast(title: string, out: LinkOutcome): [string, 'success' | 'error' | 'warning'] {
-  if (out.status === 'ok') return [`“${title}” is no longer a next action for that goal. The task itself is unchanged.`, 'success']
+  if (out.status === 'ok') return [`“${title}” is no longer a task for that goal. The task itself is unchanged.`, 'success']
   if (out.status === 'conflict') return [`Not changed: someone else moved “${title}” to ${out.currentGoalId === null ? 'no goal' : 'another goal'} meanwhile.`, 'warning']
   if (out.status === 'unknown') return [`Couldn’t confirm whether “${title}” was removed from its goal — the connection dropped.`, 'warning']
   return [`Could not remove “${title}” from its goal. Nothing was changed.`, 'error']

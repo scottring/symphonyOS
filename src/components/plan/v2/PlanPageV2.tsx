@@ -532,7 +532,7 @@ function Inner({ level }: { level: Level }) {
     if ((await updateTask(t.id, updates)) === false) return
     const line = lineId ? seasonParents.find((p) => p.id === lineId)?.task : null
     const still = revealed ? seasonParents.find((p) => p.id === revealed)?.task : null
-    showToast(line ? `“${t.title}” is for ${aboveName}: ${line.title}.` : still ? `“${t.title}” is no longer written for that line; it still shows under “${still.title}”.` : `“${t.title}” is no longer tied to ${anOrA(aboveName)} ${aboveName} line.`,
+    showToast(line ? `“${t.title}” is for ${aboveName}: ${line.title}.` : still ? `“${t.title}” is no longer written for that goal; it still shows under “${still.title}”.` : `“${t.title}” is no longer tied to ${anOrA(aboveName)} ${aboveName} goal.`,
       'success', 6000, { label: 'Undo', onClick: () => { void updateTask(t.id, before) } })
   }
   const journalColumn = () => {
@@ -547,7 +547,7 @@ function Inner({ level }: { level: Level }) {
       const vm = vmById.get(t.id)!
       return <PlanLine key={t.id} vm={vm} actions={actions} members={members} nextLabel={nextName}
         open={openLine === t.id} onToggle={() => setOpenLine((o) => (o === t.id ? null : t.id))} editable={false} draggable={dragOn}
-        extra={itself ? <span className="wk-itself">This {aboveName} line itself is on {name}’s list</span>
+        extra={itself ? <span className="wk-itself">This {aboveName} goal itself is on {name}’s list</span>
           : !t.completed ? <MonthLink title={t.title} current={shownFor(t)} options={seasonOptions} onChange={(id) => void setSeasonLink(t, id)} /> : undefined} />
     }
     const shown = groups.filter((g) => !g.parent.task.completed || g.entries.length)
@@ -555,30 +555,30 @@ function Inner({ level }: { level: Level }) {
       key: g.parent.id, eyebrow: `This ${aboveName}`, title: g.parent.task.title, done: !!g.parent.task.completed,
       rows: g.entries.map((t) => jrow(t, g.itself && t.id === g.parent.id)),
       empty: `Nothing for ${name} yet — leave it for later if it can wait.`,
-      composer: { label: `What would move this forward in ${name}?`, placeholder: `Add ${anOrA(name)} ${name} line`, onAdd: (title) => addLine(title, g.parent.id) },
+      composer: { label: `What would move this forward in ${name}?`, placeholder: `Add ${anOrA(name)} ${name} goal`, onAdd: (title) => addLine(title, g.parent.id) },
     }))
     const untouched = untouchedCount(shown.filter((g) => !g.parent.task.completed), (t) => !t.completed)
     const seasonStart = periodBounds('season', bounds.start, seasons).start
     return (
       <div className="pv2-dropcol" tabIndex={0} role="region" aria-label="Open journal column">
-        <OpenJournal label={`${name}, by ${aboveName} line`} periodKey={localYmd(bounds.start)}
+        <OpenJournal label={`${name}, by ${aboveName} goal`} periodKey={localYmd(bounds.start)}
           intro={<div className="oj-intro">
-            <p className="oj-lede">Each {aboveName} line, with what {name} does for it. Leave any of them for later.</p>
+            <p className="oj-lede">Each {aboveName} goal, with what {name} does for it. Leave any of them for later.</p>
             <div className="oj-intro-tools">
-              <span className="oj-area">New lines go in {addArea.picker}</span>
+              <span className="oj-area">New goals go in {addArea.picker}</span>
               <FromPaper altitude={level} periodStart={bounds.start} tasks={layered} />
               <button type="button" className="pv2-link" onClick={() => navigate(`/season?start=${localYmd(seasonStart)}`, { state: { write: true } })}>Add to {aboveName}’s list →</button>
             </div>
           </div>}
           sections={sections}
           general={{
-            key: 'general', eyebrow: 'Everything else', title: `Not tied to ${anOrA(aboveName)} ${aboveName} line`,
+            key: 'general', eyebrow: 'Everything else', title: `Not tied to ${anOrA(aboveName)} ${aboveName} goal`,
             rows: general.map((t) => jrow(t)), empty: `Nothing else on ${name}’s list.`,
             composer: { label: `Something else for ${name}`, placeholder: `Add to ${name}`, onAdd: (title) => addLine(title) },
           }}
           footer={<>
-            {shown.length > 0 && <p className="oj-untouched">{untouched === 0 ? `Each ${aboveName} line has something in ${name}.`
-              : `${untouched} ${aboveName} ${untouched === 1 ? 'line has' : 'lines have'} nothing in ${name} yet — you can leave ${untouched === 1 ? 'it' : 'them'} for later.`}</p>}
+            {shown.length > 0 && <p className="oj-untouched">{untouched === 0 ? `Each ${aboveName} goal has something in ${name}.`
+              : `${untouched} ${aboveName} ${untouched === 1 ? 'goal has' : 'goals have'} nothing in ${name} yet — you can leave ${untouched === 1 ? 'it' : 'them'} for later.`}</p>}
             {!guidedReview && main.some((l) => !l.task.completed) && (
               <div className="pv2-onward" role="group" aria-label="Next step">
                 <p className="pv2-onward-why">When {name}’s plan looks right: {onward.why}</p>

@@ -63,7 +63,7 @@ describe('a goal holds the steps that serve it', () => {
   it('offers a disclosure that says what it will do', async () => {
     const onToggleExpand = vi.fn()
     render(<ul><PlanRow row={goalWithSteps} actions={[]} onAction={vi.fn()} onOpen={vi.fn()} onToggleExpand={onToggleExpand} /></ul>)
-    const button = screen.getByRole('button', { name: /Show next actions under Transform the porch/i })
+    const button = screen.getByRole('button', { name: /Show tasks under Transform the porch/i })
     expect(button).toHaveAttribute('aria-expanded', 'false')
     await userEvent.click(button)
     expect(onToggleExpand).toHaveBeenCalledWith(goalWithSteps)
@@ -71,7 +71,7 @@ describe('a goal holds the steps that serve it', () => {
 
   it('a bare goal with no way to take steps offers no disclosure', () => {
     render(<ul><PlanRow row={row({ id: 'g2', title: 'Swim again', isGoal: true })} actions={[]} onAction={vi.fn()} onOpen={vi.fn()} /></ul>)
-    expect(screen.queryByRole('button', { name: /next actions under Swim again/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /tasks under Swim again/i })).not.toBeInTheDocument()
   })
 
   // Scott, 2026-09-24: a goal's title started further right than its own
@@ -93,7 +93,7 @@ describe('a goal holds the steps that serve it', () => {
 
   it('the real disclosure sits in the same lane as the placeholder', () => {
     render(<ul><PlanRow row={goalWithSteps} actions={[]} onAction={vi.fn()} onOpen={vi.fn()} /></ul>)
-    expect(screen.getByRole('button', { name: /Show next actions under Transform the porch/i }))
+    expect(screen.getByRole('button', { name: /Show tasks under Transform the porch/i }))
       .toHaveClass('period-row-caret')
   })
 
@@ -152,20 +152,20 @@ describe('a goal holds the steps that serve it', () => {
 
   it('a plain task never offers a disclosure', () => {
     render(<ul><PlanRow row={row({ title: 'Call the roofer' })} actions={[]} onAction={vi.fn()} onOpen={vi.fn()} onAddStep={vi.fn()} /></ul>)
-    expect(screen.queryByRole('button', { name: /next actions under Call the roofer/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /tasks under Call the roofer/i })).not.toBeInTheDocument()
   })
 
   it('adds a step from the inline form', async () => {
     const onAddStep = vi.fn()
     render(<ul><PlanRow row={goalWithSteps} actions={[]} onAction={vi.fn()} onOpen={vi.fn()} expanded onAddStep={onAddStep} /></ul>)
-    await userEvent.type(screen.getByLabelText(/New next action for Transform the porch/i), 'Repaint the railing{enter}')
+    await userEvent.type(screen.getByLabelText(/New task for Transform the porch/i), 'Repaint the railing{enter}')
     expect(onAddStep).toHaveBeenCalledWith(goalWithSteps, 'Repaint the railing')
   })
 
   it('ignores an empty step', async () => {
     const onAddStep = vi.fn()
     render(<ul><PlanRow row={goalWithSteps} actions={[]} onAction={vi.fn()} onOpen={vi.fn()} expanded onAddStep={onAddStep} /></ul>)
-    await userEvent.type(screen.getByLabelText(/New next action for Transform the porch/i), '   {enter}')
+    await userEvent.type(screen.getByLabelText(/New task for Transform the porch/i), '   {enter}')
     expect(onAddStep).not.toHaveBeenCalled()
   })
 
@@ -196,7 +196,7 @@ describe('a goal holds the steps that serve it', () => {
     const { rerender } = render(<ul><PlanRow row={goalWithSteps} actions={[]} onAction={vi.fn()} onOpen={vi.fn()} onAddStep={vi.fn()} onToggleExpand={onToggleExpand}
       goalControls={<button type="button">Link control</button>} refine={<button type="button">Refine control</button>} /></ul>)
     const goal = screen.getByText('Transform the porch').closest('li')!
-    expect(within(goal).queryByRole('button', { name: '+ Add a next action' })).toBeNull()
+    expect(within(goal).queryByRole('button', { name: '+ Add a task' })).toBeNull()
     expect(within(goal).queryByRole('button', { name: 'Link control' })).toBeNull()
     expect(within(goal).queryByRole('button', { name: 'Refine control' })).toBeNull()
     fireEvent.click(within(goal).getByRole('button', { name: /· show$/ }))
@@ -205,8 +205,8 @@ describe('a goal holds the steps that serve it', () => {
       goalControls={<button type="button">Link control</button>} refine={<button type="button">Refine control</button>} /></ul>)
     for (const name of ['Link control', 'Refine control']) expect(screen.getByRole('button', { name })).toBeInTheDocument()
     // Open, the next-action box is there — once, with no link repeating it.
-    expect(screen.getByRole('textbox', { name: 'New next action for Transform the porch' })).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: /Add a next action/ })).toBeNull()
+    expect(screen.getByRole('textbox', { name: 'New task for Transform the porch' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Add a task/ })).toBeNull()
   })
 
   // A bound, not a cap: the true total is stated and one press gives it back.

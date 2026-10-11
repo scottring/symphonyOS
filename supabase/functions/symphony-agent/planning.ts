@@ -15,7 +15,7 @@ export function planningRow(input:Record<string,unknown>) {
 export function validatePlanningParent(input:Record<string,unknown>,parent:Record<string,unknown>,levels:string[]=[]) {
  if(parent.context!==input.context)throw new Error('Parent belongs to a different life area; clarify the intended connection')
  if(input.level==='season') {
-  if(parent.year!==Number(String(input.period_start).slice(0,4)))throw new Error('Choose an intention for this year')
+  if(parent.year!==Number(String(input.period_start).slice(0,4)))throw new Error('Choose a year goal for this year')
  } else {
   const expected=input.level==='month'?'season':'month'
   const bucket=expected==='season'?'quarter':'month'

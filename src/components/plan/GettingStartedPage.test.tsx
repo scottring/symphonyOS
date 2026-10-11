@@ -99,7 +99,7 @@ describe('Plan with guidance', () => {
       expect(radio.checked).toBe(true)
       expect(screen.getByText('12 captures in your Inbox aren’t sorted yet.')).toBeTruthy()
       expect(screen.getByRole('link', { name: 'Sort them first' })).toHaveAttribute('href', '/inbox')
-      expect(screen.getByText('6 priorities')).toBeTruthy()
+      expect(screen.getByText('6 goals')).toBeTruthy()
       expect(screen.getByText('Ended with 3 still open')).toBeTruthy()
     })
 
@@ -108,7 +108,7 @@ describe('Plan with guidance', () => {
       fireEvent.click(screen.getByRole('button', { name: 'Continue' }))
       expect(screen.getByRole('heading', { name: 'Here’s what needs you' })).toBeTruthy()
       expect(screen.getByText('Four steps.', { exact: false })).toBeTruthy()
-      expect(screen.getByText(/Already in place, so no step is needed: 2026 \(4 goals\), Fall \(6 priorities\)/)).toBeTruthy()
+      expect(screen.getByText(/Already in place, so no step is needed: 2026 \(4 goals\), Fall \(6 goals\)/)).toBeTruthy()
       fireEvent.click(screen.getByRole('checkbox', { name: /Check week 40/ }))
       fireEvent.click(screen.getByRole('button', { name: 'Start' }))
       await waitFor(() => expect(screen.getByTestId('where').textContent).toBe('/month?start=2026-10-01'))

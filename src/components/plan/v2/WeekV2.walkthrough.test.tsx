@@ -68,22 +68,22 @@ const type = (v: string) => fireEvent.change(input(), { target: { value: v } })
 const enter = () => fireEvent.submit(input().closest('form')!)
 const deferred = <T,>() => { let resolve!: (v: T) => void; const promise = new Promise<T>((r) => { resolve = r }); return { promise, resolve } }
 
-describe('rapid weekly actions for one month line', () => {
+describe('rapid weekly actions for one month goal', () => {
   it('“Add a weekly action” chooses the line, lights it, and puts the cursor in the box', () => {
     render(ui([TRIP, SHED]))
     toWrite()
-    fireEvent.click(screen.getByRole('button', { name: 'Add a weekly action for Plan the autumn trip' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Add a task this week for Plan the autumn trip' }))
     expect(document.activeElement).toBe(input())
     expect(screen.getByText(/Adding for October:/)).toHaveTextContent('Adding for October: Plan the autumn trip')
     const ref = screen.getByRole('complementary', { name: 'October, for reference' })
     expect(within(ref).getByText('Plan the autumn trip').closest('li')).toHaveAttribute('data-chosen', 'true')
-    expect(screen.getByRole('button', { name: 'Adding weekly actions for Plan the autumn trip' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('button', { name: 'Adding tasks this week for Plan the autumn trip' })).toHaveAttribute('aria-pressed', 'true')
   })
 
   it('several Enters in a row share the line, stay distinct, and keep the cursor in the box', async () => {
     render(ui([TRIP, SHED]))
     toWrite()
-    fireEvent.click(screen.getByRole('button', { name: 'Add a weekly action for Plan the autumn trip' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Add a task this week for Plan the autumn trip' }))
     for (const t of ['Book the cabin', 'Ask about time off']) {
       type(t); enter()
       await waitFor(() => expect(input().value).toBe(''))
@@ -96,9 +96,9 @@ describe('rapid weekly actions for one month line', () => {
   it('switching the line changes only what comes next; Clear goes back to unlinked', async () => {
     render(ui([TRIP, SHED]))
     toWrite()
-    fireEvent.click(screen.getByRole('button', { name: 'Add a weekly action for Plan the autumn trip' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Add a task this week for Plan the autumn trip' }))
     type('Book the cabin'); enter(); await waitFor(() => expect(input().value).toBe(''))
-    fireEvent.change(screen.getByLabelText('For an October line'), { target: { value: 'm2' } })
+    fireEvent.change(screen.getByLabelText('For an October goal'), { target: { value: 'm2' } })
     type('Order a skip'); enter(); await waitFor(() => expect(input().value).toBe(''))
     fireEvent.click(screen.getByRole('button', { name: 'Clear' }))
     expect(document.activeElement).toBe(input())
@@ -111,7 +111,7 @@ describe('rapid weekly actions for one month line', () => {
     h.addTask.mockReturnValueOnce(d.promise)
     render(ui([TRIP]))
     toWrite()
-    fireEvent.click(screen.getByRole('button', { name: 'Add a weekly action for Plan the autumn trip' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Add a task this week for Plan the autumn trip' }))
     type('Book the cabin'); enter()
     expect(screen.getByRole('status', { name: '' })).toHaveTextContent('Saving…')
     enter() // a second Enter while saving
@@ -134,20 +134,20 @@ describe('rapid weekly actions for one month line', () => {
   it('a chosen line that is no longer on offer (another week, a filter, done) is never reused', async () => {
     const { rerender } = render(ui([TRIP, SHED]))
     toWrite()
-    fireEvent.click(screen.getByRole('button', { name: 'Add a weekly action for Plan the autumn trip' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Add a task this week for Plan the autumn trip' }))
     rerender(ui([SHED]))
-    expect(screen.getByText(/Not tied to an October line/)).toBeInTheDocument()
+    expect(screen.getByText(/Not tied to an October goal/)).toBeInTheDocument()
     type('Order a skip'); enter(); await waitFor(() => expect(input().value).toBe(''))
     expect(h.addTask.mock.calls[0][4].sourceId).toBeUndefined()
     // Back on screen: still not chosen — it was dropped, not hidden.
     rerender(ui([TRIP, SHED]))
-    expect(screen.getByText(/Not tied to an October line/)).toBeInTheDocument()
+    expect(screen.getByText(/Not tied to an October goal/)).toBeInTheDocument()
   })
 
   it('a different week starts with nothing chosen', () => {
     const { rerender } = render(ui([TRIP]))
     toWrite()
-    fireEvent.click(screen.getByRole('button', { name: 'Add a weekly action for Plan the autumn trip' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Add a task this week for Plan the autumn trip' }))
     const next = new Date(2026, 9, 10)
     rerender(ui([TRIP], next))
     rerender(ui([TRIP]))
@@ -155,11 +155,11 @@ describe('rapid weekly actions for one month line', () => {
   })
 })
 
-describe('changing an existing weekly action’s month line', () => {
+describe('changing an existing weekly action’s month goal', () => {
   it('links an item written without one, on the same row — only the link is written', async () => {
     render(ui([TRIP, SHED, weekItem('w1', 'Go through the onboarding')]))
     toWrite()
-    fireEvent.click(screen.getByRole('button', { name: 'Link Go through the onboarding to an October line' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Link Go through the onboarding to an October goal' }))
     fireEvent.click(screen.getByRole('menuitemradio', { name: 'Plan the autumn trip' }))
     await waitFor(() => expect(h.updateTask).toHaveBeenCalledWith('w1', { sourceId: 'm1' }))
     // Undo puts back exactly what was there.
@@ -172,7 +172,7 @@ describe('changing an existing weekly action’s month line', () => {
     render(ui([TRIP, SHED, weekItem('w2', 'Book the cabin', { sourceId: 'm1' })]))
     toWrite()
     fireEvent.click(screen.getByRole('button', { name: 'More for Book the cabin' }))
-    fireEvent.click(screen.getByRole('menuitem', { name: /Change October line/ }))
+    fireEvent.click(screen.getByRole('menuitem', { name: /Change October goal/ }))
     fireEvent.click(screen.getByRole('menuitemradio', { name: 'Clear out the shed' }))
     await waitFor(() => expect(h.updateTask).toHaveBeenCalledWith('w2', { sourceId: 'm2' }))
     fireEvent.click(screen.getByRole('button', { name: /^For October: Plan the autumn trip/ }))

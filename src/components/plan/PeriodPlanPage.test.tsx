@@ -40,7 +40,7 @@ const goal = (over: Partial<Goal>): Goal => ({
 
 /** Open a goal (its controls appear when it is opened), unless it already is. */
 const openGoal = (title: string) => {
-  const caret = screen.getByRole('button', { name: new RegExp(`(Show|Hide) next actions under ${title}`) })
+  const caret = screen.getByRole('button', { name: new RegExp(`(Show|Hide) tasks under ${title}`) })
   if (caret.getAttribute('aria-expanded') !== 'true') fireEvent.click(caret)
 }
 const state: { tasks: Task[]; goals: Goal[]; loading: boolean; goalsLoading?: boolean } = { tasks: [], goals: [], loading: false, goalsLoading: false }
@@ -183,7 +183,7 @@ describe('PeriodPlanPage', () => {
     const list = screen.getByRole('region', { name: /list$/ })
     expect(within(goals).getByRole('heading', { name: 'Month goals and projects' })).toBeInTheDocument()
     // Goal-first (horizon flows): the task list is the secondary route.
-    expect(within(list).getByRole('heading', { name: 'Single actions' })).toBeInTheDocument()
+    expect(within(list).getByRole('heading', { name: 'Single tasks' })).toBeInTheDocument()
     expect(goals.compareDocumentPosition(list) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
     expect(within(goals).getByText('Read more')).toBeInTheDocument()
     expect(within(list).queryByText('Read more')).not.toBeInTheDocument()
@@ -637,7 +637,7 @@ describe('PeriodPlanPage', () => {
     renderPage('month')
     // The single-action box is one press away, not the page's default.
     expect(screen.queryByLabelText('Add to this month')).not.toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: '+ Add a single action' }))
+    fireEvent.click(screen.getByRole('button', { name: '+ Add a single task' }))
     const input = screen.getByLabelText('Add to this month')
     fireEvent.change(input, { target: { value: 'Repaint the porch' } })
     fireEvent.submit(input.closest('form')!)
@@ -795,7 +795,7 @@ describe('PeriodPlanPage', () => {
           commitments: [{ level: 'month', periodStart: thisMonth, status: 'open' }] }),
       ]
       renderPage('month')
-      fireEvent.click(screen.getByRole('button', { name: /Show next actions under Islanders game/ }))
+      fireEvent.click(screen.getByRole('button', { name: /Show tasks under Islanders game/ }))
       expect(timingBtn('Research tickets')).toHaveTextContent('Choose when')
       expect(timingBtn('Buy tickets')).toHaveTextContent('Sep 20 – Sep 26 · any day')
       expect(timingBtn('Call the box office')).toHaveTextContent('Tue, Sep 22 · any time')
@@ -814,7 +814,7 @@ describe('PeriodPlanPage', () => {
         task({ id: 's1', title: 'Research tickets', monthStart: thisMonth, goalTaskId: 'g1' }),
       ]
       renderPage('month')
-      fireEvent.click(screen.getByRole('button', { name: /Show next actions under Islanders game/ }))
+      fireEvent.click(screen.getByRole('button', { name: /Show tasks under Islanders game/ }))
       fireEvent.click(timingBtn('Research tickets'))
       const weeks = screen.getAllByRole('menuitemradio')
       fireEvent.click(weeks[1])
@@ -1044,7 +1044,7 @@ describe('steps under a goal', () => {
   it('draws a step under its goal and not in the task list', () => {
     porchPlan()
     renderPage('month')
-    fireEvent.click(screen.getByRole('button', { name: /Show next actions under Transform the porch/i }))
+    fireEvent.click(screen.getByRole('button', { name: /Show tasks under Transform the porch/i }))
     const goals = screen.getByRole('region', { name: /goals$/ })
     expect(within(goals).getByText('Hang plants')).toBeInTheDocument()
     const list = screen.getByRole('region', { name: /list$/ })
@@ -1061,8 +1061,8 @@ describe('steps under a goal', () => {
   it('adding a step writes the goal it serves', () => {
     porchPlan()
     renderPage('month')
-    fireEvent.click(screen.getByRole('button', { name: /Show next actions under Transform the porch/i }))
-    const input = screen.getByLabelText(/New next action for Transform the porch/i)
+    fireEvent.click(screen.getByRole('button', { name: /Show tasks under Transform the porch/i }))
+    const input = screen.getByLabelText(/New task for Transform the porch/i)
     fireEvent.change(input, { target: { value: 'Buy new chairs' } })
     fireEvent.submit(input)
     expect(hook.addTask).toHaveBeenCalledWith('Buy new chairs', undefined, undefined, undefined,
@@ -1116,7 +1116,7 @@ describe('steps under a goal', () => {
       task({ id: 's2', title: 'Clear the garage', goalTaskId: 'g2', bucket: 'quarter' }),
     ]
     renderPage('season')
-    fireEvent.click(screen.getByRole('button', { name: /Show next actions under Make the house ours/i }))
+    fireEvent.click(screen.getByRole('button', { name: /Show tasks under Make the house ours/i }))
     expect(screen.getByText('Clear the garage')).toBeInTheDocument()
   })
 })
@@ -1172,7 +1172,7 @@ describe('PeriodPlanPage — Plan <Month>', () => {
     const label = thisMonth.toLocaleDateString('en-US', { month: 'long' })
     const list = screen.getByRole('region', { name: /list$/ })
     expect(within(list).queryByRole('button', { name: /^Plan .* →$/ })).toBeNull()
-    expect(within(list).getByRole('button', { name: '+ Add a single action' })).toBeInTheDocument()
+    expect(within(list).getByRole('button', { name: '+ Add a single task' })).toBeInTheDocument()
     expect(screen.getByText(new RegExp(`No goals or projects for ${label} yet`))).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: `Plan ${label}` }))
     expect(screen.getByLabelText('Planning steps')).toBeInTheDocument()
@@ -1183,7 +1183,7 @@ describe('PeriodPlanPage — Plan <Month>', () => {
     renderPage('month')
     const list = screen.getByRole('region', { name: /list$/ })
     expect(within(list).queryByRole('button', { name: /^Plan .* →$/ })).toBeNull()
-    expect(within(list).queryByText(/No single actions/)).toBeNull()
+    expect(within(list).queryByText(/No single tasks/)).toBeNull()
   })
 
   it('a past month\'s empty list never offers a session button', () => {
@@ -1191,13 +1191,13 @@ describe('PeriodPlanPage — Plan <Month>', () => {
     expect(screen.queryByRole('button', { name: /^Plan .* →$/ })).toBeNull()
   })
 
-  it('runs a session end to end: keep a goal with a next action, save, return to the page with the week line', async () => {
+  it('runs a session end to end: keep a goal with a task, save, return to the page with the week line', async () => {
     state.tasks = [task({ id: 'g1', title: 'Strength', isGoal: true, monthStart: lastMonth, commitments: [{ level: 'month', periodStart: lastMonth, status: 'open' }] })]
     renderPage('month')
     const label = thisMonth.toLocaleDateString('en-US', { month: 'long' })
     fireEvent.click(screen.getByRole('button', { name: `Plan ${label}` }))
-    fireEvent.click(screen.getByRole('button', { name: 'Keep, and add a next action' }))
-    fireEvent.change(screen.getByLabelText(/next action for strength/i), { target: { value: 'Book PT' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Keep, and add a task' }))
+    fireEvent.change(screen.getByLabelText(/task for strength/i), { target: { value: 'Book PT' } })
     fireEvent.click(screen.getByRole('button', { name: new RegExp(`next: plan ${label}`, 'i') }))
     fireEvent.click(screen.getByRole('button', { name: /next: save/i }))
     fireEvent.click(screen.getByRole('button', { name: new RegExp(`save ${label}`, 'i') }))
@@ -1208,19 +1208,19 @@ describe('PeriodPlanPage — Plan <Month>', () => {
     expect(await screen.findByRole('link', { name: /plan the week/i })).toBeInTheDocument()
   })
 
-  it('a kept goal with a blank next action cannot move on — its row asks for one', () => {
+  it('a kept goal with a blank task cannot move on — its row asks for one', () => {
     state.tasks = [task({ id: 'g1', title: 'Strength', isGoal: true, monthStart: lastMonth, commitments: [{ level: 'month', periodStart: lastMonth, status: 'open' }] })]
     renderPage('month')
     const label = thisMonth.toLocaleDateString('en-US', { month: 'long' })
     fireEvent.click(screen.getByRole('button', { name: `Plan ${label}` }))
-    fireEvent.click(screen.getByRole('button', { name: 'Keep, and add a next action' }))
-    fireEvent.change(screen.getByLabelText(/next action for strength/i), { target: { value: '   ' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Keep, and add a task' }))
+    fireEvent.change(screen.getByLabelText(/task for strength/i), { target: { value: '   ' } })
     fireEvent.click(screen.getByRole('button', { name: new RegExp(`next: plan ${label}`, 'i') }))
     // Still on the look-back, with the reason on the goal's own row.
-    expect(screen.getByText(/name the next action, or choose keep/i)).toBeInTheDocument()
+    expect(screen.getByText(/name the task, or choose keep/i)).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /next: save/i })).toBeNull()
     // Naming it lets the plan continue.
-    fireEvent.change(screen.getByLabelText(/next action for strength/i), { target: { value: 'Book PT' } })
+    fireEvent.change(screen.getByLabelText(/task for strength/i), { target: { value: 'Book PT' } })
     fireEvent.click(screen.getByRole('button', { name: new RegExp(`next: plan ${label}`, 'i') }))
     expect(screen.getByRole('button', { name: /next: save/i })).toBeInTheDocument()
   })
@@ -1299,7 +1299,7 @@ describe('PeriodPlanPage — Plan <Month>', () => {
     fireEvent.click(screen.getByRole('button', { name: `Plan ${label}` }))
     fireEvent.change(screen.getByLabelText(new RegExp(`new goal for ${label}`, 'i')), { target: { value: 'Three bids' } })
     fireEvent.click(screen.getByRole('button', { name: /add goal/i }))
-    fireEvent.click(screen.getByRole('button', { name: /add a single action or a next action/i }))
+    fireEvent.click(screen.getByRole('button', { name: /add a task/i }))
     fireEvent.change(screen.getByLabelText(new RegExp(`new task for ${label}`, 'i')), { target: { value: 'Call Hughes' } })
     fireEvent.change(screen.getByLabelText(new RegExp(`toward a goal for ${label}`, 'i')), { target: { value: screen.getByRole('option', { name: 'Three bids' }).getAttribute('value')! } })
     fireEvent.click(screen.getByRole('button', { name: /add task/i }))
@@ -1376,7 +1376,7 @@ describe('PeriodPlanPage — Plan <Month>', () => {
     // keep standing beside the season for ever (fix round 1).
     expect(within(screen.getByRole('complementary')).queryByText('Learn the cello')).toBeNull()
     expect(screen.queryByText('Learn the cello')).toBeNull()
-    fireEvent.click(screen.getByRole('button', { name: /add a single action or a next action/i }))
+    fireEvent.click(screen.getByRole('button', { name: /add a task/i }))
     fireEvent.change(screen.getByLabelText(/new task for fall 2026/i), { target: { value: 'Book a PT evaluation' } })
     fireEvent.click(screen.getByRole('button', { name: /add task/i }))
     fireEvent.click(screen.getByRole('button', { name: /next: save/i }))
@@ -1522,7 +1522,7 @@ describe('PeriodPlanPage — Plan <Month>', () => {
     domainState.soleDomain = 'work'
     const view = renderPage('month')
     fireEvent.click(screen.getByRole('button', { name: `Plan ${monthLabel()}` }))
-    fireEvent.click(screen.getByRole('button', { name: /add a single action or a next action/i }))
+    fireEvent.click(screen.getByRole('button', { name: /add a task/i }))
     fireEvent.change(screen.getByLabelText(new RegExp(`new task for ${monthLabel()}`, 'i')), { target: { value: 'Expense report' } })
     fireEvent.click(screen.getByRole('button', { name: /add task/i }))
     domainState.soleDomain = 'family'                                     // switch the view, then save
@@ -1533,12 +1533,12 @@ describe('PeriodPlanPage — Plan <Month>', () => {
     expect(hook.addTask).toHaveBeenCalledWith('Expense report', undefined, undefined, undefined, expect.objectContaining({ context: 'work' }))
   })
 
-  it('a next action takes its goal\'s domain, whatever is in view (I4)', async () => {
+  it('a task takes its goal\'s domain, whatever is in view (I4)', async () => {
     state.tasks = [openOn('g1', { title: 'Strength', isGoal: true, context: 'family' })]
     renderPage('month')
     fireEvent.click(screen.getByRole('button', { name: `Plan ${monthLabel()}` }))
-    fireEvent.click(screen.getByRole('button', { name: 'Keep, and add a next action' }))
-    fireEvent.change(screen.getByLabelText(/next action for strength/i), { target: { value: 'Book PT' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Keep, and add a task' }))
+    fireEvent.change(screen.getByLabelText(/task for strength/i), { target: { value: 'Book PT' } })
     toSave()
     fireEvent.click(screen.getByRole('button', { name: new RegExp(`save ${monthLabel()}`, 'i') }))
     await vi.waitFor(() => expect(saveSession).toHaveBeenCalled())
@@ -1550,7 +1550,7 @@ describe('PeriodPlanPage — Plan <Month>', () => {
     domainState.soleDomain = 'work'
     renderPage('month')
     fireEvent.click(screen.getByRole('button', { name: `Plan ${monthLabel()}` }))
-    fireEvent.click(screen.getByRole('button', { name: /add a single action or a next action/i }))
+    fireEvent.click(screen.getByRole('button', { name: /add a task/i }))
     fireEvent.change(screen.getByLabelText(new RegExp(`new task for ${monthLabel()}`, 'i')), { target: { value: 'Buy chairs' } })
     fireEvent.change(screen.getByLabelText(new RegExp(`toward a goal for ${monthLabel()}`, 'i')), { target: { value: 'cur' } })
     fireEvent.click(screen.getByRole('button', { name: /add task/i }))
@@ -1606,10 +1606,10 @@ describe('PeriodPlanPage — Plan <Month>', () => {
     state.tasks = [openOn('g1', { title: 'Strength', isGoal: true })]
     renderPage('month')
     fireEvent.click(screen.getByRole('button', { name: `Plan ${monthLabel()}` }))
-    fireEvent.click(screen.getByRole('button', { name: 'Keep, and add a next action' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Keep, and add a task' }))
     fireEvent.click(screen.getByRole('button', { name: new RegExp(`next: plan ${monthLabel()}`, 'i') }))
-    expect(screen.getByRole('alert')).toHaveTextContent(/name the next action, or choose keep/i)
-    expect(screen.getByLabelText(/next action for strength/i)).toHaveAttribute('aria-invalid', 'true')
+    expect(screen.getByRole('alert')).toHaveTextContent(/name the task, or choose keep/i)
+    expect(screen.getByLabelText(/task for strength/i)).toHaveAttribute('aria-invalid', 'true')
   })
 
   it('the Plan button is busy only while loading, not after a failed read (M9)', () => {
@@ -1622,7 +1622,7 @@ describe('PeriodPlanPage — Plan <Month>', () => {
     expect(screen.getByRole('button', { name: `Plan ${monthLabel()}` })).not.toHaveAttribute('aria-busy', 'true')
   })
 
-  it('a Keep that carried the goal but not a step is retried by Save again, with its next action (N1)', async () => {
+  it('a Keep that carried the goal but not a step is retried by Save again, with its task (N1)', async () => {
     const g1 = openOn('g1', { title: 'Strength', isGoal: true })
     const s1 = openOn('s1', { title: 'Book gym', goalTaskId: 'g1' })
     state.tasks = [g1, s1]
@@ -1635,8 +1635,8 @@ describe('PeriodPlanPage — Plan <Month>', () => {
     })
     renderPage('month')
     fireEvent.click(screen.getByRole('button', { name: `Plan ${monthLabel()}` }))
-    fireEvent.click(screen.getByRole('button', { name: 'Keep, and add a next action' }))
-    fireEvent.change(screen.getByLabelText(/next action for strength/i), { target: { value: 'Book PT' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Keep, and add a task' }))
+    fireEvent.change(screen.getByLabelText(/task for strength/i), { target: { value: 'Book PT' } })
     toSave()
     fireEvent.click(screen.getByRole('button', { name: new RegExp(`save ${monthLabel()}`, 'i') }))
     expect(await screen.findByRole('alert')).toHaveTextContent(/didn't save/i)
@@ -1755,7 +1755,7 @@ describe('a month with a realistic number of goals', () => {
   it('bounds a 60-step goal and offers the rest with the true total', async () => {
     dense()
     renderPage('month')
-    fireEvent.click(screen.getByRole('button', { name: /Show next actions under Record the album/ }))
+    fireEvent.click(screen.getByRole('button', { name: /Show tasks under Record the album/ }))
     expect(screen.getByText('Album step 1')).toBeInTheDocument()
     expect(screen.queryByText('Album step 30')).not.toBeInTheDocument()
     const more = screen.getByRole('button', { name: /^Show all 60 steps · \d+ more$/ })
@@ -1801,7 +1801,7 @@ describe('a month with a realistic number of goals', () => {
   it('completed steps fold away outside review, and come back on request', () => {
     dense()
     renderPage('month')
-    fireEvent.click(screen.getByRole('button', { name: /Show next actions under Record the album/ }))
+    fireEvent.click(screen.getByRole('button', { name: /Show tasks under Record the album/ }))
     // Album step 0 is completed; step 1 is not.
     expect(screen.getByText('Album step 1')).toBeInTheDocument()
     expect(screen.queryByText('Album step 0')).not.toBeInTheDocument()
@@ -1813,21 +1813,21 @@ describe('a month with a realistic number of goals', () => {
   it('remembers which goals were open across a remount', () => {
     dense()
     const first = renderPage('month')
-    fireEvent.click(screen.getByRole('button', { name: /Show next actions under Record the album/ }))
+    fireEvent.click(screen.getByRole('button', { name: /Show tasks under Record the album/ }))
     expect(screen.getByText('Album step 1')).toBeInTheDocument()
     first.unmount()
 
     renderPage('month')
     expect(screen.getByText('Album step 1')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /Hide next actions under Record the album/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Hide tasks under Record the album/ })).toBeInTheDocument()
   })
 
   it('opening a goal shows its next-action box, once', () => {
     dense()
     renderPage('month')
     openGoal('Goal number 7')
-    expect(screen.getByLabelText('New next action for Goal number 7')).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: /Add a next action/ })).toBeNull()
+    expect(screen.getByLabelText('New task for Goal number 7')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Add a task/ })).toBeNull()
   })
 })
 
@@ -1850,7 +1850,7 @@ describe('the completed-steps disclosure', () => {
       task({ id: 's2', title: 'Finished step', goalTaskId: 'g', monthStart: thisMonth, completed: true }),
     ]
     renderPage('month')
-    fireEvent.click(screen.getByRole('button', { name: /Show next actions under One goal/ }))
+    fireEvent.click(screen.getByRole('button', { name: /Show tasks under One goal/ }))
     expect(screen.queryByText('Finished step')).not.toBeInTheDocument()
     // …and the way to see it is right there, on a list of one goal.
     fireEvent.click(screen.getByRole('button', { name: 'Show completed steps' }))
@@ -2010,7 +2010,7 @@ describe('the filter on ONE long goal', () => {
   it('finds a step inside it, and keeps the goal for context', () => {
     oneBigGoal()
     renderPage('month')
-    fireEvent.click(screen.getByRole('button', { name: /Show next actions under Record the album/ }))
+    fireEvent.click(screen.getByRole('button', { name: /Show tasks under Record the album/ }))
     fireEvent.change(screen.getByRole('searchbox', { name: /Filter .* goals and steps/ }), { target: { value: 'Album step 47' } })
     expect(screen.getByText('Record the album')).toBeInTheDocument()
     expect(screen.getByText('Album step 47')).toBeInTheDocument()
@@ -2490,7 +2490,7 @@ describe('Assign people on goal and step rows', () => {
       task({ id: 's1', title: 'Research tickets', monthStart: thisMonth, goalTaskId: 'g1', ...over.step }),
     ]
     renderPage('month')
-    fireEvent.click(screen.getByRole('button', { name: /Show next actions under Islanders game/ }))
+    fireEvent.click(screen.getByRole('button', { name: /Show tasks under Islanders game/ }))
   }
 
   it('gives a goal and each of its steps their own visible control', () => {
@@ -2679,7 +2679,7 @@ describe('the month page offers a flexible weekend', () => {
   })
 })
 
-describe('season page: break a task into next actions, and take it into the month before the season', () => {
+describe('season page: break a task into tasks, and take it into the month before the season', () => {
   // The clock is pinned to Sep 10 2026; the default Fall runs Sep–Nov.
   const fall = periodStartFor('season', new Date(2026, 8, 10), DEFAULT_SEASONS)
   beforeEach(() => {
@@ -2696,9 +2696,9 @@ describe('season page: break a task into next actions, and take it into the mont
   })
   afterEach(() => { vi.useRealTimers() })
 
-  it('a loose season task offers "Break into next actions", which converts the SAME row, with Undo', () => {
+  it('a loose season task offers "Break into tasks", which converts the SAME row, with Undo', () => {
     renderPage('season')
-    fireEvent.click(screen.getByRole('button', { name: 'Break Nourish a love of reading into next actions' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Break Nourish a love of reading into tasks' }))
     expect(hook.setGoal).toHaveBeenCalledWith('q1', true)
     // No new row, no other write: identity, season, area and people untouched.
     expect(hook.addTask).not.toHaveBeenCalled()
@@ -2707,10 +2707,10 @@ describe('season page: break a task into next actions, and take it into the mont
 
   it('Undo converts it back', async () => {
     renderPage('season')
-    fireEvent.click(screen.getByRole('button', { name: 'Break Nourish a love of reading into next actions' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Break Nourish a love of reading into tasks' }))
     await waitFor(() => expect(toastSpy).toHaveBeenCalled())
     const [msg, , , action] = toastSpy.mock.calls.at(-1) as [string, string, number, { label: string; onClick: () => void }]
-    expect(msg).toMatch(/now holds its next actions — it is a goal on Fall 2026/)
+    expect(msg).toMatch(/now holds its tasks — it is a goal on Fall 2026/)
     action.onClick()
     expect(hook.setGoal).toHaveBeenLastCalledWith('q1', false)
   })
@@ -2718,16 +2718,16 @@ describe('season page: break a task into next actions, and take it into the mont
   it('works from the keyboard', async () => {
     const user = userEvent.setup({ advanceTimers: () => {} })
     renderPage('season')
-    screen.getByRole('button', { name: 'Break Nourish a love of reading into next actions' }).focus()
+    screen.getByRole('button', { name: 'Break Nourish a love of reading into tasks' }).focus()
     await user.keyboard('{Enter}')
     expect(hook.setGoal).toHaveBeenCalledWith('q1', true)
   })
 
   it('a goal, and a step under a goal, are not offered it on the row', () => {
     renderPage('season')
-    expect(screen.queryByRole('button', { name: 'Break Family adventures into next actions' })).toBeNull()
-    fireEvent.click(screen.getByRole('button', { name: /Show next actions under Family adventures/ }))
-    expect(screen.queryByRole('button', { name: 'Break Pick three trails into next actions' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Break Family adventures into tasks' })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: /Show tasks under Family adventures/ }))
+    expect(screen.queryByRole('button', { name: 'Break Pick three trails into tasks' })).toBeNull()
   })
 
   it('"Into a month…" offers the month before the season, and choosing it keeps the season', () => {
@@ -2740,7 +2740,7 @@ describe('season page: break a task into next actions, and take it into the mont
   })
 })
 
-describe('nested horizons: a broad item holds its next actions; the page leads down a level', () => {
+describe('nested horizons: a broad item holds its tasks; the page leads down a level', () => {
   const SEP = (d: number) => new Date(2026, 8, d)
   beforeEach(() => {
     pinClock(); localStorage.clear()
@@ -2750,17 +2750,17 @@ describe('nested horizons: a broad item holds its next actions; the page leads d
   })
   afterEach(() => { vi.useRealTimers() })
 
-  it('broken into next actions, the item opens as a goal with the cursor in its next-action box', async () => {
+  it('broken into tasks, the item opens as a goal with the cursor in its next-action box', async () => {
     // The mock stands in for the database: setGoal flips the flag on the SAME row.
     state.tasks = [task({ id: 'yard', title: 'Make the yard nice enough to sit in', monthStart: thisMonth })]
     hook.setGoal.mockImplementationOnce((id: string, isGoal: boolean) => {
       state.tasks = state.tasks.map((t) => (t.id === id ? { ...t, isGoal } : t))
     })
     const { rerender } = renderPage('month')
-    fireEvent.click(screen.getByRole('button', { name: 'Break Make the yard nice enough to sit in into next actions' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Break Make the yard nice enough to sit in into tasks' }))
     expect(hook.setGoal).toHaveBeenCalledWith('yard', true)
     rerender(<MemoryRouter><PeriodPlanPage level="month" /></MemoryRouter>)
-    await waitFor(() => expect(screen.getByRole('textbox', { name: 'New next action for Make the yard nice enough to sit in' })).toHaveFocus())
+    await waitFor(() => expect(screen.getByRole('textbox', { name: 'New task for Make the yard nice enough to sit in' })).toHaveFocus())
     expect(hook.addTask).not.toHaveBeenCalled()
   })
 
@@ -2815,7 +2815,7 @@ describe('nested horizons: a broad item holds its next actions; the page leads d
   })
 })
 
-describe('a new next action is born in its goal\'s life area', () => {
+describe('a new task is born in its goal\'s life area', () => {
   beforeEach(() => {
     pinClock(); localStorage.clear()
     state.goals = []; state.loading = false; routinesState.routines = []
@@ -2825,8 +2825,8 @@ describe('a new next action is born in its goal\'s life area', () => {
   })
   afterEach(() => { vi.useRealTimers(); domainState.soleDomain = null })
   const addUnder = (goal: string, title: string) => {
-    fireEvent.click(screen.getByRole('button', { name: new RegExp(`Show next actions under ${goal}`) }))
-    const box = screen.getByRole('textbox', { name: `New next action for ${goal}` })
+    fireEvent.click(screen.getByRole('button', { name: new RegExp(`Show tasks under ${goal}`) }))
+    const box = screen.getByRole('textbox', { name: `New task for ${goal}` })
     fireEvent.change(box, { target: { value: title } })
     fireEvent.submit(box.closest('form')!)
   }
@@ -2855,7 +2855,7 @@ describe('a new next action is born in its goal\'s life area', () => {
     expect(lastOpts().context).toBe('personal')
   })
 
-  it('existing next actions are not rewritten', () => {
+  it('existing tasks are not rewritten', () => {
     state.tasks = [
       task({ id: 'fg', title: 'Family trip', isGoal: true, context: 'family', monthStart: thisMonth }),
       task({ id: 'old', title: 'Old untagged action', goalTaskId: 'fg', context: null, monthStart: thisMonth }),
@@ -2867,7 +2867,7 @@ describe('a new next action is born in its goal\'s life area', () => {
   })
 })
 
-describe('horizon flows: outcomes on Year/Season/Month, next actions into weeks and days', () => {
+describe('horizon flows: outcomes on Year/Season/Month, tasks into weeks and days', () => {
   // Sep 10 2026; the default Fall runs Sep–Nov.
   const SEP = (d: number) => new Date(2026, 8, d)
   const fall = periodStartFor('season', new Date(2026, 8, 10), DEFAULT_SEASONS)
@@ -2911,13 +2911,13 @@ describe('horizon flows: outcomes on Year/Season/Month, next actions into weeks 
     expect(opts.goalId).toBeUndefined()
   })
 
-  it('a next action is written under its goal and planned into a chosen week in one go; the goal stays', async () => {
+  it('a task is written under its goal and planned into a chosen week in one go; the goal stays', async () => {
     state.tasks = [task({ id: 'patio', title: 'Finish the patio', isGoal: true, monthStart: thisMonth, context: 'family' })]
     hook.addTask.mockImplementation(async () => 'chairs')
     renderPage('month')
-    fireEvent.click(screen.getByRole('button', { name: /Show next actions under Finish the patio/ }))
-    const box = screen.getByRole('textbox', { name: 'New next action for Finish the patio' })
-    fireEvent.change(screen.getByRole('combobox', { name: 'Which week — next action for Finish the patio' }), { target: { value: String(SEP(13).getTime()) } })
+    fireEvent.click(screen.getByRole('button', { name: /Show tasks under Finish the patio/ }))
+    const box = screen.getByRole('textbox', { name: 'New task for Finish the patio' })
+    fireEvent.change(screen.getByRole('combobox', { name: 'Which week — task for Finish the patio' }), { target: { value: String(SEP(13).getTime()) } })
     fireEvent.change(box, { target: { value: 'Choose chairs' } })
     fireEvent.submit(box.closest('form')!)
     await waitFor(() => expect(hook.updateTask).toHaveBeenCalledWith('chairs', { bucket: 'week', weekStart: SEP(13), scheduledFor: undefined }))
@@ -2933,11 +2933,11 @@ describe('horizon flows: outcomes on Year/Season/Month, next actions into weeks 
     expect(mockNavigate).toHaveBeenCalledWith('/week?start=2026-09-13')
   })
 
-  it('with no week chosen, a next action stays on the month only', async () => {
+  it('with no week chosen, a task stays on the month only', async () => {
     state.tasks = [task({ id: 'patio', title: 'Finish the patio', isGoal: true, monthStart: thisMonth })]
     renderPage('month')
-    fireEvent.click(screen.getByRole('button', { name: /Show next actions under Finish the patio/ }))
-    const box = screen.getByRole('textbox', { name: 'New next action for Finish the patio' })
+    fireEvent.click(screen.getByRole('button', { name: /Show tasks under Finish the patio/ }))
+    const box = screen.getByRole('textbox', { name: 'New task for Finish the patio' })
     fireEvent.change(box, { target: { value: 'Order lights' } })
     fireEvent.submit(box.closest('form')!)
     await waitFor(() => expect(hook.addTask).toHaveBeenCalled())
@@ -2981,7 +2981,7 @@ describe('horizon flows: outcomes on Year/Season/Month, next actions into weeks 
     }))
   })
 
-  it('a goal whose next actions are all done stays open until someone says it is achieved', () => {
+  it('a goal whose tasks are all done stays open until someone says it is achieved', () => {
     state.tasks = [
       task({ id: 'patio', title: 'Finish the patio', isGoal: true, monthStart: thisMonth }),
       task({ id: 'a1', title: 'Choose chairs', monthStart: thisMonth, goalTaskId: 'patio', completed: true }),
@@ -3039,7 +3039,7 @@ describe('choosing goals from an imported, flat season list', () => {
     expect(within(list).getByText('One-time: organize this list.')).toBeInTheDocument()
     expect(within(list).getByRole('button', { name: 'Organize the list' })).toBeInTheDocument()
     // The per-row conversion link steps aside while the whole-list sort is offered.
-    expect(screen.queryByRole('button', { name: /^Break .* into next actions$/ })).toBeNull()
+    expect(screen.queryByRole('button', { name: /^Break .* into tasks$/ })).toBeNull()
   })
 
   it('pick → preview → confirm flips isGoal on the chosen rows only, and nothing else', async () => {
@@ -3054,7 +3054,7 @@ describe('choosing goals from an imported, flat season list', () => {
     expect(hook.updateTask).not.toHaveBeenCalled()
     fireEvent.click(within(panel).getByRole('button', { name: 'Preview 2 goals' }))
     expect(within(panel).getByRole('heading', { name: '2 items become goals for Fall 2026' })).toHaveFocus()
-    expect(within(panel).getByText(/1 stays a single action|2 stay single actions/)).toBeInTheDocument()
+    expect(within(panel).getByText(/1 stays a single task|2 stay single tasks/)).toBeInTheDocument()
     fireEvent.click(within(panel).getByRole('button', { name: 'Make 2 goals' }))
     await waitFor(() => expect(hook.updateTask).toHaveBeenCalledTimes(2))
     expect(hook.updateTask.mock.calls).toEqual([['v', { isGoal: true }], ['r', { isGoal: true }]])
@@ -3123,14 +3123,14 @@ describe('everyday horizons (product contract, 2026-09-27)', () => {
       expect.objectContaining({ bucket: 'quarter', seasonStart: fall, isGoal: true }))
   })
 
-  it('a goal with no next actions can become a single action again, with Undo — on any device', async () => {
+  it('a goal with no tasks can become a single task again, with Undo — on any device', async () => {
     state.tasks = [task({ id: 'g', title: 'Plan winter vacation', isGoal: true, bucket: 'quarter', seasonStart: fall })]
     renderPage('season')
-    fireEvent.click(screen.getByRole('button', { name: 'Make it a single action Plan winter vacation' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Make it a single task Plan winter vacation' }))
     await waitFor(() => expect(hook.updateTask).toHaveBeenCalledWith('g', { isGoal: false }))
     await waitFor(() => expect(toastSpy).toHaveBeenCalled())
     const [msg, , , undo] = toastSpy.mock.calls.at(-1) as [string, string, number, { label: string; onClick: () => void }]
-    expect(msg).toMatch(/single action again\. Nothing else changed/)
+    expect(msg).toMatch(/single task again\. Nothing else changed/)
     undo.onClick()
     await waitFor(() => expect(hook.updateTask).toHaveBeenLastCalledWith('g', { isGoal: true }))
   })
@@ -3139,9 +3139,9 @@ describe('everyday horizons (product contract, 2026-09-27)', () => {
     hook.updateTask.mockImplementation(async () => false)
     state.tasks = [task({ id: 'g', title: 'Plan winter vacation', isGoal: true, bucket: 'quarter', seasonStart: fall })]
     renderPage('season')
-    fireEvent.click(screen.getByRole('button', { name: 'Make it a single action Plan winter vacation' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Make it a single task Plan winter vacation' }))
     await waitFor(() => expect(toastSpy).toHaveBeenCalled())
-    expect(toastSpy).not.toHaveBeenCalledWith(expect.stringMatching(/single action again/), expect.anything(), expect.anything(), expect.anything())
+    expect(toastSpy).not.toHaveBeenCalledWith(expect.stringMatching(/single task again/), expect.anything(), expect.anything(), expect.anything())
     expect(toastSpy).toHaveBeenCalledWith(expect.stringMatching(/Couldn’t change .* still a goal/), 'error', 6000)
   })
 
@@ -3149,27 +3149,27 @@ describe('everyday horizons (product contract, 2026-09-27)', () => {
     hook.updateTask.mockImplementation(async () => { throw new Error('offline') })
     state.tasks = [task({ id: 'g', title: 'Plan winter vacation', isGoal: true, bucket: 'quarter', seasonStart: fall })]
     renderPage('season')
-    fireEvent.click(screen.getByRole('button', { name: 'Make it a single action Plan winter vacation' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Make it a single task Plan winter vacation' }))
     await waitFor(() => expect(toastSpy).toHaveBeenCalledWith(expect.stringMatching(/Couldn’t change/), 'error', 6000))
-    expect(toastSpy).not.toHaveBeenCalledWith(expect.stringMatching(/single action again/), expect.anything(), expect.anything(), expect.anything())
+    expect(toastSpy).not.toHaveBeenCalledWith(expect.stringMatching(/single task again/), expect.anything(), expect.anything(), expect.anything())
   })
 
   // Codex review, 2026-09-27: the database's guard checks a link only on the
   // row that carries it, so it lets both of these strand a relationship.
   const refused = async (title: string, reason: RegExp) => {
-    fireEvent.click(screen.getByRole('button', { name: `Make it a single action ${title}` }))
+    fireEvent.click(screen.getByRole('button', { name: `Make it a single task ${title}` }))
     await waitFor(() => expect(toastSpy).toHaveBeenCalledWith(expect.stringMatching(reason), 'info', 8000))
     expect(hook.updateTask).not.toHaveBeenCalled()
     expect(hook.setGoal).not.toHaveBeenCalled()
   }
 
-  it('…not while it holds next actions: it says so and writes nothing', async () => {
+  it('…not while it holds tasks: it says so and writes nothing', async () => {
     state.tasks = [
       task({ id: 'g', title: 'Plan winter vacation', isGoal: true, bucket: 'quarter', seasonStart: fall }),
       task({ id: 's', title: 'Price flights', bucket: 'quarter', seasonStart: fall, goalTaskId: 'g' }),
     ]
     renderPage('season')
-    await refused('Plan winter vacation', /stays a goal\. It holds a next action/)
+    await refused('Plan winter vacation', /stays a goal\. It holds a task/)
   })
 
   it('…not while a month goal supports it — the child’s link is never stranded', async () => {
@@ -3216,7 +3216,7 @@ describe('the import repair stays out of an ordinary, populated plan', () => {
   })
   afterEach(() => { vi.useRealTimers() })
 
-  it('a month with goals and several genuine single actions offers no sorting at all', () => {
+  it('a month with goals and several genuine single tasks offers no sorting at all', () => {
     state.tasks = [
       task({ id: 'g', title: 'Host Thanksgiving', isGoal: true, monthStart: thisMonth }),
       task({ id: 'a', title: 'Buy stamps', monthStart: thisMonth }),
@@ -3287,6 +3287,6 @@ describe('Undo the sort names the real reason a goal is kept', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Undo the sort' }))
     await waitFor(() => expect(hook.updateTask).toHaveBeenCalledWith('p', { isGoal: false }))
     expect(hook.updateTask).not.toHaveBeenCalledWith('v', expect.anything())
-    await waitFor(() => expect(toastSpy).toHaveBeenCalledWith(expect.stringMatching(/1 back to single actions\. “Plan winter vacation” stays a goal: “Book the rental” supports it/), 'success', 7000))
+    await waitFor(() => expect(toastSpy).toHaveBeenCalledWith(expect.stringMatching(/1 back to single tasks\. “Plan winter vacation” stays a goal: “Book the rental” supports it/), 'success', 7000))
   })
 })

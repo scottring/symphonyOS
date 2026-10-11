@@ -31,10 +31,10 @@ describe('PlanSession', () => {
     expect(screen.getByText(/visible to your household/i)).toBeInTheDocument()
   })
 
-  it('offers "Keep, and add a next action" on a goal and asks for the action\'s name', () => {
+  it('offers "Keep, and add a task" on a goal and asks for the action\'s name', () => {
     const s = setup()
-    fireEvent.click(screen.getByRole('button', { name: 'Keep, and add a next action' }))
-    fireEvent.change(screen.getByLabelText(/next action for strength 2x\/week/i), { target: { value: 'Book a PT evaluation' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Keep, and add a task' }))
+    fireEvent.change(screen.getByLabelText(/task for strength 2x\/week/i), { target: { value: 'Book a PT evaluation' } })
     expect(s.draft.verdicts.g).toBe('keep-action')
     expect(s.draft.actionTitles.g).toBe('Book a PT evaluation')
   })
@@ -85,12 +85,12 @@ describe('PlanSession — week', () => {
   it('has no Goals section and no next-action verdict; the month sits beside it', () => {
     week()
     expect(screen.getByRole('heading', { name: /how did last week go/i })).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Keep, and add a next action' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Keep, and add a task' })).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: /next: plan this week/i }))
     expect(screen.queryByLabelText(/new goal for/i)).toBeNull()
     expect(screen.getByText('October')).toBeInTheDocument()
     // The month's goal sits beside the week, and the week's task box can
-    // write a next action toward it (horizon flows).
+    // write a task toward it (horizon flows).
     expect(screen.getByRole('complementary')).toHaveTextContent('Finish the kitchen')
     expect(screen.getByRole('option', { name: 'Finish the kitchen' })).toBeInTheDocument()
   })
@@ -110,7 +110,7 @@ describe('PlanSession — week', () => {
     expect(screen.getByRole('button', { name: /save this week/i })).toBeInTheDocument()
   })
 
-  it('writes a next action toward a month goal, in its area; the month goal\'s own next actions sit under it', () => {
+  it('writes a task toward a month goal, in its area; the month goal\'s own tasks sit under it', () => {
     const s = week({
       above: [t({ id: 'm1', title: 'Three bids', bucket: 'month' }), t({ id: 'st', title: 'Order lights', bucket: 'month', goalTaskId: 'mg' })],
       aboveGoals: [t({ id: 'mg', title: 'Finish the kitchen', isGoal: true, bucket: 'month', context: 'family' })],
@@ -141,7 +141,7 @@ describe('PlanSession — season', () => {
     setup({ level: 'season', periodLabel: 'Winter 2026', prevLabel: 'Fall 2026', aboveLabel: '2026',
       open: [t({ id: 'g', title: 'Strength 2x/week', isGoal: true, bucket: 'quarter' })], above: [],
       aboveGoals: [t({ id: 'yg', title: 'Get strong again', isGoal: true })] })
-    expect(screen.getByRole('button', { name: 'Keep, and add a next action' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Keep, and add a task' })).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: /next: plan winter 2026/i }))
     expect(screen.getByLabelText(/for a 2026 goal/i)).toBeInTheDocument()
     expect(within(screen.getByRole('complementary')).getByText('Get strong again')).toBeInTheDocument()
@@ -155,7 +155,7 @@ describe('PlanSession — year', () => {
       finished: [t({ id: 'f', title: 'Kitchen', isGoal: true, completed: true })], open: [t({ id: 'o', title: 'Get strong', isGoal: true })], above: [], aboveGoals: [] })
     expect(screen.getByRole('heading', { name: /how did 2026 go/i })).toBeInTheDocument()
     expect(screen.getAllByRole('button', { name: /^(Keep|Done|Drop)$/ })).toHaveLength(3)
-    expect(screen.queryByRole('button', { name: /next action/i })).toBeNull()
+    expect(screen.queryByRole('button', { name: /task/i })).toBeNull()
     expect(screen.queryByRole('button', { name: 'Someday' })).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: 'Keep' }))
     fireEvent.click(screen.getByRole('button', { name: /next: plan 2027/i }))
@@ -268,7 +268,7 @@ describe('the save step tells the truth about what is already there', () => {
 
   it('once something IS proposed, separates it from the existing plan and offers Save', () => {
     setup(quiet)
-    fireEvent.click(screen.getByRole('button', { name: /add a single action or a next action/i }))
+    fireEvent.click(screen.getByRole('button', { name: /add a task/i }))
     fireEvent.change(screen.getByLabelText(/new task for/i), { target: { value: 'Call the box office' } })
     fireEvent.click(screen.getByRole('button', { name: /add task/i }))
     toSave()
@@ -345,7 +345,7 @@ describe('the review draws the saved plan the way Month does', () => {
     const s = setup(many)
     toPlan()
     // Add something, so the save has a real scope to preserve.
-    fireEvent.click(screen.getByRole('button', { name: /add a single action or a next action/i }))
+    fireEvent.click(screen.getByRole('button', { name: /add a task/i }))
     fireEvent.change(screen.getByLabelText(/New task for October/), { target: { value: 'Buy strings' } })
     fireEvent.click(screen.getByRole('button', { name: /add task/i }))
     const beforeFilter = JSON.stringify(s.draft)
@@ -367,7 +367,7 @@ describe('the review draws the saved plan the way Month does', () => {
   it('a failed save keeps the draft, says so, and retries without duplicating', () => {
     const s = setup({ ...plan, saveError: true })
     toPlan()
-    fireEvent.click(screen.getByRole('button', { name: /add a single action or a next action/i }))
+    fireEvent.click(screen.getByRole('button', { name: /add a task/i }))
     fireEvent.change(screen.getByLabelText(/New task for October/), { target: { value: 'Buy strings' } })
     fireEvent.click(screen.getByRole('button', { name: /add task/i }))
     fireEvent.click(screen.getByRole('button', { name: /next: save/i }))

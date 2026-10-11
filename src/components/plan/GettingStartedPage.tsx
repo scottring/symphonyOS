@@ -215,7 +215,7 @@ function FinishSummary({ state, onKeepPlanning }: { state: GuideState; onKeepPla
     if (step === 'month' || step === 'season') {
       const b = periodBounds(step, start, seasons)
       const open = selectPeriodTasks(tasks, step, start, isCurrentPeriod(b, now), meId, seasons).filter((t) => !t.completed).length
-      return `${open} open ${open === 1 ? 'priority' : 'priorities'}`
+      return `${open} open ${open === 1 ? 'goal' : 'goals'}`
     }
     if (step === 'week') {
       const isCurrent = weekStartAnchor(now, wso).getTime() === start.getTime()

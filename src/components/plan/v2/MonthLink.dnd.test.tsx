@@ -30,7 +30,7 @@ describe('MonthLink in a draggable row', () => {
           lines={[{ task: item, fate: 'open', partOf: null, where: null }]} forOptions={options} forLine={() => null} onForLine={onForLine} />
       </DndContext>,
     )
-    press(screen.getByRole('button', { name: 'Link Go through the onboarding checklist to an October line' }))
+    press(screen.getByRole('button', { name: 'Link Go through the onboarding checklist to an October goal' }))
     press(screen.getByRole('menuitemradio', { name: 'Get the household paperwork in order' }))
     expect(onDragStart).not.toHaveBeenCalled()
     expect(onForLine).toHaveBeenCalledWith(item, 'm3')
@@ -45,7 +45,7 @@ describe('MonthLink in a draggable row', () => {
           lines={[{ task: item, fate: 'open', partOf: null, where: null }]} forOptions={options} forLine={() => null} onForLine={vi.fn()} />
       </DndContext>,
     )
-    const button = screen.getByRole('button', { name: /to an October line/ })
+    const button = screen.getByRole('button', { name: /to an October goal/ })
     fireEvent.keyDown(button, { key: 'Enter', code: 'Enter' })
     fireEvent.click(button)
     const first = screen.getByRole('menuitemradio', { name: 'Plan the autumn trip' })

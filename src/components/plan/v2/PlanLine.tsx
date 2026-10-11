@@ -139,7 +139,7 @@ export function LineMenu({ vm, actions, nextLabel }: { vm: LineVM; actions: Line
         <div ref={menuRef} role="menu" className={`pv2-menu is-floating${forMonth ? ' wk-formenu' : ''}`}
           style={forMonth ? (fit ? { top: fit.top, left: fit.left, maxHeight: fit.maxHeight } : { top: 0, left: 0, visibility: 'hidden' }) : { top: pos.top, bottom: pos.bottom, right: pos.right }}>
           {forMonth && monthLine ? <>
-            <div className="pv2-mhead">Which {monthLine.month} line is this for?</div>
+            <div className="pv2-mhead">Which {monthLine.month} goal is this for?</div>
             {monthLine.lines.map((l) => (
               <button key={l.id} role="menuitemradio" aria-checked={forNow?.id === l.id} type="button"
                 onClick={() => { setOpen(false); if (forNow?.id !== l.id) monthLine.run(t, l.id) }}>
@@ -148,7 +148,7 @@ export function LineMenu({ vm, actions, nextLabel }: { vm: LineVM; actions: Line
             ))}
             <div className="pv2-msep" />
             <button role="menuitemradio" aria-checked={!forNow} type="button" onClick={() => { setOpen(false); if (forNow) monthLine.run(t, null) }}>
-              <span className="wk-formenu-label">{forNow ? `Remove the ${monthLine.month} link` : `No ${monthLine.month} line`}</span>
+              <span className="wk-formenu-label">{forNow ? `Remove the ${monthLine.month} link` : `No ${monthLine.month} goal`}</span>
             </button>
             <button role="menuitem" type="button" onClick={() => setForMonth(false)}>Back</button>
           </> : linking && linkUp ? <>
@@ -169,9 +169,9 @@ export function LineMenu({ vm, actions, nextLabel }: { vm: LineVM; actions: Line
           {(actions.intoLower || actions.today || actions.toggleGoal || (actions.unlink && t.goalTaskId)) && !t.completed && <div className="pv2-msep" />}
           {actions.intoLower && !t.completed && <button role="menuitem" type="button" onClick={pick(actions.intoLower.run)}><ArrowDownRight className="w-3.5 h-3.5" />{actions.intoLower.label}</button>}
           {actions.today && !t.completed && <button role="menuitem" type="button" onClick={pick(actions.today)}><Sun className="w-3.5 h-3.5" />Do it today</button>}
-          {actions.toggleGoal && !t.completed && <button role="menuitem" type="button" onClick={pick(actions.toggleGoal)}><Target className="w-3.5 h-3.5" />{t.isGoal ? 'Make it a single action' : 'Make it a goal'}</button>}
+          {actions.toggleGoal && !t.completed && <button role="menuitem" type="button" onClick={pick(actions.toggleGoal)}><Target className="w-3.5 h-3.5" />{t.isGoal ? 'Make it a single task' : 'Make it a goal'}</button>}
           {actions.unlink && t.goalTaskId && <button role="menuitem" type="button" onClick={pick(actions.unlink)}><Unlink className="w-3.5 h-3.5" />Remove from goal</button>}
-          {monthLine && <button role="menuitem" type="button" onClick={() => setForMonth(true)}><Link2 className="w-3.5 h-3.5" />{forNow ? `Change ${monthLine.month} line…` : `Link to ${/^[aeiou]/i.test(monthLine.month) ? 'an' : 'a'} ${monthLine.month} line…`}</button>}
+          {monthLine && <button role="menuitem" type="button" onClick={() => setForMonth(true)}><Link2 className="w-3.5 h-3.5" />{forNow ? `Change ${monthLine.month} goal…` : `Link to ${/^[aeiou]/i.test(monthLine.month) ? 'an' : 'a'} ${monthLine.month} goal…`}</button>}
           {linkUp && <button role="menuitem" type="button" onClick={() => setLinking(true)}><Link2 className="w-3.5 h-3.5" />{vm.partOf ? `Change ${linkUp.rung} goal…` : `Link to a ${linkUp.rung} goal…`}</button>}
           <div className="pv2-msep" />
           <button role="menuitem" type="button" onClick={pick(actions.details)}><PanelRight className="w-3.5 h-3.5" />All details</button>

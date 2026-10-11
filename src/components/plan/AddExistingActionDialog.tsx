@@ -1,8 +1,8 @@
 // src/components/plan/AddExistingActionDialog.tsx
 //
 // "Add an existing action": choose a task already in Symphony and file it
-// under this goal as one of its next actions — the same goal_task_id link a
-// new next action gets, and nothing else about the task changes. Shared by
+// under this goal as one of its tasks — the same goal_task_id link a
+// new task gets, and nothing else about the task changes. Shared by
 // the Month/Season plan rows and the goal's own page.
 
 import { useMemo, useRef, useState } from 'react'
@@ -119,7 +119,7 @@ export function AddExistingActionDialog({ goal, tasks, members = [], onLink, onC
         {confirming ? (
           <div className="m-4 rounded-xl border border-amber-200 bg-amber-50/60 p-3 text-[13px] text-neutral-700" role="group" aria-label="Move this action">
             <p>
-              <b className="font-semibold">{confirming.task.title}</b> is a next action for{' '}
+              <b className="font-semibold">{confirming.task.title}</b> is a task for{' '}
               {confirming.currentGoal ? <i>{confirming.currentGoal.title}</i> : 'a goal you can’t see'}.
               An action is under one goal at a time.
             </p>
@@ -148,7 +148,7 @@ export function AddExistingActionDialog({ goal, tasks, members = [], onLink, onC
                         type="button"
                         disabled={c.state === 'here' || saving}
                         onClick={() => choose(c)}
-                        aria-label={`${c.task.title} — ${c.where}${c.state === 'here' ? ', already a next action for this goal' : c.state === 'elsewhere' ? `, now under ${c.currentGoal?.title ?? 'another goal'}` : ''}`}
+                        aria-label={`${c.task.title} — ${c.where}${c.state === 'here' ? ', already a task for this goal' : c.state === 'elsewhere' ? `, now under ${c.currentGoal?.title ?? 'another goal'}` : ''}`}
                         className="flex w-full items-start gap-2 rounded-lg px-2 py-2 text-left transition-colors hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-300 disabled:cursor-default disabled:opacity-60 disabled:hover:bg-transparent"
                       >
                         <span className="min-w-0 flex-1">

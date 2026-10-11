@@ -225,8 +225,8 @@ export function WeekV2({ tasks, weekStart, meId, isCurrent, days, renderDays, on
     const line = lineId ? tasks.find((x) => x.id === lineId) : null
     const still = revealed ? tasks.find((x) => x.id === revealed) : null
     showToast(line ? `“${t.title}” is for ${(line.monthStart ?? monthStart).toLocaleDateString('en-US', { month: 'long' })}: ${line.title}.`
-      : still ? `“${t.title}” is no longer written for that line. It is still a step of “${still.title}”, so that shows now.`
-      : `“${t.title}” is no longer tied to a month line.`,
+      : still ? `“${t.title}” is no longer written for that goal. It is still a step of “${still.title}”, so that shows now.`
+      : `“${t.title}” is no longer tied to a month goal.`,
       'success', 6000, { label: 'Undo', onClick: () => { void updateTask(t.id, before) } })
   }
   // The month line new actions are for: chosen from the month beside the list
@@ -410,7 +410,7 @@ export function WeekV2({ tasks, weekStart, meId, isCurrent, days, renderDays, on
         onContext={(x, c: TaskContext | undefined) => { void gated.updateTask(x.id, { context: c }) }} dragEnabled={dragEnabled}
         forLine={itself ? null : forLine(t)}
         forControl={itself ? undefined : (cur) => <MonthLink title={t.title} current={cur} options={forOptions} onChange={(id) => void setMonthLine(t, id)} />}
-        note={itself ? `This ${refMonths.length > 1 ? 'month' : monthName} line itself is on the week` : undefined}
+        note={itself ? `This ${refMonths.length > 1 ? 'month' : monthName} goal itself is on the week` : undefined}
         passed={missed ? t.scheduledFor!.toLocaleDateString('en-US', { weekday: 'long' }) : null} />
     }
     const shown = groups.filter((g) => !g.parent.task.completed || g.entries.length)
@@ -418,28 +418,28 @@ export function WeekV2({ tasks, weekStart, meId, isCurrent, days, renderDays, on
       key: g.parent.id, eyebrow: `For ${g.parent.month}`, title: g.parent.task.title, done: !!g.parent.task.completed,
       // The month line's own done — never its actions' (Scott, 2026-10-04).
       parentControls: <button type="button" className="oj-parentcheck" onClick={() => void actions.done(g.parent.task)}
-        aria-label={g.parent.task.completed ? `Reopen ${g.parent.month} priority ${g.parent.task.title}` : `Mark ${g.parent.month} priority ${g.parent.task.title} done`}>
+        aria-label={g.parent.task.completed ? `Reopen ${g.parent.month} goal ${g.parent.task.title}` : `Mark ${g.parent.month} goal ${g.parent.task.title} done`}>
         {g.parent.task.completed ? 'Reopen' : 'Mark done'}</button>,
       rows: g.entries.map((t) => card(t, g.itself && t.id === g.parent.id)),
-      empty: 'No weekly actions for it yet. That’s fine — leave it for another week.',
-      composer: { label: 'What can you do this week for it?', placeholder: 'Add a weekly action', onAdd: (title) => addWeekItem(title, g.parent.id) },
+      empty: 'No tasks for it this week yet. That’s fine — leave it for another week.',
+      composer: { label: 'What can you do this week for it?', placeholder: 'Add a task for this week', onAdd: (title) => addWeekItem(title, g.parent.id) },
     }))
     const untouched = untouchedCount(shown.filter((g) => !g.parent.task.completed), (t) => !t.completed)
     return (
-      <OpenJournal label={`This week, by ${monthName} priority`} periodKey={weekKey}
+      <OpenJournal label={`This week, by ${monthName} goal`} periodKey={weekKey}
         intro={<div className="oj-intro">
-          <p className="oj-lede">Each {monthName} priority, with the concrete actions this week takes for it. Not every priority needs one this week.</p>
+          <p className="oj-lede">Each {monthName} goal, with the concrete tasks this week takes for it. Not every goal needs one this week.</p>
           <div className="oj-intro-tools"><span className="oj-area">New items go in {addArea.picker}</span><FromPaper altitude="week" periodStart={weekStart} tasks={tasks} /></div>
         </div>}
         sections={sections}
         general={{
-          key: 'general', eyebrow: 'Everything else', title: `Not tied to ${anOrA(monthName)} ${monthName} priority`,
+          key: 'general', eyebrow: 'Everything else', title: `Not tied to ${anOrA(monthName)} ${monthName} goal`,
           rows: general.map((t) => card(t)), empty: 'Nothing else on this week yet.',
           composer: { label: 'Something else for this week', placeholder: 'Add something for this week', onAdd: (title) => addWeekItem(title) },
         }}
         footer={<>
-          {shown.length > 0 && <p className="oj-untouched">{untouched === 0 ? `Each ${monthName} priority has something this week.`
-            : `${untouched} ${monthName} ${untouched === 1 ? 'priority has' : 'priorities have'} nothing this week yet — you can leave ${untouched === 1 ? 'it' : 'them'} for later.`}</p>}
+          {shown.length > 0 && <p className="oj-untouched">{untouched === 0 ? `Each ${monthName} goal has something this week.`
+            : `${untouched} ${monthName} ${untouched === 1 ? 'goal has' : 'goals have'} nothing this week yet — you can leave ${untouched === 1 ? 'it' : 'them'} for later.`}</p>}
           {openWork()}
         </>} />
     )
@@ -491,8 +491,8 @@ export function WeekV2({ tasks, weekStart, meId, isCurrent, days, renderDays, on
                         concrete actions that move it (2026-10-08). */}
                     {!t.completed && <span className="wk-refacts" onPointerDown={(e) => e.stopPropagation()}>
                       <button type="button" className={`wk-addaction${selected ? ' is-on' : ''}`} aria-pressed={selected}
-                        aria-label={selected ? `Adding weekly actions for ${t.title}` : `Add a weekly action for ${t.title}`}
-                        onClick={() => addActionFor(t.id)}>{selected ? 'Adding actions ✓' : '+ Weekly action'}</button>
+                        aria-label={selected ? `Adding tasks this week for ${t.title}` : `Add a task this week for ${t.title}`}
+                        onClick={() => addActionFor(t.id)}>{selected ? 'Adding tasks ✓' : '+ Task this week'}</button>
                       {!lower && <button type="button" className="pv2-link pv2-quiet wk-takein" onClick={() => void takeIn(t, m.name)} aria-label={`Put ${t.title} itself on this week`}>or put it on the week as is</button>}
                     </span>}
                   </> : undefined} />
