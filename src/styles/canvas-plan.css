@@ -32,7 +32,7 @@
   margin: 0; min-width: 0; font-family: var(--font-family-display); font-weight: 400;
   font-size: clamp(28px, 3vw, 40px); line-height: 1.15; color: var(--color-neutral-900);
 }
-.plan-period-range { font-size: .55em; color: var(--color-neutral-600); white-space: nowrap; }
+.plan-period-range { font-size: 13px; color: var(--color-neutral-600); white-space: nowrap; }
 .plan-period .canvas-icon { font-size: 22px; line-height: 1; }
 
 .plan-head-actions { display: flex; align-items: center; gap: 8px 16px; flex-wrap: wrap; }

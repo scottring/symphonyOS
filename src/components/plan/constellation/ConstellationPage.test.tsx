@@ -1,6 +1,6 @@
 import {render,screen,fireEvent,waitFor,within} from '@testing-library/react'
 import {MemoryRouter,Routes,Route,useLocation} from 'react-router-dom'
-import {beforeEach,describe,it,expect,vi} from 'vitest'
+import {afterEach,beforeEach,describe,it,expect,vi} from 'vitest'
 import {ConstellationPage} from './ConstellationPage'
 const api=vi.hoisted(()=>({addGoal:vi.fn(),updateGoal:vi.fn(),deleteGoal:vi.fn(),addTask:vi.fn(),updateTask:vi.fn(),refetch:vi.fn(),pushTask:vi.fn(),setBucket:vi.fn(),updateTasksBulk:vi.fn(),toggleTask:vi.fn(),deleteTask:vi.fn(),keepForward:vi.fn(),dropCommitment:vi.fn(),tasks:[] as any[],goals:[] as any[]}))
 const activity=vi.hoisted(()=>({calls:[] as {label:string;ok:boolean;opts:any}[],proposals:[] as any[],setProposalState:vi.fn(),removeProposal:vi.fn()}))
@@ -35,7 +35,8 @@ function open(url='/year?view=constellation&start=2026-10-09'){
 const season=(focus='')=>open('/season?view=constellation&horizon=1&start=2026-10-09'+focus)
 const month=(focus='')=>open('/month?view=constellation&horizon=2&start=2026-10-09'+focus)
 const group=(name:string)=>screen.getByRole('region',{name})
-const showEmpty=()=>fireEvent.click(screen.getByRole('button',{name:/with nothing in/}))
+// Empty parents fold only once the period holds something.
+const showEmpty=()=>{const fold=screen.queryByRole('button',{name:/with nothing in/});if(fold)fireEvent.click(fold)}
 const lastRun=()=>activity.calls[activity.calls.length-1]
 beforeEach(()=>{
  vi.clearAllMocks();api.tasks=[];api.goals=GOALS.map(g=>({...g}));activity.calls=[];activity.proposals=[]
@@ -47,11 +48,11 @@ describe('horizon stepper and URL',()=>{
  it('opens the horizon its route names, with the period and its dates',()=>{
   month()
   expect(screen.getByRole('button',{name:'Month'})).toHaveAttribute('aria-current','step')
-  expect(screen.getByRole('heading',{level:1})).toHaveTextContent('October')
-  expect(screen.getByText(/Oct 1 – 31 · grouped under Fall goals/)).toBeInTheDocument()
+  expect(screen.getByRole('heading',{level:1})).toHaveTextContent('October 2026')
+  expect(screen.getByText('Oct 1 – 31')).toBeInTheDocument()
   open('/season?view=constellation&start=2026-10-09')
-  expect(screen.getAllByRole('heading',{level:1})[1]).toHaveTextContent('Fall')
-  expect(screen.getByText(/Sep 1 – Nov 30 · grouped under this year's intentions/)).toBeInTheDocument()
+  expect(screen.getAllByRole('heading',{level:1})[1]).toHaveTextContent('Fall 2026')
+  expect(screen.getByText('Sep 1 – Nov 30')).toBeInTheDocument()
  })
  it('switches horizon in the URL, steps periods, and links on to Week',()=>{
   open()
@@ -85,6 +86,38 @@ describe('horizon stepper and URL',()=>{
   expect(launcher.openAssistant).toHaveBeenCalledWith(expect.objectContaining({message:expect.stringContaining('Fall 2026 across all my yearly intentions, one at a time')}))
   fireEvent.click(screen.getByRole('button',{name:'Next: Month →'}))
   expect(screen.getByRole('button',{name:'Month'})).toHaveAttribute('aria-current','step')
+ })
+})
+
+describe('where you are, and somewhere to add (Scott, 2026-10-11)',()=>{
+ beforeEach(()=>{vi.useFakeTimers({toFake:['Date']});vi.setSystemTime(new Date(2026,9,11,9))})
+ afterEach(()=>{vi.useRealTimers()})
+ it('Season from this year opens this season, not the one holding a remembered Jan 1',()=>{
+  open('/year?view=constellation&start=2026-01-01&horizon=0')
+  fireEvent.click(screen.getByRole('button',{name:'Season'}))
+  expect(screen.getByTestId('where').textContent).not.toContain('start=')
+  expect(screen.getByRole('heading',{level:1})).toHaveTextContent('Fall 2026')
+  expect(screen.queryByRole('button',{name:'This season'})).not.toBeInTheDocument()
+ })
+ it('a past period keeps its place when the horizon changes',()=>{
+  open('/season?view=constellation&start=2025-09-01&horizon=1')
+  expect(screen.getByRole('heading',{level:1})).toHaveTextContent('Fall 2025')
+  fireEvent.click(screen.getByRole('button',{name:'Month'}))
+  expect(screen.getByRole('heading',{level:1})).toHaveTextContent('September 2025')
+ })
+ it('an empty season shows each intention ready to add under, and says nothing untrue',()=>{
+  season()
+  expect(screen.queryByRole('button',{name:/with nothing in/})).not.toBeInTheDocument()
+  expect(within(group('Under Together')).getByRole('button',{name:'Add a seasonal goal under Together'})).toBeInTheDocument()
+  expect(screen.queryByText(/Everything for Fall is under/)).not.toBeInTheDocument()
+  expect(screen.getByText('Seasonal goals that aren’t under a yearly intention go here.')).toBeInTheDocument()
+ })
+ it('with no intentions for the year, the season offers goals on their own or intentions first',()=>{
+  api.goals=[]
+  season()
+  expect(group('Fall seasonal goals')).toHaveTextContent('No yearly intentions for 2026 yet.')
+  fireEvent.click(screen.getByRole('button',{name:'add yearly intentions first'}))
+  expect(screen.getByRole('button',{name:'Year'})).toHaveAttribute('aria-current','step')
  })
 })
 

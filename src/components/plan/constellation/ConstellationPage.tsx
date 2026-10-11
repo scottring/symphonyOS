@@ -93,6 +93,7 @@ function Inner() {
   const week = weekStartAnchor(anchor, weekStartsOn)
   const now = new Date()
   const periodTitle = bounds.label
+  const current = isCurrentPeriod(bounds, now)
   const periodWord = level === 0 ? bounds.label : bounds.label.replace(/\s\d{4}$/, '')
 
   // ---- What is planned (already filtered for privacy, area and people) ----
@@ -122,6 +123,9 @@ function Inner() {
   // ---- Navigation within Plan --------------------------------------------
   const setHorizon = (i: number, focusKey?: string) => setParams((prev) => {
     const p = new URLSearchParams(prev); p.set('view', 'constellation'); p.set('horizon', String(i))
+    // From this year (or this season…), Season and Month mean the current
+    // ones — not the season holding a remembered Jan 1, which is last year's.
+    if (current) p.delete('start')
     if (focusKey) p.set('focus', focusKey); else p.delete('focus')
     return p
   })
@@ -298,13 +302,13 @@ function Inner() {
     : `Let's plan ${periodTitle} across all my ${parentTerm}s, one at a time. Suggest ${term}s; don't save anything until I keep them.`
   const hasItems = groups.some((g) => g.items.length > 0)
   // Below Year and outside a focus: what holds something first, empties folded.
-  const calm = level > 0 && !focused ? calmGroups(groups, new Set(proposals.map(proposalGroup))) : null
+  const calm = level > 0 && !focused && hasItems ? calmGroups(groups, new Set(proposals.map(proposalGroup))) : null
   const weekHref = `/week?view=alongside&date=${localYmd(anchor)}`
-  const current = isCurrentPeriod(bounds, now)
 
   const seasonWord = periodWordOf(seasonB)
   const parentName = level === 1 ? 'yearly intention' : `${seasonWord.toLowerCase()} goal`
-  const groupTitle = (g: PlanGroup) => g.kind === 'unlinked' ? `Not under a ${parentName}` : g.kind === 'intentions' ? `Yearly intentions` : g.parent!.title
+  const hasParents = groups.some((g) => g.kind === 'parent')
+  const groupTitle = (g: PlanGroup) => g.kind === 'unlinked' ? (hasParents ? `Not under a ${parentName}` : `${periodWord} ${term}s`) : g.kind === 'intentions' ? `Yearly intentions` : g.parent!.title
   const addLabel = (g: PlanGroup) => g.kind === 'unlinked' ? `Add an independent ${term}` : g.kind === 'intentions' ? `Add a ${term}` : `Add a ${term} under ${g.parent!.title}`
 
   // Readiness reads only rows this reader already has, under the same filters.
@@ -365,7 +369,10 @@ function Inner() {
           {g.items.map(renderItem)}
           {groupProposals.map((p) => <ProposalRow key={p.key} proposal={p} onKeep={() => { void keepProposal(p) }} onLeave={() => activity.removeProposal(p.key)} />)}
         </ul>
-        {empty && !adding && <p className="plan-empty">{g.kind === 'unlinked' ? `Everything for ${periodWord} is under a ${parentName}.` : `Nothing for ${periodWord} yet.`}</p>}
+        {empty && !adding && <p className="plan-empty">{g.kind !== 'unlinked' ? `Nothing for ${periodWord} yet.`
+          : !hasParents ? <>No {parentName}s for {level === 1 ? anchor.getFullYear() : seasonWord} yet. Add {term}s here on their own, or <button type="button" className="canvas-link" onClick={() => setHorizon(level - 1)}>add {parentName}s first</button>.</>
+          : hasItems ? `Everything for ${periodWord} is under a ${parentName}.`
+          : `${term[0].toUpperCase()}${term.slice(1)}s that aren’t under a ${parentName} go here.`}</p>}
         {g.kind === 'unlinked' && g.items.length > 0 && groups.some((x) => x.kind === 'parent') && <button type="button" className="canvas-link plan-suggest-links"
           onClick={() => openAssistant({ message: `Which ${parentName} does each of my items under no ${parentName} for ${periodTitle} belong under? Suggest links; don't link anything until I keep them.`, autoSend: true })}>Suggest where these go</button>}
         {adding
@@ -397,12 +404,12 @@ function Inner() {
   const walk = <button type="button" className="plan-walk" onClick={() => openAssistant({ message: walkMessage, autoSend: true })}>Plan {periodTitle} with Symphony</button>
   return <main ref={mainRef} className={`plan-canvas ${PAGE_PLANNING}`} data-horizon={level}>
     <MastheadCard variant="page" numeral={numeral}
-      title={<span className="plan-period-name">{level === 0 ? 'Intentions' : periodWord}</span>}
+      title={<span className="plan-period-name">{level === 0 ? 'Intentions' : periodTitle}</span>}
       eyebrow={<PeriodNavEyebrow label={HORIZONS[level]} onPrev={() => setStart(bounds.prev)} onNext={() => setStart(bounds.next)}
         prevLabel={`Previous ${PERIODS[level]}`} nextLabel={`Next ${PERIODS[level]}`}
         trailing={current ? undefined : <button type="button" className="period-return canvas-link" onClick={() => setStart(null)}>This {PERIODS[level]}</button>} />}
       subline={level > 0
-        ? <span className="plan-period-range">{periodRange(bounds.start, bounds.end)} · grouped under {level === 1 ? "this year's intentions" : `${periodWordOf(seasonB)} goals`}</span>
+        ? <span className="plan-period-range">{periodRange(bounds.start, bounds.end)}</span>
         : <span className="plan-period-range">{periodRange(bounds.start, bounds.end)} · what {periodTitle} is for</span>}
       controls={isMobile ? undefined : <div className="plan-head-controls">{stepper}{walk}</div>} />
     {isMobile && <div className="plan-head-mobile">{stepper}{walk}</div>}
@@ -436,7 +443,7 @@ function Inner() {
           {hasItems && (level < 2
             ? <button type="button" className="plan-next" onClick={() => setHorizon(level + 1)}>Next: {HORIZONS[level + 1]} →</button>
             : <Link to={weekHref} className="plan-next">Next: Week →</Link>)}
-          <span className="plan-area">{area.picker}<span>Life area for new independent entries</span></span>
+          <span className="plan-area">{area.picker}<span>{level === 0 ? 'Life area for new intentions' : `Life area for new ${term}s not under a ${parentName}`}</span></span>
         </footer>
       </>}
   </main>
