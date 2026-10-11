@@ -120,6 +120,8 @@
   .canvas-strip.is-docked { padding-inline: 3.5rem; }
 }
 .canvas-strip.is-docked .canvas-composer { gap: 10px; }
+/* Room under a page's last row for the bar (the shell sets --dock-clearance). */
+.has-docked-bar { padding-bottom: calc(var(--dock-clearance, 67px) + 12px); }
 .canvas-strip.is-docked .canvas-composer-field {
   height: 44px; padding: 0 18px; border: 1px solid var(--color-neutral-300); border-radius: var(--radius-full);
   background: var(--color-bg-base);

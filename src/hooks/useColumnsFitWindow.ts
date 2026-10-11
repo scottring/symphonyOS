@@ -33,7 +33,9 @@ export function useColumnsFitWindow(enabled = true): (el: HTMLElement | null) =>
     const measure = () => {
       if (!wide.matches || !scroller) { el.style.removeProperty('--pv2-col-h'); return }
       const top = el.getBoundingClientRect().top - scroller.getBoundingClientRect().top + scroller.scrollTop
-      const clearance = parseFloat(getComputedStyle(scroller).getPropertyValue('--scenery-clearance')) || 0
+      const style = getComputedStyle(scroller)
+      // The landscape, and the conversation bar docked under it (--dock-clearance).
+      const clearance = (parseFloat(style.getPropertyValue('--scenery-clearance')) || 0) + (parseFloat(style.getPropertyValue('--dock-clearance')) || 0)
       const room = scroller.clientHeight - top - clearance - GAP
       el.style.setProperty('--pv2-col-h', `${Math.max(MIN_HEIGHT, Math.round(room))}px`)
     }

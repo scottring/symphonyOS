@@ -17,7 +17,7 @@ import { ReferenceListsProvider, useReferenceLists } from '@/components/referenc
 import { ReferenceListsDock } from '@/components/reference/ReferenceLists';
 import { pinIsOnPage } from '@/components/reference/periodsOnPage';
 // src/shell/ShellLayout.tsx
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Sparkles, MoreHorizontal, Plus, Sun, Map, Home as HomeIcon } from 'lucide-react';
 import { HOME_ROUTE } from '@/apps/overview/route';
@@ -91,6 +91,9 @@ import { GuideBar, GuideHostContext } from '@/components/guide/GuideBar';
 // Left reference dock at its widest, and the narrowest page worth keeping
 // beside it when a right-hand pane is also open.
 const REFERENCE_DOCK_WIDTH = 340;
+// The docked conversation bar at rest (ConversationStrip .is-docked): the
+// landscape stands on it and side-by-side columns stop above it.
+const DOCKED_BAR_HEIGHT = '67px';
 const MIN_PAGE_WITH_REFERENCES = 640;
 
 function useViewportWidth() {
@@ -176,11 +179,12 @@ function ShellLayoutInner({ children }: Props) {
   // phone alike. Focused controls must clear the scenery foreground.
   const [pageScroller, setPageScroller] = useState<HTMLDivElement | null>(null);
   const { showScenery, sceneryLighting } = useSceneryPreferences();
-  // Plan on desktop has one conversation: the bar docked at the window's foot
-  // (approved Season board, 2026-10-10). The side pane is for Details there.
-  const planBar = !isMobile && conversationStripPath(location.pathname) && ['year', 'season', 'month'].includes(planPeriodForPath(location.pathname) ?? '');
+  // Today, Week and Plan on desktop have one conversation: the bar docked at
+  // the window's foot (approved boards, 2026-10-10). The side pane is for
+  // Details there.
+  const dockedBar = !isMobile && conversationStripPath(location.pathname) && !!planPeriodForPath(location.pathname);
   // Plan's docked bar is the desktop floor the landscape stands on.
-  const sceneryFloor = isMobile ? `calc(${MOBILE_TAB_BAR_HEIGHT} + env(safe-area-inset-bottom, 0px))` : planBar ? '67px' : undefined;
+  const sceneryFloor = isMobile ? `calc(${MOBILE_TAB_BAR_HEIGHT} + env(safe-area-inset-bottom, 0px))` : dockedBar ? DOCKED_BAR_HEIGHT : undefined;
 
   const references = useReferenceLists();
 
@@ -286,7 +290,7 @@ function ShellLayoutInner({ children }: Props) {
   useDialogFocus(phoneChatOpen && isMobile, phoneChatRef, () => setPhoneChatOpen(false));
   const [pane, setPane] = useState<SidePane>('details');
   const [activeNoteId, setActiveNoteId] = useState<string | null>(null);
-  const aiOpen = !isMobile && !aiHidden && !planBar;
+  const aiOpen = !isMobile && !aiHidden && !dockedBar;
   // A new selection brings Details to the front.
   const selectionKey = selection ? `${selection.kind}:${selection.id}` : null;
   useEffect(() => { if (selectionKey) setPane('details'); }, [selectionKey]);
@@ -303,10 +307,10 @@ function ShellLayoutInner({ children }: Props) {
     if (launchNonce === 0 || launchNonce === seenLaunchNonce.current) return;
     seenLaunchNonce.current = launchNonce;
     if (isMobile) setPhoneChatOpen(true);
-    else if (!planBar) showPane('ai');
+    else if (!dockedBar) showPane('ai');
     const seed = consumeSeed();
     if (seed && seed.autoSend !== false) void assistant.sendMessage(seed.message);
-  }, [launchNonce, isMobile, planBar, consumeSeed, assistant, showPane]);
+  }, [launchNonce, isMobile, dockedBar, consumeSeed, assistant, showPane]);
 
   // Closing the More sheet returns focus to its tab, not to <body>.
   const moreTabRef = useRef<HTMLButtonElement>(null);
@@ -348,7 +352,7 @@ function ShellLayoutInner({ children }: Props) {
     <DesktopCenterContext.Provider value={desktopCenter}>
     <MobilePlanControlsContext.Provider value={mobilePlanControls}>
     <GuideHostContext.Provider value={setGuideHost}>
-    <ConversationWalkContext.Provider value={planBar ? setWalk : null}>
+    <ConversationWalkContext.Provider value={dockedBar ? setWalk : null}>
     {/* With scenery on, the shell wears the place's sky in the chosen light
         (index.css, IMMERSIVE SCENERY); page regions marked .scenery-page
         take its text colours. */}
@@ -359,7 +363,7 @@ function ShellLayoutInner({ children }: Props) {
       {/* "New version available — reload" banner: shows when a newer build
           deployed while this tab stayed open (stale-tab guard). */}
       <NewVersionBanner />
-      {voice.active && !planBar && !(isMobile ? phoneChatOpen : aiOpen && pane === 'ai') && <div className="workspace-voice-floating" role="status"><span>{voice.status === 'muted' ? 'Voice muted' : 'Voice active'}</span><button onClick={voice.mute}>{voice.status === 'muted' ? 'Unmute' : 'Mute'}</button><button onClick={voice.stop}>End voice</button></div>}
+      {voice.active && !dockedBar && !(isMobile ? phoneChatOpen : aiOpen && pane === 'ai') && <div className="workspace-voice-floating" role="status"><span>{voice.status === 'muted' ? 'Voice muted' : 'Voice active'}</span><button onClick={voice.mute}>{voice.status === 'muted' ? 'Unmute' : 'Mute'}</button><button onClick={voice.stop}>End voice</button></div>}
 
       {/* Content frame — uses <div> (not <main>) because individual apps render
           their own <main>. Avoids invalid nested-main HTML. */}
@@ -377,7 +381,7 @@ function ShellLayoutInner({ children }: Props) {
                 // the bar's actual height and clipped AttentionLine.
                 paddingBottom: `calc(${MOBILE_TAB_BAR_HEIGHT} + 0.5rem + env(safe-area-inset-bottom, 0px))`,
               }
-            : { marginRight: `${paneWidth}px` }
+            : { marginRight: `${paneWidth}px`, ...(dockedBar ? { '--dock-clearance': DOCKED_BAR_HEIGHT } : {}) } as CSSProperties
         }
       >
         {/* Mobile header — domain switcher (date nav lives in
@@ -430,7 +434,7 @@ function ShellLayoutInner({ children }: Props) {
             <HeaderPeopleFilter />
             <DomainSwitcher />
             {/* On Plan the conversation is the bar at the foot. */}
-            {!planBar && <button
+            {!dockedBar && <button
               onClick={() => setAiHidden(aiOpen)}
               className={`page-navigation-icon${aiOpen ? ' is-on' : ''}`}
               aria-label="AI chat"
@@ -472,11 +476,11 @@ function ShellLayoutInner({ children }: Props) {
                   />
                 }
               >
-                <div className="scenery-page scenery-page-contents">
+                <div className={`scenery-page scenery-page-contents${dockedBar ? ' has-docked-bar' : ''}`}>
                   {/* Guided planning rides above the page it is guiding. */}
                   <div className="guide-slot"><GuideBar host={guideHost} /></div>
                   {children}
-                  {planBar
+                  {dockedBar
                     ? <ConversationStrip docked messages={assistant.messages} walk={walk} right={paneWidth} onSend={(text) => sendConversation(text)} busy={assistant.loading} voice={stripVoice} />
                     : showStrip && <ConversationStrip onSend={(text) => sendConversation(text)} busy={assistant.loading} voice={stripVoice} onOpenConversation={openConversation} />}
                 </div>

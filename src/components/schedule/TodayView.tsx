@@ -95,7 +95,7 @@ import { ReviewDrawer, type ReviewMode } from './ReviewDrawer'
 import { HorizonPoolDropdown } from './HorizonPoolDropdown'
 import { DayNavCluster } from './DayNavCluster'
 import { MastheadCard } from '@/components/layout/MastheadCard'
-import { planV2Enabled, readPlanView, writePlanView, type PlanView } from '@/lib/planning/v2/planV2'
+import { readPlanView, writePlanView, type PlanView } from '@/lib/planning/v2/planV2'
 import { GuideAnchor } from '@/components/guide/GuideBar'
 import { useGuidedPlan } from '@/hooks/useGuidedPlan'
 import { currentStep } from '@/lib/guide/guidedPlan'
@@ -1478,8 +1478,7 @@ export function TodayView({
         // Tomorrow, a weekday — and still opens the date picker.
         eyebrow={<DayNavCluster viewedDate={viewedDate} onDateChange={onDateChange} variant="inline" label={data.isToday ? 'Today' : relativeDayLabel} />}
         title={viewedDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
-        // Planning v2: the day's big thin number, like every other horizon.
-        numeral={planV2Enabled() ? String(viewedDate.getDate()) : undefined}
+        // No big numeral (approved Today board, 2026-10-10): the date is the title.
         // Adding moved to the "For today" heading with Choose (2026-09-22):
         // the date is the page's identity, the heading holds its two verbs.
         // "Next: …" is the Up next marker's job now, inside Schedule. The

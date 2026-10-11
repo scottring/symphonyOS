@@ -155,11 +155,7 @@
 /* ---- Footer ------------------------------------------------------------------- */
 .plan-foot { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-top: 20px; }
 .plan-composer .pv2-addarea { flex: none; }
-/* Desktop: room under the last card for the conversation bar docked at the
-   window's foot (ConversationStrip .is-docked). */
-@media (min-width: 768px) {
-  .plan-canvas { padding-bottom: 160px; }
-}
+
 
 /* ---- Focus rings -------------------------------------------------------------- */
 .plan-canvas button:focus-visible, .plan-canvas a:focus-visible, .plan-group-focus:focus-visible, .plan-item-title:focus-visible {

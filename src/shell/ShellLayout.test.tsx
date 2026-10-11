@@ -453,7 +453,7 @@ describe('Capture and the Today pin from every desktop page', () => {
 
 // The approved Season board (2026-10-10): on Plan the conversation is one bar
 // at the window's foot; the side pane is for Details only.
-describe('Plan has one conversation, at the foot', () => {
+describe('Today, Week and Plan have one conversation, at the foot', () => {
   beforeEach(() => { mobileState.isMobile = false; selectionState.selection = null; aiState.hidden = false; sessionStorage.clear() })
   afterEach(() => { aiState.hidden = true })
 
@@ -466,9 +466,22 @@ describe('Plan has one conversation, at the foot', () => {
     expect(screen.queryByLabelText('Conversation draft')).not.toBeInTheDocument()
   })
 
-  it('leaves Today with its side conversation', () => {
-    renderAt('/today')
+  it('docks it on Today and Week too, with room for the bar under the page', () => {
+    for (const path of ['/today?view=alongside', '/week?view=alongside']) {
+      const view = renderAt(path)
+      expect(screen.getByRole('region', { name: 'Conversation with Symphony' })).toHaveClass('is-docked')
+      expect(screen.queryByRole('button', { name: 'AI chat' })).not.toBeInTheDocument()
+      expect(screen.getByRole('region', { name: 'Conversation with Symphony' }).closest('.has-docked-bar')).not.toBeNull()
+      view.unmount()
+    }
+  })
+
+  it('leaves Routines with its side conversation, and pages off the horizons with the AI button', () => {
+    const routines = renderAt('/routines')
     expect(screen.getByRole('button', { name: 'AI chat' })).toBeInTheDocument()
     expect(screen.getByRole('region', { name: 'Conversation with Symphony' })).not.toHaveClass('is-docked')
+    routines.unmount()
+    renderAt('/inbox')
+    expect(screen.getByRole('button', { name: 'AI chat' })).toBeInTheDocument()
   })
 })

@@ -36,6 +36,16 @@ describe('useColumnsFitWindow', () => {
     expect(grid.style.getPropertyValue('--pv2-col-h')).toBe('488px')
   })
 
+  it('stops above the docked conversation bar as well as the landscape', async () => {
+    const { scroller, grid } = mount({ wide: true })
+    grid.getBoundingClientRect = () => ({ top: 200 }) as DOMRect
+    scroller.style.setProperty('--dock-clearance', '67px')
+    scroller.style.setProperty('--scenery-clearance', '300px')
+    await new Promise((r) => setTimeout(r, 0))
+    // 1000 − 200 − 300 landscape − 67 bar − 12 gap.
+    expect(grid.style.getPropertyValue('--pv2-col-h')).toBe('421px')
+  })
+
   it('never shrinks a column below a usable height', async () => {
     const { scroller, grid } = mount({ wide: true })
     grid.getBoundingClientRect = () => ({ top: 600 }) as DOMRect

@@ -74,8 +74,13 @@ Out-of-scope findings to report (not changed here): `VITE_OPEN_BRAIN_API_KEY` is
   one bar docked at the window's foot ("Plan this season with me", field, mic); it
   shows the latest exchange with Earlier for the rest, and the AI side pane and its
   top-bar button stay off Plan (Details still opens there). Season and Month cards
-  pack in columns. The current top-bar tab is filled on every page. Today and Week
-  keep the side conversation for now. Comparison: claude.ai/artifact/B4wfgwzfkSYXqXunKERhoz
+  pack in columns. The current top-bar tab is filled on every page.
+  Comparison: claude.ai/artifact/B4wfgwzfkSYXqXunKERhoz
+- **Today and Week follow (Scott, 2026-10-11).** The same docked bar and no AI side
+  pane on Today and Week; their mastheads lose the big numeral (the approved Today
+  board titles the day by its date). Side-by-side columns stop above the bar
+  (`--dock-clearance`, useColumnsFitWindow). Routines and pages off the horizons
+  keep the side conversation and the top-bar AI button.
 
 ## Later scope (noted, not in this build)
 
