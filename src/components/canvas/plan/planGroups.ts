@@ -51,6 +51,21 @@ export function horizonGroups(nodes: PlanNode[], level: number, showDone: boolea
 }
 
 /**
+ * The calm reading order (Scott, 2026-10-11: a month of empty goal cards read
+ * as "a large number of random tasks"): parents that hold something this
+ * period first, the fullest first, then the items under no parent; parents
+ * holding nothing fold into one line. `pending` names groups showing
+ * suggestions, which count as holding something. Year is one group already.
+ */
+export function calmGroups(groups: PlanGroup[], pending: ReadonlySet<string> = new Set()): { shown: PlanGroup[]; empty: PlanGroup[] } {
+  const holds = (g: PlanGroup) => g.items.length > 0 || pending.has(g.key)
+  const parents = groups.filter((g) => g.kind === 'parent')
+  const shown = parents.filter(holds).map((g, i) => ({ g, i }))
+    .sort((a, b) => b.g.items.length - a.g.items.length || a.i - b.i).map(({ g }) => g)
+  return { shown: [...shown, ...groups.filter((g) => g.kind !== 'parent')], empty: parents.filter((g) => !holds(g)) }
+}
+
+/**
  * Which groups a `focus` key narrows the page to, or null for all of them.
  * A parent's key focuses its group; a grandparent's key focuses every group
  * under it; UNLINKED focuses the Unlinked group. An item's own key (a saved

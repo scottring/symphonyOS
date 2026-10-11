@@ -78,6 +78,20 @@
 .plan-group-folded .canvas-group-title { flex: 1; min-width: 0; overflow-wrap: anywhere; }
 .plan-group-folded:hover { opacity: .85; }
 
+/* Parents holding nothing this period, folded to one line (2026-10-11). */
+.plan-empty-fold {
+  display: flex; align-items: baseline; gap: 12px; width: 100%; margin-top: 16px; text-align: left;
+  padding: 12px 16px; font-size: 14px; color: var(--color-neutral-600); cursor: pointer;
+}
+.plan-empty-fold b { font-weight: 600; color: var(--color-neutral-900); white-space: nowrap; }
+.plan-empty-fold-names { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.plan-empty-fold + .plan-groups { margin-top: 12px; }
+.plan-suggest-links { display: block; margin-top: 6px; }
+@media (max-width: 640px) {
+  .plan-empty-fold { flex-wrap: wrap; min-height: 44px; }
+  .plan-empty-fold-names { flex-basis: 100%; order: 3; }
+}
+
 .plan-items { list-style: none; margin: 0; padding: 0; }
 .plan-empty { margin: 6px 0 2px; font-size: 13px; color: var(--color-neutral-500); }
 .plan-add { margin-top: 4px; }

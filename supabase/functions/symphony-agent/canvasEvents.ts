@@ -66,7 +66,8 @@ export async function stableRowId(userId: string, turnId: unknown, name: string,
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`
 }
 
-export interface ProposalItem { key: string; title: string; level: 0 | 1 | 2 | 3; parentId?: string | null; periodStart?: string; reason?: string }
+/** `itemId` set: link that existing item under `parentId` rather than create one. */
+export interface ProposalItem { key: string; title: string; level: 0 | 1 | 2 | 3; parentId?: string | null; itemId?: string; periodStart?: string; reason?: string }
 
 const LEVELS: Record<string, 0 | 1 | 2 | 3> = { year: 0, season: 1, month: 2, week: 3 }
 
@@ -74,7 +75,9 @@ const LEVELS: Record<string, 0 | 1 | 2 | 3> = { year: 0, season: 1, month: 2, we
 export function proposalItems(input: Record<string, unknown>, keyPrefix: string): { items: ProposalItem[] } | { error: string } {
   const raw = Array.isArray(input.items) ? input.items : null
   if (!raw || !raw.length) return { error: 'Provide at least one suggested item' }
-  if (raw.length > 12) return { error: 'Suggest at most 12 items at a time' }
+  // Links sort what already exists, so a whole month's unlinked list may go at once.
+  const links = raw.every((r) => r && typeof r === 'object' && typeof (r as Record<string, unknown>).item_id === 'string')
+  if (raw.length > (links ? 40 : 12)) return { error: links ? 'Suggest at most 40 links at a time' : 'Suggest at most 12 items at a time' }
   const items: ProposalItem[] = []
   raw.forEach((r, i) => {
     if (!r || typeof r !== 'object') return
@@ -83,9 +86,14 @@ export function proposalItems(input: Record<string, unknown>, keyPrefix: string)
     const level = LEVELS[String(o.level)]
     if (!title || level === undefined) return
     const periodStart = typeof o.period_start === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(o.period_start) ? o.period_start : undefined
+    const itemId = typeof o.item_id === 'string' && UUID_RE.test(o.item_id) ? o.item_id : undefined
+    const parentId = typeof o.parent_id === 'string' && UUID_RE.test(o.parent_id) ? o.parent_id : null
+    // A link without a parent links nothing.
+    if (o.item_id !== undefined && (!itemId || !parentId)) return
     items.push({
       key: `${keyPrefix}:${i}`, title, level,
-      parentId: typeof o.parent_id === 'string' && UUID_RE.test(o.parent_id) ? o.parent_id : null,
+      parentId,
+      ...(itemId ? { itemId } : {}),
       ...(periodStart ? { periodStart } : {}),
       ...(typeof o.reason === 'string' && o.reason.trim() ? { reason: o.reason.trim().slice(0, 200) } : {}),
     })
@@ -96,7 +104,7 @@ export function proposalItems(input: Record<string, unknown>, keyPrefix: string)
 
 export const PROPOSE_TOOL = {
   name: 'symphony_propose_plan_items',
-  description: 'Show SUGGESTED planning items on the canvas without saving them. Use only for items you are suggesting that the person did not state themselves (for example "you might add a milestone for booking the venue"). They appear dashed with Keep / Leave out, and nothing is written until the person keeps them. When the person states their own items, create them directly with symphony_create_plan_item instead. Never invent goals the person has not expressed; suggestions must follow from what they said.',
+  description: 'Show SUGGESTED planning items on the canvas without saving them. Use only for items you are suggesting that the person did not state themselves (for example "you might add a milestone for booking the venue"). They appear dashed with Keep / Leave out, and nothing is written until the person keeps them. When the person states their own items, create them directly with symphony_create_plan_item instead. Never invent goals the person has not expressed; suggestions must follow from what they said. To suggest that an EXISTING unlinked item belongs under an existing parent, pass item_id (that item) with parent_id and the item\'s own title and level; keeping it links the item, nothing new is created.',
   input_schema: {
     type: 'object',
     properties: {
@@ -108,6 +116,7 @@ export const PROPOSE_TOOL = {
             title: { type: 'string' },
             level: { type: 'string', enum: ['year', 'season', 'month', 'week'] },
             parent_id: { type: 'string', description: 'Existing parent item id at the horizon above, if any' },
+            item_id: { type: 'string', description: 'An existing item to link under parent_id instead of creating a new one' },
             period_start: { type: 'string', description: 'YYYY-MM-DD start of the period' },
             reason: { type: 'string', description: 'Short reason shown with the suggestion' },
           },

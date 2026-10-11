@@ -11,6 +11,8 @@ export interface AgentProposalItem {
   title: string
   level: 0 | 1 | 2 | 3
   parentId?: string | null
+  /** Set: a suggestion to link this existing item under parentId. */
+  itemId?: string
   periodStart?: string
   reason?: string
 }
