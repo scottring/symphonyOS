@@ -1,6 +1,6 @@
 // src/components/plan/constellation/UpstreamDrawer.tsx
 //
-// The horizon one up, beside Season and Month (Scott, 2026-10-11: "need to be
+// The horizon one up, left of Season and Month (Scott, 2026-10-11: "need to be
 // able to see year goals to drag and drop season goals into relevant year
 // goals"). Every open parent is listed — including the ones folded away for
 // holding nothing yet — and each is a drop target for the board's rows.

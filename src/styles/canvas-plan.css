@@ -229,8 +229,9 @@
 
 .plan-toolbar { display: flex; justify-content: flex-end; gap: 12px; min-height: 8px; margin: -8px 0 8px; }
 
-/* ---- The horizon one up, as a drawer beside Season and Month (2026-10-11) --- */
-.plan-body.has-drawer { display: grid; grid-template-columns: minmax(0, 1fr) 280px; gap: 24px; align-items: start; }
+/* ---- The horizon one up, as a drawer left of Season and Month (2026-10-11):
+   parents read left of their children, as they do on the board. ---------- */
+.plan-body.has-drawer { display: grid; grid-template-columns: 280px minmax(0, 1fr); gap: 24px; align-items: start; }
 .plan-board { min-width: 0; }
 .plan-drawer {
   position: sticky; top: 16px; display: flex; flex-direction: column; min-height: 0;

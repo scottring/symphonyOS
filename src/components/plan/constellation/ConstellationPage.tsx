@@ -38,7 +38,7 @@ import { PlanItemRow } from '@/components/canvas/plan/PlanItemRow'
 import { ProposalRow } from '@/components/canvas/plan/ProposalRow'
 import { InlineComposer } from '@/components/canvas/plan/InlineComposer'
 import { readinessOf, type ReadinessLookup } from '@/lib/prep/readiness'
-import { ChevronLeft, ChevronRight, PanelRightOpen } from 'lucide-react'
+import { ChevronLeft, ChevronRight, PanelLeftOpen } from 'lucide-react'
 import { UpstreamDrawer } from './UpstreamDrawer'
 import { useConversationWalk } from '@/components/canvas/conversationWalk'
 import { PAGE_PLANNING } from '@/components/layout/pageLayout'
@@ -438,7 +438,7 @@ function Inner() {
     </header>
     <div className="plan-toolbar">
       {level > 0 && !drawerOpen && <button type="button" className="canvas-link plan-drawer-open" aria-expanded={false} onClick={() => toggleDrawer(true)}>
-        <PanelRightOpen size={15} aria-hidden="true" /> Show {drawerTitle.toLowerCase()}
+        <PanelLeftOpen size={15} aria-hidden="true" /> Show {drawerTitle.toLowerCase()}
       </button>}
       {proposals.length > 0 && <button type="button" className="canvas-link" onClick={() => { void keepAll() }}>Keep all ({proposals.length})</button>}
       {(doneCount > 0 || showDone) && <button type="button" className="canvas-link" aria-pressed={showDone} onClick={() => setShowDone((s) => !s)}>
@@ -449,7 +449,7 @@ function Inner() {
     {!dataReady && <p className="plan-status" role="status">Loading your plans…</p>}
     {(error || goalsError)
       ? <p className="plan-status" role="alert">Plans could not load. <button type="button" className="canvas-link" onClick={() => { if (goalsError) window.location.reload(); else void refetch() }}>Retry</button></p>
-      : <div className={`plan-body${drawer ? ' has-drawer' : ''}`}><div className="plan-board">
+      : <div className={`plan-body${drawer ? ' has-drawer' : ''}`}>{drawer}<div className="plan-board">
         {focused && <div className="plan-focus-bar">
           <span role="status">Showing {focused.size} of {groups.length} groups</span>
           <button type="button" className="canvas-link" onClick={clearFocus}>Show all · Esc</button>
@@ -470,7 +470,7 @@ function Inner() {
             ? <button type="button" className="plan-next" onClick={() => setHorizon(level + 1)}>Next: {HORIZONS[level + 1]} →</button>
             : <Link to={weekHref} className="plan-next">Next: Week →</Link>)}
         </footer>
-      </div>{drawer}</div>}
+      </div></div>}
   </main>
 }
 
