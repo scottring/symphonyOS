@@ -253,7 +253,7 @@ export function useHomeBearings(now: Date): HomeBearings {
   const rungs: Rung[] = [
     {
       level: 'year', name: String(today.getFullYear()), to: '/year', attention: false,
-      status: yearGoals.length ? `Reference · ${words(yearGoals.length)} ${yearGoals.length === 1 ? 'intention' : 'intentions'}` : 'Nothing written yet',
+      status: yearGoals.length ? `Reference · ${words(yearGoals.length)} ${yearGoals.length === 1 ? 'goal' : 'goals'}` : 'Nothing written yet',
       sample: yearGoals[0]?.name ?? null,
     },
     {

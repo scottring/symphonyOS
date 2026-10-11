@@ -60,9 +60,9 @@ describe('WeekV2 — the month beside the week, while writing it', () => {
     expect(ref.querySelector('[data-mark="goal"]')).toBeNull()
     expect(screen.queryByRole('button', { name: /\+ Step|Week 41’s part/ })).toBeNull()
     expect(screen.getByText('Toss umbrella')).toBeInTheDocument()
-    // The month line's own action is writing weekly actions for it; taking
+    // The month goal's own action is writing weekly actions for it; taking
     // the line itself into the week stays, quieter (2026-10-08).
-    expect(screen.getByRole('button', { name: 'Add a weekly action for Plan sabbatical' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Add a task this week for Plan sabbatical' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Put Plan sabbatical itself on this week' })).toBeInTheDocument()
   })
 
@@ -127,7 +127,7 @@ describe('WeekV2 — the planned week', () => {
     expect(screen.queryByRole('group', { name: 'Whose week' })).toBeNull()
   })
 
-  it('October lines can be ticked done, and show what the weeks did for them', () => {
+  it('October goals can be ticked done, and show what the weeks did for them', () => {
     const line = task({ id: 'm1', title: 'Plan Thanksgiving', bucket: 'month', monthStart: new Date(2026, 9, 1) })
     const did = task({ id: 'w1', title: 'Book flights', bucket: 'week', weekStart: WEEK, sourceId: 'm1' })
     renderWeek([line, did])

@@ -34,7 +34,7 @@ describe('AddExistingActionDialog', () => {
   it('an action already here is shown, marked, and cannot be added twice', async () => {
     const user = userEvent.setup()
     const { onLink } = renderDialog([task('a', 'Look up music lessons', { goalTaskId: 'g1' })])
-    const row = screen.getByRole('button', { name: /already a next action for this goal/ })
+    const row = screen.getByRole('button', { name: /already a task for this goal/ })
     expect(row).toBeDisabled()
     expect(screen.getByText('Already here')).toBeInTheDocument()
     await user.click(row)
@@ -47,7 +47,7 @@ describe('AddExistingActionDialog', () => {
     await user.click(screen.getByRole('button', { name: /now under Get the house ready for winter/ }))
     expect(onLink).not.toHaveBeenCalled()
     const move = screen.getByRole('group', { name: 'Move this action' })
-    expect(move).toHaveTextContent('is a next action for Get the house ready for winter')
+    expect(move).toHaveTextContent('is a task for Get the house ready for winter')
     await user.click(within(move).getByRole('button', { name: 'Keep it where it is' }))
     expect(onLink).not.toHaveBeenCalled()
     await user.click(screen.getByRole('button', { name: /now under Get the house ready for winter/ }))

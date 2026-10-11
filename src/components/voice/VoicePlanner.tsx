@@ -362,9 +362,9 @@ function Home({ labels, existing, resumable, note, onResume, onBuild, onAdd, onR
 
 const START_COPY: Record<Horizon, string> = {
   year: 'Choose your goals, then give each a turn at every horizon below.',
-  season: 'A milestone for each goal this season, then the month, week and today.',
-  month: 'This month’s priorities across your goals, then the week and today.',
-  week: 'One list for the week, across your goals, then today.',
+  season: 'Season goals under each year goal, then the month, week and today.',
+  month: 'This month’s goals across your season goals, then the week and today.',
+  week: 'One task list for the week, across your goals, then today.',
   today: 'Choose what to do today from this week.',
 }
 

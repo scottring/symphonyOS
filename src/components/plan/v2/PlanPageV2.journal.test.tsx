@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, waitFor, within, act } from '@testing-library/react'
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
 
-// Open journal on the Month page (Scott chose it, 2026-10-08): each Fall line
+// Open journal on the Month page (Scott chose it, 2026-10-08): each Fall goal
 // beside October's lines for it. Generic fixtures; mocked data — this proves
 // the page's logic, not database permissions.
 
@@ -52,7 +52,7 @@ const s = (id: string, title: string, o: Record<string, unknown> = {}) => ({ ...
 const m = (id: string, title: string, o: Record<string, unknown> = {}) => ({ ...base, id, title, bucket: 'month', monthStart: oct, commitments: [{ level: 'month', periodStart: oct, status: 'open' }], ...o })
 const FIXTURE = [
   s('s1', 'Garden beds ready for winter'), s('s2', 'Calmer mornings'), s('s3', 'Learn three songs'),
-  s('sp', 'Another person’s private Fall line', { assignedTo: 'partner' }),
+  s('sp', 'Another person’s private Fall goal', { assignedTo: 'partner' }),
   m('m1', 'Order garlic bulbs', { sourceId: 's1' }), m('m2', 'Clear the shed', { sourceId: 's1' }),
   m('m3', 'Older month goal', { isGoal: true, supportsGoalTaskId: 's2' }),
   m('m4', 'Plan the autumn trip'), m('m5', 'Written for the private line', { sourceId: 'sp' }),
@@ -76,22 +76,22 @@ describe('Month · Open journal', () => {
   })
   afterEach(() => { vi.useRealTimers(); localStorage.clear() })
 
-  it('each Fall line stands beside October’s lines for it — source_id and the older supports link — and the rest are general', () => {
+  it('each Fall goal stands beside October’s lines for it — source_id and the older supports link — and the rest are general', () => {
     renderMonth()
     expect(within(region(/^This Fall: Garden beds ready for winter/)).getAllByRole('listitem').map((li) => li.querySelector('.pv2-line-text')?.textContent)).toEqual(['Order garlic bulbs', 'Clear the shed'])
     expect(within(region(/^This Fall: Calmer mornings/)).getByText('Older month goal')).toBeInTheDocument()
     expect(region(/^This Fall: Learn three songs/)).toHaveTextContent('Nothing for October yet')
-    const general = region(/Not tied to a Fall line/)
+    const general = region(/Not tied to a Fall goal/)
     expect(within(general).getByText('Plan the autumn trip')).toBeInTheDocument()
   })
 
-  it('a Fall line only another person can see makes no section and no title; its October line is general', () => {
+  it('a Fall goal only another person can see makes no section and no title; its October goal is general', () => {
     renderMonth()
-    expect(screen.queryByText('Another person’s private Fall line')).toBeNull()
-    expect(within(region(/Not tied to a Fall line/)).getByText('Written for the private line')).toBeInTheDocument()
+    expect(screen.queryByText('Another person’s private Fall goal')).toBeNull()
+    expect(within(region(/Not tied to a Fall goal/)).getByText('Written for the private line')).toBeInTheDocument()
   })
 
-  it('Enter adds an October line written for that Fall line (source_id, never goal_task_id), keeps focus, clears only on success', async () => {
+  it('Enter adds an October goal written for that Fall goal (source_id, never goal_task_id), keeps focus, clears only on success', async () => {
     renderMonth()
     const input = box(/^This Fall: Learn three songs/)
     for (const t of ['Pick the three songs', 'Book a lesson']) {
@@ -104,7 +104,7 @@ describe('Month · Open journal', () => {
       ['Book a lesson', expect.objectContaining({ sourceId: 's3' })],
     ])
     expect(w.addTask.mock.calls.every((c) => !('goalTaskId' in c[4]))).toBe(true)
-    // The Fall line itself is not touched — no promotion, no move.
+    // The Fall goal itself is not touched — no promotion, no move.
     expect(w.updateTask).not.toHaveBeenCalled(); expect(w.gated).not.toHaveBeenCalled(); expect(w.pushTask).not.toHaveBeenCalled()
   })
 
@@ -126,24 +126,24 @@ describe('Month · Open journal', () => {
 
   it('Open journal is the default; with Lists chosen, its own add box clears only once the line is stored', async () => {
     const first = renderMonth(null)
-    expect(screen.getByRole('region', { name: /October, by Fall line/ })).toBeInTheDocument()
+    expect(screen.getByRole('region', { name: /October, by Fall goal/ })).toBeInTheDocument()
     first.unmount()
     localStorage.setItem('symphony-plan-layout.month', 'lists')
     w.addTask.mockResolvedValueOnce(undefined)
     renderMonth(null)
-    expect(screen.queryByRole('region', { name: /October, by Fall line/ })).toBeNull()
+    expect(screen.queryByRole('region', { name: /October, by Fall goal/ })).toBeNull()
     const input = screen.getByRole('textbox', { name: 'Add to October' }) as HTMLInputElement
     fireEvent.change(input, { target: { value: 'Sort the winter clothes' } }); fireEvent.submit(input.closest('form')!)
     expect(await screen.findByRole('alert')).toHaveTextContent('That didn’t save')
     expect(input.value).toBe('Sort the winter clothes')
   })
 
-  it('an October line can be linked, changed, or have its older supports link removed — on the same row', async () => {
+  it('an October goal can be linked, changed, or have its older supports link removed — on the same row', async () => {
     renderMonth()
-    fireEvent.click(screen.getByRole('button', { name: 'Link Plan the autumn trip to a Fall line' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Link Plan the autumn trip to a Fall goal' }))
     fireEvent.click(screen.getByRole('menuitemradio', { name: 'Calmer mornings' }))
     await waitFor(() => expect(w.updateTask).toHaveBeenCalledWith('m4', { sourceId: 's2' }))
-    fireEvent.click(screen.getByRole('button', { name: /^For Fall: Calmer mornings\. Change or remove the Fall line for Older month goal/ }))
+    fireEvent.click(screen.getByRole('button', { name: /^For Fall: Calmer mornings\. Change or remove the Fall goal for Older month goal/ }))
     fireEvent.click(screen.getByRole('menuitemradio', { name: 'Remove the Fall link' }))
     await waitFor(() => expect(w.updateTask).toHaveBeenLastCalledWith('m3', { supportsGoalTaskId: undefined }))
   })
@@ -151,13 +151,13 @@ describe('Month · Open journal', () => {
   it('one onward step for the whole month, carrying the journal into the week — and nothing else', () => {
     renderMonth()
     expect(screen.getAllByRole('group', { name: 'Next step' })).toHaveLength(1)
-    expect(screen.getByText('1 Fall line has nothing in October yet — you can leave it for later.')).toBeInTheDocument()
+    expect(screen.getByText('1 Fall goal has nothing in October yet — you can leave it for later.')).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: /^Plan week \d+ · / }))
     expect(screen.getByTestId('where').textContent).toMatch(/\|\{"write":true,"ref":true,"journal":true\}$/)
     expect(w.addTask).not.toHaveBeenCalled(); expect(w.updateTask).not.toHaveBeenCalled()
   })
 
-  // 2026-10-08 review: the same Fall line heads October's and November's
+  // 2026-10-08 review: the same Fall goal heads October's and November's
   // journal; a draft or a save in flight must stay with its own month.
   it('changing month gives fresh boxes; a save still running for October lands in October and never touches November', async () => {
     const d = deferred<string>()

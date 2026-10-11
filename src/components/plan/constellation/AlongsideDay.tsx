@@ -120,11 +120,11 @@ export function AlongsideDay({ children, tasks, date, update, complete, loading,
             <aside id="ad-week" className="ad-week cw-column" hidden={!showChoices}>
               <h2>This week</h2>
               <p className="ad-week-hint">Drag onto the day, or press + to plan it for {dayWord}. Its connections stay with it.</p>
-              {loading ? <p>Loading weekly actions…</p>
+              {loading ? <p>Loading this week’s tasks…</p>
                 : error ? <p role="alert">Could not load this week. <button onClick={retry}>Retry</button></p>
                 : <>
                   {!stillToPlace && <p className="ad-week-hint">Nothing else to place this week in the current filters.</p>}
-                  <CompactWeekList rows={rows} label="This week’s actions"
+                  <CompactWeekList rows={rows} label="This week’s tasks"
                     addLabel={(title) => `Add ${title} to ${dayWord}`}
                     onAdd={(t) => { void place(t.id) }}
                     onComplete={complete ? toggle : undefined}

@@ -41,7 +41,7 @@ const TRIP = month('m1', 'Plan the autumn trip')
 const SHED = month('m2', 'Clear out the shed')
 const BOILER = task({ id: 'm3', title: 'Book the boiler service', bucket: 'week', monthStart: OCT, weekStart: WEEK,
   commitments: [{ level: 'month', periodStart: OCT, status: 'open' }, { level: 'week', periodStart: WEEK, status: 'open' }] })
-const PRIVATE = month('mp', 'Another person’s private October line', { assignedTo: 'partner' })
+const PRIVATE = month('mp', 'Another person’s private October goal', { assignedTo: 'partner' })
 const FIXTURE = [TRIP, SHED, BOILER, PRIVATE,
   weekItem('w1', 'Book the cabin', { sourceId: 'm1' }), weekItem('w2', 'Ask for time off', { sourceId: 'm1' }),
   weekItem('w3', 'Go through the onboarding checklist'), weekItem('w4', 'Draft a note for them', { sourceId: 'mp' }),
@@ -62,32 +62,32 @@ const box = (sectionName: RegExp) => within(section(sectionName)).getByRole('tex
 const deferred = <T,>() => { let resolve!: (v: T) => void; const promise = new Promise<T>((r) => { resolve = r }); return { promise, resolve } }
 
 describe('Week · Open journal — mapping and filtering', () => {
-  it('each October priority stands beside its week actions; unlinked work is in “Everything else”', () => {
+  it('each October goal stands beside its week actions; unlinked work is in “Everything else”', () => {
     render(ui(FIXTURE))
     toWrite()
     expect(within(section(/^For October: Plan the autumn trip/)).getAllByRole('listitem').map((li) => li.textContent)).toEqual([
       expect.stringContaining('Book the cabin'), expect.stringContaining('Ask for time off'),
     ])
     expect(within(section(/^For October: Clear out the shed/)).getByText('Call the plumber')).toBeInTheDocument()
-    const general = section(/Not tied to an October priority/)
+    const general = section(/Not tied to an October goal/)
     expect(within(general).getByText('Go through the onboarding checklist')).toBeInTheDocument()
   })
 
   it('a priority only another person can see makes no section and no title; its action is in Everything else', () => {
     render(ui(FIXTURE))
     toWrite()
-    expect(screen.queryByText('Another person’s private October line')).toBeNull()
-    expect(screen.queryByRole('region', { name: /private October line/ })).toBeNull()
-    expect(within(section(/Not tied to an October priority/)).getByText('Draft a note for them')).toBeInTheDocument()
+    expect(screen.queryByText('Another person’s private October goal')).toBeNull()
+    expect(screen.queryByRole('region', { name: /private October goal/ })).toBeNull()
+    expect(within(section(/Not tied to an October goal/)).getByText('Draft a note for them')).toBeInTheDocument()
   })
 
-  it('a month line also taken into the week stays visible, as itself, in its own section', () => {
+  it('a month goal also taken into the week stays visible, as itself, in its own section', () => {
     render(ui(FIXTURE))
     toWrite()
     const own = section(/^For October: Book the boiler service/)
     const row = within(own).getByRole('listitem')
     expect(row).toHaveTextContent('Book the boiler service')
-    expect(row).toHaveTextContent('This October line itself is on the week')
+    expect(row).toHaveTextContent('This October goal itself is on the week')
   })
 
   it('each action’s “when” control is still there while writing', () => {
@@ -99,15 +99,15 @@ describe('Week · Open journal — mapping and filtering', () => {
   it('Open journal is the default; choosing Lists is this device’s choice and is kept', () => {
     const { unmount } = render(ui(FIXTURE, null))
     toWrite()
-    expect(screen.getByRole('region', { name: /This week, by October priority/ })).toBeInTheDocument()
+    expect(screen.getByRole('region', { name: /This week, by October goal/ })).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Lists' }))
-    expect(screen.queryByRole('region', { name: /This week, by October priority/ })).toBeNull()
+    expect(screen.queryByRole('region', { name: /This week, by October goal/ })).toBeNull()
     expect(localStorage.getItem('symphony-plan-layout.week')).toBe('lists')
     expect(Object.keys(localStorage).filter((k) => !k.startsWith('symphony-plan-layout.') && k !== 'symphony-week-ref')).toEqual([])
     unmount()
     render(ui(FIXTURE, null))
     toWrite()
-    expect(screen.queryByRole('region', { name: /This week, by October priority/ })).toBeNull() // Lists, as chosen
+    expect(screen.queryByRole('region', { name: /This week, by October goal/ })).toBeNull() // Lists, as chosen
   })
 })
 
@@ -135,7 +135,7 @@ describe('Week · Open journal — writing actions', () => {
     await waitFor(() => expect(h.addTask).toHaveBeenCalledWith('Compare two cabins', undefined, undefined, undefined, expect.objectContaining({ sourceId: 'm1' })))
   })
 
-  it('nothing is promoted: adding an action never moves or changes the October priority', async () => {
+  it('nothing is promoted: adding an action never moves or changes the October goal', async () => {
     render(ui(FIXTURE))
     toWrite()
     const input = box(/^For October: Plan the autumn trip/)
@@ -164,9 +164,9 @@ describe('Week · Open journal — writing actions', () => {
     h.addTask.mockResolvedValueOnce(undefined)
     render(ui(FIXTURE))
     toWrite()
-    const input = box(/Not tied to an October priority/)
+    const input = box(/Not tied to an October goal/)
     fireEvent.change(input, { target: { value: 'Return the drill' } }); fireEvent.submit(input.closest('form')!)
-    expect(await within(section(/Not tied to an October priority/)).findByRole('alert')).toHaveTextContent('That didn’t save')
+    expect(await within(section(/Not tied to an October goal/)).findByRole('alert')).toHaveTextContent('That didn’t save')
     expect(input.value).toBe('Return the drill')
     expect(h.addTask.mock.calls[0][4].sourceId).toBeUndefined()
   })
@@ -174,7 +174,7 @@ describe('Week · Open journal — writing actions', () => {
   it('the priority’s own done is separate from its actions’', async () => {
     render(ui(FIXTURE))
     toWrite()
-    fireEvent.click(screen.getByRole('button', { name: 'Mark October priority Plan the autumn trip done' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Mark October goal Plan the autumn trip done' }))
     await waitFor(() => expect(h.toggleTask).toHaveBeenCalledWith('m1'))
     expect(h.toggleTask).toHaveBeenCalledTimes(1)
   })
@@ -182,7 +182,7 @@ describe('Week · Open journal — writing actions', () => {
   it('an unlinked action can be linked from Everything else, on the same row', async () => {
     render(ui(FIXTURE))
     toWrite()
-    fireEvent.click(within(section(/Not tied to an October priority/)).getByRole('button', { name: 'Link Go through the onboarding checklist to an October line' }))
+    fireEvent.click(within(section(/Not tied to an October goal/)).getByRole('button', { name: 'Link Go through the onboarding checklist to an October goal' }))
     fireEvent.click(screen.getByRole('menuitemradio', { name: 'Clear out the shed' }))
     await waitFor(() => expect(h.updateTask).toHaveBeenCalledWith('w3', { sourceId: 'm2' }))
   })
@@ -190,16 +190,16 @@ describe('Week · Open journal — writing actions', () => {
   it('the footer says how many priorities have nothing this week, and one onward step serves the whole page', () => {
     const { unmount } = render(ui(FIXTURE))
     toWrite()
-    expect(screen.getByText('Each October priority has something this week.')).toBeInTheDocument()
+    expect(screen.getByText('Each October goal has something this week.')).toBeInTheDocument()
     unmount()
     render(ui([...FIXTURE, month('m4', 'Sort the winter clothes')]))
     toWrite()
-    expect(screen.getByText('1 October priority has nothing this week yet — you can leave it for later.')).toBeInTheDocument()
-    expect(section(/^For October: Sort the winter clothes/)).toHaveTextContent('No weekly actions for it yet')
+    expect(screen.getByText('1 October goal has nothing this week yet — you can leave it for later.')).toBeInTheDocument()
+    expect(section(/^For October: Sort the winter clothes/)).toHaveTextContent('No tasks for it this week yet')
     expect(screen.getAllByRole('button', { name: /Choose what to do today/ })).toHaveLength(1)
   })
 
-  // 2026-10-08 review: the same October priority heads this week and next.
+  // 2026-10-08 review: the same October goal heads this week and next.
   it('another week gives fresh boxes; a save still running lands in its own week and never touches the next', async () => {
     const d = deferred<string>()
     h.addTask.mockReturnValueOnce(d.promise)

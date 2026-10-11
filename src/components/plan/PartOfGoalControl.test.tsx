@@ -67,7 +67,7 @@ describe('Part of… in task details (walkthrough 2026-10-02, #26)', () => {
     fireEvent.click(screen.getByRole('menuitemradio', { name: /None/ }))
     expect(setGoalLink).toHaveBeenCalledWith('t1', null, 'g-oct')
     await waitFor(() => expect(toastSpy).toHaveBeenCalled())
-    expect(toastSpy.mock.calls[0][0]).toMatch(/is no longer a next action for that goal/)
+    expect(toastSpy.mock.calls[0][0]).toMatch(/is no longer a task for that goal/)
   })
 
   it('reports a change someone else made, never overwriting it', async () => {

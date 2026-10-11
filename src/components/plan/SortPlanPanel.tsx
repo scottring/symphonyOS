@@ -58,7 +58,7 @@ export function SortPlanPanel({ periodLabel, candidates, onConfirm, onClose }: {
             Organize {periodLabel}’s list: which are goals or projects?
           </h3>
           <p className="mt-1 text-[13px] leading-snug text-neutral-500">
-            Tick the ones that are bigger than a single action — they become {periodLabel}’s goals, and you can then add month goals and next actions under them. Leave the single actions unticked. You’ll see a preview before anything changes.
+            Tick the ones that are bigger than a single task — they become {periodLabel}’s goals, and you can then add month goals and tasks under them. Leave the single tasks unticked. You’ll see a preview before anything changes.
           </p>
           <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-[13px]">
             <button type="button" onClick={() => setChosen(new Set(eligible.map((c) => c.task.id)))}
@@ -114,12 +114,12 @@ export function SortPlanPanel({ periodLabel, candidates, onConfirm, onClose }: {
           </ul>
           <ul className="mt-3 list-disc space-y-1 pl-5 text-[13px] leading-snug text-neutral-600">
             <li>The same items, not copies: their notes, links, people, area and history stay exactly as they are.</li>
-            <li>Nothing is scheduled or unscheduled. Goals stay on {periodLabel}; their next actions are what go into weeks.</li>
+            <li>Nothing is scheduled or unscheduled. Goals stay on {periodLabel}; their tasks are what go into weeks.</li>
             {preview.untagged.length > 0 && (
               <li>{preview.untagged.length} {preview.untagged.length === 1 ? 'has' : 'have'} no area, so {preview.untagged.length === 1 ? 'it stays' : 'they stay'} private to {preview.untagged.length === 1 ? 'its' : 'their'} owner, as now.</li>
             )}
-            <li>{preview.staying.length} {preview.staying.length === 1 ? 'stays a single action' : 'stay single actions'}.</li>
-            <li>Undo stays on this page, in this browser. Anywhere else, open a goal that has no next actions and choose “Make it a single action”.</li>
+            <li>{preview.staying.length} {preview.staying.length === 1 ? 'stays a single task' : 'stay single tasks'}.</li>
+            <li>Undo stays on this page, in this browser. Anywhere else, open a goal that has no tasks and choose “Make it a single task”.</li>
           </ul>
           {failed.length > 0 && (
             <p role="alert" className="mt-3 text-sm text-red-700">

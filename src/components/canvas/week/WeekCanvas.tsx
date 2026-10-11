@@ -155,7 +155,7 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
   const selectedKey = chosenDay && days.some((d) => d.key === chosenDay) ? chosenDay : (days.find((d) => d.key === todayKey) ?? days[0])?.key
 
   const dates = days.map((d) => d.date)
-  const subtitle = `${isCurrent ? 'This week' : `Week of ${weekStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`} · actions grouped under ${monthName}’s milestones`
+  const subtitle = `${isCurrent ? 'This week' : `Week of ${weekStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`} · tasks grouped under ${monthName}’s goals`
 
   // ── what is where ─────────────────────────────────────────────────────
   const shelfTasks = new Map<string, Task>()
@@ -243,7 +243,7 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
       ]} />
     }
     const o = writers.moveUnderOptions(t)
-    return o && <MoveUnderMenu item={o.item} parents={o.parents} parentTerm={`${monthName} milestone`} open
+    return o && <MoveUnderMenu item={o.item} parents={o.parents} parentTerm={`${monthName} goal`} open
       onOpenChange={(v) => { if (!v) close() }} onPick={(p) => { close(); writers.moveUnder(t, p) }} />
   }
   const moreButton = (title: string, key: string, items: { label: string; onSelect: () => void }[], size = 16) => (
@@ -290,7 +290,7 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
                 <CanvasMenu label={`${title}`} onClose={() => setMenu(null)} items={[
                   { label: 'Mark done', onSelect: () => writers.milestoneDone(g.milestone!.id) },
                   { label: 'Open details', onSelect: () => writers.open(`task-${g.milestone!.id}`) },
-                  { label: 'Add an action', onSelect: () => setComposer(g.key) },
+                  { label: 'Add a task', onSelect: () => setComposer(g.key) },
                   ...(g.milestone.onWeek ? [] : [{ label: 'Put on this week', onSelect: () => writers.putOnWeek(g.milestone!.id) }]),
                 ]} />
               )}
@@ -298,7 +298,7 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
           )}
         </div>
         {rows.length > 0 && <ul className="cw-rows">{rows.map((r) => shelfRow(r.task, r.meta, g.key))}</ul>}
-        <Composer open={composer === g.key} label={g.milestone ? `Add an action for ${title}` : 'Add something for this week'}
+        <Composer open={composer === g.key} label={g.milestone ? `Add a task for ${title}` : 'Add something for this week'}
           area={isArea(g.milestone?.context) ? g.milestone.context : g.milestone ? undefined : defaultArea}
           onOpen={() => setComposer(g.key)} onClose={() => setComposer(null)}
           onAdd={(text, area) => writers.addAction(text, g.milestone?.id, area)} />
@@ -353,7 +353,7 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
       {quiet.length > 0 && (
         <>
           <p className="wc-quiet-line">
-            Also in {monthName}: {quiet.length === 1 ? 'one milestone' : `${quiet.length} milestones`} with nothing this week{' '}·{' '}
+            Also in {monthName}: {quiet.length === 1 ? 'one goal' : `${quiet.length} goals`} with nothing this week{' '}·{' '}
             <button type="button" className="canvas-link wc-quiet-link" aria-expanded={quietOpen} onClick={() => setQuietOpen((o) => !o)}>{quietOpen ? 'Hide' : 'Show'}</button>
           </p>
           {quietOpen && <div className="wc-masonry">{quiet.map(groupCard)}</div>}

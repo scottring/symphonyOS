@@ -42,7 +42,7 @@ export function WeekListV2({ title, lines, weekStart, members, actions, timingCo
   forOptions?: { month: string; lines: { id: string; title: string }[] }
   /** Set, change or remove a row's month line after it was written. */
   onForLine?: (task: Task, lineId: string | null) => void
-  /** The month line new actions are for, held by the page so the month's
+  /** The month goal new tasks are for, held by the page so the month's
    *  "Add a weekly action" can choose it (rapid entry, 2026-10-08). */
   forId?: string
   onForId?: (id: string) => void
@@ -141,21 +141,21 @@ export function WeekListV2({ title, lines, weekStart, members, actions, timingCo
       <form className="pv2-write" onSubmit={(e) => { e.preventDefault(); void submit() }}>
         <span className="pv2-wl-check" aria-hidden="true" />
         <input ref={addRef} value={draft} onChange={(e) => box.setDraft(e.target.value)}
-          placeholder={chosen ? `A weekly action for “${chosen.title}”` : 'Add something for this week'} aria-label="Add to this week"
+          placeholder={chosen ? `A task this week for “${chosen.title}”` : 'Add something for this week'} aria-label="Add to this week"
           aria-describedby={forOptions && forOptions.lines.length > 0 ? forDescId : undefined} aria-busy={saving || undefined} />
         {addPicker}
       </form>
       {saving && <p className="wk-addsaving" role="status">Saving…</p>}
       {failed && <p className="wk-addfail" role="alert">That didn’t save — your words are still in the box. Press Enter to try again.</p>}
       {forOptions && forOptions.lines.length > 0 && (
-        // Optional: which month line new actions are for. Nothing asks you to
+        // Optional: which month goal new tasks are for. Nothing asks you to
         // choose; once chosen it stays for the next one until changed.
-        <div className={`wk-forpick${chosen ? ' is-set' : ''}`} role="group" aria-label={`Which ${forOptions.month} line new actions are for`}>
+        <div className={`wk-forpick${chosen ? ' is-set' : ''}`} role="group" aria-label={`Which ${forOptions.month} goal new tasks are for`}>
           <span id={forDescId} aria-live="polite" className="wk-foractive">
-            {chosen ? <>Adding for {forOptions.month}: <b>{chosen.title}</b></> : <>Not tied to {anOrA(forOptions.month)} {forOptions.month} line</>}
+            {chosen ? <>Adding for {forOptions.month}: <b>{chosen.title}</b></> : <>Not tied to {anOrA(forOptions.month)} {forOptions.month} goal</>}
           </span>
-          <select aria-label={`For ${anOrA(forOptions.month)} ${forOptions.month} line`} value={chosen?.id ?? ''} onChange={(e) => setForId(e.target.value)}>
-            <option value="">No {forOptions.month} line</option>
+          <select aria-label={`For ${anOrA(forOptions.month)} ${forOptions.month} goal`} value={chosen?.id ?? ''} onChange={(e) => setForId(e.target.value)}>
+            <option value="">No {forOptions.month} goal</option>
             {forOptions.lines.map((l) => <option key={l.id} value={l.id}>{l.title}</option>)}
           </select>
           {chosen && <button type="button" className="pv2-link pv2-quiet" onClick={() => { setForId(''); addRef.current?.focus() }}>Clear</button>}

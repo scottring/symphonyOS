@@ -4,7 +4,7 @@
 const LABELS: Record<string, string> = {
   symphony_create_plan_item: 'Adding to your plan…',
   symphony_link_plan_item: 'Connecting plan items…',
-  symphony_update_intention: 'Updating an intention…',
+  symphony_update_intention: 'Updating a year goal…',
   symphony_create_task: 'Adding a task…',
   symphony_create_calendar_event: 'Adding to the calendar…',
   symphony_update_task: 'Updating a task…',

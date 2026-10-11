@@ -90,7 +90,7 @@ describe('PlanPageV2 — the next horizon, beneath the whole list', () => {
     tasksHook.tasks = [octLine]
     renderAt('month', '2026-10-01')
     const button = screen.getByRole('button', { name: /^Plan week \d+ · Oct \d+ – Oct \d+ →$/ })
-    expect(screen.getByRole('group', { name: 'Next step' })).toHaveTextContent('Not every priority needs something every week')
+    expect(screen.getByRole('group', { name: 'Next step' })).toHaveTextContent('Not every goal needs something every week')
     fireEvent.click(button)
     expect(screen.getByTestId('where').textContent).toMatch(/^\/week\?start=2026-10-\d\d\|\{"write":true,"ref":true\}$/)
   })

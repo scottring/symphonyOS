@@ -102,13 +102,13 @@ export function verdictOptions(isGoal: boolean, level: SessionLevel = 'month'): 
     return [{ verdict: 'keep', label: 'Keep' }, { verdict: 'done', label: 'Done' },
       { verdict: 'drop', label: 'Drop' }]
   }
-  // A week row is a task: there is no goal to add a next action to.
+  // A week row is a task: there is no goal to add a task to.
   if (level === 'week') {
     return [{ verdict: 'keep', label: 'Keep' }, { verdict: 'done', label: 'Done' },
       { verdict: 'someday', label: 'Someday' }, { verdict: 'drop', label: 'Drop' }]
   }
   return isGoal
-    ? [{ verdict: 'keep', label: 'Keep' }, { verdict: 'keep-action', label: 'Keep, and add a next action' }, { verdict: 'done', label: 'Done' },
+    ? [{ verdict: 'keep', label: 'Keep' }, { verdict: 'keep-action', label: 'Keep, and add a task' }, { verdict: 'done', label: 'Done' },
        { verdict: 'someday', label: 'Someday' }, { verdict: 'drop', label: 'Drop' }]
     : [{ verdict: 'keep', label: 'Keep' }, { verdict: 'done', label: 'Done' },
        { verdict: 'someday', label: 'Someday' }, { verdict: 'drop', label: 'Drop' }]
@@ -253,7 +253,7 @@ export function summarize(
       lines.push({ title: t.title, destination: `${list} · ${L.kept}` })
       alsoCarries(t)
       const a = d.actionTitles[t.id]?.trim()
-      if (a) lines.push({ title: a, destination: `${L.list} · new next action toward ${t.title}` })
+      if (a) lines.push({ title: a, destination: `${L.list} · new task toward ${t.title}` })
     }
     else if (v === 'done') lines.push({ title: t.title, destination: L.done })
     else if (v === 'someday') lines.push({ title: t.title, destination: 'Someday page' })

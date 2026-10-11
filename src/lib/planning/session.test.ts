@@ -38,7 +38,7 @@ describe('lookBackRows', () => {
 })
 
 describe('verdictOptions', () => {
-  it('offers "Keep, and add a next action" to goals only', () => {
+  it('offers "Keep, and add a task" to goals only', () => {
     expect(verdictOptions(true).map((o) => o.verdict)).toEqual(['keep', 'keep-action', 'done', 'someday', 'drop'])
     expect(verdictOptions(false).map((o) => o.verdict)).toEqual(['keep', 'done', 'someday', 'drop'])
   })
@@ -61,7 +61,7 @@ describe('summarize', () => {
     const lines = summarize(d, { open: [goal, lib, photos, saw], above: [bids], aboveGoals: [sg], periodLabel: 'October', prevLabel: 'September', aboveLabel: 'the season' })
     expect(lines).toEqual([
       { title: 'Strength 2x/week', destination: 'October goals · kept from September' },
-      { title: 'Book a PT evaluation', destination: 'October tasks · new next action toward Strength 2x/week' },
+      { title: 'Book a PT evaluation', destination: 'October tasks · new task toward Strength 2x/week' },
       { title: 'Library card', destination: 'October tasks · kept from September' },
       { title: 'Photos', destination: "Dropped from September · back to the Inbox" },
       // No verdict: Save never writes it, so it is marked as untouched and
@@ -126,7 +126,7 @@ describe('pruneDraft', () => {
     expect(p.wentWell).toBe('w')
   })
 
-  it('keeps a goal already carried by a half-finished save, so its next action is still written and shown', () => {
+  it('keeps a goal already carried by a half-finished save, so its task is still written and shown', () => {
     // The goal landed in October (no longer open in September); its action did not.
     const g = t({ id: 'g', title: 'Strength', isGoal: true })
     const d = { ...emptyDraft('month', oct, sep), verdicts: { g: 'keep-action' as const }, actionTitles: { g: 'Book PT' }, actionIds: { g: 'A1' }, keptAlready: ['g'] }
@@ -134,14 +134,14 @@ describe('pruneDraft', () => {
     expect(p).toEqual(d)
     expect(summarize(p, { open: [], above: [], aboveGoals: [], current: [g], periodLabel: 'October', prevLabel: 'September', aboveLabel: 'the season' })).toEqual([
       { title: 'Strength', destination: 'October goals · kept from September' },
-      { title: 'Book PT', destination: 'October tasks · new next action toward Strength' },
+      { title: 'Book PT', destination: 'October tasks · new task toward Strength' },
     ])
   })
 
   // Re-review N1: the goal's own carry landed but a step's failed, so keepForward
   // reported failure and keptAlready was never set. The goal is now on October
   // (current), not September (open). Its verdict must survive so Save again
-  // retries the step, and a named next action must not vanish.
+  // retries the step, and a named task must not vanish.
   it('keeps the verdict of a goal already carried whose Keep has not finished (keep and keep-action)', () => {
     const g = t({ id: 'g', title: 'Porch', isGoal: true })
     const step = t({ id: 's', title: 'Buy chairs', goalTaskId: 'g', commitments: [{ level: 'month', periodStart: sep, status: 'open' }] })
@@ -156,7 +156,7 @@ describe('pruneDraft', () => {
     }
     const d = { ...emptyDraft('month', oct, sep), verdicts: { g: 'keep-action' as const }, actionTitles: { g: 'Sand' }, actionIds: { g: 'A1' } }
     expect(summarize(d, { open: [step], above: [], aboveGoals: [], current: [g], periodLabel: 'October', prevLabel: 'September', aboveLabel: 'the season' }))
-      .toContainEqual({ title: 'Sand', destination: 'October tasks · new next action toward Porch' })
+      .toContainEqual({ title: 'Sand', destination: 'October tasks · new task toward Porch' })
   })
 
   it('returns the same draft object when nothing is stale', () => {
@@ -210,7 +210,7 @@ describe('week sessions', () => {
     expect(r.open.map((x) => x.id)).toEqual(['o'])
   })
 
-  it('a week row never offers "Keep, and add a next action"', () => {
+  it('a week row never offers "Keep, and add a task"', () => {
     expect(verdictOptions(false, 'week').map((o) => o.verdict)).toEqual(['keep', 'done', 'someday', 'drop'])
     expect(verdictOptions(true, 'week').map((o) => o.verdict)).toEqual(['keep', 'done', 'someday', 'drop'])
   })

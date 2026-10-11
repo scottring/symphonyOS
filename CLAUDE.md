@@ -37,6 +37,7 @@ Users can capture urgent work directly; the cascade is not mandatory.
 - Lists above the week are for looking; the week and the day are for doing.
   Year is reference, a season is a brainstorm list, a month is a plain list
   written with its season beside it. No goal/task split above the week.
+- Names: Year, Season and Month hold goals; Week and Day hold tasks.
 - Planning a task for today should preserve its broader commitments.
 - Weeks and other periods have explicit dates.
 - Routines are repeating patterns; occurrences are individual commitments.

@@ -48,7 +48,7 @@ Respond with ONLY a JSON object (no markdown fences, no prose):
 // to show, just the rewrite the coach hint's Sharpen button drops straight
 // into the draft input.
 function buildBetPrompt(title: string): string {
-  return `Rewrite the given season intention as a single outcome sentence: the end-state that will be true by the end of the season, concrete and verifiable, under 12 words, no "start/continue/work on" phrasing. Return only the rewritten sentence.
+  return `Rewrite the given season goal as a single outcome sentence: the end-state that will be true by the end of the season, concrete and verifiable, under 12 words, no "start/continue/work on" phrasing. Return only the rewritten sentence.
 
 "${title}"`
 }

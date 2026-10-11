@@ -638,12 +638,12 @@ export function questionFor(d: VoicePlanDraft, h: Horizon, labels: PeriodLabels)
       }
     case 'season':
       return free
-        ? { prompt: `Anything else for ${labels.season}?`, hint: 'Something not tied to a year goal. Optional.', placeholder: 'A line for the season' }
-        : { prompt: `By the end of ${labels.season}, what would show “${goal}” moving?`, hint: 'A milestone you could point to — or nothing this season.', placeholder: 'A milestone, in a line' }
+        ? { prompt: `Anything else for ${labels.season}?`, hint: 'Something not tied to a year goal. Optional.', placeholder: 'A season goal, in a line' }
+        : { prompt: `By the end of ${labels.season}, what would show “${goal}” moving?`, hint: 'A season goal you could point to — or nothing this season.', placeholder: 'A season goal, in a line' }
     case 'month':
       return free
-        ? { prompt: `Anything else for ${labels.month}?`, hint: 'Something not tied to a year goal. Optional.', placeholder: 'A line for the month' }
-        : { prompt: `What is ${labels.month}’s part of “${goal}”?`, hint: 'A priority for the month, in a line — or nothing this month.', placeholder: 'A priority, in a line' }
+        ? { prompt: `Anything else for ${labels.month}?`, hint: 'Something not tied to a year goal. Optional.', placeholder: 'A month goal, in a line' }
+        : { prompt: `What is ${labels.month}’s part of “${goal}”?`, hint: 'A goal for the month, in a line — or nothing this month.', placeholder: 'A month goal, in a line' }
     case 'week':
       return { prompt: 'What will you do this week?', hint: 'One list for all your goals. Keep it to what fits around everything else.', placeholder: 'A task, in a line' }
     case 'today':

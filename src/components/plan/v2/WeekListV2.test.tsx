@@ -9,9 +9,9 @@ const actions = { done: vi.fn(), carry: vi.fn(), drop: vi.fn(), assign: vi.fn(),
 const base = { title: 'This week', weekStart: new Date(2026, 8, 27), members: [], actions, onContext: vi.fn(), onAdd: vi.fn() }
 
 // Scott, 2026-10-04: lists above the week are for looking, not linking. A
-// week row is the week's own work: it names no month line or goal.
+// week row is the week's own work: it names no month goal or goal.
 describe('WeekListV2 — the week’s own list', () => {
-  it('a row that came from a month line is just a row', () => {
+  it('a row that came from a month goal is just a row', () => {
     const step = task({ id: 's', title: 'Buy hooks', goalTaskId: 'g', sourceId: 'm' })
     render(<WeekListV2 {...base} lines={[{ task: step, fate: 'open', partOf: null, where: null }]} />)
     expect(screen.getByText('Buy hooks')).toBeInTheDocument()
@@ -36,16 +36,16 @@ describe('WeekListV2 — the week’s own list', () => {
     expect(screen.getByText('Toss umbrella')).toBeInTheDocument()
   })
 
-  it('a row written for a month line says so', () => {
+  it('a row written for a month goal says so', () => {
     const t = task({ id: 'w', title: 'Book Thanksgiving flights' })
     render(<WeekListV2 {...base} lines={[{ task: t, fate: 'open', partOf: null, where: null }]} forLine={() => ({ id: 'm', title: 'Plan Thanksgiving', month: 'October' })} />)
     expect(screen.getByText('for October: Plan Thanksgiving')).toBeInTheDocument()
   })
 
-  it('a new line can be written for an October line, optionally', () => {
+  it('a new line can be written for an October goal, optionally', () => {
     const onAdd = vi.fn().mockResolvedValue(undefined)
     render(<WeekListV2 {...base} onAdd={onAdd} lines={[]} forOptions={{ month: 'October', lines: [{ id: 'm', title: 'Plan Thanksgiving' }] }} />)
-    fireEvent.change(screen.getByLabelText('For an October line'), { target: { value: 'm' } })
+    fireEvent.change(screen.getByLabelText('For an October goal'), { target: { value: 'm' } })
     const input = screen.getByLabelText('Add to this week')
     fireEvent.change(input, { target: { value: 'Book flights' } })
     fireEvent.submit(input.closest('form')!)
@@ -61,8 +61,8 @@ describe('WeekListV2 — the week’s own list', () => {
     expect(screen.getByText('Monday passed — give it another day?')).toBeInTheDocument()
   })
 
-  // Canvas design, 2026-10-10: the week's list grouped by month line.
-  it('groups waiting rows under their month line, one row carrying it as its own note, Unlinked last', () => {
+  // Canvas design, 2026-10-10: the week's list grouped by month goal.
+  it('groups waiting rows under their month goal, one row carrying it as its own note, Unlinked last', () => {
     const lines = ['a', 'b', 'c', 'd'].map((id) => ({ task: task({ id, title: `Row ${id}` }), fate: 'open' as const, partOf: null, where: null }))
     const forLine = (t: Task) => t.id === 'a' || t.id === 'c' ? { id: 'm1', title: 'Plan the trip', month: 'October' }
       : t.id === 'b' ? { id: 'm2', title: 'Sort the paperwork', month: 'October' } : null

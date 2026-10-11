@@ -36,7 +36,7 @@ export const pageOf = (s: GuideStep): Exclude<GuideStep, ReviewStep> => (s === '
 export const ROUTE_CHOICES: { id: GuideRoute; title: string; body: string; path: string }[] = [
   { id: 'pickup', title: 'Pick up where you are', body: 'Keep what’s already planned and fill in only what’s missing.', path: 'Only the steps that need you' },
   { id: 'bigger', title: 'The bigger picture', body: 'Connect the year ahead with what you can do next.', path: 'Year · Season · Month · Week · Today' },
-  { id: 'month', title: 'The month ahead', body: 'Choose priorities for the month and steps for this week.', path: 'Month · Week · Today' },
+  { id: 'month', title: 'The month ahead', body: 'Choose goals for the month and tasks for this week.', path: 'Month · Week · Today' },
   { id: 'week', title: 'This week', body: 'Work out what fits this week and what to do today.', path: 'Week · Today' },
   { id: 'today', title: 'Just today', body: 'Choose what needs your attention today.', path: 'Today' },
 ]
@@ -282,12 +282,12 @@ export function stepIdeas(step: GuideStep, s: GuideState, seasons: Seasons, week
       }
     case 'month':
       return {
-        prompt: `For each ${aboveName ?? 'season'} line beside the list, ask: what is ${here}’s part of it? One or two lines is plenty.`,
-        patterns: ['A milestone: “Kids’ rooms painted”', 'A first step on something new: “Book a trial piano lesson”', 'A decision with a date: “Pick break dates by the 15th”'],
+        prompt: `For each ${aboveName ?? 'season'} goal beside the list, ask: what is ${here}’s part of it? One or two goals is plenty.`,
+        patterns: ['An outcome: “Kids’ rooms painted”', 'A first step on something new: “Book a trial piano lesson”', 'A decision with a date: “Pick break dates by the 15th”'],
       }
     case 'week':
       return {
-        prompt: `For each ${aboveName ?? 'month'} line beside the list, ask: what is the very next thing someone could actually do — a call, an email, an errand?`,
+        prompt: `For each ${aboveName ?? 'month'} goal beside the list, ask: what is the very next thing someone could actually do — a call, an email, an errand?`,
         patterns: ['A call or email: “Email two piano teachers”', 'An errand: “Buy porch plant hooks”', 'A conversation: “Talk with Iris about break dates”'],
       }
     default:
@@ -387,15 +387,15 @@ export function pickUpRows(f: PickUpFacts, periods: Record<GuideStep, string>, t
       })
     }
     if (facts.open > 0 || facts.planned) {
-      rows.push({ step: lvl, name: here, detail: facts.open ? plural(facts.open, noun, `${noun.replace(/y$/, 'ie')}s`) : 'Marked planned', why: '', chip: 'In place', inPath: false, on: false })
+      rows.push({ step: lvl, name: here, detail: facts.open ? plural(facts.open, noun, `${noun}s`) : 'Marked planned', why: '', chip: 'In place', inPath: false, on: false })
     } else if (lvl === 'season') {
       rows.push({ step: lvl, name: here, detail: 'Nothing yet', why: 'Optional. Nothing on it yet; a season can stay unwritten.', chip: 'Optional', inPath: true, on: false })
     } else {
       rows.push({ step: lvl, name: here, detail: 'Nothing yet', why: `Nothing on it yet. ${above} sits beside the list.`, chip: 'Plan it', inPath: true, on: true })
     }
   }
-  level('season', 'priority', `${name('year')}’s goals`)
-  level('month', 'priority', `${name('season')}`)
+  level('season', 'goal', `${name('year')}’s goals`)
+  level('month', 'goal', `${name('season')}`)
 
   const weekStart = parseYmd(periods.week)
   const left = Math.round((weekStart.getTime() + 7 * DAY - t.getTime()) / DAY) - 1

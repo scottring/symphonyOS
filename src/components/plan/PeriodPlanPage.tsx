@@ -452,7 +452,7 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
         return
       }
       // The way back from a goal, on any device: the SAME row becomes a
-      // single action again, with Undo. Offered only while it holds no next
+      // single task again, with Undo. Offered only while it holds no next
       // actions — they would otherwise be left under a row that is no goal.
       // The write's own answer decides what is said: setGoal returns nothing,
       // so a refused save used to be announced as done (Codex, 2026-09-27).
@@ -461,9 +461,9 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
         showToast(`Couldn’t change “${row.title}”. It is still a goal — try again.`, 'error', 6000)
         return
       }
-      showToast(`“${row.title}” is a single action again. Nothing else changed.`, 'success', 8000, {
+      showToast(`“${row.title}” is a single task again. Nothing else changed.`, 'success', 8000, {
         label: 'Undo',
-        onClick: () => { void wrote(true).then((ok) => { if (!ok) showToast(`Couldn’t undo — “${row.title}” is still a single action.`, 'error', 6000) }) },
+        onClick: () => { void wrote(true).then((ok) => { if (!ok) showToast(`Couldn’t undo — “${row.title}” is still a single task.`, 'error', 6000) }) },
       })
     }
     else if (action === 'keep') {
@@ -508,11 +508,11 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
    * A look-back is read, not written into: no picker on a past period.
    */
   /**
-   * "Break into next actions" on a loose task row (nested horizons, Scott and
+   * "Break into tasks" on a loose task row (nested horizons, Scott and
    * Iris, 2026-09-26). A month or season holds OUTCOMES; the concrete next
    * actions are what go into a week or a day. A broad item — "Make the yard
    * nice enough to sit in" — is not pushed into a week whole: the same row
-   * becomes the goal that holds its next actions, stays on this list, and the
+   * becomes the goal that holds its tasks, stays on this list, and the
    * cursor lands in its next-action box. Explicit and undoable; nothing is
    * reclassified unless someone asks (goalConversion says when it can, task
    * details explain when it cannot). A simple one-step task needs none of
@@ -529,7 +529,7 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
     if (!t || !goalConversion(t, tasks).ok) return undefined
     return () => {
       const where = level === 'month' ? bounds.start.toLocaleDateString('en-US', { month: 'long' }) : bounds.label
-      void makeTaskAGoal(t, setGoal, `“${t.title}” now holds its next actions — it is a goal on ${where}. Add them below.`)
+      void makeTaskAGoal(t, setGoal, `“${t.title}” now holds its tasks — it is a goal on ${where}. Add them below.`)
         .then(() => setComposerFocusId(t.id))
     }
   }, [isPast, level, tasks, setGoal, bounds])
@@ -638,7 +638,7 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
   // writing to (Scott, 2026-09-13).
   // Goal-first (horizon flows, Scott, 2026-09-26): Year, Season and Month
   // hold outcomes, so the goal box is always open and comes first. A single
-  // action is still one press away — "+ Add a single action" — but it is the
+  // action is still one press away — "+ Add a single task" — but it is the
   // secondary route, not the page's default.
   const [goalDraft, setGoalDraft] = useState('')
   const [goalParent, setGoalParent] = useState('')
@@ -723,7 +723,7 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
       monthStart: level === 'month' ? bounds.start : undefined,
       seasonStart: level === 'season' ? bounds.start : undefined,
       goalTaskId: goalRow.id,
-      // A next action is born in its goal's life area (Scott and Iris,
+      // A task is born in its goal's life area (Scott and Iris,
       // 2026-09-26): an action under a Family goal is Family, so planning it
       // into a week does not stop to ask "Where does this belong?". It stays
       // editable like any area. A goal with no area falls back to the
@@ -739,7 +739,7 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
     }
   }, [level, bounds.start, soleDomain, addTask, tasks, gated, plannedInto])
   /** The weeks the next-action box offers — the month page only; a season's
-   *  next actions go into a month first. */
+   *  tasks go into a month first. */
   const stepWeeks = useMemo(() => (level === 'month'
     ? weeksOfMonth(bounds.start, readCadenceConfig().weekStartsOn).map((w) => ({ start: w.start, label: `Week of ${formatWeekRange(w.start)}` }))
     : undefined), [level, bounds.start])
@@ -925,7 +925,7 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
 
   const goalRows = useMemo(() => {
     if (!split) return rows.filter((r) => r.isGoal)
-    // A goal's next actions are ALL the tasks filed under it that the reader
+    // A goal's tasks are ALL the tasks filed under it that the reader
     // may see — not only the ones on this period's list. An existing action
     // filed here from the Inbox or another month keeps its own placement, so
     // it is drawn under the goal saying where it lives, never re-placed.
@@ -999,7 +999,7 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
   const availableTaskRows = openTaskRows.filter((r) => !r.placed)
 
   // ── Sorting an existing list into goals (horizon flows correction) ─────────
-  // An imported plan arrives flat — outcomes and single actions as equals —
+  // An imported plan arrives flat — outcomes and single tasks as equals —
   // and new-item defaults cannot fix what is already there. The sort is ONE
   // reviewed step over the whole list: pick, preview, confirm, undo.
   const sortLevel = level === 'season' ? 'season' : 'month'
@@ -1039,7 +1039,7 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
       const batch = { ids: [...new Set([...(sortBatch?.ids ?? []), ...landed])], at: Date.now() }
       writeSortBatch(level, periodYmd, batch)
       setSortBatch(batch)
-      showToast(`${shortLabelFor(level, bounds)} now has ${landed.length} new goal${landed.length === 1 ? '' : 's'}. Open one to add month goals or next actions.`, 'success', 7000)
+      showToast(`${shortLabelFor(level, bounds)} now has ${landed.length} new goal${landed.length === 1 ? '' : 's'}. Open one to add month goals or tasks.`, 'success', 7000)
     }
     if (missed.length === 0) setSortOpen(false)
     return missed
@@ -1057,14 +1057,14 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
     const next = remaining.length ? { ids: remaining, at: sortBatch.at } : null
     writeSortBatch(level, periodYmd, missed.length ? next : null)
     setSortBatch(missed.length ? next : null)
-    const parts = [`${revert.length - missed.length} back to single actions.`]
-    // The real reason, per goal: next actions, a supporting goal, or its own link.
+    const parts = [`${revert.length - missed.length} back to single tasks.`]
+    // The real reason, per goal: tasks, a supporting goal, or its own link.
     if (kept.length === 1) parts.push(`“${kept[0].task.title}” ${kept[0].reason.replace(/^It stays/, 'stays')}`)
-    else if (kept.length) parts.push(`${kept.length} kept as goals — each still has next actions or linked goals.`)
+    else if (kept.length) parts.push(`${kept.length} kept as goals — each still has tasks or linked goals.`)
     if (missed.length) parts.push(`${missed.length} didn’t change — try again.`)
     showToast(parts.join(' '), missed.length ? 'warning' : 'success', 7000)
   }, [sortBatch, tasks, updateTask, level, periodYmd])
-  /** A goal's verbs, plus the way back to a single action (month and season
+  /** A goal's verbs, plus the way back to a single task (month and season
    *  goals; a year goal is its own table). Offered on every open goal; when a
    *  relationship would be stranded, pressing it says which and why
    *  (goalToTaskConversion) — explained, never hidden, never unlinked. */
@@ -1074,7 +1074,7 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
   ], [isPast, level])
 
   // One row at a time is the wrong tool for a whole list: when the sort is on
-  // offer, the per-row "Break into next actions" link steps aside (it stays
+  // offer, the per-row "Break into tasks" link steps aside (it stays
   // in task details, and a lone candidate still gets it).
   const rowMakeGoal = sortableCount >= 2 ? undefined : makeGoalFor
   const sortBatchLive = sortBatch ? sortBatch.ids.filter((id) => tasks.find((t) => t.id === id)?.isGoal).length : 0
@@ -1619,8 +1619,8 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
             <p className="period-section-note">{level === 'year'
                 ? 'What do you want this year to add up to? Break a goal into season goals when you are ready.'
                 : level === 'season'
-                  ? 'The outcomes and projects this season is for. Break one into month goals, or add its next actions.'
-                  : 'The outcomes and projects this month is for. Add each one’s next actions and plan them into weeks — the goal stays here.'}</p>
+                  ? 'The outcomes and projects this season is for. Break one into month goals, or add its tasks.'
+                  : 'The outcomes and projects this month is for. Add each one’s tasks and plan them into weeks — the goal stays here.'}</p>
             {!sortOpen && sortBatchLive > 0 && (
               <p className="sort-plan-undo mt-2 flex flex-wrap items-center gap-x-2 px-1 text-[13px] text-neutral-500">
                 <span>{sortBatchLive} of these goals came from sorting {shortLabel}’s list.</span>
@@ -1725,7 +1725,7 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
                     const parent = goalParent || undefined
                     setGoalDraft('')
                     void addRow(t, true, parent).then((id) => {
-                      // A month goal is where next actions are written: open
+                      // A month goal is where tasks are written: open
                       // it with the cursor in its next-action box.
                       if (id && level === 'month') setComposerFocusId(id)
                     })
@@ -1767,9 +1767,9 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
               {/* Secondary by design (horizon flows): the page is for outcomes,
                   and a one-off action that needs no goal still has a home. */}
               <div className="flex flex-wrap items-baseline gap-x-3 px-1">
-                <h2 className="font-display text-xl text-neutral-700">Single actions</h2>
+                <h2 className="font-display text-xl text-neutral-700">Single tasks</h2>
                 {/* The repair is for a plan with NO goals yet; a populated
-                    plan's single actions are just single actions. */}
+                    plan's single tasks are just single tasks. */}
                 {!sortOpen && !sortProminent && goalRows.length === 0 && sortableCount >= 2 && (
                   <button type="button" onClick={() => setSortOpen(true)}
                     className="text-[13px] text-primary-700 hover:underline">
@@ -1786,7 +1786,7 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
                 <div className="sort-plan-prompt mt-2 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg border border-neutral-200 bg-bg-elevated px-3 py-2.5">
                   <p className="min-w-[14rem] flex-1 text-[13px] leading-snug text-neutral-600">
                     <span className="font-semibold text-neutral-800">One-time: organize this list.</span>{' '}
-                    These {sortableCount} came in as single actions. If some are really goals or projects, pick them once and they move up to {shortLabel}’s goals — the same items, nothing copied or lost.
+                    These {sortableCount} came in as single tasks. If some are really goals or projects, pick them once and they move up to {shortLabel}’s goals — the same items, nothing copied or lost.
                   </p>
                   <span className="flex shrink-0 items-center gap-2">
                     <button type="button" onClick={() => setSortOpen(true)}
@@ -1796,12 +1796,12 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
                 </div>
               ) : null}
               {looseRows.length > 0 && <p className="period-section-note">{level === 'month'
-                ? 'One-off work that needs no goal. Plan each into a week — or break a bigger one into next actions.'
-                : 'One-off work that needs no goal. Plan each into a month — or break a bigger one into next actions.'}</p>}
+                ? 'One-off work that needs no goal. Plan each into a week — or break a bigger one into tasks.'
+                : 'One-off work that needs no goal. Plan each into a month — or break a bigger one into tasks.'}</p>}
               <div className="mt-3">
                 {openTaskRows.length === 0 && doneTaskRows.length === 0 && assignedTaskRows.length === 0 && supportingTaskCount === 0 && !isPast ? (
                   // Nothing here at all: say nothing. The page's invitation is
-                  // the goal box above; a single action is one press below.
+                  // the goal box above; a single task is one press below.
                   null
                 ) : openTaskRows.length === 0 ? (
                   <p className="px-2 py-2 text-sm text-neutral-400">
@@ -1811,7 +1811,7 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
                         ? `Nothing was on this ${noun}'s list.`
                         : (
                           <>
-                            No single actions for this {noun}.{!savedSession && goalRows.length === 0 && (
+                            No single tasks for this {noun}.{!savedSession && goalRows.length === 0 && (
                               <>
                                 {' '}
                                 <button type="button" onClick={beginSession} disabled={!sessionReady}
@@ -1893,14 +1893,14 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
                       aria-label={`Add to this ${noun}`}
                       value={taskDraft}
                       onChange={(e) => setTaskDraft(e.target.value)}
-                      placeholder={`A single action for ${shortLabel}`}
+                      placeholder={`A single task for ${shortLabel}`}
                       className="min-w-0 flex-1 bg-transparent py-1.5 text-sm text-neutral-800 placeholder:text-neutral-400 focus:outline-none"
                     />
                   </form>
                 ) : (
                   <button type="button" onClick={() => setAddingTask(true)}
                     className="mt-1 px-2 py-1 text-[13px] text-neutral-500 transition-colors hover:text-primary-700">
-                    + Add a single action
+                    + Add a single task
                   </button>
                 ))}
               </div>
@@ -1954,10 +1954,10 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
             <NextLevelStrip
               heading={level === 'month' ? 'Plan work for a week' : level === 'season' ? 'Plan work for a month' : 'Plan a season'}
               note={level === 'month'
-                ? 'Next actions and tasks go into weeks; the goals stay here. Open a week to plan its days.'
+                ? 'Tasks go into weeks; the goals stay here. Open a week to plan its days.'
                 : level === 'season'
-                  ? 'Goals stay on the season. Open a month to add their next actions and plan its weeks.'
-                  : 'The year holds outcomes. Open a season to set its goals and next actions.'}
+                  ? 'Goals stay on the season. Open a month to add their tasks and plan its weeks.'
+                  : 'The year holds outcomes. Open a season to set its goals and tasks.'}
               choices={nextLevel}
               onOpen={(c) => navigate(c.href)}
             />

@@ -100,7 +100,7 @@ export function buildShelf({ weekTasks, tasks, milestones, weekStart, now = new 
       g = groups.get(line.id) ?? { key: `m:${line.id}`, milestone: known.get(line.id) ?? { id: line.id, title: line.title, completed: !!line.completed }, rows: [], done: [] }
       groups.set(line.id, g)
     }
-    const row = { task: t, meta: t.completed ? null : known.has(t.id) ? 'the milestone itself' : shelfRowMeta(t, weekStart, now) }
+    const row = { task: t, meta: t.completed ? null : known.has(t.id) ? 'the month goal itself' : shelfRowMeta(t, weekStart, now) }
     if (t.completed) g.done.push(row)
     else g.rows.push(row)
   }

@@ -50,7 +50,7 @@ interface TaskViewProps {
   /** Goals only: take a step out from under this goal. The task is kept,
    *  with its dates and commitments; only the link goes. */
   onRemoveStep?: (stepId: string) => void
-  /** A next action: the goal it serves (goal_task_id), read the same way the
+  /** A task: the goal it serves (goal_task_id), read the same way the
    *  plan rows read it (goalOfTask) — the other end of the goal's Steps. */
   stepOf?: SupportLink | null
   /** Take THIS task out from under its goal; the task is kept as it is. */
@@ -393,7 +393,7 @@ export function TaskViewRedesign({
                   hidden on a phone) — the reciprocal of the goal's Steps. */}
               {!isGoal && stepOf && (
                 <p className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-neutral-500">
-                  <span>Next action for</span>
+                  <span>Task for</span>
                   {onOpenGoalLink ? (
                     <button type="button" onClick={() => onOpenGoalLink(stepOf)} className="font-medium text-primary-700 hover:underline">
                       {stepOf.period ? `${stepOf.period} · ` : ''}{stepOf.title}

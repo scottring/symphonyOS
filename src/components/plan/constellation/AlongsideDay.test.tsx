@@ -69,7 +69,7 @@ it('draws the shared compact list: on-day rows marked, done rows behind a reveal
  const done={id:'done',title:'Pick a date',createdAt:date,completed:true} as Task
  const complete=vi.fn().mockResolvedValue(true)
  render(<MemoryRouter><AlongsideDay tasks={[month,task,second,placed,done]} date={date} update={vi.fn()} complete={complete} loading={false} error={false} retry={()=>{}}>Today</AlongsideDay></MemoryRouter>)
- const list=screen.getByRole('group',{name:'This week’s actions'})
+ const list=screen.getByRole('group',{name:'This week’s tasks'})
  expect(list).toHaveClass('cw-list')
  const group=screen.getByRole('region',{name:'Plan the autumn picnic'})
  expect(group).toHaveTextContent('Choose picnic spot')

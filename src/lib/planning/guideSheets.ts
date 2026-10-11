@@ -124,7 +124,7 @@ function whatThatMeans(): GuideBand {
     lead: 'Which area a line is written in is the signal. Nothing has to be worded a particular way.',
     blocks: [
       {
-        kind: 'lines', glyph: '☐', label: 'Next actions',
+        kind: 'lines', glyph: '☐', label: 'Tasks',
         hint: 'one thing you could sit down and do — neither a date nor an owner is required',
         count: 4, tail: ['who', 'when'],
       },
@@ -158,7 +158,7 @@ function whatThatMeansBriefly(): GuideBand {
     title: 'What that means',
     lead: 'Which area a line is written in is the signal.',
     blocks: [
-      { kind: 'lines', glyph: '☐', label: 'Next actions', hint: 'no date or owner required', count: 3, tail: ['who', 'when'] },
+      { kind: 'lines', glyph: '☐', label: 'Tasks', hint: 'no date or owner required', count: 3, tail: ['who', 'when'] },
       { kind: 'lines', glyph: '↻', label: 'Happens repeatedly', count: 2, tail: ['how often'] },
       { kind: 'lines', glyph: '▣', label: 'Fixed date and time', count: 2, tail: ['date', 'time'] },
       { kind: 'lines', glyph: '○', label: 'Not yet decided', hint: 'not a commitment', count: 2 },

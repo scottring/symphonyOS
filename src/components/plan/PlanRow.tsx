@@ -35,7 +35,7 @@ export interface PlanRowModel {
   /** The goals one rung DOWN that support this one. The same relationship,
    *  read from the other end, so a parent is never a dead end. */
   supportedBy?: SupportRef[]
-  /** A next action that is not on this page's own list — where it lives
+  /** A task that is not on this page's own list — where it lives
    *  ("Inbox", "Someday"); '' when its own timing control already says when.
    *  It is still this goal's, so it is drawn under it, saying so. */
   elsewhere?: string
@@ -80,7 +80,7 @@ const ACTION_LABEL: Record<Exclude<RowAction, 'complete'>, string> = {
   someday: 'Someday',
   drop: 'Drop',
   'make-goal': 'Make it a goal',
-  'make-task': 'Make it a single action',
+  'make-task': 'Make it a single task',
   'to-lower': 'Take it into',
   'under-goal': 'Link to goal',
   'off-goal': 'Remove from goal',
@@ -190,9 +190,9 @@ export function PlanRow({
    *  `weekStart` is set when the reader chose a week in the same breath. */
   onAddStep?: (row: PlanRowModel, title: string, weekStart?: Date) => void
   /** "Add an existing action": file a task already in Symphony under this
-   *  goal. Omitted where the goal takes no next actions, or in a look-back. */
+   *  goal. Omitted where the goal takes no tasks, or in a look-back. */
   onAddExisting?: (row: PlanRowModel) => void
-  /** The weeks a new next action may be planned into as it is written (the
+  /** The weeks a new task may be planned into as it is written (the
    *  month page). Omitted, the box writes the action onto the period alone. */
   stepWeeks?: ReadonlyArray<{ start: Date; label: string }>
   /** A goal's way to a SMALLER goal one rung down (year → season, season →
@@ -231,13 +231,13 @@ export function PlanRow({
    *  people are its own, never copied from its goal. Visible at every width,
    *  like the timing control: who is doing it is not a hover secret. */
   assign?: (row: PlanRowModel) => ReactNode
-  /** "Break into next actions" for a loose task row, or undefined where it
-   *  cannot be one. The SAME row becomes the goal that holds its next actions
+  /** "Break into tasks" for a loose task row, or undefined where it
+   *  cannot be one. The SAME row becomes the goal that holds its tasks
    *  (goalConversion); a visible labelled link, not a hover icon, because it
    *  changes what the row is. */
   makeGoal?: (row: PlanRowModel) => (() => void) | undefined
   /** Open this goal and put the cursor in its next-action box — the moment a
-   *  row has just been broken into next actions. */
+   *  row has just been broken into tasks. */
   focusComposer?: boolean
   onComposerFocused?: () => void
 }) {
@@ -272,7 +272,7 @@ export function PlanRow({
   const canHoldSteps = row.isGoal && row.kind === 'task' && (!!onAddStep || (row.steps?.length ?? 0) > 0)
   /** A goal shown shut: on a phone it is one compact entry — its people ride
    *  the "· show" line and its Move menu waits until it is opened. */
-  /** A year goal (its own table, no next actions) opens too — to its
+  /** A year goal (its own table, no tasks) opens too — to its
    *  refine and link controls — so every horizon's goals read quietly shut
    *  (product contract item 2, Codex 2026-09-27). */
   const opensForRefine = row.isGoal && row.kind === 'goal' && !!refine && !!onToggleExpand
@@ -285,7 +285,7 @@ export function PlanRow({
   const [stepWeek, setStepWeek] = useState('')
   const stepInputRef = useRef<HTMLInputElement>(null)
   /**
-   * "+ Add a next action" on a collapsed goal opens it AND puts the cursor in its
+   * "+ Add a task" on a collapsed goal opens it AND puts the cursor in its
    * composer. The focus waits for an effect rather than a frame: the page's
    * own goal composer focuses itself on render, and a rAF handoff lost the
    * race to it (seen live, 2026-09-24).
@@ -297,7 +297,7 @@ export function PlanRow({
     setWantStepFocus(false)
     onComposerFocused?.()
   }, [wantStepFocus, expanded, onComposerFocused])
-  // Asked from outside (just broken into next actions): open and focus once.
+  // Asked from outside (just broken into tasks): open and focus once.
   useEffect(() => {
     if (!focusComposer || !canHoldSteps) return
     setWantStepFocus(true)
@@ -348,7 +348,7 @@ export function PlanRow({
       {canOpen ? (
         <button
           type="button"
-          aria-label={`${expanded ? 'Hide' : 'Show'} ${canHoldSteps ? 'next actions under' : 'season goals for'} ${row.title}`}
+          aria-label={`${expanded ? 'Hide' : 'Show'} ${canHoldSteps ? 'tasks under' : 'season goals for'} ${row.title}`}
           aria-expanded={expanded}
           onClick={() => onToggleExpand?.(row)}
           className="period-row-caret mt-[3px] shrink-0 text-neutral-400 transition-colors hover:text-neutral-700"
@@ -390,12 +390,12 @@ export function PlanRow({
             as goals, not as a wall of controls (Scott, 2026-09-26). Opening
             is a real button (the caret, and the line below), never hover. */}
         {(!canHoldSteps || expanded) && goalControls}
-        {/* A goal that takes next actions carries its refine link on the same
-            line as "+ Add a next action" (below); a year goal has only this. */}
+        {/* A goal that takes tasks carries its refine link on the same
+            line as "+ Add a task" (below); a year goal has only this. */}
         {!!row.supportedBy?.length && (
           <SupportLine label="Supported by" refs={row.supportedBy} onOpen={onOpenSupport} />
         )}
-        {/* A goal that takes next actions carries its refine link on its
+        {/* A goal that takes tasks carries its refine link on its
             open line (below); a year goal has only this, after what it has. */}
         {!canOpen && refine}
         {/* A row that already serves a goal says so above; offering to link
@@ -404,8 +404,8 @@ export function PlanRow({
         {(() => {
           const toGoal = makeGoal?.(row)
           return toGoal ? (
-            <button type="button" onClick={toGoal} className="mt-1 block text-xs text-primary-700 hover:underline" aria-label={`Break ${row.title} into next actions`}>
-              Break into next actions
+            <button type="button" onClick={toGoal} className="mt-1 block text-xs text-primary-700 hover:underline" aria-label={`Break ${row.title} into tasks`}>
+              Break into tasks
             </button>
           ) : null
         })()}
@@ -419,12 +419,12 @@ export function PlanRow({
             <button ref={countsRef} type="button" onClick={() => onToggleExpand?.(row)}
               className={`period-goal-open inline-flex items-center text-primary-700 hover:underline ${expanded ? '' : 'min-h-[44px] sm:min-h-0'}`}>
               {canHoldSteps
-                ? (tally.total > 0 ? countsLabel(tally) : 'No next actions yet')
+                ? (tally.total > 0 ? countsLabel(tally) : 'No tasks yet')
                 : (supportCount > 0 ? `${supportCount} season goal${supportCount === 1 ? '' : 's'}` : 'No season goals yet')}
               {expanded ? ' · hide' : ' · show'}
             </button>
             {expanded && refine}
-            {/* No "+ Add a next action" link here: once a goal is open its
+            {/* No "+ Add a task" link here: once a goal is open its
                 next-action box is right below, and the link repeated it. */}
             {hiddenByFilter > 0 && (
               <span className="text-neutral-400">{hiddenByFilter} hidden by the filter</span>
@@ -545,10 +545,10 @@ export function PlanRow({
             </span>
             <input
               ref={stepInputRef}
-              aria-label={`New next action for ${row.title}`}
+              aria-label={`New task for ${row.title}`}
               value={stepDraft}
               onChange={(e) => setStepDraft(e.target.value)}
-              placeholder="Add a next action"
+              placeholder="Add a task"
               className="min-w-[10rem] flex-1 bg-transparent py-1.5 text-[15px] text-neutral-800 placeholder:text-neutral-400 focus:outline-none"
             />
             {/* The week, chosen as the action is written — optional, and it
@@ -556,7 +556,7 @@ export function PlanRow({
                 Enter in the title still adds. */}
             {!!stepWeeks?.length && (
               <select
-                aria-label={`Which week — next action for ${row.title}`}
+                aria-label={`Which week — task for ${row.title}`}
                 value={stepWeek}
                 onChange={(e) => setStepWeek(e.target.value)}
                 className="period-step-week max-w-full rounded-md border border-neutral-200 bg-white px-1.5 py-1 text-xs text-neutral-600"

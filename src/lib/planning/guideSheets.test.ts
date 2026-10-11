@@ -104,12 +104,12 @@ describe('the printable planning guide', () => {
 
   // An undecided idea and an actionable task without a date are different
   // things, and position keeps them apart.
-  it('keeps next actions and undecided ideas in separate printed areas', () => {
+  it('keeps tasks and undecided ideas in separate printed areas', () => {
     for (const sheet of GUIDE_SHEETS) {
       const band = sheet.bands.find((b) => b.title === 'What that means')!
       const labels = band.blocks.flatMap((b) => (b.kind === 'lines' && b.label ? [b.label] : []))
-      expect(labels).toEqual(['Next actions', 'Happens repeatedly', 'Fixed date and time', 'Not yet decided'])
-      const actions = band.blocks.find((b) => b.kind === 'lines' && b.label === 'Next actions')!
+      expect(labels).toEqual(['Tasks', 'Happens repeatedly', 'Fixed date and time', 'Not yet decided'])
+      const actions = band.blocks.find((b) => b.kind === 'lines' && b.label === 'Tasks')!
       expect(text([actions])).toMatch(/(no date or owner required|neither a date nor an owner is required)/i)
       expect(text(band.blocks)).toMatch(/(nothing written here becomes a commitment|not a commitment)/i)
     }

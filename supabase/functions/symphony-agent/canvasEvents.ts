@@ -104,7 +104,7 @@ export function proposalItems(input: Record<string, unknown>, keyPrefix: string)
 
 export const PROPOSE_TOOL = {
   name: 'symphony_propose_plan_items',
-  description: 'Show SUGGESTED planning items on the canvas without saving them. Use only for items you are suggesting that the person did not state themselves (for example "you might add a milestone for booking the venue"). They appear dashed with Keep / Leave out, and nothing is written until the person keeps them. When the person states their own items, create them directly with symphony_create_plan_item instead. Never invent goals the person has not expressed; suggestions must follow from what they said. To suggest that an EXISTING unlinked item belongs under an existing parent, pass item_id (that item) with parent_id and the item\'s own title and level; keeping it links the item, nothing new is created.',
+  description: 'Show SUGGESTED planning items on the canvas without saving them. Use only for items you are suggesting that the person did not state themselves (for example "you might add a month goal for booking the venue"). They appear dashed with Keep / Leave out, and nothing is written until the person keeps them. When the person states their own items, create them directly with symphony_create_plan_item instead. Never invent goals the person has not expressed; suggestions must follow from what they said. To suggest that an EXISTING unlinked item belongs under an existing parent, pass item_id (that item) with parent_id and the item\'s own title and level; keeping it links the item, nothing new is created.',
   input_schema: {
     type: 'object',
     properties: {

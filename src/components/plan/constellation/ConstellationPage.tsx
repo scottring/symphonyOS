@@ -42,7 +42,7 @@ import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { useConversationWalk } from '@/components/canvas/conversationWalk'
 import { PAGE_PLANNING } from '@/components/layout/pageLayout'
 
-const TERMS = ['yearly intention', 'seasonal goal', 'monthly milestone', 'weekly action'] as const
+const TERMS = ['year goal', 'season goal', 'month goal', 'week task'] as const
 const HORIZONS = ['Year', 'Season', 'Month'] as const
 const periodWordOf = (b: { label: string }) => b.label.replace(/\s\d{4}$/, '')
 const PERIODS = ['year', 'season', 'month'] as const
@@ -239,9 +239,9 @@ function Inner() {
         extras={[
           ...rowVerbs,
           status === 'completed'
-            ? { label: 'Reopen intention', onSelect: () => setStatus('active', `Reopen “${node.title}”`) }
-            : { label: 'Complete intention', onSelect: () => setStatus('completed', `Complete “${node.title}”`) },
-          { label: 'Archive intention', onSelect: () => setStatus('archived', `Archive “${node.title}”`) },
+            ? { label: 'Reopen goal', onSelect: () => setStatus('active', `Reopen “${node.title}”`) }
+            : { label: 'Complete goal', onSelect: () => setStatus('completed', `Complete “${node.title}”`) },
+          { label: 'Archive goal', onSelect: () => setStatus('archived', `Archive “${node.title}”`) },
         ]} />
     }
     const period = node.level === 1 ? 'season' : node.level === 2 ? 'month' : 'week'
@@ -298,7 +298,7 @@ function Inner() {
   // The plan holds their ideas: the walk asks and structures, never supplies
   // (Scott, 2026-10-11 — "pushy in terms of its own ideas").
   const walkMessage = level === 0
-    ? `Let's plan ${periodTitle}, one yearly intention at a time. Ask me what I want; use my words and don't suggest intentions of your own.`
+    ? `Let's plan ${periodTitle}, one year goal at a time. Ask me what I want; use my words and don't suggest goals of your own.`
     : `Let's plan ${periodTitle} across my ${parentTerm}s, one at a time. Ask me what I want under each; use my words and don't suggest ${term}s of your own.`
   // The walk rides in the docked bar where there is one (desktop).
   const walkInBar = useConversationWalk(requested === 3 ? null : { label: walkLabel, message: walkMessage })
@@ -311,9 +311,9 @@ function Inner() {
   const weekHref = `/week?view=alongside&date=${localYmd(anchor)}`
 
   const seasonWord = periodWordOf(seasonB)
-  const parentName = level === 1 ? 'yearly intention' : `${seasonWord.toLowerCase()} goal`
+  const parentName = level === 1 ? 'year goal' : `${seasonWord.toLowerCase()} goal`
   const hasParents = groups.some((g) => g.kind === 'parent')
-  const groupTitle = (g: PlanGroup) => g.kind === 'unlinked' ? (hasParents ? `Not under a ${parentName}` : `${periodWord} ${term}s`) : g.kind === 'intentions' ? `Yearly intentions` : g.parent!.title
+  const groupTitle = (g: PlanGroup) => g.kind === 'unlinked' ? (hasParents ? `Not under a ${parentName}` : `${periodWord} goals`) : g.kind === 'intentions' ? `Year goals` : g.parent!.title
   const addLabel = (g: PlanGroup) => g.kind === 'unlinked' ? (hasParents ? `Add a ${term} not under a ${parentName}` : `Add a ${term}`) : g.kind === 'intentions' ? `Add a ${term}` : `Add a ${term} under ${g.parent!.title}`
 
   // Readiness reads only rows this reader already has, under the same filters.

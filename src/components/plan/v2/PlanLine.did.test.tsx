@@ -6,7 +6,7 @@ import type { Task } from '@/types/task'
 
 const actions = { done: vi.fn(), carry: vi.fn(), drop: vi.fn(), assign: vi.fn(), details: vi.fn(), rename: vi.fn(), openPartOf: vi.fn() } as unknown as LineActions
 
-// Scott, 2026-10-04: the month line shows what the weeks did for it, so a line
+// Scott, 2026-10-04: the month goal shows what the weeks did for it, so a line
 // with nothing under it stands out when the month is reviewed.
 describe('PlanLine — what the weeks did', () => {
   it('lists the week items written for the line, done ones struck', () => {
