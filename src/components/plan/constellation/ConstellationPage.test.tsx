@@ -231,7 +231,7 @@ describe('calm order',()=>{
  })
  it('asks Symphony where unparented items go, and a kept suggestion links the existing item',async()=>{
   api.tasks=[{id:'s1',title:'Yard',bucket:'quarter'},{id:'m',title:'Trim plants',bucket:'month'}]
-  activity.proposals=[{key:'k',title:'Trim plants',level:2,parentId:'s1',itemId:'m',state:'proposed'}]
+  activity.proposals=[{key:'k',title:'Trim the plants (model wording)',level:2,parentId:'s1',itemId:'m',state:'proposed'}]
   month()
   fireEvent.click(screen.getByRole('button',{name:'Suggest where these go'}))
   expect(launcher.openAssistant).toHaveBeenCalledWith(expect.objectContaining({message:expect.stringContaining('Which fall goal does each'),autoSend:true}))

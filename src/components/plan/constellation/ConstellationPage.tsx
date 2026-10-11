@@ -218,6 +218,7 @@ function Inner() {
     // A suggested link moves the existing item; it never makes a copy.
     const existing = p.itemId ? allNodes.find((n) => n.level === level && n.id === p.itemId) : undefined
     if (p.itemId && (!existing || !parent)) { activity.setProposalState(p.key, 'failed'); return }
+    if (existing && parent && existing.parent === parent.key) { activity.removeProposal(p.key); return }
     activity.setProposalState(p.key, 'saving')
     const ok = existing ? await moveUnder(existing, parent) : await runCreate(level, p.title, parent, `Keep “${p.title}”`)
     if (ok) activity.removeProposal(p.key)
@@ -265,7 +266,11 @@ function Inner() {
     const d = parseLocalYmd(ymd)
     return d >= bounds.start && d < bounds.end
   }
-  const proposals = activity.proposals.filter((p) => p.level === level && inPeriod(p.periodStart))
+  // A suggested link names the item by its own title, never the model's wording.
+  const proposals = activity.proposals.filter((p) => p.level === level && inPeriod(p.periodStart)).map((p) => {
+    const existing = p.itemId ? allNodes.find((n) => n.level === level && n.id === p.itemId) : undefined
+    return existing ? { ...p, title: existing.title } : p
+  })
   const proposalGroup = (p: CanvasProposal) => {
     if (level === 0) return INTENTIONS
     const key = allNodes.find((n) => n.level === level - 1 && n.id === p.parentId)?.key
@@ -420,12 +425,12 @@ function Inner() {
           {(calm ? calm.shown : groups).map(renderGroup)}
         </ul>
         {calm && calm.empty.length > 0 && <>
-          <button type="button" className="canvas-group is-quiet plan-empty-fold" aria-expanded={showEmpty} onClick={() => setShowEmpty((v) => !v)}>
+          <button type="button" className="canvas-group is-quiet plan-empty-fold" aria-expanded={showEmpty} aria-controls="plan-empty-goals" onClick={() => setShowEmpty((v) => !v)}>
             <b>{calm.empty.length} {parentName}{calm.empty.length === 1 ? '' : 's'} with nothing in {periodWord}</b>
             {!showEmpty && <span className="plan-empty-fold-names">{calm.empty.slice(0, 4).map(groupTitle).join(' · ')}{calm.empty.length > 4 ? ` · and ${calm.empty.length - 4} more` : ''}</span>}
             <span className="canvas-link">{showEmpty ? 'Hide' : 'Show'}</span>
           </button>
-          {showEmpty && <ul className="plan-groups" aria-label={`${parentName}s with nothing in ${periodWord}`}>{calm.empty.map(renderGroup)}</ul>}
+          {showEmpty && <ul id="plan-empty-goals" className="plan-groups" aria-label={`${parentName}s with nothing in ${periodWord}`}>{calm.empty.map(renderGroup)}</ul>}
         </>}
         <footer className="plan-foot">
           {hasItems && (level < 2

@@ -6,6 +6,10 @@
 -- written — tasks, goals, routines, lists, notes, meals, conversations — and
 -- keeps who the account is: family members, the household and its members,
 -- the profile, calendar connections and their cached events, devices.
+-- Another member's own rows are never deleted for referencing this
+-- account's; they are detached instead. Rows that only exist on this
+-- account's items (a pick or plan entry for its task, an item on its list)
+-- go with them.
 
 create table if not exists public.test_accounts (
   user_id uuid primary key references auth.users (id) on delete cascade,
@@ -34,7 +38,7 @@ create or replace function public.reset_test_account()
 returns integer
 language plpgsql
 security definer
-set search_path = public
+set search_path = public, pg_temp
 as $$
 declare
   u uuid := auth.uid();
@@ -46,8 +50,20 @@ begin
     raise exception 'Only a test account can be reset' using errcode = '42501';
   end if;
 
+  -- Another member's rows that hang off this account's keep their own
+  -- content: their subtasks and child routines come loose, and their meal
+  -- plan entries keep the recipe's name as plain text.
+  update tasks set parent_task_id = null
+    where user_id <> u and parent_task_id in (select id from tasks where user_id = u);
+  update routines set parent_routine_id = null
+    where user_id <> u and parent_routine_id in (select id from routines where user_id = u);
+  update meal_plan_entries e set ad_hoc_title = coalesce(e.ad_hoc_title, r.title), recipe_id = null
+    from recipes r
+    where e.recipe_id = r.id and r.user_id = u
+      and e.meal_plan_id not in (select id from meal_plans where user_id = u);
+
   -- Rows hanging off this account's tasks, routines and meal plans first.
-  delete from task_commitments where created_by = u or task_id in (select id from tasks where user_id = u);
+  delete from task_commitments where task_id in (select id from tasks where user_id = u);
   get diagnostics n = row_count; total := total + n;
   delete from meal_plan_entries where meal_plan_id in (select id from meal_plans where user_id = u);
   get diagnostics n = row_count; total := total + n;
