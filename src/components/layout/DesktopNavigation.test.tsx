@@ -21,13 +21,13 @@ describe('DesktopNavigation — one bar on every page (2026-09-29)', () => {
     expect(order).toEqual(['Inbox, 3 items', 'Search', 'Account'])
   })
 
-  it('the app mark anchors the corner and goes to Today (2026-10-02)', () => {
+  it('the app mark anchors the corner and goes Home (2026-10-11)', () => {
     render(<MemoryRouter initialEntries={['/week']}>
       <DesktopNavigation inboxCount={0} discussionsUnread={0} onSearch={vi.fn()} onSignOut={vi.fn()} paused={false} controlsRef={() => {}} />
     </MemoryRouter>)
     const nav = screen.getByRole('navigation', { name: 'Main navigation' })
-    const mark = within(nav).getByRole('link', { name: 'Symphony, go to Today' })
-    expect(mark).toHaveAttribute('href', '/today?view=alongside')
+    const mark = within(nav).getByRole('link', { name: 'Symphony, go to Home' })
+    expect(mark).toHaveAttribute('href', '/overview?workspace=1')
     expect(nav.querySelector('.page-navigation-left')?.firstElementChild).toBe(mark)
   })
 })

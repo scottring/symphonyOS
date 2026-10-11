@@ -165,18 +165,19 @@ describe('References and the side panels', () => {
 })
 
 describe('Phone execution chrome', () => {
-  it('carries Today, Week and Plan in the phone dock, with the current one marked', () => {
+  it('carries Home, Today and Plan in the phone dock, with the current one marked', () => {
     mobileState.isMobile = true
     localStorage.removeItem('symphony-plan-period')
     renderAt('/today')
     const nav = screen.getByRole('navigation', { name: 'Main' })
     expect(within(nav).getByRole('button', { name: 'Today' })).toHaveAttribute('aria-current', 'page')
-    fireEvent.click(within(nav).getByRole('button', { name: 'Week' }))
-    expect(screen.getByRole('button', { name: 'Week. Switch horizon' })).toBeInTheDocument()
-    expect(within(nav).getByRole('button', { name: 'Week' })).toHaveAttribute('aria-current', 'page')
+    // Plan opens the week; its title menu reaches the other horizons.
     fireEvent.click(within(nav).getByRole('button', { name: 'Plan' }))
-    expect(screen.getByRole('button', { name: 'Plan. Switch horizon' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Week. Switch horizon' })).toBeInTheDocument()
     expect(within(nav).getByRole('button', { name: 'Plan' })).toHaveAttribute('aria-current', 'page')
+    fireEvent.click(within(nav).getByRole('button', { name: 'Home' }))
+    expect(within(nav).getByRole('button', { name: 'Home' })).toHaveAttribute('aria-current', 'page')
+    expect(within(nav).getByRole('button', { name: 'Plan' })).not.toHaveAttribute('aria-current')
     fireEvent.click(within(nav).getByRole('button', { name: 'Today' }))
     expect(screen.getByRole('button', { name: 'Today. Switch horizon' })).toBeInTheDocument()
   })
@@ -387,7 +388,7 @@ describe('Grouped More menu and desktop capture', () => {
     expect(screen.getByTestId('quick-capture')).toHaveAttribute('data-fab', 'false')
     const nav = screen.getByRole('navigation', { name: 'Main' })
     expect([...nav.querySelectorAll('button')].map((b) => b.textContent || b.getAttribute('aria-label')))
-      .toEqual(['Today', 'Week', 'Add', 'Plan', 'More'])
+      .toEqual(['Home', 'Today', 'Add', 'Plan', 'More'])
     fireEvent.click(screen.getByRole('button', { name: 'Add' }))
     expect(screen.getByTestId('quick-capture')).toHaveAttribute('data-open', 'true')
   })

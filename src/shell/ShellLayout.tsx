@@ -19,7 +19,8 @@ import { pinIsOnPage } from '@/components/reference/periodsOnPage';
 // src/shell/ShellLayout.tsx
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Sparkles, CalendarRange, MoreHorizontal, Plus, Sun, Map } from 'lucide-react';
+import { Sparkles, MoreHorizontal, Plus, Sun, Map, Home as HomeIcon } from 'lucide-react';
+import { HOME_ROUTE } from '@/apps/overview/route';
 import { useTextEntryActive } from '@/hooks/useKeyboardInset';
 import { type ViewType } from '@/components/layout/Sidebar';
 import { MoreSheet } from '@/components/layout/MoreSheet';
@@ -479,7 +480,7 @@ function ShellLayoutInner({ children }: Props) {
           </>
         )}
         {showScenery && isMobile && <div className="scenery-end-clearance" aria-hidden="true" />}
-        <PlaceScenery scroller={pageScroller} right={isMobile ? 0 : paneWidth} floor={sceneryFloor} />
+        <PlaceScenery scroller={pageScroller} right={isMobile ? 0 : paneWidth} floor={sceneryFloor} vivid={location.pathname === HOME_ROUTE} />
       </div>
 
       {/* QuickCapture FAB — every route */}
@@ -560,26 +561,27 @@ function ShellLayoutInner({ children }: Props) {
         </div>
       )}
 
-      {/* The native dock: Planner · Inbox · + · Routines · More. While a text
-          field has focus the keyboard owns the bottom edge, so the dock steps
-          aside and the capture bar sits on the keyboard (as on iOS). */}
+      {/* The native dock: Home · Today · + · Plan · More. Home is where you
+          come back to for your bearings (2026-10-11); Plan opens the week, and
+          its title menu (and Home's "Where you are") reach Month, Season and
+          Year. While a text field has focus the keyboard owns the bottom
+          edge, so the dock steps aside and the capture bar sits on the
+          keyboard (as on iOS). */}
       {isMobile && !typing && (
         <nav className="phone-dock scenery-page" aria-label="Main">
-          {/* The three destinations, as on every surface (approved phone
-              boards, 2026-10-10): Today · Week · Plan, with + to add and More
-              for Inbox, Routines and the rest. */}
           <div className="phone-dock-row">
-            {([
-              ['today', 'Today', Sun],
-              ['week', 'Week', CalendarRange],
-            ] as const).map(([period, label, Icon]) => (
-              <button key={period} type="button" className="phone-dock-tab"
-                onClick={() => navigate(connectedDestination(`/${period}`, ''))}
-                aria-current={planPeriodForPath(location.pathname) === period ? 'page' : undefined}>
-                <Icon aria-hidden="true" />
-                <span>{label}</span>
-              </button>
-            ))}
+            <button type="button" className="phone-dock-tab"
+              onClick={() => navigate(connectedDestination(HOME_ROUTE, ''))}
+              aria-current={location.pathname === HOME_ROUTE ? 'page' : undefined}>
+              <HomeIcon aria-hidden="true" />
+              <span>Home</span>
+            </button>
+            <button type="button" className="phone-dock-tab"
+              onClick={() => navigate(connectedDestination('/today', ''))}
+              aria-current={planPeriodForPath(location.pathname) === 'today' ? 'page' : undefined}>
+              <Sun aria-hidden="true" />
+              <span>Today</span>
+            </button>
             <div className="phone-dock-add-slot">
               <button type="button" className="phone-dock-add" onClick={() => setQuickAddOpen(true)} aria-label="Add">
                 <Plus aria-hidden="true" />
@@ -588,8 +590,8 @@ function ShellLayoutInner({ children }: Props) {
             <button
               type="button"
               className="phone-dock-tab"
-              onClick={() => navigate(connectedDestination('/month', ''))}
-              aria-current={['month', 'season', 'year'].includes(planPeriodForPath(location.pathname) ?? '') ? 'page' : undefined}
+              onClick={() => navigate(connectedDestination('/week', ''))}
+              aria-current={['week', 'month', 'season', 'year'].includes(planPeriodForPath(location.pathname) ?? '') ? 'page' : undefined}
             >
               <Map aria-hidden="true" />
               <span>Plan</span>

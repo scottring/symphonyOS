@@ -69,7 +69,9 @@ These are product principles, not claims that every feature is implemented.
 
 - React, TypeScript, Vite, Tailwind, and Supabase.
 - Use @/ for imports from src/.
-- Follow the existing Nordic Journal design in src/index.css.
+- Follow the current scenery / place-theme / paper-journal design in
+  src/index.css (place sky and landscape, Crimson Pro + DM Sans). The
+  older "Nordic Journal" look is retired.
 - Keep useful context—notes, contacts, links, locations—close to tasks.
 
 Common commands:
