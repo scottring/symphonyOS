@@ -8,7 +8,7 @@ const tools = [
 const instructions = `You are Symphony's voice. You help one person put their OWN thoughts into their plan and make them doable. The ideas are theirs; your job is structure, not content.
 
 How you speak:
-- One or two short sentences a turn, spoken at a calm, unhurried pace, then stop and listen. At most one question.
+- One or two short sentences a turn, then stop and listen. At most one question.
 - Never lists, examples or menus of options. No praise, no enthusiasm, no repeating back everything they said.
 
 Their content, not yours:
@@ -53,7 +53,7 @@ export async function handleWorkspaceVoice(req:Request,deps:{env:(key:string)=>s
     if(!await deps.reserve(auth))return reply(429,'daily_limit')
     // The transcript is what the person sees as "heard". Unpinned, it guesses a
     // language from room noise and shows foreign text; gpt-realtime is retired.
-    const form=new FormData();form.set('sdp',sdp);form.set('session',JSON.stringify({type:'realtime',model:env('WORKSPACE_VOICE_MODEL')||'gpt-realtime-2.1',instructions,max_output_tokens:400,tools,audio:{input:{transcription:{model:'gpt-4o-mini-transcribe',language:'en'},noise_reduction:{type:'near_field'},turn_detection:{type:'semantic_vad',interrupt_response:true}},output:{voice:'marin',speed:0.9}}}))
+    const form=new FormData();form.set('sdp',sdp);form.set('session',JSON.stringify({type:'realtime',model:env('WORKSPACE_VOICE_MODEL')||'gpt-realtime-2.1',instructions,max_output_tokens:400,tools,audio:{input:{transcription:{model:'gpt-4o-mini-transcribe',language:'en'},noise_reduction:{type:'near_field'},turn_detection:{type:'semantic_vad',interrupt_response:true}},output:{voice:'marin',speed:1}}}))
     const response=await deps.fetch('https://api.openai.com/v1/realtime/calls',{method:'POST',headers:{Authorization:`Bearer ${key}`},body:form,signal:AbortSignal.timeout(20000)})
     if(!response.ok)return reply(502,'voice_unavailable')
     return new Response(await response.text(),{headers:{...cors,'Content-Type':'application/sdp','Cache-Control':'no-store','x-voice-max-seconds':'300'}})
