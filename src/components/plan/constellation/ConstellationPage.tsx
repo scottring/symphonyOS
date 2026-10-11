@@ -38,7 +38,8 @@ import { PlanItemRow } from '@/components/canvas/plan/PlanItemRow'
 import { ProposalRow } from '@/components/canvas/plan/ProposalRow'
 import { InlineComposer } from '@/components/canvas/plan/InlineComposer'
 import { readinessOf, type ReadinessLookup } from '@/lib/prep/readiness'
-import { ChevronLeft, ChevronRight } from 'lucide-react'
+import { ChevronLeft, ChevronRight, PanelLeftOpen } from 'lucide-react'
+import { UpstreamDrawer, useUpstreamDrawer } from './UpstreamDrawer'
 import { useConversationWalk } from '@/components/canvas/conversationWalk'
 import { PAGE_PLANNING } from '@/components/layout/pageLayout'
 
@@ -110,6 +111,8 @@ function Inner() {
   const [composer, setComposer] = useState<Composer | null>(null)
   const [dragKey, setDragKey] = useState<string | null>(null)
   const [dropKey, setDropKey] = useState<string | null>(null)
+  const [showFiled, setShowFiled] = useState(false)
+  const drawerUi = useUpstreamDrawer()
   const mainRef = useRef<HTMLElement>(null)
   const scrollMemo = useRef<number | null>(null)
 
@@ -283,9 +286,8 @@ function Inner() {
 
   // ---- Drag an item onto a group header (desktop shortcut for Move under…) -
   const dragNode = dragKey ? allNodes.find((n) => n.key === dragKey) : undefined
-  const canDrop = (g: PlanGroup) => !!dragNode && (g.kind === 'unlinked'
-    ? !!dragNode.parent
-    : g.kind === 'parent' && !!g.parent && g.parent.key !== dragNode.parent && !!connectionPair(allNodes, dragNode.key, g.parent.key))
+  const canDropOn = (parent: PlanNode) => !!dragNode && parent.key !== dragNode.parent && !!connectionPair(allNodes, dragNode.key, parent.key)
+  const canDrop = (g: PlanGroup) => !!dragNode && (g.kind === 'unlinked' ? !!dragNode.parent : g.kind === 'parent' && !!g.parent && canDropOn(g.parent))
   const dropProps = (g: PlanGroup) => level === 0 ? {} : {
     onDragOver: (e: DragEvent) => { if (canDrop(g)) { e.preventDefault(); if (dropKey !== g.key) setDropKey(g.key) } },
     onDragLeave: (e: DragEvent) => { if (!(e.currentTarget as HTMLElement).contains(e.relatedTarget as Node | null)) setDropKey((k) => k === g.key ? null : k) },
@@ -307,7 +309,8 @@ function Inner() {
 
   const hasItems = groups.some((g) => g.items.length > 0)
   // Below Year and outside a focus: what holds something first, empties folded.
-  const calm = level > 0 && !focused && hasItems ? calmGroups(groups, new Set(proposals.map(proposalGroup))) : null
+  const pending = new Set(proposals.map(proposalGroup))
+  const calm = level > 0 && !focused && hasItems ? calmGroups(groups, pending) : null
   const weekHref = `/week?view=alongside&date=${localYmd(anchor)}`
 
   const seasonWord = periodWordOf(seasonB)
@@ -317,6 +320,27 @@ function Inner() {
   const addLabel = (g: PlanGroup) => g.kind === 'unlinked' ? (hasParents ? `Add a ${term} not under a ${parentName}` : `Add a ${term}`) : g.kind === 'intentions' ? `Add a ${term}` : `Add a ${term} under ${g.parent!.title}`
 
   // Readiness reads only rows this reader already has, under the same filters.
+  // The drawer lists every open parent, even those folded for holding nothing.
+  const upstream = level > 0 ? allNodes.filter((n) => n.level === level - 1 && !isDone(n)) : []
+  const drawerTitle = level === 1 ? 'Year goals' : `${seasonWord} goals`
+  const drawer = level > 0 && drawerUi.shown && dataReady && !error && !goalsError
+    ? <UpstreamDrawer title={drawerTitle} childTerm={term} parents={upstream}
+        countOf={(n) => childCount(allNodes, n)} dragging={!!dragNode}
+        canDropOn={canDropOn}
+        onDrop={(parent) => { if (dragNode) void moveUnder(dragNode, parent); setDragKey(null); setDropKey(null) }}
+        onPick={(parent) => focusGroup(parent.key)} pickLabel={(parent) => `Show ${term}s under ${parent.title}`}
+        onClose={() => drawerUi.setOpen(false)}
+        empty={<>No {parentName}s for {level === 1 ? anchor.getFullYear() : seasonWord} yet. <button type="button" className="canvas-link" onClick={() => setHorizon(level - 1)}>Add {parentName}s</button></>} />
+    : null
+  // With the drawer open the board leads with what is not filed yet (Scott,
+  // 2026-10-11); what is filed folds to one line, and empty parents are in
+  // the drawer. A group showing suggestions stays open.
+  const pile = calm && drawer ? {
+    lead: [...groups.filter((g) => g.kind === 'unlinked'), ...calm.shown.filter((g) => g.kind === 'parent' && pending.has(g.key))],
+    filed: calm.shown.filter((g) => g.kind === 'parent' && !pending.has(g.key)),
+  } : null
+  const filedCount = pile ? pile.filed.reduce((n, g) => n + g.items.length, 0) : 0
+
   const visibleById = new Map(visible.map((t) => [t.id, t]))
   const goalsById = new Map(allNodes.filter((n) => n.goal).map((n) => [n.id, n.goal!]))
   const prepLookup: ReadinessLookup = { task: (id) => visibleById.get(id), goal: (id) => goalsById.get(id) }
@@ -417,6 +441,9 @@ function Inner() {
       </div>
     </header>
     <div className="plan-toolbar">
+      {level > 0 && drawerUi.available && !drawerUi.open && <button type="button" className="canvas-link plan-drawer-open" aria-expanded={false} onClick={() => drawerUi.setOpen(true)}>
+        <PanelLeftOpen size={15} aria-hidden="true" /> Show {drawerTitle.toLowerCase()}
+      </button>}
       {proposals.length > 0 && <button type="button" className="canvas-link" onClick={() => { void keepAll() }}>Keep all ({proposals.length})</button>}
       {(doneCount > 0 || showDone) && <button type="button" className="canvas-link" aria-pressed={showDone} onClick={() => setShowDone((s) => !s)}>
         {showDone ? `Hide done (${doneCount})` : `Show done (${doneCount})`}
@@ -426,15 +453,23 @@ function Inner() {
     {!dataReady && <p className="plan-status" role="status">Loading your plans…</p>}
     {(error || goalsError)
       ? <p className="plan-status" role="alert">Plans could not load. <button type="button" className="canvas-link" onClick={() => { if (goalsError) window.location.reload(); else void refetch() }}>Retry</button></p>
-      : <>
+      : <div className={`plan-body${drawer ? ' has-drawer' : ''}`}>{drawer}<div className="plan-board">
         {focused && <div className="plan-focus-bar">
           <span role="status">Showing {focused.size} of {groups.length} groups</span>
           <button type="button" className="canvas-link" onClick={clearFocus}>Show all · Esc</button>
         </div>}
         <ul className={`plan-groups${focused ? ' is-focused' : ''}${level === 0 ? ' is-year' : ''}`} aria-label={`${HORIZONS[level]} plan`}>
-          {(calm ? calm.shown : groups).map(renderGroup)}
+          {(pile ? pile.lead : calm ? calm.shown : groups).map(renderGroup)}
         </ul>
-        {calm && calm.empty.length > 0 && <>
+        {pile && pile.filed.length > 0 && <>
+          <button type="button" className="canvas-group is-quiet plan-empty-fold" aria-expanded={showFiled} aria-controls="plan-filed-goals" onClick={() => setShowFiled((v) => !v)}>
+            <b>{filedCount} {term}{filedCount === 1 ? '' : 's'} filed under {pile.filed.length} {parentName}{pile.filed.length === 1 ? '' : 's'}</b>
+            {!showFiled && <span className="plan-empty-fold-names">{pile.filed.slice(0, 4).map(groupTitle).join(' · ')}{pile.filed.length > 4 ? ` · and ${pile.filed.length - 4} more` : ''}</span>}
+            <span className="canvas-link">{showFiled ? 'Hide' : 'Show'}</span>
+          </button>
+          {showFiled && <ul id="plan-filed-goals" className="plan-groups" aria-label={`Filed under ${parentName}s`}>{pile.filed.map(renderGroup)}</ul>}
+        </>}
+        {calm && !pile && calm.empty.length > 0 && <>
           <button type="button" className="canvas-group is-quiet plan-empty-fold" aria-expanded={showEmpty} aria-controls="plan-empty-goals" onClick={() => setShowEmpty((v) => !v)}>
             <b>{calm.empty.length} {parentName}{calm.empty.length === 1 ? '' : 's'} with nothing in {periodWord}</b>
             {!showEmpty && <span className="plan-empty-fold-names">{calm.empty.slice(0, 4).map(groupTitle).join(' · ')}{calm.empty.length > 4 ? ` · and ${calm.empty.length - 4} more` : ''}</span>}
@@ -447,7 +482,7 @@ function Inner() {
             ? <button type="button" className="plan-next" onClick={() => setHorizon(level + 1)}>Next: {HORIZONS[level + 1]} →</button>
             : <Link to={weekHref} className="plan-next">Next: Week →</Link>)}
         </footer>
-      </>}
+      </div></div>}
   </main>
 }
 
