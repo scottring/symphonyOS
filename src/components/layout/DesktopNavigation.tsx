@@ -4,6 +4,7 @@ import { createPortal } from 'react-dom'
 import { NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { ChevronDown, Inbox, Menu, Search, UserRound } from 'lucide-react'
 import { requestPlanFromPaper } from '@/lib/planFromPaperSignal'
+import { HOME_ROUTE } from '@/apps/overview/route'
 import { appRegistry } from '@/shell/appRegistry'
 import { MORE_GROUPS, isDestinationActive } from './moreDestinations'
 import { HelpDialogs } from './HelpDialogs'
@@ -62,8 +63,9 @@ export function DesktopNavigation({ inboxCount, discussionsUnread, onSearch, onS
         Inbox, search and you — page controls live in the page heading. No Add
         button (Scott, 2026-09-29): the round + and ⌘K already add. */}
     <div className="page-navigation-left">
-    {/* The app's mark anchors the bar's corner (Scott, 2026-10-02); it goes Today. */}
-    <NavLink to={connectedDestination('/today', search)} className="page-navigation-brand" aria-label="Symphony, go to Today" title="Today">
+    {/* The app's mark anchors the bar's corner (Scott, 2026-10-02); it goes
+        Home, the page you come back to for your bearings (2026-10-11). */}
+    <NavLink to={connectedDestination(HOME_ROUTE, search)} className="page-navigation-brand" aria-label="Symphony, go to Home" title="Home">
       <img src="/symphony-logo.png" alt="" width={32} height={32} /><span className="page-navigation-wordmark">Symphony</span>
     </NavLink>
     {leadRef && <div ref={leadRef} className="page-navigation-lead" />}

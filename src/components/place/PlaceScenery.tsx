@@ -29,10 +29,13 @@ const ART_WIDTH = 1506
 export const FAINT_SCENERY_QUERY = '(min-width: 768px) and (max-height: 1000px)'
 const FAINT_CLEARANCE = 16
 
-export function PlaceScenery({ scroller, right = 0, floor }: {
+export function PlaceScenery({ scroller, right = 0, floor, vivid = false }: {
   scroller: HTMLElement | null
   right?: number
   floor?: string
+  /** Home (2026-10-11): the scene in flow below the page like the faint one,
+   *  but at full strength — the one page where you see your place. */
+  vivid?: boolean
 }) {
   const place = usePlaceOrDefault()
   const { showScenery, sceneryLighting, sceneryStyle, sceneryScene } = useSceneryPreferences()
@@ -43,7 +46,7 @@ export function PlaceScenery({ scroller, right = 0, floor }: {
   // column), kept outside React state: it follows the window's width.
   const height = useRef(0)
   const shortWindow = useMediaQuery(FAINT_SCENERY_QUERY)
-  const faint = sceneryScene === 'faint' || shortWindow
+  const faint = sceneryScene === 'faint' || shortWindow || vivid
 
   useEffect(() => {
     const el = box.current
@@ -117,7 +120,7 @@ export function PlaceScenery({ scroller, right = 0, floor }: {
     ...(floor ? { '--scenery-floor': floor } : {}),
   } as CSSProperties
   return (
-    <div ref={box} aria-hidden="true" className={`place-scenery${faint ? ' is-faint' : ''}`} data-place-scenery={place} data-lighting={sceneryLighting} data-style={sceneryStyle} style={css}>
+    <div ref={box} aria-hidden="true" className={`place-scenery${faint ? ' is-faint' : ''}${vivid ? ' is-vivid' : ''}`} data-place-scenery={place} data-lighting={sceneryLighting} data-style={sceneryStyle} style={css}>
       <div className="place-scenery-veil" />
       <img className="place-scenery-panorama" src={art.src} alt="" decoding="async" draggable={false} />
       <div className="place-scenery-haze" />
