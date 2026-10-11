@@ -33,6 +33,13 @@ describe('workspace voice handshake',()=>{
   expect(session.audio.input.transcription).toEqual({model:'gpt-4o-mini-transcribe',language:'en'})
   expect(session.audio.input.noise_reduction).toEqual({type:'near_field'})
  })
+ it('keeps the voice short and the plan the person\'s own',async()=>{
+  const deps=setup();await handleWorkspaceVoice(request(),deps)
+  const session=JSON.parse(((deps.fetch.mock.calls[0] as unknown as [string,RequestInit])[1].body as FormData).get('session') as string)
+  expect(session.max_output_tokens).toBe(400)
+  expect(session.instructions).toContain('Never suggest intentions, goals, milestones, tasks or activities they did not say')
+  expect(session.instructions).toContain('One or two short sentences a turn')
+ })
  it('stops at the daily limit without spending',async()=>{
   const deps=setup();deps.reserve.mockResolvedValue(false)
   expect((await handleWorkspaceVoice(request(),deps)).status).toBe(429);expect(deps.fetch).not.toHaveBeenCalled()
