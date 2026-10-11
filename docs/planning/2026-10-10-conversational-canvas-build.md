@@ -68,6 +68,15 @@ Out-of-scope findings to report (not changed here): `VITE_OPEN_BRAIN_API_KEY` is
   title x=551 on all five pages (Today, Week, Season, Year, Routines). Phone (390px):
   no horizontal overflow; Plan's stepper and Routines' controls drop under the masthead.
 
+- **Plan back to the approved board (Scott, 2026-10-11).** Year, Season and Month
+  dropped the shared masthead for the board's plain header: Year / Season / Month,
+  then "‹ Fall 2026 ›" with its dates (no numeral). On desktop the conversation is
+  one bar docked at the window's foot ("Plan this season with me", field, mic); it
+  shows the latest exchange with Earlier for the rest, and the AI side pane and its
+  top-bar button stay off Plan (Details still opens there). Season and Month cards
+  pack in columns. The current top-bar tab is filled on every page. Today and Week
+  keep the side conversation for now. Comparison: claude.ai/artifact/B4wfgwzfkSYXqXunKERhoz
+
 ## Later scope (noted, not in this build)
 
 - Kiosk play space for the kids (Scott, 2026-10-10): whimsy, fun and games in the kitchen, sandboxed so play can never change household content or interrupt held activities. The kiosk activity machine (src/lib/wall/activity/) can host a write-free Play activity reached from a kid-friendly button, with Home always returning.

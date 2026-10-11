@@ -38,9 +38,9 @@ import { PlanItemRow } from '@/components/canvas/plan/PlanItemRow'
 import { ProposalRow } from '@/components/canvas/plan/ProposalRow'
 import { InlineComposer } from '@/components/canvas/plan/InlineComposer'
 import { readinessOf, type ReadinessLookup } from '@/lib/prep/readiness'
-import { MastheadCard, PeriodNavEyebrow } from '@/components/layout/MastheadCard'
+import { ChevronLeft, ChevronRight } from 'lucide-react'
+import { useConversationWalk } from '@/components/canvas/conversationWalk'
 import { PAGE_PLANNING } from '@/components/layout/pageLayout'
-import { useMobile } from '@/hooks/useMobile'
 
 const TERMS = ['yearly intention', 'seasonal goal', 'monthly milestone', 'weekly action'] as const
 const HORIZONS = ['Year', 'Season', 'Month'] as const
@@ -68,7 +68,6 @@ function releaseFocus(setParams: SetURLSearchParams, main: RefObject<HTMLElement
 type Composer = { kind: 'add'; group: string; parent: PlanNode | null } | { kind: 'edit'; key: string }
 
 function Inner() {
-  const isMobile = useMobile()
   const selection = useSelectionOptional()
   const { goals, loading: goalsLoading, error: goalsError, addGoal, updateGoal, deleteGoal } = useGoalsContext()
   const { tasks, loading, error, addTask, updateTask, refetch, pushTask, setBucket, updateTasksBulk, toggleTask, deleteTask, keepForward, dropCommitment } = useSupabaseTasks()
@@ -293,13 +292,19 @@ function Inner() {
     onDrop: (e: DragEvent) => { e.preventDefault(); if (dragNode && canDrop(g)) moveUnder(dragNode, g.parent); setDragKey(null); setDropKey(null) },
   }
 
-  if (requested === 3) return <Navigate replace to={`/week?view=alongside&date=${localYmd(anchor)}&start=${localYmd(week)}`} />
-
   const term = TERMS[level]
   const parentTerm = level > 0 ? TERMS[level - 1] : null
+  const walkLabel = current ? `Plan this ${PERIODS[level]} with me` : `Plan ${periodTitle} with me`
+  // The plan holds their ideas: the walk asks and structures, never supplies
+  // (Scott, 2026-10-11 — "pushy in terms of its own ideas").
   const walkMessage = level === 0
-    ? `Let's plan ${periodTitle}, one yearly intention at a time. Suggest; don't save anything until I keep it.`
-    : `Let's plan ${periodTitle} across all my ${parentTerm}s, one at a time. Suggest ${term}s; don't save anything until I keep them.`
+    ? `Let's plan ${periodTitle}, one yearly intention at a time. Ask me what I want; use my words and don't suggest intentions of your own.`
+    : `Let's plan ${periodTitle} across my ${parentTerm}s, one at a time. Ask me what I want under each; use my words and don't suggest ${term}s of your own.`
+  // The walk rides in the docked bar where there is one (desktop).
+  const walkInBar = useConversationWalk(requested === 3 ? null : { label: walkLabel, message: walkMessage })
+
+  if (requested === 3) return <Navigate replace to={`/week?view=alongside&date=${localYmd(anchor)}&start=${localYmd(week)}`} />
+
   const hasItems = groups.some((g) => g.items.length > 0)
   // Below Year and outside a focus: what holds something first, empties folded.
   const calm = level > 0 && !focused && hasItems ? calmGroups(groups, new Set(proposals.map(proposalGroup))) : null
@@ -309,7 +314,7 @@ function Inner() {
   const parentName = level === 1 ? 'yearly intention' : `${seasonWord.toLowerCase()} goal`
   const hasParents = groups.some((g) => g.kind === 'parent')
   const groupTitle = (g: PlanGroup) => g.kind === 'unlinked' ? (hasParents ? `Not under a ${parentName}` : `${periodWord} ${term}s`) : g.kind === 'intentions' ? `Yearly intentions` : g.parent!.title
-  const addLabel = (g: PlanGroup) => g.kind === 'unlinked' ? `Add an independent ${term}` : g.kind === 'intentions' ? `Add a ${term}` : `Add a ${term} under ${g.parent!.title}`
+  const addLabel = (g: PlanGroup) => g.kind === 'unlinked' ? (hasParents ? `Add a ${term} not under a ${parentName}` : `Add a ${term}`) : g.kind === 'intentions' ? `Add a ${term}` : `Add a ${term} under ${g.parent!.title}`
 
   // Readiness reads only rows this reader already has, under the same filters.
   const visibleById = new Map(visible.map((t) => [t.id, t]))
@@ -377,6 +382,9 @@ function Inner() {
           onClick={() => openAssistant({ message: `Which ${parentName} does each of my items under no ${parentName} for ${periodTitle} belong under? Suggest links; don't link anything until I keep them.`, autoSend: true })}>Suggest where these go</button>}
         {adding
           ? <InlineComposer label={`New ${term}${g.parent ? ` under ${g.parent.title}` : ''}`} saveLabel="Add"
+              // An item with no parent takes its life area from here; one
+              // under a parent takes its parent's.
+              extra={g.parent ? undefined : area.picker}
               onSave={async (text) => {
                 const ok = await runCreate(level, text, g.parent, `Add “${text}”${g.parent ? ` under “${g.parent.title}”` : ''}`)
                 if (ok) setComposer(null)
@@ -389,30 +397,25 @@ function Inner() {
     </li>
   }
 
-  // One page shape on every destination (Scott, 2026-10-10: the wireframes'
-  // consistent bounds): the shared masthead — numeral, period nav, title,
-  // dated subline, controls at the right — on the shared planning frame.
-  const two = (n: number) => String(n).padStart(2, '0')
-  const lastDay = new Date(bounds.end.getTime() - 86400000)
-  const numeral = level === 0 ? String(bounds.start.getFullYear())
-    : level === 1 ? `${two(bounds.start.getMonth() + 1)}–${two(lastDay.getMonth() + 1)}`
-    : two(bounds.start.getMonth() + 1)
+  // The approved Season board (2026-10-10): the horizon switch, then the
+  // period by name with its dates. No numeral; the bar at the foot holds
+  // the walk on desktop.
   const stepper = <nav className="plan-stepper" aria-label="Planning horizon">
     {HORIZONS.map((h, i) => <button key={h} type="button" aria-current={i === level ? 'step' : undefined} onClick={() => setHorizon(i)}>{h}</button>)}
     <Link to={weekHref} className="plan-stepper-week">Week →</Link>
   </nav>
-  const walk = <button type="button" className="plan-walk" onClick={() => openAssistant({ message: walkMessage, autoSend: true })}>Plan {periodTitle} with Symphony</button>
+  const walk = <button type="button" className="plan-walk" onClick={() => openAssistant({ message: walkMessage, autoSend: true })}>{walkLabel}</button>
   return <main ref={mainRef} className={`plan-canvas ${PAGE_PLANNING}`} data-horizon={level}>
-    <MastheadCard variant="page" numeral={numeral}
-      title={<span className="plan-period-name">{level === 0 ? 'Intentions' : periodTitle}</span>}
-      eyebrow={<PeriodNavEyebrow label={HORIZONS[level]} onPrev={() => setStart(bounds.prev)} onNext={() => setStart(bounds.next)}
-        prevLabel={`Previous ${PERIODS[level]}`} nextLabel={`Next ${PERIODS[level]}`}
-        trailing={current ? undefined : <button type="button" className="period-return canvas-link" onClick={() => setStart(null)}>This {PERIODS[level]}</button>} />}
-      subline={level > 0
-        ? <span className="plan-period-range">{periodRange(bounds.start, bounds.end)}</span>
-        : <span className="plan-period-range">{periodRange(bounds.start, bounds.end)} · what {periodTitle} is for</span>}
-      controls={isMobile ? undefined : <div className="plan-head-controls">{stepper}{walk}</div>} />
-    {isMobile && <div className="plan-head-mobile">{stepper}{walk}</div>}
+    <header className="plan-head">
+      <div className="plan-head-row">{stepper}{!walkInBar && walk}</div>
+      <div className="plan-period">
+        <button type="button" className="plan-step" onClick={() => setStart(bounds.prev)} aria-label={`Previous ${PERIODS[level]}`}><ChevronLeft size={18} aria-hidden="true" /></button>
+        <h1>{periodTitle}</h1>
+        <button type="button" className="plan-step" onClick={() => setStart(bounds.next)} aria-label={`Next ${PERIODS[level]}`}><ChevronRight size={18} aria-hidden="true" /></button>
+        <span className="plan-period-range">{periodRange(bounds.start, bounds.end)}</span>
+        {!current && <button type="button" className="period-return canvas-link" onClick={() => setStart(null)}>Back to this {PERIODS[level]}</button>}
+      </div>
+    </header>
     <div className="plan-toolbar">
       {proposals.length > 0 && <button type="button" className="canvas-link" onClick={() => { void keepAll() }}>Keep all ({proposals.length})</button>}
       {(doneCount > 0 || showDone) && <button type="button" className="canvas-link" aria-pressed={showDone} onClick={() => setShowDone((s) => !s)}>
@@ -443,7 +446,6 @@ function Inner() {
           {hasItems && (level < 2
             ? <button type="button" className="plan-next" onClick={() => setHorizon(level + 1)}>Next: {HORIZONS[level + 1]} →</button>
             : <Link to={weekHref} className="plan-next">Next: Week →</Link>)}
-          <span className="plan-area">{area.picker}<span>{level === 0 ? 'Life area for new intentions' : `Life area for new ${term}s not under a ${parentName}`}</span></span>
         </footer>
       </>}
   </main>

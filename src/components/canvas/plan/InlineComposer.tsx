@@ -3,15 +3,17 @@
 // One line for writing a plan item in place: add under a parent, or edit the
 // wording. Enter saves, Escape cancels. A failed save keeps the wording.
 
-import { useState, type FormEvent, type KeyboardEvent } from 'react'
+import { useState, type FormEvent, type KeyboardEvent, type ReactNode } from 'react'
 
-export function InlineComposer({ label, initial = '', saveLabel = 'Save', onSave, onCancel }: {
+export function InlineComposer({ label, initial = '', saveLabel = 'Save', onSave, onCancel, extra }: {
   /** Accessible name of the field, e.g. "New seasonal goal under Together". */
   label: string
   initial?: string
   saveLabel?: string
   onSave: (text: string) => Promise<boolean>
   onCancel: () => void
+  /** Beside the field, e.g. the life area for an item with no parent. */
+  extra?: ReactNode
 }) {
   const [draft, setDraft] = useState(initial)
   const [busy, setBusy] = useState(false)
@@ -33,6 +35,7 @@ export function InlineComposer({ label, initial = '', saveLabel = 'Save', onSave
   }
   return <form className={`plan-composer${failed ? ' is-failed' : ''}`} onSubmit={submit} onKeyDown={onKey}>
     <input aria-label={label} value={draft} autoFocus disabled={busy} onChange={(e) => setDraft(e.target.value)} />
+    {extra}
     <button type="submit" className="canvas-link" disabled={busy || !draft.trim()}>{busy ? 'Saving…' : saveLabel}</button>
     <button type="button" className="canvas-link" disabled={busy} onClick={onCancel}>Cancel</button>
     {failed && <p className="plan-composer-error" role="alert">Didn’t save. Your wording is still here; try again.</p>}

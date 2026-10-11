@@ -58,7 +58,8 @@ vi.mock('@/hooks/useAuth', () => ({ useAuth: () => ({ user: null, signOut: vi.fn
 vi.mock('@/hooks/useSupabaseTasks', () => ({ useSupabaseTasks: () => ({
   tasks: [], loading: false, updateTask: vi.fn(), updateTasksBulk: vi.fn(), pushTask: vi.fn(), toggleTask: vi.fn(),
 }) }))
-vi.mock('@/hooks/useScratchpadHidden', () => ({ useScratchpadHidden: () => ({ hidden: true }) }))
+const aiState = vi.hoisted(() => ({ hidden: true }))
+vi.mock('@/hooks/useScratchpadHidden', () => ({ useScratchpadHidden: () => ({ hidden: aiState.hidden, setHidden: vi.fn() }) }))
 vi.mock('@/hooks/useRoutines', () => ({ useRoutines: () => ({ routines: [], deleteRoutine: vi.fn(), updateRoutine: vi.fn(), refetch: vi.fn(), addRoutine: vi.fn() }) }))
 vi.mock('@/hooks/useSymphonyAssistant', () => ({
   useSymphonyAssistant: () => ({
@@ -447,5 +448,27 @@ describe('Capture and the Today pin from every desktop page', () => {
     expect(screen.queryByRole('region', { name: 'Shelves' })).not.toBeInTheDocument()
     // Today is still one click away, on the rail.
     expect(screen.getAllByRole('link', { name: 'Today' })).toHaveLength(1)
+  })
+})
+
+// The approved Season board (2026-10-10): on Plan the conversation is one bar
+// at the window's foot; the side pane is for Details only.
+describe('Plan has one conversation, at the foot', () => {
+  beforeEach(() => { mobileState.isMobile = false; selectionState.selection = null; aiState.hidden = false; sessionStorage.clear() })
+  afterEach(() => { aiState.hidden = true })
+
+  it('docks the bar and keeps the AI pane and its top-bar button off Plan', () => {
+    renderAt('/season?view=constellation&horizon=1')
+    const bar = screen.getByRole('region', { name: 'Conversation with Symphony' })
+    expect(bar).toHaveClass('is-docked')
+    expect(within(bar).queryByRole('button', { name: 'Open the conversation' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'AI chat' })).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Conversation draft')).not.toBeInTheDocument()
+  })
+
+  it('leaves Today with its side conversation', () => {
+    renderAt('/today')
+    expect(screen.getByRole('button', { name: 'AI chat' })).toBeInTheDocument()
+    expect(screen.getByRole('region', { name: 'Conversation with Symphony' })).not.toHaveClass('is-docked')
   })
 })

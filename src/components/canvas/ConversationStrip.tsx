@@ -4,9 +4,16 @@
 // and Plan. The composer (text + mic) is always there; the latest receipt sits
 // above it with its save state, what changed (each change opens its item),
 // and Undo or Retry. The full transcript stays in the existing AI pane.
+//
+// Docked (Plan on desktop): the one conversation on the page, pinned to the
+// window's foot (approved Season board, 2026-10-10). No side pane opens; the
+// latest exchange shows above the field, with Earlier for the rest.
 
-import { useCallback, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
 import { Mic, MicOff, Send, Undo2, RotateCcw, X, MessageSquare } from 'lucide-react'
+import { ChatMessage } from '@/components/chat/ChatMessage'
+import type { ChatMessage as ChatMessageType } from '@/types/chat'
+import type { ConversationWalk } from './conversationWalk'
 import { useCanvasActivity, type CanvasReceipt } from '@/contexts/CanvasActivityContext'
 import { useSelectionOptional } from '@/shell/providers/SelectionProvider'
 import { DictationMicButton } from '@/components/common/DictationMicButton'
@@ -18,13 +25,18 @@ export interface StripVoice {
   status: string
   start: () => void
   stop: () => void
+  mute?: () => void
+  /** Live voice's latest words each way, shown in the docked bar. */
+  heard?: string
+  reply?: string
 }
 
 interface Props {
   onSend: (text: string) => void
   busy: boolean
   voice: StripVoice
-  onOpenConversation: () => void
+  /** Opens the full conversation elsewhere (the side pane). Docked bars have none. */
+  onOpenConversation?: () => void
   /** Where proposals are reviewed; shown when there are some. */
   onReviewProposals?: () => void
   placeholder?: string
@@ -32,6 +44,14 @@ interface Props {
   /** Phone: the capture bar and the conversation overlay own typing, so the
    *  strip shows only the latest receipt and suggestions, and only when there are some. */
   receiptOnly?: boolean
+  /** Pinned to the window's foot, the page's one conversation. */
+  docked?: boolean
+  /** Docked: the conversation, so its latest reply shows above the field. */
+  messages?: ChatMessageType[]
+  /** Docked: the page's walk ("Plan this season with me"). */
+  walk?: ConversationWalk | null
+  /** Docked: room left for an open side pane, in px. */
+  right?: number
 }
 
 const STATE_LABEL: Record<CanvasReceipt['state'], string> = {
@@ -45,7 +65,41 @@ export function SaveStateBadge({ state }: { state: CanvasReceipt['state'] }) {
   return <span className={`canvas-state is-${state}`} role="status">{label}</span>
 }
 
-export function ConversationStrip({ onSend, busy, voice, onOpenConversation, onReviewProposals, placeholder = 'Tell Symphony, or ask…', compact = false, receiptOnly = false }: Props) {
+/** The latest exchange, or the whole conversation when asked for. */
+function DockedTranscript({ messages, busy, voice }: { messages: ChatMessageType[]; busy: boolean; voice: StripVoice }) {
+  const [earlier, setEarlier] = useState(false)
+  // Closing hides what is there now; the next message brings it back.
+  const [closedAt, setClosedAt] = useState<number | null>(null)
+  const scroller = useRef<HTMLDivElement>(null)
+  const said = messages.filter((m) => m.content.trim() || m.role === 'assistant')
+  const lastUser = said.map((m) => m.role).lastIndexOf('user')
+  const latest = lastUser >= 0 ? said.slice(lastUser) : said.slice(-1)
+  const shown = earlier ? said : latest
+  const end = shown.at(-1)
+  useEffect(() => { scroller.current?.scrollTo?.({ top: scroller.current.scrollHeight }) }, [end?.id, end?.content, earlier])
+
+  const live = voice.active && (voice.heard || voice.reply)
+  if (live) return <div className="canvas-transcript" aria-live="polite">
+    {voice.heard && <p className="canvas-transcript-voice"><small>You</small>{voice.heard}</p>}
+    {voice.reply && <p className="canvas-transcript-voice"><small>Symphony</small>{voice.reply}</p>}
+  </div>
+  if (said.length === 0 || closedAt === said.length) return null
+  return <div className="canvas-transcript">
+    <div ref={scroller} className="canvas-transcript-scroll" aria-live="polite">
+      {shown.map((m) => m.content.trim()
+        ? <ChatMessage key={m.id} message={m} />
+        : busy ? <p key={m.id} className="canvas-transcript-wait" role="status">Symphony is thinking…</p> : null)}
+    </div>
+    <div className="canvas-transcript-tools">
+      {said.length > latest.length && <button type="button" className="canvas-link" aria-expanded={earlier} onClick={() => setEarlier((v) => !v)}>
+        {earlier ? 'Only the latest' : 'Earlier'}
+      </button>}
+      <button type="button" className="canvas-icon" onClick={() => { setClosedAt(said.length); setEarlier(false) }} aria-label="Hide the conversation"><X size={14} aria-hidden="true" /></button>
+    </div>
+  </div>
+}
+
+export function ConversationStrip({ onSend, busy, voice, onOpenConversation, onReviewProposals, placeholder = 'Tell Symphony, or ask…', compact = false, receiptOnly = false, docked = false, messages, walk, right = 0 }: Props) {
   const { receipt, undo, retry, dismiss, proposals } = useCanvasActivity()
   const selection = useSelectionOptional()
   const [draft, setDraft] = useState('')
@@ -60,12 +114,15 @@ export function ConversationStrip({ onSend, busy, voice, onOpenConversation, onR
   const appendDictation = useCallback((text: string) => setDraft((d) => (d ? `${d} ${text}` : text)), [])
 
   const pending = proposals.filter((p) => p.state !== 'saving').length
-  const shown = receipt && (receipt.state !== 'answered' || receipt.request)
+  // Docked, an answer is in the transcript; the receipt line is for saves.
+  const shown = receipt && (receipt.state !== 'answered' || (receipt.request && !messages))
 
   if (receiptOnly && !shown && pending === 0) return null
 
   return (
-    <section className={`canvas-strip${compact ? ' is-compact' : ''}${voice.active ? ' is-listening' : ''}`} aria-label="Conversation with Symphony">
+    <section className={`canvas-strip${compact ? ' is-compact' : ''}${docked ? ' is-docked' : ''}${voice.active ? ' is-listening' : ''}`} aria-label="Conversation with Symphony"
+      style={docked ? { right } : undefined}>
+      {messages && <DockedTranscript messages={messages} busy={busy} voice={voice} />}
       {shown && receipt && (
         <div className="canvas-receipt" aria-live="polite">
           <SaveStateBadge state={receipt.state} />
@@ -97,9 +154,10 @@ export function ConversationStrip({ onSend, busy, voice, onOpenConversation, onR
         </div>
       )}
       {receiptOnly ? (
-        <button type="button" className="canvas-link" onClick={onOpenConversation}><MessageSquare size={14} aria-hidden="true" /> Open the conversation</button>
+        onOpenConversation && <button type="button" className="canvas-link" onClick={onOpenConversation}><MessageSquare size={14} aria-hidden="true" /> Open the conversation</button>
       ) : (
       <form className="canvas-composer" onSubmit={submit}>
+        {walk && !voice.active && <button type="button" className="canvas-walk" disabled={busy} onClick={() => onSend(walk.message)}>{walk.label}</button>}
         <label className="sr-only" htmlFor="canvas-composer-input">Message Symphony</label>
         <input
           id="canvas-composer-input"
@@ -119,15 +177,18 @@ export function ConversationStrip({ onSend, busy, voice, onOpenConversation, onR
             aria-label={voice.active ? 'End voice conversation' : 'Talk with Symphony'}
           >
             {voice.active ? <MicOff size={16} aria-hidden="true" /> : <Mic size={16} aria-hidden="true" />}
-            <span>{voice.active ? (voice.status === 'connecting' ? 'Connecting…' : 'Listening') : 'Talk'}</span>
+            <span>{voice.active ? (voice.status === 'connecting' ? 'Connecting…' : docked ? 'End' : 'Listening') : 'Talk'}</span>
           </button>
         )}
-        <button type="submit" className="canvas-send" disabled={!draft.trim() || busy} aria-label="Send">
+        {docked && voice.active && voice.mute && voice.status !== 'connecting' && (
+          <button type="button" className="canvas-link" aria-pressed={voice.status === 'muted'} onClick={voice.mute}>{voice.status === 'muted' ? 'Unmute' : 'Mute'}</button>
+        )}
+        {(!docked || draft.trim()) && <button type="submit" className="canvas-send" disabled={!draft.trim() || busy} aria-label="Send">
           <Send size={15} aria-hidden="true" />
-        </button>
-        <button type="button" className="canvas-icon" onClick={onOpenConversation} aria-label="Open the conversation" title="Open the conversation">
+        </button>}
+        {onOpenConversation && <button type="button" className="canvas-icon" onClick={onOpenConversation} aria-label="Open the conversation" title="Open the conversation">
           <MessageSquare size={16} aria-hidden="true" />
-        </button>
+        </button>}
       </form>
       )}
     </section>

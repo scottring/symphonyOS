@@ -105,6 +105,48 @@
 @media (min-width: 1024px) {
   .desktop-workspace-page .canvas-strip { margin-inline: 3.5rem; }
 }
+/* Docked (Plan on desktop): one bar across the window's foot, white, its
+   latest exchange above the field (approved Season board, 2026-10-10). The
+   inline `right` leaves room for an open Details pane. */
+.canvas-strip.is-docked {
+  position: fixed; left: 0; bottom: 0; z-index: 30; margin: 0; max-width: none;
+  border: 0; border-top: 1px solid var(--color-neutral-200); border-radius: 0;
+  box-shadow: 0 -2px 12px rgb(0 0 0 / 0.04); padding: 10px 2.5rem 12px;
+}
+@media (min-width: 768px) {
+  .desktop-workspace-page .canvas-strip.is-docked { margin: 0; }
+}
+@media (min-width: 1024px) {
+  .canvas-strip.is-docked { padding-inline: 3.5rem; }
+}
+.canvas-strip.is-docked .canvas-composer { gap: 10px; }
+.canvas-strip.is-docked .canvas-composer-field {
+  height: 44px; padding: 0 18px; border: 1px solid var(--color-neutral-300); border-radius: var(--radius-full);
+  background: var(--color-bg-base);
+}
+.canvas-strip.is-docked .canvas-composer:focus-within { box-shadow: none; }
+.canvas-strip.is-docked .canvas-composer-field:focus { border-color: var(--color-primary-500); outline: 2px solid var(--color-primary-100); }
+.canvas-strip.is-docked .canvas-mic, .canvas-strip.is-docked .canvas-send { height: 44px; }
+.canvas-strip.is-docked .canvas-send { width: 44px; }
+.canvas-walk {
+  flex: none; height: 44px; padding: 0 18px; border-radius: var(--radius-full);
+  border: 1.5px solid var(--color-primary-600); background: var(--color-bg-elevated);
+  font-family: var(--font-family-sans); font-size: 14px; font-weight: 600; color: var(--color-primary-800); white-space: nowrap;
+}
+.canvas-walk:hover:not(:disabled) { background: var(--color-primary-50); }
+.canvas-walk:disabled { opacity: .55; }
+.canvas-walk:focus-visible { outline: 2px solid var(--color-primary-600); outline-offset: 2px; }
+.canvas-transcript {
+  display: flex; align-items: flex-start; gap: 8px; padding: 2px 0 8px; border-bottom: 1px solid var(--color-neutral-100);
+}
+.canvas-transcript-scroll {
+  flex: 1; min-width: 0; max-height: min(34vh, 320px); overflow-y: auto; display: flex; flex-direction: column; gap: 6px;
+}
+.canvas-transcript-tools { display: flex; align-items: center; gap: 4px; flex: none; }
+.canvas-transcript-wait { margin: 0; font-size: 13.5px; color: var(--color-neutral-500); }
+.canvas-transcript-voice { margin: 0; font-size: 14px; color: var(--color-neutral-800); }
+.canvas-transcript-voice small { display: block; font-size: 11.5px; color: var(--color-neutral-500); }
+
 .canvas-strip.is-listening { border-color: var(--color-primary-400); box-shadow: 0 0 0 3px var(--color-primary-100), var(--shadow-lg); }
 .canvas-receipt, .canvas-proposals-line {
   display: flex; align-items: center; gap: 8px; flex-wrap: wrap; min-width: 0;

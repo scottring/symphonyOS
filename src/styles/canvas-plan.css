@@ -11,8 +11,15 @@
   font-family: var(--font-family-sans);
 }
 
-/* ---- Header: stepper, period, horizon actions ---------------------------- */
-.plan-head { display: flex; flex-direction: column; gap: 12px; margin-bottom: 20px; }
+/* ---- Header: horizon switch, then the period by name (approved board) ---- */
+.plan-head { display: flex; flex-direction: column; gap: 14px; margin: 12px 0 20px; }
+.plan-head-row { display: flex; align-items: center; gap: 10px 14px; flex-wrap: wrap; }
+.plan-step {
+  display: inline-grid; place-items: center; width: 34px; height: 34px; flex: none;
+  border: 1px solid var(--color-neutral-200); border-radius: var(--radius-md);
+  background: var(--color-bg-elevated); color: var(--color-neutral-600);
+}
+.plan-step:hover { color: var(--color-neutral-900); background: var(--color-neutral-50); }
 .plan-stepper {
   display: inline-flex; align-self: flex-start; align-items: center; gap: 2px; flex-wrap: wrap;
   padding: 3px; border: 1px solid var(--color-neutral-200); border-radius: var(--radius-full);
@@ -21,18 +28,18 @@
 .plan-stepper > button, .plan-stepper-week {
   min-height: 34px; padding: 0 16px; border: 0; border-radius: var(--radius-full); background: none;
   font-size: 13.5px; font-weight: 600; color: var(--color-neutral-700); text-decoration: none;
-  display: inline-flex; align-items: center;
+  display: inline-flex; align-items: center; white-space: nowrap;
 }
 .plan-stepper > button:hover, .plan-stepper-week:hover { background: var(--color-neutral-100); color: var(--color-neutral-900); }
 .plan-stepper > button[aria-current] { background: var(--color-primary-700); color: #fff; }
 .plan-stepper-week { color: var(--color-primary-700); font-weight: 500; }
 
-.plan-period { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; min-width: 0; }
+.plan-period { display: flex; align-items: center; gap: 8px 10px; flex-wrap: wrap; min-width: 0; }
 .plan-period h1 {
   margin: 0; min-width: 0; font-family: var(--font-family-display); font-weight: 400;
   font-size: clamp(28px, 3vw, 40px); line-height: 1.15; color: var(--color-neutral-900);
 }
-.plan-period-range { font-size: 13px; color: var(--color-neutral-600); white-space: nowrap; }
+.plan-period-range { font-size: 14px; color: var(--color-neutral-600); white-space: nowrap; }
 .plan-period .canvas-icon { font-size: 22px; line-height: 1; }
 
 .plan-head-actions { display: flex; align-items: center; gap: 8px 16px; flex-wrap: wrap; }
@@ -55,9 +62,15 @@
 /* ---- Groups ----------------------------------------------------------------- */
 .plan-groups {
   list-style: none; margin: 0; padding: 0;
-  display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 14px; align-items: start;
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; align-items: start;
 }
 .plan-groups.is-year { grid-template-columns: minmax(0, 760px); }
+/* Season and Month pack their cards in columns, as the approved board does,
+   so a short card never leaves a hole beside a long one. */
+@media (min-width: 768px) {
+  .plan-groups:not(.is-year):not(.is-focused) { display: block; columns: 4 260px; column-gap: 16px; }
+  .plan-groups:not(.is-year):not(.is-focused) > .plan-group-slot { break-inside: avoid; margin-bottom: 16px; }
+}
 .plan-groups.is-focused { grid-template-columns: minmax(0, 1fr); gap: 8px; }
 .plan-group-slot { min-width: 0; }
 .plan-group { padding: 10px 14px 10px; }
@@ -141,7 +154,12 @@
 
 /* ---- Footer ------------------------------------------------------------------- */
 .plan-foot { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-top: 20px; }
-.plan-area { display: inline-flex; align-items: center; gap: 8px; font-size: 12px; color: var(--color-neutral-600); }
+.plan-composer .pv2-addarea { flex: none; }
+/* Desktop: room under the last card for the conversation bar docked at the
+   window's foot (ConversationStrip .is-docked). */
+@media (min-width: 768px) {
+  .plan-canvas { padding-bottom: 160px; }
+}
 
 /* ---- Focus rings -------------------------------------------------------------- */
 .plan-canvas button:focus-visible, .plan-canvas a:focus-visible, .plan-group-focus:focus-visible, .plan-item-title:focus-visible {
@@ -157,7 +175,8 @@
   .plan-group .canvas-group-head { position: sticky; top: 0; z-index: 2; background: var(--color-bg-elevated); }
   .plan-group.is-unlinked .canvas-group-head { background: var(--color-bg-base); }
   .plan-add, .plan-group-folded { min-height: 44px; }
-  .plan-period .canvas-icon { min-width: 44px; min-height: 44px; }
+  .plan-step { width: 44px; height: 44px; }
+  .plan-period h1 { font-size: 28px; }
   .plan-move-menu > button { min-height: 44px; }
 }
 
@@ -212,13 +231,4 @@
   .prep-steps label { min-height: 40px; align-items: center; }
 }
 
-/* Header in the shared masthead: stepper + walk sit in the controls slot on
-   desktop and under the masthead on phones. */
-.plan-head-controls { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; justify-content: flex-end; }
-.plan-head-mobile { display: none; }
-.plan-toolbar { display: flex; justify-content: flex-end; gap: 12px; min-height: 8px; margin: -8px 12px 8px; }
-@media (max-width: 767px) {
-  .plan-head-mobile { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; margin: 0 12px 12px; }
-  .plan-head-mobile .plan-stepper { max-width: 100%; row-gap: 6px; }
-  .plan-head-mobile .plan-stepper > button, .plan-head-mobile .plan-stepper-week { padding: 0 12px; }
-}
+.plan-toolbar { display: flex; justify-content: flex-end; gap: 12px; min-height: 8px; margin: -8px 0 8px; }

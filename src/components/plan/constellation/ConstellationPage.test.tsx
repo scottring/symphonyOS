@@ -2,6 +2,7 @@ import {render,screen,fireEvent,waitFor,within} from '@testing-library/react'
 import {MemoryRouter,Routes,Route,useLocation} from 'react-router-dom'
 import {afterEach,beforeEach,describe,it,expect,vi} from 'vitest'
 import {ConstellationPage} from './ConstellationPage'
+import {ConversationWalkContext} from '@/components/canvas/conversationWalk'
 const api=vi.hoisted(()=>({addGoal:vi.fn(),updateGoal:vi.fn(),deleteGoal:vi.fn(),addTask:vi.fn(),updateTask:vi.fn(),refetch:vi.fn(),pushTask:vi.fn(),setBucket:vi.fn(),updateTasksBulk:vi.fn(),toggleTask:vi.fn(),deleteTask:vi.fn(),keepForward:vi.fn(),dropCommitment:vi.fn(),tasks:[] as any[],goals:[] as any[]}))
 const activity=vi.hoisted(()=>({calls:[] as {label:string;ok:boolean;opts:any}[],proposals:[] as any[],setProposalState:vi.fn(),removeProposal:vi.fn()}))
 const launcher=vi.hoisted(()=>({openAssistant:vi.fn()}))
@@ -82,8 +83,11 @@ describe('horizon stepper and URL',()=>{
  it('opens a horizon-wide planning conversation and offers the next horizon',()=>{
   api.tasks=[{id:'s',title:'Autumn outings',bucket:'quarter',goalId:'g'}]
   season()
-  fireEvent.click(screen.getByRole('button',{name:'Plan Fall 2026 with Symphony'}))
-  expect(launcher.openAssistant).toHaveBeenCalledWith(expect.objectContaining({message:expect.stringContaining('Fall 2026 across all my yearly intentions, one at a time')}))
+  fireEvent.click(screen.getByRole('button',{name:/^Plan (this season|Fall 2026) with me$/}))
+  const message=launcher.openAssistant.mock.calls[0][0].message
+  expect(message).toContain('Fall 2026 across my yearly intentions, one at a time')
+  // It asks; it never supplies (Scott, 2026-10-11).
+  expect(message).toContain("don't suggest seasonal goals of your own")
   fireEvent.click(screen.getByRole('button',{name:'Next: Month →'}))
   expect(screen.getByRole('button',{name:'Month'})).toHaveAttribute('aria-current','step')
  })
@@ -97,7 +101,7 @@ describe('where you are, and somewhere to add (Scott, 2026-10-11)',()=>{
   fireEvent.click(screen.getByRole('button',{name:'Season'}))
   expect(screen.getByTestId('where').textContent).not.toContain('start=')
   expect(screen.getByRole('heading',{level:1})).toHaveTextContent('Fall 2026')
-  expect(screen.queryByRole('button',{name:'This season'})).not.toBeInTheDocument()
+  expect(screen.queryByRole('button',{name:'Back to this season'})).not.toBeInTheDocument()
  })
  it('a past period keeps its place when the horizon changes',()=>{
   open('/season?view=constellation&start=2025-09-01&horizon=1')
@@ -173,7 +177,7 @@ describe('grouped under parent',()=>{
   fireEvent.change(screen.getByLabelText('New monthly milestone under Autumn outings'),{target:{value:'Picnic'}})
   fireEvent.click(screen.getByRole('button',{name:'Add'}))
   await waitFor(()=>expect(api.addTask).toHaveBeenCalledWith('Picnic',undefined,undefined,undefined,expect.objectContaining({bucket:'month',sourceId:'s',goalId:'g',monthStart:new Date(2026,9,1)})))
-  fireEvent.click(screen.getByRole('button',{name:'Add an independent monthly milestone'}))
+  fireEvent.click(screen.getByRole('button',{name:'Add a monthly milestone not under a fall goal'}))
   fireEvent.change(screen.getByLabelText('New monthly milestone'),{target:{value:'Taxes'}})
   fireEvent.click(screen.getByRole('button',{name:'Add'}))
   await waitFor(()=>expect(api.addTask).toHaveBeenLastCalledWith('Taxes',undefined,undefined,undefined,expect.not.objectContaining({sourceId:expect.anything()})))
@@ -354,5 +358,27 @@ describe('prepared to act on plan rows',()=>{
   expect(within(row).getByRole('img',{name:'Has contact, steps 1 of 2'})).toBeInTheDocument()
   fireEvent.click(within(row).getByRole('button',{name:'Call Cami'}))
   expect(within(row).getByText('From Back to school: 1 link')).toBeInTheDocument()
+ })
+})
+
+describe('one conversation, at the foot (approved Season board, 2026-10-10)',()=>{
+ beforeEach(()=>{vi.useFakeTimers({toFake:['Date']});vi.setSystemTime(new Date(2026,9,11,9))})
+ afterEach(()=>{vi.useRealTimers()})
+ it('hands its walk to the docked bar instead of showing its own, and has no masthead numeral',()=>{
+  const setWalk=vi.fn()
+  render(<ConversationWalkContext.Provider value={setWalk}><MemoryRouter initialEntries={['/season?view=constellation&horizon=1']}><Routes>
+   <Route path="/season" element={<ConstellationPage/>}/>
+  </Routes></MemoryRouter></ConversationWalkContext.Provider>)
+  expect(screen.queryByRole('button',{name:/with me$/})).not.toBeInTheDocument()
+  expect(setWalk).toHaveBeenLastCalledWith({label:'Plan this season with me',message:expect.stringContaining('Fall 2026 across my yearly intentions')})
+  expect(screen.getByRole('heading',{level:1})).toHaveTextContent('Fall 2026')
+  expect(screen.queryByText(/09\s*[–—-]\s*11/)).not.toBeInTheDocument()
+  expect(screen.queryByText(/Life area for new/)).not.toBeInTheDocument()
+ })
+ it('names a past period in the walk and offers the way back',()=>{
+  open('/season?view=constellation&horizon=1&start=2025-10-01')
+  expect(screen.getByRole('button',{name:'Plan Fall 2025 with me'})).toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button',{name:'Back to this season'}))
+  expect(screen.getByTestId('where').textContent).not.toContain('start=')
  })
 })

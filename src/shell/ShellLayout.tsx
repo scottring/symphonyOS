@@ -47,6 +47,7 @@ import { useSymphonyAssistant, type AssistantTurnObserver } from '@/hooks/useSym
 import { CanvasActivityProvider, useCanvasActivity, type CanvasActivity } from '@/contexts/CanvasActivityContext';
 import { ConversationStrip } from '@/components/canvas/ConversationStrip';
 import { conversationStripPath } from '@/lib/canvas/stripPaths';
+import { ConversationWalkContext, type ConversationWalk } from '@/components/canvas/conversationWalk';
 import { useScratchpadHidden } from '@/hooks/useScratchpadHidden';
 import { useAssistantLaunchRequests, useAssistantLauncher } from '@/contexts/AssistantLaunchContext';
 import { useShellChrome } from './useShellChrome';
@@ -175,7 +176,11 @@ function ShellLayoutInner({ children }: Props) {
   // phone alike. Focused controls must clear the scenery foreground.
   const [pageScroller, setPageScroller] = useState<HTMLDivElement | null>(null);
   const { showScenery, sceneryLighting } = useSceneryPreferences();
-  const sceneryFloor = isMobile ? `calc(${MOBILE_TAB_BAR_HEIGHT} + env(safe-area-inset-bottom, 0px))` : undefined;
+  // Plan on desktop has one conversation: the bar docked at the window's foot
+  // (approved Season board, 2026-10-10). The side pane is for Details there.
+  const planBar = !isMobile && conversationStripPath(location.pathname) && ['year', 'season', 'month'].includes(planPeriodForPath(location.pathname) ?? '');
+  // Plan's docked bar is the desktop floor the landscape stands on.
+  const sceneryFloor = isMobile ? `calc(${MOBILE_TAB_BAR_HEIGHT} + env(safe-area-inset-bottom, 0px))` : planBar ? '67px' : undefined;
 
   const references = useReferenceLists();
 
@@ -275,12 +280,13 @@ function ShellLayoutInner({ children }: Props) {
   const resetConversation = () => { voice.stop(); assistant.resetSession(); };
 
   const { hidden: aiHidden, setHidden: setAiHidden } = useScratchpadHidden();
+  const [walk, setWalk] = useState<ConversationWalk | null>(null);
   const [phoneChatOpen, setPhoneChatOpen] = useState(false);
   const phoneChatRef = useRef<HTMLDivElement>(null);
   useDialogFocus(phoneChatOpen && isMobile, phoneChatRef, () => setPhoneChatOpen(false));
   const [pane, setPane] = useState<SidePane>('details');
   const [activeNoteId, setActiveNoteId] = useState<string | null>(null);
-  const aiOpen = !isMobile && !aiHidden;
+  const aiOpen = !isMobile && !aiHidden && !planBar;
   // A new selection brings Details to the front.
   const selectionKey = selection ? `${selection.kind}:${selection.id}` : null;
   useEffect(() => { if (selectionKey) setPane('details'); }, [selectionKey]);
@@ -297,10 +303,10 @@ function ShellLayoutInner({ children }: Props) {
     if (launchNonce === 0 || launchNonce === seenLaunchNonce.current) return;
     seenLaunchNonce.current = launchNonce;
     if (isMobile) setPhoneChatOpen(true);
-    else showPane('ai');
+    else if (!planBar) showPane('ai');
     const seed = consumeSeed();
     if (seed && seed.autoSend !== false) void assistant.sendMessage(seed.message);
-  }, [launchNonce, isMobile, consumeSeed, assistant, showPane]);
+  }, [launchNonce, isMobile, planBar, consumeSeed, assistant, showPane]);
 
   // Closing the More sheet returns focus to its tab, not to <body>.
   const moreTabRef = useRef<HTMLButtonElement>(null);
@@ -331,7 +337,7 @@ function ShellLayoutInner({ children }: Props) {
   }), [deleteTask, updateTask, deleteGoal, updateGoal, deleteRoutine, updateRoutine]);
   const canvasRefetch = useCallback(() => { window.dispatchEvent(new Event('symphony-plan-updated')); return Promise.all([refetch(), refetchRoutines()]); }, [refetch, refetchRoutines]);
   const showStrip = conversationStripPath(location.pathname);
-  const stripVoice = { available: voiceEnabled, active: voice.active, status: voice.status, start: () => { void voice.start(); }, stop: voice.stop };
+  const stripVoice = { available: voiceEnabled, active: voice.active, status: voice.status, start: () => { void voice.start(); }, stop: voice.stop, mute: voice.mute, heard: voice.heard, reply: voice.reply };
   const openConversation = () => { if (isMobile) setPhoneChatOpen(true); else showPane('ai'); };
 
   return (
@@ -342,6 +348,7 @@ function ShellLayoutInner({ children }: Props) {
     <DesktopCenterContext.Provider value={desktopCenter}>
     <MobilePlanControlsContext.Provider value={mobilePlanControls}>
     <GuideHostContext.Provider value={setGuideHost}>
+    <ConversationWalkContext.Provider value={planBar ? setWalk : null}>
     {/* With scenery on, the shell wears the place's sky in the chosen light
         (index.css, IMMERSIVE SCENERY); page regions marked .scenery-page
         take its text colours. */}
@@ -352,7 +359,7 @@ function ShellLayoutInner({ children }: Props) {
       {/* "New version available — reload" banner: shows when a newer build
           deployed while this tab stayed open (stale-tab guard). */}
       <NewVersionBanner />
-      {voice.active && !(isMobile ? phoneChatOpen : aiOpen && pane === 'ai') && <div className="workspace-voice-floating" role="status"><span>{voice.status === 'muted' ? 'Voice muted' : 'Voice active'}</span><button onClick={voice.mute}>{voice.status === 'muted' ? 'Unmute' : 'Mute'}</button><button onClick={voice.stop}>End voice</button></div>}
+      {voice.active && !planBar && !(isMobile ? phoneChatOpen : aiOpen && pane === 'ai') && <div className="workspace-voice-floating" role="status"><span>{voice.status === 'muted' ? 'Voice muted' : 'Voice active'}</span><button onClick={voice.mute}>{voice.status === 'muted' ? 'Unmute' : 'Mute'}</button><button onClick={voice.stop}>End voice</button></div>}
 
       {/* Content frame — uses <div> (not <main>) because individual apps render
           their own <main>. Avoids invalid nested-main HTML. */}
@@ -422,7 +429,8 @@ function ShellLayoutInner({ children }: Props) {
           <div className="contents">
             <HeaderPeopleFilter />
             <DomainSwitcher />
-            <button
+            {/* On Plan the conversation is the bar at the foot. */}
+            {!planBar && <button
               onClick={() => setAiHidden(aiOpen)}
               className={`page-navigation-icon${aiOpen ? ' is-on' : ''}`}
               aria-label="AI chat"
@@ -430,7 +438,7 @@ function ShellLayoutInner({ children }: Props) {
               title="AI chat"
             >
               <Sparkles className="w-[17px] h-[17px]" aria-hidden="true" />
-            </button>
+            </button>}
           </div>
         )} />
             </div>
@@ -468,7 +476,9 @@ function ShellLayoutInner({ children }: Props) {
                   {/* Guided planning rides above the page it is guiding. */}
                   <div className="guide-slot"><GuideBar host={guideHost} /></div>
                   {children}
-                  {showStrip && <ConversationStrip onSend={(text) => sendConversation(text)} busy={assistant.loading} voice={stripVoice} onOpenConversation={openConversation} />}
+                  {planBar
+                    ? <ConversationStrip docked messages={assistant.messages} walk={walk} right={paneWidth} onSend={(text) => sendConversation(text)} busy={assistant.loading} voice={stripVoice} />
+                    : showStrip && <ConversationStrip onSend={(text) => sendConversation(text)} busy={assistant.loading} voice={stripVoice} onOpenConversation={openConversation} />}
                 </div>
               </SideColumn>
             </div>
@@ -650,6 +660,7 @@ function ShellLayoutInner({ children }: Props) {
         />
       )}
     </div>
+    </ConversationWalkContext.Provider>
     </GuideHostContext.Provider>
     </MobilePlanControlsContext.Provider>
     </DesktopCenterContext.Provider>

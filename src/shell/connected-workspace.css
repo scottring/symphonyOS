@@ -18,8 +18,7 @@
    instead of centering the horizon rail over an undersized grid track. */
 .connected-workspace .page-navigation:has(> .page-navigation-mid){grid-template-columns:auto minmax(0,1fr) auto;gap:8px}
 .connected-workspace .page-navigation-mid{justify-content:flex-start}
-.connected-workspace .page-navigation-center .horizon-rail a{padding-inline:6px}
-.connected-workspace .page-navigation-center .horizon-rail-join{width:8px}
+.connected-workspace .page-navigation-center .horizon-rail a{padding-inline:10px}
 /* Week keeps the shared masthead and gutter (one page shape, 2026-10-10);
    these compact its older journal rows where they still appear. */
 .connected-workspace .pv2-week .oj-section{grid-template-columns:minmax(0,1fr);gap:8px;padding:14px 0}
