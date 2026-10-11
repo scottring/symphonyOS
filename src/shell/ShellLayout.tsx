@@ -179,10 +179,10 @@ function ShellLayoutInner({ children }: Props) {
   // phone alike. Focused controls must clear the scenery foreground.
   const [pageScroller, setPageScroller] = useState<HTMLDivElement | null>(null);
   const { showScenery, sceneryLighting } = useSceneryPreferences();
-  // Today, Week and Plan on desktop have one conversation: the bar docked at
-  // the window's foot (approved boards, 2026-10-10). The side pane is for
-  // Details there.
-  const dockedBar = !isMobile && conversationStripPath(location.pathname) && !!planPeriodForPath(location.pathname);
+  // Today, Week, Plan and Routines on desktop have one conversation: the bar
+  // docked at the window's foot (approved boards, 2026-10-10). The side pane
+  // is for Details there.
+  const dockedBar = !isMobile && conversationStripPath(location.pathname);
   // Plan's docked bar is the desktop floor the landscape stands on.
   const sceneryFloor = isMobile ? `calc(${MOBILE_TAB_BAR_HEIGHT} + env(safe-area-inset-bottom, 0px))` : dockedBar ? DOCKED_BAR_HEIGHT : undefined;
 

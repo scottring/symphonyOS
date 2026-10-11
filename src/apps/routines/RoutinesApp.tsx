@@ -21,6 +21,12 @@ import { RoutinesList, RoutineForm, RoutineInput } from '@/components/lazy'
 import { groupRoutineSteps } from '@/lib/today/routineCollections'
 import { nextStepOrder } from '@/lib/today/stepOrdering'
 import { LoadingFallback } from '@/components/layout/LoadingFallback'
+import { useConversationWalk } from '@/components/canvas/conversationWalk'
+
+const BUILD_WALK = {
+  label: 'Build a routine with me',
+  message: "Let's build a routine. Ask me what it's for, who it's for and when, one question at a time; use my words and don't add steps of your own. Save it when I say it's right.",
+}
 
 const RoutineBuilderModal = lazy(() =>
   import('@/components/routine/RoutineBuilderModal').then(m => ({ default: m.RoutineBuilderModal }))
@@ -149,6 +155,10 @@ function RoutinesIndex() {
     await Promise.all(ids.map((id, i) => updateRoutine(id, { parent_routine_id: collectionId, step_order: base + i })))
   }, [routines, updateRoutine])
 
+  // The person's routine in their words: Symphony asks and shapes, never adds
+  // steps of its own (Scott, 2026-10-11).
+  const walkInBar = useConversationWalk(BUILD_WALK)
+
   return (
     <Suspense fallback={<LoadingFallback />}>
       <RoutinesList
@@ -169,7 +179,9 @@ function RoutinesIndex() {
         onCreateCollection={handleCreateCollection}
         onGroupIntoCollection={handleGroupIntoCollection}
         onAddToCollection={handleAddToCollection}
-        onBuildWithAI={() => setBuilderOpen(true)}
+        // Desktop builds in the conversation bar (approved Routines board);
+        // phones keep the builder.
+        onBuildWithAI={walkInBar ? undefined : () => setBuilderOpen(true)}
         onCreateRoutineInSlot={handleCreateRoutineInSlot}
       />
       {builderOpen && (

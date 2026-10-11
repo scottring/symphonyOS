@@ -453,7 +453,7 @@ describe('Capture and the Today pin from every desktop page', () => {
 
 // The approved Season board (2026-10-10): on Plan the conversation is one bar
 // at the window's foot; the side pane is for Details only.
-describe('Today, Week and Plan have one conversation, at the foot', () => {
+describe('Today, Week, Plan and Routines have one conversation, at the foot', () => {
   beforeEach(() => { mobileState.isMobile = false; selectionState.selection = null; aiState.hidden = false; sessionStorage.clear() })
   afterEach(() => { aiState.hidden = true })
 
@@ -476,12 +476,13 @@ describe('Today, Week and Plan have one conversation, at the foot', () => {
     }
   })
 
-  it('leaves Routines with its side conversation, and pages off the horizons with the AI button', () => {
+  it('docks it on Routines too; pages off the destinations keep the AI button', () => {
     const routines = renderAt('/routines')
-    expect(screen.getByRole('button', { name: 'AI chat' })).toBeInTheDocument()
-    expect(screen.getByRole('region', { name: 'Conversation with Symphony' })).not.toHaveClass('is-docked')
+    expect(screen.getByRole('region', { name: 'Conversation with Symphony' })).toHaveClass('is-docked')
+    expect(screen.queryByRole('button', { name: 'AI chat' })).not.toBeInTheDocument()
     routines.unmount()
     renderAt('/inbox')
     expect(screen.getByRole('button', { name: 'AI chat' })).toBeInTheDocument()
+    expect(screen.queryByRole('region', { name: 'Conversation with Symphony' })).not.toBeInTheDocument()
   })
 })

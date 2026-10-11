@@ -79,8 +79,12 @@ Out-of-scope findings to report (not changed here): `VITE_OPEN_BRAIN_API_KEY` is
 - **Today and Week follow (Scott, 2026-10-11).** The same docked bar and no AI side
   pane on Today and Week; their mastheads lose the big numeral (the approved Today
   board titles the day by its date). Side-by-side columns stop above the bar
-  (`--dock-clearance`, useColumnsFitWindow). Routines and pages off the horizons
-  keep the side conversation and the top-bar AI button.
+  (`--dock-clearance`, useColumnsFitWindow).
+- **Routines follows (Scott, 2026-10-11).** Docked bar and no AI side pane on
+  Routines too; on desktop "Build with Symphony" becomes the bar's "Build a
+  routine with me" (asks, never adds steps); phones keep the builder. The
+  masthead loses its "Everyday" eyebrow. Pages off the destinations (Inbox,
+  Notes…) keep the side conversation and the top-bar AI button.
 
 ## Later scope (noted, not in this build)
 
