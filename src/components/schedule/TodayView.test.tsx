@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, afterEach } from 'vitest'
+import { describe, it, expect, vi, afterEach, onTestFinished } from 'vitest'
 import { ALL_LAYERS } from '@/lib/domains'
 import { screen, fireEvent, within } from '@testing-library/react'
 import { render } from '@/test/test-utils'
@@ -640,8 +640,13 @@ describe('TodayView — no scoreboard', () => {
   })
 
   it('names the next commitment instead of pointing at the timeline', () => {
+    // Mid-morning, so "an hour from now" is still today in any time zone
+    // (it was tomorrow when CI ran in the 11pm hour).
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date(TODAY.getFullYear(), TODAY.getMonth(), TODAY.getDate(), 10, 0))
+    onTestFinished(() => { vi.useRealTimers() })
     const soon = new Date(TODAY)
-    soon.setHours(soon.getHours() + 1, 0, 0, 0)
+    soon.setHours(11, 0, 0, 0)
     renderView({
       tasks: [{
         id: 'next-up', title: 'Pick up Mia from climbing', completed: false,
