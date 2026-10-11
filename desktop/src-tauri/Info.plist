@@ -1,11 +1,14 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<!-- Merged into the app bundle's Info.plist by Tauri. Without the camera usage
-     description, macOS TCC denies getUserMedia in the WKWebView outright and
-     photo-first capture's live camera can never prompt. -->
+<!-- Merged into the app bundle's Info.plist by Tauri. Without a usage
+     description, macOS TCC refuses getUserMedia in the WKWebView: the camera
+     can never prompt (photo-first capture), and asking for the microphone
+     (Talk with Symphony) KILLS the app with SIGABRT, Namespace TCC. -->
 <plist version="1.0">
 <dict>
 	<key>NSCameraUsageDescription</key>
 	<string>Symphony uses the camera to snap photos of things so AI can identify them and file them as tasks. With an iPhone nearby, Continuity Camera lets the phone act as the camera.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Symphony uses the microphone when you tap Talk, so you can plan out loud with Symphony, and when you dictate into a message.</string>
 </dict>
 </plist>

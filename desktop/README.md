@@ -60,7 +60,7 @@ through. Findings, so nobody re-derives them:
 
 **Verified working — no action needed.** File inputs (`<input type="file">`,
 10+ call sites) — wry implements `runOpenPanelWithParameters:`, so the native
-open panel appears. Camera/mic — wry grants `requestMediaCapturePermission`.
+open panel appears. Camera/mic — wry grants `requestMediaCapturePermission`, but only once `Info.plist` carries `NSCameraUsageDescription` / `NSMicrophoneUsageDescription`; without the mic one, tapping Talk crashes the app (TCC SIGABRT).
 Clipboard read/write — WebKit supports it, and the Edit menu covers ⌘C/⌘V.
 `webkitSpeechRecognition` (`useTranscription`) is absent in WKWebView, but the
 hook feature-detects and hides the UI, so it degrades correctly rather than

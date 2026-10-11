@@ -345,7 +345,15 @@ fn build_menu(app: &AppHandle, autostart_enabled: bool) -> tauri::Result<Menu<ta
         .select_all()
         .build()?;
 
-    let mut view_menu = SubmenuBuilder::new(app, "View");
+    // The shell loads the live site; Reload picks up a new deploy or settings
+    // change without quitting (Cmd+R does nothing in a bare WKWebView).
+    let mut view_menu = SubmenuBuilder::new(app, "View")
+        .item(
+            &MenuItemBuilder::with_id("reload", "Reload")
+                .accelerator("Cmd+R")
+                .build(app)?,
+        )
+        .separator();
     for (i, (id, label)) in [
         ("nav-today", "Today"),
         ("nav-week", "Week"),
@@ -402,6 +410,12 @@ fn handle_menu_event(app: &AppHandle, id: &str) {
         };
         if result.is_err() {
             eprintln!("failed to toggle launch at login");
+        }
+        return;
+    }
+    if id == "reload" {
+        if let Some(win) = app.get_webview_window("main") {
+            let _ = win.eval("window.location.reload()");
         }
         return;
     }
