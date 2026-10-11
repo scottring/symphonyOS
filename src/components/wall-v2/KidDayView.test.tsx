@@ -350,6 +350,8 @@ describe('KidDayView — the reading card', () => {
 
   it('Start, Pause, Resume, then Done logs the minutes actually read', () => {
     vi.useFakeTimers()
+    // Mid-morning: the 38 minutes below crossed midnight when CI ran at 11:46pm.
+    const now = new Date(); vi.setSystemTime(new Date(now.getFullYear(), now.getMonth(), now.getDate(), 10, 0))
     try {
       const r = routine({ name: 'Read', target_amount: 20, target_unit: 'minutes' })
       renderView({ routines: [r] })
