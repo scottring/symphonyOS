@@ -12,6 +12,14 @@ describe('workspace context',()=>{
   const result=workspaceContext(tasks,'/month','?start=2026-10-01',new Set(['family']),'79')
   expect(result.items).toHaveLength(60);expect(result.items[0].id).toBe('79');expect(result.truncated).toBe(true);expect(result.date).toBe('2026-10-01')
  })
+ it('names the horizon on screen, not the path the Plan canvas was opened on',()=>{
+  const at=(path:string,search:string)=>workspaceContext([],path,search,new Set(['family']),null,new Date('2026-10-11T12:00:00')).page
+  expect(at('/month','?view=constellation&horizon=0')).toBe('year')
+  expect(at('/year','?view=constellation&horizon=1')).toBe('season')
+  expect(at('/year','?view=constellation&horizon=2&start=2026-10-01')).toBe('month')
+  expect(at('/month','?view=constellation')).toBe('month')
+  expect(at('/week','?view=alongside')).toBe('week')
+ })
  it('only allows known canvas destinations',()=>{
   expect(workspaceDestination('week','2026-10-09')).toBe('/week?view=alongside&date=2026-10-09')
   expect(workspaceDestination('year')).toBe('/year?view=constellation&horizon=0')

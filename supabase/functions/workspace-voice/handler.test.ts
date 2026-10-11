@@ -26,6 +26,13 @@ describe('workspace voice handshake',()=>{
   expect(JSON.stringify([...response.headers])).not.toContain('test-secret')
   expect(deps.fetch).toHaveBeenCalledTimes(1)
  })
+ it('starts the current model, transcribing in English with noise reduction',async()=>{
+  const deps=setup();await handleWorkspaceVoice(request(),deps)
+  const session=JSON.parse(((deps.fetch.mock.calls[0] as unknown as [string,RequestInit])[1].body as FormData).get('session') as string)
+  expect(session.model).toBe('gpt-realtime-2.1')
+  expect(session.audio.input.transcription).toEqual({model:'gpt-4o-mini-transcribe',language:'en'})
+  expect(session.audio.input.noise_reduction).toEqual({type:'near_field'})
+ })
  it('stops at the daily limit without spending',async()=>{
   const deps=setup();deps.reserve.mockResolvedValue(false)
   expect((await handleWorkspaceVoice(request(),deps)).status).toBe(429);expect(deps.fetch).not.toHaveBeenCalled()

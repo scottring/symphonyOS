@@ -20,7 +20,11 @@ export function workspaceContext(tasks:Task[], pathname:string, search:string, l
   const raw=params.get('date')??params.get('start')
   const parsed=raw&&/^\d{4}-\d{2}-\d{2}$/.test(raw)?new Date(`${raw}T12:00:00`):now
   const date=Number.isNaN(parsed.getTime())?now:parsed
-  const page=pathname.split('/')[1]||'today'
+  // The Plan canvas switches Year/Season/Month with `horizon` and keeps the
+  // path it was opened on (/month?view=constellation&horizon=0 shows Year),
+  // so the horizon, when present, is the page the person is looking at.
+  const horizon=params.get('view')==='constellation'?params.get('horizon'):null
+  const page=horizon!==null&&/^[0-2]$/.test(horizon)?['year','season','month'][Number(horizon)]:pathname.split('/')[1]||'today'
   const visible=filterTasksForLayers(tasks,layers)
   const week=weekStartAnchor(date,readCadenceConfig().weekStartsOn)
   const weekly=weekListTasks(visible,week,null,{isCurrent:localYmd(week)===localYmd(weekStartAnchor(now,readCadenceConfig().weekStartsOn))})

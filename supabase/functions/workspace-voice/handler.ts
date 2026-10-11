@@ -27,7 +27,9 @@ export async function handleWorkspaceVoice(req:Request,deps:{env:(key:string)=>s
     const sdp=await req.text()
     if(sdp.length>65536||!sdp.startsWith('v=0'))return reply(400,'invalid_offer')
     if(!await deps.reserve(auth))return reply(429,'daily_limit')
-    const form=new FormData();form.set('sdp',sdp);form.set('session',JSON.stringify({type:'realtime',model:env('WORKSPACE_VOICE_MODEL')||'gpt-realtime',instructions,tools,audio:{input:{transcription:{model:'gpt-4o-mini-transcribe'},turn_detection:{type:'semantic_vad',interrupt_response:true}},output:{voice:'marin'}}}))
+    // The transcript is what the person sees as "heard". Unpinned, it guesses a
+    // language from room noise and shows foreign text; gpt-realtime is retired.
+    const form=new FormData();form.set('sdp',sdp);form.set('session',JSON.stringify({type:'realtime',model:env('WORKSPACE_VOICE_MODEL')||'gpt-realtime-2.1',instructions,tools,audio:{input:{transcription:{model:'gpt-4o-mini-transcribe',language:'en'},noise_reduction:{type:'near_field'},turn_detection:{type:'semantic_vad',interrupt_response:true}},output:{voice:'marin'}}}))
     const response=await deps.fetch('https://api.openai.com/v1/realtime/calls',{method:'POST',headers:{Authorization:`Bearer ${key}`},body:form,signal:AbortSignal.timeout(20000)})
     if(!response.ok)return reply(502,'voice_unavailable')
     return new Response(await response.text(),{headers:{...cors,'Content-Type':'application/sdp','Cache-Control':'no-store','x-voice-max-seconds':'300'}})
