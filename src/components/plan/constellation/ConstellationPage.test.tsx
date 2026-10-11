@@ -144,7 +144,7 @@ describe('grouped under parent',()=>{
   season()
   const together=group('Under Together')
   expect(within(together).getAllByRole('listitem').map(li=>li.querySelector('.plan-item-title')?.textContent)).toEqual(['Unhurried weekends','Autumn outings'])
-  expect(screen.getAllByText('Together')).toHaveLength(1)
+  expect(within(screen.getByRole('list',{name:'Season plan'})).getAllByText('Together')).toHaveLength(1)
   expect(within(together).getByLabelText('1 month goal below')).toHaveTextContent('1')
   const regions=screen.getAllByRole('region').map(r=>r.getAttribute('aria-label'))
   expect(regions).toEqual(['Under Together','Not under a year goal'])
@@ -252,6 +252,46 @@ describe('Move under…',()=>{
   fireEvent.dragOver(group('Under Strength'))
   fireEvent.drop(group('Under Strength'))
   await waitFor(()=>expect(api.updateTask).toHaveBeenCalledWith('m',{sourceId:'s2'}))
+ })
+})
+
+describe('drawer of the horizon one up',()=>{
+ const drawer=()=>screen.getByRole('complementary',{name:/goals$/})
+ beforeEach(()=>{try{localStorage.removeItem('symphony.plan.upstreamDrawer')}catch{/* none */}})
+ it('lists every year goal beside Season, even one holding nothing yet',()=>{
+  api.tasks=[{id:'s',title:'Autumn outings',bucket:'quarter',goalId:'g'}]
+  season()
+  const d=within(screen.getByRole('complementary',{name:'Year goals'}))
+  expect(d.getByText('Together')).toBeInTheDocument()
+  expect(d.getByText('Health')).toBeInTheDocument()
+ })
+ it('drop a season goal on a year goal in the drawer files it there',async()=>{
+  api.tasks=[{id:'s',title:'Autumn outings',bucket:'quarter'}]
+  season()
+  fireEvent.dragStart(screen.getByText('Autumn outings').closest('li')!,{dataTransfer:{setData:vi.fn(),effectAllowed:''}})
+  const target=within(drawer()).getByText('Health').closest('li')!
+  expect(target).toHaveClass('is-drop-ok')
+  fireEvent.dragOver(target);fireEvent.drop(target)
+  await waitFor(()=>expect(api.updateTask).toHaveBeenCalledWith('s',{goalId:'other'}))
+ })
+ it('beside Month it lists the season goals; the current parent is not a target',()=>{
+  api.tasks=[{id:'s1',title:'Autumn outings',bucket:'quarter'},{id:'s2',title:'Strength',bucket:'quarter'},{id:'m',title:'Picnic',bucket:'month',sourceId:'s1'}]
+  month()
+  fireEvent.dragStart(screen.getByText('Picnic').closest('li')!,{dataTransfer:{setData:vi.fn(),effectAllowed:''}})
+  const d=within(screen.getByRole('complementary',{name:'Fall goals'}))
+  expect(d.getByText('Autumn outings').closest('li')).not.toHaveClass('is-drop-ok')
+  expect(d.getByText('Strength').closest('li')).toHaveClass('is-drop-ok')
+ })
+ it('can be hidden and shown again, and stays as left',()=>{
+  season()
+  fireEvent.click(screen.getByRole('button',{name:'Hide year goals'}))
+  expect(screen.queryByRole('complementary')).toBeNull()
+  fireEvent.click(screen.getByRole('button',{name:/Show year goals/}))
+  expect(screen.getByRole('complementary',{name:'Year goals'})).toBeInTheDocument()
+ })
+ it('is not on Year',()=>{
+  open()
+  expect(screen.queryByRole('complementary')).toBeNull()
  })
 })
 

@@ -38,7 +38,8 @@ import { PlanItemRow } from '@/components/canvas/plan/PlanItemRow'
 import { ProposalRow } from '@/components/canvas/plan/ProposalRow'
 import { InlineComposer } from '@/components/canvas/plan/InlineComposer'
 import { readinessOf, type ReadinessLookup } from '@/lib/prep/readiness'
-import { ChevronLeft, ChevronRight } from 'lucide-react'
+import { ChevronLeft, ChevronRight, PanelRightOpen } from 'lucide-react'
+import { UpstreamDrawer } from './UpstreamDrawer'
 import { useConversationWalk } from '@/components/canvas/conversationWalk'
 import { PAGE_PLANNING } from '@/components/layout/pageLayout'
 
@@ -64,6 +65,11 @@ function releaseFocus(setParams: SetURLSearchParams, main: RefObject<HTMLElement
   memo.current = null
   if (top !== null) requestAnimationFrame(() => scrollHost(main.current)?.scrollTo({ top }))
 }
+
+// The drawer of the horizon one up is open unless this person closed it.
+const DRAWER_KEY = 'symphony.plan.upstreamDrawer'
+const readDrawerOpen = () => { try { return localStorage.getItem(DRAWER_KEY) !== 'closed' } catch { return true } }
+const writeDrawerOpen = (open: boolean) => { try { localStorage.setItem(DRAWER_KEY, open ? 'open' : 'closed') } catch { /* private window */ } }
 
 type Composer = { kind: 'add'; group: string; parent: PlanNode | null } | { kind: 'edit'; key: string }
 
@@ -110,6 +116,8 @@ function Inner() {
   const [composer, setComposer] = useState<Composer | null>(null)
   const [dragKey, setDragKey] = useState<string | null>(null)
   const [dropKey, setDropKey] = useState<string | null>(null)
+  const [drawerOpen, setDrawerOpen] = useState(readDrawerOpen)
+  const toggleDrawer = (open: boolean) => { setDrawerOpen(open); writeDrawerOpen(open) }
   const mainRef = useRef<HTMLElement>(null)
   const scrollMemo = useRef<number | null>(null)
 
@@ -283,9 +291,8 @@ function Inner() {
 
   // ---- Drag an item onto a group header (desktop shortcut for Move under…) -
   const dragNode = dragKey ? allNodes.find((n) => n.key === dragKey) : undefined
-  const canDrop = (g: PlanGroup) => !!dragNode && (g.kind === 'unlinked'
-    ? !!dragNode.parent
-    : g.kind === 'parent' && !!g.parent && g.parent.key !== dragNode.parent && !!connectionPair(allNodes, dragNode.key, g.parent.key))
+  const canDropOn = (parent: PlanNode) => !!dragNode && parent.key !== dragNode.parent && !!connectionPair(allNodes, dragNode.key, parent.key)
+  const canDrop = (g: PlanGroup) => !!dragNode && (g.kind === 'unlinked' ? !!dragNode.parent : g.kind === 'parent' && !!g.parent && canDropOn(g.parent))
   const dropProps = (g: PlanGroup) => level === 0 ? {} : {
     onDragOver: (e: DragEvent) => { if (canDrop(g)) { e.preventDefault(); if (dropKey !== g.key) setDropKey(g.key) } },
     onDragLeave: (e: DragEvent) => { if (!(e.currentTarget as HTMLElement).contains(e.relatedTarget as Node | null)) setDropKey((k) => k === g.key ? null : k) },
@@ -317,6 +324,19 @@ function Inner() {
   const addLabel = (g: PlanGroup) => g.kind === 'unlinked' ? (hasParents ? `Add a ${term} not under a ${parentName}` : `Add a ${term}`) : g.kind === 'intentions' ? `Add a ${term}` : `Add a ${term} under ${g.parent!.title}`
 
   // Readiness reads only rows this reader already has, under the same filters.
+  // The drawer lists every open parent, even those folded for holding nothing.
+  const upstream = level > 0 ? allNodes.filter((n) => n.level === level - 1 && !isDone(n)) : []
+  const drawerTitle = level === 1 ? 'Year goals' : `${seasonWord} goals`
+  const drawer = level > 0 && drawerOpen && dataReady && !error && !goalsError
+    ? <UpstreamDrawer title={drawerTitle} childTerm={term} parents={upstream}
+        countOf={(n) => childCount(allNodes, n)} dragging={!!dragNode}
+        canDropOn={canDropOn}
+        onDrop={(parent) => { if (dragNode) void moveUnder(dragNode, parent); setDragKey(null); setDropKey(null) }}
+        onPick={(parent) => focusGroup(parent.key)}
+        onClose={() => toggleDrawer(false)}
+        empty={<>No {parentName}s for {level === 1 ? anchor.getFullYear() : seasonWord} yet. <button type="button" className="canvas-link" onClick={() => setHorizon(level - 1)}>Add {parentName}s</button></>} />
+    : null
+
   const visibleById = new Map(visible.map((t) => [t.id, t]))
   const goalsById = new Map(allNodes.filter((n) => n.goal).map((n) => [n.id, n.goal!]))
   const prepLookup: ReadinessLookup = { task: (id) => visibleById.get(id), goal: (id) => goalsById.get(id) }
@@ -417,6 +437,9 @@ function Inner() {
       </div>
     </header>
     <div className="plan-toolbar">
+      {level > 0 && !drawerOpen && <button type="button" className="canvas-link plan-drawer-open" aria-expanded={false} onClick={() => toggleDrawer(true)}>
+        <PanelRightOpen size={15} aria-hidden="true" /> Show {drawerTitle.toLowerCase()}
+      </button>}
       {proposals.length > 0 && <button type="button" className="canvas-link" onClick={() => { void keepAll() }}>Keep all ({proposals.length})</button>}
       {(doneCount > 0 || showDone) && <button type="button" className="canvas-link" aria-pressed={showDone} onClick={() => setShowDone((s) => !s)}>
         {showDone ? `Hide done (${doneCount})` : `Show done (${doneCount})`}
@@ -426,7 +449,7 @@ function Inner() {
     {!dataReady && <p className="plan-status" role="status">Loading your plans…</p>}
     {(error || goalsError)
       ? <p className="plan-status" role="alert">Plans could not load. <button type="button" className="canvas-link" onClick={() => { if (goalsError) window.location.reload(); else void refetch() }}>Retry</button></p>
-      : <>
+      : <div className={`plan-body${drawer ? ' has-drawer' : ''}`}><div className="plan-board">
         {focused && <div className="plan-focus-bar">
           <span role="status">Showing {focused.size} of {groups.length} groups</span>
           <button type="button" className="canvas-link" onClick={clearFocus}>Show all · Esc</button>
@@ -447,7 +470,7 @@ function Inner() {
             ? <button type="button" className="plan-next" onClick={() => setHorizon(level + 1)}>Next: {HORIZONS[level + 1]} →</button>
             : <Link to={weekHref} className="plan-next">Next: Week →</Link>)}
         </footer>
-      </>}
+      </div>{drawer}</div>}
   </main>
 }
 
