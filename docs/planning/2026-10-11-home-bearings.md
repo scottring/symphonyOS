@@ -7,7 +7,7 @@
 
 1. **Masthead.** The daybook numeral, a greeting, the date and weather. When the area or people filter is narrower than everything, one line says so ("Showing Work only, for Iris").
 2. **A good next step.** One suggestion picked from the state (`src/lib/home/bearings.ts`, `nextSteps`). The order is: plan an unplanned week (while ≥3 days remain), look back at a month or season that closed with open lines, write an empty month, sort an Inbox of ≥5, choose for today, else go do today. "Not now" sets one aside for the rest of the day on this device (`symphony-home-set-aside`).
-3. **Today.** A "next up" sentence, the day's events and the things chosen for today, with "↳ for" the month line each was written for.
+3. **Today.** A "next up" sentence and everything on the day with a time, built by `computeTodayData` from Today's own inputs: events, routines and timed tasks. They are marked apart as on Week (bar, square, ring). Below them are the things chosen for today, each with "↳ for" the month line it was written for.
 4. **Waiting on you.** Inbox, unread discussions and pending look-backs. It never repeats the suggestion, and it is hidden when empty.
 5. **Where you are.** Year · Season · Month · Week · Today, each with a status in words and one line from its list. Today is marked "You are here", and an unplanned week is marked for attention.
 6. **Everything else.** Library destinations with one-line descriptions, for orientation.
@@ -22,4 +22,4 @@
 ## Not yet
 
 - The "sense of place" fore-edge (time already spent in each horizon, drawn as page edges under each step of "Where you are") is proposed and not built. See `claude/rail-edges` for the earlier rail version.
-- Routines are not listed in Home's Today.
+- The page holds its sentences ("Getting your bearings…") until tasks, routines, plans and today's events have loaded, about 2–3 seconds on a real account.
