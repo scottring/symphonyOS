@@ -75,6 +75,10 @@ await import('./styles/layout-system.css')
 await import('./styles/canvas.css')
 await import('./styles/canvas-today.css')
 await import('./styles/canvas-plan.css')
+// Season, Year and the Week session (2026-10-12), after Month's board styles.
+await import('./styles/plan-season.css')
+await import('./styles/plan-year.css')
+await import('./styles/plan-week-session.css')
 await import('./styles/canvas-kiosk.css')
 await import('./styles/canvas-routines.css')
 
