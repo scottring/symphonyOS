@@ -525,13 +525,25 @@ describe('done items and triage',()=>{
   api.tasks=[{id:'m',title:'Picnic',bucket:'month',context:'personal'}]
   api.keepForward.mockResolvedValue(undefined);api.dropCommitment.mockResolvedValue(true);month()
   fireEvent.click(screen.getByRole('button',{name:'Actions for Picnic'}))
-  fireEvent.click(screen.getByText('Carry to next month'))
+  fireEvent.click(screen.getByText('Carry to next month · November'))
   await waitFor(()=>expect(api.keepForward).toHaveBeenCalledWith('m',{monthStart:new Date(2026,10,1)},new Date(2026,9,1)))
   expect(lastRun().ok).toBe(false)
   fireEvent.click(screen.getByRole('button',{name:'Actions for Picnic'}))
   fireEvent.click(screen.getByText('Remove from this month'))
   await waitFor(()=>expect(api.dropCommitment).toHaveBeenCalledWith('m','month',new Date(2026,9,1)))
   expect(lastRun().ok).toBe(true)
+ })
+ // The triage contract (2026-10-12): a Month or Season goal keeps goal verbs
+ // and is never offered a day or a time — that would quietly make it a day task.
+ it('a month goal’s menu offers its period moves and no days or times',()=>{
+  api.tasks=[{id:'m',title:'Picnic',bucket:'month',context:'personal'}]
+  month()
+  fireEvent.click(screen.getByRole('button',{name:'Actions for Picnic'}))
+  const menu=within(screen.getByRole('menu',{name:'Actions for Picnic'}))
+  for(const day of [/^Today/,/^Tonight/,/^Tomorrow/,/^Next week/,/^This weekend/,/^Pick date/,/^Skip/]) expect(menu.queryByRole('menuitem',{name:day})).toBeNull()
+  expect(menu.getByRole('menuitem',{name:'Carry to next month · November'})).toBeInTheDocument()
+  expect(menu.getByRole('menuitem',{name:'Remove from this month'})).toBeInTheDocument()
+  expect(menu.getByRole('menuitem',{name:'Complete'})).toBeInTheDocument()
  })
  it('triages intentions through their status, with Undo restoring it',async()=>{
   open()

@@ -89,7 +89,7 @@ describe('PanelSubtasks', () => {
         />,
       )
       await user.click(screen.getByRole('button', { name: /reschedule Buy groceries/i }))
-      await user.click(screen.getByRole('menuitem', { name: 'Today' }))
+      await user.click(screen.getByRole('menuitem', { name: /^Today/ }))
       expect(onRescheduleSubtask).toHaveBeenCalledWith('s1', 'today')
     })
 

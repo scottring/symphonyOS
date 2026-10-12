@@ -197,7 +197,7 @@ describe('a relative tile nobody handles', () => {
     expect(screen.queryByRole('menuitem', { name: /Tomorrow/ })).toBeNull()
     expect(screen.queryByRole('menuitem', { name: /Someday/ })).toBeNull()
     // The one that always worked is still there.
-    expect(screen.getByRole('button', { name: /Pick date & time/ })).toBeInTheDocument()
+    expect(screen.getByRole('menuitem', { name: /Pick date & time/ })).toBeInTheDocument()
   })
 
   it('shows, and acts on, the tiles the caller says it can honour', async () => {

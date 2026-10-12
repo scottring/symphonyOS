@@ -1,29 +1,45 @@
-import { relativeWeekend, weekendLabel, weekendEnd } from '@/lib/planning/weekend'
 // src/components/schedule/RescheduleGrid.tsx
 //
-// The shared 2-column icon grid for picking a relative reschedule target — the
-// same look as the SchedulePopover quick-date grid, reused so reschedule UIs are
-// consistent. Relative tiles call onPick(when); the "Pick date…" tile reveals a
-// native date+time entry and calls onPickDate(date, isAllDay) for a precise slot.
+// The When group of the triage contract (lib/triage/contract.ts), drawn as the
+// shared 2-column icon grid: Today · Tonight · Tomorrow · This week · Next week
+// · This weekend · Next weekend · This month · Next month · This season ·
+// Someday · Pick date & time…, each tile naming where it lands ("Tue, Oct 13",
+// "Oct 17–23", "November") against the actual today, the household's week
+// start and its own seasons. Every triage surface draws When through here, so
+// the order and words cannot drift between Today, Inbox, details and Week.
+//
+// A routine occurrence (`entity="occurrence"`) is always on a day, so a period
+// tile asks which day in that period, both weekend days are offered, and the
+// two Whens it cannot take (This season, Someday) say why and offer the scoped
+// alternative instead of doing nothing.
 
 import { useState } from 'react'
-import { Sun, Moon, Sunrise, CalendarDays, CalendarRange, Calendar, CalendarClock, Hourglass, CalendarPlus, ChevronLeft } from 'lucide-react'
+import { Sun, Moon, Sunrise, CalendarDays, CalendarRange, Calendar, CalendarCheck, CalendarClock, CalendarFold, Leaf, Hourglass, CalendarPlus, ChevronLeft } from 'lucide-react'
+import { relativeWeekend, weekendLabel, weekendEnd } from '@/lib/planning/weekend'
 import type { TriageWhen } from './TriageWhenMenu'
 import type { DayLoad } from '@/lib/today/dayLoad'
 import { DayLoadBar } from './DayLoadBar'
 import { SpecificDatePicker } from './SpecificDatePicker'
 import { getBaseDate, getNextWeekend, getWeekendAfterNext, getNextMonday, TIME_PRESETS } from '@/lib/dateHelpers'
+import { WHEN_ORDER, WHEN_LABEL, PICK_DATE_LABEL, whenAvailability, unavailableNote, type WhenAvailability } from '@/lib/triage/contract'
+import { whenDetail, daysOf, dayLabel, triageClock } from '@/lib/triage/periods'
+import { localYmd } from '@/lib/cadence/config'
 
-const WHENS: { when: TriageWhen; label: string; Icon: typeof Sun }[] = [
-  { when: 'today', label: 'Today', Icon: Sun },
-  { when: 'tonight', label: 'Tonight', Icon: Moon },
-  { when: 'tomorrow', label: 'Tomorrow', Icon: Sunrise },
-  { when: 'this-weekend', label: 'This weekend', Icon: CalendarDays },
-  { when: 'next-weekend', label: 'Next weekend', Icon: CalendarRange },
-  { when: 'next-week', label: 'Next week', Icon: Calendar },
-  { when: 'this-month', label: 'This month', Icon: CalendarClock },
-  { when: 'someday', label: 'Someday', Icon: Hourglass },
-]
+const ICON: Record<TriageWhen, typeof Sun> = {
+  today: Sun,
+  tonight: Moon,
+  tomorrow: Sunrise,
+  'this-week': CalendarCheck,
+  'next-week': Calendar,
+  'this-weekend': CalendarDays,
+  'next-weekend': CalendarRange,
+  'this-month': CalendarClock,
+  'next-month': CalendarFold,
+  'this-season': Leaf,
+  someday: Hourglass,
+}
+
+const WHENS: { when: TriageWhen; label: string; Icon: typeof Sun }[] = WHEN_ORDER.map((when) => ({ when, label: WHEN_LABEL[when], Icon: ICON[when] }))
 
 // Concrete date each dated `when` resolves to — MUST mirror applyTriageWhen in
 // lib/triage/applyWhen.ts so the tile never promises a date the action won't
@@ -81,12 +97,19 @@ const tileClass =
 interface Props {
   flexibleWeekend?: boolean
   /**
-   * Which tiles to offer. Omitted, all of them — every existing caller is
-   * unchanged. A caller that can only act on some (an event cannot be moved
-   * to "Someday") names the ones it can honour, rather than showing tiles that
+   * Which tiles to offer, from the contract's order. Omitted, the whole When
+   * group. A caller that can only act on some (an event cannot be moved to
+   * "Someday") names the ones it can honour, rather than showing tiles that
    * quietly do nothing.
    */
   whens?: readonly TriageWhen[]
+  /**
+   * What is being moved. A task (default) can live in a period pool or
+   * Someday. An occurrence must land on a day: periods ask for the day, and
+   * Someday / This season explain themselves. An event keeps the dates its
+   * panel has always moved it to.
+   */
+  entity?: 'task' | 'occurrence' | 'event'
   /**
    * Offer BOTH days of a weekend rather than one tile that means Saturday.
    *
@@ -96,9 +119,10 @@ interface Props {
    * question and stays as it was.
    */
   weekendDays?: boolean
-  /** `day` is set only for a weekend tile the reader chose a day on. */
+  /** `day` is set only for a tile the reader chose a day on (a weekend day,
+   *  or a day inside a period for an occurrence). */
   onPick: (when: TriageWhen, day?: Date) => void
-  /** When provided, adds a "Pick date…" tile for a specific date/time. */
+  /** When provided, adds a "Pick date & time…" tile for a specific date/time. */
   onPickDate?: (date: Date, isAllDay: boolean) => void
   /**
    * How full each dated tile's day already is, keyed by `loadKeyFor(when)`.
@@ -107,6 +131,11 @@ interface Props {
   loads?: Map<string, DayLoad>
   /** Tapping a tile's bar opens the day peek instead of scheduling. */
   onPeek?: (date: Date, when: TriageWhen) => void
+  /** The day the thing is on now: that day's tile says so and does nothing. */
+  currentDay?: Date | null
+  /** The scoped alternatives offered when a When cannot apply (an
+   *  occurrence's Someday): "Skip this time", "Open routine". */
+  alternatives?: { label: string; onSelect: () => void }[]
 }
 
 /**
@@ -129,11 +158,14 @@ export function loadKeyFor(when: TriageWhen): string {
   return when === 'tonight' ? `${ymd}|evening` : ymd
 }
 
-export function RescheduleGrid({ onPick, onPickDate, loads, onPeek, whens, flexibleWeekend = false, weekendDays = false }: Props) {
+export function RescheduleGrid({ onPick, onPickDate, loads, onPeek, whens, flexibleWeekend = false, weekendDays = false, entity = 'task', currentDay, alternatives = [] }: Props) {
+  const occurrence = entity === 'occurrence'
+  const avail: Partial<Record<TriageWhen, WhenAvailability>> = entity === 'occurrence' ? whenAvailability('occurrence') : whenAvailability('task')
   const offered = whens ? WHENS.filter((w) => whens.includes(w.when)) : WHENS
   // A weekend becomes its two days, each an ordinary tile — same look, same
   // load bar, same one tap. Never when the caller can take "either day".
-  const tiles: Array<(typeof WHENS)[number] & { day?: Date }> = weekendDays && !flexibleWeekend
+  const expandWeekend = (weekendDays || occurrence) && !flexibleWeekend
+  const tiles: Array<(typeof WHENS)[number] & { day?: Date }> = expandWeekend
     ? offered.flatMap((t) => {
       const days = weekendDaysFor(t.when)
       return days ? days.map((day) => ({ ...t, day })) : [t]
@@ -141,9 +173,82 @@ export function RescheduleGrid({ onPick, onPickDate, loads, onPeek, whens, flexi
     : offered
   const [picking, setPicking] = useState(false)
   const [pickingToday, setPickingToday] = useState(false)
+  // An occurrence's period tile: which day in it.
+  const [pickingIn, setPickingIn] = useState<TriageWhen | null>(null)
+  // A When the thing cannot take: why, and what it can do instead.
+  const [explaining, setExplaining] = useState<TriageWhen | null>(null)
+  const clock = triageClock()
+  const todayYmd = localYmd(clock.now)
+  const currentYmd = currentDay ? localYmd(currentDay) : null
 
   if (picking && onPickDate) {
     return <SpecificDatePicker onSubmit={(date, isAllDay) => onPickDate(date, isAllDay)} onBack={() => setPicking(false)} />
+  }
+
+  const back = (onBack: () => void) => (
+    <button
+      type="button"
+      onClick={(e) => { e.stopPropagation(); onBack() }}
+      className="flex items-center gap-1.5 px-1 pb-1 text-[11px] uppercase tracking-wider font-medium text-neutral-400 hover:text-neutral-600"
+    >
+      <ChevronLeft className="w-3.5 h-3.5" /> Back
+    </button>
+  )
+
+  if (explaining) {
+    return (
+      <div className="space-y-2" role="group" aria-label={`${WHEN_LABEL[explaining]} isn’t available`} onClick={(e) => e.stopPropagation()}>
+        {back(() => setExplaining(null))}
+        <p className="px-1 text-sm text-neutral-600" role="note">{unavailableNote(explaining)}</p>
+        <div className="grid grid-cols-1 gap-2">
+          {onPickDate && explaining !== 'someday' && (
+            <button type="button" role="menuitem" className={tileClass} onClick={(e) => { e.stopPropagation(); setExplaining(null); setPicking(true) }}>
+              <CalendarPlus className="w-4 h-4 shrink-0" /><span>{PICK_DATE_LABEL}</span>
+            </button>
+          )}
+          {alternatives.map((alt) => (
+            <button key={alt.label} type="button" role="menuitem" className={tileClass} onClick={(e) => { e.stopPropagation(); alt.onSelect() }}>
+              <span>{alt.label}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+    )
+  }
+
+  if (pickingIn) {
+    const days = daysOf(pickingIn, clock)
+    const lead = (days[0]?.getDay() ?? 0)
+    return (
+      <div className="space-y-2" role="group" aria-label={`Which day ${WHEN_LABEL[pickingIn].toLowerCase()}?`} onClick={(e) => e.stopPropagation()}>
+        {back(() => setPickingIn(null))}
+        <div className="px-1 text-[11px] uppercase tracking-wider text-neutral-400">
+          {WHEN_LABEL[pickingIn]} · {whenDetail(pickingIn, clock)} — which day?
+        </div>
+        <div className="grid grid-cols-7 gap-1">
+          {days.length > 7 && Array.from({ length: lead }, (_, i) => <span key={`pad-${i}`} aria-hidden="true" />)}
+          {days.map((d) => {
+            const ymd = localYmd(d)
+            const past = ymd < todayYmd
+            const here = ymd === currentYmd
+            return (
+              <button
+                key={ymd}
+                type="button"
+                role="menuitem"
+                disabled={past || here}
+                aria-label={`${dayLabel(d)}${here ? ' (it’s on this day)' : ''}`}
+                onClick={(e) => { e.stopPropagation(); onPick(pickingIn, d) }}
+                className={`flex flex-col items-center rounded-lg px-1 py-1.5 text-xs font-medium transition-colors disabled:opacity-40 ${ymd === todayYmd ? 'bg-primary-50 text-primary-700' : 'bg-neutral-50 text-neutral-700'} hover:bg-primary-50 hover:text-primary-700`}
+              >
+                <span className="text-[10px] text-neutral-400">{d.toLocaleDateString('en-US', { weekday: 'narrow' })}</span>
+                <span>{d.getDate()}</span>
+              </button>
+            )
+          })}
+        </div>
+      </div>
+    )
   }
 
   // "Today" fans out to a time step (when the host wired onPickDate) so a task can
@@ -206,21 +311,34 @@ export function RescheduleGrid({ onPick, onPickDate, loads, onPeek, whens, flexi
   return (
     <div className="grid grid-cols-2 gap-2">
       {tiles.map(({ when, label, Icon, day }) => {
-        const dateFn = WHEN_DATE[when]
-        const weekend = flexibleWeekend && (when === 'this-weekend' || when === 'next-weekend')
+        const a = avail[when] ?? 'direct'
+        const isWeekendWhen = when === 'this-weekend' || when === 'next-weekend'
+        // A task's weekend is either day (weekendPlacement), whether or not
+        // the caller asked: that is what applyTriageWhen writes for it.
+        const weekend = isWeekendWhen && !day && entity === 'task'
+        // An event keeps the dates its panel moves it to (next week = Monday).
+        const legacy = entity === 'event' ? WHEN_DATE[when] : undefined
         const sub = day ? tileDate(day)
           : weekend ? weekendLabel(relativeWeekend(when === 'next-weekend')).replace('Weekend · ', '')
-            : dateFn ? tileDate(dateFn()) : null
-        // Pool whens (this-week / this-month / someday) have no day to measure,
-        // so they carry no bar. `loads` is keyed by the caller.
-        const load = weekend ? undefined : loads?.get(day ? loadKeyForDay(day) : loadKeyFor(when))
+            : legacy ? tileDate(legacy())
+              : a === 'unavailable' ? 'Not for one time'
+                : when === 'today' || when === 'tomorrow' ? tileDate(dateForWhen(when)!)
+                  : whenDetail(when, clock)
+        const tileDay = day ?? (when === 'today' || when === 'tonight' || when === 'tomorrow' ? dateForWhen(when) : null)
+        const here = !!tileDay && !!currentYmd && localYmd(tileDay) === currentYmd && when !== 'tonight'
+        // Only a tile that is ONE day carries that day's bar.
+        const load = tileDay ? loads?.get(day ? loadKeyForDay(day) : loadKeyFor(when)) : undefined
         return (
           <div key={day ? `${when}-${localKey(day)}` : when} data-tile className="flex flex-col">
             <button
               type="button"
               role="menuitem"
+              aria-disabled={here || undefined}
               onClick={(e) => {
                 e.stopPropagation()
+                if (here) return
+                if (a === 'unavailable') { setExplaining(when); return }
+                if (a === 'pick-day' && !day) { setPickingIn(when); return }
                 // Today opens the time step when the host can take a specific
                 // time; otherwise it stays an instant all-day pick.
                 if (when === 'today' && onPickDate) setPickingToday(true)
@@ -229,15 +347,16 @@ export function RescheduleGrid({ onPick, onPickDate, loads, onPeek, whens, flexi
                 else if (day) onPick(when, day)
                 else onPick(when)
               }}
-              className={tileClass}
+              className={`${tileClass}${a === 'unavailable' || here ? ' opacity-60' : ''}`}
             >
               <Icon className="w-4 h-4 shrink-0" />
               <span className="flex flex-col leading-tight min-w-0">
                 <span>{label}</span>
-                {sub && <span className="text-[11px] font-normal text-neutral-400">{sub}</span>}
+                {sub && <span className="text-[11px] font-normal text-neutral-400">{here ? 'It’s on this day' : sub}</span>}
                 {/* Its own line: on one line with the dates it ran past the
                     tile's edge in the side panel (walkthrough, 2026-09-25). */}
                 {weekend && <span className="text-[11px] font-normal text-neutral-400">either day</span>}
+                {a === 'pick-day' && !day && <span className="text-[11px] font-normal text-neutral-400">choose a day</span>}
               </span>
             </button>
             {load && (
@@ -251,11 +370,12 @@ export function RescheduleGrid({ onPick, onPickDate, loads, onPeek, whens, flexi
       {onPickDate && (
         <button
           type="button"
+          role="menuitem"
           onClick={(e) => { e.stopPropagation(); setPicking(true) }}
           className={`${tileClass} col-span-2`}
         >
           <CalendarPlus className="w-4 h-4 shrink-0" />
-          <span>Pick date &amp; time…</span>
+          <span>{PICK_DATE_LABEL}</span>
         </button>
       )}
     </div>

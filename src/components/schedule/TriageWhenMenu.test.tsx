@@ -22,15 +22,20 @@ describe('TriageWhenMenu', () => {
     expect(screen.queryByRole('menu')).not.toBeInTheDocument()
   })
 
-  it('Today fans out to Tonight and Tomorrow on click', async () => {
+  // Scott, 2026-10-12: Tomorrow must be directly visible — never buried under
+  // a chip labelled Today (the triage contract). Each day is its own chip.
+  it('Today, Tonight and Tomorrow are each one tap, Tomorrow naming its date', async () => {
     const onPick = vi.fn()
     const { user } = render(<TriageWhenMenu onPick={onPick} onDelete={vi.fn()} />)
-    await user.click(screen.getByRole('button', { name: 'Today' }))
-    expect(screen.getByRole('menu')).toBeInTheDocument()
-    expect(screen.getByRole('menuitem', { name: 'Tonight' })).toBeInTheDocument()
-    expect(screen.getByRole('menuitem', { name: 'Tomorrow' })).toBeInTheDocument()
-    await user.click(screen.getByRole('menuitem', { name: 'Tomorrow' }))
+    const tomorrow = screen.getByRole('button', { name: 'Tomorrow' })
+    expect(tomorrow).not.toHaveAttribute('aria-haspopup')
+    const d = new Date(); d.setDate(d.getDate() + 1)
+    expect(tomorrow.getAttribute('title')).toContain(d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }))
+    await user.click(tomorrow)
     expect(onPick).toHaveBeenCalledWith('tomorrow')
+    await user.click(screen.getByRole('button', { name: 'Tonight' }))
+    expect(onPick).toHaveBeenLastCalledWith('tonight')
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument()
   })
 
   it('Week fans out to this/next week + this/next weekend', async () => {

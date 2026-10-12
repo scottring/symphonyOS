@@ -1,40 +1,64 @@
 // src/components/schedule/TaskFateMenu.tsx
 //
-// The one fate vocabulary, in its compact form.
+// The one triage menu. A ⋯ trigger opens the whole contract
+// (lib/triage/contract.ts) for the thing in hand, grouped and ordered the same
+// everywhere:
 //
-// A task should offer the same verbs wherever you meet it — a wizard review
-// row, a Someday row, a shelf pill. The row surfaces render TriageWhenMenu
-// inline (a chips row with fan-outs); a compact pill has no room for that, so
-// this wraps the SAME TriageWhenMenu in a ⋯-triggered popover instead of
-// re-listing the fates as bespoke menu items. Built ON TOP of TriageWhenMenu,
-// not beside it, so the temporal vocabulary cannot drift between surfaces —
-// same component, same options, same handlers (applyTriageWhen at the caller).
+//   [surface verbs]  what only this place can do (another day in the week on
+//                    screen, a goal's period moves)
+//   When             the shared RescheduleGrid — Today … Someday, Pick date &
+//                    time…, each naming where it lands
+//   Skip             scoped: "Skip this time" / "Skip this day", with the line
+//                    that says exactly what it touches
+//   More             Complete/Reopen · Open details · People… · Life area… ·
+//                    Move under… · Delete
 //
-// The popover also carries the few verbs that only exist where the task is
-// standing: Open (detail panel), surface extras ("Bring to this week" on a
-// stale placement), and File under a pick (the month rung's page-side twin of
-// the wizard's MoveByPickStep).
+// A group a caller cannot honour is left out by not passing its handler; a
+// When a kind cannot take is explained by the grid, never silently dropped.
+// The writes are the caller's (activity strip, gated task actions, schedule
+// actions) — this draws and asks.
 
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
-import { MoreHorizontal, ChevronDown, ChevronRight, PanelRight } from 'lucide-react'
-import { TriageWhenMenu, type TriageWhen } from './TriageWhenMenu'
+import { MoreHorizontal, ChevronDown, ChevronRight, CircleSlash } from 'lucide-react'
+import type { TriageWhen } from './TriageWhenMenu'
+import { RescheduleGrid } from './RescheduleGrid'
 import { usePopoverFocus } from '@/hooks/usePopoverFocus'
+import { MORE_ORDER, SKIP_LABEL, SKIP_NOTE, moreFor, moreLabel, skipFor, whenAvailability, type MoreId, type TriageEntity } from '@/lib/triage/contract'
 
 export interface TaskFateMenuProps {
-  triggerText?: string
+  /** What is being triaged; picks the contract (default: an undated task). */
+  entity?: TriageEntity
+  /** Accessible name of the ⋯ trigger. */
   label?: string
+  triggerText?: string
+  /** The trigger's class (a canvas row draws its own ⋯). */
+  triggerClassName?: string
+  /** The trigger's icon size. */
+  iconSize?: number
   disabled?: boolean
-  showWhen?: boolean
-  /** Route to a when — callers map it through applyTriageWhen. */
-  onPickWhen: (when: TriageWhen) => void
+  /** Flips Complete to Reopen, and leaves When and Skip out until reopened. */
+  completed?: boolean
+  /** Route a When — callers map it through applyTriageWhen (a task) or the
+   *  occurrence writers (`day` is the day chosen inside a period). Omitted:
+   *  no When group (a goal, an event). */
+  onPickWhen?: (when: TriageWhen, day?: Date) => void
   onPickDate?: (date: Date, isAllDay: boolean) => void
+  /** Limit the When tiles (a caller that cannot honour some). */
+  whens?: readonly TriageWhen[]
+  /** The day it is on now (its tile says so). */
+  currentDay?: Date | null
+  /** The scoped Skip ("Skip this time" / "Skip this day"). */
+  onSkip?: () => void
   onComplete?: () => void
-  onDelete?: () => void
-  /** Open the task's detail surface. */
+  /** Open the detail surface (an occurrence's is its routine's). */
   onOpen?: () => void
-  /** Surface-specific verbs, listed above the when chips (e.g. "Bring to
-   *  this week" on a pill stranded by a passed week). */
+  onPeople?: () => void
+  onArea?: () => void
+  onMoveUnder?: () => void
+  onDelete?: () => void
+  /** Surface verbs, listed first (e.g. another day in the week on screen,
+   *  a goal's "Carry to next month"). */
   extras?: { label: string; onSelect: () => void }[]
   /** File this task under a season pick — threads sourceId/goalId at the
    *  caller. Page-side parity with the wizard's move-by-pick step. */
@@ -44,18 +68,23 @@ export interface TaskFateMenuProps {
   }
 }
 
-export function TaskFateMenu({ onPickWhen, onPickDate, onComplete, onDelete, onOpen, extras, fileUnder, triggerText, label = 'Task actions', disabled = false, showWhen = true }: TaskFateMenuProps) {
+const itemClass = 'w-full flex items-center gap-2 text-left text-sm px-2 py-1.5 rounded-md text-neutral-700 hover:bg-neutral-50 focus:bg-neutral-50 focus:outline-none'
+const headClass = 'px-2 pb-1 pt-1 text-[10px] font-semibold uppercase tracking-wider text-neutral-400'
+
+export function TaskFateMenu({
+  entity = 'task', onPickWhen, onPickDate, whens, currentDay, onSkip, onComplete, onOpen, onPeople, onArea, onMoveUnder, onDelete,
+  extras, fileUnder, triggerText, triggerClassName, iconSize = 16, completed = false, label = 'Task actions', disabled = false,
+}: TaskFateMenuProps) {
   const [open, setOpen] = useState(false)
   const [picksOpen, setPicksOpen] = useState(false)
   const containerRef = useRef<HTMLSpanElement>(null)
   const panelRef = useRef<HTMLDivElement>(null)
   const triggerRef = useRef<HTMLButtonElement>(null)
 
-  // Portal + fixed positioning (the PushDropdown pattern): a pill can sit at
-  // either edge of a wrap lane, so an absolutely-positioned panel clips under
-  // the sidebar or off the right edge. Measured and placed by direct style
-  // mutation (DOM is the external system here — no setState, no cascading
-  // render), clamped to the viewport, flipped above when the bottom is tight.
+  // Portal + fixed positioning (the PushDropdown pattern): a row can sit at
+  // either edge of a lane, so an absolutely-positioned panel clips under the
+  // sidebar or off the right edge. Measured and placed by direct style
+  // mutation, clamped to the viewport, flipped above when the bottom is tight.
   // No dep array: every render resets the JSX style to hidden, so every
   // render must re-place before paint.
   useLayoutEffect(() => {
@@ -95,10 +124,99 @@ export function TaskFateMenu({ onPickWhen, onPickDate, onComplete, onDelete, onO
   const close = () => { setOpen(false); setPicksOpen(false) }
   // Focus into the portalled menu, arrow keys between items, Escape back to ⋯.
   usePopoverFocus(open, triggerRef, panelRef, close)
+  const run = (fn: () => void) => () => { close(); fn() }
+
+  const allowed = new Set(moreFor(entity))
+  const handlers: Partial<Record<MoreId, (() => void) | undefined>> = {
+    complete: onComplete, open: onOpen, people: onPeople, area: onArea, 'move-under': onMoveUnder, delete: onDelete,
+  }
+  const more = MORE_ORDER.filter((id) => allowed.has(id) && handlers[id])
+  const skip = skipFor(entity)
+  // The contract decides: a goal or an event has no When, whatever is passed.
+  const showWhen = !completed && !!onPickWhen && Object.keys(whenAvailability(entity)).length > 0
+  const showSkip = !completed && !!skip && !!onSkip
+
+  let body: ReactNode = null
+  if (open && !disabled) {
+    body = (
+      <div
+        ref={panelRef}
+        role="menu"
+        aria-label={label}
+        style={{ top: 0, left: 0, visibility: 'hidden' }}
+        className="fixed z-[100] w-80 max-w-[calc(100vw-16px)] max-h-[80dvh] overflow-y-auto rounded-xl border border-neutral-200 bg-white shadow-lg p-2 text-left"
+        onPointerDown={(e) => e.stopPropagation()}
+        onMouseDown={(e) => e.stopPropagation()}
+        onClick={(e) => e.stopPropagation()}
+      >
+        {(extras?.length || fileUnder) && (
+          <div className="mb-1.5 pb-1.5 border-b border-neutral-100" role="group">
+            {extras?.map((x) => (
+              <button key={x.label} role="menuitem" type="button" onClick={run(x.onSelect)} className={itemClass}>
+                <ChevronRight className="w-3.5 h-3.5 text-neutral-400" /> {x.label}
+              </button>
+            ))}
+            {fileUnder && fileUnder.picks.length > 0 && (
+              <>
+                <button role="menuitem" type="button" aria-expanded={picksOpen} onClick={() => setPicksOpen((v) => !v)} className={itemClass}>
+                  <ChevronDown className={`w-3.5 h-3.5 text-neutral-400 transition-transform ${picksOpen ? '' : '-rotate-90'}`} />
+                  File under a pick
+                </button>
+                {picksOpen && (
+                  <div className="ml-4 mt-0.5 space-y-0.5 max-h-56 overflow-auto">
+                    {fileUnder.picks.map((p) => (
+                      <button key={p.id} role="menuitem" type="button" onClick={run(() => fileUnder.onFile(p.id))}
+                        className="w-full rounded-md px-2 py-1.5 text-left hover:bg-primary-50">
+                        <span className="block text-sm text-neutral-800 leading-snug">{p.title}</span>
+                        {p.goalName && <span className="block text-[11px] text-neutral-400">serves {p.goalName}</span>}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        )}
+        {showWhen && (
+          <div role="group" aria-label="When" className="pb-1.5">
+            <p className={headClass} aria-hidden="true">When</p>
+            <RescheduleGrid
+              entity={entity === 'occurrence' ? 'occurrence' : 'task'}
+              flexibleWeekend={entity !== 'occurrence'}
+              whens={whens}
+              currentDay={currentDay}
+              onPick={(when, day) => { close(); if (day) onPickWhen!(when, day); else onPickWhen!(when) }}
+              onPickDate={onPickDate ? (date, isAllDay) => { close(); onPickDate(date, isAllDay) } : undefined}
+              // An occurrence's Someday points at Skip this time and Open
+              // routine, which sit right below in this same menu.
+            />
+          </div>
+        )}
+        {showSkip && (
+          <div role="group" aria-label="Skip" className="border-t border-neutral-100 pt-1.5 pb-1.5">
+            <button role="menuitem" type="button" onClick={run(onSkip!)} className={itemClass}>
+              <CircleSlash className="w-3.5 h-3.5 text-neutral-400" /> {SKIP_LABEL[skip!]}
+            </button>
+            <p className="px-2 text-[11px] text-neutral-400">{SKIP_NOTE[skip!]}</p>
+          </div>
+        )}
+        {more.length > 0 && (
+          <div role="group" aria-label="More" className={showWhen || showSkip ? 'border-t border-neutral-100 pt-1.5' : ''}>
+            {more.map((id) => (
+              <button key={id} role="menuitem" type="button" onClick={run(handlers[id]!)}
+                className={`${itemClass}${id === 'delete' ? ' text-rose-700 hover:bg-rose-50' : ''}`}>
+                {moreLabel(id, { completed, entity })}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+    )
+  }
 
   return (
-    // Hosts are often draggable (dnd-kit pills, native-drag pills) — the menu
-    // must never start a drag or bubble a click into the pill's open-task.
+    // Hosts are often draggable (dnd-kit pills, native-drag rows) — the menu
+    // must never start a drag or bubble a click into the row's open-task.
     <span
       ref={containerRef}
       className="relative inline-flex"
@@ -114,71 +232,11 @@ export function TaskFateMenu({ onPickWhen, onPickDate, onComplete, onDelete, onO
         aria-haspopup="menu"
         aria-expanded={open}
         onClick={() => setOpen((v) => !v)}
-        className="p-0.5 rounded text-neutral-400 hover:text-neutral-700"
+        className={triggerClassName ?? 'p-0.5 rounded text-neutral-400 hover:text-neutral-700'}
       >
-        <MoreHorizontal className="w-4 h-4" />{triggerText && <span>{triggerText}</span>}
+        <MoreHorizontal size={iconSize} aria-hidden="true" />{triggerText && <span>{triggerText}</span>}
       </button>
-
-      {open && !disabled && createPortal(
-        <div
-          ref={panelRef}
-          role="menu"
-          style={{ top: 0, left: 0, visibility: 'hidden' }}
-          className="fixed z-[100] w-max max-w-[calc(100vw-16px)] max-h-[80dvh] overflow-y-auto rounded-xl border border-neutral-200 bg-white shadow-lg p-2"
-          onPointerDown={(e) => e.stopPropagation()}
-          onMouseDown={(e) => e.stopPropagation()}
-          onClick={(e) => e.stopPropagation()}
-        >
-          {(onOpen || extras?.length || fileUnder) && (
-            <div className="mb-1.5 pb-1.5 border-b border-neutral-100">
-              {onOpen && (
-                <button role="menuitem" type="button"
-                  onClick={() => { close(); onOpen() }}
-                  className="w-full flex items-center gap-2 text-left text-sm px-2 py-1.5 rounded-md text-neutral-700 hover:bg-neutral-50">
-                  <PanelRight className="w-3.5 h-3.5 text-neutral-400" /> Open
-                </button>
-              )}
-              {extras?.map((x) => (
-                <button key={x.label} role="menuitem" type="button"
-                  onClick={() => { close(); x.onSelect() }}
-                  className="w-full flex items-center gap-2 text-left text-sm px-2 py-1.5 rounded-md text-neutral-700 hover:bg-neutral-50">
-                  <ChevronRight className="w-3.5 h-3.5 text-neutral-400" /> {x.label}
-                </button>
-              ))}
-              {fileUnder && fileUnder.picks.length > 0 && (
-                <>
-                  <button role="menuitem" type="button"
-                    aria-expanded={picksOpen}
-                    onClick={() => setPicksOpen((v) => !v)}
-                    className="w-full flex items-center gap-2 text-left text-sm px-2 py-1.5 rounded-md text-neutral-700 hover:bg-neutral-50">
-                    <ChevronDown className={`w-3.5 h-3.5 text-neutral-400 transition-transform ${picksOpen ? '' : '-rotate-90'}`} />
-                    File under a pick
-                  </button>
-                  {picksOpen && (
-                    <div className="ml-4 mt-0.5 space-y-0.5 max-h-56 overflow-auto">
-                      {fileUnder.picks.map((p) => (
-                        <button key={p.id} role="menuitem" type="button"
-                          onClick={() => { close(); fileUnder.onFile(p.id) }}
-                          className="w-full rounded-md px-2 py-1.5 text-left hover:bg-primary-50">
-                          <span className="block text-sm text-neutral-800 leading-snug">{p.title}</span>
-                          {p.goalName && <span className="block text-[11px] text-neutral-400">serves {p.goalName}</span>}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </>
-              )}
-            </div>
-          )}
-          {showWhen && <TriageWhenMenu contained
-            onPick={(when) => { close(); onPickWhen(when) }}
-            onPickDate={onPickDate ? (date, isAllDay) => { close(); onPickDate(date, isAllDay) } : undefined}
-            onComplete={onComplete ? () => { close(); onComplete() } : undefined}
-            onDelete={onDelete ? () => { close(); onDelete() } : undefined}
-          />}
-        </div>,
-        document.body,
-      )}
+      {body && createPortal(body, document.body)}
     </span>
   )
 }

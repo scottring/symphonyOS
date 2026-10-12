@@ -1,4 +1,3 @@
-import { relativeWeekend, weekendPlacement, weekendLabel } from '@/lib/planning/weekend';
 import { PhonePaneSwitch } from '@/shell/PhonePaneSwitch';
 import { useAssistantLauncher } from '@/contexts/AssistantLaunchContext';
 // src/apps/tasks/TaskDetailPanel.tsx
@@ -65,7 +64,7 @@ import { nextStepOrder } from '@/lib/today/stepOrdering';
 import type { Routine } from '@/types/actionable';
 import { TapEventPanel } from '@/components/surface/TapEventPanel';
 import { TapMealPanel } from '@/components/surface/TapMealPanel';
-import { applyTriageWhen, describeTriageWhen } from '@/lib/triage/applyWhen';
+import { triageTaskWhen } from '@/lib/triage/feedback';
 import { formatDateLabel } from '@/lib/dateHelpers';
 import { consumeDiscussionOpen } from '@/lib/discussions/openIntent';
 import type { Task, TaskLink } from '@/types/task';
@@ -330,20 +329,11 @@ function TaskPanelBody({ id }: { id: string }) {
         })();
       }}
       onReschedule={(when) => {
-        // Gated pushTask/setBucket (not a hand-rolled bucket/scheduledFor
-        // write) — same reason as horizons/shared.tsx's applyWhen: this is
-        // the real hook logic (defer_count, weekStart, overdue time
-        // preservation), and an Unsorted task reschedule here asks first.
-        void (async () => {
-          if (when === 'this-weekend' || when === 'next-weekend') {
-            const saturday = relativeWeekend(when === 'next-weekend');
-            const result = await gated.updateTask(task.id, weekendPlacement(saturday));
-            if (result !== false) showToast(`${weekendLabel(saturday)} · either day`, 'success');
-            return;
-          }
-          const ok = await applyTriageWhen(when, task.id, { onPushTask: gated.pushTask, onSetBucket: gated.setBucket!, onFocus: (id, day) => gated.updateTask(id, { plannedOn: day }) });
-          if (ok) showToast(describeTriageWhen(when), 'success');
-        })();
+        // The shared triage write (lib/triage): gated pushTask/setBucket/
+        // updateTask — the real hook logic (defer_count, weekStart, overdue
+        // time preservation), and an Unsorted task asks first. A weekend is
+        // either day; the toast follows the write, with Undo, or Retry.
+        void triageTaskWhen(task, when, { onPushTask: gated.pushTask, onSetBucket: gated.setBucket!, onUpdateTask: gated.updateTask, onFocus: (id, day) => gated.updateTask(id, { plannedOn: day }) });
       }}
       // Unschedule clears the day only: the row's week and period commitments
       // stay (D1c.1), and the placement module picks the bucket from them —
@@ -375,16 +365,8 @@ function TaskPanelBody({ id }: { id: string }) {
         void removeFromGroup(sid, { updateTask, refetch });
       }}
       onRescheduleSubtask={(sid, when) => {
-        void (async () => {
-          if (when === 'this-weekend' || when === 'next-weekend') {
-            const saturday = relativeWeekend(when === 'next-weekend');
-            const result = await gated.updateTask(sid, weekendPlacement(saturday));
-            if (result !== false) showToast(`${weekendLabel(saturday)} · either day`, 'success');
-            return;
-          }
-          const ok = await applyTriageWhen(when, sid, { onPushTask: gated.pushTask, onSetBucket: gated.setBucket!, onFocus: (id, day) => gated.updateTask(id, { plannedOn: day }) });
-          if (ok) showToast(describeTriageWhen(when), 'success');
-        })();
+        const sub = findTask(tasks, sid);
+        if (sub) void triageTaskWhen(sub, when, { onPushTask: gated.pushTask, onSetBucket: gated.setBucket!, onUpdateTask: gated.updateTask, onFocus: (id, day) => gated.updateTask(id, { plannedOn: day }) });
       }}
       onScheduleSubtask={(sid, date, isAllDay) =>
         updateTask(sid, { bucket: 'timed', scheduledFor: date, isAllDay })

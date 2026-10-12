@@ -2,15 +2,13 @@ import { useState, useRef, useEffect, useCallback } from 'react'
 import { Trash2, ChevronDown, Check, CalendarPlus } from 'lucide-react'
 import { ConceptIcon } from '@/lib/conceptIcons'
 import { SpecificDatePicker } from './SpecificDatePicker'
+import { WHEN_LABEL, type TriageWhen } from '@/lib/triage/contract'
+import { whenDetail } from '@/lib/triage/periods'
 
-// The full temporal vocabulary a triage row can route into. The granular options
-// fan out from a small set of horizon "groups" so the common case stays one
-// glance while the precise case is one hover away.
-export type TriageWhen =
-  | 'today' | 'tonight' | 'tomorrow'
-  | 'this-week' | 'next-week' | 'this-weekend' | 'next-weekend'
-  | 'this-month' | 'next-month' | 'this-season'
-  | 'someday'
+// The temporal vocabulary and its order live in the triage contract
+// (lib/triage/contract.ts); this is its inline chip form. Re-exported so the
+// many `import type { TriageWhen } from './TriageWhenMenu'` keep working.
+export type { TriageWhen }
 
 interface WhenOption { when: TriageWhen; label: string }
 interface WhenGroup {
@@ -19,34 +17,17 @@ interface WhenGroup {
   options: WhenOption[]    // the fan-out menu (first = the "whole period")
 }
 
+const opt = (when: TriageWhen): WhenOption => ({ when, label: WHEN_LABEL[when] })
+
+// The days are chips of their own — Tomorrow is never buried under a chip
+// labelled Today (Scott, 2026-10-12). The periods fan out, in contract order.
 const GROUPS: WhenGroup[] = [
-  {
-    label: 'Today', primary: 'today', options: [
-      { when: 'today', label: 'Today' },
-      { when: 'tonight', label: 'Tonight' },
-      { when: 'tomorrow', label: 'Tomorrow' },
-    ],
-  },
-  {
-    label: 'Week', primary: 'this-week', options: [
-      { when: 'this-week', label: 'This week' },
-      { when: 'next-week', label: 'Next week' },
-      { when: 'this-weekend', label: 'This weekend' },
-      { when: 'next-weekend', label: 'Next weekend' },
-    ],
-  },
-  {
-    label: 'Month', primary: 'this-month', options: [
-      { when: 'this-month', label: 'This month' },
-      { when: 'next-month', label: 'Next month' },
-      { when: 'this-season', label: 'This season' },
-    ],
-  },
-  {
-    label: 'Someday', primary: 'someday', options: [
-      { when: 'someday', label: 'Someday' },
-    ],
-  },
+  { label: 'Today', primary: 'today', options: [opt('today')] },
+  { label: 'Tonight', primary: 'tonight', options: [opt('tonight')] },
+  { label: 'Tomorrow', primary: 'tomorrow', options: [opt('tomorrow')] },
+  { label: 'Week', primary: 'this-week', options: [opt('this-week'), opt('next-week'), opt('this-weekend'), opt('next-weekend')] },
+  { label: 'Month', primary: 'this-month', options: [opt('this-month'), opt('next-month'), opt('this-season')] },
+  { label: 'Someday', primary: 'someday', options: [opt('someday')] },
 ]
 
 interface TriageWhenMenuProps {
@@ -137,7 +118,7 @@ export function TriageWhenMenu({ onPick, onDelete, onNote, onComplete, onPickDat
       {GROUPS.map((group) => {
         const single = group.options.length === 1
         const isOpen = openGroup === group.label
-        const isPrimary = group.label === 'Today'
+        const isPrimary = group.label === 'Today' || group.label === 'Tomorrow'
         return (
           <div
             key={group.label}
@@ -148,6 +129,7 @@ export function TriageWhenMenu({ onPick, onDelete, onNote, onComplete, onPickDat
             <button
               type="button"
               aria-label={group.label}
+              title={single ? `${group.label} · ${whenDetail(group.primary)}` : undefined}
               aria-haspopup={single ? undefined : 'menu'}
               aria-expanded={single ? undefined : isOpen}
               onClick={() => {
@@ -179,17 +161,19 @@ export function TriageWhenMenu({ onPick, onDelete, onNote, onComplete, onPickDat
               >
               <div
                 role="menu"
-                className="bg-white border border-neutral-200 rounded-lg shadow-lg py-1 min-w-[150px]"
+                className="bg-white border border-neutral-200 rounded-lg shadow-lg py-1 min-w-[190px]"
               >
                 {group.options.map((opt) => (
                   <button
                     key={opt.when}
                     type="button"
                     role="menuitem"
-                    className="block w-full text-left px-3 py-1.5 text-sm text-neutral-700 hover:bg-primary-50 hover:text-primary-700 transition-colors"
+                    aria-label={opt.label}
+                    className="flex w-full items-center justify-between whitespace-nowrap text-left px-3 py-1.5 text-sm text-neutral-700 hover:bg-primary-50 hover:text-primary-700 transition-colors"
                     onClick={() => pick(opt.when)}
                   >
-                    {opt.label}
+                    <span>{opt.label}</span>
+                    <span className="ml-2 text-[11px] text-neutral-400">{whenDetail(opt.when)}</span>
                   </button>
                 ))}
               </div>

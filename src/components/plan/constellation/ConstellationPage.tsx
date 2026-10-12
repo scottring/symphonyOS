@@ -23,6 +23,7 @@ import { useEffect, useRef, useState, type DragEvent, type ReactNode, type RefOb
 import { Link, Navigate, useLocation, useSearchParams, type SetURLSearchParams } from 'react-router-dom'
 import { TaskFateMenu } from '@/components/schedule/TaskFateMenu'
 import { applyTriageWhen, describeTriageWhen } from '@/lib/triage/applyWhen'
+import { periodMoves } from '@/lib/triage/contract'
 import { useGatedTaskActions } from '@/hooks/useGatedTaskActions'
 import { useSelectionOptional } from '@/shell/providers/SelectionProvider'
 import { GoalsProvider, useGoalsContext } from '@/contexts/GoalsContext'
@@ -291,6 +292,11 @@ function Inner() {
     else activity.setProposalState(p.key, 'failed')
   }
 
+  // The triage contract (lib/triage/contract.ts) for goals: a goal keeps goal
+  // verbs — its period moves, Complete/Reopen, Open details, Delete — and is
+  // never offered a day or a time, which would quietly turn a Year, Season or
+  // Month goal into a day task. (Connection — Move under… — is the row's own
+  // control.) A week task, were one drawn here, gets the full task When set.
   const actionsFor = (node: PlanNode, rowVerbs: { label: string; onSelect: () => void }[] = []) => {
     const task = node.task
     const label = `Actions for ${node.title}`
@@ -298,32 +304,31 @@ function Inner() {
       const status = node.goal?.status ?? 'active'
       const setStatus = (next: 'active' | 'completed' | 'archived', what: string) =>
         void act(what, () => updateGoal(node.id, { status: next }), { ids: [node.id], undo: async () => (await updateGoal(node.id, { status })) !== false })
-      return <TaskFateMenu label={label} showWhen={false} onPickWhen={() => {}}
+      return <TaskFateMenu entity="year-goal" label={label} completed={status === 'completed'}
         extras={[
           ...rowVerbs,
-          status === 'completed'
-            ? { label: 'Reopen goal', onSelect: () => setStatus('active', `Reopen “${node.title}”`) }
-            : { label: 'Complete goal', onSelect: () => setStatus('completed', `Complete “${node.title}”`) },
-          { label: 'Archive goal', onSelect: () => setStatus('archived', `Archive “${node.title}”`) },
-        ]} />
+          ...periodMoves('year').map((m) => ({ label: m.label, onSelect: () => setStatus('archived', `Archive “${node.title}”`) })),
+        ]}
+        onComplete={() => status === 'completed' ? setStatus('active', `Reopen “${node.title}”`) : setStatus('completed', `Complete “${node.title}”`)} />
     }
-    const period = node.level === 1 ? 'season' : node.level === 2 ? 'month' : 'week'
-    const start = node.level === 1 ? seasonB.start : node.level === 2 ? monthB.start : week
-    const nextWeek = new Date(week); nextWeek.setDate(nextWeek.getDate() + 7)
-    const next = node.level === 1 ? { seasonStart: seasonB.next } : node.level === 2 ? { monthStart: monthB.next } : { weekStart: nextWeek }
     const toggle = async () => (await toggleTask(node.id)) !== false
-    return <TaskFateMenu label={label}
-      onOpen={selection ? () => selection.setSelection({ kind: 'task', id: node.id }) : undefined}
-      onPickWhen={(when) => void act(`${describeTriageWhen(when)}: “${node.title}”`, () => applyTriageWhen(when, node.id, { onPushTask: gated.pushTask, onSetBucket: gated.setBucket!, onFocus: (id, day) => gated.updateTask(id, { plannedOn: day }) }), { ids: [node.id] })}
-      onPickDate={(date, isAllDay) => void act(`Schedule “${node.title}”`, () => gated.setBucket!(node.id, 'timed', date, isAllDay), { ids: [node.id] })}
-      onComplete={!task.completed ? () => void act(`Complete “${node.title}”`, toggle, { ids: [node.id], undo: toggle }) : undefined}
-      onDelete={() => { if (window.confirm(`Delete “${node.title}”? This removes the item from all its planning periods.`)) void act(`Delete “${node.title}”`, async () => { await deleteTask(node.id) }) }}
-      extras={[
-        ...rowVerbs,
-        ...(task.completed ? [{ label: 'Reopen', onSelect: () => void act(`Reopen “${node.title}”`, toggle, { ids: [node.id], undo: toggle }) }] : []),
-        { label: `Carry to next ${period}`, onSelect: () => void act(`Carry “${node.title}” to next ${period}`, async () => !!await keepForward(node.id, next, start), { ids: [node.id] }) },
-        { label: `Remove from this ${period}`, onSelect: () => void act(`Remove “${node.title}” from this ${period}`, () => dropCommitment(node.id, period, start)) },
-      ]} />
+    const onComplete = () => void act(`${task.completed ? 'Reopen' : 'Complete'} “${node.title}”`, toggle, { ids: [node.id], undo: toggle })
+    const onOpen = selection ? () => selection.setSelection({ kind: 'task', id: node.id }) : undefined
+    const onDelete = () => { if (window.confirm(`Delete “${node.title}”? This removes the item from all its planning periods.`)) void act(`Delete “${node.title}”`, async () => { await deleteTask(node.id) }) }
+    if (node.level >= 3) {
+      return <TaskFateMenu entity="task" label={label} completed={task.completed} onOpen={onOpen} onComplete={onComplete} onDelete={onDelete} extras={rowVerbs}
+        onPickWhen={(when) => void act(`${describeTriageWhen(when)}: “${node.title}”`, () => applyTriageWhen(when, node.id, { onPushTask: gated.pushTask, onSetBucket: gated.setBucket!, onUpdateTask: gated.updateTask, onFocus: (id, day) => gated.updateTask(id, { plannedOn: day }) }), { ids: [node.id] })}
+        onPickDate={(date, isAllDay) => void act(`Schedule “${node.title}”`, () => gated.setBucket!(node.id, 'timed', date, isAllDay), { ids: [node.id] })} />
+    }
+    const period = node.level === 1 ? 'season' : 'month'
+    const start = node.level === 1 ? seasonB.start : monthB.start
+    const next = node.level === 1 ? { seasonStart: seasonB.next } : { monthStart: monthB.next }
+    const nextName = node.level === 1 ? periodWordOf(periodBounds('season', seasonB.next, seasons)) : monthB.next.toLocaleDateString('en-US', { month: 'long' })
+    const moves = task.completed ? [] : periodMoves(period, nextName).map((m) => m.id === 'carry'
+      ? { label: m.label, onSelect: () => void act(`Carry “${node.title}” to ${nextName}`, async () => !!await keepForward(node.id, next, start), { ids: [node.id] }) }
+      : { label: m.label, onSelect: () => void act(`Remove “${node.title}” from this ${period}`, () => dropCommitment(node.id, period, start)) })
+    return <TaskFateMenu entity="period-goal" label={label} completed={task.completed}
+      extras={[...rowVerbs, ...moves]} onComplete={onComplete} onOpen={onOpen} onDelete={onDelete} />
   }
 
   // ---- Proposals for this horizon -----------------------------------------

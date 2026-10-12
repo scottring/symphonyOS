@@ -344,6 +344,7 @@ export function TapEventPanel(props: TapEventPanelProps) {
           render: () => (
             <SchedulePicker
               label="Reschedule"
+              entity="event"
               scheduledFor={startTime ? new Date(startTime) : undefined}
               onSchedule={(date) => handleReschedule(date)}
               onReschedule={handleRelativeReschedule}

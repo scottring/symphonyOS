@@ -24,8 +24,19 @@ describe('RescheduleButton', () => {
     const onPushTask = vi.fn()
     renderBtn({ onPushTask })
     fireEvent.click(screen.getByLabelText('Reschedule'))
+    fireEvent.click(screen.getByText('Tomorrow'))
+    const tomorrow = new Date(); tomorrow.setHours(0, 0, 0, 0); tomorrow.setDate(tomorrow.getDate() + 1)
+    expect(onPushTask).toHaveBeenCalledWith('7', tomorrow)
+  })
+
+  it('a weekend is that weekend, either day — the same write as every task surface (triage contract)', () => {
+    const onPushTask = vi.fn()
+    const onUpdateTask = vi.fn()
+    renderBtn({ onPushTask, onUpdateTask })
+    fireEvent.click(screen.getByLabelText('Reschedule'))
     fireEvent.click(screen.getByText('Next weekend'))
-    expect(onPushTask).toHaveBeenCalledWith('7', expect.any(Date))
+    expect(onPushTask).not.toHaveBeenCalled()
+    expect(onUpdateTask).toHaveBeenCalledWith('7', expect.objectContaining({ bucket: 'week', weekendStart: expect.any(Date) }))
   })
 
   it('applies a pool target via updateTask', () => {

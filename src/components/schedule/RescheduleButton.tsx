@@ -1,17 +1,19 @@
 // src/components/schedule/RescheduleButton.tsx
 //
-// A dedicated one-tap reschedule control for a Today task row: a calendar icon
-// that opens straight into the WHEN list (no '...' menu, no detail pane, no
-// time-picker step). Picking a target applies immediately via the shared
-// applyTriageWhen + the schedule-actions context, so it actually persists.
+// The Today task row's triage control: a calendar icon that opens straight
+// into the contract's When group (lib/triage/contract.ts — Today … Someday,
+// Pick date & time…, each naming where it lands), then "Skip this day" when
+// the task is on the day in view, then Waiting. Picking applies at once via
+// the shared applyTriageWhen + the schedule-actions context.
 
 import { useState, useRef, useCallback, useLayoutEffect } from 'react'
 import { createPortal } from 'react-dom'
-import { CalendarClock, Hourglass } from 'lucide-react'
+import { CalendarClock, Hourglass, CircleSlash } from 'lucide-react'
 import type { TimelineItem } from '@/types/timeline'
 import { useScheduleActionsContext } from '@/contexts/ScheduleActionsContext'
-import { applyTriageWhen, describeTriageWhen } from '@/lib/triage/applyWhen'
-import { formatDateLabel } from '@/lib/dateHelpers'
+import { triageTaskWhen, triageTaskDate, triageSkipDay } from '@/lib/triage/feedback'
+import { SKIP_LABEL, SKIP_NOTE } from '@/lib/triage/contract'
+import { isSameDay } from '@/lib/dateUtils'
 import { showToast } from '@/hooks/useToast'
 import type { TriageWhen } from './TriageWhenMenu'
 import { RescheduleGrid } from './RescheduleGrid'
@@ -57,37 +59,34 @@ export function RescheduleButton({ item }: { item: TimelineItem }) {
     panel.style.visibility = 'visible'
   })
 
+  // The shared triage writes (lib/triage): the destination is confirmed only
+  // after the write landed, with Undo; a write that did not land says so and
+  // offers Retry, and the row stays where it was.
+  const task = item.originalTask
   const reschedule = useCallback((when: TriageWhen) => {
-    const taskId = item.originalTask?.id
-    if (taskId) {
-      void (async () => {
-        const ok = await applyTriageWhen(when, taskId, {
-          onPushTask: (id, target) => ctx.onPushTask?.(id, target),
-          onSetBucket: (id, bucket) => ctx.onUpdateTask?.(id, { bucket, scheduledFor: undefined, isAllDay: undefined }),
-          onFocus: (id, day) => ctx.onUpdateTask?.(id, { plannedOn: day }),
-        })
-        // A cancelled domain gate writes nothing — no confirmation for a move
-        // that didn't happen.
-        if (ok) showToast(describeTriageWhen(when), 'success')
-      })()
+    if (task) {
+      void triageTaskWhen(task, when, {
+        onPushTask: (id, target) => ctx.onPushTask?.(id, target),
+        onSetBucket: (id, bucket) => ctx.onUpdateTask?.(id, { bucket, scheduledFor: undefined, isAllDay: undefined }),
+        onUpdateTask: (id, updates) => ctx.onUpdateTask?.(id, updates),
+        onFocus: (id, day) => ctx.onUpdateTask?.(id, { plannedOn: day }),
+      })
     }
     setOpen(false)
-  }, [item.originalTask, ctx])
+  }, [task, ctx])
 
   const rescheduleToDate = useCallback((date: Date, isAllDay: boolean) => {
-    const taskId = item.originalTask?.id
-    if (taskId) {
-      void (async () => {
-        const result = await ctx.onUpdateTask?.(taskId, { bucket: 'timed', scheduledFor: date, isAllDay })
-        if (result === false) return
-        const label = isAllDay
-          ? formatDateLabel(date)
-          : `${formatDateLabel(date)}, ${date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`
-        showToast(`Moved to ${label}`, 'success')
-      })()
-    }
+    if (task) void triageTaskDate(task, date, isAllDay, (id, updates) => ctx.onUpdateTask?.(id, updates))
     setOpen(false)
-  }, [item.originalTask, ctx])
+  }, [task, ctx])
+
+  // Skip this day: only a task that is ON the day in view has a day to skip.
+  const viewed = ctx.viewedDate ?? new Date()
+  const onDay = !!task && (item.focused || (!!task.scheduledFor && isSameDay(task.scheduledFor, viewed)))
+  const skipDay = useCallback(() => {
+    if (task) void triageSkipDay(task, ctx.viewedDate ?? new Date(), (id, updates) => ctx.onUpdateTask?.(id, updates))
+    setOpen(false)
+  }, [task, ctx])
 
   const saveWaiting = useCallback((waitingFor: string, checkBack?: Date) => {
     const taskId = item.originalTask?.id
@@ -136,7 +135,7 @@ export function RescheduleButton({ item }: { item: TimelineItem }) {
             role="dialog"
             aria-label="Reschedule to"
             style={{ top: 0, left: 0, visibility: 'hidden' }}
-            className="fixed z-[100] w-80 p-2 bg-white rounded-xl border border-neutral-200 shadow-lg"
+            className="fixed z-[100] w-80 max-w-[calc(100vw-16px)] max-h-[85dvh] overflow-y-auto p-2 bg-white rounded-xl border border-neutral-200 shadow-lg"
             onClick={(e) => e.stopPropagation()}
           >
             {waiting ? (
@@ -152,8 +151,22 @@ export function RescheduleButton({ item }: { item: TimelineItem }) {
               </div>
             ) : (
               <>
-                <div className="px-1 pb-2 text-[11px] uppercase tracking-wider text-neutral-400">Reschedule to</div>
-                <RescheduleGrid onPick={reschedule} onPickDate={rescheduleToDate} />
+                <div className="px-1 pb-2 text-[11px] uppercase tracking-wider text-neutral-400">When</div>
+                <RescheduleGrid flexibleWeekend currentDay={onDay ? viewed : null} onPick={reschedule} onPickDate={rescheduleToDate} />
+                {onDay && ctx.onUpdateTask && (
+                  <div className="mt-2 border-t border-neutral-100 pt-2">
+                    <button
+                      type="button"
+                      role="menuitem"
+                      onClick={(e) => { e.stopPropagation(); skipDay() }}
+                      className="flex w-full items-center gap-2 px-2.5 py-2 rounded-lg text-sm text-neutral-600 hover:bg-neutral-50"
+                    >
+                      <CircleSlash className="w-4 h-4 shrink-0 text-neutral-400" />
+                      {SKIP_LABEL['skip-day']}
+                    </button>
+                    <p className="px-2.5 text-[11px] text-neutral-400">{SKIP_NOTE['skip-day']}</p>
+                  </div>
+                )}
                 <button
                   type="button"
                   role="menuitem"

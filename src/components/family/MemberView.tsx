@@ -6,7 +6,7 @@ import type { Project } from '@/types/project'
 import { selectMemberTasks } from '@/lib/memberTasks'
 import { DenseInboxRow } from '@/components/schedule/DenseInboxRow'
 import { TriageWhenMenu } from '@/components/schedule/TriageWhenMenu'
-import { applyTriageWhen } from '@/lib/triage/applyWhen'
+import { triageTaskWhen, triageTaskDate } from '@/lib/triage/feedback'
 
 interface MemberViewProps {
   member: FamilyMember
@@ -39,8 +39,8 @@ export function MemberView({
       onQuickAction={() => {}}
       triageMenu={
         <TriageWhenMenu
-          onPick={(when) => applyTriageWhen(when, task.id, { onPushTask, onSetBucket })}
-          onPickDate={(date) => onPushTask(task.id, date)}
+          onPick={(when) => { void triageTaskWhen(task, when, { onPushTask, onSetBucket, onUpdateTask }) }}
+          onPickDate={(date, isAllDay) => { void triageTaskDate(task, date, isAllDay, onUpdateTask) }}
           onComplete={() => onToggleTask(task.id)}
           onDelete={() => onDeleteTask(task.id)}
         />

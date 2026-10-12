@@ -43,6 +43,8 @@ export interface SchedulePickerProps {
   weekendDays?: boolean
   /** Limit the relative tiles to the ones this caller can honour. */
   whens?: readonly TriageWhen[]
+  /** A calendar event keeps its own move semantics (it is not task triage). */
+  entity?: 'task' | 'event'
   onClearSchedule?: () => void
   /** Fullness per dated tile, keyed by `loadKeyFor(when)`. */
   loads: Map<string, DayLoad>
@@ -57,7 +59,7 @@ const TRIGGER =
 /** Matches `w-80`. Kept as a number because the position math needs it. */
 const POPOVER_WIDTH = 320
 /** Enough of the grid to be worth showing below before flipping above. */
-const POPOVER_MAX_HEIGHT = 360
+const POPOVER_MAX_HEIGHT = 460
 
 /**
  * The one scheduler.
@@ -75,6 +77,7 @@ export function SchedulePicker({
   onReschedule,
   weekendDays = false,
   whens,
+  entity = 'task',
   onClearSchedule,
   loads,
   label = 'Schedule',
@@ -152,7 +155,7 @@ export function SchedulePicker({
         <div
           ref={popoverRef}
           style={{ top: pos.top, left: pos.left, width: POPOVER_WIDTH }}
-          className="fixed z-[60] rounded-xl border border-neutral-200 bg-white p-2 shadow-lg"
+          className="fixed z-[60] max-h-[calc(100dvh-16px)] overflow-y-auto rounded-xl border border-neutral-200 bg-white p-2 shadow-lg"
         >
           {peek ? (
             <DayPeek
@@ -168,7 +171,7 @@ export function SchedulePicker({
               <div className="px-1 pb-2 text-[11px] uppercase tracking-wider text-neutral-400">
                 {label} for
               </div>
-              <RescheduleGrid flexibleWeekend={flexibleWeekend} weekendDays={weekendDays}
+              <RescheduleGrid flexibleWeekend={flexibleWeekend} weekendDays={weekendDays} entity={entity}
                 // No handler, no relative tiles: only "Pick date & time…"
                 // does anything, and that is what is shown.
                 whens={onReschedule ? whens : []}

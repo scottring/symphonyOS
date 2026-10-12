@@ -1,75 +1,85 @@
 // src/lib/triage/applyWhen.ts
 //
-// The single source of truth for mapping a TriageWhen → a scheduling mutation.
-// Dated whens become a scheduled date (pushTask handles bucket=timed + all-day
-// inference — "Tonight" at 6pm stays timed); pool whens set the bucket. Shared by
-// every triage surface (inbox, horizon views, planning sessions) so the WHEN
-// vocabulary behaves identically everywhere.
+// The single source of truth for mapping a TriageWhen → a task write, for
+// every task triage surface (Today, Inbox, details, Week canvas, planning).
+//
+// Days (Today, Tonight, Tomorrow) go through pushTask, which keeps a timed
+// task's hour and counts the deferral; "Today" also chooses it for my focus.
+// Everything else is a POOL the task can live in without a day, written with
+// its period stated (weekStart / monthStart / seasonStart / weekendStart) so it
+// lands in the period the menu printed — the household's week start and its
+// own seasons, not "the Monday after" or "the 1st of next month".
+//
+// Placement (lib/placement) keeps one task identity: a move DOWN to a day keeps
+// the week and goal it serves; a move UP releases the lower lists.
 
-import { getBaseDate, getThisEvening, getNextWeekend, getWeekendAfterNext, getNextMonday, formatShortDate } from '@/lib/dateHelpers'
-import type { TriageWhen } from '@/components/schedule/TriageWhenMenu'
-import type { TaskBucket } from '@/types/task'
+import type { Task, TaskBucket } from '@/types/task'
 import { wasWritten } from '@/hooks/useGatedTaskActions'
-
-/** First day of next month at midnight (the "Next month" target). */
-export function firstOfNextMonth(): Date {
-  const d = new Date()
-  return new Date(d.getFullYear(), d.getMonth() + 1, 1, 0, 0, 0, 0)
-}
+import { weekendPlacement } from '@/lib/planning/weekend'
+import type { TriageWhen } from './contract'
+import { resolveWhen, describeWhen, triageClock, type TriageClock } from './periods'
 
 export interface TriageHandlers {
   /** `false` means a domain gate was cancelled — nothing was written. A raw
    *  (non-gated) sync handler still type-checks here since void is a member
    *  of the union. */
   onPushTask: (id: string, target: Date | 'week' | 'month' | 'quarter') => void | Promise<void | boolean>
+  /** Someday. */
   onSetBucket: (id: string, bucket: TaskBucket) => void | Promise<void | boolean>
+  /** Pools with their period stated (next week, a weekend, next month…). */
+  onUpdateTask: (id: string, updates: Partial<Task>) => unknown
   /** Chooses the task for my focus on `day`. "Today" is the Today command
    *  (spec S4): dated today AND chosen. Every other when is a date only. */
   onFocus?: (id: string, day: Date) => unknown
 }
 
 /**
- * Human confirmation for a reschedule, e.g. "Moved to next weekend · Sat, Jul 11".
- * Dated whens append the concrete date they resolved to (kept in lock-step with
- * applyTriageWhen above) so the post-action toast confirms exactly where the task
- * landed — no "which Saturday did 'next weekend' mean?" doubt after the tap.
+ * The day a When lands on, or null for a pool. Tonight carries its hour.
  */
-export function describeTriageWhen(when: TriageWhen): string {
-  switch (when) {
-    case 'today': return 'Moved to today'
-    case 'tonight': return 'Moved to tonight'
-    case 'tomorrow': return 'Moved to tomorrow'
-    case 'this-week': return 'Moved to This Week'
-    case 'next-week': return `Moved to next week · ${formatShortDate(getNextMonday())}`
-    case 'this-weekend': return `Moved to this weekend · ${formatShortDate(getNextWeekend())}`
-    case 'next-weekend': return `Moved to next weekend · ${formatShortDate(getWeekendAfterNext())}`
-    case 'this-month': return 'Moved to This Month'
-    case 'next-month': return `Moved to next month · ${formatShortDate(firstOfNextMonth())}`
-    case 'this-season': return 'Moved to This Season'
-    case 'someday': return 'Moved to Someday'
+export function dayForWhen(when: TriageWhen, clock: TriageClock = triageClock()): Date | null {
+  const t = resolveWhen(when, clock)
+  return t.kind === 'day' || t.kind === 'time' ? t.date : null
+}
+
+/**
+ * The placement write for a pool When (a week, a weekend, a month, the season,
+ * Someday), or null for a day When.
+ */
+export function poolPatch(when: TriageWhen, clock: TriageClock = triageClock()): Partial<Task> | null {
+  const t = resolveWhen(when, clock)
+  switch (t.kind) {
+    case 'day':
+    case 'time':
+      return null
+    case 'weekend':
+      return weekendPlacement(t.saturday)
+    case 'someday':
+      return { bucket: 'someday', scheduledFor: undefined }
+    case 'period':
+      if (t.level === 'week') return { bucket: 'week', weekStart: t.start, scheduledFor: undefined }
+      if (t.level === 'month') return { bucket: 'month', monthStart: t.start, scheduledFor: undefined }
+      return { bucket: 'quarter', seasonStart: t.start, scheduledFor: undefined }
   }
 }
 
-/** Resolves `false` when a domain gate was cancelled — nothing was written.
- *  Callers that show a success toast or record an undo entry MUST await this
- *  and skip both when it resolves `false`. */
-export async function applyTriageWhen(when: TriageWhen, taskId: string, h: TriageHandlers): Promise<boolean> {
-  switch (when) {
-    case 'today': {
-      const day = getBaseDate(0)
-      if (!(await wasWritten(h.onPushTask(taskId, day)))) return false
-      await h.onFocus?.(taskId, day)
-      return true
-    }
-    case 'tonight': return wasWritten(h.onPushTask(taskId, getThisEvening()))
-    case 'tomorrow': return wasWritten(h.onPushTask(taskId, getBaseDate(1)))
-    case 'this-week': return wasWritten(h.onSetBucket(taskId, 'week'))
-    case 'next-week': return wasWritten(h.onPushTask(taskId, getNextMonday()))
-    case 'this-weekend': return wasWritten(h.onPushTask(taskId, getNextWeekend()))
-    case 'next-weekend': return wasWritten(h.onPushTask(taskId, getWeekendAfterNext()))
-    case 'this-month': return wasWritten(h.onSetBucket(taskId, 'month'))
-    case 'next-month': return wasWritten(h.onPushTask(taskId, firstOfNextMonth()))
-    case 'this-season': return wasWritten(h.onSetBucket(taskId, 'quarter'))
-    case 'someday': return wasWritten(h.onSetBucket(taskId, 'someday'))
+/**
+ * Human confirmation for a move, e.g. "Moved to Next weekend · Oct 17–18".
+ * The destination is the one the menu printed beside the choice.
+ */
+export function describeTriageWhen(when: TriageWhen, clock: TriageClock = triageClock()): string {
+  return describeWhen(when, clock)
+}
+
+/** Resolves `false` when nothing was written (a refused write or a cancelled
+ *  domain gate). Callers that show a success toast or record an undo entry
+ *  MUST await this and skip both when it resolves `false`. */
+export async function applyTriageWhen(when: TriageWhen, taskId: string, h: TriageHandlers, clock: TriageClock = triageClock()): Promise<boolean> {
+  const day = dayForWhen(when, clock)
+  if (day) {
+    if (!(await wasWritten(h.onPushTask(taskId, day)))) return false
+    if (when === 'today') await h.onFocus?.(taskId, day)
+    return true
   }
+  if (when === 'someday') return wasWritten(h.onSetBucket(taskId, 'someday'))
+  return wasWritten(h.onUpdateTask(taskId, poolPatch(when, clock)!) as void | Promise<void | boolean>)
 }
