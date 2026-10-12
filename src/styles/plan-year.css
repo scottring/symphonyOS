@@ -1,1 +1,45 @@
 /* plan-year.css — owned by the year agent (2026-10-12 horizons). Reuse Month's classes in canvas-plan.css first. */
+
+/* ---- Year: "What do you want to accomplish this year?" (2026-10-12) -------
+   Month's board and cards (canvas-plan.css): the year's goals are the
+   collection; last year is the hideable source beside it, as review
+   material, never a parent. Only what Year adds is here. */
+
+/* The writing lines sit where Month's composers sit; the wrapper only
+   listens for what is typed, so a session can resume it. */
+.plan-month-goals > .plan-year-draft { display: block; margin-top: 10px; }
+.plan-source .plan-year-draft { margin-top: 6px; }
+
+/* Last year's goal: what became of it, and the decisions it can take. */
+.plan-year-past .canvas-group-title { overflow-wrap: anywhere; }
+.plan-year-past.is-decided {
+  border-color: var(--color-neutral-200); border-top-color: var(--color-neutral-400);
+  background: var(--color-bg-elevated);
+}
+.plan-year-past.is-decided .plan-source-count { color: var(--color-neutral-800); }
+.plan-year-decisions { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 14px; margin-top: 6px; font-size: 13px; }
+.plan-year-decisions > .plan-add { margin-top: 0; }
+
+/* The look-back's two questions, saved with the plan. */
+.plan-year-notes { display: grid; gap: 10px; margin: 0 0 16px; }
+.plan-year-notes label { display: grid; gap: 4px; font-size: 13px; font-weight: 500; color: var(--color-neutral-700); }
+.plan-year-notes textarea {
+  width: 100%; min-height: 3.2em; resize: vertical; padding: 6px 8px;
+  font: inherit; font-size: 14px; font-weight: 400; line-height: 1.4; color: var(--color-neutral-900);
+  border: 1px solid var(--color-neutral-300); border-radius: var(--radius-md); background: var(--color-bg-base);
+}
+.plan-year-notes textarea:focus { outline: 2px solid var(--color-primary-500); outline-offset: 0; }
+.plan-year-hint { margin: 0; font-size: 12.5px; color: var(--color-neutral-500); }
+
+/* Shaping the year: what was decided and noted, as a quiet reminder. */
+.plan-year-summary { margin: 0 0 12px; font-size: 13.5px; color: var(--color-neutral-700); }
+.plan-year-note { margin: 0 0 12px; padding-left: 10px; border-left: 2px solid var(--color-primary-300); }
+.plan-year-note h3 { margin: 0; font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--color-neutral-500); }
+.plan-year-note p { margin: 2px 0 0; font-size: 14px; line-height: 1.45; color: var(--color-neutral-800); white-space: pre-wrap; overflow-wrap: anywhere; }
+
+.plan-year-status { font-size: 13px; color: var(--color-neutral-600); }
+.plan-year-session { margin-left: 4px; }
+
+@media (max-width: 767px) {
+  .plan-year-decisions > button, .plan-year-session { min-height: 44px; }
+}

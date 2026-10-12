@@ -52,6 +52,10 @@ import { useConversationWalk } from '@/components/canvas/conversationWalk'
 import { PAGE_PLANNING } from '@/components/layout/pageLayout'
 import { EXPLAIN_LABEL, EXPLAIN_MESSAGE } from '@/lib/explain/pageGuides'
 import { useColumnsFitWindow } from '@/hooks/useColumnsFitWindow'
+// Year agent's imports
+import type { Goal } from '@/types/goal'
+import { YearBoard, YearGoalCard } from './YearBoard'
+import { useYearSession } from './useYearSession'
 
 const TERMS = ['year goal', 'season goal', 'month goal', 'week task'] as const
 const HORIZONS = ['Year', 'Season', 'Month'] as const
@@ -83,7 +87,7 @@ import type { Task } from '@/types/task'
 // ---- end Season flag ------------------------------------------------------
 // ---- Year board: flag (Year agent's region) --------------------------------
 /** Year uses the collection-and-source board Month introduced. */
-const YEAR_BOARD = false
+const YEAR_BOARD = true
 // ---- end Year flag --------------------------------------------------------
 
 /** The element that scrolls the page, so Show all can return to where you were. */
@@ -377,6 +381,12 @@ function Inner() {
   const [seasonComposerRev, setSeasonComposerRev] = useState(0)
   // ---- end Season hooks ------------------------------------------------------
   // ---- Year hooks (Year agent's region: hooks only, before the return) -----
+  // Last year beside this one, each year goal's season goals across the year,
+  // and the optional look-back-and-plan session (useYearSession.ts).
+  const yearSession = useYearSession(level === 0 && YEAR_BOARD ? {
+    year: yearB.start.getFullYear(), goals, visible, keep: (g) => matchesLayers(g.context, layers) && lens.keep(g),
+    yearBounds: yearB, seasons, now, scopeId: lens.scopeId,
+  } : null)
   // ---- end Year hooks --------------------------------------------------------
 
   if (requested === 3) return <Navigate replace to={`/week?view=alongside&date=${localYmd(anchor)}&start=${localYmd(week)}`} />
@@ -702,8 +712,97 @@ function Inner() {
   }
   // ---- end Season board ------------------------------------------------------
   // ---- Year board (Year agent's region: render) -----------------------------
-  const yearBoard: ReactNode = null
-  const yearToolbar: ReactNode = null
+  // Year (2026-10-12): every goal for the year in one collection, last year
+  // beside it as optional review material (never a parent). YearBoard.tsx.
+  const yearParts = (): { board: ReactNode; toolbar: ReactNode } => {
+    const ys = yearSession
+    const y = yearB.start.getFullYear()
+    const prevY = y - 1
+    const inShape = ys.step === 'shape'
+    const yearItems = groups[0]?.items ?? []
+    const addingYear = composer?.kind === 'add' && composer.group === INTENTIONS
+    const openWriting = () => setComposer({ kind: 'add', group: INTENTIONS, parent: null })
+    // A year goal's card counts its season goals across the whole year (the
+    // shared row counts only the season on screen), and lists them when open.
+    const yearCard = (n: PlanNode) => {
+      const open = (ys.seasonGoals.get(n.id) ?? []).filter((t) => !t.completed)
+      const named = open.map((t) => t.seasonStart ? `${t.title} (${periodWordOf(periodBounds('season', t.seasonStart, seasons))})` : t.title)
+      return <YearGoalCard key={n.key} row={renderItem(n)} count={open.length}
+        meta={named.length ? `Season goals: ${named.join(' · ')}` : 'No season goals yet.'} />
+    }
+    const addYearGoal = async (text: string) => {
+      const id = crypto.randomUUID()
+      const ok = await runCreate(0, text, null, `Add “${text}”`, id)
+      if (ok) {
+        reveal.current = `0:${id}`
+        // Shaping the year: the line stays open, empty, for the next goal.
+        if (inShape) { ys.setDraft('write', ''); ys.nextWrite() } else setComposer(null)
+      }
+      return ok
+    }
+    // Renewing writes a NEW goal for this year in the person's words; the old
+    // one keeps its year and status. Same life area, sharing and people.
+    const renew = (goal: Goal, text: string): Promise<boolean> => {
+      const id = crypto.randomUUID()
+      const attempt = (): Promise<boolean> => act(`Renew “${goal.name}” for ${y}`, async () => !!await addGoal(goal.areaId || null, text, goal.context ?? undefined, {
+        year: y, id, carriedFrom: goal.id, ...(goal.scope ? { scope: goal.scope } : {}), ...(goal.assignedToAll ? { assignedToAll: goal.assignedToAll } : {}),
+      }), { ids: [id], undo: async () => { await deleteGoal(id) }, retry: () => { void attempt() } })
+      return attempt().then((ok) => {
+        if (ok) { reveal.current = `0:${id}`; ys.setRenewing(null); ys.setDraft(`renew:${goal.id}`, '') }
+        return ok
+      })
+    }
+    const setPastStatus = (goal: Goal, next: 'active' | 'completed', label: string) =>
+      void act(label, () => updateGoal(goal.id, { status: next }), { ids: [goal.id], undo: async () => (await updateGoal(goal.id, { status: goal.status })) !== false })
+    const openSession = () => { if (ys.start() === 'shape') openWriting() }
+    const toStep = (s: 'lookback' | 'shape') => { ys.setStep(s); if (s === 'shape') openWriting() }
+    const finish = () => {
+      const notes = ys.notes
+      const attempt = (): Promise<boolean> => activity.run(`Mark ${y} planned`, async () => {
+        // Unknown is not empty: never overwrite notes that could not be read.
+        if (ys.planned.error) { ys.planned.reload(); return false }
+        return ys.planned.save(notes)
+      }, { retry: () => { void attempt() } }).then((ok) => { if (ok) ys.finish(); return ok })
+      void attempt()
+    }
+    const seasonParams = new URLSearchParams(params)
+    seasonParams.set('view', 'constellation'); seasonParams.set('horizon', '1'); seasonParams.delete('focus')
+    // From this year, Season means the current season (as the horizon switch).
+    if (current) seasonParams.delete('start')
+    const plannedOn = ys.planned.saved?.at.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+
+    const board = <YearBoard year={y} measure={monthBoardRef} dataReady={dataReady}
+      items={<>
+        {yearItems.map(yearCard)}
+        {proposals.map((p) => <ProposalRow key={p.key} proposal={p} onKeep={() => { void keepProposal(p) }} onLeave={() => activity.removeProposal(p.key)} />)}
+      </>}
+      isEmpty={yearItems.length === 0 && proposals.length === 0}
+      adding={addingYear} addKey={ys.writeKey} addInitial={ys.active ? ys.drafts.write ?? '' : ''} addPicker={area.picker}
+      onStartAdd={openWriting} onCancelAdd={() => { setComposer(null); ys.setDraft('write', '') }} onAdd={addYearGoal}
+      onAddDraft={ys.active ? (t) => ys.setDraft('write', t) : undefined}
+      seasonHref={`${pathname}?${seasonParams}`}
+      sourceShown={ys.sourceShown} lookBack={ys.lookBack}
+      renewing={ys.renewing} renewInitial={(g) => ys.drafts[`renew:${g.id}`] ?? g.name}
+      onRenewStart={(g) => ys.setRenewing(g.id)} onRenewCancel={() => ys.setRenewing(null)} onRenew={renew}
+      onRenewDraft={ys.inProgress ? (g, t) => ys.setDraft(`renew:${g.id}`, t) : undefined}
+      onMarkDone={(g) => setPastStatus(g, 'completed', `Mark “${g.name}” done in ${prevY}`)}
+      onReopen={(g) => setPastStatus(g, 'active', `Reopen “${g.name}” in ${prevY}`)}
+      onLetGo={(g) => ys.decide(g.id, 'left')} onUndoLetGo={(g) => ys.decide(g.id, null)}
+      session={ys.active && ys.step ? {
+        step: ys.step, notes: ys.notes, onNotes: (k, t) => ys.setDraft(k, t),
+        onStep: toStep, onLeave: ys.leave, onFinish: finish,
+      } : null} />
+    const toolbar = <>
+      <button type="button" className="canvas-link plan-source-toggle" aria-expanded={ys.sourceShown} aria-controls="plan-year-source"
+        onClick={ys.toggleSource}>{ys.sourceShown ? `Hide ${prevY} goals` : `Show ${prevY} goals`}</button>
+      {plannedOn && !ys.active && <span className="plan-year-status">{y} planned {plannedOn}</span>}
+      {!ys.active && <button type="button" className="plan-walk plan-year-session" onClick={openSession}>
+        {ys.inProgress ? `Continue planning ${y}` : `Look back and plan ${y}`}</button>}
+    </>
+    return { board, toolbar }
+  }
+  const { board: yearBoard, toolbar: yearToolbar }: { board: ReactNode; toolbar: ReactNode } =
+    level === 0 && YEAR_BOARD && dataReady ? yearParts() : { board: null, toolbar: null }
   // ---- end Year board --------------------------------------------------------
 
   return <main ref={mainRef} className={`plan-canvas ${PAGE_PLANNING}${boardLayout ? ' plan-month' : ''}`} data-horizon={level}>
