@@ -68,8 +68,8 @@
 /* Season and Month pack their cards in columns, as the approved board does,
    so a short card never leaves a hole beside a long one. */
 @media (min-width: 768px) {
-  .plan-groups:not(.is-year):not(.is-focused):not(.is-loose) { display: block; columns: 4 260px; column-gap: 16px; }
-  .plan-groups:not(.is-year):not(.is-focused):not(.is-loose) > .plan-group-slot { break-inside: avoid; margin-bottom: 16px; }
+  .plan-groups:not(.is-year):not(.is-focused):not(.is-loose):not(.plan-source-grid) { display: block; columns: 4 260px; column-gap: 16px; }
+  .plan-groups:not(.is-year):not(.is-focused):not(.is-loose):not(.plan-source-grid) > .plan-group-slot { break-inside: avoid; margin-bottom: 16px; }
 }
 .plan-groups.is-focused { grid-template-columns: minmax(0, 1fr); gap: 8px; }
 .plan-group-slot { min-width: 0; }
@@ -250,4 +250,108 @@
   .plan-groups.is-loose .plan-items > li { break-inside: avoid; }
 }
 
+/* ---- Month: "What do you want to accomplish this month?" (2026-10-12) ------
+   One complete collection of the month's goals, linked or not, is the main
+   subject; the season's goals sit beside it as a hideable source. Selecting
+   a season goal highlights its month goals, never filters them away. */
+.plan-month-board { display: grid; grid-template-columns: minmax(0, 1fr); gap: 28px; align-items: start; }
+.plan-month-source { min-width: 0; }
+.plan-month-source[hidden] { display: none; }
+.plan-month-goals { min-width: 0; }
+.plan-month .plan-toolbar { justify-content: flex-start; flex-wrap: wrap; margin-top: -4px; }
+.plan-source-toggle { margin-right: auto; }
+
+/* The source: one compact card per season goal, its border clearer than
+   the month goals' own cards. */
+.plan-groups.plan-source-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 12px; align-items: stretch; }
+.plan-source {
+  height: 100%; padding: 10px 12px 8px;
+  border: 1px solid var(--color-primary-200); border-top: 3px solid var(--color-primary-500);
+  background: color-mix(in srgb, var(--color-primary-50) 65%, var(--color-bg-elevated));
+}
+.plan-source .canvas-group-head { border-color: var(--color-primary-100); padding-bottom: 4px; }
+.plan-source .plan-group-crumb { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.plan-source .canvas-group-title { margin: 0; font-size: 17px; }
+.plan-source-count { margin: 6px 0 0; font-size: 12.5px; color: var(--color-neutral-600); }
+.plan-source.is-selected { border-color: var(--color-primary-600); box-shadow: 0 0 0 2px var(--color-primary-200); background: var(--color-bg-elevated); }
+.plan-source-preview {
+  list-style: none; margin: 8px 0 2px; padding: 2px 0 2px 10px; display: flex; flex-direction: column; gap: 4px;
+  border-left: 2px solid var(--color-primary-300); font-size: 13.5px; line-height: 1.35; color: var(--color-neutral-800);
+}
+.plan-source-preview > li { overflow-wrap: anywhere; }
+.plan-source-preview > li.is-done { color: var(--color-neutral-500); text-decoration: line-through; }
+.plan-source .plan-add { margin-top: 6px; font-size: 13px; }
+.plan-source .plan-composer input { font-size: 14px; }
+
+/* The month: the question, then every month goal as one quiet card. */
+.plan-month-intro { margin: 0 0 14px; padding-bottom: 10px; border-bottom: 1px solid var(--color-neutral-200); }
+.plan-month-intro h2 {
+  margin: 0; font-family: var(--font-family-display); font-weight: 500;
+  font-size: clamp(23px, 2.2vw, 29px); line-height: 1.2; color: var(--color-neutral-900);
+}
+.plan-month-intro p { margin: 4px 0 0; font-size: 14px; color: var(--color-neutral-600); }
+.plan-month-selection {
+  display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 12px; margin: 0 0 10px;
+  font-size: 13px; color: var(--color-primary-800);
+}
+.plan-items.plan-month-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 10px; }
+.plan-month-list > .plan-item, .plan-month-list > .plan-item:last-child {
+  display: flex; flex-direction: column; padding: 0; min-width: 0;
+  border: 1px solid var(--color-neutral-200); border-radius: var(--radius-md); background: var(--color-bg-elevated);
+  transition: border-color var(--transition-base), box-shadow var(--transition-base), background-color var(--transition-base);
+}
+.plan-month-list > .plan-item > .canvas-item { margin: 0; padding: 8px 8px 6px 12px; }
+.plan-month-list > .plan-item.is-open > .plan-item-more { padding: 2px 12px 10px; }
+.plan-month-list > .plan-item > .plan-item-tools, .plan-month-list > .plan-item > .plan-proposal-reason { padding: 0 12px 8px; }
+.plan-month-list > .plan-item:has(> .canvas-item.is-proposed) { border: 1.5px dashed var(--color-primary-500); }
+.plan-month-list > .plan-item > .canvas-item.is-proposed { border: 0; background: transparent; }
+.plan-item-parent { margin: auto 0 0; padding: 0 12px 9px; font-size: 12.5px; line-height: 1.35; color: var(--color-neutral-600); overflow-wrap: anywhere; border-radius: 0 0 var(--radius-md) var(--radius-md); }
+.plan-item-parent-kind { margin-right: 2px; font-size: 10.5px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--color-neutral-500); }
+.plan-month-list > .plan-item.is-related { border-color: var(--color-primary-500); box-shadow: inset 3px 0 0 var(--color-primary-500); background: var(--color-primary-50); }
+.plan-month-goals > .plan-add { display: inline-flex; margin-top: 12px; }
+.plan-month-goals > .plan-composer { margin-top: 10px; }
+.plan-month-goals > .plan-empty { margin: 4px 0 2px; font-size: 14px; }
+.plan-month-next { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 14px; margin-top: 22px; padding-top: 14px; border-top: 1px solid var(--color-neutral-200); }
+.plan-month-next > span { font-size: 13px; color: var(--color-neutral-600); }
+
+/* A link just made: the goal's parent label and its season card light up
+   together, then settle. */
+.plan-source.is-linked { animation: plan-linked 1.8s ease-out; }
+.plan-item.is-linked > .plan-item-parent { animation: plan-linked-label 1.8s ease-out; }
+@keyframes plan-linked {
+  0%, 30% { box-shadow: 0 0 0 3px var(--color-primary-300); }
+  100% { box-shadow: 0 0 0 0 transparent; }
+}
+@keyframes plan-linked-label {
+  0%, 30% { background: var(--color-primary-100); color: var(--color-primary-800); }
+  100% { background: transparent; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .plan-source.is-linked, .plan-item.is-linked > .plan-item-parent { animation: none; }
+  .plan-source.is-linked { box-shadow: 0 0 0 3px var(--color-primary-300); }
+  .plan-item.is-linked > .plan-item-parent { background: var(--color-primary-100); }
+  .plan-month-list > .plan-item { transition: none; }
+}
+
+/* Side by side once there is room: the source narrower, the month wider,
+   each scrolling on its own down to the landscape (--pv2-col-h). */
+@media (min-width: 1024px) {
+  .plan-month-board { grid-template-columns: minmax(300px, 2fr) minmax(0, 3fr); gap: 32px; }
+  .plan-month-board > .plan-month-source { grid-column: 1; grid-row: 1; }
+  .plan-month-board > .plan-month-goals { grid-column: 2; grid-row: 1; }
+  .plan-month-board.is-source-hidden { grid-template-columns: minmax(0, 1fr); }
+  .plan-month-board.is-source-hidden > .plan-month-goals { grid-column: 1; }
+  .plan-canvas.plan-month { padding-bottom: 0; }
+  .plan-month-source, .plan-month-goals {
+    max-height: var(--pv2-col-h, none); overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin;
+    /* Room for a card's drop ring and focus outline inside the scroller. */
+    padding: 3px 8px 16px 3px; margin: -3px 0 0 -3px;
+  }
+  .plan-month-source { padding-right: 20px; border-right: 1px solid var(--color-neutral-200); }
+}
+@media (max-width: 767px) {
+  .plan-items.plan-month-list { grid-template-columns: minmax(0, 1fr); }
+  .plan-source-toggle, .plan-month-goals > .plan-add, .plan-source .plan-add { min-height: 44px; }
+  .plan-source .canvas-group-head { position: static; background: transparent; }
+}
 

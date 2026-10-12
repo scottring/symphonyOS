@@ -156,6 +156,38 @@ became a grid on 2026-10-03.
   sit under the list and reference between 861 and 1060px, reached by the
   page scroll.
 
+### Month in the connected workspace — 2026-10-12
+
+Approved by Scott 2026-10-12 for `/month?view=constellation` (the Plan
+workspace's Month horizon, `ConstellationPage`). Year, Season, Week, Today
+and the wall are unchanged.
+
+- **The question is the subject.** "What do you want to accomplish in
+  October?" (the month on screen) heads one complete collection of the
+  month's goals, with "Build your month from your Fall goals, and add
+  anything else that matters." The season word comes from the household's
+  seasons, so custom seasons name themselves.
+- **Every month goal stays in the collection.** Linked and independent
+  goals sit together as quiet cards; a linked one names its parent under its
+  title ("FALL GOAL Autumn outings"). Linking or unlinking changes the label,
+  never where the goal is. A link just made lights the label and the season
+  card together for a moment (static under reduced motion).
+- **The season is a hideable source.** Compact season-goal cards (year goal
+  as a one-line crumb, count of open month goals, "+ Add an October goal")
+  sit left of the collection from 1024px, narrower than it; below that they
+  follow the collection in one page scroll. "Hide Fall goals" in the toolbar
+  hides them (remembered per viewer) without unmounting, so a goal still
+  being written under one survives.
+- **Selecting highlights, never filters.** Selecting a season goal (or
+  arriving with `focus` naming it or its year goal) highlights its month
+  goals in the collection and previews them inside its card; Esc or Clear
+  ends it. Adding from a card selects it.
+- **Week is the next step.** "Plan a week from these goals →" closes the
+  collection; the horizon switch (Year · Season · Month · Week →) and the
+  previous / next month arrows stay separate.
+- **Bounded on desktop.** From 1024px each column scrolls on its own down
+  to the landscape (`useColumnsFitWindow`, `--pv2-col-h`).
+
 ## Type scale
 
 | Token | Size | Use |

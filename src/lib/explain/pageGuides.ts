@@ -22,11 +22,11 @@ export const PAGE_GUIDES: Record<string, string> = {
     'Suggest where these go asks Symphony to propose links, which save only when kept. ' +
     'Selecting a goal opens it with what you will need and its month goals. Next: Month chooses what this month holds.',
   month:
-    'A month is a plain list of what this month holds, written with its season beside it. Nothing here is on a calendar yet. ' +
-    'The parts are named for the season, e.g. "Under a fall goal": one card per season goal, with the month goals under it. ' +
-    'Season goals with nothing this month are folded into one line; Show opens them. ' +
-    '"Not under a fall goal" (or the current season) holds month goals with no season goal; drag one onto a card, or use Move under in its ⋯ menu, to connect it. ' +
-    'Next: Week is where month goals become this week\'s tasks.',
+    'Month answers one question: what do you want to accomplish this month? Nothing here is on a calendar yet. ' +
+    'The main part lists every goal for the month, whether it belongs to a season goal or stands on its own; a goal under a season goal names it beneath its title. ' +
+    'Beside it (below it on a phone) are the season\'s goals, the source to build from. Selecting one highlights its month goals and lists them in its card; + Add on a card writes a month goal under it, and + Add at the foot of the list writes one of its own. ' +
+    'Hide (or Show) the season goals with the button above. To connect a goal, drag it onto a season goal, or use Move under in its ⋯ menu. ' +
+    'Plan a week from these goals goes on to Week, where month goals become this week\'s tasks.',
   week:
     'Week is for doing: this week\'s tasks and when they happen. ' +
     '"Still to place" is the shelf of this week\'s tasks that have no day yet; drag one onto a day, or press + to give it a day. ' +

@@ -35,6 +35,12 @@ export interface PlanItemRowProps {
   /** Quiet verbs shown when the item is open. */
   more: { label: string; onSelect: () => void }[]
   meta?: string | null
+  /** The parent one horizon up, named quietly under the row (Month). */
+  parentLabel?: { kind: string; title: string }
+  /** Belongs to the parent the person selected (Month highlights, never hides). */
+  related?: boolean
+  /** Just linked: the parent label and its container light up together. */
+  linked?: boolean
   /** What the item carries, and what its plan above carries (tasks only). */
   readiness?: Readiness
   /** Open the details pane to add what will be needed. */
@@ -54,7 +60,7 @@ export function PlanItemRow(p: PlanItemRowProps) {
     ...(p.disabled ? [] : [{ label: 'Edit wording', onSelect: p.onEdit }]),
     ...(p.move && !p.disabled ? [{ label: 'Move under…', onSelect: () => setMoving(true) }] : []),
   ]
-  return <li className={`plan-item${p.expanded && !p.editing ? ' is-open' : ''}`} data-plan-key={node.key} draggable={!!p.onDragStart && !p.editing} onDragStart={p.onDragStart} onDragEnd={p.onDragEnd}>
+  return <li className={`plan-item${p.expanded && !p.editing ? ' is-open' : ''}${p.related ? ' is-related' : ''}${p.linked ? ' is-linked' : ''}`} data-plan-key={node.key} draggable={!!p.onDragStart && !p.editing} onDragStart={p.onDragStart} onDragEnd={p.onDragEnd}>
     <div className={`canvas-item ${state}`}>
       {p.editing
         ? <InlineComposer label={`Wording for ${node.title}`} initial={node.title} onSave={p.onSaveEdit} onCancel={p.onCancelEdit} />
@@ -67,6 +73,7 @@ export function PlanItemRow(p: PlanItemRowProps) {
       {p.count > 0 && p.childTerm && <span className="plan-count" aria-label={`${p.count} ${p.childTerm}${p.count === 1 ? '' : 's'} below`}>{p.count} {p.childTerm}{p.count === 1 ? '' : 's'}</span>}
       {!p.editing && <span ref={menuWrap} className="plan-item-menu">{p.actions(verbs)}</span>}
     </div>
+    {p.parentLabel && <p className="plan-item-parent"><span className="plan-item-parent-kind">{p.parentLabel.kind}</span> {p.parentLabel.title}</p>}
     {p.move && moving && <MoveUnderMenu item={node} parents={p.move.parents} parentTerm={p.move.parentTerm}
       open={moving} onOpenChange={setMoving} returnFocusTo={menuWrap}
       onPick={(parent) => { setMoving(false); p.move!.onPick(parent) }} />}
