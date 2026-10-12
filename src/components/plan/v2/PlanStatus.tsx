@@ -45,6 +45,12 @@ export interface PlanToolbarProps {
    *  gets its own line under it (PlanSavedLine) — six things on one line
    *  crowded the title (walkthrough 2026-10-02 #8/#15). */
   justSaved?: { detail: string; next?: NextStep | null; onDone: () => void } | null
+  /** A session left part-way (Leave for now): the one verb resumes it —
+   *  "Continue planning" — whether or not the period is already planned. */
+  resumeLabel?: string
+  /** A second, quieter way in that opens a specific step ("Review last
+   *  week" goes straight to the look-back). */
+  secondary?: NextStep | null
 }
 
 /** Where the plan stands — "Week 40 isn't planned yet", "October planned ·
@@ -64,8 +70,10 @@ function statusText({ period, saved, loading, error, agreedBy, onRetry, hasLines
 /** The page's tools, the view icons and one verb: "Look back at <prev>"
  *  while the last period left open work, else "Mark <period> planned" until
  *  it is. A just-saved period's next step is PlanSavedLine's, not this row's. */
-function controlsOf({ period, saved, loading, error, onPlan, onMark, lookBack, viewSwitch, tools, justSaved, planLabel }: PlanToolbarProps, guided: boolean) {
-  const verb = guided || justSaved || loading || error ? null
+function controlsOf({ period, saved, loading, error, onPlan, onMark, lookBack, viewSwitch, tools, justSaved, planLabel, resumeLabel, secondary }: PlanToolbarProps, guided: boolean) {
+  const quiet = guided || justSaved || loading || error
+  const verb = quiet ? null
+    : resumeLabel && planLabel ? <button type="button" className="pv2-btn" onClick={onPlan}>{resumeLabel}</button>
     : planLabel ? <button type="button" className={saved ? 'pv2-qbtn' : 'pv2-btn'} onClick={onPlan}>{saved ? 'Change the plan' : planLabel}</button>
     : lookBack ? <button type="button" className="pv2-btn" onClick={onPlan}>Look back at {lookBack}</button>
       : !saved && onMark ? <button type="button" className="pv2-btn" onClick={onMark}>Mark {period} planned</button>
@@ -73,6 +81,7 @@ function controlsOf({ period, saved, loading, error, onPlan, onMark, lookBack, v
   return <>
     {tools}
     {viewSwitch}
+    {!quiet && secondary && <button type="button" className="pv2-qbtn" onClick={secondary.onClick}>{secondary.label}</button>}
     {verb}
   </>
 }
@@ -131,15 +140,16 @@ export function PlanToolbarControls(props: PlanToolbarProps) {
 /** One step of a planning session (Week's four, 2026-10-03). */
 export interface MeetingStep { key: string; label: string }
 
-export function PlanMeetingBar({ period, prevName, step, lookBack, why, onStep, viewSwitch, tools, onLeave, onSave, saveLabel, steps, stepKey, onStepKey }: {
+export function PlanMeetingBar({ period, prevName = '', step = 2, lookBack = false, why, onStep = () => {}, viewSwitch, tools, onLeave, onSave, saveLabel, steps, stepKey, onStepKey, saving = false }: {
   period: string
-  prevName: string
-  step: 1 | 2
+  /** The two-step bar only (no `steps`). */
+  prevName?: string
+  step?: 1 | 2
   /** Last period left open lines: the bar offers "Look back" first. */
-  lookBack: boolean
+  lookBack?: boolean
   /** What this step is for, in a sentence. */
   why: string
-  onStep: (s: 1 | 2) => void
+  onStep?: (s: 1 | 2) => void
   viewSwitch?: ReactNode
   /** The page's own controls (area, assistant…), as in the toolbar. */
   tools?: ReactNode
@@ -151,6 +161,8 @@ export function PlanMeetingBar({ period, prevName, step, lookBack, why, onStep, 
   steps?: MeetingStep[]
   stepKey?: string
   onStepKey?: (key: string) => void
+  /** The finishing save is in flight: the button waits and says so. */
+  saving?: boolean
 }) {
   if (steps && stepKey && onStepKey) {
     const i = Math.max(0, steps.findIndex((s) => s.key === stepKey))
@@ -170,7 +182,7 @@ export function PlanMeetingBar({ period, prevName, step, lookBack, why, onStep, 
         {/* One primary at a time (walkthrough 2026-10-04 #6): Next on every
             step, marking planned only on the last. */}
         {!last && <button type="button" className="pv2-btn" onClick={() => onStepKey(steps[i + 1].key)}>Next: {steps[i + 1].label} →</button>}
-        {last && <button type="button" className="pv2-btn" onClick={onSave}>{saveLabel}</button>}
+        {last && <button type="button" className="pv2-btn" disabled={saving} aria-busy={saving || undefined} onClick={onSave}>{saving ? 'Saving…' : saveLabel}</button>}
         <p className="pv2-sbar-why" aria-live="polite">{why}</p>
       </div>
     )
