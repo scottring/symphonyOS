@@ -68,8 +68,8 @@
 /* Season and Month pack their cards in columns, as the approved board does,
    so a short card never leaves a hole beside a long one. */
 @media (min-width: 768px) {
-  .plan-groups:not(.is-year):not(.is-focused) { display: block; columns: 4 260px; column-gap: 16px; }
-  .plan-groups:not(.is-year):not(.is-focused) > .plan-group-slot { break-inside: avoid; margin-bottom: 16px; }
+  .plan-groups:not(.is-year):not(.is-focused):not(.is-loose) { display: block; columns: 4 260px; column-gap: 16px; }
+  .plan-groups:not(.is-year):not(.is-focused):not(.is-loose) > .plan-group-slot { break-inside: avoid; margin-bottom: 16px; }
 }
 .plan-groups.is-focused { grid-template-columns: minmax(0, 1fr); gap: 8px; }
 .plan-group-slot { min-width: 0; }
@@ -229,10 +229,23 @@
 
 .plan-toolbar { display: flex; justify-content: flex-end; gap: 12px; min-height: 8px; margin: -8px 0 8px; }
 
-/* ---- The horizon one up, as a drawer left of Season and Month (2026-10-11):
-   parents read left of their children, as they do on the board. ---------- */
-.plan-body.has-drawer { display: grid; grid-template-columns: 280px minmax(0, 1fr); gap: 24px; align-items: start; }
+/* ---- Season and Month in two labelled parts (2026-10-12): the cards under
+   a parent, then what is under none, full width with its rows in columns. -- */
 .plan-board { min-width: 0; }
+.plan-section-head {
+  display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 12px;
+  margin: 0 0 12px; padding-bottom: 6px; border-bottom: 1px solid var(--color-neutral-200);
+}
+.plan-section-head h2 { margin: 0; font-family: var(--font-family-display); font-size: 21px; font-weight: 500; line-height: 1.25; color: var(--color-neutral-900); }
+.plan-section-head p { margin: 0; font-size: 13px; color: var(--color-neutral-500); }
+.plan-section.is-loose { margin-top: 28px; }
+.plan-groups.is-loose { display: block; columns: auto; }
+@media (min-width: 768px) {
+  .plan-groups.is-loose .plan-items { columns: 4 240px; column-gap: 28px; }
+  .plan-groups.is-loose .plan-items > li { break-inside: avoid; }
+}
+
+/* ---- The month's goals as a drawer beside Week's shelf (2026-10-11). ---- */
 .plan-drawer {
   position: sticky; top: 16px; display: flex; flex-direction: column; min-height: 0;
   max-height: calc(100dvh - 220px); padding: 12px 8px 8px 14px;
@@ -264,26 +277,8 @@
    they were; its list scrolls. */
 .wc-drawer-cell { position: relative; min-height: 320px; align-self: stretch; }
 .wc-drawer-cell > .plan-drawer { position: absolute; inset: 0; max-height: none; align-self: stretch; border-radius: var(--radius-lg); }
-/* Season and Month: the drawer and the board each scroll on their own, down
-   to the landscape (--pv2-col-h, useColumnsFitWindow; Scott, 2026-10-11), so
-   a long board never carries the year goals off screen. */
-@media (min-width: 1024px) {
-  /* What is not filed yet runs the board's full width, its rows in columns,
-     so the pile reads at a glance; the filed cards pack below it. */
-  .plan-groups > .plan-group-slot.is-wide { column-span: all; }
-  .plan-group-slot.is-wide .plan-items { columns: 4 240px; column-gap: 28px; }
-  .plan-group-slot.is-wide .plan-items > li { break-inside: avoid; }
-  .plan-canvas:has(.plan-body.is-colscroll) { padding-bottom: 0; }
-  .plan-body.is-colscroll > .plan-drawer { position: relative; top: auto; max-height: var(--pv2-col-h, calc(100dvh - 220px)); }
-  .plan-body.is-colscroll > .plan-board {
-    max-height: var(--pv2-col-h, none); overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin;
-    /* Room for a card's drop ring and focus outline inside the scroller. */
-    padding: 3px 8px 16px 3px; margin: -3px 0 0 -3px;
-  }
-}
 /* Dragging needs a pointer and room; below this Move under… does the job. */
 @media (max-width: 1023px) {
-  .plan-body.has-drawer { display: block; }
   .plan-drawer, .plan-drawer-open { display: none; }
 }
 @media (prefers-reduced-motion: reduce) { .plan-drawer-row { transition: none; } }

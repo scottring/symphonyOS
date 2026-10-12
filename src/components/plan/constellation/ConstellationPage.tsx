@@ -1,8 +1,11 @@
 // src/components/plan/constellation/ConstellationPage.tsx
 //
 // Plan: Year, Season and Month, one working horizon at a time. Each item sits
-// under its parent one horizon up, named once in the group's header; items
-// with no parent sit in Unlinked, last. The Week level lives on the Week page.
+// under its parent one horizon up, named once in the group's header. Season
+// and Month read in two labelled parts: what is under a parent (one card per
+// parent), then what is not (Scott, 2026-10-12: the parents are named once,
+// on their cards, not again in a column beside them). The Week level lives on
+// the Week page.
 //
 // URL: `horizon` (0 Year, 1 Season, 2 Month; 3 hands over to Week), `start`
 // (any date in the period) and `focus` (a group to narrow to, or an item a
@@ -38,9 +41,7 @@ import { PlanItemRow } from '@/components/canvas/plan/PlanItemRow'
 import { ProposalRow } from '@/components/canvas/plan/ProposalRow'
 import { InlineComposer } from '@/components/canvas/plan/InlineComposer'
 import { readinessOf, type ReadinessLookup } from '@/lib/prep/readiness'
-import { ChevronLeft, ChevronRight, PanelLeftOpen } from 'lucide-react'
-import { UpstreamDrawer, useUpstreamDrawer } from './UpstreamDrawer'
-import { useColumnsFitWindow } from '@/hooks/useColumnsFitWindow'
+import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { useConversationWalk } from '@/components/canvas/conversationWalk'
 import { PAGE_PLANNING } from '@/components/layout/pageLayout'
 
@@ -50,11 +51,8 @@ const periodWordOf = (b: { label: string }) => b.label.replace(/\s\d{4}$/, '')
 const PERIODS = ['year', 'season', 'month'] as const
 const ROUTE_LEVEL: Record<string, number> = { '/year': 0, '/season': 1, '/month': 2 }
 
-/** The element that scrolls the page, so Show all can return to where you were:
- * the board itself while it scrolls on its own beside the drawer. */
+/** The element that scrolls the page, so Show all can return to where you were. */
 function scrollHost(el: HTMLElement | null): HTMLElement | null {
-  const board = el?.querySelector<HTMLElement>('.plan-body.is-colscroll > .plan-board')
-  if (board && getComputedStyle(board).overflowY === 'auto') return board
   for (let n = el?.parentElement ?? null; n; n = n.parentElement) {
     const o = getComputedStyle(n).overflowY
     if ((o === 'auto' || o === 'scroll') && n.scrollHeight > n.clientHeight) return n
@@ -115,7 +113,6 @@ function Inner() {
   const [composer, setComposer] = useState<Composer | null>(null)
   const [dragKey, setDragKey] = useState<string | null>(null)
   const [dropKey, setDropKey] = useState<string | null>(null)
-  const drawerUi = useUpstreamDrawer()
   const mainRef = useRef<HTMLElement>(null)
   const scrollMemo = useRef<number | null>(null)
 
@@ -306,10 +303,6 @@ function Inner() {
     ? `Let's plan ${periodTitle}, one year goal at a time. Ask me what I want; use my words and don't suggest goals of your own.`
     : `Let's plan ${periodTitle} across my ${parentTerm}s, one at a time. Ask me what I want under each; use my words and don't suggest ${term}s of your own.`
   // The walk rides in the docked bar where there is one (desktop).
-  // With the drawer beside it, the drawer and the board each scroll on their
-  // own to the landscape (Scott, 2026-10-11), as Week and Month's columns do.
-  const drawerShown = level > 0 && drawerUi.shown && dataReady && !error && !goalsError
-  const bodyRef = useColumnsFitWindow(drawerShown)
   const walkInBar = useConversationWalk(requested === 3 ? null : { label: walkLabel, message: walkMessage })
 
   if (requested === 3) return <Navigate replace to={`/week?view=alongside&date=${localYmd(anchor)}&start=${localYmd(week)}`} />
@@ -327,27 +320,11 @@ function Inner() {
   const addLabel = (g: PlanGroup) => g.kind === 'unlinked' ? (hasParents ? `Add a ${term} not under a ${parentName}` : `Add a ${term}`) : g.kind === 'intentions' ? `Add a ${term}` : `Add a ${term} under ${g.parent!.title}`
 
   // Readiness reads only rows this reader already has, under the same filters.
-  // The drawer lists every open parent, even those folded for holding nothing.
-  const upstream = level > 0 ? allNodes.filter((n) => n.level === level - 1 && !isDone(n)) : []
-  const drawerTitle = level === 1 ? 'Year goals' : `${seasonWord} goals`
-  const drawer = drawerShown
-    ? <UpstreamDrawer title={drawerTitle} childTerm={term} parents={upstream}
-        countOf={(n) => childCount(allNodes, n)} dragging={!!dragNode}
-        canDropOn={canDropOn}
-        onDrop={(parent) => { if (dragNode) void moveUnder(dragNode, parent); setDragKey(null); setDropKey(null) }}
-        onPick={(parent) => focusGroup(parent.key)} pickLabel={(parent) => `Show ${term}s under ${parent.title}`}
-        onClose={() => drawerUi.setOpen(false)}
-        empty={<>No {parentName}s for {level === 1 ? anchor.getFullYear() : seasonWord} yet. <button type="button" className="canvas-link" onClick={() => setHorizon(level - 1)}>Add {parentName}s</button></>} />
-    : null
-  // With the drawer open the board leads with what is not filed yet (Scott,
-  // 2026-10-11), spread across the board's width, then the groups showing
-  // suggestions, then what is filed. Empty parents are in the drawer.
-  const pile = calm && drawer ? [
-    ...groups.filter((g) => g.kind === 'unlinked'),
-    ...calm.shown.filter((g) => g.kind === 'parent' && pending.has(g.key)),
-    ...calm.shown.filter((g) => g.kind === 'parent' && !pending.has(g.key)),
-  ] : null
-
+  // Two labelled parts below Year, once something is planned and nothing is
+  // focused: the cards under a parent, then what is under none.
+  const sectioned = !!calm && hasParents
+  // Empty parents open while an item is dragged, so they can take it too.
+  const emptyOpen = showEmpty || !!dragNode
   const visibleById = new Map(visible.map((t) => [t.id, t]))
   const goalsById = new Map(allNodes.filter((n) => n.goal).map((n) => [n.id, n.goal!]))
   const prepLookup: ReadinessLookup = { task: (id) => visibleById.get(id), goal: (id) => goalsById.get(id) }
@@ -390,17 +367,19 @@ function Inner() {
     }
     const adding = composer?.kind === 'add' && composer.group === g.key
     const empty = g.items.length === 0 && groupProposals.length === 0
-    return <li key={g.key} className={`plan-group-slot${drawer && g.kind === 'unlinked' ? ' is-wide' : ''}`}>
+    // In its own labelled part, the loose group's heading would say it twice.
+    const headless = sectioned && g.kind === 'unlinked'
+    return <li key={g.key} className="plan-group-slot">
       <section className={`canvas-group plan-group${g.kind === 'unlinked' ? ' is-unlinked' : ''}${dropKey === g.key ? ' is-drop' : ''}${dragNode && canDrop(g) ? ' is-drop-ok' : ''}`}
         aria-label={g.kind === 'parent' ? `Under ${title}` : title} data-group-key={g.key} {...dropProps(g)}>
         {g.crumb && <p className="plan-group-crumb">{g.crumb}</p>}
-        <header className="canvas-group-head">
+        {!headless && <header className="canvas-group-head">
           {g.kind === 'intentions'
             ? <h2 className="canvas-group-title">{title}</h2>
             : <h2 className="canvas-group-title"><button type="button" className="plan-group-focus" aria-pressed={isFocused} aria-label={`Focus on ${title}`}
                 onClick={() => isFocused ? clearFocus() : focusGroup(g.key)}>{title}</button></h2>}
           {g.items.length > 0 && <span className="canvas-item-meta" aria-label={`${g.items.length} ${term}${g.items.length === 1 ? '' : 's'}`}>{g.items.length}</span>}
-        </header>
+        </header>}
         <ul className="plan-items">
           {g.items.map(renderItem)}
           {groupProposals.map((p) => <ProposalRow key={p.key} proposal={p} onKeep={() => { void keepProposal(p) }} onLeave={() => activity.removeProposal(p.key)} />)}
@@ -448,9 +427,6 @@ function Inner() {
       </div>
     </header>
     <div className="plan-toolbar">
-      {level > 0 && drawerUi.available && !drawerUi.open && <button type="button" className="canvas-link plan-drawer-open" aria-expanded={false} onClick={() => drawerUi.setOpen(true)}>
-        <PanelLeftOpen size={15} aria-hidden="true" /> Show {drawerTitle.toLowerCase()}
-      </button>}
       {proposals.length > 0 && <button type="button" className="canvas-link" onClick={() => { void keepAll() }}>Keep all ({proposals.length})</button>}
       {(doneCount > 0 || showDone) && <button type="button" className="canvas-link" aria-pressed={showDone} onClick={() => setShowDone((s) => !s)}>
         {showDone ? `Hide done (${doneCount})` : `Show done (${doneCount})`}
@@ -461,22 +437,35 @@ function Inner() {
     {(error || goalsError)
       ? <p className="plan-status" role="alert">Plans could not load. <button type="button" className="canvas-link" onClick={() => { if (goalsError) window.location.reload(); else void refetch() }}>Retry</button></p>
       : !dataReady ? null
-      : <div ref={bodyRef} className={`plan-body${drawer ? ' has-drawer is-colscroll' : ''}`}>{drawer}<div className="plan-board">
+      : <div className="plan-body"><div className="plan-board">
         {focused && <div className="plan-focus-bar">
           <span role="status">Showing {focused.size} of {groups.length} groups</span>
           <button type="button" className="canvas-link" onClick={clearFocus}>Show all · Esc</button>
         </div>}
+        {sectioned && <div className="plan-section-head">
+          <h2 id="plan-under">Under a {parentName}</h2>
+          <p>Each card is one of your {level === 1 ? `${anchor.getFullYear()} year goals` : `${parentName}s`}.</p>
+        </div>}
         <ul className={`plan-groups${focused ? ' is-focused' : ''}${level === 0 ? ' is-year' : ''}`} aria-label={`${HORIZONS[level]} plan`}>
-          {(pile ?? (calm ? calm.shown : groups)).map(renderGroup)}
+          {(calm ? sectioned ? calm.shown.filter((g) => g.kind === 'parent') : calm.shown : groups).map(renderGroup)}
         </ul>
-        {calm && !pile && calm.empty.length > 0 && <>
-          <button type="button" className="canvas-group is-quiet plan-empty-fold" aria-expanded={showEmpty} aria-controls="plan-empty-goals" onClick={() => setShowEmpty((v) => !v)}>
+        {calm && calm.empty.length > 0 && <>
+          <button type="button" className="canvas-group is-quiet plan-empty-fold" aria-expanded={emptyOpen} aria-controls="plan-empty-goals" onClick={() => setShowEmpty((v) => !v)}>
             <b>{calm.empty.length} {parentName}{calm.empty.length === 1 ? '' : 's'} with nothing in {periodWord}</b>
-            {!showEmpty && <span className="plan-empty-fold-names">{calm.empty.slice(0, 4).map(groupTitle).join(' · ')}{calm.empty.length > 4 ? ` · and ${calm.empty.length - 4} more` : ''}</span>}
-            <span className="canvas-link">{showEmpty ? 'Hide' : 'Show'}</span>
+            {!emptyOpen && <span className="plan-empty-fold-names">{calm.empty.slice(0, 4).map(groupTitle).join(' · ')}{calm.empty.length > 4 ? ` · and ${calm.empty.length - 4} more` : ''}</span>}
+            <span className="canvas-link">{emptyOpen ? 'Hide' : 'Show'}</span>
           </button>
-          {showEmpty && <ul id="plan-empty-goals" className="plan-groups" aria-label={`${parentName}s with nothing in ${periodWord}`}>{calm.empty.map(renderGroup)}</ul>}
+          {emptyOpen && <ul id="plan-empty-goals" className="plan-groups" aria-label={`${parentName}s with nothing in ${periodWord}`}>{calm.empty.map(renderGroup)}</ul>}
         </>}
+        {sectioned && <div className="plan-section is-loose">
+          <div className="plan-section-head">
+            <h2>Not under a {parentName}</h2>
+            <p>Fine to leave here. To put one under a {parentName}, drag it onto a card above or use Move under.</p>
+          </div>
+          <ul className="plan-groups is-loose" aria-label={`Not under a ${parentName}`}>
+            {calm!.shown.filter((g) => g.kind === 'unlinked').map(renderGroup)}
+          </ul>
+        </div>}
         <footer className="plan-foot">
           {hasItems && (level < 2
             ? <button type="button" className="plan-next" onClick={() => setHorizon(level + 1)}>Next: {HORIZONS[level + 1]} →</button>
