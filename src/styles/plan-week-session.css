@@ -1,1 +1,87 @@
-/* plan-week-session.css — owned by the week agent (2026-10-12 horizons). Reuse Month's classes in canvas-plan.css first. */
+/* plan-week-session.css — owned by the week agent (2026-10-12 horizons).
+   Planning the week in four steps (WeekV2): the Month board (canvas-plan.css
+   .plan-month-board / .plan-month-goals / .plan-month-source / .plan-source)
+   with the week's list as the anchored collection and the step's source —
+   Inbox, last week, the month's goals, then the days — beside it. Only what
+   the week needs on top of Month's classes lives here. */
+
+/* The list keeps one column, the same size, in every step; the source takes
+   the rest, since the days in step 4 need the width. */
+@media (min-width: 1024px) {
+  .plan-month-board.wk-board { grid-template-columns: minmax(0, 3fr) minmax(360px, 2fr); }
+  .plan-month-board.wk-board.is-source-hidden { grid-template-columns: minmax(0, 1fr); }
+}
+.wk-board-toolbar { margin: -14px 0 10px; justify-content: flex-start; }
+.wk-session-fail {
+  margin: -14px 0 12px; padding: 8px 12px; font-size: 14px; color: var(--color-neutral-900);
+  border: 1px solid var(--color-warning-500); border-radius: var(--radius-md); background: var(--color-bg-elevated);
+}
+
+/* The list: each row a quiet card, as Month's goals are. */
+.wk-board-list .pv2-wl .pv2-list { display: flex; flex-direction: column; gap: 8px; margin: 8px 0; }
+.wk-board-list .pv2-wl .wk-row {
+  margin: 0; padding: 8px 10px 8px 12px; border: 1px solid var(--color-neutral-200);
+  border-radius: var(--radius-md); background: var(--color-bg-elevated);
+  transition: border-color var(--transition-base), box-shadow var(--transition-base), background-color var(--transition-base);
+}
+.wk-board-list .pv2-wl .wk-row:hover, .wk-board-list .pv2-wl .wk-row:focus-within { border-color: var(--color-primary-200); }
+/* Belongs to the month goal selected beside the list: highlighted, never filtered. */
+.wk-board-list .wk-row.is-related { border-color: var(--color-primary-500); box-shadow: inset 3px 0 0 var(--color-primary-500); background: var(--color-primary-50); }
+/* Just joined the list (from the Inbox, from last week): a brief light. */
+.wk-board-list .wk-row.is-added { animation: wk-arrived 2.4s ease-out; }
+.wk-arrived-tag { margin-right: 6px; vertical-align: 1px; }
+@keyframes wk-arrived {
+  0%, 35% { border-color: var(--color-primary-500); box-shadow: 0 0 0 3px var(--color-primary-200); }
+  100% { box-shadow: 0 0 0 0 transparent; }
+}
+
+/* The month goal a task is for, named quietly under it — Month's parent
+   label (plan-item-parent), as a control that changes or removes it. */
+.wk-forbtn.wk-parent {
+  display: inline; max-width: 100%; padding: 1px 4px; margin-left: -4px; border-radius: var(--radius-sm);
+  font-size: 12.5px; line-height: 1.35; color: var(--color-neutral-600); text-align: left; overflow-wrap: anywhere;
+}
+.wk-forbtn.wk-parent:hover { color: var(--color-neutral-900); background: var(--color-neutral-100); }
+.wk-forbtn.wk-parent .plan-item-parent-kind { margin-right: 2px; }
+.wk-row.is-linked .wk-forbtn.wk-parent { animation: plan-linked-label 1.8s ease-out; }
+
+/* The sources: Month's containers, with the step's actions in a row. */
+.wk-board-source .plan-section-head + .plan-groups { margin-top: 2px; }
+.wk-source-acts { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 8px; margin-top: 6px; }
+.wk-source-acts .plan-add { margin-top: 0; }
+.wk-source-acts .wk-quiet { font-weight: 500; color: var(--color-neutral-600); }
+.wk-source.is-decided { opacity: .8; }
+.wk-source-sub {
+  margin: 18px 0 8px; font-family: var(--font-family-sans); font-size: 12.5px; font-weight: 600;
+  letter-spacing: .04em; text-transform: uppercase; color: var(--color-neutral-600);
+}
+.wk-source-month + .wk-source-month { margin-top: 8px; }
+.wk-source-month > .canvas-link { margin-top: 8px; }
+.wk-board-days { min-width: 0; }
+.wk-fold { margin-top: 16px; padding-top: 10px; border-top: 1px solid var(--color-neutral-200); }
+.wk-fold-body { margin-top: 8px; }
+
+/* What the week holds, once planned. */
+.wk-chosen {
+  margin: 0 0 20px; padding: 12px 16px; border: 1px solid var(--color-neutral-200);
+  border-radius: var(--radius-lg); background: var(--color-bg-elevated);
+}
+.wk-chosen h2 { margin: 0 0 6px; font-family: var(--font-family-display); font-size: 21px; font-weight: 500; color: var(--color-neutral-900); }
+.wk-chosen h3 { margin: 10px 0 4px; font-size: 12.5px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--color-neutral-600); }
+.wk-chosen ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 3px; font-size: 15px; }
+.wk-chosen-day { display: inline-block; min-width: 3.2em; font-size: 13px; font-weight: 600; color: var(--color-neutral-600); }
+
+@media (prefers-reduced-motion: reduce) {
+  .wk-board-list .wk-row.is-added { animation: none; border-color: var(--color-primary-500); box-shadow: 0 0 0 3px var(--color-primary-200); }
+  .wk-row.is-linked .wk-forbtn.wk-parent { animation: none; background: var(--color-primary-100); }
+  .wk-board-list .pv2-wl .wk-row { transition: none; }
+}
+
+/* Phones: list first, the source below it; every control a full target. */
+@media (max-width: 767px) {
+  .wk-board-toolbar .plan-source-toggle, .wk-source-acts .canvas-link, .wk-fold-toggle,
+  .wk-board-source .plan-add { min-height: 44px; }
+  .wk-board-source .plan-group-focus { display: inline-flex; align-items: center; min-height: 44px; }
+  .wk-source-acts { gap: 0 10px; }
+  .wk-forbtn.wk-parent { min-height: 32px; padding: 5px 4px; }
+}

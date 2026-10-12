@@ -1,11 +1,17 @@
-// The step panels of planning a week (Scott, 2026-10-03: "we can't just have
-// one enormous list … it should be presented stepwise, in an organized
-// way"). Each panel holds ONE kind of thing and asks ONE question; the week
-// fills up beside it (WeekStrip). The panels only draw and report: WeekV2
+// The sources beside the week's list while it is planned (Scott, 2026-10-12,
+// in this order): the Inbox, last week's list, the month's goals. Each one is
+// the Month board's source column (canvas-plan.css): compact containers, one
+// per capture, last-week task or month goal, each with the one action that
+// adds to the week's list beside it. The panels only draw and report: WeekV2
 // owns the data and the writes.
-import { useState } from 'react'
+//
+// The optional reference that used to be steps of its own — Between us, Look
+// ahead, Routines — is drawn here too, folded inside a step (WeekStepScreen).
+import { useState, type FormEvent, type KeyboardEvent, type ReactNode } from 'react'
 import { Trash2 } from 'lucide-react'
 import type { Task } from '@/types/task'
+import type { LineVM } from './PlanLine'
+import type { CloseDecision } from './FocusDeck'
 import type { WaitingRow } from '@/lib/today/waiting'
 import { checkBackLabel } from '@/lib/today/waiting'
 import type { InboxRow } from '@/lib/discussions/inbox'
@@ -16,37 +22,7 @@ const short = (d: Date) => d.toLocaleDateString('en-US', { weekday: 'short', mon
 const dayName = (key: string) => { const [y, m, d] = key.split('-').map(Number); return new Date(y, m - 1, d).toLocaleDateString('en-US', { weekday: 'short' }) }
 
 function StepHead({ title, ask }: { title: string; ask: string }) {
-  return <><h2 className="wk-step-title">{title}</h2><p className="wk-step-ask">{ask}</p></>
-}
-
-// ── Inbox ──────────────────────────────────────────────────────────────────
-export function InboxStep({ tasks, onThisWeek, onSomeday, onDone, onOpen, onDelete }: {
-  tasks: Task[]
-  onThisWeek: (t: Task) => void
-  onSomeday: (t: Task) => void
-  onDone: (t: Task) => void
-  onOpen: (t: Task) => void
-  /** Throw it away (Scott, 2026-10-04); the host offers Undo. */
-  onDelete?: (t: Task) => void
-}) {
-  return (
-    <section aria-label="Inbox">
-      <StepHead title="Inbox" ask="Unsorted captures. Bring each into this week, keep it for someday, or tick it off." />
-      {tasks.length ? tasks.map((t) => (
-        <div key={t.id} className="wk-item">
-          <div><button type="button" className="wk-item-title" onClick={() => onOpen(t)}>{t.title}</button><small>Captured {short(t.createdAt)}</small></div>
-          <div className="wk-acts">
-            <button type="button" className="wk-act" aria-label={`This week: ${t.title}`} onClick={() => onThisWeek(t)}>This week</button>
-            <button type="button" className="wk-act" aria-label={`Someday: ${t.title}`} onClick={() => onSomeday(t)}>Someday</button>
-            <button type="button" className="wk-act" aria-label={`Done: ${t.title}`} onClick={() => onDone(t)}>Done</button>
-            {onDelete && <button type="button" className="wk-act wk-act-icon" aria-label={`Delete ${t.title}`} title="Delete" onClick={() => onDelete(t)}>
-              <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
-            </button>}
-          </div>
-        </div>
-      )) : <p className="wk-none">Your Inbox is empty.</p>}
-    </section>
-  )
+  return <><h3 className="wk-step-title">{title}</h3><p className="wk-step-ask">{ask}</p></>
 }
 
 // ── Between us ─────────────────────────────────────────────────────────────
@@ -233,3 +209,226 @@ export function RoutinesStep({ groups, weekKeys, weekendKeys, onSkip, onUnskip, 
   )
 }
 
+
+
+// ── The sources (2026-10-12) ───────────────────────────────────────────────
+
+/** A row's write in flight, or a write that did not save. */
+export type RowState = 'pending' | 'failed' | undefined
+
+const captured = (d: Date) => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+
+/** The source column's heading: what it is and what to do with it. */
+export function SourceHead({ id, title, ask, children }: { id: string; title: string; ask: string; children?: ReactNode }) {
+  return <div className="plan-section-head"><h2 id={id}>{title}</h2><p>{ask}</p>{children}</div>
+}
+
+/** One line of words, written in place — Month's composer (InlineComposer),
+ *  its words held by the page so a resumed session gets them back. */
+export function DraftComposer({ label, value, onChange, onSave, onCancel, saveLabel = 'Add' }: {
+  label: string
+  value: string
+  onChange: (text: string) => void
+  /** Resolves true once stored; the words then clear for the next one. */
+  onSave: (text: string) => Promise<boolean>
+  onCancel: () => void
+  saveLabel?: string
+}) {
+  const [busy, setBusy] = useState(false)
+  const [failed, setFailed] = useState(false)
+  const submit = async (e: FormEvent) => {
+    e.preventDefault()
+    const text = value.trim()
+    if (!text || busy) return
+    setBusy(true); setFailed(false)
+    const ok = await onSave(text).catch(() => false)
+    setBusy(false)
+    if (ok) onChange(''); else setFailed(true)
+  }
+  const onKey = (e: KeyboardEvent) => {
+    if (e.key !== 'Escape') return
+    e.preventDefault(); e.stopPropagation()
+    if (!busy) onCancel()
+  }
+  return <form className={`plan-composer${failed ? ' is-failed' : ''}`} onSubmit={submit} onKeyDown={onKey}>
+    <input aria-label={label} value={value} autoFocus disabled={busy} onChange={(e) => { setFailed(false); onChange(e.target.value) }} />
+    <button type="submit" className="canvas-link" disabled={busy || !value.trim()}>{busy ? 'Saving…' : saveLabel}</button>
+    <button type="button" className="canvas-link" disabled={busy} onClick={onCancel}>Cancel</button>
+    {failed && <p className="plan-composer-error" role="alert">Didn’t save. Your wording is still here; try again.</p>}
+  </form>
+}
+
+// ── 1 · Inbox ──────────────────────────────────────────────────────────────
+export function InboxSource({ tasks, weekName, stateOf, onAdd, onSomeday, onDone, onDelete, onOpen, extra }: {
+  /** Open captures, through the page's filters. */
+  tasks: Task[]
+  /** "this week", "week 43". */
+  weekName: string
+  stateOf: (id: string) => RowState
+  onAdd: (t: Task) => void
+  onSomeday: (t: Task) => void
+  onDone: (t: Task) => void
+  /** Throw it away (Scott, 2026-10-04); the host offers Undo. */
+  onDelete?: (t: Task) => void
+  onOpen: (t: Task) => void
+  /** Optional reference folded under the captures (waiting on, threads). */
+  extra?: ReactNode
+}) {
+  return <>
+    <SourceHead id="wk-source-title" title="Inbox" ask={`Choose what needs to happen in ${weekName}. It joins the list; the rest can stay here.`} />
+    {tasks.length ? <ul className="plan-groups plan-source-grid" aria-label="Inbox captures">
+      {tasks.map((t) => {
+        const state = stateOf(t.id)
+        return <li key={t.id} className="plan-group-slot">
+          <section className="canvas-group plan-group plan-source wk-source" aria-label={t.title}>
+            <header className="canvas-group-head">
+              <h3 className="canvas-group-title"><button type="button" className="plan-group-focus" onClick={() => onOpen(t)}>{t.title}</button></h3>
+            </header>
+            <p className="plan-source-count">Captured {captured(t.createdAt)}</p>
+            {state === 'failed' && <p className="plan-composer-error" role="alert">Not added. It’s still in your Inbox — try again.</p>}
+            <div className="wk-source-acts">
+              <button type="button" className="canvas-link plan-add" disabled={state === 'pending'} aria-label={`Add ${t.title} to ${weekName}`}
+                onClick={() => onAdd(t)}>{state === 'pending' ? 'Adding…' : `+ Add to ${weekName}`}</button>
+              <button type="button" className="canvas-link wk-quiet" disabled={state === 'pending'} aria-label={`Someday: ${t.title}`} onClick={() => onSomeday(t)}>Someday</button>
+              <button type="button" className="canvas-link wk-quiet" disabled={state === 'pending'} aria-label={`Done: ${t.title}`} onClick={() => onDone(t)}>Done</button>
+              {onDelete && <button type="button" className="canvas-link wk-quiet wk-act-icon" disabled={state === 'pending'} aria-label={`Delete ${t.title}`} title="Delete" onClick={() => onDelete(t)}>
+                <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
+              </button>}
+            </div>
+          </section>
+        </li>
+      })}
+    </ul> : <p className="plan-empty">Your Inbox is empty. Nothing to choose from here.</p>}
+    {extra}
+  </>
+}
+
+// ── 2 · Last week ──────────────────────────────────────────────────────────
+const VERDICT: Record<CloseDecision, string> = {
+  carried: 'Brought forward', done: 'Marked done', someday: 'Kept for someday', dropped: 'Let go', left: 'Left where it was',
+}
+
+export interface LastWeekRow { vm: LineVM; decision?: CloseDecision; state: RowState }
+
+export function LastWeekSource({ rows, earlier, done, prevName, weekName, onDecide, onOpen }: {
+  /** Last week's open work, and anything decided this session. */
+  rows: LastWeekRow[]
+  /** Unfinished work from before last week, decided the same way. */
+  earlier: LastWeekRow[]
+  /** Done last week: its record, to look at. */
+  done: Task[]
+  prevName: string
+  weekName: string
+  onDecide: (vm: LineVM, d: CloseDecision) => void
+  onOpen: (t: Task) => void
+}) {
+  const card = ({ vm, decision, state }: LastWeekRow) => {
+    const t = vm.task
+    const open = !decision || decision === 'left' || state === 'failed'
+    return <li key={t.id} className="plan-group-slot">
+      <section className={`canvas-group plan-group plan-source wk-source${decision && decision !== 'left' ? ' is-decided' : ''}`} aria-label={t.title}>
+        <header className="canvas-group-head">
+          <h3 className="canvas-group-title"><button type="button" className="plan-group-focus" onClick={() => onOpen(t)}>{t.title}</button></h3>
+          {decision && state !== 'failed' && <span className="canvas-tag">{VERDICT[decision]}</span>}
+        </header>
+        <p className="plan-source-count">{vm.origin ? `Earlier: ${vm.origin}` : vm.where ?? `Any day ${prevName}`}</p>
+        {decision === 'carried' && state !== 'failed' && <p className="plan-source-count">On {weekName}’s list now. {prevName[0].toUpperCase() + prevName.slice(1)}’s record keeps it.</p>}
+        {state === 'failed' && <p className="plan-composer-error" role="alert">That didn’t save, so it isn’t decided. It’s still here — try again.</p>}
+        {open && <div className="wk-source-acts">
+          <button type="button" className="canvas-link plan-add" disabled={state === 'pending'} aria-label={`Bring ${t.title} into ${weekName}`}
+            onClick={() => onDecide(vm, 'carried')}>{state === 'pending' ? 'Saving…' : `+ Bring into ${weekName}`}</button>
+          <button type="button" className="canvas-link wk-quiet" disabled={state === 'pending'} aria-label={`It’s done: ${t.title}`} onClick={() => onDecide(vm, 'done')}>It’s done</button>
+          <button type="button" className="canvas-link wk-quiet" disabled={state === 'pending'} aria-label={`Someday: ${t.title}`} onClick={() => onDecide(vm, 'someday')}>Someday</button>
+          <button type="button" className="canvas-link wk-quiet" disabled={state === 'pending'} aria-label={`Let go of ${t.title}`} onClick={() => onDecide(vm, 'dropped')}>Let go</button>
+          {decision !== 'left' && <button type="button" className="canvas-link wk-quiet" disabled={state === 'pending'} aria-label={`Leave ${t.title} where it is`} onClick={() => onDecide(vm, 'left')}>Leave it</button>}
+        </div>}
+      </section>
+    </li>
+  }
+  return <>
+    <SourceHead id="wk-source-title" title={prevName[0].toUpperCase() + prevName.slice(1)} ask={`Bring forward only what still matters. Nothing comes over by itself, and ${prevName}’s record keeps its history.`} />
+    {rows.length ? <ul className="plan-groups plan-source-grid" aria-label={`Open on ${prevName}’s list`}>{rows.map(card)}</ul>
+      : <p className="plan-empty">Nothing was left open {prevName === 'last week' ? 'last week' : `in ${prevName}`}.</p>}
+    {earlier.length > 0 && <>
+      <h3 className="wk-source-sub">Earlier, still open</h3>
+      <ul className="plan-groups plan-source-grid" aria-label="Earlier, still open">{earlier.map(card)}</ul>
+    </>}
+    {done.length > 0 && <>
+      <h3 className="wk-source-sub">Done {prevName}</h3>
+      <ul className="plan-source-preview" aria-label={`Done ${prevName}`}>{done.map((t) => <li key={t.id} className="is-done">{t.title}</li>)}</ul>
+    </>}
+  </>
+}
+
+// ── 3 · Monthly goals ──────────────────────────────────────────────────────
+export interface GoalSourceMonth {
+  name: string
+  start: Date
+  /** Open goals, each with this week's tasks for it (the same records the list shows). */
+  goals: { task: Task; children: Task[] }[]
+  /** Goals of that month already done (named, not listed). */
+  done: number
+}
+
+export function MonthGoalsSource({ months, weekName, selected, onSelect, linkedGoal, adding, onStartAdd, onCancelAdd, draftOf, onDraft, onAdd, onOpenMonth, loading }: {
+  months: GoalSourceMonth[]
+  weekName: string
+  selected: string | null
+  onSelect: (id: string | null) => void
+  /** The goal a task was just written for: its card lights up with the task's label. */
+  linkedGoal: string | null
+  adding: string | null
+  onStartAdd: (goalId: string) => void
+  onCancelAdd: () => void
+  draftOf: (goalId: string) => string
+  onDraft: (goalId: string, text: string) => void
+  onAdd: (goalId: string, text: string) => Promise<boolean>
+  onOpenMonth: (start: Date) => void
+  loading?: boolean
+}) {
+  const names = months.map((m) => m.name).join(' and ')
+  return <>
+    <SourceHead id="wk-source-title" title={`${names} goals`} ask={`For reference while you write ${weekName}’s tasks. Select one to see its tasks, or add one for it. The goals themselves stay as they are.`} />
+    {months.map((m) => {
+      const one = months.length === 1
+      return <div key={m.name} className="wk-source-month">
+        {!one && <h3 className="wk-source-sub">{m.name}</h3>}
+        {m.goals.length ? <ul className="plan-groups plan-source-grid" aria-label={`${m.name} goals`}>
+          {m.goals.map(({ task: g, children }) => {
+            const isSel = selected === g.id
+            const open = children.filter((c) => !c.completed).length
+            return <li key={g.id} className="plan-group-slot">
+              <section className={`canvas-group plan-group plan-source${isSel ? ' is-selected' : ''}${linkedGoal === g.id ? ' is-linked' : ''}`} aria-label={`${m.name} goal: ${g.title}`}>
+                <header className="canvas-group-head">
+                  <h3 className="canvas-group-title"><button type="button" className="plan-group-focus" aria-pressed={isSel}
+                    onClick={() => onSelect(isSel ? null : g.id)}>{g.title}</button></h3>
+                </header>
+                <p className="plan-source-count">{children.length ? `${children.length} ${children.length === 1 ? 'task' : 'tasks'} ${weekName}${open < children.length ? `, ${children.length - open} done` : ''}` : `Nothing ${weekName} yet`}</p>
+                {isSel && children.length > 0 && <ul className="plan-source-preview" aria-label={`${weekName} tasks for ${g.title}`}>
+                  {children.map((c) => <li key={c.id} className={c.completed ? 'is-done' : undefined}>{c.title}</li>)}
+                </ul>}
+                {adding === g.id
+                  ? <DraftComposer label={`New task ${weekName} for ${g.title}`} value={draftOf(g.id)} onChange={(v) => onDraft(g.id, v)}
+                      onSave={(text) => onAdd(g.id, text)} onCancel={onCancelAdd} />
+                  : <button type="button" className="canvas-link plan-add" aria-label={`Add a task ${weekName} for ${g.title}`}
+                      onClick={() => { if (!isSel) onSelect(g.id); onStartAdd(g.id) }}>+ Add a task {weekName}</button>}
+              </section>
+            </li>
+          })}
+        </ul> : <p className="plan-empty">{loading ? 'Loading…' : `No open goals for ${m.name}. That’s fine — write ${weekName}’s tasks on their own.`}</p>}
+        {m.done > 0 && <p className="plan-empty">{m.done} {m.name} {m.done === 1 ? 'goal is' : 'goals are'} done.</p>}
+        <button type="button" className="canvas-link" onClick={() => onOpenMonth(m.start)}>Open {m.name} →</button>
+      </div>
+    })}
+  </>
+}
+
+/** Optional reference inside a step, folded until asked for. The body mounts
+ *  only while open, so what it reads is read only then. */
+export function Fold({ title, children }: { title: string; children: () => ReactNode }) {
+  const [open, setOpen] = useState(false)
+  return <section className="wk-fold">
+    <button type="button" className="canvas-link wk-fold-toggle" aria-expanded={open} onClick={() => setOpen((o) => !o)}>{open ? `Hide ${title.toLowerCase()}` : title}</button>
+    {open && <div className="wk-fold-body">{children()}</div>}
+  </section>
+}

@@ -1,7 +1,8 @@
-// The data behind the week's step panels, read only while a planning session
-// shows one of them: the Inbox, waiting items and threads, the weeks ahead,
-// and the week's routines with their occurrences. WeekV2 mounts this inside
-// the session, so the page outside a session reads none of it.
+// The data behind the week session's optional reference, read only while one
+// is unfolded (2026-10-12: no longer steps of their own): waiting items and
+// threads (beside the Inbox), the weeks ahead and the week's routines with
+// their occurrences (beside the days). WeekV2 mounts this inside a fold, so
+// the page outside a session — and a folded reference — reads none of it.
 import { useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import type { Task } from '@/types/task'
@@ -16,21 +17,19 @@ import { selectWaiting } from '@/lib/today/waiting'
 import { landmarksIn } from '@/lib/planning/v2/planV2'
 import { localYmd } from '@/lib/cadence/config'
 import { routineGroups, type RoutineRow } from '@/lib/week/routineGroups'
-import { InboxStep, BetweenStep, AheadStep, RoutinesStep } from './WeekStepPanels'
+import { BetweenStep, AheadStep, RoutinesStep } from './WeekStepPanels'
 
-export type PanelStep = 'inbox' | 'between' | 'ahead' | 'routines'
+export type PanelStep = 'between' | 'ahead' | 'routines'
 const DAY = 86_400_000
 const dateOf = (key: string) => { const [y, m, d] = key.split('-').map(Number); return new Date(y, m - 1, d) }
 
-export function WeekStepMain({ step, tasks, weekStart, onSelectTask, onThisWeek, onSomeday, onDone, onDelete }: {
-  onDelete?: (t: Task) => void
+export function WeekStepMain({ step, tasks, weekStart, onSelectTask, onThisWeek }: {
   step: PanelStep
   tasks: Task[]
   weekStart: Date
   onSelectTask: (id: string) => void
+  /** "Start this week" on something due in the weeks ahead. */
   onThisWeek: (t: Task) => void
-  onSomeday: (t: Task) => void
-  onDone: (t: Task) => void
 }) {
   const navigate = useNavigate()
   const selection = useSelectionOptional()
@@ -45,10 +44,6 @@ export function WeekStepMain({ step, tasks, weekStart, onSelectTask, onThisWeek,
   const weekKeys = useMemo(() => Array.from({ length: 7 }, (_, i) => localYmd(new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate() + i))), [weekStart])
   const weekendKeys = weekKeys.filter((k) => { const dow = dateOf(k).getDay(); return dow === 6 || dow === 0 })
 
-  if (step === 'inbox') {
-    const inbox = tasks.filter((t) => !t.completed && t.bucket === 'inbox')
-    return <InboxStep tasks={inbox} onOpen={(t) => onSelectTask(t.id)} onThisWeek={onThisWeek} onSomeday={onSomeday} onDone={onDone} onDelete={onDelete} />
-  }
   if (step === 'between') {
     const waiting = selectWaiting(tasks).filter((r) => !r.checkBack || r.checkBack < weekEnd)
     const threads = threadRows.filter((r) => r.unread || r.lastAt.getTime() >= weekStart.getTime() - 14 * DAY)
