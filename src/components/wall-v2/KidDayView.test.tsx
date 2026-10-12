@@ -332,6 +332,12 @@ describe('From school card', () => {
 
 describe('KidDayView — the reading card', () => {
   beforeEach(() => { localStorage.clear(); ledger.syncEarned.mockClear(); mocks.addProgress.mockClear(); mocks.setProgress.mockClear() })
+  // Fake time from mid-morning: the timer keeps one day's reading, and the
+  // minutes below crossed midnight when CI ran near 11pm-midnight UTC.
+  const startMorning = () => {
+    const now = new Date()
+    vi.useFakeTimers({ now: new Date(now.getFullYear(), now.getMonth(), now.getDate(), 10, 0) })
+  }
 
   it('a Read target is its own card with a Start button, not a row in Anytime', () => {
     renderView({ routines: [routine({ name: 'Read', target_amount: 20, target_unit: 'minutes' })] })
@@ -349,9 +355,7 @@ describe('KidDayView — the reading card', () => {
   })
 
   it('Start, Pause, Resume, then Done logs the minutes actually read', () => {
-    vi.useFakeTimers()
-    // Mid-morning: the 38 minutes below crossed midnight when CI ran at 11:46pm.
-    const now = new Date(); vi.setSystemTime(new Date(now.getFullYear(), now.getMonth(), now.getDate(), 10, 0))
+    startMorning()
     try {
       const r = routine({ name: 'Read', target_amount: 20, target_unit: 'minutes' })
       renderView({ routines: [r] })
@@ -373,7 +377,7 @@ describe('KidDayView — the reading card', () => {
   })
 
   it('Reset takes two taps and logs nothing', () => {
-    vi.useFakeTimers()
+    startMorning()
     try {
       renderView({ routines: [routine({ name: 'Read', target_amount: 20, target_unit: 'minutes' })] })
       fireEvent.click(screen.getByRole('button', { name: 'Start reading' }))
