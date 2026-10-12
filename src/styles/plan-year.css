@@ -43,3 +43,9 @@
 @media (max-width: 767px) {
   .plan-year-decisions > button, .plan-year-session { min-height: 44px; }
 }
+
+/* Stacked (phones, narrow windows): while looking back, last year comes
+   first so the step's material is where you are — as Season does. */
+@media (max-width: 1023px) {
+  .plan-year-board.is-step-lookback > .plan-month-source { order: -1; }
+}

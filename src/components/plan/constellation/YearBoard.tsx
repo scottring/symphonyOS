@@ -169,7 +169,7 @@ export function YearBoard({ measure, ...p }: YearBoardProps) {
       steps={[{ key: 'lookback', label: `Look back at ${prev}` }, { key: 'shape', label: `Shape ${year}` }]}
       stepKey={session.step} onStepKey={(k) => session.onStep(k === 'shape' ? 'shape' : 'lookback')}
       onLeave={session.onLeave} onSave={session.onFinish} saveLabel={`Mark ${year} planned`} />}
-    <div ref={measure} className={`plan-month-board plan-year-board${p.sourceShown ? '' : ' is-source-hidden'}`}>
+    <div ref={measure} className={`plan-month-board plan-year-board${p.sourceShown ? '' : ' is-source-hidden'}${inReview ? ' is-step-lookback' : ''}`}>
       {/* The year first: it is what the page is for, and what a phone shows
           first. Wide screens put last year on its left (canvas-plan.css). */}
       <section className="plan-month-goals" aria-labelledby="plan-year-question" data-explain="year" data-explain-label={`Every ${year} goal`}>
