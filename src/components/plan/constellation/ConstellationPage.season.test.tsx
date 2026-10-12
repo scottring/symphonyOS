@@ -378,7 +378,7 @@ describe('Season: an optional planning session over the same board',()=>{
 
   season()
   expect(screen.queryByRole('region',{name:/^Planning /})).toBeNull()
-  fireEvent.click(screen.getByRole('button',{name:'Resume planning Fall · step 3 of 3'}))
+  fireEvent.click(screen.getByRole('button',{name:'Continue planning Fall · step 3 of 3'}))
   expect(currentStep()).toBe('3Write Fall')
   expect(screen.getByLabelText('New Fall goal')).toHaveValue('Call the plumber')
   // Its look-back verdict is remembered too.
@@ -393,7 +393,7 @@ describe('Season: an optional planning session over the same board',()=>{
   fireEvent.click(within(bar()).getByRole('button',{name:'Leave for now'}))
   fireEvent.click(screen.getByRole('button',{name:'Next season'}))
   expect(screen.getByRole('heading',{level:1})).toHaveTextContent('Winter 2026')
-  expect(screen.queryByRole('button',{name:/Resume planning/})).toBeNull()
+  expect(screen.queryByRole('button',{name:/Continue planning/})).toBeNull()
   fireEvent.click(screen.getByRole('button',{name:'Plan Winter'}))
   expect(currentStep()).toBe('1Look back at Fall')
   first.unmount()
@@ -403,7 +403,7 @@ describe('Season: an optional planning session over the same board',()=>{
   second.unmount()
   env.userId='me'
   season()
-  expect(screen.getByRole('button',{name:'Resume planning Fall · step 2 of 3'})).toBeInTheDocument()
+  expect(screen.getByRole('button',{name:'Continue planning Fall · step 2 of 3'})).toBeInTheDocument()
  })
  it('a period change mid-session closes the bar instead of showing it on the new season',()=>{
   withSummer();season()
@@ -411,7 +411,7 @@ describe('Season: an optional planning session over the same board',()=>{
   fireEvent.click(screen.getByRole('button',{name:'Next season'}))
   expect(screen.queryByRole('region',{name:/^Planning /})).toBeNull()
   fireEvent.click(screen.getByRole('button',{name:'Previous season'}))
-  expect(screen.getByRole('button',{name:'Resume planning Fall · step 1 of 3'})).toBeInTheDocument()
+  expect(screen.getByRole('button',{name:'Continue planning Fall · step 1 of 3'})).toBeInTheDocument()
  })
  it('writing the season keeps the line open for the next goal',async()=>{
   season()

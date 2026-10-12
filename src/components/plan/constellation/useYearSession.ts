@@ -147,6 +147,8 @@ export function useYearSession(inputs: YearInputs | null) {
     }
   }
 
+  /** The step a paused session will resume at. */
+  const progressStep: YearStep | null = p ? (p.step === 'shape' ? 'shape' : 'lookback') : null
   return {
     ...derived,
     planned,
@@ -154,6 +156,7 @@ export function useYearSession(inputs: YearInputs | null) {
     inProgress: !!p,
     active,
     step,
+    progressStep,
     drafts,
     notes: { wentWell: drafts.wentWell ?? '', didnt: drafts.didnt ?? '' },
     sourceShown,

@@ -672,7 +672,7 @@ function Inner() {
       {!seasonSession.active && seasonSession.saved && !seasonSession.inProgress && <span className="plan-season-status">
         {periodWord} planned {seasonSession.saved.at.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>}
       {!seasonSession.active && <button type="button" className="pv2-btn plan-season-start" onClick={startSession}>
-        {seasonSession.inProgress ? `Resume planning ${periodWord} · step ${seasonSession.stepIndex + 1} of 3`
+        {seasonSession.inProgress ? `Continue planning ${periodWord} · step ${seasonSession.stepIndex + 1} of 3`
           : seasonSession.saved ? `Plan ${periodWord} again` : `Plan ${periodWord}`}</button>}
     </>
     seasonBoard = <SeasonBoard boardRef={monthBoardRef} seasonWord={periodWord} seasonLabel={periodTitle} year={year} prevWord={prevWord}
@@ -795,8 +795,9 @@ function Inner() {
       <button type="button" className="canvas-link plan-source-toggle" aria-expanded={ys.sourceShown} aria-controls="plan-year-source"
         onClick={ys.toggleSource}>{ys.sourceShown ? `Hide ${prevY} goals` : `Show ${prevY} goals`}</button>
       {plannedOn && !ys.active && <span className="plan-year-status">{y} planned {plannedOn}</span>}
-      {!ys.active && <button type="button" className="plan-walk plan-year-session" onClick={openSession}>
-        {ys.inProgress ? `Continue planning ${y}` : `Look back and plan ${y}`}</button>}
+      {/* The same words and weight as Season and Week: Plan, Continue, again. */}
+      {!ys.active && <button type="button" className="pv2-btn plan-year-session" onClick={openSession}>
+        {ys.inProgress ? `Continue planning ${y} · step ${ys.progressStep === 'shape' ? 2 : 1} of 2` : plannedOn ? `Plan ${y} again` : `Plan ${y}`}</button>}
     </>
     return { board, toolbar }
   }
