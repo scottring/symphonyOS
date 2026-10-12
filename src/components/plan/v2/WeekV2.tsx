@@ -30,6 +30,8 @@ import { useSessionProgress } from '@/hooks/useSessionProgress'
 import { useAuth } from '@/hooks/useAuth'
 import { showToast } from '@/hooks/useToast'
 import { useCanvasActivity } from '@/contexts/CanvasActivityContext'
+import { applyTriageWhen, describeTriageWhen } from '@/lib/triage/applyWhen'
+import { placementSnapshot } from '@/lib/triage/feedback'
 import { weekListTasks } from '@/lib/planning/weekList'
 import { selectPeriodTasks } from '@/lib/planning/periodPage'
 import { monthStartOf, monthsOfWeek } from '@/lib/planning/periodPlacement'
@@ -279,6 +281,26 @@ export function WeekV2({ tasks, weekStart, meId, isCurrent, days, renderDays, on
     openPartOf: (link) => navigate(`/task/${link.id}`),
     today: async (t) => { if (await planActions.chooseTaskDay(t.id, new Date())) showToast(`“${t.title}” is on today — any time.`, 'success', 5000) },
     monthLine: { month: monthName, lines: forOptions.lines, current: (t) => forLine(t), run: (t, id) => void setMonthLine(t, id) },
+    // The triage contract's When (lib/triage): the same destinations, words
+    // and write as every task surface; confirmed on the strip with Undo once
+    // stored, or Retry when it did not land.
+    when: {
+      pick: function pickWhen(t, when) {
+        const before = placementSnapshot(t)
+        void activity.run(`${describeTriageWhen(when)}: “${t.title}”`, () => applyTriageWhen(when, t.id, {
+          onPushTask: gated.pushTask,
+          onSetBucket: (id, bucket) => gated.updateTask(id, { bucket, scheduledFor: undefined }),
+          onUpdateTask: gated.updateTask,
+          onFocus: (id, day) => gated.updateTask(id, { plannedOn: day }),
+        }), { ids: [t.id], undo: async () => { await gated.updateTask(t.id, before) }, retry: () => pickWhen(t, when) })
+      },
+      pickDate: function pickDate(t, at, isAllDay) {
+        const before = placementSnapshot(t)
+        void activity.run(`Move “${t.title}” to ${at.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}`,
+          async () => (await gated.updateTask(t.id, { bucket: 'timed', scheduledFor: at, isAllDay })) !== false,
+          { ids: [t.id], undo: async () => { await gated.updateTask(t.id, before) }, retry: () => pickDate(t, at, isAllDay) })
+      },
+    },
   }
 
   // ── Step 1: the Inbox ───────────────────────────────────────────────────

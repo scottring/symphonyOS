@@ -8,7 +8,7 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { useDraggable } from '@dnd-kit/core'
-import { Check, CornerDownRight, GripVertical, MoreHorizontal, ArrowRight, Moon, X, PanelRight, Target, Sun, ArrowDownRight, Unlink, Link2 } from 'lucide-react'
+import { Check, CornerDownRight, GripVertical, MoreHorizontal, ArrowRight, Moon, X, PanelRight, Target, Sun, ArrowDownRight, Unlink, Link2, CalendarClock } from 'lucide-react'
 import type { Task, TaskContext } from '@/types/task'
 import { ContextPicker } from '@/components/triage/ContextPicker'
 import type { FamilyMember } from '@/types/family'
@@ -19,6 +19,8 @@ import { assigneesOf } from '@/lib/planning/v2/planV2'
 import { notesAsText } from '@/lib/htmlUtils'
 import type { DidItem } from '@/lib/week/monthLinks'
 import { placeMenu, type MenuPlace } from '@/lib/ui/menuPlacement'
+import { RescheduleGrid } from '@/components/schedule/RescheduleGrid'
+import { moreLabel, type TriageWhen } from '@/lib/triage/contract'
 
 export interface LineVM {
   task: Task
@@ -67,6 +69,11 @@ export interface LineActions {
    *  goal…" (walkthrough 2026-09-30: October's lines, carried from
    *  September, had no way to say which Fall goal they serve). */
   linkUp?: { rung: string; goals: { id: string; title: string }[]; applies: (t: Task) => boolean; run: (t: Task, goalId: string) => void }
+  /** The triage contract's When group (lib/triage/contract.ts) for a week
+   *  task: Today … Someday and a picked date, the same as every other task
+   *  surface. Present, it stands in for this menu's own Someday and "Do it
+   *  today" (both are in it). */
+  when?: { pick: (t: Task, when: TriageWhen) => void; pickDate?: (t: Task, at: Date, isAllDay: boolean) => void }
   /** A week item's month line — set, change or remove it on the same row
    *  (walkthrough 2026-10-08). `current` is the line it is for now. */
   monthLine?: { month: string; lines: { id: string; title: string }[]; current: (t: Task) => { id: string; title: string } | null; run: (t: Task, lineId: string | null) => void }
@@ -113,7 +120,9 @@ export function LineMenu({ vm, actions, nextLabel }: { vm: LineVM; actions: Line
   const pick = (fn: (t: Task) => void) => () => { setOpen(false); fn(t) }
   const [linking, setLinking] = useState(false)
   const [forMonth, setForMonth] = useState(false)
-  useEffect(() => { if (!open) { setLinking(false); setForMonth(false) } }, [open])
+  const [choosingWhen, setChoosingWhen] = useState(false)
+  useEffect(() => { if (!open) { setLinking(false); setForMonth(false); setChoosingWhen(false) } }, [open])
+  const when = actions.when && !t.completed ? actions.when : null
   const monthLine = actions.monthLine && (actions.monthLine.lines.length > 0 || actions.monthLine.current(t)) ? actions.monthLine : null
   const forNow = monthLine?.current(t) ?? null
   // The month lines can be long: that list is placed from its measured size,
@@ -121,14 +130,14 @@ export function LineMenu({ vm, actions, nextLabel }: { vm: LineVM; actions: Line
   const [fit, setFit] = useState<MenuPlace | null>(null)
   // Measured before paint each time the list shows; ignored otherwise.
   useLayoutEffect(() => {
-    if (!open || !forMonth || !pos) return
+    if (!open || !(forMonth || choosingWhen) || !pos) return
     const fitNow = () => {
       const r = ref.current?.getBoundingClientRect()
       const m = menuRef.current
       if (r && m) setFit(placeMenu(r, { width: m.offsetWidth, height: m.scrollHeight }, { width: window.innerWidth, height: window.innerHeight }, 'end'))
     }
     fitNow()
-  }, [open, forMonth, pos])
+  }, [open, forMonth, choosingWhen, pos])
   const linkUp = actions.linkUp && !t.completed && actions.linkUp.applies(t) && actions.linkUp.goals.some((g) => g.id !== t.id) ? actions.linkUp : null
   return (
     <div ref={ref} className="relative">
@@ -137,8 +146,17 @@ export function LineMenu({ vm, actions, nextLabel }: { vm: LineVM; actions: Line
       </button>
       {open && pos && createPortal(
         <div ref={menuRef} role="menu" className={`pv2-menu is-floating${forMonth ? ' wk-formenu' : ''}`}
-          style={forMonth ? (fit ? { top: fit.top, left: fit.left, maxHeight: fit.maxHeight } : { top: 0, left: 0, visibility: 'hidden' }) : { top: pos.top, bottom: pos.bottom, right: pos.right }}>
-          {forMonth && monthLine ? <>
+          style={forMonth || choosingWhen ? (fit ? { top: fit.top, left: fit.left, maxHeight: fit.maxHeight } : { top: 0, left: 0, visibility: 'hidden' }) : { top: pos.top, bottom: pos.bottom, right: pos.right }}>
+          {choosingWhen && when ? <>
+            <div className="pv2-mhead">When</div>
+            <div className="pv2-mwhen w-[296px] max-w-full px-1 pb-1">
+              <RescheduleGrid flexibleWeekend
+                onPick={(w) => { setOpen(false); when.pick(t, w) }}
+                onPickDate={when.pickDate ? (at, allDay) => { setOpen(false); when.pickDate!(t, at, allDay) } : undefined} />
+            </div>
+            <div className="pv2-msep" />
+            <button role="menuitem" type="button" onClick={() => setChoosingWhen(false)}>Back</button>
+          </> : forMonth && monthLine ? <>
             <div className="pv2-mhead">Which {monthLine.month} goal is this for?</div>
             {monthLine.lines.map((l) => (
               <button key={l.id} role="menuitemradio" aria-checked={forNow?.id === l.id} type="button"
@@ -162,19 +180,20 @@ export function LineMenu({ vm, actions, nextLabel }: { vm: LineVM; actions: Line
             <div className="pv2-msep" />
             <button role="menuitem" type="button" onClick={() => setLinking(false)}>Back</button>
           </> : <>
-          <button role="menuitem" type="button" onClick={pick(actions.done)}><Check className="w-3.5 h-3.5" />{t.completed ? 'Reopen' : 'Done'}</button>
+          {when && <button role="menuitem" type="button" aria-haspopup="menu" onClick={() => setChoosingWhen(true)}><CalendarClock className="w-3.5 h-3.5" />When…</button>}
+          <button role="menuitem" type="button" onClick={pick(actions.done)}><Check className="w-3.5 h-3.5" />{moreLabel('complete', { completed: t.completed })}</button>
           {!t.completed && vm.fate !== 'carried' && <button role="menuitem" type="button" onClick={pick(actions.carry)}><ArrowRight className="w-3.5 h-3.5" />Carry to {nextLabel}</button>}
-          {!t.completed && vm.fate !== 'someday' && actions.someday && <button role="menuitem" type="button" onClick={pick(actions.someday)}><Moon className="w-3.5 h-3.5" />Someday</button>}
+          {!when && !t.completed && vm.fate !== 'someday' && actions.someday && <button role="menuitem" type="button" onClick={pick(actions.someday)}><Moon className="w-3.5 h-3.5" />Someday</button>}
           {!t.completed && <button role="menuitem" type="button" onClick={pick(actions.drop)}><X className="w-3.5 h-3.5" />Drop it</button>}
-          {(actions.intoLower || actions.today || actions.toggleGoal || (actions.unlink && t.goalTaskId)) && !t.completed && <div className="pv2-msep" />}
+          {(actions.intoLower || (actions.today && !when) || actions.toggleGoal || (actions.unlink && t.goalTaskId)) && !t.completed && <div className="pv2-msep" />}
           {actions.intoLower && !t.completed && <button role="menuitem" type="button" onClick={pick(actions.intoLower.run)}><ArrowDownRight className="w-3.5 h-3.5" />{actions.intoLower.label}</button>}
-          {actions.today && !t.completed && <button role="menuitem" type="button" onClick={pick(actions.today)}><Sun className="w-3.5 h-3.5" />Do it today</button>}
+          {actions.today && !when && !t.completed && <button role="menuitem" type="button" onClick={pick(actions.today)}><Sun className="w-3.5 h-3.5" />Do it today</button>}
           {actions.toggleGoal && !t.completed && <button role="menuitem" type="button" onClick={pick(actions.toggleGoal)}><Target className="w-3.5 h-3.5" />{t.isGoal ? 'Make it a single task' : 'Make it a goal'}</button>}
           {actions.unlink && t.goalTaskId && <button role="menuitem" type="button" onClick={pick(actions.unlink)}><Unlink className="w-3.5 h-3.5" />Remove from goal</button>}
           {monthLine && <button role="menuitem" type="button" onClick={() => setForMonth(true)}><Link2 className="w-3.5 h-3.5" />{forNow ? `Change ${monthLine.month} goal…` : `Link to ${/^[aeiou]/i.test(monthLine.month) ? 'an' : 'a'} ${monthLine.month} goal…`}</button>}
           {linkUp && <button role="menuitem" type="button" onClick={() => setLinking(true)}><Link2 className="w-3.5 h-3.5" />{vm.partOf ? `Change ${linkUp.rung} goal…` : `Link to a ${linkUp.rung} goal…`}</button>}
           <div className="pv2-msep" />
-          <button role="menuitem" type="button" onClick={pick(actions.details)}><PanelRight className="w-3.5 h-3.5" />All details</button>
+          <button role="menuitem" type="button" onClick={pick(actions.details)}><PanelRight className="w-3.5 h-3.5" />{moreLabel('open')}</button>
           </>}
         </div>,
         document.body,

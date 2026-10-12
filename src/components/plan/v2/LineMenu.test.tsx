@@ -29,4 +29,22 @@ describe('LineMenu', () => {
     fireEvent.mouseDown(document.body)
     expect(screen.queryByRole('menu')).toBeNull()
   })
+
+  // The triage contract on the week's planning rows (2026-10-12): When… opens
+  // the same When group every task surface shows; its Someday and Today stand
+  // in for the menu's own.
+  it('a week row’s When… offers the contract’s When and routes the pick', () => {
+    const pick = vi.fn()
+    const weekTask = { ...task, isGoal: false } as Task
+    const a = { ...actions, someday: vi.fn(), today: vi.fn(), when: { pick } } as unknown as LineActions
+    render(<LineMenu vm={{ ...vm, task: weekTask }} actions={a} nextLabel="next week" />)
+    fireEvent.click(screen.getByRole('button', { name: /More for/ }))
+    expect(screen.queryByRole('menuitem', { name: /Do it today/ })).toBeNull()
+    expect(screen.queryByRole('menuitem', { name: /^Someday$/ })).toBeNull()
+    expect(screen.getByRole('menuitem', { name: /Complete/ })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('menuitem', { name: /When…/ }))
+    fireEvent.click(screen.getByRole('menuitem', { name: /^Tomorrow/ }))
+    expect(pick).toHaveBeenCalledWith(weekTask, 'tomorrow')
+    expect(screen.queryByRole('menu')).toBeNull()
+  })
 })
