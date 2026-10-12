@@ -1,8 +1,8 @@
 # Week, Season and Year — coordinator status
 
-Coordinator: Claude background session (this worktree). Last updated 2026-10-12 16:45 ET.
+Coordinator: Claude background session (this worktree). Last updated 2026-10-12 16:50 ET.
 
-**State: agents launched; nothing integrated or released yet. Not ready for review.**
+**State: three agents running (launched 16:48); nothing integrated or released yet. Not ready for review.**
 
 ## Integration branch
 
@@ -11,7 +11,7 @@ Coordinator: Claude background session (this worktree). Last updated 2026-10-12 
 - `dae0cb29` **TEMP Month baseline snapshot** — the Month session's uncommitted working tree at 16:38
   (`codex/month-purpose`). Season and Year build on it so they match Month's board. It will be dropped
   and replaced by Month's final commit (or origin/main once Month ships) before review.
-- Coordinator seam commit (below): shared session-progress hook and ConstellationPage regions.
+- `16e99ce2`, `9951089c`, `8f13013a` coordinator seam: `useSessionProgress` (+5 tests), ConstellationPage `boardLayout` and Season/Year regions, per-horizon stylesheets. Constellation tests 66/66, typecheck clean at `8f13013a`.
 
 ## Agent assignments
 
@@ -21,7 +21,7 @@ Coordinator: Claude background session (this worktree). Last updated 2026-10-12 
 | Season | Season agent | `.worktrees/horizon-season` | `claude/horizon-season` |
 | Year | Year agent | `.worktrees/horizon-year` | `claude/horizon-year` |
 
-All three branch from the coordinator seam commit on `codex/horizon-purpose`.
+All three branch from `8f13013a`. Agent instructions: shared rules + one horizon each (Week = Scott's exact four steps; Season = year goals as source; Year = previous year as review material).
 
 ## Shared-file ownership
 
@@ -46,9 +46,9 @@ All three branch from the coordinator seam commit on `codex/horizon-purpose`.
 ## Progress
 
 - [x] Month snapshot + seam committed
-- [ ] Week agent
-- [ ] Season agent
-- [ ] Year agent
+- [~] Week agent — running
+- [~] Season agent — running
+- [~] Year agent — running
 - [ ] Rebase onto Month's final commit
 - [ ] Integrate, cross-horizon consistency pass, desktop/phone/keyboard/reduced-motion checks
 - [ ] Full tests, lint, build; PR for review (no production release without Scott's approval)
