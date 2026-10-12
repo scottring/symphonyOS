@@ -193,11 +193,11 @@ describe('RhythmPage — a card\'s ⋯ menu', () => {
     await waitFor(() => expect(onUpdateRoutine).toHaveBeenCalledWith('jax', { show_on_timeline: false }))
   })
 
-  it('Hide for today skips today only', async () => {
+  it('Skip this time skips today only', async () => {
     hide.hideForToday.mockClear()
     render(<RhythmPage {...noop} onUpdateRoutine={vi.fn()} routines={[mk('Walk Jax', { id: 'jax', time_of_day: '06:30:00' })]} />)
     open('Walk Jax')
-    fireEvent.click(screen.getByRole('menuitem', { name: /^Hide for today/ }))
+    fireEvent.click(screen.getByRole('menuitem', { name: /^Skip this time/ }))
     await waitFor(() => expect(hide.hideForToday).toHaveBeenCalled())
     expect(hide.hideForToday.mock.calls[0][0]).toBe('jax')
   })

@@ -30,7 +30,7 @@ describe('useHideForToday', () => {
     await act(async () => { await result.current.hide.hideForToday('bed', 'Bedtime', DAY) })
 
     expect(api.skip).toHaveBeenCalledWith('routine', 'bed', DAY)
-    expect(result.current.activity.receipt).toMatchObject({ state: 'saved', request: 'Hide "Bedtime" for today', undoable: true })
+    expect(result.current.activity.receipt).toMatchObject({ state: 'saved', request: expect.stringMatching(/^Skip "Bedtime" this time · /), undoable: true })
     expect(result.current.activity.isArrived('bed')).toBe(true)
 
     await act(async () => { await result.current.activity.undo() })

@@ -34,7 +34,8 @@ import {
 
 /** The three ways to stop a routine showing, labelled once for every surface. */
 export const ROUTINE_HIDE_LABELS = {
-  today: 'Hide for today',
+  // The triage contract's word for one occurrence (lib/triage/contract.ts).
+  today: 'Skip this time',
   rest: 'Rest until…',
   off: 'Off',
 } as const

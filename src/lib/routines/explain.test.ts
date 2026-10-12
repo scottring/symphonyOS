@@ -164,7 +164,7 @@ describe('helpers', () => {
   })
 
   it('labels the three strengths once', () => {
-    expect(Object.values(ROUTINE_HIDE_LABELS)).toEqual(['Hide for today', 'Rest until…', 'Off'])
+    expect(Object.values(ROUTINE_HIDE_LABELS)).toEqual(['Skip this time', 'Rest until…', 'Off'])
   })
 
   it('summarizes every surface in one line', () => {

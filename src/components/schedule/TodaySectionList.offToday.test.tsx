@@ -111,7 +111,7 @@ describe('taking a routine off Today', () => {
 
     await screen.findByText('Kids Bedtime routine')
     fireEvent.click(screen.getByLabelText('Routine options'))
-    fireEvent.click(screen.getByRole('menuitem', { name: /hide for today/i }))
+    fireEvent.click(screen.getByRole('menuitem', { name: /skip this time/i }))
 
     expect(hideForToday).toHaveBeenCalledTimes(1)
     const [id, name, date] = hideForToday.mock.calls[0]

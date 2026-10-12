@@ -7,7 +7,7 @@ import { CanvasActivityProvider, useCanvasActivity } from '@/contexts/CanvasActi
 const TUE = new Date(2026, 9, 13)
 const WED = new Date(2026, 9, 14)
 
-// Hide for today writes through the instance writer; its own test covers the
+// Skip this time writes through the instance writer; its own test covers the
 // write and Undo. Here we see what the panel asks of it.
 const { hide, skippedOn } = vi.hoisted(() => ({
   hide: { hideForToday: vi.fn(async () => true), showToday: vi.fn(async () => true) },
@@ -91,29 +91,35 @@ describe('TapRoutinePanel', () => {
     expect(within(where).getByText('On the week on Tue at 8:00 PM')).toBeInTheDocument()
   })
 
-  it('offers three distinct controls: Hide for today, Rest until…, Off', () => {
+  // The triage contract (2026-10-12): "Hide for today" is "Skip this time",
+  // with its date, under This time; Rest, Off and the schedule are labelled
+  // Whole routine so an occurrence action can't be mistaken for an edit.
+  it('separates This time (Skip this time · date) from Whole routine (Rest until…, Off)', () => {
     render(
       <TapRoutinePanel routine={routine} onClose={vi.fn()} onNotesChange={vi.fn()} onContextChange={vi.fn()}
         onVisibilityChange={vi.fn()} onShowOnTodayChange={vi.fn()} onRestUntilChange={vi.fn()} viewedDate={TUE} />,
     )
-    const controls = screen.getByRole('region', { name: 'Hide it' })
-    expect(within(controls).getByRole('button', { name: 'Hide for today' })).toBeInTheDocument()
-    expect(within(controls).getByText('Rest until…')).toBeInTheDocument()
-    expect(within(controls).getByLabelText('Rest until')).toBeInTheDocument()
-    expect(within(controls).getByRole('switch', { name: 'Off' })).toHaveAttribute('aria-checked', 'false')
-    // Each says how strong it is.
-    expect(within(controls).getByText(/Skips today’s occurrence only/)).toBeInTheDocument()
-    expect(within(controls).getByText(/Pauses it everywhere/)).toBeInTheDocument()
+    const thisTime = within(screen.getByRole('region', { name: 'This time' }))
+    expect(thisTime.getByText('This time · Tue, Oct 13')).toBeInTheDocument()
+    expect(thisTime.getByText('Skip this time · Tue, Oct 13')).toBeInTheDocument()
+    expect(thisTime.getByRole('button', { name: 'Skip this time' })).toBeInTheDocument()
+    expect(thisTime.getByText(/Skips this one time only/)).toBeInTheDocument()
+    const whole = within(screen.getByRole('region', { name: 'Whole routine' }))
+    expect(whole.getByText('Rest until…')).toBeInTheDocument()
+    expect(whole.getByLabelText('Rest until')).toBeInTheDocument()
+    expect(whole.getByRole('switch', { name: 'Off' })).toHaveAttribute('aria-checked', 'false')
+    expect(whole.getByText(/Pauses it everywhere/)).toBeInTheDocument()
+    expect(thisTime.queryByText('Rest until…')).toBeNull()
   })
 
-  it('Hide for today skips the occurrence; it never rests the routine', async () => {
+  it('Skip this time skips the occurrence on that date; it never rests the routine', async () => {
     const onVisibilityChange = vi.fn()
     const onRestUntilChange = vi.fn()
     render(
       <TapRoutinePanel routine={routine} onClose={vi.fn()} onNotesChange={vi.fn()} onContextChange={vi.fn()}
         onVisibilityChange={onVisibilityChange} onRestUntilChange={onRestUntilChange} viewedDate={TUE} />,
     )
-    fireEvent.click(screen.getByRole('button', { name: 'Hide for today' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Skip this time' }))
     await waitFor(() => expect(hide.hideForToday).toHaveBeenCalledWith('r1', 'Trash night', TUE))
     expect(onVisibilityChange).not.toHaveBeenCalled()
     expect(onRestUntilChange).not.toHaveBeenCalled()
@@ -122,10 +128,40 @@ describe('TapRoutinePanel', () => {
   it('a skipped occurrence reads as skipped and offers to show it again', () => {
     skippedOn.mockReturnValue(true)
     render(<TapRoutinePanel routine={routine} onClose={vi.fn()} onNotesChange={vi.fn()} onContextChange={vi.fn()} onVisibilityChange={vi.fn()} viewedDate={TUE} />)
-    expect(screen.getByText('Skipped for today only — back next time it’s due')).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: 'Show today again' }))
+    expect(screen.getByText('Skipped this time only — the routine itself is unchanged.')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Show it again' }))
     expect(hide.showToday).toHaveBeenCalledWith('r1', 'Trash night', TUE)
     skippedOn.mockReturnValue(false)
+  })
+
+  it('opened for a dated occurrence, it offers the occurrence contract: When (a period asks for a day), Skip this time, Complete', () => {
+    const occ = { completed: false, onPickWhen: vi.fn(), onPickDate: vi.fn(), onComplete: vi.fn() }
+    render(<TapRoutinePanel routine={routine} onClose={vi.fn()} onNotesChange={vi.fn()} onContextChange={vi.fn()} onVisibilityChange={vi.fn()} viewedDate={TUE} occurrence={occ} />)
+    const open = () => fireEvent.click(screen.getByRole('button', { name: 'This time: Trash night' }))
+    open()
+    // Tomorrow is named with its actual date (whatever today is).
+    expect(screen.getByRole('menuitem', { name: /^Tomorrow/ })).toBeInTheDocument()
+    expect(within(screen.getByRole('group', { name: 'More' })).getAllByRole('menuitem').map((m) => m.textContent)).toEqual(['Complete'])
+    fireEvent.click(screen.getByRole('menuitem', { name: /^Next week(?!end)/ }))
+    expect(occ.onPickWhen).not.toHaveBeenCalled()
+    const day = screen.getAllByRole('menuitem').find((m) => !(m as HTMLButtonElement).disabled && /^\w{3}, \w{3} \d+$/.test(m.getAttribute('aria-label') ?? ''))!
+    fireEvent.click(day)
+    expect(occ.onPickWhen).toHaveBeenCalledWith('next-week', expect.any(Date))
+    // Someday explains itself rather than doing nothing.
+    open()
+    fireEvent.click(screen.getByRole('menuitem', { name: /^Someday/ }))
+    expect(screen.getByRole('note')).toHaveTextContent('isn’t available for one time of a routine')
+    // Skip this time from the menu is the same one-occurrence write.
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Skip this time' }))
+    expect(hide.hideForToday).toHaveBeenCalledWith('r1', 'Trash night', TUE)
+    open()
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Complete' }))
+    expect(occ.onComplete).toHaveBeenCalled()
+  })
+
+  it('without a dated occurrence (the Routines page) there is no occurrence menu', () => {
+    render(<TapRoutinePanel routine={routine} onClose={vi.fn()} onNotesChange={vi.fn()} onContextChange={vi.fn()} onVisibilityChange={vi.fn()} viewedDate={TUE} />)
+    expect(screen.queryByRole('button', { name: 'This time: Trash night' })).toBeNull()
   })
 
   it('Rest until… rests with a wake date, and Undo restores what was there', async () => {
@@ -153,7 +189,7 @@ describe('TapRoutinePanel', () => {
     render(<TapRoutinePanel routine={{ ...routine, visibility: 'reference', paused_until: '2027-06-21T04:00:00.000Z' }} onClose={vi.fn()} onNotesChange={vi.fn()} onContextChange={vi.fn()} onVisibilityChange={onVisibilityChange} viewedDate={TUE} />)
     expect(screen.getByText(/Asleep everywhere until Jun 21, 2027/)).toBeInTheDocument()
     expect(screen.getAllByText('Resting until Jun 21, 2027 — it wakes on its own').length).toBeGreaterThan(0)
-    expect(screen.queryByRole('button', { name: 'Hide for today' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Skip this time' })).not.toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Wake now' }))
     await waitFor(() => expect(onVisibilityChange).toHaveBeenCalledWith('active'))
   })

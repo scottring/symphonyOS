@@ -249,17 +249,17 @@ describe('RoutineCollectionRow management menu', () => {
   it('opens the options menu with Hide / Edit / Remove', () => {
     renderWithMenu()
     fireEvent.click(screen.getByRole('button', { name: /routine options/i }))
-    expect(screen.getByRole('menuitem', { name: /hide for today/i })).toBeInTheDocument()
+    expect(screen.getByRole('menuitem', { name: /skip this time/i })).toBeInTheDocument()
     expect(screen.getByRole('menuitem', { name: /edit routine/i })).toBeInTheDocument()
     expect(screen.getByRole('menuitem', { name: /^off/i })).toBeInTheDocument()
   })
 
-  it('Hide for today fires onHideToday and closes the menu', () => {
+  it('Skip this time fires onHideToday and closes the menu', () => {
     renderWithMenu()
     fireEvent.click(screen.getByRole('button', { name: /routine options/i }))
-    fireEvent.click(screen.getByRole('menuitem', { name: /hide for today/i }))
+    fireEvent.click(screen.getByRole('menuitem', { name: /skip this time/i }))
     expect(mgmtHandlers.onHideToday).toHaveBeenCalledTimes(1)
-    expect(screen.queryByRole('menuitem', { name: /hide for today/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('menuitem', { name: /skip this time/i })).not.toBeInTheDocument()
   })
 
   it('Edit routine fires onSelect (opens the routine panel)', () => {
@@ -274,7 +274,7 @@ describe('RoutineCollectionRow management menu', () => {
   it('Off fires onRemove, and says what it hides', () => {
     renderWithMenu()
     fireEvent.click(screen.getByRole('button', { name: /routine options/i }))
-    expect(screen.getByRole('menuitem', { name: /hide for today.*skips today only/i })).toBeInTheDocument()
+    expect(screen.getByRole('menuitem', { name: /skip this time.*skips today only/i })).toBeInTheDocument()
     fireEvent.click(screen.getByRole('menuitem', { name: /^off.*hidden from today and planning/i }))
     expect(mgmtHandlers.onRemove).toHaveBeenCalledTimes(1)
   })
@@ -282,7 +282,7 @@ describe('RoutineCollectionRow management menu', () => {
   it('hides Hide/Remove items when handlers are not provided, keeps Edit', () => {
     render(<RoutineCollectionRow item={collectionItem()} {...handlers} />)
     fireEvent.click(screen.getByRole('button', { name: /routine options/i }))
-    expect(screen.queryByRole('menuitem', { name: /hide for today/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('menuitem', { name: /skip this time/i })).not.toBeInTheDocument()
     expect(screen.getByRole('menuitem', { name: /edit routine/i })).toBeInTheDocument()
   })
 })

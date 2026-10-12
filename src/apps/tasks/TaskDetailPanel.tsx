@@ -22,7 +22,7 @@ import { useAssistantLauncher } from '@/contexts/AssistantLaunchContext';
 // Vault integration is intentionally NOT wired (vault is being removed):
 // onSaveNoteToVault is omitted so the "Save to vault" affordance stays hidden.
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { showToast } from '@/hooks/useToast';
 import { useEscapeKey } from '@/hooks/useEscapeKey';
@@ -58,6 +58,8 @@ import { useMealEventsForDate } from '@/shell/providers/MealEventsProvider';
 import { removeFromGroup, ungroupTasks, deleteTaskGroup } from '@/lib/today/groupTasks';
 import { TapContextPanel } from '@/components/surface/TapContextPanel';
 import { TapRoutinePanel } from '@/components/surface/TapRoutinePanel';
+import { useOccurrenceTriage } from '@/components/surface/hooks/useOccurrenceTriage';
+import { readViewedDay, onViewedDayChange } from '@/lib/viewedDaySignal';
 import { TapStepPanel } from '@/components/surface/TapStepPanel';
 import { groupRoutineSteps } from '@/lib/today/routineCollections';
 import { nextStepOrder } from '@/lib/today/stepOrdering';
@@ -425,6 +427,17 @@ function RoutinePanelBody({ id }: { id: string }) {
     [routines, routine],
   );
   const handleClose = useCallback(() => clearSelection(), [clearSelection]);
+  // The day on screen (Today publishes it): the panel is then about that
+  // day's occurrence too — Skip this time and the occurrence's When act on
+  // it. The panel is drawn by the shell, outside Today's schedule actions, so
+  // the occurrence writes come from useOccurrenceTriage (the same instance
+  // writers) and report through the shell's activity strip.
+  const viewedDay = useSyncExternalStore(onViewedDayChange, readViewedDay);
+  const occurrenceDate = useMemo(() => viewedDay ?? new Date(), [viewedDay]);
+  const occurrence = useOccurrenceTriage(
+    { id, name: routine?.name ?? '', time_of_day: routine?.time_of_day ?? null },
+    occurrenceDate,
+  );
 
   if (!routine) return <PanelLoading />;
 
@@ -458,6 +471,8 @@ function RoutinePanelBody({ id }: { id: string }) {
       routine={routine}
       familyMembers={familyMembers}
       onClose={handleClose}
+      viewedDate={viewedDay ?? undefined}
+      occurrence={viewedDay ? occurrence : undefined}
       {...(steps.length > 0
         ? {
             steps,

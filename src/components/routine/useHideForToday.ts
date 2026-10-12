@@ -14,16 +14,18 @@ import { useCallback, useEffect, useState } from 'react'
 import { useActionableInstances } from '@/hooks/useActionableInstances'
 import { useCanvasActivity } from '@/contexts/CanvasActivityContext'
 import { onInstancesChanged } from '@/lib/instancesChangedSignal'
+import { dayLabel } from '@/lib/triage/periods'
 
 export function useHideForToday() {
   const { skip, undoDone } = useActionableInstances()
   const { run } = useCanvasActivity()
 
-  /** Skip this date's occurrence. Undo returns it to the day. */
+  /** Skip this date's occurrence ("Skip this time"). Undo returns it to the day. */
   const hideForToday = useCallback((routineId: string, name: string, date: Date) => {
     const write = () => skip('routine', routineId, date)
-    const again = () => { void run(`Hide "${name}" for today`, write, { ids: [routineId], undo: () => undoDone('routine', routineId, date) }) }
-    return run(`Hide "${name}" for today`, write, {
+    const label = `Skip "${name}" this time · ${dayLabel(date)}`
+    const again = () => { void run(label, write, { ids: [routineId], undo: () => undoDone('routine', routineId, date) }) }
+    return run(label, write, {
       ids: [routineId],
       undo: () => undoDone('routine', routineId, date),
       retry: again,
@@ -32,7 +34,7 @@ export function useHideForToday() {
 
   /** Un-skip this date's occurrence. Undo skips it again. */
   const showToday = useCallback((routineId: string, name: string, date: Date) => {
-    return run(`Show "${name}" today again`, () => undoDone('routine', routineId, date), {
+    return run(`Show "${name}" again · ${dayLabel(date)}`, () => undoDone('routine', routineId, date), {
       ids: [routineId],
       undo: () => skip('routine', routineId, date),
     })

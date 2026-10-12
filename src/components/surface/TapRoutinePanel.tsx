@@ -29,6 +29,9 @@ import { useThreadUnread } from '@/hooks/useThreadUnread'
 import { useAttachments } from '@/hooks/useAttachments'
 import { useRoutineStepChecklist } from '@/hooks/useRoutineStepChecklist'
 import { scheduleReadback } from '@/lib/routineReadback'
+import { TaskFateMenu } from '@/components/schedule/TaskFateMenu'
+import type { TriageWhen } from '@/lib/triage/contract'
+import { dayLabel } from '@/lib/triage/periods'
 
 /** The rule in words plus the next day it comes up ("Monthly, first weekend
  *  (either day) · next: Sat–Sun, Nov 7–8") — the old summary printed the raw
@@ -57,8 +60,18 @@ interface TapRoutinePanelProps {
    *  provided, and only while the routine is Active — "off Today" says nothing
    *  about a routine that is resting off everything. */
   onShowOnTodayChange?: (next: boolean) => unknown
-  /** The day "Where it shows" and "Hide for today" are about. Defaults to today. */
+  /** The day "Where it shows" and "Skip this time" are about. Defaults to today. */
   viewedDate?: Date
+  /** The occurrence on `viewedDate`, when the panel was opened from a day
+   *  (Today): the triage contract for that one time — When, Skip this time,
+   *  Complete — drawn by the shared TaskFateMenu. Nothing in it edits the
+   *  routine; the whole-routine settings sit apart below. */
+  occurrence?: {
+    completed: boolean | null
+    onPickWhen: (when: TriageWhen, day?: Date) => void
+    onPickDate: (at: Date, isAllDay: boolean) => void
+    onComplete: () => void
+  }
   /** Extra context for the explanation (a Step's parent, a lens override). */
   explainCtx?: Partial<ExplainCtx>
   onAssignChange?: (memberIds: string[]) => void
@@ -141,6 +154,9 @@ export function TapRoutinePanel(props: TapRoutinePanelProps) {
   // itself, so it writes directly.
   const { run } = useCanvasActivity()
   const { hideForToday, showToday } = useHideForToday()
+  // Skip this time: ONE occurrence (a skipped instance on this date), with
+  // Undo; the routine itself is untouched.
+  const skipThisTime = () => { void (skipped ? showToday(routine.id, routine.name, viewedDate) : hideForToday(routine.id, routine.name, viewedDate)) }
   const [restDate, setRestDate] = useState('')
   const write = async (fn: () => unknown) => (await fn()) !== false
   const saveRest = (visibility: RoutineVisibility, pausedUntil: string | null) => async () => {
@@ -236,33 +252,52 @@ export function TapRoutinePanel(props: TapRoutinePanelProps) {
         </div>
 
         {/* Three strengths of "not showing", kept apart so the difference
-            is visible: Hide for today (this occurrence), Rest until… (the
+            is visible: Skip this time (this occurrence), Rest until… (the
             whole routine, everywhere, wakes on a date), Off (keeps running
-            and stays on the kiosk; hidden from Today and planning). */}
-        <section aria-label="Hide it" className="routine-hide-controls">
-          {onTimeline && !props.unsaved && (
+            and stays on the kiosk; hidden from Today and planning). The first
+            is about THIS TIME and sits with the occurrence's triage; the other
+            two, and the schedule, are labelled as the whole routine. */}
+        {onTimeline && !props.unsaved && (
+          <section aria-label="This time" className="routine-hide-controls">
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-neutral-400">This time · {dayLabel(viewedDate)}</p>
             <div className="routine-hide-control">
               <div className="routine-hide-control-text">
-                <span className="routine-hide-control-title">{ROUTINE_HIDE_LABELS.today}</span>
+                <span className="routine-hide-control-title">{ROUTINE_HIDE_LABELS.today} · {dayLabel(viewedDate)}</span>
                 <span className="routine-hide-control-hint">
                   {skipped
-                    ? 'Skipped for today only — the routine itself is unchanged.'
+                    ? 'Skipped this time only — the routine itself is unchanged.'
                     : canHideToday
-                      ? 'Skips today’s occurrence only. Back next time it’s due.'
-                      : 'Not on Today today — nothing to hide.'}
+                      ? 'Skips this one time only. The routine keeps its schedule.'
+                      : 'Not on this day — nothing to skip.'}
                 </span>
               </div>
               <button
                 type="button"
                 className="canvas-chip"
                 disabled={!skipped && !canHideToday}
-                onClick={() => { void (skipped ? showToday(routine.id, routine.name, viewedDate) : hideForToday(routine.id, routine.name, viewedDate)) }}
+                onClick={skipThisTime}
               >
-                {skipped ? 'Show today again' : ROUTINE_HIDE_LABELS.today}
+                {skipped ? 'Show it again' : ROUTINE_HIDE_LABELS.today}
               </button>
             </div>
-          )}
+            {props.occurrence && canHideToday && !skipped && (
+              <div className="routine-hide-control">
+                <div className="routine-hide-control-text">
+                  <span className="routine-hide-control-title">Move or complete this time</span>
+                  <span className="routine-hide-control-hint">Another day or time, or done — for this one time only.</span>
+                </div>
+                <TaskFateMenu entity="occurrence" label={`This time: ${routine.name}`} triggerText="This time…"
+                  triggerClassName="canvas-chip inline-flex items-center gap-1"
+                  currentDay={viewedDate} completed={!!props.occurrence.completed}
+                  onPickWhen={props.occurrence.onPickWhen} onPickDate={props.occurrence.onPickDate}
+                  onSkip={skipThisTime} onComplete={props.occurrence.onComplete} />
+              </div>
+            )}
+          </section>
+        )}
 
+        <section aria-label="Whole routine" className="routine-hide-controls">
+          <p className="text-[11px] font-semibold uppercase tracking-wider text-neutral-400">Whole routine</p>
           <div className="routine-hide-control">
             <div className="routine-hide-control-text">
               <span className="routine-hide-control-title">{onTimeline ? ROUTINE_HIDE_LABELS.rest : 'Resting'}</span>
@@ -345,7 +380,6 @@ export function TapRoutinePanel(props: TapRoutinePanelProps) {
               </button>
             </div>
           )}
-        </section>
 
         {/* Schedule (recurrence + time) — collapsed summary, expands to edit */}
         {props.onScheduleChange && (
@@ -379,6 +413,7 @@ export function TapRoutinePanel(props: TapRoutinePanelProps) {
             )}
           </div>
         )}
+        </section>
 
         {/* A zero-step routine IS the atom — even RhythmPage's always-visible
             "add first step" Steps section counts as zero steps. Once real steps
