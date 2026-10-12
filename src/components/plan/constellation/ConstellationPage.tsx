@@ -266,7 +266,7 @@ function Inner() {
       undo: async () => (await updateTask(node.id, patch.before)) !== false,
       retry: () => { void moveUnder(node, parent) },
     }).then((ok) => {
-      if (ok && parent && node.level === 2) setLinked({ child: node.key, parent: parent.key })
+      if (ok && parent && node.level > 0) setLinked({ child: node.key, parent: parent.key })
       return ok
     })
   }
