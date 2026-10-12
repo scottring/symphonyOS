@@ -1,5 +1,6 @@
 import { keepsWeekView } from '@/lib/week/keepsWeekView'
-import { weekRangeFromParams, weekStartParam } from '@/lib/week/weekStartParam'
+import { currentWeekCleanup, weekRangeFromParams, weekStartParam } from '@/lib/week/weekStartParam'
+import { useWeekRollover } from '@/hooks/useWeekRollover'
 import { useLocation, useSearchParams } from 'react-router-dom'
 import { useState, useMemo, useCallback, useEffect, useRef, type ReactNode } from 'react'
 import { useCadenceConfig, readCadenceConfig, weekStartAnchor } from '@/lib/cadence/config'
@@ -280,7 +281,7 @@ export function HomeView({
     setWeekStart(range[0])
     setRangeDays(range.length)
     onDateChange(range[0])
-    const next = weekStartParam(fixedView, range.length, location.search, range[0], readCadenceConfig().weekStartsOn)
+    const next = weekStartParam(fixedView, range.length, location.search, range[0], readCadenceConfig().weekStartsOn, new Date())
     if (!next) return
     selfWeekNav.current = true
     setSearchParams(next, { replace: true })
@@ -301,7 +302,7 @@ export function HomeView({
   const goToWeek = useCallback((weekAnchor: Date, viewed: Date = weekAnchor) => {
     setWeekStart(weekAnchor)
     onDateChange(viewed)
-    const next = weekStartParam(fixedView, rangeDays, location.search, weekAnchor, readCadenceConfig().weekStartsOn)
+    const next = weekStartParam(fixedView, rangeDays, location.search, weekAnchor, readCadenceConfig().weekStartsOn, new Date())
     if (!next) return
     selfWeekNav.current = true
     setSearchParams(next, { replace: false })
@@ -326,6 +327,10 @@ export function HomeView({
     previousWeekLocation.current = { pathname: location.pathname, search: location.search }
     if (selfWeekNav.current) { selfWeekNav.current = false; return }
     if (fixedView !== 'week' || keepView) return
+    // A link that names the current week ("Open week 41 →") arrives as the
+    // bare page, so the page keeps showing the current week after it ends.
+    const clean = currentWeekCleanup(location.search, readCadenceConfig().weekStartsOn, new Date())
+    if (clean) { setSearchParams(clean, { replace: true }); return }
     const range = weekRangeFromParams(new URLSearchParams(location.search), readCadenceConfig().weekStartsOn, new Date())
     setWeekStart(range[0])
     setRangeDays(range.length)
@@ -335,7 +340,13 @@ export function HomeView({
     if (sundayOfWeek(viewedDateRef.current).getTime() !== sundayOfWeek(range[0]).getTime()) {
       onDateChangeRef.current(range[0])
     }
-  }, [fixedView, location.key, location.pathname, location.search])
+  }, [fixedView, location.key, location.pathname, location.search, setSearchParams])
+
+  // Left open on the current week, the page moves on when the week ends.
+  useWeekRollover(weekStart, rangeDays === 7, fixedView === 'week', useCallback((next: Date) => {
+    setWeekStart(next)
+    onDateChangeRef.current(next)
+  }, []))
 
   // Changing the setting re-anchors the week on screen. Without this the view
   // keeps whatever the initial state captured until a remount, so the setting

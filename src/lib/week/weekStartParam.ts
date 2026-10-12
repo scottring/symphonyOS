@@ -30,6 +30,7 @@ export function weekStartParam(
   search: string,
   weekAnchor: Date,
   weekStartsOn?: WeekStart,
+  today?: Date,
 ): URLSearchParams | null {
   if (view !== 'week') return null
   const next = new URLSearchParams(search)
@@ -41,6 +42,12 @@ export function weekStartParam(
     // way back in.
     next.delete('range')
     next.delete('days')
+    // The current week, like Today's today, is the page with no date in its
+    // URL: written in, it would outlive the week (Scott, 2026-10-12).
+    if (today && weekStartsOn !== undefined && localYmd(weekStartAnchor(today, weekStartsOn)) === localYmd(weekAnchor)) {
+      next.delete('start')
+      next.delete('date')
+    }
     return next
   }
   // The kind names the run the way the Week range menu does, so the menu shows
@@ -76,4 +83,22 @@ export function weekRangeFromParams(params: URLSearchParams, weekStartsOn: WeekS
     ?? (range === 'weekend' || range === 'three'
       ? presetRange(range, today)
       : weekRange(today, weekStartsOn))
+}
+
+/**
+ * A URL that names the current calendar week (`start`, and the `date` that
+ * rides with it) is cleaned to the bare page, so it keeps showing the current
+ * week after this one ends. Null when there is nothing to clean: no start, a
+ * past or future week, or an exact run (`days`).
+ */
+export function currentWeekCleanup(search: string, weekStartsOn: WeekStart, today: Date): URLSearchParams | null {
+  const params = new URLSearchParams(search)
+  const start = params.get('start')
+  if (!start || params.get('days') || params.get('range')) return null
+  const shown = weekRangeFromStartParam(start, weekStartsOn)
+  if (!shown || localYmd(shown[0]) !== localYmd(weekStartAnchor(today, weekStartsOn))) return null
+  params.delete('start')
+  const date = params.get('date')
+  if (date && /^\d{4}-\d{2}-\d{2}$/.test(date) && localYmd(weekStartAnchor(parseLocalYmd(date), weekStartsOn)) === localYmd(shown[0])) params.delete('date')
+  return params
 }

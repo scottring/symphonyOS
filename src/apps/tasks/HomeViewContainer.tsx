@@ -22,7 +22,7 @@ import { densitySourcesFor, type DensitySources } from '@/lib/planning/dayDensit
 import { makeEventMover } from '@/lib/calendar/moveEvent';
 import { PageFromPaperFlow } from '@/components/capture/PageFromPaperFlow';
 import { PaperPlanFlow } from '@/components/capture/PaperPlanFlow';
-import { localYmd } from '@/lib/cadence/config';
+import { localYmd, readCadenceConfig, weekStartAnchor } from '@/lib/cadence/config';
 import { parseRoutineTimelineId } from '@/lib/today/doseExpansion';
 import { groupItems, addToGroup, removeFromGroup, ungroupTasks } from '@/lib/today/groupTasks';
 import { useConvertTaskToProject } from '@/hooks/useConvertTaskToProject';
@@ -152,7 +152,11 @@ export function HomeViewContainer({ fixedView }: { fixedView?: 'today' | 'week' 
    */
   const changeViewedDate = useCallback((next: Date) => {
     setViewedDate(next);
-    const isToday = localYmd(next) === localYmd(new Date());
+    // On Week, any day of the current week is "now": none is written in, so
+    // the URL never pins a week that will end (Scott, 2026-10-12).
+    const weekStartsOn = readCadenceConfig().weekStartsOn;
+    const isToday = localYmd(next) === localYmd(new Date())
+      || (fixedView === 'week' && localYmd(weekStartAnchor(next, weekStartsOn)) === localYmd(weekStartAnchor(new Date(), weekStartsOn)));
     setSearchParams((prev) => {
       if (isToday && !prev.get('date')) return prev;
       const out = new URLSearchParams(prev);
@@ -160,7 +164,7 @@ export function HomeViewContainer({ fixedView }: { fixedView?: 'today' | 'week' 
       else out.set('date', localYmd(next));
       return out;
     }, { replace: true });
-  }, [setSearchParams]);
+  }, [setSearchParams, fixedView]);
 
   // "Your first week" — a fresh household's onboarding card. uid is fetched
   // once (not via useAuth, which this tree already has several copies of via

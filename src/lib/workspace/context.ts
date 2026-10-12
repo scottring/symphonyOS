@@ -18,6 +18,19 @@ export interface WorkspaceContext {
   guide?: string
   /** Regions on screen that Symphony may point at, read when a turn is sent. */
   targets?: {id:string;label:string}[]
+  /** The page's period against today: looking back, at now, or ahead. */
+  viewing?: 'past' | 'current' | 'future'
+}
+/** Where the shown period sits against today's, for the planning pages. */
+function viewingOf(page:string, date:Date, now:Date):WorkspaceContext['viewing'] {
+  const startOf=(d:Date):string|null=>page==='today'?localYmd(d)
+    :page==='week'?localYmd(weekStartAnchor(d,readCadenceConfig().weekStartsOn))
+    :page==='month'?localYmd(new Date(d.getFullYear(),d.getMonth(),1))
+    :page==='season'?localYmd(periodBounds('season',d,readSeasons()).start)
+    :page==='year'?String(d.getFullYear()):null
+  const shown=startOf(date), current=startOf(now)
+  if(shown===null||current===null)return undefined
+  return shown===current?'current':shown<current?'past':'future'
 }
 export function workspaceContext(tasks:Task[], pathname:string, search:string, layers:ReadonlySet<Layer>, selectedId:string|null, now=new Date(), goals:Goal[]=[]):WorkspaceContext {
   const params=new URLSearchParams(search)
@@ -34,7 +47,7 @@ export function workspaceContext(tasks:Task[], pathname:string, search:string, l
   const weekly=weekListTasks(visible,week,null,{isCurrent:localYmd(week)===localYmd(weekStartAnchor(now,readCadenceConfig().weekStartsOn))})
   const candidates=page==='today'||page==='week'?visible.filter(t=>weekly.some(w=>w.id===t.id)||t.id===selectedId||(t.scheduledFor&&localYmd(t.scheduledFor)===localYmd(date))):visible.filter(t=>t.id===selectedId||!t.completed)
   const ordered=[...candidates].sort((a,b)=>Number(b.id===selectedId)-Number(a.id===selectedId))
-  return {periodStarts:{year:localYmd(new Date(date.getFullYear(),0,1)),season:localYmd(periodBounds('season',date,readSeasons()).start),month:localYmd(new Date(date.getFullYear(),date.getMonth(),1)),week:localYmd(week)},intentions:goals.filter(g=>g.year===date.getFullYear()&&g.status!=='archived'&&layers.has(g.context??'unsorted')).slice(0,30).map(g=>({id:g.id,title:g.name,year:g.year})),page,date:localYmd(date),layers:[...layers],selectedId:visible.some(t=>t.id===selectedId)?selectedId:null,items:ordered.slice(0,60).map(t=>({id:t.id,title:t.title,context:t.context??null,scheduledFor:t.scheduledFor?localYmd(t.scheduledFor):null,completed:t.completed,bucket:t.bucket??null,sourceId:t.sourceId&&visible.some(v=>v.id===t.sourceId)?t.sourceId:null,goalId:goals.some(g=>g.id===t.goalId&&layers.has(g.context??'unsorted'))?t.goalId??null:null,periods:(t.commitments??[]).filter(c=>c.status==='open').map(c=>({level:c.level,start:localYmd(c.periodStart)}))})),truncated:ordered.length>60}
+  return {viewing:viewingOf(page,date,now),periodStarts:{year:localYmd(new Date(date.getFullYear(),0,1)),season:localYmd(periodBounds('season',date,readSeasons()).start),month:localYmd(new Date(date.getFullYear(),date.getMonth(),1)),week:localYmd(week)},intentions:goals.filter(g=>g.year===date.getFullYear()&&g.status!=='archived'&&layers.has(g.context??'unsorted')).slice(0,30).map(g=>({id:g.id,title:g.name,year:g.year})),page,date:localYmd(date),layers:[...layers],selectedId:visible.some(t=>t.id===selectedId)?selectedId:null,items:ordered.slice(0,60).map(t=>({id:t.id,title:t.title,context:t.context??null,scheduledFor:t.scheduledFor?localYmd(t.scheduledFor):null,completed:t.completed,bucket:t.bucket??null,sourceId:t.sourceId&&visible.some(v=>v.id===t.sourceId)?t.sourceId:null,goalId:goals.some(g=>g.id===t.goalId&&layers.has(g.context??'unsorted'))?t.goalId??null:null,periods:(t.commitments??[]).filter(c=>c.status==='open').map(c=>({level:c.level,start:localYmd(c.periodStart)}))})),truncated:ordered.length>60}
 }
 export function workspaceDestination(page:unknown,date?:unknown):string|null {
   if(typeof page!=='string'||!WORKSPACE_PAGES.includes(page as WorkspacePage))return null

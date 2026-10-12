@@ -24,14 +24,14 @@
 
 import { useContext, useState, type DragEvent, type FormEvent, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
-import { MoreHorizontal, PanelLeftOpen } from 'lucide-react'
+import { MoreHorizontal } from 'lucide-react'
 import type { Task, TaskContext } from '@/types/task'
 import type { PlanNode } from '@/components/plan/constellation/model'
 import { MoveUnderMenu } from '@/components/canvas/plan/MoveUnderMenu'
-import { UpstreamDrawer, useUpstreamDrawer } from '@/components/plan/constellation/UpstreamDrawer'
 import { ContextPicker } from '@/components/triage/ContextPicker'
 import { assigneesOf } from '@/lib/planning/v2/planV2'
-import { localYmd } from '@/lib/cadence/config'
+import { localYmd, readCadenceConfig, weekStartAnchor } from '@/lib/cadence/config'
+import { Link } from 'react-router-dom'
 import { formatTimeCompact } from '@/lib/dateHelpers'
 import { isPlanDrag, readPlanDrag, writePlanDrag, type PlanDragPayload } from '@/lib/planning/planDrag'
 import { useMediaQuery } from '@/hooks/useMediaQuery'
@@ -151,7 +151,7 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
   const [composer, setComposer] = useState<string | null>(focusAdd ? 'unlinked' : null)
   const [panel, setPanel] = useState<{ key: string; kind: 'people' | 'area' | 'move' } | null>(null)
   const [quietOpen, setQuietOpen] = useState(false)
-  const drawerUi = useUpstreamDrawer()
+  const [overGoal, setOverGoal] = useState<string | null>(null)
   const todayKey = localYmd(new Date())
   const [chosenDay, setChosenDay] = useState<string | null>(null)
   const selectedKey = chosenDay && days.some((d) => d.key === chosenDay) ? chosenDay : (days.find((d) => d.key === todayKey) ?? days[0])?.key
@@ -169,7 +169,7 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
   const dayOcc = (routineId: string, key: string) => days.find((d) => d.key === key)?.items.find((it) => it.routineId === routineId) ?? null
 
   // ── drag ───────────────────────────────────────────────────────────────
-  const endDrag = () => { setDrag(null); setOverDay(null); setOverShelf(false) }
+  const endDrag = () => { setDrag(null); setOverDay(null); setOverShelf(false); setOverGoal(null) }
   const startDrag = (ev: DragEvent, payload: PlanDragPayload, d: Drag) => {
     writePlanDrag(ev.dataTransfer, payload)
     setDrag(d); setPicker(null); setMenu(null)
@@ -278,8 +278,15 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
     const source = drag?.groupKey === g.key
     const menuKey = `group:${g.key}`
     const rows = [...g.rows, ...(showDone ? g.done : [])]
+    // Drop a task on a goal's card to put it under that goal, as Move under… does.
+    const target = fileTarget(g)
+    const fileDrop = target ? {
+      onDragOver: (e: DragEvent) => { e.preventDefault(); e.stopPropagation(); if (overGoal !== g.key) setOverGoal(g.key) },
+      onDragLeave: (e: DragEvent) => { if (!(e.currentTarget as HTMLElement).contains(e.relatedTarget as Node | null)) setOverGoal((k) => k === g.key ? null : k) },
+      onDrop: (e: DragEvent) => { e.preventDefault(); e.stopPropagation(); if (draggedTask) writers.moveUnder(draggedTask, target); endDrag() },
+    } : {}
     return (
-      <section key={g.key} className={`canvas-group wc-group${g.milestone ? '' : ' is-unlinked'}${source ? ' is-source' : ''}`} aria-label={title}>
+      <section key={g.key} className={`canvas-group wc-group${g.milestone ? '' : ' is-unlinked'}${source ? ' is-source' : ''}${target ? ' is-drop-ok' : ''}${overGoal === g.key && target ? ' is-drop' : ''}`} aria-label={title} {...fileDrop}>
         <div className="canvas-group-head wc-group-head">
           <span className="canvas-group-title">{title}</span>
           {g.milestone && (
@@ -307,28 +314,14 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
       </section>
     )
   }
-  // ── the month's goals, beside the shelf (2026-10-11) ───────────────────
-  // Drop a task on one to file it under it, as Move under… does.
-  const drawerShown = drawerUi.shown && !phone
+  // ── filing: a task dragged onto a goal's card goes under that goal ────
   const draggedTask = drag?.kind === 'task' ? shelfTasks.get(drag.id) ?? dayTask(drag.id)?.item.task : undefined
-  const fileTarget = (g: ShelfGroup) => {
+  function fileTarget(g: ShelfGroup) {
     if (!draggedTask || !g.milestone) return null
     const o = writers.moveUnderOptions(draggedTask)
     const parent = o?.parents.find((n) => n.id === g.milestone!.id)
     return o && parent && o.item.parent !== parent.key ? parent : null
   }
-  const goals = shelf.filter((g) => g.milestone && !g.milestone.completed).map((g) => ({ key: g.key, title: g.milestone!.title, group: g }))
-  const drawer = drawerShown && (
-    <UpstreamDrawer title={`${monthName} goals`} childTerm="task" parents={goals}
-      countOf={(x) => x.group.rows.length} dragging={!!draggedTask}
-      canDropOn={(x) => !!fileTarget(x.group)}
-      onDrop={(x) => { const parent = fileTarget(x.group); if (draggedTask && parent) writers.moveUnder(draggedTask, parent); endDrag() }}
-      // A goal with nothing this week is folded on the shelf: open it, ready to add.
-      onPick={(x) => { setQuietOpen(true); setMenu(null); setComposer(x.group.key) }}
-      pickLabel={(x) => `Add a task for ${x.title}`}
-      onClose={() => drawerUi.setOpen(false)}
-      empty={`No ${monthName} goals yet.`} />
-  )
 
   const unlinked = shelf.filter((g) => !g.milestone)
   // Milestones with nothing this week fold into one quiet line (2026-10-10:
@@ -361,9 +354,6 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
       <div className="wc-shelf-head">
         <h2 className="wc-label">Still to place</h2>
         <p className="wc-hint">{phone ? 'Press + to give it a day' : 'Drag onto a day, or press + to give it a day'}</p>
-        {!phone && drawerUi.available && !drawerUi.open && <button type="button" className="canvas-link plan-drawer-open" aria-expanded={false} onClick={() => drawerUi.setOpen(true)}>
-          <PanelLeftOpen size={15} aria-hidden="true" /> Show {monthName} goals
-        </button>}
       </div>
       {lookBack && lookBack.count > 0 && (
         // Nothing moves by itself: last week's open work waits for a decision
@@ -373,18 +363,17 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
           <button type="button" className="canvas-link wc-quiet-link" onClick={lookBack.onReview}>Review</button>
         </p>
       )}
-      {/* With the goals beside it, what serves no goal yet leads. */}
       <div className="wc-masonry">
-        {drawerShown ? <>{unlinked.map(groupCard)}{routinesCard}{linked.map(groupCard)}</> : <>{linked.map(groupCard)}{routinesCard}{unlinked.map(groupCard)}</>}
+        {linked.map(groupCard)}{routinesCard}{unlinked.map(groupCard)}
       </div>
-      {quiet.length > 0 && drawerShown && quietOpen && <div className="wc-masonry">{quiet.map(groupCard)}</div>}
-      {quiet.length > 0 && !drawerShown && (
+      {quiet.length > 0 && (
         <>
           <p className="wc-quiet-line">
             Also in {monthName}: {quiet.length === 1 ? 'one goal' : `${quiet.length} goals`} with nothing this week{' '}·{' '}
-            <button type="button" className="canvas-link wc-quiet-link" aria-expanded={quietOpen} onClick={() => setQuietOpen((o) => !o)}>{quietOpen ? 'Hide' : 'Show'}</button>
+            <button type="button" className="canvas-link wc-quiet-link" aria-expanded={quietOpen || !!draggedTask} onClick={() => setQuietOpen((o) => !o)}>{quietOpen ? 'Hide' : 'Show'}</button>
           </p>
-          {quietOpen && <div className="wc-masonry">{quiet.map(groupCard)}</div>}
+          {/* Goals with nothing this week open while a task is dragged, so it can go under one. */}
+          {(quietOpen || !!draggedTask) && <div className="wc-masonry">{quiet.map(groupCard)}</div>}
         </>
       )}
     </section>
@@ -483,9 +472,15 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
       ))}
     </div>
   )
+  // A past week says so, with the way back (Scott, 2026-10-12: a page left
+  // open showed last week as if it were this one).
+  const past = !isCurrent && weekStart.getTime() < weekStartAnchor(new Date(), readCadenceConfig().weekStartsOn).getTime()
+  const pastNote = past && <span className="wc-past" role="note">
+    <b>Past week</b> · <Link className="canvas-link" to="/week?view=alongside">Back to this week</Link>
+  </span>
   const subtitleNode = slots?.subline && !phone
-    ? createPortal(<span className="wc-subtitle">{subtitle}</span>, slots.subline)
-    : <p className="wc-subtitle is-inline">{subtitle}</p>
+    ? createPortal(<>{pastNote}<span className="wc-subtitle">{subtitle}</span></>, slots.subline)
+    : <>{pastNote && <p className="wc-subtitle is-inline">{pastNote}</p>}<p className="wc-subtitle is-inline">{subtitle}</p></>
 
   if (phone) {
     const sel = days.find((d) => d.key === selectedKey)
@@ -511,7 +506,7 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
   return (
     <div className={`wc${drag ? ' is-dragging' : ''}`}>
       {subtitleNode}
-      {drawer ? <div className="plan-body has-drawer wc-shelf-row"><div className="wc-drawer-cell">{drawer}</div><div className="plan-board">{shelfNode}</div></div> : shelfNode}
+      {shelfNode}
       <section className="wc-days" aria-label="The days">
         <div className="wc-days-head"><h2 className="wc-label">The days</h2>{doneToggle}</div>
         {spans.length > 0 && (

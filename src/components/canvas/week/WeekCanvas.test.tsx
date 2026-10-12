@@ -202,49 +202,38 @@ describe('WeekCanvas — drag', () => {
   })
 })
 
-describe('WeekCanvas — the month’s goals beside the shelf', () => {
-  const original = window.matchMedia
-  beforeEach(() => {
-    try { localStorage.removeItem('symphony.plan.upstreamDrawer') } catch { /* none */ }
-    window.matchMedia = ((query: string) => ({ ...original(query), matches: query === '(min-width: 1024px)' })) as typeof window.matchMedia
-  })
-  afterEach(() => { window.matchMedia = original })
-  const drawer = () => within(screen.getByRole('complementary', { name: 'October goals' }))
-
-  it('lists every open goal, even one with nothing this week, and leads the shelf with Unlinked', () => {
+// Scott, 2026-10-12: the column of October goals repeated the goal cards
+// and, stacked full width, pushed the days off the screen. Each goal is
+// named once, on its card, and a task is filed by dropping it on one.
+describe('WeekCanvas — filing a task under a goal', () => {
+  const card = (name: string) => screen.getByRole('region', { name })
+  it('has no separate column of goals', () => {
     show()
-    expect(drawer().getByText('Plan the autumn trip')).toBeInTheDocument()
-    expect(drawer().getByText('Get the paperwork in order')).toBeInTheDocument()
-    const cards = within(screen.getByRole('region', { name: 'Still to place' })).getAllByRole('region').map((r) => r.getAttribute('aria-label'))
-    expect(cards[0]).toBe('Unlinked')
-    expect(screen.queryByText(/with nothing this week/)).toBeNull()
+    expect(screen.queryByRole('complementary')).toBeNull()
+    expect(screen.queryByRole('button', { name: /Show October goals/ })).toBeNull()
   })
-  it('a shelf row dropped on a goal is filed under it; its own goal is not a target', () => {
+  it('a shelf row dropped on a goal card is filed under it; its own goal is not a target; folded goals open to take it', () => {
     const w = show()
+    expect(screen.queryByRole('region', { name: 'Get the paperwork in order' })).toBeNull()
     const d = dt()
     fireEvent.dragStart(screen.getByText('Book the cabin').closest('li')!, { dataTransfer: d.t })
     d.arm()
-    expect(drawer().getByText('Plan the autumn trip').closest('li')).not.toHaveClass('is-drop-ok')
-    const target = drawer().getByText('Get the paperwork in order').closest('li')!
+    expect(card('Plan the autumn trip')).not.toHaveClass('is-drop-ok')
+    const target = card('Get the paperwork in order')
     expect(target).toHaveClass('is-drop-ok')
     fireEvent.dragOver(target, { dataTransfer: d.t }); fireEvent.drop(target, { dataTransfer: d.t })
     expect(w.moveUnder).toHaveBeenCalledWith(cabin, expect.objectContaining({ id: 'm2' }))
     expect(w.placeTask).not.toHaveBeenCalled()
   })
-  it('a day’s task dropped on a goal is filed, not taken off its day', () => {
+  it('a day’s task dropped on a goal card is filed, not taken off its day', () => {
     const w = show()
     const d = dt()
     fireEvent.dragStart(screen.getByText('Pick up the keys').closest('li')!, { dataTransfer: d.t })
     d.arm()
-    const target = drawer().getByText('Plan the autumn trip').closest('li')!
+    const target = card('Plan the autumn trip')
     fireEvent.dragOver(target, { dataTransfer: d.t }); fireEvent.drop(target, { dataTransfer: d.t })
     expect(w.moveUnder).toHaveBeenCalledWith(placed, expect.objectContaining({ id: 'm1' }))
     expect(w.unplaceTask).not.toHaveBeenCalled()
-  })
-  it('picking a goal opens its card ready to add a task', () => {
-    show()
-    fireEvent.click(drawer().getByRole('button', { name: 'Add a task for Get the paperwork in order' }))
-    expect(screen.getByRole('textbox', { name: 'Add a task for Get the paperwork in order' })).toBeInTheDocument()
   })
 })
 
@@ -402,5 +391,21 @@ describe('WeekCanvas — restored functions', () => {
   it('arriving to write opens Unlinked’s box', () => {
     show(writers(), { focusAdd: true })
     expect(screen.getByRole('textbox', { name: 'Add something for this week' })).toBeInTheDocument()
+  })
+})
+
+// Scott, 2026-10-12: a page left open showed last week as if it were this one.
+describe('a past week says so', () => {
+  it('names a past week and links back to this one; the current week does not', async () => {
+    vi.setSystemTime(new Date(2026, 9, 12, 9)) // Mon Oct 12: Oct 3–9 is last week
+    const { MemoryRouter } = await import('react-router-dom')
+    const { unmount } = render(<MemoryRouter><WeekCanvas weekStart={weekStart} days={days()} shelf={shelf()} routinesToPlace={[]}
+      monthName="October" isCurrent={false} writers={writers()} /></MemoryRouter>)
+    expect(screen.getByText('Past week')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Back to this week' })).toHaveAttribute('href', '/week?view=alongside')
+    unmount()
+    vi.setSystemTime(new Date(2026, 9, 3, 9))
+    show()
+    expect(screen.queryByText('Past week')).toBeNull()
   })
 })
