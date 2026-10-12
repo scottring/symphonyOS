@@ -90,12 +90,15 @@ export function MonthLink({ title, current, options, onChange, compact = false }
   const label = current ? `For ${current.month}: ${current.title}. Change or remove the ${options.month} goal for ${title}` : `Link ${title} to ${anOrA(options.month)} ${options.month} goal`
   return (
     <>
-      <button ref={btnRef} type="button" className={`wk-for wk-forbtn${current ? '' : ' is-empty'}${compact ? ' is-compact' : ''}`}
+      <button ref={btnRef} type="button" className={`wk-for wk-forbtn${current ? ' wk-parent' : ' is-empty'}${compact ? ' is-compact' : ''}`}
         aria-label={label} title={current ? `for ${current.month}: ${current.title}` : undefined} aria-haspopup="menu" aria-expanded={open}
         onPointerDown={stop} onMouseDown={stop} onTouchStart={stop} onKeyDown={(e) => { if (open && e.key === 'Escape') { e.stopPropagation(); close() } else if (e.key === 'Enter' || e.key === ' ') e.stopPropagation() }}
         onClick={(e) => { e.stopPropagation(); if (open) close(); else setOpen(true) }}>
+        {/* The quiet parent label Month draws under a linked goal
+            (plan-item-parent): "OCTOBER GOAL  Plan the trip" — one record,
+            its parent named, changeable in place. */}
         {current
-          ? <><span aria-hidden="true">↳ </span>for {current.month}: {current.title}</>
+          ? <><span className="plan-item-parent-kind">{current.month} goal</span> {current.title}</>
           : <><Link2 className="inline h-3 w-3 align-[-2px]" aria-hidden="true" /> Link to {anOrA(options.month)} {options.month} goal</>}
       </button>
       {open && createPortal(

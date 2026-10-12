@@ -24,7 +24,23 @@ import { useSafeAdd } from './useSafeAdd'
 import { anOrA } from '@/lib/week/monthLinks'
 import { groupByParent } from '@/components/canvas/week/compactWeek'
 
-export function WeekListV2({ title, lines, weekStart, members, actions, timingControl, onContext, onAdd, dragEnabled = true, headerAction, addPicker, emptyHint, focusAdd = false, hint, forLine, forOptions, onForLine, forId: forIdProp, onForId, inputRef, footer }: {
+export function WeekListV2({ title, lines, weekStart, members, actions, timingControl, onContext, onAdd, dragEnabled = true, headerAction, addPicker, emptyHint, focusAdd = false, hint, forLine, forOptions, onForLine, forId: forIdProp, onForId, inputRef, footer, complete = false, highlight, related, linkedId, initialDraft, onDraftChange }: {
+  /** The planning session's list (2026-10-12): the WHOLE week — rows with a
+   *  day stay, saying which — one row after another in the person's order,
+   *  each naming its month goal quietly beneath it (Month's parent label),
+   *  never grouped under headers. */
+  complete?: boolean
+  /** Rows that just arrived, by id, with a word on where from ("From
+   *  Inbox", "From last week"): a brief highlight, still under reduced motion. */
+  highlight?: Record<string, string>
+  /** Rows that belong to the month goal selected beside the list. */
+  related?: ReadonlySet<string>
+  /** The row whose month goal was just set: its parent label lights up. */
+  linkedId?: string | null
+  /** Unfinished words to put back in the add box (a resumed session). */
+  initialDraft?: string
+  /** The add box's words as they change, so a session can keep them. */
+  onDraftChange?: (text: string) => void
   title: string
   lines: LineVM[]
   weekStart: Date
@@ -75,6 +91,20 @@ export function WeekListV2({ title, lines, weekStart, members, actions, timingCo
   const box = useSafeAdd((v) => (chosen ? onAdd(v, chosen.id) : onAdd(v)), addRef, localYmd(weekStart))
   const { draft, saving, failed, submit } = box
   useEffect(() => { if (focusAdd) addRef.current?.focus() }, [focusAdd, addRef])
+  // A resumed session's half-typed line comes back once, into an empty box.
+  const restored = useRef(false)
+  useEffect(() => {
+    if (restored.current) return
+    restored.current = true
+    if (initialDraft && !draft) box.setDraft(initialDraft)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+  const reported = useRef(draft)
+  useEffect(() => {
+    if (!onDraftChange || reported.current === draft) return
+    reported.current = draft
+    onDraftChange(draft)
+  }, [draft, onDraftChange])
   const [showDone, setShowDone] = useState(false)
   const first = localYmd(weekStart)
   const last = localYmd(new Date(weekStart.getTime() + 6 * 86_400_000))
@@ -93,7 +123,7 @@ export function WeekListV2({ title, lines, weekStart, members, actions, timingCo
   // in the person's own order, under the month line each serves (the line
   // written ONCE as a header; one row alone carries it as its own note).
   // Rows that serve no line come last, together (canvas design 2026-10-10).
-  const waiting = open.filter((l) => missedIds.has(l.task.id) || !l.task.scheduledFor || !inWeek(l.task))
+  const waiting = complete ? open : open.filter((l) => missedIds.has(l.task.id) || !l.task.scheduledFor || !inWeek(l.task))
   const parentGroups = groupByParent(waiting.map((l) => {
     const f = forLine?.(l.task) ?? null
     return { vm: l, line: f, parent: f ? { id: f.id, title: f.title } : null }
@@ -104,15 +134,22 @@ export function WeekListV2({ title, lines, weekStart, members, actions, timingCo
   const { setNodeRef: dropRef, isOver } = useDroppable({ id: 'week-list', data: { kind: 'weekList' }, disabled: !dragEnabled })
   const outside = (t: Task) => t.scheduledFor && !inWeek(t) && !missedIds.has(t.id)
     ? `Dated ${t.scheduledFor.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}, outside this week` : undefined
+  // In the complete list a row given a day this week stays, and says which.
+  const onDay = (t: Task) => complete && inWeek(t) && !missedIds.has(t.id)
+    ? `On ${t.scheduledFor!.toLocaleDateString('en-US', { weekday: 'long' })}` : undefined
+  const rowClass = (id: string) => [highlight?.[id] ? 'is-added' : '', related?.has(id) ? 'is-related' : '', linkedId === id ? 'is-linked' : ''].filter(Boolean).join(' ') || undefined
   const row = (vm: LineVM, forLineOf: { id: string; title: string; month: string } | null, forPlacement: 'meta' | 'tools' = 'meta') => <WeekCard key={vm.task.id} vm={vm} actions={actions} members={members} timingControl={timingControl}
-    onContext={onContext} dragEnabled={dragEnabled} forLine={forLineOf} forPlacement={forPlacement} note={outside(vm.task)}
+    onContext={onContext} dragEnabled={dragEnabled} forLine={forLineOf} forPlacement={forPlacement} note={outside(vm.task) ?? onDay(vm.task)}
+    rowClass={rowClass(vm.task.id)} tag={highlight?.[vm.task.id]}
     forControl={onForLine && forOptions ? (cur) => <MonthLink title={vm.task.title} current={cur} options={forOptions} onChange={(id) => onForLine(vm.task, id)} /> : undefined}
     passed={missedIds.has(vm.task.id) ? vm.task.scheduledFor!.toLocaleDateString('en-US', { weekday: 'long' }) : null} />
   const blocks: ReactNode[] = []
   let loose: ReactNode[] = []
   const flush = () => { if (loose.length) { blocks.push(<ul key={`loose-${blocks.length}`} className="pv2-list">{loose}</ul>); loose = [] } }
-  for (const g of parentGroups) {
-    if (onlyUnlinked || (g.parent && g.rows.length === 1)) { loose.push(...g.rows.map((r) => row(r.vm, r.line))); continue }
+  // The complete list: one row after another, in the order they were written.
+  const shownGroups = complete ? [{ key: 'all', parent: null, rows: parentGroups.flatMap((g) => g.rows).sort((a, b) => waiting.indexOf(a.vm) - waiting.indexOf(b.vm)) }] : parentGroups
+  for (const g of shownGroups) {
+    if (complete || onlyUnlinked || (g.parent && g.rows.length === 1)) { loose.push(...g.rows.map((r) => row(r.vm, r.line))); continue }
     flush()
     const month = g.rows[0].line?.month
     const label = g.parent ? `for ${month}: ${g.parent.title}` : 'Unlinked'
@@ -170,7 +207,11 @@ export function WeekListV2({ title, lines, weekStart, members, actions, timingCo
 // {kind:'chip'} → useWeekDragDrop: an all-day date on that day, past days
 // refused, Undo offered). The same row every column draws (WeekRow,
 // 2026-10-03) — no white card; the grip says it moves.
-export function WeekCard({ vm, actions, members, timingControl, onContext, dragEnabled, forLine, forControl, passed, note, forPlacement = 'meta' }: {
+export function WeekCard({ vm, actions, members, timingControl, onContext, dragEnabled, forLine, forControl, passed, note, forPlacement = 'meta', rowClass, tag }: {
+  /** Extra state classes on the row (is-added, is-related, is-linked). */
+  rowClass?: string
+  /** A small word on a row that just arrived ("From Inbox"). */
+  tag?: string
   /** Where the month line goes: under the title ('meta'), or with the row's
    *  hover tools when a group header already names it ('tools'). */
   forPlacement?: 'meta' | 'tools'
@@ -199,7 +240,9 @@ export function WeekCard({ vm, actions, members, timingControl, onContext, dragE
       onOpen={() => actions.details(t)}
       drag={movable ? { id: `pool:${t.id}`, data: { kind: 'chip', taskId: t.id } } : null}
       people={people}
-      meta={(forInMeta && (forLine || (forControl && !t.completed))) || passed || note ? <>
+      rowProps={rowClass ? { className: rowClass } : undefined}
+      meta={(forInMeta && (forLine || (forControl && !t.completed))) || passed || note || tag ? <>
+        {tag && <span className="canvas-tag wk-arrived-tag">{tag}</span>}
         {note && <span className="wk-itself">{note}</span>}
         {passed && <span className="wk-passed">{passed} passed — give it another day?</span>}
         {forInMeta && (forControl && !t.completed ? forControl(forLine)
