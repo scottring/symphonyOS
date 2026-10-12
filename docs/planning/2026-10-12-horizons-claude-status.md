@@ -2,8 +2,9 @@
 
 Coordinator: Claude background session (this worktree). Last updated 2026-10-12 (late evening) ET.
 
-**State: implemented, integrated, tested and visually checked. Not released.** Ready for Scott's review as a
-draft PR stacked on Month's PR #182. Production needs Scott's own approval; Month's approval does not cover it.
+**State: Week/Season/Year (draft PR #183, base `main`) and uniform triage (draft PR #184, stacked on #183) are
+implemented, integrated, tested and visually checked. Neither is released.** Month (#182) is merged to main.
+Production for #183/#184 needs Scott's own approval; Month's approval does not cover it.
 
 ## Integration branch
 
@@ -152,12 +153,12 @@ unchanged.", Inbox More grid. No kiosk/wall files changed.
 
 ## PR
 
-- Draft PR: https://github.com/scottring/symphonyOS/pull/183 (base `codex/month-purpose`; retarget to `main` after #182 merges)
+- Week/Season/Year: draft https://github.com/scottring/symphonyOS/pull/183 (base `main`, 32 files)
+- Uniform triage: draft https://github.com/scottring/symphonyOS/pull/184 (base `codex/horizon-purpose`)
 
 ## Release steps remaining
 
-0. Triage is in draft PR #184 (base `codex/horizon-purpose`); after #183 merges, retarget #184 to `main` and rerun checks.
-
-1. Scott reviews PR #182 (Month) and this PR.
-2. After #182 merges, retarget this PR to `main`, rebase onto origin/main, rerun tsc/tests/build.
-3. Only with Scott's explicit approval: merge to main (deploys production) and verify app.symphony-os.com.
+1. Scott reviews #183 and #184.
+2. Before merging either: bring the branch up to date with origin/main, rerun tsc/tests/build.
+3. After #183 merges, retarget #184 to `main` and rerun checks.
+4. Only with Scott's explicit approval: merge to main (deploys production) and verify app.symphony-os.com.
