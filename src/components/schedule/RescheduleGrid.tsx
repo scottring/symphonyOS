@@ -325,7 +325,9 @@ export function RescheduleGrid({ onPick, onPickDate, loads, onPeek, whens, flexi
                 : when === 'today' || when === 'tomorrow' ? tileDate(dateForWhen(when)!)
                   : whenDetail(when, clock)
         const tileDay = day ?? (when === 'today' || when === 'tonight' || when === 'tomorrow' ? dateForWhen(when) : null)
-        const here = !!tileDay && !!currentYmd && localYmd(tileDay) === currentYmd && when !== 'tonight'
+        // Already on that day: the tile says so rather than "moving" it there.
+        // (Today still opens its time step when the host takes a time.)
+        const here = !!tileDay && !!currentYmd && localYmd(tileDay) === currentYmd && when !== 'tonight' && !(when === 'today' && onPickDate)
         // Only a tile that is ONE day carries that day's bar.
         const load = tileDay ? loads?.get(day ? loadKeyForDay(day) : loadKeyFor(when)) : undefined
         return (
