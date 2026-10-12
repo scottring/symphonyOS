@@ -1,6 +1,6 @@
 # Week, Season and Year — coordinator status
 
-Coordinator: Claude background session (this worktree). Last updated 2026-10-12 18:05 ET.
+Coordinator: Claude background session (this worktree). Last updated 2026-10-12 (evening) ET.
 
 **State: implemented, integrated, tested and visually checked. Not released.** Ready for Scott's review as a
 draft PR stacked on Month's PR #182. Production needs Scott's own approval; Month's approval does not cover it.
@@ -8,7 +8,9 @@ draft PR stacked on Month's PR #182. Production needs Scott's own approval; Mont
 ## Integration branch
 
 - Worktree `.worktrees/horizon-purpose`, branch `codex/horizon-purpose` (pushed).
-- Base: Month's final commit `75cd0323` (`codex/month-purpose`, PR #182, **open, not yet on origin/main**).
+- Month PR #182 **merged to main** (`de4ca203`, identical tree to `75cd0323`). origin/main merged into this branch
+  (`6536261f`, no content change) and PR #183 retargeted to `main` (32 files, horizons only).
+- Formerly based on Month's commit `75cd0323` (`codex/month-purpose`).
   The 16:38 Month snapshot the agents started from was byte-identical in `src/`; it was dropped and the branch
   rebased onto `75cd0323`.
 - Draft PR (base `codex/month-purpose`, so it shows only Week/Season/Year): see "PR" below.
@@ -81,6 +83,20 @@ All three started from the coordinator seam (`useSessionProgress`, flagged Seaso
   next year's goals).
 - Removed from Week's session: "put the month goal on the week as is" and completing a month goal from Week
   (the brief says the month goal stays as it is).
+
+## Added requirement: uniform triage (2026-10-12, in progress — not implemented yet)
+
+Scott's addendum (`canvas-first-slice/docs/planning/2026-10-12-uniform-triage-claude-addendum.md`): one shared
+When / Skip / secondary-action contract across Week canvas, Today, Inbox, details, planning sessions and goal menus.
+
+- **Owner:** one Triage agent, worktree `.worktrees/uniform-triage`, branch `claude/uniform-triage` (from
+  `6536261f`). It alone owns `src/lib/triage/**`, the shared schedule menus (`TriageWhenMenu`, `TaskFateMenu`,
+  `RoutineMoveButton`, `RescheduleGrid/Button`, `RowActionRail`, Inbox triage), and the menu code in
+  `WeekCanvas`, `WeekV2`/`WeekListV2`, `ConstellationPage.actionsFor` and the detail panels. Kiosk/wall excluded.
+- The Week/Season/Year agents finished earlier; their transcripts are no longer resumable, so the notice
+  could not be delivered to them. They are not running, so they can't race the triage owner.
+- Delivery: a focused follow-up PR stacked on #183 once integrated and verified.
+- Status: agent running. Nothing about triage is fixed, tested or deployed yet.
 
 ## PR
 
