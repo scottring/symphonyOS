@@ -439,14 +439,15 @@ export function WeekV2({ tasks, weekStart, meId, isCurrent, days, renderDays, on
     window.addEventListener('pv2:plan-week', open)
     return () => window.removeEventListener('pv2:plan-week', open)
   })
-  // Arriving with { plan: true } (the last day's "Plan week N →") opens it.
-  const arrivedToPlan = useRef(!!arrivedState?.plan)
+  // Arriving with { plan: true } (the last day's "Plan week N →") opens it,
+  // once per navigation — the page may stay mounted while the week changes.
+  const plannedFrom = useRef<string | null>(null)
   useEffect(() => {
-    if (!arrivedToPlan.current) return
-    arrivedToPlan.current = false
+    if (!arrivedState?.plan || plannedFrom.current === location.key) return
+    plannedFrom.current = location.key
     startPlan()
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [location.key, weekKey])
 
   // The days always know the household, so each row shows who carries it,
   // and a week task on a day keeps its month goal as a control.

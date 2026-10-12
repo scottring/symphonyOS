@@ -549,3 +549,12 @@ describe('month links on the list and the days', () => {
     expect(addBox().value).toBe('Ask about time off')
   })
 })
+
+describe('arriving to plan', () => {
+  it('the last day’s “Plan week N →” arrives with { plan: true } and opens the session on Inbox', () => {
+    render(<MemoryRouter initialEntries={[{ pathname: '/week', state: { plan: true } }]}><DndContext>
+      <WeekV2 tasks={ALL} weekStart={WEEK} meId="me" isCurrent={false} renderDays={stubDays} onSelectTask={vi.fn()} canvas={canvas} />
+    </DndContext></MemoryRouter>)
+    expect(current()).toBe('1Inbox')
+  })
+})
