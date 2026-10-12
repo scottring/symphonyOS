@@ -1,8 +1,8 @@
 # Week, Season and Year — coordinator status
 
-Coordinator: Claude background session (this worktree). Last updated 2026-10-12 16:50 ET.
+Coordinator: Claude background session (this worktree). Last updated 2026-10-12 17:35 ET.
 
-**State: three agents running (launched 16:48); nothing integrated or released yet. Not ready for review.**
+**State: Season and Year done and integrated; Week agent still running. Nothing released. Not ready for review.**
 
 ## Integration branch
 
@@ -47,8 +47,9 @@ All three branch from `8f13013a` (pre-rebase seam tip; same content). Agent inst
 
 - [x] Month snapshot + seam committed
 - [~] Week agent — running
-- [~] Season agent — running
-- [~] Year agent — running
+- [x] Season agent — `claude/horizon-season` `c2e8c038`, `2ca3bd88` (28 tests); cherry-picked as `7f00f86f`, `059a5c80`
+- [x] Year agent — `claude/horizon-year` `71097914`, `ac315e17`, `3091e377` (23 + 2 tests); cherry-picked as `ab31ca56`, `13bb0c37`, `4198e247`
+- [x] Coordinator: 12 superseded Season/Year cases in Month's `ConstellationPage.test.tsx` rewritten to the approved board (`9cf69111`, `d073402d`); board imports consolidated; one session entry vocabulary for Season/Year ("Plan <period>", "Continue planning <period> · step N of M", "Plan <period> again", same primary button); Season look-back headed "Look back at <season>" like Year; Year look-back goes first on narrow screens like Season.
 - [x] Integration branch rebased onto Month's final commit `75cd0323` (17:00)
 - [ ] Integrate, cross-horizon consistency pass, desktop/phone/keyboard/reduced-motion checks
 - [ ] Full tests, lint, build; PR for review (no production release without Scott's approval)
