@@ -7,11 +7,11 @@ Coordinator: Claude background session (this worktree). Last updated 2026-10-12 
 ## Integration branch
 
 - Worktree: `.worktrees/horizon-purpose`, branch `codex/horizon-purpose`, from origin/main `06b8248d`.
-- `10f369b5` handoff doc.
-- `dae0cb29` **TEMP Month baseline snapshot** — the Month session's uncommitted working tree at 16:38
-  (`codex/month-purpose`). Season and Year build on it so they match Month's board. It will be dropped
-  and replaced by Month's final commit (or origin/main once Month ships) before review.
-- `16e99ce2`, `9951089c`, `8f13013a` coordinator seam: `useSessionProgress` (+5 tests), ConstellationPage `boardLayout` and Season/Year regions, per-horizon stylesheets. Constellation tests 66/66, typecheck clean at `8f13013a`.
+- Base: Month's final commit `75cd0323` (`codex/month-purpose`, not yet on origin/main at 17:00). It is
+  byte-identical in src/ to the 16:38 snapshot the agents started from, so the snapshot commit was dropped
+  and the integration branch rebased onto `75cd0323`. Agent branches will be rebased the same way at merge.
+- Coordinator seam (rebased SHAs `9ca3e003`, `d71eed4a`, `7e62e129`; agents started from the pre-rebase
+  equivalents `16e99ce2`, `9951089c`, `8f13013a`): `useSessionProgress` (+5 tests), ConstellationPage `boardLayout` and Season/Year regions, per-horizon stylesheets. Constellation tests 66/66, typecheck clean at `8f13013a`.
 
 ## Agent assignments
 
@@ -21,7 +21,7 @@ Coordinator: Claude background session (this worktree). Last updated 2026-10-12 
 | Season | Season agent | `.worktrees/horizon-season` | `claude/horizon-season` |
 | Year | Year agent | `.worktrees/horizon-year` | `claude/horizon-year` |
 
-All three branch from `8f13013a`. Agent instructions: shared rules + one horizon each (Week = Scott's exact four steps; Season = year goals as source; Year = previous year as review material).
+All three branch from `8f13013a` (pre-rebase seam tip; same content). Agent instructions: shared rules + one horizon each (Week = Scott's exact four steps; Season = year goals as source; Year = previous year as review material).
 
 ## Shared-file ownership
 
@@ -49,7 +49,7 @@ All three branch from `8f13013a`. Agent instructions: shared rules + one horizon
 - [~] Week agent — running
 - [~] Season agent — running
 - [~] Year agent — running
-- [ ] Rebase onto Month's final commit
+- [x] Integration branch rebased onto Month's final commit `75cd0323` (17:00)
 - [ ] Integrate, cross-horizon consistency pass, desktop/phone/keyboard/reduced-motion checks
 - [ ] Full tests, lint, build; PR for review (no production release without Scott's approval)
 
@@ -64,5 +64,5 @@ All three branch from `8f13013a`. Agent instructions: shared rules + one horizon
 
 ## Blockers / release steps
 
-- Month has not committed yet; its final commit must replace the snapshot before review.
+- Month is committed (`75cd0323`) but not yet on origin/main; before review, rebase onto origin/main once Month ships.
 - These horizons need their own approval before production; Month's approval does not cover them.
