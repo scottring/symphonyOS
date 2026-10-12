@@ -6,7 +6,7 @@
 
 import type { CanvasProposal } from '@/contexts/CanvasActivityContext'
 
-export function ProposalRow({ proposal, onKeep, onLeave }: { proposal: CanvasProposal; onKeep: () => void; onLeave: () => void }) {
+export function ProposalRow({ proposal, onKeep, onLeave, parentLabel }: { proposal: CanvasProposal; onKeep: () => void; onLeave: () => void; parentLabel?: { kind: string; title: string } }) {
   const saving = proposal.state === 'saving'
   const failed = proposal.state === 'failed'
   return <li className="plan-item">
@@ -16,6 +16,7 @@ export function ProposalRow({ proposal, onKeep, onLeave }: { proposal: CanvasPro
       {saving && <span className="canvas-state is-saving">Saving</span>}
       {failed && <span className="canvas-state is-failed">Didn’t save</span>}
     </div>
+    {parentLabel && <p className="plan-item-parent"><span className="plan-item-parent-kind">{parentLabel.kind}</span> {parentLabel.title}</p>}
     {proposal.reason && <p className="plan-item-meta plan-proposal-reason">{proposal.reason}</p>}
     <div className="plan-item-tools">
       <button type="button" className="canvas-link" disabled={saving} aria-label={`${failed ? 'Retry keeping' : proposal.itemId ? 'Link' : 'Keep'} ${proposal.title}`} onClick={onKeep}>{failed ? 'Retry' : proposal.itemId ? 'Link here' : 'Keep'}</button>
