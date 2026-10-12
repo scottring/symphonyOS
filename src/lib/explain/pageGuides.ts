@@ -10,9 +10,12 @@ import { collectTargets } from './targets'
 
 export const PAGE_GUIDES: Record<string, string> = {
   year:
-    'Year is reference: the few goals you want this year to hold, a list for looking, not doing. ' +
-    'Each row is a year goal; the count beside it is how many season goals sit under it. ' +
-    '+ Add writes a new one. The horizon switch (Year, Season, Month, Week) moves down a level; Next: Season goes on to this season.',
+    'Year answers one question: what do you want to accomplish this year? It is a list for looking, not doing; nothing here is on a calendar. ' +
+    'The main part lists every goal for the year, in your own words. A goal\'s count is how many season goals sit under it across the year; open a goal to see them by name, or See its season goals. ' +
+    '+ Add writes a new one; Edit wording in a goal\'s ⋯ menu changes it. The arrows beside the title step to the previous or next year. ' +
+    'Beside it (below it on a phone) are last year\'s goals, for reference only: they are not parents, and nothing carries on its own. Renew for this year writes a new goal in your words and leaves last year\'s as it was; Mark done records it as done in its own year, with Undo. Hide (or Show) last year with the button above. ' +
+    'Look back and plan opens an optional two-step session: look back at last year (decide what each goal becomes, and note what went well and what didn\'t), then shape this year. Leave for now keeps your place and unfinished wording on this device; Mark planned saves the notes. ' +
+    'Plan a season from these goals goes on to Season, which turns year goals into what each stretch of the year will hold.',
   season:
     'Season answers one question: what do you want to accomplish this season? A season is a brainstorm list for this stretch of the year; nothing here is on a calendar. ' +
     'The arrows beside the title step to the previous or next season, named by your household\'s own seasons. ' +
