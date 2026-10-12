@@ -1,0 +1,52 @@
+/* "Show me this page": the guide over the page (GuideLayer). Amber marks,
+   apart from the place accent, so an outline never reads as a selection.
+   Under the docked bar (z 30) so the bar stays usable. */
+.explain-layer {
+  --guide-mark: hsl(30 70% 51%);
+  --explain-scrim: rgb(24 32 38 / 0.28);
+  position: fixed; inset: 0; z-index: 29; pointer-events: none;
+}
+.explain-svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+.explain-scrim { fill: var(--explain-scrim); }
+.explain-ring { fill: none; stroke: var(--guide-mark); stroke-width: 2.5; }
+.explain-halo { fill: none; stroke: var(--guide-mark); stroke-width: 8; opacity: .18; }
+.explain-arrow { fill: none; stroke: var(--guide-mark); stroke-width: 2.25; stroke-linecap: round; }
+.explain-arrow.is-drag { stroke-dasharray: 7 6; animation: explain-march 1s linear infinite; }
+.explain-head, .explain-tag { fill: var(--guide-mark); }
+.explain-tag-text { fill: #fff; font: 600 12px var(--font-family-sans, system-ui, sans-serif); }
+@keyframes explain-march { to { stroke-dashoffset: -13; } }
+
+.explain-note {
+  position: fixed; pointer-events: auto; box-sizing: border-box;
+  padding: 12px 14px 12px 16px; border: 1px solid var(--color-neutral-200); border-radius: var(--radius-lg, 12px);
+  background: var(--color-bg-elevated); color: var(--color-neutral-900);
+  box-shadow: 0 12px 32px rgb(24 32 38 / 0.18);
+  transition: top .2s ease, left .2s ease;
+}
+.explain-note-head { display: flex; align-items: baseline; gap: 8px; }
+.explain-note .explain-note-title { flex: 1; min-width: 0; margin: 0; font-family: var(--font-family-display); font-size: 18px; font-weight: 600; line-height: 1.25; }
+.explain-note-count { font-size: 12px; font-weight: 600; color: hsl(30 70% 38%); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.explain-note-close {
+  align-self: center; display: inline-grid; place-items: center; width: 28px; height: 28px; margin: -4px -6px -4px 0;
+  border: 0; border-radius: 999px; background: none; color: var(--color-neutral-500); cursor: pointer;
+}
+.explain-note-close:hover { background: var(--color-neutral-100); color: var(--color-neutral-800); }
+.explain-note-text { margin: 4px 0 0; font-size: 14.5px; line-height: 1.45; color: var(--color-neutral-800); }
+.explain-note-controls { display: flex; justify-content: flex-end; align-items: center; gap: 14px; margin-top: 10px; }
+.explain-next {
+  min-height: 34px; padding: 0 16px; border: 0; border-radius: 999px; cursor: pointer;
+  background: var(--color-neutral-900); color: var(--color-bg-elevated); font-size: 13px; font-weight: 500;
+}
+.explain-note button:focus-visible { outline: 2px solid var(--color-primary-600); outline-offset: 2px; }
+
+/* The bar's tour line: where you are, Back, Next or Done, Close. */
+.canvas-tour { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; font-size: 13px; color: var(--color-neutral-600); }
+.canvas-tour-count { font-weight: 600; color: hsl(30 70% 38%); font-variant-numeric: tabular-nums; }
+.canvas-explain { white-space: nowrap; }
+
+.explain-layer.is-still .explain-arrow.is-drag { animation: none; }
+.explain-layer.is-still .explain-note { transition: none; }
+@media (prefers-reduced-motion: reduce) {
+  .explain-arrow.is-drag { animation: none; }
+  .explain-note { transition: none; }
+}

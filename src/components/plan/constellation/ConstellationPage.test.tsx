@@ -145,7 +145,7 @@ describe('grouped under parent',()=>{
   const together=group('Under Together')
   expect(within(together).getAllByRole('listitem').map(li=>li.querySelector('.plan-item-title')?.textContent)).toEqual(['Unhurried weekends','Autumn outings'])
   expect(within(screen.getByRole('list',{name:'Season plan'})).getAllByText('Together')).toHaveLength(1)
-  expect(within(together).getByLabelText('1 month goal below')).toHaveTextContent('1')
+  expect(within(together).getByLabelText('1 month goal below')).toHaveTextContent('1 month goal')
   const regions=screen.getAllByRole('region').map(r=>r.getAttribute('aria-label'))
   expect(regions).toEqual(['Under Together','Not under a year goal'])
   expect(within(group('Not under a year goal')).getByText('Fix the gate')).toBeInTheDocument()
@@ -255,55 +255,48 @@ describe('Move under…',()=>{
  })
 })
 
-describe('drawer of the horizon one up',()=>{
- const drawer=()=>screen.getByRole('complementary',{name:/goals$/})
- const realMatch=window.matchMedia
- beforeEach(()=>{
-  try{localStorage.removeItem('symphony.plan.upstreamDrawer')}catch{/* none */}
-  window.matchMedia=((q:string)=>({...realMatch(q),matches:q==='(min-width: 1024px)'})) as typeof window.matchMedia
- })
- afterEach(()=>{window.matchMedia=realMatch})
- it('lists every year goal beside Season, even one holding nothing yet',()=>{
-  api.tasks=[{id:'s',title:'Autumn outings',bucket:'quarter',goalId:'g'}]
-  season()
-  const d=within(screen.getByRole('complementary',{name:'Year goals'}))
-  expect(d.getByText('Together')).toBeInTheDocument()
-  expect(d.getByText('Health')).toBeInTheDocument()
- })
- it('drop a season goal on a year goal in the drawer files it there',async()=>{
-  api.tasks=[{id:'s',title:'Autumn outings',bucket:'quarter'}]
-  season()
-  fireEvent.dragStart(screen.getByText('Autumn outings').closest('li')!,{dataTransfer:{setData:vi.fn(),effectAllowed:''}})
-  const target=within(drawer()).getByText('Health').closest('li')!
-  expect(target).toHaveClass('is-drop-ok')
-  fireEvent.dragOver(target);fireEvent.drop(target)
-  await waitFor(()=>expect(api.updateTask).toHaveBeenCalledWith('s',{goalId:'other'}))
- })
- it('beside Month it lists the season goals; the current parent is not a target',()=>{
-  api.tasks=[{id:'s1',title:'Autumn outings',bucket:'quarter'},{id:'s2',title:'Strength',bucket:'quarter'},{id:'m',title:'Picnic',bucket:'month',sourceId:'s1'}]
-  month()
-  fireEvent.dragStart(screen.getByText('Picnic').closest('li')!,{dataTransfer:{setData:vi.fn(),effectAllowed:''}})
-  const d=within(screen.getByRole('complementary',{name:'Fall goals'}))
-  expect(d.getByText('Autumn outings').closest('li')).not.toHaveClass('is-drop-ok')
-  expect(d.getByText('Strength').closest('li')).toHaveClass('is-drop-ok')
- })
- it('can be hidden and shown again, and stays as left',()=>{
-  season()
-  fireEvent.click(screen.getByRole('button',{name:'Hide year goals'}))
-  expect(screen.queryByRole('complementary')).toBeNull()
-  fireEvent.click(screen.getByRole('button',{name:/Show year goals/}))
-  expect(screen.getByRole('complementary',{name:'Year goals'})).toBeInTheDocument()
- })
- it('the board leads with what is not filed, full width; filed goals follow as cards',()=>{
+describe('two labelled parts below Year',()=>{
+ const heads=()=>screen.getAllByRole('heading',{level:2}).map(h=>h.textContent)
+ it('Season: the cards under a year goal first, then what is under none, each part named once',()=>{
   api.tasks=[{id:'a',title:'Unhurried weekends',bucket:'quarter',goalId:'g'},{id:'c',title:'Fix the gate',bucket:'quarter'}]
   season()
-  const regions=screen.getAllByRole('region').map(r=>r.getAttribute('aria-label'))
-  expect(regions).toEqual(['Not under a year goal','Under Together'])
-  expect(group('Not under a year goal').closest('li')).toHaveClass('is-wide')
-  expect(group('Under Together')).toHaveTextContent('Unhurried weekends')
-  expect(screen.queryByRole('button',{name:/filed under/})).toBeNull()
-  // The empty-goals line is gone: the drawer lists them.
-  expect(screen.queryByRole('button',{name:/with nothing in/})).toBeNull()
+  expect(heads()).toEqual(['Under a year goal','Together','Not under a year goal'])
+  expect(screen.getByText('Each card is one of your 2026 year goals.')).toBeInTheDocument()
+  expect(screen.getAllByRole('region').map(r=>r.getAttribute('aria-label'))).toEqual(['Under Together','Not under a year goal'])
+  // The loose part's own heading names it; its card does not repeat it.
+  expect(screen.getAllByText('Not under a year goal')).toHaveLength(1)
+  expect(group('Not under a year goal')).toHaveTextContent('Fix the gate')
+ })
+ it('has no column of year goals beside the board',()=>{
+  api.tasks=[{id:'a',title:'Unhurried weekends',bucket:'quarter',goalId:'g'}]
+  season()
+  expect(screen.queryByRole('complementary')).toBeNull()
+  expect(screen.queryByRole('button',{name:/Show year goals/})).toBeNull()
+  expect(screen.getAllByText('Together')).toHaveLength(1)
+ })
+ it('Month names its parts by the season',()=>{
+  api.tasks=[{id:'s',title:'Autumn outings',bucket:'quarter',goalId:'g'},{id:'m',title:'Picnic',bucket:'month',sourceId:'s'},{id:'x',title:'Taxes',bucket:'month'}]
+  month()
+  expect(heads()).toEqual(['Under a fall goal','Autumn outings','Not under a fall goal'])
+  expect(screen.getByText('Each card is one of your fall goals.')).toBeInTheDocument()
+ })
+ it('drop on a card files the item under that goal',async()=>{
+  api.tasks=[{id:'a',title:'Unhurried weekends',bucket:'quarter',goalId:'g'},{id:'s',title:'Autumn outings',bucket:'quarter'}]
+  season()
+  fireEvent.dragStart(screen.getByText('Autumn outings').closest('li')!,{dataTransfer:{setData:vi.fn(),effectAllowed:''}})
+  const target=group('Under Together')
+  expect(target).toHaveClass('is-drop-ok')
+  fireEvent.dragOver(target);fireEvent.drop(target)
+  await waitFor(()=>expect(api.updateTask).toHaveBeenCalledWith('s',{goalId:'g'}))
+ })
+ it('goals with nothing this season open while dragging, so they take a drop too',async()=>{
+  api.tasks=[{id:'a',title:'Unhurried weekends',bucket:'quarter',goalId:'g'},{id:'s',title:'Autumn outings',bucket:'quarter'}]
+  season()
+  expect(screen.queryByRole('region',{name:'Under Health'})).toBeNull()
+  fireEvent.dragStart(screen.getByText('Autumn outings').closest('li')!,{dataTransfer:{setData:vi.fn(),effectAllowed:''}})
+  const health=group('Under Health')
+  fireEvent.dragOver(health);fireEvent.drop(health)
+  await waitFor(()=>expect(api.updateTask).toHaveBeenCalledWith('s',{goalId:'other'}))
  })
  it('shows no board, and no empty-plan message, while the plans load',()=>{
   ;(api as any).loading=true
@@ -314,17 +307,13 @@ describe('drawer of the horizon one up',()=>{
    expect(screen.queryByRole('list',{name:'Season plan'})).toBeNull()
   }finally{delete (api as any).loading}
  })
- it('on a narrow screen there is no drawer and the board stays grouped',()=>{
-  window.matchMedia=realMatch
-  api.tasks=[{id:'a',title:'Unhurried weekends',bucket:'quarter',goalId:'g'}]
-  season()
-  expect(screen.queryByRole('complementary')).toBeNull()
-  expect(screen.queryByRole('button',{name:/Show year goals/})).toBeNull()
-  expect(group('Under Together')).toHaveTextContent('Unhurried weekends')
- })
- it('is not on Year',()=>{
+ it('Year stays one list',()=>{
   open()
-  expect(screen.queryByRole('complementary')).toBeNull()
+  expect(screen.queryByRole('heading',{name:/^Under a/})).toBeNull()
+ })
+ it('a season with nothing planned yet stays one list',()=>{
+  season()
+  expect(screen.queryByRole('heading',{name:'Under a year goal'})).toBeNull()
  })
 })
 

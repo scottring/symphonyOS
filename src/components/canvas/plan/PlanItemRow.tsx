@@ -54,7 +54,7 @@ export function PlanItemRow(p: PlanItemRowProps) {
     ...(p.disabled ? [] : [{ label: 'Edit wording', onSelect: p.onEdit }]),
     ...(p.move && !p.disabled ? [{ label: 'Move under…', onSelect: () => setMoving(true) }] : []),
   ]
-  return <li className="plan-item" data-plan-key={node.key} draggable={!!p.onDragStart && !p.editing} onDragStart={p.onDragStart} onDragEnd={p.onDragEnd}>
+  return <li className={`plan-item${p.expanded && !p.editing ? ' is-open' : ''}`} data-plan-key={node.key} draggable={!!p.onDragStart && !p.editing} onDragStart={p.onDragStart} onDragEnd={p.onDragEnd}>
     <div className={`canvas-item ${state}`}>
       {p.editing
         ? <InlineComposer label={`Wording for ${node.title}`} initial={node.title} onSave={p.onSaveEdit} onCancel={p.onCancelEdit} />
@@ -64,7 +64,7 @@ export function PlanItemRow(p: PlanItemRowProps) {
       {p.readiness && !p.editing && <ReadinessIcons readiness={p.readiness} />}
       {p.saved && <span className="canvas-tag">Saved</span>}
       {p.done && <span className="canvas-tag plan-tag-done">Done</span>}
-      {p.count > 0 && p.childTerm && <span className="canvas-item-meta" aria-label={`${p.count} ${p.childTerm}${p.count === 1 ? '' : 's'} below`} title={`${p.childTerm}s below`}>{p.count}</span>}
+      {p.count > 0 && p.childTerm && <span className="plan-count" aria-label={`${p.count} ${p.childTerm}${p.count === 1 ? '' : 's'} below`}>{p.count} {p.childTerm}{p.count === 1 ? '' : 's'}</span>}
       {!p.editing && <span ref={menuWrap} className="plan-item-menu">{p.actions(verbs)}</span>}
     </div>
     {p.move && moving && <MoveUnderMenu item={node} parents={p.move.parents} parentTerm={p.move.parentTerm}
@@ -73,7 +73,7 @@ export function PlanItemRow(p: PlanItemRowProps) {
     {p.expanded && !p.editing && <div className="plan-item-more">
       {p.meta && <p className="plan-item-meta">{p.meta}</p>}
       {p.readiness && <div className="prep-summary" aria-label="What you’ll need">
-        <p className="plan-item-meta">{p.readiness.kinds.length ? `Has ${describeReadiness(p.readiness).join(', ')}` : 'Nothing attached yet'}</p>
+        <p className="plan-item-meta">{p.readiness.kinds.length ? `Has ${describeReadiness(p.readiness).join(', ')}` : 'Nothing you’ll need is attached yet.'}</p>
         {p.readiness.inherited.map((r) => <p key={r.id} className="plan-item-meta prep-summary-from">From {r.title}: {describeInherited(r)}</p>)}
         {p.onPrepare && <button type="button" className="canvas-link" disabled={p.disabled} onClick={p.onPrepare}>Add what you’ll need</button>}
       </div>}

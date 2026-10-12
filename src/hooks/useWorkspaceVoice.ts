@@ -3,6 +3,9 @@ import {supabase} from '@/lib/supabase'
 import {RealtimeTransport} from '@/lib/voiceOnboarding/realtimeTransport'
 import type {ConversationContext,TransportStatus} from '@/lib/voiceOnboarding/transport'
 import {workspaceDestination,type WorkspaceContext} from '@/lib/workspace/context'
+import {explainContext} from '@/lib/explain/pageGuides'
+import {parseSteps} from '@/lib/explain/steps'
+import {requestShow} from '@/lib/explain/showSignal'
 
 /** One connection owned by the shell, shared by its desktop and phone panes. */
 export function useWorkspaceVoice(context:WorkspaceContext, ask:(text:string)=>Promise<string|undefined>, navigate:(url:string)=>void, enabled:boolean, accountId:string|null = null) {
@@ -10,7 +13,7 @@ export function useWorkspaceVoice(context:WorkspaceContext, ask:(text:string)=>P
  const transport=useRef<RealtimeTransport|null>(null)
  const current=useRef({context,ask,navigate});current.current={context,ask,navigate}
  const busy=useRef(false)
- const toContext=():ConversationContext=>({step: (['year','season','month','week','today'].includes(current.current.context.page) ? current.current.context.page : 'today') as ConversationContext['step'],focus:current.current.context.page,plan:[JSON.stringify(current.current.context)]})
+ const toContext=():ConversationContext=>({step: (['year','season','month','week','today'].includes(current.current.context.page) ? current.current.context.page : 'today') as ConversationContext['step'],focus:current.current.context.page,plan:[JSON.stringify(explainContext(current.current.context))]})
  useEffect(()=>{transport.current?.sync(toContext())},[context])
  useEffect(()=>()=>{transport.current?.stop();transport.current=null},[])
  useEffect(()=>{if(!enabled)transport.current?.stop()},[enabled])
@@ -29,6 +32,11 @@ export function useWorkspaceVoice(context:WorkspaceContext, ask:(text:string)=>P
      const url=workspaceDestination(data.page,data.date)
      if(!url)return {error:'Unknown page or date'}
      current.current.navigate(url);return {shown:true,page:data.page}
+    }
+    if(name==='show_on_page'){
+     const steps=parseSteps(data)
+     if(!steps.length)return {error:'Nothing to show: use target ids from the screen update'}
+     requestShow(steps,'voice');return {shown:steps.length}
     }
     if(name==='ask_symphony'){
      if(typeof data.request!=='string'||!data.request.trim()||data.request.length>5000)return {error:'Invalid request'}

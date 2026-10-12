@@ -17,6 +17,7 @@ import type { ConversationWalk } from './conversationWalk'
 import { useCanvasActivity, type CanvasReceipt } from '@/contexts/CanvasActivityContext'
 import { useSelectionOptional } from '@/shell/providers/SelectionProvider'
 import { DictationMicButton } from '@/components/common/DictationMicButton'
+import { usePageGuide } from '@/components/explain/GuideProvider'
 
 export interface StripVoice {
   /** Live two-way voice is available to this account. */
@@ -50,6 +51,8 @@ interface Props {
   messages?: ChatMessageType[]
   /** Docked: the page's walk ("Plan this season with me"). */
   walk?: ConversationWalk | null
+  /** Docked: "What is this page?", where the page has a guide. */
+  explain?: ConversationWalk | null
   /** Docked: room left for an open side pane, in px. */
   right?: number
 }
@@ -99,10 +102,19 @@ function DockedTranscript({ messages, busy, voice }: { messages: ChatMessageType
   </div>
 }
 
-export function ConversationStrip({ onSend, busy, voice, onOpenConversation, onReviewProposals, placeholder = 'Tell Symphony, or ask…', compact = false, receiptOnly = false, docked = false, messages, walk, right = 0 }: Props) {
+export function ConversationStrip({ onSend, busy, voice, onOpenConversation, onReviewProposals, placeholder = 'Tell Symphony, or ask…', compact = false, receiptOnly = false, docked = false, messages, walk, explain, right = 0 }: Props) {
   const { receipt, undo, retry, dismiss, proposals } = useCanvasActivity()
   const selection = useSelectionOptional()
+  const guide = usePageGuide()
   const [draft, setDraft] = useState('')
+  // Docked, the bar carries a tour's Back / Next / Close (the note does elsewhere).
+  const setBarHosted = guide?.setBarHosted
+  useEffect(() => {
+    if (!docked || receiptOnly || !setBarHosted) return
+    setBarHosted(true)
+    return () => setBarHosted(false)
+  }, [docked, receiptOnly, setBarHosted])
+  const touring = docked && !!guide && guide.count > 1 && guide.source === 'chat'
 
   const submit = (e: FormEvent) => {
     e.preventDefault()
@@ -127,7 +139,7 @@ export function ConversationStrip({ onSend, busy, voice, onOpenConversation, onR
         <div className="canvas-receipt" aria-live="polite">
           <SaveStateBadge state={receipt.state} />
           {receipt.request && <span className="canvas-receipt-request">{receipt.source === 'conversation' ? `“${receipt.request}”` : receipt.request}</span>}
-          {receipt.summary && <span className="canvas-receipt-summary">{receipt.summary}</span>}
+          {receipt.summary && receipt.summary !== STATE_LABEL[receipt.state] && <span className="canvas-receipt-summary">{receipt.summary}</span>}
           {receipt.changes.length > 0 && selection && (
             <span className="canvas-receipt-changes">
               {receipt.changes.filter((c) => c.kind !== 'removed' && c.entity === 'task').slice(0, 4).map((c) => (
@@ -153,11 +165,21 @@ export function ConversationStrip({ onSend, busy, voice, onOpenConversation, onR
           {onReviewProposals && <button type="button" className="canvas-link" onClick={onReviewProposals}>Review</button>}
         </div>
       )}
+      {touring && guide && (
+        <div className="canvas-tour" aria-label="Showing you this page">
+          <span className="canvas-tour-count">{guide.index + 1} of {guide.count}</span>
+          <span>Showing you this page</span>
+          <button type="button" className="canvas-link" disabled={guide.index === 0} onClick={guide.back}>Back</button>
+          <button type="button" className="canvas-link" onClick={guide.next}>{guide.index === guide.count - 1 ? 'Done' : 'Next'}</button>
+          {guide.index < guide.count - 1 && <button type="button" className="canvas-link" onClick={guide.close}>Close</button>}
+        </div>
+      )}
       {receiptOnly ? (
         onOpenConversation && <button type="button" className="canvas-link" onClick={onOpenConversation}><MessageSquare size={14} aria-hidden="true" /> Open the conversation</button>
       ) : (
       <form className="canvas-composer" onSubmit={submit}>
         {walk && !voice.active && <button type="button" className="canvas-walk" disabled={busy} onClick={() => onSend(walk.message)}>{walk.label}</button>}
+        {explain && <button type="button" className="canvas-walk canvas-explain" disabled={busy} onClick={() => onSend(explain.message)}>{explain.label}</button>}
         <label className="sr-only" htmlFor="canvas-composer-input">Message Symphony</label>
         <input
           id="canvas-composer-input"

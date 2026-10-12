@@ -16,6 +16,9 @@ export interface AssistantSeed {
   message: string
   /** Send it immediately (default true). */
   autoSend?: boolean
+  /** Send without opening the conversation over the page, so what Symphony
+   *  shows on the page stays in view (What is this page? on phones). */
+  stayOnPage?: boolean
 }
 
 interface AssistantLaunchValue {
