@@ -46,6 +46,10 @@ export interface SchedulePickerProps {
   /** A calendar event keeps its own move semantics (it is not task triage). */
   entity?: 'task' | 'event'
   onClearSchedule?: () => void
+  /** The clear button's words. A task says the contract's "Skip this day"
+   *  (with the line saying what it keeps); default "Clear schedule". */
+  clearLabel?: string
+  clearNote?: string
   /** Fullness per dated tile, keyed by `loadKeyFor(when)`. */
   loads: Map<string, DayLoad>
   /** Trigger text. Defaults to "Schedule"; the event panel says "Reschedule". */
@@ -79,6 +83,8 @@ export function SchedulePicker({
   whens,
   entity = 'task',
   onClearSchedule,
+  clearLabel = 'Clear schedule',
+  clearNote,
   loads,
   label = 'Schedule',
 }: SchedulePickerProps) {
@@ -199,7 +205,8 @@ export function SchedulePicker({
                   }}
                   className="mt-2 w-full rounded-lg px-3 py-2 text-left text-sm text-neutral-500 hover:bg-neutral-50"
                 >
-                  Clear schedule
+                  {clearLabel}
+                  {clearNote && <span className="block text-[11px] text-neutral-400">{clearNote}</span>}
                 </button>
               )}
             </>

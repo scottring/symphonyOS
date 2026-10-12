@@ -343,4 +343,23 @@ describe('TapContextPanel', () => {
     expect(screen.getByRole('group', { name: 'From Classroom ready' })).toBeInTheDocument()
     expect(task.links ?? []).toHaveLength(0)
   })
+
+  // The triage contract (2026-10-12): a dated task's details end the Schedule
+  // grid with the same scoped "Skip this day" the Week and Today offer.
+  it('a dated task’s Schedule grid ends with "Skip this day", saying what it keeps', async () => {
+    const task = createMockTask({ title: 'Pick up the keys', scheduledFor: new Date(2026, 9, 13), isAllDay: true })
+    const onClearSchedule = vi.fn()
+    render(<TapContextPanel
+      task={task} contacts={[]} projects={[]} events={[]} familyMembers={[]}
+      siblingTaskCandidates={[]} allTasks={[task]} {...baseHandlers}
+      onReschedule={vi.fn()} onClearSchedule={onClearSchedule}
+    />)
+    const triggers = screen.getAllByRole('button', { name: /Schedule/ })
+    fireEvent.click(triggers[triggers.length - 1])
+    expect(screen.queryByText('Clear schedule')).toBeNull()
+    expect(screen.getByText(/The task, its week and its goal stay/)).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /^Skip this day/ }))
+    expect(onClearSchedule).toHaveBeenCalledOnce()
+  })
 })
+

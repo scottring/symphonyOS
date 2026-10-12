@@ -66,7 +66,7 @@ import { nextStepOrder } from '@/lib/today/stepOrdering';
 import type { Routine } from '@/types/actionable';
 import { TapEventPanel } from '@/components/surface/TapEventPanel';
 import { TapMealPanel } from '@/components/surface/TapMealPanel';
-import { triageTaskWhen } from '@/lib/triage/feedback';
+import { triageTaskWhen, triageSkipDay } from '@/lib/triage/feedback';
 import { formatDateLabel } from '@/lib/dateHelpers';
 import { consumeDiscussionOpen } from '@/lib/discussions/openIntent';
 import type { Task, TaskLink } from '@/types/task';
@@ -337,12 +337,13 @@ function TaskPanelBody({ id }: { id: string }) {
         // either day; the toast follows the write, with Undo, or Retry.
         void triageTaskWhen(task, when, { onPushTask: gated.pushTask, onSetBucket: gated.setBucket!, onUpdateTask: gated.updateTask, onFocus: (id, day) => gated.updateTask(id, { plannedOn: day }) });
       }}
-      // Unschedule clears the day only: the row's week and period commitments
-      // stay (D1c.1), and the placement module picks the bucket from them —
-      // back to its week list, or the inbox when it has no list at all.
-      onClearSchedule={() =>
-        updateTask(task.id, { scheduledFor: undefined, isAllDay: undefined })
-      }
+      // Skip this day (the triage contract): the same write as the Week's
+      // and Today's — the day and that day's focus go; the week and period
+      // commitments and the goal links stay (D1c.1), and the placement module
+      // picks the bucket from what is left. Confirmed with Undo, or Retry.
+      onClearSchedule={() => {
+        if (task.scheduledFor) void triageSkipDay(task, task.scheduledFor, updateTask);
+      }}
       isPinned={pinnedItems.isPinned('task', task.id)}
       onTogglePin={() => {
         if (pinnedItems.isPinned('task', task.id)) pinnedItems.unpin('task', task.id);

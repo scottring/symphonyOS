@@ -5,6 +5,7 @@ const toast = vi.hoisted(() => ({ showToast: vi.fn() }))
 vi.mock('@/hooks/useToast', () => toast)
 
 import { runTriage, triageSkipDay, triageTaskWhen, placementSnapshot } from './feedback'
+import { timingRemoval } from '@/lib/planning/planActions'
 
 const MON = new Date(2026, 9, 12)
 const week = new Date(2026, 9, 10)
@@ -67,4 +68,15 @@ describe('triage feedback', () => {
     expect(h.onUpdateTask).toHaveBeenLastCalledWith('t1', placementSnapshot(t))
     expect(placementSnapshot(t).commitments).toEqual([{ level: 'week', periodStart: week, status: 'open' }])
   })
+
+  it('Skip this day on a dated task writes exactly what the Week’s Skip this day writes (timingRemoval, day)', async () => {
+    // A task dated in October still on a September month list: the day goes
+    // and the month is carried, as the Week's "Skip this day" does.
+    const sep = new Date(2026, 8, 1)
+    const t = task({ monthStart: sep, commitments: [{ level: 'week', periodStart: week, status: 'open' }, { level: 'month', periodStart: sep, status: 'open' }] })
+    const onUpdateTask = vi.fn(async () => true)
+    await triageSkipDay(t, MON, onUpdateTask)
+    expect(onUpdateTask.mock.calls[0]).toEqual(['t1', timingRemoval(t, 'day').updates])
+  })
 })
+

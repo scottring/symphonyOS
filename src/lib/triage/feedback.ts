@@ -11,7 +11,8 @@ import type { Task } from '@/types/task'
 import { showToast } from '@/hooks/useToast'
 import { bootstrapCommitments } from '@/lib/placement/intentions'
 import { liveCommitments, focusSnapshot } from '@/lib/placement/model'
-import { taskDayRemoval } from '@/lib/planning/planActions'
+import { taskDayRemoval, timingRemoval } from '@/lib/planning/planActions'
+import { localYmd } from '@/lib/cadence/config'
 import { wasWritten } from '@/hooks/useGatedTaskActions'
 import type { TriageWhen } from './contract'
 import { applyTriageWhen, describeTriageWhen, type TriageHandlers } from './applyWhen'
@@ -76,10 +77,19 @@ export function triageTaskDate(task: Task, at: Date, isAllDay: boolean, onUpdate
   })
 }
 
-/** Skip this day: the day goes; the task, its week and its goal stay. */
+/**
+ * Skip this day: the day goes; the task, its week and its goal stay. A task
+ * DATED that day is let go of its day exactly as the Week's "Skip this day"
+ * and the details' timing control do (timingRemoval 'day' — which also carries
+ * a month that ended before the day into the day's month, rather than leaving
+ * it on a past month's list); a task only CHOSEN for that day loses that
+ * day's choice (taskDayRemoval).
+ */
 export function triageSkipDay(task: Task, day: Date, onUpdateTask: (id: string, u: Partial<Task>) => unknown): Promise<boolean> {
-  const updates = taskDayRemoval(task, day)
-  const before: Partial<Task> = { focus: focusSnapshot(task), scheduledFor: task.scheduledFor, isAllDay: task.isAllDay }
+  const dated = !!task.scheduledFor && localYmd(task.scheduledFor) === localYmd(day)
+  const removal = dated ? timingRemoval(task, 'day') : null
+  const updates = removal ? removal.updates : taskDayRemoval(task, day)
+  const before: Partial<Task> = removal ? removal.previous : { focus: focusSnapshot(task), scheduledFor: task.scheduledFor, isAllDay: task.isAllDay }
   return runTriage({
     done: `Skipped ${dayLabel(day)} for “${task.title}”. Its week and goal are unchanged.`,
     write: () => wasWritten(onUpdateTask(task.id, updates) as void | Promise<void | boolean>),
