@@ -40,6 +40,7 @@ import { InlineComposer } from '@/components/canvas/plan/InlineComposer'
 import { readinessOf, type ReadinessLookup } from '@/lib/prep/readiness'
 import { ChevronLeft, ChevronRight, PanelLeftOpen } from 'lucide-react'
 import { UpstreamDrawer, useUpstreamDrawer } from './UpstreamDrawer'
+import { useColumnsFitWindow } from '@/hooks/useColumnsFitWindow'
 import { useConversationWalk } from '@/components/canvas/conversationWalk'
 import { PAGE_PLANNING } from '@/components/layout/pageLayout'
 
@@ -49,8 +50,11 @@ const periodWordOf = (b: { label: string }) => b.label.replace(/\s\d{4}$/, '')
 const PERIODS = ['year', 'season', 'month'] as const
 const ROUTE_LEVEL: Record<string, number> = { '/year': 0, '/season': 1, '/month': 2 }
 
-/** The element that scrolls the page, so Show all can return to where you were. */
+/** The element that scrolls the page, so Show all can return to where you were:
+ * the board itself while it scrolls on its own beside the drawer. */
 function scrollHost(el: HTMLElement | null): HTMLElement | null {
+  const board = el?.querySelector<HTMLElement>('.plan-body.is-colscroll > .plan-board')
+  if (board && getComputedStyle(board).overflowY === 'auto') return board
   for (let n = el?.parentElement ?? null; n; n = n.parentElement) {
     const o = getComputedStyle(n).overflowY
     if ((o === 'auto' || o === 'scroll') && n.scrollHeight > n.clientHeight) return n
@@ -303,6 +307,10 @@ function Inner() {
     ? `Let's plan ${periodTitle}, one year goal at a time. Ask me what I want; use my words and don't suggest goals of your own.`
     : `Let's plan ${periodTitle} across my ${parentTerm}s, one at a time. Ask me what I want under each; use my words and don't suggest ${term}s of your own.`
   // The walk rides in the docked bar where there is one (desktop).
+  // With the drawer beside it, the drawer and the board each scroll on their
+  // own to the landscape (Scott, 2026-10-11), as Week and Month's columns do.
+  const drawerShown = level > 0 && drawerUi.shown && dataReady && !error && !goalsError
+  const bodyRef = useColumnsFitWindow(drawerShown)
   const walkInBar = useConversationWalk(requested === 3 ? null : { label: walkLabel, message: walkMessage })
 
   if (requested === 3) return <Navigate replace to={`/week?view=alongside&date=${localYmd(anchor)}&start=${localYmd(week)}`} />
@@ -323,7 +331,7 @@ function Inner() {
   // The drawer lists every open parent, even those folded for holding nothing.
   const upstream = level > 0 ? allNodes.filter((n) => n.level === level - 1 && !isDone(n)) : []
   const drawerTitle = level === 1 ? 'Year goals' : `${seasonWord} goals`
-  const drawer = level > 0 && drawerUi.shown && dataReady && !error && !goalsError
+  const drawer = drawerShown
     ? <UpstreamDrawer title={drawerTitle} childTerm={term} parents={upstream}
         countOf={(n) => childCount(allNodes, n)} dragging={!!dragNode}
         canDropOn={canDropOn}
@@ -453,7 +461,7 @@ function Inner() {
     {!dataReady && <p className="plan-status" role="status">Loading your plans…</p>}
     {(error || goalsError)
       ? <p className="plan-status" role="alert">Plans could not load. <button type="button" className="canvas-link" onClick={() => { if (goalsError) window.location.reload(); else void refetch() }}>Retry</button></p>
-      : <div className={`plan-body${drawer ? ' has-drawer' : ''}`}>{drawer}<div className="plan-board">
+      : <div ref={bodyRef} className={`plan-body${drawer ? ' has-drawer is-colscroll' : ''}`}>{drawer}<div className="plan-board">
         {focused && <div className="plan-focus-bar">
           <span role="status">Showing {focused.size} of {groups.length} groups</span>
           <button type="button" className="canvas-link" onClick={clearFocus}>Show all · Esc</button>

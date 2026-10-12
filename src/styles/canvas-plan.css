@@ -264,6 +264,18 @@
    they were; its list scrolls. */
 .wc-drawer-cell { position: relative; min-height: 320px; align-self: stretch; }
 .wc-drawer-cell > .plan-drawer { position: absolute; inset: 0; max-height: none; align-self: stretch; border-radius: var(--radius-lg); }
+/* Season and Month: the drawer and the board each scroll on their own, down
+   to the landscape (--pv2-col-h, useColumnsFitWindow; Scott, 2026-10-11), so
+   a long board never carries the year goals off screen. */
+@media (min-width: 1024px) {
+  .plan-canvas:has(.plan-body.is-colscroll) { padding-bottom: 0; }
+  .plan-body.is-colscroll > .plan-drawer { position: relative; top: auto; max-height: var(--pv2-col-h, calc(100dvh - 220px)); }
+  .plan-body.is-colscroll > .plan-board {
+    max-height: var(--pv2-col-h, none); overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin;
+    /* Room for a card's drop ring and focus outline inside the scroller. */
+    padding: 3px 8px 16px 3px; margin: -3px 0 0 -3px;
+  }
+}
 /* Dragging needs a pointer and room; below this Move under… does the job. */
 @media (max-width: 1023px) {
   .plan-body.has-drawer { display: block; }
