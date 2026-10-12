@@ -87,7 +87,7 @@ All three started from the coordinator seam (`useSessionProgress`, flagged Seaso
 ## Added requirement: uniform triage (2026-10-12) — implemented and verified, not released
 
 Scott's addendum (`canvas-first-slice/docs/planning/2026-10-12-uniform-triage-claude-addendum.md`). One owner (the
-Triage agent) built a single shared contract; delivered as a **separate draft PR stacked on #183** (see PR below),
+Triage agent) built a single shared contract; delivered as **draft PR #184** (https://github.com/scottring/symphonyOS/pull/184), stacked on #183,
 branch `claude/uniform-triage` (worktree `.worktrees/uniform-triage`). The finished Week/Season/Year agents were not
 running and their transcripts couldn't be resumed, so they could not race it.
 
@@ -155,6 +155,8 @@ unchanged.", Inbox More grid. No kiosk/wall files changed.
 - Draft PR: https://github.com/scottring/symphonyOS/pull/183 (base `codex/month-purpose`; retarget to `main` after #182 merges)
 
 ## Release steps remaining
+
+0. Triage is in draft PR #184 (base `codex/horizon-purpose`); after #183 merges, retarget #184 to `main` and rerun checks.
 
 1. Scott reviews PR #182 (Month) and this PR.
 2. After #182 merges, retarget this PR to `main`, rebase onto origin/main, rerun tsc/tests/build.
