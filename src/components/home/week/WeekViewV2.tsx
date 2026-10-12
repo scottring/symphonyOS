@@ -34,6 +34,8 @@ import { useFamilyMembers } from '@/hooks/useFamilyMembers'
 import { suggestSlots, type BusyInterval } from '@/lib/planning/dropSmarts'
 import { FIRST_HOUR, LAST_HOUR } from './WeekGrid'
 import { useGatedTaskActions } from '@/hooks/useGatedTaskActions'
+import { applyTriageWhen, describeTriageWhen } from '@/lib/triage/applyWhen'
+import { placementSnapshot } from '@/lib/triage/feedback'
 import { weekStartAnchor, readCadenceConfig } from '@/lib/cadence/config'
 import { partitionWeekExtras } from '@/lib/week/weekExtras'
 import { buildWeekRoutineItems } from './weekRoutineItems'
@@ -697,7 +699,7 @@ export function WeekViewV2(props: WeekViewV2Props) {
   // second toggle would read a stale snapshot — HomeView's rule). A routine
   // ticks its OCCURRENCE — that day's instance — so Today, the pin and this
   // page show the same completion.
-  const { markDone, undoDone, setPlanned, reschedule: rescheduleInstance, undoReschedule } = useActionableInstances()
+  const { markDone, undoDone, setPlanned, reschedule: rescheduleInstance, undoReschedule, skip: skipInstance } = useActionableInstances()
   const handleJournalToggle = useCallback((entry: JournalEntry, day: JournalDay) => {
     if (entry.task) {
       const task = entry.task
@@ -1099,11 +1101,20 @@ export function WeekViewV2(props: WeekViewV2Props) {
   const canvasWriters = useMemo<WeekCanvasWriters>(() => {
     const short = (d: Date) => d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
     const write = (label: string, t: Task, patch: Partial<Task>, previous?: Partial<Task>) => {
-      // The way back is exactly what the write changed.
+      // The way back is exactly what the write changed. A write that did not
+      // land says so on the strip and offers Retry; nothing moves.
       const before = previous ?? Object.fromEntries(Object.keys(patch).map((k) => [k, t[k as keyof Task]])) as Partial<Task>
       void activity.run(label, async () => (await onUpdateTask(t.id, patch)) as boolean | void, {
-        ids: [t.id], undo: async () => { await onUpdateTask(t.id, before) },
+        ids: [t.id], undo: async () => { await onUpdateTask(t.id, before) }, retry: () => write(label, t, patch, previous),
       })
+    }
+    // The triage contract's task writes (lib/triage), the same every task
+    // surface makes: one identity, its week and goal kept on a move down.
+    const triageHandlers = {
+      onPushTask: gated.pushTask,
+      onSetBucket: (id: string, bucket: Task['bucket']) => onUpdateTask(id, { bucket, scheduledFor: undefined }),
+      onUpdateTask: (id: string, updates: Partial<Task>) => onUpdateTask(id, updates),
+      onFocus: (id: string, day: Date) => onUpdateTask(id, { plannedOn: day }),
     }
     const atMidnight = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate())
     return {
@@ -1135,9 +1146,9 @@ export function WeekViewV2(props: WeekViewV2Props) {
           ids: [r.id], undo: () => setPlanned('routine', r.id, atMidnight(day), false),
         })
       },
-      moveRoutine: (it, fromKey, day) => {
+      moveRoutine: function moveRoutine(it, fromKey, day) {
         if (!it.routineId) return
-        const opts: { ids: string[]; undo?: () => Promise<boolean | void> } = { ids: [it.routineId] }
+        const opts: { ids: string[]; undo?: () => Promise<boolean | void>; retry?: () => void } = { ids: [it.routineId], retry: () => moveRoutine(it, fromKey, day) }
         void activity.run(`Move “${it.title}” to ${short(day)}`, async () => {
           const r = await moveRoutineToDay(it.routineId!, fromKey, localYmd(day), it.title, false)
           if (r.undo) { const undo = r.undo; opts.undo = async () => { await undo() } }
@@ -1183,12 +1194,46 @@ export function WeekViewV2(props: WeekViewV2Props) {
         if (!patch) return
         write(parent ? `Move “${t.title}” under “${parent.title}”` : `Unlink “${t.title}”`, t, patch.after as Partial<Task>, patch.before as Partial<Task>)
       },
+      whenTask: function whenTask(t, when) {
+        const before = placementSnapshot(t)
+        void activity.run(`${describeTriageWhen(when)}: “${t.title}”`, () => applyTriageWhen(when, t.id, triageHandlers), {
+          ids: [t.id], undo: async () => { await onUpdateTask(t.id, before) }, retry: () => whenTask(t, when),
+        })
+      },
+      dateTask: function dateTask(t, at, isAllDay) {
+        const before = placementSnapshot(t)
+        const when = isAllDay ? short(at) : `${short(at)}, ${at.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`
+        void activity.run(`Move “${t.title}” to ${when}`, async () => (await onUpdateTask(t.id, { bucket: 'timed', scheduledFor: at, isAllDay })) !== false, {
+          ids: [t.id], undo: async () => { await onUpdateTask(t.id, before) }, retry: () => dateTask(t, at, isAllDay),
+        })
+      },
+      // Skip this time: that ONE occurrence is marked skipped for its day.
+      // The routine's rule and every other occurrence are untouched; Undo
+      // reopens it.
+      skipOccurrence: function skipOccurrence(it, day) {
+        if (!it.routineId) return
+        const id = it.routineId
+        void activity.run(`Skip “${it.title}” this time · ${short(day)}`, () => skipInstance('routine', id, day), {
+          ids: [id], undo: async () => { await undoDone('routine', id, day) }, retry: () => skipOccurrence(it, day),
+        })
+      },
+      pinOccurrence: function pinOccurrence(it, fromKey, at) {
+        if (!it.routineId) return
+        const id = it.routineId
+        const [fy, fm, fd] = fromKey.split('-').map(Number)
+        const opts: { ids: string[]; undo?: () => Promise<boolean | void>; retry?: () => void } = { ids: [id], retry: () => pinOccurrence(it, fromKey, at) }
+        void activity.run(`Move “${it.title}” to ${short(at)}, ${at.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`, async () => {
+          const previous = await rescheduleInstance('routine', id, new Date(fy, fm - 1, fd), at)
+          if (previous) opts.undo = async () => { await undoReschedule(previous) }
+          return !!previous
+        }, opts)
+      },
       open: (id) => handleSelectBlock(id),
       foreignDrop: (day, payload) => { void planActions.drop(payload, { type: 'day', day }) },
     }
     // handleSelectBlock is a plain function of onSelectItem.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activity, onUpdateTask, toggleTask, markDone, undoDone, setPlanned, moveRoutineToDay, tasks, weekAnchor, meId, addTask, deleteTask, layers, planActions, onSelectItem, moveUnderFor])
+  }, [activity, onUpdateTask, toggleTask, markDone, undoDone, setPlanned, moveRoutineToDay, tasks, weekAnchor, meId, addTask, deleteTask, layers, planActions, onSelectItem, moveUnderFor, gated, skipInstance, rescheduleInstance, undoReschedule])
   const canvasMonthName = canvasMonths.map((m) => m.name).join(' and ')
   const canvasSpans = useMemo(() => {
     const ymdLabel = (ymd: string) => { const [y, m, d] = ymd.split('-').map(Number); const at = new Date(y, m - 1, d); return `${at.toLocaleDateString('en-US', { weekday: 'short' })} ${at.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}` }

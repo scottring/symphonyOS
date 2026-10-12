@@ -75,7 +75,7 @@ const show = (props: Partial<Parameters<typeof HomeView>[0]> = {}) =>
 const openTiming = () => {
   const monday = within(screen.getByTestId('journal-day-2026-09-14'))
   fireEvent.click(monday.getByRole('button', { name: 'More for List supplies to buy' }))
-  fireEvent.click(screen.getByRole('menuitem', { name: 'Move to another day' }))
+  fireEvent.click(screen.getByRole('menuitem', { name: /^Another day in / }))
 }
 
 describe('HomeView hands the week its source status', () => {

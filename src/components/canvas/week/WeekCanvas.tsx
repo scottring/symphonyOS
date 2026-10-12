@@ -25,6 +25,10 @@
 import { useContext, useState, type DragEvent, type FormEvent, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { MoreHorizontal } from 'lucide-react'
+import { TaskFateMenu } from '@/components/schedule/TaskFateMenu'
+import type { TriageWhen } from '@/lib/triage/contract'
+import { dayForWhen } from '@/lib/triage/applyWhen'
+import { rangeLabel } from '@/lib/triage/periods'
 import type { Task, TaskContext } from '@/types/task'
 import type { PlanNode } from '@/components/plan/constellation/model'
 import { MoveUnderMenu } from '@/components/canvas/plan/MoveUnderMenu'
@@ -97,6 +101,15 @@ export interface WeekCanvasWriters {
   moveUnder: (task: Task, parent: PlanNode | null) => void
   /** Opens the details pane for a selectable id. */
   open: (id: string) => void
+  /** The triage contract's When for a task (lib/triage): a day, a pool, a
+   *  weekend, Someday — the same write every task triage surface makes. */
+  whenTask?: (task: Task, when: TriageWhen) => void
+  /** Pick date & time… for a task. */
+  dateTask?: (task: Task, at: Date, isAllDay: boolean) => void
+  /** Skip this time: ONE occurrence, on that day; the routine is untouched. */
+  skipOccurrence?: (item: CanvasDayItem, day: Date) => void
+  /** One occurrence to a day AND a time (Tonight, a picked time). */
+  pinOccurrence?: (item: CanvasDayItem, fromKey: string, at: Date) => void
   /** A plan row from elsewhere (the Today pin) dropped on a day. */
   foreignDrop?: (day: Date, payload: PlanDragPayload) => void
 }
@@ -228,12 +241,45 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
     <GiveItADay title={title} days={dates} inline={phone} current={current} describe={dayDescriptions} label={picker.mode === 'move' ? 'Move to' : 'Give it a day'}
       onPick={(d) => { setPicker(null); onPick(d) }} onClose={() => setPicker(null)} />
   ))
-  // People…, Life area…, Move under… — the row's secondary actions, in its ⋯.
-  const taskMenuItems = (t: Task, key: string) => [
-    { label: 'People…', onSelect: () => setPanel({ key, kind: 'people' as const }) },
-    { label: 'Life area…', onSelect: () => setPanel({ key, kind: 'area' as const }) },
-    ...(writers.moveUnderOptions(t) ? [{ label: 'Move under…', onSelect: () => setPanel({ key, kind: 'move' as const }) }] : []),
-  ]
+  // The week on screen, named: "this week", or the week of a past or future
+  // one — the period a day move from here lands in.
+  const weekEnd = new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate() + 7)
+  const weekName = isCurrent ? 'this week' : `the week of ${rangeLabel(weekStart, weekEnd)}`
+  // The one triage menu (lib/triage/contract.ts) for a task row: When, Skip
+  // (a placed task only), and More — Complete, Open details, People…, Life
+  // area…, Move under… — in the contract's order.
+  const taskMenu = (t: Task, key: string, opts: { day?: CanvasDay; openId: string }) => (
+    <TaskFateMenu entity={opts.day ? 'dated-task' : 'task'} label={`More for ${t.title}`}
+      triggerClassName="canvas-icon wc-more" iconSize={15} completed={t.completed}
+      currentDay={opts.day?.date ?? null}
+      extras={t.completed ? [] : [{ label: opts.day ? `Another day in ${weekName}` : `Give it a day in ${weekName}`, onSelect: () => { setPanel(null); setPicker({ key, mode: opts.day ? 'move' : 'place' }) } }]}
+      onPickWhen={writers.whenTask ? (when) => writers.whenTask!(t, when) : undefined}
+      onPickDate={writers.dateTask ? (at, isAllDay) => writers.dateTask!(t, at, isAllDay) : undefined}
+      onSkip={opts.day ? () => writers.unplaceTask(t) : undefined}
+      onComplete={() => writers.toggleTask(t)}
+      onOpen={() => writers.open(opts.openId)}
+      onPeople={t.completed ? undefined : () => { setPicker(null); setPanel({ key, kind: 'people' }) }}
+      onArea={t.completed ? undefined : () => { setPicker(null); setPanel({ key, kind: 'area' }) }}
+      onMoveUnder={!t.completed && writers.moveUnderOptions(t) ? () => { setPicker(null); setPanel({ key, kind: 'move' }) } : undefined} />
+  )
+  // A routine's occurrence: the same When, each landing on a real day (a
+  // period asks which day), Skip this time, Complete, Open routine. Nothing
+  // here edits the routine itself.
+  const occurrenceMenu = (it: CanvasDayItem, day: CanvasDay, key: string) => (
+    <TaskFateMenu entity="occurrence" label={`More for ${it.title}`}
+      triggerClassName="canvas-icon wc-more" iconSize={15} completed={it.completed}
+      currentDay={day.date}
+      extras={it.completed ? [] : [{ label: `Another day in ${weekName}`, onSelect: () => { setPanel(null); setPicker({ key, mode: 'move' }) } }]}
+      onPickWhen={(when, chosen) => {
+        if (when === 'tonight') { const at = dayForWhen('tonight'); if (at && writers.pinOccurrence) writers.pinOccurrence(it, day.key, at); return }
+        const to = chosen ?? dayForWhen(when)
+        if (to) writers.moveRoutine(it, day.key, to)
+      }}
+      onPickDate={(at, isAllDay) => (isAllDay || !writers.pinOccurrence ? writers.moveRoutine(it, day.key, at) : writers.pinOccurrence(it, day.key, at))}
+      onSkip={writers.skipOccurrence ? () => writers.skipOccurrence!(it, day.date) : undefined}
+      onComplete={() => writers.toggleRoutine(it, day.date)}
+      onOpen={() => writers.open(it.id)} />
+  )
   const taskPanel = (t: Task, key: string): ReactNode => {
     if (panel?.key !== key) return null
     const close = () => setPanel(null)
@@ -248,22 +294,13 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
     return o && <MoveUnderMenu item={o.item} parents={o.parents} parentTerm={`${monthName} goal`} open
       onOpenChange={(v) => { if (!v) close() }} onPick={(p) => { close(); writers.moveUnder(t, p) }} />
   }
-  const moreButton = (title: string, key: string, items: { label: string; onSelect: () => void }[], size = 16) => (
-    <span className="wc-more-wrap">
-      <button type="button" className="canvas-icon wc-more" aria-label={`More for ${title}`} aria-haspopup="menu" aria-expanded={menu === key}
-        onClick={() => { setPicker(null); setPanel(null); setMenu(menu === key ? null : key) }}>
-        <MoreHorizontal size={size} aria-hidden="true" />
-      </button>
-      {menu === key && <CanvasMenu label={title} items={items} onClose={() => setMenu(null)} />}
-    </span>
-  )
   const shelfRow = (t: Task, meta: string | null, groupKey: string) => {
     const key = `task:${t.id}`
     const row: CompactRow<Task> = { key, id: t.id, title: t.title, item: t, completed: t.completed, meta }
     return (
       <CompactWeekRow key={key} row={row} className={picker?.key === key || panel?.key === key || menu === key ? 'has-picker' : undefined}
         addLabel={(title) => `Give ${title} a day`} addExpanded={picker?.key === key}
-        extra={!t.completed && moreButton(t.title, key, taskMenuItems(t, key), 15)}
+        extra={taskMenu(t, key, { openId: `task-${t.id}` })}
         onAdd={() => { setMenu(null); setPanel(null); setPicker(picker?.key === key ? null : { key, mode: 'place' }) }}
         onComplete={writers.toggleTask} onOpen={(x) => writers.open(`task-${x.id}`)}
         onDragStart={phone ? undefined : (x, ev) => startDrag(ev, { kind: 'task', id: x.id, date: localYmd(weekStart), title: x.title }, { kind: 'task', id: x.id, groupKey })}
@@ -297,7 +334,7 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
               </button>
               {menu === menuKey && (
                 <CanvasMenu label={`${title}`} onClose={() => setMenu(null)} items={[
-                  { label: 'Mark done', onSelect: () => writers.milestoneDone(g.milestone!.id) },
+                  { label: g.milestone.completed ? 'Reopen' : 'Complete', onSelect: () => writers.milestoneDone(g.milestone!.id) },
                   { label: 'Open details', onSelect: () => writers.open(`task-${g.milestone!.id}`) },
                   { label: 'Add a task', onSelect: () => setComposer(g.key) },
                   ...(g.milestone.onWeek ? [] : [{ label: 'Put on this week', onSelect: () => writers.putOnWeek(g.milestone!.id) }]),
@@ -385,13 +422,6 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
     const entityId = it.task?.id ?? it.routineId ?? it.id
     const row: CompactRow<CanvasDayItem> = { key, id: entityId, title: it.title, item: it, completed: it.completed, meta: it.time ? formatTimeCompact(it.time) : null }
     const isTask = it.kind === 'task' && !!it.task
-    const items = [
-      { label: 'Move to another day', onSelect: () => setPicker({ key, mode: 'move' }) },
-      ...(isTask ? [{ label: 'Back to still to place', onSelect: () => writers.unplaceTask(it.task!) }] : []),
-      { label: 'Open', onSelect: () => writers.open(it.id) },
-      { label: it.completed ? 'Mark not done' : 'Complete', onSelect: () => (isTask ? writers.toggleTask(it.task!) : writers.toggleRoutine(it, day.date)) },
-      ...(isTask && !it.completed ? taskMenuItems(it.task!, key) : []),
-    ]
     return (
       <CompactWeekRow key={key} row={row} className={`wc-dayrow${it.kind === 'routine' ? ' is-routine' : ''}${panel?.key === key || picker?.key === key ? ' has-picker' : ''}`}
         onComplete={(x) => (x.task ? writers.toggleTask(x.task) : writers.toggleRoutine(x, day.date))}
@@ -400,7 +430,7 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
           ? startDrag(ev, { kind: 'task', id: x.task.id, date: day.key, title: x.title }, { kind: 'task', id: x.task.id, fromKey: day.key })
           : x.routineId ? startDrag(ev, { kind: 'routine', id: x.routineId, date: day.key, title: x.title }, { kind: 'occ', id: x.routineId, fromKey: day.key }) : undefined}
         onDragEnd={endDrag}
-        trailing={moreButton(it.title, key, items, 15)}>
+        trailing={isTask ? taskMenu(it.task!, key, { day, openId: it.id }) : it.routineId ? occurrenceMenu(it, day, key) : undefined}>
         {pick(key, it.title, (d) => (isTask ? writers.moveTask(it.task!, d) : writers.moveRoutine(it, day.key, d)), day.key)}
         {isTask && taskPanel(it.task!, key)}
       </CompactWeekRow>

@@ -45,12 +45,12 @@ vi.mock('@/hooks/usePlanActions', () => ({
   }),
 }))
 
-const instancesMock = vi.hoisted(() => ({ rows: [] as unknown[], markDone: vi.fn(async () => true), undoDone: vi.fn(async () => true) }))
+const instancesMock = vi.hoisted(() => ({ rows: [] as unknown[], markDone: vi.fn(async () => true), undoDone: vi.fn(async () => true), skip: vi.fn(async () => true), setPlanned: vi.fn(async () => true), reschedule: vi.fn(async () => null) }))
 vi.mock('@/hooks/useActionableInstances', () => ({
   useActionableInstances: () => ({
     getInstancesForRange: async () => instancesMock.rows,
-    markDone: instancesMock.markDone, undoDone: instancesMock.undoDone,
-    setPlanned: vi.fn(async () => true), reschedule: vi.fn(async () => null),
+    markDone: instancesMock.markDone, undoDone: instancesMock.undoDone, skip: instancesMock.skip,
+    setPlanned: instancesMock.setPlanned, reschedule: instancesMock.reschedule,
   }),
 }))
 
@@ -242,12 +242,12 @@ describe('WeekViewV2 journal spread', () => {
   })
 
   // The week canvas (2026-10-10): a day's row keeps a way to another day —
-  // its ⋯ menu's "Move to another day", the same seven-day picker the shelf
+  // its ⋯ menu's "Another day in <the week on screen>", the same seven-day picker the shelf
   // uses — and a finished row is a record (no move offered by drag).
   const openMove = (dayKey: string, title: string) => {
     const day = within(screen.getByTestId(`journal-day-${dayKey}`))
     fireEvent.click(day.getByRole('button', { name: `More for ${title}` }))
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Move to another day' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: /^Another day in / }))
   }
 
   it('offers the VIEWED week\'s days to move a day\'s task to, saying what each holds', () => {
@@ -590,5 +590,62 @@ describe('WeekViewV2 — the week canvas keeps what the page could do', () => {
     expect(localStorage.getItem('symphony-week-daily')).toBe('shown')
     expect(screen.getAllByText('Walk the dog').length).toBeGreaterThan(1)
     expect(screen.getByRole('button', { name: 'Hide daily' })).toBeInTheDocument()
+  })
+})
+
+// The triage contract on the Week canvas (2026-10-12): writes go through the
+// strip — success and Undo only once stored; a failed write says so, offers
+// Retry, and moves nothing.
+describe('WeekViewV2 canvas triage writes', () => {
+  const sun = new Date(2026, 8, 13)
+  const withStrip = (ui: React.ReactNode) => {
+    function Probe() {
+      const a = useCanvasActivity()
+      return <p data-testid="strip">{a.receipt ? `${a.receipt.state}:${a.receipt.undoable}:${a.receipt.canRetry}:${a.receipt.request}` : ''}
+        <button type="button" onClick={() => void a.undo()}>Undo it</button><button type="button" onClick={() => a.retry()}>Retry it</button></p>
+    }
+    return (
+      <CanvasActivityProvider snapshot={{ tasks: [], goals: [] }} writers={{ deleteTask: vi.fn(), updateTask: vi.fn(), deleteGoal: vi.fn(), updateGoal: vi.fn() }} refetch={() => {}}>
+        {ui}<Probe />
+      </CanvasActivityProvider>
+    )
+  }
+  afterEach(() => { vi.useRealTimers() })
+
+  it('Skip this time skips ONE occurrence on its day, with an Undo that reopens only it', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] }); vi.setSystemTime(new Date(2026, 8, 13, 9))
+    instancesMock.skip.mockClear(); instancesMock.undoDone.mockClear(); instancesMock.reschedule.mockClear(); instancesMock.setPlanned.mockClear()
+    const routine = createMockRoutine({ id: 'water', name: 'Water houseplants', recurrence_pattern: { type: 'weekly', days: ['mon', 'wed'] } as RecurrencePattern })
+    render(withStrip(<WeekViewV2 {...defaultProps} routines={[routine]} weekStart={sun} tasks={[]} events={[]} />))
+    const monday = within(screen.getByTestId('journal-day-2026-09-14'))
+    fireEvent.click((await monday.findAllByRole('button', { name: 'More for Water houseplants' }))[0])
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Skip this time' }))
+    await waitFor(() => expect(screen.getByTestId('strip')).toHaveTextContent(/^saved:true:false:Skip “Water houseplants” this time · Mon, Sep 14/))
+    expect(instancesMock.skip).toHaveBeenCalledTimes(1)
+    expect(instancesMock.skip).toHaveBeenCalledWith('routine', 'water', new Date(2026, 8, 14))
+    // Wednesday's occurrence and the routine itself are untouched.
+    expect(instancesMock.reschedule).not.toHaveBeenCalled()
+    expect(instancesMock.setPlanned).not.toHaveBeenCalled()
+    expect(defaultProps.onUpdateRoutine).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: 'Undo it' }))
+    await waitFor(() => expect(instancesMock.undoDone).toHaveBeenCalledWith('routine', 'water', new Date(2026, 8, 14)))
+  })
+
+  it('a failed When says so, offers Retry and no Undo; Retry writes again', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] }); vi.setSystemTime(new Date(2026, 8, 13, 9))
+    const onUpdateTask = vi.fn(async () => false)
+    const anchor = weekStartAnchor(sun, readCadenceConfig().weekStartsOn)
+    const t = createMockTask({ id: 'w', title: 'Call the plumber', bucket: 'week', weekStart: anchor, commitments: [{ level: 'week', periodStart: anchor, status: 'open' }] })
+    render(withStrip(<WeekViewV2 {...defaultProps} onUpdateTask={onUpdateTask} routines={[]} weekStart={sun} tasks={[t]} events={[]} />))
+    fireEvent.click(screen.getByRole('button', { name: 'More for Call the plumber' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: /^Next month/ }))
+    await waitFor(() => expect(screen.getByTestId('strip')).toHaveTextContent(/^failed:false:true:/))
+    expect(onUpdateTask).toHaveBeenCalledWith('w', { bucket: 'month', monthStart: new Date(2026, 9, 1), scheduledFor: undefined })
+    // Still where it was.
+    expect(within(screen.getByRole('region', { name: 'Still to place' })).getByText('Call the plumber')).toBeInTheDocument()
+    onUpdateTask.mockResolvedValue(true)
+    fireEvent.click(screen.getByRole('button', { name: 'Retry it' }))
+    await waitFor(() => expect(screen.getByTestId('strip')).toHaveTextContent(/^saved:true:false:/))
+    expect(onUpdateTask).toHaveBeenCalledTimes(2)
   })
 })

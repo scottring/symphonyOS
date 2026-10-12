@@ -60,6 +60,9 @@ const show = (w = writers(), extra: Partial<Parameters<typeof WeekCanvas>[0]> = 
   return w
 }
 
+/** The open triage menu's More group, in order. */
+const moreGroup = () => within(screen.getByRole('group', { name: 'More' })).getAllByRole('menuitem').map((m) => m.textContent)
+
 const dt = () => {
   const data: Record<string, string> = {}
   const t = { setData: (k: string, v: string) => { data[k] = v }, getData: (k: string) => data[k] ?? '', types: [] as string[], effectAllowed: '', dropEffect: '' }
@@ -141,7 +144,7 @@ describe('WeekCanvas — Still to place', () => {
     const w = show()
     const head = () => within(screen.getByRole('region', { name: 'Plan the autumn trip' }))
     fireEvent.click(head().getByRole('button', { name: 'More for Plan the autumn trip' }))
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Mark done' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Complete' }))
     expect(w.milestoneDone).toHaveBeenCalledWith('m1')
     fireEvent.click(head().getByRole('button', { name: 'More for Plan the autumn trip' }))
     fireEvent.click(screen.getByRole('menuitem', { name: 'Open details' }))
@@ -247,8 +250,10 @@ describe('WeekCanvas — the days', () => {
     expect(within(screen.getByTestId('journal-day-2026-10-05')).getByRole('button', { name: /Dentist/ })).toHaveTextContent('9aDentist')
     const wed = within(screen.getByTestId('journal-day-2026-10-07'))
     fireEvent.click(wed.getByRole('button', { name: 'More for Pick up the keys' }))
-    expect(screen.getAllByRole('menuitem').map((m) => m.textContent).slice(0, 4)).toEqual(['Move to another day', 'Back to still to place', 'Open', 'Complete'])
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Back to still to place' }))
+    // The triage contract (2026-10-12): the week's own day move, then When,
+    // then the scoped "Skip this day" (it goes back to still to place).
+    expect(screen.getAllByRole('menuitem')[0]).toHaveTextContent('Another day in this week')
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Skip this day' }))
     expect(w.unplaceTask).toHaveBeenCalledWith(placed)
   })
 
@@ -336,7 +341,7 @@ describe('WeekCanvas — restored functions', () => {
     const w = show(writers(), { members: [{ id: 'sk', name: 'Scott' }, { id: 'ir', name: 'Iris' }] })
     const more = () => fireEvent.click(screen.getByRole('button', { name: 'More for Book the cabin' }))
     more()
-    expect(screen.getAllByRole('menuitem').map((m) => m.textContent)).toEqual(['People…', 'Life area…', 'Move under…'])
+    expect(moreGroup()).toEqual(['Complete', 'Open details', 'People…', 'Life area…', 'Move under…'])
     fireEvent.click(screen.getByRole('menuitem', { name: 'People…' }))
     fireEvent.click(screen.getByRole('menuitemcheckbox', { name: 'Iris' }))
     expect(w.assign).toHaveBeenCalledWith(cabin, ['ir'])
@@ -356,8 +361,7 @@ describe('WeekCanvas — restored functions', () => {
   it('a day’s task carries the same secondary actions in its ⋯', () => {
     show()
     fireEvent.click(within(screen.getByTestId('journal-day-2026-10-07')).getByRole('button', { name: 'More for Pick up the keys' }))
-    expect(screen.getAllByRole('menuitem').map((m) => m.textContent)).toEqual(
-      ['Move to another day', 'Back to still to place', 'Open', 'Complete', 'People…', 'Life area…', 'Move under…'])
+    expect(moreGroup()).toEqual(['Complete', 'Open details', 'People…', 'Life area…', 'Move under…'])
   })
 
   it('each day wears its forecast, small, in its header', () => {
@@ -407,5 +411,82 @@ describe('a past week says so', () => {
     vi.setSystemTime(new Date(2026, 9, 3, 9))
     show()
     expect(screen.queryByText('Past week')).toBeNull()
+  })
+})
+
+// Scott, 2026-10-12: the task menu and the routine menu on the same Week
+// canvas offered completely different options, with no Skip and no Tomorrow.
+// Both now draw the one triage contract (lib/triage/contract.ts).
+describe('WeekCanvas — the triage contract on both day menus', () => {
+  const water = { id: 'routine-r2', kind: 'routine' as const, title: 'Water houseplants', completed: false, routineId: 'r2' }
+  const withRoutine = () => days().map((d, i) => (i === 6 ? { ...d, items: [water] } : d))
+  const triage = (): WeekCanvasWriters => ({ ...writers(), whenTask: vi.fn(), dateTask: vi.fn(), skipOccurrence: vi.fn(), pinOccurrence: vi.fn() })
+  const openMenu = (dayKey: string, title: string) =>
+    fireEvent.click(within(screen.getByTestId(`journal-day-${dayKey}`)).getByRole('button', { name: `More for ${title}` }))
+  const whenLabels = () => within(screen.getByRole('group', { name: 'When' })).getAllByRole('menuitem')
+    .map((m) => (m.textContent ?? '').match(/^(Today|Tonight|Tomorrow|This weekend|Next weekend|This week|Next week|This month|Next month|This season|Someday|Pick date & time…)/)?.[1])
+  const WHEN = ['Today', 'Tonight', 'Tomorrow', 'This week', 'Next week', 'This weekend', 'This weekend', 'Next weekend', 'Next weekend', 'This month', 'Next month', 'This season', 'Someday', 'Pick date & time…']
+
+  it('the task and the routine occurrence both offer When, a scoped Skip and their More', () => {
+    show(triage(), { days: withRoutine() })
+    openMenu('2026-10-07', 'Pick up the keys')
+    // A task's weekend is either day: one tile each.
+    expect(whenLabels()).toEqual(WHEN.filter((w, i) => !(w === 'This weekend' && i === 6) && !(w === 'Next weekend' && i === 8)))
+    expect(screen.getByRole('menuitem', { name: 'Skip this day' })).toBeInTheDocument()
+    fireEvent.keyDown(document, { key: 'Escape' })
+
+    openMenu('2026-10-09', 'Water houseplants')
+    // An occurrence's weekend is its two days, each its own tile.
+    expect(whenLabels()).toEqual(WHEN)
+    expect(screen.getByRole('menuitem', { name: 'Skip this time' })).toBeInTheDocument()
+    expect(moreGroup()).toEqual(['Complete', 'Open routine'])
+  })
+
+  it('Tomorrow is the ACTUAL tomorrow, named, even while viewing another week', () => {
+    const w = show(triage(), { isCurrent: false, weekStart: new Date(2026, 9, 17), days: days() })
+    openMenu('2026-10-07', 'Pick up the keys')
+    expect(screen.getByRole('menuitem', { name: /^Tomorrow\s*Sun, Oct 4/ })).toBeInTheDocument()
+    // The week on screen is named, not assumed to be this one.
+    expect(screen.getAllByRole('menuitem')[0]).toHaveTextContent('Another day in the week of Oct 17–23')
+    fireEvent.click(screen.getByRole('menuitem', { name: /^Tomorrow/ }))
+    expect(w.whenTask).toHaveBeenCalledWith(placed, 'tomorrow')
+  })
+
+  it('Skip this time touches only that occurrence, on its day', () => {
+    const w = show(triage(), { days: withRoutine() })
+    openMenu('2026-10-09', 'Water houseplants')
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Skip this time' }))
+    expect(w.skipOccurrence).toHaveBeenCalledWith(water, dayOf(6))
+    expect(w.moveRoutine).not.toHaveBeenCalled()
+    expect(w.toggleRoutine).not.toHaveBeenCalled()
+  })
+
+  it('an occurrence moved to “Next week” asks which day, then moves only that occurrence there', () => {
+    const w = show(triage(), { days: withRoutine() })
+    openMenu('2026-10-09', 'Water houseplants')
+    fireEvent.click(screen.getByRole('menuitem', { name: /^Next week(?!end)/ }))
+    expect(w.moveRoutine).not.toHaveBeenCalled()
+    // Today is Sat Oct 3; Sunday weeks (the default): next week is Oct 4–10.
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Tue, Oct 6' }))
+    expect(w.moveRoutine).toHaveBeenCalledWith(water, '2026-10-09', new Date(2026, 9, 6))
+  })
+
+  it('an occurrence’s Someday explains itself instead of doing nothing', () => {
+    const w = show(triage(), { days: withRoutine() })
+    openMenu('2026-10-09', 'Water houseplants')
+    fireEvent.click(screen.getByRole('menuitem', { name: /^Someday/ }))
+    expect(screen.getByRole('note')).toHaveTextContent('Someday isn’t available for one time of a routine')
+    expect(w.moveRoutine).not.toHaveBeenCalled()
+    expect(w.skipOccurrence).not.toHaveBeenCalled()
+  })
+
+  it('a task to Someday goes through the shared When writer', () => {
+    const w = show(triage())
+    fireEvent.click(screen.getByRole('button', { name: 'More for Book the cabin' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: /^Someday/ }))
+    expect(w.whenTask).toHaveBeenCalledWith(cabin, 'someday')
+    // A task with no day has no day to skip.
+    fireEvent.click(screen.getByRole('button', { name: 'More for Book the cabin' }))
+    expect(screen.queryByRole('menuitem', { name: /^Skip/ })).toBeNull()
   })
 })
