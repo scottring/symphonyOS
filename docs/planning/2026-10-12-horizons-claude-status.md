@@ -1,6 +1,6 @@
 # Week, Season and Year — coordinator status
 
-Coordinator: Claude background session (this worktree). Last updated 2026-10-12 (evening) ET.
+Coordinator: Claude background session (this worktree). Last updated 2026-10-12 (late evening) ET.
 
 **State: implemented, integrated, tested and visually checked. Not released.** Ready for Scott's review as a
 draft PR stacked on Month's PR #182. Production needs Scott's own approval; Month's approval does not cover it.
@@ -84,19 +84,71 @@ All three started from the coordinator seam (`useSessionProgress`, flagged Seaso
 - Removed from Week's session: "put the month goal on the week as is" and completing a month goal from Week
   (the brief says the month goal stays as it is).
 
-## Added requirement: uniform triage (2026-10-12, in progress — not implemented yet)
+## Added requirement: uniform triage (2026-10-12) — implemented and verified, not released
 
-Scott's addendum (`canvas-first-slice/docs/planning/2026-10-12-uniform-triage-claude-addendum.md`): one shared
-When / Skip / secondary-action contract across Week canvas, Today, Inbox, details, planning sessions and goal menus.
+Scott's addendum (`canvas-first-slice/docs/planning/2026-10-12-uniform-triage-claude-addendum.md`). One owner (the
+Triage agent) built a single shared contract; delivered as a **separate draft PR stacked on #183** (see PR below),
+branch `claude/uniform-triage` (worktree `.worktrees/uniform-triage`). The finished Week/Season/Year agents were not
+running and their transcripts couldn't be resumed, so they could not race it.
 
-- **Owner:** one Triage agent, worktree `.worktrees/uniform-triage`, branch `claude/uniform-triage` (from
-  `6536261f`). It alone owns `src/lib/triage/**`, the shared schedule menus (`TriageWhenMenu`, `TaskFateMenu`,
-  `RoutineMoveButton`, `RescheduleGrid/Button`, `RowActionRail`, Inbox triage), and the menu code in
-  `WeekCanvas`, `WeekV2`/`WeekListV2`, `ConstellationPage.actionsFor` and the detail panels. Kiosk/wall excluded.
-- The Week/Season/Year agents finished earlier; their transcripts are no longer resumable, so the notice
-  could not be delivered to them. They are not running, so they can't race the triage owner.
-- Delivery: a focused follow-up PR stacked on #183 once integrated and verified.
-- Status: agent running. Nothing about triage is fixed, tested or deployed yet.
+**Contract** (`src/lib/triage/contract.ts`, dates in `periods.ts`, writes in `applyWhen.ts` / `feedback.ts`).
+When, always in this order, each with its destination date: Today · Tonight · Tomorrow · This week · Next week ·
+This weekend · Next weekend · This month · Next month · This season · Someday · Pick date & time…
+- Task / capture: all When, then More (Complete/Reopen, Open details, People, Life area, Move under, Delete where
+  the surface has a safe writer). Dated task adds **Skip this day** (removes only the day; week + goal links stay).
+- Routine occurrence: Today/Tonight/Tomorrow direct; week/weekend/month **ask for an actual day**; This season and
+  Someday shown as "Not for one time" with Skip/Open routine offered instead; **Skip this time** (one occurrence,
+  Undo); Complete; Open routine. Never edits the routine.
+- Season/Month goal: no day choices — Carry to next {period} · name, Remove from this {period}, Complete, Open,
+  Delete. Year goal: Complete/Reopen, Archive. Calendar event: unchanged, event-only.
+- Dates count from the actual today (also while viewing another week/day), household week start, custom seasons;
+  `dateHelpers.ts` (used by the kiosk) unchanged.
+
+**Coverage, before → after** (reproduced the two reported menus first on the pre-change build):
+
+| Surface | Entity | Before | After |
+|---|---|---|---|
+| Week canvas day row | task | Move to another day, Back to still to place, Open, Complete, People, Life area, Move under | Another day in this week · full When · Skip this day · Complete · Open details · People · Life area · Move under |
+| Week canvas day row | routine occurrence | Move to another day, Open, Complete | Another day · full When (periods pick a day; season/Someday explained) · Skip this time · Complete · Open routine |
+| Week canvas shelf | undated task | People, Life area, Move under | Give it a day · When · More |
+| Week planning rows | week task | Done, Carry, Someday, Drop, Do it today | When… (shared grid) · Carry/Drop kept as review verbs (distinct from Skip) · Complete · Open details |
+| Today rail / ⋯ | task | 8 tiles; weekend = Saturday; "Remove from this day" | Full When · Skip this day (Undo/Retry) · Open details |
+| Today rail | occurrence | Tomorrow, two weekend days, next Monday, Skip | Full occurrence contract |
+| Today day-scale → routine panel | occurrence | "Hide for today" beside whole-routine settings | "This time · date" section: shared occurrence menu + Skip this time; "Whole routine" section for rest/schedule |
+| Inbox More | capture | Grid; next week = Monday; weekend = Saturday | Full When grid in contract order, dated |
+| Details Schedule | task | 8 tiles; "Clear schedule" (left focus, no Undo) | Full When · Skip this day (same write as Week, Undo/Retry) |
+| Details | calendar event | Event tiles | Unchanged |
+| Season/Month goal menu | goal | Full day When (could turn a goal into a day task) | Period verbs only, no days |
+| Year goal menu | goal | Complete, Archive | Complete/Reopen, Archive |
+| Review drawer / pools / Someday / Expired / Reference (TriageRow) | task | Today/Tomorrow from the viewed day; weekend/next week as Saturday/Monday | Actual today (date in title); periods per contract |
+
+**Coordinator fixes on top:** TriageRow Today/Tomorrow from the actual today (`dac7cae8`); moves to a later pool
+count as deferrals again, as the dated writes did (urgency reads `defer_count`); routine panel occurrence menu and
+details "Skip this day" (requested from the Triage agent: `c674838e`, `deeea373`).
+
+**Evidence:** full suite 8810 passed / 3 skipped (only `connectors/…/adapter.test.ts` fails to load — missing
+package in this worktree, untouched); wall-v2 tests pass; tsc clean; eslint 0 errors; build passes. New tests
+cover parity across Week canvas / Today / Inbox / details, Tomorrow under another viewed week, Saturday weeks,
+next month, custom seasons, occurrence pick-day and Someday explanation, Skip this time + Undo touching one
+occurrence, Skip this day keeping week + goal links, goal menus without days, failed write → Retry and no Undo,
+keyboard (arrows, Escape returns focus). Browser (read-only harness, fixtures, all writes intercepted): both
+Week menus at 1440 and 390px (menu stays inside the viewport and scrolls), Skip this time → "Saved … Undo",
+Today routine panel occurrence menu, details Skip this day → "Skipped Mon, Oct 12 … Its week and goal are
+unchanged.", Inbox More grid. No kiosk/wall files changed.
+
+**Genuine model limitations / known gaps (not silently omitted):**
+1. A routine occurrence can't be undated: This season and Someday are shown as "Not for one time" and point to
+   Skip this time or Open routine.
+2. Goals have no "move to any later period" picker — only Carry to next and Remove from this period.
+3. No Delete on Week canvas task rows (no canvas delete writer with an honest Undo); Delete stays in details.
+4. Today keeps its rail layout: When/Skip in the calendar popover, People/Life area as rail cells, Open/Skip/Delete
+   in ⋯ — same vocabulary, not merged into one menu.
+5. `TaskTimingMenu` (the "timing" control on Today/details) is not converted.
+6. This season's name comes from the `symphony-seasons` cache; a browser that has only opened Inbox shows the
+   default season name until a page that loads household seasons has run once.
+7. Pre-existing: the routine panel opens focused on Location, scrolled past the new "This time" section.
+8. Behaviour change: for a task, Next week / weekends / Next month now land in that period's list (household
+   week start, a weekend as either day) instead of a date on next Monday / Saturday / the 1st.
 
 ## PR
 
