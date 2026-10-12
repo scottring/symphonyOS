@@ -122,7 +122,7 @@ export function SeasonBoard({ boardRef, ...p }: SeasonBoardProps) {
   const lookBackRows = [...p.lookBack].sort((a, b) => Number(undecided(b)) - Number(undecided(a)))
   const lookBackPanel = <>
     <div className="plan-section-head">
-      <h2 id="plan-season-lookback-title">{prevWord} goals</h2>
+      <h2 id="plan-season-lookback-title">Look back at {prevWord}</h2>
       <p>Decide what each unfinished one becomes. {prevWord} keeps its record.</p>
     </div>
     {lookBackRows.length > 0
