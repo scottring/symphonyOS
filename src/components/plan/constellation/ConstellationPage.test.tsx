@@ -130,16 +130,16 @@ describe('where you are, and somewhere to add (Scott, 2026-10-11)',()=>{
 })
 
 describe('grouped under parent',()=>{
- it('at Year the intentions are the items, and a new one keeps its wording when the save fails',async()=>{
+ it('at Year the year goals are the items, and a new one keeps its wording when the save fails',async()=>{
   api.addGoal.mockResolvedValueOnce(null);open()
-  expect(within(group('Year goals')).getByText('Together')).toBeInTheDocument()
-  fireEvent.click(screen.getByRole('button',{name:'Add a year goal'}))
-  fireEvent.change(screen.getByLabelText('New year goal'),{target:{value:'A meaningful year'}})
+  expect(within(screen.getByRole('list',{name:'2026 goals'})).getByText('Together')).toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button',{name:'Add a 2026 goal'}))
+  fireEvent.change(screen.getByLabelText('New 2026 goal'),{target:{value:'A meaningful year'}})
   fireEvent.click(screen.getByRole('button',{name:'Add'}))
   await screen.findByText(/Your wording is still here/)
-  expect(screen.getByLabelText('New year goal')).toHaveValue('A meaningful year')
+  expect(screen.getByLabelText('New 2026 goal')).toHaveValue('A meaningful year')
   fireEvent.click(screen.getByRole('button',{name:'Add'}))
-  await waitFor(()=>expect(screen.queryByLabelText('New year goal')).not.toBeInTheDocument())
+  await waitFor(()=>expect(screen.queryByLabelText('New 2026 goal')).not.toBeInTheDocument())
   expect(api.addGoal).toHaveBeenLastCalledWith(null,'A meaningful year','personal',expect.objectContaining({year:2026,id:expect.any(String)}))
   expect(lastRun().opts.ids).toEqual([api.addGoal.mock.calls[1][3].id])
  })

@@ -38,7 +38,7 @@ import { planPeopleLens } from '@/lib/planning/peopleLens'
 import { periodBounds, selectPeriodTasks, isCurrentPeriod } from '@/lib/planning/periodPage'
 import { committedTo } from '@/lib/placement/model'
 import { localYmd, parseLocalYmd, readCadenceConfig, weekStartAnchor } from '@/lib/cadence/config'
-import type { TaskContext } from '@/types/task'
+import type { Task, TaskContext } from '@/types/task'
 import { useAddArea } from '../v2/AddArea'
 import { planNodes, type PlanNode } from './model'
 import { connectionPair, eligibleParents, moveUnderPatch } from './connections'
@@ -52,7 +52,11 @@ import { useConversationWalk } from '@/components/canvas/conversationWalk'
 import { PAGE_PLANNING } from '@/components/layout/pageLayout'
 import { EXPLAIN_LABEL, EXPLAIN_MESSAGE } from '@/lib/explain/pageGuides'
 import { useColumnsFitWindow } from '@/hooks/useColumnsFitWindow'
-// Year agent's imports
+// Season and Year boards (2026-10-12).
+import { SeasonBoard } from './SeasonBoard'
+import { useSeasonSession, useYearGoalsShown, type SeasonStep } from './useSeasonSession'
+import { seasonToken } from '@/lib/cadence/seasons'
+import { lineFate } from '@/lib/planning/v2/planV2'
 import type { Goal } from '@/types/goal'
 import { YearBoard, YearGoalCard } from './YearBoard'
 import { useYearSession } from './useYearSession'
@@ -79,11 +83,6 @@ function writeSourceShown(shown: boolean) {
 // ---- Season board: flag (Season agent's region) --------------------------
 /** Season uses the collection-and-source board Month introduced. */
 const SEASON_BOARD = true
-import { SeasonBoard } from './SeasonBoard'
-import { useSeasonSession, useYearGoalsShown, type SeasonStep } from './useSeasonSession'
-import { seasonToken } from '@/lib/cadence/seasons'
-import { lineFate } from '@/lib/planning/v2/planV2'
-import type { Task } from '@/types/task'
 // ---- end Season flag ------------------------------------------------------
 // ---- Year board: flag (Year agent's region) --------------------------------
 /** Year uses the collection-and-source board Month introduced. */
