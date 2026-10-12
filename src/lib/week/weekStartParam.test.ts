@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { weekRangeFromParams, weekStartParam } from './weekStartParam'
+import { currentWeekCleanup, weekRangeFromParams, weekStartParam } from './weekStartParam'
 import { weekRangeFromStartParam } from '@/lib/planning/dateRange'
 
 describe('weekStartParam', () => {
@@ -102,5 +102,25 @@ describe('weekStartParam', () => {
         expect(weekRangeFromParams(new URLSearchParams(q), 0, wednesday)).toHaveLength(7)
       }
     })
+  })
+})
+
+// Scott, 2026-10-12: on Mon Oct 12 the Mac app reopened Week on Oct 3–9 —
+// the week it had been opened on, pinned in the URL. Like Today, the current
+// week is not written into the URL, so a reload after it ends shows the new
+// one; a week you paged to on purpose still is.
+describe('the current week stays out of the URL', () => {
+  const mon = new Date(2026, 9, 12) // Mon Oct 12; Saturday weeks start Oct 10
+  it('paging to the current week clears start; any other week writes it', () => {
+    expect(weekStartParam('week', 7, '?view=alongside&start=2026-10-03', new Date(2026, 9, 10), 6, mon)!.get('start')).toBeNull()
+    expect(weekStartParam('week', 7, '?view=alongside', new Date(2026, 9, 3), 6, mon)!.get('start')).toBe('2026-10-03')
+    expect(weekStartParam('week', 7, '?view=alongside', new Date(2026, 9, 17), 6, mon)!.get('start')).toBe('2026-10-17')
+  })
+  it('a link that names the current week is cleaned on arrival; a past week, a run or no start is left alone', () => {
+    expect(currentWeekCleanup('?view=alongside&start=2026-10-10&date=2026-10-10', 6, mon)?.toString()).toBe('view=alongside')
+    expect(currentWeekCleanup('?view=alongside&start=2026-10-12', 6, mon)?.toString()).toBe('view=alongside')
+    expect(currentWeekCleanup('?view=alongside&start=2026-10-03', 6, mon)).toBeNull()
+    expect(currentWeekCleanup('?view=alongside&start=2026-10-10&range=weekend&days=2', 6, mon)).toBeNull()
+    expect(currentWeekCleanup('?view=alongside', 6, mon)).toBeNull()
   })
 })
