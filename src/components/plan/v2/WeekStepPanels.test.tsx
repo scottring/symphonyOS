@@ -1,32 +1,74 @@
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen, fireEvent, within } from '@testing-library/react'
-import { InboxStep, BetweenStep, AheadStep, RoutinesStep, dayList } from './WeekStepPanels'
+import { InboxSource, LastWeekSource, MonthGoalsSource, BetweenStep, AheadStep, RoutinesStep, dayList } from './WeekStepPanels'
 import { createMockRoutine, createMockTask } from '@/test/mocks/factories'
 import type { RoutineGroups, RoutineRow } from '@/lib/week/routineGroups'
 
 const WEEK = ['2026-10-03', '2026-10-04', '2026-10-05', '2026-10-06', '2026-10-07', '2026-10-08', '2026-10-09']
 
-// Scott, 2026-10-03: planning a week one kind of thing at a time.
-describe('InboxStep', () => {
-  it('each capture gets this week, someday or done; an empty Inbox says so', () => {
-    const onThisWeek = vi.fn()
+// Scott, 2026-10-12: the Inbox is the first source beside the week's list.
+describe('InboxSource', () => {
+  const props = { weekName: 'week 43', stateOf: () => undefined, onAdd: vi.fn(), onSomeday: vi.fn(), onDone: vi.fn(), onOpen: vi.fn() }
+  it('each capture is a card whose one action adds it to the week; Someday and Done are quieter; an empty Inbox says so', () => {
+    const onAdd = vi.fn()
     const t = createMockTask({ id: 'c1', title: 'Call the dentist', bucket: 'inbox' })
-    const { rerender } = render(<InboxStep tasks={[t]} onThisWeek={onThisWeek} onSomeday={vi.fn()} onDone={vi.fn()} onOpen={vi.fn()} />)
-    fireEvent.click(screen.getByRole('button', { name: 'This week: Call the dentist' }))
-    expect(onThisWeek).toHaveBeenCalledWith(t)
-    rerender(<InboxStep tasks={[]} onThisWeek={onThisWeek} onSomeday={vi.fn()} onDone={vi.fn()} onOpen={vi.fn()} />)
-    expect(screen.getByText('Your Inbox is empty.')).toBeInTheDocument()
+    const { rerender } = render(<InboxSource {...props} tasks={[t]} onAdd={onAdd} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Add Call the dentist to week 43' }))
+    expect(onAdd).toHaveBeenCalledWith(t)
+    expect(screen.getByRole('button', { name: 'Someday: Call the dentist' })).toBeInTheDocument()
+    rerender(<InboxSource {...props} tasks={[]} />)
+    expect(screen.getByText('Your Inbox is empty. Nothing to choose from here.')).toBeInTheDocument()
   })
-})
 
-describe('InboxStep — trash', () => {
   // Scott, 2026-10-04: "we also need a trash button for inbox items".
   it('each capture can be thrown away', () => {
     const onDelete = vi.fn()
     const t = createMockTask({ id: 'c1', title: 'event: FedEx Delivery', bucket: 'inbox' })
-    render(<InboxStep tasks={[t]} onThisWeek={vi.fn()} onSomeday={vi.fn()} onDone={vi.fn()} onOpen={vi.fn()} onDelete={onDelete} />)
+    render(<InboxSource {...props} tasks={[t]} onDelete={onDelete} />)
     fireEvent.click(screen.getByRole('button', { name: 'Delete event: FedEx Delivery' }))
     expect(onDelete).toHaveBeenCalledWith(t)
+  })
+
+  it('while its write is in flight the card’s actions wait; a failed one says so on the card', () => {
+    const t = createMockTask({ id: 'c1', title: 'Call the dentist', bucket: 'inbox' })
+    const { rerender } = render(<InboxSource {...props} tasks={[t]} stateOf={() => 'pending'} />)
+    expect(screen.getByRole('button', { name: 'Add Call the dentist to week 43' })).toBeDisabled()
+    rerender(<InboxSource {...props} tasks={[t]} stateOf={() => 'failed'} />)
+    expect(screen.getByRole('alert')).toHaveTextContent('Not added.')
+  })
+})
+
+describe('LastWeekSource', () => {
+  const vm = (id: string, title: string) => ({ task: createMockTask({ id, title }), fate: 'open' as const, partOf: null, where: 'Tuesday, October 13' })
+  it('an undecided card offers every decision; a decided one wears it and says the record keeps it', () => {
+    const onDecide = vi.fn()
+    const open = vm('a', 'Fix the gate')
+    const { rerender } = render(<LastWeekSource rows={[{ vm: open, state: undefined }]} earlier={[]} done={[]} prevName="last week" weekName="week 43" onDecide={onDecide} onOpen={vi.fn()} />)
+    for (const name of ['Bring Fix the gate into week 43', 'It’s done: Fix the gate', 'Someday: Fix the gate', 'Let go of Fix the gate', 'Leave Fix the gate where it is']) {
+      expect(screen.getByRole('button', { name })).toBeInTheDocument()
+    }
+    fireEvent.click(screen.getByRole('button', { name: 'Bring Fix the gate into week 43' }))
+    expect(onDecide).toHaveBeenCalledWith(open, 'carried')
+    rerender(<LastWeekSource rows={[{ vm: open, decision: 'carried', state: undefined }]} earlier={[]} done={[]} prevName="last week" weekName="week 43" onDecide={onDecide} onOpen={vi.fn()} />)
+    expect(screen.getByText('Brought forward')).toBeInTheDocument()
+    expect(screen.getByText(/Last week’s record keeps it/)).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Bring Fix the gate into week 43' })).toBeNull()
+  })
+})
+
+describe('MonthGoalsSource', () => {
+  it('a selected goal previews its week tasks — the same records — and offers an add for it', () => {
+    const g = createMockTask({ id: 'm1', title: 'Plan the trip' })
+    const kids = [createMockTask({ id: 'w1', title: 'Book the cabin' }), createMockTask({ id: 'w2', title: 'Pack', completed: true })]
+    const onStartAdd = vi.fn()
+    render(<MonthGoalsSource months={[{ name: 'October', start: new Date(2026, 9, 1), goals: [{ task: g, children: kids }], done: 0 }]} weekName="week 43"
+      selected="m1" onSelect={vi.fn()} linkedGoal={null} adding={null} onStartAdd={onStartAdd} onCancelAdd={vi.fn()}
+      draftOf={() => ''} onDraft={vi.fn()} onAdd={vi.fn()} onOpenMonth={vi.fn()} />)
+    const card = screen.getByRole('region', { name: 'October goal: Plan the trip' })
+    expect(within(card).getByText('2 tasks week 43, 1 done')).toBeInTheDocument()
+    expect(within(card).getByRole('list', { name: 'week 43 tasks for Plan the trip' }).textContent).toBe('Book the cabinPack')
+    fireEvent.click(within(card).getByRole('button', { name: 'Add a task week 43 for Plan the trip' }))
+    expect(onStartAdd).toHaveBeenCalledWith('m1')
   })
 })
 

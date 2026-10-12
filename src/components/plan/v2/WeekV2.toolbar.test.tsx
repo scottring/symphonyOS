@@ -18,11 +18,6 @@ vi.mock('@/hooks/useDayPlan', () => ({ useDayPlan: () => ({ plan: null, loading:
 import { WeekV2 } from './WeekV2'
 import { PlanMastheadSlotsContext } from './planMastheadSlots'
 
-// These tests cover the Lists view; Open journal is the default since
-// 2026-10-08, so they make the device's choice explicit.
-beforeEach(() => { localStorage.setItem('symphony-plan-layout.week', 'lists'); localStorage.setItem('symphony-plan-layout.month', 'lists') })
-
-
 // A fixed Tuesday: the week's own last day changes what the toolbar offers
 // (it hands to next week), so these tests must not ride the wall clock.
 beforeEach(() => { vi.useFakeTimers({ toFake: ['Date'] }); vi.setSystemTime(new Date(2026, 8, 29, 12)) })
@@ -34,24 +29,21 @@ const renderWeek = () => render(
   </MemoryRouter>,
 )
 
-// 2026-10-04: one verb, "Plan the week", opens the session in steps (the
-// look-back its first step when last week left open work); marking planned
-// is the session's last step.
-// The month beside the week's list is the session's "Write the week" — the
-// week at rest is WeekViewV2's canvas (2026-10-10).
-const toWrite = () => {
-  fireEvent.click(screen.getByRole('button', { name: 'Plan the week' }))
-  fireEvent.click(screen.getAllByRole('button').find((b) => b.textContent?.endsWith('Write the week') && b.closest('.pv2-steps'))!)
-}
-const toLastStep = () => fireEvent.click(screen.getAllByRole('button').find((b) => b.textContent?.endsWith('The week') && b.closest('.pv2-steps'))!)
+// One verb, "Plan the week", opens the session on its first step (Inbox);
+// "Review last week" beside it opens step 2. Marking planned is the last
+// step's (2026-10-12: Inbox, Last week, Monthly goals, Days & times).
+const toStep = (label: string) => fireEvent.click(screen.getAllByRole('button').find((b) => b.textContent?.endsWith(label) && b.closest('.pv2-steps'))!)
+const toGoals = () => { fireEvent.click(screen.getByRole('button', { name: 'Plan the week' })); toStep('Monthly goals') }
+const toLastStep = () => toStep('Days & times')
 describe('WeekV2 toolbar — one verb', () => {
   beforeEach(() => { session.saved = null; session.loading = false; session.error = null; session.save.mockReset() })
 
-  it('an unplanned week offers “Plan the week”, which opens the steps', () => {
+  it('an unplanned week offers “Plan the week”, with “Review last week” quieter beside it', () => {
     renderWeek()
     expect(screen.getByText(/Week \d+ isn’t planned yet/)).toBeTruthy()
     const plan = screen.getByRole('button', { name: 'Plan the week' })
     expect(plan.className).toBe('pv2-btn')
+    expect(screen.getByRole('button', { name: 'Review last week' }).className).toBe('pv2-qbtn')
     expect(screen.queryByRole('button', { name: /^Mark week \d+ planned$/ })).toBeNull()
     fireEvent.click(plan)
     expect(screen.getByRole('region', { name: /Planning week \d+/ })).toBeTruthy()
@@ -109,33 +101,35 @@ describe('WeekV2 toolbar — folded into the masthead', () => {
   })
 })
 
-// 2026-09-29 (beta walkthrough): Sat Sep 26 – Fri Oct 2 showed only September,
-// all done, and hid October's open goals.
-describe('WeekV2 reference — a week across a month end shows both months', () => {
+// 2026-09-29 (beta walkthrough): Sat Sep 26 – Fri Oct 2 showed only September
+// and hid October's open goals. The month's goals are step 3's source now.
+describe('WeekV2 — the month goals beside the week (step 3)', () => {
   beforeEach(() => { session.saved = null; session.loading = false; session.error = null })
   const goal = (id: string, title: string, month: Date, completed = false) => ({
-    id, title, completed, isGoal: true, bucket: 'month', monthStart: month, createdAt: new Date(2026, 8, 29), assignedTo: 'me',
+    id, title, completed, bucket: 'month', monthStart: month, createdAt: new Date(2026, 8, 29), assignedTo: 'me',
   }) as unknown as import('@/types/task').Task
 
-  it('lists September and October, each whole: done lines stay, struck', () => {
+  it('a week across a month end offers both months; a done goal is named, not offered', () => {
     const tasks = [goal('s1', 'Finish the garden', new Date(2026, 8, 1), true), goal('o1', 'Book flu shots', new Date(2026, 9, 1))]
     render(<MemoryRouter><WeekV2 tasks={tasks} weekStart={new Date(2026, 8, 26)} meId="me" isCurrent days={null} onSelectTask={vi.fn()} /></MemoryRouter>)
-    toWrite()
-    expect(screen.getByRole('button', { name: 'Finish the garden' }).closest('li')?.dataset.done).toBe('true')
-    expect(screen.getByRole('button', { name: 'Book flu shots' })).toBeTruthy()
+    toGoals()
+    expect(screen.getByRole('button', { name: 'Open September →' })).toBeTruthy()
     expect(screen.getByRole('button', { name: 'Open October →' })).toBeTruthy()
+    expect(screen.getByText('1 September goal is done.')).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'Book flu shots' })).toBeTruthy()
+    expect(screen.queryByRole('button', { name: 'Finish the garden' })).toBeNull()
   })
 
   it('the empty list asks for the week’s own work, not a review to start', () => {
     render(<MemoryRouter><WeekV2 tasks={[]} weekStart={new Date(2026, 8, 26)} meId="me" isCurrent days={null} onSelectTask={vi.fn()} /></MemoryRouter>)
-    toWrite()
+    toGoals()
     expect(screen.queryByText(/start the weekly review/)).toBeNull()
-    expect(screen.getByText('Nothing on this week yet. Add the first thing below.')).toBeTruthy()
+    expect(screen.getByText('Nothing on this week yet. Each step adds to this list, or write the first thing below.')).toBeTruthy()
   })
 
   it('a week inside one month shows one month', () => {
     render(<MemoryRouter><WeekV2 tasks={[]} weekStart={new Date(2026, 9, 3)} meId="me" isCurrent days={null} onSelectTask={vi.fn()} /></MemoryRouter>)
-    toWrite()
+    toGoals()
     expect(screen.getByRole('button', { name: 'Open October →' })).toBeTruthy()
     expect(screen.queryByRole('button', { name: 'Open September →' })).toBeNull()
   })
@@ -143,31 +137,16 @@ describe('WeekV2 reference — a week across a month end shows both months', () 
 
 // Walkthrough 2026-09-29: during the first seconds the reference said
 // "Nothing open on October's plan" over twelve goals still loading.
-describe('WeekV2 reference while tasks load', () => {
-  it('says Loading, not Nothing open', async () => {
+describe('WeekV2 month goals while tasks load', () => {
+  it('says Loading, not Nothing', async () => {
     vi.resetModules()
     vi.doMock('@/hooks/useSupabaseTasks', () => ({ useSupabaseTasks: () => ({ loading: true, toggleTask: vi.fn(), updateTask: vi.fn(), pushTask: vi.fn(), updateTasksBulk: vi.fn(), keepForward: vi.fn(), dropCommitment: vi.fn(), addTask: vi.fn() }) }))
     const { WeekV2: Fresh } = await import('./WeekV2')
     render(<MemoryRouter><Fresh tasks={[]} weekStart={new Date(2026, 8, 26)} meId="me" isCurrent days={null} onSelectTask={vi.fn()} /></MemoryRouter>)
-    toWrite()
+    toGoals()
     expect(screen.getAllByText('Loading…').length).toBe(2)
-    expect(screen.queryByText(/Nothing written for/)).toBeNull()
+    expect(screen.queryByText(/No open goals for/)).toBeNull()
     vi.doUnmock('@/hooks/useSupabaseTasks')
-  })
-})
-
-// Walkthrough 2026-09-30: nothing said a month goal had come into the week.
-// 2026-10-04: the month stays whole; a line that is on the week says so.
-describe('WeekV2 — a month goal on this week says so', () => {
-  beforeEach(() => { session.saved = null; session.loading = false; session.error = null; localStorage.clear(); localStorage.setItem('symphony-plan-layout.week', 'lists') })
-  it('marks it “On this week”, and offers no second copy', () => {
-    const line = { id: 'g1', title: 'Hang porch plants', completed: false, bucket: 'week', monthStart: new Date(2026, 9, 1), weekStart: new Date(2026, 9, 3), createdAt: new Date(2026, 8, 29), assignedTo: 'me',
-      commitments: [{ level: 'month', periodStart: new Date(2026, 9, 1), status: 'open' }, { level: 'week', periodStart: new Date(2026, 9, 3), status: 'open' }] }
-    render(<MemoryRouter><WeekV2 tasks={[line] as never} weekStart={new Date(2026, 9, 3)} meId="me" isCurrent days={null} onSelectTask={vi.fn()} /></MemoryRouter>)
-    toWrite()
-    const ref = within(screen.getByRole('complementary', { name: 'October, for reference' }))
-    expect(ref.getByText('On this week')).toBeTruthy()
-    expect(ref.queryByRole('button', { name: /Add Hang porch plants to this week/ })).toBeNull()
   })
 })
 
