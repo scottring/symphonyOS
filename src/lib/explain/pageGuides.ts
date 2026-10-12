@@ -14,13 +14,13 @@ export const PAGE_GUIDES: Record<string, string> = {
     'Each row is a year goal; the count beside it is how many season goals sit under it. ' +
     '+ Add writes a new one. The horizon switch (Year, Season, Month, Week) moves down a level; Next: Season goes on to this season.',
   season:
-    'A season is a brainstorm list for this stretch of the year: what you would like it to hold. Nothing here is on a calendar. ' +
-    'The arrows beside the title step to the previous or next season. ' +
-    '"Under a year goal" holds one card per year goal, with the season goals you put under it. ' +
-    'Year goals with nothing this season are folded into one line below the cards; Show opens them. ' +
-    '"Not under a year goal" holds season goals with no year goal. That is fine; to connect one, drag it onto a card, or use Move under in its ⋯ menu. ' +
-    'Suggest where these go asks Symphony to propose links, which save only when kept. ' +
-    'Selecting a goal opens it with what you will need and its month goals. Next: Month chooses what this month holds.',
+    'Season answers one question: what do you want to accomplish this season? A season is a brainstorm list for this stretch of the year; nothing here is on a calendar. ' +
+    'The arrows beside the title step to the previous or next season, named by your household\'s own seasons. ' +
+    'The main part lists every goal for the season, whether it belongs to a year goal or stands on its own; a goal under a year goal names it beneath its title. ' +
+    'Beside it (below it on a phone) are this year\'s goals, the source to build from. Selecting one highlights its season goals and lists them in its card; + Add on a card writes a season goal under it, and + Add at the foot of the list writes one of its own. ' +
+    'Hide (or Show) the year goals with the button above. To connect a goal, drag it onto a year goal, or use Move under in its ⋯ menu. ' +
+    'The Plan <season> button is optional: look back at the season before and decide, one goal at a time, whether to carry it into this season, mark it done, or leave it there (nothing carries on its own, and the season before keeps its record); then consider the year goals; then write the season. Leave for now keeps your step and a half-written goal in this browser. ' +
+    'Plan a month from these goals goes on to Month, where season goals become this month\'s goals.',
   month:
     'Month answers one question: what do you want to accomplish this month? Nothing here is on a calendar yet. ' +
     'The main part lists every goal for the month, whether it belongs to a season goal or stands on its own; a goal under a season goal names it beneath its title. ' +

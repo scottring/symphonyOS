@@ -74,7 +74,12 @@ function writeSourceShown(shown: boolean) {
 
 // ---- Season board: flag (Season agent's region) --------------------------
 /** Season uses the collection-and-source board Month introduced. */
-const SEASON_BOARD = false
+const SEASON_BOARD = true
+import { SeasonBoard } from './SeasonBoard'
+import { useSeasonSession, useYearGoalsShown, type SeasonStep } from './useSeasonSession'
+import { seasonToken } from '@/lib/cadence/seasons'
+import { lineFate } from '@/lib/planning/v2/planV2'
+import type { Task } from '@/types/task'
 // ---- end Season flag ------------------------------------------------------
 // ---- Year board: flag (Year agent's region) --------------------------------
 /** Year uses the collection-and-source board Month introduced. */
@@ -364,6 +369,12 @@ function Inner() {
   const monthBoardRef = useColumnsFitWindow(boardLayout && dataReady && !error && !goalsError)
 
   // ---- Season hooks (Season agent's region: hooks only, before the return) -
+  // The session reads only while Season is on screen ('' reads nothing).
+  const seasonSession = useSeasonSession(level === 1 && SEASON_BOARD ? seasonToken(seasonB.start, seasons) : '')
+  const yearGoalsShown = useYearGoalsShown()
+  // Bumped after a goal is written in the session's Write step, so the
+  // composer opens empty for the next one.
+  const [seasonComposerRev, setSeasonComposerRev] = useState(0)
   // ---- end Season hooks ------------------------------------------------------
   // ---- Year hooks (Year agent's region: hooks only, before the return) -----
   // ---- end Year hooks --------------------------------------------------------
@@ -582,8 +593,113 @@ function Inner() {
   </div>
 
   // ---- Season board (Season agent's region: render) -------------------------
-  const seasonBoard: ReactNode = null
-  const seasonToolbar: ReactNode = null
+  // Season: every season goal in one collection, the year's goals beside it,
+  // and an optional session over the same board (SeasonBoard.tsx).
+  let seasonBoard: ReactNode = null
+  let seasonToolbar: ReactNode = null
+  if (level === 1 && SEASON_BOARD) {
+    const year = anchor.getFullYear()
+    const seasonGoals = allNodes.filter((n) => n.level === 1 && (showDone || !isDone(n)))
+    const yearSources = groups.filter((g) => g.kind === 'parent')
+    const prevSeasonB = periodBounds('season', seasonB.prev, seasons)
+    const prevWord = periodWordOf(prevSeasonB)
+    const lookingBack = seasonSession.active && seasonSession.step === 'lookback'
+    // The season before's goals, under the same filters as everything else.
+    const lookBack = lookingBack
+      ? selectPeriodTasks(visible, 'season', prevSeasonB.start, isCurrentPeriod(prevSeasonB, now), lens.scopeId, seasons)
+        .map((task) => ({ task, fate: lineFate(task, 'season', prevSeasonB.start, prevSeasonB.end) }))
+      : []
+    const monthParams = new URLSearchParams(params)
+    monthParams.set('view', 'constellation'); monthParams.set('horizon', '2'); monthParams.delete('focus')
+    if (current) monthParams.delete('start')
+    const monthHref = `/month?${monthParams}`
+    const loose = { kind: 'add' as const, group: UNLINKED, parent: null }
+    const composerFor = (key: string): Composer | null => {
+      if (key === UNLINKED) return loose
+      const g = yearSources.find((x) => x.key === key)
+      return g ? { kind: 'add', group: key, parent: g.parent } : null
+    }
+
+    const addSeasonGoal = async (text: string, parent: PlanNode | null) => {
+      const id = crypto.randomUUID()
+      const ok = await runCreate(1, text, parent, `Add “${text}”${parent ? ` under “${parent.title}”` : ''}`, id)
+      if (ok) {
+        reveal.current = `1:${id}`
+        if (seasonSession.active) seasonSession.setDraft(parent ? parent.key : UNLINKED, '')
+        // Writing the season freely: the line stays open for the next goal.
+        if (seasonSession.active && seasonSession.step === 'write' && !parent) setSeasonComposerRev((r) => r + 1)
+        else setComposer(null)
+      }
+      return ok
+    }
+    const startSession = () => {
+      const resuming = seasonSession.inProgress
+      const { step, drafts } = seasonSession
+      seasonSession.start()
+      yearGoalsShown.reveal()
+      // Resume where they were, with the goal they were half-way through.
+      const draftKey = resuming
+        ? (step === 'write' && drafts[UNLINKED] ? UNLINKED : Object.keys(drafts).find((k) => k !== UNLINKED && composerFor(k)) ?? (drafts[UNLINKED] ? UNLINKED : null))
+        : null
+      if (draftKey) setComposer(composerFor(draftKey))
+      else if (resuming && step === 'write') setComposer(loose)
+    }
+    const goToStep = (step: SeasonStep) => {
+      seasonSession.setStep(step)
+      if (step !== 'write') yearGoalsShown.reveal()
+      if (step === 'write' && !composer) setComposer(loose)
+    }
+    const decideWith = (task: Task, verdict: string, label: string, write: () => Promise<boolean>, undo?: () => Promise<boolean>) => {
+      const attempt = (): void => {
+        void act(label, write, { ids: [task.id], undo, retry: attempt }).then((ok) => { if (ok) seasonSession.decide(task.id, verdict) })
+      }
+      attempt()
+    }
+    const toggle = (id: string) => async () => (await toggleTask(id)) !== false
+
+    seasonToolbar = dataReady && <>
+      <button type="button" className="canvas-link plan-source-toggle" aria-expanded={yearGoalsShown.shown} aria-controls="plan-season-source"
+        onClick={yearGoalsShown.toggle}>{`${yearGoalsShown.shown ? 'Hide' : 'Show'} ${lookingBack ? prevWord : year} goals`}</button>
+      {!seasonSession.active && seasonSession.saved && !seasonSession.inProgress && <span className="plan-season-status">
+        {periodWord} planned {seasonSession.saved.at.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>}
+      {!seasonSession.active && <button type="button" className="pv2-btn plan-season-start" onClick={startSession}>
+        {seasonSession.inProgress ? `Resume planning ${periodWord} · step ${seasonSession.stepIndex + 1} of 3`
+          : seasonSession.saved ? `Plan ${periodWord} again` : `Plan ${periodWord}`}</button>}
+    </>
+    seasonBoard = <SeasonBoard boardRef={monthBoardRef} seasonWord={periodWord} seasonLabel={periodTitle} year={year} prevWord={prevWord}
+      items={seasonGoals} sources={yearSources} openCount={(parent) => childCount(allNodes, parent)}
+      selected={selected} linkedParent={linked?.parent ?? null} sourceShown={yearGoalsShown.shown}
+      dropFor={(g) => ({ className: `${dropKey === g.key ? ' is-drop' : ''}${dragNode && canDrop(g) ? ' is-drop-ok' : ''}`, handlers: dropProps(g) })}
+      renderItem={renderItem}
+      proposals={proposals.map((p) => {
+        const parent = allNodes.find((n) => n.level === 0 && n.id === p.parentId)
+        return <ProposalRow key={p.key} proposal={p} parentLabel={parentLabelOf(parent)} onKeep={() => { void keepProposal(p) }} onLeave={() => activity.removeProposal(p.key)} />
+      })}
+      composerKey={composer?.kind === 'add' ? composer.group : null} composerRev={seasonComposerRev}
+      onOpenComposer={(key, parent) => setComposer({ kind: 'add', group: key, parent })} onCloseComposer={() => setComposer(null)}
+      onAdd={addSeasonGoal}
+      draftFor={(key) => seasonSession.active ? seasonSession.drafts[key] ?? '' : ''}
+      onDraft={(key, text) => { if (seasonSession.active) seasonSession.setDraft(key, text) }}
+      areaPicker={area.picker}
+      onSelectSource={(key) => selected?.size === 1 && selected.has(key)
+        ? clearFocus()
+        : setParams((prev) => { const p = new URLSearchParams(prev); p.set('focus', key); return p }, { replace: true })}
+      onClearSelection={clearFocus}
+      onSuggestLinks={() => openAssistant({ message: `Which ${parentName} does each of my items under no ${parentName} for ${periodTitle} belong under? Suggest links; don't link anything until I keep them.`, autoSend: true })}
+      onAddYearGoals={() => setHorizon(0)}
+      dataReady={dataReady} monthHref={monthHref}
+      session={seasonSession} onStep={goToStep}
+      onFinish={() => {
+        const attempt = (): void => { void act(`Mark ${periodWord} planned`, () => seasonSession.finish(), { retry: attempt }) }
+        attempt()
+      }}
+      lookBack={lookBack}
+      onCarry={(task) => decideWith(task, 'carried', `Carry “${task.title}” to ${periodWord}`,
+        async () => !!await keepForward(task.id, { seasonStart: seasonB.start }, prevSeasonB.start))}
+      onMarkDone={(task) => decideWith(task, 'done', `Mark “${task.title}” done`, toggle(task.id), toggle(task.id))}
+      onLeaveThere={(task) => seasonSession.decide(task.id, 'left')}
+      onUndecide={(task) => seasonSession.decide(task.id, null)} />
+  }
   // ---- end Season board ------------------------------------------------------
   // ---- Year board (Year agent's region: render) -----------------------------
   const yearBoard: ReactNode = null

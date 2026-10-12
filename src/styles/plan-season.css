@@ -1,1 +1,43 @@
-/* plan-season.css — owned by the season agent (2026-10-12 horizons). Reuse Month's classes in canvas-plan.css first. */
+/* plan-season.css — owned by the season agent (2026-10-12 horizons). Reuse Month's classes in canvas-plan.css first.
+ *
+ * Season wears Month's board (.plan-month-board, .plan-month-goals,
+ * .plan-month-source, .plan-source…). Only what Season adds lives here: the
+ * session's look-back cards, the line a finished session leaves, and the
+ * composer wrapper that remembers a half-written goal. */
+
+/* The composer sits in a wrapper that hears typing; keep Month's spacing. */
+.plan-month-goals > .plan-season-draft > .plan-composer { margin-top: 10px; }
+.plan-source .plan-season-draft > .plan-composer { margin-top: 6px; }
+
+/* The toolbar: the source toggle on the left, the session on the right. */
+.plan-season-status { align-self: center; font-size: 13px; color: var(--color-neutral-600); }
+.plan-season-start { align-self: center; }
+
+/* Looking back: one card per goal of the season before, its verdicts as
+   quiet links; a decided card settles back. */
+.plan-season-verdicts { display: flex; flex-wrap: wrap; gap: 4px 14px; margin-top: 8px; font-size: 13.5px; }
+.plan-season-past.is-decided {
+  border-color: var(--color-neutral-200); border-top-color: var(--color-neutral-300);
+  background: var(--color-bg-elevated);
+}
+.plan-season-past.is-decided .canvas-group-title { color: var(--color-neutral-600); }
+.plan-season-past > .canvas-link { margin-top: 6px; font-size: 13px; }
+
+/* What a finished session chose, above the collection it chose. */
+.plan-season-finished {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; margin: 0 0 14px; padding: 12px 14px;
+  border: 1px solid var(--color-primary-100); border-radius: var(--radius-md); background: var(--color-primary-50);
+  font-size: 13.5px; color: var(--color-neutral-700);
+}
+.plan-season-finished > p { flex: 1 1 260px; min-width: 0; margin: 0; }
+.plan-season-finished b { color: var(--color-neutral-900); font-weight: 600; }
+
+/* Stacked (phones, narrow windows): while a session step works from the
+   source, the source comes first so the step's material is where you are. */
+@media (max-width: 1023px) {
+  .plan-season-board.is-step-lookback > .plan-month-source,
+  .plan-season-board.is-step-year > .plan-month-source { order: -1; }
+}
+@media (max-width: 767px) {
+  .plan-season-verdicts .canvas-link, .plan-season-past > .canvas-link, .plan-season-start { min-height: 44px; }
+}
