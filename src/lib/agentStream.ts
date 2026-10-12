@@ -1,5 +1,8 @@
 import type { WorkspaceContext } from '@/lib/workspace/context'
 import { supabase } from '@/lib/supabase'
+import { explainContext } from '@/lib/explain/pageGuides'
+import { parseSteps } from '@/lib/explain/steps'
+import { requestShow } from '@/lib/explain/showSignal'
 
 export interface AgentSourceNote { id: string; title: string; vaultPath?: string }
 
@@ -25,6 +28,7 @@ export type AgentStreamEvent =
   | { type: 'tool'; name: string }
   | { type: 'tool_result'; name: string; ok: boolean; ids?: string[]; error?: string }
   | { type: 'proposal'; items: AgentProposalItem[] }
+  | { type: 'show'; steps: unknown }
   | { type: 'done'; reply: string; sessionId: string | null; sources?: AgentSourceNote[] }
   | { type: 'error'; message: string }
 
@@ -150,7 +154,7 @@ export async function streamSymphonyAgent(
       },
       body: JSON.stringify({
         messages,
-        ...(handlers.workspaceContext ? { workspaceContext: handlers.workspaceContext } : {}),
+        ...(handlers.workspaceContext ? { workspaceContext: explainContext(handlers.workspaceContext) } : {}),
         ...(handlers.attachment ? { attachment: handlers.attachment } : {}),
         ...(handlers.currentMemberId ? { currentMemberId: handlers.currentMemberId } : {}),
         ...(handlers.taskContext ? { taskContext: handlers.taskContext } : {}),
@@ -178,6 +182,7 @@ export async function streamSymphonyAgent(
     for (const ev of events) {
       if (ev.type === 'plan_saved') handlers.onPlanSaved?.(ev)
       else if (ev.type === 'workspace') handlers.onWorkspace?.(ev.page,ev.date)
+      else if (ev.type === 'show') requestShow(parseSteps(ev), 'chat')
       else if (ev.type === 'text') handlers.onText?.(ev.text)
       else if (ev.type === 'tool') handlers.onTool?.(ev.name)
       else if (ev.type === 'tool_result') handlers.onToolResult?.({ name: ev.name, ok: ev.ok, ids: ev.ids, error: ev.error })

@@ -145,7 +145,7 @@ describe('grouped under parent',()=>{
   const together=group('Under Together')
   expect(within(together).getAllByRole('listitem').map(li=>li.querySelector('.plan-item-title')?.textContent)).toEqual(['Unhurried weekends','Autumn outings'])
   expect(within(screen.getByRole('list',{name:'Season plan'})).getAllByText('Together')).toHaveLength(1)
-  expect(within(together).getByLabelText('1 month goal below')).toHaveTextContent('1')
+  expect(within(together).getByLabelText('1 month goal below')).toHaveTextContent('1 month goal')
   const regions=screen.getAllByRole('region').map(r=>r.getAttribute('aria-label'))
   expect(regions).toEqual(['Under Together','Not under a year goal'])
   expect(within(group('Not under a year goal')).getByText('Fix the gate')).toBeInTheDocument()

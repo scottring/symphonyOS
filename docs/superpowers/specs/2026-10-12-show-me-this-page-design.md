@@ -1,6 +1,6 @@
 # Show me this page: design
 
-Date: 2026-10-12 · Status: draft for Scott's review
+Date: 2026-10-12 · Status: built and shipped with #180 (see "As built" at the end)
 Mockup (agreed): https://claude.ai/artifact/UmMGNygchL37MVVW8mmvKH
 
 ## Purpose
@@ -167,3 +167,26 @@ describe the new layout.
 - Routines, Inbox, Notes and other side-pane pages.
 - Remembering that you have seen a tour, or tours that start on their own.
 - Pointing inside dialogs or the detail panel.
+
+## As built (2026-10-12)
+
+- **Targets** are read from the page itself when a turn is sent: anything
+  marked `data-explain` (period header, the two Season/Month parts, the
+  folded line, Next, the horizon switch, Today's masthead and This week),
+  plus every section, list or group the page already names for screen
+  readers (`aria-label` / `aria-labelledby`), such as Week's "Still to place"
+  and each day. Rows and cards are found by the ids they already carry
+  (`data-plan-key`, `data-group-key`, `data-task-id`). Only the content
+  frame counts (`data-explain-root`); the bar and the chrome never do.
+- **The agent action** is `symphony_show_on_page`. It is offered only when
+  the client sends `targets`, so older app versions never see it. It streams
+  a `show` event, and the client draws it through a module signal
+  (`src/lib/explain/showSignal.ts`). Talk has `show_on_page`, one step per
+  call, handled in `useWorkspaceVoice`.
+- **Phones:** "What is this page?" sits beside the page's own walk on
+  Year, Season and Month. It sends without opening the conversation over the
+  page (`stayOnPage`), and the note carries Back and Next. Today and Week on
+  phones don't have the button; typing the question works.
+- **Verified by hand** with a real account: tours on Season, Week and Today,
+  a single point from a typed question, and the phone-width tour on Season.
+  **Not verified:** Talk (needs a microphone); Month and Year tours.

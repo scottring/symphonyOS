@@ -103,7 +103,7 @@ export function AlongsideDay({ children, tasks, date, update, complete, loading,
     <AlongsideContext.Provider value={workspaceControls}>
       <section className="ad-shell">
         {!weekView && (
-          <div className="ad-nav" role="group" aria-label="Today view">
+          <div className="ad-nav" role="group" aria-label="Today view" data-explain="week-toggle" data-explain-label="Show or hide This week">
             <button aria-expanded={showChoices} disabled={!!companion.open} aria-controls="ad-week" onClick={() => setOpen((v) => !v)}>
               {companion.open ? 'Weekly choices return when details close' : open ? 'Hide this week' : 'Show this week'}
             </button>
@@ -117,7 +117,7 @@ export function AlongsideDay({ children, tasks, date, update, complete, loading,
             {children}
           </div>
           {!weekView && (
-            <aside id="ad-week" className="ad-week cw-column" hidden={!showChoices}>
+            <aside id="ad-week" className="ad-week cw-column" hidden={!showChoices} data-explain="this-week" data-explain-label="This week: tasks to give a day">
               <h2>This week</h2>
               <p className="ad-week-hint">Drag onto the day, or press + to plan it for {dayWord}. Its connections stay with it.</p>
               {loading ? <p>Loading this week’s tasks…</p>

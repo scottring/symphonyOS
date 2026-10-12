@@ -64,6 +64,9 @@ import { onQuickAddRequest } from '@/lib/quickAddSignal';
 import { useGlobalQuickAdd } from '@/desktop/useGlobalQuickAdd';
 import { GuideProvider } from '@/hooks/useGuidedPlan';
 import { GuideBar, GuideHostContext } from '@/components/guide/GuideBar';
+import { PageGuideProvider, usePageGuide } from '@/components/explain/GuideProvider';
+import { GuideLayer } from '@/components/explain/GuideLayer';
+import { EXPLAIN_LABEL, EXPLAIN_MESSAGE, hasPageGuide } from '@/lib/explain/pageGuides';
 
 /**
  * ShellLayout wraps Shell-mounted apps with the Symphony app chrome — the
@@ -276,7 +279,10 @@ function ShellLayoutInner({ children }: Props) {
   const voiceAccess = useWorkspaceVoiceAccess(user?.id ?? null, connectedWorkspace);
   const voiceEnabled = connectedWorkspace && voiceAccess;
   const voice = useWorkspaceVoice(screenContext, assistant.sendMessage, (url) => navigate(import.meta.env.DEV && new URLSearchParams(location.search).get('voice') === '1' ? `${url}&voice=1` : url), voiceEnabled, user?.id ?? null);
+  const pageGuide = usePageGuide();
   const sendConversation = (text: string, attachment?: Parameters<typeof assistant.sendMessage>[1]) => {
+    // What Symphony showed belongs to the last exchange.
+    pageGuide?.close();
     if (voice.active && !attachment && voice.sendText(text)) return;
     if (voice.active) voice.stop();
     void assistant.sendMessage(text, attachment);
@@ -285,6 +291,8 @@ function ShellLayoutInner({ children }: Props) {
 
   const { hidden: aiHidden, setHidden: setAiHidden } = useScratchpadHidden();
   const [walk, setWalk] = useState<ConversationWalk | null>(null);
+  // "What is this page?" beside the walk, on pages Symphony can explain.
+  const explain = connectedWorkspace && hasPageGuide(screenContext.page) ? { label: EXPLAIN_LABEL, message: EXPLAIN_MESSAGE } : null;
   const [phoneChatOpen, setPhoneChatOpen] = useState(false);
   const phoneChatRef = useRef<HTMLDivElement>(null);
   useDialogFocus(phoneChatOpen && isMobile, phoneChatRef, () => setPhoneChatOpen(false));
@@ -306,11 +314,12 @@ function ShellLayoutInner({ children }: Props) {
   useEffect(() => {
     if (launchNonce === 0 || launchNonce === seenLaunchNonce.current) return;
     seenLaunchNonce.current = launchNonce;
-    if (isMobile) setPhoneChatOpen(true);
-    else if (!dockedBar) showPane('ai');
     const seed = consumeSeed();
+    if (seed?.stayOnPage) { pageGuide?.close(); }
+    else if (isMobile) setPhoneChatOpen(true);
+    else if (!dockedBar) showPane('ai');
     if (seed && seed.autoSend !== false) void assistant.sendMessage(seed.message);
-  }, [launchNonce, isMobile, dockedBar, consumeSeed, assistant, showPane]);
+  }, [launchNonce, isMobile, dockedBar, consumeSeed, assistant, showPane, pageGuide]);
 
   // Closing the More sheet returns focus to its tab, not to <body>.
   const moreTabRef = useRef<HTMLButtonElement>(null);
@@ -369,6 +378,7 @@ function ShellLayoutInner({ children }: Props) {
           their own <main>. Avoids invalid nested-main HTML. */}
       <div
         ref={setPageScroller}
+        data-explain-root
         inert={phoneChatOpen && isMobile}
         className={`${showScenery ? 'scenery-scroll' : ''} relative flex-1 overflow-auto overflow-x-hidden ${isMobile ? '' : 'transition-all duration-300 ease-in-out'}`}
         style={
@@ -481,7 +491,7 @@ function ShellLayoutInner({ children }: Props) {
                   <div className="guide-slot"><GuideBar host={guideHost} /></div>
                   {children}
                   {dockedBar
-                    ? <ConversationStrip docked messages={assistant.messages} walk={walk} right={paneWidth} onSend={(text) => sendConversation(text)} busy={assistant.loading} voice={stripVoice} />
+                    ? <ConversationStrip docked messages={assistant.messages} walk={walk} explain={explain} right={paneWidth} onSend={(text) => sendConversation(text)} busy={assistant.loading} voice={stripVoice} />
                     : showStrip && <ConversationStrip onSend={(text) => sendConversation(text)} busy={assistant.loading} voice={stripVoice} onOpenConversation={openConversation} />}
                 </div>
               </SideColumn>
@@ -690,7 +700,7 @@ export function ShellLayout({ children }: Props) {
     <ListsProvider>
       <NotesProvider>
         <PinsProvider>
-          <ReferenceListsProvider key={user?.id ?? "anonymous"} userId={user?.id ?? "anonymous"}><GuideProvider><ShellLayoutInner>{children}</ShellLayoutInner></GuideProvider></ReferenceListsProvider>
+          <ReferenceListsProvider key={user?.id ?? "anonymous"} userId={user?.id ?? "anonymous"}><GuideProvider><PageGuideProvider><ShellLayoutInner>{children}</ShellLayoutInner><GuideLayer /></PageGuideProvider></GuideProvider></ReferenceListsProvider>
         </PinsProvider>
       </NotesProvider>
     </ListsProvider>

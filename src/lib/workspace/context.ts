@@ -14,6 +14,10 @@ export interface WorkspaceContext {
   periodStarts?: {year:string;season:string;month:string;week:string}
   intentions?: {id:string;title:string;year:number}[]
   truncated: boolean
+  /** What this page is for (src/lib/explain/pageGuides.ts), added when a turn is sent. */
+  guide?: string
+  /** Regions on screen that Symphony may point at, read when a turn is sent. */
+  targets?: {id:string;label:string}[]
 }
 export function workspaceContext(tasks:Task[], pathname:string, search:string, layers:ReadonlySet<Layer>, selectedId:string|null, now=new Date(), goals:Goal[]=[]):WorkspaceContext {
   const params=new URLSearchParams(search)

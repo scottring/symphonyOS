@@ -44,6 +44,7 @@ import { readinessOf, type ReadinessLookup } from '@/lib/prep/readiness'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { useConversationWalk } from '@/components/canvas/conversationWalk'
 import { PAGE_PLANNING } from '@/components/layout/pageLayout'
+import { EXPLAIN_LABEL, EXPLAIN_MESSAGE } from '@/lib/explain/pageGuides'
 
 const TERMS = ['year goal', 'season goal', 'month goal', 'week task'] as const
 const HORIZONS = ['Year', 'Season', 'Month'] as const
@@ -378,7 +379,6 @@ function Inner() {
             ? <h2 className="canvas-group-title">{title}</h2>
             : <h2 className="canvas-group-title"><button type="button" className="plan-group-focus" aria-pressed={isFocused} aria-label={`Focus on ${title}`}
                 onClick={() => isFocused ? clearFocus() : focusGroup(g.key)}>{title}</button></h2>}
-          {g.items.length > 0 && <span className="canvas-item-meta" aria-label={`${g.items.length} ${term}${g.items.length === 1 ? '' : 's'}`}>{g.items.length}</span>}
         </header>}
         <ul className="plan-items">
           {g.items.map(renderItem)}
@@ -410,15 +410,16 @@ function Inner() {
   // The approved Season board (2026-10-10): the horizon switch, then the
   // period by name with its dates. No numeral; the bar at the foot holds
   // the walk on desktop.
-  const stepper = <nav className="plan-stepper" aria-label="Planning horizon">
+  const stepper = <nav className="plan-stepper" aria-label="Planning horizon" data-explain="horizons" data-explain-label="Year, Season, Month, Week">
     {HORIZONS.map((h, i) => <button key={h} type="button" aria-current={i === level ? 'step' : undefined} onClick={() => setHorizon(i)}>{h}</button>)}
     <Link to={weekHref} className="plan-stepper-week">Week →</Link>
   </nav>
   const walk = <button type="button" className="plan-walk" onClick={() => openAssistant({ message: walkMessage, autoSend: true })}>{walkLabel}</button>
   return <main ref={mainRef} className={`plan-canvas ${PAGE_PLANNING}`} data-horizon={level}>
     <header className="plan-head">
-      <div className="plan-head-row">{stepper}{!walkInBar && walk}</div>
-      <div className="plan-period">
+      {/* Without the docked bar (phones) the page offers both itself. */}
+      <div className="plan-head-row">{stepper}{!walkInBar && walk}{!walkInBar && <button type="button" className="plan-walk" onClick={() => openAssistant({ message: EXPLAIN_MESSAGE, autoSend: true, stayOnPage: true })}>{EXPLAIN_LABEL}</button>}</div>
+      <div className="plan-period" data-explain="period" data-explain-label={`${periodTitle}, ${periodRange(bounds.start, bounds.end)}`}>
         <button type="button" className="plan-step" onClick={() => setStart(bounds.prev)} aria-label={`Previous ${PERIODS[level]}`}><ChevronLeft size={18} aria-hidden="true" /></button>
         <h1>{periodTitle}</h1>
         <button type="button" className="plan-step" onClick={() => setStart(bounds.next)} aria-label={`Next ${PERIODS[level]}`}><ChevronRight size={18} aria-hidden="true" /></button>
@@ -442,22 +443,24 @@ function Inner() {
           <span role="status">Showing {focused.size} of {groups.length} groups</span>
           <button type="button" className="canvas-link" onClick={clearFocus}>Show all · Esc</button>
         </div>}
+        <div className={sectioned ? 'plan-section' : undefined} {...(sectioned ? { 'data-explain': 'under', 'data-explain-label': `Under a ${parentName}: one card per ${parentName}` } : {})}>
         {sectioned && <div className="plan-section-head">
           <h2 id="plan-under">Under a {parentName}</h2>
           <p>Each card is one of your {level === 1 ? `${anchor.getFullYear()} year goals` : `${parentName}s`}.</p>
         </div>}
-        <ul className={`plan-groups${focused ? ' is-focused' : ''}${level === 0 ? ' is-year' : ''}`} aria-label={`${HORIZONS[level]} plan`}>
+        <ul className={`plan-groups${focused ? ' is-focused' : ''}${level === 0 ? ' is-year' : ''}`} aria-label={`${HORIZONS[level]} plan`} data-explain-label={sectioned ? `The cards, one per ${parentName}` : undefined}>
           {(calm ? sectioned ? calm.shown.filter((g) => g.kind === 'parent') : calm.shown : groups).map(renderGroup)}
         </ul>
         {calm && calm.empty.length > 0 && <>
-          <button type="button" className="canvas-group is-quiet plan-empty-fold" aria-expanded={emptyOpen} aria-controls="plan-empty-goals" onClick={() => setShowEmpty((v) => !v)}>
+          <button type="button" className="canvas-group is-quiet plan-empty-fold" data-explain="folded" data-explain-label={`${calm.empty.length} ${parentName}${calm.empty.length === 1 ? '' : 's'} with nothing in ${periodWord}`} aria-expanded={emptyOpen} aria-controls="plan-empty-goals" onClick={() => setShowEmpty((v) => !v)}>
             <b>{calm.empty.length} {parentName}{calm.empty.length === 1 ? '' : 's'} with nothing in {periodWord}</b>
             {!emptyOpen && <span className="plan-empty-fold-names">{calm.empty.slice(0, 4).map(groupTitle).join(' · ')}{calm.empty.length > 4 ? ` · and ${calm.empty.length - 4} more` : ''}</span>}
             <span className="canvas-link">{emptyOpen ? 'Hide' : 'Show'}</span>
           </button>
           {emptyOpen && <ul id="plan-empty-goals" className="plan-groups" aria-label={`${parentName}s with nothing in ${periodWord}`}>{calm.empty.map(renderGroup)}</ul>}
         </>}
-        {sectioned && <div className="plan-section is-loose">
+        </div>
+        {sectioned && <div className="plan-section is-loose" data-explain="loose" data-explain-label={`Not under a ${parentName}`}>
           <div className="plan-section-head">
             <h2>Not under a {parentName}</h2>
             <p>Fine to leave here. To put one under a {parentName}, drag it onto a card above or use Move under.</p>
@@ -468,8 +471,8 @@ function Inner() {
         </div>}
         <footer className="plan-foot">
           {hasItems && (level < 2
-            ? <button type="button" className="plan-next" onClick={() => setHorizon(level + 1)}>Next: {HORIZONS[level + 1]} →</button>
-            : <Link to={weekHref} className="plan-next">Next: Week →</Link>)}
+            ? <button type="button" className="plan-next" data-explain="next" data-explain-label={`Next: ${HORIZONS[level + 1]}`} onClick={() => setHorizon(level + 1)}>Next: {HORIZONS[level + 1]} →</button>
+            : <Link to={weekHref} className="plan-next" data-explain="next" data-explain-label="Next: Week">Next: Week →</Link>)}
         </footer>
       </div></div>}
   </main>

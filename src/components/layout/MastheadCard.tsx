@@ -53,6 +53,7 @@ export function MastheadCard({ eyebrow, title, subline, controls, aside, footer,
   return (
     <section
       data-testid="masthead-card"
+      data-explain="page-title"
       className={`${open
         ? `daybook-masthead${variant === 'page' ? ' daybook-masthead-page' : ''}`
         : 'relative mx-3 mb-4 rounded-2xl border border-neutral-200/80 bg-bg-elevated shadow-sm md:mx-0'} ${className}`}
