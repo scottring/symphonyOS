@@ -468,7 +468,8 @@ export function WeekV2({ tasks, weekStart, meId, isCurrent, days, renderDays, on
     reviewDue: !session.saved || reviewCount > 0, onPlan: startPlan, onRetry: session.reload,
     // On its last day the week offers the next one instead (one primary).
     planLabel: endsToday ? undefined : 'Plan the week',
-    resumeLabel: progress && !endsToday ? 'Continue planning' : undefined,
+    // Worded as Season and Year word theirs: where you left off, of how many.
+    resumeLabel: progress && !endsToday ? `Continue planning week ${weekNo} · step ${Math.max(1, WEEK_STEPS.findIndex((x) => x.key === progress.step) + 1)} of ${WEEK_STEPS.length}` : undefined,
     secondary: endsToday ? null : { label: 'Review last week', onClick: startReview },
     lookBack: null, hasLines: allWeek.length > 0,
     tools: tools && <div className="pv2-wtools">{tools}</div>,

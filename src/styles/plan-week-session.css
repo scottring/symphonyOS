@@ -57,7 +57,10 @@
 }
 .wk-source-month + .wk-source-month { margin-top: 8px; }
 .wk-source-month > .canvas-link { margin-top: 8px; }
-.wk-board-days { min-width: 0; }
+/* The days measure their own column (layout-system.css's wk-days container),
+   so beside the list they go three across, or one as an agenda, instead of
+   five columns too narrow for a word (2026-10-12 integration check). */
+.wk-board-days { min-width: 0; container: wk-days / inline-size; }
 .wk-fold { margin-top: 16px; padding-top: 10px; border-top: 1px solid var(--color-neutral-200); }
 .wk-fold-body { margin-top: 8px; }
 
@@ -77,7 +80,15 @@
   .wk-board-list .pv2-wl .wk-row { transition: none; }
 }
 
-/* Phones: list first, the source below it; every control a full target. */
+/* Stacked (phones, narrow windows): while a step's choices are made in the
+   source (Inbox, last week), the source comes first so they are where you
+   are — as Season and Year do. Writing and placing keep the list first. */
+@media (max-width: 1023px) {
+  .wk-session[data-step="inbox"] .wk-board > .plan-month-source,
+  .wk-session[data-step="lastweek"] .wk-board > .plan-month-source { order: -1; }
+}
+
+/* Phones: the list first in writing and placing; every control a full target. */
 @media (max-width: 767px) {
   .wk-board-toolbar .plan-source-toggle, .wk-source-acts .canvas-link, .wk-fold-toggle,
   .wk-board-source .plan-add { min-height: 44px; }
