@@ -30,7 +30,7 @@ import type { TriageWhen } from './TriageWhenMenu'
 import { getBaseDate } from '@/lib/dateHelpers'
 import { WHEN_LABEL } from '@/lib/triage/contract'
 import { whenDetail } from '@/lib/triage/periods'
-import { dayForWhen, poolPatch } from '@/lib/triage/applyWhen'
+import { dayForWhen, deferredPoolPatch } from '@/lib/triage/applyWhen'
 import { wasWritten, isStep } from '@/hooks/useGatedTaskActions'
 import type { DomainId } from '@/lib/domains'
 import { BulkAreaDialog } from './BulkAreaDialog'
@@ -589,7 +589,7 @@ export function InboxView({
     if (when === 'this-season') { moveRow(task, 'quarter', 'This Season'); return }
     const label = `${WHEN_LABEL[when]} · ${whenDetail(when)}`
     const day = dayForWhen(when)
-    moveRow(task, day ?? { patch: poolPatch(when)! }, label)
+    moveRow(task, day ?? { patch: deferredPoolPatch(when, task.deferCount)! }, label)
   }, [moveRow])
 
   // Schedule an inbox item to a specific date/time (the "Pick date" triage path).

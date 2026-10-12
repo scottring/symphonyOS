@@ -111,7 +111,7 @@ function ReferenceList({ pin, onClose }: { pin: ReferencePin; onClose: () => voi
       if (verdict === 'completed') await toggleTask(task.id)
       else {
         const written = await applyTriageVerdict(task, verdict, {
-          viewedDate: new Date(), onUpdateTask: gated.updateTask, onPushTask: gated.pushTask,
+          onUpdateTask: gated.updateTask, onPushTask: gated.pushTask,
         })
         if (!written) return
       }

@@ -70,7 +70,7 @@ export function ExpiredSection({
     void (async () => {
       // A cancelled domain gate writes nothing — don't mark the row resolved.
       const ok = await applyTriageVerdict(row.task, v, {
-        viewedDate: new Date(), onUpdateTask, onPushTask, onDeleteTask,
+        onUpdateTask, onPushTask, onDeleteTask,
       })
       if (ok) resolve(row, v)
     })()

@@ -56,7 +56,7 @@ describe('applyTriageWhen — where each When lands (actual today, household wee
     await applyTriageWhen('this-week', 't1', h, SAT_WEEKS)
     expect(h.onUpdateTask).toHaveBeenLastCalledWith('t1', { bucket: 'week', weekStart: new Date(2026, 9, 10), scheduledFor: undefined })
     await applyTriageWhen('next-week', 't1', h, SAT_WEEKS)
-    expect(h.onUpdateTask).toHaveBeenLastCalledWith('t1', { bucket: 'week', weekStart: new Date(2026, 9, 17), scheduledFor: undefined })
+    expect(h.onUpdateTask).toHaveBeenLastCalledWith('t1', { bucket: 'week', weekStart: new Date(2026, 9, 17), scheduledFor: undefined, deferCount: 1 })
     expect(h.onPushTask).not.toHaveBeenCalled()
   })
 
@@ -73,7 +73,7 @@ describe('applyTriageWhen — where each When lands (actual today, household wee
   it('Next month is November’s list, not a date on the 1st', async () => {
     const h = handlers()
     await applyTriageWhen('next-month', 't1', h, SAT_WEEKS)
-    expect(h.onUpdateTask).toHaveBeenCalledWith('t1', { bucket: 'month', monthStart: new Date(2026, 10, 1), scheduledFor: undefined })
+    expect(h.onUpdateTask).toHaveBeenCalledWith('t1', { bucket: 'month', monthStart: new Date(2026, 10, 1), scheduledFor: undefined, deferCount: 1 })
   })
 
   it('This season follows the household’s own seasons', async () => {
@@ -95,5 +95,21 @@ describe('applyTriageWhen — where each When lands (actual today, household wee
   it('a refused pool write resolves false', async () => {
     const h = { ...handlers(), onUpdateTask: vi.fn(async () => false) }
     expect(await applyTriageWhen('next-month', 't1', h, SAT_WEEKS)).toBe(false)
+  })
+})
+
+describe('deferral count (urgency reads it)', () => {
+  it('a move to a later pool counts as a deferral; this week, this month and Someday do not', async () => {
+    const { applyTriageWhen, deferredPoolPatch } = await import('./applyWhen')
+    const { triageClock } = await import('./periods')
+    const clock = triageClock(new Date(2026, 9, 12, 9))
+    for (const when of ['next-week', 'this-weekend', 'next-weekend', 'next-month'] as const) {
+      expect(deferredPoolPatch(when, 2, clock)).toMatchObject({ deferCount: 3 })
+    }
+    expect(deferredPoolPatch('this-week', 2, clock)).not.toHaveProperty('deferCount')
+    expect(deferredPoolPatch('this-month', undefined, clock)).not.toHaveProperty('deferCount')
+    const onUpdateTask = vi.fn(async () => true)
+    await applyTriageWhen('next-week', 't1', { onPushTask: vi.fn(), onSetBucket: vi.fn(), onUpdateTask, deferCountOf: () => undefined }, clock)
+    expect(onUpdateTask).toHaveBeenCalledWith('t1', expect.objectContaining({ bucket: 'week', deferCount: 1 }))
   })
 })

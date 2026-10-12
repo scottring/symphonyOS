@@ -60,7 +60,7 @@ export function triageTaskWhen(task: Task, when: TriageWhen, h: TriageHandlers):
   const before = placementSnapshot(task)
   return runTriage({
     done: `${describeTriageWhen(when)} — “${task.title}”`,
-    write: () => applyTriageWhen(when, task.id, h),
+    write: () => applyTriageWhen(when, task.id, { deferCountOf: () => task.deferCount, ...h }),
     undo: () => h.onUpdateTask(task.id, before),
   })
 }

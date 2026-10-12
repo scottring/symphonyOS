@@ -292,6 +292,7 @@ export function WeekV2({ tasks, weekStart, meId, isCurrent, days, renderDays, on
           onSetBucket: (id, bucket) => gated.updateTask(id, { bucket, scheduledFor: undefined }),
           onUpdateTask: gated.updateTask,
           onFocus: (id, day) => gated.updateTask(id, { plannedOn: day }),
+          deferCountOf: () => t.deferCount,
         }), { ids: [t.id], undo: async () => { await gated.updateTask(t.id, before) }, retry: () => pickWhen(t, when) })
       },
       pickDate: function pickDate(t, at, isAllDay) {

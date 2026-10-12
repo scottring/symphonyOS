@@ -43,10 +43,8 @@ export function SomedayPage() {
   // (The hook's error is also set by failed writes, so only when nothing arrived.)
   const loadFailed = !loading && !!error && tasks.length === 0
 
-  const viewedDate = useMemo(() => new Date(), [])
   const onVerdict = (t: Task, v: Verdict) => {
     void applyTriageVerdict(t, v, {
-      viewedDate,
       onUpdateTask: (id, u) => gated.updateTask(id, u),
       onPushTask: (id, target) => gated.pushTask(id, target),
       onDeleteTask: (id) => pendingDelete.schedule([id], 'Deleted'),

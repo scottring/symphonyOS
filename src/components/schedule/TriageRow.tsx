@@ -4,7 +4,7 @@ import type { Task } from '@/types/task'
 import { wasWritten } from '@/hooks/useGatedTaskActions'
 import type { PlacementFate } from '@/lib/planning/lineage'
 import { WeekChoiceChip, type WeekChoice } from './WeekChoiceChip'
-import { poolPatch } from '@/lib/triage/applyWhen'
+import { deferredPoolPatch } from '@/lib/triage/applyWhen'
 
 /**
  * One triage row — a task title plus one-tap fate buttons — shared by the
@@ -30,7 +30,10 @@ export const VERDICT_LABEL: Record<Verdict, string> = {
 const WEEK_CHOICES: Verdict[] = ['this-weekend', 'next-week', 'next-weekend']
 
 interface VerdictHandlers {
-  viewedDate: Date
+  /** The actual today (tests pin it). Today and Tomorrow count from it, never
+   *  from the day on screen (triage contract, 2026-10-12: quick actions refer
+   *  to the real today and say the date they land on). */
+  now?: Date
   /** `false` means a domain gate was cancelled — nothing was written. A raw
    *  (non-gated) sync handler still type-checks here since void is a member
    *  of the union. */
@@ -48,7 +51,7 @@ export async function applyTriageVerdict(t: Task, v: Verdict, h: VerdictHandlers
   if (v === 'today' || v === 'tomorrow') {
     // All-day, not the clock time the button was pressed at (demo run
     // 2026-09-06: "Do today" at 6:50 AM landed a 6:50 AM task).
-    const day = new Date(h.viewedDate)
+    const day = new Date(h.now ?? new Date())
     day.setHours(0, 0, 0, 0)
     if (v === 'tomorrow') day.setDate(day.getDate() + 1)
     return chooseDay(t, day, h, v === 'today')
@@ -58,7 +61,7 @@ export async function applyTriageVerdict(t: Task, v: Verdict, h: VerdictHandlers
     // The triage contract's pools (lib/triage): a weekend is either day, next
     // week is next week's list under the household's week start — never a
     // silently chosen Saturday or Monday.
-    return wasWritten(h.onUpdateTask(t.id, poolPatch(v)!))
+    return wasWritten(h.onUpdateTask(t.id, deferredPoolPatch(v, t.deferCount)!))
   } else if (v === 'someday') {
     // Same shape RescheduleButton writes — never a partial upsert.
     return wasWritten(h.onUpdateTask(t.id, { bucket: 'someday', scheduledFor: undefined, isAllDay: undefined }))
@@ -79,6 +82,13 @@ async function chooseDay(t: Task, day: Date, h: VerdictHandlers, focus: boolean)
   return true
 }
 
+/** Today and Tomorrow say the day they land on (the actual today, not the day
+ *  on screen) — "Tomorrow · Tue, Oct 13". */
+function dayTitle(v: Verdict): string | undefined {
+  if (v !== 'today' && v !== 'tomorrow') return undefined
+  const d = new Date(); if (v === 'tomorrow') d.setDate(d.getDate() + 1)
+  return `${v === 'today' ? 'Today' : 'Tomorrow'} · ${d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}`
+}
 const LEAD_LABEL: Partial<Record<Verdict, string>> = { today: 'Do today', tomorrow: 'Tomorrow', week: 'This week', someday: 'Someday' }
 const FULL_LABEL: Partial<Record<Verdict, string>> = { today: 'Today', tomorrow: 'Tomorrow', week: 'This week', someday: 'Someday' }
 const SHORT_LABEL: Partial<Record<Verdict, string>> = { today: 'Today', tomorrow: 'Tmrw', week: 'This wk', someday: 'Someday' }
@@ -120,7 +130,7 @@ export function TriageRow({ task, meta, metaTitle, isNew, offer, verdict, canDel
       </button>
     )
   ) : (
-    <button key={v} type="button" onClick={() => onVerdict(task, v)}
+    <button key={v} type="button" onClick={() => onVerdict(task, v)} title={dayTitle(v)}
       className={`text-xs font-medium px-2 py-1 rounded-md transition-colors ${
         lead && v !== lead ? 'text-neutral-600 hover:bg-neutral-100' : 'text-primary-700 bg-primary-50 hover:bg-primary-100'
       }`}>

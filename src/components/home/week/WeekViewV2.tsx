@@ -1196,7 +1196,7 @@ export function WeekViewV2(props: WeekViewV2Props) {
       },
       whenTask: function whenTask(t, when) {
         const before = placementSnapshot(t)
-        void activity.run(`${describeTriageWhen(when)}: “${t.title}”`, () => applyTriageWhen(when, t.id, triageHandlers), {
+        void activity.run(`${describeTriageWhen(when)}: “${t.title}”`, () => applyTriageWhen(when, t.id, { ...triageHandlers, deferCountOf: () => t.deferCount }), {
           ids: [t.id], undo: async () => { await onUpdateTask(t.id, before) }, retry: () => whenTask(t, when),
         })
       },

@@ -317,7 +317,7 @@ function Inner() {
     const onDelete = () => { if (window.confirm(`Delete “${node.title}”? This removes the item from all its planning periods.`)) void act(`Delete “${node.title}”`, async () => { await deleteTask(node.id) }) }
     if (node.level >= 3) {
       return <TaskFateMenu entity="task" label={label} completed={task.completed} onOpen={onOpen} onComplete={onComplete} onDelete={onDelete} extras={rowVerbs}
-        onPickWhen={(when) => void act(`${describeTriageWhen(when)}: “${node.title}”`, () => applyTriageWhen(when, node.id, { onPushTask: gated.pushTask, onSetBucket: gated.setBucket!, onUpdateTask: gated.updateTask, onFocus: (id, day) => gated.updateTask(id, { plannedOn: day }) }), { ids: [node.id] })}
+        onPickWhen={(when) => void act(`${describeTriageWhen(when)}: “${node.title}”`, () => applyTriageWhen(when, node.id, { onPushTask: gated.pushTask, onSetBucket: gated.setBucket!, onUpdateTask: gated.updateTask, onFocus: (id, day) => gated.updateTask(id, { plannedOn: day }), deferCountOf: () => task.deferCount }), { ids: [node.id] })}
         onPickDate={(date, isAllDay) => void act(`Schedule “${node.title}”`, () => gated.setBucket!(node.id, 'timed', date, isAllDay), { ids: [node.id] })} />
     }
     const period = node.level === 1 ? 'season' : 'month'

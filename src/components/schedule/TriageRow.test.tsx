@@ -11,13 +11,13 @@ const task = (o: Partial<Task> = {}): Task =>
 describe('applyTriageVerdict — today/tomorrow land all-day, not at the clock time', () => {
   it('"today" pushes midnight of the viewed day, not the time it was pressed', async () => {
     const onPushTask = vi.fn(async () => true)
-    await applyTriageVerdict(task(), 'today', { viewedDate: new Date(2026, 8, 6, 6, 50), onUpdateTask: vi.fn(), onPushTask })
+    await applyTriageVerdict(task(), 'today', { now: new Date(2026, 8, 6, 6, 50), onUpdateTask: vi.fn(), onPushTask })
     expect(onPushTask).toHaveBeenCalledWith('t1', new Date(2026, 8, 6, 0, 0, 0, 0))
   })
 
   it('"tomorrow" pushes midnight of the next day', async () => {
     const onPushTask = vi.fn(async () => true)
-    await applyTriageVerdict(task(), 'tomorrow', { viewedDate: new Date(2026, 8, 6, 6, 50), onUpdateTask: vi.fn(), onPushTask })
+    await applyTriageVerdict(task(), 'tomorrow', { now: new Date(2026, 8, 6, 6, 50), onUpdateTask: vi.fn(), onPushTask })
     expect(onPushTask).toHaveBeenCalledWith('t1', new Date(2026, 8, 7, 0, 0, 0, 0))
   })
 })
@@ -28,14 +28,14 @@ describe('applyTriageVerdict — "today" chooses the day', () => {
   it('an inbox task is dated to the day AND chosen for it', async () => {
     const onPushTask = vi.fn(async () => true)
     const onUpdateTask = vi.fn(async () => true)
-    await applyTriageVerdict(task(), 'today', { viewedDate: new Date(2026, 8, 6, 6, 50), onUpdateTask, onPushTask })
+    await applyTriageVerdict(task(), 'today', { now: new Date(2026, 8, 6, 6, 50), onUpdateTask, onPushTask })
     expect(onPushTask).toHaveBeenCalledWith('t1', new Date(2026, 8, 6))
     expect(onUpdateTask).toHaveBeenCalledWith('t1', { plannedOn: new Date(2026, 8, 6) })
   })
 
   it('a cancelled placement chooses nothing', async () => {
     const onUpdateTask = vi.fn(async () => true)
-    const ok = await applyTriageVerdict(task(), 'today', { viewedDate: new Date(2026, 8, 6), onUpdateTask, onPushTask: vi.fn(async () => false) })
+    const ok = await applyTriageVerdict(task(), 'today', { now: new Date(2026, 8, 6), onUpdateTask, onPushTask: vi.fn(async () => false) })
     expect(ok).toBe(false)
     expect(onUpdateTask).not.toHaveBeenCalled()
   })
@@ -45,7 +45,7 @@ describe('applyTriageVerdict — "today" chooses the day', () => {
   it('a month-list task is dated today AND chosen (S4)', async () => {
     const onPushTask = vi.fn(async () => true)
     const onUpdateTask = vi.fn(async () => true)
-    await applyTriageVerdict(task({ bucket: 'month' }), 'today', { viewedDate: new Date(2026, 8, 6), onUpdateTask, onPushTask })
+    await applyTriageVerdict(task({ bucket: 'month' }), 'today', { now: new Date(2026, 8, 6), onUpdateTask, onPushTask })
     expect(onPushTask).toHaveBeenCalledWith('t1', new Date(2026, 8, 6))
     expect(onUpdateTask).toHaveBeenCalledWith('t1', { plannedOn: new Date(2026, 8, 6) })
   })
@@ -53,7 +53,7 @@ describe('applyTriageVerdict — "today" chooses the day', () => {
   it('"tomorrow" is a date only — no focus for tomorrow (S4)', async () => {
     const onPushTask = vi.fn(async () => true)
     const onUpdateTask = vi.fn(async () => true)
-    await applyTriageVerdict(task({ bucket: 'week' }), 'tomorrow', { viewedDate: new Date(2026, 8, 6), onUpdateTask, onPushTask })
+    await applyTriageVerdict(task({ bucket: 'week' }), 'tomorrow', { now: new Date(2026, 8, 6), onUpdateTask, onPushTask })
     expect(onPushTask).toHaveBeenCalledWith('t1', new Date(2026, 8, 7))
     expect(onUpdateTask).not.toHaveBeenCalled()
   })
@@ -68,10 +68,10 @@ describe('applyTriageVerdict — the week choices land in their period', () => {
     vi.useFakeTimers(); vi.setSystemTime(new Date(2026, 8, 30, 10, 0)) // Wed Sep 30
     const onPushTask = vi.fn(async () => true)
     const onUpdateTask = vi.fn(async () => true)
-    await applyTriageVerdict(task(), 'this-weekend', { viewedDate: new Date(), onUpdateTask, onPushTask })
+    await applyTriageVerdict(task(), 'this-weekend', { now: new Date(), onUpdateTask, onPushTask })
     expect(onPushTask).not.toHaveBeenCalled()
     expect(onUpdateTask).toHaveBeenLastCalledWith('t1', expect.objectContaining({ bucket: 'week', weekendStart: new Date(2026, 9, 3), scheduledFor: undefined }))
-    await applyTriageVerdict(task(), 'next-weekend', { viewedDate: new Date(), onUpdateTask, onPushTask })
+    await applyTriageVerdict(task(), 'next-weekend', { now: new Date(), onUpdateTask, onPushTask })
     expect(onUpdateTask).toHaveBeenLastCalledWith('t1', expect.objectContaining({ weekendStart: new Date(2026, 9, 10) }))
     expect(onUpdateTask.mock.calls.some(([, u]) => 'plannedOn' in (u as object) && (u as { plannedOn?: Date }).plannedOn)).toBe(false)
     vi.useRealTimers()
@@ -81,8 +81,8 @@ describe('applyTriageVerdict — the week choices land in their period', () => {
     vi.useFakeTimers(); vi.setSystemTime(new Date(2026, 8, 30, 10, 0)) // Wed Sep 30
     localStorage.setItem('symphony-cadence-config', JSON.stringify({ weekStartsOn: 6 }))
     const onUpdateTask = vi.fn(async () => true)
-    await applyTriageVerdict(task(), 'next-week', { viewedDate: new Date(), onUpdateTask, onPushTask: vi.fn() })
-    expect(onUpdateTask).toHaveBeenCalledWith('t1', { bucket: 'week', weekStart: new Date(2026, 9, 3), scheduledFor: undefined })
+    await applyTriageVerdict(task(), 'next-week', { now: new Date(), onUpdateTask, onPushTask: vi.fn() })
+    expect(onUpdateTask).toHaveBeenCalledWith('t1', { bucket: 'week', weekStart: new Date(2026, 9, 3), scheduledFor: undefined, deferCount: 1 })
     localStorage.removeItem('symphony-cadence-config')
     vi.useRealTimers()
   })

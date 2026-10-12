@@ -640,7 +640,7 @@ describe('WeekViewV2 canvas triage writes', () => {
     fireEvent.click(screen.getByRole('button', { name: 'More for Call the plumber' }))
     fireEvent.click(screen.getByRole('menuitem', { name: /^Next month/ }))
     await waitFor(() => expect(screen.getByTestId('strip')).toHaveTextContent(/^failed:false:true:/))
-    expect(onUpdateTask).toHaveBeenCalledWith('w', { bucket: 'month', monthStart: new Date(2026, 9, 1), scheduledFor: undefined })
+    expect(onUpdateTask).toHaveBeenCalledWith('w', { bucket: 'month', monthStart: new Date(2026, 9, 1), scheduledFor: undefined, deferCount: 1 })
     // Still where it was.
     expect(within(screen.getByRole('region', { name: 'Still to place' })).getByText('Call the plumber')).toBeInTheDocument()
     onUpdateTask.mockResolvedValue(true)

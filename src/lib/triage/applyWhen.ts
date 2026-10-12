@@ -31,6 +31,19 @@ export interface TriageHandlers {
   /** Chooses the task for my focus on `day`. "Today" is the Today command
    *  (spec S4): dated today AND chosen. Every other when is a date only. */
   onFocus?: (id: string, day: Date) => unknown
+  /** The task's current defer count, so a move to a LATER pool counts as a
+   *  deferral the way a pushed date always has (urgency reads it). */
+  deferCountOf?: (id: string) => number | undefined
+}
+
+/** Pools that put a task off to a later period: what pushTask used to count
+ *  when these were written as dates (next Monday, a Saturday, the 1st). */
+const DEFERRALS: ReadonlySet<TriageWhen> = new Set<TriageWhen>(['next-week', 'this-weekend', 'next-weekend', 'next-month'])
+
+/** poolPatch, plus the deferral count when the move puts the task off. */
+export function deferredPoolPatch(when: TriageWhen, deferCount: number | undefined, clock: TriageClock = triageClock()): Partial<Task> | null {
+  const patch = poolPatch(when, clock)
+  return patch && DEFERRALS.has(when) ? { ...patch, deferCount: (deferCount ?? 0) + 1 } : patch
 }
 
 /**
@@ -81,5 +94,5 @@ export async function applyTriageWhen(when: TriageWhen, taskId: string, h: Triag
     return true
   }
   if (when === 'someday') return wasWritten(h.onSetBucket(taskId, 'someday'))
-  return wasWritten(h.onUpdateTask(taskId, poolPatch(when, clock)!) as void | Promise<void | boolean>)
+  return wasWritten(h.onUpdateTask(taskId, deferredPoolPatch(when, h.deferCountOf?.(taskId), clock)!) as void | Promise<void | boolean>)
 }

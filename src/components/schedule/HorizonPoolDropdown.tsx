@@ -79,7 +79,7 @@ export function HorizonPoolDropdown({
   const onVerdict = (t: Task, v: Verdict) => {
     void (async () => {
       // A cancelled domain gate writes nothing — don't mark the row resolved.
-      const ok = await applyTriageVerdict(t, v, { viewedDate, onUpdateTask, onPushTask, onDeleteTask })
+      const ok = await applyTriageVerdict(t, v, { onUpdateTask, onPushTask, onDeleteTask })
       if (ok) setVerdicts((prev) => new Map(prev).set(t.id, v))
     })()
   }
