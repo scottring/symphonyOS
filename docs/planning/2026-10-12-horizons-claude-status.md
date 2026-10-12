@@ -55,7 +55,12 @@ All three branch from `8f13013a`. Agent instructions: shared rules + one horizon
 
 ## Evidence
 
-(none yet)
+- Visual harness (coordinator, outside the repo): Playwright + system Chrome against `vite preview` of the
+  integration build on :5210. Signs in as the demo test account, serves **fixture** tasks/goals/household
+  seasons (custom seasons "Thaw / Long days / Harvest / Hearth", Saturday weeks), and **intercepts every
+  write** (insert/update/delete/RPC never reach the database). Baseline Month shot taken 16:58 on the
+  snapshot: complete October list + Harvest source column renders with fixture data; no page errors;
+  0 writes.
 
 ## Blockers / release steps
 
