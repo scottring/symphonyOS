@@ -282,7 +282,6 @@ describe('drawer of the horizon one up',()=>{
  it('beside Month it lists the season goals; the current parent is not a target',()=>{
   api.tasks=[{id:'s1',title:'Autumn outings',bucket:'quarter'},{id:'s2',title:'Strength',bucket:'quarter'},{id:'m',title:'Picnic',bucket:'month',sourceId:'s1'}]
   month()
-  fireEvent.click(screen.getByRole('button',{name:/filed under/}))
   fireEvent.dragStart(screen.getByText('Picnic').closest('li')!,{dataTransfer:{setData:vi.fn(),effectAllowed:''}})
   const d=within(screen.getByRole('complementary',{name:'Fall goals'}))
   expect(d.getByText('Autumn outings').closest('li')).not.toHaveClass('is-drop-ok')
@@ -295,17 +294,25 @@ describe('drawer of the horizon one up',()=>{
   fireEvent.click(screen.getByRole('button',{name:/Show year goals/}))
   expect(screen.getByRole('complementary',{name:'Year goals'})).toBeInTheDocument()
  })
- it('the board leads with what is not filed; filed goals fold to one line',()=>{
+ it('the board leads with what is not filed, full width; filed goals follow as cards',()=>{
   api.tasks=[{id:'a',title:'Unhurried weekends',bucket:'quarter',goalId:'g'},{id:'c',title:'Fix the gate',bucket:'quarter'}]
   season()
   const regions=screen.getAllByRole('region').map(r=>r.getAttribute('aria-label'))
-  expect(regions).toEqual(['Not under a year goal'])
-  const fold=screen.getByRole('button',{name:/1 season goal filed under 1 year goal/})
-  expect(screen.queryByText('Unhurried weekends')).toBeNull()
-  fireEvent.click(fold)
+  expect(regions).toEqual(['Not under a year goal','Under Together'])
+  expect(group('Not under a year goal').closest('li')).toHaveClass('is-wide')
   expect(group('Under Together')).toHaveTextContent('Unhurried weekends')
+  expect(screen.queryByRole('button',{name:/filed under/})).toBeNull()
   // The empty-goals line is gone: the drawer lists them.
   expect(screen.queryByRole('button',{name:/with nothing in/})).toBeNull()
+ })
+ it('shows no board, and no empty-plan message, while the plans load',()=>{
+  ;(api as any).loading=true
+  try{
+   season()
+   expect(screen.getByText('Loading your plans…')).toBeInTheDocument()
+   expect(screen.queryByText(/yet\. Add/)).toBeNull()
+   expect(screen.queryByRole('list',{name:'Season plan'})).toBeNull()
+  }finally{delete (api as any).loading}
  })
  it('on a narrow screen there is no drawer and the board stays grouped',()=>{
   window.matchMedia=realMatch

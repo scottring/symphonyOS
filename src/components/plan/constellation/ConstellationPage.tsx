@@ -115,7 +115,6 @@ function Inner() {
   const [composer, setComposer] = useState<Composer | null>(null)
   const [dragKey, setDragKey] = useState<string | null>(null)
   const [dropKey, setDropKey] = useState<string | null>(null)
-  const [showFiled, setShowFiled] = useState(false)
   const drawerUi = useUpstreamDrawer()
   const mainRef = useRef<HTMLElement>(null)
   const scrollMemo = useRef<number | null>(null)
@@ -341,13 +340,13 @@ function Inner() {
         empty={<>No {parentName}s for {level === 1 ? anchor.getFullYear() : seasonWord} yet. <button type="button" className="canvas-link" onClick={() => setHorizon(level - 1)}>Add {parentName}s</button></>} />
     : null
   // With the drawer open the board leads with what is not filed yet (Scott,
-  // 2026-10-11); what is filed folds to one line, and empty parents are in
-  // the drawer. A group showing suggestions stays open.
-  const pile = calm && drawer ? {
-    lead: [...groups.filter((g) => g.kind === 'unlinked'), ...calm.shown.filter((g) => g.kind === 'parent' && pending.has(g.key))],
-    filed: calm.shown.filter((g) => g.kind === 'parent' && !pending.has(g.key)),
-  } : null
-  const filedCount = pile ? pile.filed.reduce((n, g) => n + g.items.length, 0) : 0
+  // 2026-10-11), spread across the board's width, then the groups showing
+  // suggestions, then what is filed. Empty parents are in the drawer.
+  const pile = calm && drawer ? [
+    ...groups.filter((g) => g.kind === 'unlinked'),
+    ...calm.shown.filter((g) => g.kind === 'parent' && pending.has(g.key)),
+    ...calm.shown.filter((g) => g.kind === 'parent' && !pending.has(g.key)),
+  ] : null
 
   const visibleById = new Map(visible.map((t) => [t.id, t]))
   const goalsById = new Map(allNodes.filter((n) => n.goal).map((n) => [n.id, n.goal!]))
@@ -391,7 +390,7 @@ function Inner() {
     }
     const adding = composer?.kind === 'add' && composer.group === g.key
     const empty = g.items.length === 0 && groupProposals.length === 0
-    return <li key={g.key} className="plan-group-slot">
+    return <li key={g.key} className={`plan-group-slot${drawer && g.kind === 'unlinked' ? ' is-wide' : ''}`}>
       <section className={`canvas-group plan-group${g.kind === 'unlinked' ? ' is-unlinked' : ''}${dropKey === g.key ? ' is-drop' : ''}${dragNode && canDrop(g) ? ' is-drop-ok' : ''}`}
         aria-label={g.kind === 'parent' ? `Under ${title}` : title} data-group-key={g.key} {...dropProps(g)}>
         {g.crumb && <p className="plan-group-crumb">{g.crumb}</p>}
@@ -461,22 +460,15 @@ function Inner() {
     {!dataReady && <p className="plan-status" role="status">Loading your plans…</p>}
     {(error || goalsError)
       ? <p className="plan-status" role="alert">Plans could not load. <button type="button" className="canvas-link" onClick={() => { if (goalsError) window.location.reload(); else void refetch() }}>Retry</button></p>
+      : !dataReady ? null
       : <div ref={bodyRef} className={`plan-body${drawer ? ' has-drawer is-colscroll' : ''}`}>{drawer}<div className="plan-board">
         {focused && <div className="plan-focus-bar">
           <span role="status">Showing {focused.size} of {groups.length} groups</span>
           <button type="button" className="canvas-link" onClick={clearFocus}>Show all · Esc</button>
         </div>}
         <ul className={`plan-groups${focused ? ' is-focused' : ''}${level === 0 ? ' is-year' : ''}`} aria-label={`${HORIZONS[level]} plan`}>
-          {(pile ? pile.lead : calm ? calm.shown : groups).map(renderGroup)}
+          {(pile ?? (calm ? calm.shown : groups)).map(renderGroup)}
         </ul>
-        {pile && pile.filed.length > 0 && <>
-          <button type="button" className="canvas-group is-quiet plan-empty-fold" aria-expanded={showFiled} aria-controls="plan-filed-goals" onClick={() => setShowFiled((v) => !v)}>
-            <b>{filedCount} {term}{filedCount === 1 ? '' : 's'} filed under {pile.filed.length} {parentName}{pile.filed.length === 1 ? '' : 's'}</b>
-            {!showFiled && <span className="plan-empty-fold-names">{pile.filed.slice(0, 4).map(groupTitle).join(' · ')}{pile.filed.length > 4 ? ` · and ${pile.filed.length - 4} more` : ''}</span>}
-            <span className="canvas-link">{showFiled ? 'Hide' : 'Show'}</span>
-          </button>
-          {showFiled && <ul id="plan-filed-goals" className="plan-groups" aria-label={`Filed under ${parentName}s`}>{pile.filed.map(renderGroup)}</ul>}
-        </>}
         {calm && !pile && calm.empty.length > 0 && <>
           <button type="button" className="canvas-group is-quiet plan-empty-fold" aria-expanded={showEmpty} aria-controls="plan-empty-goals" onClick={() => setShowEmpty((v) => !v)}>
             <b>{calm.empty.length} {parentName}{calm.empty.length === 1 ? '' : 's'} with nothing in {periodWord}</b>

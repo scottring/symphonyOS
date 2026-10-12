@@ -268,6 +268,11 @@
    to the landscape (--pv2-col-h, useColumnsFitWindow; Scott, 2026-10-11), so
    a long board never carries the year goals off screen. */
 @media (min-width: 1024px) {
+  /* What is not filed yet runs the board's full width, its rows in columns,
+     so the pile reads at a glance; the filed cards pack below it. */
+  .plan-groups > .plan-group-slot.is-wide { column-span: all; }
+  .plan-group-slot.is-wide .plan-items { columns: 4 240px; column-gap: 28px; }
+  .plan-group-slot.is-wide .plan-items > li { break-inside: avoid; }
   .plan-canvas:has(.plan-body.is-colscroll) { padding-bottom: 0; }
   .plan-body.is-colscroll > .plan-drawer { position: relative; top: auto; max-height: var(--pv2-col-h, calc(100dvh - 220px)); }
   .plan-body.is-colscroll > .plan-board {
