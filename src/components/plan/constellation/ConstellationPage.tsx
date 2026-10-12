@@ -19,7 +19,7 @@
 // activity, so it reports saving / saved / didn't save, with Undo when the
 // previous fields can be restored.
 
-import { useEffect, useRef, useState, type DragEvent, type RefObject } from 'react'
+import { useEffect, useRef, useState, type DragEvent, type ReactNode, type RefObject } from 'react'
 import { Link, Navigate, useLocation, useSearchParams, type SetURLSearchParams } from 'react-router-dom'
 import { TaskFateMenu } from '@/components/schedule/TaskFateMenu'
 import { applyTriageWhen, describeTriageWhen } from '@/lib/triage/applyWhen'
@@ -71,6 +71,15 @@ function readSourceShown(): boolean {
 function writeSourceShown(shown: boolean) {
   try { localStorage.setItem(SOURCE_SHOWN_KEY, shown ? '1' : '0') } catch { /* private window */ }
 }
+
+// ---- Season board: flag (Season agent's region) --------------------------
+/** Season uses the collection-and-source board Month introduced. */
+const SEASON_BOARD = false
+// ---- end Season flag ------------------------------------------------------
+// ---- Year board: flag (Year agent's region) --------------------------------
+/** Year uses the collection-and-source board Month introduced. */
+const YEAR_BOARD = false
+// ---- end Year flag --------------------------------------------------------
 
 /** The element that scrolls the page, so Show all can return to where you were. */
 function scrollHost(el: HTMLElement | null): HTMLElement | null {
@@ -349,7 +358,15 @@ function Inner() {
   const walkInBar = useConversationWalk(requested === 3 ? null : { label: walkLabel, message: walkMessage })
   // Month's two columns each scroll on their own down to the landscape.
   const monthLayout = level === 2
-  const monthBoardRef = useColumnsFitWindow(monthLayout && dataReady && !error && !goalsError)
+  // The collection-and-source board (Month, 2026-10-12), which Season and
+  // Year adopt behind their flags. Month-only behaviour stays on monthLayout.
+  const boardLayout = monthLayout || (level === 1 && SEASON_BOARD) || (level === 0 && YEAR_BOARD)
+  const monthBoardRef = useColumnsFitWindow(boardLayout && dataReady && !error && !goalsError)
+
+  // ---- Season hooks (Season agent's region: hooks only, before the return) -
+  // ---- end Season hooks ------------------------------------------------------
+  // ---- Year hooks (Year agent's region: hooks only, before the return) -----
+  // ---- end Year hooks --------------------------------------------------------
 
   if (requested === 3) return <Navigate replace to={`/week?view=alongside&date=${localYmd(anchor)}&start=${localYmd(week)}`} />
 
@@ -377,9 +394,11 @@ function Inner() {
 
   // Month: the season goals selected (by the focus param) light up their
   // month goals in the collection; nothing is folded or filtered away.
-  const selected = monthLayout ? focused : null
+  const selected = boardLayout ? focused : null
   const parentOf = (node: PlanNode) => node.parent ? allNodes.find((n) => n.key === node.parent) : undefined
-  const parentLabelOf = (parent: PlanNode | undefined) => parent ? { kind: `${seasonWord} goal`, title: parent.title } : undefined
+  // The parent one horizon up, named quietly on a linked goal.
+  const parentLabelOf = (parent: PlanNode | undefined) => parent
+    ? { kind: level === 1 ? `${anchor.getFullYear()} goal` : `${seasonWord} goal`, title: parent.title } : undefined
 
   const renderItem = (node: PlanNode) => {
     const canMove = level > 0 && !!node.task && !allNodes.some((n) => n.level === level - 1 && n.id === node.id)
@@ -390,7 +409,7 @@ function Inner() {
     if (level < 2) more.push({ label: `See its ${TERMS[level + 1]}s →`, onSelect: () => setHorizon(level + 1, node.key) })
     const editing = composer?.kind === 'edit' && composer.key === node.key
     return <PlanItemRow key={node.key} node={node}
-      parentLabel={monthLayout ? parentLabelOf(parentOf(node)) : undefined}
+      parentLabel={boardLayout && level > 0 ? parentLabelOf(parentOf(node)) : undefined}
       related={!!selected?.has(node.parent ?? UNLINKED)}
       linked={linked?.child === node.key}
       count={childCount(allNodes, node)} childTerm={TERMS[level + 1] ?? null}
@@ -562,7 +581,16 @@ function Inner() {
     </section>
   </div>
 
-  return <main ref={mainRef} className={`plan-canvas ${PAGE_PLANNING}${monthLayout ? ' plan-month' : ''}`} data-horizon={level}>
+  // ---- Season board (Season agent's region: render) -------------------------
+  const seasonBoard: ReactNode = null
+  const seasonToolbar: ReactNode = null
+  // ---- end Season board ------------------------------------------------------
+  // ---- Year board (Year agent's region: render) -----------------------------
+  const yearBoard: ReactNode = null
+  const yearToolbar: ReactNode = null
+  // ---- end Year board --------------------------------------------------------
+
+  return <main ref={mainRef} className={`plan-canvas ${PAGE_PLANNING}${boardLayout ? ' plan-month' : ''}`} data-horizon={level}>
     <header className="plan-head">
       {/* Without the docked bar (phones) the page offers both itself. */}
       <div className="plan-head-row">{stepper}{!walkInBar && walk}{!walkInBar && <button type="button" className="plan-walk" onClick={() => openAssistant({ message: EXPLAIN_MESSAGE, autoSend: true, stayOnPage: true })}>{EXPLAIN_LABEL}</button>}</div>
@@ -577,6 +605,8 @@ function Inner() {
     <div className="plan-toolbar">
       {monthLayout && dataReady && <button type="button" className="canvas-link plan-source-toggle" aria-expanded={sourceShown} aria-controls="plan-month-source"
         onClick={toggleSource}>{sourceShown ? `Hide ${seasonWord} goals` : `Show ${seasonWord} goals`}</button>}
+      {level === 1 && SEASON_BOARD && seasonToolbar}
+      {level === 0 && YEAR_BOARD && yearToolbar}
       {proposals.length > 0 && <button type="button" className="canvas-link" onClick={() => { void keepAll() }}>Keep all ({proposals.length})</button>}
       {(doneCount > 0 || showDone) && <button type="button" className="canvas-link" aria-pressed={showDone} onClick={() => setShowDone((s) => !s)}>
         {showDone ? `Hide done (${doneCount})` : `Show done (${doneCount})`}
@@ -588,6 +618,8 @@ function Inner() {
       ? <p className="plan-status" role="alert">Plans could not load. <button type="button" className="canvas-link" onClick={() => { if (goalsError) window.location.reload(); else void refetch() }}>Retry</button></p>
       : !dataReady ? null
       : monthLayout ? monthBoard
+      : level === 1 && SEASON_BOARD ? seasonBoard
+      : level === 0 && YEAR_BOARD ? yearBoard
       : <div className="plan-body"><div className="plan-board">
         {focused && <div className="plan-focus-bar">
           <span role="status">Showing {focused.size} of {groups.length} groups</span>
