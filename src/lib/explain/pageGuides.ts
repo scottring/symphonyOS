@@ -34,7 +34,9 @@ export const PAGE_GUIDES: Record<string, string> = {
     'Week is for doing: this week\'s tasks and when they happen. ' +
     '"Still to place" is the shelf of this week\'s tasks that have no day yet; drag one onto a day, or press + to give it a day. ' +
     'Each day column shows its events, tasks and daily routines. Routines to place are repeating things that need a day this week. ' +
-    'The month\'s goals (e.g. October goals) can be shown with the shelf; drop a task on one to put it under that goal.',
+    'Plan the week opens a session in four steps: Inbox (choose the captures that need to happen this week), Last week (bring forward only what still matters; nothing comes over by itself and last week keeps its record), Monthly goals (write the week\'s tasks with the month\'s goals beside them; linking one to a goal is optional and names the goal under the task), and Days & times (give tasks a day, and a time if needed, beside the calendar). ' +
+    'The week\'s list stays in the same place through every step and shows everything the week holds; the column beside it is that step\'s source, and Hide or Show changes only whether you see it. ' +
+    'Review last week opens the session on its second step. Leave for now keeps your step and unfinished words in this browser; Continue planning picks up there. Marking the week planned shows what it holds.',
   today:
     'Today is for doing: what you are doing today, with what you need to do it. ' +
     '"The day" shows the day\'s hours with timed things on them and how much free time is left. ' +
