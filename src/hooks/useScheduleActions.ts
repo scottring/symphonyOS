@@ -1,4 +1,5 @@
 import { useCallback } from 'react'
+import { showToast } from '@/hooks/useToast'
 import type { Task } from '@/types/task'
 import type { FamilyMember } from '@/types/family'
 import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
@@ -118,17 +119,29 @@ export function useScheduleActions({
     }
   }, [allRoutines, viewedDate, markDone, undoDone, refreshDateInstances, pushAction])
 
-  const onSkipRoutine = useCallback(async (routineId: string) => {
+  const onSkipRoutine = useCallback(async (routineId: string): Promise<boolean> => {
     const bareId = routineId.split('#')[0]
     const routine = allRoutines.find(r => r.id === bareId)
     const routineName = routine?.name || 'Routine'
 
-    await skip('routine', routineId, viewedDate)
-    pushAction(`Skipped "${routineName}"`, async () => {
-      await undoDone('routine', routineId, viewedDate)
+    // Only THIS occurrence (the instance on the viewed day) is skipped; the
+    // routine's rule and its other occurrences are untouched. Skipped and its
+    // Undo are announced only once the write landed — a failed skip says so
+    // and leaves the row where it was (the triage contract's feedback rule).
+    const attempt = async (): Promise<boolean> => {
+      const ok = await skip('routine', routineId, viewedDate)
       refreshDateInstances()
-    })
-    refreshDateInstances()
+      if (!ok) {
+        showToast(`Couldn’t skip "${routineName}". Nothing changed.`, 'error', 8000, { label: 'Retry', onClick: () => { void attempt() } })
+        return false
+      }
+      pushAction(`Skipped "${routineName}" this time`, async () => {
+        await undoDone('routine', routineId, viewedDate)
+        refreshDateInstances()
+      })
+      return true
+    }
+    return attempt()
   }, [allRoutines, viewedDate, skip, undoDone, refreshDateInstances, pushAction])
 
   /**
@@ -143,14 +156,15 @@ export function useScheduleActions({
     const routineName = routine?.name || 'Routine'
 
     const previous = await reschedule('routine', routineId, fromDate ?? viewedDate, date)
-    // No toast and no undo when the write failed — "Rescheduled" over an
+    // No success and no undo when the write failed — "Rescheduled" over an
     // unchanged grid is worse than no feedback at all.
-    if (!previous) return
+    if (!previous) return false
     pushAction(`Rescheduled "${routineName}"`, async () => {
       await undoReschedule(previous)
       refreshDateInstances()
     })
     refreshDateInstances()
+    return true
   }, [allRoutines, viewedDate, reschedule, undoReschedule, refreshDateInstances, pushAction])
 
   /**

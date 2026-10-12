@@ -3,7 +3,8 @@ import { MoreHorizontal, Redo2, Undo2, Clock, Trash2, CalendarCog, Hourglass, Me
 import type { TimelineItem } from '@/types/timeline'
 import { useScheduleActionsContext } from '@/contexts/ScheduleActionsContext'
 import { isSameDay } from '@/lib/dateUtils'
-import { taskDayRemoval } from '@/lib/planning/planActions'
+import { triageSkipDay } from '@/lib/triage/feedback'
+import { SKIP_LABEL, moreLabel } from '@/lib/triage/contract'
 import { DiscussionPopover } from '@/components/triage'
 import { WaitingForPopover } from './WaitingForPopover'
 import { waitingUpdates, CLEAR_WAITING, checkBackLabel } from '@/lib/today/waiting'
@@ -164,7 +165,7 @@ export function ScheduleItemActionsMenu({ item, onOpenDetail, onUpdateDiscussion
                 className="flex w-full text-left items-center gap-2.5 px-3 py-2.5 text-sm text-neutral-700 hover:bg-neutral-50"
               >
                 <CalendarCog className="w-4 h-4 text-neutral-400" />
-                Edit details
+                {moreLabel('open')}
               </button>
             ) : (
               <button
@@ -218,19 +219,20 @@ export function ScheduleItemActionsMenu({ item, onOpenDetail, onUpdateDiscussion
               </button>
             )}
 
-            {/* Remove the day's commitment while retaining the period lists. */}
+            {/* Skip this day: the day's commitment goes; the period lists stay. */}
             {isTask && (item.focused || (item.originalTask?.scheduledFor && isSameDay(item.originalTask.scheduledFor, ctx.viewedDate ?? new Date()))) && ctx.onUpdateTask && item.originalTask && (
               <button
                 type="button"
                 role="menuitem"
                 onClick={run(() => {
-                  const day = ctx.viewedDate ?? new Date()
-                  void ctx.onUpdateTask?.(item.originalTask!.id, taskDayRemoval(item.originalTask!, day))
+                  // The triage contract's scoped Skip (lib/triage): only this
+                  // day goes; confirmed with Undo once it landed, or Retry.
+                  void triageSkipDay(item.originalTask!, ctx.viewedDate ?? new Date(), (id, updates) => ctx.onUpdateTask?.(id, updates))
                 })}
                 className="flex w-full text-left items-center gap-2.5 px-3 py-2.5 text-sm text-neutral-700 hover:bg-neutral-50"
               >
                 <Undo2 className="w-4 h-4 text-neutral-400" />
-                Remove from this day
+                {SKIP_LABEL['skip-day']}
               </button>
             )}
 

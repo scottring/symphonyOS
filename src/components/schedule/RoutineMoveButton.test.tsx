@@ -47,9 +47,43 @@ describe('RoutineMoveButton', () => {
     expect(onSkipRoutine).toHaveBeenCalledWith('r1')
   })
 
-  it('offers no pool targets — an occurrence has to be on a day', () => {
-    renderButton({ onMoveRoutineToDay: vi.fn() })
-    expect(screen.queryByText('Someday')).toBeNull()
-    expect(screen.queryByText('This month')).toBeNull()
+  // Updated 2026-10-12 (triage contract): the occurrence gets the same When
+  // order as a task. Pools ask for an actual day in them; Someday explains
+  // itself instead of being silently missing.
+  it('a period asks which day in it, and moves only this occurrence there', async () => {
+    const onMoveRoutineToDay = vi.fn().mockResolvedValue(true)
+    renderButton({ onMoveRoutineToDay })
+    fireEvent.click(screen.getByRole('menuitem', { name: /^This month/ }))
+    expect(onMoveRoutineToDay).not.toHaveBeenCalled()
+    // The day it is already on says so and is not a move.
+    expect(screen.getByRole('menuitem', { name: 'Thu, Oct 1 (it’s on this day)' })).toBeDisabled()
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Thu, Oct 15' }))
+    expect(onMoveRoutineToDay).toHaveBeenCalledWith('r1', new Date(2026, 9, 15))
+  })
+
+  it('Someday is shown, explained, and leads to the scoped alternative — never a silent no-op', () => {
+    const onMoveRoutineToDay = vi.fn()
+    const onOpen = vi.fn()
+    render(
+      <ScheduleActionsProvider value={{ onMoveRoutineToDay, onSkipRoutine: vi.fn() } as unknown as ScheduleActionsValue}>
+        <RoutineMoveButton item={item} onOpen={onOpen} />
+      </ScheduleActionsProvider>,
+    )
+    fireEvent.click(screen.getByRole('button', { name: 'Move or skip' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: /^Someday/ }))
+    expect(onMoveRoutineToDay).not.toHaveBeenCalled()
+    expect(screen.getByRole('note')).toHaveTextContent(/isn’t available for one time of a routine/)
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Open routine' }))
+    expect(onOpen).toHaveBeenCalled()
+  })
+
+  it('a move that did not land says so and offers Retry (no success)', async () => {
+    const onMoveRoutineToDay = vi.fn().mockResolvedValue(false)
+    const toast = await import('@/hooks/useToast')
+    const spy = vi.spyOn(toast, 'showToast')
+    renderButton({ onMoveRoutineToDay })
+    fireEvent.click(screen.getByText('Tomorrow'))
+    await vi.waitFor(() => expect(spy).toHaveBeenCalledWith(expect.stringMatching(/Didn’t move it/), 'error', expect.any(Number), expect.objectContaining({ label: 'Retry' })))
+    spy.mockRestore()
   })
 })

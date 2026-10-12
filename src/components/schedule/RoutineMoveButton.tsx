@@ -14,13 +14,17 @@ import type { TimelineItem } from '@/types/timeline'
 import { useScheduleActionsContext } from '@/contexts/ScheduleActionsContext'
 import { usePopoverFocus } from '@/hooks/usePopoverFocus'
 import type { TriageWhen } from './TriageWhenMenu'
-import { RescheduleGrid, dateForWhen } from './RescheduleGrid'
+import { RescheduleGrid } from './RescheduleGrid'
+import { WHEN_ORDER, SKIP_LABEL, SKIP_NOTE, moreLabel } from '@/lib/triage/contract'
+import { dayForWhen } from '@/lib/triage/applyWhen'
+import { showToast } from '@/hooks/useToast'
 
-/** The days a single occurrence can move to. Pool targets (this month,
- *  someday) mean no day, and an occurrence has to be on one. */
-export const ROUTINE_MOVE_WHENS: readonly TriageWhen[] = ['tomorrow', 'this-weekend', 'next-weekend', 'next-week']
+/** The Whens an occurrence is offered: the whole contract, in its order. A
+ *  period asks for a day in it; Someday and This season explain why one time
+ *  of a routine cannot go there (lib/triage/contract.ts). */
+export const ROUTINE_MOVE_WHENS: readonly TriageWhen[] = WHEN_ORDER
 
-export function RoutineMoveButton({ item }: { item: TimelineItem }) {
+export function RoutineMoveButton({ item, onOpen }: { item: TimelineItem; onOpen?: () => void }) {
   const ctx = useScheduleActionsContext()
   const [open, setOpen] = useState(false)
   const triggerRef = useRef<HTMLButtonElement>(null)
@@ -50,19 +54,43 @@ export function RoutineMoveButton({ item }: { item: TimelineItem }) {
     panel.style.visibility = 'visible'
   })
 
-  const moveTo = useCallback((when: TriageWhen, day?: Date) => {
-    const target = day ?? dateForWhen(when)
+  // Every target writes a one-day override on THIS occurrence; siblings and
+  // the routine's rule are untouched. Success (and its Undo) is announced by
+  // the writer once stored; a move that did not land says so, with Retry.
+  const failed = useCallback((retry: () => void) => {
+    showToast('Didn’t move it. Nothing changed.', 'error', 8000, { label: 'Retry', onClick: retry })
+  }, [])
+  const moveToDay = useCallback(function attempt(day: Date) {
     setOpen(false)
-    if (target) void ctx.onMoveRoutineToDay?.(routineId, target)
-  }, [ctx, routineId])
+    void (async () => {
+      const ok = await ctx.onMoveRoutineToDay?.(routineId, day)
+      if (ok === false) failed(() => attempt(day))
+    })()
+  }, [ctx, routineId, failed])
+  // Pinned to a time on one day (Tonight, a picked hour).
+  const pinAt = useCallback(function attempt(at: Date) {
+    setOpen(false)
+    void (async () => {
+      const ok = await ctx.onPushRoutine?.(routineId, at)
+      if (ok === false) failed(() => attempt(at))
+    })()
+  }, [ctx, routineId, failed])
+  const moveTo = useCallback((when: TriageWhen, day?: Date) => {
+    if (when === 'tonight' && !day) {
+      const at = dayForWhen('tonight')
+      if (at) pinAt(at)
+      return
+    }
+    const target = day ?? dayForWhen(when)
+    if (target) moveToDay(target)
+  }, [pinAt, moveToDay])
 
   // "Pick date & time…": All day is a day move (keeps the routine's own time,
   // or none); a chosen hour pins it there for that one day.
   const moveToDate = useCallback((date: Date, isAllDay: boolean) => {
-    setOpen(false)
-    if (isAllDay) void ctx.onMoveRoutineToDay?.(routineId, date)
-    else ctx.onPushRoutine?.(routineId, date)
-  }, [ctx, routineId])
+    if (isAllDay) moveToDay(date)
+    else pinAt(date)
+  }, [pinAt, moveToDay])
 
   const skip = useCallback(() => {
     setOpen(false)
@@ -100,17 +128,21 @@ export function RoutineMoveButton({ item }: { item: TimelineItem }) {
             role="dialog"
             aria-label="Move this time to"
             style={{ top: 0, left: 0, visibility: 'hidden' }}
-            className="fixed z-[100] w-80 p-2 bg-white rounded-xl border border-neutral-200 shadow-lg"
+            className="fixed z-[100] w-80 max-w-[calc(100vw-16px)] max-h-[85dvh] overflow-y-auto p-2 bg-white rounded-xl border border-neutral-200 shadow-lg"
             onClick={(e) => e.stopPropagation()}
           >
             {canMove && (
               <>
                 <div className="px-1 pb-2 text-[11px] uppercase tracking-wider text-neutral-400">Move this time to</div>
                 <RescheduleGrid
+                  entity="occurrence"
                   whens={ROUTINE_MOVE_WHENS}
                   weekendDays
+                  currentDay={ctx.viewedDate ?? new Date()}
                   onPick={moveTo}
                   onPickDate={moveToDate}
+                  // Skip this time sits right below; the routine itself opens here.
+                  alternatives={onOpen ? [{ label: moreLabel('open', { entity: 'occurrence' }), onSelect: () => { setOpen(false); onOpen() } }] : []}
                 />
               </>
             )}
@@ -122,10 +154,10 @@ export function RoutineMoveButton({ item }: { item: TimelineItem }) {
                 className={`${canMove ? 'mt-2 border-t border-neutral-100 pt-2.5' : ''} flex w-full items-center gap-2 px-2.5 py-2 rounded-lg text-sm text-neutral-600 hover:bg-neutral-50`}
               >
                 <CircleSlash className="w-4 h-4 shrink-0 text-neutral-400" />
-                Skip this time
+                {SKIP_LABEL['skip-occurrence']}
               </button>
             )}
-            <p className="px-2.5 pt-1.5 text-[11px] text-neutral-400">Only this time — the routine keeps its schedule.</p>
+            <p className="px-2.5 pt-1.5 text-[11px] text-neutral-400">{SKIP_NOTE['skip-occurrence']}</p>
           </div>
         </>,
         document.body,

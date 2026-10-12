@@ -254,13 +254,13 @@ describe('ScheduleItemActionsMenu', () => {
     })
   })
 
-  it('a TASK still offers Edit details (full panel)', () => {
+  it('a TASK still offers Open details (full panel) — the contract’s word', () => {
     const taskItem = {
       id: 'task-8', type: 'task', title: 'x', completed: false, originalTask: { id: '8', title: 'x' },
     } as unknown as TimelineItem
     const onOpenDetail = vi.fn()
     renderMenu(taskItem, {}, onOpenDetail)
-    fireEvent.click(screen.getByText('Edit details'))
+    fireEvent.click(screen.getByText('Open details'))
     expect(onOpenDetail).toHaveBeenCalled()
   })
 })
@@ -273,7 +273,7 @@ describe('ScheduleItemActionsMenu — Unfocus clears one day only', () => {
     const item = { id: 'task-t1', type: 'task', title: 'Call CVS', completed: false, focused: true, originalTask } as unknown as TimelineItem
     const onUpdateTask = vi.fn()
     renderMenu(item, { onUpdateTask, viewedDate: WED } as Partial<ScheduleActionsValue>)
-    fireEvent.click(screen.getByText('Remove from this day'))
+    fireEvent.click(screen.getByText('Skip this day'))
     expect(onUpdateTask).toHaveBeenCalledWith('t1', { focus: [{ userId: 'scott', date: MON }] })
   })
 })
@@ -285,6 +285,6 @@ it('offers removal for a dated task even without a focus flag', () => {
   const item = { id: 'task-dated', type: 'task', title: 'Dated', completed: false, focused: false, originalTask } as unknown as TimelineItem
   const onUpdateTask = vi.fn()
   renderMenu(item, { onUpdateTask, viewedDate: day })
-  fireEvent.click(screen.getByText('Remove from this day'))
+  fireEvent.click(screen.getByText('Skip this day'))
   expect(onUpdateTask).toHaveBeenCalledWith('dated', { scheduledFor: undefined, isAllDay: undefined, focus: [] })
 })

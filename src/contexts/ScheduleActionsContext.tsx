@@ -106,8 +106,10 @@ export interface ScheduleActionsValue {
 
   // Routine actions
   onCompleteRoutine?: (routineId: string, completed: boolean, completedAt?: Date) => void
-  onSkipRoutine?: (routineId: string) => void
-  onPushRoutine?: (routineId: string, date: Date, fromDate?: Date) => void
+  /** Skips ONE occurrence (the viewed day's). Resolves false when nothing was written. */
+  onSkipRoutine?: (routineId: string) => void | Promise<boolean | void>
+  /** Resolves false when nothing was written. */
+  onPushRoutine?: (routineId: string, date: Date, fromDate?: Date) => void | Promise<boolean | void>
   /** One occurrence to another DAY, keeping its time (or none) — the row's Move. */
   onMoveRoutineToDay?: (routineId: string, day: Date) => Promise<boolean>
   onUpdateRoutine?: (id: string, updates: Partial<Routine>) => void

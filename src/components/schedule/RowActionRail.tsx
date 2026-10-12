@@ -145,7 +145,7 @@ export function RowActionRail({
 
   const verb =
     isTask && !item.completed && variant !== 'minimal' ? <RescheduleButton item={item} />
-    : isRoutine && isLive ? <RoutineMoveButton item={item} />
+    : isRoutine && isLive ? <RoutineMoveButton item={item} onOpen={onSelect} />
     : isEvent && isLive && !item.allDay ? <StartMeetingButton item={item} />
     : null
 

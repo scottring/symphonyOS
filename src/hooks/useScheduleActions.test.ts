@@ -510,7 +510,19 @@ describe('useScheduleActions', () => {
       })
 
       const [message] = mocks.pushAction.mock.calls[0]
-      expect(message).toBe('Skipped "Morning walk"')
+      // Scoped wording (the triage contract): this one time, not the routine.
+      expect(message).toBe('Skipped "Morning walk" this time')
+    })
+
+    it('a skip that did not land offers no Skipped and no Undo — it says so, with Retry', async () => {
+      const skip = vi.fn().mockResolvedValue(false)
+      const { result, mocks } = renderActions({ skip } as Parameters<typeof renderActions>[0])
+      let ok: boolean | undefined
+      await act(async () => {
+        ok = await result.current.onSkipRoutine('routine-1')
+      })
+      expect(ok).toBe(false)
+      expect(mocks.pushAction).not.toHaveBeenCalled()
     })
 
     it('calls refreshDateInstances', async () => {
