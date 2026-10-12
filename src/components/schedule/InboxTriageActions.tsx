@@ -4,7 +4,7 @@
 // delete) sits behind one More menu. The row used to carry nine controls.
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react'
 import { createPortal } from 'react-dom'
-import { MoreHorizontal, CalendarRange, Leaf, NotebookPen, CalendarPlus, Trash2, type LucideIcon } from 'lucide-react'
+import { MoreHorizontal, NotebookPen, CalendarPlus, Trash2 } from 'lucide-react'
 import { usePopoverFocus } from '@/hooks/usePopoverFocus'
 import { SchedulePopover } from '@/components/triage/SchedulePopover'
 import { RescheduleGrid } from './RescheduleGrid'
@@ -13,15 +13,10 @@ import type { TriageWhen } from './TriageWhenMenu'
 import type { TaskContext } from '@/types/task'
 import type { DayLoad } from '@/lib/today/dayLoad'
 
-// The horizons the shared grid has no tile for. Everything the grid does cover
-// — today, tonight, tomorrow, both weekends, next week, this month, someday,
-// and a specific date — now comes from `RescheduleGrid`, the same icon grid the
-// reschedule button and the detail panel use, so the Inbox stops being the one
-// place that triages from a plain text list (walk finding S1-09).
-const INBOX_EXTRA_WHEN: { when: TriageWhen; label: string; icon: LucideIcon }[] = [
-  { when: 'next-month', label: 'Next month', icon: CalendarRange },
-  { when: 'this-season', label: 'This season', icon: Leaf },
-]
+// Every When — today through Someday and a specific date — comes from
+// `RescheduleGrid`, the triage contract's one When renderer, so the Inbox
+// offers the same destinations, in the same order and words, as Today, the
+// details and the Week (lib/triage/contract.ts).
 
 const AREAS: { label: string; value: TaskContext | null }[] = [
   { label: 'Work', value: 'work' },
@@ -122,17 +117,11 @@ export function InboxTriageActions({
           <p className={headingClass} aria-hidden="true">When</p>
           <div className="px-2 pb-1">
             <RescheduleGrid
+              flexibleWeekend
               onPick={(when) => { close(); onPick(when) }}
               onPickDate={(date) => { close(); onPickDate(date) }}
               loads={loads}
             />
-          </div>
-          <div className="grid grid-cols-2 gap-2 px-2 pb-1">
-            {INBOX_EXTRA_WHEN.map(({ when, label, icon: Icon }) => (
-              <button key={when} type="button" role="menuitem" data-tile="true" className={tileClass} onClick={choose(() => onPick(when))}>
-                <Icon className="h-4 w-4 shrink-0" aria-hidden="true" />{label}
-              </button>
-            ))}
           </div>
           <p className={headingClass} aria-hidden="true">Send</p>
           <div className="grid grid-cols-2 gap-2 px-2 pb-1">

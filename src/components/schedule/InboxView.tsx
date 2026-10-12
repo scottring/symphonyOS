@@ -27,7 +27,10 @@ import { focusSnapshot } from '@/lib/placement/model'
 import { InboxTriageActions } from './InboxTriageActions'
 import { useDayLoads } from '@/components/surface/hooks/useDayLoads'
 import type { TriageWhen } from './TriageWhenMenu'
-import { getBaseDate, getThisEvening, getNextWeekend, getWeekendAfterNext, getNextMonday } from '@/lib/dateHelpers'
+import { getBaseDate } from '@/lib/dateHelpers'
+import { WHEN_LABEL } from '@/lib/triage/contract'
+import { whenDetail } from '@/lib/triage/periods'
+import { dayForWhen, poolPatch } from '@/lib/triage/applyWhen'
 import { wasWritten, isStep } from '@/hooks/useGatedTaskActions'
 import type { DomainId } from '@/lib/domains'
 import { BulkAreaDialog } from './BulkAreaDialog'
@@ -55,7 +58,9 @@ const INBOX_ACTIONS: QuickAction[] = [
 type BulkWhen = 'today' | 'this-week' | 'someday'
 /** Where a move sends a row: a day/time, a period, Someday, Today (dated +
  *  chosen), or Completed. */
-type MoveTarget = Date | 'today' | 'week' | 'month' | 'quarter' | 'someday' | 'complete'
+// `{ patch }`: a pool with its period stated (next week, a weekend, next
+// month, the season) — the triage contract's placement write (lib/triage).
+type MoveTarget = Date | 'today' | 'week' | 'month' | 'quarter' | 'someday' | 'complete' | { patch: Partial<Task> }
 type Move = { task: Task; target: MoveTarget; area?: DomainId; previous: Partial<Task> }
 
 type UndoEntry = {
@@ -483,6 +488,9 @@ export function InboxView({
 
   /** Write one row's move. True = confirmed. Today also chooses it for today. */
   const writeMove = useCallback(async (task: Task, target: MoveTarget, area?: DomainId): Promise<boolean> => {
+    if (typeof target === 'object' && !(target instanceof Date)) {
+      return onUpdateTask ? wasWritten(onUpdateTask(task.id, area ? { context: area, ...target.patch } : target.patch)) : false
+    }
     const dest = target === 'today' ? getBaseDate(0) : target
     let ok: boolean
     if (dest === 'complete') {
@@ -568,25 +576,20 @@ export function InboxView({
     if (spec) moveRow(task, spec[0], spec[1])
   }, [deleteWithUndo, moveRow])
 
-  // Fan-out triage: route an inbox item to a specific WHEN.
+  // Fan-out triage: route an inbox item to a specific WHEN — the triage
+  // contract's destinations (lib/triage), resolved against the actual today,
+  // the household's week start and its seasons, and named in the receipt.
   const applyWhen = useCallback((task: Task, when: TriageWhen) => {
-    const d = new Date()
-    const specs: Record<TriageWhen, [MoveTarget, string]> = {
-      'today': ['today', 'Today'],
-      'tonight': [getThisEvening(), 'Tonight'],
-      'tomorrow': [getBaseDate(1), 'Tomorrow'],
-      'this-week': ['week', 'This Week'],
-      'next-week': [getNextMonday(), 'Next Week'],
-      'this-weekend': [getNextWeekend(), 'This Weekend'],
-      'next-weekend': [getWeekendAfterNext(), 'Next Weekend'],
-      'this-month': ['month', 'This Month'],
-      'next-month': [new Date(d.getFullYear(), d.getMonth() + 1, 1), 'Next Month'],
-      // Was offered but never handled: it wrote nothing and still offered Undo.
-      'this-season': ['quarter', 'This Season'],
-      'someday': ['someday', 'Someday'],
-    }
-    const [target, label] = specs[when]
-    moveRow(task, target, label)
+    if (when === 'today') { moveRow(task, 'today', 'Today'); return }
+    if (when === 'someday') { moveRow(task, 'someday', 'Someday'); return }
+    // The current periods: pushTask stamps the period containing now (the
+    // household's week start and seasons, via placement) and counts the defer.
+    if (when === 'this-week') { moveRow(task, 'week', 'This Week'); return }
+    if (when === 'this-month') { moveRow(task, 'month', 'This Month'); return }
+    if (when === 'this-season') { moveRow(task, 'quarter', 'This Season'); return }
+    const label = `${WHEN_LABEL[when]} · ${whenDetail(when)}`
+    const day = dayForWhen(when)
+    moveRow(task, day ?? { patch: poolPatch(when)! }, label)
   }, [moveRow])
 
   // Schedule an inbox item to a specific date/time (the "Pick date" triage path).

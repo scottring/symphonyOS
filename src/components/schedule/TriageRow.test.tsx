@@ -60,17 +60,30 @@ describe('applyTriageVerdict — "today" chooses the day', () => {
 })
 
 // Scott, 2026-09-30: the Inbox's expired rows needed this weekend / next week
-// / next weekend. Each is a day, written like "Tomorrow" — dated, not chosen.
-describe('applyTriageVerdict — the week choices land on their day', () => {
-  it('"this-weekend" dates it to the coming Saturday and does not choose it for today', async () => {
+// / next weekend. Updated 2026-10-12 for the triage contract: a task's weekend
+// is EITHER day (weekendPlacement), never a silently chosen Saturday, and next
+// week is next week's list under the household's week start — not "Monday".
+describe('applyTriageVerdict — the week choices land in their period', () => {
+  it('"this-weekend" / "next-weekend" place it on that weekend, either day, without choosing it for today', async () => {
     vi.useFakeTimers(); vi.setSystemTime(new Date(2026, 8, 30, 10, 0)) // Wed Sep 30
     const onPushTask = vi.fn(async () => true)
     const onUpdateTask = vi.fn(async () => true)
     await applyTriageVerdict(task(), 'this-weekend', { viewedDate: new Date(), onUpdateTask, onPushTask })
-    expect(onPushTask).toHaveBeenCalledWith('t1', new Date(2026, 9, 3))
-    expect(onUpdateTask).not.toHaveBeenCalled()
+    expect(onPushTask).not.toHaveBeenCalled()
+    expect(onUpdateTask).toHaveBeenLastCalledWith('t1', expect.objectContaining({ bucket: 'week', weekendStart: new Date(2026, 9, 3), scheduledFor: undefined }))
     await applyTriageVerdict(task(), 'next-weekend', { viewedDate: new Date(), onUpdateTask, onPushTask })
-    expect(onPushTask).toHaveBeenLastCalledWith('t1', new Date(2026, 9, 10))
+    expect(onUpdateTask).toHaveBeenLastCalledWith('t1', expect.objectContaining({ weekendStart: new Date(2026, 9, 10) }))
+    expect(onUpdateTask.mock.calls.some(([, u]) => 'plannedOn' in (u as object) && (u as { plannedOn?: Date }).plannedOn)).toBe(false)
+    vi.useRealTimers()
+  })
+
+  it('"next-week" is next week’s list (Saturday weeks: the Saturday after this one)', async () => {
+    vi.useFakeTimers(); vi.setSystemTime(new Date(2026, 8, 30, 10, 0)) // Wed Sep 30
+    localStorage.setItem('symphony-cadence-config', JSON.stringify({ weekStartsOn: 6 }))
+    const onUpdateTask = vi.fn(async () => true)
+    await applyTriageVerdict(task(), 'next-week', { viewedDate: new Date(), onUpdateTask, onPushTask: vi.fn() })
+    expect(onUpdateTask).toHaveBeenCalledWith('t1', { bucket: 'week', weekStart: new Date(2026, 9, 3), scheduledFor: undefined })
+    localStorage.removeItem('symphony-cadence-config')
     vi.useRealTimers()
   })
 })

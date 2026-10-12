@@ -67,7 +67,7 @@ describe('Inbox row triage', () => {
 
   it('This season from More actually moves the item (it used to write nothing)', async () => {
     const { actions } = renderInbox([capture('t1', 'Winter tires')])
-    fromMore('This season')
+    fromMore(/^This season/)
     await waitFor(() => expect(actions.onPushTask).toHaveBeenCalledWith('t1', 'quarter'))
     expect(await screen.findByText('Sent to This Season')).toBeInTheDocument()
   })

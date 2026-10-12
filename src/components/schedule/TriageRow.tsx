@@ -3,7 +3,8 @@ import { Check, MoreHorizontal, Target, Trash2 } from 'lucide-react'
 import type { Task } from '@/types/task'
 import { wasWritten } from '@/hooks/useGatedTaskActions'
 import type { PlacementFate } from '@/lib/planning/lineage'
-import { WeekChoiceChip, weekChoices, type WeekChoice } from './WeekChoiceChip'
+import { WeekChoiceChip, type WeekChoice } from './WeekChoiceChip'
+import { poolPatch } from '@/lib/triage/applyWhen'
 
 /**
  * One triage row — a task title plus one-tap fate buttons — shared by the
@@ -54,8 +55,10 @@ export async function applyTriageVerdict(t: Task, v: Verdict, h: VerdictHandlers
   } else if (v === 'week') {
     return wasWritten(h.onPushTask?.(t.id, 'week'))
   } else if (v === 'this-weekend' || v === 'next-week' || v === 'next-weekend') {
-    // A day, as the Inbox's own weekend / next-week choices write it.
-    return chooseDay(t, weekChoices().find((c) => c.when === v)!.date, h, false)
+    // The triage contract's pools (lib/triage): a weekend is either day, next
+    // week is next week's list under the household's week start — never a
+    // silently chosen Saturday or Monday.
+    return wasWritten(h.onUpdateTask(t.id, poolPatch(v)!))
   } else if (v === 'someday') {
     // Same shape RescheduleButton writes — never a partial upsert.
     return wasWritten(h.onUpdateTask(t.id, { bucket: 'someday', scheduledFor: undefined, isAllDay: undefined }))

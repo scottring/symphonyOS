@@ -14,9 +14,22 @@ describe('InboxTriageActions — one look for the whole menu', () => {
 
   it('later periods and sending are tiles, like the dates above them', () => {
     open()
-    for (const name of ['Next month', 'This season', 'To a note…', 'To calendar…']) {
+    // Next month and This season are now the shared When grid's own tiles
+    // (the triage contract), each naming where it lands.
+    for (const name of [/^Next month/, /^This season/]) {
+      expect(screen.getByRole('menuitem', { name }).closest('[data-tile]')).not.toBeNull()
+    }
+    for (const name of ['To a note…', 'To calendar…']) {
       expect(screen.getByRole('menuitem', { name }).getAttribute('data-tile')).toBe('true')
     }
+  })
+
+  it('offers the whole When group in the contract’s order, Tomorrow and Next week each named with their dates', () => {
+    open()
+    const when = screen.getAllByRole('menuitem').map((b) => b.textContent ?? '').filter((t) => /^(Today|Tonight|Tomorrow|This|Next|Someday|Pick date)/.test(t))
+    expect(when.map((t) => t.match(/^(Today|Tonight|Tomorrow|This weekend|Next weekend|This week|Next week|This month|Next month|This season|Someday|Pick date & time…)/)?.[1])).toEqual([
+      'Today', 'Tonight', 'Tomorrow', 'This week', 'Next week', 'This weekend', 'Next weekend', 'This month', 'Next month', 'This season', 'Someday', 'Pick date & time…',
+    ])
   })
 
   it('life area is one row of chips, the current one marked', () => {

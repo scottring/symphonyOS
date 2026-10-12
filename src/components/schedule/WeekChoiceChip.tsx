@@ -5,18 +5,15 @@
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react'
 import { createPortal } from 'react-dom'
 import { ChevronDown } from 'lucide-react'
-import { getNextMonday, getNextWeekend, getWeekendAfterNext } from '@/lib/dateHelpers'
+import { WHEN_LABEL } from '@/lib/triage/contract'
+import { whenDetail } from '@/lib/triage/periods'
 
 export type WeekChoice = 'this-weekend' | 'next-week' | 'next-weekend'
 
-const day = (d: Date) => d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
-
-export function weekChoices(): { when: WeekChoice; label: string; date: Date }[] {
-  return [
-    { when: 'this-weekend', label: 'This weekend', date: getNextWeekend() },
-    { when: 'next-week', label: 'Next week', date: getNextMonday() },
-    { when: 'next-weekend', label: 'Next weekend', date: getWeekendAfterNext() },
-  ]
+/** The week's other choices, in the triage contract's order and words, each
+ *  naming where it lands (the household's week start; a weekend's two days). */
+export function weekChoices(): { when: WeekChoice; label: string; detail: string }[] {
+  return (['next-week', 'this-weekend', 'next-weekend'] as const).map((when) => ({ when, label: WHEN_LABEL[when], detail: whenDetail(when) }))
 }
 
 export function WeekChoiceChip({ label, title, onThisWeek, onPick, className, caretClassName }: {
@@ -69,7 +66,7 @@ export function WeekChoiceChip({ label, title, onThisWeek, onPick, className, ca
           {weekChoices().map((c) => (
             <button key={c.when} type="button" role="menuitem" onClick={() => { setOpen(false); onPick(c.when) }}
               className="flex w-full items-baseline justify-between gap-4 px-3 py-1.5 text-left text-sm text-neutral-700 hover:bg-primary-50 hover:text-primary-700">
-              <span>{c.label}</span><span className="text-xs text-neutral-400">{day(c.date)}</span>
+              <span>{c.label}</span><span className="text-xs text-neutral-400">{c.detail}</span>
             </button>
           ))}
         </div>,
