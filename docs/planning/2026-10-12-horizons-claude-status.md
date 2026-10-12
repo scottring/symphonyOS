@@ -1,69 +1,93 @@
 # Week, Season and Year — coordinator status
 
-Coordinator: Claude background session (this worktree). Last updated 2026-10-12 17:35 ET.
+Coordinator: Claude background session (this worktree). Last updated 2026-10-12 18:05 ET.
 
-**State: Season and Year done and integrated; Week agent still running. Nothing released. Not ready for review.**
+**State: implemented, integrated, tested and visually checked. Not released.** Ready for Scott's review as a
+draft PR stacked on Month's PR #182. Production needs Scott's own approval; Month's approval does not cover it.
 
 ## Integration branch
 
-- Worktree: `.worktrees/horizon-purpose`, branch `codex/horizon-purpose`, from origin/main `06b8248d`.
-- Base: Month's final commit `75cd0323` (`codex/month-purpose`, not yet on origin/main at 17:00). It is
-  byte-identical in src/ to the 16:38 snapshot the agents started from, so the snapshot commit was dropped
-  and the integration branch rebased onto `75cd0323`. Agent branches will be rebased the same way at merge.
-- Coordinator seam (rebased SHAs `9ca3e003`, `d71eed4a`, `7e62e129`; agents started from the pre-rebase
-  equivalents `16e99ce2`, `9951089c`, `8f13013a`): `useSessionProgress` (+5 tests), ConstellationPage `boardLayout` and Season/Year regions, per-horizon stylesheets. Constellation tests 66/66, typecheck clean at `8f13013a`.
+- Worktree `.worktrees/horizon-purpose`, branch `codex/horizon-purpose` (pushed).
+- Base: Month's final commit `75cd0323` (`codex/month-purpose`, PR #182, **open, not yet on origin/main**).
+  The 16:38 Month snapshot the agents started from was byte-identical in `src/`; it was dropped and the branch
+  rebased onto `75cd0323`.
+- Draft PR (base `codex/month-purpose`, so it shows only Week/Season/Year): see "PR" below.
 
 ## Agent assignments
 
-| Horizon | Agent | Worktree | Branch |
-|---|---|---|---|
-| Week | Week agent | `.worktrees/horizon-week` | `claude/horizon-week` |
-| Season | Season agent | `.worktrees/horizon-season` | `claude/horizon-season` |
-| Year | Year agent | `.worktrees/horizon-year` | `claude/horizon-year` |
+| Horizon | Agent | Worktree | Branch / commits | Integrated as |
+|---|---|---|---|---|
+| Week | Week agent | `.worktrees/horizon-week` | `claude/horizon-week` `88385920`…`70022e45` (6) | `ca8acde5`…`e1af49bd` |
+| Season | Season agent | `.worktrees/horizon-season` | `claude/horizon-season` `c2e8c038`, `2ca3bd88` | `7f00f86f`, `059a5c80` |
+| Year | Year agent | `.worktrees/horizon-year` | `claude/horizon-year` `71097914`, `ac315e17`, `3091e377` | `ab31ca56`, `13bb0c37`, `4198e247` |
 
-All three branch from `8f13013a` (pre-rebase seam tip; same content). Agent instructions: shared rules + one horizon each (Week = Scott's exact four steps; Season = year goals as source; Year = previous year as review material).
+All three started from the coordinator seam (`useSessionProgress`, flagged Season/Year regions in the shared
+`ConstellationPage.tsx`, per-horizon stylesheets). No agent edited Month's code, `canvas-plan.css`,
+`PlanItemRow`, `ProposalRow` or Month's test file; there were no SHARED: commits and no migrations.
 
-## Shared-file ownership
+## What each horizon now does
 
-- `ConstellationPage.tsx` (shared with Month): Season and Year edit **only inside their marked regions**
-  (flag, hooks, render). Board UI goes in their own files (`SeasonBoard.tsx`, `YearBoard.tsx`).
-  Any other line in this file: coordinator only. Month's code is not edited by anyone but the Month session.
-- `ConstellationPage.test.tsx` (Month's): read-only. Season/Year put tests in their own files; if a legacy
-  Season/Year case there must change, the agent reports it and the coordinator edits.
-- `canvas-plan.css`: read-only; reuse Month's classes (`plan-month-board`, `plan-month-goals`,
-  `plan-month-source`, `plan-source`, `plan-month-list`, `plan-item-parent`, `plan-month-intro`,
-  `plan-month-next`). Horizon-specific CSS goes in `src/styles/plan-season.css` / `plan-year.css`
-  (imported in `src/main.tsx` next to canvas-plan.css; Week adds `plan-week-session.css` if needed).
-- `PlanItemRow.tsx`, `ProposalRow.tsx`, `InlineComposer.tsx`: read-only (Month's).
-- `PlanStatus.tsx` (`PlanMeetingBar`, the one session bar for every horizon): Week agent owns;
-  additive, backward-compatible changes only. Season/Year use it read-only.
-- `useSessionProgress.ts` (new, coordinator): per-person/horizon/period step, drafts, decisions;
-  this browser only. All three use it for resume.
-- `pageGuides.ts`: each agent edits only its own key (`week`, `season`, `year`).
-- `src/main.tsx`: one CSS import line per agent.
-- Kiosk/wall, Today, Home: no one touches.
+- **Week** — "Plan the week" runs Scott's four steps in order: Inbox → Last week → Monthly goals → Days & times,
+  on the shared session bar. One week list stays in place through all four (same DOM node); the source beside
+  it changes per step; step 4 puts the days (events, routines, dated tasks) beside the list. Inbox picks and
+  last-week pulls visibly join the list; carry uses existing `keepForward` (no clones, nothing automatic).
+  Both months' goals for a boundary week. "Review last week" opens step 2. The old eight-step session is gone.
+- **Season** — "What do you want to accomplish in <season>?": every season goal in one collection; the year's
+  goals are a hideable source (select highlights, never filters; add-under in one write; quiet "<year> goal"
+  label). Optional 3-step session: Look back at <previous season> (carry / done / leave, never automatic),
+  your <year> goals, write <season>. "Plan a month from these goals →".
+- **Year** — "What do you want to accomplish in <year>?": every year goal in one collection with season-goal
+  counts; last year is hideable review material, not a parent. Renew creates a **new** goal (`carriedFrom`),
+  old goal untouched; mark done is explicit and undoable. Optional 2-step session (Look back with notes,
+  Shape <year>). "Plan a season from these goals →".
+- **All** — same Month board classes and cards; one session vocabulary: "Plan <period>", "Continue planning
+  <period> · step N of M", "Plan <period> again"; sessions pause/resume per person and period in this browser
+  only (said so in the page guides); hide/show never unmounts unfinished input.
 
-## Progress
+## Coordinator integration fixes (from the cross-horizon pass)
 
-- [x] Month snapshot + seam committed
-- [~] Week agent — running
-- [x] Season agent — `claude/horizon-season` `c2e8c038`, `2ca3bd88` (28 tests); cherry-picked as `7f00f86f`, `059a5c80`
-- [x] Year agent — `claude/horizon-year` `71097914`, `ac315e17`, `3091e377` (23 + 2 tests); cherry-picked as `ab31ca56`, `13bb0c37`, `4198e247`
-- [x] Coordinator: 12 superseded Season/Year cases in Month's `ConstellationPage.test.tsx` rewritten to the approved board (`9cf69111`, `d073402d`); board imports consolidated; one session entry vocabulary for Season/Year ("Plan <period>", "Continue planning <period> · step N of M", "Plan <period> again", same primary button); Season look-back headed "Look back at <season>" like Year; Year look-back goes first on narrow screens like Season.
-- [x] Integration branch rebased onto Month's final commit `75cd0323` (17:00)
-- [ ] Integrate, cross-horizon consistency pass, desktop/phone/keyboard/reduced-motion checks
-- [ ] Full tests, lint, build; PR for review (no production release without Scott's approval)
+- Rewrote 12 Season/Year cases in Month's `ConstellationPage.test.tsx` that asserted the superseded layouts.
+- One session entry label/weight across Week, Season and Year; Season's look-back headed like Year's.
+- Narrow screens: the look-back/Inbox source comes first during those steps on all three.
+- **Bug fixed:** Week step 4's day columns were ~120px wide beside the list, wrapping event titles one letter
+  per line; the session's days now measure their own column (3 across or an agenda).
 
 ## Evidence
 
-- Visual harness (coordinator, outside the repo): Playwright + system Chrome against `vite preview` of the
-  integration build on :5210. Signs in as the demo test account, serves **fixture** tasks/goals/household
-  seasons (custom seasons "Thaw / Long days / Harvest / Hearth", Saturday weeks), and **intercepts every
-  write** (insert/update/delete/RPC never reach the database). Baseline Month shot taken 16:58 on the
-  snapshot: complete October list + Harvest source column renders with fixture data; no page errors;
-  0 writes.
+- Full suite: **8752 passed, 3 skipped**; 1 file fails to load: `connectors/src/whatsapp/adapter.test.ts`
+  (`@whiskeysockets/baileys` isn't installed in this worktree; connectors/ untouched).
+- Horizon suites (`src/components/plan`, `canvas`, `home/week`): 906 passed. New tests: Week 32, Season 28,
+  Year 25, session hook 5.
+- `tsc -p tsconfig.app.json` clean; `eslint .` 0 errors; `npm run build` succeeds.
+- Visual pass with a read-only harness (Playwright + Chrome on a `vite preview` of this branch, :5210; demo
+  test account for sign-in; **fixture** tasks/goals and custom seasons "Thaw/Long days/Harvest/Hearth" with
+  Saturday weeks; every write intercepted — no database records changed). Checked at 1440, 1280 and 390px:
+  Month unchanged; Season and Year boards, selection highlight, sessions through every step, Leave → reload →
+  "Continue planning … step 3 of 3" restores the step and a half-written goal; Week all four steps, Inbox add
+  joins the list, "Review last week" opens step 2, the Oct 31–Nov 6 week shows October and November goals,
+  resume label shows the saved step; no horizontal scroll on phones; keyboard select (Enter) / clear (Esc)
+  with a visible focus ring; reduced-motion media query active. Screenshots are local to the session, not committed.
+- Kiosk/wall, Today and Home files: not touched.
 
-## Blockers / release steps
+## Not verified / decisions for Scott
 
-- Month is committed (`75cd0323`) but not yet on origin/main; before review, rebase onto origin/main once Month ships.
-- These horizons need their own approval before production; Month's approval does not cover them.
+- No real-account or two-account privacy test (filtering is proved with mocks); no live drag-and-drop on
+  real data in Week step 4.
+- Week's columns are source 3fr / list 2fr (Month is 2fr/3fr) so the days fit in step 4 without the list moving.
+- Week plans the week on screen (it opens on the current week); planning next week means stepping forward first.
+- Year renewals copy area/context/people but not notes or strategy (the old Year page copied notes).
+- Last year's and last season's look-backs now follow the people filter like every other list (behaviour change).
+- Season's year source uses the anchor date's year (a December-start winter viewed from January shows the
+  next year's goals).
+- Removed from Week's session: "put the month goal on the week as is" and completing a month goal from Week
+  (the brief says the month goal stays as it is).
+
+## PR
+
+- Draft PR: (added after push)
+
+## Release steps remaining
+
+1. Scott reviews PR #182 (Month) and this PR.
+2. After #182 merges, retarget this PR to `main`, rebase onto origin/main, rerun tsc/tests/build.
+3. Only with Scott's explicit approval: merge to main (deploys production) and verify app.symphony-os.com.
