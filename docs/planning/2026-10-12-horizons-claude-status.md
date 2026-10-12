@@ -84,7 +84,7 @@ All three started from the coordinator seam (`useSessionProgress`, flagged Seaso
 
 ## PR
 
-- Draft PR: (added after push)
+- Draft PR: https://github.com/scottring/symphonyOS/pull/183 (base `codex/month-purpose`; retarget to `main` after #182 merges)
 
 ## Release steps remaining
 
