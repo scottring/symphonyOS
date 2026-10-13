@@ -35,8 +35,10 @@ export interface PlanItemRowProps {
   /** Quiet verbs shown when the item is open. */
   more: { label: string; onSelect: () => void }[]
   meta?: string | null
-  /** The parent one horizon up, named quietly under the row (Month). */
+  /** The parent one horizon up, named quietly under the row ("For …"). */
   parentLabel?: { kind: string; title: string }
+  /** What is already under it one horizon down, by name ("This week: …"). */
+  below?: { label: string; titles: string[] }
   /** Belongs to the parent the person selected (Month highlights, never hides). */
   related?: boolean
   /** Just linked: the parent label and its container light up together. */
@@ -74,6 +76,7 @@ export function PlanItemRow(p: PlanItemRowProps) {
       {!p.editing && <span ref={menuWrap} className="plan-item-menu">{p.actions(verbs)}</span>}
     </div>
     {p.parentLabel && <p className="plan-item-parent"><span className="plan-item-parent-kind">{p.parentLabel.kind}</span> {p.parentLabel.title}</p>}
+    {p.below && p.below.titles.length > 0 && <p className="plan-item-below"><span className="plan-item-below-kind">{p.below.label}:</span> {p.below.titles.join(' · ')}</p>}
     {p.move && moving && <MoveUnderMenu item={node} parents={p.move.parents} parentTerm={p.move.parentTerm}
       open={moving} onOpenChange={setMoving} returnFocusTo={menuWrap}
       onPick={(parent) => { setMoving(false); p.move!.onPick(parent) }} />}

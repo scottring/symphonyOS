@@ -355,3 +355,64 @@
   .plan-source .canvas-group-head { position: static; background: transparent; }
 }
 
+
+/* ---- Year, Season, Month: one plain list (2026-10-13) ----------------------
+   The period's goals as one list, drawn one way; the level above folded into
+   one line, like Week's "Still to place". No cards, no counts. */
+.plan-horizon .plan-period h1 { font-size: 34px; }
+.plan-above { max-width: 46rem; margin: 6px 0 14px; border-top: 1px solid var(--color-neutral-200); border-bottom: 1px solid var(--color-neutral-200); }
+.plan-above-line {
+  all: unset; box-sizing: border-box; cursor: pointer; display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px;
+  width: 100%; padding: 10px 2px; font-family: var(--font-family-sans);
+}
+.plan-above-line:focus-visible { outline: 2px solid var(--color-primary-600); outline-offset: 2px; border-radius: var(--radius-md); }
+.plan-above-title { font-family: var(--font-family-display); font-size: 18px; font-weight: 500; color: var(--color-neutral-900); }
+.plan-above-what { font-size: 13px; color: var(--color-neutral-500); }
+.plan-above-go { margin-left: auto; font-size: 13px; }
+/* Open, the level above sits beside the list and stays in view while the
+   list scrolls; narrow screens show it above the list (Scott, 2026-10-13). */
+.plan-horizon-body { display: grid; grid-template-columns: minmax(0, 46rem); gap: 0 48px; align-items: start; }
+.plan-above-panel { min-width: 0; margin: 0 0 14px; }
+.plan-above-panel-title { display: none; margin: 0 0 6px; font-family: var(--font-family-display); font-size: 17px; font-weight: 500; color: var(--color-neutral-900); }
+.plan-above-list { list-style: none; margin: 0; padding: 2px 2px 14px; columns: 2 16rem; column-gap: 32px; }
+.plan-above-list > li { break-inside: avoid; padding: 3px 0; font-family: var(--font-family-display); font-size: 15px; line-height: 1.3; color: var(--color-neutral-700); }
+.plan-above-none { margin: 0; padding: 2px 2px 12px; font-family: var(--font-family-display); font-style: italic; font-size: 15px; color: var(--color-neutral-600); }
+@media (min-width: 1100px) {
+  .plan-horizon-body.has-above { grid-template-columns: minmax(0, 46rem) minmax(15rem, 22rem); }
+  .plan-horizon-body.has-above > .plan-list { grid-column: 1; grid-row: 1; }
+  .plan-above-panel {
+    grid-column: 2; grid-row: 1; position: sticky; top: 12px; margin: 0;
+    max-height: calc(100vh - 160px); overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin;
+    padding: 2px 4px 8px 20px; border-left: 1px solid var(--color-neutral-200);
+  }
+  .plan-above-panel-title { display: block; }
+  .plan-above-panel .plan-above-list { columns: 1; padding: 0; }
+  .plan-above-panel .plan-above-list > li { padding: 4px 0; }
+}
+
+.plan-list { max-width: 46rem; min-width: 0; }
+.plan-goal-list > .plan-item { padding: 6px 0 8px; border-bottom: 1px solid var(--color-neutral-200); }
+.plan-goal-list > .plan-item:last-child { border-bottom: 1px solid var(--color-neutral-200); }
+.plan-goal-list .plan-item-title { font-family: var(--font-family-display); font-size: 19px; line-height: 1.3; }
+.plan-goal-list > .plan-item > .plan-item-parent, .plan-item-below { margin: 0; padding: 0 6px 0; font-size: 12.5px; line-height: 1.4; color: var(--color-neutral-600); overflow-wrap: anywhere; }
+.plan-item-below { color: var(--color-primary-700); }
+.plan-item-below-kind { font-weight: 600; }
+.plan-goal-list > .plan-item > .plan-item-parent .plan-item-parent-kind { font-size: 12.5px; font-weight: 600; letter-spacing: 0; text-transform: none; color: var(--color-neutral-600); }
+.plan-goal-list > .plan-item:has(> .canvas-item.is-proposed) { border-bottom-style: dashed; }
+.plan-list > .plan-composer { margin-top: 8px; }
+.plan-list > .plan-composer input { font-family: var(--font-family-display); font-size: 18px; }
+.plan-for { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--color-neutral-600); }
+.plan-for select {
+  max-width: min(22rem, 100%); padding: 3px 6px; border: 1px solid var(--color-neutral-300); border-radius: var(--radius-sm);
+  background: var(--color-bg-elevated); font: inherit; color: var(--color-neutral-800);
+}
+.plan-list-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 18px; margin-top: 12px; }
+.plan-list-foot > .plan-add { margin-top: 0; font-family: var(--font-family-display); font-size: 17px; font-weight: 400; color: var(--color-neutral-600); text-decoration: none; }
+.plan-list-foot > .plan-add:hover { color: var(--color-primary-700); }
+.plan-list-foot > .plan-next { margin-left: auto; }
+@media (max-width: 767px) {
+  .plan-horizon .plan-period h1 { font-size: 28px; }
+  .plan-above-list { columns: 1; }
+  .plan-above-line, .plan-list-foot > .plan-add, .plan-list-foot > .canvas-link { min-height: 44px; }
+  .plan-list-foot > .plan-next { margin-left: 0; }
+}

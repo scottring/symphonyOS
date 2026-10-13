@@ -1,4 +1,4 @@
-import {render,screen,fireEvent,waitFor,within} from '@testing-library/react'
+import {render,screen,fireEvent,waitFor,within,cleanup} from '@testing-library/react'
 import {MemoryRouter,Routes,Route,useLocation} from 'react-router-dom'
 import {afterEach,beforeEach,describe,it,expect,vi} from 'vitest'
 import {ConstellationPage} from './ConstellationPage'
@@ -25,6 +25,10 @@ vi.mock('@/lib/planning/periodPage',async(importOriginal)=>({...await importOrig
 vi.mock('@/lib/placement/model',async(importOriginal)=>({...await importOriginal<any>(),committedTo:(t:any)=>t.bucket==='week'?{}:undefined}))
 vi.mock('@/components/domain/DomainGate',()=>({useDomainGate:()=>({requireDomain:vi.fn().mockResolvedValue('personal')})}))
 
+// Year, Season and Month, one page shape (2026-10-13): the period's goals as
+// one plain list, the level above folded into one line, an optional "For"
+// while writing, and names (never counts) for what is under a goal.
+
 const GOALS=[{id:'g',name:'Together',year:2026,status:'active',context:'personal'},{id:'other',name:'Health',year:2026,status:'active',context:'personal'}]
 function Where(){const l=useLocation();return <output data-testid="where">{l.pathname+l.search}</output>}
 function open(url='/year?view=constellation&start=2026-10-09'){
@@ -33,12 +37,11 @@ function open(url='/year?view=constellation&start=2026-10-09'){
   <Route path="/week" element={<><p>Week page</p><Where/></>}/>
  </Routes></MemoryRouter>)
 }
-const season=(focus='')=>open('/season?view=constellation&horizon=1&start=2026-10-09'+focus)
-const month=(focus='')=>open('/month?view=constellation&horizon=2&start=2026-10-09'+focus)
-const group=(name:string)=>screen.getByRole('region',{name})
-const monthList=(name='October goals')=>screen.getByRole('list',{name})
-// Empty parents fold only once the period holds something.
-const showEmpty=()=>{const fold=screen.queryByRole('button',{name:/with nothing in/});if(fold)fireEvent.click(fold)}
+const season=(extra='')=>open('/season?view=constellation&horizon=1&start=2026-10-09'+extra)
+const month=(extra='')=>open('/month?view=constellation&horizon=2&start=2026-10-09'+extra)
+const list=(name:string)=>screen.getByRole('list',{name})
+const titles=(name:string)=>within(list(name)).getAllByRole('listitem').map(li=>li.querySelector('.plan-item-title')?.textContent)
+const row=(title:string)=>screen.getByText(title,{selector:'.plan-item-title'}).closest('li')!
 const lastRun=()=>activity.calls[activity.calls.length-1]
 beforeEach(()=>{
  vi.clearAllMocks();api.tasks=[];api.goals=GOALS.map(g=>({...g}));activity.calls=[];activity.proposals=[]
@@ -47,184 +50,167 @@ beforeEach(()=>{
  api.updateTask.mockResolvedValue(true);api.addTask.mockResolvedValue('new');api.addGoal.mockResolvedValue({id:'new'});api.updateGoal.mockResolvedValue(true)
 })
 
-describe('horizon stepper and URL',()=>{
- it('opens the horizon its route names, with the period and its dates',()=>{
+describe('where you are',()=>{
+ it('opens the horizon its URL names, with the period and its dates, and no horizon tabs of its own',()=>{
   month()
-  expect(screen.getByRole('button',{name:'Month'})).toHaveAttribute('aria-current','step')
   expect(screen.getByRole('heading',{level:1})).toHaveTextContent('October 2026')
   expect(screen.getByText('Oct 1 – 31')).toBeInTheDocument()
-  open('/season?view=constellation&start=2026-10-09')
+  // The top bar names the horizon now (Today · Week · Month · Season · Year).
+  expect(screen.queryByRole('navigation',{name:'Planning horizon'})).toBeNull()
+  expect(screen.queryByRole('link',{name:'Week →'})).toBeNull()
+  open('/year?view=constellation&horizon=1&start=2026-10-09')
   expect(screen.getAllByRole('heading',{level:1})[1]).toHaveTextContent('Fall 2026')
   expect(screen.getByText('Sep 1 – Nov 30')).toBeInTheDocument()
  })
- it('switches horizon in the URL, steps periods, and links on to Week',()=>{
-  open()
-  expect(screen.getByRole('button',{name:'Year'})).toHaveAttribute('aria-current','step')
-  fireEvent.click(screen.getByRole('button',{name:'Season'}))
-  expect(screen.getByTestId('where').textContent).toContain('horizon=1')
-  expect(screen.getByRole('button',{name:'Season'})).toHaveAttribute('aria-current','step')
+ it('steps periods with the arrows and offers the way back',()=>{
+  season()
   fireEvent.click(screen.getByRole('button',{name:'Next season'}))
   expect(screen.getByTestId('where').textContent).toContain('start=2026-12-01')
   expect(screen.getByRole('heading',{level:1})).toHaveTextContent('Winter')
-  expect(screen.getByRole('link',{name:'Week →'})).toHaveAttribute('href',expect.stringContaining('/week?view=alongside'))
+  fireEvent.click(screen.getByRole('button',{name:'Back to this season'}))
+  expect(screen.getByTestId('where').textContent).not.toContain('start=')
  })
  it('hands the week horizon over to the Week page',()=>{
   open('/year?view=constellation&start=2026-10-09&horizon=3&focus=3:w')
   expect(screen.getByText('Week page')).toBeInTheDocument()
   expect(screen.getByTestId('where').textContent).toMatch(/^\/week\?view=alongside&date=2026-10-09/)
  })
- it('shows a conversation-saved item in its group and refreshes on later saves',()=>{
+ it('marks a conversation-saved item and refreshes on later saves',()=>{
   api.tasks=[{id:'s',title:'Autumn outings',bucket:'quarter',goalId:'g'}]
-  open('/year?view=constellation&start=2026-10-09&horizon=1&focus=1:s')
-  const row=within(group('Under Together')).getByText('Autumn outings').closest('li')!
-  expect(within(row).getByText('Saved')).toBeInTheDocument()
-  expect(screen.getByRole('button',{name:/1 year goal with nothing in Fall/})).toBeInTheDocument()
+  season('&focus=1:s')
+  expect(within(row('Autumn outings')).getByText('Saved')).toBeInTheDocument()
   fireEvent(window,new Event('symphony-plan-updated'))
   expect(api.refetch).toHaveBeenCalledTimes(1)
  })
- it('opens a horizon-wide planning conversation and offers the next horizon',()=>{
-  api.tasks=[{id:'s',title:'Autumn outings',bucket:'quarter',goalId:'g'}]
-  season()
-  fireEvent.click(screen.getByRole('button',{name:/^Plan (this season|Fall 2026) with me$/}))
-  const message=launcher.openAssistant.mock.calls[0][0].message
-  expect(message).toContain('Fall 2026 across my year goals, one at a time')
-  // It asks; it never supplies (Scott, 2026-10-11).
-  expect(message).toContain("don't suggest season goals of your own")
-  fireEvent.click(screen.getByRole('button',{name:'Next: Month →'}))
-  expect(screen.getByRole('button',{name:'Month'})).toHaveAttribute('aria-current','step')
+ it('shows no list, and no empty-plan message, while the plans load',()=>{
+  ;(api as any).loading=true
+  try{
+   season()
+   expect(screen.getByText('Loading your plans…')).toBeInTheDocument()
+   expect(screen.queryByText(/Nothing for/)).toBeNull()
+   expect(screen.queryByRole('list',{name:'Fall goals'})).toBeNull()
+  }finally{delete (api as any).loading}
  })
 })
 
-describe('where you are, and somewhere to add (Scott, 2026-10-11)',()=>{
- beforeEach(()=>{vi.useFakeTimers({toFake:['Date']});vi.setSystemTime(new Date(2026,9,11,9))})
- afterEach(()=>{vi.useRealTimers()})
- it('Season from this year opens this season, not the one holding a remembered Jan 1',()=>{
-  open('/year?view=constellation&start=2026-01-01&horizon=0')
-  fireEvent.click(screen.getByRole('button',{name:'Season'}))
-  expect(screen.getByTestId('where').textContent).not.toContain('start=')
-  expect(screen.getByRole('heading',{level:1})).toHaveTextContent('Fall 2026')
-  expect(screen.queryByRole('button',{name:'Back to this season'})).not.toBeInTheDocument()
- })
- it('a past period keeps its place when the horizon changes',()=>{
-  open('/season?view=constellation&start=2025-09-01&horizon=1')
-  expect(screen.getByRole('heading',{level:1})).toHaveTextContent('Fall 2025')
-  fireEvent.click(screen.getByRole('button',{name:'Month'}))
-  expect(screen.getByRole('heading',{level:1})).toHaveTextContent('September 2025')
- })
- it('an empty season shows each intention ready to add under, and says nothing untrue',()=>{
+describe('one plain list',()=>{
+ it('Season lists every season goal once, linked or not, with no cards and no counts',()=>{
+  api.tasks=[{id:'a',title:'Unhurried weekends',bucket:'quarter',goalId:'g'},{id:'c',title:'Fix the gate',bucket:'quarter'},
+   {id:'m',title:'Picnic',bucket:'month',sourceId:'a'},{id:'n',title:'Leaf pile',bucket:'month',sourceId:'a'}]
   season()
-  expect(screen.queryByRole('button',{name:/with nothing in/})).not.toBeInTheDocument()
-  expect(within(group('Under Together')).getByRole('button',{name:'Add a season goal under Together'})).toBeInTheDocument()
-  expect(screen.queryByText(/Everything for Fall is under/)).not.toBeInTheDocument()
-  expect(screen.getByText('Season goals that aren’t under a year goal go here.')).toBeInTheDocument()
+  expect(titles('Fall goals')).toEqual(['Unhurried weekends','Fix the gate'])
+  expect(screen.queryAllByRole('region').filter(r=>/^Under /.test(r.getAttribute('aria-label')??''))).toHaveLength(0)
+  // Linked: what it is for, and what is under it one horizon down, by name.
+  expect(row('Unhurried weekends')).toHaveTextContent('For Together')
+  expect(row('Unhurried weekends')).toHaveTextContent('October: Picnic · Leaf pile')
+  // On its own: nothing more is said.
+  expect(row('Fix the gate').querySelector('.plan-item-parent')).toBeNull()
+  expect(row('Fix the gate').querySelector('.plan-item-below')).toBeNull()
+  expect(screen.queryByText(/\d+ month goals?/)).toBeNull()
  })
- it('with no intentions for the year, the season offers goals on their own or intentions first',()=>{
-  api.goals=[]
-  season()
-  expect(group('Fall goals')).toHaveTextContent('No year goals for 2026 yet.')
-  fireEvent.click(screen.getByRole('button',{name:'add year goals first'}))
-  expect(screen.getByRole('button',{name:'Year'})).toHaveAttribute('aria-current','step')
- })
-})
-
-describe('grouped under parent',()=>{
- it('at Year the intentions are the items, and a new one keeps its wording when the save fails',async()=>{
-  api.addGoal.mockResolvedValueOnce(null);open()
-  expect(within(group('Year goals')).getByText('Together')).toBeInTheDocument()
-  fireEvent.click(screen.getByRole('button',{name:'Add a year goal'}))
-  fireEvent.change(screen.getByLabelText('New year goal'),{target:{value:'A meaningful year'}})
-  fireEvent.click(screen.getByRole('button',{name:'Add'}))
-  await screen.findByText(/Your wording is still here/)
-  expect(screen.getByLabelText('New year goal')).toHaveValue('A meaningful year')
-  fireEvent.click(screen.getByRole('button',{name:'Add'}))
-  await waitFor(()=>expect(screen.queryByLabelText('New year goal')).not.toBeInTheDocument())
-  expect(api.addGoal).toHaveBeenLastCalledWith(null,'A meaningful year','personal',expect.objectContaining({year:2026,id:expect.any(String)}))
-  expect(lastRun().opts.ids).toEqual([api.addGoal.mock.calls[1][3].id])
- })
- it('at Season groups goals under each intention once, empty intentions calm, Unlinked last',()=>{
-  api.tasks=[{id:'a',title:'Unhurried weekends',bucket:'quarter',goalId:'g'},{id:'b',title:'Autumn outings',bucket:'quarter',goalId:'g'},{id:'c',title:'Fix the gate',bucket:'quarter'},{id:'m',title:'Picnic',bucket:'month',sourceId:'b'}]
-  season()
-  const together=group('Under Together')
-  expect(within(together).getAllByRole('listitem').map(li=>li.querySelector('.plan-item-title')?.textContent)).toEqual(['Unhurried weekends','Autumn outings'])
-  expect(within(screen.getByRole('list',{name:'Season plan'})).getAllByText('Together')).toHaveLength(1)
-  expect(within(together).getByLabelText('1 month goal below')).toHaveTextContent('1 month goal')
-  const regions=screen.getAllByRole('region').map(r=>r.getAttribute('aria-label'))
-  expect(regions).toEqual(['Under Together','Not under a year goal'])
-  expect(within(group('Not under a year goal')).getByText('Fix the gate')).toBeInTheDocument()
-  // An intention holding nothing this season folds into one line until asked for.
-  expect(screen.queryByRole('region',{name:'Under Health'})).not.toBeInTheDocument()
-  showEmpty()
-  expect(within(group('Under Health')).getByText('Nothing for Fall yet.')).toBeInTheDocument()
- })
- it('at Month lists every month goal in one collection, naming its season goal, beside the season goal cards',()=>{
-  api.tasks=[{id:'s',title:'Autumn outings',bucket:'quarter',goalId:'g'},{id:'m',title:'Picnic',bucket:'month',sourceId:'s'},{id:'x',title:'Taxes',bucket:'month'}]
+ it('Month names the season goal it is for and its tasks this week',()=>{
+  api.tasks=[{id:'s',title:'Autumn outings',bucket:'quarter',goalId:'g'},{id:'m',title:'Picnic',bucket:'month',sourceId:'s'},{id:'x',title:'Taxes',bucket:'month'},
+   {id:'w',title:'Book the shelter',bucket:'week',sourceId:'m'}]
   month()
-  const list=monthList()
-  expect(within(list).getByText('Picnic').closest('li')).toHaveTextContent('Fall goal Autumn outings')
-  expect(within(list).getByText('Taxes').closest('li')!.querySelector('.plan-item-parent')).toBeNull()
-  const outings=group('Under Autumn outings')
-  expect(within(outings).getByText('Together')).toHaveClass('plan-group-crumb')
-  expect(within(outings).getByText('1 October goal')).toBeInTheDocument()
-  // One record, one card: the season card counts it, the collection holds it.
-  expect(screen.getAllByText('Picnic')).toHaveLength(1)
+  expect(titles('October goals')).toEqual(['Picnic','Taxes'])
+  expect(row('Picnic')).toHaveTextContent('For Autumn outings')
+  expect(row('Picnic').querySelector('.plan-item-below')).toHaveTextContent(/^(This week|Week of Oct \d+): Book the shelter$/)
+  expect(row('Taxes').querySelector('.plan-item-parent')).toBeNull()
  })
- it('adds from an empty group as a linked child in one write',async()=>{
-  season();showEmpty()
-  fireEvent.click(within(group('Under Health')).getByRole('button',{name:'Add a season goal under Health'}))
-  fireEvent.change(screen.getByLabelText('New season goal under Health'),{target:{value:'Walk daily'}})
-  fireEvent.submit(screen.getByLabelText('New season goal under Health').closest('form')!)
-  await waitFor(()=>expect(api.addTask).toHaveBeenCalledTimes(1))
-  expect(api.addTask).toHaveBeenCalledWith('Walk daily',undefined,undefined,undefined,expect.objectContaining({bucket:'quarter',goalId:'other',context:'personal',seasonStart:new Date(2026,8,1)}))
- })
- it('adds a month goal from a season goal (it carries the intention) and one of its own',async()=>{
+ it('Year lists the year goals and names the season goals under them',()=>{
   api.tasks=[{id:'s',title:'Autumn outings',bucket:'quarter',goalId:'g'}]
+  open()
+  expect(titles('2026 goals')).toEqual(['Together','Health'])
+  expect(row('Together')).toHaveTextContent('Fall: Autumn outings')
+  expect(row('Health').querySelector('.plan-item-below')).toBeNull()
+ })
+ it('an empty period says so plainly',()=>{
   month()
-  fireEvent.click(screen.getByRole('button',{name:'Add an October goal under Autumn outings'}))
-  // Adding from a season goal selects it, so the new goal lights up beside it.
-  expect(screen.getByTestId('where').textContent).toContain('focus=1%3As')
-  fireEvent.change(screen.getByLabelText('New October goal under Autumn outings'),{target:{value:'Picnic'}})
-  fireEvent.click(screen.getByRole('button',{name:'Add'}))
-  await waitFor(()=>expect(api.addTask).toHaveBeenCalledWith('Picnic',undefined,undefined,undefined,expect.objectContaining({bucket:'month',sourceId:'s',goalId:'g',monthStart:new Date(2026,9,1)})))
-  await waitFor(()=>expect(screen.queryByLabelText('New October goal under Autumn outings')).not.toBeInTheDocument())
-  fireEvent.click(screen.getByRole('button',{name:'Add an October goal of its own'}))
-  fireEvent.change(screen.getByLabelText('New October goal'),{target:{value:'Taxes'}})
-  fireEvent.click(screen.getByRole('button',{name:'Add'}))
-  await waitFor(()=>expect(api.addTask).toHaveBeenLastCalledWith('Taxes',undefined,undefined,undefined,expect.not.objectContaining({sourceId:expect.anything()})))
-  expect(api.addTask).toHaveBeenLastCalledWith('Taxes',undefined,undefined,undefined,expect.objectContaining({bucket:'month',context:'personal'}))
+  expect(screen.getByText('Nothing for October yet.')).toBeInTheDocument()
+  expect(screen.queryByRole('link',{name:/^Go to/})).toBeNull()
  })
 })
 
-describe('focus',()=>{
- it('narrows to a group, folds the others in place, and Esc or Show all returns',()=>{
-  api.tasks=[{id:'a',title:'Unhurried weekends',bucket:'quarter',goalId:'g'},{id:'h',title:'Run a 10k',bucket:'quarter',goalId:'other'}]
-  season()
-  fireEvent.click(screen.getByRole('button',{name:'Focus on Together'}))
-  expect(screen.getByTestId('where').textContent).toContain('focus=0%3Ag')
-  expect(screen.getByRole('button',{name:'Focus on Together'})).toHaveAttribute('aria-pressed','true')
-  expect(screen.queryByText('Run a 10k')).not.toBeInTheDocument()
-  expect(screen.getByRole('button',{name:'Focus on Health'})).toHaveClass('is-quiet')
-  fireEvent.keyDown(window,{key:'Escape'})
-  expect(screen.getByText('Run a 10k')).toBeInTheDocument()
-  fireEvent.click(screen.getByRole('button',{name:'Focus on Health'}))
-  expect(screen.queryByText('Unhurried weekends')).not.toBeInTheDocument()
-  fireEvent.click(screen.getByRole('button',{name:'Show all · Esc'}))
-  expect(screen.getByText('Unhurried weekends')).toBeInTheDocument()
+describe('the level above, folded to one line',()=>{
+ it('Month: the season goals open in place and fold again, without writing',()=>{
+  api.tasks=[{id:'s',title:'Autumn outings',bucket:'quarter'},{id:'t',title:'Strength',bucket:'quarter'},{id:'m',title:'Picnic',bucket:'month'}]
+  month()
+  const line=screen.getByRole('button',{name:/Fall goals.*the season October serves/})
+  expect(line).toHaveAttribute('aria-expanded','false')
+  expect(screen.queryByRole('list',{name:'Fall goals'})).toBeNull()
+  fireEvent.click(line)
+  expect(within(list('Fall goals')).getAllByRole('listitem').map(li=>li.textContent)).toEqual(['Autumn outings','Strength'])
+  fireEvent.click(line)
+  expect(screen.queryByRole('list',{name:'Fall goals'})).toBeNull()
   expect(api.updateTask).not.toHaveBeenCalled()
  })
- it('on Month a grandparent focus highlights its month goals and hides nothing',()=>{
-  api.tasks=[{id:'s',title:'Autumn outings',bucket:'quarter',goalId:'g'},{id:'t',title:'Strength',bucket:'quarter',goalId:'other'},
-   {id:'m',title:'Picnic',bucket:'month',sourceId:'s'},{id:'n',title:'Lift twice a week',bucket:'month',sourceId:'t'}]
-  month('&focus=0:g')
-  expect(group('Under Autumn outings')).toBeInTheDocument()
-  expect(group('Under Strength')).toBeInTheDocument()
-  expect(within(monthList()).getByText('Picnic').closest('li')).toHaveClass('is-related')
-  expect(within(monthList()).getByText('Lift twice a week').closest('li')).not.toHaveClass('is-related')
-  expect(screen.getByRole('button',{name:'Add an October goal under Autumn outings'})).toBeEnabled()
+ it('opens beside the list, and stays open for this viewer next time',()=>{
+  api.tasks=[{id:'s',title:'Autumn outings',bucket:'quarter'},{id:'m',title:'Picnic',bucket:'month'}]
+  month()
+  fireEvent.click(screen.getByRole('button',{name:/Fall goals.*the season October serves/}))
+  expect(screen.getByRole('complementary',{name:'Fall goals'})).toContainElement(list('Fall goals'))
+  expect(localStorage.getItem('symphony.plan.aboveOpen')).toBe('1')
+  cleanup()
+  month()
+  expect(screen.getByRole('button',{name:/Fall goals.*the season October serves/})).toHaveAttribute('aria-expanded','true')
+  expect(within(list('Fall goals')).getByText('Autumn outings')).toBeInTheDocument()
+  expect(titles('October goals')).toEqual(['Picnic'])
+ })
+ it('Season: the year goals',()=>{
+  season()
+  fireEvent.click(screen.getByRole('button',{name:/2026 goals.*the year Fall serves/}))
+  expect(within(list('2026 goals')).getAllByRole('listitem').map(li=>li.textContent)).toEqual(['Together','Health'])
+ })
+ it('Year: last year, for reference, and says when nothing was written',()=>{
+  open()
+  fireEvent.click(screen.getByRole('button',{name:/2025 goals.*last year, for reference/}))
+  expect(screen.getByText('Nothing was written for 2025.')).toBeInTheDocument()
+ })
+})
+
+describe('writing a goal, with an optional For',()=>{
+ it('Month: one of its own takes the page area; one for a season goal is linked in the same write',async()=>{
+  api.tasks=[{id:'s',title:'Autumn outings',bucket:'quarter',goalId:'g'}]
+  month()
+  fireEvent.click(screen.getByRole('button',{name:'Add an October goal'}))
+  fireEvent.change(screen.getByLabelText('New October goal'),{target:{value:'Taxes'}})
+  fireEvent.click(screen.getByRole('button',{name:'Add'}))
+  await waitFor(()=>expect(api.addTask).toHaveBeenCalledTimes(1))
+  expect(api.addTask).toHaveBeenLastCalledWith('Taxes',undefined,undefined,undefined,expect.objectContaining({bucket:'month',context:'personal',monthStart:new Date(2026,9,1)}))
+  expect(api.addTask.mock.calls[0][4].sourceId).toBeUndefined()
+  await waitFor(()=>expect(screen.queryByLabelText('New October goal')).not.toBeInTheDocument())
+  fireEvent.click(screen.getByRole('button',{name:'Add an October goal'}))
+  fireEvent.change(screen.getByLabelText('For a Fall goal (optional)'),{target:{value:'1:s'}})
+  fireEvent.change(screen.getByLabelText('New October goal'),{target:{value:'Picnic'}})
+  fireEvent.click(screen.getByRole('button',{name:'Add'}))
+  await waitFor(()=>expect(api.addTask).toHaveBeenLastCalledWith('Picnic',undefined,undefined,undefined,expect.objectContaining({bucket:'month',sourceId:'s',goalId:'g'})))
+  expect(lastRun().label).toBe('Add “Picnic” for “Autumn outings”')
+ })
+ it('Season: a goal for a year goal carries it',async()=>{
+  season()
+  fireEvent.click(screen.getByRole('button',{name:'Add a Fall goal'}))
+  fireEvent.change(screen.getByLabelText('For a 2026 goal (optional)'),{target:{value:'0:other'}})
+  fireEvent.change(screen.getByLabelText('New Fall goal'),{target:{value:'Walk daily'}})
+  fireEvent.submit(screen.getByLabelText('New Fall goal').closest('form')!)
+  await waitFor(()=>expect(api.addTask).toHaveBeenCalledWith('Walk daily',undefined,undefined,undefined,expect.objectContaining({bucket:'quarter',goalId:'other',context:'personal',seasonStart:new Date(2026,8,1)})))
+ })
+ it('Year: a new goal keeps its wording when the save fails, and has no For',async()=>{
+  api.addGoal.mockResolvedValueOnce(null);open()
+  fireEvent.click(screen.getByRole('button',{name:'Add a 2026 goal'}))
+  expect(screen.queryByLabelText(/^For a/)).toBeNull()
+  fireEvent.change(screen.getByLabelText('New 2026 goal'),{target:{value:'A meaningful year'}})
+  fireEvent.click(screen.getByRole('button',{name:'Add'}))
+  await screen.findByText(/Your wording is still here/)
+  expect(screen.getByLabelText('New 2026 goal')).toHaveValue('A meaningful year')
+  fireEvent.click(screen.getByRole('button',{name:'Add'}))
+  await waitFor(()=>expect(screen.queryByLabelText('New 2026 goal')).not.toBeInTheDocument())
+  expect(api.addGoal).toHaveBeenLastCalledWith(null,'A meaningful year','personal',expect.objectContaining({year:2026,id:expect.any(String)}))
+  expect(lastRun().opts.ids).toEqual([api.addGoal.mock.calls[1][3].id])
  })
 })
 
 describe('Move under…',()=>{
- it('moves a milestone to another season goal, keeping its intention and clearing the old legacy link; Undo restores',async()=>{
+ it('moves a month goal to another season goal, keeping its year goal and clearing the old legacy link; Undo restores',async()=>{
   api.tasks=[{id:'s1',title:'Autumn outings',bucket:'quarter',goalId:'g'},{id:'s2',title:'Strength',bucket:'quarter',goalId:'other'},{id:'m',title:'Picnic',bucket:'month',sourceId:'s1',goalTaskId:'s1',goalId:'g'}]
   month()
   fireEvent.click(screen.getByRole('button',{name:'Actions for Picnic'}));fireEvent.click(screen.getByText('Move under…'))
@@ -234,10 +220,11 @@ describe('Move under…',()=>{
   await waitFor(()=>expect(api.updateTask).toHaveBeenCalledTimes(1))
   expect(api.updateTask.mock.calls[0]).toStrictEqual(['m',{sourceId:'s2',goalTaskId:undefined,goalId:'other'}])
   expect(lastRun().label).toBe('Move “Picnic” under “Strength”')
+  await waitFor(()=>expect(row('Picnic')).toHaveClass('is-linked'))
   await lastRun().opts.undo()
   expect(api.updateTask).toHaveBeenLastCalledWith('m',{sourceId:'s1',goalTaskId:'s1',goalId:'g'})
  })
- it('unlinks every field that shows the parent',async()=>{
+ it('unlinks every field that shows the parent, and the goal stays in the list',async()=>{
   api.tasks=[{id:'s1',title:'Autumn outings',bucket:'quarter'},{id:'m',title:'Picnic',bucket:'month',sourceId:'s1',supportsGoalTaskId:'s1'}]
   month()
   fireEvent.click(screen.getByRole('button',{name:'Actions for Picnic'}));fireEvent.click(screen.getByText('Move under…'))
@@ -245,8 +232,9 @@ describe('Move under…',()=>{
   await waitFor(()=>expect(api.updateTask).toHaveBeenCalledTimes(1))
   expect(api.updateTask.mock.calls[0][1]).toStrictEqual({sourceId:undefined,supportsGoalTaskId:undefined})
   expect(lastRun().label).toBe('Unlink “Picnic”')
+  expect(titles('October goals')).toEqual(['Picnic'])
  })
- it('links a season goal to an intention; a failed save offers Retry and no Undo',async()=>{
+ it('links a season goal to a year goal; a failed save offers Retry and no Undo',async()=>{
   api.tasks=[{id:'s',title:'Autumn outings',bucket:'quarter'}];api.updateTask.mockResolvedValueOnce(false)
   season()
   fireEvent.click(screen.getByRole('button',{name:'Actions for Autumn outings'}));fireEvent.click(screen.getByText('Move under…'))
@@ -257,245 +245,18 @@ describe('Move under…',()=>{
   await waitFor(()=>expect(api.updateTask).toHaveBeenCalledTimes(2))
   expect(lastRun().ok).toBe(true)
  })
- it('drag onto a group header moves the item there',async()=>{
-  api.tasks=[{id:'s1',title:'Autumn outings',bucket:'quarter'},{id:'s2',title:'Strength',bucket:'quarter'},{id:'m',title:'Picnic',bucket:'month',sourceId:'s1'}]
-  month();showEmpty()
-  const row=screen.getByText('Picnic').closest('li')!
-  fireEvent.dragStart(row,{dataTransfer:{setData:vi.fn(),effectAllowed:''}})
-  fireEvent.dragOver(group('Under Strength'))
-  fireEvent.drop(group('Under Strength'))
-  await waitFor(()=>expect(api.updateTask).toHaveBeenCalledWith('m',{sourceId:'s2'}))
- })
-})
-
-describe('two labelled parts below Year',()=>{
- const heads=()=>screen.getAllByRole('heading',{level:2}).map(h=>h.textContent)
- it('Season: the cards under a year goal first, then what is under none, each part named once',()=>{
-  api.tasks=[{id:'a',title:'Unhurried weekends',bucket:'quarter',goalId:'g'},{id:'c',title:'Fix the gate',bucket:'quarter'}]
-  season()
-  expect(heads()).toEqual(['Under a year goal','Together','Not under a year goal'])
-  expect(screen.getByText('Each card is one of your 2026 year goals.')).toBeInTheDocument()
-  expect(screen.getAllByRole('region').map(r=>r.getAttribute('aria-label'))).toEqual(['Under Together','Not under a year goal'])
-  // The loose part's own heading names it; its card does not repeat it.
-  expect(screen.getAllByText('Not under a year goal')).toHaveLength(1)
-  expect(group('Not under a year goal')).toHaveTextContent('Fix the gate')
- })
- it('has no column of year goals beside the board',()=>{
-  api.tasks=[{id:'a',title:'Unhurried weekends',bucket:'quarter',goalId:'g'}]
-  season()
-  expect(screen.queryByRole('complementary')).toBeNull()
-  expect(screen.queryByRole('button',{name:/Show year goals/})).toBeNull()
-  expect(screen.getAllByText('Together')).toHaveLength(1)
- })
- it('Month asks what this month is for, beside the season it builds from',()=>{
-  api.tasks=[{id:'s',title:'Autumn outings',bucket:'quarter',goalId:'g'},{id:'m',title:'Picnic',bucket:'month',sourceId:'s'},{id:'x',title:'Taxes',bucket:'month'}]
-  month()
-  expect(heads()).toEqual(['What do you want to accomplish in October?','Fall goals'])
-  expect(screen.getByText('Build your month from your Fall goals, and add anything else that matters.')).toBeInTheDocument()
-  expect(screen.getByRole('heading',{level:1})).toHaveTextContent('October 2026')
- })
- it('drop on a card files the item under that goal',async()=>{
-  api.tasks=[{id:'a',title:'Unhurried weekends',bucket:'quarter',goalId:'g'},{id:'s',title:'Autumn outings',bucket:'quarter'}]
-  season()
-  fireEvent.dragStart(screen.getByText('Autumn outings').closest('li')!,{dataTransfer:{setData:vi.fn(),effectAllowed:''}})
-  const target=group('Under Together')
-  expect(target).toHaveClass('is-drop-ok')
-  fireEvent.dragOver(target);fireEvent.drop(target)
-  await waitFor(()=>expect(api.updateTask).toHaveBeenCalledWith('s',{goalId:'g'}))
- })
- it('goals with nothing this season open while dragging, so they take a drop too',async()=>{
-  api.tasks=[{id:'a',title:'Unhurried weekends',bucket:'quarter',goalId:'g'},{id:'s',title:'Autumn outings',bucket:'quarter'}]
-  season()
-  expect(screen.queryByRole('region',{name:'Under Health'})).toBeNull()
-  fireEvent.dragStart(screen.getByText('Autumn outings').closest('li')!,{dataTransfer:{setData:vi.fn(),effectAllowed:''}})
-  const health=group('Under Health')
-  fireEvent.dragOver(health);fireEvent.drop(health)
-  await waitFor(()=>expect(api.updateTask).toHaveBeenCalledWith('s',{goalId:'other'}))
- })
- it('shows no board, and no empty-plan message, while the plans load',()=>{
-  ;(api as any).loading=true
-  try{
-   season()
-   expect(screen.getByText('Loading your plans…')).toBeInTheDocument()
-   expect(screen.queryByText(/yet\. Add/)).toBeNull()
-   expect(screen.queryByRole('list',{name:'Season plan'})).toBeNull()
-  }finally{delete (api as any).loading}
- })
- it('Year stays one list',()=>{
-  open()
-  expect(screen.queryByRole('heading',{name:/^Under a/})).toBeNull()
- })
- it('a season with nothing planned yet stays one list',()=>{
-  season()
-  expect(screen.queryByRole('heading',{name:'Under a year goal'})).toBeNull()
- })
-})
-
-describe('calm order',()=>{
- it('Month keeps every season goal as a card in its own order, empty ones included, with open counts',()=>{
-  api.tasks=[{id:'s1',title:'Yard',bucket:'quarter'},{id:'s2',title:'Money',bucket:'quarter'},{id:'s3',title:'Rooms',bucket:'quarter'},
-   {id:'m1',title:'Budget',bucket:'month',sourceId:'s2'},{id:'m2',title:'Trim plants',bucket:'month',sourceId:'s1'},{id:'m3',title:'Chairs',bucket:'month',sourceId:'s1'}]
-  month()
-  const cards=within(screen.getByRole('list',{name:'Fall goals'})).getAllByRole('region')
-  expect(cards.map(r=>r.getAttribute('aria-label'))).toEqual(['Under Yard','Under Money','Under Rooms'])
-  expect(cards.map(r=>r.querySelector('.plan-source-count')?.textContent)).toEqual(['2 October goals','1 October goal','Nothing for October yet'])
-  expect(screen.queryByRole('button',{name:/with nothing in/})).not.toBeInTheDocument()
-  expect(within(monthList()).getAllByRole('listitem').map(li=>li.querySelector('.plan-item-title')?.textContent)).toEqual(['Budget','Trim plants','Chairs'])
- })
- it('asks Symphony where unparented items go, and a kept suggestion links the existing item',async()=>{
-  api.tasks=[{id:'s1',title:'Yard',bucket:'quarter'},{id:'m',title:'Trim plants',bucket:'month'}]
-  activity.proposals=[{key:'k',title:'Trim the plants (model wording)',level:2,parentId:'s1',itemId:'m',state:'proposed'}]
-  month()
-  fireEvent.click(screen.getByRole('button',{name:'Suggest Fall goals for the ones on their own'}))
-  expect(launcher.openAssistant).toHaveBeenCalledWith(expect.objectContaining({message:expect.stringContaining('Which fall goal does each'),autoSend:true}))
-  // The suggestion sits in the month collection, naming the goal it would join.
-  const suggestion=within(monthList()).getByText('Belongs here?').closest('li')!
-  expect(suggestion).toHaveTextContent('Fall goal Yard')
-  fireEvent.click(within(suggestion).getByRole('button',{name:'Link Trim plants'}))
-  await waitFor(()=>expect(activity.removeProposal).toHaveBeenCalledWith('k'))
-  expect(api.updateTask).toHaveBeenCalledWith('m',{sourceId:'s1'})
-  expect(api.addTask).not.toHaveBeenCalled()
- })
-})
-
-describe('Month: what do I want to accomplish this month (2026-10-12)',()=>{
- const TASKS=()=>[{id:'s',title:'Autumn outings',bucket:'quarter',goalId:'g'},{id:'t',title:'Strength',bucket:'quarter'},
-  {id:'m',title:'Picnic',bucket:'month',sourceId:'s'},{id:'x',title:'Taxes',bucket:'month'}]
- const titles=()=>within(monthList()).getAllByRole('listitem').map(li=>li.querySelector('.plan-item-title')?.textContent)
- it('keeps every month goal in the collection with the season goals shown or hidden, without writing',()=>{
-  api.tasks=TASKS()
-  month()
-  expect(titles()).toEqual(['Picnic','Taxes'])
-  fireEvent.click(screen.getByRole('button',{name:'Hide Fall goals'}))
-  expect(screen.queryByRole('region',{name:'Under Autumn outings'})).not.toBeInTheDocument()
-  expect(screen.getByRole('button',{name:'Show Fall goals'})).toHaveAttribute('aria-expanded','false')
-  expect(titles()).toEqual(['Picnic','Taxes'])
-  expect(within(monthList()).getByText('Picnic').closest('li')).toHaveTextContent('Fall goal Autumn outings')
-  expect(localStorage.getItem('symphony.month.seasonGoalsShown')).toBe('0')
-  fireEvent.click(screen.getByRole('button',{name:'Show Fall goals'}))
-  expect(group('Under Autumn outings')).toBeInTheDocument()
-  expect(titles()).toEqual(['Picnic','Taxes'])
-  expect(api.updateTask).not.toHaveBeenCalled()
-  expect(api.addTask).not.toHaveBeenCalled()
- })
- it('remembers hidden season goals for this viewer',()=>{
-  localStorage.setItem('symphony.month.seasonGoalsShown','0')
-  api.tasks=TASKS()
-  month()
-  expect(screen.getByRole('button',{name:'Show Fall goals'})).toBeInTheDocument()
-  expect(titles()).toEqual(['Picnic','Taxes'])
- })
- it('hiding the season goals keeps a goal still being written under one',()=>{
-  api.tasks=TASKS()
-  month()
-  fireEvent.click(screen.getByRole('button',{name:'Add an October goal under Strength'}))
-  fireEvent.change(screen.getByLabelText('New October goal under Strength'),{target:{value:'Lift twice a week'}})
-  fireEvent.click(screen.getByRole('button',{name:'Hide Fall goals'}))
-  fireEvent.click(screen.getByRole('button',{name:'Show Fall goals'}))
-  expect(screen.getByLabelText('New October goal under Strength')).toHaveValue('Lift twice a week')
-  expect(api.addTask).not.toHaveBeenCalled()
- })
- it('selecting a season goal highlights and previews its month goals, hides none, and Esc clears',()=>{
-  api.tasks=TASKS()
-  month()
-  const pick=screen.getByRole('button',{name:'Autumn outings'})
-  fireEvent.click(pick)
-  expect(screen.getByTestId('where').textContent).toContain('focus=1%3As')
-  expect(pick).toHaveAttribute('aria-pressed','true')
-  expect(within(monthList()).getByText('Picnic').closest('li')).toHaveClass('is-related')
-  expect(within(monthList()).getByText('Taxes').closest('li')).not.toHaveClass('is-related')
-  expect(titles()).toEqual(['Picnic','Taxes'])
-  expect(within(screen.getByRole('list',{name:'October goals under Autumn outings'})).getByText('Picnic')).toBeInTheDocument()
-  expect(screen.getByText('Highlighting 1 October goal for Autumn outings')).toHaveAttribute('role','status')
-  fireEvent.keyDown(window,{key:'Escape'})
-  expect(screen.getByRole('button',{name:'Autumn outings'})).toHaveAttribute('aria-pressed','false')
-  expect(within(monthList()).getByText('Picnic').closest('li')).not.toHaveClass('is-related')
-  expect(api.updateTask).not.toHaveBeenCalled()
- })
- it('a goal arriving from Season’s “See its month goals” opens with its season goal selected',()=>{
-  api.tasks=TASKS()
-  month('&focus=1:s')
-  expect(screen.getByRole('button',{name:'Autumn outings'})).toHaveAttribute('aria-pressed','true')
-  expect(titles()).toEqual(['Picnic','Taxes'])
- })
- it('linking a goal by dragging names its season goal on it and lights both, without a copy',async()=>{
-  api.tasks=TASKS()
-  month()
-  fireEvent.dragStart(within(monthList()).getByText('Taxes').closest('li')!,{dataTransfer:{setData:vi.fn(),effectAllowed:''}})
-  const strength=group('Under Strength')
-  expect(strength).toHaveClass('is-drop-ok')
-  fireEvent.dragOver(strength);fireEvent.drop(strength)
-  await waitFor(()=>expect(api.updateTask).toHaveBeenCalledWith('x',{sourceId:'t'}))
-  await waitFor(()=>expect(group('Under Strength')).toHaveClass('is-linked'))
-  expect(within(monthList()).getByText('Taxes').closest('li')).toHaveClass('is-linked')
-  // The refreshed record: same goal, now with its parent named; still one card.
-  api.tasks[3]={...api.tasks[3],sourceId:'t'}
-  fireEvent.click(screen.getByRole('button',{name:'Hide Fall goals'}))
-  expect(within(monthList()).getByText('Taxes').closest('li')).toHaveTextContent('Fall goal Strength')
-  expect(titles()).toEqual(['Picnic','Taxes'])
-  expect(api.addTask).not.toHaveBeenCalled()
-  expect(lastRun().label).toBe('Move “Taxes” under “Strength”')
-  await lastRun().opts.undo()
-  expect(api.updateTask).toHaveBeenLastCalledWith('x',{sourceId:undefined})
- })
- it('unlinking keeps the goal in the collection',async()=>{
-  api.tasks=TASKS()
-  month()
-  fireEvent.click(screen.getByRole('button',{name:'Actions for Picnic'}));fireEvent.click(screen.getByText('Move under…'))
-  fireEvent.click(screen.getByRole('menuitemradio',{name:'No parent (Unlinked)'}))
-  await waitFor(()=>expect(api.updateTask).toHaveBeenCalledWith('m',{sourceId:undefined}))
-  api.tasks[2]={...api.tasks[2],sourceId:undefined}
-  fireEvent.click(screen.getByRole('button',{name:'Hide Fall goals'}))
-  expect(titles()).toEqual(['Picnic','Taxes'])
-  expect(within(monthList()).getByText('Picnic').closest('li')!.querySelector('.plan-item-parent')).toBeNull()
- })
- it('an empty month offers the season and a goal of its own, and Week only once something is planned',()=>{
-  api.goals=[]
-  month()
-  expect(screen.getByText('Nothing for October yet.')).toBeInTheDocument()
-  expect(screen.getByText(/No Fall goals yet/)).toBeInTheDocument()
-  expect(screen.queryByRole('link',{name:'Plan a week from these goals →'})).toBeNull()
-  expect(screen.getByRole('button',{name:'Add an October goal of its own'})).toBeEnabled()
-  fireEvent.click(screen.getByRole('button',{name:'Add Fall goals'}))
-  expect(screen.getByTestId('where').textContent).toContain('horizon=1')
- })
- it('goes on to plan a week from these goals, for the month on screen',()=>{
-  api.tasks=TASKS()
-  month()
-  expect(screen.getByRole('link',{name:'Plan a week from these goals →'})).toHaveAttribute('href','/week?view=alongside&date=2026-10-09')
-  fireEvent.click(screen.getByRole('button',{name:'Season'}))
-  expect(screen.getByTestId('where').textContent).toContain('horizon=1')
- })
- it('names the month and its season for the period on screen',()=>{
-  month()
-  fireEvent.click(screen.getByRole('button',{name:'Next month'}))
-  expect(screen.getByRole('heading',{name:'What do you want to accomplish in November?'})).toBeInTheDocument()
-  expect(screen.getByRole('button',{name:'Add a November goal of its own'})).toBeInTheDocument()
-  fireEvent.click(screen.getByRole('button',{name:'Next month'}))
-  expect(screen.getByRole('heading',{name:'What do you want to accomplish in December?'})).toBeInTheDocument()
-  expect(screen.getByText('Build your month from your Winter goals, and add anything else that matters.')).toBeInTheDocument()
-  expect(screen.getByRole('button',{name:'Hide Winter goals'})).toBeInTheDocument()
- })
- it('shows completed goals in the collection only when asked, with counts of open goals',()=>{
-  api.tasks=[...TASKS(),{id:'d',title:'Book the cabin',bucket:'month',sourceId:'s',completed:true}]
-  month()
-  expect(titles()).toEqual(['Picnic','Taxes'])
-  expect(within(group('Under Autumn outings')).getByText('1 October goal')).toBeInTheDocument()
-  fireEvent.click(screen.getByRole('button',{name:'Show done (1)'}))
-  expect(titles()).toEqual(['Picnic','Taxes','Book the cabin'])
-  expect(within(monthList()).getByText('Book the cabin').closest('li')).toHaveTextContent('Done')
-  expect(within(group('Under Autumn outings')).getByText('1 October goal')).toBeInTheDocument()
- })
 })
 
 describe('proposals',()=>{
- it('shows suggestions in their parent group or Unlinked, keeps through the create path, and leaves out without writing',async()=>{
+ it('shows suggestions in the list, keeps through the create path, and leaves out without writing',async()=>{
   activity.proposals=[{key:'p1',title:'Visit Mom',level:1,parentId:'g',state:'proposed',reason:'You mentioned it'},{key:'p2',title:'Garden',level:1,state:'proposed'},{key:'p3',title:'Not now',level:2,state:'proposed'}]
   season()
-  expect(within(group('Under Together')).getByText('Visit Mom').closest('.canvas-item')).toHaveClass('is-proposed')
-  expect(within(group('Not under a year goal')).getByText('Garden')).toBeInTheDocument()
+  const visit=within(list('Fall goals')).getByText('Visit Mom').closest('li')!
+  expect(visit.querySelector('.canvas-item')).toHaveClass('is-proposed')
+  expect(visit).toHaveTextContent('For Together')
+  expect(within(list('Fall goals')).getByText('Garden')).toBeInTheDocument()
   expect(screen.queryByText('Not now')).not.toBeInTheDocument()
-  expect(screen.getByRole('button',{name:'Keep all (2)'})).toBeInTheDocument()
+  expect(screen.getByRole('button',{name:'Keep all'})).toBeInTheDocument()
   fireEvent.click(screen.getByRole('button',{name:'Keep Visit Mom'}))
   await waitFor(()=>expect(activity.removeProposal).toHaveBeenCalledWith('p1'))
   expect(activity.setProposalState).toHaveBeenCalledWith('p1','saving')
@@ -503,6 +264,17 @@ describe('proposals',()=>{
   fireEvent.click(screen.getByRole('button',{name:'Leave out Garden'}))
   expect(activity.removeProposal).toHaveBeenCalledWith('p2')
   expect(api.addTask).toHaveBeenCalledTimes(1)
+ })
+ it('a kept suggested link moves the existing item, never a copy',async()=>{
+  api.tasks=[{id:'s1',title:'Yard',bucket:'quarter'},{id:'m',title:'Trim plants',bucket:'month'}]
+  activity.proposals=[{key:'k',title:'Trim the plants (model wording)',level:2,parentId:'s1',itemId:'m',state:'proposed'}]
+  month()
+  const suggestion=within(list('October goals')).getByText('Belongs here?').closest('li')!
+  expect(suggestion).toHaveTextContent('For Yard')
+  fireEvent.click(within(suggestion).getByRole('button',{name:'Link Trim plants'}))
+  await waitFor(()=>expect(activity.removeProposal).toHaveBeenCalledWith('k'))
+  expect(api.updateTask).toHaveBeenCalledWith('m',{sourceId:'s1'})
+  expect(api.addTask).not.toHaveBeenCalled()
  })
  it('marks a failed keep and offers Retry',async()=>{
   api.addTask.mockResolvedValue(undefined)
@@ -514,16 +286,16 @@ describe('proposals',()=>{
  })
 })
 
-describe('done items and triage',()=>{
- it('hides completed items by default while a finished parent keeps its open children',()=>{
+describe('done items, triage and the way on',()=>{
+ it('hides completed goals until asked, without a count',()=>{
   api.tasks=[{id:'s',title:'Finished season',bucket:'quarter',completed:true},{id:'m',title:'Still open',bucket:'month',sourceId:'s'},{id:'d',title:'Done milestone',bucket:'month',completed:true}]
   month()
-  expect(within(group('Under Finished season')).getByText('Done')).toBeInTheDocument()
-  expect(within(monthList()).getByText('Still open').closest('li')).toHaveTextContent('Fall goal Finished season')
-  expect(screen.queryByText('Done milestone')).not.toBeInTheDocument()
-  fireEvent.click(screen.getByRole('button',{name:'Show done (1)'}))
-  expect(screen.getByText('Done milestone')).toBeInTheDocument()
-  fireEvent.click(screen.getByRole('button',{name:'Hide done (1)'}))
+  expect(titles('October goals')).toEqual(['Still open'])
+  expect(row('Still open')).toHaveTextContent('For Finished season')
+  fireEvent.click(screen.getByRole('button',{name:'Show done'}))
+  expect(titles('October goals')).toEqual(['Still open','Done milestone'])
+  expect(row('Done milestone')).toHaveTextContent('Done')
+  fireEvent.click(screen.getByRole('button',{name:'Hide done'}))
   expect(screen.queryByText('Done milestone')).not.toBeInTheDocument()
  })
  it('carries forward and removes only the viewed period through the shared writers',async()=>{
@@ -538,7 +310,7 @@ describe('done items and triage',()=>{
   await waitFor(()=>expect(api.dropCommitment).toHaveBeenCalledWith('m','month',new Date(2026,9,1)))
   expect(lastRun().ok).toBe(true)
  })
- it('triages intentions through their status, with Undo restoring it',async()=>{
+ it('triages year goals through their status, with Undo restoring it',async()=>{
   open()
   fireEvent.click(screen.getByRole('button',{name:'Actions for Together'}))
   expect(screen.queryByText('Someday')).not.toBeInTheDocument()
@@ -556,23 +328,35 @@ describe('done items and triage',()=>{
   await lastRun().opts.undo()
   expect(api.updateTask).toHaveBeenLastCalledWith('m',{title:'Picnic'})
  })
+ it('goes on one horizon down, for the period on screen',()=>{
+  api.tasks=[{id:'s',title:'Autumn outings',bucket:'quarter',goalId:'g'},{id:'m',title:'Picnic',bucket:'month'}]
+  month()
+  expect(screen.getByRole('link',{name:/^Go to (this|that) week →$/})).toHaveAttribute('href','/week?view=alongside&date=2026-10-09')
+ })
+ it('Season and Year go on to the month and the season',()=>{
+  api.tasks=[{id:'s',title:'Autumn outings',bucket:'quarter',goalId:'g'}]
+  season()
+  expect(screen.getByRole('link',{name:'Go to October →'})).toHaveAttribute('href',expect.stringMatching(/^\/month\?view=constellation&horizon=2/))
+  open()
+  expect(screen.getAllByRole('link',{name:'Go to Fall →'})[0]).toHaveAttribute('href',expect.stringMatching(/^\/season\?view=constellation&horizon=1/))
+ })
 })
 
 describe('prepared to act on plan rows',()=>{
  it('marks what an item carries and summarises it, with the plan above, when opened',()=>{
   api.tasks=[{id:'s',title:'Back to school',bucket:'quarter',links:[{url:'https://supplies.test'}]},{id:'m',title:'Call Cami',bucket:'month',sourceId:'s',contactId:'cami',subtasks:[{id:'q1',title:'Pickup?'},{id:'q2',title:'Forms?',completed:true}]}]
   month()
-  const row=screen.getByText('Call Cami').closest('li')!
-  expect(within(row).getByRole('img',{name:'Has contact, steps 1 of 2'})).toBeInTheDocument()
-  fireEvent.click(within(row).getByRole('button',{name:'Call Cami'}))
-  expect(within(row).getByText('From Back to school: 1 link')).toBeInTheDocument()
+  const r=row('Call Cami')
+  expect(within(r).getByRole('img',{name:'Has contact, steps 1 of 2'})).toBeInTheDocument()
+  fireEvent.click(within(r).getByRole('button',{name:'Call Cami'}))
+  expect(within(r).getByText('From Back to school: 1 link')).toBeInTheDocument()
  })
 })
 
 describe('one conversation, at the foot (approved Season board, 2026-10-10)',()=>{
  beforeEach(()=>{vi.useFakeTimers({toFake:['Date']});vi.setSystemTime(new Date(2026,9,11,9))})
  afterEach(()=>{vi.useRealTimers()})
- it('hands its walk to the docked bar instead of showing its own, and has no masthead numeral',()=>{
+ it('hands its walk to the docked bar instead of showing its own',()=>{
   const setWalk=vi.fn()
   render(<ConversationWalkContext.Provider value={setWalk}><MemoryRouter initialEntries={['/season?view=constellation&horizon=1']}><Routes>
    <Route path="/season" element={<ConstellationPage/>}/>
@@ -580,13 +364,12 @@ describe('one conversation, at the foot (approved Season board, 2026-10-10)',()=
   expect(screen.queryByRole('button',{name:/with me$/})).not.toBeInTheDocument()
   expect(setWalk).toHaveBeenLastCalledWith({label:'Plan this season with me',message:expect.stringContaining('Fall 2026 across my year goals')})
   expect(screen.getByRole('heading',{level:1})).toHaveTextContent('Fall 2026')
-  expect(screen.queryByText(/09\s*[–—-]\s*11/)).not.toBeInTheDocument()
-  expect(screen.queryByText(/Life area for new/)).not.toBeInTheDocument()
  })
- it('names a past period in the walk and offers the way back',()=>{
+ it('without the bar, offers the walk itself, naming a past period, and asks without supplying',()=>{
   open('/season?view=constellation&horizon=1&start=2025-10-01')
-  expect(screen.getByRole('button',{name:'Plan Fall 2025 with me'})).toBeInTheDocument()
-  fireEvent.click(screen.getByRole('button',{name:'Back to this season'}))
-  expect(screen.getByTestId('where').textContent).not.toContain('start=')
+  fireEvent.click(screen.getByRole('button',{name:'Plan Fall 2025 with me'}))
+  const message=launcher.openAssistant.mock.calls[0][0].message
+  expect(message).toContain('Fall 2025 across my year goals, one at a time')
+  expect(message).toContain("don't suggest season goals of your own")
  })
 })
