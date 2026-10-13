@@ -186,3 +186,12 @@
 .kv-weekend .kv-side { border-left: 1px solid var(--kc-line) !important; padding-left: calc(var(--kc-u) * 1.6) !important; }
 .kv-weekend { bottom: calc(var(--kc-u) * 1.6); }
 .kv-block { background: color-mix(in srgb, var(--kc-surface) 70%, transparent); }
+
+/* The recipe viewer is true full screen (Scott, 2026-10-13): over the band
+   and the bar, its own close button to leave. The bar stays mounted under it,
+   so "Hey Symphony" still hears you. */
+.kiosk-canvas[data-stage="recipe"] .kc-main.is-recipe { position: fixed; inset: 0; z-index: 60; margin: 0; background: #0f172a; }
+.kiosk-canvas[data-stage="recipe"] .kc-main.is-recipe .kc-main-inner { height: 100vh; }
+.kiosk-canvas[data-stage="recipe"] .kc-top,
+.kiosk-canvas[data-stage="recipe"] .kc-bar,
+.kiosk-canvas[data-stage="recipe"] .kc-stage > :not(.kc-main) { visibility: hidden; }
