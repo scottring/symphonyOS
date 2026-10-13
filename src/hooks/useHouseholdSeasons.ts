@@ -9,7 +9,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/hooks/useAuth'
-import { sharedLoad } from '@/lib/sharedLoad'
+import { shareInFlight } from '@/lib/sharedRequest'
 import {
   DEFAULT_SEASONS, normalizeSeasons, cacheSeasons, readSeasons, SEASONS_SYNC_EVENT, type Seasons,
 } from '@/lib/cadence/seasons'
@@ -35,8 +35,8 @@ export function useHouseholdSeasons(): {
     ;(async () => {
       // RLS scopes this to the households the user belongs to; a member is in
       // one. Oldest first so a stray second row can't shadow the real one.
-      // One trip shared by the instances that ask at once (sharedLoad.ts).
-      const { data, error } = await sharedLoad(`household-seasons:${user.id}`, () => supabase
+      // One trip shared by the instances that ask at once (shareInFlight, sharedRequest.ts).
+      const { data, error } = await shareInFlight(`household-seasons:${user.id}`, () => supabase
         .from('households')
         .select('id, owner_id, seasons')
         .order('created_at', { ascending: true })

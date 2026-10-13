@@ -2,7 +2,7 @@ import { parseLocalDate } from '@/lib/dateUtils'
 import { withDayKeys } from '@/lib/recurrenceDays'
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase, getAuthUser } from '@/lib/supabase'
-import { sharedLoad } from '@/lib/sharedLoad'
+import { shareInFlight } from '@/lib/sharedRequest'
 import type { Routine, RecurrencePattern, RoutineVisibility, PrepFollowupTemplate, TargetUnit } from '@/types/actionable'
 import { matchesRecurrenceForDate, type LastCompletionMap } from '@/lib/routineUtils'
 import { scopeForDomain, memberForAuthUser } from '@/lib/scope'
@@ -219,9 +219,9 @@ export function useRoutines() {
       // Pull every completed routine instance and reduce to a map of
       // routineId → most recent date. PostgREST doesn't expose GROUP BY,
       // so we sort desc by date and take the first occurrence per routine.
-      // One trip shared by the instances that ask at once (sharedLoad.ts);
+      // One trip shared by the instances that ask at once (shareInFlight, sharedRequest.ts);
       // RLS scopes it to the signed-in session.
-      const { data, error: fetchError } = await sharedLoad('routine-last-completions', () => supabase
+      const { data, error: fetchError } = await shareInFlight('routine-last-completions', () => supabase
         .from('actionable_instances')
         .select('entity_id, date, updated_at')
         .eq('entity_type', 'routine')
@@ -256,8 +256,8 @@ export function useRoutines() {
       }
 
       // RLS policies handle household sharing - no need to filter by user_id.
-      // One trip shared by the instances that ask at once (sharedLoad.ts).
-      const { data, error: fetchError } = await sharedLoad(`routines:${user.id}`, () => supabase
+      // One trip shared by the instances that ask at once (shareInFlight, sharedRequest.ts).
+      const { data, error: fetchError } = await shareInFlight(`routines:${user.id}`, () => supabase
         .from('routines')
         .select('*')
         .order('name', { ascending: true }))

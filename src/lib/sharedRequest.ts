@@ -13,11 +13,12 @@ const inFlight = new Map<string, Promise<unknown>>()
  * arriving later must see current data. Callers each get the same resolved
  * value, so treat it as read-only or copy before mutating.
  */
-export function shareInFlight<T>(key: string, run: () => Promise<T>): Promise<T> {
+export function shareInFlight<T>(key: string, run: () => PromiseLike<T>): Promise<T> {
   const existing = inFlight.get(key)
   if (existing) return existing as Promise<T>
 
-  const started = run().finally(() => {
+  // PromiseLike: a Supabase query builder can be passed as it is.
+  const started = Promise.resolve(run()).finally(() => {
     if (inFlight.get(key) === started) inFlight.delete(key)
   })
   inFlight.set(key, started)
