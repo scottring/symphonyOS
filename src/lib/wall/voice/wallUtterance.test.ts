@@ -13,6 +13,8 @@ describe('what a sentence said to the wall means', () => {
     expect(readUtterance('We need paper towels')).toEqual({ kind: 'groceries', items: ['paper towels'] })
     expect(readUtterance("we're out of coffee")).toEqual({ kind: 'groceries', items: ['coffee'] })
     expect(groceryItems('milk, milk and Milk')).toEqual(['milk'])
+    // Heard on the wall, 2026-10-13: Whisper's "Ad" for "Add".
+    expect(readUtterance('Ad Voice test to the grocery list.')).toEqual({ kind: 'groceries', items: ['voice test'] })
   })
 
   // The old command regex read "add … to groceries" as "add what's missing";

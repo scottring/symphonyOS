@@ -173,6 +173,32 @@
 .kc-voice.is-listening { background: var(--kc-listen); color: var(--kc-listen-ink); border-color: var(--kc-listen); }
 .kc-voice.is-listening .kc-voice-t i { color: inherit; opacity: .85; }
 .kc-voice.is-listening .kc-voice-m { animation: kc-listen 1.4s ease-out infinite; }
+/* The wall listener (2026-10-13): the mic button and its light, Undo after a
+   capture, and a spoken answer's card above the bar. */
+.kc-mic { position: relative; }
+.kc-mic-dot {
+  position: absolute; top: 10px; right: 10px; width: 12px; height: 12px; border-radius: 50%;
+  background: var(--kc-muted); box-shadow: 0 0 0 3px var(--kc-surface);
+}
+.kc-mic.is-live .kc-mic-dot { background: var(--kc-done); }
+.kc-mic[aria-pressed="true"] { border-color: var(--kc-warn); color: var(--kc-warn); }
+.kc-mic[aria-pressed="true"] .kc-mic-dot { background: var(--kc-warn); }
+.kc-voice-undo {
+  flex: none; display: inline-flex; align-items: center; gap: 8px;
+  height: max(84px, calc(var(--kc-u) * 4.8)); padding: 0 calc(var(--kc-u) * 1.1);
+  font-size: calc(var(--kc-u) * 1.05); font-weight: 600;
+}
+.kc-voice-undo svg { width: calc(var(--kc-u) * 1.1); height: calc(var(--kc-u) * 1.1); }
+.kc-answer {
+  position: absolute; z-index: 15; bottom: calc(100% + 12px); left: 50%; transform: translateX(-50%);
+  width: min(calc(var(--kc-u) * 36), calc(100% - 2 * var(--kc-pad-x)));
+  padding: calc(var(--kc-u) * 1) calc(var(--kc-u) * 1.3); border-radius: 24px; border: 1px solid var(--kc-line);
+  background: var(--kc-surface); color: var(--kc-ink-strong); box-shadow: 0 18px 50px rgba(40, 30, 15, .22);
+}
+.kc-answer small { display: block; margin-bottom: 6px; font-size: calc(var(--kc-u) * .85); color: var(--kc-muted); }
+.kc-answer small::before { content: '“'; }
+.kc-answer small::after { content: '”'; }
+.kc-answer p { margin: 0; font: 500 calc(var(--kc-u) * 1.5)/1.3 var(--kc-display); }
 .kc-next {
   display: flex; flex-direction: column; justify-content: center; flex: 0 1 auto; min-width: 0; max-width: calc(var(--kc-u) * 17);
   height: max(84px, calc(var(--kc-u) * 4.8)); padding: 0 calc(var(--kc-u) * 1.2);

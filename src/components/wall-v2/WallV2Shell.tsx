@@ -78,13 +78,16 @@ import { type MomentKid } from './moments/WallMoments';
 import { KioskCanvas } from './activity/KioskCanvas';
 import { useKioskActivity } from './activity/useKioskActivity';
 import { supabaseGroceryIO } from './activity/groceryIO';
+import type { WallVoice } from './activity/KioskTellSymphony';
+import { addGroceries, addInboxTask, addScratch } from '@/lib/wall/voice/wallVoiceActions';
+import { wallSnapshot } from '@/lib/wall/voice/wallSnapshot';
 import type { KioskDinner } from './activity/KioskStages';
 import { currentStage, servesFactor, DEFAULT_BASE_SERVES } from '@/lib/wall/activity/kioskActivity';
 import { saveGroceryLines, type GroceryLine } from '@/lib/wall/activity/groceryProposal';
 import { buildBedtimeGrid } from '@/lib/wall/activity/kioskRoutines';
 import { isIngredientLine } from '@/lib/wall/activity/cookingModel';
 import { wallMoment } from '@/lib/wall/wallMoment';
-import { wallTodayRows, specialsWeek, checklistFor, afterSchoolRows } from '@/lib/wall/wallMomentsModel';
+import { wallTodayRows, specialsWeek, checklistFor, afterSchoolRows, type WallTodayRow } from '@/lib/wall/wallMomentsModel';
 import { buildMemberDayModel, type KidRow } from '@/lib/wall/kidDayModel';
 import { memberShape } from '@/lib/wall/memberPageModel';
 import { useMemberInstanceHistory } from './useMemberInstanceHistory';
@@ -826,6 +829,50 @@ export function WallV2Shell() {
     () => buildBedtimeGrid(kidModels.map(({ member, model }) => ({ member, list: checklistFor(model, 'evening') }))),
     [kidModels],
   );
+  // Sentences said to the wall (the Pi's listener, or typed into Tell
+  // Symphony): what it may save, each with Undo, and what it knows — only
+  // what this screen already shows (household layer, 2026-10-13).
+  const wallVoice: WallVoice | undefined = useMemo(() => {
+    if (!user) return undefined;
+    const nameOf = (id: string) => wallData.familyMembers.find((m) => m.id === id)?.name ?? null;
+    const asRow = (r: WallTodayRow) => ({ time: r.time, end: r.end, title: r.title, who: r.owners.map(nameOf).filter((n): n is string => !!n), past: r.past });
+    return {
+      save: async (c) => {
+        if (c.kind === 'groceries') {
+          if (!groceryList) return { said: 'There’s no family grocery list yet.' };
+          return addGroceries(groceryList.id, groceryList.title, user.id, c.items);
+        }
+        if (c.kind === 'inbox') return addInboxTask(user.id, c.text);
+        const r = await addScratch(user.id, c.text, c.kind);
+        void scratchpad.reload();
+        return r.undo ? { ...r, undo: async () => { const ok = await r.undo!(); void scratchpad.reload(); return ok; } } : r;
+      },
+      snapshot: () => {
+        const tomorrowStart = tomorrowData ? new Date(tomorrowData.date) : null;
+        tomorrowStart?.setHours(0, 0, 0, 0);
+        return wallSnapshot({
+          now: new Date(),
+          weather: liveWeather ? { temp: weatherData.temp, condition: weatherData.condition } : null,
+          today: todayRows.map(asRow),
+          tomorrow: tomorrowData && tomorrowStart ? wallTodayRows(tomorrowData.items, wallData.familyMembers, tomorrowStart).map(asRow) : undefined,
+          kids: kidModels.map(({ member, model }) => ({
+            name: member.name,
+            special: model.school?.special ?? null,
+            tomorrowSpecial: model.school?.tomorrowSpecial ?? null,
+            pickup: model.school?.pickup ?? null,
+            needed: model.needed.map((n) => ({ title: n.title, tomorrow: n.tomorrow })),
+            homework: model.homework.map((h) => ({ title: h.title, due: h.due, late: h.late })),
+            afterSchool: afterSchoolRows(model).map((r) => ({ title: r.title, time: r.timeOfDay, done: r.done })),
+          })),
+          dinnerTonight: dinnerEvent ? { title: dinner.mealName, at: dinnerStartDate ? dinnerStartDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) : null } : null,
+          dinnerTomorrow: dinnerDays.find((d) => d.dateKey === tomorrowKey)?.title ?? null,
+          comingUp: comingUpRows.map((r) => ({ dayLabel: r.dayLabel, summary: r.summary })),
+          scratchpad: scratchRows.map((r) => ({ text: r.text, kind: r.kind })),
+        });
+      },
+    };
+  }, [user, wallData.familyMembers, groceryList, scratchpad, tomorrowData, liveWeather, weatherData, todayRows, kidModels, dinnerEvent, dinner, dinnerStartDate, dinnerDays, tomorrowKey, comingUpRows, scratchRows]);
+
   const handleTick = useCallback((member: FamilyMember, row: KidRow) => {
     void (async () => {
       if (row.entityType === 'task') await updateTask(row.id, { completed: !row.done });
@@ -1003,6 +1050,7 @@ export function WallV2Shell() {
           onClaim={() => setShowWhoSheet(true)}
           onTapQuestion={() => (handoffAsk ? setShowWhoSheet(true) : setShowQuestionSheet(true))}
           flash={showFlash}
+          voice={wallVoice}
         />
       </div>
 

@@ -38,7 +38,7 @@ import { isIngredientLine, scaledLine, cookingSteps } from '@/lib/wall/activity/
 import type { KioskCommand } from '@/lib/wall/activity/kioskCommands'
 import type { KioskActivity } from './useKioskActivity'
 import { useCookingRecipe } from './useCookingRecipe'
-import { KioskTellSymphony } from './KioskTellSymphony'
+import { KioskTellSymphony, type WallVoice } from './KioskTellSymphony'
 import { KioskHome } from './KioskHome'
 import {
   BedtimeStage, CookingStage, DepartureStage, DinnerStage, GroceriesStage, HeldColumn, type KioskDinner,
@@ -97,6 +97,8 @@ export interface KioskCanvasProps {
   onTapQuestion: () => void
   /** A short confirmation on the wall's flash line. */
   flash: (msg: string) => void
+  /** Sentences said to the wall: what it can save and what it knows. */
+  voice?: WallVoice
 }
 
 export function KioskCanvas(p: KioskCanvasProps) {
@@ -350,7 +352,7 @@ export function KioskCanvas(p: KioskCanvasProps) {
           {bottomTool('Recipes', null, ChefHat, p.tools.onRecipes)}
           {bottomTool('More', null, MoreHorizontal, () => setMoreOpen((o) => !o), 'More', moreOpen)}
         </div>
-        <KioskTellSymphony onCommand={runCommand} />
+        <KioskTellSymphony onCommand={runCommand} voice={p.voice} />
         <div className="kc-next" aria-label="Next">
           <small>NEXT</small>
           {next

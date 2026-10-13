@@ -1,0 +1,22 @@
+# systemd USER service: runs in the kiosk's own session, so PipeWire (the
+# EMEET's mic and speaker) is the same one the kiosk browser uses.
+#   ~/.config/systemd/user/wall-listener.service
+#   systemctl --user enable --now wall-listener
+[Unit]
+Description=Symphony wall listener (kitchen microphone)
+After=pipewire.service wireplumber.service
+Wants=pipewire.service
+
+[Service]
+WorkingDirectory=%h/wall-listener
+Environment=WALL_QUIET_HOURS=21:00-06:30
+Environment=WALL_VOICE=%h/wall-listener/voices/en_US-lessac-medium.onnx
+ExecStart=%h/wall-listener/venv/bin/python %h/wall-listener/listener.py
+Restart=on-failure
+RestartSec=5
+# Below the kiosk browser: the wall must stay responsive while it thinks.
+Nice=5
+CPUWeight=50
+
+[Install]
+WantedBy=default.target

@@ -28,6 +28,8 @@ export function tidy(input: string): string {
     .replace(/[’]/g, "'")
     .replace(/^\s*(?:(?:hey|ok|okay|hi)[\s,]+)?symphony\b[\s,.!:-]*/i, '')
     .replace(/^\s*(?:um+|uh+|so|please)[\s,]+/i, '')
+    // Whisper often hears a leading "add" as "ad" ("Ad milk to the grocery list").
+    .replace(/^\s*ad\s+/i, 'add ')
     .replace(/\s+/g, ' ')
     .trim()
     .replace(/[.!]+$/, '')
