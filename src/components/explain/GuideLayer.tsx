@@ -91,8 +91,9 @@ export function GuideLayer() {
   }, [step, tick])
 
   if (!guide || !step) return null
-  const tour = guide.count > 1
-  const controlsHere = tour && (!guide.barHosted || guide.source !== 'chat')
+  // A tour's Back / Next and its count ride on the note itself, beside what it
+  // points at — never in the bar at the foot (Scott, 2026-10-13).
+  const controlsHere = guide.count > 1
   const last = guide.index === guide.count - 1
 
   return createPortal(<div className={`explain-layer${reduced ? ' is-still' : ''}`}>

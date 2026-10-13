@@ -32,7 +32,22 @@ export const PAGE_GUIDES: Record<string, string> = {
     'A stay across several days is one bar over those days. Days gone by are dimmed, and this week\'s weekend folds to one line once it is over. ' +
     'Under the title, "Still to place" says what is chosen for this week but has no day yet; Show opens that shelf above the days. ' +
     'On the shelf, tasks sit under the month goal they serve (e.g. an October goal); drag one onto a day, or press + to give it a day. ' +
-    'Routines to place are repeating things that need a day this week. Inbox, last week and the month\'s goals come up when you plan the week.',
+    'Routines to place are repeating things that need a day this week. ' +
+    'Plan the week, at the top, opens a planning session that goes through last week, the Inbox and the month\'s goals one step at a time.',
+  // Week's planning session (WeekV2 marks it data-explain-guide="week-plan"):
+  // the days and "Still to place" are not on screen, so the Week guide would
+  // send notes to the wrong parts (Scott, 2026-10-13).
+  'week-plan':
+    'This is Plan the week: a planning session, one step at a time. The bar at the top ("Planning week …") lists the steps; ' +
+    'the current one is marked, the line under them says what it is for, Next goes on, Back or a step\'s name goes back, and Leave for now keeps your place. ' +
+    'Last week: decide what happens to each thing left open — carry it on, mark it done, keep it for someday, or let it go. ' +
+    'Inbox: sort what was captured into this week, someday, or done. Between us: what you are waiting on and what to talk through together. ' +
+    'Can\'t move: what is on the calendar this week. Look ahead: the next three weeks, for anything that needs a start now. ' +
+    'Routines: this week\'s routines, one kind at a time. ' +
+    'Write the week: under each month goal, add the tasks you mean to do this week, or put the goal on the week as is; a goal may have none this week, and that is fine. ' +
+    'The month sits beside the list for reference, and View switches between Lists and Open journal (each month goal with this week\'s tasks for it). ' +
+    'The week: one line for what the week is for, each day\'s shape, and who carries what; Mark week … planned saves the plan. ' +
+    'Explain the step on screen, and the steps still to come only by name.',
   today:
     'Today is for doing: what you are doing today, with what you need to do it. ' +
     '"The day" shows the day\'s hours with timed things on them and how many hours are still open. ' +
@@ -49,9 +64,20 @@ export function hasPageGuide(page: string): boolean {
   return page in PAGE_GUIDES
 }
 
+// Every guide names parts a page may not be showing right now. A note about
+// "Still to place" once landed on the Planning view switch because the shelf
+// was not on screen (Scott, 2026-10-13).
+const POINT_RULE =
+  ' Point each note only at the part it is about. A part named here that is not among the targets is not on screen: leave it out, never point its note at another part.'
+
+/** A page in a different mode (Week's planning session) names its own guide. */
+function guideKey(page: string, root?: ParentNode): string {
+  const marked = (root ?? document).querySelector?.('[data-explain-guide]')?.getAttribute('data-explain-guide')
+  return marked && marked in PAGE_GUIDES ? marked : page
+}
+
 /** The snapshot for a turn, with the page's guide and what is on screen now. */
 export function explainContext(ctx: WorkspaceContext, root?: ParentNode): WorkspaceContext {
-  const guide = PAGE_GUIDES[ctx.page]
-  if (!guide || typeof document === 'undefined') return ctx
-  return { ...ctx, guide, targets: collectTargets(root) }
+  if (!PAGE_GUIDES[ctx.page] || typeof document === 'undefined') return ctx
+  return { ...ctx, guide: PAGE_GUIDES[guideKey(ctx.page, root)] + POINT_RULE, targets: collectTargets(root) }
 }

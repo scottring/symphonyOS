@@ -40,8 +40,6 @@
 .explain-note button:focus-visible { outline: 2px solid var(--color-primary-600); outline-offset: 2px; }
 
 /* The bar's tour line: where you are, Back, Next or Done, Close. */
-.canvas-tour { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; font-size: 13px; color: var(--color-neutral-600); }
-.canvas-tour-count { font-weight: 600; color: hsl(30 70% 38%); font-variant-numeric: tabular-nums; }
 .canvas-explain { white-space: nowrap; }
 
 .explain-layer.is-still .explain-arrow.is-drag { animation: none; }

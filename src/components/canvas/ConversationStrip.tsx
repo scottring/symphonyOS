@@ -17,7 +17,6 @@ import type { ConversationWalk } from './conversationWalk'
 import { useCanvasActivity, type CanvasReceipt } from '@/contexts/CanvasActivityContext'
 import { useSelectionOptional } from '@/shell/providers/SelectionProvider'
 import { DictationMicButton } from '@/components/common/DictationMicButton'
-import { usePageGuide } from '@/components/explain/GuideProvider'
 
 export interface StripVoice {
   /** Live two-way voice is available to this account. */
@@ -105,16 +104,7 @@ function DockedTranscript({ messages, busy, voice }: { messages: ChatMessageType
 export function ConversationStrip({ onSend, busy, voice, onOpenConversation, onReviewProposals, placeholder = 'Tell Symphony, or ask…', compact = false, receiptOnly = false, docked = false, messages, walk, explain, right = 0 }: Props) {
   const { receipt, undo, retry, dismiss, proposals } = useCanvasActivity()
   const selection = useSelectionOptional()
-  const guide = usePageGuide()
   const [draft, setDraft] = useState('')
-  // Docked, the bar carries a tour's Back / Next / Close (the note does elsewhere).
-  const setBarHosted = guide?.setBarHosted
-  useEffect(() => {
-    if (!docked || receiptOnly || !setBarHosted) return
-    setBarHosted(true)
-    return () => setBarHosted(false)
-  }, [docked, receiptOnly, setBarHosted])
-  const touring = docked && !!guide && guide.count > 1 && guide.source === 'chat'
 
   const submit = (e: FormEvent) => {
     e.preventDefault()
@@ -163,15 +153,6 @@ export function ConversationStrip({ onSend, busy, voice, onOpenConversation, onR
           <span className="canvas-state is-proposed">Suggested</span>
           <span>{pending === 1 ? '1 suggestion from Symphony' : `${pending} suggestions from Symphony`}. Nothing is saved until you keep it.</span>
           {onReviewProposals && <button type="button" className="canvas-link" onClick={onReviewProposals}>Review</button>}
-        </div>
-      )}
-      {touring && guide && (
-        <div className="canvas-tour" aria-label="Showing you this page">
-          <span className="canvas-tour-count">{guide.index + 1} of {guide.count}</span>
-          <span>Showing you this page</span>
-          <button type="button" className="canvas-link" disabled={guide.index === 0} onClick={guide.back}>Back</button>
-          <button type="button" className="canvas-link" onClick={guide.next}>{guide.index === guide.count - 1 ? 'Done' : 'Next'}</button>
-          {guide.index < guide.count - 1 && <button type="button" className="canvas-link" onClick={guide.close}>Close</button>}
         </div>
       )}
       {receiptOnly ? (

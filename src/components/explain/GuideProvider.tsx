@@ -2,8 +2,8 @@
 //
 // "Show me this page": the shell's one guide. The conversation (typed or
 // Talk) asks the page to show something (showSignal); this holds what is
-// shown and where in a tour you are. GuideLayer draws it over the page; the
-// docked conversation bar carries Back / Next / Close where there is one.
+// shown and where in a tour you are. GuideLayer draws it over the page, and
+// its note carries the tour's Back / Next / Close (2026-10-13: not the bar).
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { useLocation } from 'react-router-dom'
@@ -18,9 +18,6 @@ export interface GuideState {
   next: () => void
   back: () => void
   close: () => void
-  /** The docked bar shows the tour's controls; without one the note does. */
-  barHosted: boolean
-  setBarHosted: (hosted: boolean) => void
 }
 
 const GuideContext = createContext<GuideState | null>(null)
@@ -31,7 +28,6 @@ export function usePageGuide(): GuideState | null {
 
 export function PageGuideProvider({ children }: { children: ReactNode }) {
   const [shown, setShown] = useState<{ steps: ShowStep[]; index: number; source: ShowSource } | null>(null)
-  const [barHosted, setBarHosted] = useState(false)
   const { pathname } = useLocation()
 
   useEffect(() => onShowRequest((steps, source) => setShown({ steps, index: 0, source })), [])
@@ -62,8 +58,8 @@ export function PageGuideProvider({ children }: { children: ReactNode }) {
     index: shown?.index ?? 0,
     count: shown?.steps.length ?? 0,
     source: shown?.source ?? null,
-    next, back, close, barHosted, setBarHosted,
-  }), [shown, next, back, close, barHosted])
+    next, back, close,
+  }), [shown, next, back, close])
 
   return <GuideContext.Provider value={value}>{children}</GuideContext.Provider>
 }

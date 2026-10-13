@@ -506,7 +506,7 @@ export function WeekV2({ tasks, weekStart, meId, isCurrent, days, renderDays, on
   )
 
   return (
-    <div className="pv2-week" data-week={localYmd(weekStart)}>
+    <div className="pv2-week" data-week={localYmd(weekStart)} data-explain-guide={meeting ? 'week-plan' : undefined}>
       {meeting ? (
         <PlanMeetingBar period={`week ${weekNo}`} prevName="last week" step={meeting.step === 'lookback' ? 1 : 2} lookBack={meeting.candidateIds.length > 0}
           steps={WEEK_STEPS.filter((st) => st.key !== 'lookback' || meeting.candidateIds.length > 0)}
