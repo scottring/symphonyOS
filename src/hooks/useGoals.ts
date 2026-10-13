@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/hooks/useAuth'
+import { shareInFlight } from '@/lib/sharedRequest'
 import { scopeForDomain, memberForAuthUser, type Scope } from '@/lib/scope'
 import { useFamilyMembers } from '@/hooks/useFamilyMembers'
 import type {
@@ -91,11 +92,8 @@ type GoalsLoad = { areas: GoalArea[]; goals: Goal[]; actions: GoalAction[]; mile
 // queries, 32 requests racing the rest of startup. Keyed by the refresh round
 // too, so a "plan updated" refresh never joins a load from before the write.
 // No cache: a load that has finished is never reused, so writes behave as before.
-let goalsInFlight: { key: string; promise: Promise<GoalsLoad> } | null = null
-
 function loadGoals(key: string): Promise<GoalsLoad> {
-  if (goalsInFlight?.key === key) return goalsInFlight.promise
-  const promise = (async (): Promise<GoalsLoad> => {
+  return shareInFlight(`goals:${key}`, async (): Promise<GoalsLoad> => {
     const [areasRes, goalsRes, actionsRes, milestonesRes] = await Promise.all([
       supabase.from('goal_areas').select('*').order('sort_order'),
       supabase.from('goals').select('*').order('sort_order'),
@@ -116,11 +114,7 @@ function loadGoals(key: string): Promise<GoalsLoad> {
     const milestones = mappedMilestones.filter(m => goalIds.has(m.goalId))
     const goals = (goalsRes.data as DbGoal[]).map(db => dbGoalToGoal(db, actions, milestones))
     return { areas, goals, actions, milestones }
-  })()
-  goalsInFlight = { key, promise }
-  const clear = () => { if (goalsInFlight?.promise === promise) goalsInFlight = null }
-  promise.then(clear, clear)
-  return promise
+  })
 }
 
 // Every year's goals, not just this one. The year page plans NEXT year and

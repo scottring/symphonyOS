@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
 import { showToast } from '@/hooks/useToast'
 import { useAuth } from '@/hooks/useAuth'
-import { sharedLoad } from '@/lib/sharedLoad'
+import { shareInFlight } from '@/lib/sharedRequest'
 import type { Contact, ContactCategory } from '@/types/contact'
 
 interface DbContact {
@@ -60,8 +60,8 @@ export function useContacts() {
       setError(null)
 
       // RLS policies handle household sharing - no need to filter by user_id.
-      // One trip shared by the instances that ask at once (sharedLoad.ts).
-      const { data, error: fetchError } = await sharedLoad(`contacts:${user.id}`, () => supabase
+      // One trip shared by the instances that ask at once (shareInFlight, sharedRequest.ts).
+      const { data, error: fetchError } = await shareInFlight(`contacts:${user.id}`, () => supabase
         .from('contacts')
         .select('*')
         .order('name', { ascending: true }))
