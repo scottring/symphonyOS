@@ -86,9 +86,25 @@ describe('targets on the page', () => {
     page()
     const base = { page: 'season', date: '2026-10-12', layers: [], selectedId: null, items: [], truncated: false }
     const ctx = explainContext(base)
-    expect(ctx.guide).toBe(PAGE_GUIDES.season)
+    expect(ctx.guide?.startsWith(PAGE_GUIDES.season)).toBe(true)
     expect(ctx.targets?.map((t) => t.id)).toContain('period')
     expect(explainContext({ ...base, page: 'inbox' })).toEqual({ ...base, page: 'inbox' })
+  })
+  // Scott, 2026-10-13: in Week's planning session a "Still to place" note
+  // pointed at the Planning view switch — the shelf was not on screen and the
+  // Week guide described it anyway.
+  it('a page in its planning session sends that guide, and every guide says not to point a note at another part', () => {
+    document.body.innerHTML = '<div data-explain-root><div class="pv2-week" data-explain-guide="week-plan"><div role="region" aria-label="Planning week 42">bar</div></div></div>'
+    const base = { page: 'week', date: '2026-10-13', layers: [], selectedId: null, items: [], truncated: false }
+    const ctx = explainContext(base)
+    expect(ctx.guide?.startsWith(PAGE_GUIDES['week-plan'])).toBe(true)
+    expect(ctx.guide).not.toContain('Still to place')
+    expect(ctx.guide).toContain('never point its note at another part')
+    document.body.innerHTML = '<div data-explain-root><div class="pv2-week"></div></div>'
+    expect(explainContext(base).guide?.startsWith(PAGE_GUIDES.week)).toBe(true)
+    // A marker naming no guide falls back to the page's own.
+    document.body.innerHTML = '<div data-explain-root><div data-explain-guide="nope"></div></div>'
+    expect(explainContext(base).guide?.startsWith(PAGE_GUIDES.week)).toBe(true)
   })
 })
 

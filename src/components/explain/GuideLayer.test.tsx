@@ -41,21 +41,21 @@ beforeAll(() => {
 afterAll(() => { Element.prototype.getBoundingClientRect = realRect })
 
 describe('show me this page', () => {
-  it('walks a tour from the bar: count, Back, Next, a single Done at the end', () => {
+  // Scott, 2026-10-13: the tour's controls belong on the note beside what it
+  // points at, not in the bar at the foot of the screen — docked bar or not.
+  it('walks a tour from the note: count, Back, Next, Done at the end; nothing in the bar', () => {
     render(<Page />)
     act(() => requestShow(TOUR, 'chat'))
-    const bar = screen.getByLabelText('Showing you this page')
-    expect(within(bar).getByText('1 of 3')).toBeInTheDocument()
+    const note = () => screen.getByRole('status')
+    expect(within(note()).getByText('1 of 3')).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Fall 2026' })).toBeInTheDocument()
-    expect(within(bar).getByRole('button', { name: 'Back' })).toBeDisabled()
-    expect(within(bar).getByRole('button', { name: 'Close' })).toBeInTheDocument()
-    fireEvent.click(within(bar).getByRole('button', { name: 'Next' }))
+    expect(within(note()).getByRole('button', { name: 'Back' })).toBeDisabled()
+    expect(within(note()).getByRole('button', { name: 'Close' })).toBeInTheDocument()
+    expect(document.querySelector('.canvas-strip')?.textContent).not.toMatch(/1 of 3|Showing you this page/)
+    fireEvent.click(within(note()).getByRole('button', { name: 'Next' }))
     expect(screen.getByRole('heading', { name: '2 not under a year goal' })).toBeInTheDocument()
-    fireEvent.click(within(bar).getByRole('button', { name: 'Next' }))
-    // The last step: one Done, no Close beside it.
-    expect(within(bar).getAllByRole('button', { name: /Done|Close/ }).map((b) => b.textContent)).toEqual(['Done'])
-    fireEvent.click(within(bar).getByRole('button', { name: 'Done' }))
-    expect(screen.queryByLabelText('Showing you this page')).toBeNull()
+    fireEvent.click(within(note()).getByRole('button', { name: 'Next' }))
+    fireEvent.click(within(note()).getByRole('button', { name: 'Done' }))
     expect(screen.queryByRole('status')).toBeNull()
   })
 
@@ -71,7 +71,7 @@ describe('show me this page', () => {
   it('a single point has no tour controls and clears on Esc or a click on the page', () => {
     render(<Page />)
     act(() => requestShow([TOUR[0]], 'chat'))
-    expect(screen.queryByLabelText('Showing you this page')).toBeNull()
+    expect(within(screen.getByRole('status')).queryByRole('button', { name: 'Next' })).toBeNull()
     expect(screen.getByText('A brainstorm list for this season.')).toBeInTheDocument()
     fireEvent.keyDown(window, { key: 'Escape' })
     expect(screen.queryByText('A brainstorm list for this season.')).toBeNull()
