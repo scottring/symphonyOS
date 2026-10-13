@@ -678,3 +678,35 @@ describe('useAuth', () => {
     })
   })
 })
+
+// Prod, 2026-10-13: every useAuth instance set a NEW user object twice at
+// startup (the auth event, then getSession) for the same unchanged user, so
+// every loader keyed on `user` fetched twice per instance. An unchanged user
+// keeps its object; a real change still replaces it.
+describe('useAuth: the same unchanged user keeps its object', () => {
+  const emit = (event: string, session: ReturnType<typeof createMockSession> | null) => authStateCallback?.(event, session)
+  beforeEach(() => {
+    mockGetSession = () => Promise.resolve({ data: { session: mockSession }, error: null })
+  })
+
+  it('a fresh copy of the same user is not a new user', async () => {
+    mockSession = createMockSession({ user: createMockUser({ email: 'scott@example.com' }) })
+    const { result } = renderHook(() => useAuth())
+    await waitFor(() => expect(result.current.user).not.toBeNull())
+    const first = result.current.user
+    act(() => emit('TOKEN_REFRESHED', createMockSession({ user: createMockUser({ email: 'scott@example.com' }) })))
+    expect(result.current.user).toBe(first)
+  })
+
+  it('a changed user replaces it, and signing out clears it', async () => {
+    mockSession = createMockSession({ user: createMockUser({ email: 'scott@example.com' }) })
+    const { result } = renderHook(() => useAuth())
+    await waitFor(() => expect(result.current.user).not.toBeNull())
+    const first = result.current.user
+    act(() => emit('USER_UPDATED', createMockSession({ user: createMockUser({ email: 'scott@example.com', user_metadata: { name: 'Scott' } }) })))
+    expect(result.current.user).not.toBe(first)
+    expect(result.current.user?.user_metadata).toEqual({ name: 'Scott' })
+    act(() => emit('SIGNED_OUT', null))
+    expect(result.current.user).toBeNull()
+  })
+})

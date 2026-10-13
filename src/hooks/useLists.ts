@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
 import { showToast } from '@/hooks/useToast'
 import { useAuth } from '@/hooks/useAuth'
+import { sharedLoad } from '@/lib/sharedLoad'
 import type { List, DbList, ListCategory, ListVisibility } from '@/types/list'
 
 function dbListToList(dbList: DbList): List {
@@ -43,12 +44,14 @@ export function useLists() {
 
       // Fetch lists: own lists + family-visible lists
       // We'll filter out hidden lists client-side since PostgREST doesn't support NOT contains in OR
-      const { data, error: fetchError } = await supabase
+      // One trip shared by the instances that ask at once (sharedLoad.ts).
+      const userId = user.id
+      const { data, error: fetchError } = await sharedLoad(`lists:${userId}`, () => supabase
         .from('lists')
         .select('*')
-        .or(`user_id.eq.${user.id},visibility.eq.family`)
+        .or(`user_id.eq.${userId},visibility.eq.family`)
         .order('sort_order', { ascending: true })
-        .order('title', { ascending: true })
+        .order('title', { ascending: true }))
 
       if (fetchError) {
         setError(fetchError.message)

@@ -14,6 +14,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/hooks/useAuth'
+import { sharedLoad } from '@/lib/sharedLoad'
 import { applyWeekStart, readCadenceConfig, isWeekStart, type WeekStart } from '@/lib/cadence/config'
 
 interface HouseholdRow { id: string; owner_id: string; week_starts_on: number | null }
@@ -30,11 +31,12 @@ export function useHouseholdWeekStart(): {
     if (!user) return
     let cancelled = false
     ;(async () => {
-      const { data, error } = await supabase
+      // One trip shared by the instances that ask at once (sharedLoad.ts).
+      const { data, error } = await sharedLoad(`household-weekstart:${user.id}`, () => supabase
         .from('households')
         .select('id, owner_id, week_starts_on')
         .order('created_at', { ascending: true })
-        .limit(1)
+        .limit(1))
       if (cancelled || error || !data?.[0]) return
       const r = data[0] as HouseholdRow
       setRow(r)
