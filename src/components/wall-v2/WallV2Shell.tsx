@@ -1073,7 +1073,7 @@ export function WallV2Shell() {
   }
 
   return (
-    <div className={`${isDark ? 'dark ' : ''}wall-touch-root relative h-screen w-screen overflow-hidden transition-colors ${WALL.root}`}>
+    <div className={`${kioskV1.pick.dark ? 'dark ' : ''}wall-touch-root relative h-screen w-screen overflow-hidden transition-colors ${WALL.root}`}>
       {/* flex column so the stale banner can claim height without the fixed grid
           clipping — the grid below simply shrinks when the banner appears. */}
       <div className="h-full w-full p-4 flex flex-col">

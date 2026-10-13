@@ -204,10 +204,13 @@ function Rest(p: KioskHomeV1Props) {
   return (
     <div className="kv-scene">
       {p.scenery && <img className="kv-scene-art" src={evening ? p.scenery.dusk : p.scenery.day} alt="" />}
-      <section className="kv-sentence" aria-label="Today">
-        <p className="kv-line">{p.restLine}</p>
-        {p.restSub && <p className="kv-muted">{p.restSub}</p>}
-      </section>
+      <div className="kv-sky">
+        <section className="kv-sentence" aria-label="Today">
+          <p className="kv-line">{p.restLine}</p>
+          {p.restSub && <p className="kv-muted">{p.restSub}</p>}
+        </section>
+        <Places places={p.places} />
+      </div>
       {p.notes.length > 0 && (
         <ul className="kv-notes" aria-label="Notes for the house">
           {p.notes.slice(0, 3).map((n, i) => (
@@ -217,7 +220,6 @@ function Rest(p: KioskHomeV1Props) {
           ))}
         </ul>
       )}
-      <Places places={p.places} />
     </div>
   )
 }
@@ -439,8 +441,8 @@ function Weekend(p: KioskHomeV1Props) {
             </ul>
           </section>
         </div>
+        <Places places={p.places} />
       </div>
-      <Places places={p.places} />
     </div>
   )
 }
