@@ -46,7 +46,11 @@ export interface NotesContextValue {
 
 const NotesContext = createContext<NotesContextValue | null>(null)
 
-export function NotesProvider({ children }: { children: ReactNode }) {
+export function NotesProvider({ children, deferLoad = false }: {
+  children: ReactNode
+  /** Load a moment after mount (the shell's provider; see useNotes). */
+  deferLoad?: boolean
+}) {
   const {
     notes,
     notesMap,
@@ -65,7 +69,7 @@ export function NotesProvider({ children }: { children: ReactNode }) {
     searchNotes,
     getNotesByTopic,
     getNotesByType,
-  } = useNotes()
+  } = useNotes({ deferLoad })
 
   const {
     topicsMap,

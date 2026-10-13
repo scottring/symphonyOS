@@ -698,7 +698,7 @@ export function ShellLayout({ children }: Props) {
   // (e.g. TasksApp) nest harmlessly inside these.
   return (
     <ListsProvider>
-      <NotesProvider>
+      <NotesProvider deferLoad>
         <PinsProvider>
           <ReferenceListsProvider key={user?.id ?? "anonymous"} userId={user?.id ?? "anonymous"}><GuideProvider><PageGuideProvider><ShellLayoutInner>{children}</ShellLayoutInner><GuideLayer /></PageGuideProvider></GuideProvider></ReferenceListsProvider>
         </PinsProvider>
