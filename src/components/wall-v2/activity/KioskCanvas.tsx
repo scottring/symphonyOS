@@ -331,7 +331,9 @@ export function KioskCanvas(p: KioskCanvasProps) {
     </button>
   )
   const v1 = p.v1
-  const dark = p.isDark || !!(v1 && v1.pick.dark)
+  // v1: light by day, warm dark after dinner, on its own; the old manual
+  // "Dark view" forced dark all day (Scott, 2026-10-13: "patchwork").
+  const dark = v1 ? v1.pick.dark : p.isDark
   const title = v1 && stage.kind === 'home' ? v1.pick.title : place
   // Settings live behind a long press on the clock, away from small fingers.
   const pressTimer = useRef<ReturnType<typeof setTimeout> | null>(null)

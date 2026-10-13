@@ -150,3 +150,39 @@
 .kv-side { width: calc(var(--kc-u) * 28); flex: none; }
 .kv-list { display: flex; flex-direction: column; gap: 10px; margin-top: 12px; font-size: calc(var(--kc-u) * 1.2); }
 .kv-list li { display: flex; align-items: center; gap: 10px; }
+
+/* ===== Calmer (Scott, 2026-10-13: "too much contrast between the content
+   boxes and the scenery … patchwork"). The scenery is a horizon at the foot
+   of the screen that fades up into the paper sky; content is set straight on
+   the paper, without boxes. Controls (chips, buttons, rows) keep their own
+   edges; the sticky notes stay objects on purpose. */
+.kv-scene-art {
+  top: auto; bottom: 0; height: 62%;
+  object-position: center bottom;
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 38%);
+  mask-image: linear-gradient(to bottom, transparent 0, #000 38%);
+}
+.kv-scene-art.is-faint { opacity: .5; height: 44%; }
+.kv-sky { position: absolute; left: var(--kc-pad-x); top: calc(var(--kc-u) * 2.4); max-width: 64%; display: flex; flex-direction: column; gap: calc(var(--kc-u) * 1.4); }
+.kv-sky .kv-sentence { position: static; max-width: none; }
+.kv-sentence, .kv-sentence.is-wide { background: none; padding: 0; border-radius: 0; }
+.kv-line { font-size: calc(var(--kc-u) * 4.2); }
+.kv-places { position: static; flex-wrap: wrap; }
+.kv-place { background: none; border: 1px solid var(--kc-line); height: 64px; color: var(--kc-ink); }
+.kv-talks { background: none; border: 0; padding: 0; }
+.kv-talks li { background: color-mix(in srgb, var(--kc-ink) 6%, transparent); }
+
+/* Boxes off the other screens: one paper surface, columns by space and a hairline. */
+.kiosk-canvas.is-v1 .kv-card, .kiosk-canvas.is-v1 .kc-bed-card { background: none; border: 0; border-radius: 0; padding: 0; box-shadow: none; }
+.kv-kids > .kv-kid + .kv-kid { border-left: 1px solid var(--kc-line); padding-left: calc(var(--kc-u) * 1.6); }
+.kv-countdown { border-right: 1px solid var(--kc-line); padding-right: calc(var(--kc-u) * 2); }
+.kv-countdown.is-narrow { border-right: 0; border-left: 1px solid var(--kc-line); padding: 0 0 0 calc(var(--kc-u) * 2); }
+.kv-dinner-side { border-left: 1px solid var(--kc-line) !important; padding-left: calc(var(--kc-u) * 1.6) !important; }
+.kv-dinner-side .kv-dinner-photo { border-radius: 14px; flex: none; height: 46%; }
+.kv-dinner-side .kv-pad { padding: calc(var(--kc-u) * 1) 0 0; }
+.kv-question { border-left: 1px solid var(--kc-line) !important; padding-left: calc(var(--kc-u) * 3) !important; }
+.kv-weekend .kv-hours { background: none; }
+.kv-weekend .kv-card { background: none; }
+.kv-weekend .kv-side { border-left: 1px solid var(--kc-line) !important; padding-left: calc(var(--kc-u) * 1.6) !important; }
+.kv-weekend { bottom: calc(var(--kc-u) * 1.6); }
+.kv-block { background: color-mix(in srgb, var(--kc-surface) 70%, transparent); }
