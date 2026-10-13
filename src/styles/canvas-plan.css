@@ -381,8 +381,10 @@
   .plan-horizon-body.has-above { grid-template-columns: minmax(0, 46rem) minmax(15rem, 22rem); }
   .plan-horizon-body.has-above > .plan-list { grid-column: 1; grid-row: 1; }
   .plan-above-panel {
-    grid-column: 2; grid-row: 1; position: sticky; top: 12px; margin: 0;
-    max-height: calc(100vh - 160px); overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin;
+    /* Clear of the pinned top bar, as the other reference panels sit
+       (.pv2-ref, .today-ref), and of the docked bar at the foot. */
+    grid-column: 2; grid-row: 1; position: sticky; top: 64px; margin: 0;
+    max-height: calc(100vh - 150px); overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin;
     padding: 2px 4px 8px 20px; border-left: 1px solid var(--color-neutral-200);
   }
   .plan-above-panel-title { display: block; }
