@@ -40,6 +40,10 @@ export interface KidRow {
   done: boolean
   timeOfDay: string | null // 'HH:MM' or null
   target: KidRowTarget | null // null = plain checkbox row
+  /** Who the step is for, when it names people: a kid's morning holds
+   *  "Wake the kids" (a parent) beside "Get dressed" (the kid). Absent = the
+   *  routine's own people. */
+  by?: string[]
 }
 
 export interface KidCollection {
@@ -200,6 +204,7 @@ function buildRow(
       streak: streakFor(routine, history, date),
     }
   }
+  const by = routine.assigned_to_all?.length ? routine.assigned_to_all : routine.assigned_to ? [routine.assigned_to] : []
   return {
     entityType: 'routine',
     id: routine.id,
@@ -207,6 +212,7 @@ function buildRow(
     done: dayInstance?.status === 'completed',
     timeOfDay: effectiveTimeOfDay(routine, byId),
     target,
+    ...(by.length ? { by } : {}),
   }
 }
 
