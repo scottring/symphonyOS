@@ -104,4 +104,16 @@ describe('show me this page', () => {
     fireEvent.click(screen.getByRole('button', { name: 'What is this page?' }))
     expect(onSend).toHaveBeenCalledWith('Explain it')
   })
+
+  it("What is this page? plays the page's own tour when it has one, and sends nothing", () => {
+    const onSend = vi.fn()
+    const show = vi.fn(() => true)
+    render(<MemoryRouter><PageGuideProvider><ConversationStrip docked messages={[]} explain={{ label: 'What is this page?', message: 'Explain it', show }} onSend={onSend} busy={false} voice={voice} /></PageGuideProvider></MemoryRouter>)
+    fireEvent.click(screen.getByRole('button', { name: 'What is this page?' }))
+    expect(show).toHaveBeenCalled()
+    expect(onSend).not.toHaveBeenCalled()
+    show.mockReturnValue(false)
+    fireEvent.click(screen.getByRole('button', { name: 'What is this page?' }))
+    expect(onSend).toHaveBeenCalledWith('Explain it')
+  })
 })

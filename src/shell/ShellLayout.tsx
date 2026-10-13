@@ -67,6 +67,8 @@ import { GuideBar, GuideHostContext } from '@/components/guide/GuideBar';
 import { PageGuideProvider, usePageGuide } from '@/components/explain/GuideProvider';
 import { GuideLayer } from '@/components/explain/GuideLayer';
 import { EXPLAIN_LABEL, EXPLAIN_MESSAGE, hasPageGuide } from '@/lib/explain/pageGuides';
+import { tourFor } from '@/lib/explain/pageTours';
+import { requestShow } from '@/lib/explain/showSignal';
 
 /**
  * ShellLayout wraps Shell-mounted apps with the Symphony app chrome — the
@@ -292,7 +294,12 @@ function ShellLayoutInner({ children }: Props) {
   const { hidden: aiHidden, setHidden: setAiHidden } = useScratchpadHidden();
   const [walk, setWalk] = useState<ConversationWalk | null>(null);
   // "What is this page?" beside the walk, on pages Symphony can explain.
-  const explain = connectedWorkspace && hasPageGuide(screenContext.page) ? { label: EXPLAIN_LABEL, message: EXPLAIN_MESSAGE } : null;
+  // It plays the page's own tour (pageTours.ts); Symphony answers only if the
+  // page has none on screen.
+  const explain = connectedWorkspace && hasPageGuide(screenContext.page) ? {
+    label: EXPLAIN_LABEL, message: EXPLAIN_MESSAGE,
+    show: () => { const steps = tourFor(screenContext.page); if (!steps.length) return false; requestShow(steps, 'chat'); return true },
+  } : null;
   const [phoneChatOpen, setPhoneChatOpen] = useState(false);
   const phoneChatRef = useRef<HTMLDivElement>(null);
   useDialogFocus(phoneChatOpen && isMobile, phoneChatRef, () => setPhoneChatOpen(false));

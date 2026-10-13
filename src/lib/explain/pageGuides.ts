@@ -71,7 +71,7 @@ const POINT_RULE =
   ' Point each note only at the part it is about. A part named here that is not among the targets is not on screen: leave it out, never point its note at another part.'
 
 /** A page in a different mode (Week's planning session) names its own guide. */
-function guideKey(page: string, root?: ParentNode): string {
+export function guideKey(page: string, root?: ParentNode): string {
   const marked = (root ?? document).querySelector?.('[data-explain-guide]')?.getAttribute('data-explain-guide')
   return marked && marked in PAGE_GUIDES ? marked : page
 }

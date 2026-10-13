@@ -66,7 +66,7 @@ function statusText({ period, saved, loading, error, agreedBy, onRetry, hasLines
  *  it is. A just-saved period's next step is PlanSavedLine's, not this row's. */
 function controlsOf({ period, saved, loading, error, onPlan, onMark, lookBack, viewSwitch, tools, justSaved, planLabel }: PlanToolbarProps, guided: boolean) {
   const verb = guided || justSaved || loading || error ? null
-    : planLabel ? <button type="button" className={saved ? 'pv2-qbtn' : 'pv2-btn'} onClick={onPlan}>{saved ? 'Change the plan' : planLabel}</button>
+    : planLabel ? <button type="button" className={saved ? 'pv2-qbtn' : 'pv2-btn'} onClick={onPlan} data-explain="plan-button" data-explain-label={saved ? 'Change the plan' : planLabel}>{saved ? 'Change the plan' : planLabel}</button>
     : lookBack ? <button type="button" className="pv2-btn" onClick={onPlan}>Look back at {lookBack}</button>
       : !saved && onMark ? <button type="button" className="pv2-btn" onClick={onMark}>Mark {period} planned</button>
         : null
@@ -156,7 +156,7 @@ export function PlanMeetingBar({ period, prevName, step, lookBack, why, onStep, 
     const i = Math.max(0, steps.findIndex((s) => s.key === stepKey))
     const last = i === steps.length - 1
     return (
-      <div className="pv2-sbar" role="region" aria-label={`Planning ${period}`}>
+      <div className="pv2-sbar" role="region" aria-label={`Planning ${period}`} data-explain="plan-steps">
         <span className="pv2-st">Planning<small>{period}</small></span>
         <div className="pv2-steps">
           {steps.map((s, n) => (
@@ -176,7 +176,7 @@ export function PlanMeetingBar({ period, prevName, step, lookBack, why, onStep, 
     )
   }
   return (
-    <div className="pv2-sbar" role="region" aria-label={`Planning ${period}`}>
+    <div className="pv2-sbar" role="region" aria-label={`Planning ${period}`} data-explain="plan-steps">
       <span className="pv2-st">Planning<small>{period}</small></span>
       {lookBack ? (
         <div className="pv2-steps">
