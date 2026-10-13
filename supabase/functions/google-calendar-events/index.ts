@@ -9,6 +9,7 @@ import {
   readProviderEnv,
   type CalendarConnectionRow,
 } from '../_shared/calendar-providers/index.ts'
+import { eventsToCache, STORED_EVENT_COLUMNS, type CachedEventRow } from '../_shared/calendar-providers/cache.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -132,15 +133,31 @@ serve(async (req) => {
       end: new Date(endDate).toISOString(),
     })
 
-    // Upsert events to cache. `provider` is not a column there; strip it.
+    // Cache what is new or changed. `provider` is not a column there; strip
+    // it. Every read used to rewrite every event (cache.ts); a failed read of
+    // the cache falls back to writing them all, as before.
     if (events.length > 0) {
       const rows = events.map(({ provider: _provider, ...row }) => row)
-      const { error: upsertError } = await supabaseAdmin
-        .from('calendar_events')
-        .upsert(rows, { onConflict: 'user_id,google_event_id' })
-
-      if (upsertError) {
-        console.error('Failed to cache events:', upsertError)
+      const stored: Partial<CachedEventRow>[] = []
+      let storedOk = true
+      const ids = rows.map((r) => r.google_event_id)
+      for (let i = 0; i < ids.length && storedOk; i += 100) {
+        const { data, error } = await supabaseAdmin
+          .from('calendar_events')
+          .select(STORED_EVENT_COLUMNS)
+          .eq('user_id', user.id)
+          .in('google_event_id', ids.slice(i, i + 100))
+        if (error) { storedOk = false; console.error('Failed to read cached events:', error) }
+        else stored.push(...((data ?? []) as Partial<CachedEventRow>[]))
+      }
+      const toWrite = storedOk ? eventsToCache(rows, stored) : rows
+      if (toWrite.length > 0) {
+        const { error: upsertError } = await supabaseAdmin
+          .from('calendar_events')
+          .upsert(toWrite, { onConflict: 'user_id,google_event_id' })
+        if (upsertError) {
+          console.error('Failed to cache events:', upsertError)
+        }
       }
     }
 

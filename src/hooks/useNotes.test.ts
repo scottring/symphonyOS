@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { renderHook, waitFor, act } from '@testing-library/react'
-import { useNotes, mapDbNote } from './useNotes'
+import { useNotes, mapDbNote, NOTES_DEFER_MS } from './useNotes'
 import type { DbNote } from '@/types/note'
 
 // Module-level state for mocking
@@ -180,6 +180,27 @@ describe('useNotes', () => {
     const secondNote = result.current.notes.find((n) => n.id === 'note-2')
     expect(firstNote?.title).toBe('First Note')
     expect(secondNote?.type).toBe('meeting_note')
+  })
+
+  // Prod, 2026-10-13: the shell's provider loaded every note's full content
+  // (6.5 MB) at startup on every page, competing with what the page waits on.
+  it('a deferred load waits, then fetches; a normal one fetches at once', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    try {
+      mockSupabaseData = [{ id: 'note-1', user_id: mockUser.id, title: 'T', content: 'c', type: 'quick_capture', source: 'manual',
+        topic_id: null, audio_url: null, external_id: null, external_url: null,
+        created_at: '2026-05-20T11:00:00.000Z', updated_at: '2026-05-20T11:00:00.000Z' }]
+      const deferred = renderHook(() => useNotes({ deferLoad: true }))
+      await act(async () => { await Promise.resolve() })
+      expect(deferred.result.current.loading).toBe(true)
+      expect(deferred.result.current.notes).toHaveLength(0)
+      await act(async () => { vi.advanceTimersByTime(NOTES_DEFER_MS) })
+      vi.useRealTimers()
+      await waitFor(() => expect(deferred.result.current.loading).toBe(false))
+      expect(deferred.result.current.notes).toHaveLength(1)
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('adds a note with optimistic update', async () => {

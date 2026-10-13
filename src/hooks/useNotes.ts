@@ -104,7 +104,17 @@ function collapseLineage(taskNotes: DisplayNote[]): DisplayNote[] {
 // ============================================================================
 // Hook
 // ============================================================================
-export function useNotes() {
+/** Waits this long before the deferred load (see `deferLoad`). */
+export const NOTES_DEFER_MS = 2500
+
+export function useNotes({ deferLoad = false }: {
+  /** Start the load a moment after mount instead of at once. The shell's
+   *  provider mounts on every page, but nothing on most pages shows a note,
+   *  and the load is the heaviest of startup — every note's full content
+   *  (6.5 MB for 1k notes, ~1.2s in Postgres; prod 2026-10-13) — so at once
+   *  it competed with the queries the page is waiting on. */
+  deferLoad?: boolean
+} = {}) {
   const { user } = useAuth()
   const [notes, setNotes] = useState<Note[]>([])
   const [taskNotes, setTaskNotes] = useState<DisplayNote[]>([])
@@ -189,8 +199,13 @@ export function useNotes() {
       setLoading(false)
     }
 
-    fetchNotesAndTasks()
-  }, [user])
+    if (!deferLoad) {
+      fetchNotesAndTasks()
+      return
+    }
+    const timer = setTimeout(() => { void fetchNotesAndTasks() }, NOTES_DEFER_MS)
+    return () => clearTimeout(timer)
+  }, [user, deferLoad])
 
   // ============================================================================
   // CRUD Operations
