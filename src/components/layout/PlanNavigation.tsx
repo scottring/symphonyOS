@@ -1,7 +1,7 @@
 import { connectedDestination } from '@/lib/planning/connectedDestination'
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
-import { NavLink, useLocation, useNavigate } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { PanelLeft, ChevronDown, Check } from 'lucide-react'
 import { readSeasons } from '@/lib/cadence/seasons'
 import { useReferenceLists } from '@/components/reference/ReferenceListsContext'
@@ -28,6 +28,15 @@ export function planPeriodForPath(path: string) {
   return PERIODS.find(period => path === `/${period}` || path.startsWith(`/${period}/`))
 }
 
+/** The horizon on screen. A Year, Season or Month page names its horizon in
+ *  the URL (`horizon`), which wins over the path (Season shown from /year). */
+export function shownPeriodFor(path: string, search: string) {
+  const period = planPeriodForPath(path)
+  if (period !== 'month' && period !== 'season' && period !== 'year') return period
+  const h = new URLSearchParams(search).get('horizon')
+  return h && /^[0-2]$/.test(h) ? (['year', 'season', 'month'] as const)[Number(h)] : period
+}
+
 /**
  * Where the `Planner` entry in the primary navigation points.
  *
@@ -48,13 +57,15 @@ export function usePlanDestination() {
 }
 
 const HORIZON_NAMES: Record<typeof PERIODS[number], string> = {
-  today: 'Today', week: 'Week', month: 'Plan', season: 'Plan', year: 'Plan',
+  today: 'Today', week: 'Week', month: 'Month', season: 'Season', year: 'Year',
 }
 
 function horizonSubtitle(period: typeof PERIODS[number], now: Date): string {
   if (period === 'today') return now.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
   if (period === 'week') return "This week's list and days"
-  if (period === 'year' || period === 'month' || period === 'season') return 'Year, season and month goals'
+  if (period === 'month') return "This month's goals"
+  if (period === 'season') return "This season's goals"
+  if (period === 'year') return "This year's goals"
   return ''
 }
 
@@ -79,38 +90,35 @@ function HorizonSwitcher({ period }: { period: typeof PERIODS[number] }) {
     {open && <>
       <button type="button" className="horizon-switcher-scrim" aria-label="Close" onClick={() => setOpen(false)} />
       <div role="menu" aria-label="Planning horizon" className="horizon-switcher-menu">
-        {RAIL_ORDER.map(value => <button key={value} type="button" role="menuitemradio" aria-checked={period === value || (value === 'month' && (period === 'season' || period === 'year'))}
-          onClick={() => { setOpen(false); if (value === 'month' && isPlanPeriod(period)) return; navigate(connectedDestination(`/${value}`, search)) }}>
+        {RAIL_ORDER.map(value => <button key={value} type="button" role="menuitemradio" aria-checked={period === value}
+          onClick={() => { setOpen(false); if (period === value) return; navigate(connectedDestination(`/${value}`, search)) }}>
           <span><strong>{HORIZON_NAMES[value]}</strong><small>{horizonSubtitle(value, now)}</small></span>
-          {(period === value || (value === 'month' && (period === 'season' || period === 'year'))) && <Check aria-hidden="true" />}
+          {period === value && <Check aria-hidden="true" />}
         </button>)}
       </div>
     </>}
   </div>
 }
 
-// Distinct workspaces; the Plan map owns its four horizon focus controls.
-const RAIL_ORDER = ['today', 'week', 'month'] as const
+// One line of horizons on every page, small to large (Scott, 2026-10-13: the
+// Plan entry and the page's own Year · Season · Month tabs merged into it).
+const RAIL_ORDER = ['today', 'week', 'month', 'season', 'year'] as const
 
 /** The period a rail step opens, in words: "Week 41", "October", "Fall 2026". */
 function railTitle(value: typeof RAIL_ORDER[number], step: { n: string; label: string }): string {
   if (value === 'today') return 'Today'
   if (value === 'week') return `Week ${step.n}`
-  if (value === 'month') return 'Plan across all horizons'
   return step.label
 }
 
-/** Desktop and phone share Today, Week and the connected Plan map. */
-/** On Plan, the Plan link is "you are here": the horizon and period on screen,
- *  without a narrowed focus. Elsewhere it opens Month for the period shown. */
-function planHere(pathname: string, search: string): string {
+/** The link for the horizon on screen is "you are here": its own period,
+ *  without a narrowed focus. */
+function here(pathname: string, search: string): string {
   const params = new URLSearchParams(search)
   params.delete('focus')
   const query = params.toString()
   return connectedDestination(query ? `${pathname}?${query}` : pathname, search)
 }
-
-const isPlanPeriod = (period?: typeof PERIODS[number]) => period === 'year' || period === 'season' || period === 'month'
 
 function HorizonRail({ period }: { period?: typeof PERIODS[number] }) {
   const { pathname, search } = useLocation()
@@ -127,12 +135,15 @@ function HorizonRail({ period }: { period?: typeof PERIODS[number] }) {
     : undefined
   const steps = railEntries(new Date(), shown, readSeasons(), readCadenceConfig().weekStartsOn, pinned)
   return <nav aria-label="Planning period" className="horizon-rail">
-    {RAIL_ORDER.map((value, k) => <span key={value} className="horizon-rail-step">
+    {RAIL_ORDER.map((value, k) => <span key={value} className={`horizon-rail-step${value === 'month' ? ' is-goals-start' : ''}`}>
       {k > 0 && <span className="horizon-rail-join" aria-hidden="true" />}
-      <NavLink to={value === 'month' && isPlanPeriod(period) ? planHere(pathname, search) : connectedDestination(steps[value].to, search)} aria-current={(period === value || (value === 'month' && isPlanPeriod(period))) ? 'page' : undefined} className={(period === value || (value === 'month' && isPlanPeriod(period))) ? 'is-current' : ''}
+      {/* A plain Link: the current horizon comes from the page shown, not
+          the path (/month can show Year), so NavLink's own matching is off. */}
+      <Link to={period === value && value !== 'today' && value !== 'week' ? here(pathname, search) : connectedDestination(steps[value].to, search)}
+        aria-current={period === value ? 'page' : undefined} className={period === value ? 'is-current' : undefined}
         aria-label={HORIZON_NAMES[value]} title={railTitle(value, steps[value])}>
         <span className="horizon-rail-l">{HORIZON_NAMES[value]}</span>
-      </NavLink>
+      </Link>
     </span>)}
   </nav>
 }
@@ -143,8 +154,8 @@ export function PlanNavigation({ mobile = false, paused = false, mobileControlsR
   /** Phone only: the slot MobilePlanControls portals into. */
   mobileControlsRef?: (node: HTMLDivElement | null) => void
 }) {
-  const { pathname } = useLocation()
-  const period = planPeriodForPath(pathname)
+  const { pathname, search } = useLocation()
+  const period = shownPeriodFor(pathname, search)
   const references = useReferenceLists()
   const pinned = !!references?.pins.some(pin => pin.kind === 'today')
   const [sheetPath, setSheetPath] = useState<string | null>(null)

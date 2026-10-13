@@ -247,8 +247,8 @@ describe('Consolidated desktop navigation', () => {
     expect(screen.queryByRole('link', { name: 'Planner' })).not.toBeInTheDocument()
     const rail = screen.getByRole('navigation', { name: 'Planning period' })
     expect(rail.querySelector('[aria-current="page"]')).toBeNull()
-    fireEvent.click(screen.getByRole('link', { name: 'Plan' }))
-    expect(screen.getByRole('link', { name: 'Plan' })).toHaveAttribute('aria-current', 'page')
+    fireEvent.click(screen.getByRole('link', { name: 'Season' }))
+    expect(screen.getByRole('link', { name: 'Season' })).toHaveAttribute('aria-current', 'page')
     fireEvent.click(screen.getByRole('link', { name: 'Today' }))
     expect(screen.getByRole('link', { name: 'Today' })).toHaveAttribute('aria-current', 'page')
     // Routines lives under More now.

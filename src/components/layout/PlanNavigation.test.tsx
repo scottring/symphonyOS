@@ -27,21 +27,25 @@ describe('PlanNavigation', () => {
     const rail = screen.getByRole('navigation', { name: 'Planning period' })
     const month = rail.querySelector('a[aria-current="page"]')!
     // Words only on the rail (2026-10-07); the period it opens is in the tooltip.
-    expect(month.textContent).toBe('Plan')
-    expect(month.getAttribute('title')).toBe('Plan across all horizons')
+    expect(month.textContent).toBe('Month')
+    expect(month.getAttribute('title')).toBe('October')
     expect(month.getAttribute('href')).toBe('/month?start=2026-10-01&view=constellation&horizon=2')
+    expect(rail.querySelector('a[aria-label="Season"]')?.getAttribute('href')).toMatch(/^\/season\?start=\d{4}-\d{2}-\d{2}&view=constellation&horizon=1$/)
+    expect(rail.querySelector('a[aria-label="Year"]')?.getAttribute('href')).toBe('/year?start=2026-01-01&view=constellation&horizon=0')
     // The other steps follow the period on screen (decision D, 2026-09-29):
     // the week holding October 1, not the clock's week. Today stays today.
     expect(rail.querySelector('a[href^="/week?start="]')).toBeTruthy()
     expect(rail.querySelector('a[href="/today?view=alongside"]')).toBeTruthy()
   })
 
-  it('marks Plan as the one active destination on Year, Season and Month, and keeps the horizon on screen', () => {
+  // Scott, 2026-10-13: one line of horizons; the page shown is the one marked,
+  // even when the path says otherwise (/year showing Season).
+  it('marks the horizon on screen, and its link keeps the period without a focus', () => {
     for (const path of ['/year', '/season', '/month']) {
       render(<MemoryRouter initialEntries={[`${path}?view=constellation&horizon=1&start=2026-10-01&focus=0:g`]}><PlanNavigation /></MemoryRouter>)
       const rail = screen.getByRole('navigation', { name: 'Planning period' })
       const current = [...rail.querySelectorAll('a[aria-current="page"]')]
-      expect(current.map((a) => a.getAttribute('aria-label'))).toEqual(['Plan'])
+      expect(current.map((a) => a.getAttribute('aria-label'))).toEqual(['Season'])
       // "You are here": same horizon and period, focus released.
       expect(current[0].getAttribute('href')).toBe(`${path}?view=constellation&horizon=1&start=2026-10-01`)
       cleanup()
@@ -49,24 +53,24 @@ describe('PlanNavigation', () => {
     render(<MemoryRouter initialEntries={['/week?view=alongside']}><PlanNavigation /></MemoryRouter>)
     const rail = screen.getByRole('navigation', { name: 'Planning period' })
     expect([...rail.querySelectorAll('a[aria-current="page"]')].map((a) => a.getAttribute('aria-label'))).toEqual(['Week'])
-    expect(rail.querySelector('a[aria-label="Plan"]')?.getAttribute('href')).toMatch(/^\/month\?(.*&)?view=constellation&horizon=2$/)
+    expect(rail.querySelector('a[aria-label="Month"]')?.getAttribute('href')).toMatch(/^\/month\?(.*&)?view=constellation&horizon=2$/)
   })
 
   // Scott, 2026-09-30: ascending, Today first — the same order as the phone's menu.
   it('runs Today → Week → Month → Season → Year on desktop', () => {
     render(<MemoryRouter initialEntries={['/week']}><PlanNavigation /></MemoryRouter>)
     const rail = screen.getByRole('navigation', { name: 'Planning period' })
-    expect([...rail.querySelectorAll('a')].map((a) => a.getAttribute('aria-label'))).toEqual(['Today', 'Week', 'Plan'])
+    expect([...rail.querySelectorAll('a')].map((a) => a.getAttribute('aria-label'))).toEqual(['Today', 'Week', 'Month', 'Season', 'Year'])
   })
 
   it('switches horizons on a phone from the title menu, one horizon at a time', () => {
     render(<MemoryRouter initialEntries={['/season']}><PlanNavigation mobile /></MemoryRouter>)
     expect(screen.queryByRole('navigation', { name: 'Planning period' })).not.toBeInTheDocument()
-    const title = screen.getByRole('button', { name: 'Plan. Switch horizon' })
+    const title = screen.getByRole('button', { name: 'Season. Switch horizon' })
     fireEvent.click(title)
     const items = screen.getAllByRole('menuitemradio')
-    expect(items.map((i) => i.textContent?.split(/(?=[A-Z])/)[0])).toEqual(['Today', 'Week', 'Plan'])
-    expect(screen.getByRole('menuitemradio', { name: /^Plan/ })).toHaveAttribute('aria-checked', 'true')
+    expect(items.map((i) => i.querySelector('strong')?.textContent)).toEqual(['Today', 'Week', 'Month', 'Season', 'Year'])
+    expect(screen.getByRole('menuitemradio', { name: /^Season/ })).toHaveAttribute('aria-checked', 'true')
     fireEvent.keyDown(window, { key: 'Escape' })
     expect(screen.queryByRole('menu')).not.toBeInTheDocument()
   })

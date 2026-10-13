@@ -11,22 +11,21 @@ import { collectTargets } from './targets'
 export const PAGE_GUIDES: Record<string, string> = {
   year:
     'Year is reference: the few goals you want this year to hold, a list for looking, not doing. ' +
-    'Each row is a year goal; the count beside it is how many season goals sit under it. ' +
-    '+ Add writes a new one. The horizon switch (Year, Season, Month, Week) moves down a level; Next: Season goes on to this season.',
+    'The line above the list holds last year\'s goals; Show opens them. Each row is a year goal; one with a season goal under it names it ("Fall: …"). ' +
+    '+ Add a goal at the foot writes a new one. Go to Fall (or the season shown) goes on to the season. The top bar moves between Today, Week, Month, Season and Year.',
   season:
     'A season is a brainstorm list for this stretch of the year: what you would like it to hold. Nothing here is on a calendar. ' +
     'The arrows beside the title step to the previous or next season. ' +
-    '"Under a year goal" holds one card per year goal, with the season goals you put under it. ' +
-    'Year goals with nothing this season are folded into one line below the cards; Show opens them. ' +
-    '"Not under a year goal" holds season goals with no year goal. That is fine; to connect one, drag it onto a card, or use Move under in its ⋯ menu. ' +
-    'Suggest where these go asks Symphony to propose links, which save only when kept. ' +
-    'Selecting a goal opens it with what you will need and its month goals. Next: Month chooses what this month holds.',
+    'The line above the list holds this year\'s goals; Show opens them. The list holds every season goal, drawn one way. ' +
+    'A goal written for a year goal says "For …" under it, and one with a month goal under it names it ("October: …"). A goal on its own says nothing more; that is fine. ' +
+    '+ Add a goal at the foot writes one, with an optional "For" to choose a year goal. To change what a goal is for, use Move under in its ⋯ menu. ' +
+    'Go to the month goes on to Month.',
   month:
     'Month answers one question: what do you want to accomplish this month? Nothing here is on a calendar yet. ' +
-    'The main part lists every goal for the month, whether it belongs to a season goal or stands on its own; a goal under a season goal names it beneath its title. ' +
-    'Beside it (below it on a phone) are the season\'s goals, the source to build from. Selecting one highlights its month goals and lists them in its card; + Add on a card writes a month goal under it, and + Add at the foot of the list writes one of its own. ' +
-    'Hide (or Show) the season goals with the button above. To connect a goal, drag it onto a season goal, or use Move under in its ⋯ menu. ' +
-    'Plan a week from these goals goes on to Week, where month goals become this week\'s tasks.',
+    'The line above the list holds the season\'s goals; Show opens them. The list holds every goal for the month, drawn one way. ' +
+    'A goal written for a season goal says "For …" under it, and one with tasks this week names them ("This week: …"). A goal on its own says nothing more; that is fine. ' +
+    '+ Add a goal at the foot writes one, with an optional "For" to choose a season goal. To change what a goal is for, use Move under in its ⋯ menu. ' +
+    'Go to this week goes on to Week, where month goals become this week\'s tasks.',
   week:
     'Week is for doing: this week\'s tasks and when they happen. ' +
     'Each day column shows its events (in blue), the kids\' specials, tasks (circles) and routines (rounded squares), who carries each, and in green the hours with nothing scheduled ("Calendar clear"). ' +
