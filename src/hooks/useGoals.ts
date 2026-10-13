@@ -82,6 +82,47 @@ function dbActionToAction(db: DbGoalAction): GoalAction {
 // Hook
 // ============================================================================
 
+type GoalsLoad = { areas: GoalArea[]; goals: Goal[]; actions: GoalAction[]; milestones: GoalMilestone[] }
+
+// One trip to the database, shared by every instance that asks while it is in
+// flight (the tasks hook's pattern). Prod, 2026-10-13: Month waited ~5s on
+// "Loading your plans…" while each instance — the shell, the page, the detail
+// panel, and again for each new auth user object — fired its own four goal
+// queries, 32 requests racing the rest of startup. Keyed by the refresh round
+// too, so a "plan updated" refresh never joins a load from before the write.
+// No cache: a load that has finished is never reused, so writes behave as before.
+let goalsInFlight: { key: string; promise: Promise<GoalsLoad> } | null = null
+
+function loadGoals(key: string): Promise<GoalsLoad> {
+  if (goalsInFlight?.key === key) return goalsInFlight.promise
+  const promise = (async (): Promise<GoalsLoad> => {
+    const [areasRes, goalsRes, actionsRes, milestonesRes] = await Promise.all([
+      supabase.from('goal_areas').select('*').order('sort_order'),
+      supabase.from('goals').select('*').order('sort_order'),
+      supabase.from('goal_actions').select('*').order('sort_order'),
+      supabase.from('goal_milestones').select('*').order('sort_order'),
+    ])
+    if (areasRes.error) throw areasRes.error
+    if (goalsRes.error) throw goalsRes.error
+    if (actionsRes.error) throw actionsRes.error
+    if (milestonesRes.error) throw milestonesRes.error
+
+    const areas = (areasRes.data as DbGoalArea[]).map(dbAreaToArea)
+    const mappedActions = (actionsRes.data as DbGoalAction[]).map(dbActionToAction)
+    const mappedMilestones = (milestonesRes.data as DbGoalMilestone[]).map(dbMilestoneToMilestone)
+    // Only the actions and milestones that belong to the fetched goals.
+    const goalIds = new Set((goalsRes.data as DbGoal[]).map(g => g.id))
+    const actions = mappedActions.filter(a => goalIds.has(a.goalId))
+    const milestones = mappedMilestones.filter(m => goalIds.has(m.goalId))
+    const goals = (goalsRes.data as DbGoal[]).map(db => dbGoalToGoal(db, actions, milestones))
+    return { areas, goals, actions, milestones }
+  })()
+  goalsInFlight = { key, promise }
+  const clear = () => { if (goalsInFlight?.promise === promise) goalsInFlight = null }
+  promise.then(clear, clear)
+  return promise
+}
+
 // Every year's goals, not just this one. The year page plans NEXT year and
 // looks back at the one before it, so a fetch pinned to the calendar year left
 // both of those empty (final review, Phase 3). Consumers all filter by
@@ -118,36 +159,11 @@ export function useGoals() {
       setError(null)
 
       try {
-        // Fetch areas, goals, actions, and milestones in parallel
-        const [areasRes, goalsRes, actionsRes, milestonesRes] = await Promise.all([
-          supabase.from('goal_areas').select('*').order('sort_order'),
-          supabase.from('goals').select('*').order('sort_order'),
-          supabase.from('goal_actions').select('*').order('sort_order'),
-          supabase.from('goal_milestones').select('*').order('sort_order'),
-        ])
-
-        if (areasRes.error) throw areasRes.error
-        if (goalsRes.error) throw goalsRes.error
-        if (actionsRes.error) throw actionsRes.error
-        if (milestonesRes.error) throw milestonesRes.error
-
-        const mappedAreas = (areasRes.data as DbGoalArea[]).map(dbAreaToArea)
-        const mappedActions = (actionsRes.data as DbGoalAction[]).map(dbActionToAction)
-        const mappedMilestones = (milestonesRes.data as DbGoalMilestone[]).map(dbMilestoneToMilestone)
-
-        // Filter actions/milestones to only include those belonging to fetched goals
-        const goalIds = new Set((goalsRes.data as DbGoal[]).map(g => g.id))
-        const relevantActions = mappedActions.filter(a => goalIds.has(a.goalId))
-        const relevantMilestones = mappedMilestones.filter(m => goalIds.has(m.goalId))
-
-        const mappedGoals = (goalsRes.data as DbGoal[]).map(db =>
-          dbGoalToGoal(db, relevantActions, relevantMilestones)
-        )
-
-        setAreas(mappedAreas)
-        setGoals(mappedGoals)
-        setAllActions(relevantActions)
-        setAllMilestones(relevantMilestones)
+        const loaded = await loadGoals(`${user.id}:${revision}`)
+        setAreas(loaded.areas)
+        setGoals(loaded.goals)
+        setAllActions(loaded.actions)
+        setAllMilestones(loaded.milestones)
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to fetch goals')
       } finally {
