@@ -113,6 +113,8 @@
 .wc { display: flex; flex-direction: column; gap: 28px; padding-bottom: 24px; }
 .wc-subtitle { font-family: var(--font-family-sans); font-size: 13px; color: var(--color-neutral-600); }
 .wc-subtitle.is-inline { margin: 0; }
+.wc-tray { display: inline-flex; flex-wrap: wrap; gap: 2px 14px; }
+.wc-tray-item { white-space: nowrap; }
 .wc-past { display: block; margin: 2px 0; font-size: 13px; color: var(--color-neutral-700); }
 .wc-past b { font-weight: 600; color: hsl(30 70% 34%); }
 .wc-label { margin: 0; font-family: var(--font-family-display); font-size: 21px; font-weight: 500; line-height: 1.2; color: var(--color-neutral-900); }
@@ -125,7 +127,9 @@
 .wc-masonry { columns: 18rem; column-gap: 14px; }
 .wc-masonry > .wc-group { break-inside: avoid; display: inline-block; width: 100%; margin: 0 0 14px; }
 .wc-group-head { position: relative; align-items: center; }
-.wc-group-head .canvas-group-title { flex: 1; font-size: 13px; color: var(--color-neutral-800); }
+/* Goal cards are headed like Plan's (Crimson); the no-goal card like Plan's own. */
+.wc-group-head .canvas-group-title { flex: 1; font-family: var(--font-family-display); font-size: 17px; font-weight: 500; line-height: 1.25; color: var(--color-neutral-900); }
+.wc-group.is-unlinked .wc-group-head .canvas-group-title { font-family: var(--font-family-sans); font-size: 12px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--color-neutral-600); }
 .wc-group.is-source { border-color: var(--color-primary-400); box-shadow: 0 0 0 2px var(--color-primary-100); }
 .wc-group.is-source .canvas-group-head { color: var(--color-primary-800); }
 .wc-routines .canvas-group-title { color: var(--color-primary-800); }
@@ -182,41 +186,108 @@
 .wc-span-when, .wc-rhythm-label, .wc-dinner-label { color: var(--color-neutral-500); }
 .wc-rhythm { margin: 0 0 10px; font-family: var(--font-family-sans); font-size: 13px; }
 .wc-rhythm p { margin: 0 0 2px; }
-.wc-strip { display: grid; grid-template-columns: repeat(var(--wc-days, 7), minmax(0, 1fr)); gap: 10px; align-items: start; }
-.wc-day {
-  min-width: 0; padding: 8px 10px 10px; border: 1px solid var(--color-neutral-200); border-radius: var(--radius-lg);
-  background: var(--color-bg-elevated); transition: border-color var(--transition-base), background-color var(--transition-base);
+/* Columns divided by a hairline, not boxed (mockup approved 2026-10-13):
+   header, a row for any bar across days, then the day's things. Each day is a
+   subgrid of the strip's three rows, so the bars sit under every header. */
+.wc-strip {
+  display: grid; grid-template-columns: repeat(var(--wc-days, 7), minmax(0, 1fr)); grid-template-rows: auto auto 1fr;
+  column-gap: 0; align-items: start;
 }
-.wc-day.is-today { border-color: var(--color-primary-300); box-shadow: inset 0 3px 0 var(--color-primary-600); }
+.wc-day {
+  grid-row: 1 / span 3; display: grid; grid-template-rows: subgrid; align-self: stretch;
+  min-width: 0; padding: 8px 12px 12px; border: 0; border-left: 1px solid var(--color-neutral-200); border-radius: 0;
+  background: transparent; transition: background-color var(--transition-base), opacity var(--transition-base);
+}
+.wc-strip > .wc-day:first-child { border-left-color: transparent; }
+.wc-dayhead { grid-row: 1; }
+.wc-daybody { grid-row: 3; min-width: 0; }
+.wc-day.is-today { border-left-color: transparent; border-radius: var(--radius-lg); background: color-mix(in srgb, var(--color-primary-50) 85%, transparent); }
+.wc-day.is-today + .wc-day { border-left-color: transparent; }
+/* A day gone by steps back until you reach for it. */
+.wc-day.is-past { opacity: .55; }
+.wc-day.is-past:hover, .wc-day.is-past:focus-within, .wc-day.is-past.is-over { opacity: 1; }
 .wc-day.is-empty { padding-bottom: 6px; }
-.wc-day.is-over { border: 1.5px dashed var(--color-primary-500); background: var(--color-primary-50); }
-.wc-dayhead { display: flex; align-items: baseline; gap: 6px; padding-bottom: 6px; margin-bottom: 6px; border-bottom: 1px solid var(--color-neutral-100); }
+.wc-day.is-over { outline: 1.5px dashed var(--color-primary-500); outline-offset: -2px; border-radius: var(--radius-lg); background: var(--color-primary-50); }
+.wc-dayhead { display: flex; align-items: baseline; gap: 6px; min-width: 0; padding-bottom: 6px; margin-bottom: 6px; border-bottom: 1px solid var(--color-neutral-200); }
 .wc-day.is-empty .wc-dayhead { border-bottom: 0; margin-bottom: 0; padding-bottom: 0; }
+.wc-day.is-today .wc-dayhead { border-bottom-color: color-mix(in srgb, var(--color-primary-600) 30%, transparent); }
 .wc-dayname { font-family: var(--font-family-sans); font-size: 11.5px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--color-neutral-600); }
 .wc-daynum { font-family: var(--font-family-display); font-size: 22px; line-height: 1; color: var(--color-neutral-900); }
+.wc-todaytag { font-family: var(--font-family-sans); font-size: 10.5px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--color-primary-700); }
 .wc-day.is-today .wc-dayname, .wc-day.is-today .wc-daynum { color: var(--color-primary-700); }
+.wc-specials { display: flex; flex-wrap: wrap; gap: 4px; margin: 0 0 6px; }
+.wc-specials .today-special-chip { padding: 2px 9px; font-size: 12px; }
+/* A stay across days: one bar over its columns, in the strip's second row. */
+.wc-bars {
+  grid-row: 2; grid-column: 1 / -1; display: grid; grid-template-columns: repeat(var(--wc-days, 7), minmax(0, 1fr));
+  row-gap: 3px; margin-bottom: 6px; position: relative; z-index: 1;
+}
+.wc-bar {
+  display: flex; align-items: baseline; gap: 8px; min-width: 0; margin: 0 8px; padding: 3px 10px 3px 8px;
+  border: 0; border-left: 3px solid hsl(214 50% 47%); border-radius: var(--radius-md); background: var(--event-tint);
+  font-family: var(--font-family-sans); font-size: 12.5px; text-align: left; color: var(--color-neutral-800);
+}
+.wc-bar:hover { background: var(--event-tint-hover); }
+.wc-bar-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wc-bar-tail { margin-left: auto; flex: none; font-size: 11.5px; color: var(--color-neutral-500); white-space: nowrap; }
+/* With its bar drawn, a stay's line above the days is for screen readers. */
+.wc-spans li.has-bar { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+/* A weekend that is over, folded to one line (2026-10-05, #137). */
+.wc-weekend-fold {
+  display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 14px; width: 100%; margin: 0 0 12px; padding: 9px 14px;
+  border: 1px solid var(--color-neutral-200); border-radius: var(--radius-lg); background: transparent; text-align: left;
+  font-family: var(--font-family-sans); font-size: 12.5px; color: var(--color-neutral-500); cursor: pointer;
+}
+.wc-weekend-fold:hover { border-color: var(--color-neutral-300); background: color-mix(in srgb, var(--color-neutral-100) 50%, transparent); }
+.wc-weekend-fold:focus-visible { outline: 2px solid var(--color-primary-600); outline-offset: 2px; }
+.wc-weekend-fold-title { font-family: var(--font-family-display); font-size: 17px; line-height: 1.2; color: var(--color-neutral-700); }
+.wc-weekend-fold-events { display: inline-flex; flex-wrap: wrap; gap: 3px 12px; min-width: 0; }
+.wc-weekend-fold-events > span::before { content: ""; display: inline-block; width: 2px; height: 11px; margin-right: 6px; border-radius: 1px; background: hsl(214 50% 47%); vertical-align: -1px; }
+.wc-weekend-fold-left { color: var(--color-neutral-700); }
+.wc-weekend-fold-open { margin-left: auto; font-weight: 500; color: var(--color-neutral-600); white-space: nowrap; }
+.wc-tray-aside { color: var(--color-neutral-500); }
 .wc-drop-hint { margin: 0 0 6px; font-family: var(--font-family-sans); font-size: 12px; font-weight: 600; color: var(--color-primary-800); }
 .wc-events { list-style: none; margin: 0 0 6px; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+/* Calendar events: the blue mark and quiet blue tint every page gives them
+   (ROW-LANGUAGE.md), not the place's colour. */
 .wc-event {
-  display: flex; gap: 6px; width: 100%; padding: 4px 8px; border: 0; border-radius: var(--radius-md); text-align: left;
-  background: var(--color-primary-100); color: var(--color-primary-900);
+  display: flex; gap: 6px; width: 100%; padding: 4px 8px 4px 7px; border: 0; border-left: 3px solid hsl(214 50% 47%);
+  border-radius: var(--radius-md); text-align: left;
+  background: var(--event-tint); color: var(--color-neutral-800);
   font-family: var(--font-family-sans); font-size: 12.5px; line-height: 1.3;
 }
-.wc-event:hover { background: var(--color-primary-200); }
+.wc-event:hover { background: var(--event-tint-hover); }
 .wc-event:focus-visible, .wc-span:focus-visible, .wc-rhythm-item:focus-visible, .wc-daychip:focus-visible { outline: 2px solid var(--color-primary-600); outline-offset: 2px; }
 .wc-event-time { flex: none; font-weight: 600; }
 .wc-event-title { min-width: 0; overflow-wrap: anywhere; }
 .wc-event-sub { display: block; font-size: 11.5px; opacity: .8; }
-.wc-items .cw-row { font-size: 13px; border-color: var(--color-neutral-200); margin: 3px 0; padding-left: 2px; }
-.wc-items .cw-row.is-routine { border-style: dashed; }
+/* One row anatomy, no box per row: the hover tint marks the row under your
+   hand (ROW-LANGUAGE.md; the 2026-10-13 review: cards inside cards). */
+.wc-items .cw-row { font-size: 13px; border-color: transparent; margin: 1px -6px; padding-left: 4px; }
+.wc-items .cw-row:hover, .wc-items .cw-row:focus-within { background: color-mix(in srgb, var(--color-primary-50) 70%, transparent); border-color: var(--color-primary-100); }
+/* A routine is a rounded square, a task a circle (ROW-LANGUAGE.md). */
+.wc .cw-row.is-routine .cw-check-ring { border-radius: 4px; border-color: var(--color-sage-500); background: var(--color-sage-50); }
+.wc .cw-row.is-routine .cw-check:hover .cw-check-ring, .wc .cw-row.is-routine .cw-check.is-on .cw-check-ring { border-color: var(--color-sage-600); background: var(--color-sage-600); }
+/* Faces under the title, overlapped a little, so a narrow day keeps its words. */
+.wc-people { display: flex; padding-top: 3px; }
+.wc-avatar { width: 18px; height: 18px; font-size: 8px; box-shadow: 0 0 0 1.5px var(--color-bg-elevated); }
+.wc-avatar + .wc-avatar { margin-left: -4px; }
+.wc-days-head .wc-done { margin-left: auto; }
+.wc-days-head .wc-rhythm { margin: 0; }
+.wc-day .wk-free { margin-top: 8px; }
 .wc-dinner { margin: 6px 0 0; font-family: var(--font-family-sans); font-size: 12px; }
 .wc-sometime { margin-top: 8px; padding-top: 6px; border-top: 1px dashed var(--color-neutral-200); }
 .wc-sometime-label { font-family: var(--font-family-sans); font-size: 11.5px; font-weight: 600; color: var(--color-neutral-500); }
-.wc.is-dragging .wc-day:not(.is-over) { border-style: dashed; }
+.wc.is-dragging .wc-day:not(.is-over) { border-left-style: dashed; }
 
-/* Narrower desks: the days wrap rather than crush (four across). */
+/* Narrower desks: the days wrap rather than crush (four across); the line
+   above the days says a stay, without its bar. */
 @media (min-width: 768px) and (max-width: 1100px) {
-  .wc-strip { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .wc-strip { grid-template-columns: repeat(4, minmax(0, 1fr)); grid-template-rows: none; row-gap: 12px; }
+  .wc-strip > .wc-day { grid-row: auto; grid-column: auto !important; display: block; }
+  .wc-strip > .wc-day:nth-child(4n + 1) { border-left-color: transparent; }
+  .wc-bars { display: none; }
+  .wc-spans li.has-bar { position: static; width: auto; height: auto; overflow: visible; clip: auto; white-space: normal; }
 }
 
 /* Phone: day chips, the chosen day, then the shelf in one column. */
@@ -234,6 +305,7 @@
 .wc-daychip.is-today[aria-pressed="true"] { box-shadow: 0 0 0 2px var(--color-primary-200); }
 .wc-done-row { display: flex; justify-content: flex-end; }
 @media (max-width: 767px) {
+  .wc-phone .wc-day { display: block; border-left: 0; padding: 8px 10px 12px; }
   .wc-masonry { columns: 1; }
   .wc-group-head { position: sticky; top: 0; z-index: 2; background: var(--color-bg-elevated); }
   .wc-more, .cw-daychip { min-width: 44px; min-height: 44px; }

@@ -20,9 +20,9 @@ describe('freeWindows', () => {
 
 describe('formatFree', () => {
   it('says the windows the way a person does', () => {
-    expect(formatFree([{ s: 10.5, e: 16 }, { s: 17, e: 19 }])).toBe('Free 10:30a–4p · 5–7p')
-    expect(formatFree([{ s: 7, e: 21 }])).toBe('Free all day')
-    expect(formatFree([])).toBe('No free time')
+    expect(formatFree([{ s: 10.5, e: 16 }, { s: 17, e: 19 }])).toBe('Calendar clear 10:30a–4p · 5–7p')
+    expect(formatFree([{ s: 7, e: 21 }])).toBe('Calendar clear all day')
+    expect(formatFree([])).toBe('Calendar full')
   })
 })
 

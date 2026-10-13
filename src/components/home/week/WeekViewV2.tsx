@@ -72,6 +72,8 @@ import { monthsOfWeek } from '@/lib/planning/periodPlacement'
 import { readSeasons } from '@/lib/cadence/seasons'
 import { weekRhythm } from '@/lib/week/weekRhythm'
 import { densityDescription } from '@/lib/planning/dayDensity'
+import { dayFreeWindows, formatFree } from '@/lib/week/dayShape'
+import { parseSpecials } from '@/lib/today/specials'
 import { unhomedRoutines } from '@/lib/week/unhomedRoutines'
 import { buildShelf, type ShelfMilestone } from '@/components/canvas/week/weekShelf'
 import { WeekCanvas, type CanvasDay, type CanvasDayItem, type WeekCanvasWriters } from '@/components/canvas/week/WeekCanvas'
@@ -1066,18 +1068,32 @@ export function WeekViewV2(props: WeekViewV2Props) {
     const found = weekRhythm(journalDays)
     const hasDaily = found.everyDay.length + found.weekdays.length > 0
     const rhythm = dailyShown ? { everyDay: [], weekdays: [], days: journalDays } : found
-    const toItem = (e: JournalEntry): CanvasDayItem => ({ id: e.id, kind: e.kind, title: e.title, subtitle: e.subtitle, time: e.time, completed: e.completed, task: e.task, routineId: e.routineId })
-    const days: CanvasDay[] = rhythm.days.map((d, i) => ({
-      date: d.date, key: d.key,
-      events: [
+    const toItem = (e: JournalEntry): CanvasDayItem => ({ id: e.id, kind: e.kind, title: e.title, subtitle: e.subtitle, time: e.time, completed: e.completed, task: e.task, routineId: e.routineId, people: e.people })
+    // Open calendar time is planning information: today and the days ahead,
+    // counted from the whole day — every-day routines too, though written above.
+    const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0)
+    const whole = new Map(journalDays.map((d) => [d.key, d]))
+    const days: CanvasDay[] = rhythm.days.map((d, i) => {
+      const events = [
         ...d.notes.map((ev): CanvasDayItem => ({ id: `event-${ev.google_event_id || ev.id}`, kind: 'event', title: ev.title, completed: false })),
         ...d.entries.filter((e) => e.kind === 'event').map(toItem),
-      ],
-      items: [...d.entries.filter((e) => e.kind !== 'event'), ...d.foldedRoutines].filter((e) => !(e.task && onShelf.has(e.task.id))).map(toItem),
-      sometime: journalWeekend && journalWeekend.satIndex === i ? journalWeekend.sometime.map(toItem) : undefined,
-      dinners: d.dinners.map(({ event, label }) => ({ id: `event-${event.google_event_id || event.id}`, label })),
-      weather: forecast[d.key] ? <DayWeather weather={forecast[d.key]} narrow={false} /> : undefined,
-    }))
+      ]
+      // "Specials — Ella: Library · Kaleb: Art" is one chip per kid, as on
+      // Today (ROW-LANGUAGE: specials), not an event row.
+      const specials = events.flatMap((ev) => parseSpecials(ev.title) ?? [])
+      return {
+        date: d.date, key: d.key,
+        events: events.filter((ev) => !parseSpecials(ev.title)),
+        specials,
+        items: [...d.entries.filter((e) => e.kind !== 'event'), ...d.foldedRoutines].filter((e) => !(e.task && onShelf.has(e.task.id))).map(toItem),
+        sometime: journalWeekend && journalWeekend.satIndex === i ? journalWeekend.sometime.map(toItem) : undefined,
+        dinners: d.dinners.map(({ event, label }) => ({ id: `event-${event.google_event_id || event.id}`, label })),
+        weather: forecast[d.key] ? <DayWeather weather={forecast[d.key]} narrow={false} /> : undefined,
+        // The hours with nothing scheduled ("Calendar clear 10:30a–4:15p"),
+        // not a promise of spare time: untimed tasks still want some.
+        free: d.date >= todayStart ? formatFree(dayFreeWindows(whole.get(d.key)?.entries ?? d.entries)) : undefined,
+      }
+    })
     const lines = [
       { label: 'Every day', items: rhythm.everyDay.map((r) => ({ title: r.title, openId: r.openId })) },
       { label: 'Weekdays', items: rhythm.weekdays.map((r) => ({ title: r.title, openId: r.openId })) },
@@ -1196,6 +1212,7 @@ export function WeekViewV2(props: WeekViewV2Props) {
     return journalSpans.map((sp) => ({
       id: `event-${sp.event.google_event_id || sp.event.id}`,
       when: `${wd(sp.startCol)}${sp.endCol !== sp.startCol ? `–${wd(sp.endCol)}` : ''}`,
+      from: journalDays[sp.startCol].key, to: journalDays[sp.endCol].key,
       title: sp.event.title.trim(),
       tail: sp.continuesBefore || sp.continuesAfter ? `${sp.continuesBefore ? `, from ${ymdLabel(sp.first)}` : ''}${sp.continuesAfter ? `, through ${ymdLabel(sp.last)}` : ''}` : undefined,
     }))
@@ -1204,13 +1221,12 @@ export function WeekViewV2(props: WeekViewV2Props) {
     localYmd(c.date), densityDescription(c.density, c.date.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })),
   ])), [dayChoices])
   const { area: addAreaDefault } = useAddArea()
-  const canvasMembers = useMemo(() => familyMembers.map((m) => ({ id: m.id, name: m.name })), [familyMembers])
   const weekCanvas = (host: WeekCanvasHost) => (
     <WeekCanvas weekStart={weekAnchor} days={canvasDays.days} shelf={shelf} routinesToPlace={routinesToPlace}
       rhythm={canvasDays.lines} monthName={canvasMonthName} isCurrent={weekIsCurrentFor(weekAnchor)} writers={canvasWriters}
-      spans={canvasSpans} dayDescriptions={canvasDayDescriptions} members={canvasMembers}
+      spans={canvasSpans} dayDescriptions={canvasDayDescriptions} members={familyMembers}
       daily={canvasDays.hasDaily ? { shown: dailyShown, onToggle: toggleDaily } : undefined}
-      lookBack={{ count: host.lastWeekOpen, onReview: host.onLookBack }} defaultArea={addAreaDefault} focusAdd={host.arrivedToWrite} />
+      defaultArea={addAreaDefault} focusAdd={host.arrivedToWrite} />
   )
 
   // A past week is a look-back, not a plan.

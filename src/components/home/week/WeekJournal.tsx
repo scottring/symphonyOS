@@ -31,7 +31,7 @@ import type { FamilyMember } from '@/types/family'
 import type { DayForecast } from '@/hooks/useWeather'
 import { weatherCondition, weatherIcon } from '@/lib/weatherIcon'
 import { weekRhythm } from '@/lib/week/weekRhythm'
-import { busyBlocks, freeWindows, formatFree } from '@/lib/week/dayShape'
+import { dayFreeLabel } from '@/lib/week/dayShape'
 
 import type { JournalDay, JournalEntry, JournalWeekend } from '@/lib/week/journalDays'
 export type { JournalDay, JournalEntry, JournalWeekend } from '@/lib/week/journalDays'
@@ -303,10 +303,7 @@ function DayRow({ day, onSelectItem, onToggleEntry, onPlanDrop, onAddToDay, drag
 /** A day's free time between 7a and 9p, from everything timed on it —
  *  the every-day routines included, though they are written above. */
 function dayFree(day: JournalDay): string {
-  // Done or not, a timed thing took its time.
-  const timed = day.entries.filter((e) => e.time)
-  // An hour or more counts; the half hour between dinner and bedtime doesn't.
-  return formatFree(freeWindows(busyBlocks(timed.map((e) => ({ start: e.time!, end: e.end }))), 1))
+  return dayFreeLabel(day.entries)
 }
 
 function DayCell({ day, onSelectItem, onToggleEntry, onPlanDrop, onAddToDay, onAddEvent, dragEnabled, timingControl, weather, fixedOnly = false, free, memberById, forLabel, forControl }: {

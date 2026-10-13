@@ -79,7 +79,7 @@ describe('open space on Today', () => {
     })
     await screen.findByText('School')
     // 2:10 PM to 6:45 PM, to the quarter hour.
-    expect(await screen.findByText('4½ hours free')).toBeInTheDocument()
+    expect(await screen.findByText('4½ hours open')).toBeInTheDocument()
   })
 
   it('says nothing of a gap under an hour', async () => {
@@ -91,7 +91,7 @@ describe('open space on Today', () => {
     })
     await screen.findByText('A')
     // Only the morning before A and the stretch after B: nothing for 10–10:30.
-    expect(screen.getAllByText(/hours? free$/).map((el) => el.textContent)).toEqual(['3 hours free', '9 hours free'])
+    expect(screen.getAllByText(/hours? open$/).map((el) => el.textContent)).toEqual(['3 hours open', '9 hours open'])
   })
 
   it('closes the afternoon at an all-day dinner, at its inferred hour', async () => {
@@ -104,7 +104,7 @@ describe('open space on Today', () => {
       ] as never,
     })
     await screen.findByText('School')
-    expect(await screen.findByText('4¼ hours free')).toBeInTheDocument()
+    expect(await screen.findByText('4¼ hours open')).toBeInTheDocument()
     // ...and the dinner sits at its inferred time, not its stored one.
     expect(screen.getByRole('button', { name: /^Dinner: bread, salad, 6:30 PM$/ })).toBeInTheDocument()
   })

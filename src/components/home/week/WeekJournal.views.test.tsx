@@ -39,7 +39,7 @@ describe('WeekJournal — the strip beside a step', () => {
     expect(days).toHaveLength(7)
     const mon = within(screen.getByTestId('strip-day-2026-10-05'))
     expect(mon.getByText('Jury duty')).toBeInTheDocument()
-    expect(mon.getByText(/^Free /)).toBeInTheDocument()
+    expect(mon.getByText(/^Calendar clear /)).toBeInTheDocument()
   })
 
   // Scott, 2026-10-04: "the week so far is basically unreadable … no
@@ -63,7 +63,7 @@ describe('WeekJournal — the shape of the week', () => {
   it('shows each day’s free time and who carries each thing', () => {
     renderView({ variant: 'shape' })
     const mon = within(screen.getByTestId('shape-day-2026-10-05'))
-    expect(mon.getByText('Free 7–8a · 5–7p · 7:30–9p')).toBeInTheDocument()
+    expect(mon.getByText('Calendar clear 7–8a · 5–7p · 7:30–9p')).toBeInTheDocument()
     expect(mon.getByText('Pack lunches')).toBeInTheDocument()
     expect(mon.getAllByText('IR').length).toBeGreaterThan(0)
   })
@@ -73,6 +73,6 @@ describe('WeekJournal — the shape of the week', () => {
     expect(mon.getByText('Jury duty').closest('li')).toHaveClass('is-dim')
     expect(mon.getByText('Gift shopping').closest('li')).not.toHaveClass('is-dim')
     // Iris has no jury duty: only the shared bedtime is taken.
-    expect(mon.getByText('Free 7a–7p · 7:30–9p')).toBeInTheDocument()
+    expect(mon.getByText('Calendar clear 7a–7p · 7:30–9p')).toBeInTheDocument()
   })
 })

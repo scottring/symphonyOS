@@ -138,13 +138,15 @@ export interface CompactWeekRowProps<T> {
   trailing?: ReactNode
   /** Before the + button (a shelf row's ⋯ menu). */
   extra?: ReactNode
+  /** Under the title, after its muted line (a week day's people). */
+  under?: ReactNode
   /** Drawn inside the row, after it (a picker). */
   children?: ReactNode
   className?: string
 }
 
 /** One compact row: check, wrapping title, small meta, and + (or a menu). */
-export function CompactWeekRow<T>({ row, suffix, onAdd, addExpanded, onComplete, onOpen, onDragStart, onDragEnd, addLabel, busyKey, disabled, trailing, extra, children, className }: CompactWeekRowProps<T>) {
+export function CompactWeekRow<T>({ row, suffix, onAdd, addExpanded, onComplete, onOpen, onDragStart, onDragEnd, addLabel, busyKey, disabled, trailing, extra, under, children, className }: CompactWeekRowProps<T>) {
   const arrived = useArrived(row.id)
   const done = !!row.completed
   const movable = !!onDragStart && !row.readOnly && !row.onDay && !done && !disabled
@@ -174,6 +176,7 @@ export function CompactWeekRow<T>({ row, suffix, onAdd, addExpanded, onComplete,
             {row.context && <span className="cw-context">{row.context}</span>}
           </span>
         )}
+        {under}
       </span>
       {extra}
       {row.onDay
