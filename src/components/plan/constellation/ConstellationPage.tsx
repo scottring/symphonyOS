@@ -240,6 +240,8 @@ function Inner() {
             ? { label: 'Reopen goal', onSelect: () => setStatus('active', `Reopen “${node.title}”`) }
             : { label: 'Complete goal', onSelect: () => setStatus('completed', `Complete “${node.title}”`) },
           { label: 'Archive goal', onSelect: () => setStatus('archived', `Archive “${node.title}”`) },
+          // The row's quick Delete, here too for touch (no hover there).
+          { label: 'Delete goal', onSelect: () => { if (window.confirm(`Delete “${node.title}”? Season goals written for it stay, on their own.`)) void act(`Delete “${node.title}”`, async () => { await deleteGoal(node.id) }) } },
         ]} />
     }
     const period = node.level === 1 ? 'season' : node.level === 2 ? 'month' : 'week'
@@ -259,6 +261,27 @@ function Inner() {
         { label: `Carry to next ${period}`, onSelect: () => void act(`Carry “${node.title}” to next ${period}`, async () => !!await keepForward(node.id, next, start), { ids: [node.id] }) },
         { label: `Remove from this ${period}`, onSelect: () => void act(`Remove “${node.title}” from this ${period}`, () => dropCommitment(node.id, period, start)) },
       ]} />
+  }
+
+  // One-tap triage on each open row (Scott, 2026-10-13): Done, Someday,
+  // Delete — the same writes as the ⋯ menu's. A year goal is a goals row with
+  // no Someday, so it offers Done and Delete; deleting it leaves its season
+  // goals in place, unlinked (tasks.goal_id ON DELETE SET NULL).
+  const quickFor = (node: PlanNode): { label: string; onSelect: () => void }[] => {
+    if (isDone(node)) return []
+    if (!node.task) {
+      const status = node.goal?.status ?? 'active'
+      return [
+        { label: 'Done', onSelect: () => void act(`Complete “${node.title}”`, () => updateGoal(node.id, { status: 'completed' }), { ids: [node.id], undo: async () => (await updateGoal(node.id, { status })) !== false }) },
+        { label: 'Delete', onSelect: () => { if (window.confirm(`Delete “${node.title}”? Season goals written for it stay, on their own.`)) void act(`Delete “${node.title}”`, async () => { await deleteGoal(node.id) }) } },
+      ]
+    }
+    const toggle = async () => (await toggleTask(node.id)) !== false
+    return [
+      { label: 'Done', onSelect: () => void act(`Complete “${node.title}”`, toggle, { ids: [node.id], undo: toggle }) },
+      { label: 'Someday', onSelect: () => void act(`${describeTriageWhen('someday')}: “${node.title}”`, () => applyTriageWhen('someday', node.id, { onPushTask: gated.pushTask, onSetBucket: gated.setBucket!, onFocus: (id, day) => gated.updateTask(id, { plannedOn: day }) }), { ids: [node.id] }) },
+      { label: 'Delete', onSelect: () => { if (window.confirm(`Delete “${node.title}”? This removes the item from all its planning periods.`)) void act(`Delete “${node.title}”`, async () => { await deleteTask(node.id) }) } },
+    ]
   }
 
   // ---- Proposals for this horizon -----------------------------------------
@@ -320,6 +343,7 @@ function Inner() {
     return <PlanItemRow key={node.key} node={node}
       parentLabel={parent ? { kind: 'For', title: parent.title } : undefined}
       below={{ label: belowLabel, titles: belowOf(node) }}
+      quick={quickFor(node)}
       linked={linked === node.key}
       count={0} childTerm={null}
       done={isDone(node)} saved={savedKey === node.key}

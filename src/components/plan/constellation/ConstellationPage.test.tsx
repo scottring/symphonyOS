@@ -342,6 +342,50 @@ describe('done items, triage and the way on',()=>{
  })
 })
 
+// Scott, 2026-10-13: a few quick triage options on the goal pages.
+describe('one-tap triage on a row',()=>{
+ it('a month goal: Done (with Undo), Someday, Delete — the same writes as the menu',async()=>{
+  // With a life area, so the Someday write isn't first asked for one.
+  api.tasks=[{id:'m',title:'Picnic',bucket:'month',context:'family'},{id:'n',title:'Taxes',bucket:'month',context:'personal'}]
+  api.toggleTask.mockResolvedValue(true);api.setBucket.mockResolvedValue(true);api.deleteTask.mockResolvedValue(undefined)
+  month()
+  const quick=within(screen.getByRole('group',{name:'Triage Picnic'}))
+  expect(quick.getAllByRole('button').map(b=>b.textContent)).toEqual(['Done','Someday','Delete'])
+  fireEvent.click(quick.getByRole('button',{name:'Done: Picnic'}))
+  await waitFor(()=>expect(api.toggleTask).toHaveBeenCalledWith('m'))
+  expect(lastRun().label).toBe('Complete “Picnic”')
+  expect(lastRun().opts.undo).toBeTypeOf('function')
+  fireEvent.click(within(screen.getByRole('group',{name:'Triage Taxes'})).getByRole('button',{name:'Someday: Taxes'}))
+  await waitFor(()=>expect(api.setBucket.mock.calls.map((c:any[])=>c.slice(0,2))).toContainEqual(['n','someday']))
+  const confirm=vi.spyOn(window,'confirm').mockReturnValue(true)
+  try{
+   fireEvent.click(within(screen.getByRole('group',{name:'Triage Taxes'})).getByRole('button',{name:'Delete: Taxes'}))
+   await waitFor(()=>expect(api.deleteTask).toHaveBeenCalledWith('n'))
+  }finally{confirm.mockRestore()}
+ })
+ it('a year goal: Done and Delete (no Someday for year goals); a declined delete writes nothing',async()=>{
+  api.deleteGoal.mockResolvedValue(undefined)
+  open()
+  const quick=within(screen.getByRole('group',{name:'Triage Together'}))
+  expect(quick.getAllByRole('button').map(b=>b.textContent)).toEqual(['Done','Delete'])
+  const confirm=vi.spyOn(window,'confirm').mockReturnValue(false)
+  try{
+   fireEvent.click(quick.getByRole('button',{name:'Delete: Together'}))
+   expect(api.deleteGoal).not.toHaveBeenCalled()
+  }finally{confirm.mockRestore()}
+  fireEvent.click(quick.getByRole('button',{name:'Done: Together'}))
+  await waitFor(()=>expect(api.updateGoal).toHaveBeenCalledWith('g',{status:'completed'}))
+  await lastRun().opts.undo()
+  expect(api.updateGoal).toHaveBeenLastCalledWith('g',{status:'active'})
+ })
+ it('a done goal shows no triage',()=>{
+  api.tasks=[{id:'d',title:'Done milestone',bucket:'month',completed:true}]
+  month()
+  fireEvent.click(screen.getByRole('button',{name:'Show done'}))
+  expect(screen.queryByRole('group',{name:'Triage Done milestone'})).toBeNull()
+ })
+})
+
 describe('prepared to act on plan rows',()=>{
  it('marks what an item carries and summarises it, with the plan above, when opened',()=>{
   api.tasks=[{id:'s',title:'Back to school',bucket:'quarter',links:[{url:'https://supplies.test'}]},{id:'m',title:'Call Cami',bucket:'month',sourceId:'s',contactId:'cami',subtasks:[{id:'q1',title:'Pickup?'},{id:'q2',title:'Forms?',completed:true}]}]

@@ -418,3 +418,16 @@
   .plan-above-line, .plan-list-foot > .plan-add, .plan-list-foot > .canvas-link { min-height: 44px; }
   .plan-list-foot > .plan-next { margin-left: 0; }
 }
+
+/* One-tap triage on a goal row (2026-10-13): Done · Someday · Delete, on hover
+   or keyboard focus where there is a mouse. Touch keeps them in the ⋯ menu. */
+.plan-item-quick { display: none; flex: none; align-items: center; gap: 2px; margin-left: 6px; }
+@media (hover: hover) and (pointer: fine) {
+  .plan-item:hover .plan-item-quick, .plan-item:focus-within .plan-item-quick { display: inline-flex; }
+}
+.plan-quick {
+  all: unset; box-sizing: border-box; cursor: pointer; padding: 2px 8px; border-radius: var(--radius-sm);
+  font-family: var(--font-family-sans); font-size: 12px; font-weight: 500; color: var(--color-neutral-600); white-space: nowrap;
+}
+.plan-quick:hover { background: var(--color-neutral-100); color: var(--color-neutral-900); }
+.plan-quick:focus-visible { outline: 2px solid var(--color-primary-600); outline-offset: 1px; }

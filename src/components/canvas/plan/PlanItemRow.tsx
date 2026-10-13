@@ -39,6 +39,9 @@ export interface PlanItemRowProps {
   parentLabel?: { kind: string; title: string }
   /** What is already under it one horizon down, by name ("This week: …"). */
   below?: { label: string; titles: string[] }
+  /** One-tap triage on the row (Done, Someday, Delete), shown on hover or
+   *  focus on desktop; the same verbs stay in the ⋯ menu for touch. */
+  quick?: RowVerb[]
   /** Belongs to the parent the person selected (Month highlights, never hides). */
   related?: boolean
   /** Just linked: the parent label and its container light up together. */
@@ -73,6 +76,9 @@ export function PlanItemRow(p: PlanItemRowProps) {
       {p.saved && <span className="canvas-tag">Saved</span>}
       {p.done && <span className="canvas-tag plan-tag-done">Done</span>}
       {p.count > 0 && p.childTerm && <span className="plan-count" aria-label={`${p.count} ${p.childTerm}${p.count === 1 ? '' : 's'} below`}>{p.count} {p.childTerm}{p.count === 1 ? '' : 's'}</span>}
+      {!p.editing && !p.disabled && p.quick && p.quick.length > 0 && <span className="plan-item-quick" role="group" aria-label={`Triage ${node.title}`}>
+        {p.quick.map((q) => <button key={q.label} type="button" className="plan-quick" aria-label={`${q.label}: ${node.title}`} onClick={q.onSelect}>{q.label}</button>)}
+      </span>}
       {!p.editing && <span ref={menuWrap} className="plan-item-menu">{p.actions(verbs)}</span>}
     </div>
     {p.parentLabel && <p className="plan-item-parent"><span className="plan-item-parent-kind">{p.parentLabel.kind}</span> {p.parentLabel.title}</p>}
