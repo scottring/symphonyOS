@@ -59,15 +59,15 @@ describe('WeekJournal — the grid', () => {
     vi.useRealTimers()
     expect(screen.queryByText('Walk Jax')).toBeNull()
     expect(screen.queryByRole('region', { name: 'Every week' })).toBeNull()
-    expect(within(screen.getByTestId('journal-day-2026-10-05')).getByText('Free 7a–6p · 7–9p')).toBeInTheDocument()
+    expect(within(screen.getByTestId('journal-day-2026-10-05')).getByText('Calendar clear 7a–6p · 7–9p')).toBeInTheDocument()
   })
 
   it('says how much of each day is free', () => {
     const days = week(new Date(2026, 9, 3))
     days[2].entries.push({ id: 'event-x', kind: 'event', title: 'Jury duty', completed: false, time: new Date(2026, 9, 5, 9), end: new Date(2026, 9, 5, 17) })
     renderGrid(days, { satIndex: 0, sunIndex: 1, sometime: [] })
-    expect(within(screen.getByTestId('journal-day-2026-10-05')).getByText('Free 7–9a · 5–9p')).toBeInTheDocument()
-    expect(within(screen.getByTestId('journal-day-2026-10-06')).getByText('Free all day')).toBeInTheDocument()
+    expect(within(screen.getByTestId('journal-day-2026-10-05')).getByText('Calendar clear 7–9a · 5–9p')).toBeInTheDocument()
+    expect(within(screen.getByTestId('journal-day-2026-10-06')).getByText('Calendar clear all day')).toBeInTheDocument()
   })
 
   it('a Sunday-start week has no band; Sometime stands after Saturday', () => {
@@ -113,8 +113,8 @@ describe('WeekJournal — the grid', () => {
     days[2].entries.push({ id: 'task-x', kind: 'task', title: 'Dentist', completed: true, time: new Date(2026, 9, 5, 9), end: new Date(2026, 9, 5, 17) })
     days[0].entries.push({ id: 'task-y', kind: 'task', title: 'Porch', completed: false })
     renderGrid(days, { satIndex: 0, sunIndex: 1, sometime: [] })
-    expect(within(screen.getByTestId('journal-day-2026-10-05')).getByText('Free 7–9a · 5–9p')).toBeInTheDocument()
-    expect(within(screen.getByTestId('journal-day-2026-10-03')).queryByText(/^Free|No free time/)).toBeNull()
+    expect(within(screen.getByTestId('journal-day-2026-10-05')).getByText('Calendar clear 7–9a · 5–9p')).toBeInTheDocument()
+    expect(within(screen.getByTestId('journal-day-2026-10-03')).queryByText(/^Calendar (clear|full)/)).toBeNull()
     vi.useRealTimers()
   })
 

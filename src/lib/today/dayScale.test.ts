@@ -59,12 +59,12 @@ describe('buildDayScale', () => {
       { id: 'marta', start: at(9, 30), end: at(11, 30) },
       { id: 'pickup', start: at(16) },
     ])
-    expect(s.free.map((f) => f.label)).toEqual(['2½ hours free', '4½ hours free', 'Evening open'])
+    expect(s.free.map((f) => f.label)).toEqual(['2½ hours open', '4½ hours open', 'Evening open'])
   })
 
   it('spends the part of today before now', () => {
     const s = buildDayScale([{ id: 'pickup', start: at(16) }], { now: at(13, 30) })
-    expect(s.free.map((f) => f.label)).toEqual(['2½ hours free', 'Evening open'])
+    expect(s.free.map((f) => f.label)).toEqual(['2½ hours open', 'Evening open'])
     expect(s.free[0].top).toBeGreaterThan((13.5 - 7) * 48)
   })
 
@@ -109,9 +109,9 @@ describe('timeAtOffset', () => {
 
 describe('labels', () => {
   it('says hours the way a person does', () => {
-    expect(freeHoursLabel(1)).toBe('1 hour free')
-    expect(freeHoursLabel(4.5)).toBe('4½ hours free')
-    expect(freeHoursLabel(1.25)).toBe('1¼ hours free')
+    expect(freeHoursLabel(1)).toBe('1 hour open')
+    expect(freeHoursLabel(4.5)).toBe('4½ hours open')
+    expect(freeHoursLabel(1.25)).toBe('1¼ hours open')
     expect(hourLabel(12)).toBe('12p')
     expect(hourLabel(0)).toBe('12a')
   })

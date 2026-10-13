@@ -61,12 +61,14 @@ export function hourLabel(h: number): string {
   return `${twelve}${hh < 12 ? 'a' : 'p'}`
 }
 
-/** "4½ hours free", "1 hour free" — quarter hours, as a person says them. */
+/** "4½ hours open", "1 hour open" — quarter hours, as a person says them.
+ *  Open, like "Evening open": nothing is scheduled then, which is not the
+ *  same as nothing to do (2026-10-13 review: "free" promised too much). */
 export function freeHoursLabel(hours: number): string {
   const q = Math.round(hours * 4) / 4
   const whole = Math.floor(q)
   const frac = ({ 0: '', 0.25: '¼', 0.5: '½', 0.75: '¾' } as Record<number, string>)[q - whole] ?? ''
-  return `${whole}${frac} ${q === 1 ? 'hour' : 'hours'} free`
+  return `${whole}${frac} ${q === 1 ? 'hour' : 'hours'} open`
 }
 
 /** The hour a dropped thing lands on: `top` px down the column, to the quarter hour. */

@@ -41,12 +41,28 @@ function clock(h: number, withMeridiem: boolean): string {
   return `${twelve}${mm ? `:${String(mm).padStart(2, '0')}` : ''}${withMeridiem ? (hh < 12 ? 'a' : 'p') : ''}`
 }
 
-/** "Free 10:30a–4p · 5–7p" — the start's a/p only when it differs from the end's. */
+/** "Calendar clear 10:30a–4p · 5–7p" — the start's a/p only when it differs
+ *  from the end's. It names hours with nothing scheduled, not spare capacity:
+ *  the day's untimed tasks still want some of them (2026-10-13 review: "Free
+ *  10:30a–4:15p" promised too much). */
 export function formatFree(windows: Span[]): string {
-  if (!windows.length) return 'No free time'
-  if (windows.length === 1 && windows[0].s <= DAY_START && windows[0].e >= DAY_END) return 'Free all day'
-  return 'Free ' + windows.map((w) => {
+  if (!windows.length) return 'Calendar full'
+  if (windows.length === 1 && windows[0].s <= DAY_START && windows[0].e >= DAY_END) return 'Calendar clear all day'
+  return 'Calendar clear ' + windows.map((w) => {
     const sameHalf = (w.s < 12) === (w.e < 12)
     return `${clock(w.s, !sameHalf)}–${clock(w.e, true)}`
   }).join(' · ')
+}
+
+/** A day's free time between 7a and 9p, from everything timed on it, done or
+ *  not ("Calendar clear 10:30a–4p · 5–7p"). The Week page counts only an hour or more:
+ *  the half hour between dinner and bedtime doesn't. */
+export function dayFreeLabel(entries: { time?: Date; end?: Date }[]): string {
+  return formatFree(dayFreeWindows(entries))
+}
+
+/** The windows behind dayFreeLabel: an hour or more each. */
+export function dayFreeWindows(entries: { time?: Date; end?: Date }[]): Span[] {
+  const timed = entries.filter((e) => e.time)
+  return freeWindows(busyBlocks(timed.map((e) => ({ start: e.time!, end: e.end }))), 1)
 }

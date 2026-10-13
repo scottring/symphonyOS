@@ -78,24 +78,30 @@ function mockEvent(over: { id: string; title: string; start: string; end: string
   } as unknown as CalendarEvent
 }
 
+// The days are the page (2026-10-12); the shelf opens from the line under the title.
+const openShelf = () => fireEvent.click(screen.getByRole('button', { name: 'Show' }))
+
 describe('WeekViewV2 layout', () => {
   // Scott, 2026-09-21: the week's viewport is the days. Planning is ONE panel
   // (the dock beside the page), opened from a labelled button, never a
   // second column of lists to understand first.
   it('gives the desktop viewport to the days; the shell owns the task chooser', () => {
     render(<WeekViewV2 {...defaultProps} routines={[]} />)
-    // The week canvas (2026-10-10): Still to place above the days.
-    expect(screen.getByRole('region', { name: 'Still to place' })).toBeInTheDocument()
+    // Calendar first (2026-10-12): the days, with the shelf folded into one line.
     expect(screen.getByRole('region', { name: 'The days' })).toBeInTheDocument()
+    expect(screen.queryByRole('region', { name: 'Still to place' })).toBeNull()
+    expect(screen.getByText(/^Still to place ·/)).toBeInTheDocument()
     expect(screen.queryByText(/Didn.t happen/)).toBeNull()
     expect(screen.queryByRole('button', { name: /This month/ })).toBeNull()
     expect(screen.queryByRole('button', { name: 'Shelves' })).not.toBeInTheDocument()
   })
 
-  it('shows a week task on the Still to place shelf above the days', () => {
+  it('counts a week task with no day under the title, and shows it on the shelf when asked', () => {
     const anchor = weekStartAnchor(monday, readCadenceConfig().weekStartsOn)
     const t = createMockTask({ id: 'w', title: 'Call the plumber', bucket: 'week', weekStart: anchor, commitments: [{ level: 'week', periodStart: anchor, status: 'open' }] })
     render(<WeekViewV2 {...defaultProps} tasks={[t]} routines={[]} />)
+    expect(screen.getByText(/^Still to place · 1 task ·/)).toBeInTheDocument()
+    openShelf()
     const shelf = within(screen.getByRole('region', { name: 'Still to place' }))
     expect(shelf.getByText('Call the plumber')).toBeInTheDocument()
     expect(shelf.getByRole('button', { name: 'Give Call the plumber a day' })).toBeInTheDocument()
@@ -116,12 +122,14 @@ describe('WeekViewV2 week extras', () => {
     expect(screen.queryByText(/^Specials/)).toBeNull()
   })
 
-  it('keeps specials as a grid block on a day with no School event', () => {
+  it('keeps specials on a day with no School event, as one chip per kid (ROW-LANGUAGE)', () => {
     const events = [
-      mockEvent({ id: 'spc', title: 'Specials — Ella: Library', start: '2026-05-18T07:45:00', end: '2026-05-18T08:00:00' }),
+      mockEvent({ id: 'spc', title: 'Specials — Ella: Library · Kaleb: Art', start: '2026-05-18T07:45:00', end: '2026-05-18T08:00:00' }),
     ]
     render(<WeekViewV2 {...defaultProps} routines={[]} events={events} />)
-    expect(screen.getByText('Specials — Ella: Library')).toBeInTheDocument()
+    expect(screen.getByText('Library').closest('.today-special-chip')).toHaveTextContent('EllaLibrary')
+    expect(screen.getByText('Art').closest('.today-special-chip')).toHaveTextContent('KalebArt')
+    expect(screen.queryByText('Specials — Ella: Library · Kaleb: Art')).not.toBeInTheDocument()
   })
 })
 
@@ -449,7 +457,9 @@ describe('WeekViewV2 journal spread', () => {
       expect(screen.getByRole('region', { name: 'The days' })).toBeInTheDocument()
       expect(screen.queryByRole('radio', { name: 'Hours' })).toBeNull()
       expect(within(screen.getByTestId('journal-day-2026-09-14')).getByText('Return library books')).toBeInTheDocument()
-      // No side column here either: Planning is a sheet behind its button.
+      // No side column here either: the shelf opens from its line.
+      expect(screen.queryByRole('region', { name: 'Still to place' })).toBeNull()
+      openShelf()
       expect(screen.getByRole('region', { name: 'Still to place' })).toBeInTheDocument()
       expect(screen.queryByRole('dialog', { name: 'Shelves' })).toBeNull()
       expect(screen.queryByRole('button', { name: 'Shelves' })).toBeNull() // Date header owns the launcher.
@@ -558,6 +568,7 @@ describe('WeekViewV2 — the week canvas keeps what the page could do', () => {
     const shed = line('m2', 'Clear out the shed', { goalId: 'y2' })
     const cabin = action('w1', 'Book the cabin', { sourceId: 'm1', goalId: 'y1' })
     render(<WeekViewV2 {...defaultProps} routines={[]} weekStart={sunday} tasks={[trip, shed, cabin]} onUpdateTask={onUpdateTask} />)
+    openShelf()
     fireEvent.click(screen.getByRole('button', { name: 'More for Book the cabin' }))
     fireEvent.click(screen.getByRole('menuitem', { name: 'Move under…' }))
     fireEvent.click(screen.getByRole('menuitemradio', { name: 'Clear out the shed' }))
@@ -568,6 +579,7 @@ describe('WeekViewV2 — the week canvas keeps what the page could do', () => {
     const onUpdateTask = vi.fn()
     const trip = line('m1', 'Plan the autumn trip')
     render(<WeekViewV2 {...defaultProps} routines={[]} weekStart={sunday} tasks={[trip, action('w1', 'Book the cabin', { sourceId: 'm1' })]} onUpdateTask={onUpdateTask} />)
+    openShelf()
     fireEvent.click(screen.getByRole('button', { name: 'More for Plan the autumn trip' }))
     fireEvent.click(screen.getByRole('menuitem', { name: 'Put on this week' }))
     expect(onUpdateTask).toHaveBeenCalledWith('m1', { bucket: 'week', weekStart: anchor() })
@@ -576,6 +588,7 @@ describe('WeekViewV2 — the week canvas keeps what the page could do', () => {
   it('People… and Life area… write the row’s own fields', () => {
     const onUpdateTask = vi.fn()
     render(<WeekViewV2 {...defaultProps} routines={[]} weekStart={sunday} tasks={[action('w1', 'Book the cabin')]} onUpdateTask={onUpdateTask} />)
+    openShelf()
     fireEvent.click(screen.getByRole('button', { name: 'More for Book the cabin' }))
     fireEvent.click(screen.getByRole('menuitem', { name: 'Life area…' }))
     fireEvent.click(screen.getByRole('menuitemradio', { name: 'Family' }))

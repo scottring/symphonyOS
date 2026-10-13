@@ -5,12 +5,12 @@ Every page that lists the things in a day (Today, Week, the wall, planning steps
 
 | Thing | Rule | Where it lives |
 |---|---|---|
-| Kind of row | Calendar event = blue mark and a quiet blue tint (`hsl(214 50% 47%)` / `hsl(214 45% 96%)`). Task = circle. Routine = rounded square. | Today: `[data-row-kind]` in `index.css`. Week: `.wk-glyph`, `.wk-row[data-mark]` in `layout-system.css` |
+| Kind of row | Calendar event = blue mark and a quiet blue tint (`hsl(214 50% 47%)` / `hsl(214 45% 96%)`). Task = circle. Routine = rounded square. | Today: `[data-row-kind]` in `index.css`. Week: `.wc-event`, `.wc .cw-row.is-routine` in `canvas-today.css` (the planning steps' journal: `.wk-glyph`, `.wk-row[data-mark]` in `layout-system.css`) |
 | Time | One time in the lane (the start). When it ends goes under the title: "until 10:15 AM", then the drive time | `rowSubtitle(item, { until })` |
 | Steps | Folded to their next one: "Next: … · 5 steps ›". Only a step for someone *other* than the row's person stays open | `ScheduleItem` |
 | People | Avatars a glance from the title (a 54rem reading measure on Today); your own included; nothing shown for an id the household doesn't know | `RowActionRail`, `ScheduleItem` |
 | Defaults | A control showing the default ("Any time") waits for hover or focus, on the title line so nothing moves | `ScheduleItem` |
-| Free time | Named, in green. An hour or more counts, on a Week day and on Today's day column ("4½ hours free", "Evening open") | `lib/week/dayShape.ts`, `lib/today/dayScale.ts` |
+| Open time | Named, in green, as hours with nothing scheduled, never as spare time: untimed tasks still want some of them (2026-10-13 review: "Free 10:30a–4:15p" promised too much). An hour or more counts. Week day: "Calendar clear 10:30a–4:15p" / "Calendar clear all day" / "Calendar full"; Today's day column: "4½ hours open", "Evening open" | `lib/week/dayShape.ts` (`formatFree`, `dayFreeWindows`), `lib/today/dayScale.ts` (`freeHoursLabel`) |
 | Specials | One chip per kid, from the "Specials — Ella: Library · Kaleb: Art" event | `lib/today/specials.ts` |
 | Counts | None on Today or between people. A thing's own steps ("5 steps") are fine; tallies of what's undone are not | |
 

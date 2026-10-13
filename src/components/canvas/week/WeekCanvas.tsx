@@ -4,14 +4,23 @@
 // organisation and consistency are core requirements). Days mode of /week,
 // plain and ?view=alongside:
 //
-//   Still to place   the week's work with no day yet, ABOVE the days: a
-//                    masonry of cards, each headed once by the month milestone
-//                    its actions serve; Unlinked last, dashed; weekly routines
-//                    that still need a day in their own card. Rows are the
-//                    compact week row (CompactWeekRow); + gives it a day.
-//   The days         seven equal columns in the household's week order:
-//                    events as filled chips, placed work as outlined rows
-//                    with a ⋯ menu; done work hidden until "Show done".
+//   The days         the page (Scott, 2026-10-12: calendar first; mockup
+//                    approved 2026-10-13): equal columns in the household's
+//                    week order — events in calendar blue, the kids' specials
+//                    as chips, placed work as rows with a ⋯ menu and who
+//                    carries it, routines as rounded squares, the hours with
+//                    nothing scheduled in green ("Calendar clear …",
+//                    ROW-LANGUAGE.md); a stay across days as one bar; past
+//                    days stepped back and a weekend that is over folded to a
+//                    line; done work hidden until "Show done".
+//   Still to place   what is chosen for this week with no day yet, folded
+//                    into one line under the title ("Still to place · 2
+//                    routines · Show"); Show opens it above the days: a
+//                    masonry of cards, each headed once by the month goal its
+//                    tasks serve, "Not under an October goal" last; weekly
+//                    routines that still need a day in their own card. + gives
+//                    a row a day. Inbox, last week and the month's goals are
+//                    the planning session's, not the tray's.
 //
 // Drag a row onto a day to place it, a day's row onto another day to move
 // it, back onto the shelf to take its day away. While dragging, the target
@@ -26,6 +35,9 @@ import { useContext, useState, type DragEvent, type FormEvent, type ReactNode } 
 import { createPortal } from 'react-dom'
 import { MoreHorizontal } from 'lucide-react'
 import type { Task, TaskContext } from '@/types/task'
+import type { FamilyMember } from '@/types/family'
+import { AssigneeAvatar } from '@/components/family/AssigneeAvatar'
+import { anOrA } from '@/lib/week/monthLinks'
 import type { PlanNode } from '@/components/plan/constellation/model'
 import { MoveUnderMenu } from '@/components/canvas/plan/MoveUnderMenu'
 import { ContextPicker } from '@/components/triage/ContextPicker'
@@ -52,6 +64,8 @@ export interface CanvasDayItem {
   completed: boolean
   task?: Task
   routineId?: string
+  /** Who carries it (household member ids); none for a calendar event. */
+  people?: string[]
 }
 
 export interface CanvasDay {
@@ -67,10 +81,16 @@ export interface CanvasDay {
   dinners?: { id: string; label: string }[]
   /** The day's forecast, small and muted in its header. */
   weather?: ReactNode
+  /** The kids' specials, one chip each ("Ella · Library"). */
+  specials?: { who: string; special: string }[]
+  /** The hours with nothing scheduled ("Calendar clear 10:30a–4:15p");
+   *  today and the days ahead only. */
+  free?: string
 }
 
-/** A calendar event across several days, written once above them. */
-export interface CanvasSpan { id: string; when: string; title: string; tail?: string }
+/** A calendar event across several days, written once: a bar across the
+ *  columns it covers (`from`–`to`, YYYY-MM-DD within the week). */
+export interface CanvasSpan { id: string; when: string; title: string; tail?: string; from?: string; to?: string }
 
 export interface ShelfRoutine { id: string; title: string }
 
@@ -116,16 +136,14 @@ export interface WeekCanvasProps {
   /** What each day already holds, for the day picker's spoken label
    *  (densityDescription), keyed by local YYYY-MM-DD. */
   dayDescriptions?: Record<string, string>
-  /** The household, for People…. */
-  members?: { id: string; name: string }[]
+  /** The household: People… and the faces on each day's rows. */
+  members?: (Pick<FamilyMember, 'id' | 'name'> & Partial<FamilyMember>)[]
   /** Every-day routines in each day, or written once above (the page's
    *  remembered choice). */
   daily?: { shown: boolean; onToggle: () => void }
-  /** Last week's open work waiting for a decision, and the way to it. */
-  lookBack?: { count: number; onReview: () => void }
-  /** The life area a new Unlinked action starts in. */
+  /** The life area a new task with no goal starts in. */
   defaultArea?: TaskContext
-  /** Open with the cursor in Unlinked's composer (arrived to write). */
+  /** Open the shelf with the cursor in its no-goal composer (arrived to write). */
   focusAdd?: boolean
 }
 
@@ -139,7 +157,7 @@ type Picker = { key: string; mode: 'place' | 'move' } | null
 
 const longDay = (d: Date) => d.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
 
-export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [], monthName, isCurrent, writers, spans = [], dayDescriptions, members = [], daily, lookBack, defaultArea, focusAdd = false }: WeekCanvasProps) {
+export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [], monthName, isCurrent, writers, spans = [], dayDescriptions, members = [], daily, defaultArea, focusAdd = false }: WeekCanvasProps) {
   const phone = useMediaQuery('(max-width: 767px)')
   const slots = useContext(PlanMastheadSlotsContext)
   const [showDone, setShowDone] = useState(false)
@@ -150,14 +168,17 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
   const [menu, setMenu] = useState<string | null>(null)
   const [composer, setComposer] = useState<string | null>(focusAdd ? 'unlinked' : null)
   const [panel, setPanel] = useState<{ key: string; kind: 'people' | 'area' | 'move' } | null>(null)
-  const [quietOpen, setQuietOpen] = useState(false)
   const [overGoal, setOverGoal] = useState<string | null>(null)
+  // The days are the page; the shelf waits behind one line until asked for.
+  const [shelfOpen, setShelfOpen] = useState(focusAdd)
+  const [weekendOpen, setWeekendOpen] = useState(false)
   const todayKey = localYmd(new Date())
   const [chosenDay, setChosenDay] = useState<string | null>(null)
   const selectedKey = chosenDay && days.some((d) => d.key === chosenDay) ? chosenDay : (days.find((d) => d.key === todayKey) ?? days[0])?.key
 
   const dates = days.map((d) => d.date)
-  const subtitle = `${isCurrent ? 'This week' : `Week of ${weekStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`} · tasks grouped under ${monthName}’s goals`
+  const noGoal = `Not under ${anOrA(monthName)} ${monthName} goal`
+  const memberById = new Map(members.map((m) => [m.id, m]))
 
   // ── what is where ─────────────────────────────────────────────────────
   const shelfTasks = new Map<string, Task>()
@@ -274,7 +295,7 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
     )
   }
   const groupCard = (g: ShelfGroup) => {
-    const title = g.milestone ? g.milestone.title : 'Unlinked'
+    const title = g.milestone ? g.milestone.title : noGoal
     const source = drag?.groupKey === g.key
     const menuKey = `group:${g.key}`
     const rows = [...g.rows, ...(showDone ? g.done : [])]
@@ -350,36 +371,32 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
     </section>
   )
   const shelfNode = (
-    <section className={`wc-shelf${overShelf ? ' is-over' : ''}`} aria-label="Still to place" {...shelfDrop}>
+    <section id="wc-shelf" className={`wc-shelf${overShelf ? ' is-over' : ''}`} aria-label="Still to place" {...shelfDrop}>
       <div className="wc-shelf-head">
         <h2 className="wc-label">Still to place</h2>
         <p className="wc-hint">{phone ? 'Press + to give it a day' : 'Drag onto a day, or press + to give it a day'}</p>
       </div>
-      {lookBack && lookBack.count > 0 && (
-        // Nothing moves by itself: last week's open work waits for a decision
-        // in Plan the week's look-back.
-        <p className="wc-quiet-line">
-          {lookBack.count === 1 ? 'One thing' : lookBack.count} from last week{' '}·{' '}
-          <button type="button" className="canvas-link wc-quiet-link" onClick={lookBack.onReview}>Review</button>
-        </p>
-      )}
       <div className="wc-masonry">
         {linked.map(groupCard)}{routinesCard}{unlinked.map(groupCard)}
       </div>
-      {quiet.length > 0 && (
-        <>
-          <p className="wc-quiet-line">
-            Also in {monthName}: {quiet.length === 1 ? 'one goal' : `${quiet.length} goals`} with nothing this week{' '}·{' '}
-            <button type="button" className="canvas-link wc-quiet-link" aria-expanded={quietOpen || !!draggedTask} onClick={() => setQuietOpen((o) => !o)}>{quietOpen ? 'Hide' : 'Show'}</button>
-          </p>
-          {/* Goals with nothing this week open while a task is dragged, so it can go under one. */}
-          {(quietOpen || !!draggedTask) && <div className="wc-masonry">{quiet.map(groupCard)}</div>}
-        </>
-      )}
+      {/* The tray holds what is already chosen for this week; a month goal
+          with nothing this week is a planning decision (2026-10-13 review),
+          so it shows here only while a task is dragged, to go under one. */}
+      {quiet.length > 0 && !!draggedTask && <div className="wc-masonry">{quiet.map(groupCard)}</div>}
     </section>
   )
 
   // ── the days ───────────────────────────────────────────────────────────
+  // Who carries it, a glance from the title (ROW-LANGUAGE: people); nothing
+  // for an id the household doesn't know.
+  const peopleOf = (it: CanvasDayItem) => {
+    const who = (it.people ?? []).flatMap((id) => { const m = memberById.get(id); return m ? [m] : [] })
+    return who.length > 0 && (
+      <span className="wk-people wc-people" aria-label={who.map((m) => m.name).join(', ')}>
+        {who.slice(0, 3).map((m) => <AssigneeAvatar key={m.id} member={m as FamilyMember} size="sm" className="wc-avatar" />)}
+      </span>
+    )
+  }
   const dayRow = (it: CanvasDayItem, day: CanvasDay) => {
     const key = `${day.key}:${it.id}`
     const entityId = it.task?.id ?? it.routineId ?? it.id
@@ -400,27 +417,38 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
           ? startDrag(ev, { kind: 'task', id: x.task.id, date: day.key, title: x.title }, { kind: 'task', id: x.task.id, fromKey: day.key })
           : x.routineId ? startDrag(ev, { kind: 'routine', id: x.routineId, date: day.key, title: x.title }, { kind: 'occ', id: x.routineId, fromKey: day.key }) : undefined}
         onDragEnd={endDrag}
+        under={peopleOf(it)}
         trailing={moreButton(it.title, key, items, 15)}>
         {pick(key, it.title, (d) => (isTask ? writers.moveTask(it.task!, d) : writers.moveRoutine(it, day.key, d)), day.key)}
         {isTask && taskPanel(it.task!, key)}
       </CompactWeekRow>
     )
   }
-  const dayColumn = (day: CanvasDay) => {
+  const dayColumn = (day: CanvasDay, col?: number) => {
     const items = day.items.filter((it) => showDone || !it.completed)
     const sometime = (day.sometime ?? []).filter((it) => showDone || !it.completed)
-    const empty = !day.events.length && !items.length && !sometime.length
+    const specials = day.specials ?? []
+    const empty = !day.events.length && !items.length && !sometime.length && !specials.length
     const over = overDay === day.key
+    // A day gone by steps back; today and the days ahead stay at full strength.
+    const gone = day.key < todayKey
     return (
-      <section key={day.key} className={`wc-day${day.key === todayKey ? ' is-today' : ''}${over ? ' is-over' : ''}${empty ? ' is-empty' : ''}`}
+      <section key={day.key} className={`wc-day${day.key === todayKey ? ' is-today' : ''}${gone ? ' is-past' : ''}${over ? ' is-over' : ''}${empty ? ' is-empty' : ''}`}
+        style={col ? { gridColumn: col } : undefined}
         aria-label={longDay(day.date)} data-testid={`journal-day-${day.key}`} {...dayDrop(day)}>
         <header className="wc-dayhead">
           <span className="wc-dayname">{day.date.toLocaleDateString('en-US', { weekday: 'short' })}</span>
           <span className="wc-daynum">{day.date.getDate()}</span>
-          {day.key === todayKey && <span className="sr-only">(today)</span>}
+          {day.key === todayKey && <span className="wc-todaytag">Today</span>}
           {day.weather && <span className="wc-weather">{day.weather}</span>}
         </header>
+        <div className="wc-daybody">
         {over && <p className="wc-drop-hint" aria-live="polite">Drop on {dayChipLabel(day.date)}</p>}
+        {specials.length > 0 && (
+          <p className="today-specials wc-specials">
+            {specials.map((sp) => <span key={sp.who} className="today-special-chip"><span>{sp.who}</span>{sp.special}</span>)}
+          </p>
+        )}
         {day.events.length > 0 && (
           <ul className="wc-events" aria-label={`${day.date.toLocaleDateString('en-US', { weekday: 'long' })} events`}>
             {day.events.map((ev) => (
@@ -445,6 +473,8 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
             <ul className="cw-rows">{sometime.map((it) => dayRow(it, day))}</ul>
           </div>
         )}
+        {day.free && <p className="wk-free">{day.free}</p>}
+        </div>
       </section>
     )
   }
@@ -478,9 +508,58 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
   const pastNote = past && <span className="wc-past" role="note">
     <b>Past week</b> · <Link className="canvas-link" to="/week?view=alongside">Back to this week</Link>
   </span>
+  // What is chosen for this week but has no day yet, said once under the
+  // title; Show opens the shelf. Inbox, last week and the month's goals are
+  // planning decisions, not the tray's (2026-10-13 review). A structural
+  // count, filtered as the shelf is (the people lens).
+  const tasksToPlace = shelf.reduce((n, g) => n + g.rows.length, 0)
+  const toPlace = [
+    tasksToPlace > 0 && (tasksToPlace === 1 ? '1 task' : `${tasksToPlace} tasks`),
+    routinesToPlace.length > 0 && (routinesToPlace.length === 1 ? '1 routine' : `${routinesToPlace.length} routines`),
+  ].filter(Boolean)
+  const shelfLine = (
+    <span className="wc-tray">
+      <span className="wc-tray-item">
+        {/* No count of nothing: the lists may still be loading. */}
+        Still to place{toPlace.map((p) => ` · ${p}`)}{' · '}
+        <button type="button" className="canvas-link wc-quiet-link" aria-expanded={shelfOpen} aria-controls="wc-shelf"
+          onClick={() => setShelfOpen((o) => !o)}>{shelfOpen ? 'Hide' : 'Show'}</button>
+      </span>
+      <span className="wc-tray-aside">Inbox, last week and {monthName}’s goals come up when you plan.</span>
+    </span>
+  )
+  // This week's weekend, once over, folds to one line: when it was, what
+  // happened, what was left (2026-10-05, #137) — room for the days ahead. One
+  // still ahead stays open in full: family and household plans live there. A
+  // week gone by has no days ahead to make room for, so nothing folds.
+  const isWeekend = (d: CanvasDay) => d.date.getDay() === 0 || d.date.getDay() === 6
+  const goneWeekend = phone || !isCurrent ? [] : days.filter((d) => isWeekend(d) && d.key < todayKey)
+  const stripDays = weekendOpen ? days : days.filter((d) => !goneWeekend.includes(d))
+  const shortDay = (d: CanvasDay) => `${d.date.toLocaleDateString('en-US', { weekday: 'short' })} ${d.date.getDate()}`
+  const leftOpen = goneWeekend.flatMap((d) => [...d.items, ...(d.sometime ?? [])].filter((it) => !it.completed && it.kind !== 'event'))
+  const weekendFold = goneWeekend.length > 0 && (
+    <button type="button" className="wc-weekend-fold" aria-expanded={weekendOpen} onClick={() => setWeekendOpen((o) => !o)}>
+      <span className="wc-weekend-fold-title">Weekend</span>
+      <span>{goneWeekend.map(shortDay).join(' – ')}</span>
+      {!weekendOpen && <span className="wc-weekend-fold-events">{goneWeekend.flatMap((d) => d.events).map((ev) => <span key={ev.id}>{ev.title}</span>)}</span>}
+      {!weekendOpen && leftOpen.length > 0 && (
+        <span className="wc-weekend-fold-left">Not done: {leftOpen.slice(0, 2).map((it) => it.title).join(', ')}{leftOpen.length > 2 ? `, and ${leftOpen.length - 2} more` : ''}</span>
+      )}
+      <span className="wc-weekend-fold-open">{weekendOpen ? 'Fold' : 'Open'}</span>
+    </button>
+  )
+  // A stay across several days: one bar over the columns it covers, under
+  // their headers. Where the days wrap (narrower desks), the line above says it.
+  const colOf = new Map(stripDays.map((d, i) => [d.key, i + 1]))
+  const bars = spans.flatMap((sp) => {
+    if (!sp.from || !sp.to) return []
+    const cols = stripDays.filter((d) => d.key >= sp.from! && d.key <= sp.to!).map((d) => colOf.get(d.key)!)
+    return cols.length ? [{ sp, start: Math.min(...cols), end: Math.max(...cols) }] : []
+  })
+  const barTail = (sp: CanvasSpan) => sp.tail?.replace(/^,\s*/, '')
   const subtitleNode = slots?.subline && !phone
-    ? createPortal(<>{pastNote}<span className="wc-subtitle">{subtitle}</span></>, slots.subline)
-    : <>{pastNote && <p className="wc-subtitle is-inline">{pastNote}</p>}<p className="wc-subtitle is-inline">{subtitle}</p></>
+    ? createPortal(<>{pastNote}<span className="wc-subtitle">{shelfLine}</span></>, slots.subline)
+    : <>{pastNote && <p className="wc-subtitle is-inline">{pastNote}</p>}<p className="wc-subtitle is-inline">{shelfLine}</p></>
 
   if (phone) {
     const sel = days.find((d) => d.key === selectedKey)
@@ -499,28 +578,37 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
         {sel && dayColumn(sel)}
         {rhythmNode}
         <div className="wc-done-row">{doneToggle}</div>
-        {shelfNode}
+        {shelfOpen && shelfNode}
       </div>
     )
   }
   return (
     <div className={`wc${drag ? ' is-dragging' : ''}`}>
       {subtitleNode}
-      {shelfNode}
+      {shelfOpen && shelfNode}
       <section className="wc-days" aria-label="The days">
-        <div className="wc-days-head"><h2 className="wc-label">The days</h2>{doneToggle}</div>
+        <div className="wc-days-head"><h2 className="wc-label sr-only">The days</h2>{rhythmNode}{doneToggle}</div>
         {spans.length > 0 && (
           <ul className="wc-spans" aria-label="Across these days">
             {spans.map((sp) => (
-              <li key={sp.id}><button type="button" className="wc-span" onClick={() => writers.open(sp.id)}>
+              <li key={sp.id} className={bars.some((b) => b.sp === sp) ? 'has-bar' : undefined}><button type="button" className="wc-span" onClick={() => writers.open(sp.id)}>
                 <span className="wc-span-when">{sp.when}</span> {sp.title}{sp.tail && <span className="wc-span-when">{sp.tail}</span>}
               </button></li>
             ))}
           </ul>
         )}
-        {rhythmNode}
-        <div className="wc-strip" style={{ ['--wc-days' as string]: days.length }}>
-          {days.map(dayColumn)}
+        {weekendFold}
+        <div className={`wc-strip${bars.length ? ' has-bars' : ''}`} style={{ ['--wc-days' as string]: stripDays.length }}>
+          {stripDays.map((d, i) => dayColumn(d, i + 1))}
+          {bars.length > 0 && (
+            <div className="wc-bars" aria-hidden="true">
+              {bars.map(({ sp, start, end }) => (
+                <button key={sp.id} type="button" tabIndex={-1} className="wc-bar" style={{ gridColumn: `${start} / ${end + 1}` }} onClick={() => writers.open(sp.id)}>
+                  <span className="wc-bar-title">{sp.title}</span>{barTail(sp) && <span className="wc-bar-tail">{barTail(sp)}</span>}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       </section>
     </div>

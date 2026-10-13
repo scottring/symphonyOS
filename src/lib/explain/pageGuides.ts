@@ -29,12 +29,14 @@ export const PAGE_GUIDES: Record<string, string> = {
     'Plan a week from these goals goes on to Week, where month goals become this week\'s tasks.',
   week:
     'Week is for doing: this week\'s tasks and when they happen. ' +
-    '"Still to place" is the shelf of this week\'s tasks that have no day yet; drag one onto a day, or press + to give it a day. ' +
-    'Each day column shows its events, tasks and daily routines. Routines to place are repeating things that need a day this week. ' +
-    'The month\'s goals (e.g. October goals) can be shown with the shelf; drop a task on one to put it under that goal.',
+    'Each day column shows its events (in blue), the kids\' specials, tasks (circles) and routines (rounded squares), who carries each, and in green the hours with nothing scheduled ("Calendar clear"). ' +
+    'A stay across several days is one bar over those days. Days gone by are dimmed, and this week\'s weekend folds to one line once it is over. ' +
+    'Under the title, "Still to place" says what is chosen for this week but has no day yet; Show opens that shelf above the days. ' +
+    'On the shelf, tasks sit under the month goal they serve (e.g. an October goal); drag one onto a day, or press + to give it a day. ' +
+    'Routines to place are repeating things that need a day this week. Inbox, last week and the month\'s goals come up when you plan the week.',
   today:
     'Today is for doing: what you are doing today, with what you need to do it. ' +
-    '"The day" shows the day\'s hours with timed things on them and how much free time is left. ' +
+    '"The day" shows the day\'s hours with timed things on them and how many hours are still open. ' +
     '"For today" lists things for today without a time; Add task adds one. ' +
     '"This week" holds this week\'s tasks that have no day yet; drag one onto the day, or press +, to plan it for today. ' +
     '"Coming up" shows the next few dated things after today. ' +
