@@ -79,6 +79,11 @@ import { KioskCanvas } from './activity/KioskCanvas';
 import { useKioskActivity } from './activity/useKioskActivity';
 import { supabaseGroceryIO } from './activity/groceryIO';
 import type { WallVoice } from './activity/KioskTellSymphony';
+import type { KioskV1Data } from './activity/KioskCanvas';
+import { dayAnchors, kioskScreen, minutesOf } from '@/lib/wall/activity/kioskScreen';
+import { nextCommitment } from '@/lib/wall/activity/kioskCompose';
+import { boardOwnersOf } from './wallGantt';
+import { HOUSEHOLD_ID } from './wallEventAttribution';
 import { addGroceries, addInboxTask, addScratch } from '@/lib/wall/voice/wallVoiceActions';
 import { wallSnapshot } from '@/lib/wall/voice/wallSnapshot';
 import type { KioskDinner } from './activity/KioskStages';
@@ -826,9 +831,95 @@ export function WallV2Shell() {
   }), [kidModels, moment, now]);
   // Tonight's bedtime: each kid's evening routine, steps × people.
   const bedtimeGrid = useMemo(
-    () => buildBedtimeGrid(kidModels.map(({ member, model }) => ({ member, list: checklistFor(model, 'evening') }))),
+    // Tonight's bedtime is the routine that starts at 7pm or later; the
+    // evening band also holds Home from school (5:45), which isn't bedtime.
+    () => buildBedtimeGrid(kidModels.map(({ member, model }) => {
+      const bed = model.collections.find((c) => (minutesOf(c.timeOfDay) ?? 0) >= 19 * 60 && c.rows.length > 0);
+      return { member, list: bed ? { title: bed.title, rows: bed.rows } : checklistFor(model, 'evening') };
+    })),
     [kidModels],
   );
+  // Wall v1 (2026-10-13): the Home screen that leads, chosen from the
+  // household's own routines (each kid's morning, home-from-school and
+  // bedtime collections) and tonight's dinner time — no new queries.
+  // Local preview only: /wall-v2?at=6:58 shows the screen that leads at that
+  // time today, so each one can be checked without waiting for it.
+  const previewAt = useMemo(() => {
+    if (typeof window === 'undefined' || !['localhost', '127.0.0.1'].includes(window.location.hostname)) return null;
+    const m = new URLSearchParams(window.location.search).get('at')?.match(/^(\d{1,2}):(\d{2})$/);
+    if (!m) return null;
+    const d = new Date(now); d.setHours(Number(m[1]), Number(m[2]), 0, 0);
+    return d;
+  }, [now]);
+  const kioskV1: KioskV1Data = useMemo(() => {
+    const found = dayAnchors(kidModels.flatMap(({ model }) => model.collections), dinnerStartDate);
+    // Local preview: ?weekend=1 draws today as a day with no school morning.
+    const previewWeekend = previewAt != null && new URLSearchParams(window.location.search).get('weekend') === '1';
+    const anchors = previewWeekend ? { ...found, morning: null, home: null } : found;
+    const pick = kioskScreen(previewAt ?? now, anchors);
+    const hhmm = (min: number) => `${Math.floor(min / 60) % 12 || 12}:${String(min % 60).padStart(2, '0')}`;
+    const kids = kidModels.map(({ member, model }) => ({
+      member,
+      special: model.school?.special ?? null,
+      tomorrowSpecial: model.school?.tomorrowSpecial ?? null,
+      bag: model.needed.filter((n) => !n.tomorrow).map((n) => n.title),
+      morning: model.collections.find((c) => (minutesOf(c.timeOfDay) ?? 24 * 60) < 11 * 60)?.rows ?? [],
+      // After school is the home-from-school routine itself (its steps for
+      // the day: folder, then math or reading), plus homework due. Not the
+      // old name match, which pulled in "Bag packed: homework folder" from
+      // the morning and "Own reading" from bedtime.
+      after: [
+        ...afterSchoolRows(model).filter((r) => r.entityType === 'task'),
+        ...(model.collections.find((c) => { const m = minutesOf(c.timeOfDay); return m != null && m >= 15 * 60 && m < 18 * 60; })?.rows ?? []),
+      ],
+    }));
+    // The day's landmarks come from the routines (the wall's day list leaves
+    // most-days routines out by design, 2026-09-07), events from the calendar.
+    const t = (previewAt ?? now).getHours() * 60 + (previewAt ?? now).getMinutes();
+    const dinnerShort = dinnerEvent ? (dinner.mealName.split(/\s+with\s+/i)[0] || dinner.mealName) : null;
+    const landmarks: { at: number; title: string }[] = [
+      ...(anchors.morning ? [{ at: anchors.morning.end, title: 'Out the door' }] : []),
+      ...(anchors.home ? [{ at: anchors.home.start + 30, title: 'Home from school' }] : []),
+      ...(dinnerEvent ? [{ at: anchors.dinner, title: dinnerShort ?? 'Dinner' }] : []),
+      { at: anchors.bedtime.start, title: 'Bedtime' },
+    ];
+    const rowNext = nextCommitment(todayRows, previewAt ?? now);
+    const rowAt = rowNext ? rowNext.at.getHours() * 60 + rowNext.at.getMinutes() : null;
+    const upcoming = [...landmarks, ...(rowNext && rowAt != null ? [{ at: rowAt, title: rowNext.title }] : [])]
+      .filter((l) => l.at > t).sort((a, b) => a.at - b.at);
+    const restLine = upcoming.slice(0, 2).map((l) => `${l.title} at ${hhmm(l.at)}`).join(' · ') || 'Nothing else on the clock today';
+    const next = upcoming[0] ? { time: hhmm(upcoming[0].at), title: upcoming[0].title } : null;
+    const restSub = todayRows.filter((r) => !r.past && r.kind === 'event').slice(0, 2).map((r) => `${r.title} at ${r.time}`).join(' · ') || null;
+    const tomorrowDay = new Date(now); tomorrowDay.setDate(tomorrowDay.getDate() + 1);
+    const tomorrowWeekday = tomorrowDay.getDay() >= 1 && tomorrowDay.getDay() <= 5;
+    const tomorrowStart = tomorrowData ? new Date(tomorrowData.date) : null;
+    tomorrowStart?.setHours(0, 0, 0, 0);
+    const weekdayName = tomorrowDay.toLocaleDateString('en-US', { weekday: 'long' });
+    const anytime = Object.values(todayItems).flat()
+      .filter((it) => it.type === 'routine' && !it.startTime && !it.completed && it.originalRoutine?.parent_routine_id == null)
+      .reduce<{ title: string; owners: string[] }[]>((acc, it) => (acc.some((a) => a.title === it.title) ? acc : [...acc, { title: it.title, owners: boardOwnersOf(it, wallData.familyMembers).filter((id) => id !== HOUSEHOLD_ID) }]), [])
+      .slice(0, 8);
+    return {
+      pick, anchors, kids, restLine, restSub, next,
+      notes: scratchRows.filter((r) => r.kind === 'note').map((r) => ({ id: r.key, text: r.text, by: r.authorMemberId ? memberName(r.authorMemberId) ?? null : null })),
+      talks: scratchRows.filter((r) => r.kind === 'talk').map((r) => ({ id: r.key, text: r.text, by: null })),
+      question: discussionPrompt || null,
+      tomorrow: {
+        label: weekdayName,
+        outTheDoor: tomorrowWeekday && anchors.morning ? hhmm(anchors.morning.end) : null,
+        specials: kids.filter((k) => k.tomorrowSpecial).map((k) => ({ member: k.member, text: k.tomorrowSpecial as string })),
+      },
+      weekend: {
+        rows: todayRows,
+        anytime,
+        tomorrow: tomorrowData && tomorrowStart ? wallTodayRows(tomorrowData.items, wallData.familyMembers, tomorrowStart) : [],
+        tomorrowLabel: weekdayName,
+      },
+      onNotes: () => { setScratchpadFocus(null); setShowScratchpad(true); },
+      at: previewAt ?? undefined,
+    };
+  }, [kidModels, dinnerStartDate, now, previewAt, todayRows, dinnerEvent, dinner, tomorrowData, todayItems, wallData.familyMembers, scratchRows, memberName, discussionPrompt]);
+
   // Sentences said to the wall (the Pi's listener, or typed into Tell
   // Symphony): what it may save, each with Undo, and what it knows — only
   // what this screen already shows (household layer, 2026-10-13).
@@ -1051,6 +1142,7 @@ export function WallV2Shell() {
           onTapQuestion={() => (handoffAsk ? setShowWhoSheet(true) : setShowQuestionSheet(true))}
           flash={showFlash}
           voice={wallVoice}
+          v1={kioskV1}
         />
       </div>
 

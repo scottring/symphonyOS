@@ -76,6 +76,7 @@ await import('./styles/canvas.css')
 await import('./styles/canvas-today.css')
 await import('./styles/canvas-plan.css')
 await import('./styles/canvas-kiosk.css')
+await import('./styles/kiosk-v1.css')
 await import('./styles/canvas-routines.css')
 
 // Apply the cached place theme before first paint so there's no color flash;

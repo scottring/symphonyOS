@@ -35,6 +35,9 @@ import json
 import logging
 import os
 import queue
+import shutil
+import subprocess
+import tempfile
 import threading
 import time as clock
 import uuid
@@ -147,6 +150,74 @@ class MicSource:
             return None
 
 
+class PipeWireSource(MicSource):
+    """The microphone through PipeWire's own recorder. On the wall Pi PipeWire
+    holds the EMEET, so PortAudio sees it as output only (0 inputs, no default
+    device) and a direct ALSA read returns silence; pw-record is what works."""
+
+    def open(self) -> None:
+        if self.stream:
+            return
+        cmd = ["pw-record", "--rate", str(RATE), "--channels", "1", "--format", "s16"]
+        if self.device:
+            cmd += ["--target", self.device]
+        proc = subprocess.Popen(cmd + ["-"], stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+        self.stream = proc
+
+        def pump():
+            size = FRAME * 2
+            while self.stream is proc:
+                chunk = proc.stdout.read(size)
+                if not chunk or len(chunk) < size:
+                    break
+                try:
+                    self.frames.put_nowait(np.frombuffer(chunk, dtype=np.int16).copy())
+                except queue.Full:
+                    pass
+
+        threading.Thread(target=pump, daemon=True).start()
+
+    def close(self) -> None:
+        proc, self.stream = self.stream, None
+        if proc:
+            proc.terminate()
+            try:
+                proc.wait(timeout=2)
+            except subprocess.TimeoutExpired:
+                proc.kill()
+        with self.frames.mutex:
+            self.frames.queue.clear()
+
+
+def play(audio: np.ndarray, rate: int, blocking: bool = True) -> None:
+    """Speak through PipeWire when it is there (the wall Pi), else PortAudio."""
+    if shutil.which("pw-play"):
+        audio = np.asarray(audio)
+        if audio.dtype != np.int16:
+            audio = (np.clip(audio, -1, 1) * 32767).astype(np.int16)
+        channels = audio.shape[1] if audio.ndim == 2 else 1
+        # Reply audio only (never the microphone), in RAM where /dev/shm exists.
+        tmpdir = "/dev/shm" if os.path.isdir("/dev/shm") else None
+        f = tempfile.NamedTemporaryFile(suffix=".wav", dir=tmpdir, delete=False)
+        try:
+            with wave.open(f, "wb") as w:
+                w.setnchannels(channels); w.setsampwidth(2); w.setframerate(rate)
+                w.writeframes(audio.tobytes())
+            f.close()
+            if blocking:
+                subprocess.run(["pw-play", f.name], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=60)
+            else:
+                proc = subprocess.Popen(["pw-play", f.name], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                threading.Thread(target=lambda: (proc.wait(), os.unlink(f.name)), daemon=True).start()
+                return
+        finally:
+            if blocking and os.path.exists(f.name):
+                os.unlink(f.name)
+        return
+    import sounddevice as sd
+    sd.play(audio, rate, blocking=blocking)
+
+
 class WavSource(MicSource):
     """Frames from a 16 kHz mono wav, paced like a real mic, then silence (testing)."""
 
@@ -215,31 +286,28 @@ class Models:
     def speak(self, text: str) -> None:
         if not self.voice:
             return
-        import sounddevice as sd
         chunks = [c.audio_int16_array for c in self.voice.synthesize(text)]
         if chunks:
-            sd.play(np.concatenate(chunks), self.voice.config.sample_rate, blocking=True)
+            play(np.concatenate(chunks), self.voice.config.sample_rate)
 
 
 def play_wav_bytes(data: bytes) -> None:
-    import sounddevice as sd
     with wave.open(io.BytesIO(data), "rb") as w:
         audio = np.frombuffer(w.readframes(w.getnframes()), dtype=np.int16)
         if w.getnchannels() > 1:
             audio = audio.reshape(-1, w.getnchannels())
-        sd.play(audio, w.getframerate(), blocking=True)
+        play(audio, w.getframerate())
 
 
 def chime(rising: bool = True) -> None:
     """A short two-note cue: rising when listening starts, falling when it stops."""
     try:
-        import sounddevice as sd
         sr = 22050
         notes = (660, 880) if rising else (880, 660)
         t = np.linspace(0, 0.09, int(sr * 0.09), endpoint=False)
         env = np.minimum(1, np.minimum(t, 0.09 - t) * 60)
         tone = np.concatenate([np.sin(2 * np.pi * f * t) * env for f in notes]) * 0.25
-        sd.play(tone.astype(np.float32), sr, blocking=False)
+        play(tone.astype(np.float32), sr, blocking=False)
     except Exception:  # no output device: cues are optional
         pass
 
@@ -305,9 +373,25 @@ class Listener:
         self._stop.set()
         self.source.close()
 
-    # The audio loop, on its own thread.
+    # The audio loop, on its own thread. A failure is reported and retried,
+    # never left looking "ready" (2026-10-13: the mic failed to open on the Pi
+    # and the wall was told all was well).
     def run(self) -> None:
-        self.models.load()
+        while not self._stop.is_set():
+            try:
+                self._run()
+                return
+            except Exception as e:  # noqa: BLE001 — report, back off, retry
+                log.exception("listener failed")
+                self.send({"type": "error", "message": str(e)[:200]})
+                self.state = "error"
+                self.send({"type": "state", "state": "error", "wake": WAKE_LABEL if self.cfg.wake else None, "muted": self.muted, "quiet": self.quiet})
+                self.source.close()
+                clock.sleep(10)
+
+    def _run(self) -> None:
+        if self.models.whisper is None:
+            self.models.load()
         self.set_state(self.resting_state())
         seg: list[np.ndarray] = []
         pre: "deque[np.ndarray]" = deque(maxlen=4)
@@ -363,8 +447,15 @@ class Listener:
         return room[len(room) // 5] if room else 1.0
 
     def _check_wake(self, burst: np.ndarray, cut: bool) -> None:
+        t0 = clock.time()
         text = self.models.wake_text(burst)
         rest = match_wake(text)
+        # Diagnostics without content: how long, how loud, how fast, and
+        # only the first word's shape (so "Hey"/"Hay"/"A" mishearings show).
+        first = (text.split() or [""])[0].strip(",.!?").lower()
+        log.debug("burst %.1fs rms %d → %d words in %.1fs, first=%s, wake=%s",
+                  len(burst) / RATE, Endpointer.rms(burst), len(text.split()), clock.time() - t0,
+                  first if first in ("hey", "hay", "hi", "ok", "okay", "a") else "other", rest is not None)
         if rest is None:
             return  # not for us: dropped, never kept
         log.info("wake (%s)", "with command" if worth_a_command(rest) else "name only")
@@ -480,7 +571,12 @@ async def serve(cfg: Config) -> None:
                 asyncio.ensure_future(ws.send(data))
         loop.call_soon_threadsafe(fan_out)
 
-    source = WavSource(cfg.wav) if cfg.wav else MicSource(cfg.input_device)
+    if cfg.wav:
+        source: MicSource = WavSource(cfg.wav)
+    elif shutil.which("pw-record") and cfg.input_device != "portaudio":
+        source = PipeWireSource(None if cfg.input_device in (None, "pipewire") else cfg.input_device)
+    else:
+        source = MicSource(None if cfg.input_device == "portaudio" else cfg.input_device)
     listener = Listener(cfg, Models(cfg), source, send, muted=bool(load_state().get("muted")))
 
     async def handler(ws):
