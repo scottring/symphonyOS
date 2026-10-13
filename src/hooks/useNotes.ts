@@ -140,12 +140,20 @@ export function useNotes({ deferLoad = false }: {
 
       // Fetch Second Brain notes. Shared: a single route mounts this hook
       // eight times over, and notes carry their full content.
+      //
+      // Legacy vault mirrors are left in the database (prod 2026-10-13: 985 of
+      // 1,017 rows, 6.47 MB of the 6.49 MB of content) and were dropped only
+      // after downloading every one of them — a 10–20s response that sometimes
+      // timed out with a 500 and held up the rest of the page. They are left
+      // out in the query now. `source` is nullable, so a note with no source
+      // stays in.
       const { data: notesData, error: notesError } = await shareInFlight(
         `notes:${user.id}`,
         async () => await supabase
           .from('notes')
           .select(NOTE_COLUMNS)
           .eq('user_id', user.id)
+          .or('source.is.null,source.neq.vault')
           .order('created_at', { ascending: false }),
       )
 

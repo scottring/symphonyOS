@@ -11,6 +11,8 @@ let mockError: { message: string } | null = null
 const mockUpdate = vi.fn()
 const mockDelete = vi.fn()
 const mockInsert = vi.fn()
+// Every .or(...) filter the notes list query asks for.
+const mockNotesOr = vi.fn()
 
 const { mockShowToast } = vi.hoisted(() => ({ mockShowToast: vi.fn() }))
 vi.mock('@/hooks/useToast', () => ({ showToast: mockShowToast }))
@@ -30,6 +32,10 @@ vi.mock('@/lib/supabase', () => ({
           select: () => ({
             eq: () => ({
               order: () => Promise.resolve({ data: mockSupabaseData, error: mockError }),
+              or: (filter: string) => {
+                mockNotesOr(filter)
+                return { order: () => Promise.resolve({ data: mockSupabaseData, error: mockError }) }
+              },
             }),
             in: () => ({
               order: () => Promise.resolve({ data: mockSupabaseData, error: mockError }),
@@ -131,6 +137,16 @@ describe('useNotes', () => {
     })
 
     expect(result.current.notes).toEqual([])
+  })
+
+  // Prod, 2026-10-13: 985 of 1,017 rows (6.47 MB) were legacy vault mirrors,
+  // downloaded on every load only to be dropped here — a 10–20s response that
+  // sometimes timed out. The query leaves them out; a note with no source stays.
+  it('asks the database to leave legacy vault notes out, keeping notes with no source', async () => {
+    mockNotesOr.mockClear()
+    const { result } = renderHook(() => useNotes())
+    await waitFor(() => expect(result.current.loading).toBe(false))
+    expect(mockNotesOr).toHaveBeenCalledWith('source.is.null,source.neq.vault')
   })
 
   it('fetches notes on mount', async () => {
