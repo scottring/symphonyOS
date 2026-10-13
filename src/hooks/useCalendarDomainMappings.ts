@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/hooks/useAuth'
+import { sharedLoad } from '@/lib/sharedLoad'
 import type { TaskContext } from '@/types/task'
 
 interface CalendarDomainMapping {
@@ -22,10 +23,12 @@ export function useCalendarDomainMappings() {
     }
 
     async function fetchMappings() {
-      const { data, error } = await supabase
+      // One trip shared by the instances that ask at once (sharedLoad.ts).
+      const userId = user!.id
+      const { data, error } = await sharedLoad(`calendar_domain_mappings:${userId}`, () => supabase
         .from('calendar_domain_mappings')
         .select('calendar_id, calendar_name, domain')
-        .eq('user_id', user!.id)
+        .eq('user_id', userId))
 
       if (error) {
         console.error('Failed to fetch calendar domain mappings:', error)

@@ -8,6 +8,14 @@ import { INVITE_ONLY_MESSAGE, isInviteGateFailure } from '@/lib/signupGate'
  *  fault the user can fix by retrying — the form offers the waitlist instead. */
 export type SignUpFailure = { message: string; inviteOnly?: boolean }
 
+/** The same user, unchanged, keeps its object. Prod, 2026-10-13: each
+ *  instance set a fresh copy twice at startup (the auth event, then
+ *  getSession), so every loader keyed on `user` fetched twice per instance. */
+function sameUser(prev: User | null, next: User | null): User | null {
+  if (!prev || !next || prev.id !== next.id) return next
+  return JSON.stringify(prev) === JSON.stringify(next) ? prev : next
+}
+
 export function useAuth() {
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
@@ -62,7 +70,7 @@ export function useAuth() {
           setSessionLost(false)
           signingOutRef.current = false
         }
-        setUser(session?.user ?? null)
+        setUser((prev) => sameUser(prev, session?.user ?? null))
         if (event === 'PASSWORD_RECOVERY') {
           setIsPasswordRecovery(true)
         }
@@ -93,7 +101,7 @@ export function useAuth() {
       // No code param — just get existing session
       supabase.auth.getSession()
         .then(({ data: { session } }) => {
-          setUser(session?.user ?? null)
+          setUser((prev) => sameUser(prev, session?.user ?? null))
           prevUserRef.current = session?.user ?? null
           prevExpiresRef.current = session?.expires_at
           loadingRef.current = false
