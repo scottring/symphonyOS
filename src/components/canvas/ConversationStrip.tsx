@@ -50,8 +50,9 @@ interface Props {
   messages?: ChatMessageType[]
   /** Docked: the page's walk ("Plan this season with me"). */
   walk?: ConversationWalk | null
-  /** Docked: "What is this page?", where the page has a guide. */
-  explain?: ConversationWalk | null
+  /** Docked: "What is this page?", where the page has a guide. `show` plays
+   *  the page's own tour; without one (or when it finds nothing) the message goes to Symphony. */
+  explain?: (ConversationWalk & { show?: () => boolean }) | null
   /** Docked: room left for an open side pane, in px. */
   right?: number
 }
@@ -160,7 +161,7 @@ export function ConversationStrip({ onSend, busy, voice, onOpenConversation, onR
       ) : (
       <form className="canvas-composer" onSubmit={submit}>
         {walk && !voice.active && <button type="button" className="canvas-walk" disabled={busy} onClick={() => onSend(walk.message)}>{walk.label}</button>}
-        {explain && <button type="button" className="canvas-walk canvas-explain" disabled={busy} onClick={() => onSend(explain.message)}>{explain.label}</button>}
+        {explain && <button type="button" className="canvas-walk canvas-explain" disabled={busy} onClick={() => { if (!explain.show?.()) onSend(explain.message) }}>{explain.label}</button>}
         <label className="sr-only" htmlFor="canvas-composer-input">Message Symphony</label>
         <input
           id="canvas-composer-input"

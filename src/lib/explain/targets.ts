@@ -65,6 +65,16 @@ export function collectTargets(root: ParentNode = pageRoot()): ExplainTarget[] {
   return out
 }
 
+/** The first region on screen whose id matches — for parts named by what
+ * they say ("region:This week, by October goal"). */
+export function findTargetMatching(re: RegExp, root: ParentNode = pageRoot()): { id: string; el: HTMLElement } | null {
+  for (const el of Array.from(root.querySelectorAll<HTMLElement>(REGION_SEL))) {
+    const id = regionId(el)
+    if (id && re.test(id) && shown(el)) return { id, el }
+  }
+  return null
+}
+
 /** The element a target id names, if it is on screen. Items: a plan row or
  * card ends its key with the id (`1:<id>`). */
 export function findTarget(id: string, root: ParentNode = pageRoot()): HTMLElement | null {

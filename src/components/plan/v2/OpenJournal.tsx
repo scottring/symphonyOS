@@ -102,7 +102,7 @@ export function OpenJournal({ label, periodKey, intro, sections, general, footer
  *  on this device only. Never an account setting. */
 export function PlanLayoutSwitch({ value, onChange }: { value: 'lists' | 'journal'; onChange: (v: 'lists' | 'journal') => void }) {
   return (
-    <div className="oj-switch" role="group" aria-label="Planning view">
+    <div className="oj-switch" role="group" aria-label="Planning view" data-explain="plan-view">
       <span>View</span>
       <button type="button" aria-pressed={value === 'lists'} className={value === 'lists' ? 'is-on' : undefined} onClick={() => onChange('lists')}>Lists</button>
       <button type="button" aria-pressed={value === 'journal'} className={value === 'journal' ? 'is-on' : undefined} onClick={() => onChange('journal')}>Open journal</button>

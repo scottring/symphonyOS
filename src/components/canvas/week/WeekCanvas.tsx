@@ -519,7 +519,7 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
   ].filter(Boolean)
   const shelfLine = (
     <span className="wc-tray">
-      <span className="wc-tray-item">
+      <span className="wc-tray-item" data-explain="still-to-place" data-explain-label="Still to place">
         {/* No count of nothing: the lists may still be loading. */}
         Still to place{toPlace.map((p) => ` · ${p}`)}{' · '}
         <button type="button" className="canvas-link wc-quiet-link" aria-expanded={shelfOpen} aria-controls="wc-shelf"

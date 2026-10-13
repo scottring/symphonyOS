@@ -506,7 +506,7 @@ export function WeekV2({ tasks, weekStart, meId, isCurrent, days, renderDays, on
   )
 
   return (
-    <div className="pv2-week" data-week={localYmd(weekStart)} data-explain-guide={meeting ? 'week-plan' : undefined}>
+    <div className="pv2-week" data-week={localYmd(weekStart)} data-explain-guide={meeting ? 'week-plan' : undefined} data-explain-step={meeting?.step}>
       {meeting ? (
         <PlanMeetingBar period={`week ${weekNo}`} prevName="last week" step={meeting.step === 'lookback' ? 1 : 2} lookBack={meeting.candidateIds.length > 0}
           steps={WEEK_STEPS.filter((st) => st.key !== 'lookback' || meeting.candidateIds.length > 0)}
@@ -545,8 +545,10 @@ export function WeekV2({ tasks, weekStart, meId, isCurrent, days, renderDays, on
         </div>
       )}
       {meeting?.step === 'lookback' ? (
-        <CloseOut lines={[...prevLines, ...earlierLines]} candidateIds={meeting.candidateIds} members={members} actions={actions} prevName="last week" nextName="this week"
-          onDecide={decide} onFinish={() => setMeeting({ ...meeting, step: 'inbox' })} />
+        <div data-explain="close-out" data-explain-label="Last week, one thing at a time">
+          <CloseOut lines={[...prevLines, ...earlierLines]} candidateIds={meeting.candidateIds} members={members} actions={actions} prevName="last week" nextName="this week"
+            onDecide={decide} onFinish={() => setMeeting({ ...meeting, step: 'inbox' })} />
+        </div>
       ) : meeting && (meeting.step === 'inbox' || meeting.step === 'between' || meeting.step === 'ahead' || meeting.step === 'routines') ? (
         // One kind of thing at the left, the week filling up at the right.
         <div className="wk-step">
