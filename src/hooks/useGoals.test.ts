@@ -50,6 +50,8 @@ const goalsEqMock = vi.fn()
 let goalRows: DbGoal[] = []
 // Every goals.update(payload).eq('id', id).
 const updateMock = vi.fn()
+// Every full goals load (select … order), to count trips to the database.
+const goalsFetchMock = vi.fn()
 
 vi.mock('@/lib/supabase', () => ({
   supabase: {
@@ -67,7 +69,7 @@ vi.mock('@/lib/supabase', () => ({
               chain.order = () => Promise.resolve({ data: [], error: null })
               return chain
             }
-            chain.order = () => Promise.resolve({ data: goalRows, error: null })
+            chain.order = () => { goalsFetchMock(); return Promise.resolve({ data: goalRows, error: null }) }
             return chain
           },
           update: (payload: Record<string, unknown>) => ({
@@ -171,6 +173,29 @@ describe('useGoals addGoal', () => {
     // No `.eq('year', …)` anywhere in the goals query.
     expect(goalsEqMock.mock.calls.filter(([field]) => field === 'year')).toHaveLength(0)
     expect(result.current.goals.map((g) => g.year).sort()).toEqual([2025, 2026, 2027])
+  })
+})
+
+// Prod, 2026-10-13: Month waited ~5s on "Loading your plans…" while every
+// useGoals instance (shell, page, detail panel — and again on each new auth
+// user object) fired its own four goal queries, 32 requests racing the rest
+// of startup. Instances that ask while a load is in flight share it, as tasks do.
+describe('useGoals: one load shared by the instances that ask at once', () => {
+  beforeEach(() => { goalsFetchMock.mockClear(); goalRows = [dbGoal()] })
+
+  it('three instances mounting together make one trip, and all get the goals', async () => {
+    const { result } = renderHook(() => [useGoals(), useGoals(), useGoals()])
+    await waitFor(() => expect(result.current.every((g) => !g.loading)).toBe(true))
+    expect(goalsFetchMock).toHaveBeenCalledTimes(1)
+    for (const g of result.current) expect(g.goals.map((x) => x.id)).toEqual(['goal-1'])
+  })
+
+  it('a later load (after the first finished) goes back to the database', async () => {
+    const first = renderHook(() => useGoals())
+    await waitFor(() => expect(first.result.current.loading).toBe(false))
+    const second = renderHook(() => useGoals())
+    await waitFor(() => expect(second.result.current.loading).toBe(false))
+    expect(goalsFetchMock).toHaveBeenCalledTimes(2)
   })
 })
 
