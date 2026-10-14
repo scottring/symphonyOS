@@ -37,6 +37,7 @@ import type { WallTodayRow } from '@/lib/wall/wallMomentsModel'
 import type { BedtimeGrid } from '@/lib/wall/activity/kioskRoutines'
 import { minutesOf, type DayAnchors, type KioskScreenPick } from '@/lib/wall/activity/kioskScreen'
 import { Photo, type KioskDinner } from './KioskStages'
+import type { KidMath } from '@/hooks/useKidMath'
 
 export interface V1Kid {
   member: FamilyMember
@@ -84,9 +85,29 @@ export interface KioskHomeV1Props {
   /** The conversation with Symphony, in place of the side column (stage 3).
    *  Full-stage moments keep their stage; the reply band shows it there. */
   talk?: ReactNode
+  /** Math of the day: each kid's problem and streak, and opening it. */
+  math?: KidMath
+  onOpenMath?: (member: FamilyMember) => void
 }
 
 const SHARED = '__shared'
+
+/** A kid's Math of the day button, under their after-school steps. */
+function MathButton({ p, member }: { p: KioskHomeV1Props; member: FamilyMember }) {
+  const entry = p.math?.kids.find((k) => k.member.id === member.id)
+  if (!entry || !p.onOpenMath) return null
+  const status = entry.today?.status ?? null
+  const state = status === 'solved' ? 'Solved' : status === 'revealed' ? 'Done' : 'Ready'
+  return (
+    <button type="button" className={`kw-math ${status === 'solved' ? 'is-solved' : ''}`} onClick={() => p.onOpenMath!(member)} aria-label={`${member.name}: Math of the day, ${state.toLowerCase()}${entry.streak ? `, ${entry.streak} days in a row` : ''}`}>
+      <Calculator aria-hidden="true" />
+      <span className="kw-math-grow">Math of the day</span>
+      {entry.streak > 0 && <span className="kw-math-star">★ {entry.streak}</span>}
+      <span className="kw-math-state">{state}</span>
+      <ChevronRight aria-hidden="true" />
+    </button>
+  )
+}
 
 /** A person: their colour and initial, the same everywhere on the wall. */
 export function Face({ member, size = 'md' }: { member: Pick<FamilyMember, 'name' | 'initials' | 'color'> | undefined; size?: 'xs' | 'sm' | 'md' | 'lg' }) {
@@ -518,7 +539,8 @@ function HomeFromSchool(p: KioskHomeV1Props) {
           return (
             <section key={k.member.id} className="kw-kid" aria-label={`${k.member.name} after school`}>
               <KidHead kid={k.member} count={`${done} of ${rows.length}`} onOpen={() => p.onOpenKid(k.member)} />
-              <KidChecklist kid={k.member} steps={rows} max={5} onTick={(r) => p.onTick(k.member, r)} />
+              <KidChecklist kid={k.member} steps={rows} max={p.math ? 4 : 5} onTick={(r) => p.onTick(k.member, r)} />
+              <MathButton p={p} member={k.member} />
             </section>
           )
         })}

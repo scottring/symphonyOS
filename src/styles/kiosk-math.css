@@ -1,0 +1,178 @@
+/* ===== Math of the day — the kitchen wall's math stage ======================
+   The mockup Scott approved 2026-10-14 ("Math of the Day"): the lead column is
+   grid paper with the pens beside it, under each kid's button; the side column
+   is the problem, the answer boxes and the number pad, split by the wall's
+   hairline. Drawn in Kitchen wall v2's design pixels (--p) and tokens (--kw-*):
+   touch targets ≥ 88, no text under 20, nothing scrolls. Every rule is under
+   .kiosk-canvas so it outranks the canvas's `button { font: inherit }`. */
+
+.kiosk-canvas .km-stage {
+  height: 100%;
+  display: grid;
+  grid-template-columns: minmax(0, 1.5fr) 1px minmax(0, 1fr);
+  column-gap: calc(64 * var(--p));
+  user-select: none;
+  -webkit-user-select: none;
+}
+.kiosk-canvas .km-rule { background: var(--kw-line); }
+.kiosk-canvas .km-lead { min-height: 0; display: flex; flex-direction: column; gap: calc(20 * var(--p)); }
+.kiosk-canvas .km-side { min-height: 0; min-width: 0; display: flex; flex-direction: column; gap: calc(18 * var(--p)); overflow: hidden; }
+.kiosk-canvas .km-empty { height: 100%; display: grid; place-items: center; font-size: calc(30 * var(--p)); color: var(--kw-muted); }
+
+/* Kid buttons */
+.kiosk-canvas .km-kids { display: flex; gap: calc(16 * var(--p)); flex-wrap: nowrap; min-width: 0; }
+.kiosk-canvas .km-kid {
+  display: flex; align-items: center; gap: calc(14 * var(--p)); min-width: 0; height: calc(88 * var(--p));
+  padding: 0 calc(26 * var(--p)) 0 calc(12 * var(--p)); border-radius: 999px;
+  border: calc(2 * var(--p)) solid var(--kw-line); background: var(--kw-surface); color: var(--kw-ink);
+  font: 600 calc(30 * var(--p)) var(--kw-sans); white-space: nowrap;
+}
+.kiosk-canvas .km-kid[aria-pressed="true"] { border-color: var(--kw-sym); background: var(--kw-sym-tint); }
+.kiosk-canvas .km-kid:active { transform: scale(.97); }
+.kiosk-canvas .km-streak { color: var(--kw-now); }
+.kiosk-canvas .km-state { font-size: calc(22 * var(--p)); color: var(--kw-muted); padding: calc(4 * var(--p)) calc(14 * var(--p)); border-radius: 999px; background: var(--kw-bg); }
+.kiosk-canvas .km-state.is-solved { background: var(--kw-done-tint); color: var(--kw-done); }
+
+/* Paper and pens */
+.kiosk-canvas .km-desk { flex: 1; min-height: 0; display: flex; gap: calc(20 * var(--p)); }
+.kiosk-canvas .km-paper {
+  --km-cell: calc(64 * var(--p));
+  --km-grid: color-mix(in srgb, var(--kw-line) 70%, var(--kw-surface));
+  position: relative; flex: 1; min-width: 0; overflow: hidden;
+  border-radius: calc(22 * var(--p)); border: calc(1.5 * var(--p)) solid var(--kw-line);
+  background-color: var(--kw-surface);
+  background-image:
+    linear-gradient(to right, var(--km-grid) calc(1.5 * var(--p)), transparent calc(1.5 * var(--p))),
+    linear-gradient(to bottom, var(--km-grid) calc(1.5 * var(--p)), transparent calc(1.5 * var(--p)));
+  background-size: var(--km-cell) var(--km-cell);
+  touch-action: none;
+}
+.kiosk-canvas .km-paper.is-waiting { display: grid; place-items: center; color: var(--kw-muted); font-size: calc(28 * var(--p)); }
+.kiosk-canvas .km-ink { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; cursor: crosshair; }
+.kiosk-canvas .km-paper.is-revealed .km-ink { opacity: .22; }
+.kiosk-canvas .km-printed, .kiosk-canvas .km-overlay { position: absolute; inset: 0; pointer-events: none; }
+.kiosk-canvas .km-cell {
+  position: absolute; width: var(--km-cell); height: var(--km-cell); display: grid; place-items: center;
+  font: 400 calc(46 * var(--p)) / 1 var(--kw-serif); color: var(--kw-ink);
+}
+.kiosk-canvas .km-cell.is-work { color: var(--kw-sym); font-weight: 600; }
+.kiosk-canvas .km-cell.is-carry { color: var(--kw-now); font: 600 calc(28 * var(--p)) / 1 var(--kw-sans); align-items: end; padding-bottom: calc(6 * var(--p)); }
+.kiosk-canvas .km-bar { position: absolute; height: calc(3.5 * var(--p)); border-radius: 9px; background: var(--kw-sym); }
+.kiosk-canvas .km-bar.is-given { background: var(--kw-ink); }
+.kiosk-canvas .km-bracket {
+  position: absolute; box-sizing: border-box;
+  border-top: calc(4 * var(--p)) solid var(--kw-ink);
+  border-left: calc(4 * var(--p)) solid var(--kw-ink);
+  border-top-left-radius: calc(16 * var(--p)) calc(44 * var(--p));
+}
+.kiosk-canvas .km-paper-note { position: absolute; right: calc(20 * var(--p)); bottom: calc(12 * var(--p)); font-size: calc(20 * var(--p)); color: var(--kw-muted); pointer-events: none; }
+
+.kiosk-canvas .km-tools { display: flex; flex-direction: column; gap: calc(12 * var(--p)); }
+.kiosk-canvas .km-tool {
+  width: calc(96 * var(--p)); height: calc(88 * var(--p)); display: grid; place-items: center;
+  border-radius: calc(18 * var(--p)); border: calc(1.5 * var(--p)) solid var(--kw-line); background: var(--kw-surface); color: var(--kw-ink);
+  font: 600 calc(22 * var(--p)) var(--kw-sans);
+}
+.kiosk-canvas .km-tool[aria-pressed="true"] { border: calc(3 * var(--p)) solid var(--kw-ink); }
+.kiosk-canvas .km-tool:active { transform: scale(.95); background: var(--kw-sym-tint); }
+.kiosk-canvas .km-tool svg { width: calc(38 * var(--p)); height: calc(38 * var(--p)); stroke-width: 1.7; }
+.kiosk-canvas .km-tool-gap { height: calc(4 * var(--p)); }
+.kiosk-canvas .km-dot { width: calc(40 * var(--p)); height: calc(40 * var(--p)); border-radius: 999px; }
+.kiosk-canvas .km-dot.is-ink { background: var(--kw-ink); }
+.kiosk-canvas .km-dot.is-sym { background: var(--kw-sym); }
+.kiosk-canvas .km-dot.is-now { background: var(--kw-now); }
+
+/* The problem */
+.kiosk-canvas .km-eyebrow { margin: 0; display: flex; align-items: center; flex-wrap: wrap; gap: calc(12 * var(--p)); font-size: calc(22 * var(--p)); font-weight: 600; letter-spacing: .12em; text-transform: uppercase; color: var(--kw-muted); }
+.kiosk-canvas .km-level { letter-spacing: .02em; text-transform: none; color: var(--kw-sym); background: var(--kw-sym-tint); border-radius: 999px; padding: calc(4 * var(--p)) calc(14 * var(--p)); }
+.kiosk-canvas .km-story { margin: 0; font: 400 calc(31 * var(--p)) / 1.32 var(--kw-serif); color: var(--kw-ink); text-wrap: pretty; }
+.kiosk-canvas .km-story.is-compact { font-size: calc(27 * var(--p)); line-height: 1.28; }
+.kiosk-canvas .km-expr { margin: 0; display: flex; align-items: center; gap: calc(18 * var(--p)); font: 400 calc(40 * var(--p)) / 1 var(--kw-serif); }
+.kiosk-canvas .km-frac { display: inline-flex; flex-direction: column; align-items: center; line-height: 1.05; }
+.kiosk-canvas .km-frac span:first-child { border-bottom: calc(3 * var(--p)) solid currentColor; padding: 0 calc(6 * var(--p)) calc(2 * var(--p)); }
+.kiosk-canvas .km-op { color: var(--kw-muted); }
+.kiosk-canvas .km-hint { border-radius: calc(18 * var(--p)); background: var(--kw-note); color: var(--kw-note-ink); padding: calc(14 * var(--p)) calc(22 * var(--p)); font-size: calc(24 * var(--p)); line-height: 1.36; }
+.kiosk-canvas .km-hint strong { display: block; font-size: calc(20 * var(--p)); letter-spacing: .1em; text-transform: uppercase; margin-bottom: calc(2 * var(--p)); }
+
+/* Answer boxes */
+.kiosk-canvas .km-answer-row { display: flex; align-items: flex-start; gap: calc(16 * var(--p)); }
+.kiosk-canvas .km-answer-row .km-expr { align-self: center; margin-bottom: calc(26 * var(--p)); }
+.kiosk-canvas .km-equals { align-self: center; margin-bottom: calc(26 * var(--p)); font: 400 calc(44 * var(--p)) / 1 var(--kw-serif); color: var(--kw-muted); }
+.kiosk-canvas .km-answer { display: flex; align-items: flex-start; gap: calc(16 * var(--p)); }
+.kiosk-canvas .km-slot { display: flex; flex-direction: column; align-items: center; gap: calc(6 * var(--p)); }
+.kiosk-canvas .km-answer small, .kiosk-canvas .km-slot small { font-size: calc(20 * var(--p)); color: var(--kw-muted); font-weight: 600; text-align: center; }
+.kiosk-canvas .km-box {
+  min-width: calc(200 * var(--p)); height: calc(104 * var(--p)); padding: 0 calc(20 * var(--p));
+  display: grid; grid-auto-flow: column; place-items: center; place-content: center;
+  border-radius: calc(18 * var(--p)); border: calc(2 * var(--p)) solid var(--kw-line-strong); background: var(--kw-surface); color: var(--kw-ink);
+  font: 400 calc(60 * var(--p)) / 1 var(--kw-serif);
+}
+.kiosk-canvas .km-box.is-short { min-width: calc(140 * var(--p)); }
+.kiosk-canvas .km-box[aria-pressed="true"] { border: calc(4 * var(--p)) solid var(--kw-sym); box-shadow: 0 0 0 calc(6 * var(--p)) var(--kw-sym-tint); }
+.kiosk-canvas .km-ph { color: var(--kw-line-strong); opacity: .6; }
+.kiosk-canvas .km-caret { display: inline-block; width: calc(3 * var(--p)); height: calc(52 * var(--p)); margin-left: calc(4 * var(--p)); background: var(--kw-sym); animation: km-blink 1s steps(1) infinite; }
+@keyframes km-blink { 50% { opacity: 0; } }
+.kiosk-canvas .km-r { font: 400 calc(52 * var(--p)) / calc(104 * var(--p)) var(--kw-serif); color: var(--kw-muted); }
+.kiosk-canvas .km-answer.is-frac { flex-direction: column; align-items: center; gap: calc(6 * var(--p)); }
+.kiosk-canvas .km-frac-boxes { display: flex; flex-direction: column; align-items: center; gap: calc(6 * var(--p)); }
+.kiosk-canvas .km-frac-boxes .km-box { height: calc(66 * var(--p)); min-width: calc(124 * var(--p)); font-size: calc(42 * var(--p)); }
+.kiosk-canvas .km-frac-boxes .km-caret { height: calc(40 * var(--p)); }
+.kiosk-canvas .km-frac-line { width: calc(140 * var(--p)); height: calc(4 * var(--p)); border-radius: 9px; background: var(--kw-ink); }
+.kiosk-canvas .km-tries { margin-left: auto; align-self: center; display: flex; flex-direction: column; align-items: flex-end; gap: calc(8 * var(--p)); font-size: calc(20 * var(--p)); font-weight: 600; color: var(--kw-muted); }
+.kiosk-canvas .km-tries span { display: flex; gap: calc(8 * var(--p)); }
+.kiosk-canvas .km-tries i { width: calc(18 * var(--p)); height: calc(18 * var(--p)); border-radius: 99px; border: calc(2 * var(--p)) solid var(--kw-line-strong); }
+.kiosk-canvas .km-tries i.is-used { background: var(--kw-now); border-color: var(--kw-now); }
+.kiosk-canvas .km-feedback { margin: 0; min-height: calc(32 * var(--p)); font-size: calc(24 * var(--p)); color: var(--kw-muted); }
+.kiosk-canvas .km-feedback.is-warn { color: var(--kw-now); font-weight: 600; }
+
+/* Number pad: 1–5 ⌫ / 6–0 Check */
+.kiosk-canvas .km-pad { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)) minmax(0, 1.5fr); gap: calc(12 * var(--p)); }
+.kiosk-canvas .km-key {
+  height: calc(90 * var(--p)); display: grid; place-items: center;
+  border-radius: calc(18 * var(--p)); border: calc(1.5 * var(--p)) solid var(--kw-line-strong); background: var(--kw-surface); color: var(--kw-ink);
+  font: 400 calc(46 * var(--p)) / 1 var(--kw-serif);
+}
+.kiosk-canvas .km-key:active { transform: scale(.95); background: var(--kw-sym-tint); }
+.kiosk-canvas .km-key svg { width: calc(40 * var(--p)); height: calc(40 * var(--p)); stroke-width: 1.7; }
+.kiosk-canvas .km-key.is-check { background: var(--kw-sym); border-color: var(--kw-sym); color: var(--kw-on-sym); font: 600 calc(30 * var(--p)) / 1 var(--kw-sans); }
+.kiosk-canvas .km-key.is-check:active { background: var(--kw-sym); filter: brightness(.9); }
+.kiosk-canvas .km-key.is-check:disabled { opacity: .45; }
+
+/* Solved and walkthrough panels */
+.kiosk-canvas .km-panel { display: flex; flex-direction: column; gap: calc(14 * var(--p)); border-radius: calc(22 * var(--p)); padding: calc(22 * var(--p)) calc(28 * var(--p)); }
+.kiosk-canvas .km-panel.is-win { background: var(--kw-done-tint); }
+.kiosk-canvas .km-panel.is-walk { background: var(--kw-sym-tint); }
+.kiosk-canvas .km-panel h3 { margin: 0; font: 600 calc(38 * var(--p)) / 1.2 var(--kw-serif); }
+.kiosk-canvas .km-panel p { margin: 0; font-size: calc(26 * var(--p)); line-height: 1.38; }
+.kiosk-canvas .km-bigstar { font: 600 calc(50 * var(--p)) / 1 var(--kw-serif) !important; color: var(--kw-now); }
+.kiosk-canvas .km-count { font-size: calc(20 * var(--p)) !important; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: var(--kw-muted); }
+.kiosk-canvas .km-say { font-size: calc(28 * var(--p)) !important; }
+.kiosk-canvas .km-muted { color: var(--kw-muted); }
+.kiosk-canvas .km-row { display: flex; gap: calc(14 * var(--p)); }
+.kiosk-canvas .km-btn {
+  height: calc(88 * var(--p)); padding: 0 calc(30 * var(--p)); border-radius: calc(18 * var(--p));
+  border: calc(1.5 * var(--p)) solid var(--kw-line-strong); background: var(--kw-surface); color: var(--kw-ink);
+  font: 600 calc(26 * var(--p)) var(--kw-sans);
+}
+.kiosk-canvas .km-btn.is-primary { background: var(--kw-sym); border-color: var(--kw-sym); color: var(--kw-on-sym); }
+.kiosk-canvas .km-btn:active { transform: scale(.97); }
+.kiosk-canvas .km-btn:disabled { opacity: .4; }
+
+/* Home: a kid's math button under their after-school steps. */
+.kiosk-canvas .kw-math {
+  display: flex; align-items: center; gap: calc(12 * var(--p)); width: 100%; min-height: calc(88 * var(--p));
+  margin-top: calc(14 * var(--p)); padding: 0 calc(22 * var(--p)); border-radius: calc(18 * var(--p));
+  border: calc(1.5 * var(--p)) solid var(--kw-line); background: var(--kw-surface); color: var(--kw-ink);
+  font: 600 calc(26 * var(--p)) var(--kw-sans); text-align: left;
+}
+.kiosk-canvas .kw-math:active { transform: scale(.98); background: var(--kw-sym-tint); }
+.kiosk-canvas .kw-math svg { width: calc(34 * var(--p)); height: calc(34 * var(--p)); color: var(--kw-sym); stroke-width: 1.7; flex: none; }
+.kiosk-canvas .kw-math .kw-math-grow { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.kiosk-canvas .kw-math > span { white-space: nowrap; }
+.kiosk-canvas .kw-math .kw-math-star { color: var(--kw-now); }
+.kiosk-canvas .kw-math .kw-math-state { font-size: calc(22 * var(--p)); color: var(--kw-muted); }
+.kiosk-canvas .kw-math.is-solved .kw-math-state { color: var(--kw-done); }
+
+@media (prefers-reduced-motion: reduce) {
+  .kiosk-canvas .km-caret { animation: none; }
+}

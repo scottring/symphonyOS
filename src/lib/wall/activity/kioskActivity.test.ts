@@ -264,3 +264,13 @@ describe('kiosk activity: persistence', () => {
     expect(readDeparture(store, 'd')).toBeNull()
   })
 })
+
+describe('Math of the day', () => {
+  it('opens as its own place, and an idle wall goes home from it', () => {
+    let s = kioskReducer(initialKioskState('2026-10-20'), { type: 'OPEN', stage: { kind: 'math' } })
+    expect(currentStage(s)).toEqual({ kind: 'math' })
+    expect(kioskPlace(s, { daypartLabel: null, dinnerTitle: null, recipeTitle: null, departureLabel: null, memberName: () => null })).toBe('Math of the day')
+    s = kioskReducer(s, { type: 'IDLE', ctx: { bedtimeInProgress: false } })
+    expect(currentStage(s)).toEqual({ kind: 'home' })
+  })
+})
