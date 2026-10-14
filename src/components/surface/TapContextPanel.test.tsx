@@ -369,22 +369,19 @@ describe('TapContextPanel', () => {
       }
     })
 
-    it('Bring up flags it for discussion, keeping the question', async () => {
+    it('Bring up is the discussion now: no separate flag chip (discussions v2)', async () => {
       const onUpdateDiscussion = vi.fn()
-      const { user } = renderPanel({ discussionNote: 'with Iris' }, { onUpdateDiscussion })
-      await user.click(await job(user, 'Bring up'))
-      expect(onUpdateDiscussion).toHaveBeenCalledWith({ needsDiscussion: true, discussionNote: 'with Iris' })
+      renderPanel({}, { onUpdateDiscussion })
+      expect(screen.queryByRole('button', { name: 'Bring up' })).toBeNull()
+      expect(screen.queryByRole('button', { name: 'On the list' })).toBeNull()
     })
 
-    it('a flagged task says On the list, unflags, and edits its question', async () => {
+    it('a task already on To talk about keeps its question editable', async () => {
       const onUpdateDiscussion = vi.fn()
       const { user } = renderPanel({ needsDiscussion: true, discussionNote: '' }, { onUpdateDiscussion })
       await user.type(screen.getByPlaceholderText(/what's the question/i), 'Summer camp')
       await user.tab()
       expect(onUpdateDiscussion).toHaveBeenCalledWith({ needsDiscussion: true, discussionNote: 'Summer camp' })
-      const chip = await job(user, 'On the list')
-      await user.click(chip)
-      expect(onUpdateDiscussion).toHaveBeenLastCalledWith({ needsDiscussion: false, discussionNote: undefined })
     })
 
     it('Waiting for… opens the sentence and saves it', async () => {

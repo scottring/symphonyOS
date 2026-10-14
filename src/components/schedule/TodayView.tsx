@@ -52,6 +52,8 @@ import { useActionableInstances } from '@/hooks/useActionableInstances'
 import { findTaskById } from '@/lib/findTaskById'
 import { showToast } from '@/hooks/useToast'
 import { useNavigate } from 'react-router-dom'
+import { useDiscussionInbox } from '@/hooks/useDiscussionInbox'
+import { WaitingOnYouBanner } from '@/components/discussion/WaitingOnYouBanner'
 import { useGoogleCalendar } from '@/hooks/useGoogleCalendar'
 import { ALL_LAYERS } from '@/lib/domains'
 
@@ -232,6 +234,7 @@ export function TodayView({
   const isMobile = useMobile()
   const [editionPreview, hideEditionPreview] = useEditionPreview()
   const navigate = useNavigate()
+  const { rows: discussionRows } = useDiscussionInbox()
   const { isConnected: calendarConnected, error: calendarError } = useGoogleCalendar()
   const ctx = useScheduleActionsContext()
   // Only what THIS file still uses. The row-level handlers moved with the
@@ -1071,6 +1074,13 @@ export function TodayView({
         <div className="px-4 md:px-0">
           <NeedsYourOK />
         </div>
+      )}
+
+      {/* A discussion waiting on you, first thing (discussions v2, board 4).
+          Phones get the same banner from the shell, above every page. */}
+      {data.isToday && !isMobile && (
+        <WaitingOnYouBanner rows={discussionRows}
+          onOpen={(row) => navigate(row ? `/discussions?open=${row.sessionId}` : '/discussions')} />
       )}
 
 

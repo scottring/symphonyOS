@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
+import { useItemDiscussionLabel } from '@/hooks/useItemDiscussionLabel'
 import { Trash2 } from 'lucide-react'
 import type { Routine, RoutineVisibility, RecurrencePattern } from '@/types/routine'
 import type { TargetUnit } from '@/types/actionable'
@@ -126,6 +127,7 @@ export function TapRoutinePanel(props: TapRoutinePanelProps) {
   const [assistOpen, setAssistOpen] = useState(props.autoOpenDiscussion === true)
   useEffect(() => { if (props.autoOpenDiscussion) setAssistOpen(true) }, [props.autoOpenDiscussion])
   const discussionUnread = useThreadUnread('routine', props.routine.id)
+  const discussionLabel = useItemDiscussionLabel('routine', props.routine.id)
   // Two different questions, and they were being answered by one switch: is
   // this routine running at all (Active/Resting), and does a running routine
   // want a row on Today. A bedtime routine everybody knows by heart is still
@@ -282,7 +284,7 @@ export function TapRoutinePanel(props: TapRoutinePanelProps) {
               onClick={() => setAssistOpen(true)}
               className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[15px] font-medium bg-neutral-100 text-neutral-700 hover:bg-neutral-200 transition-colors"
             >
-              <ConceptIcon name="discussion" size={14} decorative /> Discussion
+              <ConceptIcon name="discussion" size={14} decorative /> {discussionLabel}
               {discussionUnread && <span className="h-1.5 w-1.5 rounded-full bg-primary-500" aria-label="Unread" />}
             </button>
           )}
