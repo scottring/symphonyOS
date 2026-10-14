@@ -234,19 +234,44 @@
 .dark .wc-proposed-note { color: #6cc4b9; }
 .wc-dayrow.is-proposed s { color: #5f6664; }
 
-/* Week: "No day yet", one quiet line of draggable chips (Task 14). */
-.wc-noday { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; border-radius: 999px; }
-.wc-noday.is-over { outline: 2px dashed var(--color-primary-400); outline-offset: 4px; }
-.wc-noday-label { font-size: 13px; color: #6a6f6d; }
-.wc-noday-chips { display: contents; list-style: none; margin: 0; padding: 0; }
-.wc-noday-chip { display: inline-flex; border: 1px dashed #b9b9b3; border-radius: 999px; background: #fff; }
-.wc-noday-open { font: inherit; font-size: 13px; padding: 5px 11px; min-height: 32px; background: none; border: 0; color: inherit; cursor: pointer; }
-.dark .wc-noday-chip { background: transparent; border-color: #4a5352; }
-.wc-noday-chip { align-items: center; flex-wrap: wrap; }
-.wc-noday-glyph { width: 11px; height: 11px; margin-left: 10px; border-radius: 3px; border: 1.5px solid var(--color-sage-500); background: var(--color-sage-50); }
-.wc-noday-chip.is-routine .wc-noday-open { padding-left: 6px; }
+/* Week: "No day yet", under the days (2026-10-14). A few show as plain rows
+   in columns; more fold to one line like a weekend gone by. */
+.wc-noday { margin-top: 16px; border: 1px solid var(--color-neutral-200); border-radius: var(--radius-lg); font-family: var(--font-family-sans); }
+.wc-noday.is-open { padding: 10px 14px 12px; }
+.wc-noday.is-over { outline: 2px dashed var(--color-primary-400); outline-offset: 2px; background: color-mix(in srgb, var(--color-primary-50, #eef6f3) 60%, transparent); }
+.wc-noday-head { display: flex; align-items: baseline; gap: 10px; margin: 0 0 6px; }
+.wc-noday-label { font-family: var(--font-family-display); font-size: 17px; line-height: 1.2; color: var(--color-neutral-700); }
+.wc-noday-count { font-size: 12.5px; color: var(--color-neutral-500); }
+.wc-noday-hint { font-size: 12.5px; font-weight: 600; color: var(--color-primary-800); }
+.wc-noday-toggle { margin-left: auto; font-size: 12.5px; }
+.wc-noday-fold {
+  display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 14px; width: 100%; padding: 9px 14px;
+  border: 0; border-radius: inherit; background: transparent; text-align: left;
+  font-family: var(--font-family-sans); font-size: 12.5px; color: var(--color-neutral-500); cursor: pointer;
+}
+.wc-noday-fold:hover { background: color-mix(in srgb, var(--color-neutral-100) 50%, transparent); }
+.wc-noday-fold:focus-visible { outline: 2px solid var(--color-primary-600); outline-offset: 2px; }
+.wc-noday-peek { min-width: 0; color: var(--color-neutral-600); }
+.wc-noday-show { margin-left: auto; font-weight: 500; color: var(--color-neutral-600); white-space: nowrap; }
+.wc-noday-chips { list-style: none; margin: 0; padding: 0; columns: 3 220px; column-gap: 28px; }
+.wc-noday-chip { display: flex; align-items: center; gap: 8px; break-inside: avoid; border-radius: 6px; }
+.wc-noday-open { font: inherit; font-size: 13px; line-height: 1.35; padding: 4px 0; min-height: 28px; background: none; border: 0; color: var(--color-neutral-800); text-align: left; cursor: pointer; }
+.wc-noday-open:hover { color: var(--color-primary-800); }
 .wc-noday-open[draggable="true"] { cursor: grab; }
-.wc-noday-add { font: inherit; font-size: 15px; min-width: 44px; min-height: 44px; background: none; border: 0; color: inherit; }
+/* A task with no day: a dashed ring (not placed yet); a routine: its square. */
+.wc-noday-glyph { flex: none; width: 11px; height: 11px; border-radius: 50%; border: 1.5px dashed #9a9e9a; }
+.wc-noday-chip.is-routine .wc-noday-glyph { border-radius: 3px; border-style: solid; border-color: var(--color-sage-500); background: var(--color-sage-50); }
+.wc-noday-add { font: inherit; font-size: 15px; min-width: 44px; min-height: 44px; margin-left: auto; background: none; border: 0; color: inherit; }
+.dark .wc-noday { border-color: #3a4342; }
+.dark .wc-noday-open { color: #dfe5e3; }
+.dark .wc-noday-glyph { border-color: #6b7473; }
+@media (max-width: 767px) {
+  .wc-noday-chips { columns: 1; }
+  .wc-noday-chip { flex-wrap: wrap; column-gap: 8px; row-gap: 0; }
+  .wc-noday-open { flex: 1 1 0; min-width: 0; }
+  /* The day picker opens on its own line under the row. */
+  .wc-noday-chip > :not(.wc-noday-glyph):not(.wc-noday-open):not(.wc-noday-add) { flex-basis: 100%; }
+}
 
 /* Week: the Symphony halo on what the conversation is pointing at (Task 21). */
 .wc-day.is-pointed { box-shadow: 0 0 0 2px #1b6a64, 0 0 0 6px #ddece8; border-radius: 10px; transition: box-shadow 280ms ease-out; }

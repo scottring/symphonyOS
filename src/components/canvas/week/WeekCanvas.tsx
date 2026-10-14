@@ -13,9 +13,10 @@
 //                    ROW-LANGUAGE.md); a stay across days as one bar; past
 //                    days stepped back and a weekend that is over folded to a
 //                    line; done work hidden until "Show done".
-//   No day yet       what is chosen for this week with no day, one quiet line
-//                    of draggable chips under the title. Inbox, last week and
-//                    the month's goals are the planning session's.
+//   No day yet       what is chosen for this week with no day, under the
+//                    days: a few as draggable rows, more folded to one line
+//                    (2026-10-14). Inbox, last week and the month's goals
+//                    are the planning session's.
 //
 // Drag a row onto a day to place it, a day's row onto another day to move
 // it, back onto the No day yet line to take its day away. While dragging, the
@@ -23,7 +24,7 @@
 // Every write is the caller's (WeekViewV2 routes them through the canvas
 // activity strip with Undo); this component draws and asks.
 //
-// Phone (<768px): a row of day chips, the chosen day, then the No day yet line;
+// Phone (<768px): a row of day chips, the chosen day, then No day yet;
 // tap opens a chip's task (no drag on touch).
 
 import { useContext, useState, type DragEvent, type ReactNode } from 'react'
@@ -132,6 +133,9 @@ export interface WeekCanvasProps {
 type Drag = { kind: 'task' | 'routine' | 'occ'; id: string; groupKey?: string; fromKey?: string }
 type Picker = { key: string } | null
 
+/** More than this many with no day fold to one line under the days. */
+const NODAY_FOLD_AT = 4
+
 const longDay = (d: Date) => d.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
 
 export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [], isCurrent, writers, spans = [], dayDescriptions, members = [], daily, pointing, loaded = true }: WeekCanvasProps) {
@@ -143,6 +147,7 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
   const [overShelf, setOverShelf] = useState(false)
   const [picker, setPicker] = useState<Picker>(null)
   const [weekendOpen, setWeekendOpen] = useState(false)
+  const [nodayOpen, setNodayOpen] = useState<boolean | null>(null)
   const todayKey = localYmd(new Date())
   const [chosenDay, setChosenDay] = useState<string | null>(null)
   const selectedKey = chosenDay && days.some((d) => d.key === chosenDay) ? chosenDay : (days.find((d) => d.key === todayKey) ?? days[0])?.key
@@ -359,14 +364,14 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
   const unplaced = shelf.flatMap((g) => g.rows.map((r) => r.task))
   // Dragging a day's task: the line shows (even empty) so it can be dropped back.
   const draggingPlaced = drag?.kind === 'task' && !!drag.fromKey
-  // A chip: the title is what the pointer grabs (desktop) and what opens the
+  // A row: the title is what the pointer grabs (desktop) and what opens the
   // item; on the phone a + beside it gives the day, since touch can't drag.
-  const nodayChip = (kind: 'task' | 'routine', id: string, title: string, onPlace: (d: Date) => void) => {
+  const nodayRow = (kind: 'task' | 'routine', id: string, title: string, onPlace: (d: Date) => void) => {
     const lit = kind === 'task' && pointedTask(id)
     const key = `noday:${kind}:${id}`
     return (
       <li key={key} className={`wc-noday-chip${kind === 'routine' ? ' is-routine' : ''}${lit ? ' is-pointed' : ''}`}>
-        {kind === 'routine' && <span className="wc-noday-glyph" aria-hidden="true" />}
+        <span className="wc-noday-glyph" aria-hidden="true" />
         <button type="button" className="wc-noday-open" draggable={!phone}
           onDragStart={(ev) => startDrag(ev, { kind, id, date: localYmd(weekStart), title }, { kind, id })}
           onDragEnd={endDrag}
@@ -379,20 +384,39 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
       </li>
     )
   }
-  const shelfLine = (
-    <span className="wc-tray">
-      {(unplaced.length > 0 || routinesToPlace.length > 0 || draggingPlaced) && (
-        <span className={`wc-noday${overShelf ? ' is-over' : ''}`} data-explain="still-to-place" data-explain-label="No day yet" {...shelfDrop}>
-          <span className="wc-noday-label">No day yet</span>
+  // No day yet sits under the days (Scott, 2026-10-14: the chips across the
+  // top were busy and overwhelming). A few show as they are; more fold to one
+  // line, like a weekend gone by, until asked for or pointed at.
+  const nodayCount = unplaced.length + routinesToPlace.length
+  const nodayTitles = [...unplaced.map((t) => t.title), ...routinesToPlace.map((r) => r.title)]
+  const nodayPointed = unplaced.some((t) => pointedTask(t.id))
+  const nodayShown = nodayPointed || (nodayOpen ?? nodayCount <= NODAY_FOLD_AT)
+  const nodayTray = (nodayCount > 0 || draggingPlaced) && (
+    <div className={`wc-noday${overShelf ? ' is-over' : ''}${nodayShown ? ' is-open' : ''}`} data-explain="still-to-place" data-explain-label="No day yet" {...shelfDrop}>
+      {nodayShown || nodayCount === 0 ? (
+        <>
+          <p className="wc-noday-head">
+            <span className="wc-noday-label">No day yet</span>
+            {nodayCount > 0 && <span className="wc-noday-count">{nodayCount}</span>}
+            {draggingPlaced && <span className="wc-noday-hint">Drop here to take its day away</span>}
+            {nodayCount > NODAY_FOLD_AT && <button type="button" className="canvas-link wc-quiet-link wc-noday-toggle" aria-expanded onClick={() => setNodayOpen(false)}>Fold</button>}
+          </p>
           <ul className="wc-noday-chips" aria-label="No day yet">
-            {unplaced.map((t) => nodayChip('task', t.id, t.title, (d) => writers.placeTask(t, d)))}
-            {routinesToPlace.map((r) => nodayChip('routine', r.id, r.title, (d) => writers.placeRoutine(r, d)))}
+            {unplaced.map((t) => nodayRow('task', t.id, t.title, (d) => writers.placeTask(t, d)))}
+            {routinesToPlace.map((r) => nodayRow('routine', r.id, r.title, (d) => writers.placeRoutine(r, d)))}
           </ul>
-        </span>
+        </>
+      ) : (
+        <button type="button" className="wc-noday-fold" aria-expanded={false} onClick={() => setNodayOpen(true)}>
+          <span className="wc-noday-label">No day yet</span>
+          <span className="wc-noday-count">{nodayCount}</span>
+          <span className="wc-noday-peek">{nodayTitles.slice(0, 2).join(', ')}{nodayCount > 2 ? `, and ${nodayCount - 2} more` : ''}</span>
+          <span className="wc-noday-show">{draggingPlaced ? 'Drop here to take its day away' : 'Show'}</span>
+        </button>
       )}
-      {sentence && <span className="wc-tray-aside wc-week-sentence" data-explain="week-sentence" data-explain-label="The week in a sentence">{sentence}</span>}
-    </span>
+    </div>
   )
+  const subline = sentence && <span className="wc-tray-aside wc-week-sentence" data-explain="week-sentence" data-explain-label="The week in a sentence">{sentence}</span>
   // This week's weekend, once over, folds to one line: when it was, what
   // happened, what was left (2026-10-05, #137) — room for the days ahead. One
   // still ahead stays open in full: family and household plans live there. A
@@ -423,8 +447,8 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
   })
   const barTail = (sp: CanvasSpan) => sp.tail?.replace(/^,\s*/, '')
   const subtitleNode = slots?.subline && !phone
-    ? createPortal(<>{pastNote}<span className="wc-subtitle">{shelfLine}</span></>, slots.subline)
-    : <>{pastNote && <p className="wc-subtitle is-inline">{pastNote}</p>}<p className="wc-subtitle is-inline">{shelfLine}</p></>
+    ? createPortal(<>{pastNote}{subline && <span className="wc-subtitle">{subline}</span>}</>, slots.subline)
+    : <>{pastNote && <p className="wc-subtitle is-inline">{pastNote}</p>}{subline && <p className="wc-subtitle is-inline">{subline}</p>}</>
 
   if (phone) {
     const sel = days.find((d) => d.key === selectedKey)
@@ -441,6 +465,7 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
           ))}
         </div>
         {sel && dayColumn(sel)}
+        {nodayTray}
         {rhythmNode}
         <div className="wc-done-row">{doneToggle}</div>
       </div>
@@ -473,6 +498,7 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
             </div>
           )}
         </div>
+        {nodayTray}
       </section>
     </div>
   )

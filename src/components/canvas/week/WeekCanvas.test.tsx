@@ -298,8 +298,8 @@ describe('a past week says so', () => {
   })
 })
 
-// Scott, 2026-10-12: the days are the page. Work with no day waits behind one
-// line under the title, and the days follow the row rulebook.
+// Scott, 2026-10-12: the days are the page. Work with no day waits under the
+// days (2026-10-14), and the days follow the row rulebook.
 describe('WeekCanvas — calendar first', () => {
   it('things with no day sit in one quiet line, draggable onto a day; no tray', () => {
     const w = show()
@@ -316,6 +316,42 @@ describe('WeekCanvas — calendar first', () => {
     fireEvent.click(within(line).getByText('Call the bank'))
     expect(w.open).toHaveBeenCalledWith('task-c')
     expect(screen.getByText('3 days ahead are wide open.')).toBeInTheDocument()
+  })
+
+  // Scott, 2026-10-14: sixteen chips across the top were busy and
+  // overwhelming. No day yet sits under the days; more than four fold.
+  it('more than four with no day fold to one line under the days; Show opens them, Fold closes', () => {
+    const routines = ['Mow the lawn', 'Water plants', 'Clean gutters'].map((title, i) => ({ id: `r${i}`, title }))
+    const w = writers()
+    const { container } = render(<WeekCanvas weekStart={weekStart} days={days()} shelf={shelf()} routinesToPlace={routines} isCurrent writers={w} />)
+    const strip = container.querySelector('.wc-strip')!
+    const fold = screen.getByRole('button', { name: /No day yet/ })
+    expect(strip.compareDocumentPosition(fold) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(fold).toHaveAttribute('aria-expanded', 'false')
+    expect(fold).toHaveTextContent('6')
+    expect(fold).toHaveTextContent('and 4 more')
+    expect(screen.queryByRole('list', { name: 'No day yet' })).toBeNull()
+    fireEvent.click(fold)
+    const list = screen.getByRole('list', { name: 'No day yet' })
+    expect(within(list).getByText('Clean gutters')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Fold' }))
+    expect(screen.queryByRole('list', { name: 'No day yet' })).toBeNull()
+  })
+
+  it('a folded line opens by itself when Symphony points at something in it, and takes a day’s row dropped on it', () => {
+    const routines = ['Mow the lawn', 'Water plants', 'Clean gutters'].map((title, i) => ({ id: `r${i}`, title }))
+    const w = writers()
+    const { rerender } = render(<WeekCanvas weekStart={weekStart} days={days()} shelf={shelf()} routinesToPlace={routines} isCurrent writers={w} />)
+    const d = dt()
+    fireEvent.dragStart(screen.getByText('Pick up the keys').closest('li')!, { dataTransfer: d.t })
+    d.arm()
+    const fold = screen.getByRole('button', { name: /No day yet/ })
+    expect(fold).toHaveTextContent('Drop here to take its day away')
+    fireEvent.drop(fold.parentElement!, { dataTransfer: d.t })
+    expect(w.unplaceTask).toHaveBeenCalledWith(placed)
+    rerender(<WeekCanvas weekStart={weekStart} days={days()} shelf={shelf()} routinesToPlace={routines} isCurrent writers={w}
+      pointing={{ dates: new Set(), taskIds: new Set(['c']) }} />)
+    expect(within(screen.getByRole('list', { name: 'No day yet' })).getByText('Call the bank').closest('li')).toHaveClass('is-pointed')
   })
 
   it('with nothing to place there is no line at all', () => {
