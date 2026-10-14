@@ -505,3 +505,15 @@ describe('the dinner row', () => {
     expect(w.open).toHaveBeenCalledWith('event-g1')
   })
 })
+
+describe('No day yet', () => {
+  it('a task with no day can be marked done from its ring', () => {
+    const w = show()
+    fireEvent.click(screen.getByRole('button', { name: 'Complete Call the bank' }))
+    expect(w.toggleTask).toHaveBeenCalledWith(expect.objectContaining({ id: 'c', title: 'Call the bank' }))
+  })
+  it('a routine with no day has no check (it needs a day first)', () => {
+    show()
+    expect(screen.queryByRole('button', { name: 'Complete Mow the lawn' })).not.toBeInTheDocument()
+  })
+})

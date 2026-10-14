@@ -34,6 +34,7 @@ import type { FamilyMember } from '@/types/family'
 import { AssigneeAvatar } from '@/components/family/AssigneeAvatar'
 import { localYmd, readCadenceConfig, weekStartAnchor } from '@/lib/cadence/config'
 import { Link } from 'react-router-dom'
+import { Check } from 'lucide-react'
 import { formatTimeCompact } from '@/lib/dateHelpers'
 import { isPlanDrag, readPlanDrag, writePlanDrag, type PlanDragPayload } from '@/lib/planning/planDrag'
 import { useMediaQuery } from '@/hooks/useMediaQuery'
@@ -369,12 +370,18 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
   const draggingPlaced = drag?.kind === 'task' && !!drag.fromKey
   // A row: the title is what the pointer grabs (desktop) and what opens the
   // item; on the phone a + beside it gives the day, since touch can't drag.
-  const nodayRow = (kind: 'task' | 'routine', id: string, title: string, onPlace: (d: Date) => void) => {
+  const nodayRow = (kind: 'task' | 'routine', id: string, title: string, onPlace: (d: Date) => void, onComplete?: () => void) => {
     const lit = kind === 'task' && pointedTask(id)
     const key = `noday:${kind}:${id}`
     return (
       <li key={key} className={`wc-noday-chip${kind === 'routine' ? ' is-routine' : ''}${lit ? ' is-pointed' : ''}`}>
-        <span className="wc-noday-glyph" aria-hidden="true" />
+        {/* A task with no day can still be done (Scott, 2026-10-14): its ring
+            is the check. A routine needs a day, so its square stays a mark. */}
+        {onComplete
+          ? <button type="button" className="wc-noday-check" onClick={onComplete} aria-label={`Complete ${title}`} title="Mark done">
+              <span className="wc-noday-glyph" aria-hidden="true"><Check size={9} strokeWidth={3} /></span>
+            </button>
+          : <span className="wc-noday-glyph" aria-hidden="true" />}
         <button type="button" className="wc-noday-open" draggable={!phone}
           onDragStart={(ev) => startDrag(ev, { kind, id, date: localYmd(weekStart), title }, { kind, id })}
           onDragEnd={endDrag}
@@ -405,7 +412,7 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
             {nodayCount > NODAY_FOLD_AT && <button type="button" className="canvas-link wc-quiet-link wc-noday-toggle" aria-expanded onClick={() => setNodayOpen(false)}>Fold</button>}
           </p>
           <ul className="wc-noday-chips" aria-label="No day yet">
-            {unplaced.map((t) => nodayRow('task', t.id, t.title, (d) => writers.placeTask(t, d)))}
+            {unplaced.map((t) => nodayRow('task', t.id, t.title, (d) => writers.placeTask(t, d), () => writers.toggleTask(t)))}
             {routinesToPlace.map((r) => nodayRow('routine', r.id, r.title, (d) => writers.placeRoutine(r, d)))}
           </ul>
         </>

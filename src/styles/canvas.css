@@ -273,6 +273,16 @@
 /* A task with no day: a dashed ring (not placed yet); a routine: its square. */
 .wc-noday-glyph { flex: none; width: 11px; height: 11px; border-radius: 50%; border: 1.5px dashed #9a9e9a; }
 .wc-noday-chip.is-routine .wc-noday-glyph { border-radius: 3px; border-style: solid; border-color: var(--color-sage-500); background: var(--color-sage-50); }
+/* A task's ring is its check: a quiet dashed ring that firms up and shows the
+   tick on hover or focus; a generous target around a small mark. */
+.wc-noday-check { flex: none; display: grid; place-items: center; width: 28px; height: 28px; margin: -6px -8px -6px -8px; padding: 0; background: none; border: 0; border-radius: 50%; cursor: pointer; }
+.wc-noday-check .wc-noday-glyph { display: grid; place-items: center; width: 14px; height: 14px; color: transparent; transition: border-color 120ms, background 120ms, color 120ms; }
+.wc-noday-check:hover .wc-noday-glyph, .wc-noday-check:focus-visible .wc-noday-glyph { border-style: solid; border-color: var(--color-primary-600); color: var(--color-primary-600); }
+.wc-noday-check:active .wc-noday-glyph { background: var(--color-primary-600); color: #fff; }
+.wc-noday-check:focus-visible { outline: 2px solid var(--color-primary-500); outline-offset: 1px; }
+.dark .wc-noday-check:hover .wc-noday-glyph, .dark .wc-noday-check:focus-visible .wc-noday-glyph { border-color: #6cc4b9; color: #6cc4b9; }
+@media (max-width: 767px) { .wc-noday-check { width: 44px; height: 44px; margin: -12px -14px; } }
+@media (prefers-reduced-motion: reduce) { .wc-noday-check .wc-noday-glyph { transition: none; } }
 .wc-noday-add { font: inherit; font-size: 15px; min-width: 44px; min-height: 44px; margin-left: auto; background: none; border: 0; color: inherit; }
 .dark .wc-noday { border-color: #3a4342; }
 .dark .wc-noday-open { color: #dfe5e3; }
