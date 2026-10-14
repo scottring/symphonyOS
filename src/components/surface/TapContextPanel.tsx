@@ -32,6 +32,7 @@ import { WaitingForPopover } from '@/components/schedule/WaitingForPopover'
 import { useLinkedEntities } from './hooks/useLinkedEntities'
 import { useMightBeRelevant } from './hooks/useMightBeRelevant'
 import { AssistDrawer } from '@/components/assist/AssistDrawer'
+import { useItemDiscussionLabel } from '@/hooks/useItemDiscussionLabel'
 import { useThreadUnread } from '@/hooks/useThreadUnread'
 import { useFamilyMembers } from '@/hooks/useFamilyMembers'
 import { scopeForDomain } from '@/lib/scope'
@@ -151,6 +152,7 @@ export function TapContextPanel(props: TapContextPanelProps) {
   const [waitingOpen, setWaitingOpen] = useState(false)
   useEffect(() => { if (props.autoOpenDiscussion) setAssistOpen(true) }, [props.autoOpenDiscussion])
   const discussionUnread = useThreadUnread('task', task.id)
+  const discussionLabel = useItemDiscussionLabel('task', task.id)
 
   // The Discuss thread is shared exactly as widely as the task is: its scope is
   // DERIVED from the task's domain + assignees, never picked. Self is whoever
@@ -276,7 +278,7 @@ export function TapContextPanel(props: TapContextPanelProps) {
     ...(props.onAssistMutate
       ? [{
           id: 'assist',
-          label: 'Discussion',
+          label: discussionLabel,
           icon: 'discussion' as const,
           dot: discussionUnread,
           onClick: () => setAssistOpen(true),
@@ -296,24 +298,8 @@ export function TapContextPanel(props: TapContextPanelProps) {
           onClick: () => setWaitingOpen((v) => !v),
         }]
       : []),
-    ...(props.onUpdateDiscussion
-      ? [{
-          id: 'discuss',
-          label: task.needsDiscussion ? 'On the list' : 'Bring up',
-          kind: (task.needsDiscussion ? 'flagged' : 'default') as PanelAction['kind'],
-          pressed: !!task.needsDiscussion,
-          title: task.needsDiscussion
-            ? 'Take it off the To talk about list'
-            : 'Bring up in person — adds it to To talk about',
-          onClick: () => {
-            const next = !task.needsDiscussion
-            void props.onUpdateDiscussion?.({
-              needsDiscussion: next,
-              discussionNote: next ? task.discussionNote : undefined,
-            })
-          },
-        }]
-      : []),
+    // "Bring up" is the discussion itself now (discussions v2): starting one
+    // puts the task on To talk about, and settling it takes it off.
     ...(props.onToggleNeededToday && !task.completed
       ? [{
           id: 'needed-today',

@@ -14,9 +14,12 @@ const m = vi.hoisted(() => ({
   captures: [] as { id: string; subject: string | null; sourceLabel: string | null; createdAt: Date }[],
   markReviewed: vi.fn(),
   openAssistant: vi.fn(),
+  mobile: true,
+  discussionRows: [] as unknown[],
 }))
 
-vi.mock('@/hooks/useMobile', () => ({ useMobile: () => true }))
+vi.mock('@/hooks/useMobile', () => ({ useMobile: () => m.mobile }))
+vi.mock('@/hooks/useDiscussionInbox', () => ({ useDiscussionInbox: () => ({ rows: m.discussionRows, unreadCount: 0, waitingCount: 0, loading: false, reload: vi.fn() }) }))
 vi.mock('@/hooks/useWeather', () => ({ useWeather: () => ({ weather: null, loading: false, error: 'x', requestLocation: vi.fn() }) }))
 vi.mock('@/hooks/useProactiveSuggestions', () => ({ useProactiveSuggestions: () => ({ suggestions: [], topSuggestions: [], suggestionsForEntity: () => [], actOnSuggestion: vi.fn(), dismissSuggestion: vi.fn(), isLoading: false }) }))
 vi.mock('@/hooks/useRoutineStats', () => ({ useRoutineStats: () => ({ getStats: () => undefined }) }))
@@ -83,6 +86,8 @@ beforeEach(() => {
   m.captures = []
   m.markReviewed.mockReset()
   m.openAssistant.mockReset()
+  m.mobile = true
+  m.discussionRows = []
   setClock(at(10))
 })
 afterEach(() => { vi.useRealTimers() })
@@ -199,5 +204,26 @@ describe('Today, trimmed: a pending change card, dashed', () => {
     renderView({ tasks: [untimed('a', 'Buy Ella a helmet')] })
     expect(screen.queryAllByTestId('proposed-row')).toHaveLength(0)
     expect(document.querySelector('.today-preview-row')).toBeNull()
+  })
+})
+
+describe('Today, trimmed: a discussion waiting on you (discussions v2, board 4)', () => {
+  const waiting = {
+    sessionId: 's1', entityType: 'task', entityId: 't1', title: 'Summer camp', lastAuthor: 'Iris', lastText: 'Which week works?',
+    lastAt: new Date(), unread: true, state: { kind: 'waiting-on-you' }, others: ['Iris'], waitingOn: [], scope: 'couple',
+    settledAt: null, settledBy: null, outcome: null,
+  }
+  it('shows first on desktop, with who, what and Reply', () => {
+    m.mobile = false
+    m.discussionRows = [waiting]
+    renderView()
+    const card = screen.getByRole('button', { name: 'Iris is waiting on you about Summer camp' })
+    expect(card.textContent).toContain('Which week works?')
+    expect(card.textContent).toContain('Reply')
+  })
+  it('leaves phones to the shell banner', () => {
+    m.discussionRows = [waiting]
+    renderView()
+    expect(screen.queryByRole('button', { name: 'Iris is waiting on you about Summer camp' })).toBeNull()
   })
 })

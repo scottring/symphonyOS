@@ -163,9 +163,9 @@ function withStep(s: KioskState, step: number): KioskState {
 export function stageHoldsOpen(s: KioskState, ctx: HoldContext): boolean {
   const stage = currentStage(s)
   switch (stage.kind) {
+    // An idle math screen goes home; the drawing and typing wait on the stage.
     case 'home':
     case 'dinner':
-    // An idle math screen goes home; the drawing and typing wait on the stage.
     case 'math':
       return false
     case 'cooking':

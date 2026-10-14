@@ -1,4 +1,5 @@
 import { useRef, useState, useEffect } from 'react'
+import { useItemDiscussionLabel } from '@/hooks/useItemDiscussionLabel'
 
 import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
 import type { Task, TaskLink } from '@/types/task'
@@ -202,6 +203,7 @@ export function TapEventPanel(props: TapEventPanelProps) {
   // One thread per series, not per instance — the same key the wall flag uses.
   const discussionBaseId = getRecurringBaseId(eventId)
   const discussionUnread = useThreadUnread('event', discussionBaseId)
+  const discussionLabel = useItemDiscussionLabel('event', discussionBaseId)
   const calendarId = event.calendar_id ?? event.calendarId
 
   // Google refuses writes to view-only calendars — don't offer them.
@@ -372,7 +374,7 @@ export function TapEventPanel(props: TapEventPanelProps) {
       : []),
     {
       id: 'discussion',
-      label: 'Discussion',
+      label: discussionLabel,
       icon: 'discussion' as const,
       dot: discussionUnread,
       onClick: () => setAssistOpen(true),
