@@ -80,6 +80,22 @@ export function KioskTellSymphony({ onCommand, voice }: KioskTellSymphonyProps) 
   const rec = useRef<RecognitionLike | null>(null)
   const replyRef = useRef<(text: string) => void>(() => {})
 
+  /** A question, or anything not otherwise understood: ask the wall. An answer is
+   *  shown; a change it can't make yet is kept in the Inbox with Undo. */
+  const askAbout = useCallback(async (text: string): Promise<string> => {
+    if (!voice) return 'I can’t answer questions on this screen.'
+    setBusy(true)
+    const asked = await askWall(text, voice.snapshot()).catch(() => ({ answer: 'Sorry, I couldn’t answer that just now.' }))
+    if ('change' in asked) {
+      const r = await voice.save({ kind: 'inbox', text: asked.change }).finally(() => setBusy(false))
+      if (r.undo) { const fn = r.undo; setUndo(() => fn) }
+      return r.undo ? `I can’t change that from the wall yet. I saved it to your inbox: ${asked.change}` : r.said
+    }
+    setBusy(false)
+    setAnswer(asked.answer)
+    return asked.answer
+  }, [voice])
+
   /** One sentence, typed or said, → what the wall does with it. */
   const handle = useCallback(async (text: string, spoken: boolean) => {
     const u = readUtterance(text)
@@ -102,29 +118,18 @@ export function KioskTellSymphony({ onCommand, voice }: KioskTellSymphonyProps) 
         break
       }
       case 'question':
-        if (!voice) { said = 'I can’t answer questions on this screen.'; break }
-        setBusy(true)
-        {
-          const asked = await askWall(u.text, voice.snapshot()).catch(() => ({ answer: 'Sorry, I couldn’t answer that just now.' }))
-          if ('change' in asked) {
-            // Something the wall can't change yet: keep their words in the Inbox.
-            const r = await voice.save({ kind: 'inbox', text: asked.change }).finally(() => setBusy(false))
-            said = r.undo ? `I can’t change that from the wall yet. I saved it to your inbox: ${asked.change}` : r.said
-            if (r.undo) { const fn = r.undo; setUndo(() => fn) }
-          } else {
-            setBusy(false)
-            said = asked.answer
-            setAnswer(said)
-          }
-        }
+        said = await askAbout(u.text)
         break
       default:
+        // An imperative ("change dinner to Wednesday") isn't question-shaped but
+        // still deserves an answer or an Inbox note; only empty text is a miss.
+        if (u.kind === 'unknown' && u.text.trim()) { said = await askAbout(u.text); break }
         said = u.text ? `Didn’t catch what to do with “${u.text}”. Try “add milk to the grocery list” or ask a question.` : 'Didn’t catch that.'
         speak = 'Sorry, I didn’t catch that.'
     }
     setFeedback(said)
     if (spoken) replyRef.current(speak ?? said)
-  }, [onCommand, voice])
+  }, [onCommand, voice, askAbout])
 
   const onHeard = useCallback((h: Heard) => { void handle(h.text, true) }, [handle])
   const onNothing = useCallback((reason: string) => {

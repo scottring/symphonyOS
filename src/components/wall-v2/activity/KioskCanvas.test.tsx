@@ -23,7 +23,8 @@ const placeCall = vi.fn()
 vi.mock('@/lib/telephony/placeCall', () => ({ placeCall: (...a: unknown[]) => placeCall(...a) }))
 
 import { KioskCanvas, type KioskCanvasProps, type KioskTools, type KioskV1Data } from './KioskCanvas'
-import { Plus, Moon } from 'lucide-react'
+import { Plus, Moon, Sun as SunIcon } from 'lucide-react'
+import { useWallTheme } from '../wallThemeOverride'
 import { useKioskActivity } from './useKioskActivity'
 import type { KioskDinner } from './KioskStages'
 import type { FamilyMember } from '@/types/family'
@@ -261,5 +262,44 @@ describe('KioskCanvas settings button', () => {
   it('the non-v1 wall has no Settings button in the top band', () => {
     render(<Harness />)
     expect(topBand().queryByRole('button', { name: 'Settings' })).toBeNull()
+  })
+})
+
+// Wired like WallV2Shell: the automatic value feeds the hook, the effective
+// value goes into the v1 pick and the More sheet's theme item.
+function ThemedWall({ auto }: { auto: boolean }) {
+  const { dark, toggle } = useWallTheme(auto)
+  const themed: KioskTools = {
+    ...tools,
+    more: [
+      ...tools.more.filter((m) => m.id !== 'theme'),
+      { id: 'theme', label: dark ? 'Light view' : 'Dark view', sub: dark ? 'Switch the wall to light' : 'Switch the wall to dark', icon: dark ? SunIcon : Moon, onSelect: toggle },
+    ],
+  }
+  return <Harness isDark={dark} tools={themed} v1={{ ...v1Rest, pick: { ...v1Rest.pick, dark } }} />
+}
+
+describe('More: Dark view / Light view on the v1 wall', () => {
+  beforeEach(() => { localStorage.clear() })
+
+  it('toggles is-dark and the label, and survives a remount', () => {
+    const { container, unmount } = render(<ThemedWall auto={false} />)
+    const canvas = () => container.querySelector('.kiosk-canvas') as HTMLElement
+    expect(canvas()).not.toHaveClass('is-dark')
+    fireEvent.click(topBand().getByRole('button', { name: 'Settings' }))
+    fireEvent.click(screen.getByRole('button', { name: /Dark view/ }))
+    expect(canvas()).toHaveClass('is-dark')
+    fireEvent.click(topBand().getByRole('button', { name: 'Settings' }))
+    expect(screen.getByRole('button', { name: /Light view/ })).toHaveTextContent('Switch the wall to light')
+    unmount()
+    const again = render(<ThemedWall auto={false} />)
+    expect(again.container.querySelector('.kiosk-canvas')).toHaveClass('is-dark')
+    again.unmount()
+    // the automatic value moved on: the override is gone
+    const later = render(<ThemedWall auto={true} />)
+    fireEvent.click(topBand().getByRole('button', { name: 'Settings' }))
+    expect(screen.getByRole('button', { name: /Light view/ })).toBeInTheDocument()
+    expect(localStorage.getItem('symphony-wall-theme-override')).toBeNull()
+    later.unmount()
   })
 })
