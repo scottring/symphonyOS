@@ -31,8 +31,8 @@ import type { KioskDinner } from './KioskStages'
 import type { KioskScene } from './kioskScenes'
 export type { KioskScene } from './kioskScenes'
 
-const m = (id: string, name: string, role: string): FamilyMember => ({ id, name, initials: name.slice(0, 1), role_label: role } as unknown as FamilyMember)
-const MEMBERS = [m('sk', 'Scott', 'parent'), m('ir', 'Iris', 'parent'), m('li', 'Liam', 'child'), m('mi', 'Mia', 'child')]
+const m = (id: string, name: string, role: string, color?: string): FamilyMember => ({ id, name, initials: name.slice(0, 1), role_label: role, color } as unknown as FamilyMember)
+const MEMBERS = [m('sk', 'Scott', 'parent', '#2B4FD8'), m('ir', 'Iris', 'parent', '#7A2A8A'), m('li', 'Liam', 'child', '#1D8A74'), m('mi', 'Mia', 'child', '#C7861C')]
 const KIDS = MEMBERS.slice(2)
 
 const SCENE_CLOCK: Record<KioskScene, { moment: WallMoment; h: number; min: number }> = {
@@ -48,6 +48,24 @@ const SCENE_CLOCK: Record<KioskScene, { moment: WallMoment; h: number; min: numb
   bedtime: { moment: 'evening', h: 20, min: 6 },
   call: { moment: 'after', h: 16, min: 52 },
 }
+
+// v1 out the door (mockup 2026-10-14): a school morning at 6:35.
+const OTD_CLOCK = { moment: 'morning' as WallMoment, h: 6, min: 35 }
+const otd = (i: number, id: string, title: string, timeOfDay: string | null, by: string[] | undefined, done = false): KidRow =>
+  ({ entityType: 'routine', id: `${id}-${i}`, title, done, timeOfDay, target: null, ...(by ? { by } : {}) })
+const otdMorning = (i: number, kid: string): KidRow[] => [
+  otd(i, 'wake', 'Wake the kids', '06:45', ['sk']),
+  otd(i, 'dress', 'Get dressed', null, [kid], i === 0),
+  otd(i, 'hamper', 'Dirty clothes in the hamper', null, [kid]),
+  otd(i, 'bed', 'Make bed & tidy room', null, [kid]),
+  otd(i, 'teeth', 'Brush teeth', null, [kid]),
+  otd(i, 'table', 'Breakfast on the table', '06:50', ['ir']),
+  otd(i, 'eat', 'Eat breakfast', '07:00', [kid]),
+  otd(i, 'dishes', 'Clear your place & put dishes away', '07:10', [kid]),
+  otd(i, 'bag', 'Bag packed: homework folder', '07:15', [kid]),
+  otd(i, 'shoes', 'Shoes & jacket on', '07:18', [kid]),
+  otd(i, 'walk', 'Walk to school', '07:20', ['sk']),
+]
 
 const RECIPE = {
   title: 'Turkey chili',
@@ -98,7 +116,7 @@ function sceneState(scene: KioskScene, dateKey: string, nowMs: number): KioskSta
 }
 
 export function KioskCanvasPreview({ scene = 'home-evening', theme = 'light', v1Screen }: { scene?: KioskScene; theme?: 'light' | 'dark'; v1Screen?: KioskScreen }) {
-  const clock = SCENE_CLOCK[scene]
+  const clock = v1Screen === 'out-the-door' ? OTD_CLOCK : SCENE_CLOCK[scene]
   const now = useMemo(() => { const d = new Date(2026, 9, 13); d.setHours(clock.h, clock.min, 0, 0); return d }, [clock])
   const dateKey = `fixture-${scene}`
   const [isDark, setIsDark] = useState(theme === 'dark')
@@ -148,11 +166,11 @@ export function KioskCanvasPreview({ scene = 'home-evening', theme = 'light', v1
     ],
   }
   const v1: KioskV1Data | undefined = v1Screen && {
-    pick: { screen: v1Screen, title: v1Screen === 'night' ? 'Goodnight' : v1Screen === 'weekend' ? 'Saturday, together' : 'A quiet afternoon', dark: v1Screen === 'night' || isDark },
+    pick: { screen: v1Screen, title: v1Screen === 'night' ? 'Goodnight' : v1Screen === 'weekend' ? 'Saturday, together' : v1Screen === 'out-the-door' ? 'Out the door in 45 minutes' : 'A quiet afternoon', dark: v1Screen === 'night' || isDark },
     anchors: { morning: { start: 405, end: 440 }, home: { start: 1035 }, dinner: 1080, bedtime: { start: 1170, end: 1230 } },
     kids: KIDS.map((k, i) => ({
-      member: k, special: i ? 'Art' : 'Library', tomorrowSpecial: i ? 'Library' : 'Music', bag: [], after: [],
-      morning: [
+      member: k, special: v1Screen === 'out-the-door' ? (i ? 'Library' : 'Music') : i ? 'Art' : 'Library', tomorrowSpecial: i ? 'Library' : 'Music', bag: v1Screen === 'out-the-door' && i ? ['Library book'] : [], after: [],
+      morning: v1Screen === 'out-the-door' ? otdMorning(i, k.id) : [
         { entityType: 'routine' as const, id: `wake-${i}`, title: 'Wake the kids', done: false, timeOfDay: '06:45', target: null, by: [MEMBERS[0].id] },
         { entityType: 'routine' as const, id: `out-${i}`, title: 'Out the door', done: false, timeOfDay: '07:20', target: null },
       ],
