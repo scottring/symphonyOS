@@ -20,6 +20,9 @@ import { EVERYDAY_TALK_RULES, HARD_RULES, MONTH_SEASON_YEAR_NOTE, SESSION_SPINE_
 import { normalizeSchedule, etOffsetMinutes, APP_TZ } from './schedule.ts'
 import { type Surface, SCRATCHPAD_TOOL, WALL_WRITE_TOOLS, addToScratchpad, fenceDb, loadWallFence, parseSurface, systemForSurface, toolAllowed, toolsForSurface, wallClockLine } from './wallMode.ts'
 
+/** What the wall's Approve can apply today (WallV2Shell passes task writers only). */
+const WALL_CARD_OPS = new Set(['place', 'unplace', 'add', 'someday', 'assign'])
+
 // ════════════════════════════════════════════════════════════════
 // SYMPHONY AGENT — a smart, Symphony-scoped assistant.
 //
@@ -1637,8 +1640,11 @@ Deno.serve(async (req) => {
                     memberIds.length ? tdb.from('family_members').select('id, name').in('id', memberIds) : { data: [], error: null },
                     routineIds.length ? tdb.from('routines').select('id, name, updated_at, parent_routine_id').in('id', routineIds) : { data: [], error: null },
                   ])
-                  const resolved = wall && parsed.set.ops.some((o) => o.op === 'routine_add' && o.context !== 'family')
-                    ? { error: 'On the kitchen wall a new routine is a family routine: leave context as family.' }
+                  // The wall's Approve has only the task writers so far
+                  // (WallV2Shell): routine, done, merge and talk changes are
+                  // made in the app until the wall wires them in.
+                  const resolved = wall && parsed.set.ops.some((o) => !WALL_CARD_OPS.has(o.op))
+                    ? { error: 'On the kitchen wall the change card can move, add, set aside and assign tasks. Routine changes, done, merge and talk-about are made in the Symphony app for now: say so, and offer to note it on the scratchpad.' }
                     : tasksRead.error || membersRead.error || routinesRead.error
                     ? { error: 'Could not read the tasks and routines to check this list. Try again.' }
                     : resolveRefs(parsed.set, tasksRead.data ?? [], membersRead.data ?? [], routinesRead.data ?? [])

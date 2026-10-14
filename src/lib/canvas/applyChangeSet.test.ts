@@ -130,6 +130,18 @@ describe('applyChangeSet: done, merge and routine ops (stage 3)', () => {
     return r
   }
 
+  it('a page with only the task writers (the wall) refuses a routine set, writing nothing', async () => {
+    const d = deps()
+    const { skipOccurrence, undoSkip, routines, ...taskOnly } = d
+    void skipOccurrence; void undoSkip; void routines
+    const r = await applyChangeSet({ key: 'k', title: '2 changes', ops: [
+      { key: 'k:0', op: 'place', taskId: 'a', title: 'a', date: '2026-10-15', seen },
+      { key: 'k:1', op: 'routine_skip', routineId: 'r1', title: 'Bedtime', date: '2026-10-16' },
+    ] }, taskOnly)
+    expect(r).toEqual({ ok: false, reason: 'failed' })
+    expect(d.updateTask).not.toHaveBeenCalled()
+  })
+
   it('done completes the task; Undo reopens it', async () => {
     const d = deps()
     const r = await applyOk(one({ key: 'k:0', op: 'done', taskId: 'a', title: 'a', seen }), d)

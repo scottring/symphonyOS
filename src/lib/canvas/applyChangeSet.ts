@@ -10,16 +10,22 @@ import type { Task, TaskBucket, TaskLink } from '@/types/task'
 import type { Routine, RecurrencePattern } from '@/types/actionable'
 import type { CreateRoutineInput, UpdateRoutineInput } from '@/hooks/useRoutines'
 import type { RescheduleResult } from '@/hooks/useActionableInstances'
-import { opWhen, opWrite, withSteps, type ChangeOp, type ChangeSet, type DayKey } from './changeCard'
+import { opWhen, opWrite, withSteps, type ChangeOp, type ChangeOpKind, type ChangeSet, type DayKey } from './changeCard'
 import { weekStartAnchor, type WeekStart } from '@/lib/cadence/config'
 
-export interface ApplyDeps {
+export interface ApplyDeps extends Partial<MoreApplyDeps> {
   tasks: Task[]
   updateTask: (id: string, updates: Partial<Task>) => Promise<boolean | void>
   addTask: (title: string, scheduledFor: Date | undefined, options: { isAllDay?: boolean; bucket?: TaskBucket; weekStart?: Date; assignedTo?: string; assignedToAll?: string[]; sourceId?: string }) => Promise<string | undefined>
   deleteTask: (id: string) => Promise<unknown>
   /** The planned week's start, for an add with no day (plannedWeekStart). */
   weekStart: Date
+}
+
+/** Writers the stage-3 ops need (done, merge, routine ops). Optional: a page
+ *  that passes only the task writers (the wall) can still apply task sets; a
+ *  set that needs one it lacks is refused before anything is written. */
+export interface MoreApplyDeps {
   /** Everything a tick does. */
   completeTask: (id: string) => Promise<boolean>
   /** Undo of done / merge: reopen a task this set completed. */
@@ -116,9 +122,28 @@ function mergedInto(kept: Task, dup: Task): Partial<Task> {
   return updates
 }
 
-export async function applyChangeSet(set: ChangeSet, deps: ApplyDeps): Promise<ApplyResult> {
+const NEEDS: Partial<Record<ChangeOpKind, (keyof MoreApplyDeps)[]>> = {
+  done: ['completeTask', 'reopenTask'],
+  merge: ['completeTask', 'reopenTask'],
+  routine_skip: ['routines', 'skipOccurrence', 'undoSkip'],
+  routine_move: ['routines', 'moveOccurrence', 'undoMove'],
+  routine_who: ['routines', 'setOccurrenceAssignee'],
+  routine_change: ['routines', 'updateRoutine'],
+  routine_rest: ['routines', 'updateRoutine'],
+  routine_add: ['addRoutine', 'deleteRoutine'],
+}
+
+/** Whether this page has every writer the set needs. */
+export function canApply(set: ChangeSet, deps: ApplyDeps): boolean {
+  return set.ops.every((op) => (NEEDS[op.op] ?? []).every((k) => deps[k] !== undefined))
+}
+
+export async function applyChangeSet(set: ChangeSet, given: ApplyDeps): Promise<ApplyResult> {
+  if (!canApply(set, given)) return { ok: false, reason: 'failed' }
+  // Every writer an op below calls was checked just above.
+  const deps = given as ApplyDeps & MoreApplyDeps
   const byId = new Map(withSteps(deps.tasks).map((t) => [t.id, t]))
-  const routinesById = new Map(deps.routines.map((r) => [r.id, r]))
+  const routinesById = new Map((deps.routines ?? []).map((r) => [r.id, r]))
   for (const op of set.ops) {
     if (op.taskId) {
       const t = byId.get(op.taskId)
