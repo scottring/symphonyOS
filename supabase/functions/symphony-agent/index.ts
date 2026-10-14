@@ -4,6 +4,7 @@ import { contactFieldError, mergeLinks } from './prep.ts'
 import { IDEMPOTENT_CREATES, PROPOSE_TOOL, proposalItems, stableRowId, toolOutcome } from './canvasEvents.ts'
 import { PROPOSE_CHANGES_TOOL, changeSetFromInput, resolveRefs } from './changeSet.ts'
 import { READ_WEEK_TOOL, local, shapeWeek, weekWindow } from './readWeek.ts'
+import { POINT_TOOL, pointAt } from './pointing.ts'
 import { planningRow, validatePlanningParent, planningWeekStart } from './planning.ts'
 import { createClient, SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { buildDraftPayload, clampMaxResults } from '../_shared/gmail-tools.ts'
@@ -110,7 +111,7 @@ Doing versus suggesting:
 - When a request changes MORE THAN ONE task (move these three, plan the rest of my week, sort my inbox), do not write: read what you need, then call symphony_propose_changes ONCE with the whole list. The person sees one change card and approves it with one tap. If they ask for a change to the list, call it again with the full revised list.
 - A change to ONE task is still done directly with the write tools, as below.
 - symphony_propose_changes has no delete. To drop something, use someday.
-- Planning the week (or the rest of it): (1) call symphony_read_week first, passing the week's start from the page when you have it; (2) describe the week back in two or three plain sentences, including what looks muddled; (3) ask ONLY about gaps and conflicts, one or two questions at a time, never a questionnaire; check the calendar and email before asking anything they could answer; (4) when the person has answered, call symphony_propose_changes once with the whole list; (5) write nothing yourself. Month, season and year goals are reference only; mention one only when something clearly serves it. Never invent goals.
+- Planning the week (or the rest of it): (1) call symphony_read_week first, passing the week's start from the page when you have it; (2) describe the week back in two or three plain sentences, including what looks muddled. Whenever you describe or ask about specific days or tasks, call symphony_point with them first so the page lights them up; (3) ask ONLY about gaps and conflicts, one or two questions at a time, never a questionnaire; check the calendar and email before asking anything they could answer; (4) when the person has answered, call symphony_propose_changes once with the whole list; (5) write nothing yourself. Month, season and year goals are reference only; mention one only when something clearly serves it. Never invent goals.
 - When the person says what they want ("add X", "my goals are A and B", "book a consultation"), do it with the write tools; the screen shows each save as it lands and offers Undo, so do not ask them to confirm every explicit instruction.
 - When YOU think of something they did not say (a missing month goal, a week task), offer it with symphony_propose_plan_items instead of creating it. Suggestions show dashed until the person keeps them. Never invent goals; suggestions must follow from what they said.
 - When asked where unlinked items belong, read the period's items and the parents one horizon up, then suggest links with symphony_propose_plan_items (item_id + parent_id), one per item that clearly fits. Leave out items with no good match and say which. Never link them yourself unless the person says to.
@@ -131,6 +132,7 @@ const TOOLS = [
   PROPOSE_TOOL,
   PROPOSE_CHANGES_TOOL,
   READ_WEEK_TOOL,
+  POINT_TOOL,
   SHOW_TOOL,
   {name:'symphony_link_plan_item',description:'Connect an existing month goal to a season goal or an existing week task to a month goal. Preserves the existing item, dates and completion. Read both items first. Does not create a replacement or alter either life area.',input_schema:{type:'object',properties:{id:{type:'string'},parent_id:{type:'string'},level:{type:'string',enum:['month','week']}},required:['id','parent_id','level']}},
   { name: 'symphony_list_intentions', description: 'Read existing year goals before planning or creating another. Returns up to 100 visible year goals.', input_schema: {type:'object',properties:{year:{type:'integer'},context:{type:'string',enum:CONTEXT_ENUM}}}},
@@ -1556,6 +1558,14 @@ Deno.serve(async (req) => {
                 else {
                   send({ type: 'show', steps: shown.steps })
                   result = JSON.stringify({ shown: shown.steps.length, note: shown.steps.length > 1 ? 'The page is walking them through these steps with Next and Back. Your reply must be ONE short sentence, such as "Here is the page, one part at a time; use Next to go on." Do not summarise or list the steps.' : 'Shown on the page now. Answer in a sentence or two; do not repeat the note.' })
+                }
+              } else if (block.name === POINT_TOOL.name) {
+                // The page follows the conversation; nothing is written.
+                const pointed = pointAt(block.input ?? {})
+                if ('error' in pointed) result = JSON.stringify({ error: pointed.error })
+                else {
+                  send({ type: 'point', dates: pointed.dates, taskIds: pointed.taskIds })
+                  result = JSON.stringify({ shown: true, note: 'Lit up on the page. Do not describe the highlight; just talk.' })
                 }
               } else if (block.name === PROPOSE_CHANGES_TOOL.name) {
                 // A change card: validated and resolved through the person's own
