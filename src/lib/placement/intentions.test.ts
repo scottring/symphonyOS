@@ -92,6 +92,26 @@ describe('schedule / unschedule — commitments untouched; my choice follows the
     expect(p.local.focus).toEqual([{ userId: 'scott', date: new Date(2026, 8, 25) }])
     expect(p.row.scheduledFor).toEqual(new Date(2026, 8, 25))
   })
+  it('a day in ANOTHER week carries that week along (and a month, another month)', () => {
+    // Chosen for the week of Sep 20, sent to Saturday Oct 3: the week of Sep
+    // 20 no longer holds it; September's month carries to October.
+    const t = task({ bucket: 'week', weekStart: WK20, commitments: [c('month', SEP), c('week', WK20)] })
+    const sat = new Date(2026, 9, 3)
+    const p = planPlacement(t, { scheduledFor: sat, isAllDay: true, bucket: 'timed' }, ctx)
+    const weekOfSat = new Date(2026, 8, 27)
+    expect(p.commitmentOps).toEqual([
+      { op: 'carry', level: 'week', periodStart: WK20, to: weekOfSat },
+      { op: 'carry', level: 'month', periodStart: SEP, to: OCT },
+    ])
+    expect(p.local.commitments).toEqual([
+      { ...c('month', SEP, 'carried'), carriedTo: OCT },
+      { ...c('week', WK20, 'carried'), carriedTo: weekOfSat },
+    ])
+  })
+  it('a day in the same week and month changes no commitment', () => {
+    const t = task({ bucket: 'week', weekStart: WK20, commitments: [c('month', SEP), c('week', WK20)] })
+    expect(planPlacement(t, { scheduledFor: new Date(2026, 8, 24), bucket: 'timed' }, ctx).commitmentOps).toEqual([])
+  })
   it('unschedule keeps the week and period commitments and the focus', () => {
     const t = task({ bucket: 'timed', scheduledFor: new Date(2026, 8, 23), commitments: [c('month', SEP), c('week', WK20)], focus: [{ userId: 'iris', date: new Date(2026, 8, 23) }] })
     const p = planPlacement(t, { scheduledFor: undefined }, ctx)

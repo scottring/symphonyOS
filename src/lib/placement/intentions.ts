@@ -267,6 +267,30 @@ export function planPlacement(input: Task, updates: Partial<Task>, ctx: Placemen
     }
   }
 
+  // ── A day in another period ─────────────────────────────────────────────
+  // A day keeps the week and month it was chosen for (month → day keeps
+  // both) — while the day is IN them. Given a day in another week ("This
+  // weekend" from a Saturday-start week lands next Saturday) or another month
+  // ("Next month"), the open commitment there is carried to the day's period:
+  // left open, the task stayed on this week's No day yet with its day next
+  // week (Scott, 2026-10-14: "Moved to this weekend · Sat, Oct 17", still
+  // listed). A stated list, a level choice or a let-go above has decided the
+  // commitments already.
+  if ('scheduledFor' in updates && updates.scheduledFor && !('commitments' in updates) && !targetLevel && bucket !== 'inbox' && bucket !== 'someday') {
+    // A weekend can straddle two weeks (Saturday ends one Sunday-start week,
+    // Sunday begins the next): a day of the task's own weekend keeps its week.
+    const inOwnWeekend = !!task.weekendStart && inTaskWeekend(task, updates.scheduledFor)
+    for (const level of ['week', 'month'] as const) {
+      if (level === 'week' && inOwnWeekend) continue
+      const dayPeriod = periodStartFor(level, updates.scheduledFor, ctx.seasons)
+      for (const c of task.commitments ?? []) {
+        if (c.level === level && c.status === 'open' && !sameDay(c.periodStart, dayPeriod)) {
+          commitmentOps.push({ op: 'carry', level, periodStart: c.periodStart, to: dayPeriod })
+        }
+      }
+    }
+  }
+
   // ── Focus ────────────────────────────────────────────────────────────────
   if ('plannedOn' in updates) {
     if (ctx.userId) {
