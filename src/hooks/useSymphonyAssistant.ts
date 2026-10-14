@@ -36,6 +36,7 @@ export interface AssistantTurnObserver {
   toolResult?: (result: { name: string; ok: boolean; ids?: string[]; error?: string }) => void
   proposal?: (items: AgentProposalItem[]) => void
   changeSet?: (set: ChangeSet) => void
+  point?: (p: { dates: string[]; taskIds: string[] }) => void
   end?: (turn: { turnId: string; didWrite: boolean; error: string | null; text: string }) => void
 }
 
@@ -233,6 +234,7 @@ export function useSymphonyAssistant(options?: UseSymphonyAssistantOptions) {
       onToolResult: (result) => turnObserver?.toolResult?.(result),
       onProposal: (items) => turnObserver?.proposal?.(items),
       onChangeSet: (set) => turnObserver?.changeSet?.(set),
+      onPoint: (p) => turnObserver?.point?.(p),
       turnId,
       onReplyFallback: (reply) => {
         setMessages((prev) => prev.map((m) =>

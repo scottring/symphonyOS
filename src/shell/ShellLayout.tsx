@@ -210,6 +210,7 @@ function ShellLayoutInner({ children }: Props) {
     toolResult: (result) => canvasRef.current?.toolResult(result),
     proposal: (items) => canvasRef.current?.addProposals(items),
     changeSet: (set) => canvasRef.current?.setChangeSet(set),
+    point: (p) => canvasRef.current?.setPointing(p),
     end: (turn) => canvasRef.current?.turnEnded(turn),
   }), []);
   const [planningPeople] = useAssigneeFilter();

@@ -31,4 +31,9 @@ describe('parseSSEChunk', () => {
     const { events } = parseSSEChunk(`data: ${JSON.stringify({ type: 'change_set', set })}\n\n`)
     expect(events).toEqual([{ type: 'change_set', set }])
   })
+
+  it('passes a point event through intact', () => {
+    const { events } = parseSSEChunk('data: {"type":"point","dates":["2026-10-18"],"taskIds":[]}\n\n')
+    expect(events).toEqual([{ type: 'point', dates: ['2026-10-18'], taskIds: [] }])
+  })
 })

@@ -43,6 +43,7 @@ export interface AgentTurnHandlers {
   /** Suggestions to show as proposals, never written until kept. */
   onProposal?: (items: AgentProposalItem[]) => void
   onChangeSet?: (set: ChangeSet) => void
+  onPoint?: (p: { dates: string[]; taskIds: string[] }) => void
   /** Reused when the same message is retried, for server-side de-duplication. */
   turnId?: string
   /** The authoritative final reply, only when nothing streamed. */
@@ -125,6 +126,7 @@ export async function runAgentTurn(
       onToolResult: handlers.onToolResult,
       onProposal: handlers.onProposal,
       onChangeSet: handlers.onChangeSet,
+      onPoint: handlers.onPoint,
       turnId: handlers.turnId,
       workspaceContext: handlers.workspaceContext,
       onWorkspace: handlers.onWorkspace,

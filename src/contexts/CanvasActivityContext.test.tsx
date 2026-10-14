@@ -263,4 +263,16 @@ describe('change sets', () => {
     expect(applyChanges).toHaveBeenCalledTimes(1)
     expect(activity().changeSet).toBeNull()
   })
+
+  it('holds what Symphony points at, clears on an empty point and on the next turn', () => {
+    const { activity } = mountActivity({})
+    act(() => activity().setPointing({ dates: ['2026-10-18'], taskIds: ['a'] }))
+    expect(activity().pointing?.dates.has('2026-10-18')).toBe(true)
+    expect(activity().pointing?.taskIds.has('a')).toBe(true)
+    act(() => activity().setPointing({ dates: [], taskIds: [] }))
+    expect(activity().pointing).toBeNull()
+    act(() => activity().setPointing({ dates: ['2026-10-19'], taskIds: [] }))
+    act(() => activity().turnStarted('Thursday', false))
+    expect(activity().pointing).toBeNull()
+  })
 })

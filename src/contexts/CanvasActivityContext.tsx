@@ -99,6 +99,9 @@ export interface CanvasActivity {
   setChangeSet: (set: ChangeSet) => void
   dismissChangeSet: () => void
   approveChangeSet: () => Promise<boolean>
+  /** What Symphony is pointing at right now; cleared on the next turn. */
+  pointing: { dates: Set<string>; taskIds: Set<string> } | null
+  setPointing: (p: { dates: string[]; taskIds: string[] }) => void
   /** Whether voice/listening is on (drives the strip's mic state). */
   listening: boolean
   setListening: (on: boolean) => void
@@ -127,6 +130,8 @@ export function CanvasActivityProvider({ children, snapshot, writers, refetch, r
   const [arrivedVersion, setArrivedVersion] = useState(0)
   const [proposals, setProposals] = useState<CanvasProposal[]>([])
   const [listening, setListening] = useState(false)
+  const [pointing, setPointingState] = useState<{ dates: Set<string>; taskIds: Set<string> } | null>(null)
+  const setPointing = useCallback((p: { dates: string[]; taskIds: string[] }) => setPointingState(p.dates.length || p.taskIds.length ? { dates: new Set(p.dates), taskIds: new Set(p.taskIds) } : null), [])
   const keyRef = useRef(0)
   const snapshotRef = useRef(snapshot)
   const writersRef = useRef(writers)
@@ -169,6 +174,7 @@ export function CanvasActivityProvider({ children, snapshot, writers, refetch, r
     const key = nextKey()
     turnRef.current = { key, request: text, before: snapshotRef.current, startedAt: Date.now() - 2000, wrote: false, trackedWrite: false, reportedOk: false, failures: [], reportedIds: [], awaitingDiff: false }
     undoRef.current = null
+    setPointingState(null)
     retryRef.current = retryTurn ?? null
     setReceipt({ key, source: 'conversation', state: 'working', request: text, summary: retry ? 'Trying again…' : 'Working on it…', changes: [], failures: [], undoable: false, canRetry: false })
   }, [retryTurn])
@@ -343,8 +349,8 @@ export function CanvasActivityProvider({ children, snapshot, writers, refetch, r
 
   const value = useMemo<CanvasActivity>(() => ({
     receipt, isArrived, arrivedVersion, turnStarted, toolUsed, toolResult, turnEnded, run, undo, retry, dismiss,
-    proposals, addProposals, setProposalState, removeProposal, changeSet, setChangeSet, dismissChangeSet, approveChangeSet, listening, setListening,
-  }), [receipt, isArrived, arrivedVersion, turnStarted, toolUsed, toolResult, turnEnded, run, undo, retry, dismiss, proposals, addProposals, setProposalState, removeProposal, changeSet, setChangeSet, dismissChangeSet, approveChangeSet, listening])
+    proposals, addProposals, setProposalState, removeProposal, changeSet, setChangeSet, dismissChangeSet, approveChangeSet, listening, setListening, pointing, setPointing,
+  }), [receipt, isArrived, arrivedVersion, turnStarted, toolUsed, toolResult, turnEnded, run, undo, retry, dismiss, proposals, addProposals, setProposalState, removeProposal, changeSet, setChangeSet, dismissChangeSet, approveChangeSet, listening, pointing, setPointing])
 
   return <CanvasActivityContext.Provider value={value}>{children}</CanvasActivityContext.Provider>
 }
@@ -356,6 +362,7 @@ const NOOP_ACTIVITY: CanvasActivity = {
   undo: async () => {}, retry: () => {}, dismiss: () => {},
   proposals: [], addProposals: () => {}, setProposalState: () => {}, removeProposal: () => {},
   changeSet: null, setChangeSet: () => {}, dismissChangeSet: () => {}, approveChangeSet: async () => false,
+  pointing: null, setPointing: () => {},
   listening: false, setListening: () => {},
 }
 

@@ -30,6 +30,7 @@ export type AgentStreamEvent =
   | { type: 'tool_result'; name: string; ok: boolean; ids?: string[]; error?: string }
   | { type: 'proposal'; items: AgentProposalItem[] }
   | { type: 'change_set'; set: ChangeSet }
+  | { type: 'point'; dates: string[]; taskIds: string[] }
   | { type: 'show'; steps: unknown }
   | { type: 'done'; reply: string; sessionId: string | null; sources?: AgentSourceNote[] }
   | { type: 'error'; message: string }
@@ -104,6 +105,7 @@ export interface StreamHandlers {
   onToolResult?: (result: { name: string; ok: boolean; ids?: string[]; error?: string }) => void
   onProposal?: (items: AgentProposalItem[]) => void
   onChangeSet?: (set: ChangeSet) => void
+  onPoint?: (p: { dates: string[]; taskIds: string[] }) => void
   /** Stable per user message. A resent turn reuses it so the server can
    *  recognise writes it already made instead of making them twice. */
   turnId?: string
@@ -191,6 +193,7 @@ export async function streamSymphonyAgent(
       else if (ev.type === 'tool_result') handlers.onToolResult?.({ name: ev.name, ok: ev.ok, ids: ev.ids, error: ev.error })
       else if (ev.type === 'proposal') handlers.onProposal?.(Array.isArray(ev.items) ? ev.items : [])
       else if (ev.type === 'change_set') { if (ev.set && Array.isArray(ev.set.ops)) handlers.onChangeSet?.(ev.set) }
+      else if (ev.type === 'point') handlers.onPoint?.({ dates: Array.isArray(ev.dates) ? ev.dates : [], taskIds: Array.isArray(ev.taskIds) ? ev.taskIds : [] })
       else if (ev.type === 'session') handlers.onSession?.(ev.sessionId)
       else if (ev.type === 'done') handlers.onDone?.(ev.reply, ev.sessionId, ev.sources)
       else if (ev.type === 'error') handlers.onError?.(ev.message)
