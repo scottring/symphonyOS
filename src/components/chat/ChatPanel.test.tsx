@@ -147,3 +147,12 @@ describe('ChatPanel assistant markdown rendering', () => {
     expect(screen.getByText('is **this** urgent?')).toBeInTheDocument()
   })
 })
+
+describe('ChatPanel beforeInput', () => {
+  it('shows what waits for the person (the change card) above the message field', () => {
+    render(<ChatPanel {...baseProps} beforeInput={<section aria-label="3 changes">card</section>} />)
+    const card = screen.getByRole('region', { name: '3 changes' })
+    const field = screen.getByRole('textbox')
+    expect(card.compareDocumentPosition(field) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+})

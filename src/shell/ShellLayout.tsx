@@ -49,6 +49,7 @@ import { useDiscussionInbox } from '@/hooks/useDiscussionInbox';
 import { useSymphonyAssistant, type AssistantTurnObserver } from '@/hooks/useSymphonyAssistant';
 import { CanvasActivityProvider, useCanvasActivity, type CanvasActivity } from '@/contexts/CanvasActivityContext';
 import { ConversationStrip } from '@/components/canvas/ConversationStrip';
+import { PendingChangeCard } from '@/components/canvas/ChangeCard';
 import { conversationStripPath } from '@/lib/canvas/stripPaths';
 import { ConversationWalkContext, type ConversationWalk } from '@/components/canvas/conversationWalk';
 import { useScratchpadHidden } from '@/hooks/useScratchpadHidden';
@@ -485,6 +486,7 @@ function ShellLayoutInner({ children }: Props) {
                 ai={
                   <ChatPanel
                     voiceControls={voiceEnabled ? <WorkspaceVoiceControls voice={voice}/> : undefined}
+                    beforeInput={<PendingChangeCard />}
                     messages={assistant.messages}
                     loading={assistant.loading}
                     error={assistant.error}
@@ -583,6 +585,7 @@ function ShellLayoutInner({ children }: Props) {
           <div className="min-h-0 flex-1">
           <ChatPanel
                     voiceControls={voiceEnabled ? <WorkspaceVoiceControls voice={voice}/> : undefined}
+                    beforeInput={<PendingChangeCard />}
             messages={assistant.messages}
             loading={assistant.loading}
             error={assistant.error}

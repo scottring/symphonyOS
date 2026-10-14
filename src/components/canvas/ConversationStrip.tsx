@@ -16,7 +16,7 @@ import type { ChatMessage as ChatMessageType } from '@/types/chat'
 import type { ConversationWalk } from './conversationWalk'
 import { useCanvasActivity, type CanvasReceipt } from '@/contexts/CanvasActivityContext'
 import { useSelectionOptional } from '@/shell/providers/SelectionProvider'
-import { ChangeCard } from './ChangeCard'
+import { PendingChangeCard } from './ChangeCard'
 import { DictationMicButton } from '@/components/common/DictationMicButton'
 
 export interface StripVoice {
@@ -104,7 +104,7 @@ function DockedTranscript({ messages, busy, voice }: { messages: ChatMessageType
 }
 
 export function ConversationStrip({ onSend, busy, voice, onOpenConversation, onReviewProposals, placeholder = 'Tell Symphony, or ask…', compact = false, receiptOnly = false, docked = false, messages, walk, explain, right = 0 }: Props) {
-  const { receipt, undo, retry, dismiss, proposals, changeSet, approveChangeSet, dismissChangeSet } = useCanvasActivity()
+  const { receipt, undo, retry, dismiss, proposals, changeSet } = useCanvasActivity()
   const selection = useSelectionOptional()
   const [draft, setDraft] = useState('')
 
@@ -127,7 +127,7 @@ export function ConversationStrip({ onSend, busy, voice, onOpenConversation, onR
     <section className={`canvas-strip${compact ? ' is-compact' : ''}${docked ? ' is-docked' : ''}${voice.active ? ' is-listening' : ''}`} aria-label="Conversation with Symphony"
       style={docked ? { right } : undefined}>
       {messages && <DockedTranscript messages={messages} busy={busy} voice={voice} />}
-      {changeSet && <ChangeCard set={changeSet} today={new Date()} onApprove={() => void approveChangeSet()} onDismiss={dismissChangeSet} />}
+      <PendingChangeCard />
       {shown && receipt && (
         <div className="canvas-receipt" aria-live="polite">
           <SaveStateBadge state={receipt.state} />

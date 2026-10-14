@@ -4,8 +4,9 @@
 // every change in one list, one Approve, Undo afterwards in the receipt.
 // Corrections are made by talking ("say what to change"), not per-row toggles.
 
+import { useId } from 'react'
 import { X } from 'lucide-react'
-import type { PendingChangeSet } from '@/contexts/CanvasActivityContext'
+import { useCanvasActivity, type PendingChangeSet } from '@/contexts/CanvasActivityContext'
 import { opRow } from '@/lib/canvas/changeCard'
 
 interface Props {
@@ -17,7 +18,9 @@ interface Props {
 
 export function ChangeCard({ set, today, onApprove, onDismiss }: Props) {
   const saving = set.state === 'saving'
-  const titleId = `change-card-${set.key}`
+  // The phone shows the card twice (the page's strip and the conversation
+  // over it), so the heading id is per instance.
+  const titleId = `change-card-${useId()}`
   return (
     <section className="change-card" role="region" aria-labelledby={titleId}>
       <header className="change-card-head">
@@ -46,4 +49,12 @@ export function ChangeCard({ set, today, onApprove, onDismiss }: Props) {
       </footer>
     </section>
   )
+}
+
+/** The pending card, wherever the conversation is: the docked bar, the side
+ *  pane, or the phone's full-screen conversation. Nothing when none waits. */
+export function PendingChangeCard() {
+  const { changeSet, approveChangeSet, dismissChangeSet } = useCanvasActivity()
+  if (!changeSet) return null
+  return <ChangeCard set={changeSet} today={new Date()} onApprove={() => void approveChangeSet()} onDismiss={dismissChangeSet} />
 }
