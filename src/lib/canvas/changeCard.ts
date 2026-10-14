@@ -29,6 +29,21 @@ export interface ChangeOp {
 
 export interface ChangeSet { key: string; title: string; ops: ChangeOp[] }
 
+/** What became of the latest card, told to the next turn: Symphony's history
+ *  holds only the words, so without this it re-proposes changes already saved
+ *  (or ones the person dismissed). */
+export interface ChangeCardNote {
+  state: 'pending' | 'approved' | 'dismissed'
+  title: string
+  ops: { op: ChangeOpKind; title: string; where: string }[]
+  /** ISO time the card reached this state. */
+  at: string
+}
+
+export function changeCardNote(set: ChangeSet, state: ChangeCardNote['state'], now = new Date()): ChangeCardNote {
+  return { state, title: set.title, ops: set.ops.map((op) => ({ op: op.op, title: op.title, where: opRow(op, now).where })), at: now.toISOString() }
+}
+
 /** Tasks with their steps (and Today-group members) laid out flat. The app
  *  holds steps inside their parent's `subtasks`; Symphony reads them as
  *  ordinary tasks, so a set may name one. */

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { fireEvent, render, screen, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, within } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import type { ReactNode } from 'react'
 import { DomainProvider } from '@/hooks/useDomain'
@@ -61,8 +61,9 @@ vi.mock('@/hooks/useSupabaseTasks', () => ({ useSupabaseTasks: () => ({
 const aiState = vi.hoisted(() => ({ hidden: true }))
 vi.mock('@/hooks/useScratchpadHidden', () => ({ useScratchpadHidden: () => ({ hidden: aiState.hidden, setHidden: vi.fn() }) }))
 vi.mock('@/hooks/useRoutines', () => ({ useRoutines: () => ({ routines: [], deleteRoutine: vi.fn(), updateRoutine: vi.fn(), refetch: vi.fn(), addRoutine: vi.fn() }) }))
+const assistantState = vi.hoisted(() => ({ observer: null as null | import('@/hooks/useSymphonyAssistant').AssistantTurnObserver }))
 vi.mock('@/hooks/useSymphonyAssistant', () => ({
-  useSymphonyAssistant: () => ({
+  useSymphonyAssistant: (options?: { turnObserver?: import('@/hooks/useSymphonyAssistant').AssistantTurnObserver }) => (assistantState.observer = options?.turnObserver ?? null, {
     messages: [], loading: false, error: null, sendMessage: vi.fn(), resetSession: vi.fn(),
     toolActivity: [], sessions: [], sessionsLoading: false, loadSession: vi.fn(),
     deleteSession: vi.fn(), activeSessionId: null,
@@ -484,5 +485,25 @@ describe('Today, Week, Plan and Routines have one conversation, at the foot', ()
     renderAt('/inbox')
     expect(screen.getByRole('button', { name: 'AI chat' })).toBeInTheDocument()
     expect(screen.queryByRole('region', { name: 'Conversation with Symphony' })).not.toBeInTheDocument()
+  })
+})
+
+// Symphony's history holds words, not tool calls: the shell tells each turn
+// what became of the last change card (final review, 2026-10-14 #2).
+describe('The change card reaches the next turn', () => {
+  beforeEach(() => { mobileState.isMobile = false; selectionState.selection = null })
+  const set = { key: 's1', title: '2 changes', ops: [
+    { key: 's1:0', op: 'someday' as const, taskId: 'a', title: 'Paper mail' },
+    { key: 's1:1', op: 'unplace' as const, taskId: 'b', title: 'Call the bank' },
+  ] }
+
+  it('a pending card is told to every turn; a dismissed one once', () => {
+    renderAt('/week?view=alongside')
+    const observer = assistantState.observer!
+    act(() => observer.changeSet?.(set))
+    expect(observer.changeCard?.()).toMatchObject({ state: 'pending', title: '2 changes' })
+    fireEvent.click(within(screen.getByRole('region', { name: '2 changes' })).getByRole('button', { name: 'Dismiss' }))
+    expect(observer.changeCard?.()).toMatchObject({ state: 'dismissed', ops: [{ op: 'someday', title: 'Paper mail', where: '→ Someday' }, { op: 'unplace', title: 'Call the bank', where: '→ No day yet' }] })
+    expect(observer.changeCard?.()).toBeUndefined()
   })
 })

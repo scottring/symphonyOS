@@ -21,7 +21,7 @@ import type { AgentProposalItem } from '@/lib/agentStream'
 import { WRITE_TOOLS } from '@/lib/agentTurn'
 import { canUndo, describeChanges, diffSnapshots, type CanvasChange, type Snapshot } from '@/lib/canvas/changeSet'
 import { toolSavingLabel } from '@/lib/canvas/toolLabels'
-import type { ChangeSet } from '@/lib/canvas/changeCard'
+import { changeCardNote, type ChangeCardNote, type ChangeSet } from '@/lib/canvas/changeCard'
 import type { ApplyResult } from '@/lib/canvas/applyChangeSet'
 
 export type SaveState = 'listening' | 'working' | 'saving' | 'saved' | 'partial' | 'failed' | 'answered' | 'unverified'
@@ -99,6 +99,9 @@ export interface CanvasActivity {
   setChangeSet: (set: ChangeSet) => void
   dismissChangeSet: () => void
   approveChangeSet: () => Promise<boolean>
+  /** For the next turn: the pending card (every turn while it waits), or
+   *  what became of the last one (approved or dismissed), told once. */
+  takeChangeCard: () => ChangeCardNote | undefined
   /** What Symphony is pointing at right now; cleared on the next turn. */
   pointing: { dates: Set<string>; taskIds: Set<string> } | null
   setPointing: (p: { dates: string[]; taskIds: string[] }) => void
@@ -309,14 +312,30 @@ export function CanvasActivityProvider({ children, snapshot, writers, refetch, r
   const removeProposal = useCallback((key: string) => setProposals((prev) => prev.filter((p) => p.key !== key)), [])
 
   const [changeSet, setPending] = useState<PendingChangeSet | null>(null)
+  const pendingRef = useRef<PendingChangeSet | null>(null)
+  useLayoutEffect(() => { pendingRef.current = changeSet }, [changeSet])
+  // What became of the last card, until a turn has been told.
+  const cardNoteRef = useRef<ChangeCardNote | null>(null)
   const setChangeSet = useCallback((set: ChangeSet) => {
+    cardNoteRef.current = null
     setPending((prev) => {
       // The same set re-announced while it is being saved stays saving.
       if (prev && prev.key === set.key && prev.state === 'saving') return prev
       return { ...set, state: 'proposed', replaced: !!prev && prev.key !== set.key }
     })
   }, [])
-  const dismissChangeSet = useCallback(() => setPending(null), [])
+  const dismissChangeSet = useCallback(() => {
+    const cur = pendingRef.current
+    if (cur) cardNoteRef.current = changeCardNote(cur, 'dismissed')
+    setPending(null)
+  }, [])
+  const takeChangeCard = useCallback((): ChangeCardNote | undefined => {
+    const cur = pendingRef.current
+    if (cur) return changeCardNote(cur, 'pending')
+    const note = cardNoteRef.current
+    cardNoteRef.current = null
+    return note ?? undefined
+  }, [])
   const approvingRef = useRef(false)
   const approveChangeSet = useCallback(async () => {
     const set = changeSet
@@ -338,6 +357,7 @@ export function CanvasActivityProvider({ children, snapshot, writers, refetch, r
       opts.undo = r.undo
       return true
     }, opts)
+    if (ok) cardNoteRef.current = changeCardNote(set, 'approved')
     // Only touch the card if it is still the one that was saved; a newer set
     // that arrived meanwhile stays as it is.
     setPending((cur) => cur && cur.key === set.key
@@ -349,8 +369,8 @@ export function CanvasActivityProvider({ children, snapshot, writers, refetch, r
 
   const value = useMemo<CanvasActivity>(() => ({
     receipt, isArrived, arrivedVersion, turnStarted, toolUsed, toolResult, turnEnded, run, undo, retry, dismiss,
-    proposals, addProposals, setProposalState, removeProposal, changeSet, setChangeSet, dismissChangeSet, approveChangeSet, listening, setListening, pointing, setPointing,
-  }), [receipt, isArrived, arrivedVersion, turnStarted, toolUsed, toolResult, turnEnded, run, undo, retry, dismiss, proposals, addProposals, setProposalState, removeProposal, changeSet, setChangeSet, dismissChangeSet, approveChangeSet, listening, pointing, setPointing])
+    proposals, addProposals, setProposalState, removeProposal, changeSet, setChangeSet, dismissChangeSet, approveChangeSet, takeChangeCard, listening, setListening, pointing, setPointing,
+  }), [receipt, isArrived, arrivedVersion, turnStarted, toolUsed, toolResult, turnEnded, run, undo, retry, dismiss, proposals, addProposals, setProposalState, removeProposal, changeSet, setChangeSet, dismissChangeSet, approveChangeSet, takeChangeCard, listening, pointing, setPointing])
 
   return <CanvasActivityContext.Provider value={value}>{children}</CanvasActivityContext.Provider>
 }
@@ -361,7 +381,7 @@ const NOOP_ACTIVITY: CanvasActivity = {
   run: async (_l, command) => { try { return (await command()) !== false } catch { return false } },
   undo: async () => {}, retry: () => {}, dismiss: () => {},
   proposals: [], addProposals: () => {}, setProposalState: () => {}, removeProposal: () => {},
-  changeSet: null, setChangeSet: () => {}, dismissChangeSet: () => {}, approveChangeSet: async () => false,
+  changeSet: null, setChangeSet: () => {}, dismissChangeSet: () => {}, approveChangeSet: async () => false, takeChangeCard: () => undefined,
   pointing: null, setPointing: () => {},
   listening: false, setListening: () => {},
 }

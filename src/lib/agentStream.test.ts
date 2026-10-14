@@ -1,5 +1,6 @@
 import { describe, it, expect, afterEach, vi } from 'vitest'
-import { parseSSEChunk, agentFunctionName } from './agentStream'
+import { parseSSEChunk, agentFunctionName, streamSymphonyAgent } from './agentStream'
+import { supabase } from '@/lib/supabase'
 
 describe('parseSSEChunk', () => {
   it('extracts complete events and returns the remainder buffer', () => {
@@ -47,5 +48,19 @@ describe('agentFunctionName', () => {
     expect(agentFunctionName()).toBe('symphony-agent-v2')
     vi.stubEnv('VITE_AGENT_FUNCTION', '../evil')
     expect(agentFunctionName()).toBe('symphony-agent')
+  })
+})
+
+describe('streamSymphonyAgent request', () => {
+  afterEach(() => { vi.unstubAllGlobals(); vi.restoreAllMocks() })
+
+  it('carries the last change card to the agent', async () => {
+    vi.spyOn(supabase.auth, 'getSession').mockResolvedValue({ data: { session: { access_token: 't' } }, error: null } as never)
+    const fetch = vi.fn(async () => new Response('data: {"type":"done","reply":"ok"}\n\n'))
+    vi.stubGlobal('fetch', fetch)
+    const changeCard = { state: 'approved' as const, title: '2 changes', ops: [{ op: 'someday', title: 'Paper mail', where: '→ Someday' }], at: '2026-10-14T09:00:00.000Z' }
+    await streamSymphonyAgent([{ role: 'user', content: 'next' }], { changeCard })
+    const body = JSON.parse((fetch.mock.calls[0] as unknown as [string, RequestInit])[1].body as string)
+    expect(body.changeCard).toEqual(changeCard)
   })
 })

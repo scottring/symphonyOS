@@ -264,6 +264,43 @@ describe('change sets', () => {
     expect(activity().changeSet).toBeNull()
   })
 
+  it('tells the next turn the last card was approved, once', async () => {
+    const applyChanges = vi.fn(async () => ({ ok: true as const, ids: ['a', 'b'], undo: async () => true }))
+    const { activity } = mountActivity({ applyChanges })
+    act(() => activity().setChangeSet(set('s1')))
+    expect(activity().takeChangeCard()).toMatchObject({ state: 'pending', title: '2 changes' })
+    // Pending stays pending for every turn until it is decided.
+    expect(activity().takeChangeCard()).toMatchObject({ state: 'pending' })
+    await act(async () => { await activity().approveChangeSet() })
+    const note = activity().takeChangeCard()
+    expect(note).toMatchObject({ state: 'approved', title: '2 changes', ops: [
+      { op: 'someday', title: 'Paper mail', where: '→ Someday' },
+      { op: 'unplace', title: 'Call the bank', where: '→ No day yet' },
+    ] })
+    expect(typeof note?.at).toBe('string')
+    expect(activity().takeChangeCard()).toBeUndefined()
+  })
+
+  it('tells the next turn the last card was dismissed; a new proposal replaces the note', () => {
+    const { activity } = mountActivity({})
+    act(() => activity().setChangeSet(set('s1')))
+    act(() => activity().dismissChangeSet())
+    expect(activity().takeChangeCard()).toMatchObject({ state: 'dismissed', title: '2 changes' })
+    expect(activity().takeChangeCard()).toBeUndefined()
+    act(() => activity().setChangeSet(set('s2')))
+    act(() => activity().dismissChangeSet())
+    act(() => activity().setChangeSet(set('s3')))
+    expect(activity().takeChangeCard()).toMatchObject({ state: 'pending' })
+  })
+
+  it('a failed Approve leaves the card pending', async () => {
+    const applyChanges = vi.fn(async () => ({ ok: false as const, reason: 'failed' as const }))
+    const { activity } = mountActivity({ applyChanges })
+    act(() => activity().setChangeSet(set('s1')))
+    await act(async () => { await activity().approveChangeSet() })
+    expect(activity().takeChangeCard()).toMatchObject({ state: 'pending' })
+  })
+
   it('holds what Symphony points at, clears on an empty point and on the next turn', () => {
     const { activity } = mountActivity({})
     act(() => activity().setPointing({ dates: ['2026-10-18'], taskIds: ['a'] }))

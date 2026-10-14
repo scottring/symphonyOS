@@ -1,5 +1,5 @@
 import type { WorkspaceContext } from '@/lib/workspace/context'
-import type { ChangeSet } from '@/lib/canvas/changeCard'
+import type { ChangeCardNote, ChangeSet } from '@/lib/canvas/changeCard'
 import { supabase } from '@/lib/supabase'
 import { explainContext } from '@/lib/explain/pageGuides'
 import { parseSteps } from '@/lib/explain/steps'
@@ -99,6 +99,8 @@ export interface StreamHandlers {
   onPlanSaved?: (saved: { id: string; level: number; date: string }) => void
   onWorkspace?: (page:string,date?:string)=>void
   workspaceContext?: WorkspaceContext
+  /** What became of the last change card (pending, approved or dismissed). */
+  changeCard?: ChangeCardNote
   onText?: (text: string) => void
   onTool?: (name: string) => void
   /** A write tool's outcome, when the server reports it (newer agent builds). */
@@ -167,6 +169,7 @@ export async function streamSymphonyAgent(
       body: JSON.stringify({
         messages,
         ...(handlers.workspaceContext ? { workspaceContext: explainContext(handlers.workspaceContext) } : {}),
+        ...(handlers.changeCard ? { changeCard: handlers.changeCard } : {}),
         ...(handlers.attachment ? { attachment: handlers.attachment } : {}),
         ...(handlers.currentMemberId ? { currentMemberId: handlers.currentMemberId } : {}),
         ...(handlers.taskContext ? { taskContext: handlers.taskContext } : {}),

@@ -1,5 +1,5 @@
 import type { WorkspaceContext } from '@/lib/workspace/context'
-import type { ChangeSet } from '@/lib/canvas/changeCard'
+import type { ChangeCardNote, ChangeSet } from '@/lib/canvas/changeCard'
 // src/lib/agentTurn.ts
 //
 // One turn of the Symphony agent, minus the React. Extracted from
@@ -34,6 +34,8 @@ export interface AgentTurnHandlers {
   onPlanSaved?: (saved: { id: string; level: number; date: string }) => void
   onWorkspace?: (page:string,date?:string)=>void
   workspaceContext?: WorkspaceContext
+  /** What became of the last change card, for the agent. */
+  changeCard?: ChangeCardNote
   /** A streamed text delta. */
   onText?: (chunk: string) => void
   /** Every tool the agent used, write or read. */
@@ -129,6 +131,7 @@ export async function runAgentTurn(
       onPoint: handlers.onPoint,
       turnId: handlers.turnId,
       workspaceContext: handlers.workspaceContext,
+      changeCard: handlers.changeCard,
       onWorkspace: handlers.onWorkspace,
       onPlanSaved: handlers.onPlanSaved,
       attachment: handlers.attachment,

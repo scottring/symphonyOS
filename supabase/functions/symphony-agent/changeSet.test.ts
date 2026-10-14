@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import { changeSetFromInput, PROPOSE_CHANGES_TOOL, resolveRefs } from './changeSet'
+import { changeCardNote, changeSetFromInput, PROPOSE_CHANGES_TOOL, resolveRefs } from './changeSet'
 
 const A = '0b8e7c1a-2d3f-4a5b-8c6d-7e8f9a0b1c2d'
 const B = '4f1c2a9e-7b3d-4c11-9a0e-2f6b8d1e3c55'
@@ -91,6 +91,20 @@ describe('resolveRefs', () => {
   })
 })
 
+describe('changeCardNote', () => {
+  it('says the last card was approved and its changes are saved', () => {
+    const note = changeCardNote({ state: 'approved', title: '2 changes', ops: [{ op: 'someday', title: 'Paper mail', where: '→ Someday' }], at: '2026-10-14T09:00:00Z' })
+    expect(note).toContain('approved')
+    expect(note).toContain('Paper mail')
+    expect(note).toContain('untrusted data')
+  })
+  it('drops anything malformed', () => {
+    expect(changeCardNote(undefined)).toBe('')
+    expect(changeCardNote({ state: 'deleted', title: 'x', ops: [] })).toBe('')
+    expect(changeCardNote('approved')).toBe('')
+  })
+})
+
 describe('agent wiring', () => {
   const src = readFileSync('supabase/functions/symphony-agent/index.ts', 'utf8')
   it('offers the tool and streams one change_set', () => {
@@ -106,6 +120,10 @@ describe('agent wiring', () => {
     expect(src).toContain('ask ONE short question')
     expect(src).toContain('Routines have no preview yet')
     expect(src).toContain('Just this week, or from now on?')
+  })
+  it('reads what became of the last card, and never re-proposes saved or dismissed changes', () => {
+    expect(src).toMatch(/changeCardNote\(body\.changeCard\)/)
+    expect(src).toContain('If the page says the last change card was approved, its changes are saved: the next list holds only what is still unsaved. If it was dismissed, do not re-propose those changes unless asked.')
   })
   it('proposes early and revises after each answer while planning', () => {
     expect(src).toContain('as soon as one answer settles a change')

@@ -212,6 +212,7 @@ function ShellLayoutInner({ children }: Props) {
     changeSet: (set) => canvasRef.current?.setChangeSet(set),
     point: (p) => canvasRef.current?.setPointing(p),
     end: (turn) => canvasRef.current?.turnEnded(turn),
+    changeCard: () => canvasRef.current?.takeChangeCard(),
   }), []);
   const [planningPeople] = useAssigneeFilter();
   const scopedTasks = useMemo(()=>tasks.filter(planPeopleLens(planningPeople,null).keep),[tasks,planningPeople]);
