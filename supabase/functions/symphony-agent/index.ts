@@ -3,6 +3,7 @@ import { SHOW_TOOL, showSteps } from './showOnPage.ts'
 import { contactFieldError, mergeLinks } from './prep.ts'
 import { IDEMPOTENT_CREATES, PROPOSE_TOOL, proposalItems, stableRowId, toolOutcome } from './canvasEvents.ts'
 import { PROPOSE_CHANGES_TOOL, changeSetFromInput, resolveRefs } from './changeSet.ts'
+import { READ_WEEK_TOOL, local, shapeWeek, weekWindow } from './readWeek.ts'
 import { planningRow, validatePlanningParent, planningWeekStart } from './planning.ts'
 import { createClient, SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { buildDraftPayload, clampMaxResults } from '../_shared/gmail-tools.ts'
@@ -109,6 +110,7 @@ Doing versus suggesting:
 - When a request changes MORE THAN ONE task (move these three, plan the rest of my week, sort my inbox), do not write: read what you need, then call symphony_propose_changes ONCE with the whole list. The person sees one change card and approves it with one tap. If they ask for a change to the list, call it again with the full revised list.
 - A change to ONE task is still done directly with the write tools, as below.
 - symphony_propose_changes has no delete. To drop something, use someday.
+- Planning the week (or the rest of it): (1) call symphony_read_week first, passing the week's start from the page when you have it; (2) describe the week back in two or three plain sentences, including what looks muddled; (3) ask ONLY about gaps and conflicts, one or two questions at a time, never a questionnaire; check the calendar and email before asking anything they could answer; (4) when the person has answered, call symphony_propose_changes once with the whole list; (5) write nothing yourself. Month, season and year goals are reference only; mention one only when something clearly serves it. Never invent goals.
 - When the person says what they want ("add X", "my goals are A and B", "book a consultation"), do it with the write tools; the screen shows each save as it lands and offers Undo, so do not ask them to confirm every explicit instruction.
 - When YOU think of something they did not say (a missing month goal, a week task), offer it with symphony_propose_plan_items instead of creating it. Suggestions show dashed until the person keeps them. Never invent goals; suggestions must follow from what they said.
 - When asked where unlinked items belong, read the period's items and the parents one horizon up, then suggest links with symphony_propose_plan_items (item_id + parent_id), one per item that clearly fits. Leave out items with no good match and say which. Never link them yourself unless the person says to.
@@ -128,6 +130,7 @@ const BUCKET_ENUM = ['inbox', 'timed', 'week', 'month', 'quarter']
 const TOOLS = [
   PROPOSE_TOOL,
   PROPOSE_CHANGES_TOOL,
+  READ_WEEK_TOOL,
   SHOW_TOOL,
   {name:'symphony_link_plan_item',description:'Connect an existing month goal to a season goal or an existing week task to a month goal. Preserves the existing item, dates and completion. Read both items first. Does not create a replacement or alter either life area.',input_schema:{type:'object',properties:{id:{type:'string'},parent_id:{type:'string'},level:{type:'string',enum:['month','week']}},required:['id','parent_id','level']}},
   { name: 'symphony_list_intentions', description: 'Read existing year goals before planning or creating another. Returns up to 100 visible year goals.', input_schema: {type:'object',properties:{year:{type:'integer'},context:{type:'string',enum:CONTEXT_ENUM}}}},
@@ -689,6 +692,29 @@ async function runTool(
         const {data,error}=await db.from(table).insert(insert).select().single()
         if(error){if(error.code==='23505'){const existing=await alreadySaved(table);if(existing)return existing}throw error}
         return JSON.stringify(data)
+      }
+      case 'symphony_read_week': {
+        // This week by default: the household's week start lives in the app's
+        // cadence config, which the client sends in workspaceContext when it can.
+        const today = local(new Date().toISOString()).date
+        const start = typeof input.start === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(input.start)
+          ? input.start
+          : (() => { const d = new Date(`${today}T12:00:00Z`); d.setUTCDate(d.getUTCDate() - ((d.getUTCDay() + 1) % 7)); return d.toISOString().slice(0, 10) })()
+        const { end, lastStart } = weekWindow(start)
+        const shift = (ymd: string, n: number) => { const d = new Date(`${ymd}T12:00:00Z`); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10) }
+        const cols = 'id, title, scheduled_for, is_all_day, bucket, week_start, completed, assigned_to, updated_at'
+        const [dated, week, inbox, events, routines, talks] = await Promise.all([
+          // A day wider each side: stored times are UTC; shapeWeek files them by local day.
+          db.from('tasks').select(cols).gte('scheduled_for', `${shift(lastStart, -1)}T00:00:00Z`).lt('scheduled_for', `${shift(end, 1)}T00:00:00Z`).limit(300),
+          db.from('tasks').select(cols).eq('bucket', 'week').eq('completed', false).is('scheduled_for', null).limit(100),
+          db.from('tasks').select(cols).eq('bucket', 'inbox').eq('completed', false).is('scheduled_for', null).order('created_at', { ascending: false }).limit(30),
+          db.from('calendar_events').select('id, title, start_time, end_time, all_day').lt('start_time', `${shift(end, 1)}T00:00:00Z`).gte('end_time', `${shift(start, -1)}T00:00:00Z`).order('start_time').limit(200),
+          db.from('routines').select('id, name, recurrence_pattern, time_of_day, parent_routine_id').limit(200),
+          db.from('scratchpad_notes').select('id, body').eq('kind', 'talk').eq('status', 'open').limit(20),
+        ])
+        const failed = [dated, week, inbox, events, routines, talks].find((r) => r.error)
+        if (failed?.error) throw failed.error
+        return JSON.stringify(shapeWeek({ start, today, tasks: [...(dated.data ?? []), ...(week.data ?? []), ...(inbox.data ?? [])], events: events.data ?? [], routines: routines.data ?? [], talks: talks.data ?? [] }))
       }
       case 'symphony_list_tasks': {
         let q = db.from('tasks').select('*').order('scheduled_for', { ascending: true, nullsFirst: false })
