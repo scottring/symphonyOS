@@ -327,8 +327,10 @@ function ShellLayoutInner({ children }: Props) {
   const sendConversation = (text: string, attachment?: Parameters<typeof assistant.sendMessage>[1]) => {
     // What Symphony showed belongs to the last exchange.
     pageGuide?.close();
-    if (voice.active && !attachment && voice.sendText(text)) return;
-    if (voice.active) voice.stop();
+    // Typed words always go to the agent, even while voice is on: only the
+    // agent can save, and it offers Undo. Into the live voice session they
+    // were answered "Done" with nothing saved (2026-10-14, Wednesday
+    // Wheelie's). Voice stays on for speaking.
     void assistant.sendMessage(text, attachment);
   };
   const resetConversation = () => { voice.stop(); assistant.resetSession(); };

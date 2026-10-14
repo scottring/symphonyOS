@@ -52,6 +52,9 @@ describe('workspace voice handshake',()=>{
   expect(session.instructions).toContain('the planning agent leads them')
   expect(session.instructions).toContain('Sessions follow a spine, not a script')
   expect(session.instructions).toContain('Everyday talk:')
+  // Never a false "done": every change goes through ask_symphony first (2026-10-14).
+  expect(session.instructions).toContain('You cannot change anything yourself.')
+  expect(session.instructions).toContain('unless ask_symphony returned in this turn and its result says it was saved')
   expect(session.instructions).not.toContain('Shape of planning')
   expect(session.instructions).toContain('forward the request to ask_symphony and say its result in a few words')
   expect(session.instructions).toContain('During a session, never ask your own questions')
