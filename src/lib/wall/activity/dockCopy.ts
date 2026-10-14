@@ -1,6 +1,10 @@
-// What the Kitchen wall v2 dock suggests in each moment: the hint's tail,
-// an example of what to say, and one suggestion chip (sent as if said).
-// PURE.
+// What the Kitchen wall v2 dock says in each moment: the hint's tail, an
+// example of what to say, and whether the strip stays open there. PURE.
+//
+// The adaptive strip (Scott, 2026-10-14, "calmer screens"): the dock's centre
+// is a single round mic when there is nothing to say. It stays open only
+// where its hint helps hands that are busy — cooking and getting out the
+// door. No suggestion chips: what to say is an example, never a button.
 
 import type { KioskScreen } from './kioskScreen'
 
@@ -9,23 +13,22 @@ export interface DockCopy {
   tapWhat: string
   /** An example of what to say here. */
   line: string
-  /** One suggestion, sent as if said; null for none. */
-  chip: string | null
+  /** Hands are busy here: the strip stays open with its hint. */
+  open: boolean
 }
 
-/** What the dock suggests in each moment (mockups, 2026-10-14). Examples are
- *  things the wall can already do or answer. */
+/** What the dock says in each moment. Examples are things the wall can
+ *  already do or answer. */
 export function dockCopy(screen: KioskScreen | 'cooking' | 'activity' | 'more'): DockCopy {
   switch (screen) {
-    case 'rest': return { tapWhat: '', line: 'Ask anything, or tell me what changed', chip: 'What’s for dinner this week?' }
-    case 'out-the-door': return { tapWhat: ' a step', line: '“Is it a jacket day?”', chip: 'Who still needs to finish?' }
-    case 'home': return { tapWhat: '', line: '“Add apples to the grocery list”', chip: 'Start a 20-minute timer' }
-    case 'dinner': return { tapWhat: '', line: '“Set a timer for 20 minutes”', chip: 'Next step in the recipe' }
-    case 'bedtime': return { tapWhat: ' a circle', line: '“What’s for dinner tomorrow?”', chip: 'What’s tomorrow?' }
-    case 'night': return { tapWhat: '', line: '“What time do we leave tomorrow?”', chip: null }
-    case 'weekend': return { tapWhat: '', line: '“Add pancakes to the grocery list”', chip: 'Plan this afternoon' }
-    case 'cooking': return { tapWhat: '', line: '“Set a timer for 10 minutes”', chip: 'Next step' }
-    case 'more': return { tapWhat: '', line: 'Tap a tile, or just ask', chip: null }
-    default: return { tapWhat: '', line: 'Ask anything, or tell me what changed', chip: null }
+    case 'out-the-door': return { tapWhat: '', line: 'Tap a step or say it', open: true }
+    case 'cooking': return { tapWhat: '', line: '“Next step”', open: true }
+    case 'home': return { tapWhat: '', line: '“Add apples to the grocery list”', open: false }
+    case 'dinner': return { tapWhat: '', line: '“Set a timer for 20 minutes”', open: false }
+    case 'bedtime': return { tapWhat: ' a circle', line: '“What’s for dinner tomorrow?”', open: false }
+    case 'night': return { tapWhat: '', line: '“What time do we leave tomorrow?”', open: false }
+    case 'weekend': return { tapWhat: '', line: '“Add pancakes to the grocery list”', open: false }
+    case 'more': return { tapWhat: '', line: 'Tap a tile, or just ask', open: false }
+    default: return { tapWhat: '', line: 'Ask anything, or tell me what changed', open: false }
   }
 }
