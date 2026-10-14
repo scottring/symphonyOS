@@ -1,7 +1,6 @@
 import { useEffect, useRef, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { X } from 'lucide-react'
-import { useNavigate } from 'react-router-dom'
 import { DOMAINS } from '@/lib/domains'
 import { domainHotkeyLabel } from '@/lib/domainHotkey'
 
@@ -47,7 +46,6 @@ function MenuDialog({ title, onClose, returnFocus, children }: { title: string; 
 export function HelpDialogs({ open, onClose, returnFocus }: {
   open: 'shortcuts' | 'help' | null; onClose: () => void; returnFocus?: HTMLElement | null
 }) {
-  const navigate = useNavigate()
   if (open === 'shortcuts') return (
     <MenuDialog title="Keyboard shortcuts" onClose={onClose} returnFocus={returnFocus}>
       <dl className="desktop-footer-shortcuts">
@@ -58,11 +56,6 @@ export function HelpDialogs({ open, onClose, returnFocus }: {
   )
   if (open === 'help') return (
     <MenuDialog title="Help" onClose={onClose} returnFocus={returnFocus}>
-      <p className="desktop-footer-guide">
-        <strong>New here, or want a hand?</strong>{' '}
-        <button type="button" className="pv2-link" onClick={() => { onClose(); navigate('/start') }}>Plan with guidance</button>
-        {' '}walks you through the year, a month, a week or just today — on the real pages, and you can stop any time.
-      </p>
       <ul className="desktop-footer-help">
         <li><strong>Today</strong> holds what you have chosen to do today, with what you need to do it.</li>
         <li><strong>Week and Month</strong> open their pages, or pin their lists beside the page you are on.</li>

@@ -69,7 +69,6 @@ import { planV2Enabled } from '@/lib/planning/v2/planV2';
 import { onQuickAddRequest } from '@/lib/quickAddSignal';
 import { useGlobalQuickAdd } from '@/desktop/useGlobalQuickAdd';
 import { GuideProvider } from '@/hooks/useGuidedPlan';
-import { GuideBar, GuideHostContext } from '@/components/guide/GuideBar';
 import { PageGuideProvider, usePageGuide } from '@/components/explain/GuideProvider';
 import { GuideLayer } from '@/components/explain/GuideLayer';
 import { EXPLAIN_LABEL, EXPLAIN_MESSAGE, hasPageGuide } from '@/lib/explain/pageGuides';
@@ -181,8 +180,6 @@ function ShellLayoutInner({ children }: Props) {
   const {config: cadenceConfig} = useCadenceConfig();
 
   const [desktopControls, setDesktopControls] = useState<HTMLDivElement | null>(null);
-  // The spot under a planning page's heading where the guide sits (GuideAnchor).
-  const [guideHost, setGuideHost] = useState<HTMLElement | null>(null);
   const [desktopLead, setDesktopLead] = useState<HTMLDivElement | null>(null);
   const [desktopCenter, setDesktopCenter] = useState<HTMLDivElement | null>(null);
   const [mobilePlanControls, setMobilePlanControls] = useState<HTMLDivElement | null>(null);
@@ -199,8 +196,8 @@ function ShellLayoutInner({ children }: Props) {
 
   const references = useReferenceLists();
 
-  const { tasks, refetch, deleteTask, updateTask, addTask, completeTask, toggleTask } = useSupabaseTasks();
-  const { goals, deleteGoal, updateGoal } = useGoals();
+  const { tasks, refetch, deleteTask, updateTask, addTask, completeTask, toggleTask, keepForward, dropCommitment } = useSupabaseTasks();
+  const { goals, deleteGoal, updateGoal, addGoal } = useGoals();
   // Held so routine writes from a conversation are seen (and undoable) too.
   const { routines: canvasRoutines, deleteRoutine, updateRoutine, addRoutine, refetch: refetchRoutines } = useRoutines();
   // The change card's this-week routine ops write one day's occurrence.
@@ -230,7 +227,7 @@ function ShellLayoutInner({ children }: Props) {
   // and Focus mode — said "Inbox zero" (launch rehearsal, 2026-09-04). It
   // then drifted the other way when the Inbox began always showing untagged
   // captures; both now use the one selector.
-  const { layers } = useDomain();
+  const { layers, soleDomain } = useDomain();
   const inboxCount = useMemo(
     () => filterInboxTasksForLayers(tasks, layers).filter((t) => t.bucket === 'inbox' && !t.completed).length,
     [tasks, layers],
@@ -387,7 +384,13 @@ function ShellLayoutInner({ children }: Props) {
     moveOccurrence: (id, from, to, opts) => reschedule('routine', id, from, to, opts),
     undoMove: undoReschedule,
     setOccurrenceAssignee: (id, date, memberId) => setOccurrenceAssignee('routine', id, date, memberId),
-  }), [tasks, updateTask, deleteTask, addTask, completeTask, toggleTask, canvasRoutines, updateRoutine, deleteRoutine, addRoutine, skipInstance, undoInstanceDone, reschedule, undoReschedule, setOccurrenceAssignee]);
+    // Month / Season / Year: the pages' own writers (ConstellationPage, the year carry).
+    defaultContext: soleDomain ?? undefined,
+    goals,
+    addGoal: async (name, { year, context, carriedFrom, areaId, notes, strategy, assignedToAll }) =>
+      (await addGoal(areaId ?? null, name, context, { year, carriedFrom, notes, strategy, assignedToAll }))?.id,
+    updateGoal, deleteGoal, keepForward, dropCommitment,
+  }), [tasks, updateTask, deleteTask, addTask, completeTask, toggleTask, canvasRoutines, updateRoutine, deleteRoutine, addRoutine, skipInstance, undoInstanceDone, reschedule, undoReschedule, setOccurrenceAssignee, soleDomain, goals, addGoal, updateGoal, deleteGoal, keepForward, dropCommitment]);
   const canvasRefetch = useCallback(() => { window.dispatchEvent(new Event('symphony-plan-updated')); return Promise.all([refetch(), refetchRoutines()]); }, [refetch, refetchRoutines]);
   const showStrip = conversationStripPath(location.pathname);
   const stripVoice = { available: voiceEnabled, active: voice.active, status: voice.status, start: () => { void voice.start(); }, stop: voice.stop, mute: voice.mute, heard: voice.heard, reply: voice.reply };
@@ -400,7 +403,6 @@ function ShellLayoutInner({ children }: Props) {
     <DesktopLeadContext.Provider value={desktopLead}>
     <DesktopCenterContext.Provider value={desktopCenter}>
     <MobilePlanControlsContext.Provider value={mobilePlanControls}>
-    <GuideHostContext.Provider value={setGuideHost}>
     <ConversationWalkContext.Provider value={dockedBar ? setWalk : null}>
     {/* With scenery on, the shell wears the place's sky in the chosen light
         (index.css, IMMERSIVE SCENERY); page regions marked .scenery-page
@@ -463,8 +465,6 @@ function ShellLayoutInner({ children }: Props) {
               <WaitingOnYouBanner rows={discussionRows}
                 onOpen={(row) => navigate(row ? `/discussions?open=${row.sessionId}` : '/discussions')} />
             )}
-            {/* Off the planner the area lens rides top-right; the guide sits below it. */}
-            <div className={`guide-slot${planPeriodForPath(location.pathname) ? '' : ' has-lens'}`}><GuideBar host={guideHost} /></div>
             <div className="min-w-0">{children}</div>
             {showStrip && <ConversationStrip compact receiptOnly onSend={(text) => sendConversation(text)} busy={assistant.loading} voice={stripVoice} onOpenConversation={openConversation} />}
           </div>
@@ -532,8 +532,6 @@ function ShellLayoutInner({ children }: Props) {
                 }
               >
                 <div className={`scenery-page scenery-page-contents${dockedBar ? ' has-docked-bar' : ''}`}>
-                  {/* Guided planning rides above the page it is guiding. */}
-                  <div className="guide-slot"><GuideBar host={guideHost} /></div>
                   {children}
                   {dockedBar
                     ? <ConversationStrip docked messages={assistant.messages} walk={walk} explain={explain} right={paneWidth} onSend={(text) => sendConversation(text)} busy={assistant.loading} voice={stripVoice} />
@@ -721,7 +719,6 @@ function ShellLayoutInner({ children }: Props) {
       )}
     </div>
     </ConversationWalkContext.Provider>
-    </GuideHostContext.Provider>
     </MobilePlanControlsContext.Provider>
     </DesktopCenterContext.Provider>
     </DesktopLeadContext.Provider>

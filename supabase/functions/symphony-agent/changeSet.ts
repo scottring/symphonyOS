@@ -6,11 +6,18 @@
 // done, a duplicate merges into the one kept. Routines (stage 3, spec
 // 2026-10-14-routines-talk-first) take this-week ops on one day's occurrence
 // (skip, move, who) or lasting ops on the routine itself (change, rest, add);
-// stopping a routine is rest.
+// stopping a routine is rest. Goals on Month, Season and Year (stage 5, spec
+// 2026-10-14-horizons-talk-first) take plan ops: add, carry, let go, done.
 
+import { PLAN_LEVELS, type PlanLevel, type Seasons, isPeriodStart, nextPeriodStart, periodLabel, periodStartFor, realDate, seasonYears, startsNear } from './readPlan.ts'
+
+export type { PlanLevel } from './readPlan.ts'
 export type TaskOpKind = 'place' | 'unplace' | 'add' | 'someday' | 'assign' | 'done' | 'merge' | 'talk'
 export type RoutineOpKind = 'routine_skip' | 'routine_move' | 'routine_who' | 'routine_change' | 'routine_rest' | 'routine_add'
-export type ChangeOpKind = TaskOpKind | RoutineOpKind
+/** Plan ops: goals on the Month, Season and Year lists. Month and season goals
+ *  are tasks committed to a period; year goals are `goals` rows (itemKind). */
+export type PlanOpKind = 'plan_add' | 'plan_carry' | 'plan_let_go' | 'plan_done'
+export type ChangeOpKind = TaskOpKind | RoutineOpKind | PlanOpKind
 export type DayKey = 'sun' | 'mon' | 'tue' | 'wed' | 'thu' | 'fri' | 'sat'
 export type RoutineContext = 'family' | 'personal' | 'work'
 
@@ -50,8 +57,29 @@ export interface ChangeOp {
   assigneeNames?: string[]
   /** routine_rest: YYYY-MM-DD it wakes; none = rest with no date. */
   until?: string
-  /** routine_add: the life area. */
+  /** routine_add, plan_add: the life area. */
   context?: RoutineContext
+  /** plan ops: which list. */
+  level?: PlanLevel
+  /** plan ops: YYYY-MM-DD start of the period the item is on now (plan_add:
+   *  the period it is added to). A month is YYYY-MM-01, a year YYYY-01-01, a
+   *  season its household boundary. */
+  periodStart?: string
+  /** plan ops: the period's name as the card says it ("November", "Fall", "2027"). */
+  periodLabel?: string
+  /** plan_carry: the period it goes to, and its name. */
+  toPeriodStart?: string
+  toPeriodLabel?: string
+  /** plan_carry: true when the target is the very next period (CARRY), false when it skips ahead (MOVE). */
+  toNext?: boolean
+  /** plan ops: the item, a task (month/season goal) or a year goal row. */
+  itemId?: string
+  itemKind?: 'task' | 'goal'
+  /** plan_add / plan_carry: the goal it serves (a season item for a month goal, a year goal for a season goal). */
+  parentId?: string
+  parentTitle?: string
+  /** plan_carry: the new wording, if the person reworded it. */
+  newTitle?: string
 }
 
 export interface ChangeSet {
@@ -66,7 +94,8 @@ export interface ChangeSet {
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const TASK_KINDS: readonly TaskOpKind[] = ['place', 'unplace', 'add', 'someday', 'assign', 'done', 'merge', 'talk']
 const ROUTINE_KINDS: readonly RoutineOpKind[] = ['routine_skip', 'routine_move', 'routine_who', 'routine_change', 'routine_rest', 'routine_add']
-export const OP_KINDS: readonly ChangeOpKind[] = [...TASK_KINDS, ...ROUTINE_KINDS]
+const PLAN_KINDS: readonly PlanOpKind[] = ['plan_add', 'plan_carry', 'plan_let_go', 'plan_done']
+export const OP_KINDS: readonly ChangeOpKind[] = [...TASK_KINDS, ...ROUTINE_KINDS, ...PLAN_KINDS]
 const KINDS = new Set<ChangeOpKind>(OP_KINDS)
 const THIS_WEEK = new Set<ChangeOpKind>(['routine_skip', 'routine_move', 'routine_who'])
 const LASTING = new Set<ChangeOpKind>(['routine_change', 'routine_rest'])
@@ -75,12 +104,7 @@ const CONTEXTS = new Set<RoutineContext>(['family', 'personal', 'work'])
 const MAX_OPS = 40
 const MAX_NOTE = 120
 const MAX_NAME = 200
-
-const realDate = (v: unknown): string | null => {
-  if (typeof v !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(v)) return null
-  const d = new Date(`${v}T12:00:00Z`)
-  return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === v ? v : null
-}
+const MAX_GOAL = 500
 const realTime = (v: unknown): string | null =>
   typeof v === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(v) ? v : null
 const isId = (v: unknown): v is string => typeof v === 'string' && UUID_RE.test(v)
@@ -127,16 +151,23 @@ export function changeSetFromInput(input: Record<string, unknown>, key: string):
       continue
     }
 
+    if (op.startsWith('plan_')) {
+      const r = planOp(op as PlanOpKind, o, base, `Op ${i + 1}`, touched)
+      if ('error' in r) return r
+      ops.push(r.op)
+      continue
+    }
+
     if (op !== 'add') {
       if (!isId(o.task_id)) return { error: `Op ${i + 1}: task_id must be an existing task id` }
-      if (touched.has(o.task_id)) return { error: `Op ${i + 1}: this task already has an op in the list. Send one op per task: the one that says where it should end up.` }
+      if (touched.has(o.task_id)) return { error: `Op ${i + 1}: this task already has an op in the list. Send one op per task (or goal): the one that says where it should end up.` }
       touched.add(o.task_id)
       base.taskId = o.task_id
     }
     if (op === 'merge') {
       if (!isId(o.from_task_id)) return { error: `Op ${i + 1}: merge needs from_task_id, the existing duplicate that closes into task_id` }
       if (o.from_task_id === o.task_id) return { error: `Op ${i + 1}: merge needs two different tasks: task_id is the one kept, from_task_id the duplicate` }
-      if (touched.has(o.from_task_id)) return { error: `Op ${i + 1}: from_task_id already has an op in the list. Send one op per task: a merged duplicate needs no other op.` }
+      if (touched.has(o.from_task_id)) return { error: `Op ${i + 1}: from_task_id already has an op in the list. Send one op per task (or goal): a merged duplicate needs no other op.` }
       touched.add(o.from_task_id)
       base.fromTaskId = o.from_task_id
     }
@@ -276,6 +307,157 @@ function routineOp(
   return { op: base }
 }
 
+const goalText = (v: unknown): string => (typeof v === 'string' ? v.trim().slice(0, MAX_GOAL) : '')
+const isLevel = (v: unknown): v is PlanLevel => typeof v === 'string' && (PLAN_LEVELS as readonly string[]).includes(v)
+const isContext = (v: unknown): v is RoutineContext => typeof v === 'string' && CONTEXTS.has(v as RoutineContext)
+
+/** One plan op. One op per item, shared with task ops: a month goal is a task. */
+function planOp(op: PlanOpKind, o: Record<string, unknown>, base: ChangeOp, at: string, touched: Set<string>): { op: ChangeOp } | { error: string } {
+  if (o.level !== undefined && o.level !== null && !isLevel(o.level)) return { error: `${at}: level must be 'month', 'season' or 'year'` }
+  if (op === 'plan_add') {
+    if (!isLevel(o.level)) return { error: `${at}: plan_add needs level ('month', 'season' or 'year')` }
+    const start = realDate(o.period_start)
+    if (!start) return { error: `${at}: plan_add needs period_start, the real YYYY-MM-DD start of the period (from symphony_read_plan)` }
+    if (o.level === 'month' && !start.endsWith('-01')) return { error: `${at}: a month's period_start is its first day (YYYY-MM-01)` }
+    if (o.level === 'year' && !start.endsWith('-01-01')) return { error: `${at}: a year's period_start is January 1 (YYYY-01-01)` }
+    const title = goalText(o.title)
+    if (!title) return { error: `${at}: plan_add needs a title, in the person's words` }
+    base.level = o.level
+    base.periodStart = start
+    base.title = title
+    if (o.parent_id !== undefined && o.parent_id !== null) {
+      if (o.level === 'year') return { error: `${at}: a year goal serves nothing above it; leave parent_id out` }
+      if (!isId(o.parent_id)) return { error: `${at}: parent_id must be an existing goal id (from symphony_read_plan)` }
+      base.parentId = o.parent_id
+    }
+    if (o.context !== undefined && o.context !== null) {
+      if (!isContext(o.context)) return { error: `${at}: context must be family, personal or work` }
+      base.context = o.context
+    }
+    return { op: base }
+  }
+  if (!isId(o.item_id)) return { error: `${at}: ${op} needs item_id, an existing goal id (from symphony_read_plan)` }
+  if (touched.has(o.item_id)) return { error: `${at}: this goal already has an op in the list. Send one op per goal (or task): the one that says where it should end up.` }
+  touched.add(o.item_id)
+  base.itemId = o.item_id
+  if (isLevel(o.level)) base.level = o.level
+  if (op === 'plan_carry') {
+    const to = realDate(o.to_period_start)
+    if (!to) return { error: `${at}: plan_carry needs to_period_start, the real YYYY-MM-DD start of the period it goes to (from symphony_read_plan)` }
+    base.toPeriodStart = to
+    if (o.new_title !== undefined && o.new_title !== null) {
+      const newTitle = goalText(o.new_title)
+      if (!newTitle) return { error: `${at}: new_title must not be empty (leave it out to keep the wording)` }
+      base.newTitle = newTitle
+    }
+  }
+  return { op: base }
+}
+
+export type PlanCommitmentRef = { level: string; period_start: string; status: string }
+/** A month or season goal (a task), with its period commitments. */
+export type PlanTaskRef = { id: string; title: string; updated_at: string; completed: boolean; source_id?: string | null; goal_id?: string | null; context?: string | null; commitments: PlanCommitmentRef[] }
+/** A year goal. */
+export type PlanGoalRef = { id: string; name: string; updated_at: string; status: string; year: number; context?: string | null }
+/** What resolving plan ops needs, read through the person's RLS client: the
+ *  items and parents the ops name (absent = not visible), the household's
+ *  seasons, and today (for labels). */
+export type PlanRefs = { tasks: PlanTaskRef[]; goals: PlanGoalRef[]; seasons: Seasons; today: string }
+
+const notVisible = (id: string) => ({ error: `No goal ${id} on a Month, Season or Year list that this person can change. Read the list again (symphony_read_plan) and use its ids.` })
+
+type PlanItemRef =
+  | { kind: 'task'; task: PlanTaskRef; level: 'month' | 'season'; periodStart: string }
+  | { kind: 'goal'; goal: PlanGoalRef; level: 'year'; periodStart: string }
+
+/** The item an op names, and the list it is on now. A task open on both a
+ *  season and a month list needs `level` to say which. */
+function planItem(id: string, level: PlanLevel | undefined, seasons: Seasons, tasks: Map<string, PlanTaskRef>, goals: Map<string, PlanGoalRef>): PlanItemRef | { error: string } {
+  const goal = goals.get(id)
+  if (goal) {
+    if (level && level !== 'year') return { error: `"${goal.name}" is a year goal: its level is year` }
+    if (goal.status === 'completed') return { error: `"${goal.name}" is already met; leave it out` }
+    if (goal.status === 'archived') return { error: `"${goal.name}" was already let go; leave it out` }
+    return { kind: 'goal', goal, level: 'year', periodStart: `${goal.year}-01-01` }
+  }
+  const task = tasks.get(id)
+  if (!task) return notVisible(id)
+  if (level === 'year') return { error: `"${task.title}" is a month or season goal, not a year goal` }
+  if (task.completed) return { error: `"${task.title}" is already done; leave it out` }
+  const onList = task.commitments.filter((c) => (c.level === 'month' || c.level === 'season') && (!level || c.level === level))
+  const open = onList.filter((c) => c.status === 'open')
+  if (!open.length) {
+    if (onList.some((c) => c.status === 'done')) return { error: `"${task.title}" is already done${level ? ` on its ${level} list` : ''}; leave it out` }
+    return { error: `"${task.title}" is not on ${level ? `a ${level}` : 'a month or season'} list now. Read the list again (symphony_read_plan) and use its ids.` }
+  }
+  const levels = [...new Set(open.map((c) => c.level))]
+  if (levels.length > 1) return { error: `"${task.title}" is on both a season list and a month list: send level ('month' or 'season') to say which` }
+  const lvl = levels[0] as 'month' | 'season'
+  const latest = open.reduce((a, b) => (b.period_start > a.period_start ? b : a))
+  return { kind: 'task', task, level: lvl, periodStart: periodStartFor(lvl, latest.period_start, seasons) }
+}
+
+/** Fill one plan op from what was read, or refuse it. */
+function resolvePlanOp(op: ChangeOp, refs: PlanRefs, tasks: Map<string, PlanTaskRef>, goals: Map<string, PlanGoalRef>): { op: ChangeOp } | { error: string } {
+  const { seasons, today } = refs
+  const label = (level: PlanLevel, start: string) => periodLabel(level, start, seasons, today)
+  const next: ChangeOp = { ...op }
+
+  if (op.op === 'plan_add') {
+    const level = op.level!
+    const start = op.periodStart!
+    if (!isPeriodStart(level, start, seasons)) return { error: `${start} is not the start of a ${level}. The starts are: ${startsNear(level, start, seasons, today)}.` }
+    next.periodLabel = label(level, start)
+    if (!op.parentId) return { op: next }
+    const pTask = tasks.get(op.parentId)
+    const pGoal = goals.get(op.parentId)
+    let parent: { title: string; context?: string | null }
+    if (level === 'month') {
+      if (pGoal) return { error: `"${pGoal.name}" is a year goal. A month goal serves a season goal: use a season item's id as parent_id, or leave it out.` }
+      if (!pTask) return notVisible(op.parentId)
+      if (!pTask.commitments.some((c) => c.level === 'season' && c.status !== 'removed')) return { error: `"${pTask.title}" is not a season goal. A month goal serves a season goal: use a season item's id as parent_id, or leave it out.` }
+      parent = { title: pTask.title, context: pTask.context }
+    } else {
+      if (pTask) return { error: `"${pTask.title}" is a season or month goal. A season goal serves a year goal: use a year goal's id as parent_id, or leave it out.` }
+      if (!pGoal) return notVisible(op.parentId)
+      if (pGoal.status === 'archived') return { error: `"${pGoal.name}" was let go; leave parent_id out or choose another year goal` }
+      const years = seasonYears(start, seasons)
+      if (!years.includes(pGoal.year)) return { error: `"${pGoal.name}" is a ${pGoal.year} goal; ${label(level, start)} is in ${years.join('–')}. Choose a year goal for that year, or leave parent_id out.` }
+      parent = { title: pGoal.name, context: pGoal.context }
+    }
+    if (next.context && parent.context && parent.context !== next.context) return { error: `"${parent.title}" is in a different life area (${parent.context}); ask which they mean` }
+    if (!next.context && isContext(parent.context)) next.context = parent.context
+    next.parentTitle = parent.title
+    return { op: next }
+  }
+
+  const item = planItem(op.itemId!, op.level, seasons, tasks, goals)
+  if ('error' in item) return item
+  const title = item.kind === 'goal' ? item.goal.name : item.task.title
+  next.title = title
+  next.itemKind = item.kind
+  next.level = item.level
+  next.periodStart = item.periodStart
+  next.periodLabel = label(item.level, item.periodStart)
+  next.seen = item.kind === 'goal' ? item.goal.updated_at : item.task.updated_at
+
+  if (op.op === 'plan_carry') {
+    const to = op.toPeriodStart!
+    if (!isPeriodStart(item.level, to, seasons)) return { error: `${to} is not the start of a ${item.level}. The starts are: ${startsNear(item.level, item.periodStart, seasons, today)}.` }
+    if (to === item.periodStart) return { error: `"${title}" is already on ${next.periodLabel}. Carry it to a later ${item.level}.` }
+    if (to < item.periodStart) return { error: `"${title}" is on ${next.periodLabel}; ${label(item.level, to)} is before it. A carry only goes forward.` }
+    next.toPeriodLabel = label(item.level, to)
+    next.toNext = to === nextPeriodStart(item.level, item.periodStart, seasons)
+    if (op.newTitle === title) delete next.newTitle
+    if (item.kind === 'task') {
+      const parentId = item.level === 'month' ? item.task.source_id : item.task.goal_id
+      const parentTitle = !parentId ? undefined : item.level === 'month' ? tasks.get(parentId)?.title : goals.get(parentId)?.name
+      if (parentId && parentTitle !== undefined) { next.parentId = parentId; next.parentTitle = parentTitle }
+    }
+  }
+  return { op: next }
+}
+
 export type RoutineRef = { id: string; name: string; updated_at: string; parent_routine_id: string | null }
 
 export function resolveRefs(
@@ -283,13 +465,23 @@ export function resolveRefs(
   tasks: { id: string; title: string; updated_at: string; completed: boolean }[],
   members: { id: string; name: string }[],
   routines: RoutineRef[] = [],
+  plan?: PlanRefs,
 ): { set: ChangeSet } | { error: string } {
   const byId = new Map(tasks.map((t) => [t.id, t]))
+  const planTasks = new Map((plan?.tasks ?? []).map((t) => [t.id, t]))
+  const planGoals = new Map((plan?.goals ?? []).map((g) => [g.id, g]))
   const routineById = new Map(routines.map((r) => [r.id, r]))
   const names = new Map(members.map((m) => [m.id, m.name]))
   const unknownMember = (id: string) => ({ error: `No household member ${id}. Use symphony_list_household_members.` })
   const ops: ChangeOp[] = []
   for (const op of set.ops) {
+    if (op.op.startsWith('plan_')) {
+      if (!plan) return { error: 'Could not read the Month, Season and Year lists to check this list. Try again.' }
+      const r = resolvePlanOp(op, plan, planTasks, planGoals)
+      if ('error' in r) return r
+      ops.push(r.op)
+      continue
+    }
     const next = { ...op }
     if (op.taskId) {
       const t = byId.get(op.taskId)
@@ -353,7 +545,7 @@ export function changeCardNote(raw: unknown): string {
 
 export const PROPOSE_CHANGES_TOOL = {
   name: 'symphony_propose_changes',
-  description: 'Propose ONE list of changes to the person\'s tasks and routines, shown as a change card and as dashed rows on the page. Nothing is saved until they press Approve. Use this whenever a request changes MORE THAN ONE task, for any routine change, and always at the end of a planning conversation. Never call write tools for the same changes. Nothing is deleted. Task ops (one per task): place (give it a day, optionally a time), unplace (take its day away), add (a new task), someday (set it aside), assign (one household member), done (mark it finished), merge (task_id is the one kept, from_task_id the duplicate that closes into it, notes kept), talk (to talk about with someone before deciding; note like "with Iris"). Routine ops for this week only, on one day\'s occurrence (date = that occurrence\'s day; the routine itself is untouched): routine_skip, routine_move (to_date, optional time), routine_who (assignee). Routine ops from now on: routine_change (any of name, time or null for any time, days, assignees), routine_rest (stops it, optional until), routine_add (name, days, time, assignees, context). One lasting op per routine, one this-week op per routine and day. Routine ids come from symphony_read_week. Each call replaces the list on the page: while planning, call it again with the whole list so far after each answer, and whenever the person asks for a change.',
+  description: 'Propose ONE list of changes to the person\'s tasks, routines and goals, shown as a change card and as dashed rows on the page. Nothing is saved until they press Approve. Use this whenever a request changes MORE THAN ONE task, for any routine change, and always at the end of a planning conversation. Never call write tools for the same changes. Nothing is deleted. Task ops (one per task): place (give it a day, optionally a time), unplace (take its day away), add (a new task), someday (set it aside), assign (one household member), done (mark it finished), merge (task_id is the one kept, from_task_id the duplicate that closes into it, notes kept), talk (to talk about with someone before deciding; note like "with Iris"). Routine ops for this week only, on one day\'s occurrence (date = that occurrence\'s day; the routine itself is untouched): routine_skip, routine_move (to_date, optional time), routine_who (assignee). Routine ops from now on: routine_change (any of name, time or null for any time, days, assignees), routine_rest (stops it, optional until), routine_add (name, days, time, assignees, context). One lasting op per routine, one this-week op per routine and day. Routine ids come from symphony_read_week. Plan ops, for goals on the Month, Season and Year lists (ids and period starts come from symphony_read_plan; a month starts YYYY-MM-01, a year YYYY-01-01, a season on the household\'s boundary): plan_add (level, period_start, title in the person\'s words, optional parent_id: a season goal for a month goal, a year goal for a season goal), plan_carry (item_id, to_period_start, a later period; optional new_title when they reword it), plan_let_go (item_id; takes it off its list, nothing deleted), plan_done (item_id; a year goal is marked met). Send level with an item only when it is on both a season and a month list. One op per goal or task. Month and season goals are tasks too: merge and someday work on them. Each call replaces the list on the page: while planning, call it again with the whole list so far after each answer, and whenever the person asks for a change.',
   input_schema: {
     type: 'object',
     properties: {
@@ -368,7 +560,7 @@ export const PROPOSE_CHANGES_TOOL = {
             task_id: { type: 'string', description: 'Existing task id (task ops except add; for merge, the task kept)' },
             from_task_id: { type: 'string', description: 'merge: the duplicate task that closes into task_id' },
             note: { type: 'string', description: 'talk: a short line, e.g. "with Iris" (optional, at most 120 characters)' },
-            title: { type: 'string', description: 'New task title (add only)' },
+            title: { type: 'string', description: 'New task title (add), or the new goal in the person\'s words (plan_add)' },
             routine_id: { type: 'string', description: 'Existing routine id (routine ops except routine_add)' },
             name: { type: 'string', description: 'routine_add: the name; routine_change: a new name' },
             date: { type: 'string', description: 'YYYY-MM-DD: place; optional for add; routine_skip/move/who: the occurrence\'s day' },
@@ -378,8 +570,14 @@ export const PROPOSE_CHANGES_TOOL = {
             assignee: { type: 'string', description: 'Household member id (assign, routine_who; optional for add)' },
             assignees: { type: 'array', items: { type: 'string' }, description: 'routine_change/routine_add: household member ids who do it every week (empty = no one)' },
             until: { type: 'string', description: 'routine_rest: YYYY-MM-DD it wakes (omit to rest with no date)' },
-            context: { type: 'string', enum: ['family', 'personal', 'work'], description: 'routine_add: life area (default family)' },
+            context: { type: 'string', enum: ['family', 'personal', 'work'], description: 'routine_add: life area (default family); plan_add: optional (defaults to its parent\'s)' },
             goal_id: { type: 'string', description: 'Month goal the new task serves (add only, optional)' },
+            level: { type: 'string', enum: ['month', 'season', 'year'], description: 'plan_add: the list it goes on; other plan ops: only for an item on both a season and a month list' },
+            period_start: { type: 'string', description: 'plan_add: YYYY-MM-DD start of the period (from symphony_read_plan)' },
+            to_period_start: { type: 'string', description: 'plan_carry: YYYY-MM-DD start of the later period it goes to' },
+            item_id: { type: 'string', description: 'plan_carry, plan_let_go, plan_done: the goal\'s id (a month or season item, or a year goal) from symphony_read_plan' },
+            parent_id: { type: 'string', description: 'plan_add, optional: the goal it serves (a season item for a month goal, a year goal for a season goal)' },
+            new_title: { type: 'string', description: 'plan_carry, optional: the new wording' },
           },
           required: ['op'],
         },

@@ -1,8 +1,10 @@
 import { describe, expect, it, vi } from 'vitest'
-import type { Task } from '@/types/task'
+import type { Task, TaskCommitment } from '@/types/task'
+import type { Goal } from '@/types/goal'
 import type { Routine } from '@/types/actionable'
-import { applyChangeSet, plannedWeekStart, type ApplyDeps } from './applyChangeSet'
+import { applyChangeSet, canApply, plannedWeekStart, type ApplyDeps } from './applyChangeSet'
 import type { ChangeSet } from './changeCard'
+import { planKeep, planPlacement } from '@/lib/placement/intentions'
 
 const seen = '2026-10-14T07:00:00.123456+00:00'
 const task = (id: string, x: Partial<Task> = {}) => ({ id, title: id, completed: false, createdAt: new Date(2026, 8, 1), updatedAt: new Date(Date.parse(seen)), bucket: 'week', ...x }) as Task
@@ -334,5 +336,233 @@ describe('applyChangeSet: done, merge and routine ops (stage 3)', () => {
     expect(await r.undo()).toBe(true)
     const order = [vi.mocked(d.deleteRoutine).mock.invocationCallOrder[0], vi.mocked(d.setOccurrenceAssignee).mock.invocationCallOrder[1], vi.mocked(d.reopenTask).mock.invocationCallOrder[0]]
     expect([...order].sort((x, y) => x - y)).toEqual(order)
+  })
+})
+
+describe('applyChangeSet: plan ops (Month / Season / Year)', () => {
+  const one = (op: ChangeSet['ops'][number]): ChangeSet => ({ key: 'p', title: '1 change', ops: [op] })
+  const applyOk = async (s: ChangeSet, d: ApplyDeps) => {
+    const r = await applyChangeSet(s, d)
+    if (!r.ok) throw new Error(`expected ok, got ${JSON.stringify(r)}`)
+    return r
+  }
+  const goal = (id: string, x: Partial<Goal> = {}) => ({
+    id, areaId: 'area1', name: id, year: 2026, status: 'active', sortOrder: 0, actions: [], milestones: [],
+    context: 'family', notes: 'why', createdAt: new Date(2026, 0, 1), updatedAt: new Date(Date.parse(seen)), ...x,
+  }) as Goal
+  const oct: TaskCommitment = { level: 'month', periodStart: new Date(2026, 9, 1), status: 'open' }
+  const fall: TaskCommitment = { level: 'season', periodStart: new Date(2026, 8, 1), status: 'open' }
+  const planDeps = (over: Partial<ApplyDeps> = {}) => deps({
+    tasks: [
+      task('m1', { title: 'Plan sabbatical', bucket: 'month', monthStart: oct.periodStart, commitments: [oct], context: 'personal', sourceId: 's1', goalId: 'g1' }),
+      task('s1', { title: 'Plan winter vacation', bucket: 'quarter', seasonStart: fall.periodStart, commitments: [fall], context: 'family', goalId: 'g1' }),
+    ],
+    goals: [goal('g1', { name: 'Rest more' })],
+    addGoal: vi.fn(async () => 'gnew'),
+    updateGoal: vi.fn(async () => true),
+    deleteGoal: vi.fn(async () => {}),
+    keepForward: vi.fn(async (id: string) => id),
+    dropCommitment: vi.fn(async () => true),
+    ...over,
+  })
+
+  it('plan_add to a year adds a goal for that year; Undo deletes it', async () => {
+    const d = planDeps({ defaultContext: 'work' })
+    const r = await applyOk(one({ key: 'p:0', op: 'plan_add', level: 'year', periodStart: '2027-01-01', title: 'Run a half marathon' }), d)
+    expect(d.addGoal).toHaveBeenCalledWith('Run a half marathon', { year: 2027, context: 'work' })
+    expect(r.ids).toEqual(['gnew'])
+    expect(await r.undo()).toBe(true)
+    expect(d.deleteGoal).toHaveBeenCalledWith('gnew')
+  })
+
+  it('plan_add to a season commits a task there, for its year goal; Undo deletes it', async () => {
+    const d = planDeps()
+    const r = await applyOk(one({ key: 'p:0', op: 'plan_add', level: 'season', periodStart: '2026-12-01', title: 'Book the cabin', parentId: 'g1', parentTitle: 'Rest more' }), d)
+    expect(d.addTask).toHaveBeenCalledWith('Book the cabin', undefined, { bucket: 'quarter', seasonStart: new Date(2026, 11, 1), goalId: 'g1', context: 'family' })
+    expect(r.ids).toEqual(['new1'])
+    await r.undo()
+    expect(d.deleteTask).toHaveBeenCalledWith('new1')
+  })
+
+  it('plan_add to a month links its season goal and inherits the year goal', async () => {
+    const d = planDeps()
+    await applyOk(one({ key: 'p:0', op: 'plan_add', level: 'month', periodStart: '2026-11-01', title: 'Book the cabin', parentId: 's1', parentTitle: 'Plan winter vacation' }), d)
+    expect(d.addTask).toHaveBeenCalledWith('Book the cabin', undefined, { bucket: 'month', monthStart: new Date(2026, 10, 1), sourceId: 's1', goalId: 'g1', context: 'family' })
+  })
+
+  it('plan_add with no parent and no page area adds it plain', async () => {
+    const d = planDeps()
+    await applyOk(one({ key: 'p:0', op: 'plan_add', level: 'month', periodStart: '2026-11-01', title: 'Clean the garage' }), d)
+    expect(d.addTask).toHaveBeenCalledWith('Clean the garage', undefined, { bucket: 'month', monthStart: new Date(2026, 10, 1) })
+  })
+
+  it('plan_add refuses as stale when its parent has gone', async () => {
+    const d = planDeps()
+    expect(await applyChangeSet(one({ key: 'p:0', op: 'plan_add', level: 'month', periodStart: '2026-11-01', title: 'x', parentId: 'gone', parentTitle: 'Old season goal' }), d))
+      .toEqual({ ok: false, reason: 'stale', title: 'Old season goal' })
+    expect(d.addTask).not.toHaveBeenCalled()
+  })
+
+  it('plan_carry of a month goal keeps it forward from its month and renames it; Undo restores title and commitments', async () => {
+    const d = planDeps()
+    const r = await applyOk(one({ key: 'p:0', op: 'plan_carry', level: 'month', itemId: 'm1', itemKind: 'task', title: 'Plan sabbatical', seen,
+      periodStart: '2026-10-01', toPeriodStart: '2026-11-01', newTitle: 'Draft the sabbatical plan' }), d)
+    expect(d.keepForward).toHaveBeenCalledWith('m1', { monthStart: new Date(2026, 10, 1) }, new Date(2026, 9, 1))
+    expect(d.updateTask).toHaveBeenCalledWith('m1', { title: 'Draft the sabbatical plan' })
+    vi.mocked(d.updateTask).mockClear()
+    expect(await r.undo()).toBe(true)
+    expect(vi.mocked(d.updateTask).mock.calls).toEqual([
+      ['m1', { title: 'Plan sabbatical' }],
+      ['m1', { commitments: [oct] }],
+    ])
+  })
+
+  it('plan_carry of a season goal keeps it into the season named', async () => {
+    const d = planDeps()
+    await applyOk(one({ key: 'p:0', op: 'plan_carry', level: 'season', itemId: 's1', title: 'Plan winter vacation', periodStart: '2026-09-01', toPeriodStart: '2026-12-01' }), d)
+    expect(d.keepForward).toHaveBeenCalledWith('s1', { seasonStart: new Date(2026, 11, 1) }, new Date(2026, 8, 1))
+    expect(d.updateTask).not.toHaveBeenCalled()
+  })
+
+  it('plan_carry of a goal row puts its open steps back on Undo too', async () => {
+    const goalRow = task('gr', { title: 'Transform the porch', isGoal: true, bucket: 'month', monthStart: oct.periodStart, commitments: [oct] })
+    const st = task('st', { title: 'Buy chairs', goalTaskId: 'gr', bucket: 'month', monthStart: oct.periodStart, commitments: [oct] })
+    const d = planDeps({ tasks: [goalRow, st] })
+    const r = await applyOk(one({ key: 'p:0', op: 'plan_carry', level: 'month', itemId: 'gr', title: 'Transform the porch', periodStart: '2026-10-01', toPeriodStart: '2026-11-01' }), d)
+    await r.undo()
+    expect(vi.mocked(d.updateTask).mock.calls).toEqual([['gr', { commitments: [oct] }], ['st', { commitments: [oct] }]])
+  })
+
+  it('plan_carry of a year goal adds a carried copy, original untouched; Undo deletes the copy', async () => {
+    const d = planDeps()
+    const r = await applyOk(one({ key: 'p:0', op: 'plan_carry', level: 'year', itemId: 'g1', itemKind: 'goal', title: 'Rest more', seen, periodStart: '2026-01-01', toPeriodStart: '2027-01-01', newTitle: 'Rest, really' }), d)
+    expect(d.addGoal).toHaveBeenCalledWith('Rest, really', { year: 2027, carriedFrom: 'g1', areaId: 'area1', notes: 'why', strategy: null, context: 'family' })
+    expect(d.updateGoal).not.toHaveBeenCalled()
+    expect(r.ids).toEqual(['gnew'])
+    await r.undo()
+    expect(d.deleteGoal).toHaveBeenCalledWith('gnew')
+  })
+
+  it('plan_let_go of a month goal drops that month; Undo states the commitments back', async () => {
+    const d = planDeps()
+    const r = await applyOk(one({ key: 'p:0', op: 'plan_let_go', level: 'month', itemId: 'm1', title: 'Plan sabbatical', periodStart: '2026-10-01', seen }), d)
+    expect(d.dropCommitment).toHaveBeenCalledWith('m1', 'month', new Date(2026, 9, 1))
+    await r.undo()
+    expect(d.updateTask).toHaveBeenCalledWith('m1', { commitments: [oct] })
+  })
+
+  it('plan_let_go of a year goal archives it; Undo restores its status', async () => {
+    const d = planDeps()
+    const r = await applyOk(one({ key: 'p:0', op: 'plan_let_go', level: 'year', itemId: 'g1', title: 'Rest more', seen }), d)
+    expect(d.updateGoal).toHaveBeenCalledWith('g1', { status: 'archived' })
+    await r.undo()
+    expect(d.updateGoal).toHaveBeenLastCalledWith('g1', { status: 'active' })
+  })
+
+  it('plan_done of a season goal ticks it; Undo reopens it', async () => {
+    const d = planDeps()
+    const r = await applyOk(one({ key: 'p:0', op: 'plan_done', level: 'season', itemId: 's1', title: 'Plan winter vacation', seen }), d)
+    expect(d.completeTask).toHaveBeenCalledWith('s1')
+    await r.undo()
+    expect(d.reopenTask).toHaveBeenCalledWith('s1')
+  })
+
+  it('plan_done of a year goal marks it met; Undo restores its status; already met writes nothing', async () => {
+    const d = planDeps()
+    const r = await applyOk(one({ key: 'p:0', op: 'plan_done', level: 'year', itemId: 'g1', title: 'Rest more', seen }), d)
+    expect(d.updateGoal).toHaveBeenCalledWith('g1', { status: 'completed' })
+    await r.undo()
+    expect(d.updateGoal).toHaveBeenLastCalledWith('g1', { status: 'active' })
+
+    const d2 = planDeps({ goals: [goal('g1', { status: 'completed' })] })
+    const r2 = await applyOk(one({ key: 'p:0', op: 'plan_done', level: 'year', itemId: 'g1', title: 'g1' }), d2)
+    await r2.undo()
+    expect(d2.updateGoal).not.toHaveBeenCalled()
+  })
+
+  it('refuses the whole set when a year goal changed since Symphony read it', async () => {
+    const d = planDeps({ goals: [goal('g1', { updatedAt: new Date(Date.parse(seen) + 60_000) })] })
+    const s: ChangeSet = { key: 'p', title: '2 changes', ops: [
+      { key: 'p:0', op: 'plan_done', level: 'season', itemId: 's1', title: 'Plan winter vacation', seen },
+      { key: 'p:1', op: 'plan_let_go', level: 'year', itemId: 'g1', title: 'Rest more', seen },
+    ] }
+    expect(await applyChangeSet(s, d)).toEqual({ ok: false, reason: 'stale', title: 'Rest more' })
+    expect(d.completeTask).not.toHaveBeenCalled()
+    expect(d.updateGoal).not.toHaveBeenCalled()
+  })
+
+  it('refuses when a month goal moved since Symphony read it', async () => {
+    const d = planDeps({ tasks: [task('m1', { updatedAt: new Date(Date.parse(seen) + 60_000) })] })
+    expect(await applyChangeSet(one({ key: 'p:0', op: 'plan_carry', level: 'month', itemId: 'm1', title: 'Plan sabbatical', seen, toPeriodStart: '2026-11-01' }), d))
+      .toEqual({ ok: false, reason: 'stale', title: 'Plan sabbatical' })
+    expect(d.keepForward).not.toHaveBeenCalled()
+  })
+
+  it('a goal or task that has gone is stale', async () => {
+    const d = planDeps({ goals: [] })
+    expect(await applyChangeSet(one({ key: 'p:0', op: 'plan_done', level: 'year', itemId: 'g1', title: 'Rest more' }), d)).toEqual({ ok: false, reason: 'stale', title: 'Rest more' })
+    expect(await applyChangeSet(one({ key: 'p:0', op: 'plan_let_go', level: 'month', itemId: 'nope', title: 'Gone', periodStart: '2026-10-01' }), d)).toEqual({ ok: false, reason: 'stale', title: 'Gone' })
+  })
+
+  it('a page without the plan writers refuses a plan set, writing nothing', async () => {
+    const { keepForward, dropCommitment, goals, addGoal, updateGoal, deleteGoal, ...noPlan } = planDeps()
+    void keepForward; void dropCommitment; void goals; void addGoal; void updateGoal; void deleteGoal
+    const s = (op: ChangeSet['ops'][number]): ChangeSet => ({ key: 'p', title: '2 changes', ops: [{ key: 'p:a', op: 'someday', taskId: 'm1', title: 'm1', seen }, op] })
+    for (const op of [
+      { key: 'p:0', op: 'plan_carry', level: 'month', itemId: 'm1', title: 'x', toPeriodStart: '2026-11-01' },
+      { key: 'p:0', op: 'plan_carry', level: 'year', itemId: 'g1', title: 'x', toPeriodStart: '2027-01-01' },
+      { key: 'p:0', op: 'plan_let_go', level: 'month', itemId: 'm1', title: 'x', periodStart: '2026-10-01' },
+      { key: 'p:0', op: 'plan_let_go', level: 'year', itemId: 'g1', title: 'x' },
+      { key: 'p:0', op: 'plan_done', level: 'year', itemId: 'g1', title: 'x' },
+      { key: 'p:0', op: 'plan_add', level: 'year', periodStart: '2027-01-01', title: 'x' },
+      { key: 'p:0', op: 'plan_add', level: 'season', periodStart: '2026-12-01', title: 'x', parentId: 'g1' },
+    ] as ChangeSet['ops']) {
+      expect(canApply(s(op), noPlan)).toBe(false)
+      expect(await applyChangeSet(s(op), noPlan)).toEqual({ ok: false, reason: 'failed' })
+    }
+    expect(noPlan.updateTask).not.toHaveBeenCalled()
+    // A month add with no parent needs only the task writers.
+    expect(canApply(one({ key: 'p:0', op: 'plan_add', level: 'month', periodStart: '2026-11-01', title: 'x' }), noPlan)).toBe(true)
+  })
+
+  it('refuses a malformed plan op before writing anything', async () => {
+    const d = planDeps()
+    expect(await applyChangeSet(one({ key: 'p:0', op: 'plan_carry', level: 'month', itemId: 'm1', title: 'x', toPeriodStart: 'November' }), d)).toEqual({ ok: false, reason: 'failed' })
+    expect(await applyChangeSet(one({ key: 'p:0', op: 'plan_let_go', level: 'year', itemId: 'm1', itemKind: 'task', title: 'x' }), d)).toEqual({ ok: false, reason: 'failed' })
+    expect(d.keepForward).not.toHaveBeenCalled()
+    expect(d.dropCommitment).not.toHaveBeenCalled()
+  })
+
+  it('a failed write part way reverses the plan writes before it, newest first', async () => {
+    const d = planDeps({ dropCommitment: vi.fn(async () => false) })
+    const s: ChangeSet = { key: 'p', title: '4 changes', ops: [
+      { key: 'p:0', op: 'plan_add', level: 'year', periodStart: '2027-01-01', title: 'New goal' },
+      { key: 'p:1', op: 'plan_done', level: 'year', itemId: 'g1', title: 'Rest more', seen },
+      { key: 'p:2', op: 'plan_carry', level: 'season', itemId: 's1', title: 'Plan winter vacation', periodStart: '2026-09-01', toPeriodStart: '2026-12-01' },
+      { key: 'p:3', op: 'plan_let_go', level: 'month', itemId: 'm1', title: 'Plan sabbatical', periodStart: '2026-10-01' },
+    ] }
+    expect(await applyChangeSet(s, d)).toEqual({ ok: false, reason: 'failed' })
+    expect(d.updateTask).toHaveBeenCalledWith('s1', { commitments: [fall] })
+    expect(d.updateGoal).toHaveBeenLastCalledWith('g1', { status: 'active' })
+    expect(d.deleteGoal).toHaveBeenCalledWith('gnew')
+    const order = [vi.mocked(d.updateTask).mock.invocationCallOrder[0], vi.mocked(d.updateGoal).mock.invocationCallOrder[1], vi.mocked(d.deleteGoal).mock.invocationCallOrder[0]]
+    expect([...order].sort((x, y) => x - y)).toEqual(order)
+  })
+
+  it('the Undo snapshot, through the real placement planner, reopens the source and removes the destination', () => {
+    const nov = new Date(2026, 10, 1)
+    const m1 = task('m1', { bucket: 'month', monthStart: oct.periodStart, commitments: [oct] })
+    const kept = planKeep(m1, 'month', nov, oct.periodStart).local
+    expect(kept.commitments?.map((c) => c.status)).toEqual(['carried', 'open'])
+    const undone = planPlacement(kept, { commitments: [oct] }, { now: new Date(2026, 9, 14), userId: 'u' })
+    expect(undone.commitmentOps).toEqual([{ op: 'remove', level: 'month', periodStart: nov }, { op: 'ensure', level: 'month', periodStart: oct.periodStart }])
+    expect(undone.local.commitments?.map((c) => [c.periodStart.getMonth(), c.status])).toEqual([[9, 'open'], [10, 'removed']])
+    expect(undone.local.monthStart).toEqual(oct.periodStart)
+  })
+
+  it('a keepForward that fails part way is still put back', async () => {
+    const d = planDeps({ keepForward: vi.fn(async () => undefined) })
+    expect(await applyChangeSet(one({ key: 'p:0', op: 'plan_carry', level: 'month', itemId: 'm1', title: 'x', periodStart: '2026-10-01', toPeriodStart: '2026-11-01' }), d)).toEqual({ ok: false, reason: 'failed' })
+    expect(d.updateTask).toHaveBeenCalledWith('m1', { commitments: [oct] })
   })
 })

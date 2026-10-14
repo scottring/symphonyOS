@@ -33,7 +33,7 @@ describe('optional onboarding', () => {
     expect(screen.getByRole('button', { name: 'Explore on my own' })).not.toHaveClass('bg-primary-600')
     // Stacked on a phone, a row of three from the small breakpoint up.
     expect(today.parentElement).toHaveClass('grid-cols-1', 'sm:grid-cols-3')
-    expect(screen.getByRole('link', { name: 'Plan with guidance →' })).toHaveAttribute('href', '/start')
+    expect(screen.queryByRole('link', { name: /Plan with guidance/ })).toBeNull()
   })
   it('preserves cleanup of existing sample data', async () => {
     const clear = vi.fn()

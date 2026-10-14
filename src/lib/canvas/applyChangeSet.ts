@@ -6,20 +6,30 @@
 // before anything is written, and a failure part way puts back what already
 // saved. One Undo reverses the lot, newest first.
 
-import type { Task, TaskBucket, TaskLink } from '@/types/task'
+import type { Task, TaskBucket, TaskContext, TaskLink, TaskCommitment, PlacementLevel } from '@/types/task'
+import type { Goal, GoalStatus } from '@/types/goal'
 import type { Routine, RecurrencePattern } from '@/types/actionable'
 import type { CreateRoutineInput, UpdateRoutineInput } from '@/hooks/useRoutines'
 import type { RescheduleResult } from '@/hooks/useActionableInstances'
 import { opWhen, opWrite, withSteps, type ChangeOp, type ChangeOpKind, type ChangeSet, type DayKey } from './changeCard'
 import { weekStartAnchor, type WeekStart } from '@/lib/cadence/config'
+import { bootstrapCommitments } from '@/lib/placement/intentions'
+import { liveCommitments } from '@/lib/placement/model'
+import { stepsThatCarryForward } from '@/lib/planning/goalSteps'
 
 export interface ApplyDeps extends Partial<MoreApplyDeps> {
   tasks: Task[]
   updateTask: (id: string, updates: Partial<Task>) => Promise<boolean | void>
-  addTask: (title: string, scheduledFor: Date | undefined, options: { isAllDay?: boolean; bucket?: TaskBucket; weekStart?: Date; assignedTo?: string; assignedToAll?: string[]; sourceId?: string }) => Promise<string | undefined>
+  addTask: (title: string, scheduledFor: Date | undefined, options: {
+    isAllDay?: boolean; bucket?: TaskBucket; weekStart?: Date; assignedTo?: string; assignedToAll?: string[]; sourceId?: string
+    /** plan_add: a month or season goal, committed to its period, with its parent link. */
+    monthStart?: Date; seasonStart?: Date; goalId?: string; context?: TaskContext
+  }) => Promise<string | undefined>
   deleteTask: (id: string) => Promise<unknown>
   /** The planned week's start, for an add with no day (plannedWeekStart). */
   weekStart: Date
+  /** plan_add with no parent to inherit from: the life area the page adds in. */
+  defaultContext?: TaskContext
 }
 
 /** Writers the stage-3 ops need (done, merge, routine ops). Optional: a page
@@ -44,6 +54,19 @@ export interface MoreApplyDeps {
   undoMove: (previous: RescheduleResult) => Promise<boolean>
   /** One occurrence's person (assigned_to_override); null clears it. */
   setOccurrenceAssignee: (routineId: string, date: Date, memberId: string | null) => Promise<{ instanceId: string; previous: string | null } | null>
+  /** Plan ops (Month / Season / Year): the year goals the person can see
+   *  (updatedAt for the stale check). */
+  goals: Goal[]
+  /** A new year goal, or a carried copy: its id, or undefined when it did not save. */
+  addGoal: (name: string, opts: { year: number; context?: TaskContext; carriedFrom?: string; areaId?: string | null; notes?: string | null; strategy?: string | null; assignedToAll?: string[] }) => Promise<string | undefined>
+  /** false when refused. Status for done / let go, and for their Undo. */
+  updateGoal: (id: string, updates: { status?: GoalStatus; name?: string }) => Promise<boolean | void>
+  deleteGoal: (id: string) => Promise<unknown>
+  /** The page's Carry: this period's commitment carried, the next one opened
+   *  (a goal row's open steps go along). The task's id, or undefined. */
+  keepForward: (id: string, period: { monthStart?: Date; seasonStart?: Date }, from?: Date) => Promise<string | undefined>
+  /** The page's Remove from this period. */
+  dropCommitment: (id: string, level: PlacementLevel, periodStart: Date) => Promise<boolean>
 }
 
 export type ApplyResult =
@@ -61,6 +84,7 @@ export function plannedWeekStart(set: ChangeSet, now: Date, weekStartsOn: WeekSt
 /** Postgres keeps microseconds; the client's Date keeps milliseconds. */
 const changedSince = (updatedAtMs: number, seen: string) => updatedAtMs > Math.floor(Date.parse(seen)) + 1
 const movedSince = (task: Task, seen: string) => changedSince(task.updatedAt.getTime(), seen)
+const goalMovedSince = (g: Goal, seen: string) => changedSince(g.updatedAt.getTime(), seen)
 const routineMovedSince = (r: Routine, seen: string) => changedSince(Date.parse(r.updated_at), seen)
 
 const ROUTINE_OPS = new Set(['routine_skip', 'routine_move', 'routine_who', 'routine_change', 'routine_rest'])
@@ -122,6 +146,43 @@ function mergedInto(kept: Task, dup: Task): Partial<Task> {
   return updates
 }
 
+const YMD = /^\d{4}-\d{2}-\d{2}$/
+
+/** A plan op's item: a year goal (goals row) or a month / season goal (task). */
+const isGoalItem = (op: ChangeOp) => (op.itemKind ? op.itemKind === 'goal' : op.level === 'year')
+
+/** Complete enough to write. Symphony validates too; this keeps a malformed
+ *  op from writing half a set. */
+function planOpWellFormed(op: ChangeOp): boolean {
+  if (op.level !== 'year' && op.level !== 'season' && op.level !== 'month') return false
+  if (op.periodStart && !YMD.test(op.periodStart)) return false
+  if (op.op === 'plan_add') return !!op.title?.trim() && !!op.periodStart
+  if (!op.itemId || isGoalItem(op) !== (op.level === 'year')) return false
+  if (op.op === 'plan_carry') return !!op.toPeriodStart && YMD.test(op.toPeriodStart)
+  if (op.op === 'plan_let_go' && !isGoalItem(op)) return !!op.periodStart
+  return true
+}
+
+/** The writers a plan op needs, by the list it changes and the item's kind. */
+function planNeeds(op: ChangeOp): (keyof MoreApplyDeps)[] {
+  const goal = isGoalItem(op)
+  switch (op.op) {
+    case 'plan_add':
+      if (op.level === 'year') return ['addGoal', 'deleteGoal']
+      // A season goal's parent is a year goal: it must be visible to link to.
+      return op.level === 'season' && op.parentId ? ['goals'] : []
+    case 'plan_carry': return goal ? ['goals', 'addGoal', 'deleteGoal'] : ['keepForward']
+    case 'plan_let_go': return goal ? ['goals', 'updateGoal'] : ['dropCommitment']
+    case 'plan_done': return goal ? ['goals', 'updateGoal'] : ['completeTask', 'reopenTask']
+    default: return []
+  }
+}
+
+/** A task's commitments as Undo states them back (timingRemoval's snapshot,
+ *  through updateTask's stated list): the open ones reopen, any opened since
+ *  are removed, and history (done, carried) is left alone. */
+const commitmentSnapshot = (t: Task): TaskCommitment[] => liveCommitments({ commitments: bootstrapCommitments(t) })
+
 const NEEDS: Partial<Record<ChangeOpKind, (keyof MoreApplyDeps)[]>> = {
   done: ['completeTask', 'reopenTask'],
   merge: ['completeTask', 'reopenTask'],
@@ -135,7 +196,7 @@ const NEEDS: Partial<Record<ChangeOpKind, (keyof MoreApplyDeps)[]>> = {
 
 /** Whether this page has every writer the set needs. */
 export function canApply(set: ChangeSet, deps: ApplyDeps): boolean {
-  return set.ops.every((op) => (NEEDS[op.op] ?? []).every((k) => deps[k] !== undefined))
+  return set.ops.every((op) => [...(NEEDS[op.op] ?? []), ...planNeeds(op)].every((k) => deps[k] !== undefined))
 }
 
 export async function applyChangeSet(set: ChangeSet, given: ApplyDeps): Promise<ApplyResult> {
@@ -144,7 +205,22 @@ export async function applyChangeSet(set: ChangeSet, given: ApplyDeps): Promise<
   const deps = given as ApplyDeps & MoreApplyDeps
   const byId = new Map(withSteps(deps.tasks).map((t) => [t.id, t]))
   const routinesById = new Map((deps.routines ?? []).map((r) => [r.id, r]))
+  const goalsById = new Map((deps.goals ?? []).map((g) => [g.id, g]))
   for (const op of set.ops) {
+    if (op.op.startsWith('plan_')) {
+      if (!planOpWellFormed(op)) return { ok: false, reason: 'failed' }
+      if (op.itemId) {
+        const goal = isGoalItem(op)
+        const item = goal ? goalsById.get(op.itemId) : byId.get(op.itemId)
+        const moved = !!item && !!op.seen && (goal ? goalMovedSince(item as Goal, op.seen) : movedSince(item as Task, op.seen))
+        if (!item || moved) return { ok: false, reason: 'stale', title: op.title }
+      }
+      // The parent it is written for must still be there to link to.
+      if (op.op === 'plan_add' && op.parentId && op.level !== 'year') {
+        const parent = op.level === 'season' ? goalsById.get(op.parentId) : byId.get(op.parentId)
+        if (!parent) return { ok: false, reason: 'stale', title: op.parentTitle ?? op.title }
+      }
+    }
     if (op.taskId) {
       const t = byId.get(op.taskId)
       if (!t || (op.seen && movedSince(t, op.seen))) return { ok: false, reason: 'stale', title: op.title }
@@ -256,6 +332,93 @@ export async function applyChangeSet(set: ChangeSet, given: ApplyDeps): Promise<
           if (!id) return fail()
           ids.push(id)
           undos.push(() => deps.deleteRoutine(id))
+          continue
+        }
+        case 'plan_add': {
+          const start = localDay(op.periodStart!)
+          if (op.level === 'year') {
+            const id = await deps.addGoal(op.title, { year: start.getFullYear(), ...(deps.defaultContext ? { context: deps.defaultContext } : {}) })
+            if (!id) return fail()
+            ids.push(id)
+            undos.push(() => deps.deleteGoal(id))
+            continue
+          }
+          // The page's own create (ConstellationPage.createItem): a season goal
+          // serves a year goal (goalId); a month goal serves a season goal
+          // (sourceId) and inherits that one's year goal.
+          const parentGoal = op.level === 'season' && op.parentId ? goalsById.get(op.parentId) : undefined
+          const parentTask = op.level === 'month' && op.parentId ? byId.get(op.parentId) : undefined
+          const context = (parentGoal ? parentGoal.context : parentTask?.context) ?? deps.defaultContext
+          const options = op.level === 'season'
+            ? { bucket: 'quarter' as const, seasonStart: start, ...(op.parentId ? { goalId: op.parentId } : {}) }
+            : { bucket: 'month' as const, monthStart: start, ...(op.parentId ? { sourceId: op.parentId } : {}), ...(parentTask?.goalId ? { goalId: parentTask.goalId } : {}) }
+          const id = await deps.addTask(op.title, undefined, { ...options, ...(context ? { context } : {}) })
+          if (!id) return fail()
+          ids.push(id)
+          undos.push(() => deps.deleteTask(id))
+          continue
+        }
+        case 'plan_carry': {
+          const to = localDay(op.toPeriodStart!)
+          if (isGoalItem(op)) {
+            // A year goal is carried as a copy that remembers where it came
+            // from (the year page's carry); the original stays as the record.
+            const g = goalsById.get(op.itemId!)!
+            const id = await deps.addGoal(op.newTitle?.trim() || g.name, {
+              year: to.getFullYear(), carriedFrom: g.id, areaId: g.areaId || null, notes: g.notes ?? null, strategy: g.strategy ?? null,
+              ...(g.context ? { context: g.context } : {}), ...(g.assignedToAll ? { assignedToAll: g.assignedToAll } : {}),
+            })
+            if (!id) return fail()
+            ids.push(id)
+            undos.push(() => deps.deleteGoal(id))
+            continue
+          }
+          const task = byId.get(op.itemId!)!
+          const level = op.level as 'month' | 'season'
+          // Undo states the commitments back as they were: the source reopens
+          // and the destination keepForward opened is removed. A goal row's
+          // open steps travel with it, so theirs are put back too.
+          const steps = task.isGoal ? stepsThatCarryForward(task.id, withSteps(deps.tasks), level) : []
+          const restore = [task, ...steps].map((t) => ({ id: t.id, commitments: commitmentSnapshot(t) }))
+          // Held before the write: keepForward can carry the task and then fail
+          // on a step, and the rollback must still put the task back.
+          undos.push(async () => {
+            let ok = true
+            for (const r of restore) if ((await deps.updateTask(r.id, { commitments: r.commitments })) === false) ok = false
+            return ok
+          })
+          const from = op.periodStart ? localDay(op.periodStart) : undefined
+          if (!(await deps.keepForward(task.id, level === 'month' ? { monthStart: to } : { seasonStart: to }, from))) return fail()
+          ids.push(task.id)
+          const newTitle = op.newTitle?.trim()
+          if (newTitle && newTitle !== task.title
+            && !(await step(() => deps.updateTask(task.id, { title: newTitle }), () => deps.updateTask(task.id, { title: task.title }), task.id))) return fail()
+          continue
+        }
+        case 'plan_let_go': {
+          if (isGoalItem(op)) {
+            const g = goalsById.get(op.itemId!)!
+            if (g.status === 'archived') { ids.push(g.id); continue }
+            if (!(await step(() => deps.updateGoal(g.id, { status: 'archived' }), () => deps.updateGoal(g.id, { status: g.status }), g.id))) return fail()
+            continue
+          }
+          const task = byId.get(op.itemId!)!
+          const before = commitmentSnapshot(task)
+          const level = op.level as 'month' | 'season'
+          if (!(await step(() => deps.dropCommitment(task.id, level, localDay(op.periodStart!)), () => deps.updateTask(task.id, { commitments: before }), task.id))) return fail()
+          continue
+        }
+        case 'plan_done': {
+          if (isGoalItem(op)) {
+            const g = goalsById.get(op.itemId!)!
+            if (g.status === 'completed') { ids.push(g.id); continue }
+            if (!(await step(() => deps.updateGoal(g.id, { status: 'completed' }), () => deps.updateGoal(g.id, { status: g.status }), g.id))) return fail()
+            continue
+          }
+          // A month or season goal is done like a tick.
+          const task = byId.get(op.itemId!)!
+          if (task.completed) { ids.push(task.id); continue }
+          if (!(await step(() => deps.completeTask(task.id), () => deps.reopenTask(task.id), task.id))) return fail()
           continue
         }
         default: {

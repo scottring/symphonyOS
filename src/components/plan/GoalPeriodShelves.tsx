@@ -31,7 +31,7 @@ import { routinePatterns } from '@/lib/planning/routinePatterns'
 import { readOpen, writeOpen } from './foldState'
 import { goalShelvesPeriod } from '@/lib/planning/goalShelves'
 import { PeriodShelves } from './PeriodShelves'
-import { taskRow } from './PeriodPlanPage'
+import { taskRow } from './taskRow'
 
 const NOUN: Record<PlanLevel, string> = { month: 'month', season: 'season', year: 'year' }
 

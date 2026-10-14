@@ -185,17 +185,6 @@
   .plan-canvas * { scroll-behavior: auto !important; }
 }
 
-/* One row anatomy: the ⋯ menu sits on the row's line, always visible. */
-.plan-item-menu { flex: none; display: inline-flex; align-items: center; margin-left: 2px; }
-.plan-item-menu > span > button, .plan-item-menu button[aria-haspopup] {
-  display: inline-grid; place-items: center; width: 28px; height: 28px; border-radius: var(--radius-full);
-  color: var(--color-neutral-500);
-}
-.plan-item-menu > span > button:hover, .plan-item-menu button[aria-haspopup]:hover { color: var(--color-neutral-800); background: var(--color-neutral-100); }
-.plan-item > .plan-move { display: block; position: relative; }
-@media (max-width: 767px) {
-  .plan-item-menu > span > button, .plan-item-menu button[aria-haspopup] { width: 44px; height: 44px; }
-}
 
 /* ---- Prepared to act: "What you'll need" ----------------------------------- */
 .prep { display: flex; flex-direction: column; gap: 6px; font-family: var(--font-family-sans); }
@@ -419,15 +408,62 @@
   .plan-list-foot > .plan-next { margin-left: 0; }
 }
 
-/* One-tap triage on a goal row (2026-10-13): Done · Someday · Delete, on hover
-   or keyboard focus where there is a mouse. Touch keeps them in the ⋯ menu. */
-.plan-item-quick { display: none; flex: none; align-items: center; gap: 2px; margin-left: 6px; }
-@media (hover: hover) and (pointer: fine) {
-  .plan-item:hover .plan-item-quick, .plan-item:focus-within .plan-item-quick { display: inline-flex; }
+/* ---- Talk-first (spec 2026-10-14, "The pages") ----------------------------
+   A list to look at: the header's one sentence, done folded into one line,
+   a pending change card drawn dashed (Week's look: teal arrives or changes
+   here, grey leaves), and the coming period opened beside while the card
+   adds to it. */
+.plan-sentence { margin: -6px 0 0; max-width: 46rem; font-family: var(--font-family-display); font-size: 19px; line-height: 1.35; color: var(--color-neutral-700); overflow-wrap: anywhere; }
+.plan-done-fold {
+  all: unset; box-sizing: border-box; cursor: pointer; display: flex; align-items: baseline; gap: 10px;
+  width: 100%; max-width: 100%; min-width: 0; margin-top: 8px; padding: 6px 2px;
+  font-family: var(--font-family-sans); font-size: 13px; color: var(--color-neutral-600);
 }
-.plan-quick {
-  all: unset; box-sizing: border-box; cursor: pointer; padding: 2px 8px; border-radius: var(--radius-sm);
-  font-family: var(--font-family-sans); font-size: 12px; font-weight: 500; color: var(--color-neutral-600); white-space: nowrap;
+.plan-done-fold-text { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.plan-done-fold-go { flex: none; }
+.plan-done-fold:focus-visible { outline: 2px solid var(--color-primary-600); outline-offset: 2px; border-radius: var(--radius-md); }
+.plan-goal-list > .plan-item.is-preview { border-radius: 6px; margin: 3px -8px; padding: 5px 8px; }
+.plan-goal-list > .plan-item.is-preview.is-proposed { border: 1.5px dashed #1b6a64; background: #eef6f3; color: #123f3b; }
+.plan-goal-list > .plan-item.is-preview.is-leaving { border: 1.5px dashed #9aa3a0; color: #7a7f7d; }
+.plan-item.is-preview.is-struck .plan-item-title { text-decoration: line-through; }
+.plan-item.is-preview.is-leaving .plan-item-title { color: #7a7f7d; }
+.plan-item.is-preview.is-leaving .plan-preview-note { color: #4a4f4d; }
+.plan-item.is-preview .plan-item-title { color: inherit; }
+.plan-preview-row .plan-item-title { cursor: default; }
+.plan-preview-note { padding: 0 6px; }
+.dark .plan-goal-list > .plan-item.is-preview.is-proposed { border-color: #6cc4b9; background: #182b29; color: #d7efe9; }
+.dark .plan-goal-list > .plan-item.is-preview.is-leaving { border-color: #5b6461; color: #a5aca9; }
+.dark .plan-item.is-preview.is-leaving .plan-item-title, .dark .plan-item.is-preview.is-leaving .plan-preview-note { color: #a5aca9; }
+.plan-next-list { margin-top: 18px; }
+.plan-next-list-title { margin: 0 0 4px; font-size: 11.5px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: #1b6a64; }
+.dark .plan-next-list-title { color: #6cc4b9; }
+@media (min-width: 1100px) {
+  /* The coming list sits beside this one; the level above, when open, after it. */
+  .plan-horizon-body.has-next { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); max-width: 72rem; }
+  .plan-horizon-body.has-next.has-above { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(13rem, 18rem); }
+  .plan-horizon-body.has-next > .plan-list { grid-row: 1; grid-column: 1; }
+  .plan-horizon-body.has-next > .plan-next-list { grid-row: 1; grid-column: 2; margin-top: 0; }
+  .plan-horizon-body.has-next > .plan-above-panel { grid-column: 3; }
 }
-.plan-quick:hover { background: var(--color-neutral-100); color: var(--color-neutral-900); }
-.plan-quick:focus-visible { outline: 2px solid var(--color-primary-600); outline-offset: 1px; }
+/* The task panel opened from a Month or Season page: what it serves. */
+.plan-panel-for { display: inline-flex; flex-wrap: wrap; align-items: baseline; gap: 2px 6px; margin: 4px 0 0; max-width: 100%; font-size: 13px; color: var(--color-neutral-700); }
+.plan-panel-for-kind { color: var(--color-neutral-400); }
+.plan-panel-for-title { overflow-wrap: anywhere; }
+/* Today's header line: the Month / Season / Year talk, on schedule
+   (PlanTalkChip.tsx). One quiet chip; wraps rather than scrolling sideways. */
+.plan-talk-chip { display: inline-flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; max-width: 100%; vertical-align: baseline; font-family: var(--font-family-sans); }
+.plan-talk-chip-go {
+  all: unset; box-sizing: border-box; cursor: pointer; max-width: 100%; padding: 3px 10px; border: 1px solid #cfe3dc; border-radius: 999px;
+  background: #eef6f3; color: #123f3b; font-size: 14px; line-height: 1.35; overflow-wrap: anywhere;
+}
+.plan-talk-chip-go:hover { border-color: #1b6a64; }
+.plan-talk-chip-quiet {
+  all: unset; box-sizing: border-box; cursor: pointer; font-size: 13px; color: var(--color-neutral-500);
+  text-decoration: underline; text-decoration-color: transparent; text-underline-offset: 3px;
+}
+.plan-talk-chip-quiet:hover { color: var(--color-neutral-800); text-decoration-color: currentColor; }
+.plan-talk-chip-go:focus-visible, .plan-talk-chip-quiet:focus-visible { outline: 2px solid var(--color-primary-600); outline-offset: 2px; border-radius: 999px; }
+.dark .plan-talk-chip-go { border-color: #2f5550; background: #182b29; color: #d7efe9; }
+@media (max-width: 767px) {
+  .plan-talk-chip-quiet { min-height: 32px; display: inline-flex; align-items: center; }
+}
