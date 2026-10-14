@@ -104,8 +104,19 @@ export function KioskTellSymphony({ onCommand, voice }: KioskTellSymphonyProps) 
       case 'question':
         if (!voice) { said = 'I can’t answer questions on this screen.'; break }
         setBusy(true)
-        said = await askWall(u.text, voice.snapshot()).finally(() => setBusy(false))
-        setAnswer(said)
+        {
+          const asked = await askWall(u.text, voice.snapshot()).catch(() => ({ answer: 'Sorry, I couldn’t answer that just now.' }))
+          if ('change' in asked) {
+            // Something the wall can't change yet: keep their words in the Inbox.
+            const r = await voice.save({ kind: 'inbox', text: asked.change }).finally(() => setBusy(false))
+            said = r.undo ? `I can’t change that from the wall yet. I saved it to your inbox: ${asked.change}` : r.said
+            if (r.undo) { const fn = r.undo; setUndo(() => fn) }
+          } else {
+            setBusy(false)
+            said = asked.answer
+            setAnswer(said)
+          }
+        }
         break
       default:
         said = u.text ? `Didn’t catch what to do with “${u.text}”. Try “add milk to the grocery list” or ask a question.` : 'Didn’t catch that.'
