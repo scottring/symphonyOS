@@ -19,7 +19,6 @@ import { cellsThrough, workedSolution, type Worked, type WorkCell } from '@/lib/
 import { MAX_TRIES, HINT_AFTER, type MathRow } from '@/lib/wall/math/mathProgress'
 import { shownWording } from '@/lib/wall/math/mathWording'
 import { Face } from './KioskHomeV1'
-import '@/styles/kiosk-math.css'
 
 // ─── What a kid has on the go, per problem (kept while the wall is open) ───
 
