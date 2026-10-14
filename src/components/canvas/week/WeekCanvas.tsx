@@ -75,7 +75,8 @@ export interface CanvasDay {
   /** "Sometime this weekend" — drawn in the weekend's first day. */
   sometime?: CanvasDayItem[]
   /** The day's dinner, quietly ("Dinner Salmon + potatoes"). */
-  dinners?: { id: string; label: string }[]
+  /** `href`: a planned dinner opens its recipe or the meal plan; else the event opens. */
+  dinners?: { id: string; label: string; href?: string }[]
   /** The day's forecast, small and muted in its header. */
   weather?: ReactNode
   /** The kids' specials, one chip each ("Ella · Library"). */
@@ -314,7 +315,9 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
         {items.length > 0 && <ul className="cw-rows wc-items" aria-label={`${day.date.toLocaleDateString('en-US', { weekday: 'long' })} entries`}>{items.map((it) => dayRow(it, day))}</ul>}
         {(day.dinners ?? []).length > 0 && (
           <p className="wc-dinner"><span className="wc-dinner-label">Dinner</span>{' '}
-            {day.dinners!.map((d, i) => <span key={d.id}>{i > 0 && ' · '}<button type="button" className="wc-rhythm-item" onClick={() => writers.open(d.id)}>{d.label}</button></span>)}
+            {day.dinners!.map((d, i) => <span key={d.id}>{i > 0 && ' · '}{d.href
+              ? <Link to={d.href} className="wc-rhythm-item">{d.label}</Link>
+              : <button type="button" className="wc-rhythm-item" onClick={() => writers.open(d.id)}>{d.label}</button>}</span>)}
           </p>
         )}
         {sometime.length > 0 && (

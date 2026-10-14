@@ -1,6 +1,9 @@
 import { describe, it, expect } from 'vitest'
 import {
   buildMealDayRecipes,
+  buildPlannedMeals,
+  plannedMealHref,
+  weekStartsForRange,
   localDateKey,
   mealDayLabel,
   neighborDays,
@@ -273,5 +276,35 @@ describe('an ad-hoc meal whose title carries the recipe link', () => {
       slot: 'dinner',
     })
     expect(days).toEqual([])
+  })
+})
+
+describe('planned dinners for Today and Week', () => {
+  const soup = recipe('r-soup', 'Butternut Squash Soup')
+  const plans = [plan({
+    weekStartIso: THIS_WEEK,
+    entries: [
+      entry({ id: 'e-wed', dayOfWeek: 3, recipeId: 'r-soup' }),
+      // Just a name, no recipe: still dinner. The recipe viewer skips these.
+      entry({ id: 'e-thu', dayOfWeek: 4, adHocTitle: 'Wednesday Wheelie’s Pizza' }),
+    ],
+  })]
+
+  it('shows every planned dinner, recipe or not', () => {
+    const meals = buildPlannedMeals({ plans, recipes: [soup], start: new Date(2026, 7, 2), days: 7, slot: 'dinner' })
+    expect(meals.get('2026-08-05')).toMatchObject({ title: 'Butternut Squash Soup', recipeId: 'r-soup' })
+    expect(meals.get('2026-08-06')).toMatchObject({ title: 'Wednesday Wheelie’s Pizza' })
+    expect(meals.get('2026-08-06')?.recipeId).toBeUndefined()
+    expect(meals.has('2026-08-07')).toBe(false)
+  })
+
+  it('opens the recipe, else the meal plan', () => {
+    expect(plannedMealHref({ recipeId: 'r-soup' })).toBe('/meals/cook/r-soup')
+    expect(plannedMealHref({})).toBe('/meals/plan')
+  })
+
+  it('reads every week a span touches', () => {
+    expect(weekStartsForRange(new Date(2026, 7, 7), 3)).toEqual(['2026-08-02', '2026-08-09'])
+    expect(weekStartsForRange(WED, 1)).toEqual(['2026-08-02'])
   })
 })

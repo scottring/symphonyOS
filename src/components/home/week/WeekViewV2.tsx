@@ -73,6 +73,8 @@ import { changePreview, withPreview } from '@/components/canvas/week/changePrevi
 import { WeekCanvas, type CanvasDay, type CanvasDayItem, type WeekCanvasWriters } from '@/components/canvas/week/WeekCanvas'
 import { DayWeather } from './WeekJournal'
 import { committedTo } from '@/lib/placement/model'
+import { usePlannedDinners } from '@/hooks/usePlannedDinners'
+import { plannedMealHref } from '@/lib/mealDayRecipes'
 
 /** Does this calendar event span the whole day? Explicit flags win; otherwise
  *  a full-day span (midnight start, 24h+ duration — how a holiday reads from
@@ -412,6 +414,9 @@ export function WeekViewV2(props: WeekViewV2Props) {
   // weekend" holds them (buildJournalDays).
   // The people filter applies here as on the days (final review, 2026-10-03).
   const weekendTasks = useMemo(() => drawnTasks.filter((t) => t.weekendStart && !t.scheduledFor && !t.completed), [drawnTasks])
+  // Each day's planned dinner (Scott, 2026-10-14): the meal plan the kitchen
+  // wall reads, in the day's dinner row where no "Dinner:" event is there.
+  const plannedDinners = usePlannedDinners(weekStart, dayCount)
   const journal = useMemo(() => buildJournalDays({
     weekStart, dayCount, tasks: drawnTasks, weekendTasks, userId, eventItems, events,
     dinnersByDay: extras.dinnersByDay, routineItems, instances: weekInstances, labelFor,
@@ -777,7 +782,11 @@ export function WeekViewV2(props: WeekViewV2Props) {
         specials,
         items: [...d.entries.filter((e) => e.kind !== 'event'), ...d.foldedRoutines].filter((e) => !(e.task && onShelf.has(e.task.id))).map(toItem),
         sometime: journalWeekend && journalWeekend.satIndex === i ? journalWeekend.sometime.map(toItem) : undefined,
-        dinners: d.dinners.map(({ event, label }) => ({ id: `event-${event.google_event_id || event.id}`, label })),
+        dinners: d.dinners.length
+          ? d.dinners.map(({ event, label }) => ({ id: `event-${event.google_event_id || event.id}`, label }))
+          : plannedDinners.has(d.key)
+            ? [{ id: `meal-${d.key}`, label: plannedDinners.get(d.key)!.title, href: plannedMealHref(plannedDinners.get(d.key)!) }]
+            : [],
         weather: forecast[d.key] ? <DayWeather weather={forecast[d.key]} narrow={false} /> : undefined,
         // The hours with nothing scheduled ("Calendar clear 10:30a–4:15p"),
         // not a promise of spare time: untimed tasks still want some.
@@ -789,7 +798,7 @@ export function WeekViewV2(props: WeekViewV2Props) {
       { label: 'Weekdays', items: rhythm.weekdays.map((r) => ({ title: r.title, openId: r.openId })) },
     ]
     return { days, lines, hasDaily }
-  }, [journalDays, journalWeekend, shelf, dailyShown, forecast])
+  }, [journalDays, journalWeekend, shelf, dailyShown, forecast, plannedDinners])
   // A pending change card, drawn dashed on its days; what it moves leaves its current spot.
   const { changeSet } = activity
   const preview = useMemo(() => changePreview(changeSet, tasks), [changeSet, tasks])

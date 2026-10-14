@@ -26,6 +26,62 @@ import {
   type Recipe,
 } from '@/types/meal-planner'
 
+/** The household's meal plans for these weeks (stored week_start strings),
+ *  their entries, and the recipes they use. Read-only: three RLS-scoped
+ *  queries, never creating a plan. */
+export async function fetchMealPlans(weeks: string[]): Promise<{ plans: MealDayPlan[]; recipes: Recipe[] } | { error: string }> {
+  // A thrown failure (offline, a dropped request) comes back as an error too,
+  // never as an unhandled rejection from a page's effect.
+  try { return await queryMealPlans(weeks) } catch (e) { return { error: e instanceof Error ? e.message : 'Meal plan didn’t load' } }
+}
+
+async function queryMealPlans(weeks: string[]): Promise<{ plans: MealDayPlan[]; recipes: Recipe[] } | { error: string }> {
+  const { data: planRows, error: planErr } = await supabase
+    .from('meal_plans').select('*')
+    .in('week_start', weeks)
+    .order('created_at', { ascending: true })
+  if (planErr) return { error: planErr.message }
+  const rows = (planRows ?? []) as DbMealPlan[]
+  if (rows.length === 0) return { plans: [], recipes: [] }
+
+  // Ordered by created_at because a day can hold more than one dinner entry
+  // (a main plus a side salad). Oldest-first makes the pick deterministic
+  // across loads, and seeding writes the main dish first.
+  const { data: entryRows, error: entryErr } = await supabase
+    .from('meal_plan_entries').select('*')
+    .in('meal_plan_id', rows.map((r) => r.id))
+    .order('created_at', { ascending: true })
+  if (entryErr) return { error: entryErr.message }
+
+  const entries = (entryRows ?? []) as DbMealPlanEntry[]
+  const byPlan = new Map<string, DbMealPlanEntry[]>()
+  for (const e of entries) {
+    const list = byPlan.get(e.meal_plan_id)
+    if (list) list.push(e)
+    else byPlan.set(e.meal_plan_id, [e])
+  }
+
+  const recipeIds = [...new Set(entries.map((e) => e.recipe_id).filter((id): id is string => !!id))]
+  let recipes: Recipe[] = []
+  if (recipeIds.length > 0) {
+    const { data: recipeRows, error: recipeErr } = await supabase
+      .from('recipes').select('*').in('id', recipeIds)
+    if (recipeErr) return { error: recipeErr.message }
+    recipes = ((recipeRows ?? []) as DbRecipe[]).map(dbRecipeToRecipe)
+  }
+
+  // week_start is carried through as the stored string, never as a Date —
+  // `new Date('2026-08-02')` is UTC midnight and reads back as Aug 1 here.
+  return {
+    plans: rows.map((r) => ({
+      weekStartIso: r.week_start,
+      entries: (byPlan.get(r.id) ?? []).map(dbMealPlanEntryToMealPlanEntry),
+      createdAt: new Date(r.created_at),
+    })),
+    recipes,
+  }
+}
+
 interface UseMealDayRecipesResult {
   days: MealDayRecipe[]
   loading: boolean
@@ -49,63 +105,16 @@ export function useMealDayRecipes(
   useEffect(() => {
     if (!enabled) return
     let cancelled = false
-    const weeks = weekStartsKey.split(',')
-
     async function load() {
       setLoading(true)
       setError(null)
-
-      const { data: planRows, error: planErr } = await supabase
-        .from('meal_plans').select('*')
-        .in('week_start', weeks)
-        .order('created_at', { ascending: true })
+      const r = await fetchMealPlans(weekStartsKey.split(','))
       if (cancelled) return
-      if (planErr) { setError(planErr.message); setLoading(false); return }
-
-      const rows = (planRows ?? []) as DbMealPlan[]
-      if (rows.length === 0) {
-        setPlans([]); setRecipes([]); setLoading(false); return
-      }
-
-      // Ordered by created_at because a day can hold more than one dinner entry
-      // (a main plus a side salad). Oldest-first makes the pick deterministic
-      // across loads, and seeding writes the main dish first.
-      const { data: entryRows, error: entryErr } = await supabase
-        .from('meal_plan_entries').select('*')
-        .in('meal_plan_id', rows.map((r) => r.id))
-        .order('created_at', { ascending: true })
-      if (cancelled) return
-      if (entryErr) { setError(entryErr.message); setLoading(false); return }
-
-      const entries = (entryRows ?? []) as DbMealPlanEntry[]
-      const byPlan = new Map<string, DbMealPlanEntry[]>()
-      for (const e of entries) {
-        const list = byPlan.get(e.meal_plan_id)
-        if (list) list.push(e)
-        else byPlan.set(e.meal_plan_id, [e])
-      }
-
-      const recipeIds = [...new Set(entries.map((e) => e.recipe_id).filter((id): id is string => !!id))]
-      let loadedRecipes: Recipe[] = []
-      if (recipeIds.length > 0) {
-        const { data: recipeRows, error: recipeErr } = await supabase
-          .from('recipes').select('*').in('id', recipeIds)
-        if (cancelled) return
-        if (recipeErr) { setError(recipeErr.message); setLoading(false); return }
-        loadedRecipes = ((recipeRows ?? []) as DbRecipe[]).map(dbRecipeToRecipe)
-      }
-
-      // week_start is carried through as the stored string, never as a Date —
-      // `new Date('2026-08-02')` is UTC midnight and reads back as Aug 1 here.
-      setPlans(rows.map((r) => ({
-        weekStartIso: r.week_start,
-        entries: (byPlan.get(r.id) ?? []).map(dbMealPlanEntryToMealPlanEntry),
-        createdAt: new Date(r.created_at),
-      })))
-      setRecipes(loadedRecipes)
+      if ('error' in r) { setError(r.error); setLoading(false); return }
+      setPlans(r.plans)
+      setRecipes(r.recipes)
       setLoading(false)
     }
-
     void load()
     return () => { cancelled = true }
   }, [enabled, weekStartsKey])

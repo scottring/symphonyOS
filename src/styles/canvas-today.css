@@ -353,6 +353,9 @@
 }
 .today-sentence-link:hover { text-decoration-color: currentColor; }
 .today-sentence-meta { font-family: var(--font-family-sans); font-size: 13px; color: var(--color-neutral-500); white-space: nowrap; }
+/* Tonight's dinner in the day's line: quiet, but a link to the recipe or plan. */
+.today-dinner { color: inherit; text-decoration: underline; text-decoration-color: var(--color-neutral-300); text-underline-offset: 2px; }
+.today-dinner:hover { color: var(--color-neutral-800); text-decoration-color: currentColor; }
 .today-walk { margin: 4px 0 10px; }
 
 /* To talk about: one quiet line of chips under For today. */

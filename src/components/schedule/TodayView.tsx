@@ -51,7 +51,9 @@ import { planDropHandlers } from '@/lib/planning/planDrag'
 import { useActionableInstances } from '@/hooks/useActionableInstances'
 import { findTaskById } from '@/lib/findTaskById'
 import { showToast } from '@/hooks/useToast'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
+import { usePlannedDinners } from '@/hooks/usePlannedDinners'
+import { plannedMealHref } from '@/lib/mealDayRecipes'
 import { useDiscussionInbox } from '@/hooks/useDiscussionInbox'
 import { WaitingOnYouBanner } from '@/components/discussion/WaitingOnYouBanner'
 import { useGoogleCalendar } from '@/hooks/useGoogleCalendar'
@@ -378,6 +380,24 @@ export function TodayView({
   // No count on Today (Scott, 2026-10-06, "Today, calmer"): the week's
   // number places the day; how much is left to place is the column's job.
   const weekLine = `Week ${weekNo}`
+  // Tonight's dinner beside the week and weather (Scott, 2026-10-14): the
+  // meal plan's, the same the kitchen wall shows; else a "Dinner: …"
+  // calendar event. It opens the recipe, or the meal plan.
+  const plannedDinners = usePlannedDinners(viewedDate, 1)
+  const planned = plannedDinners.get(localYmd(viewedDate))
+  const viewedKey = localYmd(viewedDate)
+  const calendarDinner = planned ? null : events.find((e) => {
+    const start = e.start_time ?? e.startTime
+    return /^dinner\s*[—:–-]\s*/i.test(e.title ?? '') && !!start && localYmd(new Date(start)) === viewedKey
+  })
+  const dinner = planned
+    ? { title: planned.title, href: plannedMealHref(planned) }
+    : calendarDinner ? { title: (calendarDinner.title ?? '').replace(/^dinner\s*[—:–-]\s*/i, '').trim(), href: '/meals/plan' } : null
+  const dinnerLink = dinner && (
+    <Link to={dinner.href} className="today-dinner" title={dinner.href.startsWith('/meals/cook') ? 'Open the recipe' : 'Open the meal plan'}>
+      Dinner · {dinner.title}
+    </Link>
+  )
   // On the week's last day the column also shows the week still ahead
   // (walkthrough 2026-10-02, #24/#18). Same rows the Week page lists, through
   // the same filters this page applies: `tasks` arrives layer-filtered, and
@@ -1106,8 +1126,8 @@ export function TodayView({
         // Desktop folds the control row into the masthead (layout system,
         // 2026-10-01): the view controls sit at the title's right.
         subline={foldedControls
-          ? <>{headerLine}{headerLine && ' '}<span className="today-sentence-meta">{weekLine}{data.isToday && <> · <WeatherChip now={nowForDisplay} /></>}</span></>
-          : headerLine ?? undefined}
+          ? <>{headerLine}{headerLine && ' '}<span className="today-sentence-meta">{weekLine}{dinnerLink && <> · {dinnerLink}</>}{data.isToday && <> · <WeatherChip now={nowForDisplay} /></>}</span></>
+          : dinnerLink ? <>{headerLine}{headerLine && ' '}<span className="today-sentence-meta">{dinnerLink}</span></> : headerLine ?? undefined}
         // Domain chooser + assistant toggle, in the card's corner.
         // Desktop: the page's controls sit in the control row below, as on
         // every horizon (Scott, 2026-09-30). The masthead keeps them only where

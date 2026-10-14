@@ -491,3 +491,17 @@ describe('what Symphony points at', () => {
     expect(screen.getByText('Book the cabin').closest('li')).not.toHaveClass('is-pointed')
   })
 })
+
+describe('the dinner row', () => {
+  it('a planned dinner opens its recipe; a calendar dinner opens its event', async () => {
+    const { MemoryRouter } = await import('react-router-dom')
+    const w = writers()
+    const withDinners = days().map((d, i) => (i === 0
+      ? { ...d, dinners: [{ id: 'meal-a', label: 'Butternut Squash Soup', href: '/meals/cook/r-soup' }] }
+      : i === 1 ? { ...d, dinners: [{ id: 'event-g1', label: 'Tacos' }] } : d))
+    render(<MemoryRouter><WeekCanvas weekStart={weekStart} days={withDinners} shelf={shelf()} routinesToPlace={[]} isCurrent writers={w} /></MemoryRouter>)
+    expect(screen.getByRole('link', { name: 'Butternut Squash Soup' })).toHaveAttribute('href', '/meals/cook/r-soup')
+    fireEvent.click(screen.getByRole('button', { name: 'Tacos' }))
+    expect(w.open).toHaveBeenCalledWith('event-g1')
+  })
+})

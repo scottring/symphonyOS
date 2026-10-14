@@ -151,6 +151,71 @@ export function buildMealDayRecipes(params: {
   return out
 }
 
+/** One day's planned meal for a slot, whatever it is — a recipe, a link, or
+ *  just a name ("Tacos", "Wednesday Wheelie's Pizza"). Unlike the recipe
+ *  viewer's list, nothing is skipped: Today and Week show what's planned. */
+export interface PlannedMeal {
+  dateKey: string
+  title: string
+  recipeId?: string
+  sourceUrl?: string
+}
+
+/** The week-start (Sunday) ISO dates whose plans cover `days` days from `start`. */
+export function weekStartsForRange(start: Date, days: number): string[] {
+  const keys = new Set<string>()
+  for (let i = 0; i < Math.max(1, days); i++) {
+    const d = new Date(start)
+    d.setDate(d.getDate() + i)
+    keys.add(toIsoDate(sundayOfWeek(d)))
+  }
+  return [...keys].sort()
+}
+
+/** Each day's planned meal in a slot, for `days` days from `start`, keyed by local date. */
+export function buildPlannedMeals(params: {
+  plans: MealDayPlan[]
+  recipes: Recipe[]
+  start: Date
+  days: number
+  slot: MealSlot
+}): Map<string, PlannedMeal> {
+  const { plans, recipes, start, days, slot } = params
+  const recipesById = new Map(recipes.map((r) => [r.id, r]))
+  const planByWeek = new Map<string, MealDayPlan>()
+  for (const plan of [...plans].sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime())) {
+    if (!planByWeek.has(plan.weekStartIso)) planByWeek.set(plan.weekStartIso, plan)
+  }
+  const out = new Map<string, PlannedMeal>()
+  for (let i = 0; i < Math.max(1, days); i++) {
+    const date = new Date(start)
+    date.setDate(date.getDate() + i)
+    date.setHours(0, 0, 0, 0)
+    const plan = planByWeek.get(toIsoDate(sundayOfWeek(date)))
+    if (!plan) continue
+    const entry = pickEntry(plan.entries, date.getDay(), slot)
+    if (!entry) continue
+    const entriesById = new Map(plan.entries.map((e) => [e.id, e]))
+    const title = resolveMealTitle(entry, entriesById, recipesById).trim()
+    if (!title) continue
+    const bodyEntry = bodyEntryFor(entry, entriesById)
+    const recipe = bodyEntry?.recipeId ? recipesById.get(bodyEntry.recipeId) : undefined
+    const key = localDateKey(date)
+    out.set(key, {
+      dateKey: key,
+      title,
+      recipeId: recipe?.id,
+      sourceUrl: recipe?.sourceUrl ?? adHocRecipeUrl(entry, entriesById) ?? undefined,
+    })
+  }
+  return out
+}
+
+/** Where a planned meal opens: its recipe to cook from, else the meal plan. */
+export function plannedMealHref(meal: Pick<PlannedMeal, 'recipeId'>): string {
+  return meal.recipeId ? `/meals/cook/${meal.recipeId}` : '/meals/plan'
+}
+
 /** The day immediately before/after `dateKey` in the list. `null` at the ends —
  *  which is how the viewer knows to hide an arrow. */
 export function neighborDays(
