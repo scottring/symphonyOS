@@ -31,6 +31,9 @@ import { DomainSwitcher } from '@/components/domain/DomainSwitcher';
 import { HeaderPeopleFilter } from '@/components/layout/HeaderPeopleFilter';
 import { Toast, ConfirmationToast, ToastLiveRegion } from '@/components/toast';
 import { ChatPanel } from '@/components/chat/ChatPanel';
+import { applyChangeSet } from '@/lib/canvas/applyChangeSet';
+import type { ChangeSet } from '@/lib/canvas/changeCard';
+import { readCadenceConfig, weekStartAnchor } from '@/lib/cadence/config';
 import { NotesProvider } from '@/contexts/NotesContext';
 import { ListsProvider } from '@/contexts/ListsContext';
 import { PinsProvider } from '@/contexts/PinsContext';
@@ -193,7 +196,7 @@ function ShellLayoutInner({ children }: Props) {
 
   const references = useReferenceLists();
 
-  const { tasks, refetch, deleteTask, updateTask } = useSupabaseTasks();
+  const { tasks, refetch, deleteTask, updateTask, addTask } = useSupabaseTasks();
   const { goals, deleteGoal, updateGoal } = useGoals();
   // Held so routine writes from a conversation are seen (and undoable) too.
   const { routines: canvasRoutines, deleteRoutine, updateRoutine, refetch: refetchRoutines } = useRoutines();
@@ -206,6 +209,7 @@ function ShellLayoutInner({ children }: Props) {
     tool: (name) => canvasRef.current?.toolUsed(name),
     toolResult: (result) => canvasRef.current?.toolResult(result),
     proposal: (items) => canvasRef.current?.addProposals(items),
+    changeSet: (set) => canvasRef.current?.setChangeSet(set),
     end: (turn) => canvasRef.current?.turnEnded(turn),
   }), []);
   const [planningPeople] = useAssigneeFilter();
@@ -355,13 +359,18 @@ function ShellLayoutInner({ children }: Props) {
     deleteRoutine,
     updateRoutine: updateRoutine as unknown as (id: string, u: Partial<import('@/types/routine').Routine>) => Promise<unknown>,
   }), [deleteTask, updateTask, deleteGoal, updateGoal, deleteRoutine, updateRoutine]);
+  const applyChanges = useCallback((set: ChangeSet) => applyChangeSet(set, {
+    tasks, updateTask, deleteTask,
+    addTask: (title, when, options) => addTask(title, undefined, undefined, when, options),
+    weekStart: weekStartAnchor(new Date(), readCadenceConfig().weekStartsOn),
+  }), [tasks, updateTask, deleteTask, addTask]);
   const canvasRefetch = useCallback(() => { window.dispatchEvent(new Event('symphony-plan-updated')); return Promise.all([refetch(), refetchRoutines()]); }, [refetch, refetchRoutines]);
   const showStrip = conversationStripPath(location.pathname);
   const stripVoice = { available: voiceEnabled, active: voice.active, status: voice.status, start: () => { void voice.start(); }, stop: voice.stop, mute: voice.mute, heard: voice.heard, reply: voice.reply };
   const openConversation = () => { if (isMobile) setPhoneChatOpen(true); else showPane('ai'); };
 
   return (
-    <CanvasActivityProvider snapshot={canvasSnapshot} writers={canvasWriters} refetch={canvasRefetch} retryTurn={() => { void assistant.retryLast(); }}>
+    <CanvasActivityProvider snapshot={canvasSnapshot} writers={canvasWriters} refetch={canvasRefetch} applyChanges={applyChanges} retryTurn={() => { void assistant.retryLast(); }}>
     <CanvasBridge onActivity={setCanvasActivity} />
     <DesktopControlsContext.Provider value={desktopControls}>
     <DesktopLeadContext.Provider value={desktopLead}>
