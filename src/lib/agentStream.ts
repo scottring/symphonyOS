@@ -123,6 +123,11 @@ export interface StreamHandlers {
   taskContext?: AssistantTaskContext
   /** When set, the whole conversation is scoped to this planning session. */
   sessionContext?: AssistantSessionContext
+  /** 'wall': the kitchen wall — the agent reads only the family layer and
+   *  proposes every change (supabase/functions/symphony-agent/wallMode.ts). */
+  surface?: 'wall'
+  /** Another deployed copy of the agent function (e.g. a test copy). */
+  functionName?: string
 }
 
 export type AgentContentBlock =
@@ -165,7 +170,7 @@ export async function streamSymphonyAgent(
   }
 
   const res = await fetch(
-    `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/${agentFunctionName()}`,
+    `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/${handlers.functionName && /^[a-z0-9-]+$/.test(handlers.functionName) ? handlers.functionName : agentFunctionName()}`,
     {
       method: 'POST',
       headers: {
@@ -182,6 +187,7 @@ export async function streamSymphonyAgent(
         ...(handlers.taskContext ? { taskContext: handlers.taskContext } : {}),
         ...(handlers.sessionContext ? { sessionContext: handlers.sessionContext } : {}),
         ...(handlers.turnId ? { turnId: handlers.turnId } : {}),
+        ...(handlers.surface ? { surface: handlers.surface } : {}),
       }),
     },
   )

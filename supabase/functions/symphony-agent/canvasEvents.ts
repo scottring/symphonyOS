@@ -23,8 +23,8 @@ export const IDEMPOTENT_CREATES = new Set(['symphony_create_plan_item', 'symphon
 
 export interface ToolOutcome { type: 'tool_result'; name: string; ok: boolean; ids?: string[]; error?: string }
 
-export function toolOutcome(name: string, result: string): ToolOutcome | null {
-  if (!CANVAS_WRITE_TOOLS.has(name)) return null
+export function toolOutcome(name: string, result: string, writes: ReadonlySet<string> = CANVAS_WRITE_TOOLS): ToolOutcome | null {
+  if (!writes.has(name)) return null
   const text = (result ?? '').trim()
   if (/^error\b/i.test(text)) return { type: 'tool_result', name, ok: false, error: text.slice(0, 200) }
   let parsed: unknown
