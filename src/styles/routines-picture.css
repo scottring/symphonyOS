@@ -115,3 +115,10 @@ button.rp-open[draggable="true"] { cursor: grab; }
 .rp-empty { margin-top: 12px; }
 .rp-empty-title { margin: 0 0 4px; font-family: var(--font-family-display); font-size: 21px; font-weight: 500; color: var(--color-neutral-900); }
 .rp-empty-text { margin: 0 0 6px; font-family: var(--font-family-sans); font-size: 14px; color: var(--color-neutral-700); }
+
+/* Phones: the shell floats the area filter at the top right on pages that
+ * have no phone title row (Week and Month have one); start below it so it
+ * never covers "Our rhythm · week of …". */
+@media (max-width: 767px) {
+  .rp { padding-top: 44px; }
+}
