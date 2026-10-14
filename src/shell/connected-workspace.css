@@ -14,6 +14,8 @@
 .connected-workspace .oj-add{border-radius:20px}
 .workspace-voice{padding:12px 18px;border-bottom:1px solid var(--color-neutral-200);font-size:13px}.workspace-voice>div:first-child{display:flex;gap:10px;align-items:center;flex-wrap:wrap}.workspace-voice button{border:1px solid var(--color-neutral-300);border-radius:18px;padding:8px 12px;min-height:40px}.workspace-voice button:first-child{background:var(--color-primary-700);color:white}.workspace-voice-transcript{max-height:150px;overflow:auto}.workspace-voice-transcript p{margin-top:10px}.workspace-voice-transcript small{display:block;opacity:.65}.workspace-voice [role=alert]{margin-top:10px}
 .workspace-voice-floating{position:fixed;bottom:calc(80px + env(safe-area-inset-bottom,0px));left:50%;transform:translateX(-50%);z-index:60;display:flex;gap:12px;align-items:center;padding:10px 16px;border-radius:24px;background:var(--color-bg-elevated);border:1px solid var(--color-primary-300);box-shadow:0 3px 20px #0002;font-size:13px;white-space:nowrap}.workspace-voice-floating button{min-height:40px;text-decoration:underline}
+/* Your words as you say them, then Symphony's reply: one line, the latest end showing. */
+.workspace-voice-floating-words{max-width:min(52vw,520px);overflow:hidden;text-overflow:ellipsis}
 /* The assistant narrows the main pane; reserve actual space for utilities
    instead of centering the horizon rail over an undersized grid track. */
 .connected-workspace .page-navigation:has(> .page-navigation-mid){grid-template-columns:auto minmax(0,1fr) auto;gap:8px}

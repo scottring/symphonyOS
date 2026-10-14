@@ -440,6 +440,12 @@ describe('Capture and the Today pin from every desktop page', () => {
     expect(screen.getByTestId('quick-capture')).toHaveAttribute('data-open', 'true')
   })
 
+  it('⌘⇧K is Talk to Symphony, not the add box', () => {
+    renderAt('/week')
+    fireEvent.keyDown(window, { key: 'K', metaKey: true, shiftKey: true })
+    expect(screen.getByTestId('quick-capture')).not.toHaveAttribute('data-open', 'true')
+  })
+
   it('the Planning panel opens beside any page from its labelled button, and closes the same way', () => {
     renderAt('/notes')
     const toggle = screen.getByRole('button', { name: 'Shelves' })

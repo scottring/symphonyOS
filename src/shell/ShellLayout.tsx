@@ -264,7 +264,8 @@ function ShellLayoutInner({ children }: Props) {
     const onKeyDown = (e: KeyboardEvent) => {
       if (!(e.metaKey || e.ctrlKey)) return;
       const key = e.key.toLowerCase();
-      if (key === 'k' || key === '/') {
+      // ⌘⇧K is Talk to Symphony (below), not the box.
+      if ((key === 'k' && !e.shiftKey) || key === '/') {
         e.preventDefault();
         setQuickAddOpen((o) => !o);
 
@@ -291,6 +292,37 @@ function ShellLayoutInner({ children }: Props) {
   const voiceAccess = useWorkspaceVoiceAccess(user?.id ?? null, connectedWorkspace);
   const voiceEnabled = connectedWorkspace && voiceAccess;
   const voice = useWorkspaceVoice(screenContext, assistant.sendMessage, (url) => navigate(import.meta.env.DEV && new URLSearchParams(location.search).get('voice') === '1' ? `${url}&voice=1` : url), voiceEnabled, user?.id ?? null);
+  // Talk to Symphony from anywhere (Scott, 2026-10-14: one front door — ⌘K
+  // adds, searches, asks, or talks). Starting closes the box; the conversation
+  // carries on in the bar at the page's foot. Already talking: your turn.
+  const startTalking = useCallback(() => {
+    if (!voiceEnabled) return;
+    setQuickAddOpen(false);
+    stayInSymphony();
+    if (voice.active) voice.talk();
+    else void voice.start();
+  }, [voiceEnabled, voice, stayInSymphony]);
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.shiftKey && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        startTalking();
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [startTalking]);
+  // Phone: a long press on the dock's + talks instead of adding.
+  const addPress = useRef<{ timer: ReturnType<typeof setTimeout> | null; fired: boolean }>({ timer: null, fired: false });
+  const addPressHandlers = voiceEnabled ? {
+    onPointerDown: () => {
+      addPress.current.fired = false;
+      addPress.current.timer = setTimeout(() => { addPress.current.fired = true; startTalking(); }, 500);
+    },
+    onPointerUp: () => { if (addPress.current.timer) clearTimeout(addPress.current.timer); },
+    onPointerLeave: () => { if (addPress.current.timer) clearTimeout(addPress.current.timer); },
+    onContextMenu: (e: React.MouseEvent) => e.preventDefault(),
+  } : {};
   const pageGuide = usePageGuide();
   const sendConversation = (text: string, attachment?: Parameters<typeof assistant.sendMessage>[1]) => {
     // What Symphony showed belongs to the last exchange.
@@ -418,7 +450,7 @@ function ShellLayoutInner({ children }: Props) {
       {/* "New version available — reload" banner: shows when a newer build
           deployed while this tab stayed open (stale-tab guard). */}
       <NewVersionBanner />
-      {voice.active && !dockedBar && !(isMobile ? phoneChatOpen : aiOpen && pane === 'ai') && <div className="workspace-voice-floating" role="status"><span>{voice.turn === 'listening' ? 'Listening — take your time' : 'Voice on'}</span>{voice.status === 'live' && (voice.turn === 'listening' ? <button onClick={voice.done}>Done</button> : <button onClick={voice.talk}>Talk</button>)}<button onClick={voice.stop}>End voice</button></div>}
+      {voice.active && !dockedBar && !(isMobile ? phoneChatOpen : aiOpen && pane === 'ai') && <div className="workspace-voice-floating" role="status"><span className="workspace-voice-floating-words">{lastWords(voice.turn === 'listening' ? (voice.heard || 'Listening — take your time') : voice.reply || voice.heard || 'Voice on')}</span>{voice.status === 'live' && (voice.turn === 'listening' ? <button onClick={voice.done}>Done</button> : <button onClick={voice.talk}>Talk</button>)}<button onClick={voice.stop}>End voice</button></div>}
 
       {/* Content frame — uses <div> (not <main>) because individual apps render
           their own <main>. Avoids invalid nested-main HTML. */}
@@ -578,6 +610,7 @@ function ShellLayoutInner({ children }: Props) {
           onClose={closeQuickAdd}
           resultsSlot={(query, close) => <OmniboxResults query={query} onNavigate={() => { stayInSymphony(); close() }} />}
           onAskSymphony={(text) => { stayInSymphony(); openAssistant({ message: text, autoSend: true }) }}
+          onTalk={voiceEnabled ? startTalking : undefined}
           onAddToScratchpad={user ? async (text, kind) => addScratchpadNote(user.id, text, kind, await ownMemberId(user.id)) : undefined}
         />
       )}
@@ -655,7 +688,9 @@ function ShellLayoutInner({ children }: Props) {
               <span>Today</span>
             </button>
             <div className="phone-dock-add-slot">
-              <button type="button" className="phone-dock-add" onClick={() => setQuickAddOpen(true)} aria-label="Add">
+              <button type="button" className="phone-dock-add" {...addPressHandlers}
+                onClick={() => { if (addPress.current.fired) { addPress.current.fired = false; return; } setQuickAddOpen(true); }}
+                aria-label={voiceEnabled ? 'Add (press and hold to talk to Symphony)' : 'Add'}>
                 <Plus aria-hidden="true" />
               </button>
             </div>
@@ -738,6 +773,9 @@ function CanvasBridge({ onActivity }: { onActivity: (activity: CanvasActivity) =
   useLayoutEffect(() => { onActivity(activity); }, [onActivity, activity]);
   return null;
 }
+
+/** One line of a long sentence: its latest words (what was just said). */
+const lastWords = (text: string, max = 80) => (text.length > max ? `…${text.slice(-max).replace(/^\S*\s/, '')}` : text);
 
 export function ShellLayout({ children }: Props) {
   const { user } = useAuth();

@@ -5,7 +5,8 @@ import { DOMAINS } from '@/lib/domains'
 import { domainHotkeyLabel } from '@/lib/domainHotkey'
 
 const SHORTCUTS: [keys: string, action: string][] = [
-  ['⌘K', 'Add, search, or ask Symphony'],
+  ['⌘K', 'Add, search, ask, or talk to Symphony'],
+  ['⌘⇧K', 'Talk to Symphony'],
   ['⌘/', 'Also opens add and search'],
   ...DOMAINS.map((d, i): [string, string] => [domainHotkeyLabel(i), `While adding: file under ${d.label}`]),
   ['Enter', 'While adding: add what you typed'],
@@ -60,7 +61,7 @@ export function HelpDialogs({ open, onClose, returnFocus }: {
         <li><strong>Today</strong> holds what you have chosen to do today, with what you need to do it.</li>
         <li><strong>Week and Month</strong> open their pages, or pin their lists beside the page you are on.</li>
         <li><strong>Inbox</strong> keeps captures until you decide where they belong.</li>
-        <li><strong>⌘K</strong> adds, searches, or asks Symphony from anywhere.</li>
+        <li><strong>⌘K</strong> adds, searches, or asks Symphony from anywhere; its <strong>Talk</strong> button (or <strong>⌘⇧K</strong>) starts a conversation.</li>
       </ul>
       <p>
         Questions or problems: <a href="mailto:hello@symphony-os.com">hello@symphony-os.com</a>.

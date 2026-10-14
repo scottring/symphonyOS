@@ -781,3 +781,17 @@ describe('Destination line', () => {
     })
   })
 })
+
+describe('Talk to Symphony from ⌘K', () => {
+  it('with live voice, the box’s mic is Talk and starts a conversation', () => {
+    const onTalk = vi.fn()
+    render(<QuickCapture onAdd={vi.fn()} isOpen showFab={false} onTalk={onTalk} />)
+    expect(screen.queryByTitle('Dictate into this field')).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Talk to Symphony' }))
+    expect(onTalk).toHaveBeenCalled()
+  })
+  it('without it, the mic still dictates into the field', () => {
+    render(<QuickCapture onAdd={vi.fn()} isOpen showFab={false} />)
+    expect(screen.queryByRole('button', { name: 'Talk to Symphony' })).not.toBeInTheDocument()
+  })
+})

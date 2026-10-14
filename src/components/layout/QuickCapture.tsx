@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useMemo, type ReactNode } from 'react'
-import { Sparkles, Camera, NotebookPen, StickyNote } from 'lucide-react'
+import { Sparkles, Camera, NotebookPen, StickyNote, Mic } from 'lucide-react'
 import { usePhotoCapture } from '@/hooks/usePhotoCapture'
 import { CameraCaptureModal } from '@/components/capture/CameraCaptureModal'
 import { hasParsedFields, allDayFromParse } from '@/lib/quickInputParser'
@@ -48,6 +48,9 @@ interface QuickCaptureProps {
   onOpen?: () => void
   onClose?: () => void
   showFab?: boolean
+  /** Talk to Symphony (live voice): the box's mic starts a conversation,
+   *  which continues in the conversation bar. Without it, the mic dictates. */
+  onTalk?: () => void
   /** Unibox: render inline search results for the current text (mounted only
    *  while open, so data subscriptions stay lazy). `close` dismisses the modal. */
   resultsSlot?: (query: string, close: () => void) => ReactNode
@@ -82,6 +85,7 @@ export function QuickCapture({
   onOpen,
   onClose,
   showFab = true,
+  onTalk,
   resultsSlot,
   onAskSymphony,
   eventCalendarName,
@@ -473,15 +477,31 @@ export function QuickCapture({
                   onKeyDown={handleKeyDown}
                   aria-label="Add a task, note or event"
                   placeholder='Try "call the vet tomorrow 2pm"'
-                  className="w-full pl-4 pr-14 py-3 rounded-xl border border-neutral-200 bg-neutral-50
+                  className={`w-full pl-4 ${onTalk ? 'pr-24' : 'pr-14'} py-3 rounded-xl border border-neutral-200 bg-neutral-50
                              text-neutral-800 placeholder:text-neutral-400 text-lg md:text-2xl font-display
-                             focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                             focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent`}
                 />
-                <DictationMicButton
-                  onTranscript={(text) => setTitle((prev) => (prev ? prev.trimEnd() + ' ' : '') + text)}
-                  title="Dictate into this field"
-                  className="absolute right-3 top-1/2 -translate-y-1/2 w-9 h-9"
-                />
+                {onTalk ? (
+                  // One front door (Scott, 2026-10-14): ⌘K adds, searches, asks — or
+                  // talks. The conversation carries on in the bar at the page's foot.
+                  <button
+                    type="button"
+                    onClick={onTalk}
+                    title="Talk to Symphony (⌘⇧K)"
+                    aria-label="Talk to Symphony"
+                    className="absolute right-2 top-1/2 -translate-y-1/2 h-9 px-3 rounded-full inline-flex items-center gap-1.5
+                               text-sm font-medium text-primary-700 bg-primary-50 hover:bg-primary-100 active:bg-primary-200
+                               focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  >
+                    <Mic className="w-4 h-4" aria-hidden="true" />Talk
+                  </button>
+                ) : (
+                  <DictationMicButton
+                    onTranscript={(text) => setTitle((prev) => (prev ? prev.trimEnd() + ' ' : '') + text)}
+                    title="Dictate into this field"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 w-9 h-9"
+                  />
+                )}
               </div>
 
               {/* Syntax teaching hint — shown until the parser has something to preview */}
