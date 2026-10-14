@@ -63,14 +63,20 @@ vi.mock('@/hooks/useSupabaseTasks', () => ({ useSupabaseTasks: () => ({
 const aiState = vi.hoisted(() => ({ hidden: true }))
 vi.mock('@/hooks/useScratchpadHidden', () => ({ useScratchpadHidden: () => ({ hidden: aiState.hidden, setHidden: vi.fn() }) }))
 vi.mock('@/hooks/useRoutines', () => ({ useRoutines: () => ({ routines: [], deleteRoutine: vi.fn(), updateRoutine: vi.fn(), refetch: vi.fn(), addRoutine: vi.fn() }) }))
-const assistantState = vi.hoisted(() => ({ observer: null as null | import('@/hooks/useSymphonyAssistant').AssistantTurnObserver }))
+const assistantState = vi.hoisted(() => ({ observer: null as null | import('@/hooks/useSymphonyAssistant').AssistantTurnObserver, sendMessage: vi.fn() }))
 vi.mock('@/hooks/useSymphonyAssistant', () => ({
   useSymphonyAssistant: (options?: { turnObserver?: import('@/hooks/useSymphonyAssistant').AssistantTurnObserver }) => (assistantState.observer = options?.turnObserver ?? null, {
-    messages: [], loading: false, error: null, sendMessage: vi.fn(), resetSession: vi.fn(),
+    messages: [], loading: false, error: null, sendMessage: assistantState.sendMessage, resetSession: vi.fn(),
     toolActivity: [], sessions: [], sessionsLoading: false, loadSession: vi.fn(),
     deleteSession: vi.fn(), activeSessionId: null,
   }),
 }))
+const voiceState = vi.hoisted(() => ({ access: false, active: false, sendText: vi.fn(() => true), stop: vi.fn() }))
+vi.mock('@/hooks/useWorkspaceVoiceAccess', () => ({ useWorkspaceVoiceAccess: () => voiceState.access }))
+vi.mock('@/hooks/useWorkspaceVoice', () => ({ useWorkspaceVoice: () => ({
+  active: voiceState.active, status: voiceState.active ? 'live' : 'idle', turn: 'off', heard: '', reply: '',
+  start: vi.fn(), stop: voiceState.stop, mute: vi.fn(), talk: vi.fn(), done: vi.fn(), sendText: voiceState.sendText,
+}) }))
 vi.mock('./useShellChrome', () => ({
   useShellChrome: () => ({
     onQuickAdd: vi.fn(), onQuickAddRich: vi.fn(), onQuickAddNote: vi.fn(),
@@ -556,5 +562,22 @@ describe('Approve puts an undated add in the planned week', () => {
     act(() => assistantState.observer!.changeSet?.({ key: 'w1', title: '1 change', weekStart: '2099-10-17', ops: [{ key: 'w1:0', op: 'add', title: 'Book the vet' }] }))
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Approve all 1' })) })
     expect(tasksState.addTask).toHaveBeenCalledWith('Book the vet', undefined, undefined, undefined, { bucket: 'week', weekStart: new Date(2099, 9, 17) })
+  })
+})
+
+describe('typing while voice is on (2026-10-14, Wednesday Wheelie\'s)', () => {
+  it('sends the typed words to the agent, never into the voice session', () => {
+    mobileState.isMobile = false
+    voiceState.access = true
+    voiceState.active = true
+    assistantState.sendMessage.mockClear()
+    voiceState.sendText.mockClear()
+    renderAt('/week')
+    fireEvent.change(screen.getByLabelText('Message Symphony'), { target: { value: 'Add Wednesday Wheelies tonight 5:30–7' } })
+    fireEvent.submit(screen.getByLabelText('Message Symphony').closest('form')!)
+    expect(assistantState.sendMessage).toHaveBeenCalledWith('Add Wednesday Wheelies tonight 5:30–7', undefined)
+    expect(voiceState.sendText).not.toHaveBeenCalled()
+    voiceState.active = false
+    voiceState.access = false
   })
 })
