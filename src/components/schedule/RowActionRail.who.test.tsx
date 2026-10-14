@@ -8,7 +8,7 @@ const members = [{ id: 'sk', name: 'Scott', initials: 'SK', color: 'blue' }, { i
 const item = { id: 'task-1', type: 'task', title: 'Food prep', startTime: null, endTime: null, completed: false } as unknown as TimelineItem
 const renderRail = (assignedToAll: string[]) => render(
   <ScheduleActionsProvider value={{ projects: [], contacts: [], familyMembers: members, lists: [], projectsMap: new Map() } as unknown as ScheduleActionsValue}>
-    <RowActionRail item={item} variant="full" onSelect={vi.fn()} onAssignAll={vi.fn()} familyMembers={members}
+    <RowActionRail item={item} onAssignAll={vi.fn()} familyMembers={members}
       assignedToAll={assignedToAll} assigned={assignedToAll.length > 0} />
   </ScheduleActionsProvider>,
 )

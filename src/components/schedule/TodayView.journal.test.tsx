@@ -95,9 +95,10 @@ describe('Carried over', () => {
     expect(screen.queryByRole('button', { name: /Review unfinished work/ })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Review' })).not.toBeInTheDocument()
     expect(screen.queryByText(/Carried over · \d/)).toBeNull()
-    // The door, off the page: the ⋯ menu.
+    // No door in the ⋯ menu either: leftovers are named by "Plan my day"
+    // and end in one change card (Today, trimmed, 2026-10-14).
     fireEvent.click(screen.getAllByRole('button', { name: /more controls/i })[0])
-    expect(screen.getByRole('button', { name: 'Review carried-over work' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Review carried-over work' })).not.toBeInTheDocument()
   })
 
   it('offers no review when nothing was left behind', () => {

@@ -11,7 +11,7 @@ import { DesktopControlsContext } from '@/components/layout/DesktopNavigation'
  * NOT wired to the route yet — that happens in R4.
  */
 import { useContext, createElement, useMemo, useCallback, useRef, useState, useEffect, useLayoutEffect } from 'react'
-import type { Task, GroupMemberRef } from '@/types/task'
+import type { Task } from '@/types/task'
 import type { Project } from '@/types/project'
 import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
 import type { Routine, ActionableInstance } from '@/types/actionable'
@@ -26,21 +26,13 @@ import { parseRoutineTimelineId } from '@/lib/today/doseExpansion'
 import { readCollapsed, setCollapsed, onCollapsedChange, sectionKey } from '@/lib/today/sectionCollapse'
 import { useMobile } from '@/hooks/useMobile'
 import { useTodayData } from '@/hooks/useTodayData'
-import { mergeAssignees } from '@/lib/today/bulkAssign'
-import { partitionSelection } from '@/lib/today/timelineKey'
 import { useScheduleActionsContext } from '@/contexts/ScheduleActionsContext'
-import type { ProactiveSuggestion } from '@/types/proactiveSuggestion'
-import { useUnpromptedSuggestions, type UnpromptedItem } from '@/hooks/useUnpromptedSuggestions'
-import { suggestionIsForFreeEvent } from '@/lib/today/eventFree'
-import { UnpromptedLines } from '@/components/assistant/UnpromptedLines'
-import { resolveSuggestionAction, revealItemId } from '@/lib/assistant/suggestionAction'
-import { useSystemHealth, getHealthTextClasses } from '@/hooks/useSystemHealth'
 import { useTimelineInsert } from '@/hooks/useTimelineInsert'
 import { useDomain } from '@/hooks/useDomain'
 import { MobilePlanControls } from '@/components/layout/PlanNavigation'
 import { PhoneFilterControl } from '@/components/layout/PhoneFilterControl'
 
-import { Eye, EyeOff, Binoculars, Printer, GripVertical, Moon, Sparkles, ChevronDown, ChevronRight, Plus, History } from 'lucide-react'
+import { Eye, EyeOff, Printer, GripVertical, ChevronDown, ChevronRight, Plus } from 'lucide-react'
 import { splitTodayJournal, splitCompletedFocus } from '@/lib/today/journalSplit'
 import { panelActionsFor } from '@/components/reference/DayPlanPanel'
 import { useColumnsFitWindow } from '@/hooks/useColumnsFitWindow'
@@ -49,10 +41,9 @@ import { CalendarReconnectBanner } from '@/components/home/CalendarReconnectBann
 import { TodayComingUp } from './TodayComingUp'
 import { ServesLine } from './ServesLine'
 import { parentLinkOf } from '@/lib/planning/parentLink'
-import { alreadyPlaced, nextWeekEntries } from '@/lib/today/dayPlan'
+import { nextWeekEntries } from '@/lib/today/dayPlan'
 import { unhomedRoutines } from '@/lib/week/unhomedRoutines'
 import { useWeekInstances } from '@/components/home/week/useWeekInstances'
-import { useDayChoices } from '@/hooks/useDayChoices'
 import { useReferenceLists } from '@/components/reference/ReferenceListsContext'
 import { makePlanActions } from '@/lib/planning/planActions'
 import { localYmd } from '@/lib/cadence/config'
@@ -60,7 +51,6 @@ import { planDropHandlers } from '@/lib/planning/planDrag'
 import { useActionableInstances } from '@/hooks/useActionableInstances'
 import { findTaskById } from '@/lib/findTaskById'
 import { showToast } from '@/hooks/useToast'
-import { TaskTimingMenu } from '@/components/plan/TaskTimingMenu'
 import { useNavigate } from 'react-router-dom'
 import { useGoogleCalendar } from '@/hooks/useGoogleCalendar'
 import { ALL_LAYERS } from '@/lib/domains'
@@ -76,22 +66,16 @@ import { ForTodayDropZone } from './TodayDropZones'
 import { resolveDrop, writeMoveAndRegisterUndo, SCALE_DROP_ID, type DropIntent } from '@/lib/today/todayDrop'
 import { useCalendarPermissions } from '@/hooks/useCalendarPermissions'
 import { selectUpNext, formatUpNextStatus } from '@/lib/today/upNext'
-import { forwardLook, forwardLine, comingUp } from '@/lib/today/forwardLook'
+import { comingUp } from '@/lib/today/forwardLook'
 import { NeedsYourOK } from './NeedsYourOK'
-import { ClarityCurtain } from '@/components/clarity/ClarityCurtain'
-import { computeClaritySteps, type ClarityStepId } from '@/lib/clarity/claritySteps'
-import { selectOverdue } from '@/lib/today/taskPools'
 import { selectHorizonPool } from '@/lib/today/horizons'
 import { monthStartOf } from '@/lib/planning/periodPlacement'
 import { doableBy } from '@/lib/planning/poolViews'
 import { useFamilyMembers } from '@/hooks/useFamilyMembers'
 import { placementFate } from '@/lib/planning/lineage'
-import { useSuggestionsEnabled } from '@/lib/assistant/suggestionsPref'
 import { makeAssigneeFilter } from '@/lib/today/assigneeFilter'
 import { weekStartAnchor, readCadenceConfig } from '@/lib/cadence/config'
-import { resolveRoutine, isDraggableRoutine } from '@/lib/routineUtils'
 import { TodayOverflowMenu } from './TodayOverflowMenu'
-import { ReviewDrawer, type ReviewMode } from './ReviewDrawer'
 import { HorizonPoolDropdown } from './HorizonPoolDropdown'
 import { DayNavCluster } from './DayNavCluster'
 import { MastheadCard } from '@/components/layout/MastheadCard'
@@ -104,21 +88,18 @@ import { weekOfYear } from '@/lib/planning/horizonNumerals'
 import { WeatherChip } from './WeatherChip'
 import { parseSpecials } from '@/lib/today/specials'
 import { DEFAULT_START } from '@/lib/today/dayScale'
-import { TodayBacklogFooter } from './TodayBacklogFooter'
-import { EmailReviewSheet } from './EmailReviewSheet'
 import { useUnreviewedCaptures } from '@/hooks/useUnreviewedCaptures'
-import { InboxUndoToast } from './InboxUndoToast'
-import { BulkActionToolbar } from './BulkActionToolbar'
 import { TimelineNoteComposer } from './TimelineNoteComposer'
 
 import { discussionItems } from '@/lib/discussionItems'
-import { DiscussionBadge } from './DiscussionBadge'
 import { PrintableDayList } from './PrintableDayList'
-import { DuplicateSweep, DuplicateSweepTrigger } from './DuplicateSweep'
-import { useDuplicateSweep } from '@/hooks/useDuplicateSweep'
 import { LoadFailedNotice } from '@/components/common/LoadFailedNotice'
-import { ProposalPreview, ProposalTrigger } from './ProposalPreview'
-import { useTodayProposal } from '@/hooks/useTodayProposal'
+import { daySentence, type DaySentenceItem } from '@/lib/today/daySentence'
+import { effectiveStartTime } from '@/lib/timeUtils'
+import { useConversationWalk } from '@/components/canvas/conversationWalk'
+import { useAssistantLauncher } from '@/contexts/AssistantLaunchContext'
+import { useCanvasActivity } from '@/contexts/CanvasActivityContext'
+import { todayPreview, markForRow, type TodayPreview } from './todayPreview'
 import { readHideRoutines, writeHideRoutines, onHideRoutinesChange } from '@/lib/hideRoutinesSignal'
 import { useShareToFamilyNudges } from '@/lib/today/shareNudges'
 import { PLANNING_PAGE_CLASS } from '@/components/layout/pageLayout'
@@ -200,6 +181,11 @@ const FOCUS_SECTIONS: DaySection[] = ['allday', 'unscheduled']
 /** The timed day, drawn to scale (TodayDayScale). */
 const TIMED_SECTIONS: DaySection[] = ['earlyMorning', 'morning', 'afternoon', 'evening', 'night']
 
+/** The bar's walk on today's page (spec 2026-10-14): plan in the morning,
+ *  review from 4 pm. Each ends in one change card. */
+const PLAN_WALK = { label: 'Plan my day', message: 'Plan my day.' }
+const REVIEW_WALK = { label: 'Review my day', message: 'Review my day.' }
+
 
 const HIDE_EARLIER_KEY = 'symphony-today-hide-earlier'
 function readHideEarlier(): boolean {
@@ -215,7 +201,6 @@ export function TodayView({
   events,
   routines = [],
   allRoutines,
-  densityTasks,
   dateInstances = [],
   projects = [],
   selectedItemId,
@@ -253,9 +238,8 @@ export function TodayView({
   // section loop into TodaySectionList, which reads the same context itself.
   const {
     onUpdateTask,
-    onGroupTasks, onGroupItems,
-    onAssignTaskAll, onAssignEventAll,
-    onPushRoutine, onPushEvent, onUpdateEventContext,
+    onGroupItems,
+    onPushRoutine,
     onNotify,
     contactsMap, familyMembers = [],
   } = ctx
@@ -264,77 +248,11 @@ export function TodayView({
   // ListsContext.updateItem early-returns on any row that isn't in the open
   // list — and no list is ever open on Today.
 
-  // ── Bulk multi-select (hover checkbox on any row → bottom action bar) ──────
-  const [selectedKeys, setSelectedKeys] = useState<Set<string>>(() => new Set())
   // Raw task id of a group created by drag, held open on its name field.
+  // (Bulk select, the review drawer, the duplicate sweep and the proposed
+  // order left with "Today, trimmed", 2026-10-14: several things at once are
+  // said to Symphony and end in one change card.)
   const [renamingGroupId, setRenamingGroupId] = useState<string | null>(null)
-  // Review drawer — one body, two entries: the backlog footer's "Review"
-  // opens the morning flavor; the ⋯ menu's "End of day review" the evening.
-  const [reviewMode, setReviewMode] = useState<ReviewMode | null>(null)
-  const clearBulkSelection = useCallback(() => setSelectedKeys(new Set()), [])
-  const toggleBulkSelect = useCallback((key: string) => {
-    setSelectedKeys((prev) => {
-      const next = new Set(prev)
-      if (next.has(key)) {
-        next.delete(key)
-      } else {
-        next.add(key)
-      }
-      return next
-    })
-  }, [])
-
-  const handleBulkDefer = useCallback((target: 'week' | 'month' | 'quarter') => {
-    const { taskIds, eventIds, routineIds } = partitionSelection(selectedKeys)
-    for (const id of taskIds) onUpdateTask?.(id, { bucket: target, scheduledFor: undefined })
-    const skipped = eventIds.length + routineIds.length
-    if (skipped > 0) {
-      onNotify?.(taskIds.length > 0
-        ? `Deferred ${taskIds.length} — ${skipped} non-task item(s) skipped`
-        : `Nothing deferred — ${skipped} non-task item(s) can't be deferred`)
-    }
-    clearBulkSelection()
-  }, [selectedKeys, onUpdateTask, onNotify, clearBulkSelection])
-
-  const handleBulkSchedule = useCallback((date: Date, isAllDay: boolean) => {
-    const { taskIds, eventIds, routineIds } = partitionSelection(selectedKeys)
-    for (const id of taskIds) onUpdateTask?.(id, { bucket: 'timed', scheduledFor: date, isAllDay })
-    for (const id of routineIds) onPushRoutine?.(id, date)
-    for (const id of eventIds) onPushEvent?.(id, date)
-    clearBulkSelection()
-  }, [selectedKeys, onUpdateTask, onPushRoutine, onPushEvent, clearBulkSelection])
-
-  const handleBulkSetContext = useCallback((context: Task['context']) => {
-    const { taskIds, eventIds, routineIds } = partitionSelection(selectedKeys)
-    for (const id of taskIds) onUpdateTask?.(id, { context })
-    for (const id of eventIds) onUpdateEventContext?.(id, context ?? null)
-    if (routineIds.length > 0) onNotify?.(`Context set — ${routineIds.length} routine(s) skipped (edit the routine to change every day)`)
-    clearBulkSelection()
-  }, [selectedKeys, onUpdateTask, onUpdateEventContext, onNotify, clearBulkSelection])
-
-  // Additive assign: union the chosen members into each task's existing
-  // assignees (so "assign these to Iris" adds Iris without dropping Scott),
-  // matching the user's "if she isn't already assigned" intent.
-  const handleBulkAssign = useCallback((memberIds: string[]) => {
-    const { taskIds, eventIds, routineIds } = partitionSelection(selectedKeys)
-    for (const id of taskIds) {
-      onAssignTaskAll?.(id, mergeAssignees(tasks.find((x) => x.id === id), memberIds))
-    }
-    for (const id of eventIds) onAssignEventAll?.(id, memberIds)
-    if (routineIds.length > 0) onNotify?.(`Assigned — ${routineIds.length} routine(s) skipped`)
-    clearBulkSelection()
-  }, [selectedKeys, tasks, onAssignTaskAll, onAssignEventAll, onNotify, clearBulkSelection])
-
-  const handleBulkGroup = useCallback(async (name: string, date: Date, isAllDay: boolean) => {
-    const { taskIds, eventIds, routineIds } = partitionSelection(selectedKeys)
-    const memberRefs: GroupMemberRef[] = [
-      ...eventIds.map((id) => ({ type: 'event' as const, id })),
-      ...routineIds.map((id) => ({ type: 'routine' as const, id })),
-    ]
-    if (onGroupItems) await onGroupItems(taskIds, memberRefs, name, date, isAllDay)
-    else if (onGroupTasks) await onGroupTasks(taskIds, name, date, isAllDay)
-    clearBulkSelection()
-  }, [selectedKeys, onGroupItems, onGroupTasks, clearBulkSelection])
 
   // ── Hide-routines toggle (localStorage parity) ────────────────────────────────
   const [hideRoutines, setHideRoutines] = useState<boolean>(() => readHideRoutines())
@@ -381,17 +299,6 @@ export function TodayView({
   // Every instance touching this week: a flexible routine already placed on
   // one of its days has a home for the week and leaves the sheet's To plan.
   const weekInstances = useWeekInstances(currentWeekStart, 7)
-  /**
-   * What each day of the VIEWED week already holds, for the timing control's
-   * day tiles. Anchored to the week in view, never to today's: a row opened
-   * on a November day offers November days (Scott, 2026-09-24). The week's
-   * instances are already here, so the hook does not fetch them again.
-   */
-  const dayChoices = useDayChoices({
-    windowStart: currentWeekStart, dayCount: 7,
-    tasks: densityTasks ?? tasks, userId: userId ?? null, routines: allRoutines ?? routines,
-    instances: weekInstances,
-  })
   const todayInput = useMemo(() => ({
     tasks,
     events,
@@ -464,9 +371,6 @@ export function TodayView({
   useEffect(() => {
     if (references?.pins.some((p) => p.kind === 'today')) references.unpin('today')
   }, [references])
-  // The column's own rule (DayPlanPanel's "Still to place"), so the count
-  // and the list beside it agree.
-  const stillToPlace = data.dayPlan.chooserTasks.filter((e) => !e.completed && !alreadyPlaced(e, viewedDate)).length
   // No count on Today (Scott, 2026-10-06, "Today, calmer"): the week's
   // number places the day; how much is left to place is the column's job.
   const weekLine = `Week ${weekNo}`
@@ -507,10 +411,6 @@ export function TodayView({
   // In the desktop Shell the control row folds into the masthead; phones and
   // standalone mounts keep it as its own row.
   const foldedControls = !!desktopControls && !isMobile
-  // In the desktop shell the day's review closes the day's list (Scott,
-  // 2026-10-02 — it was the footer's), so the ⋯ menu drops its copy there
-  // (phones keep the menu entry).
-  const reviewAtEnd = foldedControls
   const poolMatchMine = useMemo(
     () => (assignedTo: string | null | undefined, assignedToAll?: readonly string[] | null) =>
       !meId || doableBy({ assignedTo: assignedTo ?? undefined, assignedToAll: assignedToAll ? [...assignedToAll] : undefined }, meId),
@@ -538,62 +438,21 @@ export function TodayView({
   const upNextId = upNext?.item.id
   const upNextStatus = upNext ? formatUpNextStatus(upNext) : undefined
 
-  // ── Backlog footer gate. The footer shows only a "Review" link now, but it
-  // still has to know whether either backlog population is non-empty, so the
-  // carried-over count survives as the gate. Incomplete count with a total
-  // fallback, same readout the old collapsed strip showed.
-  const carriedCount = useMemo(() => {
-    const incomplete = data.overdueTasks.filter((t) => !t.completed).length
-    return incomplete || data.overdueTasks.length
-  }, [data.overdueTasks])
-  const hasBacklog = carriedCount > 0 || data.attentionItems.length > 0
-
-  // ── "New from email": the quiet door, and the sheet behind it ──────────────
-  // The census gates the footer link — Today never shows a count, so the link's
-  // presence IS the signal. Closing the sheet stamps reviewed_at on everything
-  // it showed, so the door closes for good.
+  // ── New from email: told in the header sentence ("2 new from email").
+  // School mail is auto-placed, so a wrong guess can sit on a day unannounced;
+  // the review sheet used to catch it. Following the line asks Symphony what
+  // came in and where it landed (any fix ends in the change card), and stamps
+  // reviewed_at on what it counted so the line goes once it is asked about.
   const { captures: emailCaptures, markReviewed } = useUnreviewedCaptures()
-  const [emailReviewOpen, setEmailReviewOpen] = useState(false)
-  const closeEmailReview = useCallback(() => {
-    setEmailReviewOpen(false)
+  const { openAssistant } = useAssistantLauncher()
+  const askAboutEmail = useCallback(() => {
+    const subjects = emailCaptures.map((c) => c.subject?.trim()).filter(Boolean).map((t) => `“${t}”`).join(', ')
     void markReviewed(emailCaptures.map((c) => c.id))
-  }, [emailCaptures, markReviewed])
-
-  // Dismissing a wrongly-extracted row. The DELETE is deferred to the end of
-  // the undo window rather than fired immediately: deleteTask cascades to the
-  // row's per-person subtasks, and nothing on the schedule-actions surface can
-  // recreate a parent WITH its children — so an immediate delete would make
-  // "Undo" a promise this page cannot keep. Holding the row for ten seconds
-  // costs nothing and makes the undo real. Newest wins: a second dismiss
-  // commits the one already pending.
-  const pendingDismissRef = useRef<string | null>(null)
-  const [pendingDismiss, setPendingDismiss] = useState<{ id: string; title: string } | null>(null)
-  // The delete is reached through a ref rather than closed over. `commitDismiss`
-  // used to depend on `ctx`, which re-identifies on every task change — and
-  // InboxUndoToast restarts its timer whenever its props change, so on a live
-  // page the timer that OWNS the commit was perpetually reset and the delete
-  // could never fire.
-  const deleteTaskRef = useRef(ctx.onDeleteTask)
-  useEffect(() => { deleteTaskRef.current = ctx.onDeleteTask }, [ctx.onDeleteTask])
-  const commitDismiss = useCallback(() => {
-    if (pendingDismissRef.current) deleteTaskRef.current?.(pendingDismissRef.current)
-    pendingDismissRef.current = null
-    setPendingDismiss(null)
-  }, [])
-  // And nothing at all committed on unmount: navigating away inside the window
-  // left the row un-deleted for good while the sheet had already reported it
-  // gone. No setState here — the component is on its way out.
-  useEffect(() => () => {
-    if (pendingDismissRef.current) deleteTaskRef.current?.(pendingDismissRef.current)
-    pendingDismissRef.current = null
-  }, [])
-  const handleDismissEmailRow = useCallback((taskId: string) => {
-    const task = tasks.find((t) => t.id === taskId)
-    if (!task) return
-    if (pendingDismissRef.current && pendingDismissRef.current !== taskId) commitDismiss()
-    pendingDismissRef.current = taskId
-    setPendingDismiss({ id: taskId, title: task.title })
-  }, [tasks, commitDismiss])
+    openAssistant({
+      message: `What came in from email${subjects ? ` (${subjects})` : ''}? Tell me what you added and where it landed.`,
+      autoSend: true, stayOnPage: true,
+    })
+  }, [emailCaptures, markReviewed, openAssistant])
 
   // Which sections the user has folded shut. Persisted; Unscheduled starts
   // collapsed because it holds the untimed-routine slab. A section whose
@@ -621,93 +480,6 @@ export function TodayView({
       })
     }
   }, [])
-
-  // ── Unprompted tier ────────────────────────────────────────────────────────
-  // Live urgency facts, resolved from the tasks/events this view already has, so
-  // the policy scores against the real clock rather than the engine's 6h-old hint.
-  const resolveUnpromptedFacts = useCallback((s: ProactiveSuggestion) => {
-    if (s.entityType === 'task') {
-      const t = tasks.find(x => x.id === s.entityId)
-      if (!t) return null
-      return {
-        dueAt: t.scheduledFor ? new Date(t.scheduledFor).toISOString() : null,
-        waitingSince: t.isWaiting && t.waitingSince
-          ? new Date(t.waitingSince).toISOString()
-          : null,
-        deferCount: t.deferCount ?? null,
-      }
-    }
-    if (s.entityType === 'calendar_event') {
-      const e = events.find(x => x.id === s.entityId)
-      if (!e) return null
-      return { eventStartAt: e.allDay ? null : (e.startTime ?? null) }
-    }
-    return null
-  }, [tasks, events])
-
-  const [suggestionsEnabled, setSuggestionsEnabled] = useSuggestionsEnabled()
-
-  const unprompted = useUnpromptedSuggestions('today', {
-    resolveFacts: resolveUnpromptedFacts,
-    // Off means off, including the synthetic planning-cadence nudge, which is
-    // generated client-side and would otherwise survive the toggle.
-    // Planning-cadence suggestions retired with the 2026-08 analog-planning
-    // pivot (the guided sessions they pointed at are gone).
-    includeCadence: false,
-  })
-
-  // A "free" event carries no prep/handoff expectation — its suggestion chips
-  // (e.g. "leave by…") never surface, even if the engine generated one before
-  // the flag was set.
-  const visibleUnpromptedItems = useMemo(() => {
-    return unprompted.items.filter(
-      (item) => !suggestionIsForFreeEvent(item.suggestion, events, ctx.eventNotesMap),
-    )
-  }, [unprompted.items, events, ctx.eventNotesMap])
-
-  // `?why=1` renders each suggestion's policy verdict — the thing that makes a
-  // silent surface debuggable instead of mystical.
-  const showWhyDebug = useMemo(() => {
-    if (typeof window === 'undefined') return false
-    return new URLSearchParams(window.location.search).get('why') === '1'
-  }, [])
-
-  const handleUnpromptedAct = useCallback((item: UnpromptedItem) => {
-    const action = resolveSuggestionAction(item.suggestion)
-    switch (action.kind) {
-      case 'plan_session':
-        navigate(`/today?plan=${action.horizon}`)
-        return
-      case 'call':
-        window.open(`tel:${action.phoneNumber}`, '_self')
-        break
-      case 'text':
-        window.open(`sms:${action.phoneNumber}`, '_self')
-        break
-      case 'email':
-        window.open(`mailto:${action.email}`, '_blank')
-        break
-      case 'open_link':
-        window.open(action.url, '_blank')
-        break
-      case 'navigate':
-        window.open(
-          action.placeId
-            ? `https://www.google.com/maps/place/?q=place_id:${action.placeId}`
-            : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(action.location)}`,
-          '_blank',
-        )
-        break
-      case 'reveal': {
-        // Must be the prefixed composite id Today selects by — a bare entity
-        // uuid matches no row, so the panel silently never opens.
-        const itemId = revealItemId(item.suggestion)
-        if (itemId) onSelectItem?.(itemId)
-        return
-      }
-    }
-    void unprompted.act(item.suggestion.id)
-  }, [navigate, unprompted, onSelectItem])
 
   // Timeline insert points: radial wheel pick → note composer (task/event/routine
   // are handled inline by TimelineInsertPoint via onCreate)
@@ -738,70 +510,8 @@ export function TodayView({
   const onLinkNote = onLinkNoteProp ?? ctx.onLinkNote
   const timelineNotes = timelineNotesProp ?? ctx.timelineNotes
 
+  // Open talk-abouts (flagged tasks): one quiet line under For today.
   const discussion = discussionItems(tasks)
-
-  // ── Clarity binoculars + remediation popover (overflow menu) ────────────────
-  // Interactive Clarity readout restored to the Today header (a static status
-  // glance also lives in the sidebar). Trigger is a binoculars icon with an
-  // explanatory hover tooltip; clicking opens ClarityIndicator's popover.
-  // The binoculars are color-coded by clarity level (green = excellent/good,
-  // amber = fair, orange = needs attention) using the same health computation.
-  const clarityHealth = useSystemHealth({ tasks, projects })
-  const clarityColorClass = getHealthTextClasses(clarityHealth.healthColor)
-  // Clarity curtain — a full-page "where you are → your next move" guide. The
-  // binoculars pull it down. Signals are a calm read of the current state.
-  const [clarityOpen, setClarityOpen] = useState(false)
-  const clarityResult = useMemo(() => {
-    const matchAll = makeAssigneeFilter([])
-    const inboxCount = tasks.filter((t) => !t.completed && t.bucket === 'inbox').length
-    const overdueCount = selectOverdue(tasks, true, matchAll).length
-    const weekCount = selectHorizonPool(tasks, 'week', matchAll, currentWeekStart).length
-    // One resolver call per routine replaces the hand-rolled domain filter +
-    // date filter + `type !== 'daily'` everyday-approximation + resting check.
-    // `routines` is no longer domain-pre-filtered upstream (HomeView passes it
-    // raw so the resolver can apply rung 4 itself) — rung 4 (domain) is what
-    // used to need the separate filterRoutinesForLayers call. `hideRoutines:
-    // true` sweeps ambient everyday routines (rung 7's fuller everyday-ness
-    // test is a deliberate widening of the old `type !== 'daily'` check — see
-    // the task report for the resulting count delta), but it deliberately does
-    // NOT sweep a pinned or dosed one (isPinnedToTimeline): a tracked
-    // obligation with no time slot yet — e.g. a med-tracker dose — is still
-    // placeable work, same as every other surface that honors the pin escape.
-    // Do not special-case it back out.
-    const untimedRoutines = routines.filter(
-      (r) =>
-        isDraggableRoutine(r) &&
-        resolveRoutine(r, {
-          date: viewedDate,
-          prefs: { hideRoutines: true, layers },
-        }).shows,
-    ).length
-    const isEvening = !!data.isToday && new Date().getHours() >= 17
-    return computeClaritySteps({ inboxCount, overdueCount, placeableCount: weekCount + untimedRoutines, isEvening })
-  }, [tasks, routines, viewedDate, data.isToday, currentWeekStart, layers])
-
-  const onClarityStep = useCallback((id: ClarityStepId) => {
-    if (id === 'inbox') navigate('/inbox')
-    else if (id === 'carried') navigate('/inbox')
-    // 'plan' and 'review' simply close — the guided daily-prep session they
-    // launched left with the 2026-08 analog-planning pivot.
-  }, [navigate])
-
-  // In the overflow menu it reads like every other row: icon + label. The
-  // icon keeps its health colour; the bare icon with only a hover tooltip
-  // read as an unlabelled button (demo walkthrough 2026-09-04).
-  const clarityTrigger = (
-    <button
-      type="button"
-      onClick={() => setClarityOpen(true)}
-      title="Where you are, and the next move to get clear"
-      aria-label="Clarity — where you are and your next move"
-      className="flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-[15px] text-neutral-600 transition-all hover:bg-neutral-100"
-    >
-      <Binoculars className={`w-5 h-5 ${clarityColorClass}`} />
-      <span>Clarity</span>
-    </button>
-  )
 
   // ── Tasks map for parent task lookup ─────────────────────────────────────────
   const tasksMap = useMemo(() => {
@@ -825,15 +535,6 @@ export function TodayView({
     return m
   }, [shareNudges])
 
-  // Duplicate sweep — on demand; a passive count is the only unsolicited part.
-  const sweep = useDuplicateSweep(data.sectionsOrder, data.grouped, ctx.onDeleteTask)
-
-  // Suggested order + grouping — a preview you accept, never an auto-apply.
-  // Applying reuses the same writers the drag gestures use.
-  const proposal = useTodayProposal(data.sectionsOrder, data.grouped, projects, viewedDate, {
-    onGroupItems, onReorderTasks: ctx.onReorderTasks,
-  })
-
   const nowForDisplay = useMemo(() => new Date(nowTick), [nowTick])
   // "Hide earlier hours" on today's day column: it then opens an hour
   // before now. Offered once there are at least two spent hours to fold.
@@ -846,56 +547,35 @@ export function TodayView({
     [viewedDate],
   )
 
-  const nextTimeLabel = upNext?.item.allDay
-    ? ''
-    : upNext?.item.startTime
-      ? upNext.item.startTime.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
-      : upNext ? 'Today' : ''
-  // upNext only resolves against the wall clock, so it is empty on every day
-  // but today. Looking at Saturday, the honest opener is what Saturday starts
-  // with — saying "nothing left with a time on it" over a 7:00 AM list is the
-  // kind of small lie that teaches people not to read the header.
-  const dayItems = useMemo(
-    () => data.sectionsOrder.flatMap((section) => data.grouped[section] ?? []),
-    [data.sectionsOrder, data.grouped],
+  // ── The header sentence (daySentence.ts): the day said back from rules,
+  // with new email captures folded in. Empty says nothing; a load says so.
+  const sentenceItems = useMemo(() => TIMED_SECTIONS.flatMap((section) => data.grouped[section] ?? []).flatMap((item): DaySentenceItem[] => {
+    const start = item.isSubtask ? null : effectiveStartTime(item)
+    if (!start) return []
+    const kind = item.type === 'event' ? 'event' : item.type === 'task' ? 'task' : 'routine'
+    return [{ title: item.title, start, end: item.allDay ? null : item.endTime, kind, completed: item.completed || !!item.skipped }]
+  }), [data.grouped])
+  const sentence = useMemo(
+    () => daySentence({ items: sentenceItems, now: data.isToday ? nowForDisplay : null, emailCount: data.isToday ? emailCaptures.length : 0 }),
+    [sentenceItems, data.isToday, nowForDisplay, emailCaptures.length],
   )
-  const firstTimed = useMemo(() => {
-    const timed = dayItems.filter((i) => i.startTime && !i.completed)
-    if (timed.length === 0) return null
-    return timed.reduce((a, b) => (a.startTime!.getTime() <= b.startTime!.getTime() ? a : b))
-  }, [dayItems])
-  const firstTimedLabel = firstTimed?.allDay
-    ? ''
-    : firstTimed?.startTime
-      ? firstTimed.startTime.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
-      : ''
+  const statusLine = loading ? 'Loading the day.' : tasksLoadFailed ? 'Your tasks didn’t load.' : null
+  const headerSentence = statusLine || sentence.day || sentence.email ? (
+    <span className="today-sentence">
+      {statusLine ?? sentence.day}
+      {!statusLine && sentence.email && <>{sentence.day ? ' ' : ''}<button type="button" className="today-sentence-link" onClick={askAboutEmail}>{sentence.email}</button></>}
+    </span>
+  ) : null
 
-  // The subline says what is actually next, by name. It replaced a tally
-  // ("2 open of 2 actionable items") and a pair of status cards that between
-  // them managed to point at the timeline without ever naming the thing on it.
-  // Today is a commitment surface: no counts, no scores.
-  //
-  // A clear Today (nothing left with a time on it, or the whole day is
-  // empty) looks FORWARD rather than sitting mute — the demo run 2026-09-06
-  // found "Your day is clear" sitting over a week that already had 19 things
-  // planned on it.
-  const heroLine = loading
-    ? 'Loading the day.'
-    : data.isToday
-      ? upNext
-        ? `Next: ${upNext.item.title}${nextTimeLabel ? ` · ${nextTimeLabel}` : ''}`
-        // A failed task read knows nothing about the week ahead.
-        : tasksLoadFailed ? 'Your tasks didn’t load.'
-          // "Nothing else coming up this week" read wrong over a week list
-          // with steps still to place (walkthrough 2026-09-30): say so.
-          // The count lives once, in the control row below (walkthrough
-          // 2026-09-30: it was said twice).
-          : (() => { const ahead = forwardLook(tasks, viewedDate); return !ahead && stillToPlace > 0 ? 'Nothing on the days ahead this week.' : forwardLine(ahead, viewedDate) })()
-      : data.counts.totalItems === 0
-        ? (tasksLoadFailed ? 'Your tasks didn’t load.' : 'Nothing planned for this day.')
-        : firstTimed
-          ? `Starts with: ${firstTimed.title}${firstTimedLabel ? ` · ${firstTimedLabel}` : ''}`
-          : 'Nothing with a time on it.'
+  // ── Plan my day / Review my day: the bar's walk into a conversation that
+  // ends in one change card. Today's date only; phones offer it in the page.
+  const walk = data.isToday ? (nowForDisplay.getHours() < 16 ? PLAN_WALK : REVIEW_WALK) : null
+  const walkInBar = useConversationWalk(walk)
+  const pageWalk = walk && !walkInBar ? walk : null
+
+  // ── A pending change card, drawn dashed on the day (todayPreview.ts).
+  const { changeSet } = useCanvasActivity()
+  const preview: TodayPreview = useMemo(() => todayPreview(changeSet, viewedDate), [changeSet, viewedDate])
   // Viewing another day: "Tomorrow"/"Yesterday" reads better than repeating the
   // weekday the date line above already shows.
   const relativeDayLabel = useMemo(() => {
@@ -1150,15 +830,10 @@ export function TodayView({
   }, [printing])
 
   // ── Render ────────────────────────────────────────────────────────────────────
-  /* Today's secondary controls behind one button. ONE instance: on desktop it
-     sits in the controls strip; on mobile that strip is `hidden md:flex`, so
-     the same menu mounts beside the date masthead instead — otherwise "Plan
-     from paper" was unreachable on the one device that always has a camera. */
-  /* Plan from paper is the way a day gets planned here — the paper plan is
-     the product (see the analog pivot). On desktop the sidenav carries it
-     (Sidebar.tsx, from any page); on a phone the sidenav is hidden, so this
-     button sits beside the date masthead. Never back in the overflow —
-     Scott: "too important to be hidden" (2026-09-03). */
+  /* Today's secondary controls behind one button: Hide daily and Print list
+     only ("Today, trimmed", 2026-10-14). Reviews, ordering and duplicate
+     checks are asked for in the bar and end in one change card. ONE
+     instance: desktop puts it in the controls strip, phones beside the date. */
   const overflowMenu = (
     <TodayOverflowMenu>
       <button
@@ -1171,27 +846,6 @@ export function TodayView({
         {createElement(hideRoutines ? EyeOff : Eye, { className: 'w-5 h-5' })}
         <span>{hideRoutines ? 'Show daily' : 'Hide daily'}</span>
       </button>
-      {/* The unprompted tier's ONE control (2026-08-18): shows the pending
-          count, toggles the suggestions onto/off the page. Off by default —
-          the tier is opt-in. Only this tier is gated: the assistant pane
-          and the chips inside an item you opened still work. Lives here,
-          next to "Hide daily", because both answer the same question: how
-          much is this page allowed to put in front of me. */}
-      <button
-        type="button"
-        onClick={() => setSuggestionsEnabled(!suggestionsEnabled)}
-        title={suggestionsEnabled
-          ? 'Stop the assistant suggesting things on this page'
-          : 'Show what the assistant would suggest for this page'}
-        aria-pressed={suggestionsEnabled}
-        className="flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-[15px] text-neutral-600 transition-all hover:bg-neutral-100"
-      >
-        <Sparkles className={`w-5 h-5 ${suggestionsEnabled ? '' : 'opacity-40'}`} />
-        <span>
-          {suggestionsEnabled ? 'Hide suggestions' : 'Show suggestions'}
-          {visibleUnpromptedItems.length > 0 && ` · ${visibleUnpromptedItems.length}`}
-        </span>
-      </button>
       <button
         type="button"
         onClick={printList}
@@ -1201,51 +855,6 @@ export function TodayView({
         <Printer className="w-5 h-5" />
         <span>Print list</span>
       </button>
-      {/* The door to the morning review — carried-over and slipped work,
-          triaged in a bounded drawer. Off the page and into the menu
-          (2026-09-21): Today spends no line on the backlog, and the Planning
-          panel's fold is the page's one entrance to unfinished work. Present
-          whenever either backlog population is non-empty, and never a count. */}
-      {data.isToday && hasBacklog && (
-        <button
-          type="button"
-          onClick={() => setReviewMode('morning')}
-          title="Decide what to do with work that slipped past its day"
-          className="flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-[15px] text-neutral-600 transition-all hover:bg-neutral-100"
-        >
-          <History className="w-5 h-5" />
-          <span>Review carried-over work</span>
-        </button>
-      )}
-      {data.isToday && !reviewAtEnd && (
-        <button
-          type="button"
-          onClick={() => setReviewMode('evening')}
-          title="Reflect, prep for tomorrow, and close the day"
-          className="flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-[15px] text-neutral-600 transition-all hover:bg-neutral-100"
-        >
-          <Moon className="w-5 h-5" />
-          <span>End of day review</span>
-        </button>
-      )}
-
-      {clarityTrigger}
-
-      {/* Signals that only appear when they have something to say. */}
-      {(discussion.length > 0 ||
-        (data.isToday && (sweep.pairs.length > 0 || proposal.count > 0))) && (
-        <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-neutral-100 px-2.5 pt-2 text-[12px] text-neutral-400">
-          {discussion.length > 0 && (
-            <DiscussionBadge items={discussion} onSelectItem={onSelectItem} />
-          )}
-          {data.isToday && sweep.pairs.length > 0 && (
-            <DuplicateSweepTrigger count={sweep.pairs.length} onOpen={() => sweep.setOpen(true)} />
-          )}
-          {data.isToday && proposal.count > 0 && (
-            <ProposalTrigger count={proposal.count} onOpen={() => proposal.setOpen(true)} />
-          )}
-        </div>
-      )}
     </TodayOverflowMenu>
   )
 
@@ -1361,28 +970,6 @@ export function TodayView({
       Add task
     </button>
   ) : undefined
-  // Everything each slice of the journal shares — the same rows and actions
-  // the one flat list had, handed to three renders of it.
-  /**
-   * The timing control on a day row — the same one the month, season and week
-   * use, so Day is an execution view of the same work rather than a fourth
-   * vocabulary (connected planning, requirement 2 and Codex review finding 5).
-   *
-   * It sits under the title, not in the trailing rail: the rail is a fixed
-   * four-slot column and the timing answer is a sentence, not a glyph.
-   */
-  const dayTimingControl = useCallback((task: Task) => (
-    <TaskTimingMenu
-      task={task}
-      onUpdateTask={(id, updates) => ctx.onUpdateTask?.(id, updates)}
-      periodStart={viewedDate}
-      fallbackWeekStart={currentWeekStart}
-      dayChoices={dayChoices}
-      // On the day's own page the date is the title: the chip says "Any
-      // time" or the time (walkthrough 2026-10-02, #25).
-      labelRelativeTo={viewedDate}
-    />
-  ), [ctx, viewedDate, dayChoices, currentWeekStart])
   // What each row serves, at rest — the Week list's "↳ Step toward …" /
   // "↳ From …" line (walkthrough 2026-10-02, #24). Read from this page's own
   // filtered tasks, so a parent outside the reader's view is never named.
@@ -1392,8 +979,26 @@ export function TodayView({
     return parent ? <ServesLine parent={parent} onOpen={(id) => handleSelectItem(`task-${id}`)} /> : undefined
   }, [tasksMap, handleSelectItem])
 
+  // A pending change card's marks on the rows (todayPreview.ts). A row the
+  // card draws again elsewhere on the day is left out where it is now.
+  const previewOf = useCallback((item: TimelineItem) => {
+    const mark = markForRow(preview, item.id)
+    return mark === 'hidden' ? undefined : mark
+  }, [preview])
+  const notHidden = useCallback((item: TimelineItem) => markForRow(preview, item.id) !== 'hidden', [preview])
+  const focusActive = useMemo(() => {
+    const out = { ...focusWork.active }
+    for (const key of Object.keys(out) as DaySection[]) out[key] = (out[key] ?? []).filter(notHidden)
+    return out
+  }, [focusWork.active, notHidden])
+  const shownTimedItems = useMemo(() => timedItems.filter(notHidden), [timedItems, notHidden])
+  const proposedUntimed = preview.added.filter((a) => !a.time)
+  const proposedTimed = preview.added.filter((a) => a.time)
+
+  // Everything each slice of the journal shares — the same rows and actions
+  // the one flat list had, handed to three renders of it. Rows: tick, drag,
+  // tap to open; the item panel holds every other job (spec 2026-10-14).
   const listProps = {
-    timingFor: dayTimingControl,
     servesFor,
     isReadOnlyEvent,
     viewedDate,
@@ -1406,8 +1011,7 @@ export function TodayView({
     collapsedKeys,
     openedByUser,
     onToggleSection: toggleSection,
-    selectedKeys,
-    onToggleBulkSelect: toggleBulkSelect,
+    previewOf,
     tasksMap,
     shareNudgeByEventId,
     parserContext,
@@ -1481,15 +1085,13 @@ export function TodayView({
         // No big numeral (approved Today board, 2026-10-10): the date is the title.
         // Adding moved to the "For today" heading with Choose (2026-09-22):
         // the date is the page's identity, the heading holds its two verbs.
-        // "Next: …" is the Up next marker's job now, inside Schedule. The
-        // line stays only when it says something the list can't: a clear day
-        // looking forward, or another day's opener.
+        // The subline is the day in one sentence (daySentence.ts, "Today,
+        // trimmed" 2026-10-14), with the week and weather small after it.
         // Desktop folds the control row into the masthead (layout system,
-        // 2026-10-01): the week line becomes the subline and the view
-        // controls sit at the title's right, as on every horizon page.
+        // 2026-10-01): the view controls sit at the title's right.
         subline={foldedControls
-          ? <>{weekLine}{data.isToday && <> · <WeatherChip now={nowForDisplay} /></>}{!(data.isToday && upNext) && heroLine ? <> · {heroLine}</> : null}</>
-          : data.isToday && upNext ? undefined : heroLine}
+          ? <>{headerSentence}{headerSentence && ' '}<span className="today-sentence-meta">{weekLine}{data.isToday && <> · <WeatherChip now={nowForDisplay} /></>}</span></>
+          : headerSentence ?? undefined}
         // Domain chooser + assistant toggle, in the card's corner.
         // Desktop: the page's controls sit in the control row below, as on
         // every horizon (Scott, 2026-09-30). The masthead keeps them only where
@@ -1510,6 +1112,13 @@ export function TodayView({
         footer={!desktopControls ? desktopToolbar : undefined}
 
       />
+      {/* Phones have no conversation bar: the page offers the same walk. */}
+      {pageWalk && (
+        <div className="today-walk px-4 md:px-0">
+          <button type="button" className="pv2-btn" data-explain="plan-walk" data-explain-label={pageWalk.label}
+            onClick={() => openAssistant({ message: pageWalk.message, autoSend: true })}>{pageWalk.label}</button>
+        </div>
+      )}
       {/* Notices sit under the heading on every destination (one page shape). */}
       <div className="px-4 md:px-0 empty:hidden"><CalendarReconnectBanner /></div>
 
@@ -1550,38 +1159,12 @@ export function TodayView({
           members={familyMembers}
           onToggleTask={onToggleTask}
           onOpenTask={(id) => handleSelectItem(`task-${id}`)}
-          // Into the temporal flow: same write shape as the bulk scheduler
+          // Into the temporal flow: same write shape as a drop on the day
           // above — scheduled_for implies bucket 'timed', and isAllDay is
           // always a real boolean (the invariant pair).
           onScheduleTask={(id, date, isAllDay) => onUpdateTask?.(id, { bucket: 'timed', scheduledFor: date, isAllDay })}
           onScheduleListItem={ctx.onScheduleListItemAsTask}
         />
-
-        {/* Assistant lines — the unprompted tier, rendered ONLY when the ⋯
-            menu's "Show suggestions" toggle is on (off by default; the menu
-            entry carries the pending count). Only this tier is gated: chips
-            inside an item you opened are answers to a question you asked by
-            opening it. */}
-        {suggestionsEnabled && (
-          <UnpromptedLines
-            items={visibleUnpromptedItems}
-            onAct={handleUnpromptedAct}
-            todayState={(item) => {
-              if (item.suggestion.entityType !== 'task' || !ctx.onUpdateTask) return null
-              const task = findTaskById(tasks, item.suggestion.entityId)
-              if (!task || task.completed || task.isGoal) return null
-              return task.scheduledFor && localYmd(task.scheduledFor) === localYmd(new Date()) ? 'added' : 'available'
-            }}
-            onAddToToday={async (item) => {
-              // Accepting a suggestion plans the existing task; it does not
-              // perform its Call action or mark that action as completed.
-              return planActions.chooseTaskDay(item.suggestion.entityId, new Date())
-            }}
-            onSnooze={unprompted.snooze}
-            decisions={unprompted.decisions}
-            showWhy={showWhyDebug}
-          />
-        )}
 
         {loading && data.counts.totalItems === 0 ? (
           // While the day's data is still in flight, an empty list means "not
@@ -1645,7 +1228,7 @@ export function TodayView({
                 <TodaySectionList
                   {...listProps}
                   sectionsOrder={['allday']}
-                  grouped={focusWork.active}
+                  grouped={focusActive}
                   dropTargets={false}
                   anytimeHeader={false}
                 />
@@ -1653,7 +1236,7 @@ export function TodayView({
                 <TodaySectionList
                   {...listProps}
                   sectionsOrder={['unscheduled']}
-                  grouped={focusWork.active}
+                  grouped={focusActive}
                   dropTargets={false}
                   anytimeHeader={false}
                 />
@@ -1690,12 +1273,42 @@ export function TodayView({
                 )}
               </div>
             )}
+            {/* A pending change card's untimed arrivals, dashed. */}
+            {proposedUntimed.length > 0 && (
+              <ul className="today-proposed-list">
+                {proposedUntimed.map((a) => (
+                  <li key={a.key} className="today-preview-row is-proposed" data-testid="proposed-row">
+                    <span className="today-preview-title">{a.title}</span>
+                    {a.note && <span className="wc-proposed-note">{a.note}</span>}
+                    <span className="sr-only"> (proposed, not saved yet)</span>
+                  </li>
+                ))}
+              </ul>
+            )}
             {focusWork.completedCount > 0 && <div className="today-completed">
               <button type="button" aria-expanded={completedOpen} onClick={() => setCompletedOpenDay(completedOpen ? null : localYmd(viewedDate))}>
                 {completedOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}Completed · {focusWork.completedCount}
               </button>
               {completedOpen && <TodaySectionList {...listProps} sectionsOrder={FOCUS_SECTIONS} grouped={focusWork.completed} anytimeHeader={false} dropTargets={false} />}
             </div>}
+            {/* To talk about: open talk-abouts (flagged tasks), one quiet
+                line, each a chip that opens the item. Silent when none. */}
+            {(discussion.length > 0 || preview.talk.length > 0) && (
+              <div className="today-talk" aria-label="To talk about" role="group">
+                <span className="today-talk-label">To talk about</span>
+                {discussion.map((d) => (
+                  <button key={d.id} type="button" className="today-talk-chip" onClick={() => handleSelectItem(`task-${d.id}`)}>
+                    {d.title}{d.note ? ` · ${d.note}` : ''}
+                  </button>
+                ))}
+                {preview.talk.map((t) => (
+                  <span key={t.key} className="today-talk-chip is-proposed" data-testid="proposed-talk">
+                    {t.title}{t.note ? ` · ${t.note}` : ''}
+                    <span className="sr-only"> (proposed, not saved yet)</span>
+                  </span>
+                ))}
+              </div>
+            )}
           </ForTodayDropZone>
           </section>
 
@@ -1733,7 +1346,9 @@ export function TodayView({
               </ul>
             )}
             <TodayDayScale
-              items={timedItems}
+              items={shownTimedItems}
+              markOf={previewOf}
+              proposed={proposedTimed}
               viewedDate={viewedDate}
               now={data.isToday ? nowForDisplay : null}
               isMobile={isMobile}
@@ -1775,49 +1390,11 @@ export function TodayView({
           </TodayDragProvider>
         )}
 
-        {/* Backlog footer — ONE muted line merging carried-over and
-            needs-attention, deliberately OUTSIDE the totalItems ternary above.
-            `counts.totalItems` does not include this work, so a day whose only
-            remaining work is backlog renders "Your day is clear" — with 35
-            items rotting invisibly behind it. That is exactly the
-            permanently-buried failure expiry must not cause, so the footer
-            renders in BOTH branches whenever either set is non-empty.
-
-            Carried-over expands its list inline (those tasks have no other
-            home); Review opens the morning Review drawer — Scott asked for
-            ACTIVE management of this set from Today (2026-08-18), so the
-            passive navigate-to-/week gave way to a bounded triage ritual.
-            The page itself still spends only this one line: the drawer is a
-            modal you summon, not furniture. */}
-        {data.isToday && (
-          <TodayBacklogFooter
-            onReviewEmail={emailCaptures.length > 0 ? () => setEmailReviewOpen(true) : undefined}
-          />
-        )}
-        {/* Not under "Loading your day…": the review closes a list that is there. */}
-        {reviewAtEnd && data.isToday && !(loading && data.counts.totalItems === 0) && (
-          <button type="button" className="today-review-close" onClick={() => setReviewMode('evening')} title="Reflect, prep for tomorrow, and close the day">
-            <Moon className="w-4 h-4" aria-hidden="true" /> Review today
-          </button>
-        )}
-
-        {/* Undo window for a dismissed email row. Letting the toast go — by
-            timeout or by the X — is what commits the delete. */}
-        {pendingDismiss && (
-          <InboxUndoToast
-            message={`"${pendingDismiss.title}" dismissed`}
-            onUndo={() => { pendingDismissRef.current = null; setPendingDismiss(null) }}
-            onDismiss={commitDismiss}
-          />
-        )}
       </div>
         </main>
 
         {/* Today is the day alone unless its week is asked for (Scott,
-            2026-09-30). The "Needs a decision" rail that stood here was never
-            visible (no @container ancestor) and stays gone: carried-over
-            work is ⋯ → Review carried-over work; captured email is the
-            "New from email" line; suggestions are in the ⋯ menu. */}
+            2026-09-30): the by-hand way to pull one task in. */}
         {showWeek && (
         <aside className="today-aside mt-6 @[48rem]:mt-0">
           {showWeek && (
@@ -1831,78 +1408,6 @@ export function TodayView({
         </aside>
         )}
       </div>
-
-      {/* Review drawer — evening from the ⋯ menu, morning from the backlog
-          footer's Review. Triage verdicts write through the same handlers the
-          page rows use. */}
-      <ReviewDrawer
-        isOpen={reviewMode !== null}
-        mode={reviewMode ?? 'evening'}
-        onClose={() => setReviewMode(null)}
-        tasks={tasks}
-        attentionItems={data.attentionItems}
-        overdueTasks={data.overdueTasks}
-        viewedDate={viewedDate}
-        onCompleteTask={onToggleTask}
-        onUpdateTask={(id, u) => onUpdateTask?.(id, u)}
-        onPushTask={ctx.onPushTask}
-        onDeleteTask={ctx.onDeleteTask}
-      />
-
-      {/* What arrived from a forwarded email and nobody has looked at yet. */}
-      <EmailReviewSheet
-        open={emailReviewOpen}
-        captures={emailCaptures}
-        tasks={tasks}
-        members={ctx.familyMembers}
-        onClose={closeEmailReview}
-        onDismiss={handleDismissEmailRow}
-        dismissedIds={pendingDismiss ? [pendingDismiss.id] : undefined}
-      />
-
-      {/* Clarity curtain — pulled down by the binoculars in the header. */}
-      <ClarityCurtain
-        open={clarityOpen}
-        onClose={() => setClarityOpen(false)}
-        result={clarityResult}
-        onStepAction={onClarityStep}
-      />
-
-      {/* Bulk action bar — appears when ≥1 task row is selected via the
-          hover checkbox. Reuses the shared toolbar (Inbox uses the same). */}
-      {selectedKeys.size > 0 && (
-        <BulkActionToolbar
-          selectedCount={selectedKeys.size}
-          onDefer={handleBulkDefer}
-          onSchedule={handleBulkSchedule}
-          onSetContext={handleBulkSetContext}
-          onAssign={handleBulkAssign}
-          onGroup={(onGroupItems || onGroupTasks) ? handleBulkGroup : undefined}
-          onSendToList={() => {}}
-          onCancel={clearBulkSelection}
-          familyMembers={familyMembers}
-        />
-      )}
-
-      {proposal.open && (
-        <ProposalPreview
-          proposal={proposal.proposal}
-          titleOf={proposal.titleOf}
-          onClose={() => proposal.setOpen(false)}
-          onAcceptGroup={proposal.acceptGroup}
-          onAcceptOrder={proposal.acceptOrder}
-          onAcceptAll={proposal.acceptAll}
-        />
-      )}
-
-      {sweep.open && (
-        <DuplicateSweep
-          pairs={sweep.pairs}
-          onClose={() => sweep.setOpen(false)}
-          onKeepOne={sweep.keepOne}
-          onSkipRoutineToday={(routineId) => ctx.onSkipRoutine?.(routineId)}
-        />
-      )}
 
       {/* Phone: the floating capture bar above the dock (native TodayView). */}
       {isMobile && canAdd && (

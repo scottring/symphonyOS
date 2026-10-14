@@ -73,7 +73,7 @@ describe('ScheduleItem — the action rail', () => {
     expect(container.querySelectorAll('[data-rail-slot]')).toHaveLength(4)
   })
 
-  // The discussion picker moved into the '...' menu. The FLAG has to stay
+  // The discussion flag is set in the item panel ("Bring up"). The FLAG has to stay
   // visible, so it moved to the title cluster — state belongs with the title,
   // actions belong in the rail.
   describe('discussion flag', () => {

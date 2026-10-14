@@ -12,7 +12,7 @@ import { requestDiscussionOpen } from '@/lib/discussions/openIntent'
 import { ScheduleItemItems } from './ScheduleItemItems'
 import { RowActionRail } from './RowActionRail'
 import { RoutineMoveButton } from './RoutineMoveButton'
-import { ROW_SHELL, ROW_GRID, LANE, MARK, UNDER_TITLE, BULK_BOX_X } from './todayRowGrid'
+import { ROW_SHELL, ROW_GRID, LANE, MARK, UNDER_TITLE } from './todayRowGrid'
 import { useMobile } from '@/hooks/useMobile'
 import { TaskCheckbox } from './TaskCheckbox'
 import { ExpandingPanel } from './ExpandingPanel'
@@ -26,12 +26,17 @@ import { useTravelTime } from '@/hooks/useTravelTime'
 interface ScheduleItemProps {
   item: TimelineItem
   selected?: boolean
-  // Bulk multi-select (Today): a hover-revealed checkbox at the row's left edge.
-  // `bulkSelectable` enables it (task rows only); `showBulkAffordance` keeps it
-  // visible once any selection exists; toggling never opens the detail panel.
+  /**
+   * @deprecated Today, trimmed (2026-10-14): the hover bulk-select checkbox is
+   * gone — several things at once is something you say ("Plan my day"). These
+   * four are accepted and ignored until TodaySectionList stops passing them.
+   */
   bulkSelectable?: boolean
+  /** @deprecated ignored — see `bulkSelectable`. */
   bulkSelected?: boolean
+  /** @deprecated ignored — see `bulkSelectable`. */
   showBulkAffordance?: boolean
+  /** @deprecated ignored — see `bulkSelectable`. */
   onToggleBulkSelect?: () => void
   onSelect: () => void
   onToggleComplete: () => void
@@ -62,7 +67,9 @@ interface ScheduleItemProps {
   onAssignAll?: (memberIds: string[]) => void
   // Context assignment (work/family/personal)
   onContextChange?: (context: TaskContext | undefined) => void
-  // Needs-discussion flag — task variant only
+  /** @deprecated ignored — it fed the row ⋯ menu's "Flag for discussion…",
+   *  which now lives in the item panel as "Bring up" (Today, trimmed,
+   *  2026-10-14). */
   onUpdateDiscussion?: (next: { needsDiscussion: boolean; discussionNote?: string }) => void
   // Overdue styling
   isOverdue?: boolean
@@ -83,15 +90,9 @@ interface ScheduleItemProps {
   /** Draw the timeline spine reaching DOWN from this row's marker to the row below. */
   spineBelow?: boolean
   /**
-   * Rendered directly BENEATH the title, inside the title's own column — so it
-   * left-aligns with the title text automatically, whatever the row's leading
-   * columns are (time label, checkbox, date gutter).
-   *
-   * Used for the anchored suggestion chip. It previously rendered as a block
-   * sibling of the whole row at the card's left edge, which put it under the
-   * leading columns and made it read as belonging to the NEXT task down.
-   * Aligning by structure rather than a hardcoded margin is deliberate: the old
-   * `ml-[6.5rem]` default was tuned for one layout and was wrong everywhere else.
+   * @deprecated ignored. It carried the hover when-chip (TaskTimingMenu) on
+   * the title line; a task's day and time now change in the item panel, which
+   * draws the same control (Today, trimmed, 2026-10-14).
    */
   belowTitleAccessory?: React.ReactNode
   /** What this task serves — "↳ Step toward “goal”" or "↳ From “line”" —
@@ -118,10 +119,6 @@ const _contextColors: Record<string, { dot: string; bg: string }> = DOMAIN_COLOR
 export const ScheduleItem = memo(function ScheduleItem({
   item,
   selected,
-  bulkSelectable,
-  bulkSelected,
-  showBulkAffordance,
-  onToggleBulkSelect,
   onSelect,
   onToggleComplete,
   onToggleSubtask,
@@ -138,7 +135,6 @@ export const ScheduleItem = memo(function ScheduleItem({
   assignedToAll = [],
   onAssignAll,
   onContextChange,
-  onUpdateDiscussion,
   isOverdue,
   overdueLabel,
   getScheduleItemsForDate,
@@ -149,12 +145,11 @@ export const ScheduleItem = memo(function ScheduleItem({
   hideTime,
   spineAbove,
   spineBelow,
-  belowTitleAccessory,
   servesLine,
 }: ScheduleItemProps) {
   const isMobile = useMobile()
-  // Needed-today mark: STATE, so it lives with the title chips. The '...' menu
-  // (ScheduleItemActionsMenu) sets it via the same context handler. A mark
+  // Needed-today mark: STATE, so it lives with the title chips. The item
+  // panel sets it ("Need today"); the chip here only clears it. A mark
   // expires by ceasing to match the VIEWED day (src/lib/today/neededToday.ts),
   // not the real calendar day — nothing ever clears `neededOn` — so compare
   // against ctx.viewedDate. Fall back to "now" only when no provider supplies
@@ -575,35 +570,12 @@ export const ScheduleItem = memo(function ScheduleItem({
         ${item.completed || item.skipped || isFree ? 'opacity-60' : ''}
       `}
     >
-      {/* Bulk multi-select checkbox — hover-revealed at the row's left edge.
-          Absolutely positioned so it never shifts layout; the row content gets
-          a left pad (below) only while it's shown. Toggling stops propagation
-          so it never opens the detail panel. */}
-      {bulkSelectable && (
-        <button
-          type="button"
-          onClick={(e) => { e.stopPropagation(); onToggleBulkSelect?.() }}
-          aria-label={bulkSelected ? 'Deselect item' : 'Select item'}
-          aria-pressed={!!bulkSelected}
-          className={`absolute ${BULK_BOX_X} top-1/2 -translate-y-1/2 z-[2] grid place-items-center w-4 h-4 rounded-[4px] border-2 transition-all ${
-            bulkSelected
-              ? 'opacity-100 bg-primary-600 border-primary-600 text-white'
-              : `border-neutral-300 text-transparent ${showBulkAffordance ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`
-          }`}
-        >
-          <Check className="w-2.5 h-2.5" strokeWidth={3} />
-        </button>
-      )}
-
-      {/* Main row: time | checkbox/circle | title.
-          The bulk checkbox is absolutely positioned at the left edge. We reserve
-          a permanent gutter for it whenever the row is bulk-selectable, so the
-          checkbox fades in on hover WITHOUT shifting the row (which used to slide
-          the check circle out from under the cursor) and WITHOUT overlapping the
-          time (which the gutterless version did). Every Today row is
-          bulk-selectable, so they all reserve the gutter and stay aligned. */}
-      <div className={bulkSelectable ? ROW_GRID : 'relative flex items-center gap-3'}>
-        <TimelineSpine above={spineAbove} below={spineBelow} hasBulkGutter={!!bulkSelectable} />
+      {/* Main row: time | circle | title | rail — Today's shared grid, so
+          these rows line up with RoutineCollectionRow's. (The hover
+          bulk-select checkbox that hung in the gutter went with Today,
+          trimmed, 2026-10-14: a row is tick, drag and tap.) */}
+      <div className={ROW_GRID}>
+        <TimelineSpine above={spineAbove} below={spineBelow} />
 
         {/* Time column - fixed width for alignment */}
         {hideTime ? (
@@ -757,7 +729,7 @@ export const ScheduleItem = memo(function ScheduleItem({
             )}
             {/* Flagged for discussion — STATE, so it belongs with the title
                 chips, not in the action rail. The control that sets it lives in
-                the row's '...' menu. The bubble itself is the door to the
+                the item panel ("Bring up"). The bubble itself is the door to the
                 conversation (Scott, 2026-09-22): it opens the item's panel
                 with its Discussion already showing. */}
             {item.needsDiscussion && (
@@ -776,7 +748,7 @@ export const ScheduleItem = memo(function ScheduleItem({
               </button>
             )}
             {/* Needed today mark — STATE, so it belongs with the title chips,
-                not the action rail. The '...' menu sets/clears it; clicking the
+                not the action rail. The item panel sets/clears it; clicking the
                 chip itself is a shortcut to clear. */}
             {isNeededToday && !item.completed && (
               <button
@@ -789,15 +761,8 @@ export const ScheduleItem = memo(function ScheduleItem({
                 Today
               </button>
             )}
-            {/* "Any time" — the timing control — waits on the title line
-                until the row is hovered or focused: at rest it only said the
-                default (Scott, 2026-10-06). On the line, not under it, so
-                showing it never moves the rows below. */}
-            {belowTitleAccessory && (
-              <div className="hidden md:block shrink-0 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100" onClick={(e) => e.stopPropagation()}>
-                {belowTitleAccessory}
-              </div>
-            )}
+            {/* The hover when-chip ("Any time") lived here until Today,
+                trimmed (2026-10-14): day and time change in the item panel. */}
           </div>
           {/* Steps fold to their next one (2026-10-06): "Next: … · 5 steps".
               A disclosure, not a label — steps don't earn their own Today
@@ -893,10 +858,7 @@ export const ScheduleItem = memo(function ScheduleItem({
             formed a column down the page. */}
         <RowActionRail
           item={item}
-          variant={variant}
-          onSelect={onSelect}
           onContextChange={onContextChange}
-          onUpdateDiscussion={onUpdateDiscussion}
           onAssign={onAssign}
           onAssignAll={onAssignAll}
           familyMembers={familyMembers}

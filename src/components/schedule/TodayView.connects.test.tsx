@@ -186,11 +186,16 @@ describe('#28 Coming up, under Schedule', () => {
   })
 })
 
-describe('#7 the masthead names the next item, saying its day once', () => {
-  it('"Next: Talk to Tim on Monday · 11:45 AM", not "Monday: … on Monday"', () => {
+describe('#7 the next days\' work is named once, under Coming up', () => {
+  // The masthead's forward line ("Next: …") gave way to the day's own
+  // sentence (Today, trimmed, 2026-10-14): a day with nothing timed says
+  // nothing up there, and Coming up names what is ahead.
+  it('names "Talk to Tim on Monday" in Coming up, not as "Monday: … on Monday" or a Next: line', () => {
     const tim = createMockTask({ id: 'tim', title: 'Talk to Tim on Monday', bucket: 'timed', isAllDay: false, scheduledFor: new Date(2026, 8, 21, 11, 45) })
     renderView({ tasks: [tim] })
-    expect(screen.getByText('Next: Talk to Tim on Monday · 11:45 AM')).toBeInTheDocument()
+    const coming = screen.getByRole('region', { name: 'Coming up' })
+    expect(within(coming).getByText(/Talk to Tim on Monday/)).toBeInTheDocument()
+    expect(screen.queryByText(/^Next: /)).toBeNull()
     expect(screen.queryByText(/Monday: Talk to Tim/)).toBeNull()
   })
 })

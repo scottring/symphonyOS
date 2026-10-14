@@ -30,7 +30,7 @@ const baseTask: TimelineItem = {
   originalTask: { id: '1', title: 'Call Dr. Smith' },
 } as unknown as TimelineItem
 
-function renderRail(overrides: Partial<TimelineItem> = {}, variant: 'full' | 'minimal' = 'full') {
+function renderRail(overrides: Partial<TimelineItem> = {}) {
   const value = {
     onToggleTask: vi.fn(),
     onStartMeeting: vi.fn(),
@@ -44,10 +44,7 @@ function renderRail(overrides: Partial<TimelineItem> = {}, variant: 'full' | 'mi
     <ScheduleActionsProvider value={value}>
       <RowActionRail
         item={{ ...baseTask, ...overrides } as TimelineItem}
-        variant={variant}
-        onSelect={vi.fn()}
         onContextChange={vi.fn()}
-        onUpdateDiscussion={vi.fn()}
         onAssignAll={vi.fn()}
         familyMembers={[]}
         assignedToAll={[]}
@@ -58,42 +55,44 @@ function renderRail(overrides: Partial<TimelineItem> = {}, variant: 'full' | 'mi
 
 const slots = (container: HTMLElement) => container.querySelectorAll('[data-rail-slot]')
 
-// Slot order: assignee | context | verb | overflow. Named rather than inlined
+// Slot order: assignee | context | verb | spare. Named rather than inlined
 // so re-ordering the rail is one edit here, not a hunt through every index —
 // these tests care WHICH control sits in a cell, not where the cell falls.
 const WHO = 0
 const CONTEXT = 1
 const VERB = 2
-const OVERFLOW = 3
+const SPARE = 3
 /** The three plain 28px icon cells — everything except the wider assignee cell. */
-const ICON_SLOTS = [CONTEXT, VERB, OVERFLOW]
+const ICON_SLOTS = [CONTEXT, VERB, SPARE]
 
 describe('RowActionRail', () => {
   // The whole point of the rail: the same number of cells on every row, so the
   // controls form columns down the page. Before this, a task rendered six
   // trailing controls, an event five, a routine three — and nothing lined up.
   describe('always four slots, whatever the row is', () => {
-    const cases: Array<[string, Partial<TimelineItem>, 'full' | 'minimal']> = [
-      ['an open task', { type: 'task' }, 'full'],
-      ['a completed task', { type: 'task', completed: true }, 'full'],
-      ['a waiting task', { type: 'task', isWaiting: true }, 'full'],
-      ['an open routine', { type: 'routine', id: 'routine-1' }, 'full'],
-      ['a routine on the minimal variant', { type: 'routine', id: 'routine-1' }, 'minimal'],
-      ['a skipped routine', { type: 'routine', id: 'routine-1', skipped: true }, 'full'],
-      ['a timed event', { type: 'event', id: 'event-1', allDay: false }, 'full'],
-      ['an all-day event', { type: 'event', id: 'event-1', allDay: true }, 'full'],
+    const cases: Array<[string, Partial<TimelineItem>]> = [
+      ['an open task', { type: 'task' }],
+      ['a completed task', { type: 'task', completed: true }],
+      ['a waiting task', { type: 'task', isWaiting: true }],
+      ['an open routine', { type: 'routine', id: 'routine-1' }],
+      ['a skipped routine', { type: 'routine', id: 'routine-1', skipped: true }],
+      ['a timed event', { type: 'event', id: 'event-1', allDay: false }],
+      ['an all-day event', { type: 'event', id: 'event-1', allDay: true }],
     ]
 
-    it.each(cases)('renders exactly four slots for %s', (_label, overrides, variant) => {
-      const { container } = renderRail(overrides, variant)
+    it.each(cases)('renders exactly four slots for %s', (_label, overrides) => {
+      const { container } = renderRail(overrides)
       expect(slots(container)).toHaveLength(4)
     })
   })
 
   describe('the verb slot', () => {
-    it('holds Reschedule for an open task', () => {
+    // Today, trimmed (2026-10-14): a task row is tick, drag and tap — its day
+    // and time change in the item panel.
+    it('is empty on an open task — no Reschedule button', () => {
       const { container } = renderRail({ type: 'task' })
-      expect(slots(container)[VERB].querySelector('[aria-label="Reschedule"]')).toBeTruthy()
+      expect(slots(container)[VERB].querySelector('button')).toBeNull()
+      expect(container.querySelector('[aria-label="Reschedule"]')).toBeNull()
     })
 
     it('holds Move or skip for an open routine', () => {
@@ -118,27 +117,29 @@ describe('RowActionRail', () => {
     })
 
     it('never holds more than one verb', () => {
-      for (const [, overrides, variant] of [
-        ['t', { type: 'task' }, 'full'],
-        ['r', { type: 'routine', id: 'routine-1' }, 'full'],
-        ['e', { type: 'event', id: 'event-1', allDay: false }, 'full'],
-      ] as Array<[string, Partial<TimelineItem>, 'full' | 'minimal']>) {
-        const { container, unmount } = renderRail(overrides, variant)
+      for (const overrides of [
+        { type: 'task' },
+        { type: 'routine', id: 'routine-1' },
+        { type: 'event', id: 'event-1', allDay: false },
+      ] as Array<Partial<TimelineItem>>) {
+        const { container, unmount } = renderRail(overrides)
         expect(slots(container)[VERB].querySelectorAll('button').length).toBeLessThanOrEqual(1)
         unmount()
       }
     })
   })
 
-  describe('the overflow slot', () => {
-    it('holds the actions menu on the full variant', () => {
-      const { container } = renderRail({ type: 'task' })
-      expect(slots(container)[OVERFLOW].querySelector('[aria-label="Item actions"]')).toBeTruthy()
-    })
-
-    it('is empty on the minimal variant, which drops the menu', () => {
-      const { container } = renderRail({ type: 'routine', id: 'routine-1' }, 'minimal')
-      expect(slots(container)[OVERFLOW].querySelector('[aria-label="Item actions"]')).toBeNull()
+  // The row ⋯ menu is gone; its cell stays, empty, so the rail is as wide as
+  // RoutineCollectionRow's and the people column still lines up.
+  describe('the spare slot', () => {
+    it.each([
+      ['a task', { type: 'task' }],
+      ['a routine', { type: 'routine', id: 'routine-1' }],
+      ['an event', { type: 'event', id: 'event-1', allDay: false }],
+    ] as Array<[string, Partial<TimelineItem>]>)('is empty on %s — no Item actions menu', (_l, overrides) => {
+      const { container } = renderRail(overrides)
+      expect(slots(container)[SPARE].childElementCount).toBe(0)
+      expect(container.querySelector('[aria-label="Item actions"]')).toBeNull()
     })
   })
 

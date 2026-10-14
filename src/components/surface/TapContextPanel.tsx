@@ -27,6 +27,8 @@ import { PanelMightBeRelevant } from './sections/PanelMightBeRelevant'
 import { PanelClassify } from './sections/PanelClassify'
 import { PanelFooter } from './sections/PanelFooter'
 import { PanelToBuySuggestion } from './sections/PanelToBuySuggestion'
+import { PanelSection } from './sections/PanelSection'
+import { WaitingForPopover } from '@/components/schedule/WaitingForPopover'
 import { useLinkedEntities } from './hooks/useLinkedEntities'
 import { useMightBeRelevant } from './hooks/useMightBeRelevant'
 import { AssistDrawer } from '@/components/assist/AssistDrawer'
@@ -118,6 +120,27 @@ interface TapContextPanelProps {
    *  offers it as one quiet line under the actions — the suggestion lives
    *  here, not on Today's page. */
   onSendToBuy?: () => void
+
+  // ── The jobs a Today row's menus used to do (Today, trimmed, 2026-10-14).
+  // A row is tick, drag and tap now; everything else it offered lives here.
+  // Each is optional: a host that doesn't wire one gets no chip for it.
+
+  /** "Bring up" — flag for a conversation in person (the wall's For
+   *  Discussion list, Today's To talk about line), and the question. */
+  onUpdateDiscussion?: (next: { needsDiscussion: boolean; discussionNote?: string }) => unknown
+  /** "Waiting for…" — the sentence and an optional check-back day. */
+  onSaveWaiting?: (waitingFor: string, checkBack?: Date) => unknown
+  /** Ends the wait. Offered only while the task is waiting. */
+  onClearWaiting?: () => unknown
+  /** Marked needed on the day being viewed. */
+  neededToday?: boolean
+  /** Toggles that mark for the viewed day. */
+  onToggleNeededToday?: () => unknown
+  /** Takes the viewed day away, keeping the week and period lists. Passed
+   *  only when the task is on that day. */
+  onRemoveFromDay?: () => unknown
+  /** What that removal says, e.g. "Remove from today". */
+  removeFromDayLabel?: string
 }
 
 export function TapContextPanel(props: TapContextPanelProps) {
@@ -125,6 +148,7 @@ export function TapContextPanel(props: TapContextPanelProps) {
 
   const [showDirections, setShowDirections] = useState(false)
   const [assistOpen, setAssistOpen] = useState(props.autoOpenDiscussion === true)
+  const [waitingOpen, setWaitingOpen] = useState(false)
   useEffect(() => { if (props.autoOpenDiscussion) setAssistOpen(true) }, [props.autoOpenDiscussion])
   const discussionUnread = useThreadUnread('task', task.id)
 
@@ -158,6 +182,7 @@ export function TapContextPanel(props: TapContextPanelProps) {
     setPrevTaskId(task.id)
     setShowDirections(false)
     setAssistOpen(false)
+    setWaitingOpen(false)
     setRevealed(new Set())
     setPhotosHaveContent(false)
     setFiles([])
@@ -257,6 +282,56 @@ export function TapContextPanel(props: TapContextPanelProps) {
           onClick: () => setAssistOpen(true),
         }]
       : []),
+    // After the five that were always here, so they fold into the ⋯ first
+    // rather than pushing Schedule or Discussion out of sight.
+    ...(props.onSaveWaiting
+      ? [{
+          id: 'waiting',
+          label: task.isWaiting ? 'Waiting' : 'Waiting for…',
+          kind: (task.isWaiting ? 'flagged' : 'default') as PanelAction['kind'],
+          pressed: !!task.isWaiting,
+          title: task.isWaiting && task.waitingFor
+            ? `Waiting on ${task.waitingFor}`
+            : 'Did your part — waiting on someone, check back later',
+          onClick: () => setWaitingOpen((v) => !v),
+        }]
+      : []),
+    ...(props.onUpdateDiscussion
+      ? [{
+          id: 'discuss',
+          label: task.needsDiscussion ? 'On the list' : 'Bring up',
+          kind: (task.needsDiscussion ? 'flagged' : 'default') as PanelAction['kind'],
+          pressed: !!task.needsDiscussion,
+          title: task.needsDiscussion
+            ? 'Take it off the To talk about list'
+            : 'Bring up in person — adds it to To talk about',
+          onClick: () => {
+            const next = !task.needsDiscussion
+            void props.onUpdateDiscussion?.({
+              needsDiscussion: next,
+              discussionNote: next ? task.discussionNote : undefined,
+            })
+          },
+        }]
+      : []),
+    ...(props.onToggleNeededToday && !task.completed
+      ? [{
+          id: 'needed-today',
+          label: props.neededToday ? 'Needed today' : 'Need today',
+          kind: (props.neededToday ? 'flagged' : 'default') as PanelAction['kind'],
+          pressed: !!props.neededToday,
+          title: props.neededToday ? 'Clear the needed-today mark' : 'Mark it needed today',
+          onClick: () => { void props.onToggleNeededToday?.() },
+        }]
+      : []),
+  ]
+  // The ⋯ holds what the row had no room for, then removing the day — the row
+  // menu's quiet way out — before Pin and Delete.
+  const moreItems = (folded: PanelAction[]) => [
+    ...folded.map((a) => ({ id: a.id, label: a.label, onClick: a.onClick })),
+    ...(props.onRemoveFromDay
+      ? [{ id: 'remove-day', label: props.removeFromDayLabel ?? 'Remove from this day', onClick: () => { void props.onRemoveFromDay?.() } }]
+      : []),
   ]
 
   return (
@@ -281,16 +356,36 @@ export function TapContextPanel(props: TapContextPanelProps) {
         <>
           <PanelActions
             actions={actions}
-            overflow={
+            // One ⋯ for both the folded chips and Pin/Delete — two side by
+            // side read as the same button twice (the event panel's rule).
+            renderOverflow={(folded) => (
               <PanelMoreMenu
+                items={moreItems(folded)}
                 isPinned={props.isPinned}
                 onTogglePin={props.onTogglePin}
                 onDelete={props.onDelete}
                 onUngroup={hasGroup ? props.onUngroup : undefined}
                 onDeleteGroup={hasGroup ? props.onDeleteGroup : undefined}
               />
-            }
+            )}
           />
+          {waitingOpen && props.onSaveWaiting && (
+            <div className="mt-2">
+              <WaitingForPopover
+                inline
+                initialValue={task.waitingFor}
+                taskId={task.id}
+                onSave={(waitingFor, checkBack) => {
+                  void props.onSaveWaiting?.(waitingFor, checkBack)
+                  setWaitingOpen(false)
+                }}
+                onClear={task.isWaiting && props.onClearWaiting
+                  ? () => { void props.onClearWaiting?.(); setWaitingOpen(false) }
+                  : undefined}
+                onCancel={() => setWaitingOpen(false)}
+              />
+            </div>
+          )}
           <ReadinessSection
             task={task}
             allTasks={allTasks}
@@ -355,6 +450,29 @@ export function TapContextPanel(props: TapContextPanelProps) {
               onDirectionsChange={props.onDirectionsChange}
             />
           </div>)}
+          {/* The question to bring up — the event panel's section, for a
+              task. Only while it is on the list. */}
+          {task.needsDiscussion && props.onUpdateDiscussion && (
+            <PanelSection
+              id="for-discussion"
+              label="For discussion"
+              preview={task.discussionNote || undefined}
+            >
+              <textarea
+                key={task.id}
+                defaultValue={task.discussionNote ?? ''}
+                onBlur={(e) => {
+                  if ((e.target.value || '') !== (task.discussionNote ?? '')) {
+                    void props.onUpdateDiscussion?.({ needsDiscussion: true, discussionNote: e.target.value })
+                  }
+                }}
+                aria-label="What's the question?"
+                placeholder="What's the question?"
+                rows={2}
+                className="w-full px-2 py-1.5 text-[15px] rounded-md bg-white text-neutral-700 placeholder:text-neutral-400 shadow-[inset_0_0_0_1px_#e5e7eb] focus:outline-none focus:shadow-[inset_0_0_0_1px_#d97706] resize-none"
+              />
+            </PanelSection>
+          )}
           {show('notes') && (<div data-prep-field="notes" className="empty:hidden">
             <PanelNotes
               key={task.id}

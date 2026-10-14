@@ -343,3 +343,45 @@
 /* Dragging a task: the goal cards it can go under (Week, 2026-10-12). */
 .wc-group.is-drop-ok { border-color: var(--color-primary-300); }
 .wc-group.is-drop { border-color: var(--color-primary-600); box-shadow: 0 0 0 2px var(--color-primary-100); }
+
+/* ---- Today, trimmed (spec 2026-10-14) ----------------------------------- */
+/* The header sentence: the day said back from rules; week and weather small after it. */
+.today-sentence { font-family: var(--font-family-display); font-size: 18px; line-height: 1.35; color: var(--color-neutral-700); }
+.today-sentence-link {
+  border: 0; background: none; padding: 0; font: inherit; color: var(--color-primary-700);
+  text-decoration: underline; text-decoration-color: var(--color-primary-200); text-underline-offset: 3px; cursor: pointer;
+}
+.today-sentence-link:hover { text-decoration-color: currentColor; }
+.today-sentence-meta { font-family: var(--font-family-sans); font-size: 13px; color: var(--color-neutral-500); white-space: nowrap; }
+.today-walk { margin: 4px 0 10px; }
+
+/* To talk about: one quiet line of chips under For today. */
+.today-talk { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 14px; font-size: 13px; color: var(--color-neutral-600); }
+.today-talk-label { font-family: var(--font-family-display); font-size: 17px; color: var(--color-neutral-800); }
+.today-talk-chip {
+  padding: 4px 10px; border: 1px solid var(--color-neutral-200); border-radius: 999px;
+  background: var(--color-bg-elevated); color: inherit; font: inherit; text-align: left; cursor: pointer;
+}
+.today-talk-chip:hover { border-color: var(--color-neutral-300); color: var(--color-neutral-900); }
+.today-talk-chip.is-proposed { border: 1.5px dashed #1b6a64; background: #eef6f3; color: #123f3b; cursor: default; }
+.dark .today-talk-chip.is-proposed { border-color: #6cc4b9; background: #182b29; color: #d7efe9; }
+
+/* A pending change card on Today: Week's dashed look (canvas.css .wc-dayrow.is-proposed).
+   Teal = would arrive or change here; grey = would leave. Struck = done, skipped or leaving. */
+.today-preview-row { position: relative; border-radius: 6px; margin: 2px -7px; padding: 0 7px 4px; }
+.today-preview-row.is-proposed { border: 1.5px dashed #1b6a64; background: #eef6f3; color: #123f3b; }
+.today-preview-row.is-leaving { border: 1.5px dashed #9aa3a0; color: #7a7f7d; }
+.today-preview-row.is-leaving > * { opacity: .8; }
+.today-preview-row.is-struck { text-decoration: line-through; text-decoration-color: currentColor; }
+.today-preview-row.is-leaving .wc-proposed-note { color: #4a4f4d; }
+.today-preview-note { padding-left: 4px; }
+.today-proposed-list { list-style: none; margin: 6px 0 0; padding: 0; }
+.today-proposed-list .today-preview-row { display: flex; flex-direction: column; gap: 2px; padding: 6px 7px; font-size: 15px; }
+.today-scale-item.is-preview.is-proposed { border: 1.5px dashed #1b6a64; background: #eef6f3; box-shadow: none; color: #123f3b; cursor: default; }
+.today-scale-item.is-preview.is-leaving { border: 1.5px dashed #9aa3a0; background: transparent; box-shadow: none; color: #7a7f7d; }
+.today-scale-item.is-preview.is-struck .today-scale-line { text-decoration: line-through; }
+.today-scale-item.is-preview .today-scale-open { display: flex; flex-direction: column; align-items: flex-start; }
+.today-scale-item.is-preview .wc-proposed-note { font-size: 9.5px; }
+.dark .today-preview-row.is-proposed, .dark .today-scale-item.is-preview.is-proposed { border-color: #6cc4b9; background: #182b29; color: #d7efe9; }
+.dark .today-preview-row.is-leaving, .dark .today-scale-item.is-preview.is-leaving { border-color: #5b6461; color: #a5aca9; }
+.dark .today-preview-row.is-leaving .wc-proposed-note { color: #a5aca9; }

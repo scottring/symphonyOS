@@ -5,18 +5,12 @@ import type { FamilyMember } from '@/types/family'
 import { useScheduleActionsContext } from '@/contexts/ScheduleActionsContext'
 import { ContextPicker } from '@/components/triage'
 import { AssigneeDropdown, MultiAssigneeDropdown } from '@/components/family'
-import { RescheduleButton } from './RescheduleButton'
 import { RoutineMoveButton } from './RoutineMoveButton'
-import { ScheduleItemActionsMenu } from './ScheduleItemActionsMenu'
 import { RAIL, RAIL_SLOT, RAIL_WHO } from './todayRowGrid'
 
 interface RowActionRailProps {
   item: TimelineItem
-  variant: 'full' | 'minimal'
-  /** Opens the full detail panel — the '...' menu's escape hatch. */
-  onSelect: () => void
   onContextChange?: (context: TaskContext | undefined) => void
-  onUpdateDiscussion?: (next: { needsDiscussion: boolean; discussionNote?: string }) => void
   onAssign?: (memberId: string | null) => void
   onAssignAll?: (memberIds: string[]) => void
   familyMembers: FamilyMember[]
@@ -108,11 +102,16 @@ function StartMeetingButton({ item }: { item: TimelineItem }) {
  * column absorbed the slack, only the last one ever formed a column. Nothing
  * down the page lined up. Reserve the shape and the columns hold.
  *
- * Slot order is fixed: assignee | context | verb | overflow. Exactly one verb
- * exists per row type — a task reschedules, a routine moves or skips this
- * occurrence, a timed event
- * starts — so they share one slot without ever competing for it. That is what
- * lets the rail be four cells wide instead of six.
+ * Slot order is fixed: assignee | context | verb | spare. At most one verb
+ * exists per row type — a routine moves or skips this occurrence, a timed
+ * event starts — so they share one slot without ever competing for it.
+ *
+ * Today, trimmed (2026-10-14): a task row is tick, drag and tap. Its
+ * Reschedule button and the row ⋯ menu are gone — every job they did lives in
+ * the item panel (TapContextPanel / TapEventPanel). The verb cell is empty on a
+ * task, and the last cell stays as a reserved spacer: RoutineCollectionRow
+ * draws the same four cells, so the people column still lines up down the
+ * page.
  *
  * The order reads WHO -> WHAT KIND -> DO IT -> MORE: identity and
  * classification first, because "is this mine?" is the question you ask of a
@@ -127,10 +126,7 @@ function StartMeetingButton({ item }: { item: TimelineItem }) {
  */
 export function RowActionRail({
   item,
-  variant,
-  onSelect,
   onContextChange,
-  onUpdateDiscussion,
   onAssign,
   onAssignAll,
   familyMembers,
@@ -138,25 +134,13 @@ export function RowActionRail({
   assignedToAll,
   assigned = true,
 }: RowActionRailProps) {
-  const isTask = item.type === 'task'
   const isRoutine = item.type === 'routine'
   const isEvent = item.type === 'event'
   const isLive = !item.completed && !item.skipped
 
   const verb =
-    isTask && !item.completed && variant !== 'minimal' ? <RescheduleButton item={item} />
-    : isRoutine && isLive ? <RoutineMoveButton item={item} />
+    isRoutine && isLive ? <RoutineMoveButton item={item} />
     : isEvent && isLive && !item.allDay ? <StartMeetingButton item={item} />
-    : null
-
-  const menu = variant !== 'minimal' && (isTask || isRoutine || isEvent)
-    ? (
-      <ScheduleItemActionsMenu
-        item={item}
-        onOpenDetail={onSelect}
-        onUpdateDiscussion={onUpdateDiscussion}
-      />
-    )
     : null
 
   // Context is hover-revealed in BOTH states now. It was already hidden while
@@ -198,7 +182,7 @@ export function RowActionRail({
     </div>
   ) : null
 
-  // assignee | context | verb | overflow — see the slot-order note above.
+  // assignee | context | verb | spare — see the slot-order note above.
   // `who` is the one cell that stays lit: who a thing involves is household
   // INFORMATION, not a control, and it is half the reason to look at the row
   // at all. Everything after it is something you do, not something you read.
@@ -208,7 +192,8 @@ export function RowActionRail({
     { node: who, className: WHO_SLOT, quiet: !assigned },
     { node: context, className: SLOT },
     { node: verb, className: SLOT, quiet: true },
-    { node: menu, className: SLOT, quiet: true },
+    // Reserved, empty: keeps this rail as wide as RoutineCollectionRow's.
+    { node: null, className: SLOT },
   ]
 
   return (

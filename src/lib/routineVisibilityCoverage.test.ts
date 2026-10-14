@@ -92,13 +92,6 @@ const ALLOWED = new Map<string, string>([
       'Today and planning" switch. Write path only (Scott, 2026-10-03).',
   ],
   [
-    'components/schedule/ScheduleItemActionsMenu.tsx',
-    "the row's ⋯ menu WRITES the flag (\"Not on Today\") and reads it once — " +
-      'to decide whether to offer that verb on a routine already off Today. ' +
-      'Offering a verb is not deciding what renders; the row it sits on got ' +
-      'there through resolveRoutine like every other.',
-  ],
-  [
     'components/schedule/TodaySectionList.tsx',
     "a collection row's \"Remove from Today\" WRITES the flag (it used to " +
       "write visibility:'reference', which stopped the routine everywhere — a " +

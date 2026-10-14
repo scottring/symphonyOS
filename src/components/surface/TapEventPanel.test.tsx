@@ -478,4 +478,37 @@ describe('TapEventPanel', () => {
       expect(screen.queryByRole('button', { name: 'More actions' })).not.toBeInTheDocument()
     })
   })
+
+  // Today, trimmed (2026-10-14): the row ⋯ menu's "Skip today" lives here.
+  describe('skip this day', () => {
+    it('offers Skip today and calls the toggle', async () => {
+      const onToggle = vi.fn()
+      const { user } = render(<TapEventPanel
+        event={mockEvent} notes={undefined} allTasks={[]} {...baseHandlers}
+        skipDay={{ skipped: false, label: 'Skip today', onToggle }}
+      />)
+      await user.click(screen.getByRole('button', { name: 'Skip today' }))
+      expect(onToggle).toHaveBeenCalledTimes(1)
+    })
+
+    it('a skipped occurrence offers to put it back, pressed', () => {
+      render(<TapEventPanel
+        event={mockEvent} notes={undefined} allTasks={[]} {...baseHandlers}
+        skipDay={{ skipped: true, label: 'Skip today', onToggle: vi.fn() }}
+      />)
+      expect(screen.getByRole('button', { name: 'Put it back' })).toHaveAttribute('aria-pressed', 'true')
+    })
+
+    it('a completed event offers no skip, and no host means no chip', () => {
+      const { unmount } = render(<TapEventPanel
+        event={mockEvent} notes={undefined} allTasks={[]} {...baseHandlers}
+        completed onToggleComplete={vi.fn()}
+        skipDay={{ skipped: false, label: 'Skip today', onToggle: vi.fn() }}
+      />)
+      expect(screen.queryByRole('button', { name: 'Skip today' })).not.toBeInTheDocument()
+      unmount()
+      render(<TapEventPanel event={mockEvent} notes={undefined} allTasks={[]} {...baseHandlers} />)
+      expect(screen.queryByRole('button', { name: 'Skip today' })).not.toBeInTheDocument()
+    })
+  })
 })

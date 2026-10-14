@@ -71,6 +71,10 @@ import { formatDateLabel } from '@/lib/dateHelpers';
 import { consumeDiscussionOpen } from '@/lib/discussions/openIntent';
 import type { Task, TaskLink } from '@/types/task';
 import { enrichLink } from '@/lib/enrichLink';
+import { useCanvasActivity } from '@/contexts/CanvasActivityContext';
+import { waitingUpdates, CLEAR_WAITING, checkBackLabel } from '@/lib/today/waiting';
+import { viewedDayFromParam, isNeededOn, neededTodayToggle, isOnDay, dayRemovalWithUndo } from '@/lib/today/itemPanelDay';
+import { isSameDay } from '@/lib/dateUtils';
 
 /** Find a task by id, searching one level of nested subtasks (group children). */
 function findTask(tasks: Task[], id: string): Task | null {
@@ -254,7 +258,18 @@ function TaskPanelBody({ id }: { id: string }) {
 
   const handleClose = useCallback(() => clearSelection(), [clearSelection]);
 
+  // The day Today is showing (its `?date=` contract) — what "Need today" and
+  // "Remove from this day" mean, as they did on the row menu.
+  const [searchParams] = useSearchParams();
+  const dateParam = searchParams.get('date');
+  const viewedDay = useMemo(() => viewedDayFromParam(dateParam), [dateParam]);
+  const { run } = useCanvasActivity();
+
   if (!task) return <PanelLoading />;
+
+  const dayName = isSameDay(viewedDay, new Date())
+    ? 'today'
+    : viewedDay.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
 
   const childIds = (task.subtasks ?? []).map((s) => s.id);
 
@@ -419,6 +434,25 @@ function TaskPanelBody({ id }: { id: string }) {
       onContactChange={(cid) => updateTask(task.id, { contactId: cid })}
       onSearchContacts={searchContacts}
       onAddContact={(name, details) => addContact({ name, ...details })}
+      // What the Today row's menus did (Today, trimmed, 2026-10-14) — the same
+      // writers, through the same gated updateTask.
+      onUpdateDiscussion={(next) => updateTask(task.id, next)}
+      onSaveWaiting={async (waitingFor, checkBack) => {
+        const result = await updateTask(task.id, waitingUpdates(task, waitingFor, checkBack));
+        if (result === false) return;
+        showToast(checkBack ? `Waiting — back ${checkBackLabel(checkBack)}` : 'Marked waiting', 'success');
+      }}
+      onClearWaiting={() => updateTask(task.id, CLEAR_WAITING)}
+      neededToday={isNeededOn(task, viewedDay)}
+      onToggleNeededToday={() => updateTask(task.id, neededTodayToggle(task, viewedDay))}
+      removeFromDayLabel={`Remove from ${dayName}`}
+      onRemoveFromDay={isOnDay(task, viewedDay) ? () => {
+        const { updates, previous } = dayRemovalWithUndo(task, viewedDay);
+        return run(`Remove “${task.title}” from ${dayName}`, async () => (await updateTask(task.id, updates)) !== false, {
+          ids: [task.id],
+          undo: async () => (await updateTask(task.id, previous)) !== false,
+        });
+      } : undefined}
     />
   );
 }
@@ -591,17 +625,45 @@ function EventPanelBody({ id }: { id: string }) {
   // write), keyed by the event's OWN start day — so completing works even when
   // the panel was opened from another day's view. Optimistic toggle; the Today
   // timeline picks the change up via its actionable_instances realtime refresh.
-  const { getInstance, markDone, undoDone } = useActionableInstances();
+  const { getInstance, markDone, undoDone, skip } = useActionableInstances();
   const [completed, setCompleted] = useState(false);
+  const [skipped, setSkipped] = useState(false);
   const instanceDate = useMemo(() => (event ? getEventDayStart(event) : null), [event]);
   useEffect(() => {
     if (!event || !instanceDate) return;
     let cancelled = false;
     getInstance('calendar_event', event.google_event_id || event.id, instanceDate).then((instance) => {
-      if (!cancelled) setCompleted(instance?.status === 'completed');
+      if (cancelled) return;
+      setCompleted(instance?.status === 'completed');
+      setSkipped(instance?.status === 'skipped');
     });
     return () => { cancelled = true; };
   }, [event, getInstance, instanceDate]);
+
+  // "Skip today" from the Today row's ⋯ menu (Today, trimmed, 2026-10-14):
+  // this occurrence only, on the event's own day, with Undo — the row's
+  // writer (useScheduleActions.onSkipEvent) through the canvas receipt.
+  const { run } = useCanvasActivity();
+  const handleToggleSkip = useCallback(async () => {
+    if (!event || !instanceDate) return;
+    const eid = event.google_event_id || event.id;
+    const day = instanceDate;
+    const dayName = isSameDay(day, new Date()) ? 'today' : day.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+    const next = !skipped;
+    const ok = await run(
+      next ? `Skip “${event.title}” ${dayName}` : `Put “${event.title}” back ${dayName}`,
+      () => (next ? skip('calendar_event', eid, day) : undoDone('calendar_event', eid, day)),
+      {
+        ids: [eid],
+        undo: async () => {
+          const undone = await (next ? undoDone('calendar_event', eid, day) : skip('calendar_event', eid, day));
+          if (undone) setSkipped(!next);
+          return undone;
+        },
+      },
+    );
+    if (ok) setSkipped(next);
+  }, [event, instanceDate, skipped, run, skip, undoDone]);
 
   const handleToggleComplete = useCallback(async () => {
     if (!event || !instanceDate) return;
@@ -674,6 +736,11 @@ function EventPanelBody({ id }: { id: string }) {
       allTasks={tasks}
       completed={completed}
       onToggleComplete={handleToggleComplete}
+      skipDay={instanceDate ? {
+        skipped,
+        label: isSameDay(instanceDate, new Date()) ? 'Skip today' : 'Skip this day',
+        onToggle: () => { void handleToggleSkip(); },
+      } : undefined}
       calendarAccess={calendarAccess}
       writableCalendars={writableCalendars}
       onMoveToCalendar={async (destinationCalendarId) => {
