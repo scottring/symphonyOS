@@ -102,6 +102,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { AuthForm } from '@/components/AuthForm';
 import { supabase } from '@/lib/supabase';
 import type { WallV2TimelineEvent } from './types';
+import { useWallTheme } from './wallThemeOverride';
 import type { Task } from '@/types/task';
 
 /**
@@ -159,7 +160,6 @@ function formatDate(d: Date): { weekday: string; fullDate: string } {
   return { weekday, fullDate };
 }
 
-const THEME_KEY = 'symphony-wall-theme';
 
 /** How long the dinner card stays on a paged day before returning to today.
  *  Long enough to read a plan, short enough that the next person through the
@@ -208,18 +208,6 @@ export function WallV2Shell() {
   useEffect(() => {
     const id = setInterval(() => setNow(new Date()), 60_000);
     return () => clearInterval(id);
-  }, []);
-
-  const [isDark, setIsDark] = useState(() => {
-    if (typeof window === 'undefined') return false;
-    return localStorage.getItem(THEME_KEY) === 'dark';
-  });
-  const toggleTheme = useCallback(() => {
-    setIsDark((d) => {
-      const next = !d;
-      try { localStorage.setItem(THEME_KEY, next ? 'dark' : 'light'); } catch { /* noop */ }
-      return next;
-    });
   }, []);
 
   // Share the same hide-daily preference Today + Week views use, so the
@@ -1041,6 +1029,7 @@ export function WallV2Shell() {
   // Recipes stay one tap away in the bottom bar; everything secondary —
   // adding a task, lists, notes, the light/dark view, settings — sits in one
   // labelled More sheet.
+  const { dark: isDark, toggle: toggleTheme } = useWallTheme(kioskV1.pick.dark);
   const kioskTools = useMemo(() => ({
     onGroceries: () => {
       if (!groceryList) { showFlash('No family grocery list yet'); return; }
@@ -1055,6 +1044,7 @@ export function WallV2Shell() {
       { id: 'settings', label: 'Settings', sub: 'Guest mode, refresh, routines', icon: Settings, onSelect: () => handleDockAction('utilities') },
     ],
   }), [groceryList, showFlash, handleDockAction, scratchRows.length, isDark, toggleTheme]);
+  const kioskV1Shown = useMemo(() => ({ ...kioskV1, pick: { ...kioskV1.pick, dark: isDark } }), [kioskV1, isDark]);
   // What's already on the grocery list, beside a proposal ("where they'll go").
   const { items: groceryItems } = useListItems(stage.kind === 'groceries' ? groceryList?.id ?? null : null);
   const groceryOpenItems = useMemo(
@@ -1073,7 +1063,7 @@ export function WallV2Shell() {
   }
 
   return (
-    <div className={`${kioskV1.pick.dark ? 'dark ' : ''}wall-touch-root relative h-screen w-screen overflow-hidden transition-colors ${WALL.root}`}>
+    <div className={`${isDark ? 'dark ' : ''}wall-touch-root relative h-screen w-screen overflow-hidden transition-colors ${WALL.root}`}>
       {/* flex column so the stale banner can claim height without the fixed grid
           clipping — the grid below simply shrinks when the banner appears. */}
       <div className="h-full w-full p-4 flex flex-col">
@@ -1143,7 +1133,7 @@ export function WallV2Shell() {
           onTapQuestion={() => (handoffAsk ? setShowWhoSheet(true) : setShowQuestionSheet(true))}
           flash={showFlash}
           voice={wallVoice}
-          v1={kioskV1}
+          v1={kioskV1Shown}
         />
       </div>
 
