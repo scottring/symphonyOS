@@ -41,4 +41,17 @@ describe('workspace voice',()=>{
   await tool('show_workspace',{page:'week',date:'2026-10-09'})
   expect(navigate).toHaveBeenCalledWith('/week?view=alongside&date=2026-10-09');expect(ask).not.toHaveBeenCalled()
  })
+ it.each([
+  'Two changes are on the card waiting for Approve. Nothing has been saved yet.',
+  'Saved: call the bank this afternoon. Undo is available.',
+  'Gmail is not connected, so I could not check those messages.',
+ ])('hands the real assistant outcome to the voice unchanged: %s',async(reply)=>{
+  const ask=vi.fn(async()=>reply)
+  const {result}=renderHook(()=>useWorkspaceVoice(context,ask,vi.fn(),true,'a'))
+  await act(()=>result.current.start())
+  const request='Move the bank call to tomorrow'
+  expect(await mocks.instances[0].deps.handleTool('ask_symphony',{request})).toEqual({reply})
+  expect(ask).toHaveBeenCalledWith(request)
+  expect(ask).toHaveBeenCalledTimes(1)
+ })
 })
