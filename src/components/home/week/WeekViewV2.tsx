@@ -43,6 +43,7 @@ import { useActionableInstances } from '@/hooks/useActionableInstances'
 import { showToast } from '@/hooks/useToast'
 import { layoutContextSpans } from '@/lib/week/journalSpread'
 import { localYmd } from '@/lib/cadence/config'
+import { useSelectionOptional } from '@/shell/providers/SelectionProvider'
 import { weekOfYear } from '@/lib/planning/horizonNumerals'
 import { publishViewedWeek } from '@/lib/viewedWeekSignal'
 import { useMediaQuery } from '@/hooks/useMediaQuery'
@@ -566,8 +567,18 @@ export function WeekViewV2(props: WeekViewV2Props) {
   // actual routine id stored in the DB.
   // The day grid uses it too: a routine clicked in a day or in "Sometime this
   // weekend" opened nothing (Scott, 2026-10-04).
+  const selectionCtx = useSelectionOptional()
   const handleSelectBlock = (id: string) => {
     if (id.startsWith('routine-')) {
+      // Open the routine on the day it was tapped, so its panel offers that
+      // occurrence ("Thu Oct 15 only": I'll do it, Skip it, Another day).
+      const m = /^routine-(.+)-day(\d+)$/.exec(id)
+      if (m && selectionCtx) {
+        const day = new Date(weekStart)
+        day.setDate(day.getDate() + Number(m[2]))
+        selectionCtx.setSelection({ kind: 'routine', id: m[1], date: localYmd(day) })
+        return
+      }
       onSelectItem(id.replace(/-day\d+$/, ''))
       return
     }
