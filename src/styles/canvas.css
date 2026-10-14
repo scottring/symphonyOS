@@ -172,6 +172,8 @@
 .dark .change-card-kind { color: #6cc4b9; }
 .dark .change-card-approve { background: #6cc4b9; color: #0e1b1a; }
 .dark .change-card-where, .dark .change-card-note { color: #a5aca9; }
+.dark .change-card-error { color: #f2a07f; }
+.change-card-head .canvas-icon { min-width: 44px; min-height: 44px; }
 .canvas-receipt-request { color: var(--color-neutral-600); max-width: 40ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .canvas-receipt-summary { color: var(--color-neutral-900); min-width: 0; }
 .canvas-receipt-changes { display: inline-flex; gap: 6px; flex-wrap: wrap; }
