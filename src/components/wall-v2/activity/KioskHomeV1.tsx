@@ -2,7 +2,8 @@
 // https://claude.ai/artifact/QgfzGwNhgKaECK74dk5nJP). One thing leads at a
 // time, chosen by kioskScreen from the household's routines:
 //
-//   out-the-door   countdown to leaving · each kid's steps as chips · the bag
+//   out-the-door   getting ready for school: time left · each kid's steps as
+//                  a checklist (icon = check) · the grown-ups' steps below
 //   rest           the place's scenery · one sentence · notes for the house ·
 //                  the places (Groceries, Recipes, Call, Notes)
 //   home           each kid's after-school work · tonight's dinner beside it
@@ -14,12 +15,12 @@
 //                  thing and the rest of tomorrow · things to talk about
 //   weekend        the day in hours with who's in each block · sometime today
 //
-// Graphics carry the information (rings are time left, chips are steps,
+// Graphics carry the information (rings are time left, icons are steps,
 // faces are people); words only for names and the sentence that matters.
 // Presentation only: the Shell owns data, permissions and writes.
 
-import type { ReactNode } from 'react'
-import { Check, ChevronRight, Clock, ShoppingCart, BookOpen, Phone, StickyNote, ChefHat, MessageSquare } from 'lucide-react'
+import { createElement, type ReactNode } from 'react'
+import { Check, ChevronRight, Clock, ShoppingCart, BookOpen, Phone, StickyNote, ChefHat, MessageSquare, Shirt, ShoppingBasket, BedDouble, Smile, Utensils, Sparkles, Backpack, Footprints, CircleCheck, type LucideIcon } from 'lucide-react'
 import type { FamilyMember } from '@/types/family'
 import type { KidRow } from '@/lib/wall/kidDayModel'
 import type { WallTodayRow } from '@/lib/wall/wallMomentsModel'
@@ -111,75 +112,149 @@ const clockLabel = (min: number) => {
 }
 const nowMin = (d: Date) => d.getHours() * 60 + d.getMinutes()
 
-/** A step chip: done, the one under way, or still to do. */
-function StepChip({ row, current, onTick, label, startsAt }: { row: KidRow; current: boolean; onTick: () => void; label: string; startsAt: number | null }) {
-  // A step without its own time inherits the routine's start; show only its own.
-  const t = minutesOf(row.timeOfDay)
-  const own = t != null && t !== startsAt ? t : null
-  // "Bag packed: homework folder, …" — the chip says the step; the bag says what.
-  const short = row.title.split(':')[0].trim() || row.title
-  return (
-    <button type="button" aria-pressed={row.done} aria-label={`${label}: ${row.title}`} onClick={onTick}
-      className={`kv-chip ${row.done ? 'is-done' : current ? 'is-now' : ''}`}>
-      {row.done && <Check aria-hidden="true" />}
-      <span>{short}</span>
-      {own != null && !row.done && <small>{clockLabel(own)}</small>}
-    </button>
-  )
+/** A step's picture, from the words in it; a plain circle-check otherwise.
+ *  Order matters: "Dirty clothes in the hamper" is laundry, not dressing;
+ *  "Clear the breakfast dishes" is clearing, not eating. */
+const STEP_ICONS: [RegExp, LucideIcon][] = [
+  [/\b(hamper|laundry)\b/i, ShoppingBasket],
+  [/\b(dish(es)?|clear)\b/i, Sparkles],
+  [/\b(dress(ed)?|clothes|outfit|uniform)\b/i, Shirt],
+  [/\b(bed|room|tidy)\b/i, BedDouble],
+  [/\b(teeth|tooth|brush)\b/i, Smile],
+  [/\b(breakfast|eat|lunch|snack)\b/i, Utensils],
+  [/\b(bag|backpack)\b/i, Backpack],
+  [/\b(shoes?|jacket|coat|boots)\b/i, Footprints],
+]
+export function stepIcon(title: string): LucideIcon {
+  return STEP_ICONS.find(([re]) => re.test(title))?.[1] ?? CircleCheck
 }
 
 function isForKid(row: KidRow, kidId: string) {
   return !row.by || row.by.length === 0 || row.by.includes(kidId)
 }
 
+/** A step's own time: one without its own inherits the routine's start, so
+ *  a time equal to the start is no time of its own. */
+const ownTime = (row: KidRow, startsAt: number | null) => {
+  const t = minutesOf(row.timeOfDay)
+  return t != null && t !== startsAt ? t : null
+}
+
+/** The morning in two parts, from the times alone: the untimed steps before
+ *  the first timed one, then the rest. Named after that first timed step
+ *  ("Before breakfast" / "Breakfast & out the door"), or its time. */
+function morningSections(steps: KidRow[], startsAt: number | null): { label: string | null; rows: KidRow[] }[] {
+  const first = steps.findIndex((r) => ownTime(r, startsAt) != null)
+  if (first <= 0) return steps.length ? [{ label: null, rows: steps }] : []
+  const lead = steps[first]
+  const meal = lead.title.match(/\b(breakfast|lunch|snack)\b/i)?.[1].toLowerCase()
+  const name = meal ?? clockLabel(ownTime(lead, startsAt) ?? 0)
+  return [
+    { label: `Before ${name}`, rows: steps.slice(0, first) },
+    { label: `${name[0].toUpperCase()}${name.slice(1)} & out the door`, rows: steps.slice(first) },
+  ]
+}
+
+/** A checklist row: the step's icon is its check (Scott, 2026-10-14). Done,
+ *  the circle fills green and shows a check; the whole row is the toggle. */
+function StepRow({ row, next, startsAt, extra, onTick }: { row: KidRow; next: boolean; startsAt: number | null; extra?: string; onTick: () => void }) {
+  const own = ownTime(row, startsAt)
+  // "Bag packed: homework folder, …" — the row says the step; the bag says what.
+  const short = row.title.split(':')[0].trim() || row.title
+  return (
+    <button type="button" onClick={onTick} aria-label={`Mark ${short} ${row.done ? 'not done' : 'done'}`}
+      className={`kv-step ${row.done ? 'is-done' : next ? 'is-next' : ''}`}>
+      <span className="kv-step-dot" aria-hidden="true">{createElement(row.done ? Check : stepIcon(row.title))}</span>
+      <span className="kv-step-title"><span>{short}</span>{extra && <small>{extra}</small>}</span>
+      {next && <span className="kv-step-next">NEXT</span>}
+      {own != null && <span className="kv-step-time">{clockLabel(own)}</span>}
+    </button>
+  )
+}
+
+/** Getting ready for school (mockup 2026-10-14, from Scott's sketch): the
+ *  title and the time left; each kid's steps as a checklist in two parts;
+ *  the grown-ups' steps in one line at the foot. */
 function OutTheDoor(p: KioskHomeV1Props) {
   const end = p.anchors.morning?.end ?? 0
   const start = p.anchors.morning?.start ?? end - 35
+  const startsAt = p.anchors.morning?.start ?? null
   const left = Math.max(0, end - nowMin(p.now))
-  const walker = p.kids[0]?.morning.find((r) => r.by?.length && !r.by.some((id) => p.kids.some((k) => k.member.id === id)) && minutesOf(r.timeOfDay) === end)
-  const shared = p.kids[0]?.morning.filter((r) => r.by?.length && !p.kids.some((k) => r.by!.includes(k.member.id)) && r !== walker) ?? []
+  const total = end - start + 15
+  const frac = total > 0 ? Math.min(1, left / total) : 0
+  const kidIds = p.kids.map((k) => k.member.id)
+  // The grown-ups' steps: the ones that name only people who aren't kids.
+  const seen = new Set<string>()
+  const grownUps = p.kids.flatMap((k) => k.morning)
+    .filter((r) => r.by?.length && !r.by.some((id) => kidIds.includes(id)))
+    .filter((r) => { const key = `${r.title}|${r.timeOfDay}`; if (seen.has(r.id) || seen.has(key)) return false; seen.add(r.id); seen.add(key); return true })
+    .sort((a, b) => (minutesOf(a.timeOfDay) ?? 0) - (minutesOf(b.timeOfDay) ?? 0))
+  const r = 26, c = 2 * Math.PI * r
   return (
-    <div className="kv-row">
-      <section className="kv-card kv-countdown" aria-label="Countdown">
-        <Ring left={left} total={end - start + 15} size={380}>
-          <b className="kv-big">{left}</b><span>minute{left === 1 ? '' : 's'}</span>
-        </Ring>
-        <div className="kv-center">
-          <div className="kv-strong">Out the door at {clockLabel(end)}</div>
-          {walker && <div className="kv-muted"><Faces ids={walker.by ?? []} members={p.members} /> {walker.title}</div>}
+    <div className="kv-otd">
+      <header className="kv-otd-head">
+        <h2 className="kv-otd-title">Getting ready for school</h2>
+        <div className="kv-otd-left" aria-label="Time left">
+          <svg width="64" height="64" viewBox="0 0 64 64" aria-hidden="true">
+            <circle cx="32" cy="32" r={r} className="kv-otd-track" />
+            <circle cx="32" cy="32" r={r} className="kv-otd-fill" strokeDasharray={c} strokeDashoffset={c * (1 - frac)} transform="rotate(-90 32 32)" />
+          </svg>
+          {left > 0
+            ? <span><b>{left}</b> <span>{left === 1 ? 'minute to go' : 'minutes to go'}</span></span>
+            : <span><b className="is-word">Time to go</b></span>}
         </div>
-        {shared.length > 0 && (
-          <ul className="kv-shared" aria-label="Grown-ups this morning">
-            {shared.map((r) => <li key={r.id}><Faces ids={r.by ?? []} members={p.members} /><span>{r.title}</span>{r.timeOfDay && <small>{clockLabel(minutesOf(r.timeOfDay) ?? 0)}</small>}</li>)}
-          </ul>
-        )}
-      </section>
-      <section className="kv-kids" aria-label="Each kid's morning">
+        <div className="kv-otd-at">
+          <small>Out the door</small>
+          <b>{clockLabel(end)}</b>
+        </div>
+      </header>
+      <div className="kv-otd-kids" style={{ ['--kids' as string]: Math.max(1, p.kids.length) }}>
         {p.kids.map((k) => {
           const steps = k.morning.filter((r) => isForKid(r, k.member.id))
-          const current = steps.find((r) => !r.done)
+          const next = steps.find((r) => !r.done)
           const done = steps.filter((r) => r.done).length
+          const sections = morningSections(steps, startsAt)
+          const bagRow = k.bag.length ? steps.find((r) => stepIcon(r.title) === Backpack) : undefined
+          const tint = k.member.color || 'var(--kc-muted)'
           return (
-            <div key={k.member.id} className="kv-card kv-kid">
-              <button type="button" className="kv-kid-head" onClick={() => p.onOpenKid(k.member)}>
-                <Face member={k.member} size="lg" />
-                <span><b>{k.member.name}</b>{k.special && <small>{k.special} today</small>}</span>
-                <span className="kv-count">{done} of {steps.length}</span>
+            <section key={k.member.id} className="kv-otd-kid" aria-label={`${k.member.name}'s morning`}>
+              <button type="button" className="kv-otd-who" onClick={() => p.onOpenKid(k.member)}>
+                <span className="kv-otd-av" aria-hidden="true" style={{ ['--tint' as string]: tint }}>{(k.member.initials || k.member.name).slice(0, 1)}</span>
+                <span className="kv-otd-name"><b>{k.member.name}</b>{k.special && <small>{k.special} today</small>}</span>
+                <span className="kv-otd-count">
+                  <small>{done} of {steps.length} done</small>
+                  <span className="kv-otd-bar" aria-hidden="true"><span style={{ width: `${steps.length ? (done / steps.length) * 100 : 0}%` }} /></span>
+                </span>
               </button>
-              <div className="kv-chips">
-                {steps.map((r) => <StepChip key={r.id} row={r} current={r === current} label={k.member.name} startsAt={p.anchors.morning?.start ?? null} onTick={() => p.onTick(k.member, r)} />)}
-                {steps.length === 0 && <p className="kv-quiet">Nothing on {k.member.name}'s morning.</p>}
-              </div>
-              {k.bag.length > 0 && (
-                <div className="kv-bag">
-                  <p className="kv-lab">In the bag</p>
-                  <div className="kv-tags">{k.bag.map((b) => <span key={b} className="kv-tag is-today">{b}</span>)}</div>
+              {sections.map((s) => (
+                <div key={s.label ?? 'all'} role="group" aria-label={s.label ?? `${k.member.name}'s steps`} className="kv-otd-sec">
+                  {s.label && <p className="kv-otd-lab" aria-hidden="true">{s.label}</p>}
+                  {s.rows.map((r) => (
+                    <StepRow key={r.id} row={r} next={r === next} startsAt={startsAt}
+                      extra={r === bagRow ? k.bag.join(' · ') : undefined} onTick={() => p.onTick(k.member, r)} />
+                  ))}
                 </div>
-              )}
-            </div>
+              ))}
+              {steps.length === 0 && <p className="kv-quiet">Nothing on {k.member.name}'s morning.</p>}
+              {k.bag.length > 0 && !bagRow && <p className="kv-otd-bag">In the bag: <span>{k.bag.join(' · ')}</span></p>}
+            </section>
           )
         })}
-      </section>
+      </div>
+      {grownUps.length > 0 && (
+        <ul className="kv-otd-grown" aria-label="Grown-ups this morning">
+          {grownUps.map((row) => {
+            const names = (row.by ?? []).map((id) => p.members.find((m) => m.id === id)?.name).filter(Boolean).join(' & ')
+            return (
+              <li key={row.id}>
+                <span className="kv-otd-gt">{row.timeOfDay ? clockLabel(minutesOf(row.timeOfDay) ?? 0) : ''}</span>
+                <Faces ids={row.by ?? []} members={p.members} />
+                <span>{row.title}{names ? ` · ${names}` : ''}</span>
+              </li>
+            )
+          })}
+        </ul>
+      )}
     </div>
   )
 }

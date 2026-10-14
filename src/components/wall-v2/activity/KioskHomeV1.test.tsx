@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, within } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
-import { KioskHomeV1, type KioskHomeV1Props } from './KioskHomeV1'
+import { KioskHomeV1, stepIcon, type KioskHomeV1Props } from './KioskHomeV1'
+import { Backpack, BedDouble, CircleCheck, Footprints, Shirt, ShoppingBasket, Smile, Sparkles, Utensils } from 'lucide-react'
 import type { FamilyMember } from '@/types/family'
 
 const member = (id: string, name: string, color: string) => ({ id, name, initials: name[0], color }) as FamilyMember
@@ -37,20 +38,74 @@ function props(over: Partial<KioskHomeV1Props> = {}): KioskHomeV1Props {
 }
 
 describe('the wall, version 1', () => {
-  it("out the door: each kid's own steps as chips; the grown-ups' steps beside the countdown", () => {
+  it("out the door: each kid's own steps as a checklist; the grown-ups' steps in a strip below", () => {
     const p = props()
     render(<KioskHomeV1 {...p} />)
-    const ellaCard = screen.getByText('Ella').closest('.kv-kid') as HTMLElement
-    const chips = within(ellaCard).getAllByRole('button', { name: /^Ella: / }).map((b) => b.textContent)
+    const ellaCol = screen.getByRole('region', { name: "Ella's morning" })
+    const rows = within(ellaCol).getAllByRole('button', { name: /^Mark / })
     // "Bag packed: …" shows as "Bag packed"; the walk and wake-up are Scott's, breakfast is Iris's.
-    expect(chips).toEqual(['Get dressed', 'Bag packed7:15'])
-    expect(within(ellaCard).getByText('Library today')).toBeInTheDocument()
-    expect(within(ellaCard).getByText('Library book')).toBeInTheDocument()
-    expect(screen.getByText('Out the door at 7:20')).toBeInTheDocument()
-    expect(screen.getByText('Wake the kids')).toBeInTheDocument()
-    expect(screen.getByText('Breakfast on the table')).toBeInTheDocument()
-    fireEvent.click(within(ellaCard).getByRole('button', { name: 'Ella: Bag packed: homework folder, take-home folder' }))
+    // One leading element per row: the step's icon is the completion circle.
+    expect(rows.map((r) => r.getAttribute('aria-label'))).toEqual(['Mark Get dressed not done', 'Mark Bag packed done'])
+    expect(within(rows[0]).getByText('Get dressed')).toBeInTheDocument()
+    expect(within(rows[1]).getByText('Bag packed')).toBeInTheDocument()
+    expect(within(rows[1]).getByText('7:15')).toBeInTheDocument()
+    expect(rows[0]).toHaveClass('is-done')
+    expect(rows[1]).not.toHaveClass('is-done')
+    expect(ellaCol.querySelector('.kv-chip')).toBeNull()
+    expect(ellaCol.querySelector('.kv-check')).toBeNull()
+    expect(rows[0].querySelectorAll('.kv-step-dot')).toHaveLength(1)
+    expect(within(ellaCol).getByText('Library today')).toBeInTheDocument()
+    expect(within(ellaCol).getByText('Library book')).toBeInTheDocument()
+    expect(within(ellaCol).getByText('1 of 2 done')).toBeInTheDocument()
+    expect(screen.getByText('Getting ready for school')).toBeInTheDocument()
+    expect(screen.getByText('22')).toBeInTheDocument()
+    expect(screen.getByText('minutes to go')).toBeInTheDocument()
+    expect(screen.getByText('Out the door').parentElement).toHaveTextContent('Out the door7:20')
+    const grownUps = screen.getByRole('list', { name: 'Grown-ups this morning' })
+    expect(within(grownUps).getAllByRole('listitem').map((li) => li.textContent)).toEqual([
+      '6:45SWake the kids · Scott', '6:50IBreakfast on the table · Iris', '7:20SOut the door, walk to school · Scott',
+    ])
+    fireEvent.click(rows[1])
     expect(p.onTick).toHaveBeenCalledWith(ella, expect.objectContaining({ id: 'bag' }))
+  })
+
+  it('out the door: steps group by time, and the first undone step is NEXT', () => {
+    const morning = [
+      step('d', 'Get dressed', '06:45', ['e'], true),
+      step('h', 'Dirty clothes in the hamper', null, ['e']),
+      step('t', 'Brush teeth', null, ['e']),
+      step('eat', 'Eat breakfast', '07:00', ['e']),
+      step('bag', 'Bag packed', '07:15', ['e']),
+      step('sh', 'Shoes & jacket on', null, ['e']),
+    ]
+    render(<KioskHomeV1 {...props({ kids: [{ member: ella, special: 'Music', tomorrowSpecial: null, bag: [], morning, after: [] }] })} />)
+    const col = screen.getByRole('region', { name: "Ella's morning" })
+    const before = within(col).getByRole('group', { name: 'Before breakfast' })
+    const rest = within(col).getByRole('group', { name: 'Breakfast & out the door' })
+    const names = (el: HTMLElement) => within(el).getAllByRole('button').map((r) => r.getAttribute('aria-label'))
+    expect(names(before)).toEqual(['Mark Get dressed not done', 'Mark Dirty clothes in the hamper done', 'Mark Brush teeth done'])
+    expect(names(rest)).toEqual(['Mark Eat breakfast done', 'Mark Bag packed done', 'Mark Shoes & jacket on done'])
+    const next = within(col).getByRole('button', { name: 'Mark Dirty clothes in the hamper done' })
+    expect(next).toHaveClass('is-next')
+    expect(within(next).getByText('NEXT')).toBeInTheDocument()
+    expect(within(col).getAllByText('NEXT')).toHaveLength(1)
+    expect(within(col).getByText('1 of 6 done')).toBeInTheDocument()
+    expect(within(rest).getByText('7:00')).toBeInTheDocument()
+  })
+
+  it('out the door: with no untimed steps first, one unlabelled list', () => {
+    const morning = [step('eat', 'Eat lunch', '11:00', ['e']), step('bag', 'Bag packed', '11:15', ['e'])]
+    render(<KioskHomeV1 {...props({ kids: [{ member: ella, special: null, tomorrowSpecial: null, bag: [], morning, after: [] }] })} />)
+    const col = screen.getByRole('region', { name: "Ella's morning" })
+    expect(within(col).queryAllByRole('group')).toHaveLength(1)
+    expect(within(col).getByRole('group', { name: "Ella's steps" })).toBeInTheDocument()
+  })
+
+  it('out the door: section names come from the first timed step', () => {
+    const morning = [step('a', 'Make bed', null, ['e']), step('b', 'Feed the cat', '07:05', ['e'])]
+    render(<KioskHomeV1 {...props({ kids: [{ member: ella, special: null, tomorrowSpecial: null, bag: [], morning, after: [] }] })} />)
+    expect(screen.getByRole('group', { name: 'Before 7:05' })).toBeInTheDocument()
+    expect(screen.getByRole('group', { name: '7:05 & out the door' })).toBeInTheDocument()
   })
 
   it('rest: one sentence and the places; notes for the house on the fridge door', () => {
@@ -90,5 +145,18 @@ describe('the wall, version 1', () => {
     expect(within(side).getByText('Math night')).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: /2 things to talk about/ }))
     expect(p.places.onNotes).toHaveBeenCalled()
+  })
+
+  it('step icons come from the words in the step', () => {
+    expect(stepIcon('Get dressed')).toBe(Shirt)
+    expect(stepIcon('Dirty clothes in the hamper')).toBe(ShoppingBasket)
+    expect(stepIcon('Laundry downstairs')).toBe(ShoppingBasket)
+    expect(stepIcon('Make bed & tidy room')).toBe(BedDouble)
+    expect(stepIcon('Brush teeth')).toBe(Smile)
+    expect(stepIcon('Eat breakfast')).toBe(Utensils)
+    expect(stepIcon('Clear your place & put dishes away')).toBe(Sparkles)
+    expect(stepIcon('Bag packed: homework folder')).toBe(Backpack)
+    expect(stepIcon('Shoes & jacket on')).toBe(Footprints)
+    expect(stepIcon('Feed the cat')).toBe(CircleCheck)
   })
 })
