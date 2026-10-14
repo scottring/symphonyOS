@@ -107,7 +107,6 @@ export interface WeekCanvasProps {
   routinesToPlace: ShelfRoutine[]
   /** Routines written once above the days ("Every day", "Weekdays"). */
   rhythm?: { label: string; items: { title: string; openId: string }[] }[]
-  /** "October" — whose milestones the shelf is grouped under. */
   isCurrent: boolean
   writers: WeekCanvasWriters
   spans?: CanvasSpan[]
