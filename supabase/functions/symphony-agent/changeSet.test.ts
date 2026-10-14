@@ -156,6 +156,7 @@ describe('agent wiring', () => {
     }
     expect(src).toContain("from '../_shared/sessionScripts.ts'")
     expect(src).toContain('Everyday talk:')
+    expect(src).toContain('${WEEKLY_PLANNING_SCRIPT}\n\nOther planning rules:\n- When the person says what they want for ONE item')
     // the interpolated strings themselves
     expect(SESSION_SPINE_PREAMBLE).toContain('Sessions follow a spine, not a script')
     expect(WEEKLY_PLANNING_SCRIPT).toContain("Let's plan the week of")

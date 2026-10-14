@@ -48,6 +48,11 @@ describe('workspace voice handshake',()=>{
   expect(session.instructions).toContain('Sessions follow a spine, not a script')
   expect(session.instructions).toContain('Everyday talk:')
   expect(session.instructions).not.toContain('Shape of planning')
+  expect(session.instructions).toContain('forward the request to ask_symphony and say its result in a few words')
+  expect(session.instructions).toContain('During a session, never ask your own questions')
+  expect(session.instructions).toContain('say its reply naturally, keeping its meaning and any options it offers')
+  expect(session.instructions).toContain("don't call show_on_page")
+  expect(session.instructions).not.toContain('Clear and about one item: just do it')
  })
  it('stops at the daily limit without spending',async()=>{
   const deps=setup();deps.reserve.mockResolvedValue(false)
