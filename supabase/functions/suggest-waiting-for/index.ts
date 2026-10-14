@@ -108,14 +108,14 @@ Deno.serve(async (req) => {
 
   const apiKey = Deno.env.get('ANTHROPIC_API_KEY')
   const url = Deno.env.get('SUPABASE_URL')
-  const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
-  if (!apiKey || !url || !serviceKey) return json({ error: 'Missing server config' }, 500)
+  const anon = Deno.env.get('SUPABASE_ANON_KEY')
+  if (!apiKey || !url || !anon) return json({ error: 'Missing server config' }, 500)
 
   // Validate the caller's JWT before any model call so an unauthenticated
   // request can't bill the key.
   const token = authHeader.slice('Bearer '.length)
-  const service = createClient(url, serviceKey)
-  const { data: { user }, error: authErr } = await service.auth.getUser(token)
+  const db = createClient(url, anon, { global: { headers: { Authorization: authHeader } } })
+  const { data: { user }, error: authErr } = await db.auth.getUser(token)
   if (authErr || !user) return json({ error: 'Invalid token' }, 401)
 
   let body: { taskId?: string }
@@ -129,10 +129,10 @@ Deno.serve(async (req) => {
   if (!taskId) return json({ error: 'taskId required' }, 400)
 
   try {
-    // Runs on a service client, so assembleContext restates the RLS itself: the caller's own
-    // rows plus household-shared ones. A single bundle, so it resolves the owner set inline.
+    // All context reads run as the caller, just like the app's item panel.
+    // Current RLS policies remain authoritative as sharing rules evolve.
     const bundle = await assembleContext(
-      { client: service, openAiKey: Deno.env.get('OPENAI_API_KEY') || undefined },
+      { client: db, openAiKey: Deno.env.get('OPENAI_API_KEY') || undefined },
       { entityType: 'task', entityId: taskId, userId: user.id },
     )
     if (!bundle.entity?.title) return json({ error: 'Task not found' }, 404)

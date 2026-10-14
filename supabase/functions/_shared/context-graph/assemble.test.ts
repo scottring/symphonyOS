@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest'
+import { afterEach, describe, it, expect, vi } from 'vitest'
 import { assembleContext } from './assemble'
 
 /** Chainable stub: stub({ tasks: { data: {...} }, contacts: { data: [...] } }) */
@@ -78,6 +78,68 @@ const TASK = {
   scheduled_for: null, bucket: 'week', is_waiting: true, waiting_since: '2026-07-22T00:00:00Z',
   defer_count: 2, location: null, created_at: '2026-07-01T00:00:00Z', completed: false,
 }
+
+describe('semantic context authorization', () => {
+  afterEach(() => vi.unstubAllGlobals())
+
+  function world() {
+    return stubClient({
+      tasks: { data: { ...TASK, contact_id: null, project_id: null, goal_id: null } },
+      attachments: { data: [] }, note_entity_links: { data: [] }, action_history: { data: [] },
+      notes: { data: [{ id: 'mine', title: 'Current title', content: 'Authorized text', vault_path: null }] },
+    }) as unknown as { from: (table: string) => Record<string, (...args: unknown[]) => unknown>; rpc: ReturnType<typeof vi.fn> }
+  }
+
+  function embedding() {
+    const fetcher = vi.fn().mockResolvedValue(new Response(JSON.stringify({ data: [{ embedding: [0.1, 0.2] }] })))
+    vi.stubGlobal('fetch', fetcher)
+    return fetcher
+  }
+
+  it('uses authenticated search, then includes only owner notes still readable through the client', async () => {
+    embedding()
+    const client = world()
+    client.rpc = vi.fn().mockResolvedValue({ data: [
+      { id: 'hidden', title: 'Private RPC text', content: 'Must not reach the model', similarity: 0.95 },
+      { id: 'mine', title: 'Stale title', content: 'Stale text', similarity: 0.8 },
+    ], error: null })
+    const notesQuery = client.from('notes')
+    const eq = vi.spyOn(notesQuery, 'eq')
+    const from = client.from.bind(client)
+    client.from = (table) => table === 'notes' ? notesQuery : from(table)
+    const bundle = await assembleContext({ client: client as never, openAiKey: 'test', visibleOwnerIds: ['u1'] }, { entityType: 'task', entityId: 't1', userId: 'u1' })
+    expect(client.rpc).toHaveBeenCalledWith('search_notes_semantic', {
+      query_embedding: '[0.1,0.2]', match_threshold: 0.55, match_count: 5,
+    })
+    expect(eq).toHaveBeenCalledWith('user_id', 'u1')
+    expect(bundle.knowledge).toEqual([{ id: 'mine', title: 'Current title', snippet: 'Authorized text', source: 'semantic', similarity: 0.8, vaultPath: undefined }])
+  })
+
+  it('a denied semantic RPC degrades without retrying with elevated privileges', async () => {
+    embedding()
+    const client = world()
+    client.rpc = vi.fn().mockResolvedValue({ data: null, error: { message: 'permission denied' } })
+    const bundle = await assembleContext({ client: client as never, openAiKey: 'test', visibleOwnerIds: ['u1'] }, { entityType: 'task', entityId: 't1', userId: 'u1' })
+    expect(client.rpc).toHaveBeenCalledTimes(1)
+    expect(bundle.knowledge).toEqual([])
+    expect(bundle.degraded).toContain('knowledge')
+  })
+
+  it('does not embed or search when the requested task is inaccessible', async () => {
+    const fetcher = embedding()
+    const client = stubClient({ tasks: { data: null } })
+    await expect(assembleContext({ client, openAiKey: 'test', visibleOwnerIds: ['u1'] }, { entityType: 'task', entityId: 'hidden', userId: 'u1' })).rejects.toThrow('not found')
+    expect(fetcher).not.toHaveBeenCalled()
+  })
+
+  it('requires explicit service mode for background semantic searches', async () => {
+    embedding()
+    const client = world()
+    client.rpc = vi.fn().mockResolvedValue({ data: [{ id: 'mine', similarity: 0.8 }], error: null })
+    await assembleContext({ client: client as never, semanticAccess: 'service', openAiKey: 'test', visibleOwnerIds: ['u1'] }, { entityType: 'task', entityId: 't1', userId: 'u1' })
+    expect(client.rpc).toHaveBeenCalledWith('search_notes_semantic_for_user', expect.objectContaining({ p_user_id: 'u1' }))
+  })
+})
 
 describe('assembleContext (task)', () => {
   it('assembles all parts from a fully-stubbed world', async () => {

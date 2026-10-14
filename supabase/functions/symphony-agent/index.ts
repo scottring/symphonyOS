@@ -1430,15 +1430,13 @@ Deno.serve(async (req) => {
   const apiKey = Deno.env.get('ANTHROPIC_API_KEY')
   const url = Deno.env.get('SUPABASE_URL')
   const anon = Deno.env.get('SUPABASE_ANON_KEY')
-  const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
-  if (!apiKey || !url || !anon || !serviceKey) return json({ error: 'Server not configured' }, 500)
+  if (!apiKey || !url || !anon) return json({ error: 'Server not configured' }, 500)
 
-  // Verify the user, then build an RLS-scoped client that acts AS them.
+  // Use the caller's JWT for both validation and all interactive data reads.
   const token = authHeader.replace('Bearer ', '')
-  const service = createClient(url, serviceKey)
-  const { data: { user }, error: authErr } = await service.auth.getUser(token)
-  if (authErr || !user) return json({ error: 'Unauthorized' }, 401)
   const db = createClient(url, anon, { global: { headers: { Authorization: authHeader } } })
+  const { data: { user }, error: authErr } = await db.auth.getUser(token)
+  if (authErr || !user) return json({ error: 'Unauthorized' }, 401)
 
   const body = await req.json().catch(() => ({}))
   // surface:'wall' — the kitchen wall, family layer only (wallMode.ts).
@@ -1449,8 +1447,8 @@ Deno.serve(async (req) => {
   // Every tool reads and writes through this client. On the wall it is fenced
   // to the household's family layer; elsewhere it IS the user's client.
   const tdb = wall ? fenceDb(db, await loadWallFence(db, user.id)) : db
-  // The wall sends none of the page/item/session context, and an item context
-  // is assembled with the service client, so the wall never takes one.
+  // The wall never accepts personal page/item/session context, even though
+  // item assembly now also uses the caller's RLS-scoped client.
   const workspaceContext = wall ? undefined : body.workspaceContext
   const incoming = body.messages
   const attachment: AttachmentMeta | null = wall ? null : (body.attachment ?? null)
@@ -1513,7 +1511,7 @@ Deno.serve(async (req) => {
       let taskContextBlock = ''
       try {
         const bundle = await assembleContext(
-          { client: service, openAiKey: Deno.env.get('OPENAI_API_KEY') ?? undefined },
+          { client: db, openAiKey: Deno.env.get('OPENAI_API_KEY') ?? undefined },
           { entityType: 'task', entityId: taskContext.id, userId: user.id },
         )
         taskContextBlock = `\nThe user is asking about this item — full assembled context:\n${renderBundleForPrompt(bundle)}`

@@ -1,8 +1,8 @@
 import type { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
-// The context graph runs on a SERVICE-ROLE client, which bypasses RLS entirely. Every query
-// it makes therefore has to restate the policy it would otherwise have inherited. This module
-// is that restatement for the five scope-gated tables — tasks, routines, projects, contacts,
+// Background context assembly runs on a SERVICE-ROLE client, bypassing RLS. Interactive
+// requests now use their user-JWT client, so current RLS is authoritative there. This module
+// adds narrowing for the five scope-gated tables — tasks, routines, projects, contacts,
 // notes — whose SELECT policy is, verbatim from 2026-06-07_scope_axis.sql:34:
 //
 //   auth.uid() = user_id

@@ -537,7 +537,7 @@ async function runLLMPass(
   const openAiKey = Deno.env.get('OPENAI_API_KEY') ?? undefined
   const visibleOwnerIds = await resolveVisibleOwners(supabase, userId)
   const bundles = await Promise.all(aiTasks.map(t =>
-    assembleContext({ client: supabase, openAiKey, visibleOwnerIds }, { entityType: 'task', entityId: t.id, userId })
+    assembleContext({ client: supabase, semanticAccess: 'service', openAiKey, visibleOwnerIds }, { entityType: 'task', entityId: t.id, userId })
       // A swallowed failure here is invisible by construction: the task simply drops out of the
       // AI tier with no trace. That hid the household-visibility gap for weeks — so log it.
       .catch((err) => {
