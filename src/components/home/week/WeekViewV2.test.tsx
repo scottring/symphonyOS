@@ -80,7 +80,6 @@ function mockEvent(over: { id: string; title: string; start: string; end: string
 }
 
 // The days are the page (2026-10-12); the shelf opens from the line under the title.
-const openShelf = () => fireEvent.click(screen.getByRole('button', { name: 'Show' }))
 
 describe('WeekViewV2 layout', () => {
   // Scott, 2026-09-21: the week's viewport is the days. Planning is ONE panel
@@ -88,24 +87,20 @@ describe('WeekViewV2 layout', () => {
   // second column of lists to understand first.
   it('gives the desktop viewport to the days; the shell owns the task chooser', () => {
     render(<WeekViewV2 {...defaultProps} routines={[]} />)
-    // Calendar first (2026-10-12): the days, with the shelf folded into one line.
+    // Calendar first (2026-10-12): the days, and no tray.
     expect(screen.getByRole('region', { name: 'The days' })).toBeInTheDocument()
     expect(screen.queryByRole('region', { name: 'Still to place' })).toBeNull()
-    expect(screen.getByText(/^Still to place ·/)).toBeInTheDocument()
     expect(screen.queryByText(/Didn.t happen/)).toBeNull()
     expect(screen.queryByRole('button', { name: /This month/ })).toBeNull()
     expect(screen.queryByRole('button', { name: 'Shelves' })).not.toBeInTheDocument()
   })
 
-  it('counts a week task with no day under the title, and shows it on the shelf when asked', () => {
+  it('a week task with no day sits in the No day yet line', () => {
     const anchor = weekStartAnchor(monday, readCadenceConfig().weekStartsOn)
     const t = createMockTask({ id: 'w', title: 'Call the plumber', bucket: 'week', weekStart: anchor, commitments: [{ level: 'week', periodStart: anchor, status: 'open' }] })
     render(<WeekViewV2 {...defaultProps} tasks={[t]} routines={[]} />)
-    expect(screen.getByText(/^Still to place · 1 task ·/)).toBeInTheDocument()
-    openShelf()
-    const shelf = within(screen.getByRole('region', { name: 'Still to place' }))
-    expect(shelf.getByText('Call the plumber')).toBeInTheDocument()
-    expect(shelf.getByRole('button', { name: 'Give Call the plumber a day' })).toBeInTheDocument()
+    expect(screen.queryByRole('region', { name: 'Still to place' })).toBeNull()
+    expect(within(screen.getByRole('list', { name: 'No day yet' })).getByText('Call the plumber')).toBeInTheDocument()
   })
 })
 
@@ -458,10 +453,8 @@ describe('WeekViewV2 journal spread', () => {
       expect(screen.getByRole('region', { name: 'The days' })).toBeInTheDocument()
       expect(screen.queryByRole('radio', { name: 'Hours' })).toBeNull()
       expect(within(screen.getByTestId('journal-day-2026-09-14')).getByText('Return library books')).toBeInTheDocument()
-      // No side column here either: the shelf opens from its line.
+      // No side column here either, and no tray.
       expect(screen.queryByRole('region', { name: 'Still to place' })).toBeNull()
-      openShelf()
-      expect(screen.getByRole('region', { name: 'Still to place' })).toBeInTheDocument()
       expect(screen.queryByRole('dialog', { name: 'Shelves' })).toBeNull()
       expect(screen.queryByRole('button', { name: 'Shelves' })).toBeNull() // Date header owns the launcher.
     })
@@ -567,29 +560,17 @@ describe('WeekViewV2 — the week canvas keeps what the page could do', () => {
     const onUpdateTask = vi.fn()
     const trip = line('m1', 'Plan the autumn trip', { goalId: 'y1' })
     const shed = line('m2', 'Clear out the shed', { goalId: 'y2' })
-    const cabin = action('w1', 'Book the cabin', { sourceId: 'm1', goalId: 'y1' })
+    const cabin = action('w1', 'Book the cabin', { sourceId: 'm1', goalId: 'y1', scheduledFor: new Date(2026, 8, 14), isAllDay: true })
     render(<WeekViewV2 {...defaultProps} routines={[]} weekStart={sunday} tasks={[trip, shed, cabin]} onUpdateTask={onUpdateTask} />)
-    openShelf()
     fireEvent.click(screen.getByRole('button', { name: 'More for Book the cabin' }))
     fireEvent.click(screen.getByRole('menuitem', { name: 'Move under…' }))
     fireEvent.click(screen.getByRole('menuitemradio', { name: 'Clear out the shed' }))
     expect(onUpdateTask).toHaveBeenCalledWith('w1', { sourceId: 'm2', goalId: 'y2' })
   })
 
-  it('Put on this week writes the month line onto the week, as the month page does', () => {
-    const onUpdateTask = vi.fn()
-    const trip = line('m1', 'Plan the autumn trip')
-    render(<WeekViewV2 {...defaultProps} routines={[]} weekStart={sunday} tasks={[trip, action('w1', 'Book the cabin', { sourceId: 'm1' })]} onUpdateTask={onUpdateTask} />)
-    openShelf()
-    fireEvent.click(screen.getByRole('button', { name: 'More for Plan the autumn trip' }))
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Put on this week' }))
-    expect(onUpdateTask).toHaveBeenCalledWith('m1', { bucket: 'week', weekStart: anchor() })
-  })
-
   it('People… and Life area… write the row’s own fields', () => {
     const onUpdateTask = vi.fn()
-    render(<WeekViewV2 {...defaultProps} routines={[]} weekStart={sunday} tasks={[action('w1', 'Book the cabin')]} onUpdateTask={onUpdateTask} />)
-    openShelf()
+    render(<WeekViewV2 {...defaultProps} routines={[]} weekStart={sunday} tasks={[action('w1', 'Book the cabin', { scheduledFor: new Date(2026, 8, 14), isAllDay: true })]} onUpdateTask={onUpdateTask} />)
     fireEvent.click(screen.getByRole('button', { name: 'More for Book the cabin' }))
     fireEvent.click(screen.getByRole('menuitem', { name: 'Life area…' }))
     fireEvent.click(screen.getByRole('menuitemradio', { name: 'Family' }))

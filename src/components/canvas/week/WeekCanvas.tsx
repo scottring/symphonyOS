@@ -13,34 +13,27 @@
 //                    ROW-LANGUAGE.md); a stay across days as one bar; past
 //                    days stepped back and a weekend that is over folded to a
 //                    line; done work hidden until "Show done".
-//   Still to place   what is chosen for this week with no day yet, folded
-//                    into one line under the title ("Still to place · 2
-//                    routines · Show"); Show opens it above the days: a
-//                    masonry of cards, each headed once by the month goal its
-//                    tasks serve, "Not under an October goal" last; weekly
-//                    routines that still need a day in their own card. + gives
-//                    a row a day. Inbox, last week and the month's goals are
-//                    the planning session's, not the tray's.
+//   No day yet       what is chosen for this week with no day, one quiet line
+//                    of draggable chips under the title. Inbox, last week and
+//                    the month's goals are the planning session's.
 //
 // Drag a row onto a day to place it, a day's row onto another day to move
-// it, back onto the shelf to take its day away. While dragging, the target
-// day says where it will land and the row's card lights — the only "tie".
+// it, back onto the No day yet line to take its day away. While dragging, the
+// target day says where it will land.
 // Every write is the caller's (WeekViewV2 routes them through the canvas
 // activity strip with Undo); this component draws and asks.
 //
-// Phone (<768px): a row of day chips, the chosen day, then the shelf in one
-// column; + opens the day chips inline (no drag on touch).
+// Phone (<768px): a row of day chips, the chosen day, then the No day yet line;
+// tap opens a chip's task (no drag on touch).
 
-import { useContext, useState, type DragEvent, type FormEvent, type ReactNode } from 'react'
+import { useContext, useState, type DragEvent, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { MoreHorizontal } from 'lucide-react'
 import type { Task, TaskContext } from '@/types/task'
 import type { FamilyMember } from '@/types/family'
 import { AssigneeAvatar } from '@/components/family/AssigneeAvatar'
-import { anOrA } from '@/lib/week/monthLinks'
 import type { PlanNode } from '@/components/plan/constellation/model'
 import { MoveUnderMenu } from '@/components/canvas/plan/MoveUnderMenu'
-import { ContextPicker } from '@/components/triage/ContextPicker'
 import { assigneesOf } from '@/lib/planning/v2/planV2'
 import { localYmd, readCadenceConfig, weekStartAnchor } from '@/lib/cadence/config'
 import { Link } from 'react-router-dom'
@@ -144,23 +137,22 @@ export interface WeekCanvasProps {
   /** Every-day routines in each day, or written once above (the page's
    *  remembered choice). */
   daily?: { shown: boolean; onToggle: () => void }
-  /** The life area a new task with no goal starts in. */
+  /** Unused since the tray went (callers still pass it; Task 15 prunes). */
   defaultArea?: TaskContext
-  /** Open the shelf with the cursor in its no-goal composer (arrived to write). */
+  /** Unused since the tray went (callers still pass it; Task 15 prunes). */
   focusAdd?: boolean
 }
 
 const AREAS: { value: TaskContext; label: string }[] = [
   { value: 'work', label: 'Work' }, { value: 'family', label: 'Family' }, { value: 'personal', label: 'Personal' },
 ]
-const isArea = (v: unknown): v is TaskContext => v === 'work' || v === 'family' || v === 'personal'
 
 type Drag = { kind: 'task' | 'routine' | 'occ'; id: string; groupKey?: string; fromKey?: string }
 type Picker = { key: string; mode: 'place' | 'move' } | null
 
 const longDay = (d: Date) => d.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
 
-export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [], monthName, isCurrent, writers, spans = [], dayDescriptions, members = [], daily, defaultArea, focusAdd = false }: WeekCanvasProps) {
+export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [], monthName, isCurrent, writers, spans = [], dayDescriptions, members = [], daily }: WeekCanvasProps) {
   const phone = useMediaQuery('(max-width: 767px)')
   const slots = useContext(PlanMastheadSlotsContext)
   const [showDone, setShowDone] = useState(false)
@@ -169,18 +161,13 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
   const [overShelf, setOverShelf] = useState(false)
   const [picker, setPicker] = useState<Picker>(null)
   const [menu, setMenu] = useState<string | null>(null)
-  const [composer, setComposer] = useState<string | null>(focusAdd ? 'unlinked' : null)
   const [panel, setPanel] = useState<{ key: string; kind: 'people' | 'area' | 'move' } | null>(null)
-  const [overGoal, setOverGoal] = useState<string | null>(null)
-  // The days are the page; the shelf waits behind one line until asked for.
-  const [shelfOpen, setShelfOpen] = useState(focusAdd)
   const [weekendOpen, setWeekendOpen] = useState(false)
   const todayKey = localYmd(new Date())
   const [chosenDay, setChosenDay] = useState<string | null>(null)
   const selectedKey = chosenDay && days.some((d) => d.key === chosenDay) ? chosenDay : (days.find((d) => d.key === todayKey) ?? days[0])?.key
 
   const dates = days.map((d) => d.date)
-  const noGoal = `Not under ${anOrA(monthName)} ${monthName} goal`
   const memberById = new Map(members.map((m) => [m.id, m]))
 
   // ── what is where ─────────────────────────────────────────────────────
@@ -193,7 +180,7 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
   const dayOcc = (routineId: string, key: string) => days.find((d) => d.key === key)?.items.find((it) => it.routineId === routineId) ?? null
 
   // ── drag ───────────────────────────────────────────────────────────────
-  const endDrag = () => { setDrag(null); setOverDay(null); setOverShelf(false); setOverGoal(null) }
+  const endDrag = () => { setDrag(null); setOverDay(null); setOverShelf(false) }
   const startDrag = (ev: DragEvent, payload: PlanDragPayload, d: Drag) => {
     writePlanDrag(ev.dataTransfer, payload)
     setDrag(d); setPicker(null); setMenu(null)
@@ -281,114 +268,6 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
       {menu === key && <CanvasMenu label={title} items={items} onClose={() => setMenu(null)} />}
     </span>
   )
-  const shelfRow = (t: Task, meta: string | null, groupKey: string) => {
-    const key = `task:${t.id}`
-    const row: CompactRow<Task> = { key, id: t.id, title: t.title, item: t, completed: t.completed, meta }
-    return (
-      <CompactWeekRow key={key} row={row} className={picker?.key === key || panel?.key === key || menu === key ? 'has-picker' : undefined}
-        addLabel={(title) => `Give ${title} a day`} addExpanded={picker?.key === key}
-        extra={!t.completed && moreButton(t.title, key, taskMenuItems(t, key), 15)}
-        onAdd={() => { setMenu(null); setPanel(null); setPicker(picker?.key === key ? null : { key, mode: 'place' }) }}
-        onComplete={writers.toggleTask} onOpen={(x) => writers.open(`task-${x.id}`)}
-        onDragStart={phone ? undefined : (x, ev) => startDrag(ev, { kind: 'task', id: x.id, date: localYmd(weekStart), title: x.title }, { kind: 'task', id: x.id, groupKey })}
-        onDragEnd={endDrag}>
-        {pick(key, t.title, (d) => writers.placeTask(t, d))}
-        {taskPanel(t, key)}
-      </CompactWeekRow>
-    )
-  }
-  const groupCard = (g: ShelfGroup) => {
-    const title = g.milestone ? g.milestone.title : noGoal
-    const source = drag?.groupKey === g.key
-    const menuKey = `group:${g.key}`
-    const rows = [...g.rows, ...(showDone ? g.done : [])]
-    // Drop a task on a goal's card to put it under that goal, as Move under… does.
-    const target = fileTarget(g)
-    const fileDrop = target ? {
-      onDragOver: (e: DragEvent) => { e.preventDefault(); e.stopPropagation(); if (overGoal !== g.key) setOverGoal(g.key) },
-      onDragLeave: (e: DragEvent) => { if (!(e.currentTarget as HTMLElement).contains(e.relatedTarget as Node | null)) setOverGoal((k) => k === g.key ? null : k) },
-      onDrop: (e: DragEvent) => { e.preventDefault(); e.stopPropagation(); if (draggedTask) writers.moveUnder(draggedTask, target); endDrag() },
-    } : {}
-    return (
-      <section key={g.key} className={`canvas-group wc-group${g.milestone ? '' : ' is-unlinked'}${source ? ' is-source' : ''}${target ? ' is-drop-ok' : ''}${overGoal === g.key && target ? ' is-drop' : ''}`} aria-label={title} {...fileDrop}>
-        <div className="canvas-group-head wc-group-head">
-          <span className="canvas-group-title">{title}</span>
-          {g.milestone && (
-            <span className="wc-more-wrap">
-              <button type="button" className="canvas-icon wc-more" aria-label={`More for ${title}`} aria-haspopup="menu" aria-expanded={menu === menuKey}
-                onClick={() => { setPicker(null); setMenu(menu === menuKey ? null : menuKey) }}>
-                <MoreHorizontal size={16} aria-hidden="true" />
-              </button>
-              {menu === menuKey && (
-                <CanvasMenu label={`${title}`} onClose={() => setMenu(null)} items={[
-                  { label: 'Mark done', onSelect: () => writers.milestoneDone(g.milestone!.id) },
-                  { label: 'Open details', onSelect: () => writers.open(`task-${g.milestone!.id}`) },
-                  { label: 'Add a task', onSelect: () => setComposer(g.key) },
-                  ...(g.milestone.onWeek ? [] : [{ label: 'Put on this week', onSelect: () => writers.putOnWeek(g.milestone!.id) }]),
-                ]} />
-              )}
-            </span>
-          )}
-        </div>
-        {rows.length > 0 && <ul className="cw-rows">{rows.map((r) => shelfRow(r.task, r.meta, g.key))}</ul>}
-        <Composer open={composer === g.key} label={g.milestone ? `Add a task for ${title}` : 'Add something for this week'}
-          area={isArea(g.milestone?.context) ? g.milestone.context : g.milestone ? undefined : defaultArea}
-          onOpen={() => setComposer(g.key)} onClose={() => setComposer(null)}
-          onAdd={(text, area) => writers.addAction(text, g.milestone?.id, area)} />
-      </section>
-    )
-  }
-  // ── filing: a task dragged onto a goal's card goes under that goal ────
-  const draggedTask = drag?.kind === 'task' ? shelfTasks.get(drag.id) ?? dayTask(drag.id)?.item.task : undefined
-  function fileTarget(g: ShelfGroup) {
-    if (!draggedTask || !g.milestone) return null
-    const o = writers.moveUnderOptions(draggedTask)
-    const parent = o?.parents.find((n) => n.id === g.milestone!.id)
-    return o && parent && o.item.parent !== parent.key ? parent : null
-  }
-
-  const unlinked = shelf.filter((g) => !g.milestone)
-  // Milestones with nothing this week fold into one quiet line (2026-10-10:
-  // six empty cards crowded the shelf); shown, each keeps its + Add.
-  const hasItems = (g: ShelfGroup) => g.rows.length > 0 || (showDone && g.done.length > 0)
-  const linked = shelf.filter((g) => g.milestone && hasItems(g))
-  const quiet = shelf.filter((g) => g.milestone && !hasItems(g))
-  const routinesCard = routinesToPlace.length > 0 && (
-    <section key="routines" className={`canvas-group wc-group wc-routines${drag?.groupKey === 'routines' ? ' is-source' : ''}`} aria-label="Routines to place">
-      <div className="canvas-group-head wc-group-head"><span className="canvas-group-title">Routines to place</span></div>
-      <ul className="cw-rows">
-        {routinesToPlace.map((r) => {
-          const key = `routine:${r.id}`
-          return (
-            <CompactWeekRow key={key} row={{ key, id: r.id, title: r.title, item: r }} className={`is-routine${picker?.key === key ? ' has-picker' : ''}`}
-              addLabel={(title) => `Give ${title} a day`} addExpanded={picker?.key === key}
-              onAdd={() => { setMenu(null); setPicker(picker?.key === key ? null : { key, mode: 'place' }) }}
-              onOpen={(x) => writers.open(`routine-${x.id}`)}
-              onDragStart={phone ? undefined : (x, ev) => startDrag(ev, { kind: 'routine', id: x.id, date: localYmd(weekStart), title: x.title }, { kind: 'routine', id: x.id, groupKey: 'routines' })}
-              onDragEnd={endDrag}>
-              {pick(key, r.title, (d) => writers.placeRoutine(r, d))}
-            </CompactWeekRow>
-          )
-        })}
-      </ul>
-    </section>
-  )
-  const shelfNode = (
-    <section id="wc-shelf" className={`wc-shelf${overShelf ? ' is-over' : ''}`} aria-label="Still to place" {...shelfDrop}>
-      <div className="wc-shelf-head">
-        <h2 className="wc-label">Still to place</h2>
-        <p className="wc-hint">{phone ? 'Press + to give it a day' : 'Drag onto a day, or press + to give it a day'}</p>
-      </div>
-      <div className="wc-masonry">
-        {linked.map(groupCard)}{routinesCard}{unlinked.map(groupCard)}
-      </div>
-      {/* The tray holds what is already chosen for this week; a month goal
-          with nothing this week is a planning decision (2026-10-13 review),
-          so it shows here only while a task is dragged, to go under one. */}
-      {quiet.length > 0 && !!draggedTask && <div className="wc-masonry">{quiet.map(groupCard)}</div>}
-    </section>
-  )
-
   // ── the days ───────────────────────────────────────────────────────────
   // Who carries it, a glance from the title (ROW-LANGUAGE: people); nothing
   // for an id the household doesn't know.
@@ -522,26 +401,28 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
   const pastNote = past && <span className="wc-past" role="note">
     <b>Past week</b> · <Link className="canvas-link" to="/week?view=alongside">Back to this week</Link>
   </span>
-  // What is chosen for this week but has no day yet, said once under the
-  // title; Show opens the shelf. Inbox, last week and the month's goals are
-  // planning decisions, not the tray's (2026-10-13 review). A structural
-  // count, filtered as the shelf is (the people lens).
-  const tasksToPlace = shelf.reduce((n, g) => n + g.rows.length, 0)
-  const toPlace = [
-    tasksToPlace > 0 && (tasksToPlace === 1 ? '1 task' : `${tasksToPlace} tasks`),
-    routinesToPlace.length > 0 && (routinesToPlace.length === 1 ? '1 routine' : `${routinesToPlace.length} routines`),
-  ].filter(Boolean)
   // One plain sentence about the week, from the rules (weekSentence); the
   // current week only.
   const sentence = isCurrent ? weekSentence(days, todayKey) : null
+  const unplaced = shelf.flatMap((g) => g.rows.map((r) => r.task))
+  // Dragging a day's task: the line shows (even empty) so it can be dropped back.
+  const draggingPlaced = drag?.kind === 'task' && !!drag.fromKey
   const shelfLine = (
     <span className="wc-tray">
-      <span className="wc-tray-item" data-explain="still-to-place" data-explain-label="Still to place">
-        {/* No count of nothing: the lists may still be loading. */}
-        Still to place{toPlace.map((p) => ` · ${p}`)}{' · '}
-        <button type="button" className="canvas-link wc-quiet-link" aria-expanded={shelfOpen} aria-controls="wc-shelf"
-          onClick={() => setShelfOpen((o) => !o)}>{shelfOpen ? 'Hide' : 'Show'}</button>
-      </span>
+      {(unplaced.length > 0 || draggingPlaced) && (
+        <span className={`wc-noday${overShelf ? ' is-over' : ''}`} data-explain="still-to-place" data-explain-label="No day yet" {...shelfDrop}>
+          <span className="wc-noday-label">No day yet</span>
+          <ul className="wc-noday-chips" aria-label="No day yet">
+            {unplaced.map((t) => (
+              <li key={t.id} draggable={!phone} className="wc-noday-chip"
+                onDragStart={(ev) => startDrag(ev, { kind: 'task', id: t.id, date: localYmd(weekStart), title: t.title }, { kind: 'task', id: t.id })}
+                onDragEnd={endDrag}>
+                <button type="button" className="wc-noday-open" onClick={() => writers.open(`task-${t.id}`)}>{t.title}</button>
+              </li>
+            ))}
+          </ul>
+        </span>
+      )}
       {sentence && <span className="wc-tray-aside wc-week-sentence">{sentence}</span>}
     </span>
   )
@@ -595,14 +476,12 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
         {sel && dayColumn(sel)}
         {rhythmNode}
         <div className="wc-done-row">{doneToggle}</div>
-        {shelfOpen && shelfNode}
       </div>
     )
   }
   return (
     <div className={`wc${drag ? ' is-dragging' : ''}`}>
       {subtitleNode}
-      {shelfOpen && shelfNode}
       <section className="wc-days" aria-label="The days">
         <div className="wc-days-head"><h2 className="wc-label sr-only">The days</h2>{rhythmNode}{doneToggle}</div>
         {spans.length > 0 && (
@@ -629,37 +508,5 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
         </div>
       </section>
     </div>
-  )
-}
-
-function Composer({ open, label, area: initialArea, onOpen, onClose, onAdd }: {
-  open: boolean
-  label: string
-  /** The life area a new entry starts in (the milestone's). */
-  area?: TaskContext
-  onOpen: () => void
-  onClose: () => void
-  onAdd: (title: string, area?: TaskContext) => Promise<boolean>
-}): ReactNode {
-  const [text, setText] = useState('')
-  const [saving, setSaving] = useState(false)
-  const [area, setArea] = useState<TaskContext | undefined>(initialArea)
-  if (!open) return <div className="wc-group-foot"><button type="button" className="canvas-link wc-add" onClick={onOpen}>+ Add</button></div>
-  const submit = async (e: FormEvent) => {
-    e.preventDefault()
-    const v = text.trim()
-    if (!v || saving) return
-    setSaving(true)
-    const ok = await onAdd(v, area).catch(() => false)
-    setSaving(false)
-    // Kept open for the next one; the words stay when the save failed.
-    if (ok) setText('')
-  }
-  return (
-    <form className="wc-group-foot wc-composer" onSubmit={(e) => void submit(e)}>
-      <input autoFocus value={text} onChange={(e) => setText(e.target.value)} aria-label={label} placeholder={label} aria-busy={saving || undefined}
-        onKeyDown={(e) => { if (e.key === 'Escape') { e.stopPropagation(); onClose() } }} />
-      <span className="wc-composer-area" title="Life area for what you add"><ContextPicker size="sm" value={area ?? null} onChange={setArea} /></span>
-    </form>
   )
 }

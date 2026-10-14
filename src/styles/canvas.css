@@ -227,3 +227,12 @@
 /* Week: a pending change card's proposed rows — dashed, inert. */
 .wc-dayrow.is-proposed { border: 1.5px dashed #1b6a64; background: #eef6f3; border-radius: 6px; padding: 4px 7px; margin: 2px -7px; color: #123f3b; display: flex; gap: 8px; list-style: none; }
 .dark .wc-dayrow.is-proposed { border-color: #6cc4b9; background: #182b29; color: #d7efe9; }
+
+/* Week: "No day yet", one quiet line of draggable chips (Task 14). */
+.wc-noday { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; border-radius: 999px; }
+.wc-noday.is-over { outline: 2px dashed var(--color-primary-400); outline-offset: 4px; }
+.wc-noday-label { font-size: 13px; color: #6a6f6d; }
+.wc-noday-chips { display: contents; list-style: none; margin: 0; padding: 0; }
+.wc-noday-chip { display: inline-flex; border: 1px dashed #b9b9b3; border-radius: 999px; background: #fff; }
+.wc-noday-open { font: inherit; font-size: 13px; padding: 5px 11px; min-height: 32px; background: none; border: 0; color: inherit; cursor: pointer; }
+.dark .wc-noday-chip { background: transparent; border-color: #4a5352; }
