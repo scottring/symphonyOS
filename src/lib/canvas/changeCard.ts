@@ -14,7 +14,13 @@ export type TaskOpKind = 'place' | 'unplace' | 'add' | 'someday' | 'assign' | 'd
  *  change ONE day's occurrence ("this week only"); change/rest/add change the
  *  routine itself ("from now on"). */
 export type RoutineOpKind = 'routine_skip' | 'routine_move' | 'routine_who' | 'routine_change' | 'routine_rest' | 'routine_add'
-export type ChangeOpKind = TaskOpKind | RoutineOpKind
+/** Plan ops (stage 5, Month / Season / Year): goals on those lists. Month and
+ *  season goals are tasks committed to a period; year goals are `goals` rows
+ *  (itemKind). Done, merge and someday for month/season goals reuse the task
+ *  ops above. */
+export type PlanOpKind = 'plan_add' | 'plan_carry' | 'plan_let_go' | 'plan_done'
+export type ChangeOpKind = TaskOpKind | RoutineOpKind | PlanOpKind
+export type PlanLevel = 'year' | 'season' | 'month'
 
 export type DayKey = 'sun' | 'mon' | 'tue' | 'wed' | 'thu' | 'fri' | 'sat'
 
@@ -56,11 +62,34 @@ export interface ChangeOp {
   until?: string
   /** routine_add: the life area. */
   context?: 'family' | 'personal' | 'work'
+  /** plan ops: which list. */
+  level?: PlanLevel
+  /** plan ops: YYYY-MM-DD start of the period the item is on now (or, for
+   *  plan_add, the period it is added to). A year is YYYY-01-01. */
+  periodStart?: string
+  /** plan ops: the period's name as the card says it ("November", "Fall", "2027"). */
+  periodLabel?: string
+  /** plan_carry: the period it goes to, and its name. */
+  toPeriodStart?: string
+  toPeriodLabel?: string
+  /** plan_carry: true when the target is the very next period (CARRY), false
+   *  when it skips ahead (MOVE … to January). */
+  toNext?: boolean
+  /** plan ops: the item, a task (month/season goal) or a year goal row. */
+  itemId?: string
+  itemKind?: 'task' | 'goal'
+  /** plan_add / plan_carry: the parent goal it serves (season item for a month
+   *  goal, year goal for a season goal), and its title. */
+  parentId?: string
+  parentTitle?: string
+  /** plan_carry: the new wording, if the person reworded it. */
+  newTitle?: string
 }
 
 /** Which heading a row sits under on the card. */
-export type OpScope = 'task' | 'week' | 'lasting'
+export type OpScope = 'task' | 'week' | 'lasting' | 'plan'
 export function opScope(op: ChangeOp): OpScope {
+  if (op.op.startsWith('plan_')) return 'plan'
   if (op.op === 'routine_skip' || op.op === 'routine_move' || op.op === 'routine_who') return 'week'
   if (op.op.startsWith('routine_')) return 'lasting'
   return 'task'
@@ -69,6 +98,14 @@ export const SCOPE_HEADING: Record<OpScope, string> = {
   task: 'Tasks',
   week: 'Routines · this week only',
   lasting: 'Routines · from now on',
+  plan: 'Goals',
+}
+
+/** The card heading a plan op sits under: the list it changes ("November",
+ *  "October", "Fall"). A carry is listed under where it lands. */
+export function planHeading(op: ChangeOp): string {
+  if (op.op === 'plan_carry') return op.toPeriodLabel ?? 'Goals'
+  return op.periodLabel ?? 'Goals'
 }
 
 export interface ChangeSet {
@@ -153,7 +190,7 @@ export function daysWords(days: readonly DayKey[]): string {
 
 const names = (list?: string[]) => (list?.length ? list.join(', ') : 'no one')
 
-export type RowKind = 'MOVE' | 'ADD' | 'LATER' | 'WHO' | 'DONE' | 'MERGE' | 'TALK' | 'SKIP' | 'TIME' | 'DAYS' | 'NAME' | 'CHANGE' | 'REST' | 'NEW'
+export type RowKind = 'MOVE' | 'ADD' | 'LATER' | 'WHO' | 'DONE' | 'MERGE' | 'TALK' | 'SKIP' | 'TIME' | 'DAYS' | 'NAME' | 'CHANGE' | 'REST' | 'NEW' | 'CARRY' | 'LET GO' | 'MET'
 
 /** One card row: what kind of change, to what, and where it lands. */
 export function opRow(op: ChangeOp, today: Date): { kind: RowKind; title: string; where: string } {
@@ -185,6 +222,13 @@ export function opRow(op: ChangeOp, today: Date): { kind: RowKind; title: string
       return { kind, title, where: parts.length ? `→ ${parts.join(' ')}` : '' }
     }
     case 'routine_rest': return { kind: 'REST', title: op.title, where: op.until ? `→ until ${ymdDate(op.until).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}` : '→ resting' }
+    case 'plan_add': return { kind: 'NEW', title: op.title, where: `→ ${op.periodLabel ?? 'the list'}${op.parentTitle ? `, for ${op.parentTitle}` : ''}` }
+    case 'plan_carry': {
+      const to = op.toPeriodLabel ?? 'next'
+      return { kind: op.toNext === false ? 'MOVE' : 'CARRY', title: op.title, where: op.newTitle ? `→ ${to}, as “${op.newTitle}”` : `→ ${to}` }
+    }
+    case 'plan_let_go': return { kind: 'LET GO', title: op.title, where: '→ Let go' }
+    case 'plan_done': return op.level === 'year' ? { kind: 'MET', title: op.title, where: '→ Met' } : { kind: 'DONE', title: op.title, where: '→ Done' }
     case 'routine_add': {
       const when = [op.days ? daysWords(op.days) : null, op.time ? clock(op.time) : null].filter(Boolean).join(' ')
       return { kind: 'NEW', title: op.title, where: when ? `→ ${when}` : '' }
