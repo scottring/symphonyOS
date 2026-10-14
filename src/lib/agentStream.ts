@@ -133,6 +133,13 @@ export interface AgentApiMessage {
   content: string | AgentContentBlock[]
 }
 
+/** The agent edge function's name. A preview build may set VITE_AGENT_FUNCTION
+ *  to a separately deployed test copy; anything malformed falls back to the live one. */
+export function agentFunctionName(): string {
+  const name = import.meta.env.VITE_AGENT_FUNCTION
+  return typeof name === 'string' && /^[a-z0-9-]+$/.test(name) ? name : 'symphony-agent'
+}
+
 /**
  * Stream the Symphony agent edge function for one conversation turn.
  * Sends the full message history; the function verifies the caller's JWT
@@ -149,7 +156,7 @@ export async function streamSymphonyAgent(
   }
 
   const res = await fetch(
-    `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/symphony-agent`,
+    `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/${agentFunctionName()}`,
     {
       method: 'POST',
       headers: {

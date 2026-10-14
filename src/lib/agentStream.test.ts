@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest'
-import { parseSSEChunk } from './agentStream'
+import { describe, it, expect, afterEach, vi } from 'vitest'
+import { parseSSEChunk, agentFunctionName } from './agentStream'
 
 describe('parseSSEChunk', () => {
   it('extracts complete events and returns the remainder buffer', () => {
@@ -35,5 +35,17 @@ describe('parseSSEChunk', () => {
   it('passes a point event through intact', () => {
     const { events } = parseSSEChunk('data: {"type":"point","dates":["2026-10-18"],"taskIds":[]}\n\n')
     expect(events).toEqual([{ type: 'point', dates: ['2026-10-18'], taskIds: [] }])
+  })
+})
+
+describe('agentFunctionName', () => {
+  afterEach(() => vi.unstubAllEnvs())
+
+  it('is symphony-agent unless a preview build names another', () => {
+    expect(agentFunctionName()).toBe('symphony-agent')
+    vi.stubEnv('VITE_AGENT_FUNCTION', 'symphony-agent-v2')
+    expect(agentFunctionName()).toBe('symphony-agent-v2')
+    vi.stubEnv('VITE_AGENT_FUNCTION', '../evil')
+    expect(agentFunctionName()).toBe('symphony-agent')
   })
 })
