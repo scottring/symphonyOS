@@ -3,6 +3,7 @@ import { MemoryRouter } from 'react-router-dom'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { PageGuideProvider } from './GuideProvider'
 import { GuideLayer } from './GuideLayer'
+import { PageHelpButton, PageHelpContext } from './PageHelp'
 import { ConversationStrip } from '@/components/canvas/ConversationStrip'
 import { requestShow } from '@/lib/explain/showSignal'
 import type { ShowStep } from '@/lib/explain/steps'
@@ -98,22 +99,22 @@ describe('show me this page', () => {
     expect(screen.getByRole('heading', { name: 'Fall 2026' })).toBeInTheDocument()
   })
 
-  it('the bar offers What is this page? and sends it', () => {
-    const onSend = vi.fn()
-    render(<MemoryRouter><PageGuideProvider><ConversationStrip docked messages={[]} explain={{ label: 'What is this page?', message: 'Explain it' }} onSend={onSend} busy={false} voice={voice} /></PageGuideProvider></MemoryRouter>)
+  it('What is this page? is a "?" beside the page title, not in the bar (2026-10-14)', () => {
+    const help = vi.fn()
+    render(<PageHelpContext.Provider value={help}><h1>Week<PageHelpButton /></h1></PageHelpContext.Provider>)
     fireEvent.click(screen.getByRole('button', { name: 'What is this page?' }))
-    expect(onSend).toHaveBeenCalledWith('Explain it')
+    expect(help).toHaveBeenCalledTimes(1)
+    render(<MemoryRouter><PageGuideProvider><ConversationStrip docked messages={[]} onSend={vi.fn()} busy={false} voice={voice} /></PageGuideProvider></MemoryRouter>)
+    expect(screen.getAllByRole('button', { name: 'What is this page?' })).toHaveLength(1)
   })
 
-  it("What is this page? plays the page's own tour when it has one, and sends nothing", () => {
-    const onSend = vi.fn()
-    const show = vi.fn(() => true)
-    render(<MemoryRouter><PageGuideProvider><ConversationStrip docked messages={[]} explain={{ label: 'What is this page?', message: 'Explain it', show }} onSend={onSend} busy={false} voice={voice} /></PageGuideProvider></MemoryRouter>)
+  it('a page with no shell help uses its own, and with neither shows no "?"', () => {
+    const own = vi.fn()
+    const { unmount } = render(<PageHelpButton onHelp={own} />)
     fireEvent.click(screen.getByRole('button', { name: 'What is this page?' }))
-    expect(show).toHaveBeenCalled()
-    expect(onSend).not.toHaveBeenCalled()
-    show.mockReturnValue(false)
-    fireEvent.click(screen.getByRole('button', { name: 'What is this page?' }))
-    expect(onSend).toHaveBeenCalledWith('Explain it')
+    expect(own).toHaveBeenCalledTimes(1)
+    unmount()
+    render(<PageHelpButton />)
+    expect(screen.queryByRole('button', { name: 'What is this page?' })).toBeNull()
   })
 })

@@ -71,6 +71,7 @@ import { useGlobalQuickAdd } from '@/desktop/useGlobalQuickAdd';
 import { GuideProvider } from '@/hooks/useGuidedPlan';
 import { PageGuideProvider, usePageGuide } from '@/components/explain/GuideProvider';
 import { GuideLayer } from '@/components/explain/GuideLayer';
+import { PageHelpContext } from '@/components/explain/PageHelp';
 import { EXPLAIN_LABEL, EXPLAIN_MESSAGE, hasPageGuide } from '@/lib/explain/pageGuides';
 import { tourFor } from '@/lib/explain/pageTours';
 import { requestShow } from '@/lib/explain/showSignal';
@@ -309,6 +310,8 @@ function ShellLayoutInner({ children }: Props) {
     label: EXPLAIN_LABEL, message: EXPLAIN_MESSAGE,
     show: () => { const steps = tourFor(screenContext.page); if (!steps.length) return false; requestShow(steps, 'chat'); return true },
   } : null;
+  // The page shows it as a "?" beside its title (PageHelp.tsx).
+  const pageHelp = explain ? () => { if (!explain.show()) sendConversation(explain.message) } : null;
   const [phoneChatOpen, setPhoneChatOpen] = useState(false);
   const phoneChatRef = useRef<HTMLDivElement>(null);
   useDialogFocus(phoneChatOpen && isMobile, phoneChatRef, () => setPhoneChatOpen(false));
@@ -398,6 +401,7 @@ function ShellLayoutInner({ children }: Props) {
 
   return (
     <CanvasActivityProvider snapshot={canvasSnapshot} writers={canvasWriters} refetch={canvasRefetch} applyChanges={applyChanges} retryTurn={() => { void assistant.retryLast(); }}>
+    <PageHelpContext.Provider value={pageHelp}>
     <CanvasBridge onActivity={setCanvasActivity} />
     <DesktopControlsContext.Provider value={desktopControls}>
     <DesktopLeadContext.Provider value={desktopLead}>
@@ -534,7 +538,7 @@ function ShellLayoutInner({ children }: Props) {
                 <div className={`scenery-page scenery-page-contents${dockedBar ? ' has-docked-bar' : ''}`}>
                   {children}
                   {dockedBar
-                    ? <ConversationStrip docked messages={assistant.messages} walk={walk} explain={explain} right={paneWidth} onSend={(text) => sendConversation(text)} busy={assistant.loading} voice={stripVoice} />
+                    ? <ConversationStrip docked messages={assistant.messages} walk={walk} right={paneWidth} onSend={(text) => sendConversation(text)} busy={assistant.loading} voice={stripVoice} />
                     : showStrip && <ConversationStrip onSend={(text) => sendConversation(text)} busy={assistant.loading} voice={stripVoice} onOpenConversation={openConversation} />}
                 </div>
               </SideColumn>
@@ -723,6 +727,7 @@ function ShellLayoutInner({ children }: Props) {
     </DesktopCenterContext.Provider>
     </DesktopLeadContext.Provider>
     </DesktopControlsContext.Provider>
+    </PageHelpContext.Provider>
     </CanvasActivityProvider>
   );
 }

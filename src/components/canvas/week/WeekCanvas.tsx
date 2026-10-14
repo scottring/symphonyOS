@@ -428,13 +428,14 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
   const leftOpen = goneWeekend.flatMap((d) => [...d.items, ...(d.sometime ?? [])].filter((it) => !it.completed && it.kind !== 'event'))
   const weekendFold = goneWeekend.length > 0 && (
     <button type="button" className="wc-weekend-fold" aria-expanded={weekendOpen} onClick={() => setWeekendOpen((o) => !o)}>
-      <span className="wc-weekend-fold-title">Weekend</span>
-      <span>{goneWeekend.map(shortDay).join(' – ')}</span>
+      {/* One label, "This past weekend · Sat 10 – Sun 11 (open)" (Scott,
+          2026-10-14): no Open link off at the far right. */}
+      <span className="wc-weekend-fold-title">This past weekend</span>
+      <span>{goneWeekend.map(shortDay).join(' – ')} <span className="wc-weekend-fold-open">({weekendOpen ? 'fold' : 'open'})</span></span>
       {!weekendOpen && <span className="wc-weekend-fold-events">{goneWeekend.flatMap((d) => d.events).map((ev) => <span key={ev.id}>{ev.title}</span>)}</span>}
       {!weekendOpen && leftOpen.length > 0 && (
         <span className="wc-weekend-fold-left">Not done: {leftOpen.slice(0, 2).map((it) => it.title).join(', ')}{leftOpen.length > 2 ? `, and ${leftOpen.length - 2} more` : ''}</span>
       )}
-      <span className="wc-weekend-fold-open">{weekendOpen ? 'Fold' : 'Open'}</span>
     </button>
   )
   // A stay across several days: one bar over the columns it covers, under

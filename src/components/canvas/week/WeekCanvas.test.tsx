@@ -418,14 +418,16 @@ describe('WeekCanvas — days gone by', () => {
     render(<WeekCanvas weekStart={weekStart} days={withWeekend()} shelf={shelf()} routinesToPlace={[]} isCurrent writers={writers()} />)
     expect(screen.queryByTestId('journal-day-2026-10-03')).toBeNull()
     expect(screen.queryByTestId('journal-day-2026-10-04')).toBeNull()
-    const fold = screen.getByRole('button', { name: /Weekend/ })
-    expect(fold).toHaveTextContent('Sat 3 – Sun 4')
+    const fold = screen.getByRole('button', { name: /This past weekend/ })
+    // One label: "This past weekend · Sat 3 – Sun 4 (open)", no Open link at the far end.
+    expect(fold).toHaveTextContent('This past weekendSat 3 – Sun 4 (open)')
     expect(fold).toHaveTextContent('Kaleb’s baseball')
     expect(fold).toHaveTextContent('Not done: Throw out umbrella')
     expect(fold).toHaveAttribute('aria-expanded', 'false')
     fireEvent.click(fold)
     expect(screen.getByTestId('journal-day-2026-10-03')).toBeInTheDocument()
     expect(fold).toHaveAttribute('aria-expanded', 'true')
+    expect(fold).toHaveTextContent('Sat 3 – Sun 4 (fold)')
   })
 
   it('steps back the days gone by; today and the days ahead stay at full strength', () => {
@@ -440,7 +442,7 @@ describe('WeekCanvas — days gone by', () => {
   it('a weekend still ahead stays open in full', () => {
     // Sat Oct 3 is today: the weekend has not passed.
     render(<WeekCanvas weekStart={weekStart} days={withWeekend()} shelf={shelf()} routinesToPlace={[]} isCurrent writers={writers()} />)
-    expect(screen.queryByRole('button', { name: /^Weekend/ })).toBeNull()
+    expect(screen.queryByRole('button', { name: /This past weekend/ })).toBeNull()
     expect(screen.getByTestId('journal-day-2026-10-03')).toBeInTheDocument()
     expect(screen.getByTestId('journal-day-2026-10-04')).toBeInTheDocument()
   })
@@ -449,7 +451,7 @@ describe('WeekCanvas — days gone by', () => {
     vi.setSystemTime(new Date(2026, 9, 14, 9))
     const { MemoryRouter } = await import('react-router-dom')
     render(<MemoryRouter><WeekCanvas weekStart={weekStart} days={withWeekend()} shelf={shelf()} routinesToPlace={[]} isCurrent={false} writers={writers()} /></MemoryRouter>)
-    expect(screen.queryByRole('button', { name: /^Weekend/ })).toBeNull()
+    expect(screen.queryByRole('button', { name: /This past weekend/ })).toBeNull()
     expect(screen.getByTestId('journal-day-2026-10-03')).toBeInTheDocument()
   })
 

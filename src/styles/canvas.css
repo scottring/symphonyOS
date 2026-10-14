@@ -122,14 +122,24 @@
 .canvas-strip.is-docked .canvas-composer { gap: 10px; }
 /* Room under a page's last row for the bar (the shell sets --dock-clearance). */
 .has-docked-bar { padding-bottom: calc(var(--dock-clearance, 67px) + 12px); }
-.canvas-strip.is-docked .canvas-composer-field {
-  height: 44px; padding: 0 18px; border: 1px solid var(--color-neutral-300); border-radius: var(--radius-full);
-  background: var(--color-bg-base);
+.canvas-strip.is-docked .canvas-composer {
+  /* One field: the mic and send sit inside it (Scott, 2026-10-14). */
+  min-height: 48px; padding: 4px 4px 4px 18px; gap: 6px;
+  border: 1px solid var(--color-neutral-300); border-radius: var(--radius-full); background: var(--color-bg-base);
 }
-.canvas-strip.is-docked .canvas-composer:focus-within { box-shadow: none; }
-.canvas-strip.is-docked .canvas-composer-field:focus { border-color: var(--color-primary-500); outline: 2px solid var(--color-primary-100); }
-.canvas-strip.is-docked .canvas-mic, .canvas-strip.is-docked .canvas-send { height: 44px; }
-.canvas-strip.is-docked .canvas-send { width: 44px; }
+.canvas-strip.is-docked .canvas-composer-field { height: 40px; padding: 0; border: 0; background: transparent; }
+.canvas-strip.is-docked .canvas-composer:focus-within { box-shadow: none; border-color: var(--color-primary-500); outline: 2px solid var(--color-primary-100); }
+.canvas-strip.is-docked .canvas-mic, .canvas-strip.is-docked .canvas-send { height: 40px; }
+.canvas-strip.is-docked .canvas-send { width: 40px; }
+/* The page's suggested talk, above the field: a suggestion, not a command. */
+.canvas-suggest { margin: 0 0 6px 6px; font-family: var(--font-family-sans); font-size: 13px; color: var(--color-neutral-600); }
+.canvas-suggest-link {
+  padding: 0; border: 0; background: none; font: inherit; font-weight: 600; color: var(--color-primary-700);
+  text-decoration: underline; text-underline-offset: 3px; cursor: pointer;
+}
+.canvas-suggest-link:hover:not(:disabled) { color: var(--color-primary-800); }
+.canvas-suggest-link:disabled { opacity: .55; cursor: default; }
+.canvas-suggest-link:focus-visible { outline: 2px solid var(--color-primary-600); outline-offset: 2px; border-radius: 3px; }
 .canvas-walk {
   flex: none; height: 44px; padding: 0 18px; border-radius: var(--radius-full);
   border: 1.5px solid var(--color-primary-600); background: var(--color-bg-elevated);
@@ -189,10 +199,12 @@
 .canvas-composer-field::placeholder { color: var(--color-neutral-500); }
 .canvas-composer:focus-within { box-shadow: inset 0 -2px 0 var(--color-primary-500); }
 .canvas-mic {
-  display: inline-flex; align-items: center; gap: 6px; height: 36px; padding: 0 14px 0 11px;
-  border-radius: var(--radius-full); border: 1.5px solid var(--color-primary-600); background: var(--color-bg-elevated);
+  /* An icon in the field until it is on; then it says what it is doing. */
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-width: 40px; height: 36px; padding: 0 10px;
+  border-radius: var(--radius-full); border: 0; background: var(--color-primary-50);
   font-family: var(--font-family-sans); font-size: 13.5px; font-weight: 600; color: var(--color-primary-800);
 }
+.canvas-mic:hover:not(.is-on) { background: var(--color-primary-100); }
 .canvas-mic.is-on { background: var(--color-primary-700); border-color: var(--color-primary-700); color: #fff; }
 .canvas-mic.is-on svg { animation: canvas-pulse 1.2s ease-in-out infinite; }
 .canvas-send {
