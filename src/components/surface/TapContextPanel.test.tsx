@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { screen, fireEvent } from '@testing-library/react'
+import { screen, fireEvent, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { render } from '@/test/test-utils'
 import { TapContextPanel } from './TapContextPanel'
@@ -342,5 +342,94 @@ describe('TapContextPanel', () => {
     expect(screen.getByRole('link', { name: 'Open Supply list' })).toHaveAttribute('href', 'https://supplies.test')
     expect(screen.getByRole('group', { name: 'From Classroom ready' })).toBeInTheDocument()
     expect(task.links ?? []).toHaveLength(0)
+  })
+
+  // Today, trimmed (2026-10-14): a row is tick, drag and tap, so every job
+  // the row's menus did has to be here.
+  describe('the jobs the Today row menus did', () => {
+    const renderPanel = (taskOver: Parameters<typeof createMockTask>[0] = {}, extra: Record<string, unknown> = {}) => {
+      const task = createMockTask({ title: 'Reply to Christian', ...taskOver })
+      return render(<TapContextPanel
+        task={task} contacts={[]} projects={[]} events={[]} familyMembers={[]}
+        siblingTaskCandidates={[]} allTasks={[task]} {...baseHandlers} {...extra}
+      />)
+    }
+    /** A chip, or the same job folded into the ⋯. */
+    const job = async (user: ReturnType<typeof userEvent.setup>, name: string | RegExp) => {
+      const chip = screen.queryByRole('button', { name })
+      if (chip) return chip
+      await user.click(screen.getByRole('button', { name: 'More actions' }))
+      return within(screen.getByRole('group', { name: 'More actions' })).getByRole('button', { name })
+    }
+
+    it('offers none of them when the host wires none', () => {
+      renderPanel()
+      for (const name of ['Bring up', 'Waiting for…', 'Need today']) {
+        expect(screen.queryByRole('button', { name })).not.toBeInTheDocument()
+      }
+    })
+
+    it('Bring up flags it for discussion, keeping the question', async () => {
+      const onUpdateDiscussion = vi.fn()
+      const { user } = renderPanel({ discussionNote: 'with Iris' }, { onUpdateDiscussion })
+      await user.click(await job(user, 'Bring up'))
+      expect(onUpdateDiscussion).toHaveBeenCalledWith({ needsDiscussion: true, discussionNote: 'with Iris' })
+    })
+
+    it('a flagged task says On the list, unflags, and edits its question', async () => {
+      const onUpdateDiscussion = vi.fn()
+      const { user } = renderPanel({ needsDiscussion: true, discussionNote: '' }, { onUpdateDiscussion })
+      await user.type(screen.getByPlaceholderText(/what's the question/i), 'Summer camp')
+      await user.tab()
+      expect(onUpdateDiscussion).toHaveBeenCalledWith({ needsDiscussion: true, discussionNote: 'Summer camp' })
+      const chip = await job(user, 'On the list')
+      await user.click(chip)
+      expect(onUpdateDiscussion).toHaveBeenLastCalledWith({ needsDiscussion: false, discussionNote: undefined })
+    })
+
+    it('Waiting for… opens the sentence and saves it', async () => {
+      const onSaveWaiting = vi.fn()
+      const { user } = renderPanel({}, { onSaveWaiting, onClearWaiting: vi.fn() })
+      await user.click(await job(user, 'Waiting for…'))
+      await user.type(screen.getByPlaceholderText(/pizza Saturday/), 'Guy to call back')
+      await user.click(screen.getByRole('button', { name: 'Save' }))
+      expect(onSaveWaiting).toHaveBeenCalledWith('Guy to call back', undefined)
+    })
+
+    it('a waiting task can stop waiting', async () => {
+      const onClearWaiting = vi.fn()
+      const { user } = renderPanel({ isWaiting: true, waitingFor: 'Guy' }, { onSaveWaiting: vi.fn(), onClearWaiting })
+      await user.click(await job(user, 'Waiting'))
+      await user.click(screen.getByRole('button', { name: 'Not waiting anymore' }))
+      expect(onClearWaiting).toHaveBeenCalledTimes(1)
+    })
+
+    it('Need today toggles the mark, and says when it is set', async () => {
+      const onToggleNeededToday = vi.fn()
+      const { user, unmount } = renderPanel({}, { onToggleNeededToday, neededToday: false })
+      await user.click(await job(user, 'Need today'))
+      expect(onToggleNeededToday).toHaveBeenCalledTimes(1)
+      unmount()
+      renderPanel({}, { onToggleNeededToday, neededToday: true })
+      expect(await job(user, 'Needed today')).toBeInTheDocument()
+    })
+
+    it('Remove from the day sits in the ⋯ with Delete', async () => {
+      const onRemoveFromDay = vi.fn()
+      const { user } = renderPanel({}, { onRemoveFromDay, removeFromDayLabel: 'Remove from today' })
+      await user.click(screen.getByRole('button', { name: 'More actions' }))
+      const menu = within(screen.getByRole('group', { name: 'More actions' }))
+      expect(menu.getByRole('button', { name: 'Delete' })).toBeInTheDocument()
+      await user.click(menu.getByRole('button', { name: 'Remove from today' }))
+      expect(onRemoveFromDay).toHaveBeenCalledTimes(1)
+    })
+
+    it('with every job wired there is still exactly one ⋯', () => {
+      renderPanel({ phoneNumber: '555-0100', location: '1 Main St' }, {
+        onUpdateDiscussion: vi.fn(), onSaveWaiting: vi.fn(), onToggleNeededToday: vi.fn(),
+        onRemoveFromDay: vi.fn(), onAssistMutate: vi.fn(),
+      })
+      expect(screen.getAllByRole('button', { name: 'More actions' })).toHaveLength(1)
+    })
   })
 })

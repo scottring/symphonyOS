@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { screen, fireEvent } from '@testing-library/react'
+import { screen, fireEvent, within } from '@testing-library/react'
 import { render } from '@/test/test-utils'
 import { ScheduleActionsProvider } from '@/contexts/ScheduleActionsContext'
 import { computeTodayData } from '@/lib/today/computeTodayData'
@@ -153,18 +153,14 @@ describe('Today invariant: the PAGE does not grow with the backlog', () => {
     expect(screen.queryByText('backlog 499')).toBeNull()
   })
 
-  it('still points at the whole backlog from the page menu', () => {
-    // No line names the size. A running tally of everything you have not
-    // done is not a commitment, and "oldest 250 days" read as an accusation
-    // rather than a pointer. What the invariant actually needs is the DOOR —
-    // a Review that opens the full backlog — and it must be there at 5 items
-    // and at 500 alike. It lives in the ⋯ menu (2026-09-21): the page itself
-    // spends no line on the backlog, and the Planning panel's fold is the
-    // page's one entrance to unfinished work.
+  it('the page menu does not grow with the backlog either', () => {
+    // No line names the size and no drawer waits behind a door (Today,
+    // trimmed, 2026-10-14): leftovers are named by "Plan my day" in the bar,
+    // and the ⋯ menu holds the same two entries at 5 items and at 500.
     renderToday(backlog(500))
     expect(screen.queryByRole('button', { name: 'Review' })).toBeNull()
     fireEvent.click(screen.getAllByRole('button', { name: /more controls/i })[0])
-    expect(screen.getByRole('button', { name: 'Review carried-over work' })).toBeInTheDocument()
+    expect(within(screen.getByRole('menu')).getAllByRole('button').map((b) => b.textContent?.replace('Show daily', 'Hide daily'))).toEqual(['Hide daily', 'Print list'])
   })
 
   it('the Needed Today note does not grow with backlog size', () => {

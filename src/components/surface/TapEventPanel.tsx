@@ -96,6 +96,12 @@ interface TapEventPanelProps {
   onDiscussionNoteChange?: (note: string) => void
   /** Open the Discussion on mount (deep link from the Discussions inbox). */
   autoOpenDiscussion?: boolean
+  /**
+   * Skip this one occurrence (Symphony-side, never a Google write) — the job
+   * the Today row's ⋯ menu did as "Skip today". `label` names the day;
+   * pressing again while skipped puts it back. Omitted, no chip.
+   */
+  skipDay?: { skipped: boolean; label: string; onToggle: () => void }
   /** Informational-only "free" flag: the kids just show up, nothing for a
    *  parent to do. When set, the Complete pill and prep-task input hide. */
   free?: boolean
@@ -392,6 +398,18 @@ export function TapEventPanel(props: TapEventPanelProps) {
           title: 'The kids just show up — no prep, no handoff, nothing for a parent to do.'
             + (props.freeAppliesToSeries ? ' Applies to every occurrence.' : ''),
           onClick: () => props.onToggleFree?.(!props.free),
+        }]
+      : []),
+    ...(props.skipDay && !props.completed
+      ? [{
+          id: 'skip-day',
+          label: props.skipDay.skipped ? 'Put it back' : props.skipDay.label,
+          kind: (props.skipDay.skipped ? 'flagged' : 'default') as PanelAction['kind'],
+          pressed: props.skipDay.skipped,
+          title: props.skipDay.skipped
+            ? 'Skipped for this day only — put it back'
+            : 'Skip this occurrence only — the calendar is unchanged',
+          onClick: props.skipDay.onToggle,
         }]
       : []),
   ]

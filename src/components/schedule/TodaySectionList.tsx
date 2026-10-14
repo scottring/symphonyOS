@@ -41,6 +41,22 @@ import { OpenSpaceLine } from './OpenSpaceLine'
 import { TimelineSpine } from './TimelineSpine'
 import { countRoutineRowUnits } from '@/lib/today/routineCollections'
 import { ROW_SHELL, ROW_GRID, LANE, MARK } from './todayRowGrid'
+import type { RowMark } from './todayPreview'
+
+/** A pending change card's mark, drawn around a row (Week's dashed look). */
+function previewClass(mark: RowMark | undefined): string {
+  if (!mark) return ''
+  return `today-preview-row is-${mark.tone}${mark.struck ? ' is-struck' : ''}`
+}
+function PreviewNote({ mark }: { mark: RowMark | undefined }) {
+  if (!mark) return null
+  return (
+    <>
+      {mark.note && <span className="wc-proposed-note today-preview-note">{mark.note}</span>}
+      <span className="sr-only"> (change proposed, not saved yet)</span>
+    </>
+  )
+}
 
 // ─── Meal detection ────────────────────────────────────────────────────────────
 
@@ -105,13 +121,10 @@ export interface TodaySectionListProps {
   collapsedKeys: Set<string>
   openedByUser: Set<string>
   onToggleSection: (section: DaySection, currentlyCollapsed: boolean) => void
-  selectedKeys: Set<string>
-  onToggleBulkSelect: (key: string) => void
+  /** A pending change card's mark on a row (todayPreview.ts): dashed teal
+   *  (proposed) or grey (leaving), struck for done/skipped/leaving. */
+  previewOf?: (item: TimelineItem) => RowMark | undefined
   tasksMap: Map<string, Task>
-  /** The shared timing control, for a task row on a day. Supplied by the host
-   *  so this list stays presentational; Day is an execution view of the same
-   *  work, so it must be the same control the period pages use. */
-  timingFor?: (task: Task) => React.ReactNode
   /** What a task row serves (ServesLine), drawn at rest under its title. */
   servesFor?: (task: Task) => React.ReactNode
   shareNudgeByEventId: Map<string, { eventId: string; context: string }>
@@ -164,10 +177,8 @@ export function TodaySectionList({
   collapsedKeys,
   openedByUser,
   onToggleSection,
-  selectedKeys,
-  onToggleBulkSelect,
+  previewOf,
   tasksMap,
-  timingFor,
   servesFor,
   shareNudgeByEventId,
   parserContext,
@@ -201,11 +212,11 @@ export function TodaySectionList({
     setExpandedSections((prev) => new Set(prev).add(key))
   }, [])
   const {
-    onToggleWaiting, onUpdateTask, onPushTask,
+    onToggleWaiting, onUpdateTask,
     onAssignTask, onAssignTaskAll, onAssignEvent, onAssignEventAll,
     onAssignRoutine, onAssignRoutineAll,
-    onSkipRoutine, onPushRoutine, onUpdateRoutine, onRegisterUndo,
-    onSkipEvent, onPushEvent, onUpdateEventContext,
+    onSkipRoutine, onUpdateRoutine, onRegisterUndo,
+    onSkipEvent, onUpdateEventContext,
     onOpenTask,
     contactsMap, projectsMap, familyMembers = [],
     eventNotesMap,
@@ -463,7 +474,7 @@ export function TodaySectionList({
                         {showInsert && insertBefore}
                         {isUpNext && <UpNextMarker status={upNextStatus} />}
                         <TodayDraggableRow itemId={item.id} disabled={dragRefused}>
-                        <div className={isUpNext ? UP_NEXT_ROW_CLASS : undefined}>
+                        <div className={[isUpNext ? UP_NEXT_ROW_CLASS : '', previewClass(previewOf?.(item))].filter(Boolean).join(' ') || undefined}>
                         <RoutineCollectionRow
                           item={item}
                           familyMembers={familyMembers}
@@ -511,6 +522,7 @@ export function TodaySectionList({
                             })
                           } : undefined}
                         />
+                        <PreviewNote mark={previewOf?.(item)} />
                         </div>
                         </TodayDraggableRow>
                       </div>
@@ -549,7 +561,7 @@ export function TodaySectionList({
                     {/* Group chrome wins over the up-next tint: stripping a
                         parent's card top to tint it leaves the group's border
                         broken. The marker line above still says "Up next". */}
-                    <div data-item-id={item.id} className={(groupCardClass || (isUpNext ? UP_NEXT_ROW_CLASS : '')) || undefined} {...(isFirstItem ? { 'data-today-first': '' } : {})}>
+                    <div data-item-id={item.id} className={[groupCardClass || (isUpNext ? UP_NEXT_ROW_CLASS : ''), previewClass(previewOf?.(item))].filter(Boolean).join(' ') || undefined} {...(isFirstItem ? { 'data-today-first': '' } : {})}>
                     {(() => {
                       const { routineId: bareRoutineId, slot } = item.type === 'routine'
                         ? parseRoutineTimelineId(item.id)
@@ -558,14 +570,6 @@ export function TodaySectionList({
                       return (
                         <>
                     <ScheduleItem
-                      // A row already in a time slot says when in its lane; the
-                      // chip only repeated it (Scott, 2026-10-04). Untimed rows
-                      // keep it — it is how they get a time.
-                      belowTitleAccessory={
-                        item.type === 'task' && taskId && timingFor && !effectiveStartTime(item)
-                          ? (() => { const t = tasksMap.get(taskId); return t ? timingFor(t) : undefined })()
-                          : undefined
-                      }
                       servesLine={
                         item.type === 'task' && taskId && servesFor
                           ? (() => { const t = tasksMap.get(taskId); return t ? servesFor(t) : undefined })()
@@ -577,10 +581,6 @@ export function TodaySectionList({
                       // the dish, not the glyph the meal event was given.
                       item={isMobile && isMealItem(item.id, item.type, item.title) ? { ...item, title: mealRowTitle(item.title) } : item}
                       selected={selectedItemId === item.id}
-                      bulkSelectable={true}
-                      bulkSelected={selectedKeys.has(item.id)}
-                      showBulkAffordance={selectedKeys.size > 0}
-                      onToggleBulkSelect={() => onToggleBulkSelect(item.id)}
                       onSelect={() => onSelectItem(item.id)}
                       onToggleWaiting={
                         item.type === 'task' && taskId && onToggleWaiting
@@ -599,20 +599,9 @@ export function TodaySectionList({
                       // Per-person items under the row. A subtask IS a task, so
                       // the same handler the parent uses completes it.
                       onToggleSubtask={onToggleTask}
-                      onPush={
-                        item.type === 'task' && taskId && onPushTask
-                          ? (target) => onPushTask(taskId, target)
-                          : item.type === 'routine' && onPushRoutine
-                          ? (date) => { if (date instanceof Date) onPushRoutine(bareRoutineId, date) }
-                          : item.type === 'event' && onPushEvent
-                          ? (date) => { if (date instanceof Date) onPushEvent(item.id.replace('event-', ''), date) }
-                          : undefined
-                      }
-                      onSchedule={
-                        item.type === 'task' && taskId && onUpdateTask
-                          ? (date, isAllDay) => onUpdateTask(taskId, { bucket: 'timed', scheduledFor: date, isAllDay })
-                          : undefined
-                      }
+                      // No row reschedule button, no bulk checkbox ("Today,
+                      // trimmed", 2026-10-14): a day and time are set in the
+                      // item panel, or by dragging onto the day.
                       onSkip={
                         item.type === 'routine' && onSkipRoutine
                           ? () => onSkipRoutine(routineEntityId)
@@ -668,16 +657,12 @@ export function TodaySectionList({
                           ? (context) => onUpdateEventContext(item.id.replace('event-', ''), context ?? null)
                           : undefined
                       }
-                      onUpdateDiscussion={
-                        item.type === 'task' && taskId && onUpdateTask
-                          ? (next) => onUpdateTask(taskId, next)
-                          : undefined
-                      }
                       panelOpen={panelOpen}
                       onClosePanel={onClosePanel}
                       variant={item.type === 'routine' ? 'minimal' : 'full'}
                       currentMemberId={currentMemberId}
                     />
+                    <PreviewNote mark={previewOf?.(item)} />
                     {item.type === 'event' && (() => {
                       const nudge = shareNudgeByEventId.get(item.id.replace('event-', ''))
                       if (!nudge) return null

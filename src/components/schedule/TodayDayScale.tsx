@@ -9,6 +9,7 @@ import { dragPointerY } from '@/lib/today/dragPointer'
 import { isPlanDrag, readPlanDrag, type PlanDragPayload } from '@/lib/planning/planDrag'
 import { useTravelTime } from '@/hooks/useTravelTime'
 import { effectiveStartTime, formatTimeLong } from '@/lib/timeUtils'
+import type { ProposedRow, RowMark } from './todayPreview'
 
 /**
  * The day, to scale (Scott, 2026-10-06, option B): Today's timed day as a
@@ -63,6 +64,8 @@ interface BlockProps {
   upNext: boolean
   past: boolean
   refused: boolean
+  /** A pending change card's mark on this thing (todayPreview.ts). */
+  mark?: RowMark
   onSelect: (id: string) => void
 }
 
@@ -70,7 +73,7 @@ interface BlockProps {
  *  side by side "looks stupid"): "9:00–10:15 · Boxing" and who carries it.
  *  No check here — a click opens its details, where it is ticked off or its
  *  time fine-tuned. */
-function ScaleItem({ item, start, end, hasEnd, block, pxPerHour, people, selected, upNext, past, refused, onSelect }: BlockProps) {
+function ScaleItem({ item, start, end, hasEnd, block, pxPerHour, people, selected, upNext, past, refused, mark, onSelect }: BlockProps) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: item.id, disabled: refused })
   const isEvent = item.type === 'event'
   // How far away it is, drawn above it as the time it takes to get there.
@@ -108,17 +111,44 @@ function ScaleItem({ item, start, end, hasEnd, block, pxPerHour, people, selecte
           past && !upNext ? 'is-past' : '',
           selected ? 'is-selected' : '',
           isDragging ? 'is-dragging' : '',
+          mark ? `is-preview is-${mark.tone}` : '',
+          mark?.struck ? 'is-struck' : '',
         ].filter(Boolean).join(' ')}
         style={pos}
       >
         <button type="button" className="today-scale-open" aria-label={label} onClick={() => onSelect(item.id)}>
           <span className="today-scale-line"><span className="tabular-nums">{time}</span> · <span>{item.title}</span></span>
+          {mark?.note && <span className="wc-proposed-note">{mark.note}</span>}
         </button>
         {people.length > 0 && (
           <span className="today-scale-people">{people.slice(0, 3).map((m) => <MiniAvatar key={m.id} member={m} />)}</span>
         )}
       </div>
     </>
+  )
+}
+
+/** A thing a pending change card would put here: dashed teal, inert — the
+ *  card is where it is approved, not the column. */
+function ProposedBlock({ row, block }: { row: ProposedRow; block: ScaleBlock }) {
+  const lanes = block.lanes
+  return (
+    <div
+      className="today-scale-item is-preview is-proposed"
+      data-testid="proposed-row"
+      style={{
+        top: block.top,
+        height: block.height,
+        left: `calc(var(--scale-gutter) + (100% - var(--scale-gutter)) * ${block.lane / lanes})`,
+        width: `calc((100% - var(--scale-gutter)) / ${lanes} - ${lanes > 1 ? 6 : 0}px)`,
+      }}
+    >
+      <span className="today-scale-open">
+        <span className="today-scale-line"><span className="tabular-nums">{clock(row.time!)}</span> · <span>{row.title}</span></span>
+        {row.note && <span className="wc-proposed-note">{row.note}</span>}
+        <span className="sr-only"> (proposed, not saved yet)</span>
+      </span>
+    </div>
   )
 }
 
@@ -135,6 +165,8 @@ export function TodayDayScale({
   onPlanDrop,
   fromHour = null,
   handleRef,
+  markOf,
+  proposed = [],
 }: {
   /** The day's timed rows (a group's children ride with their parent). */
   items: TimelineItem[]
@@ -154,6 +186,10 @@ export function TodayDayScale({
   /** "Hide earlier hours": the column opens at this hour. */
   fromHour?: number | null
   handleRef?: Ref<DayScaleHandle>
+  /** A pending change card's mark on a thing already on the day. */
+  markOf?: (item: TimelineItem) => RowMark | undefined
+  /** A pending change card's timed arrivals: dashed, inert, at their time. */
+  proposed?: readonly ProposedRow[]
 }) {
   // When each thing runs. An all-day "Dinner: …" event sits at its meal's
   // hour (effectiveStartTime), for the half hour a bare time gets.
@@ -164,12 +200,19 @@ export function TodayDayScale({
     const hasEnd = !!own && own.getTime() > start.getTime()
     return [{ item, start, end: hasEnd ? own! : new Date(start.getTime() + DEFAULT_MINUTES * 60_000), hasEnd }]
   }), [items])
+  const proposedById = useMemo(
+    () => new Map(proposed.filter((p) => p.time).map((p) => [`proposed-${p.key}`, p])),
+    [proposed],
+  )
   const scale: DayScale = useMemo(
     () => buildDayScale(
-      timed.map((t) => ({ id: t.item.id, start: t.start, end: t.hasEnd ? t.end : null })),
+      [
+        ...timed.map((t) => ({ id: t.item.id, start: t.start, end: t.hasEnd ? t.end : null })),
+        ...[...proposedById].map(([id, p]) => ({ id, start: p.time!, end: null })),
+      ],
       { now, pxPerHour: isMobile ? 40 : 48, fromHour },
     ),
-    [timed, now, isMobile, fromHour],
+    [timed, proposedById, now, isMobile, fromHour],
   )
   const trackRef = useRef<HTMLDivElement | null>(null)
   const { setNodeRef, isOver } = useDroppable({ id: SCALE_DROP_ID })
@@ -246,6 +289,8 @@ export function TodayDayScale({
         <div key={f.top} className="today-scale-free" style={{ top: f.top, height: f.height }}>{f.label}</div>
       ))}
       {scale.blocks.map((b) => {
+        const arriving = proposedById.get(b.id)
+        if (arriving) return <ProposedBlock key={b.id} row={arriving} block={b} />
         const entry = byId.get(b.id)
         if (!entry) return null
         const { item, start, end, hasEnd } = entry
@@ -264,6 +309,7 @@ export function TodayDayScale({
             upNext={upNextId === item.id}
             past={past}
             refused={!!refusalFor(item, isReadOnlyEvent)}
+            mark={markOf?.(item)}
             onSelect={onSelect}
           />
         )

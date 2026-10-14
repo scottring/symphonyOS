@@ -3,7 +3,6 @@ import { ALL_LAYERS } from '@/lib/domains'
 import { screen, fireEvent, within } from '@testing-library/react'
 import { render } from '@/test/test-utils'
 import { ScheduleActionsProvider } from '@/contexts/ScheduleActionsContext'
-import { createMockRoutine } from '@/test/mocks/factories'
 import { TodayView } from './TodayView'
 import { DesktopControlsContext } from '@/components/layout/DesktopNavigation'
 
@@ -77,12 +76,6 @@ const TOMORROW = new Date(TODAY.getFullYear(), TODAY.getMonth(), TODAY.getDate()
  */
 async function openOverflow(user: { click: (el: Element) => Promise<void> }) {
   await user.click(screen.getByRole('button', { name: /more controls/i }))
-}
-
-/** The morning review's door — in the ⋯ menu, off the page (2026-09-21). */
-function reviewDoor() {
-  fireEvent.click(screen.getAllByRole('button', { name: /more controls/i })[0])
-  return screen.getByRole('button', { name: 'Review carried-over work' })
 }
 
 function renderView(props: Record<string, unknown> = {}, ctxOverrides: Record<string, unknown> = {}) {
@@ -242,7 +235,7 @@ describe('TodayView', () => {
     expect(screen.queryByRole('button', { name: 'Add task' })).toBeNull()
   })
 
-  it('carried-over tasks live in the backlog footer: one line, expanding to the list', () => {
+  it('carried-over tasks stay off the page, with no review door (Today, trimmed)', () => {
     // Build a past date 2 days before actual today so computeIsToday + selectOverdue both fire
     const past = new Date(TODAY)
     past.setDate(past.getDate() - 2)
@@ -260,17 +253,12 @@ describe('TodayView', () => {
         },
       ],
     } as never)
-    // A two-day-old commitment is NOT drawn on the page: it waits in the
-    // planning panel's fold (Scott, 2026-09-21), and the page spends no line
-    // pointing at it. The ⋯ menu's "Review carried-over work" opens the
-    // bounded triage that owns the backlog.
+    // A two-day-old commitment is NOT drawn on the page, and no line points at
+    // it: leftovers are named by "Plan my day", which ends in one change card.
     expect(screen.queryByText('Overdue task title')).toBeNull()
     expect(screen.queryByRole('heading', { name: 'Carried over' })).toBeNull()
-    expect(screen.queryByRole('button', { name: /Review unfinished work/ })).toBeNull()
-    expect(screen.queryByRole('button', { name: 'Review' })).toBeNull()
     fireEvent.click(screen.getAllByRole('button', { name: /more controls/i })[0])
-    fireEvent.click(screen.getByRole('button', { name: 'Review carried-over work' }))
-    expect(screen.getAllByText('Overdue task title').length).toBeGreaterThanOrEqual(1)
+    expect(screen.queryByRole('button', { name: 'Review carried-over work' })).toBeNull()
   })
 
   it('renders TimelineNoteComposer when insert.noteComposer is set', () => {
@@ -291,67 +279,34 @@ describe('TodayView', () => {
     }
   })
 
-  it('shows the discussion badge in the overflow when a task needs discussion', async () => {
+  describe('To talk about', () => {
+    const flagged = {
+      id: 'disc-1', title: 'Summer camp', completed: false, createdAt: TODAY, updatedAt: TODAY,
+      needsDiscussion: true, discussionNote: 'with Iris',
+    }
+    it('one quiet line of chips under For today; a chip opens the item', () => {
+      const onSelectItem = vi.fn()
+      renderView({ tasks: [flagged], onSelectItem })
+      const line = screen.getByRole('group', { name: 'To talk about' })
+      fireEvent.click(within(line).getByRole('button', { name: 'Summer camp · with Iris' }))
+      expect(onSelectItem).toHaveBeenCalledWith('task-disc-1')
+    })
+    it('is silent when nothing is flagged, or the flagged thing is done', () => {
+      renderView({ tasks: [{ ...flagged, completed: true }] })
+      expect(screen.queryByRole('group', { name: 'To talk about' })).toBeNull()
+    })
+  })
+
+  it('the ⋯ menu holds only Hide daily and Print list', async () => {
     const { user } = renderView({
-      tasks: [
-        {
-          id: 'disc-1',
-          title: 'Talk to Iris about budget',
-          completed: false,
-          createdAt: TODAY,
-          updatedAt: TODAY,
-          needsDiscussion: true,
-        },
-      ],
+      tasks: [{ id: 'd', title: 'Talk', completed: false, createdAt: TODAY, updatedAt: TODAY, needsDiscussion: true }],
     })
     await openOverflow(user)
-    expect(screen.getByText(/to discuss/i)).toBeInTheDocument()
-  })
-
-  it('keeps the Clarity binoculars reachable from the overflow', async () => {
-    // Clarity is a binoculars icon with an explanatory hover tooltip; the static
-    // status glance still lives in the sidebar.
-    const { user } = renderView()
-    await openOverflow(user)
-    expect(screen.getByLabelText(/clarity/i)).toBeInTheDocument()
-  })
-
-  // Pins the fix-round-2 widening: rung 7's everyday sweep has a pin/dose
-  // escape (isPinnedToTimeline) that the old hand-rolled `type !== 'daily'`
-  // check never had. A daily + untimed + pinned routine (the med-tracker
-  // shape) is placeable work and must be counted; the same routine unpinned
-  // must still be swept. This is the one seam that reaches the clarity
-  // count without a dedicated export — through the rendered curtain text.
-  describe('Clarity placeable count — pin/dose escape from the everyday sweep', () => {
-    it('counts a pinned untimed daily routine as placeable work', async () => {
-      const pinned = createMockRoutine({
-        recurrence_pattern: { type: 'daily' },
-        time_of_day: null,
-        pin_to_timeline: true,
-      })
-      const { user } = renderView({ routines: [pinned] })
-      await openOverflow(user)
-      await user.click(screen.getByLabelText(/clarity/i))
-      expect(await screen.findByText(/1 item to place/i)).toBeInTheDocument()
-    })
-
-    it('does not count the same routine unpinned — the everyday sweep still applies', async () => {
-      const unpinned = createMockRoutine({
-        recurrence_pattern: { type: 'daily' },
-        time_of_day: null,
-        // Show in Today not positively set: the everyday sweep applies.
-        show_on_timeline: null as unknown as boolean,
-      })
-      const { user } = renderView({ routines: [unpinned] })
-      await openOverflow(user)
-      await user.click(screen.getByLabelText(/clarity/i))
-      const curtain = await screen.findByRole('dialog', { name: /clarity/i })
-      // Depending on time of day the curtain shows either "You're clear" or
-      // the per-step "Your day is placed" line — neither contains "to place",
-      // so this holds regardless of when the suite runs. (Scoped to the
-      // curtain: the week column beside the day says "Still to place".)
-      expect(within(curtain).queryByText(/to place/i)).not.toBeInTheDocument()
-    })
+    const menu = screen.getByRole('menu')
+    expect(within(menu).getAllByRole('button').map((b) => b.textContent?.replace('Show daily', 'Hide daily'))).toEqual(['Hide daily', 'Print list'])
+    for (const gone of [/suggestions/i, /carried-over/i, /end of day review/i, /clarity/i, /to discuss/i, /duplicate/i, /suggested order/i]) {
+      expect(within(menu).queryByText(gone)).toBeNull()
+    }
   })
 
   describe('Up next (in place)', () => {
@@ -545,7 +500,7 @@ describe('TodayView print list', () => {
 
 })
 
-describe('TodayView attention line', () => {
+describe('TodayView: slipped work stays off the page', () => {
   function daysAgo(n: number) {
     const d = new Date(TODAY)
     d.setDate(d.getDate() - n)
@@ -557,65 +512,15 @@ describe('TodayView attention line', () => {
     bucket: 'timed' as const, scheduledFor: daysAgo(n),
   })
 
-  it('keeps every slipped row off the page and points at them instead', () => {
+  it('draws neither carried nor slipped rows, and no scoreboard', () => {
     renderView({ viewedDate: TODAY, tasks: [mk('c', 'carried thing', 1), mk('s', 'slipped thing', 200)] } as never)
-    // Neither is drawn on the page, and no line points at them (2026-09-21).
-    // The one-day-old carry-over waits in the planning panel's fold; the
-    // 200-day-old slip is reachable through the ⋯ menu's review and the
-    // Inbox's Expired fold.
+    // Leftovers are named by "Plan my day" (the change card), not by a line
+    // or a drawer on the page (spec 2026-10-14).
     expect(screen.queryByText('carried thing')).toBeNull()
-    expect(screen.queryByRole('button', { name: /Review unfinished work/ })).toBeNull()
     expect(screen.queryByText('slipped thing')).toBeNull()
-    expect(screen.queryByRole('button', { name: 'Review' })).toBeNull()
-    expect(reviewDoor()).toBeInTheDocument()
-    // No scoreboard: the footer names neither the size nor the age.
     expect(screen.queryByText(/need attention/)).toBeNull()
     expect(screen.queryByText(/oldest/)).toBeNull()
-  })
-
-  it('points at the queue even when the rest of the day is empty', () => {
-    // counts.totalItems excludes slipped work, so this day renders its empty
-    // journal. The attention line must survive that or the queue is invisible
-    // exactly when it is all that is left.
-    renderView({ viewedDate: TODAY, tasks: [mk('s', 'slipped thing', 200)] } as never)
     expect(screen.getByText(/nothing chosen yet/i)).toBeInTheDocument()
-    expect(reviewDoor()).toBeInTheDocument()
-  })
-
-  it('Review opens the morning Review drawer with the slipped item triageable', () => {
-    // Active management from Today (Scott, 2026-08-18): Review summons a
-    // bounded triage ritual as a MODAL — the page itself still spends one
-    // line, so the commitment-surface invariant holds. No navigation.
-    const back = window.location.pathname + window.location.search
-    try {
-      renderView({ viewedDate: TODAY, tasks: [mk('s', 'slipped thing', 200)] } as never)
-      fireEvent.click(reviewDoor())
-      expect(window.location.pathname).toBe(back.split('?')[0])
-      expect(screen.getByRole('dialog', { name: /start the day/i })).toBeInTheDocument()
-      // The slipped item appears INSIDE the drawer, with a fate on offer.
-      expect(screen.getByText('slipped thing')).toBeInTheDocument()
-      expect(screen.getByRole('button', { name: 'Someday' })).toBeInTheDocument()
-    } finally {
-      window.history.replaceState({}, '', back)
-    }
-  })
-
-  it('still offers the review when the carried-over lane is empty', () => {
-    renderView({ viewedDate: TODAY, tasks: [mk('s', 'slipped thing', 200)] } as never)
-    expect(reviewDoor()).toBeInTheDocument()
-  })
-
-  it('still offers the review when only the carried-over lane has work', () => {
-    // Carried-over tasks have no other home on the page now that the inline
-    // list is gone, so the door must open for them too.
-    renderView({ viewedDate: TODAY, tasks: [mk('c', 'carried thing', 1)] } as never)
-    expect(reviewDoor()).toBeInTheDocument()
-  })
-
-  it('offers no review when neither lane has work', () => {
-    renderView({ viewedDate: TODAY, tasks: [] } as never)
-    fireEvent.click(screen.getAllByRole('button', { name: /more controls/i })[0])
-    expect(screen.queryByRole('button', { name: 'Review carried-over work' })).toBeNull()
   })
 })
 
@@ -691,60 +596,27 @@ describe('TodayView — the day card carries the date nav', () => {
   })
 })
 
-describe('TodayView — desktop review closes the list (2026-10-02)', () => {
+describe('TodayView — no review button (Today, trimmed)', () => {
   afterEach(() => { mockUseMobile.mockReturnValue(true) })
-
-  // The desktop shell supplies the top bar's controls slot; that is what
-  // marks a desktop-shell mount.
-  function renderInShell(props: Record<string, unknown> = {}) {
+  it('the desktop day list ends without "Review today": reviewing is asked for in the bar', async () => {
+    mockUseMobile.mockReturnValue(false)
     const host = document.createElement('div')
     document.body.appendChild(host)
-    const result = render(
+    const { user } = render(
       <DesktopControlsContext.Provider value={host}>
         <ScheduleActionsProvider value={ctxValue as never}>
           <TodayView
             tasks={[]} events={[]} routines={[]} dateInstances={[]}
             selectedItemId={null} onSelectItem={vi.fn()} onToggleTask={vi.fn()}
             onCompleteRoutine={vi.fn()} onCompleteEvent={vi.fn()} loading={false}
-            viewedDate={TODAY} onDateChange={vi.fn()} projects={[]} {...props}
+            viewedDate={TODAY} onDateChange={vi.fn()} projects={[]}
           />
         </ScheduleActionsProvider>
       </DesktopControlsContext.Provider>,
     )
-    return { ...result, host }
-  }
-
-  it('ends the day list with Review today, once, and opens the existing review', async () => {
-    mockUseMobile.mockReturnValue(false)
-    const { user, host } = renderInShell()
-    const review = screen.getByRole('button', { name: 'Review today' })
+    expect(screen.queryByRole('button', { name: 'Review today' })).not.toBeInTheDocument()
     await openOverflow(user)
     expect(screen.queryByRole('button', { name: /End of day review/i })).not.toBeInTheDocument()
-    await user.click(review)
-    expect(screen.getByRole('dialog', { name: 'End of day review' })).toBeInTheDocument()
-    host.remove()
-  })
-
-  it('waits for the day to load before offering the review', () => {
-    mockUseMobile.mockReturnValue(false)
-    const { host } = renderInShell({ loading: true })
-    expect(screen.queryByRole('button', { name: 'Review today' })).not.toBeInTheDocument()
-    host.remove()
-  })
-
-  it('offers no review on another day', () => {
-    mockUseMobile.mockReturnValue(false)
-    const yesterday = new Date(TODAY); yesterday.setDate(yesterday.getDate() - 1)
-    const { host } = renderInShell({ viewedDate: yesterday })
-    expect(screen.queryByRole('button', { name: 'Review today' })).not.toBeInTheDocument()
-    host.remove()
-  })
-
-  it('keeps the ⋯ menu entry on phones', async () => {
-    const { user, host } = renderInShell()
-    expect(screen.queryByRole('button', { name: 'Review today' })).not.toBeInTheDocument()
-    await openOverflow(user)
-    expect(screen.getByRole('button', { name: /End of day review/i })).toBeInTheDocument()
     host.remove()
   })
 })
@@ -774,47 +646,3 @@ describe('TodayView weather', () => {
   })
 })
 
-// Scott asked for "Choose when" to say which day has room wherever it offers a
-// day. Today offers the days of the week in VIEW; the counting rules live in
-// lib/planning/weekDensity and are tested there.
-describe('Today’s Choose when offers the viewed week’s days', () => {
-  // Pinned: which weekday "today" is decides which tile the two rows land on,
-  // and the case is about the tiles, not the calendar.
-  const PINNED = new Date(2026, 9, 7, 9, 0)            // Wednesday 7 Oct 2026
-  const sunday = new Date(2026, 9, 4)
-  const wednesday = new Date(2026, 9, 7)           // the day in view
-
-  const open = (title: string) =>
-    fireEvent.click(screen.getByRole('button', { name: new RegExp(`Choose a week or a day for ${title}`) }))
-  const tiles = () => screen.queryAllByRole('menuitemradio')
-    .filter((b) => /^Plan for /.test(b.getAttribute('aria-label') ?? ''))
-
-  afterEach(() => { mockUseMobile.mockReturnValue(true) })
-
-  beforeEach(() => { vi.useFakeTimers({ toFake: ['Date'] }); vi.setSystemTime(PINNED) })
-  afterEach(() => { vi.useRealTimers() })
-
-  it('draws seven days of this week, counting what is already on them', () => {
-    mockUseMobile.mockReturnValue(false)
-    renderView({
-      tasks: [
-        { id: 'a', title: 'Fix the gate', completed: false, createdAt: PINNED, updatedAt: PINNED, bucket: 'week', weekStart: sunday, focus: [{ userId: 'me', date: wednesday }] },
-        { id: 'b', title: 'Pick up the parcel', completed: false, createdAt: PINNED, updatedAt: PINNED, bucket: 'timed', scheduledFor: wednesday, isAllDay: true },
-      ],
-      viewedDate: PINNED,
-    })
-    open('Fix the gate')
-    expect(tiles()).toHaveLength(7)
-    // The tiles are this week's days, in order, starting on its first day.
-    const first = tiles()[0].getAttribute('aria-label') ?? ''
-    expect(first).toContain(sunday.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }))
-    // And the Thursday says what is on it rather than reading as empty.
-    const wed = tiles().find((t) => (t.getAttribute('aria-label') ?? '').includes(
-      wednesday.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })))!
-    // Both rows land on that day — one scheduled for it, one chosen for it.
-    expect(wed.getAttribute('aria-label')).toMatch(/2 tasks already/)
-    // Every day of the week in view is counted, including the ones already
-    // past: the planning calendar is read a week back for exactly this.
-    expect(tiles().every((t) => !/read for/.test(t.getAttribute('aria-label') ?? ''))).toBe(true)
-  })
-})

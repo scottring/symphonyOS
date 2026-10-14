@@ -299,6 +299,7 @@ describe('agent wiring', () => {
     expect(src).toContain('- "Review my day" (the evening chip): call symphony_read_week')
     expect(src).toContain('done for what they finished')
     expect(src).toContain('No row-by-row questionnaire')
+    expect(src).toContain('- "What came in from email (…)?" (Today\'s new-from-email line)')
   })
   it('sends routine changes to the card, this week or from now on, and never deletes one', () => {
     expect(src).not.toContain('Routines have no preview yet')
