@@ -19,6 +19,7 @@ import {
 } from './webAccess.ts'
 import { EVERYDAY_TALK_RULES, HARD_RULES, MONTH_SEASON_YEAR_NOTE, SESSION_SPINE_PREAMBLE, WEEKLY_PLANNING_SCRIPT } from '../_shared/sessionScripts.ts'
 import { normalizeSchedule, etOffsetMinutes, APP_TZ } from './schedule.ts'
+import { MEAL_SLOTS, type MealSlot, getMeals, resolveDate, setMeal } from './meals.ts'
 import { type Surface, SCRATCHPAD_TOOL, WALL_WRITE_TOOLS, addToScratchpad, fenceDb, loadWallFence, parseSurface, systemForSurface, toolAllowed, toolsForSurface, wallClockLine } from './wallMode.ts'
 
 /** What the wall's Approve can apply today (WallV2Shell passes task writers only). */
@@ -101,6 +102,7 @@ Symphony domain model:
 - Dates are ISO (YYYY-MM-DD). Today's date is provided in the first user message.
 
 Routines vs tasks:
+- Meals live in the family meal plan, not in tasks or the calendar. "What's for dinner" is symphony_get_meals; "dinner tonight is pizza" or "make Thursday tacos" is symphony_set_meal (it replaces that day's meal). Say what it was and what it is now.
 - A routine is a recurring item (e.g. "Feed Jax dinner", "Walk Jax", "Kids morning routine"). Routines are NOT tasks. To find a routine, use symphony_list_routines, never symphony_list_tasks.
 - Routines can be grouped into collections. A "step" is just a routine whose parent_routine_id points at a parent routine; step_order sets its order within the parent.
 - To GROUP existing routines into a collection (e.g. "group Feed Jax dinner and Walk Jax into Jax Evening Routine"): first confirm the grouping with the person in one sentence listing what goes under which collection; then (1) symphony_list_routines to find each one and get its id; (2) symphony_create_routine to make the parent collection; (3) symphony_update_routine on each existing routine, setting parent_routine_id to the parent's id and step_order (0, 1, 2...). Do NOT recreate routines that already exist; fold the existing ones in.
@@ -406,6 +408,31 @@ const TOOLS = [
         context: { type: ['string', 'null'], enum: [...CONTEXT_ENUM, null] },
       },
       required: ['id'],
+    },
+  },
+  {
+    name: 'symphony_get_meals',
+    description: "What's planned to eat: the family meal plan (the same one the kitchen wall, Today and Week show), day by day. Use it for \"what's for dinner\", and before changing a meal. date accepts YYYY-MM-DD, \"today\" or \"tomorrow\".",
+    input_schema: {
+      type: 'object',
+      properties: {
+        start_date: { type: 'string', description: 'YYYY-MM-DD, "today" or "tomorrow"; default today' },
+        days: { type: 'number', description: '1 to 14; default 7' },
+      },
+    },
+  },
+  {
+    name: 'symphony_set_meal',
+    description: "Set what's planned for a meal on a day, replacing what was there (\"dinner tonight is pizza\", \"make Thursday tacos\"). The meal plan is where meals live: never a task or calendar event for this. title is what the family will see; when it names a recipe on the shelf it links to it. date accepts YYYY-MM-DD, \"today\" or \"tomorrow\".",
+    input_schema: {
+      type: 'object',
+      properties: {
+        date: { type: 'string' },
+        slot: { type: 'string', enum: ['breakfast', 'lunch', 'snack', 'dinner', 'prep'], description: 'default dinner' },
+        title: { type: 'string' },
+        recipe_id: { type: 'string', description: 'Optional: a recipe id, when known' },
+      },
+      required: ['date', 'title'],
     },
   },
   {
@@ -1125,6 +1152,21 @@ async function runTool(
           .update({ ...updates, updated_at: now() }).eq('id', id).select().single()
         if (error) throw error
         return JSON.stringify(data, null, 2)
+      }
+      case 'symphony_get_meals': {
+        const today = local(new Date().toISOString()).date
+        const start = resolveDate(input.start_date, today)
+        if (!start) return 'Error: start_date must be YYYY-MM-DD, "today" or "tomorrow"'
+        return JSON.stringify(await getMeals(db, start, typeof input.days === 'number' ? input.days : 7), null, 2)
+      }
+      case 'symphony_set_meal': {
+        const today = local(new Date().toISOString()).date
+        const date = resolveDate(input.date, today)
+        const title = typeof input.title === 'string' ? input.title.trim() : ''
+        const slot = (typeof input.slot === 'string' && (MEAL_SLOTS as readonly string[]).includes(input.slot) ? input.slot : 'dinner') as MealSlot
+        if (!date) return 'Error: date must be YYYY-MM-DD, "today" or "tomorrow"'
+        if (!title) return 'Error: title is required'
+        return JSON.stringify(await setMeal(db, userId, { date, slot, title, recipe_id: typeof input.recipe_id === 'string' ? input.recipe_id : null }), null, 2)
       }
       case 'symphony_list_lists': {
         let q = db.from('lists').select('id, title, category, visibility, icon')

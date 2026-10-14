@@ -34,6 +34,8 @@ import type { FamilyMember } from '@/types/family'
 import { AssigneeAvatar } from '@/components/family/AssigneeAvatar'
 import { localYmd, readCadenceConfig, weekStartAnchor } from '@/lib/cadence/config'
 import { Link } from 'react-router-dom'
+import { Check } from 'lucide-react'
+import { TriageWhenMenu, type TriageWhen } from '@/components/schedule/TriageWhenMenu'
 import { formatTimeCompact } from '@/lib/dateHelpers'
 import { isPlanDrag, readPlanDrag, writePlanDrag, type PlanDragPayload } from '@/lib/planning/planDrag'
 import { useMediaQuery } from '@/hooks/useMediaQuery'
@@ -104,6 +106,10 @@ export interface WeekCanvasWriters {
   open: (id: string) => void
   /** A plan row from elsewhere (the Today pin) dropped on a day. */
   foreignDrop?: (day: Date, payload: PlanDragPayload) => void
+  /** No day yet triage: send a task to a when (today, next week, someday …). */
+  triageTask?: (task: Task, when: TriageWhen) => void
+  /** No day yet triage: a specific date (and time). */
+  scheduleTask?: (task: Task, at: Date, isAllDay: boolean) => void
 }
 
 export interface WeekCanvasProps {
@@ -149,6 +155,9 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
   const [picker, setPicker] = useState<Picker>(null)
   const [weekendOpen, setWeekendOpen] = useState(false)
   const [nodayOpen, setNodayOpen] = useState<boolean | null>(null)
+  // No day yet, one by one (Scott, 2026-10-14: "we need triage for no day yet
+  // items"): each task gets the Inbox's when-chips, Done and a date.
+  const [triaging, setTriaging] = useState(false)
   const todayKey = localYmd(new Date())
   const [chosenDay, setChosenDay] = useState<string | null>(null)
   const selectedKey = chosenDay && days.some((d) => d.key === chosenDay) ? chosenDay : (days.find((d) => d.key === todayKey) ?? days[0])?.key
@@ -369,12 +378,18 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
   const draggingPlaced = drag?.kind === 'task' && !!drag.fromKey
   // A row: the title is what the pointer grabs (desktop) and what opens the
   // item; on the phone a + beside it gives the day, since touch can't drag.
-  const nodayRow = (kind: 'task' | 'routine', id: string, title: string, onPlace: (d: Date) => void) => {
+  const nodayRow = (kind: 'task' | 'routine', id: string, title: string, onPlace: (d: Date) => void, onComplete?: () => void) => {
     const lit = kind === 'task' && pointedTask(id)
     const key = `noday:${kind}:${id}`
     return (
       <li key={key} className={`wc-noday-chip${kind === 'routine' ? ' is-routine' : ''}${lit ? ' is-pointed' : ''}`}>
-        <span className="wc-noday-glyph" aria-hidden="true" />
+        {/* A task with no day can still be done (Scott, 2026-10-14): its ring
+            is the check. A routine needs a day, so its square stays a mark. */}
+        {onComplete
+          ? <button type="button" className="wc-noday-check" onClick={onComplete} aria-label={`Complete ${title}`} title="Mark done">
+              <span className="wc-noday-glyph" aria-hidden="true"><Check size={9} strokeWidth={3} /></span>
+            </button>
+          : <span className="wc-noday-glyph" aria-hidden="true" />}
         <button type="button" className="wc-noday-open" draggable={!phone}
           onDragStart={(ev) => startDrag(ev, { kind, id, date: localYmd(weekStart), title }, { kind, id })}
           onDragEnd={endDrag}
@@ -393,7 +408,7 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
   const nodayCount = unplaced.length + routinesToPlace.length
   const nodayTitles = [...unplaced.map((t) => t.title), ...routinesToPlace.map((r) => r.title)]
   const nodayPointed = unplaced.some((t) => pointedTask(t.id))
-  const nodayShown = nodayPointed || (nodayOpen ?? nodayCount <= NODAY_FOLD_AT)
+  const nodayShown = triaging || nodayPointed || (nodayOpen ?? nodayCount <= NODAY_FOLD_AT)
   const nodayTray = (nodayCount > 0 || draggingPlaced) && (
     <div className={`wc-noday${overShelf ? ' is-over' : ''}${nodayShown ? ' is-open' : ''}`} data-explain="still-to-place" data-explain-label="No day yet" {...shelfDrop}>
       {nodayShown || nodayCount === 0 ? (
@@ -402,12 +417,33 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
             <span className="wc-noday-label">No day yet</span>
             {nodayCount > 0 && <span className="wc-noday-count">{nodayCount}</span>}
             {draggingPlaced && <span className="wc-noday-hint">Drop here to take its day away</span>}
-            {nodayCount > NODAY_FOLD_AT && <button type="button" className="canvas-link wc-quiet-link wc-noday-toggle" aria-expanded onClick={() => setNodayOpen(false)}>Fold</button>}
+            {writers.triageTask && unplaced.length > 0 && (
+              <button type="button" className="canvas-link wc-quiet-link wc-noday-triage-toggle" aria-pressed={triaging} onClick={() => setTriaging((v) => !v)}>
+                {triaging ? 'Done triaging' : 'Triage'}
+              </button>
+            )}
+            {nodayCount > NODAY_FOLD_AT && !triaging && <button type="button" className="canvas-link wc-quiet-link wc-noday-toggle" aria-expanded onClick={() => setNodayOpen(false)}>Fold</button>}
           </p>
-          <ul className="wc-noday-chips" aria-label="No day yet">
-            {unplaced.map((t) => nodayRow('task', t.id, t.title, (d) => writers.placeTask(t, d)))}
-            {routinesToPlace.map((r) => nodayRow('routine', r.id, r.title, (d) => writers.placeRoutine(r, d)))}
-          </ul>
+          {triaging && writers.triageTask ? (
+            <ul className="wc-noday-triage" aria-label="Triage no day yet">
+              {unplaced.map((t) => (
+                <li key={t.id} className="wc-noday-triage-row">
+                  <button type="button" className="wc-noday-open" onClick={() => writers.open(`task-${t.id}`)}>{t.title}</button>
+                  <TriageWhenMenu
+                    contained
+                    onPick={(when) => writers.triageTask!(t, when)}
+                    onComplete={() => writers.toggleTask(t)}
+                    onPickDate={writers.scheduleTask ? (at, allDay) => writers.scheduleTask!(t, at, allDay) : undefined}
+                  />
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <ul className="wc-noday-chips" aria-label="No day yet">
+              {unplaced.map((t) => nodayRow('task', t.id, t.title, (d) => writers.placeTask(t, d), () => writers.toggleTask(t)))}
+              {routinesToPlace.map((r) => nodayRow('routine', r.id, r.title, (d) => writers.placeRoutine(r, d)))}
+            </ul>
+          )}
         </>
       ) : (
         <button type="button" className="wc-noday-fold" aria-expanded={false} onClick={() => setNodayOpen(true)}>

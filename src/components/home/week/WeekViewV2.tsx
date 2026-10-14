@@ -74,6 +74,7 @@ import { WeekCanvas, type CanvasDay, type CanvasDayItem, type WeekCanvasWriters 
 import { DayWeather } from './WeekJournal'
 import { committedTo } from '@/lib/placement/model'
 import { usePlannedDinners } from '@/hooks/usePlannedDinners'
+import { applyTriageWhen, describeTriageWhen } from '@/lib/triage/applyWhen'
 import { plannedMealHref } from '@/lib/mealDayRecipes'
 
 /** Does this calendar event span the whole day? Explicit flags win; otherwise
@@ -176,6 +177,14 @@ function weekWalk(anchor: Date, now: Date): { label: string; message: string } |
     return { label: 'Plan the rest of my week', message: 'Plan the rest of my week.' }
   }
   return anchor.getTime() > current.getTime() ? { label: 'Plan the week', message: named(anchor) } : null
+}
+
+
+/** Where a task sits (its horizon, day and time): what triage changes, and
+ *  what Undo puts back. Cleared fields come back as null. */
+function placementOf(t: Task): Partial<Task> {
+  const keep = ['bucket', 'scheduledFor', 'isAllDay', 'plannedOn', 'weekendStart', 'weekStart', 'monthStart', 'seasonStart', 'deferCount', 'weekDeferredAt'] as const
+  return Object.fromEntries(keep.map((k) => [k, t[k] ?? null])) as Partial<Task>
 }
 
 export function WeekViewV2(props: WeekViewV2Props) {
@@ -854,10 +863,25 @@ export function WeekViewV2(props: WeekViewV2Props) {
       },
       open: (id) => handleSelectBlock(id),
       foreignDrop: (day, payload) => { void planActions.drop(payload, { type: 'day', day }) },
+      // No day yet triage: the Inbox's when-vocabulary, through the same gated
+      // writes (applyTriageWhen); Undo puts back where the task was.
+      triageTask: (t, when) => {
+        const before = placementOf(t)
+        void activity.run(`${describeTriageWhen(when)}: “${t.title}”`, () => applyTriageWhen(when, t.id, {
+          onPushTask: gated.pushTask, onSetBucket: gated.setBucket ?? ((id, bucket) => onUpdateTask(id, { bucket })),
+          onFocus: (id, day) => onUpdateTask(id, { plannedOn: day }),
+        }), { ids: [t.id], undo: async () => { await onUpdateTask(t.id, before) } })
+      },
+      scheduleTask: (t, at, isAllDay) => {
+        const before = placementOf(t)
+        void activity.run(`Give “${t.title}” ${short(at)}`, () => gated.pushTask(t.id, isAllDay ? atMidnight(at) : at) as Promise<boolean | void>, {
+          ids: [t.id], undo: async () => { await onUpdateTask(t.id, before) },
+        })
+      },
     }
     // handleSelectBlock is a plain function of onSelectItem.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activity, onUpdateTask, toggleTask, markDone, undoDone, setPlanned, moveRoutineToDay, tasks, weekAnchor, planActions, onSelectItem])
+  }, [activity, onUpdateTask, toggleTask, markDone, undoDone, setPlanned, moveRoutineToDay, tasks, weekAnchor, planActions, onSelectItem, gated])
   const canvasSpans = useMemo(() => {
     const ymdLabel = (ymd: string) => { const [y, m, d] = ymd.split('-').map(Number); const at = new Date(y, m - 1, d); return `${at.toLocaleDateString('en-US', { weekday: 'short' })} ${at.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}` }
     const wd = (i: number) => journalDays[i].date.toLocaleDateString('en-US', { weekday: 'short' })

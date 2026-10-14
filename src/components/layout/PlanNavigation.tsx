@@ -2,10 +2,9 @@ import { connectedDestination } from '@/lib/planning/connectedDestination'
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
-import { PanelLeft, ChevronDown, Check } from 'lucide-react'
+import { ChevronDown, Check } from 'lucide-react'
 import { readSeasons } from '@/lib/cadence/seasons'
 import { useReferenceLists } from '@/components/reference/ReferenceListsContext'
-import { PlanningSheet } from '@/components/reference/PlanningSheet'
 import { DomainSwitcher } from '@/components/domain/DomainSwitcher'
 import { HeaderPeopleFilter } from './HeaderPeopleFilter'
 import { DesktopCenterContext } from '@/components/layout/DesktopNavigation'
@@ -151,15 +150,11 @@ export function PlanNavigation({ mobile = false, paused = false, mobileControlsR
   const { pathname, search } = useLocation()
   const period = shownPeriodFor(pathname, search)
   const references = useReferenceLists()
-  const pinned = !!references?.pins.some(pin => pin.kind === 'today')
-  const [sheetPath, setSheetPath] = useState<string | null>(null)
   // No ◎ Goals control (Scott, 2026-09-28: "unnecessary") — the Year,
   // Season and Month pages are where goals are read.
-  const sheetOpen = sheetPath === pathname
-  // Horizon pages own their Shelves launcher in the date masthead.
-  const onToday = pathname === '/' || pathname === '/today' || pathname.startsWith('/tasks-new')
-  const broaderPeriod = ['month', 'season', 'year'].includes(period ?? '')
-  const showChooser = !period && !onToday && !mobile
+  // No Shelves button on any page (Scott, 2026-10-14): Today's own "This
+  // week" column and the Week page's No day yet line hold what it opened. A
+  // panel already pinned still closes from its own ×.
   // The kept-pins note ("Lists return when you close the side panel") is
   // still said on Today, even though its chooser button lives on the page.
   const pausedNote = !mobile && paused && !!references && references.pins.length > 0
@@ -187,13 +182,9 @@ export function PlanNavigation({ mobile = false, paused = false, mobileControlsR
     // keeps a slim row of its own, only when there is some.
     return <><div ref={sentinel} className="plan-rail-sentinel" aria-hidden="true" />
       {createPortal(<HorizonRail period={period} />, center)}
-      {(showChooser || pausedNote) && references && <div className="plan-page-tools is-rail-extras">
+      {pausedNote && references && <div className="plan-page-tools is-rail-extras">
         <div className="task-chooser-control">
-          {showChooser && <button type="button" aria-label={pinned ? 'Close shelves' : 'Shelves'} aria-pressed={pinned}
-            onClick={() => pinned ? references.unpin('today') : references.pin('today')}>
-            <PanelLeft size={15} aria-hidden="true" />Shelves
-          </button>}
-          {pausedNote && <span>Lists return when you close the side panel.</span>}
+          <span>Lists return when you close the side panel.</span>
         </div>
       </div>}
     </>
@@ -209,33 +200,23 @@ export function PlanNavigation({ mobile = false, paused = false, mobileControlsR
       <div className="plan-rail-side is-right">
         {/* No week-range picker here (Scott, 2026-09-28: "I don't understand
             what it is") — the Week heading's own menu offers the same ranges. */}
-        {(showChooser || pausedNote) && references && <div className="task-chooser-control">
-          {showChooser && <button type="button" aria-label={pinned ? 'Close shelves' : 'Shelves'} aria-pressed={pinned}
-            onClick={() => pinned ? references.unpin('today') : references.pin('today')}>
-            <PanelLeft size={15} aria-hidden="true" />Shelves
-          </button>}
-          {pausedNote && <span>Lists return when you close the side panel.</span>}
+        {pausedNote && references && <div className="task-chooser-control">
+          <span>Lists return when you close the side panel.</span>
         </div>}
       </div>
     </div></>
   }
-  if (!period && !showChooser && !pausedNote) return null
+  if (!period && !pausedNote) return null
   return <div className="plan-page-tools" data-period={period}>
     {period && <div className="plan-period-controls">
       <HorizonSwitcher period={period} />
     </div>}
-    {(showChooser || pausedNote) && references && <div className="task-chooser-control">
-      {showChooser && <button type="button" aria-label={pinned && !mobile ? 'Close shelves' : 'Shelves'}
-        aria-pressed={mobile ? sheetOpen : pinned}
-        onClick={() => mobile ? setSheetPath(sheetOpen ? null : pathname) : pinned ? references.unpin('today') : references.pin('today')}>
-        <PanelLeft size={15} aria-hidden="true" />Shelves
-      </button>}
-      {pausedNote && <span>Lists return when you close the side panel.</span>}
+    {pausedNote && references && <div className="task-chooser-control">
+      <span>Lists return when you close the side panel.</span>
     </div>}
     {/* Phone: the life-area lens rides on this row (Today folds it into
         its Filters control instead). */}
     {period && mobile && period !== 'today' && <><HeaderPeopleFilter /><DomainSwitcher /></>}
     {period && mobile && <div ref={mobileControlsRef} className="plan-mobile-controls" />}
-    {mobile && showChooser && <PlanningSheet open={sheetOpen} onClose={() => setSheetPath(null)} periodShelves={broaderPeriod} />}
   </div>
 }
