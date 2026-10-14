@@ -99,6 +99,7 @@ import { LoadFailedNotice } from '@/components/common/LoadFailedNotice'
 import { daySentence, type DaySentenceItem } from '@/lib/today/daySentence'
 import { effectiveStartTime } from '@/lib/timeUtils'
 import { useConversationWalk } from '@/components/canvas/conversationWalk'
+import { PlanTalkChip } from './PlanTalkChip'
 import { useAssistantLauncher } from '@/contexts/AssistantLaunchContext'
 import { useCanvasActivity } from '@/contexts/CanvasActivityContext'
 import { todayPreview, markForRow, type TodayPreview } from './todayPreview'
@@ -569,6 +570,11 @@ export function TodayView({
       {!statusLine && sentence.email && <>{sentence.day ? ' ' : ''}<button type="button" className="today-sentence-link" onClick={askAboutEmail}>{sentence.email}</button></>}
     </span>
   ) : null
+
+  // ── Month, Season and Year on schedule (planSchedule.ts): one quiet chip in
+  // the header line, "November starts Sunday · Plan it". Today's date only.
+  const planTalk = data.isToday ? <PlanTalkChip tasks={tasks} meId={meId} today={nowForDisplay} /> : null
+  const headerLine = headerSentence || planTalk ? <>{headerSentence}{headerSentence && planTalk && ' '}{planTalk}</> : null
 
   // ── Plan my day / Review my day: the bar's walk into a conversation that
   // ends in one change card. Today's date only; phones offer it in the page.
@@ -1100,8 +1106,8 @@ export function TodayView({
         // Desktop folds the control row into the masthead (layout system,
         // 2026-10-01): the view controls sit at the title's right.
         subline={foldedControls
-          ? <>{headerSentence}{headerSentence && ' '}<span className="today-sentence-meta">{weekLine}{data.isToday && <> · <WeatherChip now={nowForDisplay} /></>}</span></>
-          : headerSentence ?? undefined}
+          ? <>{headerLine}{headerLine && ' '}<span className="today-sentence-meta">{weekLine}{data.isToday && <> · <WeatherChip now={nowForDisplay} /></>}</span></>
+          : headerLine ?? undefined}
         // Domain chooser + assistant toggle, in the card's corner.
         // Desktop: the page's controls sit in the control row below, as on
         // every horizon (Scott, 2026-09-30). The masthead keeps them only where

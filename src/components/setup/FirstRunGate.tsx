@@ -63,10 +63,10 @@ export function FirstRunGate({ user, children }: { user: User; children: ReactNo
         user={user}
         onDone={() => {
           markFirstRunDoneLocally(user.id)
-          // A new household lands on Plan with guidance — choose what to plan,
-          // or "Explore on my own" — not on an empty Today (onboarding suite,
-          // 2026-09-29). The shell mounts after this, so its router reads it.
-          try { window.history.replaceState(null, '', '/start') } catch { /* not a browser */ }
+          // A new household lands on Today, where the first-week card offers
+          // the ways in (the guided path chooser is retired, 2026-10-14). The
+          // shell mounts after this, so its router reads it.
+          try { window.history.replaceState(null, '', '/today') } catch { /* not a browser */ }
           setStage('ready')
         }}
       />

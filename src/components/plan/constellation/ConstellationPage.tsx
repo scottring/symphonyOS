@@ -7,9 +7,18 @@
 // Week · Month · Season · Year), so the page carries no horizon tabs of its own.
 //
 // Levels connect by looking, not linking (Scott, 2026-07-08 and 2026-10-13):
-// a link is made only while writing (an optional "For" pick) or from a goal's
-// ⋯ menu. A linked goal says what it is for and what is already under it one
-// horizon down; an unlinked goal says nothing. No counts.
+// a link is made while writing (an optional "For" pick) or from the goal's
+// panel. A linked goal says what it is for and what is already under it one
+// horizon down; an unlinked goal says nothing.
+//
+// Talk-first (spec 2026-10-14, "The pages"): a list to look at. Rows carry no
+// ⋯ menu and no quick buttons; tapping a month or season goal opens its task
+// panel (which holds done, delete, its day, what it serves, Move to / Remove
+// from — horizonPanel.tsx), and a year goal opens in place with Done and
+// Archive. Done goals fold into one line. Under the heading, one sentence
+// from rules (horizonSentence.ts). The bar's walk becomes "Plan November"
+// while that talk is due (planSchedule.ts), and a pending change card is
+// drawn dashed on the list (planPreview.ts).
 //
 // URL: `horizon` (0 Year, 1 Season, 2 Month; 3 hands over to Week), `start`
 // (any date in the period) and `focus` (an item a conversation just saved).
@@ -18,9 +27,6 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { Link, Navigate, useLocation, useSearchParams } from 'react-router-dom'
-import { TaskFateMenu } from '@/components/schedule/TaskFateMenu'
-import { applyTriageWhen, describeTriageWhen } from '@/lib/triage/applyWhen'
-import { useGatedTaskActions } from '@/hooks/useGatedTaskActions'
 import { useSelectionOptional } from '@/shell/providers/SelectionProvider'
 import { GoalsProvider, useGoalsContext } from '@/contexts/GoalsContext'
 import { useCanvasActivity, type CanvasProposal } from '@/contexts/CanvasActivityContext'
@@ -33,12 +39,15 @@ import { useHouseholdSeasons } from '@/hooks/useHouseholdSeasons'
 import { filterTasksForLayers, matchesLayers } from '@/lib/today/domainFilter'
 import { planPeopleLens } from '@/lib/planning/peopleLens'
 import { periodBounds, selectPeriodTasks, isCurrentPeriod } from '@/lib/planning/periodPage'
+import { horizonSentence } from '@/lib/planning/horizonSentence'
+import { talkFor, listIsEmpty, isPutOff, readDismissals } from '@/lib/planning/planSchedule'
 import { committedTo } from '@/lib/placement/model'
 import { localYmd, parseLocalYmd, readCadenceConfig, weekStartAnchor } from '@/lib/cadence/config'
 import type { TaskContext } from '@/types/task'
 import { useAddArea } from '../v2/AddArea'
 import { planNodes, type PlanNode } from './model'
-import { eligibleParents, moveUnderPatch } from './connections'
+import { moveUnderPatch } from './connections'
+import { planPreview, type PeriodSpan } from './planPreview'
 import { isDone, periodRange } from '@/components/canvas/plan/planGroups'
 import { PlanItemRow } from '@/components/canvas/plan/PlanItemRow'
 import { ProposalRow } from '@/components/canvas/plan/ProposalRow'
@@ -71,8 +80,7 @@ function writeAboveOpen(open: boolean) {
 function Inner() {
   const selection = useSelectionOptional()
   const { goals, loading: goalsLoading, error: goalsError, addGoal, updateGoal, deleteGoal } = useGoalsContext()
-  const { tasks, loading, error, addTask, updateTask, refetch, pushTask, setBucket, updateTasksBulk, toggleTask, deleteTask, keepForward, dropCommitment } = useSupabaseTasks()
-  const gated = useGatedTaskActions({ updateTask, pushTask, setBucket, updateTasksBulk }, (id) => tasks.find((t) => t.id === id))
+  const { tasks, loading, error, addTask, updateTask, refetch, deleteTask } = useSupabaseTasks()
   const activity = useCanvasActivity()
   const { openAssistant } = useAssistantLauncher()
   const { layers } = useDomain(), [people] = useAssigneeFilter(), { getCurrentUserMember } = useFamilyMembers(), { seasons } = useHouseholdSeasons()
@@ -100,7 +108,8 @@ function Inner() {
   const seasonWord = periodWordOf(seasonB), monthWord = periodWordOf(monthB)
 
   // ---- What is planned (already filtered for privacy, area and people) ----
-  const lens = planPeopleLens(people, getCurrentUserMember()?.id ?? null)
+  const meId = getCurrentUserMember()?.id ?? null
+  const lens = planPeopleLens(people, meId)
   const visible = filterTasksForLayers(tasks, layers).filter(lens.keep)
   const goalsOf = (y: number) => goals.filter((g) => g.year === y && g.status !== 'archived' && matchesLayers(g.context, layers) && lens.keep(g))
   const allNodes = planNodes(goalsOf(year), [
@@ -226,62 +235,10 @@ function Inner() {
     else activity.setProposalState(p.key, 'failed')
   }
 
-  const actionsFor = (node: PlanNode, rowVerbs: { label: string; onSelect: () => void }[] = []) => {
-    const task = node.task
-    const label = `Actions for ${node.title}`
-    if (!task) {
-      const status = node.goal?.status ?? 'active'
-      const setStatus = (next: 'active' | 'completed' | 'archived', what: string) =>
-        void act(what, () => updateGoal(node.id, { status: next }), { ids: [node.id], undo: async () => (await updateGoal(node.id, { status })) !== false })
-      return <TaskFateMenu label={label} showWhen={false} onPickWhen={() => {}}
-        extras={[
-          ...rowVerbs,
-          status === 'completed'
-            ? { label: 'Reopen goal', onSelect: () => setStatus('active', `Reopen “${node.title}”`) }
-            : { label: 'Complete goal', onSelect: () => setStatus('completed', `Complete “${node.title}”`) },
-          { label: 'Archive goal', onSelect: () => setStatus('archived', `Archive “${node.title}”`) },
-          // The row's quick Delete, here too for touch (no hover there).
-          { label: 'Delete goal', onSelect: () => { if (window.confirm(`Delete “${node.title}”? Season goals written for it stay, on their own.`)) void act(`Delete “${node.title}”`, async () => { await deleteGoal(node.id) }) } },
-        ]} />
-    }
-    const period = node.level === 1 ? 'season' : node.level === 2 ? 'month' : 'week'
-    const start = node.level === 1 ? seasonB.start : node.level === 2 ? monthB.start : week
-    const nextWeek = new Date(week); nextWeek.setDate(nextWeek.getDate() + 7)
-    const next = node.level === 1 ? { seasonStart: seasonB.next } : node.level === 2 ? { monthStart: monthB.next } : { weekStart: nextWeek }
-    const toggle = async () => (await toggleTask(node.id)) !== false
-    return <TaskFateMenu label={label}
-      onOpen={selection ? () => selection.setSelection({ kind: 'task', id: node.id }) : undefined}
-      onPickWhen={(when) => void act(`${describeTriageWhen(when)}: “${node.title}”`, () => applyTriageWhen(when, node.id, { onPushTask: gated.pushTask, onSetBucket: gated.setBucket!, onFocus: (id, day) => gated.updateTask(id, { plannedOn: day }) }), { ids: [node.id] })}
-      onPickDate={(date, isAllDay) => void act(`Schedule “${node.title}”`, () => gated.setBucket!(node.id, 'timed', date, isAllDay), { ids: [node.id] })}
-      onComplete={!task.completed ? () => void act(`Complete “${node.title}”`, toggle, { ids: [node.id], undo: toggle }) : undefined}
-      onDelete={() => { if (window.confirm(`Delete “${node.title}”? This removes the item from all its planning periods.`)) void act(`Delete “${node.title}”`, async () => { await deleteTask(node.id) }) }}
-      extras={[
-        ...rowVerbs,
-        ...(task.completed ? [{ label: 'Reopen', onSelect: () => void act(`Reopen “${node.title}”`, toggle, { ids: [node.id], undo: toggle }) }] : []),
-        { label: `Carry to next ${period}`, onSelect: () => void act(`Carry “${node.title}” to next ${period}`, async () => !!await keepForward(node.id, next, start), { ids: [node.id] }) },
-        { label: `Remove from this ${period}`, onSelect: () => void act(`Remove “${node.title}” from this ${period}`, () => dropCommitment(node.id, period, start)) },
-      ]} />
-  }
-
-  // One-tap triage on each open row (Scott, 2026-10-13): Done, Someday,
-  // Delete — the same writes as the ⋯ menu's. A year goal is a goals row with
-  // no Someday, so it offers Done and Delete; deleting it leaves its season
-  // goals in place, unlinked (tasks.goal_id ON DELETE SET NULL).
-  const quickFor = (node: PlanNode): { label: string; onSelect: () => void }[] => {
-    if (isDone(node)) return []
-    if (!node.task) {
-      const status = node.goal?.status ?? 'active'
-      return [
-        { label: 'Done', onSelect: () => void act(`Complete “${node.title}”`, () => updateGoal(node.id, { status: 'completed' }), { ids: [node.id], undo: async () => (await updateGoal(node.id, { status })) !== false }) },
-        { label: 'Delete', onSelect: () => { if (window.confirm(`Delete “${node.title}”? Season goals written for it stay, on their own.`)) void act(`Delete “${node.title}”`, async () => { await deleteGoal(node.id) }) } },
-      ]
-    }
-    const toggle = async () => (await toggleTask(node.id)) !== false
-    return [
-      { label: 'Done', onSelect: () => void act(`Complete “${node.title}”`, toggle, { ids: [node.id], undo: toggle }) },
-      { label: 'Someday', onSelect: () => void act(`${describeTriageWhen('someday')}: “${node.title}”`, () => applyTriageWhen('someday', node.id, { onPushTask: gated.pushTask, onSetBucket: gated.setBucket!, onFocus: (id, day) => gated.updateTask(id, { plannedOn: day }) }), { ids: [node.id] }) },
-      { label: 'Delete', onSelect: () => { if (window.confirm(`Delete “${node.title}”? This removes the item from all its planning periods.`)) void act(`Delete “${node.title}”`, async () => { await deleteTask(node.id) }) } },
-    ]
+  // A year goal is a goals row: it opens in place with its own few verbs.
+  const setGoalStatus = (node: PlanNode, next: 'active' | 'completed' | 'archived', what: string) => {
+    const status = node.goal?.status ?? 'active'
+    void act(what, () => updateGoal(node.id, { status: next }), { ids: [node.id], undo: async () => (await updateGoal(node.id, { status })) !== false })
   }
 
   // ---- Proposals for this horizon -----------------------------------------
@@ -299,10 +256,16 @@ function Inner() {
 
   const term = TERMS[level]
   const parentTerm = level > 0 ? TERMS[level - 1] : null
-  const walkLabel = current ? `Plan this ${PERIODS[level]} with me` : `Plan ${periodTitle} with me`
+  // On schedule (planSchedule.ts): while this horizon's talk is due — its
+  // window is open, the coming list is empty, it isn't put off — the walk is
+  // that talk ("Plan November"), on this period's page or the coming one's.
+  const talk = talkFor(PERIODS[level], now, seasons)
+  const talkDue = !!talk && dataReady && (current || localYmd(bounds.start) === localYmd(talk.start))
+    && listIsEmpty(talk, { tasks, goals, meId, seasons, today: now }) && !isPutOff(talk, now, readDismissals())
   // The plan holds their ideas: the walk asks and structures, never supplies
   // (Scott, 2026-10-11 — "pushy in terms of its own ideas").
-  const walkMessage = level === 0
+  const walkLabel = talk && talkDue ? talk.label : current ? `Plan this ${PERIODS[level]} with me` : `Plan ${periodTitle} with me`
+  const walkMessage = talk && talkDue ? talk.message : level === 0
     ? `Let's plan ${periodTitle}, one year goal at a time. Ask me what I want; use my words and don't suggest goals of your own.`
     : `Let's plan ${periodTitle} across my ${parentTerm}s, one at a time. Ask me what I want under each; use my words and don't suggest ${term}s of your own.`
   // The walk rides in the docked bar where there is one (desktop).
@@ -323,9 +286,33 @@ function Inner() {
   const aboveWhat = level === 2 ? `the season ${periodWord} serves` : level === 1 ? `the year ${periodWord} serves` : 'last year, for reference'
   const aboveNone = level === 2 ? `No ${seasonWord} goals yet.` : level === 1 ? `No ${year} goals yet.` : `Nothing was written for ${year - 1}.`
 
-  // ---- The period's goals ---------------------------------------------------
-  const items = allNodes.filter((n) => n.level === level && (showDone || !isDone(n)))
-  const hasDone = allNodes.some((n) => n.level === level && isDone(n))
+  // ---- The period's goals: open first, done folded into one line -----------
+  const levelNodes = allNodes.filter((n) => n.level === level)
+  const openNodes = levelNodes.filter((n) => !isDone(n))
+  const doneNodes = levelNodes.filter(isDone)
+  const items = showDone ? [...openNodes, ...doneNodes] : openNodes
+  const sentence = horizonSentence({
+    items: levelNodes.map((n) => ({ done: isDone(n), hasParent: !!n.parent })),
+    parentWord: level === 2 ? seasonWord : level === 1 ? String(year) : null,
+  })
+  const doneLine = `${doneNodes.length} done · ${doneNodes.slice(0, 2).map((n) => n.title).join(', ')}${doneNodes.length > 2 ? '…' : ''}`
+
+  // ---- A pending change card, drawn dashed (planPreview.ts) -----------------
+  const span = (b: { start: Date; end: Date; label: string }): PeriodSpan => ({ start: localYmd(b.start), end: localYmd(b.end), label: periodWordOf(b) })
+  const nextB = periodBounds(PERIODS[level], bounds.next, seasons)
+  const nextWord = periodWordOf(nextB)
+  const preview = planPreview({ set: activity.changeSet ?? null, level: PERIODS[level], shown: span(bounds), next: span(nextB), ids: new Set(levelNodes.map((n) => n.id)) })
+  // The coming list, beside this one, while the card adds to it.
+  const nextTitles = preview.next.length === 0 ? [] : level === 0
+    ? goalsOf(year + 1).map((g) => g.name)
+    : selectPeriodTasks(visible, PERIODS[level] as 'season' | 'month', nextB.start, isCurrentPeriod(nextB, now), lens.scopeId, seasons).map((t) => t.title)
+  const previewRow = (r: { key: string; title: string; note: string; parentTitle?: string }) =>
+    <li key={`preview:${r.key}`} className="plan-item plan-preview-row is-preview is-proposed">
+      <div className="canvas-item"><span className="canvas-item-title plan-item-title">{r.title}</span></div>
+      <span className="wc-proposed-note plan-preview-note">{r.note}</span>
+      {r.parentTitle && <p className="plan-item-parent"><span className="plan-item-parent-kind">For</span> {r.parentTitle}</p>}
+    </li>
+
   const parentOf = (node: PlanNode) => node.parent ? allNodes.find((n) => n.key === node.parent) : undefined
   // What is already under a goal one horizon down, by name — never a count.
   const belowLabel = level === 2 ? (thisWeek ? 'This week' : `Week of ${week.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`)
@@ -333,28 +320,33 @@ function Inner() {
   const belowOf = (node: PlanNode) => allNodes.filter((n) => n.parent === node.key && n.level === level + 1 && !isDone(n)).map((n) => n.title)
 
   const renderItem = (node: PlanNode) => {
-    const canMove = level > 0 && !!node.task && !allNodes.some((n) => n.level === level - 1 && n.id === node.id)
-    const moveParents = canMove ? eligibleParents(allNodes, node).filter((p) => !isDone(p) || p.key === node.parent) : []
     const scheduled = node.task?.scheduledFor
-    const more: { label: string; onSelect: () => void }[] = []
-    if (node.task && selection) more.push({ label: 'Open details', onSelect: () => selection.setSelection({ kind: 'task', id: node.id }) })
     const editing = composer?.kind === 'edit' && composer.key === node.key
     const parent = parentOf(node)
+    const status = node.goal?.status ?? 'active'
+    // A year goal opens in place with Done (or Reopen), Archive and its wording.
+    const more = node.goal ? [
+      status === 'completed'
+        ? { label: 'Reopen', onSelect: () => setGoalStatus(node, 'active', `Reopen “${node.title}”`) }
+        : { label: 'Done', onSelect: () => setGoalStatus(node, 'completed', `Complete “${node.title}”`) },
+      { label: 'Archive', onSelect: () => setGoalStatus(node, 'archived', `Archive “${node.title}”`) },
+      { label: 'Edit wording', onSelect: () => setComposer({ kind: 'edit', key: node.key }) },
+    ] : undefined
+    // A month or season goal is a task: its panel holds every verb.
+    const onOpen = node.goal
+      ? () => setExpanded((k) => k === node.key ? null : node.key)
+      : () => selection?.setSelection({ kind: 'task', id: node.id })
     return <PlanItemRow key={node.key} node={node}
       parentLabel={parent ? { kind: 'For', title: parent.title } : undefined}
       below={{ label: belowLabel, titles: belowOf(node) }}
-      quick={quickFor(node)}
       linked={linked === node.key}
-      count={0} childTerm={null}
       done={isDone(node)} saved={savedKey === node.key}
-      expanded={expanded === node.key} onToggle={() => setExpanded((k) => k === node.key ? null : node.key)}
-      editing={editing} onEdit={() => setComposer({ kind: 'edit', key: node.key })}
+      onOpen={onOpen} expanded={expanded === node.key} more={more}
+      editing={editing}
       onSaveEdit={async (text) => { const ok = await rename(node, text); if (ok) setComposer(null); return ok }}
       onCancelEdit={() => setComposer(null)}
-      move={canMove ? { parents: moveParents, parentTerm: parentTerm!, onPick: (p) => moveUnder(node, p) } : undefined}
-      actions={(verbs) => actionsFor(node, verbs)} more={more}
+      preview={preview.marks.get(node.id)}
       readiness={node.task ? readinessOf(node.task, prepLookup) : undefined}
-      onPrepare={node.task && selection ? () => selection.setSelection({ kind: 'task', id: node.id }) : undefined}
       meta={scheduled ? `Scheduled ${scheduled.toLocaleDateString()}${!node.task?.isAllDay ? ` · ${scheduled.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}` : ''}` : null} />
   }
 
@@ -398,6 +390,7 @@ function Inner() {
         <span className="plan-period-range">{periodRange(bounds.start, bounds.end)}</span>
         {!current && <button type="button" className="period-return canvas-link" onClick={() => setStart(null)}>Back to this {PERIODS[level]}</button>}
       </div>
+      {dataReady && !error && !goalsError && sentence && <p className="plan-sentence">{sentence}</p>}
     </header>
 
     {!dataReady && <p className="plan-status" role="status">Loading your plans…</p>}
@@ -413,7 +406,7 @@ function Inner() {
           </button>
         </div>
 
-        <div className={`plan-horizon-body${aboveOpen ? ' has-above' : ''}`}>
+        <div className={`plan-horizon-body${aboveOpen ? ' has-above' : ''}${preview.next.length ? ' has-next' : ''}`}>
         {/* Open, the level above sits beside the list and stays in view while
             the list scrolls (Scott, 2026-10-13); narrow screens show it above. */}
         {aboveOpen && <aside id="plan-above-panel" className="plan-above-panel" aria-label={aboveTitle}>
@@ -425,13 +418,18 @@ function Inner() {
         <section className="plan-list" data-explain="list" data-explain-label={`Every ${periodWord} goal`}>
           <ul className="plan-items plan-goal-list" aria-label={`${periodWord} goals`}>
             {items.map(renderItem)}
+            {preview.here.map(previewRow)}
             {proposals.map((p) => {
               const parent = level > 0 ? allNodes.find((n) => n.level === level - 1 && n.id === p.parentId) : undefined
               return <ProposalRow key={p.key} proposal={p} parentLabel={parent ? { kind: 'For', title: parent.title } : undefined}
                 onKeep={() => { void keepProposal(p) }} onLeave={() => activity.removeProposal(p.key)} />
             })}
           </ul>
-          {items.length === 0 && proposals.length === 0 && !adding && <p className="plan-empty">Nothing for {periodWord} yet.</p>}
+          {openNodes.length === 0 && preview.here.length === 0 && proposals.length === 0 && !adding && <p className="plan-empty">Nothing{doneNodes.length ? ' open' : ''} for {periodWord} yet.</p>}
+          {doneNodes.length > 0 && <button type="button" className="plan-done-fold" aria-expanded={showDone} onClick={() => setShowDone((s) => !s)}>
+            <span className="plan-done-fold-text">{doneLine}</span>
+            <span className="canvas-link plan-done-fold-go">{showDone ? 'Hide' : 'Show'}</span>
+          </button>}
           {adding && <InlineComposer label={`New ${periodWord} goal`} saveLabel="Add"
             // A goal for something above takes its life area from it.
             extra={<>{forPicker}{!forParent && area.picker}</>}
@@ -439,11 +437,17 @@ function Inner() {
           <footer className="plan-list-foot">
             {!adding && <button type="button" className="canvas-link plan-add" aria-label={`Add ${aGoal}`} disabled={!dataReady}
               onClick={() => setComposer({ kind: 'add' })}>+ Add {aGoal}</button>}
-            {(hasDone || showDone) && <button type="button" className="canvas-link" aria-pressed={showDone} onClick={() => setShowDone((s) => !s)}>{showDone ? 'Hide done' : 'Show done'}</button>}
             {proposals.length > 0 && <button type="button" className="canvas-link" onClick={() => { void keepAll() }}>Keep all</button>}
-            {items.length > 0 && <Link to={onward.to} className="plan-next" data-explain="next" data-explain-label={onward.label.replace(' →', '')}>{onward.label}</Link>}
+            {openNodes.length > 0 && <Link to={onward.to} className="plan-next" data-explain="next" data-explain-label={onward.label.replace(' →', '')}>{onward.label}</Link>}
           </footer>
         </section>
+        {preview.next.length > 0 && <section className="plan-list plan-next-list" aria-label={`${nextWord}, proposed`}>
+          <p className="plan-next-list-title">{nextWord}</p>
+          <ul className="plan-items plan-goal-list" aria-label={`${nextWord} goals`}>
+            {nextTitles.map((t, i) => <li key={`${i}:${t}`} className="plan-item"><div className="canvas-item"><span className="canvas-item-title plan-item-title">{t}</span></div></li>)}
+            {preview.next.map(previewRow)}
+          </ul>
+        </section>}
         </div>
       </>}
   </main>

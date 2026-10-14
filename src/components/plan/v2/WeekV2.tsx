@@ -18,7 +18,6 @@ import { useAuth } from '@/hooks/useAuth'
 import { showToast } from '@/hooks/useToast'
 import { PlanMastheadSlotsContext } from './planMastheadSlots'
 import { PlanSavedLine, PlanToolbar, PlanToolbarControls, PlanToolbarStatus, type PlanToolbarProps } from './PlanStatus'
-import { GuideAnchor } from '@/components/guide/GuideBar'
 import { readCadenceConfig, localYmd } from '@/lib/cadence/config'
 import { weekOfYear } from '@/lib/planning/horizonNumerals'
 import { writePlanView } from '@/lib/planning/v2/planV2'
@@ -80,9 +79,8 @@ export function WeekV2({ weekStart, isCurrent, tools, canvas, walk }: {
     <div className="pv2-week" data-week={localYmd(weekStart)}>
       {slots?.subline && slots.controls ? (
         // Desktop: the control row folds into the week's masthead (HomeHeader
-        // draws it; layout system 2026-10-01). The guide still opens here.
+        // draws it; layout system 2026-10-01).
         <>
-          <GuideAnchor />
           {createPortal(<PlanToolbarStatus {...toolbar} />, slots.subline)}
           {createPortal(<PlanToolbarControls {...toolbar} />, slots.controls)}
           <PlanSavedLine period={`week ${weekNo}`} justSaved={toolbar.justSaved} />

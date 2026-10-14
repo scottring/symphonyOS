@@ -7,7 +7,7 @@
 import { useId } from 'react'
 import { X } from 'lucide-react'
 import { useCanvasActivity, type PendingChangeSet } from '@/contexts/CanvasActivityContext'
-import { opRow, opScope, SCOPE_HEADING, type ChangeOp, type OpScope } from '@/lib/canvas/changeCard'
+import { opRow, opScope, planHeading, SCOPE_HEADING, type ChangeOp, type OpScope } from '@/lib/canvas/changeCard'
 
 interface Props {
   set: PendingChangeSet
@@ -29,7 +29,7 @@ export function ChangeCard({ set, today, onApprove, onDismiss }: Props) {
       </header>
       <div className="change-card-body">
       {groups(set.ops).map((g) => (
-        <div key={g.scope} className="change-card-group">
+        <div key={g.key} className="change-card-group">
           {g.heading && <h3 className="change-card-scope">{g.heading}</h3>}
           <ul className="change-card-rows">
             {g.ops.map((op) => {
@@ -59,13 +59,23 @@ export function ChangeCard({ set, today, onApprove, onDismiss }: Props) {
 }
 
 /** Rows under their scope (tasks, this week's routines, lasting routine
- *  changes). A card of tasks alone keeps no heading, as before. */
-function groups(ops: ChangeOp[]): { scope: OpScope; heading: string | null; ops: ChangeOp[] }[] {
-  const order: OpScope[] = ['task', 'week', 'lasting']
-  const by = new Map<OpScope, ChangeOp[]>()
-  for (const op of ops) by.set(opScope(op), [...(by.get(opScope(op)) ?? []), op])
-  const onlyTasks = by.size === 1 && by.has('task')
-  return order.filter((sc) => by.has(sc)).map((sc) => ({ scope: sc, heading: onlyTasks ? null : SCOPE_HEADING[sc], ops: by.get(sc)! }))
+ *  changes, and goal changes under the list they change: "November",
+ *  "October", "Fall"). A card of tasks alone keeps no heading, as before. */
+function groups(ops: ChangeOp[]): { key: string; heading: string | null; ops: ChangeOp[] }[] {
+  const order: OpScope[] = ['plan', 'task', 'week', 'lasting']
+  const out: { key: string; scope: OpScope; heading: string; ops: ChangeOp[] }[] = []
+  for (const op of ops) {
+    const scope = opScope(op)
+    const heading = scope === 'plan' ? planHeading(op) : SCOPE_HEADING[scope]
+    const key = `${scope}:${heading}`
+    const g = out.find((x) => x.key === key)
+    if (g) g.ops.push(op)
+    else out.push({ key, scope, heading, ops: [op] })
+  }
+  const onlyTasks = out.length === 1 && out[0].scope === 'task'
+  return out
+    .sort((a, b) => order.indexOf(a.scope) - order.indexOf(b.scope))
+    .map((g) => ({ key: g.key, heading: onlyTasks ? null : g.heading, ops: g.ops }))
 }
 
 /** The pending card, wherever the conversation is: the docked bar, the side

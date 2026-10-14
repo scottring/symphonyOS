@@ -4,6 +4,7 @@ import { contactFieldError, mergeLinks } from './prep.ts'
 import { IDEMPOTENT_CREATES, PROPOSE_TOOL, proposalItems, stableRowId, toolOutcome } from './canvasEvents.ts'
 import { PROPOSE_CHANGES_TOOL, changeCardNote, changeSetFromInput, resolveRefs } from './changeSet.ts'
 import { READ_WEEK_TOOL, local, shapeWeek, weekWindow } from './readWeek.ts'
+import { READ_PLAN_TOOL, loadPlanRefs, readPlan } from './readPlan.ts'
 import { POINT_TOOL, pointAt } from './pointing.ts'
 import { planningRow, validatePlanningParent, planningWeekStart } from './planning.ts'
 import { createClient, SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2'
@@ -136,10 +137,10 @@ The week's spine:
 ${WEEKLY_PLANNING_SCRIPT}
 
 Other planning rules:
-- When the person says what they want for ONE item ("add X", "book a consultation"), do it with the write tools; the screen shows each save as it lands and offers Undo, so do not ask them to confirm every explicit instruction. Several tasks at once go on the change card (symphony_propose_changes), as above. Goals they name ("my goals are A and B") are written with the write tools: the card holds tasks only.
-- When YOU think of something they did not say, offer a missing month, season or year goal, or a goal link, with symphony_propose_plan_items instead of creating it; offer a week task on the change card with symphony_propose_changes. Suggestions show dashed until the person keeps them. Never invent goals; suggestions must follow from what they said.
+- When the person says what they want for ONE item ("add X", "book a consultation"), do it with the write tools; the screen shows each save as it lands and offers Undo, so do not ask them to confirm every explicit instruction. Several tasks at once go on the change card (symphony_propose_changes), as above. Outside a Month, Season or Year session, ONE goal they name may be written directly with the write tools; several goals, and every goal in a Month, Season or Year session, go on the change card as plan ops.
+- Outside a Month, Season or Year session, when YOU think of something they did not say, offer a missing month, season or year goal, or a goal link, with symphony_propose_plan_items instead of creating it; offer a week task on the change card with symphony_propose_changes. Suggestions show dashed until the person keeps them. Never invent goals; suggestions must follow from what they said.
 - When asked where unlinked items belong, read the period's items and the parents one horizon up, then suggest links with symphony_propose_plan_items (item_id + parent_id), one per item that clearly fits. Leave out items with no good match and say which. Never link them yourself unless the person says to.
-- Planning a month, season or year goes across, not down: all of the year goals first, then the season goals across every year goal, then the month goals across those. Do not take one year goal all the way to today before returning to the next. Accept items with no parent; they sit in Unlinked. Planning a week follows its own steps above. ${MONTH_SEASON_YEAR_NOTE}
+- Planning a month, season or year goes across, not down, and is a talk that ends in ONE change card. "Plan {Month}", "Plan {Season}" or "Plan {Year}" (the pages' and Today's chips, e.g. "Plan November"), or "Plan this month with me" (season, year): call symphony_read_plan first, with the level and a day in the period that is ending ("Plan November" reads October, so next is November; "Plan this month with me" reads this one). Say the period back plainly in two or three sentences: what moved and what didn't, with counts ("October: 7 goals, 4 done, 2 carried, 1 untouched"). Ask what the next period is for, one question at a time. Write down only what the person says, in their words: never invent, suggest or polish goals. Point out duplicates and overlaps with what is already on the lists (the next period's list, what is still open, the parent list) and offer to merge them, or to carry the old one with their new wording. What is still open on the period that is ending: ask once, as a group, what carries, what is done and what to let go. A season is a brainstorm: everything they say goes on the list in their words, nothing trimmed. A year is a handful: look back at last year's goals first (carry, or mark met), then ask for a few. End in ONE symphony_propose_changes with plan ops: plan_add (level, the next period's start from symphony_read_plan, their words, and parent_id only when they say what it serves), plan_carry (to_period_start; new_title when they reword it), plan_let_go, plan_done; plus merge and someday for month or season goals. As in week planning, call it again with the whole list so far after each answer. Write nothing directly in these sessions. When several are due (late December), plan the year first, then the season, then the month, one at a time. Accept goals with no parent. Planning a week follows its own steps above. ${MONTH_SEASON_YEAR_NOTE}
 
 When the user attaches a document describing a recurring protocol (e.g. a physical-therapy home exercise program):
 - Read it. Extract each distinct item, its instructions, and how many times per day it is done.
@@ -156,6 +157,7 @@ const TOOLS = [
   PROPOSE_TOOL,
   PROPOSE_CHANGES_TOOL,
   READ_WEEK_TOOL,
+  READ_PLAN_TOOL,
   POINT_TOOL,
   SHOW_TOOL,
   {name:'symphony_link_plan_item',description:'Connect an existing month goal to a season goal or an existing week task to a month goal. Preserves the existing item, dates and completion. Read both items first. Does not create a replacement or alter either life area.',input_schema:{type:'object',properties:{id:{type:'string'},parent_id:{type:'string'},level:{type:'string',enum:['month','week']}},required:['id','parent_id','level']}},
@@ -756,6 +758,10 @@ async function runTool(
           instances = read.data ?? []
         }
         return JSON.stringify(shapeWeek({ start, today, tasks: [...(dated.data ?? []), ...(week.data ?? []), ...(inbox.data ?? [])], events: events.data ?? [], routines: routines.data ?? [], talks: talks.data ?? [], instances, members: members.data ?? [] }))
+      }
+      case 'symphony_read_plan': {
+        // Month, Season or Year: this list, the next, and the parent list, through RLS.
+        return JSON.stringify(await readPlan(db, input, local(new Date().toISOString()).date))
       }
       case 'symphony_list_tasks': {
         let q = db.from('tasks').select('*').order('scheduled_for', { ascending: true, nullsFirst: false })
@@ -1636,21 +1642,27 @@ Deno.serve(async (req) => {
                   const taskIds = [...new Set(parsed.set.ops.flatMap((o) => [o.taskId, o.fromTaskId].filter((x): x is string => !!x)))]
                   const memberIds = [...new Set(parsed.set.ops.flatMap((o) => [...(o.assignee ? [o.assignee] : []), ...(o.assignees ?? [])]))]
                   const routineIds = [...new Set(parsed.set.ops.flatMap((o) => o.routineId ? [o.routineId] : []))]
-                  // Same RLS client as every tool: a routine the person cannot
-                  // see is simply absent, and resolveRefs refuses it.
-                  const [tasksRead, membersRead, routinesRead] = await Promise.all([
+                  // Goals on Month, Season and Year: the items and parents plan ops name.
+                  const planIds = [...new Set(parsed.set.ops.flatMap((o) => [o.itemId, o.parentId].filter((x): x is string => !!x)))]
+                  const hasPlanOps = parsed.set.ops.some((o) => o.op.startsWith('plan_'))
+                  // The wall's Approve has only the task writers so far
+                  // (WallV2Shell): routine, done, merge, talk and goal changes
+                  // are made in the app until the wall wires them in. Month,
+                  // Season and Year are personal: the wall never changes them.
+                  const wallRefused = wall && parsed.set.ops.some((o) => !WALL_CARD_OPS.has(o.op))
+                  // Same RLS client as every tool: a routine or goal the person
+                  // cannot see is simply absent, and resolveRefs refuses it.
+                  const [tasksRead, membersRead, routinesRead, planRead] = await Promise.all([
                     taskIds.length ? tdb.from('tasks').select('id, title, updated_at, completed').in('id', taskIds) : { data: [], error: null },
                     memberIds.length ? tdb.from('family_members').select('id, name').in('id', memberIds) : { data: [], error: null },
                     routineIds.length ? tdb.from('routines').select('id, name, updated_at, parent_routine_id').in('id', routineIds) : { data: [], error: null },
+                    hasPlanOps && !wallRefused ? loadPlanRefs(tdb, planIds, local(new Date().toISOString()).date).catch(() => null) : undefined,
                   ])
-                  // The wall's Approve has only the task writers so far
-                  // (WallV2Shell): routine, done, merge and talk changes are
-                  // made in the app until the wall wires them in.
-                  const resolved = wall && parsed.set.ops.some((o) => !WALL_CARD_OPS.has(o.op))
-                    ? { error: 'On the kitchen wall the change card can move, add, set aside and assign tasks. Routine changes, done, merge and talk-about are made in the Symphony app for now: say so, and offer to note it on the scratchpad.' }
-                    : tasksRead.error || membersRead.error || routinesRead.error
-                    ? { error: 'Could not read the tasks and routines to check this list. Try again.' }
-                    : resolveRefs(parsed.set, tasksRead.data ?? [], membersRead.data ?? [], routinesRead.data ?? [])
+                  const resolved = wallRefused
+                    ? { error: 'On the kitchen wall the change card can move, add, set aside and assign tasks. Routine changes, done, merge, talk-about and goals are made in the Symphony app for now: say so, and offer to note it on the scratchpad.' }
+                    : tasksRead.error || membersRead.error || routinesRead.error || planRead === null
+                    ? { error: 'Could not read the tasks, routines and goals to check this list. Try again.' }
+                    : resolveRefs(parsed.set, tasksRead.data ?? [], membersRead.data ?? [], routinesRead.data ?? [], planRead)
                   if ('error' in resolved) result = JSON.stringify({ error: resolved.error })
                   else {
                     send({ type: 'change_set', set: resolved.set })

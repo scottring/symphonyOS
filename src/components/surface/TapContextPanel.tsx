@@ -142,6 +142,9 @@ interface TapContextPanelProps {
   onRemoveFromDay?: () => unknown
   /** What that removal says, e.g. "Remove from today". */
   removeFromDayLabel?: string
+  /** Opened from a Month or Season page: "Move to November", "Remove from
+   *  October" (horizonPanel.tsx). Listed in the ⋯ with removing the day. */
+  periodActions?: { id: string; label: string; onClick: () => void }[]
 }
 
 export function TapContextPanel(props: TapContextPanelProps) {
@@ -318,6 +321,7 @@ export function TapContextPanel(props: TapContextPanelProps) {
     ...(props.onRemoveFromDay
       ? [{ id: 'remove-day', label: props.removeFromDayLabel ?? 'Remove from this day', onClick: () => { void props.onRemoveFromDay?.() } }]
       : []),
+    ...(props.periodActions ?? []),
   ]
 
   return (

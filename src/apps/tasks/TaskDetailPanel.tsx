@@ -59,6 +59,7 @@ import { usePinnedItems } from '@/hooks/usePinnedItems';
 import { useMealEventsForDate } from '@/shell/providers/MealEventsProvider';
 import { removeFromGroup, ungroupTasks, deleteTaskGroup } from '@/lib/today/groupTasks';
 import { TapContextPanel } from '@/components/surface/TapContextPanel';
+import { useHorizonPanel } from '@/components/plan/constellation/horizonPanel';
 import { TapRoutinePanel } from '@/components/surface/TapRoutinePanel';
 import { TapStepPanel } from '@/components/surface/TapStepPanel';
 import { groupRoutineSteps } from '@/lib/today/routineCollections';
@@ -212,7 +213,7 @@ function TaskPanelBody({ id }: { id: string }) {
   const { clearSelection } = useSelection();
   const navigate = useNavigate();
 
-  const { tasks, addTask, addSubtask, deleteTask, toggleTask, updateTask: rawUpdateTask, updateTasksBulk, pushTask, setBucket, setGoal, setGoalLink, refetch } = useSupabaseTasks();
+  const { tasks, addTask, addSubtask, deleteTask, toggleTask, updateTask: rawUpdateTask, updateTasksBulk, pushTask, setBucket, setGoal, setGoalLink, refetch, keepForward, dropCommitment } = useSupabaseTasks();
   // "Part of…" offers the goals in the life areas in view — the same lens
   // every list applies (useDomain layers).
   const { layers } = useDomain();
@@ -264,6 +265,9 @@ function TaskPanelBody({ id }: { id: string }) {
   const dateParam = searchParams.get('date');
   const viewedDay = useMemo(() => viewedDayFromParam(dateParam), [dateParam]);
   const { run } = useCanvasActivity();
+  // Opened over a Month or Season page: which goal it serves there, and
+  // Move to / Remove from that period (the row's ⋯ menu is gone, 2026-10-14).
+  const horizon = useHorizonPanel(task, { tasks, goals, seasons, updateTask, keepForward, dropCommitment });
 
   if (!task) return <PanelLoading />;
 
@@ -311,6 +315,7 @@ function TaskPanelBody({ id }: { id: string }) {
       // cannot (Scott, 2026-09-25).
       purpose={task.isGoal ? undefined : (
         <div className="flex flex-wrap items-start gap-x-4">
+          {horizon.forLine}
           <PartOfGoalControl
             task={task}
             tasks={tasks}
@@ -446,6 +451,7 @@ function TaskPanelBody({ id }: { id: string }) {
       neededToday={isNeededOn(task, viewedDay)}
       onToggleNeededToday={() => updateTask(task.id, neededTodayToggle(task, viewedDay))}
       removeFromDayLabel={`Remove from ${dayName}`}
+      periodActions={horizon.actions}
       onRemoveFromDay={isOnDay(task, viewedDay) ? () => {
         const { updates, previous } = dayRemovalWithUndo(task, viewedDay);
         return run(`Remove “${task.title}” from ${dayName}`, async () => (await updateTask(task.id, updates)) !== false, {

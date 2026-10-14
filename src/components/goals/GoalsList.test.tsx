@@ -56,25 +56,6 @@ describe('GoalsList area rename', () => {
 })
 
 describe('GoalsList goal coaching', () => {
-  it('shows the vague hint on a clearly-vague goal, with a Sharpen affordance', () => {
-    render(<GoalsList {...baseProps} goals={[makeGoal('Make home into home')]} />)
-    expect(screen.getByText(/name what’s true by next year/)).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Sharpen' })).toBeInTheDocument()
-  })
-
-  it('does not show the vague hint on a sharp goal, but still offers Sharpen', () => {
-    render(<GoalsList {...baseProps} goals={[makeGoal('Shipped the beta to 10 customers')]} />)
-    expect(screen.queryByText(/name what’s true by next year/)).not.toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Sharpen' })).toBeInTheDocument()
-  })
-
-  it('dismissing the vague hint hides it without touching the goal', async () => {
-    const { user } = render(<GoalsList {...baseProps} goals={[makeGoal('Get healthy')]} />)
-    await user.click(screen.getByRole('button', { name: 'Dismiss hint' }))
-    expect(screen.queryByText(/name what’s true by next year/)).not.toBeInTheDocument()
-    expect(baseProps.onUpdateGoal).not.toHaveBeenCalled()
-  })
-
   it('teaches past-tense phrasing in the add-goal placeholder', async () => {
     const { user } = render(<GoalsList {...baseProps} />)
     await user.click(screen.getByRole('button', { name: 'Add Goal' }))

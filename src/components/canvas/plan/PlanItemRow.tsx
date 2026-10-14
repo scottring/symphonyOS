@@ -1,55 +1,49 @@
 // src/components/canvas/plan/PlanItemRow.tsx
 //
-// One plan item in its group, in the canvas's single row anatomy: title,
-// small meta, and one always-visible ⋯ menu holding every verb (Edit wording,
-// Move under…, scheduling and triage). Selecting the title opens it in place
-// with the quieter verbs (details, add below, see what is below).
+// One goal on a Month, Season or Year list: a list to look at (spec
+// 2026-10-14, "The pages"). No ⋯ menu and no quick buttons. Tapping a month
+// or season goal (a task) opens its panel, which holds every verb; a year
+// goal opens in place with its few verbs (Done, Archive). Under the title, the
+// goal it serves and what is moving it one horizon down.
+//
+// A pending change card marks the row dashed (planPreview.ts): teal when it
+// would change here, grey when it would leave, struck when done or gone.
 
-import { useRef, useState, type ReactNode, type DragEvent } from 'react'
+import type { DragEvent } from 'react'
 import { useArrived } from '@/contexts/CanvasActivityContext'
 import type { PlanNode } from '@/components/plan/constellation/model'
+import type { PlanMark } from '@/components/plan/constellation/planPreview'
 import { InlineComposer } from './InlineComposer'
-import { MoveUnderMenu } from './MoveUnderMenu'
 import { ReadinessIcons } from '@/components/canvas/prep/ReadinessIcons'
-import { describeReadiness, describeInherited, type Readiness } from '@/lib/prep/readiness'
+import type { Readiness } from '@/lib/prep/readiness'
 
 export interface RowVerb { label: string; onSelect: () => void }
 
 export interface PlanItemRowProps {
   node: PlanNode
-  /** Open items one horizon below, with their term ("monthly milestone"). */
-  count: number
-  childTerm: string | null
   done: boolean
   /** The item a conversation just saved (focus param names it). */
   saved: boolean
-  expanded: boolean
-  onToggle: () => void
-  editing: boolean
-  onEdit: () => void
-  onSaveEdit: (text: string) => Promise<boolean>
-  onCancelEdit: () => void
-  move?: { parents: PlanNode[]; parentTerm: string; onPick: (parent: PlanNode | null) => void }
-  /** The row's ⋯ menu, given the row's own verbs to list first. */
-  actions: (rowVerbs: RowVerb[]) => ReactNode
-  /** Quiet verbs shown when the item is open. */
-  more: { label: string; onSelect: () => void }[]
+  /** Tapping the title: opens the task's panel, or a year goal in place. */
+  onOpen: () => void
+  /** A year goal opened in place (only rows with `more` open in place). */
+  expanded?: boolean
+  /** The verbs a year goal shows when open. */
+  more?: RowVerb[]
+  editing?: boolean
+  onSaveEdit?: (text: string) => Promise<boolean>
+  onCancelEdit?: () => void
   meta?: string | null
   /** The parent one horizon up, named quietly under the row ("For …"). */
   parentLabel?: { kind: string; title: string }
   /** What is already under it one horizon down, by name ("This week: …"). */
   below?: { label: string; titles: string[] }
-  /** One-tap triage on the row (Done, Someday, Delete), shown on hover or
-   *  focus on desktop; the same verbs stay in the ⋯ menu for touch. */
-  quick?: RowVerb[]
-  /** Belongs to the parent the person selected (Month highlights, never hides). */
-  related?: boolean
-  /** Just linked: the parent label and its container light up together. */
+  /** Just linked: the parent label lights up. */
   linked?: boolean
   /** What the item carries, and what its plan above carries (tasks only). */
   readiness?: Readiness
-  /** Open the details pane to add what will be needed. */
-  onPrepare?: () => void
+  /** A pending change card's mark on this row. */
+  preview?: PlanMark
   disabled?: boolean
   onDragStart?: (e: DragEvent) => void
   onDragEnd?: () => void
@@ -57,43 +51,30 @@ export interface PlanItemRowProps {
 
 export function PlanItemRow(p: PlanItemRowProps) {
   const arrived = useArrived(p.node.id)
-  const [moving, setMoving] = useState(false)
-  const menuWrap = useRef<HTMLSpanElement>(null)
   const { node } = p
+  const opensInPlace = !!p.more
   const state = [arrived ? 'is-arrived' : '', p.saved ? 'is-selected' : '', p.done ? 'is-done' : ''].filter(Boolean).join(' ')
-  const verbs: RowVerb[] = [
-    ...(p.disabled ? [] : [{ label: 'Edit wording', onSelect: p.onEdit }]),
-    ...(p.move && !p.disabled ? [{ label: 'Move under…', onSelect: () => setMoving(true) }] : []),
-  ]
-  return <li className={`plan-item${p.expanded && !p.editing ? ' is-open' : ''}${p.related ? ' is-related' : ''}${p.linked ? ' is-linked' : ''}`} data-plan-key={node.key} draggable={!!p.onDragStart && !p.editing} onDragStart={p.onDragStart} onDragEnd={p.onDragEnd}>
+  const preview = p.preview ? ` is-preview is-${p.preview.tone}${p.preview.struck ? ' is-struck' : ''}` : ''
+  const open = opensInPlace && !!p.expanded && !p.editing
+  return <li className={`plan-item${open ? ' is-open' : ''}${p.linked ? ' is-linked' : ''}${preview}`} data-plan-key={node.key}
+    draggable={!!p.onDragStart && !p.editing} onDragStart={p.onDragStart} onDragEnd={p.onDragEnd}>
     <div className={`canvas-item ${state}`}>
-      {p.editing
+      {p.editing && p.onSaveEdit && p.onCancelEdit
         ? <InlineComposer label={`Wording for ${node.title}`} initial={node.title} onSave={p.onSaveEdit} onCancel={p.onCancelEdit} />
-        : <button type="button" className="canvas-item-title plan-item-title" aria-expanded={p.expanded} onClick={p.onToggle}>
+        : <button type="button" className="canvas-item-title plan-item-title" aria-expanded={opensInPlace ? !!p.expanded : undefined}
+            onClick={p.onOpen}>
             {node.title}
           </button>}
       {p.readiness && !p.editing && <ReadinessIcons readiness={p.readiness} />}
       {p.saved && <span className="canvas-tag">Saved</span>}
-      {p.done && <span className="canvas-tag plan-tag-done">Done</span>}
-      {p.count > 0 && p.childTerm && <span className="plan-count" aria-label={`${p.count} ${p.childTerm}${p.count === 1 ? '' : 's'} below`}>{p.count} {p.childTerm}{p.count === 1 ? '' : 's'}</span>}
-      {!p.editing && !p.disabled && p.quick && p.quick.length > 0 && <span className="plan-item-quick" role="group" aria-label={`Triage ${node.title}`}>
-        {p.quick.map((q) => <button key={q.label} type="button" className="plan-quick" aria-label={`${q.label}: ${node.title}`} onClick={q.onSelect}>{q.label}</button>)}
-      </span>}
-      {!p.editing && <span ref={menuWrap} className="plan-item-menu">{p.actions(verbs)}</span>}
+      {p.done && !p.preview && <span className="canvas-tag plan-tag-done">{node.goal ? 'Met' : 'Done'}</span>}
     </div>
+    {p.preview && <span className="wc-proposed-note plan-preview-note">{p.preview.note}</span>}
     {p.parentLabel && <p className="plan-item-parent"><span className="plan-item-parent-kind">{p.parentLabel.kind}</span> {p.parentLabel.title}</p>}
     {p.below && p.below.titles.length > 0 && <p className="plan-item-below"><span className="plan-item-below-kind">{p.below.label}:</span> {p.below.titles.join(' · ')}</p>}
-    {p.move && moving && <MoveUnderMenu item={node} parents={p.move.parents} parentTerm={p.move.parentTerm}
-      open={moving} onOpenChange={setMoving} returnFocusTo={menuWrap}
-      onPick={(parent) => { setMoving(false); p.move!.onPick(parent) }} />}
-    {p.expanded && !p.editing && <div className="plan-item-more">
+    {open && <div className="plan-item-more">
       {p.meta && <p className="plan-item-meta">{p.meta}</p>}
-      {p.readiness && <div className="prep-summary" aria-label="What you’ll need">
-        <p className="plan-item-meta">{p.readiness.kinds.length ? `Has ${describeReadiness(p.readiness).join(', ')}` : 'Nothing you’ll need is attached yet.'}</p>
-        {p.readiness.inherited.map((r) => <p key={r.id} className="plan-item-meta prep-summary-from">From {r.title}: {describeInherited(r)}</p>)}
-        {p.onPrepare && <button type="button" className="canvas-link" disabled={p.disabled} onClick={p.onPrepare}>Add what you’ll need</button>}
-      </div>}
-      {p.more.map((m) => <button key={m.label} type="button" className="canvas-link" disabled={p.disabled} onClick={m.onSelect}>{m.label}</button>)}
+      {p.more!.map((m) => <button key={m.label} type="button" className="canvas-link" disabled={p.disabled} onClick={m.onSelect}>{m.label}</button>)}
     </div>}
   </li>
 }

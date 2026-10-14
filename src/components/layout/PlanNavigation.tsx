@@ -11,8 +11,6 @@ import { HeaderPeopleFilter } from './HeaderPeopleFilter'
 import { DesktopCenterContext } from '@/components/layout/DesktopNavigation'
 import { railEntries } from '@/lib/planning/horizonNumerals'
 import { readCadenceConfig } from '@/lib/cadence/config'
-import { useGuidedPlan } from '@/hooks/useGuidedPlan'
-import { parseYmd } from '@/lib/guide/guidedPlan'
 
 /** Phone: a page's own header controls (filters, ⋯) join the horizon-tab row
  *  instead of adding rows above the date. Falls back to inline rendering. */
@@ -129,11 +127,7 @@ function HorizonRail({ period }: { period?: typeof PERIODS[number] }) {
   const start = params.get('start') ?? (period === 'week' ? params.get('date') : null)
   const valid = !!start && /^\d{4}-\d{2}-\d{2}$/.test(start) && (period === 'month' || period === 'season' || period === 'week' || period === 'year')
   const shown = valid ? (() => { const [y, m, d] = start!.split('-').map(Number); return { period: period as 'year' | 'season' | 'month' | 'week', start: new Date(y, m - 1, d) } })() : null
-  const { state: guide } = useGuidedPlan()
-  const pinned = guide?.status === 'active'
-    ? Object.fromEntries((['year', 'season', 'month', 'week'] as const).filter((k) => guide.periods[k]).map((k) => [k, parseYmd(guide.periods[k]!)]))
-    : undefined
-  const steps = railEntries(new Date(), shown, readSeasons(), readCadenceConfig().weekStartsOn, pinned)
+  const steps = railEntries(new Date(), shown, readSeasons(), readCadenceConfig().weekStartsOn)
   return <nav aria-label="Planning period" className="horizon-rail">
     {RAIL_ORDER.map((value, k) => <span key={value} className={`horizon-rail-step${value === 'month' ? ' is-goals-start' : ''}`}>
       {k > 0 && <span className="horizon-rail-join" aria-hidden="true" />}

@@ -1,7 +1,8 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { SESSION_SPINE_PREAMBLE, WEEKLY_PLANNING_SCRIPT } from '../_shared/sessionScripts'
-import { changeCardNote, changeSetFromInput, PROPOSE_CHANGES_TOOL, resolveRefs } from './changeSet'
+import { changeCardNote, changeSetFromInput, PROPOSE_CHANGES_TOOL, resolveRefs, type PlanRefs } from './changeSet'
+import { DEFAULT_SEASONS, READ_PLAN_TOOL } from './readPlan'
 
 const A = '0b8e7c1a-2d3f-4a5b-8c6d-7e8f9a0b1c2d'
 const B = '4f1c2a9e-7b3d-4c11-9a0e-2f6b8d1e3c55'
@@ -317,7 +318,8 @@ describe('agent wiring', () => {
   })
   it('resolves routines and merged tasks through the same RLS client', () => {
     expect(src).toContain("tdb.from('routines').select('id, name, updated_at, parent_routine_id').in('id', routineIds)")
-    expect(src).toMatch(/resolveRefs\(parsed\.set, tasksRead\.data \?\? \[\], membersRead\.data \?\? \[\], routinesRead\.data \?\? \[\]\)/)
+    expect(src).toMatch(/resolveRefs\(parsed\.set, tasksRead\.data \?\? \[\], membersRead\.data \?\? \[\], routinesRead\.data \?\? \[\], planRead\)/)
+    expect(src).toContain('loadPlanRefs(tdb, planIds,')
     expect(src).toContain('[o.taskId, o.fromTaskId]')
   })
   it("reads this week's routine exceptions for read_week", () => {
@@ -387,5 +389,226 @@ describe('agent wiring', () => {
     expect(src).toContain('When planning a Month, Season or Year, proceed across all items at each horizon before moving down')
     expect(src).not.toContain('Ask one natural question at a time;')
     expect(src).toContain('Ask one question at a time;')
+  })
+})
+
+// ── Stage 5: Month, Season and Year (spec 2026-10-14-horizons-talk-first) ──
+const MONTH = '11111111-1111-4111-8111-111111111111'
+const SEASON = '22222222-2222-4222-8222-222222222222'
+const GOAL = '33333333-3333-4333-8333-333333333333'
+const GOAL27 = '44444444-4444-4444-8444-444444444444'
+const BOTH = '55555555-5555-4555-8555-555555555555'
+const DONE_T = '66666666-6666-4666-8666-666666666666'
+const TICKED = '77777777-7777-4777-8777-777777777777'
+const MET = '88888888-8888-4888-8888-888888888888'
+const ARCHIVED = '99999999-9999-4999-8999-999999999999'
+const MONTH2 = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
+
+describe('plan ops: parsing', () => {
+  it('keeps add, carry, let go and done with their fields', () => {
+    const [add, carry, letGo, done, yearAdd] = ok([
+      { op: 'plan_add', level: 'month', period_start: '2026-11-01', title: '  Book the cabin ', parent_id: SEASON },
+      { op: 'plan_carry', item_id: MONTH, to_period_start: '2026-11-01', new_title: ' Plan the sabbatical leave ' },
+      { op: 'plan_let_go', item_id: SEASON },
+      { op: 'plan_done', item_id: GOAL },
+      { op: 'plan_add', level: 'year', period_start: '2027-01-01', title: 'Run a half marathon', context: 'personal' },
+    ])
+    expect(add).toMatchObject({ op: 'plan_add', level: 'month', periodStart: '2026-11-01', title: 'Book the cabin', parentId: SEASON })
+    expect(add.taskId).toBeUndefined()
+    expect(carry).toMatchObject({ op: 'plan_carry', itemId: MONTH, toPeriodStart: '2026-11-01', newTitle: 'Plan the sabbatical leave' })
+    expect(letGo).toMatchObject({ op: 'plan_let_go', itemId: SEASON })
+    expect(done).toMatchObject({ op: 'plan_done', itemId: GOAL })
+    expect(yearAdd).toMatchObject({ level: 'year', periodStart: '2027-01-01', context: 'personal' })
+  })
+  it('refuses a plan_add without what it needs', () => {
+    expect(err([{ op: 'plan_add', period_start: '2026-11-01', title: 'x' }])).toContain('needs level')
+    expect(err([{ op: 'plan_add', level: 'decade', period_start: '2026-11-01', title: 'x' }])).toContain('level must be')
+    expect(err([{ op: 'plan_add', level: 'month', title: 'x' }])).toContain('period_start')
+    expect(err([{ op: 'plan_add', level: 'month', period_start: '2026-11-31', title: 'x' }])).toContain('period_start')
+    expect(err([{ op: 'plan_add', level: 'month', period_start: '2026-11-15', title: 'x' }])).toContain('YYYY-MM-01')
+    expect(err([{ op: 'plan_add', level: 'year', period_start: '2027-02-01', title: 'x' }])).toContain('YYYY-01-01')
+    expect(err([{ op: 'plan_add', level: 'month', period_start: '2026-11-01', title: '  ' }])).toContain('title')
+    expect(err([{ op: 'plan_add', level: 'year', period_start: '2027-01-01', title: 'x', parent_id: GOAL }])).toContain('leave parent_id out')
+    expect(err([{ op: 'plan_add', level: 'month', period_start: '2026-11-01', title: 'x', parent_id: 'Fall' }])).toContain('parent_id')
+    expect(err([{ op: 'plan_add', level: 'month', period_start: '2026-11-01', title: 'x', context: 'school' }])).toContain('context')
+  })
+  it('refuses carry, let go and done without an item, and a carry without a target', () => {
+    expect(err([{ op: 'plan_carry', to_period_start: '2026-11-01' }])).toContain('item_id')
+    expect(err([{ op: 'plan_carry', item_id: MONTH }])).toContain('to_period_start')
+    expect(err([{ op: 'plan_carry', item_id: MONTH, to_period_start: '2026-11-01', new_title: ' ' }])).toContain('new_title')
+    expect(err([{ op: 'plan_let_go', item_id: 'umbrella' }])).toContain('item_id')
+    expect(err([{ op: 'plan_done' }])).toContain('item_id')
+  })
+  it('allows one op per goal, counted with task ops on the same id', () => {
+    expect(err([{ op: 'plan_carry', item_id: MONTH, to_period_start: '2026-11-01' }, { op: 'plan_done', item_id: MONTH }])).toContain('one op per goal')
+    expect(err([{ op: 'someday', task_id: MONTH }, { op: 'plan_let_go', item_id: MONTH }])).toContain('one op per goal')
+    expect(err([{ op: 'plan_let_go', item_id: MONTH }, { op: 'done', task_id: MONTH }])).toContain('one op per task')
+    expect(err([{ op: 'plan_let_go', item_id: MONTH }, { op: 'merge', task_id: A, from_task_id: MONTH }])).toContain('one op per task')
+    // A parent named by an add is not an op on it.
+    expect(ok([{ op: 'plan_add', level: 'month', period_start: '2026-11-01', title: 'x', parent_id: SEASON }, { op: 'plan_carry', item_id: SEASON, to_period_start: '2026-12-01' }])).toHaveLength(2)
+  })
+})
+
+describe('plan ops: resolving', () => {
+  const task = (id: string, title: string, commitments: { level: string; period_start: string; status: string }[], x: Record<string, unknown> = {}) =>
+    ({ id, title, updated_at: `seen-${title}`, completed: false, source_id: null, goal_id: null, context: 'personal', commitments, ...x })
+  const goal = (id: string, name: string, year: number, status = 'active') => ({ id, name, updated_at: `seen-${name}`, status, year, context: 'personal' })
+  const refs: PlanRefs = {
+    today: '2026-10-14',
+    seasons: DEFAULT_SEASONS,
+    tasks: [
+      task(MONTH, 'Plan sabbatical', [{ level: 'month', period_start: '2026-09-01', status: 'carried' }, { level: 'month', period_start: '2026-10-01', status: 'open' }], { source_id: SEASON }),
+      task(SEASON, 'Fall trip', [{ level: 'season', period_start: '2026-09-01', status: 'open' }], { goal_id: GOAL }),
+      task(BOTH, 'Clear the garage', [{ level: 'season', period_start: '2026-09-01', status: 'open' }, { level: 'month', period_start: '2026-10-01', status: 'open' }]),
+      task(DONE_T, 'Toss umbrella', [{ level: 'month', period_start: '2026-10-01', status: 'open' }], { completed: true }),
+      task(TICKED, 'Fix the gate', [{ level: 'month', period_start: '2026-10-01', status: 'done' }]),
+      task(MONTH2, 'Call the vet', [{ level: 'month', period_start: '2026-10-01', status: 'open' }], { context: 'family' }),
+    ],
+    goals: [goal(GOAL, 'Take a sabbatical', 2026), goal(GOAL27, 'Run a half marathon', 2027), goal(MET, 'Learn to sail', 2026, 'completed'), goal(ARCHIVED, 'Write a novel', 2026, 'archived')],
+  }
+  const resolve = (ops: Record<string, unknown>[], r: PlanRefs | undefined = refs) => {
+    const p = parse(ops)
+    if ('error' in p) throw new Error(p.error)
+    return resolveRefs(p.set, [], [], [], r)
+  }
+  const one = (o: Record<string, unknown>) => {
+    const r = resolve([o])
+    if ('error' in r) throw new Error(r.error)
+    return r.set.ops[0]
+  }
+  const refused = (o: Record<string, unknown>, r: PlanRefs | undefined = refs) => {
+    const x = resolve([o], r)
+    return 'error' in x ? x.error : null
+  }
+
+  it("names the list a new goal goes on and the goal it serves, in its parent's life area", () => {
+    expect(one({ op: 'plan_add', level: 'month', period_start: '2026-11-01', title: 'Book the cabin', parent_id: SEASON }))
+      .toMatchObject({ level: 'month', periodStart: '2026-11-01', periodLabel: 'November', parentId: SEASON, parentTitle: 'Fall trip', context: 'personal' })
+    expect(one({ op: 'plan_add', level: 'season', period_start: '2026-12-01', title: 'Ski weekend', parent_id: GOAL }))
+      .toMatchObject({ periodLabel: 'Winter', parentTitle: 'Take a sabbatical' })
+    expect(one({ op: 'plan_add', level: 'year', period_start: '2027-01-01', title: 'Run a half marathon' }))
+      .toMatchObject({ periodLabel: '2027', title: 'Run a half marathon' })
+    const plain = one({ op: 'plan_add', level: 'month', period_start: '2027-01-01', title: 'Taxes' })
+    expect(plain).toMatchObject({ periodLabel: 'January 2027' })
+    expect(plain.parentTitle).toBeUndefined()
+    expect(plain.context).toBeUndefined()
+  })
+  it('lets a season that runs into the next year serve either year', () => {
+    expect(one({ op: 'plan_add', level: 'season', period_start: '2026-12-01', title: 'x', parent_id: GOAL27 })).toMatchObject({ parentTitle: 'Run a half marathon' })
+    expect(refused({ op: 'plan_add', level: 'season', period_start: '2027-03-01', title: 'x', parent_id: GOAL })).toContain('is a 2026 goal')
+  })
+  it("refuses a season start that is not one of the household's, and says which are", () => {
+    expect(refused({ op: 'plan_add', level: 'season', period_start: '2026-11-01', title: 'x' })).toContain('2026-12-01 (Winter)')
+    const custom: PlanRefs = { ...refs, seasons: [{ name: 'Fall', month: 9, day: 1 }, { name: 'Holidays', month: 11, day: 20 }, { name: 'Winter', month: 1, day: 6 }, { name: 'Spring', month: 4, day: 1 }].sort((a, b) => a.month - b.month) }
+    const r = resolve([{ op: 'plan_add', level: 'season', period_start: '2026-11-20', title: 'x' }], custom)
+    if ('error' in r) throw new Error(r.error)
+    expect(r.set.ops[0].periodLabel).toBe('Holidays')
+    expect(refused({ op: 'plan_add', level: 'season', period_start: '2026-12-01', title: 'x' }, custom)).toContain('2026-11-20 (Holidays)')
+  })
+  it('refuses a parent at the wrong level, unseen, let go, or in another life area', () => {
+    expect(refused({ op: 'plan_add', level: 'month', period_start: '2026-11-01', title: 'x', parent_id: GOAL })).toContain('A month goal serves a season goal')
+    expect(refused({ op: 'plan_add', level: 'month', period_start: '2026-11-01', title: 'x', parent_id: MONTH2 })).toContain('is not a season goal')
+    expect(refused({ op: 'plan_add', level: 'season', period_start: '2026-12-01', title: 'x', parent_id: SEASON })).toContain('A season goal serves a year goal')
+    expect(refused({ op: 'plan_add', level: 'season', period_start: '2026-12-01', title: 'x', parent_id: ARCHIVED })).toContain('was let go')
+    expect(refused({ op: 'plan_add', level: 'month', period_start: '2026-11-01', title: 'x', parent_id: A })).toContain(`No goal ${A}`)
+    expect(refused({ op: 'plan_add', level: 'month', period_start: '2026-11-01', title: 'x', parent_id: SEASON, context: 'work' })).toContain('different life area')
+  })
+  it('carries a month goal to the next month (CARRY) or further on (MOVE), with what Symphony saw', () => {
+    expect(one({ op: 'plan_carry', item_id: MONTH, to_period_start: '2026-11-01' })).toMatchObject({
+      title: 'Plan sabbatical', itemKind: 'task', level: 'month', periodStart: '2026-10-01', periodLabel: 'October',
+      toPeriodStart: '2026-11-01', toPeriodLabel: 'November', toNext: true, seen: 'seen-Plan sabbatical', parentId: SEASON, parentTitle: 'Fall trip',
+    })
+    expect(one({ op: 'plan_carry', item_id: MONTH, to_period_start: '2027-01-01' })).toMatchObject({ toPeriodLabel: 'January 2027', toNext: false })
+  })
+  it('keeps new wording only when it differs', () => {
+    expect(one({ op: 'plan_carry', item_id: MONTH, to_period_start: '2026-11-01', new_title: 'Sabbatical: ask HR' }).newTitle).toBe('Sabbatical: ask HR')
+    expect(one({ op: 'plan_carry', item_id: MONTH, to_period_start: '2026-11-01', new_title: 'Plan sabbatical' }).newTitle).toBeUndefined()
+  })
+  it('refuses a carry backwards, to the same period, or to a day that starts nothing', () => {
+    expect(refused({ op: 'plan_carry', item_id: MONTH, to_period_start: '2026-09-01' })).toContain('only goes forward')
+    expect(refused({ op: 'plan_carry', item_id: MONTH, to_period_start: '2026-10-01' })).toContain('already on October')
+    expect(refused({ op: 'plan_carry', item_id: MONTH, to_period_start: '2026-11-15' })).toContain('not the start of a month')
+    expect(refused({ op: 'plan_carry', item_id: SEASON, to_period_start: '2026-11-01' })).toContain('2026-12-01 (Winter)')
+  })
+  it("carries a season goal along the household's seasons", () => {
+    expect(one({ op: 'plan_carry', item_id: SEASON, to_period_start: '2026-12-01' })).toMatchObject({ level: 'season', periodLabel: 'Fall', toPeriodLabel: 'Winter', toNext: true, parentId: GOAL, parentTitle: 'Take a sabbatical' })
+    expect(one({ op: 'plan_carry', item_id: SEASON, to_period_start: '2027-03-01' })).toMatchObject({ toPeriodLabel: 'Spring 2027', toNext: false })
+  })
+  it('carries, lets go of and marks met a year goal', () => {
+    expect(one({ op: 'plan_carry', item_id: GOAL, to_period_start: '2027-01-01' })).toMatchObject({ itemKind: 'goal', level: 'year', periodStart: '2026-01-01', periodLabel: '2026', toPeriodLabel: '2027', toNext: true, title: 'Take a sabbatical', seen: 'seen-Take a sabbatical' })
+    expect(one({ op: 'plan_carry', item_id: GOAL, to_period_start: '2028-01-01' }).toNext).toBe(false)
+    expect(refused({ op: 'plan_carry', item_id: GOAL, to_period_start: '2026-01-01' })).toContain('already on 2026')
+    expect(one({ op: 'plan_done', item_id: GOAL })).toMatchObject({ op: 'plan_done', level: 'year', itemKind: 'goal' })
+    expect(one({ op: 'plan_let_go', item_id: GOAL })).toMatchObject({ op: 'plan_let_go', level: 'year', periodLabel: '2026' })
+  })
+  it('lets go of and finishes month and season goals', () => {
+    expect(one({ op: 'plan_let_go', item_id: MONTH2 })).toMatchObject({ itemKind: 'task', level: 'month', periodStart: '2026-10-01', title: 'Call the vet' })
+    expect(one({ op: 'plan_done', item_id: SEASON })).toMatchObject({ level: 'season', periodLabel: 'Fall' })
+  })
+  it('refuses what is already done, met, let go, unseen, or ambiguous', () => {
+    expect(refused({ op: 'plan_done', item_id: DONE_T })).toContain('already done')
+    expect(refused({ op: 'plan_let_go', item_id: TICKED })).toContain('already done')
+    expect(refused({ op: 'plan_done', item_id: MET })).toContain('already met')
+    expect(refused({ op: 'plan_carry', item_id: ARCHIVED, to_period_start: '2027-01-01' })).toContain('already let go')
+    expect(refused({ op: 'plan_let_go', item_id: A })).toContain(`No goal ${A}`)
+    expect(refused({ op: 'plan_let_go', item_id: BOTH })).toContain("send level ('month' or 'season')")
+    expect(one({ op: 'plan_let_go', item_id: BOTH, level: 'month' })).toMatchObject({ level: 'month', periodLabel: 'October' })
+    expect(one({ op: 'plan_carry', item_id: BOTH, level: 'season', to_period_start: '2026-12-01' })).toMatchObject({ level: 'season', toPeriodLabel: 'Winter' })
+    expect(refused({ op: 'plan_done', item_id: MONTH, level: 'year' })).toContain('not a year goal')
+    expect(refused({ op: 'plan_done', item_id: GOAL, level: 'month' })).toContain('is a year goal')
+    expect(refused({ op: 'plan_let_go', item_id: MONTH2, level: 'season' })).toContain('not on a season list')
+  })
+  it('refuses plan ops when the lists could not be read', () => {
+    const p = parse([{ op: 'plan_done', item_id: GOAL }])
+    if ('error' in p) throw new Error(p.error)
+    expect(resolveRefs(p.set, [], [], [])).toEqual({ error: expect.stringContaining('Could not read') })
+  })
+  it('resolves plan ops alongside task ops on the same card', () => {
+    const p = parse([{ op: 'plan_carry', item_id: MONTH, to_period_start: '2026-11-01' }, { op: 'someday', task_id: A }])
+    if ('error' in p) throw new Error(p.error)
+    const r = resolveRefs(p.set, [{ id: A, title: 'Paper mail', updated_at: 't', completed: false }], [], [], refs)
+    if ('error' in r) throw new Error(r.error)
+    expect(r.set.ops.map((o) => [o.op, o.title])).toEqual([['plan_carry', 'Plan sabbatical'], ['someday', 'Paper mail']])
+  })
+})
+
+describe('agent wiring: Month, Season and Year talk-first', () => {
+  const src = readFileSync('supabase/functions/symphony-agent/index.ts', 'utf8')
+  it('offers symphony_read_plan and runs it through the RLS client', () => {
+    expect(src).toMatch(/READ_PLAN_TOOL,/)
+    expect(src).toContain("case 'symphony_read_plan':")
+    expect(src).toContain('readPlan(db, input,')
+  })
+  it('documents every plan op and field in the propose tool', () => {
+    const schema = JSON.stringify(PROPOSE_CHANGES_TOOL.input_schema)
+    for (const op of ['plan_add', 'plan_carry', 'plan_let_go', 'plan_done']) {
+      expect(schema).toContain(`"${op}"`)
+      expect(PROPOSE_CHANGES_TOOL.description).toContain(op)
+    }
+    for (const field of ['level', 'period_start', 'to_period_start', 'item_id', 'parent_id', 'new_title']) expect(schema).toContain(`"${field}"`)
+    expect(READ_PLAN_TOOL.input_schema.required).toEqual(['level'])
+  })
+  it('plans Month, Season and Year as a talk that reads first and ends in one card', () => {
+    expect(src).toContain('"Plan {Month}", "Plan {Season}" or "Plan {Year}"')
+    expect(src).toContain('"Plan this month with me"')
+    expect(src).toContain('call symphony_read_plan first')
+    expect(src).toContain("what moved and what didn't, with counts")
+    expect(src).toContain('Ask what the next period is for')
+    expect(src).toContain('never invent, suggest or polish goals')
+    expect(src).toContain('Point out duplicates and overlaps')
+    expect(src).toContain('A season is a brainstorm: everything they say goes on the list in their words')
+    expect(src).toContain("A year is a handful: look back at last year's goals first")
+    expect(src).toContain('End in ONE symphony_propose_changes with plan ops')
+    expect(src).toContain('plan the year first, then the season, then the month')
+    expect(src).toContain('Write nothing directly in these sessions.')
+  })
+  it('no longer tells the model the card holds tasks only, or to write goals directly in a session', () => {
+    expect(src).not.toContain('the card holds tasks only')
+    expect(src).not.toContain('Do not take one year goal all the way to today')
+    expect(src).toContain('Outside a Month, Season or Year session, ONE goal they name may be written directly with the write tools')
+  })
+  it('keeps goal changes off the kitchen wall', () => {
+    expect(src).toContain("const WALL_CARD_OPS = new Set(['place', 'unplace', 'add', 'someday', 'assign'])")
+    expect(src).toContain('hasPlanOps && !wallRefused')
   })
 })
