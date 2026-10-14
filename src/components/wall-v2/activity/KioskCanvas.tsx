@@ -22,7 +22,7 @@
 // one adult's own tasks dropped by wallTodayRows). Nothing here adds a query.
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { ArrowLeft, Home, ChevronRight, Timer, Phone, ShoppingCart, ChefHat, MoreHorizontal, X, Keyboard, Mic, MicOff } from 'lucide-react'
+import { ArrowLeft, Home, ChevronRight, Timer, Phone, ShoppingCart, ChefHat, MoreHorizontal, X, Keyboard, Mic, MicOff, CalendarDays } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import type { FamilyMember } from '@/types/family'
 import type { WallMoment } from '@/lib/wall/wallMoment'
@@ -48,6 +48,9 @@ import { TellSymphonyPill, type WallVoice } from './KioskTellSymphony'
 import { useTellSymphony, type ListenerPreview } from './useTellSymphony'
 import { KioskDock, KioskMorePanel, type MoreTile } from './KioskDock'
 import { dockCopy } from '@/lib/wall/activity/dockCopy'
+import { talkUsesBand } from '@/lib/wall/wallTalk'
+import { localYmd } from '@/lib/cadence/config'
+import { WallConversation, WallTalkLead, WallTalkStage, type WallTalkWeek } from './WallTalk'
 import { KioskHome } from './KioskHome'
 import { KioskHomeV1, type KioskHomeV1Props } from './KioskHomeV1'
 import {
@@ -114,6 +117,9 @@ export interface KioskCanvasProps {
   v1?: KioskV1Data
   /** Design previews only: hold the listener in one state. */
   listenerPreview?: ListenerPreview
+  /** The family's next seven days and what the wall knows of a task, for the
+   *  conversation's pictures (Kitchen wall v2, stage 3). */
+  week?: WallTalkWeek
 }
 
 const V2_FONTS = 'https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300..600&family=Instrument+Sans:wght@400;500;600;700&display=swap'
@@ -297,7 +303,10 @@ export function KioskCanvas(p: KioskCanvasProps) {
         icon: tell.voiceOn && tell.supported ? Mic : MicOff,
         onSelect: tell.supported ? tell.toggleVoice : () => { setMoreOpen(false); setTyping(true) },
       }
+  const talk = tell.talk
+  const endTalk = () => { talk.end(); tell.clearReply() }
   const moreTiles = [
+    talk.enabled ? { id: 'plan', label: 'Plan the week', sub: 'Together, with Symphony', icon: CalendarDays, onSelect: () => { setMoreOpen(false); void tell.handle('Plan the week', false) } } : null,
     { id: 'type', label: 'Type instead', sub: 'Same Symphony, with a keyboard', icon: Keyboard, onSelect: () => { setMoreOpen(false); setTyping(true) } },
     shellTile('list'),
     shellTile('notes'),
@@ -308,6 +317,20 @@ export function KioskCanvas(p: KioskCanvasProps) {
     shellTile('settings'),
   ].filter((t): t is MoreTile => !!t)
   const morePanel = <KioskMorePanel tiles={moreTiles} onDone={() => setMoreOpen(false)} />
+
+  // ─── Talking with Symphony (stage 3) ───
+  // A card, the week being planned or a day Symphony pointed at takes the
+  // canvas (lead · conversation); otherwise the conversation takes the side
+  // column of a two-column moment, and the reply band serves the rest.
+  const week = p.week
+  const talkOn = !!p.v1 && talk.enabled && talk.active && !!week
+  const takeover = talkOn && (talk.planning || !!talk.card || talk.pointed.some((d) => week!.days.some((w) => localYmd(w.date) === d)))
+  const bandMoment = stage.kind !== 'home' || !p.v1 || talkUsesBand(p.v1.pick.screen)
+  const talkInSide = talkOn && !moreOpen && (takeover || !bandMoment)
+  const convo = talkOn && week ? (
+    <WallConversation talk={talk} info={week.task} today={p.now}
+      onApprove={() => void tell.approveCard()} onUndo={() => void tell.undoCard()} onBack={takeover ? undefined : endTalk} />
+  ) : null
 
   let content: ReactNode
   switch (stage.kind) {
@@ -325,6 +348,7 @@ export function KioskCanvas(p: KioskCanvasProps) {
           onStartCooking={() => { const said = startCooking(); if (said.startsWith('No')) p.flash(said) }}
           places={{ onGroceries: p.tools.onGroceries, onRecipes: p.tools.onRecipes, onCall: () => dispatch({ type: 'OPEN', stage: { kind: 'calling' } }), onNotes: p.v1.onNotes }}
           aside={moreOpen ? morePanel : undefined}
+          talk={talkInSide && !bandMoment ? convo : undefined}
         />
       ) : (
         <KioskHome
@@ -385,6 +409,10 @@ export function KioskCanvas(p: KioskCanvasProps) {
       break
   }
 
+  if (takeover && week) {
+    content = <WallTalkStage plan={talk.planning} side={convo} lead={<WallTalkLead talk={talk} week={week} today={p.now} onBack={endTalk} />} />
+  }
+
   const W = p.weather
   const bottomTool = (label: string, sub: string | null, Icon: LucideIcon, onClick: () => void, aria?: string, active = false) => (
     <button type="button" className={`kc-tool ${active ? 'is-active' : ''}`} onClick={onClick} aria-label={aria ?? label} aria-current={active ? 'page' : undefined}>
@@ -442,16 +470,17 @@ export function KioskCanvas(p: KioskCanvasProps) {
           <main className={`kc-main is-${stage.kind} ${stage.kind === 'home' ? `v1-${v1.pick.screen}` : ''}`}>
             <div className="kc-main-inner">{content}</div>
           </main>
-          {moreOpen && stage.kind !== 'home' && <div className="kw-more-over">{morePanel}</div>}
+          {moreOpen && (stage.kind !== 'home' || takeover) && <div className="kw-more-over">{morePanel}</div>}
         </div>
 
         <KioskDock
           tell={tell} copy={copy} typing={typing} setTyping={setTyping}
-          onHome={() => { setMoreOpen(false); dispatch({ type: 'HOME' }) }}
+          onHome={() => { setMoreOpen(false); endTalk(); dispatch({ type: 'HOME' }) }}
           onBack={state.stack.length >= 2 ? () => dispatch({ type: 'BACK' }) : undefined}
           moreOpen={moreOpen} onMore={() => setMoreOpen((o) => !o)}
           held={heldEls.length ? <div className="kw-held" aria-label="Held activities">{heldEls}</div> : null}
           next={v1.next}
+          replyInSide={talkInSide}
         />
       </div>
     )

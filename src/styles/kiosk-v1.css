@@ -434,3 +434,89 @@
 .is-v1 .kw-stage.is-more .kw-otd-tables { column-gap: calc(32 * var(--p)); }
 .is-v1 .kw-stage.is-more .kw-otd-kidh { width: calc(100 * var(--p)); }
 .is-v1 .kw-stage.is-more .kw-otd-kidh small { display: none; }
+
+/* More with a ninth tile (Plan the week): shorter tiles, one-line subs. */
+.is-v1 .kw-tiles.is-tight .kw-tile { min-height: calc(104 * var(--p)); padding-top: calc(8 * var(--p)); padding-bottom: calc(8 * var(--p)); }
+.is-v1 .kw-tiles.is-tight .kw-tile small { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* ===== Talking with Symphony (stage 3; Ask, Change, PlanWeek, KidAsks) =====
+   The conversation takes the side column: the speaker as a neutral "You"
+   mark, Symphony in Fraunces. A card, the week or a pointed day takes the
+   lead: proposals dashed, where a moved item was a dotted trace. */
+.is-v1 .kw-grow { flex: 1; min-width: 0; }
+.is-v1 .kw-back-today { min-height: calc(88 * var(--p)); font-size: calc(26 * var(--p)); flex: none; }
+.is-v1 .kw-convo { display: flex; flex-direction: column; min-height: 0; height: 100%; }
+.is-v1 .kw-convo-head { display: flex; align-items: center; margin-bottom: calc(18 * var(--p)); flex: none; }
+.is-v1 .kw-turns { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; justify-content: flex-end; overflow: hidden; }
+/* Older turns fade out at the top rather than being cut mid-line. */
+.is-v1 .kw-turns:not(.is-short) { -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 calc(90 * var(--p))); mask-image: linear-gradient(to bottom, transparent 0, #000 calc(90 * var(--p))); }
+.is-v1 .kw-turns.is-short { flex: 0 1 auto; justify-content: flex-start; margin-bottom: calc(22 * var(--p)); }
+.is-v1 .kw-turn { display: grid; grid-template-columns: calc(64 * var(--p)) minmax(0, 1fr); column-gap: calc(20 * var(--p)); align-items: start; margin-bottom: calc(28 * var(--p)); flex: none; }
+.is-v1 .kw-turn p { margin: 0; }
+.is-v1 .kw-turn .kw-meta { margin-bottom: calc(6 * var(--p)); }
+.is-v1 .kw-turn .kw-eyebrow { margin-bottom: calc(8 * var(--p)); }
+.is-v1 .kw-words { font-size: calc(32 * var(--p)); line-height: 1.3; }
+.is-v1 .kw-turn.is-sym .kw-words { font: 400 calc(44 * var(--p)) / 1.18 var(--kw-serif); }
+.is-v1 .kw-turn.is-sym .kw-words.is-mid { font-size: calc(36 * var(--p)); }
+.is-v1 .kw-turn.is-sym .kw-words.is-long { font-size: calc(28 * var(--p)); line-height: 1.3; }
+.is-v1 .kw-you { display: inline-grid; place-items: center; width: calc(64 * var(--p)); height: calc(64 * var(--p)); border-radius: 999px; border: 2px solid var(--kw-line-strong); color: var(--kw-muted); font-size: calc(20 * var(--p)); font-weight: 600; }
+.is-v1 .kw-symdot { display: inline-grid; place-items: center; width: calc(64 * var(--p)); height: calc(64 * var(--p)); border-radius: 999px; background: var(--kw-sym-tint); color: var(--kw-sym); }
+.is-v1 .kw-symdot svg { width: calc(30 * var(--p)); height: calc(30 * var(--p)); stroke-width: 2; }
+.is-v1 .kw-thinking { margin: 0 0 calc(12 * var(--p)) calc(84 * var(--p)); }
+
+/* The wall-size change card (Change.dc.html). */
+.is-v1 .kw-card { flex: none; border: 2.5px solid var(--kw-sym); background: color-mix(in srgb, var(--kw-sym-tint) 55%, var(--kw-surface)); border-radius: calc(24 * var(--p)); padding: calc(26 * var(--p)) calc(30 * var(--p)); }
+.is-v1 .kw-card-title { margin: calc(10 * var(--p)) 0 calc(12 * var(--p)); font: 400 calc(40 * var(--p)) / 1.15 var(--kw-serif); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.is-v1 .kw-ops { margin: 0; padding: 0; list-style: none; }
+.is-v1 .kw-op { display: grid; grid-template-columns: calc(44 * var(--p)) minmax(0, 1fr); column-gap: calc(16 * var(--p)); padding: calc(14 * var(--p)) 0; border-top: 1px solid var(--kw-line); font-size: calc(28 * var(--p)); line-height: 1.25; }
+.is-v1 .kw-op > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.is-v1 .kw-op > svg { width: calc(32 * var(--p)); height: calc(32 * var(--p)); color: var(--kw-sym); stroke-width: 2; margin-top: calc(2 * var(--p)); }
+.is-v1 .kw-op-d { display: block; margin-top: calc(2 * var(--p)); font-size: calc(22 * var(--p)); color: var(--kw-muted); overflow: hidden; text-overflow: ellipsis; }
+.is-v1 .kw-op.is-more { font-size: calc(24 * var(--p)); color: var(--kw-muted); }
+.is-v1 .kw-card-err { margin: calc(12 * var(--p)) 0 0; font-size: calc(24 * var(--p)); color: var(--kw-now); }
+.is-v1 .kw-card-acts { display: flex; gap: calc(16 * var(--p)); margin-top: calc(20 * var(--p)); }
+.is-v1 .kw-approve { flex: 1; min-height: calc(112 * var(--p)); font-size: calc(34 * var(--p)); }
+.is-v1 .kw-notnow { min-height: calc(112 * var(--p)); }
+.is-v1 .kw-btn:disabled { opacity: .6; }
+.is-v1 .kw-family-only { margin-top: calc(14 * var(--p)); flex: none; }
+.is-v1 .kw-card.is-mini { display: flex; align-items: center; gap: calc(18 * var(--p)); padding: calc(18 * var(--p)) calc(24 * var(--p)); margin-top: calc(16 * var(--p)); }
+.is-v1 .kw-card.is-mini b { display: block; font-size: calc(28 * var(--p)); font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.is-v1 .kw-card.is-mini .kw-btn { min-height: calc(88 * var(--p)); font-size: calc(26 * var(--p)); }
+.is-v1 .kw-card.is-saved { border-color: var(--kw-done); background: var(--kw-done-tint); }
+.is-v1 .kw-saved-check { width: calc(40 * var(--p)); height: calc(40 * var(--p)); color: var(--kw-done); flex: none; }
+.is-v1 .kw-undo { min-height: calc(88 * var(--p)); }
+
+/* The lead while talking. */
+.is-v1 .kw-stage.is-plan { grid-template-columns: minmax(0, 2fr) 1px minmax(0, 1fr); column-gap: calc(56 * var(--p)); }
+.is-v1 .kw-talk-head { display: flex; align-items: center; gap: calc(20 * var(--p)); flex: none; }
+.is-v1 .kw-talk-title { margin: calc(8 * var(--p)) 0 calc(24 * var(--p)); font: 400 calc(72 * var(--p)) / 1.05 var(--kw-serif); flex: none; }
+.is-v1 .kw-oneday { display: flex; flex-direction: column; gap: calc(12 * var(--p)); min-height: 0; overflow: hidden; }
+.is-v1 .kw-de { display: grid; grid-template-columns: calc(118 * var(--p)) minmax(0, 1fr); column-gap: calc(22 * var(--p)); align-items: center; flex: none; border-radius: calc(14 * var(--p)); }
+.is-v1 .kw-de.is-lg { min-height: calc(92 * var(--p)); padding: 0 calc(24 * var(--p)); }
+.is-v1 .kw-de.is-lg.is-plain { border-top: 1px solid var(--kw-line); border-radius: 0; }
+.is-v1 .kw-de-t { font-size: calc(30 * var(--p)); color: var(--kw-muted); }
+.is-v1 .kw-de-w { display: flex; flex-direction: column; min-width: 0; font-size: calc(32 * var(--p)); font-weight: 600; line-height: 1.2; }
+.is-v1 .kw-de-w > span, .is-v1 .kw-de-by { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.is-v1 .kw-de-by { margin-top: calc(2 * var(--p)); font-size: calc(24 * var(--p)); font-weight: 400; color: var(--kw-muted); }
+.is-v1 .kw-de.is-prop { border: 3px dashed var(--kw-sym); background: color-mix(in srgb, var(--kw-sym-tint) 55%, var(--kw-surface)); }
+.is-v1 .kw-de.is-trace { border: 2.5px dotted var(--kw-line-strong); color: var(--kw-muted); }
+.is-v1 .kw-de.is-trace .kw-de-w { font-weight: 500; }
+/* Small rows: a week or a few days side by side. */
+.is-v1 .kw-de.is-sm { grid-template-columns: minmax(0, 1fr); padding: calc(8 * var(--p)) calc(12 * var(--p)); border: 1px solid var(--kw-line); background: var(--kw-surface); }
+.is-v1 .kw-de.is-sm .kw-de-t { order: 2; font-size: calc(20 * var(--p)); }
+.is-v1 .kw-de.is-sm .kw-de-t:empty { display: none; }
+.is-v1 .kw-de.is-sm .kw-de-w { font-size: calc(22 * var(--p)); }
+.is-v1 .kw-de.is-sm .kw-de-w > span:first-child { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.is-v1 .kw-de.is-sm .kw-de-by { font-size: calc(20 * var(--p)); }
+.is-v1 .kw-de.is-sm.is-prop { border: 3px dashed var(--kw-sym); background: color-mix(in srgb, var(--kw-sym-tint) 55%, var(--kw-surface)); }
+.is-v1 .kw-de.is-sm.is-trace { border: 2.5px dotted var(--kw-line-strong); background: none; }
+.is-v1 .kw-week { flex: 1; min-height: 0; display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); column-gap: calc(12 * var(--p)); margin-top: calc(16 * var(--p)); }
+.is-v1 .kw-days { flex: 1; min-height: 0; display: grid; grid-template-columns: repeat(var(--cols, 2), minmax(0, 1fr)); column-gap: calc(28 * var(--p)); margin-top: calc(16 * var(--p)); }
+.is-v1 .kw-days .kw-de.is-sm .kw-de-w { font-size: calc(28 * var(--p)); }
+.is-v1 .kw-days .kw-de.is-sm .kw-de-t, .is-v1 .kw-days .kw-de.is-sm .kw-de-by { font-size: calc(22 * var(--p)); }
+.is-v1 .kw-day { display: flex; flex-direction: column; gap: calc(10 * var(--p)); min-width: 0; min-height: 0; overflow: hidden; border-top: 2px solid var(--kw-line); padding-top: calc(14 * var(--p)); }
+.is-v1 .kw-day.is-today { border-top-color: var(--kw-now); }
+.is-v1 .kw-day-h { font-size: calc(22 * var(--p)); font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: var(--kw-muted); }
+.is-v1 .kw-day-n { font: 400 calc(46 * var(--p)) / 1 var(--kw-serif); margin-bottom: calc(6 * var(--p)); }
+.is-v1 .kw-de-none, .is-v1 .kw-de-more { font-size: calc(20 * var(--p)); color: var(--kw-muted); }
+.is-v1 .kw-de-none { font-style: italic; }

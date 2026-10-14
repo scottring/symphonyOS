@@ -31,6 +31,8 @@ export interface KioskDockProps {
   /** Held activities (cooking, timers) as chips beside the nav. */
   held?: ReactNode
   next: { time: string; title: string } | null
+  /** The conversation has the side column: no reply band (stage 3). */
+  replyInSide?: boolean
 }
 
 function NavButton({ icon: Icon, label, onClick, current }: { icon: LucideIcon; label: string; onClick: () => void; current?: boolean }) {
@@ -52,6 +54,7 @@ export function KioskDock(p: KioskDockProps) {
   const wake = l.wake ?? 'Hey Symphony'
   const quiet = t.live && l.quiet && !t.isListening
   const muted = t.live && l.muted
+  const off = quiet || muted
   const [typed, setTyped] = useState('')
   const input = useRef<HTMLInputElement>(null)
   useEffect(() => { if (p.typing) input.current?.focus() }, [p.typing])
@@ -70,18 +73,24 @@ export function KioskDock(p: KioskDockProps) {
     p.setTyping(true)
   }
 
+  const conv = t.talk
+  const lastSaid = [...conv.turns].reverse().find((x) => x.who === 'symphony')?.text ?? t.answer ?? t.feedback ?? ''
   let hint: string, line: string
-  if (t.isListening) { hint = 'Listening · tap to stop'; line = 'Go ahead…' }
+  if (t.isListening) { hint = 'Listening · tap to stop'; line = conv.card ? 'Say “approve”, or say what to change' : 'Go ahead…' }
   else if (t.isThinking) { hint = t.heard ? `Heard “${t.heard}”` : 'One moment'; line = 'Thinking…' }
+  else if (t.isSpeaking) { hint = 'Symphony is speaking · tap to talk'; line = lastSaid.length > 60 ? `“${lastSaid.slice(0, 58).trimEnd()}…”` : lastSaid ? `“${lastSaid}”` : 'Speaking…' }
+  else if (conv.card && !off) { hint = t.live ? `Say “${wake}”, or tap` : 'Tap to talk'; line = 'Say “approve”, or say what to change' }
+  else if (conv.planning && !off) { hint = t.live ? `Say “${wake}”, or tap · either of you can answer` : 'Tap to talk'; line = 'Answer, or say “approve” when ready' }
   else if (quiet) { hint = `Not listening for “${wake}”`; line = 'Quiet hours · tap to talk' }
   else if (muted) { hint = 'The microphone is off'; line = 'Tap to type, or turn it on in More' }
   else if (t.live) { hint = `Say “${wake}”, or tap${p.copy.tapWhat}`; line = p.copy.line }
   else if (t.voiceOn && t.supported) { hint = `Tap to talk${p.copy.tapWhat ? `, or tap${p.copy.tapWhat}` : ''}`; line = p.copy.line }
   else { hint = 'Tap to type'; line = p.copy.line }
-  const off = quiet || muted
   const MicIcon = t.isListening ? Square : off ? MicOff : !t.live && !(t.voiceOn && t.supported) ? Keyboard : Mic
   const reply = t.answer ?? t.feedback
-  const showReply = !!reply && !t.isListening && !p.typing
+  const showReply = !!reply && !t.isListening && !p.typing && !p.replyInSide
+  // After Approve, Undo rides the band when the conversation has no side column.
+  const saved = !p.replyInSide ? conv.saved : null
 
   return (
     <>
@@ -92,6 +101,13 @@ export function KioskDock(p: KioskDockProps) {
             <p className={`kw-reply-text ${reply.length > 320 ? 'is-long' : reply.length > 160 ? 'is-mid' : ''}`}>{reply}</p>
           </div>
           {t.undo && <button type="button" className="kw-btn" onClick={() => void t.takeBack()}><Undo2 aria-hidden="true" />Undo</button>}
+          {saved && <button type="button" className="kw-btn kw-undo" onClick={() => void t.undoCard()}><Undo2 aria-hidden="true" />Undo</button>}
+        </section>
+      )}
+      {!showReply && saved && !t.isListening && !p.typing && (
+        <section className="kw-reply" role="status" aria-label="Symphony says">
+          <div className="kw-reply-body"><p className="kw-reply-text is-mid">Saved · {saved.title}</p></div>
+          <button type="button" className="kw-btn kw-undo" onClick={() => void t.undoCard()}><Undo2 aria-hidden="true" />Undo</button>
         </section>
       )}
       <footer className="kw-dock" aria-label="Kiosk">
@@ -110,13 +126,13 @@ export function KioskDock(p: KioskDockProps) {
             <button type="button" className="kw-close" aria-label="Stop typing" onClick={() => { setTyped(''); p.setTyping(false) }}><X aria-hidden="true" /></button>
           </form>
         ) : (
-          <div className={`kw-talk ${t.isListening ? 'is-live' : ''} ${off ? 'is-quiet' : ''}`}>
+          <div className={`kw-talk ${t.isListening || t.isSpeaking ? 'is-live' : ''} ${off ? 'is-quiet' : ''}`}>
             <button type="button" className="kw-talk-main" onClick={talk} aria-label={`Talk to Symphony — ${hint}`}>
               <span className={`kw-mic ${off ? 'is-off' : ''}`} aria-hidden="true"><MicIcon /></span>
-              {t.isListening && <Bars />}
+              {(t.isListening || t.isSpeaking) && <Bars />}
               <span className="kw-say"><span className="kw-hint">{hint}</span><span className="kw-line">{line}</span></span>
             </button>
-            {p.copy.chip && !off && !t.isListening && !t.isThinking && (
+            {p.copy.chip && !off && !t.isListening && !t.isThinking && !conv.active && (
               <button type="button" className="kw-chip" onClick={() => void t.handle(p.copy.chip!, true)}>{p.copy.chip}</button>
             )}
           </div>
@@ -140,7 +156,7 @@ export function KioskMorePanel({ tiles, onDone }: { tiles: MoreTile[]; onDone: (
         <h2>More</h2>
         <button type="button" className="kw-btn is-quiet" onClick={onDone}>Done</button>
       </div>
-      <div className="kw-tiles">
+      <div className={`kw-tiles ${tiles.length > 8 ? 'is-tight' : ''}`}>
         {tiles.map(({ id, label, sub, icon: Icon, onSelect }) => (
           <button key={id} type="button" className="kw-tile" onClick={onSelect}>
             <Icon aria-hidden="true" /><span><b>{label}</b>{sub && <small>{sub}</small>}</span>
