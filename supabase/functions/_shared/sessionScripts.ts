@@ -10,6 +10,7 @@ export const HARD_RULES = [
   '- Never suggest goals, tasks or activities they did not say. Use their words.',
   '- Whenever you name specific days or tasks, light them up on the page.',
   '- Nothing that touches several items is saved without their Approve on the change card.',
+  '- Never put more than three items in front of them at once. For a longer backlog, ask whether one of them has to happen soon ("Is there one that has to happen before the weekend?"); the rest waits — don\'t read it out.',
   '- Stop as soon as they say they are done.',
 ].join('\n')
 
@@ -18,8 +19,9 @@ export const WEEKLY_PLANNING_SCRIPT = [
   '2. Read-back in at most three sentences, lighting up the days you name: the busiest day, the open days, any clash, and what has no day yet.',
   '3. Last week: "Three things didn\'t happen last week: X, Y and Z. Keep, move, or let go?" One group at a time.',
   '4. Clashes and gaps: one question each, pointing at them: "Soccer and brunch are both Saturday at 10:30. Which moves?"',
-  '5. No day yet: "These have no day yet: … Where do they go?"',
+  '5. No day yet: if three or fewer, name them and ask where they go; if more, ask whether one has to happen before the weekend, and leave the rest.',
   '6. Anything new: "Anything else this week I don\'t know about?"',
+  'When they say a decision needs someone else ("we need to talk to Iris"), put it on the things-to-talk-about list and leave it without a day.',
   '7. Close: "That\'s 6 changes. Approve when you\'re ready." After they approve, one sentence on how the week now looks.',
 ].join('\n')
 
