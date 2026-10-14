@@ -3,6 +3,7 @@ import { useState, useCallback, useEffect, useRef } from 'react'
 import { supabase, getAuthUser } from '@/lib/supabase'
 import type { AgentApiMessage, AgentProposalItem, AssistantTaskContext, AgentSourceNote } from '@/lib/agentStream'
 import { runAgentTurn } from '@/lib/agentTurn'
+import type { ChangeSet } from '@/lib/canvas/changeCard'
 import type { ChatMessage, ChatSession } from '@/types/chat'
 import type { ChatAttachment } from '@/components/chat/ChatAttachment'
 import { useFamilyMembers } from '@/hooks/useFamilyMembers'
@@ -34,6 +35,7 @@ export interface AssistantTurnObserver {
   tool?: (name: string) => void
   toolResult?: (result: { name: string; ok: boolean; ids?: string[]; error?: string }) => void
   proposal?: (items: AgentProposalItem[]) => void
+  changeSet?: (set: ChangeSet) => void
   end?: (turn: { turnId: string; didWrite: boolean; error: string | null; text: string }) => void
 }
 
@@ -230,6 +232,7 @@ export function useSymphonyAssistant(options?: UseSymphonyAssistantOptions) {
       onTool: (name) => { setToolActivity((prev) => [...prev, name]); turnObserver?.tool?.(name) },
       onToolResult: (result) => turnObserver?.toolResult?.(result),
       onProposal: (items) => turnObserver?.proposal?.(items),
+      onChangeSet: (set) => turnObserver?.changeSet?.(set),
       turnId,
       onReplyFallback: (reply) => {
         setMessages((prev) => prev.map((m) =>

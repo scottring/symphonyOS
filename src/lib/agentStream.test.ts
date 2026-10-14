@@ -25,4 +25,10 @@ describe('parseSSEChunk', () => {
     const { events } = parseSSEChunk('data: not-json\n\ndata: {"type":"text","text":"ok"}\n\n')
     expect(events).toEqual([{ type: 'text', text: 'ok' }])
   })
+
+  it('passes a change_set event through intact', () => {
+    const set = { key: 'tu1', title: '2 changes', ops: [{ key: 'tu1:0', op: 'someday', taskId: 'a', title: 'Paper mail' }] }
+    const { events } = parseSSEChunk(`data: ${JSON.stringify({ type: 'change_set', set })}\n\n`)
+    expect(events).toEqual([{ type: 'change_set', set }])
+  })
 })

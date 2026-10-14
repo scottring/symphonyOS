@@ -1,4 +1,5 @@
 import type { WorkspaceContext } from '@/lib/workspace/context'
+import type { ChangeSet } from '@/lib/canvas/changeCard'
 // src/lib/agentTurn.ts
 //
 // One turn of the Symphony agent, minus the React. Extracted from
@@ -41,6 +42,7 @@ export interface AgentTurnHandlers {
   onToolResult?: (result: { name: string; ok: boolean; ids?: string[]; error?: string }) => void
   /** Suggestions to show as proposals, never written until kept. */
   onProposal?: (items: AgentProposalItem[]) => void
+  onChangeSet?: (set: ChangeSet) => void
   /** Reused when the same message is retried, for server-side de-duplication. */
   turnId?: string
   /** The authoritative final reply, only when nothing streamed. */
@@ -122,6 +124,7 @@ export async function runAgentTurn(
       },
       onToolResult: handlers.onToolResult,
       onProposal: handlers.onProposal,
+      onChangeSet: handlers.onChangeSet,
       turnId: handlers.turnId,
       workspaceContext: handlers.workspaceContext,
       onWorkspace: handlers.onWorkspace,
