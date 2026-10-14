@@ -367,7 +367,7 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
           </ul>
         </span>
       )}
-      {sentence && <span className="wc-tray-aside wc-week-sentence">{sentence}</span>}
+      {sentence && <span className="wc-tray-aside wc-week-sentence" data-explain="week-sentence" data-explain-label="The week in a sentence">{sentence}</span>}
     </span>
   )
   // This week's weekend, once over, folds to one line: when it was, what

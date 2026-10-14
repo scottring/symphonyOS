@@ -40,12 +40,11 @@ export const PAGE_TOURS: Record<string, TourPart[]> = {
     { target: 'next', title: 'On to the week', text: 'Goes on to Week, where month goals become this week’s tasks.' },
   ],
   week: [
-    { target: 'page-title', title: 'This week', text: 'Week is for doing: this week’s tasks and when they happen. Days and Hours, at the right, switch how the days are drawn.' },
-    { target: 'still-to-place', title: 'Still to place', text: 'What is chosen for this week but has no day yet. Show opens it above the days.' },
-    { target: 'region:Still to place', title: 'The shelf', text: 'Tasks sit under the month goal they serve. Drag one onto a day, or press + to give it a day.' },
-    { target: 'region:Routines to place', title: 'Routines to place', text: 'Repeating things that still need a day this week.' },
-    { target: 'region:The days', title: 'The days', text: 'Each day shows its events, the kids’ specials, tasks (circles) and routines (rounded squares), who carries each, and the hours with nothing scheduled. Days gone by are dimmed.' },
-    { target: 'plan-button', title: 'Plan the week', text: 'Opens the planning session: last week, the Inbox, the calendar and routines, then writing the week.' },
+    { target: 'page-title', title: 'This week', text: 'Week is for doing: this week’s tasks and when they happen.' },
+    { target: 'region:The days', title: 'The days', text: 'The picture of the week. Each day shows its events, the kids’ specials, tasks (circles) and routines (rounded squares), who carries each, and the hours with nothing scheduled. Tick a task to finish it, drag it to move it, tap it to open it. Days gone by are dimmed.' },
+    { target: 'week-sentence', title: 'The week in a sentence', text: 'One plain sentence about how the week stands.' },
+    { target: 'still-to-place', title: 'No day yet', text: 'What is chosen for this week but has no day. Drag one onto a day, or on a phone press + to pick its day.' },
+    { target: 'plan-walk', title: 'Plan the rest of my week', text: 'Starts planning as a conversation. On a computer the same button is in the bar at the bottom.' },
   ],
   today: [
     { target: 'page-title', title: 'Today', text: 'Today is for doing: what you are doing today, with what you need to do it.' },
@@ -53,44 +52,6 @@ export const PAGE_TOURS: Record<string, TourPart[]> = {
     { target: /^region:For (today|this day)$/, title: 'For today', text: 'Things for today without a time. Add task adds one; drag one onto the day to give it a time.' },
     { target: 'this-week', title: 'This week', text: 'This week’s tasks with no day yet. Drag one onto the day, or press +, to plan it for today.' },
     { target: 'region:Coming up', title: 'Coming up', text: 'The next few dated things after today.' },
-  ],
-  // Week's planning session: the bar, then the parts of the step on screen.
-  'week-plan': [
-    { target: 'plan-steps', title: 'Planning, one step at a time', text: 'The steps run left to right; the current one is marked, and the line under them says what it is for. Next goes on, Back or a step’s name goes back, and Leave for now keeps your place.' },
-  ],
-  'week-plan:lookback': [
-    { target: 'close-out', title: 'Last week', text: 'One thing left open at a time: carry it on, mark it done, keep it for someday, or let it go. Nothing is deleted.' },
-  ],
-  'week-plan:inbox': [
-    { target: 'region:Inbox', title: 'Inbox', text: 'What you captured and have not sorted yet. Send each to this week, keep it for someday, or mark it done.' },
-    { target: 'region:Your week so far', title: 'Your week so far', text: 'The week filling up as you go.' },
-  ],
-  'week-plan:between': [
-    { target: 'region:Waiting on', title: 'Waiting on', text: 'What you are waiting on from someone else.' },
-    { target: 'region:To discuss', title: 'To discuss', text: 'What to talk through together.' },
-    { target: 'region:Your week so far', title: 'Your week so far', text: 'The week filling up as you go.' },
-  ],
-  'week-plan:fixed': [
-    { target: 'region:The days', title: 'What can’t move', text: 'Only what is on the calendar: appointments and events. Add anything missing to the calendar, then plan around it.' },
-    { target: 'region:Across these days', title: 'Across several days', text: 'Something that spans several days is one bar over them.' },
-  ],
-  'week-plan:ahead': [
-    { target: 'region:Look ahead', title: 'Look ahead', text: 'The next three weeks. Start this week puts anything that needs a head start on this week.' },
-    { target: 'region:Your week so far', title: 'Your week so far', text: 'The week filling up as you go.' },
-  ],
-  'week-plan:routines': [
-    { target: /^region:(At a set time|On a set day|Sometime this weekend|Any day this week|Every day|Less often)$/, title: 'Routines, one kind at a time', text: 'Grouped by how they repeat. Where one needs a day this week, choose it; the rest ask nothing.' },
-    { target: 'region:Your week so far', title: 'Your week so far', text: 'The week filling up as you go.' },
-  ],
-  'week-plan:write': [
-    { target: 'plan-view', title: 'Lists or Open journal', text: 'Two layouts of the same week: Lists, or Open journal, with each month goal on the left and this week’s tasks for it on the right.' },
-    { target: /^region:This week, by .+ goal$/, title: 'This week, by month goal', text: 'Under each month goal, add the tasks you mean to do this week, or put the goal on the week as is. A goal can have none this week; that is fine.' },
-    { target: /^region:Not tied to an? .+ goal$/, title: 'Everything else', text: 'This week’s tasks that do not serve a month goal.' },
-    { target: /^region:.+, for reference$/, title: 'The month, for reference', text: 'The month’s goals beside you while you write. Nothing on it has to come down.' },
-  ],
-  'week-plan:plan': [
-    { target: 'region:Show whose week', title: 'Whose week', text: 'Everyone’s week, or one person’s share of it.' },
-    { target: 'region:The days', title: 'The week’s shape', text: 'Each day’s shape and who carries what. When it looks right, Mark week … planned, at the top, saves the plan.' },
   ],
 }
 

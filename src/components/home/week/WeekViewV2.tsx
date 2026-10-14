@@ -16,8 +16,6 @@ import { PlanWeekMenu } from '@/components/plan/PlanWeekMenu'
 import { taskTiming, hasTiming, broaderCommitment, removeDayOutcome, removeAllOutcome } from '@/lib/planning/taskTiming'
 import { timingRemoval } from '@/lib/planning/planActions'
 import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
-import { useGoogleCalendar } from '@/hooks/useGoogleCalendar'
-import { useOptionalScheduleActionsContext } from '@/contexts/ScheduleActionsContext'
 import type { Routine, ActionableInstance } from '@/types/actionable'
 import { useSupabaseTasks } from '@/hooks/useSupabaseTasks'
 import { eventToTimelineItem } from '@/types/timeline'
@@ -52,6 +50,7 @@ import { makeAssigneeFilter } from '@/lib/today/assigneeFilter'
 import type { Layer } from '@/lib/domains'
 import { WeekPlanHost } from './WeekPlanHost'
 import { useConversationWalk } from '@/components/canvas/conversationWalk'
+import { useAssistantLauncher } from '@/contexts/AssistantLaunchContext'
 import { WeekV2 } from '@/components/plan/v2/WeekV2'
 import { useWeather } from '@/hooks/useWeather'
 import { planV2Enabled, lineDropUpdates } from '@/lib/planning/v2/planV2'
@@ -180,10 +179,6 @@ export function WeekViewV2(props: WeekViewV2Props) {
   // The rail plans MY week — scope it to the current member, as the strip does.
   const { getCurrentUserMember, members: familyMembers } = useFamilyMembers()
   const meId = getCurrentUserMember()?.id ?? null
-  const { createEvent, deleteEvent, isConnected: calendarConnected } = useGoogleCalendar()
-  // createEvent never updates the held events; without a refetch a
-  // quick-created event only showed up after a reload.
-  const refetchEvents = useOptionalScheduleActionsContext()?.onRefetchEvents
 
   // Pool-pill triage. Defers run through the DomainGate (a context-less task
   // asks "Where does this belong?" before the write — Iris's rule); "not this
@@ -202,9 +197,13 @@ export function WeekViewV2(props: WeekViewV2Props) {
   useEffect(() => { publishViewedWeek(weekAnchor) }, [weekAnchor])
   // Planning the week is a conversation: on the current week the bar offers it.
   const planFirstDay = localYmd(new Date()) === localYmd(weekAnchor)
-  useConversationWalk(weekIsCurrentFor(weekAnchor)
+  const weekWalk = weekIsCurrentFor(weekAnchor)
     ? (planFirstDay ? { label: 'Plan the week', message: 'Plan the week.' } : { label: 'Plan the rest of my week', message: 'Plan the rest of my week.' })
-    : null)
+    : null
+  const walkInBar = useConversationWalk(weekWalk)
+  // Phones have no bar: the page offers the same walk, sent the same way.
+  const { openAssistant } = useAssistantLauncher()
+  const pageWalk = weekWalk && !walkInBar ? { label: weekWalk.label, onStart: () => openAssistant({ message: weekWalk.message, autoSend: true }) } : undefined
   // Only unmount clears it — a cleanup on every change published null → week
   // and defeated the signal's same-week dedupe.
   useEffect(() => () => publishViewedWeek(null), [])
@@ -536,18 +535,6 @@ export function WeekViewV2(props: WeekViewV2Props) {
     pushAction?.(`Added "${title}"`, () => { void deleteTask(id) })
   }, [addTask, deleteTask, meId, layers, pushAction])
 
-  // "Can't move" adds a real calendar event (Scott, 2026-10-04: "calendared
-  // events only"): an hour at the time given, with Undo, then the range
-  // re-read so it shows at once.
-  const handleAddEvent = useCallback(async (day: JournalDay, title: string, time: string) => {
-    const [h, m] = time.split(':').map(Number)
-    const startTime = new Date(day.date.getFullYear(), day.date.getMonth(), day.date.getDate(), h || 9, m || 0)
-    const result = await createEvent({ title, startTime, endTime: new Date(startTime.getTime() + 60 * 60 * 1000) })
-    if (!result?.id) { showToast(`Couldn’t add “${title}” to the calendar.`, 'error', 6000); return }
-    pushAction?.(`Added "${title}" to the calendar`, () => { void deleteEvent({ eventId: result.id }) })
-    await refetchEvents?.()
-  }, [createEvent, deleteEvent, refetchEvents, pushAction])
-
   const handlePlanDropOnDay = useCallback((day: JournalDay, payload: PlanDragPayload) => {
     void planActions.drop(payload, { type: 'day', day: day.date })
   }, [planActions])
@@ -670,7 +657,7 @@ export function WeekViewV2(props: WeekViewV2Props) {
     }
   }, [tasks, weekAnchor])
 
-  const weekListFor = (onPlan: () => void) => (
+  const weekListFor = () => (
     <WeekList
       key={localYmd(weekAnchor)}
       tasks={tasks}
@@ -699,7 +686,6 @@ export function WeekViewV2(props: WeekViewV2Props) {
         else showToast(`Added ${where}`, 'success')
         if (hidden) showToast('Hidden by your current view — turn on Unsorted to see it', 'warning', 8000)
       }}
-      onPlan={onPlan}
       timingControl={weekTimingControl}
     />
   )
@@ -859,7 +845,6 @@ export function WeekViewV2(props: WeekViewV2Props) {
 
   return (
     <WeekPlanHost tasks={tasks} weekStart={weekAnchor} meId={meId} isPast={weekIsPast}>
-      {({ openSession }) => (
     <div className="relative week-content">
 
       <DndContext
@@ -878,13 +863,10 @@ export function WeekViewV2(props: WeekViewV2Props) {
             never by dragging from it. On a narrow screen the list sits above
             the stacked days instead. */}
         {narrow && planV2Enabled() ? (
-          <WeekV2 tasks={tasks} weekStart={weekAnchor} meId={meId} isCurrent={weekIsCurrent} dragEnabled={false} canvas={weekCanvas}
-            onSelectTask={(id) => onSelectItem(`task-${id}`)}
-            timingControl={weekTimingControl}
-            renderDays={(o) => <WeekJournal layout="grid" days={journalDays} weekend={journalWeekend} spans={journalSpans} onSelectItem={handleSelectBlock} onToggleEntry={handleJournalToggle} onPlanDrop={handlePlanDropOnDay} onAddToDay={handleAddToDay} onAddEvent={calendarConnected ? handleAddEvent : undefined} narrow dragEnabled={false} timingControl={weekTimingControl} forecast={forecast} {...o} />} />
+          <WeekV2 weekStart={weekAnchor} isCurrent={weekIsCurrent} canvas={weekCanvas} walk={pageWalk} />
         ) : narrow ? (
           <div className="flex flex-col gap-4">
-            {weekListFor(openSession)}
+            {weekListFor()}
             <h2 className="week-days-heading">The days</h2>
             <WeekJournal days={journalDays} weekend={journalWeekend} spans={journalSpans} onSelectItem={handleSelectBlock} onToggleEntry={handleJournalToggle} onPlanDrop={handlePlanDropOnDay} onAddToDay={handleAddToDay} narrow dragEnabled={false} timingControl={weekTimingControl} forecast={forecast} />
           </div>
@@ -895,13 +877,10 @@ export function WeekViewV2(props: WeekViewV2Props) {
         {planV2Enabled() ? (
           // v2 (docs/planning/2026-09-28-planning-v2.md): the same journal and
           // list, laid out as the prototype's day column + "Any day this week".
-          <WeekV2 tasks={tasks} weekStart={weekAnchor} meId={meId} isCurrent={weekIsCurrent} onPlan={openSession} canvas={weekCanvas}
-            onSelectTask={(id) => onSelectItem(`task-${id}`)}
-            timingControl={weekTimingControl}
-            renderDays={(o) => <WeekJournal layout="grid" days={journalDays} weekend={journalWeekend} spans={journalSpans} onSelectItem={handleSelectBlock} onToggleEntry={handleJournalToggle} onPlanDrop={handlePlanDropOnDay} onAddToDay={handleAddToDay} onAddEvent={calendarConnected ? handleAddEvent : undefined} timingControl={weekTimingControl} forecast={forecast} {...o} />} />
+          <WeekV2 weekStart={weekAnchor} isCurrent={weekIsCurrent} canvas={weekCanvas} walk={pageWalk} />
         ) : (
           <>
-            {weekListFor(openSession)}
+            {weekListFor()}
             <h2 className="week-days-heading">The days</h2>
             <WeekJournal days={journalDays} weekend={journalWeekend} spans={journalSpans} onSelectItem={handleSelectBlock} onToggleEntry={handleJournalToggle} onPlanDrop={handlePlanDropOnDay} onAddToDay={handleAddToDay} timingControl={weekTimingControl} forecast={forecast} />
           </>
@@ -970,7 +949,6 @@ export function WeekViewV2(props: WeekViewV2Props) {
         </DragOverlay>
       </DndContext>
     </div>
-      )}
     </WeekPlanHost>
   )
 }

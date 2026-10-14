@@ -28,26 +28,12 @@ export const PAGE_GUIDES: Record<string, string> = {
     'Go to this week goes on to Week, where month goals become this week\'s tasks.',
   week:
     'Week is for doing: this week\'s tasks and when they happen. ' +
-    'Each day column shows its events (in blue), the kids\' specials, tasks (circles) and routines (rounded squares), who carries each, and in green the hours with nothing scheduled ("Calendar clear"). ' +
+    'The days are the picture of the week: each day column shows its events (in blue), the kids\' specials, tasks (circles) and routines (rounded squares), who carries each, and in green the hours with nothing scheduled ("Calendar clear"). ' +
     'A stay across several days is one bar over those days. Days gone by are dimmed, and this week\'s weekend folds to one line once it is over. ' +
-    'Under the title, "Still to place" says what is chosen for this week but has no day yet; Show opens that shelf above the days. ' +
-    'On the shelf, tasks sit under the month goal they serve (e.g. an October goal); drag one onto a day, or press + to give it a day. ' +
-    'Routines to place are repeating things that need a day this week. ' +
-    'Plan the week, at the top, opens a planning session that goes through last week, the Inbox and the month\'s goals one step at a time.',
-  // Week's planning session (WeekV2 marks it data-explain-guide="week-plan"):
-  // the days and "Still to place" are not on screen, so the Week guide would
-  // send notes to the wrong parts (Scott, 2026-10-13).
-  'week-plan':
-    'This is Plan the week: a planning session, one step at a time. The bar at the top ("Planning week …") lists the steps; ' +
-    'the current one is marked, the line under them says what it is for, Next goes on, Back or a step\'s name goes back, and Leave for now keeps your place. ' +
-    'Last week: decide what happens to each thing left open — carry it on, mark it done, keep it for someday, or let it go. ' +
-    'Inbox: sort what was captured into this week, someday, or done. Between us: what you are waiting on and what to talk through together. ' +
-    'Can\'t move: what is on the calendar this week. Look ahead: the next three weeks, for anything that needs a start now. ' +
-    'Routines: this week\'s routines, one kind at a time. ' +
-    'Write the week: under each month goal, add the tasks you mean to do this week, or put the goal on the week as is; a goal may have none this week, and that is fine. ' +
-    'The month sits beside the list for reference, and View switches between Lists and Open journal (each month goal with this week\'s tasks for it). ' +
-    'The week: one line for what the week is for, each day\'s shape, and who carries what; Mark week … planned saves the plan. ' +
-    'Explain the step on screen, and the steps still to come only by name.',
+    'One plain sentence about the week sits under the title. ' +
+    '"No day yet" lists what is chosen for this week but has no day: drag one onto a day, or on a phone press + to pick the day. ' +
+    'Tick a task to finish it, drag it to move it, tap it to open it. ' +
+    'Planning is a conversation: "Plan the rest of my week" in the bar at the bottom (on a phone, the button under the title) starts it, and Symphony proposes the changes for you to approve.',
   today:
     'Today is for doing: what you are doing today, with what you need to do it. ' +
     '"The day" shows the day\'s hours with timed things on them and how many hours are still open. ' +

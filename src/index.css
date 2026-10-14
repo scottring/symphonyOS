@@ -3363,6 +3363,8 @@ div.chooser-action-group { overflow: visible !important; }
 .pv2-wl-placed .pv2-wl-title { color: var(--color-neutral-500); }
 .pv2-wl-placed > .pv2-hint { white-space: nowrap; flex: none; }
 .pv2-endsweek { margin-bottom: 18px; }
+/* The page's own entry to the walk, where no conversation bar hosts it (phones). */
+.pv2-walk { margin: 0 0 14px; }
 .pv2-wl-draft { width: 100%; background: transparent; font-size: 15px; color: var(--color-neutral-900); outline: none; }
 .pv2-rrow.is-linked { background: color-mix(in srgb, var(--color-primary-100) 70%, transparent); box-shadow: -8px 0 0 color-mix(in srgb, var(--color-primary-100) 70%, transparent), 8px 0 0 color-mix(in srgb, var(--color-primary-100) 70%, transparent); border-radius: 2px; }
 .pv2-rrow.is-flash { animation: pv2-flash 1.2s ease-out; }

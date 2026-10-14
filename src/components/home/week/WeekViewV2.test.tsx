@@ -26,6 +26,13 @@ vi.mock('@/hooks/useSupabaseTasks', async (importOriginal) => {
   return { ...actual, useSupabaseTasks: () => ({ ...actual.useSupabaseTasks(), toggleTask: async () => toggleResult.ok }) }
 })
 
+// Phones have no bar: the page's own entry sends the walk through the launcher.
+const launcher = vi.hoisted(() => ({ openAssistant: vi.fn() }))
+vi.mock('@/contexts/AssistantLaunchContext', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/contexts/AssistantLaunchContext')>()),
+  useAssistantLauncher: () => launcher,
+}))
+
 // The week's planning session, settled and unplanned: "Plan the week" is offered.
 vi.mock('@/hooks/usePlanningSession', () => ({ usePlanningSession: () => ({ saved: null, mine: null, loading: false, error: null, reload: vi.fn(), save: vi.fn() }), weekToken: () => 'w' }))
 
@@ -413,9 +420,22 @@ describe('WeekViewV2 — the week canvas keeps what the page could do', () => {
   beforeEach(() => { vi.useFakeTimers({ toFake: ['Date'] }); vi.setSystemTime(new Date(2026, 8, 13, 9)) })
   afterEach(() => { vi.useRealTimers(); localStorage.removeItem('symphony-week-daily') })
 
-  it('keeps "Plan the week" in the frame', () => {
+  it('has no Plan the week session button, no steps; planning starts in the conversation', () => {
+    render(
+      <ConversationWalkContext.Provider value={vi.fn()}>
+        <WeekViewV2 {...defaultProps} routines={[]} weekStart={sunday} />
+      </ConversationWalkContext.Provider>,
+    )
+    expect(screen.queryByRole('button', { name: 'Plan the week' })).toBeNull()
+    expect(screen.queryByText(/Step \d of 8/)).toBeNull()
+    expect(screen.queryByRole('region', { name: /Planning week/ })).toBeNull()
+  })
+
+  it('on a phone (no bar) the page offers the same walk and sends the same message', () => {
+    launcher.openAssistant.mockClear()
     render(<WeekViewV2 {...defaultProps} routines={[]} weekStart={sunday} />)
-    expect(screen.getByRole('button', { name: 'Plan the week' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Plan the week' }))
+    expect(launcher.openAssistant).toHaveBeenCalledWith({ message: 'Plan the week.', autoSend: true })
   })
 
   it('every-day routines are written once until "Show daily", which is remembered', () => {
@@ -459,9 +479,24 @@ describe('WeekViewV2 — Plan the rest of my week in the bar', () => {
     expect(setWalk).toHaveBeenCalledWith({ label: 'Plan the week', message: 'Plan the week.' })
   })
 
+  it('offers no in-page button when the bar carries the walk', () => {
+    vi.setSystemTime(new Date(2026, 9, 14, 9))
+    mount(new Date(2026, 9, 10))
+    expect(screen.queryByRole('button', { name: /^Plan (the rest of my|the) week$/ })).toBeNull()
+  })
+
+  it('on a phone mid-week the page offers "Plan the rest of my week"', () => {
+    vi.setSystemTime(new Date(2026, 9, 14, 9))
+    launcher.openAssistant.mockClear()
+    render(<WeekViewV2 {...defaultProps} routines={[]} weekStart={new Date(2026, 9, 10)} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Plan the rest of my week' }))
+    expect(launcher.openAssistant).toHaveBeenCalledWith({ message: 'Plan the rest of my week.', autoSend: true })
+  })
+
   it('offers nothing on another week', () => {
     vi.setSystemTime(new Date(2026, 9, 14, 9))
     const setWalk = mount(new Date(2026, 9, 3))
+    expect(screen.queryByRole('button', { name: /^Plan (the rest of my|the) week$/ })).toBeNull()
     expect(setWalk).not.toHaveBeenCalledWith(expect.objectContaining({ label: expect.any(String) }))
   })
 })
