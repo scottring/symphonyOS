@@ -21,7 +21,9 @@ Protocol (JSON text frames, ws://127.0.0.1:8765):
     {"type":"nothing","reason":"silence|too-short"}
     {"type":"error","message":"..."}
   page -> listener
-    {"type":"listen"}  {"type":"cancel"}  {"type":"mute","on":bool}
+    {"type":"listen"}  {"type":"finish"}  {"type":"cancel"}  {"type":"mute","on":bool}
+    ("finish": the person tapped while listening — send what was said now.
+     "cancel": drop it.)
     {"type":"say","text":"..."} (or {"type":"play","wav":"<base64>"})  {"type":"done"}
 """
 
@@ -325,6 +327,7 @@ class Listener:
     muted: bool = False
     _listen_now: threading.Event = field(default_factory=threading.Event)
     _cancel: threading.Event = field(default_factory=threading.Event)
+    _finish: threading.Event = field(default_factory=threading.Event)
     _stop: threading.Event = field(default_factory=threading.Event)
     _out: "queue.Queue[tuple[str, object]]" = field(default_factory=queue.Queue)
     _room: "deque[float]" = field(default_factory=lambda: deque(maxlen=25))
@@ -352,6 +355,10 @@ class Listener:
 
     def cancel(self) -> None:
         self._cancel.set()
+
+    def finish(self) -> None:
+        """A tap while listening: the person is done — send what they said."""
+        self._finish.set()
 
     def say(self, text: str) -> None:
         text = (text or "").strip()[:400]
@@ -459,14 +466,12 @@ class Listener:
         if rest is None:
             return  # not for us: dropped, never kept
         log.info("wake (%s)", "with command" if worth_a_command(rest) else "name only")
-        if worth_a_command(rest) and not cut:
-            # "Hey Symphony, add milk" — the command came in the same breath.
-            chime(True)
-            self.set_state("thinking")
-            words = strip_wake(self.models.transcribe(burst)) or rest
-            self._hand_over(words, "wake")
-            return
-        prefix = burst if cut else None  # still talking: keep what was said
+        # "Hey Symphony, add milk" — the command began in the same breath. Keep
+        # listening through the same patient pause as any turn, so "…and eggs"
+        # after a breath is part of it, not cut off at the burst's short pause.
+        prefix = burst if cut or worth_a_command(rest) else None
+        if prefix is not None and not cut:
+            chime(True)  # heard the name: the same chime as a tap
         self._capture(via="wake", prefix=prefix)
 
     def _speak(self, kind: str, payload) -> None:
@@ -486,6 +491,7 @@ class Listener:
 
     def _capture(self, via: str, prefix: Optional[np.ndarray] = None) -> None:
         self._cancel.clear()
+        self._finish.clear()
         self.set_state("listening")
         if prefix is None:
             chime(True)
@@ -500,6 +506,10 @@ class Listener:
                 self._cancel.clear()
                 self.set_state(self.resting_state())
                 return
+            if self._finish.is_set():
+                self._finish.clear()
+                verdict = "speech" if ep.speech >= ep.min_speech else "silence"
+                break
             frame = self.source.read()
             if frame is None:
                 continue
@@ -596,6 +606,8 @@ async def serve(cfg: Config) -> None:
                 kind = msg.get("type")
                 if kind == "listen":
                     listener.listen()
+                elif kind == "finish":
+                    listener.finish()
                 elif kind == "cancel":
                     listener.cancel()
                 elif kind == "mute":

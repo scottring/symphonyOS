@@ -49,7 +49,20 @@ describe('docked conversation bar (approved Season board, 2026-10-10)', () => {
     expect(screen.getByRole('status')).toHaveTextContent('Symphony is thinking…')
     rerender(<ConversationStrip docked messages={[]} onSend={vi.fn()} busy={false} voice={{ ...voice, active: true, status: 'live', heard: 'Add a picnic', reply: 'Saved.' }} />)
     expect(screen.getByText('Add a picnic')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Mute' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'End voice conversation' })).toBeInTheDocument()
+  })
+
+  it('tap to talk: Talk opens your turn, Done sends it, and a pause shows patience', () => {
+    const talk = vi.fn(), done = vi.fn()
+    const live = { ...voice, active: true, status: 'live', talk, done }
+    const { rerender } = render(<ConversationStrip docked messages={[]} onSend={vi.fn()} busy={false} voice={{ ...live, turn: 'listening' }} />)
+    expect(screen.getByText('Listening — take your time. Tap Done when you’re finished.')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Done talking — send to Symphony' }))
+    expect(done).toHaveBeenCalled()
+    rerender(<ConversationStrip docked messages={[]} onSend={vi.fn()} busy={false} voice={{ ...live, turn: 'listening', heard: 'Add milk and' }} />)
+    expect(screen.getByText('Add milk and')).toBeInTheDocument()
+    rerender(<ConversationStrip docked messages={[]} onSend={vi.fn()} busy={false} voice={{ ...live, turn: 'off', heard: 'Add milk and eggs', reply: 'Added.' }} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Talk — your turn' }))
+    expect(talk).toHaveBeenCalled()
   })
 })

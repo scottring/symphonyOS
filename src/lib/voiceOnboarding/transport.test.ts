@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest'
 import { DemoTransport, type TransportEvent } from './transport'
-import { RealtimeTransport, errorForStatus, type RealtimeDeps } from './realtimeTransport'
+import { RealtimeTransport, TAP_FALLBACK_MS, errorForStatus, type RealtimeDeps } from './realtimeTransport'
 
 const ctx = { step: 'year' as const, plan: [] }
 
@@ -248,6 +248,103 @@ describe('RealtimeTransport', () => {
   it('maps status codes', () => {
     expect(errorForStatus(503, 'server_not_configured')).toBe('unavailable')
     expect(errorForStatus(400, '')).toBe('network')
+  })
+})
+
+describe('RealtimeTransport, tap to talk', () => {
+  const sent = (peer: FakePeer) => peer.channel.sent.map((e) => (e as { type: string }).type)
+
+  it('Talk is the person’s turn: the mic opens, Symphony doesn’t speak first', async () => {
+    const { t, peer, track, events } = setup({ turns: 'tap' })
+    await t.start(ctx)
+    peer.channel.onopen?.()
+    expect(track.enabled).toBe(true)
+    expect(events).toContainEqual({ type: 'turn', turn: 'listening' })
+    expect(sent(peer)).not.toContain('response.create')
+  })
+
+  it('a pause is not the end: no reply until Done, and the words show as they come', async () => {
+    const { t, peer, events } = setup({ turns: 'tap' })
+    await t.start(ctx)
+    serverEvent(peer, { type: 'input_audio_buffer.speech_started' })
+    serverEvent(peer, { type: 'input_audio_buffer.speech_stopped' })
+    serverEvent(peer, { type: 'input_audio_buffer.committed', item_id: 'a' })
+    serverEvent(peer, { type: 'conversation.item.input_audio_transcription.delta', item_id: 'a', delta: 'Add milk' })
+    serverEvent(peer, { type: 'input_audio_buffer.speech_started' })
+    serverEvent(peer, { type: 'input_audio_buffer.speech_stopped' })
+    serverEvent(peer, { type: 'input_audio_buffer.committed', item_id: 'b' })
+    serverEvent(peer, { type: 'conversation.item.input_audio_transcription.completed', item_id: 'b', transcript: 'and eggs.' })
+    serverEvent(peer, { type: 'conversation.item.input_audio_transcription.completed', item_id: 'a', transcript: 'Add milk' })
+    expect(sent(peer)).not.toContain('response.create')
+    expect(events.filter((e) => e.type === 'user').at(-1)).toEqual({ type: 'user', text: 'Add milk and eggs.' })
+  })
+
+  it('Done sends the turn and closes the mic; mid-sentence it commits what’s still coming', async () => {
+    const { t, peer, track, events } = setup({ turns: 'tap' })
+    await t.start(ctx)
+    serverEvent(peer, { type: 'input_audio_buffer.speech_started' })
+    t.finishTurn()
+    expect(sent(peer).slice(-2)).toEqual(['input_audio_buffer.commit', 'response.create'])
+    expect(track.enabled).toBe(false)
+    expect(events.at(-1)).toEqual({ type: 'turn', turn: 'off' })
+  })
+
+  it('Done after a pause doesn’t commit an empty buffer', async () => {
+    const { t, peer } = setup({ turns: 'tap' })
+    await t.start(ctx)
+    serverEvent(peer, { type: 'input_audio_buffer.speech_started' })
+    serverEvent(peer, { type: 'input_audio_buffer.speech_stopped' })
+    t.finishTurn()
+    expect(sent(peer)).not.toContain('input_audio_buffer.commit')
+    expect(sent(peer).at(-1)).toBe('response.create')
+  })
+
+  it('Done with nothing said asks for no reply', async () => {
+    const { t, peer } = setup({ turns: 'tap' })
+    await t.start(ctx)
+    t.finishTurn()
+    expect(sent(peer)).not.toContain('response.create')
+  })
+
+  it('ten quiet seconds after speaking send it anyway (a forgotten Done); speaking again resets', async () => {
+    const { t, peer, timers } = setup({ turns: 'tap' })
+    await t.start(ctx)
+    serverEvent(peer, { type: 'input_audio_buffer.speech_started' })
+    serverEvent(peer, { type: 'input_audio_buffer.speech_stopped' })
+    const fallback = timers.at(-1)!
+    expect(fallback.ms).toBe(TAP_FALLBACK_MS)
+    fallback.fn()
+    expect(sent(peer).at(-1)).toBe('response.create')
+  })
+
+  it('Talk while Symphony is answering stops it and opens the mic', async () => {
+    const { t, peer, track } = setup({ turns: 'tap' })
+    await t.start(ctx)
+    serverEvent(peer, { type: 'input_audio_buffer.speech_started' })
+    t.finishTurn()
+    serverEvent(peer, { type: 'response.created' })
+    serverEvent(peer, { type: 'output_audio_buffer.started' })
+    t.listen()
+    expect(sent(peer).slice(-3)).toEqual(['response.cancel', 'output_audio_buffer.clear', 'input_audio_buffer.clear'])
+    expect(track.enabled).toBe(true)
+  })
+
+  it('harmless races are not shown as errors', async () => {
+    const { t, peer, events } = setup({ turns: 'tap' })
+    await t.start(ctx)
+    serverEvent(peer, { type: 'error', error: { code: 'input_audio_buffer_commit_empty' } })
+    serverEvent(peer, { type: 'error', error: { code: 'response_cancel_not_active' } })
+    expect(events.filter((e) => e.type === 'error')).toEqual([])
+  })
+
+  it('auto turns are unchanged: Symphony opens, and Talk/Done do nothing', async () => {
+    const { t, peer, track } = setup()
+    await t.start(ctx)
+    peer.channel.onopen?.()
+    expect(sent(peer)).toContain('response.create')
+    t.finishTurn()
+    t.listen()
+    expect(track.enabled).toBe(true)
   })
 })
 

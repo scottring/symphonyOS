@@ -10,7 +10,7 @@
 // latest exchange shows above the field, with Earlier for the rest.
 
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react'
-import { Mic, MicOff, Send, Undo2, RotateCcw, X, MessageSquare } from 'lucide-react'
+import { Mic, Send, Undo2, RotateCcw, X, MessageSquare, Check } from 'lucide-react'
 import { ChatMessage } from '@/components/chat/ChatMessage'
 import type { ChatMessage as ChatMessageType } from '@/types/chat'
 import type { ConversationWalk } from './conversationWalk'
@@ -30,6 +30,12 @@ export interface StripVoice {
   /** Live voice's latest words each way, shown in the docked bar. */
   heard?: string
   reply?: string
+  /** Tap to talk: 'listening' while it's the person's turn. */
+  turn?: 'listening' | 'off'
+  /** Open the mic for the person's turn (stops Symphony if it is talking). */
+  talk?: () => void
+  /** Done: send the turn. */
+  done?: () => void
 }
 
 interface Props {
@@ -79,10 +85,16 @@ function DockedTranscript({ messages, busy, voice }: { messages: ChatMessageType
   const end = shown.at(-1)
   useEffect(() => { scroller.current?.scrollTo?.({ top: scroller.current.scrollHeight }) }, [end?.id, end?.content, earlier])
 
-  const live = voice.active && (voice.heard || voice.reply)
+  const listening = voice.active && voice.turn === 'listening'
+  const live = voice.active && (voice.heard || voice.reply || listening)
+  // While it's your turn: your words as you say them, and no hurry.
   if (live) return <div className="canvas-transcript" aria-live="polite">
-    {voice.heard && <p className="canvas-transcript-voice"><small>You</small>{voice.heard}</p>}
-    {voice.reply && <p className="canvas-transcript-voice"><small>Symphony</small>{voice.reply}</p>}
+    {listening
+      ? <p className="canvas-transcript-voice is-listening"><small>You</small>{voice.heard || <span className="canvas-transcript-wait">Listening — take your time. Tap Done when you’re finished.</span>}</p>
+      : <>
+          {voice.heard && <p className="canvas-transcript-voice"><small>You</small>{voice.heard}</p>}
+          {voice.reply && <p className="canvas-transcript-voice"><small>Symphony</small>{voice.reply}</p>}
+        </>}
   </div>
   if (said.length === 0 || closedAt === said.length) return null
   return <div className="canvas-transcript">
@@ -171,25 +183,32 @@ export function ConversationStrip({ onSend, busy, voice, onOpenConversation, onR
           className="canvas-composer-field"
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
-          placeholder={voice.active ? (voice.status === 'muted' ? 'Voice muted' : 'Listening… or type') : placeholder}
+          placeholder={voice.active ? (voice.turn === 'listening' ? 'Listening — take your time' : 'Tap Talk, or type') : placeholder}
           autoComplete="off"
         />
         {!voice.available && <DictationMicButton onTranscript={appendDictation} className="canvas-icon" title="Dictate into the message" />}
-        {voice.available && (
-          <button
-            type="button"
-            className={`canvas-mic${voice.active ? ' is-on' : ''}`}
-            onClick={voice.active ? voice.stop : voice.start}
-            aria-pressed={voice.active}
-            aria-label={voice.active ? 'End voice conversation' : 'Talk with Symphony'}
-          >
-            {voice.active ? <MicOff size={16} aria-hidden="true" /> : <Mic size={16} aria-hidden="true" />}
-            {/* The mic is an icon in the field; it says what it is doing once on. */}
-            {voice.active && <span>{voice.status === 'connecting' ? 'Connecting…' : docked ? 'End' : 'Listening'}</span>}
-          </button>
-        )}
-        {docked && voice.active && voice.mute && voice.status !== 'connecting' && (
-          <button type="button" className="canvas-link" aria-pressed={voice.status === 'muted'} onClick={voice.mute}>{voice.status === 'muted' ? 'Unmute' : 'Mute'}</button>
+        {voice.available && (() => {
+          // Tap to talk: Talk opens your turn, Done sends it. Pauses are yours.
+          const listening = voice.active && voice.turn === 'listening'
+          const connecting = voice.active && voice.status === 'connecting'
+          const onClick = !voice.active ? voice.start : listening ? voice.done : voice.talk
+          return (
+            <button
+              type="button"
+              className={`canvas-mic${listening ? ' is-on' : ''}`}
+              onClick={() => onClick?.()}
+              disabled={connecting}
+              aria-pressed={listening}
+              aria-label={listening ? 'Done talking — send to Symphony' : voice.active ? 'Talk — your turn' : 'Talk with Symphony'}
+            >
+              {listening ? <Check size={16} aria-hidden="true" /> : <Mic size={16} aria-hidden="true" />}
+              {/* An icon in the field until a conversation is on (2026-10-14). */}
+              {voice.active && <span>{connecting ? 'Connecting…' : listening ? 'Done' : 'Talk'}</span>}
+            </button>
+          )
+        })()}
+        {voice.active && voice.status !== 'connecting' && (
+          <button type="button" className="canvas-link" onClick={voice.stop} aria-label="End voice conversation">End</button>
         )}
         {(!docked || draft.trim()) && <button type="submit" className="canvas-send" disabled={!draft.trim() || busy} aria-label="Send">
           <Send size={15} aria-hidden="true" />

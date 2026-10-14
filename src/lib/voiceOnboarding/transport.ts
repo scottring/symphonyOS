@@ -24,6 +24,8 @@ export type TransportEvent =
   | { type: 'status'; status: TransportStatus; reason?: 'stopped' | 'time_limit' }
   | { type: 'assistant'; text: string; final: boolean }
   | { type: 'user'; text: string }
+  /** Tap mode: whose move it is. 'listening' = the mic is open for the person's turn. */
+  | { type: 'turn'; turn: 'listening' | 'off' }
   | { type: 'speaking'; who: 'user' | 'assistant'; active: boolean }
   /** `goal`: the goal it is for, as the guide named it (else the one on screen). */
   | { type: 'propose'; level: Horizon; text: string; goal?: string }

@@ -42,6 +42,13 @@ Everyday talk: forward the request to ask_symphony and say its result in a few w
 During a session the agent lights the page; don't call show_on_page.
 
 When the session starts, say hello in a few words and ask what they would like to work on. Nothing more. But when the session was started by a walk message (the bar's "Plan the rest of my week" button sends that text), the first user message is the request: forward it to ask_symphony immediately.`
+// Tap to talk (Scott, 2026-10-14: "I feel rushed"): the person taps Talk to
+// speak and Done to send. The server still splits speech at short pauses —
+// so their words show on screen as they speak, and the app knows when they
+// went quiet — but never answers or interrupts on its own; the app's Done
+// (or ten quiet seconds) asks for the reply.
+export const TURN_DETECTION = {type:'server_vad',create_response:false,interrupt_response:false,silence_duration_ms:500,prefix_padding_ms:300} as const
+
 export async function handleWorkspaceVoice(req:Request,deps:{env:(key:string)=>string|undefined;userId:(authorization:string)=>Promise<string|null>;fetch:typeof fetch;reserve:(authorization:string)=>Promise<boolean>}) {
   const env=deps.env
   const reply=(status:number,text:string)=>new Response(status===204?null:text,{status,headers:{...cors,'Cache-Control':'no-store'}})
@@ -65,7 +72,7 @@ export async function handleWorkspaceVoice(req:Request,deps:{env:(key:string)=>s
     if(!await deps.reserve(auth))return reply(429,'daily_limit')
     // The transcript is what the person sees as "heard". Unpinned, it guesses a
     // language from room noise and shows foreign text; gpt-realtime is retired.
-    const form=new FormData();form.set('sdp',sdp);form.set('session',JSON.stringify({type:'realtime',model:env('WORKSPACE_VOICE_MODEL')||'gpt-realtime-2.1',instructions,max_output_tokens:400,tools,audio:{input:{transcription:{model:'gpt-4o-mini-transcribe',language:'en'},noise_reduction:{type:'near_field'},turn_detection:{type:'semantic_vad',interrupt_response:true}},output:{voice:'marin',speed:1}}}))
+    const form=new FormData();form.set('sdp',sdp);form.set('session',JSON.stringify({type:'realtime',model:env('WORKSPACE_VOICE_MODEL')||'gpt-realtime-2.1',instructions,max_output_tokens:400,tools,audio:{input:{transcription:{model:'gpt-4o-mini-transcribe',language:'en'},noise_reduction:{type:'near_field'},turn_detection:TURN_DETECTION},output:{voice:'marin',speed:1}}}))
     const response=await deps.fetch('https://api.openai.com/v1/realtime/calls',{method:'POST',headers:{Authorization:`Bearer ${key}`},body:form,signal:AbortSignal.timeout(20000)})
     if(!response.ok)return reply(502,'voice_unavailable')
     return new Response(await response.text(),{headers:{...cors,'Content-Type':'application/sdp','Cache-Control':'no-store','x-voice-max-seconds':'300'}})

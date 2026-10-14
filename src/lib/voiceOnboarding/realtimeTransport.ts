@@ -11,6 +11,16 @@
 // The microphone is requested only by start(), which the page calls only
 // from an explicit tap, and every track is stopped by stop() — including on
 // any error, a dropped connection, and the session time limit.
+//
+// Turns, two ways:
+//  - 'auto' (voice onboarding): the server decides when the person is done
+//    and answers on its own.
+//  - 'tap' (the workspace's Talk, Scott 2026-10-14: "I feel rushed"): the
+//    person taps to talk and taps Done to send. The mic is open only for
+//    their turn; the server still splits speech at pauses so the words show
+//    as they speak, but never answers on its own (create_response: false,
+//    set by workspace-voice). Quiet for TAP_FALLBACK_MS after speaking sends
+//    anyway, for a forgotten Done. Tapping while Symphony talks stops it.
 
 import { Emitter, VOICE_ERROR_COPY, isHorizon, type ConversationContext, type TransportEvent, type TransportStatus, type VoiceErrorCode, type VoiceTransport } from './transport'
 import { MAX_LINE } from './flow'
@@ -30,7 +40,12 @@ export interface RealtimeDeps {
   createAudio?: () => HTMLAudioElement
   setTimer?: (fn: () => void, ms: number) => unknown
   clearTimer?: (t: unknown) => void
+  /** Who ends a turn: the server ('auto', the default) or the person's tap. */
+  turns?: 'auto' | 'tap'
 }
+
+/** Tap mode: quiet this long after speaking sends the turn (a forgotten Done). */
+export const TAP_FALLBACK_MS = 10_000
 
 /** Session length when the server does not say. The server's own cap is authoritative. */
 export const DEFAULT_MAX_SECONDS = 480
@@ -50,6 +65,15 @@ export class RealtimeTransport implements VoiceTransport {
   private calls = new Set<string>()
   private latestContext: ConversationContext | null = null
   private abort: AbortController | null = null
+  // Tap mode.
+  private turn: 'listening' | 'off' = 'off'
+  private userSpeaking = false
+  private spokeThisTurn = false
+  private responding = false
+  private assistantAudio = false
+  private fallback: unknown = null
+  /** This turn's words, by conversation item, in the order heard. */
+  private turnItems = new Map<string, string>()
 
   private deps: RealtimeDeps
 
@@ -58,6 +82,48 @@ export class RealtimeTransport implements VoiceTransport {
   }
 
   subscribe(fn: (e: TransportEvent) => void) { return this.em.subscribe(fn) }
+
+  private get tap() { return this.deps.turns === 'tap' }
+
+  private setTimer(fn: () => void, ms: number) { return (this.deps.setTimer ?? ((f, t) => setTimeout(f, t)))(fn, ms) }
+  private clearTimer(t: unknown) { if (t !== null) (this.deps.clearTimer ?? ((x) => clearTimeout(x as ReturnType<typeof setTimeout>)))(t) }
+
+  private setMic(on: boolean) {
+    for (const t of this.stream?.getAudioTracks() ?? []) t.enabled = on
+  }
+
+  private setTurn(turn: 'listening' | 'off') {
+    if (this.turn === turn) return
+    this.turn = turn
+    this.em.emit({ type: 'turn', turn })
+  }
+
+  /** Tap mode: the person's turn begins. Stops Symphony if it is talking. */
+  listen() {
+    if (!this.tap || this.status !== 'live' || !this.dc || this.turn === 'listening') return
+    if (this.responding) send(this.dc, { type: 'response.cancel' })
+    if (this.assistantAudio) send(this.dc, { type: 'output_audio_buffer.clear' })
+    send(this.dc, { type: 'input_audio_buffer.clear' })
+    this.turnItems.clear()
+    this.spokeThisTurn = false
+    this.userSpeaking = false
+    this.clearTimer(this.fallback); this.fallback = null
+    this.setMic(true)
+    this.setTurn('listening')
+  }
+
+  /** Tap mode: Done — send what was said and let Symphony answer. */
+  finishTurn() {
+    if (!this.tap || this.turn !== 'listening' || !this.dc) return
+    this.clearTimer(this.fallback); this.fallback = null
+    this.setMic(false)
+    // Mid-sentence, the words not yet split off are committed now; after a
+    // pause the server has already committed them (an empty commit is an error).
+    if (this.userSpeaking) send(this.dc, { type: 'input_audio_buffer.commit' })
+    if (this.spokeThisTurn) send(this.dc, { type: 'response.create' })
+    this.userSpeaking = false
+    this.setTurn('off')
+  }
 
   private set(status: TransportStatus, reason?: 'stopped' | 'time_limit') {
     this.status = status
@@ -109,6 +175,8 @@ export class RealtimeTransport implements VoiceTransport {
         }
       }
       for (const track of this.stream.getAudioTracks()) pc.addTrack(track, this.stream)
+      // Tap mode: the mic opens only for the person's turn (listen()).
+      if (this.tap) this.setMic(false)
 
       const dc = pc.createDataChannel('oai-events')
       this.dc = dc
@@ -137,14 +205,17 @@ export class RealtimeTransport implements VoiceTransport {
       if (gen !== this.generation) return
 
       const maxSeconds = Math.max(1, Math.min(DEFAULT_MAX_SECONDS, Number(res.headers.get('x-voice-max-seconds')) || DEFAULT_MAX_SECONDS))
-      this.timer = (this.deps.setTimer ?? ((f, ms) => setTimeout(f, ms)))(() => this.end('time_limit'), maxSeconds * 1000)
+      this.timer = this.setTimer(() => this.end('time_limit'), maxSeconds * 1000)
       this.set('live')
+      // Tapping Talk is starting to speak.
+      if (this.tap) this.listen()
     } catch {
       if (gen === this.generation) this.fail('network')
     }
   }
 
   setMuted(muted: boolean) {
+    if (this.tap) return // the mic is only open while it's the person's turn
     if (this.status !== 'live' && this.status !== 'muted') return
     for (const t of this.stream?.getAudioTracks() ?? []) t.enabled = !muted
     this.set(muted ? 'muted' : 'live')
@@ -162,7 +233,10 @@ export class RealtimeTransport implements VoiceTransport {
   /** Every resource let go: mic tracks stopped, channel and peer closed, audio detached. */
   private release() {
     this.abort?.abort(); this.abort = null
-    if (this.timer !== null) { (this.deps.clearTimer ?? ((t) => clearTimeout(t as ReturnType<typeof setTimeout>)))(this.timer); this.timer = null }
+    if (this.timer !== null) { this.clearTimer(this.timer); this.timer = null }
+    this.clearTimer(this.fallback); this.fallback = null
+    this.turn = 'off'; this.userSpeaking = false; this.spokeThisTurn = false; this.responding = false; this.assistantAudio = false
+    this.turnItems.clear()
     for (const t of this.stream?.getTracks() ?? []) t.stop()
     this.stream = null
     try { this.dc?.close() } catch { /* already closed */ }
@@ -193,8 +267,9 @@ export class RealtimeTransport implements VoiceTransport {
     // so far, so a touch edit and the voice stay in step.
     const note = `[Screen update] Current step: ${ctx.step}.${ctx.focus ? ` Goal on screen: ${ctx.focus}.` : ''} Plan so far: ${ctx.plan.length ? ctx.plan.join(' | ') : '(empty)'}.`
     send(dc, { type: 'conversation.item.create', item: { type: 'message', role: 'user', content: [{ type: 'input_text', text: note }] } })
-    // Only the opening asks for a reply; later updates ride along with the next turn.
-    if (opening) send(dc, { type: 'response.create' })
+    // Only the opening asks for a reply; later updates ride along with the next
+    // turn. In tap mode the person speaks first: Talk was their tap.
+    if (opening && !this.tap) send(dc, { type: 'response.create' })
   }
 
   private onServerEvent(raw: unknown) {
@@ -204,16 +279,43 @@ export class RealtimeTransport implements VoiceTransport {
       case 'input_audio_buffer.speech_started':
         // The person started talking. Over WebRTC the server stops the
         // reply and drops audio not yet played; the screen shows who has the floor.
+        if (this.tap) {
+          this.userSpeaking = true
+          this.spokeThisTurn = true
+          this.clearTimer(this.fallback); this.fallback = null
+        }
         this.em.emit({ type: 'speaking', who: 'user', active: true })
         break
       case 'input_audio_buffer.speech_stopped':
+        if (this.tap) {
+          this.userSpeaking = false
+          // A forgotten Done: a long quiet after speaking sends anyway.
+          if (this.turn === 'listening') {
+            this.clearTimer(this.fallback)
+            this.fallback = this.setTimer(() => { this.fallback = null; this.finishTurn() }, TAP_FALLBACK_MS)
+          }
+        }
         this.em.emit({ type: 'speaking', who: 'user', active: false })
         break
+      case 'input_audio_buffer.committed':
+        if (this.tap && typeof e.item_id === 'string' && !this.turnItems.has(e.item_id)) this.turnItems.set(e.item_id, '')
+        break
+      case 'conversation.item.input_audio_transcription.delta':
+        if (this.tap && typeof e.item_id === 'string' && typeof e.delta === 'string') {
+          this.turnItems.set(e.item_id, (this.turnItems.get(e.item_id) ?? '') + e.delta)
+          this.emitHeard()
+        }
+        break
+      case 'response.created':
+        this.responding = true
+        break
       case 'output_audio_buffer.started':
+        this.assistantAudio = true
         this.em.emit({ type: 'speaking', who: 'assistant', active: true })
         break
       case 'output_audio_buffer.stopped':
       case 'output_audio_buffer.cleared':
+        this.assistantAudio = false
         this.em.emit({ type: 'speaking', who: 'assistant', active: false })
         break
       case 'response.output_audio_transcript.delta':
@@ -225,16 +327,35 @@ export class RealtimeTransport implements VoiceTransport {
         this.assistantText = ''
         break
       case 'conversation.item.input_audio_transcription.completed':
+        if (this.tap) {
+          if (typeof e.item_id === 'string' && typeof e.transcript === 'string') {
+            this.turnItems.set(e.item_id, e.transcript)
+            this.emitHeard()
+          }
+          break
+        }
         if (typeof e.transcript === 'string' && e.transcript.trim()) this.em.emit({ type: 'user', text: e.transcript.trim() })
         break
       case 'response.done':
+        this.responding = false
         void this.onResponseDone(e.response)
         break
-      case 'error':
+      case 'error': {
+        // An empty commit (Done right after a pause the server already took)
+        // and cancelling a reply that just ended are harmless races.
+        const code = (e.error as { code?: string } | undefined)?.code
+        if (code === 'input_audio_buffer_commit_empty' || code === 'response_cancel_not_active') break
         // Reported, not fatal: the connection may carry on.
         this.em.emit({ type: 'error', code: 'model', message: VOICE_ERROR_COPY.model })
         break
+      }
     }
+  }
+
+  /** Tap mode: this turn's words so far, as one line. */
+  private emitHeard() {
+    const text = [...this.turnItems.values()].map((t) => t.trim()).filter(Boolean).join(' ')
+    if (text) this.em.emit({ type: 'user', text })
   }
 
   private async onResponseDone(response: unknown) {
