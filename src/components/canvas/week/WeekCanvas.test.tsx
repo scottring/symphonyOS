@@ -512,20 +512,18 @@ describe('No day yet', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Complete Call the bank' }))
     expect(w.toggleTask).toHaveBeenCalledWith(expect.objectContaining({ id: 'c', title: 'Call the bank' }))
   })
-  it('Triage: each task gets the when-chips; a pick sends it there', () => {
+  it('each task carries the when-chips (shown on hover); a pick sends it there', () => {
     const w = { ...writers(), triageTask: vi.fn(), scheduleTask: vi.fn() }
     show(w)
-    fireEvent.click(screen.getByRole('button', { name: 'Triage' }))
-    const list = screen.getByRole('list', { name: 'Triage no day yet' })
-    const bankRow = within(list).getByRole('button', { name: 'Call the bank' }).closest('li')!
-    fireEvent.click(within(bankRow).getByRole('button', { name: /Someday/ }))
-    expect(w.triageTask).toHaveBeenCalledWith(expect.objectContaining({ id: 'c' }), 'someday')
-    fireEvent.click(screen.getByRole('button', { name: 'Done triaging' }))
-    expect(screen.queryByRole('list', { name: 'Triage no day yet' })).not.toBeInTheDocument()
-  })
-  it('no Triage without a way to triage', () => {
-    show()
     expect(screen.queryByRole('button', { name: 'Triage' })).not.toBeInTheDocument()
+    const actions = screen.getByRole('group', { name: 'When for Call the bank' })
+    fireEvent.click(within(actions).getByRole('button', { name: /Someday/ }))
+    expect(w.triageTask).toHaveBeenCalledWith(expect.objectContaining({ id: 'c' }), 'someday')
+  })
+  it('no when-chips without a way to triage, and none on routines', () => {
+    show()
+    expect(screen.queryByRole('group', { name: 'When for Call the bank' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('group', { name: 'When for Mow the lawn' })).not.toBeInTheDocument()
   })
   it('a routine with no day has no check (it needs a day first)', () => {
     show()
