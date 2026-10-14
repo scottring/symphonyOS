@@ -25,6 +25,7 @@
 // Every manual write goes through the canvas activity, so it reports saving /
 // saved / didn't save, with Undo when the previous fields can be restored.
 
+import { PageHelpButton } from '@/components/explain/PageHelp'
 import { useEffect, useRef, useState } from 'react'
 import { Link, Navigate, useLocation, useSearchParams } from 'react-router-dom'
 import { useSelectionOptional } from '@/shell/providers/SelectionProvider'
@@ -56,7 +57,7 @@ import { readinessOf, type ReadinessLookup } from '@/lib/prep/readiness'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { useConversationWalk } from '@/components/canvas/conversationWalk'
 import { PAGE_PLANNING } from '@/components/layout/pageLayout'
-import { EXPLAIN_LABEL, EXPLAIN_MESSAGE } from '@/lib/explain/pageGuides'
+import { EXPLAIN_MESSAGE } from '@/lib/explain/pageGuides'
 
 const TERMS = ['year goal', 'season goal', 'month goal', 'week task'] as const
 const periodWordOf = (b: { label: string }) => b.label.replace(/\s\d{4}$/, '')
@@ -382,12 +383,13 @@ function Inner() {
   return <main ref={mainRef} className={`plan-canvas plan-horizon ${PAGE_PLANNING}`} data-horizon={level}>
     <header className="plan-head">
       {/* Without the docked bar (phones) the page offers both itself. */}
-      {!walkInBar && <div className="plan-head-row">{walk}<button type="button" className="plan-walk" onClick={() => openAssistant({ message: EXPLAIN_MESSAGE, autoSend: true, stayOnPage: true })}>{EXPLAIN_LABEL}</button></div>}
+      {!walkInBar && <div className="plan-head-row">{walk}</div>}
       <div className="plan-period" data-explain="period" data-explain-label={`${periodTitle}, ${periodRange(bounds.start, bounds.end)}`}>
         <button type="button" className="plan-step" onClick={() => setStart(bounds.prev)} aria-label={`Previous ${PERIODS[level]}`}><ChevronLeft size={18} aria-hidden="true" /></button>
         <h1>{periodTitle}</h1>
         <button type="button" className="plan-step" onClick={() => setStart(bounds.next)} aria-label={`Next ${PERIODS[level]}`}><ChevronRight size={18} aria-hidden="true" /></button>
         <span className="plan-period-range">{periodRange(bounds.start, bounds.end)}</span>
+        <PageHelpButton onHelp={() => openAssistant({ message: EXPLAIN_MESSAGE, autoSend: true, stayOnPage: true })} />
         {!current && <button type="button" className="period-return canvas-link" onClick={() => setStart(null)}>Back to this {PERIODS[level]}</button>}
       </div>
       {dataReady && !error && !goalsError && sentence && <p className="plan-sentence">{sentence}</p>}

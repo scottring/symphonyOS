@@ -20,6 +20,7 @@
 //   'page'     every other surface — the period pages, Inbox, the library;
 //              the surface's motif rides along as a small stamp, not a wash
 //   'card'     the older illustrated card, kept for anything still on it
+import { PageHelpButton } from '@/components/explain/PageHelp'
 import type { ReactNode } from 'react'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { PlaceWash } from '@/components/place/PlaceWash'
@@ -80,6 +81,8 @@ export function MastheadCard({ eyebrow, title, subline, controls, aside, footer,
             <div className={action ? 'daybook-title-row' : undefined}>
               <h1 className={open ? 'daybook-title' : 'font-display text-[28px] font-semibold leading-tight text-neutral-950 md:text-[34px]'}>
                 {title}
+                {/* "What is this page?", where the page has a guide. */}
+                <PageHelpButton />
               </h1>
               {action && <div className="daybook-title-action">{action}</div>}
             </div>

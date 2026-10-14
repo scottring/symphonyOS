@@ -25,6 +25,13 @@ describe('docked conversation bar (approved Season board, 2026-10-10)', () => {
     expect(onSend).toHaveBeenCalledWith('Let us plan')
   })
 
+  it('offers the page\'s talk as a suggestion, the mic as an icon, and no page help (2026-10-14)', () => {
+    render(<ConversationStrip docked messages={[]} walk={{ label: 'Plan the rest of my week', message: 'Plan the rest of my week.' }} onSend={vi.fn()} busy={false} voice={voice} />)
+    expect(screen.getByText(/Suggested:/)).toContainElement(screen.getByRole('button', { name: 'Plan the rest of my week' }))
+    expect(screen.getByRole('button', { name: 'Talk with Symphony' })).not.toHaveTextContent('Talk')
+    expect(screen.queryByRole('button', { name: 'What is this page?' })).not.toBeInTheDocument()
+  })
+
   it('shows the latest exchange above the field, with Earlier for the rest', () => {
     const messages = [msg('1', 'user', 'First ask'), msg('2', 'assistant', 'First answer'), msg('3', 'user', 'Second ask'), msg('4', 'assistant', 'Second answer')]
     render(<ConversationStrip docked messages={messages} onSend={vi.fn()} busy={false} voice={voice} />)

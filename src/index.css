@@ -4273,3 +4273,13 @@ button.domain-switcher-trigger[data-filtered="true"] { color: var(--color-primar
   .home-library-hint { display: none; }
   .home-library a { min-height: 44px; align-items: center; background: color-mix(in srgb, var(--color-bg-elevated) 70%, transparent); }
 }
+
+/* "What is this page?" — a small "?" beside the page title (PageHelp.tsx). */
+.page-help {
+  display: inline-grid; place-items: center; width: 26px; height: 26px; margin-left: 10px; vertical-align: middle;
+  border: 1px solid var(--color-neutral-300); border-radius: 9999px; background: var(--color-bg-elevated);
+  font-family: var(--font-family-sans); font-size: 13px; font-weight: 600; line-height: 1; color: var(--color-neutral-600);
+  cursor: pointer;
+}
+.page-help:hover { border-color: var(--color-primary-500); color: var(--color-primary-700); }
+.page-help:focus-visible { outline: 2px solid var(--color-primary-600); outline-offset: 2px; }

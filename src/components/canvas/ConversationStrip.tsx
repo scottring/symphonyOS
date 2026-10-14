@@ -51,9 +51,6 @@ interface Props {
   messages?: ChatMessageType[]
   /** Docked: the page's walk ("Plan this season with me"). */
   walk?: ConversationWalk | null
-  /** Docked: "What is this page?", where the page has a guide. `show` plays
-   *  the page's own tour; without one (or when it finds nothing) the message goes to Symphony. */
-  explain?: (ConversationWalk & { show?: () => boolean }) | null
   /** Docked: room left for an open side pane, in px. */
   right?: number
 }
@@ -103,7 +100,7 @@ function DockedTranscript({ messages, busy, voice }: { messages: ChatMessageType
   </div>
 }
 
-export function ConversationStrip({ onSend, busy, voice, onOpenConversation, onReviewProposals, placeholder = 'Tell Symphony, or ask…', compact = false, receiptOnly = false, docked = false, messages, walk, explain, right = 0 }: Props) {
+export function ConversationStrip({ onSend, busy, voice, onOpenConversation, onReviewProposals, placeholder = 'Tell Symphony, or ask…', compact = false, receiptOnly = false, docked = false, messages, walk, right = 0 }: Props) {
   const { receipt, undo, retry, dismiss, proposals, changeSet } = useCanvasActivity()
   const selection = useSelectionOptional()
   const [draft, setDraft] = useState('')
@@ -161,9 +158,13 @@ export function ConversationStrip({ onSend, busy, voice, onOpenConversation, onR
       {receiptOnly ? (
         onOpenConversation && <button type="button" className="canvas-link" onClick={onOpenConversation}><MessageSquare size={14} aria-hidden="true" /> Open the conversation</button>
       ) : (
+      <>
+      {/* The page's suggested talk reads as a suggestion, not a command
+          (Scott, 2026-10-14: three same-looking buttons were confusing). */}
+      {walk && !voice.active && (
+        <p className="canvas-suggest">Suggested: <button type="button" className="canvas-suggest-link" disabled={busy} onClick={() => onSend(walk.message)}>{walk.label}</button></p>
+      )}
       <form className="canvas-composer" onSubmit={submit}>
-        {walk && !voice.active && <button type="button" className="canvas-walk" disabled={busy} onClick={() => onSend(walk.message)}>{walk.label}</button>}
-        {explain && <button type="button" className="canvas-walk canvas-explain" disabled={busy} onClick={() => { if (!explain.show?.()) onSend(explain.message) }}>{explain.label}</button>}
         <label className="sr-only" htmlFor="canvas-composer-input">Message Symphony</label>
         <input
           id="canvas-composer-input"
@@ -183,7 +184,8 @@ export function ConversationStrip({ onSend, busy, voice, onOpenConversation, onR
             aria-label={voice.active ? 'End voice conversation' : 'Talk with Symphony'}
           >
             {voice.active ? <MicOff size={16} aria-hidden="true" /> : <Mic size={16} aria-hidden="true" />}
-            <span>{voice.active ? (voice.status === 'connecting' ? 'Connecting…' : docked ? 'End' : 'Listening') : 'Talk'}</span>
+            {/* The mic is an icon in the field; it says what it is doing once on. */}
+            {voice.active && <span>{voice.status === 'connecting' ? 'Connecting…' : docked ? 'End' : 'Listening'}</span>}
           </button>
         )}
         {docked && voice.active && voice.mute && voice.status !== 'connecting' && (
@@ -196,6 +198,7 @@ export function ConversationStrip({ onSend, busy, voice, onOpenConversation, onR
           <MessageSquare size={16} aria-hidden="true" />
         </button>}
       </form>
+      </>
       )}
     </section>
   )
