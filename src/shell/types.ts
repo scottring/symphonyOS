@@ -4,6 +4,9 @@ import type { ComponentType } from 'react';
 export type SelectionRef = {
   kind: string;
   id: string;
+  /** YYYY-MM-DD: the occurrence's day, when a repeating item (a routine) was
+   *  opened from one day on Week or Routines. Carried as ?detailDay=. */
+  date?: string;
 };
 
 export type SidebarSpec = {

@@ -20,6 +20,7 @@ import { WhereItShows } from '@/components/routine/WhereItShows'
 import { useRoutineExplainLens } from '@/components/routine/useRoutineExplainLens'
 import { useHideForToday, useSkippedOn } from '@/components/routine/useHideForToday'
 import { useCanvasActivity } from '@/contexts/CanvasActivityContext'
+import { useActionableInstances, type RescheduleResult } from '@/hooks/useActionableInstances'
 import { RoutineStepsSection } from './sections/RoutineStepsSection'
 import { PanelAttachments } from './sections/PanelAttachments'
 import { ExtractSteps } from '@/components/routine/ExtractSteps'
@@ -35,6 +36,11 @@ import { scheduleReadback } from '@/lib/routineReadback'
  *  type ("quarterly"), which is how a wrong rule went unnoticed. */
 function recurrenceSummary(r: Routine): string {
   return scheduleReadback(r.recurrence_pattern, r.time_of_day ? r.time_of_day.slice(0, 5) : null)
+}
+
+/** "Thu Oct 15". */
+function dayLabel(d: Date): string {
+  return `${d.toLocaleDateString('en-US', { weekday: 'short' })} ${d.toLocaleDateString('en-US', { month: 'short' })} ${d.getDate()}`
 }
 
 interface TapRoutinePanelProps {
@@ -59,6 +65,12 @@ interface TapRoutinePanelProps {
   onShowOnTodayChange?: (next: boolean) => unknown
   /** The day "Where it shows" and "Hide for today" are about. Defaults to today. */
   viewedDate?: Date
+  /** The occurrence the panel was opened from (a day on Week or Routines).
+   *  Drives the "<day> only" section; without it, that section is about the
+   *  viewed day, and only when the routine is due then. */
+  occurrenceDate?: Date
+  /** The signed-in person's family-member id, for "I'll do it". */
+  selfMemberId?: string | null
   /** Extra context for the explanation (a Step's parent, a lens override). */
   explainCtx?: Partial<ExplainCtx>
   onAssignChange?: (memberIds: string[]) => void
@@ -183,6 +195,47 @@ export function TapRoutinePanel(props: TapRoutinePanelProps) {
       { ids: [routine.id], undo: () => write(() => fn(next)) })
   }
 
+  // "<day> only": one occurrence changes, the routine does not. Each write
+  // goes through the canvas activity with Undo restoring what was there.
+  const { skip, undoDone, reschedule, undoReschedule, setOccurrenceAssignee } = useActionableInstances()
+  const occurrenceDay = props.occurrenceDate ?? (canHideToday || skipped ? viewedDate : null)
+  const occurrenceLabel = occurrenceDay ? dayLabel(occurrenceDay) : ''
+  const occurrenceSkipped = !!skipped && !!occurrenceDay && occurrenceDay.toDateString() === viewedDate.toDateString()
+  const [movingTo, setMovingTo] = useState<string | null>(null)
+  const doItMyself = async () => {
+    if (!occurrenceDay || !props.selfMemberId) return
+    const self = props.selfMemberId
+    let before: string | null = null
+    await run(`"${routine.name}" → you, ${occurrenceLabel} only`, async () => {
+      const r = await setOccurrenceAssignee('routine', routine.id, occurrenceDay, self)
+      if (!r) return false
+      before = r.previous
+      return true
+    }, { ids: [routine.id], undo: async () => (await setOccurrenceAssignee('routine', routine.id, occurrenceDay, before)) !== null })
+  }
+  const skipOccurrence = async () => {
+    if (!occurrenceDay) return
+    if (occurrenceSkipped) {
+      await run(`Put "${routine.name}" back on ${occurrenceLabel}`, () => undoDone('routine', routine.id, occurrenceDay),
+        { ids: [routine.id], undo: () => skip('routine', routine.id, occurrenceDay) })
+      return
+    }
+    await run(`Skip "${routine.name}" on ${occurrenceLabel}`, () => skip('routine', routine.id, occurrenceDay),
+      { ids: [routine.id], undo: () => undoDone('routine', routine.id, occurrenceDay) })
+  }
+  const moveOccurrence = async (ymd: string) => {
+    // A typed year arrives a digit at a time ("0002-10-15"): wait for a real one.
+    const [y, m, d] = ymd.split('-').map(Number)
+    if (!occurrenceDay || !/^\d{4}-\d{2}-\d{2}$/.test(ymd) || y < 2000) { setMovingTo(ymd); return }
+    const to = new Date(y, m - 1, d)
+    let before: RescheduleResult | null = null
+    setMovingTo(null)
+    await run(`Move "${routine.name}" to ${dayLabel(to)}, ${occurrenceLabel} only`, async () => {
+      before = await reschedule('routine', routine.id, occurrenceDay, to, { dayOnly: true })
+      return !!before
+    }, { ids: [routine.id], undo: () => (before ? undoReschedule(before) : Promise.resolve(false)) })
+  }
+
   // Today-completion checklist for the steps — same instance keys as the
   // Today collection row, so checking here updates its progress too.
   const { checkedByStep, toggleStep } = useRoutineStepChecklist(props.steps ?? [])
@@ -234,6 +287,39 @@ export function TapRoutinePanel(props: TapRoutinePanelProps) {
             </button>
           )}
         </div>
+
+        {/* One occurrence only — the every-week fields below stay as they are. */}
+        {occurrenceDay && onTimeline && !props.unsaved && (
+          <section aria-label={`${occurrenceLabel} only`} className="routine-hide-controls">
+            <div className="routine-hide-control">
+              <div className="routine-hide-control-text">
+                <span className="routine-hide-control-title">{occurrenceLabel} only</span>
+                <span className="routine-hide-control-hint">Changes this one day. Every other week stays as it is.</span>
+              </div>
+              <div className="routine-hide-control-act">
+                {props.selfMemberId && (
+                  <button type="button" className="canvas-chip" onClick={() => { void doItMyself() }}>I’ll do it</button>
+                )}
+                <button type="button" className="canvas-chip" onClick={() => { void skipOccurrence() }}>
+                  {occurrenceSkipped ? 'Put it back' : 'Skip it'}
+                </button>
+                {movingTo === null ? (
+                  <button type="button" className="canvas-chip" onClick={() => setMovingTo('')}>Another day</button>
+                ) : (
+                  <input
+                    type="date"
+                    aria-label={`Move ${occurrenceLabel} to`}
+                    autoFocus
+                    value={movingTo}
+                    onChange={(e) => { if (e.target.value) void moveOccurrence(e.target.value); else setMovingTo('') }}
+                    onBlur={() => { if (!movingTo) setMovingTo(null) }}
+                    className="rounded-lg border border-neutral-200 px-2 py-1 text-xs text-neutral-600"
+                  />
+                )}
+              </div>
+            </div>
+          </section>
+        )}
 
         {/* Three strengths of "not showing", kept apart so the difference
             is visible: Hide for today (this occurrence), Rest until… (the

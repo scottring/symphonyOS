@@ -125,3 +125,15 @@ describe('buildJournalDays — the weekend for each week start', () => {
     expect(weekend?.sometime.map((e) => e.title)).toEqual(['Wash the car'])
   })
 })
+
+// Stage 3: the Week's routine rows show the day's own person.
+describe('buildJournalDays — the day’s own person', () => {
+  it('a routine row wears the occurrence’s override on its day, the routine’s people elsewhere', () => {
+    const r = createMockRoutine({ id: 'r', name: 'FFG pickup', time_of_day: '17:15', assigned_to_all: ['scott'], recurrence_pattern: { type: 'weekly', days: ['mon', 'thu'] } })
+    const { days } = build([r], [instance({ date: '2026-10-08', assigned_to_override: 'iris' })])
+    const thu = days.find((d) => d.key === '2026-10-08')!.entries.find((e) => e.title === 'FFG pickup')!
+    const mon = days.find((d) => d.key === '2026-10-05')!.entries.find((e) => e.title === 'FFG pickup')!
+    expect(thu.people).toEqual(['iris'])
+    expect(mon.people).toEqual(['scott'])
+  })
+})

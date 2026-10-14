@@ -105,12 +105,17 @@ export function buildWeekRoutineItems({
       if (!resolveRoutine(routine, { date: day, member, prefs, deferredInto, lastCompletedAt }).shows) continue
 
       const instance = deferredIn ?? onThisDay
+      // This day's own person ("Iris has pickup Thursday"): the occurrence's
+      // assigned_to_override replaces the routine's people for this day only.
+      const override = instance?.assigned_to_override ?? undefined
       items.push({
         ...routineToTimelineItem(routine, day),
         // routineToTimelineItem returns the same id for every day; the suffix
         // keeps React keys unique and tells a drop which day it came from.
         id: `routine-${routine.id}-day${dayIdx}`,
         startTime: resolveRoutineTime(routine, instance, day),
+        ...(instance?.status === 'skipped' ? { skipped: true } : {}),
+        ...(override ? { assigneeOverride: override, assignedTo: override, owners: [override] } : {}),
       })
     }
   }

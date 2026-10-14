@@ -40,7 +40,54 @@ describe('shapeWeek', () => {
     expect(read.noDay.map((x) => x.id)).toEqual(['b'])
     expect(read.lastWeekUnfinished).toEqual([{ id: 'c', title: 'Pull PPVIS numbers', was: '2026-10-08', seen: 'u' }])
     expect(read.inbox.map((x) => x.id)).toEqual(['d'])
-    expect(read.routines).toEqual([{ id: 'r', name: 'Out the door', time: '07:20', pattern: { days: ['mon'] } }])
+    expect(read.routines).toEqual([{ id: 'r', name: 'Out the door', time: '07:20', pattern: { days: ['mon'] }, who: [] }])
     expect(read.talkAbouts).toEqual(['Summer camp'])
+  })
+})
+
+describe('shapeWeek routines', () => {
+  const IRIS = 'm-iris', SCOTT = 'm-scott'
+  const inst = (x: Record<string, unknown>) => ({ entity_id: 'pick', date: '2026-10-15', status: 'pending', deferred_to: null, assigned_to_override: null, ...x })
+  const read = shapeWeek({
+    start: '2026-10-10', today: '2026-10-14', tasks: [], events: [], talks: [],
+    routines: [
+      { id: 'pick', name: 'FFG pickup', recurrence_pattern: { type: 'weekly', days: ['tue', 'thu'] }, time_of_day: '15:10:00', parent_routine_id: null, assigned_to_all: [SCOTT, 'm-gone'], visibility: 'active', paused_until: null },
+      { id: 'bed', name: 'Kids bedtime', recurrence_pattern: { type: 'daily' }, time_of_day: '19:45:00', parent_routine_id: null, assigned_to_all: null },
+      { id: 'run', name: 'Iris long run', recurrence_pattern: { type: 'weekly', days: ['sat'] }, time_of_day: null, parent_routine_id: null, assigned_to_all: [IRIS], visibility: 'reference', paused_until: '2026-11-01T04:00:00+00:00' },
+      { id: 'nap', name: 'Nap', recurrence_pattern: { type: 'daily' }, time_of_day: null, parent_routine_id: null, visibility: 'reference', paused_until: null },
+      { id: 'step', name: 'Brush teeth', recurrence_pattern: { type: 'daily' }, time_of_day: null, parent_routine_id: 'bed' },
+    ],
+    members: [{ id: IRIS, name: 'Iris' }, { id: SCOTT, name: 'Scott' }],
+    instances: [
+      inst({ date: '2026-10-15', assigned_to_override: IRIS }),
+      inst({ entity_id: 'bed', date: '2026-10-16', status: 'skipped' }),
+      inst({ entity_id: 'bed', date: '2026-10-13', status: 'deferred', deferred_to: '2026-10-14T04:00:00+00:00' }),
+      inst({ entity_id: 'bed', date: '2026-10-11', status: 'deferred', deferred_to: '2026-10-11T23:30:00+00:00' }),
+      inst({ entity_id: 'bed', date: '2026-10-12', status: 'completed' }),
+      inst({ entity_id: 'bed', date: '2026-10-17', status: 'skipped' }),
+      inst({ entity_id: 'step', date: '2026-10-12', status: 'skipped' }),
+    ],
+  })
+  const byId = (id: string) => read.routines.find((r) => r.id === id)!
+  it('names who does each routine, by member name (the id when unknown)', () => {
+    expect(byId('pick').who).toEqual(['Scott', 'm-gone'])
+    expect(byId('bed').who).toEqual([])
+  })
+  it("lists this week's skipped, moved and someone-else days, in date order, inside the week only", () => {
+    expect(byId('pick').thisWeek).toEqual([{ date: '2026-10-15', who: 'Iris' }])
+    expect(byId('bed').thisWeek).toEqual([
+      { date: '2026-10-11', status: 'deferred', movedTo: '2026-10-11 19:30' },
+      { date: '2026-10-13', status: 'deferred', movedTo: '2026-10-14' },
+      { date: '2026-10-16', status: 'skipped' },
+    ])
+    expect(byId('run').thisWeek).toBeUndefined()
+  })
+  it('says which routines are resting, and until when', () => {
+    expect(byId('run').resting).toEqual({ until: '2026-11-01' })
+    expect(byId('nap').resting).toEqual({ until: null })
+    expect(byId('pick').resting).toBeUndefined()
+  })
+  it('leaves steps out', () => {
+    expect(read.routines.map((r) => r.id)).toEqual(['pick', 'bed', 'run', 'nap'])
   })
 })

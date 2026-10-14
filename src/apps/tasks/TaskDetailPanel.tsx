@@ -52,6 +52,7 @@ import { useActionableInstances } from '@/hooks/useActionableInstances';
 import { useRoutines } from '@/hooks/useRoutines';
 import { useGoals } from '@/hooks/useGoals';
 import { useFamilyMembers } from '@/hooks/useFamilyMembers';
+import { memberForAuthUser } from '@/lib/scope';
 import { useListsContext } from '@/contexts/ListsContext';
 import { useSendTaskToBuy } from '@/hooks/useSendTaskToBuy';
 import { usePinnedItems } from '@/hooks/usePinnedItems';
@@ -423,14 +424,22 @@ function TaskPanelBody({ id }: { id: string }) {
 }
 
 // ── Routine ─────────────────────────────────────────────────────────────────
-function RoutinePanelBody({ id }: { id: string }) {
+function RoutinePanelBody({ id, date }: { id: string; date?: string }) {
   const autoOpenDiscussion = useAutoOpenDiscussion('routine', id);
   const { clearSelection, setSelection } = useSelection();
   // Search ALL routines (not just active): flipping a routine to "reference"
   // visibility removes it from the active set/timeline but the panel must stay
   // populated so it doesn't go blank (and so the user can flip it back).
   const { routines, updateRoutine, addRoutine, deleteRoutine, refetch: refetchRoutines } = useRoutines();
-  const { members: familyMembers } = useFamilyMembers();
+  const { members: familyMembers, currentUserId } = useFamilyMembers();
+  // "I'll do it" on one day: the signed-in person exactly, never a guess.
+  const selfMemberId = memberForAuthUser(familyMembers, currentUserId)?.id ?? null;
+  // Opened from one day (Week, Routines): the "<day> only" section is about it.
+  const occurrenceDate = useMemo(() => {
+    if (!date) return undefined;
+    const [y, m, d] = date.split('-').map(Number);
+    return new Date(y, m - 1, d);
+  }, [date]);
 
   const routine = useMemo(() => routines.find((r) => r.id === id), [routines, id]);
   // Steps of this collection, sorted the same way /routines sorts them.
@@ -476,6 +485,9 @@ function RoutinePanelBody({ id }: { id: string }) {
       routine={routine}
       familyMembers={familyMembers}
       onClose={handleClose}
+      viewedDate={occurrenceDate}
+      occurrenceDate={occurrenceDate}
+      selfMemberId={selfMemberId}
       {...(steps.length > 0
         ? {
             steps,
@@ -815,7 +827,7 @@ export function TaskDetailPanel({ selection }: { selection: SelectionRef }) {
       {selection.kind === 'task' ? (
         <TaskPanelBody id={selection.id} />
       ) : selection.kind === 'routine' ? (
-        <RoutinePanelBody id={selection.id} />
+        <RoutinePanelBody id={selection.id} date={selection.date} />
       ) : selection.kind === 'event' ? (
         <EventPanelBody id={selection.id} />
       ) : selection.kind === 'meal' ? (

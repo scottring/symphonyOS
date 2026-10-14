@@ -230,6 +230,9 @@
 /* Week: a pending change card's proposed rows — dashed, inert. */
 .wc-dayrow.is-proposed { border: 1.5px dashed #1b6a64; background: #eef6f3; border-radius: 6px; padding: 4px 7px; margin: 2px -7px; color: #123f3b; display: flex; gap: 8px; list-style: none; }
 .dark .wc-dayrow.is-proposed { border-color: #6cc4b9; background: #182b29; color: #d7efe9; }
+.wc-proposed-note { display: block; font-size: 10.5px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; color: #1b6a64; }
+.dark .wc-proposed-note { color: #6cc4b9; }
+.wc-dayrow.is-proposed s { color: #5f6664; }
 
 /* Week: "No day yet", one quiet line of draggable chips (Task 14). */
 .wc-noday { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; border-radius: 999px; }

@@ -116,7 +116,8 @@ ${EVERYDAY_TALK_RULES}
 Doing versus suggesting:
 - A clear, reversible change to ONE item is done directly with the write tools (the screen shows it and offers Undo): "this afternoon I need to call Molly about the Buick repairs" just happens — find the contact, attach what helps, no confirmation.
 - If anything needed is ambiguous (two contacts named Molly, an unclear day), ask ONE short question first instead of guessing.
-- Changes with wider effects get a preview instead of a direct write: anything that touches MORE THAN ONE task (move these three, plan the rest of my week, sort my inbox), and anything recurring. Read what you need, then call symphony_propose_changes with the whole list; the person sees one change card and approves it with one tap. While planning, call it again with the whole list so far after each answer; whenever the person asks for a change, call it again with the whole revised list. If the page says the last change card was approved, its changes are saved: the next list holds only what is still unsaved. If it was dismissed, do not re-propose those changes unless asked. Routines have no preview yet: before changing a routine (its time, days, steps, who does it, or pausing it), say the change in one short sentence and ask "Just this week, or from now on?" when that is unclear; write only after the person says yes. A one-off change for this week only can be made to that day's occurrence instead.
+- Changes with wider effects get a preview instead of a direct write: anything that touches MORE THAN ONE task (move these three, plan the rest of my week, sort my inbox), and anything recurring. Read what you need, then call symphony_propose_changes with the whole list; the person sees one change card and approves it with one tap. While planning, call it again with the whole list so far after each answer; whenever the person asks for a change, call it again with the whole revised list. If the page says the last change card was approved, its changes are saved: the next list holds only what is still unsaved. If it was dismissed, do not re-propose those changes unless asked. A routine change ends in symphony_propose_changes. A named day, "tomorrow" or "this week" means this week only: routine_skip, routine_move or routine_who on that date's occurrence (the routine itself is untouched, so next week shows as usual). "From now on", "every week", "anymore" or "always" means a lasting change: routine_change, routine_rest or routine_add. Otherwise ask exactly one question: "Just this week, or from now on?" Say the change back plainly, in one short sentence, before or with the card. There is no delete: stopping a routine is routine_rest (with until when they name a date). Splitting one routine into two (different times on different days) is not an op: say so and offer the nearest change. Steps are changed in the routine's panel, not on the card.
+- When several things change, these go on the card with the rest: done (mark a task finished), merge (two tasks that are the same thing: task_id is the one with the better title, from_task_id the duplicate) and talk (something the person wants to discuss with someone before deciding; note like "with Iris"). A single clear done can still be done directly.
 - symphony_propose_changes has no delete. To drop something, use someday.
 - Planning the week (or the rest of it): call symphony_read_week first, passing the week's start: the week the message names ("Plan the week of Oct 17" means the week starting on the Oct 17 nearest today), else the week on the page. Call symphony_point with the days or tasks before you name them so the page lights them up. Propose early: as soon as one answer settles a change, call symphony_propose_changes with the whole list so far (title like "2 changes so far") and week_start set to the start symphony_read_week returned, and call it again with the whole revised list after each later answer, so the page rebuilds as you talk; the person approves whenever they are ready. Write nothing yourself for the week's changes — the card carries them; a separate one-off the person mentions in passing (e.g. "also call Molly this afternoon") may still be done directly. Month, season and year goals are reference only for the week; mention one only when something clearly serves it. Check the calendar and email before asking anything they could answer.
 
@@ -722,18 +723,33 @@ async function runTool(
         const { end, lastStart } = weekWindow(start)
         const shift = (ymd: string, n: number) => { const d = new Date(`${ymd}T12:00:00Z`); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10) }
         const cols = 'id, title, scheduled_for, is_all_day, bucket, week_start, completed, assigned_to, updated_at'
-        const [dated, week, inbox, events, routines, talks] = await Promise.all([
+        const [dated, week, inbox, events, routines, talks, members] = await Promise.all([
           // A day wider each side: stored times are UTC; shapeWeek files them by local day.
           db.from('tasks').select(cols).gte('scheduled_for', `${shift(lastStart, -1)}T00:00:00Z`).lt('scheduled_for', `${shift(end, 1)}T00:00:00Z`).limit(300),
           db.from('tasks').select(cols).eq('bucket', 'week').eq('completed', false).is('scheduled_for', null).limit(100),
           db.from('tasks').select(cols).eq('bucket', 'inbox').eq('completed', false).is('scheduled_for', null).order('created_at', { ascending: false }).limit(30),
           db.from('calendar_events').select('id, title, start_time, end_time, all_day').lt('start_time', `${shift(end, 1)}T00:00:00Z`).gte('end_time', `${shift(start, -1)}T00:00:00Z`).order('start_time').limit(200),
-          db.from('routines').select('id, name, recurrence_pattern, time_of_day, parent_routine_id').limit(200),
+          db.from('routines').select('id, name, recurrence_pattern, time_of_day, parent_routine_id, assigned_to_all, visibility, paused_until').limit(200),
           db.from('scratchpad_notes').select('id, body').eq('kind', 'talk').eq('status', 'open').limit(20),
+          db.from('family_members').select('id, name').limit(50),
         ])
-        const failed = [dated, week, inbox, events, routines, talks].find((r) => r.error)
+        const failed = [dated, week, inbox, events, routines, talks, members].find((r) => r.error)
         if (failed?.error) throw failed.error
-        return JSON.stringify(shapeWeek({ start, today, tasks: [...(dated.data ?? []), ...(week.data ?? []), ...(inbox.data ?? [])], events: events.data ?? [], routines: routines.data ?? [], talks: talks.data ?? [] }))
+        // This week's skipped, moved and someone-else days. shapeWeek keeps
+        // only rows for routines read above. The wall's fenced client has no
+        // family filter for instances and refuses the read: no exceptions there.
+        let instances: { entity_id: string; date: string; status: string; deferred_to: string | null; assigned_to_override: string | null }[] = []
+        const routineIds = (routines.data ?? []).filter((r) => !r.parent_routine_id).map((r) => r.id)
+        if (routineIds.length) {
+          let read
+          try {
+            read = await db.from('actionable_instances').select('entity_id, date, status, deferred_to, assigned_to_override')
+              .eq('entity_type', 'routine').in('entity_id', routineIds).gte('date', start).lt('date', end).limit(500)
+          } catch { read = { data: [], error: null } }
+          if (read.error) throw read.error
+          instances = read.data ?? []
+        }
+        return JSON.stringify(shapeWeek({ start, today, tasks: [...(dated.data ?? []), ...(week.data ?? []), ...(inbox.data ?? [])], events: events.data ?? [], routines: routines.data ?? [], talks: talks.data ?? [], instances, members: members.data ?? [] }))
       }
       case 'symphony_list_tasks': {
         let q = db.from('tasks').select('*').order('scheduled_for', { ascending: true, nullsFirst: false })
@@ -1611,17 +1627,21 @@ Deno.serve(async (req) => {
                 const parsed = changeSetFromInput(block.input ?? {}, String(block.id ?? crypto.randomUUID()))
                 if ('error' in parsed) result = JSON.stringify({ error: parsed.error })
                 else {
-                  const taskIds = [...new Set(parsed.set.ops.flatMap((o) => o.taskId ? [o.taskId] : []))]
-                  const memberIds = [...new Set(parsed.set.ops.flatMap((o) => o.assignee ? [o.assignee] : []))]
-                  const { data: taskRows, error: taskErr } = taskIds.length
-                    ? await tdb.from('tasks').select('id, title, updated_at, completed').in('id', taskIds)
-                    : { data: [], error: null }
-                  const { data: memberRows, error: memberErr } = memberIds.length
-                    ? await tdb.from('family_members').select('id, name').in('id', memberIds)
-                    : { data: [], error: null }
-                  const resolved = taskErr || memberErr
-                    ? { error: 'Could not read the tasks to check this list. Try again.' }
-                    : resolveRefs(parsed.set, taskRows ?? [], memberRows ?? [])
+                  const taskIds = [...new Set(parsed.set.ops.flatMap((o) => [o.taskId, o.fromTaskId].filter((x): x is string => !!x)))]
+                  const memberIds = [...new Set(parsed.set.ops.flatMap((o) => [...(o.assignee ? [o.assignee] : []), ...(o.assignees ?? [])]))]
+                  const routineIds = [...new Set(parsed.set.ops.flatMap((o) => o.routineId ? [o.routineId] : []))]
+                  // Same RLS client as every tool: a routine the person cannot
+                  // see is simply absent, and resolveRefs refuses it.
+                  const [tasksRead, membersRead, routinesRead] = await Promise.all([
+                    taskIds.length ? tdb.from('tasks').select('id, title, updated_at, completed').in('id', taskIds) : { data: [], error: null },
+                    memberIds.length ? tdb.from('family_members').select('id, name').in('id', memberIds) : { data: [], error: null },
+                    routineIds.length ? tdb.from('routines').select('id, name, updated_at, parent_routine_id').in('id', routineIds) : { data: [], error: null },
+                  ])
+                  const resolved = wall && parsed.set.ops.some((o) => o.op === 'routine_add' && o.context !== 'family')
+                    ? { error: 'On the kitchen wall a new routine is a family routine: leave context as family.' }
+                    : tasksRead.error || membersRead.error || routinesRead.error
+                    ? { error: 'Could not read the tasks and routines to check this list. Try again.' }
+                    : resolveRefs(parsed.set, tasksRead.data ?? [], membersRead.data ?? [], routinesRead.data ?? [])
                   if ('error' in resolved) result = JSON.stringify({ error: resolved.error })
                   else {
                     send({ type: 'change_set', set: resolved.set })

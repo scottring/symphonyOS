@@ -429,6 +429,16 @@ describe('WeekCanvas — days gone by', () => {
     fireEvent.click(row)
     expect(w.open).not.toHaveBeenCalled()
   })
+
+  it('a proposed skip is struck through and says why', async () => {
+    const { MemoryRouter } = await import('react-router-dom')
+    const d = days()
+    d[4].items.push({ id: 'routine-bed-day4', kind: 'routine', routineId: 'bed', title: 'Bedtime', completed: false, proposed: true, struck: true, note: 'Skipped · this week' })
+    render(<MemoryRouter><WeekCanvas weekStart={weekStart} days={d} shelf={shelf()} routinesToPlace={[]} isCurrent writers={writers()} /></MemoryRouter>)
+    const row = screen.getByTestId('proposed-row')
+    expect(row.querySelector('s')).toHaveTextContent('Bedtime')
+    expect(row).toHaveTextContent('Skipped · this week')
+  })
 })
 
 describe('what Symphony points at', () => {

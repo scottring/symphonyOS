@@ -20,11 +20,16 @@ interface SelectionContextValue {
 
 const SelectionContext = createContext<SelectionContextValue | null>(null);
 
-function parseSelection(raw: string | null): SelectionRef | null {
+/** The occurrence day beside ?detail (see SelectionRef.date). */
+const DAY_PARAM = 'detailDay';
+
+function parseSelection(raw: string | null, day: string | null): SelectionRef | null {
   if (!raw) return null;
   const idx = raw.indexOf(':');
   if (idx <= 0 || idx === raw.length - 1) return null;
-  return { kind: raw.slice(0, idx), id: raw.slice(idx + 1) };
+  const ref: SelectionRef = { kind: raw.slice(0, idx), id: raw.slice(idx + 1) };
+  if (day && /^\d{4}-\d{2}-\d{2}$/.test(day)) ref.date = day;
+  return ref;
 }
 
 function findAppForPath(
@@ -54,7 +59,7 @@ export function SelectionProvider({ registry, children }: ProviderProps) {
   const location = useLocation();
 
   const selection = useMemo(
-    () => parseSelection(searchParams.get('detail')),
+    () => parseSelection(searchParams.get('detail'), searchParams.get(DAY_PARAM)),
     [searchParams],
   );
 
@@ -64,6 +69,8 @@ export function SelectionProvider({ registry, children }: ProviderProps) {
         (prev) => {
           const next = new URLSearchParams(prev);
           next.set('detail', `${ref.kind}:${ref.id}`);
+          if (ref.date) next.set(DAY_PARAM, ref.date);
+          else next.delete(DAY_PARAM);
           return next;
         },
         { replace: false },
@@ -77,6 +84,7 @@ export function SelectionProvider({ registry, children }: ProviderProps) {
       (prev) => {
         const next = new URLSearchParams(prev);
         next.delete('detail');
+        next.delete(DAY_PARAM);
         return next;
       },
       { replace: true },

@@ -105,19 +105,6 @@ const ALLOWED = new Map<string, string>([
       'bigger promise than the label makes). Write path only; nothing here ' +
       'reads a primitive to decide what shows.',
   ],
-  ['components/routine/RhythmPage.tsx', 'Tend deliberately shows RESTING routines — opted out, see the comment there'],
-  [
-    'components/routine/rhythm/RoutineRow.tsx',
-    'LABELS a routine hidden from Today and planning, never filters it: the ' +
-      'Routines page lists every routine, and the row says which are off so ' +
-      'they can be found and shown again (Scott, 2026-10-03).',
-  ],
-  ['components/routine/rhythm/tendHeuristics.ts', 'same opt-out as RhythmPage'],
-  [
-    'components/routine/rhythm/rhythmModel.ts',
-    'the same Tend opt-out as RhythmPage/tendHeuristics, expressed via the ' +
-      "complementary literal — Tend deliberately surfaces resting routines.",
-  ],
   ['hooks/useSystemHealth.ts', 'diagnostics: counts unassigned ACTIVE routines'],
   [
     'components/wall-v2/wallV2Adapter.ts',

@@ -1,4 +1,4 @@
-import { Suspense, useCallback, useMemo, useState, lazy } from 'react'
+import { Suspense, useCallback, useMemo } from 'react'
 import {
   Routes,
   Route,
@@ -7,62 +7,39 @@ import {
   useLocation,
   Navigate,
 } from 'react-router-dom'
-import type { RecurrencePattern } from '@/types/actionable'
-import { useRoutines, type CreateRoutineInput } from '@/hooks/useRoutines'
+import { useRoutines } from '@/hooks/useRoutines'
 import { useContacts } from '@/hooks/useContacts'
 import { useFamilyMembers } from '@/hooks/useFamilyMembers'
 import { usePinnedItems } from '@/hooks/usePinnedItems'
 import { useDomain } from '@/hooks/useDomain'
-import { showToast } from '@/hooks/useToast'
-import type { SlotRoutineDraft } from '@/components/routine/rhythm/SlotAdd'
-import { resolveSlotRoutineFields } from '@/components/routine/rhythm/SlotAdd'
 import { matchesLayers } from '@/lib/today/domainFilter'
 import { RoutinesList, RoutineForm, RoutineInput } from '@/components/lazy'
-import { groupRoutineSteps } from '@/lib/today/routineCollections'
-import { nextStepOrder } from '@/lib/today/stepOrdering'
 import { LoadingFallback } from '@/components/layout/LoadingFallback'
 import { useConversationWalk } from '@/components/canvas/conversationWalk'
+import { useAssistantLauncher } from '@/contexts/AssistantLaunchContext'
 
-const BUILD_WALK = {
-  label: 'Build a routine with me',
-  message: "Let's build a routine. Ask me what it's for, who it's for and when, one question at a time; use my words and don't add steps of your own. Save it when I say it's right.",
+/** Changing routines is a conversation (spec 2026-10-14-routines-talk-first):
+ *  Symphony reads the week's routines, then asks what is changing, and ends
+ *  in the change card. */
+const CHANGE_WALK = {
+  label: 'Change our routines',
+  message: "Let's change our routines. Read this week's routines first (symphony_read_week), then ask me what's changing.",
 }
-
-const RoutineBuilderModal = lazy(() =>
-  import('@/components/routine/RoutineBuilderModal').then(m => ({ default: m.RoutineBuilderModal }))
-)
 
 /**
  * Routines surface, mounted by the Shell at /routines/*. The inner <Routes>
  * match segments relative to /routines (the parent route ends in /*):
- *   index        -> RoutinesList
+ *   index        -> RoutinesList (the picture of the week, RoutinesPicture)
  *   new          -> RoutineInput (natural-language create)
  *   :routineId   -> RoutineForm (edit)
  *
- * Mirrors the legacy ViewRouter `routines` branch. The list + create are domain
- * filtered/tagged using useDomain (`soleDomain` pre-fills deliberate creates).
- * The new routine create reads the `?initial=` query param like ViewRouter did.
+ * The picture is filtered by the area lens (useDomain); tapping a routine
+ * opens it in the shared detail pane, where its edits live.
  */
 function RoutinesIndex() {
-  const navigate = useNavigate()
-  const { soleDomain, layers, all: showAllDomains } = useDomain()
-  const { routines, addRoutine, updateRoutine: saveRoutine, deleteRoutine: removeRoutine, loading } = useRoutines()
-  // useRoutines reports a failed write by returning false (and setting an
-  // `error` this page never rendered), so renames, schedules and deletes
-  // could revert silently. Say so.
-  const updateRoutine = useCallback(async (...args: Parameters<typeof saveRoutine>) => {
-    const ok = await saveRoutine(...args)
-    if (!ok) showToast("Couldn't save that routine change. It was undone.", 'error')
-    return ok
-  }, [saveRoutine])
-  const deleteRoutine = useCallback(async (id: string) => {
-    const ok = await removeRoutine(id)
-    if (!ok) showToast("Couldn't delete that routine.", 'error')
-    return ok
-  }, [removeRoutine])
-  const { contacts } = useContacts()
+  const { layers, all: showAllDomains } = useDomain()
+  const { routines, loading } = useRoutines()
   const { members: familyMembers } = useFamilyMembers()
-  const [builderOpen, setBuilderOpen] = useState(false)
 
   // Steps travel with their parent through the layer lens — a Step inherits
   // its collection's layer, so an unstamped step must not strip a matching
@@ -76,88 +53,11 @@ function RoutinesIndex() {
     })
   }, [routines, layers])
 
-  const handleAddStep = useCallback(async (collectionId: string, name: string) => {
-    const { collections } = groupRoutineSteps(routines)
-    const steps = collections.find(c => c.id === collectionId)?.steps ?? []
-    const parent = routines.find(r => r.id === collectionId)
-    await addRoutine({ name, parent_routine_id: collectionId, step_order: nextStepOrder(steps), context: parent?.context ?? undefined })
-  }, [routines, addRoutine])
-
-  // Batch add (document → steps extraction): order is computed once up front
-  // so sequential inserts don't all land on the same step_order.
-  const handleAddSteps = useCallback(async (collectionId: string, stepsToAdd: { name: string; detail?: string }[]) => {
-    const { collections } = groupRoutineSteps(routines)
-    const existing = collections.find(c => c.id === collectionId)?.steps ?? []
-    const base = nextStepOrder(existing)
-    const parent = routines.find(r => r.id === collectionId)
-    for (let i = 0; i < stepsToAdd.length; i++) {
-      await addRoutine({
-        name: stepsToAdd[i].name,
-        description: stepsToAdd[i].detail,
-        parent_routine_id: collectionId,
-        step_order: base + i,
-        recurrence_pattern: parent?.recurrence_pattern,
-        context: parent?.context ?? undefined,
-      })
-    }
-  }, [routines, addRoutine])
-
-  const handleReorderSteps = useCallback(async (writes: { id: string; step_order: number }[]) => {
-    await Promise.all(writes.map(w => updateRoutine(w.id, { step_order: w.step_order })))
-  }, [updateRoutine])
-
-  const handlePromoteStep = useCallback(async (stepId: string) => {
-    await updateRoutine(stepId, { parent_routine_id: null, step_order: null })
-  }, [updateRoutine])
-
-  // Stamp the active domain lens on creation: an unstamped routine is
-  // invisible in a domain-filtered list the instant it's created — the
-  // "New routine button does nothing" bug (it worked; the lens hid it).
-  const handleCreateCollection = useCallback(async (name: string, fields?: Omit<CreateRoutineInput, 'name'>) => {
-    return addRoutine({ ...fields, name, context: fields?.context ?? soleDomain ?? undefined })
-  }, [addRoutine, soleDomain])
-
-  // A slot-created routine carries the slot's recurrence and either the active
-  // domain lens or the Routines page's member lens (draft.assigned_to) — same
-  // stamping rule as handleCreateCollection, so it joins the layer model
-  // instead of landing unsorted and invisible in a filtered list. Under
-  // "Everyone" with no domain lens, it shares with the whole family.
-  const handleCreateRoutineInSlot = useCallback((draft: SlotRoutineDraft) => {
-    void addRoutine({
-      name: draft.name,
-      recurrence_pattern: draft.recurrence_pattern,
-      time_of_day: draft.time_of_day,
-      ...resolveSlotRoutineFields(soleDomain, draft.assigned_to, draft.assigned_to_all),
-    })
-  }, [addRoutine, soleDomain])
-
-  const handleGroupIntoCollection = useCallback(async (
-    name: string,
-    ids: string[],
-    opts?: { time_of_day?: string; recurrence_pattern?: RecurrencePattern },
-  ) => {
-    const parent = await addRoutine({
-      name,
-      context: soleDomain ?? undefined,
-      time_of_day: opts?.time_of_day,
-      recurrence_pattern: opts?.recurrence_pattern,
-    })
-    if (!parent) return
-    await Promise.all(ids.map((id, i) => updateRoutine(id, { parent_routine_id: parent.id, step_order: i })))
-  }, [addRoutine, updateRoutine, soleDomain])
-
-  // Fold existing routines into an existing routine as steps, appended after
-  // any steps it already has.
-  const handleAddToCollection = useCallback(async (collectionId: string, ids: string[]) => {
-    const { collections } = groupRoutineSteps(routines)
-    const existing = collections.find(c => c.id === collectionId)?.steps ?? []
-    const base = nextStepOrder(existing)
-    await Promise.all(ids.map((id, i) => updateRoutine(id, { parent_routine_id: collectionId, step_order: base + i })))
-  }, [routines, updateRoutine])
-
-  // The person's routine in their words: Symphony asks and shapes, never adds
-  // steps of its own (Scott, 2026-10-11).
-  const walkInBar = useConversationWalk(BUILD_WALK)
+  // The bar offers "Change our routines"; phones have no bar, so the page
+  // offers the same walk, sent the same way (as Week does).
+  const walkInBar = useConversationWalk(CHANGE_WALK)
+  const { openAssistant } = useAssistantLauncher()
+  const startWalk = useCallback(() => openAssistant({ message: CHANGE_WALK.message, autoSend: true }), [openAssistant])
 
   return (
     <Suspense fallback={<LoadingFallback />}>
@@ -166,33 +66,10 @@ function RoutinesIndex() {
         loading={loading}
         hiddenByFilter={routines.length > 0 && filtered.length === 0}
         onShowAllDomains={showAllDomains}
-        contacts={contacts}
         familyMembers={familyMembers}
-        onCreateRoutine={() => navigate('/routines/new')}
-        onUpdateRoutine={updateRoutine}
-        onAddStep={handleAddStep}
-        onAddSteps={handleAddSteps}
-        onReorderSteps={handleReorderSteps}
-        onPromoteStep={handlePromoteStep}
-        onDeleteStep={deleteRoutine}
-        onDelete={deleteRoutine}
-        onCreateCollection={handleCreateCollection}
-        onGroupIntoCollection={handleGroupIntoCollection}
-        onAddToCollection={handleAddToCollection}
-        // Desktop builds in the conversation bar (approved Routines board);
-        // phones keep the builder.
-        onBuildWithAI={walkInBar ? undefined : () => setBuilderOpen(true)}
-        onCreateRoutineInSlot={handleCreateRoutineInSlot}
+        layers={layers}
+        walk={walkInBar ? undefined : { label: CHANGE_WALK.label, onStart: startWalk }}
       />
-      {builderOpen && (
-        <RoutineBuilderModal
-          onClose={() => setBuilderOpen(false)}
-          onCreated={(routineId) => {
-            setBuilderOpen(false)
-            navigate(`/routines/${routineId}`)
-          }}
-        />
-      )}
     </Suspense>
   )
 }
