@@ -115,7 +115,8 @@ export function useTellSymphony(onCommand: (c: KioskCommand) => string, voice?: 
   }, [askAbout, talk])
 
   /** One sentence, typed or said, → what the wall does with it. Timers, kiosk
-   *  commands, groceries, notes and talk-abouts stay instant and local; with
+   *  commands, groceries, notes, talk-abouts and Inbox captures ("remind us
+   *  to…") stay instant and local — a clear single item happens at once; with
    *  the agent, everything else is a turn with Symphony. */
   const handle = useCallback(async (text: string, spoken: boolean) => {
     const u = readUtterance(text)
@@ -126,7 +127,7 @@ export function useTellSymphony(onCommand: (c: KioskCommand) => string, voice?: 
     let said: string | null
     let speak: string | null = null
     const intent = talk.enabled ? talkIntent(text, !!talk.card) : null
-    const agentTakes = talk.enabled && (u.kind === 'question' || u.kind === 'inbox' || (u.kind === 'unknown' && !!u.text.trim()))
+    const agentTakes = talk.enabled && (u.kind === 'question' || (u.kind === 'unknown' && !!u.text.trim()))
     if (intent === 'approve') {
       setBusy(true)
       said = (await talk.approve().finally(() => setBusy(false))) ?? 'There’s nothing to approve.'
@@ -136,7 +137,7 @@ export function useTellSymphony(onCommand: (c: KioskCommand) => string, voice?: 
     } else if (intent === 'plan-week') {
       said = await converse(() => talk.startPlanning(), text)
     } else if (agentTakes) {
-      said = await converse(() => talk.ask(text.trim()), u.kind === 'question' || u.kind === 'unknown' || u.kind === 'inbox' ? u.text : text)
+      said = await converse(() => talk.ask(text.trim()), u.kind === 'question' || u.kind === 'unknown' ? u.text : text)
     } else {
       switch (u.kind) {
         case 'command':

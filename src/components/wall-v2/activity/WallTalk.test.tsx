@@ -102,12 +102,16 @@ const side = () => within(screen.getByRole('region', { name: 'Talking with Symph
 describe('talking to the wall: routing', () => {
   beforeEach(() => { localStorage.clear(); vi.mocked(askWall).mockClear() })
 
-  it('kiosk commands and groceries stay local and instant; Symphony is not asked', async () => {
+  it('kiosk commands, groceries and Inbox captures stay local and instant; Symphony is not asked', async () => {
     const { ask, save } = setup(async (t, h) => reply(t, h, 'never'))
     await type('timer 5 minutes')
     expect(screen.getByRole('status', { name: 'Symphony says' })).toHaveTextContent('Timer · 5 min')
     await type('add milk to the grocery list')
     expect(save).toHaveBeenCalledWith({ kind: 'groceries', items: ['milk'] })
+    await type('remind us to call the plumber')
+    expect(save).toHaveBeenLastCalledWith({ kind: 'inbox', text: 'Call the plumber' })
+    await type("don't forget to return the library books")
+    expect(save).toHaveBeenLastCalledWith({ kind: 'inbox', text: 'Return the library books' })
     expect(ask).not.toHaveBeenCalled()
     expect(askWall).not.toHaveBeenCalled()
   })
