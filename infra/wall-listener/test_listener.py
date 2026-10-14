@@ -48,17 +48,21 @@ class Endpointing(unittest.TestCase):
         return None
 
     def test_a_turn_ends_after_a_pause(self):
-        self.assertEqual(self.run_ep([(2, 0.3), (1500, 1.5), (2, 1.5)], floor=1), "speech")
+        self.assertEqual(self.run_ep([(2, 0.3), (1500, 1.5), (2, 3.2)], floor=1), "speech")
+
+    def test_a_thinking_pause_does_not_end_the_turn(self):
+        # "Add milk … [two seconds] … and eggs": still one turn.
+        self.assertIsNone(self.run_ep([(1500, 1.0), (2, 2.0), (1500, 1.0), (2, 2.0)], floor=1))
 
     def test_nobody_speaks(self):
-        self.assertEqual(self.run_ep([(2, 5)], floor=1), "silence")
+        self.assertEqual(self.run_ep([(2, 6.5)], floor=1), "silence")
 
     def test_speech_at_once_after_the_tap_counts(self):
         # The EMEET zeroes the room (~1); speech right away must not become the floor.
-        self.assertEqual(self.run_ep([(1500, 1.2), (2, 1.5)], floor=1), "speech")
+        self.assertEqual(self.run_ep([(1500, 1.2), (2, 3.2)], floor=1), "speech")
 
     def test_never_listens_forever(self):
-        self.assertEqual(self.run_ep([(1500, 12)], floor=1), "speech")
+        self.assertEqual(self.run_ep([(1500, 31)], floor=1), "speech")
 
 
 class Rules(unittest.TestCase):

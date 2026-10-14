@@ -98,18 +98,21 @@ export function KioskDock(p: KioskDockProps) {
     if (t.live) l.listen()
     else t.listenInBrowser()
   }
+  /** Typing instead: drop what was being heard. */
   const stopListening = () => { if (t.live) l.cancel(); else t.stopListening() }
+  /** A tap while listening: done — send what was said (never throw it away). */
+  const finishListening = () => { if (t.live) l.finish(); else t.finishListening() }
 
   /** A tap on the mic: open the strip listening, with the field focused. */
   const openStrip = () => {
-    if (t.isListening) { stopListening(); return }
+    if (t.isListening) { finishListening(); return }
     setTyping(true)
     if (canListen) listen()
     else t.clearReply()
   }
   /** The mic inside the open field: stop, or listen again. */
   const fieldMic = () => {
-    if (t.isListening) { stopListening(); return }
+    if (t.isListening) { finishListening(); return }
     if (canListen) listen()
     input.current?.focus()
   }

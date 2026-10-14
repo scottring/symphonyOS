@@ -17,6 +17,9 @@ export interface WallListener {
   /** The wake phrase it answers to ("Hey Symphony"), or null for tap only. */
   wake: string | null
   listen: () => void
+  /** A tap while listening: done, send what was said now. */
+  finish: () => void
+  /** Drop what is being heard. */
   cancel: () => void
   mute: (on: boolean) => void
   say: (text: string) => void
@@ -77,6 +80,7 @@ export function useWallListener(onHeard: (h: Heard) => void, onNothing?: (reason
   return {
     connected, ...status,
     listen: useCallback(() => send({ type: 'listen' }), [send]),
+    finish: useCallback(() => send({ type: 'finish' }), [send]),
     cancel: useCallback(() => send({ type: 'cancel' }), [send]),
     mute: useCallback((on: boolean) => send({ type: 'mute', on }), [send]),
     say: useCallback((text: string) => send({ type: 'say', text }), [send]),

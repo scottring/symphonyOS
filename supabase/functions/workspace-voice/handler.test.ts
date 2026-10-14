@@ -33,6 +33,11 @@ describe('workspace voice handshake',()=>{
   expect(session.audio.input.transcription).toEqual({model:'gpt-4o-mini-transcribe',language:'en'})
   expect(session.audio.input.noise_reduction).toEqual({type:'near_field'})
  })
+ it('lets the person end their turn: speech is split for the transcript, but nothing answers by itself',async()=>{
+  const deps=setup();await handleWorkspaceVoice(request(),deps)
+  const session=JSON.parse(((deps.fetch.mock.calls[0] as unknown as [string,RequestInit])[1].body as FormData).get('session') as string)
+  expect(session.audio.input.turn_detection).toMatchObject({type:'server_vad',create_response:false,interrupt_response:false})
+ })
  it('keeps the voice short and the plan the person\'s own',async()=>{
   const deps=setup();await handleWorkspaceVoice(request(),deps)
   const session=JSON.parse(((deps.fetch.mock.calls[0] as unknown as [string,RequestInit])[1].body as FormData).get('session') as string)

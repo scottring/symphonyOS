@@ -393,7 +393,7 @@ function ShellLayoutInner({ children }: Props) {
   }), [tasks, updateTask, deleteTask, addTask, completeTask, toggleTask, canvasRoutines, updateRoutine, deleteRoutine, addRoutine, skipInstance, undoInstanceDone, reschedule, undoReschedule, setOccurrenceAssignee, soleDomain, goals, addGoal, updateGoal, deleteGoal, keepForward, dropCommitment]);
   const canvasRefetch = useCallback(() => { window.dispatchEvent(new Event('symphony-plan-updated')); return Promise.all([refetch(), refetchRoutines()]); }, [refetch, refetchRoutines]);
   const showStrip = conversationStripPath(location.pathname);
-  const stripVoice = { available: voiceEnabled, active: voice.active, status: voice.status, start: () => { void voice.start(); }, stop: voice.stop, mute: voice.mute, heard: voice.heard, reply: voice.reply };
+  const stripVoice = { available: voiceEnabled, active: voice.active, status: voice.status, start: () => { void voice.start(); }, stop: voice.stop, heard: voice.heard, reply: voice.reply, turn: voice.turn, talk: voice.talk, done: voice.done };
   const openConversation = () => { if (isMobile) setPhoneChatOpen(true); else showPane('ai'); };
 
   return (
@@ -414,7 +414,7 @@ function ShellLayoutInner({ children }: Props) {
       {/* "New version available — reload" banner: shows when a newer build
           deployed while this tab stayed open (stale-tab guard). */}
       <NewVersionBanner />
-      {voice.active && !dockedBar && !(isMobile ? phoneChatOpen : aiOpen && pane === 'ai') && <div className="workspace-voice-floating" role="status"><span>{voice.status === 'muted' ? 'Voice muted' : 'Voice active'}</span><button onClick={voice.mute}>{voice.status === 'muted' ? 'Unmute' : 'Mute'}</button><button onClick={voice.stop}>End voice</button></div>}
+      {voice.active && !dockedBar && !(isMobile ? phoneChatOpen : aiOpen && pane === 'ai') && <div className="workspace-voice-floating" role="status"><span>{voice.turn === 'listening' ? 'Listening — take your time' : 'Voice on'}</span>{voice.status === 'live' && (voice.turn === 'listening' ? <button onClick={voice.done}>Done</button> : <button onClick={voice.talk}>Talk</button>)}<button onClick={voice.stop}>End voice</button></div>}
 
       {/* Content frame — uses <div> (not <main>) because individual apps render
           their own <main>. Avoids invalid nested-main HTML. */}

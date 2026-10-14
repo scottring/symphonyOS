@@ -19,8 +19,23 @@ import { askWall, speechFor, type VoiceSave } from '@/lib/wall/voice/wallVoiceAc
 import { talkIntent } from '@/lib/wall/wallTalk'
 import { useWallTalk, type WallTalkDeps } from './useWallTalk'
 
-interface RecognitionResultLike { 0: { transcript: string }; length: number; [i: number]: { transcript: string } }
-interface RecognitionEventLike { results: { 0: RecognitionResultLike; length: number } }
+interface RecognitionResultLike { 0: { transcript: string }; length: number; isFinal?: boolean; [i: number]: { transcript: string } }
+interface RecognitionEventLike { results: { length: number; [i: number]: RecognitionResultLike } }
+
+/** Browser listening (no wall listener): quiet this long ends the turn. Long
+ *  on purpose, like the listener's (Scott, 2026-10-14: "I feel rushed"); a
+ *  tap on the mic sends sooner. */
+export const BROWSER_PAUSE_MS = 3000
+
+/** What was said, from the browser's final results: one phrase picks the
+ *  alternative the wall understands; several are joined in order. */
+export function spokenText(finals: string[][]): string {
+  if (finals.length === 1) {
+    const alts = finals[0]
+    return (alts.find((a) => readUtterance(a).kind !== 'unknown') ?? alts[0] ?? '').trim()
+  }
+  return finals.map((alts) => (alts[0] ?? '').trim()).filter(Boolean).join(' ')
+}
 interface RecognitionLike {
   lang: string
   interimResults: boolean
@@ -73,6 +88,8 @@ export function useTellSymphony(onCommand: (c: KioskCommand) => string, voice?: 
   const [listening, setListening] = useState(false)
   const supported = recognitionCtor() !== null
   const rec = useRef<RecognitionLike | null>(null)
+  /** Set when listening is dropped rather than finished: nothing is sent. */
+  const discard = useRef(false)
   const replyRef = useRef<(text: string) => void>(() => {})
 
   /** A question, or anything not otherwise understood: ask the wall. An answer is
@@ -201,11 +218,15 @@ export function useTellSymphony(onCommand: (c: KioskCommand) => string, voice?: 
     setOpen(false)
   }, [onCommand])
 
+  /** Drop what is being heard (voice turned off, typing instead). */
   const stopListening = useCallback(() => {
+    discard.current = true
     rec.current?.abort()
     rec.current = null
     setListening(false)
   }, [])
+  /** A tap while listening: done — send what was said. */
+  const finishListening = useCallback(() => { rec.current?.stop() }, [])
   useEffect(() => () => { rec.current?.abort() }, [])
   // The reply fades; longer while Undo or an answer is up.
   useEffect(() => {
@@ -218,21 +239,41 @@ export function useTellSymphony(onCommand: (c: KioskCommand) => string, voice?: 
   const listenInBrowser = useCallback(() => {
     const Ctor = recognitionCtor()
     if (!Ctor || !voiceOn) return
+    discard.current = true
     rec.current?.abort()
+    discard.current = false
     const r = new Ctor()
     r.lang = 'en-US'
-    r.interimResults = false
-    r.continuous = false
+    // Keep listening through pauses; the turn ends after BROWSER_PAUSE_MS of
+    // quiet (or a tap), not at the browser's own first breath.
+    r.interimResults = true
+    r.continuous = true
     r.maxAlternatives = 3
+    let finals: string[][] = []
+    let quiet: ReturnType<typeof setTimeout> | undefined
     r.onresult = (e) => {
-      const alts: string[] = []
-      const first = e.results[0]
-      for (let i = 0; i < (first?.length ?? 0); i++) alts.push(first[i].transcript)
-      const hit = alts.find((a) => readUtterance(a).kind !== 'unknown')
-      void handle(hit ?? alts[0] ?? '', false)
+      finals = []
+      for (let i = 0; i < e.results.length; i++) {
+        const res = e.results[i]
+        if (res.isFinal === false) continue
+        const alts: string[] = []
+        for (let j = 0; j < res.length; j++) alts.push(res[j].transcript)
+        finals.push(alts)
+      }
+      clearTimeout(quiet)
+      quiet = setTimeout(() => r.stop(), BROWSER_PAUSE_MS)
     }
-    r.onerror = (e) => { setFeedback(e.error === 'not-allowed' ? 'The microphone is blocked on this device.' : 'Didn’t catch that — try again or tap a button.') }
-    r.onend = () => { setListening(false); rec.current = null }
+    r.onerror = (e) => {
+      if (e.error === 'aborted') return
+      setFeedback(e.error === 'not-allowed' ? 'The microphone is blocked on this device.' : 'Didn’t catch that — try again or tap a button.')
+    }
+    r.onend = () => {
+      clearTimeout(quiet)
+      setListening(false)
+      if (rec.current === r) rec.current = null
+      const said = spokenText(finals)
+      if (said && !discard.current) void handle(said, false)
+    }
     rec.current = r
     setFeedback(null)
     setListening(true)
@@ -271,13 +312,13 @@ export function useTellSymphony(onCommand: (c: KioskCommand) => string, voice?: 
   /** The slice-7 pill: listen, or open the commands panel. */
   const onPill = () => {
     if (live) {
-      if (isListening) { listener.cancel(); return }
+      if (isListening) { listener.finish(); return }
       if (listener.muted || open) { setOpen((o) => !o); return }
       clearReply()
       listener.listen()
       return
     }
-    if (listening) { stopListening(); return }
+    if (listening) { finishListening(); return }
     if (voiceOn && supported && !open) { setOpen(true); listenInBrowser(); return }
     setOpen((o) => !o)
   }
@@ -297,7 +338,7 @@ export function useTellSymphony(onCommand: (c: KioskCommand) => string, voice?: 
     talk, approveCard, undoCard,
     open, setOpen, feedback, heard, answer, undo, busy, voiceOn, supported, listening, listener, live,
     isListening, isThinking, isSpeaking, micLive, canHear, stateLabel,
-    handle, runPhrase, stopListening, listenInBrowser, toggleVoice, takeBack, clearReply, onPill,
+    handle, runPhrase, stopListening, finishListening, listenInBrowser, toggleVoice, takeBack, clearReply, onPill,
   }
 }
 

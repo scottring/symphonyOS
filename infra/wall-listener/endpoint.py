@@ -3,6 +3,10 @@
 Energy based, against the room's own noise floor: a kitchen has a fridge, a
 dishwasher, a TV. Speech is a frame well above the floor; the turn ends after
 a pause once speech has started, or gives up if nobody speaks.
+
+The pause is long on purpose (Scott, 2026-10-14: people felt rushed to get
+their words out before a breath counted as "done"): three seconds of quiet,
+so a thinking pause mid-request doesn't end it. Tapping the mic sends at once.
 """
 
 from __future__ import annotations
@@ -13,8 +17,8 @@ import numpy as np
 
 
 class Endpointer:
-    def __init__(self, rate: int = 16000, frame: int = 1280, *, pause_s: float = 0.9, start_timeout_s: float = 4.0,
-                 max_s: float = 10.0, min_speech_s: float = 0.25, ratio: float = 3.0, floor_min: float = 120.0,
+    def __init__(self, rate: int = 16000, frame: int = 1280, *, pause_s: float = 3.0, start_timeout_s: float = 6.0,
+                 max_s: float = 30.0, min_speech_s: float = 0.25, ratio: float = 3.0, floor_min: float = 120.0,
                  floor: Optional[float] = None):
         """`floor`: the room's level just before the trigger, if known — so
         speech that starts at once is not taken for the room."""
