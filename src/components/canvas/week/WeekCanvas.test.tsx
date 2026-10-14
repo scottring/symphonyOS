@@ -275,6 +275,22 @@ describe('WeekCanvas — phone', () => {
   })
   afterEach(() => { window.matchMedia = original })
 
+  // 2026-10-14 browser check: at 390px the line said "Friday is wide open"
+  // while Friday had four calendar events. The sentence must read the same
+  // days at every width.
+  it('the week sentence counts events on the phone as it does on the desk', () => {
+    vi.setSystemTime(new Date(2026, 9, 7, 9)) // Wed
+    const evt = (id: string, title: string) => ({ id, kind: 'event' as const, title, completed: false })
+    const week = days().map((d, i) => i === 6
+      ? { ...d, events: [evt('e1', 'No School'), evt('e2', 'iPhone Pre-order'), evt('e3', 'Kami PT'), evt('e4', 'Grampappa')] }
+      : i === 4 ? { ...d, events: [evt('c1', 'CEPI standby')] } : d)
+    show(writers(), { days: week }, false)
+    const line = document.querySelector('.wc-week-sentence')
+    expect(line?.textContent).toContain('Today: CEPI standby.')
+    expect(line?.textContent).toContain('Friday is the full one.')
+    expect(line?.textContent).not.toMatch(/Friday is wide open/)
+  })
+
   it('a row of day chips picks the day shown; + opens the days inline; rows do not drag', () => {
     const w = show()
     const chips = within(screen.getByRole('group', { name: 'Days' }))
