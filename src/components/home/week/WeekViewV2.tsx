@@ -857,7 +857,9 @@ export function WeekViewV2(props: WeekViewV2Props) {
       rhythm={canvasDays.lines} isCurrent={weekIsCurrentFor(weekAnchor)} writers={canvasWriters}
       spans={canvasSpans} dayDescriptions={canvasDayDescriptions} members={familyMembers}
       daily={canvasDays.hasDaily ? { shown: dailyShown, onToggle: toggleDaily } : undefined}
-      pointing={activity.pointing} />
+      pointing={activity.pointing}
+      // A calendar that is not connected has nothing to load.
+      loaded={(sources?.tasks ?? 'ready') === 'ready' && ['ready', 'not-connected'].includes(sources?.events ?? 'ready')} />
   )
 
   // A past week is a look-back, not a plan.

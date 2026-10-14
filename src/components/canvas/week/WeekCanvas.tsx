@@ -120,6 +120,9 @@ export interface WeekCanvasProps {
   daily?: { shown: boolean; onToggle: () => void }
   /** What Symphony is talking about right now: lit with the teal halo. */
   pointing?: { dates: Set<string>; taskIds: Set<string> } | null
+  /** The week's tasks and calendar have loaded. Until then the sentence says
+   *  nothing: an unloaded day reads as wide open. */
+  loaded?: boolean
 }
 
 type Drag = { kind: 'task' | 'routine' | 'occ'; id: string; groupKey?: string; fromKey?: string }
@@ -127,7 +130,7 @@ type Picker = { key: string } | null
 
 const longDay = (d: Date) => d.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
 
-export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [], isCurrent, writers, spans = [], dayDescriptions, members = [], daily, pointing }: WeekCanvasProps) {
+export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [], isCurrent, writers, spans = [], dayDescriptions, members = [], daily, pointing, loaded = true }: WeekCanvasProps) {
   const phone = useMediaQuery('(max-width: 767px)')
   const slots = useContext(PlanMastheadSlotsContext)
   const [showDone, setShowDone] = useState(false)
@@ -345,8 +348,8 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
     <b>Past week</b> · <Link className="canvas-link" to="/week?view=alongside">Back to this week</Link>
   </span>
   // One plain sentence about the week, from the rules (weekSentence); the
-  // current week only.
-  const sentence = isCurrent ? weekSentence(days, todayKey) : null
+  // current week only, once what it counts has loaded.
+  const sentence = isCurrent && loaded ? weekSentence(days, todayKey) : null
   const unplaced = shelf.flatMap((g) => g.rows.map((r) => r.task))
   // Dragging a day's task: the line shows (even empty) so it can be dropped back.
   const draggingPlaced = drag?.kind === 'task' && !!drag.fromKey

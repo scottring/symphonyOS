@@ -227,6 +227,14 @@ describe('WeekCanvas — phone', () => {
     expect(line?.textContent).not.toMatch(/Friday is wide open/)
   })
 
+  // Final review 2026-10-14 #5: while the week was still loading, the line
+  // said every day was wide open.
+  it('the week sentence waits until the week has loaded', () => {
+    vi.setSystemTime(new Date(2026, 9, 7, 9)) // Wed
+    show(writers(), { loaded: false })
+    expect(document.querySelector('.wc-week-sentence')).toBeNull()
+  })
+
   it('a row of day chips picks the day shown; No day yet chips show and open on tap, but do not drag', () => {
     const w = show()
     const chips = within(screen.getByRole('group', { name: 'Days' }))

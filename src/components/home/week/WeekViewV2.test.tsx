@@ -522,4 +522,16 @@ describe('WeekViewV2 — Plan the rest of my week in the bar', () => {
     const setWalk = mount(new Date(2026, 9, 17))
     expect(setWalk).toHaveBeenCalledWith({ label: 'Plan the week', message: 'Plan the week of Oct 17.' })
   })
+
+  // Final review 2026-10-14 #5: the line said false things while loading.
+  it('says the week in a sentence only once its tasks and calendar have loaded', () => {
+    vi.setSystemTime(new Date(2026, 9, 14, 9))
+    const loading = { tasks: 'ready' as const, events: 'loading' as const, routines: 'ready' as const }
+    const { rerender } = render(<WeekViewV2 {...defaultProps} routines={[]} weekStart={new Date(2026, 9, 10)} sources={loading} />)
+    expect(document.querySelector('.wc-week-sentence')).toBeNull()
+    rerender(<WeekViewV2 {...defaultProps} routines={[]} weekStart={new Date(2026, 9, 10)} sources={{ ...loading, tasks: 'loading' }} />)
+    expect(document.querySelector('.wc-week-sentence')).toBeNull()
+    rerender(<WeekViewV2 {...defaultProps} routines={[]} weekStart={new Date(2026, 9, 10)} sources={{ ...loading, events: 'ready' }} />)
+    expect(document.querySelector('.wc-week-sentence')?.textContent).toMatch(/wide open/)
+  })
 })
