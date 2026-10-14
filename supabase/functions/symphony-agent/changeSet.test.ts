@@ -130,6 +130,20 @@ describe('agent wiring', () => {
     expect(src).toContain('week_start set to the start symphony_read_week returned')
     expect(JSON.stringify(PROPOSE_CHANGES_TOOL.input_schema)).toContain('week_start')
   })
+  // Final review 2026-10-14 #6: three older rules contradicted the card.
+  it('writes an explicit request directly only when it is ONE item', () => {
+    expect(src).not.toContain('When the person says what they want ("add X", "my goals are A and B", "book a consultation"), do it with the write tools')
+    expect(src).toContain('When the person says what they want for ONE item')
+    expect(src).toContain('Several tasks at once go on the change card')
+  })
+  it('prepares a task to act on only once it is saved, never while it waits on a card', () => {
+    expect(src).toContain('only for a task that is saved: after the person approves the card, or after a one-item change.')
+    expect(src).toContain('Approve refuses the card')
+  })
+  it('goes across the horizons only when planning Month, Season or Year', () => {
+    expect(src).not.toContain('then one combined week of tasks')
+    expect(src).toContain('Planning a month, season or year goes across, not down')
+  })
   it('proposes early and revises after each answer while planning', () => {
     expect(src).toContain('as soon as one answer settles a change')
     expect(PROPOSE_CHANGES_TOOL.description).toContain('call it again with the whole list so far')
