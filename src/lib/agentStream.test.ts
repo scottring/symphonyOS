@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach, vi } from 'vitest'
-import { parseSSEChunk, agentFunctionName, streamSymphonyAgent } from './agentStream'
+import { parseSSEChunk, agentFunctionName, voiceFunctionName, streamSymphonyAgent } from './agentStream'
 import { supabase } from '@/lib/supabase'
 
 describe('parseSSEChunk', () => {
@@ -48,6 +48,18 @@ describe('agentFunctionName', () => {
     expect(agentFunctionName()).toBe('symphony-agent-v2')
     vi.stubEnv('VITE_AGENT_FUNCTION', '../evil')
     expect(agentFunctionName()).toBe('symphony-agent')
+  })
+})
+
+describe('voiceFunctionName', () => {
+  afterEach(() => vi.unstubAllEnvs())
+
+  it('is workspace-voice unless a preview build names another', () => {
+    expect(voiceFunctionName()).toBe('workspace-voice')
+    vi.stubEnv('VITE_VOICE_FUNCTION', 'workspace-voice-v2')
+    expect(voiceFunctionName()).toBe('workspace-voice-v2')
+    vi.stubEnv('VITE_VOICE_FUNCTION', '../evil')
+    expect(voiceFunctionName()).toBe('workspace-voice')
   })
 })
 

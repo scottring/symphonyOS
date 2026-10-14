@@ -142,6 +142,13 @@ export function agentFunctionName(): string {
   return typeof name === 'string' && /^[a-z0-9-]+$/.test(name) ? name : 'symphony-agent'
 }
 
+/** The voice edge function's name. A preview build may set VITE_VOICE_FUNCTION
+ *  to a separately deployed test copy; anything malformed falls back to the live one. */
+export function voiceFunctionName(): string {
+  const name = import.meta.env.VITE_VOICE_FUNCTION
+  return typeof name === 'string' && /^[a-z0-9-]+$/.test(name) ? name : 'workspace-voice'
+}
+
 /**
  * Stream the Symphony agent edge function for one conversation turn.
  * Sends the full message history; the function verifies the caller's JWT

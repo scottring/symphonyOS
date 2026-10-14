@@ -1,5 +1,6 @@
 import {useEffect,useRef,useState} from 'react'
 import {supabase} from '@/lib/supabase'
+import {voiceFunctionName} from '@/lib/agentStream'
 import {RealtimeTransport} from '@/lib/voiceOnboarding/realtimeTransport'
 import type {ConversationContext,TransportStatus} from '@/lib/voiceOnboarding/transport'
 import {workspaceDestination,type WorkspaceContext} from '@/lib/workspace/context'
@@ -24,7 +25,7 @@ export function useWorkspaceVoice(context:WorkspaceContext, ask:(text:string)=>P
  const start=async()=>{
   if(!enabled||busy.current)return
   transport.current?.stop();setError(null);setHeard('');setReply('')
-  const voice=new RealtimeTransport({endpoint:`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/workspace-voice`,apiKey:import.meta.env.VITE_SUPABASE_ANON_KEY,getAccessToken:async()=>(await supabase.auth.getSession()).data.session?.access_token??null,
+  const voice=new RealtimeTransport({endpoint:`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/${voiceFunctionName()}`,apiKey:import.meta.env.VITE_SUPABASE_ANON_KEY,getAccessToken:async()=>(await supabase.auth.getSession()).data.session?.access_token??null,
    handleTool:async(name,args)=>{
     const data=args as Record<string,unknown>|null
     if(!data||typeof data!=='object')return {error:'Invalid request'}
