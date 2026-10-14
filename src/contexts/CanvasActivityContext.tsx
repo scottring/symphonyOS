@@ -304,12 +304,19 @@ export function CanvasActivityProvider({ children, snapshot, writers, refetch, r
 
   const [changeSet, setPending] = useState<PendingChangeSet | null>(null)
   const setChangeSet = useCallback((set: ChangeSet) => {
-    setPending((prev) => ({ ...set, state: 'proposed', replaced: !!prev && prev.key !== set.key && prev.state !== 'saving' }))
+    setPending((prev) => {
+      // The same set re-announced while it is being saved stays saving.
+      if (prev && prev.key === set.key && prev.state === 'saving') return prev
+      return { ...set, state: 'proposed', replaced: !!prev && prev.key !== set.key }
+    })
   }, [])
   const dismissChangeSet = useCallback(() => setPending(null), [])
+  const approvingRef = useRef(false)
   const approveChangeSet = useCallback(async () => {
     const set = changeSet
-    if (!set || set.state === 'saving' || !applyChanges) return false
+    if (approvingRef.current || !set || set.state === 'saving' || !applyChanges) return false
+    approvingRef.current = true
+    try {
     setPending({ ...set, state: 'saving', message: undefined })
     const opts: CommandOptions = { ids: [] }
     let failure: string | null = null
@@ -325,8 +332,13 @@ export function CanvasActivityProvider({ children, snapshot, writers, refetch, r
       opts.undo = r.undo
       return true
     }, opts)
-    setPending(ok ? null : { ...set, state: 'failed', message: failure ?? "Couldn't save. Nothing was changed. Try again." })
+    // Only touch the card if it is still the one that was saved; a newer set
+    // that arrived meanwhile stays as it is.
+    setPending((cur) => cur && cur.key === set.key
+      ? (ok ? null : { ...cur, state: 'failed', message: failure ?? "Couldn't save. Nothing was changed. Try again." })
+      : cur)
     return ok
+    } finally { approvingRef.current = false }
   }, [changeSet, applyChanges, run])
 
   const value = useMemo<CanvasActivity>(() => ({

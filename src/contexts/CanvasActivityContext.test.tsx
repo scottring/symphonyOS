@@ -221,4 +221,47 @@ describe('change sets', () => {
     act(() => activity().dismiss())
     expect(activity().receipt).toBeNull()
   })
+
+  function gate() {
+    let resolve!: (v: Awaited<ReturnType<NonNullable<CanvasActivityProviderProps['applyChanges']>>>) => void
+    const promise = new Promise<Awaited<ReturnType<NonNullable<CanvasActivityProviderProps['applyChanges']>>>>((r) => { resolve = r })
+    return { promise, resolve }
+  }
+
+  it('a newer set that arrives while one saves survives the older apply succeeding', async () => {
+    const g = gate()
+    const { activity } = mountActivity({ applyChanges: () => g.promise })
+    act(() => activity().setChangeSet(set('s1')))
+    let p!: Promise<boolean>
+    act(() => { p = activity().approveChangeSet() })
+    act(() => activity().setChangeSet(set('s2')))
+    await act(async () => { g.resolve({ ok: true, ids: ['a'], undo: async () => true }); await p })
+    expect(activity().changeSet).toMatchObject({ key: 's2', state: 'proposed', replaced: true })
+  })
+
+  it('a newer set survives the older apply failing', async () => {
+    const g = gate()
+    const { activity } = mountActivity({ applyChanges: () => g.promise })
+    act(() => activity().setChangeSet(set('s1')))
+    let p!: Promise<boolean>
+    act(() => { p = activity().approveChangeSet() })
+    act(() => activity().setChangeSet(set('s2')))
+    await act(async () => { g.resolve({ ok: false, reason: 'failed' }); await p })
+    expect(activity().changeSet).toMatchObject({ key: 's2', state: 'proposed' })
+    expect(activity().changeSet?.message).toBeUndefined()
+  })
+
+  it('two Approves in the same tick apply once, and the same set re-announced keeps saving', async () => {
+    const g = gate()
+    const applyChanges = vi.fn(() => g.promise)
+    const { activity } = mountActivity({ applyChanges })
+    act(() => activity().setChangeSet(set('s1')))
+    let p1!: Promise<boolean>, p2!: Promise<boolean>
+    act(() => { p1 = activity().approveChangeSet(); p2 = activity().approveChangeSet() })
+    act(() => activity().setChangeSet(set('s1')))
+    expect(activity().changeSet?.state).toBe('saving')
+    await act(async () => { await activity().approveChangeSet(); g.resolve({ ok: true, ids: ['a'], undo: async () => true }); await Promise.all([p1, p2]) })
+    expect(applyChanges).toHaveBeenCalledTimes(1)
+    expect(activity().changeSet).toBeNull()
+  })
 })
