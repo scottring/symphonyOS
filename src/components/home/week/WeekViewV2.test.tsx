@@ -7,6 +7,7 @@ import type { RecurrencePattern } from '@/types/actionable'
 import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
 import { ALL_LAYERS } from '@/lib/domains'
 import { weekStartAnchor, readCadenceConfig } from '@/lib/cadence/config'
+import { ConversationWalkContext } from '@/components/canvas/conversationWalk'
 import { CanvasActivityProvider, useCanvasActivity } from '@/contexts/CanvasActivityContext'
 
 // These tests cover the Lists view; Open journal is the default since
@@ -603,5 +604,42 @@ describe('WeekViewV2 — the week canvas keeps what the page could do', () => {
     expect(localStorage.getItem('symphony-week-daily')).toBe('shown')
     expect(screen.getAllByText('Walk the dog').length).toBeGreaterThan(1)
     expect(screen.getByRole('button', { name: 'Hide daily' })).toBeInTheDocument()
+  })
+})
+
+// Task 12: the walk sits in the conversation bar on the current week. The
+// household's week starts on Saturday.
+describe('WeekViewV2 — Plan the rest of my week in the bar', () => {
+  beforeEach(() => {
+    localStorage.setItem('symphony-cadence-config', JSON.stringify({ weekStartsOn: 6 }))
+    vi.useFakeTimers({ toFake: ['Date'] })
+  })
+  afterEach(() => { vi.useRealTimers(); localStorage.removeItem('symphony-cadence-config') })
+
+  const mount = (weekStart: Date, setWalk = vi.fn()) => {
+    render(
+      <ConversationWalkContext.Provider value={setWalk}>
+        <WeekViewV2 {...defaultProps} routines={[]} weekStart={weekStart} />
+      </ConversationWalkContext.Provider>,
+    )
+    return setWalk
+  }
+
+  it('offers "Plan the rest of my week" mid-week', () => {
+    vi.setSystemTime(new Date(2026, 9, 14, 9))
+    const setWalk = mount(new Date(2026, 9, 10))
+    expect(setWalk).toHaveBeenCalledWith({ label: 'Plan the rest of my week', message: 'Plan the rest of my week.' })
+  })
+
+  it('offers "Plan the week" on the week\'s first day', () => {
+    vi.setSystemTime(new Date(2026, 9, 10, 9))
+    const setWalk = mount(new Date(2026, 9, 10))
+    expect(setWalk).toHaveBeenCalledWith({ label: 'Plan the week', message: 'Plan the week.' })
+  })
+
+  it('offers nothing on another week', () => {
+    vi.setSystemTime(new Date(2026, 9, 14, 9))
+    const setWalk = mount(new Date(2026, 9, 3))
+    expect(setWalk).not.toHaveBeenCalledWith(expect.objectContaining({ label: expect.any(String) }))
   })
 })

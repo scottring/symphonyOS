@@ -60,6 +60,7 @@ import type { AssigneeFilter } from '@/lib/today/types'
 import { makeAssigneeFilter } from '@/lib/today/assigneeFilter'
 import type { Layer } from '@/lib/domains'
 import { WeekPlanHost } from './WeekPlanHost'
+import { useConversationWalk } from '@/components/canvas/conversationWalk'
 import { WeekV2 } from '@/components/plan/v2/WeekV2'
 import { useWeather } from '@/hooks/useWeather'
 import { planV2Enabled, lineDropUpdates, dayNamedIn } from '@/lib/planning/v2/planV2'
@@ -249,6 +250,11 @@ export function WeekViewV2(props: WeekViewV2Props) {
   // workweek); the list and the pin key on the week ANCHOR, like belongsToWeek.
   const weekAnchor = useMemo(() => weekStartAnchor(weekStart, readCadenceConfig().weekStartsOn), [weekStart])
   useEffect(() => { publishViewedWeek(weekAnchor) }, [weekAnchor])
+  // Planning the week is a conversation: on the current week the bar offers it.
+  const planFirstDay = localYmd(new Date()) === localYmd(weekAnchor)
+  useConversationWalk(weekIsCurrentFor(weekAnchor)
+    ? (planFirstDay ? { label: 'Plan the week', message: 'Plan the week.' } : { label: 'Plan the rest of my week', message: 'Plan the rest of my week.' })
+    : null)
   // Only unmount clears it — a cleanup on every change published null → week
   // and defeated the signal's same-week dedupe.
   useEffect(() => () => publishViewedWeek(null), [])
