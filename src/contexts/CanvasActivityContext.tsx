@@ -21,6 +21,8 @@ import type { AgentProposalItem } from '@/lib/agentStream'
 import { WRITE_TOOLS } from '@/lib/agentTurn'
 import { canUndo, describeChanges, diffSnapshots, type CanvasChange, type Snapshot } from '@/lib/canvas/changeSet'
 import { toolSavingLabel } from '@/lib/canvas/toolLabels'
+import type { ChangeSet } from '@/lib/canvas/changeCard'
+import type { ApplyResult } from '@/lib/canvas/applyChangeSet'
 
 export type SaveState = 'listening' | 'working' | 'saving' | 'saved' | 'partial' | 'failed' | 'answered' | 'unverified'
 
@@ -41,6 +43,13 @@ export interface CanvasReceipt {
 
 export interface CanvasProposal extends AgentProposalItem {
   state: 'proposed' | 'saving' | 'failed'
+}
+
+export interface PendingChangeSet extends ChangeSet {
+  state: 'proposed' | 'saving' | 'failed'
+  message?: string
+  /** A newer proposal took the place of one still waiting. */
+  replaced?: boolean
 }
 
 export interface CanvasWriters {
@@ -86,6 +95,10 @@ export interface CanvasActivity {
   addProposals: (items: AgentProposalItem[]) => void
   setProposalState: (key: string, state: CanvasProposal['state']) => void
   removeProposal: (key: string) => void
+  changeSet: PendingChangeSet | null
+  setChangeSet: (set: ChangeSet) => void
+  dismissChangeSet: () => void
+  approveChangeSet: () => Promise<boolean>
   /** Whether voice/listening is on (drives the strip's mic state). */
   listening: boolean
   setListening: (on: boolean) => void
@@ -97,16 +110,18 @@ const ARRIVED_MS = 6000
 /** How long to wait for refetched rows before diffing what is there. */
 const SETTLE_MS = 2500
 
-interface ProviderProps {
+export interface CanvasActivityProviderProps {
   children: ReactNode
   snapshot: Snapshot
   writers: CanvasWriters
   refetch: () => Promise<unknown> | void
   /** Resend the last conversation turn (same turn id). */
   retryTurn?: () => void
+  /** Approve on the change card (the shell wires the task writers). */
+  applyChanges?: (set: ChangeSet) => Promise<ApplyResult>
 }
 
-export function CanvasActivityProvider({ children, snapshot, writers, refetch, retryTurn }: ProviderProps) {
+export function CanvasActivityProvider({ children, snapshot, writers, refetch, retryTurn, applyChanges }: CanvasActivityProviderProps) {
   const [receipt, setReceipt] = useState<CanvasReceipt | null>(null)
   const [arrived, setArrived] = useState<Map<string, number>>(new Map())
   const [arrivedVersion, setArrivedVersion] = useState(0)
@@ -287,10 +302,37 @@ export function CanvasActivityProvider({ children, snapshot, writers, refetch, r
   }, [])
   const removeProposal = useCallback((key: string) => setProposals((prev) => prev.filter((p) => p.key !== key)), [])
 
+  const [changeSet, setPending] = useState<PendingChangeSet | null>(null)
+  const setChangeSet = useCallback((set: ChangeSet) => {
+    setPending((prev) => ({ ...set, state: 'proposed', replaced: !!prev && prev.key !== set.key && prev.state !== 'saving' }))
+  }, [])
+  const dismissChangeSet = useCallback(() => setPending(null), [])
+  const approveChangeSet = useCallback(async () => {
+    const set = changeSet
+    if (!set || set.state === 'saving' || !applyChanges) return false
+    setPending({ ...set, state: 'saving', message: undefined })
+    const opts: CommandOptions = { ids: [] }
+    let failure: string | null = null
+    const ok = await run(set.title, async () => {
+      const r = await applyChanges(set)
+      if (!r.ok) {
+        failure = r.reason === 'stale'
+          ? `“${r.title}” changed since I proposed this. Ask me for a fresh list.`
+          : "Couldn't save. Nothing was changed. Try again."
+        return false
+      }
+      opts.ids = r.ids
+      opts.undo = r.undo
+      return true
+    }, opts)
+    setPending(ok ? null : { ...set, state: 'failed', message: failure ?? "Couldn't save. Nothing was changed. Try again." })
+    return ok
+  }, [changeSet, applyChanges, run])
+
   const value = useMemo<CanvasActivity>(() => ({
     receipt, isArrived, arrivedVersion, turnStarted, toolUsed, toolResult, turnEnded, run, undo, retry, dismiss,
-    proposals, addProposals, setProposalState, removeProposal, listening, setListening,
-  }), [receipt, isArrived, arrivedVersion, turnStarted, toolUsed, toolResult, turnEnded, run, undo, retry, dismiss, proposals, addProposals, setProposalState, removeProposal, listening])
+    proposals, addProposals, setProposalState, removeProposal, changeSet, setChangeSet, dismissChangeSet, approveChangeSet, listening, setListening,
+  }), [receipt, isArrived, arrivedVersion, turnStarted, toolUsed, toolResult, turnEnded, run, undo, retry, dismiss, proposals, addProposals, setProposalState, removeProposal, changeSet, setChangeSet, dismissChangeSet, approveChangeSet, listening])
 
   return <CanvasActivityContext.Provider value={value}>{children}</CanvasActivityContext.Provider>
 }
@@ -301,6 +343,7 @@ const NOOP_ACTIVITY: CanvasActivity = {
   run: async (_l, command) => { try { return (await command()) !== false } catch { return false } },
   undo: async () => {}, retry: () => {}, dismiss: () => {},
   proposals: [], addProposals: () => {}, setProposalState: () => {}, removeProposal: () => {},
+  changeSet: null, setChangeSet: () => {}, dismissChangeSet: () => {}, approveChangeSet: async () => false,
   listening: false, setListening: () => {},
 }
 

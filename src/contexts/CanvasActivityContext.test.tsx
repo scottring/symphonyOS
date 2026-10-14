@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { act, render, screen, waitFor } from '@testing-library/react'
 import { useEffect, useState } from 'react'
-import { CanvasActivityProvider, useCanvasActivity, type CanvasActivity } from './CanvasActivityContext'
+import { CanvasActivityProvider, useCanvasActivity, type CanvasActivity, type CanvasActivityProviderProps } from './CanvasActivityContext'
 import type { Task } from '@/types/task'
 
 const t0 = new Date('2026-10-10T08:00:00Z')
@@ -154,5 +154,71 @@ describe('CanvasActivityProvider — writes the canvas does not hold', () => {
     await act(async () => { await vi.advanceTimersByTimeAsync(3000) })
     await waitFor(() => expect(screen.getByTestId('state').textContent).toMatch(/^unverified\|Symphony says it's done/))
     vi.useRealTimers()
+  })
+})
+
+describe('change sets', () => {
+  function mountActivity(extra: { applyChanges?: CanvasActivityProviderProps['applyChanges'] }) {
+    let latest: CanvasActivity | null = null
+    const Grab = () => { latest = useCanvasActivity(); return null }
+    render(
+      <CanvasActivityProvider
+        snapshot={{ tasks: [], goals: [] }}
+        writers={{ deleteTask: vi.fn(), updateTask: vi.fn(), deleteGoal: vi.fn(), updateGoal: vi.fn() }}
+        refetch={vi.fn()}
+        {...extra}
+      ><Grab /></CanvasActivityProvider>,
+    )
+    return { activity: () => latest! }
+  }
+  const set = (key: string) => ({ key, title: '2 changes', ops: [
+    { key: `${key}:0`, op: 'someday' as const, taskId: 'a', title: 'Paper mail' },
+    { key: `${key}:1`, op: 'unplace' as const, taskId: 'b', title: 'Call the bank' },
+  ] })
+
+  it('holds one set; a newer one replaces it and says so', () => {
+    const { activity } = mountActivity({})
+    act(() => activity().setChangeSet(set('s1')))
+    act(() => activity().setChangeSet(set('s2')))
+    expect(activity().changeSet).toMatchObject({ key: 's2', state: 'proposed', replaced: true })
+  })
+
+  it('Approve applies once, clears the card and offers one Undo', async () => {
+    const undo = vi.fn(async () => true)
+    const applyChanges = vi.fn(async () => ({ ok: true as const, ids: ['a', 'b'], undo }))
+    const { activity } = mountActivity({ applyChanges })
+    act(() => activity().setChangeSet(set('s1')))
+    await act(async () => { await activity().approveChangeSet() })
+    expect(applyChanges).toHaveBeenCalledTimes(1)
+    expect(activity().changeSet).toBeNull()
+    expect(activity().receipt).toMatchObject({ state: 'saved', request: '2 changes', undoable: true })
+    await act(async () => { await activity().undo() })
+    expect(undo).toHaveBeenCalledTimes(1)
+  })
+
+  it('a stale set stays on the card with the reason, and nothing is undoable', async () => {
+    const applyChanges = vi.fn(async () => ({ ok: false as const, reason: 'stale' as const, title: 'Paper mail' }))
+    const { activity } = mountActivity({ applyChanges })
+    act(() => activity().setChangeSet(set('s1')))
+    await act(async () => { await activity().approveChangeSet() })
+    expect(activity().changeSet).toMatchObject({ state: 'failed', message: '“Paper mail” changed since I proposed this. Ask me for a fresh list.' })
+    expect(activity().receipt?.undoable).toBe(false)
+  })
+
+  it('a failed apply says nothing changed', async () => {
+    const applyChanges = vi.fn(async () => ({ ok: false as const, reason: 'failed' as const }))
+    const { activity } = mountActivity({ applyChanges })
+    act(() => activity().setChangeSet(set('s1')))
+    await act(async () => { await activity().approveChangeSet() })
+    expect(activity().changeSet).toMatchObject({ state: 'failed', message: "Couldn't save. Nothing was changed. Try again." })
+  })
+
+  it('Undo is gone once the receipt is dismissed', async () => {
+    const applyChanges = vi.fn(async () => ({ ok: true as const, ids: ['a'], undo: vi.fn(async () => true) }))
+    const { activity } = mountActivity({ applyChanges })
+    act(() => activity().setChangeSet(set('s1')))
+    await act(async () => { await activity().approveChangeSet() })
+    act(() => activity().dismiss())
+    expect(activity().receipt).toBeNull()
   })
 })
