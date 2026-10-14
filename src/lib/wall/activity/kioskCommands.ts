@@ -97,7 +97,10 @@ export function parseKioskCommand(input: string): KioskCommand | null {
     if (n != null && n > 0 && n <= 24) return { type: 'set-serves', serves: n }
   }
 
-  if (/\bwhat's for dinner\b|\bwhat is for dinner\b|\bwhats for dinner\b|\bshow (me )?dinner\b|\bdinner tonight\b|^dinner$/.test(t)) {
+  // Tonight's dinner only: "what's for dinner this week / tomorrow / on
+  // Friday" is a question for Symphony (the v2 dock's rest suggestion).
+  const otherDay = /\b(week|weekend|tomorrow|monday|tuesday|wednesday|thursday|friday|saturday|sunday|next)\b/.test(t)
+  if (!otherDay && /\bwhat's for dinner\b|\bwhat is for dinner\b|\bwhats for dinner\b|\bshow (me )?dinner\b|\bdinner tonight\b|^dinner$/.test(t)) {
     return { type: 'show-dinner' }
   }
 

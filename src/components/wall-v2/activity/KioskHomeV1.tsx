@@ -1,33 +1,37 @@
-// The kitchen wall's Home, version 1 (Scott, 2026-10-13; mockup
-// https://claude.ai/artifact/QgfzGwNhgKaECK74dk5nJP). One thing leads at a
-// time, chosen by kioskScreen from the household's routines:
+// The kitchen wall's Home. Version 1 (Scott, 2026-10-13) chose one screen at
+// a time from the household's routines (kioskScreen); Kitchen wall v2 (the
+// mockup Scott approved 2026-10-14, stage 1) gives every moment the same
+// frame: a lead column and a quiet side column split by a hairline, the side
+// column's timeline rows, Fraunces for what matters and Instrument Sans for
+// the rest.
 //
-//   out-the-door   getting ready for school: time left · each kid's steps as
-//                  a checklist (icon = check) · the grown-ups' steps below
-//   rest           the place's scenery · one sentence · notes for the house ·
-//                  the places (Groceries, Recipes, Call, Notes)
-//   home           each kid's after-school work · tonight's dinner beside it
-//   dinner         the dinner view the wall had until Oct 10 (photo, cue,
-//                  what you have, ×1–3, add what's missing) · the question
-//                  of the day as the centrepiece
-//   bedtime        steps × kids · lights out as an arc
-//   night          tomorrow's one time, large · who has what · the first
-//                  thing and the rest of tomorrow · things to talk about
-//   weekend        the day in hours with who's in each block · sometime today
+//   out-the-door   full stage: the time and what's left · the grown-ups'
+//                  line · each kid's checklist (done steps fold to one line;
+//                  the step's icon is its check)
+//   rest           the next landmark, large · dinner · notes for the house ·
+//                  the places · the rest of today and tomorrow beside it
+//   home           each kid's after-school steps · dinner and what's next
+//   dinner         tonight's dinner · the question of the day beside it
+//   bedtime        steps × kids · lights out as a ring · tomorrow
+//   night          tomorrow's one time, large · who has what · talk-abouts ·
+//                  the first thing and the rest of tomorrow beside it
+//   weekend        what's on now · sometime today · the rest of the day
 //
-// Graphics carry the information (rings are time left, icons are steps,
-// faces are people); words only for names and the sentence that matters.
-// Presentation only: the Shell owns data, permissions and writes.
+// More takes the side column (`aside`): the lead stays, dimmed. Presentation
+// only: the Shell owns data, permissions and writes. Lists are limited so
+// nothing scrolls at 1920×1080.
 
-import { createElement, type ReactNode } from 'react'
-import { Check, ChevronRight, Clock, ShoppingCart, BookOpen, Phone, StickyNote, ChefHat, MessageSquare, Shirt, ShoppingBasket, BedDouble, Smile, Utensils, Sparkles, Backpack, Footprints, CircleCheck, type LucideIcon } from 'lucide-react'
+import { createElement, useState, type ReactNode } from 'react'
+import {
+  Check, ChevronRight, ShoppingCart, BookOpen, Phone, StickyNote, ChefHat, MessageSquare, Shirt, ShoppingBasket, BedDouble,
+  Smile, Utensils, Sparkles, Backpack, Footprints, CircleCheck, Folder, Calculator, ShowerHead, BookOpenText, type LucideIcon,
+} from 'lucide-react'
 import type { FamilyMember } from '@/types/family'
 import type { KidRow } from '@/lib/wall/kidDayModel'
 import type { WallTodayRow } from '@/lib/wall/wallMomentsModel'
 import type { BedtimeGrid } from '@/lib/wall/activity/kioskRoutines'
 import { minutesOf, type DayAnchors, type KioskScreenPick } from '@/lib/wall/activity/kioskScreen'
-import { parseWallClock } from '@/lib/wall/activity/kioskCompose'
-import { BedtimeStage, Photo, type KioskDinner } from './KioskStages'
+import { Photo, type KioskDinner } from './KioskStages'
 
 export interface V1Kid {
   member: FamilyMember
@@ -69,12 +73,14 @@ export interface KioskHomeV1Props {
   onAnotherQuestion?: () => void
   onTapRow: (id: string) => void
   places: { onGroceries: () => void; onRecipes: () => void; onCall: () => void; onNotes: () => void }
+  /** More, in place of the side column (Kitchen wall v2). */
+  aside?: ReactNode
 }
 
 const SHARED = '__shared'
 
 /** A person: their colour and initial, the same everywhere on the wall. */
-export function Face({ member, size = 'md' }: { member: Pick<FamilyMember, 'name' | 'initials' | 'color'> | undefined; size?: 'sm' | 'md' | 'lg' }) {
+export function Face({ member, size = 'md' }: { member: Pick<FamilyMember, 'name' | 'initials' | 'color'> | undefined; size?: 'xs' | 'sm' | 'md' | 'lg' }) {
   if (!member) return null
   return (
     <span className={`kv-face is-${size}`} style={{ background: member.color || undefined }} aria-hidden="true">
@@ -83,47 +89,37 @@ export function Face({ member, size = 'md' }: { member: Pick<FamilyMember, 'name
   )
 }
 
-function Faces({ ids, members, size = 'sm' }: { ids: string[]; members: FamilyMember[]; size?: 'sm' | 'md' }) {
-  const people = ids.map((id) => members.find((m) => m.id === id)).filter((m): m is FamilyMember => !!m)
-  if (!people.length) return null
-  return <span className="kv-faces" aria-label={people.map((p) => p.name).join(', ')}>{people.map((p) => <Face key={p.id} member={p} size={size} />)}</span>
-}
-
-/** Time left as a ring: full when the window opens, empty when it closes. */
-function Ring({ left, total, size, children }: { left: number; total: number; size: number; children: ReactNode }) {
-  const r = size / 2 - 18
-  const c = 2 * Math.PI * r
-  const frac = total > 0 ? Math.min(1, Math.max(0, left / total)) : 0
-  return (
-    <div className="kv-ring" style={{ width: size, height: size }}>
-      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} aria-hidden="true">
-        <circle cx={size / 2} cy={size / 2} r={r} className="kv-ring-track" />
-        <circle cx={size / 2} cy={size / 2} r={r} className="kv-ring-fill"
-          strokeDasharray={c} strokeDashoffset={c * (1 - frac)} transform={`rotate(-90 ${size / 2} ${size / 2})`} />
-      </svg>
-      <div className="kv-ring-label">{children}</div>
-    </div>
-  )
-}
-
 const clockLabel = (min: number) => {
   const h = Math.floor(min / 60), m = min % 60
   return `${h % 12 === 0 ? 12 : h % 12}:${String(m).padStart(2, '0')}`
 }
 const nowMin = (d: Date) => d.getHours() * 60 + d.getMinutes()
+/** "4:15p" / "6p" → "4:15" / "6:00": the side column's times. */
+const tlTime = (t: string) => {
+  const m = t.match(/^(\d{1,2})(?::(\d{2}))?\s*([ap])?/i)
+  return m ? `${m[1]}:${m[2] ?? '00'}` : t
+}
+const namesOf = (ids: string[] | undefined, members: FamilyMember[]) =>
+  (ids ?? []).map((id) => members.find((m) => m.id === id)?.name).filter((n): n is string => !!n)
+const byOf = (r: WallTodayRow, members: FamilyMember[]) => r.sub ?? (namesOf(r.owners, members).join(' & ') || null)
 
 /** A step's picture, from the words in it; a plain circle-check otherwise.
  *  Order matters: "Dirty clothes in the hamper" is laundry, not dressing;
- *  "Clear the breakfast dishes" is clearing, not eating. */
+ *  "Clear the breakfast dishes" is clearing, not eating; "Bag packed:
+ *  homework folder" is the bag. */
 const STEP_ICONS: [RegExp, LucideIcon][] = [
   [/\b(hamper|laundry)\b/i, ShoppingBasket],
   [/\b(dish(es)?|clear)\b/i, Sparkles],
-  [/\b(dress(ed)?|clothes|outfit|uniform)\b/i, Shirt],
-  [/\b(bed|room|tidy)\b/i, BedDouble],
+  [/\b(dress(ed)?|clothes|outfit|uniform|pajamas|pyjamas|pjs)\b/i, Shirt],
+  [/\b(shower|bath)\b/i, ShowerHead],
   [/\b(teeth|tooth|brush)\b/i, Smile],
+  [/\b(read|reading|book)\b/i, BookOpenText],
+  [/\b(bed|room|tidy)\b/i, BedDouble],
   [/\b(breakfast|eat|lunch|snack)\b/i, Utensils],
   [/\b(bag|backpack)\b/i, Backpack],
   [/\b(shoes?|jacket|coat|boots)\b/i, Footprints],
+  [/\b(folder)\b/i, Folder],
+  [/\b(math|maths)\b/i, Calculator],
 ]
 export function stepIcon(title: string): LucideIcon {
   return STEP_ICONS.find(([re]) => re.test(title))?.[1] ?? CircleCheck
@@ -139,49 +135,132 @@ const ownTime = (row: KidRow, startsAt: number | null) => {
   const t = minutesOf(row.timeOfDay)
   return t != null && t !== startsAt ? t : null
 }
+/** "Bag packed: homework folder, …" — the row says the step; the bag says what. */
+const shortTitle = (title: string) => title.split(':')[0].trim() || title
 
-/** The morning in two parts, from the times alone: the untimed steps before
- *  the first timed one, then the rest. Named after that first timed step
- *  ("Before breakfast" / "Breakfast & out the door"), or its time. */
-function morningSections(steps: KidRow[], startsAt: number | null): { label: string | null; rows: KidRow[] }[] {
-  const first = steps.findIndex((r) => ownTime(r, startsAt) != null)
-  if (first <= 0) return steps.length ? [{ label: null, rows: steps }] : []
-  const lead = steps[first]
-  const meal = lead.title.match(/\b(breakfast|lunch|snack)\b/i)?.[1].toLowerCase()
-  const name = meal ?? clockLabel(ownTime(lead, startsAt) ?? 0)
-  return [
-    { label: `Before ${name}`, rows: steps.slice(0, first) },
-    { label: `${name[0].toUpperCase()}${name.slice(1)} & out the door`, rows: steps.slice(first) },
-  ]
+// ─── The frame's pieces ──────────────────────────────────────────────────
+
+/** Lead · hairline · side column. With `aside`, More takes the side column
+ *  and the lead stays, dimmed; a full-stage moment gives up ~45% to it. */
+function Stage({ lead, side, sideLabel, aside, full, label }: { lead: ReactNode; side?: ReactNode; sideLabel?: string; aside?: ReactNode; full?: boolean; label: string }) {
+  if (aside) {
+    return (
+      <div className={`kw-stage is-more ${full ? 'was-full' : ''}`}>
+        <section className="kw-col is-dim" aria-label={label}>{lead}</section>
+        <div className="kw-vr" aria-hidden="true" />
+        <div className="kw-col">{aside}</div>
+      </div>
+    )
+  }
+  if (full || !side) return <div className="kw-stage is-full"><section className="kw-col" aria-label={label}>{lead}</section></div>
+  return (
+    <div className="kw-stage">
+      <section className="kw-col" aria-label={label}>{lead}</section>
+      <div className="kw-vr" aria-hidden="true" />
+      <aside className="kw-col kw-side" aria-label={sideLabel}>{side}</aside>
+    </div>
+  )
+}
+
+/** A timeline row in the side column; a button when it opens something. */
+function Tl({ t, w, by, onTap }: { t: string; w: string; by?: string | null; onTap?: () => void }) {
+  const body = <><span className="kw-tl-t">{t}</span><span className="kw-tl-w"><span>{w}</span>{by && <span className="kw-tl-by">{by}</span>}</span></>
+  return onTap
+    ? <button type="button" className="kw-tl" onClick={onTap}>{body}</button>
+    : <div className="kw-tl">{body}</div>
+}
+
+function TodayRows({ rows, p, max }: { rows: WallTodayRow[]; p: KioskHomeV1Props; max: number }) {
+  return <>{rows.slice(0, max).map((r) => <Tl key={r.id} t={tlTime(r.time)} w={r.title} by={byOf(r, p.members)} onTap={() => p.onTapRow(r.id)} />)}</>
+}
+
+/** Time left as a ring: full when the window opens, empty when it closes. */
+function Arc({ frac, size, stroke, children }: { frac: number; size: number; stroke: number; children?: ReactNode }) {
+  const r = 50 - stroke / 2 - 1
+  const c = 2 * Math.PI * r
+  const f = Math.min(1, Math.max(0, frac))
+  return (
+    <div className="kw-arc" style={{ width: `calc(${size} * var(--p))`, height: `calc(${size} * var(--p))` }}>
+      <svg viewBox="0 0 100 100" aria-hidden="true">
+        <circle cx="50" cy="50" r={r} className="kw-arc-track" strokeWidth={stroke} />
+        <circle cx="50" cy="50" r={r} className="kw-arc-fill" strokeWidth={stroke} strokeDasharray={c} strokeDashoffset={c * (1 - f)} transform="rotate(-90 50 50)" />
+      </svg>
+      {children && <div className="kw-arc-label">{children}</div>}
+    </div>
+  )
 }
 
 /** A checklist row: the step's icon is its check (Scott, 2026-10-14). Done,
- *  the circle fills green and shows a check; the whole row is the toggle. */
-function StepRow({ row, next, startsAt, extra, onTick }: { row: KidRow; next: boolean; startsAt: number | null; extra?: string; onTick: () => void }) {
-  const own = ownTime(row, startsAt)
-  // "Bag packed: homework folder, …" — the row says the step; the bag says what.
-  const short = row.title.split(':')[0].trim() || row.title
+ *  the circle fills sage and shows a check; the whole row is the toggle. */
+function StepRow({ row, next, startsAt, extra, onTick }: { row: KidRow; next: boolean; startsAt?: number | null; extra?: string; onTick: () => void }) {
+  const own = startsAt === undefined ? null : ownTime(row, startsAt)
+  const short = shortTitle(row.title)
   return (
     <button type="button" onClick={onTick} aria-label={`Mark ${short} ${row.done ? 'not done' : 'done'}`}
-      className={`kv-step ${row.done ? 'is-done' : next ? 'is-next' : ''}`}>
-      <span className="kv-step-dot" aria-hidden="true">{createElement(row.done ? Check : stepIcon(row.title))}</span>
-      <span className="kv-step-title"><span>{short}</span>{extra && <small>{extra}</small>}</span>
-      {next && <span className="kv-step-next">NEXT</span>}
-      {own != null && <span className="kv-step-time">{clockLabel(own)}</span>}
+      className={`kw-ck ${row.done ? 'is-done' : next ? 'is-next' : ''}`}>
+      <span className="kw-ck-c" aria-hidden="true">{createElement(row.done ? Check : stepIcon(row.title))}</span>
+      <span className="kw-ck-t"><span>{short}</span>{extra && <small>{extra}</small>}</span>
+      {next ? <span className="kw-ck-tag">NEXT</span> : own != null ? <span className="kw-ck-time">{clockLabel(own)}</span> : <span />}
     </button>
   )
 }
 
-/** Getting ready for school (mockup 2026-10-14, from Scott's sketch): the
- *  title and the time left; each kid's steps as a checklist in two parts;
- *  the grown-ups' steps in one line at the foot. */
+/** Done steps fold into one line; a tap opens them so one can be unticked. */
+function DoneLine({ rows, open, onToggle }: { rows: KidRow[]; open: boolean; onToggle: () => void }) {
+  if (!rows.length) return null
+  return (
+    <button type="button" className="kw-ck is-done is-fold" onClick={onToggle} aria-expanded={open}
+      aria-label={open ? 'Hide the done steps' : `Done: ${rows.map((r) => shortTitle(r.title)).join(', ')}. Show them`}>
+      <span className="kw-ck-c" aria-hidden="true"><Check /></span>
+      <span className="kw-ck-t"><span>{open ? 'Done · tap a step to undo it' : rows.map((r) => shortTitle(r.title)).join(' · ')}</span></span>
+      <span />
+    </button>
+  )
+}
+
+/** One kid's checklist: done steps folded, the rest in order; at most `max`
+ *  rows counting the folded line, so nothing scrolls (the count in the
+ *  kid's heading says how many are left). */
+function KidChecklist({ kid, steps, startsAt, bag, max, onTick }: { kid: FamilyMember; steps: KidRow[]; startsAt?: number | null; bag?: string[]; max: number; onTick: (r: KidRow) => void }) {
+  const [open, setOpen] = useState(false)
+  const done = steps.filter((r) => r.done)
+  const todo = steps.filter((r) => !r.done)
+  const next = todo[0]
+  const bagRow = bag?.length ? steps.find((r) => stepIcon(r.title) === Backpack) : undefined
+  const room = Math.max(1, max - (done.length ? 1 : 0))
+  const shown = open ? [...done, ...todo].slice(0, room) : todo.slice(0, room)
+  return (
+    <div className="kw-ck-list" role="group" aria-label={`${kid.name}'s steps`}>
+      <DoneLine rows={done} open={open} onToggle={() => setOpen((o) => !o)} />
+      {shown.map((r) => (
+        <StepRow key={r.id} row={r} next={r === next} startsAt={startsAt}
+          extra={r === bagRow ? bag!.join(' · ') : undefined} onTick={() => onTick(r)} />
+      ))}
+      {steps.length === 0 && <p className="kw-quiet">Nothing on {kid.name}'s list.</p>}
+    </div>
+  )
+}
+
+function KidHead({ kid, meta, count, onOpen }: { kid: FamilyMember; meta?: string | null; count: string; onOpen: () => void }) {
+  return (
+    <button type="button" className="kw-kid-head" onClick={onOpen}>
+      <Face member={kid} size="lg" />
+      <span className="kw-grow"><b>{kid.name}</b>{meta && <small>{meta}</small>}</span>
+      <span className="kw-meta">{count}</span>
+    </button>
+  )
+}
+
+// ─── The moments ────────────────────────────────────────────────────────
+
+/** Getting ready for school (OutTheDoor.dc.html): the time and what's left,
+ *  the grown-ups' line, each kid's checklist. */
 function OutTheDoor(p: KioskHomeV1Props) {
   const end = p.anchors.morning?.end ?? 0
   const start = p.anchors.morning?.start ?? end - 35
   const startsAt = p.anchors.morning?.start ?? null
   const left = Math.max(0, end - nowMin(p.now))
   const total = end - start + 15
-  const frac = total > 0 ? Math.min(1, left / total) : 0
   const kidIds = p.kids.map((k) => k.member.id)
   // The grown-ups' steps: the ones that name only people who aren't kids.
   const seen = new Set<string>()
@@ -189,82 +268,53 @@ function OutTheDoor(p: KioskHomeV1Props) {
     .filter((r) => r.by?.length && !r.by.some((id) => kidIds.includes(id)))
     .filter((r) => { const key = `${r.title}|${r.timeOfDay}`; if (seen.has(r.id) || seen.has(key)) return false; seen.add(r.id); seen.add(key); return true })
     .sort((a, b) => (minutesOf(a.timeOfDay) ?? 0) - (minutesOf(b.timeOfDay) ?? 0))
-  const r = 26, c = 2 * Math.PI * r
-  return (
-    <div className="kv-otd">
-      <header className="kv-otd-head">
-        <h2 className="kv-otd-title">Getting ready for school</h2>
-        <div className="kv-otd-left" aria-label="Time left">
-          <svg width="64" height="64" viewBox="0 0 64 64" aria-hidden="true">
-            <circle cx="32" cy="32" r={r} className="kv-otd-track" />
-            <circle cx="32" cy="32" r={r} className="kv-otd-fill" strokeDasharray={c} strokeDashoffset={c * (1 - frac)} transform="rotate(-90 32 32)" />
-          </svg>
-          {left > 0
-            ? <span><b>{left}</b> <span>{left === 1 ? 'minute to go' : 'minutes to go'}</span></span>
-            : <span><b className="is-word">Time to go</b></span>}
-        </div>
-        <div className="kv-otd-at">
-          <small>Out the door</small>
-          <b>{clockLabel(end)}</b>
-        </div>
+    .slice(0, 4)
+  const lead = (
+    <div className="kw-otd">
+      <header className="kw-otd-head">
+        <h2 className="kw-serif">Out the door at {clockLabel(end)}</h2>
+        <span className="kw-grow" />
+        <Arc frac={total > 0 ? left / total : 0} size={84} stroke={11} />
+        {left > 0
+          ? <span className="kw-otd-left" aria-label="Time left"><b className="kw-serif">{left}</b> <span>{left === 1 ? 'minute' : 'minutes'}</span></span>
+          : <span className="kw-otd-left" aria-label="Time left"><b className="kw-serif is-word">Time to go</b></span>}
       </header>
-      <div className="kv-otd-kids" style={{ ['--kids' as string]: Math.max(1, p.kids.length) }}>
-        {p.kids.map((k) => {
+      {grownUps.length > 0 && (
+        <ul className="kw-grown" aria-label="Grown-ups this morning">
+          {grownUps.map((row) => (
+            <li key={row.id} className={row.done ? 'is-done' : ''}>
+              {(row.by ?? []).slice(0, 2).map((id) => <Face key={id} member={p.members.find((m) => m.id === id)} size="xs" />)}
+              <span>{row.timeOfDay ? `${clockLabel(minutesOf(row.timeOfDay) ?? 0)} ` : ''}{row.title}</span>
+              <span className="sr-only">{namesOf(row.by, p.members).join(' & ')}</span>
+              {row.done && <Check aria-label="done" />}
+            </li>
+          ))}
+        </ul>
+      )}
+      <div className="kw-otd-kids" style={{ ['--kids' as string]: Math.max(1, Math.min(3, p.kids.length)) }}>
+        {p.kids.slice(0, 3).map((k) => {
           const steps = k.morning.filter((r) => isForKid(r, k.member.id))
-          const next = steps.find((r) => !r.done)
           const done = steps.filter((r) => r.done).length
-          const sections = morningSections(steps, startsAt)
-          const bagRow = k.bag.length ? steps.find((r) => stepIcon(r.title) === Backpack) : undefined
-          const tint = k.member.color || 'var(--kc-muted)'
           return (
-            <section key={k.member.id} className="kv-otd-kid" aria-label={`${k.member.name}'s morning`}>
-              <button type="button" className="kv-otd-who" onClick={() => p.onOpenKid(k.member)}>
-                <span className="kv-otd-av" aria-hidden="true" style={{ ['--tint' as string]: tint }}>{(k.member.initials || k.member.name).slice(0, 1)}</span>
-                <span className="kv-otd-name"><b>{k.member.name}</b>{k.special && <small>{k.special} today</small>}</span>
-                <span className="kv-otd-count">
-                  <small>{done} of {steps.length} done</small>
-                  <span className="kv-otd-bar" aria-hidden="true"><span style={{ width: `${steps.length ? (done / steps.length) * 100 : 0}%` }} /></span>
-                </span>
-              </button>
-              {sections.map((s) => (
-                <div key={s.label ?? 'all'} role="group" aria-label={s.label ?? `${k.member.name}'s steps`} className="kv-otd-sec">
-                  {s.label && <p className="kv-otd-lab" aria-hidden="true">{s.label}</p>}
-                  {s.rows.map((r) => (
-                    <StepRow key={r.id} row={r} next={r === next} startsAt={startsAt}
-                      extra={r === bagRow ? k.bag.join(' · ') : undefined} onTick={() => p.onTick(k.member, r)} />
-                  ))}
-                </div>
-              ))}
-              {steps.length === 0 && <p className="kv-quiet">Nothing on {k.member.name}'s morning.</p>}
-              {k.bag.length > 0 && !bagRow && <p className="kv-otd-bag">In the bag: <span>{k.bag.join(' · ')}</span></p>}
+            <section key={k.member.id} className="kw-otd-kid" aria-label={`${k.member.name}'s morning`}>
+              <KidHead kid={k.member} meta={k.special ? `${k.special} today` : null} count={`${done} of ${steps.length}`} onOpen={() => p.onOpenKid(k.member)} />
+              <KidChecklist kid={k.member} steps={steps} startsAt={startsAt} bag={k.bag} max={5} onTick={(r) => p.onTick(k.member, r)} />
+              {k.bag.length > 0 && !steps.some((r) => stepIcon(r.title) === Backpack) && <p className="kw-meta">In the bag: {k.bag.join(' · ')}</p>}
             </section>
           )
         })}
       </div>
-      {grownUps.length > 0 && (
-        <ul className="kv-otd-grown" aria-label="Grown-ups this morning">
-          {grownUps.map((row) => {
-            const names = (row.by ?? []).map((id) => p.members.find((m) => m.id === id)?.name).filter(Boolean).join(' & ')
-            return (
-              <li key={row.id}>
-                <span className="kv-otd-gt">{row.timeOfDay ? clockLabel(minutesOf(row.timeOfDay) ?? 0) : ''}</span>
-                <Faces ids={row.by ?? []} members={p.members} />
-                <span>{row.title}{names ? ` · ${names}` : ''}</span>
-              </li>
-            )
-          })}
-        </ul>
-      )}
     </div>
   )
+  return <Stage full lead={lead} aside={p.aside} label="Getting ready for school" />
 }
 
 function Places({ places }: { places: KioskHomeV1Props['places'] }) {
-  const item = (label: string, Icon: typeof Phone, onClick: () => void) => (
-    <button type="button" className="kv-place" onClick={onClick}><Icon aria-hidden="true" />{label}</button>
+  const item = (label: string, Icon: LucideIcon, onClick: () => void) => (
+    <button type="button" className="kw-btn is-place" onClick={onClick}><Icon aria-hidden="true" />{label}</button>
   )
   return (
-    <nav className="kv-places" aria-label="Places">
+    <nav className="kw-places" aria-label="Places">
       {item('Groceries', ShoppingCart, places.onGroceries)}
       {item('Recipes', BookOpen, places.onRecipes)}
       {item('Call', Phone, places.onCall)}
@@ -273,281 +323,303 @@ function Places({ places }: { places: KioskHomeV1Props['places'] }) {
   )
 }
 
+/** A quiet stretch (Main.dc.html): the next landmark, large; the rest of
+ *  today and tomorrow in the side column. */
 function Rest(p: KioskHomeV1Props) {
-  return (
-    <div className="kv-scene">
-      <div className="kv-sky">
-        <section className="kv-sentence" aria-label="Today">
-          <p className="kv-line">{p.restLine}</p>
-          {p.restSub && <p className="kv-muted">{p.restSub}</p>}
-        </section>
-        <Places places={p.places} />
-      </div>
+  const [hero, ...rest] = p.restLine.split(' · ')
+  const lede = rest.join(' · ') || p.restSub
+  const today = p.weekend.rows.filter((r) => !r.past)
+  // Five timeline rows fit beside the lead, tomorrow's included.
+  const todayMax = p.weekend.tomorrow.length ? 4 : 5
+  const tomorrow = p.weekend.tomorrow.slice(0, Math.max(1, 5 - Math.min(today.length, todayMax)))
+  const lead = (
+    <>
+      <p className="kw-eyebrow">Today</p>
+      <h2 className={`kw-hero ${hero.length > 30 ? 'is-long' : ''}`}>{hero}</h2>
+      {lede && <p className="kw-lede is-muted">{lede}</p>}
+      <span className="kw-grow" />
       {p.notes.length > 0 && (
-        <ul className="kv-notes" aria-label="Notes for the house">
-          {p.notes.slice(0, 3).map((n, i) => (
-            <li key={n.id} className="kv-note" style={{ ['--tilt' as string]: `${[1.6, -1.2, 0.8][i]}deg` }}>
+        <ul className="kw-notes" aria-label="Notes for the house">
+          {p.notes.slice(0, 2).map((n, i) => (
+            <li key={n.id} className="kw-note" style={{ ['--tilt' as string]: `${[-1.5, 1][i]}deg` }}>
               <p>{n.text}</p>{n.by && <small>{n.by}</small>}
             </li>
           ))}
         </ul>
       )}
-    </div>
+      <Places places={p.places} />
+    </>
   )
+  const side = (
+    <>
+      <p className="kw-eyebrow kw-side-lab">The rest of today</p>
+      <TodayRows rows={today} p={p} max={todayMax} />
+      {today.length === 0 && <p className="kw-quiet">Nothing else on the clock today.</p>}
+      {tomorrow.length > 0 && (
+        <>
+          <p className="kw-eyebrow kw-side-lab is-gap">Tomorrow</p>
+          {tomorrow.map((r) => <Tl key={r.id} t={tlTime(r.time)} w={r.title} by={byOf(r, p.members)} />)}
+        </>
+      )}
+    </>
+  )
+  return <Stage lead={lead} side={side} sideLabel="The rest of today" aside={p.aside} label="Today" />
 }
 
-function HomeFromSchool(p: KioskHomeV1Props) {
-  return (
-    <div className="kv-row">
-      <section className="kv-kids" aria-label="After school">
-        {p.kids.map((k) => {
-          const rows = k.after.filter((r) => isForKid(r, k.member.id))
-          const current = rows.find((r) => !r.done)
-          return (
-            <div key={k.member.id} className="kv-card kv-kid">
-              <button type="button" className="kv-kid-head" onClick={() => p.onOpenKid(k.member)}>
-                <Face member={k.member} size="lg" />
-                <span><b>{k.member.name}</b></span>
-                <ChevronRight aria-hidden="true" className="kv-go" />
-              </button>
-              <div className="kv-work">
-                {rows.map((r) => (
-                  <button key={`${r.entityType}:${r.id}`} type="button" aria-pressed={r.done} onClick={() => p.onTick(k.member, r)}
-                    className={`kv-work-row ${r.done ? 'is-done' : r === current ? 'is-now' : ''}`}>
-                    <span className="kv-check" aria-hidden="true">{r.done && <Check />}</span>
-                    <span>{r.title}</span>
-                    {r.target && <small>{r.target.amount} {r.target.unit}</small>}
-                  </button>
-                ))}
-                {rows.length === 0 && <p className="kv-quiet">Nothing to do after school.</p>}
-              </div>
-            </div>
-          )
-        })}
-      </section>
-      <DinnerSide {...p} />
-    </div>
-  )
-}
-
-function DinnerSide(p: KioskHomeV1Props) {
+/** Dinner in the side column: what, when, and the way in. */
+function DinnerSide({ p, after }: { p: KioskHomeV1Props; after: WallTodayRow[] }) {
   const d = p.dinner
   return (
-    <aside className="kv-card kv-dinner-side" aria-label="Dinner">
+    <>
+      <p className="kw-eyebrow">{d?.timeLabel ?? 'Dinner'}</p>
       {d ? (
         <>
-          <button type="button" className="kv-dinner-photo" onClick={d.hasRecipe ? p.onOpenRecipe : undefined} aria-label={d.hasRecipe ? `${d.title}: open the recipe` : d.title}>
-            <Photo url={d.imageUrl} className="kv-fill" />
-          </button>
-          <div className="kv-pad">
-            <p className="kv-lab">{d.timeLabel ?? 'Dinner tonight'}</p>
-            <p className="kv-title">{d.title}</p>
-            {d.cue && <p className="kv-cue"><Clock aria-hidden="true" />{d.cue}</p>}
-          </div>
+          <p className="kw-lede kw-side-title">{d.title}</p>
+          {d.cue && <p className="kw-meta">{d.cue}</p>}
+          {(d.key || d.hasRecipe) && (
+            <div className="kw-acts">
+              {d.key && <button type="button" className="kw-btn is-primary" onClick={p.onStartCooking}><ChefHat aria-hidden="true" />Start cooking</button>}
+              {d.hasRecipe && <button type="button" className="kw-btn is-quiet" onClick={p.onOpenRecipe}>Recipe</button>}
+            </div>
+          )}
         </>
-      ) : <div className="kv-pad"><p className="kv-lab">Dinner</p><p className="kv-quiet">Nothing planned yet.</p></div>}
-    </aside>
+      ) : <p className="kw-quiet">Nothing planned yet.</p>}
+      <TodayRows rows={after} p={p} max={3} />
+    </>
   )
 }
 
-/** The dinner view the wall had until Oct 10 (Scott: keep it), beside the question of the day. */
+/** Home from school (HomeFromSchool.dc.html): each kid's steps · dinner. */
+function HomeFromSchool(p: KioskHomeV1Props) {
+  const lead = (
+    <>
+      <p className="kw-eyebrow">After school</p>
+      <div className="kw-kids" style={{ ['--kids' as string]: Math.max(1, Math.min(3, p.kids.length)) }}>
+        {p.kids.slice(0, 3).map((k) => {
+          const rows = k.after.filter((r) => isForKid(r, k.member.id))
+          const done = rows.filter((r) => r.done).length
+          return (
+            <section key={k.member.id} className="kw-kid" aria-label={`${k.member.name} after school`}>
+              <KidHead kid={k.member} count={`${done} of ${rows.length}`} onOpen={() => p.onOpenKid(k.member)} />
+              <KidChecklist kid={k.member} steps={rows} max={5} onTick={(r) => p.onTick(k.member, r)} />
+            </section>
+          )
+        })}
+      </div>
+    </>
+  )
+  const after = p.weekend.rows.filter((r) => !r.past && !/dinner/i.test(r.title))
+  return <Stage lead={lead} side={<DinnerSide p={p} after={after} />} sideLabel="Dinner" aside={p.aside} label="After school" />
+}
+
+/** Dinner (Dinner.dc.html): tonight's dinner leads; the question of the day
+ *  sits in the side column, large. */
 function Dinner(p: KioskHomeV1Props) {
   const d = p.dinner
-  return (
-    <div className="kv-row">
-      <section className="kv-card kv-dinner" aria-label="Tonight's dinner">
-        {d ? (
-          <>
-            <div className="kv-dinner-hero">
-              <button type="button" className="kv-dinner-photo" onClick={d.hasRecipe ? p.onOpenRecipe : undefined} aria-label={d.hasRecipe ? `${d.title}: open the recipe` : d.title}>
-                <Photo url={d.imageUrl} className="kv-fill" />
-              </button>
-              <div className="kv-dinner-cap">
-                <p className="kv-title">{d.title}</p>
-                {d.minutes && <small>{d.minutes} min</small>}
-              </div>
-            </div>
-            {d.cue && <p className="kv-cue"><Clock aria-hidden="true" />{d.cue}</p>}
-            <div className="kv-dinner-body">
-              <ul className="kv-have" aria-label="What you have">
-                {d.ingredients.map((line, i) => {
-                  const have = p.have.includes(i)
-                  return (
-                    <li key={i}>
-                      <button type="button" aria-pressed={have} onClick={() => p.onToggleHave(i)} className={have ? 'is-have' : ''}>
-                        <span className="kv-check" aria-hidden="true">{have && <Check />}</span><span>{line}</span>
-                      </button>
-                    </li>
-                  )
-                })}
-                {d.ingredients.length === 0 && <li className="kv-quiet">No ingredient list for this one.</li>}
-              </ul>
-              <div className="kv-dinner-acts">
-                {d.hasRecipe && <button type="button" className="kv-btn is-primary" onClick={p.onOpenRecipe}>Cook from the recipe <ChevronRight aria-hidden="true" /></button>}
-                {d.key && <button type="button" className="kv-btn" onClick={p.onStartCooking}><ChefHat aria-hidden="true" />Step by step, with timers</button>}
-                <div className="kv-scale" role="group" aria-label="Scale the recipe">
-                  {[1, 2, 3].map((n) => <button key={n} type="button" aria-pressed={p.scale === n} onClick={() => p.onScale(n)}>×{n}</button>)}
-                </div>
-                {d.ingredients.length > 0 && <button type="button" className="kv-btn" onClick={p.onAddMissing}><ShoppingCart aria-hidden="true" />Add what's missing</button>}
-              </div>
-            </div>
-          </>
-        ) : <p className="kv-quiet">No dinner planned tonight.</p>}
-      </section>
-      <section className="kv-card kv-question" aria-label="Question of the day">
-        <p className="kv-lab is-voice">Question of the day</p>
-        {p.question
-          ? <p className="kv-question-text">{p.question}</p>
-          : <p className="kv-quiet">No question today.</p>}
-        <div className="kv-question-foot">
-          <Faces ids={p.members.map((m) => m.id)} members={p.members} size="md" />
-          <span className="kv-muted">Everyone answers.</span>
-          {p.onAnotherQuestion && <button type="button" className="kv-btn" onClick={p.onAnotherQuestion}>Another question</button>}
-        </div>
-      </section>
-    </div>
+  const t = nowMin(p.now)
+  const after = p.weekend.rows.filter((r) => !r.past && r.startsAt != null && nowMin(new Date(r.startsAt)) > t + 30 && !/dinner/i.test(r.title))
+  const lead = d ? (
+    <>
+      {d.imageUrl && (
+        <button type="button" className="kw-photo" onClick={d.hasRecipe ? p.onOpenRecipe : undefined} aria-label={d.hasRecipe ? `${d.title}: open the recipe` : d.title}>
+          <Photo url={d.imageUrl} />
+        </button>
+      )}
+      <p className="kw-eyebrow">{d.timeLabel ?? 'Tonight'}</p>
+      <h2 className={`kw-serif kw-dinner-title ${d.imageUrl ? '' : 'is-big'}`}>{d.title}</h2>
+      {d.minutes && <p className="kw-sub">{d.minutes} minutes to make{d.ingredients.length ? ` · ${d.ingredients.length} ingredients` : ''}</p>}
+      {d.cue && <p className="kw-meta kw-cue">{d.cue}</p>}
+      <span className="kw-grow" />
+      <div className="kw-acts">
+        {d.hasRecipe && <button type="button" className="kw-btn is-primary" onClick={p.onOpenRecipe}><BookOpen aria-hidden="true" />Open the recipe</button>}
+        {d.key && <button type="button" className={`kw-btn ${d.hasRecipe ? 'is-quiet' : 'is-primary'}`} onClick={p.onStartCooking}><ChefHat aria-hidden="true" />Step by step</button>}
+        {d.ingredients.length > 0 && <button type="button" className="kw-btn is-quiet" onClick={p.onAddMissing}><ShoppingCart aria-hidden="true" />What's missing</button>}
+      </div>
+    </>
+  ) : (
+    <>
+      <p className="kw-eyebrow">Tonight</p>
+      <h2 className="kw-serif kw-dinner-title is-big">No dinner planned tonight</h2>
+    </>
   )
+  const side = (
+    <>
+      <p className="kw-eyebrow is-sym">Question of the day</p>
+      {p.question ? <p className="kw-question">{p.question}</p> : <p className="kw-quiet">No question today.</p>}
+      {p.onAnotherQuestion && <button type="button" className="kw-btn is-quiet kw-another" onClick={p.onAnotherQuestion}>Another question</button>}
+      <span className="kw-grow" />
+      {after.length > 0 && <p className="kw-eyebrow kw-side-lab">After dinner</p>}
+      <TodayRows rows={after} p={p} max={2} />
+    </>
+  )
+  return <Stage lead={lead} side={side} sideLabel="Question of the day" aside={p.aside} label="Tonight's dinner" />
 }
 
+/** Bedtime (Bedtime.dc.html): steps × kids, lights out as a ring, tomorrow. */
 function Bedtime(p: KioskHomeV1Props) {
-  const left = Math.max(0, p.anchors.bedtime.end - nowMin(p.now))
-  return (
-    <div className="kv-row">
-      <div className="kv-grow"><BedtimeStage grid={p.bedtime} onTick={(id, row) => { const m = p.members.find((x) => x.id === id); if (m) p.onTick(m, row) }} /></div>
-      <aside className="kv-card kv-countdown is-narrow" aria-label="Lights out">
-        <Ring left={left} total={p.anchors.bedtime.end - p.anchors.bedtime.start} size={320}>
-          <b className="kv-big">{left}</b><span>minutes</span>
-        </Ring>
-        <div className="kv-center">
-          <div className="kv-strong">Lights out at {clockLabel(p.anchors.bedtime.end)}</div>
-          {p.tomorrow.specials.length > 0 && <div className="kv-muted">Tomorrow: {p.tomorrow.specials.map((s) => `${s.member.name} ${s.text}`).join(' · ')}</div>}
+  const g = p.bedtime
+  const end = p.anchors.bedtime.end
+  const left = Math.max(0, end - nowMin(p.now))
+  const span = Math.max(1, end - p.anchors.bedtime.start)
+  const people = g.people.slice(0, 3)
+  const current = g.steps.find((s) => s.cells.some((c) => c.row && !c.row.done))?.key
+  // Six rows fit; past that, steps everyone has finished give way first.
+  const MAX = 6
+  let steps = g.steps
+  if (steps.length > MAX) {
+    const open = steps.filter((s) => s.cells.some((c) => c.row && !c.row.done))
+    const keep = open.length >= MAX ? open.slice(0, MAX) : [...steps.filter((s) => !open.includes(s)).slice(-(MAX - open.length)), ...open]
+    steps = g.steps.filter((s) => keep.includes(s))
+  }
+  const lead = people.length === 0 ? <p className="kw-quiet">No bedtime routine tonight.</p> : (
+    <div className="kw-bed" style={{ ['--cols' as string]: people.length }}>
+      <p className="kw-eyebrow kw-bed-lab">{g.title} · {g.done} of {g.total}</p>
+      {people.map((who) => (
+        <span key={who.id} className="kw-bed-who"><Face member={p.members.find((m) => m.id === who.id) ?? { name: who.name, initials: who.name.slice(0, 1), color: '' } as FamilyMember} size="lg" /><span className="kw-meta">{who.name}</span></span>
+      ))}
+      {steps.map((s) => (
+        <div key={s.key} className="kw-bed-row" role="group" aria-label={s.title}>
+          <span className="kw-bed-s">{createElement(stepIcon(s.title), { 'aria-hidden': true })}{s.title}</span>
+          {s.cells.filter((c) => people.some((x) => x.id === c.memberId)).map((c) => {
+            const name = g.people.find((x) => x.id === c.memberId)?.name ?? ''
+            return (
+              <span key={c.memberId} className="kw-bed-cell">
+                {c.row
+                  ? <button type="button" aria-pressed={c.row.done} aria-label={`${name}: ${s.title}`}
+                      className={`kw-bed-c ${c.row.done ? 'is-done' : s.key === current ? 'is-now' : ''}`} onClick={() => { const m = p.members.find((x) => x.id === c.memberId); if (m) p.onTick(m, c.row!) }}>
+                      {c.row.done && <Check aria-hidden="true" />}
+                    </button>
+                  : <span className="kw-bed-na" role="img" aria-label={`${name}: not in their routine`} />}
+              </span>
+            )
+          })}
         </div>
-      </aside>
+      ))}
     </div>
   )
+  const specials = p.tomorrow.specials.map((s) => `${s.member.name}: ${s.text}`).join(' · ')
+  const side = (
+    <>
+      <p className="kw-eyebrow">Lights out</p>
+      <Arc frac={left / span} size={300} stroke={5}>
+        <span className="kw-serif kw-arc-big">{clockLabel(end)}</span>
+        <span className="kw-meta">{left > 0 ? `in ${left} minute${left === 1 ? '' : 's'}` : 'now'}</span>
+      </Arc>
+      <p className="kw-eyebrow kw-side-lab">Tomorrow</p>
+      {p.tomorrow.outTheDoor && <Tl t={p.tomorrow.outTheDoor} w="Out the door" by={specials || null} />}
+      {p.weekend.tomorrow.slice(0, p.tomorrow.outTheDoor ? 1 : 2).map((r) => <Tl key={r.id} t={tlTime(r.time)} w={r.title} by={byOf(r, p.members)} />)}
+      {!p.tomorrow.outTheDoor && p.weekend.tomorrow.length === 0 && <p className="kw-quiet">Nothing on the clock yet.</p>}
+    </>
+  )
+  return <Stage lead={lead} side={side} sideLabel="Lights out" aside={p.aside} label="Bedtime" />
 }
 
-/** Night (mockup 2026-10-14): tomorrow's one time, large; who has what;
- *  the first thing in the morning and what else is on the clock beside it. */
+/** Night (Night.dc.html): tomorrow's one time, large; who has what; the
+ *  first thing in the morning and the rest of tomorrow beside it. */
 function Night(p: KioskHomeV1Props) {
   const t = p.tomorrow
   const first = t.outTheDoor && p.anchors.morning
     ? [...(p.kids[0]?.morning ?? [])].filter((r) => minutesOf(r.timeOfDay) != null).sort((a, b) => (minutesOf(a.timeOfDay) ?? 0) - (minutesOf(b.timeOfDay) ?? 0))[0] ?? null
     : null
-  const lead = t.outTheDoor ? null : p.weekend.tomorrow[0] ?? null
-  const also = p.weekend.tomorrow.filter((r) => r !== lead).slice(0, 3)
-  return (
-    <div className="kv-night">
-      <section className="kv-night-lead" aria-label="Tomorrow">
-        <p className="kv-lab">Tomorrow · {t.label}</p>
-        {t.outTheDoor
-          ? <div className="kv-hero"><b>{t.outTheDoor}</b><small>am</small></div>
-          : lead ? <div className="kv-hero"><b>{lead.time.replace(/[ap]$/, '')}</b><small>{lead.time.endsWith('p') ? 'pm' : 'am'}</small></div> : null}
-        {t.outTheDoor ? <p className="kv-hero-sub">Out the door</p>
-          : lead ? <p className="kv-hero-sub">{lead.title}</p>
-          : <p className="kv-hero-sub is-quiet">Nothing set for the morning yet.</p>}
-        {t.specials.length > 0 && (
-          <div className="kv-specials">
-            {t.specials.map((s) => (
-              <span key={s.member.id}><Face member={s.member} size="md" /><span><small>{s.member.name}</small><b>{s.text}</b></span></span>
-            ))}
-          </div>
-        )}
-        {p.talks.length > 0 && (
-          <button type="button" className="kv-talk-line" onClick={p.places.onNotes}>
-            <MessageSquare aria-hidden="true" />
-            <span><b>{p.talks.length === 1 ? '1 thing' : `${p.talks.length} things`} to talk about</b><small>{p.talks.slice(0, 3).map((x) => x.text).join(' · ')}</small></span>
-            <ChevronRight aria-hidden="true" className="kv-go" />
-          </button>
-        )}
-      </section>
-      {(first || also.length > 0) && (
-        <aside className="kv-night-side" aria-label="Also tomorrow">
-          {first && p.anchors.morning && (
-            <div>
-              <p className="kv-lab">First thing</p>
-              <div className="kv-side-time"><b>{clockLabel(minutesOf(first.timeOfDay) ?? p.anchors.morning.start)}</b><small>am</small></div>
-              <p className="kv-side-sub">{first.title}</p>
-            </div>
-          )}
-          {also.length > 0 && (
-            <div>
-              <p className="kv-lab">Also tomorrow</p>
-              <ul className="kv-times">
-                {also.map((r) => <li key={r.id}><b>{r.time}</b><span>{r.title}</span></li>)}
-              </ul>
-            </div>
-          )}
-        </aside>
+  const lead0 = t.outTheDoor ? null : p.weekend.tomorrow[0] ?? null
+  const also = p.weekend.tomorrow.filter((r) => r !== lead0).slice(0, 3)
+  const big = t.outTheDoor ?? (lead0 ? tlTime(lead0.time) : null)
+  const ampm = t.outTheDoor ? 'am' : lead0 ? (/p/i.test(lead0.time) ? 'pm' : 'am') : ''
+  const lead = (
+    <>
+      <p className="kw-eyebrow">Tomorrow · {t.label}</p>
+      {big && <div className="kw-night-time"><b className="kw-serif">{big}</b><small>{ampm}</small></div>}
+      <p className={`kw-night-what ${big ? '' : 'is-quiet'}`}>{t.outTheDoor ? 'Out the door' : lead0 ? lead0.title : 'Nothing set for the morning yet.'}</p>
+      {t.specials.length > 0 && (
+        <div className="kw-specials">
+          {t.specials.slice(0, 3).map((s) => (
+            <span key={s.member.id} className="kw-who"><Face member={s.member} size="lg" /><span><small>{s.member.name}</small><b>{s.text}</b></span></span>
+          ))}
+        </div>
       )}
-    </div>
+      <span className="kw-grow" />
+      {p.talks.length > 0 && (
+        <button type="button" className="kw-btn is-quiet kw-talks" onClick={p.places.onNotes}>
+          <MessageSquare aria-hidden="true" />
+          <span><b>{p.talks.length === 1 ? '1 thing' : `${p.talks.length} things`} to talk about</b><small>{p.talks.slice(0, 3).map((x) => x.text).join(' · ')}</small></span>
+          <ChevronRight aria-hidden="true" />
+        </button>
+      )}
+    </>
   )
+  const side = (first || also.length > 0) ? (
+    <>
+      {first && p.anchors.morning && (
+        <>
+          <p className="kw-eyebrow">First thing</p>
+          <div className="kw-first"><b className="kw-serif">{clockLabel(minutesOf(first.timeOfDay) ?? p.anchors.morning.start)}</b><small>am</small></div>
+          <p className="kw-first-what">{first.title}{first.by?.length ? <span className="kw-muted"> · {namesOf(first.by, p.members).join(' & ')}</span> : null}</p>
+        </>
+      )}
+      {also.length > 0 && (
+        <>
+          <p className={`kw-eyebrow kw-side-lab ${first ? 'is-gap-lg' : ''}`}>Also tomorrow</p>
+          {also.map((r) => <Tl key={r.id} t={tlTime(r.time)} w={r.title} by={byOf(r, p.members)} />)}
+        </>
+      )}
+    </>
+  ) : null
+  return <Stage lead={lead} side={side} sideLabel="Also tomorrow" aside={p.aside} label="Tomorrow" />
 }
 
-/** A weekend day in hours: blocks with the faces of who's in them. */
+/** A weekend day (Saturday.dc.html): what's on now, sometime today, and the
+ *  rest of the day beside it. */
 function Weekend(p: KioskHomeV1Props) {
-  const day = new Date(p.now); day.setHours(0, 0, 0, 0)
-  const startH = 7, endH = 21, span = (endH - startH) * 60
-  const pos = (d: Date) => ((d.getHours() * 60 + d.getMinutes() - startH * 60) / span) * 100
-  const blocks = p.weekend.rows.flatMap((r) => {
-    const at = r.startsAt != null ? new Date(r.startsAt) : parseWallClock(r.time, day)
-    if (!at) return []
-    const end = r.endsAt != null ? new Date(r.endsAt) : new Date(at.getTime() + 45 * 60_000)
-    const left = Math.max(0, pos(at)), right = Math.min(100, pos(end))
-    if (right <= 0 || left >= 100) return []
-    return [{ r, left, width: Math.max(5, right - left) }]
-  })
-  // Overlapping blocks stack into lanes so each stays readable.
-  const lanes: { end: number }[] = []
-  const placed = blocks.sort((a, b) => a.left - b.left).map((b) => {
-    let lane = lanes.findIndex((l) => l.end <= b.left)
-    if (lane < 0) { lane = lanes.length; lanes.push({ end: 0 }) }
-    lanes[lane].end = b.left + b.width
-    return { ...b, lane }
-  })
-  const laneH = 100 / Math.max(1, lanes.length)
-  const nowPos = pos(p.now)
-  return (
-    <div className="kv-scene is-weekend">
-      <div className="kv-weekend">
-        <section className="kv-card kv-hours" aria-label="Today, hour by hour">
-          <div className="kv-hour-ticks" aria-hidden="true">
-            {Array.from({ length: endH - startH }, (_, i) => <span key={i}>{((startH + i) % 12) || 12}</span>)}
-          </div>
-          <div className="kv-hour-track">
-            {placed.map(({ r, left, width, lane }) => (
-              <button key={r.id} type="button" onClick={() => p.onTapRow(r.id)}
-                className={`kv-block ${r.now ? 'is-now' : r.past ? 'is-past' : ''}`}
-                style={{ left: `${left}%`, width: `${width}%`, top: `${lane * laneH}%`, height: `calc(${laneH}% - 10px)` }}>
-                <small>{r.time}{r.end ? `–${r.end}` : ''}</small>
-                <b>{r.title}</b>
-                <Faces ids={r.owners} members={p.members} />
-              </button>
-            ))}
-            {placed.length === 0 && <p className="kv-quiet kv-hour-empty">Nothing on the clock today. A free day.</p>}
-            {nowPos > 0 && nowPos < 100 && <span className="kv-now-line" style={{ left: `${nowPos}%` }} aria-hidden="true" />}
-          </div>
-        </section>
-        <div className="kv-row is-short">
-          <section className="kv-card kv-grow" aria-label="Sometime today">
-            <p className="kv-lab">Sometime today</p>
-            <div className="kv-tags">
-              {p.weekend.anytime.map((a) => <span key={a.title} className="kv-tag is-task">{a.title}<Faces ids={a.owners} members={p.members} /></span>)}
-              {p.weekend.anytime.length === 0 && <p className="kv-quiet">Nothing else today.</p>}
+  const rows = p.weekend.rows
+  const lead0 = rows.find((r) => r.now && !r.past) ?? rows.find((r) => !r.past) ?? null
+  const later = rows.filter((r) => !r.past && r !== lead0)
+  const until = lead0?.endsAt ? new Date(lead0.endsAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }).replace(/\s?[AP]M$/i, '') : null
+  const anytime = p.weekend.anytime.slice(0, 6)
+  const lead = (
+    <>
+      {lead0 ? (
+        <>
+          <p className={`kw-eyebrow ${lead0.now ? 'is-now' : ''}`}>{lead0.now && <span className="kw-dot" aria-hidden="true" />}{lead0.now ? `Now${until ? ` · until ${until}` : ''}` : `Next · ${tlTime(lead0.time)}`}</p>
+          <h2 className={`kw-hero is-weekend ${lead0.title.length > 26 ? 'is-long' : ''}`}>{lead0.title}</h2>
+          {lead0.sub && <p className="kw-sub">{lead0.sub}</p>}
+          {lead0.owners.length > 0 && (
+            <div className="kw-people">
+              {lead0.owners.slice(0, 5).map((id) => { const m = p.members.find((x) => x.id === id); return m ? <span key={id} className="kw-who"><Face member={m} size="sm" />{m.name}</span> : null })}
             </div>
-          </section>
-          <section className="kv-card kv-side" aria-label="Tomorrow">
-            <p className="kv-lab">Tomorrow · {p.weekend.tomorrowLabel}</p>
-            <ul className="kv-list">
-              {p.weekend.tomorrow.slice(0, 4).map((r) => <li key={r.id}><b>{r.time}</b> {r.title}<Faces ids={r.owners} members={p.members} /></li>)}
-              {p.weekend.tomorrow.length === 0 && <li className="kv-quiet">Nothing on the clock yet.</li>}
-            </ul>
-          </section>
-        </div>
-        <Places places={p.places} />
-      </div>
-    </div>
+          )}
+        </>
+      ) : (
+        <>
+          <p className="kw-eyebrow">Today</p>
+          <h2 className="kw-hero is-weekend">A free day</h2>
+          <p className="kw-sub">Nothing on the clock today.</p>
+        </>
+      )}
+      <span className="kw-grow" />
+      <div className="kw-anytime-head"><span className="kw-eyebrow">Sometime today</span><span className="kw-meta">{p.weekend.anytime.length ? `${p.weekend.anytime.length} to do` : 'Nothing else today'}</span></div>
+      {anytime.length > 0 && (
+        <ul className="kw-anytime" aria-label="Sometime today">
+          {anytime.map((a) => (
+            <li key={a.title}><span className="kw-anytime-dot" aria-hidden="true" /><span>{a.title}{a.owners.length > 0 && <small>{namesOf(a.owners, p.members).join(' & ')}</small>}</span></li>
+          ))}
+        </ul>
+      )}
+    </>
   )
+  const side = (
+    <>
+      <p className="kw-eyebrow kw-side-lab">Later today</p>
+      <TodayRows rows={later} p={p} max={p.weekend.tomorrow.length ? 3 : 5} />
+      {later.length === 0 && <p className="kw-quiet">Nothing else on the calendar.</p>}
+      {p.weekend.tomorrow.length > 0 && (
+        <>
+          <p className="kw-eyebrow kw-side-lab is-gap">Tomorrow · {p.weekend.tomorrowLabel}</p>
+          {p.weekend.tomorrow.slice(0, Math.max(1, 4 - Math.min(3, later.length))).map((r) => <Tl key={r.id} t={tlTime(r.time)} w={r.title} by={byOf(r, p.members)} />)}
+        </>
+      )}
+    </>
+  )
+  return <Stage lead={lead} side={side} sideLabel="Later today" aside={p.aside} label="Today" />
 }
 
 export function KioskHomeV1(p: KioskHomeV1Props) {
