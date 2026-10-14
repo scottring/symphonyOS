@@ -2,6 +2,7 @@ import { planSaved } from './planSaved.ts'
 import { SHOW_TOOL, showSteps } from './showOnPage.ts'
 import { contactFieldError, mergeLinks } from './prep.ts'
 import { IDEMPOTENT_CREATES, PROPOSE_TOOL, proposalItems, stableRowId, toolOutcome } from './canvasEvents.ts'
+import { PROPOSE_CHANGES_TOOL, changeSetFromInput, resolveRefs } from './changeSet.ts'
 import { planningRow, validatePlanningParent, planningWeekStart } from './planning.ts'
 import { createClient, SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { buildDraftPayload, clampMaxResults } from '../_shared/gmail-tools.ts'
@@ -105,6 +106,9 @@ Preparing to act:
 - When a resource serves several tasks (a supply list for the whole class, the venue for every planning step), put it once on the goal they share, and say so; the tasks reach it from there. Don't copy it onto every child.
 
 Doing versus suggesting:
+- When a request changes MORE THAN ONE task (move these three, plan the rest of my week, sort my inbox), do not write: read what you need, then call symphony_propose_changes ONCE with the whole list. The person sees one change card and approves it with one tap. If they ask for a change to the list, call it again with the full revised list.
+- A change to ONE task is still done directly with the write tools, as below.
+- symphony_propose_changes has no delete. To drop something, use someday.
 - When the person says what they want ("add X", "my goals are A and B", "book a consultation"), do it with the write tools; the screen shows each save as it lands and offers Undo, so do not ask them to confirm every explicit instruction.
 - When YOU think of something they did not say (a missing month goal, a week task), offer it with symphony_propose_plan_items instead of creating it. Suggestions show dashed until the person keeps them. Never invent goals; suggestions must follow from what they said.
 - When asked where unlinked items belong, read the period's items and the parents one horizon up, then suggest links with symphony_propose_plan_items (item_id + parent_id), one per item that clearly fits. Leave out items with no good match and say which. Never link them yourself unless the person says to.
@@ -123,6 +127,7 @@ const BUCKET_ENUM = ['inbox', 'timed', 'week', 'month', 'quarter']
 
 const TOOLS = [
   PROPOSE_TOOL,
+  PROPOSE_CHANGES_TOOL,
   SHOW_TOOL,
   {name:'symphony_link_plan_item',description:'Connect an existing month goal to a season goal or an existing week task to a month goal. Preserves the existing item, dates and completion. Read both items first. Does not create a replacement or alter either life area.',input_schema:{type:'object',properties:{id:{type:'string'},parent_id:{type:'string'},level:{type:'string',enum:['month','week']}},required:['id','parent_id','level']}},
   { name: 'symphony_list_intentions', description: 'Read existing year goals before planning or creating another. Returns up to 100 visible year goals.', input_schema: {type:'object',properties:{year:{type:'integer'},context:{type:'string',enum:CONTEXT_ENUM}}}},
@@ -1525,6 +1530,29 @@ Deno.serve(async (req) => {
                 else {
                   send({ type: 'show', steps: shown.steps })
                   result = JSON.stringify({ shown: shown.steps.length, note: shown.steps.length > 1 ? 'The page is walking them through these steps with Next and Back. Your reply must be ONE short sentence, such as "Here is the page, one part at a time; use Next to go on." Do not summarise or list the steps.' : 'Shown on the page now. Answer in a sentence or two; do not repeat the note.' })
+                }
+              } else if (block.name === PROPOSE_CHANGES_TOOL.name) {
+                // A change card: validated and resolved through the person's own
+                // RLS-scoped reads, streamed to the page, never written here.
+                const parsed = changeSetFromInput(block.input ?? {}, String(block.id ?? crypto.randomUUID()))
+                if ('error' in parsed) result = JSON.stringify({ error: parsed.error })
+                else {
+                  const taskIds = [...new Set(parsed.set.ops.flatMap((o) => o.taskId ? [o.taskId] : []))]
+                  const memberIds = [...new Set(parsed.set.ops.flatMap((o) => o.assignee ? [o.assignee] : []))]
+                  const { data: taskRows, error: taskErr } = taskIds.length
+                    ? await db.from('tasks').select('id, title, updated_at, completed').in('id', taskIds)
+                    : { data: [], error: null }
+                  const { data: memberRows, error: memberErr } = memberIds.length
+                    ? await db.from('family_members').select('id, name').in('id', memberIds)
+                    : { data: [], error: null }
+                  const resolved = taskErr || memberErr
+                    ? { error: 'Could not read the tasks to check this list. Try again.' }
+                    : resolveRefs(parsed.set, taskRows ?? [], memberRows ?? [])
+                  if ('error' in resolved) result = JSON.stringify({ error: resolved.error })
+                  else {
+                    send({ type: 'change_set', set: resolved.set })
+                    result = JSON.stringify({ shown: resolved.set.ops.length, saved: false, note: 'Shown as a change card. Nothing is saved until the person approves. Reply in one short sentence; do not repeat the list.' })
+                  }
                 }
               } else if (block.name === PROPOSE_TOOL.name) {
                 // Suggestions are shown, never written here.

@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { changeSetFromInput, resolveRefs } from './changeSet'
 
@@ -64,5 +65,17 @@ describe('resolveRefs', () => {
     expect('error' in resolveRefs(base.set,
       [{ id: A, title: 'a', updated_at: 'x', completed: false }, { id: B, title: 'b', updated_at: 'x', completed: false }],
       [])).toBe(true)
+  })
+})
+
+describe('agent wiring', () => {
+  const src = readFileSync('supabase/functions/symphony-agent/index.ts', 'utf8')
+  it('offers the tool and streams one change_set', () => {
+    expect(src).toMatch(/PROPOSE_CHANGES_TOOL,/)
+    expect(src).toMatch(/send\(\{ type: 'change_set', set: resolved\.set \}\)/)
+  })
+  it('tells the model to propose, not write, when several items change', () => {
+    expect(src).toContain('MORE THAN ONE task')
+    expect(src).toContain('symphony_propose_changes')
   })
 })
