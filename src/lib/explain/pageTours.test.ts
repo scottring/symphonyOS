@@ -61,3 +61,14 @@ describe('page-written tours', () => {
     }
   })
 })
+
+// Final review 2026-10-14 #7: Week no longer has a box where month goals
+// become tasks; you ask Symphony there.
+describe('Month points at asking Symphony on Week', () => {
+  it('no guide or tour promises the removed box', () => {
+    const month = [PAGE_GUIDES.month, ...PAGE_TOURS.month.map((s) => s.text)].join(' ')
+    expect(month).not.toMatch(/month goals become this week/)
+    expect(PAGE_GUIDES.month).toContain('tell Symphony what to do this week for a goal')
+    expect(PAGE_TOURS.month.find((s) => s.target === 'next')?.text).toContain('tell Symphony what to do this week for a goal')
+  })
+})

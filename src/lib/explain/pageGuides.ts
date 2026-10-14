@@ -25,7 +25,7 @@ export const PAGE_GUIDES: Record<string, string> = {
     'The line above the list holds the season\'s goals; Show opens them. The list holds every goal for the month, drawn one way. ' +
     'A goal written for a season goal says "For …" under it, and one with tasks this week names them ("This week: …"). A goal on its own says nothing more; that is fine. ' +
     '+ Add a goal at the foot writes one, with an optional "For" to choose a season goal. To change what a goal is for, use Move under in its ⋯ menu. ' +
-    'Go to this week goes on to Week, where month goals become this week\'s tasks.',
+    'Go to this week opens Week. To turn a month goal into this week\'s tasks, tell Symphony what to do this week for a goal there.',
   week:
     'Week is for doing: this week\'s tasks and when they happen. ' +
     'The days are the picture of the week: each day column shows its events (in blue), the kids\' specials, tasks (circles) and routines (rounded squares), who carries each, and in green the hours with nothing scheduled ("Calendar clear"). ' +

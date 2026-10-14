@@ -37,7 +37,7 @@ export const PAGE_TOURS: Record<string, TourPart[]> = {
     { target: 'period', title: 'This month', text: 'One question: what do you want to accomplish this month? Nothing here is on a calendar yet.' },
     { target: 'above', title: 'The season, for reference', text: 'The season’s goals, folded to one line. Show opens them; nothing on it has to come down.' },
     { target: 'list', title: 'Every month goal', text: `One list, drawn one way. A goal written for a season goal says “For …” under it; one with tasks this week names them. + Add a goal at the foot writes one. ${PLAN_LIST_HINT}` },
-    { target: 'next', title: 'On to the week', text: 'Goes on to Week, where month goals become this week’s tasks.' },
+    { target: 'next', title: 'On to the week', text: 'Opens Week. There, tell Symphony what to do this week for a goal.' },
   ],
   week: [
     { target: 'page-title', title: 'This week', text: 'Week is for doing: this week’s tasks and when they happen.' },

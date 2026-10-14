@@ -123,6 +123,6 @@ export function onwardStep(
   return {
     label: `Plan week ${helpers.weekNumber(at)} · ${md(at)} – ${md(end)}`,
     to: next.to,
-    why: `Choose a few doable tasks for that week from ${periodName}’s goals. Not every goal needs something every week; ${periodName} stays beside the week.`,
+    why: `On the week, tell Symphony what to do that week for ${periodName}’s goals. Not every goal needs something every week; ${periodName} stays beside the week.`,
   }
 }

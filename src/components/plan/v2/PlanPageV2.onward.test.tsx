@@ -86,13 +86,15 @@ describe('PlanPageV2 — the next horizon, beneath the whole list', () => {
     expect(screen.getByRole('button', { name: 'Continue to December →' })).toBeInTheDocument()
   })
 
-  it('October offers a dated week, says not every priority needs something, and opens it with October beside it', () => {
+  // Week has no box to write into any more (final review 2026-10-14 #7): you
+  // ask Symphony there, so the week opens as itself.
+  it('October offers a dated week, says not every priority needs something, and just opens it', () => {
     tasksHook.tasks = [octLine]
     renderAt('month', '2026-10-01')
     const button = screen.getByRole('button', { name: /^Plan week \d+ · Oct \d+ – Oct \d+ →$/ })
     expect(screen.getByRole('group', { name: 'Next step' })).toHaveTextContent('Not every goal needs something every week')
     fireEvent.click(button)
-    expect(screen.getByTestId('where').textContent).toMatch(/^\/week\?start=2026-10-\d\d\|\{"write":true,"ref":true\}$/)
+    expect(screen.getByTestId('where').textContent).toMatch(/^\/week\?start=2026-10-\d\d\|\{"ref":true\}$/)
   })
 
   it('nothing on the list, nothing offered — and it never moves on by itself', () => {

@@ -260,9 +260,11 @@ function Inner({ level }: { level: Level }) {
   }, [level, bounds.start, name, isCurrent, today, seasons])
   // One onward step for the whole page. In the journal, the next page opens
   // in the journal too — it carries the context, never any of the lines.
+  // Only a month has a box to write into on arrival; Week is planned by
+  // asking Symphony there, so it just opens.
   const goOnward = () => {
     writePlanView(level === 'season' ? 'month' : 'week', 'ref')
-    navigate(onward.to, { state: { write: true, ref: true, ...(journalOn ? { journal: true } : {}) } })
+    navigate(onward.to, { state: { ...(level === 'season' ? { write: true } : {}), ref: true, ...(journalOn ? { journal: true } : {}) } })
   }
   const startMeeting = () => {
     const candidateIds = reviewIds
@@ -605,7 +607,7 @@ function Inner({ level }: { level: Level }) {
     justSaved: justSaved && {
       detail: justSaved.detail,
       // The next page opens with this one's level above beside it, ready to write.
-      next: { label: nextStep.label, onClick: () => { writePlanView(level === 'season' ? 'month' : 'week', 'ref'); navigate(nextStep.to, { state: { write: true } }) } },
+      next: { label: nextStep.label, onClick: () => { writePlanView(level === 'season' ? 'month' : 'week', 'ref'); navigate(nextStep.to, level === 'season' ? { state: { write: true } } : undefined) } },
       onDone: () => setJustSaved(null),
     },
   }
