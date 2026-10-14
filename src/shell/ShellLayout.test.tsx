@@ -244,9 +244,7 @@ describe('Consolidated desktop navigation', () => {
     // No "Planner" and no "Routines" in the top row: the numbered rail is the
     // navigation, shown on pages that are no horizon too, with none marked.
     renderAt('/notes')
-    const nav = screen.getByRole('navigation', { name: 'Main navigation' })
-    const chooser = screen.getByRole('button', { name: 'Shelves' })
-    expect(nav).not.toContainElement(chooser)
+    expect(screen.getByRole('navigation', { name: 'Main navigation' })).toBeInTheDocument()
     expect(screen.queryByRole('link', { name: 'Planner' })).not.toBeInTheDocument()
     const rail = screen.getByRole('navigation', { name: 'Planning period' })
     expect(rail.querySelector('[aria-current="page"]')).toBeNull()
@@ -446,15 +444,11 @@ describe('Capture and the Today pin from every desktop page', () => {
     expect(screen.getByTestId('quick-capture')).not.toHaveAttribute('data-open', 'true')
   })
 
-  it('the Planning panel opens beside any page from its labelled button, and closes the same way', () => {
-    renderAt('/notes')
-    const toggle = screen.getByRole('button', { name: 'Shelves' })
-    expect(toggle).toHaveAttribute('aria-pressed', 'false')
-    expect(toggle).toHaveTextContent('Shelves')
-    fireEvent.click(toggle)
-    expect(screen.getByRole('region', { name: 'Shelves' })).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: 'Close shelves', pressed: true }))
-    expect(screen.queryByRole('region', { name: 'Shelves' })).not.toBeInTheDocument()
+  // Scott, 2026-10-14: no Shelves button on any page — Today's This week
+  // column and Week's No day yet line hold what it opened.
+  it.each(['/notes', '/inbox', '/today', '/week'])('%s has no Shelves button', (path) => {
+    renderAt(path)
+    expect(screen.queryByRole('button', { name: /shelves/i })).not.toBeInTheDocument()
     // Today is still one click away, on the rail.
     expect(screen.getAllByRole('link', { name: 'Today' })).toHaveLength(1)
   })
