@@ -410,8 +410,9 @@ describe('WeekCanvas — calendar first', () => {
     expect(screen.queryByRole('region', { name: 'Still to place' })).toBeNull()
     // Book the cabin, Call the bank, Service the car; and Mow the lawn.
     const line = screen.getByText(/^Still to place · 3 tasks · 1 routine ·/)
-    // Inbox, last week and the month's goals are the planning session's.
-    expect(screen.getByText('Inbox, last week and October’s goals come up when you plan.')).toBeInTheDocument()
+    // The week in one sentence, from the rules: Tue, Thu and Fri are open.
+    expect(screen.getByText('3 days ahead are wide open.')).toBeInTheDocument()
+    expect(screen.queryByText(/come up when you plan/)).toBeNull()
     expect(screen.queryByText(/from last week/)).toBeNull()
     const toggle = within(line).getByRole('button', { name: 'Show' })
     expect(toggle).toHaveAttribute('aria-expanded', 'false')

@@ -52,6 +52,7 @@ import { CompactWeekRow, type CompactRow } from './CompactWeekList'
 import { CanvasMenu, GiveItADay, PeoplePicker } from './GiveItADay'
 import { dayChipLabel } from './compactWeek'
 import type { ShelfGroup } from './weekShelf'
+import { weekSentence } from './weekSentence'
 
 export interface CanvasDayItem {
   /** Selectable id ('task-…', 'routine-…', 'event-…'). */
@@ -530,6 +531,9 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
     tasksToPlace > 0 && (tasksToPlace === 1 ? '1 task' : `${tasksToPlace} tasks`),
     routinesToPlace.length > 0 && (routinesToPlace.length === 1 ? '1 routine' : `${routinesToPlace.length} routines`),
   ].filter(Boolean)
+  // One plain sentence about the week, from the rules (weekSentence); the
+  // current week only.
+  const sentence = isCurrent ? weekSentence(days, todayKey) : null
   const shelfLine = (
     <span className="wc-tray">
       <span className="wc-tray-item" data-explain="still-to-place" data-explain-label="Still to place">
@@ -538,7 +542,7 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
         <button type="button" className="canvas-link wc-quiet-link" aria-expanded={shelfOpen} aria-controls="wc-shelf"
           onClick={() => setShelfOpen((o) => !o)}>{shelfOpen ? 'Hide' : 'Show'}</button>
       </span>
-      <span className="wc-tray-aside">Inbox, last week and {monthName}’s goals come up when you plan.</span>
+      {sentence && <span className="wc-tray-aside wc-week-sentence">{sentence}</span>}
     </span>
   )
   // This week's weekend, once over, folds to one line: when it was, what
