@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import { START_LEVEL, type MathKind, type MathSpec } from './mathProblem'
-import { attempt, buildProblem, dbToMathRow, levelFor, streakFor, type MathRow, type MathStatus } from './mathProgress'
+import { attempt, bonusStars, buildBonus, buildProblem, currentRow, dbToMathRow, levelFor, streakFor, type MathRow, type MathStatus } from './mathProgress'
 
 const SPEC: MathSpec = { kind: 'divide', dividend: 742, divisor: 6, remainders: true }
 
 function row(forDate: string, status: MathStatus, over: Partial<MathRow> = {}): MathRow {
-  return { id: forDate, memberId: 'ella', forDate, kind: 'divide', level: 3, spec: SPEC, wording: null, status, tries: 0, solvedAt: null, ...over }
+  return { id: forDate, memberId: 'ella', forDate, slot: 0, kind: 'divide', level: 3, spec: SPEC, wording: null, status, tries: 0, solvedAt: null, ...over }
 }
 
 describe('levelFor', () => {
@@ -93,5 +93,37 @@ describe('dbToMathRow', () => {
   })
   it('drops a row whose problem doesn’t match its type', () => {
     expect(dbToMathRow({ id: 'x', member_id: 'ella', for_date: '2026-10-20', kind: 'multiply', level: 3, problem: SPEC, wording: null, status: 'open', tries: 0, solved_at: null })).toBeNull()
+  })
+})
+
+describe('bonus problems', () => {
+  const daily = (status: MathStatus, level = 3) => row('2026-10-20', status, { id: 'd', level })
+  const bonus = (slot: number, status: MathStatus) => row('2026-10-20', status, { id: `b${slot}`, slot, level: 3 + slot })
+
+  it('come only after the daily problem is finished', () => {
+    expect(buildBonus([daily('open')])).toBeNull()
+    expect(buildBonus([daily('solved')])).toMatchObject({ slot: 1, level: 4, kind: 'divide', forDate: '2026-10-20' })
+    expect(buildBonus([daily('revealed')])).toMatchObject({ slot: 1 })
+  })
+  it('are a step harder each, never past 5, and stop at three', () => {
+    expect(buildBonus([daily('solved'), bonus(1, 'solved')])).toMatchObject({ slot: 2, level: 5 })
+    expect(buildBonus([daily('solved', 4), bonus(1, 'solved'), bonus(2, 'solved')])).toMatchObject({ slot: 3, level: 5 })
+    expect(buildBonus([daily('solved'), bonus(1, 'solved'), bonus(2, 'solved'), bonus(3, 'revealed')])).toBeNull()
+  })
+  it('wait while the last one is still open', () => {
+    expect(buildBonus([daily('solved'), bonus(1, 'open')])).toBeNull()
+  })
+  it('are the same problem when asked for twice', () => {
+    expect(buildBonus([daily('solved')])).toEqual(buildBonus([daily('solved')]))
+  })
+  it('the latest is on screen, and solved ones are counted', () => {
+    const rows = [daily('solved'), bonus(1, 'solved'), bonus(2, 'open')]
+    expect(currentRow(rows)?.id).toBe('b2')
+    expect(bonusStars(rows)).toBe(1)
+  })
+  it('don’t move levels or the streak', () => {
+    const rows = [row('2026-10-13', 'solved', { tries: 2 }), row('2026-10-13', 'revealed', { id: 'x', slot: 1 })]
+    expect(levelFor(rows, 'divide', '2026-10-20')).toBe(3)
+    expect(streakFor([row('2026-10-20', 'open'), row('2026-10-20', 'solved', { id: 'y', slot: 1 })], '2026-10-20')).toBe(0)
   })
 })

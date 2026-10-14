@@ -21,7 +21,7 @@
 // Presentation only: what a sentence does lives in useTellSymphony.
 
 import { useEffect, useRef, useState, type ReactNode } from 'react'
-import { Home, LayoutGrid, Mic, MicOff, Square, Undo2, ArrowLeft, Send } from 'lucide-react'
+import { Home, LayoutGrid, Mic, MicOff, Square, Undo2, ArrowLeft, Send, Calculator } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import type { DockCopy } from '@/lib/wall/activity/dockCopy'
 import { TALK_IDLE_MS } from '@/lib/wall/wallTalk'
@@ -43,12 +43,15 @@ export interface KioskDockProps {
   next: { time: string; title: string } | null
   /** The conversation has the side column: no reply band (stage 3). */
   replyInSide?: boolean
+  /** Math of the day, one tap from any screen; the dot means a kid's problem is still open. */
+  math?: { onOpen: () => void; open: boolean; current: boolean }
 }
 
-function NavButton({ icon: Icon, label, onClick, current }: { icon: LucideIcon; label: string; onClick: () => void; current?: boolean }) {
+function NavButton({ icon: Icon, label, onClick, current, dot, aria }: { icon: LucideIcon; label: string; onClick: () => void; current?: boolean; dot?: boolean; aria?: string }) {
   return (
-    <button type="button" className={`kw-navb ${current ? 'is-current' : ''}`} onClick={onClick} aria-pressed={current === undefined ? undefined : current}>
+    <button type="button" className={`kw-navb ${current ? 'is-current' : ''}`} onClick={onClick} aria-pressed={current === undefined ? undefined : current} aria-label={aria}>
       <Icon aria-hidden="true" /><span>{label}</span>
+      {dot && <i className="kw-navb-dot" aria-hidden="true" />}
     </button>
   )
 }
@@ -190,6 +193,10 @@ export function KioskDock(p: KioskDockProps) {
           {p.onHome && <NavButton icon={Home} label="Home" onClick={p.onHome} />}
           {p.onBack && <NavButton icon={ArrowLeft} label="Back" onClick={p.onBack} />}
           <NavButton icon={LayoutGrid} label="More" onClick={p.onMore} current={p.moreOpen} />
+          {p.math && (
+            <NavButton icon={Calculator} label="Math" onClick={p.math.onOpen} current={p.math.current} dot={p.math.open}
+              aria={`Math of the day${p.math.open ? ' · still to solve' : ''}`} />
+          )}
           {p.held}
         </nav>
         <div className={`kw-talk ${open ? 'is-open' : 'is-collapsed'} ${entry ? 'is-typing' : ''} ${t.isListening || t.isSpeaking ? 'is-live' : ''} ${off && !entry ? 'is-quiet' : ''}`}

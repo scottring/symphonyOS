@@ -173,6 +173,66 @@
 .kiosk-canvas .kw-math .kw-math-state { font-size: calc(22 * var(--p)); color: var(--kw-muted); }
 .kiosk-canvas .kw-math.is-solved .kw-math-state { color: var(--kw-done); }
 
+/* The kids' row shares its line with the Grown-ups button. */
+.kiosk-canvas .km-top { display: flex; align-items: center; justify-content: space-between; gap: calc(16 * var(--p)); min-width: 0; }
+.kiosk-canvas .km-top .km-row { flex: none; }
+.kiosk-canvas .km-title { margin: 0; font: 400 calc(44 * var(--p)) / 1.1 var(--kw-serif); color: var(--kw-ink); }
+.kiosk-canvas .km-bonus { color: var(--kw-sym); font-size: calc(24 * var(--p)); }
+
+/* Press and hold: the fill grows while held; letting go early cancels. */
+.kiosk-canvas .km-hold {
+  position: relative; overflow: hidden; flex: none; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  min-width: calc(150 * var(--p)); height: calc(88 * var(--p)); padding: 0 calc(20 * var(--p));
+  border-radius: calc(18 * var(--p)); border: calc(1.5 * var(--p)) dashed var(--kw-line-strong); background: transparent; color: var(--kw-muted);
+  font: 600 calc(22 * var(--p)) var(--kw-sans); touch-action: none;
+}
+.kiosk-canvas .km-hold small { font-size: calc(20 * var(--p)); font-weight: 500; opacity: .8; }
+.kiosk-canvas .km-hold > span:not(.km-hold-fill), .kiosk-canvas .km-hold small { position: relative; }
+.kiosk-canvas .km-hold-fill { position: absolute; inset: 0; transform: scaleX(0); transform-origin: left; background: var(--kw-sym-tint); }
+.kiosk-canvas .km-hold.is-holding .km-hold-fill { transform: scaleX(1); transition: transform 700ms linear; }
+
+/* Grown-ups */
+.kiosk-canvas .km-card { display: flex; flex-direction: column; gap: calc(20 * var(--p)); padding: calc(28 * var(--p)); border-radius: calc(22 * var(--p)); border: calc(1.5 * var(--p)) solid var(--kw-line); background: var(--kw-surface); }
+.kiosk-canvas .km-copy { margin: 0; font-size: calc(24 * var(--p)); line-height: 1.4; color: var(--kw-muted); }
+.kiosk-canvas .km-choices { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: calc(12 * var(--p)); }
+.kiosk-canvas .km-choice, .kiosk-canvas .km-topic {
+  min-height: calc(88 * var(--p)); padding: 0 calc(16 * var(--p)); border-radius: calc(18 * var(--p));
+  border: calc(2 * var(--p)) solid var(--kw-line); background: var(--kw-surface); color: var(--kw-ink);
+  font: 600 calc(24 * var(--p)) var(--kw-sans);
+}
+.kiosk-canvas .km-choice[aria-pressed="true"], .kiosk-canvas .km-topic[aria-pressed="true"] { border-color: var(--kw-sym); background: var(--kw-sym-tint); color: var(--kw-sym); }
+.kiosk-canvas .km-choice:active, .kiosk-canvas .km-topic:active { transform: scale(.97); }
+.kiosk-canvas .km-levelpick { display: flex; align-items: center; gap: calc(16 * var(--p)); }
+.kiosk-canvas .km-levelpick > span { display: flex; flex-direction: column; min-width: calc(260 * var(--p)); }
+.kiosk-canvas .km-levelpick b { font: 600 calc(30 * var(--p)) var(--kw-sans); color: var(--kw-ink); }
+.kiosk-canvas .km-levelpick small { font-size: calc(20 * var(--p)); color: var(--kw-muted); }
+.kiosk-canvas .km-levelpick .km-tool:disabled { opacity: .35; }
+.kiosk-canvas .km-start { margin-left: auto; }
+.kiosk-canvas .km-reset-row { display: flex; align-items: center; gap: calc(16 * var(--p)); padding: calc(14 * var(--p)) 0; border-top: calc(1 * var(--p)) solid var(--kw-line); }
+.kiosk-canvas .km-reset-row .km-reset-who { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+.kiosk-canvas .km-reset-row b { font: 600 calc(28 * var(--p)) var(--kw-sans); color: var(--kw-ink); }
+.kiosk-canvas .km-reset-row small { font-size: calc(22 * var(--p)); color: var(--kw-muted); }
+.kiosk-canvas .km-btn { display: inline-flex; align-items: center; justify-content: center; gap: calc(10 * var(--p)); }
+.kiosk-canvas .km-btn svg { width: calc(30 * var(--p)); height: calc(30 * var(--p)); stroke-width: 1.8; flex: none; }
+.kiosk-canvas .km-btn.is-danger { background: var(--kw-now); border-color: var(--kw-now); color: var(--kw-on-sym); }
+.kiosk-canvas .km-btn.is-quiet { border-color: var(--kw-line); color: var(--kw-muted); }
+.kiosk-canvas .km-panel .km-btn { align-self: flex-start; }
+
+/* Topics: big buttons, no typing */
+.kiosk-canvas .km-topics { flex: 1; min-height: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-auto-rows: minmax(calc(96 * var(--p)), 1fr); gap: calc(16 * var(--p)); }
+.kiosk-canvas .km-topic { font-size: calc(30 * var(--p)); }
+.kiosk-canvas .km-chip {
+  align-self: flex-start; display: inline-flex; align-items: center; gap: calc(10 * var(--p)); min-height: calc(88 * var(--p)); padding: 0 calc(22 * var(--p));
+  border-radius: 999px; border: calc(1.5 * var(--p)) solid var(--kw-line); background: transparent; color: var(--kw-muted);
+  font: 600 calc(21 * var(--p)) var(--kw-sans);
+}
+.kiosk-canvas .km-chip svg { width: calc(24 * var(--p)); height: calc(24 * var(--p)); }
+.kiosk-canvas .km-chip:active { background: var(--kw-sym-tint); }
+
+/* The dock's Math button: a dot while a kid's problem is still open. */
+.is-v1 .kw-navb { position: relative; }
+.is-v1 .kw-navb-dot { position: absolute; top: calc(16 * var(--p)); right: calc(30 * var(--p)); width: calc(14 * var(--p)); height: calc(14 * var(--p)); border-radius: 99px; background: var(--kw-now); }
+
 @media (prefers-reduced-motion: reduce) {
   .kiosk-canvas .km-caret { animation: none; }
 }

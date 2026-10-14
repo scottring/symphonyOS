@@ -37,7 +37,16 @@ at an advanced third grader and gets harder or easier with each kid.
 
 `/kiosk-preview?scene=math&v1=home` (dev only) shows two fixed problems: Liam's long division with a story, and Mia's fractions with the plain wording.
 
+## Round two (approved 2026-10-14)
+
+- **Math in the bar:** a Math button sits in the wall's bottom bar on every screen, with a dot while a kid's problem is still open.
+- **Bonus problems:** after the daily problem, "Want another?" gives up to three more the same day. They are stored as `slot` 1–3 beside the daily row (slot 0), each one rung harder. They earn bonus stars; streaks and levels read only slot 0.
+- **Topics:** after a solve, a kid taps up to three topics (`kid_math_prefs`), and each new story is about one of them, the same topic every time for the same problem.
+- **Grown-ups corner:** opened with a press-and-hold on the math screen.
+  - **Practice:** any type and level, with "Show me how" to step through the solution on the paper. Nothing is saved.
+  - **Reset today:** asks for a second tap, then puts a kid's daily problem back to unsolved and removes that day's bonus problems.
+- **Parent view:** each kid's page in the app (Family → name) has a "Math of the day" section covering the last four weeks: the streak, each type's level and results, the type that needs the most help, and the recent days (`mathHistory.ts`, `KidMathSection.tsx`).
+
 ## Later
 
-- Each kid's interests (dinosaurs, soccer) for the stories.
-- A parent view of history: what each kid finds hard.
+- Parent-set topics in the app, beside the kids' own.

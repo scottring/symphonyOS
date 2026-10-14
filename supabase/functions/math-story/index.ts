@@ -31,6 +31,8 @@ interface StoryRequest {
   labelCount: number
   steps: string[] | null
   defaultHint: string
+  /** What the kid picked on the wall ("dinosaurs"); null = any kid things. */
+  topic: string | null
 }
 
 const KINDS = new Set(['multiply', 'divide', 'fraction', 'addsub', 'word'])
@@ -53,6 +55,7 @@ function readRequest(b: Record<string, unknown>): StoryRequest | null {
     labelCount: b.labelCount as number,
     steps,
     defaultHint: typeof b.defaultHint === 'string' ? b.defaultHint.slice(0, 240) : '',
+    topic: str(b.topic, 40) ? (b.topic as string).trim() : null,
   }
 }
 
@@ -77,7 +80,7 @@ The problem: ${r.expression} (${kindLine[r.kind]}${r.levelLabel ? `; level: ${r.
 The answer is ${r.answer}.${r.steps ? `\nThe story must need exactly these two steps, in this order: ${r.steps.join(', then ')}.` : ''}
 
 Write:
-1. "story": a short, playful problem, 1-3 short sentences, under 40 words (at most 220 characters), starring ${r.kidName}. Use everyday kid things (school, sports, animals, baking, games, space). Write each of these numbers exactly as shown, as digits: ${r.numbers.join(', ')}. Use no other numbers. Never state the answer (${r.answer}) or hint at it. End with the question.
+1. "story": a short, playful problem, 1-3 short sentences, under 40 words (at most 220 characters), starring ${r.kidName}. ${r.topic ? `Make it about ${r.topic} — ${r.kidName} picked that.` : 'Use everyday kid things (school, sports, animals, baking, games, space).'} Write each of these numbers exactly as shown, as digits: ${r.numbers.join(', ')}. Use no other numbers. Never state the answer (${r.answer}) or hint at it. End with the question.
 2. "hint": one short sentence that nudges the first step without giving the answer. A good one: "${r.defaultHint}"
 3. ${labels}. Each label is at most 18 characters.
 

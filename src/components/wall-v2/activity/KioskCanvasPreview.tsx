@@ -31,31 +31,30 @@ import type { KioskDinner } from './KioskStages'
 
 import type { KioskScene } from './kioskScenes'
 import type { KidMath } from '@/hooks/useKidMath'
-import { attempt, type MathRow } from '@/lib/wall/math/mathProgress'
+import type { MathRow } from '@/lib/wall/math/mathProgress'
+import { useLocalKidMath } from './useLocalKidMath'
 
-/** Math of the day with fixed problems: a story for Liam's, the plain problem for Mia's. */
+/** Math of the day with fixed problems: Liam's long division (with a story,
+ *  six days in a row behind it), Mia's fractions in plain words. */
+const PREVIEW_DAY = '2026-10-13'
+const previewStreak = (memberId: string, days: number): MathRow[] =>
+  Array.from({ length: days }, (_, i) => {
+    const d = new Date(2026, 9, 12 - i)
+    const ymd = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+    return { id: `${memberId}-${ymd}`, memberId, forDate: ymd, slot: 0, kind: 'multiply', level: 2, spec: { kind: 'multiply', a: 48, b: 7 }, wording: null, status: 'solved', tries: 0, solvedAt: null }
+  })
+const PREVIEW_MATH: MathRow[] = [
+  {
+    id: 'pm-li', memberId: 'li', forDate: PREVIEW_DAY, slot: 0, kind: 'divide', level: 3, spec: { kind: 'divide', dividend: 742, divisor: 6, remainders: true },
+    wording: { story: 'The bakery made 742 cookies for Liam’s school fair. They pack them in boxes of 6. How many full boxes can they fill, and how many cookies are left over?', hint: 'Start with the 7 hundreds. How many 6s fit in 7? Write that above the 7, take away 6, then bring down the 4.', labels: ['Full boxes', 'Left over'] },
+    status: 'open', tries: 0, solvedAt: null,
+  },
+  { id: 'pm-mi', memberId: 'mi', forDate: PREVIEW_DAY, slot: 0, kind: 'fraction', level: 3, spec: { kind: 'fraction', form: 'add', x: { n: 1, d: 4 }, y: { n: 3, d: 8 } }, wording: null, status: 'open', tries: 0, solvedAt: null },
+  ...previewStreak('li', 5),
+  ...previewStreak('mi', 2),
+]
 function usePreviewMath(): KidMath {
-  const [rows, setRows] = useState<MathRow[]>(() => [
-    {
-      id: 'pm-li', memberId: 'li', forDate: '2026-10-13', kind: 'divide', level: 3, spec: { kind: 'divide', dividend: 742, divisor: 6, remainders: true },
-      wording: { story: 'The bakery made 742 cookies for Liam’s school fair. They pack them in boxes of 6. How many full boxes can they fill, and how many cookies are left over?', hint: 'Start with the 7 hundreds. How many 6s fit in 7? Write that above the 7, take away 6, then bring down the 4.', labels: ['Full boxes', 'Left over'] },
-      status: 'open', tries: 0, solvedAt: null,
-    },
-    { id: 'pm-mi', memberId: 'mi', forDate: '2026-10-13', kind: 'fraction', level: 3, spec: { kind: 'fraction', form: 'add', x: { n: 1, d: 4 }, y: { n: 3, d: 8 } }, wording: null, status: 'open', tries: 0, solvedAt: null },
-  ])
-  const [selectedId, select] = useState('li')
-  return {
-    kids: KIDS.map((member) => ({ member, today: rows.find((r) => r.memberId === member.id) ?? null, streak: member.id === 'li' ? 6 : 3 })),
-    selectedId,
-    select,
-    check: (memberId, input) => {
-      const r = rows.find((x) => x.memberId === memberId)
-      if (!r) return null
-      const res = attempt(r, input)
-      setRows((prev) => prev.map((x) => (x.id === r.id ? { ...x, status: res.status, tries: res.tries } : x)))
-      return res.verdict
-    },
-  }
+  return useLocalKidMath(KIDS, PREVIEW_MATH, PREVIEW_DAY, { li: ['space', 'soccer'] })
 }
 export type { KioskScene } from './kioskScenes'
 

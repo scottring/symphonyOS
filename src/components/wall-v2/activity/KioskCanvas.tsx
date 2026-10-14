@@ -315,7 +315,7 @@ export function KioskCanvas(p: KioskCanvasProps) {
     if (memberId) math?.select(memberId)
     dispatch({ type: 'OPEN', stage: { kind: 'math' } })
   }, [math, dispatch])
-  const mathLeft = math ? math.kids.filter((k) => k.today?.status === 'open').length : 0
+  const mathLeft = math ? math.kids.filter((k) => k.daily?.status === 'open').length : 0
   const moreTiles = [
     talk.enabled ? { id: 'plan', label: 'Plan the week', sub: 'Together, with Symphony', icon: CalendarDays, onSelect: () => { setMoreOpen(false); void tell.handle('Plan the week', false) } } : null,
     math && math.kids.length > 0
@@ -424,7 +424,7 @@ export function KioskCanvas(p: KioskCanvasProps) {
       break
     case 'math':
       content = math
-        ? <MathStage math={math} now={p.now} />
+        ? <MathStage math={math} now={p.now} flash={p.flash} />
         : <div className="kc-card kc-fill"><p className="kc-quiet-line">Math of the day isn’t ready.</p></div>
       break
   }
@@ -503,6 +503,7 @@ export function KioskCanvas(p: KioskCanvasProps) {
           held={heldEls.length ? <div className="kw-held" aria-label="Held activities">{heldEls}</div> : null}
           next={v1.next}
           replyInSide={talkInSide}
+          math={math && math.kids.length > 0 ? { onOpen: () => { setMoreOpen(false); openMath() }, open: mathLeft > 0, current: stage.kind === 'math' && !moreOpen } : undefined}
         />
       </div>
     )

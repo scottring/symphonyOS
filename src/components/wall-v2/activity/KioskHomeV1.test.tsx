@@ -189,12 +189,13 @@ describe('Math of the day on Home', () => {
   it('each kid’s after-school card opens their problem, with their streak', () => {
     const onOpenMath = vi.fn()
     const spec = { kind: 'multiply' as const, a: 48, b: 7 }
-    const today = (memberId: string, status: 'open' | 'solved') => ({ id: memberId, memberId, forDate: '2026-10-13', kind: 'multiply' as const, level: 2, spec, wording: null, status, tries: 0, solvedAt: null })
+    const today = (memberId: string, status: 'open' | 'solved') => ({ id: memberId, memberId, forDate: '2026-10-13', slot: 0, kind: 'multiply' as const, level: 2, spec, wording: null, status, tries: 0, solvedAt: null })
+    const entry = (member: typeof ella, status: 'open' | 'solved', streak: number) => ({ member, daily: today(member.id, status), current: today(member.id, status), streak, bonusStars: 0, canBonus: false, topics: [] })
     render(<KioskHomeV1 {...props({
       pick: { screen: 'home', title: 'After school', dark: false },
       math: {
-        kids: [{ member: ella, today: today('e', 'solved'), streak: 4 }, { member: kaleb, today: today('k', 'open'), streak: 0 }],
-        selectedId: 'e', select: vi.fn(), check: vi.fn(),
+        kids: [entry(ella, 'solved', 4), entry(kaleb, 'open', 0)],
+        selectedId: 'e', select: vi.fn(), check: vi.fn(), addBonus: vi.fn(), resetToday: vi.fn(), setTopics: vi.fn(),
       },
       onOpenMath,
     })} />)

@@ -10,11 +10,14 @@
 //           school day left open breaks it.
 //   tries   three. A miss keeps the answer in the boxes; the second miss
 //           shows the hint; the third walks through the solution.
+//   bonus   after the daily problem (slot 0), up to three more the same day
+//           (slots 1–3), each a step harder. They earn bonus stars only:
+//           levels and streaks read the daily problem alone.
 //
 // PURE: dates arrive as YYYY-MM-DD strings.
 
 import {
-  answerOf, checkAnswer, clampLevel, generateSpec, kindForDate, parseSpec, rngFor, START_LEVEL,
+  answerOf, checkAnswer, clampLevel, generateSpec, hashString, kindForDate, MAX_LEVEL, parseSpec, rngFor, seededRng, START_LEVEL,
   type MathInput, type MathKind, type MathSpec,
 } from './mathProblem'
 
@@ -23,6 +26,8 @@ export const MAX_TRIES = 3
 export const HINT_AFTER = 2
 /** How far back the wall reads rows (levels and streaks). */
 export const HISTORY_DAYS = 90
+/** Bonus problems a kid can ask for after the daily one. */
+export const MAX_BONUS = 3
 
 export type MathStatus = 'open' | 'solved' | 'revealed'
 
@@ -37,6 +42,8 @@ export interface MathRow {
   id: string
   memberId: string
   forDate: string
+  /** 0 = the daily problem; 1–3 = bonus problems that day. */
+  slot: number
   kind: MathKind
   level: number
   spec: MathSpec
@@ -50,6 +57,7 @@ export interface DbMathRow {
   id: string
   member_id: string
   for_date: string
+  slot?: number | null
   kind: string
   level: number
   problem: unknown
@@ -81,6 +89,7 @@ export function dbToMathRow(r: DbMathRow): MathRow | null {
     id: r.id,
     memberId: r.member_id,
     forDate: r.for_date.slice(0, 10),
+    slot: Math.min(MAX_BONUS, Math.max(0, r.slot ?? 0)),
     kind: r.kind as MathKind,
     level: clampLevel(r.level),
     spec,
@@ -92,7 +101,8 @@ export function dbToMathRow(r: DbMathRow): MathRow | null {
 }
 
 /** The level for `kind` on `ymd`, from the kid's last finished row of that type before it. */
-export function levelFor(history: MathRow[], kind: MathKind, ymd: string): number {
+export function levelFor(rows: MathRow[], kind: MathKind, ymd: string): number {
+  const history = rows.filter((r) => r.slot === 0)
   const last = history
     .filter((r) => r.kind === kind && r.forDate < ymd && r.status !== 'open')
     .sort((a, b) => (a.forDate < b.forDate ? 1 : -1))[0]
@@ -108,6 +118,7 @@ export function levelFor(history: MathRow[], kind: MathKind, ymd: string): numbe
 export interface NewMathProblem {
   memberId: string
   forDate: string
+  slot: number
   kind: MathKind
   level: number
   spec: MathSpec
@@ -118,7 +129,32 @@ export function buildProblem(memberId: string, ymd: string, history: MathRow[]):
   const rng = rngFor(memberId, ymd)
   const kind = kindForDate(ymd, rng)
   const level = levelFor(history, kind, ymd)
-  return { memberId, forDate: ymd, kind, level, spec: generateSpec(kind, level, rng) }
+  return { memberId, forDate: ymd, slot: 0, kind, level, spec: generateSpec(kind, level, rng) }
+}
+
+/** The next bonus problem after `today`'s rows, or null when there is none to
+ *  give: the daily problem isn't finished, the last one is still open, or all
+ *  three bonuses are used. Same type as the daily one, a step harder each time
+ *  (never past the top rung). */
+export function buildBonus(todayRows: MathRow[]): NewMathProblem | null {
+  const daily = todayRows.find((r) => r.slot === 0)
+  if (!daily || daily.status === 'open') return null
+  const last = [...todayRows].sort((a, b) => b.slot - a.slot)[0]
+  if (last.status === 'open' || last.slot >= MAX_BONUS) return null
+  const slot = last.slot + 1
+  const level = Math.min(MAX_LEVEL, daily.level + slot)
+  const rng = seededRng(hashString(`${daily.memberId}:${daily.forDate}:bonus${slot}`))
+  return { memberId: daily.memberId, forDate: daily.forDate, slot, kind: daily.kind, level, spec: generateSpec(daily.kind, level, rng) }
+}
+
+/** The problem on screen for a kid today: the latest one they have. */
+export function currentRow(todayRows: MathRow[]): MathRow | null {
+  return [...todayRows].sort((a, b) => b.slot - a.slot)[0] ?? null
+}
+
+/** Bonus problems solved today. */
+export function bonusStars(todayRows: MathRow[]): number {
+  return todayRows.filter((r) => r.slot > 0 && r.status === 'solved').length
 }
 
 function addDays(ymd: string, n: number): string {
@@ -136,7 +172,7 @@ function isWeekend(ymd: string): boolean {
 
 /** Days solved in a row, counting back from today (see the header for what breaks it). */
 export function streakFor(rows: MathRow[], today: string, maxDays = HISTORY_DAYS): number {
-  const byDate = new Map(rows.map((r) => [r.forDate, r]))
+  const byDate = new Map(rows.filter((r) => r.slot === 0).map((r) => [r.forDate, r]))
   let streak = 0
   for (let i = 0; i < maxDays; i++) {
     const ymd = addDays(today, -i)

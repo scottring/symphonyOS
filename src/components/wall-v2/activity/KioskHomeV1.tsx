@@ -96,7 +96,7 @@ const SHARED = '__shared'
 function MathButton({ p, member }: { p: KioskHomeV1Props; member: FamilyMember }) {
   const entry = p.math?.kids.find((k) => k.member.id === member.id)
   if (!entry || !p.onOpenMath) return null
-  const status = entry.today?.status ?? null
+  const status = entry.daily?.status ?? null
   const state = status === 'solved' ? 'Solved' : status === 'revealed' ? 'Done' : 'Ready'
   return (
     <button type="button" className={`kw-math ${status === 'solved' ? 'is-solved' : ''}`} onClick={() => p.onOpenMath!(member)} aria-label={`${member.name}: Math of the day, ${state.toLowerCase()}${entry.streak ? `, ${entry.streak} days in a row` : ''}`}>

@@ -128,9 +128,11 @@ export interface StoryRequest {
   /** Word problems: the two steps the story must need, in order. */
   steps: string[] | null
   defaultHint: string
+  /** What the kid likes, for this story ("dinosaurs"); null = any kid things. */
+  topic: string | null
 }
 
-export function storyRequest(spec: MathSpec, level: number, kidName: string): StoryRequest {
+export function storyRequest(spec: MathSpec, level: number, kidName: string, topic: string | null = null): StoryRequest {
   const answer = answerOf(spec)
   let steps: string[] | null = null
   if (spec.kind === 'word') {
@@ -151,5 +153,6 @@ export function storyRequest(spec: MathSpec, level: number, kidName: string): St
     labelCount: labelCount(answer.type),
     steps,
     defaultHint: defaultHint(spec),
+    topic,
   }
 }

@@ -7,6 +7,9 @@ import { selectMemberTasks } from '@/lib/memberTasks'
 import { DenseInboxRow } from '@/components/schedule/DenseInboxRow'
 import { TriageWhenMenu } from '@/components/schedule/TriageWhenMenu'
 import { applyTriageWhen } from '@/lib/triage/applyWhen'
+import { memberShape } from '@/lib/wall/memberPageModel'
+import { useKidMathHistory } from '@/hooks/useKidMathHistory'
+import { KidMathSection } from './KidMathSection'
 
 interface MemberViewProps {
   member: FamilyMember
@@ -29,6 +32,8 @@ export function MemberView({
 }: MemberViewProps) {
   const { open, upcoming } = selectMemberTasks(tasks, member.id)
   const colors = FAMILY_COLORS[member.color as FamilyMemberColor] ?? FAMILY_COLORS.blue
+  const isKid = memberShape(member) === 'kid'
+  const math = useKidMathHistory(isKid ? member.id : null)
 
   const renderRow = (task: Task) => (
     <DenseInboxRow
@@ -86,6 +91,8 @@ export function MemberView({
           <div className="space-y-2">{upcoming.map(renderRow)}</div>
         </section>
       )}
+
+      {isKid && <KidMathSection name={member.name.split(' ')[0]} summary={math.summary} topics={math.topics} loading={math.loading} />}
 
       <section>
         <div className="flex items-center justify-between mb-2">
