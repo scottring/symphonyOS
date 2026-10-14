@@ -22,7 +22,7 @@ import { useDomain } from '@/hooks/useDomain'
 import { useAssigneeFilter } from '@/hooks/useAssigneeFilter'
 import { makeAssigneeFilter } from '@/lib/today/assigneeFilter'
 import { WeekView } from './WeekView'
-import { WeekViewV2, type WeekMode } from './week/WeekViewV2'
+import { WeekViewV2 } from './week/WeekViewV2'
 import { MonthView } from './MonthView'
 
 const WEEK_V2_FLAG = 'symphony-week-v2'
@@ -251,9 +251,6 @@ export function HomeView({
   const rangePreset = new URLSearchParams(location.search).get('range')
   const startParam = new URLSearchParams(location.search).get('start')
   const [rangeDays, setRangeDays] = useState(7)
-  // Journal (the paper week) or Schedule (the hourly grid). Always opens as
-  // the journal; switching is presentation only — same dates, same data.
-  const [weekMode, setWeekMode] = useState<WeekMode>('journal')
   // Desktop /week folds the week's control row into its masthead (layout
   // system, 2026-10-01): HomeHeader draws two hosts, WeekV2 portals its plan
   // status and controls into them. Phones keep the row.
@@ -264,14 +261,12 @@ export function HomeView({
     () => (planSlotsOn && planSublineHost && planControlsHost ? { subline: planSublineHost, controls: planControlsHost } : null),
     [planSlotsOn, planSublineHost, planControlsHost])
   // Week is a planning page: it fills the screen up to 1600px of content
-  // (Scott, 2026-10-03); its hourly grid is a canvas and keeps the full width
-  // (lg+, where it is drawn — below lg the journal stands in for it).
+  // (Scott, 2026-10-03).
   const weekColumn = (currentView === 'week' || currentView === 'workweek') && isWeekV2Enabled()
-    ? ` week-column w-full max-w-[1712px] mx-auto ${PLANNING_PAGE_CLASS}${weekMode === 'schedule' ? ' lg:max-w-none' : ''}`
+    ? ` week-column w-full max-w-[1712px] mx-auto ${PLANNING_PAGE_CLASS}`
     : ''
   // Set by goToWeek and onRangeChange: the run they just wrote into the URL is
-  // already on screen, so re-deriving it would only undo the Schedule/Journal
-  // choice the reader made.
+  // already on screen, so re-deriving it would only redo what the reader just did.
   const selfWeekNav = useRef(false)
   // A range picked from the masthead goes into the URL too, or a reload (or
   // Back from a task) would drop it for the full week. Replace, not push: the
@@ -334,7 +329,6 @@ export function HomeView({
     const range = weekRangeFromParams(new URLSearchParams(location.search), readCadenceConfig().weekStartsOn, new Date())
     setWeekStart(range[0])
     setRangeDays(range.length)
-    setWeekMode('journal')
     // The event fetch follows viewedDate (its week and the next); a weekend
     // chosen on a Sunday sits in next week, so move it along when needed.
     if (sundayOfWeek(viewedDateRef.current).getTime() !== sundayOfWeek(range[0]).getTime()) {
@@ -461,7 +455,6 @@ export function HomeView({
             onUpdateEvent={ctx.onUpdateEvent}
             onPushRoutine={ctx.onPushRoutine}
             pushAction={pushAction}
-            mode={weekMode}
           />
         </>
       )
@@ -511,7 +504,6 @@ export function HomeView({
             onUpdateEvent={ctx.onUpdateEvent}
             onPushRoutine={ctx.onPushRoutine}
             pushAction={pushAction}
-            mode={weekMode}
           />
         </>
       )
@@ -632,8 +624,6 @@ export function HomeView({
             // custom run already in the URL (with its start) is restored as
             // days on screen, not re-opened for editing on every reload.
             customRangeRequest={rangePreset === 'custom' && !startParam ? location.key : undefined}
-            weekMode={currentView === 'week' || currentView === 'workweek' ? weekMode : undefined}
-            onWeekModeChange={setWeekMode}
             onRangeChange={onRangeChange}
             monthStart={monthStart}
             onMonthChange={setMonthStart}

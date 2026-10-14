@@ -178,29 +178,14 @@ describe('HomeHeader week masthead card', () => {
   })
 })
 
-describe('HomeHeader — Journal | Schedule sits by the dates', () => {
-  it('old planning pages: draws the switch in the masthead and reports a change; Journal is what is on', () => {
+describe('HomeHeader — the week has one view', () => {
+  it('draws no Days | Hours switch, on v2 or the old planning pages', () => {
+    renderWeek()
+    expect(screen.queryByRole('radio', { name: 'Hours' })).toBeNull()
     localStorage.setItem('symphony-plan-v2', 'off')
-    const onWeekModeChange = vi.fn()
-    renderWeek({ weekMode: 'journal', onWeekModeChange })
-    const aside = screen.getByTestId('masthead-aside')
-    expect(within(aside).getByRole('radio', { name: 'Days' })).toHaveAttribute('aria-checked', 'true')
-    fireEvent.click(within(aside).getByRole('radio', { name: 'Hours' }))
-    expect(onWeekModeChange).toHaveBeenCalledWith('schedule')
+    renderWeek()
+    expect(screen.queryByRole('radio', { name: 'Hours' })).toBeNull()
     localStorage.removeItem('symphony-plan-v2')
-  })
-
-  // Scott, 2026-09-30: on v2 the switch sits in the week's control row, beside
-  // the view icons (WeekViewV2), not in the masthead corner.
-  // v2 (Scott, 2026-09-30): the switch sits on the date's line at right, not
-  // in the corner aside.
-  it('v2: the switch is on the date line, not in the aside', () => {
-    const onWeekModeChange = vi.fn()
-    renderWeek({ weekMode: 'journal', onWeekModeChange })
-    expect(screen.queryByTestId('masthead-aside')).toBeNull()
-    const card = screen.getByTestId('masthead-card')
-    fireEvent.click(within(card).getByRole('radio', { name: 'Hours' }))
-    expect(onWeekModeChange).toHaveBeenCalledWith('schedule')
   })
 })
 
