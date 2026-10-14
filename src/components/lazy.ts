@@ -11,9 +11,9 @@ export const ProjectView = lazy(() =>
   import('./project/ProjectViewRedesign').then(m => ({ default: m.ProjectViewRedesign }))
 )
 
-// Routine views — the Rhythm page (time-rendered week)
+// Routine views — the Routines picture (the household's week)
 export const RoutinesList = lazy(() =>
-  import('./routine/RhythmPage').then(m => ({ default: m.RhythmPage }))
+  import('./routine/RoutinesPicture').then(m => ({ default: m.RoutinesPicture }))
 )
 export const RoutineForm = lazy(() =>
   import('./routine/RoutineForm').then(m => ({ default: m.RoutineForm }))

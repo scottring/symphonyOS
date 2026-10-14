@@ -58,6 +58,10 @@ export interface CanvasDayItem {
   people?: string[]
   /** Drawn from a pending change card: dashed, not yet saved, not interactive. */
   proposed?: boolean
+  /** A proposed row that would be done or skipped: struck through. */
+  struck?: boolean
+  /** A proposed row's one-line reason ("Skipped · this week", "Done"). */
+  note?: string
 }
 
 export interface CanvasDay {
@@ -240,10 +244,12 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
   const dayRow = (it: CanvasDayItem, day: CanvasDay) => {
     if (it.proposed) {
       return (
-        <li key={`${day.key}:${it.id}`} className={`cw-row wc-dayrow is-proposed${pointedTask(it.task?.id) ? ' is-pointed' : ''}`} data-testid="proposed-row">
+        <li key={`${day.key}:${it.id}`} className={`cw-row wc-dayrow is-proposed${it.kind === 'routine' ? ' is-routine' : ''}${pointedTask(it.task?.id) ? ' is-pointed' : ''}`} data-testid="proposed-row">
           <span className="canvas-item-title">
-            <span className="cw-title">{it.title}</span>
+            <span className="cw-title">{it.struck ? <s>{it.title}</s> : it.title}</span>
             {it.time && <span className="cw-sub"><span className="cw-meta">{formatTimeCompact(it.time)}</span></span>}
+            {it.note && <span className="wc-proposed-note">{it.note}</span>}
+            {peopleOf(it)}
           </span>
           <span className="sr-only"> (proposed, not saved yet)</span>
         </li>

@@ -61,6 +61,10 @@ export interface TimelineItem {
    *  assignment columns by routineOwners(). `assignedTo` stays for callers that
    *  have not migrated. */
   owners?: string[]
+  /** Routine occurrences only: the one person doing THIS day's occurrence
+   *  (actionable_instances.assigned_to_override, "Iris has FFG pickup
+   *  Thursday"). When set it replaces the routine's people for that day. */
+  assigneeOverride?: string
   context?: 'work' | 'family' | 'personal' | null // Life domain for filtering
   category?: TaskCategory // Type of task: task, chore, errand, event, activity
   // Subtask support

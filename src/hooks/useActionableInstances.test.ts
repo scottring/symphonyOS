@@ -513,6 +513,30 @@ describe('useActionableInstances', () => {
     })
   })
 
+  describe('setOccurrenceAssignee', () => {
+    it('writes the per-day person and hands back what was there', async () => {
+      mockFetchResult = createMockActionableInstance({ id: 'inst-1', assigned_to_override: 'm-old' })
+      const { result } = renderHook(() => useActionableInstances())
+      let r: unknown
+      await act(async () => {
+        r = await result.current.setOccurrenceAssignee('routine', 'routine-1', new Date(2026, 9, 15), 'm-iris')
+      })
+      expect(r).toEqual({ instanceId: 'inst-1', previous: 'm-old' })
+      expect(mockUpdate).toHaveBeenCalledWith({ assigned_to_override: 'm-iris' })
+    })
+
+    it('returns null when the write fails', async () => {
+      mockFetchResult = createMockActionableInstance({ id: 'inst-1' })
+      mockUpdateError = { message: 'denied' }
+      const { result } = renderHook(() => useActionableInstances())
+      let r: unknown = 'unset'
+      await act(async () => {
+        r = await result.current.setOccurrenceAssignee('routine', 'routine-1', new Date(2026, 9, 15), null)
+      })
+      expect(r).toBeNull()
+    })
+  })
+
   describe('defer', () => {
     it('marks instance as deferred with target date', async () => {
       const mockInstance = createMockActionableInstance({ id: 'inst-1' })

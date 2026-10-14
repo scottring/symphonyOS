@@ -206,4 +206,27 @@ describe('buildWeekRoutineItems — the weekend is one window', () => {
     const items = build([flexible], [midnight])
     expect(startOn(items, 'f2', 2)?.getHours()).toBe(0)
   })
+
+  // Stage 3 (routines by talking): "Iris does FFG pickup Thursday" writes the
+  // occurrence's assigned_to_override. That day's faces are hers; the rest of
+  // the week keeps the routine's own people.
+  it("carries a day's own person, from the occurrence's override, on that day only", () => {
+    const routine = createMockRoutine({ id: 'r1', name: 'FFG pickup', time_of_day: '17:15', assigned_to_all: ['scott'] })
+    const iris = createMockActionableInstance({ entity_type: 'routine', entity_id: 'r1', date: '2026-05-21', status: 'pending', assigned_to_override: 'iris' })
+    const items = build([routine], [iris])
+    const thu = items.find((i) => i.id === 'routine-r1-day3')!
+    expect(thu.assigneeOverride).toBe('iris')
+    expect(thu.owners).toEqual(['iris'])
+    const wed = items.find((i) => i.id === 'routine-r1-day2')!
+    expect(wed.assigneeOverride).toBeUndefined()
+    expect(wed.owners).toEqual(['scott'])
+  })
+
+  it('marks a skipped occurrence, and only that one', () => {
+    const routine = createMockRoutine({ id: 'r1', name: 'Bedtime', time_of_day: '19:30' })
+    const skipped = createMockActionableInstance({ entity_type: 'routine', entity_id: 'r1', date: '2026-05-22', status: 'skipped' })
+    const items = build([routine], [skipped])
+    expect(items.find((i) => i.id === 'routine-r1-day4')?.skipped).toBe(true)
+    expect(items.filter((i) => i.skipped)).toHaveLength(1)
+  })
 })

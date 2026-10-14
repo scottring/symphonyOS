@@ -26,7 +26,7 @@ function Probe() {
       <div data-testid="path">{location.pathname}</div>
       <div data-testid="search">{location.search}</div>
       <div data-testid="selection">
-        {selection ? `${selection.kind}:${selection.id}` : 'none'}
+        {selection ? `${selection.kind}:${selection.id}${selection.date ? `@${selection.date}` : ''}` : 'none'}
       </div>
       <button onClick={() => setSelection({ kind: 'task', id: 'abc' })}>
         select-task
@@ -50,6 +50,25 @@ function renderWithRoutes(initial: string) {
 }
 
 describe('SelectionProvider', () => {
+  it('carries an occurrence day beside the selection, and drops it with the selection', () => {
+    renderWithRoutes('/today?detail=task:abc&detailDay=2026-10-15');
+    expect(screen.getByTestId('selection').textContent).toBe('task:abc@2026-10-15');
+    act(() => {
+      screen.getByText('select-task').click();
+    });
+    // A selection made without a day does not inherit the old one.
+    expect(screen.getByTestId('selection').textContent).toBe('task:abc');
+    expect(screen.getByTestId('search').textContent).not.toContain('detailDay');
+  });
+
+  it('clearSelection removes the occurrence day too', () => {
+    renderWithRoutes('/today?detail=task:abc&detailDay=2026-10-15');
+    act(() => {
+      screen.getByText('clear').click();
+    });
+    expect(screen.getByTestId('search').textContent).toBe('');
+  });
+
   it('parses ?detail=task:abc into selection state', () => {
     renderWithRoutes('/today?detail=task:abc');
     expect(screen.getByTestId('selection').textContent).toBe('task:abc');

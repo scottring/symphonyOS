@@ -18,6 +18,18 @@ vi.mock('@/components/routine/useHideForToday', () => ({
   useSkippedOn: () => skippedOn(),
 }))
 
+// The "<day> only" writers; useActionableInstances' own test covers the writes.
+const { occ } = vi.hoisted(() => ({
+  occ: {
+    skip: vi.fn(async () => true),
+    undoDone: vi.fn(async () => true),
+    reschedule: vi.fn(async () => ({ instanceId: 'i1', previousStatus: 'pending' as const, previousDeferredTo: null, previousPlannedOn: null })),
+    undoReschedule: vi.fn(async () => true),
+    setOccurrenceAssignee: vi.fn(async () => ({ instanceId: 'i1', previous: 'iris' as string | null })),
+  },
+}))
+vi.mock('@/hooks/useActionableInstances', () => ({ useActionableInstances: () => occ }))
+
 function UndoButton() {
   const { receipt, undo } = useCanvasActivity()
   return receipt?.undoable ? <button type="button" onClick={() => { void undo() }}>Undo</button> : null
@@ -395,4 +407,60 @@ it('keeps a failed schedule edit open and retries the same time before closing',
   fireEvent.click(screen.getByRole('button', { name: 'Save & close' }))
   await waitFor(() => expect(close).toHaveBeenCalledOnce())
   expect(save).toHaveBeenLastCalledWith(routine.recurrence_pattern, '20:30')
+})
+
+describe('TapRoutinePanel: one day only', () => {
+  const THU = new Date(2026, 9, 15)
+  const thursday: Routine = { ...routine, recurrence_pattern: { type: 'weekly', days: ['thu'] } }
+  const panel = (extra: Partial<Parameters<typeof TapRoutinePanel>[0]> = {}) => render(
+    <CanvasActivityProvider snapshot={{ tasks: [], goals: [] }} writers={{} as never} refetch={() => {}}>
+      <TapRoutinePanel routine={thursday} onClose={vi.fn()} onNotesChange={vi.fn()} onContextChange={vi.fn()}
+        onVisibilityChange={vi.fn()} occurrenceDate={THU} viewedDate={THU} selfMemberId="me" {...extra} />
+      <UndoButton />
+    </CanvasActivityProvider>,
+  )
+
+  it('names the day and offers I’ll do it, Skip it, Another day', () => {
+    panel()
+    const day = screen.getByRole('region', { name: 'Thu Oct 15 only' })
+    expect(within(day).getByRole('button', { name: 'I’ll do it' })).toBeInTheDocument()
+    expect(within(day).getByRole('button', { name: 'Skip it' })).toBeInTheDocument()
+    expect(within(day).getByRole('button', { name: 'Another day' })).toBeInTheDocument()
+  })
+
+  it('I’ll do it sets that day’s person to me; Undo puts back who it was', async () => {
+    panel()
+    fireEvent.click(screen.getByRole('button', { name: 'I’ll do it' }))
+    await waitFor(() => expect(occ.setOccurrenceAssignee).toHaveBeenCalledWith('routine', 'r1', THU, 'me'))
+    fireEvent.click(await screen.findByRole('button', { name: 'Undo' }))
+    await waitFor(() => expect(occ.setOccurrenceAssignee).toHaveBeenLastCalledWith('routine', 'r1', THU, 'iris'))
+  })
+
+  it('Skip it skips that occurrence; Undo un-skips it', async () => {
+    panel()
+    fireEvent.click(screen.getByRole('button', { name: 'Skip it' }))
+    await waitFor(() => expect(occ.skip).toHaveBeenCalledWith('routine', 'r1', THU))
+    fireEvent.click(await screen.findByRole('button', { name: 'Undo' }))
+    await waitFor(() => expect(occ.undoDone).toHaveBeenCalledWith('routine', 'r1', THU))
+  })
+
+  it('Another day moves that occurrence to the chosen day, day only; Undo moves it back', async () => {
+    panel()
+    fireEvent.click(screen.getByRole('button', { name: 'Another day' }))
+    fireEvent.change(screen.getByLabelText('Move Thu Oct 15 to'), { target: { value: '2026-10-16' } })
+    await waitFor(() => expect(occ.reschedule).toHaveBeenCalledWith('routine', 'r1', THU, new Date(2026, 9, 16), { dayOnly: true }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Undo' }))
+    await waitFor(() => expect(occ.undoReschedule).toHaveBeenCalledWith(expect.objectContaining({ instanceId: 'i1' })))
+  })
+
+  it('without the signed-in member there is no I’ll do it', () => {
+    panel({ selfMemberId: null })
+    expect(screen.queryByRole('button', { name: 'I’ll do it' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Skip it' })).toBeInTheDocument()
+  })
+
+  it('is not offered for a day the routine is not on, unless opened from that day', () => {
+    panel({ occurrenceDate: undefined, viewedDate: WED })
+    expect(screen.queryByRole('region', { name: /only$/ })).not.toBeInTheDocument()
+  })
 })

@@ -1,0 +1,124 @@
+/* src/styles/routines-picture.css
+ *
+ * The Routines page as a picture of the week (spec 2026-10-14, frame "After
+ * 1"). Week's look: Crimson Pro day numerals and band names, DM Sans rows, a
+ * routine as a rounded square (ROW-LANGUAGE.md), the place's tokens; the
+ * change card's dashed teal for what is proposed and dashed grey for what
+ * would leave, as on Week.
+ */
+
+.rp-sentence { font-family: var(--font-family-display); font-size: 18px; line-height: 1.35; color: var(--color-neutral-700); }
+.rp-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; }
+.rp-new { font-weight: 500; }
+.rp-quiet { margin: 6px 0; font-family: var(--font-family-sans); font-size: 13px; color: var(--color-neutral-500); }
+.rp-picture { display: flex; flex-direction: column; gap: 14px; margin-top: 8px; padding-bottom: 24px; }
+
+/* ---- Lines: Every day, Each month, No day yet, Not showing -------------- */
+.rp-line { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
+.rp-line-label { margin: 0; min-width: 96px; font-family: var(--font-family-display); font-size: 17px; font-weight: 400; color: var(--color-neutral-900); }
+.rp-line.is-quiet .rp-line-label { color: var(--color-neutral-500); }
+.rp-pills { display: contents; list-style: none; margin: 0; padding: 0; }
+.rp-pill { display: inline-flex; border: 1px solid var(--color-neutral-200); border-radius: 999px; background: var(--color-bg-elevated); }
+.rp-line.is-quiet .rp-pill { border-style: dashed; background: transparent; }
+.rp-pill-open {
+  display: inline-flex; align-items: center; gap: 6px; min-height: 32px; padding: 4px 11px;
+  border: 0; background: none; font: inherit; font-family: var(--font-family-sans); font-size: 13px; color: var(--color-neutral-800); text-align: left;
+}
+button.rp-pill-open { cursor: pointer; border-radius: 999px; }
+button.rp-pill-open:hover { background: color-mix(in srgb, var(--color-primary-50) 70%, transparent); }
+.rp-pill-title { min-width: 0; overflow-wrap: anywhere; }
+.rp-hint { font-size: 11.5px; color: var(--color-neutral-500); }
+.rp-line.is-quiet .rp-pill-title { color: var(--color-neutral-600); }
+
+/* ---- One routine on one day --------------------------------------------- */
+.rp-rows, .rp-daylist { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 3px; }
+.rp-open {
+  display: flex; align-items: flex-start; gap: 6px; width: 100%; min-width: 0; padding: 2px 4px; margin: 0 -4px;
+  border: 1.5px solid transparent; border-radius: 6px; background: none; text-align: left;
+  font: inherit; font-family: var(--font-family-sans); font-size: 13px; line-height: 17px; color: var(--color-neutral-900);
+}
+button.rp-open { cursor: pointer; }
+button.rp-open:hover, button.rp-open:focus-visible { background: color-mix(in srgb, var(--color-primary-50) 70%, transparent); border-color: var(--color-primary-100); }
+button.rp-open[draggable="true"] { cursor: grab; }
+.rp-open:focus-visible, .rp-pill-open:focus-visible { outline: 2px solid var(--color-primary-600); outline-offset: 1px; }
+.rp-time { flex: none; min-width: 30px; padding-top: 1px; font-size: 11.5px; font-variant-numeric: tabular-nums; color: var(--color-neutral-500); }
+.rp-pill .rp-time { min-width: 0; padding: 0; }
+.rp-glyph { flex: none; width: 10px; height: 10px; margin-top: 3px; border-radius: 3px; border: 1.5px solid var(--color-sage-500); background: var(--color-sage-50); }
+.rp-pill .rp-glyph { margin-top: 0; }
+.rp-text { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 2px 5px; }
+.rp-title { min-width: 0; overflow-wrap: break-word; }
+.rp-title s { color: var(--color-neutral-500); }
+.rp-steps { font-size: 11px; color: var(--color-neutral-500); white-space: nowrap; }
+.rp-faces { display: inline-flex; }
+.rp-avatar { width: 16px; height: 16px; font-size: 8px; box-shadow: 0 0 0 1.5px var(--color-bg-elevated); }
+.rp-avatar + .rp-avatar { margin-left: -3px; }
+/* A this-week change already saved: said on its day ("THIS WEEK · skipped"). */
+.rp-once { flex-basis: 100%; font-size: 10.5px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: hsl(22 68% 36%); }
+.dark .rp-once { color: hsl(22 80% 70%); }
+.rp-note { flex-basis: 100%; font-size: 10.5px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; color: #1b6a64; }
+
+/* A pending change card (frames "This week" / "From now on"). */
+.rp-row.is-proposed > .rp-open, .rp-pill.is-proposed { border: 1.5px dashed #1b6a64; background: #eef6f3; color: #123f3b; }
+.rp-row.is-leaving > .rp-open, .rp-pill.is-leaving { border: 1.5px dashed #9aa3a0; background: transparent; color: #7a7f7d; }
+.rp-row.is-leaving .rp-note { color: #7a7f7d; }
+.rp-row.is-proposed > .rp-open, .rp-row.is-leaving > .rp-open { padding: 3px 6px; margin: 1px -6px; }
+.dark .rp-row.is-proposed > .rp-open, .dark .rp-pill.is-proposed { border-color: #6cc4b9; background: #182b29; color: #d7efe9; }
+.dark .rp-note { color: #6cc4b9; }
+.dark .rp-row.is-leaving > .rp-open, .dark .rp-pill.is-leaving { border-color: #5b6461; color: #a5aca9; }
+
+/* ---- The grid: days across, bands down ---------------------------------- */
+.rp-grid {
+  display: grid; grid-template-columns: 96px repeat(7, minmax(0, 1fr));
+  border-top: 1px solid var(--color-neutral-200);
+}
+.rp-corner { border-bottom: 1px solid var(--color-neutral-100); }
+.rp-dayhead {
+  display: flex; align-items: baseline; gap: 4px; min-width: 0; padding: 8px 10px 6px;
+  border-left: 1px solid var(--color-neutral-100); border-bottom: 1px solid var(--color-neutral-100);
+  font-family: var(--font-family-sans); font-size: 11.5px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--color-neutral-600);
+}
+.rp-daynum { font-family: var(--font-family-display); font-size: 20px; font-weight: 500; letter-spacing: 0; color: var(--color-neutral-900); }
+.rp-dayhead.is-today, .rp-dayhead.is-today .rp-daynum { color: var(--color-primary-700); }
+.rp-band {
+  margin: 0; padding: 10px 6px 0 2px; border-top: 1px solid var(--color-neutral-100);
+  font-family: var(--font-family-display); font-size: 17px; font-weight: 400; color: var(--color-neutral-700);
+}
+.rp-cell {
+  min-width: 0; padding: 8px 8px 10px; border-left: 1px solid var(--color-neutral-100); border-top: 1px solid var(--color-neutral-100);
+}
+.rp-cell.is-today, .rp-dayhead.is-today { background: color-mix(in srgb, var(--color-primary-50) 70%, transparent); }
+.rp-cell.is-over, .rp-dayhead.is-over { background: var(--color-primary-50); box-shadow: inset 0 0 0 1.5px var(--color-primary-400); }
+.rp-grid-empty { grid-column: 1 / -1; padding: 8px 2px; }
+
+/* Narrower desks: the band names take their own row, the days the width. */
+@media (min-width: 768px) and (max-width: 1100px) {
+  .rp-grid { grid-template-columns: repeat(7, minmax(0, 1fr)); }
+  .rp-corner { display: none; }
+  .rp-band { grid-column: 1 / -1; padding: 8px 2px 2px; }
+  .rp-cell { padding: 6px 5px 8px; }
+  .rp-cell .rp-open { flex-wrap: wrap; column-gap: 5px; row-gap: 0; }
+  .rp-cell .rp-time { flex-basis: 100%; min-width: 0; padding: 0; }
+}
+
+/* ---- Phone: a day picker and that day's list ----------------------------- */
+.rp-phone { display: flex; flex-direction: column; gap: 14px; margin-top: 8px; padding-bottom: 24px; }
+.rp-daylist { gap: 0; }
+.rp-daylist > .rp-row { border-bottom: 1px solid var(--color-neutral-100); }
+.rp-daylist .rp-open { padding: 8px 4px; font-size: 14px; line-height: 19px; min-height: 44px; }
+.rp-daylist .rp-time { min-width: 36px; font-size: 12px; padding-top: 2px; }
+@media (max-width: 767px) {
+  .rp-pill-open { min-height: 44px; }
+  .rp-new { min-height: 44px; }
+  .rp-line-label { min-width: 0; flex-basis: 100%; }
+}
+
+.rp-empty { margin-top: 12px; }
+.rp-empty-title { margin: 0 0 4px; font-family: var(--font-family-display); font-size: 21px; font-weight: 500; color: var(--color-neutral-900); }
+.rp-empty-text { margin: 0 0 6px; font-family: var(--font-family-sans); font-size: 14px; color: var(--color-neutral-700); }
+
+/* Phones: the shell floats the area filter at the top right on pages that
+ * have no phone title row (Week and Month have one); start below it so it
+ * never covers "Our rhythm · week of …". */
+@media (max-width: 767px) {
+  .rp { padding-top: 44px; }
+}

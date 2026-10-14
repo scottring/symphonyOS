@@ -10,7 +10,21 @@ import { APP_TZ } from './schedule.ts'
 
 export type TaskRow = { id: string; title: string; scheduled_for: string | null; is_all_day: boolean | null; bucket: string | null; week_start: string | null; completed: boolean; assigned_to: string | null; updated_at: string }
 export type EventRow = { id: string; title: string; start_time: string; end_time: string; all_day: boolean | null }
-export type RoutineRow = { id: string; name: string; recurrence_pattern: unknown; time_of_day: string | null; parent_routine_id: string | null }
+export type RoutineRow = { id: string; name: string; recurrence_pattern: unknown; time_of_day: string | null; parent_routine_id: string | null; assigned_to_all?: string[] | null; visibility?: string | null; paused_until?: string | null }
+/** One routine occurrence row (actionable_instances, entity_type 'routine'). */
+export type InstanceRow = { entity_id: string; date: string; status: string; deferred_to: string | null; assigned_to_override: string | null }
+
+/** A routine day that differs from the routine this week: skipped, moved
+ *  (deferred) or done by someone else. */
+export type RoutineException = { date: string; status?: 'skipped' | 'deferred'; movedTo?: string; who?: string }
+export type WeekRoutine = {
+  id: string; name: string; time: string | null; pattern: unknown
+  /** Who does it every week: member names (ids when a name is not known). */
+  who: string[]
+  /** Resting (the board's Rest): until a date, or null for no date. */
+  resting?: { until: string | null }
+  thisWeek?: RoutineException[]
+}
 
 export interface WeekRead {
   start: string
@@ -19,7 +33,7 @@ export interface WeekRead {
   noDay: { id: string; title: string; seen: string }[]
   lastWeekUnfinished: { id: string; title: string; was: string; seen: string }[]
   inbox: { id: string; title: string; seen: string }[]
-  routines: { id: string; name: string; time: string | null; pattern: unknown }[]
+  routines: WeekRoutine[]
   talkAbouts: string[]
 }
 
@@ -44,9 +58,33 @@ const hhmm = (iso: string, allDay: boolean | null) => (allDay ? null : local(iso
 /** An all-day calendar event's dates are calendar dates, not instants. */
 const eventDay = (iso: string, allDay: boolean | null) => (allDay ? iso.slice(0, 10) : local(iso).date)
 
-export function shapeWeek(input: { start: string; today: string; tasks: TaskRow[]; events: EventRow[]; routines: RoutineRow[]; talks: { id: string; body: string }[] }): WeekRead {
+/** This week's occurrence exceptions, by routine id. A move to midnight is a
+ *  move to that day with no time (how reschedule stores a day-only move). */
+function routineExceptions(instances: InstanceRow[], start: string, end: string, nameOf: (id: string) => string) {
+  const byRoutine = new Map<string, RoutineException[]>()
+  for (const x of instances) {
+    if (x.date < start || x.date >= end) continue
+    const status = x.status === 'skipped' || x.status === 'deferred' ? x.status : undefined
+    if (!status && !x.assigned_to_override) continue
+    const e: RoutineException = { date: x.date }
+    if (status) e.status = status
+    if (status === 'deferred' && x.deferred_to) {
+      const to = local(x.deferred_to)
+      e.movedTo = to.time === '00:00' ? to.date : `${to.date} ${to.time}`
+    }
+    if (x.assigned_to_override) e.who = nameOf(x.assigned_to_override)
+    byRoutine.set(x.entity_id, [...(byRoutine.get(x.entity_id) ?? []), e])
+  }
+  for (const list of byRoutine.values()) list.sort((a, b) => a.date.localeCompare(b.date))
+  return byRoutine
+}
+
+export function shapeWeek(input: { start: string; today: string; tasks: TaskRow[]; events: EventRow[]; routines: RoutineRow[]; talks: { id: string; body: string }[]; instances?: InstanceRow[]; members?: { id: string; name: string }[] }): WeekRead {
   const { start, today } = input
-  const { lastStart } = weekWindow(start)
+  const { end, lastStart } = weekWindow(start)
+  const memberNames = new Map((input.members ?? []).map((m) => [m.id, m.name]))
+  const nameOf = (id: string) => memberNames.get(id) ?? id
+  const exceptions = routineExceptions(input.instances ?? [], start, end, nameOf)
   const open = input.tasks.filter((t) => !t.completed)
   const days = Array.from({ length: 7 }, (_, i) => {
     const date = addDays(start, i)
@@ -64,13 +102,21 @@ export function shapeWeek(input: { start: string; today: string; tasks: TaskRow[
     lastWeekUnfinished: open.filter((t) => { const d = ymd(t.scheduled_for); return !!d && d >= lastStart && d < start })
       .map((t) => ({ id: t.id, title: t.title, was: ymd(t.scheduled_for)!, seen: t.updated_at })),
     inbox: open.filter((t) => t.bucket === 'inbox' && !t.scheduled_for).slice(0, 30).map((t) => ({ id: t.id, title: t.title, seen: t.updated_at })),
-    routines: input.routines.filter((r) => !r.parent_routine_id).map((r) => ({ id: r.id, name: r.name, time: r.time_of_day ? r.time_of_day.slice(0, 5) : null, pattern: r.recurrence_pattern })),
+    routines: input.routines.filter((r) => !r.parent_routine_id).map((r) => {
+      const thisWeek = exceptions.get(r.id)
+      return {
+        id: r.id, name: r.name, time: r.time_of_day ? r.time_of_day.slice(0, 5) : null, pattern: r.recurrence_pattern,
+        who: (r.assigned_to_all ?? []).map(nameOf),
+        ...(r.visibility === 'reference' ? { resting: { until: r.paused_until ? local(r.paused_until).date : null } } : {}),
+        ...(thisWeek ? { thisWeek } : {}),
+      }
+    }),
     talkAbouts: input.talks.map((s) => s.body),
   }
 }
 
 export const READ_WEEK_TOOL = {
   name: 'symphony_read_week',
-  description: 'Read the whole week in one call before planning it: each day\'s calendar events and dated tasks, tasks chosen for the week with no day yet, last week\'s unfinished tasks, the inbox, routines, and open things-to-talk-about. Use it FIRST when asked to plan the week or the rest of the week. Task ids here are the ids symphony_propose_changes takes.',
+  description: 'Read the whole week in one call before planning it: each day\'s calendar events and dated tasks, tasks chosen for the week with no day yet, last week\'s unfinished tasks, the inbox, routines (id, time, days, who, resting, and thisWeek: days skipped, moved or done by someone else), and open things-to-talk-about. Use it FIRST when asked to plan the week or the rest of the week, and before proposing a routine change. Task and routine ids here are the ids symphony_propose_changes takes.',
   input_schema: { type: 'object', properties: { start: { type: 'string', description: 'YYYY-MM-DD first day of the week (omit for this week)' } } },
 }

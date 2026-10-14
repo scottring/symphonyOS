@@ -92,6 +92,178 @@ describe('resolveRefs', () => {
   })
 })
 
+const R = 'c3d4e5f6-a7b8-4c9d-8e0f-1a2b3c4d5e6f'
+const R2 = 'd4e5f6a7-b8c9-4d0e-9f1a-2b3c4d5e6f70'
+const STEP = 'e5f6a7b8-c9d0-4e1f-8a2b-3c4d5e6f7081'
+const M2 = '1b2c3d4e-5f6a-4b7c-9d8e-0f1a2b3c4d5e'
+const parse = (ops: Record<string, unknown>[]) => changeSetFromInput({ ops }, 'k')
+const ok = (ops: Record<string, unknown>[]) => {
+  const r = parse(ops)
+  if ('error' in r) throw new Error(r.error)
+  return r.set.ops
+}
+const err = (ops: Record<string, unknown>[]) => {
+  const r = parse(ops)
+  return 'error' in r ? r.error : null
+}
+
+describe('task ops: done, merge, talk', () => {
+  it('keeps done, merge and talk', () => {
+    const [done, merge, talk] = ok([
+      { op: 'done', task_id: A },
+      { op: 'merge', task_id: B, from_task_id: '7c1d2e3f-4a5b-4c6d-8e7f-9a0b1c2d3e4f' },
+      { op: 'talk', task_id: '8d2e3f4a-5b6c-4d7e-9f8a-0b1c2d3e4f5a', note: '  with Iris ' },
+    ])
+    expect(done).toMatchObject({ op: 'done', taskId: A })
+    expect(merge).toMatchObject({ op: 'merge', taskId: B, fromTaskId: '7c1d2e3f-4a5b-4c6d-8e7f-9a0b1c2d3e4f' })
+    expect(talk).toMatchObject({ op: 'talk', note: 'with Iris' })
+    expect(ok([{ op: 'talk', task_id: A }])[0].note).toBeUndefined()
+  })
+  it('refuses a merge without a second task, or with the same task twice', () => {
+    expect(err([{ op: 'merge', task_id: A }])).toContain('from_task_id')
+    expect(err([{ op: 'merge', task_id: A, from_task_id: A }])).toContain('two different tasks')
+  })
+  it('counts a merge for both of its tasks', () => {
+    expect(err([{ op: 'merge', task_id: A, from_task_id: B }, { op: 'done', task_id: B }])).toContain('one op per task')
+    expect(err([{ op: 'someday', task_id: B }, { op: 'merge', task_id: A, from_task_id: B }])).toContain('one op per task')
+  })
+  it('refuses a talk note that is not one short line', () => {
+    expect(err([{ op: 'talk', task_id: A, note: 'x'.repeat(121) }])).toContain('120')
+    expect(err([{ op: 'talk', task_id: A, note: 7 }])).toContain('note')
+  })
+})
+
+describe('routine ops: this week only', () => {
+  it('keeps skip, move and who on one day', () => {
+    const [skip, move, who] = ok([
+      { op: 'routine_skip', routine_id: R, date: '2026-10-16' },
+      { op: 'routine_move', routine_id: R, date: '2026-10-15', to_date: '2026-10-16', time: '16:00' },
+      { op: 'routine_who', routine_id: R2, date: '2026-10-15', assignee: M },
+    ])
+    expect(skip).toMatchObject({ op: 'routine_skip', routineId: R, date: '2026-10-16' })
+    expect(skip.taskId).toBeUndefined()
+    expect(move).toMatchObject({ routineId: R, date: '2026-10-15', toDate: '2026-10-16', time: '16:00' })
+    expect(who).toMatchObject({ routineId: R2, date: '2026-10-15', assignee: M })
+  })
+  it('refuses bad fields', () => {
+    expect(err([{ op: 'routine_skip', routine_id: 'bed', date: '2026-10-16' }])).toContain('routine_id')
+    expect(err([{ op: 'routine_skip', routine_id: R }])).toContain('date')
+    expect(err([{ op: 'routine_move', routine_id: R, date: '2026-10-15' }])).toContain('to_date')
+    expect(err([{ op: 'routine_move', routine_id: R, date: '2026-10-15', to_date: '2026-10-16', time: '4pm' }])).toContain('HH:MM')
+    expect(err([{ op: 'routine_move', routine_id: R, date: '2026-10-15', to_date: '2026-10-15' }])).toContain('new time')
+    expect(err([{ op: 'routine_who', routine_id: R, date: '2026-10-15' }])).toContain('assignee')
+  })
+  it('allows one op per routine and day', () => {
+    expect(err([
+      { op: 'routine_skip', routine_id: R, date: '2026-10-16' },
+      { op: 'routine_who', routine_id: R, date: '2026-10-16', assignee: M },
+    ])).toContain('one op per routine and day')
+  })
+})
+
+describe('routine ops: from now on', () => {
+  it('keeps a change with any of name, time, days and assignees', () => {
+    const [c] = ok([{ op: 'routine_change', routine_id: R, name: ' Tuesday run ', time: '08:30', days: ['tue', 'sun', 'tue'], assignees: [M, M] }])
+    expect(c).toMatchObject({ op: 'routine_change', routineId: R, name: 'Tuesday run', time: '08:30', days: ['sun', 'tue'], assignees: [M] })
+    expect(c.clearTime).toBeUndefined()
+  })
+  it('reads time null as any time of day, and an empty assignees list as no one', () => {
+    const [c] = ok([{ op: 'routine_change', routine_id: R, time: null, assignees: [] }])
+    expect(c).toMatchObject({ clearTime: true, assignees: [] })
+    expect(c.time).toBeUndefined()
+  })
+  it('refuses a change that changes nothing, or bad fields', () => {
+    expect(err([{ op: 'routine_change', routine_id: R }])).toContain('at least one of')
+    expect(err([{ op: 'routine_change', routine_id: R, days: [] }])).toContain('days')
+    expect(err([{ op: 'routine_change', routine_id: R, days: ['monday'] }])).toContain('days')
+    expect(err([{ op: 'routine_change', routine_id: R, time: '8:30' }])).toContain('HH:MM')
+    expect(err([{ op: 'routine_change', routine_id: R, name: '  ' }])).toContain('name')
+    expect(err([{ op: 'routine_change', routine_id: R, assignees: ['Iris'] }])).toContain('assignees')
+  })
+  it('keeps a rest, with or without until', () => {
+    const [a, b] = ok([{ op: 'routine_rest', routine_id: R, until: '2026-11-01' }, { op: 'routine_rest', routine_id: R2 }])
+    expect(a).toMatchObject({ op: 'routine_rest', routineId: R, until: '2026-11-01' })
+    expect(b.until).toBeUndefined()
+    expect(err([{ op: 'routine_rest', routine_id: R, until: '2026-11-31' }])).toContain('until')
+  })
+  it('keeps a new routine, family unless told otherwise', () => {
+    const [n, w] = ok([
+      { op: 'routine_add', name: 'Reading time', days: ['sun', 'mon', 'tue', 'wed', 'thu'], time: '19:00', assignees: [M] },
+      { op: 'routine_add', name: 'Inbox zero', context: 'work' },
+    ])
+    expect(n).toMatchObject({ op: 'routine_add', title: 'Reading time', days: ['sun', 'mon', 'tue', 'wed', 'thu'], time: '19:00', assignees: [M], context: 'family' })
+    expect(n.routineId).toBeUndefined()
+    expect(w).toMatchObject({ title: 'Inbox zero', context: 'work' })
+    expect(err([{ op: 'routine_add', days: ['mon'] }])).toContain('name')
+    expect(err([{ op: 'routine_add', name: 'x', context: 'school' }])).toContain('context')
+  })
+  it('allows one lasting op per routine, alongside its this-week ops', () => {
+    expect(err([
+      { op: 'routine_change', routine_id: R, time: '08:30' },
+      { op: 'routine_rest', routine_id: R },
+    ])).toContain('one routine_change')
+    expect(ok([
+      { op: 'routine_change', routine_id: R, time: '08:30' },
+      { op: 'routine_skip', routine_id: R, date: '2026-10-16' },
+    ])).toHaveLength(2)
+  })
+  it('names every op in an unknown-op error', () => {
+    expect(err([{ op: 'routine_delete', routine_id: R }])).toContain('routine_rest')
+  })
+})
+
+describe('resolveRefs: new ops', () => {
+  const tasks = [
+    { id: A, title: 'Call Molly about the Buick', updated_at: 't-a', completed: false },
+    { id: B, title: 'Call Molly', updated_at: 't-b', completed: false },
+  ]
+  const members = [{ id: M, name: 'Iris' }, { id: M2, name: 'Scott' }]
+  const routines = [
+    { id: R, name: 'Monday run', updated_at: 'r-1', parent_routine_id: null },
+    { id: R2, name: 'FFG pickup', updated_at: 'r-2', parent_routine_id: null },
+    { id: STEP, name: 'Brush teeth', updated_at: 'r-3', parent_routine_id: R2 },
+  ]
+  const resolve = (ops: Record<string, unknown>[], t = tasks, r = routines) => {
+    const p = parse(ops)
+    if ('error' in p) throw new Error(p.error)
+    return resolveRefs(p.set, t, members, r)
+  }
+  it('fills both halves of a merge', () => {
+    const r = resolve([{ op: 'merge', task_id: A, from_task_id: B }])
+    if ('error' in r) throw new Error(r.error)
+    expect(r.set.ops[0]).toMatchObject({ title: 'Call Molly about the Buick', seen: 't-a', fromTaskId: B, fromTitle: 'Call Molly', fromSeen: 't-b' })
+  })
+  it('refuses a merge from a finished or unseen task', () => {
+    expect(resolve([{ op: 'merge', task_id: A, from_task_id: B }], [tasks[0], { ...tasks[1], completed: true }])).toEqual({ error: expect.stringContaining('already done') })
+    expect(resolve([{ op: 'merge', task_id: A, from_task_id: B }], [tasks[0]])).toEqual({ error: expect.stringContaining(`No task ${B}`) })
+  })
+  it('names the routine, and keeps what Symphony saw only for lasting ops', () => {
+    const r = resolve([
+      { op: 'routine_skip', routine_id: R, date: '2026-10-16' },
+      { op: 'routine_change', routine_id: R, days: ['tue'], assignees: [M2, M] },
+      { op: 'routine_who', routine_id: R2, date: '2026-10-15', assignee: M },
+      { op: 'routine_rest', routine_id: R2 },
+      { op: 'routine_add', name: 'Reading time', assignees: [M] },
+    ])
+    if ('error' in r) throw new Error(r.error)
+    const [skip, change, who, rest, add] = r.set.ops
+    expect(skip).toMatchObject({ title: 'Monday run' })
+    expect(skip.seen).toBeUndefined()
+    expect(change).toMatchObject({ title: 'Monday run', seen: 'r-1', assigneeNames: ['Scott', 'Iris'] })
+    expect(who).toMatchObject({ title: 'FFG pickup', assigneeName: 'Iris' })
+    expect(who.seen).toBeUndefined()
+    expect(rest).toMatchObject({ title: 'FFG pickup', seen: 'r-2' })
+    expect(add).toMatchObject({ title: 'Reading time', assigneeNames: ['Iris'] })
+  })
+  it('refuses a routine the person cannot see, a step, or an unknown person', () => {
+    expect(resolve([{ op: 'routine_skip', routine_id: R, date: '2026-10-16' }], tasks, [])).toEqual({ error: expect.stringContaining(`No routine ${R}`) })
+    expect(resolve([{ op: 'routine_rest', routine_id: STEP }])).toEqual({ error: '"Brush teeth" is a step of another routine; change the routine itself' })
+    const stranger = '2c3d4e5f-6a7b-4c8d-9e0f-1a2b3c4d5e6f'
+    expect(resolve([{ op: 'routine_who', routine_id: R, date: '2026-10-15', assignee: stranger }])).toEqual({ error: expect.stringContaining(`No household member ${stranger}`) })
+    expect(resolve([{ op: 'routine_change', routine_id: R, assignees: [M, stranger] }])).toEqual({ error: expect.stringContaining(`No household member ${stranger}`) })
+  })
+})
+
 describe('changeCardNote', () => {
   it('says the last card was approved and its changes are saved', () => {
     const note = changeCardNote({ state: 'approved', title: '2 changes', ops: [{ op: 'someday', title: 'Paper mail', where: '→ Someday' }], at: '2026-10-14T09:00:00Z' })
@@ -119,8 +291,38 @@ describe('agent wiring', () => {
   it('does a clear single change directly and asks one question when ambiguous', () => {
     expect(src).toContain('A clear, reversible change to ONE item')
     expect(src).toContain('ask ONE short question')
-    expect(src).toContain('Routines have no preview yet')
     expect(src).toContain('Just this week, or from now on?')
+  })
+  it('sends routine changes to the card, this week or from now on, and never deletes one', () => {
+    expect(src).not.toContain('Routines have no preview yet')
+    expect(src).toContain('A routine change ends in symphony_propose_changes.')
+    expect(src).toContain('A named day, "tomorrow" or "this week" means this week only: routine_skip, routine_move or routine_who')
+    expect(src).toContain('"From now on", "every week", "anymore" or "always" means a lasting change: routine_change, routine_rest or routine_add')
+    expect(src).toContain('Otherwise ask exactly one question: "Just this week, or from now on?"')
+    expect(src).toContain('Say the change back plainly')
+    expect(src).toContain('stopping a routine is routine_rest')
+    expect(src).toContain('Splitting one routine into two (different times on different days) is not an op: say so and offer the nearest change.')
+  })
+  it('puts done, merge and talk on the card when several things change', () => {
+    expect(src).toContain('When several things change, these go on the card with the rest: done (mark a task finished), merge (two tasks that are the same thing')
+    expect(src).toContain('A single clear done can still be done directly.')
+  })
+  it('resolves routines and merged tasks through the same RLS client', () => {
+    expect(src).toContain("tdb.from('routines').select('id, name, updated_at, parent_routine_id').in('id', routineIds)")
+    expect(src).toMatch(/resolveRefs\(parsed\.set, tasksRead\.data \?\? \[\], membersRead\.data \?\? \[\], routinesRead\.data \?\? \[\]\)/)
+    expect(src).toContain('[o.taskId, o.fromTaskId]')
+  })
+  it("reads this week's routine exceptions for read_week", () => {
+    expect(src).toContain("db.from('actionable_instances').select('entity_id, date, status, deferred_to, assigned_to_override')")
+    expect(src).toContain("assigned_to_all, visibility, paused_until')")
+  })
+  it('documents every op in the tool', () => {
+    const schema = JSON.stringify(PROPOSE_CHANGES_TOOL.input_schema)
+    for (const op of ['done', 'merge', 'talk', 'routine_skip', 'routine_move', 'routine_who', 'routine_change', 'routine_rest', 'routine_add']) {
+      expect(schema).toContain(`"${op}"`)
+      expect(PROPOSE_CHANGES_TOOL.description).toContain(op)
+    }
+    for (const field of ['from_task_id', 'note', 'routine_id', 'to_date', 'days', 'assignees', 'until', 'context', 'name']) expect(schema).toContain(`"${field}"`)
   })
   it('reads what became of the last card, and never re-proposes saved or dismissed changes', () => {
     expect(src).toMatch(/changeCardNote\(body\.changeCard\)/)

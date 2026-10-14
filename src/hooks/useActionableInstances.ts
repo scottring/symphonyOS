@@ -609,6 +609,40 @@ export function useActionableInstances() {
     }
   }, [getInstance, getOrCreateInstance])
 
+  // Someone else does ONE occurrence ("Iris takes Thursday's pickup"): writes
+  // assigned_to_override on that day's instance only, so the routine's own
+  // people — and every other day — are untouched. Null clears the override.
+  // Returns what was there, so Undo is the same call with `previous`.
+  const setOccurrenceAssignee = useCallback(async (
+    entityType: EntityType,
+    entityId: string,
+    date: Date,
+    memberId: string | null,
+  ): Promise<{ instanceId: string; previous: string | null } | null> => {
+    setIsLoading(true)
+    setError(null)
+    try {
+      let instance = await findInstanceForDate(entityType, entityId, date)
+      if (!instance) instance = await getOrCreateInstance(entityType, entityId, date)
+      if (!instance) throw new Error('Failed to get instance')
+      const previous = instance.assigned_to_override ?? null
+      const { error: updateError } = await supabase
+        .from('actionable_instances')
+        .update({ assigned_to_override: memberId })
+        .eq('id', instance.id)
+      if (updateError) throw updateError
+      emitInstancesChanged()
+      return { instanceId: instance.id, previous }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to set who'
+      setError(message)
+      console.error('setOccurrenceAssignee error:', err)
+      return null
+    } finally {
+      setIsLoading(false)
+    }
+  }, [findInstanceForDate, getOrCreateInstance])
+
   // Put an instance back the way reschedule found it. Undo for onPushRoutine /
   // onPushEvent — see RescheduleResult.
   const undoReschedule = useCallback(async (previous: RescheduleResult): Promise<boolean> => {
@@ -832,6 +866,7 @@ export function useActionableInstances() {
     setPlanned,
     reschedule,
     undoReschedule,
+    setOccurrenceAssignee,
     addProgress,
     setProgress,
     // Notes

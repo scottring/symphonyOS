@@ -203,8 +203,10 @@ export function buildJournalDays(a: BuildJournalDaysArgs): { days: JournalDay[];
   return { days, weekend }
 }
 
-/** A routine's people: its members, or its one legacy assignee. */
+/** A routine's people: the day's own person when this occurrence has one
+ *  (assigned_to_override), else its members, or its one legacy assignee. */
 function routinePeople(r: TimelineItem): string[] {
+  if (r.assigneeOverride) return [r.assigneeOverride]
   const routine = r.originalRoutine
   if (!routine) return []
   return routine.assigned_to_all ?? (routine.assigned_to ? [routine.assigned_to] : [])

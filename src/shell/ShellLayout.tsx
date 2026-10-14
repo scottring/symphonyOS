@@ -32,7 +32,8 @@ import { HeaderPeopleFilter } from '@/components/layout/HeaderPeopleFilter';
 import { Toast, ConfirmationToast, ToastLiveRegion } from '@/components/toast';
 import { ChatPanel } from '@/components/chat/ChatPanel';
 import { applyChangeSet, plannedWeekStart } from '@/lib/canvas/applyChangeSet';
-import type { ChangeSet } from '@/lib/canvas/changeCard';
+import { withSteps, type ChangeSet } from '@/lib/canvas/changeCard';
+import { useActionableInstances } from '@/hooks/useActionableInstances';
 import { readCadenceConfig } from '@/lib/cadence/config';
 import { NotesProvider } from '@/contexts/NotesContext';
 import { ListsProvider } from '@/contexts/ListsContext';
@@ -197,10 +198,12 @@ function ShellLayoutInner({ children }: Props) {
 
   const references = useReferenceLists();
 
-  const { tasks, refetch, deleteTask, updateTask, addTask } = useSupabaseTasks();
+  const { tasks, refetch, deleteTask, updateTask, addTask, completeTask, toggleTask } = useSupabaseTasks();
   const { goals, deleteGoal, updateGoal } = useGoals();
   // Held so routine writes from a conversation are seen (and undoable) too.
-  const { routines: canvasRoutines, deleteRoutine, updateRoutine, refetch: refetchRoutines } = useRoutines();
+  const { routines: canvasRoutines, deleteRoutine, updateRoutine, addRoutine, refetch: refetchRoutines } = useRoutines();
+  // The change card's this-week routine ops write one day's occurrence.
+  const { skip: skipInstance, undoDone: undoInstanceDone, reschedule, undoReschedule, setOccurrenceAssignee } = useActionableInstances();
   // The canvas activity provider sits inside this component's tree, but the
   // assistant hook runs above it: a ref bridges each turn's events across.
   const canvasRef = useRef<CanvasActivity | null>(null);
@@ -362,11 +365,27 @@ function ShellLayoutInner({ children }: Props) {
     deleteRoutine,
     updateRoutine: updateRoutine as unknown as (id: string, u: Partial<import('@/types/routine').Routine>) => Promise<unknown>,
   }), [deleteTask, updateTask, deleteGoal, updateGoal, deleteRoutine, updateRoutine]);
+  // Undo reads the tasks as they are THEN, not as they were at Approve: a
+  // task already reopened by hand must not be toggled closed again.
+  const latestTasks = useRef(tasks);
+  useEffect(() => { latestTasks.current = tasks; }, [tasks]);
   const applyChanges = useCallback((set: ChangeSet) => applyChangeSet(set, {
     tasks, updateTask, deleteTask,
     addTask: (title, when, options) => addTask(title, undefined, undefined, when, options),
     weekStart: plannedWeekStart(set, new Date(), readCadenceConfig().weekStartsOn),
-  }), [tasks, updateTask, deleteTask, addTask]);
+    completeTask,
+    reopenTask: async (id) => {
+      const now = withSteps(latestTasks.current).find((t) => t.id === id);
+      return now && !now.completed ? true : toggleTask(id);
+    },
+    routines: canvasRoutines, updateRoutine, deleteRoutine,
+    addRoutine: async (input) => (await addRoutine(input))?.id,
+    skipOccurrence: (id, date) => skipInstance('routine', id, date),
+    undoSkip: (id, date) => undoInstanceDone('routine', id, date),
+    moveOccurrence: (id, from, to, opts) => reschedule('routine', id, from, to, opts),
+    undoMove: undoReschedule,
+    setOccurrenceAssignee: (id, date, memberId) => setOccurrenceAssignee('routine', id, date, memberId),
+  }), [tasks, updateTask, deleteTask, addTask, completeTask, toggleTask, canvasRoutines, updateRoutine, deleteRoutine, addRoutine, skipInstance, undoInstanceDone, reschedule, undoReschedule, setOccurrenceAssignee]);
   const canvasRefetch = useCallback(() => { window.dispatchEvent(new Event('symphony-plan-updated')); return Promise.all([refetch(), refetchRoutines()]); }, [refetch, refetchRoutines]);
   const showStrip = conversationStripPath(location.pathname);
   const stripVoice = { available: voiceEnabled, active: voice.active, status: voice.status, start: () => { void voice.start(); }, stop: voice.stop, mute: voice.mute, heard: voice.heard, reply: voice.reply };
