@@ -3,6 +3,7 @@ import { useState, useCallback, useEffect, useRef } from 'react'
 import { supabase, getAuthUser } from '@/lib/supabase'
 import type { AgentApiMessage, AgentProposalItem, AssistantTaskContext, AgentSourceNote } from '@/lib/agentStream'
 import { runAgentTurn } from '@/lib/agentTurn'
+import type { ChangeCardNote, ChangeSet } from '@/lib/canvas/changeCard'
 import type { ChatMessage, ChatSession } from '@/types/chat'
 import type { ChatAttachment } from '@/components/chat/ChatAttachment'
 import { useFamilyMembers } from '@/hooks/useFamilyMembers'
@@ -34,7 +35,11 @@ export interface AssistantTurnObserver {
   tool?: (name: string) => void
   toolResult?: (result: { name: string; ok: boolean; ids?: string[]; error?: string }) => void
   proposal?: (items: AgentProposalItem[]) => void
+  changeSet?: (set: ChangeSet) => void
+  point?: (p: { dates: string[]; taskIds: string[] }) => void
   end?: (turn: { turnId: string; didWrite: boolean; error: string | null; text: string }) => void
+  /** The change card's state to tell this turn (read once per turn). */
+  changeCard?: () => ChangeCardNote | undefined
 }
 
 type StoredMessage = { role: 'user' | 'assistant'; content: string; timestamp?: string; sources?: AgentSourceNote[] }
@@ -72,7 +77,7 @@ export function useSymphonyAssistant(options?: UseSymphonyAssistantOptions) {
   const { onPlanSaved, onWorkspace, onMutate, taskContext, workspaceContext, persistKey, persistEntityId, turnObserver } = options ?? {}
   // The last message sent, so a failed turn can be retried with the same turn
   // id (the server can then recognise writes it already made).
-  const lastTurn = useRef<{ text: string; turnId: string } | null>(null)
+  const lastTurn = useRef<{ text: string; turnId: string; changeCard?: ChangeCardNote } | null>(null)
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [loading, setLoading] = useState(false)
   const sending = useRef(false)
@@ -173,7 +178,9 @@ export function useSymphonyAssistant(options?: UseSymphonyAssistantOptions) {
     sending.current = true
     const turnId = opts?.turnId ?? crypto.randomUUID()
     const retry = !!opts?.retry
-    lastTurn.current = { text, turnId }
+    // A retry tells the same card again: it was taken for the first try.
+    const changeCard = retry && lastTurn.current?.turnId === turnId ? lastTurn.current.changeCard : turnObserver?.changeCard?.()
+    lastTurn.current = { text, turnId, changeCard }
     turnObserver?.start?.({ text: text.trim(), turnId, retry })
 
     // Build the content for this turn: blocks array if there's an attachment, plain string otherwise.
@@ -230,6 +237,8 @@ export function useSymphonyAssistant(options?: UseSymphonyAssistantOptions) {
       onTool: (name) => { setToolActivity((prev) => [...prev, name]); turnObserver?.tool?.(name) },
       onToolResult: (result) => turnObserver?.toolResult?.(result),
       onProposal: (items) => turnObserver?.proposal?.(items),
+      onChangeSet: (set) => turnObserver?.changeSet?.(set),
+      onPoint: (p) => turnObserver?.point?.(p),
       turnId,
       onReplyFallback: (reply) => {
         setMessages((prev) => prev.map((m) =>
@@ -248,6 +257,7 @@ export function useSymphonyAssistant(options?: UseSymphonyAssistantOptions) {
       currentMemberId: getCurrentUserMember()?.id,
       taskContext,
       workspaceContext,
+      changeCard,
       onWorkspace,
       onPlanSaved,
     })

@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { act, render, screen, waitFor } from '@testing-library/react'
 import { useEffect, useState } from 'react'
-import { CanvasActivityProvider, useCanvasActivity, type CanvasActivity } from './CanvasActivityContext'
+import { CanvasActivityProvider, useCanvasActivity, type CanvasActivity, type CanvasActivityProviderProps } from './CanvasActivityContext'
 import type { Task } from '@/types/task'
 
 const t0 = new Date('2026-10-10T08:00:00Z')
@@ -154,5 +154,162 @@ describe('CanvasActivityProvider — writes the canvas does not hold', () => {
     await act(async () => { await vi.advanceTimersByTimeAsync(3000) })
     await waitFor(() => expect(screen.getByTestId('state').textContent).toMatch(/^unverified\|Symphony says it's done/))
     vi.useRealTimers()
+  })
+})
+
+describe('change sets', () => {
+  function mountActivity(extra: { applyChanges?: CanvasActivityProviderProps['applyChanges'] }) {
+    let latest: CanvasActivity | null = null
+    render(
+      <CanvasActivityProvider
+        snapshot={{ tasks: [], goals: [] }}
+        writers={{ deleteTask: vi.fn(), updateTask: vi.fn(), deleteGoal: vi.fn(), updateGoal: vi.fn() }}
+        refetch={vi.fn()}
+        {...extra}
+      ><Probe onReady={(a) => { latest = a }} /></CanvasActivityProvider>,
+    )
+    return { activity: () => latest! }
+  }
+  const set = (key: string) => ({ key, title: '2 changes', ops: [
+    { key: `${key}:0`, op: 'someday' as const, taskId: 'a', title: 'Paper mail' },
+    { key: `${key}:1`, op: 'unplace' as const, taskId: 'b', title: 'Call the bank' },
+  ] })
+
+  it('holds one set; a newer one replaces it and says so', () => {
+    const { activity } = mountActivity({})
+    act(() => activity().setChangeSet(set('s1')))
+    act(() => activity().setChangeSet(set('s2')))
+    expect(activity().changeSet).toMatchObject({ key: 's2', state: 'proposed', replaced: true })
+  })
+
+  it('Approve applies once, clears the card and offers one Undo', async () => {
+    const undo = vi.fn(async () => true)
+    const applyChanges = vi.fn(async () => ({ ok: true as const, ids: ['a', 'b'], undo }))
+    const { activity } = mountActivity({ applyChanges })
+    act(() => activity().setChangeSet(set('s1')))
+    await act(async () => { await activity().approveChangeSet() })
+    expect(applyChanges).toHaveBeenCalledTimes(1)
+    expect(activity().changeSet).toBeNull()
+    expect(activity().receipt).toMatchObject({ state: 'saved', request: '2 changes', undoable: true })
+    await act(async () => { await activity().undo() })
+    expect(undo).toHaveBeenCalledTimes(1)
+  })
+
+  it('a stale set stays on the card with the reason, and nothing is undoable', async () => {
+    const applyChanges = vi.fn(async () => ({ ok: false as const, reason: 'stale' as const, title: 'Paper mail' }))
+    const { activity } = mountActivity({ applyChanges })
+    act(() => activity().setChangeSet(set('s1')))
+    await act(async () => { await activity().approveChangeSet() })
+    expect(activity().changeSet).toMatchObject({ state: 'failed', message: '“Paper mail” changed since I proposed this. Ask me for a fresh list.' })
+    expect(activity().receipt?.undoable).toBe(false)
+  })
+
+  it('a failed apply says nothing changed', async () => {
+    const applyChanges = vi.fn(async () => ({ ok: false as const, reason: 'failed' as const }))
+    const { activity } = mountActivity({ applyChanges })
+    act(() => activity().setChangeSet(set('s1')))
+    await act(async () => { await activity().approveChangeSet() })
+    expect(activity().changeSet).toMatchObject({ state: 'failed', message: "Couldn't save. Nothing was changed. Try again." })
+  })
+
+  it('Undo is gone once the receipt is dismissed', async () => {
+    const applyChanges = vi.fn(async () => ({ ok: true as const, ids: ['a'], undo: vi.fn(async () => true) }))
+    const { activity } = mountActivity({ applyChanges })
+    act(() => activity().setChangeSet(set('s1')))
+    await act(async () => { await activity().approveChangeSet() })
+    act(() => activity().dismiss())
+    expect(activity().receipt).toBeNull()
+  })
+
+  function gate() {
+    let resolve!: (v: Awaited<ReturnType<NonNullable<CanvasActivityProviderProps['applyChanges']>>>) => void
+    const promise = new Promise<Awaited<ReturnType<NonNullable<CanvasActivityProviderProps['applyChanges']>>>>((r) => { resolve = r })
+    return { promise, resolve }
+  }
+
+  it('a newer set that arrives while one saves survives the older apply succeeding', async () => {
+    const g = gate()
+    const { activity } = mountActivity({ applyChanges: () => g.promise })
+    act(() => activity().setChangeSet(set('s1')))
+    let p!: Promise<boolean>
+    act(() => { p = activity().approveChangeSet() })
+    act(() => activity().setChangeSet(set('s2')))
+    await act(async () => { g.resolve({ ok: true, ids: ['a'], undo: async () => true }); await p })
+    expect(activity().changeSet).toMatchObject({ key: 's2', state: 'proposed', replaced: true })
+  })
+
+  it('a newer set survives the older apply failing', async () => {
+    const g = gate()
+    const { activity } = mountActivity({ applyChanges: () => g.promise })
+    act(() => activity().setChangeSet(set('s1')))
+    let p!: Promise<boolean>
+    act(() => { p = activity().approveChangeSet() })
+    act(() => activity().setChangeSet(set('s2')))
+    await act(async () => { g.resolve({ ok: false, reason: 'failed' }); await p })
+    expect(activity().changeSet).toMatchObject({ key: 's2', state: 'proposed' })
+    expect(activity().changeSet?.message).toBeUndefined()
+  })
+
+  it('two Approves in the same tick apply once, and the same set re-announced keeps saving', async () => {
+    const g = gate()
+    const applyChanges = vi.fn(() => g.promise)
+    const { activity } = mountActivity({ applyChanges })
+    act(() => activity().setChangeSet(set('s1')))
+    let p1!: Promise<boolean>, p2!: Promise<boolean>
+    act(() => { p1 = activity().approveChangeSet(); p2 = activity().approveChangeSet() })
+    act(() => activity().setChangeSet(set('s1')))
+    expect(activity().changeSet?.state).toBe('saving')
+    await act(async () => { await activity().approveChangeSet(); g.resolve({ ok: true, ids: ['a'], undo: async () => true }); await Promise.all([p1, p2]) })
+    expect(applyChanges).toHaveBeenCalledTimes(1)
+    expect(activity().changeSet).toBeNull()
+  })
+
+  it('tells the next turn the last card was approved, once', async () => {
+    const applyChanges = vi.fn(async () => ({ ok: true as const, ids: ['a', 'b'], undo: async () => true }))
+    const { activity } = mountActivity({ applyChanges })
+    act(() => activity().setChangeSet(set('s1')))
+    expect(activity().takeChangeCard()).toMatchObject({ state: 'pending', title: '2 changes' })
+    // Pending stays pending for every turn until it is decided.
+    expect(activity().takeChangeCard()).toMatchObject({ state: 'pending' })
+    await act(async () => { await activity().approveChangeSet() })
+    const note = activity().takeChangeCard()
+    expect(note).toMatchObject({ state: 'approved', title: '2 changes', ops: [
+      { op: 'someday', title: 'Paper mail', where: '→ Someday' },
+      { op: 'unplace', title: 'Call the bank', where: '→ No day yet' },
+    ] })
+    expect(typeof note?.at).toBe('string')
+    expect(activity().takeChangeCard()).toBeUndefined()
+  })
+
+  it('tells the next turn the last card was dismissed; a new proposal replaces the note', () => {
+    const { activity } = mountActivity({})
+    act(() => activity().setChangeSet(set('s1')))
+    act(() => activity().dismissChangeSet())
+    expect(activity().takeChangeCard()).toMatchObject({ state: 'dismissed', title: '2 changes' })
+    expect(activity().takeChangeCard()).toBeUndefined()
+    act(() => activity().setChangeSet(set('s2')))
+    act(() => activity().dismissChangeSet())
+    act(() => activity().setChangeSet(set('s3')))
+    expect(activity().takeChangeCard()).toMatchObject({ state: 'pending' })
+  })
+
+  it('a failed Approve leaves the card pending', async () => {
+    const applyChanges = vi.fn(async () => ({ ok: false as const, reason: 'failed' as const }))
+    const { activity } = mountActivity({ applyChanges })
+    act(() => activity().setChangeSet(set('s1')))
+    await act(async () => { await activity().approveChangeSet() })
+    expect(activity().takeChangeCard()).toMatchObject({ state: 'pending' })
+  })
+
+  it('holds what Symphony points at, clears on an empty point and on the next turn', () => {
+    const { activity } = mountActivity({})
+    act(() => activity().setPointing({ dates: ['2026-10-18'], taskIds: ['a'] }))
+    expect(activity().pointing?.dates.has('2026-10-18')).toBe(true)
+    expect(activity().pointing?.taskIds.has('a')).toBe(true)
+    act(() => activity().setPointing({ dates: [], taskIds: [] }))
+    expect(activity().pointing).toBeNull()
+    act(() => activity().setPointing({ dates: ['2026-10-19'], taskIds: [] }))
+    act(() => activity().turnStarted('Thursday', false))
+    expect(activity().pointing).toBeNull()
   })
 })

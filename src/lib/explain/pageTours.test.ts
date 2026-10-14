@@ -26,32 +26,29 @@ describe('page-written tours', () => {
       <section aria-label="The days">days</section>
     </div>`
     const steps = tourFor('week')
-    expect(steps.map((s) => s.targets)).toEqual([['page-title'], ['still-to-place'], ['region:The days']])
-    expect(steps[1].title).toBe('Still to place')
+    expect(steps.map((s) => s.targets)).toEqual([['page-title'], ['region:The days'], ['still-to-place']])
+    expect(steps[2].title).toBe('No day yet')
     expect(titles()).not.toContain('The shelf')
   })
 
-  it("in Week's planning session: the bar, then only the current step's parts, matched by what they say", () => {
-    document.body.innerHTML = `<div data-explain-root><div data-explain-guide="week-plan" data-explain-step="write">
+  it('describes the week as it is now: the days, the sentence, No day yet, planning by talking; no eight steps', () => {
+    document.body.innerHTML = `<div data-explain-root>
       <div data-explain="page-title">Oct 10 – 16</div>
-      <div role="region" aria-label="Planning week 42" data-explain="plan-steps">bar</div>
-      <div role="group" aria-label="Planning view" data-explain="plan-view">Lists · Open journal</div>
-      <section aria-label="This week, by October goal">list</section>
-      <section aria-label="Not tied to an October goal">rest</section>
-      <section aria-label="The days" hidden>days</section>
-    </div></div>`
+      <span data-explain="week-sentence">Three days are full.</span>
+      <span data-explain="still-to-place">No day yet</span>
+      <button data-explain="plan-walk">Plan the rest of my week</button>
+      <section aria-label="The days">days</section>
+    </div>`
     const steps = tourFor('week')
-    expect(steps.map((s) => s.targets[0])).toEqual(['plan-steps', 'plan-view', 'region:This week, by October goal', 'region:Not tied to an October goal'])
-    // Nothing from the Week page at rest, nothing from another step.
-    expect(steps.map((s) => s.title)).not.toContain('Still to place')
-    expect(steps.map((s) => s.title)).not.toContain('The week’s shape')
+    expect(steps.map((s) => s.targets[0])).toEqual(['page-title', 'region:The days', 'week-sentence', 'still-to-place', 'plan-walk'])
+    const words = [PAGE_GUIDES.week, ...(PAGE_TOURS.week ?? []).map((p) => p.text)].join(' ')
+    for (const gone of [/eight steps/i, /Show opens/, /Days and Hours/, /Still to place/, /⋯/, /planning session/i]) expect(words).not.toMatch(gone)
+    expect(PAGE_GUIDES.week).toContain('Plan the rest of my week')
   })
 
   it('never shows the same part twice, and a page without a tour gets none', () => {
-    document.body.innerHTML = `<div data-explain-root><div data-explain-guide="week-plan" data-explain-step="inbox">
-      <div data-explain="plan-steps">bar</div><section aria-label="Your week so far">so far</section>
-    </div></div>`
-    expect(tourFor('week').map((s) => s.title)).toEqual(['Planning, one step at a time', 'Your week so far'])
+    document.body.innerHTML = `<div data-explain-root><div data-explain="page-title">Oct</div><div data-explain="page-title">Oct again</div></div>`
+    expect(tourFor('week').map((s) => s.title)).toEqual(['This week'])
     document.body.innerHTML = '<div data-explain-root><section aria-label="Inbox">captures</section></div>'
     expect(tourFor('inbox')).toEqual([])
   })
@@ -62,5 +59,16 @@ describe('page-written tours', () => {
       expect(parts.length).toBeLessThanOrEqual(6)
       for (const p of parts) expect(p.title && p.text).toBeTruthy()
     }
+  })
+})
+
+// Final review 2026-10-14 #7: Week no longer has a box where month goals
+// become tasks; you ask Symphony there.
+describe('Month points at asking Symphony on Week', () => {
+  it('no guide or tour promises the removed box', () => {
+    const month = [PAGE_GUIDES.month, ...PAGE_TOURS.month.map((s) => s.text)].join(' ')
+    expect(month).not.toMatch(/month goals become this week/)
+    expect(PAGE_GUIDES.month).toContain('tell Symphony what to do this week for a goal')
+    expect(PAGE_TOURS.month.find((s) => s.target === 'next')?.text).toContain('tell Symphony what to do this week for a goal')
   })
 })

@@ -7,6 +7,7 @@ import type { RecurrencePattern } from '@/types/actionable'
 import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
 import { ALL_LAYERS } from '@/lib/domains'
 import { weekStartAnchor, readCadenceConfig } from '@/lib/cadence/config'
+import { ConversationWalkContext } from '@/components/canvas/conversationWalk'
 import { CanvasActivityProvider, useCanvasActivity } from '@/contexts/CanvasActivityContext'
 
 // These tests cover the Lists view; Open journal is the default since
@@ -24,6 +25,13 @@ vi.mock('@/hooks/useSupabaseTasks', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/hooks/useSupabaseTasks')>()
   return { ...actual, useSupabaseTasks: () => ({ ...actual.useSupabaseTasks(), toggleTask: async () => toggleResult.ok }) }
 })
+
+// Phones have no bar: the page's own entry sends the walk through the launcher.
+const launcher = vi.hoisted(() => ({ openAssistant: vi.fn() }))
+vi.mock('@/contexts/AssistantLaunchContext', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/contexts/AssistantLaunchContext')>()),
+  useAssistantLauncher: () => launcher,
+}))
 
 // The week's planning session, settled and unplanned: "Plan the week" is offered.
 vi.mock('@/hooks/usePlanningSession', () => ({ usePlanningSession: () => ({ saved: null, mine: null, loading: false, error: null, reload: vi.fn(), save: vi.fn() }), weekToken: () => 'w' }))
@@ -79,7 +87,6 @@ function mockEvent(over: { id: string; title: string; start: string; end: string
 }
 
 // The days are the page (2026-10-12); the shelf opens from the line under the title.
-const openShelf = () => fireEvent.click(screen.getByRole('button', { name: 'Show' }))
 
 describe('WeekViewV2 layout', () => {
   // Scott, 2026-09-21: the week's viewport is the days. Planning is ONE panel
@@ -87,24 +94,20 @@ describe('WeekViewV2 layout', () => {
   // second column of lists to understand first.
   it('gives the desktop viewport to the days; the shell owns the task chooser', () => {
     render(<WeekViewV2 {...defaultProps} routines={[]} />)
-    // Calendar first (2026-10-12): the days, with the shelf folded into one line.
+    // Calendar first (2026-10-12): the days, and no tray.
     expect(screen.getByRole('region', { name: 'The days' })).toBeInTheDocument()
     expect(screen.queryByRole('region', { name: 'Still to place' })).toBeNull()
-    expect(screen.getByText(/^Still to place ·/)).toBeInTheDocument()
     expect(screen.queryByText(/Didn.t happen/)).toBeNull()
     expect(screen.queryByRole('button', { name: /This month/ })).toBeNull()
     expect(screen.queryByRole('button', { name: 'Shelves' })).not.toBeInTheDocument()
   })
 
-  it('counts a week task with no day under the title, and shows it on the shelf when asked', () => {
+  it('a week task with no day sits in the No day yet line', () => {
     const anchor = weekStartAnchor(monday, readCadenceConfig().weekStartsOn)
     const t = createMockTask({ id: 'w', title: 'Call the plumber', bucket: 'week', weekStart: anchor, commitments: [{ level: 'week', periodStart: anchor, status: 'open' }] })
     render(<WeekViewV2 {...defaultProps} tasks={[t]} routines={[]} />)
-    expect(screen.getByText(/^Still to place · 1 task ·/)).toBeInTheDocument()
-    openShelf()
-    const shelf = within(screen.getByRole('region', { name: 'Still to place' }))
-    expect(shelf.getByText('Call the plumber')).toBeInTheDocument()
-    expect(shelf.getByRole('button', { name: 'Give Call the plumber a day' })).toBeInTheDocument()
+    expect(screen.queryByRole('region', { name: 'Still to place' })).toBeNull()
+    expect(within(screen.getByRole('list', { name: 'No day yet' })).getByText('Call the plumber')).toBeInTheDocument()
   })
 })
 
@@ -165,44 +168,6 @@ describe('WeekViewV2 routine visibility', () => {
   })
 })
 
-// ── All-day lane + Earlier row (A2.8, A2.9) ─────────────────────────────────
-// Demo run 2026-09-06: a holiday all-day event drew as an 8 AM block, and a
-// 6:50 AM task got pinned to the 8 AM row alongside it.
-describe('WeekViewV2 all-day lane', () => {
-  const labourDayWeek = new Date(2026, 8, 7) // Monday Sep 7, 2026 (Labor Day)
-
-  it('an all-day calendar event sits in the all-day lane', () => {
-    const events = [
-      {
-        id: 'e1',
-        title: 'Labor Day',
-        start_time: '2026-09-07T00:00:00',
-        end_time: '2026-09-08T00:00:00',
-        is_all_day: true,
-      } as unknown as CalendarEvent,
-    ]
-    render(<WeekViewV2 {...defaultProps} routines={[]} weekStart={labourDayWeek} events={events} />)
-    fireEvent.click(screen.getByRole('radio', { name: 'Hours' }))
-    expect(screen.getByRole('region', { name: "This week's list" })).toBeInTheDocument()
-    expect(within(screen.getByTestId('allday-2026-09-07')).getByText('Labor Day')).toBeInTheDocument()
-  })
-
-  it('a 6:50 AM task shows in the Earlier row with its time', () => {
-    const tasks = [
-      createMockTask({
-        id: 't1',
-        title: 'Get gutter cleaning quotes',
-        scheduledFor: new Date(2026, 8, 7, 6, 50),
-        isAllDay: false,
-      }),
-    ]
-    render(<WeekViewV2 {...defaultProps} routines={[]} weekStart={labourDayWeek} tasks={tasks} />)
-    fireEvent.click(screen.getByRole('radio', { name: 'Hours' }))
-    expect(screen.getByText(/6:50 AM · Get gutter/)).toBeInTheDocument()
-    expect(screen.getByLabelText(/Earlier: Get gutter cleaning quotes/)).toBeInTheDocument()
-  })
-})
-
 // ── Journal spread (Scott, 2026-09-19) ──────────────────────────────────────
 // Week opens as a seven-day journal: appointments with small times, then the
 // day's untimed tasks; multi-day context ruled across the top; the hourly
@@ -210,15 +175,12 @@ describe('WeekViewV2 all-day lane', () => {
 describe('WeekViewV2 journal spread', () => {
   const sunday = new Date(2026, 8, 13) // Sun Sep 13 – Sat Sep 19, 2026
 
-  it('opens on Days (the week canvas), with Hours — the timed grid — a switch away', () => {
+  it('opens on the days, and has no Days/Hours switch', () => {
     render(<WeekViewV2 {...defaultProps} routines={[]} weekStart={sunday} />)
     expect(screen.getByRole('region', { name: 'The days' })).toBeInTheDocument()
-    expect(screen.getByRole('radio', { name: 'Days' })).toHaveAttribute('aria-checked', 'true')
+    expect(screen.queryByRole('radio', { name: 'Hours' })).toBeNull()
+    expect(screen.queryByRole('radio', { name: 'Days' })).toBeNull()
     expect(screen.queryByTestId('allday-2026-09-13')).toBeNull()
-
-    fireEvent.click(screen.getByRole('radio', { name: 'Hours' }))
-    expect(screen.queryByRole('region', { name: 'The days' })).toBeNull()
-    expect(screen.getByTestId('allday-2026-09-13')).toBeInTheDocument()
   })
 
   it('draws a day as event chips, then its work in time order; done waits behind Show done', () => {
@@ -249,44 +211,6 @@ describe('WeekViewV2 journal spread', () => {
     expect(monday.getByText('Renew license').closest('li')).toHaveClass('is-done')
   })
 
-  // The week canvas (2026-10-10): a day's row keeps a way to another day —
-  // its ⋯ menu's "Move to another day", the same seven-day picker the shelf
-  // uses — and a finished row is a record (no move offered by drag).
-  const openMove = (dayKey: string, title: string) => {
-    const day = within(screen.getByTestId(`journal-day-${dayKey}`))
-    fireEvent.click(day.getByRole('button', { name: `More for ${title}` }))
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Move to another day' }))
-  }
-
-  it('offers the VIEWED week\'s days to move a day\'s task to, saying what each holds', () => {
-    const tasks = [
-      createMockTask({ id: 'a', title: 'List supplies to buy', scheduledFor: new Date(2026, 8, 14), isAllDay: true }),
-      // Something already on Tuesday, so the days differ from one another.
-      createMockTask({ id: 'b', title: 'Call the bank', scheduledFor: new Date(2026, 8, 15, 10), isAllDay: false }),
-      createMockTask({ id: 'c', title: 'Dentist', scheduledFor: new Date(2026, 8, 15, 14), isAllDay: false }),
-    ]
-    render(<WeekViewV2 {...defaultProps} routines={[]} weekStart={sunday} tasks={tasks} events={[]} />)
-    openMove('2026-09-14', 'List supplies to buy')
-    const picker = within(screen.getByRole('group', { name: /Move to: List supplies to buy/ }))
-    expect(picker.getAllByRole('button')).toHaveLength(7)
-    expect(picker.getByRole('button', { name: /Sunday, September 13/ })).toHaveTextContent('Sun 13')
-    expect(picker.getByRole('button', { name: /Monday, September 14/ })).toHaveAttribute('aria-pressed', 'true')
-    expect(picker.getByRole('button', { name: /Tuesday, September 15/ })).toHaveAccessibleName(/2 tasks already/)
-    expect(picker.getByRole('button', { name: /Wednesday, September 16/ })).toHaveAccessibleName(/nothing on it yet/)
-    for (const b of picker.getAllByRole('button')) expect(b.getAttribute('aria-label')).not.toMatch(/%|hour|booked|capacity/i)
-  })
-
-  it('moves a day\'s task to the day picked, keeping it all-day, with an Undo that puts it back', () => {
-    vi.useFakeTimers({ toFake: ['Date'] }); vi.setSystemTime(new Date(2026, 8, 13, 9))
-    const onUpdateTask = vi.fn()
-    const tasks = [createMockTask({ id: 'a', title: 'List supplies to buy', scheduledFor: new Date(2026, 8, 14), isAllDay: true, bucket: 'timed' })]
-    render(<WeekViewV2 {...defaultProps} routines={[]} weekStart={sunday} tasks={tasks} events={[]} onUpdateTask={onUpdateTask} />)
-    openMove('2026-09-14', 'List supplies to buy')
-    fireEvent.click(screen.getByRole('button', { name: /Thursday, September 17/ }))
-    vi.useRealTimers()
-    expect(onUpdateTask).toHaveBeenCalledWith('a', { bucket: 'timed', scheduledFor: new Date(2026, 8, 17), isAllDay: true })
-  })
-
   it('a day\'s task drags onto another day with the plan payload, and the drop moves it', () => {
     vi.useFakeTimers({ toFake: ['Date'] }); vi.setSystemTime(new Date(2026, 8, 13, 9))
     const onUpdateTask = vi.fn()
@@ -309,45 +233,6 @@ describe('WeekViewV2 journal spread', () => {
   // Codex, 2026-09-24: the helper supports a dedupe key, but the caller has to
   // pass one. The journal draws the same meeting twice when two calendars
   // report it, so the count must merge what the journal does not.
-  it('counts one meeting once, however many calendars report it', () => {
-    const tasks = [createMockTask({ id: 'a', title: 'List supplies to buy', scheduledFor: new Date(2026, 8, 14), isAllDay: true })]
-    const events = [
-      mockEvent({ id: 'cal-a', title: 'PT appointment', start: '2026-09-15T10:00:00', end: '2026-09-15T11:00:00' }),
-      // The same hour, the same meeting, a second calendar's id.
-      mockEvent({ id: 'cal-b', title: 'PT appointment', start: '2026-09-15T10:00:00', end: '2026-09-15T11:00:00' }),
-    ]
-    render(<WeekViewV2 {...defaultProps} routines={[]} weekStart={sunday} tasks={tasks} events={events} />)
-    openMove('2026-09-14', 'List supplies to buy')
-    expect(screen.getByRole('button', { name: /Tuesday, September 15/ })).toHaveAccessibleName(/1 event already/)
-  })
-
-  // The status is the PARENT's to know. An isolated prop test would not have
-  // caught a container that never supplies one.
-  it('says a day is unknown when the week is told its sources are not ready', () => {
-    const tasks = [createMockTask({ id: 'a', title: 'List supplies to buy', scheduledFor: new Date(2026, 8, 14), isAllDay: true })]
-    render(
-      <WeekViewV2 {...defaultProps} routines={[]} weekStart={sunday} tasks={tasks} events={[]}
-        sources={{ tasks: 'ready', routines: 'ready', events: 'stale' }} />,
-    )
-    openMove('2026-09-14', 'List supplies to buy')
-    // Not "nothing on it" — we have not read it.
-    expect(screen.getByRole('button', { name: /Wednesday, September 16/ })).toHaveAccessibleName(/still loading/)
-    expect(screen.getByRole('button', { name: /Wednesday, September 16/ })).not.toHaveAccessibleName(/nothing on it yet/)
-  })
-
-  it('still counts a quiet day as quiet when there is simply no calendar', () => {
-    const tasks = [createMockTask({ id: 'a', title: 'List supplies to buy', scheduledFor: new Date(2026, 8, 14), isAllDay: true })]
-    render(
-      <WeekViewV2 {...defaultProps} routines={[]} weekStart={sunday} tasks={tasks} events={[]}
-        sources={{ tasks: 'ready', routines: 'ready', events: 'not-connected' }} />,
-    )
-    openMove('2026-09-14', 'List supplies to buy')
-    const wed = screen.getByRole('button', { name: /Wednesday, September 16/ })
-    // Complete, and scoped — never dressed up as a failure.
-    expect(wed).toHaveAccessibleName(/nothing on it yet · no calendar connected/)
-    expect(wed.getAttribute('aria-label')).not.toMatch(/error|couldn|fail|loading/i)
-  })
-
   it('lists multi-day context once above the days — including one that began last week — and not in the days', () => {
     const events = [
       { id: 'brk', title: 'Fall break', start_time: '2026-09-10T12:00:00.000Z', end_time: '2026-09-16T12:00:00.000Z', all_day: true } as unknown as CalendarEvent,
@@ -425,17 +310,14 @@ describe('WeekViewV2 journal spread', () => {
   })
 
   // Scott, 2026-09-27: Show in Today ON + due = on the day, untimed, in the
-  // journal AND Schedule's all-day cell — as on Today.
-  it('a due routine with Show in Today on is a Sunday entry in both modes, untimed', () => {
+  // journal — as on Today.
+  it('a due routine with Show in Today on is a Sunday entry, untimed', () => {
     const routines = [createMockRoutine({ id: 'wp', name: 'Water houseplants', time_of_day: null, recurrence_pattern: { type: 'weekly', days: ['sun'] } as RecurrencePattern, show_on_timeline: true })]
     render(<WeekViewV2 {...defaultProps} routines={routines} weekStart={sunday} />)
     const sun = within(screen.getByTestId('journal-day-2026-09-13'))
     // A day's own routines read in the day — no fold, no count (2026-10-04).
     expect(within(sun.getByRole('list', { name: 'Sunday entries' })).getByText('Water houseplants')).toBeInTheDocument()
     expect(screen.getAllByText('Water houseplants')).toHaveLength(1)
-    fireEvent.click(screen.getByRole('radio', { name: 'Hours' }))
-    expect(within(screen.getByTestId('allday-2026-09-13')).getByText('Water houseplants')).toBeInTheDocument()
-    expect(within(screen.getByTestId('allday-2026-09-14')).queryByText('Water houseplants')).toBeNull()
   })
 
   describe('on a narrow screen', () => {
@@ -457,27 +339,23 @@ describe('WeekViewV2 journal spread', () => {
       expect(screen.getByRole('region', { name: 'The days' })).toBeInTheDocument()
       expect(screen.queryByRole('radio', { name: 'Hours' })).toBeNull()
       expect(within(screen.getByTestId('journal-day-2026-09-14')).getByText('Return library books')).toBeInTheDocument()
-      // No side column here either: the shelf opens from its line.
+      // No side column here either, and no tray.
       expect(screen.queryByRole('region', { name: 'Still to place' })).toBeNull()
-      openShelf()
-      expect(screen.getByRole('region', { name: 'Still to place' })).toBeInTheDocument()
       expect(screen.queryByRole('dialog', { name: 'Shelves' })).toBeNull()
       expect(screen.queryByRole('button', { name: 'Shelves' })).toBeNull() // Date header owns the launcher.
     })
   })
 })
 
-// Journal | Schedule is presentation only: the same dates, the same data.
-describe('WeekViewV2 — Journal and Schedule agree', () => {
+// Untimed placements read as entries in their day.
+describe('WeekViewV2 — untimed placements', () => {
   const sunday = new Date(2026, 8, 13)
   beforeEach(() => { instancesMock.rows = []; instancesMock.markDone.mockClear() })
 
-  it('an untimed Saturday placement is a Saturday entry in Journal and sits in Saturday\'s all-day cell in Schedule', () => {
+  it('an untimed Saturday placement is a Saturday entry', () => {
     const tasks = [createMockTask({ id: 'sat', title: 'Organize kids clothes', bucket: 'timed', isAllDay: true, scheduledFor: new Date(2026, 8, 19), plannedOn: new Date(2026, 8, 19) })]
     render(<WeekViewV2 {...defaultProps} routines={[]} weekStart={sunday} tasks={tasks} />)
     expect(within(screen.getByTestId('journal-day-2026-09-19')).getByText('Organize kids clothes')).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('radio', { name: 'Hours' }))
-    expect(within(screen.getByTestId('allday-2026-09-19')).getByText('Organize kids clothes')).toBeInTheDocument()
   })
 
   it('keeps completed untimed routine occurrences in the day record', async () => {
@@ -494,7 +372,7 @@ describe('WeekViewV2 — Journal and Schedule agree', () => {
     expect(saturday.getByText('Read').closest('li')).toHaveClass('is-done')
   })
 
-  it('a routine occurrence chosen for Saturday (no time) is an entry in both; one nobody chose is only "available"', async () => {
+  it('a routine occurrence chosen for Saturday (no time) is an entry; one nobody chose is only "available"', async () => {
     instancesMock.rows = [{
       id: 'i1', user_id: 'u', entity_type: 'routine', entity_id: 'chosen', date: '2026-09-19', status: 'pending',
       assignee: null, assigned_to_override: null, deferred_to: null, planned_on: '2026-09-19',
@@ -516,11 +394,6 @@ describe('WeekViewV2 — Journal and Schedule agree', () => {
     // Ticking the entry completes THAT occurrence — Saturday's instance.
     fireEvent.click(saturday.getByRole('button', { name: 'Complete Family reading time' }))
     expect(instancesMock.markDone).toHaveBeenCalledWith('routine', 'chosen', new Date(2026, 8, 19))
-
-    fireEvent.click(screen.getByRole('radio', { name: 'Hours' }))
-    const cell = within(screen.getByTestId('allday-2026-09-19'))
-    expect(cell.getByText('Family reading time')).toBeInTheDocument()
-    expect(cell.queryByText('Kids clean rooms')).toBeNull()
   })
 })
 
@@ -544,55 +417,25 @@ describe('WeekViewV2 — Sometime this weekend follows the people filter', () =>
 // composition, writing through the page's own writers.
 describe('WeekViewV2 — the week canvas keeps what the page could do', () => {
   const sunday = new Date(2026, 8, 13)
-  const anchor = () => weekStartAnchor(sunday, readCadenceConfig().weekStartsOn)
-  const october = new Date(2026, 9, 1)
-  const september = new Date(2026, 8, 1)
-  const line = (id: string, title: string, o: Partial<Task> = {}) => createMockTask({ id, title, bucket: 'month', monthStart: september, commitments: [{ level: 'month', periodStart: september, status: 'open' }], ...o })
-  const action = (id: string, title: string, o: Partial<Task> = {}) => createMockTask({ id, title, bucket: 'week', weekStart: anchor(), commitments: [{ level: 'week', periodStart: anchor(), status: 'open' }], ...o })
-  void october
   beforeEach(() => { vi.useFakeTimers({ toFake: ['Date'] }); vi.setSystemTime(new Date(2026, 8, 13, 9)) })
   afterEach(() => { vi.useRealTimers(); localStorage.removeItem('symphony-week-daily') })
 
-  it('Hours keeps "Plan the week" in the frame', () => {
+  it('has no Plan the week session button, no steps; planning starts in the conversation', () => {
+    render(
+      <ConversationWalkContext.Provider value={vi.fn()}>
+        <WeekViewV2 {...defaultProps} routines={[]} weekStart={sunday} />
+      </ConversationWalkContext.Provider>,
+    )
+    expect(screen.queryByRole('button', { name: 'Plan the week' })).toBeNull()
+    expect(screen.queryByText(/Step \d of 8/)).toBeNull()
+    expect(screen.queryByRole('region', { name: /Planning week/ })).toBeNull()
+  })
+
+  it('on a phone (no bar) the page offers the same walk and sends the same message', () => {
+    launcher.openAssistant.mockClear()
     render(<WeekViewV2 {...defaultProps} routines={[]} weekStart={sunday} />)
-    const inDays = !!screen.queryByRole('button', { name: 'Plan the week' })
-    fireEvent.click(screen.getByRole('radio', { name: 'Hours' }))
-    expect(screen.getByTestId('allday-2026-09-13')).toBeInTheDocument()
-    expect(inDays).toBe(true)
-    expect(screen.getByRole('button', { name: 'Plan the week' })).toBeInTheDocument()
-  })
-
-  it('Move under… writes Plan’s link patch, goal_id following the new milestone', () => {
-    const onUpdateTask = vi.fn()
-    const trip = line('m1', 'Plan the autumn trip', { goalId: 'y1' })
-    const shed = line('m2', 'Clear out the shed', { goalId: 'y2' })
-    const cabin = action('w1', 'Book the cabin', { sourceId: 'm1', goalId: 'y1' })
-    render(<WeekViewV2 {...defaultProps} routines={[]} weekStart={sunday} tasks={[trip, shed, cabin]} onUpdateTask={onUpdateTask} />)
-    openShelf()
-    fireEvent.click(screen.getByRole('button', { name: 'More for Book the cabin' }))
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Move under…' }))
-    fireEvent.click(screen.getByRole('menuitemradio', { name: 'Clear out the shed' }))
-    expect(onUpdateTask).toHaveBeenCalledWith('w1', { sourceId: 'm2', goalId: 'y2' })
-  })
-
-  it('Put on this week writes the month line onto the week, as the month page does', () => {
-    const onUpdateTask = vi.fn()
-    const trip = line('m1', 'Plan the autumn trip')
-    render(<WeekViewV2 {...defaultProps} routines={[]} weekStart={sunday} tasks={[trip, action('w1', 'Book the cabin', { sourceId: 'm1' })]} onUpdateTask={onUpdateTask} />)
-    openShelf()
-    fireEvent.click(screen.getByRole('button', { name: 'More for Plan the autumn trip' }))
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Put on this week' }))
-    expect(onUpdateTask).toHaveBeenCalledWith('m1', { bucket: 'week', weekStart: anchor() })
-  })
-
-  it('People… and Life area… write the row’s own fields', () => {
-    const onUpdateTask = vi.fn()
-    render(<WeekViewV2 {...defaultProps} routines={[]} weekStart={sunday} tasks={[action('w1', 'Book the cabin')]} onUpdateTask={onUpdateTask} />)
-    openShelf()
-    fireEvent.click(screen.getByRole('button', { name: 'More for Book the cabin' }))
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Life area…' }))
-    fireEvent.click(screen.getByRole('menuitemradio', { name: 'Family' }))
-    expect(onUpdateTask).toHaveBeenCalledWith('w1', { context: 'family' })
+    fireEvent.click(screen.getByRole('button', { name: 'Plan the week' }))
+    expect(launcher.openAssistant).toHaveBeenCalledWith({ message: 'Plan the week.', autoSend: true })
   })
 
   it('every-day routines are written once until "Show daily", which is remembered', () => {
@@ -603,5 +446,92 @@ describe('WeekViewV2 — the week canvas keeps what the page could do', () => {
     expect(localStorage.getItem('symphony-week-daily')).toBe('shown')
     expect(screen.getAllByText('Walk the dog').length).toBeGreaterThan(1)
     expect(screen.getByRole('button', { name: 'Hide daily' })).toBeInTheDocument()
+  })
+})
+
+// Task 12: the walk sits in the conversation bar on the current week. The
+// household's week starts on Saturday.
+describe('WeekViewV2 — Plan the rest of my week in the bar', () => {
+  beforeEach(() => {
+    localStorage.setItem('symphony-cadence-config', JSON.stringify({ weekStartsOn: 6 }))
+    vi.useFakeTimers({ toFake: ['Date'] })
+  })
+  afterEach(() => { vi.useRealTimers(); localStorage.removeItem('symphony-cadence-config') })
+
+  const mount = (weekStart: Date, setWalk = vi.fn()) => {
+    render(
+      <ConversationWalkContext.Provider value={setWalk}>
+        <WeekViewV2 {...defaultProps} routines={[]} weekStart={weekStart} />
+      </ConversationWalkContext.Provider>,
+    )
+    return setWalk
+  }
+
+  it('offers "Plan the rest of my week" mid-week', () => {
+    vi.setSystemTime(new Date(2026, 9, 14, 9))
+    const setWalk = mount(new Date(2026, 9, 10))
+    expect(setWalk).toHaveBeenCalledWith({ label: 'Plan the rest of my week', message: 'Plan the rest of my week.' })
+  })
+
+  it('offers "Plan the week" on the week\'s first day', () => {
+    vi.setSystemTime(new Date(2026, 9, 10, 9))
+    const setWalk = mount(new Date(2026, 9, 10))
+    expect(setWalk).toHaveBeenCalledWith({ label: 'Plan the week', message: 'Plan the week.' })
+  })
+
+  it('offers no in-page button when the bar carries the walk', () => {
+    vi.setSystemTime(new Date(2026, 9, 14, 9))
+    mount(new Date(2026, 9, 10))
+    expect(screen.queryByRole('button', { name: /^Plan (the rest of my|the) week$/ })).toBeNull()
+  })
+
+  it('on a phone mid-week the page offers "Plan the rest of my week"', () => {
+    vi.setSystemTime(new Date(2026, 9, 14, 9))
+    launcher.openAssistant.mockClear()
+    render(<WeekViewV2 {...defaultProps} routines={[]} weekStart={new Date(2026, 9, 10)} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Plan the rest of my week' }))
+    expect(launcher.openAssistant).toHaveBeenCalledWith({ message: 'Plan the rest of my week.', autoSend: true })
+  })
+
+  it('offers nothing on a past week', () => {
+    vi.setSystemTime(new Date(2026, 9, 14, 9))
+    const setWalk = mount(new Date(2026, 9, 3))
+    expect(screen.queryByRole('button', { name: /^Plan (the rest of my|the) week$/ })).toBeNull()
+    expect(setWalk).not.toHaveBeenCalledWith(expect.objectContaining({ label: expect.any(String) }))
+  })
+
+  // Final review 2026-10-14 #4: Friday is the Saturday-start week's last day,
+  // when the household plans the next one.
+  it('on the week\'s last day offers planning the next week, by its start date', () => {
+    vi.setSystemTime(new Date(2026, 9, 16, 18))
+    const setWalk = mount(new Date(2026, 9, 10))
+    expect(setWalk).toHaveBeenCalledWith({ label: 'Plan week 43', message: 'Plan the week of Oct 17.' })
+    expect(setWalk).not.toHaveBeenCalledWith(expect.objectContaining({ label: 'Plan the rest of my week' }))
+  })
+
+  it('on the last day a phone offers the same, in the page', () => {
+    vi.setSystemTime(new Date(2026, 9, 16, 18))
+    launcher.openAssistant.mockClear()
+    render(<WeekViewV2 {...defaultProps} routines={[]} weekStart={new Date(2026, 9, 10)} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Plan week 43' }))
+    expect(launcher.openAssistant).toHaveBeenCalledWith({ message: 'Plan the week of Oct 17.', autoSend: true })
+  })
+
+  it('next week\'s page offers "Plan the week", naming its start', () => {
+    vi.setSystemTime(new Date(2026, 9, 14, 9))
+    const setWalk = mount(new Date(2026, 9, 17))
+    expect(setWalk).toHaveBeenCalledWith({ label: 'Plan the week', message: 'Plan the week of Oct 17.' })
+  })
+
+  // Final review 2026-10-14 #5: the line said false things while loading.
+  it('says the week in a sentence only once its tasks and calendar have loaded', () => {
+    vi.setSystemTime(new Date(2026, 9, 14, 9))
+    const loading = { tasks: 'ready' as const, events: 'loading' as const, routines: 'ready' as const }
+    const { rerender } = render(<WeekViewV2 {...defaultProps} routines={[]} weekStart={new Date(2026, 9, 10)} sources={loading} />)
+    expect(document.querySelector('.wc-week-sentence')).toBeNull()
+    rerender(<WeekViewV2 {...defaultProps} routines={[]} weekStart={new Date(2026, 9, 10)} sources={{ ...loading, tasks: 'loading' }} />)
+    expect(document.querySelector('.wc-week-sentence')).toBeNull()
+    rerender(<WeekViewV2 {...defaultProps} routines={[]} weekStart={new Date(2026, 9, 10)} sources={{ ...loading, events: 'ready' }} />)
+    expect(document.querySelector('.wc-week-sentence')?.textContent).toMatch(/wide open/)
   })
 })

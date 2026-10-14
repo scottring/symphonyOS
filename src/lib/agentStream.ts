@@ -1,4 +1,5 @@
 import type { WorkspaceContext } from '@/lib/workspace/context'
+import type { ChangeCardNote, ChangeSet } from '@/lib/canvas/changeCard'
 import { supabase } from '@/lib/supabase'
 import { explainContext } from '@/lib/explain/pageGuides'
 import { parseSteps } from '@/lib/explain/steps'
@@ -28,6 +29,8 @@ export type AgentStreamEvent =
   | { type: 'tool'; name: string }
   | { type: 'tool_result'; name: string; ok: boolean; ids?: string[]; error?: string }
   | { type: 'proposal'; items: AgentProposalItem[] }
+  | { type: 'change_set'; set: ChangeSet }
+  | { type: 'point'; dates: string[]; taskIds: string[] }
   | { type: 'show'; steps: unknown }
   | { type: 'done'; reply: string; sessionId: string | null; sources?: AgentSourceNote[] }
   | { type: 'error'; message: string }
@@ -96,11 +99,15 @@ export interface StreamHandlers {
   onPlanSaved?: (saved: { id: string; level: number; date: string }) => void
   onWorkspace?: (page:string,date?:string)=>void
   workspaceContext?: WorkspaceContext
+  /** What became of the last change card (pending, approved or dismissed). */
+  changeCard?: ChangeCardNote
   onText?: (text: string) => void
   onTool?: (name: string) => void
   /** A write tool's outcome, when the server reports it (newer agent builds). */
   onToolResult?: (result: { name: string; ok: boolean; ids?: string[]; error?: string }) => void
   onProposal?: (items: AgentProposalItem[]) => void
+  onChangeSet?: (set: ChangeSet) => void
+  onPoint?: (p: { dates: string[]; taskIds: string[] }) => void
   /** Stable per user message. A resent turn reuses it so the server can
    *  recognise writes it already made instead of making them twice. */
   turnId?: string
@@ -128,6 +135,20 @@ export interface AgentApiMessage {
   content: string | AgentContentBlock[]
 }
 
+/** The agent edge function's name. A preview build may set VITE_AGENT_FUNCTION
+ *  to a separately deployed test copy; anything malformed falls back to the live one. */
+export function agentFunctionName(): string {
+  const name = import.meta.env.VITE_AGENT_FUNCTION
+  return typeof name === 'string' && /^[a-z0-9-]+$/.test(name) ? name : 'symphony-agent'
+}
+
+/** The voice edge function's name. A preview build may set VITE_VOICE_FUNCTION
+ *  to a separately deployed test copy; anything malformed falls back to the live one. */
+export function voiceFunctionName(): string {
+  const name = import.meta.env.VITE_VOICE_FUNCTION
+  return typeof name === 'string' && /^[a-z0-9-]+$/.test(name) ? name : 'workspace-voice'
+}
+
 /**
  * Stream the Symphony agent edge function for one conversation turn.
  * Sends the full message history; the function verifies the caller's JWT
@@ -144,7 +165,7 @@ export async function streamSymphonyAgent(
   }
 
   const res = await fetch(
-    `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/symphony-agent`,
+    `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/${agentFunctionName()}`,
     {
       method: 'POST',
       headers: {
@@ -155,6 +176,7 @@ export async function streamSymphonyAgent(
       body: JSON.stringify({
         messages,
         ...(handlers.workspaceContext ? { workspaceContext: explainContext(handlers.workspaceContext) } : {}),
+        ...(handlers.changeCard ? { changeCard: handlers.changeCard } : {}),
         ...(handlers.attachment ? { attachment: handlers.attachment } : {}),
         ...(handlers.currentMemberId ? { currentMemberId: handlers.currentMemberId } : {}),
         ...(handlers.taskContext ? { taskContext: handlers.taskContext } : {}),
@@ -187,6 +209,8 @@ export async function streamSymphonyAgent(
       else if (ev.type === 'tool') handlers.onTool?.(ev.name)
       else if (ev.type === 'tool_result') handlers.onToolResult?.({ name: ev.name, ok: ev.ok, ids: ev.ids, error: ev.error })
       else if (ev.type === 'proposal') handlers.onProposal?.(Array.isArray(ev.items) ? ev.items : [])
+      else if (ev.type === 'change_set') { if (ev.set && Array.isArray(ev.set.ops)) handlers.onChangeSet?.(ev.set) }
+      else if (ev.type === 'point') handlers.onPoint?.({ dates: Array.isArray(ev.dates) ? ev.dates : [], taskIds: Array.isArray(ev.taskIds) ? ev.taskIds : [] })
       else if (ev.type === 'session') handlers.onSession?.(ev.sessionId)
       else if (ev.type === 'done') handlers.onDone?.(ev.reply, ev.sessionId, ev.sources)
       else if (ev.type === 'error') handlers.onError?.(ev.message)

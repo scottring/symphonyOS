@@ -85,6 +85,9 @@ describe('onwardStep — the next horizon offered beneath a list at rest (2026-1
     expect(o.label).toBe('Plan week 41 · Oct 3 – Oct 9')
     expect(o.to).toBe('/week?start=2026-10-03')
     expect(o.why).toMatch(/Not every goal needs something every week/)
+    // Week plans by conversation now (final review 2026-10-14 #7).
+    expect(o.why).toMatch(/tell Symphony what to do that week/)
+    expect(o.why).not.toMatch(/Choose a few doable tasks/)
   })
   it('the same destination as after a save', () => {
     for (const [lvl, start, cur] of [['season', new Date(2026, 8, 1), true], ['month', new Date(2026, 10, 1), false]] as const) {

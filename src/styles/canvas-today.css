@@ -145,8 +145,6 @@
 .cw-row.is-routine .cw-title { color: var(--color-primary-800); }
 
 /* ⋯ menus and the day picker float under their row. */
-.wc-more-wrap { position: relative; flex: none; display: inline-flex; }
-.wc-more { width: 26px; height: 26px; }
 .cw-menu, .cw-giveday:not(.is-inline) {
   position: absolute; z-index: 40; right: 0; top: calc(100% + 4px);
   background: var(--color-bg-elevated); border: 1px solid var(--color-neutral-200); border-radius: var(--radius-lg);
@@ -308,7 +306,7 @@
   .wc-phone .wc-day { display: block; border-left: 0; padding: 8px 10px 12px; }
   .wc-masonry { columns: 1; }
   .wc-group-head { position: sticky; top: 0; z-index: 2; background: var(--color-bg-elevated); }
-  .wc-more, .cw-daychip { min-width: 44px; min-height: 44px; }
+  .cw-daychip { min-width: 44px; min-height: 44px; }
   .wc-add, .wc-done { min-height: 44px; }
   .cw-giveday.is-inline .cw-giveday-days { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 }

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { fireEvent, render, screen, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, within } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import type { ReactNode } from 'react'
 import { DomainProvider } from '@/hooks/useDomain'
@@ -55,14 +55,17 @@ describe('deriveActiveView', () => {
 const mobileState = vi.hoisted(() => ({ isMobile: false }))
 vi.mock('@/hooks/useMobile', () => ({ useMobile: () => mobileState.isMobile }))
 vi.mock('@/hooks/useAuth', () => ({ useAuth: () => ({ user: null, signOut: vi.fn() }) }))
+const tasksState = vi.hoisted(() => ({ addTask: vi.fn(async () => 'new1') }))
 vi.mock('@/hooks/useSupabaseTasks', () => ({ useSupabaseTasks: () => ({
   tasks: [], loading: false, updateTask: vi.fn(), updateTasksBulk: vi.fn(), pushTask: vi.fn(), toggleTask: vi.fn(),
+  addTask: tasksState.addTask, deleteTask: vi.fn(), refetch: vi.fn(),
 }) }))
 const aiState = vi.hoisted(() => ({ hidden: true }))
 vi.mock('@/hooks/useScratchpadHidden', () => ({ useScratchpadHidden: () => ({ hidden: aiState.hidden, setHidden: vi.fn() }) }))
 vi.mock('@/hooks/useRoutines', () => ({ useRoutines: () => ({ routines: [], deleteRoutine: vi.fn(), updateRoutine: vi.fn(), refetch: vi.fn(), addRoutine: vi.fn() }) }))
+const assistantState = vi.hoisted(() => ({ observer: null as null | import('@/hooks/useSymphonyAssistant').AssistantTurnObserver }))
 vi.mock('@/hooks/useSymphonyAssistant', () => ({
-  useSymphonyAssistant: () => ({
+  useSymphonyAssistant: (options?: { turnObserver?: import('@/hooks/useSymphonyAssistant').AssistantTurnObserver }) => (assistantState.observer = options?.turnObserver ?? null, {
     messages: [], loading: false, error: null, sendMessage: vi.fn(), resetSession: vi.fn(),
     toolActivity: [], sessions: [], sessionsLoading: false, loadSession: vi.fn(),
     deleteSession: vi.fn(), activeSessionId: null,
@@ -92,7 +95,7 @@ vi.mock('@/hooks/useDayPlan', () => ({ useDayPlan: () => ({ loading: false, erro
 vi.mock('@/hooks/usePlanActions', () => ({ usePlanActions: () => ({}) }))
 vi.mock('@/components/layout/NewVersionBanner', () => ({ NewVersionBanner: () => null }))
 vi.mock('@/components/omnibox/OmniboxResults', () => ({ OmniboxResults: () => null }))
-vi.mock('@/components/chat/ChatPanel', () => ({ ChatPanel: () => <textarea aria-label="Conversation draft" /> }))
+vi.mock('@/components/chat/ChatPanel', () => ({ ChatPanel: ({ beforeInput }: { beforeInput?: ReactNode }) => <><textarea aria-label="Conversation draft" />{beforeInput}</> }))
 vi.mock('@/components/toast', () => ({ Toast: () => null, ConfirmationToast: () => null, ToastLiveRegion: () => null }))
 
 function renderAt(path: string, children: ReactNode = <div data-testid="app-content" />) {
@@ -484,5 +487,74 @@ describe('Today, Week, Plan and Routines have one conversation, at the foot', ()
     renderAt('/inbox')
     expect(screen.getByRole('button', { name: 'AI chat' })).toBeInTheDocument()
     expect(screen.queryByRole('region', { name: 'Conversation with Symphony' })).not.toBeInTheDocument()
+  })
+})
+
+// Symphony's history holds words, not tool calls: the shell tells each turn
+// what became of the last change card (final review, 2026-10-14 #2).
+describe('The change card reaches the next turn', () => {
+  beforeEach(() => { mobileState.isMobile = false; selectionState.selection = null })
+  const set = { key: 's1', title: '2 changes', ops: [
+    { key: 's1:0', op: 'someday' as const, taskId: 'a', title: 'Paper mail' },
+    { key: 's1:1', op: 'unplace' as const, taskId: 'b', title: 'Call the bank' },
+  ] }
+
+  it('a pending card is told to every turn; a dismissed one once', () => {
+    renderAt('/week?view=alongside')
+    const observer = assistantState.observer!
+    act(() => observer.changeSet?.(set))
+    expect(observer.changeCard?.()).toMatchObject({ state: 'pending', title: '2 changes' })
+    fireEvent.click(within(screen.getByRole('region', { name: '2 changes' })).getByRole('button', { name: 'Dismiss' }))
+    expect(observer.changeCard?.()).toMatchObject({ state: 'dismissed', ops: [{ op: 'someday', title: 'Paper mail', where: '→ Someday' }, { op: 'unplace', title: 'Call the bank', where: '→ No day yet' }] })
+    expect(observer.changeCard?.()).toBeUndefined()
+  })
+})
+
+// The card belongs where the person is talking (final review, 2026-10-14 #3):
+// on a phone the conversation covers the page; on desktop pages without the
+// docked bar the conversation is the side pane.
+describe('The change card in the conversation', () => {
+  afterEach(() => { mobileState.isMobile = false; aiState.hidden = true; selectionState.selection = null })
+  const set = { key: 's2', title: '3 changes to your week', ops: [
+    { key: 's2:0', op: 'someday' as const, taskId: 'a', title: 'Paper mail' },
+    { key: 's2:1', op: 'unplace' as const, taskId: 'b', title: 'Call the bank' },
+    { key: 's2:2', op: 'add' as const, title: 'Hold for WSWMD' },
+  ] }
+
+  it('shows in the phone conversation, over the page', () => {
+    mobileState.isMobile = true
+    renderAt('/week?view=alongside')
+    fireEvent.click(screen.getByRole('button', { name: /^More/ }))
+    fireEvent.click(screen.getByRole('button', { name: 'Ask Symphony' }))
+    const chat = screen.getByRole('dialog', { name: 'Symphony conversation' })
+    expect(within(chat).queryByRole('region', { name: '3 changes to your week' })).not.toBeInTheDocument()
+    act(() => assistantState.observer!.changeSet?.(set))
+    const card = within(chat).getByRole('region', { name: '3 changes to your week' })
+    expect(within(card).getByRole('button', { name: 'Approve all 3' })).toBeInTheDocument()
+  })
+
+  it('shows in the desktop side pane on a page with no docked bar', () => {
+    aiState.hidden = false
+    renderAt('/inbox')
+    act(() => assistantState.observer!.changeSet?.(set))
+    const card = screen.getByRole('region', { name: '3 changes to your week' })
+    expect(card.closest('.side-column')).not.toBeNull()
+    fireEvent.click(within(card).getByRole('button', { name: 'Dismiss' }))
+    expect(screen.queryByRole('region', { name: '3 changes to your week' })).not.toBeInTheDocument()
+  })
+})
+
+// Planning next week on this week's last day: an ADD with no day lands in the
+// week Symphony read, not the one it is today (final review, 2026-10-14 #4).
+describe('Approve puts an undated add in the planned week', () => {
+  beforeEach(() => { mobileState.isMobile = false; selectionState.selection = null; localStorage.setItem('symphony-cadence-config', JSON.stringify({ weekStartsOn: 6 })) })
+  afterEach(() => { localStorage.removeItem('symphony-cadence-config') })
+
+  it('uses the set\'s week_start', async () => {
+    tasksState.addTask.mockClear()
+    renderAt('/week?view=alongside')
+    act(() => assistantState.observer!.changeSet?.({ key: 'w1', title: '1 change', weekStart: '2099-10-17', ops: [{ key: 'w1:0', op: 'add', title: 'Book the vet' }] }))
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Approve all 1' })) })
+    expect(tasksState.addTask).toHaveBeenCalledWith('Book the vet', undefined, undefined, undefined, { bucket: 'week', weekStart: new Date(2099, 9, 17) })
   })
 })

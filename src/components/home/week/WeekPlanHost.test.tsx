@@ -18,7 +18,7 @@ const LAST = new Date(2026, 8, 27), WEEK = new Date(2026, 9, 4)
 const open = createMockTask({ id: 'o', title: 'Bike rack', bucket: 'week', weekStart: LAST, commitments: [{ level: 'week', periodStart: LAST, status: 'open' }] })
 const monthTask = createMockTask({ id: 'm', title: 'Three bids', bucket: 'month', monthStart: new Date(2026, 9, 1), commitments: [{ level: 'month', periodStart: new Date(2026, 9, 1), status: 'open' }] })
 
-const mount = () => render(<MemoryRouter><WeekPlanHost tasks={[open, monthTask]} weekStart={WEEK} meId={null} isPast={false}>{() => <div>the days</div>}</WeekPlanHost></MemoryRouter>)
+const mount = () => render(<MemoryRouter><WeekPlanHost tasks={[open, monthTask]} weekStart={WEEK} meId={null} isPast={false}><div>the days</div></WeekPlanHost></MemoryRouter>)
 
 describe('WeekPlanHost', () => {
   // WEEK is "this week" only if the clock says so — the copy turns on it.
@@ -75,7 +75,7 @@ describe('WeekPlanHost', () => {
     const carried = createMockTask({ id: 'c', title: 'Old bids', bucket: 'month', monthStart: new Date(2026, 10, 1),
       commitments: [{ level: 'month', periodStart: new Date(2026, 9, 1), status: 'carried', carriedTo: new Date(2026, 10, 1) },
         { level: 'month', periodStart: new Date(2026, 10, 1), status: 'open' }] })
-    render(<MemoryRouter><WeekPlanHost tasks={[open, monthTask, carried]} weekStart={WEEK} meId={null} isPast={false}>{() => <div>the days</div>}</WeekPlanHost></MemoryRouter>)
+    render(<MemoryRouter><WeekPlanHost tasks={[open, monthTask, carried]} weekStart={WEEK} meId={null} isPast={false}><div>the days</div></WeekPlanHost></MemoryRouter>)
     fireEvent.click(screen.getByRole('button', { name: 'Plan this week' }))
     fireEvent.click(screen.getByRole('button', { name: /next: plan this week/i }))
     expect(screen.getByRole('button', { name: /add to this week: three bids/i })).toBeInTheDocument()
@@ -87,11 +87,11 @@ describe('WeekPlanHost', () => {
     // "this week" only; planning a future week must not sweep it in.
     const legacy = createMockTask({ id: 'l', title: 'Legacy row', bucket: 'week', weekStart: undefined, commitments: [] })
     const NEXT = new Date(2026, 9, 11)
-    const { unmount } = render(<MemoryRouter><WeekPlanHost tasks={[legacy]} weekStart={NEXT} meId={null} isPast={false}>{() => <div>the days</div>}</WeekPlanHost></MemoryRouter>)
+    const { unmount } = render(<MemoryRouter><WeekPlanHost tasks={[legacy]} weekStart={NEXT} meId={null} isPast={false}><div>the days</div></WeekPlanHost></MemoryRouter>)
     fireEvent.click(screen.getByRole('button', { name: /plan the week of/i }))
     expect(screen.queryByText('Legacy row')).toBeNull()
     unmount()
-    render(<MemoryRouter><WeekPlanHost tasks={[legacy]} weekStart={WEEK} meId={null} isPast={false}>{() => <div>the days</div>}</WeekPlanHost></MemoryRouter>)
+    render(<MemoryRouter><WeekPlanHost tasks={[legacy]} weekStart={WEEK} meId={null} isPast={false}><div>the days</div></WeekPlanHost></MemoryRouter>)
     // Nothing to look back at, so the session opens straight on the Plan step.
     fireEvent.click(screen.getByRole('button', { name: 'Plan this week' }))
     expect(screen.getByText('Legacy row')).toBeInTheDocument()

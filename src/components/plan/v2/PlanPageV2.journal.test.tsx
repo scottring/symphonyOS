@@ -153,7 +153,7 @@ describe('Month · Open journal', () => {
     expect(screen.getAllByRole('group', { name: 'Next step' })).toHaveLength(1)
     expect(screen.getByText('1 Fall goal has nothing in October yet — you can leave it for later.')).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: /^Plan week \d+ · / }))
-    expect(screen.getByTestId('where').textContent).toMatch(/\|\{"write":true,"ref":true,"journal":true\}$/)
+    expect(screen.getByTestId('where').textContent).toMatch(/\|\{"ref":true,"journal":true\}$/)
     expect(w.addTask).not.toHaveBeenCalled(); expect(w.updateTask).not.toHaveBeenCalled()
   })
 

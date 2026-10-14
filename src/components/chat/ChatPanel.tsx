@@ -10,6 +10,9 @@ import type { ChatAttachment } from './ChatAttachment'
 
 interface ChatPanelProps {
   voiceControls?: ReactNode
+  /** Shown above the message field, outside the scrolling transcript (the
+   *  change card waiting for Approve). */
+  beforeInput?: ReactNode
   messages: ChatMessageType[]
   loading: boolean
   error: string | null
@@ -63,6 +66,7 @@ function formatSessionDate(date: Date): string {
 
 export function ChatPanel({
   voiceControls,
+  beforeInput,
   messages,
   loading,
   error,
@@ -375,6 +379,8 @@ export function ChatPanel({
           {toolActivity[toolActivity.length - 1].replace(/^mcp__symphony__symphony_/, '').replace(/^symphony_/, '').replace(/_/g, ' ')}…
         </div>
       )}
+
+      {beforeInput && <div className="relative max-h-[60%] shrink-0 overflow-y-auto px-3 pt-2">{beforeInput}</div>}
 
       {/* Input */}
       <ChatInput

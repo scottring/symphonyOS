@@ -36,7 +36,7 @@ export function WeekPlanHost({ tasks, weekStart, meId, isPast, children, tools }
   isPast: boolean
   tools?: ReactNode
   /** The page's normal content (list + journal), shown when the session is closed. */
-  children: (host: { openSession: () => void }) => ReactNode
+  children: ReactNode
 }) {
   const { loading, addTask, updateTask, updateTasksBulk, pushTask, keepForward, dropCommitment, completeTask } = useSupabaseTasks()
   const gated = useGatedTaskActions({ updateTask, pushTask, updateTasksBulk }, (id) => tasks.find((t) => t.id === id))
@@ -168,7 +168,7 @@ export function WeekPlanHost({ tasks, weekStart, meId, isPast, children, tools }
             above={above} aboveGoals={aboveGoals} hiddenStepGoals={undefined} domainInView={soleDomain ?? null} uid={user?.id ?? null}
             draft={shownDraft} onChange={changeDraft} onClose={closeSession} onSave={saveDraft} saving={savingSession} saveError={saveError} />
         )
-        : children({ openSession: startSession })}
+        : children}
     </>
   )
 }

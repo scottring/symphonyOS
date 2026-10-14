@@ -16,6 +16,8 @@ import { ALL_LAYERS } from '@/lib/domains'
 import type { Task } from '@/types/task'
 import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
 
+// The picker is reached from the phone's No day yet "+" (rows no longer carry a ⋯).
+vi.mock('@/hooks/useMediaQuery', () => ({ useMediaQuery: () => true }))
 vi.mock('@/hooks/useDayPlan', () => ({
   useDayPlan: () => ({
     loading: false, error: false,
@@ -40,9 +42,11 @@ const MONDAY = new Date(2026, 8, 14)
 const WEDNESDAY = new Date(2026, 8, 16, 9, 0)
 
 const task: Task = createMockTask({ id: 'a', title: 'List supplies to buy', scheduledFor: MONDAY, isAllDay: true })
+// A week task with no day: the phone's No day yet chip, whose "+" opens the day picker.
+const noDay: Task = createMockTask({ id: 'n', title: 'Call the plumber', bucket: 'week', weekStart: SUNDAY })
 
 const baseProps = {
-  tasks: [task],
+  tasks: [task, noDay],
   userId: 'u1',
   events: [] as CalendarEvent[],
   routines: [],
@@ -70,12 +74,11 @@ const show = (props: Partial<Parameters<typeof HomeView>[0]> = {}) =>
     </AppShellChromeContext.Provider>,
   )
 
-// The week canvas (2026-10-10): a day's row moves from its ⋯ menu, and the
-// day picker says what each day already holds.
+// The phone's No day yet chip: its "+" opens the day picker, which says what
+// each day already holds.
 const openTiming = () => {
-  const monday = within(screen.getByTestId('journal-day-2026-09-14'))
-  fireEvent.click(monday.getByRole('button', { name: 'More for List supplies to buy' }))
-  fireEvent.click(screen.getByRole('menuitem', { name: 'Move to another day' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Give Call the plumber a day' }))
+  return within(screen.getByRole('group', { name: /Give it a day: Call the plumber/ }))
 }
 
 describe('HomeView hands the week its source status', () => {
@@ -96,8 +99,8 @@ describe('HomeView hands the week its source status', () => {
     })
     expect(sources.events).toBe('stale')
     show({ densitySources: sources })
-    openTiming()
-    const wed = screen.getByRole('button', { name: /Wednesday, September 16/ })
+    const picker = openTiming()
+    const wed = picker.getByRole('button', { name: /Wednesday, September 16/ })
     expect(wed).toHaveAccessibleName(/still loading/)
     expect(wed).not.toHaveAccessibleName(/nothing on it yet/)
   })
@@ -109,8 +112,8 @@ describe('HomeView hands the week its source status', () => {
       heldRange: null, neededRange: null,
     })
     show({ densitySources: sources })
-    openTiming()
-    const wed = screen.getByRole('button', { name: /Wednesday, September 16/ })
+    const picker = openTiming()
+    const wed = picker.getByRole('button', { name: /Wednesday, September 16/ })
     expect(wed).toHaveAccessibleName(/nothing on it yet · no calendar connected/)
     expect(wed.getAttribute('aria-label')).not.toMatch(/error|couldn|fail|loading/i)
   })
@@ -122,16 +125,16 @@ describe('HomeView hands the week its source status', () => {
       heldRange: { start: 0, end: 10 }, neededRange: null,
     })
     show({ densitySources: sources })
-    openTiming()
-    expect(screen.getByRole('button', { name: /Wednesday, September 16/ }))
+    const picker = openTiming()
+    expect(picker.getByRole('button', { name: /Wednesday, September 16/ }))
       .toHaveAccessibleName(/the calendar couldn’t be read/)
   })
 
   // The regression that matters: a parent that forgets to pass it at all.
   it('with nothing passed, the days read as counted — the old, always-ready shape', () => {
     show()
-    openTiming()
-    expect(screen.getByRole('button', { name: /Wednesday, September 16/ })).toHaveAccessibleName(/nothing on it yet/)
-    expect(screen.getByRole('button', { name: /Monday, September 14/ })).toHaveAccessibleName(/1 task already/)
+    const picker = openTiming()
+    expect(picker.getByRole('button', { name: /Wednesday, September 16/ })).toHaveAccessibleName(/nothing on it yet/)
+    expect(picker.getByRole('button', { name: /Monday, September 14/ })).toHaveAccessibleName(/1 task already/)
   })
 })

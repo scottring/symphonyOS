@@ -96,6 +96,22 @@ describe('useSymphonyAssistant', () => {
     expect(msgs[1].content).toBe('Hello Scott.')
   })
 
+  it('sends what became of the last change card with the turn', async () => {
+    let sent: unknown
+    vi.mocked(streamSymphonyAgent).mockImplementation(async (_messages, h) => {
+      sent = h.changeCard
+      h.onText?.('ok')
+      h.onDone?.('ok', null)
+    })
+    const card = { state: 'approved' as const, title: '2 changes', ops: [{ op: 'someday', title: 'Paper mail', where: '→ Someday' }], at: '2026-10-14T09:00:00.000Z' }
+    const changeCard = vi.fn().mockReturnValueOnce(card).mockReturnValue(undefined)
+    const { result } = renderHook(() => useSymphonyAssistant({ turnObserver: { changeCard } }))
+    await act(async () => { await result.current.sendMessage('what next?') })
+    expect(sent).toEqual(card)
+    await act(async () => { await result.current.sendMessage('and then?') })
+    expect(sent).toBeUndefined()
+  })
+
   it('sends prior history plus the new user turn to the agent', async () => {
     let captured: Array<{ role: string; content: string }> = []
     vi.mocked(streamSymphonyAgent).mockImplementation(async (messages, h) => {

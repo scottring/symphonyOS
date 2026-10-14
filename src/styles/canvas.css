@@ -155,6 +155,25 @@
   font-family: var(--font-family-sans); font-size: 13.5px; color: var(--color-neutral-700);
   padding: 2px 0 6px; border-bottom: 1px solid var(--color-neutral-100);
 }
+.change-card { margin: 0 0 10px; padding: 10px 16px 12px; border: 1.5px dashed #1b6a64; border-radius: 12px; background: #f6faf8; }
+.change-card-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.change-card-title { margin: 0; font-family: 'Crimson Pro', serif; font-weight: 400; font-size: 20px; }
+.change-card-rows { list-style: none; margin: 4px 0 0; padding: 0; max-height: 40vh; overflow-y: auto; }
+.change-card-row { display: grid; grid-template-columns: 56px minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 7px 0; border-bottom: 1px solid #e7ece9; font-size: 14px; }
+.change-card-row:last-child { border-bottom: 0; }
+.change-card-kind { font-size: 11px; font-weight: 600; letter-spacing: .06em; color: #1b6a64; }
+.change-card-where { font-size: 13px; color: #4a4f4d; white-space: nowrap; }
+.change-card-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; margin-top: 10px; }
+.change-card-approve { font: inherit; font-size: 15px; font-weight: 600; min-height: 44px; padding: 0 20px; border: 0; border-radius: 9px; background: #1b6a64; color: #fff; }
+.change-card-approve:disabled { opacity: .6; }
+.change-card-note { font-size: 13px; color: #4a4f4d; }
+.change-card-error { margin: 8px 0 0; font-size: 13px; color: #9b3412; }
+.dark .change-card { background: #182b29; border-color: #6cc4b9; }
+.dark .change-card-kind { color: #6cc4b9; }
+.dark .change-card-approve { background: #6cc4b9; color: #0e1b1a; }
+.dark .change-card-where, .dark .change-card-note { color: #a5aca9; }
+.dark .change-card-error { color: #f2a07f; }
+.change-card-head .canvas-icon { min-width: 44px; min-height: 44px; }
 .canvas-receipt-request { color: var(--color-neutral-600); max-width: 40ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .canvas-receipt-summary { color: var(--color-neutral-900); min-width: 0; }
 .canvas-receipt-changes { display: inline-flex; gap: 6px; flex-wrap: wrap; }
@@ -204,3 +223,30 @@
 @media (min-width: 1024px) {
   .desktop-workspace-page > .plan-page-tools.is-rail-extras { right: 3.5rem; }
 }
+
+/* Week: a pending change card's proposed rows — dashed, inert. */
+.wc-dayrow.is-proposed { border: 1.5px dashed #1b6a64; background: #eef6f3; border-radius: 6px; padding: 4px 7px; margin: 2px -7px; color: #123f3b; display: flex; gap: 8px; list-style: none; }
+.dark .wc-dayrow.is-proposed { border-color: #6cc4b9; background: #182b29; color: #d7efe9; }
+
+/* Week: "No day yet", one quiet line of draggable chips (Task 14). */
+.wc-noday { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; border-radius: 999px; }
+.wc-noday.is-over { outline: 2px dashed var(--color-primary-400); outline-offset: 4px; }
+.wc-noday-label { font-size: 13px; color: #6a6f6d; }
+.wc-noday-chips { display: contents; list-style: none; margin: 0; padding: 0; }
+.wc-noday-chip { display: inline-flex; border: 1px dashed #b9b9b3; border-radius: 999px; background: #fff; }
+.wc-noday-open { font: inherit; font-size: 13px; padding: 5px 11px; min-height: 32px; background: none; border: 0; color: inherit; cursor: pointer; }
+.dark .wc-noday-chip { background: transparent; border-color: #4a5352; }
+.wc-noday-chip { align-items: center; flex-wrap: wrap; }
+.wc-noday-glyph { width: 11px; height: 11px; margin-left: 10px; border-radius: 3px; border: 1.5px solid var(--color-sage-500); background: var(--color-sage-50); }
+.wc-noday-chip.is-routine .wc-noday-open { padding-left: 6px; }
+.wc-noday-open[draggable="true"] { cursor: grab; }
+.wc-noday-add { font: inherit; font-size: 15px; min-width: 44px; min-height: 44px; background: none; border: 0; color: inherit; }
+
+/* Week: the Symphony halo on what the conversation is pointing at (Task 21). */
+.wc-day.is-pointed { box-shadow: 0 0 0 2px #1b6a64, 0 0 0 6px #ddece8; border-radius: 10px; transition: box-shadow 280ms ease-out; }
+.wc-dayrow.is-pointed, .wc-noday-chip.is-pointed { box-shadow: 0 0 0 2px #1b6a64; background: #ddece8; border-radius: 6px; transition: box-shadow 200ms ease-out, background 200ms ease-out; }
+.wc-daychip.is-pointed { box-shadow: 0 0 0 2px #1b6a64; transition: box-shadow 200ms ease-out; }
+.dark .wc-day.is-pointed { box-shadow: 0 0 0 2px #6cc4b9, 0 0 0 6px #1c3634; }
+.dark .wc-dayrow.is-pointed, .dark .wc-noday-chip.is-pointed { box-shadow: 0 0 0 2px #6cc4b9; background: #1c3634; }
+.dark .wc-daychip.is-pointed { box-shadow: 0 0 0 2px #6cc4b9; }
+@media (prefers-reduced-motion: reduce) { .wc-day.is-pointed, .wc-dayrow.is-pointed, .wc-noday-chip.is-pointed, .wc-daychip.is-pointed { transition: none; } }

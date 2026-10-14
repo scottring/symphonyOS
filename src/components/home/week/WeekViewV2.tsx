@@ -16,23 +16,12 @@ import { PlanWeekMenu } from '@/components/plan/PlanWeekMenu'
 import { taskTiming, hasTiming, broaderCommitment, removeDayOutcome, removeAllOutcome } from '@/lib/planning/taskTiming'
 import { timingRemoval } from '@/lib/planning/planActions'
 import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
-import { useGoogleCalendar } from '@/hooks/useGoogleCalendar'
-import { useOptionalScheduleActionsContext } from '@/contexts/ScheduleActionsContext'
 import type { Routine, ActionableInstance } from '@/types/actionable'
 import { useSupabaseTasks } from '@/hooks/useSupabaseTasks'
-import { taskToTimelineItem, eventToTimelineItem, findEventByItemId } from '@/types/timeline'
+import { eventToTimelineItem } from '@/types/timeline'
 import { goalTitleMap } from '@/lib/planning/goalSteps'
-import { WeekGrid, dayKey, type PlanSlot } from './WeekGrid'
-import { WeekAllDayChip, WeekAllDayEventChip } from './WeekAllDayChip'
-import { WeekEventBlock } from './WeekEventBlock'
-import { layoutWeekLanes, type PlacedItem } from './layoutLanes'
 import { useWeekDragDrop } from './useWeekDragDrop'
-import { useGridCreate } from './useGridCreate'
-import { SlotQuickCreatePopover, type CreateType } from './SlotQuickCreatePopover'
-import { RoutinePlacePopover } from './RoutinePlacePopover'
 import { useFamilyMembers } from '@/hooks/useFamilyMembers'
-import { suggestSlots, type BusyInterval } from '@/lib/planning/dropSmarts'
-import { FIRST_HOUR, LAST_HOUR } from './WeekGrid'
 import { useGatedTaskActions } from '@/hooks/useGatedTaskActions'
 import { weekStartAnchor, readCadenceConfig } from '@/lib/cadence/config'
 import { partitionWeekExtras } from '@/lib/week/weekExtras'
@@ -54,15 +43,18 @@ import { useActionableInstances } from '@/hooks/useActionableInstances'
 import { showToast } from '@/hooks/useToast'
 import { layoutContextSpans } from '@/lib/week/journalSpread'
 import { localYmd } from '@/lib/cadence/config'
+import { weekOfYear } from '@/lib/planning/horizonNumerals'
 import { publishViewedWeek } from '@/lib/viewedWeekSignal'
 import { useMediaQuery } from '@/hooks/useMediaQuery'
 import type { AssigneeFilter } from '@/lib/today/types'
 import { makeAssigneeFilter } from '@/lib/today/assigneeFilter'
 import type { Layer } from '@/lib/domains'
 import { WeekPlanHost } from './WeekPlanHost'
+import { useConversationWalk } from '@/components/canvas/conversationWalk'
+import { useAssistantLauncher } from '@/contexts/AssistantLaunchContext'
 import { WeekV2 } from '@/components/plan/v2/WeekV2'
 import { useWeather } from '@/hooks/useWeather'
-import { planV2Enabled, lineDropUpdates, dayNamedIn } from '@/lib/planning/v2/planV2'
+import { planV2Enabled, lineDropUpdates } from '@/lib/planning/v2/planV2'
 import { useCanvasActivity } from '@/contexts/CanvasActivityContext'
 import { useAssigneeFilter } from '@/hooks/useAssigneeFilter'
 import { planPeopleLens } from '@/lib/planning/peopleLens'
@@ -76,14 +68,10 @@ import { dayFreeWindows, formatFree } from '@/lib/week/dayShape'
 import { parseSpecials } from '@/lib/today/specials'
 import { unhomedRoutines } from '@/lib/week/unhomedRoutines'
 import { buildShelf, type ShelfMilestone } from '@/components/canvas/week/weekShelf'
+import { changePreview, withPreview } from '@/components/canvas/week/changePreview'
 import { WeekCanvas, type CanvasDay, type CanvasDayItem, type WeekCanvasWriters } from '@/components/canvas/week/WeekCanvas'
 import { DayWeather } from './WeekJournal'
 import { committedTo } from '@/lib/placement/model'
-import { parentOf, WEEK_TO_MONTH } from '@/lib/planning/journalGroups'
-import type { PlanNode } from '@/components/plan/constellation/model'
-import { eligibleParents, moveUnderPatch } from '@/components/plan/constellation/connections'
-import { useAddArea } from '@/components/plan/v2/AddArea'
-import type { WeekCanvasHost } from '@/components/plan/v2/WeekV2'
 
 /** Does this calendar event span the whole day? Explicit flags win; otherwise
  *  a full-day span (midnight start, 24h+ duration — how a holiday reads from
@@ -104,18 +92,6 @@ function isAllDayEvent(ev: CalendarEvent): boolean {
   if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return false
   const startsAtMidnight = start.getHours() === 0 && start.getMinutes() === 0
   return startsAtMidnight && end.getTime() - start.getTime() >= 24 * 60 * 60 * 1000
-}
-
-/** A task whose start is before the grid's first hour — too early to place on
- *  the timed grid without being clamped onto FIRST_HOUR (a 6:50 AM task drawn
- *  as if it were 8 AM; demo run 2026-09-06). Rendered in the all-day lane
- *  instead, its real time prefixed onto the chip. */
-function isEarlyTask(d: Date): boolean {
-  return d.getHours() * 60 + d.getMinutes() < FIRST_HOUR * 60
-}
-
-function formatEarlyTime(d: Date): string {
-  return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
 }
 
 interface WeekViewV2Props {
@@ -170,35 +146,34 @@ interface WeekViewV2Props {
   dayCount?: number
   /** From HomeView's useUndo. Called after successful mutations to surface an undo toast. */
   pushAction?: (message: string, undo: () => void) => void
-  /** Journal (default) or Schedule. When omitted the view keeps its own and
-   *  draws its own switch; HomeView passes it so the switch sits by the dates. */
-  mode?: WeekMode
-  /** With `mode`: the switch sits in the week's control row, beside the view
-   *  icons (Scott, 2026-09-30), and reports here. */
-  onModeChange?: (m: WeekMode) => void
-}
-
-export type WeekMode = 'journal' | 'schedule'
-
-/** Days | Hours — presentation only: same dates, same data (approved week
- *  composition, 2026-10-10). Days is the week canvas; Hours is the timed
- *  schedule grid. A small secondary segmented toggle beside "Plan the week". */
-export function WeekModeSwitch({ mode, onChange }: { mode: WeekMode; onChange: (m: WeekMode) => void }) {
-  return (
-    <div role="radiogroup" aria-label="Week layout" className="wc-seg">
-      {(['journal', 'schedule'] as const).map((m) => (
-        <button key={m} type="button" role="radio" aria-checked={mode === m} onClick={() => onChange(m)}>
-          {m === 'journal' ? 'Days' : 'Hours'}
-        </button>
-      ))}
-    </div>
-  )
 }
 
 /** The week's every-day routines: in each day ('shown') or once above. */
 const DAILY_KEY = 'symphony-week-daily'
 
 const weekIsCurrentFor = (anchor: Date) => sameDay(anchor, weekStartAnchor(new Date(), readCadenceConfig().weekStartsOn))
+
+/**
+ * The page's walk into planning by conversation. This week: "Plan the week"
+ * on its first day, "Plan the rest of my week" after. On its last day (Friday,
+ * for a Saturday week) there is nothing left to plan, so it offers the next
+ * week by number, as the old step did ("Plan week 43"). A week ahead offers
+ * "Plan the week". Whenever the week is not this one, the message names its
+ * start, so Symphony reads and plans that week. A past week offers nothing.
+ */
+function weekWalk(anchor: Date, now: Date): { label: string; message: string } | null {
+  const wso = readCadenceConfig().weekStartsOn
+  const current = weekStartAnchor(now, wso)
+  const named = (d: Date) => `Plan the week of ${d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}.`
+  if (sameDay(anchor, current)) {
+    if (localYmd(now) === localYmd(anchor)) return { label: 'Plan the week', message: 'Plan the week.' }
+    const next = new Date(anchor.getFullYear(), anchor.getMonth(), anchor.getDate() + 7)
+    const lastDay = new Date(anchor.getFullYear(), anchor.getMonth(), anchor.getDate() + 6)
+    if (localYmd(now) === localYmd(lastDay)) return { label: `Plan week ${weekOfYear(next, wso)}`, message: named(next) }
+    return { label: 'Plan the rest of my week', message: 'Plan the rest of my week.' }
+  }
+  return anchor.getTime() > current.getTime() ? { label: 'Plan the week', message: named(anchor) } : null
+}
 
 export function WeekViewV2(props: WeekViewV2Props) {
   const {
@@ -227,11 +202,6 @@ export function WeekViewV2(props: WeekViewV2Props) {
   // The rail plans MY week — scope it to the current member, as the strip does.
   const { getCurrentUserMember, members: familyMembers } = useFamilyMembers()
   const meId = getCurrentUserMember()?.id ?? null
-  const { createEvent, deleteEvent, isConnected: calendarConnected } = useGoogleCalendar()
-  // createEvent never updates the held events; without a refetch a
-  // quick-created event only showed up after a reload.
-  const refetchEvents = useOptionalScheduleActionsContext()?.onRefetchEvents
-  const gridCreate = useGridCreate()
 
   // Pool-pill triage. Defers run through the DomainGate (a context-less task
   // asks "Where does this belong?" before the write — Iris's rule); "not this
@@ -248,90 +218,15 @@ export function WeekViewV2(props: WeekViewV2Props) {
   // workweek); the list and the pin key on the week ANCHOR, like belongsToWeek.
   const weekAnchor = useMemo(() => weekStartAnchor(weekStart, readCadenceConfig().weekStartsOn), [weekStart])
   useEffect(() => { publishViewedWeek(weekAnchor) }, [weekAnchor])
+  // Planning the week is a conversation: the bar offers it (weekWalk).
+  const walk = weekWalk(weekAnchor, new Date())
+  const walkInBar = useConversationWalk(walk)
+  // Phones have no bar: the page offers the same walk, sent the same way.
+  const { openAssistant } = useAssistantLauncher()
+  const pageWalk = walk && !walkInBar ? { label: walk.label, onStart: () => openAssistant({ message: walk.message, autoSend: true }) } : undefined
   // Only unmount clears it — a cleanup on every change published null → week
   // and defeated the signal's same-week dedupe.
   useEffect(() => () => publishViewedWeek(null), [])
-
-  // A shelf routine pill dropped on a slot asks the place-scope question
-  // before anything is written: the rule ("every Thursday at 5:00" — its new
-  // home) or just this week (the existing one-day override).
-  const [routinePlace, setRoutinePlace] = useState<{ routineId: string; when: Date } | null>(null)
-  const placingRoutine = routinePlace
-    ? routines.find((r) => r.id === routinePlace.routineId) ?? null
-    : null
-  const confirmRoutinePlace = useCallback((scope: 'rule' | 'once') => {
-    if (!routinePlace) return
-    const routine = routines.find((r) => r.id === routinePlace.routineId)
-    setRoutinePlace(null)
-    if (!routine) return
-    if (scope === 'once') {
-      // A shelf pill isn't leaving another day — it's landing on this one, so
-      // the day it moves off IS the drop day (a same-day time override).
-      onPushRoutine?.(routine.id, routinePlace.when, routinePlace.when)
-      return
-    }
-    const when = routinePlace.when
-    const weekdayKey = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'][when.getDay()]
-    const prevTime = routine.time_of_day
-    const prevPattern = routine.recurrence_pattern
-    const updates: Partial<Routine> = {
-      time_of_day: `${String(when.getHours()).padStart(2, '0')}:${String(when.getMinutes()).padStart(2, '0')}:00`,
-    }
-    if (prevPattern.type === 'weekly') {
-      updates.recurrence_pattern = { ...prevPattern, days: [weekdayKey] }
-    }
-    void onUpdateRoutine(routine.id, updates)
-    pushAction?.(`Placed "${routine.name}"`, () => {
-      void onUpdateRoutine(routine.id, { time_of_day: prevTime, recurrence_pattern: prevPattern })
-    })
-  }, [routinePlace, routines, onPushRoutine, onUpdateRoutine, pushAction])
-
-  const handleCreate = useCallback(
-    async (params: { type: CreateType; title: string; startTime: Date; endTime: Date }) => {
-      if (params.type === 'task') {
-        const newId = await addTask(params.title, undefined, undefined, params.startTime, { isAllDay: false })
-        if (newId) {
-          pushAction?.(`Created "${params.title}"`, () => {
-            void deleteTask(newId)
-          })
-        }
-      } else if (params.type === 'event') {
-        const result = await createEvent({
-          title: params.title,
-          startTime: params.startTime,
-          endTime: params.endTime,
-        })
-        if (result?.id) {
-          pushAction?.(`Created "${params.title}"`, () => {
-            void deleteEvent({ eventId: result.id })
-          })
-        }
-        // Same as Today's inline create: re-read the range on screen so the
-        // new event appears now, not after a reload.
-        await refetchEvents?.()
-      } else if (params.type === 'routine') {
-        // Routines need a recurrence pattern that doesn't fit the popover.
-        // Build an NL string from the slot's title/weekday/time and navigate
-        // to /routines/new with it as initial input — parseRoutine handles
-        // the structured conversion. e.g., "Yoga every tuesday at 9:00am"
-        const weekday = params.startTime
-          .toLocaleDateString('en-US', { weekday: 'long' })
-          .toLowerCase()
-        const timeStr = params.startTime
-          .toLocaleTimeString('en-US', {
-            hour: 'numeric',
-            minute: '2-digit',
-            hour12: true,
-          })
-          .toLowerCase()
-          .replace(/\s/g, '') // "9:00am" not "9:00 AM"
-        const initialNl = `${params.title} every ${weekday} at ${timeStr}`
-        navigate(`/routines/new?initial=${encodeURIComponent(initialNl)}`)
-      }
-      gridCreate.close()
-    },
-    [addTask, deleteTask, createEvent, deleteEvent, refetchEvents, navigate, gridCreate, pushAction],
-  )
 
   // Drag-drop wiring. Domain-on-drop needs nothing here: onUpdateTask is the
   // GATED update (ctx.onUpdateTask = useGatedTaskActions), so scheduling a
@@ -349,7 +244,6 @@ export function WeekViewV2(props: WeekViewV2Props) {
     dayCount,
     pushAction,
     onPushRoutine,
-    onRoutinePlaceRequest: setRoutinePlace,
     // One drag rule (2026-10-03): read at drop time, after the page's own
     // writers below exist.
     onTakeIn: (taskId) => takeIntoWeek(taskId),
@@ -426,84 +320,21 @@ export function WeekViewV2(props: WeekViewV2Props) {
     return tasks.filter((t) => match(t.assignedTo, t.assignedToAll))
   }, [tasks, selectedAssignees])
 
-  // Tasks that have a specific start time AND fall at/after the grid's first
-  // hour go into the time grid. Anything earlier is too early to place without
-  // being clamped onto FIRST_HOUR — it renders in the all-day lane's Earlier
-  // row instead (see earlyTasksByDay).
-  const scheduledTasks = useMemo(
-    () => drawnTasks.filter((t) => t.scheduledFor && inWeek(t.scheduledFor) && !t.isAllDay && !isEarlyTask(t.scheduledFor)),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [drawnTasks, weekStart],
-  )
-
-  // All-day tasks, grouped by day so each renders in the grid's all-day row
-  // under its actual day column. Completed tasks are excluded so finishing one
-  // elsewhere (Today, detail panel) removes its chip here.
-  const allDayByDay = useMemo(() => {
-    const map = new Map<string, Task[]>()
-    for (const t of drawnTasks) {
-      if (!t.scheduledFor || !t.isAllDay || t.completed) continue
-      if (!inWeek(t.scheduledFor)) continue
-      const key = dayKey(t.scheduledFor)
-      const arr = map.get(key)
-      if (arr) arr.push(t)
-      else map.set(key, [t])
-    }
-    return map
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [drawnTasks, weekStart])
-
-  // Timed tasks too early for the grid ("Earlier" row) — see scheduledTasks.
-  const earlyTasksByDay = useMemo(() => {
-    const map = new Map<string, Task[]>()
-    for (const t of drawnTasks) {
-      if (!t.scheduledFor || t.isAllDay || t.completed) continue
-      if (!inWeek(t.scheduledFor)) continue
-      if (!isEarlyTask(t.scheduledFor)) continue
-      const key = dayKey(t.scheduledFor)
-      const arr = map.get(key)
-      if (arr) arr.push(t)
-      else map.set(key, [t])
-    }
-    return map
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [drawnTasks, weekStart])
-
-  // In-week calendar events, split into timed (grid material) and all-day
-  // (all-day lane). A holiday used to reach the timed grid and get clamped to
-  // the 8 AM row (demo run 2026-09-06) — isAllDayEvent keeps it out.
-  const { weekEvents, allDayEventsByDay } = useMemo(() => {
-    const timed: CalendarEvent[] = []
-    const allDayMap = new Map<string, CalendarEvent[]>()
-    for (const ev of events) {
-      const startStr =
-        (ev as { start_time?: string }).start_time ??
-        (ev as { startTime?: string }).startTime
-      if (!startStr) continue
-      const start = new Date(startStr)
-      if (!inWeek(start)) continue
-      if (isAllDayEvent(ev)) {
-        const key = dayKey(start)
-        const arr = allDayMap.get(key)
-        if (arr) arr.push(ev)
-        else allDayMap.set(key, [ev])
-      } else {
-        timed.push(ev)
-      }
-    }
-    return { weekEvents: timed, allDayEventsByDay: allDayMap }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [events, weekStart])
+  // In-week timed calendar events. A holiday (all-day) stays out of this set —
+  // isAllDayEvent keeps it from being clamped onto the 8 AM row (demo run
+  // 2026-09-06); the days draw it from `events` directly.
+  const weekEvents = useMemo(() => events.filter((ev) => {
+    const startStr =
+      (ev as { start_time?: string }).start_time ??
+      (ev as { startTime?: string }).startTime
+    if (!startStr) return false
+    return inWeek(new Date(startStr)) && !isAllDayEvent(ev)
+  }),
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  [events, weekStart])
 
 
-  // Journal is the week; Schedule is the hourly grid, a switch away. The grid
-  // needs desk width to read — below lg the spread stacks and is the only mode.
-  // Controlled from the masthead when HomeView hosts it (the switch sits by
-  // the dates); uncontrolled — with its own switch — when mounted alone.
-  const [ownMode, setOwnMode] = useState<WeekMode>('journal')
-  const mode = props.mode ?? ownMode
   const narrow = useMediaQuery('(max-width: 1023px)')
-  const showSchedule = mode === 'schedule' && !narrow
 
   // Instance-level overrides for the whole visible week — what a drag on this
   // grid writes. The container's `dateInstances` covers one column only.
@@ -533,7 +364,7 @@ export function WeekViewV2(props: WeekViewV2Props) {
     const schoolByDay = new Map<string, (typeof items)[number]>()
     for (const item of items) {
       if (item.startTime && /^school\b/i.test(item.title)) {
-        const key = dayKey(item.startTime)
+        const key = localYmd(item.startTime)
         if (!schoolByDay.has(key)) schoolByDay.set(key, item)
       }
     }
@@ -563,74 +394,6 @@ export function WeekViewV2(props: WeekViewV2Props) {
     }),
     [routines, weekStart, dayCount, weekInstances, selectedAssignees, layers],
   )
-
-  const allItems = useMemo(() => {
-    const taskItems = scheduledTasks.map((t) => taskToTimelineItem(t, labelFor(t)))
-    const blocks = [...taskItems, ...eventItems, ...routineItems]
-
-    // Keep the actively-dragged task/event mounted even if cross-week auto-
-    // advance moved its scheduledFor out of the visible range. Without this,
-    // dnd-kit loses the draggable's data registration and the drop is a no-op.
-    // WeekEventBlock calls useDraggable before its placement guard, so the
-    // drag data stays registered even when computePlacement returns null.
-    // WeekGrid's overflow-hidden clips the off-grid render; DragOverlay still
-    // shows the floating chip the user sees.
-    const activeId = drag.activeDragId
-    if (activeId) {
-      // Drag ids are 'block:<itemId>' for tasks/events, 'block-routine:<itemId>'
-      // for routines. Routines are not draggable, so only handle task/event.
-      if (activeId.startsWith('block:')) {
-        const itemId = activeId.slice('block:'.length)
-        if (!blocks.find((b) => b.id === itemId)) {
-          if (itemId.startsWith('task-')) {
-            const taskId = itemId.slice('task-'.length)
-            const task = tasks.find((t) => t.id === taskId)
-            if (task) blocks.push(taskToTimelineItem(task, labelFor(task)))
-          } else if (itemId.startsWith('event-')) {
-            const event = findEventByItemId(events, itemId)
-            if (event) blocks.push(eventToTimelineItem(event))
-          }
-        }
-      }
-    }
-
-    return blocks
-  }, [scheduledTasks, eventItems, routineItems, drag.activeDragId, tasks, events, labelFor])
-
-  // Run the lane-placement pass over allItems. Items with a startTime outside
-  // the visible week range are filtered out by layoutWeekLanes (dayIdx check).
-  // However, the drag-mount fallback above may have pushed an out-of-week item
-  // into allItems so dnd-kit's draggable registration stays live during cross-
-  // week auto-advance. Those items are filtered by layoutWeekLanes and won't
-  // appear in placedItems — WeekEventBlock would never mount, dnd-kit would
-  // lose registration, and the drop would be a no-op.
-  //
-  // Fix: after the layout pass, check if the active drag item is absent from
-  // placedItems. If so, inject a synthetic PlacedItem with dayIdx=0 / laneIdx=0
-  // / laneCount=1. computePlacementFromLane inside WeekEventBlock checks
-  // dayIdx === placedItem.dayIdx; since dayIdx from the real startTime != 0
-  // (it's outside the week), it returns null — triggering the hidden-stub branch
-  // (isDragging → 1×1 invisible div). This is exactly the mounting behaviour
-  // the original allBlocks code relied on.
-  const placedItems = useMemo<PlacedItem[]>(() => {
-    const placed = layoutWeekLanes(allItems, weekStart, dayCount, FIRST_HOUR * 60)
-
-    const activeId = drag.activeDragId
-    if (activeId && activeId.startsWith('block:')) {
-      const itemId = activeId.slice('block:'.length)
-      const alreadyPlaced = placed.some((p) => p.item.id === itemId)
-      if (!alreadyPlaced) {
-        const fallback = allItems.find((b) => b.id === itemId)
-        if (fallback) {
-          // dayIdx=0 is intentionally wrong so computePlacementFromLane returns
-          // null, which triggers WeekEventBlock's hidden-stub mount path.
-          placed.push({ item: fallback, dayIdx: 0, laneIdx: 0, laneCount: 1 })
-        }
-      }
-    }
-
-    return placed
-  }, [allItems, weekStart, dayCount, drag.activeDragId])
 
   // ── Journal spread ────────────────────────────────────────────────────
   // The same inputs the grid reads (layer-filtered tasks and events, routines
@@ -792,92 +555,9 @@ export function WeekViewV2(props: WeekViewV2Props) {
     pushAction?.(`Added "${title}"`, () => { void deleteTask(id) })
   }, [addTask, deleteTask, meId, layers, pushAction])
 
-  // "Can't move" adds a real calendar event (Scott, 2026-10-04: "calendared
-  // events only"): an hour at the time given, with Undo, then the range
-  // re-read so it shows at once.
-  const handleAddEvent = useCallback(async (day: JournalDay, title: string, time: string) => {
-    const [h, m] = time.split(':').map(Number)
-    const startTime = new Date(day.date.getFullYear(), day.date.getMonth(), day.date.getDate(), h || 9, m || 0)
-    const result = await createEvent({ title, startTime, endTime: new Date(startTime.getTime() + 60 * 60 * 1000) })
-    if (!result?.id) { showToast(`Couldn’t add “${title}” to the calendar.`, 'error', 6000); return }
-    pushAction?.(`Added "${title}" to the calendar`, () => { void deleteEvent({ eventId: result.id }) })
-    await refetchEvents?.()
-  }, [createEvent, deleteEvent, refetchEvents, pushAction])
-
   const handlePlanDropOnDay = useCallback((day: JournalDay, payload: PlanDragPayload) => {
     void planActions.drop(payload, { type: 'day', day: day.date })
   }, [planActions])
-  const handlePlanDropOnSlot = useCallback((slot: PlanSlot, payload: PlanDragPayload) => {
-    const [y, m, d] = slot.dayIso.split('-').map(Number)
-    if (slot.hour === undefined) {
-      void planActions.drop(payload, { type: 'day', day: new Date(y, m - 1, d) })
-      return
-    }
-    const when = new Date(y, m - 1, d, slot.hour, slot.minute ?? 0)
-    // A routine with no day of its own, dragged from the Planning panel onto a
-    // slot, is placed for THAT day of this week — an occurrence, never the
-    // rule. Changing the repeating schedule is a separate, explicit action
-    // (Scott, 2026-09-21).
-    if (payload.kind === 'routine') {
-      const r = routines.find((x) => x.id === payload.id)
-      if (r && r.recurrence_pattern.type === 'weekly' && !r.recurrence_pattern.days?.length) {
-        void planActions.placeRoutineOnce(r.id, when, r.name)
-        return
-      }
-    }
-    void planActions.drop(payload, { type: 'time', when })
-  }, [planActions, routines])
-
-  // Chosen-but-untimed work the grid has no row for: a routine occurrence
-  // chosen for its day, a week-list task chosen for a day. Schedule shows them
-  // in that day's all-day cell, so the two modes never disagree.
-  const plannedAllDay = useMemo(() => {
-    const map = new Map<string, JournalEntry[]>()
-    for (const d of journalDays) {
-      const extra = [...d.entries, ...d.foldedRoutines].filter((e) =>
-        !e.time && (e.kind === 'routine' || (e.task && !(e.task.scheduledFor && localYmd(e.task.scheduledFor) === d.key))))
-      if (extra.length) map.set(d.key, extra)
-    }
-    return map
-  }, [journalDays])
-
-  // Suggested open slots while a POOL pill drags — rules-based paint
-  // (dropSmarts); never captures the drop. Only pool pills: an already-placed
-  // block being moved knows where it's going.
-  const suggestedSlotIds = useMemo(() => {
-    const activeId = drag.activeDragId
-    if (!activeId || !activeId.startsWith('pool:')) return null
-    const task = tasks.find((t) => t.id === activeId.slice('pool:'.length))
-    if (!task) return null
-    const busyByDate = new Map<string, BusyInterval[]>()
-    for (const item of allItems) {
-      if (!item.startTime) continue
-      const key = dayKey(item.startTime)
-      const startMinutes = item.startTime.getHours() * 60 + item.startTime.getMinutes()
-      const endMinutes = item.endTime
-        ? item.endTime.getHours() * 60 + item.endTime.getMinutes()
-        : startMinutes + 30
-      const list = busyByDate.get(key) ?? []
-      list.push({ startMinutes, endMinutes })
-      busyByDate.set(key, list)
-    }
-    const dates = Array.from({ length: dayCount }, (_, i) => {
-      const d = new Date(weekStart)
-      d.setDate(d.getDate() + i)
-      return d
-    })
-    const pad = (n: number) => String(n).padStart(2, '0')
-    return new Set(
-      suggestSlots(task, busyByDate, {
-        dates,
-        dayStartHour: FIRST_HOUR,
-        dayEndHour: LAST_HOUR,
-        slotMinutes: 30,
-        now: new Date(),
-      }).map((s) => `slot:${s.dateKey}:${pad(s.hour)}:${pad(s.minute)}`),
-    )
-  }, [drag.activeDragId, tasks, allItems, weekStart, dayCount])
-
   // WeekEventBlock.onSelect expects (id: string), but onSelectItem is
   // (id: string | null). Narrow here so TypeScript is satisfied; passing null
   // is only needed for deselection, which happens elsewhere.
@@ -997,7 +677,7 @@ export function WeekViewV2(props: WeekViewV2Props) {
     }
   }, [tasks, weekAnchor])
 
-  const weekListFor = (onPlan: () => void) => (
+  const weekListFor = () => (
     <WeekList
       key={localYmd(weekAnchor)}
       tasks={tasks}
@@ -1026,7 +706,6 @@ export function WeekViewV2(props: WeekViewV2Props) {
         else showToast(`Added ${where}`, 'success')
         if (hidden) showToast('Hidden by your current view — turn on Unsorted to see it', 'warning', 8000)
       }}
-      onPlan={onPlan}
       timingControl={weekTimingControl}
     />
   )
@@ -1100,18 +779,11 @@ export function WeekViewV2(props: WeekViewV2Props) {
     ]
     return { days, lines, hasDaily }
   }, [journalDays, journalWeekend, shelf, dailyShown, forecast])
+  // A pending change card, drawn dashed on its days; what it moves leaves its current spot.
+  const { changeSet } = activity
+  const preview = useMemo(() => changePreview(changeSet, tasks), [changeSet, tasks])
+  const shown = useMemo(() => withPreview(canvasDays.days, shelf, preview), [canvasDays.days, shelf, preview])
 
-  // Move under…: the month's milestones as Plan's nodes, so the link write and
-  // its goal_id consistency are Plan's own (moveUnderPatch).
-  const moveUnderFor = useCallback((t: Task) => {
-    const parents: PlanNode[] = canvasMonths.flatMap((m) => m.rows.filter((r) => !r.completed && r.id !== t.id))
-      .map((r) => ({ key: `2:${r.id}`, id: r.id, title: r.title, level: 2, parent: null, task: r }))
-    const current = parentOf(t, WEEK_TO_MONTH, new Set(parents.map((p) => p.id)))
-    const item: PlanNode = { key: `3:${t.id}`, id: t.id, title: t.title, level: 3, parent: current ? `2:${current.id}` : null, task: t }
-    const nodes = [...parents, item]
-    const eligible = eligibleParents(nodes, item)
-    return eligible.length || item.parent ? { item, parents: eligible, nodes } : null
-  }, [canvasMonths])
   const canvasWriters = useMemo<WeekCanvasWriters>(() => {
     const short = (d: Date) => d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
     const write = (label: string, t: Task, patch: Partial<Task>, previous?: Partial<Task>) => {
@@ -1160,52 +832,12 @@ export function WeekViewV2(props: WeekViewV2Props) {
           return r.ok
         }, opts)
       },
-      addAction: async (title, milestoneId, area) => {
-        const line = milestoneId ? tasks.find((t) => t.id === milestoneId) : undefined
-        const day = dayNamedIn(title, weekAnchor, new Date())
-        const opts: { ids: string[]; undo?: () => Promise<boolean | void> } = { ids: [] }
-        const ok = await activity.run(line ? `Add “${title}” for ${line.title}` : `Add “${title}” to the week`, async () => {
-          const id = await addTask(title, undefined, undefined, day ?? undefined, {
-            bucket: 'week', weekStart: weekAnchor, assignedTo: meId ?? undefined, context: area ?? line?.context ?? undefined,
-            ...(day ? { isAllDay: true } : {}), ...(line ? { sourceId: line.id } : {}),
-          })
-          if (!id) return false
-          opts.ids.push(id)
-          opts.undo = async () => { await deleteTask(id) }
-          return true
-        }, opts)
-        const landed = area ?? line?.context
-        if (ok && !(landed ? layers.has(landed) : layers.has('unsorted'))) showToast('Added — hidden by your current view.', 'warning', 8000)
-        return ok
-      },
-      milestoneDone: (id) => {
-        const t = tasks.find((x) => x.id === id)
-        if (!t) return
-        void activity.run(t.completed ? `Reopen “${t.title}”` : `Done: “${t.title}”`, () => toggleTask(id), {
-          ids: [id], undo: async () => { await onUpdateTask(id, { completed: t.completed }) },
-        })
-      },
-      putOnWeek: (id) => {
-        const t = tasks.find((x) => x.id === id)
-        // The same write as the month's "put it on the week": it stays on the month's list.
-        if (t) write(`Put “${t.title}” on this week`, t, { bucket: 'week', weekStart: weekAnchor })
-      },
-      assign: (t, ids) => write(`People for “${t.title}”`, t, { assignedToAll: ids, assignedTo: ids[0] ?? undefined }),
-      setArea: (t, area) => write(`Life area for “${t.title}”`, t, { context: area }),
-      moveUnderOptions: (t) => moveUnderFor(t),
-      moveUnder: (t, parent) => {
-        const o = moveUnderFor(t)
-        const patch = o && moveUnderPatch(o.nodes, o.item, parent)
-        if (!patch) return
-        write(parent ? `Move “${t.title}” under “${parent.title}”` : `Unlink “${t.title}”`, t, patch.after as Partial<Task>, patch.before as Partial<Task>)
-      },
       open: (id) => handleSelectBlock(id),
       foreignDrop: (day, payload) => { void planActions.drop(payload, { type: 'day', day }) },
     }
     // handleSelectBlock is a plain function of onSelectItem.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activity, onUpdateTask, toggleTask, markDone, undoDone, setPlanned, moveRoutineToDay, tasks, weekAnchor, meId, addTask, deleteTask, layers, planActions, onSelectItem, moveUnderFor])
-  const canvasMonthName = canvasMonths.map((m) => m.name).join(' and ')
+  }, [activity, onUpdateTask, toggleTask, markDone, undoDone, setPlanned, moveRoutineToDay, tasks, weekAnchor, planActions, onSelectItem])
   const canvasSpans = useMemo(() => {
     const ymdLabel = (ymd: string) => { const [y, m, d] = ymd.split('-').map(Number); const at = new Date(y, m - 1, d); return `${at.toLocaleDateString('en-US', { weekday: 'short' })} ${at.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}` }
     const wd = (i: number) => journalDays[i].date.toLocaleDateString('en-US', { weekday: 'short' })
@@ -1220,29 +852,22 @@ export function WeekViewV2(props: WeekViewV2Props) {
   const canvasDayDescriptions = useMemo(() => Object.fromEntries((dayChoices ?? []).map((c) => [
     localYmd(c.date), densityDescription(c.density, c.date.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })),
   ])), [dayChoices])
-  const { area: addAreaDefault } = useAddArea()
-  const weekCanvas = (host: WeekCanvasHost) => (
-    <WeekCanvas weekStart={weekAnchor} days={canvasDays.days} shelf={shelf} routinesToPlace={routinesToPlace}
-      rhythm={canvasDays.lines} monthName={canvasMonthName} isCurrent={weekIsCurrentFor(weekAnchor)} writers={canvasWriters}
+  const weekCanvas = () => (
+    <WeekCanvas weekStart={weekAnchor} days={shown.days} shelf={shown.shelf} routinesToPlace={routinesToPlace}
+      rhythm={canvasDays.lines} isCurrent={weekIsCurrentFor(weekAnchor)} writers={canvasWriters}
       spans={canvasSpans} dayDescriptions={canvasDayDescriptions} members={familyMembers}
       daily={canvasDays.hasDaily ? { shown: dailyShown, onToggle: toggleDaily } : undefined}
-      defaultArea={addAreaDefault} focusAdd={host.arrivedToWrite} />
+      pointing={activity.pointing}
+      // A calendar that is not connected has nothing to load.
+      loaded={(sources?.tasks ?? 'ready') === 'ready' && ['ready', 'not-connected'].includes(sources?.events ?? 'ready')} />
   )
 
   // A past week is a look-back, not a plan.
   const weekIsPast = weekAnchor.getTime() + 7 * 86_400_000 <= Date.now()
 
-  const weekTools = <>
-    {!narrow && (props.mode === undefined || props.onModeChange) && (
-      <div className={planV2Enabled() ? '' : 'mr-auto'}><WeekModeSwitch mode={mode} onChange={props.onModeChange ?? setOwnMode} /></div>
-    )}
-  </>
-  // v2 draws these in its one toolbar, not on a row of their own.
-  const v2Page = planV2Enabled()
 
   return (
-    <WeekPlanHost tasks={tasks} weekStart={weekAnchor} meId={meId} isPast={weekIsPast} tools={v2Page ? undefined : weekTools}>
-      {({ openSession }) => (
+    <WeekPlanHost tasks={tasks} weekStart={weekAnchor} meId={meId} isPast={weekIsPast}>
     <div className="relative week-content">
 
       <DndContext
@@ -1261,13 +886,10 @@ export function WeekViewV2(props: WeekViewV2Props) {
             never by dragging from it. On a narrow screen the list sits above
             the stacked days instead. */}
         {narrow && planV2Enabled() ? (
-          <WeekV2 tasks={tasks} weekStart={weekAnchor} meId={meId} isCurrent={weekIsCurrent} dragEnabled={false} tools={weekTools} canvas={weekCanvas}
-            onSelectTask={(id) => onSelectItem(`task-${id}`)}
-            timingControl={weekTimingControl}
-            renderDays={(o) => <WeekJournal layout="grid" days={journalDays} weekend={journalWeekend} spans={journalSpans} onSelectItem={handleSelectBlock} onToggleEntry={handleJournalToggle} onPlanDrop={handlePlanDropOnDay} onAddToDay={handleAddToDay} onAddEvent={calendarConnected ? handleAddEvent : undefined} narrow dragEnabled={false} timingControl={weekTimingControl} forecast={forecast} {...o} />} />
+          <WeekV2 weekStart={weekAnchor} isCurrent={weekIsCurrent} canvas={weekCanvas} walk={pageWalk} />
         ) : narrow ? (
           <div className="flex flex-col gap-4">
-            {weekListFor(openSession)}
+            {weekListFor()}
             <h2 className="week-days-heading">The days</h2>
             <WeekJournal days={journalDays} weekend={journalWeekend} spans={journalSpans} onSelectItem={handleSelectBlock} onToggleEntry={handleJournalToggle} onPlanDrop={handlePlanDropOnDay} onAddToDay={handleAddToDay} narrow dragEnabled={false} timingControl={weekTimingControl} forecast={forecast} />
           </div>
@@ -1275,166 +897,20 @@ export function WeekViewV2(props: WeekViewV2Props) {
         <div className="flex items-start gap-4">
         {/* Edge auto-advance measures THIS box, not the whole view. */}
         <div ref={gridBoundsRef} data-week-bounds className="flex-1 min-w-0">
-        {!showSchedule && planV2Enabled() ? (
+        {planV2Enabled() ? (
           // v2 (docs/planning/2026-09-28-planning-v2.md): the same journal and
           // list, laid out as the prototype's day column + "Any day this week".
-          <WeekV2 tasks={tasks} weekStart={weekAnchor} meId={meId} isCurrent={weekIsCurrent} onPlan={openSession} tools={weekTools} canvas={weekCanvas}
-            onSelectTask={(id) => onSelectItem(`task-${id}`)}
-            timingControl={weekTimingControl}
-            renderDays={(o) => <WeekJournal layout="grid" days={journalDays} weekend={journalWeekend} spans={journalSpans} onSelectItem={handleSelectBlock} onToggleEntry={handleJournalToggle} onPlanDrop={handlePlanDropOnDay} onAddToDay={handleAddToDay} onAddEvent={calendarConnected ? handleAddEvent : undefined} timingControl={weekTimingControl} forecast={forecast} {...o} />} />
-        ) : !showSchedule ? (
+          <WeekV2 weekStart={weekAnchor} isCurrent={weekIsCurrent} canvas={weekCanvas} walk={pageWalk} />
+        ) : (
           <>
-            {weekListFor(openSession)}
+            {weekListFor()}
             <h2 className="week-days-heading">The days</h2>
             <WeekJournal days={journalDays} weekend={journalWeekend} spans={journalSpans} onSelectItem={handleSelectBlock} onToggleEntry={handleJournalToggle} onPlanDrop={handlePlanDropOnDay} onAddToDay={handleAddToDay} timingControl={weekTimingControl} forecast={forecast} />
           </>
-        ) : (() => {
-        // Hours: the timed grid. "Plan the week" stays in the frame here too
-        // (WeekV2 draws the toolbar and runs the session around it).
-        const hours = (<>
-        {weekListFor(openSession)}
-        <WeekGrid
-          weekStart={weekStart}
-          dayCount={dayCount}
-          renderAllDay={(day) => {
-            const key = dayKey(day)
-            return (
-              <>
-                {(allDayEventsByDay.get(key) ?? []).map((ev) => (
-                  <WeekAllDayEventChip key={ev.google_event_id || ev.id} event={ev} onSelect={onSelectItem} />
-                ))}
-                {(allDayByDay.get(key) ?? []).map((t) => (
-                  <WeekAllDayChip key={t.id} task={t} onSelect={onSelectItem} />
-                ))}
-                {(plannedAllDay.get(key) ?? []).map((e) => e.task ? (
-                  <WeekAllDayChip key={e.id} task={e.task} onSelect={onSelectItem} />
-                ) : (
-                  <button key={e.id} type="button" onClick={() => onSelectItem(e.id.replace(/-day\d+$/, ''))}
-                    className={`w-full min-w-0 truncate rounded border border-neutral-200 bg-bg-elevated px-1.5 py-0.5 text-left text-[11.5px] text-neutral-600 hover:border-neutral-300 ${e.completed ? 'line-through text-neutral-400' : ''}`}
-                    title={e.title}>
-                    {e.title}
-                  </button>
-                ))}
-                {(earlyTasksByDay.get(key) ?? []).map((t) => (
-                  <WeekAllDayChip
-                    key={t.id}
-                    task={t}
-                    onSelect={onSelectItem}
-                    displayLabel={`${formatEarlyTime(t.scheduledFor!)} · ${t.title}`}
-                    ariaLabel={`Earlier: ${t.title}`}
-                  />
-                ))}
-              </>
-            )
-          }}
-          renderDinner={
-            extras.dinnersByDay.size === 0
-              ? undefined
-              : (day) =>
-                  (extras.dinnersByDay.get(dayKey(day)) ?? []).map(({ event, label }) => (
-                    <button
-                      key={event.id}
-                      type="button"
-                      title={label}
-                      onClick={() => onSelectItem(`event-${event.google_event_id || event.id}`)}
-                      className="block w-full min-w-0 text-left text-[11.5px] leading-tight text-accent-700 truncate hover:underline cursor-pointer"
-                    >
-                      {label}
-                    </button>
-                  ))
-          }
-          onCreateGesture={
-            drag.activeDragId
-              ? undefined
-              : {
-                  onSlotPointerDown: gridCreate.onSlotPointerDown,
-                  onSlotPointerMove: gridCreate.onGridPointerMove,
-                  onSlotPointerUp: gridCreate.onSlotPointerUp,
-                }
-          }
-          suppressCreate={!!drag.activeDragId}
-          suggestedSlotIds={suggestedSlotIds}
-          onPlanDrop={handlePlanDropOnSlot}
-        >
-          {placedItems.map((p) => (
-            <WeekEventBlock
-              key={p.item.id}
-              placedItem={p}
-              weekStart={weekStart}
-              dayCount={dayCount}
-              onSelect={handleSelectBlock}
-              routinesMovable={!!onPushRoutine}
-              onResizeCommit={(itemId, updates) => {
-                // itemId from WeekEventBlock is the TimelineItem.id (prefixed).
-                // Strip before persisting so the DB update targets the real uuid.
-                if (itemId.startsWith('task-')) {
-                  void onUpdateTask(itemId.slice('task-'.length), updates as Partial<Task>)
-                }
-                // Events resize: not wired. Routines: not resizable (disabled in WeekEventBlock).
-              }}
-            />
-          ))}
-        </WeekGrid>
-        </>)
-        return planV2Enabled() ? (
-          <WeekV2 tasks={tasks} weekStart={weekAnchor} meId={meId} isCurrent={weekIsCurrent} onPlan={openSession} tools={weekTools} canvas={hours}
-            onSelectTask={(id) => onSelectItem(`task-${id}`)}
-            timingControl={weekTimingControl}
-            renderDays={(o) => <WeekJournal layout="grid" days={journalDays} weekend={journalWeekend} spans={journalSpans} onSelectItem={handleSelectBlock} onToggleEntry={handleJournalToggle} onPlanDrop={handlePlanDropOnDay} onAddToDay={handleAddToDay} onAddEvent={calendarConnected ? handleAddEvent : undefined} timingControl={weekTimingControl} forecast={forecast} {...o} />} />
-        ) : hours
-        })()}
+        )}
         </div>
         </div>
         )}
-
-        {placingRoutine && routinePlace && (
-          <RoutinePlacePopover
-            routine={placingRoutine}
-            when={routinePlace.when}
-            canOnce={!!onPushRoutine}
-            onConfirm={confirmRoutinePlace}
-            onCancel={() => setRoutinePlace(null)}
-          />
-        )}
-
-        {gridCreate.state && (() => {
-          const { startTime, endTime } = gridCreate.toTimes(gridCreate.state)
-          return (
-            <SlotQuickCreatePopover
-              anchorRect={gridCreate.state.anchorRect}
-              startTime={startTime}
-              endTime={endTime}
-              onCreate={handleCreate}
-              onCancel={gridCreate.close}
-            />
-          )
-        })()}
-
-        {gridCreate.liveGesture && (() => {
-          const lg = gridCreate.liveGesture
-          // Compute outline rect from the live gesture. anchorRect is the start
-          // slot's rect (15-min sub-slot). The height = number-of-15min-slots
-          // between start and end, inclusive of the end slot itself.
-          const startMinutes = lg.startSlot.hour * 60 + lg.startSlot.minute
-          const endMinutes = lg.endSlot.hour * 60 + lg.endSlot.minute + 15
-          const minutesSpan = Math.max(15, endMinutes - startMinutes)
-          const heightPx = (minutesSpan / 15) * lg.anchorRect.height
-          const style: React.CSSProperties = {
-            position: 'fixed',
-            top: lg.anchorRect.top,
-            left: lg.anchorRect.left,
-            width: lg.anchorRect.width,
-            height: heightPx,
-            pointerEvents: 'none',
-            zIndex: 55,
-          }
-          return (
-            <div
-              style={style}
-              className="border-2 border-dashed border-primary-500/60 bg-primary-500/5 rounded-md"
-            />
-          )
-        })()}
 
         <DragOverlay dropAnimation={null}>
           {drag.activeDragId
@@ -1490,28 +966,12 @@ export function WeekViewV2(props: WeekViewV2Props) {
                     </div>
                   )
                 }
-                // Strip the dnd-kit drag prefix to recover the TimelineItem id.
-                // Routines use 'block-routine:', everything else uses 'block:'.
-                const itemId = drag.activeDragId.startsWith('block-routine:')
-                  ? drag.activeDragId.slice('block-routine:'.length)
-                  : drag.activeDragId.startsWith('block:')
-                  ? drag.activeDragId.slice('block:'.length)
-                  : drag.activeDragId
-                const item = placedItems.find((p) => p.item.id === itemId)?.item
-                if (!item) return null
-                return (
-                  <div className="opacity-60 pointer-events-none">
-                    <div className="px-2 py-1 rounded-md bg-primary-50 border border-primary-200 text-[12px] text-primary-900 shadow-md whitespace-nowrap">
-                      {item.title}
-                    </div>
-                  </div>
-                )
+                return null
               })()
             : null}
         </DragOverlay>
       </DndContext>
     </div>
-      )}
     </WeekPlanHost>
   )
 }

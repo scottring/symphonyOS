@@ -8,7 +8,6 @@ import { buildRange, presetRange, weekRange, type RangePreset } from '@/lib/plan
 import { readCadenceConfig } from '@/lib/cadence/config'
 import { MastheadCard, PeriodNavEyebrow } from '@/components/layout/MastheadCard'
 import { ShelvesButton } from '@/components/reference/ShelvesButton'
-import { WeekModeSwitch, type WeekMode } from './week/WeekViewV2'
 import { planV2Enabled } from '@/lib/planning/v2/planV2'
 
 interface HomeHeaderProps {
@@ -34,8 +33,6 @@ interface HomeHeaderProps {
   onRangeChange?: (range: Date[]) => void
 
   /** Journal | Schedule on /week — presentation only; drawn beside the dates. */
-  weekMode?: WeekMode
-  onWeekModeChange?: (mode: WeekMode) => void
 
   /** For currentView === 'month' */
   monthStart: Date
@@ -253,12 +250,8 @@ export function HomeHeader(props: HomeHeaderProps) {
         />
       </span>
     ) : null
-    const modeSwitch = props.weekMode && props.onWeekModeChange
-      ? <div className="hidden lg:block"><WeekModeSwitch mode={props.weekMode} onChange={props.onWeekModeChange} /></div>
-      : null
     // Folded (desktop, v2): the week's status under the dates, and the
-    // journal/hourly switch beside the week's own controls at the right.
-    // The switch stays when the hourly grid is up and WeekV2 is not.
+    // week's own controls at the right.
     const slots = planV2Enabled() ? props.planSlots : undefined
     return (
       <MastheadCard
@@ -267,20 +260,11 @@ export function HomeHeader(props: HomeHeaderProps) {
         title={label.long}
         // Shelves beside the dates, not on a row of its own (2026-09-23).
         // v2: no Shelves here — what they held is in the month column.
-        // v2: the journal/hourly switch sits on the date's line at right
-        // (Scott, 2026-09-30), where Shelves once stood.
-        action={slots ? undefined : planV2Enabled()
-          ? (modeSwitch ?? undefined)
-          : <ShelvesButton weekPage={weekStart} />}
+        action={slots || planV2Enabled() ? undefined : <ShelvesButton weekPage={weekStart} />}
         subline={slots ? <>{customInputs}<SlotHost onHost={slots.subline} className="pv2-mslot" /></> : customInputs}
-        // The hourly grid needs desk width; below lg the journal is the week.
-        // v2: the journal/hourly switch sits in the week's control row.
-        aside={props.weekMode && props.onWeekModeChange && !planV2Enabled()
-          ? <div className="hidden lg:block"><WeekModeSwitch mode={props.weekMode} onChange={props.onWeekModeChange} /></div>
-          : undefined}
         // v2: the page's controls live in the week's control row (WeekV2).
         controls={slots
-          ? <div className="pv2-mcontrols">{modeSwitch}<SlotHost onHost={slots.controls} className="contents" /></div>
+          ? <div className="pv2-mcontrols"><SlotHost onHost={slots.controls} className="contents" /></div>
           : planV2Enabled() ? undefined : <HomeChromeControls className="flex" />}
       />
     )
