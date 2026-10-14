@@ -5,6 +5,7 @@
 // Pure so the page and the sidebar badge derive from the same rule.
 
 import { isUnread } from './unread'
+import { discussionState, memberOfAuth, othersIn, type DiscussionState, type WaitingMember } from './waiting'
 
 export type InboxEntityType = 'task' | 'routine' | 'event'
 
@@ -16,6 +17,11 @@ export interface InboxSession {
   messages: unknown
   updated_at: string
   scope?: string | null
+  user_id?: string | null
+  with_user_ids?: string[] | null
+  settled_at?: string | null
+  settled_by?: string | null
+  outcome?: string | null
 }
 
 export interface InboxRow {
@@ -27,6 +33,17 @@ export interface InboxRow {
   lastText: string
   lastAt: Date
   unread: boolean
+  /** Whose turn it is (discussions v2). */
+  state: DiscussionState
+  /** The others in it, by name ("Iris"). */
+  others: string[]
+  /** Whose turn, by name whoever is looking ("Iris", or your own name) — the
+   *  wall's view, which belongs to no one in the room. */
+  waitingOn: string[]
+  scope: string
+  settledAt: Date | null
+  settledBy: string | null
+  outcome: string | null
 }
 
 interface StoredMessage {
@@ -56,6 +73,7 @@ export function buildInboxRows(
   sessions: readonly InboxSession[],
   reads: Readonly<Record<string, string>>,
   selfAuthId: string | null,
+  members: readonly WaitingMember[] = [],
 ): InboxRow[] {
   const rows: InboxRow[] = []
   for (const s of sessions) {
@@ -81,6 +99,20 @@ export function buildInboxRows(
       lastText: previewText(last.content ?? ''),
       lastAt,
       unread: isUnread(readable, selfAuthId, readAt),
+      ...(() => {
+        const ws = { user_id: s.user_id ?? '', scope: s.scope, with_user_ids: s.with_user_ids, settled_at: s.settled_at, messages: s.messages }
+        const state: DiscussionState = s.user_id ? discussionState(ws, members, selfAuthId) : { kind: 'just-you' }
+        const selfName = memberOfAuth(members, selfAuthId)?.name
+        return {
+          state,
+          others: s.user_id ? othersIn(ws, members, selfAuthId) : [],
+          waitingOn: state.kind === 'waiting-on-them' ? state.names : state.kind === 'waiting-on-you' && selfName ? [selfName] : [],
+        }
+      })(),
+      scope: s.scope ?? 'individual',
+      settledAt: s.settled_at ? new Date(s.settled_at) : null,
+      settledBy: s.settled_by ?? null,
+      outcome: s.outcome?.trim() || null,
     })
   }
   rows.sort((a, b) => b.lastAt.getTime() - a.lastAt.getTime())

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 
 const sendMessage = vi.fn()
 const hookSpy = vi.fn()
@@ -33,7 +33,10 @@ const discussState = vi.hoisted(() => ({
   participants: [] as string[],
   sharedWith: [] as string[],
   selfAuthId: 'u1' as string | null,
+  meta: null as null | { ownerId: string; scope: string; withUserIds: string[]; settledAt: Date | null; settledBy: string | null; outcome: string | null },
 }))
+const discussSetWith = vi.fn(async () => true)
+const discussSettle = vi.fn(async () => true)
 
 vi.mock('@/hooks/useDiscussThread', () => ({
   DISCUSS_UNAVAILABLE: "Discussion isn't available yet",
@@ -52,6 +55,10 @@ vi.mock('@/hooks/useDiscussThread', () => ({
       sharedWith: discussState.sharedWith,
       selfAuthId: discussState.selfAuthId,
       reload: vi.fn(),
+      meta: discussState.meta,
+      reads: {},
+      setWith: discussSetWith,
+      settle: discussSettle,
     }
   },
 }))
@@ -87,6 +94,7 @@ describe('AssistDrawer', () => {
     discussState.participants = []
     discussState.sharedWith = []
     discussState.selfAuthId = 'u1'
+    discussState.meta = { ownerId: 'u1', scope: 'compound', withUserIds: [], settledAt: null, settledBy: null, outcome: null }
     familyMembersState.members = []
   })
 
@@ -121,7 +129,7 @@ describe('AssistDrawer', () => {
       render(<AssistDrawer item={task} onClose={vi.fn()} discuss={discuss} />)
       expect(discussSpy).toHaveBeenCalledWith(discuss, expect.objectContaining({ taskContext: task }))
       expect(screen.getByRole('dialog', { name: 'Discuss Replace kitchen light bulbs' })).toBeInTheDocument()
-      expect(screen.getByRole('heading', { name: 'Discussion' })).toBeInTheDocument()
+      expect(screen.getByRole('heading', { name: 'Just you' })).toBeInTheDocument()
     })
 
     it('marks the thread read while it is open', () => {
@@ -129,20 +137,52 @@ describe('AssistDrawer', () => {
       expect(discussSpy).toHaveBeenCalledWith(discuss, expect.objectContaining({ markRead: true }))
     })
 
-    it('suggestion chips ask Symphony in the shared thread, not the solo assistant', () => {
+    it('suggestion chips ask Symphony in the shared thread, not the solo assistant', async () => {
       render(<AssistDrawer item={task} onClose={vi.fn()} discuss={discuss} />)
       fireEvent.click(screen.getByRole('button', { name: 'Break this into doable steps' }))
-      expect(discussAsk).toHaveBeenCalledWith('Break this into doable steps')
+      await waitFor(() => expect(discussAsk).toHaveBeenCalledWith('Break this into doable steps'))
       expect(sendMessage).not.toHaveBeenCalled()
     })
 
-    it('a typed message posts to the people in the thread and never wakes Symphony', () => {
+    it('a typed message posts to the people in the thread and never wakes Symphony', async () => {
       render(<AssistDrawer item={task} onClose={vi.fn()} discuss={discuss} />)
       const box = screen.getByRole('textbox', { name: 'Message' })
       fireEvent.change(box, { target: { value: 'Iris, can you grab these?' } })
       fireEvent.keyDown(box, { key: 'Enter' })
-      expect(discussPost).toHaveBeenCalledWith('Iris, can you grab these?')
+      await waitFor(() => expect(discussPost).toHaveBeenCalledWith('Iris, can you grab these?'))
       expect(discussAsk).not.toHaveBeenCalled()
+    })
+
+    // Scott, 2026-10-14: a message meant for Iris that said nothing of her.
+    it('a new discussion is with Iris to start; the first word records that, then goes to her', async () => {
+      familyMembersState.members = [
+        { id: 'm1', name: 'Scott', auth_user_id: null, user_id: 'u1', is_full_user: true },
+        { id: 'm2', name: 'Iris', auth_user_id: 'u2', user_id: 'u1', is_full_user: false },
+      ]
+      render(<AssistDrawer item={task} onClose={vi.fn()} discuss={discuss} />)
+      expect(screen.getByRole('heading', { name: 'You and Iris' })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Iris' })).toHaveAttribute('aria-pressed', 'true')
+      const box = screen.getByRole('textbox', { name: 'Message Iris' })
+      fireEvent.change(box, { target: { value: 'Iris, we need to review these days' } })
+      fireEvent.keyDown(box, { key: 'Enter' })
+      await waitFor(() => expect(discussPost).toHaveBeenCalledWith('Iris, we need to review these days'))
+      expect(discussSetWith).toHaveBeenCalledWith(['u2'])
+    })
+
+    it('on a private item, Just Symphony keeps it to you: nothing is opened to anyone', async () => {
+      familyMembersState.members = [
+        { id: 'm1', name: 'Scott', auth_user_id: null, user_id: 'u1', is_full_user: true },
+        { id: 'm2', name: 'Iris', auth_user_id: 'u2', user_id: 'u1', is_full_user: false },
+      ]
+      discussState.meta = { ownerId: 'u1', scope: 'individual', withUserIds: [], settledAt: null, settledBy: null, outcome: null }
+      render(<AssistDrawer item={task} onClose={vi.fn()} discuss={{ ...discuss, scope: 'individual' }} />)
+      fireEvent.click(screen.getByRole('button', { name: /Just Symphony/ }))
+      expect(screen.getByRole('heading', { name: 'Just you' })).toBeInTheDocument()
+      const box = screen.getByRole('textbox', { name: 'Message' })
+      fireEvent.change(box, { target: { value: 'thinking out loud' } })
+      fireEvent.keyDown(box, { key: 'Enter' })
+      await waitFor(() => expect(discussPost).toHaveBeenCalledWith('thinking out loud'))
+      expect(discussSetWith).not.toHaveBeenCalled()
     })
 
     it("says the discussion isn't available yet when the ensure RPC failed", () => {
@@ -151,11 +191,14 @@ describe('AssistDrawer', () => {
       render(<AssistDrawer item={task} onClose={vi.fn()} discuss={discuss} />)
       expect(screen.getByText("Discussion isn't available yet")).toBeInTheDocument()
       // No chat surface behind it — a broken chat is worse than a clear notice.
-      expect(screen.queryByRole('heading', { name: 'Discussion' })).toBeNull()
+      expect(screen.queryByRole('heading', { name: 'Just you' })).toBeNull()
     })
 
-    it('renders the shared thread with its authors and says who can see it', () => {
-      discussState.sharedWith = ['Iris']
+    it('renders the shared thread with its authors and says who it is with', () => {
+      familyMembersState.members = [
+        { id: 'm1', name: 'Scott', auth_user_id: null, user_id: 'u1', is_full_user: true },
+        { id: 'm2', name: 'Iris', auth_user_id: 'u2', user_id: 'u1', is_full_user: false },
+      ]
       discussState.messages = [{
         id: 'm-0', role: 'user', content: 'Can you grab bulbs?', timestamp: new Date(),
         author: { id: 'u2', name: 'Iris', kind: 'member' },
@@ -163,7 +206,8 @@ describe('AssistDrawer', () => {
       render(<AssistDrawer item={task} onClose={vi.fn()} discuss={discuss} />)
       expect(screen.getByText('Can you grab bulbs?')).toBeInTheDocument()
       expect(screen.getByText('Iris')).toBeInTheDocument()
-      expect(screen.getByText('Shared with Iris')).toBeInTheDocument()
+      expect(screen.getByRole('heading', { name: 'You and Iris' })).toBeInTheDocument()
+      expect(screen.getByText('Waiting on you')).toBeInTheDocument()
     })
 
     it('keeps the solo planning label when no discuss entity is given', () => {
@@ -181,57 +225,6 @@ describe('AssistDrawer', () => {
       }]
       render(<AssistDrawer item={task} onClose={vi.fn()} discuss={discuss} />)
       expect(screen.getByText('On it.').closest('.flex')?.className).toContain('justify-end')
-    })
-
-    it('offers to share a private thread with the house when the host supplies onShare', () => {
-      familyMembersState.members = [
-        { id: 'm1', name: 'Scott', auth_user_id: null, user_id: 'u1', is_full_user: true },
-        { id: 'm2', name: 'Iris', auth_user_id: 'u2', user_id: 'u1', is_full_user: false },
-      ]
-      const onShare = vi.fn()
-      render(
-        <AssistDrawer
-          item={task}
-          onClose={vi.fn()}
-          discuss={{ ...discuss, scope: 'individual' }}
-          onShare={onShare}
-        />,
-      )
-      fireEvent.click(screen.getByRole('button', { name: 'Move to Family and share' }))
-      expect(onShare).toHaveBeenCalled()
-    })
-
-    it('does not offer to share when the thread is already shared', () => {
-      familyMembersState.members = [
-        { id: 'm1', name: 'Scott', auth_user_id: null, user_id: 'u1', is_full_user: true },
-        { id: 'm2', name: 'Iris', auth_user_id: 'u2', user_id: 'u1', is_full_user: false },
-      ]
-      render(<AssistDrawer item={task} onClose={vi.fn()} discuss={discuss} onShare={vi.fn()} />)
-      expect(screen.queryByRole('button', { name: 'Move to Family and share' })).not.toBeInTheDocument()
-    })
-
-    it('does not offer to share when nobody else in the house has a login', () => {
-      familyMembersState.members = [
-        { id: 'm1', name: 'Scott', auth_user_id: null, user_id: 'u1', is_full_user: true },
-      ]
-      render(
-        <AssistDrawer
-          item={task}
-          onClose={vi.fn()}
-          discuss={{ ...discuss, scope: 'individual' }}
-          onShare={vi.fn()}
-        />,
-      )
-      expect(screen.queryByRole('button', { name: 'Move to Family and share' })).not.toBeInTheDocument()
-    })
-
-    it('does not offer to share when the host gives no onShare handler', () => {
-      familyMembersState.members = [
-        { id: 'm1', name: 'Scott', auth_user_id: null, user_id: 'u1', is_full_user: true },
-        { id: 'm2', name: 'Iris', auth_user_id: 'u2', user_id: 'u1', is_full_user: false },
-      ]
-      render(<AssistDrawer item={task} onClose={vi.fn()} discuss={{ ...discuss, scope: 'individual' }} />)
-      expect(screen.queryByRole('button', { name: 'Move to Family and share' })).not.toBeInTheDocument()
     })
   })
 })

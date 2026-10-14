@@ -76,6 +76,7 @@ import { useWallRecipeIndex } from '@/hooks/useWallRecipeIndex';
 import { useRecipe } from '@/hooks/useRecipe';
 import { WallV2ScratchpadSheet } from './WallV2ScratchpadSheet';
 import { useScratchpad } from '@/hooks/useScratchpad';
+import { useDiscussionInbox } from '@/hooks/useDiscussionInbox';
 import { openScratchpadRows, recentlySorted, type ScratchpadRow } from '@/lib/wall/scratchpad';
 import { useFamilyDiscussionItems, type DiscussionItem } from '@/hooks/useFamilyDiscussionItems';
 import { QuickCapture } from '@/components/layout/QuickCapture';
@@ -574,6 +575,12 @@ export function WallV2Shell() {
     discussionItems.map((d) => ({ kind: d.kind, id: d.id, title: d.title, note: d.note ?? null })),
   ), [scratchpad.notes, discussionItems]);
   const scratchSorted = useMemo(() => recentlySorted(scratchpad.notes, now), [scratchpad.notes, now]);
+  // A flagged task being talked over in the app says whose turn it is
+  // (discussions v2, 2026-10-14). Only rows already on the wall are marked.
+  const { rows: discussionRows } = useDiscussionInbox();
+  const turnOf = useMemo(() => new Map(discussionRows
+    .filter((r) => r.entityType === 'task' && r.waitingOn.length > 0 && r.state.kind !== 'settled')
+    .map((r) => [r.entityId, `waiting on ${r.waitingOn.join(' and ')}`])), [discussionRows]);
   const memberName = useCallback(
     (id: string) => wallData.familyMembers.find((m) => m.id === id)?.name,
     [wallData.familyMembers],
@@ -895,7 +902,10 @@ export function WallV2Shell() {
     return {
       pick, anchors, kids, restLine, restSub, next,
       notes: scratchRows.filter((r) => r.kind === 'note').map((r) => ({ id: r.key, text: r.text, by: r.authorMemberId ? memberName(r.authorMemberId) ?? null : null })),
-      talks: scratchRows.filter((r) => r.kind === 'talk').map((r) => ({ id: r.key, text: r.text, by: null })),
+      talks: scratchRows.filter((r) => r.kind === 'talk').map((r) => {
+        const turn = r.source === 'task' ? turnOf.get(r.id) : undefined;
+        return { id: r.key, text: turn ? `${r.text} — ${turn}` : r.text, by: null };
+      }),
       question: discussionPrompt || null,
       tomorrow: {
         label: weekdayName,
@@ -911,7 +921,7 @@ export function WallV2Shell() {
       onNotes: () => { setScratchpadFocus(null); setShowScratchpad(true); },
       at: previewAt ?? undefined,
     };
-  }, [kidModels, dinnerStartDate, now, previewAt, todayRows, dinnerEvent, dinner, tomorrowData, todayItems, wallData.familyMembers, scratchRows, memberName, discussionPrompt]);
+  }, [kidModels, dinnerStartDate, now, previewAt, todayRows, dinnerEvent, dinner, tomorrowData, todayItems, wallData.familyMembers, scratchRows, memberName, discussionPrompt, turnOf]);
 
   // ─── Talking with Symphony (Kitchen wall v2, stage 3) ───
   // The app's own task store (shared cache; the discussion items already

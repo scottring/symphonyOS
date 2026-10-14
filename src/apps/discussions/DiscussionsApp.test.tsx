@@ -10,6 +10,10 @@ vi.mock('react-router-dom', async (importOriginal) => {
 })
 
 const inbox = vi.hoisted(() => ({ rows: [] as InboxRow[], loading: false }))
+const drawer = vi.hoisted(() => ({ props: null as null | Record<string, unknown> }))
+vi.mock('@/components/assist/AssistDrawer', () => ({
+  AssistDrawer: (p: Record<string, unknown>) => { drawer.props = p; return <div role="dialog" aria-label="Discussion drawer" /> },
+}))
 vi.mock('@/hooks/useDiscussionInbox', () => ({
   useDiscussionInbox: () => ({ rows: inbox.rows, loading: inbox.loading, unreadCount: 0, reload: vi.fn() }),
 }))
@@ -20,12 +24,14 @@ function row(over: Partial<InboxRow>): InboxRow {
   return {
     sessionId: 's1', entityType: 'task', entityId: 't1', title: 'Dentist',
     lastAuthor: 'Iris', lastText: 'Can you take her?', lastAt: new Date(), unread: true,
+    state: { kind: 'waiting-on-you' }, others: ['Iris'], waitingOn: ['Scott'], scope: 'compound',
+    settledAt: null, settledBy: null, outcome: null,
     ...over,
   }
 }
 
 describe('DiscussionsApp', () => {
-  beforeEach(() => { mockNavigate.mockClear(); inbox.rows = []; inbox.loading = false })
+  beforeEach(() => { mockNavigate.mockClear(); inbox.rows = []; inbox.loading = false; drawer.props = null })
 
   it('shows an empty state when nothing has been discussed', () => {
     render(<MemoryRouter><DiscussionsApp /></MemoryRouter>)
@@ -33,22 +39,37 @@ describe('DiscussionsApp', () => {
     expect(screen.getByText(/Nothing to talk about yet/)).toBeInTheDocument()
   })
 
-  it('renders each thread with who said what last and an unread dot', () => {
-    inbox.rows = [row({}), row({ sessionId: 's2', entityId: 't2', title: 'Laundry', lastAuthor: 'Scott', lastText: 'done', unread: false })]
+  // Scott, 2026-10-14: discussions by whose turn it is.
+  it('groups by whose turn it is, with who it is with, who said what last and an unread dot', () => {
+    inbox.rows = [
+      row({}),
+      row({ sessionId: 's2', entityId: 't2', title: 'Laundry', lastAuthor: 'Scott', lastText: 'done', unread: false, state: { kind: 'waiting-on-them', names: ['Iris'] } }),
+      row({ sessionId: 's3', entityId: 't3', title: 'Bagels', lastAuthor: 'Symphony', lastText: '6pm', unread: false, state: { kind: 'just-you' }, others: [] }),
+      row({ sessionId: 's4', entityId: 't4', title: 'Front gate', unread: false, state: { kind: 'settled' }, settledAt: new Date(), outcome: 'Matt comes Tuesday' }),
+    ]
     render(<MemoryRouter><DiscussionsApp /></MemoryRouter>)
-    expect(screen.getByText('Dentist')).toBeInTheDocument()
+    expect(within(screen.getByRole('region', { name: 'Waiting on you' })).getByText('Dentist')).toBeInTheDocument()
+    expect(within(screen.getByRole('region', { name: 'Waiting on Iris' })).getByText('Laundry')).toBeInTheDocument()
+    expect(within(screen.getByRole('region', { name: 'Just you and Symphony' })).getByText('Bagels')).toBeInTheDocument()
+    expect(within(screen.getByRole('region', { name: 'Settled this week' })).getByText('Settled: Matt comes Tuesday')).toBeInTheDocument()
+    expect(screen.getAllByText(/With Iris/).length).toBeGreaterThan(0)
     expect(screen.getByText('Iris:')).toBeInTheDocument()
-    expect(screen.getByText('Can you take her?')).toBeInTheDocument()
     expect(screen.getAllByLabelText('Unread')).toHaveLength(1)
   })
 
-  it('opens the item with its Discussion already open', () => {
+  it('opens a discussion right here; About opens the item', () => {
     inbox.rows = [row({}), row({ sessionId: 's2', entityType: 'event', entityId: 'ev1', title: 'Soccer' })]
     render(<MemoryRouter><DiscussionsApp /></MemoryRouter>)
     fireEvent.click(screen.getByText('Dentist'))
+    expect(drawer.props).toMatchObject({ discuss: { type: 'task', id: 't1', title: 'Dentist', scope: 'compound' } })
+    ;(drawer.props!.onOpenItem as () => void)()
     expect(mockNavigate).toHaveBeenCalledWith('/today?detail=task:t1&discuss=1')
-    fireEvent.click(screen.getByText('Soccer'))
-    expect(mockNavigate).toHaveBeenCalledWith('/today?detail=event:ev1&discuss=1')
+  })
+
+  it('?open= opens that discussion (the phone’s Waiting on you)', () => {
+    inbox.rows = [row({})]
+    render(<MemoryRouter initialEntries={['/discussions?open=s1']}><DiscussionsApp /></MemoryRouter>)
+    expect(drawer.props).toMatchObject({ discuss: { id: 't1' } })
   })
 
   it('builds routine links too', () => {

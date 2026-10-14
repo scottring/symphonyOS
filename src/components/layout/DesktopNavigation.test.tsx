@@ -5,9 +5,9 @@ import { DesktopNavigation } from './DesktopNavigation'
 
 describe('DesktopNavigation — one bar on every page (2026-09-29)', () => {
   // Scott, 2026-10-03: the menu immediately left of the rail, in the centre.
-  it('the menu just before the rail; Inbox (a count, no word), search and the account at the right — no Add', () => {
+  it('the menu just before the rail; Discussions and Inbox (counts, no words), search and the account at the right — no Add', () => {
     render(<MemoryRouter initialEntries={['/week']}>
-      <DesktopNavigation inboxCount={3} discussionsUnread={0} onSearch={vi.fn()} onSignOut={vi.fn()} paused={false} controlsRef={() => {}} centerRef={() => {}} />
+      <DesktopNavigation inboxCount={3} discussionsUnread={1} onSearch={vi.fn()} onSignOut={vi.fn()} paused={false} controlsRef={() => {}} centerRef={() => {}} />
     </MemoryRouter>)
     const nav = screen.getByRole('navigation', { name: 'Main navigation' })
     const mid = nav.querySelector('.page-navigation-mid') as HTMLElement
@@ -18,7 +18,11 @@ describe('DesktopNavigation — one bar on every page (2026-09-29)', () => {
     const inbox = within(right).getByRole('link', { name: 'Inbox, 3 items' })
     expect(inbox.textContent).toBe('3')
     const order = [...right.querySelectorAll('a, button')].map((el) => el.getAttribute('aria-label') ?? el.textContent)
-    expect(order).toEqual(['Inbox, 3 items', 'Search', 'Account'])
+    expect(order).toEqual(['Discussions, 1 waiting on you', 'Inbox, 3 items', 'Search', 'Account'])
+    // Scott, 2026-10-14: nowhere showed discussions waiting; now beside Inbox.
+    const talk = within(right).getByRole('link', { name: 'Discussions, 1 waiting on you' })
+    expect(talk.getAttribute('href')).toMatch(/^\/discussions\b/)
+    expect(talk.textContent).toBe('1')
   })
 
   it('the app mark anchors the corner and goes Home (2026-10-11)', () => {

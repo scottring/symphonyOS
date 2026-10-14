@@ -50,6 +50,17 @@ export interface DiscussMessage {
   askedSymphony?: true
 }
 
+export interface DiscussMeta {
+  /** The auth id that started the thread. */
+  ownerId: string
+  scope: Scope
+  /** The people it is with besides the owner (auth ids). */
+  withUserIds: string[]
+  settledAt: Date | null
+  settledBy: string | null
+  outcome: string | null
+}
+
 export interface UseDiscussThreadOptions {
   /** Sent to the edge fn every turn so the agent keeps the item in view. */
   taskContext?: AssistantTaskContext
@@ -134,6 +145,10 @@ export function useDiscussThread(
   const [sending, setSending] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [toolActivity, setToolActivity] = useState<string[]>([])
+  // Who it is with, whether it is settled, and when the others last read it
+  // (discussions v2, 2026-10-14).
+  const [meta, setMeta] = useState<DiscussMeta | null>(null)
+  const [reads, setReads] = useState<Record<string, Date>>({})
 
   const { members, getCurrentUserMember } = useFamilyMembers()
 
@@ -166,6 +181,8 @@ export function useDiscussThread(
     threadIdRef.current = null
     setThreadId(null)
     setMessages([])
+    setMeta(null)
+    setReads({})
     setError(null)
     if (!entityType || !entityId || !entityScope) return
 
@@ -204,12 +221,28 @@ export function useDiscussThread(
     try {
       const { data, error: readError } = await supabase
         .from('chat_sessions')
-        .select('id, messages, scope, user_id')
+        .select('id, messages, scope, user_id, with_user_ids, settled_at, settled_by, outcome')
         .eq('id', id)
         .eq('mode', 'discuss')
         .single()
       if (readError || !data) return
       setMessages(hydrateDiscussMessages(data.messages, id))
+      setMeta({
+        ownerId: data.user_id,
+        scope: (data.scope ?? 'individual') as Scope,
+        withUserIds: Array.isArray(data.with_user_ids) ? data.with_user_ids : [],
+        settledAt: data.settled_at ? new Date(data.settled_at) : null,
+        settledBy: data.settled_by ?? null,
+        outcome: data.outcome ?? null,
+      })
+      // The others' read stamps, for "Iris saw this". Visible on shared threads.
+      const { data: stamps } = await supabase
+        .from('chat_session_reads')
+        .select('user_id, last_read_at')
+        .eq('session_id', id)
+      const next: Record<string, Date> = {}
+      for (const r of (stamps ?? []) as Array<{ user_id: string; last_read_at: string }>) next[r.user_id] = new Date(r.last_read_at)
+      setReads(next)
     } catch {
       // A failed re-read leaves the last good transcript on screen.
     }
@@ -229,6 +262,11 @@ export function useDiscussThread(
       .on(
         'postgres_changes',
         { event: 'UPDATE', schema: 'public', table: 'chat_sessions', filter: `id=eq.${threadId}` },
+        () => { void reload() },
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'chat_session_reads', filter: `session_id=eq.${threadId}` },
         () => { void reload() },
       )
       .subscribe()
@@ -388,6 +426,27 @@ export function useDiscussThread(
     return true
   }, [appendMember, getCurrentUserMember, taskContext, onMutate, reload])
 
+  /** Who this discussion is with (auth ids; empty = just you). On a private
+   *  item, choosing someone opens the thread — never the item — to them. */
+  const setWith = useCallback(async (ids: string[]): Promise<boolean> => {
+    const id = threadIdRef.current
+    if (!id) return false
+    const { error: rpcError } = await supabase.rpc('set_discussion_with', { p_session: id, p_with: ids })
+    if (rpcError) { setError("Couldn't change who this is with. Try again."); return false }
+    await reload()
+    return true
+  }, [reload])
+
+  /** Mark settled (optionally with what was decided), or reopen. */
+  const settle = useCallback(async (outcome: string | null, settled = true): Promise<boolean> => {
+    const id = threadIdRef.current
+    if (!id) return false
+    const { error: rpcError } = await supabase.rpc('settle_discussion', { p_session: id, p_outcome: outcome, p_settled: settled })
+    if (rpcError) { setError(settled ? "Couldn't mark it settled. Try again." : "Couldn't reopen it. Try again."); return false }
+    await reload()
+    return true
+  }, [reload])
+
   // ── Mark read ─────────────────────────────────────────────────────────────
   // Stamp whenever the thread on screen changes while the tab is visible. A
   // failed stamp only affects the dot, so it stays silent.
@@ -425,5 +484,6 @@ export function useDiscussThread(
   return {
     threadId, messages, loading, sending, error, toolActivity,
     post, ask, participants, sharedWith, reload, selfAuthId,
+    meta, reads, members, setWith, settle,
   }
 }

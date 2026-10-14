@@ -11,7 +11,7 @@
 //
 // Rendered at z-[60] so it sits above full-screen overlays.
 
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useEscapeKey } from '@/hooks/useEscapeKey'
 import { useSymphonyAssistant } from '@/hooks/useSymphonyAssistant'
@@ -19,7 +19,7 @@ import { useDiscussThread, type DiscussEntity } from '@/hooks/useDiscussThread'
 import { useFamilyMembers } from '@/hooks/useFamilyMembers'
 import type { AssistantTaskContext } from '@/lib/agentStream'
 import type { ChatMessage } from '@/types/chat'
-import { sharedWithLabel, canOfferShare } from '@/lib/discussions/sharedWith'
+import { discussionState, loginIds, memberOfAuth, othersIn, peopleLabel, stateLine } from '@/lib/discussions/waiting'
 import { ChatPanel } from '@/components/chat/ChatPanel'
 import { DiscussionThread } from '@/components/discussion/DiscussionThread'
 
@@ -49,13 +49,15 @@ interface AssistDrawerProps {
   /** Turns this into the item's shared Discussion. The scope must already
    *  be derived with scopeForDomain — the drawer never invents one. */
   discuss?: DiscussEntity
-  /** Share the underlying item with the house (e.g. task.context -> 'family').
-   *  The drawer has no update function of its own — this comes from whichever
-   *  host has one. Offered only when canOfferShare(...) says it's eligible. */
+  /** Was "Move to Family and share". Choosing who a discussion is with
+   *  (2026-10-14) opens the thread instead, never the item; kept so hosts
+   *  that still pass it compile. */
   onShare?: () => void
+  /** Open the item itself — given by the Discussions page. */
+  onOpenItem?: () => void
 }
 
-export function AssistDrawer({ item, onClose, onMutate, discuss, onShare }: AssistDrawerProps) {
+export function AssistDrawer({ item, onClose, onMutate, discuss, onOpenItem }: AssistDrawerProps) {
   // Escape closes the drawer first; the panel that opened it stays (useEscapeKey stack).
   useEscapeKey(true, onClose)
   const isRoutine = item.kind === 'routine'
@@ -86,7 +88,39 @@ export function AssistDrawer({ item, onClose, onMutate, discuss, onShare }: Assi
   )
 
   const unavailable = !!discuss && !thread.threadId && !!thread.error
-  const shareEligible = !!discuss && canOfferShare(discuss.scope, members)
+
+  // Who it is with (discussions v2). Before the first word the person chooses;
+  // the household's other logins are offered, and chosen to start with.
+  const self = thread.selfAuthId
+  const choices = useMemo(() => loginIds(members).filter((id) => id !== self)
+    .flatMap((id) => { const m = memberOfAuth(members, id); return m ? [{ id, name: m.name }] : [] }), [members, self])
+  const [picked, setPicked] = useState<string[] | null>(null)
+  const meta = thread.meta
+  const chosen = picked ?? (meta && meta.withUserIds.length > 0 ? meta.withUserIds : choices.map((c) => c.id))
+  const session = meta
+    ? { user_id: meta.ownerId, scope: meta.scope, with_user_ids: meta.withUserIds, settled_at: meta.settledAt?.toISOString() ?? null, messages: thread.messages }
+    : null
+  const others = thread.messages.length === 0
+    ? chosen.flatMap((id) => choices.filter((c) => c.id === id).map((c) => c.name))
+    : session ? othersIn(session, members, self) : []
+  const state = session ? discussionState(session, members, self) : { kind: 'empty' as const }
+  const lastMsg = thread.messages[thread.messages.length - 1]
+  const otherIds = session ? [session.user_id, ...session.with_user_ids].filter((id) => id !== self) : []
+  const seen = (() => {
+    if (!lastMsg || lastMsg.author.kind !== 'member' || lastMsg.author.id !== self || others.length === 0) return null
+    const seers = otherIds.filter((id) => (thread.reads[id]?.getTime() ?? 0) >= lastMsg.timestamp.getTime())
+    if (seers.length === 0) return 'Not seen yet'
+    const at = Math.max(...seers.map((id) => thread.reads[id].getTime()))
+    const names = seers.map((id) => memberOfAuth(members, id)?.name).filter(Boolean).join(' and ')
+    return `${names} saw this · ${new Date(at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`
+  })()
+  const settled = meta?.settledAt ? { by: memberOfAuth(members, meta.settledBy)?.name ?? 'someone', outcome: meta.outcome } : null
+  // The first word fixes who it is with, then goes.
+  const withFirst = async () => {
+    if (!meta || thread.messages.length > 0) return true
+    const same = chosen.length === meta.withUserIds.length && chosen.every((id) => meta.withUserIds.includes(id))
+    return same ? true : thread.setWith(chosen)
+  }
   const suggestions = discuss?.type === 'event'
     ? EVENT_SUGGESTIONS
     : isRoutine ? ROUTINE_SUGGESTIONS : TASK_SUGGESTIONS
@@ -125,8 +159,18 @@ export function AssistDrawer({ item, onClose, onMutate, discuss, onShare }: Assi
         ) : discuss ? (
           <DiscussionThread
             title={item.title}
-            sharedWithLabel={sharedWithLabel(thread.sharedWith, discuss.scope)}
             scope={discuss.scope}
+            peopleLabel={peopleLabel(others)}
+            stateLabel={thread.messages.length === 0 ? (others.length ? 'New' : 'Just you and Symphony') : stateLine(state)}
+            others={others}
+            choices={choices}
+            chosen={chosen}
+            onChoose={setPicked}
+            seen={seen}
+            settled={settled}
+            onSettle={(outcome) => thread.settle(outcome)}
+            onReopen={() => { void thread.settle(null, false) }}
+            onOpenItem={onOpenItem}
             messages={discussMessages}
             loading={thread.loading}
             sending={thread.sending}
@@ -135,10 +179,9 @@ export function AssistDrawer({ item, onClose, onMutate, discuss, onShare }: Assi
             currentUserId={thread.selfAuthId}
             familyMembers={members}
             suggestions={suggestions}
-            onPost={(text) => thread.post(text)}
-            onAsk={(text) => thread.ask(text)}
+            onPost={async (text) => (await withFirst()) ? thread.post(text) : false}
+            onAsk={async (text) => (await withFirst()) ? thread.ask(text) : false}
             onClose={onClose}
-            onShare={shareEligible ? onShare : undefined}
           />
         ) : (
           <ChatPanel

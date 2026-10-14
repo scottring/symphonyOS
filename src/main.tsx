@@ -78,6 +78,8 @@ await import('./styles/canvas-plan.css')
 await import('./styles/canvas-kiosk.css')
 await import('./styles/kiosk-v1.css')
 await import('./styles/canvas-routines.css')
+// Discussions with someone: the top-bar count, the phone's Waiting on you.
+await import('./styles/discussions.css')
 
 // Apply the cached place theme before first paint so there's no color flash;
 // PlaceProvider owns it (and syncs with the DB) once React mounts.
