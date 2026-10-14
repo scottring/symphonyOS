@@ -125,6 +125,15 @@ describe('semantic context authorization', () => {
     expect(bundle.degraded).toContain('knowledge')
   })
 
+  it('uses the supplied paid-call guard for embeddings without an unmetered fallback', async () => {
+    const unguarded = embedding()
+    const providerFetch = vi.fn(async () => { throw new Error('Allowance exhausted') })
+    const bundle = await assembleContext({ client: world() as never, openAiKey: 'test', visibleOwnerIds: ['u1'], providerFetch }, { entityType: 'task', entityId: 't1', userId: 'u1' })
+    expect(providerFetch).toHaveBeenCalledTimes(1)
+    expect(unguarded).not.toHaveBeenCalled()
+    expect(bundle.degraded).toContain('knowledge')
+  })
+
   it('does not embed or search when the requested task is inaccessible', async () => {
     const fetcher = embedding()
     const client = stubClient({ tasks: { data: null } })

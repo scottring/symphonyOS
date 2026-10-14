@@ -41,6 +41,7 @@ describe.each(['agent', 'waiting'] as const)('%s interactive context', (route) =
         ? { data: { user: { id: 'u1' } }, error: null }
         : { data: { user: null }, error: { message: 'Invalid token' } }) },
       from: vi.fn(() => ({ select: () => ({ order: () => Promise.resolve({ data: [] }) }) })),
+      rpc: vi.fn(async () => ({ data: { allowed: true }, error: null })),
     }
     createClient.mockReturnValue(db)
     if (route === 'agent') await import('../../symphony-agent/index.ts')
@@ -64,7 +65,7 @@ describe.each(['agent', 'waiting'] as const)('%s interactive context', (route) =
     })
     expect(db.auth.getUser).toHaveBeenCalledWith('user-token')
     expect(assembleContext).toHaveBeenCalledWith(
-      { client: db, openAiKey: undefined }, { entityType: 'task', entityId: 't1', userId: 'u1' },
+      expect.objectContaining({ client: db, openAiKey: undefined }), { entityType: 'task', entityId: 't1', userId: 'u1' },
     )
   })
 

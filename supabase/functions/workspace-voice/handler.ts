@@ -1,5 +1,6 @@
 import {HARD_RULES,SESSION_SPINE_PREAMBLE} from '../_shared/sessionScripts.ts'
 import {ACCOUNT_GROUNDING_RULES,ASSISTANT_PERSONALITY,RESULT_LANGUAGE_RULES} from '../_shared/assistantExperience.ts'
+import {AiUsageError} from '../_shared/aiUsage.ts'
 const cors = {'Access-Control-Allow-Origin':'*','Access-Control-Allow-Headers':'authorization, apikey, content-type, x-client-info','Access-Control-Expose-Headers':'x-voice-max-seconds','Access-Control-Allow-Methods':'GET, POST, OPTIONS'}
 const tools = [
   {type:'function',name:'ask_symphony',description:'Look up or change real Symphony plans using the authenticated app assistant. Forward the user’s request faithfully, including the relevant visible item IDs and dates. Required for any claims about saved data or changes.',parameters:{type:'object',properties:{request:{type:'string'}},required:['request'],additionalProperties:false}},
@@ -75,5 +76,8 @@ export async function handleWorkspaceVoice(req:Request,deps:{env:(key:string)=>s
     const response=await deps.fetch('https://api.openai.com/v1/realtime/calls',{method:'POST',headers:{Authorization:`Bearer ${key}`},body:form,signal:AbortSignal.timeout(20000)})
     if(!response.ok)return reply(502,'voice_unavailable')
     return new Response(await response.text(),{headers:{...cors,'Content-Type':'application/sdp','Cache-Control':'no-store','x-voice-max-seconds':'300'}})
-  }catch{return reply(502,'voice_unavailable')}
+  }catch(error){
+    if(error instanceof AiUsageError)return reply(error.status,JSON.stringify({error:error.message,code:error.code,retry_at:error.retryAt}))
+    return reply(502,'voice_unavailable')
+  }
 }

@@ -10,6 +10,7 @@ export interface AssembleDeps {
    * Interactive callers must never opt in; their reads remain subject to RLS. */
   semanticAccess?: 'user' | 'service'
   openAiKey?: string            // enables semantic knowledge; absent → linked notes only
+  providerFetch?: typeof fetch // metered provider transport for guarded callers
   now?: Date                    // injectable for tests; defaults to new Date()
   /** Owner set from `resolveVisibleOwners`. Optional: assembly resolves it itself when absent.
    *  Callers assembling many bundles for one user (proactive-engine) should resolve once and
@@ -214,11 +215,11 @@ async function loadLinkedNotes(client: SupabaseClient, entityType: string, entit
 
 /** Same fetch shape as supabase/functions/semantic-search/index.ts:49-66, with a 3s timeout.
  *  Plain fetch + a passed-in key so no Deno globals leak into code paths vitest executes. */
-async function embed(openAiKey: string, text: string): Promise<number[]> {
+async function embed(openAiKey: string, text: string, providerFetch: typeof fetch): Promise<number[]> {
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), 3000)
   try {
-    const response = await fetch('https://api.openai.com/v1/embeddings', {
+    const response = await providerFetch('https://api.openai.com/v1/embeddings', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${openAiKey}`,
@@ -240,8 +241,8 @@ async function embed(openAiKey: string, text: string): Promise<number[]> {
   }
 }
 
-async function loadSemanticNotes(client: SupabaseClient, openAiKey: string, title: string, userId: string, access: 'user' | 'service'): Promise<BundleNote[]> {
-  const embedding = await embed(openAiKey, title)
+async function loadSemanticNotes(client: SupabaseClient, openAiKey: string, title: string, userId: string, access: 'user' | 'service', providerFetch: typeof fetch): Promise<BundleNote[]> {
+  const embedding = await embed(openAiKey, title, providerFetch)
   const { data, error } = await client.rpc(access === 'service' ? 'search_notes_semantic_for_user' : 'search_notes_semantic', {
     ...(access === 'service' ? { p_user_id: userId } : {}),
     query_embedding: JSON.stringify(embedding),
@@ -320,7 +321,7 @@ export async function assembleContext(deps: AssembleDeps, ref: EntityRef): Promi
     // User requests use the authenticated search RPC, never the service-only
     // variant. Both re-read candidates and keep semantic knowledge owner-only.
     openAiKey
-      ? part<BundleNote[]>('knowledge', degraded, () => loadSemanticNotes(client, openAiKey, row.title, ref.userId, deps.semanticAccess ?? 'user'), [])
+      ? part<BundleNote[]>('knowledge', degraded, () => loadSemanticNotes(client, openAiKey, row.title, ref.userId, deps.semanticAccess ?? 'user', deps.providerFetch ?? fetch), [])
       : Promise.resolve([] as BundleNote[]),
   ])
 

@@ -25,6 +25,7 @@ beforeEach(() => {
   createClient.mockReturnValue({
     auth: { getUser: vi.fn().mockResolvedValue({ data: { user: { id: 'new-member' } }, error: null }) },
     from: vi.fn(() => ({ select: () => ({ order: () => Promise.resolve({ data: [] }) }) })),
+    rpc: vi.fn(async () => ({ data: { allowed: true }, error: null })),
   })
 })
 afterEach(() => vi.unstubAllGlobals())

@@ -1,4 +1,5 @@
 import { planSaved } from './planSaved.ts'
+import { guardedAiFetch } from '../_shared/aiUsage.ts'
 import { ACCOUNT_GROUNDING_RULES, ASSISTANT_PERSONALITY, RESULT_LANGUAGE_RULES } from '../_shared/assistantExperience.ts'
 import { SHOW_TOOL, showSteps } from './showOnPage.ts'
 import { contactFieldError, mergeLinks } from './prep.ts'
@@ -622,11 +623,11 @@ function dedupeMembersByName<T extends { name: string }>(rows: T[]): T[] {
 
 // Embed a query with the SAME model vault-sync used for notes
 // (text-embedding-3-small, 1536-dim) so cosine search is meaningful.
-async function embedQuery(text: string): Promise<number[] | null> {
+async function embedQuery(text: string, paidFetch: typeof fetch): Promise<number[] | null> {
   const openAiKey = Deno.env.get('OPENAI_API_KEY')
   if (!openAiKey) return null
   try {
-    const res = await fetch('https://api.openai.com/v1/embeddings', {
+    const res = await paidFetch('https://api.openai.com/v1/embeddings', {
       method: 'POST',
       headers: { 'Authorization': `Bearer ${openAiKey}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({ model: 'text-embedding-3-small', input: text.slice(0, 8000) }),
@@ -652,6 +653,7 @@ async function runTool(
   // Structured side-channel: search_notes pushes the notes it found here so the
   // handler can surface them to the client as clickable source chips.
   sourceSink: Array<{ id: string; title: string; vaultPath?: string }>,
+  paidFetch: typeof fetch,
   // The client's id for this user message. Creations derive their row id from
   // it, so a resent turn recognises what it already saved.
   turnId: string | null = null,
@@ -1196,7 +1198,7 @@ async function runTool(
         const query = typeof input.query === 'string' ? input.query.trim() : ''
         if (!query) return 'Error: query is required'
         const limit = Math.min(typeof input.limit === 'number' ? input.limit : 6, 12)
-        const embedding = await embedQuery(query)
+        const embedding = await embedQuery(query, paidFetch)
 
         type NoteHit = { id: string; title: string | null; content: string | null; vault_path: string | null; context: string | null; similarity?: number }
         let hits: NoteHit[] = []
@@ -1372,6 +1374,7 @@ interface AnthropicBlock {
 
 async function callAnthropic(
   apiKey: string,
+  paidFetch: typeof fetch,
   messages: Array<{ role: string; content: unknown }>,
   webTouched: boolean,
   containerId: string | null,
@@ -1386,7 +1389,7 @@ async function callAnthropic(
   // On the wall, only the family-layer tools (wallMode.ts); desktop unchanged.
   const symphonyTools = toolsForTurn(toolsForSurface(TOOLS, surface), webTouched).filter((t) => canShow || t.name !== SHOW_TOOL.name)
   const tools: unknown[] = [...symphonyTools, ...WEB_TOOLS]
-  const res = await fetch('https://api.anthropic.com/v1/messages', {
+  const res = await paidFetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: {
       'x-api-key': apiKey,
@@ -1443,6 +1446,7 @@ Deno.serve(async (req) => {
   const db = createClient(url, anon, { global: { headers: { Authorization: authHeader } } })
   const { data: { user }, error: authErr } = await db.auth.getUser(token)
   if (authErr || !user) return json({ error: 'Unauthorized' }, 401)
+  const paidFetch = guardedAiFetch(db, 'symphony-agent')
 
   const body = await req.json().catch(() => ({}))
   // surface:'wall' — the kitchen wall, family layer only (wallMode.ts).
@@ -1517,7 +1521,7 @@ Deno.serve(async (req) => {
       let taskContextBlock = ''
       try {
         const bundle = await assembleContext(
-          { client: db, openAiKey: Deno.env.get('OPENAI_API_KEY') ?? undefined },
+          { client: db, openAiKey: Deno.env.get('OPENAI_API_KEY') ?? undefined, providerFetch: paidFetch },
           { entityType: 'task', entityId: taskContext.id, userId: user.id },
         )
         taskContextBlock = `\nThe user is asking about this item — full assembled context:\n${renderBundleForPrompt(bundle)}`
@@ -1585,7 +1589,7 @@ Deno.serve(async (req) => {
       let containerId: string | null = null
       try {
         for (let turn = 0; turn < MAX_TURNS; turn++) {
-          const res = await callAnthropic(apiKey, convo, webTouched, containerId, canShow, surface)
+          const res = await callAnthropic(apiKey, paidFetch, convo, webTouched, containerId, canShow, surface)
           const { content, stop_reason } = res
           if (res.containerId) containerId = res.containerId
           const toolResults: Array<Record<string, unknown>> = []
@@ -1669,7 +1673,7 @@ Deno.serve(async (req) => {
                   send({ type: 'proposal', items: proposal.items })
                   result = JSON.stringify({ shown: proposal.items.length, saved: false, note: 'Shown as suggestions. Nothing is saved until the person keeps them.' })
                 }
-              } else result = await runTool(tdb, user.id, block.name, block.input ?? {}, attachment, currentMemberId, authHeader, sourceNotes, turnId)
+              } else result = await runTool(tdb, user.id, block.name, block.input ?? {}, attachment, currentMemberId, authHeader, sourceNotes, paidFetch, turnId)
               // The wall's own saves report their ids too, so the wall can offer Undo.
               const outcome = toolOutcome(block.name, result, wall ? WALL_WRITE_TOOLS : undefined)
               if (outcome) send({ ...outcome })
