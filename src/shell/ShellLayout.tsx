@@ -47,6 +47,7 @@ import { filterInboxTasksForLayers } from '@/lib/today/domainFilter';
 import { useSupabaseTasks } from '@/hooks/useSupabaseTasks';
 import { useRoutines } from '@/hooks/useRoutines';
 import { useDiscussionInbox } from '@/hooks/useDiscussionInbox';
+import { WaitingOnYouBanner } from '@/components/discussion/WaitingOnYouBanner';
 import { useSymphonyAssistant, type AssistantTurnObserver } from '@/hooks/useSymphonyAssistant';
 import { CanvasActivityProvider, useCanvasActivity, type CanvasActivity } from '@/contexts/CanvasActivityContext';
 import { ConversationStrip } from '@/components/canvas/ConversationStrip';
@@ -221,7 +222,8 @@ function ShellLayoutInner({ children }: Props) {
   const [planningPeople] = useAssigneeFilter();
   const scopedTasks = useMemo(()=>tasks.filter(planPeopleLens(planningPeople,null).keep),[tasks,planningPeople]);
   const scopedGoals = useMemo(()=>goals.filter(planPeopleLens(planningPeople,null).keep),[goals,planningPeople]);
-  const { unreadCount: discussionsUnread } = useDiscussionInbox();
+  // The count beside Inbox is the discussions waiting on you (2026-10-14).
+  const { waitingCount: discussionsUnread, rows: discussionRows } = useDiscussionInbox();
   // The badge MUST mirror what the Inbox actually renders. It used to count
   // every inbox task regardless of the active domain layers, so an item in an
   // unchecked layer showed as "1 to triage" in the chrome while the Inbox —
@@ -457,6 +459,10 @@ function ShellLayoutInner({ children }: Props) {
         {isMobile ? (
           <div className="scenery-page">
             <PlanNavigation mobile mobileControlsRef={setMobilePlanControls} />
+            {location.pathname !== '/discussions' && (
+              <WaitingOnYouBanner rows={discussionRows}
+                onOpen={(row) => navigate(row ? `/discussions?open=${row.sessionId}` : '/discussions')} />
+            )}
             {/* Off the planner the area lens rides top-right; the guide sits below it. */}
             <div className={`guide-slot${planPeriodForPath(location.pathname) ? '' : ' has-lens'}`}><GuideBar host={guideHost} /></div>
             <div className="min-w-0">{children}</div>

@@ -78,6 +78,8 @@ vi.mock('@/lib/supabase', () => {
         const ch = {
           name,
           on: (_event: string, filter: unknown, cb: () => void) => {
+            // The row's own messages; read stamps ride a second listener.
+            if ((filter as { table?: string }).table !== 'chat_sessions') return ch
             db.realtime.filter = filter
             db.realtime.cb = cb
             return ch

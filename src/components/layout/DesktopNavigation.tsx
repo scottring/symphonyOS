@@ -2,7 +2,7 @@ import { connectedDestination } from '@/lib/planning/connectedDestination'
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { NavLink, useLocation, useNavigate } from 'react-router-dom'
-import { ChevronDown, Inbox, Menu, Search, UserRound } from 'lucide-react'
+import { ChevronDown, Inbox, Menu, MessageSquare, Search, UserRound } from 'lucide-react'
 import { requestPlanFromPaper } from '@/lib/planFromPaperSignal'
 import { HOME_ROUTE } from '@/apps/overview/route'
 import { appRegistry } from '@/shell/appRegistry'
@@ -21,6 +21,7 @@ export const DesktopLeadContext = createContext<HTMLElement | null>(null)
 export const DesktopCenterContext = createContext<HTMLElement | null>(null)
 
 export function DesktopNavigation({ inboxCount, discussionsUnread, onSearch, onSignOut, userName, controlsRef, leadRef, centerRef, auxiliaryControls }: {
+  /** discussionsUnread: the discussions waiting on you (2026-10-14). */
   inboxCount: number; discussionsUnread: number; onSearch: () => void; onSignOut: () => void
   auxiliaryControls?: ReactNode; userName?: string; paused: boolean; controlsRef: (node: HTMLDivElement | null) => void
   leadRef?: (node: HTMLDivElement | null) => void
@@ -73,13 +74,12 @@ export function DesktopNavigation({ inboxCount, discussionsUnread, onSearch, onS
     {/* The menu sits immediately left of the horizon rail, in the bar's
         centre (Scott, 2026-10-03). */}
     <div className="page-navigation-mid">
-    {menu('more', <><Menu size={18} aria-hidden="true" />{discussionsUnread > 0 && <span className="navigation-count">{discussionsUnread}</span>}</>, <div className="page-navigation-more">
+    {menu('more', <Menu size={18} aria-hidden="true" />, <div className="page-navigation-more">
       <div className="page-navigation-groups">
         {groups.map(([group, items]) => <div key={group} role="group" aria-labelledby={`navigation-group-${group}`} className="page-navigation-group">
           <h3 id={`navigation-group-${group}`}>{group}</h3>
-          {items.map(([label, route]) => <button key={route} onClick={() => go(route)} aria-current={isDestinationActive(route, pathname) ? 'page' : undefined}
-            aria-label={label === 'Discussions' && discussionsUnread > 0 ? `Discussions, ${discussionsUnread} unread` : undefined}>
-            {label}{label === 'Discussions' && discussionsUnread > 0 && <span className="navigation-count">{discussionsUnread}</span>}
+          {items.map(([label, route]) => <button key={route} onClick={() => go(route)} aria-current={isDestinationActive(route, pathname) ? 'page' : undefined}>
+            {label}
           </button>)}
         </div>)}
       </div>
@@ -94,12 +94,19 @@ export function DesktopNavigation({ inboxCount, discussionsUnread, onSearch, onS
         <button onClick={() => { setOpen(null); setDialog({ kind: 'help', from: trigger.current }) }}>Help</button>
       </div>
     </div>, destinations.some(([, route]) => isDestinationActive(route, pathname)),
-      { ariaLabel: discussionsUnread > 0 ? `More, ${discussionsUnread} unread discussions` : 'More', chevron: false, className: 'is-hamburger' })}
+      { ariaLabel: 'More', chevron: false, className: 'is-hamburger' })}
     {centerRef && <div ref={centerRef} className="page-navigation-center" />}
     </div>
     <div className="page-navigation-utilities">
       {auxiliaryControls}
       <div ref={controlsRef} className="page-navigation-page-controls" />
+      {/* Discussions beside Inbox, counting the ones waiting on you (Scott,
+          2026-10-14: "there's no place … you're notified of new or ongoing
+          discussions"). Was a count on the menu. */}
+      <NavLink to={connectedDestination('/discussions', search)} className="page-navigation-icon" title="Discussions"
+        aria-label={`Discussions${discussionsUnread ? `, ${discussionsUnread} waiting on you` : ''}`}>
+        <MessageSquare size={17} aria-hidden="true" />{discussionsUnread > 0 && <span className="navigation-count is-waiting">{discussionsUnread}</span>}
+      </NavLink>
       <NavLink to={connectedDestination('/inbox', search)} className="page-navigation-icon" title="Inbox"
         aria-label={`Inbox${inboxCount ? `, ${inboxCount} ${inboxCount === 1 ? 'item' : 'items'}` : ''}`}>
         <Inbox size={17} aria-hidden="true" />{inboxCount > 0 && <span className="navigation-count">{inboxCount}</span>}

@@ -5,7 +5,7 @@
 // the message with "@Symphony" — and nothing else ever wakes the assistant.
 // Enter sends, Shift+Enter breaks a line.
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { ConceptIcon } from '@/lib/conceptIcons'
 import { mentionsSymphony, parseComposer } from '@/lib/discussions/composer'
 
@@ -15,12 +15,14 @@ interface DiscussionComposerProps {
   onAsk: (text: string) => void | Promise<boolean | void>
   disabled?: boolean
   placeholder?: string
+  /** A quiet control at the start of the bottom row ("Mark settled"). */
+  aside?: ReactNode
 }
 
 const MIN_HEIGHT = 44
 const MAX_HEIGHT = 160
 
-export function DiscussionComposer({ onPost, onAsk, disabled = false, placeholder }: DiscussionComposerProps) {
+export function DiscussionComposer({ onPost, onAsk, disabled = false, placeholder, aside }: DiscussionComposerProps) {
   const [value, setValue] = useState('')
   const ref = useRef<HTMLTextAreaElement>(null)
 
@@ -65,7 +67,7 @@ export function DiscussionComposer({ onPost, onAsk, disabled = false, placeholde
         onKeyDown={onKeyDown}
         disabled={disabled}
         rows={1}
-        aria-label="Message"
+        aria-label={placeholder?.startsWith('Message ') ? placeholder.replace(/…$/, '') : 'Message'}
         placeholder={placeholder ?? 'Write a message… or @Symphony to ask'}
         className="w-full resize-none rounded-xl border border-neutral-200 bg-neutral-50/60 px-3 py-2.5 text-sm leading-relaxed text-neutral-800 placeholder:text-neutral-400 focus:border-primary-300 focus:bg-white focus:outline-none focus:ring-2 focus:ring-primary-100 disabled:opacity-60"
       />
@@ -75,7 +77,7 @@ export function DiscussionComposer({ onPost, onAsk, disabled = false, placeholde
             <ConceptIcon name="ai" size={12} decorative />
             Symphony will answer
           </span>
-        ) : (
+        ) : aside ?? (
           <span className="text-[11px] text-neutral-400">Enter to send · Shift+Enter for a new line</span>
         )}
         <div className="ml-auto flex items-center gap-1.5">

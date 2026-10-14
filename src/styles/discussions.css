@@ -1,0 +1,16 @@
+/* Discussions v2 (2026-10-14): a discussion is with someone, and whose turn
+   it is shows. The ember of "now" marks what is waiting on you. */
+.page-navigation-icon .navigation-count.is-waiting { background: #b84a26; }
+
+/* Phone: what is waiting on you, at the top of the page. */
+.waiting-banner {
+  display: flex; align-items: flex-start; gap: 12px; width: calc(100% - 32px); margin: 8px 16px 4px; padding: 12px 14px;
+  border: 1.5px solid #b84a26; border-radius: 14px; background: var(--color-bg-elevated, #fffdf9); text-align: left;
+  font-family: var(--font-family-sans); color: var(--color-neutral-800);
+}
+.waiting-banner-eyebrow { display: block; font-size: 11px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; color: #b84a26; }
+.waiting-banner-line { display: block; margin-top: 3px; font-size: 14px; line-height: 1.35; }
+.waiting-banner-quote { display: block; margin-top: 2px; font-size: 14px; color: var(--color-neutral-600); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.waiting-banner-go { margin-left: auto; align-self: center; font-size: 13px; font-weight: 600; color: var(--color-primary-700); white-space: nowrap; }
+.dark .waiting-banner { background: #1e2526; border-color: #f08d66; }
+.dark .waiting-banner-eyebrow { color: #f08d66; }

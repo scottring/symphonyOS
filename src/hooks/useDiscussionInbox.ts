@@ -13,6 +13,7 @@ import { supabase, getAuthUser } from '@/lib/supabase'
 import { useRefreshOnVisible } from '@/hooks/useRefreshOnVisible'
 import { onThreadRead } from '@/lib/discussions/readSignal'
 import { buildInboxRows, type InboxRow, type InboxSession } from '@/lib/discussions/inbox'
+import type { WaitingMember } from '@/lib/discussions/waiting'
 
 export function useDiscussionInbox() {
   const [rows, setRows] = useState<InboxRow[]>([])
@@ -24,7 +25,7 @@ export function useDiscussionInbox() {
       if (!user) { setRows([]); setLoading(false); return }
       const { data: sessions } = await supabase
         .from('chat_sessions')
-        .select('id, entity_type, entity_id, title, messages, updated_at, scope')
+        .select('id, entity_type, entity_id, title, messages, updated_at, scope, user_id, with_user_ids, settled_at, settled_by, outcome')
         .eq('mode', 'discuss')
         .order('updated_at', { ascending: false })
         .limit(200)
@@ -36,7 +37,11 @@ export function useDiscussionInbox() {
       for (const r of (reads ?? []) as Array<{ session_id: string; last_read_at: string }>) {
         readMap[r.session_id] = r.last_read_at
       }
-      setRows(buildInboxRows((sessions ?? []) as InboxSession[], readMap, user.id))
+      // Names for "You and Iris" / "Waiting on Iris": the household's people.
+      const { data: people } = await supabase
+        .from('family_members')
+        .select('id, name, user_id, auth_user_id, is_full_user')
+      setRows(buildInboxRows((sessions ?? []) as InboxSession[], readMap, user.id, (people ?? []) as WaitingMember[]))
     } catch {
       // Keep the last good list on screen.
     } finally {
@@ -62,5 +67,7 @@ export function useDiscussionInbox() {
   useRefreshOnVisible(() => { void reload() })
 
   const unreadCount = rows.filter((r) => r.unread).length
-  return { rows, unreadCount, loading, reload }
+  /** Discussions whose turn is yours: the top-bar count. */
+  const waitingCount = rows.filter((r) => r.state.kind === 'waiting-on-you').length
+  return { rows, unreadCount, waitingCount, loading, reload }
 }
