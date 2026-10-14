@@ -6,7 +6,7 @@
 // itself are a family-list line and a scratchpad note / talk-about, reported
 // in `saved` so the wall can offer Undo.
 //
-// Not wired into the UI yet (stage 3).
+// The wall talks through it in useWallTalk (stage 3).
 
 import { streamSymphonyAgent, type AgentApiMessage } from '@/lib/agentStream'
 import type { ChangeCardNote, ChangeSet } from '@/lib/canvas/changeCard'

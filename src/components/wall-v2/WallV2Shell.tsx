@@ -32,7 +32,12 @@ import { WallV2QuestionSheet } from './WallV2QuestionSheet';
 import { openHandoffQuestions, type HandoffQuestion } from './wallQuestions';
 import { assignWallEvent } from '@/lib/wall/eventAssign';
 import { readReadingTimer, readingTimerKey, elapsedMinutes, isTimerRunning } from '@/lib/wall/readingScreenTime';
-import { localYmd } from '@/lib/cadence/config';
+import { localYmd, readCadenceConfig } from '@/lib/cadence/config';
+import { useSupabaseTasks } from '@/hooks/useSupabaseTasks';
+import { applyChangeSet, plannedWeekStart } from '@/lib/canvas/applyChangeSet';
+import { withSteps, type ChangeSet } from '@/lib/canvas/changeCard';
+import type { WallTalkDeps, WallApplyResult } from './activity/useWallTalk';
+import type { WallTalkWeek } from './activity/WallTalk';
 
 const safeStorage = (): Storage | null => {
   try { return typeof localStorage !== 'undefined' ? localStorage : null; } catch { return null; }
@@ -908,6 +913,53 @@ export function WallV2Shell() {
     };
   }, [kidModels, dinnerStartDate, now, previewAt, todayRows, dinnerEvent, dinner, tomorrowData, todayItems, wallData.familyMembers, scratchRows, memberName, discussionPrompt]);
 
+  // ─── Talking with Symphony (Kitchen wall v2, stage 3) ───
+  // The app's own task store (shared cache; the discussion items already
+  // load it) for Approve: every op goes through applyChangeSet, the change
+  // card's all-or-nothing apply with one Undo. Only family tasks may change
+  // from the wall, and anything it adds is a family task.
+  const { tasks: storeTasks, updateTask: storeUpdate, deleteTask: storeDelete, addTask: storeAdd } = useSupabaseTasks();
+  const applyWallChanges = useCallback(async (set: ChangeSet): Promise<WallApplyResult> => {
+    const byId = new Map(withSteps(storeTasks).map((t) => [t.id, t]));
+    for (const op of set.ops) {
+      const t = op.taskId ? byId.get(op.taskId) : undefined;
+      if (t && t.context !== 'family') return { ok: false, reason: 'private', title: op.title };
+    }
+    const r = await applyChangeSet(set, {
+      tasks: storeTasks,
+      updateTask: storeUpdate,
+      deleteTask: storeDelete,
+      addTask: (title, when, options) => storeAdd(title, undefined, undefined, when, { ...options, context: 'family' }),
+      weekStart: plannedWeekStart(set, new Date(), readCadenceConfig().weekStartsOn),
+    });
+    if (!r.ok) return r;
+    void wallData.refetch();
+    return { ...r, undo: async () => { const ok = await r.undo(); void wallData.refetch(); return ok; } };
+  }, [storeTasks, storeUpdate, storeDelete, storeAdd, wallData]);
+  const wallAgent: WallTalkDeps = useMemo(
+    () => ({ applyChanges: applyWallChanges, weekStartsOn: readCadenceConfig().weekStartsOn }),
+    [applyWallChanges],
+  );
+  // The family's next seven days (useWallData's own, family-only) for the
+  // conversation's pictures, and what the wall knows of a task a card names.
+  const talkWeek: WallTalkWeek = useMemo(() => {
+    const byId = new Map(withSteps(storeTasks).filter((t) => t.context === 'family').map((t) => [t.id, t]));
+    const nameOf = (id: string) => wallData.familyMembers.find((m) => m.id === id)?.name ?? null;
+    return {
+      days: wallData.days.map((d) => {
+        const start = new Date(d.date);
+        start.setHours(0, 0, 0, 0);
+        return { date: start, rows: wallTodayRows(d.items, wallData.familyMembers, d.isToday ? now : start) };
+      }),
+      task: (id) => {
+        const t = byId.get(id);
+        if (!t) return null;
+        const who = (t.assignedToAll?.length ? t.assignedToAll : t.assignedTo ? [t.assignedTo] : []).map(nameOf).filter((n): n is string => !!n);
+        return { title: t.title, at: t.scheduledFor ?? null, allDay: !!t.isAllDay, who };
+      },
+    };
+  }, [storeTasks, wallData.days, wallData.familyMembers, now]);
+
   // Sentences said to the wall (the Pi's listener, or typed into Tell
   // Symphony): what it may save, each with Undo, and what it knows — only
   // what this screen already shows (household layer, 2026-10-13).
@@ -949,8 +1001,9 @@ export function WallV2Shell() {
           scratchpad: scratchRows.map((r) => ({ text: r.text, kind: r.kind })),
         });
       },
+      agent: wallAgent,
     };
-  }, [user, wallData.familyMembers, groceryList, scratchpad, tomorrowData, liveWeather, weatherData, todayRows, kidModels, dinnerEvent, dinner, dinnerStartDate, dinnerDays, tomorrowKey, comingUpRows, scratchRows]);
+  }, [wallAgent, user, wallData.familyMembers, groceryList, scratchpad, tomorrowData, liveWeather, weatherData, todayRows, kidModels, dinnerEvent, dinner, dinnerStartDate, dinnerDays, tomorrowKey, comingUpRows, scratchRows]);
 
   const handleTick = useCallback((member: FamilyMember, row: KidRow) => {
     void (async () => {
@@ -1136,6 +1189,7 @@ export function WallV2Shell() {
           onTapQuestion={() => (handoffAsk ? setShowWhoSheet(true) : setShowQuestionSheet(true))}
           flash={showFlash}
           voice={wallVoice}
+          week={talkWeek}
           v1={kioskV1Shown}
         />
       </div>

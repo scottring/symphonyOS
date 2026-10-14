@@ -75,6 +75,9 @@ export interface KioskHomeV1Props {
   places: { onGroceries: () => void; onRecipes: () => void; onCall: () => void; onNotes: () => void }
   /** More, in place of the side column (Kitchen wall v2). */
   aside?: ReactNode
+  /** The conversation with Symphony, in place of the side column (stage 3).
+   *  Full-stage moments keep their stage; the reply band shows it there. */
+  talk?: ReactNode
 }
 
 const SHARED = '__shared'
@@ -142,13 +145,22 @@ const shortTitle = (title: string) => title.split(':')[0].trim() || title
 
 /** Lead · hairline · side column. With `aside`, More takes the side column
  *  and the lead stays, dimmed; a full-stage moment gives up ~45% to it. */
-function Stage({ lead, side, sideLabel, aside, full, label }: { lead: ReactNode; side?: ReactNode; sideLabel?: string; aside?: ReactNode; full?: boolean; label: string }) {
+function Stage({ lead, side, sideLabel, aside, talk, full, label }: { lead: ReactNode; side?: ReactNode; sideLabel?: string; aside?: ReactNode; talk?: ReactNode; full?: boolean; label: string }) {
   if (aside) {
     return (
       <div className={`kw-stage is-more ${full ? 'was-full' : ''}`}>
         <section className="kw-col is-dim" aria-label={label}>{lead}</section>
         <div className="kw-vr" aria-hidden="true" />
         <div className="kw-col">{aside}</div>
+      </div>
+    )
+  }
+  if (talk && !full) {
+    return (
+      <div className="kw-stage">
+        <section className="kw-col" aria-label={label}>{lead}</section>
+        <div className="kw-vr" aria-hidden="true" />
+        <aside className="kw-col kw-side" aria-label="Symphony">{talk}</aside>
       </div>
     )
   }
@@ -421,7 +433,7 @@ function OutTheDoor(p: KioskHomeV1Props) {
       </div>
     </div>
   )
-  return <Stage full lead={lead} aside={p.aside} label="Getting ready for school" />
+  return <Stage full lead={lead} aside={p.aside} talk={p.talk} label="Getting ready for school" />
 }
 
 function Places({ places }: { places: KioskHomeV1Props['places'] }) {
@@ -478,7 +490,7 @@ function Rest(p: KioskHomeV1Props) {
       )}
     </>
   )
-  return <Stage lead={lead} side={side} sideLabel="The rest of today" aside={p.aside} label="Today" />
+  return <Stage lead={lead} side={side} sideLabel="The rest of today" aside={p.aside} talk={p.talk} label="Today" />
 }
 
 /** Dinner in the side column: what, when, and the way in. */
@@ -524,7 +536,7 @@ function HomeFromSchool(p: KioskHomeV1Props) {
     </>
   )
   const after = p.weekend.rows.filter((r) => !r.past && !/dinner/i.test(r.title))
-  return <Stage lead={lead} side={<DinnerSide p={p} after={after} />} sideLabel="Dinner" aside={p.aside} label="After school" />
+  return <Stage lead={lead} side={<DinnerSide p={p} after={after} />} sideLabel="Dinner" aside={p.aside} talk={p.talk} label="After school" />
 }
 
 /** Dinner (Dinner.dc.html): tonight's dinner leads; the question of the day
@@ -567,7 +579,7 @@ function Dinner(p: KioskHomeV1Props) {
       <TodayRows rows={after} p={p} max={2} />
     </>
   )
-  return <Stage lead={lead} side={side} sideLabel="Question of the day" aside={p.aside} label="Tonight's dinner" />
+  return <Stage lead={lead} side={side} sideLabel="Question of the day" aside={p.aside} talk={p.talk} label="Tonight's dinner" />
 }
 
 /** Bedtime (Bedtime.dc.html): steps × kids, lights out as a ring, tomorrow. */
@@ -626,7 +638,7 @@ function Bedtime(p: KioskHomeV1Props) {
       {!p.tomorrow.outTheDoor && p.weekend.tomorrow.length === 0 && <p className="kw-quiet">Nothing on the clock yet.</p>}
     </>
   )
-  return <Stage lead={lead} side={side} sideLabel="Lights out" aside={p.aside} label="Bedtime" />
+  return <Stage lead={lead} side={side} sideLabel="Lights out" aside={p.aside} talk={p.talk} label="Bedtime" />
 }
 
 /** Night (Night.dc.html): tomorrow's one time, large; who has what; the
@@ -679,7 +691,7 @@ function Night(p: KioskHomeV1Props) {
       )}
     </>
   ) : null
-  return <Stage lead={lead} side={side} sideLabel="Also tomorrow" aside={p.aside} label="Tomorrow" />
+  return <Stage lead={lead} side={side} sideLabel="Also tomorrow" aside={p.aside} talk={p.talk} label="Tomorrow" />
 }
 
 /** A weekend day (Saturday.dc.html): what's on now, sometime today, and the
@@ -734,7 +746,7 @@ function Weekend(p: KioskHomeV1Props) {
       )}
     </>
   )
-  return <Stage lead={lead} side={side} sideLabel="Later today" aside={p.aside} label="Today" />
+  return <Stage lead={lead} side={side} sideLabel="Later today" aside={p.aside} talk={p.talk} label="Today" />
 }
 
 export function KioskHomeV1(p: KioskHomeV1Props) {
