@@ -317,6 +317,42 @@ export function workedSolution(spec: MathSpec): Worked {
   }
 }
 
+// ─── Sizing the paper ───
+
+/** Empty squares above the problem: room to write over the top row by finger
+ *  (Scott, 2026-10-14: "a little more space at the top"). */
+export const TOP_ROOM = 1.5
+/** Squares are as big as the problem allows, between these (design px). */
+export const MIN_CELL = 48
+export const MAX_CELL = 104
+/** A blank sheet (fractions, word problems): big squares for big writing. */
+export const BLANK_CELL = 96
+
+export interface PaperGeometry {
+  /** One grid square, in design px. */
+  cell: number
+  /** Where square (0, 0) starts, in design px from the paper's top left. */
+  offX: number
+  offY: number
+}
+
+/** How big the squares can be on a paper `width` × `height` (design px) so the
+ *  whole worked solution fits under the room at the top, with half a square
+ *  to spare at the right and the bottom. */
+export function paperGeometry(w: Worked, width: number, height: number): PaperGeometry {
+  if (w.rows === 0) return { cell: BLANK_CELL, offX: 0, offY: 0 }
+  const cells = [...w.given, ...w.steps.flatMap((s) => s.cells)]
+  const lastCol = Math.max(
+    0,
+    ...cells.map((c) => c.col + (c.text.length > 1 ? 1 : 0)),
+    ...[...w.givenBars, ...w.steps.flatMap((s) => s.bars)].map((b) => b.col + b.span - 1),
+    w.bracket ? w.bracket.col + w.bracket.span - 1 : 0,
+  )
+  const fit = Math.min(width / (lastCol + 1.5), height / (w.rows + TOP_ROOM + 0.5))
+  const cell = Math.max(MIN_CELL, Math.min(MAX_CELL, Math.floor(fit)))
+  return { cell, offX: 0, offY: Math.round(TOP_ROOM * cell) }
+}
+
 /** Everything written on the paper through step `step` (-1 = none): where a
  *  square was written twice (a borrowed-from digit borrowed again), the later
  *  one shows. */

@@ -18,7 +18,7 @@ import {
   answerOf, answerText, generateSpec, inputReady, KIND_LABEL, LEVEL_LABEL, MATH_KINDS, MAX_LEVEL, MIN_LEVEL, seededRng,
   type MathAnswer, type MathKind, type MathSpec,
 } from '@/lib/wall/math/mathProblem'
-import { cellsThrough, workedSolution, type Worked, type WorkCell } from '@/lib/wall/math/mathWorked'
+import { cellsThrough, paperGeometry, workedSolution, type PaperGeometry, type Worked, type WorkCell } from '@/lib/wall/math/mathWorked'
 import { attempt, MAX_BONUS, MAX_TRIES, HINT_AFTER, type MathRow, type Verdict } from '@/lib/wall/math/mathProgress'
 import { shownWording } from '@/lib/wall/math/mathWording'
 import { MATH_TOPICS, MAX_TOPICS, toggleTopic, topicLabels } from '@/lib/wall/math/mathTopics'
@@ -53,17 +53,24 @@ const designPx = () => Math.min(window.innerWidth / 1920, window.innerHeight / 1
 
 // ─── Grid paper ───
 
-function Cell({ c, cell }: { c: WorkCell; cell: number }) {
+function Cell({ c, g }: { c: WorkCell; g: PaperGeometry }) {
   return (
     <span
       className={`km-cell is-${c.tone}`}
       style={{
-        left: `calc(${c.col * cell + (c.nudge ?? 0)} * var(--p))`,
-        top: `calc(${c.row * cell} * var(--p))`,
+        left: `calc(${g.offX + c.col * g.cell + (c.nudge ?? 0)} * var(--p))`,
+        top: `calc(${g.offY + c.row * g.cell} * var(--p))`,
       }}
     >{c.text}</span>
   )
 }
+
+/** A rule under row `row`, across `span` squares from `col`; `inset` trims each end. */
+const barStyle = (g: PaperGeometry, b: { col: number; row: number; span: number }, inset: number) => ({
+  left: `calc(${g.offX + b.col * g.cell + inset} * var(--p))`,
+  width: `calc(${b.span * g.cell - inset * 2} * var(--p))`,
+  top: `calc(${g.offY + (b.row + 1) * g.cell - 3} * var(--p))`,
+})
 
 function Paper({ worked, revealedStep, strokes, pen, onStrokes }: {
   worked: Worked
@@ -75,7 +82,9 @@ function Paper({ worked, revealedStep, strokes, pen, onStrokes }: {
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const live = useRef<Stroke | null>(null)
-  const cell = worked.rows >= 10 ? 60 : 64
+  // The paper's size in design px, measured; the squares are sized to it.
+  const [box, setBox] = useState({ w: 880, h: 640 })
+  const g = paperGeometry(worked, box.w, box.h)
   const shown = useMemo(() => (revealedStep >= 0 ? cellsThrough(worked, revealedStep) : { cells: [], bars: [] }), [worked, revealedStep])
 
   const color = useCallback((p: Pen) => {
@@ -125,6 +134,11 @@ function Paper({ worked, revealedStep, strokes, pen, onStrokes }: {
       const dpr = window.devicePixelRatio || 1
       el.width = Math.max(1, Math.round(r.width * dpr))
       el.height = Math.max(1, Math.round(r.height * dpr))
+      const p = designPx()
+      if (r.width > 0 && r.height > 0) {
+        const w = Math.round(r.width / p), h = Math.round(r.height / p)
+        setBox((b) => (b.w === w && b.h === h ? b : { w, h }))
+      }
       redraw()
     }
     size()
@@ -162,18 +176,20 @@ function Paper({ worked, revealedStep, strokes, pen, onStrokes }: {
   const up = () => { live.current = null }
 
   return (
-    <div className={`km-paper ${revealedStep >= 0 ? 'is-revealed' : ''}`} style={{ ['--km-cell' as string]: `calc(${cell} * var(--p))` }}>
+    <div className={`km-paper ${revealedStep >= 0 ? 'is-revealed' : ''}`} style={{
+      ['--km-cell' as string]: `calc(${g.cell} * var(--p))`,
+      ['--km-off-x' as string]: `calc(${g.offX} * var(--p))`,
+      ['--km-off-y' as string]: `calc(${g.offY} * var(--p))`,
+    }}>
       <div className="km-printed" aria-hidden="true">
-        {worked.given.map((c, i) => <Cell key={`g${i}`} c={c} cell={cell} />)}
-        {worked.givenBars.map((b, i) => (
-          <span key={`gb${i}`} className="km-bar is-given" style={{ left: `calc(${b.col * cell + 6} * var(--p))`, width: `calc(${b.span * cell - 12} * var(--p))`, top: `calc(${(b.row + 1) * cell - 3} * var(--p))` }} />
-        ))}
+        {worked.given.map((c, i) => <Cell key={`g${i}`} c={c} g={g} />)}
+        {worked.givenBars.map((b, i) => <span key={`gb${i}`} className="km-bar is-given" style={barStyle(g, b, 6)} />)}
         {worked.bracket && (
           <span className="km-bracket" style={{
-            left: `calc(${worked.bracket.col * cell - 8} * var(--p))`,
-            top: `calc(${worked.bracket.row * cell + 4} * var(--p))`,
-            width: `calc(${worked.bracket.span * cell + 14} * var(--p))`,
-            height: `calc(${cell - 6} * var(--p))`,
+            left: `calc(${g.offX + worked.bracket.col * g.cell - 8} * var(--p))`,
+            top: `calc(${g.offY + worked.bracket.row * g.cell + 4} * var(--p))`,
+            width: `calc(${worked.bracket.span * g.cell + 14} * var(--p))`,
+            height: `calc(${g.cell - 6} * var(--p))`,
           }} />
         )}
       </div>
@@ -187,9 +203,9 @@ function Paper({ worked, revealedStep, strokes, pen, onStrokes }: {
         onPointerCancel={up}
       />
       <div className="km-overlay" aria-hidden="true">
-        {shown.cells.map((c) => <Cell key={`${c.col}:${c.row}`} c={c} cell={cell} />)}
+        {shown.cells.map((c) => <Cell key={`${c.col}:${c.row}`} c={c} g={g} />)}
         {shown.bars.map((b, i) => (
-          <span key={`b${i}`} className="km-bar" style={{ left: `calc(${b.col * cell + 8} * var(--p))`, width: `calc(${b.span * cell - 16} * var(--p))`, top: `calc(${(b.row + 1) * cell - 3} * var(--p))` }} />
+          <span key={`b${i}`} className="km-bar" style={barStyle(g, b, 8)} />
         ))}
       </div>
       <span className="km-paper-note">Your work clears tomorrow</span>

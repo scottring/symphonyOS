@@ -45,6 +45,8 @@
     linear-gradient(to right, var(--km-grid) calc(1.5 * var(--p)), transparent calc(1.5 * var(--p))),
     linear-gradient(to bottom, var(--km-grid) calc(1.5 * var(--p)), transparent calc(1.5 * var(--p)));
   background-size: var(--km-cell) var(--km-cell);
+  /* The grid lines up with the problem, wherever the room at the top leaves it. */
+  background-position: var(--km-off-x, 0) var(--km-off-y, 0);
   touch-action: none;
 }
 .kiosk-canvas .km-paper.is-waiting { display: grid; place-items: center; color: var(--kw-muted); font-size: calc(28 * var(--p)); }
@@ -53,10 +55,10 @@
 .kiosk-canvas .km-printed, .kiosk-canvas .km-overlay { position: absolute; inset: 0; pointer-events: none; }
 .kiosk-canvas .km-cell {
   position: absolute; width: var(--km-cell); height: var(--km-cell); display: grid; place-items: center;
-  font: 400 calc(46 * var(--p)) / 1 var(--kw-serif); color: var(--kw-ink);
+  font: 400 calc(var(--km-cell) * .72) / 1 var(--kw-serif); color: var(--kw-ink);
 }
 .kiosk-canvas .km-cell.is-work { color: var(--kw-sym); font-weight: 600; }
-.kiosk-canvas .km-cell.is-carry { color: var(--kw-now); font: 600 calc(28 * var(--p)) / 1 var(--kw-sans); align-items: end; padding-bottom: calc(6 * var(--p)); }
+.kiosk-canvas .km-cell.is-carry { color: var(--kw-now); font: 600 calc(var(--km-cell) * .44) / 1 var(--kw-sans); align-items: end; padding-bottom: calc(6 * var(--p)); }
 .kiosk-canvas .km-bar { position: absolute; height: calc(3.5 * var(--p)); border-radius: 9px; background: var(--kw-sym); }
 .kiosk-canvas .km-bar.is-given { background: var(--kw-ink); }
 .kiosk-canvas .km-bracket {

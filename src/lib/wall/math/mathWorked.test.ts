@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { answerOf, generateSpec, MAX_LEVEL, MIN_LEVEL, seededRng, type MathSpec } from './mathProblem'
-import { cellsThrough, defaultHint, longDivisionSteps, workedSolution } from './mathWorked'
+import { BLANK_CELL, cellsThrough, defaultHint, longDivisionSteps, paperGeometry, TOP_ROOM, workedSolution } from './mathWorked'
 
 /** The digits written in one row, left to right. */
 function rowText(spec: MathSpec, row: number): string {
@@ -118,6 +118,38 @@ describe('defaultHint', () => {
         const a = answerOf(spec)
         const value = a.type === 'number' ? String(a.value) : a.type === 'remainder' ? String(a.quotient) : `${a.n}/${a.d}`
         if (value.length > 1) expect(defaultHint(spec)).not.toContain(value)
+      }
+    }
+  })
+})
+
+describe('paperGeometry', () => {
+  // The wall's paper, in design px, beside the pens (1920×1080 frame).
+  const W = 880, H = 640
+
+  it('leaves room above the problem and makes squares as big as it fits', () => {
+    const g = paperGeometry(workedSolution({ kind: 'multiply', a: 48, b: 7 }), W, H)
+    expect(g.cell).toBeGreaterThanOrEqual(96)
+    expect(g.offY).toBe(Math.round(TOP_ROOM * g.cell))
+    const d = paperGeometry(workedSolution({ kind: 'divide', dividend: 742, divisor: 6, remainders: true }), W, H)
+    expect(d.cell).toBeGreaterThanOrEqual(64)
+    expect(d.offY).toBeGreaterThan(d.cell)
+  })
+
+  it('a blank sheet gets big squares', () => {
+    expect(paperGeometry(workedSolution({ kind: 'word', a: 12, op1: '×', b: 4, op2: '+', c: 15 }), W, H)).toEqual({ cell: BLANK_CELL, offX: 0, offY: 0 })
+  })
+
+  it('every generated problem fits the paper, room at the top included', () => {
+    for (const kind of ['divide', 'multiply', 'addsub'] as const) {
+      for (let level = MIN_LEVEL; level <= MAX_LEVEL; level++) {
+        for (let seed = 1; seed <= 60; seed++) {
+          const w = workedSolution(generateSpec(kind, level, seededRng(seed * 7 + level)))
+          const g = paperGeometry(w, W, H)
+          expect(g.offY + w.rows * g.cell).toBeLessThanOrEqual(H)
+          const lastCol = Math.max(...[...w.given, ...w.steps.flatMap((s) => s.cells)].map((c) => c.col + (c.text.length > 1 ? 1 : 0)))
+          expect(g.offX + (lastCol + 1) * g.cell).toBeLessThanOrEqual(W)
+        }
       }
     }
   })
