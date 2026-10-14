@@ -2225,6 +2225,37 @@ Delete the old ChangeCard test `'says when it replaced an earlier list'`.
 
 - [ ] **Step 5: Commit** — `git commit -m "Planning: the change list is proposed early and revised after each answer"`
 
+### Task 24: A preview build can talk to a test copy of the agent
+
+Added 2026-10-14 (Scott chose test path A): the live app must keep using `symphony-agent` while a preview build of this branch talks to a separately deployed `symphony-agent-v2`.
+
+**Files:** Modify `src/lib/agentStream.ts` (the fetch URL at ~line 150); Test: `src/lib/agentStream.test.ts`.
+
+**Interfaces:** Produces `agentFunctionName(): string` — `import.meta.env.VITE_AGENT_FUNCTION` when it is a non-empty string of `[a-z0-9-]+`, else `'symphony-agent'`.
+
+- [ ] **Step 1: Write the failing test**
+
+```ts
+import { agentFunctionName } from './agentStream'
+describe('agentFunctionName', () => {
+  afterEach(() => vi.unstubAllEnvs())
+  it('is symphony-agent unless a preview build names another', () => {
+    expect(agentFunctionName()).toBe('symphony-agent')
+    vi.stubEnv('VITE_AGENT_FUNCTION', 'symphony-agent-v2')
+    expect(agentFunctionName()).toBe('symphony-agent-v2')
+    vi.stubEnv('VITE_AGENT_FUNCTION', '../evil')
+    expect(agentFunctionName()).toBe('symphony-agent')
+  })
+})
+```
+
+- [ ] **Step 2: Run it to verify it fails.**
+- [ ] **Step 3: Implement** — export `agentFunctionName()` as specified and use it in the fetch URL: `` `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/${agentFunctionName()}` ``.
+- [ ] **Step 4: Run** `npx vitest run src/lib/agentStream.test.ts && npx tsc -b`.
+- [ ] **Step 5: Commit** — `git commit -m "Agent stream: a preview build may name a test copy of the agent"`
+
+The deploy steps (controller, not an implementer): copy `supabase/functions/symphony-agent` to an untracked `supabase/functions/symphony-agent-v2`, `supabase functions deploy symphony-agent-v2 --project-ref mwadppyrqzuzgstmwpuy`, set `VITE_AGENT_FUNCTION=symphony-agent-v2` for Vercel Preview on branch `claude/v2-live-canvas` only, push, and give Scott the preview link with the three-situation checklist.
+
 ### Task 23: PR 4 verification and pull request
 
 - [ ] Full suite, lint, build (Node 22).
