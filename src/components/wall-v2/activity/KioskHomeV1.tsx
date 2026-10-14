@@ -253,6 +253,120 @@ function KidHead({ kid, meta, count, onOpen }: { kid: FamilyMember; meta?: strin
 
 // ─── The moments ────────────────────────────────────────────────────────
 
+/** A step across the kids: one row per step (matched by its words), one
+ *  cell per kid; null where that kid's routine doesn't have it. */
+interface StepRowModel { key: string; title: string; cells: (KidRow | null)[] }
+type OtdKid = V1Kid & { steps: KidRow[]; done: number }
+
+const stepKey = (title: string) => shortTitle(title).toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()
+
+/** The union of the kids' steps in routine order: each kid's order is kept,
+ *  and a step only one kid has sits after the step before it. */
+function stepRows(kids: { steps: KidRow[] }[]): StepRowModel[] {
+  const rows: StepRowModel[] = []
+  kids.forEach((k, ki) => {
+    let at = -1
+    for (const r of k.steps) {
+      const key = stepKey(r.title)
+      let i = rows.findIndex((x) => x.key === key && !x.cells[ki])
+      if (i < 0) {
+        rows.splice(at + 1, 0, { key, title: r.title, cells: kids.map(() => null) })
+        i = at + 1
+      }
+      rows[i].cells[ki] = r
+      at = i
+    }
+  })
+  return rows
+}
+
+/** Two halves side by side: split where the first timed step starts
+ *  ("Before breakfast" / "Breakfast & out the door") when each half holds
+ *  four rows or fewer; else evenly, unlabelled (one table for four or
+ *  fewer). Past eight rows, steps
+ *  everyone has finished give way first so nothing scrolls. */
+const HALF = 4
+function splitRows(all: StepRowModel[], startsAt: number | null): { label: string | null; rows: StepRowModel[] }[] {
+  let rows = all
+  if (rows.length > HALF * 2) {
+    const open = rows.filter((r) => r.cells.some((c) => c && !c.done))
+    const keep = open.length >= HALF * 2 ? open.slice(0, HALF * 2) : [...rows.filter((r) => !open.includes(r)).slice(-(HALF * 2 - open.length)), ...open]
+    rows = all.filter((r) => keep.includes(r))
+  }
+  if (rows.length <= HALF) return [{ label: null, rows }]
+  const timed = (r: StepRowModel) => r.cells.some((c) => c && ownTime(c, startsAt) != null)
+  const first = rows.findIndex(timed)
+  if (first > 0 && first <= HALF && rows.length - first <= HALF) {
+    const lead = rows[first]
+    const meal = lead.title.match(/\b(breakfast|lunch|snack)\b/i)?.[1].toLowerCase()
+    const own = lead.cells.map((c) => (c ? ownTime(c, startsAt) : null)).find((t) => t != null) ?? 0
+    const name = meal ?? clockLabel(own)
+    return [
+      { label: `Before ${name}`, rows: rows.slice(0, first) },
+      { label: `${name[0].toUpperCase()}${name.slice(1)} & out the door`, rows: rows.slice(first) },
+    ]
+  }
+  const mid = Math.ceil(rows.length / 2)
+  return [{ label: null, rows: rows.slice(0, mid) }, { label: null, rows: rows.slice(mid) }]
+}
+
+/** Half of the morning: the step (its icon, name and time) and one check
+ *  circle per kid; the whole cell is the tap target. */
+function StepTable({ label, rows, kids, startsAt, next, onTick }: {
+  label: string | null; rows: StepRowModel[]; kids: OtdKid[]; startsAt: number | null; next: Map<string, string | null>
+  onTick: (member: FamilyMember, row: KidRow) => void
+}) {
+  return (
+    <table className="kw-otd-table" aria-label={label ?? 'Steps'}>
+      <thead>
+        <tr>
+          <th scope="col" className="kw-otd-lab">{label && <span className="kw-eyebrow">{label}</span>}</th>
+          {kids.map((k) => (
+            <th key={k.member.id} scope="col" className="kw-otd-kidh">
+              <Face member={k.member} size="md" />
+              <b>{k.member.name}</b>
+              {k.special && <small>{k.special} today</small>}
+              <small>{k.done} of {k.steps.length}</small>
+            </th>
+          ))}
+        </tr>
+      </thead>
+      <tbody>
+        {rows.map((r) => {
+          const isNext = r.cells.some((c, i) => c && next.get(kids[i].member.id) === c.id)
+          const time = r.cells.map((c) => (c ? ownTime(c, startsAt) : null)).find((t) => t != null)
+          const bags = kids.filter((k, i) => k.bag.length && r.cells[i] && stepIcon(r.title) === Backpack)
+          const short = shortTitle(r.title)
+          return (
+            <tr key={r.key} className={isNext ? 'is-next' : ''}>
+              <th scope="row">
+                <span className="kw-otd-step">
+                  {createElement(stepIcon(r.title), { 'aria-hidden': true })}
+                  <span className="kw-otd-name"><span>{short}</span>{bags.length > 0 && <small>{bags.map((k) => (kids.length > 1 ? `${k.member.name}: ${k.bag.join(' · ')}` : k.bag.join(' · '))).join(' · ')}</small>}</span>
+                  {time != null && <span className="kw-otd-time">{clockLabel(time)}</span>}
+                </span>
+              </th>
+              {r.cells.map((c, i) => {
+                const k = kids[i]
+                return (
+                  <td key={k.member.id}>
+                    {c && (
+                      <button type="button" className={`kw-otd-cell ${c.done ? 'is-done' : next.get(k.member.id) === c.id ? 'is-now' : ''}`}
+                        aria-pressed={c.done} aria-label={`${k.member.name}: ${short}`} onClick={() => onTick(k.member, c)}>
+                        <span className="kw-otd-c" aria-hidden="true">{c.done && <Check />}</span>
+                      </button>
+                    )}
+                  </td>
+                )
+              })}
+            </tr>
+          )
+        })}
+      </tbody>
+    </table>
+  )
+}
+
 /** Getting ready for school (OutTheDoor.dc.html): the time and what's left,
  *  the grown-ups' line, each kid's checklist. */
 function OutTheDoor(p: KioskHomeV1Props) {
@@ -269,6 +383,15 @@ function OutTheDoor(p: KioskHomeV1Props) {
     .filter((r) => { const key = `${r.title}|${r.timeOfDay}`; if (seen.has(r.id) || seen.has(key)) return false; seen.add(r.id); seen.add(key); return true })
     .sort((a, b) => (minutesOf(a.timeOfDay) ?? 0) - (minutesOf(b.timeOfDay) ?? 0))
     .slice(0, 4)
+  // One table, steps × kids (Scott, 2026-10-14): each kid's own steps
+  // merged in routine order, in two halves side by side so all fit.
+  const kids = p.kids.slice(0, 3).map((k) => {
+    const steps = k.morning.filter((r) => isForKid(r, k.member.id) && !(r.by?.length && !r.by.some((id) => kidIds.includes(id))))
+    return { ...k, steps, done: steps.filter((r) => r.done).length }
+  })
+  const rows = stepRows(kids)
+  const next = new Map(kids.map((k) => [k.member.id, k.steps.find((r) => !r.done)?.id ?? null]))
+  const halves = splitRows(rows, startsAt)
   const lead = (
     <div className="kw-otd">
       <header className="kw-otd-head">
@@ -291,18 +414,10 @@ function OutTheDoor(p: KioskHomeV1Props) {
           ))}
         </ul>
       )}
-      <div className="kw-otd-kids" style={{ ['--kids' as string]: Math.max(1, Math.min(3, p.kids.length)) }}>
-        {p.kids.slice(0, 3).map((k) => {
-          const steps = k.morning.filter((r) => isForKid(r, k.member.id))
-          const done = steps.filter((r) => r.done).length
-          return (
-            <section key={k.member.id} className="kw-otd-kid" aria-label={`${k.member.name}'s morning`}>
-              <KidHead kid={k.member} meta={k.special ? `${k.special} today` : null} count={`${done} of ${steps.length}`} onOpen={() => p.onOpenKid(k.member)} />
-              <KidChecklist kid={k.member} steps={steps} startsAt={startsAt} bag={k.bag} max={5} onTick={(r) => p.onTick(k.member, r)} />
-              {k.bag.length > 0 && !steps.some((r) => stepIcon(r.title) === Backpack) && <p className="kw-meta">In the bag: {k.bag.join(' · ')}</p>}
-            </section>
-          )
-        })}
+      <div className="kw-otd-tables" style={{ ['--kids' as string]: Math.max(1, kids.length) }}>
+        {halves.map((h, i) => (
+          <StepTable key={i} label={h.label} rows={h.rows} kids={kids} startsAt={startsAt} next={next} onTick={p.onTick} />
+        ))}
       </div>
     </div>
   )

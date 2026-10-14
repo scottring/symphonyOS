@@ -38,58 +38,66 @@ function props(over: Partial<KioskHomeV1Props> = {}): KioskHomeV1Props {
 }
 
 describe('the wall, version 1', () => {
-  it("out the door: each kid's own steps as a checklist; done steps fold to one line; the grown-ups' line on top", () => {
+  it("out the door: one table, steps × kids — the step's icon labels the row, each kid's cell is a check circle", () => {
     const p = props()
     render(<KioskHomeV1 {...p} />)
-    const ellaCol = screen.getByRole('region', { name: "Ella's morning" })
-    // "Bag packed: …" shows as "Bag packed"; the walk and wake-up are Scott's, breakfast is Iris's.
-    // One leading element per row: the step's icon is the completion circle.
-    const rows = within(ellaCol).getAllByRole('button', { name: /^Mark / })
-    expect(rows.map((r) => r.getAttribute('aria-label'))).toEqual(['Mark Bag packed done'])
-    expect(within(rows[0]).getByText('Bag packed')).toBeInTheDocument()
-    expect(within(rows[0]).getByText('Library book')).toBeInTheDocument()
-    expect(rows[0]).toHaveClass('is-next')
-    expect(rows[0].querySelectorAll('.kw-ck-c')).toHaveLength(1)
-    // Get dressed is done: folded into one line, which opens to untick it.
-    const fold = within(ellaCol).getByRole('button', { name: 'Done: Get dressed. Show them' })
-    fireEvent.click(fold)
-    const dressed = within(ellaCol).getByRole('button', { name: 'Mark Get dressed not done' })
+    // Ella and Kaleb share the routine: one row per step, grown-ups' steps left out.
+    const table = screen.getByRole('table', { name: 'Steps' })
+    const heads = within(table).getAllByRole('columnheader')
+    expect(heads.map((h) => h.textContent)).toEqual(['', 'EEllaLibrary today1 of 2', 'KKalebArt today1 of 2'])
+    const rows = within(table).getAllByRole('row').slice(1)
+    expect(rows.map((r) => within(r).getByRole('rowheader').textContent)).toEqual(['Get dressed', 'Bag packedElla: Library book7:15'])
+    // Done = filled; that kid's next step = the ember ring; the row is tinted.
+    const dressed = within(table).getByRole('button', { name: 'Ella: Get dressed' })
+    expect(dressed).toHaveAttribute('aria-pressed', 'true')
     expect(dressed).toHaveClass('is-done')
-    fireEvent.click(dressed)
-    expect(p.onTick).toHaveBeenCalledWith(ella, expect.objectContaining({ id: 'd' }))
-    expect(within(ellaCol).getByText('Library today')).toBeInTheDocument()
-    expect(within(ellaCol).getByText('1 of 2')).toBeInTheDocument()
+    const bag = within(table).getByRole('button', { name: 'Kaleb: Bag packed' })
+    expect(bag).toHaveClass('is-now')
+    expect(rows[1]).toHaveClass('is-next')
+    expect(rows[0]).not.toHaveClass('is-next')
+    // Tapping a cell ticks that kid's step, exactly as before.
+    fireEvent.click(bag)
+    expect(p.onTick).toHaveBeenCalledWith(kaleb, expect.objectContaining({ id: 'bag' }))
     expect(screen.getByRole('heading', { name: 'Out the door at 7:20' })).toBeInTheDocument()
     expect(screen.getByText('22')).toBeInTheDocument()
-    expect(screen.getByText('minutes')).toBeInTheDocument()
     const grownUps = screen.getByRole('list', { name: 'Grown-ups this morning' })
     expect(within(grownUps).getAllByRole('listitem').map((li) => li.textContent)).toEqual([
       'S6:45 Wake the kidsScott', 'I6:50 Breakfast on the tableIris', 'S7:20 Out the door, walk to schoolScott',
     ])
-    fireEvent.click(within(ellaCol).getByRole('button', { name: 'Mark Bag packed done' }))
-    expect(p.onTick).toHaveBeenCalledWith(ella, expect.objectContaining({ id: 'bag' }))
   })
 
-  it('out the door: the first undone step is NEXT, and the list stops before it would scroll', () => {
-    const morning = [
+  it('out the door: the union of the kids\' steps in routine order, in two halves split at the first timed step', () => {
+    const mine = [
       step('d', 'Get dressed', '06:45', ['e'], true),
       step('h', 'Dirty clothes in the hamper', null, ['e']),
       step('t', 'Brush teeth', null, ['e']),
       step('eat', 'Eat breakfast', '07:00', ['e']),
       step('bag', 'Bag packed', '07:15', ['e']),
-      step('sh', 'Shoes & jacket on', null, ['e']),
     ]
-    render(<KioskHomeV1 {...props({ kids: [{ member: ella, special: 'Music', tomorrowSpecial: null, bag: [], morning, after: [] }] })} />)
-    const col = screen.getByRole('region', { name: "Ella's morning" })
-    const names = within(col).getAllByRole('button', { name: /^Mark / }).map((r) => r.getAttribute('aria-label'))
-    // Five rows fit: the folded line and four steps; the count says the rest.
-    expect(names).toEqual(['Mark Dirty clothes in the hamper done', 'Mark Brush teeth done', 'Mark Eat breakfast done', 'Mark Bag packed done'])
-    const next = within(col).getByRole('button', { name: 'Mark Dirty clothes in the hamper done' })
-    expect(next).toHaveClass('is-next')
-    expect(within(next).getByText('NEXT')).toBeInTheDocument()
-    expect(within(col).getAllByText('NEXT')).toHaveLength(1)
-    expect(within(col).getByText('1 of 6')).toBeInTheDocument()
-    expect(within(col).getByText('7:00')).toBeInTheDocument()
+    const his = [
+      step('d2', 'Get dressed', '06:45', ['k']),
+      step('feed', 'Feed the cat', null, ['k']),
+      step('t2', 'Brush teeth', null, ['k']),
+      step('eat2', 'Eat breakfast', '07:00', ['k']),
+    ]
+    render(<KioskHomeV1 {...props({ kids: [
+      { member: ella, special: null, tomorrowSpecial: null, bag: [], morning: mine, after: [] },
+      { member: kaleb, special: null, tomorrowSpecial: null, bag: [], morning: his, after: [] },
+    ] })} />)
+    const before = screen.getByRole('table', { name: 'Before breakfast' })
+    const after = screen.getByRole('table', { name: 'Breakfast & out the door' })
+    const names = (t: HTMLElement) => within(t).getAllByRole('rowheader').map((h) => h.querySelector('.kw-otd-name > span')?.textContent)
+    // Kaleb's own step sits right after the step before it in his routine.
+    expect(names(before)).toEqual(['Get dressed', 'Feed the cat', 'Dirty clothes in the hamper', 'Brush teeth'])
+    expect(names(after)).toEqual(['Eat breakfast', 'Bag packed'])
+    // No step for that kid: an empty cell, no circle.
+    expect(within(before).queryByRole('button', { name: 'Ella: Feed the cat' })).toBeNull()
+    expect(within(before).queryByRole('button', { name: 'Kaleb: Dirty clothes in the hamper' })).toBeNull()
+    expect(within(after).getByText('7:00')).toBeInTheDocument()
+    // Each kid's next step: Ella's hamper, Kaleb's dressing.
+    expect(within(before).getByRole('button', { name: 'Ella: Dirty clothes in the hamper' })).toHaveClass('is-now')
+    expect(within(before).getByRole('button', { name: 'Kaleb: Get dressed' })).toHaveClass('is-now')
+    expect(screen.getAllByText('1 of 5')).toHaveLength(2)
   })
 
   it('rest: the next landmark large, then dinner; notes for the house; the places; the rest of today beside it', () => {

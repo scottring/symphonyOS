@@ -301,9 +301,6 @@
 .is-v1 .kw-grown { flex: none; display: flex; gap: calc(44 * var(--p)); padding: calc(10 * var(--p)) 0 calc(4 * var(--p)); overflow: hidden; }
 .is-v1 .kw-grown li { display: flex; align-items: center; gap: calc(10 * var(--p)); font-size: calc(24 * var(--p)); color: var(--kw-muted); white-space: nowrap; }
 .is-v1 .kw-grown li svg { width: calc(26 * var(--p)); height: calc(26 * var(--p)); color: var(--kw-done); stroke-width: 2.4; }
-.is-v1 .kw-otd-kids { flex: 1; min-height: 0; display: grid; grid-template-columns: repeat(var(--kids, 2), minmax(0, 1fr)); column-gap: calc(96 * var(--p)); margin-top: calc(10 * var(--p)); }
-.is-v1 .kw-stage.is-more .kw-otd-kids { column-gap: calc(40 * var(--p)); }
-.is-v1 .kw-otd-kid { display: flex; flex-direction: column; gap: calc(6 * var(--p)); min-width: 0; min-height: 0; overflow: hidden; }
 
 /* Arcs: time left. */
 .is-v1 .kw-arc { position: relative; flex: none; }
@@ -405,3 +402,35 @@
 .is-v1 .kw-stage.is-more .kw-otd-head { gap: calc(24 * var(--p)); }
 .is-v1 .kw-stage.is-more .kw-otd-head h2 { font-size: calc(52 * var(--p)); }
 .is-v1 .kw-stage.is-more .kw-otd-left b { font-size: calc(56 * var(--p)); }
+
+/* Getting ready as one table (Scott, 2026-10-14): steps × kids, in two
+   halves side by side. The step's icon sits in the row label; each kid's
+   cell is a plain check circle and the whole cell is the tap target. */
+.is-v1 .kw-otd-tables { flex: 1; min-height: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: calc(72 * var(--p)); align-items: start; margin-top: calc(14 * var(--p)); }
+.is-v1 .kw-otd-table { width: 100%; border-collapse: separate; border-spacing: 0; table-layout: fixed; }
+.is-v1 .kw-otd-lab { text-align: left; vertical-align: bottom; padding: 0 0 calc(16 * var(--p)) calc(12 * var(--p)); }
+.is-v1 .kw-otd-kidh { width: calc(170 * var(--p)); vertical-align: bottom; padding: 0 0 calc(12 * var(--p)); text-align: center; font-weight: 400; }
+.is-v1 .kw-otd-kidh .kv-face { margin: 0 auto calc(6 * var(--p)); }
+.is-v1 .kw-otd-kidh b { display: block; font-size: calc(28 * var(--p)); font-weight: 600; line-height: 1.2; }
+.is-v1 .kw-otd-kidh small { display: block; font-size: calc(22 * var(--p)); line-height: 1.3; color: var(--kw-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.is-v1 .kw-otd-table tbody th, .is-v1 .kw-otd-table tbody td { height: calc(96 * var(--p)); padding: 0; border-top: 1px solid var(--kw-line); }
+.is-v1 .kw-otd-table tbody th { text-align: left; font-weight: 400; }
+.is-v1 .kw-otd-table tr.is-next > * { background: var(--kw-now-tint); border-top-color: transparent; }
+.is-v1 .kw-otd-table tr.is-next > :first-child { border-radius: calc(18 * var(--p)) 0 0 calc(18 * var(--p)); }
+.is-v1 .kw-otd-table tr.is-next > :last-child { border-radius: 0 calc(18 * var(--p)) calc(18 * var(--p)) 0; }
+.is-v1 .kw-otd-table tr.is-next + tr > * { border-top-color: transparent; }
+.is-v1 .kw-otd-step { display: flex; align-items: center; gap: calc(18 * var(--p)); min-width: 0; padding: 0 calc(16 * var(--p)) 0 calc(12 * var(--p)); font-size: calc(32 * var(--p)); }
+.is-v1 .kw-otd-step > svg { width: calc(36 * var(--p)); height: calc(36 * var(--p)); flex: none; color: var(--kw-muted); stroke-width: 1.7; }
+.is-v1 .kw-otd-name { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.is-v1 .kw-otd-name > span, .is-v1 .kw-otd-name small { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.is-v1 .kw-otd-name small { font-size: calc(22 * var(--p)); color: var(--kw-muted); }
+.is-v1 .kw-otd-time { flex: none; font-size: calc(24 * var(--p)); color: var(--kw-muted); }
+.is-v1 .kw-otd-cell { display: flex; align-items: center; justify-content: center; width: 100%; height: calc(96 * var(--p)); padding: 0; border: 0; background: none; color: var(--kw-ink); }
+.is-v1 .kw-otd-c { width: calc(76 * var(--p)); height: calc(76 * var(--p)); display: flex; align-items: center; justify-content: center; border-radius: 999px; border: 2.5px solid var(--kw-line-strong); transition: transform .08s ease, background-color .15s ease; }
+.is-v1 .kw-otd-c svg { width: calc(36 * var(--p)); height: calc(36 * var(--p)); stroke-width: 2.4; }
+.is-v1 .kw-otd-cell.is-done .kw-otd-c { background: var(--kw-done); border-color: var(--kw-done); color: var(--kw-on-done); }
+.is-v1 .kw-otd-cell.is-now .kw-otd-c { border: 4px solid var(--kw-now); }
+.is-v1 .kw-otd-cell:active .kw-otd-c { transform: scale(.92); }
+.is-v1 .kw-stage.is-more .kw-otd-tables { column-gap: calc(32 * var(--p)); }
+.is-v1 .kw-stage.is-more .kw-otd-kidh { width: calc(100 * var(--p)); }
+.is-v1 .kw-stage.is-more .kw-otd-kidh small { display: none; }
