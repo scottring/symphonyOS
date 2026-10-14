@@ -9,22 +9,66 @@ import { lineDropUpdates } from '@/lib/planning/v2/planV2'
 import { timingRemoval } from '@/lib/planning/planActions'
 import { localYmd } from '@/lib/cadence/config'
 
-export type ChangeOpKind = 'place' | 'unplace' | 'add' | 'someday' | 'assign'
+export type TaskOpKind = 'place' | 'unplace' | 'add' | 'someday' | 'assign' | 'done' | 'merge' | 'talk'
+/** Routine ops (stage 3, spec 2026-10-14-routines-talk-first). skip/move/who
+ *  change ONE day's occurrence ("this week only"); change/rest/add change the
+ *  routine itself ("from now on"). */
+export type RoutineOpKind = 'routine_skip' | 'routine_move' | 'routine_who' | 'routine_change' | 'routine_rest' | 'routine_add'
+export type ChangeOpKind = TaskOpKind | RoutineOpKind
+
+export type DayKey = 'sun' | 'mon' | 'tue' | 'wed' | 'thu' | 'fri' | 'sat'
 
 export interface ChangeOp {
   key: string
   op: ChangeOpKind
   taskId?: string
+  /** The task's or routine's current title (resolved server-side), or the new
+   *  task's / routine's name for add and routine_add. */
   title: string
-  /** YYYY-MM-DD */
+  /** YYYY-MM-DD. For routine_skip/move/who: the occurrence's own day. */
   date?: string
-  /** HH:MM, 24-hour */
+  /** HH:MM, 24-hour. routine_move: the new time; routine_change/add: the routine's time. */
   time?: string
   assignee?: string
   assigneeName?: string
   goalId?: string
-  /** The task's updated_at when Symphony read it. */
+  /** The task's (or, for routine_change/rest, the routine's) updated_at when Symphony read it. */
   seen?: string
+  /** merge: the duplicate that closes into taskId. */
+  fromTaskId?: string
+  fromTitle?: string
+  fromSeen?: string
+  /** talk: what to talk about, or with whom ("with Iris"). */
+  note?: string
+  routineId?: string
+  /** routine_move: YYYY-MM-DD the occurrence moves to. */
+  toDate?: string
+  /** routine_change: the new name. */
+  name?: string
+  /** routine_change: true = any time of day (clear the time). */
+  clearTime?: boolean
+  /** routine_change/add: the weekly days. */
+  days?: DayKey[]
+  /** routine_change/add: who does it, every week. */
+  assignees?: string[]
+  assigneeNames?: string[]
+  /** routine_rest: YYYY-MM-DD it wakes; none = rest with no date. */
+  until?: string
+  /** routine_add: the life area. */
+  context?: 'family' | 'personal' | 'work'
+}
+
+/** Which heading a row sits under on the card. */
+export type OpScope = 'task' | 'week' | 'lasting'
+export function opScope(op: ChangeOp): OpScope {
+  if (op.op === 'routine_skip' || op.op === 'routine_move' || op.op === 'routine_who') return 'week'
+  if (op.op.startsWith('routine_')) return 'lasting'
+  return 'task'
+}
+export const SCOPE_HEADING: Record<OpScope, string> = {
+  task: 'Tasks',
+  week: 'Routines · this week only',
+  lasting: 'Routines · from now on',
 }
 
 export interface ChangeSet {
@@ -72,20 +116,79 @@ function clock(time: string): string {
   return `${hour}:${String(m).padStart(2, '0')}`
 }
 
+function ymdDate(ymd: string): Date {
+  const [y, m, d] = ymd.split('-').map(Number)
+  return new Date(y, m - 1, d)
+}
+
+function dayName(ymd: string, today: Date): string {
+  return ymd === localYmd(today) ? 'Today' : ymdDate(ymd).toLocaleDateString('en-US', { weekday: 'short' })
+}
+
+/** "Thu 15": an occurrence's day, with its date so "this week only" reads true. */
+function dayAndDate(ymd: string): string {
+  const d = ymdDate(ymd)
+  return `${d.toLocaleDateString('en-US', { weekday: 'short' })} ${d.getDate()}`
+}
+
 function dayWords(op: ChangeOp, today: Date): string {
-  const when = opWhen(op)!
-  const day = localYmd(when) === localYmd(today) ? 'Today' : when.toLocaleDateString('en-US', { weekday: 'short' })
+  const day = dayName(op.date!, today)
   return op.time ? `${day} ${clock(op.time)}` : day
 }
 
+const DAY_ORDER: DayKey[] = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat']
+const DAY_SHORT: Record<DayKey, string> = { sun: 'Sun', mon: 'Mon', tue: 'Tue', wed: 'Wed', thu: 'Thu', fri: 'Fri', sat: 'Sat' }
+
+/** "Every day", "Mon–Thu", "Tue, Thu", "Sat". */
+export function daysWords(days: readonly DayKey[]): string {
+  const set = new Set(days)
+  const sorted = DAY_ORDER.filter((d) => set.has(d))
+  if (sorted.length === 7) return 'Every day'
+  if (!sorted.length) return 'No day yet'
+  const idx = sorted.map((d) => DAY_ORDER.indexOf(d))
+  const run = idx.every((v, i) => i === 0 || v === idx[i - 1] + 1)
+  if (run && sorted.length >= 3) return `${DAY_SHORT[sorted[0]]}–${DAY_SHORT[sorted[sorted.length - 1]]}`
+  return sorted.map((d) => DAY_SHORT[d]).join(', ')
+}
+
+const names = (list?: string[]) => (list?.length ? list.join(', ') : 'no one')
+
+export type RowKind = 'MOVE' | 'ADD' | 'LATER' | 'WHO' | 'DONE' | 'MERGE' | 'TALK' | 'SKIP' | 'TIME' | 'DAYS' | 'NAME' | 'CHANGE' | 'REST' | 'NEW'
+
 /** One card row: what kind of change, to what, and where it lands. */
-export function opRow(op: ChangeOp, today: Date): { kind: 'MOVE' | 'ADD' | 'LATER' | 'WHO'; title: string; where: string } {
+export function opRow(op: ChangeOp, today: Date): { kind: RowKind; title: string; where: string } {
   switch (op.op) {
     case 'place': return { kind: 'MOVE', title: op.title, where: `→ ${dayWords(op, today)}` }
     case 'unplace': return { kind: 'MOVE', title: op.title, where: '→ No day yet' }
     case 'add': return { kind: 'ADD', title: op.title, where: op.date ? dayWords(op, today) : 'No day yet' }
     case 'someday': return { kind: 'LATER', title: op.title, where: '→ Someday' }
     case 'assign': return { kind: 'WHO', title: op.title, where: `→ ${op.assigneeName ?? 'someone'}` }
+    case 'done': return { kind: 'DONE', title: op.title, where: '→ Done' }
+    case 'merge': return { kind: 'MERGE', title: `${op.fromTitle ?? 'Another task'} + ${op.title}`, where: '→ one, notes kept' }
+    case 'talk': return { kind: 'TALK', title: op.title, where: op.note ? `→ Talk about, ${op.note}` : '→ Talk about' }
+    case 'routine_skip': return { kind: 'SKIP', title: op.title, where: `${dayAndDate(op.date!)} only` }
+    case 'routine_move': {
+      const to = dayAndDate(op.toDate!)
+      return { kind: 'MOVE', title: op.title, where: `→ ${op.time ? `${to} ${clock(op.time)}` : to} · ${dayAndDate(op.date!)} only` }
+    }
+    case 'routine_who': return { kind: 'WHO', title: op.title, where: `→ ${op.assigneeName ?? 'someone'}, ${dayAndDate(op.date!)} only` }
+    case 'routine_change': {
+      const parts: string[] = []
+      const kinds: RowKind[] = []
+      if (op.days) { parts.push(daysWords(op.days)); kinds.push('DAYS') }
+      if (op.time) { parts.push(clock(op.time)); kinds.push('TIME') }
+      if (op.clearTime) { parts.push('any time'); kinds.push('TIME') }
+      if (op.assignees) { parts.push(names(op.assigneeNames)); kinds.push('WHO') }
+      if (op.name) kinds.push('NAME')
+      const kind: RowKind = new Set(kinds).size === 1 ? kinds[0] : 'CHANGE'
+      const title = op.name ? `${op.title} → ${op.name}` : op.title
+      return { kind, title, where: parts.length ? `→ ${parts.join(' ')}` : '' }
+    }
+    case 'routine_rest': return { kind: 'REST', title: op.title, where: op.until ? `→ until ${ymdDate(op.until).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}` : '→ resting' }
+    case 'routine_add': {
+      const when = [op.days ? daysWords(op.days) : null, op.time ? clock(op.time) : null].filter(Boolean).join(' ')
+      return { kind: 'NEW', title: op.title, where: when ? `→ ${when}` : '' }
+    }
   }
 }
 
@@ -106,6 +209,15 @@ export function opWrite(op: ChangeOp, task: Task): { updates: Partial<Task>; pre
     case 'unplace': return timingRemoval(task, 'day')
     case 'someday': return before({ bucket: 'someday', scheduledFor: undefined, isAllDay: undefined })
     case 'assign': return before({ assignedTo: op.assignee, assignedToAll: op.assignee ? [op.assignee] : [] })
-    case 'add': throw new Error('add has no existing task to write')
+    case 'talk': {
+      // Off its day and onto the talk-about list (here and on the wall).
+      const off = task.scheduledFor ? timingRemoval(task, 'day') : { updates: {}, previous: {} }
+      const flag: Partial<Task> = { needsDiscussion: true, ...(op.note ? { discussionNote: op.note } : {}) }
+      return {
+        updates: { ...off.updates, ...flag },
+        previous: { ...off.previous, needsDiscussion: task.needsDiscussion ?? false, ...(op.note ? { discussionNote: task.discussionNote } : {}) },
+      }
+    }
+    default: throw new Error(`${op.op} is not a plain task write`)
   }
 }

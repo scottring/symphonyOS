@@ -7,7 +7,7 @@
 import { useId } from 'react'
 import { X } from 'lucide-react'
 import { useCanvasActivity, type PendingChangeSet } from '@/contexts/CanvasActivityContext'
-import { opRow } from '@/lib/canvas/changeCard'
+import { opRow, opScope, SCOPE_HEADING, type ChangeOp, type OpScope } from '@/lib/canvas/changeCard'
 
 interface Props {
   set: PendingChangeSet
@@ -27,18 +27,25 @@ export function ChangeCard({ set, today, onApprove, onDismiss }: Props) {
         <h2 id={titleId} className="change-card-title">{set.title}</h2>
         <button type="button" className="canvas-icon" onClick={onDismiss} aria-label="Dismiss" disabled={saving}><X size={14} aria-hidden="true" /></button>
       </header>
-      <ul className="change-card-rows">
-        {set.ops.map((op) => {
-          const row = opRow(op, today)
-          return (
-            <li key={op.key} className="change-card-row">
-              <span className="change-card-kind">{row.kind}</span>
-              <span className="change-card-what">{row.title}</span>
-              <span className="change-card-where">{row.where}</span>
-            </li>
-          )
-        })}
-      </ul>
+      <div className="change-card-body">
+      {groups(set.ops).map((g) => (
+        <div key={g.scope} className="change-card-group">
+          {g.heading && <h3 className="change-card-scope">{g.heading}</h3>}
+          <ul className="change-card-rows">
+            {g.ops.map((op) => {
+              const row = opRow(op, today)
+              return (
+                <li key={op.key} className="change-card-row">
+                  <span className="change-card-kind">{row.kind}</span>
+                  <span className="change-card-what">{row.title}</span>
+                  <span className="change-card-where">{row.where}</span>
+                </li>
+              )
+            })}
+          </ul>
+        </div>
+      ))}
+      </div>
       {set.state === 'failed' && set.message && <p className="change-card-error" role="alert">{set.message}</p>}
       <footer className="change-card-foot">
         <button type="button" className="change-card-approve" onClick={onApprove} disabled={saving}>
@@ -49,6 +56,16 @@ export function ChangeCard({ set, today, onApprove, onDismiss }: Props) {
       </footer>
     </section>
   )
+}
+
+/** Rows under their scope (tasks, this week's routines, lasting routine
+ *  changes). A card of tasks alone keeps no heading, as before. */
+function groups(ops: ChangeOp[]): { scope: OpScope; heading: string | null; ops: ChangeOp[] }[] {
+  const order: OpScope[] = ['task', 'week', 'lasting']
+  const by = new Map<OpScope, ChangeOp[]>()
+  for (const op of ops) by.set(opScope(op), [...(by.get(opScope(op)) ?? []), op])
+  const onlyTasks = by.size === 1 && by.has('task')
+  return order.filter((sc) => by.has(sc)).map((sc) => ({ scope: sc, heading: onlyTasks ? null : SCOPE_HEADING[sc], ops: by.get(sc)! }))
 }
 
 /** The pending card, wherever the conversation is: the docked bar, the side
