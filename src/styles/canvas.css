@@ -265,7 +265,9 @@
 .wc-noday-fold:focus-visible { outline: 2px solid var(--color-primary-600); outline-offset: 2px; }
 .wc-noday-peek { min-width: 0; color: var(--color-neutral-600); }
 .wc-noday-show { margin-left: auto; font-weight: 500; color: var(--color-neutral-600); white-space: nowrap; }
-.wc-noday-chips { list-style: none; margin: 0; padding: 0; columns: 3 220px; column-gap: 28px; }
+/* A grid, not CSS columns: inside a multi-column box the browser places a
+   row's floating hover toolbar in the wrong column. */
+.wc-noday-chips { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); column-gap: 28px; }
 /* Triage on hover: the when-chips float just above the row (the title stays
    readable) on hover or keyboard focus, so the line never reflows; touch
    screens keep the + (a day). */
@@ -300,7 +302,7 @@
 .dark .wc-noday-open { color: #dfe5e3; }
 .dark .wc-noday-glyph { border-color: #6b7473; }
 @media (max-width: 767px) {
-  .wc-noday-chips { columns: 1; }
+  .wc-noday-chips { grid-template-columns: 1fr; }
   .wc-noday-chip { flex-wrap: wrap; column-gap: 8px; row-gap: 0; }
   .wc-noday-open { flex: 1 1 0; min-width: 0; }
   /* The day picker opens on its own line under the row. */
