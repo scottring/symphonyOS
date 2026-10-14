@@ -22,7 +22,7 @@
 // one adult's own tasks dropped by wallTodayRows). Nothing here adds a query.
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { ArrowLeft, Home, ChevronRight, Timer, Phone, ShoppingCart, ChefHat, MoreHorizontal, X, Mic, MicOff, CalendarDays, BookOpen } from 'lucide-react'
+import { ArrowLeft, Home, ChevronRight, Timer, Phone, ShoppingCart, ChefHat, MoreHorizontal, X, Mic, MicOff, CalendarDays, BookOpen, Calculator } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import type { FamilyMember } from '@/types/family'
 import type { WallMoment } from '@/lib/wall/wallMoment'
@@ -57,6 +57,8 @@ import {
   BedtimeStage, CookingStage, DepartureStage, DinnerStage, GroceriesStage, HeldColumn, type KioskDinner,
 } from './KioskStages'
 import { WallV2PhoneScreen, type PhoneFixture } from '../WallV2PhoneScreen'
+import { MathStage } from './MathStage'
+import type { KidMath } from '@/hooks/useKidMath'
 
 /** The household tools in the bottom bar. Call is the canvas's own (it opens
  *  the Calling activity); the rest are the Shell's sheets. */
@@ -120,6 +122,8 @@ export interface KioskCanvasProps {
   /** The family's next seven days and what the wall knows of a task, for the
    *  conversation's pictures (Kitchen wall v2, stage 3). */
   week?: WallTalkWeek
+  /** Math of the day: each kid's problem, streak and the writes (useKidMath). */
+  math?: KidMath
 }
 
 const V2_FONTS = 'https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300..600&family=Instrument+Sans:wght@400;500;600;700&display=swap'
@@ -306,8 +310,17 @@ export function KioskCanvas(p: KioskCanvasProps) {
       }
   const talk = tell.talk
   const endTalk = () => { talk.end(); tell.clearReply() }
+  const math = p.math
+  const openMath = useCallback((memberId?: string) => {
+    if (memberId) math?.select(memberId)
+    dispatch({ type: 'OPEN', stage: { kind: 'math' } })
+  }, [math, dispatch])
+  const mathLeft = math ? math.kids.filter((k) => k.today?.status === 'open').length : 0
   const moreTiles = [
     talk.enabled ? { id: 'plan', label: 'Plan the week', sub: 'Together, with Symphony', icon: CalendarDays, onSelect: () => { setMoreOpen(false); void tell.handle('Plan the week', false) } } : null,
+    math && math.kids.length > 0
+      ? { id: 'math', label: 'Math of the day', sub: mathLeft ? `${mathLeft} still to solve` : 'All done today', icon: Calculator, onSelect: () => { setMoreOpen(false); openMath() } }
+      : null,
     shellTile('list'),
     { id: 'recipes', label: 'Recipes', sub: 'The family’s recipes', icon: BookOpen, onSelect: () => { setMoreOpen(false); p.tools.onRecipes() } },
     shellTile('notes'),
@@ -349,6 +362,8 @@ export function KioskCanvas(p: KioskCanvasProps) {
           onStartCooking={() => { const said = startCooking(); if (said.startsWith('No')) p.flash(said) }}
           aside={moreOpen ? morePanel : undefined}
           talk={talkInSide && !bandMoment ? convo : undefined}
+          math={math}
+          onOpenMath={(m) => openMath(m.id)}
         />
       ) : (
         <KioskHome
@@ -406,6 +421,11 @@ export function KioskCanvas(p: KioskCanvasProps) {
       break
     case 'recipe':
       content = p.recipePage
+      break
+    case 'math':
+      content = math
+        ? <MathStage math={math} now={p.now} />
+        : <div className="kc-card kc-fill"><p className="kc-quiet-line">Math of the day isn’t ready.</p></div>
       break
   }
 

@@ -30,6 +30,33 @@ import type { ListenerPreview } from './useTellSymphony'
 import type { KioskDinner } from './KioskStages'
 
 import type { KioskScene } from './kioskScenes'
+import type { KidMath } from '@/hooks/useKidMath'
+import { attempt, type MathRow } from '@/lib/wall/math/mathProgress'
+
+/** Math of the day with fixed problems: a story for Liam's, the plain problem for Mia's. */
+function usePreviewMath(): KidMath {
+  const [rows, setRows] = useState<MathRow[]>(() => [
+    {
+      id: 'pm-li', memberId: 'li', forDate: '2026-10-13', kind: 'divide', level: 3, spec: { kind: 'divide', dividend: 742, divisor: 6, remainders: true },
+      wording: { story: 'The bakery made 742 cookies for Liam’s school fair. They pack them in boxes of 6. How many full boxes can they fill, and how many cookies are left over?', hint: 'Start with the 7 hundreds. How many 6s fit in 7? Write that above the 7, take away 6, then bring down the 4.', labels: ['Full boxes', 'Left over'] },
+      status: 'open', tries: 0, solvedAt: null,
+    },
+    { id: 'pm-mi', memberId: 'mi', forDate: '2026-10-13', kind: 'fraction', level: 3, spec: { kind: 'fraction', form: 'add', x: { n: 1, d: 4 }, y: { n: 3, d: 8 } }, wording: null, status: 'open', tries: 0, solvedAt: null },
+  ])
+  const [selectedId, select] = useState('li')
+  return {
+    kids: KIDS.map((member) => ({ member, today: rows.find((r) => r.memberId === member.id) ?? null, streak: member.id === 'li' ? 6 : 3 })),
+    selectedId,
+    select,
+    check: (memberId, input) => {
+      const r = rows.find((x) => x.memberId === memberId)
+      if (!r) return null
+      const res = attempt(r, input)
+      setRows((prev) => prev.map((x) => (x.id === r.id ? { ...x, status: res.status, tries: res.tries } : x)))
+      return res.verdict
+    },
+  }
+}
 export type { KioskScene } from './kioskScenes'
 
 const m = (id: string, name: string, role: string, color?: string): FamilyMember => ({ id, name, initials: name.slice(0, 1), role_label: role, color } as unknown as FamilyMember)
@@ -48,6 +75,7 @@ const SCENE_CLOCK: Record<KioskScene, { moment: WallMoment; h: number; min: numb
   departure: { moment: 'morning', h: 7, min: 43 },
   bedtime: { moment: 'evening', h: 20, min: 6 },
   call: { moment: 'after', h: 16, min: 52 },
+  math: { moment: 'after', h: 15, min: 42 },
 }
 
 // Wall v2 moments (mockups 2026-10-14): each at the time its mockup shows.
@@ -125,6 +153,7 @@ function sceneState(scene: KioskScene, dateKey: string, nowMs: number): KioskSta
     departure: [{ type: 'OPEN', stage: { kind: 'departure' } }, { type: 'DEPARTURE_TOGGLE', key: key('li', 'bring', 'Library book') }, { type: 'DEPARTURE_TOGGLE', key: key('mi', 'bring', 'Swim bag') }, { type: 'DEPARTURE_TOGGLE', key: key('mi', 'bring', 'Water bottle') }],
     bedtime: [{ type: 'OPEN', stage: { kind: 'bedtime' } }],
     call: [{ type: 'OPEN', stage: { kind: 'calling' } }],
+    math: [{ type: 'OPEN', stage: { kind: 'math' } }],
   }
   let s = events[scene].reduce(kioskReducer, initialKioskState(dateKey))
   // "Cumin — probably in the pantry": the board shows one line left off.
@@ -138,6 +167,7 @@ export function KioskCanvasPreview({ scene = 'home-evening', theme = 'light', v1
   const dateKey = `fixture-${scene}`
   const [isDark, setIsDark] = useState(theme === 'dark')
   const activity = useKioskActivity(dateKey, { initial: sceneState(scene, dateKey, now.getTime()), fixedNow: now.getTime(), persist: false })
+  const math = usePreviewMath()
   const at = (h: number, min = 0) => new Date(now).setHours(h, min, 0, 0)
   const row = (id: string, h: number, min: number, title: string, owners: string[], sub: string | null = null, endH?: number, endMin = 0, kind: WallTodayRow['kind'] = 'event'): WallTodayRow => {
     const end = at(endH ?? h + 1, endH != null ? endMin : min)
@@ -238,6 +268,7 @@ export function KioskCanvasPreview({ scene = 'home-evening', theme = 'light', v1
         personPage={null} recipePage={null} recipeTitle={null}
         onOpenRecipe={noop} onTapRow={noop} onTick={noop} onClaim={noop} onTapQuestion={noop} flash={noop}
         v1={v1}
+        math={math}
         listenerPreview={v1Screen ? dock ?? (v1Screen === 'night' ? 'quiet' : 'idle') : undefined}
       />
     </div>
