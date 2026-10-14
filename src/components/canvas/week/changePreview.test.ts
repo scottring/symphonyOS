@@ -20,6 +20,11 @@ describe('changePreview', () => {
     ])
     expect([...p.leaving]).toEqual(['a', 'b'])
   })
+  it('finds a nested step the set places, so its dashed row carries the task', () => {
+    const step = task('s1', { parentTaskId: 'p' })
+    const p = changePreview({ key: 'n', title: '1 change', ops: [{ key: 'n:0', op: 'place', taskId: 's1', title: 'Buy paint', date: '2026-10-14' }] }, [task('p', { subtasks: [step] })])
+    expect(p.byDay.get('2026-10-14')![0].task).toBe(step)
+  })
   it('nothing pending, nothing drawn', () => {
     const p = changePreview(null, [])
     expect(p.byDay.size).toBe(0)

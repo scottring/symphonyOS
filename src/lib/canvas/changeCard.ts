@@ -29,6 +29,13 @@ export interface ChangeOp {
 
 export interface ChangeSet { key: string; title: string; ops: ChangeOp[] }
 
+/** Tasks with their steps (and Today-group members) laid out flat. The app
+ *  holds steps inside their parent's `subtasks`; Symphony reads them as
+ *  ordinary tasks, so a set may name one. */
+export function withSteps(tasks: readonly Task[]): Task[] {
+  return tasks.flatMap((t) => [t, ...(t.subtasks ?? [])])
+}
+
 /** The local moment an op names: its date at its time, or at midnight. */
 export function opWhen(op: ChangeOp): Date | undefined {
   if (!op.date) return undefined

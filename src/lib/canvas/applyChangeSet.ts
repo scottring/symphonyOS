@@ -7,7 +7,7 @@
 // saved. One Undo reverses the lot, newest first.
 
 import type { Task, TaskBucket } from '@/types/task'
-import { opWhen, opWrite, type ChangeSet } from './changeCard'
+import { opWhen, opWrite, withSteps, type ChangeSet } from './changeCard'
 
 export interface ApplyDeps {
   tasks: Task[]
@@ -27,7 +27,7 @@ export type ApplyResult =
 const movedSince = (task: Task, seen: string) => task.updatedAt.getTime() > Math.floor(Date.parse(seen)) + 1
 
 export async function applyChangeSet(set: ChangeSet, deps: ApplyDeps): Promise<ApplyResult> {
-  const byId = new Map(deps.tasks.map((t) => [t.id, t]))
+  const byId = new Map(withSteps(deps.tasks).map((t) => [t.id, t]))
   for (const op of set.ops) {
     if (!op.taskId) continue
     const t = byId.get(op.taskId)

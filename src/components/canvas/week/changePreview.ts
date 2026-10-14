@@ -4,7 +4,7 @@
 
 import type { Task } from '@/types/task'
 import type { ChangeSet } from '@/lib/canvas/changeCard'
-import { opWhen } from '@/lib/canvas/changeCard'
+import { opWhen, withSteps } from '@/lib/canvas/changeCard'
 import { localYmd } from '@/lib/cadence/config'
 import type { CanvasDay, CanvasDayItem } from './WeekCanvas'
 import type { ShelfGroup } from './weekShelf'
@@ -15,7 +15,7 @@ export function changePreview(set: ChangeSet | null, tasks: Task[]): ChangePrevi
   const byDay = new Map<string, CanvasDayItem[]>()
   const leaving = new Set<string>()
   if (!set) return { byDay, leaving }
-  const byId = new Map(tasks.map((t) => [t.id, t]))
+  const byId = new Map(withSteps(tasks).map((t) => [t.id, t]))
   for (const op of set.ops) {
     if (op.taskId && op.op !== 'assign') leaving.add(op.taskId)
     if ((op.op === 'place' || op.op === 'add') && op.date) {

@@ -72,4 +72,13 @@ describe('applyChangeSet', () => {
     await applyChangeSet({ key: 'x', title: '1 change', ops: [{ key: 'x:0', op: 'add', title: 'Call the bank', assignee: 'm1' }] }, d)
     expect(d.addTask).toHaveBeenCalledWith('Call the bank', undefined, { bucket: 'week', weekStart: new Date(2026, 9, 10), assignedTo: 'm1', assignedToAll: ['m1'] })
   })
+
+  it('finds a step nested inside its parent (read_week lists steps as ordinary tasks)', async () => {
+    const step = task('s1', { parentTaskId: 'p' })
+    const parent = task('p', { subtasks: [step] })
+    const d = deps({ tasks: [parent] })
+    const r = await applyChangeSet({ key: 'n', title: '1 change', ops: [{ key: 'n:0', op: 'someday', taskId: 's1', title: 's1', seen }] }, d)
+    expect(r).toMatchObject({ ok: true, ids: ['s1'] })
+    expect(d.updateTask).toHaveBeenCalledWith('s1', { bucket: 'someday', scheduledFor: undefined, isAllDay: undefined })
+  })
 })
