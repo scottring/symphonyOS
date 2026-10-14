@@ -236,3 +236,8 @@
 .wc-noday-chip { display: inline-flex; border: 1px dashed #b9b9b3; border-radius: 999px; background: #fff; }
 .wc-noday-open { font: inherit; font-size: 13px; padding: 5px 11px; min-height: 32px; background: none; border: 0; color: inherit; cursor: pointer; }
 .dark .wc-noday-chip { background: transparent; border-color: #4a5352; }
+.wc-noday-chip { align-items: center; flex-wrap: wrap; }
+.wc-noday-glyph { width: 11px; height: 11px; margin-left: 10px; border-radius: 3px; border: 1.5px solid var(--color-sage-500); background: var(--color-sage-50); }
+.wc-noday-chip.is-routine .wc-noday-open { padding-left: 6px; }
+.wc-noday-open[draggable="true"] { cursor: grab; }
+.wc-noday-add { font: inherit; font-size: 15px; min-width: 44px; min-height: 44px; background: none; border: 0; color: inherit; }

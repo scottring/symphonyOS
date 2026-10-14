@@ -407,19 +407,33 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
   const unplaced = shelf.flatMap((g) => g.rows.map((r) => r.task))
   // Dragging a day's task: the line shows (even empty) so it can be dropped back.
   const draggingPlaced = drag?.kind === 'task' && !!drag.fromKey
+  // A chip: the title is what the pointer grabs (desktop) and what opens the
+  // item; on the phone a + beside it gives the day, since touch can't drag.
+  const nodayChip = (kind: 'task' | 'routine', id: string, title: string, onPlace: (d: Date) => void) => {
+    const key = `noday:${kind}:${id}`
+    return (
+      <li key={key} className={`wc-noday-chip${kind === 'routine' ? ' is-routine' : ''}`}>
+        {kind === 'routine' && <span className="wc-noday-glyph" aria-hidden="true" />}
+        <button type="button" className="wc-noday-open" draggable={!phone}
+          onDragStart={(ev) => startDrag(ev, { kind, id, date: localYmd(weekStart), title }, { kind, id })}
+          onDragEnd={endDrag}
+          onClick={() => writers.open(`${kind}-${id}`)}>{title}</button>
+        {phone && (
+          <button type="button" className="wc-noday-add" aria-label={`Give ${title} a day`} aria-expanded={picker?.key === key}
+            onClick={() => { setMenu(null); setPicker(picker?.key === key ? null : { key, mode: 'place' }) }}>+</button>
+        )}
+        {pick(key, title, onPlace)}
+      </li>
+    )
+  }
   const shelfLine = (
     <span className="wc-tray">
-      {(unplaced.length > 0 || draggingPlaced) && (
+      {(unplaced.length > 0 || routinesToPlace.length > 0 || draggingPlaced) && (
         <span className={`wc-noday${overShelf ? ' is-over' : ''}`} data-explain="still-to-place" data-explain-label="No day yet" {...shelfDrop}>
           <span className="wc-noday-label">No day yet</span>
           <ul className="wc-noday-chips" aria-label="No day yet">
-            {unplaced.map((t) => (
-              <li key={t.id} draggable={!phone} className="wc-noday-chip"
-                onDragStart={(ev) => startDrag(ev, { kind: 'task', id: t.id, date: localYmd(weekStart), title: t.title }, { kind: 'task', id: t.id })}
-                onDragEnd={endDrag}>
-                <button type="button" className="wc-noday-open" onClick={() => writers.open(`task-${t.id}`)}>{t.title}</button>
-              </li>
-            ))}
+            {unplaced.map((t) => nodayChip('task', t.id, t.title, (d) => writers.placeTask(t, d)))}
+            {routinesToPlace.map((r) => nodayChip('routine', r.id, r.title, (d) => writers.placeRoutine(r, d)))}
           </ul>
         </span>
       )}

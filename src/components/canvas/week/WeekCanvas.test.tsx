@@ -98,7 +98,7 @@ describe('WeekCanvas — drag', () => {
   it('a No day yet chip carries the plan payload; the day says where it lands; the drop places it', () => {
     const w = show()
     const d = dt()
-    fireEvent.dragStart(screen.getByText('Book the cabin').closest('li')!, { dataTransfer: d.t })
+    fireEvent.dragStart(screen.getByText('Book the cabin'), { dataTransfer: d.t })
     expect(JSON.parse(d.data['application/x-symphony-plan'])).toEqual({ kind: 'task', id: 'a', date: '2026-10-03', title: 'Book the cabin' })
     d.arm()
     const mon = screen.getByTestId('journal-day-2026-10-05')
@@ -107,6 +107,17 @@ describe('WeekCanvas — drag', () => {
     expect(within(mon).getByText('Drop on Mon 5')).toBeInTheDocument()
     fireEvent.drop(mon, { dataTransfer: d.t })
     expect(w.placeTask).toHaveBeenCalledWith(cabin, dayOf(2))
+  })
+
+  it('a weekly routine chip drags onto a day and is placed there', () => {
+    const w = show()
+    const d = dt()
+    const chip = within(screen.getByRole('list', { name: 'No day yet' })).getByText('Mow the lawn')
+    fireEvent.dragStart(chip, { dataTransfer: d.t })
+    expect(JSON.parse(d.data['application/x-symphony-plan'])).toMatchObject({ kind: 'routine', id: 'r1' })
+    d.arm()
+    fireEvent.drop(screen.getByTestId('journal-day-2026-10-05'), { dataTransfer: d.t })
+    expect(w.placeRoutine).toHaveBeenCalledWith({ id: 'r1', title: 'Mow the lawn' }, dayOf(2))
   })
 
   it('a day’s row dropped on the No day yet line loses its day', () => {
@@ -211,9 +222,16 @@ describe('WeekCanvas — phone', () => {
     expect(screen.queryByText('Pick up the keys')).toBeNull()
     fireEvent.click(chips.getByRole('button', { name: /Wednesday, October 7/ }))
     expect(screen.getByText('Pick up the keys')).toBeInTheDocument()
-    expect(screen.getByText('Book the cabin').closest('li')).toHaveAttribute('draggable', 'false')
+    expect(screen.getByText('Book the cabin')).toHaveAttribute('draggable', 'false')
     fireEvent.click(screen.getByText('Book the cabin'))
     expect(w.open).toHaveBeenCalledWith('task-a')
+    fireEvent.click(screen.getByRole('button', { name: 'Give Book the cabin a day' }))
+    const inline = screen.getByRole('group', { name: 'Give it a day: Book the cabin' })
+    fireEvent.click(within(inline).getByRole('button', { name: /Thursday, October 8/ }))
+    expect(w.placeTask).toHaveBeenCalledWith(cabin, dayOf(5))
+    fireEvent.click(screen.getByRole('button', { name: 'Give Mow the lawn a day' }))
+    fireEvent.click(within(screen.getByRole('group', { name: 'Give it a day: Mow the lawn' })).getByRole('button', { name: /Sunday, October 4/ }))
+    expect(w.placeRoutine).toHaveBeenCalledWith({ id: 'r1', title: 'Mow the lawn' }, dayOf(1))
   })
 })
 
@@ -279,6 +297,8 @@ describe('WeekCanvas — calendar first', () => {
     expect(within(line).getByText('Service the car')).toBeInTheDocument()
     expect(within(line).queryByText('Pick up the keys')).toBeNull()
     expect(within(line).getByText('Book the cabin').closest('[draggable="true"]')).not.toBeNull()
+    expect(within(line).getByText('Mow the lawn')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Give .* a day/ })).toBeNull()
     fireEvent.click(within(line).getByText('Call the bank'))
     expect(w.open).toHaveBeenCalledWith('task-c')
     expect(screen.getByText('3 days ahead are wide open.')).toBeInTheDocument()
