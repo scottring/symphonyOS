@@ -197,6 +197,20 @@ describe('WeekCanvas — phone', () => {
   })
   afterEach(() => { window.matchMedia = original })
 
+  it('selects the one day Symphony points at, once, and lets a tap choose another', () => {
+    const d = days()
+    const el = (pointing: Parameters<typeof WeekCanvas>[0]['pointing']) => (
+      <WeekCanvas weekStart={weekStart} days={d} shelf={shelf()} routinesToPlace={[]} isCurrent writers={writers()} pointing={pointing} />
+    )
+    const { rerender } = render(el(null))
+    rerender(el({ dates: new Set([d[4].key]), taskIds: new Set() }))
+    expect(screen.getByTestId(`journal-day-${d[4].key}`)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^Wednesday/, pressed: true })).toHaveClass('is-pointed')
+    expect(screen.queryByTestId(`journal-day-${d[1].key}`)).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: new RegExp(d[1].date.toLocaleDateString('en-US', { weekday: 'long' })) }))
+    expect(screen.getByTestId(`journal-day-${d[1].key}`)).toBeInTheDocument()
+  })
+
   // 2026-10-14 browser check: at 390px the line said "Friday is wide open"
   // while Friday had four calendar events. The sentence must read the same
   // days at every width.
@@ -406,5 +420,18 @@ describe('WeekCanvas — days gone by', () => {
     expect(row).toHaveTextContent('proposed, not saved yet')
     fireEvent.click(row)
     expect(w.open).not.toHaveBeenCalled()
+  })
+})
+
+describe('what Symphony points at', () => {
+  it('lights up the days and rows Symphony is talking about', () => {
+    const d = days()
+    render(<WeekCanvas weekStart={weekStart} days={d} shelf={shelf()} routinesToPlace={[]} isCurrent writers={writers()}
+      pointing={{ dates: new Set([d[4].key]), taskIds: new Set(['p', 'c']) }} />)
+    expect(screen.getByTestId(`journal-day-${d[4].key}`)).toHaveClass('is-pointed')
+    expect(screen.getByTestId(`journal-day-${d[3].key}`)).not.toHaveClass('is-pointed')
+    expect(screen.getByText('Pick up the keys').closest('li')).toHaveClass('is-pointed')
+    expect(screen.getByText('Call the bank').closest('li')).toHaveClass('is-pointed')
+    expect(screen.getByText('Book the cabin').closest('li')).not.toHaveClass('is-pointed')
   })
 })

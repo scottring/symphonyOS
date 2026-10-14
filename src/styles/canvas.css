@@ -241,3 +241,12 @@
 .wc-noday-chip.is-routine .wc-noday-open { padding-left: 6px; }
 .wc-noday-open[draggable="true"] { cursor: grab; }
 .wc-noday-add { font: inherit; font-size: 15px; min-width: 44px; min-height: 44px; background: none; border: 0; color: inherit; }
+
+/* Week: the Symphony halo on what the conversation is pointing at (Task 21). */
+.wc-day.is-pointed { box-shadow: 0 0 0 2px #1b6a64, 0 0 0 6px #ddece8; border-radius: 10px; transition: box-shadow 280ms ease-out; }
+.wc-dayrow.is-pointed, .wc-noday-chip.is-pointed { box-shadow: 0 0 0 2px #1b6a64; background: #ddece8; border-radius: 6px; transition: box-shadow 200ms ease-out, background 200ms ease-out; }
+.wc-daychip.is-pointed { box-shadow: 0 0 0 2px #1b6a64; transition: box-shadow 200ms ease-out; }
+.dark .wc-day.is-pointed { box-shadow: 0 0 0 2px #6cc4b9, 0 0 0 6px #1c3634; }
+.dark .wc-dayrow.is-pointed, .dark .wc-noday-chip.is-pointed { box-shadow: 0 0 0 2px #6cc4b9; background: #1c3634; }
+.dark .wc-daychip.is-pointed { box-shadow: 0 0 0 2px #6cc4b9; }
+@media (prefers-reduced-motion: reduce) { .wc-day.is-pointed, .wc-dayrow.is-pointed, .wc-noday-chip.is-pointed, .wc-daychip.is-pointed { transition: none; } }

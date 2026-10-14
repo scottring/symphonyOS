@@ -118,6 +118,8 @@ export interface WeekCanvasProps {
   /** Every-day routines in each day, or written once above (the page's
    *  remembered choice). */
   daily?: { shown: boolean; onToggle: () => void }
+  /** What Symphony is talking about right now: lit with the teal halo. */
+  pointing?: { dates: Set<string>; taskIds: Set<string> } | null
 }
 
 type Drag = { kind: 'task' | 'routine' | 'occ'; id: string; groupKey?: string; fromKey?: string }
@@ -125,7 +127,7 @@ type Picker = { key: string } | null
 
 const longDay = (d: Date) => d.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
 
-export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [], isCurrent, writers, spans = [], dayDescriptions, members = [], daily }: WeekCanvasProps) {
+export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [], isCurrent, writers, spans = [], dayDescriptions, members = [], daily, pointing }: WeekCanvasProps) {
   const phone = useMediaQuery('(max-width: 767px)')
   const slots = useContext(PlanMastheadSlotsContext)
   const [showDone, setShowDone] = useState(false)
@@ -137,6 +139,17 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
   const todayKey = localYmd(new Date())
   const [chosenDay, setChosenDay] = useState<string | null>(null)
   const selectedKey = chosenDay && days.some((d) => d.key === chosenDay) ? chosenDay : (days.find((d) => d.key === todayKey) ?? days[0])?.key
+
+  const pointedDay = (key: string) => !!pointing?.dates.has(key)
+  const pointedTask = (id?: string) => !!id && !!pointing?.taskIds.has(id)
+  // On the phone, pointing at exactly one day of this week shows that day. It
+  // happens when the pointing changes, so a tap on another day sticks.
+  const [seenPointing, setSeenPointing] = useState(pointing)
+  if (pointing !== seenPointing) {
+    setSeenPointing(pointing)
+    const only = pointing && pointing.dates.size === 1 ? [...pointing.dates][0] : null
+    if (only && days.some((d) => d.key === only)) setChosenDay(only)
+  }
 
   const dates = days.map((d) => d.date)
   const memberById = new Map(members.map((m) => [m.id, m]))
@@ -224,7 +237,7 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
   const dayRow = (it: CanvasDayItem, day: CanvasDay) => {
     if (it.proposed) {
       return (
-        <li key={`${day.key}:${it.id}`} className="cw-row wc-dayrow is-proposed" data-testid="proposed-row">
+        <li key={`${day.key}:${it.id}`} className={`cw-row wc-dayrow is-proposed${pointedTask(it.task?.id) ? ' is-pointed' : ''}`} data-testid="proposed-row">
           <span className="canvas-item-title">
             <span className="cw-title">{it.title}</span>
             {it.time && <span className="cw-sub"><span className="cw-meta">{formatTimeCompact(it.time)}</span></span>}
@@ -237,7 +250,7 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
     const entityId = it.task?.id ?? it.routineId ?? it.id
     const row: CompactRow<CanvasDayItem> = { key, id: entityId, title: it.title, item: it, completed: it.completed, meta: it.time ? formatTimeCompact(it.time) : null }
     return (
-      <CompactWeekRow key={key} row={row} className={`wc-dayrow${it.kind === 'routine' ? ' is-routine' : ''}`}
+      <CompactWeekRow key={key} row={row} className={`wc-dayrow${it.kind === 'routine' ? ' is-routine' : ''}${pointedTask(it.task?.id) ? ' is-pointed' : ''}`}
         onComplete={(x) => (x.task ? writers.toggleTask(x.task) : writers.toggleRoutine(x, day.date))}
         onOpen={(x) => writers.open(x.id)}
         onDragStart={phone ? undefined : (x, ev) => x.task
@@ -256,7 +269,7 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
     // A day gone by steps back; today and the days ahead stay at full strength.
     const gone = day.key < todayKey
     return (
-      <section key={day.key} className={`wc-day${day.key === todayKey ? ' is-today' : ''}${gone ? ' is-past' : ''}${over ? ' is-over' : ''}${empty ? ' is-empty' : ''}`}
+      <section key={day.key} className={`wc-day${day.key === todayKey ? ' is-today' : ''}${gone ? ' is-past' : ''}${over ? ' is-over' : ''}${empty ? ' is-empty' : ''}${pointedDay(day.key) ? ' is-pointed' : ''}`}
         style={col ? { gridColumn: col } : undefined}
         aria-label={longDay(day.date)} data-testid={`journal-day-${day.key}`} {...dayDrop(day)}>
         <header className="wc-dayhead">
@@ -340,9 +353,10 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
   // A chip: the title is what the pointer grabs (desktop) and what opens the
   // item; on the phone a + beside it gives the day, since touch can't drag.
   const nodayChip = (kind: 'task' | 'routine', id: string, title: string, onPlace: (d: Date) => void) => {
+    const lit = kind === 'task' && pointedTask(id)
     const key = `noday:${kind}:${id}`
     return (
-      <li key={key} className={`wc-noday-chip${kind === 'routine' ? ' is-routine' : ''}`}>
+      <li key={key} className={`wc-noday-chip${kind === 'routine' ? ' is-routine' : ''}${lit ? ' is-pointed' : ''}`}>
         {kind === 'routine' && <span className="wc-noday-glyph" aria-hidden="true" />}
         <button type="button" className="wc-noday-open" draggable={!phone}
           onDragStart={(ev) => startDrag(ev, { kind, id, date: localYmd(weekStart), title }, { kind, id })}
@@ -410,7 +424,7 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
         {subtitleNode}
         <div className="wc-daychips" role="group" aria-label="Days">
           {days.map((d) => (
-            <button key={d.key} type="button" className={`wc-daychip${d.key === todayKey ? ' is-today' : ''}`} aria-pressed={d.key === selectedKey}
+            <button key={d.key} type="button" className={`wc-daychip${d.key === todayKey ? ' is-today' : ''}${pointedDay(d.key) ? ' is-pointed' : ''}`} aria-pressed={d.key === selectedKey}
               aria-label={longDay(d.date)} onClick={() => setChosenDay(d.key)}>
               <span className="wc-daychip-name">{d.date.toLocaleDateString('en-US', { weekday: 'short' })}</span>
               <span className="wc-daychip-num">{d.date.getDate()}</span>

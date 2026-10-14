@@ -836,7 +836,8 @@ export function WeekViewV2(props: WeekViewV2Props) {
     <WeekCanvas weekStart={weekAnchor} days={shown.days} shelf={shown.shelf} routinesToPlace={routinesToPlace}
       rhythm={canvasDays.lines} isCurrent={weekIsCurrentFor(weekAnchor)} writers={canvasWriters}
       spans={canvasSpans} dayDescriptions={canvasDayDescriptions} members={familyMembers}
-      daily={canvasDays.hasDaily ? { shown: dailyShown, onToggle: toggleDaily } : undefined} />
+      daily={canvasDays.hasDaily ? { shown: dailyShown, onToggle: toggleDaily } : undefined}
+      pointing={activity.pointing} />
   )
 
   // A past week is a look-back, not a plan.
