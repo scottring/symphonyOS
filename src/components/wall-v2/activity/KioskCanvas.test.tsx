@@ -22,7 +22,7 @@ vi.mock('@/hooks/useHandsetState', () => ({ useHandsetState: () => ({ offHook: f
 const placeCall = vi.fn()
 vi.mock('@/lib/telephony/placeCall', () => ({ placeCall: (...a: unknown[]) => placeCall(...a) }))
 
-import { KioskCanvas, type KioskCanvasProps, type KioskTools } from './KioskCanvas'
+import { KioskCanvas, type KioskCanvasProps, type KioskTools, type KioskV1Data } from './KioskCanvas'
 import { Plus, Moon } from 'lucide-react'
 import { useKioskActivity } from './useKioskActivity'
 import type { KioskDinner } from './KioskStages'
@@ -233,5 +233,33 @@ describe('KioskCanvas frame', () => {
     fireEvent.click(bar().getByRole('button', { name: /Back/ }))
     expect(place()).toBe('Home · Evening')
     expect(placeCall).not.toHaveBeenCalled()
+  })
+})
+
+const v1Rest: KioskV1Data = {
+  pick: { screen: 'rest', title: 'A quiet afternoon', dark: false },
+  anchors: { morning: null, home: null, dinner: null, bedtime: null } as unknown as KioskV1Data['anchors'],
+  kids: [], restLine: 'Quiet', restSub: null, notes: [], talks: [], question: null,
+  tomorrow: { label: 'Thursday', outTheDoor: null, specials: [] },
+  weekend: { rows: [], anytime: [], tomorrow: [], tomorrowLabel: 'Thursday' },
+  onNotes: vi.fn(), next: null,
+}
+const topBand = () => within(screen.getByRole('banner'))
+
+describe('KioskCanvas settings button', () => {
+  beforeEach(() => { localStorage.clear() })
+
+  it('v1 wall shows a visible Settings button in the top band that opens the More sheet', () => {
+    render(<Harness v1={v1Rest} />)
+    const btn = topBand().getByRole('button', { name: 'Settings' })
+    expect(btn).toHaveTextContent('Settings')
+    expect(screen.queryByRole('dialog', { name: 'More' })).toBeNull()
+    fireEvent.click(btn)
+    expect(screen.getByRole('dialog', { name: 'More' })).toBeInTheDocument()
+  })
+
+  it('the non-v1 wall has no Settings button in the top band', () => {
+    render(<Harness />)
+    expect(topBand().queryByRole('button', { name: 'Settings' })).toBeNull()
   })
 })

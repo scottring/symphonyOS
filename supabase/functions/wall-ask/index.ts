@@ -7,7 +7,7 @@
 // unauthenticated request can't bill the key. No service role.
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import { buildWallPrompt, cleanAnswer, MAX_QUESTION } from './prompt.ts'
+import { buildWallPrompt, parseAskBody, replyFromResponse } from './prompt.ts'
 
 const MODEL = Deno.env.get('WALL_ASK_MODEL') || 'claude-haiku-5-5'
 
@@ -35,25 +35,23 @@ Deno.serve(async (req) => {
   const { data: { user }, error: authErr } = await db.auth.getUser()
   if (authErr || !user) return json({ error: 'Invalid token' }, 401)
 
-  let body: { question?: string; snapshot?: string }
-  try { body = await req.json() } catch { return json({ error: 'Invalid JSON body' }, 400) }
-  const question = body.question?.trim() ?? ''
-  const snapshot = body.snapshot?.trim() ?? ''
-  if (!question || question.length > MAX_QUESTION) return json({ error: 'question required (≤300 characters)' }, 400)
-  if (!snapshot) return json({ error: 'snapshot required' }, 400)
+  let raw: unknown
+  try { raw = await req.json() } catch { return json({ error: 'Invalid JSON body' }, 400) }
+  const parsed = parseAskBody(raw)
+  if ('error' in parsed) return json({ error: parsed.error }, 400)
+  const { question, snapshot } = parsed
 
   const { system, user: content } = buildWallPrompt(question, snapshot)
   try {
     const res = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: { 'content-type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
-      body: JSON.stringify({ model: MODEL, max_tokens: 160, system, messages: [{ role: 'user', content }] }),
+      body: JSON.stringify({ model: MODEL, max_tokens: 1024, system, messages: [{ role: 'user', content }] }),
     })
     if (!res.ok) return json({ error: `Anthropic returned ${res.status}: ${(await res.text()).slice(0, 200)}` }, 502)
-    const data = (await res.json()) as { content?: { type: string; text?: string }[] }
-    const text = data.content?.find((b) => b.type === 'text')?.text
-    if (!text) return json({ error: 'No answer' }, 502)
-    return json({ answer: cleanAnswer(text) })
+    const reply = replyFromResponse(await res.json())
+    if (!reply) return json({ error: 'No complete answer' }, 502)
+    return json(reply)
   } catch (e) {
     return json({ error: e instanceof Error ? e.message : 'Ask failed' }, 502)
   }

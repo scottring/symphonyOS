@@ -16,7 +16,7 @@
 // one adult's own tasks dropped by wallTodayRows). Nothing here adds a query.
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { ArrowLeft, Home, ChevronRight, Timer, Phone, ShoppingCart, ChefHat, MoreHorizontal, X } from 'lucide-react'
+import { ArrowLeft, Home, ChevronRight, Timer, Phone, ShoppingCart, ChefHat, MoreHorizontal, Settings, X } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import type { FamilyMember } from '@/types/family'
 import type { WallMoment } from '@/lib/wall/wallMoment'
@@ -364,6 +364,7 @@ export function KioskCanvas(p: KioskCanvasProps) {
         </div>
         <div className="kc-top-right">
           {W && <span className="kc-weather" title={W.condition}><W.icon aria-hidden="true" />{Math.round(W.temp)}° · {W.condition.toLowerCase()}</span>}
+          {v1 && <button type="button" className="kv-settings" onClick={() => setMoreOpen(true)}><Settings aria-hidden="true" /><span>Settings</span></button>}
           {!v1 && <span className="kc-context"><Home aria-hidden="true" />Household</span>}
         </div>
       </header>

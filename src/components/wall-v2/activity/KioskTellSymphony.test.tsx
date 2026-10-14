@@ -1,9 +1,10 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { askWall } from '@/lib/wall/voice/wallVoiceActions'
 import { KioskTellSymphony, type WallVoice } from './KioskTellSymphony'
 
 vi.mock('@/lib/wall/voice/wallVoiceActions', () => ({
-  askWall: vi.fn(async () => 'Mia has swim at 4:15.'),
+  askWall: vi.fn(async (): Promise<{ answer: string } | { change: string }> => ({ answer: 'Mia has swim at 4:15.' })),
   speechFor: vi.fn(async () => null),
 }))
 
@@ -66,6 +67,17 @@ describe('Tell Symphony with the wall listener', () => {
     await act(async () => FakeSocket.last!.emit({ type: 'heard', id: '2', text: 'Is Mia at swim today?', via: 'wake' }))
     expect(await screen.findAllByText('Mia has swim at 4:15.')).not.toHaveLength(0)
     await waitFor(() => expect(FakeSocket.last!.sent).toContainEqual({ type: 'say', text: 'Mia has swim at 4:15.' }))
+  })
+
+  it('a request to change something the wall cannot change is saved to the Inbox, with Undo', async () => {
+    vi.mocked(askWall).mockResolvedValueOnce({ change: 'add Feed Jax to Ella’s morning routine' })
+    const v = voice()
+    render(<KioskTellSymphony onCommand={() => ''} voice={v} />)
+    await act(async () => FakeSocket.last!.open())
+    await act(async () => FakeSocket.last!.emit({ type: 'heard', id: '9', text: 'can we add feed Jax to Ella’s morning routine', via: 'wake' }))
+    await waitFor(() => expect(v.save).toHaveBeenCalledWith({ kind: 'inbox', text: 'add Feed Jax to Ella’s morning routine' }))
+    expect(await screen.findAllByText(/I saved it to your inbox: add Feed Jax to Ella’s morning routine/)).not.toHaveLength(0)
+    expect(screen.getByRole('button', { name: /Undo/ })).toBeInTheDocument()
   })
 
   it('tapping the pill listens; the mic button mutes', async () => {

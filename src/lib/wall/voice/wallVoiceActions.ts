@@ -79,13 +79,18 @@ export async function speechFor(text: string): Promise<string | null> {
   return wav
 }
 
+/** wall-ask's verdict: an answer, or a request to change something the wall
+ *  can't change yet (the tidied request, to be saved to the Inbox). */
+export type WallAsk = { answer: string } | { change: string }
+
 /** A spoken question, answered from what the wall shows (wall-ask). */
-export async function askWall(question: string, snapshot: string): Promise<string> {
+export async function askWall(question: string, snapshot: string): Promise<WallAsk> {
   const { data, error } = await supabase.functions.invoke('wall-ask', { body: { question, snapshot } })
-  const answer = (data as { answer?: string } | null)?.answer
-  if (error || !answer) {
+  const r = data as { answer?: string; change?: string } | null
+  if (!error && r?.change) return { change: r.change }
+  if (error || !r?.answer) {
     console.error('[wall-voice] ask failed:', error?.message ?? data)
-    return 'Sorry, I couldn’t answer that just now.'
+    return { answer: 'Sorry, I couldn’t answer that just now.' }
   }
-  return answer
+  return { answer: r.answer }
 }
