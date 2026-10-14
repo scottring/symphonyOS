@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, fireEvent, within, act } from '@testing-library/react'
+import { render, screen, fireEvent, within, act, waitFor } from '@testing-library/react'
 import { Sun } from 'lucide-react'
 
 // No network: Supabase, the recipe read, the phone book and placeCall are all
@@ -18,6 +18,10 @@ vi.mock('@/hooks/useKidPhoneContacts', () => ({
   callableContacts: (cs: { enabled?: boolean }[]) => cs.filter((c) => c.enabled !== false),
   partitionContacts: (cs: { favorite: boolean }[]) => ({ favorites: cs.filter((c) => c.favorite), others: cs.filter((c) => !c.favorite) }),
 }))
+vi.mock('@/lib/wall/voice/wallVoiceActions', () => ({
+  askWall: vi.fn(async (): Promise<{ answer: string } | { change: string }> => ({ answer: 'Turkey chili.' })),
+  speechFor: vi.fn(async () => null),
+}))
 vi.mock('@/hooks/useHandsetState', () => ({ useHandsetState: () => ({ offHook: false }) }))
 const placeCall = vi.fn()
 vi.mock('@/lib/telephony/placeCall', () => ({ placeCall: (...a: unknown[]) => placeCall(...a) }))
@@ -30,6 +34,7 @@ import type { KioskDinner } from './KioskStages'
 import type { FamilyMember } from '@/types/family'
 import type { GroceryLine, GroceryLineResult } from '@/lib/wall/activity/groceryProposal'
 import { buildBedtimeGrid } from '@/lib/wall/activity/kioskRoutines'
+import { askWall } from '@/lib/wall/voice/wallVoiceActions'
 
 const NOW = new Date(2026, 9, 10, 17, 30)
 const members = [{ id: 'sk', name: 'Scott', initials: 'SK' }, { id: 'el', name: 'Ella', initials: 'EL' }] as unknown as FamilyMember[]
@@ -246,34 +251,51 @@ const v1Rest: KioskV1Data = {
   onNotes: vi.fn(), next: null,
 }
 const topBand = () => within(screen.getByRole('banner'))
+const dock = () => within(screen.getByRole('contentinfo', { name: 'Kiosk' }))
 
-describe('KioskCanvas settings button', () => {
+describe('Kitchen wall v2: the frame', () => {
   beforeEach(() => { localStorage.clear() })
 
-  it('v1 wall shows a visible Settings button in the top band that opens the More sheet', () => {
+  it('the top band has no Settings button; More opens in place of the side column, not as a sheet', () => {
     render(<Harness v1={v1Rest} />)
-    const btn = topBand().getByRole('button', { name: 'Settings' })
-    expect(btn).toHaveTextContent('Settings')
-    expect(screen.queryByRole('dialog', { name: 'More' })).toBeNull()
-    fireEvent.click(btn)
-    expect(screen.getByRole('dialog', { name: 'More' })).toBeInTheDocument()
+    expect(topBand().queryByRole('button', { name: 'Settings' })).toBeNull()
+    expect(topBand().getByRole('heading', { level: 1 })).toHaveTextContent('A quiet afternoon')
+    fireEvent.click(dock().getByRole('button', { name: 'More' }))
+    expect(screen.queryByRole('dialog')).toBeNull()
+    const more = screen.getByRole('region', { name: 'More' })
+    expect(within(more).getAllByRole('button').map((b) => b.querySelector('b')?.textContent ?? b.textContent))
+      .toEqual(['Done', 'Type instead', 'Call', 'Dark view', 'Voice is off'])
+    // The lead stays, the side column gives way.
+    expect(screen.getByRole('region', { name: 'Today' })).toBeInTheDocument()
+    expect(screen.queryByRole('complementary', { name: 'The rest of today' })).toBeNull()
+    fireEvent.click(within(more).getByRole('button', { name: 'Done' }))
+    expect(screen.queryByRole('region', { name: 'More' })).toBeNull()
+    expect(screen.getByRole('complementary', { name: 'The rest of today' })).toBeInTheDocument()
   })
 
-  it('the non-v1 wall has no Settings button in the top band', () => {
-    render(<Harness />)
-    expect(topBand().queryByRole('button', { name: 'Settings' })).toBeNull()
+  it('Type instead opens a typing field in the dock pill; what is typed runs like speech', () => {
+    render(<Harness v1={v1Rest} />)
+    fireEvent.click(dock().getByRole('button', { name: 'More' }))
+    fireEvent.click(screen.getByRole('button', { name: /Type instead/ }))
+    expect(screen.queryByRole('region', { name: 'More' })).toBeNull()
+    fireEvent.change(dock().getByLabelText('Type to Symphony'), { target: { value: 'timer 5 minutes' } })
+    fireEvent.click(dock().getByRole('button', { name: 'Send' }))
+    const reply = screen.getByRole('status', { name: 'Symphony says' })
+    expect(reply).toHaveTextContent('You said “timer 5 minutes”')
+    expect(reply).toHaveTextContent('Timer · 5 min')
+    expect(dock().queryByLabelText('Type to Symphony')).toBeNull()
   })
 })
 
 // Wired like WallV2Shell: the automatic value feeds the hook, the effective
-// value goes into the v1 pick and the More sheet's theme item.
+// value goes into the v1 pick and the More panel's theme tile.
 function ThemedWall({ auto }: { auto: boolean }) {
   const { dark, toggle } = useWallTheme(auto)
   const themed: KioskTools = {
     ...tools,
     more: [
       ...tools.more.filter((m) => m.id !== 'theme'),
-      { id: 'theme', label: dark ? 'Light view' : 'Dark view', sub: dark ? 'Switch the wall to light' : 'Switch the wall to dark', icon: dark ? SunIcon : Moon, onSelect: toggle },
+      { id: 'theme', label: dark ? 'Light view' : 'Dark view', sub: 'Until the wall switches by itself', icon: dark ? SunIcon : Moon, onSelect: toggle },
     ],
   }
   return <Harness isDark={dark} tools={themed} v1={{ ...v1Rest, pick: { ...v1Rest.pick, dark } }} />
@@ -282,24 +304,93 @@ function ThemedWall({ auto }: { auto: boolean }) {
 describe('More: Dark view / Light view on the v1 wall', () => {
   beforeEach(() => { localStorage.clear() })
 
-  it('toggles is-dark and the label, and survives a remount', () => {
+  it('the label follows the effective theme, toggles in place, and survives a remount', () => {
     const { container, unmount } = render(<ThemedWall auto={false} />)
     const canvas = () => container.querySelector('.kiosk-canvas') as HTMLElement
     expect(canvas()).not.toHaveClass('is-dark')
-    fireEvent.click(topBand().getByRole('button', { name: 'Settings' }))
+    fireEvent.click(dock().getByRole('button', { name: 'More' }))
     fireEvent.click(screen.getByRole('button', { name: /Dark view/ }))
     expect(canvas()).toHaveClass('is-dark')
-    fireEvent.click(topBand().getByRole('button', { name: 'Settings' }))
-    expect(screen.getByRole('button', { name: /Light view/ })).toHaveTextContent('Switch the wall to light')
+    // More stays open so the new label shows.
+    expect(screen.getByRole('button', { name: /Light view/ })).toHaveTextContent('Until the wall switches by itself')
     unmount()
     const again = render(<ThemedWall auto={false} />)
     expect(again.container.querySelector('.kiosk-canvas')).toHaveClass('is-dark')
     again.unmount()
-    // the automatic value moved on: the override is gone
+    // Dark automatically (after dinner): the tile offers Light view.
     const later = render(<ThemedWall auto={true} />)
-    fireEvent.click(topBand().getByRole('button', { name: 'Settings' }))
+    expect(later.container.querySelector('.kiosk-canvas')).toHaveClass('is-dark')
+    fireEvent.click(dock().getByRole('button', { name: 'More' }))
     expect(screen.getByRole('button', { name: /Light view/ })).toBeInTheDocument()
     expect(localStorage.getItem('symphony-wall-theme-override')).toBeNull()
     later.unmount()
+  })
+})
+
+// The Pi's listener, as the page sees it: a local WebSocket.
+class FakeSocket {
+  static last: FakeSocket | null = null
+  static OPEN = 1
+  readyState = 0
+  sent: Record<string, unknown>[] = []
+  onopen: (() => void) | null = null
+  onmessage: ((e: { data: string }) => void) | null = null
+  onclose: (() => void) | null = null
+  onerror: (() => void) | null = null
+  constructor(public url: string) { FakeSocket.last = this }
+  send(d: string) { this.sent.push(JSON.parse(d)) }
+  close() { this.onclose?.() }
+  open(over: object = {}) {
+    this.readyState = 1
+    this.onopen?.()
+    this.emit({ type: 'state', state: 'ready', wake: 'Hey Symphony', muted: false, quiet: false, ...over })
+  }
+  emit(m: object) { this.onmessage?.({ data: JSON.stringify(m) }) }
+}
+
+describe('Kitchen wall v2: the conversation dock', () => {
+  const realWS = globalThis.WebSocket
+  beforeEach(() => { localStorage.clear(); (globalThis as { WebSocket: unknown }).WebSocket = FakeSocket; FakeSocket.last = null; vi.mocked(askWall).mockClear() })
+  afterEach(() => { (globalThis as { WebSocket: unknown }).WebSocket = realWS })
+  const voice = { save: vi.fn(async () => ({ said: 'Saved.' })), snapshot: () => 'Today: nothing' }
+
+  it("the moment's suggestion chip sends its words exactly as if they were said", async () => {
+    render(<Harness v1={{ ...v1Rest, pick: { screen: 'home', title: 'Home from school', dark: false } }} voice={voice} />)
+    await act(async () => FakeSocket.last!.open())
+    expect(dock().getByText('Say “Hey Symphony”, or tap')).toBeInTheDocument()
+    await act(async () => { fireEvent.click(dock().getByRole('button', { name: 'Start a 20-minute timer' })) })
+    // The same path as speech: the command runs, the reply shows and is said back.
+    expect(screen.getByRole('status', { name: 'Symphony says' })).toHaveTextContent('You said “Start a 20-minute timer”')
+    expect(screen.getByRole('status', { name: 'Symphony says' })).toHaveTextContent('Timer · 20 min')
+    await waitFor(() => expect(FakeSocket.last!.sent).toContainEqual({ type: 'say', text: 'Timer · 20 min' }))
+  })
+
+  it('a question from the chip goes to Symphony, and the reply band shows the whole answer', async () => {
+    const long = 'Tonight is turkey chili at 6:30. Thursday is not planned yet. Friday the kids are with Grandpa and home about 8, so nothing to cook. Saturday is pizza night at 6, and Sunday is not planned yet either — you could ask me to plan the rest of the week and I will suggest something from your recipes.'
+    vi.mocked(askWall).mockResolvedValueOnce({ answer: long })
+    render(<Harness v1={v1Rest} voice={voice} />)
+    await act(async () => FakeSocket.last!.open())
+    await act(async () => { fireEvent.click(dock().getByRole('button', { name: 'What’s for dinner this week?' })) })
+    await waitFor(() => expect(askWall).toHaveBeenCalledWith("What's for dinner this week?", 'Today: nothing'))
+    const band = await screen.findByRole('status', { name: 'Symphony says' })
+    expect(within(band).getByText(long)).toBeInTheDocument()
+    expect(within(band).getByText(long)).toHaveClass('is-mid')
+  })
+
+  it('quiet hours: an outlined mic with a slash, no suggestion, and a tap still talks', async () => {
+    render(<Harness v1={v1Rest} voice={voice} />)
+    await act(async () => FakeSocket.last!.open({ state: 'quiet', quiet: true }))
+    expect(dock().getByText('Quiet hours · tap to talk')).toBeInTheDocument()
+    expect(dock().queryByRole('button', { name: 'What’s for dinner this week?' })).toBeNull()
+    fireEvent.click(dock().getByRole('button', { name: /Talk to Symphony/ }))
+    expect(FakeSocket.last!.sent).toContainEqual({ type: 'listen' })
+  })
+
+  it('More: listening on/off is a tile that mutes the listener', async () => {
+    render(<Harness v1={v1Rest} voice={voice} />)
+    await act(async () => FakeSocket.last!.open())
+    fireEvent.click(dock().getByRole('button', { name: 'More' }))
+    fireEvent.click(screen.getByRole('button', { name: /Listening is on/ }))
+    expect(FakeSocket.last!.sent).toContainEqual({ type: 'mute', on: true })
   })
 })

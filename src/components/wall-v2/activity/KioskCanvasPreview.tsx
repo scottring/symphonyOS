@@ -14,7 +14,7 @@
 // Not routed here — mount it on a dev-only route.
 
 import { useMemo, useState } from 'react'
-import { Sun, Plus, ClipboardList, StickyNote, Moon, Settings } from 'lucide-react'
+import { Sun, Plus, ClipboardList, StickyNote, Moon, Settings, Users } from 'lucide-react'
 import type { FamilyMember } from '@/types/family'
 import type { WallMoment } from '@/lib/wall/wallMoment'
 import type { WallTodayRow } from '@/lib/wall/wallMomentsModel'
@@ -26,6 +26,7 @@ import { MINUTE_MS } from '@/lib/wall/activity/kioskTimers'
 import { KioskCanvas, type KioskTools, type KioskV1Data } from './KioskCanvas'
 import type { KioskScreen } from '@/lib/wall/activity/kioskScreen'
 import { useKioskActivity } from './useKioskActivity'
+import type { ListenerPreview } from './useTellSymphony'
 import type { KioskDinner } from './KioskStages'
 
 import type { KioskScene } from './kioskScenes'
@@ -49,8 +50,24 @@ const SCENE_CLOCK: Record<KioskScene, { moment: WallMoment; h: number; min: numb
   call: { moment: 'after', h: 16, min: 52 },
 }
 
-// v1 out the door (mockup 2026-10-14): a school morning at 6:35.
-const OTD_CLOCK = { moment: 'morning' as WallMoment, h: 6, min: 35 }
+// Wall v2 moments (mockups 2026-10-14): each at the time its mockup shows.
+const V1_CLOCK: Record<KioskScreen, { moment: WallMoment; h: number; min: number }> = {
+  'out-the-door': { moment: 'morning', h: 7, min: 4 },
+  rest: { moment: 'after', h: 10, min: 40 },
+  home: { moment: 'after', h: 17, min: 52 },
+  dinner: { moment: 'dinner', h: 18, min: 24 },
+  bedtime: { moment: 'evening', h: 19, min: 52 },
+  night: { moment: 'evening', h: 21, min: 15 },
+  weekend: { moment: 'after', h: 9, min: 5 },
+}
+const V1_NEXT: Record<KioskScreen, { time: string; title: string }> = {
+  'out-the-door': { time: '7:20', title: 'Walk to school' }, rest: { time: '5:45', title: 'Home from school' }, home: { time: '6:30', title: 'Turkey chili' },
+  dinner: { time: '6:30', title: 'Turkey chili' }, bedtime: { time: '8:30', title: 'Lights out' }, night: { time: '6:45', title: 'Wake the kids' }, weekend: { time: '12:30', title: 'Lunch' },
+}
+const V1_TITLE: Record<KioskScreen, string> = {
+  'out-the-door': 'Out the door in 16 minutes', rest: 'A quiet morning', home: 'Home from school', dinner: 'Dinner',
+  bedtime: 'Bedtime · lights out in 38 min', night: 'Goodnight', weekend: 'Saturday',
+}
 const otd = (i: number, id: string, title: string, timeOfDay: string | null, by: string[] | undefined, done = false): KidRow =>
   ({ entityType: 'routine', id: `${id}-${i}`, title, done, timeOfDay, target: null, ...(by ? { by } : {}) })
 const otdMorning = (i: number, kid: string): KidRow[] => [
@@ -115,8 +132,8 @@ function sceneState(scene: KioskScene, dateKey: string, nowMs: number): KioskSta
   return s
 }
 
-export function KioskCanvasPreview({ scene = 'home-evening', theme = 'light', v1Screen }: { scene?: KioskScene; theme?: 'light' | 'dark'; v1Screen?: KioskScreen }) {
-  const clock = v1Screen === 'out-the-door' ? OTD_CLOCK : SCENE_CLOCK[scene]
+export function KioskCanvasPreview({ scene = 'home-evening', theme = 'light', v1Screen, dock }: { scene?: KioskScene; theme?: 'light' | 'dark'; v1Screen?: KioskScreen; dock?: ListenerPreview }) {
+  const clock = v1Screen ? V1_CLOCK[v1Screen] : SCENE_CLOCK[scene]
   const now = useMemo(() => { const d = new Date(2026, 9, 13); d.setHours(clock.h, clock.min, 0, 0); return d }, [clock])
   const dateKey = `fixture-${scene}`
   const [isDark, setIsDark] = useState(theme === 'dark')
@@ -129,7 +146,13 @@ export function KioskCanvasPreview({ scene = 'home-evening', theme = 'light', v1
       past: end <= now.getTime(), now: at(h, min) <= now.getTime() + 45 * 60_000 && end > now.getTime(), startsAt: at(h, min), endsAt: end,
     }
   }
-  const rows = [
+  const weekendRows = [
+    row('outing', 9, 0, 'Family outing', ['sk', 'ir', 'li', 'mi'], 'Walk, bike ride or hike, with breakfast along the way', 12, 0),
+    row('lunch', 12, 30, 'Lunch', [], null, 13, 15),
+    row('prep', 17, 30, 'Prep dinner', ['sk'], null, 18, 15, 'task'),
+    row('showers', 19, 30, 'Showers', ['li', 'mi'], 'Bed at 8:30', 20, 0),
+  ]
+  const rows = v1Screen === 'weekend' ? weekendRows : [
     row('school', 7, 55, 'School', ['li', 'mi'], 'Hampden Elementary', 14, 30),
     row('dentist', 15, 30, 'Dentist', ['li'], 'Iris drives', 16, 30),
     row('swim', 16, 0, 'Swim', ['mi'], 'Scott picks up 5:00', 17),
@@ -159,28 +182,33 @@ export function KioskCanvasPreview({ scene = 'home-evening', theme = 'light', v1
     onGroceries: noop, onRecipes: noop,
     more: [
       { id: 'task', label: 'Add', sub: 'A task for the household', icon: Plus, onSelect: noop },
-      { id: 'list', label: 'Lists', sub: 'Family lists', icon: ClipboardList, onSelect: noop },
-      { id: 'notes', label: 'Notes', sub: 'The family scratchpad', icon: StickyNote, onSelect: noop },
-      { id: 'theme', label: isDark ? 'Light view' : 'Dark view', sub: isDark ? 'Switch the wall to light' : 'Switch the wall to dark', icon: isDark ? Sun : Moon, onSelect: () => setIsDark((d) => !d) },
-      { id: 'settings', label: 'Settings', sub: 'Guest mode, refresh, routines', icon: Settings, onSelect: noop },
+      { id: 'list', label: 'Lists', sub: 'Groceries and family lists', icon: ClipboardList, onSelect: noop },
+      { id: 'notes', label: 'Notes', sub: '2 on the scratchpad', icon: StickyNote, onSelect: noop },
+      { id: 'theme', label: isDark ? 'Light view' : 'Dark view', sub: 'Until the wall switches by itself', icon: isDark ? Sun : Moon, onSelect: () => setIsDark((d) => !d) },
+      { id: 'guest', label: 'Guest mode', sub: 'Hides the family’s day', icon: Users, onSelect: noop },
+      { id: 'settings', label: 'Settings', sub: 'Refresh and daily routines', icon: Settings, onSelect: noop },
     ],
   }
   const v1: KioskV1Data | undefined = v1Screen && {
-    pick: { screen: v1Screen, title: v1Screen === 'night' ? 'Goodnight' : v1Screen === 'weekend' ? 'Saturday, together' : v1Screen === 'out-the-door' ? 'Out the door in 45 minutes' : 'A quiet afternoon', dark: v1Screen === 'night' || isDark },
+    pick: { screen: v1Screen, title: V1_TITLE[v1Screen], dark: v1Screen === 'night' || v1Screen === 'bedtime' || isDark },
     anchors: { morning: { start: 405, end: 440 }, home: { start: 1035 }, dinner: 1080, bedtime: { start: 1170, end: 1230 } },
     kids: KIDS.map((k, i) => ({
-      member: k, special: v1Screen === 'out-the-door' ? (i ? 'Library' : 'Music') : i ? 'Art' : 'Library', tomorrowSpecial: i ? 'Library' : 'Music', bag: v1Screen === 'out-the-door' && i ? ['Library book'] : [], after: [],
+      member: k, special: v1Screen === 'out-the-door' ? (i ? 'Library' : 'Music') : i ? 'Art' : 'Library', tomorrowSpecial: i ? 'Library' : 'Music', bag: v1Screen === 'out-the-door' && i ? ['Library book'] : [],
+      after: [
+        { entityType: 'routine' as const, id: `folder-${i}`, title: 'Take-home folder', done: i === 0, timeOfDay: '17:45', target: null },
+        { entityType: 'routine' as const, id: `math-${i}`, title: i ? 'Reading, 20 minutes' : 'Math sheet', done: false, timeOfDay: '17:45', target: null },
+      ],
       morning: v1Screen === 'out-the-door' ? otdMorning(i, k.id) : [
         { entityType: 'routine' as const, id: `wake-${i}`, title: 'Wake the kids', done: false, timeOfDay: '06:45', target: null, by: [MEMBERS[0].id] },
         { entityType: 'routine' as const, id: `out-${i}`, title: 'Out the door', done: false, timeOfDay: '07:20', target: null },
       ],
     })),
     restLine: 'Home from school at 5:45 · Turkey chili at 6:30', restSub: null,
-    notes: [], talks: [{ id: 't1', text: 'Summer camp', by: null }, { id: 't2', text: 'Grandma’s visit', by: null }],
+    notes: [{ id: 'n1', text: 'Plumber Thursday between 10 and 12', by: 'Iris' }, { id: 'n2', text: 'Library books back by Friday', by: 'Scott' }], talks: [{ id: 't1', text: 'Summer camp', by: null }, { id: 't2', text: 'Grandma’s visit', by: null }],
     question: 'If our family had a flag, what would be on it?',
     tomorrow: { label: 'Thursday', outTheDoor: v1Screen === 'night' ? '7:20' : null, specials: KIDS.map((k, i) => ({ member: k, text: i ? 'Library' : 'Music' })) },
-    weekend: { rows, anytime: [{ title: 'Kids’ laundry', owners: [] }, { title: 'Paper mail', owners: [] }], tomorrow: [row('soccer', 16, 0, 'Soccer', ['mi']), row('math', 18, 30, 'Math night', ['li'])], tomorrowLabel: 'Thursday' },
-    onNotes: noop, next: { time: '7:20', title: 'Out the door' },
+    weekend: { rows, anytime: [{ title: 'Kids’ laundry', owners: ['sk', 'ir'] }, { title: 'Food planning', owners: ['ir'] }, { title: 'Paper mail', owners: [] }], tomorrow: [row('soccer', 16, 0, 'Soccer', ['mi']), row('math', 18, 30, 'Math night', ['li'])], tomorrowLabel: 'Thursday' },
+    onNotes: noop, next: V1_NEXT[v1Screen],
   }
   return (
     <div className={`${(v1 ? v1.pick.dark : isDark) ? 'dark ' : ''}h-screen w-screen overflow-hidden`} data-kiosk-scene={scene}>
@@ -210,6 +238,7 @@ export function KioskCanvasPreview({ scene = 'home-evening', theme = 'light', v1
         personPage={null} recipePage={null} recipeTitle={null}
         onOpenRecipe={noop} onTapRow={noop} onTick={noop} onClaim={noop} onTapQuestion={noop} flash={noop}
         v1={v1}
+        listenerPreview={v1Screen ? dock ?? (v1Screen === 'night' ? 'quiet' : 'idle') : undefined}
       />
     </div>
   )

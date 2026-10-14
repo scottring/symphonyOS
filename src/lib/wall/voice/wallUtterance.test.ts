@@ -27,6 +27,9 @@ describe('what a sentence said to the wall means', () => {
   it('kitchen commands still run', () => {
     expect(readUtterance('Hey Symphony, set a timer for 5 minutes')).toEqual({ kind: 'command', command: { type: 'start-timer', minutes: 5 } })
     expect(readUtterance("What's for dinner tonight?")).toEqual({ kind: 'command', command: { type: 'show-dinner' } })
+    // Another day is a question for Symphony, not tonight's dinner screen.
+    expect(readUtterance('What’s for dinner this week?')).toEqual({ kind: 'question', text: "What's for dinner this week?" })
+    expect(readUtterance("What's for dinner tomorrow?").kind).toBe('question')
     expect(readUtterance('next step')).toEqual({ kind: 'command', command: { type: 'next-step' } })
   })
 

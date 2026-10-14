@@ -13,7 +13,7 @@
 // `/wall-design` preview (see `wallV2Mock.ts`).
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Sun, Moon, Plus, ClipboardList, Settings, StickyNote } from 'lucide-react';
+import { Sun, Moon, Plus, ClipboardList, Settings, StickyNote, Users } from 'lucide-react';
 import { useActionableInstances } from '@/hooks/useActionableInstances';
 import { useBuildAutoReload } from '@/hooks/useBuildAutoReload';
 import { WallV2GuestScreen } from './WallV2GuestScreen';
@@ -1028,7 +1028,8 @@ export function WallV2Shell() {
   // The kiosk's household tools (approved Kiosk-Frame): Call, Groceries and
   // Recipes stay one tap away in the bottom bar; everything secondary —
   // adding a task, lists, notes, the light/dark view, settings — sits in one
-  // labelled More sheet.
+  // labelled More sheet. Kitchen wall v2 picks its More tiles from these by
+  // id (list, notes, theme, guest, settings) beside its own.
   const { dark: isDark, toggle: toggleTheme } = useWallTheme(kioskV1.pick.dark);
   const kioskTools = useMemo(() => ({
     onGroceries: () => {
@@ -1038,10 +1039,12 @@ export function WallV2Shell() {
     onRecipes: () => setShowRecipePicker(true),
     more: [
       { id: 'task', label: 'Add', sub: 'A task for the household', icon: Plus, onSelect: () => handleDockAction('task') },
-      { id: 'list', label: 'Lists', sub: 'Family lists', icon: ClipboardList, onSelect: () => handleDockAction('list') },
+      { id: 'list', label: 'Lists', sub: 'Groceries and family lists', icon: ClipboardList, onSelect: () => handleDockAction('list') },
       { id: 'notes', label: 'Notes', sub: scratchRows.length ? `${scratchRows.length} on the scratchpad` : 'The family scratchpad', icon: StickyNote, onSelect: () => { setScratchpadFocus(null); setShowScratchpad(true); } },
-      { id: 'theme', label: isDark ? 'Light view' : 'Dark view', sub: isDark ? 'Switch the wall to light' : 'Switch the wall to dark', icon: isDark ? Sun : Moon, onSelect: toggleTheme },
-      { id: 'settings', label: 'Settings', sub: 'Guest mode, refresh, routines', icon: Settings, onSelect: () => handleDockAction('utilities') },
+      // The label follows the EFFECTIVE theme (automatic or overridden).
+      { id: 'theme', label: isDark ? 'Light view' : 'Dark view', sub: 'Until the wall switches by itself', icon: isDark ? Sun : Moon, onSelect: toggleTheme },
+      { id: 'guest', label: 'Guest mode', sub: 'Hides the family’s day', icon: Users, onSelect: () => setGuestMode(true) },
+      { id: 'settings', label: 'Settings', sub: 'Refresh and daily routines', icon: Settings, onSelect: () => handleDockAction('utilities') },
     ],
   }), [groceryList, showFlash, handleDockAction, scratchRows.length, isDark, toggleTheme]);
   const kioskV1Shown = useMemo(() => ({ ...kioskV1, pick: { ...kioskV1.pick, dark: isDark } }), [kioskV1, isDark]);
@@ -1085,7 +1088,7 @@ export function WallV2Shell() {
           activity={kiosk}
           now={now}
           moment={moment}
-          dateLabel={now.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
+          dateLabel={now.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
           clock={clock}
           weather={liveWeather ? { icon: weatherData.icon ?? Sun, temp: weatherData.temp, condition: weatherData.condition } : null}
           tools={kioskTools}
@@ -1144,7 +1147,7 @@ export function WallV2Shell() {
       {flashMessage && (
         <div
           role="status"
-          className="animate-fade-in-up fixed bottom-[124px] left-1/2 z-[60] -translate-x-1/2 px-4 py-2 rounded-full bg-stone-800/90 dark:bg-stone-200/90 text-white dark:text-stone-900 text-[0.85rem] font-bold shadow-lg backdrop-blur-md whitespace-nowrap"
+          className="animate-fade-in-up fixed bottom-[17vh] left-1/2 z-[60] -translate-x-1/2 px-[1.6vw] py-[0.8vw] rounded-full bg-stone-800/90 dark:bg-stone-200/90 text-white dark:text-stone-900 text-[max(16px,1.25vw)] font-bold shadow-lg backdrop-blur-md whitespace-nowrap"
         >
           {flashMessage}
         </div>

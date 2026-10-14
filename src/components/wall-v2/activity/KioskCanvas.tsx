@@ -6,6 +6,12 @@
 //   bottom bar Home · Back · held chips · Call · Groceries · Recipes · More ·
 //              Tell Symphony · NEXT
 //
+// The live wall (v1 data) draws Kitchen wall v2 (mockup approved 2026-10-14):
+// a top band (clock · date · weather · the moment), the stage, and the
+// conversation dock (KioskDock) as the only bottom bar; More takes the
+// stage's side column in place (KioskMorePanel). The frame above is the
+// slice-7 canvas, kept for the design previews.
+//
 // Layout follows the approved kiosk boards (Kiosk-Frame and the eleven
 // activity boards) in the wall's own themes: light by default, the warm dark
 // view when the wall is switched to it (More → Dark view).
@@ -16,7 +22,7 @@
 // one adult's own tasks dropped by wallTodayRows). Nothing here adds a query.
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { ArrowLeft, Home, ChevronRight, Timer, Phone, ShoppingCart, ChefHat, MoreHorizontal, Settings, X } from 'lucide-react'
+import { ArrowLeft, Home, ChevronRight, Timer, Phone, ShoppingCart, ChefHat, MoreHorizontal, X, Keyboard, Mic, MicOff } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import type { FamilyMember } from '@/types/family'
 import type { WallMoment } from '@/lib/wall/wallMoment'
@@ -38,7 +44,10 @@ import { isIngredientLine, scaledLine, cookingSteps } from '@/lib/wall/activity/
 import type { KioskCommand } from '@/lib/wall/activity/kioskCommands'
 import type { KioskActivity } from './useKioskActivity'
 import { useCookingRecipe } from './useCookingRecipe'
-import { KioskTellSymphony, type WallVoice } from './KioskTellSymphony'
+import { TellSymphonyPill, type WallVoice } from './KioskTellSymphony'
+import { useTellSymphony, type ListenerPreview } from './useTellSymphony'
+import { KioskDock, KioskMorePanel, type MoreTile } from './KioskDock'
+import { dockCopy } from '@/lib/wall/activity/dockCopy'
 import { KioskHome } from './KioskHome'
 import { KioskHomeV1, type KioskHomeV1Props } from './KioskHomeV1'
 import {
@@ -103,6 +112,21 @@ export interface KioskCanvasProps {
   /** Wall v1 (2026-10-13): the Home screens chosen from the household's
    *  routines, the trimmed bar and automatic dark. Without it, the slice-7 Home. */
   v1?: KioskV1Data
+  /** Design previews only: hold the listener in one state. */
+  listenerPreview?: ListenerPreview
+}
+
+const V2_FONTS = 'https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300..600&family=Instrument+Sans:wght@400;500;600;700&display=swap'
+/** Kitchen wall v2's faces, loaded once when the v1 wall mounts. */
+function useWallFonts(on: boolean) {
+  useEffect(() => {
+    if (!on || import.meta.env.MODE === 'test' || typeof document === 'undefined' || document.getElementById('kw-fonts')) return
+    const link = document.createElement('link')
+    link.id = 'kw-fonts'
+    link.rel = 'stylesheet'
+    link.href = V2_FONTS
+    document.head.appendChild(link)
+  }, [on])
 }
 
 /** What the Shell hands the v1 Home; the canvas adds the handlers. */
@@ -224,6 +248,11 @@ export function KioskCanvas(p: KioskCanvasProps) {
     }
   }, [p.dinner, stage.kind, state.cooking, state.timers, addMissing, startCooking, startTimer, dispatch])
 
+  // One path for every sentence: speech, typing and the dock's chip.
+  const tell = useTellSymphony(runCommand, p.voice, p.listenerPreview)
+  const [typing, setTyping] = useState(false)
+  useWallFonts(!!p.v1)
+
   const save = useCallback(async (lines: GroceryLine[]) => {
     if (!lines.length) return
     dispatch({ type: 'GROCERY_SAVING', keys: lines.map((l) => l.key) })
@@ -248,6 +277,38 @@ export function KioskCanvas(p: KioskCanvasProps) {
   const scenery = useSceneryPreferences()
   const art = sceneryArt(scenery.sceneryStyle, placeId, p.isDark && scenery.lightingChoice === 'auto' ? 'nighttime' : scenery.sceneryLighting)
 
+  // More, in place (Kitchen wall v2): the Shell's tools by id, with the
+  // canvas's own Type instead, Call and Listening. Toggles keep it open so
+  // their new label shows; everything else closes it.
+  const l = tell.listener
+  const shellTile = (id: string): MoreTile | null => {
+    const t = p.tools.more.find((m) => m.id === id)
+    return t ? { ...t, onSelect: () => { if (id !== 'theme') setMoreOpen(false); t.onSelect() } } : null
+  }
+  const listenTile: MoreTile = tell.live
+    ? {
+        id: 'listen', label: l.muted ? 'Listening is off' : 'Listening is on',
+        sub: l.muted ? `Tap to listen for “${l.wake ?? 'Hey Symphony'}” again` : l.quiet ? 'Quiet hours now · tap to mute' : 'Tap to mute',
+        icon: l.muted ? MicOff : Mic, onSelect: () => l.mute(!l.muted),
+      }
+    : {
+        id: 'listen', label: tell.voiceOn && tell.supported ? 'Voice is on' : 'Voice is off',
+        sub: tell.supported ? (tell.voiceOn ? 'Listens when you tap the mic · tap to turn off' : 'Tap to let this screen listen when you tap the mic') : 'This screen can’t listen · type instead',
+        icon: tell.voiceOn && tell.supported ? Mic : MicOff,
+        onSelect: tell.supported ? tell.toggleVoice : () => { setMoreOpen(false); setTyping(true) },
+      }
+  const moreTiles = [
+    { id: 'type', label: 'Type instead', sub: 'Same Symphony, with a keyboard', icon: Keyboard, onSelect: () => { setMoreOpen(false); setTyping(true) } },
+    shellTile('list'),
+    shellTile('notes'),
+    { id: 'call', label: 'Call', sub: 'Faces, big enough for the kids', icon: Phone, onSelect: () => { setMoreOpen(false); dispatch({ type: 'OPEN', stage: { kind: 'calling' } }) } },
+    shellTile('theme'),
+    listenTile,
+    shellTile('guest'),
+    shellTile('settings'),
+  ].filter((t): t is MoreTile => !!t)
+  const morePanel = <KioskMorePanel tiles={moreTiles} onDone={() => setMoreOpen(false)} />
+
   let content: ReactNode
   switch (stage.kind) {
     case 'home':
@@ -263,6 +324,7 @@ export function KioskCanvas(p: KioskCanvasProps) {
           onOpenRecipe={p.onOpenRecipe}
           onStartCooking={() => { const said = startCooking(); if (said.startsWith('No')) p.flash(said) }}
           places={{ onGroceries: p.tools.onGroceries, onRecipes: p.tools.onRecipes, onCall: () => dispatch({ type: 'OPEN', stage: { kind: 'calling' } }), onNotes: p.v1.onNotes }}
+          aside={moreOpen ? morePanel : undefined}
         />
       ) : (
         <KioskHome
@@ -347,32 +409,76 @@ export function KioskCanvas(p: KioskCanvasProps) {
     onPointerUp: () => { if (pressTimer.current) clearTimeout(pressTimer.current) },
     onPointerLeave: () => { if (pressTimer.current) clearTimeout(pressTimer.current) },
   }
+  const heldEls = chips.map((c) => {
+    const body = <>{c.timer && <Timer aria-hidden="true" />}<span>{c.label}</span>{c.timer && <b>{c.timer}</b>}</>
+    if (c.kind === 'timer') return <span key={c.kind} className={`kc-held-chip ${c.ringing ? 'is-ringing' : ''}`} role="status">{body}</span>
+    const kind = c.kind
+    const go = () => {
+      if (kind === 'cooking') dispatch({ type: 'RESUME_COOKING' })
+      else dispatch({ type: 'OPEN', stage: { kind } })
+    }
+    return <button key={c.kind} type="button" className={`kc-held-chip ${c.ringing ? 'is-ringing' : ''}`} onClick={go} aria-label={`${c.label}${c.timer ? ` · ${c.timer}` : ''}`}>{body}<ChevronRight aria-hidden="true" /></button>
+  })
+
+  // ─── Kitchen wall v2: top band · stage · the conversation dock ───
+  if (v1) {
+    const screen = stage.kind === 'home' ? v1.pick.screen : stage.kind === 'cooking' ? 'cooking' : 'activity'
+    const copy = dockCopy(moreOpen ? 'more' : screen)
+    const ampm = /PM$/i.test(p.clock) ? 'pm' : /AM$/i.test(p.clock) ? 'am' : ''
+    return (
+      <div className={`kiosk-canvas is-v1 ${dark ? 'is-dark dark' : ''} sky-${stage.kind === 'home' ? v1.pick.screen : 'activity'} ${moreOpen ? 'is-more' : ''}`} onPointerDownCapture={touched} data-stage={stage.kind}>
+        {wash && <div className={`kv-wash ${quietScreen && !moreOpen ? '' : 'is-faint'}`} aria-hidden="true"><img src={wash} alt="" /></div>}
+        <header className="kw-top">
+          <span className="kw-clock" {...pressClock}>{p.clock.replace(/\s?[AP]M$/i, '')}<small>{ampm}</small></span>
+          <span className="kw-date">{p.dateLabel}</span>
+          {p.freshness}
+          <span className="kw-grow" />
+          {W && <span className="kw-wx" title={W.condition}><W.icon aria-hidden="true" />{Math.round(W.temp)}° · {W.condition.toLowerCase()}</span>}
+          <h1 className="kw-moment" ref={placeRef} tabIndex={-1} aria-live="polite">{title}</h1>
+        </header>
+
+        <div className={`kc-stage ${showHeld ? 'is-held' : ''}`}>
+          {showHeld && <HeldColumn session={state.cooking} recipe={recipe} timers={state.timers} nowMs={nowMs} dispatch={dispatch} />}
+          <main className={`kc-main is-${stage.kind} ${stage.kind === 'home' ? `v1-${v1.pick.screen}` : ''}`}>
+            <div className="kc-main-inner">{content}</div>
+          </main>
+          {moreOpen && stage.kind !== 'home' && <div className="kw-more-over">{morePanel}</div>}
+        </div>
+
+        <KioskDock
+          tell={tell} copy={copy} typing={typing} setTyping={setTyping}
+          onHome={() => { setMoreOpen(false); dispatch({ type: 'HOME' }) }}
+          onBack={state.stack.length >= 2 ? () => dispatch({ type: 'BACK' }) : undefined}
+          moreOpen={moreOpen} onMore={() => setMoreOpen((o) => !o)}
+          held={heldEls.length ? <div className="kw-held" aria-label="Held activities">{heldEls}</div> : null}
+          next={v1.next}
+        />
+      </div>
+    )
+  }
+
   return (
-    <div className={`kiosk-canvas ${dark ? 'is-dark dark' : ''} ${v1 ? `is-v1 sky-${stage.kind === 'home' ? v1.pick.screen : 'activity'}` : ''}`} onPointerDownCapture={touched} data-stage={stage.kind}>
-      {wash && <div className={`kv-wash ${quietScreen ? '' : 'is-faint'}`} aria-hidden="true"><img src={wash} alt="" /></div>}
+    <div className={`kiosk-canvas ${dark ? 'is-dark dark' : ''}`} onPointerDownCapture={touched} data-stage={stage.kind}>
       <header className="kc-top">
-        <div className="kc-time" {...(v1 ? pressClock : {})}>
-          {!v1 && <img className="kc-mark" src="/symphony-logo.png" alt="Symphony" />}
-          {v1
-            ? <div className="kv-clock"><b className="kc-clock">{p.clock.replace(/\s?[AP]M$/i, '')}<small>{/PM$/i.test(p.clock) ? 'pm' : /AM$/i.test(p.clock) ? 'am' : ''}</small></b><span className="kc-date">{p.dateLabel}</span></div>
-            : <div><b className="kc-clock">{p.clock}</b><span className="kc-date">{p.dateLabel}</span></div>}
+        <div className="kc-time">
+          <img className="kc-mark" src="/symphony-logo.png" alt="Symphony" />
+          <div><b className="kc-clock">{p.clock}</b><span className="kc-date">{p.dateLabel}</span></div>
           {p.freshness}
         </div>
         <div className="kc-place-wrap">
-          {!v1 && <small aria-hidden="true">YOU ARE IN</small>}
+          <small aria-hidden="true">YOU ARE IN</small>
           <h1 className="kc-place" ref={placeRef} tabIndex={-1} aria-live="polite">{title}</h1>
         </div>
         <div className="kc-top-right">
           {W && <span className="kc-weather" title={W.condition}><W.icon aria-hidden="true" />{Math.round(W.temp)}° · {W.condition.toLowerCase()}</span>}
-          {v1 && <button type="button" className="kv-settings" onClick={() => setMoreOpen(true)}><Settings aria-hidden="true" /><span>Settings</span></button>}
-          {!v1 && <span className="kc-context"><Home aria-hidden="true" />Household</span>}
+          <span className="kc-context"><Home aria-hidden="true" />Household</span>
         </div>
       </header>
 
       <div className={`kc-stage ${showHeld ? 'is-held' : ''}`}>
         {showHeld && <HeldColumn session={state.cooking} recipe={recipe} timers={state.timers} nowMs={nowMs} dispatch={dispatch} />}
-        <main className={`kc-main is-${stage.kind} ${stage.kind === 'home' ? (v1 ? `v1-${v1.pick.screen}` : `part-${comp.part}`) : ''}`}>
-          {!v1 && scenery.showScenery && stage.kind === 'home' && comp.part === 'quiet' && (
+        <main className={`kc-main is-${stage.kind} ${stage.kind === 'home' ? `part-${comp.part}` : ''}`}>
+          {scenery.showScenery && stage.kind === 'home' && comp.part === 'quiet' && (
             <div className="kc-scenery" aria-hidden="true"><img src={art.src} alt="" /></div>
           )}
           <div className="kc-main-inner">{content}</div>
@@ -381,31 +487,18 @@ export function KioskCanvas(p: KioskCanvasProps) {
 
       <nav className="kc-bar" aria-label="Kiosk">
         <button type="button" className="kc-nb" onClick={() => dispatch({ type: 'HOME' })} aria-current={stage.kind === 'home' ? 'page' : undefined}><Home aria-hidden="true" />Home</button>
-        {(!v1 || state.stack.length >= 2) && <button type="button" className="kc-nb" onClick={() => dispatch({ type: 'BACK' })} disabled={state.stack.length < 2}><ArrowLeft aria-hidden="true" />Back</button>}
-        <div className="kc-chips-held" aria-label="Held activities">
-          {chips.map((c) => {
-            const body = <>{c.timer && <Timer aria-hidden="true" />}<span>{c.label}</span>{c.timer && <b>{c.timer}</b>}</>
-            if (c.kind === 'timer') return <span key={c.kind} className={`kc-held-chip ${c.ringing ? 'is-ringing' : ''}`} role="status">{body}</span>
-            const kind = c.kind
-            const go = () => {
-              if (kind === 'cooking') dispatch({ type: 'RESUME_COOKING' })
-              else dispatch({ type: 'OPEN', stage: { kind } })
-            }
-            return <button key={c.kind} type="button" className={`kc-held-chip ${c.ringing ? 'is-ringing' : ''}`} onClick={go} aria-label={`${c.label}${c.timer ? ` · ${c.timer}` : ''}`}>{body}<ChevronRight aria-hidden="true" /></button>
-          })}
-        </div>
-        {!v1 && <div className="kc-tools" role="group" aria-label="Household tools">
+        <button type="button" className="kc-nb" onClick={() => dispatch({ type: 'BACK' })} disabled={state.stack.length < 2}><ArrowLeft aria-hidden="true" />Back</button>
+        <div className="kc-chips-held" aria-label="Held activities">{heldEls}</div>
+        <div className="kc-tools" role="group" aria-label="Household tools">
           {bottomTool('Call', 'kidsPhone', Phone, () => dispatch({ type: 'OPEN', stage: { kind: 'calling' } }), 'Call — kidsPhone', stage.kind === 'calling')}
           {bottomTool('Groceries', null, ShoppingCart, p.tools.onGroceries)}
           {bottomTool('Recipes', null, ChefHat, p.tools.onRecipes)}
           {bottomTool('More', null, MoreHorizontal, () => setMoreOpen((o) => !o), 'More', moreOpen)}
-        </div>}
-        <KioskTellSymphony onCommand={runCommand} voice={p.voice} />
+        </div>
+        <TellSymphonyPill tell={tell} />
         <div className="kc-next" aria-label="Next">
           <small>NEXT</small>
-          {v1
-            ? (v1.next ? <b>{v1.next.time} · {v1.next.title}</b> : <b className="kc-muted">Nothing else today</b>)
-            : next
+          {next
             ? <b>{next.time} · {next.title}{next.owners.length ? ` · ${next.owners.map((id) => memberById(id)?.name).filter(Boolean).join(', ')}` : ''}</b>
             : <b className="kc-muted">Nothing else today</b>}
         </div>

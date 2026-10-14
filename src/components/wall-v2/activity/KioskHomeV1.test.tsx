@@ -38,38 +38,39 @@ function props(over: Partial<KioskHomeV1Props> = {}): KioskHomeV1Props {
 }
 
 describe('the wall, version 1', () => {
-  it("out the door: each kid's own steps as a checklist; the grown-ups' steps in a strip below", () => {
+  it("out the door: each kid's own steps as a checklist; done steps fold to one line; the grown-ups' line on top", () => {
     const p = props()
     render(<KioskHomeV1 {...p} />)
     const ellaCol = screen.getByRole('region', { name: "Ella's morning" })
-    const rows = within(ellaCol).getAllByRole('button', { name: /^Mark / })
     // "Bag packed: …" shows as "Bag packed"; the walk and wake-up are Scott's, breakfast is Iris's.
     // One leading element per row: the step's icon is the completion circle.
-    expect(rows.map((r) => r.getAttribute('aria-label'))).toEqual(['Mark Get dressed not done', 'Mark Bag packed done'])
-    expect(within(rows[0]).getByText('Get dressed')).toBeInTheDocument()
-    expect(within(rows[1]).getByText('Bag packed')).toBeInTheDocument()
-    expect(within(rows[1]).getByText('7:15')).toBeInTheDocument()
-    expect(rows[0]).toHaveClass('is-done')
-    expect(rows[1]).not.toHaveClass('is-done')
-    expect(ellaCol.querySelector('.kv-chip')).toBeNull()
-    expect(ellaCol.querySelector('.kv-check')).toBeNull()
-    expect(rows[0].querySelectorAll('.kv-step-dot')).toHaveLength(1)
+    const rows = within(ellaCol).getAllByRole('button', { name: /^Mark / })
+    expect(rows.map((r) => r.getAttribute('aria-label'))).toEqual(['Mark Bag packed done'])
+    expect(within(rows[0]).getByText('Bag packed')).toBeInTheDocument()
+    expect(within(rows[0]).getByText('Library book')).toBeInTheDocument()
+    expect(rows[0]).toHaveClass('is-next')
+    expect(rows[0].querySelectorAll('.kw-ck-c')).toHaveLength(1)
+    // Get dressed is done: folded into one line, which opens to untick it.
+    const fold = within(ellaCol).getByRole('button', { name: 'Done: Get dressed. Show them' })
+    fireEvent.click(fold)
+    const dressed = within(ellaCol).getByRole('button', { name: 'Mark Get dressed not done' })
+    expect(dressed).toHaveClass('is-done')
+    fireEvent.click(dressed)
+    expect(p.onTick).toHaveBeenCalledWith(ella, expect.objectContaining({ id: 'd' }))
     expect(within(ellaCol).getByText('Library today')).toBeInTheDocument()
-    expect(within(ellaCol).getByText('Library book')).toBeInTheDocument()
-    expect(within(ellaCol).getByText('1 of 2 done')).toBeInTheDocument()
-    expect(screen.getByText('Getting ready for school')).toBeInTheDocument()
+    expect(within(ellaCol).getByText('1 of 2')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Out the door at 7:20' })).toBeInTheDocument()
     expect(screen.getByText('22')).toBeInTheDocument()
-    expect(screen.getByText('minutes to go')).toBeInTheDocument()
-    expect(screen.getByText('Out the door').parentElement).toHaveTextContent('Out the door7:20')
+    expect(screen.getByText('minutes')).toBeInTheDocument()
     const grownUps = screen.getByRole('list', { name: 'Grown-ups this morning' })
     expect(within(grownUps).getAllByRole('listitem').map((li) => li.textContent)).toEqual([
-      '6:45SWake the kids · Scott', '6:50IBreakfast on the table · Iris', '7:20SOut the door, walk to school · Scott',
+      'S6:45 Wake the kidsScott', 'I6:50 Breakfast on the tableIris', 'S7:20 Out the door, walk to schoolScott',
     ])
-    fireEvent.click(rows[1])
+    fireEvent.click(within(ellaCol).getByRole('button', { name: 'Mark Bag packed done' }))
     expect(p.onTick).toHaveBeenCalledWith(ella, expect.objectContaining({ id: 'bag' }))
   })
 
-  it('out the door: steps group by time, and the first undone step is NEXT', () => {
+  it('out the door: the first undone step is NEXT, and the list stops before it would scroll', () => {
     const morning = [
       step('d', 'Get dressed', '06:45', ['e'], true),
       step('h', 'Dirty clothes in the hamper', null, ['e']),
@@ -80,41 +81,36 @@ describe('the wall, version 1', () => {
     ]
     render(<KioskHomeV1 {...props({ kids: [{ member: ella, special: 'Music', tomorrowSpecial: null, bag: [], morning, after: [] }] })} />)
     const col = screen.getByRole('region', { name: "Ella's morning" })
-    const before = within(col).getByRole('group', { name: 'Before breakfast' })
-    const rest = within(col).getByRole('group', { name: 'Breakfast & out the door' })
-    const names = (el: HTMLElement) => within(el).getAllByRole('button').map((r) => r.getAttribute('aria-label'))
-    expect(names(before)).toEqual(['Mark Get dressed not done', 'Mark Dirty clothes in the hamper done', 'Mark Brush teeth done'])
-    expect(names(rest)).toEqual(['Mark Eat breakfast done', 'Mark Bag packed done', 'Mark Shoes & jacket on done'])
+    const names = within(col).getAllByRole('button', { name: /^Mark / }).map((r) => r.getAttribute('aria-label'))
+    // Five rows fit: the folded line and four steps; the count says the rest.
+    expect(names).toEqual(['Mark Dirty clothes in the hamper done', 'Mark Brush teeth done', 'Mark Eat breakfast done', 'Mark Bag packed done'])
     const next = within(col).getByRole('button', { name: 'Mark Dirty clothes in the hamper done' })
     expect(next).toHaveClass('is-next')
     expect(within(next).getByText('NEXT')).toBeInTheDocument()
     expect(within(col).getAllByText('NEXT')).toHaveLength(1)
-    expect(within(col).getByText('1 of 6 done')).toBeInTheDocument()
-    expect(within(rest).getByText('7:00')).toBeInTheDocument()
+    expect(within(col).getByText('1 of 6')).toBeInTheDocument()
+    expect(within(col).getByText('7:00')).toBeInTheDocument()
   })
 
-  it('out the door: with no untimed steps first, one unlabelled list', () => {
-    const morning = [step('eat', 'Eat lunch', '11:00', ['e']), step('bag', 'Bag packed', '11:15', ['e'])]
-    render(<KioskHomeV1 {...props({ kids: [{ member: ella, special: null, tomorrowSpecial: null, bag: [], morning, after: [] }] })} />)
-    const col = screen.getByRole('region', { name: "Ella's morning" })
-    expect(within(col).queryAllByRole('group')).toHaveLength(1)
-    expect(within(col).getByRole('group', { name: "Ella's steps" })).toBeInTheDocument()
-  })
-
-  it('out the door: section names come from the first timed step', () => {
-    const morning = [step('a', 'Make bed', null, ['e']), step('b', 'Feed the cat', '07:05', ['e'])]
-    render(<KioskHomeV1 {...props({ kids: [{ member: ella, special: null, tomorrowSpecial: null, bag: [], morning, after: [] }] })} />)
-    expect(screen.getByRole('group', { name: 'Before 7:05' })).toBeInTheDocument()
-    expect(screen.getByRole('group', { name: '7:05 & out the door' })).toBeInTheDocument()
-  })
-
-  it('rest: one sentence and the places; notes for the house on the fridge door', () => {
-    const p = props({ pick: { screen: 'rest', title: 'A quiet morning', dark: false }, notes: [{ id: 'n1', text: 'Plumber at 2', by: 'Scott' }] })
+  it('rest: the next landmark large, then dinner; notes for the house; the places; the rest of today beside it', () => {
+    const row = { id: 'dent', kind: 'event' as const, time: '3:30p', end: null, title: 'Dentist', sub: 'Iris drives', owners: [], past: false, now: false }
+    const p = props({ pick: { screen: 'rest', title: 'A quiet morning', dark: false }, notes: [{ id: 'n1', text: 'Plumber at 2', by: 'Scott' }], weekend: { rows: [row], anytime: [], tomorrow: [], tomorrowLabel: 'Thursday' } })
     render(<KioskHomeV1 {...p} />)
-    expect(screen.getByText('Home from school at 5:45 · Tacos at 6:30')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Home from school at 5:45' })).toBeInTheDocument()
+    expect(screen.getByText('Tacos at 6:30')).toBeInTheDocument()
+    const side = screen.getByRole('complementary', { name: 'The rest of today' })
+    fireEvent.click(within(side).getByRole('button', { name: /3:30.*Dentist.*Iris drives/ }))
+    expect(p.onTapRow).toHaveBeenCalledWith('dent')
     expect(screen.getByText('Plumber at 2')).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Groceries' }))
     expect(p.places.onGroceries).toHaveBeenCalled()
+  })
+
+  it('More takes the side column; the lead stays', () => {
+    render(<KioskHomeV1 {...props({ pick: { screen: 'dinner', title: 'Dinner', dark: false }, aside: <section aria-label="More">tiles</section> })} />)
+    expect(screen.getByRole('region', { name: 'More' })).toBeInTheDocument()
+    expect(screen.queryByText('What is the best advice anyone has ever given you?')).toBeNull()
+    expect(screen.getByRole('region', { name: "Tonight's dinner" })).toBeInTheDocument()
   })
 
   it('dinner: the question of the day is the centrepiece', () => {
