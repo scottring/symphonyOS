@@ -1088,7 +1088,8 @@ export function WallV2Shell() {
           anything past the fold is unreachable, not merely awkward. */}
       {/* The wall, by time of day (Scott, 2026-10-04): Today · the moment ·
           specials and coming up · the question and the kids' lists. */}
-      <div className="flex-1 min-h-0 -m-4 mt-0">
+      {/* Edge to edge, the top too unless the stale banner sits above it. */}
+      <div className="flex-1 min-h-0 -m-4 mt-0 first:-mt-4">
         <KioskCanvas
           isDark={isDark}
           activity={kiosk}

@@ -8,6 +8,8 @@
 // scene: home-morning · home-afternoon · home-evening · quiet · dinner ·
 //        groceries · cooking · held · departure · bedtime · call
 // theme: 'light' (the wall's default) | 'dark' (the wall's dark view)
+// v1Screen: a wall v1 Home screen instead (night · rest · weekend · …);
+//        night is dark, the others follow theme.
 //
 // Not routed here — mount it on a dev-only route.
 
@@ -21,7 +23,8 @@ import { buildBedtimeGrid } from '@/lib/wall/activity/kioskRoutines'
 import { normalizeGroceryText, proposeGroceries, type GroceryLine } from '@/lib/wall/activity/groceryProposal'
 import { kioskReducer, initialKioskState, type KioskEvent, type KioskState } from '@/lib/wall/activity/kioskActivity'
 import { MINUTE_MS } from '@/lib/wall/activity/kioskTimers'
-import { KioskCanvas, type KioskTools } from './KioskCanvas'
+import { KioskCanvas, type KioskTools, type KioskV1Data } from './KioskCanvas'
+import type { KioskScreen } from '@/lib/wall/activity/kioskScreen'
 import { useKioskActivity } from './useKioskActivity'
 import type { KioskDinner } from './KioskStages'
 
@@ -94,7 +97,7 @@ function sceneState(scene: KioskScene, dateKey: string, nowMs: number): KioskSta
   return s
 }
 
-export function KioskCanvasPreview({ scene = 'home-evening', theme = 'light' }: { scene?: KioskScene; theme?: 'light' | 'dark' }) {
+export function KioskCanvasPreview({ scene = 'home-evening', theme = 'light', v1Screen }: { scene?: KioskScene; theme?: 'light' | 'dark'; v1Screen?: KioskScreen }) {
   const clock = SCENE_CLOCK[scene]
   const now = useMemo(() => { const d = new Date(2026, 9, 13); d.setHours(clock.h, clock.min, 0, 0); return d }, [clock])
   const dateKey = `fixture-${scene}`
@@ -144,8 +147,25 @@ export function KioskCanvasPreview({ scene = 'home-evening', theme = 'light' }: 
       { id: 'settings', label: 'Settings', sub: 'Guest mode, refresh, routines', icon: Settings, onSelect: noop },
     ],
   }
+  const v1: KioskV1Data | undefined = v1Screen && {
+    pick: { screen: v1Screen, title: v1Screen === 'night' ? 'Goodnight' : v1Screen === 'weekend' ? 'Saturday, together' : 'A quiet afternoon', dark: v1Screen === 'night' || isDark },
+    anchors: { morning: { start: 405, end: 440 }, home: { start: 1035 }, dinner: 1080, bedtime: { start: 1170, end: 1230 } },
+    kids: KIDS.map((k, i) => ({
+      member: k, special: i ? 'Art' : 'Library', tomorrowSpecial: i ? 'Library' : 'Music', bag: [], after: [],
+      morning: [
+        { entityType: 'routine' as const, id: `wake-${i}`, title: 'Wake the kids', done: false, timeOfDay: '06:45', target: null, by: [MEMBERS[0].id] },
+        { entityType: 'routine' as const, id: `out-${i}`, title: 'Out the door', done: false, timeOfDay: '07:20', target: null },
+      ],
+    })),
+    restLine: 'Home from school at 5:45 · Turkey chili at 6:30', restSub: null,
+    notes: [], talks: [{ id: 't1', text: 'Summer camp', by: null }, { id: 't2', text: 'Grandma’s visit', by: null }],
+    question: 'If our family had a flag, what would be on it?',
+    tomorrow: { label: 'Thursday', outTheDoor: v1Screen === 'night' ? '7:20' : null, specials: KIDS.map((k, i) => ({ member: k, text: i ? 'Library' : 'Music' })) },
+    weekend: { rows, anytime: [{ title: 'Kids’ laundry', owners: [] }, { title: 'Paper mail', owners: [] }], tomorrow: [row('soccer', 16, 0, 'Soccer', ['mi']), row('math', 18, 30, 'Math night', ['li'])], tomorrowLabel: 'Thursday' },
+    onNotes: noop, next: { time: '7:20', title: 'Out the door' },
+  }
   return (
-    <div className={`${isDark ? 'dark ' : ''}h-screen w-screen overflow-hidden`} data-kiosk-scene={scene}>
+    <div className={`${(v1 ? v1.pick.dark : isDark) ? 'dark ' : ''}h-screen w-screen overflow-hidden`} data-kiosk-scene={scene}>
       <KioskCanvas
         isDark={isDark} activity={activity} now={now} moment={clock.moment}
         dateLabel={now.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
@@ -171,6 +191,7 @@ export function KioskCanvasPreview({ scene = 'home-evening', theme = 'light' }: 
         }}
         personPage={null} recipePage={null} recipeTitle={null}
         onOpenRecipe={noop} onTapRow={noop} onTick={noop} onClaim={noop} onTapQuestion={noop} flash={noop}
+        v1={v1}
       />
     </div>
   )

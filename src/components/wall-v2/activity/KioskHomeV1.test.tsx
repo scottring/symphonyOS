@@ -29,7 +29,6 @@ function props(over: Partial<KioskHomeV1Props> = {}): KioskHomeV1Props {
     bedtime: { title: 'Bedtime', people: [], steps: [], done: 0, total: 0, inProgress: false },
     tomorrow: { label: 'Wednesday', outTheDoor: '7:20', specials: [] },
     weekend: { rows: [], anytime: [], tomorrow: [], tomorrowLabel: 'Sunday' },
-    scenery: null,
     onTick: vi.fn(), onOpenKid: vi.fn(), onToggleHave: vi.fn(), onScale: vi.fn(), onAddMissing: vi.fn(),
     onOpenRecipe: vi.fn(), onStartCooking: vi.fn(), onTapRow: vi.fn(),
     places: { onGroceries: vi.fn(), onRecipes: vi.fn(), onCall: vi.fn(), onNotes: vi.fn() },
@@ -76,5 +75,20 @@ describe('the wall, version 1', () => {
     unmount()
     render(<KioskHomeV1 {...props({ pick: { screen: 'dinner', title: 'Dinner', dark: false }, talks })} />)
     expect(screen.queryByText('Summer camp')).toBeNull()
+  })
+
+  it('night: the first thing in the morning, the rest of tomorrow, and talk-abouts open the notes', () => {
+    const p = props({
+      pick: { screen: 'night', title: 'Goodnight', dark: true },
+      talks: [{ id: 't1', text: 'Summer camp', by: null }, { id: 't2', text: 'Grandma', by: null }],
+      weekend: { rows: [], anytime: [], tomorrow: [{ id: 'm', kind: 'event', time: '6:30p', end: null, title: 'Math night', sub: null, owners: [], past: false, now: false, startsAt: null, endsAt: null }], tomorrowLabel: 'Wednesday' },
+    })
+    render(<KioskHomeV1 {...p} />)
+    const side = screen.getByRole('complementary', { name: 'Also tomorrow' })
+    expect(within(side).getByText('6:45')).toBeInTheDocument()
+    expect(within(side).getByText('Wake the kids')).toBeInTheDocument()
+    expect(within(side).getByText('Math night')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /2 things to talk about/ }))
+    expect(p.places.onNotes).toHaveBeenCalled()
   })
 })

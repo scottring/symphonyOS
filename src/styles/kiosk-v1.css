@@ -1,16 +1,79 @@
 /* ===== Wall v1 (2026-10-13): one thing leads, chosen from the routines ======
    Mockup: https://claude.ai/artifact/QgfzGwNhgKaECK74dk5nJP. Builds on
-   canvas-kiosk.css's tokens (--kc-*). The top band's colour is the sky for
-   the part of the day; scenery screens run edge to edge. */
-.kiosk-canvas.is-v1 .kc-place { font-size: calc(var(--kc-u) * 2.6); }
-.kiosk-canvas.is-v1.sky-out-the-door .kc-top { background: #F3E4D6; }
-.kiosk-canvas.is-v1.sky-rest .kc-top, .kiosk-canvas.is-v1.sky-weekend .kc-top { background: #DFE9F1; }
-.kiosk-canvas.is-v1.sky-home .kc-top { background: #F0E2CF; }
-.kiosk-canvas.is-v1.sky-dinner .kc-top { background: #ECD6C2; }
-.kiosk-canvas.is-v1.is-dark .kc-top { background: #1B2734; }
-.kiosk-canvas.is-v1.is-dark.sky-night .kc-top { background: #141C26; }
-.kc-main.v1-rest, .kc-main.v1-night, .kc-main.v1-weekend { margin: calc(var(--kc-u) * -1.6) calc(var(--kc-pad-x) * -1); }
-.kc-main.v1-rest .kc-main-inner, .kc-main.v1-night .kc-main-inner, .kc-main.v1-weekend .kc-main-inner { overflow: hidden; }
+   canvas-kiosk.css's tokens (--kc-*). Mist and slate (2026-10-14, Scott's
+   ChatGPT mocks): one continuous surface, mist by day and slate at night;
+   the top band and the bar sit on it without a colour or rule of their own;
+   the place's scenery is a faint wash behind everything (.kv-wash). */
+.kiosk-canvas.is-v1 {
+  --kc-bg: linear-gradient(180deg, #F3F4EF 0%, #EDEFE8 100%);
+  --kc-band: transparent;
+  --kc-surface: #FAFBF7;
+  --kc-inset: #E8EBE3;
+  --kc-line: #D6DBD0;
+  --kc-line-soft: #E0E4DA;
+  --kc-ink: #33403A;
+  --kc-ink-strong: #24312B;
+  --kc-muted: #66716A;
+  --kc-strong-line: #33403A;
+  --kc-accent-soft: #E1E8DD;
+}
+.kiosk-canvas.is-v1.is-dark {
+  --kc-bg: linear-gradient(180deg, #26332F 0%, #1D2829 100%);
+  --kc-surface: #2B3835;
+  --kc-inset: #303D3A;
+  --kc-line: #3D4A47;
+  --kc-line-soft: #35423F;
+  --kc-ink: #E6E5DE;
+  --kc-ink-strong: #F2F1EA;
+  --kc-muted: #A3ADA8;
+  --kc-strong-line: #C8CFCA;
+  --kc-accent-soft: #34413E;
+  --kc-dinner: #2D3633;
+  --kc-dinner-line: #46524E;
+  --kc-warn-soft: #3B3A2C;
+  --kc-held: #2F3B38;
+  --kc-listen: #F2F1EA;
+  --kc-listen-ink: #1D2829;
+}
+.kiosk-canvas.is-v1 .kc-top, .kiosk-canvas.is-v1 .kc-bar { background: none; border: 0; }
+.kiosk-canvas.is-v1 .kc-top { position: relative; z-index: 2; }
+.kiosk-canvas.is-v1 .kc-stage { z-index: 1; }
+
+/* The wash: the place's scenery at the foot of the wall, faded into the
+   surface's own colour so it reads as weather, not a picture. */
+.kv-wash { position: absolute; inset: 0; z-index: 0; pointer-events: none; overflow: hidden; }
+.kv-wash img {
+  position: absolute; left: 0; bottom: 0; width: 100%; height: 58%; object-fit: cover; object-position: center bottom;
+  opacity: .3; filter: saturate(.45);
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 45%);
+  mask-image: linear-gradient(to bottom, transparent 0, #000 45%);
+}
+.kv-wash.is-faint img { opacity: .2; height: 40%; }
+.is-dark .kv-wash img { opacity: .34; filter: saturate(.45) brightness(.8); }
+.is-dark .kv-wash.is-faint img { opacity: .16; }
+
+/* The top band: the time small and plain, what leads on the right. */
+.kiosk-canvas.is-v1 .kc-top { grid-template-columns: minmax(0, 1fr) auto auto; min-height: max(96px, calc(var(--kc-u) * 6.4)); }
+.kiosk-canvas.is-v1 .kc-top-right { grid-column: 2; grid-row: 1; }
+.kiosk-canvas.is-v1 .kc-place-wrap { grid-column: 3; grid-row: 1; text-align: right; }
+.kiosk-canvas.is-v1 .kc-place { font-size: calc(var(--kc-u) * 2.2); font-weight: 400; }
+.kiosk-canvas.is-v1 .kc-weather { font-size: calc(var(--kc-u) * .95); color: var(--kc-muted); }
+.kv-clock { display: flex; align-items: baseline; gap: calc(var(--kc-u) * 1.2); }
+.kiosk-canvas.is-v1 .kc-clock { font-size: calc(var(--kc-u) * 2.6); font-weight: 400; letter-spacing: -.01em; }
+.kiosk-canvas.is-v1 .kc-clock small { margin-left: 6px; font-size: calc(var(--kc-u) * .95); font-weight: 400; color: var(--kc-muted); }
+.kiosk-canvas.is-v1 .kc-date { margin: 0; font-size: calc(var(--kc-u) * .95); }
+
+/* The bar: Home, Tell Symphony and NEXT float on the surface; targets stay
+   finger-sized (64px+), only their frames go. */
+.kiosk-canvas.is-v1 .kc-nb { flex-direction: row; gap: 10px; width: auto; height: 72px; padding: 0 calc(var(--kc-u) * 1); border: 0; background: none; font-size: calc(var(--kc-u) * 1.05); font-weight: 500; color: var(--kc-ink); }
+.kiosk-canvas.is-v1 .kc-nb[aria-current="page"] { background: none; color: var(--kc-ink-strong); }
+.kiosk-canvas.is-v1 .kc-nb svg { width: calc(var(--kc-u) * 1.3); height: calc(var(--kc-u) * 1.3); }
+.kiosk-canvas.is-v1 .kc-voice { max-width: calc(var(--kc-u) * 24); height: 80px; border: 1px solid var(--kc-line); background: color-mix(in srgb, var(--kc-surface) 55%, transparent); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
+.kiosk-canvas.is-v1 .kc-voice-m { border-width: 0; }
+.kiosk-canvas.is-v1 .kc-voice.is-listening { background: var(--kc-listen); }
+.kiosk-canvas.is-v1 .kc-next { border: 0; background: none; align-items: flex-end; text-align: right; padding: 0; }
+.kiosk-canvas.is-v1 .kc-next b { font-weight: 500; font-size: calc(var(--kc-u) * 1.1); }
+.kiosk-canvas.is-v1 .kc-held-chip { background: color-mix(in srgb, var(--kc-surface) 60%, transparent); }
 
 .kv-row { display: flex; gap: calc(var(--kc-u) * 2); height: 100%; min-height: 0; }
 .kv-row.is-short { flex: 1; height: auto; }
@@ -74,8 +137,6 @@
 
 /* Scenery screens: rest, night, weekend */
 .kv-scene { position: relative; height: 100%; overflow: hidden; }
-.kv-scene-art { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: center 70%; }
-.kv-scene-art.is-faint { opacity: .35; }
 .kv-sentence { position: absolute; left: var(--kc-pad-x); top: calc(var(--kc-u) * 2.6); max-width: 62%; padding: calc(var(--kc-u) * 1.8) calc(var(--kc-u) * 2.2); border-radius: calc(var(--kc-u) * 1.4); background: color-mix(in srgb, var(--kc-surface) 90%, transparent); display: flex; flex-direction: column; gap: 10px; }
 .kv-sentence.is-wide { max-width: 54%; }
 .kv-line { margin: 0; font: 500 calc(var(--kc-u) * 3.8) / 1.05 var(--kc-display); color: var(--kc-ink-strong); }
@@ -90,7 +151,7 @@
 .kv-tomorrow > div { display: flex; flex-direction: column; gap: 8px; }
 .kv-tomorrow small { font-size: calc(var(--kc-u) * 1.1); color: var(--kc-muted); }
 .kv-specials { gap: 12px; }
-.kv-specials span { display: flex; align-items: center; gap: 12px; font-size: calc(var(--kc-u) * 1.7); font-weight: 600; }
+.kv-specials > span { display: flex; align-items: center; gap: 12px; font-size: calc(var(--kc-u) * 1.7); font-weight: 600; }
 .kv-talks { position: absolute; right: var(--kc-pad-x); top: calc(var(--kc-u) * 2.6); width: calc(var(--kc-u) * 30); padding: calc(var(--kc-u) * 1.6) calc(var(--kc-u) * 1.8); border-radius: calc(var(--kc-u) * 1.4); background: color-mix(in srgb, var(--kc-surface) 88%, transparent); border: 1px solid var(--kc-line); }
 .kv-talks ul { display: flex; flex-direction: column; gap: 12px; margin-top: 14px; }
 .kv-talks li { padding: 16px 18px; border-radius: 12px; background: var(--kc-inset); font-size: calc(var(--kc-u) * 1.4); font-weight: 600; }
@@ -156,13 +217,6 @@
    of the screen that fades up into the paper sky; content is set straight on
    the paper, without boxes. Controls (chips, buttons, rows) keep their own
    edges; the sticky notes stay objects on purpose. */
-.kv-scene-art {
-  top: auto; bottom: 0; height: 62%;
-  object-position: center bottom;
-  -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 38%);
-  mask-image: linear-gradient(to bottom, transparent 0, #000 38%);
-}
-.kv-scene-art.is-faint { opacity: .5; height: 44%; }
 .kv-sky { position: absolute; left: var(--kc-pad-x); top: calc(var(--kc-u) * 2.4); max-width: 64%; display: flex; flex-direction: column; gap: calc(var(--kc-u) * 1.4); }
 .kv-sky .kv-sentence { position: static; max-width: none; }
 .kv-sentence, .kv-sentence.is-wide { background: none; padding: 0; border-radius: 0; }
@@ -195,3 +249,42 @@
 .kiosk-canvas[data-stage="recipe"] .kc-top,
 .kiosk-canvas[data-stage="recipe"] .kc-bar,
 .kiosk-canvas[data-stage="recipe"] .kc-stage > :not(.kc-main) { visibility: hidden; }
+
+/* ===== Night (mockup 2026-10-14): tomorrow's one time, large, with who has
+   what under it; the first thing and the rest of tomorrow beside it, past a
+   hairline. Talk-abouts fold to one line that opens the notes. */
+.kv-night { position: absolute; inset: calc(var(--kc-u) * 1.2) var(--kc-pad-x) 0; display: grid; grid-template-columns: minmax(0, 1fr) calc(var(--kc-u) * 26); gap: calc(var(--kc-u) * 4); align-items: start; }
+.kv-night-lead { display: flex; flex-direction: column; gap: calc(var(--kc-u) * .6); }
+.kv-hero { display: flex; align-items: baseline; gap: calc(var(--kc-u) * .8); margin-top: calc(var(--kc-u) * .6); }
+.kv-hero b { font: 400 calc(var(--kc-u) * 9) / .95 var(--kc-display); letter-spacing: -.02em; color: var(--kc-ink-strong); font-variant-numeric: tabular-nums; }
+.kv-hero small { font-size: calc(var(--kc-u) * 1.5); color: var(--kc-muted); }
+.kv-hero-sub { margin: 0; font-size: calc(var(--kc-u) * 2); color: var(--kc-ink); }
+.kv-hero-sub.is-quiet { font-size: calc(var(--kc-u) * 1.6); color: var(--kc-muted); font-style: italic; }
+.kv-night .kv-specials { display: flex; flex-wrap: wrap; gap: calc(var(--kc-u) * 3); margin-top: calc(var(--kc-u) * 2); }
+.kv-night .kv-specials > span { display: flex; align-items: center; gap: 14px; }
+.kv-night .kv-specials > span > span:not(.kv-face) { display: flex; flex-direction: column; line-height: 1.15; }
+.kv-night .kv-specials small { font-size: calc(var(--kc-u) * .95); font-weight: 400; color: var(--kc-muted); }
+.kv-night .kv-specials b { font-size: calc(var(--kc-u) * 1.6); font-weight: 500; color: var(--kc-ink-strong); }
+.kv-night .kv-face { box-shadow: none; }
+.kv-talk-line { display: flex; align-items: center; gap: 16px; align-self: flex-start; min-height: 72px; max-width: 100%; margin-top: calc(var(--kc-u) * 1.6); padding: 0; border: 0; background: none; text-align: left; color: var(--kc-ink); }
+.kv-talk-line > svg:first-child { width: calc(var(--kc-u) * 1.4); height: calc(var(--kc-u) * 1.4); color: var(--kc-muted); }
+.kv-talk-line > span { display: flex; flex-direction: column; min-width: 0; }
+.kv-talk-line b { font-size: calc(var(--kc-u) * 1.25); font-weight: 500; }
+.kv-talk-line small { font-size: calc(var(--kc-u) * 1); color: var(--kc-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.kv-talk-line .kv-go { margin-left: 4px; }
+.kv-night-side { display: flex; flex-direction: column; gap: calc(var(--kc-u) * 2.4); padding-left: calc(var(--kc-u) * 2.4); border-left: 1px solid var(--kc-line); margin-top: calc(var(--kc-u) * .2); }
+.kv-side-time { display: flex; align-items: baseline; gap: 8px; margin-top: calc(var(--kc-u) * .6); }
+.kv-side-time b { font-size: calc(var(--kc-u) * 2.6); font-weight: 400; color: var(--kc-ink-strong); font-variant-numeric: tabular-nums; }
+.kv-side-time small { font-size: calc(var(--kc-u) * 1); color: var(--kc-muted); }
+.kv-side-sub { margin: 4px 0 0; font-size: calc(var(--kc-u) * 1.3); color: var(--kc-ink); }
+.kv-times { display: flex; flex-direction: column; gap: 14px; margin-top: calc(var(--kc-u) * .8); }
+.kv-times li { display: grid; grid-template-columns: calc(var(--kc-u) * 4.4) minmax(0, 1fr); align-items: baseline; font-size: calc(var(--kc-u) * 1.3); }
+.kv-times b { font-weight: 400; color: var(--kc-muted); font-variant-numeric: tabular-nums; }
+.kv-times span { color: var(--kc-ink-strong); }
+
+/* Rest and weekend sit on the same surface as everything else now. */
+.kv-sky { top: calc(var(--kc-u) * 1.2); }
+.kv-weekend { top: calc(var(--kc-u) * .4); }
+.kv-block { background: color-mix(in srgb, var(--kc-surface) 55%, transparent); border-color: var(--kc-line); }
+.kv-weekend .kv-hours { border-bottom: 1px solid var(--kc-line); padding-bottom: calc(var(--kc-u) * 1.2); }
+.kv-tag.is-task { border: 0; padding-left: 0; background: none; font-weight: 500; }
