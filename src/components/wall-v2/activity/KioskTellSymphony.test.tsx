@@ -80,6 +80,18 @@ describe('Tell Symphony with the wall listener', () => {
     expect(screen.getByRole('button', { name: /Undo/ })).toBeInTheDocument()
   })
 
+  it('an imperative that is not question-shaped still goes to askWall, and a change is saved to the Inbox', async () => {
+    vi.mocked(askWall).mockResolvedValueOnce({ change: 'Change dinner to Wednesday' })
+    const v = voice()
+    render(<KioskTellSymphony onCommand={() => ''} voice={v} />)
+    await act(async () => FakeSocket.last!.open())
+    await act(async () => FakeSocket.last!.emit({ type: 'heard', id: '10', text: 'Change dinner to Wednesday', via: 'wake' }))
+    await waitFor(() => expect(askWall).toHaveBeenCalledWith('Change dinner to Wednesday', expect.anything()))
+    await waitFor(() => expect(v.save).toHaveBeenCalledWith({ kind: 'inbox', text: 'Change dinner to Wednesday' }))
+    expect(await screen.findAllByText(/I can’t change that from the wall yet. I saved it to your inbox: Change dinner to Wednesday/)).not.toHaveLength(0)
+    expect(screen.queryByText(/Didn’t catch/)).toBeNull()
+  })
+
   it('tapping the pill listens; the mic button mutes', async () => {
     render(<KioskTellSymphony onCommand={() => ''} voice={voice()} />)
     await act(async () => FakeSocket.last!.open())
