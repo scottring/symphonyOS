@@ -1,5 +1,6 @@
 // Dev-only route body: /kiosk-preview?scene=dinner&theme=dark renders one
-// approved kiosk board with fixed data (no reads, writes or calls).
+// approved kiosk board with fixed data (no reads, writes or calls);
+// &v1=night shows a wall v1 Home screen instead.
 import { useSearchParams } from 'react-router-dom'
 import { KioskCanvasPreview } from './KioskCanvasPreview'
 
@@ -9,5 +10,6 @@ export default function KioskScenePreviewRoute() {
   const [params] = useSearchParams()
   const scene = (params.get('scene') ?? 'home-evening') as NonNullable<PreviewProps['scene']>
   const theme = params.get('theme') === 'dark' ? 'dark' : 'light'
-  return <KioskCanvasPreview scene={scene} theme={theme} />
+  const v1Screen = (params.get('v1') ?? undefined) as PreviewProps['v1Screen']
+  return <KioskCanvasPreview scene={scene} theme={theme} v1Screen={v1Screen} />
 }

@@ -10,8 +10,8 @@
 //                  what you have, ×1–3, add what's missing) · the question
 //                  of the day as the centrepiece
 //   bedtime        steps × kids · lights out as an arc
-//   night          the night scenery · tomorrow in three things · things to
-//                  talk about
+//   night          tomorrow's one time, large · who has what · the first
+//                  thing and the rest of tomorrow · things to talk about
 //   weekend        the day in hours with who's in each block · sometime today
 //
 // Graphics carry the information (rings are time left, chips are steps,
@@ -19,7 +19,7 @@
 // Presentation only: the Shell owns data, permissions and writes.
 
 import type { ReactNode } from 'react'
-import { Check, ChevronRight, Clock, ShoppingCart, BookOpen, Phone, StickyNote, ChefHat } from 'lucide-react'
+import { Check, ChevronRight, Clock, ShoppingCart, BookOpen, Phone, StickyNote, ChefHat, MessageSquare } from 'lucide-react'
 import type { FamilyMember } from '@/types/family'
 import type { KidRow } from '@/lib/wall/kidDayModel'
 import type { WallTodayRow } from '@/lib/wall/wallMomentsModel'
@@ -58,7 +58,6 @@ export interface KioskHomeV1Props {
   bedtime: BedtimeGrid
   tomorrow: { label: string; outTheDoor: string | null; specials: { member: FamilyMember; text: string }[] }
   weekend: { rows: WallTodayRow[]; anytime: { title: string; owners: string[] }[]; tomorrow: WallTodayRow[]; tomorrowLabel: string }
-  scenery: { day: string; night: string; dusk: string } | null
   onTick: (member: FamilyMember, row: KidRow) => void
   onOpenKid: (member: FamilyMember) => void
   onToggleHave: (index: number) => void
@@ -200,10 +199,8 @@ function Places({ places }: { places: KioskHomeV1Props['places'] }) {
 }
 
 function Rest(p: KioskHomeV1Props) {
-  const evening = p.pick.dark
   return (
     <div className="kv-scene">
-      {p.scenery && <img className="kv-scene-art" src={evening ? p.scenery.dusk : p.scenery.day} alt="" />}
       <div className="kv-sky">
         <section className="kv-sentence" aria-label="Today">
           <p className="kv-line">{p.restLine}</p>
@@ -355,26 +352,58 @@ function Bedtime(p: KioskHomeV1Props) {
   )
 }
 
+/** Night (mockup 2026-10-14): tomorrow's one time, large; who has what;
+ *  the first thing in the morning and what else is on the clock beside it. */
 function Night(p: KioskHomeV1Props) {
+  const t = p.tomorrow
+  const first = t.outTheDoor && p.anchors.morning
+    ? [...(p.kids[0]?.morning ?? [])].filter((r) => minutesOf(r.timeOfDay) != null).sort((a, b) => (minutesOf(a.timeOfDay) ?? 0) - (minutesOf(b.timeOfDay) ?? 0))[0] ?? null
+    : null
+  const lead = t.outTheDoor ? null : p.weekend.tomorrow[0] ?? null
+  const also = p.weekend.tomorrow.filter((r) => r !== lead).slice(0, 3)
   return (
-    <div className="kv-scene is-night">
-      {p.scenery && <img className="kv-scene-art" src={p.scenery.night} alt="" />}
-      <section className="kv-sentence is-wide" aria-label="Tomorrow">
-        <p className="kv-lab">Tomorrow · {p.tomorrow.label}</p>
-        <div className="kv-tomorrow">
-          {p.tomorrow.outTheDoor && <div><b className="kv-mid">{p.tomorrow.outTheDoor}</b><small>Out the door</small></div>}
-          {p.tomorrow.specials.length > 0 && (
-            <div className="kv-specials">{p.tomorrow.specials.map((s) => <span key={s.member.id}><Face member={s.member} size="sm" />{s.text}</span>)}</div>
-          )}
-          {!p.tomorrow.outTheDoor && p.tomorrow.specials.length === 0 && <p className="kv-muted">Nothing set for the morning yet.</p>}
-        </div>
+    <div className="kv-night">
+      <section className="kv-night-lead" aria-label="Tomorrow">
+        <p className="kv-lab">Tomorrow · {t.label}</p>
+        {t.outTheDoor
+          ? <div className="kv-hero"><b>{t.outTheDoor}</b><small>am</small></div>
+          : lead ? <div className="kv-hero"><b>{lead.time.replace(/[ap]$/, '')}</b><small>{lead.time.endsWith('p') ? 'pm' : 'am'}</small></div> : null}
+        {t.outTheDoor ? <p className="kv-hero-sub">Out the door</p>
+          : lead ? <p className="kv-hero-sub">{lead.title}</p>
+          : <p className="kv-hero-sub is-quiet">Nothing set for the morning yet.</p>}
+        {t.specials.length > 0 && (
+          <div className="kv-specials">
+            {t.specials.map((s) => (
+              <span key={s.member.id}><Face member={s.member} size="md" /><span><small>{s.member.name}</small><b>{s.text}</b></span></span>
+            ))}
+          </div>
+        )}
+        {p.talks.length > 0 && (
+          <button type="button" className="kv-talk-line" onClick={p.places.onNotes}>
+            <MessageSquare aria-hidden="true" />
+            <span><b>{p.talks.length === 1 ? '1 thing' : `${p.talks.length} things`} to talk about</b><small>{p.talks.slice(0, 3).map((x) => x.text).join(' · ')}</small></span>
+            <ChevronRight aria-hidden="true" className="kv-go" />
+          </button>
+        )}
       </section>
-      {p.talks.length > 0 && (
-        <section className="kv-talks" aria-label="Things to talk about">
-          <p className="kv-lab is-voice">{p.talks.length === 1 ? '1 thing' : `${p.talks.length} things`} to talk about</p>
-          <ul>{p.talks.slice(0, 4).map((t) => <li key={t.id}>{t.text}</li>)}</ul>
-          <small>Or save them for the week's planning.</small>
-        </section>
+      {(first || also.length > 0) && (
+        <aside className="kv-night-side" aria-label="Also tomorrow">
+          {first && p.anchors.morning && (
+            <div>
+              <p className="kv-lab">First thing</p>
+              <div className="kv-side-time"><b>{clockLabel(minutesOf(first.timeOfDay) ?? p.anchors.morning.start)}</b><small>am</small></div>
+              <p className="kv-side-sub">{first.title}</p>
+            </div>
+          )}
+          {also.length > 0 && (
+            <div>
+              <p className="kv-lab">Also tomorrow</p>
+              <ul className="kv-times">
+                {also.map((r) => <li key={r.id}><b>{r.time}</b><span>{r.title}</span></li>)}
+              </ul>
+            </div>
+          )}
+        </aside>
       )}
     </div>
   )
@@ -405,7 +434,6 @@ function Weekend(p: KioskHomeV1Props) {
   const nowPos = pos(p.now)
   return (
     <div className="kv-scene is-weekend">
-      {p.scenery && <img className="kv-scene-art is-faint" src={p.scenery.day} alt="" />}
       <div className="kv-weekend">
         <section className="kv-card kv-hours" aria-label="Today, hour by hour">
           <div className="kv-hour-ticks" aria-hidden="true">

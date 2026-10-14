@@ -255,7 +255,6 @@ export function KioskCanvas(p: KioskCanvasProps) {
         <KioskHomeV1
           {...p.v1} now={p.v1.at ?? p.now} members={p.members} dinner={p.dinner} bedtime={p.bedtime}
           have={state.have} scale={p.dinner ? Math.max(1, Math.round((state.serves ?? p.dinner.baseServes) / p.dinner.baseServes)) : 1}
-          scenery={scenery.showScenery ? { day: sceneryArt(scenery.sceneryStyle, placeId, 'daytime').src, night: sceneryArt(scenery.sceneryStyle, placeId, 'nighttime').src, dusk: sceneryArt(scenery.sceneryStyle, placeId, 'dusk-dawn').src } : null}
           onTick={p.onTick} onTapRow={p.onTapRow}
           onOpenKid={(m) => dispatch({ type: 'OPEN', stage: { kind: 'person', memberId: m.id } })}
           onToggleHave={(index) => dispatch({ type: 'TOGGLE_HAVE', index })}
@@ -335,6 +334,12 @@ export function KioskCanvas(p: KioskCanvasProps) {
   // "Dark view" forced dark all day (Scott, 2026-10-13: "patchwork").
   const dark = v1 ? v1.pick.dark : p.isDark
   const title = v1 && stage.kind === 'home' ? v1.pick.title : place
+  // v1 (mockup 2026-10-14): the place's scenery is a faint wash behind the
+  // whole wall, band and bar included; fuller when nothing is pressing.
+  const quietScreen = v1 && ['rest', 'night', 'weekend'].includes(v1.pick.screen)
+  const wash = v1 && stage.kind === 'home' && scenery.showScenery
+    ? sceneryArt(scenery.sceneryStyle, placeId, v1.pick.screen === 'night' ? 'nighttime' : dark ? 'dusk-dawn' : 'daytime').src
+    : null
   // Settings live behind a long press on the clock, away from small fingers.
   const pressTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const pressClock = {
@@ -344,10 +349,13 @@ export function KioskCanvas(p: KioskCanvasProps) {
   }
   return (
     <div className={`kiosk-canvas ${dark ? 'is-dark dark' : ''} ${v1 ? `is-v1 sky-${stage.kind === 'home' ? v1.pick.screen : 'activity'}` : ''}`} onPointerDownCapture={touched} data-stage={stage.kind}>
+      {wash && <div className={`kv-wash ${quietScreen ? '' : 'is-faint'}`} aria-hidden="true"><img src={wash} alt="" /></div>}
       <header className="kc-top">
         <div className="kc-time" {...(v1 ? pressClock : {})}>
-          <img className="kc-mark" src="/symphony-logo.png" alt="Symphony" />
-          <div><b className="kc-clock">{p.clock}</b><span className="kc-date">{p.dateLabel}</span></div>
+          {!v1 && <img className="kc-mark" src="/symphony-logo.png" alt="Symphony" />}
+          {v1
+            ? <div className="kv-clock"><b className="kc-clock">{p.clock.replace(/\s?[AP]M$/i, '')}<small>{/PM$/i.test(p.clock) ? 'pm' : /AM$/i.test(p.clock) ? 'am' : ''}</small></b><span className="kc-date">{p.dateLabel}</span></div>
+            : <div><b className="kc-clock">{p.clock}</b><span className="kc-date">{p.dateLabel}</span></div>}
           {p.freshness}
         </div>
         <div className="kc-place-wrap">
