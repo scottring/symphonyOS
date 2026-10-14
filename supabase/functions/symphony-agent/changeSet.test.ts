@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
+import { SESSION_SPINE_PREAMBLE, WEEKLY_PLANNING_SCRIPT } from '../_shared/sessionScripts'
 import { changeCardNote, changeSetFromInput, PROPOSE_CHANGES_TOOL, resolveRefs } from './changeSet'
 
 const A = '0b8e7c1a-2d3f-4a5b-8c6d-7e8f9a0b1c2d'
@@ -147,5 +148,33 @@ describe('agent wiring', () => {
   it('proposes early and revises after each answer while planning', () => {
     expect(src).toContain('as soon as one answer settles a change')
     expect(PROPOSE_CHANGES_TOOL.description).toContain('call it again with the whole list so far')
+  })
+  // Task 25: one session script shared with the voice.
+  it('carries the shared session spine, hard rules and everyday manner', () => {
+    for (const name of ['SESSION_SPINE_PREAMBLE', 'HARD_RULES', 'WEEKLY_PLANNING_SCRIPT', 'EVERYDAY_TALK_RULES', 'MONTH_SEASON_YEAR_NOTE']) {
+      expect(src).toContain('${' + name + '}')
+    }
+    expect(src).toContain("from '../_shared/sessionScripts.ts'")
+    expect(src).toContain('Everyday talk:')
+    // the interpolated strings themselves
+    expect(SESSION_SPINE_PREAMBLE).toContain('Sessions follow a spine, not a script')
+    expect(WEEKLY_PLANNING_SCRIPT).toContain("Let's plan the week of")
+  })
+  // Task 25 add-on: three older lines competed with the card.
+  it('writes linked week work directly only for ONE stated week task', () => {
+    expect(src).not.toContain('Create linked weekly work with symphony_create_plan_item and parent_id, then schedule that same ID.')
+    expect(src).toContain('For ONE week task the person states, create it with symphony_create_plan_item and parent_id, then schedule that same ID.')
+    expect(src).toContain('use symphony_propose_changes add with goal_id')
+  })
+  it('sends week-level suggestions through the card, plan items only for goals and links', () => {
+    expect(src).not.toContain('(a missing month goal, a week task), offer it with symphony_propose_plan_items')
+    expect(src).toContain('offer a missing month, season or year goal, or a goal link, with symphony_propose_plan_items')
+    expect(src).toContain('offer a week task on the change card with symphony_propose_changes')
+  })
+  it('scopes across-the-horizon planning in the workspace prefix to Month, Season and Year', () => {
+    expect(src).not.toContain('Full planning proceeds across all items at each horizon before moving down;')
+    expect(src).toContain('When planning a Month, Season or Year, proceed across all items at each horizon before moving down')
+    expect(src).not.toContain('Ask one natural question at a time;')
+    expect(src).toContain('Ask one question at a time;')
   })
 })
