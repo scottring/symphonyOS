@@ -43,6 +43,7 @@ import { useActionableInstances } from '@/hooks/useActionableInstances'
 import { showToast } from '@/hooks/useToast'
 import { layoutContextSpans } from '@/lib/week/journalSpread'
 import { localYmd } from '@/lib/cadence/config'
+import { weekOfYear } from '@/lib/planning/horizonNumerals'
 import { publishViewedWeek } from '@/lib/viewedWeekSignal'
 import { useMediaQuery } from '@/hooks/useMediaQuery'
 import type { AssigneeFilter } from '@/lib/today/types'
@@ -152,6 +153,28 @@ const DAILY_KEY = 'symphony-week-daily'
 
 const weekIsCurrentFor = (anchor: Date) => sameDay(anchor, weekStartAnchor(new Date(), readCadenceConfig().weekStartsOn))
 
+/**
+ * The page's walk into planning by conversation. This week: "Plan the week"
+ * on its first day, "Plan the rest of my week" after. On its last day (Friday,
+ * for a Saturday week) there is nothing left to plan, so it offers the next
+ * week by number, as the old step did ("Plan week 43"). A week ahead offers
+ * "Plan the week". Whenever the week is not this one, the message names its
+ * start, so Symphony reads and plans that week. A past week offers nothing.
+ */
+function weekWalk(anchor: Date, now: Date): { label: string; message: string } | null {
+  const wso = readCadenceConfig().weekStartsOn
+  const current = weekStartAnchor(now, wso)
+  const named = (d: Date) => `Plan the week of ${d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}.`
+  if (sameDay(anchor, current)) {
+    if (localYmd(now) === localYmd(anchor)) return { label: 'Plan the week', message: 'Plan the week.' }
+    const next = new Date(anchor.getFullYear(), anchor.getMonth(), anchor.getDate() + 7)
+    const lastDay = new Date(anchor.getFullYear(), anchor.getMonth(), anchor.getDate() + 6)
+    if (localYmd(now) === localYmd(lastDay)) return { label: `Plan week ${weekOfYear(next, wso)}`, message: named(next) }
+    return { label: 'Plan the rest of my week', message: 'Plan the rest of my week.' }
+  }
+  return anchor.getTime() > current.getTime() ? { label: 'Plan the week', message: named(anchor) } : null
+}
+
 export function WeekViewV2(props: WeekViewV2Props) {
   const {
     tasks,
@@ -195,15 +218,12 @@ export function WeekViewV2(props: WeekViewV2Props) {
   // workweek); the list and the pin key on the week ANCHOR, like belongsToWeek.
   const weekAnchor = useMemo(() => weekStartAnchor(weekStart, readCadenceConfig().weekStartsOn), [weekStart])
   useEffect(() => { publishViewedWeek(weekAnchor) }, [weekAnchor])
-  // Planning the week is a conversation: on the current week the bar offers it.
-  const planFirstDay = localYmd(new Date()) === localYmd(weekAnchor)
-  const weekWalk = weekIsCurrentFor(weekAnchor)
-    ? (planFirstDay ? { label: 'Plan the week', message: 'Plan the week.' } : { label: 'Plan the rest of my week', message: 'Plan the rest of my week.' })
-    : null
-  const walkInBar = useConversationWalk(weekWalk)
+  // Planning the week is a conversation: the bar offers it (weekWalk).
+  const walk = weekWalk(weekAnchor, new Date())
+  const walkInBar = useConversationWalk(walk)
   // Phones have no bar: the page offers the same walk, sent the same way.
   const { openAssistant } = useAssistantLauncher()
-  const pageWalk = weekWalk && !walkInBar ? { label: weekWalk.label, onStart: () => openAssistant({ message: weekWalk.message, autoSend: true }) } : undefined
+  const pageWalk = walk && !walkInBar ? { label: walk.label, onStart: () => openAssistant({ message: walk.message, autoSend: true }) } : undefined
   // Only unmount clears it — a cleanup on every change published null → week
   // and defeated the signal's same-week dedupe.
   useEffect(() => () => publishViewedWeek(null), [])

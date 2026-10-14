@@ -27,7 +27,14 @@ export interface ChangeOp {
   seen?: string
 }
 
-export interface ChangeSet { key: string; title: string; ops: ChangeOp[] }
+export interface ChangeSet {
+  key: string
+  title: string
+  ops: ChangeOp[]
+  /** YYYY-MM-DD: the week being planned (read_week's start). An add with no
+   *  day lands in it. */
+  weekStart?: string
+}
 
 /** What became of the latest card, told to the next turn: Symphony's history
  *  holds only the words, so without this it re-proposes changes already saved

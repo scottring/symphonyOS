@@ -31,9 +31,9 @@ import { DomainSwitcher } from '@/components/domain/DomainSwitcher';
 import { HeaderPeopleFilter } from '@/components/layout/HeaderPeopleFilter';
 import { Toast, ConfirmationToast, ToastLiveRegion } from '@/components/toast';
 import { ChatPanel } from '@/components/chat/ChatPanel';
-import { applyChangeSet } from '@/lib/canvas/applyChangeSet';
+import { applyChangeSet, plannedWeekStart } from '@/lib/canvas/applyChangeSet';
 import type { ChangeSet } from '@/lib/canvas/changeCard';
-import { readCadenceConfig, weekStartAnchor } from '@/lib/cadence/config';
+import { readCadenceConfig } from '@/lib/cadence/config';
 import { NotesProvider } from '@/contexts/NotesContext';
 import { ListsProvider } from '@/contexts/ListsContext';
 import { PinsProvider } from '@/contexts/PinsContext';
@@ -365,7 +365,7 @@ function ShellLayoutInner({ children }: Props) {
   const applyChanges = useCallback((set: ChangeSet) => applyChangeSet(set, {
     tasks, updateTask, deleteTask,
     addTask: (title, when, options) => addTask(title, undefined, undefined, when, options),
-    weekStart: weekStartAnchor(new Date(), readCadenceConfig().weekStartsOn),
+    weekStart: plannedWeekStart(set, new Date(), readCadenceConfig().weekStartsOn),
   }), [tasks, updateTask, deleteTask, addTask]);
   const canvasRefetch = useCallback(() => { window.dispatchEvent(new Event('symphony-plan-updated')); return Promise.all([refetch(), refetchRoutines()]); }, [refetch, refetchRoutines]);
   const showStrip = conversationStripPath(location.pathname);

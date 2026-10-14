@@ -493,10 +493,33 @@ describe('WeekViewV2 — Plan the rest of my week in the bar', () => {
     expect(launcher.openAssistant).toHaveBeenCalledWith({ message: 'Plan the rest of my week.', autoSend: true })
   })
 
-  it('offers nothing on another week', () => {
+  it('offers nothing on a past week', () => {
     vi.setSystemTime(new Date(2026, 9, 14, 9))
     const setWalk = mount(new Date(2026, 9, 3))
     expect(screen.queryByRole('button', { name: /^Plan (the rest of my|the) week$/ })).toBeNull()
     expect(setWalk).not.toHaveBeenCalledWith(expect.objectContaining({ label: expect.any(String) }))
+  })
+
+  // Final review 2026-10-14 #4: Friday is the Saturday-start week's last day,
+  // when the household plans the next one.
+  it('on the week\'s last day offers planning the next week, by its start date', () => {
+    vi.setSystemTime(new Date(2026, 9, 16, 18))
+    const setWalk = mount(new Date(2026, 9, 10))
+    expect(setWalk).toHaveBeenCalledWith({ label: 'Plan week 43', message: 'Plan the week of Oct 17.' })
+    expect(setWalk).not.toHaveBeenCalledWith(expect.objectContaining({ label: 'Plan the rest of my week' }))
+  })
+
+  it('on the last day a phone offers the same, in the page', () => {
+    vi.setSystemTime(new Date(2026, 9, 16, 18))
+    launcher.openAssistant.mockClear()
+    render(<WeekViewV2 {...defaultProps} routines={[]} weekStart={new Date(2026, 9, 10)} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Plan week 43' }))
+    expect(launcher.openAssistant).toHaveBeenCalledWith({ message: 'Plan the week of Oct 17.', autoSend: true })
+  })
+
+  it('next week\'s page offers "Plan the week", naming its start', () => {
+    vi.setSystemTime(new Date(2026, 9, 14, 9))
+    const setWalk = mount(new Date(2026, 9, 17))
+    expect(setWalk).toHaveBeenCalledWith({ label: 'Plan the week', message: 'Plan the week of Oct 17.' })
   })
 })

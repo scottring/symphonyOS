@@ -125,6 +125,11 @@ describe('agent wiring', () => {
     expect(src).toMatch(/changeCardNote\(body\.changeCard\)/)
     expect(src).toContain('If the page says the last change card was approved, its changes are saved: the next list holds only what is still unsaved. If it was dismissed, do not re-propose those changes unless asked.')
   })
+  it('plans the week the message names, and sends that week with the card', () => {
+    expect(src).toContain('the week the message names ("Plan the week of Oct 17"')
+    expect(src).toContain('week_start set to the start symphony_read_week returned')
+    expect(JSON.stringify(PROPOSE_CHANGES_TOOL.input_schema)).toContain('week_start')
+  })
   it('proposes early and revises after each answer while planning', () => {
     expect(src).toContain('as soon as one answer settles a change')
     expect(PROPOSE_CHANGES_TOOL.description).toContain('call it again with the whole list so far')

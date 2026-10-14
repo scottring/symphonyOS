@@ -8,13 +8,14 @@
 
 import type { Task, TaskBucket } from '@/types/task'
 import { opWhen, opWrite, withSteps, type ChangeSet } from './changeCard'
+import { weekStartAnchor, type WeekStart } from '@/lib/cadence/config'
 
 export interface ApplyDeps {
   tasks: Task[]
   updateTask: (id: string, updates: Partial<Task>) => Promise<boolean | void>
   addTask: (title: string, scheduledFor: Date | undefined, options: { isAllDay?: boolean; bucket?: TaskBucket; weekStart?: Date; assignedTo?: string; assignedToAll?: string[]; sourceId?: string }) => Promise<string | undefined>
   deleteTask: (id: string) => Promise<unknown>
-  /** This week's start, for an add with no day. */
+  /** The planned week's start, for an add with no day (plannedWeekStart). */
   weekStart: Date
 }
 
@@ -22,6 +23,13 @@ export type ApplyResult =
   | { ok: true; ids: string[]; undo: () => Promise<boolean> }
   | { ok: false; reason: 'stale'; title: string }
   | { ok: false; reason: 'failed' }
+
+/** The week an add with no day lands in: the one the set was planned for
+ *  (planning next week on this week's last day), else this week. */
+export function plannedWeekStart(set: ChangeSet, now: Date, weekStartsOn: WeekStart): Date {
+  const named = set.weekStart && /^\d{4}-\d{2}-\d{2}$/.test(set.weekStart) ? set.weekStart.split('-').map(Number) : null
+  return weekStartAnchor(named ? new Date(named[0], named[1] - 1, named[2]) : now, weekStartsOn)
+}
 
 /** Postgres keeps microseconds; the client's Date keeps milliseconds. */
 const movedSince = (task: Task, seen: string) => task.updatedAt.getTime() > Math.floor(Date.parse(seen)) + 1

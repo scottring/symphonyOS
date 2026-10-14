@@ -55,8 +55,10 @@ describe('deriveActiveView', () => {
 const mobileState = vi.hoisted(() => ({ isMobile: false }))
 vi.mock('@/hooks/useMobile', () => ({ useMobile: () => mobileState.isMobile }))
 vi.mock('@/hooks/useAuth', () => ({ useAuth: () => ({ user: null, signOut: vi.fn() }) }))
+const tasksState = vi.hoisted(() => ({ addTask: vi.fn(async () => 'new1') }))
 vi.mock('@/hooks/useSupabaseTasks', () => ({ useSupabaseTasks: () => ({
   tasks: [], loading: false, updateTask: vi.fn(), updateTasksBulk: vi.fn(), pushTask: vi.fn(), toggleTask: vi.fn(),
+  addTask: tasksState.addTask, deleteTask: vi.fn(), refetch: vi.fn(),
 }) }))
 const aiState = vi.hoisted(() => ({ hidden: true }))
 vi.mock('@/hooks/useScratchpadHidden', () => ({ useScratchpadHidden: () => ({ hidden: aiState.hidden, setHidden: vi.fn() }) }))
@@ -539,5 +541,20 @@ describe('The change card in the conversation', () => {
     expect(card.closest('.side-column')).not.toBeNull()
     fireEvent.click(within(card).getByRole('button', { name: 'Dismiss' }))
     expect(screen.queryByRole('region', { name: '3 changes to your week' })).not.toBeInTheDocument()
+  })
+})
+
+// Planning next week on this week's last day: an ADD with no day lands in the
+// week Symphony read, not the one it is today (final review, 2026-10-14 #4).
+describe('Approve puts an undated add in the planned week', () => {
+  beforeEach(() => { mobileState.isMobile = false; selectionState.selection = null; localStorage.setItem('symphony-cadence-config', JSON.stringify({ weekStartsOn: 6 })) })
+  afterEach(() => { localStorage.removeItem('symphony-cadence-config') })
+
+  it('uses the set\'s week_start', async () => {
+    tasksState.addTask.mockClear()
+    renderAt('/week?view=alongside')
+    act(() => assistantState.observer!.changeSet?.({ key: 'w1', title: '1 change', weekStart: '2099-10-17', ops: [{ key: 'w1:0', op: 'add', title: 'Book the vet' }] }))
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Approve all 1' })) })
+    expect(tasksState.addTask).toHaveBeenCalledWith('Book the vet', undefined, undefined, undefined, { bucket: 'week', weekStart: new Date(2099, 9, 17) })
   })
 })

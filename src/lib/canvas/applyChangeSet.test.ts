@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { Task } from '@/types/task'
-import { applyChangeSet, type ApplyDeps } from './applyChangeSet'
+import { applyChangeSet, plannedWeekStart, type ApplyDeps } from './applyChangeSet'
 import type { ChangeSet } from './changeCard'
 
 const seen = '2026-10-14T07:00:00.123456+00:00'
@@ -80,5 +80,24 @@ describe('applyChangeSet', () => {
     const r = await applyChangeSet({ key: 'n', title: '1 change', ops: [{ key: 'n:0', op: 'someday', taskId: 's1', title: 's1', seen }] }, d)
     expect(r).toMatchObject({ ok: true, ids: ['s1'] })
     expect(d.updateTask).toHaveBeenCalledWith('s1', { bucket: 'someday', scheduledFor: undefined, isAllDay: undefined })
+  })
+
+  it('an add with no day lands in the week being planned, not this one (final review #4)', async () => {
+    const planned: ChangeSet = { key: 'w', title: '1 change', weekStart: '2026-10-17', ops: [{ key: 'w:0', op: 'add', title: 'Book the vet' }] }
+    const now = new Date(2026, 9, 16, 18) // Friday, the Saturday week's last day
+    const d = deps({ weekStart: plannedWeekStart(planned, now, 6) })
+    await applyChangeSet(planned, d)
+    expect(d.addTask).toHaveBeenCalledWith('Book the vet', undefined, { bucket: 'week', weekStart: new Date(2026, 9, 17) })
+  })
+})
+
+describe('plannedWeekStart', () => {
+  const now = new Date(2026, 9, 14, 9)
+  it('is the set\'s week when it names one, anchored to the household\'s week start', () => {
+    expect(plannedWeekStart({ key: 'k', title: 't', ops: [], weekStart: '2026-10-17' }, now, 6)).toEqual(new Date(2026, 9, 17))
+    expect(plannedWeekStart({ key: 'k', title: 't', ops: [], weekStart: '2026-10-19' }, now, 6)).toEqual(new Date(2026, 9, 17))
+  })
+  it('is this week otherwise', () => {
+    expect(plannedWeekStart({ key: 'k', title: 't', ops: [] }, now, 6)).toEqual(new Date(2026, 9, 10))
   })
 })
