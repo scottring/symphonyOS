@@ -49,4 +49,7 @@ at an advanced third grader and gets harder or easier with each kid.
 
 ## Later
 
+- **Parked (2026-10-14):** branch `claude/math-paper-room` adds room above the problem and squares sized to fit. It is built and tested but not deployed.
+- **Finger precision, proposed:** let only the first finger draw (no palm or second-finger marks); smooth strokes; make ink thickness scale with the squares; use a low-latency canvas. A fat stylus would help with the touch frame's own accuracy. Bigger option: tap a square, then a digit on the pad, to write a crisp digit.
+
 - Parent-set topics in the app, beside the kids' own.
