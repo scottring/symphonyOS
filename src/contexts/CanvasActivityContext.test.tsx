@@ -160,14 +160,13 @@ describe('CanvasActivityProvider — writes the canvas does not hold', () => {
 describe('change sets', () => {
   function mountActivity(extra: { applyChanges?: CanvasActivityProviderProps['applyChanges'] }) {
     let latest: CanvasActivity | null = null
-    const Grab = () => { latest = useCanvasActivity(); return null }
     render(
       <CanvasActivityProvider
         snapshot={{ tasks: [], goals: [] }}
         writers={{ deleteTask: vi.fn(), updateTask: vi.fn(), deleteGoal: vi.fn(), updateGoal: vi.fn() }}
         refetch={vi.fn()}
         {...extra}
-      ><Grab /></CanvasActivityProvider>,
+      ><Probe onReady={(a) => { latest = a }} /></CanvasActivityProvider>,
     )
     return { activity: () => latest! }
   }
