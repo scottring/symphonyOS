@@ -81,6 +81,8 @@ describe('agent wiring', () => {
   it('does a clear single change directly and asks one question when ambiguous', () => {
     expect(src).toContain('A clear, reversible change to ONE item')
     expect(src).toContain('ask ONE short question')
+    expect(src).toContain('Routines have no preview yet')
+    expect(src).toContain('Just this week, or from now on?')
   })
   it('proposes early and revises after each answer while planning', () => {
     expect(src).toContain('as soon as one answer settles a change')
