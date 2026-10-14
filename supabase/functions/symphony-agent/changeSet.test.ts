@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import { changeSetFromInput, resolveRefs } from './changeSet'
+import { changeSetFromInput, PROPOSE_CHANGES_TOOL, resolveRefs } from './changeSet'
 
 const A = '0b8e7c1a-2d3f-4a5b-8c6d-7e8f9a0b1c2d'
 const B = '4f1c2a9e-7b3d-4c11-9a0e-2f6b8d1e3c55'
@@ -77,5 +77,13 @@ describe('agent wiring', () => {
   it('tells the model to propose, not write, when several items change', () => {
     expect(src).toContain('MORE THAN ONE task')
     expect(src).toContain('symphony_propose_changes')
+  })
+  it('does a clear single change directly and asks one question when ambiguous', () => {
+    expect(src).toContain('A clear, reversible change to ONE item')
+    expect(src).toContain('ask ONE short question')
+  })
+  it('proposes early and revises after each answer while planning', () => {
+    expect(src).toContain('as soon as one answer settles a change')
+    expect(PROPOSE_CHANGES_TOOL.description).toContain('call it again with the whole list so far')
   })
 })

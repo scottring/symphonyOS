@@ -24,7 +24,6 @@ export function ChangeCard({ set, today, onApprove, onDismiss }: Props) {
         <h2 id={titleId} className="change-card-title">{set.title}</h2>
         <button type="button" className="canvas-icon" onClick={onDismiss} aria-label="Dismiss" disabled={saving}><X size={14} aria-hidden="true" /></button>
       </header>
-      {set.replaced && <p className="change-card-note">This replaces the earlier list.</p>}
       <ul className="change-card-rows">
         {set.ops.map((op) => {
           const row = opRow(op, today)

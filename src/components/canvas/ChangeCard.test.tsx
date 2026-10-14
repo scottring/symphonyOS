@@ -34,8 +34,8 @@ describe('ChangeCard', () => {
     rerender(<ChangeCard set={pending({ state: 'failed', message: "Couldn't save. Nothing was changed. Try again." })} today={today} onApprove={vi.fn()} onDismiss={vi.fn()} />)
     expect(screen.getByRole('alert')).toHaveTextContent("Couldn't save. Nothing was changed. Try again.")
   })
-  it('says when it replaced an earlier list', () => {
+  it('a revised list updates in place without a banner', () => {
     render(<ChangeCard set={pending({ replaced: true })} today={today} onApprove={vi.fn()} onDismiss={vi.fn()} />)
-    expect(screen.getByText('This replaces the earlier list.')).toBeInTheDocument()
+    expect(screen.queryByText('This replaces the earlier list.')).toBeNull()
   })
 })

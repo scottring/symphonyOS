@@ -109,7 +109,7 @@ export function resolveRefs(
 
 export const PROPOSE_CHANGES_TOOL = {
   name: 'symphony_propose_changes',
-  description: 'Propose ONE list of changes to the person\'s tasks, shown as a change card and as dashed rows on the page. Nothing is saved until they press Approve. Use this whenever a request changes MORE THAN ONE task, and always at the end of a planning conversation. Never call write tools for the same changes. Ops: place (give an existing task a day, optionally a time), unplace (take its day away), add (a new task, optionally on a day/time), someday (set it aside; there is no delete), assign (one household member). If the person asks to change the list, call this again with the whole revised list.',
+  description: 'Propose ONE list of changes to the person\'s tasks, shown as a change card and as dashed rows on the page. Nothing is saved until they press Approve. Use this whenever a request changes MORE THAN ONE task, and always at the end of a planning conversation. Never call write tools for the same changes. Ops: place (give an existing task a day, optionally a time), unplace (take its day away), add (a new task, optionally on a day/time), someday (set it aside; there is no delete), assign (one household member). Each call replaces the list on the page: while planning, call it again with the whole list so far after each answer, and whenever the person asks for a change.',
   input_schema: {
     type: 'object',
     properties: {
