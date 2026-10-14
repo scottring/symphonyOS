@@ -88,16 +88,17 @@ stage 3, and calendar writes stay out until Google Calendar Undo is solved.
 5. **Dashed preview.** Pages read `pendingChangeSet` and draw the affected items
    where they would land, with a dashed teal border on the proposal fill.
    Week is first (stage 2).
-6. **Atomic apply: Postgres function `apply_change_set(ops jsonb)`.** It runs
-   with the caller's rights (security invoker), so RLS still decides what the
-   person can change. It applies every op in one transaction: all or nothing.
-   Each op carries the item's `updated_at` as Symphony saw it. If the item has
-   changed since, the whole set is refused (see Errors). It returns the
-   before-values of every row it touched. Undo calls the same
-   function with the inverse ops. The client wires this through
-   `CanvasActivityContext.run(label, cmd, { ids, undo })`, so Undo appears as
-   usual. Undo lasts until the end of the day, or until one of those items is
-   edited again, whichever comes first.
+6. **All-or-nothing apply, through the app's own writers.** Approve runs each
+   op through the same task writers the page's gestures use (`updateTask`,
+   `addTask`), which already apply the placement rules (commitments, week and
+   month stamps) and the privacy scope. Before writing anything it checks
+   each task's `updated_at` against what Symphony saw, and refuses the whole
+   set if one has moved. If a write fails part way, the ones already saved are
+   put back. One Undo reverses the lot, newest first, through
+   `CanvasActivityContext.run`. *(Changed while planning, 2026-10-14: a
+   single Postgres function would have had to re-implement the client's
+   placement planner. The visible behaviour is the same: all saved, or
+   nothing changed.)*
 
 **Errors.** If validation fails on the server, the agent gets the reason and
 revises. If apply fails, nothing changes, and the card stays with "Couldn't
@@ -109,9 +110,8 @@ person asks for a fresh set.
 
 - Unit: op validation, card wording per op, and that the inverse of every op
   restores the before-values.
-- Database: `apply_change_set` against a local Supabase: all-or-nothing on a
-  bad op, refusal when an item changed since the proposal, round-trip apply
-  then Undo.
+- Apply: all-or-nothing when a write fails part way, refusal when an item
+  changed since the proposal, round-trip apply then Undo.
 - Privacy, with real signed-in accounts (Scott and Iris): a set cannot touch
   the other person's private Work or Personal tasks, and the dashed preview
   shows only what the viewer may see.
@@ -125,11 +125,13 @@ person asks for a fresh set.
 
 Matching mockup frame "After 1":
 
-- **Header:** the period and one Symphony sentence describing the week, for
-  example "A work-heavy middle: CEPI today, the WSWMD slot may land this
-  afternoon. Thursday is wide open." It is generated once per day and when the
-  week changes, from the week's own data only. If it can't be generated, the
-  header shows just the period.
+- **Header:** the period and one plain sentence about the week, for example
+  "Today: CEPI food-contact meeting. Thursday is wide open. Friday is the full
+  one." The sentence comes from fixed rules over the week's own data, not
+  from the model (rules decide, Symphony assists). With nothing to say, the
+  header shows just the period. *(Changed while planning, 2026-10-14: the
+  mockup's sentence read like the model wrote it; rules keep it reliable and
+  free.)*
 - **Days:** as now: events, routines, tasks, faces, free time, with past days
   stepped back.
 - **No day yet:** one quiet line of the week's tasks with no day, in place of
@@ -173,8 +175,8 @@ something clearly fits.
 
 ## How it ships
 
-1. **PR 1, change card:** the tool, the prompt rule, `apply_change_set` plus
-   its migration, the context state and the card in the bar. Week stays as it
+1. **PR 1, change card:** the tool, the prompt rule, the apply step, the
+   context state and the card in the bar. Week stays as it
    is, but the card already works there for "move these three to Thursday".
 2. **PR 2, Week picture:** dashed preview, header sentence, No day yet line,
    `symphony_read_week`, the bar chip.
