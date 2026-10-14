@@ -7,7 +7,7 @@
 //   The days         the page (Scott, 2026-10-12: calendar first; mockup
 //                    approved 2026-10-13): equal columns in the household's
 //                    week order — events in calendar blue, the kids' specials
-//                    as chips, placed work as rows with a ⋯ menu and who
+//                    as chips, placed work as rows (tick, drag, tap to open) and who
 //                    carries it, routines as rounded squares, the hours with
 //                    nothing scheduled in green ("Calendar clear …",
 //                    ROW-LANGUAGE.md); a stay across days as one bar; past
@@ -28,13 +28,9 @@
 
 import { useContext, useState, type DragEvent, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
-import { MoreHorizontal } from 'lucide-react'
-import type { Task, TaskContext } from '@/types/task'
+import type { Task } from '@/types/task'
 import type { FamilyMember } from '@/types/family'
 import { AssigneeAvatar } from '@/components/family/AssigneeAvatar'
-import type { PlanNode } from '@/components/plan/constellation/model'
-import { MoveUnderMenu } from '@/components/canvas/plan/MoveUnderMenu'
-import { assigneesOf } from '@/lib/planning/v2/planV2'
 import { localYmd, readCadenceConfig, weekStartAnchor } from '@/lib/cadence/config'
 import { Link } from 'react-router-dom'
 import { formatTimeCompact } from '@/lib/dateHelpers'
@@ -42,7 +38,7 @@ import { isPlanDrag, readPlanDrag, writePlanDrag, type PlanDragPayload } from '@
 import { useMediaQuery } from '@/hooks/useMediaQuery'
 import { PlanMastheadSlotsContext } from '@/components/plan/v2/planMastheadSlots'
 import { CompactWeekRow, type CompactRow } from './CompactWeekList'
-import { CanvasMenu, GiveItADay, PeoplePicker } from './GiveItADay'
+import { GiveItADay } from './GiveItADay'
 import { dayChipLabel } from './compactWeek'
 import type { ShelfGroup } from './weekShelf'
 import { weekSentence } from './weekSentence'
@@ -98,19 +94,6 @@ export interface WeekCanvasWriters {
   toggleRoutine: (item: CanvasDayItem, day: Date) => void
   placeRoutine: (routine: ShelfRoutine, day: Date) => void
   moveRoutine: (item: CanvasDayItem, fromKey: string, toDay: Date) => void
-  /** Resolves true once stored; the composer keeps its words otherwise. */
-  addAction: (title: string, milestoneId?: string, area?: TaskContext) => Promise<boolean>
-  milestoneDone: (milestoneId: string) => void
-  /** The milestone itself onto this week (it stays on the month's list). */
-  putOnWeek: (milestoneId: string) => void
-  /** People… — who carries it (assigned_to_all, the first as assigned_to). */
-  assign: (task: Task, ids: string[]) => void
-  /** Life area… */
-  setArea: (task: Task, area: TaskContext | undefined) => void
-  /** Move under… — the milestones it may serve, as Plan offers them. Null:
-   *  nothing to offer for this row. */
-  moveUnderOptions: (task: Task) => { item: PlanNode; parents: PlanNode[] } | null
-  moveUnder: (task: Task, parent: PlanNode | null) => void
   /** Opens the details pane for a selectable id. */
   open: (id: string) => void
   /** A plan row from elsewhere (the Today pin) dropped on a day. */
@@ -125,7 +108,6 @@ export interface WeekCanvasProps {
   /** Routines written once above the days ("Every day", "Weekdays"). */
   rhythm?: { label: string; items: { title: string; openId: string }[] }[]
   /** "October" — whose milestones the shelf is grouped under. */
-  monthName: string
   isCurrent: boolean
   writers: WeekCanvasWriters
   spans?: CanvasSpan[]
@@ -137,22 +119,14 @@ export interface WeekCanvasProps {
   /** Every-day routines in each day, or written once above (the page's
    *  remembered choice). */
   daily?: { shown: boolean; onToggle: () => void }
-  /** Unused since the tray went (callers still pass it; Task 15 prunes). */
-  defaultArea?: TaskContext
-  /** Unused since the tray went (callers still pass it; Task 15 prunes). */
-  focusAdd?: boolean
 }
 
-const AREAS: { value: TaskContext; label: string }[] = [
-  { value: 'work', label: 'Work' }, { value: 'family', label: 'Family' }, { value: 'personal', label: 'Personal' },
-]
-
 type Drag = { kind: 'task' | 'routine' | 'occ'; id: string; groupKey?: string; fromKey?: string }
-type Picker = { key: string; mode: 'place' | 'move' } | null
+type Picker = { key: string } | null
 
 const longDay = (d: Date) => d.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
 
-export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [], monthName, isCurrent, writers, spans = [], dayDescriptions, members = [], daily }: WeekCanvasProps) {
+export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [], isCurrent, writers, spans = [], dayDescriptions, members = [], daily }: WeekCanvasProps) {
   const phone = useMediaQuery('(max-width: 767px)')
   const slots = useContext(PlanMastheadSlotsContext)
   const [showDone, setShowDone] = useState(false)
@@ -160,8 +134,6 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
   const [overDay, setOverDay] = useState<string | null>(null)
   const [overShelf, setOverShelf] = useState(false)
   const [picker, setPicker] = useState<Picker>(null)
-  const [menu, setMenu] = useState<string | null>(null)
-  const [panel, setPanel] = useState<{ key: string; kind: 'people' | 'area' | 'move' } | null>(null)
   const [weekendOpen, setWeekendOpen] = useState(false)
   const todayKey = localYmd(new Date())
   const [chosenDay, setChosenDay] = useState<string | null>(null)
@@ -183,7 +155,7 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
   const endDrag = () => { setDrag(null); setOverDay(null); setOverShelf(false) }
   const startDrag = (ev: DragEvent, payload: PlanDragPayload, d: Drag) => {
     writePlanDrag(ev.dataTransfer, payload)
-    setDrag(d); setPicker(null); setMenu(null)
+    setDrag(d); setPicker(null)
   }
   const dropOnDay = (day: CanvasDay, p: PlanDragPayload) => {
     endDrag()
@@ -236,38 +208,9 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
 
   // ── the shelf ──────────────────────────────────────────────────────────
   const pick = (rowKey: string, title: string, onPick: (d: Date) => void, current?: string) => (picker?.key === rowKey && (
-    <GiveItADay title={title} days={dates} inline={phone} current={current} describe={dayDescriptions} label={picker.mode === 'move' ? 'Move to' : 'Give it a day'}
+    <GiveItADay title={title} days={dates} inline={phone} current={current} describe={dayDescriptions} label="Give it a day"
       onPick={(d) => { setPicker(null); onPick(d) }} onClose={() => setPicker(null)} />
   ))
-  // People…, Life area…, Move under… — the row's secondary actions, in its ⋯.
-  const taskMenuItems = (t: Task, key: string) => [
-    { label: 'People…', onSelect: () => setPanel({ key, kind: 'people' as const }) },
-    { label: 'Life area…', onSelect: () => setPanel({ key, kind: 'area' as const }) },
-    ...(writers.moveUnderOptions(t) ? [{ label: 'Move under…', onSelect: () => setPanel({ key, kind: 'move' as const }) }] : []),
-  ]
-  const taskPanel = (t: Task, key: string): ReactNode => {
-    if (panel?.key !== key) return null
-    const close = () => setPanel(null)
-    if (panel.kind === 'people') return <PeoplePicker title={t.title} members={members} selected={assigneesOf(t)} onChange={(ids) => writers.assign(t, ids)} onClose={close} />
-    if (panel.kind === 'area') {
-      return <CanvasMenu label={`Life area for ${t.title}`} onClose={close} items={[
-        ...AREAS.map((a) => ({ label: a.label, checked: t.context === a.value, onSelect: () => writers.setArea(t, a.value) })),
-        { label: 'No life area', checked: !t.context, onSelect: () => writers.setArea(t, undefined) },
-      ]} />
-    }
-    const o = writers.moveUnderOptions(t)
-    return o && <MoveUnderMenu item={o.item} parents={o.parents} parentTerm={`${monthName} goal`} open
-      onOpenChange={(v) => { if (!v) close() }} onPick={(p) => { close(); writers.moveUnder(t, p) }} />
-  }
-  const moreButton = (title: string, key: string, items: { label: string; onSelect: () => void }[], size = 16) => (
-    <span className="wc-more-wrap">
-      <button type="button" className="canvas-icon wc-more" aria-label={`More for ${title}`} aria-haspopup="menu" aria-expanded={menu === key}
-        onClick={() => { setPicker(null); setPanel(null); setMenu(menu === key ? null : key) }}>
-        <MoreHorizontal size={size} aria-hidden="true" />
-      </button>
-      {menu === key && <CanvasMenu label={title} items={items} onClose={() => setMenu(null)} />}
-    </span>
-  )
   // ── the days ───────────────────────────────────────────────────────────
   // Who carries it, a glance from the title (ROW-LANGUAGE: people); nothing
   // for an id the household doesn't know.
@@ -294,27 +237,15 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
     const key = `${day.key}:${it.id}`
     const entityId = it.task?.id ?? it.routineId ?? it.id
     const row: CompactRow<CanvasDayItem> = { key, id: entityId, title: it.title, item: it, completed: it.completed, meta: it.time ? formatTimeCompact(it.time) : null }
-    const isTask = it.kind === 'task' && !!it.task
-    const items = [
-      { label: 'Move to another day', onSelect: () => setPicker({ key, mode: 'move' }) },
-      ...(isTask ? [{ label: 'Back to still to place', onSelect: () => writers.unplaceTask(it.task!) }] : []),
-      { label: 'Open', onSelect: () => writers.open(it.id) },
-      { label: it.completed ? 'Mark not done' : 'Complete', onSelect: () => (isTask ? writers.toggleTask(it.task!) : writers.toggleRoutine(it, day.date)) },
-      ...(isTask && !it.completed ? taskMenuItems(it.task!, key) : []),
-    ]
     return (
-      <CompactWeekRow key={key} row={row} className={`wc-dayrow${it.kind === 'routine' ? ' is-routine' : ''}${panel?.key === key || picker?.key === key ? ' has-picker' : ''}`}
+      <CompactWeekRow key={key} row={row} className={`wc-dayrow${it.kind === 'routine' ? ' is-routine' : ''}`}
         onComplete={(x) => (x.task ? writers.toggleTask(x.task) : writers.toggleRoutine(x, day.date))}
         onOpen={(x) => writers.open(x.id)}
         onDragStart={phone ? undefined : (x, ev) => x.task
           ? startDrag(ev, { kind: 'task', id: x.task.id, date: day.key, title: x.title }, { kind: 'task', id: x.task.id, fromKey: day.key })
           : x.routineId ? startDrag(ev, { kind: 'routine', id: x.routineId, date: day.key, title: x.title }, { kind: 'occ', id: x.routineId, fromKey: day.key }) : undefined}
         onDragEnd={endDrag}
-        under={peopleOf(it)}
-        trailing={moreButton(it.title, key, items, 15)}>
-        {pick(key, it.title, (d) => (isTask ? writers.moveTask(it.task!, d) : writers.moveRoutine(it, day.key, d)), day.key)}
-        {isTask && taskPanel(it.task!, key)}
-      </CompactWeekRow>
+        under={peopleOf(it)} />
     )
   }
   const dayColumn = (day: CanvasDay, col?: number) => {
@@ -420,7 +351,7 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
           onClick={() => writers.open(`${kind}-${id}`)}>{title}</button>
         {phone && (
           <button type="button" className="wc-noday-add" aria-label={`Give ${title} a day`} aria-expanded={picker?.key === key}
-            onClick={() => { setMenu(null); setPicker(picker?.key === key ? null : { key, mode: 'place' }) }}>+</button>
+            onClick={() => { setPicker(picker?.key === key ? null : { key }) }}>+</button>
         )}
         {pick(key, title, onPlace)}
       </li>

@@ -23,12 +23,7 @@ const placed = task({ id: 'p', title: 'Pick up the keys', scheduledFor: dayOf(4)
 
 const writers = (): WeekCanvasWriters => ({
   placeTask: vi.fn(), moveTask: vi.fn(), unplaceTask: vi.fn(), toggleTask: vi.fn(), toggleRoutine: vi.fn(),
-  placeRoutine: vi.fn(), moveRoutine: vi.fn(), addAction: vi.fn(async () => true), milestoneDone: vi.fn(), open: vi.fn(), foreignDrop: vi.fn(),
-  putOnWeek: vi.fn(), assign: vi.fn(), setArea: vi.fn(), moveUnder: vi.fn(),
-  moveUnderOptions: vi.fn((t: Task) => ({
-    item: { key: `3:${t.id}`, id: t.id, title: t.title, level: 3, parent: t.sourceId ? `2:${t.sourceId}` : null, task: t },
-    parents: [trip, paper].map((m) => ({ key: `2:${m.id}`, id: m.id, title: m.title, level: 2, parent: null, task: m })),
-  })),
+  placeRoutine: vi.fn(), moveRoutine: vi.fn(), open: vi.fn(), foreignDrop: vi.fn(),
 })
 
 function days(): CanvasDay[] {
@@ -56,7 +51,7 @@ function shelf(): ShelfGroup[] {
 
 const show = (w = writers(), extra: Partial<Parameters<typeof WeekCanvas>[0]> = {}) => {
   render(<WeekCanvas weekStart={weekStart} days={days()} shelf={shelf()} routinesToPlace={[{ id: 'r1', title: 'Mow the lawn' }]}
-    monthName="October" isCurrent writers={w} {...extra} />)
+    isCurrent writers={w} {...extra} />)
   return w
 }
 
@@ -134,7 +129,7 @@ describe('WeekCanvas — drag', () => {
 
   it('with nothing unplaced the line is absent until a day’s row is dragged, then it takes the drop', () => {
     const w = writers()
-    render(<WeekCanvas weekStart={weekStart} days={days()} shelf={[]} routinesToPlace={[]} monthName="October" isCurrent writers={w} />)
+    render(<WeekCanvas weekStart={weekStart} days={days()} shelf={[]} routinesToPlace={[]} isCurrent writers={w} />)
     expect(screen.queryByRole('list', { name: 'No day yet' })).toBeNull()
     const d = dt()
     fireEvent.dragStart(screen.getByText('Pick up the keys').closest('li')!, { dataTransfer: d.t })
@@ -166,18 +161,22 @@ describe('WeekCanvas — filing a task under a goal', () => {
 })
 
 describe('WeekCanvas — the days', () => {
-  it('draws seven equal days: events as chips with their time, placed work as rows with a ⋯ menu', () => {
-    const w = show()
+  it('draws seven equal days: events as chips with their time, placed work as rows', () => {
+    show()
     const strip = screen.getByRole('region', { name: 'The days' })
     expect(within(strip).getAllByRole('region')).toHaveLength(7)
     expect(screen.getByTestId('journal-day-2026-10-03')).toHaveClass('is-today')
     expect(screen.getByTestId('journal-day-2026-10-04')).toHaveClass('is-empty')
     expect(within(screen.getByTestId('journal-day-2026-10-05')).getByRole('button', { name: /Dentist/ })).toHaveTextContent('9aDentist')
-    const wed = within(screen.getByTestId('journal-day-2026-10-07'))
-    fireEvent.click(wed.getByRole('button', { name: 'More for Pick up the keys' }))
-    expect(screen.getAllByRole('menuitem').map((m) => m.textContent).slice(0, 4)).toEqual(['Move to another day', 'Back to still to place', 'Open', 'Complete'])
-    fireEvent.click(screen.getByRole('menuitem', { name: 'Back to still to place' }))
-    expect(w.unplaceTask).toHaveBeenCalledWith(placed)
+  })
+
+  it('a day row has no ⋯ menu: tick, drag and tap-to-open only', () => {
+    const w = writers()
+    show(w)
+    const row = screen.getByText('Pick up the keys').closest('li')!
+    expect(within(row).queryByRole('button', { name: /more/i })).toBeNull()
+    fireEvent.click(within(row).getByText('Pick up the keys'))
+    expect(w.open).toHaveBeenCalled()
   })
 
   it('one “Show done” reveals done work in the days', () => {
@@ -241,13 +240,6 @@ describe('WeekCanvas — restored functions', () => {
   // 2026-10-13 review: a month goal with nothing this week is a planning
   // decision, not the tray's. It shows only while a task is dragged, so the
   // task can still go under it.
-  it('a day’s task carries the same secondary actions in its ⋯', () => {
-    show()
-    fireEvent.click(within(screen.getByTestId('journal-day-2026-10-07')).getByRole('button', { name: 'More for Pick up the keys' }))
-    expect(screen.getAllByRole('menuitem').map((m) => m.textContent)).toEqual(
-      ['Move to another day', 'Back to still to place', 'Open', 'Complete', 'People…', 'Life area…', 'Move under…'])
-  })
-
   it('each day wears its forecast, small, in its header', () => {
     show()
     expect(within(screen.getByTestId('journal-day-2026-10-03')).getByRole('img', { name: /Sunny, high 64°/ })).toBeInTheDocument()
@@ -255,12 +247,12 @@ describe('WeekCanvas — restored functions', () => {
 
   it('every-day routines are written once, with a quiet Show daily / Hide daily', () => {
     const onToggle = vi.fn()
-    const { rerender } = render(<WeekCanvas weekStart={weekStart} days={days()} shelf={shelf()} routinesToPlace={[]} monthName="October" isCurrent writers={writers()}
+    const { rerender } = render(<WeekCanvas weekStart={weekStart} days={days()} shelf={shelf()} routinesToPlace={[]} isCurrent writers={writers()}
       rhythm={[{ label: 'Every day', items: [{ title: 'Walk the dog', openId: 'routine-r9-day0' }] }]} daily={{ shown: false, onToggle }} />)
     expect(screen.getByText('Walk the dog')).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Show daily' }))
     expect(onToggle).toHaveBeenCalled()
-    rerender(<WeekCanvas weekStart={weekStart} days={days()} shelf={shelf()} routinesToPlace={[]} monthName="October" isCurrent writers={writers()}
+    rerender(<WeekCanvas weekStart={weekStart} days={days()} shelf={shelf()} routinesToPlace={[]} isCurrent writers={writers()}
       rhythm={[{ label: 'Every day', items: [] }]} daily={{ shown: true, onToggle }} />)
     expect(screen.getByText('Daily routines are in each day')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Hide daily' })).toHaveAttribute('aria-pressed', 'true')
@@ -274,7 +266,7 @@ describe('a past week says so', () => {
     vi.setSystemTime(new Date(2026, 9, 12, 9)) // Mon Oct 12: Oct 3–9 is last week
     const { MemoryRouter } = await import('react-router-dom')
     const { unmount } = render(<MemoryRouter><WeekCanvas weekStart={weekStart} days={days()} shelf={shelf()} routinesToPlace={[]}
-      monthName="October" isCurrent={false} writers={writers()} /></MemoryRouter>)
+      isCurrent={false} writers={writers()} /></MemoryRouter>)
     expect(screen.getByText('Past week')).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Back to this week' })).toHaveAttribute('href', '/week?view=alongside')
     unmount()
@@ -305,7 +297,7 @@ describe('WeekCanvas — calendar first', () => {
   })
 
   it('with nothing to place there is no line at all', () => {
-    render(<WeekCanvas weekStart={weekStart} days={days()} shelf={[]} routinesToPlace={[]} monthName="October" isCurrent writers={writers()} />)
+    render(<WeekCanvas weekStart={weekStart} days={days()} shelf={[]} routinesToPlace={[]} isCurrent writers={writers()} />)
     expect(screen.queryByText('No day yet')).toBeNull()
     expect(screen.queryByText(/Nothing/)).toBeNull()
   })
@@ -313,7 +305,7 @@ describe('WeekCanvas — calendar first', () => {
   it('a day’s rows show who carries them; an id the household doesn’t know shows nothing', () => {
     const d = days()
     d[4].items[0] = { ...d[4].items[0], people: ['ir', 'ghost'] }
-    render(<WeekCanvas weekStart={weekStart} days={d} shelf={shelf()} routinesToPlace={[]} monthName="October" isCurrent writers={writers()}
+    render(<WeekCanvas weekStart={weekStart} days={d} shelf={shelf()} routinesToPlace={[]} isCurrent writers={writers()}
       members={[{ id: 'ir', name: 'Iris', initials: 'IR', color: 'purple' }]} />)
     const row = screen.getByText('Pick up the keys').closest('li')!
     expect(within(row).getByLabelText('Iris')).toBeInTheDocument()
@@ -323,21 +315,21 @@ describe('WeekCanvas — calendar first', () => {
   it('names each day’s free time at its foot', () => {
     const d = days()
     d[2] = { ...d[2], free: 'Calendar clear 10a–9p' }
-    render(<WeekCanvas weekStart={weekStart} days={d} shelf={shelf()} routinesToPlace={[]} monthName="October" isCurrent writers={writers()} />)
+    render(<WeekCanvas weekStart={weekStart} days={d} shelf={shelf()} routinesToPlace={[]} isCurrent writers={writers()} />)
     expect(within(screen.getByTestId('journal-day-2026-10-05')).getByText('Calendar clear 10a–9p')).toHaveClass('wk-free')
   })
 
   it('draws the kids’ specials as one chip each', () => {
     const d = days()
     d[3] = { ...d[3], specials: [{ who: 'Ella', special: 'Library' }, { who: 'Kaleb', special: 'Art' }] }
-    render(<WeekCanvas weekStart={weekStart} days={d} shelf={shelf()} routinesToPlace={[]} monthName="October" isCurrent writers={writers()} />)
+    render(<WeekCanvas weekStart={weekStart} days={d} shelf={shelf()} routinesToPlace={[]} isCurrent writers={writers()} />)
     const day = within(screen.getByTestId('journal-day-2026-10-06'))
     expect(day.getByText('Library').closest('.today-special-chip')).toHaveTextContent('EllaLibrary')
     expect(day.getByText('Art').closest('.today-special-chip')).toHaveTextContent('KalebArt')
   })
 
   it('a stay across days is one bar over its columns, still said in words for a screen reader', () => {
-    render(<WeekCanvas weekStart={weekStart} days={days()} shelf={shelf()} routinesToPlace={[]} monthName="October" isCurrent writers={writers()}
+    render(<WeekCanvas weekStart={weekStart} days={days()} shelf={shelf()} routinesToPlace={[]} isCurrent writers={writers()}
       spans={[{ id: 'event-safta', when: 'Thu–Fri', from: '2026-10-08', to: '2026-10-09', title: 'Safta visiting', tail: ', through Tue Oct 13' }]} />)
     const bar = screen.getByText('Safta visiting', { selector: '.wc-bar-title' }).closest('button')!
     expect(bar).toHaveStyle({ gridColumn: '6 / 8' })
@@ -348,7 +340,7 @@ describe('WeekCanvas — calendar first', () => {
   it('a routine on a day is marked as one', () => {
     const d = days()
     d[1].items = [{ id: 'routine-r2-day1', kind: 'routine', title: 'Piano', completed: false, routineId: 'r2' }]
-    render(<WeekCanvas weekStart={weekStart} days={d} shelf={shelf()} routinesToPlace={[]} monthName="October" isCurrent writers={writers()} />)
+    render(<WeekCanvas weekStart={weekStart} days={d} shelf={shelf()} routinesToPlace={[]} isCurrent writers={writers()} />)
     expect(screen.getByText('Piano').closest('li')).toHaveClass('is-routine')
   })
 })
@@ -365,7 +357,7 @@ describe('WeekCanvas — days gone by', () => {
 
   it('this week’s weekend, once over, folds to one line that names what happened and what was left, and opens', () => {
     vi.setSystemTime(new Date(2026, 9, 6, 9)) // Tue Oct 6: Sat 3 and Sun 4 are over
-    render(<WeekCanvas weekStart={weekStart} days={withWeekend()} shelf={shelf()} routinesToPlace={[]} monthName="October" isCurrent writers={writers()} />)
+    render(<WeekCanvas weekStart={weekStart} days={withWeekend()} shelf={shelf()} routinesToPlace={[]} isCurrent writers={writers()} />)
     expect(screen.queryByTestId('journal-day-2026-10-03')).toBeNull()
     expect(screen.queryByTestId('journal-day-2026-10-04')).toBeNull()
     const fold = screen.getByRole('button', { name: /Weekend/ })
@@ -380,7 +372,7 @@ describe('WeekCanvas — days gone by', () => {
 
   it('steps back the days gone by; today and the days ahead stay at full strength', () => {
     vi.setSystemTime(new Date(2026, 9, 6, 9))
-    render(<WeekCanvas weekStart={weekStart} days={days()} shelf={shelf()} routinesToPlace={[]} monthName="October" isCurrent writers={writers()} />)
+    render(<WeekCanvas weekStart={weekStart} days={days()} shelf={shelf()} routinesToPlace={[]} isCurrent writers={writers()} />)
     expect(screen.getByTestId('journal-day-2026-10-05')).toHaveClass('is-past')
     expect(screen.getByTestId('journal-day-2026-10-06')).toHaveClass('is-today')
     expect(screen.getByTestId('journal-day-2026-10-06')).not.toHaveClass('is-past')
@@ -389,7 +381,7 @@ describe('WeekCanvas — days gone by', () => {
 
   it('a weekend still ahead stays open in full', () => {
     // Sat Oct 3 is today: the weekend has not passed.
-    render(<WeekCanvas weekStart={weekStart} days={withWeekend()} shelf={shelf()} routinesToPlace={[]} monthName="October" isCurrent writers={writers()} />)
+    render(<WeekCanvas weekStart={weekStart} days={withWeekend()} shelf={shelf()} routinesToPlace={[]} isCurrent writers={writers()} />)
     expect(screen.queryByRole('button', { name: /^Weekend/ })).toBeNull()
     expect(screen.getByTestId('journal-day-2026-10-03')).toBeInTheDocument()
     expect(screen.getByTestId('journal-day-2026-10-04')).toBeInTheDocument()
@@ -398,7 +390,7 @@ describe('WeekCanvas — days gone by', () => {
   it('a week gone by folds nothing: it has no days ahead to make room for', async () => {
     vi.setSystemTime(new Date(2026, 9, 14, 9))
     const { MemoryRouter } = await import('react-router-dom')
-    render(<MemoryRouter><WeekCanvas weekStart={weekStart} days={withWeekend()} shelf={shelf()} routinesToPlace={[]} monthName="October" isCurrent={false} writers={writers()} /></MemoryRouter>)
+    render(<MemoryRouter><WeekCanvas weekStart={weekStart} days={withWeekend()} shelf={shelf()} routinesToPlace={[]} isCurrent={false} writers={writers()} /></MemoryRouter>)
     expect(screen.queryByRole('button', { name: /^Weekend/ })).toBeNull()
     expect(screen.getByTestId('journal-day-2026-10-03')).toBeInTheDocument()
   })
@@ -408,7 +400,7 @@ describe('WeekCanvas — days gone by', () => {
     const d = days()
     d[4].items.push({ id: 'proposed-s:0', kind: 'task', title: 'Reply to Christian', completed: false, proposed: true, time: new Date(2026, 9, 7, 9, 0) })
     const w = writers()
-    render(<MemoryRouter><WeekCanvas weekStart={weekStart} days={d} shelf={shelf()} routinesToPlace={[]} monthName="October" isCurrent writers={w} /></MemoryRouter>)
+    render(<MemoryRouter><WeekCanvas weekStart={weekStart} days={d} shelf={shelf()} routinesToPlace={[]} isCurrent writers={w} /></MemoryRouter>)
     const row = screen.getByTestId('proposed-row')
     expect(row).toHaveTextContent('Reply to Christian')
     expect(row).toHaveTextContent('proposed, not saved yet')
