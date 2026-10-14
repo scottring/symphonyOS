@@ -23,7 +23,14 @@ export interface ChangeOp {
   seen?: string
 }
 
-export interface ChangeSet { key: string; title: string; ops: ChangeOp[] }
+export interface ChangeSet {
+  key: string
+  title: string
+  ops: ChangeOp[]
+  /** YYYY-MM-DD: the start of the week being planned. An add with no date
+   *  lands in this week, not in whatever week it is when Approve is pressed. */
+  weekStart?: string
+}
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const KINDS = new Set<ChangeOpKind>(['place', 'unplace', 'add', 'someday', 'assign'])
@@ -41,7 +48,14 @@ export function changeSetFromInput(input: Record<string, unknown>, key: string):
   const raw = Array.isArray(input.ops) ? input.ops : null
   if (!raw || !raw.length) return { error: 'Provide at least one op' }
   if (raw.length > MAX_OPS) return { error: `Propose at most ${MAX_OPS} changes at a time` }
+  let weekStart: string | undefined
+  if (input.week_start !== undefined) {
+    const ws = realDate(input.week_start)
+    if (!ws) return { error: 'week_start must be a real YYYY-MM-DD date (the start symphony_read_week returned)' }
+    weekStart = ws
+  }
   const ops: ChangeOp[] = []
+  const touched = new Set<string>()
   for (let i = 0; i < raw.length; i++) {
     const o = raw[i] as Record<string, unknown> | null
     if (!o || typeof o !== 'object') return { error: `Op ${i + 1} is not an object` }
@@ -50,6 +64,8 @@ export function changeSetFromInput(input: Record<string, unknown>, key: string):
     const base: ChangeOp = { key: `${key}:${i}`, op, title: '' }
     if (op !== 'add') {
       if (typeof o.task_id !== 'string' || !UUID_RE.test(o.task_id)) return { error: `Op ${i + 1}: task_id must be an existing task id` }
+      if (touched.has(o.task_id)) return { error: `Op ${i + 1}: this task already has an op in the list. Send one op per task: the one that says where it should end up.` }
+      touched.add(o.task_id)
       base.taskId = o.task_id
     }
     if (op === 'place' || (op === 'add' && o.date !== undefined)) {
@@ -57,6 +73,7 @@ export function changeSetFromInput(input: Record<string, unknown>, key: string):
       if (!date) return { error: `Op ${i + 1}: date must be a real YYYY-MM-DD date` }
       base.date = date
     }
+    if (op === 'add' && o.time !== undefined && o.date === undefined) return { error: `Op ${i + 1}: an add with a time needs a date too` }
     if (o.time !== undefined && (op === 'place' || op === 'add')) {
       const time = realTime(o.time)
       if (!time) return { error: `Op ${i + 1}: time must be HH:MM (24-hour)` }
@@ -77,7 +94,7 @@ export function changeSetFromInput(input: Record<string, unknown>, key: string):
   const title = typeof input.title === 'string' && input.title.trim()
     ? input.title.trim().slice(0, 120)
     : ops.length === 1 ? '1 change' : `${ops.length} changes`
-  return { set: { key, title, ops } }
+  return { set: { key, title, ops, ...(weekStart ? { weekStart } : {}) } }
 }
 
 export function resolveRefs(
@@ -109,11 +126,12 @@ export function resolveRefs(
 
 export const PROPOSE_CHANGES_TOOL = {
   name: 'symphony_propose_changes',
-  description: 'Propose ONE list of changes to the person\'s tasks, shown as a change card and as dashed rows on the page. Nothing is saved until they press Approve. Use this whenever a request changes MORE THAN ONE task, and always at the end of a planning conversation. Never call write tools for the same changes. Ops: place (give an existing task a day, optionally a time), unplace (take its day away), add (a new task, optionally on a day/time), someday (set it aside; there is no delete), assign (one household member). Each call replaces the list on the page: while planning, call it again with the whole list so far after each answer, and whenever the person asks for a change.',
+  description: 'Propose ONE list of changes to the person\'s tasks, shown as a change card and as dashed rows on the page. Nothing is saved until they press Approve. Use this whenever a request changes MORE THAN ONE task, and always at the end of a planning conversation. Never call write tools for the same changes. One op per task. Ops: place (give an existing task a day, optionally a time), unplace (take its day away), add (a new task, optionally on a day/time), someday (set it aside; there is no delete), assign (one household member). Each call replaces the list on the page: while planning, call it again with the whole list so far after each answer, and whenever the person asks for a change.',
   input_schema: {
     type: 'object',
     properties: {
       title: { type: 'string', description: 'Short heading, e.g. "6 changes to your week"' },
+      week_start: { type: 'string', description: 'YYYY-MM-DD start of the week being planned (the start symphony_read_week returned). New tasks with no date land in this week.' },
       ops: {
         type: 'array',
         items: {

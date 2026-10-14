@@ -33,6 +33,29 @@ describe('changeSetFromInput', () => {
     expect('error' in changeSetFromInput({ ops: many }, 'k')).toBe(true)
   })
 
+  it('refuses two ops on the same task, and says to send one op per task', () => {
+    const r = changeSetFromInput({ ops: [
+      { op: 'place', task_id: A, date: '2026-10-15' },
+      { op: 'assign', task_id: A, assignee: M },
+    ] }, 'k')
+    expect(r).toEqual({ error: expect.stringContaining('one op per task') })
+  })
+
+  it('refuses an add with a time but no date', () => {
+    const r = changeSetFromInput({ ops: [{ op: 'add', title: 'Call the bank', time: '09:00' }] }, 'k')
+    expect(r).toEqual({ error: expect.stringContaining('needs a date') })
+  })
+
+  it('keeps the week being planned, for adds with no date', () => {
+    const r = changeSetFromInput({ week_start: '2026-10-17', ops: [{ op: 'add', title: 'Call the bank' }] }, 'k')
+    if ('error' in r) throw new Error(r.error)
+    expect(r.set.weekStart).toBe('2026-10-17')
+    expect('error' in changeSetFromInput({ week_start: '2026-02-30', ops: [{ op: 'add', title: 'x' }] }, 'k')).toBe(true)
+    const none = changeSetFromInput({ ops: [{ op: 'add', title: 'x' }] }, 'k')
+    if ('error' in none) throw new Error(none.error)
+    expect(none.set.weekStart).toBeUndefined()
+  })
+
   it('defaults the title to the count', () => {
     const r = changeSetFromInput({ ops: [{ op: 'someday', task_id: A }, { op: 'unplace', task_id: B }] }, 'k')
     if ('error' in r) throw new Error(r.error)
