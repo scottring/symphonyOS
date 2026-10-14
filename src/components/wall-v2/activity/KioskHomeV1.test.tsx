@@ -32,7 +32,7 @@ function props(over: Partial<KioskHomeV1Props> = {}): KioskHomeV1Props {
     weekend: { rows: [], anytime: [], tomorrow: [], tomorrowLabel: 'Sunday' },
     onTick: vi.fn(), onOpenKid: vi.fn(), onToggleHave: vi.fn(), onScale: vi.fn(), onAddMissing: vi.fn(),
     onOpenRecipe: vi.fn(), onStartCooking: vi.fn(), onTapRow: vi.fn(),
-    places: { onGroceries: vi.fn(), onRecipes: vi.fn(), onCall: vi.fn(), onNotes: vi.fn() },
+    onNotes: vi.fn(),
     ...over,
   }
 }
@@ -100,7 +100,7 @@ describe('the wall, version 1', () => {
     expect(screen.getAllByText('1 of 5')).toHaveLength(2)
   })
 
-  it('rest: the next landmark large, then dinner; notes for the house; the places; the rest of today beside it', () => {
+  it('rest: the next landmark large, then dinner; notes for the house; the rest of today beside it; no places row', () => {
     const row = { id: 'dent', kind: 'event' as const, time: '3:30p', end: null, title: 'Dentist', sub: 'Iris drives', owners: [], past: false, now: false }
     const p = props({ pick: { screen: 'rest', title: 'A quiet morning', dark: false }, notes: [{ id: 'n1', text: 'Plumber at 2', by: 'Scott' }], weekend: { rows: [row], anytime: [], tomorrow: [], tomorrowLabel: 'Thursday' } })
     render(<KioskHomeV1 {...p} />)
@@ -110,8 +110,27 @@ describe('the wall, version 1', () => {
     fireEvent.click(within(side).getByRole('button', { name: /3:30.*Dentist.*Iris drives/ }))
     expect(p.onTapRow).toHaveBeenCalledWith('dent')
     expect(screen.getByText('Plumber at 2')).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: 'Groceries' }))
-    expect(p.places.onGroceries).toHaveBeenCalled()
+    // Calmer screens: the places live in More, never at the foot of a moment.
+    expect(screen.queryByRole('navigation', { name: 'Places' })).toBeNull()
+    for (const name of ['Groceries', 'Recipes', 'Call', 'Notes']) expect(screen.queryByRole('button', { name })).toBeNull()
+  })
+
+  it('every moment centres its lead group: nothing pinned to the foot by a spacer', () => {
+    const screens = ['rest', 'out-the-door', 'home', 'dinner', 'bedtime', 'night', 'weekend'] as const
+    for (const s of screens) {
+      const { container, unmount } = render(<KioskHomeV1 {...props({ pick: { screen: s, title: s, dark: false }, talks: [{ id: 't', text: 'Camp', by: null }] })} />)
+      expect(container.querySelector('.kw-col.is-lead')).not.toBeNull()
+      expect(container.querySelector('.kw-col > .kw-grow, .kw-col.is-lead > .kw-grow, .kw-side > .kw-grow')).toBeNull()
+      expect(container.querySelector('.kw-places')).toBeNull()
+      unmount()
+    }
+  })
+
+  it('weekend: one row of sometime-today under the lead, with the count of the rest', () => {
+    const anytime = ['Bikes', 'Garden', 'Library', 'Laundry', 'Cards'].map((title) => ({ title, owners: [] }))
+    render(<KioskHomeV1 {...props({ pick: { screen: 'weekend', title: 'Saturday', dark: false }, weekend: { rows: [], anytime, tomorrow: [], tomorrowLabel: 'Sunday' } })} />)
+    expect(within(screen.getByRole('list', { name: 'Sometime today' })).getAllByRole('listitem')).toHaveLength(3)
+    expect(screen.getByText('5 to do')).toBeInTheDocument()
   })
 
   it('More takes the side column; the lead stays', () => {
@@ -147,8 +166,9 @@ describe('the wall, version 1', () => {
     expect(within(side).getByText('6:45')).toBeInTheDocument()
     expect(within(side).getByText('Wake the kids')).toBeInTheDocument()
     expect(within(side).getByText('Math night')).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: /2 things to talk about/ }))
-    expect(p.places.onNotes).toHaveBeenCalled()
+    // The talk-abouts sit with tomorrow, not pinned under the lead.
+    fireEvent.click(within(side).getByRole('button', { name: /2 things to talk about/ }))
+    expect(p.onNotes).toHaveBeenCalled()
   })
 
   it('step icons come from the words in the step', () => {

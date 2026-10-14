@@ -9,13 +9,18 @@
 //                  line · each kid's checklist (done steps fold to one line;
 //                  the step's icon is its check)
 //   rest           the next landmark, large · dinner · notes for the house ·
-//                  the places · the rest of today and tomorrow beside it
+//                  the rest of today and tomorrow beside it
 //   home           each kid's after-school steps · dinner and what's next
 //   dinner         tonight's dinner · the question of the day beside it
 //   bedtime        steps × kids · lights out as a ring · tomorrow
-//   night          tomorrow's one time, large · who has what · talk-abouts ·
-//                  the first thing and the rest of tomorrow beside it
+//   night          tomorrow's one time, large · who has what · the first
+//                  thing, the rest of tomorrow and the talk-abouts beside it
 //   weekend        what's on now · sometime today · the rest of the day
+//
+// Calmer screens (Scott, 2026-10-14): nothing stacked at the foot of the
+// screen. The lead group sits centred in its column, with at most one row of
+// supporting detail under it; no spacer pushes anything to the bottom. The
+// places (Groceries · Recipes · Call · Notes) live in More and by voice.
 //
 // More takes the side column (`aside`): the lead stays, dimmed. Presentation
 // only: the Shell owns data, permissions and writes. Lists are limited so
@@ -23,7 +28,7 @@
 
 import { createElement, useState, type ReactNode } from 'react'
 import {
-  Check, ChevronRight, ShoppingCart, BookOpen, Phone, StickyNote, ChefHat, MessageSquare, Shirt, ShoppingBasket, BedDouble,
+  Check, ChevronRight, ShoppingCart, BookOpen, ChefHat, MessageSquare, Shirt, ShoppingBasket, BedDouble,
   Smile, Utensils, Sparkles, Backpack, Footprints, CircleCheck, Folder, Calculator, ShowerHead, BookOpenText, type LucideIcon,
 } from 'lucide-react'
 import type { FamilyMember } from '@/types/family'
@@ -72,7 +77,8 @@ export interface KioskHomeV1Props {
   onStartCooking: () => void
   onAnotherQuestion?: () => void
   onTapRow: (id: string) => void
-  places: { onGroceries: () => void; onRecipes: () => void; onCall: () => void; onNotes: () => void }
+  /** The scratchpad: the night's talk-abouts open it. */
+  onNotes: () => void
   /** More, in place of the side column (Kitchen wall v2). */
   aside?: ReactNode
   /** The conversation with Symphony, in place of the side column (stage 3).
@@ -149,7 +155,7 @@ function Stage({ lead, side, sideLabel, aside, talk, full, label }: { lead: Reac
   if (aside) {
     return (
       <div className={`kw-stage is-more ${full ? 'was-full' : ''}`}>
-        <section className="kw-col is-dim" aria-label={label}>{lead}</section>
+        <section className="kw-col is-lead is-dim" aria-label={label}>{lead}</section>
         <div className="kw-vr" aria-hidden="true" />
         <div className="kw-col">{aside}</div>
       </div>
@@ -158,18 +164,18 @@ function Stage({ lead, side, sideLabel, aside, talk, full, label }: { lead: Reac
   if (talk && !full) {
     return (
       <div className="kw-stage">
-        <section className="kw-col" aria-label={label}>{lead}</section>
+        <section className="kw-col is-lead" aria-label={label}>{lead}</section>
         <div className="kw-vr" aria-hidden="true" />
         <aside className="kw-col kw-side" aria-label="Symphony">{talk}</aside>
       </div>
     )
   }
-  if (full || !side) return <div className="kw-stage is-full"><section className="kw-col" aria-label={label}>{lead}</section></div>
+  if (full || !side) return <div className="kw-stage is-full"><section className="kw-col is-lead" aria-label={label}>{lead}</section></div>
   return (
     <div className="kw-stage">
-      <section className="kw-col" aria-label={label}>{lead}</section>
+      <section className="kw-col is-lead" aria-label={label}>{lead}</section>
       <div className="kw-vr" aria-hidden="true" />
-      <aside className="kw-col kw-side" aria-label={sideLabel}>{side}</aside>
+      <aside className="kw-col kw-side is-centred" aria-label={sideLabel}>{side}</aside>
     </div>
   )
 }
@@ -436,20 +442,6 @@ function OutTheDoor(p: KioskHomeV1Props) {
   return <Stage full lead={lead} aside={p.aside} talk={p.talk} label="Getting ready for school" />
 }
 
-function Places({ places }: { places: KioskHomeV1Props['places'] }) {
-  const item = (label: string, Icon: LucideIcon, onClick: () => void) => (
-    <button type="button" className="kw-btn is-place" onClick={onClick}><Icon aria-hidden="true" />{label}</button>
-  )
-  return (
-    <nav className="kw-places" aria-label="Places">
-      {item('Groceries', ShoppingCart, places.onGroceries)}
-      {item('Recipes', BookOpen, places.onRecipes)}
-      {item('Call', Phone, places.onCall)}
-      {item('Notes', StickyNote, places.onNotes)}
-    </nav>
-  )
-}
-
 /** A quiet stretch (Main.dc.html): the next landmark, large; the rest of
  *  today and tomorrow in the side column. */
 function Rest(p: KioskHomeV1Props) {
@@ -464,7 +456,6 @@ function Rest(p: KioskHomeV1Props) {
       <p className="kw-eyebrow">Today</p>
       <h2 className={`kw-hero ${hero.length > 30 ? 'is-long' : ''}`}>{hero}</h2>
       {lede && <p className="kw-lede is-muted">{lede}</p>}
-      <span className="kw-grow" />
       {p.notes.length > 0 && (
         <ul className="kw-notes" aria-label="Notes for the house">
           {p.notes.slice(0, 2).map((n, i) => (
@@ -474,7 +465,6 @@ function Rest(p: KioskHomeV1Props) {
           ))}
         </ul>
       )}
-      <Places places={p.places} />
     </>
   )
   const side = (
@@ -556,8 +546,7 @@ function Dinner(p: KioskHomeV1Props) {
       <h2 className={`kw-serif kw-dinner-title ${d.imageUrl ? '' : 'is-big'}`}>{d.title}</h2>
       {d.minutes && <p className="kw-sub">{d.minutes} minutes to make{d.ingredients.length ? ` · ${d.ingredients.length} ingredients` : ''}</p>}
       {d.cue && <p className="kw-meta kw-cue">{d.cue}</p>}
-      <span className="kw-grow" />
-      <div className="kw-acts">
+      <div className="kw-acts is-under">
         {d.hasRecipe && <button type="button" className="kw-btn is-primary" onClick={p.onOpenRecipe}><BookOpen aria-hidden="true" />Open the recipe</button>}
         {d.key && <button type="button" className={`kw-btn ${d.hasRecipe ? 'is-quiet' : 'is-primary'}`} onClick={p.onStartCooking}><ChefHat aria-hidden="true" />Step by step</button>}
         {d.ingredients.length > 0 && <button type="button" className="kw-btn is-quiet" onClick={p.onAddMissing}><ShoppingCart aria-hidden="true" />What's missing</button>}
@@ -574,8 +563,7 @@ function Dinner(p: KioskHomeV1Props) {
       <p className="kw-eyebrow is-sym">Question of the day</p>
       {p.question ? <p className="kw-question">{p.question}</p> : <p className="kw-quiet">No question today.</p>}
       {p.onAnotherQuestion && <button type="button" className="kw-btn is-quiet kw-another" onClick={p.onAnotherQuestion}>Another question</button>}
-      <span className="kw-grow" />
-      {after.length > 0 && <p className="kw-eyebrow kw-side-lab">After dinner</p>}
+      {after.length > 0 && <p className="kw-eyebrow kw-side-lab is-gap-lg">After dinner</p>}
       <TodayRows rows={after} p={p} max={2} />
     </>
   )
@@ -664,17 +652,16 @@ function Night(p: KioskHomeV1Props) {
           ))}
         </div>
       )}
-      <span className="kw-grow" />
-      {p.talks.length > 0 && (
-        <button type="button" className="kw-btn is-quiet kw-talks" onClick={p.places.onNotes}>
-          <MessageSquare aria-hidden="true" />
-          <span><b>{p.talks.length === 1 ? '1 thing' : `${p.talks.length} things`} to talk about</b><small>{p.talks.slice(0, 3).map((x) => x.text).join(' · ')}</small></span>
-          <ChevronRight aria-hidden="true" />
-        </button>
-      )}
     </>
   )
-  const side = (first || also.length > 0) ? (
+  const talks = p.talks.length > 0 && (
+    <button type="button" className={`kw-btn is-quiet kw-talks ${first || also.length ? 'is-gap' : ''}`} onClick={p.onNotes}>
+      <MessageSquare aria-hidden="true" />
+      <span><b>{p.talks.length === 1 ? '1 thing' : `${p.talks.length} things`} to talk about</b><small>{p.talks.slice(0, 3).map((x) => x.text).join(' · ')}</small></span>
+      <ChevronRight aria-hidden="true" />
+    </button>
+  )
+  const side = (first || also.length > 0 || talks) ? (
     <>
       {first && p.anchors.morning && (
         <>
@@ -689,6 +676,7 @@ function Night(p: KioskHomeV1Props) {
           {also.map((r) => <Tl key={r.id} t={tlTime(r.time)} w={r.title} by={byOf(r, p.members)} />)}
         </>
       )}
+      {talks}
     </>
   ) : null
   return <Stage lead={lead} side={side} sideLabel="Also tomorrow" aside={p.aside} talk={p.talk} label="Tomorrow" />
@@ -701,7 +689,8 @@ function Weekend(p: KioskHomeV1Props) {
   const lead0 = rows.find((r) => r.now && !r.past) ?? rows.find((r) => !r.past) ?? null
   const later = rows.filter((r) => !r.past && r !== lead0)
   const until = lead0?.endsAt ? new Date(lead0.endsAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }).replace(/\s?[AP]M$/i, '') : null
-  const anytime = p.weekend.anytime.slice(0, 6)
+  // One row of supporting detail: three of the day's anytime things.
+  const anytime = p.weekend.anytime.slice(0, 3)
   const lead = (
     <>
       {lead0 ? (
@@ -722,7 +711,6 @@ function Weekend(p: KioskHomeV1Props) {
           <p className="kw-sub">Nothing on the clock today.</p>
         </>
       )}
-      <span className="kw-grow" />
       <div className="kw-anytime-head"><span className="kw-eyebrow">Sometime today</span><span className="kw-meta">{p.weekend.anytime.length ? `${p.weekend.anytime.length} to do` : 'Nothing else today'}</span></div>
       {anytime.length > 0 && (
         <ul className="kw-anytime" aria-label="Sometime today">

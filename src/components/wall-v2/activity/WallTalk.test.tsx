@@ -211,6 +211,18 @@ describe('talking to the wall: the change card', () => {
     expect(applyChanges).not.toHaveBeenCalled()
   })
 
+  it('while the card waits the strip stays open and says how to answer', async () => {
+    setup(proposing())
+    const strip = () => dock().getByRole('button', { name: /Talk to Symphony/ }).closest('.kw-talk') as HTMLElement
+    expect(strip()).toHaveAttribute('data-strip', 'collapsed')
+    await type("Move swim to Friday and add 'Call the plumber' Saturday at 10")
+    expect(screen.getByRole('region', { name: 'Proposed changes' })).toBeInTheDocument()
+    expect(strip()).toHaveAttribute('data-strip', 'open')
+    expect(dock().getByText('Say “approve”, or say what to change')).toBeInTheDocument()
+    // Planning is away from Home: Home is in the bar.
+    expect(dock().getByRole('button', { name: 'Home' })).toBeInTheDocument()
+  })
+
   it('Approve applies through the shared apply, then Undo reverses it', async () => {
     const { applyChanges, undo } = setup(proposing())
     await type('Move swim to Friday')
@@ -308,6 +320,9 @@ describe('talking to the wall: ending', () => {
     expect(screen.getByRole('region', { name: 'Talking with Symphony' })).toBeInTheDocument()
     await act(async () => { vi.advanceTimersByTime(121_000) })
     expect(screen.queryByRole('region', { name: 'Talking with Symphony' })).toBeNull()
+    // The strip folds back to the mic, and Home leaves the bar.
+    expect(dock().getByRole('button', { name: /Talk to Symphony/ }).closest('.kw-talk')).toHaveAttribute('data-strip', 'collapsed')
+    expect(dock().queryByRole('button', { name: 'Home' })).toBeNull()
   })
 
   it('Home ends it', async () => {

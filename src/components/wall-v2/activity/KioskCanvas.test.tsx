@@ -264,7 +264,7 @@ describe('Kitchen wall v2: the frame', () => {
     expect(screen.queryByRole('dialog')).toBeNull()
     const more = screen.getByRole('region', { name: 'More' })
     expect(within(more).getAllByRole('button').map((b) => b.querySelector('b')?.textContent ?? b.textContent))
-      .toEqual(['Done', 'Type instead', 'Call', 'Dark view', 'Voice is off'])
+      .toEqual(['Done', 'Recipes', 'Call', 'Dark view', 'Voice is off'])
     // The lead stays, the side column gives way.
     expect(screen.getByRole('region', { name: 'Today' })).toBeInTheDocument()
     expect(screen.queryByRole('complementary', { name: 'The rest of today' })).toBeNull()
@@ -273,17 +273,69 @@ describe('Kitchen wall v2: the frame', () => {
     expect(screen.getByRole('complementary', { name: 'The rest of today' })).toBeInTheDocument()
   })
 
-  it('Type instead opens a typing field in the dock pill; what is typed runs like speech', () => {
+  it('More has a Recipes tile (the places moved off the moments); Type instead is gone', () => {
+    onRecipes.mockClear()
     render(<Harness v1={v1Rest} />)
+    expect(screen.queryByRole('navigation', { name: 'Places' })).toBeNull()
     fireEvent.click(dock().getByRole('button', { name: 'More' }))
-    fireEvent.click(screen.getByRole('button', { name: /Type instead/ }))
+    expect(screen.queryByRole('button', { name: /Type instead/ })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: /Recipes/ }))
+    expect(onRecipes).toHaveBeenCalled()
     expect(screen.queryByRole('region', { name: 'More' })).toBeNull()
-    fireEvent.change(dock().getByLabelText('Type to Symphony'), { target: { value: 'timer 5 minutes' } })
+  })
+
+  it('Home shows only away from Home: not on a home moment; in More and inside an activity', () => {
+    render(<Harness v1={v1Rest} />)
+    const navNames = () => within(dock().getByRole('navigation', { name: 'Wall' })).getAllByRole('button').map((b) => b.textContent)
+    expect(navNames()).toEqual(['More'])
+    fireEvent.click(dock().getByRole('button', { name: 'More' }))
+    expect(navNames()).toEqual(['Home', 'More'])
+    fireEvent.click(dock().getByRole('button', { name: 'Home' }))
+    expect(navNames()).toEqual(['More'])
+    fireEvent.click(dock().getByRole('button', { name: 'More' }))
+    fireEvent.click(screen.getByRole('button', { name: /^Call/ }))
+    expect(navNames()).toEqual(['Home', 'Back', 'More'])
+  })
+
+  it('without a listener, a tap on the mic opens the strip with the field focused; what is typed runs like speech', () => {
+    render(<Harness v1={v1Rest} />)
+    const strip = () => dock().getByRole('button', { name: /Talk to Symphony/ }).closest('.kw-talk') as HTMLElement
+    expect(strip()).toHaveAttribute('data-strip', 'collapsed')
+    fireEvent.click(dock().getByRole('button', { name: /Talk to Symphony/ }))
+    const field = dock().getByLabelText('Type to Symphony')
+    expect(field).toHaveFocus()
+    expect(field.closest('.kw-talk')).toHaveAttribute('data-strip', 'open')
+    fireEvent.change(field, { target: { value: 'timer 5 minutes' } })
     fireEvent.click(dock().getByRole('button', { name: 'Send' }))
     const reply = screen.getByRole('status', { name: 'Symphony says' })
     expect(reply).toHaveTextContent('You said “timer 5 minutes”')
     expect(reply).toHaveTextContent('Timer · 5 min')
     expect(dock().queryByLabelText('Type to Symphony')).toBeNull()
+  })
+
+  it('the strip stays open where hands are busy (out the door), collapsed elsewhere', () => {
+    const anchors = { morning: { start: 405, end: 440 }, home: { start: 1035 }, dinner: 1080, bedtime: { start: 1170, end: 1230 } }
+    const { unmount } = render(<Harness v1={{ ...v1Rest, anchors, pick: { screen: 'out-the-door', title: 'Out the door', dark: false } }} />)
+    const strip = () => dock().getByRole('button', { name: /Talk to Symphony/ }).closest('.kw-talk') as HTMLElement
+    expect(strip()).toHaveAttribute('data-strip', 'open')
+    expect(dock().getByText('Tap a step or say it')).toBeInTheDocument()
+    unmount()
+    for (const screenName of ['rest', 'home', 'dinner', 'bedtime', 'night', 'weekend'] as const) {
+      const r = render(<Harness v1={{ ...v1Rest, anchors, pick: { screen: screenName, title: screenName, dark: false } }} />)
+      expect(strip()).toHaveAttribute('data-strip', 'collapsed')
+      r.unmount()
+    }
+  })
+
+  it('an open field left empty folds back to the mic after the idle time', () => {
+    vi.useFakeTimers()
+    render(<Harness v1={v1Rest} />)
+    fireEvent.click(dock().getByRole('button', { name: /Talk to Symphony/ }))
+    expect(dock().getByLabelText('Type to Symphony')).toBeInTheDocument()
+    act(() => { vi.advanceTimersByTime(121_000) })
+    expect(dock().queryByLabelText('Type to Symphony')).toBeNull()
+    expect(dock().getByRole('button', { name: /Talk to Symphony/ }).closest('.kw-talk')).toHaveAttribute('data-strip', 'collapsed')
+    vi.useRealTimers()
   })
 })
 
@@ -354,36 +406,74 @@ describe('Kitchen wall v2: the conversation dock', () => {
   afterEach(() => { (globalThis as { WebSocket: unknown }).WebSocket = realWS })
   const voice = { save: vi.fn(async () => ({ said: 'Saved.' })), snapshot: () => 'Today: nothing' }
 
-  it("the moment's suggestion chip sends its words exactly as if they were said", async () => {
+  const strip = () => dock().getByRole('button', { name: /Talk to Symphony|Stop listening/ }).closest('.kw-talk') as HTMLElement
+
+  it('at rest the strip is one round mic, with no suggestion chips', async () => {
     render(<Harness v1={{ ...v1Rest, pick: { screen: 'home', title: 'Home from school', dark: false } }} voice={voice} />)
     await act(async () => FakeSocket.last!.open())
-    expect(dock().getByText('Say “Hey Symphony”, or tap')).toBeInTheDocument()
-    await act(async () => { fireEvent.click(dock().getByRole('button', { name: 'Start a 20-minute timer' })) })
-    // The same path as speech: the command runs, the reply shows and is said back.
-    expect(screen.getByRole('status', { name: 'Symphony says' })).toHaveTextContent('You said “Start a 20-minute timer”')
-    expect(screen.getByRole('status', { name: 'Symphony says' })).toHaveTextContent('Timer · 20 min')
-    await waitFor(() => expect(FakeSocket.last!.sent).toContainEqual({ type: 'say', text: 'Timer · 20 min' }))
+    expect(strip()).toHaveAttribute('data-strip', 'collapsed')
+    expect(dock().getByRole('button', { name: /Talk to Symphony/ })).toHaveClass('is-solo')
+    expect(dock().queryByRole('button', { name: 'Start a 20-minute timer' })).toBeNull()
+    expect(screen.getByRole('contentinfo', { name: 'Kiosk' }).querySelector('.kw-chip:not(.is-send)')).toBeNull()
   })
 
-  it('a question from the chip goes to Symphony, and the reply band shows the whole answer', async () => {
+  it('a tap on the mic opens the strip: listening started and the field focused', async () => {
+    render(<Harness v1={v1Rest} voice={voice} />)
+    await act(async () => FakeSocket.last!.open())
+    fireEvent.click(dock().getByRole('button', { name: /Talk to Symphony/ }))
+    expect(FakeSocket.last!.sent).toContainEqual({ type: 'listen' })
+    expect(dock().getByLabelText('Type to Symphony')).toHaveFocus()
+    expect(strip()).toHaveAttribute('data-strip', 'open')
+    await act(async () => FakeSocket.last!.emit({ type: 'state', state: 'listening', wake: 'Hey Symphony' }))
+    expect(dock().getByText('Listening — or type')).toBeInTheDocument()
+    // Spoken: listening ends, the field closes, Symphony answers in the band.
+    await act(async () => {
+      FakeSocket.last!.emit({ type: 'heard', id: '1', text: 'timer 5 minutes', via: 'tap' })
+      FakeSocket.last!.emit({ type: 'state', state: 'ready', wake: 'Hey Symphony' })
+    })
+    expect(dock().queryByLabelText('Type to Symphony')).toBeNull()
+    expect(screen.getByRole('status', { name: 'Symphony says' })).toHaveTextContent('Timer · 5 min')
+    expect(strip()).toHaveAttribute('data-strip', 'open')
+  })
+
+  it('"Hey Symphony" opens the strip too, and it stays open while Symphony speaks', async () => {
+    render(<Harness v1={v1Rest} voice={voice} />)
+    await act(async () => FakeSocket.last!.open())
+    expect(strip()).toHaveAttribute('data-strip', 'collapsed')
+    await act(async () => FakeSocket.last!.emit({ type: 'state', state: 'listening', wake: 'Hey Symphony' }))
+    expect(strip()).toHaveAttribute('data-strip', 'open')
+    expect(dock().getByLabelText('Type to Symphony')).toBeInTheDocument()
+    await act(async () => FakeSocket.last!.emit({ type: 'state', state: 'speaking', wake: 'Hey Symphony' }))
+    expect(strip()).toHaveAttribute('data-strip', 'open')
+    expect(dock().getByText('Symphony is speaking · tap to talk')).toBeInTheDocument()
+  })
+
+  it('a question goes to Symphony, and the reply band shows the whole answer', async () => {
     const long = 'Tonight is turkey chili at 6:30. Thursday is not planned yet. Friday the kids are with Grandpa and home about 8, so nothing to cook. Saturday is pizza night at 6, and Sunday is not planned yet either — you could ask me to plan the rest of the week and I will suggest something from your recipes.'
     vi.mocked(askWall).mockResolvedValueOnce({ answer: long })
     render(<Harness v1={v1Rest} voice={voice} />)
     await act(async () => FakeSocket.last!.open())
-    await act(async () => { fireEvent.click(dock().getByRole('button', { name: 'What’s for dinner this week?' })) })
+    fireEvent.click(dock().getByRole('button', { name: /Talk to Symphony/ }))
+    fireEvent.change(dock().getByLabelText('Type to Symphony'), { target: { value: 'What’s for dinner this week?' } })
+    await act(async () => { fireEvent.click(dock().getByRole('button', { name: 'Send' })) })
     await waitFor(() => expect(askWall).toHaveBeenCalledWith("What's for dinner this week?", 'Today: nothing'))
     const band = await screen.findByRole('status', { name: 'Symphony says' })
     expect(within(band).getByText(long)).toBeInTheDocument()
     expect(within(band).getByText(long)).toHaveClass('is-mid')
+    // An answer is away from Home: Home is back in the bar.
+    expect(dock().getByRole('button', { name: 'Home' })).toBeInTheDocument()
   })
 
-  it('quiet hours: an outlined mic with a slash, no suggestion, and a tap still talks', async () => {
+  it('quiet hours: a collapsed, outlined mic with a slash; a tap still talks', async () => {
     render(<Harness v1={v1Rest} voice={voice} />)
     await act(async () => FakeSocket.last!.open({ state: 'quiet', quiet: true }))
-    expect(dock().getByText('Quiet hours · tap to talk')).toBeInTheDocument()
-    expect(dock().queryByRole('button', { name: 'What’s for dinner this week?' })).toBeNull()
-    fireEvent.click(dock().getByRole('button', { name: /Talk to Symphony/ }))
+    const mic = dock().getByRole('button', { name: /Talk to Symphony/ })
+    expect(mic).toHaveAccessibleName(/quiet hours/)
+    expect(mic).toHaveClass('is-solo', 'is-off')
+    expect(strip()).toHaveAttribute('data-strip', 'collapsed')
+    fireEvent.click(mic)
     expect(FakeSocket.last!.sent).toContainEqual({ type: 'listen' })
+    expect(strip()).toHaveAttribute('data-strip', 'open')
   })
 
   it('More: listening on/off is a tile that mutes the listener', async () => {

@@ -22,7 +22,7 @@
 // one adult's own tasks dropped by wallTodayRows). Nothing here adds a query.
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { ArrowLeft, Home, ChevronRight, Timer, Phone, ShoppingCart, ChefHat, MoreHorizontal, X, Keyboard, Mic, MicOff, CalendarDays } from 'lucide-react'
+import { ArrowLeft, Home, ChevronRight, Timer, Phone, ShoppingCart, ChefHat, MoreHorizontal, X, Mic, MicOff, CalendarDays, BookOpen } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import type { FamilyMember } from '@/types/family'
 import type { WallMoment } from '@/lib/wall/wallMoment'
@@ -284,8 +284,9 @@ export function KioskCanvas(p: KioskCanvasProps) {
   const art = sceneryArt(scenery.sceneryStyle, placeId, p.isDark && scenery.lightingChoice === 'auto' ? 'nighttime' : scenery.sceneryLighting)
 
   // More, in place (Kitchen wall v2): the Shell's tools by id, with the
-  // canvas's own Type instead, Call and Listening. Toggles keep it open so
-  // their new label shows; everything else closes it.
+  // canvas's own Recipes, Call and Listening — the places that used to sit
+  // on the moments live here (and by voice). Typing is a tap on the mic.
+  // Toggles keep it open so their new label shows; everything else closes it.
   const l = tell.listener
   const shellTile = (id: string): MoreTile | null => {
     const t = p.tools.more.find((m) => m.id === id)
@@ -307,8 +308,8 @@ export function KioskCanvas(p: KioskCanvasProps) {
   const endTalk = () => { talk.end(); tell.clearReply() }
   const moreTiles = [
     talk.enabled ? { id: 'plan', label: 'Plan the week', sub: 'Together, with Symphony', icon: CalendarDays, onSelect: () => { setMoreOpen(false); void tell.handle('Plan the week', false) } } : null,
-    { id: 'type', label: 'Type instead', sub: 'Same Symphony, with a keyboard', icon: Keyboard, onSelect: () => { setMoreOpen(false); setTyping(true) } },
     shellTile('list'),
+    { id: 'recipes', label: 'Recipes', sub: 'The family’s recipes', icon: BookOpen, onSelect: () => { setMoreOpen(false); p.tools.onRecipes() } },
     shellTile('notes'),
     { id: 'call', label: 'Call', sub: 'Faces, big enough for the kids', icon: Phone, onSelect: () => { setMoreOpen(false); dispatch({ type: 'OPEN', stage: { kind: 'calling' } }) } },
     shellTile('theme'),
@@ -346,7 +347,6 @@ export function KioskCanvas(p: KioskCanvasProps) {
           onAddMissing={() => { const said = addMissing(); if (said === 'Nothing missing' || said.startsWith('No')) p.flash(said) }}
           onOpenRecipe={p.onOpenRecipe}
           onStartCooking={() => { const said = startCooking(); if (said.startsWith('No')) p.flash(said) }}
-          places={{ onGroceries: p.tools.onGroceries, onRecipes: p.tools.onRecipes, onCall: () => dispatch({ type: 'OPEN', stage: { kind: 'calling' } }), onNotes: p.v1.onNotes }}
           aside={moreOpen ? morePanel : undefined}
           talk={talkInSide && !bandMoment ? convo : undefined}
         />
@@ -452,6 +452,8 @@ export function KioskCanvas(p: KioskCanvasProps) {
   if (v1) {
     const screen = stage.kind === 'home' ? v1.pick.screen : stage.kind === 'cooking' ? 'cooking' : 'activity'
     const copy = dockCopy(moreOpen ? 'more' : screen)
+    // Home only away from Home: an activity, an answer, More, the week.
+    const away = stage.kind !== 'home' || moreOpen || takeover || talk.active || !!tell.answer
     const ampm = /PM$/i.test(p.clock) ? 'pm' : /AM$/i.test(p.clock) ? 'am' : ''
     return (
       <div className={`kiosk-canvas is-v1 ${dark ? 'is-dark dark' : ''} sky-${stage.kind === 'home' ? v1.pick.screen : 'activity'} ${moreOpen ? 'is-more' : ''}`} onPointerDownCapture={touched} data-stage={stage.kind}>
@@ -475,7 +477,7 @@ export function KioskCanvas(p: KioskCanvasProps) {
 
         <KioskDock
           tell={tell} copy={copy} typing={typing} setTyping={setTyping}
-          onHome={() => { setMoreOpen(false); endTalk(); dispatch({ type: 'HOME' }) }}
+          onHome={away ? () => { setMoreOpen(false); setTyping(false); endTalk(); dispatch({ type: 'HOME' }) } : undefined}
           onBack={state.stack.length >= 2 ? () => dispatch({ type: 'BACK' }) : undefined}
           moreOpen={moreOpen} onMore={() => setMoreOpen((o) => !o)}
           held={heldEls.length ? <div className="kw-held" aria-label="Held activities">{heldEls}</div> : null}
