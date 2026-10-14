@@ -76,6 +76,7 @@ import { dayFreeWindows, formatFree } from '@/lib/week/dayShape'
 import { parseSpecials } from '@/lib/today/specials'
 import { unhomedRoutines } from '@/lib/week/unhomedRoutines'
 import { buildShelf, type ShelfMilestone } from '@/components/canvas/week/weekShelf'
+import { changePreview, withPreview } from '@/components/canvas/week/changePreview'
 import { WeekCanvas, type CanvasDay, type CanvasDayItem, type WeekCanvasWriters } from '@/components/canvas/week/WeekCanvas'
 import { DayWeather } from './WeekJournal'
 import { committedTo } from '@/lib/placement/model'
@@ -1100,6 +1101,10 @@ export function WeekViewV2(props: WeekViewV2Props) {
     ]
     return { days, lines, hasDaily }
   }, [journalDays, journalWeekend, shelf, dailyShown, forecast])
+  // A pending change card, drawn dashed on its days; what it moves leaves its current spot.
+  const { changeSet } = activity
+  const preview = useMemo(() => changePreview(changeSet, tasks), [changeSet, tasks])
+  const shown = useMemo(() => withPreview(canvasDays.days, shelf, preview), [canvasDays.days, shelf, preview])
 
   // Move under…: the month's milestones as Plan's nodes, so the link write and
   // its goal_id consistency are Plan's own (moveUnderPatch).
@@ -1222,7 +1227,7 @@ export function WeekViewV2(props: WeekViewV2Props) {
   ])), [dayChoices])
   const { area: addAreaDefault } = useAddArea()
   const weekCanvas = (host: WeekCanvasHost) => (
-    <WeekCanvas weekStart={weekAnchor} days={canvasDays.days} shelf={shelf} routinesToPlace={routinesToPlace}
+    <WeekCanvas weekStart={weekAnchor} days={shown.days} shelf={shown.shelf} routinesToPlace={routinesToPlace}
       rhythm={canvasDays.lines} monthName={canvasMonthName} isCurrent={weekIsCurrentFor(weekAnchor)} writers={canvasWriters}
       spans={canvasSpans} dayDescriptions={canvasDayDescriptions} members={familyMembers}
       daily={canvasDays.hasDaily ? { shown: dailyShown, onToggle: toggleDaily } : undefined}

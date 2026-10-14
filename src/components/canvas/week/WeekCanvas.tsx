@@ -66,6 +66,8 @@ export interface CanvasDayItem {
   routineId?: string
   /** Who carries it (household member ids); none for a calendar event. */
   people?: string[]
+  /** Drawn from a pending change card: dashed, not yet saved, not interactive. */
+  proposed?: boolean
 }
 
 export interface CanvasDay {
@@ -398,6 +400,17 @@ export function WeekCanvas({ weekStart, days, shelf, routinesToPlace, rhythm = [
     )
   }
   const dayRow = (it: CanvasDayItem, day: CanvasDay) => {
+    if (it.proposed) {
+      return (
+        <li key={`${day.key}:${it.id}`} className="cw-row wc-dayrow is-proposed" data-testid="proposed-row">
+          <span className="canvas-item-title">
+            <span className="cw-title">{it.title}</span>
+            {it.time && <span className="cw-sub"><span className="cw-meta">{formatTimeCompact(it.time)}</span></span>}
+          </span>
+          <span className="sr-only"> (proposed, not saved yet)</span>
+        </li>
+      )
+    }
     const key = `${day.key}:${it.id}`
     const entityId = it.task?.id ?? it.routineId ?? it.id
     const row: CompactRow<CanvasDayItem> = { key, id: entityId, title: it.title, item: it, completed: it.completed, meta: it.time ? formatTimeCompact(it.time) : null }

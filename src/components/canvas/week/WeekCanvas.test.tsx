@@ -520,4 +520,17 @@ describe('WeekCanvas — days gone by', () => {
     expect(screen.queryByRole('button', { name: /^Weekend/ })).toBeNull()
     expect(screen.getByTestId('journal-day-2026-10-03')).toBeInTheDocument()
   })
+
+  it('draws a proposed row dashed and inert', async () => {
+    const { MemoryRouter } = await import('react-router-dom')
+    const d = days()
+    d[4].items.push({ id: 'proposed-s:0', kind: 'task', title: 'Reply to Christian', completed: false, proposed: true, time: new Date(2026, 9, 7, 9, 0) })
+    const w = writers()
+    render(<MemoryRouter><WeekCanvas weekStart={weekStart} days={d} shelf={shelf()} routinesToPlace={[]} monthName="October" isCurrent writers={w} /></MemoryRouter>)
+    const row = screen.getByTestId('proposed-row')
+    expect(row).toHaveTextContent('Reply to Christian')
+    expect(row).toHaveTextContent('proposed, not saved yet')
+    fireEvent.click(row)
+    expect(w.open).not.toHaveBeenCalled()
+  })
 })
