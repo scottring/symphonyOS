@@ -1,5 +1,5 @@
 import { fireEvent, render, screen } from '@testing-library/react'
-import { MemoryRouter, useNavigate } from 'react-router-dom'
+import { MemoryRouter, Route, Routes, useNavigate } from 'react-router-dom'
 import { useState, type ReactNode } from 'react'
 import { describe, expect, it, vi } from 'vitest'
 
@@ -25,6 +25,23 @@ describe('TasksApp horizon navigation', () => {
     fireEvent.click(screen.getByText('Browse week'))
     expect(screen.getByText('week: week Sunday')).toBeInTheDocument()
     fireEvent.click(screen.getByText('Today destination'))
+    expect(screen.getByText('today: current day')).toBeInTheDocument()
+  })
+
+  it('the app root lands on Home, so signing in opens Home (2026-10-14)', () => {
+    render(
+      <MemoryRouter initialEntries={['/']}>
+        <Routes>
+          <Route path="/overview" element={<p>Home page</p>} />
+          <Route path="/*" element={<TasksApp />} />
+        </Routes>
+      </MemoryRouter>,
+    )
+    expect(screen.getByText('Home page')).toBeInTheDocument()
+  })
+
+  it('a link to Today still opens Today', () => {
+    render(<MemoryRouter initialEntries={['/today']}><TasksApp /></MemoryRouter>)
     expect(screen.getByText('today: current day')).toBeInTheDocument()
   })
 })

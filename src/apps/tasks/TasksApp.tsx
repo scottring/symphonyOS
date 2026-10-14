@@ -1,6 +1,7 @@
 // src/apps/tasks/TasksApp.tsx
 import { useMemo } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
+import { HOME_ROUTE } from '@/apps/overview/route';
 import { ListsProvider } from '@/contexts/ListsContext';
 import { NotesProvider } from '@/contexts/NotesContext';
 import { GoalsProvider } from '@/contexts/GoalsContext';
@@ -45,7 +46,9 @@ export function TasksApp() {
           <NotesProvider>
             <Routes>
             {/* Cutover paths (active when feature flag enabled) */}
-            <Route path="/" element={<Navigate to="/today" replace />} />
+            {/* Signing in, or opening the app at its root, lands on Home (Scott,
+                2026-10-14). Links to a page still go straight to it. */}
+            <Route path="/" element={<Navigate to={HOME_ROUTE} replace />} />
             <Route path="today" element={<HomeViewContainer key="today" />} />
             <Route path="inbox" element={<InboxViewContainer />} />
             <Route path="task/:taskId" element={<TaskViewRoute />} />
