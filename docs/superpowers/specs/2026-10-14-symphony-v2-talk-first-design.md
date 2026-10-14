@@ -31,7 +31,7 @@ Each stage gets its own mockup, approval and spec. This document covers stages
 | 2 | **Week** | The page becomes the picture; "Plan the rest of my week" runs the loop |
 | 3 | **Routines** | A picture of the household rhythm; change several routines by talking; the editor modes and the tend drawer go |
 | 4 | **Today** | Same trim; the review drawer, duplicate sweep and "proposed order" become asks that end in a card |
-| 5 | **Month, Season, Year, Inbox** | Light pass: the bar and the card ("sort my inbox") |
+| 5 | **Month, Season, Year, Inbox** | Full scheduled conversations (a month check when a month starts, a season check each season, the year once), reflected live on each page; personal goals layer. Inbox: the bar and the card ("sort my inbox") |
 
 The wall reuses the card later for voice requests that touch several things.
 
