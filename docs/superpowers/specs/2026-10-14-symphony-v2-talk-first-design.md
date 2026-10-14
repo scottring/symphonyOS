@@ -173,6 +173,23 @@ something clearly fits.
 - A browser walkthrough on Scott's real week before it ships: plan the rest of
   the week, approve, Undo, approve again.
 
+## The page follows the conversation (added 2026-10-14)
+
+Scott: "the idea was to create an adaptive, dynamic canvas that responds and
+updates in real time to conversations." Two pieces join this work:
+
+- **Symphony points.** When it describes or asks about specific days or
+  tasks, they light up on the page (a teal halo, the Symphony colour). A new
+  tool, `symphony_point`, changes no data; the highlight clears on the next
+  turn. On a phone, pointing at one day selects that day.
+- **The week rebuilds as you answer.** While planning, Symphony proposes the
+  change list as soon as one answer settles something, and revises the whole
+  list after each later answer. The dashed rows and the card update in place;
+  you approve whenever you're ready.
+
+Later, with its own mockup: the layout itself rearranges around the
+conversation (the day being discussed opens up, the rest steps back).
+
 ## How it ships
 
 1. **PR 1, change card:** the tool, the prompt rule, the apply step, the
@@ -182,6 +199,9 @@ something clearly fits.
    `symphony_read_week`, the bar chip.
 3. **PR 3, removal:** the tray, Hours mode, the ⋯ menu, the 8 steps and their
    tests. This is separate, so it can wait a week of real use if wanted.
+
+4. **PR 4, live canvas:** `symphony_point`, the halo on Week, and the
+   propose-early-and-revise prompt.
 
 Each PR goes through review and CI, and production deploys wait for Scott's OK.
 

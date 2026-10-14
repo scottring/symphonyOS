@@ -1972,8 +1972,270 @@ git commit -m "Week: No day yet replaces the still-to-place tray"
 
 ---
 
+# PR 4: the page follows the conversation
+
+Added 2026-10-14 at Scott's request ("the idea was an adaptive canvas that updates in real time to conversations"). Two pieces: **Symphony points** (a teal halo on the days and tasks it is talking about) and **the week rebuilds as you answer** (the change set is proposed early and revised after each answer, so dashed rows appear live). Layout rearrangement is a later stage with its own mockup.
+
+Branch: `claude/v2-live-canvas`, stacked on `claude/v2-week-retire`.
+
+### Task 19: `symphony_point`, the agent points at days and tasks
+
+**Files:**
+- Create: `supabase/functions/symphony-agent/pointing.ts`
+- Test: `supabase/functions/symphony-agent/pointing.test.ts`
+- Modify: `supabase/functions/symphony-agent/index.ts` (import; `TOOLS` after `READ_WEEK_TOOL,`; dispatch branch before the `PROPOSE_CHANGES_TOOL` branch; prompt)
+
+**Interfaces:**
+- Produces: `pointAt(input: Record<string, unknown>): { dates: string[]; taskIds: string[] } | { error: string }`, `POINT_TOOL`, and the SSE event `{ type: 'point', dates: string[], taskIds: string[] }`
+
+- [ ] **Step 1: Write the failing test**
+
+```ts
+// supabase/functions/symphony-agent/pointing.test.ts
+import { describe, expect, it } from 'vitest'
+import { pointAt } from './pointing'
+
+const A = '0b8e7c1a-2d3f-4a5b-8c6d-7e8f9a0b1c2d'
+
+describe('pointAt', () => {
+  it('keeps real dates and task ids', () => {
+    expect(pointAt({ dates: ['2026-10-18', '2026-10-19'], task_ids: [A] })).toEqual({ dates: ['2026-10-18', '2026-10-19'], taskIds: [A] })
+  })
+  it('drops bad values; nothing left is an error', () => {
+    expect(pointAt({ dates: ['2026-02-30', 'Sunday'], task_ids: ['nope'] })).toEqual({ error: 'Point at real YYYY-MM-DD dates or task ids' })
+    expect(pointAt({})).toEqual({ error: 'Point at real YYYY-MM-DD dates or task ids' })
+  })
+  it('clearing is allowed: an explicit empty point', () => {
+    expect(pointAt({ clear: true })).toEqual({ dates: [], taskIds: [] })
+  })
+  it('caps at 7 dates and 12 tasks', () => {
+    const r = pointAt({ dates: Array.from({ length: 10 }, (_, i) => `2026-10-${String(10 + i).padStart(2, '0')}`), task_ids: Array.from({ length: 20 }, () => A) })
+    if ('error' in r) throw new Error(r.error)
+    expect(r.dates).toHaveLength(7)
+    expect(r.taskIds).toHaveLength(1) // de-duplicated
+  })
+})
+```
+
+- [ ] **Step 2: Run it to verify it fails**
+
+Run: `npx vitest run supabase/functions/symphony-agent/pointing.test.ts`
+Expected: FAIL (module not found)
+
+- [ ] **Step 3: Implement**
+
+```ts
+// supabase/functions/symphony-agent/pointing.ts
+//
+// The page follows the conversation (Scott, 2026-10-14): while Symphony talks
+// about days or tasks, the page lights them up. Pointing changes no data.
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+const realDate = (v: unknown) => {
+  if (typeof v !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(v)) return null
+  const d = new Date(`${v}T12:00:00Z`)
+  return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === v ? v : null
+}
+
+export function pointAt(input: Record<string, unknown>): { dates: string[]; taskIds: string[] } | { error: string } {
+  if (input.clear === true) return { dates: [], taskIds: [] }
+  const dates = [...new Set((Array.isArray(input.dates) ? input.dates : []).map(realDate).filter((d): d is string => !!d))].slice(0, 7)
+  const taskIds = [...new Set((Array.isArray(input.task_ids) ? input.task_ids : []).filter((t): t is string => typeof t === 'string' && UUID_RE.test(t)))].slice(0, 12)
+  if (!dates.length && !taskIds.length) return { error: 'Point at real YYYY-MM-DD dates or task ids' }
+  return { dates, taskIds }
+}
+
+export const POINT_TOOL = {
+  name: 'symphony_point',
+  description: 'Light up the days and/or tasks you are talking about on the page the person is looking at, so the page follows the conversation. Call it right before you ask about or describe specific days or tasks ("Baseball and the dentist are both Sunday at 10:30"). Changes no data. The highlight stays until you point again or the next turn starts; pass clear: true to remove it.',
+  input_schema: {
+    type: 'object',
+    properties: {
+      dates: { type: 'array', items: { type: 'string' }, description: 'YYYY-MM-DD days to light up (at most 7)' },
+      task_ids: { type: 'array', items: { type: 'string' }, description: 'Task ids to light up (at most 12), e.g. from symphony_read_week' },
+      clear: { type: 'boolean' },
+    },
+  },
+}
+```
+
+In `index.ts`:
+- `import { POINT_TOOL, pointAt } from './pointing.ts'`
+- `POINT_TOOL,` after `READ_WEEK_TOOL,` in `TOOLS`
+- dispatch branch, placed immediately before `} else if (block.name === PROPOSE_CHANGES_TOOL.name) {`:
+
+```ts
+              } else if (block.name === POINT_TOOL.name) {
+                // The page follows the conversation; nothing is written.
+                const pointed = pointAt(block.input ?? {})
+                if ('error' in pointed) result = JSON.stringify({ error: pointed.error })
+                else {
+                  send({ type: 'point', dates: pointed.dates, taskIds: pointed.taskIds })
+                  result = JSON.stringify({ shown: true, note: 'Lit up on the page. Do not describe the highlight; just talk.' })
+                }
+```
+
+- add to the planning bullet in the prompt (after "(2) describe the week back…"): `Whenever you describe or ask about specific days or tasks, call symphony_point with them first so the page lights them up.`
+
+- [ ] **Step 4: Run the tests** — `npx vitest run supabase/functions/symphony-agent/ && deno check supabase/functions/symphony-agent/index.ts`. Expected: PASS, clean.
+
+- [ ] **Step 5: Commit** — `git commit -m "Agent: symphony_point lights up the days and tasks it is talking about"`
+
+### Task 20: The client holds what Symphony is pointing at
+
+**Files:**
+- Modify: `src/lib/agentStream.ts` (event union, `StreamHandlers.onPoint`, loop), `src/lib/agentTurn.ts` (handler type + passthrough, as Task 3 did for `onChangeSet`), `src/hooks/useSymphonyAssistant.ts` (`AssistantTurnObserver.point`, handler), `src/shell/ShellLayout.tsx` (`turnObserver.point`), `src/contexts/CanvasActivityContext.tsx`
+- Test: `src/lib/agentStream.test.ts`, `src/contexts/CanvasActivityContext.test.tsx`
+
+**Interfaces:**
+- Produces on `CanvasActivity`: `pointing: { dates: Set<string>; taskIds: Set<string> } | null` and `setPointing(p: { dates: string[]; taskIds: string[] }): void`. `turnStarted` clears `pointing`. An empty point (`clear`) sets `null`.
+
+- [ ] **Step 1: Write the failing tests**
+
+```ts
+  // agentStream.test.ts
+  it('passes a point event through intact', () => {
+    const { events } = parseSSEChunk('data: {"type":"point","dates":["2026-10-18"],"taskIds":[]}\n\n')
+    expect(events).toEqual([{ type: 'point', dates: ['2026-10-18'], taskIds: [] }])
+  })
+```
+
+```tsx
+  // CanvasActivityContext.test.tsx — reuse the file's Probe/mount pattern
+  describe('pointing', () => {
+    it('holds what Symphony points at, clears on an empty point and on the next turn', () => {
+      const { activity } = mountActivity({})
+      act(() => activity().setPointing({ dates: ['2026-10-18'], taskIds: ['a'] }))
+      expect(activity().pointing?.dates.has('2026-10-18')).toBe(true)
+      expect(activity().pointing?.taskIds.has('a')).toBe(true)
+      act(() => activity().setPointing({ dates: [], taskIds: [] }))
+      expect(activity().pointing).toBeNull()
+      act(() => activity().setPointing({ dates: ['2026-10-19'], taskIds: [] }))
+      act(() => activity().turnStarted('Thursday', false))
+      expect(activity().pointing).toBeNull()
+    })
+  })
+```
+
+- [ ] **Step 2: Run them to verify they fail.**
+
+- [ ] **Step 3: Implement**
+  - `agentStream.ts`: `| { type: 'point'; dates: string[]; taskIds: string[] }`; `onPoint?: (p: { dates: string[]; taskIds: string[] }) => void`; loop: `else if (ev.type === 'point') handlers.onPoint?.({ dates: Array.isArray(ev.dates) ? ev.dates : [], taskIds: Array.isArray(ev.taskIds) ? ev.taskIds : [] })`
+  - `agentTurn.ts`: `onPoint?` on the handler type and `onPoint: handlers.onPoint` in the passthrough (without it the event never arrives — see Task 3).
+  - `useSymphonyAssistant.ts`: `point?: (p: { dates: string[]; taskIds: string[] }) => void` on the observer; `onPoint: (p) => turnObserver?.point?.(p),`
+  - `ShellLayout.tsx` `turnObserver`: `point: (p) => canvasRef.current?.setPointing(p),`
+  - `CanvasActivityContext.tsx`: state `const [pointing, setPointingState] = useState<{ dates: Set<string>; taskIds: Set<string> } | null>(null)`; `const setPointing = useCallback((p: { dates: string[]; taskIds: string[] }) => setPointingState(p.dates.length || p.taskIds.length ? { dates: new Set(p.dates), taskIds: new Set(p.taskIds) } : null), [])`; in `turnStarted` add `setPointingState(null)`; expose both in the value + memo deps; NOOP: `pointing: null, setPointing: () => {}`.
+
+- [ ] **Step 4: Run** `npx vitest run src/lib/agentStream.test.ts src/contexts/CanvasActivityContext.test.tsx && npx tsc -b`. Expected: PASS.
+
+- [ ] **Step 5: Commit** — `git commit -m "Pointing: the shell holds what Symphony is talking about"`
+
+### Task 21: Week lights up what Symphony points at
+
+**Files:**
+- Modify: `src/components/canvas/week/WeekCanvas.tsx` (new prop `pointing`; `dayColumn` ~line 251; `dayRow`; the No day yet chips; the phone day chips)
+- Modify: `src/components/home/week/WeekViewV2.tsx` (pass `activity.pointing`)
+- Modify: `src/styles/canvas.css`
+- Test: `src/components/canvas/week/WeekCanvas.test.tsx`
+
+**Interfaces:**
+- Consumes: `CanvasActivity.pointing` (Task 20).
+- Produces: `WeekCanvasProps.pointing?: { dates: Set<string>; taskIds: Set<string> } | null`
+
+- [ ] **Step 1: Write the failing test**
+
+```tsx
+  it('lights up the days and rows Symphony is talking about', () => {
+    const d = days()
+    render(<WeekCanvas weekStart={weekStart} days={d} shelf={shelf()} routinesToPlace={[]} monthName="October" isCurrent writers={writers()}
+      pointing={{ dates: new Set([d[4].key]), taskIds: new Set(['p']) }} />)
+    expect(screen.getByTestId(`journal-day-${d[4].key}`)).toHaveClass('is-pointed')
+    expect(screen.getByTestId(`journal-day-${d[3].key}`)).not.toHaveClass('is-pointed')
+    expect(screen.getByText('Pick up the keys').closest('li')).toHaveClass('is-pointed')
+  })
+```
+
+(Wrap in `MemoryRouter` the way the file's other tests do, if needed. `placed` — "Pick up the keys", id `p` — sits on `dayOf(4)` in the fixture.)
+
+- [ ] **Step 2: Run it to verify it fails.**
+
+- [ ] **Step 3: Implement**
+  - Add the prop; `const pointedDay = (key: string) => !!pointing?.dates.has(key)`; `const pointedTask = (id?: string) => !!id && !!pointing?.taskIds.has(id)`.
+  - `dayColumn`: append `${pointedDay(day.key) ? ' is-pointed' : ''}` to the section's class list.
+  - `dayRow`: append ` is-pointed` to the row's `className` when `pointedTask(it.task?.id)`; proposed rows too when their `task` id is pointed.
+  - No day yet chips: append ` is-pointed` when `pointedTask(t.id)`.
+  - Phone: the day-chip strip (`SAT 10 … FRI 16`) gets ` is-pointed` on pointed days, and when exactly one date is pointed and it is in this week, the phone selects that day (so the card shown is the one being discussed).
+  - `WeekViewV2`: pass `pointing={activity.pointing}` to `<WeekCanvas>`.
+  - Styles (`canvas.css`), the Symphony halo:
+
+```css
+.wc-day.is-pointed { box-shadow: 0 0 0 2px #1b6a64, 0 0 0 6px #ddece8; border-radius: 10px; transition: box-shadow 280ms ease-out; }
+.wc-dayrow.is-pointed, .wc-noday-chip.is-pointed { box-shadow: 0 0 0 2px #1b6a64; background: #ddece8; border-radius: 6px; transition: box-shadow 200ms ease-out, background 200ms ease-out; }
+.dark .wc-day.is-pointed { box-shadow: 0 0 0 2px #6cc4b9, 0 0 0 6px #1c3634; }
+.dark .wc-dayrow.is-pointed, .dark .wc-noday-chip.is-pointed { box-shadow: 0 0 0 2px #6cc4b9; background: #1c3634; }
+@media (prefers-reduced-motion: reduce) { .wc-day.is-pointed, .wc-dayrow.is-pointed, .wc-noday-chip.is-pointed { transition: none; } }
+```
+
+  (Check the phone day-chip class name in the phone branch and add the same 2px teal ring there.)
+
+- [ ] **Step 4: Run** `npx vitest run src/components/canvas/week/ src/components/home/week/ && npx tsc -b && npm run lint`. Expected: PASS, 0 errors.
+
+- [ ] **Step 5: Commit** — `git commit -m "Week: the days and tasks Symphony is talking about light up"`
+
+### Task 22: The week rebuilds as you answer
+
+**Files:**
+- Modify: `supabase/functions/symphony-agent/index.ts` (the planning bullet and the `symphony_propose_changes` tool-result note)
+- Modify: `supabase/functions/symphony-agent/changeSet.ts` (`PROPOSE_CHANGES_TOOL.description`)
+- Modify: `src/components/canvas/ChangeCard.tsx` (+ test)
+- Test: `supabase/functions/symphony-agent/changeSet.test.ts` (prompt guard)
+
+**Interfaces:** none new.
+
+- [ ] **Step 1: Write the failing tests**
+
+```ts
+  // changeSet.test.ts, in 'agent wiring'
+  it('proposes early and revises after each answer while planning', () => {
+    expect(src).toContain('as soon as one answer settles a change')
+    expect(PROPOSE_CHANGES_TOOL.description).toContain('call it again with the whole list so far')
+  })
+```
+
+```tsx
+  // ChangeCard.test.tsx — a revised list updates in place, without a "replaces" banner
+  it('a revised list updates in place without a banner', () => {
+    render(<ChangeCard set={pending({ replaced: true })} today={today} onApprove={vi.fn()} onDismiss={vi.fn()} />)
+    expect(screen.queryByText('This replaces the earlier list.')).toBeNull()
+  })
+```
+
+Delete the old ChangeCard test `'says when it replaced an earlier list'`.
+
+- [ ] **Step 2: Run them to verify they fail.**
+
+- [ ] **Step 3: Implement**
+  - Planning bullet in `index.ts`: replace "(4) when the person has answered, call symphony_propose_changes once with the whole list;" with: `(4) as soon as one answer settles a change, call symphony_propose_changes with the whole list so far (title like "2 changes so far"), and call it again with the whole revised list after each later answer, so the page rebuilds as you talk; the person approves whenever they are ready;`
+  - Task 2's bullet "call symphony_propose_changes ONCE with the whole list" → `call symphony_propose_changes with the whole list (while planning, call it again with the whole list so far after each answer)`.
+  - `PROPOSE_CHANGES_TOOL.description`: replace "If the person asks to change the list, call this again with the whole revised list." with "Each call replaces the list on the page: while planning, call it again with the whole list so far after each answer, and whenever the person asks for a change."
+  - The tool-result note after a successful `change_set`: `'Shown as a change card and dashed on the page. Nothing is saved until the person approves. Do not read the list back; ask your next question or say it is ready to approve.'`
+  - `ChangeCard.tsx`: remove the `{set.replaced && …}` line. (The context keeps the flag; nothing else reads it.)
+
+- [ ] **Step 4: Run** `npx vitest run supabase/functions/symphony-agent/ src/components/canvas/ && deno check supabase/functions/symphony-agent/index.ts`. Expected: PASS.
+
+- [ ] **Step 5: Commit** — `git commit -m "Planning: the change list is proposed early and revised after each answer"`
+
+### Task 23: PR 4 verification and pull request
+
+- [ ] Full suite, lint, build (Node 22).
+- [ ] Local browser check of the halo at desktop and phone width by setting pointing through a test-only path is NOT added; instead rely on Task 21's tests, and note that the live pointing turn needs `symphony-agent` deployed (Scott's OK).
+- [ ] Push `claude/v2-live-canvas`, open a draft PR stacked on `claude/v2-week-retire`, titled `Week follows the conversation: Symphony points, the week rebuilds as you answer`.
+
+---
+
 ## Not in this plan
 
+- Layout that rearranges around the conversation (the day being discussed opens up; the rest steps back) — its own mockup first.
 - Stage 3 (Routines), stage 4 (Today) and stage 5 (Month/Season/Year/Inbox). Each gets its own mockup, spec and plan.
 - The change card on the wall (voice).
 - Calendar writes from a change set.
