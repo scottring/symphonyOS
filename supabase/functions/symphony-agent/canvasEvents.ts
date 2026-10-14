@@ -16,6 +16,7 @@ export const CANVAS_WRITE_TOOLS = new Set([
   'symphony_complete_task', 'symphony_delete_task', 'symphony_create_project',
   'symphony_update_project', 'symphony_create_routine', 'symphony_update_routine',
   'symphony_delete_routine', 'symphony_create_note', 'symphony_attach_source',
+  'symphony_set_meal',
 ])
 
 /** Creations that accept a deterministic id. */

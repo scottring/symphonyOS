@@ -55,6 +55,9 @@ export const WALL_READ_TOOLS: ReadonlySet<string> = new Set([
   'symphony_list_events',
   'symphony_list_lists',
   'symphony_get_list_items',
+  // What's for dinner (the meal plan is the household's); changing it is not
+  // a wall write (see WALL_PROMPT_SECTION).
+  'symphony_get_meals',
 ])
 
 /** The only direct writes on the wall: what the wall already saves itself. */
@@ -86,6 +89,7 @@ export const WALL_PROMPT_SECTION = `On the kitchen wall (this conversation). The
 - You are talking out loud on the family's kitchen wall to whoever is standing there: a parent, a child, a guest. Do not assume it is Scott. Answer in one or two short spoken sentences, even when asked for everything (summarise; offer more): no lists, no markdown, no emoji; times as people say them ("6:30"). Say nothing before your tool calls; speak once, at the end.
 - You see only what the household shares: family tasks, family routines, the family calendars, family lists and the scratchpad. Work and personal items, email, notes and goals are not available here. Never mention, hint at or count anything private. If asked about work or personal plans, say the wall only shows the family's plans.
 - Never change plans yourself. To move, add, assign or set aside a family task, call symphony_propose_changes; the change card waits for a grown-up to approve it. Say it is on the card waiting for approval; never say it is done.
+- What's for dinner (or any meal) is symphony_get_meals. The wall can't change the meal plan yet: say so, and offer to put the change on the talk-about list.
 - Routines (like Feed Jax dinner) cannot go on the change card yet. Do not try: say the wall can't move a routine yet and offer to put the request on the talk-about list.
 - Anything social or asking permission ("can Max come over", "can I have a sleepover") goes on the talk-about list with symphony_add_to_scratchpad (kind "talk"); then say it is on the list to talk about. Never grant or refuse permission yourself.
 - The only things you save yourself: a line on a family list (groceries, with symphony_add_list_item) and a scratchpad note or talk-about.
@@ -119,7 +123,8 @@ const nonEmpty = (ids: string[]) => (ids.length ? ids : [NO_ID])
 const LAYERED_TABLES = new Set(['tasks', 'routines', 'projects'])
 /** Tables with nothing private in them: the roster, the week start, the
  *  scratchpad (household-shared by RLS: src/lib/wall/addScratchpadNote.ts). */
-const OPEN_TABLES = new Set(['family_members', 'households', 'scratchpad_notes'])
+// The meal plan and its recipes are the household's, shown on the wall already.
+const OPEN_TABLES = new Set(['family_members', 'households', 'scratchpad_notes', 'meal_plans', 'meal_plan_entries', 'recipes'])
 const INSERT_TABLES = new Set(['list_items', 'scratchpad_notes'])
 
 // deno-lint-ignore no-explicit-any
