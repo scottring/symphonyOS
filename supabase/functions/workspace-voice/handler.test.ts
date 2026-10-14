@@ -41,6 +41,14 @@ describe('workspace voice handshake',()=>{
   expect(session.instructions).toContain('Never suggest goals, tasks or activities they did not say')
   expect(session.instructions).toContain('One or two short sentences a turn')
  })
+ it('lets the planning agent lead sessions, with the shared spine',async()=>{
+  const deps=setup();await handleWorkspaceVoice(request(),deps)
+  const session=JSON.parse(((deps.fetch.mock.calls[0] as unknown as [string,RequestInit])[1].body as FormData).get('session') as string)
+  expect(session.instructions).toContain('the planning agent leads them')
+  expect(session.instructions).toContain('Sessions follow a spine, not a script')
+  expect(session.instructions).toContain('Everyday talk:')
+  expect(session.instructions).not.toContain('Shape of planning')
+ })
  it('stops at the daily limit without spending',async()=>{
   const deps=setup();deps.reserve.mockResolvedValue(false)
   expect((await handleWorkspaceVoice(request(),deps)).status).toBe(429);expect(deps.fetch).not.toHaveBeenCalled()
