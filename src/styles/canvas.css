@@ -266,6 +266,13 @@
 .wc-noday-peek { min-width: 0; color: var(--color-neutral-600); }
 .wc-noday-show { margin-left: auto; font-weight: 500; color: var(--color-neutral-600); white-space: nowrap; }
 .wc-noday-chips { list-style: none; margin: 0; padding: 0; columns: 3 220px; column-gap: 28px; }
+/* Triage: one task a row, the when-chips beside it (wrapping under on narrow screens). */
+.wc-noday-triage { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+.wc-noday-triage-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 4px 6px; border-radius: 6px; }
+.wc-noday-triage-row:hover { background: var(--color-neutral-50); }
+.wc-noday-triage-row > .wc-noday-open { flex: 1 1 220px; min-width: 0; }
+.wc-noday-triage-toggle { margin-left: auto; }
+.dark .wc-noday-triage-row:hover { background: #222a29; }
 .wc-noday-chip { display: flex; align-items: center; gap: 8px; break-inside: avoid; border-radius: 6px; }
 .wc-noday-open { font: inherit; font-size: 13px; line-height: 1.35; padding: 4px 0; min-height: 28px; background: none; border: 0; color: var(--color-neutral-800); text-align: left; cursor: pointer; }
 .wc-noday-open:hover { color: var(--color-primary-800); }
