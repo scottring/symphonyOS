@@ -1,0 +1,114 @@
+{
+  "scenario": "j1-plumber-week",
+  "at": "2026-10-15T06:15:16.313Z",
+  "user": "deb3b752-cb26-480a-910c-fb174b308409",
+  "steps": [
+    {
+      "step": 1,
+      "say": "I need to call the plumber, pick up the Amazon order, clean the yard, and fit in an all-day test drive this week.",
+      "tools": [
+        "symphony_read_week",
+        "symphony_propose_changes"
+      ],
+      "outcome": "proposed",
+      "reply": "The week looks clear — no events or tasks yet. Here are all four as a card:\n\nWhich day works for the test drive? That one needs a date before I can place it.Which day did you have in mind for the test drive?",
+      "card": [
+        {
+          "op": "add",
+          "title": "Call the plumber",
+          "date": null,
+          "time": null
+        },
+        {
+          "op": "add",
+          "title": "Pick up Amazon order",
+          "date": null,
+          "time": null
+        },
+        {
+          "op": "add",
+          "title": "Clean the yard",
+          "date": null,
+          "time": null
+        },
+        {
+          "op": "add",
+          "title": "Test drive (all day)",
+          "date": null,
+          "time": null
+        }
+      ],
+      "findings": []
+    },
+    {
+      "step": 2,
+      "say": "Actually, the plumber call is Friday, not whenever.",
+      "tools": [],
+      "outcome": "answered",
+      "reply": "Got it. And which day for the test drive?",
+      "card": null,
+      "findings": [
+        "outcome answered, expected proposed",
+        "missing tool symphony_propose_changes"
+      ]
+    },
+    {
+      "step": 3,
+      "action": "approve",
+      "result": "manual (page action: run in the browser layer)"
+    },
+    {
+      "step": 4,
+      "say": "Add buy mulch for the yard on Saturday.",
+      "tools": [
+        "symphony_read_week",
+        "symphony_propose_changes"
+      ],
+      "outcome": "proposed",
+      "reply": "So we have: call the plumber on Friday, buy mulch + clean the yard on Saturday, and the Amazon pickup and test drive still need days. Which day for the test drive?Which day works for the test drive — and when do you want to pick up the Amazon order?",
+      "card": [
+        {
+          "op": "add",
+          "title": "Call the plumber",
+          "date": "2026-10-16",
+          "time": null
+        },
+        {
+          "op": "add",
+          "title": "Pick up the Amazon order",
+          "date": null,
+          "time": null
+        },
+        {
+          "op": "add",
+          "title": "Clean the yard",
+          "date": "2026-10-17",
+          "time": null
+        },
+        {
+          "op": "add",
+          "title": "Buy mulch for the yard",
+          "date": "2026-10-17",
+          "time": null
+        },
+        {
+          "op": "add",
+          "title": "All-day test drive",
+          "date": null,
+          "time": null
+        }
+      ],
+      "findings": []
+    },
+    {
+      "step": 5,
+      "action": "retry",
+      "result": "manual (page action: run in the browser layer)"
+    },
+    {
+      "step": 6,
+      "action": "undo-set",
+      "result": "manual (page action: run in the browser layer)"
+    }
+  ]
+}

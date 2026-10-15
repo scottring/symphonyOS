@@ -52,12 +52,16 @@ const session = await signIn()
 const token = session.access_token
 const report = { scenario: scenario.id, at: new Date().toISOString(), user: session.user?.id, steps: [] }
 const history = []
+// The page tells the next turn what became of the last card (the client's
+// takeChangeCard): while one is waiting, the model is told so, with its ops.
+let pendingCard = null
 let pass = true
 for (const [i, step] of scenario.steps.entries()) {
   if (!step.say) { report.steps.push({ step: i + 1, action: step.action, result: 'manual (page action: run in the browser layer)' }); continue }
   history.push({ role: 'user', content: step.say })
   const turnId = crypto.randomUUID()
-  const got = await turn(token, history, turnId, { workspaceContext: { page: scenario.page, date: scenario.today, layers: ['family'], selectedId: null, items: [], truncated: false } })
+  const got = await turn(token, history, turnId, { workspaceContext: { page: scenario.page, date: scenario.today, layers: ['family'], selectedId: null, items: [], truncated: false }, ...(pendingCard ? { changeCard: pendingCard } : {}) })
+  if (got.changeSet) pendingCard = { state: 'pending', title: got.changeSet.title, ops: got.changeSet.ops.map((o) => ({ op: o.op, title: o.title, where: o.date ?? '' })), at: new Date().toISOString() }
   history.push({ role: 'assistant', content: got.reply })
   const findings = []
   if (!got.outcome) findings.push('no outcome event (older agent build?)')
