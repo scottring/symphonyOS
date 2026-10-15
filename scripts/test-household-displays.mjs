@@ -53,7 +53,8 @@ try {
     grant usage on schema public to anon, authenticated;
     create table public.households(id uuid primary key);
     create table public.household_members(id uuid primary key default gen_random_uuid(), household_id uuid references public.households(id) on delete cascade not null, user_id uuid references auth.users(id) on delete cascade not null, role text not null default 'member' check (role in ('owner','admin','member')), status text not null default 'pending', invited_by uuid, joined_at timestamptz, unique(household_id,user_id));
-    create table public.household_invitations(id uuid primary key default gen_random_uuid(), household_id uuid, email text);
+    create table public.household_invitations(id uuid primary key default gen_random_uuid(), household_id uuid, email text, accepted_at timestamptz, expires_at timestamptz not null default now() + interval '7 days');
+    create table public.waitlist(email text, approved_at timestamptz);
     create table public.calendar_domain_mappings(user_id uuid, calendar_id text, domain text);
     create table public.tasks(id uuid primary key default gen_random_uuid(), user_id uuid not null, title text, scope text default 'individual');
     create table public.lists(id uuid primary key default gen_random_uuid(), user_id uuid not null, visibility text default 'self');
@@ -82,6 +83,7 @@ try {
     insert into public.lists (user_id,visibility) values ('${OWNER}','family');
     insert into public.family_members (user_id,name) values ('${OWNER}','Kid');`)
   sql(readFileSync(new URL('../supabase/migrations/20261015100000_household_displays.sql', import.meta.url), 'utf8'))
+  sql('select 1;\n' + readFileSync(new URL('../supabase/migrations/20261015130000_signup_allowed_invited.sql', import.meta.url), 'utf8'))
 
   let code
   check('only an owner or admin can make a pairing code', () => {
@@ -129,6 +131,18 @@ try {
     assert.equal(as(DISPLAY, 'select count(*) from public.family_members', true), '0')
     assert.equal(as(DISPLAY, 'select public.my_surface()', true), 'member')
     assert.equal(as(OWNER, 'select count(*) from public.household_displays where revoked_at is not null'), '1')
+  })
+  check('sign-up: a live household invitation admits its address; expired, used or unknown ones do not', () => {
+    sql(`insert into public.household_invitations (household_id, email) values ('${H1}', 'Partner@Example.com');
+         insert into public.household_invitations (household_id, email, expires_at) values ('${H1}', 'late@example.com', now() - interval '1 day');
+         insert into public.household_invitations (household_id, email, accepted_at) values ('${H1}', 'joined@example.com', now());
+         insert into public.waitlist values ('listed@example.com', now()), ('waiting@example.com', null);`)
+    assert.equal(sql("select public.signup_allowed('partner@example.com')"), 't')
+    assert.equal(sql("select public.signup_allowed('late@example.com')"), 'f')
+    assert.equal(sql("select public.signup_allowed('joined@example.com')"), 'f')
+    assert.equal(sql("select public.signup_allowed('listed@example.com')"), 't')
+    assert.equal(sql("select public.signup_allowed('waiting@example.com')"), 'f')
+    assert.equal(sql("select public.signup_allowed('stranger@example.com')"), 'f')
   })
   console.log(`${checks} local PostgreSQL checks passed. No remote database or provider was contacted.`)
 } finally {
