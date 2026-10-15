@@ -114,10 +114,11 @@ Columns: what the person wants · how they say it · context/permission needed �
 | Retry after a dropped connection does not duplicate | stable row ids for task, routine, plan item, contact, note, list, list item; stable calendar requestId | canvasEvents.test (stableRowId); **P** integration case against a real database | IT (unit) / P (integration) |
 | Approve refuses a set whose rows moved | `seen` vs cached `updatedAt` (client) | applyChangeSet.test | IT; **gap**: compares against the browser cache, not a fresh read |
 | Partial failure reported as partial | applyChangeSet reports `reverted`/`kept`; the bar and the wall say "some of it stayed saved" when a rollback could not reverse a write; direct writes report `partial` | applyChangeSet.test (unreverted rollback), CanvasActivityContext.test | IT |
-| Undo does not overwrite another person's later edit | — | — | **P** (conflict check on Undo) |
+| Undo does not overwrite another person's later edit | applyChangeSet's Undo reads the rows as they are then and skips one stamped clearly after Approve; the bar says it could not undo all of it | applyChangeSet.test (edited since) | IT |
 | "This Friday" while viewing an old week | `viewing: past` in context; prompt asks | context.test, voice instructions | IU |
+| An item the screen left out is looked up, not denied | prompt rule on `truncated` and items not in the snapshot | — | IU |
 | Imported mail/notes are data, not instructions | prompt marks screen context and card notes untrusted | changeSet.test (changeCardNote) | IU; **P** injection scenario (benchmark #13) |
-| Household vocabulary (names, schools, places) | roster in the prompt; no custom vocabulary for the voice transcriber | — | **P** |
+| Household vocabulary (names, schools, places) | roster in the agent prompt; the voice transcriber is prompted with the family's names and routine names (bounded, never task text) | workspace-voice handler.test | IT (contract) / IU (does it help recognition: needs recorded audio) |
 | Durable session state across reload | chat text in `chat_sessions`; a waiting change card is kept per person in the tab's session storage and restored (approve/dismiss clears it); Undo, receipts and voice state are still in memory only | CanvasActivityContext.test (reload) | IT (card) / **P** (Undo, receipt, objective and unresolved questions) |
 | Authorization not inferred from the screen | every tool through RLS client; wall fence; a display's identity decides the wall server-side | wallMode.test (callerSurface), `scripts/test-household-displays.mjs` (8 SQL checks); integration privacy test (not run on this candidate) | IT (unit, local SQL) / P (real accounts, hosted migration) |
 | Spending limits | `reserve_ai_provider_call` on four routes; many paid routes unguarded; 27 orphaned functions deployed | aiUsage tests; `scripts/test-ai-usage-guard.mjs` | IU; see beta-readiness B03 |
@@ -125,9 +126,7 @@ Columns: what the person wants · how they say it · context/permission needed �
 ## Known gaps found while building (not yet in a row above)
 
 - **A display has no Google tokens.** The wall page loads calendar events through `google-calendar-events`, which uses the signed-in user's tokens; under a display session the wall's calendar would be empty. The agent's wall reads are fine (they read the cached `calendar_events` through the fence with the household's family calendars). Needed: a display path in `useDayLoadEvents` that reads cached household events, and a server-side refresh of the household's family calendars that does not depend on who is looking. Until then a display is certified for routines, meals, lists and the scratchpad, not the calendar.
-- **`last_seen_at` on displays is never written.** Settings cannot yet show whether a display is alive.
-- **Wall timeout.** After the wall's 20 s fallback to `wall-ask`, the agent turn keeps running on the server and may still write; the client does not abort the stream.
-- **Spoken "approve" binds to whatever card is current.** Plan §6 asks that a spoken approval refer to one identifiable proposal; see the wall row.
+- **Wall timeout and spoken approve:** fixed in the sixth batch (the stream is aborted; a spoken approve means the card last read out).
 
 ## Benchmark journey J1 (the plan's first deliverable)
 
