@@ -20,14 +20,15 @@ create table public.ai_model_prices (
   note text
 );
 insert into public.ai_model_prices (model, input_cents_per_million, output_cents_per_million, cents_per_minute, note) values
-  ('claude-opus-5-5', 1500, 7500, null, 'placeholder: public list rate, confirm before enabling'),
-  ('claude-sonnet-4-6', 300, 1500, null, 'placeholder: public list rate, confirm before enabling'),
-  ('claude-haiku-4-5', 100, 500, null, 'placeholder: confirm'),
-  ('gpt-4o-mini', 15, 60, null, 'placeholder: confirm'),
-  ('gpt-4o', 250, 1000, null, 'placeholder: confirm'),
-  ('text-embedding-3-small', 2, 0, null, 'placeholder: confirm'),
-  ('gpt-4o-mini-tts', 1200, 0, null, 'placeholder: per million CHARACTERS (wall-say records characters as input units); confirm'),
-  ('gpt-realtime-2.1', null, null, 600, 'placeholder: audio in+out estimate per minute, confirm');
+  ('claude-opus-5-5', 400, 2000, null, 'verified 2026-10-15: platform.claude.com/docs/en/about-claude/pricing'),
+  ('claude-sonnet-4-6', 300, 1500, null, 'verified 2026-10-15: platform.claude.com/docs/en/about-claude/pricing'),
+  ('claude-haiku-4-5', 100, 500, null, 'verified 2026-10-15: platform.claude.com/docs/en/about-claude/pricing'),
+  ('gpt-4o-mini', 15, 60, null, 'verified 2026-10-15: developers.openai.com/api/docs/pricing'),
+  ('gpt-4o', 250, 1000, null, 'verified 2026-10-15: developers.openai.com/api/docs/pricing'),
+  ('text-embedding-3-small', 2, 0, null, 'verified 2026-10-15: developers.openai.com/api/docs/pricing'),
+  ('gpt-4o-mini-tts', 1500, 0, null, 'ESTIMATE 2026-10-15: provider text in $0.60/M tokens + audio out $12/M tokens; recorded per million CHARACTERS spoken (wall-say); ~$0.015 per minute of speech'),
+  ('gpt-realtime-2.1', null, null, 600, 'ESTIMATE 2026-10-15: provider lists gpt-realtime audio $32/M in, $64/M out per token and no per-minute rate; 600c/min is a conservative guess until measured'),
+  ('gpt-realtime', null, null, 600, 'ESTIMATE 2026-10-15: same basis as gpt-realtime-2.1');
 
 alter table public.ai_usage_configuration
   add column daily_cents bigint check (daily_cents > 0),
