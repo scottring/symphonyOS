@@ -574,3 +574,23 @@ describe('applyChangeSet: plan ops (Month / Season / Year)', () => {
     expect(d.updateTask).toHaveBeenCalledWith('m1', { commitments: [oct] })
   })
 })
+
+describe('Undo leaves what someone else changed after Approve (plan §7)', () => {
+  it('skips a task edited since, reverses the rest, and reports it could not undo everything', async () => {
+    const later = { ...task('a'), updatedAt: new Date(Date.now() + 60_000) }
+    const d = deps({ latest: () => ({ tasks: [later, task('b')] }) })
+    const r = await applyChangeSet(set, d)
+    if (!r.ok) throw new Error('expected ok')
+    vi.mocked(d.updateTask).mockClear()
+    expect(await r.undo()).toBe(false)
+    // b was put back; a (edited by someone else since) was left alone.
+    expect(vi.mocked(d.updateTask).mock.calls.map((c) => c[0])).toEqual(['b'])
+    expect(d.deleteTask).toHaveBeenCalledWith('new1')
+  })
+  it('a row this set itself stamped is not "edited since"', async () => {
+    const d = deps({ latest: () => ({ tasks: [{ ...task('a'), updatedAt: new Date() }, task('b')] }) })
+    const r = await applyChangeSet(set, d)
+    if (!r.ok) throw new Error('expected ok')
+    expect(await r.undo()).toBe(true)
+  })
+})

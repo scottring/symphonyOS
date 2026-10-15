@@ -30,6 +30,10 @@ export interface ApplyDeps extends Partial<MoreApplyDeps> {
   weekStart: Date
   /** plan_add with no parent to inherit from: the life area the page adds in. */
   defaultContext?: TaskContext
+  /** The rows as they are NOW, for Undo's conflict check: a task or routine
+   *  someone else changed after Approve is left as they left it, not put
+   *  back to how it was (plan §7). Without this, Undo trusts the set. */
+  latest?: () => { tasks: Task[]; routines?: Routine[] }
 }
 
 /** Writers the stage-3 ops need (done, merge, routine ops). Optional: a page
@@ -238,7 +242,7 @@ export async function applyChangeSet(set: ChangeSet, given: ApplyDeps): Promise<
     }
   }
 
-  const undos: Array<{ id: string; undo: () => Promise<unknown> }> = []
+  const undos: Array<{ id: string; undo: () => Promise<unknown>; kind?: 'task' | 'routine' }> = []
   const ids: string[] = []
   /** Reverse what saved, newest first; the ids that would not reverse. */
   const rollback = async (): Promise<string[]> => {
@@ -252,7 +256,7 @@ export async function applyChangeSet(set: ChangeSet, given: ApplyDeps): Promise<
   const step = async (write: () => Promise<boolean | void>, undo: () => Promise<unknown>, id: string) => {
     if ((await write()) === false) return false
     ids.push(id)
-    undos.push({ id, undo })
+    undos.push({ id, undo, kind: routinesById.has(id) ? 'routine' : 'task' })
     return true
   }
   const fail = async (): Promise<ApplyResult> => { const kept = await rollback(); return { ok: false, reason: 'failed', reverted: kept.length === 0, kept } }
@@ -441,12 +445,30 @@ export async function applyChangeSet(set: ChangeSet, given: ApplyDeps): Promise<
     return fail()
   }
 
+  // Everything saved: from here on, a later edit by someone else is theirs.
+  const appliedAt = Date.now()
   return {
     ok: true, ids,
     undo: async () => {
       let ok = true
-      for (const u of [...undos].reverse()) { try { if ((await u.undo()) === false) ok = false } catch { ok = false } }
+      const now = given.latest?.()
+      for (const u of [...undos].reverse()) {
+        // Changed since Approve by a hand other than this set's: leave it.
+        if (now && u.kind && editedSince(u.kind === 'task' ? now.tasks.find((t) => t.id === u.id)?.updatedAt : routineUpdatedAt(now.routines, u.id), appliedAt)) { ok = false; continue }
+        try { if ((await u.undo()) === false) ok = false } catch { ok = false }
+      }
       return ok
     },
   }
+}
+
+/** Postgres stamps updated_at on the set's own writes too, so a row is
+ *  "edited since" only when its stamp is clearly after Approve finished. */
+const UNDO_GRACE_MS = 2_000
+function editedSince(updatedAt: Date | undefined, appliedAt: number): boolean {
+  return !!updatedAt && updatedAt.getTime() > appliedAt + UNDO_GRACE_MS
+}
+function routineUpdatedAt(routines: Routine[] | undefined, id: string): Date | undefined {
+  const r = routines?.find((x) => x.id === id)
+  return r ? new Date(r.updated_at) : undefined
 }

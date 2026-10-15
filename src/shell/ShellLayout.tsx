@@ -427,6 +427,8 @@ function ShellLayoutInner({ children }: Props) {
     addGoal: async (name, { year, context, carriedFrom, areaId, notes, strategy, assignedToAll }) =>
       (await addGoal(areaId ?? null, name, context, { year, carriedFrom, notes, strategy, assignedToAll }))?.id,
     updateGoal, deleteGoal, keepForward, dropCommitment,
+    // Undo's conflict check reads the rows as they are then.
+    latest: () => ({ tasks: latestTasks.current, routines: canvasRoutines }),
   }), [tasks, updateTask, deleteTask, addTask, completeTask, toggleTask, canvasRoutines, updateRoutine, deleteRoutine, addRoutine, skipInstance, undoInstanceDone, reschedule, undoReschedule, setOccurrenceAssignee, soleDomain, goals, addGoal, updateGoal, deleteGoal, keepForward, dropCommitment]);
   const canvasRefetch = useCallback(() => { window.dispatchEvent(new Event('symphony-plan-updated')); return Promise.all([refetch(), refetchRoutines()]); }, [refetch, refetchRoutines]);
   const showStrip = conversationStripPath(location.pathname);
