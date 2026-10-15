@@ -50,6 +50,37 @@ const turn = async (token, messages, turnId, extra = {}) => {
 
 const session = await signIn()
 const token = session.access_token
+const userId = session.user?.id
+
+// --seed: put the scenario's starting records into the synthetic household
+// (with their scenario ids), and remove them afterwards. Family-scoped, so the
+// agent's wall and desktop reads both see them.
+const seeded = { tasks: [], routines: [], goals: [] }
+const rest = async (path, method, body) => {
+  const r = await fetch(`${url}/rest/v1/${path}`, { method, headers: { apikey: anon, Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', Prefer: 'return=representation' }, body: body ? JSON.stringify(body) : undefined })
+  const text = await r.text(); return { status: r.status, body: text.slice(0, 200) }
+}
+if (process.argv.includes('--seed')) {
+  const dayKeys = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat']
+  for (const t of scenario.start.tasks ?? []) {
+    const r = await rest('tasks', 'POST', { id: t.id, title: t.title, user_id: userId, context: 'family', scope: 'compound', bucket: t.scheduledFor ? 'timed' : 'week', ...(t.scheduledFor ? { scheduled_for: `${t.scheduledFor}T12:00:00Z`, is_all_day: true } : {}) })
+    if (r.status < 300) seeded.tasks.push(t.id); else console.error('seed task failed', r.status, r.body)
+  }
+  for (const r0 of scenario.start.routines ?? []) {
+    const r = await rest('routines', 'POST', { id: r0.id, name: r0.name, user_id: userId, context: 'family', scope: 'compound', visibility: 'active', recurrence_pattern: { type: 'weekly', days: r0.days.filter((d) => dayKeys.includes(d)), interval: 1 }, time_of_day: `${r0.time}:00` })
+    if (r.status < 300) seeded.routines.push(r0.id); else console.error('seed routine failed', r.status, r.body)
+  }
+  for (const g of scenario.start.yearGoals ?? []) {
+    const r = await rest('goals', 'POST', { id: g.id, name: g.name, year: g.year, status: g.status, user_id: userId, context: 'family', scope: 'compound' })
+    if (r.status < 300) seeded.goals.push(g.id); else console.error('seed goal failed', r.status, r.body)
+  }
+  console.log(`seeded ${seeded.tasks.length} tasks, ${seeded.routines.length} routines, ${seeded.goals.length} goals`)
+}
+const unseed = async () => {
+  for (const id of seeded.tasks) await rest(`tasks?id=eq.${id}`, 'DELETE')
+  for (const id of seeded.routines) await rest(`routines?id=eq.${id}`, 'DELETE')
+  for (const id of seeded.goals) await rest(`goals?id=eq.${id}`, 'DELETE')
+}
 const report = { scenario: scenario.id, at: new Date().toISOString(), user: session.user?.id, steps: [] }
 const history = []
 // The page tells the next turn what became of the last card (the client's
@@ -77,6 +108,7 @@ for (const [i, step] of scenario.steps.entries()) {
   report.steps.push({ step: i + 1, say: step.say, tools: got.tools, outcome: got.outcome?.state, reply: got.reply.slice(0, 300), card: got.changeSet ? got.changeSet.ops.map((o) => ({ op: o.op, title: o.title, date: o.date ?? null, time: o.time ?? null })) : null, findings })
   console.log(`${findings.length ? 'FAIL' : 'PASS'} step ${i + 1}: ${got.outcome?.state ?? 'no outcome'} ${findings.join('; ')}`)
 }
+await unseed()
 mkdirSync(join(import.meta.dirname, 'reports'), { recursive: true })
 const out = join(import.meta.dirname, 'reports', `${basename(scenarioPath, '.json')}-${Date.now()}.json`)
 writeFileSync(out, JSON.stringify(report, null, 2))

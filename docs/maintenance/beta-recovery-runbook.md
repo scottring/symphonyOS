@@ -58,5 +58,5 @@ One human route for beta households: a named email address and a reply time, pub
 | Targeted repair of one household | not run | | | |
 | Web rollback (promote previous deployment) | not run | | | |
 | Edge function rollback with migration ordering check | not run | | | |
-| Emergency AI disable and re-enable | not run on hosted (local SQL harness only); allowances are now live on the hosted project | | | |
+| Emergency AI disable and re-enable | 2026-10-15 | Claude (approved by Scott) | Pass: with `enabled=false` the agent answered the allowance refusal with no provider call; re-enabled, it answered normally | ~1 min |
 | Display revoke on a real tablet | not run (local SQL harness only) | | | |

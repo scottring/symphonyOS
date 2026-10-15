@@ -1,10 +1,10 @@
 {
-  "id": "m1-plan-november",
-  "title": "Plan November: carry one October goal forward, let one go, mark one done, add one in the person's words; one Approve; Undo of the set",
+  "id": "m1-plan-next-year",
+  "title": "Plan 2027: carry one year goal forward, let one go, mark one done, add one in the person's words; one Approve; Undo of the set",
   "surface": "desktop",
   "page": "month",
-  "today": "2026-10-28",
-  "weekStart": "2026-10-25",
+  "today": "2026-12-20",
+  "weekStart": "2026-12-20",
   "start": {
     "members": [{ "id": "m-a", "name": "Alex" }],
     "tasks": [],
@@ -16,11 +16,11 @@
   },
   "steps": [
     {
-      "say": "Plan November. The house goal carries, bread I'm letting go, and the 10k is done. And add: plan the holiday trip.",
+      "say": "Plan 2027. Of this year's goals: the house goal carries, bread I'm letting go, and the 10k is done. And add for next year: plan the holiday trip.",
       "expect": {
         "outcome": ["proposed"],
         "tools": [
-          { "name": "symphony_read_plan", "input": { "level": "year", "date": "2026-10-28" } },
+          { "name": "symphony_read_plan", "input": { "level": "year", "date": "2026-12-20" } },
           { "name": "symphony_propose_changes", "input": { "title": "4 changes to 2027", "ops": [
             { "op": "plan_carry", "item_id": "9a1b2c3d-0000-4000-8000-00000000b001", "to_period_start": "2027-01-01" },
             { "op": "plan_let_go", "item_id": "9a1b2c3d-0000-4000-8000-00000000b002" },

@@ -1,0 +1,56 @@
+{
+  "scenario": "r1-routine-this-week-vs-always",
+  "at": "2026-10-15T06:58:51.851Z",
+  "user": "deb3b752-cb26-480a-910c-fb174b308409",
+  "steps": [
+    {
+      "step": 1,
+      "say": "No piano this Thursday, Kaleb has a field trip.",
+      "tools": [
+        "symphony_read_week",
+        "symphony_point"
+      ],
+      "outcome": "answered",
+      "reply": "I see a Piano practice routine on Thursdays. Just this week, or should Kaleb skip piano every time there's a field trip (a one-off)?Just this Thursday, or from now on?",
+      "card": null,
+      "findings": [
+        "outcome answered, expected proposed",
+        "missing tool symphony_propose_changes"
+      ]
+    },
+    {
+      "step": 2,
+      "action": "approve",
+      "result": "manual (page action: run in the browser layer)"
+    },
+    {
+      "step": 3,
+      "say": "Actually piano is moving to Tuesdays at 4 from now on.",
+      "tools": [
+        "symphony_read_week",
+        "symphony_propose_changes"
+      ],
+      "outcome": "proposed",
+      "reply": "Piano practice moves from Thursdays to Tuesdays at 4:00. Here's the change:Piano practice shifts to Tuesdays at 4pm from now on — approve when ready.",
+      "card": [
+        {
+          "op": "routine_change",
+          "title": "Piano practice",
+          "date": null,
+          "time": "16:00"
+        }
+      ],
+      "findings": []
+    },
+    {
+      "step": 4,
+      "action": "approve",
+      "result": "manual (page action: run in the browser layer)"
+    },
+    {
+      "step": 5,
+      "action": "undo-set",
+      "result": "manual (page action: run in the browser layer)"
+    }
+  ]
+}
