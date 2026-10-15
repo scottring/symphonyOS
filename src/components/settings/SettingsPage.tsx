@@ -16,6 +16,7 @@ import { PlanningRhythmSettings } from './PlanningRhythmSettings'
 import { SeasonsSettings } from './SeasonsSettings'
 import { DemoControls } from './DemoControls'
 import { SchoolMailCard } from './SchoolMailCard'
+import { DisplaysSection } from './DisplaysSection'
 import { SignOutSection } from './SignOutSection'
 import { TestAccountReset } from './TestAccountReset'
 import type { FamilyMember } from '@/types/family'
@@ -677,6 +678,9 @@ export function SettingsPage({
                 )}
               </div>
             </section>
+
+            {/* Displays — a kitchen wall's own restricted sign-in */}
+            <DisplaysSection />
 
             {/* School mail — the household's forwarding address */}
             <SchoolMailCard />

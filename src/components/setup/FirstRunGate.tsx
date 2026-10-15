@@ -22,6 +22,9 @@ export function FirstRunGate({ user, children }: { user: User; children: ReactNo
     // Dev preview: localStorage.setItem('symphony.firstRun.force', '1') shows
     // the setup screen on any account without touching its data.
     if (import.meta.env.DEV && localStorage.getItem('symphony.firstRun.force') === '1') return 'setup'
+    // A paired display (anonymous sign-in) has no household of its own to
+    // set up; it goes straight to the wall.
+    if (user.is_anonymous) return 'ready'
     return isFirstRunDoneLocally(user.id) ? 'ready' : 'checking'
   })
 

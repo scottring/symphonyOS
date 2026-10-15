@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen } from '@/test/test-utils'
+import { fireEvent, render, screen } from '@/test/test-utils'
 import { AuthGate } from './AuthGate'
 
 // Controllable auth state shared across tests
@@ -196,5 +196,22 @@ describe('AuthGate', () => {
       await screen.findByText('PROTECTED')
       expect(mockNavigate).toHaveBeenCalledTimes(1)
     })
+  })
+})
+
+describe('AuthGate on the wall', () => {
+  it('shows pairing, not a person’s sign-in, when signed out on /wall-v2; "Sign in instead" is one tap away', () => {
+    window.history.replaceState({}, '', '/wall-v2')
+    render(<AuthGate>{() => <div>APP</div>}</AuthGate>)
+    expect(screen.getByRole('button', { name: /pair this display/i })).toBeInTheDocument()
+    expect(screen.queryByText('AUTH_FORM')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: /sign in instead/i }))
+    expect(screen.getByText('AUTH_FORM')).toBeInTheDocument()
+  })
+  it('keeps the ordinary sign-in everywhere else', () => {
+    window.history.replaceState({}, '', '/today')
+    render(<AuthGate>{() => <div>APP</div>}</AuthGate>)
+    expect(screen.getByText('AUTH_FORM')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /pair this display/i })).toBeNull()
   })
 })

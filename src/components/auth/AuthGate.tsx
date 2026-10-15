@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, Suspense, type ReactNode } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
 import { AuthForm } from '@/components/lazy'
+import { PairDisplayScreen } from './PairDisplayScreen'
 import { LoadingFallback } from '@/components/layout/LoadingFallback'
 import type { User } from '@supabase/supabase-js'
 
@@ -94,6 +95,10 @@ export function AuthGate({ children }: { children: (auth: AuthedContext) => Reac
   // later sign-out/sign-in in the same tab (found in review — the state was
   // read once and never cleared).
   const [hasReturnHint, setHasReturnHint] = useState(false)
+  // The wall's front door is pairing, not a person's sign-in; "Sign in
+  // instead" is one tap away for setup.
+  const [wantsPersonSignIn, setWantsPersonSignIn] = useState(false)
+  const onWall = (() => { try { return window.location.pathname.startsWith('/wall') } catch { return false } })()
 
   useEffect(() => {
     try {
@@ -143,6 +148,7 @@ export function AuthGate({ children }: { children: (auth: AuthedContext) => Reac
   }
 
   if (!user) {
+    if (onWall && !wantsPersonSignIn) return <PairDisplayScreen onSignInInstead={() => setWantsPersonSignIn(true)} />
     return (
       <Suspense fallback={<LoadingFallback />}>
         <AuthForm message={sessionLost || hasReturnHint ? SESSION_ENDED_MESSAGE : undefined} />
