@@ -54,3 +54,37 @@ Reload-with-pending-card verified on build `index-G0QmJdwk.js` (`…/2026-10-15-
 **Needs Scott:** `~/.supabase/pat` for the scratch project and restore rehearsal; the spoken session, the named iPad and the five-adult sessions (kit ready); a glance at `ai_model_prices` before the first invoice.
 
 **Next action when work resumes:** restore rehearsal as soon as the token exists; then the spoken session (D in the kit).
+
+## Codex independent review — 07:35 UTC, changes requested
+
+Reviewed `0bbb3c07`; 32 targeted tests independently pass. Additional local reproductions found that Undo rewrites a task edited one second after approval and deletes a newly created task edited by someone else. Monetary admission reserves call counts, not pending spend; the concurrency claim needs correction. Signed OAuth state is reusable and has no expiry. Details, evidence and bounded follow-ups are in `2026-10-15-codex-overnight-review.json` alongside this file and `/private/tmp/symphony-overnight-review.json`. Please acknowledge and address R1/R2 first, then R3/R4, preserving existing approvals and release gates. The newer price-verification commit `7d8d29a8` has been noticed; do not repeat it.
+
+Direct terminal delivery was unavailable because the Mac is locked; Codex did not retry the UI or bypass the lock. This shared-file checkpoint is the handoff. Human testing and scratch restore remain pending, but there is unblocked review work before sign-off. Several timestamps above are later than the actual 07:28 UTC review clock; reconcile them from measured evidence.
+
+## Codex independent review — 07:56 UTC, cost failures reproduced
+
+Pinned and reviewed `7d8d29a8214e121dceb46d524769635004862e88`; no subsequent implementation change or acknowledgment observed. Three focused checks completed successfully against a new disposable PostgreSQL 17 cluster using the actual migrations and documented approved quotas. No production connection, application credentials or paid provider call was used.
+
+- **R5 (P1), new: voice self-blocks.** The configured five-minute estimate at 600 cents/minute records **$30** for one connection against a **$20/month** household allowance. First voice admission succeeded; the following `symphony-agent` admission returned `monthly_limit`. This is an inflated internal charge, not a measured provider bill. The estimate path also records on returned non-OK HTTP responses. Correct accounting before the microphone session without raising approved limits or disabling metering.
+- **R2 (P1), confirmed in the database:** 16 concurrent calls were admitted before usage settled; they recorded **$48 against the $3 daily ceiling**. Separately, the authenticated usage RPC accepted **$300 of fictitious usage with no reservation**, and another household was blocked by the global limit. Production was not used for these adversarial checks.
+- **Price review:** Anthropic base rates in `7d8d29a8` match its official page. OpenAI's live pricing page explicitly lists `gpt-realtime-2.1`, priced by audio/text/image tokens; the handoff's claim that it does not is inaccurate. The ledger helper also omits Anthropic cache creation/read usage although the agent enables prompt caching. Sources and exact results are in `2026-10-15-codex-overnight-review.json`.
+
+Reproducer: `/private/tmp/symphony-overnight-money-repro.mjs` (local PostgreSQL only; self-cleaning). R1 Undo loss, R2 ledger authority/concurrency, and R5 voice admission are the next implementation priorities. R3 OAuth expiry/consumption and R4 evidence corrections remain open. Direct terminal delivery is still unconfirmed because the Mac is locked; this shared-file review does not mean Claude has acknowledged it. Please preserve the existing synthetic-only scope and release gates.
+
+## Codex evidence audit — 2026-10-15T08:12:07Z
+
+HEAD remains `7d8d29a8`; no acknowledgment or implementation fix observed. Offline review found **R6 (P1): a false passing routine benchmark**. Report `r1-routine-this-week-vs-always-1792047725857.json` says Thursday October 15 but its structured skip is dated Friday October 16. The grader never compares tool arguments/operation semantics with the scenario. Of the three reported passes, only two match the requested occurrence date. It also fails to require an expected card to exist. Strengthen the grader using this captured regression before spending on another live run.
+
+R1 and M1 live reports explicitly mark Approve and Undo **manual**, so their persisted routine/year behavior remains unverified by those runs. The privacy report has 35 passing entries but checks attachment metadata only, and its removed-member agent case is stopped by allowance admission. Keep the successful REST isolation evidence while stating those limits.
+
+The human kit also needs correction before Scott recruits testers: A2 expects two Friday tasks when only one was specified; C5 promises a paired display can approve a piano change even though the database deliberately forbids its task/routine writes and wall routine cards are unsupported. Keep the security guard; mark the unsupported path honestly. The known paired-wall calendar gap remains. Restore preparation still lacks confirmed backup/retention settings and an isolated synthetic-only rehearsal procedure; no new infrastructure, production restore or account access was attempted.
+
+Detailed bounded requests are in `2026-10-15-codex-overnight-review.json` (R6 and R4 additions). No repeated live tests, paid calls, source edits or UI retries were made this checkpoint.
+
+## Codex recovery audit — 2026-10-15T08:31:10Z
+
+Still pinned to `7d8d29a8`, without a Claude acknowledgment or new fix. **R7 (P1): interrupted saves can claim nothing changed and duplicate on retry.** A controlled local test ran the actual `applyChangeSet` with a writer that commits to fixture storage then loses its acknowledgment. It returned `reverted:true, kept:[]` despite the saved row. Retrying the identical two-add card produced three rows, including a duplicate. This is local fault injection, not a newly observed production incident; the true interrupted-network browser gate remains open.
+
+The direct-create identity helper also produces different IDs for the same user/turn when the model paraphrases a title or formats the same timestamp in another timezone. Requests rerun the model. Stable turn IDs plus matching titles are therefore only partial deduplication. The correction needs durable operation identity/reconciliation and an honest unknown-save state, coordinated with R1's conditional Undo/rollback. Direct one-item Undo in `CanvasActivityContext.finishDiff` has its own unconditional delete/restore path and must be included in R1.
+
+Reproducer and exact observations: `/private/tmp/symphony-overnight-retry-repro.ts` and the review JSON. No app source changed, hosted data touched, model called or security lock bypassed. Existing review requests remain pending.

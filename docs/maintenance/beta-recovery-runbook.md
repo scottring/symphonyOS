@@ -22,7 +22,9 @@ October 15, 2026. What to do when something goes wrong for a beta household, and
 
 ## Backups and restore
 
-Supabase keeps daily backups on the current plan and offers point-in-time recovery (PITR) as an add-on. Before invitations:
+Checked October 15, 2026 with Scott's access token: the hosted project has **daily physical backups, all COMPLETED, one per day for the last 8 days (latest 07:16Z today)**; **PITR is not enabled**; no add-ons selected. The token can read the project but **cannot create projects** (403), so a hosted scratch project needs the dashboard (or an owner-scoped token). The rehearsal below therefore restores a logical dump into a local Supabase stack, which proves the dump/restore mechanics and the data, not the provider's physical-backup restore path (that one is a dashboard action: Database → Backups → Restore, which restores IN PLACE and must never be used casually).
+
+Before invitations:
 
 1. Confirm the plan's backup retention and whether PITR is on. Record it here.
 2. Rehearse a restore **to a separate project** (never over production): restore the latest backup into a scratch project, run the app against it with a disposable account, and confirm tasks, routines, households, memberships and connections are intact.
@@ -54,8 +56,8 @@ One human route for beta households: a named email address and a reply time, pub
 
 | Rehearsal | Date | Who | Result | Duration |
 |---|---|---|---|---|
-| Restore latest backup to a scratch project | not run | | | |
-| Targeted repair of one household | not run | | | |
+| Restore a logical dump into a separate database | 2026-10-15 04:40–04:46Z | Claude (Scott's token) | **Pass with one limit.** `supabase db dump --linked` (roles, schema, data with COPY) took ~2 min; restore into a throwaway `supabase/postgres:17.6.1.054` container took 1 s (roles+schema) + 4 s (data); all 119 public tables matched production row for row (exact counts on both sides, e.g. tasks 994, notes 1028, routines 92). **auth rows did not restore** (the bare image's `auth` schema is an older gotrue version: missing columns such as `email_confirmed_at`), so people would have to sign up again after this kind of restore. The provider's own backup restore (Database → Backups) is the path that carries auth; it restores in place and was not rehearsed. Container and dumps deleted afterwards. | dump ~2 min, restore 5 s |
+| Targeted repair of one household | not run (needs a hosted scratch project; the token cannot create one — 403) | | | |
 | Web rollback (promote previous deployment) | not run | | | |
 | Edge function rollback with migration ordering check | not run | | | |
 | Emergency AI disable and re-enable | 2026-10-15 | Claude (approved by Scott) | Pass: with `enabled=false` the agent answered the allowance refusal with no provider call; re-enabled, it answered normally | ~1 min |

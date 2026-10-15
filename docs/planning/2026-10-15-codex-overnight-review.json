@@ -1,0 +1,268 @@
+{
+  "reviewed_at_utc": "2026-10-15T07:35:00Z",
+  "reviewed_commit": "0bbb3c075203c7e9978905e5af3655ff9fe43b6a",
+  "newer_unreviewed_commit": null,
+  "status": "changes_requested",
+  "delivery": "Mac locked at prior CUA attempt; no UI retry or security bypass. Shared-file review delivery only. As of 07:54Z HEAD remains 7d8d29a8 and no Claude acknowledgment or implementation correction has been observed.",
+  "verification": {
+    "targeted_tests": "32/32 pass with NODE_OPTIONS=--no-experimental-webstorage (FirstRunGate, CanvasActivityContext, oauthState). Initial Node v26 native localStorage mismatch resolved by documented runtime flag; not a product regression.",
+    "repro_path": "/private/tmp/symphony-overnight-repro.ts",
+    "repro_command": "TSX_TSCONFIG_PATH=./tsconfig.app.json node --import tsx /private/tmp/symphony-overnight-repro.ts",
+    "repro_result": [
+      "Undo after another person's edit 1 second later returns true and rewrites the task.",
+      "Undo after a newly created task was edited 60 seconds later returns true and deletes the task.",
+      "verifyOAuthState accepts the identical signed state repeatedly."
+    ],
+    "local_postgres": {
+      "reviewed_commit": "7d8d29a8214e121dceb46d524769635004862e88",
+      "script": "/private/tmp/symphony-overnight-money-repro.mjs",
+      "command": "node /private/tmp/symphony-overnight-money-repro.mjs --pg-bin /opt/homebrew/opt/postgresql@17/bin",
+      "environment": "Disposable PostgreSQL 17 cluster, unique Unix socket only, synthetic UUIDs, exact migrations and documented approved hosted quota settings. No application credentials, provider calls or production connections. Cluster stopped and temp directory removed after completion.",
+      "exit_code": 0,
+      "results": [
+        {
+          "case": "First workspace-voice admission; five-minute configured estimate",
+          "admission": {
+            "allowed": true
+          },
+          "recorded_cents": 3000,
+          "next_symphony_agent": {
+            "allowed": false,
+            "reason": "monthly_limit"
+          },
+          "household_daily_limit_cents": 300,
+          "household_monthly_limit_cents": 2000
+        },
+        {
+          "case": "16 simultaneous admissions before usage settles",
+          "admitted": 16,
+          "settled_cents": 4800,
+          "household_daily_limit_cents": 300
+        },
+        {
+          "case": "Authenticated client supplies arbitrary usage with no reservation",
+          "recorded_cents": 30000,
+          "reservation_count": 0,
+          "different_household_next_call": {
+            "allowed": false,
+            "reason": "monthly_limit"
+          },
+          "global_monthly_limit_cents": 25000
+        }
+      ],
+      "limits": "These prove the database behavior under the checked-in prices and documented configuration; they do not prove current hosted rows or complete acoustic/browser voice behavior. No malicious ledger request was made to production."
+    },
+    "offline_report_audit": {
+      "at": "2026-10-15T08:12:07Z",
+      "routine_runs": [
+        {
+          "report": "r1-routine-this-week-vs-always-1792047553729.json",
+          "reported_pass": false,
+          "expected_occurrence": "2026-10-15",
+          "actual_occurrence": null,
+          "occurrence_matches": false,
+          "manual_steps": [
+            "approve",
+            "approve",
+            "undo-set"
+          ]
+        },
+        {
+          "report": "r1-routine-this-week-vs-always-1792047630459.json",
+          "reported_pass": true,
+          "expected_occurrence": "2026-10-15",
+          "actual_occurrence": "2026-10-15",
+          "occurrence_matches": true,
+          "manual_steps": [
+            "approve",
+            "approve",
+            "undo-set"
+          ]
+        },
+        {
+          "report": "r1-routine-this-week-vs-always-1792047679269.json",
+          "reported_pass": true,
+          "expected_occurrence": "2026-10-15",
+          "actual_occurrence": "2026-10-15",
+          "occurrence_matches": true,
+          "manual_steps": [
+            "approve",
+            "approve",
+            "undo-set"
+          ]
+        },
+        {
+          "report": "r1-routine-this-week-vs-always-1792047725857.json",
+          "reported_pass": true,
+          "expected_occurrence": "2026-10-15",
+          "actual_occurrence": "2026-10-16",
+          "occurrence_matches": false,
+          "manual_steps": [
+            "approve",
+            "approve",
+            "undo-set"
+          ]
+        }
+      ],
+      "year_scope": "M1 saved reports mark Approve and Undo manual; the report stores op/title/date/time but omits level, periodStart, item IDs and days, so year semantics cannot be verified from the summary alone.",
+      "privacy_scope": "Latest privacy report has 35 passing entries. Attachment checks insert/read metadata only, not storage objects or signed download URLs. Removed-member agent check passed because AI allowance admission failed, not because the agent read layer was exercised. The separate REST membership-removal check is positive isolation evidence."
+    },
+    "retry_fault_injection": {
+      "at": "2026-10-15T08:31:10Z",
+      "script": "/private/tmp/symphony-overnight-retry-repro.ts",
+      "command": "TSX_TSCONFIG_PATH=./tsconfig.app.json node --import tsx /private/tmp/symphony-overnight-retry-repro.ts",
+      "exit_code": 0,
+      "results": [
+        {
+          "case": "First add commits in fixture storage, then acknowledgment throws",
+          "actual_apply_result": {
+            "ok": false,
+            "reason": "failed",
+            "reverted": true,
+            "kept": []
+          },
+          "committed_fixture_rows": 1
+        },
+        {
+          "case": "Retry identical two-add card",
+          "actual_apply_result_ok": true,
+          "committed_fixture_rows": 3,
+          "duplicate_Call_Morgan_rows": 2
+        },
+        {
+          "case": "Same user, turn and semantic task; synonymous title or equivalent timestamp formatting",
+          "deterministic_ids_differ": true
+        }
+      ],
+      "limitations": "Actual applyChangeSet and stableRowId functions; controlled in-memory persistence/transport fault, not a real lost-network browser or hosted database test. Demonstrates the recovery algorithm lacks identity/uncertain-outcome handling; does not claim a newly observed production incident."
+    }
+  },
+  "findings": [
+    {
+      "id": "R1",
+      "priority": "P1",
+      "files": [
+        "src/lib/canvas/applyChangeSet.ts"
+      ],
+      "finding": "Undo can destroy another person's work. UNDO_GRACE_MS=2000 ignores real edits within 2 seconds and compares browser Date.now with server stamps. New-item undos lack kind and skip conflict checking entirely: the local repro deletes an edited new task. Year goals are also classified as task in step(), and latest() has no goals, so their edits are not checked. Rollback writers are unconditional too.",
+      "request": "Fix with the actual persisted versions after each write and server-conditional update/delete (or an equivalent authoritative conflict guard) covering existing and created tasks/goals/routines and rollback. Do not rely on clock grace or only a pre-read. Add tests for immediate edits, changed newly created records, goal edits and an edit racing between read and write. Until fixed, do not claim whole-set Undo preserves concurrent edits.",
+      "additional_path_review": "CanvasActivityContext.finishDiff also implements direct-write Undo separately from applyChangeSet: created rows are deleted and c.before fields restored unconditionally, without the later-edit/version guard. Include this direct one-item route in the R1 correction; fixing only card Undo leaves it exposed."
+    },
+    {
+      "id": "R2",
+      "priority": "P1",
+      "files": [
+        "supabase/migrations/20261015150000_ai_spend_ledger.sql",
+        "supabase/functions/_shared/aiUsage.ts"
+      ],
+      "finding": "The monetary concurrency claim is incorrect. reserve_ai_provider_call takes a lock but increments only call counts; no money is reserved. Multiple calls admitted sequentially before any provider response all see the same low recorded spend and can collectively overshoot. A four-call allowance concurrency test proves call counts only. record_ai_usage is directly executable by authenticated users and takes arbitrary token/minute values without a reservation identity; a client can poison global spend and deny all households service. Do not test ledger poisoning on production.",
+      "request": "Correct the evidence claim immediately. Reproduce with isolated fixtures and prepare bounded fixes: server-authoritative usage settlement tied to a unique reservation; pending monetary liability or an explicit bounded exposure policy. Include record failure/missing usage and replay. Keep actual financial limits distinct from estimates. Preserve existing approvals and quota settings.",
+      "independent_database_reproduction": "Confirmed in disposable real PostgreSQL with production migrations and approved quota values: 16 admitted in-flight calls settled 4800 cents against a 300-cent daily limit. An authenticated client with zero reservations inserted fictitious 30000 cents, after which another household was refused by the global 25000-cent cap.",
+      "additional_source_observation": "aiUsage.ts usageOf reads only input_tokens/prompt_tokens and output_tokens/completion_tokens, while symphony-agent uses Anthropic ephemeral cache_control. Cache creation/read usage fields are omitted, despite distinct provider prices. Include those and hosted tool charges in reconciliation or explicitly bound/document omitted cost."
+    },
+    {
+      "id": "R3",
+      "priority": "P2",
+      "files": [
+        "supabase/functions/_shared/oauthState.ts",
+        "supabase/functions/google-calendar-callback/index.ts"
+      ],
+      "finding": "Signed user-bound state is an improvement, but the nonce is never stored/consumed and has no expiry, so it is not a one-time OAuth transaction. Direct replay succeeds in the local helper repro. Current tests prove HMAC/user binding only, not replay protection or a complete callback.",
+      "request": "Add short-lived, one-time state consumption bound to the authorized user/provider/redirect and verify replay/expiry before token storage. Test the callback path, including recovery when a link expires. At minimum keep B05 replay protection explicitly open; don't label this fully verified. No new live account consent needed for isolated tests."
+    },
+    {
+      "id": "R4",
+      "priority": "P2",
+      "files": [
+        "docs/planning/beta-readiness.md",
+        "docs/planning/2026-10-15-overnight-handoff.md",
+        "docs/planning/beta-sessions/evidence/2026-10-15-j1-failure-cases.md"
+      ],
+      "finding": "Evidence needs accuracy corrections: Current decision and blocker rows still say no production changes / not applied, contradicting the top. The document records 07:45Z and 07:55Z events while the actual tool clock was 07:28Z and the summary commit was 07:27:51Z. The retry evidence is two identical direct requests, not an actual dropped-connection browser test. Revoke evidence reloads the device, so it doesn't prove automatic sign-out of a still-open wall.",
+      "request": "Use measured clock/build timestamps; label historical rows or replace current status. Separate directly observed browser/network/device behaviors from helper/direct-request tests. Check a no-reload revocation and actual interrupted request if practical; otherwise list them pending. New price-verification commit 7d8d29a8 was seen; no need to repeat that work.",
+      "session_kit_corrections": [
+        "Session A2 expects two Friday tasks after only the plumber was assigned Friday. Fix the expected state or supply a second explicit date; do not reward arbitrary scheduling.",
+        "Session C5 promises a paired display can move piano, approve and undo. The current display trigger intentionally refuses tasks/routines writes, while WallV2Shell.applyWallChanges uses the display client and offers no adult-authenticated handoff; routine cards are also explicitly unsupported on wall. Mark this capability unsupported/pending and test an honest refusal rather than weakening the display guard.",
+        "The paired wall calendar remains a known functional gap: useWallData gates Google fetch on the signed-in account connection, but the display has no Google connection. Pairing/revoke success alone is not a complete usable wall.",
+        "Current scope offers voice only on desktop Chrome, but the iPad script expects wake-word voice success. Separate exploratory iPad microphone testing from certified behavior. Do not imply the named iPad gate is already covered."
+      ],
+      "privacy_evidence_corrections": "Latest privacy report has 35 passing entries. Attachment checks insert/read metadata only, not storage objects or signed download URLs. Removed-member agent check passed because AI allowance admission failed, not because the agent read layer was exercised. The separate REST membership-removal check is positive isolation evidence.",
+      "restore_preparation_corrections": [
+        "Recovery runbook still says 84 functions/27 orphans and no hosted rehearsal, contradicting its own emergency-disable pass and newer release summary. Update current counts and dated evidence.",
+        "No backup retention/PITR evidence is filled in; scratch restore and targeted repair are not rehearsed. Do not label the restore preparation complete merely because the checklist exists.",
+        "Prepare a synthetic-only isolated restore procedure first, with background jobs/provider/email egress disabled before starting the restored app; production data/credential copying or repairs remain outside tonight's authority. Preserve the explicit approval requirement for any future production repair."
+      ]
+    },
+    {
+      "id": "R5",
+      "priority": "P1",
+      "files": [
+        "supabase/functions/workspace-voice/index.ts:10",
+        "supabase/functions/_shared/aiUsage.ts:88",
+        "supabase/migrations/20261015150000_ai_spend_ledger.sql:30",
+        "docs/planning/beta-readiness.md:153"
+      ],
+      "finding": "Voice is self-blocking under the committed price and documented approved limits: each connection records 5 minutes x 600 cents = 3000 cents ($30), exceeding both the $3/day and $20/month household limits. Disposable PostgreSQL reproduced first admission allowed followed immediately by symphony-agent monthly_limit. Therefore a voice connection can prevent the first subsequent agent action and later voice starts for that household. This is an internal estimate, NOT an observed $30 provider bill. recordUsage also uses the estimate without checking res.ok, so a failed handshake with a returned HTTP response can record the same estimate.",
+      "request": "Treat this as a pre-microphone gate alongside R1/R2. Correct the realtime reservation/settlement accounting using justified units and bounded exposure, keeping the approved household/global limits. Do not simply raise limits or zero the meter. Add an integration test proving voice admission followed by its agent call works within allowance; distinguish failed handshake, canceled short session, full session and repeated starts. Verify any hosted configuration read-only first, then use the existing synthetic fixture/release gates for a fix.",
+      "verification": "Local real PostgreSQL reproduction, not acoustic or deployed end-to-end proof."
+    },
+    {
+      "id": "R6",
+      "priority": "P1",
+      "files": [
+        "scripts/conversation-bench/live.mjs:119",
+        "scripts/conversation-bench/reports/r1-routine-this-week-vs-always-1792047725857.json",
+        "scripts/conversation-bench/scenarios/r1-routine-this-week-vs-always.json"
+      ],
+      "finding": "The R1 3/3 live pass claim includes a false pass: the final report says Thursday Oct 15 but its structured routine_skip targets 2026-10-16 (Friday), against the scenario expected 2026-10-15. Offline regrading finds only two of the three claimed successful runs match the occurrence date. The live grader checks tool names and op count but never compares expected tool arguments or op semantics. A required card can even be absent without a card-specific failure because the condition requires got.changeSet to exist. All R1 and M1 Approve/Undo actions in these live reports are marked manual, so they do not establish persisted routine/year behavior.",
+      "request": "Correct the readiness claim; investigate the wrong structured occurrence without assuming a cause. Make the live grader reject absent required cards and validate task/routine/item identities, op kinds, exact dates, routine days/times, plan level/period and approval state as applicable. Preserve enough structured output for audit. Add a local regression using this saved bad report, then run only the affected live scenario on authorized synthetic fixtures under the existing cost controls. Explicitly exercise R1/M1 Approve and Undo in the browser with database checks when UI is available; do not count manual steps as completed.",
+      "verification": "Confirmed from existing hosted-run artifact and current grader source; offline regraded all four saved R1 runs. No new provider requests or app writes."
+    },
+    {
+      "id": "R7",
+      "priority": "P1",
+      "files": [
+        "src/lib/canvas/applyChangeSet.ts:255",
+        "src/lib/canvas/applyChangeSet.ts:273",
+        "src/contexts/CanvasActivityContext.tsx:380",
+        "src/hooks/useSupabaseTasks.ts:930",
+        "supabase/functions/symphony-agent/canvasEvents.ts:52",
+        "supabase/functions/symphony-agent/index.ts:1391"
+      ],
+      "finding": "Interrupted saves are not proven retry-safe. Local fault injection against actual applyChangeSet committed the first add then lost its response: the function returned reverted:true/kept:[], which the card renders as Nothing was changed. Retrying the exact same two-add card created three fixture rows including a duplicate of the first task. Card creation passes no stable operation/row ID. Separately, direct-create stableRowId includes model-generated title/date spelling; the same user/turn with Call Morgan versus Phone Morgan, or the same instant expressed with -04:00 versus Z, produces different IDs. The endpoint reruns the model on retry rather than replaying an authoritative stored turn result, so same turnId alone is not a complete idempotency guarantee.",
+      "request": "Add stable persisted operation identities for card Approve and durable replay/deduplication for direct turns, with authorization and exact prior-write preconditions. Distinguish unknown commit outcome from confirmed no-write/rollback; reconcile by operation ID before retry or saying nothing changed. Add regressions for commit followed by lost response, retry/reload of the same card, two devices approving, and model wording/date-format variation on direct retry. Keep hosted interrupted-network proof explicitly pending until exercised on the existing synthetic fixtures. Coordinate with R1 conditional rollback/Undo; do not expand product scope.",
+      "verification": "Controlled local fault injection and pure helper outputs, plus source review. Not an observed hosted failure."
+    }
+  ],
+  "next": "No new commit or acknowledgment; direct coordination still blocked by locked UI. Claude correction priorities R5/R1/R2/R7, then R6 semantic benchmark strengthening and R3/R4. Do not repeat completed tests or describe pending review as accepted. Continue only useful independent evidence work until morning deadline.",
+  "updated_at_utc": "2026-10-15T08:31:10Z",
+  "reviewed_commits": [
+    "0bbb3c075203c7e9978905e5af3655ff9fe43b6a",
+    "7d8d29a8214e121dceb46d524769635004862e88"
+  ],
+  "latest_reviewed_commit": "7d8d29a8214e121dceb46d524769635004862e88",
+  "price_source_review": {
+    "checked_at_utc": "2026-10-15T07:53:00Z",
+    "anthropic_source": "https://platform.claude.com/docs/en/about-claude/pricing",
+    "anthropic_verified": "Opus 5.5 $4 input/$20 output, Sonnet 4.6 $3/$15, Haiku 4.5 $1/$5 per million tokens. Provider also separately prices cache writes and cache hits.",
+    "openai_source": "https://developers.openai.com/api/docs/pricing",
+    "openai_verified": "The live page explicitly includes gpt-realtime-2.1: audio input $32/M, cached $0.40/M, output $64/M; text input $4/M, cached $0.40/M, output $24/M; image input $5/M, cached $0.50/M. No $6/minute provider rate was found. Correct the claim that only gpt-realtime is listed.",
+    "limit": "Other legacy OpenAI model rows were not independently verified in this review. Future-dated source-check timestamps in the handoff still need correction."
+  },
+  "checkpoints": [
+    {
+      "at": "2026-10-15T08:12:07Z",
+      "head": "7d8d29a8214e121dceb46d524769635004862e88",
+      "claude_acknowledgment_observed": false,
+      "new_implementation_observed": false,
+      "work": "Offline audit of stored routine/year/privacy reports, live grader, wall approval code and human/restore session kits. No UI retry, paid call or hosted mutation."
+    },
+    {
+      "at": "2026-10-15T08:31:10Z",
+      "head": "7d8d29a8214e121dceb46d524769635004862e88",
+      "claude_acknowledgment_observed": false,
+      "new_implementation_observed": false,
+      "work": "Retry/ambiguous-commit audit and local fault-injection reproduction. No UI retry, hosted write or paid request."
+    }
+  ]
+}

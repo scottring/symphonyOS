@@ -21,7 +21,7 @@ The product and rollout authority is the [Symphony beta and market launch plan](
 
 **Residual exposure (recorded, not fixed):** money is an estimate reconciled after the fact, not a hard cap (see "Money"); realtime audio beyond the five-minute admission estimate is unmeasured and its per-minute rate is an estimate (the provider prices per audio token); speech is priced per character as an estimate; web-tool charges ($10 per 1,000 searches) are not itemised; revoked anonymous auth users linger until deleted.
 
-**Gates only people or access can close:** spoken session with a microphone; one named iPad as the wall; five-adult usability (UX01–08); backup/restore rehearsal on a scratch project (no access token found); confirmed prices; staged invitations. Kit: `docs/planning/beta-session-kit.md`.
+**Gates only people or access can close:** spoken session with a microphone; one named iPad as the wall; five-adult usability (UX01–08); staged invitations. Restore: a logical dump restored into a separate database with every public table matching row for row (runbook, October 15); the provider's in-place backup restore and a hosted scratch project remain unrehearsed (the token cannot create projects). Prices verified October 15. Kit: `docs/planning/beta-session-kit.md`.
 
 ## Current decision
 
