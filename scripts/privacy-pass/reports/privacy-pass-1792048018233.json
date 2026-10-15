@@ -1,0 +1,150 @@
+{
+  "at": "2026-10-15T07:06:58.234Z",
+  "url": "https://mwadppyrqzuzgstmwpuy.supabase.co",
+  "households": {
+    "A": "43533a9e-deaa-4100-9a26-ab7961ea95d6",
+    "B": "8c65d772-ecaf-4087-8a50-1678b9605651"
+  },
+  "results": [
+    {
+      "name": "A1 has a household",
+      "ok": true,
+      "detail": "43533a9e-deaa-4100-9a26-ab7961ea95d6"
+    },
+    {
+      "name": "A1 can invite A2 (invitation row)",
+      "ok": false,
+      "detail": "409 {\"code\":\"23505\",\"details\":null,\"hint\":null,\"message\":\"duplicate key value violates unique constraint \\\"household_invitat"
+    },
+    {
+      "name": "A2 accepts the invitation and joins A",
+      "ok": false,
+      "detail": "{\"code\":\"PGRST202\",\"details\":\"Searched for the function public.accept_household_invitation without parameters or with a "
+    },
+    {
+      "name": "A2 is in household A",
+      "ok": false,
+      "detail": ""
+    },
+    {
+      "name": "B1 is in a different household",
+      "ok": true,
+      "detail": "8c65d772-ecaf-4087-8a50-1678b9605651"
+    },
+    {
+      "name": "A1 creates a private (work) task and a family task",
+      "ok": true,
+      "detail": "201/201"
+    },
+    {
+      "name": "A2 sees A1's family task",
+      "ok": false,
+      "detail": ""
+    },
+    {
+      "name": "A2 does not see A1's private task (by id)",
+      "ok": true,
+      "detail": "[]"
+    },
+    {
+      "name": "A2 gets no row (not even existence) for the private id",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "A2 cannot change A1's private task",
+      "ok": true,
+      "detail": "200"
+    },
+    {
+      "name": "B1 (other household) sees neither task",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "B1 cannot read household A's membership",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "B1 cannot read household A's people",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "agent as A2 does not reveal A1's private task",
+      "ok": true,
+      "detail": "failed  | AI is unavailable while its usage controls are not ready. You can still view and change your plans directly."
+    },
+    {
+      "name": "agent as B1 does not reveal household A's family task",
+      "ok": true,
+      "detail": "answered | I wasn't able to find that task — a search of your tasks came back empty, so either the ID doesn't exist in your account"
+    },
+    {
+      "name": "assigning A1's private task to A2 does not make it visible to A2",
+      "ok": true,
+      "detail": "assign 200"
+    },
+    {
+      "name": "explicitly moving it to Family shares it with A2",
+      "ok": false,
+      "detail": ""
+    },
+    {
+      "name": "moving it back to Work hides it again",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "A1 creates a private note and a family note",
+      "ok": false,
+      "detail": "400/400 {\"code\":\"23514\",\"details\":null,\"hint\":null,\"message\":\"new row for relation \\\"not"
+    },
+    {
+      "name": "A1 records an attachment on each task (metadata rows only)",
+      "ok": true,
+      "detail": "201/201 [{\"id\":\"6cb181de-6fbb-4ddc-9223-fbaf53b3057b\",\"user_id\":\"deb3b752-cb26-480a-910c"
+    },
+    {
+      "name": "A2 sees the family task's attachment, not the private task's",
+      "ok": false,
+      "detail": "[]"
+    },
+    {
+      "name": "B1 sees no attachment",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "A1 saves a conversation (client default scope)",
+      "ok": false,
+      "detail": "400 {\"code\":\"PGRST204\",\"details\":null,\"hint\":null,\"message\":\"Could not find the 'persist_key' column of 'chat_sessions' in t"
+    },
+    {
+      "name": "B1 cannot list household A's displays",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "B1 cannot revoke household A's display",
+      "ok": true,
+      "detail": "{\"code\":\"P0001\",\"details\":null,\"hint\":null,\"message\":\"Only a household owner or admin can revoke a d"
+    },
+    {
+      "name": "B1 (owner of B) can make a pairing code for B only",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "A2 (a member, not owner/admin) cannot make a pairing code",
+      "ok": true,
+      "detail": "{\"code\":\"P0001\",\"details\":null,\"hint\":null,\"message\":\"Only a household owner or admin can pair a dis"
+    },
+    {
+      "name": "A1 (owner) can remove A2 from household A through the ordinary client",
+      "ok": false,
+      "detail": "200 []"
+    }
+  ]
+}

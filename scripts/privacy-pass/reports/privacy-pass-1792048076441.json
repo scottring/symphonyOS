@@ -1,0 +1,185 @@
+{
+  "at": "2026-10-15T07:07:56.442Z",
+  "url": "https://mwadppyrqzuzgstmwpuy.supabase.co",
+  "households": {
+    "A": "43533a9e-deaa-4100-9a26-ab7961ea95d6",
+    "B": "8c65d772-ecaf-4087-8a50-1678b9605651"
+  },
+  "results": [
+    {
+      "name": "A1 has a household",
+      "ok": true,
+      "detail": "43533a9e-deaa-4100-9a26-ab7961ea95d6"
+    },
+    {
+      "name": "A1 can invite A2 (invitation row)",
+      "ok": true,
+      "detail": "201 [{\"id\":\"fbdbd0ba-9fee-4da8-a5e0-bfd441780a9d\",\"household_id\":\"43533a9e-deaa-4100-9a26-ab7961ea95d6\",\"email\":\"smkaufman+b"
+    },
+    {
+      "name": "A2 accepts the invitation and joins A",
+      "ok": true,
+      "detail": "{\"status\":\"joined\",\"household_id\":\"43533a9e-deaa-4100-9a26-ab7961ea95d6\"}"
+    },
+    {
+      "name": "A2 is in household A",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "B1 is in a different household",
+      "ok": true,
+      "detail": "8c65d772-ecaf-4087-8a50-1678b9605651"
+    },
+    {
+      "name": "A1 creates a private (work) task and a family task",
+      "ok": true,
+      "detail": "201/201"
+    },
+    {
+      "name": "A2 sees A1's family task",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "A2 does not see A1's private task (by id)",
+      "ok": true,
+      "detail": "[\"A1 family dinner 1792048047618\"]"
+    },
+    {
+      "name": "A2 gets no row (not even existence) for the private id",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "A2 cannot change A1's private task",
+      "ok": true,
+      "detail": "200"
+    },
+    {
+      "name": "B1 (other household) sees neither task",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "B1 cannot read household A's membership",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "B1 cannot read household A's people",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "agent as A2 does not reveal A1's private task",
+      "ok": true,
+      "detail": "answered symphony_list_tasks | I can't find a task with that ID in your account. The only task returned is \"A1 family dinner 1792048047618\" — the ID `0"
+    },
+    {
+      "name": "agent as B1 does not reveal household A's family task",
+      "ok": true,
+      "detail": "answered | I couldn't find a task with that ID in your Symphony tasks. It's possible the ID is incorrect, the task has been removed"
+    },
+    {
+      "name": "assigning A1's private task to A2 does not make it visible to A2",
+      "ok": true,
+      "detail": "assign 200"
+    },
+    {
+      "name": "explicitly moving it to Family shares it with A2",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "moving it back to Work hides it again",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "A1 creates a private note and a family note",
+      "ok": true,
+      "detail": "201/201 [{\"id\":\"2c8a02a9-c76d-4cce-895a-1e5a8273280a\",\"user_id\":\"deb3b752-cb26-480a-910c"
+    },
+    {
+      "name": "A2 sees the family note, not the private note",
+      "ok": true,
+      "detail": "[{\"id\":\"9428acd3-3df6-4628-a988-354ebdd47137\"}]"
+    },
+    {
+      "name": "B1 sees neither note",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "agent as A2 does not surface A1's private note",
+      "ok": true,
+      "detail": "answered symphony_search_notes | Nothing came up in your notes for \"salary conversation.\" It's possible the note lives under a differ"
+    },
+    {
+      "name": "A1 records an attachment on each task (metadata rows only)",
+      "ok": true,
+      "detail": "201/201 [{\"id\":\"fbd0381b-7232-4806-859d-2b8f601362d6\",\"user_id\":\"deb3b752-cb26-480a-910c"
+    },
+    {
+      "name": "A2 sees the family task's attachment, not the private task's",
+      "ok": true,
+      "detail": "[{\"id\":\"f155e4d0-eb3c-436d-bb91-db660a0b8ab9\"}]"
+    },
+    {
+      "name": "B1 sees no attachment",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "A1 saves a conversation (client default scope)",
+      "ok": true,
+      "detail": "201 [{\"id\":\"5c6d8009-88af-4adf-bb40-125d15c7a7d7\",\"user_id\":\"deb3b752-cb26-480a-910c-fb174b308409\",\"title\":\"bench 1792048047"
+    },
+    {
+      "name": "A2 cannot read A1's conversation (saved with scope \"individual\")",
+      "ok": true,
+      "detail": "[]"
+    },
+    {
+      "name": "B1 cannot read A1's conversation",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "B1 cannot list household A's displays",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "B1 cannot revoke household A's display",
+      "ok": true,
+      "detail": "{\"code\":\"P0001\",\"details\":null,\"hint\":null,\"message\":\"Only a household owner or admin can revoke a d"
+    },
+    {
+      "name": "B1 (owner of B) can make a pairing code for B only",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "A2 (a member, not owner/admin) cannot make a pairing code",
+      "ok": true,
+      "detail": "{\"code\":\"P0001\",\"details\":null,\"hint\":null,\"message\":\"Only a household owner or admin can pair a dis"
+    },
+    {
+      "name": "A1 (owner) can remove A2 from household A through the ordinary client",
+      "ok": true,
+      "detail": "200 [{\"id\":\"461417a1-77d6-44b6-8ba5-ec73c413966d\",\"household_id\":\"43533a9e-deaa-4100"
+    },
+    {
+      "name": "after removal A2 no longer sees household A's family task",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "agent as removed A2 has no household context (no disclosure)",
+      "ok": true,
+      "detail": "failed | AI is unavailable while its usage controls are not ready. You can still view and change your plans d"
+    }
+  ]
+}

@@ -59,6 +59,8 @@ check('A1 has a household', typeof hhA === 'string', String(hhA))
 let hhA2 = (await rpc(A2, 'get_user_household_id')).data
 if (hhA2 !== hhA) {
   // Invite A2 into A through the product's own path: an invitation row by A1, accepted by A2.
+  // A used invitation from an earlier run is removed first (the owner may, as in Settings).
+  await rest(A1, `household_invitations?household_id=eq.${hhA}&email=eq.${encodeURIComponent(A2.email.toLowerCase())}`, { method: 'DELETE' })
   const inv = await rest(A1, 'household_invitations', { method: 'POST', body: { household_id: hhA, email: A2.email.toLowerCase(), invited_by: A1.id }, prefer: 'return=representation' })
   let token = Array.isArray(inv.data) ? inv.data[0]?.token : null
   if (!token) { const existing = await rest(A1, `household_invitations?email=eq.${encodeURIComponent(A2.email.toLowerCase())}&select=token,accepted_at`); token = (existing.data ?? []).find((i) => !i.accepted_at)?.token }
@@ -79,6 +81,7 @@ const fam = await rest(A1, 'tasks', { method: 'POST', body: { title: `A1 family 
 const privId = priv.data?.[0]?.id, famId = fam.data?.[0]?.id
 check('A1 creates a private (work) task and a family task', !!privId && !!famId, `${priv.status}/${fam.status}`)
 const created = [privId, famId].filter(Boolean)
+const createdNotes = [], createdAtt = [], createdChats = []
 
 try {
   // ── Isolation ────────────────────────────────────────────────────────────
@@ -116,6 +119,44 @@ try {
   const a2afterUnshare = (await rest(A2, `tasks?select=id&id=eq.${privId}`)).data ?? []
   check('moving it back to Work hides it again', a2afterUnshare.length === 0)
 
+  // ── Notes, attachments and chat history ─────────────────────────────────
+  const pnote = await rest(A1, 'notes', { method: 'POST', body: { title: `A1 private note ${stamp}`, content: 'salary conversation notes', type: 'quick_capture', context: 'work', scope: 'individual', source: 'manual', user_id: A1.id }, prefer: 'return=representation' })
+  const fnote = await rest(A1, 'notes', { method: 'POST', body: { title: `A1 family note ${stamp}`, content: 'grocery ideas', type: 'quick_capture', context: 'family', scope: 'compound', source: 'manual', user_id: A1.id }, prefer: 'return=representation' })
+  const pnoteId = pnote.data?.[0]?.id, fnoteId = fnote.data?.[0]?.id
+  check('A1 creates a private note and a family note', !!pnoteId && !!fnoteId, `${pnote.status}/${fnote.status} ${JSON.stringify(pnote.data).slice(0, 80)}`)
+  if (pnoteId && fnoteId) {
+    createdNotes.push(pnoteId, fnoteId)
+    const a2notes = (await rest(A2, `notes?select=id&or=(id.eq.${pnoteId},id.eq.${fnoteId})`)).data ?? []
+    check('A2 sees the family note, not the private note', a2notes.some((n) => n.id === fnoteId) && !a2notes.some((n) => n.id === pnoteId), JSON.stringify(a2notes))
+    const b1notes = (await rest(B1, `notes?select=id&or=(id.eq.${pnoteId},id.eq.${fnoteId})`)).data ?? []
+    check('B1 sees neither note', Array.isArray(b1notes) && b1notes.length === 0)
+    const askNote = await agent(A2, 'Search my notes for "salary conversation" and tell me what they say.')
+    check('agent as A2 does not surface A1\'s private note', askNote.status === 200 && !/salary conversation notes/.test(askNote.reply), `${askNote.outcome} ${askNote.tools.join(',')} | ${askNote.reply.slice(0, 100)}`)
+  }
+  const patt = await rest(A1, 'attachments', { method: 'POST', body: { user_id: A1.id, entity_type: 'task', entity_id: privId, file_name: 'private.pdf', file_type: 'application/pdf', file_size: 1, storage_path: `bench/${stamp}/private.pdf` }, prefer: 'return=representation' })
+  const fatt = await rest(A1, 'attachments', { method: 'POST', body: { user_id: A1.id, entity_type: 'task', entity_id: famId, file_name: 'family.pdf', file_type: 'application/pdf', file_size: 1, storage_path: `bench/${stamp}/family.pdf` }, prefer: 'return=representation' })
+  const pattId = patt.data?.[0]?.id, fattId = fatt.data?.[0]?.id
+  check('A1 records an attachment on each task (metadata rows only)', !!pattId && !!fattId, `${patt.status}/${fatt.status} ${JSON.stringify(patt.data).slice(0, 80)}`)
+  if (pattId && fattId) {
+    createdAtt.push(pattId, fattId)
+    const a2att = (await rest(A2, `attachments?select=id&or=(id.eq.${pattId},id.eq.${fattId})`)).data ?? []
+    check('A2 sees the family task\'s attachment, not the private task\'s', a2att.some((x) => x.id === fattId) && !a2att.some((x) => x.id === pattId), JSON.stringify(a2att))
+    const b1att = (await rest(B1, `attachments?select=id&or=(id.eq.${pattId},id.eq.${fattId})`)).data ?? []
+    check('B1 sees no attachment', Array.isArray(b1att) && b1att.length === 0)
+  }
+  // Chat history: whatever the client writes, a session not marked shared must stay private.
+  const chat = await rest(A1, 'chat_sessions', { method: 'POST', body: { user_id: A1.id, entity_type: 'symphony_rail', entity_id: `bench-${stamp}`, mode: 'chat', title: `bench ${stamp}`, messages: [{ role: 'user', content: 'private chat about a raise' }] }, prefer: 'return=representation' })
+  const chatId = chat.data?.[0]?.id
+  check('A1 saves a conversation (client default scope)', !!chatId, `${chat.status} ${JSON.stringify(chat.data).slice(0, 120)}`)
+  if (chatId) {
+    createdChats.push(chatId)
+    const scope = chat.data[0].scope
+    const a2chat = (await rest(A2, `chat_sessions?select=id,scope&id=eq.${chatId}`)).data ?? []
+    check(`A2 cannot read A1's conversation (saved with scope "${scope}")`, Array.isArray(a2chat) && a2chat.length === 0, JSON.stringify(a2chat))
+    const b1chat = (await rest(B1, `chat_sessions?select=id&id=eq.${chatId}`)).data ?? []
+    check('B1 cannot read A1\'s conversation', Array.isArray(b1chat) && b1chat.length === 0)
+  }
+
   // ── Displays across households ──────────────────────────────────────────
   const aDisplays = (await rest(A1, 'household_displays?select=id')).data ?? []
   const bSees = (await rest(B1, `household_displays?select=id&household_id=eq.${hhA}`)).data ?? []
@@ -137,6 +178,9 @@ try {
     check('agent as removed A2 has no household context (no disclosure)', askGone.status === 200 && !askGone.reply.includes('family dinner'), `${askGone.outcome} | ${askGone.reply.slice(0, 100)}`)
   }
 } finally {
+  for (const id of createdAtt) await rest(A1, `attachments?id=eq.${id}`, { method: 'DELETE' })
+  for (const id of createdNotes) await rest(A1, `notes?id=eq.${id}`, { method: 'DELETE' })
+  for (const id of createdChats) await rest(A1, `chat_sessions?id=eq.${id}`, { method: 'DELETE' })
   for (const id of created) await rest(A1, `tasks?id=eq.${id}`, { method: 'DELETE' })
   mkdirSync(join(here, 'reports'), { recursive: true })
   const out = join(here, 'reports', `privacy-pass-${Date.now()}.json`)
