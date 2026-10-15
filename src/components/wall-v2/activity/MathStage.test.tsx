@@ -161,7 +161,7 @@ describe('the Grown-ups corner', () => {
   it('practice: any type and level, “Show me how”, nothing saved', () => {
     render(<Harness initial={[row('ella', DIV)]} />)
     hold(/Grown-ups/)
-    fireEvent.click(screen.getByRole('button', { name: 'Multiplication' }))
+    fireEvent.click(within(screen.getByRole('group', { name: 'Problem type' })).getByRole('button', { name: 'Multiplication' }))
     fireEvent.click(screen.getByRole('button', { name: 'Harder' }))
     expect(screen.getByText('2-digit × 2-digit')).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Start practice' }))
@@ -172,6 +172,24 @@ describe('the Grown-ups corner', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Done' }))
     // Ella's real problem is untouched.
     expect(screen.getByRole('button', { name: /Ella/ })).toHaveTextContent('Not started')
+  })
+
+  it('a grown-up picks a kid’s type: an untouched problem changes today; a started one from tomorrow', async () => {
+    // "i clicked long division and it gave the kids fraction problems" (Scott, 2026-10-15).
+    const flash = vi.fn()
+    render(<Harness initial={[row('ella', FRAC), row('kaleb', FRAC, { tries: 1 })]} flash={flash} />)
+    hold(/Grown-ups/)
+    const ellas = within(screen.getByRole('group', { name: 'Ella’s problems' }))
+    expect(ellas.getByRole('button', { name: 'By weekday' })).toHaveAttribute('aria-pressed', 'true')
+    await act(async () => { fireEvent.click(ellas.getByRole('button', { name: 'Long division' })) })
+    expect(flash).toHaveBeenCalledWith('Ella gets long division from today')
+    expect(ellas.getByRole('button', { name: 'Long division' })).toHaveAttribute('aria-pressed', 'true')
+    await act(async () => { fireEvent.click(within(screen.getByRole('group', { name: 'Kaleb’s problems' })).getByRole('button', { name: 'Long division' })) })
+    expect(flash).toHaveBeenCalledWith('Kaleb gets long division from tomorrow (today’s is started)')
+    fireEvent.click(screen.getByRole('button', { name: 'Done' }))
+    expect(screen.getByText(/^Long division/)).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /Kaleb/ }))
+    expect(screen.getByText(/^Fractions/)).toBeInTheDocument()
   })
 
   it('reset gives a kid today’s problem back, after a second tap', async () => {

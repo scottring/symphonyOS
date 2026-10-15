@@ -4,12 +4,14 @@
 import { useCallback, useState } from 'react'
 import type { FamilyMember } from '@/types/family'
 import type { KidMath } from '@/hooks/useKidMath'
-import { attempt, bonusStars, buildBonus, currentRow, streakFor, type MathRow } from '@/lib/wall/math/mathProgress'
+import { attempt, bonusStars, buildBonus, buildProblem, currentRow, retypedDaily, streakFor, type MathRow } from '@/lib/wall/math/mathProgress'
+import type { MathKind } from '@/lib/wall/math/mathProblem'
 import { parseTopics } from '@/lib/wall/math/mathTopics'
 
 export function useLocalKidMath(kids: FamilyMember[], initial: MathRow[], today: string, initialTopics: Record<string, string[]> = {}): KidMath {
   const [rows, setRows] = useState(initial)
   const [topics, setTopicsState] = useState(initialTopics)
+  const [kinds, setKinds] = useState<Record<string, MathKind | null>>({})
   const [selectedId, select] = useState<string | null>(kids[0]?.id ?? null)
 
   const check: KidMath['check'] = useCallback((rowId, input) => {
@@ -38,6 +40,18 @@ export function useLocalKidMath(kids: FamilyMember[], initial: MathRow[], today:
     setTopicsState((prev) => ({ ...prev, [memberId]: parseTopics(next) }))
   }, [])
 
+  const setKind: KidMath['setKind'] = useCallback(async (memberId, kind) => {
+    setKinds((prev) => ({ ...prev, [memberId]: kind }))
+    const mine = rows.filter((r) => r.memberId === memberId)
+    const todays = mine.filter((r) => r.forDate === today)
+    const daily = todays.find((r) => r.slot === 0)
+    if (!daily) return 'today'
+    const next = retypedDaily(todays, mine, kind)
+    if (!next) return daily.kind === buildProblem(memberId, today, mine, kind).kind ? 'today' : 'tomorrow'
+    setRows((prev) => prev.map((r) => (r.id === daily.id ? { ...r, kind: next.kind, level: next.level, spec: next.spec, wording: null } : r)))
+    return 'today'
+  }, [rows, today])
+
   return {
     kids: kids.map((member) => {
       const mine = rows.filter((r) => r.memberId === member.id)
@@ -50,6 +64,7 @@ export function useLocalKidMath(kids: FamilyMember[], initial: MathRow[], today:
         bonusStars: bonusStars(todays),
         canBonus: !!buildBonus(todays),
         topics: topics[member.id] ?? [],
+        kindChoice: kinds[member.id] ?? null,
       }
     }),
     selectedId: selectedId && kids.some((k) => k.id === selectedId) ? selectedId : kids[0]?.id ?? null,
@@ -58,5 +73,6 @@ export function useLocalKidMath(kids: FamilyMember[], initial: MathRow[], today:
     addBonus,
     resetToday,
     setTopics,
+    setKind,
   }
 }

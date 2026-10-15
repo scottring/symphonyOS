@@ -426,6 +426,9 @@ export interface MathStageProps {
   flash?: (msg: string) => void
 }
 
+/** The type buttons beside each kid: short enough for three across. */
+const KIND_SHORT: Record<MathKind, string> = { multiply: 'Multiplication', divide: 'Long division', fraction: 'Fractions', addsub: 'Adding & subtracting', word: 'Word problem' }
+
 let practiceSeq = 0
 function practiceRow(kind: MathKind, level: number): ProblemRow {
   practiceSeq += 1
@@ -479,7 +482,7 @@ export function MathStage({ math, now, flash }: MathStageProps) {
           <div className="km-top"><h2 className="km-title">Grown-ups</h2><button type="button" className="km-btn" onClick={() => setMode({ kind: 'kid' })}>Done</button></div>
           <div className="km-card">
             <p className="km-eyebrow">Practice</p>
-            <p className="km-copy">Work a problem together, or tap “Show me how” to walk through it on the paper. Nothing is saved and no stars change.</p>
+            <p className="km-copy">Work a problem together, or tap “Show me how” to walk through it on the paper. Nothing is saved and no stars change. What the kids get is on the right.</p>
             <div className="km-choices" role="group" aria-label="Problem type">
               {MATH_KINDS.map((k) => (
                 <button key={k} type="button" className="km-choice" aria-pressed={practiceKind === k} onClick={() => setPracticeKind(k)}>{KIND_LABEL[k]}</button>
@@ -494,15 +497,24 @@ export function MathStage({ math, now, flash }: MathStageProps) {
           </div>
         </section>
         <div className="km-rule" />
-        <section className="km-side" aria-label="Reset today">
-          <p className="km-eyebrow">Reset today</p>
-          <p className="km-copy">Gives the kid today’s problem back from the start: no tries used, the paper cleared, bonus problems gone.</p>
+        <section className="km-side" aria-label="Each kid">
+          <p className="km-eyebrow">Each kid’s problems</p>
+          <p className="km-copy">By weekday: Mon ×, Tue ÷, Wed fractions, Thu + and −, Fri a word problem. A pick changes today’s too, if it isn’t started.</p>
           {math.kids.map((k) => {
             const d = k.daily
             const state = !d ? 'Not ready yet' : d.status === 'solved' ? `Solved${k.bonusStars ? ` · +${k.bonusStars} bonus` : ''}` : d.status === 'revealed' ? 'Shown the answer' : d.tries ? `${d.tries} ${d.tries === 1 ? 'try' : 'tries'}` : 'Not started'
             const armed = confirmReset === k.member.id
+            const pickKind = async (kind: MathKind | null) => {
+              if (kind === k.kindChoice) return
+              const daily = k.daily
+              const when = await math.setKind(k.member.id, kind)
+              if (when === 'today' && daily && daily.status === 'open') uiByRow.delete(daily.id)
+              const what = kind ? KIND_LABEL[kind].toLowerCase() : 'the weekday’s problem'
+              flash?.(when === 'failed' ? 'That didn’t save' : when === 'today' ? `${firstName(k.member)} gets ${what} from today` : `${firstName(k.member)} gets ${what} from tomorrow (today’s is started)`)
+            }
             return (
-              <div key={k.member.id} className="km-reset-row">
+              <div key={k.member.id} className="km-kidset">
+              <div className="km-reset-row">
                 <Face member={k.member} size="md" />
                 <span className="km-reset-who"><b>{firstName(k.member)}</b><small>{state}</small></span>
                 <button type="button" className={`km-btn ${armed ? 'is-danger' : ''}`} disabled={!d}
@@ -517,6 +529,13 @@ export function MathStage({ math, now, flash }: MathStageProps) {
                   }}>
                   {armed ? 'Tap again to reset' : `Reset ${firstName(k.member)}’s`}
                 </button>
+              </div>
+              <div className="km-kinds" role="group" aria-label={`${firstName(k.member)}’s problems`}>
+                <button type="button" className="km-choice" aria-pressed={!k.kindChoice} onClick={() => void pickKind(null)}>By weekday</button>
+                {MATH_KINDS.map((kind) => (
+                  <button key={kind} type="button" className="km-choice" aria-pressed={k.kindChoice === kind} onClick={() => void pickKind(kind)}>{KIND_SHORT[kind]}</button>
+                ))}
+              </div>
               </div>
             )
           })}

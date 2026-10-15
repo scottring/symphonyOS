@@ -124,12 +124,33 @@ export interface NewMathProblem {
   spec: MathSpec
 }
 
-/** Today's problem for one kid. Same kid + day + history → same problem. */
-export function buildProblem(memberId: string, ymd: string, history: MathRow[]): NewMathProblem {
+/** A stored type choice: a type the wall knows, or null (by weekday). */
+export function parseKind(raw: unknown): MathKind | null {
+  return typeof raw === 'string' && KINDS.has(raw) ? (raw as MathKind) : null
+}
+
+/** Today's problem for one kid. Same kid + day + history + choice → same
+ *  problem. `chosen` is the type a grown-up picked for this kid (Scott,
+ *  2026-10-15: "i clicked long division and it gave the kids fraction
+ *  problems"); null keeps the weekday's. */
+export function buildProblem(memberId: string, ymd: string, history: MathRow[], chosen: MathKind | null = null): NewMathProblem {
   const rng = rngFor(memberId, ymd)
-  const kind = kindForDate(ymd, rng)
+  // The weekday's draw runs either way, so the numbers come from the same seed.
+  const kind = chosen ?? kindForDate(ymd, rng)
+  if (chosen) kindForDate(ymd, rng)
   const level = levelFor(history, kind, ymd)
   return { memberId, forDate: ymd, slot: 0, kind, level, spec: generateSpec(kind, level, rng) }
+}
+
+/** A grown-up's new type choice reaching today: the daily problem made again
+ *  in the chosen type (or the weekday's, for null) — only while the kid hasn't
+ *  started it (open, no tries, no bonus) and it is another type. Null when
+ *  today's stays as it is; the choice still holds from tomorrow. */
+export function retypedDaily(todayRows: MathRow[], history: MathRow[], chosen: MathKind | null): NewMathProblem | null {
+  const daily = todayRows.find((r) => r.slot === 0)
+  if (!daily || daily.status !== 'open' || daily.tries > 0 || todayRows.some((r) => r.slot > 0)) return null
+  const next = buildProblem(daily.memberId, daily.forDate, history, chosen)
+  return next.kind === daily.kind ? null : next
 }
 
 /** The next bonus problem after `today`'s rows, or null when there is none to

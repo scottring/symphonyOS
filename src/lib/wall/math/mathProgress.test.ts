@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { START_LEVEL, type MathKind, type MathSpec } from './mathProblem'
-import { attempt, bonusStars, buildBonus, buildProblem, currentRow, dbToMathRow, levelFor, streakFor, type MathRow, type MathStatus } from './mathProgress'
+import { attempt, bonusStars, buildBonus, buildProblem, currentRow, dbToMathRow, levelFor, parseKind, retypedDaily, streakFor, type MathRow, type MathStatus } from './mathProgress'
 
 const SPEC: MathSpec = { kind: 'divide', dividend: 742, divisor: 6, remainders: true }
 
@@ -42,6 +42,40 @@ describe('buildProblem', () => {
   })
   it('differs between kids', () => {
     expect(buildProblem('ella', '2026-10-20', []).spec).not.toEqual(buildProblem('kaleb', '2026-10-20', []).spec)
+  })
+  it('a grown-up’s choice beats the weekday: long division on a fractions Wednesday', () => {
+    const p = buildProblem('ella', '2026-10-14', [row('2026-10-07', 'solved', { level: 3, tries: 1 })], 'divide')
+    expect(p.kind).toBe('divide')
+    expect(p.spec.kind).toBe('divide')
+    // Its level is long division's own.
+    expect(p.level).toBe(4)
+    expect(buildProblem('ella', '2026-10-14', []).kind).toBe('fraction')
+    expect(buildProblem('ella', '2026-10-17', [], 'word')).toEqual(buildProblem('ella', '2026-10-17', [], 'word'))
+  })
+})
+
+describe('parseKind', () => {
+  it('keeps the types the wall knows; anything else is by weekday', () => {
+    expect(parseKind('divide')).toBe('divide')
+    expect(parseKind(null)).toBeNull()
+    expect(parseKind('algebra')).toBeNull()
+  })
+})
+
+describe('retypedDaily', () => {
+  const daily = (over: Partial<MathRow> = {}) => row('2026-10-14', 'open', { kind: 'fraction', spec: { kind: 'fraction', form: 'add', x: { n: 1, d: 5 }, y: { n: 2, d: 5 } }, ...over })
+  it('remakes today’s problem in the chosen type while it is untouched', () => {
+    const p = retypedDaily([daily()], [], 'divide')
+    expect(p).toMatchObject({ memberId: 'ella', forDate: '2026-10-14', slot: 0, kind: 'divide' })
+  })
+  it('goes back to the weekday’s type when the choice is cleared', () => {
+    expect(retypedDaily([daily({ kind: 'divide', spec: SPEC })], [], null)?.kind).toBe('fraction')
+  })
+  it('leaves a started, finished or same-type problem alone', () => {
+    expect(retypedDaily([daily({ tries: 1 })], [], 'divide')).toBeNull()
+    expect(retypedDaily([daily({ status: 'solved' })], [], 'divide')).toBeNull()
+    expect(retypedDaily([daily()], [], 'fraction')).toBeNull()
+    expect(retypedDaily([], [], 'divide')).toBeNull()
   })
 })
 
