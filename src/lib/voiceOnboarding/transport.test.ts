@@ -131,13 +131,18 @@ describe('RealtimeTransport', () => {
     expect(events.at(-1)).toEqual({ type: 'status', status: 'error' })
   })
 
-  it.each([[503, '{"error":"voice_disabled"}', 'disabled'], [429, '{"error":"daily_limit"}', 'limit'], [401, '', 'not_signed_in'], [502, '', 'unavailable']])(
+  it.each([[503, '{"error":"voice_disabled"}', 'disabled'], [429, '{"error":"daily_limit"}', 'limit'], [401, '', 'not_signed_in'], [502, '', 'unavailable'],
+    [429, '{"code":"ai_daily_limit"}', 'ai_daily_limit'], [429, '{"code":"ai_monthly_limit"}', 'ai_monthly_limit'], [503, '{"code":"ai_usage_unavailable"}', 'ai_usage_unavailable']])(
     'server %s → %s, and the microphone is released', async (status, body, code) => {
       const { t, track, peer, events } = setup({ status, body })
       await t.start(ctx)
       expect(events).toContainEqual(expect.objectContaining({ type: 'error', code }))
       expect(track.stopped).toBe(true)
       expect(peer.closed).toBe(true)
+      if (String(code).startsWith('ai_')) {
+        expect(events).toContainEqual(expect.objectContaining({ type: 'error', message: expect.stringContaining('change your plans directly') }))
+        expect(JSON.stringify(events)).not.toContain('Typing works')
+      }
     })
 
   it('stop releases everything, once', async () => {

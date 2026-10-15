@@ -6,6 +6,7 @@
 // Auth: the caller's JWT is checked before any model call. No service role.
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { AiUsageError, guardedAiFetch } from '../_shared/aiUsage.ts'
 
 const MODEL = Deno.env.get('WALL_SAY_MODEL') || 'gpt-4o-mini-tts'
 const VOICES = new Set(['alloy', 'ash', 'ballad', 'coral', 'echo', 'fable', 'nova', 'onyx', 'sage', 'shimmer', 'verse'])
@@ -48,11 +49,17 @@ Deno.serve(async (req) => {
   if (!text || text.length > MAX_TEXT) return json({ error: `text required (≤${MAX_TEXT} characters)` }, 400)
   const voice = body.voice && VOICES.has(body.voice) ? body.voice : DEFAULT_VOICE
 
-  const res = await fetch('https://api.openai.com/v1/audio/speech', {
-    method: 'POST',
-    headers: { 'content-type': 'application/json', authorization: `Bearer ${apiKey}` },
-    body: JSON.stringify({ model: MODEL, voice, input: text, instructions: STYLE, response_format: 'wav' }),
-  })
+  let res: Response
+  try {
+    res = await guardedAiFetch(db, 'wall-say')('https://api.openai.com/v1/audio/speech', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', authorization: `Bearer ${apiKey}` },
+      body: JSON.stringify({ model: MODEL, voice, input: text, instructions: STYLE, response_format: 'wav' }),
+    })
+  } catch (e) {
+    if (e instanceof AiUsageError) return json({ error: e.message, code: e.code, retry_at: e.retryAt }, e.status)
+    return json({ error: 'Speech is unavailable' }, 502)
+  }
   if (!res.ok) return json({ error: `Speech returned ${res.status}: ${(await res.text()).slice(0, 200)}` }, 502)
   return json({ wav: toBase64(new Uint8Array(await res.arrayBuffer())), voice })
 })

@@ -1,6 +1,7 @@
 // The kitchen wall's spoken question → a short spoken answer, from what the
 // wall already shows. No tools, no database: the wall sends its own snapshot
 // (src/lib/wall/voice/wallSnapshot.ts), and the answer may use only that.
+import { ASSISTANT_PERSONALITY, RESULT_LANGUAGE_RULES } from '../_shared/assistantExperience.ts'
 
 export const MAX_QUESTION = 300
 export const MAX_SNAPSHOT = 6000
@@ -8,6 +9,8 @@ export const MAX_SNAPSHOT = 6000
 export function buildWallPrompt(question: string, snapshot: string): { system: string; user: string } {
   return {
     system: [
+      ASSISTANT_PERSONALITY,
+      RESULT_LANGUAGE_RULES,
       'You answer a question asked out loud at a family kitchen wall display. Your answer is spoken aloud and shown on the screen.',
       'Answer ONLY from WHAT THE WALL SHOWS below. If it is not there, say you do not see it on the wall, in one short sentence. Never guess, never invent times, names or plans.',
       'One or two short sentences, plain spoken English, times written as they appear (4:15). No lists, no markdown, no emoji.',

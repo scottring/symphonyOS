@@ -398,6 +398,9 @@ function send(dc: RTCDataChannel, event: unknown) {
 
 export function errorForStatus(status: number, body: string): VoiceErrorCode {
   if (status === 401) return 'not_signed_in'
+  if (status === 429 && body.includes('ai_monthly_limit')) return 'ai_monthly_limit'
+  if (status === 429 && body.includes('ai_daily_limit')) return 'ai_daily_limit'
+  if (status === 503 && body.includes('ai_usage_unavailable')) return 'ai_usage_unavailable'
   if (status === 429) return 'limit'
   if (status === 503 && body.includes('voice_disabled')) return 'disabled'
   if (status >= 500) return 'unavailable'

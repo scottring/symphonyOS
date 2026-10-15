@@ -1,8 +1,12 @@
 import {createClient} from 'https://esm.sh/@supabase/supabase-js@2'
 import {handleWorkspaceVoice} from './handler.ts'
+import {guardedAiFetch} from '../_shared/aiUsage.ts'
 Deno.serve(req=>handleWorkspaceVoice(req,{
  env:key=>Deno.env.get(key),
- fetch,
+ fetch:async (input,init)=>{
+  const db=createClient(Deno.env.get('SUPABASE_URL')!,Deno.env.get('SUPABASE_ANON_KEY')!,{global:{headers:{Authorization:req.headers.get('Authorization')??''}}})
+  return guardedAiFetch(db,'workspace-voice')(input,init)
+ },
  reserve:async authorization=>{
   const db=createClient(Deno.env.get('SUPABASE_URL')!,Deno.env.get('SUPABASE_ANON_KEY')!,{global:{headers:{Authorization:authorization}}})
   const {data,error}=await db.rpc('reserve_workspace_voice_start')

@@ -18,7 +18,7 @@ import { HORIZONS, horizonOf, type Horizon, type Step } from './flow'
 export type TransportStatus = 'idle' | 'connecting' | 'live' | 'muted' | 'ended' | 'error'
 
 export type VoiceErrorCode =
-  | 'unsupported' | 'mic_denied' | 'not_signed_in' | 'disabled' | 'limit' | 'unavailable' | 'network' | 'connection_lost' | 'model'
+  | 'unsupported' | 'mic_denied' | 'not_signed_in' | 'disabled' | 'limit' | 'ai_daily_limit' | 'ai_monthly_limit' | 'ai_usage_unavailable' | 'unavailable' | 'network' | 'connection_lost' | 'model'
 
 export type TransportEvent =
   | { type: 'status'; status: TransportStatus; reason?: 'stopped' | 'time_limit' }
@@ -57,6 +57,9 @@ export const VOICE_ERROR_COPY: Record<VoiceErrorCode, string> = {
   not_signed_in: 'Voice needs you signed in. Typing works without it.',
   disabled: 'Voice isn’t switched on for this account yet. Typing works just the same.',
   limit: 'That’s today’s voice limit. Typing works just the same.',
+  ai_daily_limit: 'The daily AI allowance has been reached. It resets at midnight UTC. You can still view and change your plans directly.',
+  ai_monthly_limit: 'The monthly AI allowance has been reached. It resets on the first of the month at midnight UTC. You can still view and change your plans directly.',
+  ai_usage_unavailable: 'AI is unavailable while its usage controls are not ready. You can still view and change your plans directly.',
   unavailable: 'Voice is unavailable right now. Typing works just the same.',
   network: 'Couldn’t reach the voice service. Typing works just the same.',
   connection_lost: 'The voice connection dropped. Your plan so far is kept — type, or start voice again.',

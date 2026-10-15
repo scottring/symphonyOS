@@ -5,8 +5,12 @@ import { facetsToFacts, boundKnowledge, buildTime } from './build.ts'
 import { applyScopeVisibility, resolveVisibleOwners } from './visibility.ts'
 
 export interface AssembleDeps {
-  client: SupabaseClient        // service-role client
+  client: SupabaseClient        // user-JWT client for interactive requests
+  /** Background jobs without a user JWT must explicitly use the service RPC.
+   * Interactive callers must never opt in; their reads remain subject to RLS. */
+  semanticAccess?: 'user' | 'service'
   openAiKey?: string            // enables semantic knowledge; absent → linked notes only
+  providerFetch?: typeof fetch // metered provider transport for guarded callers
   now?: Date                    // injectable for tests; defaults to new Date()
   /** Owner set from `resolveVisibleOwners`. Optional: assembly resolves it itself when absent.
    *  Callers assembling many bundles for one user (proactive-engine) should resolve once and
@@ -211,11 +215,11 @@ async function loadLinkedNotes(client: SupabaseClient, entityType: string, entit
 
 /** Same fetch shape as supabase/functions/semantic-search/index.ts:49-66, with a 3s timeout.
  *  Plain fetch + a passed-in key so no Deno globals leak into code paths vitest executes. */
-async function embed(openAiKey: string, text: string): Promise<number[]> {
+async function embed(openAiKey: string, text: string, providerFetch: typeof fetch): Promise<number[]> {
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), 3000)
   try {
-    const response = await fetch('https://api.openai.com/v1/embeddings', {
+    const response = await providerFetch('https://api.openai.com/v1/embeddings', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${openAiKey}`,
@@ -237,23 +241,38 @@ async function embed(openAiKey: string, text: string): Promise<number[]> {
   }
 }
 
-async function loadSemanticNotes(client: SupabaseClient, openAiKey: string, title: string, userId: string): Promise<BundleNote[]> {
-  const embedding = await embed(openAiKey, title)
-  const { data, error } = await client.rpc('search_notes_semantic_for_user', {
-    p_user_id: userId,
+async function loadSemanticNotes(client: SupabaseClient, openAiKey: string, title: string, userId: string, access: 'user' | 'service', providerFetch: typeof fetch): Promise<BundleNote[]> {
+  const embedding = await embed(openAiKey, title, providerFetch)
+  const { data, error } = await client.rpc(access === 'service' ? 'search_notes_semantic_for_user' : 'search_notes_semantic', {
+    ...(access === 'service' ? { p_user_id: userId } : {}),
     query_embedding: JSON.stringify(embedding),
     match_threshold: SIMILARITY_FLOOR,
     match_count: KNOWLEDGE_K,
   })
   if (error) throw new Error(error.message)
-  return ((data ?? []) as { id: string; title: string; content: string; vault_path: string | null; similarity: number }[]).map(n => ({
-    id: n.id,
-    title: n.title,
-    snippet: (n.content ?? '').slice(0, SNIPPET_LEN),
-    source: 'semantic' as const,
-    similarity: n.similarity,
-    vaultPath: n.vault_path ?? undefined,
-  }))
+  const matches = (data ?? []) as { id: string; similarity: number }[]
+  if (matches.length === 0) return []
+  // Both search functions are SECURITY DEFINER. Re-read candidates through
+  // the caller's client before giving their text to the model. Keep semantic
+  // enrichment owner-only (the prior service RPC contract), even if the user
+  // search returns shared notes. Linked notes retain their explicit sharing.
+  const { data: notes } = throwIfErrored(await client.from('notes')
+    .select('id, title, content, vault_path')
+    .eq('user_id', userId)
+    .in('id', matches.map(n => n.id)))
+  const readable = new Map(((notes ?? []) as { id: string; title: string; content: string; vault_path: string | null }[]).map(n => [n.id, n]))
+  return matches.flatMap(match => {
+    const n = readable.get(match.id)
+    if (!n) return []
+    return [{
+      id: n.id,
+      title: n.title,
+      snippet: (n.content ?? '').slice(0, SNIPPET_LEN),
+      source: 'semantic' as const,
+      similarity: match.similarity,
+      vaultPath: n.vault_path ?? undefined,
+    }]
+  })
 }
 
 async function loadHistory(client: SupabaseClient, entityType: string, entityId: string, userId: string): Promise<BundleAction[]> {
@@ -280,8 +299,9 @@ export async function assembleContext(deps: AssembleDeps, ref: EntityRef): Promi
   const now = deps.now ?? new Date()
   const degraded: string[] = []
 
-  // Restates the RLS the service-role client bypasses. Resolved before loadEntity because the
-  // entity read itself is scope-gated; pass deps.visibleOwnerIds to skip the two extra reads.
+  // Additional narrowing for background service callers; interactive callers
+  // use a user client so current database policies still decide every read.
+  // Resolve before loadEntity; visibleOwnerIds avoids repeated membership reads.
   const owners = deps.visibleOwnerIds ?? await resolveVisibleOwners(client, ref.userId)
 
   const row = await loadEntity(client, ref, owners)
@@ -298,11 +318,10 @@ export async function assembleContext(deps: AssembleDeps, ref: EntityRef): Promi
     // action_history is the CALLER's own record of what they did to this entity, so it stays
     // keyed to ref.userId regardless of who owns the entity.
     part<BundleAction[]>('history', degraded, () => loadHistory(client, ref.entityType, ref.entityId, ref.userId), []),
-    // Semantic knowledge goes through search_notes_semantic_for_user, a SECURITY DEFINER fn
-    // whose only gate is `n.user_id = p_user_id` (2026-07-29_semantic_search_service.sql:27).
-    // Widening it is a migration, not a client change — left owner-only deliberately.
+    // User requests use the authenticated search RPC, never the service-only
+    // variant. Both re-read candidates and keep semantic knowledge owner-only.
     openAiKey
-      ? part<BundleNote[]>('knowledge', degraded, () => loadSemanticNotes(client, openAiKey, row.title, ref.userId), [])
+      ? part<BundleNote[]>('knowledge', degraded, () => loadSemanticNotes(client, openAiKey, row.title, ref.userId, deps.semanticAccess ?? 'user', deps.providerFetch ?? fetch), [])
       : Promise.resolve([] as BundleNote[]),
   ])
 

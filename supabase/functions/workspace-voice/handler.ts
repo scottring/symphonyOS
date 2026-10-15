@@ -1,4 +1,6 @@
 import {HARD_RULES,SESSION_SPINE_PREAMBLE} from '../_shared/sessionScripts.ts'
+import {ACCOUNT_GROUNDING_RULES,ASSISTANT_PERSONALITY,RESULT_LANGUAGE_RULES} from '../_shared/assistantExperience.ts'
+import {AiUsageError} from '../_shared/aiUsage.ts'
 const cors = {'Access-Control-Allow-Origin':'*','Access-Control-Allow-Headers':'authorization, apikey, content-type, x-client-info','Access-Control-Expose-Headers':'x-voice-max-seconds','Access-Control-Allow-Methods':'GET, POST, OPTIONS'}
 const tools = [
   {type:'function',name:'ask_symphony',description:'Look up or change real Symphony plans using the authenticated app assistant. Forward the user’s request faithfully, including the relevant visible item IDs and dates. Required for any claims about saved data or changes.',parameters:{type:'object',properties:{request:{type:'string'}},required:['request'],additionalProperties:false}},
@@ -7,11 +9,16 @@ const tools = [
 ]
 // The person's plan holds THEIR ideas. The voice structures and clarifies; it
 // never supplies content, and it keeps every turn short (see also maxOutputTokens).
-const instructions = `You are Symphony's voice. You help one person put their OWN thoughts into their plan and make them doable. The ideas are theirs; your job is structure, not content.
+const instructions = `${ASSISTANT_PERSONALITY}
+You are Symphony's voice. You help one person put their OWN thoughts into their plan and make them doable. The ideas are theirs; your job is structure, not content.
+
+${ACCOUNT_GROUNDING_RULES}
+
+${RESULT_LANGUAGE_RULES}
 
 How you speak:
 - One or two short sentences a turn, then stop and listen. At most one question.
-- Never lists, examples or menus of options. No praise, no enthusiasm, no repeating back everything they said.
+- Never read out long lists, examples or menus of options. Do not overpraise or repeat back everything they said. Keep any short options needed to answer the planning agent's question.
 
 Their content, not yours:
 - Never suggest goals, tasks or activities they did not say. Do not offer examples of what they could add.
@@ -77,5 +84,8 @@ export async function handleWorkspaceVoice(req:Request,deps:{env:(key:string)=>s
     const response=await deps.fetch('https://api.openai.com/v1/realtime/calls',{method:'POST',headers:{Authorization:`Bearer ${key}`},body:form,signal:AbortSignal.timeout(20000)})
     if(!response.ok)return reply(502,'voice_unavailable')
     return new Response(await response.text(),{headers:{...cors,'Content-Type':'application/sdp','Cache-Control':'no-store','x-voice-max-seconds':'300'}})
-  }catch{return reply(502,'voice_unavailable')}
+  }catch(error){
+    if(error instanceof AiUsageError)return reply(error.status,JSON.stringify({error:error.message,code:error.code,retry_at:error.retryAt}))
+    return reply(502,'voice_unavailable')
+  }
 }

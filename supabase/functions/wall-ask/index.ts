@@ -8,6 +8,7 @@
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { buildWallPrompt, parseAskBody, replyFromResponse } from './prompt.ts'
+import { AiUsageError, guardedAiFetch } from '../_shared/aiUsage.ts'
 
 const MODEL = Deno.env.get('WALL_ASK_MODEL') || 'claude-haiku-5-5'
 
@@ -43,7 +44,7 @@ Deno.serve(async (req) => {
 
   const { system, user: content } = buildWallPrompt(question, snapshot)
   try {
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
+    const res = await guardedAiFetch(db, 'wall-ask')('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: { 'content-type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
       body: JSON.stringify({ model: MODEL, max_tokens: 1024, system, messages: [{ role: 'user', content }] }),
@@ -53,6 +54,7 @@ Deno.serve(async (req) => {
     if (!reply) return json({ error: 'No complete answer' }, 502)
     return json(reply)
   } catch (e) {
+    if (e instanceof AiUsageError) return json({ error: e.message, code: e.code, retry_at: e.retryAt }, e.status)
     return json({ error: e instanceof Error ? e.message : 'Ask failed' }, 502)
   }
 })

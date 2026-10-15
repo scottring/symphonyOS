@@ -1,4 +1,6 @@
 import { planSaved } from './planSaved.ts'
+import { guardedAiFetch } from '../_shared/aiUsage.ts'
+import { ACCOUNT_GROUNDING_RULES, ASSISTANT_PERSONALITY, RESULT_LANGUAGE_RULES } from '../_shared/assistantExperience.ts'
 import { SHOW_TOOL, showSteps } from './showOnPage.ts'
 import { contactFieldError, mergeLinks } from './prep.ts'
 import { IDEMPOTENT_CREATES, PROPOSE_TOOL, proposalItems, stableRowId, toolOutcome } from './canvasEvents.ts'
@@ -70,16 +72,21 @@ function scopeFor(
 const MODEL = 'claude-sonnet-4-6'
 const MAX_TURNS = 14
 
-const SYSTEM_PROMPT = `You are the assistant inside Symphony, Scott's task, project, and routine manager. You help manage tasks, projects, and contacts using the tools available to you.
+const SYSTEM_PROMPT = `${ASSISTANT_PERSONALITY}
+You help with yearly, seasonal and monthly goals, weekly and daily tasks, routines and useful context, using the tools available on this surface.
+
+${ACCOUNT_GROUNDING_RULES}
+
+${RESULT_LANGUAGE_RULES}
 
 Rules:
-- You operate within Symphony. You cannot edit the vault. You CAN search and read Scott's connected Gmail mailbox, and draft (never send) mail from it — see Email below. You CAN search and read the web (see Web access below). And you CAN search Scott's knowledge base — his notes synced from his vault (people, projects, job search, meetings, daily logs, research, context) — with symphony_search_notes. If asked to do something none of your tools cover, say so plainly and stop.
+- You operate within Symphony. You cannot edit an external vault. When the tools and authorized sources are available, you can search notes, read Gmail, create email drafts (never send), and search the web. See the source-specific rules below. If asked to do something none of your tools cover, say so plainly and stop.
 - No em dashes. No AI cliches. No sycophancy. Be direct and action-oriented.
 - Just do it; don't narrate what you are about to do. After acting, confirm briefly.
 
 Grounding and verification (important):
 - Only state facts you have actually read from a tool result. Never assert a prior value, schedule, date, or history you have not looked up. If you are not sure, look it up or say you don't know. Do not invent.
-- Scott has a large knowledge base of notes synced from his vault. When he asks what he knows about a topic, wants background or prep on something (an interview, a person, a project, a decision), or asks you to gather relevant material, call symphony_search_notes BEFORE concluding there is nothing. Do not say "nothing exists" or "I have no information on X" about any topic without searching notes first. When you use a note, name its title so he can find it. The notes you find are shown to the user as clickable chips they can open in-app, so you do not need to print file paths, ".md" filenames, or links.
+- When the person asks about their notes or wants background or preparation from saved material, use symphony_search_notes if it is available on this surface before concluding there is nothing. Notes may be absent; do not assume a vault or knowledge base was imported. Name the titles of notes you actually find so the person can open their in-app chips; do not print file paths or ".md" filenames. A failed search means you could not check, not that no notes exist.
 - The user's data spans tasks, routines, projects, contacts, lists, notes, and calendar events. Before acting on "X", check the right entity type: a recurring item like "Feed Jax dinner" is a routine (symphony_list_routines), not a task. Look it up before assuming it doesn't exist.
 - A dated occasion someone ATTENDS (a show, appointment, party, pickup, reservation) normally belongs on the calendar. However, when the user explicitly asks for a timed task, honor that using a task with scheduled_for and is_all_day=false; do not require a calendar connection. Tasks are to-dos someone DOES. Family occasions go on the family calendar (domain "family").
 - Keep the IDs returned by writes and reuse them in this conversation instead of repeatedly searching. For ONE week task the person states, create it with symphony_create_plan_item and parent_id, then schedule that same ID. For several week tasks, or anything during week planning, use symphony_propose_changes add with goal_id instead. If linking fails, repair the existing item; never create a replacement that leaves a duplicate. After a connection failure, check existing items before retrying a creation.
@@ -87,11 +94,11 @@ Grounding and verification (important):
 - When updating an item, change only the fields the user asked about. Do not modify unrelated fields (schedule, time, name, context) as a side effect.
 
 Email:
-- Scott's Gmail is connected and searchable. When he asks you to check his email, look something up in it, or find a message, USE symphony_search_email. Never reply that you have no access to email.
+- When the person asks you to check email, use symphony_search_email if it is available on this surface. Its result establishes whether Gmail is connected and authorized; never assume that sign-in or calendar access includes email access. If access is missing, explain the returned connection or permission issue and let them continue without email.
 - Work in two steps: symphony_search_email returns subjects, senders and snippets; symphony_read_email_thread returns the full bodies of ONE thread. Search broadly, then read only the thread that actually looks right. Do not read every hit — bodies are long.
 - Query syntax is Gmail's: bare words match anywhere, and from:, to:, subject:, newer_than:30d, has:attachment, label:, in:sent narrow it. If a specific query finds nothing, retry once with something broader before concluding it isn't there.
-- Symphony is connected to exactly ONE Google account. Search results name the mailbox that was searched — say which one, and say it especially when you found nothing, since the message may be sitting in an account Symphony isn't connected to. "I didn't find it in <mailbox>" is honest; "you have no such email" is not.
-- symphony_draft_email creates a DRAFT and never sends. Say so plainly every time: the draft is waiting in Drafts for him to review and send. Never say or imply that mail has gone out. You have no way to send email, and should not offer to.
+- Search results name the mailbox checked: say which one, especially when nothing matched. If its address was not returned, say "the connected mailbox" without inventing an address. "I didn't find it in <mailbox>" is honest; "you have no such email" is not. Never infer other household members' connections from this result.
+- symphony_draft_email creates a DRAFT and never sends. Say so plainly every time: the draft is waiting in Drafts for the person to review and send. Never say or imply that mail has gone out. You have no way to send email, and should not offer to.
 - Email is for reading and drafting. When something in an email needs doing, turn it into the right Symphony object — a task, or a calendar event for a dated occasion.
 
 Symphony domain model:
@@ -519,7 +526,7 @@ const TOOLS = [
   {
     name: 'symphony_search_notes',
     description:
-      "Semantic search over Scott's knowledge base (notes synced from his vault: people, projects, job search, meetings, daily logs, research, background). Use this whenever he asks what he knows about a topic, wants background or prep on something, or asks you to gather relevant material. Returns the most relevant notes with a content snippet and their vault path. Pass a natural-language query describing the topic, not just a keyword.",
+      "Search the signed-in person's accessible Symphony notes for background, preparation or saved knowledge. Notes may be absent; do not assume a vault has been imported. Returns relevant notes with a content snippet and any recorded source path. Pass a natural-language query describing the topic, not just a keyword.",
     input_schema: {
       type: 'object',
       properties: {
@@ -645,11 +652,11 @@ function dedupeMembersByName<T extends { name: string }>(rows: T[]): T[] {
 
 // Embed a query with the SAME model vault-sync used for notes
 // (text-embedding-3-small, 1536-dim) so cosine search is meaningful.
-async function embedQuery(text: string): Promise<number[] | null> {
+async function embedQuery(text: string, paidFetch: typeof fetch): Promise<number[] | null> {
   const openAiKey = Deno.env.get('OPENAI_API_KEY')
   if (!openAiKey) return null
   try {
-    const res = await fetch('https://api.openai.com/v1/embeddings', {
+    const res = await paidFetch('https://api.openai.com/v1/embeddings', {
       method: 'POST',
       headers: { 'Authorization': `Bearer ${openAiKey}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({ model: 'text-embedding-3-small', input: text.slice(0, 8000) }),
@@ -675,6 +682,7 @@ async function runTool(
   // Structured side-channel: search_notes pushes the notes it found here so the
   // handler can surface them to the client as clickable source chips.
   sourceSink: Array<{ id: string; title: string; vaultPath?: string }>,
+  paidFetch: typeof fetch,
   // The client's id for this user message. Creations derive their row id from
   // it, so a resent turn recognises what it already saved.
   turnId: string | null = null,
@@ -1238,7 +1246,7 @@ async function runTool(
         const query = typeof input.query === 'string' ? input.query.trim() : ''
         if (!query) return 'Error: query is required'
         const limit = Math.min(typeof input.limit === 'number' ? input.limit : 6, 12)
-        const embedding = await embedQuery(query)
+        const embedding = await embedQuery(query, paidFetch)
 
         type NoteHit = { id: string; title: string | null; content: string | null; vault_path: string | null; context: string | null; similarity?: number }
         let hits: NoteHit[] = []
@@ -1342,7 +1350,7 @@ async function runTool(
         // "nothing found" is misleading if the user meant another account.
         const where = parsed.mailbox ? ` in ${parsed.mailbox}` : ''
         if (threads.length === 0) {
-          return `No email threads${where} matched "${query}". This mailbox is the only one Symphony is connected to — if the user expects mail in a different account, say so rather than concluding it does not exist.`
+          return `No email threads${where} matched "${query}". Only this mailbox was checked; do not infer anything about other accounts or say that the email does not exist.`
         }
         return `${threads.length} thread(s)${where} matching "${query}". Snippets only — call symphony_read_email_thread for full bodies:\n${JSON.stringify(threads, null, 2)}`
       }
@@ -1414,6 +1422,7 @@ interface AnthropicBlock {
 
 async function callAnthropic(
   apiKey: string,
+  paidFetch: typeof fetch,
   messages: Array<{ role: string; content: unknown }>,
   webTouched: boolean,
   containerId: string | null,
@@ -1428,7 +1437,7 @@ async function callAnthropic(
   // On the wall, only the family-layer tools (wallMode.ts); desktop unchanged.
   const symphonyTools = toolsForTurn(toolsForSurface(TOOLS, surface), webTouched).filter((t) => canShow || t.name !== SHOW_TOOL.name)
   const tools: unknown[] = [...symphonyTools, ...WEB_TOOLS]
-  const res = await fetch('https://api.anthropic.com/v1/messages', {
+  const res = await paidFetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: {
       'x-api-key': apiKey,
@@ -1478,15 +1487,14 @@ Deno.serve(async (req) => {
   const apiKey = Deno.env.get('ANTHROPIC_API_KEY')
   const url = Deno.env.get('SUPABASE_URL')
   const anon = Deno.env.get('SUPABASE_ANON_KEY')
-  const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
-  if (!apiKey || !url || !anon || !serviceKey) return json({ error: 'Server not configured' }, 500)
+  if (!apiKey || !url || !anon) return json({ error: 'Server not configured' }, 500)
 
-  // Verify the user, then build an RLS-scoped client that acts AS them.
+  // Use the caller's JWT for both validation and all interactive data reads.
   const token = authHeader.replace('Bearer ', '')
-  const service = createClient(url, serviceKey)
-  const { data: { user }, error: authErr } = await service.auth.getUser(token)
-  if (authErr || !user) return json({ error: 'Unauthorized' }, 401)
   const db = createClient(url, anon, { global: { headers: { Authorization: authHeader } } })
+  const { data: { user }, error: authErr } = await db.auth.getUser(token)
+  if (authErr || !user) return json({ error: 'Unauthorized' }, 401)
+  const paidFetch = guardedAiFetch(db, 'symphony-agent')
 
   const body = await req.json().catch(() => ({}))
   // surface:'wall' — the kitchen wall, family layer only (wallMode.ts).
@@ -1497,8 +1505,8 @@ Deno.serve(async (req) => {
   // Every tool reads and writes through this client. On the wall it is fenced
   // to the household's family layer; elsewhere it IS the user's client.
   const tdb = wall ? fenceDb(db, await loadWallFence(db, user.id)) : db
-  // The wall sends none of the page/item/session context, and an item context
-  // is assembled with the service client, so the wall never takes one.
+  // The wall never accepts personal page/item/session context, even though
+  // item assembly now also uses the caller's RLS-scoped client.
   const workspaceContext = wall ? undefined : body.workspaceContext
   const incoming = body.messages
   const attachment: AttachmentMeta | null = wall ? null : (body.attachment ?? null)
@@ -1561,7 +1569,7 @@ Deno.serve(async (req) => {
       let taskContextBlock = ''
       try {
         const bundle = await assembleContext(
-          { client: service, openAiKey: Deno.env.get('OPENAI_API_KEY') ?? undefined },
+          { client: db, openAiKey: Deno.env.get('OPENAI_API_KEY') ?? undefined, providerFetch: paidFetch },
           { entityType: 'task', entityId: taskContext.id, userId: user.id },
         )
         taskContextBlock = `\nThe user is asking about this item — full assembled context:\n${renderBundleForPrompt(bundle)}`
@@ -1629,7 +1637,7 @@ Deno.serve(async (req) => {
       let containerId: string | null = null
       try {
         for (let turn = 0; turn < MAX_TURNS; turn++) {
-          const res = await callAnthropic(apiKey, convo, webTouched, containerId, canShow, surface)
+          const res = await callAnthropic(apiKey, paidFetch, convo, webTouched, containerId, canShow, surface)
           const { content, stop_reason } = res
           if (res.containerId) containerId = res.containerId
           const toolResults: Array<Record<string, unknown>> = []
@@ -1719,7 +1727,7 @@ Deno.serve(async (req) => {
                   send({ type: 'proposal', items: proposal.items })
                   result = JSON.stringify({ shown: proposal.items.length, saved: false, note: 'Shown as suggestions. Nothing is saved until the person keeps them.' })
                 }
-              } else result = await runTool(tdb, user.id, block.name, block.input ?? {}, attachment, currentMemberId, authHeader, sourceNotes, turnId)
+              } else result = await runTool(tdb, user.id, block.name, block.input ?? {}, attachment, currentMemberId, authHeader, sourceNotes, paidFetch, turnId)
               // The wall's own saves report their ids too, so the wall can offer Undo.
               const outcome = toolOutcome(block.name, result, wall ? WALL_WRITE_TOOLS : undefined)
               if (outcome) send({ ...outcome })
