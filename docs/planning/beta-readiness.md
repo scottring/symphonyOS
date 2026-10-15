@@ -38,6 +38,8 @@ No configuration is certified by this document. Fill exact device, OS and browse
 | First supported iPad wall, exact model/OS/browser to be named | Glanceability, touch, paired audience, quiet hours and supported voice | Not run |
 | Mac, native iOS, Android tablet, Fire and Pi additions | Same applicable suite before each is supported; do not infer support from shared code | Not certified |
 
+Proposed named candidates for the first beta (B07), to be confirmed or replaced by Scott before any evidence is attached: desktop — current Chrome and Safari on macOS; phone — Safari on iOS 18+ and Chrome on Android 14+ (typed, touch, no voice promised); wall — one iPad (model and iPadOS version to be named) in Safari, paired as a display, in landscape at kitchen-counter distance. Voice is offered on desktop Chrome only until the UX05 measurements exist for another configuration. A display is certified for routines, meals, lists and the scratchpad before its calendar (see the coverage register's known gaps).
+
 - [ ] Product/design signs off the maintained visual reference and approved voice sample; all supported surfaces map to them.
 - [ ] Release QA attaches evidence for every applicable UX scenario on every named supported configuration. Inapplicable tests have a reason; “not run” is never counted as a pass.
 - [ ] No unresolved audience confusion, wrong saved/proposed claim, unintended change or blocked core journey remains. Private scenarios must pass before private assistance is enabled.
