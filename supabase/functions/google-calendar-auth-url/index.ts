@@ -1,5 +1,6 @@
 import { createClient } from 'npm:@supabase/supabase-js@2'
 import { parseAccess, scopesFor } from './scopes.ts'
+import { signOAuthState } from '../_shared/oauthState.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -56,7 +57,12 @@ Deno.serve(async (req) => {
     // Calendar by default; mail only when the person asked for it separately
     // (scopes.ts). Changing the asked-for scopes means reconnecting to re-consent.
     const access = parseAccess(body.access)
-    const state = btoa(JSON.stringify({ userId: user.id, access }))
+    const clientSecret = Deno.env.get('GOOGLE_CLIENT_SECRET')
+    if (!clientSecret) {
+      return new Response(JSON.stringify({ error: 'GOOGLE_CLIENT_SECRET not configured in Edge Function secrets' }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
+    }
+    // Signed and bound to this person: the callback refuses any other state.
+    const state = await signOAuthState(clientSecret, { userId: user.id, provider: 'google', access })
     const scopes = scopesFor(access)
 
     const authUrl = new URL('https://accounts.google.com/o/oauth2/v2/auth')

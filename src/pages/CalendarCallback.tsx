@@ -31,6 +31,8 @@ export function CalendarCallback() {
           body: {
             code,
             redirectUri: `${window.location.origin}/calendar-callback`,
+            // Handed back for verification: the callback refuses a state that is not this person's.
+            state: searchParams.get('state'),
           },
         })
 

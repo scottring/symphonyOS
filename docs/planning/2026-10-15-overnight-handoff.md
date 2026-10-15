@@ -32,6 +32,10 @@ Branch `claude/beta-readiness-program` = `main` (last gated push listed below). 
 
 Done since the last checkpoint: revoke/sign-out evidence with build id (`docs/planning/beta-sessions/evidence/2026-10-15-display-revoke.md`); privacy pass extended to notes, attachments and chat history, 35/35; invited-adult join through the product page (`…-invited-adult-joined.jpg`) and the first-run gate now asks the server for a live invitation (`my_pending_invitation`, applied hosted); J1 failure cases (`…-j1-failure-cases.md`): retry no duplicate, stale approval refused, Undo conflict partial — and one failure found and fixed (pending card lost on reload, `676029ee`, on main, Vercel building). Money reconciliation written into beta-readiness.md with residual exposure. New hosted migrations tonight: `20261015190000_my_pending_invitation`, `20261015200000_updated_at_stamped_by_database`.
 
+## Checkpoint 07:45Z
+
+Reload-with-pending-card verified on build `index-G0QmJdwk.js` (`…/2026-10-15-reload-card-restored.jpg`). beta-readiness.md now opens with a current release summary. OAuth review found the Google callback never bound `state` to the caller; fixed by signing the state and verifying it (and the user) in the callback — client passes `state` back. Deploy order: web first (so clients send `state`), then the two Google functions; in flight at this checkpoint.
+
 ## Next action
 
-Verify the reload-with-pending-card fix on the new build; then restructure beta-readiness.md (current summary on top); then the Gmail consent/OAuth recovery review.
+Confirm the Google functions deployed after the web build; then final morning handoff summary.

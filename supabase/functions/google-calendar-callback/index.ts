@@ -1,5 +1,6 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { verifyOAuthState } from '../_shared/oauthState.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -26,7 +27,7 @@ serve(async (req) => {
       })
     }
 
-    const { code, redirectUri } = await req.json()
+    const { code, redirectUri, state } = await req.json()
 
     const clientId = Deno.env.get('GOOGLE_CLIENT_ID')
     const clientSecret = Deno.env.get('GOOGLE_CLIENT_SECRET')
@@ -34,6 +35,16 @@ serve(async (req) => {
     if (!clientId || !clientSecret) {
       return new Response(JSON.stringify({ error: 'Google credentials not configured' }), {
         status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
+    // The round trip must be the one this person started (oauthState.ts): a
+    // state that is missing, forged or someone else's is refused before any
+    // token is exchanged or stored.
+    if (!(await verifyOAuthState(clientSecret, state, user.id, 'google'))) {
+      return new Response(JSON.stringify({ error: 'This sign-in link is not yours or has been altered. Start the connection again from Settings.' }), {
+        status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     }
