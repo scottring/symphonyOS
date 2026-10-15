@@ -21,13 +21,14 @@ const [, , scenarioPath] = process.argv
 if (!scenarioPath) { console.error('Pass a scenario file.'); process.exit(2) }
 const env = (k) => { const v = process.env[k]; if (!v) { console.error(`Missing ${k}`); process.exit(2) } return v }
 const url = env('SUPABASE_URL'), anon = env('SUPABASE_ANON_KEY'), email = env('BENCH_EMAIL'), password = env('BENCH_PASSWORD')
-if (!/\+bench|synthetic/i.test(email)) { console.error('Refusing: the bench account must be a synthetic one (+bench or "synthetic" in its address).'); process.exit(2) }
+// A synthetic account is one made for the bench: named so, or confirmed by the operator for this run.
+if (!/\+bench|synthetic/i.test(email) && process.env.BENCH_CONFIRM_SYNTHETIC !== '1') { console.error('Refusing: the bench account must be a synthetic one (+bench or "synthetic" in its address), or set BENCH_CONFIRM_SYNTHETIC=1 for an account you made for this.'); process.exit(2) }
 
 const scenario = JSON.parse(readFileSync(scenarioPath, 'utf8'))
 
 const signIn = async () => {
   const r = await fetch(`${url}/auth/v1/token?grant_type=password`, { method: 'POST', headers: { apikey: anon, 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password }) })
-  if (!r.ok) throw new Error(`sign-in failed: ${r.status}`)
+  if (!r.ok) throw new Error(`sign-in failed: ${r.status} ${(await r.text()).slice(0, 200)}`)
   return r.json()
 }
 
