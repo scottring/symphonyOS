@@ -58,6 +58,18 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+/** The household's IANA time zone (households.timezone), or the app's when
+ *  the row is missing, unreadable or not a zone Intl knows. */
+export async function householdTimeZone(db: { from: (table: string) => { select: (cols: string) => { limit: (n: number) => PromiseLike<{ data: unknown; error: unknown }> } } }): Promise<string> {
+  try {
+    const { data, error } = await db.from('households').select('timezone').limit(1)
+    const tz = !error && Array.isArray(data) && data[0] && typeof (data[0] as { timezone?: unknown }).timezone === 'string' ? (data[0] as { timezone: string }).timezone : ''
+    if (!tz) return APP_TZ
+    new Intl.DateTimeFormat('en-CA', { timeZone: tz })
+    return tz
+  } catch { return APP_TZ }
+}
+
 // Mirror of src/lib/scope.ts scopeForDomain — the app's single scope rule.
 // (Deno; an edge function cannot import from src/.) Scope is DERIVED from what
 // the row IS plus who it was handed to. Nothing may write a literal scope.
@@ -1414,12 +1426,14 @@ Deno.serve(async (req) => {
   }
 
   // The household's day, not UTC's: after 8pm Eastern the UTC date is
-  // already tomorrow, and "today" would land a day late.
-  const nowLocal = new Intl.DateTimeFormat('en-CA', { timeZone: APP_TZ, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false }).formatToParts(new Date())
+  // already tomorrow, and "today" would land a day late. The zone is the
+  // household's (households.timezone), falling back to the app's.
+  const tz = await householdTimeZone(tdb)
+  const nowLocal = new Intl.DateTimeFormat('en-CA', { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false }).formatToParts(new Date())
   const part = (t: string) => nowLocal.find((x) => x.type === t)?.value ?? ''
   const today = `${part('year')}-${part('month')}-${part('day')}`
-  let datePrefix = `(Today is ${today}, ${part('hour')}:${part('minute')} local time, ${APP_TZ}.)${familyLine}`
-  if (wall) datePrefix += wallClockLine(new Date(), APP_TZ)
+  let datePrefix = `(Today is ${today}, ${part('hour')}:${part('minute')} local time, ${tz}.)${familyLine}`
+  if (wall) datePrefix += wallClockLine(new Date(), tz)
   if (taskContext) {
     const isRoutine = taskContext.kind === 'routine'
     if (isRoutine) {
