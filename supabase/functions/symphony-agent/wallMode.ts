@@ -179,15 +179,35 @@ export function fenceDb<D extends { from: (table: string) => Query }>(db: D, fen
 
 /** Read the fence's id sets as the signed-in user. Fails closed: an error
  *  leaves a set empty, which matches nothing. */
-export async function loadWallFence(db: { from: (table: string) => Query }, userId: string): Promise<WallFence> {
+export async function loadWallFence(db: { from: (table: string) => Query; rpc?: (name: string, args?: Record<string, unknown>) => PromiseLike<{ data: unknown; error: unknown }> }, userId: string, display = false): Promise<WallFence> {
   const [maps, lists] = await Promise.all([
-    db.from('calendar_domain_mappings').select('calendar_id, domain').eq('user_id', userId),
+    // A display has no calendar mappings of its own: it uses the household's
+    // family calendars (household_family_calendar_ids, security definer).
+    display && db.rpc ? db.rpc('household_family_calendar_ids') : db.from('calendar_domain_mappings').select('calendar_id, domain').eq('user_id', userId),
     db.from('lists').select('id').eq('visibility', 'family'),
   ])
+  const familyCalendarIds = maps.error ? []
+    : display ? ((maps.data ?? []) as unknown[]).map((r) => typeof r === 'string' ? r : String((r as { household_family_calendar_ids?: unknown }).household_family_calendar_ids ?? '')).filter(Boolean)
+    : familyCalendars((maps.data ?? []) as { calendar_id: string; domain: string | null }[])
   return {
-    familyCalendarIds: maps.error ? [] : familyCalendars(maps.data ?? []),
+    familyCalendarIds,
     familyListIds: lists.error ? [] : ((lists.data ?? []) as { id: string }[]).map((l) => l.id),
   }
+}
+
+/** Who is asking, by identity: a paired display, an ordinary member, or
+ *  unknown when the database could not say (fail closed: the caller refuses). */
+export async function callerSurface(db: { rpc: (name: string, args?: Record<string, unknown>) => PromiseLike<{ data: unknown; error: unknown }> }): Promise<'display' | 'member' | 'unknown'> {
+  try {
+    const { data, error } = await db.rpc('my_surface')
+    if (error) {
+      // Before the migration is applied the function does not exist: every
+      // caller is a member, as before. Any other failure is unknown.
+      const code = (error as { code?: unknown }).code
+      return code === 'PGRST202' || code === '42883' ? 'member' : 'unknown'
+    }
+    return data === 'display' ? 'display' : 'member'
+  } catch { return 'unknown' }
 }
 
 /** Calendars mapped to family and never to work or personal. */

@@ -4,7 +4,7 @@ import { toolOutcome } from './canvasEvents'
 import { PROPOSE_CHANGES_TOOL } from './changeSet'
 import { POINT_TOOL } from './pointing'
 import { READ_WEEK_TOOL } from './readWeek'
-import {
+import { callerSurface,
   SCRATCHPAD_TOOL, WALL_PROMPT_SECTION, WALL_TOOL_NAMES, WALL_WRITE_TOOLS,
   addToScratchpad, familyCalendars, fenceDb, loadWallFence, parseSurface,
   systemForSurface, toolAllowed, toolsForSurface, wallClockLine, type WallFence,
@@ -56,7 +56,10 @@ describe('desktop is unchanged without a surface', () => {
     expect(toolOutcome('symphony_create_task', '{"id":"a"}')).toEqual({ type: 'tool_result', name: 'symphony_create_task', ok: true, ids: ['a'] })
   })
   it('index.ts gates every wall difference on surface', () => {
-    expect(source).toContain("const tdb = wall ? fenceDb(db, await loadWallFence(db, user.id)) : db")
+    expect(source).toContain("const tdb = wall ? fenceDb(db, await loadWallFence(db, user.id, display)) : db")
+    // The wall is decided by identity first: a paired display is the wall
+    // whatever its request says; an adult is the wall only when asking.
+    expect(source).toContain("const surface = display ? 'wall' : surfaceParsed.surface")
     expect(source).toContain('const workspaceContext = wall ? undefined : body.workspaceContext')
     expect(source).toContain('toolsForTurn(toolsForSurface(TOOLS, surface), webTouched)')
     expect(source).toContain('text: systemForSurface(SYSTEM_PROMPT, surface)')
@@ -195,5 +198,21 @@ describe('addToScratchpad', () => {
     const { db } = recorder()
     expect(await addToScratchpad(db, 'u1', { text: 'x' })).toMatch(/^Error/)
     expect(await addToScratchpad(db, 'u1', { kind: 'talk' })).toMatch(/^Error/)
+  })
+})
+
+describe('callerSurface (display identity)', () => {
+  const rpc = (reply: { data: unknown; error: unknown }) => ({ rpc: async () => reply })
+  it('a paired display is the wall; a member is not', async () => {
+    expect(await callerSurface(rpc({ data: 'display', error: null }))).toBe('display')
+    expect(await callerSurface(rpc({ data: 'member', error: null }))).toBe('member')
+  })
+  it('before the migration (no function) every caller is a member, as before', async () => {
+    expect(await callerSurface(rpc({ data: null, error: { code: 'PGRST202' } }))).toBe('member')
+    expect(await callerSurface(rpc({ data: null, error: { code: '42883' } }))).toBe('member')
+  })
+  it('any other failure is unknown, and the caller refuses the request', async () => {
+    expect(await callerSurface(rpc({ data: null, error: { code: '57014' } }))).toBe('unknown')
+    expect(await callerSurface({ rpc: async () => { throw new Error('down') } })).toBe('unknown')
   })
 })

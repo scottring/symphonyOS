@@ -23,7 +23,7 @@ import { EVERYDAY_TALK_RULES, HARD_RULES, MONTH_SEASON_YEAR_NOTE, SESSION_SPINE_
 import { normalizeSchedule, etOffsetMinutes, APP_TZ } from './schedule.ts'
 import { MEAL_SLOTS, type MealSlot, getMeals, resolveDate, setMeal } from './meals.ts'
 import { summarizeTurn, type TurnWrite } from './outcome.ts'
-import { type Surface, SCRATCHPAD_TOOL, WALL_WRITE_TOOLS, addToScratchpad, fenceDb, loadWallFence, parseSurface, systemForSurface, toolAllowed, toolsForSurface, wallClockLine } from './wallMode.ts'
+import { type Surface, SCRATCHPAD_TOOL, WALL_WRITE_TOOLS, addToScratchpad, callerSurface, fenceDb, loadWallFence, parseSurface, systemForSurface, toolAllowed, toolsForSurface, wallClockLine } from './wallMode.ts'
 
 /** What the wall's Approve can apply today (WallV2Shell passes task writers only). */
 const WALL_CARD_OPS = new Set(['place', 'unplace', 'add', 'someday', 'assign'])
@@ -1354,11 +1354,18 @@ Deno.serve(async (req) => {
   // surface:'wall' — the kitchen wall, family layer only (wallMode.ts).
   const surfaceParsed = parseSurface(body.surface)
   if ('error' in surfaceParsed) return json({ error: surfaceParsed.error }, 400)
-  const surface = surfaceParsed.surface
+  // A paired display (household_members.role = 'display', migration
+  // 20261015100000) is the wall whatever its request says: the server decides
+  // from the identity, not from a field a client could leave out. An adult's
+  // login still gets the wall only when it asks for it.
+  const identity = await callerSurface(db)
+  if (identity === 'unknown') return json({ error: 'Could not confirm who is asking' }, 503)
+  const display = identity === 'display'
+  const surface = display ? 'wall' : surfaceParsed.surface
   const wall = surface === 'wall'
   // Every tool reads and writes through this client. On the wall it is fenced
   // to the household's family layer; elsewhere it IS the user's client.
-  const tdb = wall ? fenceDb(db, await loadWallFence(db, user.id)) : db
+  const tdb = wall ? fenceDb(db, await loadWallFence(db, user.id, display)) : db
   // The wall never accepts personal page/item/session context, even though
   // item assembly now also uses the caller's RLS-scoped client.
   const workspaceContext = wall ? undefined : body.workspaceContext
