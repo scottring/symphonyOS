@@ -1,0 +1,33 @@
+{
+  "scenario": "m1-plan-next-year",
+  "at": "2026-10-15T07:01:20.789Z",
+  "user": "deb3b752-cb26-480a-910c-fb174b308409",
+  "steps": [
+    {
+      "step": 1,
+      "say": "Plan 2027. Of this year's goals: the house goal carries, bread I'm letting go, and the 10k is done. And add for next year: plan the holiday trip.",
+      "tools": [
+        "symphony_list_intentions",
+        "symphony_list_intentions"
+      ],
+      "outcome": "answered",
+      "reply": "Here's what I have for 2026: **Get the house ready to sell** carries, **Learn to bake bread** gets let go, and **Run a 10k** is done. Plus adding **Plan the holiday trip** to 2027. What context should \"Plan the holiday trip\" live in — family or personal?",
+      "card": null,
+      "findings": [
+        "outcome answered, expected proposed",
+        "missing tool symphony_read_plan",
+        "missing tool symphony_propose_changes"
+      ]
+    },
+    {
+      "step": 2,
+      "action": "approve",
+      "result": "manual (page action: run in the browser layer)"
+    },
+    {
+      "step": 3,
+      "action": "undo-set",
+      "result": "manual (page action: run in the browser layer)"
+    }
+  ]
+}

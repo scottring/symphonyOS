@@ -1,0 +1,55 @@
+{
+  "scenario": "m1-plan-next-year",
+  "at": "2026-10-15T07:04:00.708Z",
+  "user": "deb3b752-cb26-480a-910c-fb174b308409",
+  "steps": [
+    {
+      "step": 1,
+      "say": "Plan 2027. Of this year's goals: the house goal carries, bread I'm letting go, and the 10k is done. And add for next year: plan the holiday trip.",
+      "tools": [
+        "symphony_list_intentions",
+        "symphony_read_plan",
+        "symphony_propose_changes"
+      ],
+      "outcome": "proposed",
+      "reply": "Here's what I have:\n\n**2026 goals:**\n- *Get the house ready to sell* → carry to 2027\n- *Learn to bake bread* → let go\n- *Run a 10k* → done ✓\n\n**2027 new goal:**\n- *Plan the holiday trip*That's 4 changes — approve when you're ready. Anything else for 2027?",
+      "card": [
+        {
+          "op": "plan_carry",
+          "title": "Get the house ready to sell",
+          "date": null,
+          "time": null
+        },
+        {
+          "op": "plan_let_go",
+          "title": "Learn to bake bread",
+          "date": null,
+          "time": null
+        },
+        {
+          "op": "plan_done",
+          "title": "Run a 10k",
+          "date": null,
+          "time": null
+        },
+        {
+          "op": "plan_add",
+          "title": "Plan the holiday trip",
+          "date": null,
+          "time": null
+        }
+      ],
+      "findings": []
+    },
+    {
+      "step": 2,
+      "action": "approve",
+      "result": "manual (page action: run in the browser layer)"
+    },
+    {
+      "step": 3,
+      "action": "undo-set",
+      "result": "manual (page action: run in the browser layer)"
+    }
+  ]
+}

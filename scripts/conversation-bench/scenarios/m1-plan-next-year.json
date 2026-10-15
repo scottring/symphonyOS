@@ -28,6 +28,7 @@
             { "op": "plan_add", "level": "year", "period_start": "2027-01-01", "title": "Plan the holiday trip" }
           ] } }
         ],
+        "anyTools": ["symphony_propose_changes"],
         "card": { "ops": 4 },
         "goals": { "unchanged": ["9a1b2c3d-0000-4000-8000-00000000b001", "9a1b2c3d-0000-4000-8000-00000000b002", "9a1b2c3d-0000-4000-8000-00000000b003"] }
       },

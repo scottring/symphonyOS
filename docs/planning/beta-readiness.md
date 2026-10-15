@@ -181,6 +181,12 @@ Found and fixed on the way: removing a member through the ordinary client failed
 
 Not covered yet: private assistants (B01 proper: per-adult assistant identity and history) are not in the first beta; notes, attachments and chat history isolation were not exercised by this pass; the display's own reads were checked in the browser-layer run, not here.
 
+## Overnight run, October 15–16 (Scott's standing approval)
+
+- **Privacy pass** 23/23 (above). **Emergency disable** rehearsed hosted (runbook).
+- **Bench live, seeded records** (`live.mjs --seed` puts the scenario's rows into the synthetic household and removes them after): R1 routines (skip this Thursday → `routine_skip` on the card without asking "this week or from now on"; "from now on" → `routine_change`) **3/3**; M1 year planning (carry, let go, done, add on one card) **5/5** after two prompt rules (a named day is this week only; do not ask a new goal's life area) and accepting any read tool. J1 remains 5/5. Running total on the deployed agent since the fixes: 13 scenario runs, 13 passed.
+- Not run: restore rehearsal (no access token was found at `~/.supabase/pat`); the spoken, iPad and five-adult sessions (kit ready).
+
 ## Release blockers in order
 
 Owner labels are responsibilities, not additional staff. Scott retains scope, spending, external-claim, and release approval.
