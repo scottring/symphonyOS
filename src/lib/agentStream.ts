@@ -33,8 +33,8 @@ export type AgentStreamEvent =
   | { type: 'change_set'; set: ChangeSet }
   | { type: 'point'; dates: string[]; taskIds: string[] }
   | { type: 'show'; steps: unknown }
-  | { type: 'done'; reply: string; sessionId: string | null; sources?: AgentSourceNote[]; outcome?: unknown }
-  | { type: 'error'; message: string; outcome?: unknown }
+  | { type: 'done'; reply: string; sessionId: string | null; sources?: AgentSourceNote[]; outcome?: unknown; requestId?: string }
+  | { type: 'error'; message: string; outcome?: unknown; requestId?: string }
 
 /**
  * Parse a growing SSE buffer. Returns the complete events found and the
@@ -113,9 +113,9 @@ export interface StreamHandlers {
    *  recognise writes it already made instead of making them twice. */
   turnId?: string
   onSession?: (sessionId: string) => void
-  onDone?: (reply: string, sessionId: string | null, sources?: AgentSourceNote[], outcome?: TurnOutcome) => void
+  onDone?: (reply: string, sessionId: string | null, sources?: AgentSourceNote[], outcome?: TurnOutcome, requestId?: string) => void
   /** `outcome` carries the writes made before the failure, when the server got that far. */
-  onError?: (message: string, outcome?: TurnOutcome) => void
+  onError?: (message: string, outcome?: TurnOutcome, requestId?: string) => void
   attachment?: AttachmentMeta
   /** The caller's own family-member id, so the agent can assign personal
    *  routines to them (otherwise they're unassigned and the Today "my tasks"
@@ -225,8 +225,8 @@ export async function streamSymphonyAgent(
       else if (ev.type === 'change_set') { if (ev.set && Array.isArray(ev.set.ops)) handlers.onChangeSet?.(ev.set) }
       else if (ev.type === 'point') handlers.onPoint?.({ dates: Array.isArray(ev.dates) ? ev.dates : [], taskIds: Array.isArray(ev.taskIds) ? ev.taskIds : [] })
       else if (ev.type === 'session') handlers.onSession?.(ev.sessionId)
-      else if (ev.type === 'done') handlers.onDone?.(ev.reply, ev.sessionId, ev.sources, parseTurnOutcome(ev.outcome))
-      else if (ev.type === 'error') handlers.onError?.(ev.message, parseTurnOutcome(ev.outcome))
+      else if (ev.type === 'done') handlers.onDone?.(ev.reply, ev.sessionId, ev.sources, parseTurnOutcome(ev.outcome), typeof ev.requestId === 'string' ? ev.requestId : undefined)
+      else if (ev.type === 'error') handlers.onError?.(ev.message, parseTurnOutcome(ev.outcome), typeof ev.requestId === 'string' ? ev.requestId : undefined)
     }
   }
 }

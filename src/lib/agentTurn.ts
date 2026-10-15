@@ -76,6 +76,8 @@ export interface AgentTurnResult {
   /** The server's verdict on what the turn did. Never absent: a stream that
    *  failed without one is 'unverified'. */
   outcome: TurnOutcome
+  /** The server's id for this turn, for a problem report. No content. */
+  requestId?: string
 }
 
 /**
@@ -94,6 +96,7 @@ export async function runAgentTurn(
   let didWrite = false
   let streamError: string | null = null
   let outcome: TurnOutcome | undefined
+  let requestId: string | undefined
   // Set on a tool event, cleared on the next text delta. A tool call sits
   // between two text segments in the transcript (e.g. "Let me check." / tool
   // use / "Found it."); without a separator those segments run together into
@@ -118,8 +121,9 @@ export async function runAgentTurn(
         needsSeparatorBeforeNextText = true
         handlers.onTool?.(name)
       },
-      onDone: (reply, _sessionId, replySources, serverOutcome) => {
+      onDone: (reply, _sessionId, replySources, serverOutcome, serverRequestId) => {
         outcome = serverOutcome
+        requestId = serverRequestId
 
         // Fall back to the authoritative final reply if no text streamed.
         if (text.length === 0) {
@@ -131,9 +135,10 @@ export async function runAgentTurn(
           handlers.onSources?.(replySources)
         }
       },
-      onError: (message, serverOutcome) => {
+      onError: (message, serverOutcome, serverRequestId) => {
         streamError = message
         if (serverOutcome) outcome = serverOutcome
+        if (serverRequestId) requestId = serverRequestId
         handlers.onError?.(message)
       },
       onToolResult: handlers.onToolResult,
@@ -167,5 +172,5 @@ export async function runAgentTurn(
   const fallback: TurnOutcome = streamError
     ? (didWrite ? UNKNOWN_OUTCOME : { state: 'failed', writes: [], say: 'Nothing saved.' })
     : didWrite ? UNKNOWN_OUTCOME : { state: 'answered', writes: [], say: 'Nothing was changed.' }
-  return { text, sources, didWrite, error: streamError, outcome: outcome ?? fallback }
+  return { text, sources, didWrite, error: streamError, outcome: outcome ?? fallback, ...(requestId ? { requestId } : {}) }
 }
