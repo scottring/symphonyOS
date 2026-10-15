@@ -80,7 +80,10 @@ export function useWorkspaceVoice(context:WorkspaceContext, ask:(text:string)=>P
   voice.subscribe(event=>{
    if(transport.current!==voice)return
    if(event.type==='status'){setStatus(event.status);if(event.status!=='live')setTurn('off')}
-   if(event.type==='turn'){setTurn(event.turn);if(event.turn==='listening')setHeard('')}
+   if(event.type==='turn')setTurn(event.turn)
+   // The heard line stays until the person speaks again: the mic now re-opens
+   // by itself after each answer, and clearing then hid what was heard (2026-10-15).
+   if(event.type==='speaking'&&event.who==='user'&&event.active)setHeard('')
    if(event.type==='error')setError(event.message)
    if(event.type==='user')setHeard(event.text)
    if(event.type==='assistant')setReply(event.text)

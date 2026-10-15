@@ -315,15 +315,26 @@
       "finding": "Attachment storage authorization can be granted by a caller-controlled metadata row. The INSERT/UPDATE attachment policy checks only user_id=auth.uid(); the storage SELECT policy authorizes any path referenced by a visible attachment. In isolated PostgreSQL, user B could not initially see A's private object or metadata. B then inserted an attachment on B's own task with A's known storage_path. The object became selectable to B, while A's metadata stayed hidden. The private-document restrictive policy does not help because B owns the forged metadata. Existing 35/35 privacy checks exercise only metadata and miss this authorization path. Knowledge of an object path must not confer access.",
       "request": "Prioritize before expanding beta. Read the deployed attachment/storage policies without downloading real content, and close the authorization gap with server-enforced ownership/reference validity on insert and update, and a storage policy that cannot derive access solely from attacker-created metadata. Preserve authorized household file sharing. Regressions must cover unrelated household with known path, same-household private document, altered storage_path, legitimate shared attachment, revoked access and signed URL/download behavior on synthetic files. Do not run adversarial access against real family objects; use existing synthetic fixtures or local isolated policy tests.",
       "verification": "Confirmed with actual checked-in migrations on local PostgreSQL; deployed exploitability not yet checked."
+    },
+    {
+      "id": "R9",
+      "priority": "P2",
+      "files": [
+        "src/hooks/useWorkspaceVoice.ts:52",
+        "src/shell/ShellLayout.tsx:294"
+      ],
+      "finding": "New spoken approve invokes approveCard before checking busy.current. It does not hold that busy flag while approving. Thus the stated guard cannot prevent approval during an outstanding ask_symphony call, and can return a busy error after the callback has already saved. CanvasActivityContext has a separate duplicate-approval guard, but that does not serialize an assistant turn with approval or bind approval to the card version the user heard.",
+      "request": "Check and acquire the interaction lock before invoking the approval callback, release in finally, and bind approval to the intended card identity/version or refuse when it changed. Add deferred-promise tests for approve during an outstanding ask, an ask during approval, card replacement before approval, and accurate saved/failed reporting. Preserve explicit approval and existing display restrictions.",
+      "verification": "Source-level ordering finding; existing 63 tests pass but do not exercise overlapping turns or replacement. No hosted incident asserted."
     }
   ],
   "next": "Review new fixes when present. Original voice monthly lockout locally mitigated; keep R5 partially open for session settlement and human-kit viability. Prioritize R8 file authorization and R2 ledger authority, then R1 Undo/R7 retry correctness; R6 grader and R3/R4 remain open. Preserve approved limits and synthetic-only scope.",
-  "updated_at_utc": "2026-10-15T09:32:01.228682+00:00",
+  "updated_at_utc": "2026-10-15T09:50:02.190513+00:00",
   "reviewed_commits": [
     "0bbb3c075203c7e9978905e5af3655ff9fe43b6a",
     "7d8d29a8214e121dceb46d524769635004862e88"
   ],
-  "latest_reviewed_commit": "520eeeb6feedd6b4f67dc77111b84ee677c52716",
+  "latest_reviewed_commit": "e82422e558527582850af2d2713c2c3dfef8e343",
   "price_source_review": {
     "checked_at_utc": "2026-10-15T07:53:00Z",
     "anthropic_source": "https://platform.claude.com/docs/en/about-claude/pricing",
@@ -366,6 +377,12 @@
       "head": "520eeeb6feedd6b4f67dc77111b84ee677c52716",
       "new_implementation_observed": true,
       "work": "Verified voice error type/prop correction; no UI retry while prior lock restriction persists, no paid calls or hosted mutations. Other open findings unchanged."
+    },
+    {
+      "at": "2026-10-15T09:50:02.190513+00:00",
+      "head": "e82422e558527582850af2d2713c2c3dfef8e343",
+      "new_implementation_observed": true,
+      "work": "Reviewed new voice changes, ran 63 targeted tests, recorded approval serialization concern R9. No production calls or UI lock retry."
     }
   ],
   "reviewed_scopes": [
@@ -388,6 +405,10 @@
     {
       "commit": "520eeeb6feedd6b4f67dc77111b84ee677c52716",
       "scope": "Voice refusal error is now included in StripVoice type and passed by ShellLayout. Independent tsc --noEmit --incremental false -p tsconfig.app.json passed; ConversationStrip tests 5/5 passed. Existing tests do not assert refusal text; hosted display and acoustic behavior remain unverified."
+    },
+    {
+      "commit": "e82422e558527582850af2d2713c2c3dfef8e343",
+      "scope": "Reviewed voice transcription hint/deduplication, automatic listening between explicit voice-session turns, and spoken approval wiring. Independent targeted tests passed 63/63 (handler 15, transport 37, hook 11). No microphone or deployed-browser proof."
     }
   ]
 }

@@ -56,6 +56,16 @@ describe('workspace voice',()=>{
  })
 })
 
+describe('heard line',()=>{
+ it('stays on screen when the mic re-opens, and clears when the person speaks again',async()=>{
+  const {result}=renderHook(()=>useWorkspaceVoice(context,vi.fn(),vi.fn(),true,'a'))
+  await act(()=>result.current.start())
+  const l=mocks.instances[0].listener
+  act(()=>{l({type:'user',text:'Clean the yard'})});expect(result.current.heard).toBe('Clean the yard')
+  act(()=>{l({type:'turn',turn:'listening'})});expect(result.current.heard).toBe('Clean the yard')
+  act(()=>{l({type:'speaking',who:'user',active:true})});expect(result.current.heard).toBe('')
+ })
+})
 describe('spoken approve',()=>{
  it('approve_card saves the waiting card and says saved; "Approve" as text does the same',async()=>{
   const approveCard=vi.fn(async()=>'saved' as const);const ask=vi.fn(async()=>'answered')
