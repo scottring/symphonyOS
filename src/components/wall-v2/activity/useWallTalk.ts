@@ -137,14 +137,16 @@ export function useWallTalk(deps: WallTalkDeps | undefined) {
     touch()
     setCard({ ...c, state: 'saving', message: undefined })
     let r: WallApplyResult
-    try { r = await deps.applyChanges(c.set) } catch { r = { ok: false, reason: 'failed' } }
+    try { r = await deps.applyChanges(c.set) } catch { r = { ok: false, reason: 'failed', reverted: true, kept: [] } }
     approving.current = false
     if (!r.ok) {
       const message = r.reason === 'stale'
         ? `“${r.title}” changed since Symphony proposed this. Ask for a fresh list.`
         : r.reason === 'private'
           ? `“${r.title}” isn’t a family plan. Only family plans can change from the wall.`
-          : 'Couldn’t save. Nothing was changed. Try again.'
+          : r.reverted
+            ? 'Couldn’t save. Nothing was changed. Try again.'
+            : 'Couldn’t finish, and some of it stayed saved. Check the week before trying again.'
       setCard((cur) => (cur && cur.set.key === c.set.key ? { ...cur, state: 'failed', message } : cur))
       return message
     }

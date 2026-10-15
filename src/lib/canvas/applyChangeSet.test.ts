@@ -77,15 +77,23 @@ describe('applyChangeSet', () => {
   it('a failure part way reverses what already saved', async () => {
     const updateTask = vi.fn(async (id: string) => id !== 'b')
     const d = deps({ updateTask })
-    expect(await applyChangeSet(set, d)).toEqual({ ok: false, reason: 'failed' })
+    expect(await applyChangeSet(set, d)).toEqual({ ok: false, reason: 'failed', reverted: true, kept: [] })
     // a saved, b failed, so a is put back; the add never ran.
     expect(updateTask.mock.calls.map((c) => c[0])).toEqual(['a', 'b', 'a'])
     expect(d.addTask).not.toHaveBeenCalled()
   })
 
+  it('a rollback that cannot reverse a saved write says so: not "nothing changed"', async () => {
+    // a saves; b fails; putting a back fails too (someone else holds it).
+    let calls = 0
+    const updateTask = vi.fn(async (id: string) => { calls++; if (id === 'b') return false; return calls === 1 })
+    const d = deps({ updateTask })
+    expect(await applyChangeSet(set, d)).toEqual({ ok: false, reason: 'failed', reverted: false, kept: ['a'] })
+  })
+
   it('a thrown write is a failure too', async () => {
     const d = deps({ addTask: vi.fn(async () => { throw new Error('offline') }) })
-    expect(await applyChangeSet(set, d)).toEqual({ ok: false, reason: 'failed' })
+    expect(await applyChangeSet(set, d)).toEqual({ ok: false, reason: 'failed', reverted: true, kept: [] })
     expect(vi.mocked(d.updateTask).mock.calls.map((c) => c[0])).toEqual(['a', 'b', 'b', 'a'])
   })
 
@@ -140,7 +148,7 @@ describe('applyChangeSet: done, merge and routine ops (stage 3)', () => {
       { key: 'k:0', op: 'place', taskId: 'a', title: 'a', date: '2026-10-15', seen },
       { key: 'k:1', op: 'routine_skip', routineId: 'r1', title: 'Bedtime', date: '2026-10-16' },
     ] }, taskOnly)
-    expect(r).toEqual({ ok: false, reason: 'failed' })
+    expect(r).toEqual({ ok: false, reason: 'failed', reverted: true, kept: [] })
     expect(d.updateTask).not.toHaveBeenCalled()
   })
 
@@ -317,7 +325,7 @@ describe('applyChangeSet: done, merge and routine ops (stage 3)', () => {
       { key: 'k:2', op: 'routine_move', routineId: 'r2', title: 'Haircut', date: '2026-10-15', toDate: '2026-10-16' },
       { key: 'k:3', op: 'routine_add', title: 'Reading time' },
     ] }
-    expect(await applyChangeSet(s, d)).toEqual({ ok: false, reason: 'failed' })
+    expect(await applyChangeSet(s, d)).toEqual({ ok: false, reason: 'failed', reverted: true, kept: [] })
     expect(d.undoSkip).toHaveBeenCalledWith('r1', new Date(2026, 9, 16))
     expect(d.reopenTask).toHaveBeenCalledWith('a')
     expect(vi.mocked(d.undoSkip).mock.invocationCallOrder[0]).toBeLessThan(vi.mocked(d.reopenTask).mock.invocationCallOrder[0])
@@ -518,7 +526,7 @@ describe('applyChangeSet: plan ops (Month / Season / Year)', () => {
       { key: 'p:0', op: 'plan_add', level: 'season', periodStart: '2026-12-01', title: 'x', parentId: 'g1' },
     ] as ChangeSet['ops']) {
       expect(canApply(s(op), noPlan)).toBe(false)
-      expect(await applyChangeSet(s(op), noPlan)).toEqual({ ok: false, reason: 'failed' })
+      expect(await applyChangeSet(s(op), noPlan)).toEqual({ ok: false, reason: 'failed', reverted: true, kept: [] })
     }
     expect(noPlan.updateTask).not.toHaveBeenCalled()
     // A month add with no parent needs only the task writers.
@@ -527,8 +535,8 @@ describe('applyChangeSet: plan ops (Month / Season / Year)', () => {
 
   it('refuses a malformed plan op before writing anything', async () => {
     const d = planDeps()
-    expect(await applyChangeSet(one({ key: 'p:0', op: 'plan_carry', level: 'month', itemId: 'm1', title: 'x', toPeriodStart: 'November' }), d)).toEqual({ ok: false, reason: 'failed' })
-    expect(await applyChangeSet(one({ key: 'p:0', op: 'plan_let_go', level: 'year', itemId: 'm1', itemKind: 'task', title: 'x' }), d)).toEqual({ ok: false, reason: 'failed' })
+    expect(await applyChangeSet(one({ key: 'p:0', op: 'plan_carry', level: 'month', itemId: 'm1', title: 'x', toPeriodStart: 'November' }), d)).toEqual({ ok: false, reason: 'failed', reverted: true, kept: [] })
+    expect(await applyChangeSet(one({ key: 'p:0', op: 'plan_let_go', level: 'year', itemId: 'm1', itemKind: 'task', title: 'x' }), d)).toEqual({ ok: false, reason: 'failed', reverted: true, kept: [] })
     expect(d.keepForward).not.toHaveBeenCalled()
     expect(d.dropCommitment).not.toHaveBeenCalled()
   })
@@ -541,7 +549,7 @@ describe('applyChangeSet: plan ops (Month / Season / Year)', () => {
       { key: 'p:2', op: 'plan_carry', level: 'season', itemId: 's1', title: 'Plan winter vacation', periodStart: '2026-09-01', toPeriodStart: '2026-12-01' },
       { key: 'p:3', op: 'plan_let_go', level: 'month', itemId: 'm1', title: 'Plan sabbatical', periodStart: '2026-10-01' },
     ] }
-    expect(await applyChangeSet(s, d)).toEqual({ ok: false, reason: 'failed' })
+    expect(await applyChangeSet(s, d)).toEqual({ ok: false, reason: 'failed', reverted: true, kept: [] })
     expect(d.updateTask).toHaveBeenCalledWith('s1', { commitments: [fall] })
     expect(d.updateGoal).toHaveBeenLastCalledWith('g1', { status: 'active' })
     expect(d.deleteGoal).toHaveBeenCalledWith('gnew')
@@ -562,7 +570,7 @@ describe('applyChangeSet: plan ops (Month / Season / Year)', () => {
 
   it('a keepForward that fails part way is still put back', async () => {
     const d = planDeps({ keepForward: vi.fn(async () => undefined) })
-    expect(await applyChangeSet(one({ key: 'p:0', op: 'plan_carry', level: 'month', itemId: 'm1', title: 'x', periodStart: '2026-10-01', toPeriodStart: '2026-11-01' }), d)).toEqual({ ok: false, reason: 'failed' })
+    expect(await applyChangeSet(one({ key: 'p:0', op: 'plan_carry', level: 'month', itemId: 'm1', title: 'x', periodStart: '2026-10-01', toPeriodStart: '2026-11-01' }), d)).toEqual({ ok: false, reason: 'failed', reverted: true, kept: [] })
     expect(d.updateTask).toHaveBeenCalledWith('m1', { commitments: [oct] })
   })
 })

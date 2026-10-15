@@ -350,7 +350,9 @@ export function CanvasActivityProvider({ children, snapshot, writers, refetch, r
       if (!r.ok) {
         failure = r.reason === 'stale'
           ? `“${r.title}” changed since I proposed this. Ask me for a fresh list.`
-          : "Couldn't save. Nothing was changed. Try again."
+          : r.reverted
+            ? "Couldn't save. Nothing was changed. Try again."
+            : "Couldn't finish, and some of it stayed saved. Check the page before trying again."
         return false
       }
       opts.ids = r.ids

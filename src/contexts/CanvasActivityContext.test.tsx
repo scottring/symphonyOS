@@ -204,12 +204,20 @@ describe('change sets', () => {
     expect(activity().receipt?.undoable).toBe(false)
   })
 
-  it('a failed apply says nothing changed', async () => {
-    const applyChanges = vi.fn(async () => ({ ok: false as const, reason: 'failed' as const }))
+  it('a failed apply that was fully reversed says nothing changed', async () => {
+    const applyChanges = vi.fn(async () => ({ ok: false as const, reason: 'failed' as const, reverted: true, kept: [] }))
     const { activity } = mountActivity({ applyChanges })
     act(() => activity().setChangeSet(set('s1')))
     await act(async () => { await activity().approveChangeSet() })
     expect(activity().changeSet).toMatchObject({ state: 'failed', message: "Couldn't save. Nothing was changed. Try again." })
+  })
+
+  it('a failed apply that left a write in place says so', async () => {
+    const applyChanges = vi.fn(async () => ({ ok: false as const, reason: 'failed' as const, reverted: false, kept: ['a'] }))
+    const { activity } = mountActivity({ applyChanges })
+    act(() => activity().setChangeSet(set('s1')))
+    await act(async () => { await activity().approveChangeSet() })
+    expect(activity().changeSet).toMatchObject({ state: 'failed', message: expect.stringMatching(/some of it stayed saved/) })
   })
 
   it('Undo is gone once the receipt is dismissed', async () => {

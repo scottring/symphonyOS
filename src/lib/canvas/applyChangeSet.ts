@@ -72,7 +72,10 @@ export interface MoreApplyDeps {
 export type ApplyResult =
   | { ok: true; ids: string[]; undo: () => Promise<boolean> }
   | { ok: false; reason: 'stale'; title: string }
-  | { ok: false; reason: 'failed' }
+  /** `reverted`: every write made before the failure was put back. When it is
+   *  false, `kept` names the rows whose write could not be reversed: the page
+   *  must say that some of it saved, never "nothing changed". */
+  | { ok: false; reason: 'failed'; reverted: boolean; kept: string[] }
 
 /** The week an add with no day lands in: the one the set was planned for
  *  (planning next week on this week's last day), else this week. */
@@ -200,7 +203,7 @@ export function canApply(set: ChangeSet, deps: ApplyDeps): boolean {
 }
 
 export async function applyChangeSet(set: ChangeSet, given: ApplyDeps): Promise<ApplyResult> {
-  if (!canApply(set, given)) return { ok: false, reason: 'failed' }
+  if (!canApply(set, given)) return { ok: false, reason: 'failed', reverted: true, kept: [] }
   // Every writer an op below calls was checked just above.
   const deps = given as ApplyDeps & MoreApplyDeps
   const byId = new Map(withSteps(deps.tasks).map((t) => [t.id, t]))
@@ -208,7 +211,7 @@ export async function applyChangeSet(set: ChangeSet, given: ApplyDeps): Promise<
   const goalsById = new Map((deps.goals ?? []).map((g) => [g.id, g]))
   for (const op of set.ops) {
     if (op.op.startsWith('plan_')) {
-      if (!planOpWellFormed(op)) return { ok: false, reason: 'failed' }
+      if (!planOpWellFormed(op)) return { ok: false, reason: 'failed', reverted: true, kept: [] }
       if (op.itemId) {
         const goal = isGoalItem(op)
         const item = goal ? goalsById.get(op.itemId) : byId.get(op.itemId)
@@ -235,19 +238,24 @@ export async function applyChangeSet(set: ChangeSet, given: ApplyDeps): Promise<
     }
   }
 
-  const undos: Array<() => Promise<unknown>> = []
+  const undos: Array<{ id: string; undo: () => Promise<unknown> }> = []
   const ids: string[] = []
-  const rollback = async () => {
-    for (const u of [...undos].reverse()) { try { await u() } catch { /* best effort: keep reversing the rest */ } }
+  /** Reverse what saved, newest first; the ids that would not reverse. */
+  const rollback = async (): Promise<string[]> => {
+    const kept: string[] = []
+    for (const u of [...undos].reverse()) {
+      try { if ((await u.undo()) === false) kept.push(u.id) } catch { kept.push(u.id) }
+    }
+    return [...new Set(kept)]
   }
   /** One write: false (or a thrown error, caught below) fails the whole set. */
   const step = async (write: () => Promise<boolean | void>, undo: () => Promise<unknown>, id: string) => {
     if ((await write()) === false) return false
     ids.push(id)
-    undos.push(undo)
+    undos.push({ id, undo })
     return true
   }
-  const fail = async (): Promise<ApplyResult> => { await rollback(); return { ok: false, reason: 'failed' } }
+  const fail = async (): Promise<ApplyResult> => { const kept = await rollback(); return { ok: false, reason: 'failed', reverted: kept.length === 0, kept } }
 
   try {
     for (const op of set.ops) {
@@ -261,7 +269,7 @@ export async function applyChangeSet(set: ChangeSet, given: ApplyDeps): Promise<
           const id = await deps.addTask(op.title, when, options)
           if (!id) return fail()
           ids.push(id)
-          undos.push(() => deps.deleteTask(id))
+          undos.push({ id, undo: () => deps.deleteTask(id) })
           continue
         }
         case 'done': {
@@ -300,7 +308,7 @@ export async function applyChangeSet(set: ChangeSet, given: ApplyDeps): Promise<
           const moved = await deps.moveOccurrence(rid, from, to, { dayOnly: !op.time })
           if (!moved) return fail()
           ids.push(rid)
-          undos.push(() => deps.undoMove(moved))
+          undos.push({ id: rid, undo: () => deps.undoMove(moved) })
           continue
         }
         case 'routine_who': {
@@ -309,7 +317,7 @@ export async function applyChangeSet(set: ChangeSet, given: ApplyDeps): Promise<
           const who = await deps.setOccurrenceAssignee(rid, day, op.assignee ?? null)
           if (!who) return fail()
           ids.push(rid)
-          undos.push(async () => (await deps.setOccurrenceAssignee(rid, day, who.previous)) !== null)
+          undos.push({ id: rid, undo: async () => (await deps.setOccurrenceAssignee(rid, day, who.previous)) !== null })
           continue
         }
         case 'routine_change': {
@@ -331,7 +339,7 @@ export async function applyChangeSet(set: ChangeSet, given: ApplyDeps): Promise<
           const id = await deps.addRoutine(routineAdd(op))
           if (!id) return fail()
           ids.push(id)
-          undos.push(() => deps.deleteRoutine(id))
+          undos.push({ id, undo: () => deps.deleteRoutine(id) })
           continue
         }
         case 'plan_add': {
@@ -340,7 +348,7 @@ export async function applyChangeSet(set: ChangeSet, given: ApplyDeps): Promise<
             const id = await deps.addGoal(op.title, { year: start.getFullYear(), ...(deps.defaultContext ? { context: deps.defaultContext } : {}) })
             if (!id) return fail()
             ids.push(id)
-            undos.push(() => deps.deleteGoal(id))
+            undos.push({ id, undo: () => deps.deleteGoal(id) })
             continue
           }
           // The page's own create (ConstellationPage.createItem): a season goal
@@ -355,7 +363,7 @@ export async function applyChangeSet(set: ChangeSet, given: ApplyDeps): Promise<
           const id = await deps.addTask(op.title, undefined, { ...options, ...(context ? { context } : {}) })
           if (!id) return fail()
           ids.push(id)
-          undos.push(() => deps.deleteTask(id))
+          undos.push({ id, undo: () => deps.deleteTask(id) })
           continue
         }
         case 'plan_carry': {
@@ -370,7 +378,7 @@ export async function applyChangeSet(set: ChangeSet, given: ApplyDeps): Promise<
             })
             if (!id) return fail()
             ids.push(id)
-            undos.push(() => deps.deleteGoal(id))
+            undos.push({ id, undo: () => deps.deleteGoal(id) })
             continue
           }
           const task = byId.get(op.itemId!)!
@@ -382,11 +390,11 @@ export async function applyChangeSet(set: ChangeSet, given: ApplyDeps): Promise<
           const restore = [task, ...steps].map((t) => ({ id: t.id, commitments: commitmentSnapshot(t) }))
           // Held before the write: keepForward can carry the task and then fail
           // on a step, and the rollback must still put the task back.
-          undos.push(async () => {
+          undos.push({ id: task.id, undo: async () => {
             let ok = true
             for (const r of restore) if ((await deps.updateTask(r.id, { commitments: r.commitments })) === false) ok = false
             return ok
-          })
+          } })
           const from = op.periodStart ? localDay(op.periodStart) : undefined
           if (!(await deps.keepForward(task.id, level === 'month' ? { monthStart: to } : { seasonStart: to }, from))) return fail()
           ids.push(task.id)
@@ -437,7 +445,7 @@ export async function applyChangeSet(set: ChangeSet, given: ApplyDeps): Promise<
     ok: true, ids,
     undo: async () => {
       let ok = true
-      for (const u of [...undos].reverse()) { try { if ((await u()) === false) ok = false } catch { ok = false } }
+      for (const u of [...undos].reverse()) { try { if ((await u.undo()) === false) ok = false } catch { ok = false } }
       return ok
     },
   }
