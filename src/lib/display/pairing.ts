@@ -31,7 +31,7 @@ export async function claimPairingCode(code: string): Promise<{ ok: true; househ
   if (session && !session.user.is_anonymous) return { ok: false, error: 'Sign out first: a display uses its own sign-in, not a person’s account.' }
   if (!session) {
     const { error } = await supabase.auth.signInAnonymously()
-    if (error) return { ok: false, error: /anonymous/i.test(error.message) ? 'Display sign-in is not enabled for this Symphony yet.' : message(error, 'Could not start the display’s sign-in') }
+    if (error) return { ok: false, error: /anonymous sign-ins are disabled/i.test(error.message) ? 'Display sign-in is not enabled for this Symphony yet.' : message(error, 'Could not start the display’s sign-in') }
   }
   const { data, error } = await supabase.rpc('claim_display_pairing', { p_code: trimmed })
   if (error) return { ok: false, error: message(error, 'That code did not work') }

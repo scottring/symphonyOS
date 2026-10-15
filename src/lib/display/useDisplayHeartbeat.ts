@@ -3,6 +3,10 @@
 // A paired display says it is alive (household_displays.last_seen_at) on
 // mount and every ten minutes, so Settings can show when it was last seen.
 // A person's session is not a display and sends nothing.
+//
+// A REVOKED display (an anonymous session the server no longer calls a
+// display) is signed out at once, so the wall shows the pairing screen
+// instead of an empty household: revoke means the device is out, visibly.
 
 import { useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
@@ -16,10 +20,18 @@ export function useDisplayHeartbeat(enabled = true): void {
     let live = true
     let timer: ReturnType<typeof setInterval> | undefined
     const beat = () => { void supabase.rpc('display_heartbeat').then(() => undefined, () => undefined) }
-    void isDisplaySession().then((display) => {
+    const check = async () => {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!live || !session?.user.is_anonymous) return false
+      const display = await isDisplaySession()
+      if (!live) return false
+      if (!display) { await supabase.auth.signOut(); return false }
+      return true
+    }
+    void check().then((display) => {
       if (!live || !display) return
       beat()
-      timer = setInterval(beat, HEARTBEAT_MS)
+      timer = setInterval(() => { void check().then((still) => { if (still) beat() }) }, HEARTBEAT_MS)
     })
     return () => { live = false; if (timer) clearInterval(timer) }
   }, [enabled])

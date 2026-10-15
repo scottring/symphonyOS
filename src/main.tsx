@@ -110,6 +110,18 @@ import { DomainGateProvider } from './components/domain/DomainGate'
 import { PlaceProvider } from './hooks/usePlace'
 import { Shell } from './shell/Shell'
 import { AuthGate } from './components/auth/AuthGate'
+
+// A tab that reloads while a deploy lands can be handed an index.html whose
+// chunks are gone (seen 2026-10-15: a blank page until a hard reload). Vite
+// reports the failed import; reload once, with the new index, instead of
+// leaving the person a white screen. Guarded so it cannot loop.
+window.addEventListener('vite:preloadError', (event) => {
+  let already = false
+  try { already = sessionStorage.getItem('symphony.reloadedForChunk') === '1'; if (!already) sessionStorage.setItem('symphony.reloadedForChunk', '1') } catch { /* no storage */ }
+  if (already) return
+  event.preventDefault()
+  window.location.reload()
+})
 import { FirstRunGate } from './components/setup/FirstRunGate'
 import { ErrorBoundary } from './components/ErrorBoundary'
 
