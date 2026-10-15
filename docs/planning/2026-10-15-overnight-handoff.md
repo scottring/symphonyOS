@@ -28,6 +28,10 @@ Branch `claude/beta-readiness-program` = `main` (last gated push listed below). 
 - Supabase personal access token at `~/.supabase/pat` (none found) → scratch project → restore rehearsal. Not rehearsed; not claimed.
 - Spoken session (microphone), named iPad, five-adult usability: `docs/planning/beta-session-kit.md`.
 
+## Checkpoint 07:25Z
+
+Done since the last checkpoint: revoke/sign-out evidence with build id (`docs/planning/beta-sessions/evidence/2026-10-15-display-revoke.md`); privacy pass extended to notes, attachments and chat history, 35/35; invited-adult join through the product page (`…-invited-adult-joined.jpg`) and the first-run gate now asks the server for a live invitation (`my_pending_invitation`, applied hosted); J1 failure cases (`…-j1-failure-cases.md`): retry no duplicate, stale approval refused, Undo conflict partial — and one failure found and fixed (pending card lost on reload, `676029ee`, on main, Vercel building). Money reconciliation written into beta-readiness.md with residual exposure. New hosted migrations tonight: `20261015190000_my_pending_invitation`, `20261015200000_updated_at_stamped_by_database`.
+
 ## Next action
 
-See the bottom of this file for the latest checkpoint.
+Verify the reload-with-pending-card fix on the new build; then restructure beta-readiness.md (current summary on top); then the Gmail consent/OAuth recovery review.
