@@ -159,6 +159,18 @@ Against the deployed agent, with the synthetic household Scott created (`smkaufm
 
 The 95% target for the core scenarios is a sample of five on one scenario so far; it is evidence that the loop is measurable, not a pass of the release suite.
 
+## Browser-layer run, October 15 (hosted, synthetic household, Scott's Chrome + a separate Playwright browser)
+
+Recorded as `symphony-j1-browser-layer.gif` (Scott's Downloads). Observed:
+
+- Four captures typed into the bar → one card with all four, dashed on the week, nothing saved; the correction revised the card in place (one plumber task, now Friday); **Approve all 4** saved them (receipt "Saved · 4 things for the week" with Undo; two on Friday, two in "No day yet"); **Undo** removed all four (database: 0 rows).
+- Display pairing from a separate browser: code from Settings → Displays, claimed on `/wall-v2` → the wall rendered for the display; `household_members.role = display`, heartbeat written. **Revoke** in Settings → membership gone; after the fix below the device signs out and shows the pairing screen.
+- Anonymous sign-ins were enabled by Scott in the dashboard.
+
+Bugs found and fixed in the same run (all on main and live): `create_display_pairing_code` failed hosted because `gen_random_bytes` lives in the `extensions` schema there; `/wall-v2` rendered its own sign-in form inside `WallV2Shell` so the pairing screen never appeared; the invite gate refused anonymous users ("Database error creating anonymous user", migration `20261015170000`); a revoked wall kept its empty shell (now signs out at the next check); a tab reloading as a deploy landed cached a 404 for the new bundle and went white (Vite `preloadError` now reloads once).
+
+Left over: revoked anonymous auth users remain in `auth.users` until deleted (two were removed by hand; `revoke_display` could delete the auth user through the service role later); a price row for `claude-opus-5-5` was added as a placeholder.
+
 ## Release blockers in order
 
 Owner labels are responsibilities, not additional staff. Scott retains scope, spending, external-claim, and release approval.

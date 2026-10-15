@@ -20,6 +20,7 @@ create table public.ai_model_prices (
   note text
 );
 insert into public.ai_model_prices (model, input_cents_per_million, output_cents_per_million, cents_per_minute, note) values
+  ('claude-opus-5-5', 1500, 7500, null, 'placeholder: public list rate, confirm before enabling'),
   ('claude-sonnet-4-6', 300, 1500, null, 'placeholder: public list rate, confirm before enabling'),
   ('claude-haiku-4-5', 100, 500, null, 'placeholder: confirm'),
   ('gpt-4o-mini', 15, 60, null, 'placeholder: confirm'),
