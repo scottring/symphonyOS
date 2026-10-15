@@ -5,7 +5,9 @@ Deno.serve(req=>handleWorkspaceVoice(req,{
  env:key=>Deno.env.get(key),
  fetch:async (input,init)=>{
   const db=createClient(Deno.env.get('SUPABASE_URL')!,Deno.env.get('SUPABASE_ANON_KEY')!,{global:{headers:{Authorization:req.headers.get('Authorization')??''}}})
-  return guardedAiFetch(db,'workspace-voice')(input,init)
+  // A realtime call reports no usage: the five-minute admission is charged as
+  // an estimate at the model's per-minute price (ai_model_prices).
+  return guardedAiFetch(db,'workspace-voice',fetch,{model:Deno.env.get('WORKSPACE_VOICE_MODEL')||'gpt-realtime-2.1',minutes:5})(input,init)
  },
  reserve:async authorization=>{
   const db=createClient(Deno.env.get('SUPABASE_URL')!,Deno.env.get('SUPABASE_ANON_KEY')!,{global:{headers:{Authorization:authorization}}})

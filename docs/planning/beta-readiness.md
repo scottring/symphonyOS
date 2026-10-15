@@ -129,6 +129,12 @@ Prepared on `claude/beta-readiness-program`, October 15.
 
 Prepared on `claude/beta-readiness-program`, October 15. Every paid route in the repository now reserves a provider call per attempt (interactive through the caller, background through the service role for the person the job serves). A paired display reports `last_seen_at` every ten minutes (`display_heartbeat`, display-only). The live voice's transcriber is given the family's names and routine names as its prompt (plan §5), bounded and never task text. Still outstanding for B03: chosen allowance numbers, hosted migrations, a realtime-duration cap and a dollar reconciliation.
 
+## Ninth implementation batch — money, not only calls
+
+Prepared on `claude/beta-readiness-program`, October 15. Migration `20261015150000_ai_spend_ledger.sql`: `ai_model_prices` (seeded as disabled placeholders at public list rates; an operator confirms and enables each), `ai_spend` (tokens, minutes and cents per call; never words), `record_ai_usage` / `record_ai_usage_for`, and `daily_cents` / `monthly_cents` on the global configuration and each household allowance, checked by both reservation functions before every provider attempt, plus `refuse_unpriced` to forbid any model without an enabled price. `guardedAiFetch` / `guardedAiFetchFor` now name the model to the reservation and record the reply's usage (Anthropic and OpenAI shapes) or the caller's estimate: a realtime admission is charged as five minutes at the model's per-minute price, speech as characters. A call can overshoot a ceiling by at most its own cost; the next is refused. Harness: 15 local checks (pricing, unpriced rows, daily and monthly cent ceilings, unpriced-model refusal).
+
+To turn the plan's hypotheses into limits: `update ai_usage_configuration set monthly_cents = 25000` ($250/month globally), and per household `daily_cents = 300, monthly_cents = 2000` ($3/day, $20/month) — after enabling confirmed price rows. Still not covered: provider-side realtime usage beyond the admission estimate, hosted web/container tool charges, and reconciliation against the provider invoices (compare `ai_spend` sums with the dashboards monthly).
+
 ## Release blockers in order
 
 Owner labels are responsibilities, not additional staff. Scott retains scope, spending, external-claim, and release approval.

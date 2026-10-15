@@ -51,7 +51,9 @@ Deno.serve(async (req) => {
 
   let res: Response
   try {
-    res = await guardedAiFetch(db, 'wall-say')('https://api.openai.com/v1/audio/speech', {
+    // Speech is priced per character: recorded as input units so the price
+    // row's input rate (per million characters) can cost it.
+    res = await guardedAiFetch(db, 'wall-say', fetch, { model: MODEL, inputTokens: text.length })('https://api.openai.com/v1/audio/speech', {
       method: 'POST',
       headers: { 'content-type': 'application/json', authorization: `Bearer ${apiKey}` },
       body: JSON.stringify({ model: MODEL, voice, input: text, instructions: STYLE, response_format: 'wav' }),

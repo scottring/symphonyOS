@@ -49,6 +49,7 @@ try {
   // psql -c treats a leading "--" as the end of its options: lead with a statement.
   sql('select 1;\n' + readFileSync(new URL('../supabase/migrations/20261015110000_ai_allowance_all_interactive_routes.sql', import.meta.url), 'utf8'))
   sql('select 1;\n' + readFileSync(new URL('../supabase/migrations/20261015120000_ai_allowance_background_routes.sql', import.meta.url), 'utf8'))
+  sql('select 1;\n' + readFileSync(new URL('../supabase/migrations/20261015150000_ai_spend_ledger.sql', import.meta.url), 'utf8'))
 
   check('migration starts disabled without invented quotas', () => {
     assert.equal(reserve().allowed, false)
@@ -144,6 +145,25 @@ try {
     assert.equal(refused, true)
     // Even with the grant, a request whose JWT is not the service role is refused inside.
     assert.equal(JSON.parse(sql(`set role service_role; set request.jwt.claims = '{"role":"authenticated","sub":"${B}"}'; select public.reserve_ai_provider_call_for('${A}', 'email-scanner');`).split('\n').at(-1)).reason, 'unavailable')
+  })
+  reset()
+  check('cents: usage is priced only by an enabled price, and a cent ceiling refuses the next call', () => {
+    sql("update public.ai_model_prices set enabled = true where model = 'claude-sonnet-4-6'")
+    sql(`set role authenticated; set request.jwt.claim.sub = '${A}'; select public.record_ai_usage('symphony-agent', 'claude-sonnet-4-6', 1000000, 100000);`)
+    sql(`set role authenticated; set request.jwt.claim.sub = '${A}'; select public.record_ai_usage('symphony-agent', 'unknown-model', 1000000, 0);`)
+    // 1M input at 300c + 100k output at 1500c/M = 450c; the unknown model is unpriced (null).
+    assert.equal(sql("select sum(cents)::text from public.ai_spend"), '450.0000')
+    assert.equal(sql("select count(*) from public.ai_spend where cents is null"), '1')
+    assert.equal(reserve(A).allowed, true)
+    sql(`update public.ai_household_allowances set daily_cents = 400 where household_id = '${H1}'`)
+    assert.equal(reserve(A).reason, 'daily_limit')
+    assert.equal(reserve(C).allowed, true)
+    sql(`update public.ai_household_allowances set daily_cents = null where household_id = '${H1}'; update public.ai_usage_configuration set monthly_cents = 400`)
+    assert.equal(reserve(C).reason, 'monthly_limit')
+    sql('update public.ai_usage_configuration set monthly_cents = null, refuse_unpriced = true')
+    assert.equal(JSON.parse(sql(query(A).replace("select public.reserve_ai_provider_call('symphony-agent')", "select public.reserve_ai_provider_call('symphony-agent', 'mystery-model')")).split('\n').at(-1)).detail, 'unpriced_model')
+    assert.equal(JSON.parse(sql(query(A).replace("select public.reserve_ai_provider_call('symphony-agent')", "select public.reserve_ai_provider_call('symphony-agent', 'claude-sonnet-4-6')")).split('\n').at(-1)).allowed, true)
+    sql('update public.ai_usage_configuration set refuse_unpriced = false; truncate public.ai_spend')
   })
   reset()
   check('emergency disable blocks the next reservation without resetting usage', () => {

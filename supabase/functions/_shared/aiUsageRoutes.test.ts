@@ -56,7 +56,7 @@ describe.each(routes)('%s usage guard', (route) => {
     quotaReady = true
     expect((await run(route)).status).toBe(200)
     expect(providerCalls).toBe(1)
-    expect(rpc).toHaveBeenCalledWith('reserve_ai_provider_call', { p_route: route })
+    expect(rpc).toHaveBeenCalledWith('reserve_ai_provider_call', expect.objectContaining({ p_route: route }))
   })
 
   it('denies an exhausted allowance without any provider request', async () => {
@@ -65,7 +65,7 @@ describe.each(routes)('%s usage guard', (route) => {
     expect(result.status).toBe(route === 'symphony-agent' ? 200 : 429)
     expect(result.body).toContain('AI allowance')
     expect(result.body).toContain('view and change your plans directly')
-    expect(rpc).toHaveBeenCalledWith('reserve_ai_provider_call', { p_route: route })
+    expect(rpc).toHaveBeenCalledWith('reserve_ai_provider_call', expect.objectContaining({ p_route: route }))
   })
 
   it('authenticates before reserving or spending', async () => {
