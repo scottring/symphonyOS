@@ -165,6 +165,18 @@ export function voiceFunctionName(): string {
  * Sends the full message history; the function verifies the caller's JWT
  * and runs all tool queries RLS-scoped to that user.
  */
+/** Why the agent refused, in the person's words: the AI allowance (429/503
+ *  with an `ai_*` code, from _shared/aiUsage.ts) says so and when it resets;
+ *  an expired session says so; anything else is "offline". Never the raw body. */
+export async function describeRefusal(res: { status: number; text?: () => Promise<string> }): Promise<string> {
+  if (res.status === 401) return 'Session expired'
+  try {
+    const body = JSON.parse(await (res.text?.() ?? Promise.resolve(''))) as { error?: unknown; code?: unknown }
+    if (typeof body?.code === 'string' && body.code.startsWith('ai_') && typeof body.error === 'string' && body.error.trim()) return body.error.trim()
+  } catch { /* not JSON */ }
+  return 'Assistant offline'
+}
+
 export async function streamSymphonyAgent(
   messages: AgentApiMessage[],
   handlers: StreamHandlers,
@@ -200,7 +212,7 @@ export async function streamSymphonyAgent(
   )
 
   if (!res.ok || !res.body) {
-    handlers.onError?.(res.status === 401 ? 'Session expired' : 'Assistant offline')
+    handlers.onError?.(await describeRefusal(res))
     return
   }
 

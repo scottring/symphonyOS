@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach, vi } from 'vitest'
-import { parseSSEChunk, agentFunctionName, voiceFunctionName, streamSymphonyAgent } from './agentStream'
+import { parseSSEChunk, agentFunctionName, voiceFunctionName, streamSymphonyAgent, describeRefusal } from './agentStream'
 import { supabase } from '@/lib/supabase'
 
 describe('parseSSEChunk', () => {
@@ -74,5 +74,17 @@ describe('streamSymphonyAgent request', () => {
     await streamSymphonyAgent([{ role: 'user', content: 'next' }], { changeCard })
     const body = JSON.parse((fetch.mock.calls[0] as unknown as [string, RequestInit])[1].body as string)
     expect(body.changeCard).toEqual(changeCard)
+  })
+})
+
+describe('describeRefusal', () => {
+  it('says the allowance message and reset, never the raw body', async () => {
+    const res = { status: 429, text: async () => JSON.stringify({ error: 'The AI allowance for this day has been reached. It resets at 2026-10-16T00:00:00.000Z (UTC). You can still view and change your plans directly.', code: 'ai_daily_limit' }) }
+    expect(await describeRefusal(res)).toMatch(/^The AI allowance for this day has been reached/)
+  })
+  it('an expired session and an unexplained failure keep their plain words', async () => {
+    expect(await describeRefusal({ status: 401 })).toBe('Session expired')
+    expect(await describeRefusal({ status: 500, text: async () => 'boom' })).toBe('Assistant offline')
+    expect(await describeRefusal({ status: 429, text: async () => JSON.stringify({ error: 'rate', code: 'other' }) })).toBe('Assistant offline')
   })
 })
