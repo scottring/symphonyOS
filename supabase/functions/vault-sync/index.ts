@@ -1,8 +1,24 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { AiUsageError, guardedAiFetchFor } from '../_shared/aiUsage.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-hub-signature-256',
+}
+
+/** Once the allowance refuses a run, every later embedding in that run is
+ * refused locally instead of asking the database again per file. */
+function rememberingRefusal(guarded: typeof fetch): typeof fetch {
+  let refused: AiUsageError | null = null
+  return async (input, init) => {
+    if (refused) throw refused
+    try {
+      return await guarded(input, init)
+    } catch (err) {
+      if (err instanceof AiUsageError) refused = err
+      throw err
+    }
+  }
 }
 
 // Mirror of src/lib/scope.ts scopeForDomain — the app's single scope rule.
@@ -112,10 +128,12 @@ async function verifySignature(payload: string, signature: string, secret: strin
   return hexSig === signature
 }
 
-// Generate embeddings via OpenAI
-async function generateEmbedding(text: string, openAiKey: string): Promise<number[] | null> {
+// Generate embeddings via OpenAI. A refused allowance (AiUsageError) is
+// rethrown so the caller can record the file as deferred; provider failures
+// still degrade to null as before.
+async function generateEmbedding(text: string, openAiKey: string, transport: typeof fetch = fetch): Promise<number[] | null> {
   try {
-    const response = await fetch('https://api.openai.com/v1/embeddings', {
+    const response = await transport('https://api.openai.com/v1/embeddings', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${openAiKey}`,
@@ -133,6 +151,7 @@ async function generateEmbedding(text: string, openAiKey: string): Promise<numbe
     const result = await response.json()
     return result.data?.[0]?.embedding ?? null
   } catch (err) {
+    if (err instanceof AiUsageError) throw err
     console.error('Embedding generation failed:', err)
     return null
   }
@@ -165,6 +184,8 @@ Deno.serve(async (req) => {
     const vaultUserId = Deno.env.get('VAULT_USER_ID')! // Scott's user ID
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
+    // Embeddings are charged to the vault's owner: this is a webhook, no JWT.
+    const paidFetch = rememberingRefusal(guardedAiFetchFor(supabase, vaultUserId, 'vault-sync'))
 
     // Check if this is a backfill request
     const url = new URL(req.url)
@@ -183,7 +204,7 @@ Deno.serve(async (req) => {
       // Optional path prefix to process a subset (e.g. 'job-search/') so a large
       // vault can be backfilled in chunks that each fit the worker compute limit.
       const prefix = url.searchParams.get('prefix') ?? undefined
-      return await handleBackfill(supabase, githubPat, openAiKey, vaultUserId, prefix)
+      return await handleBackfill(supabase, githubPat, openAiKey, vaultUserId, prefix, paidFetch)
     }
 
     // Normal webhook flow
@@ -230,7 +251,9 @@ Deno.serve(async (req) => {
 
     const filesToSync = [...added, ...modified]
     const attempted = filesToSync.length
-    const results = { synced: 0, removed: 0, errors: [] as string[] }
+    // embedding_deferred: files whose text synced but whose embedding the AI
+    // allowance refused; they are not errors, and a backfill picks them up.
+    const results = { synced: 0, removed: 0, embedding_deferred: [] as string[], errors: [] as string[] }
 
     // Remove deleted files
     for (const filePath of removed) {
@@ -251,8 +274,9 @@ Deno.serve(async (req) => {
     // Sync added/modified files
     for (const filePath of filesToSync) {
       try {
-        await syncFile(supabase, githubPat, openAiKey, vaultUserId, filePath, lastCommitSha, payload.repository.full_name)
+        const outcome = await syncFile(supabase, githubPat, openAiKey, vaultUserId, filePath, lastCommitSha, payload.repository.full_name, paidFetch)
         results.synced++
+        if (outcome === 'embedding_deferred') results.embedding_deferred.push(filePath)
       } catch (err) {
         results.errors.push(`Sync ${filePath}: ${err instanceof Error ? err.message : String(err)}`)
       }
@@ -292,10 +316,11 @@ async function syncFile(
   filePath: string,
   commitSha: string,
   repoFullName: string,
-) {
+  paidFetch: typeof fetch = fetch,
+): Promise<'synced' | 'embedding_deferred' | 'skipped'> {
   // Skip non-content directories
   if (filePath.startsWith('.') || filePath.startsWith('scripts/') || filePath.startsWith('assets/')) {
-    return
+    return 'skipped'
   }
 
   // Fetch file content from GitHub
@@ -319,9 +344,20 @@ async function syncFile(
   const domain = frontmatter.domain as string | undefined
   const context = domainToContext(domain)
 
-  // Generate embedding
+  // Generate embedding. When the allowance refuses it, the note text still
+  // syncs (an existing embedding is left untouched by the upsert) and the
+  // file is reported as deferred rather than counted as embedded.
   const embeddingText = `${title}\n\n${body}`.slice(0, 8000)
-  const embedding = openAiKey ? await generateEmbedding(embeddingText, openAiKey) : null
+  let embedding: number[] | null = null
+  let embeddingDeferred = false
+  if (openAiKey) {
+    try {
+      embedding = await generateEmbedding(embeddingText, openAiKey, paidFetch)
+    } catch (err) {
+      if (!(err instanceof AiUsageError)) throw err
+      embeddingDeferred = true
+    }
+  }
 
   // Upsert note
   //
@@ -362,6 +398,7 @@ async function syncFile(
 
   // Entity matching
   await matchEntities(supabase, userId, note.id, filePath, frontmatter, body)
+  return embeddingDeferred ? 'embedding_deferred' : 'synced'
 }
 
 async function matchEntities(
@@ -486,6 +523,7 @@ async function handleBackfill(
   openAiKey: string | undefined,
   userId: string,
   prefix?: string,
+  paidFetch: typeof fetch = fetch,
 ) {
   const repoFullName = 'scottring/scotts-world'
 
@@ -520,7 +558,7 @@ async function handleBackfill(
     )
     .map((f: { path: string }) => f.path)
 
-  const results = { total: mdFiles.length, synced: 0, errors: [] as string[] }
+  const results = { total: mdFiles.length, synced: 0, embedding_deferred: [] as string[], errors: [] as string[] }
 
   // Process in batches to avoid rate limits
   const batchSize = 10
@@ -528,8 +566,9 @@ async function handleBackfill(
     const batch = mdFiles.slice(i, i + batchSize)
     const promises = batch.map(async (filePath: string) => {
       try {
-        await syncFile(supabase, githubPat, openAiKey, userId, filePath, 'backfill', repoFullName)
+        const outcome = await syncFile(supabase, githubPat, openAiKey, userId, filePath, 'backfill', repoFullName, paidFetch)
         results.synced++
+        if (outcome === 'embedding_deferred') results.embedding_deferred.push(filePath)
       } catch (err) {
         results.errors.push(`${filePath}: ${err instanceof Error ? err.message : String(err)}`)
       }

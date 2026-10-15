@@ -1,4 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { AiUsageError, guardedAiFetchFor } from '../_shared/aiUsage.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -287,7 +288,11 @@ Deno.serve(async (req) => {
       })
     }
 
-    const aiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+    // Charged to the scanned user through the service client (this route is
+    // background-only). A refusal lands before any item is written, so the
+    // same messages are found unprocessed on the next scan.
+    const paidFetch = guardedAiFetchFor(supabase, user.id, 'email-scanner')
+    const aiResponse = await paidFetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${openAiKey}`,
@@ -388,6 +393,12 @@ Rules:
     })
 
   } catch (err) {
+    if (err instanceof AiUsageError) {
+      return new Response(JSON.stringify({ error: err.message, code: err.code, retry_at: err.retryAt }), {
+        status: err.status,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
     console.error('Email scanner error:', err)
     return new Response(JSON.stringify({ error: (err as Error).message }), {
       status: 500,

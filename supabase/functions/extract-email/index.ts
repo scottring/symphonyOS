@@ -8,6 +8,7 @@ import { buildEmailPrompt, parseEmailExtraction } from './lib/prompt.ts'
 import { planWrites, itemsMatch, sameAudience, type MailRowAudience } from './lib/plan.ts'
 import { addDays, zonedIso } from './lib/dates.ts'
 import type { ExistingBlock, Member, TaskRow } from './lib/types.ts'
+import { AiUsageError, guardedAiFetchFor } from '../_shared/aiUsage.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -17,8 +18,8 @@ const corsHeaders = {
 const json = (b: unknown, status = 200) =>
   new Response(JSON.stringify(b), { status, headers: { ...corsHeaders, 'content-type': 'application/json' } })
 
-async function callClaude(prompt: string, apiKey: string): Promise<string> {
-  const res = await fetch('https://api.anthropic.com/v1/messages', {
+async function callClaude(prompt: string, apiKey: string, transport: typeof fetch = fetch): Promise<string> {
+  const res = await transport('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: { 'content-type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
     body: JSON.stringify({ model: 'claude-sonnet-5', max_tokens: 4096, messages: [{ role: 'user', content: prompt }] }),
@@ -119,7 +120,9 @@ Deno.serve(async (req: Request) => {
     const body = truncated
       ? `${fullBody.slice(0, MAX_PROMPT_BODY)}\n\n[TRUNCATED — the email was longer than what could be read]`
       : fullBody
-    const raw = await callClaude(buildEmailPrompt({ subject, sender: capture.sender ?? senderLabel, body, members, todayYmd, truncated }), Deno.env.get('ANTHROPIC_API_KEY')!)
+    // The model call is charged to the capture's owner (service role, no JWT).
+    const paidFetch = guardedAiFetchFor(supabase, capture.user_id, 'extract-email')
+    const raw = await callClaude(buildEmailPrompt({ subject, sender: capture.sender ?? senderLabel, body, members, todayYmd, truncated }), Deno.env.get('ANTHROPIC_API_KEY')!, paidFetch)
     const extraction = parseEmailExtraction(raw)
     const plan = planWrites({ extraction, members, todayYmd, tz, capture: { id: capture.id, user_id: capture.user_id, subject, sender_label: senderLabel }, existing })
 
@@ -212,6 +215,12 @@ Deno.serve(async (req: Request) => {
     await supabase.from('captures').update({ status: 'extracted', error: null }).eq('id', capture.id)
     return json({ ok: true, events: plan.events.length, children, inbox: plan.inbox.length, routines: plan.routines.length, note: !!plan.note, notices: plan.notices.length })
   } catch (e) {
+    if (e instanceof AiUsageError) {
+      // Allowance refused: nothing was written. Leave the capture pending so
+      // the next inbound-email delivery (or a hand re-run) retries it.
+      await supabase.from('captures').update({ status: 'pending', error: e.message }).eq('id', capture.id)
+      return json({ error: e.message, code: e.code, retry_at: e.retryAt }, e.status)
+    }
     const { error: markError } = await supabase.from('captures').update({ status: 'failed', error: String(e) }).eq('id', capture.id)
     // If even this write fails the capture stays 'pending' and looks like a
     // lost dispatch; the log is the only place that says otherwise.

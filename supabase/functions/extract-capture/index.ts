@@ -8,6 +8,7 @@ import { filterSince } from './lib/dedupe.ts'
 import { buildExtractPrompt, parseExtractResponse, type CandidateItem, type GapFlag } from './lib/extract.ts'
 import { chunkMessages } from './lib/chunk.ts'
 import { isTimestampedKind } from './lib/kinds.ts'
+import { AiUsageError, guardedAiFetchFor } from '../_shared/aiUsage.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -29,8 +30,8 @@ function scopeFor(
   return assignees.some((a) => a && a !== self) ? 'couple' : 'individual'
 }
 
-async function callAnthropic(prompt: string, apiKey: string): Promise<string> {
-  const res = await fetch('https://api.anthropic.com/v1/messages', {
+async function callAnthropic(prompt: string, apiKey: string, transport: typeof fetch = fetch): Promise<string> {
+  const res = await transport('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: { 'content-type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
     body: JSON.stringify({ model: 'claude-haiku-4-5-20251001', max_tokens: 4096, messages: [{ role: 'user', content: prompt }] }),
@@ -128,11 +129,13 @@ Deno.serve(async (req: Request) => {
     }
 
     const apiKey = Deno.env.get('ANTHROPIC_API_KEY')!
+    // One reservation per chunk, charged to the capture's owner (service role, no JWT).
+    const paidFetch = guardedAiFetchFor(supabase, capture.user_id, 'extract-capture')
     const label = capture.source_label ?? capture.source_key ?? 'capture'
     const merged: { candidates: CandidateItem[]; summary: string[]; announcements: string[]; gaps: GapFlag[] } =
       { candidates: [], summary: [], announcements: [], gaps: [] }
     for (const chunk of chunks) {
-      const r = parseExtractResponse(await callAnthropic(buildExtractPrompt(chunk, label), apiKey))
+      const r = parseExtractResponse(await callAnthropic(buildExtractPrompt(chunk, label), apiKey, paidFetch))
       merged.candidates.push(...r.candidates)
       if (r.summary) merged.summary.push(r.summary)
       merged.announcements.push(...r.announcements)
@@ -196,6 +199,12 @@ Deno.serve(async (req: Request) => {
     await supabase.from('captures').update({ status: 'extracted' }).eq('id', capture.id)
     return json({ ok: true, candidates: result.candidates.length, announcements: result.announcements.length, gaps: result.gaps.length })
   } catch (e) {
+    if (e instanceof AiUsageError) {
+      // Allowance refused before anything was written (tasks, note and
+      // checkpoint all come after the model loop). Stay pending for a retry.
+      await supabase.from('captures').update({ status: 'pending', error: e.message }).eq('id', capture.id)
+      return json({ error: e.message, code: e.code, retry_at: e.retryAt }, e.status)
+    }
     await supabase.from('captures').update({ status: 'failed', error: String(e) }).eq('id', capture.id)
     return json({ error: String(e) }, 500)
   }

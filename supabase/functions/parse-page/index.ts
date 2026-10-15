@@ -12,7 +12,7 @@
 // (the dropbox-poll caller, which has no user session).
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { windowCalendar, buildPagePrompt, parsePageResponse, isAltitude, type Member, type PageAltitude } from './lib/parse.ts'
-import { AiUsageError, guardedAiFetch } from '../_shared/aiUsage.ts'
+import { AiUsageError, guardedAiFetch, guardedAiFetchFor } from '../_shared/aiUsage.ts'
 
 const MODEL = 'claude-sonnet-4-6'
 const YMD = /^\d{4}-\d{2}-\d{2}$/
@@ -88,13 +88,14 @@ Deno.serve(async (req) => {
   // read paths under its own user id; dropbox-poll sends the service key and
   // names the user explicitly.
   let userId: string
-  // A signed-in caller reserves an AI provider call (as themselves) before each
-  // model attempt. The service-role poller has no user session, so the
-  // reservation RPC cannot attribute it; that path is not metered here.
-  let modelFetch: typeof fetch = fetch
+  // Either way one AI provider call is reserved before each model attempt: a
+  // signed-in caller as themselves; the service-role poller on behalf of the
+  // named user, through the service client (the only role the RPC accepts).
+  let modelFetch: typeof fetch
   if (token === serviceKey) {
     if (!body.userId) return json({ error: 'userId required for service-role calls' }, 400)
     userId = body.userId
+    modelFetch = guardedAiFetchFor(service, userId, 'parse-page')
   } else {
     const { data: { user }, error: authErr } = await service.auth.getUser(token)
     if (authErr || !user) return json({ error: 'Invalid token' }, 401)

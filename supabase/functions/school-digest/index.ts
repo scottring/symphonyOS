@@ -20,6 +20,7 @@ import {
 } from './lib/digest.ts'
 import { buildHomeworkPrompt, parseHomework, planHomework, type ExistingHomework } from './lib/homework.ts'
 import type { Member } from '../extract-email/lib/types.ts'
+import { AiUsageError, guardedAiFetchFor } from '../_shared/aiUsage.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -29,8 +30,8 @@ const corsHeaders = {
 const json = (b: unknown, status = 200) =>
   new Response(JSON.stringify(b), { status, headers: { ...corsHeaders, 'content-type': 'application/json' } })
 
-async function callClaude(prompt: string, apiKey: string): Promise<string> {
-  const res = await fetch('https://api.anthropic.com/v1/messages', {
+async function callClaude(prompt: string, apiKey: string, transport: typeof fetch = fetch): Promise<string> {
+  const res = await transport('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: { 'content-type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
     body: JSON.stringify({
@@ -157,7 +158,7 @@ type Db = any
 interface RosterRow { id: string; name: string; role_label: string | null; is_full_user: boolean | null }
 
 async function postKidsWork(
-  supabase: Db, userId: string, sources: DigestSource[], apiKey: string,
+  supabase: Db, userId: string, sources: DigestSource[], apiKey: string, transport: typeof fetch = fetch,
 ): Promise<{ written: number; skipped?: string }> {
   // The household this user belongs to, its clock and its roster — read the
   // way extract-email reads them.
@@ -183,7 +184,7 @@ async function postKidsWork(
   })
   if (!members.some((m) => m.isChild)) return { written: 0, skipped: 'no children in the household' }
 
-  const items = parseHomework(await callClaude(buildHomeworkPrompt(sources, members, today.ymd, today.weekday), apiKey))
+  const items = parseHomework(await callClaude(buildHomeworkPrompt(sources, members, today.ymd, today.weekday), apiKey, transport))
   if (items.length === 0) return { written: 0 }
 
   // Open homework anyone in the household already has, for the dedupe.
@@ -224,11 +225,14 @@ Deno.serve(async (req: Request) => {
   const timezone = body.timezone ?? 'America/New_York'
   const dateLabel = digestDateLabel(new Date(), timezone)
 
+  const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!)
+  // Both model calls (digest, then homework) are charged to the user whose
+  // transcripts these are: the worker holds a shared secret, not a JWT.
+  const paidFetch = guardedAiFetchFor(supabase, userId, 'school-digest')
   try {
-    const digest = parseDigestResponse(await callClaude(buildDigestPrompt(sources, dateLabel), Deno.env.get('ANTHROPIC_API_KEY')!))
+    const digest = parseDigestResponse(await callClaude(buildDigestPrompt(sources, dateLabel), Deno.env.get('ANTHROPIC_API_KEY')!, paidFetch))
     if (digest.sections.length === 0) throw new Error('Digest came back empty — not sending')
 
-    const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!)
     const accessToken = await gmailAccessToken(supabase, userId)
     const profile = await (await fetch('https://gmail.googleapis.com/gmail/v1/users/me/profile', {
       headers: { Authorization: `Bearer ${accessToken}` },
@@ -246,15 +250,23 @@ Deno.serve(async (req: Request) => {
       html: renderDigestHtml(digest, dateLabel),
     }))
     // The kids' work onto the wall — after the email, and never at its cost.
-    let kidsWork: { written: number; skipped?: string } | { error: string }
+    let kidsWork: { written: number; skipped?: string; retry_at?: string } | { error: string }
     try {
-      kidsWork = await postKidsWork(supabase, userId, sources, Deno.env.get('ANTHROPIC_API_KEY')!)
+      kidsWork = await postKidsWork(supabase, userId, sources, Deno.env.get('ANTHROPIC_API_KEY')!, paidFetch)
     } catch (e) {
-      console.error('school-digest: kids\' work failed:', e)
-      kidsWork = { error: String(e) }
+      if (e instanceof AiUsageError) {
+        // The email went; the homework pass was refused by the allowance and
+        // is reported as skipped, not done. Tomorrow's digest carries it again.
+        kidsWork = { written: 0, skipped: e.code, retry_at: e.retryAt }
+      } else {
+        console.error('school-digest: kids\' work failed:', e)
+        kidsWork = { error: String(e) }
+      }
     }
     return json({ ok: true, messageId: id, to, sections: digest.sections.length, toDo, kidsWork })
   } catch (e) {
+    // Digest refused: nothing was sent or written; the worker retries later.
+    if (e instanceof AiUsageError) return json({ error: e.message, code: e.code, retry_at: e.retryAt }, e.status)
     console.error('school-digest failed:', e)
     return json({ error: String(e) }, 500)
   }

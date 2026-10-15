@@ -1,4 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { AiUsageError, guardedAiFetchFor } from '../_shared/aiUsage.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -397,7 +398,12 @@ Rules:
 - Be conservative — only propose actions when clearly needed.
 - If an email is purely informational with no action needed, return an empty actions array.`
 
-    const aiResponse = await fetch('https://api.anthropic.com/v1/messages', {
+    // One reservation for the one model call, charged to the resolved user on
+    // both paths (the route is background-only, so the JWT path goes through
+    // the service client too). Refusal happens before anything is queued, so
+    // the unread emails are picked up again on the next check.
+    const paidFetch = guardedAiFetchFor(supabaseAdmin, userId, 'gmail-check')
+    const aiResponse = await paidFetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
         'x-api-key': anthropicKey,
@@ -512,6 +518,12 @@ Rules:
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
   } catch (err) {
+    if (err instanceof AiUsageError) {
+      return new Response(JSON.stringify({ error: err.message, code: err.code, retry_at: err.retryAt }), {
+        status: err.status,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
     console.error('Gmail check error:', err)
     return new Response(JSON.stringify({ error: (err as Error).message }), {
       status: 500,

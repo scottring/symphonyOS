@@ -5,6 +5,7 @@ import { facetsToFacts, renderBundleForPrompt } from '../_shared/context-graph/b
 import { facetRuleSuggestions } from './lib/facetRules.ts'
 import { documentExpirySuggestions, type DocumentRow } from './lib/documentRules.ts'
 import { computeUrgency, deriveUrgencyFacts, type UrgencyInput } from '../_shared/urgency.ts'
+import { AiUsageError, guardedAiFetchFor } from '../_shared/aiUsage.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -503,6 +504,7 @@ async function runLLMPass(
   contactsMap: Map<string, ContactRow>,
   recentActions: ActionHistoryRow[],
   existingRuleSuggestions: Suggestion[],
+  paidFetch: typeof fetch,
 ): Promise<Suggestion[]> {
   const anthropicKey = Deno.env.get('ANTHROPIC_API_KEY')
   if (!anthropicKey) {
@@ -537,7 +539,9 @@ async function runLLMPass(
   const openAiKey = Deno.env.get('OPENAI_API_KEY') ?? undefined
   const visibleOwnerIds = await resolveVisibleOwners(supabase, userId)
   const bundles = await Promise.all(aiTasks.map(t =>
-    assembleContext({ client: supabase, semanticAccess: 'service', openAiKey, visibleOwnerIds }, { entityType: 'task', entityId: t.id, userId })
+    // Each embedding is one metered provider attempt; a refusal degrades that
+    // bundle's semantic knowledge (assembleContext's `part` fallback), not the pass.
+    assembleContext({ client: supabase, semanticAccess: 'service', openAiKey, providerFetch: paidFetch, visibleOwnerIds }, { entityType: 'task', entityId: t.id, userId })
       // A swallowed failure here is invisible by construction: the task simply drops out of the
       // AI tier with no trace. That hid the household-visibility gap for weeks — so log it.
       .catch((err) => {
@@ -605,7 +609,7 @@ Return ONLY a JSON array (no markdown, no explanation):
 }]`
 
   try {
-    const aiResponse = await fetch('https://api.anthropic.com/v1/messages', {
+    const aiResponse = await paidFetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
         'x-api-key': anthropicKey,
@@ -645,6 +649,8 @@ Return ONLY a JSON array (no markdown, no explanation):
       }))
       .slice(0, 8)
   } catch (err) {
+    // A refused allowance is the caller's to report as skipped, not a failure to swallow.
+    if (err instanceof AiUsageError) throw err
     console.error('LLM pass failed:', err)
     return []
   }
@@ -802,6 +808,9 @@ Deno.serve(async (req) => {
     }
 
     // 3. LLM reasoning pass (calendar inference, cross-entity connections)
+    // Every provider call in the pass (embeddings and the model) is charged to
+    // the user being analyzed, through the service client on both auth paths.
+    let llmPass: { skipped: true; code: string; retry_at?: string } | undefined
     try {
       const llmSuggestions = await runLLMPass(
         supabase,
@@ -812,10 +821,17 @@ Deno.serve(async (req) => {
         contactsMap,
         (actionHistory || []) as ActionHistoryRow[],
         allSuggestions,
+        guardedAiFetchFor(supabase, userId, 'proactive-engine'),
       )
       allSuggestions.push(...llmSuggestions)
     } catch (err) {
-      console.error('LLM pass error:', err)
+      if (err instanceof AiUsageError) {
+        // Rule-based suggestions still land; the AI tier is reported as skipped
+        // and the next scheduled run tries it again.
+        llmPass = { skipped: true, code: err.code, retry_at: err.retryAt }
+      } else {
+        console.error('LLM pass error:', err)
+      }
     }
 
     // ── SMART RANKING — adjust confidence based on dismiss/act history ──
@@ -950,6 +966,7 @@ Deno.serve(async (req) => {
       tasksAnalyzed: (tasks || []).length,
       eventsAnalyzed: calendarEvents.length,
       emailsAnalyzed: (emailActions || []).length,
+      ...(llmPass ? { llmPass } : {}),
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
