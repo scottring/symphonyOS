@@ -2,6 +2,9 @@
 // Parses 4 free-text answers about a household's eating rhythms into a
 // structured list of standing-habit drafts. Used by the onboarding RhythmsScreen.
 
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { AiUsageError, guardedAiFetch } from '../_shared/aiUsage.ts'
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -69,6 +72,16 @@ Deno.serve(async (req) => {
 
     const anthropicKey = Deno.env.get('ANTHROPIC_API_KEY')
     if (!anthropicKey) return jsonError(500, 'ANTHROPIC_API_KEY not set')
+    const url = Deno.env.get('SUPABASE_URL')
+    const anon = Deno.env.get('SUPABASE_ANON_KEY')
+    if (!url || !anon) return jsonError(500, 'missing server config')
+
+    // Validate the caller's JWT before any model call; the user-scoped client
+    // also reserves the AI allowance as the caller.
+    const db = createClient(url, anon, { global: { headers: { Authorization: authHeader } } })
+    const { data: { user }, error: authErr } = await db.auth.getUser(authHeader.replace(/^Bearer /i, ''))
+    if (authErr || !user) return jsonError(401, 'invalid token')
+    const paidFetch = guardedAiFetch(db, 'rhythms-parse')
 
     const body = (await req.json()) as RequestBody
     const a = body.answers ?? {}
@@ -86,7 +99,7 @@ Deno.serve(async (req) => {
       a.off_nights?.trim() && `Any nights you don't cook?\n${a.off_nights.trim()}`,
     ].filter(Boolean).join('\n\n')
 
-    const aiResp = await callAnthropic(anthropicKey, userMessage)
+    const aiResp = await callAnthropic(anthropicKey, userMessage, paidFetch)
     let parsed: { habits?: RhythmHabit[]; note?: string }
     try {
       parsed = JSON.parse(extractJson(aiResp))
@@ -102,12 +115,18 @@ Deno.serve(async (req) => {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
   } catch (e) {
+    if (e instanceof AiUsageError) {
+      return new Response(JSON.stringify({ error: e.message, code: e.code, retry_at: e.retryAt }), {
+        status: e.status,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
     return jsonError(500, `unexpected: ${e instanceof Error ? e.message : String(e)}`)
   }
 })
 
-async function callAnthropic(apiKey: string, userMessage: string): Promise<string> {
-  const resp = await fetch('https://api.anthropic.com/v1/messages', {
+async function callAnthropic(apiKey: string, userMessage: string, paidFetch: typeof fetch): Promise<string> {
+  const resp = await paidFetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: {
       'x-api-key': apiKey,

@@ -25,3 +25,17 @@ describe('paper plan errors', () => {
     expect(isRetryable('unauthorized')).toBe(false)
   })
 })
+
+describe('AI allowance refusals', () => {
+  it('are read from the edge function body and say when the allowance returns, keeping the photos', () => {
+    expect(codeFromBody({ error: 'The AI allowance for this day has been reached.', code: 'ai_daily_limit', retry_at: '2026-10-16T00:00:00Z' }, 429)).toBe('ai_daily_limit')
+    expect(paperErrorMessage('ai_daily_limit')).toMatch(/resets tomorrow.*photos and notes are kept/)
+    expect(paperErrorMessage('ai_monthly_limit')).toMatch(/resets next month/)
+    expect(paperErrorMessage('ai_usage_unavailable')).toMatch(/type the plan in yourself/)
+  })
+  it('a used-up allowance is not retried blindly; an unavailable guard can be', () => {
+    expect(isRetryable('ai_daily_limit')).toBe(false)
+    expect(isRetryable('ai_monthly_limit')).toBe(false)
+    expect(isRetryable('ai_usage_unavailable')).toBe(true)
+  })
+})

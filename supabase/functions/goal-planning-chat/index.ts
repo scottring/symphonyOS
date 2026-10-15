@@ -1,4 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { AiUsageError, guardedAiFetch } from '../_shared/aiUsage.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -66,6 +67,10 @@ Deno.serve(async (req) => {
       })
     }
 
+    // User-scoped client: every paid provider call reserves an allowance as the caller first.
+    const db = createClient(supabaseUrl, Deno.env.get('SUPABASE_ANON_KEY')!, { global: { headers: { Authorization: authHeader } } })
+    const paidFetch = guardedAiFetch(db, 'goal-planning-chat')
+
     const body = await req.json()
     const { action } = body
 
@@ -88,7 +93,7 @@ Be encouraging and practical. Ask one question at a time. Start with a warm ackn
 
 Keep responses concise (2-3 sentences max). Be natural, not clinical.`
 
-      const aiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+      const aiResponse = await paidFetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${openAiKey}`,
@@ -188,7 +193,7 @@ ${shouldFinish
         ...existingMessages.map(m => ({ role: m.role, content: m.content })),
       ]
 
-      const aiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+      const aiResponse = await paidFetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${openAiKey}`,
@@ -296,7 +301,7 @@ RULES:
 - Be specific and practical — reference things discussed in the conversation
 - Milestones should have realistic target dates spread over a reasonable timeline`
 
-      const aiResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+      const aiResponse = await paidFetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${openAiKey}`,
@@ -377,6 +382,12 @@ RULES:
     })
 
   } catch (error) {
+    if (error instanceof AiUsageError) {
+      return new Response(JSON.stringify({ error: error.message, code: error.code, retry_at: error.retryAt }), {
+        status: error.status,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
     console.error('Goal planning error:', error)
     return new Response(JSON.stringify({ error: 'Internal server error' }), {
       status: 500,

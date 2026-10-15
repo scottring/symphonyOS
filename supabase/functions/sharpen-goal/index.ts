@@ -5,6 +5,7 @@
 // user taps "Use this" (AI proposes; only the user's tap writes). Auth: user JWT
 // (same pattern as analyze-capture / symphony-agent).
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { AiUsageError, guardedAiFetch } from '../_shared/aiUsage.ts'
 
 const MODEL = 'claude-sonnet-4-6'
 
@@ -159,8 +160,8 @@ function parseBetResult(text: string): SharpenResult {
   return { suggestion: stripped.slice(0, 300), why: '' }
 }
 
-async function callClaude(prompt: string, apiKey: string, maxTokens = 400): Promise<string> {
-  const res = await fetch('https://api.anthropic.com/v1/messages', {
+async function callClaude(prompt: string, apiKey: string, paidFetch: typeof fetch, maxTokens = 400): Promise<string> {
+  const res = await paidFetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: { 'content-type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
     body: JSON.stringify({
@@ -188,14 +189,18 @@ Deno.serve(async (req) => {
 
   const apiKey = Deno.env.get('ANTHROPIC_API_KEY')
   const url = Deno.env.get('SUPABASE_URL')
+  const anon = Deno.env.get('SUPABASE_ANON_KEY')
   const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
-  if (!apiKey || !url || !serviceKey) return json({ error: 'Missing server config' }, 500)
+  if (!apiKey || !url || !anon || !serviceKey) return json({ error: 'Missing server config' }, 500)
 
   // Validate the caller's JWT so unauthenticated requests can't bill the model.
   const token = authHeader.slice('Bearer '.length)
   const service = createClient(url, serviceKey)
   const { data: { user }, error: authErr } = await service.auth.getUser(token)
   if (authErr || !user) return json({ error: 'Invalid token' }, 401)
+  // User-scoped client: every paid provider call reserves an allowance as the caller first.
+  const db = createClient(url, anon, { global: { headers: { Authorization: authHeader } } })
+  const paidFetch = guardedAiFetch(db, 'sharpen-goal')
 
   let body: {
     name?: string; title?: string; areaName?: string; context?: string
@@ -225,10 +230,11 @@ Deno.serve(async (req) => {
       .map((i) => ({ id: i.id, title: i.title.trim().slice(0, 300) }))
     const wantSlate = body.wantSlate === true
     try {
-      const text = await callClaude(buildAuditPrompt(items, picks, wantSlate), apiKey, 8000)
+      const text = await callClaude(buildAuditPrompt(items, picks, wantSlate), apiKey, paidFetch, 8000)
       const { results, slate } = parseAuditResult(text, items.map((i) => i.id), [...items, ...picks].map((i) => i.id))
       return json({ results, slate })
     } catch (e) {
+      if (e instanceof AiUsageError) return json({ error: e.message, code: e.code, retry_at: e.retryAt }, e.status)
       return json({ error: e instanceof Error ? e.message : 'Audit failed' }, 502)
     }
   }
@@ -240,10 +246,11 @@ Deno.serve(async (req) => {
 
   try {
     const text = isBet
-      ? await callClaude(buildBetPrompt(name), apiKey)
-      : await callClaude(buildPrompt(name, body.areaName, body.context), apiKey)
+      ? await callClaude(buildBetPrompt(name), apiKey, paidFetch)
+      : await callClaude(buildPrompt(name, body.areaName, body.context), apiKey, paidFetch)
     return json(isBet ? parseBetResult(text) : parseResult(text))
   } catch (e) {
+    if (e instanceof AiUsageError) return json({ error: e.message, code: e.code, retry_at: e.retryAt }, e.status)
     return json({ error: e instanceof Error ? e.message : 'Sharpen failed' }, 502)
   }
 })

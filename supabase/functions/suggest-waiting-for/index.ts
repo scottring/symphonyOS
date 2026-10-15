@@ -17,6 +17,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { assembleContext } from '../_shared/context-graph/assemble.ts'
 import { renderBundleForPrompt } from '../_shared/context-graph/build.ts'
+import { AiUsageError, guardedAiFetch } from '../_shared/aiUsage.ts'
 
 const MODEL = 'claude-haiku-4-5-20251001'
 
@@ -79,8 +80,8 @@ function parseSuggestions(text: string): string[] {
   return out
 }
 
-async function callClaude(prompt: string, apiKey: string, maxTokens = 400): Promise<string> {
-  const res = await fetch('https://api.anthropic.com/v1/messages', {
+async function callClaude(prompt: string, apiKey: string, paidFetch: typeof fetch, maxTokens = 400): Promise<string> {
+  const res = await paidFetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: { 'content-type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
     body: JSON.stringify({
@@ -117,6 +118,8 @@ Deno.serve(async (req) => {
   const db = createClient(url, anon, { global: { headers: { Authorization: authHeader } } })
   const { data: { user }, error: authErr } = await db.auth.getUser(token)
   if (authErr || !user) return json({ error: 'Invalid token' }, 401)
+  // Every paid provider call (context embeddings included) reserves an allowance first.
+  const paidFetch = guardedAiFetch(db, 'suggest-waiting-for')
 
   let body: { taskId?: string }
   try {
@@ -132,14 +135,15 @@ Deno.serve(async (req) => {
     // All context reads run as the caller, just like the app's item panel.
     // Current RLS policies remain authoritative as sharing rules evolve.
     const bundle = await assembleContext(
-      { client: db, openAiKey: Deno.env.get('OPENAI_API_KEY') || undefined },
+      { client: db, openAiKey: Deno.env.get('OPENAI_API_KEY') || undefined, providerFetch: paidFetch },
       { entityType: 'task', entityId: taskId, userId: user.id },
     )
     if (!bundle.entity?.title) return json({ error: 'Task not found' }, 404)
 
-    const text = await callClaude(buildPrompt(bundle.entity.title, renderBundleForPrompt(bundle)), apiKey)
+    const text = await callClaude(buildPrompt(bundle.entity.title, renderBundleForPrompt(bundle)), apiKey, paidFetch)
     return json({ suggestions: parseSuggestions(text), degraded: bundle.degraded })
   } catch (e) {
+    if (e instanceof AiUsageError) return json({ error: e.message, code: e.code, retry_at: e.retryAt }, e.status)
     const message = e instanceof Error ? e.message : 'Suggest failed'
     // An unreachable entity is a 404, not a gateway failure. Reporting it as 502 is what made
     // the household-visibility gap read as "the model broke" rather than "you can't see this".

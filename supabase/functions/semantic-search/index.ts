@@ -1,4 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { AiUsageError, guardedAiFetch } from '../_shared/aiUsage.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -34,6 +35,15 @@ Deno.serve(async (req) => {
     const supabase = createClient(supabaseUrl, supabaseAnonKey, {
       global: { headers: { Authorization: authHeader } },
     })
+    // Confirm the JWT belongs to a signed-in person before any paid call.
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    if (authError || !user) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+    const paidFetch = guardedAiFetch(supabase, 'semantic-search')
 
     const { query, limit = 10, threshold = 0.5, vaultDomain } = await req.json()
 
@@ -45,7 +55,7 @@ Deno.serve(async (req) => {
     }
 
     // Generate embedding for the query
-    const embeddingResponse = await fetch('https://api.openai.com/v1/embeddings', {
+    const embeddingResponse = await paidFetch('https://api.openai.com/v1/embeddings', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${openAiKey}`,
@@ -94,6 +104,12 @@ Deno.serve(async (req) => {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
   } catch (error) {
+    if (error instanceof AiUsageError) {
+      return new Response(JSON.stringify({ error: error.message, code: error.code, retry_at: error.retryAt }), {
+        status: error.status,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
     console.error('Error in semantic-search:', error)
     return new Response(JSON.stringify({ error: error instanceof Error ? error.message : 'Unknown error' }), {
       status: 500,

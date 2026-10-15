@@ -5,6 +5,7 @@
 // Apply (AI proposes; only the user's tap writes). Auth: user JWT — same
 // pattern as sharpen-goal.
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { AiUsageError, guardedAiFetch } from '../_shared/aiUsage.ts'
 
 const MODEL = 'claude-sonnet-4-6'
 
@@ -98,8 +99,8 @@ Respond with ONLY a JSON object (no markdown fences, no prose):
 {"proposals":[ ... ]}`
 }
 
-async function callClaude(prompt: string, apiKey: string): Promise<string> {
-  const res = await fetch('https://api.anthropic.com/v1/messages', {
+async function callClaude(prompt: string, apiKey: string, paidFetch: typeof fetch): Promise<string> {
+  const res = await paidFetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: { 'content-type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
     body: JSON.stringify({
@@ -127,14 +128,18 @@ Deno.serve(async (req) => {
 
   const apiKey = Deno.env.get('ANTHROPIC_API_KEY')
   const url = Deno.env.get('SUPABASE_URL')
+  const anon = Deno.env.get('SUPABASE_ANON_KEY')
   const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
-  if (!apiKey || !url || !serviceKey) return json({ error: 'Missing server config' }, 500)
+  if (!apiKey || !url || !anon || !serviceKey) return json({ error: 'Missing server config' }, 500)
 
   // Validate the caller's JWT so unauthenticated requests can't bill the model.
   const token = authHeader.slice('Bearer '.length)
   const service = createClient(url, serviceKey)
   const { data: { user }, error: authErr } = await service.auth.getUser(token)
   if (authErr || !user) return json({ error: 'Invalid token' }, 401)
+  // User-scoped client: every paid provider call reserves an allowance as the caller first.
+  const db = createClient(url, anon, { global: { headers: { Authorization: authHeader } } })
+  const paidFetch = guardedAiFetch(db, 'tend-week')
 
   let body: {
     tasks?: unknown; weekStart?: unknown; today?: unknown; busy?: unknown
@@ -196,12 +201,14 @@ Deno.serve(async (req) => {
     const text = await callClaude(
       buildPrompt(tasks, weekStart, today, busy, grain, monthEnd || undefined, placeWindow),
       apiKey,
+      paidFetch,
     )
     const stripped = text.trim().replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/, '')
     const parsed = JSON.parse(stripped) as { proposals?: unknown }
     const proposals = Array.isArray(parsed.proposals) ? parsed.proposals.slice(0, 12) : []
     return json({ proposals })
   } catch (e) {
+    if (e instanceof AiUsageError) return json({ error: e.message, code: e.code, retry_at: e.retryAt }, e.status)
     console.error('tend-week failed:', e)
     return json({ error: 'Tending failed' }, 502)
   }

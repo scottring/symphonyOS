@@ -2,8 +2,11 @@
 // new-note title. Called from the client when the user opens the
 // NotePicker on an inbox row.
 //
-// Auth: requires the calling user's Supabase JWT (standard pattern).
+// Auth: requires the calling user's Supabase JWT (standard pattern); the
+// provider-call allowance is reserved as that user before Anthropic is called.
 // Anthropic API key: ANTHROPIC_API_KEY secret.
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { AiUsageError, guardedAiFetch } from '../_shared/aiUsage.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -79,8 +82,8 @@ export function parseResponse(raw: string): NoteMatchResponse {
   return { best_match, suggested_new_title: title }
 }
 
-async function callAnthropic(prompt: string, apiKey: string, signal: AbortSignal): Promise<string> {
-  const res = await fetch('https://api.anthropic.com/v1/messages', {
+async function callAnthropic(prompt: string, apiKey: string, signal: AbortSignal, transport: typeof fetch = fetch): Promise<string> {
+  const res = await transport('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: {
       'content-type': 'application/json',
@@ -115,6 +118,32 @@ Deno.serve(async (req: Request) => {
     })
   }
 
+  const authHeader = req.headers.get('Authorization')
+  if (!authHeader?.startsWith('Bearer ')) {
+    return new Response(JSON.stringify({ error: 'Missing Authorization' }), {
+      status: 401,
+      headers: { ...corsHeaders, 'content-type': 'application/json' },
+    })
+  }
+  const url = Deno.env.get('SUPABASE_URL')
+  const anonKey = Deno.env.get('SUPABASE_ANON_KEY')
+  if (!url || !anonKey) {
+    return new Response(JSON.stringify({ error: 'Missing server config' }), {
+      status: 500,
+      headers: { ...corsHeaders, 'content-type': 'application/json' },
+    })
+  }
+  // RLS-scoped client acting AS the caller; also verifies the JWT.
+  const db = createClient(url, anonKey, { global: { headers: { Authorization: authHeader } } })
+  const { data: { user }, error: authErr } = await db.auth.getUser(authHeader.slice('Bearer '.length))
+  if (authErr || !user) {
+    return new Response(JSON.stringify({ error: 'Invalid token' }), {
+      status: 401,
+      headers: { ...corsHeaders, 'content-type': 'application/json' },
+    })
+  }
+  const paidFetch = guardedAiFetch(db, 'note-match')
+
   let body: NoteMatchRequest
   try {
     body = await req.json()
@@ -147,7 +176,7 @@ Deno.serve(async (req: Request) => {
   const timeoutId = setTimeout(() => controller.abort(), 3000)
   try {
     const prompt = buildPrompt(body)
-    const text = await callAnthropic(prompt, apiKey, controller.signal)
+    const text = await callAnthropic(prompt, apiKey, controller.signal, paidFetch)
     const parsed = parseResponse(text)
     // If LLM didn't propose a title, fall back to the task title
     if (!parsed.suggested_new_title) parsed.suggested_new_title = body.inbox_item.title
@@ -155,6 +184,13 @@ Deno.serve(async (req: Request) => {
       headers: { ...corsHeaders, 'content-type': 'application/json' },
     })
   } catch (err) {
+    // A denied allowance is reported as such, never dressed up as a match.
+    if (err instanceof AiUsageError) {
+      return new Response(JSON.stringify({ error: err.message, code: err.code, retry_at: err.retryAt }), {
+        status: err.status,
+        headers: { ...corsHeaders, 'content-type': 'application/json' },
+      })
+    }
     console.error('note-match failed:', err)
     return new Response(JSON.stringify(fallback), {
       headers: { ...corsHeaders, 'content-type': 'application/json' },

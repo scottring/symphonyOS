@@ -5,6 +5,8 @@
 export type PaperErrorCode =
   | 'bad_request' | 'unauthorized' | 'forbidden' | 'image_unavailable' | 'model_busy' | 'model_refused'
   | 'reply_unreadable' | 'too_long' | 'server_config' | 'network' | 'unknown'
+  // The AI allowance (_shared/aiUsage.ts): the reading was refused before it began.
+  | 'ai_daily_limit' | 'ai_monthly_limit' | 'ai_usage_unavailable'
 
 const KEPT = 'Your photos and notes are kept.'
 
@@ -22,6 +24,12 @@ export function paperErrorMessage(code: string | null | undefined): string {
       return `There’s more on these pages than one reading can hold. Try one page per photo. ${KEPT}`
     case 'network':
       return `Couldn’t reach Symphony. Check your connection and try again. ${KEPT}`
+    case 'ai_daily_limit':
+      return `Today’s AI allowance is used up; it resets tomorrow. You can still type the plan in yourself. ${KEPT}`
+    case 'ai_monthly_limit':
+      return `This month’s AI allowance is used up; it resets next month. You can still type the plan in yourself. ${KEPT}`
+    case 'ai_usage_unavailable':
+      return `AI reading isn’t available right now. You can still type the plan in yourself. ${KEPT}`
     case 'forbidden':
     case 'bad_request':
       return `Something about these photos couldn’t be sent. Remove them and add them again.`
@@ -36,6 +44,7 @@ export function paperErrorMessage(code: string | null | undefined): string {
 /** Whether "Try again" can work without the user changing anything. */
 export function isRetryable(code: string | null | undefined): boolean {
   return code !== 'forbidden' && code !== 'bad_request' && code !== 'image_unavailable' && code !== 'unauthorized'
+    && code !== 'ai_daily_limit' && code !== 'ai_monthly_limit'
 }
 
 export class PaperPlanError extends Error {
@@ -47,7 +56,7 @@ export class PaperPlanError extends Error {
   }
 }
 
-const KNOWN = new Set<string>(['bad_request', 'unauthorized', 'forbidden', 'image_unavailable', 'model_busy', 'model_refused', 'reply_unreadable', 'too_long', 'server_config', 'network', 'unknown'])
+const KNOWN = new Set<string>(['bad_request', 'unauthorized', 'forbidden', 'image_unavailable', 'model_busy', 'model_refused', 'reply_unreadable', 'too_long', 'server_config', 'network', 'unknown', 'ai_daily_limit', 'ai_monthly_limit', 'ai_usage_unavailable'])
 
 /** The code from an edge function's JSON error body: `{error:{code}}` (plan-from-paper) or `{error, code}` (parse-page). */
 export function codeFromBody(body: unknown, status?: number): PaperErrorCode {

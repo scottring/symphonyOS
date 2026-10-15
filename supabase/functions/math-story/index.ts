@@ -9,6 +9,7 @@
 // dropped and the kid sees the plain problem. Auth: user JWT (same pattern as
 // sharpen-goal), so unauthenticated requests can't bill the model.
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { AiUsageError, guardedAiFetch } from '../_shared/aiUsage.ts'
 
 const MODEL = 'claude-opus-5-5'
 
@@ -90,8 +91,8 @@ Respond with ONLY a JSON object, no code fences:
 {"story": "...", "hint": "...", "labels": [...]}`
 }
 
-async function callClaude(prompt: string, apiKey: string): Promise<string> {
-  const res = await fetch('https://api.anthropic.com/v1/messages', {
+async function callClaude(prompt: string, apiKey: string, transport: typeof fetch = fetch): Promise<string> {
+  const res = await transport('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: {
       'content-type': 'application/json',
@@ -140,12 +141,16 @@ Deno.serve(async (req) => {
   const apiKey = Deno.env.get('ANTHROPIC_API_KEY')
   const url = Deno.env.get('SUPABASE_URL')
   const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
-  if (!apiKey || !url || !serviceKey) return json({ error: 'Missing server config' }, 500)
+  const anonKey = Deno.env.get('SUPABASE_ANON_KEY')
+  if (!apiKey || !url || !serviceKey || !anonKey) return json({ error: 'Missing server config' }, 500)
 
   const token = authHeader.slice('Bearer '.length)
   const service = createClient(url, serviceKey)
   const { data: { user }, error: authErr } = await service.auth.getUser(token)
   if (authErr || !user) return json({ error: 'Invalid token' }, 401)
+  // The provider-call allowance is reserved AS the caller (RLS-scoped client).
+  const db = createClient(url, anonKey, { global: { headers: { Authorization: authHeader } } })
+  const paidFetch = guardedAiFetch(db, 'math-story')
 
   let body: Record<string, unknown>
   try {
@@ -157,8 +162,9 @@ Deno.serve(async (req) => {
   if (!r) return json({ error: 'Invalid problem' }, 400)
 
   try {
-    return json(parseResult(await callClaude(buildPrompt(r), apiKey)))
+    return json(parseResult(await callClaude(buildPrompt(r), apiKey, paidFetch)))
   } catch (e) {
+    if (e instanceof AiUsageError) return json({ error: e.message, code: e.code, retry_at: e.retryAt }, e.status)
     return json({ error: e instanceof Error ? e.message : 'Story failed' }, 502)
   }
 })

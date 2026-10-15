@@ -14,6 +14,7 @@
 // migration), which this release does not include.
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { DEFAULT_MODEL, messagesBody, parseRequest, parseToolInput, PROPOSE_TOOL } from '../_shared/planningConversation.ts'
+import { AiUsageError, guardedAiFetch } from '../_shared/aiUsage.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -36,8 +37,11 @@ Deno.serve(async (req) => {
   const anon = Deno.env.get('SUPABASE_ANON_KEY')
   if (!apiKey || !url || !anon) return json({ error: 'Missing server config' }, 500)
 
-  const { data: { user }, error: authErr } = await createClient(url, anon).auth.getUser(authHeader.slice('Bearer '.length))
+  // User-scoped client: the allowance reservation runs as the caller.
+  const db = createClient(url, anon, { global: { headers: { Authorization: authHeader } } })
+  const { data: { user }, error: authErr } = await db.auth.getUser(authHeader.slice('Bearer '.length))
   if (authErr || !user) return json({ error: 'Invalid token' }, 401)
+  const paidFetch = guardedAiFetch(db, 'planning-conversation')
 
   const parsed = parseRequest(await req.text())
   if (!parsed.ok) return json({ error: parsed.error }, parsed.status)
@@ -46,7 +50,7 @@ Deno.serve(async (req) => {
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), 30_000)
   try {
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
+    const res = await paidFetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       signal: controller.signal,
       headers: { 'content-type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
@@ -63,6 +67,7 @@ Deno.serve(async (req) => {
     if (!reply) return json({ error: 'The guide could not answer just now' }, 502)
     return json(reply)
   } catch (e) {
+    if (e instanceof AiUsageError) return json({ error: e.message, code: e.code, retry_at: e.retryAt }, e.status)
     console.error('[planning-conversation] failed', e instanceof Error ? e.name : 'unknown')
     return json({ error: 'The guide could not answer just now' }, 504)
   } finally {

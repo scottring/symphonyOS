@@ -11,6 +11,7 @@
 // carrying the caller's Authorization header, so RLS (household-shared on
 // meal_plans/meal_plan_entries/recipes, owner-only on notes) is the fence.
 import { createClient, SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { AiUsageError, guardedAiFetch } from '../_shared/aiUsage.ts'
 
 const MODEL = 'claude-sonnet-4-6'
 const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
@@ -169,8 +170,8 @@ function parseSuggestions(text: string, ctx: PlanContext): Suggestion[] {
   return out
 }
 
-async function callClaude(prompt: string, apiKey: string): Promise<string> {
-  const res = await fetch('https://api.anthropic.com/v1/messages', {
+async function callClaude(prompt: string, apiKey: string, transport: typeof fetch = fetch): Promise<string> {
+  const res = await transport('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: { 'content-type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
     body: JSON.stringify({
@@ -225,12 +226,14 @@ Deno.serve(async (req) => {
 
   // RLS-scoped client that reads AS the caller.
   const db = createClient(url, anonKey, { global: { headers: { Authorization: authHeader } } })
+  const paidFetch = guardedAiFetch(db, 'meal-slot-suggest')
 
   try {
     const ctx = await loadContext(db, weekStart)
-    const text = await callClaude(buildPrompt(ctx, dayOfWeek, slot, intent), apiKey)
+    const text = await callClaude(buildPrompt(ctx, dayOfWeek, slot, intent), apiKey, paidFetch)
     return json({ suggestions: parseSuggestions(text, ctx) })
   } catch (e) {
+    if (e instanceof AiUsageError) return json({ error: e.message, code: e.code, retry_at: e.retryAt }, e.status)
     return json({ error: e instanceof Error ? e.message : 'Suggest failed' }, 502)
   }
 })

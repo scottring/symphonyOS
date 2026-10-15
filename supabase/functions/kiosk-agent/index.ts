@@ -1,4 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { AiUsageError, guardedAiFetch } from '../_shared/aiUsage.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -156,6 +157,7 @@ Deno.serve(async (req) => {
     const openAiKey = Deno.env.get('OPENAI_API_KEY')
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+    const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
     // Auth
@@ -175,6 +177,10 @@ Deno.serve(async (req) => {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     }
+    // Paid provider calls (OpenAI classification, SerpAPI searches) each
+    // reserve an allowance AS the caller — never through the service client.
+    const db = createClient(supabaseUrl, supabaseAnonKey, { global: { headers: { Authorization: authHeader } } })
+    const paidFetch = guardedAiFetch(db, 'kiosk-agent')
 
     // ════════════════════════════════════════════════════════════════
     // HOME APP RULES — surface kiosk cards for Symphony Home assets
@@ -333,7 +339,7 @@ Deno.serve(async (req) => {
       })
     }
 
-    const classifyResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+    const classifyResponse = await paidFetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${openAiKey}`,
@@ -449,7 +455,7 @@ Today's date: ${new Date().toISOString().split('T')[0]}`
               api_key: serpApiKey,
             })
 
-            const flightRes = await fetch(`https://serpapi.com/search?${serpParams}`)
+            const flightRes = await paidFetch(`https://serpapi.com/search?${serpParams}`)
             const flightData = await flightRes.json()
 
             // Capture the exact Google Flights URL from search metadata
@@ -473,6 +479,9 @@ Today's date: ${new Date().toISOString().split('T')[0]}`
               })
             }
           } catch (err) {
+            // A denied allowance ends the run — it must not become a "no
+            // flights match" card that reads as a completed search.
+            if (err instanceof AiUsageError) throw err
             console.error(`Flight search ${search.origin}→${search.dest} failed:`, err)
           }
         }
@@ -563,8 +572,14 @@ Today's date: ${new Date().toISOString().split('T')[0]}`
     })
 
   } catch (err) {
+    if (err instanceof AiUsageError) {
+      return new Response(JSON.stringify({ error: err.message, code: err.code, retry_at: err.retryAt }), {
+        status: err.status,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
     console.error('Kiosk agent error:', err)
-    return new Response(JSON.stringify({ error: err.message }), {
+    return new Response(JSON.stringify({ error: err instanceof Error ? err.message : String(err) }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })

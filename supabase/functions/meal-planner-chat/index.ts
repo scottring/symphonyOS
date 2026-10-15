@@ -1,5 +1,6 @@
 // deno-lint-ignore-file no-explicit-any
 import { createClient, SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { AiUsageError, guardedAiFetch } from '../_shared/aiUsage.ts'
 
 // ════════════════════════════════════════════════════════════════
 // MEAL-PLANNER CHAT — a Claude tool-calling loop that writes DIRECTLY to
@@ -597,8 +598,9 @@ async function callAnthropic(
   apiKey: string,
   systemPrompt: string,
   messages: Array<{ role: string; content: unknown }>,
+  transport: typeof fetch = fetch,
 ): Promise<{ content: AnthropicBlock[]; stop_reason: string }> {
-  const res = await fetch('https://api.anthropic.com/v1/messages', {
+  const res = await transport('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: {
       'x-api-key': apiKey,
@@ -645,6 +647,8 @@ Deno.serve(async (req) => {
   const { data: { user }, error: authErr } = await service.auth.getUser(token)
   if (authErr || !user) return json({ error: 'Unauthorized' }, 401)
   const db = createClient(url, anon, { global: { headers: { Authorization: authHeader } } })
+  // One allowance reservation per Anthropic attempt, including tool-loop turns.
+  const paidFetch = guardedAiFetch(db, 'meal-planner-chat')
 
   const body = await req.json().catch(() => ({}))
   const message = typeof body.message === 'string' ? body.message.trim() : ''
@@ -686,7 +690,7 @@ Deno.serve(async (req) => {
       let finalText = ''
       try {
         for (let turn = 0; turn < MAX_TURNS; turn++) {
-          const { content, stop_reason } = await callAnthropic(apiKey, systemPrompt, convo)
+          const { content, stop_reason } = await callAnthropic(apiKey, systemPrompt, convo, paidFetch)
           const toolResults: Array<Record<string, unknown>> = []
           for (const block of content) {
             if (block.type === 'text' && block.text) {
@@ -711,7 +715,11 @@ Deno.serve(async (req) => {
         }
         send({ type: 'done', reply: finalText })
       } catch (err) {
-        send({ type: 'error', message: err instanceof Error ? err.message : 'Meal planner agent failed' })
+        // The stream is already open (200), so a denied allowance travels as
+        // the error event — never a 'done' — with its code/retry_at so the
+        // client can show the allowance message and keep the draft.
+        if (err instanceof AiUsageError) send({ type: 'error', message: err.message, code: err.code, retry_at: err.retryAt })
+        else send({ type: 'error', message: err instanceof Error ? err.message : 'Meal planner agent failed' })
       } finally {
         controller.close()
       }
