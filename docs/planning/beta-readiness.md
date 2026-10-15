@@ -104,6 +104,16 @@ Prepared on `claude/beta-readiness-program`, October 15. Migration `202610151000
 
 Evidence: `scripts/test-household-displays.mjs` — 8 checks on a disposable PostgreSQL 17 cluster with stub auth (pair, claim, no adult claim, no double claim, household reads only, family calendars, write refusal, list/scratchpad allowed, revoke fails closed, outsider cannot revoke). Unit tests for the agent's identity check and the client pieces. **Not done:** the migration is not applied to the hosted project; `enable_anonymous_sign_ins` must be turned on there first; the wall UI has not been run under a display session on a real tablet (its calendar fetch goes through the signed-in user's Google tokens, which a display does not have — see the finding below); the display's `last_seen_at` is never written yet.
 
+## Sixth implementation batch — truthful wall, diagnostics, every interactive paid route metered
+
+Prepared on `claude/beta-readiness-program`, October 15.
+
+- **Wall.** When the wall stops waiting (20 s) it aborts the agent stream, so a turn that outlived the listener stops at its next tool instead of finishing unseen. A spoken "approve" is bound to the card the wall last read out; a card that arrived unannounced is read first and approved on the next "approve". Approve's failure wording distinguishes a full rollback from "some of it stayed saved".
+- **Diagnostics (plan §11).** `symphony-agent` logs one content-free JSON line per turn (request and turn ids, surface, model, provider call count and time, tool names, write counts, outcome state, error class) and returns a `requestId` on the done/error event, which the client keeps for problem reports. Hitting the 14-round tool cap now appends a plain sentence and marks the turn unverified instead of ending as if finished.
+- **Allowance (B03).** Migration `20261015110000_ai_allowance_all_interactive_routes.sql` puts every interactive paid route on the shared allowlist (`GUARDED_AI_ROUTES` in `_shared/aiUsage.ts`); the local harness now checks it (13 checks). The nineteen previously unguarded interactive functions are being wired to `guardedAiFetch` (see the paid-path inventory for status). Background routes without a person's JWT (`email-scanner`, `extract-email`, `gmail-check`, `school-digest`, `proactive-engine`, `vault-sync`) are still unmetered: disable or meter them before invitations.
+- **Durability (plan §4).** A change card still waiting survives a reload (per person, per tab); approve or dismiss clears it. Undo, receipts and voice state remain in memory.
+- **Bench (plan §10).** `scripts/conversation-bench`: scenarios J1 (the plumber week) and R1 (routine: this week vs from now on) as data; the contract layer replays them through the real validators and applier and passes; the live layer exists for synthetic accounts and has not been run.
+
 ## Release blockers in order
 
 Owner labels are responsibilities, not additional staff. Scott retains scope, spending, external-claim, and release approval.
