@@ -21,6 +21,10 @@
 //    as they speak, but never answers on its own (create_response: false,
 //    set by workspace-voice). Quiet for TAP_FALLBACK_MS after speaking sends
 //    anyway, for a forgotten Done. Tapping while Symphony talks stops it.
+//    Open conversation (Scott, 2026-10-15: "press-to-talk, stop and end each
+//    time is not effective"): the mic opens by itself on connect and again
+//    when Symphony finishes answering, and a short quiet sends. Talk and
+//    Done remain as overrides; End closes it.
 
 import { Emitter, VOICE_ERROR_COPY, isHorizon, type ConversationContext, type TransportEvent, type TransportStatus, type VoiceErrorCode, type VoiceTransport } from './transport'
 import { MAX_LINE } from './flow'
@@ -45,7 +49,7 @@ export interface RealtimeDeps {
 }
 
 /** Tap mode: quiet this long after speaking sends the turn (a forgotten Done). */
-export const TAP_FALLBACK_MS = 10_000
+export const TAP_FALLBACK_MS = 2_000
 
 /** Session length when the server does not say. The server's own cap is authoritative. */
 export const DEFAULT_MAX_SECONDS = 480
@@ -54,6 +58,7 @@ export class RealtimeTransport implements VoiceTransport {
   readonly kind = 'realtime' as const
   private em = new Emitter()
   private status: TransportStatus = 'idle'
+  private toolPending = false
   private pc: RTCPeerConnection | null = null
   private dc: RTCDataChannel | null = null
   private stream: MediaStream | null = null
@@ -275,6 +280,8 @@ export class RealtimeTransport implements VoiceTransport {
     // Only the opening asks for a reply; later updates ride along with the next
     // turn. In tap mode the person speaks first: Talk was their tap.
     if (opening && !this.tap) send(dc, { type: 'response.create' })
+    // Open conversation: the person speaks first, with no tap.
+    if (opening && this.tap) this.listen()
   }
 
   private onServerEvent(raw: unknown) {
@@ -323,6 +330,9 @@ export class RealtimeTransport implements VoiceTransport {
       case 'output_audio_buffer.cleared':
         this.assistantAudio = false
         this.em.emit({ type: 'speaking', who: 'assistant', active: false })
+        // Symphony finished: the person's turn again, with no tap (unless a
+        // tool is still running and will bring another reply).
+        if (e.type === 'output_audio_buffer.stopped' && this.tap && !this.responding && !this.toolPending) this.listen()
         break
       case 'response.output_audio_transcript.delta':
         this.assistantText += typeof e.delta === 'string' ? e.delta : ''
@@ -378,11 +388,13 @@ export class RealtimeTransport implements VoiceTransport {
       if (this.calls.has(item.call_id)) continue
       this.calls.add(item.call_id)
       let result: unknown
+      this.toolPending = true
       try {
         result = this.deps.handleTool
           ? await this.deps.handleTool(item.name ?? '', JSON.parse(item.arguments ?? '{}'))
           : item.name === 'propose_plan_card' ? this.propose(item.arguments) : { shown: false, error: 'unknown tool' }
       } catch { result = {error: 'The action failed. Do not claim it saved. Ask the person to retry.'} }
+      finally { this.toolPending = false }
       if (generation !== this.generation || !this.dc) return
       send(this.dc, { type: 'conversation.item.create', item: { type: 'function_call_output', call_id: item.call_id, output: JSON.stringify(result) } })
       answered = true

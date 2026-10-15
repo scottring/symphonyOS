@@ -56,6 +56,30 @@ describe('workspace voice',()=>{
  })
 })
 
+describe('spoken approve',()=>{
+ it('approve_card saves the waiting card and says saved; "Approve" as text does the same',async()=>{
+  const approveCard=vi.fn(async()=>'saved' as const);const ask=vi.fn(async()=>'answered')
+  const {result}=renderHook(()=>useWorkspaceVoice(context,ask,vi.fn(),true,'a',approveCard))
+  await act(()=>result.current.start())
+  const tool=mocks.instances[0].deps.handleTool
+  expect(await tool('approve_card',{})).toEqual({reply:'Saved.',outcome:{state:'saved',say:'Saved.'}})
+  expect(await tool('ask_symphony',{request:'Approve.'})).toEqual({reply:'Saved.',outcome:{state:'saved',say:'Saved.'}})
+  expect(ask).not.toHaveBeenCalled()
+ })
+ it('with no card waiting, approve_card says so and "approve" as text goes to the assistant',async()=>{
+  const approveCard=vi.fn(async()=>'none' as const);const ask=vi.fn(async()=>'Nothing to approve.')
+  const {result}=renderHook(()=>useWorkspaceVoice(context,ask,vi.fn(),true,'a',approveCard))
+  await act(()=>result.current.start())
+  const tool=mocks.instances[0].deps.handleTool
+  expect((await tool('approve_card',{})) as {outcome:{state:string}}).toMatchObject({outcome:{state:'answered'}})
+  expect(await tool('ask_symphony',{request:'approve'})).toEqual({reply:'Nothing to approve.'})
+ })
+ it('a failed approve is reported as failed, never as saved',async()=>{
+  const {result}=renderHook(()=>useWorkspaceVoice(context,vi.fn(),vi.fn(),true,'a',async()=>'failed' as const))
+  await act(()=>result.current.start())
+  expect((await mocks.instances[0].deps.handleTool('approve_card',{})) as {outcome:{state:string}}).toMatchObject({outcome:{state:'failed'}})
+ })
+})
 describe('ask_symphony outcome',()=>{
  it('hands the voice the server verdict beside the reply, never a bare "done"',async()=>{
   const ask=vi.fn(async()=>({text:'Three changes are on the card.',outcome:{state:'proposed' as const,writes:[],proposal:{key:'k',title:'3 changes',ops:3},say:'Shown as a change card. Nothing is saved until the person approves it.'}}))

@@ -15,11 +15,13 @@ export type AskResult=string|{text:string;outcome?:TurnOutcome}|undefined
 /** One connection owned by the shell, shared by its desktop and phone panes.
  *  Tap to talk: Talk opens the mic for the person's turn, Done sends it
  *  (RealtimeTransport `turns: 'tap'`); their words show as they speak. */
-export function useWorkspaceVoice(context:WorkspaceContext, ask:(text:string)=>Promise<AskResult>, navigate:(url:string)=>void, enabled:boolean, accountId:string|null = null) {
+export type ApproveCard=()=>Promise<'saved'|'none'|'failed'>
+const APPROVE=/^\s*(ok(ay)?[,.]?\s*)?(yes[,.]?\s*)?(approve|approved|approve (it|all|them|everything)|save it|save them|go ahead|do it)[.!]*\s*$/i
+export function useWorkspaceVoice(context:WorkspaceContext, ask:(text:string)=>Promise<AskResult>, navigate:(url:string)=>void, enabled:boolean, accountId:string|null = null, approveCard?:ApproveCard) {
  const [status,setStatus]=useState<TransportStatus>('idle'),[error,setError]=useState<string|null>(null),[heard,setHeard]=useState(''),[reply,setReply]=useState('')
  const [turn,setTurn]=useState<'listening'|'off'>('off')
  const transport=useRef<RealtimeTransport|null>(null)
- const current=useRef({context,ask,navigate});current.current={context,ask,navigate}
+ const current=useRef({context,ask,navigate,approveCard});current.current={context,ask,navigate,approveCard}
  const busy=useRef(false)
  const toContext=():ConversationContext=>({step: (['year','season','month','week','today'].includes(current.current.context.page) ? current.current.context.page : 'today') as ConversationContext['step'],focus:current.current.context.page,plan:[JSON.stringify(explainContext(current.current.context))]})
  useEffect(()=>{transport.current?.sync(toContext())},[context])
@@ -46,8 +48,21 @@ export function useWorkspaceVoice(context:WorkspaceContext, ask:(text:string)=>P
      if(!steps.length)return {error:'Nothing to show: use target ids from the screen update'}
      requestShow(steps,'voice');return {shown:steps.length}
     }
+    // Spoken approve saves the card on screen (Session D, 2026-10-15: "Approve"
+    // was forwarded as text and answered "needs your approval in the app").
+    const approve=async()=>{
+     const fn=current.current.approveCard
+     const got=fn?await fn():'none'
+     if(got==='none')return null
+     if(busy.current)return {error:'A save is still running. Wait for it to finish.'}
+     return got==='saved'?{reply:'Saved.',outcome:{state:'saved',say:'Saved.'}}:{reply:"Couldn't save it.",outcome:{state:'failed',say:'Not saved. The card on screen says why.'}}
+    }
+    if(name==='approve_card'){
+     return (await approve())??{reply:'No card is waiting.',outcome:{state:'answered',say:'There is no card to approve right now.'}}
+    }
     if(name==='ask_symphony'){
      if(typeof data.request!=='string'||!data.request.trim()||data.request.length>5000)return {error:'Invalid request'}
+     if(APPROVE.test(data.request)){const r=await approve();if(r)return r}
      if(busy.current)return {error:'A save is still running. Wait for it to finish.'}
      busy.current=true
      try{

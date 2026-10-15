@@ -313,7 +313,23 @@ describe('RealtimeTransport, tap to talk', () => {
     expect(sent(peer)).not.toContain('response.create')
   })
 
-  it('ten quiet seconds after speaking send it anyway (a forgotten Done); speaking again resets', async () => {
+  it('open conversation: the mic is open on connect, and again once Symphony finishes answering', async () => {
+    const { t, peer, track, events } = setup({ turns: 'tap' })
+    await t.start(ctx)
+    expect(track.enabled).toBe(true)
+    expect(events.filter((e) => e.type === 'turn').at(-1)).toEqual({ type: 'turn', turn: 'listening' })
+    serverEvent(peer, { type: 'input_audio_buffer.speech_started' })
+    t.finishTurn()
+    expect(track.enabled).toBe(false)
+    serverEvent(peer, { type: 'response.created' })
+    serverEvent(peer, { type: 'output_audio_buffer.started' })
+    serverEvent(peer, { type: 'response.done', response: { output: [] } })
+    serverEvent(peer, { type: 'output_audio_buffer.stopped' })
+    expect(track.enabled).toBe(true)
+    expect(events.filter((e) => e.type === 'turn').at(-1)).toEqual({ type: 'turn', turn: 'listening' })
+  })
+
+  it('a short quiet after speaking sends it (no Done needed); speaking again resets', async () => {
     const { t, peer, timers } = setup({ turns: 'tap' })
     await t.start(ctx)
     serverEvent(peer, { type: 'input_audio_buffer.speech_started' })

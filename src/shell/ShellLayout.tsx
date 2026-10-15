@@ -291,7 +291,7 @@ function ShellLayoutInner({ children }: Props) {
   }, onWorkspace: (page,date) => { if (connectedWorkspace) { const url=workspaceDestination(page,date); if(url) navigate(url); } }, taskContext: conversationContext.taskContext, workspaceContext: connectedWorkspace ? screenContext : undefined, onMutate: () => { void refetch(); window.dispatchEvent(new Event('symphony-plan-updated')); }, turnObserver });
   const voiceAccess = useWorkspaceVoiceAccess(user?.id ?? null, connectedWorkspace);
   const voiceEnabled = connectedWorkspace && voiceAccess;
-  const voice = useWorkspaceVoice(screenContext, assistant.sendTurn, (url) => navigate(import.meta.env.DEV && new URLSearchParams(location.search).get('voice') === '1' ? `${url}&voice=1` : url), voiceEnabled, user?.id ?? null);
+  const voice = useWorkspaceVoice(screenContext, assistant.sendTurn, (url) => navigate(import.meta.env.DEV && new URLSearchParams(location.search).get('voice') === '1' ? `${url}&voice=1` : url), voiceEnabled, user?.id ?? null, async () => { const a = canvasRef.current; if (!a?.changeSet) return 'none'; return (await a.approveChangeSet()) ? 'saved' : 'failed'; });
   // Talk to Symphony from anywhere (Scott, 2026-10-14: one front door — ⌘K
   // adds, searches, asks, or talks). Starting closes the box; the conversation
   // carries on in the bar at the page's foot. Already talking: your turn.
