@@ -7,6 +7,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { tryParseFacets, type Facet } from '../_shared/facets.ts'
 import { parseDocumentProposal, stripSensitive, type DocumentProposal } from '../_shared/documents.ts'
+import { AiUsageError, guardedAiFetch } from '../_shared/aiUsage.ts'
 
 const MODEL = 'claude-sonnet-4-6'
 const MAX_CONTEXT = 300
@@ -51,11 +52,11 @@ Omit the "document" key entirely for ordinary files (a party invite, a photo of 
 The label must identify this file on its own, because the user will see it in a list next to other documents of the same kind. When the file is clearly ONE PART of a multi-part document, the label MUST end with the part in parentheses — "(front)", "(back)", "(page 2)". Judge the side from what is visible: the side with the photo, name and date of birth is the front; the side with barcodes, magnetic stripe, endorsements or donor/organ text is the back. If you genuinely cannot tell which part it is, still say so — end the label with "(one side)" rather than leaving it ambiguous. Never return the same label for two different sides.`
 }
 
-async function callVision(fileUrl: string, isPdf: boolean, prompt: string, apiKey: string): Promise<string> {
+async function callVision(fileUrl: string, isPdf: boolean, prompt: string, apiKey: string, transport: typeof fetch = fetch): Promise<string> {
   const fileBlock = isPdf
     ? { type: 'document', source: { type: 'url', url: fileUrl } }
     : { type: 'image', source: { type: 'url', url: fileUrl } }
-  const res = await fetch('https://api.anthropic.com/v1/messages', {
+  const res = await transport('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: { 'content-type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
     body: JSON.stringify({
@@ -90,6 +91,8 @@ Deno.serve(async (req) => {
 
   // User-scoped client: every table op below is RLS-enforced as the caller.
   const db = createClient(url, anon, { global: { headers: { Authorization: authHeader } } })
+  // Every vision attempt (including the retry) reserves one provider call first.
+  const paidFetch = guardedAiFetch(db, 'analyze-attachment')
 
   let body: { attachmentId?: string; entityContext?: string }
   try { body = await req.json() } catch { return json({ error: 'Invalid JSON body' }, 400) }
@@ -138,7 +141,7 @@ Deno.serve(async (req) => {
    *  sensitive document's own numbers never reach the row, and therefore never
    *  reach the context graph (see _shared/context-graph/build.ts). */
   const analyzeOnce = async (): Promise<{ facets: Facet[]; proposal: DocumentProposal | null }> => {
-    const raw = await callVision(signed.signedUrl, isPdf, prompt, apiKey)
+    const raw = await callVision(signed.signedUrl, isPdf, prompt, apiKey, paidFetch)
     const parsed = tryParseFacets(raw)
     if (parsed === null) throw new Error('Invalid facets structure from model')
 
@@ -161,10 +164,14 @@ Deno.serve(async (req) => {
   try {
     ;({ facets, proposal } = await analyzeOnce())
   } catch (err) {
+    // No allowance → nothing was analyzed, so leave the row unmarked for a
+    // later attempt and tell the client why.
+    if (err instanceof AiUsageError) return json({ error: err.message, code: err.code, retry_at: err.retryAt }, err.status)
     console.error('first analysis attempt failed, retrying once:', err instanceof Error ? err.message : err)
     try {
       ;({ facets, proposal } = await analyzeOnce())
     } catch (err2) {
+      if (err2 instanceof AiUsageError) return json({ error: err2.message, code: err2.code, retry_at: err2.retryAt }, err2.status)
       console.error('analysis failed after retry:', err2 instanceof Error ? err2.message : err2)
     }
   }

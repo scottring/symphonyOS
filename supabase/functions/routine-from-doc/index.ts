@@ -10,6 +10,8 @@
 //   - text: pasted instructions / description
 //   - file: a PDF or image (≤ ~5MB base64) — PT sheets, screenshots, scans
 // Output: { proposal: RoutineProposal | null, note: string }
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { AiUsageError, guardedAiFetch } from '../_shared/aiUsage.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -110,6 +112,13 @@ Deno.serve(async (req) => {
     if (!authHeader) return jsonError(401, 'missing authorization')
     const anthropicKey = Deno.env.get('ANTHROPIC_API_KEY')
     if (!anthropicKey) return jsonError(500, 'ANTHROPIC_API_KEY not set')
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')
+    const anon = Deno.env.get('SUPABASE_ANON_KEY')
+    if (!supabaseUrl || !anon) return jsonError(500, 'Missing server config')
+    // Caller-scoped client: the AI allowance is reserved as the signed-in
+    // person (the gateway has already verified the JWT).
+    const db = createClient(supabaseUrl, anon, { global: { headers: { Authorization: authHeader } } })
+    const paidFetch = guardedAiFetch(db, 'routine-from-doc')
 
     const body = await req.json().catch(() => ({}))
     const text = typeof body.text === 'string' ? body.text.trim() : ''
@@ -126,7 +135,7 @@ Deno.serve(async (req) => {
     }
     content.push({ type: 'text', text: text || 'Extract the routine from the attached document.' })
 
-    const resp = await fetch('https://api.anthropic.com/v1/messages', {
+    const resp = await paidFetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: { 'x-api-key': anthropicKey, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
       body: JSON.stringify({
@@ -151,6 +160,11 @@ Deno.serve(async (req) => {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
   } catch (e) {
+    if (e instanceof AiUsageError) {
+      return new Response(JSON.stringify({ error: e.message, code: e.code, retry_at: e.retryAt }), {
+        status: e.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
     return jsonError(500, `unexpected: ${e instanceof Error ? e.message : String(e)}`)
   }
 })

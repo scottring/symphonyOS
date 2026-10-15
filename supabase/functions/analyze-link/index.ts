@@ -22,6 +22,7 @@
 // client, so RLS is what proves the link belongs to whoever asked.
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { tryParseFacets, type Facet } from '../_shared/facets.ts'
+import { AiUsageError, guardedAiFetch } from '../_shared/aiUsage.ts'
 
 const MODEL = 'claude-sonnet-4-6'
 const MAX_CONTEXT = 300
@@ -82,7 +83,7 @@ Rules:
 - If the fetch fails and you cannot actually read the page, respond with exactly {"facets":[{"type":"summary","text":"Could not read this page."}]}. Do NOT answer from prior knowledge of this URL or site. A remembered fact presented as a read one is worse than no facet at all — the user will act on it.`
 }
 
-async function callWithFetch(url: string, prompt: string, apiKey: string): Promise<string> {
+async function callWithFetch(url: string, prompt: string, apiKey: string, transport: typeof fetch = fetch): Promise<string> {
   const messages: Array<{ role: string; content: unknown }> = [
     { role: 'user', content: [{ type: 'text', text: prompt }] },
   ]
@@ -90,7 +91,8 @@ async function callWithFetch(url: string, prompt: string, apiKey: string): Promi
   // model produces its answer. Bounded low — one fetch, then the JSON.
   let containerId: string | null = null
   for (let turn = 0; turn < 4; turn++) {
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
+    // Each pause_turn follow-up is its own paid request, reserved separately.
+    const res = await transport('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: { 'content-type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
       body: JSON.stringify({
@@ -158,6 +160,7 @@ Deno.serve(async (req) => {
 
   // Caller-scoped: RLS decides whether this row is theirs to read or write.
   const db = createClient(supabaseUrl, anon, { global: { headers: { Authorization: authHeader } } })
+  const paidFetch = guardedAiFetch(db, 'analyze-link')
 
   const { data: row, error: rowErr } = await db
     .from(entity.table)
@@ -189,10 +192,13 @@ Deno.serve(async (req) => {
 
   let facets: Facet[] = []
   try {
-    const parsed = tryParseFacets(await callWithFetch(target.toString(), buildPrompt(target.toString(), entityContext), apiKey))
+    const parsed = tryParseFacets(await callWithFetch(target.toString(), buildPrompt(target.toString(), entityContext), apiKey, paidFetch))
     if (parsed === null) throw new Error('Invalid facets structure from model')
     facets = parsed
   } catch (err) {
+    // No allowance → the link stays un-analyzed (no analyzedAt) so a later
+    // save can read it; the client is told why.
+    if (err instanceof AiUsageError) return json({ error: err.message, code: err.code, retry_at: err.retryAt }, err.status)
     console.error('analyze-link failed:', err instanceof Error ? err.message : err)
     await finish([])
     return json({ status: 'failed' })

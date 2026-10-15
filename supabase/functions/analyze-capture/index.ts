@@ -8,6 +8,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { parseCaptureFacets, reachFromFacets, type CaptureLink } from '../_shared/captureReach.ts'
 import { parseReminders, reminderRows } from '../_shared/captureReminders.ts'
+import { AiUsageError, guardedAiFetch } from '../_shared/aiUsage.ts'
 
 const MODEL = 'claude-sonnet-4-6'
 
@@ -78,8 +79,8 @@ function parseAnalysis(text: string): AnalysisResult {
   }
 }
 
-async function callVision(imageUrl: string, prompt: string, apiKey: string): Promise<string> {
-  const res = await fetch('https://api.anthropic.com/v1/messages', {
+async function callVision(imageUrl: string, prompt: string, apiKey: string, transport: typeof fetch = fetch): Promise<string> {
+  const res = await transport('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: { 'content-type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
     body: JSON.stringify({
@@ -126,6 +127,7 @@ Deno.serve(async (req) => {
 
   // User-scoped client: every table op below is RLS-enforced as the caller.
   const db = createClient(url, anon, { global: { headers: { Authorization: authHeader } } })
+  const paidFetch = guardedAiFetch(db, 'analyze-capture')
 
   let body: { taskId?: string; storagePath?: string; fileName?: string; fileType?: string; fileSize?: number; timeZone?: string }
   try {
@@ -185,7 +187,7 @@ Deno.serve(async (req) => {
       ? new Intl.DateTimeFormat('en-US', { timeZone, weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }).format(new Date())
       : null
 
-    const raw = await callVision(signed.signedUrl, buildPrompt(candidates, today), apiKey)
+    const raw = await callVision(signed.signedUrl, buildPrompt(candidates, today), apiKey, paidFetch)
     const analysis = parseAnalysis(raw)
     const facets = parseCaptureFacets(analysis.facets)
     // The number to call and the sites to visit, tappable on the task itself.
@@ -256,6 +258,12 @@ Deno.serve(async (req) => {
 
     return json({ ok: true, title: analysis.title, suggested_task_id: suggestedId, reminders: remindersAdded })
   } catch (e) {
+    if (e instanceof AiUsageError) {
+      // Nothing was read: record the failure so the card is not stuck pending,
+      // and send the allowance code so the client can say when to try again.
+      await fail(e.message, e.status)
+      return json({ error: e.message, code: e.code, retry_at: e.retryAt }, e.status)
+    }
     const message = e instanceof Error ? e.message : String(e)
     console.error('analyze-capture failed:', message)
     return await fail(message)

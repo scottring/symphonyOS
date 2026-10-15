@@ -21,6 +21,7 @@ import {
   PlanError, classifyModelHttpError, isOwnPagePath, boundContext, LIMITS, applyRevision,
   type Analysis, type RevisionPatch,
 } from './lib/plan.ts'
+import { AiUsageError, reserveAiProviderCall } from '../_shared/aiUsage.ts'
 
 // Reading the photo: Opus. On a real two-page spread (2026-09-23) it kept the
 // page's own misspellings and noted the likely word, where Sonnet silently
@@ -161,14 +162,21 @@ Deno.serve(async (req) => {
     if (!authHeader?.startsWith('Bearer ')) throw new PlanError('unauthorized', 'Missing Authorization', 401)
     const apiKey = Deno.env.get('ANTHROPIC_API_KEY')
     const url = Deno.env.get('SUPABASE_URL')
+    const anon = Deno.env.get('SUPABASE_ANON_KEY')
     const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
-    if (!apiKey || !url || !serviceKey) throw new PlanError('server_config', 'Missing server config', 500)
+    if (!apiKey || !url || !anon || !serviceKey) throw new PlanError('server_config', 'Missing server config', 500)
 
     // A signed-in user only — checked before any work. The gateway's JWT check
     // also admits the public anon key, which is not a user.
     const service = createClient(url, serviceKey)
     const { data: { user }, error: authErr } = await service.auth.getUser(authHeader.slice('Bearer '.length))
     if (authErr || !user) throw new PlanError('unauthorized', 'Invalid token', 401)
+    // Caller-scoped client for the AI allowance: the reservation runs as the
+    // signed-in person. Each action makes exactly ONE model request, and the
+    // reply is streamed with status 200 from the first byte, so the call is
+    // reserved here, before the stream opens, and a refusal still arrives
+    // with its own HTTP status (429/503) and body.
+    const db = createClient(url, anon, { global: { headers: { Authorization: authHeader } } })
 
     // Bodies are small (paths, text, a proposal); refuse anything outsized
     // before parsing it.
@@ -202,6 +210,7 @@ Deno.serve(async (req) => {
         if (error || !signed?.signedUrl) throw new PlanError('image_unavailable', `Image ${i + 1} could not be opened`, 404)
         images.push({ type: 'text', text: `Image ${i + 1}:` }, { type: 'image', source: { type: 'url', url: signed.signedUrl } })
       }
+      await reserveAiProviderCall(db, 'plan-from-paper')
       return streamed(async () => {
         const { text, usage } = await callModel(
           [...images, { type: 'text', text: buildAnalysisPrompt(ctx, paths.length, instructions) }],
@@ -223,6 +232,7 @@ Deno.serve(async (req) => {
       if (currentJson.length > LIMITS.analysisJsonChars) throw new PlanError('bad_request', 'Proposal too large to revise', 413)
       const history = (Array.isArray(body.conversation) ? body.conversation : []).slice(-LIMITS.conversationTurns)
         .map((m) => `${m?.role === 'user' ? 'User' : 'You'}: ${String(m?.text ?? '').slice(0, LIMITS.conversationChars)}`).join('\n\n')
+      await reserveAiProviderCall(db, 'plan-from-paper')
       return streamed(async () => {
         const { text, usage } = await callModel([{
           type: 'text',
@@ -247,6 +257,7 @@ ${history ? `Conversation so far:\n${history}\n\n` : ''}User: ${message}`,
 
     throw new PlanError('bad_request', 'action must be analyze or revise', 400)
   } catch (e) {
+    if (e instanceof AiUsageError) return json({ error: e.message, code: e.code, retry_at: e.retryAt }, e.status)
     const err = e instanceof PlanError ? e : new PlanError('unknown', e instanceof Error ? e.message : String(e), 500)
     console.error('plan-from-paper failed', JSON.stringify({ code: err.code, message: err.message, ms: Date.now() - started }))
     return json({ error: { code: err.code, message: err.message } }, err.status)

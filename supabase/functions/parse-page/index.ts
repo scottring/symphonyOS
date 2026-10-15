@@ -12,6 +12,7 @@
 // (the dropbox-poll caller, which has no user session).
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { windowCalendar, buildPagePrompt, parsePageResponse, isAltitude, type Member, type PageAltitude } from './lib/parse.ts'
+import { AiUsageError, guardedAiFetch } from '../_shared/aiUsage.ts'
 
 const MODEL = 'claude-sonnet-4-6'
 const YMD = /^\d{4}-\d{2}-\d{2}$/
@@ -24,13 +25,13 @@ const corsHeaders = {
 const json = (b: unknown, status = 200) =>
   new Response(JSON.stringify(b), { status, headers: { ...corsHeaders, 'content-type': 'application/json' } })
 
-async function callVision(fileUrl: string, isPdf: boolean, prompt: string, apiKey: string): Promise<string> {
+async function callVision(fileUrl: string, isPdf: boolean, prompt: string, apiKey: string, transport: typeof fetch = fetch): Promise<string> {
   // A multi-page PDF export is one page-set the model sees together; images go
   // through the image block, the way analyze-attachment already branches.
   const fileBlock = isPdf
     ? { type: 'document', source: { type: 'url', url: fileUrl } }
     : { type: 'image', source: { type: 'url', url: fileUrl } }
-  const res = await fetch('https://api.anthropic.com/v1/messages', {
+  const res = await transport('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: { 'content-type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
     body: JSON.stringify({
@@ -59,8 +60,9 @@ Deno.serve(async (req) => {
 
   const apiKey = Deno.env.get('ANTHROPIC_API_KEY')
   const url = Deno.env.get('SUPABASE_URL')
+  const anon = Deno.env.get('SUPABASE_ANON_KEY')
   const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
-  if (!apiKey || !url || !serviceKey) return json({ error: 'Missing server config' }, 500)
+  if (!apiKey || !url || !anon || !serviceKey) return json({ error: 'Missing server config' }, 500)
 
   let body: {
     storagePath?: string
@@ -86,6 +88,10 @@ Deno.serve(async (req) => {
   // read paths under its own user id; dropbox-poll sends the service key and
   // names the user explicitly.
   let userId: string
+  // A signed-in caller reserves an AI provider call (as themselves) before each
+  // model attempt. The service-role poller has no user session, so the
+  // reservation RPC cannot attribute it; that path is not metered here.
+  let modelFetch: typeof fetch = fetch
   if (token === serviceKey) {
     if (!body.userId) return json({ error: 'userId required for service-role calls' }, 400)
     userId = body.userId
@@ -93,6 +99,8 @@ Deno.serve(async (req) => {
     const { data: { user }, error: authErr } = await service.auth.getUser(token)
     if (authErr || !user) return json({ error: 'Invalid token' }, 401)
     userId = user.id
+    const db = createClient(url, anon, { global: { headers: { Authorization: authHeader } } })
+    modelFetch = guardedAiFetch(db, 'parse-page')
   }
 
   const { storagePath, placeStart, placeEnd, today } = body
@@ -127,15 +135,17 @@ Deno.serve(async (req) => {
     // second pass almost always comes back clean (the analyze-attachment rule).
     let parsed
     try {
-      parsed = parsePageResponse(await callVision(signed.signedUrl, isPdf, prompt, apiKey), calendarSet, memberIds, altitude)
-    } catch {
-      parsed = parsePageResponse(await callVision(signed.signedUrl, isPdf, prompt, apiKey), calendarSet, memberIds, altitude)
+      parsed = parsePageResponse(await callVision(signed.signedUrl, isPdf, prompt, apiKey, modelFetch), calendarSet, memberIds, altitude)
+    } catch (e) {
+      if (e instanceof AiUsageError) throw e
+      parsed = parsePageResponse(await callVision(signed.signedUrl, isPdf, prompt, apiKey, modelFetch), calendarSet, memberIds, altitude)
     }
 
     // The altitude is echoed with the window for the same reason: a staged
     // page is reviewed against what the model was told, never re-derived.
     return json({ ok: true, ...parsed, window: calendar.map((c) => c.ymd), altitude, storagePath })
   } catch (e) {
+    if (e instanceof AiUsageError) return json({ error: e.message, code: e.code, retry_at: e.retryAt }, e.status)
     const message = e instanceof Error ? e.message : String(e)
     console.error('parse-page failed:', message)
     // A stable code alongside the message: the client says something a person
