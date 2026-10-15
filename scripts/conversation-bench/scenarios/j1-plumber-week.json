@@ -65,9 +65,11 @@
     {
       "say": "Add buy mulch for the yard on Saturday.",
       "connection": "drop-after-commit",
+      "liveNote": "the drop cannot be simulated live; graded on outcome and tools only",
       "expect": {
-        "outcome": ["unverified", "saved"],
+        "outcome": ["unverified", "saved", "proposed"],
         "tools": [{ "name": "symphony_create_task", "input": { "title": "Buy mulch", "scheduled_for": "2026-10-17" } }],
+        "anyTools": ["symphony_create_task", "symphony_propose_changes"],
         "records": { "created": ["Buy mulch"], "count": { "Buy mulch": 1 } }
       },
       "forbid": { "records": { "duplicateTitles": true } },

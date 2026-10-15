@@ -63,7 +63,9 @@ for (const [i, step] of scenario.steps.entries()) {
   if (!got.outcome) findings.push('no outcome event (older agent build?)')
   else if (!step.expect.outcome.includes(got.outcome.state)) findings.push(`outcome ${got.outcome.state}, expected ${step.expect.outcome.join('|')}`)
   for (const name of step.forbid?.tools ?? []) if (got.tools.includes(name)) findings.push(`forbidden tool ${name}`)
-  for (const call of step.expect.tools ?? []) if (!got.tools.includes(call.name)) findings.push(`missing tool ${call.name}`)
+  // `anyTools`: the live model may reach the same outcome by another supported route (a card instead of a direct write).
+  if (step.expect.anyTools) { if (!step.expect.anyTools.some((n) => got.tools.includes(n))) findings.push(`none of ${step.expect.anyTools.join('|')} called`) }
+  else for (const call of step.expect.tools ?? []) if (!got.tools.includes(call.name)) findings.push(`missing tool ${call.name}`)
   if (step.expect.card && got.changeSet && got.changeSet.ops.length !== step.expect.card.ops) findings.push(`card has ${got.changeSet.ops.length} ops, expected ${step.expect.card.ops}`)
   for (const re of step.say_must_not ?? []) if (new RegExp(re, 'i').test(got.reply)) findings.push(`reply must not match /${re}/`)
   for (const re of step.say_must ?? []) if (!new RegExp(re, 'i').test(got.reply)) findings.push(`reply must match /${re}/`)

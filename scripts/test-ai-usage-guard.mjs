@@ -50,6 +50,7 @@ try {
   sql('select 1;\n' + readFileSync(new URL('../supabase/migrations/20261015110000_ai_allowance_all_interactive_routes.sql', import.meta.url), 'utf8'))
   sql('select 1;\n' + readFileSync(new URL('../supabase/migrations/20261015120000_ai_allowance_background_routes.sql', import.meta.url), 'utf8'))
   sql('select 1;\n' + readFileSync(new URL('../supabase/migrations/20261015150000_ai_spend_ledger.sql', import.meta.url), 'utf8'))
+  sql('select 1;\n' + readFileSync(new URL('../supabase/migrations/20261015160000_ai_household_allowance_defaults.sql', import.meta.url), 'utf8'))
 
   check('migration starts disabled without invented quotas', () => {
     assert.equal(reserve().allowed, false)
@@ -164,6 +165,15 @@ try {
     assert.equal(JSON.parse(sql(query(A).replace("select public.reserve_ai_provider_call('symphony-agent')", "select public.reserve_ai_provider_call('symphony-agent', 'mystery-model')")).split('\n').at(-1)).detail, 'unpriced_model')
     assert.equal(JSON.parse(sql(query(A).replace("select public.reserve_ai_provider_call('symphony-agent')", "select public.reserve_ai_provider_call('symphony-agent', 'claude-sonnet-4-6')")).split('\n').at(-1)).allowed, true)
     sql('update public.ai_usage_configuration set refuse_unpriced = false; truncate public.ai_spend')
+  })
+  reset()
+  check('a new household gets the configured default allowance; none when no default is set', () => {
+    sql("insert into public.households values ('10000000-0000-0000-0000-000000000009')")
+    assert.equal(sql("select count(*) from public.ai_household_allowances where household_id = '10000000-0000-0000-0000-000000000009'"), '0')
+    sql('update public.ai_usage_configuration set default_daily_calls = 50, default_monthly_calls = 500, default_daily_cents = 300, default_monthly_cents = 2000')
+    sql("insert into public.households values ('10000000-0000-0000-0000-00000000000a')")
+    assert.equal(sql("select daily_calls || ',' || monthly_cents from public.ai_household_allowances where household_id = '10000000-0000-0000-0000-00000000000a'"), '50,2000')
+    sql("update public.ai_usage_configuration set default_daily_calls = null; delete from public.households where id in ('10000000-0000-0000-0000-000000000009','10000000-0000-0000-0000-00000000000a')")
   })
   reset()
   check('emergency disable blocks the next reservation without resetting usage', () => {

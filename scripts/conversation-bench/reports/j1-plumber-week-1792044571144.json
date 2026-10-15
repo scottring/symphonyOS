@@ -1,0 +1,56 @@
+{
+  "scenario": "j1-plumber-week",
+  "at": "2026-10-15T06:09:27.364Z",
+  "user": "deb3b752-cb26-480a-910c-fb174b308409",
+  "steps": [
+    {
+      "step": 1,
+      "say": "I need to call the plumber, pick up the Amazon order, clean the yard, and fit in an all-day test drive this week.",
+      "tools": [],
+      "outcome": "failed",
+      "reply": "",
+      "findings": [
+        "outcome failed, expected proposed",
+        "missing tool symphony_read_week",
+        "missing tool symphony_propose_changes"
+      ]
+    },
+    {
+      "step": 2,
+      "say": "Actually, the plumber call is Friday, not whenever.",
+      "tools": [],
+      "outcome": "failed",
+      "reply": "",
+      "findings": [
+        "outcome failed, expected proposed",
+        "missing tool symphony_propose_changes"
+      ]
+    },
+    {
+      "step": 3,
+      "action": "approve",
+      "result": "manual (page action: run in the browser layer)"
+    },
+    {
+      "step": 4,
+      "say": "Add buy mulch for the yard on Saturday.",
+      "tools": [],
+      "outcome": "failed",
+      "reply": "",
+      "findings": [
+        "outcome failed, expected unverified|saved",
+        "missing tool symphony_create_task"
+      ]
+    },
+    {
+      "step": 5,
+      "action": "retry",
+      "result": "manual (page action: run in the browser layer)"
+    },
+    {
+      "step": 6,
+      "action": "undo-set",
+      "result": "manual (page action: run in the browser layer)"
+    }
+  ]
+}
