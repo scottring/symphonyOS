@@ -169,6 +169,16 @@ end $$;
 revoke all on function public.revoke_display(uuid) from public, anon;
 grant execute on function public.revoke_display(uuid) to authenticated;
 
+-- The display says it is alive (Settings shows when it was last seen). Only
+-- a display may call it, and only for its own row.
+create or replace function public.display_heartbeat()
+returns void language sql security definer set search_path = public, pg_temp as $$
+  update public.household_displays set last_seen_at = now()
+  where user_id = auth.uid() and revoked_at is null and public.is_display()
+$$;
+revoke all on function public.display_heartbeat() from public, anon;
+grant execute on function public.display_heartbeat() to authenticated;
+
 -- A display may read what the household shares; it may not change it. This
 -- trigger refuses every write from a display on the tables a wall never
 -- writes, whatever the row policies allow a household member.

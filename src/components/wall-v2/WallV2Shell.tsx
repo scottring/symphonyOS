@@ -35,6 +35,7 @@ import { readReadingTimer, readingTimerKey, elapsedMinutes, isTimerRunning } fro
 import { localYmd, readCadenceConfig } from '@/lib/cadence/config';
 import { useSupabaseTasks } from '@/hooks/useSupabaseTasks';
 import { applyChangeSet, plannedWeekStart } from '@/lib/canvas/applyChangeSet';
+import { useDisplayHeartbeat } from '@/lib/display/useDisplayHeartbeat';
 import { withSteps, type ChangeSet } from '@/lib/canvas/changeCard';
 import type { WallTalkDeps, WallApplyResult } from './activity/useWallTalk';
 import type { WallTalkWeek } from './activity/WallTalk';
@@ -232,6 +233,8 @@ export function WallV2Shell() {
   );
 
   const wallData = useWallData();
+  // A paired display says it is alive; a person's session sends nothing.
+  useDisplayHeartbeat();
   const { weather } = useWeather();
   // force:true — surface tonight's planned dinner + its stored recipe on the
   // kiosk even while planned meals stay off the Today/Week/Month timelines.

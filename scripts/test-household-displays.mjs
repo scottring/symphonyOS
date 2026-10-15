@@ -123,6 +123,12 @@ try {
     assert.equal(as(DISPLAY, `insert into public.list_items (list_id,user_id,text) values ('${list}','${DISPLAY}','milk') returning 1`, true), '1')
     assert.equal(as(DISPLAY, `insert into public.scratchpad_notes (user_id,body) values ('${DISPLAY}','call grandma') returning 1`, true), '1')
   })
+  check('the display reports it is alive; a member calling the heartbeat changes nothing', () => {
+    as(DISPLAY, 'select public.display_heartbeat()', true)
+    assert.equal(as(OWNER, 'select count(*) from public.household_displays where last_seen_at is not null'), '1')
+    as(OWNER, 'select public.display_heartbeat()')
+    assert.equal(as(OWNER, 'select count(*) from public.household_displays where last_seen_at is not null'), '1')
+  })
   check('revoking fails the display closed at once; an outsider cannot revoke', () => {
     const display = as(OWNER, 'select id from public.household_displays')
     fails(`set role authenticated; set request.jwt.claim.sub = '${OUTSIDER}'; select public.revoke_display('${display}')`, /owner or admin/)
