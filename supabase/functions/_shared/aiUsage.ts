@@ -87,6 +87,9 @@ export function guardedAiFetch(db: UsageDb, route: GuardedAiRoute, transport: ty
 async function recordUsage(record: (args: Record<string, unknown>) => PromiseLike<unknown>, res: Response, model: string | null, estimate?: AiUsageEstimate): Promise<void> {
   try {
     let usage: AiUsageRecord | null = null
+    // A refused or failed attempt costs nothing at the provider; an estimate
+    // charged anyway locked a household out of voice after two tries (2026-10-15).
+    if (!res.ok) return
     if (estimate) usage = { model: estimate.model, inputTokens: estimate.inputTokens ?? 0, outputTokens: estimate.outputTokens ?? 0, minutes: estimate.minutes ?? 0 }
     else if (res.ok && /json/i.test(res.headers.get('content-type') ?? '')) usage = usageOf(await res.clone().json().catch(() => null), model)
     if (!usage) return

@@ -72,6 +72,13 @@ describe('spend ledger (cents, not only calls)', () => {
     expect((await guardedAiFetch(db, 'workspace-voice', sdp, { model: 'gpt-realtime-2.1', minutes: 5 })('https://api.openai.com/v1/realtime/calls', { method: 'POST' })).ok).toBe(true)
     expect(calls).toEqual(['reserve_ai_provider_call', 'record_ai_usage', 'reserve_ai_provider_call', 'record_ai_usage'])
   })
+  it('a refused provider handshake records no spend: the estimate is only charged on success', async () => {
+    const calls: string[] = []
+    const db = { rpc: async (name: string) => { calls.push(name); return { data: { allowed: true }, error: null } } }
+    const refused = vi.fn(async () => new Response('bad sdp', { status: 400 }))
+    expect((await guardedAiFetch(db, 'workspace-voice', refused, { model: 'gpt-realtime-2.1', minutes: 2 })('https://api.openai.com/v1/realtime/calls', { method: 'POST' })).ok).toBe(false)
+    expect(calls).toEqual(['reserve_ai_provider_call'])
+  })
   it('usageOf reads both vendors and ignores replies without usage', () => {
     expect(usageOf({ model: 'm', usage: { input_tokens: 1, output_tokens: 2 } }, null)).toEqual({ model: 'm', inputTokens: 1, outputTokens: 2, minutes: 0 })
     expect(usageOf({ usage: { prompt_tokens: 3, total_tokens: 3 } }, 'text-embedding-3-small')).toEqual({ model: 'text-embedding-3-small', inputTokens: 3, outputTokens: 0, minutes: 0 })

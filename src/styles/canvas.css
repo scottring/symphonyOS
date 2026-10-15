@@ -317,3 +317,6 @@
 .dark .wc-dayrow.is-pointed, .dark .wc-noday-chip.is-pointed { box-shadow: 0 0 0 2px #6cc4b9; background: #1c3634; }
 .dark .wc-daychip.is-pointed { box-shadow: 0 0 0 2px #6cc4b9; }
 @media (prefers-reduced-motion: reduce) { .wc-day.is-pointed, .wc-dayrow.is-pointed, .wc-noday-chip.is-pointed, .wc-daychip.is-pointed { transition: none; } }
+
+/* A refused voice start says why, in the bar, instead of nothing (2026-10-15). */
+.canvas-voice-error { flex-basis: 100%; margin: 4px 0 0; font-size: 13px; color: var(--ink-muted, #6b6560); }

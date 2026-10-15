@@ -6,8 +6,10 @@ Deno.serve(req=>handleWorkspaceVoice(req,{
  fetch:async (input,init)=>{
   const db=createClient(Deno.env.get('SUPABASE_URL')!,Deno.env.get('SUPABASE_ANON_KEY')!,{global:{headers:{Authorization:req.headers.get('Authorization')??''}}})
   // A realtime call reports no usage: the five-minute admission is charged as
-  // an estimate at the model's per-minute price (ai_model_prices).
-  return guardedAiFetch(db,'workspace-voice',fetch,{model:Deno.env.get('WORKSPACE_VOICE_MODEL')||'gpt-realtime-2.1',minutes:5})(input,init)
+  // an estimate at the model's per-minute price (ai_model_prices). Two minutes:
+  // a typical exchange; the session cap is longer, so the ledger under-counts
+  // long sessions rather than locking people out (2026-10-15).
+  return guardedAiFetch(db,'workspace-voice',fetch,{model:Deno.env.get('WORKSPACE_VOICE_MODEL')||'gpt-realtime-2.1',minutes:2})(input,init)
  },
  reserve:async authorization=>{
   const db=createClient(Deno.env.get('SUPABASE_URL')!,Deno.env.get('SUPABASE_ANON_KEY')!,{global:{headers:{Authorization:authorization}}})

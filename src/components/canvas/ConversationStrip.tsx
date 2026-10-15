@@ -210,6 +210,7 @@ export function ConversationStrip({ onSend, busy, voice, onOpenConversation, onR
             </button>
           )
         })()}
+        {voice.error && !voice.active && <p role="alert" className="canvas-voice-error">{voice.error}</p>}
         {voice.active && voice.status !== 'connecting' && (
           <button type="button" className="canvas-link" onClick={voice.stop} aria-label="End voice conversation">End</button>
         )}
