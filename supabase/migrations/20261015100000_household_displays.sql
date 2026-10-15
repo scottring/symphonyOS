@@ -94,8 +94,9 @@ revoke all on function public.household_family_calendar_ids() from public;
 grant execute on function public.household_family_calendar_ids() to authenticated, service_role;
 
 -- Owner or admin: a six-character code, good for ten minutes, one display name.
+-- pgcrypto lives in the extensions schema on Supabase; locally it may be in public.
 create or replace function public.create_display_pairing_code(p_name text default 'Kitchen wall')
-returns jsonb language plpgsql security definer set search_path = public, pg_temp as $$
+returns jsonb language plpgsql security definer set search_path = public, extensions, pg_temp as $$
 declare me uuid := auth.uid(); hh uuid; code text; tries int := 0;
 begin
   if me is null then raise exception 'Not authenticated'; end if;

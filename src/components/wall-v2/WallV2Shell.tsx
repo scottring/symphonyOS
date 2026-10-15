@@ -108,6 +108,7 @@ import { scaleIngredient } from '@/lib/wall/scaleIngredient';
 import { findToBuyList } from '@/lib/lists/toBuy';
 import { useAuth } from '@/hooks/useAuth';
 import { AuthForm } from '@/components/AuthForm';
+import { PairDisplayScreen } from '@/components/auth/PairDisplayScreen';
 import { supabase } from '@/lib/supabase';
 import type { WallV2TimelineEvent } from './types';
 import { useWallTheme } from './wallThemeOverride';
@@ -314,6 +315,7 @@ export function WallV2Shell() {
   // Guest mode: a privacy cover for when company's over — hides all content
   // behind a full-screen ambient clock/weather screen.
   const [guestMode, setGuestMode] = useState(false);
+  const [wantsPersonSignIn, setWantsPersonSignIn] = useState(false);
   // The recipe viewer is the kiosk's 'recipe' stage now.
   const recipeViewerMeal = (stage.kind === 'recipe' && stage.source === 'dinner' ? 'dinner' : null) as 'dinner' | 'breakfast' | null;
   const setRecipeViewerMeal = useCallback((meal: 'dinner' | null) => {
@@ -1131,8 +1133,10 @@ export function WallV2Shell() {
   // no way to log back in. Render the sign-in form instead of a dead spinner so
   // the wall can recover itself. Wait out the initial auth check to avoid a
   // login flash; AuthForm flips `user` on success and we re-render into the wall.
+  // A signed-out wall's front door is pairing (its own restricted sign-in);
+  // "Sign in instead" is one tap away for setup or recovery.
   if (!authLoading && !user) {
-    return <AuthForm />;
+    return wantsPersonSignIn ? <AuthForm /> : <PairDisplayScreen onSignInInstead={() => setWantsPersonSignIn(true)} />;
   }
 
   return (
