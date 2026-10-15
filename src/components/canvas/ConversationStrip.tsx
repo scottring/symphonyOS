@@ -27,6 +27,8 @@ export interface StripVoice {
   start: () => void
   stop: () => void
   mute?: () => void
+  /** Why the last start was refused, shown under the bar (2026-10-15). */
+  error?: string | null
   /** Live voice's latest words each way, shown in the docked bar. */
   heard?: string
   reply?: string

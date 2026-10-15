@@ -3,7 +3,7 @@
   "reviewed_commit": "0bbb3c075203c7e9978905e5af3655ff9fe43b6a",
   "newer_unreviewed_commit": null,
   "status": "changes_requested",
-  "delivery": "Prior review through R7 is now committed by Claude in d3d5dfae; this confirms inclusion in the branch, not acknowledgment or resolution. No explicit response to the findings observed. Direct UI delivery remains unavailable following the lock failure; no UI retry or bypass attempted.",
+  "delivery": "Claude has committed reviews through R8 and made a first code/configuration response (3f89337c voice estimate). Other findings remain unacknowledged/unfixed in the visible branch. UI delivery remains unavailable after the lock failure; no retry or bypass.",
   "verification": {
     "targeted_tests": "32/32 pass with NODE_OPTIONS=--no-experimental-webstorage (FirstRunGate, CanvasActivityContext, oauthState). Initial Node v26 native localStorage mismatch resolved by documented runtime flag; not a product regression.",
     "repro_path": "/private/tmp/symphony-overnight-repro.ts",
@@ -151,6 +151,28 @@
         "private_metadata_visible_to_B_after": false
       },
       "limits": "Proves a bypass in the checked-in storage.objects SELECT policy under an ordinary authenticated role. Current deployed policies, actual signed-URL/download HTTP behavior and storage configuration remain unverified. No real private content was accessed."
+    },
+    "voice_price_recheck": {
+      "at": "2026-10-15T09:10:49Z",
+      "commit": "3f89337cd82766972b77bdb2c0ec1c24fa5fd31e",
+      "script": "/private/tmp/symphony-overnight-voice-recheck.mjs",
+      "command": "node /private/tmp/symphony-overnight-voice-recheck.mjs --pg-bin /opt/homebrew/opt/postgresql@17/bin",
+      "exit_code": 0,
+      "environment": "Disposable local PostgreSQL using current migrations and approved documented limits; synthetic rows only, no TCP listener, no application env/credentials, no hosted data or provider calls. Cluster cleaned up.",
+      "results": [
+        {
+          "case": "first voice estimate",
+          "recorded_cents": 150,
+          "next_agent_allowed": true
+        },
+        {
+          "case": "second voice estimate",
+          "recorded_total_cents": 300,
+          "next_agent_allowed": false,
+          "reason": "daily_limit"
+        }
+      ],
+      "limits": "Proves changed seed behavior locally. Claude reports hosted repricing; live price rows and acoustic session not independently checked."
     }
   },
   "findings": [
@@ -232,7 +254,26 @@
       ],
       "finding": "Voice is self-blocking under the committed price and documented approved limits: each connection records 5 minutes x 600 cents = 3000 cents ($30), exceeding both the $3/day and $20/month household limits. Disposable PostgreSQL reproduced first admission allowed followed immediately by symphony-agent monthly_limit. Therefore a voice connection can prevent the first subsequent agent action and later voice starts for that household. This is an internal estimate, NOT an observed $30 provider bill. recordUsage also uses the estimate without checking res.ok, so a failed handshake with a returned HTTP response can record the same estimate.",
       "request": "Treat this as a pre-microphone gate alongside R1/R2. Correct the realtime reservation/settlement accounting using justified units and bounded exposure, keeping the approved household/global limits. Do not simply raise limits or zero the meter. Add an integration test proving voice admission followed by its agent call works within allowance; distinguish failed handshake, canceled short session, full session and repeated starts. Verify any hosted configuration read-only first, then use the existing synthetic fixture/release gates for a fix.",
-      "verification": "Local real PostgreSQL reproduction, not acoustic or deployed end-to-end proof."
+      "verification": "Local real PostgreSQL reproduction, not acoustic or deployed end-to-end proof.",
+      "status": "partially_mitigated",
+      "follow_up": {
+        "commit": "3f89337cd82766972b77bdb2c0ec1c24fa5fd31e",
+        "fixed_locally": "600 cents/minute reduced to 30. First five-minute estimated charge is now $1.50 and the next agent admission succeeds. The original immediate monthly lockout is mitigated.",
+        "still_open": [
+          "Two admitted connections consume the $3 daily estimate and the next agent call fails; every start is still counted as five minutes, including short/canceled sessions and returned failed-handshake responses.",
+          "No duration/token settlement or defensible bound for contextual input and overlapping work was added; R2 remains open.",
+          "Session D calls for ten microphone starts; the current two-start daily accounting prevents that script under the ordinary approved budget. Correct settlement and the test procedure without casually raising limits or disabling metering.",
+          "The committed change edits an already-applied migration. Capture the reported hosted update/repricing as a narrow forward migration or operator change record with exact scope and verification; do not assume editing a historical seed updates existing databases.",
+          "No completed human Session D results sheet accompanies the new claim. Keep configuration/admission testing distinct from real acoustic/UX validation."
+        ]
+      },
+      "latest_follow_up": {
+        "commit": "44a9993cb1862fd33facf91c620167e4b98b27fd",
+        "at": "2026-10-15T09:17:27.084600+00:00",
+        "status": "partially_mitigated",
+        "verified": "13/13 aiUsage tests pass, including no spend record on refused HTTP handshake. Source now estimates 2 minutes per successful voice start (60 cents at the new rate), superseding the previous five-minute/150-cent analysis. The strip now renders voice.error when inactive.",
+        "remaining": "Actual duration/token settlement and reservation concurrency remain unresolved; five successful starts alone exhaust the $3 daily estimate, so ten-start acoustic kit still needs reconciliation. New visual error state and live deployed configuration not independently verified. No completed human session evidence attached."
+      }
     },
     {
       "id": "R6",
@@ -276,13 +317,13 @@
       "verification": "Confirmed with actual checked-in migrations on local PostgreSQL; deployed exploitability not yet checked."
     }
   ],
-  "next": "Claude has committed prior findings but no correction/acknowledgment observed. R8 storage authorization now joins R5 voice admission, R1 Undo, R2 costs and R7 retry recovery as pre-beta priorities. Preserve guards; use synthetic-only proof. R6 benchmark validity and R3/R4 remain open. Review new fixes when they appear, do not repeat unchanged checks; UI remains unavailable pending manual unlock.",
-  "updated_at_utc": "2026-10-15T08:52:46Z",
+  "next": "Review new fixes when present. Original voice monthly lockout locally mitigated; keep R5 partially open for session settlement and human-kit viability. Prioritize R8 file authorization and R2 ledger authority, then R1 Undo/R7 retry correctness; R6 grader and R3/R4 remain open. Preserve approved limits and synthetic-only scope.",
+  "updated_at_utc": "2026-10-15T09:17:27.084600+00:00",
   "reviewed_commits": [
     "0bbb3c075203c7e9978905e5af3655ff9fe43b6a",
     "7d8d29a8214e121dceb46d524769635004862e88"
   ],
-  "latest_reviewed_commit": "c416795aac0c8ab7826cd9e3954378ec1a7ba754",
+  "latest_reviewed_commit": "44a9993cb1862fd33facf91c620167e4b98b27fd",
   "price_source_review": {
     "checked_at_utc": "2026-10-15T07:53:00Z",
     "anthropic_source": "https://platform.claude.com/docs/en/about-claude/pricing",
@@ -312,6 +353,13 @@
       "claude_acknowledgment_observed": false,
       "new_implementation_observed": false,
       "work": "New restore report reviewed; earlier findings committed by Claude but not acknowledged/resolved. Attachment storage authorization tested on synthetic local PostgreSQL. Math work left alone."
+    },
+    {
+      "at": "2026-10-15T09:10:49Z",
+      "head": "3f89337cd82766972b77bdb2c0ec1c24fa5fd31e",
+      "new_implementation_observed": true,
+      "claude_acknowledgment_observed": "Voice lockout addressed by rate adjustment; no explicit responses to R1/R2/R3/R4/R6/R7/R8 observed.",
+      "work": "Independent regression check of affected voice price; no prior passing tests repeated."
     }
   ],
   "reviewed_scopes": [
@@ -322,6 +370,14 @@
     {
       "commit": "c416795aac0c8ab7826cd9e3954378ec1a7ba754",
       "scope": "Relevant beta/privacy source unchanged; attachment-policy reproduction. Unrelated math changes merged from origin/main deliberately not reviewed or edited."
+    },
+    {
+      "commit": "3f89337cd82766972b77bdb2c0ec1c24fa5fd31e",
+      "scope": "Realtime estimate adjustment, accompanying documentation and incorporated prior reviews. Focused local PostgreSQL recheck only."
+    },
+    {
+      "commit": "44a9993cb1862fd33facf91c620167e4b98b27fd",
+      "scope": "Failed HTTP handshake no longer records estimate; successful voice starts now estimate two minutes; conversation strip error text added. 13 aiUsage tests independently passed. Visual/acoustic behavior unverified."
     }
   ]
 }

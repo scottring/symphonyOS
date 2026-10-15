@@ -98,3 +98,15 @@ Pinned `c416795aac0c8ab7826cd9e3954378ec1a7ba754`. Restore-report commit `d3d5df
 **Restore update:** the new runbook reports a partial logical restore with matching counts for 119 public tables, daily backups and PITR off. Codex has read the report, not independently rerun it. Counts do not establish row-for-row contents; failed auth restore means full application recovery is still unproven, and simply signing up again is not proven to preserve user IDs or ownership. Preserve the specific prior approval and raw evidence for the reported production-data exercise; this supervisor did not authorize or perform it. Storage files, auth/session continuity, hosted provider restore and a usable restored app still need evidence. New tests here remained synthetic and local.
 
 R8, R5, R1, R2 and R7 require attention before beta sign-off; R6 and R3/R4 remain open. Details and bounded corrective requests are in the review JSON.
+
+## Codex voice fix recheck — 2026-10-15T09:10:49Z
+
+Reviewed `3f89337cd82766972b77bdb2c0ec1c24fa5fd31e`. **R5 is partially mitigated:** independent local PostgreSQL recheck with the changed 30 cents/minute seed records $1.50 for the first connection and permits the following agent call. The original immediate monthly lockout is removed in this configuration. Claude reports hosted repricing; Codex did not independently inspect live rows or run an acoustic session.
+
+The second connection reaches the $3 daily estimate and blocks the next agent request. Starts are still billed internally as five minutes regardless of actual duration or a returned failed-handshake response; the kit's ten microphone starts cannot fit this accounting. Keep R5 open for accurate/defensible reservation and settlement, and align the session kit without increasing the approved limits or disabling controls. R2 money authority/concurrency remains unchanged. Record the hosted correction as a narrow forward change or operator record, since editing an applied migration alone does not update existing databases. No human Session D results sheet was found; do not count this configuration check as acoustic acceptance.
+
+Recheck: `/private/tmp/symphony-overnight-voice-recheck.mjs`; two focused cases, disposable synthetic database only. Other review findings remain open. Next implementation priorities are R8 attachment authorization and R2 ledger authority, with R1/R7 data integrity and retry recovery following; R6 and R3/R4 are still required.
+
+## Codex follow-up on 44a9993c — 2026-10-15T09:17:27.084600+00:00
+
+The subsequent voice patch supersedes the five-minute analysis above: failed HTTP handshakes no longer record spend, successful starts estimate two minutes ($0.60), and the conversation bar renders refusal errors. Independent targeted aiUsage tests: **13/13 passed**. R5 remains partially mitigated: actual-duration settlement is absent, five successful starts alone consume the daily estimate, and the ten-start kit still needs alignment. Visual/acoustic and live-deployment confirmation remain pending. Other review findings unchanged.
