@@ -6,16 +6,17 @@
 // ignored), asks Claude for a story once per new problem — about one of the
 // kid's topics when they picked some — and keeps it only if it passes
 // acceptWording. Owns every write: a tap on Check, a bonus problem, a
-// grown-up's reset of the day, a kid's topics. The wall shows the plain
-// problem until (or unless) a story arrives.
+// grown-up's reset of the day, a kid's topics, a grown-up's pick of a kid's
+// problem type. The wall shows the plain problem until (or unless) a story
+// arrives.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useRefreshOnVisible } from '@/hooks/useRefreshOnVisible'
 import type { FamilyMember } from '@/types/family'
-import type { MathInput } from '@/lib/wall/math/mathProblem'
+import type { MathInput, MathKind } from '@/lib/wall/math/mathProblem'
 import {
-  addDaysYmd, attempt, bonusStars, buildBonus, buildProblem, currentRow, dbToMathRow, HISTORY_DAYS, streakFor,
+  addDaysYmd, attempt, bonusStars, buildBonus, buildProblem, currentRow, dbToMathRow, HISTORY_DAYS, parseKind, retypedDaily, streakFor,
   type DbMathRow, type MathRow, type NewMathProblem, type Verdict,
 } from '@/lib/wall/math/mathProgress'
 import { acceptWording, storyRequest } from '@/lib/wall/math/mathWording'
@@ -36,6 +37,8 @@ export interface KidMathEntry {
   canBonus: boolean
   /** What they like, for the stories (topic ids). */
   topics: string[]
+  /** The type a grown-up picked for them; null = by weekday. */
+  kindChoice: MathKind | null
 }
 
 export interface KidMath {
@@ -49,6 +52,10 @@ export interface KidMath {
   /** A grown-up's reset: today's problem back to unsolved, bonus problems gone. */
   resetToday: (memberId: string) => Promise<boolean>
   setTopics: (memberId: string, topics: string[]) => void
+  /** A grown-up's pick of a kid's type (null = by weekday). 'today' when
+   *  today's problem is (now) that type, 'tomorrow' when the kid had already
+   *  started today's. */
+  setKind: (memberId: string, kind: MathKind | null) => Promise<'today' | 'tomorrow' | 'failed'>
 }
 
 export const firstName = (m: FamilyMember) => m.name.trim().split(/\s+/)[0] || m.name
@@ -58,6 +65,9 @@ const insertRow = (p: NewMathProblem) => ({ member_id: p.memberId, for_date: p.f
 export function useKidMath(userId: string | null, kids: FamilyMember[], today: string, onWriteFailed?: () => void): KidMath {
   const [rows, setRows] = useState<MathRow[]>([])
   const [topics, setTopicsState] = useState<Record<string, string[]>>({})
+  const [kinds, setKindsState] = useState<Record<string, MathKind | null>>({})
+  const kindsRef = useRef(kinds)
+  kindsRef.current = kinds
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const kidIds = useMemo(() => kids.map((k) => k.id).sort().join(','), [kids])
   const asked = useRef(new Set<string>())
@@ -76,10 +86,14 @@ export function useKidMath(userId: string | null, kids: FamilyMember[], today: s
         .in('member_id', ids)
         .gte('for_date', addDaysYmd(today, -HISTORY_DAYS))
         .order('for_date', { ascending: false }),
-      supabase.from('kid_math_prefs').select('member_id, topics').in('member_id', ids),
+      supabase.from('kid_math_prefs').select('member_id, topics, kind').in('member_id', ids),
     ])
     if (!prefs.error) {
-      setTopicsState(Object.fromEntries((prefs.data as { member_id: string; topics: unknown }[]).map((p) => [p.member_id, parseTopics(p.topics)])))
+      const list = prefs.data as { member_id: string; topics: unknown; kind: unknown }[]
+      setTopicsState(Object.fromEntries(list.map((p) => [p.member_id, parseTopics(p.topics)])))
+      // Read at once by the build below, before the state lands.
+      kindsRef.current = Object.fromEntries(list.map((p) => [p.member_id, parseKind(p.kind)]))
+      setKindsState(kindsRef.current)
     }
     if (error) { console.error('[kid-math] load failed:', error.message); return null }
     const next = (data as DbMathRow[]).map(dbToMathRow).filter((r): r is MathRow => !!r)
@@ -95,7 +109,7 @@ export function useKidMath(userId: string | null, kids: FamilyMember[], today: s
       if (cancelled || !loaded || !userId) return
       const missing = kids.filter((k) => !loaded.some((r) => r.memberId === k.id && r.forDate === today && r.slot === 0))
       if (!missing.length) return
-      const inserts = missing.map((k) => insertRow(buildProblem(k.id, today, loaded.filter((r) => r.memberId === k.id))))
+      const inserts = missing.map((k) => insertRow(buildProblem(k.id, today, loaded.filter((r) => r.memberId === k.id), kindsRef.current[k.id] ?? null)))
       const { error } = await supabase
         .from('kid_math_problems')
         .upsert(inserts, { onConflict: 'member_id,for_date,slot', ignoreDuplicates: true })
@@ -185,6 +199,33 @@ export function useKidMath(userId: string | null, kids: FamilyMember[], today: s
       })
   }, [onWriteFailed])
 
+  const setKind = useCallback(async (memberId: string, kind: MathKind | null): Promise<'today' | 'tomorrow' | 'failed'> => {
+    const before = kindsRef.current[memberId] ?? null
+    setKindsState((prev) => ({ ...prev, [memberId]: kind }))
+    const { error } = await supabase.from('kid_math_prefs').upsert({ member_id: memberId, kind }, { onConflict: 'member_id' })
+    if (error) {
+      console.error('[kid-math] type not saved:', error.message)
+      setKindsState((prev) => ({ ...prev, [memberId]: before }))
+      onWriteFailed?.()
+      return 'failed'
+    }
+    const mine = rowsRef.current.filter((r) => r.memberId === memberId)
+    const todays = mine.filter((r) => r.forDate === today)
+    const daily = todays.find((r) => r.slot === 0)
+    if (!daily) return 'today'
+    const next = retypedDaily(todays, mine, kind)
+    if (!next) return daily.kind === buildProblem(memberId, today, mine, kind).kind ? 'today' : 'tomorrow'
+    // Only while still untouched: a kid who started on another wall keeps theirs.
+    const { data, error: upErr } = await supabase.from('kid_math_problems')
+      .update({ kind: next.kind, level: next.level, problem: next.spec, wording: null })
+      .eq('id', daily.id).eq('status', 'open').eq('tries', 0)
+      .select('id')
+    if (upErr) { console.error('[kid-math] today’s problem not changed:', upErr.message); onWriteFailed?.() }
+    asked.current.delete(daily.id)
+    await load()
+    return !upErr && data?.length ? 'today' : 'tomorrow'
+  }, [today, load, onWriteFailed])
+
   const entries = useMemo(() => kids.map((member): KidMathEntry => {
     const mine = rows.filter((r) => r.memberId === member.id)
     const todays = mine.filter((r) => r.forDate === today)
@@ -196,11 +237,12 @@ export function useKidMath(userId: string | null, kids: FamilyMember[], today: s
       bonusStars: bonusStars(todays),
       canBonus: !!buildBonus(todays),
       topics: topics[member.id] ?? [],
+      kindChoice: kinds[member.id] ?? null,
     }
-  }), [kids, rows, today, topics])
+  }), [kids, rows, today, topics, kinds])
 
   const select = useCallback((memberId: string) => setSelectedId(memberId), [])
   const selected = selectedId && kids.some((k) => k.id === selectedId) ? selectedId : kids[0]?.id ?? null
 
-  return { kids: entries, selectedId: selected, select, check, addBonus, resetToday, setTopics }
+  return { kids: entries, selectedId: selected, select, check, addBonus, resetToday, setTopics, setKind }
 }

@@ -208,6 +208,11 @@
 .kiosk-canvas .km-levelpick small { font-size: calc(20 * var(--p)); color: var(--kw-muted); }
 .kiosk-canvas .km-levelpick .km-tool:disabled { opacity: .35; }
 .kiosk-canvas .km-start { margin-left: auto; }
+.kiosk-canvas .km-side[aria-label="Each kid"] { gap: calc(12 * var(--p)); }
+.kiosk-canvas .km-kidset { display: flex; flex-direction: column; gap: calc(8 * var(--p)); padding-bottom: calc(6 * var(--p)); }
+.kiosk-canvas .km-kidset .km-reset-row { padding: calc(8 * var(--p)) 0 0; }
+.kiosk-canvas .km-kinds { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: calc(10 * var(--p)); }
+.kiosk-canvas .km-kinds .km-choice { min-height: calc(64 * var(--p)); font-size: calc(21 * var(--p)); line-height: 1.15; }
 .kiosk-canvas .km-reset-row { display: flex; align-items: center; gap: calc(16 * var(--p)); padding: calc(14 * var(--p)) 0; border-top: calc(1 * var(--p)) solid var(--kw-line); }
 .kiosk-canvas .km-reset-row .km-reset-who { flex: 1; display: flex; flex-direction: column; min-width: 0; }
 .kiosk-canvas .km-reset-row b { font: 600 calc(28 * var(--p)) var(--kw-sans); color: var(--kw-ink); }
