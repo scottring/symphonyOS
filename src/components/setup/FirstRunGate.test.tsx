@@ -5,7 +5,9 @@ import type { User } from '@supabase/supabase-js'
 
 const h = vi.hoisted(() => ({
   signals: vi.fn(),
+  rpc: vi.fn(async () => ({ data: null, error: null })),
 }))
+vi.mock('@/lib/supabase', () => ({ supabase: { rpc: h.rpc } }))
 vi.mock('@/lib/firstRun', async (importOriginal) => {
   const mod = await importOriginal<typeof import('@/lib/firstRun')>()
   return { ...mod, loadFirstRunSignals: h.signals }
@@ -16,7 +18,7 @@ import { FirstRunGate } from './FirstRunGate'
 
 const user = { id: 'u-gate', email: 'a@b.c' } as unknown as User
 
-beforeEach(() => { h.signals.mockReset(); localStorage.clear() })
+beforeEach(() => { h.signals.mockReset(); h.rpc.mockReset(); h.rpc.mockResolvedValue({ data: null, error: null }); localStorage.clear() })
 
 describe('FirstRunGate', () => {
   it('shows setup for a fresh account', async () => {
@@ -40,6 +42,22 @@ describe('FirstRunGate', () => {
     h.signals.mockRejectedValue(new Error('offline'))
     render(<FirstRunGate user={user}><div>APP</div></FirstRunGate>)
     expect(await screen.findByText('APP')).toBeInTheDocument()
+  })
+
+  it('asks the server for a live invitation when the browser has none, and goes to join it', async () => {
+    h.signals.mockResolvedValue({ completed: false, hasTasks: false, memberCount: 1 })
+    h.rpc.mockResolvedValue({ data: { token: 'tok-srv', household_id: 'hh' }, error: null })
+    const replace = vi.fn()
+    const loc = window.location
+    Object.defineProperty(window, 'location', { configurable: true, value: { ...loc, replace } })
+    try {
+      render(<FirstRunGate user={user}><div>APP</div></FirstRunGate>)
+      await vi.waitFor(() => expect(replace).toHaveBeenCalledWith('/join/tok-srv'))
+      expect(h.rpc).toHaveBeenCalledWith('my_pending_invitation')
+      expect(screen.queryByText('SETUP SCREEN')).not.toBeInTheDocument()
+    } finally {
+      Object.defineProperty(window, 'location', { configurable: true, value: loc })
+    }
   })
 
   // Clarity audit 2026-09-29: an invited partner who signed up was sent to

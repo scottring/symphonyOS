@@ -8,6 +8,7 @@ import {
   needsFirstRun,
 } from '@/lib/firstRun'
 import { getPendingJoin } from '@/lib/pendingJoin'
+import { supabase } from '@/lib/supabase'
 
 type Stage = 'checking' | 'setup' | 'ready'
 
@@ -32,11 +33,18 @@ export function FirstRunGate({ user, children }: { user: User; children: ReactNo
     if (stage !== 'checking') return
     let live = true
     loadFirstRunSignals(user.id)
-      .then((signals) => {
+      .then(async (signals) => {
         if (!live) return
         if (needsFirstRun(signals)) {
           // Invited to a household: join it, rather than setting up a new one.
-          const invite = getPendingJoin()
+          // The browser may remember the invite; otherwise ask the server
+          // whether this address has a live one (an invitee who signed up
+          // without the link, B04).
+          let invite = getPendingJoin()
+          if (!invite) {
+            try { const { data } = await supabase.rpc('my_pending_invitation'); invite = (data as { token?: string } | null)?.token ?? null } catch { invite = null }
+          }
+          if (!live) return
           if (invite) { window.location.replace(`/join/${invite}`); return }
           setStage('setup')
         } else {
