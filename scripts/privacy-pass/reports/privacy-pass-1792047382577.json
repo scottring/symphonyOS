@@ -1,0 +1,130 @@
+{
+  "at": "2026-10-15T06:56:22.577Z",
+  "url": "https://mwadppyrqzuzgstmwpuy.supabase.co",
+  "households": {
+    "A": "43533a9e-deaa-4100-9a26-ab7961ea95d6",
+    "B": "8c65d772-ecaf-4087-8a50-1678b9605651"
+  },
+  "results": [
+    {
+      "name": "A1 has a household",
+      "ok": true,
+      "detail": "43533a9e-deaa-4100-9a26-ab7961ea95d6"
+    },
+    {
+      "name": "A1 can invite A2 (invitation row)",
+      "ok": true,
+      "detail": "201 [{\"id\":\"38295721-5abc-4406-b930-ca18dc024d0f\",\"household_id\":\"43533a9e-deaa-4100-9a26-ab7961ea95d6\",\"email\":\"smkaufman+b"
+    },
+    {
+      "name": "A2 accepts the invitation and joins A",
+      "ok": true,
+      "detail": "{\"status\":\"joined\",\"household_id\":\"43533a9e-deaa-4100-9a26-ab7961ea95d6\"}"
+    },
+    {
+      "name": "A2 is in household A",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "B1 sets up household B",
+      "ok": true,
+      "detail": "\"8c65d772-ecaf-4087-8a50-1678b9605651\""
+    },
+    {
+      "name": "B1 is in a different household",
+      "ok": true,
+      "detail": "8c65d772-ecaf-4087-8a50-1678b9605651"
+    },
+    {
+      "name": "A1 creates a private (work) task and a family task",
+      "ok": true,
+      "detail": "201/201"
+    },
+    {
+      "name": "A2 sees A1's family task",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "A2 does not see A1's private task (by id)",
+      "ok": true,
+      "detail": "[\"A1 family dinner 1792047364582\"]"
+    },
+    {
+      "name": "A2 gets no row (not even existence) for the private id",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "A2 cannot change A1's private task",
+      "ok": true,
+      "detail": "200"
+    },
+    {
+      "name": "B1 (other household) sees neither task",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "B1 cannot read household A's membership",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "B1 cannot read household A's people",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "agent as A2 does not reveal A1's private task",
+      "ok": true,
+      "detail": "answered symphony_list_tasks | I couldn't find a task with that ID in your task list — it may have been completed, archived, or the ID may not match an"
+    },
+    {
+      "name": "agent as B1 does not reveal household A's family task",
+      "ok": true,
+      "detail": "answered | I wasn't able to find a task with that ID in your Symphony tasks. It's possible the ID doesn't exist, was deleted, or be"
+    },
+    {
+      "name": "assigning A1's private task to A2 does not make it visible to A2",
+      "ok": false,
+      "detail": "assign 409"
+    },
+    {
+      "name": "explicitly moving it to Family shares it with A2",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "moving it back to Work hides it again",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "B1 cannot list household A's displays",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "B1 cannot revoke household A's display",
+      "ok": true,
+      "detail": "{\"code\":\"P0001\",\"details\":null,\"hint\":null,\"message\":\"Only a household owner or admin can revoke a d"
+    },
+    {
+      "name": "B1 (owner of B) can make a pairing code for B only",
+      "ok": true,
+      "detail": ""
+    },
+    {
+      "name": "A2 (a member, not owner/admin) cannot make a pairing code",
+      "ok": true,
+      "detail": "{\"code\":\"P0001\",\"details\":null,\"hint\":null,\"message\":\"Only a household owner or admin can pair a dis"
+    },
+    {
+      "name": "A1 (owner) can remove A2 from household A through the ordinary client",
+      "ok": false,
+      "detail": "500 {\"code\":\"42P17\",\"details\":null,\"hint\":null,\"message\":\"infinite recursion detecte"
+    }
+  ]
+}
