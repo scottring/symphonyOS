@@ -127,7 +127,7 @@ interface GoogleCalendarContextValue {
   isFetching: boolean
   events: CalendarEvent[]
   error: string | null
-  connect: (provider?: CalendarProvider) => Promise<void>
+  connect: (provider?: CalendarProvider, options?: { mail?: boolean }) => Promise<void>
   disconnect: (provider?: CalendarProvider) => Promise<void>
   fetchEvents: (startDate: Date, endDate: Date, domainOverride?: string) => Promise<CalendarEvent[]>
   fetchTodayEvents: () => Promise<CalendarEvent[]>
@@ -307,12 +307,14 @@ export function GoogleCalendarProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
-  // Start the OAuth flow for a provider (Google by default).
-  const connect = useCallback(async (provider: CalendarProvider = 'google') => {
+  // Start the OAuth flow for a provider (Google by default). Calendar only
+  // unless `mail` is asked for: mail is optional and consented to separately.
+  const connect = useCallback(async (provider: CalendarProvider = 'google', options: { mail?: boolean } = {}) => {
     try {
       const { data, error } = await supabase.functions.invoke(authUrlFunctionFor(provider), {
         body: {
           redirectUri: `${window.location.origin}/calendar-callback`,
+          ...(provider === 'google' && options.mail ? { access: 'calendar_mail' } : {}),
         },
       })
 

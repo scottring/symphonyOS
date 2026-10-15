@@ -76,6 +76,8 @@ serve(async (req) => {
         access_token: tokenData.access_token,
         refresh_token: tokenData.refresh_token,
         token_expires_at: expiresAt,
+        // What Google says was granted (space-separated); mail features check this.
+        granted_scopes: typeof tokenData.scope === 'string' ? tokenData.scope : null,
         updated_at: new Date().toISOString(),
       }, {
         onConflict: 'user_id,provider',
@@ -92,7 +94,7 @@ serve(async (req) => {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
   } catch (error) {
-    return new Response(JSON.stringify({ error: error.message }), {
+    return new Response(JSON.stringify({ error: error instanceof Error ? error.message : 'Unknown error' }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })

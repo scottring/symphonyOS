@@ -187,6 +187,16 @@ export function CalendarSettings() {
                 <span className="text-sm text-neutral-600">Google Calendar</span>
               </div>
 
+              {/* Mail is optional and consented to separately (beta plan B05):
+                  school email and drafts need it; the calendar does not. */}
+              <div className="mb-4 p-3 rounded-lg border border-dashed border-neutral-200">
+                <p className="text-sm text-neutral-700">Gmail is optional.</p>
+                <p className="text-xs text-neutral-500 mt-0.5 mb-2">Connect it only if you want school email read into the week and email drafts written for you. Symphony never sends mail itself.</p>
+                <button type="button" onClick={() => { void connect('google', { mail: true }) }} className="text-sm font-medium text-primary-600 hover:text-primary-700">
+                  Also connect Gmail
+                </button>
+              </div>
+
               {/* Default write calendar — where Symphony-created events land.
                   Read-only calendars are excluded: Google refuses writes to
                   them ("You need to have writer access") no matter what. */}

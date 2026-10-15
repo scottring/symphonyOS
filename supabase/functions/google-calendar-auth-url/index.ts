@@ -1,4 +1,5 @@
 import { createClient } from 'npm:@supabase/supabase-js@2'
+import { parseAccess, scopesFor } from './scopes.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -25,7 +26,7 @@ Deno.serve(async (req) => {
       })
     }
 
-    let body: { redirectUri?: string } = {}
+    let body: { redirectUri?: string; access?: unknown } = {}
     try {
       body = await req.json()
     } catch {
@@ -52,16 +53,11 @@ Deno.serve(async (req) => {
       })
     }
 
-    const state = btoa(JSON.stringify({ userId: user.id }))
-
-    // Gmail scopes are used by gmail-check and gmail-send edge functions.
-    // If you change these, users must disconnect + reconnect Google to re-consent.
-    const scopes = [
-      'https://www.googleapis.com/auth/calendar',
-      'https://www.googleapis.com/auth/calendar.events',
-      'https://www.googleapis.com/auth/gmail.readonly',
-      'https://www.googleapis.com/auth/gmail.send',
-    ]
+    // Calendar by default; mail only when the person asked for it separately
+    // (scopes.ts). Changing the asked-for scopes means reconnecting to re-consent.
+    const access = parseAccess(body.access)
+    const state = btoa(JSON.stringify({ userId: user.id, access }))
+    const scopes = scopesFor(access)
 
     const authUrl = new URL('https://accounts.google.com/o/oauth2/v2/auth')
     authUrl.searchParams.set('client_id', clientId)
