@@ -41,6 +41,25 @@ export const PAGE_GUIDES: Record<string, string> = {
     '"This week" holds this week\'s tasks that have no day yet; drag one onto the day, or press +, to plan it for today. ' +
     '"Coming up" shows the next few dated things after today. ' +
     'Open any item to see its notes, people, links and places, or to move it to another day.',
+  inbox:
+    'Inbox holds what you captured and have not decided about yet; the line under the title counts the items to triage. ' +
+    'Each row is one capture with Today, This week and Someday beside it; its ⋯ menu offers more times (a date, Next month, This season), Send to a note or to calendar, the Life area (Work, Family, Personal, Unsorted) and Delete. ' +
+    'List and Focus at the foot of the title switch between every row at once and one capture at a time; Select turns on checkboxes, and the bar that appears moves, files or deletes several together. ' +
+    '"Needs re-filing" lists captures whose area does not match who can see them; "Waiting on" holds things you did your part on and are waiting to hear back about; "Expired" holds older unfinished work. ' +
+    'Tap a row to open it. "Inbox zero" means nothing is waiting for a decision.',
+  routines:
+    'Routines is the picture of what your household does again and again: the repeating patterns, shown as this week\'s occurrences. ' +
+    'The arrows beside "Our rhythm" step to the previous or next week; one plain sentence about the rhythm sits under the title. ' +
+    '"Every day" holds the routines that happen daily; the grid below has a column per day and a band per time of day (Morning, Afternoon, Evening, Any time), each cell listing that day\'s occurrences with their time and who carries them; a crossed-out one is skipped this week. ' +
+    '"Each month" holds the less frequent ones, "No day yet" the ones with no day chosen, and "Not showing" the ones resting or switched off. ' +
+    'Tap an occurrence to open its routine, or drag it onto another day. ' +
+    'Change our routines starts a conversation in which Symphony reads the week and asks what is changing; New routine writes one in plain words.',
+  meals:
+    'Meals plans a week of eating and keeps the recipes you cook; the Plan and Recipes tabs under the title switch between them. ' +
+    'On Plan the title is the week, the arrows beside "Meals" step between weeks, and each day card has a Breakfast, Lunch and Dinner slot: an empty one offers Pick recipe, Type name, Add for one person… or Leftovers from last night; a filled one\'s ⋯ menu offers Change recipe, Clear and, for a dinner, → Lunch tomorrow. ' +
+    'Preferences holds how your family eats, Build shopping list gathers the week\'s ingredients, and the chat beside the week (on a phone, the chat button) plans with Symphony. ' +
+    'On Recipes, "Memory shelf" counts what is saved; the + adds a recipe by finding one, pasting a URL or manual entry, the search box searches titles, tags and ingredients, and the row of filters (All, Quick, Both kids will eat, Never cooked, Prep-friendly) narrows the shelf. ' +
+    'Tap a recipe card to open it.',
 }
 
 export const EXPLAIN_LABEL = 'What is this page?'

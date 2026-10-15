@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { parseSteps } from './steps'
 import { arrowBetween, edgePoint, placeNote } from './geometry'
 import { collectTargets, findTarget } from './targets'
-import { explainContext, PAGE_GUIDES } from './pageGuides'
+import { explainContext, hasPageGuide, PAGE_GUIDES } from './pageGuides'
 import { onShowRequest, requestShow } from './showSignal'
 
 const box = (x: number, y: number, w: number, h: number) => ({ left: x, top: y, width: w, height: h, right: x + w, bottom: y + h, x, y, toJSON: () => ({}) }) as DOMRect
@@ -88,7 +88,25 @@ describe('targets on the page', () => {
     const ctx = explainContext(base)
     expect(ctx.guide?.startsWith(PAGE_GUIDES.season)).toBe(true)
     expect(ctx.targets?.map((t) => t.id)).toContain('period')
-    expect(explainContext({ ...base, page: 'inbox' })).toEqual({ ...base, page: 'inbox' })
+    expect(explainContext({ ...base, page: 'settings' })).toEqual({ ...base, page: 'settings' })
+  })
+  // Inbox, Routines and Meals have a guide for "What is this page?", written
+  // like the period pages' (what it is for, its parts, how to act on it).
+  it('explains Inbox, Routines and Meals with their own guides', () => {
+    page()
+    const base = { page: 'inbox', date: '2026-10-14', layers: [], selectedId: null, items: [], truncated: false }
+    for (const p of ['inbox', 'routines', 'meals'] as const) {
+      expect(hasPageGuide(p)).toBe(true)
+      expect(PAGE_GUIDES[p].length).toBeGreaterThan(200)
+      const ctx = explainContext({ ...base, page: p })
+      expect(ctx.guide?.startsWith(PAGE_GUIDES[p])).toBe(true)
+      expect(ctx.guide).toContain('never point its note at another part')
+      expect(ctx.targets?.map((t) => t.id)).toContain('period')
+    }
+    expect(PAGE_GUIDES.inbox).toContain('Today, This week and Someday')
+    expect(PAGE_GUIDES.routines).toContain('Change our routines')
+    expect(PAGE_GUIDES.meals).toContain('Build shopping list')
+    expect(hasPageGuide('settings')).toBe(false)
   })
   // Scott, 2026-10-13: a note once pointed at the wrong part because the guide
   // named one that was not on screen; every guide says not to.

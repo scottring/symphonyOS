@@ -53,6 +53,24 @@ export const PAGE_TOURS: Record<string, TourPart[]> = {
     { target: 'this-week', title: 'This week', text: 'This week’s tasks with no day yet. Drag one onto the day, or press +, to plan it for today.' },
     { target: 'region:Coming up', title: 'Coming up', text: 'The next few dated things after today.' },
   ],
+  // Inbox, Routines and Meals mark only their masthead and a few sections, so
+  // their tours are short; the guide (pageGuides.ts) carries the rest.
+  inbox: [
+    { target: 'page-title', title: 'Inbox', text: 'What you captured and have not decided about yet. Each row offers Today, This week and Someday; its ⋯ menu has more times, Send to a note or calendar, the Life area and Delete. List and Focus at the foot switch between every row and one at a time; Select acts on several together.' },
+    { target: 'region:Needs re-filing', title: 'Needs re-filing', text: 'Captures whose area does not match who can see them. Choose the right area to file each one.' },
+    { target: 'region:Waiting on', title: 'Waiting on', text: 'Things you did your part on and are waiting to hear back about.' },
+    { target: 'region:Expired', title: 'Expired', text: 'Older unfinished work, folded away until you open it.' },
+  ],
+  routines: [
+    { target: 'page-title', title: 'Routines', text: 'The picture of what your household does again and again, shown as this week’s occurrences. The arrows beside “Our rhythm” step between weeks; Change our routines starts a conversation, New routine writes one in plain words.' },
+    { target: 'rhythm-sentence', title: 'The week in a sentence', text: 'One plain sentence about how the rhythm stands this week.' },
+    { target: 'region:Every day', title: 'Every day', text: 'The routines that happen daily. Tap one to open it.' },
+    { target: 'region:The week', title: 'The week', text: 'A column per day and a band per time of day (Morning, Afternoon, Evening, Any time), each cell listing that day’s occurrences with their time and who carries them. Tap one to open it, or drag it onto another day.' },
+    { target: 'region:No day yet', title: 'No day yet', text: 'Routines with no day chosen yet.' },
+  ],
+  meals: [
+    { target: 'page-title', title: 'Meals', text: 'A week of eating and the recipes you cook; Plan and Recipes switch between them. On Plan, each day has a Breakfast, Lunch and Dinner slot to fill from a recipe, a typed name or last night’s leftovers; Build shopping list gathers the week’s ingredients. On Recipes, + adds one and the filters narrow the shelf.' },
+  ],
 }
 
 /** The tour key(s) for what is on screen: the page's own, or the mode it is in. */
