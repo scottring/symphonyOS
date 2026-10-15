@@ -46,3 +46,31 @@ export function guardedAiFetch(db: UsageDb, route: GuardedAiRoute, transport: ty
     return transport(input, init)
   }
 }
+
+/** Background paid routes: a worker or cron charging the person it works
+ *  for. Must match ai_background_routes() (migration 20261015120000). */
+export const BACKGROUND_AI_ROUTES = ['email-scanner', 'extract-email', 'gmail-check', 'school-digest', 'proactive-engine', 'vault-sync', 'extract-capture', 'parse-page'] as const
+export type BackgroundAiRoute = typeof BACKGROUND_AI_ROUTES[number]
+type ServiceDb = { rpc: (name: string, args: { p_user: string; p_route: string }) => PromiseLike<{ data: unknown; error: unknown }> }
+
+/** Reserve on behalf of `userId` through a SERVICE-ROLE client. The database
+ *  refuses this call from any other role, so a person cannot charge another. */
+export async function reserveAiProviderCallFor(db: ServiceDb, userId: string, route: BackgroundAiRoute): Promise<void> {
+  let result: { data: unknown; error: unknown }
+  try { result = await db.rpc('reserve_ai_provider_call_for', { p_user: userId, p_route: route }) }
+  catch { throw new AiUsageError('unavailable') }
+  if (result.error) throw new AiUsageError('unavailable')
+  const value = result.data as { allowed?: unknown; reason?: unknown; retry_at?: unknown } | null
+  if (value?.allowed === true) return
+  const reset = typeof value?.retry_at === 'string' && Number.isFinite(Date.parse(value.retry_at))
+    ? new Date(value.retry_at).toISOString() : undefined
+  throw new AiUsageError(typeof value?.reason === 'string' ? value.reason : 'unavailable', reset)
+}
+
+/** One reservation per outbound provider attempt, charged to `userId`. */
+export function guardedAiFetchFor(db: ServiceDb, userId: string, route: BackgroundAiRoute, transport: typeof fetch = fetch): typeof fetch {
+  return async (input, init) => {
+    await reserveAiProviderCallFor(db, userId, route)
+    return transport(input, init)
+  }
+}

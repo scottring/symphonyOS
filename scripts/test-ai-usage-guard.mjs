@@ -48,6 +48,7 @@ try {
   sql(readFileSync(new URL('../supabase/migrations/20261014180000_ai_provider_call_allowances.sql', import.meta.url), 'utf8'))
   // psql -c treats a leading "--" as the end of its options: lead with a statement.
   sql('select 1;\n' + readFileSync(new URL('../supabase/migrations/20261015110000_ai_allowance_all_interactive_routes.sql', import.meta.url), 'utf8'))
+  sql('select 1;\n' + readFileSync(new URL('../supabase/migrations/20261015120000_ai_allowance_background_routes.sql', import.meta.url), 'utf8'))
 
   check('migration starts disabled without invented quotas', () => {
     assert.equal(reserve().allowed, false)
@@ -130,6 +131,19 @@ try {
     for (const route of ['meal-planner-chat', 'analyze-capture', 'planning-conversation', 'semantic-search', 'math-story']) assert.equal(reserve(A, route).allowed, true, route)
     assert.equal(reserve(A, 'email-scanner').reason, 'unavailable')
     assert.equal(reserve(A, 'not-a-route').reason, 'unavailable')
+  })
+  reset()
+  check('a worker charges the person it works for; a signed-in person cannot', () => {
+    const asService = (user, route) => JSON.parse(sql(`set role service_role; set request.jwt.claims = '{"role":"service_role"}'; select public.reserve_ai_provider_call_for('${user}', '${route}');`).split('\n').at(-1))
+    assert.equal(asService(A, 'email-scanner').allowed, true)
+    assert.equal(asService(A, 'symphony-agent').reason, 'unavailable')
+    assert.equal(sql(`select sum(calls) from public.ai_provider_call_usage where route = 'email-scanner' and household_id = '${H1}'`), '1')
+    // An authenticated caller is refused by the grant before the body runs.
+    let refused = false
+    try { sql(`set role authenticated; set request.jwt.claim.sub = '${B}'; select public.reserve_ai_provider_call_for('${A}', 'email-scanner');`) } catch { refused = true }
+    assert.equal(refused, true)
+    // Even with the grant, a request whose JWT is not the service role is refused inside.
+    assert.equal(JSON.parse(sql(`set role service_role; set request.jwt.claims = '{"role":"authenticated","sub":"${B}"}'; select public.reserve_ai_provider_call_for('${A}', 'email-scanner');`).split('\n').at(-1)).reason, 'unavailable')
   })
   reset()
   check('emergency disable blocks the next reservation without resetting usage', () => {
