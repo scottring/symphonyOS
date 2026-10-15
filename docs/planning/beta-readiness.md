@@ -6,6 +6,23 @@ The product and rollout authority is the [Symphony beta and market launch plan](
 
 **A consistent visual and voice experience is a P0 release requirement.** The same Symphony identity, terminology, audience cues and action semantics must carry across supported screens and typed, spoken and direct interactions. The experience gate below is required alongside privacy, setup, recovery and cost gates; it is not deferred polish.
 
+## Current release summary (October 15, 2026, 07:30Z) — read this first; everything below is dated history
+
+**Production:** web `main` at `676029ee` and later (Vercel, `app.symphony-os.com`); backend project `mwadppyrqzuzgstmwpuy` with 57 functions deployed from the same tree and these migrations applied and recorded: `20261014180000` allowances, `20261015100000` displays, `110000` interactive routes, `120000` background routes, `130000` invited sign-up, `140000` granted scopes, `150000` spend ledger, `160000` allowance defaults, `170000` anonymous sign-up, `180000` membership policies, `190000` pending invitation, `200000` updated_at trigger. Allowances on with Scott's approved placeholder limits and prices. Anonymous sign-ins enabled (Scott). Voice allowlist: four ids.
+
+**Verified on the hosted project (synthetic households only):**
+- Text bench on the deployed agent: J1 5/5, R1 3/3, M1 5/5 (`scripts/conversation-bench/reports/`).
+- Browser layer: capture → one card → correction revises → Approve saves 4 → Undo removes 4 (GIF in Scott's Downloads); display pairing from a separate browser, heartbeat, revoke → signed out (`docs/planning/beta-sessions/evidence/2026-10-15-display-revoke.md`); invited adult joins through the product join page.
+- J1 failure cases: retry with one turn id → one row; stale approval refused; Undo with a conflicting edit → partial, the other person's edit kept (`…/2026-10-15-j1-failure-cases.md`).
+- Privacy pass as three real accounts: 35/35 across tasks, notes, attachments, chat history, assignment vs sharing, cross-household displays, removal (`scripts/privacy-pass/reports/`).
+- Emergency AI disable/re-enable rehearsed (runbook).
+
+**Open failures:** none known at this build. Fixed tonight on the way: pairing-code schema path, wall sign-in bypassing pairing, invite gate blocking anonymous users, revoked wall keeping its shell, white page after a mid-deploy reload, recursive membership policies, pending card lost on reload, `updated_at` not stamped by the database, invited adult shown household setup.
+
+**Residual exposure (recorded, not fixed):** money is an estimate reconciled after the fact, not a hard cap (see "Money"); realtime audio beyond the five-minute admission estimate is unmeasured; web-tool charges are not itemised; placeholder prices unverified against provider price pages; revoked anonymous auth users linger until deleted.
+
+**Gates only people or access can close:** spoken session with a microphone; one named iPad as the wall; five-adult usability (UX01–08); backup/restore rehearsal on a scratch project (no access token found); confirmed prices; staged invitations. Kit: `docs/planning/beta-session-kit.md`.
+
 ## Current decision
 
 **Do not expand invitations yet.** (Hosted release of the hardening done October 15; see that section.) Source inspection found useful foundations, but cross-device visual/voice acceptance, separate assistant scopes, restricted display credentials, comprehensive AI budgets, and fresh-household acceptance evidence remain incomplete. The prepared changes harden retrieval and establish shared assistant instructions; they do not certify model replies, acoustic quality or the complete shared/private assistant model. No production data, schema, provider settings, or deployment has been changed by this work.
