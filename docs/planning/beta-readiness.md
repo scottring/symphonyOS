@@ -148,6 +148,17 @@ The web client followed: `claude/beta-readiness-program` was merged to `main` on
 
 Not done: **anonymous sign-ins** could not be enabled from here (the management API refused the stored CLI token); flip Authentication → Sign-in methods → Anonymous in the dashboard. Until then "Pair this display" says plainly that display sign-in is not enabled. Real-account verification (a fresh organizer, an invited adult, a paired iPad, the bench live layer) remains to be run.
 
+## First live bench runs, October 15
+
+Against the deployed agent, with the synthetic household Scott created (`smkaufman+1015@gmail.com`; no real family records):
+
+- Run 1 refused every turn: a household created after the allowance rows had none. Fixed by migration `20261015160000_ai_household_allowance_defaults.sql` (operator defaults copied to each new household; applied hosted; harness 16 checks).
+- Runs 2–3: the model asked for the test-drive day before proposing anything, and at the correction said "Got it" without re-sending the card. Two prompt changes (put every capture on the card in the same turn, before any question; a correction re-sends the whole revised list) and one runner fix (the next turn is told a card is waiting, as the page does). Measured before the runner fix, 7 runs: capture→card 5/7, correction→revised card 2/7, later capture→card 7/7.
+- After the fixes, **5 of 5 runs passed every graded step** (capture of four items → one card with all four, undated where unknown, the all-day test drive not placed on an invented day; correction → one revised card with one plumber task; later capture → joins the card; nothing written without approval). 15 of 15 steps. This is the text layer only; Approve, the dropped connection, retry and Undo are page actions for the browser layer, and the spoken layer is unmeasured.
+- Spend ledger after the runs: 113 priced calls, $0.52 estimated, models `claude-sonnet-4-6` and `text-embedding-3-small`; 2 calls unpriced (`claude-opus-5-5`, used by a route not in the price list — add a confirmed row).
+
+The 95% target for the core scenarios is a sample of five on one scenario so far; it is evidence that the loop is measurable, not a pass of the release suite.
+
 ## Release blockers in order
 
 Owner labels are responsibilities, not additional staff. Scott retains scope, spending, external-claim, and release approval.

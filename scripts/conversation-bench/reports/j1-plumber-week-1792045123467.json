@@ -1,0 +1,137 @@
+{
+  "scenario": "j1-plumber-week",
+  "at": "2026-10-15T06:18:22.438Z",
+  "user": "deb3b752-cb26-480a-910c-fb174b308409",
+  "steps": [
+    {
+      "step": 1,
+      "say": "I need to call the plumber, pick up the Amazon order, clean the yard, and fit in an all-day test drive this week.",
+      "tools": [
+        "symphony_read_week",
+        "symphony_propose_changes"
+      ],
+      "outcome": "proposed",
+      "reply": "The week looks clear — no events or tasks already placed. Here are your four items on a change card; which day do you want the test drive?Which day works for the test drive? Once you tell me I'll add the date and you can approve everything at once.",
+      "card": [
+        {
+          "op": "add",
+          "title": "Call the plumber",
+          "date": null,
+          "time": null
+        },
+        {
+          "op": "add",
+          "title": "Pick up the Amazon order",
+          "date": null,
+          "time": null
+        },
+        {
+          "op": "add",
+          "title": "Clean the yard",
+          "date": null,
+          "time": null
+        },
+        {
+          "op": "add",
+          "title": "All-day test drive",
+          "date": null,
+          "time": null
+        }
+      ],
+      "findings": []
+    },
+    {
+      "step": 2,
+      "say": "Actually, the plumber call is Friday, not whenever.",
+      "tools": [
+        "symphony_propose_changes"
+      ],
+      "outcome": "proposed",
+      "reply": "Got it — plumber call on Friday (Oct 16). Here's the updated card:Which day works for the test drive?",
+      "card": [
+        {
+          "op": "add",
+          "title": "Call the plumber",
+          "date": "2026-10-16",
+          "time": null
+        },
+        {
+          "op": "add",
+          "title": "Pick up the Amazon order",
+          "date": null,
+          "time": null
+        },
+        {
+          "op": "add",
+          "title": "Clean the yard",
+          "date": null,
+          "time": null
+        },
+        {
+          "op": "add",
+          "title": "All-day test drive",
+          "date": null,
+          "time": null
+        }
+      ],
+      "findings": []
+    },
+    {
+      "step": 3,
+      "action": "approve",
+      "result": "manual (page action: run in the browser layer)"
+    },
+    {
+      "step": 4,
+      "say": "Add buy mulch for the yard on Saturday.",
+      "tools": [
+        "symphony_propose_changes"
+      ],
+      "outcome": "proposed",
+      "reply": "Added. Which day works for the test drive?Which day works for the test drive?",
+      "card": [
+        {
+          "op": "add",
+          "title": "Call the plumber",
+          "date": "2026-10-16",
+          "time": null
+        },
+        {
+          "op": "add",
+          "title": "Pick up the Amazon order",
+          "date": null,
+          "time": null
+        },
+        {
+          "op": "add",
+          "title": "Clean the yard",
+          "date": null,
+          "time": null
+        },
+        {
+          "op": "add",
+          "title": "All-day test drive",
+          "date": null,
+          "time": null
+        },
+        {
+          "op": "add",
+          "title": "Buy mulch for the yard",
+          "date": "2026-10-17",
+          "time": null
+        }
+      ],
+      "findings": []
+    },
+    {
+      "step": 5,
+      "action": "retry",
+      "result": "manual (page action: run in the browser layer)"
+    },
+    {
+      "step": 6,
+      "action": "undo-set",
+      "result": "manual (page action: run in the browser layer)"
+    }
+  ]
+}
