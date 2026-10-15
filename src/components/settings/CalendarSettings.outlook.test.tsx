@@ -30,6 +30,7 @@ vi.mock('@/hooks/useGoogleCalendar', () => ({
 import { CalendarSettings } from './CalendarSettings'
 
 beforeEach(() => {
+  vi.stubEnv('VITE_MICROSOFT_CALENDAR_ENABLED', '1')
   connect.mockClear()
   disconnect.mockClear()
   vi.spyOn(window, 'confirm').mockReturnValue(true)

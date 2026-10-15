@@ -66,3 +66,13 @@ describe('pickAccountEmail', () => {
     expect(pickAccountEmail([{ primary: true }])).toBeNull()
   })
 })
+
+describe('Outlook is offered only when tested (B05)', () => {
+  it('hides the Outlook card without the flag', async () => {
+    vi.stubEnv('VITE_MICROSOFT_CALENDAR_ENABLED', '')
+    const { CalendarSettings: Settings } = await import('./CalendarSettings')
+    render(<Settings />)
+    expect(screen.queryByTestId('outlook-card')).toBeNull()
+    vi.unstubAllEnvs()
+  })
+})

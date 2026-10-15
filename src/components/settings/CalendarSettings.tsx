@@ -76,6 +76,7 @@ export function CalendarSettings() {
 
   const googleConnected = connectedProviders.includes('google') && !reconnectProviders.includes('google') && !needsReconnect
   const googleNeedsReconnect = reconnectProviders.includes('google') || (needsReconnect && connectedProviders.includes('google'))
+  const outlookOffered = import.meta.env.VITE_MICROSOFT_CALENDAR_ENABLED === '1' || connectedProviders.includes('microsoft')
   const outlookConnected = connectedProviders.includes('microsoft') && !reconnectProviders.includes('microsoft') && !needsReconnect
   const outlookNeedsReconnect = reconnectProviders.includes('microsoft') || (needsReconnect && connectedProviders.includes('microsoft'))
 
@@ -285,92 +286,96 @@ export function CalendarSettings() {
         </div>
       </section>
 
-      <section data-testid="outlook-card">
-        <SectionHeading>Outlook Calendar</SectionHeading>
-        <p className="text-sm text-neutral-500 mb-6">
-          Connect an Outlook or Microsoft 365 calendar. Its events show alongside everything else; editing stays in Outlook.
-        </p>
+      {/* Outlook is offered only once it has been tested on real personal and
+          work accounts (beta plan B05); an existing connection stays manageable. */}
+      {outlookOffered && (
+        <section data-testid="outlook-card">
+          <SectionHeading>Outlook Calendar</SectionHeading>
+          <p className="text-sm text-neutral-500 mb-6">
+            Connect an Outlook or Microsoft 365 calendar. Its events show alongside everything else; editing stays in Outlook.
+          </p>
 
-        <div className="p-4 bg-white rounded-lg border border-neutral-100">
-          {outlookConnected ? (
-            <>
-              <div className="flex items-center gap-3 mb-4">
-                <ConnectedBadge />
-                <div className="flex-1 min-w-0">
-                  <p className="font-medium text-neutral-800">Connected</p>
-                  <p className="text-sm text-neutral-500">View only</p>
+          <div className="p-4 bg-white rounded-lg border border-neutral-100">
+            {outlookConnected ? (
+              <>
+                <div className="flex items-center gap-3 mb-4">
+                  <ConnectedBadge />
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-neutral-800">Connected</p>
+                    <p className="text-sm text-neutral-500">View only</p>
+                  </div>
                 </div>
-              </div>
 
-              {outlookCalendars.length > 0 && (
-                <ul className="mb-4 p-3 bg-neutral-50 rounded-lg space-y-1">
-                  {outlookCalendars.map((c) => (
-                    <li key={c.id} className="flex items-center gap-2 text-sm text-neutral-600">
-                      <span
-                        className="w-2.5 h-2.5 rounded-full flex-shrink-0"
-                        style={{ backgroundColor: c.backgroundColor ?? '#0078d4' }}
-                        aria-hidden
-                      />
-                      <span className="truncate">{c.summary}</span>
-                    </li>
-                  ))}
-                </ul>
-              )}
+                {outlookCalendars.length > 0 && (
+                  <ul className="mb-4 p-3 bg-neutral-50 rounded-lg space-y-1">
+                    {outlookCalendars.map((c) => (
+                      <li key={c.id} className="flex items-center gap-2 text-sm text-neutral-600">
+                        <span
+                          className="w-2.5 h-2.5 rounded-full flex-shrink-0"
+                          style={{ backgroundColor: c.backgroundColor ?? '#0078d4' }}
+                          aria-hidden
+                        />
+                        <span className="truncate">{c.summary}</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
 
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setShowSetupWizard(true)}
-                  className="flex-1 py-2 px-4 bg-primary-600 hover:bg-primary-700 text-white rounded-lg font-medium transition-colors"
-                >
-                  Choose areas for calendars
-                </button>
-                <button
-                  data-action="disconnect"
-                  onClick={() => handleDisconnect('microsoft')}
-                  disabled={disconnecting === 'microsoft'}
-                  className="flex-1 py-2 px-4 border border-neutral-200 rounded-lg text-neutral-600 hover:bg-neutral-50 hover:border-neutral-300 transition-colors disabled:opacity-50"
-                >
-                  {disconnecting === 'microsoft' ? 'Disconnecting...' : 'Disconnect'}
-                </button>
-              </div>
-            </>
-          ) : (
-            <>
-              <div className="flex items-center gap-3 mb-4">
-                <DisconnectedBadge />
-                <div className="flex-1">
-                  <p className="font-medium text-neutral-800">
-                    {outlookNeedsReconnect ? 'Reconnection Required' : 'Not Connected'}
-                  </p>
-                  <p className="text-sm text-neutral-500">
-                    {outlookNeedsReconnect
-                      ? 'Your Outlook connection expired. Please reconnect.'
-                      : 'Connect to see Outlook events'}
-                  </p>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setShowSetupWizard(true)}
+                    className="flex-1 py-2 px-4 bg-primary-600 hover:bg-primary-700 text-white rounded-lg font-medium transition-colors"
+                  >
+                    Choose areas for calendars
+                  </button>
+                  <button
+                    data-action="disconnect"
+                    onClick={() => handleDisconnect('microsoft')}
+                    disabled={disconnecting === 'microsoft'}
+                    className="flex-1 py-2 px-4 border border-neutral-200 rounded-lg text-neutral-600 hover:bg-neutral-50 hover:border-neutral-300 transition-colors disabled:opacity-50"
+                  >
+                    {disconnecting === 'microsoft' ? 'Disconnecting...' : 'Disconnect'}
+                  </button>
                 </div>
-              </div>
+              </>
+            ) : (
+              <>
+                <div className="flex items-center gap-3 mb-4">
+                  <DisconnectedBadge />
+                  <div className="flex-1">
+                    <p className="font-medium text-neutral-800">
+                      {outlookNeedsReconnect ? 'Reconnection Required' : 'Not Connected'}
+                    </p>
+                    <p className="text-sm text-neutral-500">
+                      {outlookNeedsReconnect
+                        ? 'Your Outlook connection expired. Please reconnect.'
+                        : 'Connect to see Outlook events'}
+                    </p>
+                  </div>
+                </div>
 
-              <button
-                onClick={handleConnectOutlook}
-                disabled={connecting}
-                className="w-full flex items-center justify-center gap-2 py-2 px-4 bg-white border border-neutral-200 rounded-lg text-neutral-700 hover:bg-neutral-50 hover:border-neutral-300 transition-colors disabled:opacity-50"
-              >
-                <svg className="w-5 h-5" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden>
-                  <rect x="2" y="2" width="9" height="9" fill="#F25022" />
-                  <rect x="13" y="2" width="9" height="9" fill="#7FBA00" />
-                  <rect x="2" y="13" width="9" height="9" fill="#00A4EF" />
-                  <rect x="13" y="13" width="9" height="9" fill="#FFB900" />
-                </svg>
-                {connecting
-                  ? 'Opening Microsoft sign-in…'
-                  : outlookNeedsReconnect
-                    ? 'Reconnect Outlook Calendar'
-                    : 'Connect Outlook Calendar'}
-              </button>
-            </>
-          )}
-        </div>
-      </section>
+                <button
+                  onClick={handleConnectOutlook}
+                  disabled={connecting}
+                  className="w-full flex items-center justify-center gap-2 py-2 px-4 bg-white border border-neutral-200 rounded-lg text-neutral-700 hover:bg-neutral-50 hover:border-neutral-300 transition-colors disabled:opacity-50"
+                >
+                  <svg className="w-5 h-5" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden>
+                    <rect x="2" y="2" width="9" height="9" fill="#F25022" />
+                    <rect x="13" y="2" width="9" height="9" fill="#7FBA00" />
+                    <rect x="2" y="13" width="9" height="9" fill="#00A4EF" />
+                    <rect x="13" y="13" width="9" height="9" fill="#FFB900" />
+                  </svg>
+                  {connecting
+                    ? 'Opening Microsoft sign-in…'
+                    : outlookNeedsReconnect
+                      ? 'Reconnect Outlook Calendar'
+                      : 'Connect Outlook Calendar'}
+                </button>
+              </>
+            )}
+          </div>
+        </section>
+      )}
 
       {/* Info about calendar sync */}
       <div className="p-4 bg-neutral-50 rounded-lg border border-neutral-100">
