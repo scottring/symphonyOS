@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import type { ChangeSet } from '@/lib/canvas/changeCard'
 import type { WallTodayRow } from './wallMomentsModel'
 import { cardDays, cardLine, dayEntries, fitEntries, talkIntent, talkUsesBand, wallPlanOpening, withTimeout, type TalkTaskInfo } from './wallTalk'
@@ -94,5 +94,20 @@ describe('drawing a change card', () => {
     const { rows: kept, hidden } = fitEntries([...many, prop].sort((a, b) => a.min - b.min), 3)
     expect(kept.map((r) => r.key)).toEqual(['p4', 'p5', 'x'])
     expect(hidden).toBe(4)
+  })
+})
+
+describe('withTimeout', () => {
+  it('tells the caller when it stopped waiting, so the work can be aborted', async () => {
+    const onTimeout = vi.fn()
+    const never = new Promise<string>(() => {})
+    await expect(withTimeout(never, 5, onTimeout)).rejects.toThrow('timeout')
+    expect(onTimeout).toHaveBeenCalledTimes(1)
+  })
+  it('does not fire the timeout once the work finished', async () => {
+    const onTimeout = vi.fn()
+    expect(await withTimeout(Promise.resolve('ok'), 5, onTimeout)).toBe('ok')
+    await new Promise((r) => setTimeout(r, 10))
+    expect(onTimeout).not.toHaveBeenCalled()
   })
 })

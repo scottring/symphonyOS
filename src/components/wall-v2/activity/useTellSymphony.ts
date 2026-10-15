@@ -147,7 +147,7 @@ export function useTellSymphony(onCommand: (c: KioskCommand) => string, voice?: 
     const agentTakes = talk.enabled && (u.kind === 'question' || (u.kind === 'unknown' && !!u.text.trim()))
     if (intent === 'approve') {
       setBusy(true)
-      said = (await talk.approve().finally(() => setBusy(false))) ?? 'There’s nothing to approve.'
+      said = (await talk.approve({ spoken: true }).finally(() => setBusy(false))) ?? 'There’s nothing to approve.'
     } else if (intent === 'dismiss') {
       talk.dismiss()
       said = 'Okay, not now. Nothing was changed.'

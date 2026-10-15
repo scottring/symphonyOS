@@ -22,11 +22,13 @@ beforeEach(() => {
   vi.stubGlobal('Deno', { env: { get: (key: string) => env[key] }, serve: (next: Handler) => { handler = next } })
   rpc.mockImplementation(async (name: string) => name === 'reserve_workspace_voice_start'
     ? { data: true, error: null }
+    // The agent's identity check (a paired display or a member) is not a reservation.
+    : name === 'my_surface' ? { data: 'member', error: null }
     : { data: quotaReady ? { allowed: true } : { allowed: false, reason: 'daily_limit', retry_at: '2026-10-15T00:00:00Z' }, error: null })
   createClient.mockReturnValue({
     rpc,
     auth: { getUser: async () => ({ data: { user: allowed ? { id: 'member' } : null }, error: allowed ? null : { message: 'Invalid' } }) },
-    from: () => ({ select: () => ({ order: async () => ({ data: [] }) }) }),
+    from: () => ({ select: () => ({ order: async () => ({ data: [] }), limit: async () => ({ data: [], error: null }) }) }),
   })
   vi.stubGlobal('fetch', vi.fn(async () => {
     providerCalls++
@@ -76,7 +78,9 @@ describe.each(routes)('%s usage guard', (route) => {
 
 it('reserves the next agent tool-loop attempt and stops when it is refused', async () => {
   let reservations = 0
-  rpc.mockImplementation(async () => ({ data: ++reservations === 1 ? { allowed: true } : { allowed: false, reason: 'daily_limit' }, error: null }))
+  rpc.mockImplementation(async (name: string) => name === 'my_surface'
+    ? { data: 'member', error: null }
+    : { data: ++reservations === 1 ? { allowed: true } : { allowed: false, reason: 'daily_limit' }, error: null })
   vi.stubGlobal('fetch', vi.fn(async () => {
     providerCalls++
     return new Response(JSON.stringify({ content: [{ type: 'server_tool_use', name: 'web_search' }], stop_reason: 'pause_turn' }))

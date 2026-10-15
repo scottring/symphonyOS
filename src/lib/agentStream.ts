@@ -130,6 +130,10 @@ export interface StreamHandlers {
   surface?: 'wall'
   /** Another deployed copy of the agent function (e.g. a test copy). */
   functionName?: string
+  /** Abort the request (the wall's timeout): the server's stream closes and
+   *  its next tool send fails, so a turn that outlived the listener stops
+   *  writing instead of finishing unseen. */
+  signal?: AbortSignal
 }
 
 export type AgentContentBlock =
@@ -191,6 +195,7 @@ export async function streamSymphonyAgent(
         ...(handlers.turnId ? { turnId: handlers.turnId } : {}),
         ...(handlers.surface ? { surface: handlers.surface } : {}),
       }),
+      ...(handlers.signal ? { signal: handlers.signal } : {}),
     },
   )
 

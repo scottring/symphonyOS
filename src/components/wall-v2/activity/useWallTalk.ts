@@ -92,7 +92,9 @@ export function useWallTalk(deps: WallTalkDeps | undefined) {
       const cur = cardRef.current
       const changeCard = cur ? changeCardNote(cur.set, 'pending') : noteRef.current ?? undefined
       try {
-        const r = await withTimeout((deps.ask ?? askWallAgent)(text, history.current, { changeCard, turnId: newId() }), AGENT_TIMEOUT_MS)
+        // Past the timeout the agent is aborted, not left to finish unseen.
+        const abort = new AbortController()
+        const r = await withTimeout((deps.ask ?? askWallAgent)(text, history.current, { changeCard, turnId: newId(), signal: abort.signal }), AGENT_TIMEOUT_MS, () => abort.abort())
         if (mine !== epoch.current) return null
         noteRef.current = null
         history.current = r.history
@@ -101,6 +103,8 @@ export function useWallTalk(deps: WallTalkDeps | undefined) {
           // A revision replaces the card; the same set re-sent while saving stays saving.
           setCard((c) => (c && c.set.key === r.changeSet!.key && c.state === 'saving' ? c : { set: r.changeSet!, state: 'proposed' }))
           setReview(false)
+          // This is the card the reply reads out: the one a spoken "approve" means.
+          announced.current = r.changeSet.key
         }
         if (r.pointed?.dates.length) setPointed(r.pointed.dates)
         touch()
@@ -129,10 +133,19 @@ export function useWallTalk(deps: WallTalkDeps | undefined) {
     return ask(wallPlanOpening(now, deps.weekStartsOn), 'Plan the week')
   }, [deps, ask])
 
+  /** The card the wall last read out. A spoken approve means that one (plan
+   *  §6): a card that arrived since is read first and approved on the next
+   *  "approve", never bound to whichever card happened to land. */
+  const announced = useRef<string | null>(null)
+
   /** Approve the card showing. Returns what to say, or null with no card. */
-  const approve = useCallback(async (): Promise<string | null> => {
+  const approve = useCallback(async (opts: { spoken?: boolean } = {}): Promise<string | null> => {
     const c = cardRef.current
     if (!deps || !c || c.state === 'saving' || approving.current) return null
+    if (opts.spoken && announced.current !== c.set.key) {
+      announced.current = c.set.key
+      return `A newer list came in: ${c.set.title}. Say approve again if that is the one.`
+    }
     approving.current = true
     touch()
     setCard({ ...c, state: 'saving', message: undefined })

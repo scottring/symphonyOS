@@ -28,6 +28,8 @@ export interface WallAgentOptions {
   onText?: (text: string) => void
   /** Another deployed copy of the agent (a preview build's test copy). */
   functionName?: string
+  /** Abort the turn (the wall gave up waiting); the agent stops at its next tool. */
+  signal?: AbortSignal
 }
 
 export interface WallAgentReply {
@@ -97,6 +99,7 @@ export async function askWallAgent(text: string, history: readonly WallTurn[] = 
     ...(opts.changeCard ? { changeCard: opts.changeCard } : {}),
     ...(opts.currentMemberId ? { currentMemberId: opts.currentMemberId } : {}),
     ...(opts.turnId ? { turnId: opts.turnId } : {}),
+    ...(opts.signal ? { signal: opts.signal } : {}),
     onText: (t) => { got.streamed += t; got.afterTool += t; opts.onText?.(t) },
     onTool: () => { got.afterTool = '' },
     onChangeSet: (set) => { got.changeSet = set },

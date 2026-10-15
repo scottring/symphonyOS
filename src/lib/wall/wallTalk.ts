@@ -57,10 +57,11 @@ export function wallPlanOpening(now: Date, weekStartsOn: WeekStart): string {
   return 'Plan the rest of my week.'
 }
 
-/** Rejects with 'timeout' when the promise takes longer than `ms`. */
-export function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
+/** Rejects with 'timeout' when the promise takes longer than `ms`; `onTimeout`
+ *  lets the caller abort the work it stopped waiting for. */
+export function withTimeout<T>(p: Promise<T>, ms: number, onTimeout?: () => void): Promise<T> {
   return new Promise<T>((resolve, reject) => {
-    const id = setTimeout(() => reject(new Error('timeout')), ms)
+    const id = setTimeout(() => { onTimeout?.(); reject(new Error('timeout')) }, ms)
     p.then((v) => { clearTimeout(id); resolve(v) }, (e) => { clearTimeout(id); reject(e) })
   })
 }

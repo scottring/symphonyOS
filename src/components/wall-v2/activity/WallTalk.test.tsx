@@ -269,6 +269,17 @@ describe('talking to the wall: the change card', () => {
     expect(applyChanges).toHaveBeenCalledWith(revised)
   })
 
+  it('a spoken "approve" means the card the wall last read out, after a revision too', async () => {
+    let n = 0
+    const revised: ChangeSet = { key: 'set-2', title: 'Swim on Thursday', ops: [{ key: 'o3', op: 'place', taskId: 'swim', title: 'Swim lesson', date: '2026-10-15', time: '10:00' }] }
+    const { applyChanges } = setup(async (t, h) => reply(t, h, n++ ? 'Thursday then.' : 'Friday it is.', { changeSet: n === 1 ? SET : revised }))
+    await type('Move swim to Friday')
+    await type('actually make it Thursday')
+    await type('approve')
+    expect(applyChanges).toHaveBeenCalledTimes(1)
+    expect(applyChanges).toHaveBeenCalledWith(revised)
+  })
+
   it('a refusal (not a family task) is said on the card and nothing is saved', async () => {
     const { applyChanges } = setup(proposing())
     applyChanges.mockResolvedValueOnce({ ok: false, reason: 'private', title: 'Swim lesson' })

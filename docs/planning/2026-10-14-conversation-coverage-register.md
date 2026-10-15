@@ -1,6 +1,6 @@
 # Symphony conversation coverage register
 
-Version 1, October 14, 2026. Branch `claude/beta-readiness-program` (origin/main `d781b072` plus `codex/beta-readiness`). Companion to [beta-readiness.md](beta-readiness.md), which holds the release gates; this register holds the per-intent evidence the gates point at.
+Version 2, October 15, 2026. Branch `claude/beta-readiness-program` (origin/main `d781b072` plus `codex/beta-readiness`). Companion to [beta-readiness.md](beta-readiness.md), which holds the release gates; this register holds the per-intent evidence the gates point at.
 
 Status marks, per the reliability plan §1:
 
@@ -31,8 +31,8 @@ Columns: what the person wants · how they say it · context/permission needed �
 | Intent | Ways of asking | Needs | May | Tools | Approval | Screen | Says | Failure / Undo | Surfaces | Tests | Status |
 |---|---|---|---|---|---|---|---|---|---|---|---|
 | Capture one task | "Add call the plumber", "I need to…", "remind me to…" | signed-in member; life area (asks once if unclear) | write one task | `symphony_create_task` | none (one clear change) | row appears; receipt "Saved" with Undo | "Added … to Thursday" (only after `saved`) | retry reuses turnId → same row id, no duplicate; Undo deletes the created row | typed desktop/phone, voice desktop, wall (family only, via scratchpad or card) | canvasEvents (stableRowId), CanvasActivityContext receipts, ShellLayout typed-goes-to-agent | IT (contract) / IU (real model) |
-| Capture several tasks in one breath | "plumber, Amazon pickup, clean the yard, and an all-day test drive this week" | as above | propose a card of adds | `symphony_propose_changes` (add ×N) | one Approve | dashed rows + change card | "Four on the card; the test drive is all day. Approve when ready." | card refused if page data moved (`seen`); Undo reverses the set | typed, voice, wall (task ops only) | changeSet.test (add/one-op-per-task), applyChangeSet.test | IT (contract) / IU (real model, see benchmark J1) |
-| Correct in the same breath | "call the plumber tomorrow — actually Friday" | — | one task, final date only | create_task once, or card revised | as above | one row, not two | names the final day | — | all | **P**: benchmark scenario, no automated case yet | P |
+| Capture several tasks in one breath | "plumber, Amazon pickup, clean the yard, and an all-day test drive this week" | as above | propose a card of adds | `symphony_propose_changes` (add ×N) | one Approve | dashed rows + change card | "Four on the card; the test drive is all day. Approve when ready." | card refused if page data moved (`seen`); Undo reverses the set | typed, voice, wall (task ops only) | bench J1 contract layer (`scripts/conversation-bench`), changeSet.test, applyChangeSet.test | IT (contract) / IU (real model: bench live layer not run) |
+| Correct in the same breath | "call the plumber tomorrow — actually Friday" | — | one task, final date only | create_task once, or card revised | as above | one row, not two | names the final day | — | all | bench J1 step 2 (contract) | IT (contract) / IU (real model) |
 | Triage Inbox | "sort my inbox", "what's in the inbox" | inbox visible | read; propose place/someday/assign/done | list_tasks, read_week, propose_changes | one Approve | card + dashed rows | summary + question | as cards | typed, voice | prompt rule only (index.ts "Doing versus suggesting") | IU |
 | Paper / photo / document capture | attach a sheet | attachment | read; confirm; then routines or tasks | create_routine, create_task | model asks first (prompt) | — | lists what it found | — | typed | none for the agent path (plan-from-paper has its own) | IU |
 
@@ -56,9 +56,9 @@ Columns: what the person wants · how they say it · context/permission needed �
 
 | Intent | Ways of asking | Needs | May | Tools | Approval | Screen | Says | Failure / Undo | Surfaces | Tests | Status |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| Skip this week's occurrence | "skip piano Thursday", "no soccer this week" | routine visible | card `routine_skip` (date) | propose_changes | Approve (routines always card) | card | "Just this week, or from now on?" if unclear | undoSkip | typed, voice; **wall: U** (says so) | changeSet (routine ops), applyChangeSet | IT |
+| Skip this week's occurrence | "skip piano Thursday", "no soccer this week" | routine visible | card `routine_skip` (date) | propose_changes | Approve (routines always card) | card | "Just this week, or from now on?" if unclear | undoSkip | typed, voice; **wall: U** (says so) | bench R1 (contract), changeSet (routine ops), applyChangeSet | IT (contract) |
 | Move / reassign one occurrence | "piano is at 5 on Thursday", "Iris takes pickup Friday" | — | `routine_move`, `routine_who` | propose_changes | Approve | card | — | undoMove / previous assignee | typed, voice | as above | IT |
-| Change from now on | "piano is Tuesdays now", "stop the Saturday chores" | — | `routine_change`, `routine_rest` (until) | propose_changes | Approve | card | — | previous fields back | typed, voice | as above | IT |
+| Change from now on | "piano is Tuesdays now", "stop the Saturday chores" | — | `routine_change`, `routine_rest` (until) | propose_changes | Approve | card | — | previous fields back; an earlier approved skip is untouched | typed, voice | bench R1 (contract), as above | IT (contract) |
 | Add a routine | "every weekday at 7, feed the dog" | — | `routine_add` on the card; or `symphony_create_routine` for a single explicit one | propose_changes / create_routine | Approve / none | card / row | — | deleteRoutine on Undo (card) | typed, voice | as above; stableRowId | IT |
 | Delete a routine | "delete the chore routine" | — | **U** (rest instead) | — | — | — | explains rest | — | all | webAccess/wallMode tests assert no delete tool | U by design |
 
@@ -102,7 +102,7 @@ Columns: what the person wants · how they say it · context/permission needed �
 |---|---|---|---|---|---|---|---|---|---|---|---|
 | "What can I do here?" | "what is this page", "how do I…" | page guide (`src/lib/explain/pageGuides.ts`: year, season, month, week, today only) | point and explain, one part at a time | `symphony_show_on_page`, `symphony_point` | — | outlines + notes | one part per step | — | typed, voice | showOnPage.test, pointing.test | IT for the five guided pages; **P** inbox/routines/meals guides |
 | Go to a page | "show me the week" | connected workspace | navigate | `symphony_show_workspace` | — | page changes | — | — | typed, voice | context.test (workspaceDestination) | IT |
-| Wall: ask about the day / add to a list / note on the scratchpad | spoken at the wall | adult login + `surface:'wall'` (**B02 open**) | family reads; scratchpad; family list items; task-op cards | wallMode allowlists, `fenceDb` | card: spoken "approve" | wall card; 30 s Undo | — | 20 s timeout → `wall-ask` fallback (agent may still finish server-side: **gap**) | wall | wallMode.test, wallTalk.test, useTellSymphony.test | IU |
+| Wall: ask about the day / add to a list / note on the scratchpad | spoken at the wall | a paired display (identity-derived wall; migration 20261015100000) or an adult login with `surface:'wall'` | family reads; scratchpad; family list items; task-op cards | wallMode allowlists, `fenceDb` | card: spoken "approve" | wall card; 30 s Undo | — | 20 s timeout → `wall-ask` fallback (agent may still finish server-side: **gap**) | wall | wallMode.test, wallTalk.test, useTellSymphony.test | IU |
 | Private assistant (work / personal) | — | separate identity (B01) | — | — | — | — | — | — | — | — | **P** (not in the first beta) |
 
 ## Cross-cutting behaviors
@@ -113,18 +113,25 @@ Columns: what the person wants · how they say it · context/permission needed �
 | Proposed never spoken as saved | voice instructions + `outcome.say`; wall speaks words after the last tool | handler.test, wallAgent.test | IU (needs recorded-audio runs) |
 | Retry after a dropped connection does not duplicate | stable row ids for task, routine, plan item, contact, note, list, list item; stable calendar requestId | canvasEvents.test (stableRowId); **P** integration case against a real database | IT (unit) / P (integration) |
 | Approve refuses a set whose rows moved | `seen` vs cached `updatedAt` (client) | applyChangeSet.test | IT; **gap**: compares against the browser cache, not a fresh read |
-| Partial failure reported as partial | applyChangeSet rolls back best-effort and reports `failed`; direct writes report `partial` | applyChangeSet.test, CanvasActivityContext.test | IU; **gap**: a failed rollback is still reported as "nothing changed" |
+| Partial failure reported as partial | applyChangeSet reports `reverted`/`kept`; the bar and the wall say "some of it stayed saved" when a rollback could not reverse a write; direct writes report `partial` | applyChangeSet.test (unreverted rollback), CanvasActivityContext.test | IT |
 | Undo does not overwrite another person's later edit | — | — | **P** (conflict check on Undo) |
 | "This Friday" while viewing an old week | `viewing: past` in context; prompt asks | context.test, voice instructions | IU |
 | Imported mail/notes are data, not instructions | prompt marks screen context and card notes untrusted | changeSet.test (changeCardNote) | IU; **P** injection scenario (benchmark #13) |
 | Household vocabulary (names, schools, places) | roster in the prompt; no custom vocabulary for the voice transcriber | — | **P** |
-| Durable session state across reload | chat text only (`chat_sessions`); card/Undo/voice in memory | — | **P** (plan §4) |
-| Authorization not inferred from the screen | every tool through RLS client; wall fence | wallMode.test; integration privacy test (not run on this candidate) | IT (unit) / P (real accounts) |
+| Durable session state across reload | chat text in `chat_sessions`; a waiting change card is kept per person in the tab's session storage and restored (approve/dismiss clears it); Undo, receipts and voice state are still in memory only | CanvasActivityContext.test (reload) | IT (card) / **P** (Undo, receipt, objective and unresolved questions) |
+| Authorization not inferred from the screen | every tool through RLS client; wall fence; a display's identity decides the wall server-side | wallMode.test (callerSurface), `scripts/test-household-displays.mjs` (8 SQL checks); integration privacy test (not run on this candidate) | IT (unit, local SQL) / P (real accounts, hosted migration) |
 | Spending limits | `reserve_ai_provider_call` on four routes; many paid routes unguarded; 27 orphaned functions deployed | aiUsage tests; `scripts/test-ai-usage-guard.mjs` | IU; see beta-readiness B03 |
+
+## Known gaps found while building (not yet in a row above)
+
+- **A display has no Google tokens.** The wall page loads calendar events through `google-calendar-events`, which uses the signed-in user's tokens; under a display session the wall's calendar would be empty. The agent's wall reads are fine (they read the cached `calendar_events` through the fence with the household's family calendars). Needed: a display path in `useDayLoadEvents` that reads cached household events, and a server-side refresh of the household's family calendars that does not depend on who is looking. Until then a display is certified for routines, meals, lists and the scratchpad, not the calendar.
+- **`last_seen_at` on displays is never written.** Settings cannot yet show whether a display is alive.
+- **Wall timeout.** After the wall's 20 s fallback to `wall-ask`, the agent turn keeps running on the server and may still write; the client does not abort the stream.
+- **Spoken "approve" binds to whatever card is current.** Plan §6 asks that a spoken approval refer to one identifiable proposal; see the wall row.
 
 ## Benchmark journey J1 (the plan's first deliverable)
 
-"I need to call the plumber, pick up the Amazon order, clean the yard, and fit in an all-day test drive this week." Typed and spoken, desktop and wall, with a conflicting Thursday commitment, a correction, a pending proposal, approval, a dropped connection and Undo. Expected record and screen state after every step is to be written as the first scenario in `scripts/conversation-bench/` (**P**). Until that harness exists and has been run against a real model on synthetic data, no row above moves from IU to IT for real-model behavior.
+"I need to call the plumber, pick up the Amazon order, clean the yard, and fit in an all-day test drive this week." Typed and spoken, desktop and wall, with a conflicting Thursday commitment, a correction, a pending proposal, approval, a dropped connection and Undo. Expected record and screen state after every step is `scripts/conversation-bench/scenarios/j1-plumber-week.json`; the contract layer (`contract.test.ts`) replays it and passes. The live-model layer (`live.mjs`) exists but has not been run: it needs a synthetic account and the deployed agent with the `outcome` event. Until it has been run on synthetic data, no row above moves from IU to IT for real-model behavior.
 
 ## Changes in this version
 
