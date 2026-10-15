@@ -80,6 +80,22 @@ Prepared locally on October 14. **B03 remains open: this is a provider-call allo
 
 Source: `supabase/migrations/20261014180000_ai_provider_call_allowances.sql`, `supabase/functions/_shared/aiUsage.ts`, the four guarded entry points, and `scripts/test-ai-usage-guard.mjs`. The helper's transport hook also covers context embeddings only when a guarded caller supplies it; other context-assembly callers remain unmetered.
 
+## Fourth implementation batch — one verdict per turn, no delete, household time
+
+Prepared on branch `claude/beta-readiness-program` on October 14 (merges `codex/beta-readiness` cleanly onto `origin/main` `d781b072`; full unit suite 8,556 passed, 3 skipped, before this batch; the WhatsApp connector file needs its own dependencies as before).
+
+- Every `symphony-agent` turn now ends with a structured `outcome` (answered / proposed / saved / partial / failed / unverified, the writes made, the card left on the page) and the error event carries the writes made before a failure. The client carries it to the live voice's `ask_symphony` result and the wall's reply; the voice is instructed to say no more than the state allows. This is the shared request/result contract of plan §2. It does not yet prove the live voice obeys it: that needs the recorded-audio layer of the benchmark.
+- The agent no longer has `symphony_delete_task`, `symphony_delete_routine`, the Projects tools, `attach_source` or the "protocol" flow. Setting aside, done and rest are the supported paths. Legacy vault / project / protocol language is out of the prompt.
+- "Today" in the prompt is the household's date and local time (America/New_York), not UTC.
+- Retry de-duplication covers contacts, notes, lists, list items and calendar events as well as tasks, routines and plan items. Server and client write-tool sets agree, so meal, contact, list and draft writes get a receipt.
+- Coverage register started: [2026-10-14-conversation-coverage-register.md](2026-10-14-conversation-coverage-register.md).
+
+### Findings that change the gates
+
+- **Orphaned production functions (B03, B01).** The hosted project has 84 deployed edge functions; 27 of them no longer exist in the repository, including `symphony-agent-v2` and `symphony-agent-wall-test` (stale copies of the main agent, reachable by any signed-in user, calling Anthropic with no allowance guard), `coaching-block-generate` and `suggest-rules-from-research` (OpenAI, verify their own JWT, unguarded), `agent-proxy` (forwards to an external engine), `symphony-chat`, `conduct-onboarding-conversation`, `generate-daily-brief`, `get-context-snapshot`, `copilot-runtime`, `chat-message`, `workspace-voice-v2` and others (some with `verify_jwt=false`; several could not be downloaded for inspection). **Recommendation: delete every deployed function that is not in the repository before invitations.** Deleting is a production change and needs Scott's approval; nothing has been deleted. `dropbox-poll` exists in the repository but is not deployed.
+- **No display credential exists (B02).** The wall runs on an adult login and is identified only by the request body's `surface: 'wall'`. The schema has no device or pairing concept (`household_members.role` is owner / admin / member). Anonymous sign-in is disabled in `supabase/config.toml`. A restricted display identity is a build item, specified under B02 below.
+- **Approve is browser-only (B06).** The stale check compares the card's `seen` stamps with the browser's cached rows, not a fresh read, and a failed rollback is still reported as "nothing changed". Direct writes are de-duplicated on retry; the card's Approve has no operation id.
+
 ## Release blockers in order
 
 Owner labels are responsibilities, not additional staff. Scott retains scope, spending, external-claim, and release approval.

@@ -9,6 +9,7 @@
 // The wall talks through it in useWallTalk (stage 3).
 
 import { streamSymphonyAgent, type AgentApiMessage } from '@/lib/agentStream'
+import type { TurnOutcome } from '@/lib/turnOutcome'
 import type { ChangeCardNote, ChangeSet } from '@/lib/canvas/changeCard'
 
 export interface WallTurn {
@@ -40,6 +41,8 @@ export interface WallAgentReply {
   saved?: { name: string; ids: string[] }[]
   /** The conversation so far, including this turn: pass it back next time. */
   history: WallTurn[]
+  /** The server's verdict on what the turn did (turnOutcome.ts). */
+  outcome?: TurnOutcome
 }
 
 /** The wall's agent function: VITE_WALL_AGENT_FUNCTION in a preview build
@@ -85,6 +88,7 @@ export async function askWallAgent(text: string, history: readonly WallTurn[] = 
     pointed?: { dates: string[]; taskIds: string[] }
     failure: string | null
     saved: { name: string; ids: string[] }[]
+    outcome?: TurnOutcome
   } = { streamed: '', afterTool: '', reply: null, failure: null, saved: [] }
 
   await streamSymphonyAgent(apiMessages(history, question), {
@@ -98,13 +102,13 @@ export async function askWallAgent(text: string, history: readonly WallTurn[] = 
     onChangeSet: (set) => { got.changeSet = set },
     onPoint: (p) => { got.pointed = p.dates.length || p.taskIds.length ? p : undefined },
     onToolResult: (r) => { if (r.ok && r.ids?.length) got.saved.push({ name: r.name, ids: r.ids }) },
-    onDone: (reply) => { got.reply = reply ?? '' },
-    onError: (message) => { got.failure = message },
+    onDone: (reply, _s, _src, outcome) => { got.reply = reply ?? ''; got.outcome = outcome },
+    onError: (message, outcome) => { got.failure = message; got.outcome = outcome },
   })
 
   if (got.failure) throw new Error(got.failure)
   if (got.reply === null) throw new Error('No answer from Symphony')
-  const { changeSet, pointed, saved } = got
+  const { changeSet, pointed, saved, outcome } = got
   // A card with no words still needs a sentence to speak.
   // Spoken: the closing words, not "Let me check…" said before a tool ran.
   const reply = got.afterTool.trim() || (got.reply || got.streamed).trim() || (changeSet ? 'That’s on the card for a grown-up to approve.' : '')
@@ -114,6 +118,7 @@ export async function askWallAgent(text: string, history: readonly WallTurn[] = 
     ...(changeSet ? { changeSet } : {}),
     ...(pointed ? { pointed } : {}),
     ...(saved.length ? { saved } : {}),
+    ...(outcome ? { outcome } : {}),
     history: [...history, { role: 'user', content: question }, { role: 'assistant', content: reply }],
   }
 }
