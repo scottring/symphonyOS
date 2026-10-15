@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { act, render, screen, waitFor } from '@testing-library/react'
 import { useEffect, useState } from 'react'
-import { CanvasActivityProvider, readPendingCard, useCanvasActivity, type CanvasActivity, type CanvasActivityProviderProps } from './CanvasActivityContext'
+import { CanvasActivityProvider, readPendingCard, writePendingCard, useCanvasActivity, type CanvasActivity, type CanvasActivityProviderProps } from './CanvasActivityContext'
 import type { Task } from '@/types/task'
 
 const t0 = new Date('2026-10-10T08:00:00Z')
@@ -351,6 +351,26 @@ describe('a waiting card survives a reload (plan §4)', () => {
     await act(async () => { await first.activity().approveChangeSet() })
     expect(readPendingCard('user-1')).toBeNull()
   })
+  it('restores the card when the person becomes known after first render, without wiping it', async () => {
+    sessionStorage.clear()
+    writePendingCard('user-late', { ...card('s-late'), state: 'proposed' })
+    let latest: CanvasActivity | null = null
+    const { rerender } = render(
+      <CanvasActivityProvider snapshot={{ tasks: [], goals: [] }} writers={{ deleteTask: vi.fn(), updateTask: vi.fn(), deleteGoal: vi.fn(), updateGoal: vi.fn() }} refetch={vi.fn()} persistKey={undefined}>
+        <Probe onReady={(a) => { latest = a }} />
+      </CanvasActivityProvider>,
+    )
+    expect(latest!.changeSet).toBeNull()
+    expect(readPendingCard('user-late')?.key).toBe('s-late')
+    rerender(
+      <CanvasActivityProvider snapshot={{ tasks: [], goals: [] }} writers={{ deleteTask: vi.fn(), updateTask: vi.fn(), deleteGoal: vi.fn(), updateGoal: vi.fn() }} refetch={vi.fn()} persistKey="user-late">
+        <Probe onReady={(a) => { latest = a }} />
+      </CanvasActivityProvider>,
+    )
+    await waitFor(() => expect(latest!.changeSet).toMatchObject({ key: 's-late', state: 'proposed' }))
+    expect(readPendingCard('user-late')?.key).toBe('s-late')
+  })
+
   it('ignores a malformed stored card', () => {
     sessionStorage.setItem('symphony.pendingCard.user-3', '{"key":"x"}')
     expect(readPendingCard('user-3')).toBeNull()

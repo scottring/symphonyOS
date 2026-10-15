@@ -342,8 +342,18 @@ export function CanvasActivityProvider({ children, snapshot, writers, refetch, r
   const [changeSet, setPending] = useState<PendingChangeSet | null>(() => persistKey ? readPendingCard(persistKey) : null)
   const pendingRef = useRef<PendingChangeSet | null>(null)
   useLayoutEffect(() => { pendingRef.current = changeSet }, [changeSet])
+  // The person is often not known at first render (auth still loading), so
+  // the stored card is read when the key arrives, and nothing is written for
+  // a key that has not been read yet: otherwise the first render's empty state
+  // wiped the stored card before it could be restored (found hosted, 2026-10-15).
+  const restoredFor = useRef<string | null>(null)
+  useLayoutEffect(() => {
+    if (!persistKey || restoredFor.current === persistKey) return
+    restoredFor.current = persistKey
+    if (!pendingRef.current) { const stored = readPendingCard(persistKey); if (stored) setPending(stored) }
+  }, [persistKey])
   // Only a card still waiting survives a reload; saving/failed states do not.
-  useEffect(() => { if (persistKey) writePendingCard(persistKey, changeSet?.state === 'proposed' ? changeSet : null) }, [persistKey, changeSet])
+  useEffect(() => { if (persistKey && restoredFor.current === persistKey) writePendingCard(persistKey, changeSet?.state === 'proposed' ? changeSet : null) }, [persistKey, changeSet])
   // What became of the last card, until a turn has been told.
   const cardNoteRef = useRef<ChangeCardNote | null>(null)
   const setChangeSet = useCallback((set: ChangeSet) => {
