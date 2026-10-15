@@ -13,14 +13,19 @@
 export const CANVAS_WRITE_TOOLS = new Set([
   'symphony_create_plan_item', 'symphony_link_plan_item', 'symphony_update_intention',
   'symphony_create_task', 'symphony_create_calendar_event', 'symphony_update_task',
-  'symphony_complete_task', 'symphony_delete_task', 'symphony_create_project',
-  'symphony_update_project', 'symphony_create_routine', 'symphony_update_routine',
-  'symphony_delete_routine', 'symphony_create_note', 'symphony_attach_source',
-  'symphony_set_meal',
+  'symphony_complete_task', 'symphony_create_routine', 'symphony_update_routine',
+  'symphony_create_note', 'symphony_set_meal',
+  'symphony_create_contact', 'symphony_update_contact',
+  'symphony_create_list', 'symphony_add_list_item', 'symphony_check_list_item', 'symphony_delete_list_item',
+  'symphony_draft_email',
 ])
 
 /** Creations that accept a deterministic id. */
-export const IDEMPOTENT_CREATES = new Set(['symphony_create_plan_item', 'symphony_create_task', 'symphony_create_routine'])
+export const IDEMPOTENT_CREATES = new Set([
+  'symphony_create_plan_item', 'symphony_create_task', 'symphony_create_routine',
+  'symphony_create_contact', 'symphony_create_note', 'symphony_create_list', 'symphony_add_list_item',
+  'symphony_create_calendar_event',
+])
 
 export interface ToolOutcome { type: 'tool_result'; name: string; ok: boolean; ids?: string[]; error?: string }
 
@@ -50,7 +55,9 @@ export function creationKey(name: string, input: Record<string, unknown>): strin
     norm(input.title ?? input.name),
     norm(input.level),
     norm(input.period_start ?? input.scheduled_for),
-    norm(input.parent_id ?? input.parent_task_id ?? input.parent_routine_id),
+    norm(input.parent_id ?? input.parent_task_id ?? input.parent_routine_id ?? input.list_id),
+    // Lists, notes and events: their own identity fields.
+    norm(input.text ?? (typeof input.content === 'string' ? input.content.slice(0, 120) : undefined) ?? input.start_time),
   ])
 }
 

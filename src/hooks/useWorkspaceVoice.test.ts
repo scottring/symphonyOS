@@ -55,3 +55,23 @@ describe('workspace voice',()=>{
   expect(ask).toHaveBeenCalledTimes(1)
  })
 })
+
+describe('ask_symphony outcome',()=>{
+ it('hands the voice the server verdict beside the reply, never a bare "done"',async()=>{
+  const ask=vi.fn(async()=>({text:'Three changes are on the card.',outcome:{state:'proposed' as const,writes:[],proposal:{key:'k',title:'3 changes',ops:3},say:'Shown as a change card. Nothing is saved until the person approves it.'}}))
+  const {result}=renderHook(()=>useWorkspaceVoice(context,ask,vi.fn(),true,'a'))
+  await act(()=>result.current.start())
+  const tool=mocks.instances[0].deps.handleTool
+  const out=await tool('ask_symphony',{request:'Move those three to Friday'}) as {reply:string;outcome:{state:string;say:string;proposal?:{ops:number}}}
+  expect(out.reply).toBe('Three changes are on the card.')
+  expect(out.outcome.state).toBe('proposed');expect(out.outcome.proposal?.ops).toBe(3);expect(out.outcome.say).toMatch(/Nothing is saved/)
+ })
+ it('reports a dropped turn as failed, not silent',async()=>{
+  const ask=vi.fn(async()=>undefined)
+  const {result}=renderHook(()=>useWorkspaceVoice(context,ask,vi.fn(),true,'a'))
+  await act(()=>result.current.start())
+  const tool=mocks.instances[0].deps.handleTool
+  const out=await tool('ask_symphony',{request:'Add milk'}) as {reply:string;outcome:{state:string}}
+  expect(out.outcome.state).toBe('failed');expect(out.reply).toMatch(/not processed/)
+ })
+})

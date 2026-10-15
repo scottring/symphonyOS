@@ -7,11 +7,15 @@ import {workspaceDestination,type WorkspaceContext} from '@/lib/workspace/contex
 import {explainContext} from '@/lib/explain/pageGuides'
 import {parseSteps} from '@/lib/explain/steps'
 import {requestShow} from '@/lib/explain/showSignal'
+import type {TurnOutcome} from '@/lib/turnOutcome'
+
+/** What the shell's ask returns: the reply alone (older callers) or the reply with the server's verdict. */
+export type AskResult=string|{text:string;outcome?:TurnOutcome}|undefined
 
 /** One connection owned by the shell, shared by its desktop and phone panes.
  *  Tap to talk: Talk opens the mic for the person's turn, Done sends it
  *  (RealtimeTransport `turns: 'tap'`); their words show as they speak. */
-export function useWorkspaceVoice(context:WorkspaceContext, ask:(text:string)=>Promise<string|undefined>, navigate:(url:string)=>void, enabled:boolean, accountId:string|null = null) {
+export function useWorkspaceVoice(context:WorkspaceContext, ask:(text:string)=>Promise<AskResult>, navigate:(url:string)=>void, enabled:boolean, accountId:string|null = null) {
  const [status,setStatus]=useState<TransportStatus>('idle'),[error,setError]=useState<string|null>(null),[heard,setHeard]=useState(''),[reply,setReply]=useState('')
  const [turn,setTurn]=useState<'listening'|'off'>('off')
  const transport=useRef<RealtimeTransport|null>(null)
@@ -46,7 +50,14 @@ export function useWorkspaceVoice(context:WorkspaceContext, ask:(text:string)=>P
      if(typeof data.request!=='string'||!data.request.trim()||data.request.length>5000)return {error:'Invalid request'}
      if(busy.current)return {error:'A save is still running. Wait for it to finish.'}
      busy.current=true
-     try{return {reply:await current.current.ask(data.request)??'The request was not processed. Do not claim success.'}}finally{busy.current=false}
+     try{
+      const got=await current.current.ask(data.request)
+      if(got===undefined)return {reply:'The request was not processed. Do not claim success.',outcome:{state:'failed',say:'Nothing saved.'}}
+      if(typeof got==='string')return {reply:got}
+      // The verdict travels beside the words: the voice says what `outcome.say`
+      // means, never a stronger claim than `outcome.state` allows.
+      return {reply:got.text,...(got.outcome?{outcome:{state:got.outcome.state,say:got.outcome.say,...(got.outcome.proposal?{proposal:got.outcome.proposal}:{})}}:{})}
+     }finally{busy.current=false}
     }
     return {error:'Unknown action'}
    }})

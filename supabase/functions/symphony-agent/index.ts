@@ -22,6 +22,7 @@ import {
 import { EVERYDAY_TALK_RULES, HARD_RULES, MONTH_SEASON_YEAR_NOTE, SESSION_SPINE_PREAMBLE, WEEKLY_PLANNING_SCRIPT } from '../_shared/sessionScripts.ts'
 import { normalizeSchedule, etOffsetMinutes, APP_TZ } from './schedule.ts'
 import { MEAL_SLOTS, type MealSlot, getMeals, resolveDate, setMeal } from './meals.ts'
+import { summarizeTurn, type TurnWrite } from './outcome.ts'
 import { type Surface, SCRATCHPAD_TOOL, WALL_WRITE_TOOLS, addToScratchpad, fenceDb, loadWallFence, parseSurface, systemForSurface, toolAllowed, toolsForSurface, wallClockLine } from './wallMode.ts'
 
 /** What the wall's Approve can apply today (WallV2Shell passes task writers only). */
@@ -80,17 +81,17 @@ ${ACCOUNT_GROUNDING_RULES}
 ${RESULT_LANGUAGE_RULES}
 
 Rules:
-- You operate within Symphony. You cannot edit an external vault. When the tools and authorized sources are available, you can search notes, read Gmail, create email drafts (never send), and search the web. See the source-specific rules below. If asked to do something none of your tools cover, say so plainly and stop.
+- You operate within Symphony. When the tools and authorized sources are available, you can search notes, read Gmail, create email drafts (never send), and search the web. See the source-specific rules below. If asked to do something none of your tools cover, say so plainly and stop.
 - No em dashes. No AI cliches. No sycophancy. Be direct and action-oriented.
 - Just do it; don't narrate what you are about to do. After acting, confirm briefly.
 
 Grounding and verification (important):
 - Only state facts you have actually read from a tool result. Never assert a prior value, schedule, date, or history you have not looked up. If you are not sure, look it up or say you don't know. Do not invent.
 - When the person asks about their notes or wants background or preparation from saved material, use symphony_search_notes if it is available on this surface before concluding there is nothing. Notes may be absent; do not assume a vault or knowledge base was imported. Name the titles of notes you actually find so the person can open their in-app chips; do not print file paths or ".md" filenames. A failed search means you could not check, not that no notes exist.
-- The user's data spans tasks, routines, projects, contacts, lists, notes, and calendar events. Before acting on "X", check the right entity type: a recurring item like "Feed Jax dinner" is a routine (symphony_list_routines), not a task. Look it up before assuming it doesn't exist.
+- The user's data spans tasks, routines, goals, contacts, lists, notes, meals and calendar events. Before acting on "X", check the right entity type: a recurring item like "Feed Jax dinner" is a routine (symphony_list_routines), not a task. Look it up before assuming it doesn't exist.
 - A dated occasion someone ATTENDS (a show, appointment, party, pickup, reservation) normally belongs on the calendar. However, when the user explicitly asks for a timed task, honor that using a task with scheduled_for and is_all_day=false; do not require a calendar connection. Tasks are to-dos someone DOES. Family occasions go on the family calendar (domain "family").
 - Keep the IDs returned by writes and reuse them in this conversation instead of repeatedly searching. For ONE week task the person states, create it with symphony_create_plan_item and parent_id, then schedule that same ID. For several week tasks, or anything during week planning, use symphony_propose_changes add with goal_id instead. If linking fails, repair the existing item; never create a replacement that leaves a duplicate. After a connection failure, check existing items before retrying a creation.
-- After ANY write (create / update / complete / delete / add / check), VERIFY before you claim success: read the affected item back with the matching list_/get_ tool and confirm the fields you intended actually changed. If the change did not take or a value looks wrong, say so and retry or ask. Never report a change you have not verified.
+- After ANY write (create / update / complete / delete / add / check), VERIFY before you claim success: read the affected item back with the matching list_/get_ tool and confirm the fields you intended actually changed. If the change did not take or a value looks wrong, say so and retry or ask. Never report a change you have not verified. There is no delete: a task the person no longer wants is set aside (someday) or marked done; a routine they stop is rested (routine_rest on the change card).
 - When updating an item, change only the fields the user asked about. Do not modify unrelated fields (schedule, time, name, context) as a side effect.
 
 Email:
@@ -151,11 +152,11 @@ Other planning rules:
 - When asked where unlinked items belong, read the period's items and the parents one horizon up, then suggest links with symphony_propose_plan_items (item_id + parent_id), one per item that clearly fits. Leave out items with no good match and say which. Never link them yourself unless the person says to.
 - Planning a month, season or year goes across, not down, and is a talk that ends in ONE change card. "Plan {Month}", "Plan {Season}" or "Plan {Year}" (the pages' and Today's chips, e.g. "Plan November"), or "Plan this month with me" (season, year): call symphony_read_plan first, with the level and a day in the period that is ending ("Plan November" reads October, so next is November; "Plan this month with me" reads this one). Say the period back plainly in two or three sentences: what moved and what didn't, with counts ("October: 7 goals, 4 done, 2 carried, 1 untouched"). Ask what the next period is for, one question at a time. Write down only what the person says, in their words: never invent, suggest or polish goals. Point out duplicates and overlaps with what is already on the lists (the next period's list, what is still open, the parent list) and offer to merge them, or to carry the old one with their new wording. What is still open on the period that is ending: ask once, as a group, what carries, what is done and what to let go. A season is a brainstorm: everything they say goes on the list in their words, nothing trimmed. A year is a handful: look back at last year's goals first (carry, or mark met), then ask for a few. End in ONE symphony_propose_changes with plan ops: plan_add (level, the next period's start from symphony_read_plan, their words, and parent_id only when they say what it serves), plan_carry (to_period_start; new_title when they reword it), plan_let_go, plan_done; plus merge and someday for month or season goals. As in week planning, call it again with the whole list so far after each answer. Write nothing directly in these sessions. When several are due (late December), plan the year first, then the season, then the month, one at a time. Accept goals with no parent. Planning a week follows its own steps above. ${MONTH_SEASON_YEAR_NOTE}
 
-When the user attaches a document describing a recurring protocol (e.g. a physical-therapy home exercise program):
+When the user attaches a document describing a recurring program (e.g. a physical-therapy home exercise sheet):
 - Read it. Extract each distinct item, its instructions, and how many times per day it is done.
 - Before creating anything, list what you found (item -> frequency) and ask the user to confirm. Only write after they confirm.
 - If a frequency is unclear, ask rather than guessing. Never invent a cadence the document does not state.
-- After the user confirms: (1) create a project with symphony_create_project (context "personal"); (2) if the user attached a document, call symphony_attach_source with the project id to register the source PDF on the project; (3) create one routine per item with symphony_create_routine, setting project_id to the program's project id and times_per_day when an item is done more than once a day.
+- After the user confirms, create one routine per item with symphony_create_routine, setting times_per_day when an item is done more than once a day, and put the document's instructions for that item in its notes.
 ${WEB_PROMPT_SECTION}`
 
 // ── Tool schemas (Anthropic tool-use format) ───────────────────────
@@ -176,7 +177,7 @@ const TOOLS = [
   { name: 'symphony_update_intention', description: 'Edit the wording or completion state of an existing year goal. Does not change its year, sharing or links.', input_schema:{type:'object',properties:{id:{type:'string'},name:{type:'string'},status:{type:'string',enum:['active','completed']}},required:['id']}},
   {
     name: 'symphony_list_tasks',
-    description: 'List tasks (max 50). Filter by bucket, context, completed, is_waiting, project_id, scheduled_for (YYYY-MM-DD), or search (title substring).',
+    description: 'List tasks (max 50). Filter by bucket, context, completed, is_waiting, scheduled_for (YYYY-MM-DD), or search (title substring).',
     input_schema: {
       type: 'object',
       properties: {
@@ -184,7 +185,6 @@ const TOOLS = [
         context: { type: 'string', enum: CONTEXT_ENUM },
         completed: { type: 'boolean' },
         is_waiting: { type: 'boolean' },
-        project_id: { type: 'string' },
         scheduled_for: { type: 'string', description: 'YYYY-MM-DD' },
         search: { type: 'string' },
         limit: { type: 'number' },
@@ -203,7 +203,6 @@ const TOOLS = [
         context: { type: 'string', enum: CONTEXT_ENUM },
         category: { type: 'string', enum: ['task', 'chore', 'errand', 'event', 'activity'] },
         notes: { type: 'string' },
-        project_id: { type: 'string' },
         contact_id: { type: 'string', description: 'who the task is ABOUT' },
         assigned_to: { type: 'string', description: 'household member id who should DO it' },
         phone_number: { type: 'string' },
@@ -216,15 +215,6 @@ const TOOLS = [
         },
       },
       required: ['title'],
-    },
-  },
-  {
-    name: 'symphony_delete_task',
-    description: 'Delete a task by id. Permanent. Prefer symphony_complete_task to mark done; only delete when the user wants it removed.',
-    input_schema: {
-      type: 'object',
-      properties: { id: { type: 'string' } },
-      required: ['id'],
     },
   },
   {
@@ -241,7 +231,6 @@ const TOOLS = [
         context: { type: ['string', 'null'], enum: [...CONTEXT_ENUM, null] },
         category: { type: 'string' },
         notes: { type: ['string', 'null'] },
-        project_id: { type: ['string', 'null'] },
         contact_id: { type: ['string', 'null'] },
         assigned_to: { type: ['string', 'null'] },
         is_waiting: { type: 'boolean' },
@@ -261,49 +250,6 @@ const TOOLS = [
     input_schema: {
       type: 'object',
       properties: { id: { type: 'string' }, completed: { type: 'boolean' } },
-      required: ['id'],
-    },
-  },
-  {
-    name: 'symphony_list_projects',
-    description: 'List projects. Filter by status (not_started/in_progress/on_hold/completed), context, or search (name).',
-    input_schema: {
-      type: 'object',
-      properties: {
-        status: { type: 'string', enum: ['not_started', 'in_progress', 'on_hold', 'completed'] },
-        context: { type: 'string', enum: CONTEXT_ENUM },
-        search: { type: 'string' },
-      },
-    },
-  },
-  {
-    name: 'symphony_create_project',
-    description: 'Create a project (a container for related tasks).',
-    input_schema: {
-      type: 'object',
-      properties: {
-        name: { type: 'string' },
-        status: { type: 'string', enum: ['not_started', 'in_progress', 'on_hold', 'completed'] },
-        context: { type: 'string', enum: CONTEXT_ENUM },
-        notes: { type: 'string' },
-        phone_number: { type: 'string' },
-      },
-      required: ['name'],
-    },
-  },
-  {
-    name: 'symphony_update_project',
-    description: 'Update a project by id: name, status, notes, context, or phone_number. Set status to "completed" to finish it.',
-    input_schema: {
-      type: 'object',
-      properties: {
-        id: { type: 'string' },
-        name: { type: 'string' },
-        status: { type: 'string', enum: ['not_started', 'in_progress', 'on_hold', 'completed'] },
-        notes: { type: ['string', 'null'] },
-        context: { type: ['string', 'null'], enum: [...CONTEXT_ENUM, null] },
-        phone_number: { type: ['string', 'null'] },
-      },
       required: ['id'],
     },
   },
@@ -330,7 +276,7 @@ const TOOLS = [
   },
   {
     name: 'symphony_create_routine',
-    description: 'Create a recurring routine. For a protocol/exercise done multiple times a day, set times_per_day (array of HH:MM). recurrence_pattern defaults to daily.',
+    description: 'Create a recurring routine. For an exercise or medication done several times a day, set times_per_day (array of HH:MM). recurrence_pattern defaults to daily.',
     input_schema: {
       type: 'object',
       properties: {
@@ -341,7 +287,6 @@ const TOOLS = [
         time_of_day: { type: 'string', description: 'HH:MM for a once-a-day routine' },
         context: { type: 'string', enum: CONTEXT_ENUM },
         image_url: { type: 'string' },
-        project_id: { type: 'string', description: 'id of the program/project this exercise belongs to' },
         assigned_to: { type: 'string', description: 'household member id who DOES this routine (see symphony_list_household_members / the household roster)' },
         assigned_to_all: { type: 'array', items: { type: 'string' }, description: 'every household member id who does it, when more than one' },
       },
@@ -526,7 +471,7 @@ const TOOLS = [
   {
     name: 'symphony_search_notes',
     description:
-      "Search the signed-in person's accessible Symphony notes for background, preparation or saved knowledge. Notes may be absent; do not assume a vault has been imported. Returns relevant notes with a content snippet and any recorded source path. Pass a natural-language query describing the topic, not just a keyword.",
+      "Search the signed-in person's accessible Symphony notes for background, preparation or saved knowledge. Notes may be absent; do not assume any notes were imported. Returns relevant notes with a content snippet. Pass a natural-language query describing the topic, not just a keyword.",
     input_schema: {
       type: 'object',
       properties: {
@@ -568,15 +513,6 @@ const TOOLS = [
     },
   },
   {
-    name: 'symphony_delete_routine',
-    description: 'Delete a routine by id. Permanent. (Pausing a routine is not yet supported via the assistant.)',
-    input_schema: {
-      type: 'object',
-      properties: { id: { type: 'string' } },
-      required: ['id'],
-    },
-  },
-  {
     name: 'symphony_search_email',
     description:
       "Search the user's connected Gmail mailbox. Read-only. Use this whenever they ask you to check, look in, or find something in their email. Takes a Gmail search query — the same syntax as the Gmail search box: bare words match anywhere (\"potluck\"), and operators narrow it (from:, to:, subject:, newer_than:30d, older_than:, has:attachment, label:, in:sent). Prefer a broad query with a recency bound, e.g. \"potluck newer_than:30d\". Returns one entry per thread — subject, sender, date, and a short snippet — NOT full message bodies. When a snippet looks like the right thread but does not contain the detail you need, call symphony_read_email_thread on its thread_id. Always tell the user which mailbox was searched, especially when nothing was found — they may be thinking of a different account.",
@@ -614,17 +550,6 @@ const TOOLS = [
         thread_id: { type: 'string', description: 'optional; reply inside this existing thread' },
       },
       required: ['to', 'subject', 'body'],
-    },
-  },
-  {
-    name: 'symphony_attach_source',
-    description: 'Attach the document the user shared in this message to a project as its source document. Call this once, after creating the project, when the user attached a file.',
-    input_schema: {
-      type: 'object',
-      properties: {
-        project_id: { type: 'string' },
-      },
-      required: ['project_id'],
     },
   },
 ]
@@ -804,7 +729,6 @@ async function runTool(
         if (input.context) q = q.eq('context', input.context)
         if (input.completed !== undefined) q = q.eq('completed', input.completed)
         if (input.is_waiting !== undefined) q = q.eq('is_waiting', input.is_waiting)
-        if (input.project_id) q = q.eq('project_id', input.project_id)
         if (input.search) q = q.ilike('title', `%${input.search}%`)
         if (input.scheduled_for) {
           q = q.gte('scheduled_for', `${input.scheduled_for}T00:00:00`).lte('scheduled_for', `${input.scheduled_for}T23:59:59`)
@@ -954,35 +878,14 @@ async function runTool(
             timeZone: APP_TZ,
             location: input.location,
             calendarId: target.calendar_id,
-            requestId: crypto.randomUUID(),
+            // Stable across a resent turn, so a retry after a dropped
+            // connection cannot put the same event on the calendar twice.
+            requestId: stableId ?? crypto.randomUUID(),
           }),
         })
         const body = await res.text()
         if (!res.ok) return `Error creating calendar event (${res.status}): ${body.slice(0, 300)}`
         return `Created Google Calendar event on "${target.calendar_name}" (${start} to ${end} UTC): ${body.slice(0, 400)}`
-      }
-      case 'symphony_list_projects': {
-        let q = db.from('projects').select('*').order('updated_at', { ascending: false })
-        if (input.status) q = q.eq('status', input.status)
-        if (input.context) q = q.eq('context', input.context)
-        if (input.search) q = q.ilike('name', `%${input.search}%`)
-        const { data, error } = await q
-        if (error) throw error
-        return `${(data || []).length} projects:\n${JSON.stringify(data, null, 2)}`
-      }
-      case 'symphony_create_project': {
-        // Scope is DERIVED, never defaulted. `projects` carries a scope column
-        // and projects RLS reads scope ALONE, so "make a family project" with
-        // no scope wrote context='family' beside the 'individual' column
-        // default: on every family surface for its owner, invisible to the
-        // rest of the household. Projects have no assignee, so the domain
-        // decides on its own.
-        const row:Record<string,unknown> = { ...(input as Record<string, unknown>), user_id: userId }
-        row.scope = scopeFor(row.context as string | null, [], null)
-        const { data, error } = await db.from('projects')
-          .insert(row).select().single()
-        if (error) throw error
-        return JSON.stringify(data, null, 2)
       }
       case 'symphony_list_contacts': {
         let q = db.from('contacts').select('*').order('name')
@@ -1104,43 +1007,15 @@ async function runTool(
         if (error) throw error
         return JSON.stringify(data, null, 2)
       }
-      case 'symphony_delete_task': {
-        if (!input.id) return 'Error: id is required'
-        const { error } = await db.from('tasks').delete().eq('id', input.id)
-        if (error) throw error
-        return `Task ${input.id} deleted.`
-      }
-      case 'symphony_update_project': {
-        const { id, ...updates } = input as Record<string, unknown>
-        if (!id) return 'Error: id is required'
-        // Scope is DERIVED — never a value the model may set (see
-        // symphony_update_task). Drop it, then recompute when the domain moves,
-        // in BOTH directions: a family project re-tagged personal must lose the
-        // household share, not keep it.
-        delete updates.scope
-        if ('context' in updates) {
-          const { data: before } = await db.from('projects')
-            .select('context').eq('id', id).single()
-          // Only when the row was actually readable: deriving from the update
-          // alone would read a family row's missing context as null and narrow
-          // it. An explicit move into `family` decides the scope by itself.
-          if (before || updates.context === 'family') {
-            const next = { ...(before ?? {}), ...updates }
-            updates.scope = scopeFor(next.context as string | null, [], null)
-          }
-        }
-        const { data, error } = await db.from('projects')
-          .update({ ...updates, updated_at: now() }).eq('id', id).select().single()
-        if (error) throw error
-        return JSON.stringify(data, null, 2)
-      }
       case 'symphony_create_contact': {
         // `contacts` carries a scope column too, and its RLS reads scope alone
-        // — same derivation as projects above.
+        // — same derivation as tasks above.
         const row:Record<string,unknown> = { ...(input as Record<string, unknown>), user_id: userId }
         row.scope = scopeFor(row.context as string | null, [], null)
+        if (stableId) row.id = stableId
         const { data, error } = await db.from('contacts')
           .insert(row).select().single()
+        if (error?.code === '23505') { const again = await alreadySaved('contacts'); if (again) return again }
         if (error) throw error
         return JSON.stringify(data, null, 2)
       }
@@ -1196,16 +1071,18 @@ async function runTool(
       }
       case 'symphony_create_list': {
         const { data, error } = await db.from('lists')
-          .insert({ title: input.title, category: input.category, visibility: input.visibility ?? 'self', user_id: userId })
+          .insert({ title: input.title, category: input.category, visibility: input.visibility ?? 'self', user_id: userId, ...(stableId ? { id: stableId } : {}) })
           .select().single()
+        if (error?.code === '23505') { const again = await alreadySaved('lists'); if (again) return again }
         if (error) throw error
         return JSON.stringify(data, null, 2)
       }
       case 'symphony_add_list_item': {
         if (!input.list_id || !input.text) return 'Error: list_id and text are required'
         const { data, error } = await db.from('list_items')
-          .insert({ list_id: input.list_id, text: input.text, note: input.note, user_id: userId, completed: false })
+          .insert({ list_id: input.list_id, text: input.text, note: input.note, user_id: userId, completed: false, ...(stableId ? { id: stableId } : {}) })
           .select().single()
+        if (error?.code === '23505') { const again = await alreadySaved('list_items'); if (again) return again }
         if (error) throw error
         return JSON.stringify(data, null, 2)
       }
@@ -1237,6 +1114,7 @@ async function runTool(
             scope: scopeFor(input.context as string | null, [], null),
             source: 'assistant',
             user_id: userId,
+            ...(stableId ? { id: stableId } : {}),
           })
           .select('id, title, type, context, created_at').single()
         if (error) throw error
@@ -1284,7 +1162,6 @@ async function runTool(
         // Snippet the content — never dump full notes into the context window.
         const results = hits.map((n) => ({
           title: n.title || (n.vault_path ? n.vault_path.split('/').pop() : 'Untitled'),
-          vault_path: n.vault_path,
           context: n.context,
           similarity: typeof n.similarity === 'number' ? Number(n.similarity.toFixed(3)) : undefined,
           snippet: (n.content || '').replace(/\s+/g, ' ').slice(0, 500),
@@ -1316,12 +1193,6 @@ async function runTool(
         if (error) throw error
         const range = start === end ? `on ${start}` : `from ${start} to ${end}`
         return `${(data || []).length} events ${range}${search ? ` matching "${search}"` : ''}:\n${JSON.stringify(data, null, 2)}`
-      }
-      case 'symphony_delete_routine': {
-        if (!input.id) return 'Error: id is required'
-        const { error } = await db.from('routines').delete().eq('id', input.id)
-        if (error) throw error
-        return `Routine ${input.id} deleted.`
       }
       case 'symphony_search_email': {
         const query = typeof input.query === 'string' ? input.query.trim() : ''
@@ -1385,23 +1256,6 @@ async function runTool(
         const text = await res.text()
         if (!res.ok) return `Error creating draft (${res.status}): ${text.slice(0, 300)}`
         return `Draft created in the user's Gmail Drafts folder — NOT sent. They need to review and send it themselves. ${text.slice(0, 300)}`
-      }
-      case 'symphony_attach_source': {
-        if (!attachment) return 'Error: No document was attached to this message.'
-        if (!input.project_id) return 'Error: project_id is required'
-        const { data, error } = await db.from('attachments')
-          .insert({
-            user_id: userId,
-            entity_type: 'project',
-            entity_id: input.project_id,
-            file_name: attachment.fileName,
-            file_type: attachment.fileType,
-            file_size: attachment.fileSize,
-            storage_path: attachment.storagePath,
-          })
-          .select().single()
-        if (error) throw error
-        return JSON.stringify(data, null, 2)
       }
       default:
         return `Error: unknown tool ${name}`
@@ -1552,8 +1406,12 @@ Deno.serve(async (req) => {
     // Roster is a nice-to-have; never fail the request over it.
   }
 
-  const today = new Date().toISOString().split('T')[0]
-  let datePrefix = `(Today is ${today}.)${familyLine}`
+  // The household's day, not UTC's: after 8pm Eastern the UTC date is
+  // already tomorrow, and "today" would land a day late.
+  const nowLocal = new Intl.DateTimeFormat('en-CA', { timeZone: APP_TZ, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false }).formatToParts(new Date())
+  const part = (t: string) => nowLocal.find((x) => x.type === t)?.value ?? ''
+  const today = `${part('year')}-${part('month')}-${part('day')}`
+  let datePrefix = `(Today is ${today}, ${part('hour')}:${part('minute')} local time, ${APP_TZ}.)${familyLine}`
   if (wall) datePrefix += wallClockLine(new Date(), APP_TZ)
   if (taskContext) {
     const isRoutine = taskContext.kind === 'routine'
@@ -1577,8 +1435,7 @@ Deno.serve(async (req) => {
       } catch (_e) {
         // Fall back to the thin client-provided fields — never fail the chat over context.
         const notesPart = taskContext.notes ? ` Notes: ${taskContext.notes}.` : ''
-        const projectPart = taskContext.projectName ? ` Project: ${taskContext.projectName}.` : ''
-        taskContextBlock = `\nThe user is asking about the task "${taskContext.title}" (id ${taskContext.id}).${notesPart}${projectPart}`
+        taskContextBlock = `\nThe user is asking about the task "${taskContext.title}" (id ${taskContext.id}).${notesPart}`
       }
       datePrefix += taskContextBlock +
         '\nThe user wants help making this task doable. You can: break it into subtasks' +
@@ -1635,6 +1492,10 @@ Deno.serve(async (req) => {
       // every later request in this turn. Sticky — a container survives the
       // turn, and dropping it mid-turn is what triggers the 400.
       let containerId: string | null = null
+      // What this turn did, for the done event: every write's outcome and
+      // whatever card is now on the page (outcome.ts).
+      const writes: TurnWrite[] = []
+      const shown: { proposal?: { key: string; title: string; ops: number }; suggestions?: number } = {}
       try {
         for (let turn = 0; turn < MAX_TURNS; turn++) {
           const res = await callAnthropic(apiKey, paidFetch, convo, webTouched, containerId, canShow, surface)
@@ -1716,6 +1577,7 @@ Deno.serve(async (req) => {
                   if ('error' in resolved) result = JSON.stringify({ error: resolved.error })
                   else {
                     send({ type: 'change_set', set: resolved.set })
+                    shown.proposal = { key: resolved.set.key, title: resolved.set.title, ops: resolved.set.ops.length }
                     result = JSON.stringify({ shown: resolved.set.ops.length, saved: false, note: 'Shown as a change card and dashed on the page. Nothing is saved until the person approves. Do not read the list back; ask your next question or say it is ready to approve.' })
                   }
                 }
@@ -1725,12 +1587,13 @@ Deno.serve(async (req) => {
                 if ('error' in proposal) result = JSON.stringify({ error: proposal.error })
                 else {
                   send({ type: 'proposal', items: proposal.items })
+                  shown.suggestions = (shown.suggestions ?? 0) + proposal.items.length
                   result = JSON.stringify({ shown: proposal.items.length, saved: false, note: 'Shown as suggestions. Nothing is saved until the person keeps them.' })
                 }
               } else result = await runTool(tdb, user.id, block.name, block.input ?? {}, attachment, currentMemberId, authHeader, sourceNotes, paidFetch, turnId)
               // The wall's own saves report their ids too, so the wall can offer Undo.
               const outcome = toolOutcome(block.name, result, wall ? WALL_WRITE_TOOLS : undefined)
-              if (outcome) send({ ...outcome })
+              if (outcome) { send({ ...outcome }); writes.push({ name: outcome.name, ok: outcome.ok, ...(outcome.ids ? { ids: outcome.ids } : {}), ...(outcome.error ? { error: outcome.error } : {}) }) }
               const saved = workspaceContext ? planSaved(block.name, block.input ?? {}, result) : null
               if (saved) send(saved)
               toolResults.push({ type: 'tool_result', tool_use_id: block.id, content: result })
@@ -1749,9 +1612,11 @@ Deno.serve(async (req) => {
         }
         const seen = new Set<string>()
         const sources = sourceNotes.filter((s) => (seen.has(s.id) ? false : (seen.add(s.id), true)))
-        send({ type: 'done', reply: finalText, sessionId: null, sources })
+        send({ type: 'done', reply: finalText, sessionId: null, sources, outcome: summarizeTurn(writes, shown, 'ok') })
       } catch (err) {
-        send({ type: 'error', message: err instanceof Error ? err.message : 'Agent failed' })
+        // The writes so far travel with the error: a turn cut off after a
+        // save is 'unverified', never silently 'nothing happened'.
+        send({ type: 'error', message: err instanceof Error ? err.message : 'Agent failed', outcome: summarizeTurn(writes, shown, 'error') })
       } finally {
         controller.close()
       }

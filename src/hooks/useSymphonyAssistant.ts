@@ -1,4 +1,5 @@
 import type { WorkspaceContext } from '@/lib/workspace/context'
+import type { TurnOutcome } from '@/lib/turnOutcome'
 import { useState, useCallback, useEffect, useRef } from 'react'
 import { supabase, getAuthUser } from '@/lib/supabase'
 import type { AgentApiMessage, AgentProposalItem, AssistantTaskContext, AgentSourceNote } from '@/lib/agentStream'
@@ -173,7 +174,9 @@ export function useSymphonyAssistant(options?: UseSymphonyAssistantOptions) {
     }
   }, [persistKey, persistEntityId])
 
-  const sendMessage = useCallback(async (text: string, attachment?: ChatAttachment, opts?: { turnId?: string; retry?: boolean }) => {
+  /** One turn, with the server's verdict on what it did (turnOutcome.ts).
+   *  Voice reads the outcome; the typed bar reads the text. */
+  const sendTurn = useCallback(async (text: string, attachment?: ChatAttachment, opts?: { turnId?: string; retry?: boolean }): Promise<{ text: string; outcome: TurnOutcome; error: string | null } | undefined> => {
     if ((!text.trim() && !attachment) || sending.current) return
     sending.current = true
     const turnId = opts?.turnId ?? crypto.randomUUID()
@@ -273,8 +276,10 @@ export function useSymphonyAssistant(options?: UseSymphonyAssistantOptions) {
     ])
     setLoading(false)
     sending.current = false
-    return turn.error ? `The request failed: ${turn.error}. ${turn.text}` : turn.text
+    return { text: turn.error ? `The request failed: ${turn.error}. ${turn.text}` : turn.text, outcome: turn.outcome, error: turn.error }
   }, [onPlanSaved, onWorkspace, workspaceContext, loading, messages, onMutate, taskContext, getCurrentUserMember, persistTurn, turnObserver])
+
+  const sendMessage = useCallback(async (text: string, attachment?: ChatAttachment, opts?: { turnId?: string; retry?: boolean }) => (await sendTurn(text, attachment, opts))?.text, [sendTurn])
 
   /** Send the last message again with the same turn id. */
   const retryLast = useCallback(async () => {
@@ -314,7 +319,7 @@ export function useSymphonyAssistant(options?: UseSymphonyAssistantOptions) {
   }, [resetSession])
 
   return {
-    messages, loading, error, toolActivity, sendMessage, retryLast, resetSession,
+    messages, loading, error, toolActivity, sendMessage, sendTurn, retryLast, resetSession,
     sessions, sessionsLoading, activeSessionId, loadSession, deleteSession,
   }
 }

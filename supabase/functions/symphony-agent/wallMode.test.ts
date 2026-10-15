@@ -47,10 +47,12 @@ describe('desktop is unchanged without a surface', () => {
     expect(systemForSurface(base, null)).toBe(base)
     const db = { from: () => ({}) }
     expect(fenceDb(db, null)).toBe(db)
-    expect(toolAllowed('symphony_delete_task', null)).toBe(true)
+    expect(toolAllowed('symphony_update_task', null)).toBe(true)
   })
   it('toolOutcome keeps its desktop write list by default', () => {
-    expect(toolOutcome('symphony_add_list_item', '{"id":"a"}')).toBeNull()
+    // Reads report nothing; every write on the desktop list reports.
+    expect(toolOutcome('symphony_list_tasks', '[]')).toBeNull()
+    expect(toolOutcome('symphony_add_list_item', '{"id":"a"}')).toEqual({ type: 'tool_result', name: 'symphony_add_list_item', ok: true, ids: ['a'] })
     expect(toolOutcome('symphony_create_task', '{"id":"a"}')).toEqual({ type: 'tool_result', name: 'symphony_create_task', ok: true, ids: ['a'] })
   })
   it('index.ts gates every wall difference on surface', () => {
@@ -78,8 +80,8 @@ describe('wall tools', () => {
     expect(offered).toContain('symphony_read_week')
     expect(offered).toContain('symphony_add_list_item')
     expect(offered).toContain(SCRATCHPAD_TOOL.name)
-    for (const direct of ['symphony_create_task', 'symphony_update_task', 'symphony_complete_task', 'symphony_delete_task',
-      'symphony_update_routine', 'symphony_create_routine', 'symphony_delete_routine', 'symphony_create_calendar_event',
+    for (const direct of ['symphony_create_task', 'symphony_update_task', 'symphony_complete_task',
+      'symphony_update_routine', 'symphony_create_routine', 'symphony_create_calendar_event',
       'symphony_create_plan_item', 'symphony_delete_list_item', 'symphony_check_list_item', 'symphony_create_list',
       'symphony_create_note', 'symphony_draft_email']) {
       expect(offered, direct).not.toContain(direct)

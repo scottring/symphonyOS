@@ -43,8 +43,7 @@ export const WEB_TOOL_NAMES: ReadonlySet<string> = new Set(WEB_TOOLS.map((t) => 
  *  so "find the podiatrist's number and put it on that task" still works
  *  in one turn. */
 export const DESTRUCTIVE_TOOL_NAMES: ReadonlySet<string> = new Set([
-  'symphony_delete_task',
-  'symphony_delete_routine',
+  // Tasks and routines have no delete tool at all (set aside / rest instead).
   'symphony_delete_list_item',
 ])
 

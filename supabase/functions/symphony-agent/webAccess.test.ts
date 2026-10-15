@@ -12,10 +12,7 @@ const SYMPHONY_TOOLS = [
   { name: 'symphony_list_tasks' },
   { name: 'symphony_create_task' },
   { name: 'symphony_update_task' },
-  { name: 'symphony_delete_task' },
-  { name: 'symphony_delete_routine' },
   { name: 'symphony_delete_list_item' },
-  { name: 'symphony_attach_source' },
 ]
 
 describe('WEB_TOOLS', () => {
@@ -51,7 +48,7 @@ describe('isWebBlock', () => {
   })
 
   it('does not fire on ordinary Symphony tool use or text', () => {
-    expect(isWebBlock({ type: 'tool_use', name: 'symphony_delete_task' })).toBe(false)
+    expect(isWebBlock({ type: 'tool_use', name: 'symphony_delete_list_item' })).toBe(false)
     expect(isWebBlock({ type: 'text' })).toBe(false)
     expect(isWebBlock({})).toBe(false)
   })

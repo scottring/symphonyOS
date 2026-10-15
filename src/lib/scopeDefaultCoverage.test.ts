@@ -160,17 +160,16 @@ describe('a written context implies a written scope', () => {
     expect(agent, 'symphony-agent must call its local scopeFor mirror').toMatch(/scopeFor\(/)
   })
 
-  // The agent's project and contact writers spread `{...input}` / `{...updates}`
-  // into the payload, so the inline scan above can see no `context:` key to
-  // demand a scope beside — every one of them shipped with NO derivation at
-  // all. `projects` and `contacts` carry a scope column and their RLS reads
-  // scope alone, so "make a family project" produced context='family' +
-  // scope='individual': on every family surface for its owner, invisible to
-  // the rest of the household. Pinned by name, on the CALL.
-  it('the agent derives a scope on every project and contact write', () => {
+  // The agent's contact writers spread `{...input}` / `{...updates}` into the
+  // payload, so the inline scan above can see no `context:` key to demand a
+  // scope beside — they shipped with NO derivation at all. `contacts` carries
+  // a scope column and its RLS reads scope alone, so "a family contact"
+  // produced context='family' + scope='individual': on every family surface
+  // for its owner, invisible to the rest of the household. Pinned by name, on
+  // the CALL. (The project tools were retired from the agent in October 2026.)
+  it('the agent derives a scope on every contact write', () => {
     const text = stripComments(readFileSync(join(FUNCTIONS, 'symphony-agent/index.ts'), 'utf8'))
     for (const tool of [
-      'symphony_create_project', 'symphony_update_project',
       'symphony_create_contact', 'symphony_update_contact',
     ]) {
       const start = text.indexOf(`case '${tool}':`)

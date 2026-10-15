@@ -64,8 +64,8 @@ export interface CanvasWriters {
 /** Writes whose rows the canvas holds and can check after a turn. */
 const TRACKED_TOOLS = new Set([
   'symphony_create_plan_item', 'symphony_link_plan_item', 'symphony_update_intention',
-  'symphony_create_task', 'symphony_update_task', 'symphony_complete_task', 'symphony_delete_task',
-  'symphony_create_routine', 'symphony_update_routine', 'symphony_delete_routine',
+  'symphony_create_task', 'symphony_update_task', 'symphony_complete_task',
+  'symphony_create_routine', 'symphony_update_routine',
 ])
 
 interface CommandOptions {

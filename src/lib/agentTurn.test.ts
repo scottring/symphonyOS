@@ -101,3 +101,38 @@ it('delivers saved nodes before the reply finishes, even when the connection lat
  expect(result.error).toBe('Connection dropped')
  expect(onPlanSaved).toHaveBeenCalledTimes(1)
 })
+
+describe('runAgentTurn outcome', () => {
+  it('passes the server verdict through', async () => {
+    vi.mocked(streamSymphonyAgent).mockImplementation(async (_m, h: StreamHandlers) => {
+      h.onTool?.('symphony_create_task')
+      h.onToolResult?.({ name: 'symphony_create_task', ok: true, ids: ['t1'] })
+      h.onDone?.('Added.', null, undefined, { state: 'saved', writes: [{ name: 'symphony_create_task', ok: true, ids: ['t1'] }], say: 'Saved.' })
+    })
+    const r = await runAgentTurn([])
+    expect(r.outcome.state).toBe('saved')
+    expect(r.outcome.writes[0].ids).toEqual(['t1'])
+  })
+  it('a write with no verdict is unverified, a read with none is answered', async () => {
+    vi.mocked(streamSymphonyAgent).mockImplementation(async (_m, h: StreamHandlers) => { h.onTool?.('symphony_add_list_item'); h.onDone?.('Added milk.', null) })
+    expect((await runAgentTurn([])).outcome.state).toBe('unverified')
+    vi.mocked(streamSymphonyAgent).mockImplementation(async (_m, h: StreamHandlers) => { h.onTool?.('symphony_list_tasks'); h.onDone?.('Two tasks.', null) })
+    expect((await runAgentTurn([])).outcome.state).toBe('answered')
+  })
+  it('a dropped stream after a write is unverified; before any write it is failed', async () => {
+    vi.mocked(streamSymphonyAgent).mockImplementation(async (_m, h: StreamHandlers) => { h.onTool?.('symphony_create_task'); throw new Error('boom') })
+    expect((await runAgentTurn([])).outcome.state).toBe('unverified')
+    vi.mocked(streamSymphonyAgent).mockImplementation(async () => { throw new Error('boom') })
+    expect((await runAgentTurn([])).outcome.state).toBe('failed')
+  })
+  it('an error event that carries the writes so far keeps them', async () => {
+    vi.mocked(streamSymphonyAgent).mockImplementation(async (_m, h: StreamHandlers) => {
+      h.onTool?.('symphony_create_task')
+      h.onError?.('Agent failed', { state: 'unverified', writes: [{ name: 'symphony_create_task', ok: true, ids: ['t1'] }], say: 'x' })
+    })
+    const r = await runAgentTurn([])
+    expect(r.error).toBe('Agent failed')
+    expect(r.outcome.state).toBe('unverified')
+    expect(r.outcome.writes).toHaveLength(1)
+  })
+})

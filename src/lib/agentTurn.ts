@@ -8,6 +8,7 @@ import type { ChangeCardNote, ChangeSet } from '@/lib/canvas/changeCard'
 // never-leave-the-bubble-empty rule — without a second copy of the streaming
 // code drifting away from the first.
 
+import { UNKNOWN_OUTCOME, type TurnOutcome } from '@/lib/turnOutcome'
 import { streamSymphonyAgent, type AgentApiMessage, type AgentProposalItem, type AgentSourceNote, type AssistantTaskContext, type AttachmentMeta } from '@/lib/agentStream'
 
 /** Tools that mutate task/project data. When the agent uses one, the app needs
@@ -20,14 +21,17 @@ export const WRITE_TOOLS = new Set([
   'symphony_create_calendar_event',
   'symphony_update_task',
   'symphony_complete_task',
-  'symphony_delete_task',
-  'symphony_create_project',
-  'symphony_update_project',
   'symphony_create_routine',
   'symphony_update_routine',
-  'symphony_delete_routine',
   'symphony_create_note',
-  'symphony_attach_source',
+  'symphony_set_meal',
+  'symphony_create_contact',
+  'symphony_update_contact',
+  'symphony_create_list',
+  'symphony_add_list_item',
+  'symphony_check_list_item',
+  'symphony_delete_list_item',
+  'symphony_draft_email',
 ])
 
 export interface AgentTurnHandlers {
@@ -69,6 +73,9 @@ export interface AgentTurnResult {
   didWrite: boolean
   /** The raw stream failure, when there was one. */
   error: string | null
+  /** The server's verdict on what the turn did. Never absent: a stream that
+   *  failed without one is 'unverified'. */
+  outcome: TurnOutcome
 }
 
 /**
@@ -86,6 +93,7 @@ export async function runAgentTurn(
   let sources: AgentSourceNote[] | undefined
   let didWrite = false
   let streamError: string | null = null
+  let outcome: TurnOutcome | undefined
   // Set on a tool event, cleared on the next text delta. A tool call sits
   // between two text segments in the transcript (e.g. "Let me check." / tool
   // use / "Found it."); without a separator those segments run together into
@@ -110,7 +118,9 @@ export async function runAgentTurn(
         needsSeparatorBeforeNextText = true
         handlers.onTool?.(name)
       },
-      onDone: (reply, _sessionId, replySources) => {
+      onDone: (reply, _sessionId, replySources, serverOutcome) => {
+        outcome = serverOutcome
+
         // Fall back to the authoritative final reply if no text streamed.
         if (text.length === 0) {
           text = reply
@@ -121,8 +131,9 @@ export async function runAgentTurn(
           handlers.onSources?.(replySources)
         }
       },
-      onError: (message) => {
+      onError: (message, serverOutcome) => {
         streamError = message
+        if (serverOutcome) outcome = serverOutcome
         handlers.onError?.(message)
       },
       onToolResult: handlers.onToolResult,
@@ -150,5 +161,11 @@ export async function runAgentTurn(
     handlers.onFallbackText?.(text)
   }
 
-  return { text, sources, didWrite, error: streamError }
+  // No verdict from the server (an older build, or a dropped stream): a
+  // turn that used a write tool is unverified, one that did not is answered
+  // or failed. Never 'saved' on a guess.
+  const fallback: TurnOutcome = streamError
+    ? (didWrite ? UNKNOWN_OUTCOME : { state: 'failed', writes: [], say: 'Nothing saved.' })
+    : didWrite ? UNKNOWN_OUTCOME : { state: 'answered', writes: [], say: 'Nothing was changed.' }
+  return { text, sources, didWrite, error: streamError, outcome: outcome ?? fallback }
 }

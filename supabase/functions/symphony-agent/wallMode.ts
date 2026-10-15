@@ -49,7 +49,6 @@ export const WALL_READ_TOOLS: ReadonlySet<string> = new Set([
   'symphony_read_week',
   'symphony_list_tasks',
   'symphony_list_routines',
-  'symphony_list_projects',
   'symphony_list_household_members',
   'symphony_daily_summary',
   'symphony_list_events',
