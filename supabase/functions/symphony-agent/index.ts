@@ -1517,9 +1517,24 @@ Deno.serve(async (req) => {
       // whatever card is now on the page (outcome.ts).
       const writes: TurnWrite[] = []
       const shown: { proposal?: { key: string; title: string; ops: number }; suggestions?: number } = {}
+      // Content-free diagnostics (plan §11): ids, names, counts and timings,
+      // never the words. One line per turn, at the end.
+      const requestId = crypto.randomUUID()
+      const startedAt = Date.now()
+      const trace = { providerCalls: 0, providerMs: 0, tools: [] as string[], truncated: false }
+      const logTurn = (state: string, error?: string) => console.log(JSON.stringify({
+        kind: 'symphony-agent.turn', requestId, turnId: typeof turnId === 'string' ? turnId : null, surface: surface ?? 'desktop', model: MODEL,
+        providerCalls: trace.providerCalls, providerMs: trace.providerMs, totalMs: Date.now() - startedAt,
+        tools: trace.tools, writes: writes.length, writesFailed: writes.filter((w) => !w.ok).length,
+        proposed: !!shown.proposal, webTouched, truncated: trace.truncated, outcome: state, ...(error ? { error: error.slice(0, 120) } : {}),
+      }))
       try {
-        for (let turn = 0; turn < MAX_TURNS; turn++) {
+        let turn = 0
+        for (; turn < MAX_TURNS; turn++) {
+          const callStarted = Date.now()
           const res = await callAnthropic(apiKey, paidFetch, convo, webTouched, containerId, canShow, surface)
+          trace.providerCalls++
+          trace.providerMs += Date.now() - callStarted
           const { content, stop_reason } = res
           if (res.containerId) containerId = res.containerId
           const toolResults: Array<Record<string, unknown>> = []
@@ -1536,6 +1551,7 @@ Deno.serve(async (req) => {
               if (!webTouched) webTouched = true
               if (block.type === 'server_tool_use' && block.name) send({ type: 'tool', name: block.name })
             } else if (block.type === 'tool_use' && block.name) {
+              trace.tools.push(block.name)
               send({ type: 'tool', name: block.name })
               let result:string
               if (!toolAllowed(block.name, surface)) {
@@ -1631,13 +1647,25 @@ Deno.serve(async (req) => {
           if (stop_reason === 'pause_turn') continue
           break
         }
+        // The tool-loop cap is a cost bound (plan §11). Hitting it must not
+        // read as a finished answer: say so, and mark the outcome.
+        if (turn >= MAX_TURNS) {
+          trace.truncated = true
+          const note = 'I stopped before finishing; what is saved is saved, and the rest is not. Ask me to continue.'
+          finalText = finalText ? `${finalText}\n\n${note}` : note
+          send({ type: 'text', text: `\n\n${note}` })
+        }
         const seen = new Set<string>()
         const sources = sourceNotes.filter((s) => (seen.has(s.id) ? false : (seen.add(s.id), true)))
-        send({ type: 'done', reply: finalText, sessionId: null, sources, outcome: summarizeTurn(writes, shown, 'ok') })
+        const outcome = summarizeTurn(writes, shown, trace.truncated ? 'error' : 'ok')
+        send({ type: 'done', reply: finalText, sessionId: null, sources, outcome, requestId })
+        logTurn(outcome.state)
       } catch (err) {
         // The writes so far travel with the error: a turn cut off after a
         // save is 'unverified', never silently 'nothing happened'.
-        send({ type: 'error', message: err instanceof Error ? err.message : 'Agent failed', outcome: summarizeTurn(writes, shown, 'error') })
+        const outcome = summarizeTurn(writes, shown, 'error')
+        send({ type: 'error', message: err instanceof Error ? err.message : 'Agent failed', outcome, requestId })
+        logTurn(outcome.state, err instanceof Error ? err.message : 'Agent failed')
       } finally {
         controller.close()
       }
