@@ -8,7 +8,7 @@ The product and rollout authority is the [Symphony beta and market launch plan](
 
 ## Current decision
 
-**Do not expand invitations yet.** Source inspection found useful foundations, but cross-device visual/voice acceptance, separate assistant scopes, restricted display credentials, comprehensive AI budgets, and fresh-household acceptance evidence remain incomplete. The prepared changes harden retrieval and establish shared assistant instructions; they do not certify model replies, acoustic quality or the complete shared/private assistant model. No production data, schema, provider settings, or deployment has been changed by this work.
+**Do not expand invitations yet.** (Hosted release of the hardening done October 15; see that section.) Source inspection found useful foundations, but cross-device visual/voice acceptance, separate assistant scopes, restricted display credentials, comprehensive AI budgets, and fresh-household acceptance evidence remain incomplete. The prepared changes harden retrieval and establish shared assistant instructions; they do not certify model replies, acoustic quality or the complete shared/private assistant model. No production data, schema, provider settings, or deployment has been changed by this work.
 
 ## Visual and voice experience gate — B00
 
@@ -134,6 +134,17 @@ Prepared on `claude/beta-readiness-program`, October 15. Every paid route in the
 Prepared on `claude/beta-readiness-program`, October 15. Migration `20261015150000_ai_spend_ledger.sql`: `ai_model_prices` (seeded as disabled placeholders at public list rates; an operator confirms and enables each), `ai_spend` (tokens, minutes and cents per call; never words), `record_ai_usage` / `record_ai_usage_for`, and `daily_cents` / `monthly_cents` on the global configuration and each household allowance, checked by both reservation functions before every provider attempt, plus `refuse_unpriced` to forbid any model without an enabled price. `guardedAiFetch` / `guardedAiFetchFor` now name the model to the reservation and record the reply's usage (Anthropic and OpenAI shapes) or the caller's estimate: a realtime admission is charged as five minutes at the model's per-minute price, speech as characters. A call can overshoot a ceiling by at most its own cost; the next is refused. Harness: 15 local checks (pricing, unpriced rows, daily and monthly cent ceilings, unpriced-model refusal).
 
 To turn the plan's hypotheses into limits: `update ai_usage_configuration set monthly_cents = 25000` ($250/month globally), and per household `daily_cents = 300, monthly_cents = 2000` ($3/day, $20/month) — after enabling confirmed price rows. Still not covered: provider-side realtime usage beyond the admission estimate, hosted web/container tool charges, and reconciliation against the provider invoices (compare `ai_spend` sums with the dashboards monthly).
+
+## Hosted release, October 15 (Scott approved the production steps)
+
+Done on project `mwadppyrqzuzgstmwpuy`:
+
+- The 27 orphaned edge functions were deleted; 57 remain, all in the repository. No client, app or function referenced any of them (only test stubs named `symphony-agent-v2`, `symphony-agent-wall-test`, `workspace-voice-v2` as example env values).
+- The seven migrations were applied in order with `supabase db query --linked -f` (the project's migration history is not in sync with the numbered local files, so `db push` was not used) and recorded with `migration repair --status applied`; the objects were verified present afterwards. `20261014170000_discussion_with.sql` (another session's) was found not applied and left alone.
+- Allowances turned on with the plan's cent ceilings and placeholder call limits: global `daily_calls 3000, monthly_calls 40000, monthly_cents 25000`; every existing household (4) `daily_calls 400, monthly_calls 6000, daily_cents 300, monthly_cents 2000`; the seven seeded price rows enabled as placeholders (public list rates; confirm); `refuse_unpriced = false` so an unlisted model is recorded unpriced rather than refused.
+- Every repository function redeployed (57 of 57, no failures), preserving each one's existing JWT setting; the four main conversational routes answer 401 unauthenticated. The 14 functions without gateway JWT verification are the shared-secret and worker routes as before (`capture-to-inbox`, `email-scanner`, `extract-capture`, `extract-email`, `fetch-recipe`, `fetch-weather`, `inbound-email`, `kid-phone-call`, `log-medication`, `log-symptom`, `proactive-engine`, `school-digest`, `vault-capture`, `vault-sync`); `fetch-recipe`, `fetch-weather`, `log-medication` and `log-symptom` do their own checks and are not paid routes, but they remain on the list to review before invitations.
+
+Not done: **anonymous sign-ins** could not be enabled from here (the management API refused the stored CLI token); flip Authentication → Sign-in methods → Anonymous in the dashboard. Until then "Pair this display" says plainly that display sign-in is not enabled. Real-account verification (a fresh organizer, an invited adult, a paired iPad, the bench live layer) remains to be run.
 
 ## Release blockers in order
 
