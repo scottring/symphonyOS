@@ -37,7 +37,7 @@ try {
   // Unique Unix socket directory, no TCP listener, no existing database.
   execFileSync(join(bin, 'pg_ctl'), ['-D', cluster, '-l', join(root, 'server.log'), '-o', `-k ${root} -h '' -p 55449`, '-w', 'start'], { stdio: 'ignore' })
   started = true
-  sql(`create role anon; create role authenticated; create schema auth;
+  sql(`create role anon; create role authenticated; create role service_role; create schema auth;
     create table auth.users(id uuid primary key);
     create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid $$;
     create table public.households(id uuid primary key);
@@ -46,6 +46,8 @@ try {
     insert into public.households values ('${H1}'),('${H2}');
     insert into public.household_members values ('${H1}','${A}','active'),('${H1}','${B}','active'),('${H2}','${C}','active');`)
   sql(readFileSync(new URL('../supabase/migrations/20261014180000_ai_provider_call_allowances.sql', import.meta.url), 'utf8'))
+  // psql -c treats a leading "--" as the end of its options: lead with a statement.
+  sql('select 1;\n' + readFileSync(new URL('../supabase/migrations/20261015110000_ai_allowance_all_interactive_routes.sql', import.meta.url), 'utf8'))
 
   check('migration starts disabled without invented quotas', () => {
     assert.equal(reserve().allowed, false)
@@ -122,6 +124,12 @@ try {
     const denied = reserve()
     assert.equal(denied.reason, 'daily_limit')
     assert.equal(new Date(denied.retry_at).getUTCHours(), 0)
+  })
+  reset()
+  check('every interactive paid route is on the allowlist; an unknown route is refused', () => {
+    for (const route of ['meal-planner-chat', 'analyze-capture', 'planning-conversation', 'semantic-search', 'math-story']) assert.equal(reserve(A, route).allowed, true, route)
+    assert.equal(reserve(A, 'email-scanner').reason, 'unavailable')
+    assert.equal(reserve(A, 'not-a-route').reason, 'unavailable')
   })
   reset()
   check('emergency disable blocks the next reservation without resetting usage', () => {

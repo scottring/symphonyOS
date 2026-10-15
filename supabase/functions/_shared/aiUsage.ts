@@ -1,6 +1,14 @@
 /** Provider-call admission, not a token/dollar budget. No local fallback: a
  * missing migration/configuration or failed reservation means no paid call. */
-export type GuardedAiRoute = 'symphony-agent' | 'workspace-voice' | 'wall-ask' | 'wall-say'
+/** Every interactive paid route (the caller is a signed-in person). Must match
+ *  the allowlist in reserve_ai_provider_call (migration 20261015110000). */
+export const GUARDED_AI_ROUTES = [
+  'symphony-agent', 'workspace-voice', 'wall-ask', 'wall-say',
+  'analyze-attachment', 'analyze-capture', 'analyze-link', 'extract-capture', 'parse-page', 'plan-from-paper', 'routine-from-doc',
+  'goal-planning-chat', 'planning-conversation', 'tend-week', 'sharpen-goal', 'suggest-waiting-for', 'rhythms-parse',
+  'kiosk-agent', 'math-story', 'meal-planner-chat', 'meal-slot-suggest', 'semantic-search', 'note-match',
+] as const
+export type GuardedAiRoute = typeof GUARDED_AI_ROUTES[number]
 type UsageDb = { rpc: (name: string, args: { p_route: string }) => PromiseLike<{ data: unknown; error: unknown }> }
 
 export class AiUsageError extends Error {
