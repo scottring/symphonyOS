@@ -70,7 +70,7 @@ for (const [i, step] of scenario.steps.entries()) {
   for (const re of step.say_must_not ?? []) if (new RegExp(re, 'i').test(got.reply)) findings.push(`reply must not match /${re}/`)
   for (const re of step.say_must ?? []) if (!new RegExp(re, 'i').test(got.reply)) findings.push(`reply must match /${re}/`)
   if (findings.length) pass = false
-  report.steps.push({ step: i + 1, say: step.say, tools: got.tools, outcome: got.outcome?.state, reply: got.reply.slice(0, 300), findings })
+  report.steps.push({ step: i + 1, say: step.say, tools: got.tools, outcome: got.outcome?.state, reply: got.reply.slice(0, 300), card: got.changeSet ? got.changeSet.ops.map((o) => ({ op: o.op, title: o.title, date: o.date ?? null, time: o.time ?? null })) : null, findings })
   console.log(`${findings.length ? 'FAIL' : 'PASS'} step ${i + 1}: ${got.outcome?.state ?? 'no outcome'} ${findings.join('; ')}`)
 }
 mkdirSync(join(import.meta.dirname, 'reports'), { recursive: true })
