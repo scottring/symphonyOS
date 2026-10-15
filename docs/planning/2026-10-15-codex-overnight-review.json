@@ -318,12 +318,12 @@
     }
   ],
   "next": "Review new fixes when present. Original voice monthly lockout locally mitigated; keep R5 partially open for session settlement and human-kit viability. Prioritize R8 file authorization and R2 ledger authority, then R1 Undo/R7 retry correctness; R6 grader and R3/R4 remain open. Preserve approved limits and synthetic-only scope.",
-  "updated_at_utc": "2026-10-15T09:17:27.084600+00:00",
+  "updated_at_utc": "2026-10-15T09:32:01.228682+00:00",
   "reviewed_commits": [
     "0bbb3c075203c7e9978905e5af3655ff9fe43b6a",
     "7d8d29a8214e121dceb46d524769635004862e88"
   ],
-  "latest_reviewed_commit": "44a9993cb1862fd33facf91c620167e4b98b27fd",
+  "latest_reviewed_commit": "520eeeb6feedd6b4f67dc77111b84ee677c52716",
   "price_source_review": {
     "checked_at_utc": "2026-10-15T07:53:00Z",
     "anthropic_source": "https://platform.claude.com/docs/en/about-claude/pricing",
@@ -360,6 +360,12 @@
       "new_implementation_observed": true,
       "claude_acknowledgment_observed": "Voice lockout addressed by rate adjustment; no explicit responses to R1/R2/R3/R4/R6/R7/R8 observed.",
       "work": "Independent regression check of affected voice price; no prior passing tests repeated."
+    },
+    {
+      "at": "2026-10-15T09:32:01.228682+00:00",
+      "head": "520eeeb6feedd6b4f67dc77111b84ee677c52716",
+      "new_implementation_observed": true,
+      "work": "Verified voice error type/prop correction; no UI retry while prior lock restriction persists, no paid calls or hosted mutations. Other open findings unchanged."
     }
   ],
   "reviewed_scopes": [
@@ -378,6 +384,10 @@
     {
       "commit": "44a9993cb1862fd33facf91c620167e4b98b27fd",
       "scope": "Failed HTTP handshake no longer records estimate; successful voice starts now estimate two minutes; conversation strip error text added. 13 aiUsage tests independently passed. Visual/acoustic behavior unverified."
+    },
+    {
+      "commit": "520eeeb6feedd6b4f67dc77111b84ee677c52716",
+      "scope": "Voice refusal error is now included in StripVoice type and passed by ShellLayout. Independent tsc --noEmit --incremental false -p tsconfig.app.json passed; ConversationStrip tests 5/5 passed. Existing tests do not assert refusal text; hosted display and acoustic behavior remain unverified."
     }
   ]
 }

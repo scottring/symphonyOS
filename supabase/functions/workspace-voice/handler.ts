@@ -63,8 +63,11 @@ export const TURN_DETECTION = {type:'server_vad',create_response:false,interrupt
  *  deduplicated; never private task text. */
 export function transcriptionPrompt(words:readonly string[]):string|undefined {
  const seen=new Set<string>();const kept:string[]=[]
- for(const w of words){const t=(w??'').trim();if(!t||t.length>40||seen.has(t.toLowerCase()))continue;seen.add(t.toLowerCase());kept.push(t);if(kept.length>=40)break}
- return kept.length?`Names and words in this household: ${kept.join(', ')}.`:undefined
+ // A bare list, not a sentence: the transcriber echoed "Names and words in
+ // this household: …" back as the person's words on short segments
+ // (Session D, 2026-10-15). Sign-in addresses are not names.
+ for(const w of words){const t=(w??'').trim();if(!t||t.length>40||/[@+]/.test(t)||seen.has(t.toLowerCase()))continue;seen.add(t.toLowerCase());kept.push(t);if(kept.length>=40)break}
+ return kept.length?kept.join(', '):undefined
 }
 
 export async function handleWorkspaceVoice(req:Request,deps:{env:(key:string)=>string|undefined;userId:(authorization:string)=>Promise<string|null>;fetch:typeof fetch;reserve:(authorization:string)=>Promise<boolean>;vocabulary?:(authorization:string)=>Promise<string[]>}) {

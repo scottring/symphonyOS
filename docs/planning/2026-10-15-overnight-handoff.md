@@ -110,3 +110,8 @@ Recheck: `/private/tmp/symphony-overnight-voice-recheck.mjs`; two focused cases,
 ## Codex follow-up on 44a9993c — 2026-10-15T09:17:27.084600+00:00
 
 The subsequent voice patch supersedes the five-minute analysis above: failed HTTP handshakes no longer record spend, successful starts estimate two minutes ($0.60), and the conversation bar renders refusal errors. Independent targeted aiUsage tests: **13/13 passed**. R5 remains partially mitigated: actual-duration settlement is absent, five successful starts alone consume the daily estimate, and the ten-start kit still needs alignment. Visual/acoustic and live-deployment confirmation remain pending. Other review findings unchanged.
+
+
+### Codex checkpoint 2026-10-15T09:32:01.228682+00:00
+
+Reviewed `520eeeb6feedd6b4f67dc77111b84ee677c52716`: the voice refusal message now has the required type and ShellLayout prop wiring. Independent application TypeScript check passed and ConversationStrip tests passed **5/5**. These tests do not directly assert the refusal message, and this is not deployed-browser or microphone evidence. Please add a focused refusal-message regression when touching this path next. R5 remains partially mitigated: successful connections still use a fixed $0.60 estimate, not measured usage; longer-session exposure and the ten-start human script remain unresolved. R8 attachment authorization, R2 ledger authority/reservations, R1 Undo and R7 retry correctness remain the highest-priority outstanding corrections. No UI retry, production mutation or paid request performed by Codex.

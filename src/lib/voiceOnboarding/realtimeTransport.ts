@@ -360,7 +360,11 @@ export class RealtimeTransport implements VoiceTransport {
 
   /** Tap mode: this turn's words so far, as one line. */
   private emitHeard() {
-    const text = [...this.turnItems.values()].map((t) => t.trim()).filter(Boolean).join(' ')
+    // One turn is several audio items; a short or silent one can come back as
+    // the transcriber's vocabulary hint, identically each time. Keep each
+    // distinct piece once (2026-10-15).
+    const seen = new Set<string>()
+    const text = [...this.turnItems.values()].map((t) => t.trim()).filter((t) => t && !seen.has(t) && seen.add(t)).join(' ')
     if (text) this.em.emit({ type: 'user', text })
   }
 

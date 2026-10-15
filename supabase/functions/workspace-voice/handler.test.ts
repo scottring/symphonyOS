@@ -89,7 +89,7 @@ describe('household vocabulary for the transcriber',()=>{
   await handleWorkspaceVoice(request(),deps)
   const form=(deps.fetch as unknown as {mock:{calls:[[string,{body:FormData}]]}}).mock.calls[0][1].body
   const session=JSON.parse(String(form.get('session')))
-  expect(session.audio.input.transcription.prompt).toBe('Names and words in this household: Kaleb, Ella, Piano practice.')
+  expect(session.audio.input.transcription.prompt).toBe('Kaleb, Ella, Piano practice')
  })
  it('a failed vocabulary read never blocks the call',async()=>{
   const deps={...setup(),vocabulary:vi.fn(async()=>{throw new Error('down')})}
@@ -97,5 +97,8 @@ describe('household vocabulary for the transcriber',()=>{
  })
  it('transcriptionPrompt is empty with nothing to say',()=>{
   expect(transcriptionPrompt([])).toBeUndefined()
+ })
+ it('transcriptionPrompt is a bare word list without sign-in addresses, so an echo is never mistaken for speech',()=>{
+  expect(transcriptionPrompt(['Jerry Salve','Rita','smkaufman+bench-a2','a@b.c','rita'])).toBe('Jerry Salve, Rita')
  })
 })
