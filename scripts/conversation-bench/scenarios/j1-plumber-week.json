@@ -1,0 +1,89 @@
+{
+  "id": "j1-plumber-week",
+  "title": "Four things this week, one all day, with a Thursday conflict, a correction, approval, a dropped connection and Undo",
+  "surface": "desktop",
+  "page": "week",
+  "today": "2026-10-14",
+  "weekStart": "2026-10-11",
+  "start": {
+    "members": [{ "id": "m-a", "name": "Alex" }, { "id": "m-b", "name": "Blair" }],
+    "tasks": [
+      { "id": "t-dentist", "title": "Dentist for Kaleb", "scheduledFor": "2026-10-15", "updatedAt": "2026-10-10T12:00:00Z" }
+    ],
+    "events": [
+      { "id": "e-thu", "title": "Grampappa visit", "date": "2026-10-15", "allDay": true, "calendar": "family" }
+    ],
+    "routines": []
+  },
+  "steps": [
+    {
+      "say": "I need to call the plumber, pick up the Amazon order, clean the yard, and fit in an all-day test drive this week.",
+      "expect": {
+        "outcome": ["proposed"],
+        "tools": [
+          { "name": "symphony_read_week", "input": { "week_start": "2026-10-11" } },
+          { "name": "symphony_propose_changes", "input": { "title": "4 changes to your week", "week_start": "2026-10-11", "ops": [
+            { "op": "add", "title": "Call the plumber" },
+            { "op": "add", "title": "Pick up the Amazon order" },
+            { "op": "add", "title": "Clean the yard" },
+            { "op": "add", "title": "Test drive", "date": "2026-10-16" }
+          ] } }
+        ],
+        "card": { "ops": 4, "allDay": ["Test drive"] },
+        "records": { "created": [], "untouched": ["t-dentist"] }
+      },
+      "forbid": { "tools": ["symphony_create_task", "symphony_update_task"], "records": { "created": "any" } },
+      "say_must_not": ["\\bdone\\b", "\\bsaved\\b", "\\badded\\b"],
+      "note": "Nothing is saved; four adds on one card; the all-day test drive is not on Thursday (Grampappa visit) unless the person is asked first."
+    },
+    {
+      "say": "Actually, the plumber call is Friday, not whenever.",
+      "expect": {
+        "outcome": ["proposed"],
+        "tools": [
+          { "name": "symphony_propose_changes", "input": { "title": "4 changes to your week", "week_start": "2026-10-11", "ops": [
+            { "op": "add", "title": "Call the plumber", "date": "2026-10-16" },
+            { "op": "add", "title": "Pick up the Amazon order" },
+            { "op": "add", "title": "Clean the yard" },
+            { "op": "add", "title": "Test drive", "date": "2026-10-17" }
+          ] } }
+        ],
+        "card": { "ops": 4 },
+        "records": { "created": [], "untouched": ["t-dentist"] }
+      },
+      "forbid": { "tools": ["symphony_create_task"], "records": { "created": "any" } },
+      "note": "The correction revises the card: still four ops, one plumber call, now dated. No second plumber task."
+    },
+    {
+      "action": "approve",
+      "expect": {
+        "outcome": ["saved"],
+        "records": { "created": ["Call the plumber", "Pick up the Amazon order", "Clean the yard", "Test drive"], "dated": { "Call the plumber": "2026-10-16" }, "untouched": ["t-dentist"] }
+      },
+      "note": "One Approve saves the four; Undo is offered for the set."
+    },
+    {
+      "say": "Add buy mulch for the yard on Saturday.",
+      "connection": "drop-after-commit",
+      "expect": {
+        "outcome": ["unverified", "saved"],
+        "tools": [{ "name": "symphony_create_task", "input": { "title": "Buy mulch", "scheduled_for": "2026-10-17" } }],
+        "records": { "created": ["Buy mulch"], "count": { "Buy mulch": 1 } }
+      },
+      "forbid": { "records": { "duplicateTitles": true } },
+      "note": "The stream drops after the row commits. The retry reuses the turn id; exactly one 'Buy mulch' exists; the first reply never claims saved."
+    },
+    {
+      "action": "retry",
+      "expect": { "outcome": ["saved"], "records": { "count": { "Buy mulch": 1 } } }
+    },
+    {
+      "action": "undo-set",
+      "expect": {
+        "outcome": ["saved"],
+        "records": { "absent": ["Call the plumber", "Pick up the Amazon order", "Clean the yard", "Test drive"], "present": ["Buy mulch"], "untouched": ["t-dentist"] }
+      },
+      "note": "Undo of the approved set removes those four and nothing else."
+    }
+  ]
+}

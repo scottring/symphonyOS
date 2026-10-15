@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { act, render, screen, waitFor } from '@testing-library/react'
 import { useEffect, useState } from 'react'
-import { CanvasActivityProvider, useCanvasActivity, type CanvasActivity, type CanvasActivityProviderProps } from './CanvasActivityContext'
+import { CanvasActivityProvider, readPendingCard, useCanvasActivity, type CanvasActivity, type CanvasActivityProviderProps } from './CanvasActivityContext'
 import type { Task } from '@/types/task'
 
 const t0 = new Date('2026-10-10T08:00:00Z')
@@ -319,5 +319,40 @@ describe('change sets', () => {
     act(() => activity().setPointing({ dates: ['2026-10-19'], taskIds: [] }))
     act(() => activity().turnStarted('Thursday', false))
     expect(activity().pointing).toBeNull()
+  })
+})
+
+describe('a waiting card survives a reload (plan §4)', () => {
+  function mountFor(persistKey: string, applyChanges?: CanvasActivityProviderProps['applyChanges']) {
+    let latest: CanvasActivity | null = null
+    render(
+      <CanvasActivityProvider snapshot={{ tasks: [], goals: [] }} writers={{ deleteTask: vi.fn(), updateTask: vi.fn(), deleteGoal: vi.fn(), updateGoal: vi.fn() }} refetch={vi.fn()} applyChanges={applyChanges} persistKey={persistKey}>
+        <Probe onReady={(a) => { latest = a }} />
+      </CanvasActivityProvider>,
+    )
+    return { activity: () => latest! }
+  }
+  const card = (key: string) => ({ key, title: '1 change', ops: [{ key: `${key}:0`, op: 'place' as const, taskId: 'a', title: 'Paper mail', date: '2026-10-15' }] })
+
+  it('is kept per person in session storage while proposed, and cleared once approved or dismissed', async () => {
+    sessionStorage.clear()
+    const applyChanges = vi.fn(async () => ({ ok: true as const, ids: ['a'], undo: vi.fn(async () => true) }))
+    const first = mountFor('user-1', applyChanges)
+    act(() => first.activity().setChangeSet(card('s1')))
+    expect(readPendingCard('user-1')?.key).toBe('s1')
+    expect(readPendingCard('user-2')).toBeNull()
+    // A fresh mount for the same person starts with the card still waiting.
+    const again = mountFor('user-1', applyChanges)
+    expect(again.activity().changeSet).toMatchObject({ key: 's1', state: 'proposed' })
+    act(() => again.activity().dismissChangeSet())
+    expect(readPendingCard('user-1')).toBeNull()
+    act(() => first.activity().setChangeSet(card('s2')))
+    expect(readPendingCard('user-1')?.key).toBe('s2')
+    await act(async () => { await first.activity().approveChangeSet() })
+    expect(readPendingCard('user-1')).toBeNull()
+  })
+  it('ignores a malformed stored card', () => {
+    sessionStorage.setItem('symphony.pendingCard.user-3', '{"key":"x"}')
+    expect(readPendingCard('user-3')).toBeNull()
   })
 })

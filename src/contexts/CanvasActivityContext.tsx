@@ -52,6 +52,25 @@ export interface PendingChangeSet extends ChangeSet {
   replaced?: boolean
 }
 
+const PENDING_CARD_KEY = (who: string) => `symphony.pendingCard.${who}`
+/** The card this tab had waiting for this person, if any. Shape-checked; a
+ *  stale `seen` stamp still makes Approve refuse it if the rows moved. */
+export function readPendingCard(who: string): PendingChangeSet | null {
+  try {
+    const raw = sessionStorage.getItem(PENDING_CARD_KEY(who))
+    if (!raw) return null
+    const v = JSON.parse(raw) as Partial<PendingChangeSet>
+    if (!v || typeof v.key !== 'string' || !Array.isArray(v.ops) || !v.ops.length || typeof v.title !== 'string') return null
+    return { ...(v as ChangeSet), state: 'proposed' }
+  } catch { return null }
+}
+export function writePendingCard(who: string, card: PendingChangeSet | null): void {
+  try {
+    if (card) sessionStorage.setItem(PENDING_CARD_KEY(who), JSON.stringify({ key: card.key, title: card.title, ops: card.ops, ...(card.weekStart ? { weekStart: card.weekStart } : {}) }))
+    else sessionStorage.removeItem(PENDING_CARD_KEY(who))
+  } catch { /* private mode / blocked site data: the card lives in memory only */ }
+}
+
 export interface CanvasWriters {
   deleteTask: (id: string) => Promise<unknown>
   updateTask: (id: string, updates: Partial<Task>) => Promise<unknown>
@@ -117,6 +136,10 @@ const ARRIVED_MS = 6000
 const SETTLE_MS = 2500
 
 export interface CanvasActivityProviderProps {
+  /** Who is signed in. A card still waiting is kept in this tab's session
+   *  storage under it, so an ordinary reload does not lose the proposal
+   *  (plan §4). Keyed by person: another sign-in never inherits it. */
+  persistKey?: string
   children: ReactNode
   snapshot: Snapshot
   writers: CanvasWriters
@@ -127,7 +150,7 @@ export interface CanvasActivityProviderProps {
   applyChanges?: (set: ChangeSet) => Promise<ApplyResult>
 }
 
-export function CanvasActivityProvider({ children, snapshot, writers, refetch, retryTurn, applyChanges }: CanvasActivityProviderProps) {
+export function CanvasActivityProvider({ children, snapshot, writers, refetch, retryTurn, applyChanges, persistKey }: CanvasActivityProviderProps) {
   const [receipt, setReceipt] = useState<CanvasReceipt | null>(null)
   const [arrived, setArrived] = useState<Map<string, number>>(new Map())
   const [arrivedVersion, setArrivedVersion] = useState(0)
@@ -311,9 +334,11 @@ export function CanvasActivityProvider({ children, snapshot, writers, refetch, r
   }, [])
   const removeProposal = useCallback((key: string) => setProposals((prev) => prev.filter((p) => p.key !== key)), [])
 
-  const [changeSet, setPending] = useState<PendingChangeSet | null>(null)
+  const [changeSet, setPending] = useState<PendingChangeSet | null>(() => persistKey ? readPendingCard(persistKey) : null)
   const pendingRef = useRef<PendingChangeSet | null>(null)
   useLayoutEffect(() => { pendingRef.current = changeSet }, [changeSet])
+  // Only a card still waiting survives a reload; saving/failed states do not.
+  useEffect(() => { if (persistKey) writePendingCard(persistKey, changeSet?.state === 'proposed' ? changeSet : null) }, [persistKey, changeSet])
   // What became of the last card, until a turn has been told.
   const cardNoteRef = useRef<ChangeCardNote | null>(null)
   const setChangeSet = useCallback((set: ChangeSet) => {

@@ -434,7 +434,7 @@ function ShellLayoutInner({ children }: Props) {
   const openConversation = () => { if (isMobile) setPhoneChatOpen(true); else showPane('ai'); };
 
   return (
-    <CanvasActivityProvider snapshot={canvasSnapshot} writers={canvasWriters} refetch={canvasRefetch} applyChanges={applyChanges} retryTurn={() => { void assistant.retryLast(); }}>
+    <CanvasActivityProvider snapshot={canvasSnapshot} writers={canvasWriters} refetch={canvasRefetch} applyChanges={applyChanges} persistKey={user?.id} retryTurn={() => { void assistant.retryLast(); }}>
     <PageHelpContext.Provider value={pageHelp}>
     <CanvasBridge onActivity={setCanvasActivity} />
     <DesktopControlsContext.Provider value={desktopControls}>

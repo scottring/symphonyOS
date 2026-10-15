@@ -19,6 +19,7 @@ export default defineConfig({
       'vite/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts}',
       'supabase/functions/**/*.{test,spec}.{ts,mts,cts}',
       'connectors/src/**/*.{test,spec}.{ts,mts,cts}',
+      'scripts/conversation-bench/**/*.{test,spec}.{ts,mts,cts}',
     ],
     coverage: {
       provider: 'v8',
